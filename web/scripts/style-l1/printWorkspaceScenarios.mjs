@@ -53,9 +53,7 @@ export function createPrintWorkspaceScenarios({
       .evaluate((element) => {
         const before = element.getBoundingClientRect()
         element.focus()
-        const cell = element.parentElement?.matches('td, th')
-          ? element.parentElement
-          : null
+        const cell = element.closest('td, th')
         const group = element.closest('[data-print-focus-group]')
         const frame = group || cell || element
         const frameStyle = getComputedStyle(frame)
@@ -122,6 +120,12 @@ export function createPrintWorkspaceScenarios({
           background: frameStyle.backgroundColor,
           wholeCell: Boolean(cell),
           grouped: Boolean(group),
+          frameIsEditable: frame === element,
+          cellFrameOutset:
+            cell && frame === cell
+              ? Number.parseFloat(frameStyle.outlineOffset) +
+                Number.parseFloat(frameStyle.outlineWidth)
+              : null,
           innerOutlineStyle: getComputedStyle(element).outlineStyle,
           widthChange: after.width - before.width,
           heightChange: after.height - before.height,
@@ -136,12 +140,16 @@ export function createPrintWorkspaceScenarios({
         metrics.outlineColor === 'rgba(47, 143, 75, 0.82)' &&
         metrics.background === 'rgba(47, 143, 75, 0.08)' &&
         (!(metrics.wholeCell || metrics.grouped) ||
+          metrics.frameIsEditable ||
           metrics.innerOutlineStyle === 'none') &&
+        (metrics.cellFrameOutset === null ||
+          metrics.cellFrameOutset <= -0.99) &&
         Math.abs(metrics.widthChange) < 0.5 &&
         Math.abs(metrics.heightChange) < 0.5,
       `${scenarioLabel} 焦点应显示单一绿色虚线框，表格覆盖整格，聚焦不改变纸面尺寸: ${JSON.stringify(metrics)}`
     )
-    const minimum = metrics.wholeCell ? 0.75 : 1.75
+    // 单元格内框与固定纸面文字至少留半像素净空；独立字段继续向外留白。
+    const minimum = metrics.wholeCell ? 0.49 : 1.75
     assert(
       [metrics.textClearance, metrics.caretClearance].every(
         (gaps) => !gaps || Object.values(gaps).every((gap) => gap >= minimum)
@@ -173,9 +181,8 @@ export function createPrintWorkspaceScenarios({
     const metrics = await second.evaluate((element) => {
       const frame =
         element.closest('[data-print-focus-group]') ||
-        (element.parentElement?.matches('td, th')
-          ? element.parentElement
-          : element)
+        element.closest('td, th') ||
+        element
       const style = window.getComputedStyle(frame)
       return {
         activeElementMatches: document.activeElement === element,
@@ -1741,7 +1748,7 @@ export function createPrintWorkspaceScenarios({
                   {
                     index,
                     text: element.textContent,
-                    cell: parent.matches('td, th'),
+                    cell: Boolean(element.closest('td, th')),
                   },
                 ]
               })

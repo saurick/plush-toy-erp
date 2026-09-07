@@ -865,14 +865,20 @@
       var(--erp-print-focus-background);
   }
 
-  .erp-print-shell__stage :is(td, th):has(> [contenteditable='true']:focus) {
+  .erp-print-shell__stage
+    :is(td, th):has([contenteditable='true']:focus):where(
+      :not(:has(:is(td, th):focus-within))
+    ),
+  .erp-print-shell__stage :is(td, th)[contenteditable='true']:focus {
     outline: 1px dashed var(--erp-print-focus-color);
-    outline-offset: 0;
+    outline-offset: -2px;
     background: var(--erp-print-focus-background);
     box-shadow: none;
   }
 
-  .erp-print-shell__stage :is(td, th) > [contenteditable='true']:focus {
+  .erp-print-shell__stage
+    :is(td, th)
+    [contenteditable='true']:not(td, th):focus {
     outline: none;
     background: transparent;
     box-shadow: none;

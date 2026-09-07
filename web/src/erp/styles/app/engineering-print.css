@@ -1237,6 +1237,12 @@
   padding: 0.8mm 1mm;
 }
 
+@media screen {
+  .erp-color-card-paper__side td > .erp-engineering-print-editable {
+    padding-block: 1.2mm;
+  }
+}
+
 .erp-engineering-print-meta-grid > div > .erp-engineering-print-editable {
   display: flex;
   align-items: center;
