@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import {
+  PrintToolButton,
+  PrintImageSlotTool,
+} from '../components/print/PrintWorkspaceTools.jsx'
 import usePrintWorkspaceFeedback from '../utils/usePrintWorkspaceFeedback.js'
 import { getPrintOutputProblem } from '../utils/printOutputPreflight.mjs'
 import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
@@ -369,8 +373,6 @@ export default function EngineeringPrintWorkspacePage() {
   const paperRef = useRef(null)
   const stageWrapRef = useRef(null)
   const pdfPreviewPreloadRef = useRef(null)
-  const materialImageInputRefs = useRef({})
-  const workInstructionHeaderImageInputRefs = useRef({})
   const instructionRowImageInputRefs = useRef({})
   const [pdfAction, setPdfAction] = useState('')
   const [pdfActionStartedAt, setPdfActionStartedAt] = useState(0)
@@ -949,16 +951,6 @@ export default function EngineeringPrintWorkspacePage() {
     reportFeedback('images', '已移除图片。')
   }
 
-  const handleMaterialImageUploadClick = (slotKey) => {
-    materialImageInputRefs.current[slotKey]?.click()
-  }
-
-  const handleMaterialImageFileChange = (slotKey, event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (file) uploadImage(slotKey, file)
-  }
-
   const handleInstructionRowImageUploadClick = (target) => {
     const normalizedTarget = normalizeInstructionRowTarget(target)
     if (!normalizedTarget) return
@@ -1325,141 +1317,32 @@ export default function EngineeringPrintWorkspacePage() {
     )
   }
 
-  const materialImageUploadBar =
-    templateKey === MATERIAL_DETAIL_TEMPLATE_KEY ? (
-      <section className="erp-processing-contract-upload-bar">
-        <div className="erp-processing-contract-upload-bar__copy">
-          物料明细右上两张产品图通过这里上传，会同步到右侧打印纸面。
-        </div>
-        <div className="erp-processing-contract-upload-bar__actions">
-          {engineeringImageSlots.materialDetail.map((slot) => {
-            const snapshot = draft.images?.[slot.key]
-            const hasImage = Boolean(snapshot?.dataURL)
-            return (
-              <div
-                className="erp-processing-contract-upload-bar__item"
-                key={slot.key}
-              >
-                <input
-                  ref={(node) => {
-                    materialImageInputRefs.current[slot.key] = node
-                  }}
-                  className="erp-processing-contract-upload-bar__input"
-                  type="file"
-                  accept={ATTACHMENT_ACCEPT}
-                  onChange={(event) =>
-                    handleMaterialImageFileChange(slot.key, event)
-                  }
-                />
-                <button
-                  type="button"
-                  className={getToolbarButtonClassName({ active: hasImage })}
-                  onClick={() => handleMaterialImageUploadClick(slot.key)}
-                  title={
-                    hasImage
-                      ? `${slot.label}：${snapshot.name}`
-                      : `上传${slot.label}`
-                  }
-                >
-                  上传{slot.label}
-                </button>
-                {hasImage ? (
-                  <button
-                    type="button"
-                    className={getToolbarButtonClassName()}
-                    onClick={() => clearImage(slot.key)}
-                  >
-                    清空
-                  </button>
-                ) : null}
-                <span
-                  className="erp-processing-contract-upload-bar__status"
-                  title={snapshot?.name || slot.label}
-                >
-                  {hasImage ? `已同步：${snapshot.name}` : '未上传'}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-    ) : null
-
-  const workInstructionHeaderImageUploadBar =
-    templateKey === WORK_INSTRUCTION_TEMPLATE_KEY ? (
-      <section className="erp-processing-contract-upload-bar">
-        <div className="erp-processing-contract-upload-bar__copy">
-          作业指导书右上 1–2 张产品图通过这里上传，会同步到右侧打印纸面。
-        </div>
-        <div className="erp-processing-contract-upload-bar__actions">
-          {engineeringImageSlots.workInstruction.map((slot) => {
-            const snapshot = draft.images?.[slot.key]
-            const hasImage = Boolean(snapshot?.dataURL)
-            return (
-              <div
-                className="erp-processing-contract-upload-bar__item"
-                key={slot.key}
-              >
-                <input
-                  ref={(node) => {
-                    workInstructionHeaderImageInputRefs.current[slot.key] = node
-                  }}
-                  className="erp-processing-contract-upload-bar__input"
-                  type="file"
-                  accept={ATTACHMENT_ACCEPT}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    event.target.value = ''
-                    if (file) uploadInstructionImage(slot.key, file)
-                  }}
-                />
-                <button
-                  type="button"
-                  className={getToolbarButtonClassName({ active: hasImage })}
-                  onClick={() =>
-                    workInstructionHeaderImageInputRefs.current[
-                      slot.key
-                    ]?.click()
-                  }
-                  title={
-                    hasImage
-                      ? `${slot.label}：${snapshot.name}`
-                      : `上传${slot.label}`
-                  }
-                >
-                  上传{slot.label}
-                </button>
-                {hasImage ? (
-                  <button
-                    type="button"
-                    className={getToolbarButtonClassName()}
-                    onClick={() => clearInstructionImage(slot.key)}
-                  >
-                    清空
-                  </button>
-                ) : null}
-                <span
-                  className="erp-processing-contract-upload-bar__status"
-                  title={snapshot?.name || slot.label}
-                >
-                  {hasImage ? `已同步：${snapshot.name}` : '未上传'}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-    ) : null
-
-  const panelActions = (
-    <div className="erp-print-panel-action-stack">
-      {materialImageUploadBar || workInstructionHeaderImageUploadBar}
-      <PrintAppendixImageManager
-        images={draft.appendixImages}
-        onImagesChange={handleAppendixImagesChange}
-        onStatusChange={(text, tone) => reportFeedback('images', text, tone)}
-      />
+  const productImageSlots =
+    templateKey === MATERIAL_DETAIL_TEMPLATE_KEY
+      ? engineeringImageSlots.materialDetail
+      : templateKey === WORK_INSTRUCTION_TEMPLATE_KEY
+        ? engineeringImageSlots.workInstruction
+        : []
+  const panelActions = productImageSlots.length ? (
+    <div className="erp-print-image-tools">
+      {productImageSlots.map((slot) => (
+        <PrintImageSlotTool
+          key={slot.key}
+          label={slot.label}
+          image={draft.images?.[slot.key]}
+          accept={ATTACHMENT_ACCEPT}
+          onUpload={(file) => uploadImage(slot.key, file)}
+          onClear={() => clearImage(slot.key)}
+        />
+      ))}
     </div>
+  ) : null
+  const appendixActions = (
+    <PrintAppendixImageManager
+      images={draft.appendixImages}
+      onImagesChange={handleAppendixImagesChange}
+      onStatusChange={(text, tone) => reportFeedback('appendix', text, tone)}
+    />
   )
 
   const warmupPreviewPDF = () => {
@@ -1637,35 +1520,42 @@ export default function EngineeringPrintWorkspacePage() {
         <>
           <PrintWorkspaceToolSection
             title="明细行"
+            tool="rows"
             feedback={feedback?.area === 'rows' ? feedback : null}
           >
             <div className="erp-print-shell__toolbar-group">
-              <button
+              <PrintToolButton
+                icon="select"
+                wide
                 type="button"
                 className={getToolbarButtonClassName({
                   active: materialLineSelectionMode,
                 })}
                 onClick={toggleMaterialLineSelectionMode}
               >
-                {materialLineSelectionMode ? '取消选择' : '选择明细行'}
-              </button>
-              <button
+                {materialLineSelectionMode ? '返回编辑' : '选择明细行'}
+              </PrintToolButton>
+              <PrintToolButton
+                icon="up"
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={selectedMaterialLineIndex === null}
                 onClick={() => applyMaterialLineAction('insert', 'before')}
               >
                 上插一行
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="down"
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={selectedMaterialLineIndex === null}
                 onClick={() => applyMaterialLineAction('insert', 'after')}
               >
                 下插一行
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="remove"
+                wide
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={
@@ -1674,7 +1564,7 @@ export default function EngineeringPrintWorkspacePage() {
                 onClick={() => applyMaterialLineAction('remove')}
               >
                 移除当前行
-              </button>
+              </PrintToolButton>
               <span className="erp-print-shell__counter">
                 物料行: {draft.lines.length}/
                 {ENGINEERING_PRINT_LIMITS.materialRows}
@@ -1683,34 +1573,39 @@ export default function EngineeringPrintWorkspacePage() {
           </PrintWorkspaceToolSection>
           <PrintWorkspaceToolSection
             title="单元格"
+            tool="cells"
             feedback={feedback?.area === 'cells' ? feedback : null}
           >
             <div className="erp-print-shell__toolbar-group">
-              <button
+              <PrintToolButton
+                icon="cells"
+                wide
                 type="button"
                 className={getToolbarButtonClassName({
                   active: materialCellSelectionMode,
                 })}
                 onClick={toggleMaterialCellSelectionMode}
               >
-                {materialCellSelectionMode ? '取消选区' : '选择单元格'}
-              </button>
-              <button
+                {materialCellSelectionMode ? '返回编辑' : '选择单元格'}
+              </PrintToolButton>
+              <PrintToolButton
+                icon="merge"
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={!canApplyMaterialMerge}
                 onClick={applyMaterialMerge}
               >
                 合并选区
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="split"
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={!canSplitMaterialMerge}
                 onClick={splitMaterialMerge}
               >
                 拆分当前
-              </button>
+              </PrintToolButton>
             </div>
           </PrintWorkspaceToolSection>
         </>
@@ -1722,35 +1617,42 @@ export default function EngineeringPrintWorkspacePage() {
         <>
           <PrintWorkspaceToolSection
             title="色卡块"
+            tool="blocks"
             feedback={feedback?.area === 'blocks' ? feedback : null}
           >
             <div className="erp-print-shell__toolbar-group">
-              <button
+              <PrintToolButton
+                icon="select"
+                wide
                 type="button"
                 className={getToolbarButtonClassName({
                   active: colorBlockSelectionMode,
                 })}
                 onClick={toggleColorBlockSelectionMode}
               >
-                {colorBlockSelectionMode ? '取消选择' : '选择色卡块'}
-              </button>
-              <button
+                {colorBlockSelectionMode ? '返回编辑' : '选择色卡块'}
+              </PrintToolButton>
+              <PrintToolButton
+                icon="up"
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={selectedColorBlockIndex === null}
                 onClick={() => applyColorBlockAction('insert', 'before')}
               >
                 上插色卡块
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="down"
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={selectedColorBlockIndex === null}
                 onClick={() => applyColorBlockAction('insert', 'after')}
               >
                 下插色卡块
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="remove"
+                wide
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={
@@ -1759,7 +1661,7 @@ export default function EngineeringPrintWorkspacePage() {
                 onClick={() => applyColorBlockAction('remove')}
               >
                 移除当前块
-              </button>
+              </PrintToolButton>
               <span className="erp-print-shell__counter">
                 色卡块: {draft.blocks.length}/
                 {ENGINEERING_PRINT_LIMITS.colorBlocks}
@@ -1768,35 +1670,42 @@ export default function EngineeringPrintWorkspacePage() {
           </PrintWorkspaceToolSection>
           <PrintWorkspaceToolSection
             title="明细行"
+            tool="rows"
             feedback={feedback?.area === 'rows' ? feedback : null}
           >
             <div className="erp-print-shell__toolbar-group">
-              <button
+              <PrintToolButton
+                icon="select"
+                wide
                 type="button"
                 className={getToolbarButtonClassName({
                   active: colorLineSelectionMode,
                 })}
                 onClick={toggleColorLineSelectionMode}
               >
-                {colorLineSelectionMode ? '取消选择' : '选择色卡行'}
-              </button>
-              <button
+                {colorLineSelectionMode ? '返回编辑' : '选择色卡行'}
+              </PrintToolButton>
+              <PrintToolButton
+                icon="up"
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={!selectedColorLine}
                 onClick={() => applyColorLineAction('insert', 'before')}
               >
                 上插一行
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="down"
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={!selectedColorLine}
                 onClick={() => applyColorLineAction('insert', 'after')}
               >
                 下插一行
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="remove"
+                wide
                 type="button"
                 className={getToolbarButtonClassName()}
                 disabled={
@@ -1805,7 +1714,7 @@ export default function EngineeringPrintWorkspacePage() {
                 onClick={() => applyColorLineAction('remove')}
               >
                 移除当前行
-              </button>
+              </PrintToolButton>
             </div>
           </PrintWorkspaceToolSection>
         </>
@@ -1815,19 +1724,23 @@ export default function EngineeringPrintWorkspacePage() {
     return (
       <PrintWorkspaceToolSection
         title="明细行"
+        tool="rows"
         feedback={feedback?.area === 'rows' ? feedback : null}
       >
         <div className="erp-print-shell__toolbar-group">
-          <button
+          <PrintToolButton
+            icon="select"
+            wide
             type="button"
             className={getToolbarButtonClassName({
               active: instructionRowSelectionMode,
             })}
             onClick={toggleInstructionRowSelectionMode}
           >
-            {instructionRowSelectionMode ? '取消选择' : '选择行'}
-          </button>
-          <button
+            {instructionRowSelectionMode ? '返回编辑' : '选择行'}
+          </PrintToolButton>
+          <PrintToolButton
+            icon="up"
             type="button"
             className={getToolbarButtonClassName()}
             disabled={selectedWorkInstructionRowTarget === null}
@@ -1836,8 +1749,9 @@ export default function EngineeringPrintWorkspacePage() {
             }
           >
             上插一行
-          </button>
-          <button
+          </PrintToolButton>
+          <PrintToolButton
+            icon="down"
             type="button"
             className={getToolbarButtonClassName()}
             disabled={selectedWorkInstructionRowTarget === null}
@@ -1846,8 +1760,10 @@ export default function EngineeringPrintWorkspacePage() {
             }
           >
             下插一行
-          </button>
-          <button
+          </PrintToolButton>
+          <PrintToolButton
+            icon="remove"
+            wide
             type="button"
             className={getToolbarButtonClassName()}
             disabled={
@@ -1857,77 +1773,92 @@ export default function EngineeringPrintWorkspacePage() {
             onClick={() => applySelectedWorkInstructionRowAction('remove')}
           >
             移除当前行
-          </button>
-          {[
-            [WORK_INSTRUCTION_ROW_TYPES.title, '设为标题行'],
-            [WORK_INSTRUCTION_ROW_TYPES.step, '设为编号行'],
-            [WORK_INSTRUCTION_ROW_TYPES.text, '设为文本行'],
-          ].map(([type, label]) => (
-            <button
-              type="button"
-              className={getToolbarButtonClassName({
-                active:
-                  getWorkInstructionRowType(selectedInstructionRow) === type,
-              })}
-              disabled={selectedWorkInstructionRowTarget === null}
-              key={type}
-              onClick={() => applyInstructionRowType(type)}
-            >
-              {label}
-            </button>
-          ))}
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            disabled={
-              selectedWorkInstructionRowTarget === null ||
-              !selectedInstructionRowIsStep ||
-              selectedInstructionRowImages.length >=
-                ENGINEERING_PRINT_LIMITS.instructionRowImages
-            }
-            title={
-              selectedInstructionRowImages.length >=
-              ENGINEERING_PRINT_LIMITS.instructionRowImages
-                ? `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片`
-                : undefined
-            }
-            onClick={() =>
-              handleInstructionRowImageUploadClick(
-                selectedWorkInstructionRowTarget
-              )
-            }
-          >
-            给当前行加图
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            disabled={
-              selectedWorkInstructionRowTarget === null ||
-              !selectedInstructionRowIsStep ||
-              selectedInstructionRowImages.length === 0
-            }
-            onClick={() =>
-              clearInstructionRowImages(selectedWorkInstructionRowTarget)
-            }
-          >
-            清空当前行图片
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            data-open-work-instruction-annotation-editor
-            disabled={
-              selectedWorkInstructionRowTarget === null ||
-              !selectedInstructionRowIsStep ||
-              selectedInstructionRowImages.length === 0
-            }
-            onClick={() =>
-              openInstructionAnnotationEditor(selectedWorkInstructionRowTarget)
-            }
-          >
-            标注当前行图片
-          </button>
+          </PrintToolButton>
+          {selectedInstructionRow ? (
+            <>
+              {[
+                [WORK_INSTRUCTION_ROW_TYPES.title, '设为标题行'],
+                [WORK_INSTRUCTION_ROW_TYPES.step, '设为编号行'],
+                [WORK_INSTRUCTION_ROW_TYPES.text, '设为文本行'],
+              ].map(([type, label]) => (
+                <PrintToolButton
+                  icon="text"
+                  wide
+                  type="button"
+                  className={getToolbarButtonClassName({
+                    active:
+                      getWorkInstructionRowType(selectedInstructionRow) ===
+                      type,
+                  })}
+                  disabled={selectedWorkInstructionRowTarget === null}
+                  key={type}
+                  onClick={() => applyInstructionRowType(type)}
+                >
+                  {label}
+                </PrintToolButton>
+              ))}
+              <PrintToolButton
+                icon="image"
+                wide
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={
+                  selectedWorkInstructionRowTarget === null ||
+                  !selectedInstructionRowIsStep ||
+                  selectedInstructionRowImages.length >=
+                    ENGINEERING_PRINT_LIMITS.instructionRowImages
+                }
+                title={
+                  selectedInstructionRowImages.length >=
+                  ENGINEERING_PRINT_LIMITS.instructionRowImages
+                    ? `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片`
+                    : undefined
+                }
+                onClick={() =>
+                  handleInstructionRowImageUploadClick(
+                    selectedWorkInstructionRowTarget
+                  )
+                }
+              >
+                给当前行加图
+              </PrintToolButton>
+              <PrintToolButton
+                icon="remove"
+                wide
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={
+                  selectedWorkInstructionRowTarget === null ||
+                  !selectedInstructionRowIsStep ||
+                  selectedInstructionRowImages.length === 0
+                }
+                onClick={() =>
+                  clearInstructionRowImages(selectedWorkInstructionRowTarget)
+                }
+              >
+                清空当前行图片
+              </PrintToolButton>
+              <PrintToolButton
+                icon="note"
+                wide
+                type="button"
+                className={getToolbarButtonClassName()}
+                data-open-work-instruction-annotation-editor
+                disabled={
+                  selectedWorkInstructionRowTarget === null ||
+                  !selectedInstructionRowIsStep ||
+                  selectedInstructionRowImages.length === 0
+                }
+                onClick={() =>
+                  openInstructionAnnotationEditor(
+                    selectedWorkInstructionRowTarget
+                  )
+                }
+              >
+                标注当前行图片
+              </PrintToolButton>
+            </>
+          ) : null}
           <span className="erp-print-shell__counter">
             正文行: {draft.rows.length}
             {Array.isArray(draft.continuationPages) &&
@@ -1941,13 +1872,37 @@ export default function EngineeringPrintWorkspacePage() {
             /{ENGINEERING_PRINT_LIMITS.instructionRows}/页
           </span>
         </div>
+        {selectedInstructionRowIsStep && selectedInstructionRowImages.length ? (
+          <div className="erp-print-image-tools" aria-label="当前行图片">
+            {selectedInstructionRowImages.map((image, index) => (
+              <PrintImageSlotTool
+                key={image.id || index}
+                label={`当前行图片 ${index + 1}`}
+                image={image}
+                accept={ATTACHMENT_ACCEPT}
+                onUpload={(file) =>
+                  uploadInstructionImage(
+                    selectedWorkInstructionRowTarget,
+                    file,
+                    index
+                  )
+                }
+                onClear={() =>
+                  clearInstructionImage(selectedWorkInstructionRowTarget, index)
+                }
+              />
+            ))}
+          </div>
+        ) : null}
       </PrintWorkspaceToolSection>
     )
   })()
 
   const richTextToolbarActions = (
     <div className="erp-print-shell__toolbar-group">
-      <button
+      <PrintToolButton
+        icon="text"
+        wide
         type="button"
         className={getToolbarButtonClassName()}
         onMouseDown={(event) => {
@@ -1956,26 +1911,30 @@ export default function EngineeringPrintWorkspacePage() {
         }}
       >
         文字标红/取消
-      </button>
+      </PrintToolButton>
     </div>
   )
 
   const draftActions = (
     <div className="erp-print-shell__toolbar-group">
-      <button
+      <PrintToolButton
+        icon="reset"
+        wide
         type="button"
         className={getToolbarButtonClassName()}
         onClick={handleResetDraft}
       >
         恢复样例
-      </button>
-      <button
+      </PrintToolButton>
+      <PrintToolButton
+        icon="blank"
+        wide
         type="button"
         className={getToolbarButtonClassName()}
         onClick={handleBlankDraft}
       >
         空白模板
-      </button>
+      </PrintToolButton>
     </div>
   )
   const toolbarActions = (
@@ -2079,6 +2038,8 @@ export default function EngineeringPrintWorkspacePage() {
         onRetrySave={flushDraft}
         workspaceClassName="erp-engineering-print-workspace-shell"
         panelActions={panelActions}
+        appendixActions={appendixActions}
+        appendixCount={draft.appendixImages?.length || 0}
         toolbarActions={toolbarActions}
         editorActions={templateEditorActions}
         formatActions={richTextToolbarActions}

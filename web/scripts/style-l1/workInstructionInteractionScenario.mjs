@@ -405,12 +405,12 @@ async function verifyWorkInstructionHeaderImages({
   let workInstructionHeaderImageState = await page.evaluate(() => ({
     uploadBarInPanel: Boolean(
       document
-        .querySelector('.erp-processing-contract-upload-bar')
+        .querySelector('.erp-print-image-tools')
         ?.closest('.erp-print-shell__record-panel')
     ),
     uploadBarInStage: Boolean(
       document
-        .querySelector('.erp-processing-contract-upload-bar')
+        .querySelector('.erp-print-image-tools')
         ?.closest('.erp-print-shell__stage')
     ),
     headerImageActionCount: document.querySelectorAll(
@@ -455,11 +455,11 @@ async function verifyWorkInstructionHeaderImages({
   )
 
   await page
-    .locator('.erp-processing-contract-upload-bar__input')
+    .locator('.erp-print-image-tools input[type="file"]')
     .first()
     .setInputFiles(path.resolve(webDir, 'public', 'favicon.svg'))
 
-  await expectText(page, '已同步：favicon.svg')
+  await page.locator('.erp-print-image-tool__thumbnail img').first().waitFor()
 
   await page.waitForFunction(
     () =>
@@ -496,7 +496,7 @@ async function verifyWorkInstructionHeaderImages({
   )
 
   await page
-    .locator('.erp-processing-contract-upload-bar__input')
+    .locator('.erp-print-image-tools input[type="file"]')
     .nth(1)
     .setInputFiles(path.resolve(webDir, 'public', 'favicon.svg'))
 
@@ -601,7 +601,7 @@ async function verifyWorkInstructionHeaderImages({
   )
 
   await page
-    .locator('.erp-processing-contract-upload-bar__item')
+    .locator('.erp-print-image-tool')
     .nth(1)
     .getByRole('button', { name: '清空' })
     .click()
@@ -614,7 +614,7 @@ async function verifyWorkInstructionHeaderImages({
   )
 
   await page
-    .locator('.erp-processing-contract-upload-bar__item')
+    .locator('.erp-print-image-tool')
     .first()
     .getByRole('button', { name: '清空' })
     .click()
@@ -1712,18 +1712,7 @@ export function createWorkInstructionInteractionScenario({
 
       assertButtonTexts(
         toolbarGroups[0],
-        [
-          '选择行',
-          '上插一行',
-          '下插一行',
-          '移除当前行',
-          '设为标题行',
-          '设为编号行',
-          '设为文本行',
-          '给当前行加图',
-          '清空当前行图片',
-          '标注当前行图片',
-        ],
+        ['选择行', '上插一行', '下插一行', '移除当前行'],
         '作业指导书纸面行'
       )
 
@@ -1783,27 +1772,11 @@ export function createWorkInstructionInteractionScenario({
       )
 
       assert.equal(
-        toolbarGroups[0].buttons.find(
-          (button) => button.text === '给当前行加图'
-        ).disabled,
-        true,
-        '作业指导书未选择纸面行前，给当前行加图应禁用'
-      )
-
-      assert.equal(
-        toolbarGroups[0].buttons.find(
-          (button) => button.text === '清空当前行图片'
-        ).disabled,
-        true,
-        '作业指导书未选择纸面行前，清空当前行图片应禁用'
-      )
-
-      assert.equal(
-        toolbarGroups[0].buttons.find(
-          (button) => button.text === '标注当前行图片'
-        ).disabled,
-        true,
-        '作业指导书未选择纸面行前，标注当前行图片应禁用'
+        await page
+          .getByRole('button', { name: '给当前行加图', exact: true })
+          .count(),
+        0,
+        '选中行后才显示该行的图片工具'
       )
 
       await verifyWorkInstructionHeaderImages({

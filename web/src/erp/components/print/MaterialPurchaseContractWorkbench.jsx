@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { PrintToolButton } from './PrintWorkspaceTools.jsx'
 import usePrintWorkspaceFeedback from '../../utils/usePrintWorkspaceFeedback.js'
 import { getPrintOutputProblem } from '../../utils/printOutputPreflight.mjs'
 import { modal } from '@/common/utils/antdApp'
@@ -108,7 +109,6 @@ export default function MaterialPurchaseContractWorkbench({
         }),
       draftStorageKey
     )
-  const [formulaVisible, setFormulaVisible] = useState(false)
   const [rowSelectionMode, setRowSelectionMode] = useState(false)
   const [selectedRowIndex, setSelectedRowIndex] = useState(null)
   const [cellSelectionMode, setCellSelectionMode] = useState(false)
@@ -131,7 +131,6 @@ export default function MaterialPurchaseContractWorkbench({
         businessInput,
       })
     )
-    setFormulaVisible(false)
     setRowSelectionMode(false)
     setSelectedRowIndex(null)
     setCellSelectionMode(false)
@@ -547,7 +546,6 @@ export default function MaterialPurchaseContractWorkbench({
 
   const handleResetDraft = () => {
     setDraft(buildMaterialPurchaseContractDraft(template?.sample))
-    setFormulaVisible(false)
     setRowSelectionMode(false)
     resetRowSelection()
     setCellSelectionMode(false)
@@ -567,7 +565,6 @@ export default function MaterialPurchaseContractWorkbench({
         setDraft((currentDraft) =>
           buildBlankMaterialPurchaseContractDraft(currentDraft)
         )
-        setFormulaVisible(false)
         setRowSelectionMode(false)
         resetRowSelection()
         setCellSelectionMode(false)
@@ -645,73 +642,71 @@ export default function MaterialPurchaseContractWorkbench({
           : ''
       }
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
-      panelActions={
+      appendixActions={
         <PrintAppendixImageManager
           images={draft.appendixImages}
           onImagesChange={handleAppendixImagesChange}
-          onStatusChange={(text, tone) => reportFeedback('images', text, tone)}
+          onStatusChange={(text, tone) =>
+            reportFeedback('appendix', text, tone)
+          }
         />
       }
-      formulaActions={
-        <button
-          type="button"
-          aria-expanded={formulaVisible}
-          className={getToolbarButtonClassName({ active: formulaVisible })}
-          onClick={() => setFormulaVisible((currentValue) => !currentValue)}
-        >
-          {formulaVisible ? '收起规则' : '查看规则'}
-        </button>
-      }
+      appendixCount={draft.appendixImages?.length || 0}
       formulaPanel={
-        formulaVisible ? (
-          <>
-            <span>默认金额 = 数量 × 单价</span>
-            <span>如合同中已有确认金额，可直接改写采购金额。</span>
-            <span>总计 = Σ 当前采购金额列</span>
-            <span>单价保留 3 位小数，采购金额保留 2 位小数。</span>
-          </>
-        ) : null
+        <>
+          <span>默认金额 = 数量 × 单价</span>
+          <span>如合同中已有确认金额，可直接改写采购金额。</span>
+          <span>总计 = Σ 当前采购金额列</span>
+          <span>单价保留 3 位小数，采购金额保留 2 位小数。</span>
+        </>
       }
       editorActions={
         <>
           <PrintWorkspaceToolSection
             title="明细行"
+            tool="rows"
             feedback={feedback?.area === 'rows' ? feedback : null}
           >
             <div className="erp-print-shell__toolbar-group">
-              <button
+              <PrintToolButton
+                icon="select"
+                wide
                 type="button"
                 className={getToolbarButtonClassName({
                   active: rowSelectionMode,
                 })}
                 onClick={handleToggleRowSelectionMode}
               >
-                {rowSelectionMode ? '取消选择' : '选择明细行'}
-              </button>
-              <button
+                {rowSelectionMode ? '返回编辑' : '选择明细行'}
+              </PrintToolButton>
+              <PrintToolButton
+                icon="up"
                 type="button"
                 className={getToolbarButtonClassName()}
-                onClick={handleInsertRow.bind(null, 'before')}
+                onClick={() => handleInsertRow('before')}
                 disabled={selectedRowIndex == null}
               >
                 上插一行
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="down"
                 type="button"
                 className={getToolbarButtonClassName()}
-                onClick={handleInsertRow.bind(null, 'after')}
+                onClick={() => handleInsertRow('after')}
                 disabled={selectedRowIndex == null}
               >
                 下插一行
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="remove"
+                wide
                 type="button"
                 className={getToolbarButtonClassName()}
                 onClick={handleDeleteRow}
                 disabled={selectedRowIndex == null}
               >
                 移除当前行
-              </button>
+              </PrintToolButton>
               <span className="erp-print-shell__counter">
                 采购明细行: {draft.lines.length}/{MATERIAL_PURCHASE_MAX_ROWS}
               </span>
@@ -719,61 +714,72 @@ export default function MaterialPurchaseContractWorkbench({
           </PrintWorkspaceToolSection>
           <PrintWorkspaceToolSection
             title="单元格"
+            tool="cells"
             feedback={feedback?.area === 'cells' ? feedback : null}
           >
             <div className="erp-print-shell__toolbar-group">
-              <button
+              <PrintToolButton
+                icon="cells"
+                wide
                 type="button"
                 className={getToolbarButtonClassName({
                   active: cellSelectionMode,
                 })}
                 onClick={handleToggleCellSelectionMode}
               >
-                {cellSelectionMode ? '取消选区' : '选择单元格'}
-              </button>
-              <button
+                {cellSelectionMode ? '返回编辑' : '选择单元格'}
+              </PrintToolButton>
+              <PrintToolButton
+                icon="merge"
                 type="button"
                 className={getToolbarButtonClassName()}
                 onClick={handleApplyMerge}
                 disabled={!canApplyMerge}
               >
                 合并选区
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="split"
                 type="button"
                 className={getToolbarButtonClassName()}
                 onClick={handleSplitMerge}
                 disabled={!canSplitMerge}
               >
                 拆分当前
-              </button>
+              </PrintToolButton>
             </div>
           </PrintWorkspaceToolSection>
         </>
       }
       draftActions={
         <div className="erp-print-shell__toolbar-group">
-          <button
+          <PrintToolButton
+            icon="reset"
+            wide
             type="button"
             className={getToolbarButtonClassName()}
             onClick={handleResetDraft}
           >
             恢复样例
-          </button>
-          <button
+          </PrintToolButton>
+          <PrintToolButton
+            icon="signature"
+            wide
             type="button"
             className={getToolbarButtonClassName()}
             onClick={handleClearSignature}
           >
             手签留白
-          </button>
-          <button
+          </PrintToolButton>
+          <PrintToolButton
+            icon="blank"
+            wide
             type="button"
             className={getToolbarButtonClassName()}
             onClick={handleBlankDraft}
           >
             空白模板
-          </button>
+          </PrintToolButton>
         </div>
       }
       toolbarActions={

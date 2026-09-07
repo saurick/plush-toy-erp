@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { PrintToolButton } from '../components/print/PrintWorkspaceTools.jsx'
 import usePrintWorkspaceFeedback from '../utils/usePrintWorkspaceFeedback.js'
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import { getPrintOutputProblem } from '../utils/printOutputPreflight.mjs'
@@ -170,7 +171,6 @@ export default function ProcessingContractPrintWorkspacePage() {
   const [mergeSelectionAnchor, setMergeSelectionAnchor] = useState(null)
   const [mergeSelectionFocus, setMergeSelectionFocus] = useState(null)
   const [activeCell, setActiveCell] = useState(null)
-  const [showFormula, setShowFormula] = useState(false)
   const [busyAction, setBusyAction] = useState('')
   const [busyActionStartedAt, setBusyActionStartedAt] = useState(0)
   const pdfPreviewPreloadRef = useRef(null)
@@ -196,7 +196,6 @@ export default function ProcessingContractPrintWorkspacePage() {
     setMergeSelectionAnchor(null)
     setMergeSelectionFocus(null)
     setActiveCell(null)
-    setShowFormula(false)
     setBusyAction('')
     setBusyActionStartedAt(0)
     clearFeedback()
@@ -603,7 +602,6 @@ export default function ProcessingContractPrintWorkspacePage() {
     setRowSelectionMode(false)
     setCellSelectionMode(false)
     resetCellSelection()
-    setShowFormula(false)
     reportFeedback('draft', '已恢复样例。')
   }
 
@@ -624,7 +622,6 @@ export default function ProcessingContractPrintWorkspacePage() {
         setRowSelectionMode(false)
         setCellSelectionMode(false)
         resetCellSelection()
-        setShowFormula(false)
         setBusyAction('')
         reportFeedback(
           'draft',
@@ -694,78 +691,76 @@ export default function ProcessingContractPrintWorkspacePage() {
           : ''
       }
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
-      panelActions={
+      appendixActions={
         <PrintAppendixImageManager
           images={contract.appendixImages}
           onImagesChange={handleAppendixImagesChange}
-          onStatusChange={(text, tone) => reportFeedback('images', text, tone)}
+          onStatusChange={(text, tone) =>
+            reportFeedback('appendix', text, tone)
+          }
         />
       }
-      formulaActions={
-        <button
-          type="button"
-          aria-expanded={showFormula}
-          className={getToolbarButtonClassName({ active: showFormula })}
-          onClick={() => setShowFormula((current) => !current)}
-        >
-          {showFormula ? '收起规则' : '查看规则'}
-        </button>
-      }
+      appendixCount={contract.appendixImages?.length || 0}
       formulaPanel={
-        showFormula ? (
-          <>
-            <span>1. 默认金额 = 委托加工数量 × 单价。</span>
-            <span>
-              2. 合计数量 = 所有明细数量求和；合计金额 = 所有明细金额求和。
-            </span>
-            <span>
-              3.
-              如合同中已有确认金额，可直接改写委托加工金额；未手工改写时会继续按数量
-              × 单价自动计算。
-            </span>
-          </>
-        ) : null
+        <>
+          <span>1. 默认金额 = 委托加工数量 × 单价。</span>
+          <span>
+            2. 合计数量 = 所有明细数量求和；合计金额 = 所有明细金额求和。
+          </span>
+          <span>
+            3.
+            如合同中已有确认金额，可直接改写委托加工金额；未手工改写时会继续按数量
+            × 单价自动计算。
+          </span>
+        </>
       }
       editorActions={
         <>
           <PrintWorkspaceToolSection
             title="明细行"
+            tool="rows"
             feedback={feedback?.area === 'rows' ? feedback : null}
           >
             <div className="erp-print-shell__toolbar-group">
-              <button
+              <PrintToolButton
+                icon="select"
+                wide
                 type="button"
                 className={getToolbarButtonClassName({
                   active: rowSelectionMode,
                 })}
                 onClick={handleToggleRowSelectionMode}
               >
-                {rowSelectionMode ? '取消选择' : '选择明细行'}
-              </button>
-              <button
+                {rowSelectionMode ? '返回编辑' : '选择明细行'}
+              </PrintToolButton>
+              <PrintToolButton
+                icon="up"
                 type="button"
                 className={getToolbarButtonClassName()}
                 onClick={() => handleInsertLine('before')}
                 disabled={selectedLineIndex === null}
               >
                 上插一行
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="down"
                 type="button"
                 className={getToolbarButtonClassName()}
                 onClick={() => handleInsertLine('after')}
                 disabled={selectedLineIndex === null}
               >
                 下插一行
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="remove"
+                wide
                 type="button"
                 className={getToolbarButtonClassName()}
                 onClick={handleRemoveLine}
                 disabled={selectedLineIndex === null}
               >
                 移除当前行
-              </button>
+              </PrintToolButton>
               <span className="erp-print-shell__counter">
                 加工明细行: {contract.lines.length}/
                 {PROCESSING_CONTRACT_MAX_ROWS}
@@ -774,61 +769,72 @@ export default function ProcessingContractPrintWorkspacePage() {
           </PrintWorkspaceToolSection>
           <PrintWorkspaceToolSection
             title="单元格"
+            tool="cells"
             feedback={feedback?.area === 'cells' ? feedback : null}
           >
             <div className="erp-print-shell__toolbar-group">
-              <button
+              <PrintToolButton
+                icon="cells"
+                wide
                 type="button"
                 className={getToolbarButtonClassName({
                   active: cellSelectionMode,
                 })}
                 onClick={handleToggleCellSelectionMode}
               >
-                {cellSelectionMode ? '取消选区' : '选择单元格'}
-              </button>
-              <button
+                {cellSelectionMode ? '返回编辑' : '选择单元格'}
+              </PrintToolButton>
+              <PrintToolButton
+                icon="merge"
                 type="button"
                 className={getToolbarButtonClassName()}
                 onClick={handleApplyMerge}
                 disabled={!canApplyMerge}
               >
                 合并选区
-              </button>
-              <button
+              </PrintToolButton>
+              <PrintToolButton
+                icon="split"
                 type="button"
                 className={getToolbarButtonClassName()}
                 onClick={handleSplitMerge}
                 disabled={!canSplitMerge}
               >
                 拆分当前
-              </button>
+              </PrintToolButton>
             </div>
           </PrintWorkspaceToolSection>
         </>
       }
       draftActions={
         <div className="erp-print-shell__toolbar-group">
-          <button
+          <PrintToolButton
+            icon="reset"
+            wide
             type="button"
             className={getToolbarButtonClassName()}
             onClick={resetDraft}
           >
             恢复样例
-          </button>
-          <button
+          </PrintToolButton>
+          <PrintToolButton
+            icon="signature"
+            wide
             type="button"
             className={getToolbarButtonClassName()}
             onClick={handleClearSignature}
           >
             手签留白
-          </button>
-          <button
+          </PrintToolButton>
+          <PrintToolButton
+            icon="blank"
+            wide
             type="button"
             className={getToolbarButtonClassName()}
             onClick={handleBlankDraft}
           >
             空白模板
-          </button>
+          </PrintToolButton>
         </div>
       }
       toolbarActions={

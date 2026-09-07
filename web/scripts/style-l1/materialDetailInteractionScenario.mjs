@@ -165,9 +165,7 @@ export function createMaterialDetailInteractionScenario({
       )
 
       const materialImageState = await page.evaluate(() => {
-        const headerUploadBar = document.querySelector(
-          '.erp-processing-contract-upload-bar'
-        )
+        const headerUploadBar = document.querySelector('.erp-print-image-tools')
         const appendixManager = document.querySelector(
           '[data-print-appendix-manager]'
         )
@@ -179,9 +177,8 @@ export function createMaterialDetailInteractionScenario({
             headerUploadBar?.closest('.erp-print-shell__stage')
           ),
           headerUploadItemCount:
-            headerUploadBar?.querySelectorAll(
-              '.erp-processing-contract-upload-bar__item'
-            ).length || 0,
+            headerUploadBar?.querySelectorAll('.erp-print-image-tool').length ||
+            0,
           topSlotCount: document.querySelectorAll(
             '.erp-material-detail-paper__images .erp-engineering-print-image-slot'
           ).length,
@@ -281,7 +278,7 @@ export function createMaterialDetailInteractionScenario({
         '物料明细移除当前行后行数应恢复'
       )
 
-      await page.getByRole('button', { name: '取消选择' }).click()
+      await page.getByRole('button', { name: '返回编辑' }).click()
 
       await assertMaterialDetailPageBreakBottomBorder()
     },

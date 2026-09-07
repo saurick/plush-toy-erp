@@ -54,7 +54,40 @@ export function createPrintWorkspaceControlScenarios({
             '默认编辑态不显示重复的返回按钮'
           )
 
+          assert.equal(
+            await page.locator('.erp-print-shell__view-bar').count(),
+            0,
+            '纸面不再被独立模式栏占高'
+          )
+          assert.equal(
+            await page.getByText('点击纸面填写', { exact: true }).count(),
+            0
+          )
+          const tableDetails = panel
+            .getByRole('region', { name: '表格操作', exact: true })
+            .locator(':scope > details')
+          assert(
+            await tableDetails.evaluate((node) => node.open),
+            '常用表格操作默认展开'
+          )
+          for (const title of ['末尾附图', '计算规则', '模板内容']) {
+            const group = panel
+              .getByRole('region', { name: title, exact: true })
+              .locator(':scope > details')
+            if (await group.count())
+              assert.equal(
+                await group.evaluate((node) => node.open),
+                false,
+                `${title} 默认收起`
+              )
+          }
           const zoom = page.getByLabel('显示比例')
+          assert(
+            await zoom.evaluate((node) =>
+              Boolean(node.closest('.erp-print-shell__toolbar-actions'))
+            ),
+            '显示比例与 PDF 操作同在顶栏'
+          )
           await zoom.selectOption('1')
           const controls = await page.evaluate(() => {
             const styles = (node) => {
@@ -117,6 +150,8 @@ export function createPrintWorkspaceControlScenarios({
           assert.equal(controls.arrow.pointerEvents, 'none', '箭头不截获点击')
           assert.equal(controls.panel.width, 248, '所有模板使用共享侧栏宽度')
           assert.equal(controls.panel.padding, '12px')
+          assert.equal(controls.button.fontSize, '13px')
+          assert.equal(controls.button.height, '32px')
           await zoom.focus()
           await zoom.press('Space')
           assert(
@@ -273,13 +308,48 @@ export function createPrintWorkspaceControlScenarios({
                 .locator('[data-print-edit-mode]')
                 .getAttribute('data-print-edit-mode'),
               label,
-              '模式栏准确区分行、色卡块和单元格选择'
+              '所属工具内准确区分行、色卡块和单元格选择'
             )
             assert.equal(
               await page.locator('.erp-print-shell__feedback').count(),
               0,
-              '选择状态只在模式栏显示'
+              '选择状态不另占纸面高度'
             )
+            assert.equal(
+              await page
+                .getByRole('button', { name: '返回编辑', exact: true })
+                .count(),
+              1,
+              '活动组只有一个退出选择入口'
+            )
+            assert.equal(
+              await page
+                .getByRole('button', { name: /取消选择|取消选区/ })
+                .count(),
+              0,
+              '不并列同义退出按钮'
+            )
+            const selection = page.locator('[data-print-edit-mode]')
+            assert(
+              await selection.evaluate((node) =>
+                Boolean(node.closest('[data-print-tool]'))
+              ),
+              '选择状态和返回入口紧邻当前工具'
+            )
+            await tableDetails.locator(':scope > summary').click()
+            await page.waitForFunction(
+              () =>
+                document.querySelector('[data-print-workspace-mode]').dataset
+                  .printWorkspaceMode === 'edit'
+            )
+            assert.equal(await selection.count(), 0, '收起表格工具同时退出选择')
+            await tableDetails.locator(':scope > summary').focus()
+            await tableDetails.locator(':scope > summary').press('Space')
+            assert(
+              await tableDetails.evaluate((node) => node.open),
+              '键盘可重新展开工具'
+            )
+            await action.click()
             await page.keyboard.press('Escape')
             assert.equal(
               await page
@@ -294,19 +364,20 @@ export function createPrintWorkspaceControlScenarios({
               '退出后不残留旧选择提示'
             )
           }
-          const formula = panel.getByRole('button', {
-            name: '查看规则',
-            exact: true,
-          })
+          const formula = panel
+            .getByRole('region', { name: '计算规则', exact: true })
+            .locator('summary')
           if (await formula.count()) {
             await formula.click()
-            await panel
-              .getByRole('button', { name: '收起规则', exact: true })
-              .click()
+            assert(
+              await page.locator('.erp-print-shell__formula-panel').isVisible(),
+              '分组标题直接展开计算规则'
+            )
+            await formula.click()
             assert.equal(
-              await page.locator('.erp-print-shell__formula-panel').count(),
-              0,
-              '计算规则从同一入口收起'
+              await page.locator('.erp-print-shell__formula-panel').isVisible(),
+              false,
+              '同一标题可收起规则'
             )
           }
           await page.emulateMedia({ media: 'print' })

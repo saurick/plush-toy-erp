@@ -1,3 +1,4 @@
+import { expandPrintToolSection } from './printToolHelpers.mjs'
 import { Buffer } from 'node:buffer'
 import { writeFile } from 'node:fs/promises'
 
@@ -63,6 +64,7 @@ export function createPrintWorkspaceFeedbackScenarios({
           )
           await page.locator('.erp-print-shell--ready').waitFor()
           await page.evaluate(() => document.fonts.ready)
+          await expandPrintToolSection(page, '模板内容')
           const draftTools = page.getByRole('region', {
             name: '模板内容',
             exact: true,
@@ -211,12 +213,12 @@ export function createPrintWorkspaceFeedbackScenarios({
             buffer: Buffer.from('invalid image'),
           })
           await page
-            .locator('[data-print-feedback="images"][role="alert"]')
+            .locator('[data-print-feedback="appendix"][role="alert"]')
             .waitFor()
           const error = await assertLocalFeedback(
             page,
-            'images',
-            '图片管理',
+            'appendix',
+            '末尾附图',
             /./
           )
           const imageData = await page.evaluate(() => {
@@ -235,8 +237,8 @@ export function createPrintWorkspaceFeedbackScenarios({
           })
           const recovered = await assertLocalFeedback(
             page,
-            'images',
-            '图片管理',
+            'appendix',
+            '末尾附图',
             /已添加 1 张/
           )
           assert.equal(
@@ -249,7 +251,8 @@ export function createPrintWorkspaceFeedbackScenarios({
             .first()
             .getByRole('button', { name: /移除/ })
             .click()
-          await assertLocalFeedback(page, 'images', '图片管理', /已移除/)
+          await assertLocalFeedback(page, 'appendix', '末尾附图', /已移除/)
+          await expandPrintToolSection(page, '模板内容')
           await draftTools
             .getByRole('button', { name: '恢复样例', exact: true })
             .click()
@@ -300,6 +303,7 @@ export function createPrintWorkspaceFeedbackScenarios({
             `/erp/print-workspace/${key}?draft=fresh&state=feedback-output`
           )
           await page.locator('.erp-print-shell--ready').waitFor()
+          await expandPrintToolSection(page, '模板内容')
           await page
             .getByRole('button', { name: '手签留白', exact: true })
             .click()

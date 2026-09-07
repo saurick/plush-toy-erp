@@ -1,3 +1,4 @@
+import { expandPrintToolSection } from './printToolHelpers.mjs'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -420,6 +421,7 @@ export function createPrintAssertions({
       signatureTextsToRetain = [],
     }
   ) {
+    await expandPrintToolSection(page, '模板内容')
     await page.getByRole('button', { name: '手签留白' }).waitFor({
       state: 'visible',
       timeout: 10_000,
@@ -685,6 +687,7 @@ export function createPrintAssertions({
     { editableSelector, staleTexts, scenarioLabel }
   ) {
     const filteredStaleTexts = staleTexts.filter(Boolean)
+    await expandPrintToolSection(page, '模板内容')
     await page.getByRole('button', { name: '恢复样例' }).click()
     await page.waitForFunction(
       ({ selector, texts }) => {

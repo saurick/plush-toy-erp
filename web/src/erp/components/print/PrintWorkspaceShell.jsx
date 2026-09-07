@@ -1,4 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import '@fontsource-variable/noto-sans-sc'
 import '@fontsource-variable/noto-serif-sc'
 import { inspectPrintImageBudget } from '../../utils/printOutputPreflight.mjs'
@@ -11,11 +18,24 @@ const DRAFT_PERSISTENCE_STATUS_TEXT = Object.freeze({
   unavailable: '本窗口内容不会自动保存',
 })
 
+const SelectionContext = createContext({})
+
+function revealTool(node) {
+  for (
+    let parent = node?.parentElement;
+    parent;
+    parent = parent.parentElement
+  ) {
+    if (parent.tagName === 'DETAILS') parent.open = true
+  }
+}
+
 function PrintWorkspaceFeedback({ feedback, local = false }) {
   const feedbackRef = useRef(null)
   useEffect(() => {
     if (!local || !feedback) return
     const node = feedbackRef.current
+    revealTool(node)
     const panel = node?.closest('.erp-print-shell__record-panel')
     if (!panel || panel.scrollHeight <= panel.clientHeight) return
     const bounds = panel.getBoundingClientRect()
@@ -45,13 +65,83 @@ function PrintWorkspaceFeedback({ feedback, local = false }) {
   )
 }
 
-export function PrintWorkspaceToolSection({ title, children, feedback }) {
-  if (!children) return null
+function PrintSelectionStatus({ selection }) {
+  const { mode, count, bounds, summary } = selection
   return (
-    <section className="erp-print-shell__tool-section" aria-label={title}>
-      <h3>{title}</h3>
+    <div className="erp-print-shell__selection" data-print-edit-mode={mode}>
+      <p role="status" aria-live="polite">
+        已选择 {count} 个{mode === '选择单元格' ? '单元格' : '目标'}
+        {bounds
+          ? `（第 ${bounds.rowStart + 1}–${bounds.rowEnd + 1} 行，第 ${bounds.colStart + 1}–${bounds.colEnd + 1} 列）`
+          : summary
+            ? `（${summary}）`
+            : ''}
+      </p>
+      <small className="erp-print-shell__selection-impact">
+        {mode === '选择单元格'
+          ? '合并保留左上格内容，其余选区内容会清空。'
+          : '插入或删除作用于当前选中的位置。'}
+      </small>
+    </div>
+  )
+}
+
+export function PrintWorkspaceToolSection({
+  title,
+  children,
+  feedback,
+  tool,
+  collapsible = false,
+  defaultOpen = false,
+  count,
+}) {
+  const sectionRef = useRef(null)
+  const selection = useContext(SelectionContext)
+  const selected = selection.area === tool && Boolean(selection.mode)
+  useEffect(() => {
+    if (selected) revealTool(sectionRef.current)
+  }, [selected])
+  if (!children) return null
+  const content = (
+    <div className="erp-print-shell__tool-content">
+      {selected ? <PrintSelectionStatus selection={selection} /> : null}
       {children}
       <PrintWorkspaceFeedback feedback={feedback} local />
+    </div>
+  )
+  return (
+    <section
+      ref={sectionRef}
+      className="erp-print-shell__tool-section"
+      aria-label={title}
+      data-print-tool={tool}
+    >
+      {collapsible ? (
+        <details
+          open={defaultOpen}
+          onToggle={(event) => {
+            if (
+              !event.currentTarget.open &&
+              event.currentTarget.querySelector('[data-print-edit-mode]')
+            ) {
+              selection.onReturn?.()
+            }
+          }}
+        >
+          <summary>
+            <span>{title}</span>
+            {count !== undefined ? (
+              <span className="erp-print-shell__tool-count">{count}</span>
+            ) : null}
+          </summary>
+          {content}
+        </details>
+      ) : (
+        <>
+          <h3>{title}</h3>
+          {content}
+        </>
+      )}
     </section>
   )
 }
@@ -67,6 +157,8 @@ export default function PrintWorkspaceShell({
   onRetrySave,
   workspaceClassName = '',
   panelActions = null,
+  appendixActions = null,
+  appendixCount = 0,
   editorActions = null,
   draftActions = null,
   formatActions = null,
@@ -77,7 +169,6 @@ export default function PrintWorkspaceShell({
   onReturnToEdit,
   toolbarActions = null,
   formulaPanel = null,
-  formulaActions = null,
   prepareSignature = '',
   preparingText = '正在准备打印模板...',
   children,
@@ -193,130 +284,71 @@ export default function PrintWorkspaceShell({
     }
   }, [prepareSignature])
 
-  return (
-    <div
-      className={`erp-print-shell ${
-        preparing ? 'erp-print-shell--preparing' : 'erp-print-shell--ready'
-      } ${workspaceClassName}`.trim()}
-      data-preparing-text={preparingText}
-      onKeyDownCapture={(event) => {
-        if (event.key === 'Escape' && selectionMode && !event.isComposing) {
-          event.preventDefault()
-          onReturnToEdit?.()
-        }
-      }}
-    >
-      <header className="erp-print-shell__toolbar">
-        <div className="erp-print-shell__toolbar-copy">
-          <strong>{title}</strong>
-          {sourceTag ? (
-            <span className="erp-print-shell__source-tag">{sourceTag}</span>
-          ) : null}
-          {DRAFT_PERSISTENCE_STATUS_TEXT[persistenceStatus] ? (
-            <span
-              className="erp-print-shell__toolbar-status"
-              data-print-draft-save-status={persistenceStatus}
-              role="status"
-              aria-live="polite"
-            >
-              {DRAFT_PERSISTENCE_STATUS_TEXT[persistenceStatus]}
-            </span>
-          ) : null}
-          {persistenceStatus === 'error' && onRetrySave ? (
-            <button
-              type="button"
-              className="erp-print-shell__button erp-print-shell__button--ghost"
-              onClick={onRetrySave}
-            >
-              重试保存
-            </button>
-          ) : null}
-        </div>
-        <div className="erp-print-shell__toolbar-actions">{toolbarActions}</div>
-      </header>
+  const selection = useMemo(
+    () => ({
+      mode: selectionMode,
+      area:
+        selectionMode === '选择单元格'
+          ? 'cells'
+          : selectionMode === '选择色卡块'
+            ? 'blocks'
+            : 'rows',
+      count: selectionCount,
+      bounds: selectionBounds,
+      summary: selectionSummary,
+      onReturn: onReturnToEdit,
+    }),
+    [
+      selectionMode,
+      selectionCount,
+      selectionBounds,
+      selectionSummary,
+      onReturnToEdit,
+    ]
+  )
 
-      <main className="erp-print-shell__content">
-        <aside className="erp-print-shell__panel" aria-label="打印编辑工具">
-          <div className="erp-print-shell__record-panel">
-            {editorActions &&
-            tools.some((tool) => ['rows', 'cells', 'blocks'].includes(tool))
-              ? editorActions
-              : null}
-            {formatActions && tools.includes('text') ? (
-              <PrintWorkspaceToolSection
-                title="文字格式"
-                feedback={feedback?.area === 'text' ? feedback : null}
-              >
-                {formatActions}
-              </PrintWorkspaceToolSection>
+  return (
+    <SelectionContext.Provider value={selection}>
+      <div
+        className={`erp-print-shell ${
+          preparing ? 'erp-print-shell--preparing' : 'erp-print-shell--ready'
+        } ${workspaceClassName}`.trim()}
+        data-preparing-text={preparingText}
+        data-print-workspace-mode={selectionMode || 'edit'}
+        onKeyDownCapture={(event) => {
+          if (event.key === 'Escape' && selectionMode && !event.isComposing) {
+            event.preventDefault()
+            onReturnToEdit?.()
+          }
+        }}
+      >
+        <header className="erp-print-shell__toolbar">
+          <div className="erp-print-shell__toolbar-copy">
+            <strong>{title}</strong>
+            {sourceTag ? (
+              <span className="erp-print-shell__source-tag">{sourceTag}</span>
             ) : null}
-            {panelActions && tools.includes('images') ? (
-              <PrintWorkspaceToolSection
-                title="图片管理"
-                feedback={feedback?.area === 'images' ? feedback : null}
+            {DRAFT_PERSISTENCE_STATUS_TEXT[persistenceStatus] ? (
+              <span
+                className="erp-print-shell__toolbar-status"
+                data-print-draft-save-status={persistenceStatus}
+                role="status"
+                aria-live="polite"
               >
-                {panelActions}
-                <p role="status" data-print-image-budget>
-                  {imageBudget.problem ||
-                    `输出图片 ${imageBudget.count}/32 张（含长图分段）`}
-                </p>
-              </PrintWorkspaceToolSection>
+                {DRAFT_PERSISTENCE_STATUS_TEXT[persistenceStatus]}
+              </span>
             ) : null}
-            {(formulaActions || formulaPanel) &&
-            tools.includes('calculation') ? (
-              <PrintWorkspaceToolSection title="计算规则">
-                {formulaActions}
-                {formulaPanel ? (
-                  <div className="erp-print-shell__formula-panel">
-                    {formulaPanel}
-                  </div>
-                ) : null}
-              </PrintWorkspaceToolSection>
-            ) : null}
-            {draftActions ? (
-              <PrintWorkspaceToolSection
-                title="模板内容"
-                feedback={feedback?.area === 'draft' ? feedback : null}
+            {persistenceStatus === 'error' && onRetrySave ? (
+              <button
+                type="button"
+                className="erp-print-shell__button erp-print-shell__button--ghost"
+                onClick={onRetrySave}
               >
-                {draftActions}
-              </PrintWorkspaceToolSection>
+                重试保存
+              </button>
             ) : null}
           </div>
-        </aside>
-
-        <section className="erp-print-shell__workspace">
-          <div className="erp-print-shell__view-bar" data-print-editor-only>
-            <div
-              role="status"
-              aria-live="polite"
-              data-print-edit-mode={selectionMode || 'edit'}
-            >
-              {selectionMode ? (
-                <>
-                  <strong>{selectionMode}</strong> · 已选择 {selectionCount} 个
-                  {selectionMode === '选择单元格' ? '单元格' : '目标'}
-                  {selectionBounds
-                    ? `（第 ${selectionBounds.rowStart + 1}–${selectionBounds.rowEnd + 1} 行，第 ${selectionBounds.colStart + 1}–${selectionBounds.colEnd + 1} 列）`
-                    : selectionSummary
-                      ? `（${selectionSummary}）`
-                      : ''}
-                  <button
-                    type="button"
-                    className="erp-print-shell__button erp-print-shell__button--ghost"
-                    onClick={onReturnToEdit}
-                  >
-                    返回编辑
-                  </button>
-                  <small className="erp-print-shell__selection-impact">
-                    {selectionMode === '选择单元格'
-                      ? '合并保留左上格内容，其余选区内容会清空。'
-                      : '插入或删除作用于当前选中的位置。'}
-                  </small>
-                </>
-              ) : (
-                '点击纸面填写'
-              )}
-            </div>
+          <div className="erp-print-shell__toolbar-actions">
             <label className="erp-print-shell__zoom-control print-zoom-control">
               显示比例
               <span className="print-zoom-select">
@@ -333,26 +365,104 @@ export default function PrintWorkspaceShell({
                 </select>
               </span>
             </label>
+            {toolbarActions}
           </div>
-          <PrintWorkspaceFeedback
-            feedback={
-              statusText
-                ? { area: 'output', text: statusText, tone: 'info' }
-                : feedback?.area === 'output'
-                  ? feedback
-                  : null
-            }
-          />
-          <div
-            className="erp-print-shell__stage"
-            ref={stageRef}
-            style={{ '--print-view-scale': scale }}
-            onInputCapture={captureInput}
-          >
-            {children}
-          </div>
-        </section>
-      </main>
-    </div>
+        </header>
+
+        <main className="erp-print-shell__content">
+          <aside className="erp-print-shell__panel" aria-label="打印编辑工具">
+            <div className="erp-print-shell__record-panel">
+              {editorActions &&
+              tools.some((tool) =>
+                ['rows', 'cells', 'blocks'].includes(tool)
+              ) ? (
+                <PrintWorkspaceToolSection
+                  title="表格操作"
+                  collapsible
+                  defaultOpen
+                >
+                  {editorActions}
+                </PrintWorkspaceToolSection>
+              ) : null}
+              {formatActions && tools.includes('text') ? (
+                <PrintWorkspaceToolSection
+                  title="文字格式"
+                  feedback={feedback?.area === 'text' ? feedback : null}
+                >
+                  {formatActions}
+                </PrintWorkspaceToolSection>
+              ) : null}
+              {panelActions && tools.includes('images') ? (
+                <PrintWorkspaceToolSection
+                  title="产品图片"
+                  feedback={feedback?.area === 'images' ? feedback : null}
+                >
+                  {panelActions}
+                </PrintWorkspaceToolSection>
+              ) : null}
+              {appendixActions && tools.includes('images') ? (
+                <PrintWorkspaceToolSection
+                  title="末尾附图"
+                  collapsible
+                  count={appendixCount}
+                  feedback={
+                    feedback?.area === 'appendix'
+                      ? feedback
+                      : imageBudget.problem && !feedback
+                        ? {
+                            area: 'appendix',
+                            text: imageBudget.problem,
+                            tone: 'error',
+                          }
+                        : null
+                  }
+                >
+                  {appendixActions}
+                  <p role="status" data-print-image-budget>
+                    输出图片 {imageBudget.count}/32 张（含长图分段）
+                  </p>
+                </PrintWorkspaceToolSection>
+              ) : null}
+              {formulaPanel && tools.includes('calculation') ? (
+                <PrintWorkspaceToolSection title="计算规则" collapsible>
+                  <div className="erp-print-shell__formula-panel">
+                    {formulaPanel}
+                  </div>
+                </PrintWorkspaceToolSection>
+              ) : null}
+              {draftActions ? (
+                <PrintWorkspaceToolSection
+                  title="模板内容"
+                  collapsible
+                  feedback={feedback?.area === 'draft' ? feedback : null}
+                >
+                  {draftActions}
+                </PrintWorkspaceToolSection>
+              ) : null}
+            </div>
+          </aside>
+
+          <section className="erp-print-shell__workspace">
+            <PrintWorkspaceFeedback
+              feedback={
+                statusText
+                  ? { area: 'output', text: statusText, tone: 'info' }
+                  : feedback?.area === 'output'
+                    ? feedback
+                    : null
+              }
+            />
+            <div
+              className="erp-print-shell__stage"
+              ref={stageRef}
+              style={{ '--print-view-scale': scale }}
+              onInputCapture={captureInput}
+            >
+              {children}
+            </div>
+          </section>
+        </main>
+      </div>
+    </SelectionContext.Provider>
   )
 }

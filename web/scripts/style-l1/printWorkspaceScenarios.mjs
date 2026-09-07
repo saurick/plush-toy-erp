@@ -260,9 +260,6 @@ export function createPrintWorkspaceScenarios({
       const stageRect = stage?.getBoundingClientRect()
       const paperRect = paper?.getBoundingClientRect()
       const stageStyle = stage ? window.getComputedStyle(stage) : null
-      const viewBarRect = document
-        .querySelector('.erp-print-shell__view-bar')
-        ?.getBoundingClientRect()
       const feedbackRect = document
         .querySelector('.erp-print-shell__feedback')
         ?.getBoundingClientRect()
@@ -276,7 +273,7 @@ export function createPrintWorkspaceScenarios({
           toolbarRect && contentRect
             ? contentRect.top - toolbarRect.bottom
             : -1,
-        controlsBottom: feedbackRect?.bottom || viewBarRect?.bottom || 0,
+        controlsBottom: feedbackRect?.bottom || toolbarRect?.bottom || 0,
         stageTop: stageRect?.top || 0,
         contentToStage:
           contentRect && stageRect ? stageRect.top - contentRect.top : -1,
@@ -1895,7 +1892,9 @@ export function createPrintWorkspaceScenarios({
             await page.keyboard.press('Escape')
           }
           assert.equal(
-            await selection.getAttribute('data-print-edit-mode'),
+            await page
+              .locator('[data-print-workspace-mode]')
+              .getAttribute('data-print-workspace-mode'),
             'edit'
           )
           assert.equal(

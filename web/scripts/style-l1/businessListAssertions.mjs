@@ -1766,7 +1766,7 @@ export function createBusinessListAssertions({ outputDir }) {
       `插入空白行后应仍只有 1 行高亮: ${selectedRowSelector}`
     )
 
-    await page.getByRole('button', { name: '取消选择' }).click()
+    await page.getByRole('button', { name: '返回编辑' }).click()
 
     assert.equal(
       await page.locator(selectedRowSelector).count(),

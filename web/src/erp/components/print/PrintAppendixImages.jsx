@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react'
+import { PrintToolButton } from './PrintWorkspaceTools.jsx'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   PRINT_APPENDIX_IMAGE_ACCEPT,
@@ -161,13 +162,7 @@ export default function PrintAppendixImageManager({
       data-print-appendix-manager
       aria-label="管理模板末尾图片"
     >
-      <div className="erp-print-appendix-manager__heading">
-        <strong>模板末尾图片</strong>
-        <span>{normalizedImages.length} 张</span>
-      </div>
-      <p>
-        普通图片自动两张一行，长图自动整行并按打印页分段；每张都可手动改为半宽或整行。
-      </p>
+      <p>普通图片自动两张一行，长图自动整行并分段；也可单独调整排版。</p>
       <input
         ref={inputRef}
         className="erp-print-appendix-manager__input"
@@ -177,14 +172,16 @@ export default function PrintAppendixImageManager({
         multiple
         onChange={handleFileChange}
       />
-      <button
+      <PrintToolButton
+        icon="image"
+        wide
         type="button"
         className="erp-print-shell__button erp-print-shell__button--ghost"
         disabled={busy}
         onClick={() => inputRef.current?.click()}
       >
         {busy ? '正在添加…' : '添加末尾图片'}
-      </button>
+      </PrintToolButton>
       {normalizedImages.length ? (
         <ol className="erp-print-appendix-manager__list">
           {normalizedImages.map((image, index) => {
