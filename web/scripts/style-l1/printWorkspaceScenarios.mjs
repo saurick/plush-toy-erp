@@ -1,3 +1,4 @@
+import { assertPrintTemplateGuide } from './printTemplateGuideAssertions.mjs'
 import { Buffer } from 'node:buffer'
 import { createMaterialDetailInteractionScenario } from './materialDetailInteractionScenario.mjs'
 import { createColorCardInteractionScenario } from './colorCardInteractionScenario.mjs'
@@ -663,13 +664,13 @@ export function createPrintWorkspaceScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '模板打印中心')
-        await expectText(page, '打印当前模板')
+        await expectText(page, '打开编辑与打印')
         await expectText(page, '模板')
         await expectText(page, '采购合同')
         await expectText(page, '加工合同')
         await assertTextAbsent(page, '样品确认单')
         await assertTextAbsent(page, '候选模板 / 未启用')
-        await expectText(page, '纸面预览')
+        await expectText(page, '版式示意')
         await assertTextAbsent(page, '字段映射')
         await assertTextAbsent(page, '字段核对')
         await assertTextAbsent(page, '运营中枢')
@@ -734,14 +735,7 @@ export function createPrintWorkspaceScenarios({
                 tagName: button.tagName,
                 cursor: style.cursor,
                 ariaPressed: button.getAttribute('aria-pressed'),
-                actionText:
-                  button
-                    .querySelector('.erp-print-center-template-action')
-                    ?.textContent?.replace(/\s+/g, ' ')
-                    .trim() || '',
-                iconCount: button.querySelectorAll(
-                  '.erp-print-center-template-action .anticon'
-                ).length,
+                iconCount: button.querySelectorAll('.anticon').length,
                 text: button.textContent?.replace(/\s+/g, ' ').trim() || '',
                 scrollWidth: button.scrollWidth,
                 clientWidth: button.clientWidth,
@@ -760,8 +754,7 @@ export function createPrintWorkspaceScenarios({
               item.tagName === 'BUTTON' &&
               item.cursor === 'pointer' &&
               ['true', 'false'].includes(item.ariaPressed) &&
-              item.actionText.length > 0 &&
-              item.iconCount === 1 &&
+              item.iconCount === (item.ariaPressed === 'true' ? 1 : 0) &&
               item.scrollWidth <= item.clientWidth + 1
           ),
           `打印模板目录按钮应明确暴露选择动作和当前态: ${JSON.stringify(templateButtonSemantics)}`
@@ -775,6 +768,32 @@ export function createPrintWorkspaceScenarios({
           /[?&]template=processing-contract(?:&|$)/,
           '切换打印模板应写入 URL 以便刷新恢复'
         )
+        for (const title of [
+          '采购合同',
+          '加工合同',
+          '物料分析明细表',
+          '色卡',
+          '作业指导书',
+        ]) {
+          await page
+            .locator('.erp-print-center-template-list')
+            .getByRole('button', { name: title, exact: true })
+            .click()
+          await assertPrintTemplateGuide(page)
+        }
+        await page.reload()
+        await page
+          .getByRole('heading', { name: '作业指导书', exact: true })
+          .waitFor({ state: 'visible' })
+        await assertPrintTemplateGuide(page)
+        const lastTemplateButton = page
+          .locator('.erp-print-center-template-list')
+          .getByRole('button', { name: '作业指导书', exact: true })
+        await lastTemplateButton.press('Tab')
+        const focusInPreview = await page.evaluate(() =>
+          Boolean(document.activeElement?.closest('.erp-template-guide__paper'))
+        )
+        assert.equal(focusInPreview, false, 'Tab 不应进入只读缩略图的编辑字段')
         await assertTextAbsent(page, '页面结构')
         await assertTextAbsent(page, '适用场景')
         await assertTextAbsent(page, '版式特点')
@@ -792,15 +811,28 @@ export function createPrintWorkspaceScenarios({
       viewport: { width: 2048, height: 1024 },
       verify: async (page) => {
         await expectHeading(page, '模板打印中心')
-        await expectText(page, '打印当前模板')
+        await expectText(page, '打开编辑与打印')
         await expectText(page, '模板')
         await expectText(page, '采购合同')
         await expectText(page, '加工合同')
         await assertTextAbsent(page, '样品确认单')
-        await expectText(page, '纸面预览')
+        await expectText(page, '版式示意')
         await assertTextAbsent(page, '字段映射')
         await assertTextAbsent(page, '运营中枢')
         await assertTextAbsent(page, '示例记录')
+        for (const title of [
+          '采购合同',
+          '加工合同',
+          '物料分析明细表',
+          '色卡',
+          '作业指导书',
+        ]) {
+          await page
+            .locator('.erp-print-center-template-list')
+            .getByRole('button', { name: title, exact: true })
+            .click()
+          await assertPrintTemplateGuide(page)
+        }
         await assertERPThemeMode(page, {
           scenarioName: 'print-center-dark-desktop',
           expectedMode: 'dark',
@@ -821,7 +853,7 @@ export function createPrintWorkspaceScenarios({
       viewport: { width: 968, height: 534 },
       verify: async (page) => {
         await expectHeading(page, '模板打印中心')
-        await expectText(page, '纸面预览')
+        await expectText(page, '版式示意')
         const templateButtons = [
           { name: /^物料分析明细表/, title: '物料分析明细表' },
           { name: /^色卡/, title: '色卡' },
@@ -834,8 +866,9 @@ export function createPrintWorkspaceScenarios({
             .click()
           await page
             .locator('.erp-print-center-preview-panel')
-            .getByText(template.title, { exact: true })
+            .getByRole('heading', { name: template.title, exact: true })
             .waitFor({ state: 'visible' })
+          await assertPrintTemplateGuide(page)
           const metrics = await page.evaluate((expectedTitle) => {
             const workbench = document.querySelector(
               '.erp-print-center-workbench'
@@ -847,7 +880,7 @@ export function createPrintWorkspaceScenarios({
               '.erp-print-center-preview-panel'
             )
             const previewPaper = document.querySelector(
-              '.erp-print-center-paper-preview'
+              '.erp-template-guide__thumbnail'
             )
             const navRect = navPanel?.getBoundingClientRect()
             const previewRect = previewPanel?.getBoundingClientRect()
@@ -904,8 +937,8 @@ export function createPrintWorkspaceScenarios({
             )}`
           )
           assert(
-            metrics.paperRect?.width >= 360 &&
-              metrics.paperRect?.height >= 320 &&
+            metrics.paperRect?.width >= 190 &&
+              metrics.paperRect?.height >= 260 &&
               metrics.previewText.includes(template.title),
             `工程模板纸面预览应渲染当前模板样例: ${JSON.stringify(metrics)}`
           )
@@ -923,6 +956,29 @@ export function createPrintWorkspaceScenarios({
           page,
           'print-center-engineering-preview-tablet'
         )
+      },
+    },
+    {
+      name: 'print-center-mobile',
+      path: '/erp/print-center?template=engineering-color-card',
+      auth: 'admin',
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectHeading(page, '模板打印中心')
+        for (const title of [
+          '采购合同',
+          '加工合同',
+          '物料分析明细表',
+          '色卡',
+          '作业指导书',
+        ]) {
+          await page
+            .locator('.erp-print-center-template-list')
+            .getByRole('button', { name: title, exact: true })
+            .click()
+          await assertPrintTemplateGuide(page)
+          await assertNoHorizontalOverflow(page, 'print-center-mobile')
+        }
       },
     },
     {

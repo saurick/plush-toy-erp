@@ -184,7 +184,6 @@ test('FL_print_templates_processing_preview__uses_processing_signature_and_total
     'web/src/erp/components/print/PrintTemplateRenderer.jsx'
   )
   const previewPage = read('web/src/erp/pages/PrintTemplatePreviewPage.jsx')
-  const printCenterPage = read('web/src/erp/pages/PrintCenterPage.jsx')
 
   assert.match(renderer, /resolvePrintTemplateTotals/u)
   assert.match(renderer, /buildPrintTemplateLineCells/u)
@@ -197,7 +196,6 @@ test('FL_print_templates_processing_preview__uses_processing_signature_and_total
   assert.match(renderer, /data\.buyerSignDateText/u)
   assert.match(renderer, /renderPrintValue\(data\.supplierSigner\)/u)
   assert.match(previewPage, /<PrintTemplateRenderer template=\{template\} \/>/u)
-  assert.match(printCenterPage, /activeSample\.buyerSignDateText/u)
 })
 
 test('printTemplates: 打印中心模板选择以 URL 为单一真源', () => {
@@ -227,7 +225,7 @@ test('printTemplates: 正式打印入口使用岗位可理解的说明和中文�
     'web/src/erp/pages/ProcessingContractPrintWorkspacePage.jsx'
   )
 
-  assert.match(printCenterPage, /选择模板、预览内容并打开打印窗口/u)
+  assert.match(printCenterPage, /选择模板，查看说明并打开编辑/u)
   assert.doesNotMatch(printCenterPage, /业务带值|轻量工作台/u)
   assert.match(printWorkspaceShell, /aria-label="打印编辑工具"/u)
   assert.doesNotMatch(printWorkspaceShell, /当前记录字段|字段名或字段值/u)

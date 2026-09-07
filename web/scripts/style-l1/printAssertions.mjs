@@ -217,7 +217,7 @@ export function createPrintAssertions({
   ) {
     const [workspacePopup] = await Promise.all([
       page.waitForEvent('popup', { timeout: 10_000 }),
-      page.getByRole('button', { name: '打印当前模板' }).click(),
+      page.getByRole('button', { name: '打开编辑与打印' }).click(),
     ])
     const mockToken = createMockAdminToken()
     await installAdminRpcMocks(workspacePopup, { baseURL })
@@ -279,7 +279,7 @@ export function createPrintAssertions({
   ) {
     const [popup] = await Promise.all([
       page.waitForEvent('popup', { timeout: 10_000 }),
-      page.getByRole('button', { name: '打印当前模板' }).click(),
+      page.getByRole('button', { name: '打开编辑与打印' }).click(),
     ])
     const mockToken = createMockAdminToken()
     await installAdminRpcMocks(popup, { baseURL })

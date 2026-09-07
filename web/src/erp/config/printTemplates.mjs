@@ -63,7 +63,23 @@ export const printTemplateCatalog = [
       '签字区默认按纸质合同留给手写签名，不带电子印章。',
     ],
     tags: ['固定版式', '采购合同', 'PDF / 打印', '纸质签字'],
-    previewLines: ['普通合同头', '采购明细 / 合计', '条款 / 手写签字'],
+    guide: [
+      {
+        title: '合同信息',
+        description: '核对单号、交货日期和双方联系方式。',
+        selector: '.erp-material-contract-meta',
+      },
+      {
+        title: '采购明细',
+        description: '填写材料、数量和单价，核对金额与合计。',
+        selector: '.erp-material-contract-table',
+      },
+      {
+        title: '条款与签字',
+        description: '确认来货、结算等约定，打印后由双方签字。',
+        selector: '.erp-material-contract-signature',
+      },
+    ],
     sourceFiles: [
       '来源样本：材料与加工合同工作簿（C类辅料合同 / 原辅料采购汇总表 / 材料厂商编号）',
       '来源样本：采购合同纸面照片',
@@ -178,6 +194,23 @@ export const printTemplateCatalog = [
   },
   {
     ...processingContractTemplateMeta,
+    guide: [
+      {
+        title: '合同信息',
+        description: '核对合同编号、加工方和委托方资料。',
+        selector: '.erp-processing-contract-meta',
+      },
+      {
+        title: '加工明细',
+        description: '填写加工项目、数量和单价，核对金额与合计。',
+        selector: '.erp-processing-contract-table',
+      },
+      {
+        title: '条款与签字',
+        description: '确认加工、交货和结算约定，打印后由双方签字。',
+        selector: '.erp-processing-contract-signature',
+      },
+    ],
     runtime: {
       workspace: 'processingContract',
       family: 'contract',
@@ -222,7 +255,23 @@ export const printTemplateCatalog = [
       '从物料清单（BOM）页面选中版本打开时，只带入当前产品、版本和 BOM 明细；缺失内容保持空白。',
     ],
     tags: ['工程资料', '物料明细', '图片槽', 'PDF / 打印'],
-    previewLines: ['产品头信息', '材料明细 / 用量', '右上产品图 / 末尾附图'],
+    guide: [
+      {
+        title: '产品与图片',
+        description: '核对产品、订单和数量，可替换右上产品图。',
+        selector: '.erp-material-detail-paper__header',
+      },
+      {
+        title: '物料与用量',
+        description: '核对材料、规格、用量和使用部位，按需增删明细。',
+        selector: '.erp-material-detail-table',
+      },
+      {
+        title: '制表与审核',
+        description: '补齐制表、审核信息；补充图片可放在末尾附图。',
+        selector: '.erp-material-detail-paper__footer',
+      },
+    ],
     sourceFiles: ['来源样本：材料分析明细工作表'],
     fieldTruth: [
       '产品编号、产品名称、BOM 版本和材料明细优先来自所选 BOM 版本及其明细。',
@@ -282,7 +331,23 @@ export const printTemplateCatalog = [
       '从物料清单（BOM）页面带值时按 BOM 明细生成物料分块，无法确认的颜色 / 加工方式保持空白。',
     ],
     tags: ['工程资料', '色卡', '对色发料', 'PDF / 打印'],
-    previewLines: ['产品信息', '物料分块', '制卡 / 审核 / 复核'],
+    guide: [
+      {
+        title: '产品信息',
+        description: '核对产品编号和名称，确认样本对应的产品。',
+        selector: '.erp-color-card-paper__meta',
+      },
+      {
+        title: '物料与贴样',
+        description: '核对物料、厂商、部位和加工方式，打印后贴样。',
+        selector: '.erp-color-card-paper__sheet',
+      },
+      {
+        title: '制卡与签核',
+        description: '填写制卡、日期、审核和复核信息。',
+        selector: '.erp-color-card-paper__footer',
+      },
+    ],
     sourceFiles: ['来源样本：色卡工作表'],
     fieldTruth: [
       '产品编号和产品名称来自所选 BOM 版本的产品资料或打印草稿。',
@@ -336,7 +401,23 @@ export const printTemplateCatalog = [
       '从单一产品的 BOM 或委外订单打开时，右上角优先带入产品基础信息中的 0–2 张产品图；多产品委外不猜测首行产品。右上产品图和编号行图片都只进入当前打印草稿。',
     ],
     tags: ['工程资料', '作业指导', '加工厂', '图片槽'],
-    previewLines: ['产品头信息', '可变正文行', '编号行 / 图片槽'],
+    guide: [
+      {
+        title: '产品与工序',
+        description: '核对产品、版本和本页工序，可替换右上产品图。',
+        selector: '.erp-work-instruction-paper__header',
+      },
+      {
+        title: '作业步骤',
+        description: '按顺序填写要求；步骤可配图、添加说明或标注距离。',
+        selector: '.erp-work-instruction-paper__step-row--text',
+      },
+      {
+        title: '注意事项',
+        description: '补充操作要点和质量要求，可增删标题、编号和文字行。',
+        selector: '.erp-work-instruction-paper__text-row',
+      },
+    ],
     sourceFiles: ['来源样本：作业指导工作表'],
     fieldTruth: [
       'BOM 入口的产品编号优先使用产品业务款号；委外入口沿用源单冻结的产品编号快照。产品名称只显示名称；版本/版次、本页工序和工序日期是独立打印字段，缺少明确来源时保持空白，不拿 BOM 技术版本、完整工艺路线或委外回货日期代替。',

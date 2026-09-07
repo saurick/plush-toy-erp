@@ -13,7 +13,7 @@
 | 正式入口与菜单 | `seedData.mjs`、`menuPermissions.mjs`、`businessModules.mjs`、`appRegistry.mjs`、`entryConfig.mjs`                                  | 桌面菜单、岗位入口、权限码映射和登录入口展示            |
 | 客户配置投影   | `customerMenuConfig.mjs`、`devCustomerConfig.mjs`、`devCustomerConfigRoute.mjs`                                                     | 消费静态客户外观 / 菜单候选和 dev-only 客户配置预检入口 |
 | dev-only 导航  | `devHub.mjs`、`devRoutes.mjs`、`devDocs.mjs`、`devTesting.mjs`、`devDataPreparation.mjs`、`devGovernance.mjs`、`devPrototypes.mjs` | `/__dev/*` 本地治理、文档、测试数据准备和原型入口 |
-| 展示配置       | `commandCenter.mjs`、`dashboardModules.mjs`、`workflowStatus.mjs`、`printTemplates.mjs`                                             | 工作台、看板、Workflow 状态和打印模板字段预检展示       |
+| 展示配置       | `commandCenter.mjs`、`dashboardModules.mjs`、`workflowStatus.mjs`、`printTemplates.mjs`                                             | 工作台、看板、Workflow 状态、打印模板说明与字段预检展示       |
 
 ## 边界
 
@@ -22,6 +22,12 @@
 - `customerMenuConfig.mjs` 的静态客户配置只控制候选品牌、菜单和展示，不代表 active customer config revision 已发布或已生效。
 - `dev*` 文件只服务 `/__dev` 本地开发态入口，不进入正式 ERP 菜单、seedData、RBAC 或生产构建。测试数据准备只通过 loopback Bridge 的固定 profile 编排既有 seed / 验收入口，不接任意 shell、SQL、DSN、后端地址或正式业务菜单。
 - 配置文件里的测试通常锁住展示合同和入口边界，不证明目标环境 release evidence、真实账号 RBAC 或客户验收完成。
+
+## 打印模板说明
+
+打印中心以一句用途、正式纸面缩略图和三条分区说明展示五种模板。`printTemplates.mjs` 的 `summary` 提供用途，`guide` 的每项包含 `title`、`description` 和定位正式纸面区域的 `selector`；编号由同一数组生成，不另维护示意图字段或图片。
+
+`PrintTemplateGuide.jsx` 复用五种正式纸面组件，用 `inert` 隔离编辑、选择和上传操作，并按实际尺寸缩放和定位编号；只展示通用样例，不读写工作台草稿或业务数据。新增模板时补齐分区说明、纸面组件和区域定位回归。模板切换仍以 URL 为准，顶部“打开编辑与打印”沿用现有账号、客户与草稿入口。
 
 ## 修改后验证
 
