@@ -191,7 +191,6 @@ export default function MaterialPurchaseContractPaper({
   selectedRowIndex,
   rowSelectionMode,
   setSelectedRowIndex,
-  setToolbarStatus,
   activeCell,
   mergeSelection,
   cellSelectionMode,
@@ -364,9 +363,6 @@ export default function MaterialPurchaseContractPaper({
                 }
                 event.preventDefault()
                 setSelectedRowIndex(rowIndex)
-                setToolbarStatus(
-                  `已选中第 ${rowIndex + 1} 行，可继续上插 / 下插 / 移除。`
-                )
               }}
             >
               {MATERIAL_PURCHASE_DETAIL_COLUMNS.map((column, colIndex) => {

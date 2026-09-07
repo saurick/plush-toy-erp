@@ -832,27 +832,6 @@
   word-break: break-word;
 }
 
-.erp-engineering-print-workspace-shell .erp-print-shell__content {
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 6px;
-}
-
-.erp-engineering-print-workspace-shell .erp-print-shell__record-panel {
-  padding: 10px;
-}
-
-.erp-engineering-print-workspace-shell .erp-print-shell__stage {
-  padding: 24px;
-}
-
-.erp-engineering-print-workspace-shell .erp-print-shell__stage-wrap {
-  justify-content: center;
-}
-
-.erp-engineering-print-workspace-shell .erp-engineering-print-paper {
-  margin: 0 auto;
-}
-
 .erp-work-instruction-paper {
   display: flex;
   flex-direction: column;

@@ -7,7 +7,9 @@ import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PrintAppendixImageManager from '../components/print/PrintAppendixImages.jsx'
 import ProcessingContractPaper from '../components/print/ProcessingContractPaper.jsx'
-import PrintWorkspaceShell from '../components/print/PrintWorkspaceShell.jsx'
+import PrintWorkspaceShell, {
+  PrintWorkspaceToolSection,
+} from '../components/print/PrintWorkspaceShell.jsx'
 import {
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   createBlankProcessingContractDraft,
@@ -105,16 +107,6 @@ function formatExportFileName() {
   return `加工合同-${stamp}.pdf`
 }
 
-function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
-  if (resetDraftOnOpen) {
-    return '已恢复默认加工合同示例。'
-  }
-  if (sourceTag === '来自业务页面') {
-    return '已从业务页面带入加工合同内容，可继续核对并打印。'
-  }
-  return '打印窗口已准备好，可以开始编辑。'
-}
-
 export default function ProcessingContractPrintWorkspacePage() {
   const template = getPrintTemplateByKey(PROCESSING_CONTRACT_TEMPLATE_KEY)
   const { templateKey } = useParams()
@@ -181,9 +173,7 @@ export default function ProcessingContractPrintWorkspacePage() {
   const [busyAction, setBusyAction] = useState('')
   const [busyActionStartedAt, setBusyActionStartedAt] = useState(0)
   const pdfPreviewPreloadRef = useRef(null)
-  const [toolbarStatus, setToolbarStatus] = useState(() =>
-    resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag)
-  )
+  const [toolbarStatus, setToolbarStatus] = useState('')
 
   useEffect(() => {
     document.title = '加工合同打印窗口'
@@ -207,7 +197,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     setShowFormula(false)
     setBusyAction('')
     setBusyActionStartedAt(0)
-    setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
+    setToolbarStatus('')
   }, [
     draftStorageKey,
     entrySource,
@@ -334,39 +324,36 @@ export default function ProcessingContractPrintWorkspacePage() {
   }
 
   const handleToggleRowSelectionMode = () => {
+    setToolbarStatus('')
     setRowSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
         setCellSelectionMode(false)
         resetCellSelection()
-        setToolbarStatus('已进入明细行选择模式，请点击中间明细表中的目标行。')
       } else {
         setSelectedLineIndex(null)
-        setToolbarStatus('已退出明细行选择模式。')
       }
       return nextValue
     })
   }
 
   const handleToggleCellSelectionMode = () => {
+    setToolbarStatus('')
     setCellSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
         setRowSelectionMode(false)
         setSelectedLineIndex(null)
         resetCellSelection()
-        setToolbarStatus(
-          '已进入单元格选区模式，请在右侧加工明细表里依次点选起点和终点。'
-        )
       } else {
         resetCellSelection()
-        setToolbarStatus('已退出单元格选区模式。')
       }
       return nextValue
     })
   }
 
   const handleSelectCell = (rowIndex, colIndex) => {
+    setToolbarStatus('')
     const nextCell = { rowIndex, colIndex }
     setActiveCell(nextCell)
     const currentSelection = normalizeCellSelection(
@@ -381,19 +368,10 @@ export default function ProcessingContractPrintWorkspacePage() {
     if (!mergeSelectionAnchor || hasExpandedSelection) {
       setMergeSelectionAnchor(nextCell)
       setMergeSelectionFocus(nextCell)
-      setToolbarStatus(
-        `已选中第 ${rowIndex + 1} 行第 ${colIndex + 1} 列，请继续点终点或直接拆分当前合并块。`
-      )
       return
     }
 
     setMergeSelectionFocus(nextCell)
-    const nextSelection = normalizeCellSelection(mergeSelectionAnchor, nextCell)
-    const rowCount = nextSelection.rowEnd - nextSelection.rowStart + 1
-    const colCount = nextSelection.colEnd - nextSelection.colStart + 1
-    setToolbarStatus(
-      `已选中 ${rowCount} × ${colCount} 的矩形区域，可继续合并。`
-    )
   }
 
   const handleInsertLine = (position) => {
@@ -692,6 +670,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             : 1
       }
       onReturnToEdit={() => {
+        setToolbarStatus('')
         setRowSelectionMode(false)
         setCellSelectionMode(false)
         setSelectedLineIndex(null)
@@ -703,7 +682,6 @@ export default function ProcessingContractPrintWorkspacePage() {
           ? `第 ${selectedLineIndex + 1} 行`
           : ''
       }
-      panelTip="直接点击纸面填写；选择行或单元格后，可在这里调整结构。"
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
       panelActions={
         <PrintAppendixImageManager
@@ -712,10 +690,19 @@ export default function ProcessingContractPrintWorkspacePage() {
           onStatusChange={setToolbarStatus}
         />
       }
+      formulaActions={
+        <button
+          type="button"
+          aria-expanded={showFormula}
+          className={getToolbarButtonClassName({ active: showFormula })}
+          onClick={() => setShowFormula((current) => !current)}
+        >
+          {showFormula ? '收起规则' : '查看规则'}
+        </button>
+      }
       formulaPanel={
         showFormula ? (
           <>
-            <strong>加工合同计算规则</strong>
             <span>1. 默认金额 = 委托加工数量 × 单价。</span>
             <span>
               2. 合计数量 = 所有明细数量求和；合计金额 = 所有明细金额求和。
@@ -729,76 +716,78 @@ export default function ProcessingContractPrintWorkspacePage() {
         ) : null
       }
       editorActions={
-        <div className="erp-print-shell__toolbar-group">
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            onClick={() => handleInsertLine('before')}
-            disabled={selectedLineIndex === null}
-          >
-            上插一行
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            onClick={() => handleInsertLine('after')}
-            disabled={selectedLineIndex === null}
-          >
-            下插一行
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            onClick={handleRemoveLine}
-            disabled={selectedLineIndex === null}
-          >
-            移除当前行
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName({
-              active: rowSelectionMode,
-            })}
-            onClick={handleToggleRowSelectionMode}
-          >
-            {rowSelectionMode ? '取消选择' : '选择明细行'}
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName({
-              active: cellSelectionMode,
-            })}
-            onClick={handleToggleCellSelectionMode}
-          >
-            {cellSelectionMode ? '取消选区' : '选择单元格'}
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            onClick={handleApplyMerge}
-            disabled={!canApplyMerge}
-          >
-            合并选区
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            onClick={handleSplitMerge}
-            disabled={!canSplitMerge}
-          >
-            拆分当前
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName({ active: showFormula })}
-            onClick={() => setShowFormula((current) => !current)}
-          >
-            计算规则
-          </button>
-          <span className="erp-print-shell__counter">
-            加工明细行: {contract.lines.length}/{PROCESSING_CONTRACT_MAX_ROWS}
-          </span>
-        </div>
+        <>
+          <PrintWorkspaceToolSection title="明细行">
+            <div className="erp-print-shell__toolbar-group">
+              <button
+                type="button"
+                className={getToolbarButtonClassName({
+                  active: rowSelectionMode,
+                })}
+                onClick={handleToggleRowSelectionMode}
+              >
+                {rowSelectionMode ? '取消选择' : '选择明细行'}
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                onClick={() => handleInsertLine('before')}
+                disabled={selectedLineIndex === null}
+              >
+                上插一行
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                onClick={() => handleInsertLine('after')}
+                disabled={selectedLineIndex === null}
+              >
+                下插一行
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                onClick={handleRemoveLine}
+                disabled={selectedLineIndex === null}
+              >
+                移除当前行
+              </button>
+              <span className="erp-print-shell__counter">
+                加工明细行: {contract.lines.length}/
+                {PROCESSING_CONTRACT_MAX_ROWS}
+              </span>
+            </div>
+          </PrintWorkspaceToolSection>
+          <PrintWorkspaceToolSection title="单元格">
+            <div className="erp-print-shell__toolbar-group">
+              <button
+                type="button"
+                className={getToolbarButtonClassName({
+                  active: cellSelectionMode,
+                })}
+                onClick={handleToggleCellSelectionMode}
+              >
+                {cellSelectionMode ? '取消选区' : '选择单元格'}
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                onClick={handleApplyMerge}
+                disabled={!canApplyMerge}
+              >
+                合并选区
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                onClick={handleSplitMerge}
+                disabled={!canSplitMerge}
+              >
+                拆分当前
+              </button>
+            </div>
+          </PrintWorkspaceToolSection>
+        </>
       }
       draftActions={
         <div className="erp-print-shell__toolbar-group">

@@ -11,6 +11,16 @@ const DRAFT_PERSISTENCE_STATUS_TEXT = Object.freeze({
   unavailable: '本窗口内容不会自动保存',
 })
 
+export function PrintWorkspaceToolSection({ title, children }) {
+  if (!children) return null
+  return (
+    <section className="erp-print-shell__tool-section" aria-label={title}>
+      <h3>{title}</h3>
+      {children}
+    </section>
+  )
+}
+
 export default function PrintWorkspaceShell({
   title,
   sourceTag = '使用默认模板',
@@ -19,7 +29,6 @@ export default function PrintWorkspaceShell({
   tools = [],
   onRetrySave,
   workspaceClassName = '',
-  panelTip = '',
   panelActions = null,
   editorActions = null,
   draftActions = null,
@@ -31,6 +40,7 @@ export default function PrintWorkspaceShell({
   onReturnToEdit,
   toolbarActions = null,
   formulaPanel = null,
+  formulaActions = null,
   prepareSignature = '',
   preparingText = '正在准备打印模板...',
   children,
@@ -38,7 +48,6 @@ export default function PrintWorkspaceShell({
   const stageRef = useRef(null)
   const [zoomMode, setZoomMode] = useState('fit')
   const [fitScale, setFitScale] = useState(1)
-  const [editingText, setEditingText] = useState('直接点击纸面填写内容')
   const [preparing, setPreparing] = useState(true)
   const [imageBudget, setImageBudget] = useState({ count: 0, problem: '' })
 
@@ -189,44 +198,41 @@ export default function PrintWorkspaceShell({
       </header>
 
       <main className="erp-print-shell__content">
-        <aside className="erp-print-shell__panel">
+        <aside className="erp-print-shell__panel" aria-label="打印编辑工具">
           <div className="erp-print-shell__record-panel">
-            <h3>编辑工具</h3>
-            {panelTip ? <p>{panelTip}</p> : null}
             {editorActions &&
-            tools.some((tool) => ['rows', 'cells', 'blocks'].includes(tool)) ? (
-              <section className="erp-print-shell__tool-section">
-                <h4>行与单元格</h4>
-                {editorActions}
-              </section>
-            ) : null}
+            tools.some((tool) => ['rows', 'cells', 'blocks'].includes(tool))
+              ? editorActions
+              : null}
             {formatActions && tools.includes('text') ? (
-              <section className="erp-print-shell__tool-section">
-                <h4>文字格式</h4>
+              <PrintWorkspaceToolSection title="文字格式">
                 {formatActions}
-              </section>
+              </PrintWorkspaceToolSection>
             ) : null}
             {panelActions && tools.includes('images') ? (
-              <section className="erp-print-shell__tool-section">
-                <h4>图片管理</h4>
+              <PrintWorkspaceToolSection title="图片管理">
                 {panelActions}
                 <p role="status" data-print-image-budget>
                   {imageBudget.problem ||
                     `输出图片 ${imageBudget.count}/32 张（含长图分段）`}
                 </p>
-              </section>
+              </PrintWorkspaceToolSection>
             ) : null}
-            {formulaPanel && tools.includes('calculation') ? (
-              <section className="erp-print-shell__tool-section erp-print-shell__formula-panel">
-                <h4>计算规则</h4>
-                {formulaPanel}
-              </section>
+            {(formulaActions || formulaPanel) &&
+            tools.includes('calculation') ? (
+              <PrintWorkspaceToolSection title="计算规则">
+                {formulaActions}
+                {formulaPanel ? (
+                  <div className="erp-print-shell__formula-panel">
+                    {formulaPanel}
+                  </div>
+                ) : null}
+              </PrintWorkspaceToolSection>
             ) : null}
             {draftActions ? (
-              <section className="erp-print-shell__tool-section">
-                <h4>整份内容</h4>
+              <PrintWorkspaceToolSection title="模板内容">
                 {draftActions}
-              </section>
+              </PrintWorkspaceToolSection>
             ) : null}
           </div>
         </aside>
@@ -261,22 +267,24 @@ export default function PrintWorkspaceShell({
                   </small>
                 </>
               ) : (
-                editingText
+                '点击纸面填写'
               )}
             </div>
-            <label className="erp-print-shell__zoom-control">
-              显示比例{' '}
-              <select
-                aria-label="显示比例"
-                value={zoomMode}
-                onChange={(event) => setZoomMode(event.target.value)}
-              >
-                <option value="fit">适应宽度</option>
-                <option value="0.75">75%</option>
-                <option value="1">100%</option>
-                <option value="1.25">125%</option>
-                <option value="1.5">150%</option>
-              </select>
+            <label className="erp-print-shell__zoom-control print-zoom-control">
+              显示比例
+              <span className="print-zoom-select">
+                <select
+                  aria-label="显示比例"
+                  value={zoomMode}
+                  onChange={(event) => setZoomMode(event.target.value)}
+                >
+                  <option value="fit">适应宽度</option>
+                  <option value="0.75">75%</option>
+                  <option value="1">100%</option>
+                  <option value="1.25">125%</option>
+                  <option value="1.5">150%</option>
+                </select>
+              </span>
             </label>
           </div>
           {statusText ? (
@@ -289,12 +297,6 @@ export default function PrintWorkspaceShell({
             ref={stageRef}
             style={{ '--print-view-scale': scale }}
             onInputCapture={captureInput}
-            onFocusCapture={(event) => {
-              if (event.target.isContentEditable) {
-                setEditingText('正在编辑纸面内容 · 完成后自动保存')
-              }
-            }}
-            onBlurCapture={() => setEditingText('直接点击纸面填写内容')}
           >
             {children}
           </div>

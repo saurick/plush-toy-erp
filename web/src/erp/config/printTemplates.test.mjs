@@ -229,7 +229,7 @@ test('printTemplates: 正式打印入口使用岗位可理解的说明和中文�
 
   assert.match(printCenterPage, /选择模板、预览内容并打开打印窗口/u)
   assert.doesNotMatch(printCenterPage, /业务带值|轻量工作台/u)
-  assert.match(printWorkspaceShell, /<h3>打印内容<\/h3>/u)
+  assert.match(printWorkspaceShell, /aria-label="打印编辑工具"/u)
   assert.doesNotMatch(printWorkspaceShell, /当前记录字段|字段名或字段值/u)
   assert.match(
     engineeringWorkspace,
@@ -241,7 +241,7 @@ test('printTemplates: 正式打印入口使用岗位可理解的说明和中文�
   )
   assert.match(processingWorkspace, /`加工合同-\$\{stamp\}\.pdf`/u)
   assert.doesNotMatch(processingWorkspace, /processing-contract_\$\{stamp\}/u)
-  assert.match(processingWorkspace, /打印窗口已准备好，可以开始编辑/u)
+  assert.doesNotMatch(processingWorkspace, /打印窗口已准备好，可以开始编辑/u)
   assert.doesNotMatch(processingWorkspace, /主工作流/u)
 })
 

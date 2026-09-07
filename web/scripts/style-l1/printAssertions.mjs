@@ -87,9 +87,11 @@ export function createPrintAssertions({
         await new Promise((resolve, reject) => {
           const transaction = db.transaction('drafts', 'readwrite')
           for (const { key, value } of values) {
-            if (typeof value === 'string')
+            if (typeof value === 'string') {
               transaction.objectStore('drafts').put(JSON.parse(value), key)
-            else transaction.objectStore('drafts').delete(key)
+            } else {
+              transaction.objectStore('drafts').delete(key)
+            }
           }
           transaction.oncomplete = resolve
           transaction.onerror = () => reject(transaction.error)
@@ -1145,7 +1147,9 @@ export function createPrintAssertions({
         originalEntries,
         'material_meta_alignment_restore'
       )
-      await expectText(page, '编辑工具')
+      await page
+        .getByRole('complementary', { name: '打印编辑工具' })
+        .waitFor({ state: 'visible' })
     }
   }
 
@@ -1327,7 +1331,9 @@ export function createPrintAssertions({
       }, storageKeys)
 
       await reloadWithDraftEntries(page, injectedEntries, 'material_long_line')
-      await expectText(page, '编辑工具')
+      await page
+        .getByRole('complementary', { name: '打印编辑工具' })
+        .waitFor({ state: 'visible' })
       await expectText(page, 'SIM-YOYOOSUN-BULK-PO-03')
 
       const metrics = await page.evaluate(() => {
@@ -1455,7 +1461,9 @@ export function createPrintAssertions({
         originalEntries,
         'material_long_line_restore'
       )
-      await expectText(page, '编辑工具')
+      await page
+        .getByRole('complementary', { name: '打印编辑工具' })
+        .waitFor({ state: 'visible' })
     }
   }
 
@@ -1934,7 +1942,9 @@ export function createPrintAssertions({
       )
 
       await reloadWithDraftEntries(page, injectedEntries, 'large_total')
-      await expectText(page, '编辑工具')
+      await page
+        .getByRole('complementary', { name: '打印编辑工具' })
+        .waitFor({ state: 'visible' })
       await page.waitForFunction(
         (selector) => document.querySelectorAll(selector).length >= 2,
         totalValueSelector,
@@ -1993,7 +2003,9 @@ export function createPrintAssertions({
       })
     } finally {
       await reloadWithDraftEntries(page, originalEntries, 'large_total_restore')
-      await expectText(page, '编辑工具')
+      await page
+        .getByRole('complementary', { name: '打印编辑工具' })
+        .waitFor({ state: 'visible' })
     }
   }
 

@@ -19,7 +19,9 @@ import {
   updateMaterialPurchaseField,
   updateMaterialPurchaseLineCell,
 } from '../../utils/materialPurchaseContractEditor.mjs'
-import PrintWorkspaceShell from './PrintWorkspaceShell.jsx'
+import PrintWorkspaceShell, {
+  PrintWorkspaceToolSection,
+} from './PrintWorkspaceShell.jsx'
 import {
   PDF_ACTION_UI_STALE_TIMEOUT_MS,
   downloadPdfFromElement,
@@ -85,16 +87,6 @@ function loadDraft(template, storageKey, options = {}) {
   return buildDraft(storedDraft)
 }
 
-function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
-  if (resetDraftOnOpen) {
-    return '已按菜单入口恢复默认采购合同样例。'
-  }
-  if (sourceTag === '业务记录带值') {
-    return '已从业务页带入采购合同草稿，可继续核对并打印。'
-  }
-  return '已恢复模板样例数据。'
-}
-
 export default function MaterialPurchaseContractWorkbench({
   template,
   draftStorageKey = '',
@@ -122,9 +114,7 @@ export default function MaterialPurchaseContractWorkbench({
   const [mergeSelectionAnchor, setMergeSelectionAnchor] = useState(null)
   const [mergeSelectionFocus, setMergeSelectionFocus] = useState(null)
   const [activeCell, setActiveCell] = useState(null)
-  const [toolbarStatus, setToolbarStatus] = useState(() =>
-    resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag)
-  )
+  const [toolbarStatus, setToolbarStatus] = useState('')
   const [pdfAction, setPdfAction] = useState('')
   const [pdfActionStartedAt, setPdfActionStartedAt] = useState(0)
   const pdfPreviewPreloadRef = useRef(null)
@@ -148,7 +138,7 @@ export default function MaterialPurchaseContractWorkbench({
     setActiveCell(null)
     setPdfAction('')
     setPdfActionStartedAt(0)
-    setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
+    setToolbarStatus('')
   }, [
     businessInput,
     draftStorageKey,
@@ -267,39 +257,36 @@ export default function MaterialPurchaseContractWorkbench({
   }
 
   const handleToggleRowSelectionMode = () => {
+    setToolbarStatus('')
     setRowSelectionMode((currentValue) => {
       const nextValue = !currentValue
       if (nextValue) {
         setCellSelectionMode(false)
         resetCellSelection()
-        setToolbarStatus('已进入明细行选择模式，请点击中间明细表中的目标行。')
       } else {
         resetRowSelection()
-        setToolbarStatus('已退出明细行选择模式。')
       }
       return nextValue
     })
   }
 
   const handleToggleCellSelectionMode = () => {
+    setToolbarStatus('')
     setCellSelectionMode((currentValue) => {
       const nextValue = !currentValue
       if (nextValue) {
         setRowSelectionMode(false)
         resetRowSelection()
         resetCellSelection()
-        setToolbarStatus(
-          '已进入单元格选区模式，请在右侧采购明细表里依次点选起点和终点。'
-        )
       } else {
         resetCellSelection()
-        setToolbarStatus('已退出单元格选区模式。')
       }
       return nextValue
     })
   }
 
   const handleSelectCell = (rowIndex, colIndex) => {
+    setToolbarStatus('')
     const nextCell = { rowIndex, colIndex }
     setActiveCell(nextCell)
     const currentSelection = normalizeCellSelection(
@@ -314,19 +301,10 @@ export default function MaterialPurchaseContractWorkbench({
     if (!mergeSelectionAnchor || hasExpandedSelection) {
       setMergeSelectionAnchor(nextCell)
       setMergeSelectionFocus(nextCell)
-      setToolbarStatus(
-        `已选中第 ${rowIndex + 1} 行第 ${colIndex + 1} 列，请继续点终点或直接拆分当前合并块。`
-      )
       return
     }
 
     setMergeSelectionFocus(nextCell)
-    const nextSelection = normalizeCellSelection(mergeSelectionAnchor, nextCell)
-    const rowCount = nextSelection.rowEnd - nextSelection.rowStart + 1
-    const colCount = nextSelection.colEnd - nextSelection.colStart + 1
-    setToolbarStatus(
-      `已选中 ${rowCount} × ${colCount} 的矩形区域，可继续合并。`
-    )
   }
 
   const handleApplyMerge = () => {
@@ -650,6 +628,7 @@ export default function MaterialPurchaseContractWorkbench({
             : 1
       }
       onReturnToEdit={() => {
+        setToolbarStatus('')
         setRowSelectionMode(false)
         setCellSelectionMode(false)
         resetRowSelection()
@@ -661,7 +640,6 @@ export default function MaterialPurchaseContractWorkbench({
           ? `第 ${selectedRowIndex + 1} 行`
           : ''
       }
-      panelTip="直接点击纸面填写；选择行或单元格后，可在这里调整结构。"
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
       panelActions={
         <PrintAppendixImageManager
@@ -670,10 +648,19 @@ export default function MaterialPurchaseContractWorkbench({
           onStatusChange={setToolbarStatus}
         />
       }
+      formulaActions={
+        <button
+          type="button"
+          aria-expanded={formulaVisible}
+          className={getToolbarButtonClassName({ active: formulaVisible })}
+          onClick={() => setFormulaVisible((currentValue) => !currentValue)}
+        >
+          {formulaVisible ? '收起规则' : '查看规则'}
+        </button>
+      }
       formulaPanel={
         formulaVisible ? (
           <>
-            <strong>采购合同计算规则</strong>
             <span>默认金额 = 数量 × 单价</span>
             <span>如合同中已有确认金额，可直接改写采购金额。</span>
             <span>总计 = Σ 当前采购金额列</span>
@@ -682,76 +669,77 @@ export default function MaterialPurchaseContractWorkbench({
         ) : null
       }
       editorActions={
-        <div className="erp-print-shell__toolbar-group">
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            onClick={handleInsertRow.bind(null, 'before')}
-            disabled={selectedRowIndex == null}
-          >
-            上插一行
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            onClick={handleInsertRow.bind(null, 'after')}
-            disabled={selectedRowIndex == null}
-          >
-            下插一行
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            onClick={handleDeleteRow}
-            disabled={selectedRowIndex == null}
-          >
-            移除当前行
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName({
-              active: rowSelectionMode,
-            })}
-            onClick={handleToggleRowSelectionMode}
-          >
-            {rowSelectionMode ? '取消选择' : '选择明细行'}
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName({
-              active: cellSelectionMode,
-            })}
-            onClick={handleToggleCellSelectionMode}
-          >
-            {cellSelectionMode ? '取消选区' : '选择单元格'}
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            onClick={handleApplyMerge}
-            disabled={!canApplyMerge}
-          >
-            合并选区
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName()}
-            onClick={handleSplitMerge}
-            disabled={!canSplitMerge}
-          >
-            拆分当前
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName({ active: formulaVisible })}
-            onClick={() => setFormulaVisible((currentValue) => !currentValue)}
-          >
-            计算规则
-          </button>
-          <span className="erp-print-shell__counter">
-            采购明细行: {draft.lines.length}/{MATERIAL_PURCHASE_MAX_ROWS}
-          </span>
-        </div>
+        <>
+          <PrintWorkspaceToolSection title="明细行">
+            <div className="erp-print-shell__toolbar-group">
+              <button
+                type="button"
+                className={getToolbarButtonClassName({
+                  active: rowSelectionMode,
+                })}
+                onClick={handleToggleRowSelectionMode}
+              >
+                {rowSelectionMode ? '取消选择' : '选择明细行'}
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                onClick={handleInsertRow.bind(null, 'before')}
+                disabled={selectedRowIndex == null}
+              >
+                上插一行
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                onClick={handleInsertRow.bind(null, 'after')}
+                disabled={selectedRowIndex == null}
+              >
+                下插一行
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                onClick={handleDeleteRow}
+                disabled={selectedRowIndex == null}
+              >
+                移除当前行
+              </button>
+              <span className="erp-print-shell__counter">
+                采购明细行: {draft.lines.length}/{MATERIAL_PURCHASE_MAX_ROWS}
+              </span>
+            </div>
+          </PrintWorkspaceToolSection>
+          <PrintWorkspaceToolSection title="单元格">
+            <div className="erp-print-shell__toolbar-group">
+              <button
+                type="button"
+                className={getToolbarButtonClassName({
+                  active: cellSelectionMode,
+                })}
+                onClick={handleToggleCellSelectionMode}
+              >
+                {cellSelectionMode ? '取消选区' : '选择单元格'}
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                onClick={handleApplyMerge}
+                disabled={!canApplyMerge}
+              >
+                合并选区
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                onClick={handleSplitMerge}
+                disabled={!canSplitMerge}
+              >
+                拆分当前
+              </button>
+            </div>
+          </PrintWorkspaceToolSection>
+        </>
       }
       draftActions={
         <div className="erp-print-shell__toolbar-group">
@@ -819,7 +807,6 @@ export default function MaterialPurchaseContractWorkbench({
           selectedRowIndex={selectedRowIndex}
           rowSelectionMode={rowSelectionMode}
           setSelectedRowIndex={setSelectedRowIndex}
-          setToolbarStatus={setToolbarStatus}
           activeCell={activeCell}
           mergeSelection={mergeSelection}
           cellSelectionMode={cellSelectionMode}

@@ -4,6 +4,7 @@ import { createColorCardInteractionScenario } from './colorCardInteractionScenar
 import { createWorkInstructionInteractionScenario } from './workInstructionInteractionScenario.mjs'
 import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 import { createPrintPolishScenarios } from './printPolishScenarios.mjs'
+import { createPrintWorkspaceControlScenarios } from './printWorkspaceControlScenarios.mjs'
 
 export function createPrintWorkspaceScenarios({
   expectHeading,
@@ -632,6 +633,12 @@ export function createPrintWorkspaceScenarios({
     )
   }
   return [
+    ...createPrintWorkspaceControlScenarios({
+      assert,
+      path,
+      outputDir,
+      gotoScenarioPath,
+    }),
     ...createPrintPolishScenarios({
       assert,
       path,
@@ -1058,7 +1065,9 @@ export function createPrintWorkspaceScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '采购合同')
-        await expectText(page, '编辑工具')
+        await page
+          .getByRole('complementary', { name: '打印编辑工具' })
+          .waitFor({ state: 'visible' })
         await expectText(page, '使用默认模板')
         await expectText(page, '在线预览 PDF')
         await expectText(page, '选择明细行')
@@ -1256,7 +1265,9 @@ export function createPrintWorkspaceScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '加工合同')
-        await expectText(page, '编辑工具')
+        await page
+          .getByRole('complementary', { name: '打印编辑工具' })
+          .waitFor({ state: 'visible' })
         await expectText(page, '使用默认模板')
         await expectText(page, '在线预览 PDF')
         await expectText(page, '下载 PDF')

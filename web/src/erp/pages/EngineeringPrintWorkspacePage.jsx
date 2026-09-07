@@ -20,7 +20,9 @@ import {
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PrintAppendixImageManager from '../components/print/PrintAppendixImages.jsx'
-import PrintWorkspaceShell from '../components/print/PrintWorkspaceShell.jsx'
+import PrintWorkspaceShell, {
+  PrintWorkspaceToolSection,
+} from '../components/print/PrintWorkspaceShell.jsx'
 import WorkInstructionImageAnnotationEditor from '../components/print/WorkInstructionImageAnnotationEditor.jsx'
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import {
@@ -372,9 +374,7 @@ export default function EngineeringPrintWorkspacePage() {
   const instructionRowImageInputRefs = useRef({})
   const [pdfAction, setPdfAction] = useState('')
   const [pdfActionStartedAt, setPdfActionStartedAt] = useState(0)
-  const [toolbarStatus, setToolbarStatus] = useState(
-    businessInput ? '已从业务页带入打印草稿。' : '已加载默认样例。'
-  )
+  const [toolbarStatus, setToolbarStatus] = useState('')
   const [draft, setDraft, flushDraft, draftRef, persistenceStatus] =
     usePersistentPrintWorkspaceDraft(
       () =>
@@ -425,9 +425,7 @@ export default function EngineeringPrintWorkspacePage() {
         businessInput,
       })
     )
-    setToolbarStatus(
-      businessInput ? '已从业务页带入打印草稿。' : '已加载默认样例。'
-    )
+    setToolbarStatus('')
     setSelectedMaterialLineIndex(null)
     setMaterialLineSelectionMode(false)
     setMaterialCellSelectionMode(false)
@@ -569,6 +567,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const resetSelectionForTemplate = () => {
+    setToolbarStatus('')
     setSelectedMaterialLineIndex(null)
     setMaterialLineSelectionMode(false)
     setMaterialCellSelectionMode(false)
@@ -618,6 +617,7 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const toggleMaterialLineSelectionMode = () => {
+    setToolbarStatus('')
     setMaterialLineSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
@@ -625,10 +625,8 @@ export default function EngineeringPrintWorkspacePage() {
         setMaterialMergeSelectionAnchor(null)
         setMaterialMergeSelectionFocus(null)
         setMaterialActiveCell(null)
-        setToolbarStatus('已进入物料明细行选择模式，请点击表格中的目标行。')
       } else {
         setSelectedMaterialLineIndex(null)
-        setToolbarStatus('已退出物料明细行选择模式。')
       }
       return nextValue
     })
@@ -636,12 +634,11 @@ export default function EngineeringPrintWorkspacePage() {
 
   const selectMaterialLine = (rowIndex) => {
     setSelectedMaterialLineIndex(rowIndex)
-    setToolbarStatus(
-      `已选中物料明细第 ${rowIndex + 1} 行，可继续上插 / 下插 / 移除。`
-    )
+    setToolbarStatus('')
   }
 
   const toggleMaterialCellSelectionMode = () => {
+    setToolbarStatus('')
     setMaterialCellSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
@@ -651,16 +648,12 @@ export default function EngineeringPrintWorkspacePage() {
       setMaterialMergeSelectionAnchor(null)
       setMaterialMergeSelectionFocus(null)
       setMaterialActiveCell(null)
-      setToolbarStatus(
-        nextValue
-          ? '已进入物料明细单元格选区模式，请依次点击起点和终点。'
-          : '已退出物料明细单元格选区模式。'
-      )
       return nextValue
     })
   }
 
   const selectMaterialCell = (rowIndex, colIndex) => {
+    setToolbarStatus('')
     const nextCell = { rowIndex, colIndex }
     setMaterialActiveCell(nextCell)
     const currentSelection = normalizeCellSelection(
@@ -675,22 +668,10 @@ export default function EngineeringPrintWorkspacePage() {
     if (!materialMergeSelectionAnchor || hasExpandedSelection) {
       setMaterialMergeSelectionAnchor(nextCell)
       setMaterialMergeSelectionFocus(nextCell)
-      setToolbarStatus(
-        `已选中第 ${rowIndex + 1} 行第 ${colIndex + 1} 列，请继续点终点或直接拆分当前合并块。`
-      )
       return
     }
 
     setMaterialMergeSelectionFocus(nextCell)
-    const nextSelection = normalizeCellSelection(
-      materialMergeSelectionAnchor,
-      nextCell
-    )
-    setToolbarStatus(
-      `已选中 ${nextSelection.rowEnd - nextSelection.rowStart + 1} × ${
-        nextSelection.colEnd - nextSelection.colStart + 1
-      } 的物料明细区域，可继续合并。`
-    )
   }
 
   const applyMaterialMerge = () => {
@@ -747,32 +728,30 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const toggleColorBlockSelectionMode = () => {
+    setToolbarStatus('')
     setColorBlockSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
         setColorLineSelectionMode(false)
         setSelectedColorLine(null)
-        setToolbarStatus('已进入色卡块选择模式，请点击右侧色卡物料块。')
       } else {
         setSelectedColorBlockIndex(null)
         setSelectedColorLine(null)
-        setToolbarStatus('已退出色卡块选择模式。')
       }
       return nextValue
     })
   }
 
   const toggleColorLineSelectionMode = () => {
+    setToolbarStatus('')
     setColorLineSelectionMode((current) => {
       const nextValue = !current
       if (nextValue) {
         setColorBlockSelectionMode(false)
         setSelectedColorBlockIndex(null)
         setSelectedColorLine(null)
-        setToolbarStatus('已进入色卡行选择模式，请点击右侧色卡块内目标行。')
       } else {
         setSelectedColorLine(null)
-        setToolbarStatus('已退出色卡行选择模式。')
       }
       return nextValue
     })
@@ -781,19 +760,13 @@ export default function EngineeringPrintWorkspacePage() {
   const selectColorBlock = (blockIndex) => {
     setSelectedColorBlockIndex(blockIndex)
     setSelectedColorLine(null)
-    setToolbarStatus(
-      `已选中色卡块 ${blockIndex + 1}，可继续上插 / 下插 / 移除。`
-    )
+    setToolbarStatus('')
   }
 
   const selectColorLine = (blockIndex, lineIndex, persisted = true) => {
     setSelectedColorBlockIndex(null)
     setSelectedColorLine({ blockIndex, lineIndex, persisted })
-    setToolbarStatus(
-      persisted
-        ? `已选中色卡块 ${blockIndex + 1} 第 ${lineIndex + 1} 行，可继续上插 / 下插 / 移除。`
-        : `已选中色卡块 ${blockIndex + 1} 第 ${lineIndex + 1} 个空白位，可继续上插 / 下插。`
-    )
+    setToolbarStatus('')
   }
 
   const applyColorLineAction = (action, position = 'after') => {
@@ -820,13 +793,11 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const toggleInstructionRowSelectionMode = () => {
+    setToolbarStatus('')
     setInstructionRowSelectionMode((current) => {
       const nextValue = !current
-      if (nextValue) {
-        setToolbarStatus('已进入行选择模式，请点击作业指导书中的目标行。')
-      } else {
+      if (!nextValue) {
         setSelectedInstructionRowTarget(null)
-        setToolbarStatus('已退出行选择模式。')
       }
       return nextValue
     })
@@ -836,11 +807,7 @@ export default function EngineeringPrintWorkspacePage() {
     const normalizedTarget = normalizeInstructionRowTarget(target)
     if (!normalizedTarget) return
     setSelectedInstructionRowTarget(normalizedTarget)
-    setToolbarStatus(
-      `已选中作业指导书${formatInstructionRowTargetLabel(
-        normalizedTarget
-      )}，可继续上插 / 下插 / 移除 / 调整行类型。`
-    )
+    setToolbarStatus('')
   }
 
   const applyInstructionRowAction = (action, position = 'after') => {
@@ -1623,20 +1590,201 @@ export default function EngineeringPrintWorkspacePage() {
   const templateEditorActions = (() => {
     if (templateKey === MATERIAL_DETAIL_TEMPLATE_KEY) {
       return (
+        <>
+          <PrintWorkspaceToolSection title="明细行">
+            <div className="erp-print-shell__toolbar-group">
+              <button
+                type="button"
+                className={getToolbarButtonClassName({
+                  active: materialLineSelectionMode,
+                })}
+                onClick={toggleMaterialLineSelectionMode}
+              >
+                {materialLineSelectionMode ? '取消选择' : '选择明细行'}
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={selectedMaterialLineIndex === null}
+                onClick={() => applyMaterialLineAction('insert', 'before')}
+              >
+                上插一行
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={selectedMaterialLineIndex === null}
+                onClick={() => applyMaterialLineAction('insert', 'after')}
+              >
+                下插一行
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={
+                  selectedMaterialLineIndex === null || draft.lines.length <= 1
+                }
+                onClick={() => applyMaterialLineAction('remove')}
+              >
+                移除当前行
+              </button>
+              <span className="erp-print-shell__counter">
+                物料行: {draft.lines.length}/
+                {ENGINEERING_PRINT_LIMITS.materialRows}
+              </span>
+            </div>
+          </PrintWorkspaceToolSection>
+          <PrintWorkspaceToolSection title="单元格">
+            <div className="erp-print-shell__toolbar-group">
+              <button
+                type="button"
+                className={getToolbarButtonClassName({
+                  active: materialCellSelectionMode,
+                })}
+                onClick={toggleMaterialCellSelectionMode}
+              >
+                {materialCellSelectionMode ? '取消选区' : '选择单元格'}
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={!canApplyMaterialMerge}
+                onClick={applyMaterialMerge}
+              >
+                合并选区
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={!canSplitMaterialMerge}
+                onClick={splitMaterialMerge}
+              >
+                拆分当前
+              </button>
+            </div>
+          </PrintWorkspaceToolSection>
+        </>
+      )
+    }
+
+    if (templateKey === COLOR_CARD_TEMPLATE_KEY) {
+      return (
+        <>
+          <PrintWorkspaceToolSection title="色卡块">
+            <div className="erp-print-shell__toolbar-group">
+              <button
+                type="button"
+                className={getToolbarButtonClassName({
+                  active: colorBlockSelectionMode,
+                })}
+                onClick={toggleColorBlockSelectionMode}
+              >
+                {colorBlockSelectionMode ? '取消选择' : '选择色卡块'}
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={selectedColorBlockIndex === null}
+                onClick={() => applyColorBlockAction('insert', 'before')}
+              >
+                上插色卡块
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={selectedColorBlockIndex === null}
+                onClick={() => applyColorBlockAction('insert', 'after')}
+              >
+                下插色卡块
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={
+                  selectedColorBlockIndex === null || draft.blocks.length <= 1
+                }
+                onClick={() => applyColorBlockAction('remove')}
+              >
+                移除当前块
+              </button>
+              <span className="erp-print-shell__counter">
+                色卡块: {draft.blocks.length}/
+                {ENGINEERING_PRINT_LIMITS.colorBlocks}
+              </span>
+            </div>
+          </PrintWorkspaceToolSection>
+          <PrintWorkspaceToolSection title="明细行">
+            <div className="erp-print-shell__toolbar-group">
+              <button
+                type="button"
+                className={getToolbarButtonClassName({
+                  active: colorLineSelectionMode,
+                })}
+                onClick={toggleColorLineSelectionMode}
+              >
+                {colorLineSelectionMode ? '取消选择' : '选择色卡行'}
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={!selectedColorLine}
+                onClick={() => applyColorLineAction('insert', 'before')}
+              >
+                上插一行
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={!selectedColorLine}
+                onClick={() => applyColorLineAction('insert', 'after')}
+              >
+                下插一行
+              </button>
+              <button
+                type="button"
+                className={getToolbarButtonClassName()}
+                disabled={
+                  !selectedColorLine || selectedColorLine.persisted === false
+                }
+                onClick={() => applyColorLineAction('remove')}
+              >
+                移除当前行
+              </button>
+            </div>
+          </PrintWorkspaceToolSection>
+        </>
+      )
+    }
+
+    return (
+      <PrintWorkspaceToolSection title="明细行">
         <div className="erp-print-shell__toolbar-group">
           <button
             type="button"
+            className={getToolbarButtonClassName({
+              active: instructionRowSelectionMode,
+            })}
+            onClick={toggleInstructionRowSelectionMode}
+          >
+            {instructionRowSelectionMode ? '取消选择' : '选择行'}
+          </button>
+          <button
+            type="button"
             className={getToolbarButtonClassName()}
-            disabled={selectedMaterialLineIndex === null}
-            onClick={() => applyMaterialLineAction('insert', 'before')}
+            disabled={selectedWorkInstructionRowTarget === null}
+            onClick={() =>
+              applySelectedWorkInstructionRowAction('insert', 'before')
+            }
           >
             上插一行
           </button>
           <button
             type="button"
             className={getToolbarButtonClassName()}
-            disabled={selectedMaterialLineIndex === null}
-            onClick={() => applyMaterialLineAction('insert', 'after')}
+            disabled={selectedWorkInstructionRowTarget === null}
+            onClick={() =>
+              applySelectedWorkInstructionRowAction('insert', 'after')
+            }
           >
             下插一行
           </button>
@@ -1644,263 +1792,97 @@ export default function EngineeringPrintWorkspacePage() {
             type="button"
             className={getToolbarButtonClassName()}
             disabled={
-              selectedMaterialLineIndex === null || draft.lines.length <= 1
+              selectedWorkInstructionRowTarget === null ||
+              selectedInstructionRows.length <= 1
             }
-            onClick={() => applyMaterialLineAction('remove')}
+            onClick={() => applySelectedWorkInstructionRowAction('remove')}
           >
             移除当前行
           </button>
+          {[
+            [WORK_INSTRUCTION_ROW_TYPES.title, '设为标题行'],
+            [WORK_INSTRUCTION_ROW_TYPES.step, '设为编号行'],
+            [WORK_INSTRUCTION_ROW_TYPES.text, '设为文本行'],
+          ].map(([type, label]) => (
+            <button
+              type="button"
+              className={getToolbarButtonClassName({
+                active:
+                  getWorkInstructionRowType(selectedInstructionRow) === type,
+              })}
+              disabled={selectedWorkInstructionRowTarget === null}
+              key={type}
+              onClick={() => applyInstructionRowType(type)}
+            >
+              {label}
+            </button>
+          ))}
           <button
             type="button"
-            className={getToolbarButtonClassName({
-              active: materialLineSelectionMode,
-            })}
-            onClick={toggleMaterialLineSelectionMode}
+            className={getToolbarButtonClassName()}
+            disabled={
+              selectedWorkInstructionRowTarget === null ||
+              !selectedInstructionRowIsStep ||
+              selectedInstructionRowImages.length >=
+                ENGINEERING_PRINT_LIMITS.instructionRowImages
+            }
+            title={
+              selectedInstructionRowImages.length >=
+              ENGINEERING_PRINT_LIMITS.instructionRowImages
+                ? `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片`
+                : undefined
+            }
+            onClick={() =>
+              handleInstructionRowImageUploadClick(
+                selectedWorkInstructionRowTarget
+              )
+            }
           >
-            {materialLineSelectionMode ? '取消选择' : '选择明细行'}
-          </button>
-          <button
-            type="button"
-            className={getToolbarButtonClassName({
-              active: materialCellSelectionMode,
-            })}
-            onClick={toggleMaterialCellSelectionMode}
-          >
-            {materialCellSelectionMode ? '取消选区' : '选择单元格'}
+            给当前行加图
           </button>
           <button
             type="button"
             className={getToolbarButtonClassName()}
-            disabled={!canApplyMaterialMerge}
-            onClick={applyMaterialMerge}
+            disabled={
+              selectedWorkInstructionRowTarget === null ||
+              !selectedInstructionRowIsStep ||
+              selectedInstructionRowImages.length === 0
+            }
+            onClick={() =>
+              clearInstructionRowImages(selectedWorkInstructionRowTarget)
+            }
           >
-            合并选区
+            清空当前行图片
           </button>
           <button
             type="button"
             className={getToolbarButtonClassName()}
-            disabled={!canSplitMaterialMerge}
-            onClick={splitMaterialMerge}
+            data-open-work-instruction-annotation-editor
+            disabled={
+              selectedWorkInstructionRowTarget === null ||
+              !selectedInstructionRowIsStep ||
+              selectedInstructionRowImages.length === 0
+            }
+            onClick={() =>
+              openInstructionAnnotationEditor(selectedWorkInstructionRowTarget)
+            }
           >
-            拆分当前
+            标注当前行图片
           </button>
           <span className="erp-print-shell__counter">
-            物料行: {draft.lines.length}/{ENGINEERING_PRINT_LIMITS.materialRows}
+            正文行: {draft.rows.length}
+            {Array.isArray(draft.continuationPages) &&
+            draft.continuationPages.length
+              ? ` + 续页 ${draft.continuationPages.reduce(
+                  (total, page) =>
+                    total + (Array.isArray(page.rows) ? page.rows.length : 0),
+                  0
+                )}`
+              : ''}
+            /{ENGINEERING_PRINT_LIMITS.instructionRows}/页
           </span>
         </div>
-      )
-    }
-
-    if (templateKey === COLOR_CARD_TEMPLATE_KEY) {
-      return (
-        <>
-          <div className="erp-print-shell__toolbar-group">
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              disabled={selectedColorBlockIndex === null}
-              onClick={() => applyColorBlockAction('insert', 'before')}
-            >
-              上插色卡块
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              disabled={selectedColorBlockIndex === null}
-              onClick={() => applyColorBlockAction('insert', 'after')}
-            >
-              下插色卡块
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              disabled={
-                selectedColorBlockIndex === null || draft.blocks.length <= 1
-              }
-              onClick={() => applyColorBlockAction('remove')}
-            >
-              移除当前块
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName({
-                active: colorBlockSelectionMode,
-              })}
-              onClick={toggleColorBlockSelectionMode}
-            >
-              {colorBlockSelectionMode ? '取消选择' : '选择色卡块'}
-            </button>
-            <span className="erp-print-shell__counter">
-              色卡块: {draft.blocks.length}/
-              {ENGINEERING_PRINT_LIMITS.colorBlocks}
-            </span>
-          </div>
-          <div className="erp-print-shell__toolbar-group">
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              disabled={!selectedColorLine}
-              onClick={() => applyColorLineAction('insert', 'before')}
-            >
-              上插一行
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              disabled={!selectedColorLine}
-              onClick={() => applyColorLineAction('insert', 'after')}
-            >
-              下插一行
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName()}
-              disabled={
-                !selectedColorLine || selectedColorLine.persisted === false
-              }
-              onClick={() => applyColorLineAction('remove')}
-            >
-              移除当前行
-            </button>
-            <button
-              type="button"
-              className={getToolbarButtonClassName({
-                active: colorLineSelectionMode,
-              })}
-              onClick={toggleColorLineSelectionMode}
-            >
-              {colorLineSelectionMode ? '取消选择' : '选择色卡行'}
-            </button>
-          </div>
-        </>
-      )
-    }
-
-    return (
-      <div className="erp-print-shell__toolbar-group">
-        <button
-          type="button"
-          className={getToolbarButtonClassName()}
-          disabled={selectedWorkInstructionRowTarget === null}
-          onClick={() =>
-            applySelectedWorkInstructionRowAction('insert', 'before')
-          }
-        >
-          上插一行
-        </button>
-        <button
-          type="button"
-          className={getToolbarButtonClassName()}
-          disabled={selectedWorkInstructionRowTarget === null}
-          onClick={() =>
-            applySelectedWorkInstructionRowAction('insert', 'after')
-          }
-        >
-          下插一行
-        </button>
-        <button
-          type="button"
-          className={getToolbarButtonClassName()}
-          disabled={
-            selectedWorkInstructionRowTarget === null ||
-            selectedInstructionRows.length <= 1
-          }
-          onClick={() => applySelectedWorkInstructionRowAction('remove')}
-        >
-          移除当前行
-        </button>
-        {[
-          [WORK_INSTRUCTION_ROW_TYPES.title, '设为标题行'],
-          [WORK_INSTRUCTION_ROW_TYPES.step, '设为编号行'],
-          [WORK_INSTRUCTION_ROW_TYPES.text, '设为文本行'],
-        ].map(([type, label]) => (
-          <button
-            type="button"
-            className={getToolbarButtonClassName({
-              active:
-                getWorkInstructionRowType(selectedInstructionRow) === type,
-            })}
-            disabled={selectedWorkInstructionRowTarget === null}
-            key={type}
-            onClick={() => applyInstructionRowType(type)}
-          >
-            {label}
-          </button>
-        ))}
-        <button
-          type="button"
-          className={getToolbarButtonClassName()}
-          disabled={
-            selectedWorkInstructionRowTarget === null ||
-            !selectedInstructionRowIsStep ||
-            selectedInstructionRowImages.length >=
-              ENGINEERING_PRINT_LIMITS.instructionRowImages
-          }
-          title={
-            selectedInstructionRowImages.length >=
-            ENGINEERING_PRINT_LIMITS.instructionRowImages
-              ? `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片`
-              : undefined
-          }
-          onClick={() =>
-            handleInstructionRowImageUploadClick(
-              selectedWorkInstructionRowTarget
-            )
-          }
-        >
-          给当前行加图
-        </button>
-        <button
-          type="button"
-          className={getToolbarButtonClassName()}
-          disabled={
-            selectedWorkInstructionRowTarget === null ||
-            !selectedInstructionRowIsStep ||
-            selectedInstructionRowImages.length === 0
-          }
-          onClick={() =>
-            clearInstructionRowImages(selectedWorkInstructionRowTarget)
-          }
-        >
-          清空当前行图片
-        </button>
-        <button
-          type="button"
-          className={getToolbarButtonClassName()}
-          data-open-work-instruction-annotation-editor
-          disabled={
-            selectedWorkInstructionRowTarget === null ||
-            !selectedInstructionRowIsStep ||
-            selectedInstructionRowImages.length === 0
-          }
-          onClick={() =>
-            openInstructionAnnotationEditor(selectedWorkInstructionRowTarget)
-          }
-        >
-          标注当前行图片
-        </button>
-        <button
-          type="button"
-          className={getToolbarButtonClassName({
-            active: instructionRowSelectionMode,
-          })}
-          onClick={toggleInstructionRowSelectionMode}
-        >
-          {instructionRowSelectionMode ? '取消选择' : '选择行'}
-        </button>
-        <span className="erp-print-shell__counter">
-          正文行: {draft.rows.length}
-          {Array.isArray(draft.continuationPages) &&
-          draft.continuationPages.length
-            ? ` + 续页 ${draft.continuationPages.reduce(
-                (total, page) =>
-                  total + (Array.isArray(page.rows) ? page.rows.length : 0),
-                0
-              )}`
-            : ''}
-          /{ENGINEERING_PRINT_LIMITS.instructionRows}/页
-        </span>
-      </div>
+      </PrintWorkspaceToolSection>
     )
   })()
 
@@ -2036,7 +2018,6 @@ export default function EngineeringPrintWorkspacePage() {
         persistenceStatus={persistenceStatus}
         onRetrySave={flushDraft}
         workspaceClassName="erp-engineering-print-workspace-shell"
-        panelTip="直接点击纸面填写；图片和行结构在这里调整。"
         panelActions={panelActions}
         toolbarActions={toolbarActions}
         editorActions={templateEditorActions}
@@ -2045,12 +2026,15 @@ export default function EngineeringPrintWorkspacePage() {
         selectionMode={
           materialCellSelectionMode
             ? '选择单元格'
-            : materialLineSelectionMode ||
-                colorBlockSelectionMode ||
-                colorLineSelectionMode ||
-                instructionRowSelectionMode
+            : materialLineSelectionMode
               ? '选择明细行'
-              : ''
+              : colorBlockSelectionMode
+                ? '选择色卡块'
+                : colorLineSelectionMode
+                  ? '选择色卡行'
+                  : instructionRowSelectionMode
+                    ? '选择行'
+                    : ''
         }
         selectionCount={
           materialCellSelectionMode && materialMergeSelection
@@ -2076,7 +2060,13 @@ export default function EngineeringPrintWorkspacePage() {
             ? `第 ${selectedMaterialLineIndex + 1} 行`
             : colorBlockSelectionMode && selectedColorBlockIndex !== null
               ? `第 ${selectedColorBlockIndex + 1} 个物料块`
-              : ''
+              : colorLineSelectionMode && selectedColorLine !== null
+                ? `第 ${selectedColorLine.blockIndex + 1} 块第 ${selectedColorLine.lineIndex + 1} ${selectedColorLine.persisted === false ? '个空白位' : '行'}`
+                : instructionRowSelectionMode && selectedInstructionRowTarget
+                  ? formatInstructionRowTargetLabel(
+                      selectedInstructionRowTarget
+                    )
+                  : ''
         }
         prepareSignature={`${templateKey}:${workspaceStateID}:${businessInput}`}
       >
