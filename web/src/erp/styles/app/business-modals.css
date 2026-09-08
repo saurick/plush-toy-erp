@@ -313,12 +313,10 @@
   min-height: 34px;
   border-radius: 7px;
   font-weight: 650;
-  padding-inline: 16px;
 }
 
 .erp-business-action-modal .ant-btn-primary {
   box-shadow: none;
-  min-width: 82px;
 }
 
 .erp-business-action-form {

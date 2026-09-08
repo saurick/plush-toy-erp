@@ -105,6 +105,13 @@ function ThemedApp() {
       }}
       theme={{
         algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        components: {
+          Button: {
+            paddingInline: 12,
+            paddingInlineSM: 12,
+            paddingInlineLG: 16,
+          },
+        },
         token: {
           colorPrimary: isDark ? '#60a5fa' : '#2b8a3e',
           colorInfo: isDark ? '#60a5fa' : '#2f8f4b',

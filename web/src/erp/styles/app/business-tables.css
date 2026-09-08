@@ -169,7 +169,6 @@
 
 .erp-permission-checklist__actions .ant-btn {
   height: 26px;
-  padding: 0 8px;
   border-radius: 6px;
 }
 
@@ -711,7 +710,6 @@
 
 .erp-business-filter-control--clear.ant-btn {
   flex: 0 0 auto;
-  min-width: 112px;
 }
 
 @media screen and (min-width: 769px) {
@@ -1466,7 +1464,7 @@
   border-radius: 10px;
 }
 
-.erp-business-selection-action-bar--embedded
+:where(.erp-business-selection-action-bar--embedded)
   .erp-business-selection-action-bar__actions {
   flex-basis: 760px;
 }
@@ -1476,7 +1474,6 @@
   .ant-btn {
   min-height: 30px;
   border-radius: 8px;
-  padding-inline: 10px;
   font-size: 13px;
   line-height: 1.2;
 }
@@ -1493,15 +1490,8 @@
   line-height: 20px;
 }
 
-.erp-business-module-status-action.ant-btn {
-  width: 112px;
-  min-width: 112px;
-  padding-inline: 8px;
-  gap: 4px;
-}
-
+/* 状态主动作保留稳定槽位，较长文案仍可按内容扩展。 */
 .erp-business-lifecycle-slot.ant-btn {
-  width: 96px;
   min-width: 96px;
 }
 

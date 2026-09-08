@@ -76,9 +76,11 @@
   .ant-btn {
   width: 100%;
   min-width: 44px;
+  height: auto;
   flex: 1 1 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding-block: 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .erp-business-selection-action-bar__actions--compact
@@ -96,7 +98,6 @@
   .erp-business-selection-action-bar__actions--compact
     .erp-business-selection-action-bar__compact-more.ant-btn {
     min-width: 104px;
-    padding-inline: 12px;
   }
 }
 

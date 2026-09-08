@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
+import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
 
 export function createBusinessFormInteractionScenarios({
   customerRuntimeEffectiveSession,
@@ -80,7 +81,6 @@ export function createBusinessFormInteractionScenarios({
               .trim(),
             width: rect.width,
             height: rect.height,
-            whiteSpace: style.whiteSpace,
             writingMode: style.writingMode,
           }
         })
@@ -112,11 +112,11 @@ export function createBusinessFormInteractionScenarios({
         (item) =>
           item.width >= 44 &&
           item.height >= 44 &&
-          item.whiteSpace === 'nowrap' &&
           !item.writingMode.startsWith('vertical')
       ),
       `${scenarioName} 主动作应保持横向可读和 44px 触控尺寸: ${JSON.stringify(metrics)}`
     )
+    await assertButtonSpacing(compactActions, scenarioName)
     assert(
       metrics.moreButton &&
         !metrics.moreButton.disabled &&

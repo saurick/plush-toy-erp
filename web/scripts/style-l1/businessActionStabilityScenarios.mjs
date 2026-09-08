@@ -1,4 +1,5 @@
 import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
+import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
 
 const SALES_ORDER_PATH = '/erp/sales/project-orders/sales-orders'
 const PURCHASE_ORDER_PATH = '/erp/purchase/accessories'
@@ -518,6 +519,7 @@ async function selectBusinessRow(page, recordNo) {
 
 async function captureDesktopActionLayout(page) {
   const actionBar = page.locator('.erp-business-module-current-action').first()
+  await assertButtonSpacing(actionBar, '桌面当前操作', { contentSized: true })
   return actionBar.evaluate((bar) => {
     const actions = bar.querySelector(
       '.erp-business-selection-action-bar__actions'
@@ -774,6 +776,136 @@ export function createBusinessActionStabilityScenarios(deps) {
   const productionIdentity = roleIdentity('production')
 
   return [
+    ...['light', 'dark'].map((themeMode) => ({
+      name: `business-button-spacing-${themeMode}`,
+      path: FINANCE_PAYMENT_PATH,
+      auth: 'admin',
+      themeMode,
+      ...financeIdentity,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, {
+          includeSales: false,
+          includeFinance: true,
+        })
+      },
+      verify: async (page) => {
+        await waitForBusinessPage(page, '收付款与核销')
+        await assertERPThemeMode(page, {
+          scenarioName: `button-spacing-${themeMode}`,
+          expectedMode: themeMode,
+          expectedEffectiveTheme: themeMode,
+        })
+        for (const width of [1440, 1280, 1024, 992, 991, 768, 390, 320]) {
+          await page.setViewportSize({ width, height: 900 })
+          const compact = width < 992
+          const actions = page
+            .locator('.erp-business-module-current-action')
+            .first()
+          await actions
+            .locator('.erp-business-selection-action-bar__compact-more')
+            .waitFor({ state: compact ? 'visible' : 'hidden' })
+          if (compact) {
+            const visibleCount = width >= 768 ? 2 : 1
+            const primaryButtons = actions.locator(
+              '.erp-business-selection-action-bar__compact-visible .ant-btn'
+            )
+            await primaryButtons.nth(visibleCount - 1).waitFor({ state: 'visible' })
+            await primaryButtons.nth(visibleCount).waitFor({ state: 'hidden' })
+          }
+          const name = `button-spacing-${themeMode}-${width}`
+          const metrics = await assertButtonSpacing(actions, name, {
+            contentSized: !compact,
+          })
+          if (compact) {
+            assert(
+              metrics.every((button) => button.height >= 44),
+              `${name} 窄屏按钮应保留 44px 触控高度`
+            )
+            assert(
+              Math.max(...metrics.map((button) => button.top)) -
+                Math.min(...metrics.map((button) => button.top)) <=
+                1,
+              `${name} 主按钮和更多操作应对齐，桌面宽度不能变成窄屏高度: ${JSON.stringify(metrics)}`
+            )
+            const more = actions.locator(
+              '.erp-business-selection-action-bar__compact-more'
+            )
+            await more.click()
+            const drawer = page.locator('.erp-business-selection-action-drawer')
+            await drawer.waitFor({ state: 'visible' })
+            await assertButtonSpacing(drawer, `${name}-more`)
+            await closeMobileActionDrawer(page)
+            await drawer
+              .locator('.ant-drawer-content')
+              .waitFor({ state: 'hidden' })
+            const restored = await assertButtonSpacing(
+              actions,
+              `${name}-restored`
+            )
+            assert.deepEqual(
+              restored.map((button) => button.text),
+              metrics.map((button) => button.text),
+              `${name} 关闭更多操作后应保留原按钮`
+            )
+          }
+          await assertNoHorizontalOverflow(page, name)
+          if (width === 1440 || width === 320) {
+            await screenshot(page, path, outputDir, `${name}.png`)
+          }
+        }
+
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await page
+          .getByRole('button', { name: '登记收付款', exact: true })
+          .click()
+        const modal = page.getByRole('dialog', {
+          name: /^登记收付款/u,
+        })
+        await modal.waitFor({ state: 'visible' })
+        await modal.evaluate(async (element) => {
+          await Promise.all(
+            element.getAnimations().map((animation) => animation.finished)
+          )
+        })
+        await assertButtonSpacing(
+          modal.locator('.ant-modal-footer'),
+          `button-spacing-${themeMode}-modal`,
+          { contentSized: true }
+        )
+        await modal.getByRole('button', { name: /^取\s*消$/u }).click()
+        await modal.waitFor({ state: 'hidden' })
+
+        await gotoScenarioPath(page, '/erp/finance/receivables', {
+          waitUntil: 'domcontentloaded',
+        })
+        await waitForBusinessPage(page, '应收管理')
+        const shortActions = page
+          .locator('.erp-business-module-current-action')
+          .first()
+        const confirm = shortActions.locator(
+          '[data-business-action-key="finance-fact-confirm"]'
+        )
+        await confirm.waitFor({ state: 'visible' })
+        await assertButtonSpacing(
+          shortActions,
+          `button-spacing-${themeMode}-short`,
+          {
+            contentSized: true,
+          }
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          `button-spacing-${themeMode}-short`
+        )
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          `button-spacing-${themeMode}-short.png`
+        )
+      },
+    })),
     {
       name: 'business-action-stability-sales-five-states-desktop',
       path: SALES_ORDER_PATH,
@@ -1918,6 +2050,11 @@ export function createBusinessActionStabilityScenarios(deps) {
         )
         await openMobileActionDrawer(page)
         const emptyDrawerKeys = await captureMobileDrawerKeys(page)
+        assert.equal(
+          emptyDrawerKeys.includes('related-records'),
+          false,
+          '手机未选择订单时不展示关联记录入口'
+        )
         assert(
           emptyDrawerKeys.includes('lifecycle-more'),
           '手机未选择记录时应在更多抽屉保留低频状态动作入口'
@@ -1978,6 +2115,11 @@ export function createBusinessActionStabilityScenarios(deps) {
         assert.equal(activeLayout.pageOverflow, 0)
         await openMobileActionDrawer(page)
         const activeDrawerKeys = await captureMobileDrawerKeys(page)
+        assert.equal(
+          activeDrawerKeys.includes('related-records'),
+          true,
+          '手机选中订单后应提供关联记录入口'
+        )
         const lifecycleMore = page
           .locator('.erp-business-selection-action-drawer')
           .locator('[data-business-action-key="lifecycle-more"]')
@@ -2033,9 +2175,9 @@ export function createBusinessActionStabilityScenarios(deps) {
           '手机订单状态切换不得改变抽屉动作目录'
         )
         assert.deepEqual(
-          closedDrawerKeys,
+          closedDrawerKeys.filter((key) => key !== 'related-records'),
           emptyDrawerKeys,
-          '手机选择前后不得改变抽屉动作目录'
+          '手机选择前后应保留核心动作目录，关联记录按所选订单展示'
         )
         await screenshot(
           page,
