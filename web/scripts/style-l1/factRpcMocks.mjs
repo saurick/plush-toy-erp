@@ -2522,11 +2522,14 @@ export async function installFactRpcMocks(page, context) {
         if (listDelayMs > 0) {
           await delay(listDelayMs)
         }
+        const keyword = String(params.keyword || '')
+          .trim()
+          .toLowerCase()
         const roleKey = String(params.role_key || '').trim()
         const viewKey = String(params.view_key || '').trim()
         const limit = Math.min(Math.max(Number(params.limit || 50), 1), 100)
         const cursor = String(params.cursor || '').trim()
-        const cursorSnapshotKey = `${viewKey}|${roleKey}|${cursor}`
+        const cursorSnapshotKey = `${viewKey}|${roleKey}|${keyword}|${cursor}`
         const snapshotAt = cursor
           ? workflowRoleTaskSnapshotByCursor.get(cursorSnapshotKey) ||
             Number(nowUnix())
@@ -2549,6 +2552,19 @@ export async function installFactRpcMocks(page, context) {
             'workflow.task.supervise'
           )
         const matchesView = (task, targetViewKey, targetBeforeID = 0) => {
+          if (
+            keyword &&
+            ![
+              task.task_name,
+              task.source_no,
+              JSON.stringify(task.display_context || task.payload || {}),
+            ]
+              .join(' ')
+              .toLowerCase()
+              .includes(keyword)
+          ) {
+            return false
+          }
           const terminal = terminalStatuses.has(task.task_status_key)
           const assignedToCurrentAdmin =
             Number(task.assignee_id || 0) > 0 &&
@@ -2587,7 +2603,7 @@ export async function installFactRpcMocks(page, context) {
           hasMore && items.length > 0 ? String(items[items.length - 1].id) : ''
         if (nextCursor) {
           workflowRoleTaskSnapshotByCursor.set(
-            `${viewKey}|${roleKey}|${nextCursor}`,
+            `${viewKey}|${roleKey}|${keyword}|${nextCursor}`,
             snapshotAt
           )
         }
@@ -2696,6 +2712,9 @@ export async function installFactRpcMocks(page, context) {
               version: 1,
               task_status_key: 'blocked',
               task_name: '处理订单阻塞',
+              blocked_reason:
+                '客户尚未确认耳长尺寸，需要工程核对样品后再安排生产。',
+              owner_role_key: 'engineering',
               source_type: 'sales-orders',
               source_id: 102,
               source_no: 'STYLE-SO-002',
@@ -2706,6 +2725,8 @@ export async function installFactRpcMocks(page, context) {
               version: 1,
               task_status_key: 'ready',
               task_name: '确认到期事项',
+              owner_role_key: 'sales',
+              due_at: Math.floor(Date.now() / 1000) + 3600,
               source_type: 'sales-orders',
               source_id: 103,
               source_no: 'STYLE-SO-003',
@@ -2721,6 +2742,21 @@ export async function installFactRpcMocks(page, context) {
               source_no: 'STYLE-SO-004',
               payload: {},
             },
+          }
+          for (const [key, task] of Object.entries(representativeTasks)) {
+            task.display_context = {
+              available: true,
+              source_no: task.source_no,
+              items: [
+                {
+                  kind: 'product',
+                  name: key === 'exception' ? '长耳兔抱枕' : '云朵小熊',
+                  code: 'PLUSH-001',
+                  style_no: 'RB-018',
+                  order_no: '',
+                },
+              ],
+            }
           }
           data = {
             snapshot_at: Number(nowUnix()),

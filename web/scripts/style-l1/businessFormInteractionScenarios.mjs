@@ -231,6 +231,12 @@ export function createBusinessFormInteractionScenarios({
           /^MAT-\d{8}-\d{3}$/u.test(materialCodeValue),
           `材料编号应自动生成，不应要求用户手填: ${materialCodeValue}`
         )
+        const supplierItemInput = materialModal.getByLabel('款号', {
+          exact: true,
+        })
+        assert.equal(await supplierItemInput.inputValue(), '')
+        assert.equal(await supplierItemInput.getAttribute('maxlength'), '255')
+        await supplierItemInput.fill('示例织造AB-001#-02#米白')
         await materialModal
           .locator('.erp-material-category-suggested-input')
           .waitFor({ state: 'visible', timeout: 10_000 })
@@ -277,6 +283,63 @@ export function createBusinessFormInteractionScenarios({
         await expectText(page, '件（PCS）')
         await assertTextAbsent(page, '默认单位 ID')
         await closeBusinessFormModal(page, materialModal)
+        await page
+          .locator('.ant-table-row')
+          .filter({ hasText: 'MAT-STYLE-L1' })
+          .first()
+          .getByRole('radio')
+          .check()
+        await page.getByRole('button', { name: /编辑材料$/u }).click()
+        await materialModal.waitFor({ state: 'visible' })
+        assert.equal(
+          await supplierItemInput.inputValue(),
+          '示例织造AB-001#-02#米白'
+        )
+        await supplierItemInput.fill('另一示例CD-002#蓝')
+        await assertAntdModalCentered(
+          page,
+          materialModal,
+          'material-master-supplier-item-no-edit'
+        )
+        await materialModal.screenshot({
+          path: path.resolve(outputDir, 'material-supplier-item-no-edit.png'),
+          animations: 'disabled',
+        })
+        const [updateRequest] = await Promise.all([
+          page.waitForRequest(
+            (request) =>
+              request.url().endsWith('/rpc/masterdata') &&
+              request.postDataJSON()?.method === 'update_material'
+          ),
+          materialModal.getByRole('button', { name: /^确\s*定$/u }).click(),
+        ])
+        assert.equal(
+          updateRequest.postDataJSON().params.supplier_item_no,
+          '另一示例CD-002#蓝'
+        )
+        await materialModal.waitFor({ state: 'hidden' })
+        await page
+          .locator('.ant-table-row')
+          .filter({ hasText: 'MAT-STYLE-L1' })
+          .first()
+          .getByRole('radio')
+          .check()
+        await page.getByRole('button', { name: /编辑材料$/u }).click()
+        await materialModal.waitFor({ state: 'visible' })
+        await supplierItemInput.fill('')
+        const [clearRequest] = await Promise.all([
+          page.waitForRequest(
+            (request) =>
+              request.url().endsWith('/rpc/masterdata') &&
+              request.postDataJSON()?.method === 'update_material'
+          ),
+          materialModal.getByRole('button', { name: /^确\s*定$/u }).click(),
+        ])
+        assert.equal(
+          clearRequest.postDataJSON().params.supplier_item_no,
+          undefined
+        )
+        await materialModal.waitFor({ state: 'hidden' })
         await assertNoHorizontalOverflow(page, 'material-master-header-desktop')
       },
     },

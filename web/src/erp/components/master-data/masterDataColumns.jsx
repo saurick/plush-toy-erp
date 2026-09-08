@@ -336,8 +336,8 @@ function supplierProcessLabels(processIDs, processOptions) {
 function baseColumns({ type, unitDisplay, processOptions }) {
   return [
     {
-      title: '编号',
-      exportTitle: '编号',
+      title: type === 'materials' ? '系统物料编号' : '编号',
+      exportTitle: type === 'materials' ? '系统物料编号' : '编号',
       dataIndex: 'code',
       copyable: true,
       effectiveFieldKey:
@@ -358,7 +358,18 @@ function baseColumns({ type, unitDisplay, processOptions }) {
       sorter: (a, b) => compareText(a?.name, b?.name),
     },
     ...(type === 'materials'
-      ? []
+      ? [
+          {
+            title: '款号',
+            exportTitle: '款号',
+            dataIndex: 'supplier_item_no',
+            copyable: true,
+            width: 240,
+            sorter: (a, b) =>
+              compareText(a?.supplier_item_no, b?.supplier_item_no),
+            render: (value) => value || '-',
+          },
+        ]
       : [
           {
             title: '简称',

@@ -31,6 +31,7 @@ import {
   isWorkflowProcessDecisionTask,
   workflowTaskAllowsApprovedQuantity,
 } from '../../utils/workflowTaskActionContract.mjs'
+import { retainWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
 
 function resolveWorkflowTaskActionMode(action = '') {
   if (action === 'done') return 'complete'
@@ -428,7 +429,7 @@ export default function useMobileRoleTaskActions({
       }
       const confirmedTask =
         canonicalTask && typeof canonicalTask === 'object'
-          ? buildMobileTaskView(canonicalTask)
+          ? buildMobileTaskView(retainWorkflowTaskIdentity(task, canonicalTask))
           : null
       publishActionReceipt({
         action: taskStatusKey,
@@ -579,7 +580,7 @@ export default function useMobileRoleTaskActions({
       }
       const confirmedTask =
         canonicalTask && typeof canonicalTask === 'object'
-          ? buildMobileTaskView(canonicalTask)
+          ? buildMobileTaskView(retainWorkflowTaskIdentity(task, canonicalTask))
           : null
       publishActionReceipt({
         action: 'urge',

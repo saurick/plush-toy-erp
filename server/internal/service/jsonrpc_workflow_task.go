@@ -18,7 +18,7 @@ import (
 
 const workflowBreakGlassMaxDuration = 2 * time.Hour
 const workflowTaskBoardMaxOffset = 2_147_483_647
-const workflowRoleTaskViewCursorVersion = 2
+const workflowRoleTaskViewCursorVersion = 3
 
 const (
 	workflowRoleTaskRiskScopeRole       = "role"
@@ -26,6 +26,7 @@ const (
 )
 
 type workflowRoleTaskViewRequest struct {
+	Keyword         string
 	Method          string
 	ViewKey         string
 	RoleKey         string
@@ -39,6 +40,7 @@ type workflowRoleTaskViewRequest struct {
 }
 
 type workflowRoleTaskViewCursor struct {
+	Keyword       string `json:"keyword"`
 	Version       int    `json:"v"`
 	Method        string `json:"method"`
 	ViewKey       string `json:"view_key"`
@@ -1209,7 +1211,7 @@ func parseWorkflowRoleTaskViewRequest(
 	pm map[string]any,
 	method string,
 ) (workflowRoleTaskViewRequest, *v1.JsonrpcResult) {
-	if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor"); res != nil {
+	if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor", "keyword"); res != nil {
 		return workflowRoleTaskViewRequest{}, res
 	}
 	request := workflowRoleTaskViewRequest{
@@ -1222,6 +1224,13 @@ func parseWorkflowRoleTaskViewRequest(
 			Code:    errcode.InvalidParam.Code,
 			Message: "岗位任务视图参数不完整",
 		}
+	}
+	if raw, exists := pm["keyword"]; exists {
+		value, ok := raw.(string)
+		if !ok || utf8.RuneCountInString(strings.TrimSpace(value)) > 100 {
+			return workflowRoleTaskViewRequest{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "搜索内容最多 100 个字"}
+		}
+		request.Keyword = strings.TrimSpace(value)
 	}
 	limit, limitRes := getWorkflowRoleTaskViewLimit(pm)
 	if limitRes != nil {
@@ -1245,7 +1254,7 @@ func parseWorkflowRoleTaskViewRequest(
 		if cursorRes != nil ||
 			cursorState.Method != request.Method ||
 			cursorState.ViewKey != request.ViewKey ||
-			cursorState.RoleKey != request.RoleKey {
+			cursorState.RoleKey != request.RoleKey || cursorState.Keyword != request.Keyword {
 			if cursorRes != nil {
 				return workflowRoleTaskViewRequest{}, cursorRes
 			}
@@ -1336,6 +1345,7 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 		return invalidWorkflowRoleTaskViewCursorResult()
 	}
 	page, err := d.workflowUC.ListRoleTaskView(ctx, biz.WorkflowRoleTaskViewQuery{
+		Keyword:                  request.Keyword,
 		ViewKey:                  request.ViewKey,
 		RoleKey:                  request.RoleKey,
 		Limit:                    request.Limit,
@@ -1374,6 +1384,7 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 			cursorExpectedTotal = -1
 		}
 		nextCursor = encodeWorkflowRoleTaskViewCursor(workflowRoleTaskViewCursor{
+			Keyword:       request.Keyword,
 			Method:        request.Method,
 			ViewKey:       request.ViewKey,
 			RoleKey:       request.RoleKey,

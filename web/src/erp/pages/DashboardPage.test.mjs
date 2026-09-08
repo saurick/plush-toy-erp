@@ -22,15 +22,6 @@ const desktopTaskActionSource = readFileSync(
   ),
   'utf8'
 )
-const taskCenterStyleSource = readFileSync(
-  fileURLToPath(new URL('../styles/app/task-center.css', import.meta.url)),
-  'utf8'
-)
-const themeOverrideStyleSource = readFileSync(
-  fileURLToPath(new URL('../styles/app/theme-overrides.css', import.meta.url)),
-  'utf8'
-)
-
 test('product core summary keeps status text outside numeric metric values', () => {
   const metricStart = source.indexOf('const PRODUCT_CORE_METRICS')
   const metricEnd = source.indexOf('const PRODUCT_CORE_REVIEW_ENTRIES')
@@ -51,10 +42,10 @@ test('desktop workbench uses one bounded server projection for counts and the ac
     /const workbenchResult = await getWorkflowWorkbench\(workbenchRequest,/u
   )
   assert.match(source, /queue_key:\s*workbenchQueueKey/u)
-  assert.match(source, /limit:\s*WORKBENCH_QUEUE_PAGE_SIZE/u)
+  assert.match(source, /limit:\s*workbenchQueuePageSize/u)
   assert.match(
     source,
-    /offset:\s*\(workbenchQueuePage - 1\) \* WORKBENCH_QUEUE_PAGE_SIZE/u
+    /offset:\s*\(workbenchQueuePage - 1\) \* workbenchQueuePageSize/u
   )
   assert.match(source, /counts:\s*workbenchResult\.counts/u)
   assert.doesNotMatch(source, /<WorkflowTaskOverview/u)
@@ -79,21 +70,6 @@ test('desktop workbench renders its page shell before the bounded task read fini
   assert.match(source, />\s*重新加载\s*</u)
 })
 
-test('routine task guidance stays readable without repeating an alert icon on every task', () => {
-  const hintStart = source.indexOf('function TaskProcessingHint')
-  const hintEnd = source.indexOf(
-    '\nexport default function DashboardPage',
-    hintStart
-  )
-  const hintSource = source.slice(hintStart, hintEnd)
-
-  assert.ok(hintStart >= 0)
-  assert.ok(hintEnd > hintStart)
-  assert.match(hintSource, /className="erp-task-processing-hint"/u)
-  assert.match(hintSource, /<Text type="secondary">办理提示：<\/Text>/u)
-  assert.doesNotMatch(hintSource, /<Alert|showIcon|系统按任务状态/u)
-})
-
 test('workbench pagination keeps settled rows mounted while the next page loads', () => {
   assert.match(
     source,
@@ -101,102 +77,18 @@ test('workbench pagination keeps settled rows mounted while the next page loads'
   )
 })
 
-test('workbench keeps the explicit view button and opens plain rows on double-click', () => {
-  assert.match(source, /openDashboardItemOnDoubleClick/u)
-  assert.match(source, /erp-workbench-task-row--openable/u)
-  assert.match(source, /data-open-on-double-click['"]?:\s*['"]true['"]/u)
+test('workbench opens task details directly without a permanent selection', () => {
+  assert.doesNotMatch(
+    source,
+    /selectedWorkbench|erp-workbench-side-stack|aria-selected/u
+  )
+  assert.match(source, /onClick: \(event\) =>/u)
   assert.match(
     source,
-    /onDoubleClick:\s*\(event\)\s*=>[\s\S]{0,180}openDashboardItemOnDoubleClick\(event,[\s\S]{0,180}openTaskDrawer\(record\)/u
+    /<TaskTitleEntry task=\{record\} onOpenTask=\{openTaskDrawer\}/u
   )
-  assert.match(source, />\s*查看\s*</u)
-  assert.match(source, /电脑端双击可直接打开详情/u)
-})
-
-test('task board keeps selection on click and opens the same detail surface on double-click', () => {
-  assert.match(source, /onClick=\{\(\) => onSelectTask\(task\)\}/u)
-  assert.match(
-    source,
-    /onDoubleClick=\{\(event\)\s*=>[\s\S]{0,160}openDashboardItemOnDoubleClick\(event,[\s\S]{0,120}onOpenTask\(task\)/u
-  )
-  assert.match(source, /title="单击选中，双击查看任务详情"/u)
-  assert.match(
-    source,
-    /<Text strong className="erp-task-board-card-title">[\s\S]{0,100}task\.task_name/u
-  )
-})
-
-test('task board presents approval as a range filter instead of a title action', () => {
-  const filtersStart = source.indexOf(
-    '<div className="erp-task-board-filters">'
-  )
-  const scopeFilterStart = source.indexOf(
-    'className="erp-task-board-scope-filter"',
-    filtersStart
-  )
-  const searchStart = source.indexOf('<SearchInput', filtersStart)
-
-  assert.ok(filtersStart >= 0)
-  assert.ok(scopeFilterStart > filtersStart)
-  assert.ok(searchStart > scopeFilterStart)
-  assert.match(
-    source,
-    /<Title level=\{3\} className="erp-command-center-hero-title">\s*任务看板\s*<\/Title>/u
-  )
-  assert.match(source, /aria-label="任务范围筛选"/u)
-  assert.match(
-    source,
-    /<Segmented[\s\S]{0,220}aria-label="任务范围"[\s\S]{0,220}value=\{filters\.mode\}[\s\S]{0,220}options=\{TASK_BOARD_SCOPE_OPTIONS\}/u
-  )
-  assert.match(source, /\{ label: '全部任务', value: 'all' \}/u)
-  assert.match(source, /\{ label: '待我审批', value: 'approval' \}/u)
-  assert.doesNotMatch(source, /返回全部任务/u)
-  assert.match(
-    taskCenterStyleSource,
-    /\.erp-task-board-scope-filter\s*\{[\s\S]{0,180}flex:\s*1 0 100%/u
-  )
-})
-
-test('task board metrics keep category tones separate from the active filter state', () => {
-  assert.match(
-    source,
-    /`erp-task-center-metric--tone-\$\{tone\}`[\s\S]{0,160}erp-task-center-metric--active/u
-  )
-  for (const tone of ['actionable', 'exception', 'due', 'finished']) {
-    assert.match(source, new RegExp(`tone="${tone}"`, 'u'))
-  }
-  assert.match(source, /aria-pressed=\{active\}/u)
-  assert.match(
-    taskCenterStyleSource,
-    /\.erp-task-center-metric::before\s*\{[\s\S]{0,240}background:\s*var\(--erp-task-center-metric-accent\)/u
-  )
-  assert.match(
-    taskCenterStyleSource,
-    /\.erp-task-center-metric\s*\{[\s\S]{0,160}--erp-task-center-metric-accent:\s*#2d64a7/u
-  )
-  for (const [tone, lightColor, darkColor] of [
-    ['actionable', '#2d64a7', '#71a7e0'],
-    ['exception', '#b42318', '#ff9aa3'],
-    ['due', '#b86b16', '#f4b55e'],
-    ['finished', '#667085', '#94a3b8'],
-  ]) {
-    if (tone !== 'actionable') {
-      assert.match(
-        taskCenterStyleSource,
-        new RegExp(
-          `\\.erp-task-center-metric--tone-${tone}\\s*\\{[^}]*--erp-task-center-metric-accent:\\s*${lightColor}`,
-          'u'
-        )
-      )
-    }
-    assert.match(
-      themeOverrideStyleSource,
-      new RegExp(
-        `\\.erp-task-center-metric--tone-${tone}\\s*\\{[^}]*--erp-task-center-metric-accent:\\s*${darkColor}`,
-        'u'
-      )
-    )
-  }
+  assert.doesNotMatch(source, /title: '操作'/u)
+  assert.doesNotMatch(source, /onDoubleClick|openDashboardItemOnDoubleClick/u)
 })
 
 test('task board exposes server sorting only after focusing one lane', () => {
@@ -212,25 +104,21 @@ test('task board exposes server sorting only after focusing one lane', () => {
 })
 
 test('related document entry is gated by backend source access and menu projection on every path', () => {
+  assert.doesNotMatch(source, /selectedWorkbench|erp-workbench-side-stack/u)
   assert.match(
     source,
-    /canOpenWorkflowTaskEntry\(\s*adminProfile,\s*selectedWorkbenchEntryPath,\s*selectedWorkbenchTaskAccess\.sourceAccess/u
-  )
-  assert.match(
-    source,
-    /canOpenWorkflowTaskEntry\(\s*adminProfile,\s*taskCenterCurrentEntryPath,\s*taskCenterCurrentTaskAccess\.sourceAccess/u
+    /canOpenWorkflowTaskEntry\(\s*adminProfile,\s*actionDrawerEntryPath,\s*actionDrawerAccess\.sourceAccess/u
   )
   assert.match(
     source,
     /canOpenWorkflowTaskEntry\(\s*adminProfile,\s*entryPath,\s*access\?\.sourceAccess/u
   )
   assert.match(source, /canOpenEntry=\{actionDrawerCanOpenEntry\}/u)
-  assert.match(source, /if \(access\.urgeOnly\) return '催办'/u)
 })
 
 test('task surfaces expose the batch task code only as non-visible evidence metadata', () => {
-  assert.equal(source.match(/data-task-code(?:=|['"]:)/gu)?.length, 3)
-  assert.equal(source.match(/data-task-group(?:=|['"]:)/gu)?.length, 3)
+  assert.equal(source.match(/data-task-code(?:=|['"]:)/gu)?.length, 4)
+  assert.equal(source.match(/data-task-group(?:=|['"]:)/gu)?.length, 4)
   assert.match(source, /data-task-code=\{task\.task_code \|\| undefined\}/u)
   assert.match(
     source,
@@ -279,7 +167,10 @@ test('desktop task board preserves the canonical mutation result as the shared d
     source,
     /const confirmedTask = await mutationAttemptsRef\.current\.run/u
   )
-  assert.match(source, /setSelectedTask\(confirmedTask\)/u)
+  assert.match(
+    source,
+    /setSelectedTask\(\s*retainWorkflowTaskIdentity\(taskSnapshot, confirmedTask\)\s*\)/u
+  )
   assert.match(source, /setActionReceipt\(\{/u)
   assert.match(source, /successMessage: actionMetaSnapshot\.successMessage/u)
   assert.match(source, /actionReceipt=\{actionReceipt\}/u)

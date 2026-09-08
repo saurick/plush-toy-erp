@@ -41,6 +41,7 @@ const WORKFLOW_ROLE_TASK_QUERY_KEYS = new Set([
   'role_key',
   'limit',
   'cursor',
+  'keyword',
 ])
 const WORKFLOW_ROLE_TASK_STATUS_KEYS_BY_VIEW = Object.freeze({
   todo: new Set(['ready', 'blocked']),
@@ -123,6 +124,11 @@ function requireWorkflowRoleTaskQuery(params = {}) {
   const roleKey = typeof params.role_key === 'string' ? params.role_key : ''
   const { cursor } = params
   if (
+    (params.keyword !== undefined &&
+      (typeof params.keyword !== 'string' ||
+        !params.keyword.trim() ||
+        params.keyword !== params.keyword.trim() ||
+        [...params.keyword].length > 100)) ||
     !WORKFLOW_ROLE_TASK_VIEW_KEYS.has(viewKey) ||
     !roleKey ||
     roleKey !== roleKey.trim() ||
@@ -139,6 +145,7 @@ function requireWorkflowRoleTaskQuery(params = {}) {
     view_key: viewKey,
     role_key: roleKey,
     limit: params.limit,
+    ...(params.keyword ? { keyword: params.keyword } : {}),
     ...(cursor ? { cursor } : {}),
   }
 }

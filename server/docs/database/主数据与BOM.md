@@ -321,6 +321,7 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
 | <code>code</code> | <code>varchar(64)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>name</code> | <code>varchar(255)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>supplier_item_no</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
 | <code>category</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>spec</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>color</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |

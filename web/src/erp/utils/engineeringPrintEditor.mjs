@@ -103,7 +103,7 @@ export function createBlankColorCardBlock(lineCount = 3, side = '') {
   const normalizedLineCount = Math.max(1, lineCount)
   return {
     materialName: '',
-    vendor: '厂商：',
+    vendor: '款号：',
     side: side === 'right' || side === 'left' ? side : '',
     minRows: normalizedLineCount,
     lines: Array.from(

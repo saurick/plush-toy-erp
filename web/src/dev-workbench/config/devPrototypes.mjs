@@ -156,7 +156,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '用四类互斥队列、组合筛选和当前任务只读详情收敛桌面职责处理台；处理入口只传递任务上下文，三步状态机由共享任务处理流程唯一定义。',
     appliesTo:
-      '我的任务、任务看板、工作台风险队列、岗位任务端和业务页协同入口可参照；不复制业务菜单树，不把任务完成写成事实过账。',
+      '任务入口与共享处理流程可参照；任务看板运行时使用全宽分类与单击打开详情，常驻选中详情仅作设计备选，不改变业务菜单或事实过账。',
   },
   {
     key: 'task-command-center-redesign-reference',
@@ -210,7 +210,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '把业务管理菜单收敛为业务对象总控：按链路选择对象、查看风险、进入标准业务页或详情页。',
     appliesTo:
-      '业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；未接 API 仍保持待实现状态。',
+      '业务看板按正式投影展示全宽关注事项和独立业务记录；原型的汇总卡与常驻侧栏未被采纳，仍保持待实现状态。',
   },
   {
     key: 'business-management-center-redesign-reference',

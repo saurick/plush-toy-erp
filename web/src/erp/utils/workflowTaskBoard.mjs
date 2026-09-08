@@ -63,11 +63,44 @@ export const TASK_BOARD_DUE_OPTIONS = Object.freeze([
   { value: 'noDue', label: '未设置到期' },
 ])
 
+export function getWorkflowTaskBoardStatusOptions(lane = 'all') {
+  const values = {
+    actionable: ['all', 'ready'],
+    exception: ['all', 'blocked', 'overdue', 'dueSoon'],
+    due: ['all', 'ready', 'overdue', 'dueSoon'],
+    finished: ['all', 'done', 'rejected', 'withdrawn'],
+  }[lane]
+  return TASK_BOARD_STATUS_OPTIONS.filter(
+    (option) => !values || values.includes(option.value)
+  )
+}
+
+export function getWorkflowTaskBoardDueOptions(lane = 'all') {
+  const values = {
+    actionable: ['all', 'noDue'],
+    due: ['all', 'overdue', 'dueSoon'],
+    finished: ['all', 'noDue'],
+  }[lane]
+  return TASK_BOARD_DUE_OPTIONS.filter(
+    (option) => !values || values.includes(option.value)
+  )
+}
+
 export const TASK_BOARD_SORT_OPTIONS = Object.freeze([
   { value: 'smart', label: '智能优先' },
   { value: 'due_soon', label: '最早到期' },
   { value: 'newest', label: '最近创建' },
 ])
+
+export const TASK_BOARD_FOCUS_PAGE_SIZE = 8
+export const TASK_BOARD_PAGE_SIZE_OPTIONS = Object.freeze([8, 20, 50])
+
+export function normalizeWorkflowTaskPageSize(value) {
+  const size = Number(value)
+  return TASK_BOARD_PAGE_SIZE_OPTIONS.includes(size)
+    ? size
+    : TASK_BOARD_FOCUS_PAGE_SIZE
+}
 
 export const DEFAULT_TASK_BOARD_FILTERS = Object.freeze({
   keyword: '',
@@ -79,10 +112,10 @@ export const DEFAULT_TASK_BOARD_FILTERS = Object.freeze({
   sort: 'smart',
   mode: 'all',
   page: 1,
+  pageSize: TASK_BOARD_FOCUS_PAGE_SIZE,
 })
 
-export const TASK_BOARD_OVERVIEW_LIMIT = 5
-export const TASK_BOARD_FOCUS_PAGE_SIZE = 8
+export const TASK_BOARD_OVERVIEW_LIMIT = 2
 export const TASK_BOARD_LANE_DEFINITIONS = Object.freeze([
   {
     key: 'actionable',
@@ -123,6 +156,7 @@ const FILTER_QUERY_KEYS = Object.freeze({
   lane: 'lane',
   sort: 'sort',
   page: 'page',
+  pageSize: 'pageSize',
   mode: 'mode',
 })
 
@@ -343,11 +377,21 @@ function normalizePositiveInteger(value, fallback = 1) {
 
 export function normalizeWorkflowTaskBoardFilters(filters = {}) {
   const lane = normalizeKnownFilterValue(filters.lane, LANE_FILTER_VALUES)
+  const status = normalizeKnownFilterValue(filters.status, STATUS_FILTER_VALUES)
+  const due = normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES)
   return {
     keyword: String(filters.keyword || '').trim(),
-    status: normalizeKnownFilterValue(filters.status, STATUS_FILTER_VALUES),
+    status: getWorkflowTaskBoardStatusOptions(lane).some(
+      (option) => option.value === status
+    )
+      ? status
+      : 'all',
     role: normalizeKnownFilterValue(filters.role, ROLE_FILTER_VALUES),
-    due: normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES),
+    due: getWorkflowTaskBoardDueOptions(lane).some(
+      (option) => option.value === due
+    )
+      ? due
+      : 'all',
     sourceType: normalizeFilterValue(filters.sourceType),
     lane,
     sort:
@@ -356,6 +400,7 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
         : normalizeKnownFilterValue(filters.sort, SORT_VALUES, 'smart'),
     mode: filters.mode === 'approval' ? 'approval' : 'all',
     page: normalizePositiveInteger(filters.page),
+    pageSize: normalizeWorkflowTaskPageSize(filters.pageSize),
   }
 }
 
@@ -386,6 +431,7 @@ export function readWorkflowTaskBoardFiltersFromSearch(searchParams = '') {
     sort: params.get(FILTER_QUERY_KEYS.sort),
     mode: params.get(FILTER_QUERY_KEYS.mode),
     page: params.get(FILTER_QUERY_KEYS.page),
+    pageSize: params.get(FILTER_QUERY_KEYS.pageSize),
   })
 }
 
@@ -426,6 +472,9 @@ export function writeWorkflowTaskBoardFiltersToSearch(
   if (normalized.mode !== DEFAULT_TASK_BOARD_FILTERS.mode) {
     params.set(FILTER_QUERY_KEYS.mode, normalized.mode)
   }
+  if (normalized.pageSize !== DEFAULT_TASK_BOARD_FILTERS.pageSize) {
+    params.set(FILTER_QUERY_KEYS.pageSize, String(normalized.pageSize))
+  }
 
   return params
 }
@@ -434,8 +483,8 @@ export function buildWorkflowTaskBoardRequest(filters = {}) {
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
   const focused = normalized.lane !== DEFAULT_TASK_BOARD_FILTERS.lane
   const params = {
-    limit: focused ? TASK_BOARD_FOCUS_PAGE_SIZE : TASK_BOARD_OVERVIEW_LIMIT,
-    offset: focused ? (normalized.page - 1) * TASK_BOARD_FOCUS_PAGE_SIZE : 0,
+    limit: focused ? normalized.pageSize : TASK_BOARD_OVERVIEW_LIMIT,
+    offset: focused ? (normalized.page - 1) * normalized.pageSize : 0,
   }
 
   if (normalized.keyword) params.keyword = normalized.keyword
@@ -526,7 +575,7 @@ export function buildWorkflowTaskBoardModel(response = {}, filters = {}) {
     })
   )
   const displayLimit = focused
-    ? TASK_BOARD_FOCUS_PAGE_SIZE
+    ? normalizedFilters.pageSize
     : TASK_BOARD_OVERVIEW_LIMIT
   const lanes = TASK_BOARD_LANE_DEFINITIONS.map((definition) => {
     const responseLane = responseLanes.get(definition.key) || {}
@@ -549,7 +598,7 @@ export function buildWorkflowTaskBoardModel(response = {}, filters = {}) {
   const pageCount = selectedLaneModel
     ? Math.max(
         1,
-        Math.ceil(selectedLaneModel.count / TASK_BOARD_FOCUS_PAGE_SIZE)
+        Math.ceil(selectedLaneModel.count / normalizedFilters.pageSize)
       )
     : 1
 

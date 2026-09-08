@@ -78,9 +78,7 @@ function buildMaterialPurchaseContractDraftFromPurchaseOrder(
         materialName:
           trimOptional(item.material_name_snapshot) ||
           trimOptional(material.name),
-        vendorCode:
-          trimOptional(item.material_code_snapshot) ||
-          trimOptional(material.code),
+        vendorCode: trimOptional(material.supplier_item_no),
         spec: trimOptional(material.spec),
         unit:
           normalizeMaterialPurchaseUnitText(unitOptionLabel) ||

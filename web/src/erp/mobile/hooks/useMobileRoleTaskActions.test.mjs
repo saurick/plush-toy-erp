@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import vm from 'node:vm'
+import { retainWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
 
 import {
   createTaskMutationAttemptStore,
@@ -30,7 +31,8 @@ test('mobile task page uses backend action projection and does not restore local
     pageSource,
     /workflowTaskAdminAccessRequestIdentity\(adminProfile\)/u
   )
-  assert.match(pageSource, /taskScopeKey = `\$\{activeRoleKey\}\|access:/u)
+  assert.match(pageSource, /taskAccessScopeKey = `\$\{activeRoleKey\}\|access:\$\{taskAccessIdentity\}/u)
+  assert.match(pageSource, /taskScopeKey = `\$\{taskAccessScopeKey\}\|search:\$\{taskKeyword\}`/u)
   assert.match(pageSource, /persistMobileTaskDraftBackup/u)
   assert.match(pageSource, /readMobileTaskDraftBackup/u)
   assert.match(pageSource, /restoreActionDraft/u)
@@ -72,14 +74,10 @@ test('mobile task page keeps load failures explicit and invalidates inactive vie
   assert.match(listSource, /role="alert"/u)
   assert.match(listSource, /当前没有可确认的任务数据，请重试/u)
   assert.match(listSource, /onClick=\{\(\) => loadTasks\(\)\}/u)
-  assert.match(listSource, /taskSummary\.ready/u)
-  assert.match(listSource, /taskSummary\.blocked/u)
-  assert.match(listSource, /taskSummary\.rejected/u)
-  assert.match(listSource, /taskSummary\.done/u)
-  assert.doesNotMatch(
-    listSource,
-    /taskSummary\.(?:pending|processing|blockedProgress)/u
-  )
+  assert.doesNotMatch(listSource, /taskSummary/u)
+  assert.match(listSource, /authoritativeTaskCounts\?\.history \?\? '—'/u)
+  assert.match(listSource, /authoritativeTaskCounts\?\.risk \?\? '—'/u)
+  assert.match(listSource, /authoritativeTaskCounts\?\.overdue \?\? '—'/u)
   assert.match(listSource, />超时</u)
   assert.match(listSource, /条超时/u)
 })
@@ -228,6 +226,7 @@ module.exports = { useMobileRoleTaskActions }`,
         '../../utils/workflowTaskActionSubmitGuard.mjs': {
           verifyWorkflowTaskActionAccessBeforeSubmit,
         },
+        '../../utils/workflowTaskIdentity.mjs': { retainWorkflowTaskIdentity },
         '../../utils/workflowTaskMutation.mjs': {
           createTaskMutationAttemptStore,
           createTaskMutationInFlightGuard,

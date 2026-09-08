@@ -22,6 +22,8 @@ type Material struct {
 	Code string `json:"code,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
+	// SupplierItemNo holds the value of the "supplier_item_no" field.
+	SupplierItemNo *string `json:"supplier_item_no,omitempty"`
 	// Category holds the value of the "category" field.
 	Category *string `json:"category,omitempty"`
 	// Spec holds the value of the "spec" field.
@@ -159,7 +161,7 @@ func (*Material) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case material.FieldID, material.FieldDefaultUnitID:
 			values[i] = new(sql.NullInt64)
-		case material.FieldCode, material.FieldName, material.FieldCategory, material.FieldSpec, material.FieldColor:
+		case material.FieldCode, material.FieldName, material.FieldSupplierItemNo, material.FieldCategory, material.FieldSpec, material.FieldColor:
 			values[i] = new(sql.NullString)
 		case material.FieldCreatedAt, material.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -195,6 +197,13 @@ func (_m *Material) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
 			} else if value.Valid {
 				_m.Name = value.String
+			}
+		case material.FieldSupplierItemNo:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field supplier_item_no", values[i])
+			} else if value.Valid {
+				_m.SupplierItemNo = new(string)
+				*_m.SupplierItemNo = value.String
 			}
 		case material.FieldCategory:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -327,6 +336,11 @@ func (_m *Material) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)
+	builder.WriteString(", ")
+	if v := _m.SupplierItemNo; v != nil {
+		builder.WriteString("supplier_item_no=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	if v := _m.Category; v != nil {
 		builder.WriteString("category=")

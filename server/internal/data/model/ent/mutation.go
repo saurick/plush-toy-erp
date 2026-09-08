@@ -29377,6 +29377,7 @@ type MaterialMutation struct {
 	id                                            *int
 	code                                          *string
 	name                                          *string
+	supplier_item_no                              *string
 	category                                      *string
 	spec                                          *string
 	color                                         *string
@@ -29583,6 +29584,55 @@ func (m *MaterialMutation) OldName(ctx context.Context) (v string, err error) {
 // ResetName resets all changes to the "name" field.
 func (m *MaterialMutation) ResetName() {
 	m.name = nil
+}
+
+// SetSupplierItemNo sets the "supplier_item_no" field.
+func (m *MaterialMutation) SetSupplierItemNo(s string) {
+	m.supplier_item_no = &s
+}
+
+// SupplierItemNo returns the value of the "supplier_item_no" field in the mutation.
+func (m *MaterialMutation) SupplierItemNo() (r string, exists bool) {
+	v := m.supplier_item_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSupplierItemNo returns the old "supplier_item_no" field's value of the Material entity.
+// If the Material object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MaterialMutation) OldSupplierItemNo(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSupplierItemNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSupplierItemNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSupplierItemNo: %w", err)
+	}
+	return oldValue.SupplierItemNo, nil
+}
+
+// ClearSupplierItemNo clears the value of the "supplier_item_no" field.
+func (m *MaterialMutation) ClearSupplierItemNo() {
+	m.supplier_item_no = nil
+	m.clearedFields[material.FieldSupplierItemNo] = struct{}{}
+}
+
+// SupplierItemNoCleared returns if the "supplier_item_no" field was cleared in this mutation.
+func (m *MaterialMutation) SupplierItemNoCleared() bool {
+	_, ok := m.clearedFields[material.FieldSupplierItemNo]
+	return ok
+}
+
+// ResetSupplierItemNo resets all changes to the "supplier_item_no" field.
+func (m *MaterialMutation) ResetSupplierItemNo() {
+	m.supplier_item_no = nil
+	delete(m.clearedFields, material.FieldSupplierItemNo)
 }
 
 // SetCategory sets the "category" field.
@@ -30369,12 +30419,15 @@ func (m *MaterialMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MaterialMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 10)
 	if m.code != nil {
 		fields = append(fields, material.FieldCode)
 	}
 	if m.name != nil {
 		fields = append(fields, material.FieldName)
+	}
+	if m.supplier_item_no != nil {
+		fields = append(fields, material.FieldSupplierItemNo)
 	}
 	if m.category != nil {
 		fields = append(fields, material.FieldCategory)
@@ -30409,6 +30462,8 @@ func (m *MaterialMutation) Field(name string) (ent.Value, bool) {
 		return m.Code()
 	case material.FieldName:
 		return m.Name()
+	case material.FieldSupplierItemNo:
+		return m.SupplierItemNo()
 	case material.FieldCategory:
 		return m.Category()
 	case material.FieldSpec:
@@ -30436,6 +30491,8 @@ func (m *MaterialMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCode(ctx)
 	case material.FieldName:
 		return m.OldName(ctx)
+	case material.FieldSupplierItemNo:
+		return m.OldSupplierItemNo(ctx)
 	case material.FieldCategory:
 		return m.OldCategory(ctx)
 	case material.FieldSpec:
@@ -30472,6 +30529,13 @@ func (m *MaterialMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetName(v)
+		return nil
+	case material.FieldSupplierItemNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSupplierItemNo(v)
 		return nil
 	case material.FieldCategory:
 		v, ok := value.(string)
@@ -30555,6 +30619,9 @@ func (m *MaterialMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *MaterialMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(material.FieldSupplierItemNo) {
+		fields = append(fields, material.FieldSupplierItemNo)
+	}
 	if m.FieldCleared(material.FieldCategory) {
 		fields = append(fields, material.FieldCategory)
 	}
@@ -30578,6 +30645,9 @@ func (m *MaterialMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *MaterialMutation) ClearField(name string) error {
 	switch name {
+	case material.FieldSupplierItemNo:
+		m.ClearSupplierItemNo()
+		return nil
 	case material.FieldCategory:
 		m.ClearCategory()
 		return nil
@@ -30600,6 +30670,9 @@ func (m *MaterialMutation) ResetField(name string) error {
 		return nil
 	case material.FieldName:
 		m.ResetName()
+		return nil
+	case material.FieldSupplierItemNo:
+		m.ResetSupplierItemNo()
 		return nil
 	case material.FieldCategory:
 		m.ResetCategory()

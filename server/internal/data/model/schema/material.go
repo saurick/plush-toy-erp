@@ -22,6 +22,10 @@ func (Material) Fields() []ent.Field {
 		field.String("name").
 			NotEmpty().
 			MaxLen(255),
+		field.String("supplier_item_no").
+			Optional().
+			Nillable().
+			MaxLen(255),
 		field.String("category").
 			Optional().
 			Nillable().

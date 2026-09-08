@@ -550,7 +550,7 @@ export function MasterDataFormFields({
       ) : null}
       <Form.Item
         className="erp-business-action-form__field"
-        label="编号（自动）"
+        label={type === 'materials' ? '系统物料编号（自动）' : '编号（自动）'}
         name="code"
         rules={[{ required: true, message: '请填写或保留自动编号' }]}
       >
@@ -782,6 +782,19 @@ export function MasterDataFormFields({
       ) : null}
       {type === 'materials' ? (
         <>
+          <Form.Item
+            className="erp-business-action-form__field erp-business-action-form__field--full"
+            label="款号"
+            name="supplier_item_no"
+            rules={[{ max: 255, message: '款号不能超过 255 个字符' }]}
+          >
+            <Input
+              allowClear
+              autoComplete="off"
+              maxLength={255}
+              placeholder="按原资料填写，保留商家名及符号"
+            />
+          </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
             label="分类"

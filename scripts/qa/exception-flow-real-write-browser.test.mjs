@@ -31,18 +31,14 @@ test("exception-flow task search follows the current page placeholder contract",
     "utf8",
   );
 
-  assert.match(dashboardSource, /placeholder="搜索任务"/u);
+  assert.match(dashboardSource, /placeholder="订单 \/ 产品 \/ 物料 \/ 款号"/u);
   assert.match(
     dashboardSource,
-    /searchHint="可搜索：任务、单号、来源、处理原因"/u,
+    /searchHint="可搜索：任务、单号、产品、款号、物料、处理原因"/u,
   );
   assert.match(
     runnerSource,
-    /getByPlaceholder\("搜索任务", \{ exact: true \}\)/u,
-  );
-  assert.doesNotMatch(
-    runnerSource,
-    /getByPlaceholder\("搜索任务、单号、来源、处理原因"/u,
+    /getByPlaceholder\("订单 \/ 产品 \/ 物料 \/ 款号", \{ exact: true \}\)/u,
   );
 });
 

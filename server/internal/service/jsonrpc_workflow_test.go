@@ -2351,6 +2351,34 @@ func TestWorkflowTaskToMapIncludesInternalConcurrencyVersion(t *testing.T) {
 	}
 }
 
+func TestWorkflowTaskToMapIncludesReadOnlyDisplayContext(t *testing.T) {
+	task := &biz.WorkflowTask{ID: 1, DisplayContext: &biz.WorkflowTaskDisplayContext{
+		Available: true, SourceNo: "SO-TEST", Items: []biz.WorkflowTaskDisplayItem{{Kind: "product", Name: "长耳兔", Code: "PRODUCT-1", StyleNo: "RB-018", ProductID: 42, ImageAttachmentID: 8}},
+	}}
+	encoded, err := structpb.NewStruct(workflowTaskToMap(task))
+	if err != nil {
+		t.Fatal(err)
+	}
+	context := encoded.AsMap()["display_context"].(map[string]any)
+	item := context["items"].([]any)[0].(map[string]any)
+	expectedItem := map[string]any{
+		"kind": "product", "name": "长耳兔", "code": "PRODUCT-1", "style_no": "RB-018",
+		"supplier_item_no": "", "order_no": "", "product_id": float64(42), "image_attachment_id": float64(8),
+	}
+	if context["available"] != true || context["source_no"] != "SO-TEST" || len(item) != len(expectedItem) {
+		t.Fatalf("display identity contract=%#v", context)
+	}
+	for key, expected := range expectedItem {
+		if item[key] != expected {
+			t.Fatalf("display identity %s=%#v, want %#v", key, item[key], expected)
+		}
+	}
+	task.DisplayContext = nil
+	if workflowTaskToMap(task)["display_context"] != nil {
+		t.Fatal("absent projection must serialize as null")
+	}
+}
+
 func TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode(t *testing.T) {
 	processID := 10
 	nodeID := 20

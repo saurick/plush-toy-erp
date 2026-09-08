@@ -279,6 +279,7 @@ export function buildMobileRoleTaskQuery({
   roleKey,
   viewKey,
   cursor = '',
+  keyword = '',
   limit = MOBILE_ROLE_TASK_PAGE_LIMIT,
 } = {}) {
   const normalizedRoleKey = normalizeRoleKey(roleKey)
@@ -295,7 +296,11 @@ export function buildMobileRoleTaskQuery({
     throw new TypeError('移动岗位任务查询分页大小无效')
   }
 
+  const normalizedKeyword = typeof keyword === 'string' ? keyword.trim() : null
+  if (normalizedKeyword === null || [...normalizedKeyword].length > 100)
+    { throw new TypeError('搜索内容最多 100 个字') }
   return {
+    ...(normalizedKeyword ? { keyword: normalizedKeyword } : {}),
     view_key: normalizedViewKey,
     role_key: normalizedRoleKey,
     limit,

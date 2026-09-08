@@ -1,0 +1,75 @@
+.erp-task-timing {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  color: var(--erp-text-muted, #64748b);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: left;
+}
+
+.erp-task-timing__icon {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.erp-task-timing dl {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  gap: 4px;
+}
+
+.erp-task-timing__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
+  min-width: 0;
+}
+
+.erp-task-timing dt,
+.erp-task-timing dd {
+  margin: 0;
+  font-weight: 400;
+}
+
+.erp-task-timing dt {
+  flex-shrink: 0;
+}
+
+.erp-task-timing dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-timing__row--danger {
+  color: #c62828;
+}
+
+[data-erp-theme='dark'] .erp-task-timing__row--danger {
+  color: #fca5a5;
+}
+
+.erp-task-timing__row--warning {
+  color: var(--erp-warning-text, #ad6800);
+}
+
+.erp-task-timing--detail {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 22px;
+}
+
+.erp-task-timing--detail dl {
+  gap: 8px;
+}
+
+.erp-task-timing--detail dt {
+  width: 5em;
+}
+
+.mobile-role-tasks-page .erp-task-timing {
+  font-size: 13px;
+}

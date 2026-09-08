@@ -10,6 +10,8 @@ import {
   buildWorkflowTaskBoardRoleOptions,
   getWorkflowTaskBoardRequestKey,
   getWorkflowTaskBoardSummaryRequestKey,
+  getWorkflowTaskBoardStatusOptions,
+  getWorkflowTaskBoardDueOptions,
   canRunWorkflowTaskAction,
   getWorkflowTaskActionPermission,
   getWorkflowTaskAllowedActionModes,
@@ -29,6 +31,53 @@ import {
 } from './workflowTaskBoard.mjs'
 
 const now = Math.floor(Date.now() / 1000)
+
+test('workflowTaskBoard: 分类只提供可以匹配的状态和日期条件', () => {
+  assert.deepEqual(
+    getWorkflowTaskBoardStatusOptions('finished').map((option) => option.value),
+    ['all', 'rejected', 'withdrawn', 'done']
+  )
+  assert.deepEqual(
+    getWorkflowTaskBoardDueOptions('due').map((option) => option.value),
+    ['all', 'overdue', 'dueSoon']
+  )
+  for (const [lane, status, due] of [
+    ['finished', 'blocked', 'overdue'],
+    ['actionable', 'done', 'dueSoon'],
+    ['due', 'rejected', 'noDue'],
+    ['exception', 'ready', 'all'],
+  ]) {
+    const filters = readWorkflowTaskBoardFiltersFromSearch(
+      `lane=${lane}&status=${status}&due=${due}&q=兔子&role=engineering&pageSize=20`
+    )
+    const request = buildWorkflowTaskBoardRequest(filters)
+    assert.equal(request.status, undefined)
+    assert.equal(request.due, undefined)
+    assert.equal(request.keyword, '兔子')
+    assert.equal(request.owner_role_key, 'engineering')
+    assert.equal(request.lane_key, lane)
+    assert.equal(request.limit, 20)
+    const restored = readWorkflowTaskBoardFiltersFromSearch(
+      writeWorkflowTaskBoardFiltersToSearch('', filters)
+    )
+    assert.deepEqual(restored, filters)
+  }
+  assert.equal(
+    buildWorkflowTaskBoardRequest({ lane: 'finished', status: 'done' }).status,
+    'done'
+  )
+  assert.equal(
+    buildWorkflowTaskBoardRequest({ lane: 'exception', due: 'overdue' }).due,
+    'overdue'
+  )
+  for (const status of ['overdue', 'dueSoon']) {
+    assert.equal(
+      buildWorkflowTaskBoardRequest({ lane: 'exception', status }).status,
+      status,
+      '从到期状态筛选进入阻塞分类时，应保留仍然适用的条件'
+    )
+  }
+})
 
 const tasks = Object.freeze([
   {
@@ -265,34 +314,30 @@ test('workflowTaskBoard: 使用服务端互斥计数构建四个运营泳道', (
       {
         key: 'actionable',
         total: 6,
-        limit: 5,
+        limit: TASK_BOARD_OVERVIEW_LIMIT,
         offset: 0,
-        tasks: Array.from({ length: 5 }, (_, index) =>
+        tasks: Array.from({ length: TASK_BOARD_OVERVIEW_LIMIT }, (_, index) =>
           boardTask(index + 1, 'ready')
         ),
       },
       {
         key: 'exception',
         total: 2,
-        limit: 5,
+        limit: TASK_BOARD_OVERVIEW_LIMIT,
         offset: 0,
         tasks: [boardTask(7, 'blocked'), boardTask(8, 'blocked')],
       },
       {
         key: 'due',
         total: 3,
-        limit: 5,
+        limit: TASK_BOARD_OVERVIEW_LIMIT,
         offset: 0,
-        tasks: [
-          boardTask(9, 'ready'),
-          boardTask(10, 'ready'),
-          boardTask(11, 'ready'),
-        ],
+        tasks: [boardTask(9, 'ready'), boardTask(10, 'ready')],
       },
       {
         key: 'finished',
         total: 1,
-        limit: 5,
+        limit: TASK_BOARD_OVERVIEW_LIMIT,
         offset: 0,
         tasks: [boardTask(12, 'rejected')],
       },
@@ -312,7 +357,7 @@ test('workflowTaskBoard: 使用服务端互斥计数构建四个运营泳道', (
   )
   assert.equal(model.lanes[0].title, '常规待办')
   assert.equal(model.lanes[0].tasks.length, TASK_BOARD_OVERVIEW_LIMIT)
-  assert.equal(model.lanes[0].hiddenCount, 1)
+  assert.equal(model.lanes[0].hiddenCount, 4)
   assert.equal(model.visibleLanes.length, 4)
   assert.deepEqual(model.sourceTypes, ['inbound', 'project-orders'])
   assert.deepEqual(model.ownerRoleKeys, ['warehouse', 'finance'])
@@ -332,6 +377,7 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
     sort: 'smart',
     mode: 'all',
     page: 1,
+    pageSize: 8,
   })
 
   assert.deepEqual(
@@ -348,6 +394,7 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
       sort: 'smart',
       mode: 'all',
       page: 1,
+      pageSize: 8,
     }
   )
   assert.equal(
@@ -387,6 +434,63 @@ test('workflowTaskBoard: 写入 URL 时保留上下文并规范 lane/page', () =
     page: 1,
   })
   assert.equal(cleared.toString(), 'keep=1')
+})
+
+test('workflowTaskBoard: 页容量在 URL、请求与末页计算中保持一致', () => {
+  const filters = readWorkflowTaskBoardFiltersFromSearch(
+    'q=兔子&lane=actionable&page=3&pageSize=20&keep=1'
+  )
+  const request = buildWorkflowTaskBoardRequest(filters)
+  assert.equal(request.limit, 20)
+  assert.equal(request.offset, 40)
+  assert.equal(request.keyword, '兔子')
+  const restored = readWorkflowTaskBoardFiltersFromSearch(
+    writeWorkflowTaskBoardFiltersToSearch('keep=1', filters)
+  )
+  assert.deepEqual(restored, filters)
+
+  const response = {
+    snapshot_at: now,
+    total: 25,
+    counts: { actionable: 25, exception: 0, due: 0, finished: 0 },
+    lanes: [{ key: 'actionable', total: 25, limit: 20, offset: 40, tasks: [] }],
+    source_types: [],
+    owner_role_keys: [],
+  }
+  const model = buildWorkflowTaskBoardModel(response, filters)
+  assert.equal(model.pageCount, 2)
+  assert.equal(model.page, 2)
+  assert.equal(model.visibleLanes[0].limit, 20)
+  assert.equal(
+    buildWorkflowTaskBoardRequest({ ...filters, lane: 'all' }).limit,
+    2
+  )
+  assert.equal(
+    getWorkflowTaskBoardSummaryRequestKey(request),
+    getWorkflowTaskBoardSummaryRequestKey(
+      buildWorkflowTaskBoardRequest({ ...filters, pageSize: 50 })
+    )
+  )
+})
+
+test('workflowTaskBoard: 非法页容量回到默认值，合法容量最多五十项', () => {
+  for (const value of ['0', '-1', '1.5', '100', 'Infinity', 'bad']) {
+    const filters = readWorkflowTaskBoardFiltersFromSearch(
+      `lane=due&pageSize=${value}`
+    )
+    assert.equal(filters.pageSize, 8)
+    assert.equal(buildWorkflowTaskBoardRequest(filters).limit, 8)
+    assert.equal(
+      writeWorkflowTaskBoardFiltersToSearch('', filters).has('pageSize'),
+      false
+    )
+  }
+  const filters = readWorkflowTaskBoardFiltersFromSearch(
+    'lane=due&page=2&pageSize=50'
+  )
+  assert.equal(buildWorkflowTaskBoardRequest(filters).offset, 50)
+  assert.equal(buildWorkflowTaskBoardRequest(filters).limit, 50)
+  assert.equal(hasActiveWorkflowTaskBoardFilters({ pageSize: 50 }), false)
 })
 
 test('workflowTaskBoard: 聚焦请求保留筛选并按每页八条计算 offset', () => {

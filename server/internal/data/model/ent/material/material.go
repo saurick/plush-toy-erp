@@ -18,6 +18,8 @@ const (
 	FieldCode = "code"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
+	// FieldSupplierItemNo holds the string denoting the supplier_item_no field in the database.
+	FieldSupplierItemNo = "supplier_item_no"
 	// FieldCategory holds the string denoting the category field in the database.
 	FieldCategory = "category"
 	// FieldSpec holds the string denoting the spec field in the database.
@@ -122,6 +124,7 @@ var Columns = []string{
 	FieldID,
 	FieldCode,
 	FieldName,
+	FieldSupplierItemNo,
 	FieldCategory,
 	FieldSpec,
 	FieldColor,
@@ -146,6 +149,8 @@ var (
 	CodeValidator func(string) error
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
+	// SupplierItemNoValidator is a validator for the "supplier_item_no" field. It is called by the builders before save.
+	SupplierItemNoValidator func(string) error
 	// CategoryValidator is a validator for the "category" field. It is called by the builders before save.
 	CategoryValidator func(string) error
 	// SpecValidator is a validator for the "spec" field. It is called by the builders before save.
@@ -180,6 +185,11 @@ func ByCode(opts ...sql.OrderTermOption) OrderOption {
 // ByName orders the results by the name field.
 func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
+}
+
+// BySupplierItemNo orders the results by the supplier_item_no field.
+func BySupplierItemNo(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSupplierItemNo, opts...).ToFunc()
 }
 
 // ByCategory orders the results by the category field.

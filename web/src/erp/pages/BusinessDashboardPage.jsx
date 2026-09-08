@@ -1,6 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ArrowRightOutlined,
+  FileTextOutlined,
+  InfoCircleOutlined,
+  UserOutlined,
+} from '@ant-design/icons'
 import { Alert, Button, Card, Space, Spin, Table, Typography } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import WorkflowTaskIdentity from '../components/workflow/WorkflowTaskIdentity.jsx'
+import WorkflowTaskTiming from '../components/workflow/WorkflowTaskTiming.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getBusinessDashboardStats } from '../api/businessDashboardApi.mjs'
@@ -17,12 +25,15 @@ import {
 } from '../utils/dashboardTaskDisplay.mjs'
 import {
   buildDashboardModuleRows,
-  buildDashboardSummary,
   normalizeDashboardModuleStats,
 } from '../utils/dashboardStats.mjs'
 import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mjs'
 import { effectiveSessionAllowsPage } from '../utils/adminProfileSync.mjs'
-import { TASK_BOARD_LANE_DEFINITIONS } from '../utils/workflowTaskBoard.mjs'
+import {
+  TASK_BOARD_LANE_DEFINITIONS,
+  getWorkflowTaskOwnerRoleLabel,
+  getWorkflowTaskReasonMeta,
+} from '../utils/workflowTaskBoard.mjs'
 import { canOpenWorkflowTaskEntry } from '../utils/workflowTaskEntryAccess.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -87,10 +98,12 @@ function BusinessAttentionItem({
   onOpenEntry,
   taskBoard,
   taskBoardReady,
+  onViewAll,
 }) {
   const lane = getLane(taskBoard, definition.key)
   const total = taskBoardReady ? taskBoard.counts[definition.key] : null
   const task = taskBoardReady ? lane?.tasks?.[0] : null
+  const reason = task ? getWorkflowTaskReasonMeta(task) : null
   const access = useWorkflowTaskActionAccess({
     adminProfile,
     task,
@@ -105,6 +118,8 @@ function BusinessAttentionItem({
 
   return (
     <div
+      role="group"
+      aria-label={`${definition.title}，${taskBoardReady ? `${formatCount(total)} 项` : '暂不可用'}`}
       className={`erp-business-board-alert-item${
         canOpenEntry ? ' erp-business-board-alert-item--openable' : ''
       }`}
@@ -119,7 +134,7 @@ function BusinessAttentionItem({
           : undefined
       }
     >
-      <div>
+      <div className="erp-business-board-alert-head">
         <Text strong>{definition.title}</Text>
         <strong className="erp-business-board-alert-count">
           {taskBoardReady ? formatCount(total) : '—'}
@@ -128,28 +143,60 @@ function BusinessAttentionItem({
       {!taskBoardReady ? (
         <Text type="secondary">暂不可用</Text>
       ) : task ? (
-        canOpenEntry ? (
-          <Button
-            type="link"
-            size="small"
-            className="erp-dashboard-link-button erp-business-board-task-entry"
-            onClick={() => onOpenEntry(task, access)}
-            aria-label={`查看${task.task_name || definition.title}`}
-          >
-            {task.task_name || definition.title} /{' '}
-            {formatWorkflowTaskSource(task)}
-          </Button>
-        ) : (
-          <Text className="erp-business-board-task-text">
-            {task.task_name || definition.title} /{' '}
-            {formatWorkflowTaskSource(task)}
+        <>
+          <Text strong className="erp-business-board-task-text">
+            {task.task_name || definition.title}
           </Text>
-        )
+          <WorkflowTaskIdentity task={task} compact />
+          <Text type="secondary" className="erp-business-board-task-source">
+            <FileTextOutlined aria-hidden="true" />
+            <span>{formatWorkflowTaskSource(task)}</span>
+          </Text>
+          {reason?.value ? (
+            <Text
+              className="erp-business-board-task-reason"
+              type={reason.kind === 'blocked' ? 'danger' : 'secondary'}
+            >
+              {reason.label}：{reason.value}
+            </Text>
+          ) : null}
+          <WorkflowTaskTiming task={task} />
+          <div className="erp-business-board-task-meta">
+            <Text type="secondary">
+              <UserOutlined aria-hidden="true" />{' '}
+              {getWorkflowTaskOwnerRoleLabel(task)}
+            </Text>
+          </div>
+        </>
       ) : total > 0 ? (
         <Text type="secondary">暂无可展示事项</Text>
       ) : (
         <Text type="secondary">暂无</Text>
       )}
+      <div className="erp-business-board-alert-actions">
+        {canOpenEntry ? (
+          <Button
+            type="link"
+            size="small"
+            className="erp-dashboard-link-button erp-business-board-task-entry"
+            onClick={() => onOpenEntry(task, access)}
+            aria-label={`查看${task.task_name || definition.title}的单据`}
+          >
+            查看单据
+          </Button>
+        ) : null}
+        {taskBoardReady && total > 0 && onViewAll ? (
+          <Button
+            type="link"
+            size="small"
+            icon={<ArrowRightOutlined aria-hidden="true" />}
+            iconPosition="end"
+            onClick={() => onViewAll(definition.key)}
+          >
+            查看全部 {formatCount(total)} 项
+          </Button>
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -248,7 +295,6 @@ export default function BusinessDashboardPage() {
     () => buildDashboardModuleRows(dashboardHealthModules, moduleStats),
     [moduleStats]
   )
-  const summary = useMemo(() => buildDashboardSummary(moduleRows), [moduleRows])
   const isSuperAdmin = adminProfile?.is_super_admin === true
   const allowedMenuPaths = useMemo(
     () =>
@@ -288,43 +334,6 @@ export default function BusinessDashboardPage() {
       ),
     [adminProfile, allowedMenuPaths, isSuperAdmin, moduleRows]
   )
-  const collaborationRisk = taskBoardReady
-    ? Number(taskBoard?.counts?.exception || 0) +
-      Number(taskBoard?.counts?.due || 0)
-    : null
-
-  const businessMetricCards = useMemo(
-    () => [
-      {
-        key: 'master-data',
-        title: '基础资料',
-        note: '档案与物料清单',
-        ...summary[DASHBOARD_TRUTH_KINDS.MASTER_DATA],
-      },
-      {
-        key: 'source-document',
-        title: '业务单据',
-        note: '订单与合同',
-        ...summary[DASHBOARD_TRUTH_KINDS.SOURCE_DOCUMENT],
-      },
-      {
-        key: 'business-fact',
-        title: '办理结果',
-        note: '已经发生',
-        ...summary[DASHBOARD_TRUTH_KINDS.BUSINESS_FACT],
-      },
-      {
-        key: 'collaboration-risk',
-        title: '需要关注',
-        note: '当前账号',
-        available: taskBoardReady,
-        total: collaborationRisk,
-        color: '#d4380d',
-      },
-    ],
-    [collaborationRisk, summary, taskBoardReady]
-  )
-
   const openTaskEntry = (task, access) => {
     const entryPath = resolveWorkflowTaskEntryPath(task)
     if (
@@ -352,44 +361,51 @@ export default function BusinessDashboardPage() {
             </Title>
           </div>
         </div>
-        <div className="erp-business-board-summary-grid">
-          {businessMetricCards.map((item) => {
-            const displayValue = item.available ? formatCount(item.total) : '—'
-            return (
-              <div
-                className="erp-business-board-summary-card erp-metric-readonly-card"
-                key={item.key}
-                aria-label={`${item.title} ${
-                  item.available ? displayValue : '暂不可用'
-                }，只读摘要`}
-              >
-                <div className="erp-metric-readonly-card__head">
-                  <Text type="secondary">{item.title}</Text>
-                  <span className="erp-metric-readonly-card__badge">
-                    {item.note}
-                  </span>
-                </div>
-                <strong style={item.color ? { color: item.color } : undefined}>
-                  {displayValue}
-                </strong>
-                {!item.available ? (
-                  <Text
-                    type="secondary"
-                    className="erp-metric-readonly-card__hint"
-                  >
-                    暂不可用
-                  </Text>
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-        <Paragraph type="secondary" className="erp-business-board-summary-note">
-          四类数字分别统计，请不要直接相加；“需要关注”只统计当前账号可见的阻塞和到期任务。
-        </Paragraph>
       </Card>
 
       <div className="erp-business-board-workspace">
+        <Card
+          className="erp-dashboard-card erp-business-board-attention-card"
+          variant="borderless"
+        >
+          <Space direction="vertical" className="erp-dashboard-block" size={8}>
+            <Title level={5} className="erp-dashboard-section-title">
+              需要关注
+            </Title>
+            {workflowLoadError ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="待办概览暂不可用"
+                description="业务统计和各业务页面不受影响，可稍后刷新重试。"
+                className="erp-business-board-inline-alert"
+              />
+            ) : null}
+            <div className="erp-business-board-alert-grid">
+              {BUSINESS_ATTENTION_LANES.map((definition) => (
+                <BusinessAttentionItem
+                  key={definition.key}
+                  adminProfile={taskEntryAdminProfile}
+                  definition={definition}
+                  onOpenEntry={openTaskEntry}
+                  taskBoard={taskBoard}
+                  taskBoardReady={taskBoardReady}
+                  onViewAll={
+                    (isSuperAdmin || allowedMenuPaths.has('/erp/task-board')) &&
+                    effectiveSessionAllowsPage(adminProfile, 'task-board', {
+                      isLocalDev: false,
+                      isSuperAdmin,
+                    })
+                      ? (lane) => navigate(`/erp/task-board?lane=${lane}`)
+                      : null
+                  }
+                />
+              ))}
+            </div>
+            <Text type="secondary">显示当前账号可见的任务，每类预览一项。</Text>
+          </Space>
+        </Card>
+
         <Card
           className="erp-dashboard-card erp-dashboard-table-card"
           variant="borderless"
@@ -405,8 +421,7 @@ export default function BusinessDashboardPage() {
             />
           ) : null}
           <Paragraph type="secondary" className="erp-business-board-table-note">
-            每项分别统计；0 表示当前确实为零，—
-            表示统计暂不可用。有“查看业务记录”的项目可进入，电脑端也可双击整行；其他项目仅显示数量。
+            各项独立统计；0 表示暂无记录，— 表示数量暂不可用。
           </Paragraph>
           <Table
             size="middle"
@@ -438,13 +453,13 @@ export default function BusinessDashboardPage() {
                 title: '业务环节',
                 dataIndex: 'module',
                 fixed: 'left',
-                width: 150,
+                width: 125,
                 render: (value) => <Text strong>{value}</Text>,
               },
               {
                 title: '业务记录',
                 dataIndex: 'label',
-                width: 180,
+                width: 155,
                 render: (value) => <Text>{value}</Text>,
               },
               {
@@ -472,7 +487,7 @@ export default function BusinessDashboardPage() {
               {
                 title: '进入业务',
                 key: 'entry',
-                width: 150,
+                width: 110,
                 fixed: 'right',
                 render: (_, source) =>
                   source.canOpen ? (
@@ -483,7 +498,7 @@ export default function BusinessDashboardPage() {
                       onClick={() => navigate(source.path)}
                       aria-label={`查看${source.label}`}
                     >
-                      查看业务记录
+                      查看记录 <ArrowRightOutlined aria-hidden="true" />
                     </Button>
                   ) : (
                     <Text
@@ -498,48 +513,21 @@ export default function BusinessDashboardPage() {
             dataSource={businessSourceRows}
           />
         </Card>
-
-        <Card
-          className="erp-dashboard-card erp-business-board-attention-card"
-          variant="borderless"
-        >
-          <Space direction="vertical" className="erp-dashboard-block" size={8}>
-            <Title level={5} className="erp-dashboard-section-title">
-              需要关注
-            </Title>
-            {workflowLoadError ? (
-              <Alert
-                type="warning"
-                showIcon
-                message="待办概览暂不可用"
-                description="业务统计和各业务页面不受影响，可稍后刷新重试。"
-                className="erp-business-board-inline-alert"
-              />
-            ) : null}
-            <div className="erp-business-board-alert-grid">
-              {BUSINESS_ATTENTION_LANES.map((definition) => (
-                <BusinessAttentionItem
-                  key={definition.key}
-                  adminProfile={taskEntryAdminProfile}
-                  definition={definition}
-                  onOpenEntry={openTaskEntry}
-                  taskBoard={taskBoard}
-                  taskBoardReady={taskBoardReady}
-                />
-              ))}
-            </div>
-            <Text type="secondary">
-              阻塞和到期任务互不重复；显示当前账号可见的总数，每类最多展示一项。
-            </Text>
-          </Space>
-        </Card>
       </div>
 
-      <Text type="secondary" className="erp-business-board-boundary-summary">
-        {DATA_BOUNDARIES.map(
-          (item) => `${item.title}：${item.description}`
-        ).join('；')}
-      </Text>
+      <details className="erp-business-board-boundary-summary">
+        <summary>
+          <InfoCircleOutlined aria-hidden="true" /> 统计说明
+        </summary>
+        <dl>
+          {DATA_BOUNDARIES.map((item) => (
+            <div key={item.key}>
+              <dt>{item.title}</dt>
+              <dd>{item.description}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
     </Space>
   )
 }

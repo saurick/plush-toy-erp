@@ -135,3 +135,34 @@ test('workflowTaskBoardMock: 旧任务状态和聚合筛选不进入 target-only
     )
   }
 })
+
+test('workflowTaskBoardMock: 按显示的产品款号搜索，来源清空后不匹配旧快照', () => {
+  const linked = task(1, 'ready', {
+    payload: { product_name: '旧产品', style_no: 'OLD' },
+    display_context: {
+      available: true,
+      source_no: 'MO-1',
+      items: [
+        {
+          kind: 'product',
+          name: '长耳兔',
+          code: 'PRODUCT-1',
+          style_no: 'RB-018',
+          order_no: 'SO-ROOT',
+        },
+      ],
+    },
+  })
+  const search = (keyword) =>
+    buildWorkflowTaskBoardMock({
+      tasks: [linked],
+      params: { keyword, limit: 8 },
+      snapshotAt,
+    }).total
+  assert.equal(search('RB-018'), 1)
+  assert.equal(search('SO-ROOT'), 1)
+  assert.equal(search('OLD'), 0)
+  linked.display_context.items = []
+  assert.equal(search('长耳兔'), 0)
+  assert.equal(search('旧产品'), 0)
+})

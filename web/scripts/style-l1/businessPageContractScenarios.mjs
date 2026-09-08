@@ -406,17 +406,7 @@ export function createBusinessPageContractScenarios({
           .filter({ hasText: '下拉分类只读验收任务' })
           .first()
         await assignmentTaskCard.waitFor({ state: 'visible', timeout: 10_000 })
-        await assignmentTaskCard
-          .locator('.erp-task-board-card-meta')
-          .first()
-          .click()
-        const assignmentCurrentTask = page
-          .locator('.erp-task-center-current')
-          .filter({ hasText: '下拉分类只读验收任务' })
-          .first()
-        await assignmentCurrentTask
-          .getByRole('button', { name: '处理任务', exact: true })
-          .click()
+        await assignmentTaskCard.click()
         const assignmentDrawer = page.locator('.erp-task-action-drawer')
         await assignmentDrawer.waitFor({ state: 'visible', timeout: 10_000 })
         await assignmentDrawer.getByRole('tab', { name: /选择处理/u }).click()

@@ -10,6 +10,45 @@ import {
   parseBOMXlsx,
 } from './bomXlsxImport.mjs'
 
+test('supplier reference participates in material matching without inventing master data', () => {
+  const supplierItemNo = '示例织造AB-001#-02#米白'
+  const parsed = {
+    rows: [
+      { materialName: '短毛绒', supplierItemNo, quantity: '1', unit: '米' },
+    ],
+  }
+  const materials = [
+    { id: 1, code: 'MAT-1', name: '短毛绒', supplier_item_no: supplierItemNo },
+    { id: 2, code: 'MAT-2', name: '短毛绒', supplier_item_no: '另一示例CD-2#' },
+    {
+      id: 3,
+      code: 'MAT-3',
+      name: '其他面料',
+      supplier_item_no: supplierItemNo,
+    },
+  ]
+  const source = structuredClone(materials)
+  const draft = buildBOMImportDraft(parsed, { materials })
+  assert.equal(draft.values.items[0].material_id, 1)
+  assert.equal(
+    draft.values.items[0]._import_source.supplierItemNo,
+    supplierItemNo
+  )
+  for (const values of [
+    [],
+    [materials[1]],
+    [{ ...materials[0], supplier_item_no: '' }],
+    [materials[0], { ...materials[0], id: 4 }],
+  ]) {
+    assert.equal(
+      buildBOMImportDraft(parsed, { materials: values }).values.items[0]
+        .material_id,
+      undefined
+    )
+  }
+  assert.deepEqual(materials, source)
+})
+
 const CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
   let entry = value
   for (let bit = 0; bit < 8; bit += 1) {
@@ -138,7 +177,7 @@ function createWorkbook(sheets) {
   return createZip(entries)
 }
 
-function firstFormatWorkbook() {
+function firstFormatWorkbook(styleHeader = '厂商料号') {
   return createWorkbook([
     {
       name: '材料分析明细表',
@@ -168,7 +207,7 @@ function firstFormatWorkbook() {
         ],
         [
           '物料名称',
-          '厂商料号',
+          styleHeader,
           '规格',
           '单位',
           '组装部位',
@@ -356,8 +395,20 @@ test('buildBOMImportDraft: only unique existing master data is linked and source
       },
     ],
     materials: [
-      { id: 21, code: 'M-21', name: '测试毛绒', spec: '48"' },
-      { id: 22, code: 'M-22', name: '测试毛绒', spec: '51"' },
+      {
+        id: 21,
+        code: 'M-21',
+        name: '测试毛绒',
+        supplier_item_no: '客供',
+        spec: '48"',
+      },
+      {
+        id: 22,
+        code: 'M-22',
+        name: '测试毛绒',
+        supplier_item_no: '客供',
+        spec: '51"',
+      },
       { id: 23, code: 'M-23', name: '测试扣', spec: '10mm' },
     ],
     units: [
@@ -386,8 +437,20 @@ test('buildBOMImportDraft: missing or ambiguous mappings stay blank until the us
   const draft = buildBOMImportDraft(parsed, {
     products: [],
     materials: [
-      { id: 21, code: 'M-21', name: '测试毛绒', spec: '51"' },
-      { id: 22, code: 'M-22', name: '测试毛绒', spec: '51"' },
+      {
+        id: 21,
+        code: 'M-21',
+        name: '测试毛绒',
+        supplier_item_no: '客供',
+        spec: '51"',
+      },
+      {
+        id: 22,
+        code: 'M-22',
+        name: '测试毛绒',
+        supplier_item_no: '客供',
+        spec: '51"',
+      },
     ],
     units: [{ id: 31, code: 'Y', name: '码' }],
   })
@@ -454,4 +517,11 @@ test('parseBOMXlsx: rejects unsupported file types and unsafe ZIP paths', async 
     (error) =>
       error instanceof BOMXlsxImportError && error.code === 'invalid_zip_path'
   )
+})
+
+test('BOM import accepts the confirmed style-number label and original workbook label', async () => {
+  const original = await parseBOMXlsx(firstFormatWorkbook('厂商料号'))
+  const current = await parseBOMXlsx(firstFormatWorkbook('款号'))
+  assert.deepEqual(current.rows, original.rows)
+  assert.deepEqual(current.context, original.context)
 })

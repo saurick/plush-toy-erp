@@ -92,7 +92,11 @@ func (r *workflowRepo) GetWorkflowTask(ctx context.Context, id int) (*biz.Workfl
 		}
 		return nil, err
 	}
-	return entWorkflowTaskToBiz(row), nil
+	task := entWorkflowTaskToBiz(row)
+	if err := hydrateWorkflowTaskDisplayContexts(ctx, r.data.postgres, []*biz.WorkflowTask{task}); err != nil {
+		return nil, err
+	}
+	return task, nil
 }
 
 func (r *workflowRepo) GetWorkflowTaskByTaskCode(ctx context.Context, taskCode string) (*biz.WorkflowTask, error) {
@@ -283,6 +287,9 @@ func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.Workflo
 	out := make([]*biz.WorkflowTask, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, entWorkflowTaskToBiz(row))
+	}
+	if err := hydrateWorkflowTaskDisplayContexts(ctx, r.data.postgres, out); err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }

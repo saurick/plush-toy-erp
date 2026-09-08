@@ -39,7 +39,7 @@ test('mobile task filter cold load scopes busy state and feedback to the task li
     listScreenSource,
     /const taskListLoading =\s*loading && !activeViewHasData && !initialLoading/u
   )
-  assert.match(listScreenSource, /data-testid="mobile-loaded-task-overview"/u)
+  assert.match(listScreenSource, /className="mobile-role-task-search/u)
   assert.match(listScreenSource, /data-testid="mobile-role-task-filters"/u)
   assert.match(listScreenSource, /data-testid="mobile-role-bottom-nav"/u)
   assert.match(listScreenSource, /data-testid="mobile-role-task-list"/u)

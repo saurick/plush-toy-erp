@@ -25,13 +25,6 @@ export default function MobileTaskListSkeleton({
       data-skeleton-row-count={rows.length}
       aria-hidden="true"
     >
-      <div className="mobile-role-skeleton__focus rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <SkeletonBlock className="mobile-role-skeleton__focus-kicker" />
-        <SkeletonBlock className="mobile-role-skeleton__focus-title" />
-        <SkeletonBlock className="mobile-role-skeleton__focus-copy" />
-        <SkeletonBlock className="mobile-role-skeleton__focus-counts" />
-      </div>
-
       <div
         className="mobile-role-skeleton__filters mt-4 grid rounded-2xl bg-slate-100 p-1 shadow-inner"
         style={{

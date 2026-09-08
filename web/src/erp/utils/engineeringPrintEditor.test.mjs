@@ -134,6 +134,7 @@ test('engineeringPrintTemplates: BOM 版本带值生成物料明细并保留产�
         {
           id: 21,
           code: 'MAT-BLACK-51',
+          supplier_item_no: '示例织造AB-001#米白',
           name: '黑色毛绒',
           category: '面料',
           spec: '51"',
@@ -176,7 +177,7 @@ test('engineeringPrintTemplates: BOM 版本带值生成物料明细并保留产�
   assert.deepEqual(draft.lines[0], {
     category: '面料',
     materialName: '黑色毛绒',
-    vendorCode: 'MAT-BLACK-51',
+    vendorCode: '示例织造AB-001#米白',
     spec: '51"',
     color: '黑色',
     unit: '码',
@@ -231,7 +232,7 @@ test('engineeringPrintTemplates: BOM 版本带值生成色卡并用材料快照�
   assert.equal(draft.auditor, '工程审核')
   assert.equal(draft.blocks.length, 1)
   assert.equal(draft.blocks[0].materialName, '51" 黄色 黄色毛绒')
-  assert.equal(draft.blocks[0].vendor, '料号：MAT-YELLOW-51')
+  assert.equal(draft.blocks[0].vendor, '款号：')
   assert.deepEqual(draft.blocks[0].lines, [
     { position: '后头*2', method: '布底贴12g纸朴；热裁；热裁 -2' },
   ])
@@ -536,7 +537,7 @@ test('engineeringPrintEditor: 色卡块和块内行可插入移除且不回填�
   assert.equal(insertedBlock.ok, true)
   assert.equal(insertedBlock.selectedIndex, 0)
   assert.equal(insertedBlock.draft.blocks[0].materialName, '')
-  assert.equal(insertedBlock.draft.blocks[0].vendor, '厂商：')
+  assert.equal(insertedBlock.draft.blocks[0].vendor, '款号：')
 
   const insertedLine = insertColorCardLine(insertedBlock.draft, 0, 0, 'after')
 
@@ -559,7 +560,7 @@ test('engineeringPrintEditor: 色卡可从空白占位行上插或下插可见�
     blocks: [
       {
         materialName: '主料',
-        vendor: '厂商：客供',
+        vendor: '款号：客供',
         side: 'left',
         minRows: 3,
         lines: [{ position: '面布*1', method: '热裁' }],
@@ -610,7 +611,7 @@ test('engineeringPrintEditor: 色卡块内行可超过源表 12 行且仍保留�
     blocks: [
       {
         materialName: '主料',
-        vendor: '厂商：客供',
+        vendor: '款号：客供',
         side: 'left',
         minRows: 12,
         lines: Array.from({ length: 12 }, (_, index) => ({
@@ -631,7 +632,7 @@ test('engineeringPrintEditor: 色卡块内行可超过源表 12 行且仍保留�
     blocks: [
       {
         materialName: '主料',
-        vendor: '厂商：客供',
+        vendor: '款号：客供',
         side: 'left',
         minRows: ENGINEERING_PRINT_LIMITS.colorBlockLines,
         lines: Array.from(
@@ -688,13 +689,13 @@ test('engineeringPrintEditor: 色卡左右栏各至少保留一个块但不锁�
     blocks: [
       {
         materialName: '主料',
-        vendor: '厂商：客供',
+        vendor: '款号：客供',
         side: 'left',
         lines: [{ position: '脸*1', method: '热裁 -1' }],
       },
       {
         materialName: '辅料',
-        vendor: '厂商：客供',
+        vendor: '款号：客供',
         side: 'right',
         lines: [{ position: '眼*2', method: '贴纸配套' }],
       },

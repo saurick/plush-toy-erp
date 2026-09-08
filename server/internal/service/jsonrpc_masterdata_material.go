@@ -68,12 +68,13 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 
 func materialMutationFromParams(pm map[string]any) *biz.MaterialMutation {
 	return &biz.MaterialMutation{
-		Code:          getString(pm, "code"),
-		Name:          getString(pm, "name"),
-		Category:      getWorkflowStringPtr(pm, "category"),
-		Spec:          getWorkflowStringPtr(pm, "spec"),
-		Color:         getWorkflowStringPtr(pm, "color"),
-		DefaultUnitID: getInt(pm, "default_unit_id", 0),
+		Code:           getString(pm, "code"),
+		Name:           getString(pm, "name"),
+		SupplierItemNo: getWorkflowStringPtr(pm, "supplier_item_no"),
+		Category:       getWorkflowStringPtr(pm, "category"),
+		Spec:           getWorkflowStringPtr(pm, "spec"),
+		Color:          getWorkflowStringPtr(pm, "color"),
+		DefaultUnitID:  getInt(pm, "default_unit_id", 0),
 	}
 }
 
@@ -89,16 +90,17 @@ func materialToMap(item *biz.Material) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":              item.ID,
-		"code":            item.Code,
-		"name":            item.Name,
-		"category":        optionalStringValue(item.Category),
-		"spec":            optionalStringValue(item.Spec),
-		"color":           optionalStringValue(item.Color),
-		"default_unit_id": item.DefaultUnitID,
-		"is_active":       item.IsActive,
-		"created_at":      item.CreatedAt.Unix(),
-		"updated_at":      item.UpdatedAt.Unix(),
+		"id":               item.ID,
+		"code":             item.Code,
+		"name":             item.Name,
+		"supplier_item_no": optionalStringValue(item.SupplierItemNo),
+		"category":         optionalStringValue(item.Category),
+		"spec":             optionalStringValue(item.Spec),
+		"color":            optionalStringValue(item.Color),
+		"default_unit_id":  item.DefaultUnitID,
+		"is_active":        item.IsActive,
+		"created_at":       item.CreatedAt.Unix(),
+		"updated_at":       item.UpdatedAt.Unix(),
 	}
 }
 

@@ -6,6 +6,7 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
 import {
   normalizeMobileTaskActionKey,
   resolveMobileActionDisplayLabel,
@@ -151,24 +152,24 @@ export default function MobileTaskReceiptScreen({
         title="结果回执"
       />
 
-      <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-6">
+      <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-4">
         <section
-          className="erp-mobile-card rounded-3xl border border-slate-200 bg-white px-5 py-7 text-center shadow-sm"
+          className="mobile-task-receipt-outcome erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
           role={
             outcome === MOBILE_TASK_RECEIPT_OUTCOMES.FAILED ? 'alert' : 'status'
           }
         >
           <span
-            className={`mx-auto inline-flex h-16 w-16 items-center justify-center rounded-2xl text-3xl ${outcomeMeta.iconClass}`}
+            className={`mobile-task-receipt-outcome__icon inline-flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${outcomeMeta.iconClass}`}
           >
-            <OutcomeIcon />
+            <OutcomeIcon aria-hidden="true" />
           </span>
-          <h2 className="mt-4 text-2xl font-semibold text-slate-950">
+          <h2 className="text-xl font-semibold text-slate-950">
             {approvalTask && outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
               ? '审批办理已确认'
               : outcomeMeta.title}
           </h2>
-          <p className="mx-auto mt-2 max-w-md break-words text-base leading-7 text-slate-600 [overflow-wrap:anywhere]">
+          <p className="break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
             {message || outcomeMeta.description}
           </p>
         </section>
@@ -207,6 +208,9 @@ export default function MobileTaskReceiptScreen({
           <h2 className="break-words text-lg font-semibold leading-7 text-slate-950 [overflow-wrap:anywhere]">
             {taskName}
           </h2>
+          <div className="mt-2">
+            <WorkflowTaskIdentity task={task} compact />
+          </div>
 
           <dl className="mt-3 divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200">
             <div className="mobile-task-receipt-row grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-3">

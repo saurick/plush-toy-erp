@@ -65,6 +65,26 @@ func (_u *MaterialUpdate) SetNillableName(v *string) *MaterialUpdate {
 	return _u
 }
 
+// SetSupplierItemNo sets the "supplier_item_no" field.
+func (_u *MaterialUpdate) SetSupplierItemNo(v string) *MaterialUpdate {
+	_u.mutation.SetSupplierItemNo(v)
+	return _u
+}
+
+// SetNillableSupplierItemNo sets the "supplier_item_no" field if the given value is not nil.
+func (_u *MaterialUpdate) SetNillableSupplierItemNo(v *string) *MaterialUpdate {
+	if v != nil {
+		_u.SetSupplierItemNo(*v)
+	}
+	return _u
+}
+
+// ClearSupplierItemNo clears the value of the "supplier_item_no" field.
+func (_u *MaterialUpdate) ClearSupplierItemNo() *MaterialUpdate {
+	_u.mutation.ClearSupplierItemNo()
+	return _u
+}
+
 // SetCategory sets the "category" field.
 func (_u *MaterialUpdate) SetCategory(v string) *MaterialUpdate {
 	_u.mutation.SetCategory(v)
@@ -511,6 +531,11 @@ func (_u *MaterialUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Material.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SupplierItemNo(); ok {
+		if err := material.SupplierItemNoValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_item_no", err: fmt.Errorf(`ent: validator failed for field "Material.supplier_item_no": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Category(); ok {
 		if err := material.CategoryValidator(v); err != nil {
 			return &ValidationError{Name: "category", err: fmt.Errorf(`ent: validator failed for field "Material.category": %w`, err)}
@@ -554,6 +579,12 @@ func (_u *MaterialUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(material.FieldName, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SupplierItemNo(); ok {
+		_spec.SetField(material.FieldSupplierItemNo, field.TypeString, value)
+	}
+	if _u.mutation.SupplierItemNoCleared() {
+		_spec.ClearField(material.FieldSupplierItemNo, field.TypeString)
 	}
 	if value, ok := _u.mutation.Category(); ok {
 		_spec.SetField(material.FieldCategory, field.TypeString, value)
@@ -1016,6 +1047,26 @@ func (_u *MaterialUpdateOne) SetNillableName(v *string) *MaterialUpdateOne {
 	return _u
 }
 
+// SetSupplierItemNo sets the "supplier_item_no" field.
+func (_u *MaterialUpdateOne) SetSupplierItemNo(v string) *MaterialUpdateOne {
+	_u.mutation.SetSupplierItemNo(v)
+	return _u
+}
+
+// SetNillableSupplierItemNo sets the "supplier_item_no" field if the given value is not nil.
+func (_u *MaterialUpdateOne) SetNillableSupplierItemNo(v *string) *MaterialUpdateOne {
+	if v != nil {
+		_u.SetSupplierItemNo(*v)
+	}
+	return _u
+}
+
+// ClearSupplierItemNo clears the value of the "supplier_item_no" field.
+func (_u *MaterialUpdateOne) ClearSupplierItemNo() *MaterialUpdateOne {
+	_u.mutation.ClearSupplierItemNo()
+	return _u
+}
+
 // SetCategory sets the "category" field.
 func (_u *MaterialUpdateOne) SetCategory(v string) *MaterialUpdateOne {
 	_u.mutation.SetCategory(v)
@@ -1475,6 +1526,11 @@ func (_u *MaterialUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Material.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SupplierItemNo(); ok {
+		if err := material.SupplierItemNoValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_item_no", err: fmt.Errorf(`ent: validator failed for field "Material.supplier_item_no": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Category(); ok {
 		if err := material.CategoryValidator(v); err != nil {
 			return &ValidationError{Name: "category", err: fmt.Errorf(`ent: validator failed for field "Material.category": %w`, err)}
@@ -1535,6 +1591,12 @@ func (_u *MaterialUpdateOne) sqlSave(ctx context.Context) (_node *Material, err 
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(material.FieldName, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SupplierItemNo(); ok {
+		_spec.SetField(material.FieldSupplierItemNo, field.TypeString, value)
+	}
+	if _u.mutation.SupplierItemNoCleared() {
+		_spec.ClearField(material.FieldSupplierItemNo, field.TypeString)
 	}
 	if value, ok := _u.mutation.Category(); ok {
 		_spec.SetField(material.FieldCategory, field.TypeString, value)

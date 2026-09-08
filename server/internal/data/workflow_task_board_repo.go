@@ -180,6 +180,13 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		})
 	}
 
+	visibleTasks := []*biz.WorkflowTask{}
+	for _, lane := range lanes {
+		visibleTasks = append(visibleTasks, lane.Tasks...)
+	}
+	if err := hydrateWorkflowTaskDisplayContexts(ctx, client, visibleTasks); err != nil {
+		return nil, err
+	}
 	return &biz.WorkflowTaskBoard{
 		SnapshotAt:    query.SnapshotAt,
 		Total:         total,
@@ -286,6 +293,11 @@ func workflowTaskKeywordPredicate(keyword string) predicate.WorkflowTask {
 		workflowtask.BusinessStatusKeyContainsFold(keyword),
 		workflowtask.OwnerRoleKeyContainsFold(keyword),
 		workflowTaskPayloadKeywordPredicate(keyword, "record_title", "module_title"),
+		workflowtask.And(
+			workflowtask.Not(workflowTaskHasIdentitySourceBinding()),
+			workflowTaskPayloadKeywordPredicate(keyword, "product_name", "product_names", "product_code", "style_no", "material_name", "material_code", "supplier_item_no", "sales_order_no", "production_order_no"),
+		),
+		workflowTaskSourceIdentityKeywordPredicate(keyword),
 		workflowtask.And(
 			workflowtask.TaskStatusKeyIn("blocked", "rejected", "withdrawn"),
 			workflowtask.Or(

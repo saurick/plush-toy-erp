@@ -1,4 +1,10 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
+import { clickERPThemeOption } from './themeAssertions.mjs'
+import {
+  assertReadableOnBackground,
+  isDarkControlBackground,
+} from './colorAssertions.mjs'
 
 export function createMobileTaskScenarios({
   expectText,
@@ -23,6 +29,596 @@ export function createMobileTaskScenarios({
   assertNoDashboardCenterLocalRefreshButton,
 }) {
   return [
+    {
+      name: 'mobile-task-search-and-product-image',
+      path: '/m/engineering/tasks',
+      auth: 'admin',
+      customerKey: 'yoyoosun',
+      viewport: { width: 390, height: 844 },
+      adminProfile: {
+        username: 'style-l1-product-images',
+        is_super_admin: false,
+        roles: [{ role_key: 'engineering', name: '工程' }],
+        permissions: [
+          'mobile.engineering.access',
+          'workflow.task.read',
+          'product.read',
+        ],
+        menus: [],
+      },
+      effectiveSession: {
+        configRevision: 'style-l1-image-search',
+        configHash: 'style-l1-image-search-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: [],
+        actions: [
+          'mobile.engineering.access',
+          'workflow.task.read',
+          'product.read',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['engineering'],
+        },
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      workflowTaskFixtures: [
+        ...Array.from({ length: 55 }, (_, index) => ({
+          id: 96000 + index,
+          version: 1,
+          task_code: `STYLE-L1-IMAGE-${index}`,
+          task_name: index === 0 ? '确认兔子样品' : '核对产品资料',
+          created_at: 1_788_840_000,
+          task_group: 'engineering_check',
+          owner_role_key: 'engineering',
+          task_status_key: 'ready',
+          source_type: 'sales_order',
+          source_no: `SO-IMAGE-${index}`,
+          payload: {},
+          display_context: {
+            available: true,
+            source_no: `SO-IMAGE-${index}`,
+            items: [
+              {
+                kind: 'product',
+                name: '图片识别模拟产品',
+                product_id: 7,
+                image_attachment_id: 8801,
+                style_no: index === 0 ? '唯一款号-RB018' : 'TB025',
+                code: 'PRODUCT-7',
+                order_no: '',
+              },
+            ],
+          },
+        })),
+        {
+          id: 96100,
+          version: 2,
+          task_code: 'STYLE-L1-TASK-COMPLETED-TIME',
+          task_name: '样品资料已核对',
+          task_group: 'engineering_check',
+          owner_role_key: 'engineering',
+          task_status_key: 'done',
+          source_type: 'sales_order',
+          source_no: 'SO-COMPLETED-TIME',
+          created_at: 1_788_840_000,
+          due_at: 1_788_841_000,
+          completed_at: 1_788_842_700,
+          updated_at: 1_788_846_000,
+          payload: {},
+        },
+        ...[
+          {
+            id: 95001,
+            name: '占位产品',
+            kind: 'product',
+            product_id: 8,
+            image_attachment_id: 0,
+          },
+          {
+            id: 95002,
+            name: '占位物料',
+            kind: 'material',
+            code: 'MAT-95002',
+            supplier_item_no: '示例织造AB-001#-02#米白',
+          },
+          {
+            id: 95003,
+            name: '占位加载失败',
+            kind: 'product',
+            product_id: 7,
+            image_attachment_id: 8802,
+          },
+        ].map((item) => ({
+          id: item.id,
+          version: 1,
+          task_code: `STYLE-L1-PLACEHOLDER-${item.id}`,
+          task_name: `检查${item.name}`,
+          task_group: 'engineering_check',
+          owner_role_key: 'engineering',
+          task_status_key: 'ready',
+          source_type: 'sales_order',
+          source_no: `SO-PLACEHOLDER-${item.id}`,
+          created_at: 1_700_000_000,
+          updated_at: 1_700_000_000,
+          payload: {},
+          display_context: { available: true, items: [item] },
+        })),
+      ],
+      beforeNavigate: async (page) => {
+        page.__imageReads = []
+        page.__taskSearchReads = []
+        page.on('request', (request) => {
+          if (new URL(request.url()).pathname.endsWith('/rpc/attachment')) {
+            page.__imageReads.push(request.postDataJSON())
+          }
+          if (new URL(request.url()).pathname.endsWith('/rpc/workflow')) {
+            const body = request.postDataJSON()
+            if (body.method === 'list_role_tasks') {
+              page.__taskSearchReads.push(body.params.keyword || '')
+            }
+          }
+        })
+      },
+      verify: async (page) => {
+        const rows = page.locator(
+          '[data-testid="mobile-role-task-list"] .erp-mobile-list-item'
+        )
+        await rows.first().waitFor({ state: 'visible' })
+        await page.waitForFunction(
+          () =>
+            document.querySelector('.erp-task-product-image img')
+              ?.naturalWidth > 0
+        )
+        assert.equal(
+          page.__imageReads.filter(
+            (r) =>
+              r.method === 'download_attachment' &&
+              r.params.variant === 'thumbnail'
+          ).length,
+          1
+        )
+        assert.equal(
+          page.__imageReads.filter(
+            (r) => r.method === 'download_attachment' && !r.params.variant
+          ).length,
+          0
+        )
+        assert.equal(
+          await page.getByText('确认兔子样品', { exact: true }).count(),
+          0,
+          '目标任务不在最初加载的 50 项内'
+        )
+        const search = page.getByRole('searchbox', {
+          name: '搜索订单、产品、物料或款号',
+        })
+        const assertSearchFocus = async (name) => {
+          await search.focus()
+          await page.waitForFunction(
+            () =>
+              !document
+                .getAnimations()
+                .some(
+                  (animation) =>
+                    animation.playState !== 'finished' &&
+                    Number.isFinite(animation.effect?.getTiming().iterations) &&
+                    animation.effect?.target?.closest(
+                      '.mobile-role-task-search'
+                    )
+                )
+          )
+          const focusStyle = await search.evaluate((input) => {
+            const style = getComputedStyle(input)
+            const form = input.closest('[role="search"]')
+            const wrapper = input.closest('.ant-input-affix-wrapper') || form
+            const wrapperStyle = getComputedStyle(wrapper)
+            return {
+              inputShadow: style.boxShadow,
+              inputBorder: style.borderWidth,
+              inputOutline: style.outlineWidth,
+              inputColor: style.color,
+              wrapperBackground: wrapperStyle.backgroundColor,
+              wrapperShadow: wrapperStyle.boxShadow,
+              wrapperBorder: wrapperStyle.borderColor,
+              wrapperHeight: wrapper.getBoundingClientRect().height,
+              formOutline: getComputedStyle(form).outlineWidth,
+            }
+          })
+          await page.screenshot({
+            path: path.join(outputDir, `${name}.png`),
+            fullPage: true,
+          })
+          assert.equal(
+            focusStyle.inputShadow,
+            'none',
+            `搜索框内部不应叠加第二层焦点边框：${JSON.stringify(focusStyle)}`
+          )
+          assert.equal(focusStyle.inputBorder, '0px')
+          assert.equal(focusStyle.inputOutline, '0px')
+          assert.equal(focusStyle.formOutline, '0px')
+          assert.equal(focusStyle.wrapperHeight, 48)
+          assert.match(focusStyle.wrapperShadow, /inset/u)
+          assertReadableOnBackground(
+            focusStyle.inputColor,
+            focusStyle.wrapperBackground,
+            '搜索文字清晰可读'
+          )
+          if (name.endsWith('dark')) {
+            assert.ok(
+              isDarkControlBackground(focusStyle.wrapperBackground),
+              JSON.stringify(focusStyle)
+            )
+          }
+        }
+        await assertSearchFocus('mobile-task-search-focused')
+        assert.equal(
+          await page.getByRole('button', { name: '搜索', exact: true }).count(),
+          0
+        )
+        const searchedKeywords = () => page.__taskSearchReads.filter(Boolean)
+
+        await search.dispatchEvent('compositionstart')
+        await search.fill('wei')
+        await search.dispatchEvent('keydown', {
+          key: 'Enter',
+          keyCode: 229,
+          isComposing: true,
+        })
+        // 等待超过防抖窗口，确认中文候选阶段不会发出查询。
+        await page.waitForTimeout(400)
+        assert.deepEqual(searchedKeywords(), [])
+        await search.fill('唯一')
+        await search.dispatchEvent('compositionend', { data: '唯一' })
+        await page
+          .getByText('确认兔子样品', { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.deepEqual(searchedKeywords(), ['唯一'])
+        const clearSearch = async () => {
+          await page.getByRole('button', { name: '清除搜索' }).click()
+          await page.waitForFunction(
+            () =>
+              document.querySelectorAll(
+                '[data-testid="mobile-role-task-list"] .erp-mobile-list-item'
+              ).length > 1
+          )
+          assert.equal(await search.inputValue(), '')
+          assert.equal(
+            await search.evaluate((input) => input === document.activeElement),
+            true
+          )
+        }
+        await clearSearch()
+
+        await search.pressSequentially('唯一款号-RB018', { delay: 30 })
+        assert.deepEqual(searchedKeywords(), ['唯一'])
+        await page
+          .getByText('确认兔子样品', { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.deepEqual(searchedKeywords(), ['唯一', '唯一款号-RB018'])
+        assert.equal(
+          await search.evaluate((input) => input === document.activeElement),
+          true
+        )
+        assert.equal(await rows.count(), 1)
+        const taskTime = rows.first().locator('.erp-task-timing')
+        assert.deepEqual(await taskTime.locator('dt').allTextContents(), [
+          '进入本岗',
+        ])
+        assert.equal(
+          await taskTime.locator('time').getAttribute('datetime'),
+          new Date(1_788_840_000_000).toISOString(),
+          '列表入岗时间应使用任务创建值，未设置截止时不添加占位'
+        )
+        await page.setViewportSize({ width: 320, height: 700 })
+        const timeGeometry = await taskTime.evaluate((node) => ({
+          width: node.clientWidth,
+          scrollWidth: node.scrollWidth,
+          pageWidth: document.documentElement.clientWidth,
+          pageScrollWidth: document.documentElement.scrollWidth,
+          icons: node.querySelectorAll('.erp-task-timing__icon').length,
+        }))
+        assert(timeGeometry.scrollWidth <= timeGeometry.width + 1)
+        assert(timeGeometry.pageScrollWidth <= timeGeometry.pageWidth + 1)
+        assert.equal(timeGeometry.icons, 1)
+        await page.setViewportSize({ width: 390, height: 844 })
+        await search.press('Enter')
+        await search.fill('  唯一款号-RB018  ')
+        await page.waitForTimeout(400)
+        assert.deepEqual(
+          searchedKeywords(),
+          ['唯一', '唯一款号-RB018'],
+          '相同的规范化关键词不重复请求'
+        )
+        const clearBox = await page
+          .getByRole('button', { name: '清除搜索' })
+          .boundingBox()
+        assert.ok(clearBox.width >= 44 && clearBox.height >= 44)
+
+        await clickERPThemeOption(page, '暗色')
+        await assertERPThemeMode(page, {
+          scenarioName: 'mobile-task-search',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertSearchFocus('mobile-task-search-focused-dark')
+        await clickERPThemeOption(page, '浅色')
+        await assertERPThemeMode(page, {
+          scenarioName: 'mobile-task-search',
+          expectedMode: 'light',
+          expectedEffectiveTheme: 'light',
+        })
+
+        const delayedQuery = async (route) => {
+          const body = route.request().postDataJSON()
+          if (
+            body.method === 'list_role_tasks' &&
+            body.params.keyword === 'TB025'
+          ) {
+            await new Promise((resolve) => setTimeout(resolve, 800))
+          }
+          await route.fallback()
+        }
+        await page.route('**/rpc/workflow', delayedQuery)
+        let oldResponseReturned = false
+        const oldResponse = page.waitForResponse(
+          (response) =>
+            response.url().endsWith('/rpc/workflow') &&
+            response.request().postDataJSON()?.params?.keyword === 'TB025'
+        )
+        oldResponse.then(() => {
+          oldResponseReturned = true
+        })
+        await search.fill('TB025')
+        await search.press('Enter')
+        const latestResponse = page.waitForResponse(
+          (response) =>
+            response.url().endsWith('/rpc/workflow') &&
+            response.request().postDataJSON()?.params?.keyword ===
+              '唯一款号-RB018'
+        )
+        await search.fill('唯一款号-RB018')
+        await latestResponse
+        assert.equal(oldResponseReturned, false, '新查询先于旧查询返回')
+        await oldResponse
+        await page.waitForTimeout(100)
+        await page.unroute('**/rpc/workflow', delayedQuery)
+        await page
+          .getByText('确认兔子样品', { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await rows.count(),
+          1,
+          '慢请求返回后仍只显示最新关键词的结果'
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'mobile-task-search-product-image.png'),
+          fullPage: true,
+        })
+        const copyStyle = rows
+          .first()
+          .getByRole('button', { name: '复制产品编号', exact: true })
+        await assertTaskCopy(page, copyStyle, 'PRODUCT-7')
+        await assertTaskCopy(
+          page,
+          rows
+            .first()
+            .getByRole('button', { name: '复制单据编号', exact: true }),
+          'SO-IMAGE-0'
+        )
+        const copySize = await copyStyle.boundingBox()
+        assert.ok(
+          copySize.width >= 44 && copySize.height >= 44,
+          '手机复制按钮点击范围至少 44px'
+        )
+        await clickTaskCardContent(
+          rows.first(),
+          rows.first().locator('.erp-task-product-image img')
+        )
+        await page
+          .getByTestId('mobile-task-detail-screen')
+          .waitFor({ state: 'visible' })
+        const copyDetail = page.getByTestId('mobile-task-detail-screen')
+        await assertTaskCopy(
+          page,
+          copyDetail.getByRole('button', { name: '复制产品信息', exact: true }),
+          [
+            '产品：图片识别模拟产品',
+            '产品编号：PRODUCT-7',
+            '内部款号：唯一款号-RB018',
+          ]
+        )
+        await assertTaskCopy(
+          page,
+          copyDetail.getByRole('button', { name: '复制任务信息', exact: true }),
+          ['任务：确认兔子样品', 'SO-IMAGE-0', '进入本岗：2026年']
+        )
+        await page
+          .getByRole('button', { name: '查看图片识别模拟产品大图' })
+          .click()
+        await page.waitForFunction(
+          () =>
+            document.querySelector('.erp-task-product-image__preview')
+              ?.naturalWidth > 0
+        )
+        assert.equal(
+          page.__imageReads.filter(
+            (r) => r.method === 'download_attachment' && !r.params.variant
+          ).length,
+          1
+        )
+        await page.locator('.ant-modal-close').click()
+        await page.goBack()
+        await search.waitFor({ state: 'visible' })
+        assert.equal(await search.inputValue(), '唯一款号-RB018')
+        assert.equal(await rows.count(), 1)
+        await clearSearch()
+        const readsBeforeLeave = page.__taskSearchReads.length
+        await search.fill('不应触发的搜索')
+        await clickTaskCardContent(
+          rows.first(),
+          rows.first().locator('.mobile-task-list-row__head')
+        )
+        await page
+          .getByTestId('mobile-task-detail-screen')
+          .waitFor({ state: 'visible' })
+        await page.waitForTimeout(400)
+        assert.equal(
+          page.__taskSearchReads.length,
+          readsBeforeLeave,
+          '离开列表取消尚未触发的搜索'
+        )
+        await page.goBack()
+        await search.waitFor({ state: 'visible' })
+        assert.equal(await search.inputValue(), '')
+        await page.getByRole('button', { name: '已办', exact: true }).click()
+        const endedTask = page.getByRole('button', {
+          name: '查看样品资料已核对处理结果',
+          exact: true,
+        })
+        await endedTask.waitFor({ state: 'visible' })
+        const endedCard = page
+          .locator('.erp-task-card')
+          .filter({ has: endedTask })
+        assert.deepEqual(
+          await endedCard.locator('.erp-task-timing dt').allTextContents(),
+          ['完成']
+        )
+        assert.equal(
+          await endedCard.locator('time').getAttribute('datetime'),
+          new Date(1_788_842_700_000).toISOString()
+        )
+        assert.doesNotMatch(
+          await endedCard.innerText(),
+          /更新时间|已超时|进入本岗/u
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'mobile-task-ended-time.png'),
+        })
+        await endedTask.click()
+        const endedDetail = page.getByTestId('mobile-task-detail-screen')
+        await endedDetail.waitFor({ state: 'visible' })
+        assert.equal(
+          await endedDetail
+            .locator('[data-task-time="ended"] time')
+            .getAttribute('datetime'),
+          new Date(1_788_842_700_000).toISOString()
+        )
+        assert.equal(
+          await endedDetail.locator('.erp-task-timing__row--danger').count(),
+          0
+        )
+        await page.goBack()
+        await page.getByRole('button', { name: '待办', exact: true }).click()
+        for (const [keyword, label, state] of [
+          ['占位产品', '暂无图', 'empty'],
+          ['占位物料', '物料', 'empty'],
+          ['占位加载失败', '加载失败', 'failed'],
+        ]) {
+          const readsBefore = page.__imageReads.length
+          await search.fill(keyword)
+          const placeholderRow = page
+            .locator('.mobile-task-list-row')
+            .filter({ hasText: `检查${keyword}` })
+          const frame = placeholderRow.locator(
+            `.erp-task-product-image[data-image-state="${state}"]`
+          )
+          await frame.waitFor({ state: 'visible' })
+          assert.equal((await frame.innerText()).trim(), label)
+          assert.equal(await frame.locator('img, button').count(), 0)
+          const geometry = await frame.boundingBox()
+          assert.equal(geometry.width, 52)
+          assert.equal(geometry.height, 52)
+          if (state === 'empty') {
+            assert.equal(
+              page.__imageReads.length,
+              readsBefore,
+              '默认占位不请求图片'
+            )
+          }
+          await clickTaskCardContent(placeholderRow, frame)
+          const placeholderDetail = page.getByTestId(
+            'mobile-task-detail-screen'
+          )
+          await placeholderDetail.waitFor({ state: 'visible' })
+          await placeholderDetail
+            .locator(`.erp-task-product-image[data-image-state="${state}"]`)
+            .waitFor({ state: 'visible' })
+          assert.equal(
+            await placeholderDetail
+              .getByRole('button', { name: /大图/ })
+              .count(),
+            0
+          )
+          await page.goBack()
+          assert.equal(await search.inputValue(), keyword)
+        }
+        await search.fill('AB-001#-02#')
+        const materialCard = rows.filter({ hasText: '检查占位物料' })
+        await materialCard.waitFor({ state: 'visible' })
+        assert.equal(await rows.count(), 1)
+        assert.equal(
+          await materialCard
+            .getByText('款号 示例织造AB-001#-02#米白', { exact: true })
+            .count(),
+          1
+        )
+        assert.equal(
+          await materialCard
+            .getByRole('button', { name: '复制系统物料编号', exact: true })
+            .count(),
+          0
+        )
+        await assertTaskCopy(
+          page,
+          materialCard.getByRole('button', {
+            name: '复制款号',
+            exact: true,
+          }),
+          '示例织造AB-001#-02#米白'
+        )
+        await clickTaskCardContent(
+          materialCard,
+          materialCard.locator('.erp-task-product-image')
+        )
+        const materialDetail = page.getByTestId('mobile-task-detail-screen')
+        await materialDetail.waitFor({ state: 'visible' })
+        await assertTaskCopy(
+          page,
+          materialDetail.getByRole('button', {
+            name: '复制物料信息',
+            exact: true,
+          }),
+          ['款号：示例织造AB-001#-02#米白', '系统物料编号：MAT-95002']
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'mobile-task-supplier-item-no.png'),
+          fullPage: true,
+        })
+        await page.goBack()
+        assert.equal(await search.inputValue(), 'AB-001#-02#')
+        await search.fill('占位加载失败')
+        await page
+          .locator('.erp-task-product-image[data-image-state="failed"]')
+          .waitFor({ state: 'visible' })
+        await clickERPThemeOption(page, '暗色')
+        const failedFrame = page.locator(
+          '.erp-task-product-image[data-image-state="failed"]'
+        )
+        const placeholderColors = await failedFrame.evaluate((node) => {
+          const style = getComputedStyle(node)
+          return { color: style.color, background: style.backgroundColor }
+        })
+        assertReadableOnBackground(
+          placeholderColors.color,
+          placeholderColors.background,
+          '暗色占位应可辨认'
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'mobile-task-image-placeholder-dark.png'),
+        })
+      },
+    },
     {
       name: 'mobile-customer-runtime-sync-failure-customer-copy',
       path: '/m/engineering/tasks',
@@ -337,6 +933,11 @@ export function createMobileTaskScenarios({
                   owner_role_key: role.key,
                   priority: index + 1,
                   payload: {
+                    product_name: '长耳兔抱枕（加长耳朵与可拆洗外套）',
+                    product_names: [
+                      '长耳兔抱枕（加长耳朵与可拆洗外套）',
+                      '云朵小熊',
+                    ],
                     customer_name: '永绅试用模拟客户（非真实客户数据）',
                     style_no: `STYLE-${role.key.toUpperCase()}-LONG-VALUE`,
                     due_date: '2026-07-16',
@@ -492,29 +1093,30 @@ export function createMobileTaskScenarios({
             )}`
           )
           assert.equal(
-            metrics.statusCounts.ready +
-              metrics.statusCounts.blocked +
-              metrics.statusCounts.rejected +
-              metrics.statusCounts.done,
-            metrics.statusCounts.total,
-            `${role.label}岗位状态必须满足全部=待处理+卡住+已退回+完成: ${JSON.stringify(metrics)}`
+            await page
+              .locator('[data-testid="mobile-loaded-task-overview"]')
+              .count(),
+            0
           )
-          assert(
-            metrics.conservationNote.includes(
-              '审批、风险、超时为可重叠关注项，不与全部相加。'
-            ) && !metrics.conservationNote.includes('跨岗风险包含'),
-            `${role.label}无监督权限时应使用岗位内风险口径: ${JSON.stringify(metrics)}`
-          )
+          assert.equal(metrics.conservationNote, '')
           await page.waitForTimeout(350)
           await page.screenshot({
             path: path.join(outputDir, `mobile-yoyo-${role.key}-task-list.png`),
             fullPage: true,
           })
-          await page
+          const roleTaskCard = page
             .locator('.erp-mobile-list-item')
             .filter({ hasText: role.taskName })
-            .click()
+          await clickTaskCardContent(
+            roleTaskCard,
+            roleTaskCard.getByText(role.taskName, { exact: true })
+          )
           await expectText(page, role.taskName)
+          const identity = page.locator('[aria-label="关联产品与物料"]')
+          await expectText(identity, '长耳兔抱枕（加长耳朵与可拆洗外套）')
+          await identity.locator('summary').click()
+          await expectText(identity, '云朵小熊')
+          await identity.locator('summary').click()
           const actionDiagnostic = await page.evaluate(async (taskName) => {
             const call = async (domain, method, params = {}) => {
               const response = await fetch(`/rpc/${domain}`, {
@@ -666,10 +1268,13 @@ export function createMobileTaskScenarios({
         await gotoScenarioPath(page, '/m/engineering/tasks', {
           waitUntil: 'domcontentloaded',
         })
-        await page
+        const processTaskCard = page
           .locator('.erp-mobile-list-item')
           .filter({ hasText: '销售订单工程资料办理' })
-          .click()
+        await clickTaskCardContent(
+          processTaskCard,
+          processTaskCard.getByText('销售订单工程资料办理', { exact: true })
+        )
         const processContextCard = page.getByTestId(
           'mobile-task-process-context'
         )
@@ -762,6 +1367,8 @@ export function createMobileTaskScenarios({
                   .length || 0,
               summaryText:
                 taskSummary?.textContent?.replace(/\s+/g, ' ').trim() || '',
+              timingText:
+                screen.querySelector('.erp-task-timing')?.textContent || '',
               optionalBusinessInformationCount: businessInformation ? 1 : 0,
               optionalRelatedDocumentsCount: relatedDocuments ? 1 : 0,
               ordered: sectionOrder.every(
@@ -778,7 +1385,8 @@ export function createMobileTaskScenarios({
             mobileTrajectoryMetrics430.eventOverflow <= 1 &&
             mobileTrajectoryMetrics430.eventItemCount === 1 &&
             mobileTrajectoryMetrics430.summaryText.includes('负责：工程') &&
-            mobileTrajectoryMetrics430.summaryText.includes('截止：') &&
+            mobileTrajectoryMetrics430.timingText.includes('进入本岗') &&
+            mobileTrajectoryMetrics430.timingText.includes('处理截止') &&
             mobileTrajectoryMetrics430.optionalBusinessInformationCount === 0 &&
             mobileTrajectoryMetrics430.optionalRelatedDocumentsCount === 0 &&
             mobileTrajectoryMetrics430.ordered,
@@ -814,7 +1422,8 @@ export function createMobileTaskScenarios({
             mobileTrajectoryMetrics390.eventOverflow <= 1 &&
             mobileTrajectoryMetrics390.eventItemCount === 1 &&
             mobileTrajectoryMetrics390.summaryText.includes('负责：工程') &&
-            mobileTrajectoryMetrics390.summaryText.includes('截止：') &&
+            mobileTrajectoryMetrics390.timingText.includes('进入本岗') &&
+            mobileTrajectoryMetrics390.timingText.includes('处理截止') &&
             mobileTrajectoryMetrics390.optionalBusinessInformationCount === 0 &&
             mobileTrajectoryMetrics390.optionalRelatedDocumentsCount === 0 &&
             mobileTrajectoryMetrics390.ordered,
@@ -1312,7 +1921,7 @@ export function createMobileTaskScenarios({
 
         await page
           .locator('.mobile-role-action-bar')
-          .getByRole('button', { name: '处理任务', exact: true })
+          .getByRole('button', { name: '催办任务', exact: true })
           .click()
         const actionScreen = page.getByTestId('mobile-task-action-screen')
         await actionScreen.waitFor({ state: 'visible', timeout: 10_000 })
@@ -2172,9 +2781,7 @@ export function createMobileTaskScenarios({
             historyLength: window.history.length,
             navigationEntryCount:
               performance.getEntriesByType('navigation').length,
-            overview: document.querySelector(
-              '[data-testid="mobile-loaded-task-overview"]'
-            ),
+            search: document.querySelector('.mobile-role-task-search'),
             path: `${window.location.pathname}${window.location.search}`,
           }
         })
@@ -2185,9 +2792,7 @@ export function createMobileTaskScenarios({
         await approvalLoading.waitFor({ state: 'visible', timeout: 10_000 })
         const approvalLoadingMetrics = await page.evaluate(() => {
           const identity = window.__styleL1MobileTaskFilterIdentity || {}
-          const overview = document.querySelector(
-            '[data-testid="mobile-loaded-task-overview"]'
-          )
+          const search = document.querySelector('.mobile-role-task-search')
           const filters = document.querySelector(
             '[data-testid="mobile-role-task-filters"]'
           )
@@ -2227,8 +2832,8 @@ export function createMobileTaskScenarios({
             navigationEntryCountStable:
               identity.navigationEntryCount ===
               performance.getEntriesByType('navigation').length,
-            overviewConnected: identity.overview?.isConnected === true,
-            overviewStable: identity.overview === overview,
+            searchConnected: identity.search?.isConnected === true,
+            searchStable: identity.search === search,
             pathStable:
               identity.path ===
               `${window.location.pathname}${window.location.search}`,
@@ -2248,8 +2853,8 @@ export function createMobileTaskScenarios({
             approvalLoadingMetrics.loadingText === '正在加载审批任务' &&
             approvalLoadingMetrics.markerStable &&
             approvalLoadingMetrics.navigationEntryCountStable &&
-            approvalLoadingMetrics.overviewConnected &&
-            approvalLoadingMetrics.overviewStable &&
+            approvalLoadingMetrics.searchConnected &&
+            approvalLoadingMetrics.searchStable &&
             approvalLoadingMetrics.pathStable,
           `移动筛选冷加载只能替换列表区域，不能刷新整页或重建稳定区域: ${JSON.stringify(
             approvalLoadingMetrics
@@ -2318,7 +2923,10 @@ export function createMobileTaskScenarios({
           .locator('.erp-mobile-list-item')
           .filter({ hasText: '阻塞原因' })
           .first()
-        await blockedTaskItem.click()
+        await clickTaskCardContent(
+          blockedTaskItem,
+          blockedTaskItem.locator('.mobile-task-list-row__head')
+        )
         await page
           .getByTestId('mobile-task-detail-screen')
           .waitFor({ state: 'visible', timeout: 10_000 })
@@ -2726,7 +3334,7 @@ export function createMobileTaskScenarios({
         })
         await assertDashboardMetricInteractionSemantics(page, {
           scenarioName: 'erp-business-dashboard-mobile',
-          expectBusinessSummary: true,
+          expectBusinessAttention: true,
         })
         await assertNoDashboardCenterLocalRefreshButton(page, {
           scenarioName: 'erp-business-dashboard-mobile',

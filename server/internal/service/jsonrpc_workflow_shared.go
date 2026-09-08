@@ -125,12 +125,29 @@ func workflowTaskToMap(task *biz.WorkflowTask) map[string]any {
 		"due_at":                   workflowUnixValue(task.DueAt),
 		"completed_at":             workflowUnixValue(task.CompletedAt),
 		"payload":                  workflowMapValue(task.Payload),
+		"display_context":          workflowTaskDisplayContextToMap(task.DisplayContext),
 		"version":                  task.Version,
 		"created_by":               workflowIntValue(task.CreatedBy),
 		"updated_by":               workflowIntValue(task.UpdatedBy),
 		"created_at":               task.CreatedAt.Unix(),
 		"updated_at":               task.UpdatedAt.Unix(),
 	}
+}
+
+func workflowTaskDisplayContextToMap(context *biz.WorkflowTaskDisplayContext) any {
+	if context == nil {
+		return nil
+	}
+	items := make([]any, 0, len(context.Items))
+	for _, item := range context.Items {
+		items = append(items, map[string]any{
+			"kind": item.Kind, "name": item.Name, "code": item.Code,
+			"style_no": item.StyleNo, "order_no": item.OrderNo,
+			"supplier_item_no": item.SupplierItemNo,
+			"product_id":       item.ProductID, "image_attachment_id": item.ImageAttachmentID,
+		})
+	}
+	return map[string]any{"available": context.Available, "source_no": context.SourceNo, "items": items}
 }
 
 func workflowTaskEventsToAny(items []*biz.WorkflowTaskEvent) []any {

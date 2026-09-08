@@ -75,6 +75,11 @@ export async function installAttachmentRpcMocks(page, context) {
         data = { cleared: true }
         break
       case 'download_attachment':
+        if (Number(params.id) === 8801) {
+          data = { attachment: { id: 8801, owner_type: 'product', owner_id: 7, mime_type: 'image/png', content_base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==' } }
+          break
+        }
+
         if (workflowAttachment.withdrawn_at) {
           code = 40010
           message = '附件已撤销，不能预览或下载'

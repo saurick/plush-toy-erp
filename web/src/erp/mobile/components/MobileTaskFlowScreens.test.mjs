@@ -175,7 +175,10 @@ test('mobile task flow exposes one shared three-step navigation contract', () =>
   assert.doesNotMatch(flowHeaderSource, /mobile-task-flow-step__subtitle/u)
   assert.doesNotMatch(flowHeaderSource, /subtitle:/u)
   assert.match(detailScreenSource, /data-testid="mobile-task-detail-screen"/u)
-  assert.match(detailScreenSource, />\s*处理任务\s*</u)
+  assert.match(
+    detailScreenSource,
+    /selectedCanUrge && !selectedCanOperate[\s\S]*?\? '催办任务'[\s\S]*?: '处理任务'/u
+  )
   assert.doesNotMatch(
     detailScreenSource,
     />\s*发起催办\s*</u,
@@ -184,22 +187,12 @@ test('mobile task flow exposes one shared three-step navigation contract', () =>
 })
 
 test('mobile task overview, list heading and loaded counts stay concise', () => {
-  assert.match(listScreenSource, />\s*当前岗位任务状态\s*</u)
-  assert.match(listScreenSource, /data-testid="mobile-role-total-count"/u)
-  assert.match(listScreenSource, /审批、风险、超时为可重叠关注项/u)
-  assert.doesNotMatch(listScreenSource, /任务按页加载/u)
-  assert.doesNotMatch(listScreenSource, /不代表岗位全量/u)
-  assert.match(listScreenSource, /mobile-loaded-task-overview/u)
-  assert.match(
+  assert.doesNotMatch(
     listScreenSource,
-    /data-testid="mobile-task-list-status-heading"/u
+    /renderLoadedTaskOverview|mobile-role-total-count|当前岗位任务状态/u
   )
-  assert.match(listScreenSource, />\s*状态 \/ 截止\s*</u)
-  assert.match(listScreenSource, /whitespace-nowrap/u)
-  assert.equal(
-    (listScreenSource.match(/renderLoadedTaskOverview\(\)/gu) || []).length,
-    1
-  )
+  assert.match(listScreenSource, /data-testid="mobile-task-list-range"/u)
+  assert.match(listScreenSource, /搜索订单、产品、物料或款号/u)
   const donePanelSource = listScreenSource.slice(
     listScreenSource.indexOf('const renderDonePanel'),
     listScreenSource.indexOf('const renderMessageTabs')
@@ -292,7 +285,10 @@ test('mobile task processing explains business boundaries before submit without 
 test('mobile task detail keeps one compact task summary and leaves completion feedback to the receipt', () => {
   assert.match(detailScreenSource, /mobile-task-detail-summary/u)
   assert.match(detailScreenSource, /负责：\{ownerRoleLabel\}/u)
-  assert.match(detailScreenSource, /截止：\{taskDueLabel\}/u)
+  assert.match(
+    detailScreenSource,
+    /<WorkflowTaskTiming\s+task=\{selectedTask\}\s+detail/u
+  )
   assert.match(detailScreenSource, />\s*业务信息\s*</u)
   assert.doesNotMatch(detailScreenSource, />\s*当前任务\s*</u)
   assert.doesNotMatch(detailScreenSource, />\s*当前办理状态\s*</u)

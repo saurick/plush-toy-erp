@@ -425,6 +425,7 @@ func (r *masterDataRepo) CreateMaterial(ctx context.Context, in *biz.MaterialMut
 	row, err := r.data.postgres.Material.Create().
 		SetCode(in.Code).
 		SetName(in.Name).
+		SetNillableSupplierItemNo(in.SupplierItemNo).
 		SetNillableCategory(in.Category).
 		SetNillableSpec(in.Spec).
 		SetNillableColor(in.Color).
@@ -441,6 +442,11 @@ func (r *masterDataRepo) UpdateMaterial(ctx context.Context, id int, in *biz.Mat
 		SetCode(in.Code).
 		SetName(in.Name).
 		SetDefaultUnitID(in.DefaultUnitID)
+	if in.SupplierItemNo == nil {
+		update.ClearSupplierItemNo()
+	} else {
+		update.SetSupplierItemNo(*in.SupplierItemNo)
+	}
 	if in.Category == nil {
 		update.ClearCategory()
 	} else {
@@ -483,6 +489,7 @@ func (r *masterDataRepo) ListMaterials(ctx context.Context, filter biz.MasterDat
 		query = query.Where(material.Or(
 			material.CodeContains(filter.Keyword),
 			material.NameContains(filter.Keyword),
+			material.SupplierItemNoContainsFold(filter.Keyword),
 			material.CategoryContains(filter.Keyword),
 			material.SpecContains(filter.Keyword),
 			material.ColorContains(filter.Keyword),
@@ -1501,16 +1508,17 @@ func entMaterialToBiz(row *ent.Material) *biz.Material {
 		return nil
 	}
 	return &biz.Material{
-		ID:            row.ID,
-		Code:          row.Code,
-		Name:          row.Name,
-		Category:      row.Category,
-		Spec:          row.Spec,
-		Color:         row.Color,
-		DefaultUnitID: row.DefaultUnitID,
-		IsActive:      row.IsActive,
-		CreatedAt:     row.CreatedAt,
-		UpdatedAt:     row.UpdatedAt,
+		ID:             row.ID,
+		Code:           row.Code,
+		Name:           row.Name,
+		SupplierItemNo: row.SupplierItemNo,
+		Category:       row.Category,
+		Spec:           row.Spec,
+		Color:          row.Color,
+		DefaultUnitID:  row.DefaultUnitID,
+		IsActive:       row.IsActive,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
 	}
 }
 

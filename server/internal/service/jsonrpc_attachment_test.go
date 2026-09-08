@@ -1,7 +1,13 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"image"
+	"image/png"
 	"io"
 	"reflect"
 	"strings"
@@ -1163,5 +1169,52 @@ func TestJsonrpcDispatcher_AttachmentMethodsAreCanonicalAndDeleteIsUnavailable(t
 		if err != nil || res == nil || res.Code != errcode.UnknownMethod.Code {
 			t.Fatalf("method %s must fail closed as unknown, res=%#v err=%v", method, res, err)
 		}
+	}
+}
+
+func TestJsonrpcDispatcher_ThumbnailAuthorizesBeforeLoadingContent(t *testing.T) {
+	repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{
+		ID: 71, OwnerType: biz.BusinessAttachmentOwnerProduct, OwnerID: 7,
+		FileName: "proof.pdf", MimeType: "application/pdf", FileSize: 5,
+	}}
+	admin := workflowJSONRPCAdmin([]string{biz.SalesRoleKey})
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, admin)
+	_, res, err := dispatcher.handleBusinessAttachment(
+		workflowJSONRPCAdminContext(),
+		"download_attachment",
+		"unauthorized-download",
+		mustJSONRPCStruct(t, map[string]any{"id": 71, "variant": "thumbnail"}),
+	)
+	if err != nil || res.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("download without owner read permission must be denied: res=%#v err=%v", res, err)
+	}
+	if repo.getCalls != 1 || repo.contentCalls != 0 {
+		t.Fatalf("authorization may read metadata but must not load content: metadata=%d content=%d", repo.getCalls, repo.contentCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_ProductThumbnailReturnsDerivativeAndPreservesOriginal(t *testing.T) {
+	var original bytes.Buffer
+	if err := png.Encode(&original, image.NewNRGBA(image.Rect(0, 0, 320, 160))); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(original.Bytes())
+	repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{ID: 71, OwnerType: biz.BusinessAttachmentOwnerProduct, OwnerID: 7, AttachmentType: biz.BusinessAttachmentTypeProductImage, FileName: "bear.png", MimeType: "image/png", FileSize: original.Len(), SHA256: hex.EncodeToString(sum[:]), Content: original.Bytes()}}
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin([]string{biz.EngineeringRoleKey}, biz.PermissionProductRead))
+	_, res, err := dispatcher.handleBusinessAttachment(workflowJSONRPCAdminContext(), "download_attachment", "thumbnail", mustJSONRPCStruct(t, map[string]any{"id": 71, "variant": "thumbnail"}))
+	if err != nil || res.Code != errcode.OK.Code {
+		t.Fatalf("thumbnail result=%#v err=%v", res, err)
+	}
+	attachment := res.Data.AsMap()["attachment"].(map[string]any)
+	content, err := base64.StdEncoding.DecodeString(attachment["content_base64"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := png.DecodeConfig(bytes.NewReader(content))
+	if err != nil || result.Width != 160 || result.Height != 80 {
+		t.Fatalf("thumbnail dimensions=%#v err=%v", result, err)
+	}
+	if repo.current.FileSize != original.Len() || !bytes.Equal(repo.current.Content, original.Bytes()) || repo.createCalls != 0 {
+		t.Fatal("thumbnail changed original")
 	}
 }

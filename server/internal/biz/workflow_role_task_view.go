@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -14,6 +15,7 @@ const (
 )
 
 type WorkflowRoleTaskViewQuery struct {
+	Keyword                  string
 	ViewKey                  string
 	RoleKey                  string
 	Limit                    int
@@ -101,6 +103,10 @@ func (uc *WorkflowUsecase) ListRoleTaskView(ctx context.Context, query WorkflowR
 	}
 	repo, ok := uc.repo.(WorkflowRoleTaskViewRepo)
 	if !ok {
+		return nil, ErrBadParam
+	}
+	query.Keyword = strings.TrimSpace(query.Keyword)
+	if utf8.RuneCountInString(query.Keyword) > 100 {
 		return nil, ErrBadParam
 	}
 	query.ViewKey = strings.TrimSpace(query.ViewKey)

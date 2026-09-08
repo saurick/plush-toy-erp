@@ -1,19 +1,27 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   ArrowUpOutlined,
+  CloseOutlined,
   BellOutlined,
   CheckSquareOutlined,
+  FileTextOutlined,
   InfoCircleOutlined,
   InboxOutlined,
   LogoutOutlined,
   ReloadOutlined,
+  RightOutlined,
   SafetyCertificateOutlined,
   SwapOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
+import SearchInput from '@/common/components/SearchInput'
+import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
+import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
+import { WorkflowTaskSource } from '../../components/workflow/WorkflowTaskCopy.jsx'
+import WorkflowTaskTiming from '../../components/workflow/WorkflowTaskTiming.jsx'
+import { getWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
 import MobileTaskListSkeleton from './MobileTaskListSkeleton.jsx'
-import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
 import {
   MOBILE_LIST_COLLAPSED_LIMITS,
   MOBILE_LIST_KEYS,
@@ -23,12 +31,10 @@ import {
   getMobileRoleLabel,
   getTaskQueueTone,
   getTaskSeverityView,
-  resolveMobileTaskDueLabel,
   resolveTaskBusinessChip,
   resolveTaskListMeta,
   resolveTaskReason,
   resolveTaskReasonLabel,
-  resolveTaskSourceLabel,
   resolveMobileTaskStatusLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
 import { mobileTheme } from '../theme'
@@ -58,7 +64,6 @@ export default function MobileTaskListScreen({
   handleMainScroll,
   handleSwitchEntry,
   initialLoading,
-  latestTaskUpdate,
   loadError,
   loadTasks,
   loadMoreActiveView,
@@ -80,10 +85,46 @@ export default function MobileTaskListScreen({
   setDetailAction,
   setSelectedTaskID,
   showScrollTopButton,
-  taskSummary,
+  taskKeyword,
+  onSearchTasks,
   visibleListLimitsByKey,
   setVisibleListLimitsByKey,
 }) {
+  const [keywordDraft, setKeywordDraft] = useState(taskKeyword || '')
+  const searchFormRef = useRef(null)
+  const searchTimerRef = useRef(null)
+  const composingSearchRef = useRef(false)
+  const submittedKeywordRef = useRef(taskKeyword || '')
+
+  useEffect(() => {
+    const keyword = taskKeyword || ''
+    if (keyword === submittedKeywordRef.current) return
+    clearTimeout(searchTimerRef.current)
+    submittedKeywordRef.current = keyword
+    setKeywordDraft(keyword)
+  }, [taskKeyword])
+
+  useEffect(() => () => clearTimeout(searchTimerRef.current), [])
+
+  useEffect(() => {
+    if (activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE) return
+    clearTimeout(searchTimerRef.current)
+    composingSearchRef.current = false
+    setKeywordDraft(taskKeyword || '')
+  }, [activeMainTabKey, taskKeyword])
+
+  const searchTasks = (value, immediate = false) => {
+    clearTimeout(searchTimerRef.current)
+    const keyword = value.trim()
+    if (keyword === submittedKeywordRef.current) return
+    const submit = () => {
+      submittedKeywordRef.current = keyword
+      onSearchTasks(keyword)
+    }
+    if (immediate || !keyword) submit()
+    else searchTimerRef.current = setTimeout(submit, 300)
+  }
+
   const activeTodoListKey =
     activeFilterKey === MOBILE_TASK_FILTER_KEYS.APPROVAL
       ? MOBILE_LIST_KEYS.APPROVAL
@@ -187,150 +228,75 @@ export default function MobileTaskListScreen({
     resetVisibleListLimit(listKey)
   }
 
-  const renderSummaryMetric = ({
-    label,
-    value,
-    tone = '',
-    valueClassName = 'text-slate-950',
-    testID,
-  }) => {
-    const toneClass = tone ? `mobile-role-summary-metric--${tone}` : ''
-    return (
-      <div
-        key={label}
-        data-testid={testID}
-        className={`mobile-role-summary-metric ${toneClass} min-w-0 px-2 text-center`}
-      >
-        <div
-          className={`mobile-role-metric-button__value font-semibold leading-tight ${valueClassName}`}
-        >
-          {value}
-        </div>
-        <div className="mobile-role-metric-button__label mt-1 flex items-center justify-center gap-1 text-base">
-          <span>{label}</span>
-        </div>
-      </div>
-    )
-  }
-
-  const renderLoadedTaskOverview = () => (
-    <section
-      className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-      data-testid="mobile-loaded-task-overview"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-slate-950">
-          当前岗位任务状态
-        </h2>
-        <span
-          className="mobile-role-count-tag mobile-role-section-count"
-          data-testid="mobile-role-total-count"
-          aria-label={
-            taskSummary.total === null
-              ? '岗位任务总数暂不可用'
-              : `岗位任务共 ${taskSummary.total} 条`
-          }
-        >
-          {taskSummary.total ?? '—'}
-        </span>
-      </div>
-      <div className="mt-3 grid grid-cols-4 divide-x divide-slate-200 rounded-xl border border-slate-100 bg-slate-50 py-3 text-center">
-        {[
-          {
-            label: '待处理',
-            value: taskSummary.ready,
-            tone: 'ready',
-            testID: 'mobile-role-progress-ready',
-          },
-          {
-            label: '卡住',
-            value: taskSummary.blocked,
-            tone: 'blocked',
-            testID: 'mobile-role-progress-blocked',
-          },
-          {
-            label: '已退回',
-            value: taskSummary.rejected,
-            tone: 'rejected',
-            testID: 'mobile-role-progress-rejected',
-          },
-          {
-            label: '完成',
-            value: taskSummary.done,
-            tone: 'done',
-            testID: 'mobile-role-progress-done',
-          },
-        ].map((item) =>
-          renderSummaryMetric({
-            ...item,
-            valueClassName: 'text-xl',
-          })
-        )}
-      </div>
-      <p
-        className="mt-3 text-sm leading-6 text-slate-500"
-        data-testid="mobile-role-count-conservation-note"
-      >
-        审批、风险、超时为可重叠关注项，不与全部相加。
-        {riskScope === 'supervised' ? '跨岗风险包含当前账号可监督的岗位。' : ''}
-      </p>
-    </section>
-  )
-
   const renderTaskRow = (task) => {
     const severity = getTaskSeverityView(task)
+    const identity = getWorkflowTaskIdentity(task)
+    const listMeta =
+      !task.display_context && !identity.items.length
+        ? resolveTaskListMeta(task)
+        : ''
     const isSelected = String(selectedTask?.id) === String(task.id)
+    const businessLabel = resolveTaskBusinessChip(task)
     return (
-      <button
+      <WorkflowTaskCard
         key={task.id}
-        type="button"
+        label={`查看${task.task_name}详情`}
         data-mobile-task-id={task.id}
         data-task-code={task.task_code || undefined}
-        className={`erp-mobile-list-item grid w-full grid-cols-[64px_minmax(0,1fr)_94px] gap-3 px-5 py-4 text-left transition hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${severity.rowClass} ${
+        className={`erp-mobile-list-item mobile-task-list-row w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${severity.rowClass} ${
           isSelected ? 'ring-2 ring-emerald-500/40' : ''
         }`}
-        onClick={() => {
+        onOpen={() => {
           setSelectedTaskID(task.id)
           setDetailAction(null)
         }}
       >
-        <div className="pt-1">
+        <div className="mobile-task-list-row__head">
+          <span className="min-w-0 break-words text-base font-semibold leading-snug text-slate-950">
+            {task.task_name}
+          </span>
           <span
             className={`inline-flex min-w-[52px] items-center justify-center rounded-md border px-2 py-1 text-sm font-semibold ${severity.badgeClass}`}
           >
-            {severity.label}
+            {task.task_status_key === 'blocked'
+              ? resolveMobileTaskStatusLabel(task)
+              : severity.label === '普通'
+                ? '待处理'
+                : severity.label}
           </span>
         </div>
-        <div className="min-w-0">
-          <div className="break-words text-base font-semibold leading-snug text-slate-950">
-            {task.task_name}
-          </div>
-          <div className="mt-1 break-all text-sm leading-5 text-slate-500">
-            {resolveTaskSourceLabel(task)}
-          </div>
-          <div className="mt-2 flex min-w-0 items-start gap-1 text-sm leading-5 text-slate-600">
-            <UserOutlined className="mt-0.5 shrink-0 text-slate-400" />
-            <span className="min-w-0 break-words">
-              {resolveTaskListMeta(task)}
+        <div className="mobile-task-list-row__body min-w-0">
+          <WorkflowTaskIdentity task={task} compact />
+          <div className="mobile-task-list-row__source text-sm leading-5 text-slate-500">
+            <FileTextOutlined aria-hidden="true" />
+            <span className="mobile-task-list-row__source-text">
+              <WorkflowTaskSource task={task} />
             </span>
           </div>
+          {listMeta ? (
+            <div className="mt-2 flex min-w-0 items-start gap-1 text-sm leading-5 text-slate-600">
+              <span className="min-w-0 break-words">{listMeta}</span>
+            </div>
+          ) : null}
           {resolveTaskReason(task) ? (
-            <div className="mt-1 text-sm leading-5 text-red-500">
+            <div className="mobile-task-list-row__reason text-sm leading-5 text-red-500">
               {resolveTaskReasonLabel(task)}：{resolveTaskReason(task)}
             </div>
           ) : null}
         </div>
-        <div className="min-w-0 text-right">
-          <span className="inline-flex max-w-full items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-sm font-semibold leading-5 text-blue-600">
-            <span className="truncate">{resolveTaskBusinessChip(task)}</span>
-          </span>
-          <div
-            className={`mt-2 break-words text-sm leading-5 ${severity.timeClass}`}
-          >
-            {resolveMobileTaskDueLabel(task)}
+        <WorkflowTaskTiming task={task} />
+        <div className="mobile-task-list-row__footer min-w-0">
+          <div className="mobile-task-list-row__context text-sm leading-5 text-slate-500">
+            {businessLabel &&
+            businessLabel !== resolveMobileTaskStatusLabel(task) ? (
+              <span>{businessLabel}</span>
+            ) : null}
           </div>
+          <span className="mobile-task-list-row__entry" aria-hidden="true">
+            查看任务 <RightOutlined />
+          </span>
         </div>
-      </button>
+      </WorkflowTaskCard>
     )
   }
 
@@ -344,7 +310,7 @@ export default function MobileTaskListScreen({
     return (
       <div
         data-testid="mobile-role-task-filters"
-        className={`mobile-role-task-filters mobile-role-task-filters--${activeFilterKey} mx-5 mt-4 grid rounded-2xl bg-slate-100 p-1 shadow-inner`}
+        className={`mobile-role-task-filters mobile-role-task-filters--${activeFilterKey} mx-4 mt-4 grid rounded-2xl bg-slate-100 p-1 shadow-inner`}
         style={{
           '--mobile-role-task-filter-offset': `${activeFilterIndex * 100}%`,
           '--mobile-role-task-filter-width': `calc((100% - 8px) / ${filterCount})`,
@@ -398,20 +364,22 @@ export default function MobileTaskListScreen({
       <MobileTaskListSkeleton filterCount={canViewApprovalInbox ? 4 : 3} />
     ) : (
       <>
-        <div className="mx-5 mt-4">{renderLoadedTaskOverview()}</div>
         {renderTaskFilters()}
-        <section className="mx-5 mt-5 pb-5">
-          <div className="grid grid-cols-[minmax(0,1fr)_112px] pb-2 text-base text-slate-500">
-            <span>任务信息</span>
-            <span
-              className="whitespace-nowrap text-right"
-              data-testid="mobile-task-list-status-heading"
-            >
-              状态 / 截止
-            </span>
+        <section className="mx-4 mt-4 pb-4">
+          <div
+            className="pb-3 text-sm text-slate-500"
+            data-testid="mobile-task-list-range"
+            aria-live="polite"
+          >
+            已显示{' '}
+            {getVisibleListItems(filteredTasks, activeTodoListKey).length} 项
+            {' / '}共{' '}
+            {filterItems.find((item) => item.key === activeFilterKey)?.count ??
+              '—'}{' '}
+            项
           </div>
           <div
-            className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
+            className="mobile-task-list min-w-0"
             data-testid="mobile-role-task-list"
             aria-busy={taskListLoading ? 'true' : 'false'}
           >
@@ -440,7 +408,7 @@ export default function MobileTaskListScreen({
                 )}
               </>
             ) : (
-              <div className="divide-y divide-slate-200">
+              <div className="grid gap-3">
                 {getVisibleListItems(filteredTasks, activeTodoListKey).map(
                   renderTaskRow
                 )}
@@ -459,14 +427,13 @@ export default function MobileTaskListScreen({
   const renderDoneTaskItem = (task) => {
     const rejected = String(task.task_status_key || '').trim() === 'rejected'
     return (
-      <button
+      <WorkflowTaskCard
         key={task.id}
-        type="button"
         data-mobile-task-id={task.id}
         data-task-code={task.task_code || undefined}
         className="erp-mobile-list-item w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
-        aria-label={`查看${task.task_name}处理结果`}
-        onClick={() => {
+        label={`查看${task.task_name}处理结果`}
+        onOpen={() => {
           setSelectedTaskID(task.id)
           setDetailAction(null)
         }}
@@ -476,8 +443,9 @@ export default function MobileTaskListScreen({
             <div className="break-words text-base font-semibold text-slate-950">
               {task.task_name}
             </div>
+            <WorkflowTaskIdentity task={task} compact />
             <div className="mt-1 break-all text-sm text-slate-500">
-              {resolveTaskSourceLabel(task)}
+              <WorkflowTaskSource task={task} />
             </div>
           </div>
           <span
@@ -490,15 +458,15 @@ export default function MobileTaskListScreen({
             {resolveMobileTaskStatusLabel(task)}
           </span>
         </div>
-        <div className="mt-2 text-sm text-slate-500">
-          更新时间：{formatMobileTaskTime(task.updated_at)}
+        <div className="mt-2">
+          <WorkflowTaskTiming task={task} />
         </div>
-      </button>
+      </WorkflowTaskCard>
     )
   }
 
   const renderDonePanel = () => (
-    <section className="mx-5 mt-5 space-y-4 pb-5">
+    <section className="mx-4 mt-5 space-y-4 pb-5">
       <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold text-slate-950">已办任务</h2>
@@ -608,12 +576,12 @@ export default function MobileTaskListScreen({
           <>
             {getVisibleListItems(riskTasks, MOBILE_LIST_KEYS.WARNING).map(
               (task) => (
-                <button
+                <WorkflowTaskCard
                   key={task.id}
-                  type="button"
+                  label={`查看${task.task_name}详情`}
                   data-mobile-task-id={task.id}
                   className="mobile-role-message-card mobile-role-message-card--warning w-full rounded-xl border border-amber-200 bg-white/80 px-3 py-3 text-left"
-                  onClick={() => setSelectedTaskID(task.id)}
+                  onOpen={() => setSelectedTaskID(task.id)}
                 >
                   <div className="mobile-role-message-card__tone font-semibold text-amber-800">
                     {getTaskQueueTone(task)}
@@ -621,15 +589,19 @@ export default function MobileTaskListScreen({
                   <div className="mobile-role-message-card__title mt-1 text-sm text-slate-900">
                     {task.task_name}
                   </div>
+                  <WorkflowTaskIdentity task={task} compact />
                   <div className="mobile-role-message-card__source mt-1 break-all text-xs text-amber-700">
-                    {resolveTaskSourceLabel(task)}
+                    <WorkflowTaskSource task={task} />
                   </div>
                   {resolveTaskReason(task) ? (
                     <div className="mobile-role-message-card__reason mt-1 text-sm text-red-600">
                       {resolveTaskReasonLabel(task)}：{resolveTaskReason(task)}
                     </div>
                   ) : null}
-                </button>
+                  <div className="mt-2">
+                    <WorkflowTaskTiming task={task} />
+                  </div>
+                </WorkflowTaskCard>
               )
             )}
             {renderListLimitControl(
@@ -662,20 +634,26 @@ export default function MobileTaskListScreen({
           <>
             {getVisibleListItems(overdueTasks, MOBILE_LIST_KEYS.NOTICE).map(
               (task) => (
-                <button
+                <WorkflowTaskCard
                   key={task.id}
-                  type="button"
+                  label={`查看${task.task_name}详情`}
                   data-mobile-task-id={task.id}
-                  className="mobile-role-message-card mobile-role-message-card--notice flex w-full items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3 text-left"
-                  onClick={() => setSelectedTaskID(task.id)}
+                  className="mobile-role-message-card mobile-role-message-card--notice w-full rounded-xl bg-slate-50 px-3 py-3 text-left"
+                  onOpen={() => setSelectedTaskID(task.id)}
                 >
-                  <span className="mobile-role-message-card__title min-w-0 text-sm font-medium text-slate-700">
-                    {task.task_name}
+                  <span className="min-w-0">
+                    <span className="mobile-role-message-card__title text-sm font-medium text-slate-700">
+                      {task.task_name}
+                    </span>
+                    <WorkflowTaskIdentity task={task} compact />
+                    <span className="mobile-role-message-card__source mt-1 block break-all text-xs text-slate-500">
+                      <WorkflowTaskSource task={task} />
+                    </span>
                   </span>
-                  <span className="mobile-role-message-card__time shrink-0 text-xs text-slate-400">
-                    {formatMobileTaskTime(task.updated_at)}
-                  </span>
-                </button>
+                  <div className="mt-2">
+                    <WorkflowTaskTiming task={task} />
+                  </div>
+                </WorkflowTaskCard>
               )
             )}
             {renderListLimitControl(
@@ -690,7 +668,7 @@ export default function MobileTaskListScreen({
   )
 
   const renderMessagesPanel = () => (
-    <section className="mobile-role-messages mx-5 mt-5 space-y-4 pb-5">
+    <section className="mobile-role-messages mx-4 mt-5 space-y-4 pb-5">
       {renderMessageTabs()}
       {activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.WARNING
         ? renderWarningMessages()
@@ -707,7 +685,7 @@ export default function MobileTaskListScreen({
       ? '电脑端 / 手机待办'
       : '手机待办'
     return (
-      <section className="mx-5 mt-5 space-y-4 pb-5">
+      <section className="mx-4 mt-5 space-y-4 pb-5">
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-3xl text-emerald-700">
@@ -908,14 +886,12 @@ export default function MobileTaskListScreen({
 
         <div className="flex flex-wrap items-center gap-3 px-5 text-sm text-slate-500">
           <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-          <span>数据时间：{serverDataTime}</span>
-          <span className="text-slate-300">|</span>
-          <span>任务最近更新：{latestTaskUpdate}</span>
+          <span>更新于 {serverDataTime}</span>
         </div>
 
         {loadError ? (
           <section
-            className="mobile-role-load-error mx-5 mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-red-800"
+            className="mobile-role-load-error mx-4 mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-red-800"
             role="alert"
           >
             <strong className="block text-base">任务加载失败</strong>
@@ -936,6 +912,73 @@ export default function MobileTaskListScreen({
           </section>
         ) : null}
 
+        {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE ? (
+          <form
+            ref={searchFormRef}
+            className="mobile-role-task-search mx-4 mt-4"
+            role="search"
+            onSubmit={(event) => event.preventDefault()}
+          >
+            <SearchInput
+              type="search"
+              size="large"
+              enterKeyHint="search"
+              autoComplete="off"
+              aria-label="搜索订单、产品、物料或款号"
+              placeholder="订单 / 产品 / 物料 / 款号"
+              maxLength={100}
+              value={keywordDraft}
+              onCompositionStart={() => {
+                composingSearchRef.current = true
+                clearTimeout(searchTimerRef.current)
+              }}
+              onCompositionEnd={(event) => {
+                composingSearchRef.current = false
+                setKeywordDraft(event.currentTarget.value)
+                searchTasks(event.currentTarget.value)
+              }}
+              onChange={(event) => {
+                const { value } = event.target
+                setKeywordDraft(value)
+                if (
+                  !composingSearchRef.current &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  searchTasks(value)
+                }
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.key !== 'Enter' ||
+                  composingSearchRef.current ||
+                  event.nativeEvent.isComposing ||
+                  event.nativeEvent.keyCode === 229
+                ) {
+                  return
+                }
+                event.preventDefault()
+                searchTasks(event.currentTarget.value, true)
+              }}
+              suffix={
+                keywordDraft || taskKeyword ? (
+                  <button
+                    type="button"
+                    aria-label="清除搜索"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      composingSearchRef.current = false
+                      setKeywordDraft('')
+                      searchTasks('', true)
+                      searchFormRef.current?.querySelector('input')?.focus()
+                    }}
+                  >
+                    <CloseOutlined aria-hidden="true" />
+                  </button>
+                ) : null
+              }
+            />
+          </form>
+        ) : null}
         {renderActiveTabPanel()}
       </div>
 

@@ -46,11 +46,31 @@ type WorkflowTask struct {
 	DueAt                 *time.Time
 	CompletedAt           *time.Time
 	Payload               map[string]any
+	DisplayContext        *WorkflowTaskDisplayContext
 	Version               int
 	CreatedBy             *int
 	UpdatedBy             *int
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
+}
+
+// WorkflowTaskDisplayContext is a read-only identity projection. It is never
+// persisted into the task payload or consumed by a business command.
+type WorkflowTaskDisplayContext struct {
+	Available bool                      `json:"available"`
+	SourceNo  string                    `json:"source_no"`
+	Items     []WorkflowTaskDisplayItem `json:"items"`
+}
+
+type WorkflowTaskDisplayItem struct {
+	ProductID         int    `json:"product_id"`
+	ImageAttachmentID int    `json:"image_attachment_id"`
+	Kind              string `json:"kind"`
+	Name              string `json:"name"`
+	Code              string `json:"code"`
+	StyleNo           string `json:"style_no"`
+	SupplierItemNo    string `json:"supplier_item_no"`
+	OrderNo           string `json:"order_no"`
 }
 
 type WorkflowTaskFilter struct {

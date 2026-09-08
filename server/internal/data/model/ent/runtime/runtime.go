@@ -2312,32 +2312,36 @@ func init() {
 			return nil
 		}
 	}()
+	// materialDescSupplierItemNo is the schema descriptor for supplier_item_no field.
+	materialDescSupplierItemNo := materialFields[2].Descriptor()
+	// material.SupplierItemNoValidator is a validator for the "supplier_item_no" field. It is called by the builders before save.
+	material.SupplierItemNoValidator = materialDescSupplierItemNo.Validators[0].(func(string) error)
 	// materialDescCategory is the schema descriptor for category field.
-	materialDescCategory := materialFields[2].Descriptor()
+	materialDescCategory := materialFields[3].Descriptor()
 	// material.CategoryValidator is a validator for the "category" field. It is called by the builders before save.
 	material.CategoryValidator = materialDescCategory.Validators[0].(func(string) error)
 	// materialDescSpec is the schema descriptor for spec field.
-	materialDescSpec := materialFields[3].Descriptor()
+	materialDescSpec := materialFields[4].Descriptor()
 	// material.SpecValidator is a validator for the "spec" field. It is called by the builders before save.
 	material.SpecValidator = materialDescSpec.Validators[0].(func(string) error)
 	// materialDescColor is the schema descriptor for color field.
-	materialDescColor := materialFields[4].Descriptor()
+	materialDescColor := materialFields[5].Descriptor()
 	// material.ColorValidator is a validator for the "color" field. It is called by the builders before save.
 	material.ColorValidator = materialDescColor.Validators[0].(func(string) error)
 	// materialDescDefaultUnitID is the schema descriptor for default_unit_id field.
-	materialDescDefaultUnitID := materialFields[5].Descriptor()
+	materialDescDefaultUnitID := materialFields[6].Descriptor()
 	// material.DefaultUnitIDValidator is a validator for the "default_unit_id" field. It is called by the builders before save.
 	material.DefaultUnitIDValidator = materialDescDefaultUnitID.Validators[0].(func(int) error)
 	// materialDescIsActive is the schema descriptor for is_active field.
-	materialDescIsActive := materialFields[6].Descriptor()
+	materialDescIsActive := materialFields[7].Descriptor()
 	// material.DefaultIsActive holds the default value on creation for the is_active field.
 	material.DefaultIsActive = materialDescIsActive.Default.(bool)
 	// materialDescCreatedAt is the schema descriptor for created_at field.
-	materialDescCreatedAt := materialFields[7].Descriptor()
+	materialDescCreatedAt := materialFields[8].Descriptor()
 	// material.DefaultCreatedAt holds the default value on creation for the created_at field.
 	material.DefaultCreatedAt = materialDescCreatedAt.Default.(func() time.Time)
 	// materialDescUpdatedAt is the schema descriptor for updated_at field.
-	materialDescUpdatedAt := materialFields[8].Descriptor()
+	materialDescUpdatedAt := materialFields[9].Descriptor()
 	// material.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	material.DefaultUpdatedAt = materialDescUpdatedAt.Default.(func() time.Time)
 	// material.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

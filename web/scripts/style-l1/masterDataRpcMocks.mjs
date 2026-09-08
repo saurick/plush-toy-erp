@@ -109,6 +109,7 @@ export async function installMasterDataRpcMocks(page, context) {
       id: 1,
       code: 'MAT-STYLE-L1',
       name: '样式材料',
+      supplier_item_no: '示例织造AB-001#-02#米白',
       category: '面料',
       spec: '短毛绒 300g',
       color: '米白',

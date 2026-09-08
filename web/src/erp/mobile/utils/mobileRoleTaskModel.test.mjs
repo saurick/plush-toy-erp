@@ -395,7 +395,7 @@ test('mobileRoleTaskModel: 任务摘要不透出技术 task_group，业务事实
   })
 
   assert.equal(listMeta.includes('unknown_task_group'), false)
-  assert.equal(listMeta.includes('任务：业务任务'), true)
+  assert.equal(listMeta, '')
   assert.deepEqual(factRows, [])
 })
 
@@ -415,7 +415,6 @@ test('mobileRoleTaskModel: 详情只输出有值的独立业务字段，不拼�
 
   assert.deepEqual(rows, [
     ['客户', '东莞美悦礼品'],
-    ['产品', '云朵小熊'],
     ['数量', '0只'],
   ])
   assert.equal(

@@ -100,6 +100,9 @@ func loadWorkflowRoleTaskView(ctx context.Context, client *ent.Client, query biz
 	for _, row := range rows {
 		items = append(items, entWorkflowTaskToBiz(row))
 	}
+	if err := hydrateWorkflowTaskDisplayContexts(ctx, client, items); err != nil {
+		return nil, err
+	}
 	nextID := 0
 	if hasMore && len(rows) > 0 {
 		nextID = rows[len(rows)-1].ID
@@ -213,6 +216,9 @@ func buildWorkflowRoleTaskVisibilityEntQuery(
 	viewKey string,
 ) *ent.WorkflowTaskQuery {
 	dbQuery := client.WorkflowTask.Query()
+	if query.Keyword != "" {
+		dbQuery = dbQuery.Where(workflowTaskKeywordPredicate(query.Keyword))
+	}
 	if viewKey == biz.WorkflowRoleTaskViewApproval {
 		return dbQuery.Where(workflowApprovalRoleTaskVisibilityPredicate(
 			query.ApprovalVisibilityScopes,

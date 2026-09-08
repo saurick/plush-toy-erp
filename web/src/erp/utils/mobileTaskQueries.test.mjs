@@ -735,3 +735,14 @@ test('mobileTaskQueries: 同范围刷新失败保留任务、游标和服务端�
   assert.equal(failed.slots.todo.error, '刷新任务失败，已保留上次数据')
   assert.equal(failed.slots.todo.count_summary, null)
 })
+
+test('mobileTaskQueries: keyword stays bound to each pagination request', () => {
+  assert.deepEqual(buildMobileRoleTaskQuery({ roleKey: 'engineering', viewKey: 'todo', keyword: ' RB-018 ', cursor: 'next' }), { role_key: 'engineering', view_key: 'todo', keyword: 'RB-018', cursor: 'next', limit: 50 })
+  assert.throws(() =>
+    buildMobileRoleTaskQuery({
+      roleKey: 'engineering',
+      viewKey: 'todo',
+      keyword: '字'.repeat(101),
+    })
+  )
+})

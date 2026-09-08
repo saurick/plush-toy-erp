@@ -380,10 +380,6 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
   const taskBoardSource = readFileSync(taskBoardPath, "utf8");
 
   assert.match(dashboardSource, /getWorkflowTaskOwnerRoleLabel\(record\)/u);
-  assert.match(
-    dashboardSource,
-    /getWorkflowTaskOwnerRoleLabel\(\s*selectedWorkbenchTask\s*\)/u,
-  );
   assert(
     !dashboardSource.includes("getWorkflowTaskAllowedActionModes"),
     "dashboard must not use local workflow action fallback as executable button proof; backend explain projection controls task actions",
@@ -1232,7 +1228,8 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "canCreate || hasActionPermission(adminProfile, 'warehouse.inbound.confirm')",
         "canUpload={canCreate || canPost}",
         "canWithdraw={canCreate || canPost}",
-        "页面不提供脱离采购来源的手工入库明细。",
+        "buildPurchaseReturnFromReceiptPayload(values, receipt)",
+        "buildPurchaseReceiptAdjustmentPayload(values, receipt)",
         "{canCreateReturn ? (",
         'data-business-action-key="create-return"',
         "{canCreateAdjustment ? (",

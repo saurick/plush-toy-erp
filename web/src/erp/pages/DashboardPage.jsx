@@ -6,18 +6,27 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { ArrowRightOutlined } from '@ant-design/icons'
+import {
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
+  CheckOutlined,
+  ClockCircleOutlined,
+  CloseOutlined,
+  ExclamationCircleOutlined,
+  FileTextOutlined,
+  FilterOutlined,
+} from '@ant-design/icons'
 import {
   Alert,
   Button,
   Card,
-  Descriptions,
   Empty,
-  Pagination,
   Segmented,
   Space,
   Table,
+  Tabs,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
 import {
@@ -32,6 +41,12 @@ import WorkflowTaskActionDrawer, {
   TASK_ACTION_META,
   getWorkflowTaskActionMeta,
 } from '../components/workflow/WorkflowTaskActionDrawer.jsx'
+import WorkflowTaskIdentity from '../components/workflow/WorkflowTaskIdentity.jsx'
+import WorkflowTaskCard from '../components/workflow/WorkflowTaskCard.jsx'
+import { WorkflowTaskSource } from '../components/workflow/WorkflowTaskCopy.jsx'
+import WorkflowTaskTiming from '../components/workflow/WorkflowTaskTiming.jsx'
+import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
+import { retainWorkflowTaskIdentity } from '../utils/workflowTaskIdentity.mjs'
 import {
   SearchInput,
   SelectFilter,
@@ -51,14 +66,10 @@ import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js
 import useWorkflowTaskAssignmentAccess from '../hooks/useWorkflowTaskAssignmentAccess.js'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
-  formatWorkflowTaskSource,
   getWorkflowTaskSourceTypeLabel,
   resolveWorkflowTaskEntryPath,
 } from '../utils/dashboardTaskDisplay.mjs'
-import {
-  getWorkflowTaskDueStatus,
-  getWorkflowWorkbenchScopeKey,
-} from '../utils/workflowDashboardStats.mjs'
+import { getWorkflowWorkbenchScopeKey } from '../utils/workflowDashboardStats.mjs'
 import { isTerminalWorkflowTask } from '../utils/workflowTaskLifecycle.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
 import { buildDesktopWorkflowTaskActionParams } from '../utils/desktopWorkflowTaskAction.mjs'
@@ -70,29 +81,30 @@ import {
 } from '../utils/workflowTaskMutation.mjs'
 import {
   TASK_BOARD_DUE_OPTIONS,
+  TASK_BOARD_FOCUS_PAGE_SIZE,
+  TASK_BOARD_LANE_DEFINITIONS,
   TASK_BOARD_SORT_OPTIONS,
   TASK_BOARD_STATUS_OPTIONS,
   buildWorkflowTaskBoardRoleOptions,
   buildWorkflowTaskBoardModel,
   buildWorkflowTaskBoardRequest,
-  getWorkflowTaskDueLabel,
   getWorkflowTaskBoardRequestKey,
   getWorkflowTaskBoardSummaryRequestKey,
+  getWorkflowTaskBoardStatusOptions,
+  getWorkflowTaskBoardDueOptions,
   getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
-  getWorkflowTaskReasonLabel,
   getWorkflowTaskReasonMeta,
   getWorkflowTaskReadonlyReason,
   getWorkflowTaskStatusMeta,
   getWorkflowTaskStatusRiskTags,
   hasActiveWorkflowTaskBoardFilters,
+  normalizeWorkflowTaskPageSize,
   readWorkflowTaskBoardFiltersFromSearch,
   resolveWorkflowTaskBoardResponseState,
   writeWorkflowTaskBoardFiltersToSearch,
 } from '../utils/workflowTaskBoard.mjs'
-import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mjs'
 import { canOpenWorkflowTaskEntry } from '../utils/workflowTaskEntryAccess.mjs'
-import { getWorkflowTaskProcessingHint } from '../utils/workflowTaskProcessingHint.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import {
   canViewWorkflowApprovalInbox,
@@ -113,14 +125,22 @@ const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
 ])
 
 const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
-  { label: '全部任务', value: 'all' },
-  { label: '待我审批', value: 'approval' },
+  {
+    label: '全部任务',
+    value: 'all',
+    icon: <CheckOutlined aria-hidden="true" />,
+  },
+  {
+    label: '待我审批',
+    value: 'approval',
+    icon: <CheckOutlined aria-hidden="true" />,
+  },
 ])
 
-const WORKBENCH_QUEUE_PAGE_SIZE = 8
+const WORKBENCH_QUEUE_PAGE_SIZE = TASK_BOARD_FOCUS_PAGE_SIZE
 const TASK_BOARD_PAGE_SCROLL_GAP = 12
 
-function scrollTaskBoardLanesToStart(lanesElement) {
+function scrollTaskListToStart(lanesElement) {
   const scrollContainer = lanesElement?.closest?.('.erp-admin-content')
   if (!scrollContainer) return
 
@@ -319,19 +339,138 @@ function getWorkflowTaskStableKey(task) {
   return String(task?.id || task?.task_code || '')
 }
 
-function TaskLane({
-  lane,
-  loading = false,
-  focused,
-  page,
-  selectedTaskId,
-  onSelectTask,
-  onOpenTask,
-  onViewAll,
-  onPageChange,
-}) {
-  const shownStart = lane.tasks.length > 0 ? lane.offset + 1 : 0
-  const shownEnd = lane.offset + lane.tasks.length
+function TaskTitleEntry({ task, onOpenTask }) {
+  const name = task.task_name || '未命名任务'
+  return (
+    <button
+      type="button"
+      className="erp-task-title-entry"
+      aria-label={`查看${name}详情`}
+      aria-haspopup="dialog"
+      onClick={(event) => {
+        event.stopPropagation()
+        event.currentTarget.focus({ preventScroll: true })
+        onOpenTask(task)
+      }}
+    >
+      <span>{name}</span>
+      <ArrowRightOutlined aria-hidden="true" />
+    </button>
+  )
+}
+
+function openTaskTableRow(event, task, onOpenTask) {
+  if (
+    event.target.closest(
+      'button, a, input, textarea, select, label, summary, [role="button"], [role="link"], [role="combobox"]'
+    )
+  ) {
+    return
+  }
+  const selection = event.currentTarget.ownerDocument.getSelection()
+  if (
+    selection &&
+    !selection.isCollapsed &&
+    event.currentTarget.contains(selection.anchorNode)
+  ) {
+    return
+  }
+  event.currentTarget
+    .querySelector('.erp-task-title-entry')
+    ?.focus({ preventScroll: true })
+  onOpenTask(task)
+}
+
+function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
+  if (focused) {
+    return (
+      <Card
+        size="small"
+        variant="borderless"
+        className={`erp-task-board-lane erp-task-board-lane--${lane.key} erp-task-board-lane--focused`}
+        aria-busy={loading}
+      >
+        <Table
+          size="middle"
+          rowKey={getWorkflowTaskStableKey}
+          loading={loading}
+          dataSource={lane.tasks}
+          scroll={{ x: 900 }}
+          rowClassName="erp-task-table-row"
+          columns={[
+            {
+              title: '任务 / 产品与物料',
+              key: 'identity',
+              width: '36%',
+              render: (_, task) => (
+                <div className="erp-workbench-task-cell">
+                  <TaskTitleEntry task={task} onOpenTask={onOpenTask} />
+                  <WorkflowTaskIdentity task={task} compact />
+                </div>
+              ),
+            },
+            {
+              title: '关联单据 / 时间',
+              key: 'source',
+              width: '27%',
+              render: (_, task) => (
+                <div className="erp-workbench-task-cell">
+                  <WorkflowTaskSource task={task} />
+                  <WorkflowTaskTiming task={task} />
+                </div>
+              ),
+            },
+            {
+              title:
+                lane.key === 'exception'
+                  ? '阻塞原因 / 负责'
+                  : '状态与说明 / 负责',
+              key: 'reason',
+              render: (_, task) => (
+                <div className="erp-workbench-task-cell">
+                  <Space size={[4, 4]} wrap>
+                    {getWorkflowTaskStatusRiskTags(task).map((tag) => (
+                      <Tag key={tag.key} color={tag.color}>
+                        {tag.label}
+                      </Tag>
+                    ))}
+                  </Space>
+                  {getWorkflowTaskReason(task) ? (
+                    <Text
+                      type={
+                        task.task_status_key === 'blocked'
+                          ? 'danger'
+                          : undefined
+                      }
+                    >
+                      {getWorkflowTaskReason(task)}
+                    </Text>
+                  ) : null}
+                  <Text type="secondary">
+                    {getWorkflowTaskOwnerRoleLabel(task)}
+                  </Text>
+                </div>
+              ),
+            },
+          ]}
+          onRow={(task) => ({
+            'data-task-code': task.task_code,
+            'data-task-group': task.task_group,
+            onClick: (event) => openTaskTableRow(event, task, onOpenTask),
+          })}
+          pagination={false}
+          locale={{
+            emptyText: (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="当前分类暂无匹配任务"
+              />
+            ),
+          }}
+        />
+      </Card>
+    )
+  }
   return (
     <Card
       size="small"
@@ -340,53 +479,48 @@ function TaskLane({
       loading={loading}
       aria-busy={loading}
       title={
-        <Space>
-          <Tag color={lane.count > 0 ? lane.tagColor : 'default'}>
-            {lane.count}
-          </Tag>
+        <span className="erp-task-board-lane-heading" title={lane.description}>
+          {lane.key === 'exception' ? (
+            <ExclamationCircleOutlined aria-hidden="true" />
+          ) : null}
+          {lane.key === 'due' ? (
+            <ClockCircleOutlined aria-hidden="true" />
+          ) : null}
           <span>{lane.title}</span>
-        </Space>
+        </span>
       }
+      extra={<span className="erp-task-board-lane-count">{lane.count}</span>}
     >
-      <Paragraph type="secondary" className="erp-task-board-lane-note">
-        {lane.description}
-      </Paragraph>
       <Space direction="vertical" size={8} className="erp-task-board-list">
         {lane.tasks.length > 0 ? (
           lane.tasks.map((task) => {
             const statusMeta = getWorkflowTaskStatusMeta(task)
             const reasonMeta = getWorkflowTaskReasonMeta(task)
             const taskId = getWorkflowTaskStableKey(task)
-            const isSelected = taskId && taskId === selectedTaskId
             return (
-              <div
-                className={`erp-task-board-card${
-                  isSelected ? ' erp-task-board-card--selected' : ''
-                }`}
+              <WorkflowTaskCard
+                className="erp-task-board-card"
                 key={`${lane.key}-${taskId || task.id}`}
                 data-task-code={task.task_code || undefined}
                 data-task-group={task.task_group || undefined}
-                data-open-on-double-click="true"
-                title="单击选中，双击查看任务详情"
-                onClick={() => onSelectTask(task)}
-                onDoubleClick={(event) =>
-                  openDashboardItemOnDoubleClick(event, () => onOpenTask(task))
-                }
-                onFocusCapture={() => onSelectTask(task)}
+                label={`查看${task.task_name || '任务'}详情`}
+                onOpen={() => onOpenTask(task)}
               >
-                <Space
-                  className="erp-task-board-card-head"
-                  align="start"
-                  size={8}
-                >
+                <span className="erp-task-board-card-head">
                   <Text strong className="erp-task-board-card-title">
                     {task.task_name || '未命名任务'}
                   </Text>
                   <Tag color={statusMeta.color}>{statusMeta.label}</Tag>
-                </Space>
-                <Text type="secondary" className="erp-task-board-card-meta">
-                  {formatWorkflowTaskSource(task)} /{' '}
-                  {getWorkflowTaskDueLabel(task)}
+                </span>
+                <WorkflowTaskIdentity task={task} compact />
+                <Text
+                  type="secondary"
+                  className="erp-task-board-card-meta erp-task-board-card-source"
+                >
+                  <FileTextOutlined aria-hidden="true" />
+                  <span className="erp-task-board-card-source-text">
+                    <WorkflowTaskSource task={task} />
+                  </span>
                 </Text>
                 {reasonMeta.value ? (
                   <Text
@@ -400,87 +534,40 @@ function TaskLane({
                     {reasonMeta.label}：{reasonMeta.value}
                   </Text>
                 ) : null}
-                <Space wrap>
-                  <Button
-                    size="small"
-                    aria-label={`查看${task.task_name || '任务'}详情`}
-                    onClick={() => onOpenTask(task)}
+                <WorkflowTaskTiming task={task} />
+                <span className="erp-task-board-card-footer">
+                  <Text type="secondary" className="erp-task-board-card-meta">
+                    {getWorkflowTaskOwnerRoleLabel(task)}
+                  </Text>
+                  <span
+                    className="erp-task-board-card-entry"
+                    aria-hidden="true"
                   >
-                    查看
-                  </Button>
-                </Space>
-              </div>
+                    <ArrowRightOutlined />
+                  </span>
+                </span>
+              </WorkflowTaskCard>
             )
           })
         ) : (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无任务" />
         )}
       </Space>
-      {focused ? (
-        <div className="erp-task-board-lane-footer erp-task-board-lane-footer--focused">
-          <Text type="secondary">
-            已显示第 {shownStart}-{shownEnd} 条，共 {lane.count} 条
-          </Text>
-          {lane.count > lane.limit ? (
-            <Pagination
-              size="small"
-              current={page}
-              pageSize={lane.limit}
-              total={lane.count}
-              showSizeChanger={false}
-              onChange={onPageChange}
-            />
-          ) : null}
-        </div>
-      ) : lane.hiddenCount > 0 ? (
+      {lane.count > 0 ? (
         <div className="erp-task-board-lane-footer">
-          <Text type="secondary">
-            已显示前 {lane.tasks.length} 条，共 {lane.count} 条
-          </Text>
-          <Button type="link" size="small" onClick={onViewAll}>
-            查看全部 {lane.count} 条
+          <Button
+            type="link"
+            size="small"
+            aria-label={`${lane.actionLabel}，${lane.count} 项`}
+            icon={<ArrowRightOutlined aria-hidden="true" />}
+            iconPosition="end"
+            onClick={onViewAll}
+          >
+            查看全部 {lane.count} 项
           </Button>
         </div>
       ) : null}
     </Card>
-  )
-}
-
-function TaskMetricAction({
-  label,
-  value,
-  actionLabel,
-  active = false,
-  danger = false,
-  disabled = false,
-  onClick,
-  tone = 'actionable',
-}) {
-  return (
-    <button
-      type="button"
-      className={[
-        'erp-task-center-metric',
-        `erp-task-center-metric--tone-${tone}`,
-        danger ? 'erp-task-center-metric--danger' : '',
-        active ? 'erp-task-center-metric--active' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
-      aria-pressed={active}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <span className="erp-task-center-metric__head">
-        <span>{label}</span>
-        <ArrowRightOutlined
-          aria-hidden="true"
-          className="erp-task-center-metric__icon"
-        />
-      </span>
-      <strong>{value}</strong>
-      <small>{actionLabel}</small>
-    </button>
   )
 }
 
@@ -501,35 +588,6 @@ function WorkbenchQueueEmpty({ activeOption, fallbackOption, onSwitchQueue }) {
   )
 }
 
-function isWorkflowTaskAccessChecking(access = {}) {
-  return access.loading || access.source === 'fallback_checking'
-}
-
-function getWorkflowTaskPrimaryButtonLabel(access = {}) {
-  if (access.canHandle) return '处理任务'
-  if (access.urgeOnly) return '催办'
-  return '查看详情'
-}
-
-function TaskProcessingHint({ task, access = {}, canOpenEntry = false }) {
-  const hint = getWorkflowTaskProcessingHint({
-    task,
-    allowedActionModes: access.allowedModes,
-    loading: isWorkflowTaskAccessChecking(access),
-    failed: access.failed || access.source === 'fallback_failed',
-    readonlyReason: access.readonlyReason,
-    canOpenEntry,
-    sourceAccess: access.sourceAccess,
-  })
-
-  return (
-    <div className="erp-task-processing-hint" role="note">
-      <Text type="secondary">办理提示：</Text>
-      <span>{hint}</span>
-    </div>
-  )
-}
-
 export default function DashboardPage({ initialView = 'workbench' }) {
   const [loading, setLoading] = useState(false)
   const [workbenchResponseState, setWorkbenchResponseState] = useState(null)
@@ -537,8 +595,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [taskBoardResponseState, setTaskBoardResponseState] = useState(null)
   const [taskBoardSummaryState, setTaskBoardSummaryState] = useState(null)
   const [taskBoardKeywordDraft, setTaskBoardKeywordDraft] = useState('')
+  const [taskBoardFiltersOpen, setTaskBoardFiltersOpen] = useState(false)
+  const taskBoardFilterButtonRef = useRef(null)
   const [selectedTask, setSelectedTask] = useState(null)
-  const [selectedTaskBoardTaskId, setSelectedTaskBoardTaskId] = useState('')
   const [actionMode, setActionMode] = useState('')
   const [actionReason, setActionReason] = useState('')
   const [assignmentTarget, setAssignmentTarget] = useState()
@@ -549,12 +608,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [activeView, setActiveView] = useState(initialView)
   const [workbenchQueueKey, setWorkbenchQueueKey] = useState('actionable')
   const [workbenchQueuePage, setWorkbenchQueuePage] = useState(1)
-  const [selectedWorkbenchTaskId, setSelectedWorkbenchTaskId] = useState('')
+  const [workbenchQueuePageSize, setWorkbenchQueuePageSize] = useState(
+    WORKBENCH_QUEUE_PAGE_SIZE
+  )
   const [taskBoardTransitionMinHeight, setTaskBoardTransitionMinHeight] =
     useState(0)
   const mountedRef = useRef(false)
   const beginLatestRequest = useLatestRequestCoordinator()
   const taskBoardLanesRef = useRef(null)
+  const workbenchListRef = useRef(null)
+  const pendingWorkbenchPageScrollRef = useRef(null)
   const pendingTaskBoardPageScrollRef = useRef(null)
   const pendingTaskBoardTransitionRequestKeyRef = useRef('')
   const mutationAttemptsRef = useRef(null)
@@ -618,10 +681,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const workbenchRequest = useMemo(
     () => ({
       queue_key: workbenchQueueKey,
-      limit: WORKBENCH_QUEUE_PAGE_SIZE,
-      offset: (workbenchQueuePage - 1) * WORKBENCH_QUEUE_PAGE_SIZE,
+      limit: workbenchQueuePageSize,
+      offset: (workbenchQueuePage - 1) * workbenchQueuePageSize,
     }),
-    [workbenchQueueKey, workbenchQueuePage]
+    [workbenchQueueKey, workbenchQueuePage, workbenchQueuePageSize]
   )
   const workbenchRequestKey = useMemo(
     () => JSON.stringify([workflowWorkbenchScopeKey, workbenchRequest]),
@@ -805,7 +868,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   ])
 
   const hasActiveFilters = useMemo(
-    () => hasActiveWorkflowTaskBoardFilters(filters),
+    () => hasActiveWorkflowTaskBoardFilters({ ...filters, mode: 'all' }),
     [filters]
   )
   const taskBoardResponse = useMemo(
@@ -834,7 +897,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     Boolean(taskBoardSummaryResponse) || taskBoardReady
   const taskBoardCounts =
     taskBoardSummaryResponse?.counts || taskBoardModel.counts
-  const taskBoardTotal = taskBoardSummaryResponse?.total ?? taskBoardModel.total
   const taskBoardInitialLoading =
     isTaskBoardView &&
     !taskBoardHasLoaded &&
@@ -852,10 +914,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         count: taskBoardMetricsReady ? taskBoardCounts[lane.key] : lane.count,
       })),
     [taskBoardCounts, taskBoardMetricsReady, taskBoardModel.visibleLanes]
-  )
-  const taskBoardVisibleTasks = useMemo(
-    () => taskLanes.flatMap((lane) => lane.tasks),
-    [taskLanes]
   )
   const sourceOptions = useMemo(
     () =>
@@ -878,33 +936,23 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ),
     [taskBoardModel.ownerRoleKeys, taskBoardSummaryResponse?.owner_role_keys]
   )
+  const statusOptions = getWorkflowTaskBoardStatusOptions(filters.lane)
+  const dueOptions = getWorkflowTaskBoardDueOptions(filters.lane)
+  const activeExtraFilters = [
+    { key: 'status', label: '状态', options: TASK_BOARD_STATUS_OPTIONS },
+    { key: 'due', label: '截止', options: TASK_BOARD_DUE_OPTIONS },
+    { key: 'sourceType', label: '业务', options: sourceOptions },
+  ]
+    .filter((filter) => filters[filter.key] !== 'all')
+    .map((filter) => ({
+      ...filter,
+      valueLabel: filter.options.find(
+        (option) => option.value === filters[filter.key]
+      )?.label,
+    }))
   const actionMeta = actionMode
     ? getWorkflowTaskActionMeta(selectedTask, actionMode)
     : null
-  const taskCenterCurrentTask = useMemo(
-    () =>
-      taskBoardVisibleTasks.find(
-        (task) => getWorkflowTaskStableKey(task) === selectedTaskBoardTaskId
-      ) || null,
-    [selectedTaskBoardTaskId, taskBoardVisibleTasks]
-  )
-  const taskCenterCurrentStatusMeta = taskCenterCurrentTask
-    ? getWorkflowTaskStatusMeta(taskCenterCurrentTask)
-    : null
-  const taskCenterCurrentEntryPath = taskCenterCurrentTask
-    ? resolveWorkflowTaskEntryPath(taskCenterCurrentTask)
-    : ''
-
-  useEffect(() => {
-    if (!taskBoardReady || !selectedTaskBoardTaskId) return
-    const stillVisible = taskBoardVisibleTasks.some(
-      (task) => getWorkflowTaskStableKey(task) === selectedTaskBoardTaskId
-    )
-    if (!stillVisible) {
-      setSelectedTaskBoardTaskId('')
-    }
-  }, [selectedTaskBoardTaskId, taskBoardReady, taskBoardVisibleTasks])
-
   useEffect(() => {
     setTaskBoardKeywordDraft(filters.keyword)
   }, [filters.keyword])
@@ -953,7 +1001,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ) {
         return
       }
-      scrollTaskBoardLanesToStart(taskBoardLanesRef.current)
+      scrollTaskListToStart(taskBoardLanesRef.current)
       pendingTaskBoardPageScrollRef.current = null
     }
     pendingTaskBoardTransitionRequestKeyRef.current = ''
@@ -996,7 +1044,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           })
         )
     }
-    setSelectedTaskBoardTaskId('')
     setSearchParams(
       writeWorkflowTaskBoardFiltersToSearch(searchParams, {
         ...filters,
@@ -1048,7 +1095,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     ) || null
   const workbenchQueuePageCount = Math.max(
     1,
-    Math.ceil(workbenchQueueTotal / WORKBENCH_QUEUE_PAGE_SIZE)
+    Math.ceil(workbenchQueueTotal / workbenchQueuePageSize)
   )
   const activeWorkbenchQueuePage = Math.min(
     workbenchQueuePage,
@@ -1058,54 +1105,43 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => workbenchResponse?.items || [],
     [workbenchResponse]
   )
+  useLayoutEffect(() => {
+    const pending = pendingWorkbenchPageScrollRef.current
+    if (!pending || loading || !workbenchResponse || workbenchLoadError) return
+    if (
+      pending.queue !== workbenchQueueKey ||
+      pending.page !== workbenchQueuePage ||
+      pending.pageSize !== workbenchQueuePageSize ||
+      workbenchResponse.offset !== workbenchRequest.offset ||
+      workbenchResponse.limit !== workbenchRequest.limit
+    ) {
+      return
+    }
+    scrollTaskListToStart(workbenchListRef.current)
+    pendingWorkbenchPageScrollRef.current = null
+  }, [
+    loading,
+    workbenchLoadError,
+    workbenchQueueKey,
+    workbenchQueuePage,
+    workbenchQueuePageSize,
+    workbenchRequest,
+    workbenchResponse,
+  ])
   useEffect(() => {
     if (!workbenchResponse || workbenchQueuePage <= workbenchQueuePageCount) {
       return
     }
-    setWorkbenchQueuePage(workbenchQueuePageCount)
-    setSelectedWorkbenchTaskId('')
-  }, [workbenchQueuePage, workbenchQueuePageCount, workbenchResponse])
-  const selectedWorkbenchTask = useMemo(() => {
-    if (workbenchQueuePageTasks.length === 0) {
-      return null
+    if (pendingWorkbenchPageScrollRef.current) {
+      pendingWorkbenchPageScrollRef.current.page = workbenchQueuePageCount
     }
-    return (
-      workbenchQueuePageTasks.find(
-        (task) => String(task.id || task.task_code) === selectedWorkbenchTaskId
-      ) || workbenchQueuePageTasks[0]
-    )
-  }, [selectedWorkbenchTaskId, workbenchQueuePageTasks])
-  const selectedWorkbenchStatusMeta = selectedWorkbenchTask
-    ? getWorkflowTaskStatusMeta(selectedWorkbenchTask)
-    : null
-  const selectedWorkbenchEntryPath = selectedWorkbenchTask
-    ? resolveWorkflowTaskEntryPath(selectedWorkbenchTask)
-    : ''
-  const selectedWorkbenchTaskAccess = useWorkflowTaskActionAccess({
-    adminProfile,
-    task: selectedWorkbenchTask,
-    enabled: Boolean(selectedWorkbenchTask),
-  })
-  const taskCenterCurrentTaskAccess = useWorkflowTaskActionAccess({
-    adminProfile,
-    task: taskCenterCurrentTask,
-    enabled: Boolean(taskCenterCurrentTask),
-  })
+    setWorkbenchQueuePage(workbenchQueuePageCount)
+  }, [workbenchQueuePage, workbenchQueuePageCount, workbenchResponse])
   const actionDrawerAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: selectedTask,
     enabled: Boolean(selectedTask),
   })
-  const selectedWorkbenchCanOpenEntry = canOpenWorkflowTaskEntry(
-    adminProfile,
-    selectedWorkbenchEntryPath,
-    selectedWorkbenchTaskAccess.sourceAccess
-  )
-  const taskCenterCurrentCanOpenEntry = canOpenWorkflowTaskEntry(
-    adminProfile,
-    taskCenterCurrentEntryPath,
-    taskCenterCurrentTaskAccess.sourceAccess
-  )
   const actionDrawerEntryPath = selectedTask
     ? resolveWorkflowTaskEntryPath(selectedTask)
     : ''
@@ -1144,13 +1180,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     }
     setWorkbenchQueueKey('actionable')
     setWorkbenchQueuePage(1)
-    setSelectedWorkbenchTaskId('')
   }, [visibleWorkbenchQueueOptions, workbenchQueueKey])
 
   useEffect(() => {
     if (workbenchQueuePage === activeWorkbenchQueuePage) return
     setWorkbenchQueuePage(activeWorkbenchQueuePage)
-    setSelectedWorkbenchTaskId('')
   }, [activeWorkbenchQueuePage, workbenchQueuePage])
 
   const updateFilter = (key, value) => {
@@ -1170,11 +1204,23 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }
 
   const clearFilters = () => {
+    taskBoardFilterButtonRef.current?.focus({ preventScroll: true })
     pendingTaskBoardPageScrollRef.current = null
-    preserveTaskBoardTransitionHeight(buildWorkflowTaskBoardRequest({}))
-    setSearchParams(writeWorkflowTaskBoardFiltersToSearch(searchParams), {
-      replace: true,
-    })
+    const nextFilters = {
+      lane: filters.lane,
+      mode: filters.mode,
+      sort: filters.sort,
+      pageSize: filters.pageSize,
+    }
+    preserveTaskBoardTransitionHeight(
+      buildWorkflowTaskBoardRequest(nextFilters)
+    )
+    setSearchParams(
+      writeWorkflowTaskBoardFiltersToSearch(searchParams, nextFilters),
+      {
+        replace: true,
+      }
+    )
   }
 
   const selectTaskBoardLane = (lane) => {
@@ -1188,20 +1234,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     preserveTaskBoardTransitionHeight(
       buildWorkflowTaskBoardRequest(nextFilters)
     )
-    setSelectedTaskBoardTaskId('')
     setSearchParams(
       writeWorkflowTaskBoardFiltersToSearch(searchParams, nextFilters),
       { replace: true }
     )
   }
 
-  const selectTaskBoardPage = (page) => {
-    const nextPage = Number(page)
+  const selectTaskBoardPage = (page, pageSize = filters.pageSize) => {
+    const nextPageSize = normalizeWorkflowTaskPageSize(pageSize)
+    const nextPage = nextPageSize !== filters.pageSize ? 1 : Number(page)
     if (
       !taskBoardModel.focused ||
       !Number.isInteger(nextPage) ||
       nextPage < 1 ||
-      nextPage === taskBoardModel.page
+      (nextPage === taskBoardModel.page && nextPageSize === filters.pageSize)
     ) {
       return
     }
@@ -1213,13 +1259,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       buildWorkflowTaskBoardRequest({
         ...filters,
         page: nextPage,
+        pageSize: nextPageSize,
       })
     )
-    setSelectedTaskBoardTaskId('')
     setSearchParams(
       writeWorkflowTaskBoardFiltersToSearch(searchParams, {
         ...filters,
         page: nextPage,
+        pageSize: nextPageSize,
       }),
       { replace: true }
     )
@@ -1248,23 +1295,26 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [adminProfile]
   )
 
-  const selectTaskBoardTask = useCallback((task) => {
-    const taskId = getWorkflowTaskStableKey(task)
-    if (taskId) {
-      setSelectedTaskBoardTaskId(taskId)
-    }
-  }, [])
-
   const selectWorkbenchQueue = useCallback((queueKey) => {
+    pendingWorkbenchPageScrollRef.current = null
     setWorkbenchQueueKey(queueKey)
     setWorkbenchQueuePage(1)
-    setSelectedWorkbenchTaskId('')
   }, [])
 
-  const selectWorkbenchQueuePage = useCallback((page) => {
+  const selectWorkbenchQueuePage = (
+    page,
+    pageSize = workbenchQueuePageSize
+  ) => {
+    const nextPageSize = normalizeWorkflowTaskPageSize(pageSize)
+    if (nextPageSize !== workbenchQueuePageSize) page = 1
+    pendingWorkbenchPageScrollRef.current = {
+      queue: workbenchQueueKey,
+      page,
+      pageSize: nextPageSize,
+    }
     setWorkbenchQueuePage(page)
-    setSelectedWorkbenchTaskId('')
-  }, [])
+    setWorkbenchQueuePageSize(nextPageSize)
+  }
 
   const openTaskDrawer = (task, mode = '') => {
     if (actionSaving) return
@@ -1423,7 +1473,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         if (
           getWorkflowTaskStableKey(selectedTaskRef.current) === taskIdentity
         ) {
-          setSelectedTask(confirmedTask)
+          setSelectedTask(
+            retainWorkflowTaskIdentity(taskSnapshot, confirmedTask)
+          )
           setActionReceipt({
             actionMode: actionModeSnapshot,
             actionTitle: actionMetaSnapshot.title,
@@ -1457,6 +1509,29 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
   const workbenchTaskColumns = [
     {
+      title: '任务 / 产品与物料',
+      dataIndex: 'task_name',
+      render: (_, record) => (
+        <div className="erp-workbench-task-cell">
+          <TaskTitleEntry task={record} onOpenTask={openTaskDrawer} />
+          <WorkflowTaskIdentity task={record} compact />
+          <Text type="secondary">
+            <WorkflowTaskSource task={record} />
+          </Text>
+          {getWorkflowTaskReason(record) ? (
+            <Text
+              type={
+                record.task_status_key === 'blocked' ? 'danger' : 'secondary'
+              }
+            >
+              {getWorkflowTaskReasonMeta(record).label}：
+              {getWorkflowTaskReason(record)}
+            </Text>
+          ) : null}
+        </div>
+      ),
+    },
+    {
       title: '状态 / 风险',
       key: 'task_priority',
       width: 132,
@@ -1482,59 +1557,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       },
     },
     {
-      title: '任务 / 相关单据',
-      dataIndex: 'task_name',
-      render: (value, record) => (
-        <div className="erp-workbench-task-cell">
-          <Text strong>{value || '未命名任务'}</Text>
-          <Text type="secondary">{formatWorkflowTaskSource(record)}</Text>
-        </div>
-      ),
-    },
-    {
       title: '负责',
       key: 'owner_role',
       width: 90,
       render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
     },
     {
-      title: '截止时间',
-      dataIndex: 'due_at',
-      width: 132,
-      render: (_, record) => {
-        const dueStatus = getWorkflowTaskDueStatus(record)
-        return (
-          <Tag
-            color={
-              dueStatus === 'overdue'
-                ? 'red'
-                : dueStatus === 'due_soon'
-                  ? 'orange'
-                  : 'green'
-            }
-          >
-            {getWorkflowTaskDueLabel(record)}
-          </Tag>
-        )
-      },
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 112,
-      render: (_, record) => {
-        return (
-          <Button
-            size="small"
-            onClick={(event) => {
-              event.stopPropagation()
-              openTaskDrawer(record)
-            }}
-          >
-            查看
-          </Button>
-        )
-      },
+      title: '任务时间',
+      key: 'timing',
+      width: 210,
+      render: (_, record) => <WorkflowTaskTiming task={record} />,
     },
   ]
 
@@ -1614,22 +1646,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
             <div className="erp-workbench-main-grid">
               <section
+                ref={workbenchListRef}
                 className="erp-workbench-panel erp-workbench-queue-panel"
                 aria-label="优先处理"
                 aria-busy={loading}
               >
-                <div className="erp-workbench-panel-head">
-                  <div>
-                    <Title level={5}>优先处理</Title>
-                    <Text type="secondary">
-                      单击任务可在右侧查看；电脑端双击可直接打开详情。
-                    </Text>
-                  </div>
-                  <Tag color={workbenchQueueTotal > 0 ? 'blue' : 'default'}>
-                    {activeWorkbenchQueueOption.label}{' '}
-                    {workbenchCounts ? workbenchQueueTotal : '—'}
-                  </Tag>
-                </div>
                 {workbenchLoadError ? (
                   <Alert
                     type="error"
@@ -1649,61 +1670,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   columns={workbenchTaskColumns}
                   dataSource={workbenchQueuePageTasks}
                   loading={{ spinning: loading, delay: 120 }}
-                  pagination={
-                    workbenchQueueTotal > WORKBENCH_QUEUE_PAGE_SIZE
-                      ? {
-                          current: activeWorkbenchQueuePage,
-                          pageSize: WORKBENCH_QUEUE_PAGE_SIZE,
-                          total: workbenchQueueTotal,
-                          showLessItems: true,
-                          showSizeChanger: false,
-                          showTotal: (total, [start, end]) =>
-                            `第 ${start}-${end} 项 / 共 ${total} 项`,
-                          onChange: selectWorkbenchQueuePage,
-                        }
-                      : false
-                  }
-                  scroll={{ x: 760 }}
-                  rowClassName={(record) =>
-                    [
-                      'erp-workbench-task-row--openable',
-                      String(record.id || record.task_code) ===
-                      String(
-                        selectedWorkbenchTask?.id ||
-                          selectedWorkbenchTask?.task_code ||
-                          ''
-                      )
-                        ? 'erp-workbench-task-row--active'
-                        : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')
-                  }
+                  pagination={false}
+                  scroll={{ x: 680 }}
+                  rowClassName="erp-task-table-row"
                   onRow={(record) => ({
-                    tabIndex: 0,
-                    title: '单击选中，双击查看任务详情',
                     'data-task-code': record.task_code || undefined,
                     'data-task-group': record.task_group || undefined,
-                    'data-open-on-double-click': 'true',
-                    onClick: () =>
-                      setSelectedWorkbenchTaskId(
-                        String(record.id || record.task_code || '')
-                      ),
-                    onDoubleClick: (event) =>
-                      openDashboardItemOnDoubleClick(event, () =>
-                        openTaskDrawer(record)
-                      ),
-                    onFocus: () =>
-                      setSelectedWorkbenchTaskId(
-                        String(record.id || record.task_code || '')
-                      ),
-                    'aria-selected':
-                      String(record.id || record.task_code) ===
-                      String(
-                        selectedWorkbenchTask?.id ||
-                          selectedWorkbenchTask?.task_code ||
-                          ''
-                      ),
+                    onClick: (event) =>
+                      openTaskTableRow(event, record, openTaskDrawer),
                   })}
                   locale={{
                     emptyText: (
@@ -1716,132 +1690,17 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   }}
                 />
               </section>
-
-              <aside className="erp-workbench-side-stack">
-                <section
-                  className="erp-workbench-panel erp-workbench-task-detail"
-                  aria-label="任务详情"
-                >
-                  <div className="erp-workbench-panel-head">
-                    <div>
-                      <Title level={5}>任务详情</Title>
-                      <Text type="secondary">当前选中的任务</Text>
-                    </div>
-                    {selectedWorkbenchStatusMeta ? (
-                      <Tag color={selectedWorkbenchStatusMeta.color}>
-                        {selectedWorkbenchStatusMeta.label}
-                      </Tag>
-                    ) : (
-                      <Tag>暂无任务</Tag>
-                    )}
-                  </div>
-                  {selectedWorkbenchTask ? (
-                    <Space
-                      direction="vertical"
-                      size={10}
-                      className="erp-dashboard-block erp-workbench-detail-body"
-                    >
-                      <Title level={4} className="erp-workbench-detail-title">
-                        {selectedWorkbenchTask.task_name || '未命名任务'}
-                      </Title>
-                      <Descriptions
-                        size="small"
-                        column={1}
-                        items={[
-                          {
-                            key: 'source',
-                            label: '来源',
-                            children:
-                              formatWorkflowTaskSource(selectedWorkbenchTask),
-                          },
-                          {
-                            key: 'owner-role',
-                            label: '负责岗位',
-                            children:
-                              getWorkflowTaskOwnerRoleLabel(
-                                selectedWorkbenchTask
-                              ),
-                          },
-                          {
-                            key: 'due',
-                            label: '到期',
-                            children:
-                              getWorkflowTaskDueLabel(selectedWorkbenchTask),
-                          },
-                          {
-                            key: 'reason',
-                            label:
-                              getWorkflowTaskReasonLabel(
-                                selectedWorkbenchTask
-                              ),
-                            children:
-                              getWorkflowTaskReason(selectedWorkbenchTask) ||
-                              '-',
-                          },
-                        ]}
-                      />
-                      <TaskProcessingHint
-                        task={selectedWorkbenchTask}
-                        access={selectedWorkbenchTaskAccess}
-                        canOpenEntry={selectedWorkbenchCanOpenEntry}
-                      />
-                      <Space wrap className="erp-workbench-detail-actions">
-                        {isWorkflowTaskAccessChecking(
-                          selectedWorkbenchTaskAccess
-                        ) ? (
-                          <Button disabled>正在确认可用操作</Button>
-                        ) : (
-                          <Button
-                            type={
-                              selectedWorkbenchTaskAccess.allowedModes.length >
-                              0
-                                ? 'primary'
-                                : 'default'
-                            }
-                            title={
-                              selectedWorkbenchTaskAccess.allowedModes.length >
-                              0
-                                ? undefined
-                                : selectedWorkbenchTaskAccess.readonlyReason
-                            }
-                            onClick={() =>
-                              openTaskDrawer(selectedWorkbenchTask)
-                            }
-                          >
-                            {getWorkflowTaskPrimaryButtonLabel(
-                              selectedWorkbenchTaskAccess
-                            )}
-                          </Button>
-                        )}
-                        {selectedWorkbenchCanOpenEntry ? (
-                          <Button
-                            onClick={() =>
-                              openTaskEntry(
-                                selectedWorkbenchTask,
-                                selectedWorkbenchTaskAccess
-                              )
-                            }
-                          >
-                            查看相关单据
-                          </Button>
-                        ) : null}
-                      </Space>
-                    </Space>
-                  ) : (
-                    <div className="erp-workbench-detail-empty">
-                      <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description={
-                          fallbackWorkbenchQueueOption
-                            ? `当前任务列表暂无任务，可切到${fallbackWorkbenchQueueOption.label}。`
-                            : '暂无可处理任务'
-                        }
-                      />
-                    </div>
-                  )}
-                </section>
-              </aside>
             </div>
+            {workbenchCounts ? (
+              <WorkflowTaskPagination
+                total={workbenchQueueTotal}
+                current={activeWorkbenchQueuePage}
+                pageSize={workbenchQueuePageSize}
+                loading={loading}
+                error={Boolean(workbenchLoadError)}
+                onChange={selectWorkbenchQueuePage}
+              />
+            ) : null}
           </div>
         </Card>
       ) : null}
@@ -1858,246 +1717,168 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           }
         >
           <div className="erp-dashboard-block">
-            <div className="erp-task-center-overview">
-              <section className="erp-task-center-summary">
-                <div>
+            <section className="erp-task-center-summary">
+              <div className="erp-task-board-heading">
+                <div className="erp-task-board-title">
+                  {taskBoardModel.focused ? (
+                    <Tooltip title="返回任务概览">
+                      <Button
+                        type="text"
+                        aria-label="返回任务概览"
+                        icon={<ArrowLeftOutlined aria-hidden="true" />}
+                        onClick={() => selectTaskBoardLane('all')}
+                      />
+                    </Tooltip>
+                  ) : null}
                   <Title level={3} className="erp-command-center-hero-title">
                     任务看板
                   </Title>
                 </div>
-                <div
-                  className="erp-task-center-metrics"
-                  aria-label="任务看板关键筛选"
-                >
-                  <TaskMetricAction
-                    label="常规待办"
-                    tone="actionable"
-                    value={
-                      taskBoardMetricsReady ? taskBoardCounts.actionable : '-'
-                    }
-                    actionLabel="查看常规待办"
-                    active={filters.lane === 'actionable'}
-                    onClick={() => selectTaskBoardLane('actionable')}
-                  />
-                  <TaskMetricAction
-                    label="阻塞"
-                    tone="exception"
-                    value={
-                      taskBoardMetricsReady ? taskBoardCounts.exception : '-'
-                    }
-                    actionLabel="查看阻塞任务"
-                    active={filters.lane === 'exception'}
-                    danger={taskBoardCounts.exception > 0}
-                    onClick={() => selectTaskBoardLane('exception')}
-                  />
-                  <TaskMetricAction
-                    label="到期提醒"
-                    tone="due"
-                    value={taskBoardMetricsReady ? taskBoardCounts.due : '-'}
-                    actionLabel="查看到期提醒"
-                    active={filters.lane === 'due'}
-                    danger={taskBoardCounts.due > 0}
-                    onClick={() => selectTaskBoardLane('due')}
-                  />
-                  <TaskMetricAction
-                    label="已结束"
-                    tone="finished"
-                    value={
-                      taskBoardMetricsReady ? taskBoardCounts.finished : '-'
-                    }
-                    actionLabel="查看已结束任务"
-                    active={filters.lane === 'finished'}
-                    onClick={() => selectTaskBoardLane('finished')}
-                  />
-                </div>
-                <Text type="secondary" className="erp-task-center-metrics-note">
-                  {taskBoardMetricsReady
-                    ? `当前筛选共 ${taskBoardTotal} 项；四类任务互不重复，点击指标可查看对应任务。`
-                    : '任务数量读取完成后，可点击指标查看对应任务。'}
-                </Text>
-              </section>
-
-              <section
-                className="erp-task-center-current"
-                aria-label="当前选中任务"
-              >
-                <div className="erp-task-center-current-head">
-                  <Text type="secondary">当前选中任务</Text>
-                  {taskCenterCurrentStatusMeta ? (
-                    <Tag color={taskCenterCurrentStatusMeta.color}>
-                      {taskCenterCurrentStatusMeta.label}
-                    </Tag>
-                  ) : (
-                    <Tag>暂无任务</Tag>
-                  )}
-                </div>
-                {taskCenterCurrentTask ? (
-                  <>
-                    <Title level={5} className="erp-task-center-current-title">
-                      {taskCenterCurrentTask.task_name || '未命名任务'}
-                    </Title>
-                    <Text
-                      type="secondary"
-                      className="erp-task-center-current-meta"
-                    >
-                      {formatWorkflowTaskSource(taskCenterCurrentTask)} /{' '}
-                      {getWorkflowTaskDueLabel(taskCenterCurrentTask)}
-                    </Text>
-                    {getWorkflowTaskReason(taskCenterCurrentTask) ? (
-                      <Text
-                        type={
-                          ['blocked', 'rejected'].includes(
-                            getWorkflowTaskReasonMeta(taskCenterCurrentTask)
-                              .kind
-                          )
-                            ? 'danger'
-                            : 'secondary'
-                        }
-                        className="erp-task-center-current-meta"
-                      >
-                        {getWorkflowTaskReasonLabel(taskCenterCurrentTask)}：
-                        {getWorkflowTaskReason(taskCenterCurrentTask)}
-                      </Text>
-                    ) : null}
-                    <TaskProcessingHint
-                      task={taskCenterCurrentTask}
-                      access={taskCenterCurrentTaskAccess}
-                      canOpenEntry={taskCenterCurrentCanOpenEntry}
+                {canViewApprovalInbox ? (
+                  <div className="erp-task-board-scope-filter">
+                    <Segmented
+                      aria-label="任务范围"
+                      value={filters.mode}
+                      options={TASK_BOARD_SCOPE_OPTIONS}
+                      onChange={(value) => updateFilter('mode', value)}
                     />
-                    <Space wrap className="erp-task-center-current-actions">
-                      {isWorkflowTaskAccessChecking(
-                        taskCenterCurrentTaskAccess
-                      ) ? (
-                        <Button size="small" disabled>
-                          正在确认可用操作
-                        </Button>
-                      ) : (
-                        <Button
-                          size="small"
-                          type={
-                            taskCenterCurrentTaskAccess.allowedModes.length > 0
-                              ? 'primary'
-                              : 'default'
-                          }
-                          title={
-                            taskCenterCurrentTaskAccess.allowedModes.length > 0
-                              ? undefined
-                              : taskCenterCurrentTaskAccess.readonlyReason
-                          }
-                          onClick={() => openTaskDrawer(taskCenterCurrentTask)}
-                        >
-                          {getWorkflowTaskPrimaryButtonLabel(
-                            taskCenterCurrentTaskAccess
-                          )}
-                        </Button>
-                      )}
-                      {taskCenterCurrentCanOpenEntry ? (
-                        <Button
-                          size="small"
-                          onClick={() =>
-                            openTaskEntry(
-                              taskCenterCurrentTask,
-                              taskCenterCurrentTaskAccess
-                            )
-                          }
-                        >
-                          查看相关单据
-                        </Button>
-                      ) : null}
-                    </Space>
-                  </>
-                ) : (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="从下方任务卡选择一条任务"
-                  />
-                )}
-              </section>
-            </div>
-
-            <div className="erp-task-board-filters">
-              {canViewApprovalInbox ? (
-                <div
-                  className="erp-task-board-scope-filter"
-                  role="group"
-                  aria-label="任务范围筛选"
-                >
-                  <Text strong>任务范围</Text>
-                  <Segmented
-                    aria-label="任务范围"
-                    size="large"
-                    value={filters.mode}
-                    options={TASK_BOARD_SCOPE_OPTIONS}
-                    onChange={(value) => updateFilter('mode', value)}
-                  />
-                </div>
-              ) : null}
-              <SearchInput
-                placeholder="搜索任务"
-                searchHint="可搜索：任务、单号、来源、处理原因"
-                value={taskBoardKeywordDraft}
-                onChange={(event) => {
-                  const nextKeyword = event.target.value
-                  setTaskBoardKeywordDraft(nextKeyword)
-                  if (!nextKeyword && filters.keyword) {
-                    updateFilter('keyword', '')
-                  }
-                }}
-                onPressEnter={(event) =>
-                  updateFilter('keyword', event.currentTarget.value)
-                }
-              />
-              <SelectFilter
-                value={filters.status}
-                options={TASK_BOARD_STATUS_OPTIONS}
-                onChange={(value) => updateFilter('status', value)}
-              />
-              {roleOptions.length > 1 ? (
-                <SelectFilter
-                  aria-label="负责岗位"
-                  value={filters.role}
-                  options={roleOptions}
-                  onChange={(value) => updateFilter('role', value)}
-                />
-              ) : null}
-              <SelectFilter
-                value={filters.due}
-                options={TASK_BOARD_DUE_OPTIONS}
-                onChange={(value) => updateFilter('due', value)}
-              />
-              <SelectFilter
-                value={filters.sourceType}
-                options={sourceOptions}
-                onChange={(value) => updateFilter('sourceType', value)}
-              />
-              {taskBoardModel.focused ? (
-                <SelectFilter
-                  aria-label="任务排序"
-                  value={filters.sort}
-                  options={TASK_BOARD_SORT_OPTIONS}
-                  onChange={(value) => updateFilter('sort', value)}
-                />
-              ) : null}
-              <ToolbarButton
-                disabled={!hasActiveFilters}
-                onClick={clearFilters}
-              >
-                清空筛选
-              </ToolbarButton>
-              <div className="erp-task-board-filter-summary" aria-live="polite">
-                <Text type="secondary">
-                  筛选结果 {taskBoardMetricsReady ? taskBoardTotal : '-'} 条
-                </Text>
-                {taskBoardModel.focused ? (
-                  <Button
-                    type="link"
-                    size="small"
-                    onClick={() => selectTaskBoardLane('all')}
-                  >
-                    查看全部分类
-                  </Button>
+                  </div>
                 ) : null}
               </div>
+              {taskBoardModel.focused ? (
+                <Tabs
+                  className="erp-task-board-categories"
+                  aria-label="任务分类"
+                  activeKey={filters.lane}
+                  onChange={selectTaskBoardLane}
+                  tabBarGutter={24}
+                  items={TASK_BOARD_LANE_DEFINITIONS.map((lane) => ({
+                    key: lane.key,
+                    label: (
+                      <span className="erp-task-board-category">
+                        <span>{lane.title}</span>
+                        <span className="erp-task-board-category-count">
+                          {taskBoardMetricsReady
+                            ? taskBoardCounts[lane.key]
+                            : '—'}
+                        </span>
+                      </span>
+                    ),
+                  }))}
+                />
+              ) : null}
+            </section>
+
+            <div className="erp-task-board-controls">
+              <div className="erp-task-board-filters">
+                <SearchInput
+                  placeholder="订单 / 产品 / 物料 / 款号"
+                  searchHint="可搜索：任务、单号、产品、款号、物料、处理原因"
+                  value={taskBoardKeywordDraft}
+                  onChange={(event) => {
+                    const nextKeyword = event.target.value
+                    setTaskBoardKeywordDraft(nextKeyword)
+                    if (!nextKeyword && filters.keyword) {
+                      updateFilter('keyword', '')
+                    }
+                  }}
+                  onPressEnter={(event) =>
+                    updateFilter('keyword', event.currentTarget.value)
+                  }
+                />
+                {roleOptions.length > 1 ? (
+                  <SelectFilter
+                    aria-label="负责岗位"
+                    value={filters.role}
+                    options={roleOptions}
+                    onChange={(value) => updateFilter('role', value)}
+                  />
+                ) : null}
+                <Button
+                  ref={taskBoardFilterButtonRef}
+                  icon={<FilterOutlined aria-hidden="true" />}
+                  aria-expanded={taskBoardFiltersOpen}
+                  aria-controls="task-board-extra-filters"
+                  onClick={() => setTaskBoardFiltersOpen((open) => !open)}
+                >
+                  筛选
+                  {activeExtraFilters.length
+                    ? ` · ${activeExtraFilters.length}`
+                    : ''}
+                </Button>
+                {taskBoardModel.focused ? (
+                  <SelectFilter
+                    aria-label="任务排序"
+                    value={filters.sort}
+                    options={TASK_BOARD_SORT_OPTIONS}
+                    onChange={(value) => updateFilter('sort', value)}
+                  />
+                ) : null}
+              </div>
+              {taskBoardFiltersOpen ? (
+                <div
+                  id="task-board-extra-filters"
+                  className="erp-task-board-extra-filters"
+                  role="group"
+                  aria-label="更多筛选条件"
+                >
+                  {filters.lane === 'all' || filters.lane === 'finished' ? (
+                    <label>
+                      <span>任务状态</span>
+                      <SelectFilter
+                        aria-label="任务状态"
+                        value={filters.status}
+                        options={statusOptions}
+                        onChange={(value) => updateFilter('status', value)}
+                      />
+                    </label>
+                  ) : null}
+                  <label>
+                    <span>截止时间</span>
+                    <SelectFilter
+                      aria-label="截止时间"
+                      value={filters.due}
+                      options={dueOptions}
+                      onChange={(value) => updateFilter('due', value)}
+                    />
+                  </label>
+                  <label>
+                    <span>业务来源</span>
+                    <SelectFilter
+                      aria-label="业务来源"
+                      value={filters.sourceType}
+                      options={sourceOptions}
+                      onChange={(value) => updateFilter('sourceType', value)}
+                    />
+                  </label>
+                </div>
+              ) : null}
+              {hasActiveFilters ? (
+                <div
+                  className="erp-task-board-active-filters"
+                  aria-label="已选筛选条件"
+                >
+                  {activeExtraFilters.map((filter) => (
+                    <Button
+                      key={filter.key}
+                      size="small"
+                      className="erp-task-board-filter-chip"
+                      aria-label={`清除${filter.label}：${filter.valueLabel}`}
+                      icon={<CloseOutlined aria-hidden="true" />}
+                      iconPosition="end"
+                      onClick={() => {
+                        taskBoardFilterButtonRef.current?.focus({
+                          preventScroll: true,
+                        })
+                        updateFilter(filter.key, 'all')
+                      }}
+                    >
+                      {filter.label}：{filter.valueLabel}
+                    </Button>
+                  ))}
+                  <ToolbarButton onClick={clearFilters}>清空筛选</ToolbarButton>
+                </div>
+              ) : null}
             </div>
             {taskBoardLoadError ? (
               <Alert
@@ -2105,6 +1886,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 showIcon
                 message="任务看板加载失败"
                 description={taskBoardLoadError}
+                action={<Button onClick={loadDashboardStats}>重新加载</Button>}
               />
             ) : (
               <div
@@ -2121,19 +1903,22 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     lane={lane}
                     loading={taskBoardUpdating}
                     focused={taskBoardModel.focused}
-                    page={taskBoardModel.page}
-                    selectedTaskId={selectedTaskBoardTaskId}
-                    onSelectTask={selectTaskBoardTask}
-                    onOpenTask={(task) => {
-                      selectTaskBoardTask(task)
-                      openTaskDrawer(task)
-                    }}
+                    onOpenTask={openTaskDrawer}
                     onViewAll={() => selectTaskBoardLane(lane.key)}
-                    onPageChange={selectTaskBoardPage}
                   />
                 ))}
               </div>
             )}
+            {taskBoardModel.focused ? (
+              <WorkflowTaskPagination
+                total={taskBoardCounts[filters.lane] || 0}
+                current={taskBoardReady ? taskBoardModel.page : filters.page}
+                pageSize={filters.pageSize}
+                loading={taskBoardUpdating}
+                error={Boolean(taskBoardLoadError)}
+                onChange={selectTaskBoardPage}
+              />
+            ) : null}
           </div>
         </Card>
       ) : null}

@@ -36,8 +36,8 @@ export const MATERIAL_DETAIL_COLUMNS = [
   { key: 'materialName', label: '物料名称', widthWeight: 34.6667 },
   {
     key: 'vendorCode',
-    label: '厂商料号',
-    headerLabel: '厂商\n料号',
+    label: '款号',
+    headerLabel: '款号',
     widthWeight: 23.1667,
   },
   { key: 'spec', label: '规格', widthWeight: 18.5 },
@@ -673,7 +673,7 @@ export const DEFAULT_COLOR_CARD_SAMPLE = {
   blocks: [
     {
       materialName: '51" 灰色毛绒',
-      vendor: '厂商：客供',
+      vendor: '款号：客供',
       side: 'left',
       minRows: 5,
       lines: [
@@ -684,7 +684,7 @@ export const DEFAULT_COLOR_CARD_SAMPLE = {
     },
     {
       materialName: '51" 黄色毛绒',
-      vendor: '厂商：客供',
+      vendor: '款号：客供',
       side: 'left',
       minRows: 5,
       lines: [
@@ -695,7 +695,7 @@ export const DEFAULT_COLOR_CARD_SAMPLE = {
     },
     {
       materialName: '58" 黄色T/C 布',
-      vendor: '厂商：旭辉X10#',
+      vendor: '款号：旭辉X10#',
       side: 'right',
       minRows: 5,
       lines: [
@@ -705,7 +705,7 @@ export const DEFAULT_COLOR_CARD_SAMPLE = {
     },
     {
       materialName: 'ø10.5mm水晶眼（见样板）',
-      vendor: '厂商：客供',
+      vendor: '款号：客供',
       side: 'right',
       minRows: 5,
       lines: [
@@ -1150,8 +1150,7 @@ export function buildMaterialDetailDraftFromBOMVersion(
       return normalizeMaterialDetailLine({
         category: material.category || 'BOM',
         materialName: material.name || material.code || '材料已关联',
-        vendorCode:
-          material.vendor_code || material.supplier_code || material.code || '',
+        vendorCode: material.supplier_item_no || '',
         spec: material.spec || material.specification || '',
         color: material.color || item.color || '',
         unit: unit.name || unit.code || '',
@@ -1201,12 +1200,9 @@ export function buildColorCardDraftFromBOMVersion(
   const blocks = (Array.isArray(version.items) ? version.items : []).map(
     (item) => {
       const material = materialByID.get(Number(item?.material_id || 0)) || {}
-      const materialIdentifier =
-        material.vendor_code || material.supplier_code
-          ? `厂商：${material.vendor_code || material.supplier_code}`
-          : material.code
-            ? `料号：${material.code}`
-            : '厂商：'
+      const materialIdentifier = material.supplier_item_no
+        ? `款号：${material.supplier_item_no}`
+        : '款号：'
       return normalizeColorCardBlock({
         materialName: compactTextParts(
           [

@@ -32,10 +32,6 @@ test('business dashboard loads business totals and account-visible collaboration
     source,
     /dashboardResult\.status === 'fulfilled'\s*&&\s*workflowResult\.status === 'fulfilled'/u
   )
-  assert.match(
-    source,
-    /taskBoard\?\.counts\?\.exception[\s\S]*taskBoard\?\.counts\?\.due/u
-  )
   assert.doesNotMatch(source, /listWorkflowTasks/u)
   assert.doesNotMatch(source, /buildWorkflowDashboardStats/u)
 })
@@ -76,22 +72,23 @@ test('business dashboard only applies the latest account-scoped response', () =>
   assert.doesNotMatch(source, /mountedRef|loadPromiseRef/u)
 })
 
-test('business dashboard separates three data totals from collaboration risk', () => {
-  for (const title of ['基础资料', '业务单据', '办理结果', '需要关注']) {
-    assert.match(source, new RegExp(`title: '${title}'`, 'u'))
-  }
-  assert.match(source, /四类数字分别统计，请不要直接相加/u)
-  assert.match(source, /只统计当前账号可见的阻塞和到期任务/u)
+test('business dashboard prioritizes visible task problems without mixing unrelated object totals', () => {
+  assert.doesNotMatch(
+    source,
+    /buildDashboardSummary|businessMetricCards|erp-business-board-summary-grid/u
+  )
   assert.match(source, /BUSINESS_ATTENTION_LANES\.map/u)
   assert.match(source, /definition\.key === 'exception'/u)
   assert.match(source, /definition\.key === 'due'/u)
-  assert.match(source, /阻塞和到期任务互不重复/u)
-  assert.doesNotMatch(source, /四类任务互不重复/u)
-  assert.match(source, /每类最多展示一项/u)
+  assert.match(source, /getWorkflowTaskReasonMeta/u)
+  assert.match(source, /每类预览一项/u)
 })
 
 test('business dashboard renders unavailable counts distinctly from true zero', () => {
-  assert.match(source, /item\.available\s*\?\s*formatCount\(item\.total\)/u)
+  assert.match(
+    source,
+    /taskBoardReady \? taskBoard\.counts\[definition\.key\] : null/u
+  )
   assert.match(source, /source\.available\s*\?\s*formatCount\(source\.total\)/u)
   assert.match(source, /暂不可用/u)
   assert.match(source, /业务统计暂不可用/u)
@@ -99,7 +96,7 @@ test('business dashboard renders unavailable counts distinctly from true zero', 
 })
 
 test('business dashboard avoids cross-boundary family totals and keeps every source visible', () => {
-  assert.match(source, /每项分别统计/u)
+  assert.match(source, /各项独立统计/u)
   assert.match(source, /moduleRow\.sources\.map/u)
   assert.match(source, /effectiveSessionAllowsPage/u)
   assert.match(source, /allowedMenuPaths\.has\(source\.path\)/u)
@@ -114,8 +111,11 @@ test('business dashboard avoids cross-boundary family totals and keeps every sou
   assert.doesNotMatch(source, /dashboardStatusGroups/u)
 })
 
-test('business dashboard explains the four business-facing data boundaries', () => {
-  assert.match(source, /erp-business-board-boundary-summary/u)
+test('business dashboard makes business data explanations available on demand', () => {
+  assert.match(
+    source,
+    /<details className="erp-business-board-boundary-summary"/u
+  )
   assert.match(source, /用于记录业务发起或约定，后续仍需按流程办理/u)
   assert.match(source, /完成任务不会自动产生库存、出货或财务记录/u)
   assert.doesNotMatch(source, />\s*数字说明\s*</u)
@@ -157,7 +157,6 @@ test('business dashboard keeps explicit entries and guards task shortcuts with s
     source,
     /openDashboardItemOnDoubleClick\(event,\s*\(\) =>[\s\S]*?onOpenEntry\(task, access\)/u
   )
-  assert.match(source, /有“查看业务记录”的项目可进入/u)
-  assert.match(source, /其他项目仅显示数量/u)
+  assert.match(source, /查看记录/u)
   assert.match(source, /aria-label=\{`查看\$\{source\.label\}`\}/u)
 })

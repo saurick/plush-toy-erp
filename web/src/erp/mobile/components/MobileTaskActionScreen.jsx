@@ -9,6 +9,7 @@ import {
   ReloadOutlined,
   StopOutlined,
 } from '@ant-design/icons'
+import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
 import {
   MOBILE_TASK_ACTION_ACCESS_STATES,
   resolveMobileActionLabel,
@@ -415,6 +416,9 @@ export default function MobileTaskActionScreen({
           <h2 className="break-words text-base font-semibold leading-6 text-slate-950 [overflow-wrap:anywhere]">
             {taskName}
           </h2>
+          <div className="mt-2">
+            <WorkflowTaskIdentity task={task} compact />
+          </div>
           <p className="mt-1 break-words text-sm leading-5 text-slate-500 [overflow-wrap:anywhere]">
             {taskSource}
           </p>
@@ -503,7 +507,6 @@ export default function MobileTaskActionScreen({
                   aria-required="true"
                 >
                   {visibleActions.map((option, index) => {
-                    const ActionIcon = option.icon
                     const selected = effectiveAction === option.key
                     return (
                       <label
@@ -524,7 +527,6 @@ export default function MobileTaskActionScreen({
                           value={option.key}
                           onChange={() => handleActionChange(option.key)}
                         />
-                        <ActionIcon className="shrink-0" aria-hidden="true" />
                         <span className="min-w-0 break-words">
                           {approvalTask && option.key === 'done'
                             ? '审批通过'
@@ -673,7 +675,7 @@ export default function MobileTaskActionScreen({
               </section>
             ) : null}
 
-            <p className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm leading-6 text-blue-700 [overflow-wrap:anywhere]">
+            <p className="px-1 text-sm leading-6 text-slate-500 [overflow-wrap:anywhere]">
               {actionOutcomeHint}
             </p>
           </>

@@ -13,10 +13,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import useRuntimeBuildIdentity from '@/common/runtime/useRuntimeBuildIdentity'
 import { useERPWorkspace } from '../../context/ERPWorkspaceProvider'
 import { listWorkflowRoleTasks } from '../../api/workflowApi.mjs'
-import {
-  buildMobileTaskListForRole,
-  formatMobileTaskTime,
-} from '../../utils/mobileTaskView.mjs'
+import { buildMobileTaskListForRole } from '../../utils/mobileTaskView.mjs'
 import {
   MOBILE_ROLE_TASK_PAGE_LIMIT,
   MOBILE_ROLE_TASK_VIEW_KEYS,
@@ -63,7 +60,6 @@ import {
   isTaskOverdue,
   isTaskReadyProgress,
   isTaskRisk,
-  resolveLatestTaskTime,
 } from '../utils/mobileRoleTaskModel.mjs'
 
 const MOBILE_TASK_HISTORY_SCREEN_KEY = 'mobileRoleTasksScreen'
@@ -79,6 +75,7 @@ const MOBILE_TASK_HISTORY_LIST_LIMITS_KEY = 'mobileRoleTasksListLimits'
 const MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY =
   'mobileRoleTasksLoadedCountsByView'
 const MOBILE_TASK_HISTORY_SCOPE_KEY = 'mobileRoleTasksScope'
+const MOBILE_TASK_HISTORY_KEYWORD_KEY = 'mobileRoleTasksKeyword'
 const MOBILE_TASK_HISTORY_REASON_KEY = 'mobileRoleTasksReason'
 const MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY =
   'mobileRoleTasksApprovedQuantity'
@@ -198,9 +195,22 @@ export default function MobileRoleTasksPage() {
   const canViewApprovalInbox = canViewWorkflowApprovalInbox(adminProfile)
   const taskAccessIdentity =
     workflowTaskAdminAccessRequestIdentity(adminProfile)
-  const taskScopeKey = `${activeRoleKey}|access:${taskAccessIdentity}|${canMountCustomerTasks ? 'ready' : 'blocked'}`
+  const taskAccessScopeKey = `${activeRoleKey}|access:${taskAccessIdentity}|${canMountCustomerTasks ? 'ready' : 'blocked'}`
   const initialHistoryStateRef = useRef(readMobileTaskHistoryState())
   const initialHistoryCandidate = initialHistoryStateRef.current
+  const [taskKeyword, setTaskKeyword] = useState(() => {
+    const keyword = String(
+      initialHistoryCandidate[MOBILE_TASK_HISTORY_KEYWORD_KEY] || ''
+    )
+      .trim()
+      .slice(0, 100)
+    return initialHistoryCandidate[MOBILE_TASK_HISTORY_SCOPE_KEY] ===
+      `${taskAccessScopeKey}|search:${keyword}`
+      ? keyword
+      : ''
+  })
+  const taskScopeKey = `${taskAccessScopeKey}|search:${taskKeyword}`
+
   const initialHistoryScopeKey = String(
     initialHistoryCandidate[MOBILE_TASK_HISTORY_SCOPE_KEY] || ''
   ).trim()
@@ -386,16 +396,6 @@ export default function MobileRoleTasksPage() {
   const overdueTasks = useMemo(
     () => riskTasks.filter((task) => isTaskOverdue(task)),
     [riskTasks]
-  )
-  const taskSummary = useMemo(
-    () => ({
-      ready: authoritativeTaskCounts?.ready ?? '—',
-      blocked: authoritativeTaskCounts?.blocked ?? '—',
-      rejected: authoritativeTaskCounts?.rejected ?? '—',
-      done: authoritativeTaskCounts?.done ?? '—',
-      total: authoritativeTaskCounts?.total ?? null,
-    }),
-    [authoritativeTaskCounts]
   )
   const activeTaskViewState = useMemo(
     () =>
@@ -583,6 +583,7 @@ export default function MobileRoleTasksPage() {
         const response = await listWorkflowRoleTasks(
           buildMobileRoleTaskQuery({
             roleKey: activeRoleKey,
+            keyword: taskKeyword,
             viewKey,
             cursor: append ? currentSlot.next_cursor : '',
           })
@@ -644,7 +645,7 @@ export default function MobileRoleTasksPage() {
         return false
       }
     },
-    [activeRoleKey, canMountCustomerTasks, taskScopeKey]
+    [activeRoleKey, canMountCustomerTasks, taskScopeKey, taskKeyword]
   )
 
   useEffect(() => {
@@ -874,12 +875,15 @@ export default function MobileRoleTasksPage() {
     loading && !activeTaskSlot.loaded && activeTaskSlot.items.length === 0
   const hasLoadedTaskView = Object.values(taskSlots).some((slot) => slot.loaded)
   const initialLoading = activeViewInitialLoading && !hasLoadedTaskView
-  const latestTaskUpdate = resolveLatestTaskTime([
-    ...activeTasks,
-    ...doneTasks,
-    ...riskTasks,
-  ])
-  const serverDataTime = formatMobileTaskTime(activeTaskSlot.server_time)
+  const serverDataTime = activeTaskSlot.server_time
+    ? new Intl.DateTimeFormat('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date(activeTaskSlot.server_time * 1000))
+    : '—'
   const detailSeverity = detailTask ? getTaskSeverityView(detailTask) : null
   const {
     actionReceipt,
@@ -1224,6 +1228,7 @@ export default function MobileRoleTasksPage() {
         [MOBILE_TASK_HISTORY_MAIN_TAB_KEY]: activeMainTabKey,
         [MOBILE_TASK_HISTORY_MESSAGE_TAB_KEY]: activeMessageTabKey,
         [MOBILE_TASK_HISTORY_FILTER_KEY]: activeFilterKey,
+        [MOBILE_TASK_HISTORY_KEYWORD_KEY]: taskKeyword,
         [MOBILE_TASK_HISTORY_SCROLL_TOP_KEY]: listScrollTopRef.current,
         [MOBILE_TASK_HISTORY_LIST_LIMITS_KEY]: visibleListLimitsByKey,
         [MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY]: loadedCounts,
@@ -1241,6 +1246,7 @@ export default function MobileRoleTasksPage() {
       activeFilterKey,
       activeMainTabKey,
       activeMessageTabKey,
+      taskKeyword,
       taskScopeKey,
       visibleListLimitsByKey,
     ]
@@ -1670,13 +1676,17 @@ export default function MobileRoleTasksPage() {
       restoredScrollTop >= MOBILE_SCROLL_TOP_VISIBLE_OFFSET
     )
     const focusedTaskID = String(lastFocusedTaskIDRef.current || '')
-    const taskButton = Array.from(
+    const taskCard = Array.from(
       scrollContainer.querySelectorAll('[data-mobile-task-id]')
-    ).find((button) => button.dataset.mobileTaskId === focusedTaskID)
+    ).find((card) => card.dataset.mobileTaskId === focusedTaskID)
     const focusTarget =
-      taskButton ||
+      taskCard?.querySelector('.erp-task-card__open') ||
       scrollContainer.querySelector('[data-testid="mobile-role-list-heading"]')
-    focusTarget?.focus({ preventScroll: true })
+    // 搜索重读也会恢复列表位置，输入过程中保留键盘焦点。
+    const searchHasFocus = scrollContainer
+      .querySelector('[role="search"]')
+      ?.contains(document.activeElement)
+    if (!searchHasFocus) focusTarget?.focus({ preventScroll: true })
     restoreListStateRef.current = false
   }, [
     actionReceipt,
@@ -1805,6 +1815,7 @@ export default function MobileRoleTasksPage() {
 
   return (
     <MobileTaskListScreen
+      key={taskAccessScopeKey}
       activeFilterKey={visibleActiveFilterKey}
       activeMainTabKey={activeMainTabKey}
       activeMessageTabKey={activeMessageTabKey}
@@ -1830,7 +1841,6 @@ export default function MobileRoleTasksPage() {
       handleMainScroll={handleMainScroll}
       handleSwitchEntry={() => navigate('/entry')}
       initialLoading={initialLoading}
-      latestTaskUpdate={latestTaskUpdate}
       loadError={activeTaskSlot.error}
       loadTasks={loadTasks}
       loadMoreActiveView={loadMoreActiveTaskView}
@@ -1853,7 +1863,8 @@ export default function MobileRoleTasksPage() {
       setSelectedTaskID={handleSelectTaskID}
       setVisibleListLimitsByKey={setVisibleListLimitsByKey}
       showScrollTopButton={showScrollTopButton}
-      taskSummary={taskSummary}
+      taskKeyword={taskKeyword}
+      onSearchTasks={setTaskKeyword}
       visibleListLimitsByKey={visibleListLimitsByKey}
     />
   )

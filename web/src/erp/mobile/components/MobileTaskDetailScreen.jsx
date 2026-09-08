@@ -8,7 +8,14 @@ import {
   LoadingOutlined,
   ReloadOutlined,
   RightOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
+import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
+import WorkflowTaskTiming from '../../components/workflow/WorkflowTaskTiming.jsx'
+import {
+  WorkflowTaskCopySummary,
+  WorkflowTaskSource,
+} from '../../components/workflow/WorkflowTaskCopy.jsx'
 import {
   getWorkflowTaskProcessContext,
   listWorkflowTaskEvents,
@@ -23,7 +30,6 @@ import {
   buildTaskFactRows,
   getMobileRoleLabel,
   isTaskRisk,
-  resolveMobileTaskDueLabel,
   resolveMobileTaskStatusLabel,
   resolveTaskReason,
   resolveTaskReasonLabel,
@@ -175,9 +181,6 @@ export default function MobileTaskDetailScreen({
     getWorkflowTaskExceptionContactPresentation(selectedTask)
   const exceptionContactHint = exceptionContact.text
   const taskStatusLabel = resolveMobileTaskStatusLabel(selectedTask)
-  const resolvedDueLabel = resolveMobileTaskDueLabel(selectedTask)
-  const taskDueLabel =
-    resolvedDueLabel === '-' ? '未设置截止' : resolvedDueLabel
   const canManageAttachments = selectedCanManageAttachments === true
   const canOpenProcess = selectedCanOperate || selectedCanUrge
   const canViewReceipt = typeof onViewReceipt === 'function'
@@ -199,7 +202,7 @@ export default function MobileTaskDetailScreen({
   const actionGuidance = actionAccess?.loading
     ? '正在确认当前账号的处理范围，请稍候。'
     : actionAccess?.failed
-      ? '处理范围确认失败。可点击下方重新确认；系统不会在未确认权限时开放操作。'
+      ? '暂时无法确认处理权限，请点击下方重试。'
       : !selectedCanOperate
         ? selectedCanUrge
           ? `这条任务由${ownerRoleLabel}办理，您可以查看并发起催办。`
@@ -230,37 +233,84 @@ export default function MobileTaskDetailScreen({
           <span
             className={`mobile-task-flow-status shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${selectedSeverity.badgeClass}`}
           >
-            {selectedSeverity.label}
+            {taskStatusLabel}
           </span>
         }
       />
 
       <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-4">
-        <section className="mobile-task-detail-hero erp-mobile-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="break-words text-2xl font-semibold leading-tight text-slate-950 [overflow-wrap:anywhere]">
-            {selectedTask.task_name}
-          </h2>
+        <section className="mobile-task-detail-hero erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="erp-task-copy-heading">
+            <h2 className="break-words text-xl font-semibold leading-7 text-slate-950 [overflow-wrap:anywhere]">
+              {selectedTask.task_name}
+            </h2>
+            <WorkflowTaskCopySummary task={selectedTask} />
+          </div>
+          <div className="mt-3">
+            <WorkflowTaskIdentity task={selectedTask} />
+          </div>
           <div className="mt-3 flex min-w-0 items-start gap-2 text-sm leading-6 text-slate-500">
             <FileTextOutlined className="mt-1 shrink-0" aria-hidden="true" />
             <span className="shrink-0">来源：</span>
-            <span className="min-w-0 break-all">{relatedSource}</span>
+            <span className="min-w-0 break-all">
+              <WorkflowTaskSource task={selectedTask} label={relatedSource} />
+            </span>
           </div>
           <div
-            className="mt-4 flex min-w-0 flex-wrap gap-2 text-sm"
+            className="mobile-task-detail-meta mt-3 text-sm text-slate-600"
             data-testid="mobile-task-detail-summary"
           >
-            <span className="rounded-lg bg-blue-50 px-3 py-2 font-semibold text-blue-700">
-              {taskStatusLabel}
-            </span>
-            <span className="rounded-lg bg-slate-100 px-3 py-2 font-medium text-slate-700">
+            <span>
+              <UserOutlined aria-hidden="true" />
               负责：{ownerRoleLabel}
             </span>
-            <span className="min-w-0 break-words rounded-lg bg-slate-100 px-3 py-2 font-medium text-slate-700">
-              截止：{taskDueLabel}
-            </span>
           </div>
+          <WorkflowTaskTiming
+            task={selectedTask}
+            detail
+            events={taskEventsState === 'ready' ? taskEvents : []}
+          />
+          {(isTaskRisk(selectedTask) && taskReason) || exceptionContactHint ? (
+            <section
+              className="mobile-role-detail-risk mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-4 text-sm leading-6 text-red-700"
+              data-testid="mobile-task-exception-contact"
+              role="note"
+            >
+              {isTaskRisk(selectedTask) ? (
+                <ExclamationCircleFilled className="mr-2" aria-hidden="true" />
+              ) : null}
+              {taskReason ? (
+                <strong>
+                  {taskReasonLabel}：{taskReason}
+                </strong>
+              ) : null}
+              {exceptionContactHint ? (
+                <span
+                  className={`${taskReason ? 'mt-2 ' : ''}block font-normal`}
+                >
+                  {exceptionContact.parts.map((part, index) =>
+                    part.kind === 'role' ? (
+                      <strong
+                        className="mobile-task-exception-contact__role font-extrabold"
+                        key={`${part.kind}-${part.text}-${index}`}
+                      >
+                        {part.text}
+                      </strong>
+                    ) : (
+                      <React.Fragment
+                        key={`${part.kind}-${part.text}-${index}`}
+                      >
+                        {part.text}
+                      </React.Fragment>
+                    )
+                  )}
+                </span>
+              ) : null}
+            </section>
+          ) : null}
+
           <div
-            className="mt-4 border-t border-slate-200 pt-4"
+            className="mt-4 border-t border-slate-200 pt-3"
             data-testid="mobile-task-attachment-action"
           >
             <BusinessAttachmentModalButton
@@ -287,6 +337,15 @@ export default function MobileTaskDetailScreen({
             />
           </div>
         </section>
+
+        {selectedTask.complete_condition ? (
+          <section className="erp-mobile-card rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
+            <div className="text-sm font-semibold text-blue-700">完成条件</div>
+            <p className="mt-2 break-words text-base leading-7 text-slate-800">
+              {selectedTask.complete_condition}
+            </p>
+          </section>
+        ) : null}
 
         {actionGuidance ? (
           <section
@@ -321,50 +380,6 @@ export default function MobileTaskDetailScreen({
                 </div>
               ))}
             </div>
-          </section>
-        ) : null}
-
-        {(isTaskRisk(selectedTask) && taskReason) || exceptionContactHint ? (
-          <section
-            className="mobile-role-detail-risk rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm leading-6 text-red-700"
-            data-testid="mobile-task-exception-contact"
-            role="note"
-          >
-            {isTaskRisk(selectedTask) ? (
-              <ExclamationCircleFilled className="mr-2" aria-hidden="true" />
-            ) : null}
-            {taskReason ? (
-              <strong>
-                {taskReasonLabel}：{taskReason}
-              </strong>
-            ) : null}
-            {exceptionContactHint ? (
-              <span className={`${taskReason ? 'mt-2 ' : ''}block font-normal`}>
-                {exceptionContact.parts.map((part, index) =>
-                  part.kind === 'role' ? (
-                    <strong
-                      className="mobile-task-exception-contact__role font-extrabold"
-                      key={`${part.kind}-${part.text}-${index}`}
-                    >
-                      {part.text}
-                    </strong>
-                  ) : (
-                    <React.Fragment key={`${part.kind}-${part.text}-${index}`}>
-                      {part.text}
-                    </React.Fragment>
-                  )
-                )}
-              </span>
-            ) : null}
-          </section>
-        ) : null}
-
-        {selectedTask.complete_condition ? (
-          <section className="erp-mobile-card rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
-            <div className="text-sm font-semibold text-blue-700">完成条件</div>
-            <p className="mt-2 break-words text-base leading-7 text-slate-800">
-              {selectedTask.complete_condition}
-            </p>
           </section>
         ) : null}
 
@@ -524,7 +539,7 @@ export default function MobileTaskDetailScreen({
                 )
               }
             >
-              处理任务
+              {selectedCanUrge && !selectedCanOperate ? '催办任务' : '处理任务'}
               <RightOutlined className="ml-2" aria-hidden="true" />
             </button>
           ) : canViewReceipt ? (

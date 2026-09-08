@@ -118,6 +118,9 @@ func loadWorkflowWorkbench(ctx context.Context, client *ent.Client, query biz.Wo
 	for _, row := range rows {
 		items = append(items, entWorkflowTaskToBiz(row))
 	}
+	if err := hydrateWorkflowTaskDisplayContexts(ctx, client, items); err != nil {
+		return nil, err
+	}
 	return &biz.WorkflowWorkbenchPage{
 		SnapshotAt: query.SnapshotAt,
 		QueueKey:   query.QueueKey,

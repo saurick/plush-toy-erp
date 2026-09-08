@@ -28,7 +28,7 @@ const MATERIAL_DETAIL_COLUMNS = [
   { key: 'productNo', label: '产品编号', editable: true },
   { key: 'productName', label: '产品名称', editable: true },
   { key: 'materialName', label: '材料品名', editable: true },
-  { key: 'vendorCode', label: '厂商料号', editable: true },
+  { key: 'vendorCode', label: '款号', editable: true },
   { key: 'spec', label: '规格', editable: true },
   { key: 'unit', label: '单位', editable: true },
   { key: 'unitPrice', label: '单价', editable: true, numeric: true },

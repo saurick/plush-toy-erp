@@ -65,6 +65,11 @@ func Name(v string) predicate.Material {
 	return predicate.Material(sql.FieldEQ(FieldName, v))
 }
 
+// SupplierItemNo applies equality check predicate on the "supplier_item_no" field. It's identical to SupplierItemNoEQ.
+func SupplierItemNo(v string) predicate.Material {
+	return predicate.Material(sql.FieldEQ(FieldSupplierItemNo, v))
+}
+
 // Category applies equality check predicate on the "category" field. It's identical to CategoryEQ.
 func Category(v string) predicate.Material {
 	return predicate.Material(sql.FieldEQ(FieldCategory, v))
@@ -228,6 +233,81 @@ func NameEqualFold(v string) predicate.Material {
 // NameContainsFold applies the ContainsFold predicate on the "name" field.
 func NameContainsFold(v string) predicate.Material {
 	return predicate.Material(sql.FieldContainsFold(FieldName, v))
+}
+
+// SupplierItemNoEQ applies the EQ predicate on the "supplier_item_no" field.
+func SupplierItemNoEQ(v string) predicate.Material {
+	return predicate.Material(sql.FieldEQ(FieldSupplierItemNo, v))
+}
+
+// SupplierItemNoNEQ applies the NEQ predicate on the "supplier_item_no" field.
+func SupplierItemNoNEQ(v string) predicate.Material {
+	return predicate.Material(sql.FieldNEQ(FieldSupplierItemNo, v))
+}
+
+// SupplierItemNoIn applies the In predicate on the "supplier_item_no" field.
+func SupplierItemNoIn(vs ...string) predicate.Material {
+	return predicate.Material(sql.FieldIn(FieldSupplierItemNo, vs...))
+}
+
+// SupplierItemNoNotIn applies the NotIn predicate on the "supplier_item_no" field.
+func SupplierItemNoNotIn(vs ...string) predicate.Material {
+	return predicate.Material(sql.FieldNotIn(FieldSupplierItemNo, vs...))
+}
+
+// SupplierItemNoGT applies the GT predicate on the "supplier_item_no" field.
+func SupplierItemNoGT(v string) predicate.Material {
+	return predicate.Material(sql.FieldGT(FieldSupplierItemNo, v))
+}
+
+// SupplierItemNoGTE applies the GTE predicate on the "supplier_item_no" field.
+func SupplierItemNoGTE(v string) predicate.Material {
+	return predicate.Material(sql.FieldGTE(FieldSupplierItemNo, v))
+}
+
+// SupplierItemNoLT applies the LT predicate on the "supplier_item_no" field.
+func SupplierItemNoLT(v string) predicate.Material {
+	return predicate.Material(sql.FieldLT(FieldSupplierItemNo, v))
+}
+
+// SupplierItemNoLTE applies the LTE predicate on the "supplier_item_no" field.
+func SupplierItemNoLTE(v string) predicate.Material {
+	return predicate.Material(sql.FieldLTE(FieldSupplierItemNo, v))
+}
+
+// SupplierItemNoContains applies the Contains predicate on the "supplier_item_no" field.
+func SupplierItemNoContains(v string) predicate.Material {
+	return predicate.Material(sql.FieldContains(FieldSupplierItemNo, v))
+}
+
+// SupplierItemNoHasPrefix applies the HasPrefix predicate on the "supplier_item_no" field.
+func SupplierItemNoHasPrefix(v string) predicate.Material {
+	return predicate.Material(sql.FieldHasPrefix(FieldSupplierItemNo, v))
+}
+
+// SupplierItemNoHasSuffix applies the HasSuffix predicate on the "supplier_item_no" field.
+func SupplierItemNoHasSuffix(v string) predicate.Material {
+	return predicate.Material(sql.FieldHasSuffix(FieldSupplierItemNo, v))
+}
+
+// SupplierItemNoIsNil applies the IsNil predicate on the "supplier_item_no" field.
+func SupplierItemNoIsNil() predicate.Material {
+	return predicate.Material(sql.FieldIsNull(FieldSupplierItemNo))
+}
+
+// SupplierItemNoNotNil applies the NotNil predicate on the "supplier_item_no" field.
+func SupplierItemNoNotNil() predicate.Material {
+	return predicate.Material(sql.FieldNotNull(FieldSupplierItemNo))
+}
+
+// SupplierItemNoEqualFold applies the EqualFold predicate on the "supplier_item_no" field.
+func SupplierItemNoEqualFold(v string) predicate.Material {
+	return predicate.Material(sql.FieldEqualFold(FieldSupplierItemNo, v))
+}
+
+// SupplierItemNoContainsFold applies the ContainsFold predicate on the "supplier_item_no" field.
+func SupplierItemNoContainsFold(v string) predicate.Material {
+	return predicate.Material(sql.FieldContainsFold(FieldSupplierItemNo, v))
 }
 
 // CategoryEQ applies the EQ predicate on the "category" field.

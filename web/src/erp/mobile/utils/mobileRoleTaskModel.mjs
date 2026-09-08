@@ -252,7 +252,7 @@ export function resolveTaskListMeta(task) {
       payload.payable_type
     )}`
   }
-  return `任务：${getMobileTaskGroupLabel(task.task_group)} ｜ 优先级：${task.priority || '-'}`
+  return ''
 }
 
 export function resolveTaskBusinessChip(task) {
@@ -638,11 +638,8 @@ export function buildTaskFactRows(task) {
   }
 
   pushVisibleRow('客户', payload.customer_name)
-  pushVisibleRow('款式', payload.style_no)
-  pushVisibleRow('产品', payload.product_name)
   pushVisibleRow('交期', payload.due_date)
   pushVisibleRow('供应商', payload.supplier_name)
-  pushVisibleRow('物料', payload.material_name)
   pushVisibleRow('规格', payload.spec)
   pushVisibleRow(
     '数量',

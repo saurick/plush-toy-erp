@@ -90,12 +90,12 @@ test('task action drawer keeps one compact business-facing task summary', () => 
   assert.match(source, /getWorkflowTaskDisplayName\(task\)/u)
   assert.match(
     source,
-    /const taskSourceLabel = task\s+\? formatWorkflowTaskSource/u
+    /<WorkflowTaskSource task=\{taskWithSource\} \/>/u
   )
   assert.match(source, /erp-task-action-drawer__task-meta/u)
   assert.match(source, /<span>来源单据<\/span>/u)
   assert.match(source, /hasActionReceipt \? '本次责任岗位' : '负责人'/u)
-  assert.match(source, /<span>截止时间<\/span>/u)
+  assert.match(source, /<WorkflowTaskTiming\s+task=\{task\}\s+detail/u)
   assert.doesNotMatch(source, /getWorkflowTaskCodeLabel/u)
   assert.doesNotMatch(source, /erp-task-action-drawer__eyebrow">当前任务/u)
   assert.doesNotMatch(source, /<span>负责岗位<\/span>/u)

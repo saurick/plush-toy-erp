@@ -41,6 +41,20 @@ func (_c *MaterialCreate) SetName(v string) *MaterialCreate {
 	return _c
 }
 
+// SetSupplierItemNo sets the "supplier_item_no" field.
+func (_c *MaterialCreate) SetSupplierItemNo(v string) *MaterialCreate {
+	_c.mutation.SetSupplierItemNo(v)
+	return _c
+}
+
+// SetNillableSupplierItemNo sets the "supplier_item_no" field if the given value is not nil.
+func (_c *MaterialCreate) SetNillableSupplierItemNo(v *string) *MaterialCreate {
+	if v != nil {
+		_c.SetSupplierItemNo(*v)
+	}
+	return _c
+}
+
 // SetCategory sets the "category" field.
 func (_c *MaterialCreate) SetCategory(v string) *MaterialCreate {
 	_c.mutation.SetCategory(v)
@@ -323,6 +337,11 @@ func (_c *MaterialCreate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Material.name": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.SupplierItemNo(); ok {
+		if err := material.SupplierItemNoValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_item_no", err: fmt.Errorf(`ent: validator failed for field "Material.supplier_item_no": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.Category(); ok {
 		if err := material.CategoryValidator(v); err != nil {
 			return &ValidationError{Name: "category", err: fmt.Errorf(`ent: validator failed for field "Material.category": %w`, err)}
@@ -391,6 +410,10 @@ func (_c *MaterialCreate) createSpec() (*Material, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(material.FieldName, field.TypeString, value)
 		_node.Name = value
+	}
+	if value, ok := _c.mutation.SupplierItemNo(); ok {
+		_spec.SetField(material.FieldSupplierItemNo, field.TypeString, value)
+		_node.SupplierItemNo = &value
 	}
 	if value, ok := _c.mutation.Category(); ok {
 		_spec.SetField(material.FieldCategory, field.TypeString, value)

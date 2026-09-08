@@ -402,25 +402,10 @@
 
 .erp-workbench-main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(360px, 0.95fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
   align-items: stretch;
-}
-
-.erp-workbench-side-stack {
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  min-width: 0;
-}
-
-@media (min-width: 1281px) {
-  .erp-workbench-side-stack {
-    position: sticky;
-    top: 12px;
-    align-self: start;
-  }
 }
 
 .erp-workbench-panel {
@@ -452,16 +437,6 @@
   min-width: 0;
 }
 
-.erp-workbench-queue-panel .ant-table-pagination.ant-pagination {
-  gap: 4px;
-  margin: 12px 14px;
-}
-
-.erp-workbench-queue-panel .ant-pagination-total-text {
-  color: #667085;
-  font-variant-numeric: tabular-nums;
-}
-
 .erp-workbench-queue-empty {
   display: grid;
   justify-items: center;
@@ -484,10 +459,6 @@
   cursor: pointer;
 }
 
-.erp-workbench-task-row--active :where(td) {
-  background: #eff6ff !important;
-}
-
 .erp-workbench-task-cell {
   display: grid;
   gap: 2px;
@@ -500,28 +471,46 @@
   overflow-wrap: anywhere;
 }
 
-.erp-workbench-task-detail {
-  min-height: 256px;
+.erp-task-table-row > .ant-table-cell {
+  cursor: pointer;
 }
 
-.erp-workbench-detail-body {
-  min-width: 0;
-  padding: 14px;
+.erp-task-title-entry {
+  display: inline-flex;
+  align-items: baseline;
+  justify-self: start;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
 
-.erp-workbench-task-detail .ant-descriptions-item-label {
-  width: 82px;
-  color: #667085;
-}
-
-.erp-workbench-task-detail .ant-descriptions-item-content {
+.erp-task-title-entry > span:first-child {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.erp-workbench-detail-title.ant-typography {
-  margin: 0;
-  overflow-wrap: anywhere;
+.erp-task-title-entry .anticon {
+  flex: 0 0 auto;
+  color: var(--erp-primary, #16774f);
+  font-size: 12px;
+}
+
+.erp-task-title-entry:hover {
+  color: var(--erp-primary, #16774f);
+}
+
+.erp-task-title-entry:focus-visible {
+  outline: 2px solid var(--erp-control-focus-border);
+  outline-offset: 3px;
 }
 
 .erp-task-processing-hint {
@@ -541,19 +530,6 @@
   flex: 0 0 auto;
   margin: 0;
   font-size: inherit;
-}
-
-.erp-workbench-detail-actions {
-  width: 100%;
-  padding-top: 2px;
-}
-
-.erp-workbench-detail-actions .ant-btn {
-  min-width: 96px;
-}
-
-.erp-workbench-detail-empty {
-  padding: 28px 14px;
 }
 
 .erp-workbench-role-list {
@@ -664,65 +640,6 @@
   background: linear-gradient(180deg, #bfe5c8, #e7f5ea);
 }
 
-.erp-business-board-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(140px, 1fr));
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.erp-business-board-summary-card {
-  display: grid;
-  min-width: 0;
-  min-height: 58px;
-  align-content: center;
-  gap: 4px;
-  border: 1px solid #dfe9e1;
-  border-radius: 10px;
-  background: #f8fbf8;
-  padding: 8px 10px;
-  cursor: default;
-}
-
-.erp-metric-readonly-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  min-width: 0;
-}
-
-.erp-metric-readonly-card__head .ant-typography {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: calc(100% - 48px);
-  overflow-wrap: anywhere;
-}
-
-.erp-metric-readonly-card__badge {
-  flex: 0 0 auto;
-  color: #667085;
-  font-size: 11px;
-  line-height: 1.5;
-  border: 1px solid #d8e1ed;
-  border-radius: 999px;
-  background: #fff;
-  padding: 0 6px;
-}
-
-.erp-business-board-summary-card strong {
-  color: #17231c;
-  font-size: 22px;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-
-.erp-metric-readonly-card__hint.ant-typography {
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-.erp-business-board-summary-note.ant-typography,
 .erp-business-board-table-note.ant-typography {
   margin: 8px 0 0;
 }
@@ -787,21 +704,41 @@
 
 .erp-business-board-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
 }
 
 .erp-business-board-attention-card.ant-card {
-  position: sticky;
-  top: 8px;
+  min-width: 0;
 }
 
-.erp-business-board-boundary-summary.ant-typography {
+.erp-business-board-boundary-summary {
   display: block;
   margin: 0 4px;
-  font-size: 12px;
+  color: var(--erp-text-muted, #64748b);
+  font-size: 13px;
   line-height: 1.55;
+}
+
+.erp-business-board-boundary-summary summary {
+  width: fit-content;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.erp-business-board-boundary-summary dl {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.erp-business-board-boundary-summary dt {
+  font-weight: 600;
+}
+
+.erp-business-board-boundary-summary dd {
+  margin: 0;
 }
 
 .erp-business-board-boundary-list,
@@ -827,18 +764,19 @@
 
 .erp-business-board-alert-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .erp-business-board-alert-item {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 70px;
-  align-content: start;
-  gap: 5px;
+  gap: 10px;
   border: 1px solid #e2ece4;
   border-radius: 8px;
   background: #fff;
-  padding: 8px 10px;
+  padding: 16px;
 }
 
 .erp-business-board-alert-item--openable {
@@ -864,11 +802,36 @@
   box-shadow: 0 8px 18px rgb(31 64 104 / 0.08);
 }
 
-.erp-business-board-alert-item > div {
+.erp-business-board-alert-head,
+.erp-business-board-alert-actions,
+.erp-business-board-task-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.erp-business-board-alert-actions {
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--erp-border, #e2e8f0);
+}
+
+.erp-business-board-task-reason.ant-typography-danger {
+  color: #b42318;
+}
+
+.erp-business-board-task-source.ant-typography {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-business-board-task-source > span:last-child {
+  overflow-wrap: anywhere;
 }
 
 .erp-business-board-alert-count {
@@ -877,7 +840,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.erp-business-board-task-entry.ant-btn,
 .erp-business-board-task-text.ant-typography {
   display: block;
   width: 100%;

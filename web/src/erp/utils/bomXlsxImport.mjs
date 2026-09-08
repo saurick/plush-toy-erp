@@ -20,7 +20,7 @@ const ZIP_LOCAL_SIGNATURE = 0x04034b50
 const HEADER_ALIASES = {
   materialCode: ['材料编号', '物料编号'],
   materialName: ['物料名称', '材料名称', '材料品名'],
-  supplierItemNo: ['厂商料号'],
+  supplierItemNo: ['款号', '厂商料号'],
   materialSpec: ['规格'],
   color: ['颜色'],
   unit: ['单位'],
@@ -1040,8 +1040,19 @@ function matchMaterial(source, materials) {
   let matches = records.filter((record) =>
     sameText(record.name, source.materialName)
   )
+  if (source.supplierItemNo) {
+    // Supplier references are not globally unique (for example 客供). Require
+    // the material name as well; a conflicting reference needs manual review.
+    matches = matches.filter((record) =>
+      sameText(record.supplier_item_no, source.supplierItemNo)
+    )
+  }
   if (matches.length === 1) {
-    return { status: 'matched', by: '材料名称', record: matches[0] }
+    return {
+      status: 'matched',
+      by: source.supplierItemNo ? '材料名称/款号' : '材料名称',
+      record: matches[0],
+    }
   }
   if (matches.length > 1 && source.materialSpec) {
     const specMatches = matches.filter((record) =>
@@ -1120,6 +1131,7 @@ export function buildBOMImportDraft(
       _import_source: {
         rowNumber: row.rowNumber,
         materialName: row.materialName,
+        supplierItemNo: row.supplierItemNo,
         materialSpec: row.materialSpec,
         color: row.color,
         unit: row.unit,

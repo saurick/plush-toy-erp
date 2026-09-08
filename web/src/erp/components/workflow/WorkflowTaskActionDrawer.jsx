@@ -5,14 +5,18 @@ import {
   SendOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Drawer, Input, Select, Tag, Typography } from 'antd'
+import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
+import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
+import {
+  WorkflowTaskCopySummary,
+  WorkflowTaskSource,
+} from './WorkflowTaskCopy.jsx'
 import {
   getWorkflowTaskProcessContext,
   listWorkflowTaskEvents,
 } from '../../api/workflowApi.mjs'
-import { formatWorkflowTaskSource } from '../../utils/dashboardTaskDisplay.mjs'
 import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import {
-  getWorkflowTaskDueLabel,
   getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
   getWorkflowTaskStatusMeta,
@@ -273,18 +277,15 @@ export default function WorkflowTaskActionDrawer({
   const processDecisionReady =
     !processDecisionRequired ||
     (processContextState === 'ready' && Boolean(processApprovalForm))
-  const taskSourceLabel = task
-    ? formatWorkflowTaskSource(
-        processContext?.source
-          ? {
-              ...task,
-              source_type: processContext.source.type,
-              source_id: processContext.source.id,
-              source_no: processContext.source.no,
-            }
-          : task
-      )
-    : ''
+  const taskWithSource =
+    task && processContext?.source
+      ? {
+          ...task,
+          source_type: processContext.source.type,
+          source_id: processContext.source.id,
+          source_no: processContext.source.no,
+        }
+      : task
   const approvedQuantityAllowed =
     processDecisionRequired &&
     workflowProcessDecisionAllowsApprovedQuantity(processApprovalForm)
@@ -534,6 +535,8 @@ export default function WorkflowTaskActionDrawer({
         canChooseActions)
   )
 
+  // 外壳预先挂载，避免入场动画尚未结束就关闭时 Portal 被移除、跳过焦点恢复。
+  // 任务内容仍随 task 清空，不在关闭状态读取任务或附件。
   return (
     <Drawer
       title={
@@ -547,13 +550,13 @@ export default function WorkflowTaskActionDrawer({
       }
       width="min(640px, calc(100vw - 24px))"
       open={Boolean(task)}
+      forceRender
       closable={!actionSaving}
       maskClosable={!actionSaving}
       keyboard={!actionSaving}
       onClose={() => {
         if (!actionSaving) onClose?.()
       }}
-      destroyOnHidden
       className="erp-task-action-drawer"
       extra={
         task ? <Tag color={statusMeta?.color}>{statusMeta?.label}</Tag> : null
@@ -661,13 +664,22 @@ export default function WorkflowTaskActionDrawer({
       {task ? (
         <div className="erp-task-action-drawer__body" aria-busy={actionSaving}>
           <section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">
-            <Title level={4} className="erp-task-action-drawer__task-title">
-              {taskDisplayName}
-            </Title>
+            <div className="erp-task-copy-heading">
+              <Title level={4} className="erp-task-action-drawer__task-title">
+                {taskDisplayName}
+              </Title>
+              <WorkflowTaskCopySummary
+                task={taskWithSource}
+                assigneeLabel={hasActionReceipt ? '' : currentAssigneeLabel}
+              />
+            </div>
+            <WorkflowTaskIdentity task={task} />
             <div className="erp-task-action-drawer__meta-grid erp-task-action-drawer__task-meta">
               <div>
                 <span>来源单据</span>
-                <strong>{taskSourceLabel}</strong>
+                <strong>
+                  <WorkflowTaskSource task={taskWithSource} />
+                </strong>
               </div>
               <div>
                 <span>{hasActionReceipt ? '本次责任岗位' : '负责人'}</span>
@@ -698,11 +710,12 @@ export default function WorkflowTaskActionDrawer({
                     : null}
                 </strong>
               </div>
-              <div>
-                <span>截止时间</span>
-                <strong>{getWorkflowTaskDueLabel(task)}</strong>
-              </div>
             </div>
+            <WorkflowTaskTiming
+              task={task}
+              detail
+              events={taskEventsState === 'ready' ? taskEvents : []}
+            />
             {taskReason || exceptionContactHint ? (
               <div className="erp-task-action-drawer__reason">
                 <span>{taskReason ? '当前原因' : '处理建议'}</span>
@@ -1165,9 +1178,7 @@ export default function WorkflowTaskActionDrawer({
                         <Button
                           size="small"
                           onClick={() =>
-                            setProcessContextReloadKey(
-                              (current) => current + 1
-                            )
+                            setProcessContextReloadKey((current) => current + 1)
                           }
                         >
                           重新读取

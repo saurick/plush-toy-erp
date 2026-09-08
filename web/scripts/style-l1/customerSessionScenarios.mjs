@@ -20,6 +20,7 @@ export function createCustomerSessionScenarios({
   assertERPThemeMode,
   assertDarkThemeContrast,
   assertDashboardWorkbenchEntryNavigation,
+  assertDashboardWorkbenchLayout,
   customerRuntimeEffectiveSession,
   assertThemeReadable,
   expectNoButton,
@@ -394,8 +395,7 @@ export function createCustomerSessionScenarios({
         await expectText(page, '待我处理')
         await expectText(page, '待我审批')
         await expectText(page, '阻塞/逾期')
-        await expectText(page, '优先处理')
-        await expectText(page, '任务详情')
+        await expectText(page, '待我处理')
         await page
           .locator(
             '.erp-workbench-queue-panel[aria-busy="true"] .ant-spin-spinning'
@@ -424,7 +424,7 @@ export function createCustomerSessionScenarios({
           loadingShell.cardWidth > 0 &&
             loadingShell.cardHeight > 0 &&
             loadingShell.queueVisible &&
-            loadingShell.detailVisible &&
+            !loadingShell.detailVisible &&
             loadingShell.queueBusy === 'true' &&
             loadingShell.spinnerVisible &&
             loadingShell.cardSkeletonCount === 0 &&
@@ -594,7 +594,6 @@ export function createCustomerSessionScenarios({
         )
 
         const queuePanel = page.locator('.erp-workbench-queue-panel')
-        const detailPanel = page.locator('.erp-workbench-task-detail')
         const waitForWorkbenchRead = (queueKey, offset = 0) =>
           page.waitForResponse((response) => {
             if (!response.url().includes('/rpc/workflow')) return false
@@ -687,9 +686,7 @@ export function createCustomerSessionScenarios({
               mainGrid: readRect('.erp-workbench-main-grid'),
               queuePanel: readRect('.erp-workbench-queue-panel'),
               table: readRect('.erp-workbench-queue-panel .ant-table-wrapper'),
-              pagination: readRect(
-                '.erp-workbench-queue-panel .ant-pagination'
-              ),
+              pagination: readRect('.erp-task-pagination .ant-pagination'),
               detailPanel: readRect('.erp-workbench-task-detail'),
               content: {
                 rect: readRect('.erp-admin-content'),
@@ -718,11 +715,12 @@ export function createCustomerSessionScenarios({
             'queuePanel',
             'table',
             'pagination',
-            'detailPanel',
           ]) {
             assert(before[key], `${label}: 缺少翻页前 ${key} 几何信息`)
             assert(after[key], `${label}: 缺少翻页后 ${key} 几何信息`)
-            for (const metric of ['top', 'left', 'width', 'height']) {
+            for (const metric of label === '工作台翻页完成后'
+              ? ['left', 'width', 'height']
+              : ['top', 'left', 'width', 'height']) {
               const delta = Math.abs(before[key][metric] - after[key][metric])
               assert(
                 delta <= tolerance,
@@ -732,7 +730,9 @@ export function createCustomerSessionScenarios({
               )
             }
           }
-          for (const metric of ['clientHeight', 'scrollHeight', 'scrollTop']) {
+          for (const metric of label === '工作台翻页完成后'
+            ? ['clientHeight', 'scrollHeight']
+            : ['clientHeight', 'scrollHeight', 'scrollTop']) {
             const delta = Math.abs(
               before.content[metric] - after.content[metric]
             )
@@ -744,7 +744,7 @@ export function createCustomerSessionScenarios({
             )
           }
         }
-        const actionableSecondPageButton = queuePanel.locator(
+        const actionableSecondPageButton = page.locator(
           '.ant-pagination-item-2'
         )
         await actionableSecondPageButton.scrollIntoViewIfNeeded()
@@ -784,11 +784,6 @@ export function createCustomerSessionScenarios({
           firstPageLayout.firstRowText,
           '工作台翻页加载中应保留当前页首行'
         )
-        assert.equal(
-          loadingSecondPageLayout.detailTitle,
-          firstPageLayout.detailTitle,
-          '工作台翻页加载中应保留当前任务详情'
-        )
         assertWorkbenchPaginationGeometryStable(
           firstPageLayout,
           loadingSecondPageLayout,
@@ -807,7 +802,7 @@ export function createCustomerSessionScenarios({
         await page
           .locator('.erp-workbench-queue-panel[aria-busy="false"]')
           .waitFor({ state: 'visible', timeout: 10_000 })
-        await queuePanel
+        await page
           .locator('.ant-pagination-item-2.ant-pagination-item-active')
           .waitFor({ state: 'visible', timeout: 10_000 })
         const settledSecondPageLayout = await readWorkbenchPaginationLayout()
@@ -826,6 +821,17 @@ export function createCustomerSessionScenarios({
           settledSecondPageLayout,
           '工作台翻页完成后'
         )
+        const queueStart = await page.evaluate(() => {
+          const content = document.querySelector('.erp-admin-content')
+          const panel = document.querySelector('.erp-workbench-queue-panel')
+          return Math.abs(
+            panel.getBoundingClientRect().top -
+              content.getBoundingClientRect().top -
+              parseFloat(getComputedStyle(content).paddingTop) -
+              12
+          )
+        })
+        assert(queueStart <= 2, '工作台翻页后定位列表起点')
         await page.screenshot({
           path: path.resolve(
             outputDir,
@@ -909,31 +915,19 @@ export function createCustomerSessionScenarios({
           .waitFor({ state: 'visible', timeout: 10_000 })
 
         const queueRows = queuePanel.locator('.ant-table-tbody .ant-table-row')
+        assert.equal(
+          await queuePanel
+            .getByRole('columnheader', { name: '操作', exact: true })
+            .count(),
+          0
+        )
         const queueRowCount = await queueRows.count()
         assert.equal(queueRowCount, 8, '工作台待处理队列首屏应保持 8 条')
-        const firstTaskName = String(
-          await queueRows
-            .first()
-            .locator('.erp-workbench-task-cell .ant-typography')
-            .first()
-            .textContent()
-        ).trim()
-        const secondTaskName = String(
-          await queueRows
-            .nth(1)
-            .locator('.erp-workbench-task-cell .ant-typography')
-            .first()
-            .textContent()
-        ).trim()
-        await queueRows.nth(1).focus()
-        await detailPanel
-          .getByText(secondTaskName, { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await queueRows.first().focus()
-        await detailPanel
-          .getByText(firstTaskName, { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await queueRows.first().dblclick({ position: { x: 24, y: 20 } })
+        await queueRows
+          .first()
+          .getByRole('button', { name: '查看长队列待办 01详情', exact: true })
+          .focus()
+        await page.keyboard.press('Enter')
         const workbenchTaskDrawer = page.locator('.erp-task-action-drawer')
         await workbenchTaskDrawer.waitFor({
           state: 'visible',
@@ -945,7 +939,7 @@ export function createCustomerSessionScenarios({
         await page.screenshot({
           path: path.resolve(
             outputDir,
-            'erp-yoyo-global-dashboard-row-double-click.png'
+            'erp-yoyo-global-dashboard-task-open.png'
           ),
         })
         await workbenchTaskDrawer.locator('.ant-drawer-close').click()
@@ -954,122 +948,22 @@ export function createCustomerSessionScenarios({
           timeout: 10_000,
         })
 
-        const metrics = await page.evaluate(async () => {
-          const dashboard = document.querySelector('.erp-workbench-command')
-          const queue = document.querySelector('.erp-workbench-queue-panel')
-          const detail = document.querySelector('.erp-workbench-task-detail')
-          const content = document.querySelector('.erp-admin-content')
-          const selectedRow = queue?.querySelector(
-            '.erp-workbench-task-row--active[aria-selected="true"]'
-          )
-          const pageRows = queue?.querySelectorAll(
-            '.ant-table-tbody .ant-table-row'
-          )
-          const pagination = queue?.querySelector('.ant-pagination')
-          const sideStack = document.querySelector('.erp-workbench-side-stack')
-          const processingHint = detail?.querySelector(
-            '.erp-task-processing-hint'
-          )
-          const dashboardRect = dashboard?.getBoundingClientRect()
-          const queueRect = queue?.getBoundingClientRect()
-          const detailRect = detail?.getBoundingClientRect()
-          const paginationRect = pagination?.getBoundingClientRect()
-          const contentRect = content?.getBoundingClientRect()
-          const contentPaddingTop = content
-            ? Number.parseFloat(window.getComputedStyle(content).paddingTop) ||
-              0
-            : 0
-          const expectedStickyTop =
-            (contentRect?.top || 0) + contentPaddingTop + 12
-          const sideStackTopBeforeScroll =
-            sideStack?.getBoundingClientRect().top || 0
-          const stickyThreshold = Math.max(
-            0,
-            sideStackTopBeforeScroll - expectedStickyTop
-          )
-          if (content) {
-            content.scrollTop = stickyThreshold + 48
-          }
-          await new Promise((resolve) =>
-            requestAnimationFrame(() => requestAnimationFrame(resolve))
-          )
-          const stickyTopAfterScroll =
-            sideStack?.getBoundingClientRect().top || 0
-          const contentScrollTop = content?.scrollTop || 0
-          const sideStackHeight = sideStack?.getBoundingClientRect().height || 0
-          const contentClientHeight = content?.clientHeight || 0
-          const contentScrollHeight = content?.scrollHeight || 0
-          if (content) content.scrollTop = 0
-          return {
-            dashboardWidth: dashboardRect?.width || 0,
-            queueWidth: queueRect?.width || 0,
-            detailWidth: detailRect?.width || 0,
-            pageRowCount: pageRows?.length || 0,
-            paginationVisible: Boolean(
-              paginationRect?.width > 0 && paginationRect?.height > 0
-            ),
-            selectedRowText: String(selectedRow?.textContent || '')
-              .replace(/\s+/gu, ' ')
-              .trim(),
-            selectedRowCount: queue?.querySelectorAll(
-              '.erp-workbench-task-row--active[aria-selected="true"]'
-            ).length,
-            focusableRowCount: queue?.querySelectorAll(
-              '.ant-table-tbody .ant-table-row[tabindex="0"]'
-            ).length,
-            sideStackPosition: sideStack
-              ? window.getComputedStyle(sideStack).position
-              : '',
-            contentScrollTop,
-            contentClientHeight,
-            contentScrollHeight,
-            contentPaddingTop,
-            expectedStickyTop,
-            sideStackTopBeforeScroll,
-            stickyThreshold,
-            stickyTopAfterScroll,
-            sideStackHeight,
-            processingHintClientWidth: processingHint?.clientWidth || 0,
-            processingHintScrollWidth: processingHint?.scrollWidth || 0,
-            stickyVisibleAfterScroll: Boolean(
-              contentRect &&
-                contentScrollTop >= stickyThreshold &&
-                stickyTopAfterScroll >= expectedStickyTop - 2 &&
-                stickyTopAfterScroll < sideStackTopBeforeScroll &&
-                stickyTopAfterScroll + sideStackHeight <= contentRect.bottom + 2
-            ),
-            queueOverlapsDetail: Boolean(
-              queueRect &&
-                detailRect &&
-                queueRect.right > detailRect.left + 1 &&
-                queueRect.left < detailRect.right - 1
-            ),
-            documentOverflowX:
-              document.documentElement.scrollWidth -
-              document.documentElement.clientWidth,
-          }
-        })
-        assert(
-          metrics.dashboardWidth > 0 &&
-            metrics.queueWidth > 0 &&
-            metrics.detailWidth > 0 &&
-            !metrics.queueOverlapsDetail &&
-            metrics.pageRowCount === 8 &&
-            metrics.paginationVisible &&
-            metrics.selectedRowCount === 1 &&
-            metrics.focusableRowCount === 8 &&
-            metrics.selectedRowText.includes(firstTaskName) &&
-            metrics.processingHintClientWidth > 0 &&
-            metrics.processingHintScrollWidth <=
-              metrics.processingHintClientWidth + 1 &&
-            metrics.sideStackPosition === 'sticky' &&
-            metrics.stickyVisibleAfterScroll &&
-            metrics.documentOverflowX <= 1,
-          `永绅全局工作台队列与上下文不得重叠或推宽页面: ${JSON.stringify(
-            metrics
-          )}`
-        )
+        await queueRows.first().locator('td').first().click()
+        await workbenchTaskDrawer.waitFor({ state: 'visible', timeout: 10_000 })
+        await page.keyboard.press('Escape')
+        await workbenchTaskDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
+        await queueRows
+          .first()
+          .getByRole('button', { name: '查看长队列待办 01详情', exact: true })
+          .evaluate((button) => {
+            if (document.activeElement !== button) {
+              throw new Error('整行打开后关闭详情应回到该任务标题')
+            }
+          })
 
+        await assertDashboardWorkbenchLayout(page, {
+          scenarioName: '全宽工作台',
+        })
         const mobileRiskRead = waitForWorkbenchRead('risk')
         await riskFilter.click()
         await mobileRiskRead
@@ -1088,72 +982,15 @@ export function createCustomerSessionScenarios({
           null,
           { timeout: 10_000 }
         )
-        const mobileMetrics = await page.evaluate(() => {
-          const queue = document.querySelector('.erp-workbench-queue-panel')
-          const detail = document.querySelector('.erp-workbench-task-detail')
-          const pagination = queue?.querySelector('.ant-pagination')
-          const sideStack = document.querySelector('.erp-workbench-side-stack')
-          const processingHint = detail?.querySelector(
-            '.erp-task-processing-hint'
-          )
-          const statusRisk = queue?.querySelector(
-            '.erp-workbench-task-status-risk'
-          )
-          const queueRect = queue?.getBoundingClientRect()
-          const detailRect = detail?.getBoundingClientRect()
-          const paginationRect = pagination?.getBoundingClientRect()
-          return {
-            queueBottom: queueRect?.bottom || 0,
-            detailTop: detailRect?.top || 0,
-            paginationWidth: paginationRect?.width || 0,
-            queueWidth: queueRect?.width || 0,
-            sideStackPosition: sideStack
-              ? window.getComputedStyle(sideStack).position
-              : '',
-            processingHintClientWidth: processingHint?.clientWidth || 0,
-            processingHintScrollWidth: processingHint?.scrollWidth || 0,
-            statusRiskLabels: [
-              ...(statusRisk?.querySelectorAll('.ant-tag') || []),
-            ].map((tag) => String(tag.textContent || '').trim()),
-            statusRiskClientWidth: statusRisk?.clientWidth || 0,
-            statusRiskScrollWidth: statusRisk?.scrollWidth || 0,
-            documentOverflowX:
-              document.documentElement.scrollWidth -
-              document.documentElement.clientWidth,
-          }
+        await assertDashboardWorkbenchLayout(page, {
+          scenarioName: '窄屏工作台',
         })
-        assert(
-          mobileMetrics.queueWidth > 0 &&
-            mobileMetrics.paginationWidth > 0 &&
-            mobileMetrics.paginationWidth <= mobileMetrics.queueWidth + 1 &&
-            mobileMetrics.detailTop >= mobileMetrics.queueBottom - 1 &&
-            mobileMetrics.processingHintClientWidth > 0 &&
-            mobileMetrics.processingHintScrollWidth <=
-              mobileMetrics.processingHintClientWidth + 1 &&
-            mobileMetrics.statusRiskLabels.join(',') === '阻塞,逾期' &&
-            mobileMetrics.statusRiskClientWidth > 0 &&
-            mobileMetrics.statusRiskScrollWidth <=
-              mobileMetrics.statusRiskClientWidth + 1 &&
-            mobileMetrics.sideStackPosition !== 'sticky' &&
-            mobileMetrics.documentOverflowX <= 1,
-          `永绅全局工作台窄屏分页、队列和上下文应按文档流排列: ${JSON.stringify(
-            mobileMetrics
-          )}`
-        )
         await page.screenshot({
           path: path.resolve(
             outputDir,
             'erp-yoyo-global-dashboard-mobile-long-queue-top.png'
           ),
         })
-        await detailPanel.scrollIntoViewIfNeeded()
-        await detailPanel.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-yoyo-global-dashboard-mobile-long-queue-context.png'
-          ),
-        })
-
         await page.setViewportSize({ width: 1440, height: 900 })
         await clickERPThemeOption(page, '暗色')
         await assertERPThemeMode(page, {
@@ -1496,7 +1333,7 @@ export function createCustomerSessionScenarios({
       },
       verify: async (page) => {
         await expectHeading(page, '工作台')
-        await expectText(page, '优先处理')
+        await expectText(page, '待我处理')
         await assertTextAbsent(page, '暂时无法进入工作台')
         assert.equal(
           transientProfileSyncCustomerConfigRequests,

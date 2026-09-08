@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/image/draw"
 	"golang.org/x/image/webp"
 )
 
@@ -607,4 +608,40 @@ func decodeBusinessAttachmentContentWithMax(raw string, maxBytes int) ([]byte, e
 		return nil, ErrBusinessAttachmentTooLarge
 	}
 	return content, nil
+}
+
+// ProductImageThumbnail is a read-only derivative; the uploaded original remains unchanged.
+func ProductImageThumbnail(metadata *BusinessAttachment, content []byte) ([]byte, error) {
+	if metadata == nil || metadata.OwnerType != BusinessAttachmentOwnerProduct || metadata.AttachmentType != BusinessAttachmentTypeProductImage {
+		return nil, ErrBadParam
+	}
+	config, format, err := image.DecodeConfig(bytes.NewReader(content))
+	if err != nil || (format != "png" && format != "jpeg" && format != "webp") {
+		return nil, ErrBusinessAttachmentProductImageContentInvalid
+	}
+	if !isBusinessAttachmentProductImageDimensionsAllowed(config.Width, config.Height) {
+		return nil, ErrBusinessAttachmentProductImageDimensionsInvalid
+	}
+	source, _, err := image.Decode(bytes.NewReader(content))
+	if err != nil {
+		return nil, ErrBusinessAttachmentProductImageContentInvalid
+	}
+	width, height := source.Bounds().Dx(), source.Bounds().Dy()
+	const edge = 160
+	if width > edge || height > edge {
+		if width >= height {
+			height = max(1, height*edge/width)
+			width = edge
+		} else {
+			width = max(1, width*edge/height)
+			height = edge
+		}
+	}
+	target := image.NewNRGBA(image.Rect(0, 0, width, height))
+	draw.ApproxBiLinear.Scale(target, target.Bounds(), source, source.Bounds(), draw.Src, nil)
+	var buffer bytes.Buffer
+	if err := png.Encode(&buffer, target); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
 }

@@ -1,0 +1,121 @@
+.erp-task-pagination {
+  position: sticky;
+  z-index: 5;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--erp-border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--erp-surface-bg, #fff);
+  box-shadow: 0 -4px 16px rgb(15 23 42 / 6%);
+}
+
+.erp-task-pagination__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  color: var(--erp-text-muted, #64748b);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-task-pagination__summary > .ant-select {
+  width: 112px;
+  height: 36px;
+}
+
+.erp-task-pagination .ant-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.erp-task-pagination .ant-pagination > li {
+  min-width: 36px;
+  height: 36px;
+  margin: 0;
+  line-height: 34px;
+}
+
+.erp-task-pagination .ant-pagination-prev,
+.erp-task-pagination .ant-pagination-next {
+  width: auto;
+}
+
+.erp-task-pagination .ant-pagination .ant-pagination-prev > button,
+.erp-task-pagination .ant-pagination .ant-pagination-next > button {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  transition-property: color, background-color, border-color, box-shadow;
+}
+
+.erp-task-pagination .ant-pagination-options-quick-jumper {
+  height: 36px;
+  line-height: 36px;
+}
+
+.erp-task-pagination .ant-pagination-options-quick-jumper > input {
+  height: 36px;
+}
+
+@media (max-width: 767px) {
+  .erp-task-pagination {
+    padding: 10px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .erp-task-pagination__summary {
+    flex: 1 0 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .erp-task-pagination__summary > .ant-select {
+    height: 44px;
+  }
+
+  .erp-task-pagination .ant-pagination {
+    flex: 1;
+    justify-content: space-between;
+  }
+
+  .erp-task-pagination .ant-pagination > li {
+    height: 44px;
+    line-height: 42px;
+  }
+
+  .erp-task-pagination .ant-pagination-simple-pager {
+    display: flex;
+    align-items: center;
+  }
+
+  .erp-task-pagination .ant-pagination .ant-pagination-prev > button,
+  .erp-task-pagination .ant-pagination .ant-pagination-next > button {
+    min-width: 64px;
+    min-height: 44px;
+    gap: 4px;
+    padding-inline: 4px;
+    font-size: 12px;
+  }
+
+  .erp-task-pagination .ant-pagination-simple-pager > input {
+    width: 44px;
+    margin-inline-end: 6px;
+  }
+
+  .erp-task-pagination .ant-pagination-slash {
+    margin-inline: 0 6px;
+  }
+}

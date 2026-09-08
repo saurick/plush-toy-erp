@@ -240,6 +240,15 @@ test('masterDataOrderView: order lifecycle actions expose real transitions only'
   )
 })
 
+test('masterDataOrderView: blank supplier item numbers clear without falling back to system code', () => {
+  for (const supplier_item_no of [null, '', '   ']) {
+    assert.deepEqual(
+      buildMasterDataParams({ code: 'MAT-1', supplier_item_no }),
+      { code: 'MAT-1' }
+    )
+  }
+})
+
 test('masterDataOrderView: params trim optional values without adding facts', () => {
   assert.equal(V1_ROUTE_PATHS.materials, '/erp/master/materials')
   assert.equal(V1_ROUTE_PATHS.processes, '/erp/engineering/processes')
@@ -288,6 +297,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     buildMasterDataParams({
       code: ' MAT001 ',
       name: ' 面料 ',
+      supplier_item_no: ' 示例织造AB-001#-02#米白 ',
       category: ' fabric ',
       spec: ' 75D ',
       color: ' 米白 ',
@@ -298,6 +308,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     {
       code: 'MAT001',
       name: '面料',
+      supplier_item_no: '示例织造AB-001#-02#米白',
       category: 'fabric',
       spec: '75D',
       color: '米白',
@@ -1555,7 +1566,13 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
     ],
     {
       materials: [
-        { id: 12, code: 'MAT-002', name: '辅料', spec: '12mm' },
+        {
+          id: 12,
+          code: 'MAT-002',
+          supplier_item_no: '示例配件CD-002#',
+          name: '辅料',
+          spec: '12mm',
+        },
         { id: 13, code: 'MAT-013', name: '不应出现' },
       ],
       unitOptions: [
@@ -1581,7 +1598,6 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
     productNo: 'P-001',
     productName: '毛绒兔',
     materialName: '面料',
-    vendorCode: 'MAT-001',
     unit: '米',
     unitPrice: '3.50',
     quantity: '10',
@@ -1591,7 +1607,7 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
   assert.deepEqual(draft.lines[1], {
     contractNo: 'PO-PRINT-001',
     materialName: '辅料',
-    vendorCode: 'MAT-002',
+    vendorCode: '示例配件CD-002#',
     spec: '12mm',
     unit: '码',
     quantity: '2',

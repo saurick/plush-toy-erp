@@ -1,3 +1,5 @@
+import { getWorkflowTaskIdentity } from '../erp/utils/workflowTaskIdentity.mjs'
+
 const TASK_BOARD_LANE_KEYS = Object.freeze([
   'actionable',
   'exception',
@@ -92,6 +94,19 @@ function matchesKeyword(task = {}, keyword = '') {
     payload.record_title,
     payload.module_title,
   ]
+  const identity = getWorkflowTaskIdentity(task)
+  if (identity.available) {
+    values.push(
+      identity.sourceNo,
+      ...identity.items.flatMap((item) => [
+        item.name,
+        item.code,
+        item.styleNo,
+        item.supplierItemNo,
+        item.orderNo,
+      ])
+    )
+  }
   if (['blocked', 'rejected', 'withdrawn'].includes(taskStatus(task))) {
     values.push(
       task.blocked_reason,

@@ -1,11 +1,11 @@
+import assert from 'node:assert/strict'
+import path from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import {
   assertThemeReadable,
   assertDarkThemeContrast,
 } from './themeAssertions.mjs'
 import { expectText } from './pageAssertions.mjs'
-import assert from 'node:assert/strict'
-import path from 'node:path'
-import { setTimeout as delay } from 'node:timers/promises'
 import {
   assertReadableOnBackground,
   isDarkNeutralBorderColor,
@@ -92,12 +92,12 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     page,
     {
       scenarioName,
-      expectTaskMetrics = false,
-      expectBusinessSummary = false,
+      expectTaskCategories = false,
+      expectBusinessAttention = false,
     } = {}
   ) {
     const metrics = await page.evaluate(
-      ({ expectTaskMetrics, expectBusinessSummary }) => {
+      ({ expectTaskCategories, expectBusinessAttention }) => {
         const isVisible = (node) => {
           if (!(node instanceof HTMLElement)) return false
           const rect = node.getBoundingClientRect()
@@ -120,128 +120,113 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
             cursor: style.cursor,
             width: rect.width,
             height: rect.height,
+            contentFits: node.scrollWidth <= node.clientWidth + 1,
             text: String(node.textContent || '')
               .replace(/\s+/g, ' ')
               .trim(),
           }
         }
-        const taskMetrics = expectTaskMetrics
-          ? Array.from(document.querySelectorAll('.erp-task-center-metric'))
+        const taskMetrics = expectTaskCategories
+          ? Array.from(document.querySelectorAll('.erp-task-board-lane'))
               .filter(isVisible)
               .map((node) => ({
-                ...describeNode(node),
-                iconCount: node.querySelectorAll(
-                  '.erp-task-center-metric__icon'
-                ).length,
-                hintCount: node.querySelectorAll('small').length,
-                active: node.classList.contains(
-                  'erp-task-center-metric--active'
+                count: Number(
+                  node.querySelector('.erp-task-board-lane-count')?.textContent
                 ),
+                entries: [
+                  ...node.querySelectorAll(
+                    '.erp-task-board-lane-footer button'
+                  ),
+                ].map((button) => ({
+                  ...describeNode(button),
+                  accessibleName: button.getAttribute('aria-label'),
+                })),
+                oldMetrics: document.querySelectorAll('.erp-task-center-metric')
+                  .length,
               }))
           : []
-        const businessSummary = expectBusinessSummary
-          ? Array.from(
-              document.querySelectorAll('.erp-business-board-summary-card')
-            )
-              .filter(isVisible)
-              .map((node) => ({
-                ...describeNode(node),
-                buttonCount: node.querySelectorAll('button').length,
-                badgeText:
-                  node
-                    .querySelector('.erp-metric-readonly-card__badge')
-                    ?.textContent?.trim() || '',
-              }))
-          : []
+        const businessAttention = expectBusinessAttention
+          ? {
+              items: [
+                ...document.querySelectorAll('.erp-business-board-alert-item'),
+              ]
+                .filter(isVisible)
+                .map(describeNode),
+              summaryCount: document.querySelectorAll(
+                '.erp-business-board-summary-card'
+              ).length,
+              attention: document
+                .querySelector('.erp-business-board-attention-card')
+                ?.getBoundingClientRect()
+                .toJSON(),
+              table: document
+                .querySelector('.erp-dashboard-table-card')
+                ?.getBoundingClientRect()
+                .toJSON(),
+              explanationOpen: document.querySelector(
+                '.erp-business-board-boundary-summary'
+              )?.open,
+            }
+          : null
 
         return {
           taskMetrics,
-          businessSummary,
+          businessAttention,
         }
       },
-      { expectTaskMetrics, expectBusinessSummary }
+      { expectTaskCategories, expectBusinessAttention }
     )
 
-    if (expectTaskMetrics) {
+    if (expectTaskCategories) {
       assert.equal(
         metrics.taskMetrics.length,
         4,
-        `${scenarioName} 任务中心应有 4 个动作指标按钮: ${JSON.stringify(metrics)}`
+        `${scenarioName} 应展示四类任务`
       )
-      for (const item of metrics.taskMetrics) {
-        assert.equal(
-          item.tagName,
-          'BUTTON',
-          `${scenarioName} 动作指标必须是真实 button: ${JSON.stringify(item)}`
-        )
-        assert.equal(
-          item.iconCount,
-          1,
-          `${scenarioName} 动作指标必须带进入箭头: ${JSON.stringify(item)}`
-        )
-        assert.equal(
-          item.hintCount,
-          1,
-          `${scenarioName} 动作指标必须带动作提示文案: ${JSON.stringify(item)}`
-        )
+      for (const lane of metrics.taskMetrics) {
+        assert.equal(lane.oldMetrics, 0, '概览不应重复渲染四个大指标')
         assert(
-          item.ariaPressed === 'true' || item.ariaPressed === 'false',
-          `${scenarioName} 动作指标必须声明 aria-pressed: ${JSON.stringify(item)}`
+          Number.isInteger(lane.count) && lane.count >= 0,
+          '分类标题应显示真实数量'
         )
-        assert(
-          item.height >= 72,
-          `${scenarioName} 动作指标高度过低，容易退化成普通统计块: ${JSON.stringify(item)}`
-        )
-        if (item.disabled) {
-          assert.notEqual(
-            item.cursor,
-            'pointer',
-            `${scenarioName} 禁用动作指标不应露出可点光标: ${JSON.stringify(item)}`
-          )
-        } else {
-          assert.equal(
-            item.cursor,
-            'pointer',
-            `${scenarioName} 可用动作指标必须露出 pointer 光标: ${JSON.stringify(item)}`
+        assert.equal(lane.entries.length, lane.count > 0 ? 1 : 0)
+        for (const entry of lane.entries) {
+          assert.equal(entry.tagName, 'BUTTON')
+          assert(
+            entry.contentFits && entry.accessibleName?.includes('查看全部')
           )
         }
       }
-      assert(
-        metrics.taskMetrics.some((item) => !item.disabled),
-        `${scenarioName} 动作指标应至少有一个可用入口: ${JSON.stringify(metrics)}`
-      )
     }
 
-    if (expectBusinessSummary) {
+    if (expectBusinessAttention) {
+      const attention = metrics.businessAttention
       assert.equal(
-        metrics.businessSummary.length,
-        4,
-        `${scenarioName} 业务看板应有 4 个只读摘要卡: ${JSON.stringify(metrics)}`
+        attention.items.length,
+        2,
+        `${scenarioName} 应直接展示阻塞和到期事项`
       )
-      for (const item of metrics.businessSummary) {
-        assert.equal(
-          item.tagName,
-          'DIV',
-          `${scenarioName} 只读摘要卡不应渲染成 button: ${JSON.stringify(item)}`
-        )
-        assert.equal(
-          item.role,
-          '',
-          `${scenarioName} 只读摘要卡不应声明 button 角色: ${JSON.stringify(item)}`
-        )
-        assert.equal(
-          item.buttonCount,
-          0,
-          `${scenarioName} 只读摘要卡内部不应有按钮: ${JSON.stringify(item)}`
-        )
-        assert.equal(
-          item.cursor,
-          'default',
-          `${scenarioName} 只读摘要卡必须使用 default 光标: ${JSON.stringify(item)}`
-        )
+      assert.equal(
+        attention.summaryCount,
+        0,
+        `${scenarioName} 不应保留重复汇总卡`
+      )
+      assert.equal(
+        attention.explanationOpen,
+        false,
+        `${scenarioName} 统计说明默认按需展开`
+      )
+      assert(
+        attention.attention &&
+          attention.table &&
+          attention.attention.bottom <= attention.table.top &&
+          Math.abs(attention.attention.width - attention.table.width) < 2,
+        `${scenarioName} 关注事项应在业务数据之前并使用内容全宽: ${JSON.stringify(attention)}`
+      )
+      for (const item of attention.items) {
         assert(
-          item.badgeText.length > 0,
-          `${scenarioName} 只读摘要卡必须露出用途标签: ${JSON.stringify(item)}`
+          item.width > 0 && item.height > 0 && item.role === 'group',
+          `${scenarioName} 关注项应可见并有分组语义`
         )
       }
     }
@@ -380,174 +365,41 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     })
 
     const metrics = await page.evaluate(() => {
-      const rectOf = (selectorOrNode) => {
-        const element =
-          typeof selectorOrNode === 'string'
-            ? document.querySelector(selectorOrNode)
-            : selectorOrNode
-        if (!(element instanceof HTMLElement)) return null
-        const rect = element.getBoundingClientRect()
-        const style = window.getComputedStyle(element)
-        return {
-          top: rect.top,
-          bottom: rect.bottom,
-          left: rect.left,
-          right: rect.right,
-          width: rect.width,
-          height: rect.height,
-          display: style.display,
-          gridTemplateColumns: style.gridTemplateColumns,
-          overflowX: style.overflowX,
-          overflowY: style.overflowY,
-        }
-      }
-      const overlaps = (left, right) => {
-        if (!left || !right) return false
-        return (
-          left.left < right.right - 1 &&
-          left.right > right.left + 1 &&
-          left.top < right.bottom - 1 &&
-          left.bottom > right.top + 1
-        )
-      }
-      const commandCard = rectOf('.erp-workbench-command-card')
-      const mainGrid = rectOf('.erp-workbench-main-grid')
-      const queuePanel = rectOf('.erp-workbench-queue-panel')
-      const detailPanel = rectOf('.erp-workbench-task-detail')
-      const detailHead = rectOf(
-        '.erp-workbench-task-detail .erp-workbench-panel-head'
-      )
-      const detailBody = rectOf('.erp-workbench-detail-body')
-      const detailTitle = rectOf('.erp-workbench-detail-title')
-      const detailDescriptions = rectOf(
-        '.erp-workbench-task-detail .ant-descriptions'
-      )
-      const detailActions = rectOf('.erp-workbench-detail-actions')
-      const detailEmpty = rectOf('.erp-workbench-detail-empty')
-      const detailEmptyContent = rectOf(
-        '.erp-workbench-detail-empty .ant-empty'
-      )
-      const queueFilters = Array.from(
-        document.querySelectorAll('.erp-workbench-queue-filter')
-      )
-        .map((node) => rectOf(node))
-        .filter(Boolean)
-      const activeQueueFilters = document.querySelectorAll(
-        '.erp-workbench-queue-filter[aria-pressed="true"]'
-      ).length
-      const roleRows = Array.from(
-        document.querySelectorAll('.erp-workbench-role-row')
-      )
-        .map((node) => rectOf(node))
-        .filter(Boolean)
-      const activeRows = document.querySelectorAll(
-        '.erp-workbench-task-row--active'
-      ).length
+      const grid = document
+        .querySelector('.erp-workbench-main-grid')
+        ?.getBoundingClientRect()
+      const queue = document
+        .querySelector('.erp-workbench-queue-panel')
+        ?.getBoundingClientRect()
       return {
-        viewport: {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          documentScrollWidth: document.documentElement.scrollWidth,
-          clientWidth: document.documentElement.clientWidth,
-        },
-        commandCard,
-        mainGrid,
-        queuePanel,
-        detailPanel,
-        detailHead,
-        detailBody,
-        detailTitle,
-        detailDescriptions,
-        detailActions,
-        detailEmpty,
-        detailEmptyContent,
-        queueFilters,
-        activeQueueFilters,
-        roleRows,
-        activeRows,
-        queueDetailOverlap: overlaps(queuePanel, detailPanel),
+        gridWidth: grid?.width,
+        queueWidth: queue?.width,
+        permanentDetail: Boolean(
+          document.querySelector('.erp-workbench-task-detail')
+        ),
+        selectedRows: document.querySelectorAll(
+          '.erp-workbench-task-row--active'
+        ).length,
+        filters: document.querySelectorAll('.erp-workbench-queue-filter')
+          .length,
+        activeFilters: document.querySelectorAll(
+          '.erp-workbench-queue-filter[aria-pressed="true"]'
+        ).length,
+        overflow:
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
       }
     })
-
     assert(
-      metrics.commandCard?.width > 0 && metrics.commandCard?.height > 0,
-      `${scenarioName} 工作台主卡片不可见: ${JSON.stringify(metrics)}`
+      metrics.queueWidth > 0 &&
+        Math.abs(metrics.gridWidth - metrics.queueWidth) < 2 &&
+        !metrics.permanentDetail &&
+        !metrics.selectedRows &&
+        metrics.filters === 3 &&
+        metrics.activeFilters === 1 &&
+        metrics.overflow <= 1,
+      `${scenarioName} 工作台应全宽展示任务并保留队列筛选: ${JSON.stringify(metrics)}`
     )
-    assert.equal(
-      metrics.queueFilters.length,
-      3,
-      `${scenarioName} 工作台应保留 3 个队列筛选入口: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(
-      metrics.activeQueueFilters,
-      1,
-      `${scenarioName} 工作台应只有一个当前队列入口: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.queuePanel?.width > 0 && metrics.detailPanel?.width > 0,
-      `${scenarioName} 工作台队列和当前任务上下文应同时可见: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      !metrics.queueDetailOverlap,
-      `${scenarioName} 工作台主列与当前任务上下文不应重叠: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.detailHead?.height > 0,
-      `${scenarioName} 工作台任务上下文头部应可见: ${JSON.stringify(metrics)}`
-    )
-    if (metrics.detailBody) {
-      assert(
-        metrics.detailTitle?.height > 0 &&
-          metrics.detailDescriptions?.height > 0 &&
-          metrics.detailActions?.height > 0,
-        `${scenarioName} 工作台任务上下文正文、字段和动作区应同时可见: ${JSON.stringify(metrics)}`
-      )
-      assert(
-        metrics.detailTitle.left >= metrics.detailPanel.left + 12 &&
-          metrics.detailDescriptions.left >= metrics.detailPanel.left + 12 &&
-          metrics.detailActions.left >= metrics.detailPanel.left + 12,
-        `${scenarioName} 工作台任务上下文正文不应贴左边框: ${JSON.stringify(metrics)}`
-      )
-      assert(
-        metrics.detailTitle.top >= metrics.detailHead.bottom + 12,
-        `${scenarioName} 工作台任务上下文标题不应贴住头部分割线: ${JSON.stringify(metrics)}`
-      )
-      assert(
-        metrics.detailActions.right <= metrics.detailPanel.right - 12 + 1 &&
-          metrics.detailActions.bottom <= metrics.detailPanel.bottom - 12 + 1,
-        `${scenarioName} 工作台任务上下文动作区不应贴边或溢出: ${JSON.stringify(metrics)}`
-      )
-    } else {
-      assert(
-        metrics.detailEmpty?.height > 0,
-        `${scenarioName} 工作台任务上下文空态应可见: ${JSON.stringify(metrics)}`
-      )
-      assert(
-        metrics.detailEmptyContent?.height > 0 &&
-          metrics.detailEmptyContent.left >= metrics.detailPanel.left + 12 &&
-          metrics.detailEmptyContent.top >= metrics.detailHead.bottom + 12 &&
-          metrics.detailEmptyContent.right <=
-            metrics.detailPanel.right - 12 + 1 &&
-          metrics.detailEmptyContent.bottom <=
-            metrics.detailPanel.bottom - 12 + 1,
-        `${scenarioName} 工作台任务上下文空态不应贴边或溢出: ${JSON.stringify(metrics)}`
-      )
-    }
-    assert(
-      metrics.viewport.documentScrollWidth <= metrics.viewport.clientWidth + 1,
-      `${scenarioName} 工作台出现页面级横向溢出: ${JSON.stringify(metrics)}`
-    )
-    if (metrics.viewport.width >= 1280) {
-      assert(
-        metrics.queuePanel.width > metrics.detailPanel.width,
-        `${scenarioName} 桌面工作台应是左侧主队列、右侧上下文: ${JSON.stringify(metrics)}`
-      )
-    } else {
-      assert(
-        metrics.detailPanel.top >= metrics.queuePanel.bottom - 1,
-        `${scenarioName} 窄屏工作台应改为上下排列: ${JSON.stringify(metrics)}`
-      )
-    }
   }
 
   async function assertDashboardWorkbenchEntryNavigation(
@@ -598,16 +450,6 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       .filter({ hasText: '工作台来源标签非真实关联任务' })
       .first()
     await formalRow.click()
-    const detailPanel = page.locator('.erp-workbench-task-detail')
-    await expectText(page, 'SO-STYLE-L1')
-    assert.equal(
-      await detailPanel
-        .getByRole('button', { name: '查看相关单据', exact: true })
-        .count(),
-      0,
-      `${scenarioName} 仅有来源标签和 source_id 的普通任务不得显示相关单据入口`
-    )
-    await formalRow.dblclick({ position: { x: 24, y: 20 } })
     const drawer = page.locator('.erp-task-action-drawer')
     await drawer.waitFor({ state: 'visible', timeout: 10_000 })
     assert.equal(
@@ -660,7 +502,13 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
         }
       }
       const boardCard = rectOf('.erp-dashboard-task-board-card')
+      const boardContent = rectOf(
+        '.erp-dashboard-task-board-card .erp-dashboard-block'
+      )
       const lanes = rectOf('.erp-task-board-lanes')
+      const currentTaskPanelCount = document.querySelectorAll(
+        '.erp-task-center-current'
+      ).length
       const filters = rectOf('.erp-task-board-filters')
       const tableCard = rectOf('.erp-dashboard-table-card')
       const visiblePageHeads = Array.from(
@@ -712,7 +560,9 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           clientWidth: document.documentElement.clientWidth,
         },
         boardCard,
+        boardContent,
         lanes,
+        currentTaskPanelCount,
         filters,
         laneRects,
         laneVisuals,
@@ -726,6 +576,16 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       metrics.boardCard && metrics.lanes && metrics.filters,
       `${scenarioName} 缺少任务看板布局关键节点: ${JSON.stringify(metrics)}`
     )
+    assert.equal(
+      metrics.currentTaskPanelCount,
+      0,
+      `${scenarioName} 任务看板不应保留重复的当前选中任务侧栏`
+    )
+    assert(
+      metrics.boardContent &&
+        Math.abs(metrics.lanes.width - metrics.boardContent.width) <= 2,
+      `${scenarioName} 分类区域应使用全部内容宽度: ${JSON.stringify(metrics)}`
+    )
     assert(
       metrics.laneRects.length === 4,
       `${scenarioName} 任务看板应渲染四个泳道: ${JSON.stringify(metrics)}`
@@ -733,6 +593,18 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     assert(
       metrics.laneRects.every((lane) => lane.width >= 180 && lane.height > 0),
       `${scenarioName} 任务看板泳道尺寸异常: ${JSON.stringify(metrics)}`
+    )
+    const expectedColumns =
+      metrics.lanes.width >= 1200 ? 4 : metrics.lanes.width >= 600 ? 2 : 1
+    assert.equal(
+      new Set(metrics.laneRects.map((rect) => Math.round(rect.top))).size,
+      4 / expectedColumns,
+      `${scenarioName} 应按可用宽度显示 ${expectedColumns} 列`
+    )
+    assert(
+      metrics.lanes.top - metrics.boardContent.top <=
+        (metrics.viewport.width < 768 ? 280 : 140),
+      `${scenarioName} 默认顶部不应占满首屏: ${JSON.stringify(metrics)}`
     )
     assert.deepEqual(
       metrics.laneVisuals.map(({ tone }) => tone).sort(),
@@ -934,6 +806,11 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           body,
           textArea,
           metaItems,
+          timingKeys: Array.from(
+            drawerElement?.querySelectorAll(
+              '.erp-task-timing [data-task-time]'
+            ) || []
+          ).map((row) => row.dataset.taskTime),
           stepItems,
           selectedTabs,
           tabList,
@@ -962,8 +839,13 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     )
     assert.equal(
       metrics.metaItems,
-      3,
-      `${scenarioName} 任务详情摘要应只展示来源、负责人和截止时间: ${JSON.stringify(metrics)}`
+      2,
+      `${scenarioName} 任务详情基础摘要应展示来源和负责人，日期集中展示: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.timingKeys.includes('arrived') &&
+        metrics.timingKeys.includes('due'),
+      `${scenarioName} 任务详情应同时显示入岗和处理截止时间: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.guideNoteCount,

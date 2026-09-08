@@ -1165,7 +1165,7 @@ export function createPrintWorkspaceScenarios({
             '产品编号',
             '产品名称',
             '材料品名',
-            '厂商料号',
+            '款号',
             '规格',
             '单位',
             '单价',

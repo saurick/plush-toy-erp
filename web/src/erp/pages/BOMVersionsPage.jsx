@@ -240,6 +240,7 @@ function BOMImportLineStatus({ fieldName, form }) {
   })
   const sourceParts = [
     source.materialName || '未识别材料',
+    source.supplierItemNo ? `款号 ${source.supplierItemNo}` : '',
     source.materialSpec,
     source.color,
     source.unit,

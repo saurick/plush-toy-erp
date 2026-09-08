@@ -1129,6 +1129,7 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "code", Type: field.TypeString, Size: 64},
 		{Name: "name", Type: field.TypeString, Size: 255},
+		{Name: "supplier_item_no", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "category", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "spec", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "color", Type: field.TypeString, Nullable: true, Size: 64},
@@ -1145,7 +1146,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "materials_units_materials",
-				Columns:    []*schema.Column{MaterialsColumns[9]},
+				Columns:    []*schema.Column{MaterialsColumns[10]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1159,7 +1160,7 @@ var (
 			{
 				Name:    "material_category",
 				Unique:  false,
-				Columns: []*schema.Column{MaterialsColumns[3]},
+				Columns: []*schema.Column{MaterialsColumns[4]},
 			},
 			{
 				Name:    "material_name",

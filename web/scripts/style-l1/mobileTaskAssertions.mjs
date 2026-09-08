@@ -53,7 +53,7 @@ export function createMobileTaskAssertions(deps) {
     const todoMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(todoMetrics, scenarioName)
     assertMobileTaskCompactCountTags(todoMetrics, {
-      expectedCount: 5,
+      expectedCount: 4,
       scenarioName,
       tabLabel: '待办页',
     })
@@ -68,11 +68,11 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 退出登录不应出现在待办分区: ${JSON.stringify(todoMetrics)}`
     )
     assert(
-      todoMetrics.sectionHeadings.includes('当前岗位任务状态') &&
+      !todoMetrics.sectionHeadings.includes('当前岗位任务状态') &&
         !todoMetrics.sectionHeadings.includes('已加载任务进度') &&
         !todoMetrics.sectionHeadings.includes('超时') &&
         !todoMetrics.sectionHeadings.includes('跨岗风险'),
-      `${scenarioName} 待办分区应展示岗位任务状态且不混入风险/超时区块: ${JSON.stringify(todoMetrics)}`
+      `${scenarioName} 待办分区应直接展示任务且不重复状态统计或风险/超时区块: ${JSON.stringify(todoMetrics)}`
     )
     await assertMobileTaskLoadedOverview(page, { scenarioName })
     await assertMobileTaskListToggle(page, {
@@ -236,195 +236,26 @@ export function createMobileTaskAssertions(deps) {
   }
 
   async function assertMobileTaskLoadedOverview(page, { scenarioName }) {
-    const expectedToneByTestID = {
-      'mobile-role-progress-ready': 'ready',
-      'mobile-role-progress-blocked': 'blocked',
-      'mobile-role-progress-rejected': 'rejected',
-      'mobile-role-progress-done': 'done',
-    }
-    const overviewMetrics = await page.evaluate(() => {
-      const overview = document.querySelector(
-        '[data-testid="mobile-loaded-task-overview"]'
-      )
-      const heading = overview?.querySelector('h2')
-      const statusHeading = document.querySelector(
-        '[data-testid="mobile-task-list-status-heading"]'
-      )
-      const statusHeadingStyle = statusHeading
-        ? window.getComputedStyle(statusHeading)
-        : null
-      const statusHeadingRect = statusHeading?.getBoundingClientRect()
-      const total = document.querySelector(
-        '[data-testid="mobile-role-total-count"]'
-      )
-      const conservationNote = document.querySelector(
-        '[data-testid="mobile-role-count-conservation-note"]'
-      )
-      return {
-        exists: Boolean(overview),
-        text: overview?.textContent?.replace(/\s+/g, ' ').trim() || '',
-        heading: heading?.textContent?.trim() || '',
-        totalText: total?.textContent?.trim() || '',
-        conservationNote:
-          conservationNote?.textContent?.replace(/\s+/g, ' ').trim() || '',
-        paragraphCount: overview?.querySelectorAll('p').length || 0,
-        focusCardExists: Boolean(
-          document.querySelector('[data-testid="mobile-role-focus-card"]')
-        ),
-        pageText: document.body?.innerText?.replace(/\s+/g, ' ').trim() || '',
-        scrollWidth: overview?.scrollWidth || 0,
-        clientWidth: overview?.clientWidth || 0,
-        statusHeadingText:
-          statusHeading?.textContent?.replace(/\s+/g, ' ').trim() || '',
-        statusHeadingWhiteSpace: statusHeadingStyle?.whiteSpace || '',
-        statusHeadingHeight: statusHeadingRect?.height || 0,
-        statusHeadingLineHeight: Number.parseFloat(
-          statusHeadingStyle?.lineHeight || '0'
-        ),
-        statusHeadingScrollWidth: statusHeading?.scrollWidth || 0,
-        statusHeadingClientWidth: statusHeading?.clientWidth || 0,
-      }
-    })
-    assert(
-      overviewMetrics.exists &&
-        overviewMetrics.heading === '当前岗位任务状态' &&
-        /^\d+$/u.test(overviewMetrics.totalText) &&
-        overviewMetrics.paragraphCount === 1 &&
-        overviewMetrics.conservationNote.includes(
-          '审批、风险、超时为可重叠关注项，不与全部相加。'
-        ) &&
-        overviewMetrics.conservationNote.includes(
-          '跨岗风险包含当前账号可监督的岗位。'
-        ) &&
-        !overviewMetrics.text.includes('任务按页加载') &&
-        !overviewMetrics.text.includes('不代表岗位全量') &&
-        overviewMetrics.statusHeadingText === '状态 / 截止' &&
-        overviewMetrics.statusHeadingWhiteSpace === 'nowrap' &&
-        overviewMetrics.statusHeadingHeight <=
-          overviewMetrics.statusHeadingLineHeight + 1.5 &&
-        overviewMetrics.statusHeadingScrollWidth <=
-          overviewMetrics.statusHeadingClientWidth + 1 &&
-        !overviewMetrics.text.includes('%') &&
-        !overviewMetrics.focusCardExists &&
-        !overviewMetrics.pageText.includes('已加载任务优先事项') &&
-        !overviewMetrics.pageText.includes('当前优先事项') &&
-        overviewMetrics.scrollWidth <= overviewMetrics.clientWidth + 1,
-      `${scenarioName} 岗位任务状态、数量口径说明、列表表头或相邻布局异常: ${JSON.stringify(overviewMetrics)}`
-    )
-
-    const metrics = await page.evaluate(() =>
-      [
-        'mobile-role-progress-ready',
-        'mobile-role-progress-blocked',
-        'mobile-role-progress-rejected',
-        'mobile-role-progress-done',
-      ].map((testID) => {
-        const node = document.querySelector(`[data-testid="${testID}"]`)
-        const value = node?.querySelector('.mobile-role-metric-button__value')
-        const label = node?.querySelector('.mobile-role-metric-button__label')
-        const nodeStyle = node ? window.getComputedStyle(node) : null
-        const valueStyle = value ? window.getComputedStyle(value) : null
-        const labelStyle = label ? window.getComputedStyle(label) : null
-        const rect = node?.getBoundingClientRect()
-        const valueRect = value?.getBoundingClientRect()
-        const labelRect = label?.getBoundingClientRect()
-        return {
-          testID,
-          tagName: node?.tagName || '',
-          role: node?.getAttribute('role') || '',
-          ariaPressed: node?.getAttribute('aria-pressed'),
-          className: node?.className || '',
-          text: node?.textContent?.replace(/\s+/g, ' ').trim() || '',
-          display: nodeStyle?.display || '',
-          flexDirection: nodeStyle?.flexDirection || '',
-          alignItems: nodeStyle?.alignItems || '',
-          justifyContent: nodeStyle?.justifyContent || '',
-          valueText: value?.textContent?.trim() || '',
-          valueColor: valueStyle?.color || '',
-          labelColor: labelStyle?.color || '',
-          labelWhiteSpace: labelStyle?.whiteSpace || '',
-          labelHeight: labelRect?.height || 0,
-          labelLineHeight: Number.parseFloat(labelStyle?.lineHeight || '0'),
-          labelScrollWidth: label?.scrollWidth || 0,
-          labelClientWidth: label?.clientWidth || 0,
-          iconCount: label?.querySelectorAll('.anticon').length || 0,
-          width: rect?.width || 0,
-          height: rect?.height || 0,
-          topWhitespace:
-            rect && valueRect ? valueRect.top - rect.top : Number.NaN,
-          bottomWhitespace:
-            rect && labelRect ? rect.bottom - labelRect.bottom : Number.NaN,
-          scrollWidth: node?.scrollWidth || 0,
-          clientWidth: node?.clientWidth || 0,
-        }
-      })
-    )
-    metrics.forEach((item) => {
-      assert.equal(
-        item.tagName,
-        'DIV',
-        `${scenarioName} 分布项应是只读摘要，不应作为按钮: ${JSON.stringify(metrics)}`
-      )
-      assert.equal(
-        item.ariaPressed,
-        null,
-        `${scenarioName} 分布摘要不应暴露选中态: ${JSON.stringify(metrics)}`
-      )
-      assert(
-        item.scrollWidth <= item.clientWidth + 1,
-        `${scenarioName} 分布摘要出现横向溢出: ${JSON.stringify(metrics)}`
-      )
-      assert(
-        item.display === 'flex' &&
-          item.flexDirection === 'column' &&
-          item.alignItems === 'center' &&
-          item.justifyContent === 'center' &&
-          Math.abs(item.height - 56) <= 1.5 &&
-          Number.isFinite(item.topWhitespace) &&
-          Number.isFinite(item.bottomWhitespace) &&
-          Math.abs(item.topWhitespace - item.bottomWhitespace) <= 1.5,
-        `${scenarioName} 分布摘要应以 56px 紧凑高度垂直居中并保持上下留白均衡: ${JSON.stringify(metrics)}`
-      )
-      assert.equal(
-        item.iconCount,
-        0,
-        `${scenarioName} 分布摘要不应保留挤占窄屏宽度的装饰图标: ${JSON.stringify(metrics)}`
-      )
-      assert(
-        item.labelWhiteSpace === 'nowrap' &&
-          item.labelHeight <= item.labelLineHeight + 1.5 &&
-          item.labelScrollWidth <= item.labelClientWidth + 1,
-        `${scenarioName} 分布摘要标签应保持单行且完整可见: ${JSON.stringify(metrics)}`
-      )
-      assert.match(
-        item.valueText,
-        /^\d+$/u,
-        `${scenarioName} 状态摘要必须显示岗位权威计数: ${JSON.stringify(metrics)}`
-      )
-      assert(
-        String(item.className).includes(
-          `mobile-role-summary-metric--${expectedToneByTestID[item.testID]}`
-        ),
-        `${scenarioName} 分布摘要缺少语义色 tone class: ${JSON.stringify(metrics)}`
-      )
-      assert(
-        !isTransparentColor(item.valueColor) &&
-          item.valueColor === item.labelColor,
-        `${scenarioName} 进度摘要数字和标签应使用同一语义色: ${JSON.stringify(metrics)}`
-      )
-    })
-    const valueByTestID = Object.fromEntries(
-      metrics.map((item) => [item.testID, Number(item.valueText)])
-    )
-    const statusTotal =
-      valueByTestID['mobile-role-progress-ready'] +
-      valueByTestID['mobile-role-progress-blocked'] +
-      valueByTestID['mobile-role-progress-rejected'] +
-      valueByTestID['mobile-role-progress-done']
     assert.equal(
-      statusTotal,
-      Number(overviewMetrics.totalText),
-      `${scenarioName} 岗位状态必须满足全部=待处理+卡住+已退回+完成: ${JSON.stringify({ overviewMetrics, metrics })}`
+      await page.locator('[data-testid="mobile-loaded-task-overview"]').count(),
+      0,
+      `${scenarioName} 不保留独立状态统计卡`
+    )
+    await page
+      .getByRole('searchbox', { name: '搜索订单、产品、物料或款号' })
+      .waitFor({ state: 'visible' })
+    const range = await page.getByTestId('mobile-task-list-range').innerText()
+    assert(
+      /已显示\s*\d+\s*项.*共\s*\d+\s*项/u.test(range),
+      `${scenarioName} 应展示当前列表范围: ${range}`
+    )
+    assert.equal(
+      await page
+        .locator(
+          '[data-testid="mobile-role-task-filters"] button[aria-pressed="true"]'
+        )
+        .count(),
+      1
     )
   }
 
@@ -1099,7 +930,8 @@ export function createMobileTaskAssertions(deps) {
         '.mobile-role-message-card__title',
         '.mobile-role-message-card__source',
         '.mobile-role-message-card__reason',
-        '.mobile-role-message-card__time',
+        '.erp-task-timing dt',
+        '.erp-task-timing dd',
       ].join(',')
 
       const sections = Array.from(
@@ -1318,6 +1150,9 @@ export function createMobileTaskAssertions(deps) {
             .querySelector('[data-testid="mobile-task-detail-summary"]')
             ?.textContent?.replace(/\s+/g, ' ')
             .trim() || '',
+        timingText:
+          document.querySelector('.mobile-task-detail-hero .erp-task-timing')
+            ?.textContent || '',
         redundantCopy: ['当前任务', '当前办理状态', '关联来源'].filter((copy) =>
           shell?.textContent?.includes(copy)
         ),
@@ -1350,7 +1185,8 @@ export function createMobileTaskAssertions(deps) {
     )
     assert(
       detailMetrics.summaryText.includes('负责：业务') &&
-        detailMetrics.summaryText.includes('截止：') &&
+        detailMetrics.timingText.includes('进入本岗') &&
+        detailMetrics.timingText.includes('处理截止') &&
         detailMetrics.redundantCopy.length === 0,
       `${scenarioName} 详情页摘要缺失或仍有重复区块: ${JSON.stringify(detailMetrics)}`
     )

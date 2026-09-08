@@ -755,3 +755,17 @@ func assertWorkflowRevisionScope(t *testing.T, name string, scope *biz.WorkflowT
 func workflowRevisionStringPtr(value string) *string {
 	return &value
 }
+
+func TestWorkflowRoleTaskCursorBindsSearch(t *testing.T) {
+	cursor := encodeWorkflowRoleTaskViewCursor(workflowRoleTaskViewCursor{Method: "list_role_tasks", ViewKey: "todo", RoleKey: "engineering", Keyword: "RB-018", BeforeID: 9, SnapshotUnix: time.Now().Unix(), ExpectedTotal: 2, SeenTotal: 1, RiskScope: workflowRoleTaskRiskScopeRole})
+	for _, keyword := range []any{"RB-018", "other", float64(42)} {
+		request, res := parseWorkflowRoleTaskViewRequest(map[string]any{"view_key": "todo", "role_key": "engineering", "limit": float64(1), "cursor": cursor, "keyword": keyword}, "list_role_tasks")
+		if keyword == "RB-018" {
+			if res != nil || request.Keyword != "RB-018" {
+				t.Fatalf("same search rejected: %#v", res)
+			}
+		} else if res == nil {
+			t.Fatal("cursor reused with changed or invalid keyword")
+		}
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/shopspring/decimal"
 )
@@ -87,16 +88,17 @@ type Warehouse struct {
 }
 
 type Material struct {
-	ID            int
-	Code          string
-	Name          string
-	Category      *string
-	Spec          *string
-	Color         *string
-	DefaultUnitID int
-	IsActive      bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID             int
+	Code           string
+	Name           string
+	SupplierItemNo *string
+	Category       *string
+	Spec           *string
+	Color          *string
+	DefaultUnitID  int
+	IsActive       bool
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type Process struct {
@@ -196,12 +198,13 @@ type SupplierMutation struct {
 }
 
 type MaterialMutation struct {
-	Code          string
-	Name          string
-	Category      *string
-	Spec          *string
-	Color         *string
-	DefaultUnitID int
+	Code           string
+	Name           string
+	SupplierItemNo *string
+	Category       *string
+	Spec           *string
+	Color          *string
+	DefaultUnitID  int
 }
 
 type ProcessMutation struct {
@@ -953,6 +956,10 @@ func (uc *MasterDataUsecase) validateSupplierProcessIDs(ctx context.Context, sup
 func normalizeMaterialMutation(in MaterialMutation) (MaterialMutation, error) {
 	in.Code = strings.TrimSpace(in.Code)
 	in.Name = strings.TrimSpace(in.Name)
+	in.SupplierItemNo = normalizeOptionalString(in.SupplierItemNo)
+	if in.SupplierItemNo != nil && utf8.RuneCountInString(*in.SupplierItemNo) > 255 {
+		return MaterialMutation{}, ErrBadParam
+	}
 	in.Category = normalizeOptionalString(in.Category)
 	in.Spec = normalizeOptionalString(in.Spec)
 	in.Color = normalizeOptionalString(in.Color)

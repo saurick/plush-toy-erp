@@ -215,6 +215,15 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			"attachment": businessAttachmentToAny(item, false),
 		})}, nil
 	case "download_attachment":
+		variant := getString(pm, "variant")
+		if raw, exists := pm["variant"]; exists {
+			if _, ok := raw.(string); !ok {
+				return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "图片查看方式无效"}, nil
+			}
+		}
+		if variant != "" && variant != "thumbnail" {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "图片查看方式无效"}, nil
+		}
 		item, err := d.attachmentUC.GetBusinessAttachmentMetadata(ctx, getInt(pm, "id", 0))
 		if err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
@@ -225,9 +234,21 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if _, res := d.authorizeWorkflowAttachmentTaskAccess(ctx, item.OwnerType, item.OwnerID, 0, false); res != nil {
 			return id, res, nil
 		}
+		if variant == "thumbnail" && (item.OwnerType != biz.BusinessAttachmentOwnerProduct || item.AttachmentType != biz.BusinessAttachmentTypeProductImage) {
+			return id, d.mapBusinessAttachmentError(ctx, biz.ErrBadParam), nil
+		}
 		content, err := d.attachmentUC.GetBusinessAttachmentContent(ctx, item)
 		if err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
+		}
+		if variant == "thumbnail" {
+			thumbnail, err := biz.ProductImageThumbnail(item, content)
+			if err != nil {
+				return id, d.mapBusinessAttachmentError(ctx, err), nil
+			}
+			return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+				"attachment": map[string]any{"id": item.ID, "owner_type": item.OwnerType, "owner_id": item.OwnerID, "mime_type": "image/png", "content_base64": base64.StdEncoding.EncodeToString(thumbnail)},
+			})}, nil
 		}
 		item.Content = content
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
