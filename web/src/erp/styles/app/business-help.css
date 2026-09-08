@@ -4,11 +4,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
-  margin-bottom: 6px;
-}
-
-.erp-business-page-header-card__title-row h1 {
-  margin-bottom: 0;
 }
 
 .erp-business-page-help-trigger.ant-btn {

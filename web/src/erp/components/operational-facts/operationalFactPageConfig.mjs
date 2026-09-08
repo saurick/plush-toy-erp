@@ -71,8 +71,6 @@ const RESERVED_DATE_FILTER_OPTIONS = [
   { label: '预留日期', value: 'reserved_at' },
 ]
 
-export const DEFAULT_OPERATIONAL_FACT_SUMMARY =
-  '统一处理生产、委外、出货、库存预留和财务记录。确认后系统会更新相应状态和库存；取消已确认记录时会保留原记录并作撤销调整。'
 export const EMPTY_VIEW_OVERRIDES = Object.freeze({})
 
 export const financeCancelAuditText = (record) =>

@@ -126,7 +126,7 @@ export function createAuditLogScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '系统操作记录')
-        await expectText(
+        await assertTextAbsent(
           page,
           '查看员工账号、岗位和系统设置的操作记录，需要时按风险和操作类型筛选。'
         )

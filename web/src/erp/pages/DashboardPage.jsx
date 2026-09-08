@@ -602,7 +602,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         : requestedFilters,
     [canViewApprovalInbox, requestedFilters]
   )
-  const approvalInboxActive = filters.mode === 'approval'
   const isTaskBoardView = initialView === 'task-board'
   const taskBoardRequest = useMemo(
     () => buildWorkflowTaskBoardRequest(filters),
@@ -1574,9 +1573,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 <Title level={3} className="erp-command-center-hero-title">
                   工作台
                 </Title>
-                <Paragraph className="erp-dashboard-summary">
-                  登录后先看今天该处理什么，再进入相关业务页面继续办理。
-                </Paragraph>
               </div>
             </div>
 
@@ -1868,11 +1864,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   <Title level={3} className="erp-command-center-hero-title">
                     任务看板
                   </Title>
-                  <Paragraph className="erp-dashboard-summary">
-                    {approvalInboxActive
-                      ? '只显示服务端登记为审批节点且当前账号可见的事项；审批仍受岗位、指定处理人、配置版本和单据状态约束。'
-                      : '看清谁该处理、哪里卡住、哪些已经超时；电脑端可双击任务卡快速查看详情。'}
-                  </Paragraph>
                 </div>
                 <div
                   className="erp-task-center-metrics"

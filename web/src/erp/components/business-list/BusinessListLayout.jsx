@@ -536,7 +536,6 @@ export function BusinessPageLayout({ children, className = '' }) {
 
 export function PageHeaderCard({
   title,
-  description,
   helpKey = '',
   tags = null,
   stats = [],
@@ -558,7 +557,6 @@ export function PageHeaderCard({
               <h1>{title}</h1>
               <BusinessPageHelpTrigger pageKey={helpKey} />
             </div>
-            <p>{description}</p>
           </div>
           {tags ? (
             <div className="erp-business-page-header-card__tags erp-business-module-hero__tags">

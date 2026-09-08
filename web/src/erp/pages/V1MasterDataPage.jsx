@@ -1007,7 +1007,6 @@ export default function V1MasterDataPage({ type }) {
       <PageHeaderCard
         compact
         title={config.title}
-        description={config.summary}
         stats={
           isProcessDictionaryPage
             ? []

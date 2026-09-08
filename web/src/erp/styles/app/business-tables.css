@@ -462,7 +462,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, auto);
   gap: 16px;
-  align-items: start;
+  align-items: center;
 }
 
 .erp-business-page-header-card__main {
@@ -473,21 +473,10 @@
 }
 
 .erp-business-page-header-card h1 {
-  margin: 0 0 6px;
+  margin: 0;
   color: #1f2937;
   font-size: 22px;
   line-height: 1.2;
-}
-
-.erp-business-page-header-card p {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  max-width: 880px;
-  margin: 0;
-  color: #6b7280;
-  line-height: 1.6;
 }
 
 .erp-business-module-chip-row,

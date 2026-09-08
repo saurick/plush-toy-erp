@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { getBusinessUsabilityEntry } from '../config/businessUsabilityCatalog.mjs'
 
 const page = readFileSync(
   new URL('./V1ProductionOrdersPage.jsx', import.meta.url),
@@ -270,11 +271,16 @@ test('production order page exposes authoritative finished-goods rework progress
   assert.match(reworkProgressModal, /补完工已过账/u)
 })
 
-test('production page explains fixed sewing-before-handwork and warehouse inbound handoff', () => {
-  assert.match(page, /布料加工、车缝、手工、包装依次办理/u)
-  assert.match(page, /先车缝、后手工/u)
-  assert.match(page, /生产岗位提交完工报告后，由仓库核对并确认成品入库/u)
-  assert.match(page, /只有仓库确认时才增加库存/u)
+test('production help and completion form explain route order and warehouse inbound handoff', () => {
+  const guide = getBusinessUsabilityEntry('production-orders')
+  assert.match(page, /helpKey="production-orders"/u)
+  assert.match(guide.flowSteps.join(' '), /布料加工、车缝、手工、包装/u)
+  assert.match(
+    guide.flowSteps.join(' '),
+    /生产提交完工报告，仓库核对实收并确认入库后，库存才增加/u
+  )
+  assert.match(completionModal, /生产岗位只提交完工报告/u)
+  assert.match(completionModal, /仓库核对实收后确认入库，届时才增加成品库存/u)
   assert.match(page, /请由仓库核对并确认成品入库/u)
 })
 

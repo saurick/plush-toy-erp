@@ -1887,7 +1887,6 @@ export default function V1InventoryLedgerPage() {
         compact
         helpKey="inventory"
         title="库存台账"
-        description="可查询余额、批次和库存变动，也可从选中的真实库存余额登记盘点、调拨和经审批的人工调整；作业草稿只有过账后才会形成库存变动。"
         tags={[
           <Tag color="blue" key="balances">
             余额只读

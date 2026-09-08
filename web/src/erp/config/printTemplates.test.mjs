@@ -225,7 +225,7 @@ test('printTemplates: 正式打印入口使用岗位可理解的说明和中文�
     'web/src/erp/pages/ProcessingContractPrintWorkspacePage.jsx'
   )
 
-  assert.match(printCenterPage, /选择模板查看说明，双击模板打开编辑/u)
+  assert.match(printCenterPage, /打开编辑与打印/u)
   assert.doesNotMatch(printCenterPage, /业务带值|轻量工作台/u)
   assert.match(printWorkspaceShell, /aria-label="打印编辑工具"/u)
   assert.doesNotMatch(printWorkspaceShell, /当前记录字段|字段名或字段值/u)

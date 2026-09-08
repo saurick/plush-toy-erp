@@ -92,7 +92,6 @@ import {
 } from '../utils/businessSourceNavigation.mjs'
 import { resolveOperationalFactRouteRecord } from '../utils/operationalFactRelatedNavigation.mjs'
 import {
-  DEFAULT_OPERATIONAL_FACT_SUMMARY,
   EMPTY_VIEW_OVERRIDES,
   OCCURRED_DATE_FILTER_OPTIONS,
   STATUS_OPTIONS,
@@ -106,7 +105,6 @@ import {
 
 export function OperationalFactWorkspace({
   pageTitle = '业务记录处理',
-  pageSummary = DEFAULT_OPERATIONAL_FACT_SUMMARY,
   toolbarModuleKey = 'operational-facts',
   initialActiveKey = 'production',
   enabledViews,
@@ -653,7 +651,6 @@ export function OperationalFactWorkspace({
       <PageHeaderCard
         compact
         title={pageTitle}
-        description={pageSummary}
         tags={[
           <Tag color="cyan" key="view">
             {activeConfig.title}

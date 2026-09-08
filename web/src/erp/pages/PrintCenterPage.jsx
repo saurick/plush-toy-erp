@@ -24,7 +24,7 @@ import {
   resolvePrintWorkspaceDraftMode,
 } from '../utils/printWorkspace.js'
 
-const { Paragraph, Title } = Typography
+const { Title } = Typography
 
 const PRINT_TEMPLATE_ICONS = {
   'material-purchase-contract': FileTextOutlined,
@@ -88,9 +88,6 @@ export default function PrintCenterPage() {
             <Title level={4} className="erp-print-center-section-title">
               模板打印中心
             </Title>
-            <Paragraph className="erp-print-center-nav-description">
-              选择模板查看说明，双击模板打开编辑。
-            </Paragraph>
           </div>
           <Button
             type="primary"

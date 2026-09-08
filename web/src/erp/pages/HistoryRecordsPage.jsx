@@ -229,7 +229,6 @@ export default function HistoryRecordsPage() {
       <PageHeaderCard
         compact
         title="历史记录中心"
-        description="只读汇总你有权查看的已关闭、已取消、已归档和已停用记录；原业务台账、审计记录和事实数据仍保留在所属模块。"
         tags={
           <>
             <Tag color="blue">只读查询</Tag>

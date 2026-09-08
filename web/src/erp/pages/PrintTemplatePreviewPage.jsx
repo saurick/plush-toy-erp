@@ -9,7 +9,7 @@ import {
   openPrintWorkspaceWindow,
 } from '../utils/printWorkspace.js'
 
-const { Paragraph, Text, Title } = Typography
+const { Text, Title } = Typography
 
 export default function PrintTemplatePreviewPage() {
   const { adminProfile } = useOutletContext() || {}
@@ -34,12 +34,9 @@ export default function PrintTemplatePreviewPage() {
           <Text className="erp-print-center-detail-eyebrow">
             {supportsWorkspace ? '模板预览入口' : '模板预览'}
           </Text>
-          <Title level={3}>{template.title}</Title>
-          <Paragraph>
-            {supportsWorkspace
-              ? '可在独立窗口编辑、预览、下载或打印当前模板。'
-              : '当前页面用于核对模板字段、版式和示例内容。'}
-          </Paragraph>
+          <Title level={3} className="erp-print-center-section-title">
+            {template.title}
+          </Title>
         </div>
 
         <div className="erp-print-center-note-list">

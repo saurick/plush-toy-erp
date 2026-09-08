@@ -1578,7 +1578,6 @@ export default function ShipmentsPage() {
         compact
         helpKey="shipments"
         title="出货单"
-        description="销售出货草稿需先完成品质检验与财务放行，并由仓库确认实际出货后才扣减库存。"
         tags={[
           <Tag color="gold" key="release">
             出货放行：财务审批

@@ -1329,10 +1329,6 @@ export default function ERPLayout() {
                   <div className="erp-admin-page-head__title">
                     {currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label}
                   </div>
-                  <Paragraph className="erp-admin-page-head__summary">
-                    {currentEntry?.description ||
-                      DEFAULT_DESKTOP_ENTRY.description}
-                  </Paragraph>
                 </div>
               </div>
             ) : null}

@@ -1005,7 +1005,6 @@ export default function V1PurchaseReceiptsPage() {
         compact
         helpKey="inbound"
         title="入库管理"
-        description="入库管理查看从已审核采购订单生成的入库草稿，并继续办理收货、质检、退货、调整和确认过账；页面不提供脱离采购来源的手工入库明细。"
         tags={[
           <Tag color="gold" key="workflow">
             待办任务：入库跟进

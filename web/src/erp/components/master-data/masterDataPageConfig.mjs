@@ -72,8 +72,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     entityLabel: '客户',
     draftCodePrefix: 'CUS',
     formBoundary: '只维护交易主体资料，不在此写订单、库存或财务记录。',
-    summary:
-      '维护客户交易主体和联系人；订单、出货、库存和财务记录请到对应业务页面处理。',
   },
   suppliers: {
     title: '供应商与加工厂',
@@ -100,8 +98,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     entityLabel: '供应商',
     draftCodePrefix: 'SUP',
     formBoundary: '只维护交易主体资料，不在此写采购、库存、质检或财务记录。',
-    summary:
-      '在同一入口维护供应商与加工厂交易主体、主联系人和可加工工序；采购、委外、质检、库存和财务记录请到对应业务页面处理。',
   },
   materials: {
     title: '材料档案',
@@ -121,8 +117,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'MAT',
     formBoundary:
       '这里只维护材料基础资料，不办理采购、库存、质检或物料清单用量。',
-    summary:
-      '维护材料基础资料；采购订单、库存余额、来料质检和物料清单用量请到对应业务页面处理。',
   },
   processes: {
     title: '加工环节',
@@ -142,8 +136,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'PROC',
     formBoundary:
       '只维护委外订单和后续质检可引用的标准加工环节；排序只影响列表展示，不定义前后工序。需质检只是工序属性标记，不在此生成委外订单、生产任务、库存记录或质检判定。',
-    summary:
-      '维护少量可复用加工环节，用于委外订单选择和后续质检提示；默认展示车缝在手工前，但不管理完整工艺路线、排程、报工、质检结果或库存记录。',
     initialValues: {
       outsourcing_enabled: true,
       inhouse_enabled: false,
@@ -170,8 +162,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'PRD',
     formBoundary:
       '这里只维护产品基础信息，不办理订单、库存、物料清单、生产或出货业务。',
-    summary:
-      '维护产品基础信息；产品规格（SKU）、物料清单（BOM）、订单、库存和出货记录请到对应业务页面处理。',
   },
   product_skus: {
     title: '产品档案',
@@ -193,8 +183,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'SKU',
     formBoundary:
       '这里只维护产品规格，不办理订单、库存、物料清单、生产或出货业务。',
-    summary:
-      '维护产品规格（SKU）及其所属产品；订单、库存、物料清单和出货记录请到对应业务页面处理。',
   },
 })
 

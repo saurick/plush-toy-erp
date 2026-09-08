@@ -1317,7 +1317,6 @@ export default function FinancePaymentsPage() {
         compact
         helpKey="finance-payments"
         title="收付款与核销"
-        description="登记真实收款或付款，按同一往来方和币种跨多张应收或应付核销；已过账记录通过冲销恢复未核销金额，红冲记录保留独立审计。"
         tags={[
           <Tag color="blue" key="payment">
             真实收付款

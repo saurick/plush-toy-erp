@@ -350,9 +350,6 @@ export default function BusinessDashboardPage() {
             <Title level={4} className="erp-dashboard-title">
               业务看板
             </Title>
-            <Paragraph type="secondary" className="erp-dashboard-summary">
-              从业务数量和待办风险定位需要关注的环节。
-            </Paragraph>
           </div>
         </div>
         <div className="erp-business-board-summary-grid">

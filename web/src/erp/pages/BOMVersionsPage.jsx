@@ -1487,7 +1487,6 @@ export default function BOMVersionsPage() {
         compact
         helpKey="material-bom"
         title="物料清单（BOM）"
-        description="维护产品工程资料版本、材料用量、损耗率和生效规则。"
         stats={[
           { key: 'total', label: '物料清单总数', value: total },
           { key: 'current', label: '本页显示', value: versions.length },

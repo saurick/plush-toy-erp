@@ -95,7 +95,6 @@
 
 [data-erp-theme='dark'] .erp-admin-brand__logo-subtitle,
 [data-erp-theme='dark'] .erp-admin-header__user,
-[data-erp-theme='dark'] .erp-admin-page-head__summary.ant-typography,
 [data-erp-theme='dark'] .erp-admin-page-head__pill span,
 [data-erp-theme='dark'] .erp-dashboard-summary.ant-typography,
 [data-erp-theme='dark'] .erp-mobile-muted,
@@ -1203,7 +1202,6 @@
 }
 
 [data-erp-theme='dark'] .erp-business-action-modal__title small,
-[data-erp-theme='dark'] .erp-business-page-header-card p,
 [data-erp-theme='dark'] .erp-business-date-range-filter__range > span,
 [data-erp-theme='dark'] .erp-permission-checklist-filter,
 [data-erp-theme='dark'] .erp-permission-row__note,
@@ -1518,7 +1516,6 @@
 }
 
 [data-erp-theme='dark'] .erp-print-center-nav-title,
-[data-erp-theme='dark'] .erp-print-center-nav-description,
 [data-erp-theme='dark'] .erp-print-center-note-text,
 [data-erp-theme='dark'] .erp-print-center-workbench-note {
   color: var(--erp-text-muted);

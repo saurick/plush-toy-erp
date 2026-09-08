@@ -383,12 +383,6 @@
   font-weight: 700;
 }
 
-.erp-admin-page-head__summary.ant-typography {
-  margin: 6px 0 0;
-  color: #475569;
-  line-height: 1.7;
-}
-
 .erp-admin-page-head__pill {
   display: grid;
   gap: 4px;

@@ -742,7 +742,6 @@ export default function V1OutsourcingOrdersPage() {
         compact
         helpKey="processing-contracts"
         title="委外订单"
-        description="维护加工合同、工序明细、加工厂承诺和打印内容；已确认合同可从对应明细登记发料或回货草稿，之后请分别到委外记录、质量检验和应付页面继续办理。"
         tags={[
           <Tag color="blue" key="source">
             业务单据：加工合同

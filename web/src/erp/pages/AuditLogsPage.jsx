@@ -706,9 +706,6 @@ export default function AuditLogsPage() {
       <section className="erp-audit-command" aria-label="系统操作记录总览">
         <div className="erp-audit-command__title">
           <Title level={4}>系统操作记录</Title>
-          <Text type="secondary">
-            查看员工账号、岗位和系统设置的操作记录，需要时按风险和操作类型筛选。
-          </Text>
         </div>
         <div className="erp-audit-command__stats" aria-label="当前页操作摘要">
           <div className="erp-audit-stat erp-audit-stat--danger">

@@ -230,7 +230,6 @@
   text-transform: uppercase;
 }
 
-.erp-print-center-nav-description,
 .erp-print-center-note-text,
 .erp-print-center-workbench-note {
   color: #6d7b70;
@@ -246,7 +245,7 @@
 }
 
 .erp-print-center-section-title.ant-typography {
-  margin: 0 0 4px;
+  margin: 0;
 }
 
 .erp-print-center-workbench-note {

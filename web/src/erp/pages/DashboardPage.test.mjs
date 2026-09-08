@@ -120,7 +120,6 @@ test('task board keeps selection on click and opens the same detail surface on d
     /onDoubleClick=\{\(event\)\s*=>[\s\S]{0,160}openDashboardItemOnDoubleClick\(event,[\s\S]{0,120}onOpenTask\(task\)/u
   )
   assert.match(source, /title="单击选中，双击查看任务详情"/u)
-  assert.match(source, /电脑端可双击任务卡快速查看详情/u)
   assert.match(
     source,
     /<Text strong className="erp-task-board-card-title">[\s\S]{0,100}task\.task_name/u

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Form, Input, Modal, Select, Tag, Typography } from 'antd'
+import { Alert, Button, Form, Input, Modal, Select, Tag, Typography } from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   useNavigate,
@@ -1592,9 +1592,11 @@ export default function V1ProductionOrdersPage() {
   if (!canRead) {
     return (
       <BusinessPageLayout>
-        <PageHeaderCard
-          title="生产订单"
-          description="当前账号没有查看生产订单的权限。"
+        <PageHeaderCard title="生产订单" />
+        <Alert
+          type="warning"
+          showIcon
+          message="当前账号没有查看生产订单的权限。"
         />
       </BusinessPageLayout>
     )
@@ -1605,7 +1607,6 @@ export default function V1ProductionOrdersPage() {
       <PageHeaderCard
         helpKey="production-orders"
         title="生产订单"
-        description="维护生产计划单；标准路线按布料加工、车缝、手工、包装依次办理，特别是先车缝、后手工。生产岗位提交完工报告后，由仓库核对并确认成品入库；只有仓库确认时才增加库存。"
         stats={[{ key: 'total', label: '符合条件', value: total }]}
       />
       <BusinessOperationPanel

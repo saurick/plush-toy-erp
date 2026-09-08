@@ -286,7 +286,7 @@ export function createDashboardTaskScenarios({
           .filter({ hasText: '待我审批' })
           .waitFor({ state: 'visible', timeout: 2_000 })
         await expectHeading(page, '任务看板')
-        await expectText(
+        await assertTextAbsent(
           page,
           '只显示服务端登记为审批节点且当前账号可见的事项；审批仍受岗位、指定处理人、配置版本和单据状态约束。'
         )
@@ -750,7 +750,7 @@ export function createDashboardTaskScenarios({
             'approval'
         )
         await expectHeading(page, '任务看板')
-        await expectText(
+        await assertTextAbsent(
           page,
           '看清谁该处理、哪里卡住、哪些已经超时；电脑端可双击任务卡快速查看详情。'
         )

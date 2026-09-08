@@ -1103,10 +1103,12 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   if (!moduleItem || !config) {
     return (
       <BusinessPageLayout>
-        <PageHeaderCard
-          title="页面暂不可用"
-          description="当前页面暂不可用，请返回工作台或联系管理员。"
-          tags={<Tag color="red">暂不可用</Tag>}
+        <Alert
+          type="warning"
+          showIcon
+          message="页面暂不可用"
+          description="请返回工作台或联系管理员。"
+          action={<Button href="/erp/dashboard">返回工作台</Button>}
         />
       </BusinessPageLayout>
     )
@@ -1578,7 +1580,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     <BusinessPageLayout className="erp-workflow-business-page">
       <PageHeaderCard
         title={moduleItem.title}
-        description={moduleItem.description}
         tags={
           <Space size={6} wrap>
             <Tag color="blue">

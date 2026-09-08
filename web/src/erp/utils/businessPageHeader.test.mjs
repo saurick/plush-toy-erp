@@ -45,7 +45,7 @@ function collectPageHeaderBlocks(source) {
   return blocks
 }
 
-test('businessPageHeader: 业务页头不再提供底部 summary 区域', () => {
+test('businessPageHeader: 业务页头不提供常驻介绍或底部 summary 区域', () => {
   const layoutPath = resolve(
     erpSourceRoot,
     'components/business-list/BusinessListLayout.jsx'
@@ -57,8 +57,8 @@ test('businessPageHeader: 业务页头不再提供底部 summary 区域', () => 
   )
 
   assert(
-    !/\bsummary\b/u.test(pageHeaderSource),
-    'PageHeaderCard 不应再接收 summary'
+    !/\b(?:summary|description)\b/u.test(pageHeaderSource),
+    'PageHeaderCard 不应再接收常驻介绍或 summary'
   )
   assert(
     !pageHeaderSource.includes('erp-business-page-header-card__summary'),
@@ -93,13 +93,13 @@ test('businessPageHeader: 共享页头只渲染规范化后的非负整数统计
   assert.doesNotMatch(pageHeaderSource, /\{stats\.map\(\(item\) =>/u)
 })
 
-test('businessPageHeader: 页面调用点不得向 PageHeaderCard 传 summary', () => {
+test('businessPageHeader: 页面调用点不传常驻介绍或 summary', () => {
   const offenders = []
 
   for (const filePath of listSourceFiles(erpSourceRoot)) {
     const source = readFileSync(filePath, 'utf8')
     for (const block of collectPageHeaderBlocks(source)) {
-      if (/\bsummary\s*=/u.test(block)) {
+      if (/\b(?:summary|description)\s*=/u.test(block)) {
         offenders.push(relative(erpSourceRoot, filePath))
       }
     }
