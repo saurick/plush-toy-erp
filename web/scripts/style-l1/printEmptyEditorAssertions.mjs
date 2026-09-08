@@ -19,17 +19,23 @@ export async function measureEmptyEditorHints(editors) {
         fontWeight: hint.fontWeight,
         letterSpacing: hint.letterSpacing,
         lineHeight: hint.lineHeight,
+        lineBreak: hint.lineBreak,
         whiteSpace: hint.whiteSpace,
         overflowWrap: hint.overflowWrap,
         wordBreak: hint.wordBreak,
+        zoom: style.zoom,
       })
       probe.textContent = '点击填写'
-      document.body.append(probe)
-      const requiredHeight = probe.getBoundingClientRect().height
+      // 字体在缩放时会按实际像素取整，探针必须与提示处于相同的缩放上下文。
+      node.parentElement.append(probe)
+      const probeBox = probe.getBoundingClientRect()
+      const zoom =
+        probeBox.width / Number.parseFloat(getComputedStyle(probe).width) || 1
+      const requiredHeight = probeBox.height / zoom
       const range = document.createRange()
       range.selectNodeContents(probe)
       const textWidth = Math.max(
-        ...[...range.getClientRects()].map((r) => r.width)
+        ...[...range.getClientRects()].map((r) => r.width / zoom)
       )
       probe.remove()
       const width = Number.parseFloat(hint.width)
