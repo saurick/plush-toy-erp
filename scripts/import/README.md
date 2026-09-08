@@ -7,11 +7,13 @@
 | 目的 | 脚本 | 边界 |
 | --- | --- | --- |
 | 来源清单校验 | `customerSourceManifestCheck.mjs` | 显式读取外部 manifest 与 raw dir，校验 customer、相对路径、hash、大小、重复项和目录逃逸 |
-| 结构化提取 | `customerSourceExtract.mjs` | 只提取 manifest 允许的 Excel；PDF / 图片保留人工复核，不做 OCR |
+| 结构化提取 | `customerSourceExtract.mjs` | 只提取 manifest 允许的 `.xlsx`；Numbers、旧版 Excel、Word、PDF / 图片保留人工复核，不做格式转换或 OCR |
 | 快照冻结 | `customerSourceSnapshotFreezeCheck.mjs` | 只读取 JSON snapshot，生成可复查的 freeze evidence |
 | 导入预演 | `customerImportDryRun.mjs` | 输出候选、重复、冲突、未决项和禁止自动导入项；`canExecuteRealImport=false` |
 
 这些脚本不得连接后端或数据库，不写正式表，不生成 migration，不创建库存、质检、出货、财务或 Workflow 事实。Product Core 普通测试只使用 `scripts/import/fixtures/synthetic/` 及其他明确标记为 synthetic / sanitized 的 fixture，不访问客户私有仓库。
+
+Numbers 原件可使用 `.numbers` 和 `application/vnd.apple.numbers` 登记到私有来源清单，并校验 hash 与大小；`structuredExtract.enabled` 必须为 `false`。这只支持原件归档，不解析 Numbers 表格或批准导入。
 
 ## 客户私有验证
 

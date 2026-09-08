@@ -230,11 +230,12 @@ test('manifest checker reports unregistered files without exposing their names o
   )
 })
 
-test('manifest checker accepts registered legacy Excel and Word references as manual sources', async (t) => {
+test('manifest checker accepts Word, legacy Excel and Numbers references only as manual sources', async (t) => {
   const mediaTypes = new Map([
     ['.doc', 'application/msword'],
     ['.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
     ['.xls', 'application/vnd.ms-excel'],
+    ['.numbers', 'application/vnd.apple.numbers'],
   ])
   for (const [extension, mediaType] of mediaTypes) {
     await t.test(extension, async (t) => {
@@ -259,6 +260,12 @@ test('manifest checker accepts registered legacy Excel and Word references as ma
       await fixture.writeManifest()
       const result = await fixture.run()
       assert.equal(result.summary.manualReferenceCount, 1)
+      assert.equal(result.summary.structuredExtractCount, 0)
+      assert.deepEqual(selectStructuredExtractSources(result.sources), [])
+
+      fixture.manifest.sources[0].structuredExtract = { enabled: true, mode: 'xlsx_workbook' }
+      await fixture.writeManifest()
+      await assert.rejects(() => fixture.run(), /structuredExtract is only supported for \.xlsx sources/u)
     })
   }
 })
