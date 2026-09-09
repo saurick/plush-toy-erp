@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Card, Descriptions, Form, Input, Select } from 'antd'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import {
@@ -183,7 +184,17 @@ export default function InventoryOperationModal({
                       {
                         key: 'stock',
                         label: '来源库存',
-                        children: selectedInventoryText(source, labels),
+                        children:
+                          source.subject_type === 'PRODUCT' ? (
+                            <ProductIdentity
+                              productId={source.subject_id}
+                              name={labels.subject}
+                            >
+                              {selectedInventoryText(source, labels)}
+                            </ProductIdentity>
+                          ) : (
+                            selectedInventoryText(source, labels)
+                          ),
                       },
                     ]}
                   />

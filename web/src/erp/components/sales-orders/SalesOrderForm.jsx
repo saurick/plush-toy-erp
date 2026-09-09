@@ -16,6 +16,7 @@ import {
   Space,
   Tag,
 } from 'antd'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
@@ -710,8 +711,13 @@ export function SalesOrderItemsFormSection({
     {
       title: '产品名称',
       width: 190,
-      render: (_, sku) =>
-        sku.sku_name || sku.customer_sku || sku.barcode || '-',
+      render: (_, sku) => (
+        <ProductIdentity
+          productId={sku.product_id}
+          name={sku.sku_name || sku.customer_sku || sku.barcode || '产品'}
+          preview={false}
+        />
+      ),
       searchText: (sku) => skuLabel(sku),
     },
     { title: '颜色', dataIndex: 'color', width: 110 },

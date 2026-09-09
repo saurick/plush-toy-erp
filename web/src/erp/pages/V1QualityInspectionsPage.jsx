@@ -27,6 +27,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -2321,6 +2322,26 @@ export default function V1QualityInspectionsPage() {
                 </Space>
               }
             />
+            {(
+              decisionIsProductionStage
+                ? inspectionModal?.inspection?.product_id
+                : inspectionModal?.inspection?.subject_type === 'PRODUCT'
+                  ? inspectionModal?.inspection?.subject_id
+                  : 0
+            ) ? (
+              <div className="erp-business-inline-note">
+                <ProductIdentity
+                  productId={
+                    decisionIsProductionStage
+                      ? inspectionModal.inspection.product_id
+                      : inspectionModal.inspection.subject_id
+                  }
+                  name="产品参考图"
+                >
+                  {decisionSourceSummary.primary}
+                </ProductIdentity>
+              </div>
+            ) : null}
             <QualityInspectionDecisionForm
               form={decisionForm}
               mode={inspectionModal?.mode}

@@ -10,6 +10,7 @@ import {
   Space,
   Switch,
 } from 'antd'
+import { renderProductOption } from './ProductIdentity.jsx'
 
 import {
   PURCHASE_INVOICE_CATEGORY_OPTIONS,
@@ -359,6 +360,8 @@ export function MasterDataFormFields({
             disabled={productSKUParentField.disabled}
             optionFilterProp="label"
             options={productOptions}
+            listItemHeight={48}
+            optionRender={renderProductOption}
             placeholder="请选择产品"
             showSearch
           />

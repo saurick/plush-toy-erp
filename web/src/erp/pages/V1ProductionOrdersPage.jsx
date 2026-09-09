@@ -1,11 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Form, Input, Modal, Select, Tag, Typography } from 'antd'
+import {
+  Alert,
+  Button,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Tag,
+  Typography,
+} from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -608,9 +618,18 @@ export default function V1ProductionOrdersPage() {
       {
         key: 'product',
         label: '产品',
-        value: productionSnapshotLabel(
-          [item?.product_code_snapshot, item?.product_name_snapshot],
-          productionOptionLabel(optionsByType.product, item?.product_id, '产品')
+        value: (
+          <ProductIdentity
+            productId={item?.product_id}
+            name={productionSnapshotLabel(
+              [item?.product_code_snapshot, item?.product_name_snapshot],
+              productionOptionLabel(
+                optionsByType.product,
+                item?.product_id,
+                '产品'
+              )
+            )}
+          />
         ),
         wide: true,
       },
@@ -1553,17 +1572,13 @@ export default function V1ProductionOrdersPage() {
     ],
     []
   )
-  const {
-    tableColumns,
-    exportColumns,
-    openColumnOrder,
-    columnOrderModal,
-  } = useBusinessColumnOrder({
-    adminProfile,
-    moduleKey: 'production-orders',
-    moduleTitle: '生产订单',
-    columns,
-  })
+  const { tableColumns, exportColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
+      adminProfile,
+      moduleKey: 'production-orders',
+      moduleTitle: '生产订单',
+      columns,
+    })
   const loadExportOrders = useCallback(
     async ({ signal }) => {
       if (!canRead) return []

@@ -58,6 +58,7 @@ async function installProductImageAttachmentMocks(page, state) {
     const body = route.request().postDataJSON() || {}
     const { id = 'product-image-style-l1', method, params = {} } = body
     const isProductRequest =
+      method === 'list_product_image_references' ||
       (method === 'list_attachments' && params.owner_type === 'product') ||
       (method === 'upload_attachment' && params.owner_type === 'product') ||
       method === 'clear_product_image' ||
@@ -80,7 +81,18 @@ async function installProductImageAttachmentMocks(page, state) {
       await writeGate.promise
     }
     let data = {}
-    if (method === 'list_attachments') {
+    if (method === 'list_product_image_references') {
+      data = {
+        images: params.product_ids.map((productID) => ({
+          product_id: productID,
+          image_attachment_id:
+            state.attachments.find(
+              (item) =>
+                item.owner_id === productID && item.slot_key === 'primary'
+            )?.id || 0,
+        })),
+      }
+    } else if (method === 'list_attachments') {
       data = { attachments: state.attachments.map((item) => ({ ...item })) }
     } else if (method === 'upload_attachment') {
       const replacedAttachments = state.attachments.filter(
@@ -145,7 +157,7 @@ async function openProductEditModal(page, assert) {
     .filter({ hasText: 'PROD-STYLE-L1' })
   await productRow.waitFor()
   assert.equal(await productRow.count(), 1, '产品列表应有且仅有一条目标记录')
-  await productRow.dblclick()
+  await productRow.getByText('PROD-STYLE-L1', { exact: true }).dblclick()
   const modal = page.locator(
     '.erp-business-action-modal--form.ant-modal:visible'
   )
@@ -290,7 +302,8 @@ export function createProductImageSlotScenarios(deps) {
         )
         assert.equal(
           desktopState.calls.filter(
-            (call) => call.method === 'download_attachment'
+            (call) =>
+              call.method === 'download_attachment' && !call.params.variant
           ).length,
           4,
           '两次打开产品应分别读取两个固定图片槽的内容'
@@ -370,6 +383,20 @@ export function createProductImageSlotScenarios(deps) {
           writeGate.resolve()
         }
         await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+        const catalogImage = page
+          .locator('.ant-table-tbody .erp-product-identity img')
+          .first()
+        await page.waitForFunction(() =>
+          document
+            .querySelector('.ant-table-tbody .erp-product-identity img')
+            ?.getAttribute('src')
+            ?.startsWith('data:image/webp;')
+        )
+        assert.match(
+          await catalogImage.getAttribute('src'),
+          /^data:image\/webp;/,
+          'saving the replacement must refresh the catalog thumbnail'
+        )
 
         const writeCalls = desktopState.calls.filter((call) =>
           ['upload_attachment', 'clear_product_image'].includes(call.method)
@@ -449,7 +476,8 @@ export function createProductImageSlotScenarios(deps) {
         )
         assert.equal(
           desktopState.calls.filter(
-            (call) => call.method === 'download_attachment'
+            (call) =>
+              call.method === 'download_attachment' && !call.params.variant
           ).length,
           6,
           '保存后的回读和第三次打开都应下载当前主图'
@@ -605,7 +633,10 @@ export function createProductImageSlotScenarios(deps) {
         )
         assert.deepEqual(
           readCalls
-            .filter((call) => call.method === 'download_attachment')
+            .filter(
+              (call) =>
+                call.method === 'download_attachment' && !call.params.variant
+            )
             .map((call) => Number(call.params.id || 0))
             .sort((left, right) => left - right),
           [101, 102],

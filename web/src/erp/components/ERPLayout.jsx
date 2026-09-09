@@ -38,6 +38,7 @@ import {
   Typography,
 } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { notifyProductImagesChanged } from '../utils/productImageReferences.mjs'
 import { isAuthFailureCode } from '@/common/consts/errorCodes'
 import {
   AUTH_SCOPE,
@@ -1022,6 +1023,7 @@ export default function ERPLayout() {
     try {
       const refreshed = await pageRefreshHandler()
       if (refreshed !== false) {
+        notifyProductImagesChanged()
         message.success('当前页面数据已刷新')
       }
     } catch (error) {

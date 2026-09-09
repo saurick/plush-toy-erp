@@ -1,5 +1,6 @@
 import React from 'react'
 import { Space, Tag, Typography } from 'antd'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
@@ -414,6 +415,27 @@ export function buildQualityInspectionDataColumns({
   purchaseReceiptOptions = [],
   warehouseOptions = [],
 }) {
+  const renderSubject = (record) => {
+    const [subject, ...secondary] = subjectParts(
+      record,
+      inventoryLotOptions,
+      materialOptions,
+      productOptions,
+      warehouseOptions
+    )
+    const productID = isProductionStageQualityInspection(record)
+      ? record.product_id
+      : record.subject_type === 'PRODUCT'
+        ? record.subject_id
+        : 0
+    return productID ? (
+      <ProductIdentity productId={productID} name={subject}>
+        {renderStackCell(subject, secondary)}
+      </ProductIdentity>
+    ) : (
+      renderStackCell(subject, secondary)
+    )
+  }
   return applyBusinessColumnSorters([
     {
       title: '质检单号',
@@ -480,16 +502,9 @@ export function buildQualityInspectionDataColumns({
       exportTitle: '产品 / 材料 / 在制品',
       dataIndex: 'subject_type',
       width: 260,
-      render: (_value, record) => {
-        const [subject, ...secondary] = subjectParts(
-          record,
-          inventoryLotOptions,
-          materialOptions,
-          productOptions,
-          warehouseOptions
-        )
-        return renderStackCell(subject, secondary)
-      },
+      className: 'erp-product-identity-cell',
+      render: (_value, record) => renderSubject(record),
+      detailValue: renderSubject,
       exportValue: (record) =>
         subjectParts(
           record,

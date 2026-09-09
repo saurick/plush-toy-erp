@@ -1,5 +1,6 @@
 import React from 'react'
 import { Tag } from 'antd'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
@@ -48,10 +49,22 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       title: '产品',
       exportTitle: '产品',
       dataIndex: 'product_id',
-      width: 180,
+      width: 300,
       sortType: 'number',
       sorter: (a, b) => Number(a?.product_id || 0) - Number(b?.product_id || 0),
-      render: (value) => referenceLabel(productOptions, value, '产品'),
+      className: 'erp-product-identity-cell',
+      render: (value) => (
+        <ProductIdentity
+          productId={value}
+          name={referenceLabel(productOptions, value, '产品')}
+        />
+      ),
+      detailValue: (record) => (
+        <ProductIdentity
+          productId={record.product_id}
+          name={referenceLabel(productOptions, record.product_id, '产品')}
+        />
+      ),
       exportValue: (record) =>
         referenceLabel(productOptions, record?.product_id, '产品'),
     },

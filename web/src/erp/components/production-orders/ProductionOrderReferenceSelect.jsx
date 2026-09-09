@@ -1,11 +1,6 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Select } from 'antd'
+import { renderProductOption } from '../master-data/ProductIdentity.jsx'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -96,12 +91,7 @@ export default function ProductionOrderReferenceSelect({
         }
       }
     },
-    [
-      referenceType,
-      filters.product_id,
-      filters.product_sku_id,
-      filters.unit_id,
-    ]
+    [referenceType, filters.product_id, filters.product_sku_id, filters.unit_id]
   )
 
   const resetAndLoad = useCallback(
@@ -203,6 +193,10 @@ export default function ProductionOrderReferenceSelect({
       loading={loading}
       value={value}
       options={renderedOptions}
+      listItemHeight={referenceType === 'product' ? 48 : undefined}
+      optionRender={
+        referenceType === 'product' ? renderProductOption : undefined
+      }
       placeholder={placeholder}
       onSearch={resetAndLoad}
       onPopupScroll={handlePopupScroll}

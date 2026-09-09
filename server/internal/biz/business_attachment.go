@@ -217,6 +217,7 @@ type BusinessAttachmentWithdraw struct {
 }
 
 type BusinessAttachmentRepo interface {
+	ListProductImageReferences(ctx context.Context, productIDs []int) (map[int]int, error)
 	CreateBusinessAttachment(ctx context.Context, in *BusinessAttachmentCreate) (*BusinessAttachment, error)
 	WithdrawBusinessAttachment(ctx context.Context, in *BusinessAttachmentWithdraw) (time.Time, error)
 	ClearProductImage(ctx context.Context, productID int, slotKey string) error
@@ -232,6 +233,25 @@ type BusinessAttachmentUsecase struct {
 
 func NewBusinessAttachmentUsecase(repo BusinessAttachmentRepo) *BusinessAttachmentUsecase {
 	return &BusinessAttachmentUsecase{repo: repo}
+}
+
+// ListProductImageReferences returns current primary media references, never image content or evidence attachments.
+func (uc *BusinessAttachmentUsecase) ListProductImageReferences(ctx context.Context, productIDs []int) (map[int]int, error) {
+	if uc == nil || uc.repo == nil || len(productIDs) == 0 || len(productIDs) > 80 {
+		return nil, ErrBadParam
+	}
+	seen := make(map[int]bool, len(productIDs))
+	ids := make([]int, 0, len(productIDs))
+	for _, id := range productIDs {
+		if id <= 0 {
+			return nil, ErrBadParam
+		}
+		if !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	return uc.repo.ListProductImageReferences(ctx, ids)
 }
 
 func NormalizeBusinessAttachmentOwnerType(raw string) string {

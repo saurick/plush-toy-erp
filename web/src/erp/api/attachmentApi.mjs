@@ -2,6 +2,7 @@ import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { assertBusinessAttachmentUploadParams } from '../utils/businessAttachmentContract.mjs'
+import { notifyProductImagesChanged } from '../utils/productImageReferences.mjs'
 
 const attachmentRpc = new JsonRpc({
   url: 'attachment',
@@ -43,14 +44,24 @@ export async function listProductImages(params = {}) {
   })
 }
 
+export async function listProductImageReferences(params = {}) {
+  const result = await attachmentRpc.call(
+    'list_product_image_references',
+    params
+  )
+  return dataOf(result)?.images || []
+}
+
 export async function uploadProductImage(params = {}) {
   const { product_id: productID, ...rest } = params
-  return uploadBusinessAttachment({
+  const image = await uploadBusinessAttachment({
     ...rest,
     owner_type: 'product',
     owner_id: productID,
     attachment_type: 'product_image',
   })
+  notifyProductImagesChanged(productID)
+  return image
 }
 
 export async function clearProductImage(params = {}) {
@@ -59,5 +70,6 @@ export async function clearProductImage(params = {}) {
     ...rest,
     owner_id: productID,
   })
+  if (dataOf(result)?.cleared === true) notifyProductImagesChanged(productID)
   return dataOf(result)?.cleared === true
 }

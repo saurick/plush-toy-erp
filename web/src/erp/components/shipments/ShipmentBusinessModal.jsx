@@ -13,6 +13,9 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import ProductIdentity, {
+  renderProductOption,
+} from '../master-data/ProductIdentity.jsx'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
@@ -702,6 +705,8 @@ function ShipmentItemFormFields({
           disabled={sourceLocked}
           optionFilterProp="label"
           options={productOptions}
+          listItemHeight={48}
+          optionRender={renderProductOption}
           placeholder="请选择产品"
           showSearch
           onChange={(nextID) =>
@@ -709,6 +714,14 @@ function ShipmentItemFormFields({
           }
         />
       </Form.Item>
+      {productID ? (
+        <div className="erp-business-action-form__field">
+          <ProductIdentity
+            productId={productID}
+            name={referenceLabel(productOptions, productID, '产品')}
+          />
+        </div>
+      ) : null}
       <Form.Item
         className="erp-business-action-form__field"
         label="SKU"
@@ -846,8 +859,14 @@ function ShipmentItemsTable({
         {
           title: '产品',
           dataIndex: 'product_id',
-          width: 150,
-          render: (value) => referenceLabel(productOptions, value, '产品'),
+          width: 280,
+          className: 'erp-product-identity-cell',
+          render: (value) => (
+            <ProductIdentity
+              productId={value}
+              name={referenceLabel(productOptions, value, '产品')}
+            />
+          ),
         },
         {
           title: 'SKU',

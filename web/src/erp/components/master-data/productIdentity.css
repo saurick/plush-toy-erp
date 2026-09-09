@@ -1,0 +1,62 @@
+.erp-product-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  min-width: 0;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.erp-product-identity__picture {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.erp-product-identity .erp-task-product-image {
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
+}
+
+.erp-product-identity--compact .erp-task-product-image {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
+}
+
+.erp-product-identity__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.erp-product-identity__text small {
+  color: var(--erp-text-muted, #64748b);
+  font-size: 12px;
+}
+
+.ant-table-wrapper .ant-table-cell.erp-product-identity-cell {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.erp-product-identity__retry {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--erp-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--erp-surface-bg-muted, #f1f5f9);
+  color: var(--erp-primary, #24823a);
+  cursor: pointer;
+}
+
+.erp-product-identity__retry:focus-visible {
+  outline: 2px solid var(--erp-primary, #24823a);
+  outline-offset: 2px;
+}

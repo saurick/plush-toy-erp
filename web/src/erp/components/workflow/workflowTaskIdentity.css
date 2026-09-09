@@ -100,6 +100,7 @@
 }
 
 .erp-task-product-image > button {
+  position: relative;
   display: flex;
   width: 100%;
   height: 100%;
@@ -109,6 +110,8 @@
   border: 0;
   background: transparent;
   cursor: zoom-in;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .erp-task-product-image > button:focus-visible {
@@ -122,15 +125,31 @@
   object-fit: contain;
 }
 
-.erp-task-product-image__preview {
-  display: block;
-  width: 100%;
-  max-height: 70vh;
-  object-fit: contain;
+.erp-task-product-image__zoom {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: rgb(15 23 42 / 75%);
+  color: #fff;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 120ms ease;
 }
 
-.erp-task-product-image__loading {
-  min-height: 160px;
+.erp-task-product-image > button:hover .erp-task-product-image__zoom,
+.erp-task-product-image > button:focus-visible .erp-task-product-image__zoom {
+  opacity: 1;
+}
+
+@media (pointer: coarse) {
+  .erp-task-product-image__zoom {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 767px) {

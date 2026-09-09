@@ -47,6 +47,14 @@ export async function installAttachmentRpcMocks(page, context) {
     let message = 'OK'
     let data = {}
     switch (method) {
+      case 'list_product_image_references':
+        data = {
+          images: (params.product_ids || []).map((product_id) => ({
+            product_id,
+            image_attachment_id: 0,
+          })),
+        }
+        break
       case 'list_attachments':
         data = {
           attachments:
@@ -76,7 +84,16 @@ export async function installAttachmentRpcMocks(page, context) {
         break
       case 'download_attachment':
         if (Number(params.id) === 8801) {
-          data = { attachment: { id: 8801, owner_type: 'product', owner_id: 7, mime_type: 'image/png', content_base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==' } }
+          data = {
+            attachment: {
+              id: 8801,
+              owner_type: 'product',
+              owner_id: 7,
+              mime_type: 'image/png',
+              content_base64:
+                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+            },
+          }
           break
         }
 

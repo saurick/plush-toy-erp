@@ -43,6 +43,37 @@ func NewBusinessAttachmentRepo(d *Data, logger log.Logger) *businessAttachmentRe
 
 var _ biz.BusinessAttachmentRepo = (*businessAttachmentRepo)(nil)
 
+func (r *businessAttachmentRepo) ListProductImageReferences(ctx context.Context, productIDs []int) (map[int]int, error) {
+	refs := make(map[int]int, len(productIDs))
+	for _, id := range productIDs {
+		refs[id] = 0
+	}
+	if len(productIDs) == 0 {
+		return refs, nil
+	}
+	rows, err := r.data.postgres.BusinessAttachment.Query().
+		Select(businessattachment.FieldID, businessattachment.FieldOwnerID).
+		Where(
+			businessattachment.OwnerTypeEQ(biz.BusinessAttachmentOwnerProduct),
+			businessattachment.OwnerIDIn(productIDs...),
+			businessattachment.AttachmentTypeEQ(biz.BusinessAttachmentTypeProductImage),
+			businessattachment.SlotKeyEQ(biz.BusinessAttachmentProductImageSlotPrimary),
+			businessattachment.WithdrawnAtIsNil(),
+			func(s *entsql.Selector) {
+				owner := entsql.Table(product.Table)
+				s.Where(entsql.In(s.C(businessattachment.FieldOwnerID), entsql.Select(owner.C(product.FieldID)).From(owner)))
+			},
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		refs[row.OwnerID] = row.ID
+	}
+	return refs, nil
+}
+
 func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, in *biz.BusinessAttachmentCreate) (*biz.BusinessAttachment, error) {
 	if r == nil || r.data == nil || r.data.sqldb == nil || in == nil {
 		return nil, biz.ErrBusinessAttachmentOwnerInvalid

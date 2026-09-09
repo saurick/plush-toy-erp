@@ -17,6 +17,7 @@ import {
   Typography,
 } from 'antd'
 import { BranchesOutlined, ReloadOutlined } from '@ant-design/icons'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -1300,6 +1301,21 @@ export default function ProductionRouteExecutionModal({
                   key: 'route',
                   label: '工序路线',
                   children: '标准毛绒生产路线',
+                },
+              ]
+            : []),
+          ...(selectedOrderItem?.product_id
+            ? [
+                {
+                  key: 'product-image',
+                  label: '产品参考',
+                  children: (
+                    <ProductIdentity
+                      productId={selectedOrderItem.product_id}
+                      name={selectedOrderItem.product_name_snapshot}
+                      code={selectedOrderItem.product_code_snapshot}
+                    />
+                  ),
                 },
               ]
             : []),

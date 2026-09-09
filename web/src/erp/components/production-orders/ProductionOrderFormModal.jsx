@@ -18,6 +18,7 @@ import {
   PlusOutlined,
   ScheduleOutlined,
 } from '@ant-design/icons'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import ProductionOrderReferenceSelect from './ProductionOrderReferenceSelect.jsx'
@@ -265,6 +266,18 @@ function RowReference({
           />
         </Form.Item>
       </Col>
+      {productID ? (
+        <Col span={24}>
+          <ProductIdentity
+            productId={productID}
+            name={
+              optionsByType.product.find(
+                (option) => Number(option.value) === Number(productID)
+              )?.label || '当前产品'
+            }
+          />
+        </Col>
+      ) : null}
       <Col xs={24} md={8}>
         <Form.Item name={[field.name, 'product_sku_id']} label="规格（可选）">
           <ProductionOrderReferenceSelect

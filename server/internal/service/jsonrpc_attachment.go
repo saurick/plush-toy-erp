@@ -32,6 +32,31 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 	}
 
 	switch method {
+	case "list_product_image_references":
+		if res := d.requireBusinessAttachmentOwnerPermission(ctx, biz.BusinessAttachmentOwnerProduct, false); res != nil {
+			return id, res, nil
+		}
+		values, ok := pm["product_ids"].([]any)
+		if !ok || len(values) == 0 || len(values) > 80 {
+			return id, d.mapBusinessAttachmentError(ctx, biz.ErrBadParam), nil
+		}
+		ids := make([]int, 0, len(values))
+		for _, value := range values {
+			productID, valid := positiveSafeIntegerParam(map[string]any{"id": value}, "id")
+			if !valid {
+				return id, d.mapBusinessAttachmentError(ctx, biz.ErrBadParam), nil
+			}
+			ids = append(ids, productID)
+		}
+		refs, err := d.attachmentUC.ListProductImageReferences(ctx, ids)
+		if err != nil {
+			return id, d.mapBusinessAttachmentError(ctx, err), nil
+		}
+		items := make([]any, 0, len(refs))
+		for productID, attachmentID := range refs {
+			items = append(items, map[string]any{"product_id": productID, "image_attachment_id": attachmentID})
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"images": items})}, nil
 	case "list_attachments":
 		ownerType := biz.NormalizeBusinessAttachmentOwnerType(getString(pm, "owner_type"))
 		ownerID := getInt(pm, "owner_id", 0)

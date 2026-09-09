@@ -14,6 +14,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -570,7 +571,12 @@ export default function ShipmentsPage() {
       {
         key: 'product',
         label: '产品',
-        value: referenceLabel(productOptions, item?.product_id, '产品'),
+        value: (
+          <ProductIdentity
+            productId={item?.product_id}
+            name={referenceLabel(productOptions, item?.product_id, '产品')}
+          />
+        ),
       },
       {
         key: 'product_sku',

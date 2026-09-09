@@ -28,6 +28,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -1356,6 +1357,18 @@ export default function V1InventoryLedgerPage() {
     },
     [materialOptions, productOptions]
   )
+  const renderSubjectIdentity = useCallback(
+    (value, record) =>
+      record?.subject_type === 'PRODUCT' ? (
+        <ProductIdentity
+          productId={value}
+          name={renderSubjectReference(value, record)}
+        />
+      ) : (
+        renderSubjectReference(value, record)
+      ),
+    [renderSubjectReference]
+  )
   const renderWarehouseReference = useCallback(
     (value) => referenceLabel(warehouseOptions, value, '仓库'),
     [warehouseOptions]
@@ -1444,8 +1457,11 @@ export default function V1InventoryLedgerPage() {
             resolveValue: (_value, record) =>
               renderSubjectReference(record?.subject_id, record),
           },
-          width: 220,
-          render: renderSubjectReference,
+          width: 300,
+          className: 'erp-product-identity-cell',
+          render: renderSubjectIdentity,
+          detailValue: (record) =>
+            renderSubjectIdentity(record.subject_id, record),
           exportValue: (record) =>
             renderSubjectReference(record?.subject_id, record),
         },
@@ -1550,8 +1566,11 @@ export default function V1InventoryLedgerPage() {
             resolveValue: (_value, record) =>
               renderSubjectReference(record?.subject_id, record),
           },
-          width: 220,
-          render: renderSubjectReference,
+          width: 300,
+          className: 'erp-product-identity-cell',
+          render: renderSubjectIdentity,
+          detailValue: (record) =>
+            renderSubjectIdentity(record.subject_id, record),
           exportValue: (record) =>
             renderSubjectReference(record?.subject_id, record),
         },
@@ -1683,8 +1702,11 @@ export default function V1InventoryLedgerPage() {
           resolveValue: (_value, record) =>
             renderSubjectReference(record?.subject_id, record),
         },
-        width: 220,
-        render: renderSubjectReference,
+        width: 300,
+        className: 'erp-product-identity-cell',
+        render: renderSubjectIdentity,
+        detailValue: (record) =>
+          renderSubjectIdentity(record.subject_id, record),
         exportValue: (record) =>
           renderSubjectReference(record?.subject_id, record),
       },
@@ -1768,6 +1790,7 @@ export default function V1InventoryLedgerPage() {
     renderLotReference,
     renderProductSKUReference,
     renderSubjectReference,
+    renderSubjectIdentity,
     renderUnitReference,
     renderWarehouseReference,
   ])

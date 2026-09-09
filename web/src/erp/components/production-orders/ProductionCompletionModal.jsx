@@ -9,6 +9,7 @@ import {
   Select,
   Typography,
 } from 'antd'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import {
@@ -185,6 +186,21 @@ export default function ProductionCompletionModal({
         style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           { key: 'order', label: '生产订单', children: order?.order_no || '-' },
+          ...(selectedChoice?.item?.product_id
+            ? [
+                {
+                  key: 'product',
+                  label: '产品',
+                  children: (
+                    <ProductIdentity
+                      productId={selectedChoice.item.product_id}
+                      name={selectedChoice.item.product_name_snapshot}
+                      code={selectedChoice.item.product_code_snapshot}
+                    />
+                  ),
+                },
+              ]
+            : []),
           {
             key: 'status',
             label: '来源状态',

@@ -3,6 +3,8 @@ import { createBusinessPageContractScenarios } from './businessPageContractScena
 import { createAuditLogScenarios } from './auditLogScenarios.mjs'
 import { createMobileTaskScenarios } from './mobileTaskScenarios.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
+import { createTaskImagePreviewScenarios } from './taskImagePreviewScenarios.mjs'
+import { createProductIdentityScenarios } from './productIdentityScenarios.mjs'
 import { createCustomerSessionScenarios } from './customerSessionScenarios.mjs'
 import { createAuthenticationEntryScenarios } from './authenticationEntryScenarios.mjs'
 import { createPrintWorkspaceScenarios } from './printWorkspaceScenarios.mjs'
@@ -417,6 +419,10 @@ export function createStyleL1Scenarios(deps) {
       expectNoButton,
       gotoScenarioPath,
     }),
+    ...createTaskImagePreviewScenarios({
+      outputDir,
+      customerRuntimeEffectiveSession,
+    }),
     ...createDashboardTaskScenarios({
       expectText,
       expectHeading,
@@ -572,6 +578,10 @@ export function createStyleL1Scenarios(deps) {
       expectText,
       outputDir,
       path,
+    }),
+    ...createProductIdentityScenarios({
+      customerRuntimeEffectiveSession,
+      outputDir,
     }),
     ...createBusinessFormInteractionScenarios({
       customerRuntimeEffectiveSession,

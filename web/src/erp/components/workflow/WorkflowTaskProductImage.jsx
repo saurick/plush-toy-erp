@@ -1,11 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { InboxOutlined, PictureOutlined } from '@ant-design/icons'
-import { Button, Modal, Spin } from 'antd'
+import {
+  InboxOutlined,
+  PictureOutlined,
+  ZoomInOutlined,
+} from '@ant-design/icons'
 import { useOutletContext } from 'react-router-dom'
 import { downloadBusinessAttachment } from '../../api/attachmentApi.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
 import { createTaskProductImageLoader } from '../../utils/taskProductImage.mjs'
+import WorkflowTaskImagePreview from './WorkflowTaskImagePreview.jsx'
 
 // A profile's cache becomes unreachable on logout; permission changes use a new loader.
 const profileLoaders = new WeakMap()
@@ -48,17 +52,11 @@ function ImagePlaceholder({ item, state = 'empty' }) {
   )
 }
 
-function ProductImage({ item, preview, load }) {
+function ProductImage({ item, load, preview }) {
   const target = useRef(null)
   const [thumbnail, setThumbnail] = useState('')
   const [failed, setFailed] = useState(false)
   const [opened, setOpened] = useState(false)
-  const [original, setOriginal] = useState('')
-  const [previewError, setPreviewError] = useState(false)
-  const request = {
-    productID: item.productID,
-    attachmentID: item.imageAttachmentID,
-  }
 
   useEffect(() => {
     let active = true
@@ -86,25 +84,6 @@ function ProductImage({ item, preview, load }) {
     }
   }, [item.productID, item.imageAttachmentID, load])
 
-  useEffect(() => {
-    if (!opened || original) return
-    let active = true
-    load({
-      productID: item.productID,
-      attachmentID: item.imageAttachmentID,
-      variant: '',
-    })
-      .then((src) => {
-        if (active) setOriginal(src)
-      })
-      .catch(() => {
-        if (active) setPreviewError(true)
-      })
-    return () => {
-      active = false
-    }
-  }, [opened, original, item.productID, item.imageAttachmentID, load])
-
   const picture = thumbnail ? (
     <img
       src={thumbnail}
@@ -126,55 +105,36 @@ function ProductImage({ item, preview, load }) {
       >
         {failed ? (
           <ImagePlaceholder item={item} state="failed" />
-        ) : preview ? (
+        ) : thumbnail && preview ? (
           <button
             type="button"
             aria-label={`查看${item.name || '产品'}大图`}
-            onClick={() => {
-              setPreviewError(false)
+            aria-haspopup="dialog"
+            onDoubleClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation()
+              event.currentTarget.focus({ preventScroll: true })
               setOpened(true)
             }}
           >
             {picture}
+            <ZoomInOutlined
+              className="erp-task-product-image__zoom"
+              aria-hidden="true"
+            />
           </button>
         ) : (
           picture
         )}
       </span>
-      {preview ? (
-        <Modal
-          title={item.name || '产品主图'}
-          open={opened}
-          onCancel={() => setOpened(false)}
-          footer={null}
-        >
-          {previewError ? (
-            <div role="alert">
-              图片加载失败。
-              <Button
-                onClick={() => {
-                  setPreviewError(false)
-                  load({ ...request, variant: '' })
-                    .then(setOriginal)
-                    .catch(() => setPreviewError(true))
-                }}
-              >
-                重新加载
-              </Button>
-            </div>
-          ) : original ? (
-            <img
-              className="erp-task-product-image__preview"
-              src={original}
-              alt={item.name || '产品主图'}
-              onError={() => setPreviewError(true)}
-            />
-          ) : (
-            <Spin tip="正在加载图片">
-              <div className="erp-task-product-image__loading" />
-            </Spin>
-          )}
-        </Modal>
+      {opened ? (
+        <WorkflowTaskImagePreview
+          item={item}
+          thumbnail={thumbnail}
+          load={load}
+          onClose={() => setOpened(false)}
+        />
       ) : null}
     </>
   )
@@ -182,7 +142,8 @@ function ProductImage({ item, preview, load }) {
 
 export default function WorkflowTaskProductImage({
   item = {},
-  preview = false,
+  preview = true,
+  state = 'empty',
 }) {
   const { adminProfile } = useOutletContext() || {}
   if (
@@ -194,9 +155,9 @@ export default function WorkflowTaskProductImage({
     return (
       <span
         className="erp-task-product-image erp-task-product-image--placeholder"
-        data-image-state="empty"
+        data-image-state={state}
       >
-        <ImagePlaceholder item={item} />
+        <ImagePlaceholder item={item} state={state} />
       </span>
     )
   }

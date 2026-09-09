@@ -1,5 +1,6 @@
 import React from 'react'
 import { Tag } from 'antd'
+import ProductIdentity from './ProductIdentity.jsx'
 
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import {
@@ -91,6 +92,14 @@ function productColumns({ unitDisplay }) {
       copyable: true,
       width: 220,
       sorter: (a, b) => compareText(a?.name, b?.name),
+      className: 'erp-product-identity-cell',
+      render: (value, record) => (
+        <ProductIdentity productId={record.id} name={value} />
+      ),
+      detailValue: (record) => (
+        <ProductIdentity productId={record.id} name={record.name} />
+      ),
+      exportValue: (record) => record.name || '',
     },
     {
       title: '英文品名',
@@ -152,9 +161,21 @@ function productSKUColumns({ productOptions, unitDisplay }) {
       title: '产品',
       exportTitle: '产品',
       dataIndex: 'product_id',
-      width: 180,
+      width: 280,
       sorter: (a, b) => Number(a?.product_id || 0) - Number(b?.product_id || 0),
-      render: (value) => referenceLabel(productOptions, value, '产品'),
+      className: 'erp-product-identity-cell',
+      render: (value) => (
+        <ProductIdentity
+          productId={value}
+          name={referenceLabel(productOptions, value, '产品')}
+        />
+      ),
+      detailValue: (record) => (
+        <ProductIdentity
+          productId={record.product_id}
+          name={referenceLabel(productOptions, record.product_id, '产品')}
+        />
+      ),
       exportValue: (record) =>
         referenceLabel(productOptions, record?.product_id, '产品'),
     },

@@ -1,5 +1,8 @@
 import React, { useCallback } from 'react'
 import { Button, Form, Input, Select, Space } from 'antd'
+import ProductIdentity, {
+  renderProductOption,
+} from '../master-data/ProductIdentity.jsx'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
@@ -141,11 +144,29 @@ export function BOMHeaderFormFields({
             disabled={disabled || productDisabled}
             optionFilterProp="label"
             options={productOptions}
+            listItemHeight={48}
+            optionRender={renderProductOption}
             placeholder="请选择产品"
             showSearch
           />
         </Form.Item>
       ) : null}
+      <Form.Item noStyle shouldUpdate>
+        {({ getFieldValue }) => {
+          const id = getFieldValue('product_id')
+          const product = productOptions.find(
+            (option) => Number(option.value) === Number(id)
+          )
+          return id ? (
+            <div className="erp-business-action-form__field">
+              <ProductIdentity
+                productId={id}
+                name={product?.label || '当前产品'}
+              />
+            </div>
+          ) : null
+        }}
+      </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
         label="BOM 版本"

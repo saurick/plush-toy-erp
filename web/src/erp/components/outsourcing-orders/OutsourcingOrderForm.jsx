@@ -13,6 +13,9 @@ import {
   Select,
   Space,
 } from 'antd'
+import ProductIdentity, {
+  renderProductOption,
+} from '../master-data/ProductIdentity.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
@@ -537,6 +540,8 @@ export default function OutsourcingOrderForm({
                       <Select
                         showSearch
                         options={productOptions}
+                        listItemHeight={48}
+                        optionRender={renderProductOption}
                         optionFilterProp="label"
                         onChange={(value) => onProductChange(field.name, value)}
                       />
@@ -607,6 +612,22 @@ export default function OutsourcingOrderForm({
                       />
                     </Form.Item>
                   )
+                }}
+              </Form.Item>
+              <Form.Item noStyle shouldUpdate>
+                {({ getFieldValue }) => {
+                  const line = getFieldValue(['items', field.name]) || {}
+                  return line.subject_type !== 'MATERIAL' && line.product_id ? (
+                    <ProductIdentity
+                      productId={line.product_id}
+                      name={
+                        productOptions.find(
+                          (option) =>
+                            Number(option.value) === Number(line.product_id)
+                        )?.label || '当前产品'
+                      }
+                    />
+                  ) : null
                 }}
               </Form.Item>
               <Form.Item

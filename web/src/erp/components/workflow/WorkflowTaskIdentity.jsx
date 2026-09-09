@@ -23,7 +23,7 @@ function IdentityCode({ item }) {
 function IdentityItem({ item }) {
   return (
     <span className="erp-task-identity__row">
-      <WorkflowTaskProductImage item={item} preview />
+      <WorkflowTaskProductImage item={item} />
       <span className="erp-task-identity__item">
         <span className="erp-task-identity__name">
           <strong>

@@ -1,6 +1,7 @@
 import { ExportOutlined, ImportOutlined } from '@ant-design/icons'
 import React, { useCallback, useRef, useState } from 'react'
 import { Button, Input, Space } from 'antd'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { useOutsourcingReturnPayable } from './useOutsourcingReturnPayable.mjs'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -814,7 +815,15 @@ export function useOutsourcingSourceFacts({
           : [
               { label: '产品编号', value: item?.product_no_snapshot },
               { label: '产品规格', value: item?.sku_code_snapshot },
-              { label: '产品名称', value: item?.product_name_snapshot },
+              {
+                label: '产品名称',
+                value: (
+                  <ProductIdentity
+                    productId={item?.product_id}
+                    name={item?.product_name_snapshot}
+                  />
+                ),
+              },
             ]),
         { label: '加工项目', value: item?.processing_item },
         { label: '工序', value: item?.process_name_snapshot },

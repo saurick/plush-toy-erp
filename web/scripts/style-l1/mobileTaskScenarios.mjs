@@ -413,7 +413,7 @@ export function createMobileTaskScenarios({
         )
         await clickTaskCardContent(
           rows.first(),
-          rows.first().locator('.erp-task-product-image img')
+          rows.first().getByText('确认兔子样品', { exact: true })
         )
         await page
           .getByTestId('mobile-task-detail-screen')
@@ -438,7 +438,7 @@ export function createMobileTaskScenarios({
           .click()
         await page.waitForFunction(
           () =>
-            document.querySelector('.erp-task-product-image__preview')
+            document.querySelector('.erp-task-image-preview__stage img')
               ?.naturalWidth > 0
         )
         assert.equal(
@@ -447,7 +447,12 @@ export function createMobileTaskScenarios({
           ).length,
           1
         )
-        await page.locator('.ant-modal-close').click()
+        await page
+          .getByRole('button', { name: '关闭图片预览', exact: true })
+          .click()
+        await page
+          .locator('.erp-task-image-preview__stage')
+          .waitFor({ state: 'hidden' })
         await page.goBack()
         await search.waitFor({ state: 'visible' })
         assert.equal(await search.inputValue(), '唯一款号-RB018')
