@@ -76,6 +76,7 @@ function safeFailure(error) {
 function runGit(root, args) {
   const result = spawnSync("git", args, {
     cwd: root,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],

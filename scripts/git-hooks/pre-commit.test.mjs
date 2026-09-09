@@ -487,7 +487,7 @@ test("pre-commit source contains no mutating formatter or git add", () => {
     source,
     /\bnode[^\n]*gen-error-codes\.mjs(?![^\n]*--check)/u,
   );
-  assert.match(source, /git diff --cached --check/u);
+  assert.match(source, /git --no-optional-locks -c diff\.autoRefreshIndex=false diff --cached --check/u);
   assert.match(source, /git checkout-index --all/u);
   assert.match(source, /GIT_WORK_TREE="\$INDEX_ROOT"/u);
   assert.match(source, /SHFMT_CHECK=1/u);

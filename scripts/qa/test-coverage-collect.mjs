@@ -1274,7 +1274,7 @@ export function buildBaselineCommandPlan({
       "t0-static",
       {
         command: "git",
-        args: ["diff", "--check"],
+        args: ["--no-optional-locks", "-c", "diff.autoRefreshIndex=false", "diff", "--check"],
         cwd: projectRoot,
       },
     ],

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export GIT_OPTIONAL_LOCKS=0
 
 print_help() {
   cat <<'USAGE'

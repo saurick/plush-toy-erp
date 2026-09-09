@@ -93,7 +93,9 @@ function sha256(value) {
 async function readExecutionIdentity() {
   const [{ stdout: commit }, { stdout: status }] = await Promise.all([
     execFileAsync("git", ["rev-parse", "HEAD"]),
-    execFileAsync("git", ["status", "--porcelain=v1", "--untracked-files=no"]),
+    execFileAsync("git", ["status", "--porcelain=v1", "--untracked-files=no"], {
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    }),
   ]);
   const hardware = {
     platform: os.platform(),

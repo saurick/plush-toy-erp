@@ -36,8 +36,8 @@ const V1_ACCEPTANCE_PHASES = [
     key: "preflight",
     title: "环境和真源预检",
     commands: [
-      "git status --short",
-      "git diff --check",
+      "git --no-optional-locks status --short",
+      "git --no-optional-locks -c diff.autoRefreshIndex=false diff --check",
       "cd server && make print_db_url",
       "cd server && make migrate_status",
     ],

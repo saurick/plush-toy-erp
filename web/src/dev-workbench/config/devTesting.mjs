@@ -333,9 +333,9 @@ const DEV_TESTING_TIER_HEADINGS = Object.freeze([
 const DEV_TESTING_TIER_COPY_FALLBACKS = Object.freeze({
   T1: [
     'cd /Users/simon/projects/plush-toy-erp',
-    'git status --short',
-    'git diff --stat',
-    'git diff --check',
+    'git --no-optional-locks status --short',
+    'git --no-optional-locks -c diff.autoRefreshIndex=false diff --stat',
+    'git --no-optional-locks -c diff.autoRefreshIndex=false diff --check',
     'grep -R "tenant_id" docs/customers docs/product docs/architecture config deployments server web || true',
     'grep -R "ChangeUsecase\\|change_records" server web docs || true',
   ],

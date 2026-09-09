@@ -73,7 +73,7 @@ collect_targets() {
   elif [[ "${ERROR_CODE_GUARD_STAGED_ONLY:-0}" == "1" ]]; then
     while IFS= read -r -d '' file; do
       raw_files+=("$file")
-    done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+    done < <(git --no-optional-locks -c diff.autoRefreshIndex=false diff --cached --name-only --diff-filter=ACMR -z)
   else
     while IFS= read -r file; do
       raw_files+=("$file")

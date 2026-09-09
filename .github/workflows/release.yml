@@ -312,7 +312,7 @@ jobs:
         run: |
           set -euo pipefail
           make data
-          status="$(git -C .. status --porcelain --untracked-files=all)"
+          status="$(git --no-optional-locks -C .. status --porcelain --untracked-files=all)"
           if [[ -n "$status" ]]; then
             printf '%s\n' "$status"
             echo "[release] make data changed the committed tree"

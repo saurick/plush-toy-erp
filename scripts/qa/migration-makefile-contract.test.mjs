@@ -113,8 +113,8 @@ test("migration generation pins Atlas and closes checksum/revision escape hatche
     /--dev-url "docker:\/\/postgres\/18\/dev\?search_path=public"/u,
   );
   assert.match(source, /migrate_hash: atlas_check/u);
-  assert.match(source, /git diff --name-only -- internal\/data\/model\/migrate/u);
-  assert.match(source, /git diff --cached --name-only -- internal\/data\/model\/migrate/u);
+  assert.match(source, /git --no-optional-locks -c diff\.autoRefreshIndex=false diff --exit-code --name-only -- internal\/data\/model\/migrate/u);
+  assert.match(source, /git --no-optional-locks -c diff\.autoRefreshIndex=false diff --cached --name-only -- internal\/data\/model\/migrate/u);
   assert.match(source, /migrate_hash 只用于新增 custom migration/u);
   assert.doesNotMatch(source, /curl\s+-sSf\s+https:\/\/atlasgo\.sh/u);
 

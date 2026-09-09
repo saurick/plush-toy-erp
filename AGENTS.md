@@ -33,7 +33,7 @@
 - 开始和收口检查 worktree，保留其他任务或用户已有改动，不回退、格式化、删除、stage 或宣称为本轮成果。
 - Goal 的启动、恢复和已写明闭环授权遵循全局 `$prompt-governance`；普通任务与 Goal 都完成当前业务切片、验证和必要回滚，不登记或广播跨会话调度状态。
 - 存在待提交或需交接改动时，在最终回复保留一份被动 `Git handoff record`：精确文件 / hunk、提交分组及中文意图、验证与盲区、外部脏文件、commit / push 授权。简单改动可融入交付摘要；该记录不产生授权或跨会话调度状态。
-- Local 任务首次写入前和任务收口时，用 `GIT_OPTIONAL_LOCKS=0` 读取实时 HEAD、index、`index.lock`、status 和 scoped diff；共享 Local 不运行普通 `git status`。普通个人单 writer 按精确范围继续并保留外部脏现场；只有真实并发 writer、混合 hunk 或 index / `index.lock` 冲突时，才临时串行当前重叠路径或 Git 动作并重新读回，同一时点只能有一个 Git index 操作者。无法证明安全时停止相关写入或 Git 动作并报告，不建立任务调度、资源租约、registry、daemon、轮询、定时唤醒或消息广播。
+- Local 任务首次写入前和任务收口时，用 `GIT_OPTIONAL_LOCKS=0` 读取实时 HEAD、index、`index.lock`、status 和 scoped diff；共享 Local 不运行普通 `git status`。普通个人单 writer 按精确范围继续并保留外部脏现场；真实并发 writer、混合 hunk 或活动索引锁冲突时，才串行受影响路径或 Git 动作，同一时点只能有一个 Git index 操作者。陈旧空锁按全局 Git 恢复规则核实处理；无法证明安全时仅停止受影响的写入或 Git 动作并报告，不建立任务调度、资源租约、registry、daemon、轮询、定时唤醒或消息广播。
 - 本仓库不恢复单独执行规格目录、短任务模板或本地审查报告目录。
 
 ## 过程记录

@@ -11,14 +11,14 @@ cd "$ROOT_DIR"
 STAGED_FILES=()
 while IFS= read -r -d '' file; do
   STAGED_FILES+=("$file")
-done < <(git diff --cached --name-only --diff-filter=ACMRD -z)
+done < <(git --no-optional-locks -c diff.autoRefreshIndex=false diff --cached --name-only --diff-filter=ACMRD -z)
 
 if [[ "${#STAGED_FILES[@]}" -eq 0 ]]; then
   exit 0
 fi
 
 echo "[pre-commit] 检查暂存 diff"
-git diff --cached --check
+git --no-optional-locks -c diff.autoRefreshIndex=false diff --cached --check
 
 INDEX_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/plush-pre-commit-index.XXXXXX")"
 INDEX_ROOT="$(cd "$INDEX_ROOT" && pwd -P)"

@@ -114,11 +114,16 @@ export function buildRepositoryFingerprint({
 }
 
 async function gitBytes(projectRoot, args, maxBuffer) {
-  const { stdout } = await execFileAsync("git", args, {
-    cwd: projectRoot,
-    encoding: null,
-    maxBuffer,
-  });
+  const { stdout } = await execFileAsync(
+    "git",
+    ["-c", "diff.autoRefreshIndex=false", ...args],
+    {
+      cwd: projectRoot,
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+      encoding: null,
+      maxBuffer,
+    },
+  );
   return asBuffer(stdout);
 }
 

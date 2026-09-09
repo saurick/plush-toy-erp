@@ -120,7 +120,7 @@ plan:
         mode="${QA_MODE:-full}"
       fi
       case "$mode" in affected|full) ;; *) echo "[gitlab-ci] invalid QA_MODE=$mode"; exit 1 ;; esac
-      git diff --check "$range"
+      git --no-optional-locks -c diff.autoRefreshIndex=false diff --check "$range"
       git log --check --format= "$history_range"
       trusted_config="$(mktemp)"
       trap 'rm -f "$trusted_config"' EXIT
@@ -734,7 +734,7 @@ quality_affected:
       fi
       if [[ "$make_data" == "true" ]]; then
         (cd server && make data)
-        test -z "$(git status --porcelain --untracked-files=all)"
+        test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
       fi
       if [[ "$effective_mode" == "affected" ]]; then
         bash scripts/qa/affected.sh --base "$range" --run
@@ -744,7 +744,7 @@ quality_affected:
       if [[ "$source_archive" == "true" ]]; then
         node scripts/deploy/source-archive-release-check.mjs --light --ref HEAD
       fi
-      test -z "$(git status --porcelain --untracked-files=all)"
+      test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
   artifacts:
     when: always
     expire_in: 30 days

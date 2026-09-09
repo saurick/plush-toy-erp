@@ -8,14 +8,28 @@ function commandFailure(error, args) {
 }
 
 export function runGit(root, args, options = {}) {
+  // Name-only worktree diffs need a content comparison when stat refresh is disabled.
+  const verifyContents =
+    args[0] === "diff" &&
+    args.some((arg) => ["--name-only", "--name-status", "--raw"].includes(arg)) &&
+    !args.some((arg) =>
+      ["--cached", "--staged", "--exit-code", "--quiet"].includes(arg),
+    );
+  const queryArgs = verifyContents ? ["diff", "--exit-code", ...args.slice(1)] : args;
   try {
-    return execFileSync("git", args, {
-      cwd: root,
-      encoding: options.encoding ?? "utf8",
-      maxBuffer: 16 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    return execFileSync(
+      "git",
+      ["--no-optional-locks", "-c", "diff.autoRefreshIndex=false", ...queryArgs],
+      {
+        cwd: root,
+        encoding: options.encoding ?? "utf8",
+        maxBuffer: 16 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
   } catch (error) {
+    // --exit-code returns 1 for a valid diff; operational errors still fail closed.
+    if (verifyContents && error.status === 1 && !error.signal) return error.stdout;
     throw commandFailure(error, args);
   }
 }

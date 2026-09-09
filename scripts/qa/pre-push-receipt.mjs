@@ -197,6 +197,7 @@ function runCommand(
 function runGit(root, args, options = {}) {
   return runCommand("git", args, {
     cwd: root,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     reason: options.reason || "git_command_failed",
     acceptedStatuses: options.acceptedStatuses,
     timeout: options.timeout,

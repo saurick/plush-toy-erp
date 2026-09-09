@@ -111,7 +111,11 @@ function assertCleanExactHead(root, gitSha, runCommand) {
   const status = runCommand(
     "git",
     ["status", "--porcelain=v1", "--untracked-files=all"],
-    { cwd: root, encoding: "utf8" },
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    },
   );
   if (
     head.error ||

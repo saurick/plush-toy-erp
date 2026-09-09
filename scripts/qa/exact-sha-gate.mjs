@@ -98,6 +98,7 @@ function sha256(value) {
 function run(root, command, args, { acceptedStatuses = [0] } = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],

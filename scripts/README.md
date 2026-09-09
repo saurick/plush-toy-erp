@@ -131,6 +131,12 @@ pnpm smoke:purchase-contract-real-login
 pnpm smoke:processing-contract-real-login
 ```
 
+## Git 只读检查 / Read-only Git checks
+
+构建、验收、CI 和发布检查读取工作区状态时，通过子进程环境 `GIT_OPTIONAL_LOCKS=0` 或 `git --no-optional-locks status` 禁止可选索引刷新；读取差异还需 `-c diff.autoRefreshIndex=false`，仅设置环境变量不能阻止 `git diff` 默认的索引刷新。共享差异读取 helper 对文件名 / 状态差异使用 `--exit-code` 强制内容核验，0 / 1 表示无 / 有差异，其余错误仍阻断，避免时间戳变化误报为文件修改。状态查询仍正常识别 staged、unstaged 和未跟踪内容。`server/Makefile` 同时把该环境变量传给 Go / Atlas 等子工具。这不禁止已授权的 `git add` / `commit` 使用必要锁，也不改变干净工作区或发布门禁。
+
+索引锁恢复沿用全局 Git 规则及 Git 收口 Skill 的一次性检查；产品脚本和 hook 不自动删锁、重试或启动监听器。`scripts/qa/git-readonly.test.mjs` 在独立临时仓库改变文件时间，验证真实状态查询和 Make 版本读取不改写 index，并保留已有锁及正确的脏状态。
+
 ## 推荐顺序
 
 ### 0. 导入冻结与 dry-run 工具 / Import freeze and dry-run tooling

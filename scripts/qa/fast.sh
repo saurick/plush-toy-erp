@@ -108,8 +108,8 @@ qa_fast_repository_guards() {
   bash "$ROOT_DIR/scripts/qa/agents-size.sh"
 
   echo "[qa:fast] 运行 T0 diff whitespace 检查"
-  git diff --check
-  git diff --cached --check
+  git --no-optional-locks -c diff.autoRefreshIndex=false diff --check
+  git --no-optional-locks -c diff.autoRefreshIndex=false diff --cached --check
 
   bash "$ROOT_DIR/scripts/qa/db-guard.sh"
 

@@ -289,6 +289,7 @@ function gitOutput(repoRoot, args, label) {
     command: "git",
     args,
     cwd: repoRoot,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     label,
   }).stdout.trim();
 }

@@ -84,16 +84,16 @@ else
   if [[ -n "$range" ]]; then
     while IFS= read -r f; do
       [[ -n "$f" ]] && files+=("$f")
-    done < <(git diff --name-only "$range")
+    done < <(git --no-optional-locks -c diff.autoRefreshIndex=false diff --exit-code --name-only "$range")
   fi
 
   while IFS= read -r f; do
     [[ -n "$f" ]] && files+=("$f")
-  done < <(git diff --name-only)
+  done < <(git --no-optional-locks -c diff.autoRefreshIndex=false diff --exit-code --name-only)
 
   while IFS= read -r f; do
     [[ -n "$f" ]] && files+=("$f")
-  done < <(git diff --name-only --cached)
+  done < <(git --no-optional-locks -c diff.autoRefreshIndex=false diff --exit-code --name-only --cached)
 
   while IFS= read -r f; do
     [[ "$f" == *.yml || "$f" == *.yaml ]] || continue

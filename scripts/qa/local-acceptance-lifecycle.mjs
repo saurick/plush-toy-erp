@@ -840,6 +840,7 @@ function createDirectRuntime(context) {
       }).trim();
       const status = runCommand("git", ["status", "--porcelain"], {
         cwd: context.repoRoot,
+        env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
         label: "Git source cleanliness",
       }).trim();
       if (head !== identity.commit || status) {

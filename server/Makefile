@@ -1,3 +1,6 @@
+# Read-only Git queries in Make and child tools must not refresh the shared index.
+export GIT_OPTIONAL_LOCKS := 0
+
 GOHOSTOS:=$(shell go env GOHOSTOS)
 # ⚠️ 注意：数据库迁移必须使用 `make data` 生成，严禁手动修改 SQL 文件！详见 internal/data/AI_DB_WORKFLOW.md
 GOPATH:=$(shell go env GOPATH)
@@ -16,7 +19,7 @@ ifeq ($(GIT_ROOT),)
   GIT_DIRTY     :=
 else
   # 工作区是否有未提交改动（包含 staged/unstaged/未跟踪）
-  GIT_DIRTY     := $(shell cd "$(GIT_ROOT)" 2>/dev/null && test -n "$$(git status --porcelain)" && echo "-local" || echo "")
+  GIT_DIRTY     := $(shell cd "$(GIT_ROOT)" 2>/dev/null && test -n "$$(git --no-optional-locks status --porcelain)" && echo "-local" || echo "")
 
   VERSION       := $(shell git -C "$(GIT_ROOT)" describe --tags --always 2>/dev/null || echo local)
 
@@ -136,7 +139,7 @@ ent_migrate: atlas_check
 # 重新计算迁移目录校验，如果改了 migration 的 sql 文件，必须重新计算校验，否则migrate_apply会报错，提示Error: checksum mismatch
 .PHONY: migrate_hash
 migrate_hash: atlas_check
-	@if { git diff --name-only -- internal/data/model/migrate; git diff --cached --name-only -- internal/data/model/migrate; } | grep -E '\.sql$$' | grep -q .; then \
+	@if { git --no-optional-locks -c diff.autoRefreshIndex=false diff --exit-code --name-only -- internal/data/model/migrate; git --no-optional-locks -c diff.autoRefreshIndex=false diff --cached --name-only -- internal/data/model/migrate; } | grep -E '\.sql$$' | grep -q .; then \
 		echo "ERROR: 已跟踪 migration SQL 不可改写；请先恢复历史 SQL，migrate_hash 只用于新增 custom migration"; \
 		exit 1; \
 	fi

@@ -87,6 +87,9 @@ const PHASE_LABEL_TEXT_EXTENSIONS = new Set([
 
 const FIXED_COMMANDS = {
   diff: command("diff-check", "T0", "检查当前 diff 格式", "git", [
+    "--no-optional-locks",
+    "-c",
+    "diff.autoRefreshIndex=false",
     "diff",
     "--check",
   ]),

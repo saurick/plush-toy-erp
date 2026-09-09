@@ -1609,6 +1609,7 @@ function currentGitState(repoRoot, runCommand) {
     command: "git",
     args: ["status", "--porcelain=v1", "--untracked-files=all"],
     cwd: repoRoot,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     label: "read current Git status",
   }).trim();
   return { head, clean: status === "" };
