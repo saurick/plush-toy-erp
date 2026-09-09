@@ -208,7 +208,7 @@ psql_version="$("$psql_bin" --version)"
   exit 1
 }
 atlas_version="$(atlas version 2>&1)"
-grep -Eq "(^|[[:space:]])${atlas_required_version}([[:space:]]|$)" <<<"$atlas_version" || {
+printf '%s\n' "$atlas_version" | grep -Eq "(^|[[:space:]])${atlas_required_version}([[:space:]]|$)" || {
   echo "[backup-restore-rehearsal] Atlas 版本必须是 $atlas_required_version" >&2
   exit 1
 }
@@ -315,7 +315,7 @@ WHERE role.rolname = current_user;")"
 IFS='|' read -r source_user source_database source_postgres_version source_read_only \
   source_super source_createdb source_createrole source_bypassrls \
   source_database_create source_schema_create source_invalid_table_count \
-  <<<"$source_identity"
+  < <(printf '%s\n' "$source_identity")
 [[ "$source_user" == "$source_pg_user" &&
   "$source_database" == "$source_pg_database" &&
   "$source_read_only" == "on" ]] || {
@@ -412,8 +412,7 @@ trap cleanup EXIT
 echo "[backup-restore-rehearsal] backupId=$backup_id"
 echo "[backup-restore-rehearsal] output=$run_dir"
 
-cat >"$command_summary_file" <<EOF
-backupId=$backup_id
+printf '%s\n' "backupId=$backup_id
 customer=$customer
 environment=$environment
 releaseVersion=$release_version
@@ -428,8 +427,7 @@ sourcePolicy=$source_policy
 atlasVersion=$atlas_required_version
 sourceEnv=$source_env
 sourceAlias=env:$source_env
-outputDir=$run_dir
-EOF
+outputDir=$run_dir" >"$command_summary_file"
 
 echo "[backup-restore-rehearsal] running pg_dump with $pg_dump_version"
 PGHOST="$source_pg_host" PGPORT="$source_pg_port" \
@@ -500,14 +498,12 @@ rm -f "$role_secret_file"
 
 restore_port="$(docker port "$container_name" 5432/tcp | awk -F: 'NR==1 {print $NF}')"
 restore_dsn="postgres://erp_migrator:${restore_migrator_pass}@127.0.0.1:${restore_port}/${restore_db}?sslmode=disable"
-cat >"$atlas_config_file" <<EOF
-env "restore" {
-  url = getenv("ATLAS_DATABASE_URL")
+printf '%s\n' "env \"restore\" {
+  url = getenv(\"ATLAS_DATABASE_URL\")
   migration {
-    dir = "file://$repo_root/server/internal/data/model/migrate"
+    dir = \"file://$repo_root/server/internal/data/model/migrate\"
   }
-}
-EOF
+}" >"$atlas_config_file"
 chmod 600 "$atlas_config_file"
 
 atlas_restore_migrate() {
@@ -599,8 +595,7 @@ if [[ "$pending_before" -gt 0 ]]; then
       cat "${migration_matches[0]}"
       printf '\n'
     done <"$pending_versions_file"
-    cat <<'SQL'
-SELECT
+    printf '%s\n' "SELECT
   'database_programmability='
   || count(*) FILTER (WHERE object_kind = 'function')::text
   || '|'
@@ -623,8 +618,7 @@ FROM (
     AND namespace.nspname !~ '^pg_'
     AND NOT trigger.tgisinternal
 ) AS forbidden_object;
-ROLLBACK;
-SQL
+ROLLBACK;"
   } >"$rehearsal_sql"
   chmod 600 "$rehearsal_sql"
   rehearsal_output="$run_dir/migration-rollback-rehearsal.out"
@@ -754,8 +748,7 @@ if [[ "$keep_container" == "1" ]]; then
   restore_target="temp-postgres-container:${container_name}:kept"
 fi
 
-cat >>"$command_summary_file" <<EOF
-restoreTarget=$restore_target
+printf '%s\n' "restoreTarget=$restore_target
 populatedUpgradeAuditStatus=$populated_upgrade_audit_status
 customerConfigCutoverAuditStatus=$customer_config_cutover_audit_status
 databaseConstraintAuditStatus=$database_constraint_audit_status
@@ -766,11 +759,9 @@ restoreMigrationRole=erp_migrator
 rollbackRehearsalStatus=$rollback_rehearsal_status
 schemaReadbackSha256=$schema_readback_sha256
 programmability=$programmability_result
-permissionReadbackStatus=$permission_readback_status
-EOF
+permissionReadbackStatus=$permission_readback_status" >>"$command_summary_file"
 
-cat >"$backup_evidence" <<EOF
-# yoyoosun Backup Restore Rehearsal Evidence
+printf '%s\n' "# yoyoosun Backup Restore Rehearsal Evidence
 
 ## 基本信息
 
@@ -826,77 +817,74 @@ cat >"$backup_evidence" <<EOF
 - [x] 备份已恢复到隔离临时 PostgreSQL 容器。
 - [x] 恢复后已执行 migration status 和 smoke query。
 - [x] 恢复后已读回 schema fingerprint、programmability=0|0|0 和三角色权限合同。
-- [x] 本 evidence 只记录 hash、大小、alias 和状态，不包含 dump、完整 DSN、密码或客户 raw rows。
-EOF
+- [x] 本 evidence 只记录 hash、大小、alias 和状态，不包含 dump、完整 DSN、密码或客户 raw rows。" >"$backup_evidence"
 
-cat >"$report_file" <<EOF
-{
-  "customerCode": "$customer",
-  "environment": "$environment",
-  "releaseVersion": "$release_version",
-  "backupId": "$backup_id",
-  "verifiedAt": "$verified_at",
-  "sourceAlias": "env:$source_env",
-  "restoreTarget": "$restore_target",
-  "artifacts": {
-    "backupFileAlias": "$run_dir/database.dump",
-    "backupEvidence": "backup-evidence.md",
-    "migrationStatus": "migration-status.txt",
-    "preMigrationStatus": "migration-status-before-apply.txt",
-    "commandSummary": "command-summary.txt"
+printf '%s\n' "{
+  \"customerCode\": \"$customer\",
+  \"environment\": \"$environment\",
+  \"releaseVersion\": \"$release_version\",
+  \"backupId\": \"$backup_id\",
+  \"verifiedAt\": \"$verified_at\",
+  \"sourceAlias\": \"env:$source_env\",
+  \"restoreTarget\": \"$restore_target\",
+  \"artifacts\": {
+    \"backupFileAlias\": \"$run_dir/database.dump\",
+    \"backupEvidence\": \"backup-evidence.md\",
+    \"migrationStatus\": \"migration-status.txt\",
+    \"preMigrationStatus\": \"migration-status-before-apply.txt\",
+    \"commandSummary\": \"command-summary.txt\"
   },
-  "backup": {
-    "databaseBackupSize": $backup_size,
-    "databaseBackupHash": "$backup_hash",
-    "storageLocationAlias": "local-output-gitignored",
-    "migrationVersion": "${pre_migration_version:-unknown}",
-    "sourcePolicy": "$source_policy",
-    "sourceRole": "$source_role_alias",
-    "sourcePostgreSQLVersion": "$source_postgres_version",
-    "pgDumpVersion": "$pg_dump_version",
-    "restorePostgreSQLImage": "$postgres_image",
-    "atlasVersion": "$atlas_required_version"
+  \"backup\": {
+    \"databaseBackupSize\": $backup_size,
+    \"databaseBackupHash\": \"$backup_hash\",
+    \"storageLocationAlias\": \"local-output-gitignored\",
+    \"migrationVersion\": \"${pre_migration_version:-unknown}\",
+    \"sourcePolicy\": \"$source_policy\",
+    \"sourceRole\": \"$source_role_alias\",
+    \"sourcePostgreSQLVersion\": \"$source_postgres_version\",
+    \"pgDumpVersion\": \"$pg_dump_version\",
+    \"restorePostgreSQLImage\": \"$postgres_image\",
+    \"atlasVersion\": \"$atlas_required_version\"
   },
-  "restore": {
-    "restoreTestStatus": "passed-temp-container",
-    "migrationBeforeApply": "${pre_migration_version:-unknown}",
-    "restoreMigrationVersion": "${current_version:-unknown}",
-    "pendingFiles": "${pending_files:-unknown}",
-    "rollbackRehearsalStatus": "$rollback_rehearsal_status",
-    "schemaReadbackSha256": "$schema_readback_sha256",
-    "programmability": "$programmability_result",
-    "permissionReadbackStatus": "$permission_readback_status",
-    "populatedUpgradeAuditStatus": "$populated_upgrade_audit_status",
-    "customerConfigCutoverAuditStatus": "$customer_config_cutover_audit_status",
-    "databaseConstraintAuditStatus": "$database_constraint_audit_status"
+  \"restore\": {
+    \"restoreTestStatus\": \"passed-temp-container\",
+    \"migrationBeforeApply\": \"${pre_migration_version:-unknown}\",
+    \"restoreMigrationVersion\": \"${current_version:-unknown}\",
+    \"pendingFiles\": \"${pending_files:-unknown}\",
+    \"rollbackRehearsalStatus\": \"$rollback_rehearsal_status\",
+    \"schemaReadbackSha256\": \"$schema_readback_sha256\",
+    \"programmability\": \"$programmability_result\",
+    \"permissionReadbackStatus\": \"$permission_readback_status\",
+    \"populatedUpgradeAuditStatus\": \"$populated_upgrade_audit_status\",
+    \"customerConfigCutoverAuditStatus\": \"$customer_config_cutover_audit_status\",
+    \"databaseConstraintAuditStatus\": \"$database_constraint_audit_status\"
   },
-  "smoke": {
-    "smokeQueryStatus": "$smoke_query_status",
-    "publicTableCount": "$public_table_count",
-    "adminUserCount": "$admin_user_count",
-    "backendUrl": "${backend_url:-not-run}",
-    "backendHealthStatus": "$backend_health_status",
-    "backendReadyStatus": "$backend_ready_status",
-    "webUrl": "${web_url:-not-run}",
-    "webSmokeStatus": "$web_smoke_status"
+  \"smoke\": {
+    \"smokeQueryStatus\": \"$smoke_query_status\",
+    \"publicTableCount\": \"$public_table_count\",
+    \"adminUserCount\": \"$admin_user_count\",
+    \"backendUrl\": \"${backend_url:-not-run}\",
+    \"backendHealthStatus\": \"$backend_health_status\",
+    \"backendReadyStatus\": \"$backend_ready_status\",
+    \"webUrl\": \"${web_url:-not-run}\",
+    \"webSmokeStatus\": \"$web_smoke_status\"
   },
-  "redaction": {
-    "containsSecrets": false,
-    "containsRawCustomerRows": false,
-    "containsDumpContent": false,
-    "containsFullDsn": false
+  \"redaction\": {
+    \"containsSecrets\": false,
+    \"containsRawCustomerRows\": false,
+    \"containsDumpContent\": false,
+    \"containsFullDsn\": false
   },
-  "summary": {
-    "backupCreated": true,
-    "restoreCompleted": true,
-    "migrationStatus": "$migration_status",
-    "populatedUpgradeAuditStatus": "$populated_upgrade_audit_status",
-    "customerConfigCutoverAuditStatus": "$customer_config_cutover_audit_status",
-    "databaseConstraintAuditStatus": "$database_constraint_audit_status",
-    "smokeQueryStatus": "$smoke_query_status"
+  \"summary\": {
+    \"backupCreated\": true,
+    \"restoreCompleted\": true,
+    \"migrationStatus\": \"$migration_status\",
+    \"populatedUpgradeAuditStatus\": \"$populated_upgrade_audit_status\",
+    \"customerConfigCutoverAuditStatus\": \"$customer_config_cutover_audit_status\",
+    \"databaseConstraintAuditStatus\": \"$database_constraint_audit_status\",
+    \"smokeQueryStatus\": \"$smoke_query_status\"
   }
-}
-EOF
+}" >"$report_file"
 
 if [[ "$migration_status" != "ok" || "$populated_upgrade_audit_status" != "passed" || "$customer_config_cutover_audit_status" != "passed" || "$database_constraint_audit_status" != "passed" || "$smoke_query_status" != "passed" || ( "$rollback_rehearsal_status" != "passed" && "$rollback_rehearsal_status" != "not-required" ) || "$programmability_result" != "0|0|0" || "$permission_readback_status" != "passed" ]]; then
   echo "[backup-restore-rehearsal] failed: migrationStatus=$migration_status populatedUpgradeAuditStatus=$populated_upgrade_audit_status customerConfigCutoverAuditStatus=$customer_config_cutover_audit_status databaseConstraintAuditStatus=$database_constraint_audit_status rollbackRehearsalStatus=$rollback_rehearsal_status programmability=$programmability_result permissionReadbackStatus=$permission_readback_status smokeQueryStatus=$smoke_query_status" >&2

@@ -209,6 +209,14 @@ function publicIssue(error, fallbackCode = 'operation_blocked') {
       message: '迁移写入或读回结果尚未证明；请刷新状态核对，系统不会自动重试',
     }
   }
+  if (error?.code === 'migration_command_timeout') {
+    return {
+      code: 'migration_command_timeout',
+      severity: 'blocked',
+      message:
+        '迁移命令等待超时，本次命令及其子进程已停止；请检查当前步骤后重新准备',
+    }
+  }
   if (
     /数据库.*(?:配置|地址|连接)|(?:dial tcp|connection refused|context deadline|timed? ?out|aborted|password authentication failed|no such host|could not translate host name)|超时/iu.test(
       diagnostic
@@ -358,6 +366,12 @@ export function createDevDatabaseMigrationService({
   }
 
   const runPrepare = async (operationId) => {
+    const progress = (message) =>
+      transitionDatabaseMigrationOperation(store, operationId, {
+        status: 'preparing',
+        message,
+        now: now().toISOString(),
+      })
     try {
       const initialTarget = await runtime.status()
       if (
@@ -388,13 +402,16 @@ export function createDevDatabaseMigrationService({
         })
         return
       }
+      progress('正在检查迁移准备工具')
       const tools = normalizeToolReadiness(await runtime.toolReadiness())
       if (tools.status !== 'ready') {
         throw new DatabaseMigrationActionError(migrationToolIssueMessage(), {
           code: 'migration_tool_unavailable',
         })
       }
+      progress('正在停止本地后端，准备验证迁移计划')
       await runtime.stopRuntime()
+      progress('正在验证迁移计划及事务回滚')
       const plan = await runtime.plan(initialTarget.targetConfirmation)
       const reusableBackupOperation = listDatabaseMigrationOperations(store, {
         limit: 30,
@@ -414,8 +431,11 @@ export function createDevDatabaseMigrationService({
         (await runtime.verifyBackup(reusableBackupOperation.backup))
           ? reusableBackupOperation.backup
           : null
+      progress('正在验证备份与隔离恢复')
       const backup =
-        reusableBackup || (await runtime.backup(operationId, initialTarget))
+        reusableBackup ||
+        (await runtime.backup(operationId, initialTarget, progress))
+      progress('正在复核迁移文件、目标状态和备份证据')
       const finalSource = await runtime.sourceIdentity()
       if (finalSource.fingerprint !== source.fingerprint) {
         throw new DatabaseMigrationActionError(

@@ -4,6 +4,15 @@
 
 ## 当前活跃事项
 
+### 数据库迁移准备阻塞修正（2026-09-09）
+
+- 根因与修正：本机 Bash 在备份说明的 heredoc 写入阶段阻塞，原超时只结束父进程并留下子进程。备份脚本的六处文本生成改用 `printf`；迁移命令使用独立进程组并在超时后清理子进程，准备操作按实际步骤更新事件和时间，失败后可重新准备。已按 PID 和输出文件身份清理本次旧孤儿进程，未修改全局 Bash 配置。
+- 验证：备份脚本、迁移 runtime / service / store、终端入口、恢复页与启动回归共 95 项通过；Shell 语法、ShellCheck 和精确 diff 检查通过。未设置 `BASH_COMPAT` 的正式 `make migrate_prepare` 用时约 22 秒，真实备份、隔离恢复、回滚预演、升级与权限 / schema 读回通过；恢复容器及执行锁已清理，浏览器显示等待确认。
+- 共享开发库执行：随后按本轮明确授权，使用同一次 ready 操作 `1a7b5b76-1b10-4ab8-b513-6f7f85014353` 执行 `make migrate_execute`，2026-09-09 10:29:11 完成。执行前重新证明 source / target 未变且备份 SHA-256 一致；3 条 migration 只 apply 一次，从 `20260908123839` 升级至 `20260908172207`，读回 `132/132`、`pending=0`、同目标 schema 零差异及后端 health / ready 均为 200。操作为 `passed`，执行锁已释放，已验证的备份 `br-yoyoosun-20260909T100908+0800` 保留。
+- 页面 / 接口：迁移页显示已完成，普通 ERP 页面已退出恢复模式，前端 `/rpc/system` 的 `ping` 返回 `code=0 / pong=pong`，页面无控制台错误。当前演示会话显示功能预览，本次未将它作为订单、BOM 等完整业务验收证据。
+- 边界：本次运行只涉及登记的共享开发库与本地后端，未发布演示或正式环境，未运行全量发布门禁或客户 UAT。用户随后授权提交本轮修复并移走遗留 Git index 锁；已确认没有锁占用或 Git 进程，将锁原样另存于 `.git/`，保留其他任务的业务改动，未获推送授权。
+- Git handoff record：本轮独立提交意图为 `fix: 修正迁移准备阻塞与超时清理`。精确文件为 `deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh`、`web/dev-server/devDatabaseMigrationRuntime.mjs`、`web/dev-server/devDatabaseMigrationPlugin.mjs`、`scripts/qa/dev-database-migration-operation-store.mjs`、上述 runtime / plugin 同名测试、`scripts/deploy/backup-restore-rehearsal-script.test.mjs`、`scripts/README.md` 的迁移准备说明及本节新增内容；`progress.md` 其余已有改动不属于本轮。主要验证入口为 `node --test` 的备份脚本、operation-store、runtime、plugin、recovery-plugin、local-migration、local-migration-workflow、migration-makefile-contract、startWebDev 九份测试及 `make migrate_prepare`；当前 `pnpm start` 已重新启动并证明 pending migration 时恢复页可达。Git commit 已获授权，仅按上述文件和本节精确暂存；push 未获授权。
+
 ### 款号真源与任务信息贯通（2026-09-08）
 
 - 甲方确认业务称谓为“款号”。材料档案以 `materials.supplier_item_no` 保存完整文本，保留商家名、字母、数字及符号；系统物料编号继续独立存在，缺值不代填。任务、搜索、复制、导出、BOM 导入核对和默认打印同步该口径，原工作簿“厂商料号”列仍可识别；已有打印草稿和业务事实不回写。

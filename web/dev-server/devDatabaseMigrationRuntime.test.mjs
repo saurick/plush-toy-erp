@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -17,11 +18,92 @@ import {
   DEV_DATABASE_MIGRATION_SOURCE_FILES,
   SHARED_DEV_BACKUP_SOURCE_POLICY,
   buildSharedDevBackupRehearsalArgs,
+  createBackupProgressReporter,
   createDevDatabaseMigrationRuntime,
+  executeCommand,
   readDatabaseMigrationToolReadiness,
   redactDatabaseMigrationDiagnostic,
   waitForRuntime,
 } from './devDatabaseMigrationRuntime.mjs'
+
+test('migration commands return output and preserve failure diagnostics', async () => {
+  assert.deepEqual(
+    await executeCommand(process.execPath, ['-e', 'console.log("ready")']),
+    {
+      stdout: 'ready\n',
+      stderr: '',
+    }
+  )
+  await assert.rejects(
+    executeCommand(process.execPath, [
+      '-e',
+      'console.error("failed-check"); process.exit(7)',
+    ]),
+    (error) => error.exitCode === 7 && /failed-check/u.test(error.diagnostic)
+  )
+})
+
+test('migration timeout kills an owned child tree before reporting failure', async (t) => {
+  const root = createRoot(t)
+  const pidFile = path.join(root, 'child.pid')
+  const unrelated = spawn(
+    process.execPath,
+    ['-e', 'setInterval(() => {}, 1000)'],
+    { stdio: 'ignore' }
+  )
+  t.after(() => unrelated.kill('SIGKILL'))
+  const script = `
+    const { spawn } = require('node:child_process');
+    const { writeFileSync } = require('node:fs');
+    process.on('SIGTERM', () => {});
+    const child = spawn(process.execPath, ['-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'], { stdio: 'inherit' });
+    writeFileSync(process.argv[1], String(child.pid));
+    setInterval(() => {}, 1000);
+  `
+  const started = Date.now()
+  await assert.rejects(
+    executeCommand(process.execPath, ['-e', script, pidFile], {
+      timeout: 500,
+      killGraceMs: 100,
+    }),
+    (error) => error.code === 'migration_command_timeout'
+  )
+  assert(Date.now() - started < 5000)
+  const pid = Number(readFileSync(pidFile, 'utf8'))
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      process.kill(pid, 0)
+    } catch (error) {
+      assert.equal(error.code, 'ESRCH')
+      assert.doesNotThrow(() => process.kill(unrelated.pid, 0))
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+  t.after(() => {
+    try {
+      process.kill(pid, 'SIGKILL')
+    } catch {}
+  })
+  assert.fail('owned child survived command timeout')
+})
+
+test('backup progress accepts only fixed stages and handles chunk boundaries', () => {
+  const messages = []
+  const report = createBackupProgressReporter((message) =>
+    messages.push(message)
+  )
+  report('[backup-restore-rehearsal] starting restore cont')
+  report('ainer\n[backup-restore-rehearsal] output=/tmp/private\n')
+  report(
+    '[backup-restore-rehearsal] restoring dump into isolated container\r\n'
+  )
+  report('postgres://user:secret@host/db\n')
+  assert.deepEqual(messages, [
+    '正在启动隔离恢复环境',
+    '正在将备份恢复到隔离数据库',
+  ])
+})
 
 test('database migration runtime handles spawn failure without crashing the workbench', async () => {
   const child = new EventEmitter()

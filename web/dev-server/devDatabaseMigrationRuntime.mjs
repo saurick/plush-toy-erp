@@ -167,21 +167,151 @@ function commandFailure(error, fallback) {
   return wrapped
 }
 
-async function executeCommand(
+export async function executeCommand(
   command,
   args,
-  { cwd, env, timeout = COMMAND_TIMEOUT_MS, maxBuffer = 16 * 1024 * 1024 } = {}
+  {
+    cwd,
+    env,
+    timeout = COMMAND_TIMEOUT_MS,
+    maxBuffer = 16 * 1024 * 1024,
+    onStdout,
+    killGraceMs = 1000,
+  } = {}
 ) {
+  let child
+  let timer
+  let timedOut = false
+  let outputError
+  let cleanup
+  const signalGroup = async (signal) => {
+    if (!child?.pid) return
+    try {
+      if (process.platform === 'win32') {
+        await execFileAsync(
+          'taskkill',
+          ['/pid', String(child.pid), '/T', '/F'],
+          { timeout: 5000 }
+        )
+      } else process.kill(-child.pid, signal)
+    } catch (error) {
+      if (
+        error.code !== 'ESRCH' &&
+        !(process.platform === 'win32' && error.code === 128)
+      )
+        throw error
+    }
+  }
+  const stop = () => {
+    cleanup ||= (async () => {
+      await signalGroup('SIGTERM')
+      await new Promise((resolve) => setTimeout(resolve, killGraceMs))
+      await signalGroup('SIGKILL')
+    })()
+    return cleanup
+  }
   try {
-    return await execFileAsync(command, args, {
-      cwd,
-      env,
-      timeout,
-      maxBuffer,
-      encoding: 'utf8',
+    const result = await new Promise((resolve, reject) => {
+      child = spawn(command, args, {
+        cwd,
+        env,
+        detached: process.platform !== 'win32',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      const output = { stdout: '', stderr: '' }
+      for (const stream of ['stdout', 'stderr']) {
+        let bytes = 0
+        child[stream].setEncoding('utf8')
+        child[stream].on('data', (chunk) => {
+          if (outputError) return
+          bytes += Buffer.byteLength(chunk)
+          if (bytes > maxBuffer) {
+            outputError = new Error('迁移命令输出超过限制')
+            void stop().catch(reject)
+            return
+          }
+          output[stream] += chunk
+          try {
+            if (stream === 'stdout') onStdout?.(chunk)
+          } catch (error) {
+            outputError = error
+            void stop().catch(reject)
+          }
+        })
+      }
+      child.once('error', (error) => resolve({ error, ...output }))
+      child.once('close', (code, signal) => {
+        const error =
+          code === 0
+            ? null
+            : Object.assign(new Error(`${command} exited: ${code ?? signal}`), {
+                code,
+              })
+        resolve({ error, ...output })
+      })
+      timer = setTimeout(() => {
+        timedOut = true
+        void stop().catch(reject)
+      }, timeout)
     })
+    clearTimeout(timer)
+    // A shell can exit while its children survive and still hold output pipes.
+    if (result.error || timedOut || outputError) await stop()
+    if (timedOut) {
+      const error = new Error('迁移命令超时，已停止本次命令及其子进程')
+      error.code = 'migration_command_timeout'
+      error.stdout = result.stdout
+      error.stderr = result.stderr
+      throw error
+    }
+    if (outputError) throw outputError
+    if (result.error) {
+      throw Object.assign(result.error, {
+        stdout: result.stdout,
+        stderr: result.stderr,
+      })
+    }
+    return { stdout: result.stdout, stderr: result.stderr }
   } catch (error) {
-    throw commandFailure(error, `${command} 未完成`)
+    const failure = commandFailure(error, `${command} 未完成`)
+    if (error.code === 'migration_command_timeout') failure.code = error.code
+    throw failure
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export function createBackupProgressReporter(onProgress) {
+  const messages = new Map([
+    ['starting restore container', '正在启动隔离恢复环境'],
+    ['restoring dump into isolated container', '正在将备份恢复到隔离数据库'],
+    ['validating migration directory', '正在校验迁移文件'],
+    [
+      'reading pre-apply migration status against restored DB',
+      '正在核对恢复库的迁移状态',
+    ],
+    ['auditing populated upgrade boundaries', '正在检查恢复库的存量升级条件'],
+    ['auditing customer config cutover boundaries', '正在检查恢复库的客户配置'],
+    ['auditing database constraint boundaries', '正在检查恢复库的数据约束'],
+    ['running tx-mode=all dry-run', '正在隔离数据库预演迁移及事务回滚'],
+    ['applying migrations against restored DB', '正在隔离数据库验证升级'],
+    [
+      'running post-apply migration status against restored DB',
+      '正在读回隔离升级结果并核对恢复证据',
+    ],
+  ])
+  let pending = ''
+  return (chunk) => {
+    pending += String(chunk)
+    const lines = pending.split(/\r?\n/u)
+    pending = (lines.pop() || '').slice(-1024)
+    for (const line of lines) {
+      const step = line.replace(/^\[backup-restore-rehearsal\] /u, '')
+      const message = messages.get(step)
+      if (line.startsWith('[backup-restore-rehearsal] ') && message) {
+        onProgress(message)
+      }
+    }
   }
 }
 
@@ -471,7 +601,7 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
       })
       return parseMigrationPlanOutput(result.stdout)
     },
-    async backup(operationId, expectedTarget) {
+    async backup(operationId, expectedTarget, onProgress = () => {}) {
       const dsnResult = await executeCommand(
         'go',
         ['run', './cmd/dburl', '-conf', './configs/dev/config.yaml'],
@@ -485,12 +615,14 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
       if (!/^postgres(?:ql)?:\/\//u.test(sourceDsn)) {
         throw new Error('shared development database URL is unavailable')
       }
+      onProgress('正在备份共享开发库，源库连接只读')
       const result = await executeCommand(
         'bash',
         buildSharedDevBackupRehearsalArgs(operationId),
         {
           cwd: root,
           env: { ...process.env, SOURCE_POSTGRES_DSN: sourceDsn },
+          onStdout: createBackupProgressReporter(onProgress),
         }
       )
       const reportPath = parseBackupReportPath(result.stdout, root)

@@ -36,7 +36,14 @@ const TERMINAL_STATUSES = new Set([
   "not_proven",
 ]);
 const TRANSITIONS = Object.freeze({
-  preparing: new Set(["ready", "passed", "failed", "blocked", "not_proven"]),
+  preparing: new Set([
+    "preparing",
+    "ready",
+    "passed",
+    "failed",
+    "blocked",
+    "not_proven",
+  ]),
   ready: new Set(["applying", "blocked", "not_proven"]),
   applying: new Set([
     "restarting",

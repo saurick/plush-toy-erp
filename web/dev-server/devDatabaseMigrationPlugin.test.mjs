@@ -245,6 +245,74 @@ test('database migration service prepares once, applies once, reads back, and re
   )
 })
 
+test('preparation records live backup stages and allows retry after a cleaned-up timeout', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  const originalBackup = runtime.backup
+  let releaseBackup
+  const gate = new Promise((resolve) => {
+    releaseBackup = resolve
+  })
+  let reportProgress
+  runtime.backup = async (_operationId, _target, progress) => {
+    reportProgress = progress
+    progress('正在启动隔离恢复环境')
+    await gate
+    const error = new Error('command timed out')
+    error.code = 'migration_command_timeout'
+    throw error
+  }
+  let tick = 0
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+    now: () => new Date(Date.UTC(2026, 8, 9, 1, 0, tick++)),
+  })
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  for (let attempt = 0; attempt < 50 && !reportProgress; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  const preparing = service.readOperation(result.operation.id)
+  assert.equal(preparing.status, 'preparing')
+  assert.equal(preparing.message, '正在启动隔离恢复环境')
+  assert(preparing.updatedAt > preparing.createdAt)
+  assert(
+    preparing.events.some(
+      (event) => event.message === '正在验证迁移计划及事务回滚'
+    )
+  )
+  releaseBackup()
+  const blocked = await waitForOperation(service, result.operation.id, [
+    'blocked',
+  ])
+  assert.equal(blocked.issues[0].code, 'migration_command_timeout')
+  assert.equal(blocked.confirmationPrompt, null)
+  assert.equal(
+    calls.some((call) => call.startsWith('apply:')),
+    false
+  )
+  assert.throws(
+    () => reportProgress('迟到的进度'),
+    /operation transition is invalid/u
+  )
+  runtime.backup = originalBackup
+  const retry = await service.act({
+    action: 'prepare',
+    idempotencyKey:
+      'database-migration:prepare:22222222-2222-4222-8222-222222222222',
+  })
+  assert.equal(
+    (await waitForOperation(service, retry.operation.id, ['ready'])).backup
+      .restoreVerified,
+    true
+  )
+})
+
 test('database migration service reports runtime recovery only after migration and health readback', async (t) => {
   const { root, store } = createProject(t)
   const calls = []

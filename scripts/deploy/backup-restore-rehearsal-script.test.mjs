@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
@@ -100,7 +101,7 @@ test("backup restore rehearsal requires existing release evidence dir before ext
 });
 
 test("backup restore rehearsal report shape stays compatible with release evidence gate", () => {
-  const source = fs.readFileSync(scriptPath, "utf8");
+  const source = fs.readFileSync(scriptPath, "utf8").replaceAll('\\"', '"');
 
   for (const requiredTerm of [
     'backup_purpose="pre-migration"',
@@ -174,7 +175,7 @@ test("backup restore rehearsal report shape stays compatible with release eviden
 });
 
 test("backup restore rehearsal keeps credentials private and uses the full migration contract", () => {
-  const source = fs.readFileSync(scriptPath, "utf8");
+  const source = fs.readFileSync(scriptPath, "utf8").replaceAll('\\"', '"');
 
   assert.match(source, /^umask 077$/m);
   assert.match(source, /postgres:18\.1/);
@@ -209,8 +210,69 @@ test("backup restore rehearsal keeps credentials private and uses the full migra
   assert.match(source, /chmod 600 "\$private_file"/);
 });
 
-test("backup restore rehearsal scopes the shared development source exception", () => {
+test("backup documents are written without Bash heredoc pipe blocking", (t) => {
   const source = fs.readFileSync(scriptPath, "utf8");
+  assert.doesNotMatch(source, /<<<?/u);
+  const writes = [
+    ...source.matchAll(
+      /^printf '%s\\n' "(?:\\[\s\S]|[^"\\])*" >>?"\$(?:command_summary_file|atlas_config_file|backup_evidence|report_file)"$/gmu,
+    ),
+  ].map((match) => match[0]);
+  assert.equal(writes.length, 5);
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "plush-backup-documents-"),
+  );
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const env = { ...process.env };
+  delete env.BASH_COMPAT;
+  for (const [, name] of writes
+    .join("\n")
+    .matchAll(/\$\{?([a-z_][a-z0-9_]*)/gu))
+    env[name] = `test-${name}`;
+  for (const name of [
+    "command_summary_file",
+    "atlas_config_file",
+    "backup_evidence",
+    "report_file",
+  ])
+    env[name] = path.join(directory, name);
+  Object.assign(env, {
+    backup_size: "1234",
+    backup_hash: "a".repeat(64),
+    repo_root: "/test/repo with spaces",
+    migration_status: "ok",
+    pending_files: "0",
+    source_policy: "shared-dev-session-read-only",
+  });
+  const result = spawnSync("bash", ["-eu", "-c", writes.join("\n")], {
+    env,
+    encoding: "utf8",
+    timeout: 3000,
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(fs.readFileSync(env.report_file, "utf8"));
+  assert.equal(report.backup.databaseBackupSize, 1234);
+  assert.equal(report.backup.databaseBackupHash, "a".repeat(64));
+  assert.equal(report.backup.sourcePolicy, "shared-dev-session-read-only");
+  assert.equal(report.restore.pendingFiles, "0");
+  assert.equal(report.summary.restoreCompleted, true);
+  assert.equal(report.redaction.containsSecrets, false);
+  const summary = fs.readFileSync(env.command_summary_file, "utf8");
+  assert.match(summary, /^backupId=test-backup_id$/mu);
+  assert.match(summary, /^restoreTarget=test-restore_target$/mu);
+  assert.match(
+    fs.readFileSync(env.atlas_config_file, "utf8"),
+    /file:\/\/\/test\/repo with spaces\/server\/internal\/data\/model\/migrate/u,
+  );
+  assert.match(
+    fs.readFileSync(env.backup_evidence, "utf8"),
+    /\| databaseBackupSize \| 1234 \|/u,
+  );
+});
+
+test("backup restore rehearsal scopes the shared development source exception", () => {
+  const source = fs.readFileSync(scriptPath, "utf8").replaceAll('\\"', '"');
   const sharedPolicyStart = source.indexOf(
     'if [[ "$source_policy" == "shared-dev-session-read-only" ]]',
   );
