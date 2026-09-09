@@ -652,10 +652,6 @@ test('style-l1 operational fact mock enforces production requirement and issue a
   assert.equal(requirements.result.code, 0)
   assert.equal(requirements.result.data.material_requirements.length, 1)
   assert.equal(
-    requirements.result.data.material_requirements[0].production_operation_code,
-    'FABRIC_PROCESSING'
-  )
-  assert.equal(
     requirements.result.data.material_requirements[0]
       .approved_over_issue_quantity,
     '0'

@@ -99,8 +99,8 @@ status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
 | --- | --- |
 | Schema | <code>public</code> |
 | 分类 | MasterData / 主数据 |
-| 用途 | 保存一个 BOM 版本引用的物料、单位、用量、损耗率和显式工序归属。 |
-| 明确不负责 | production_operation_code 必须显式绑定，不能从位置、名称或其他自由文本推断。 |
+| 用途 | 保存材料在各部位的单位用量、损耗、片数和工艺资料；界面按材料分组复用主数据。 |
+| 明确不负责 | 不保存委外或车间执行归属。单位用量已包含该部位片数，汇总按生产数量乘单位用量乘一加损耗率；片数不再重复相乘。 |
 | 生命周期 / 删除语义 | 仅所属 BOM 为 DRAFT 时可新增、修改、替换或移除；激活或归档后不得直接编辑。 |
 | 写入边界 | InventoryUsecase 的 BOM 聚合保存事务维护；不允许独立绕过 BOM 状态写入。 |
 
@@ -116,7 +116,6 @@ status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
 | <code>total_usage_snapshot</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务发生时冻结的显示快照，不回写上游主数据。 |
 | <code>process_base</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>process_method</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>production_operation_code</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>note</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
@@ -148,12 +147,6 @@ status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
 
 ```sql
 loss_rate >= 0
-```
-
-- <code>bom_items_production_operation_allowed</code>
-
-```sql
-production_operation_code IS NULL OR production_operation_code = 'FABRIC_PROCESSING'
 ```
 
 - <code>bom_items_quantity_positive</code>
@@ -309,8 +302,8 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 | --- | --- |
 | Schema | <code>public</code> |
 | 分类 | MasterData / 主数据 |
-| 用途 | 保存 BOM、采购、库存和生产引用的物料主档。 |
-| 明确不负责 | 物料分类和默认单位不等于采购、在库数量或成本事实。 |
+| 用途 | 保存可复用材料名称、厂商、厂商料号、色号、规格、默认单位、库存类别和默认入库仓。 |
+| 明确不负责 | 厂商与料号色号组合决定材料身份；同料号色号的不同厂商保留独立档案。category 保存细分分类；stock_category 区分主料、辅料、包材、其他材料。默认仓只预填收货，不代替入库事实。 |
 | 生命周期 / 删除语义 | 启用或停用；停用阻止新业务引用但保留历史。 |
 | 写入边界 | MasterDataUsecase 创建、修改和启停。 |
 
@@ -323,11 +316,14 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 | <code>name</code> | <code>varchar(255)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>supplier_item_no</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
 | <code>category</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>stock_category</code> | <code>varchar(32)</code> | <code>string</code> | 非空 | <code>&#39;UNCLASSIFIED&#39;</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>spec</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>color</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+| <code>default_warehouse_id</code> | <code>bigint</code> | <code>int</code> | 可空 | — | — | 外键，关联 `warehouses`。 |
+| <code>supplier_id</code> | <code>bigint</code> | <code>int</code> | 可空 | — | — | 外键，关联 `suppliers`。 |
 | <code>default_unit_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 外键，关联 `units`。 |
 
 ### 主键
@@ -338,7 +334,9 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 
 | 约束 | 本表字段 | 引用 | ON UPDATE | ON DELETE |
 | --- | --- | --- | --- | --- |
+| <code>materials_suppliers_supplier</code> | <code>supplier_id</code> | [<code>public.suppliers</code>](主数据与BOM.md#table-suppliers) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
 | <code>materials_units_materials</code> | <code>default_unit_id</code> | [<code>public.units</code>](主数据与BOM.md#table-units) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
+| <code>materials_warehouses_default_warehouse</code> | <code>default_warehouse_id</code> | [<code>public.warehouses</code>](主数据与BOM.md#table-warehouses) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
 
 ### 索引
 
@@ -347,10 +345,17 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 | <code>material_category</code> | 否 | <code>category</code> | — |
 | <code>material_code</code> | 是 | <code>code</code> | — |
 | <code>material_name</code> | 否 | <code>name</code> | — |
+| <code>material_stock_category</code> | 否 | <code>stock_category</code> | — |
+| <code>material_supplier_id_supplier_item_no</code> | 是 | <code>supplier_id</code>, <code>supplier_item_no</code> | <code>supplier_id IS NOT NULL AND supplier_item_no IS NOT NULL AND color IS NULL</code> |
+| <code>material_supplier_id_supplier_item_no_color</code> | 是 | <code>supplier_id</code>, <code>supplier_item_no</code>, <code>color</code> | <code>supplier_id IS NOT NULL AND supplier_item_no IS NOT NULL AND color IS NOT NULL</code> |
 
 ### CHECK 约束
 
-无表级 CHECK。
+- <code>materials_stock_category_check</code>
+
+```sql
+stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')
+```
 
 ### 代码与业务真源
 
@@ -767,7 +772,7 @@ supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service',
 | Schema | <code>public</code> |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存库存、入库、调拨、出货和数据范围引用的仓库主档。 |
-| 明确不负责 | 仓库主档不保存库存数量；余额和流水仍在库存事实层。 |
+| 明确不负责 | type 区分主料仓、辅料仓、包材仓、其他材料仓、原辅料综合仓和成品仓；未分类仓阻止新入库。仓库主档不保存库存数量，余额和流水仍在库存事实层。 |
 | 生命周期 / 删除语义 | 启用或停用；停用阻止新业务引用并保留历史。 |
 | 写入边界 | MasterDataUsecase 创建、修改和启停。 |
 
@@ -800,7 +805,11 @@ supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service',
 
 ### CHECK 约束
 
-无表级 CHECK。
+- <code>warehouses_type_check</code>
+
+```sql
+type IN ('MAIN_MATERIAL', 'AUXILIARY_MATERIAL', 'PACKAGING_MATERIAL', 'OTHER_MATERIAL', 'MATERIAL', 'FINISHED_GOODS', 'UNCLASSIFIED')
+```
 
 ### 代码与业务真源
 

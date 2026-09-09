@@ -55,6 +55,8 @@ export function materialOption(material = {}) {
     label: compactParts([
       material.code || '材料已关联',
       material.name,
+      material.supplier_name,
+      material.supplier_item_no,
       material.spec,
       material.color,
     ]),
@@ -254,6 +256,12 @@ export function warehouseOptionFromRecord(record = {}) {
   const warehouseCode = record.warehouse_code || record.code
   return {
     value,
+    ...(record.type || record.warehouse_type
+      ? { type: record.type || record.warehouse_type }
+      : {}),
+    ...(typeof record.is_active === 'boolean'
+      ? { is_active: record.is_active }
+      : {}),
     label:
       warehouseName || warehouseCode
         ? compactParts([warehouseName, warehouseCode])

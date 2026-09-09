@@ -21,10 +21,11 @@ import (
 )
 
 type inventoryTestFixtures struct {
-	unitID      int
-	materialID  int
-	productID   int
-	warehouseID int
+	unitID             int
+	materialID         int
+	productID          int
+	warehouseID        int
+	productWarehouseID int
 }
 
 func operationalFactStatusMutation(id, expectedVersion, actorID int, reason string) *biz.OperationalFactStatusMutation {
@@ -68,7 +69,7 @@ func TestInventoryMasterDataCodeUnique(t *testing.T) {
 	if _, err := client.Warehouse.Create().
 		SetCode("RAW-01").
 		SetName("重复仓库").
-		SetType("RAW_MATERIAL").
+		SetType("MATERIAL").
 		Save(ctx); !ent.IsConstraintError(err) {
 		t.Fatalf("expected warehouse code unique constraint, got %v", err)
 	}
@@ -104,11 +105,13 @@ func createInventoryTestFixtures(t *testing.T, ctx context.Context, client *ent.
 	material := createTestMaterial(t, ctx, client, unit.ID, "MAT-INV-001")
 	product := createTestProduct(t, ctx, client, unit.ID, "PRD-INV-001")
 	warehouse := createTestWarehouse(t, ctx, client, "WH-INV-001")
+	productWarehouse := createTestProductWarehouse(t, ctx, client, "WH-FINISHED-001")
 	return inventoryTestFixtures{
-		unitID:      unit.ID,
-		materialID:  material.ID,
-		productID:   product.ID,
-		warehouseID: warehouse.ID,
+		productWarehouseID: productWarehouse.ID,
+		unitID:             unit.ID,
+		materialID:         material.ID,
+		productID:          product.ID,
+		warehouseID:        warehouse.ID,
 	}
 }
 
@@ -120,7 +123,7 @@ func TestInventoryUsecase_IdempotencyKeyRequiresSamePayload(t *testing.T) {
 	input := &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(2),
@@ -147,7 +150,7 @@ func TestInventoryUsecase_IdempotencyKeyRequiresSamePayload(t *testing.T) {
 	balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
 		SubjectType: biz.InventorySubjectProduct,
 		SubjectID:   fixtures.productID,
-		WarehouseID: fixtures.warehouseID,
+		WarehouseID: fixtures.productWarehouseID,
 		UnitID:      fixtures.unitID,
 	})
 	if err != nil {
@@ -167,7 +170,7 @@ func TestInventoryUsecase_IdempotencyDistinguishesExplicitOccurredAt(t *testing.
 	create := func(key string, occurredAt time.Time) (*biz.InventoryTxnApplyResult, error) {
 		return uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-			WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+			WarehouseID: fixtures.productWarehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
 			Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
 			SourceType: "IDEMPOTENCY_TIME_TEST", IdempotencyKey: key, OccurredAt: occurredAt,
 		})
@@ -214,7 +217,7 @@ func TestInventoryUsecase_IdempotencyDistinguishesExplicitOccurredAt(t *testing.
 	historicalRow, err := client.InventoryTxn.Create().
 		SetSubjectType(biz.InventorySubjectProduct).
 		SetSubjectID(fixtures.productID).
-		SetWarehouseID(fixtures.warehouseID).
+		SetWarehouseID(fixtures.productWarehouseID).
 		SetTxnType(biz.InventoryTxnIn).
 		SetDirection(1).
 		SetQuantity(decimal.NewFromInt(1)).
@@ -231,7 +234,7 @@ func TestInventoryUsecase_IdempotencyDistinguishesExplicitOccurredAt(t *testing.
 	}
 	historicalReplay, err := uc.CreateInventoryTxn(ctx, &biz.InventoryTxnCreate{
 		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-		WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+		WarehouseID: fixtures.productWarehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
 		Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
 		SourceType: "IDEMPOTENCY_TIME_HISTORY", IdempotencyKey: "inventory-time-history",
 	})
@@ -240,7 +243,7 @@ func TestInventoryUsecase_IdempotencyDistinguishesExplicitOccurredAt(t *testing.
 	}
 	if _, err := uc.CreateInventoryTxn(ctx, &biz.InventoryTxnCreate{
 		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-		WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+		WarehouseID: fixtures.productWarehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
 		Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
 		SourceType: "IDEMPOTENCY_TIME_HISTORY", IdempotencyKey: "inventory-time-history",
 		OccurredAt: historicalAt,
@@ -256,20 +259,20 @@ func TestInventoryRepo_ProductOutboundProtectsActiveReservations(t *testing.T) {
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	operationalRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(5), UnitID: fixtures.unitID,
 		SourceType: "RESERVATION_GUARD", IdempotencyKey: "RESERVATION_GUARD:IN",
 	}); err != nil {
 		t.Fatalf("seed product inventory failed: %v", err)
 	}
 	if _, err := operationalRepo.CreateStockReservation(ctx, &biz.StockReservationCreate{
-		ReservationNo: "RSV-GUARD", ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		ReservationNo: "RSV-GUARD", ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 		UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(4), IdempotencyKey: "RSV-GUARD",
 	}); err != nil {
 		t.Fatalf("create stock reservation failed: %v", err)
 	}
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 		TxnType: biz.InventoryTxnOut, Direction: -1, Quantity: decimal.NewFromInt(2), UnitID: fixtures.unitID,
 		SourceType: "RESERVATION_GUARD", IdempotencyKey: "RESERVATION_GUARD:OUT-REJECTED",
 	}); !errors.Is(err, biz.ErrInventoryInsufficientStock) {
@@ -279,7 +282,7 @@ func TestInventoryRepo_ProductOutboundProtectsActiveReservations(t *testing.T) {
 		t.Fatalf("rejected outbound persisted %d inventory txns", count)
 	}
 	result, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 		TxnType: biz.InventoryTxnOut, Direction: -1, Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
 		SourceType: "RESERVATION_GUARD", IdempotencyKey: "RESERVATION_GUARD:OUT-ALLOWED",
 	})
@@ -307,6 +310,7 @@ func createTestUnit(t *testing.T, ctx context.Context, client *ent.Client, code 
 func createTestMaterial(t *testing.T, ctx context.Context, client *ent.Client, unitID int, code string) *ent.Material {
 	t.Helper()
 	material, err := client.Material.Create().
+		SetStockCategory("MAIN").
 		SetCode(code).
 		SetName(code + "材料").
 		SetCategory("FABRIC").
@@ -338,12 +342,21 @@ func createTestWarehouse(t *testing.T, ctx context.Context, client *ent.Client, 
 	warehouse, err := client.Warehouse.Create().
 		SetCode(code).
 		SetName(code + "仓").
-		SetType("RAW_MATERIAL").
+		SetType("MATERIAL").
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create warehouse %s failed: %v", code, err)
 	}
 	return warehouse
+}
+
+func createTestProductWarehouse(t *testing.T, ctx context.Context, client *ent.Client, code string) *ent.Warehouse {
+	t.Helper()
+	row, err := client.Warehouse.Create().SetCode(code).SetName(code + "成品仓").SetType("FINISHED_GOODS").Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return row
 }
 
 func createTestInventoryLot(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, subjectType string, subjectID int, lotNo string) *biz.InventoryLot {
@@ -433,9 +446,6 @@ func TestInventoryUsecase_DirectWritePrimitiveAllowsHistoricalInactiveReferences
 	}
 	if _, err := client.Unit.UpdateOneID(fixtures.unitID).SetIsActive(false).Save(ctx); err != nil {
 		t.Fatalf("disable unit failed: %v", err)
-	}
-	if _, err := client.Warehouse.UpdateOneID(fixtures.warehouseID).SetIsActive(false).Save(ctx); err != nil {
-		t.Fatalf("disable warehouse failed: %v", err)
 	}
 	lot, err := uc.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
 		SubjectType: biz.InventorySubjectMaterial,

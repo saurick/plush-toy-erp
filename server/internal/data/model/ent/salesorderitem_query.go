@@ -7,6 +7,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"math"
+	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productsku"
@@ -25,16 +26,18 @@ import (
 // SalesOrderItemQuery is the builder for querying SalesOrderItem entities.
 type SalesOrderItemQuery struct {
 	config
-	ctx                   *QueryContext
-	order                 []salesorderitem.OrderOption
-	inters                []Interceptor
-	predicates            []predicate.SalesOrderItem
-	withSalesOrder        *SalesOrderQuery
-	withProduct           *ProductQuery
-	withProductSku        *ProductSKUQuery
-	withUnit              *UnitQuery
-	withShipmentItems     *ShipmentItemQuery
-	withStockReservations *StockReservationQuery
+	ctx                      *QueryContext
+	order                    []salesorderitem.OrderOption
+	inters                   []Interceptor
+	predicates               []predicate.SalesOrderItem
+	withSampleReusedFromItem *SalesOrderItemQuery
+	withSalesOrder           *SalesOrderQuery
+	withProduct              *ProductQuery
+	withSampleBom            *BOMHeaderQuery
+	withProductSku           *ProductSKUQuery
+	withUnit                 *UnitQuery
+	withShipmentItems        *ShipmentItemQuery
+	withStockReservations    *StockReservationQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -69,6 +72,28 @@ func (_q *SalesOrderItemQuery) Unique(unique bool) *SalesOrderItemQuery {
 func (_q *SalesOrderItemQuery) Order(o ...salesorderitem.OrderOption) *SalesOrderItemQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QuerySampleReusedFromItem chains the current query on the "sample_reused_from_item" edge.
+func (_q *SalesOrderItemQuery) QuerySampleReusedFromItem() *SalesOrderItemQuery {
+	query := (&SalesOrderItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(salesorderitem.Table, salesorderitem.FieldID, selector),
+			sqlgraph.To(salesorderitem.Table, salesorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, salesorderitem.SampleReusedFromItemTable, salesorderitem.SampleReusedFromItemColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // QuerySalesOrder chains the current query on the "sales_order" edge.
@@ -108,6 +133,28 @@ func (_q *SalesOrderItemQuery) QueryProduct() *ProductQuery {
 			sqlgraph.From(salesorderitem.Table, salesorderitem.FieldID, selector),
 			sqlgraph.To(product.Table, product.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, salesorderitem.ProductTable, salesorderitem.ProductColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QuerySampleBom chains the current query on the "sample_bom" edge.
+func (_q *SalesOrderItemQuery) QuerySampleBom() *BOMHeaderQuery {
+	query := (&BOMHeaderClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(salesorderitem.Table, salesorderitem.FieldID, selector),
+			sqlgraph.To(bomheader.Table, bomheader.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, salesorderitem.SampleBomTable, salesorderitem.SampleBomColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -390,21 +437,34 @@ func (_q *SalesOrderItemQuery) Clone() *SalesOrderItemQuery {
 		return nil
 	}
 	return &SalesOrderItemQuery{
-		config:                _q.config,
-		ctx:                   _q.ctx.Clone(),
-		order:                 append([]salesorderitem.OrderOption{}, _q.order...),
-		inters:                append([]Interceptor{}, _q.inters...),
-		predicates:            append([]predicate.SalesOrderItem{}, _q.predicates...),
-		withSalesOrder:        _q.withSalesOrder.Clone(),
-		withProduct:           _q.withProduct.Clone(),
-		withProductSku:        _q.withProductSku.Clone(),
-		withUnit:              _q.withUnit.Clone(),
-		withShipmentItems:     _q.withShipmentItems.Clone(),
-		withStockReservations: _q.withStockReservations.Clone(),
+		config:                   _q.config,
+		ctx:                      _q.ctx.Clone(),
+		order:                    append([]salesorderitem.OrderOption{}, _q.order...),
+		inters:                   append([]Interceptor{}, _q.inters...),
+		predicates:               append([]predicate.SalesOrderItem{}, _q.predicates...),
+		withSampleReusedFromItem: _q.withSampleReusedFromItem.Clone(),
+		withSalesOrder:           _q.withSalesOrder.Clone(),
+		withProduct:              _q.withProduct.Clone(),
+		withSampleBom:            _q.withSampleBom.Clone(),
+		withProductSku:           _q.withProductSku.Clone(),
+		withUnit:                 _q.withUnit.Clone(),
+		withShipmentItems:        _q.withShipmentItems.Clone(),
+		withStockReservations:    _q.withStockReservations.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithSampleReusedFromItem tells the query-builder to eager-load the nodes that are connected to
+// the "sample_reused_from_item" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *SalesOrderItemQuery) WithSampleReusedFromItem(opts ...func(*SalesOrderItemQuery)) *SalesOrderItemQuery {
+	query := (&SalesOrderItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withSampleReusedFromItem = query
+	return _q
 }
 
 // WithSalesOrder tells the query-builder to eager-load the nodes that are connected to
@@ -426,6 +486,17 @@ func (_q *SalesOrderItemQuery) WithProduct(opts ...func(*ProductQuery)) *SalesOr
 		opt(query)
 	}
 	_q.withProduct = query
+	return _q
+}
+
+// WithSampleBom tells the query-builder to eager-load the nodes that are connected to
+// the "sample_bom" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *SalesOrderItemQuery) WithSampleBom(opts ...func(*BOMHeaderQuery)) *SalesOrderItemQuery {
+	query := (&BOMHeaderClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withSampleBom = query
 	return _q
 }
 
@@ -551,9 +622,11 @@ func (_q *SalesOrderItemQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	var (
 		nodes       = []*SalesOrderItem{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [8]bool{
+			_q.withSampleReusedFromItem != nil,
 			_q.withSalesOrder != nil,
 			_q.withProduct != nil,
+			_q.withSampleBom != nil,
 			_q.withProductSku != nil,
 			_q.withUnit != nil,
 			_q.withShipmentItems != nil,
@@ -578,6 +651,12 @@ func (_q *SalesOrderItemQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withSampleReusedFromItem; query != nil {
+		if err := _q.loadSampleReusedFromItem(ctx, query, nodes, nil,
+			func(n *SalesOrderItem, e *SalesOrderItem) { n.Edges.SampleReusedFromItem = e }); err != nil {
+			return nil, err
+		}
+	}
 	if query := _q.withSalesOrder; query != nil {
 		if err := _q.loadSalesOrder(ctx, query, nodes, nil,
 			func(n *SalesOrderItem, e *SalesOrder) { n.Edges.SalesOrder = e }); err != nil {
@@ -587,6 +666,12 @@ func (_q *SalesOrderItemQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	if query := _q.withProduct; query != nil {
 		if err := _q.loadProduct(ctx, query, nodes, nil,
 			func(n *SalesOrderItem, e *Product) { n.Edges.Product = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withSampleBom; query != nil {
+		if err := _q.loadSampleBom(ctx, query, nodes, nil,
+			func(n *SalesOrderItem, e *BOMHeader) { n.Edges.SampleBom = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -621,6 +706,38 @@ func (_q *SalesOrderItemQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	return nodes, nil
 }
 
+func (_q *SalesOrderItemQuery) loadSampleReusedFromItem(ctx context.Context, query *SalesOrderItemQuery, nodes []*SalesOrderItem, init func(*SalesOrderItem), assign func(*SalesOrderItem, *SalesOrderItem)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*SalesOrderItem)
+	for i := range nodes {
+		if nodes[i].SampleReusedFromItemID == nil {
+			continue
+		}
+		fk := *nodes[i].SampleReusedFromItemID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(salesorderitem.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "sample_reused_from_item_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 func (_q *SalesOrderItemQuery) loadSalesOrder(ctx context.Context, query *SalesOrderQuery, nodes []*SalesOrderItem, init func(*SalesOrderItem), assign func(*SalesOrderItem, *SalesOrder)) error {
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*SalesOrderItem)
@@ -672,6 +789,38 @@ func (_q *SalesOrderItemQuery) loadProduct(ctx context.Context, query *ProductQu
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "product_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *SalesOrderItemQuery) loadSampleBom(ctx context.Context, query *BOMHeaderQuery, nodes []*SalesOrderItem, init func(*SalesOrderItem), assign func(*SalesOrderItem, *BOMHeader)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*SalesOrderItem)
+	for i := range nodes {
+		if nodes[i].SampleBomID == nil {
+			continue
+		}
+		fk := *nodes[i].SampleBomID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(bomheader.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "sample_bom_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -832,11 +981,17 @@ func (_q *SalesOrderItemQuery) querySpec() *sqlgraph.QuerySpec {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
 		}
+		if _q.withSampleReusedFromItem != nil {
+			_spec.Node.AddColumnOnce(salesorderitem.FieldSampleReusedFromItemID)
+		}
 		if _q.withSalesOrder != nil {
 			_spec.Node.AddColumnOnce(salesorderitem.FieldSalesOrderID)
 		}
 		if _q.withProduct != nil {
 			_spec.Node.AddColumnOnce(salesorderitem.FieldProductID)
+		}
+		if _q.withSampleBom != nil {
+			_spec.Node.AddColumnOnce(salesorderitem.FieldSampleBomID)
 		}
 		if _q.withProductSku != nil {
 			_spec.Node.AddColumnOnce(salesorderitem.FieldProductSkuID)

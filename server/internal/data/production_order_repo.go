@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingreturndisposition"
 	"server/internal/data/model/ent/product"
@@ -410,6 +411,9 @@ func (r *productionOrderRepo) ApplyProductionOrderAction(ctx context.Context, in
 				return nil, err
 			}
 			if _, err := validateProductionOrderDraftReferences(ctx, client, items); err != nil {
+				return nil, err
+			}
+			if err := validateProductionEngineeringRelease(ctx, client, items, r.data.sqlDialect); err != nil {
 				return nil, err
 			}
 			if err := freezeProductionOrderMaterialRequirements(ctx, client, in.ID); err != nil {
@@ -1097,6 +1101,44 @@ func validateProductionOrderDraftReferences(ctx context.Context, client *ent.Cli
 	return snapshots, nil
 }
 
+func validateProductionEngineeringRelease(ctx context.Context, client *ent.Client, items []biz.ProductionOrderDraftItem, sqlDialect string) error {
+	for _, item := range items {
+		if item.SalesOrderItemID == nil {
+			continue
+		}
+		line, err := client.SalesOrderItem.Get(ctx, *item.SalesOrderItemID)
+		if err != nil {
+			return err
+		}
+		if line.EngineeringStatus != biz.SalesOrderEngineeringConfirmed || line.SampleBomID == nil || item.BOMHeaderID == nil || *line.SampleBomID != *item.BOMHeaderID || line.SampleBomFingerprint == nil || line.SampleImageAttachmentID == nil {
+			return biz.ErrSalesOrderEngineeringNotReady
+		}
+		header, err := client.BOMHeader.Query().Where(bomheader.ID(*item.BOMHeaderID)).Where(func(s *entsql.Selector) { applyBOMReferenceShareLock(s, sqlDialect) }).Only(ctx)
+		if err != nil {
+			return err
+		}
+		fingerprint, err := salesOrderBOMFingerprint(ctx, client, header, sqlDialect)
+		if err != nil {
+			return err
+		}
+		imageID, err := currentSalesOrderSampleImage(ctx, client, line.ProductID)
+		if err != nil {
+			return err
+		}
+		if fingerprint != *line.SampleBomFingerprint || imageID != *line.SampleImageAttachmentID {
+			return biz.ErrSalesOrderEngineeringNotReady
+		}
+		approved, err := client.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.SalesOrderID(line.SalesOrderID), engineeringmaterialrequest.Status(biz.MaterialRequestApproved)).Exist(ctx)
+		if err != nil {
+			return err
+		}
+		if !approved {
+			return biz.ErrMaterialRequestNotReady
+		}
+	}
+	return nil
+}
+
 func sameProductionOrderOptionalInt(a, b *int) bool {
 	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
 }
@@ -1230,8 +1272,7 @@ func resolveProductionOrderMaterialRequirementsState(
 		for _, bomRow := range bomRows {
 			requirement := byBOMItem[bomRow.ID]
 			if requirement == nil || requirement.BOMHeaderID != bomRow.BomHeaderID ||
-				requirement.MaterialID != bomRow.MaterialID || requirement.UnitID != bomRow.UnitID ||
-				!equalProductionOrderOptionalString(requirement.ProductionOperationCode, bomRow.ProductionOperationCode) {
+				requirement.MaterialID != bomRow.MaterialID || requirement.UnitID != bomRow.UnitID {
 				return biz.ProductionOrderMaterialRequirementsNeedsReview, nil
 			}
 		}
@@ -1316,7 +1357,6 @@ func freezeProductionOrderMaterialRequirements(ctx context.Context, client *ent.
 				SetBomItemID(bomRow.ID).
 				SetMaterialID(materialRow.ID).
 				SetUnitID(unitRow.ID).
-				SetNillableProductionOperationCode(bomRow.ProductionOperationCode).
 				SetUnitQuantitySnapshot(bomRow.Quantity).
 				SetLossRateSnapshot(bomRow.LossRate).
 				SetPlannedQuantity(planned).
@@ -1425,8 +1465,7 @@ func entProductionOrderMaterialRequirementToBiz(
 	return &biz.ProductionOrderMaterialRequirement{
 		ID: row.ID, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID,
 		BOMHeaderID: row.BomHeaderID, BOMItemID: row.BomItemID, MaterialID: row.MaterialID, UnitID: row.UnitID,
-		ProductionOperationCode: row.ProductionOperationCode,
-		UnitQuantitySnapshot:    row.UnitQuantitySnapshot, LossRateSnapshot: row.LossRateSnapshot,
+		UnitQuantitySnapshot: row.UnitQuantitySnapshot, LossRateSnapshot: row.LossRateSnapshot,
 		PlannedQuantity:           row.PlannedQuantity,
 		ApprovedOverIssueQuantity: approvedOverIssue,
 		EffectiveLimitQuantity:    effectiveLimit,

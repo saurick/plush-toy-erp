@@ -36,7 +36,7 @@ func TestSourceDocumentPostgresShipmentCreateVsSalesCancelUsesOneSourceLock(t *t
 			create := func() error {
 				_, err := factUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 					Shipment: &biz.ShipmentCreate{ShipmentNo: "SHIP-SETTLE-PG-" + name + "-" + fixtures.suffix, SalesOrderID: &order.ID, CustomerID: &customer.ID, IdempotencyKey: "ship-settle-pg-" + name + "-" + fixtures.suffix},
-					Items:    []*biz.ShipmentItemCreate{{SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)}},
+					Items:    []*biz.ShipmentItemCreate{{SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)}},
 				})
 				return err
 			}

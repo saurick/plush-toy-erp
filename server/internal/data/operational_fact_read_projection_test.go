@@ -171,7 +171,7 @@ func TestStockReservationReadProjectionUsesOneScopedAuthoritativeSnapshot(t *tes
 	data, client := openInventoryRepoTestData(t, "stock_reservation_read_projection")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	product := client.Product.GetX(ctx, fixtures.productID)
-	warehouse := client.Warehouse.GetX(ctx, fixtures.warehouseID)
+	warehouse := client.Warehouse.GetX(ctx, fixtures.productWarehouseID)
 	unit := client.Unit.GetX(ctx, fixtures.unitID)
 	sku := client.ProductSKU.Create().
 		SetProductID(product.ID).

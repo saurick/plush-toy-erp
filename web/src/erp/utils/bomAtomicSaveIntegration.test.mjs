@@ -11,12 +11,6 @@ const apiSource = readFileSync(
   fileURLToPath(new URL('../api/bomApi.mjs', import.meta.url)),
   'utf8'
 )
-const formSource = readFileSync(
-  fileURLToPath(
-    new URL('../components/bom/BOMVersionForms.jsx', import.meta.url)
-  ),
-  'utf8'
-)
 
 test('BOM form saves header and authoritative items through one aggregate RPC', () => {
   assert.match(apiSource, /call\(\s*'save_bom_with_items'/u)
@@ -50,7 +44,10 @@ test('BOM form is mounted before open handlers initialize its form instance', ()
   assert.ok(modalStart >= 0)
   assert.match(modalContract, /forceRender/u)
   assert.match(modalContract, /destroyOnHidden=\{false\}/u)
-  assert.match(pageSource, /const openCreate = \(\) => \{[\s\S]*headerForm\.resetFields/u)
+  assert.match(
+    pageSource,
+    /const openCreate = \(\) => \{[\s\S]*headerForm\.resetFields/u
+  )
 })
 
 test('BOM copy and catalog source choices are not truncated by fixed page limits', () => {
@@ -72,12 +69,14 @@ test('BOM copy and catalog source choices are not truncated by fixed page limits
   )
 })
 
-test('BOM material rows persist explicit fabric-processing ownership without name inference', () => {
-  assert.match(formSource, /production_operation_code/u)
-  assert.match(formSource, /normalizeBOMProductionOperationCode/u)
-  assert.match(pageSource, /生产工序归属/u)
-  assert.match(pageSource, /布料加工/u)
-  assert.match(pageSource, /不指定/u)
-  assert.match(pageSource, /不按材料名称自动判断/u)
+test('BOM material entry delegates execution decisions to production', () => {
+  const groupForm = readFileSync(
+    fileURLToPath(
+      new URL('../components/bom/BOMMaterialGroupsForm.jsx', import.meta.url)
+    ),
+    'utf8'
+  )
+  assert.match(pageSource, /BOMMaterialGroupsForm/u)
+  assert.doesNotMatch(groupForm, /label=["'](?:生产工序归属|内做外发)/u)
   assert.doesNotMatch(pageSource, /includes\([^)]*(?:面料|布料)/u)
 })

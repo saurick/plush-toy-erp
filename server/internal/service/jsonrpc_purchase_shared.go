@@ -22,6 +22,7 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 		"purchase_order_id",
 		"receipt_no",
 		"warehouse_id",
+		"item_warehouses",
 		"received_at",
 		"note",
 		"idempotency_key",
@@ -36,7 +37,12 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 	if idempotencyKey == "" {
 		return nil, false
 	}
+	itemWarehouses, valid := purchaseReceiptItemWarehousesFromParams(pm)
+	if !valid {
+		return nil, false
+	}
 	return &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		ItemWarehouses:  itemWarehouses,
 		PurchaseOrderID: getInt(pm, "purchase_order_id", 0),
 		ReceiptNo:       getString(pm, "receipt_no"),
 		WarehouseID:     getInt(pm, "warehouse_id", 0),
@@ -136,6 +142,9 @@ func purchaseReceiptItemResult(ctx context.Context, d *jsonrpcDispatcher, item *
 }
 
 func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := warehouseClassificationError(err); result != nil {
+		return result
+	}
 	l := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrIdempotencyConflict):
@@ -260,4 +269,32 @@ func purchaseReceiptItemToAny(item *biz.PurchaseReceiptItem) map[string]any {
 		"created_at":             item.CreatedAt.Unix(),
 		"updated_at":             item.UpdatedAt.Unix(),
 	}
+}
+
+func purchaseReceiptItemWarehousesFromParams(pm map[string]any) (map[int]int, bool) {
+	raw, exists := pm["item_warehouses"]
+	if !exists {
+		return nil, true
+	}
+	rows, ok := raw.([]any)
+	if !ok || len(rows) == 0 || len(rows) > 1000 {
+		return nil, false
+	}
+	result := make(map[int]int, len(rows))
+	for _, raw := range rows {
+		row, ok := raw.(map[string]any)
+		if !ok || !jsonRPCParamsAllowed(row, "purchase_order_item_id", "warehouse_id") {
+			return nil, false
+		}
+		itemID, itemOK := getOptionalJSONRPCNonNegativeInt(row, "purchase_order_item_id")
+		warehouseID, warehouseOK := getOptionalJSONRPCNonNegativeInt(row, "warehouse_id")
+		if !itemOK || !warehouseOK || itemID == nil || warehouseID == nil || *itemID <= 0 || *warehouseID <= 0 {
+			return nil, false
+		}
+		if _, exists := result[*itemID]; exists {
+			return nil, false
+		}
+		result[*itemID] = *warehouseID
+	}
+	return result, true
 }

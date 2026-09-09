@@ -548,6 +548,9 @@ test-populated-upgrade)
 
   populated_psql -q -v plush_legacy_dashboard_seed=1 -f "$populated_contract_file"
 
+  apply_populated_upgrade_to 20260908172207
+  populated_psql -q -v plush_warehouse_classification_seed=1 -f "$populated_contract_file"
+
   atlas migrate apply \
     --dir "file://${migration_dir}" \
     --url "$POPULATED_UPGRADE_DB_URL"
@@ -569,7 +572,7 @@ test-populated-upgrade)
     populated_psql -Atq -c \
       "SELECT (SELECT count(*) FROM permissions WHERE permission_key = 'erp.dashboard.read')::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'erp.workbench.read' AND rp.role_id IN (910003, 910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'erp.business_dashboard.read' AND rp.role_id IN (910003, 910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'workflow.task.supervise' AND rp.role_id IN (910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'production.fact.read' AND rp.role_id = 910004)::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'workflow.task.assign' AND rp.role_id = 910004)::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'process_runtime.recover' AND rp.role_id IN (910001, 910002, 910003, 910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id JOIN roles r ON r.id = rp.role_id WHERE p.permission_key = 'process_runtime.recover' AND r.role_type = 'system')::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id JOIN roles r ON r.id = rp.role_id WHERE p.permission_key = 'process_runtime.recover' AND r.role_type <> 'system')::text || '|' || (SELECT string_agg(role_key || ':' || version::text, ',' ORDER BY role_key) FROM roles WHERE id IN (910001, 910002, 910003, 910004, 910005))"
   )"
-  if [[ "$dashboard_permission_readback" != '0|3|2|2|1|1|1|1|0|admin:1,boss:6,pmc:5,qa_business_default:2,qa_custom:3' ]]; then
+  if [[ "$dashboard_permission_readback" != '0|3|2|2|1|1|1|1|0|admin:1,boss:8,pmc:6,qa_business_default:2,qa_custom:3' ]]; then
     echo "ERROR: dashboard, assignment and control-plane permission migration mismatch: ${dashboard_permission_readback:-empty}" >&2
     exit 1
   fi
@@ -577,8 +580,15 @@ test-populated-upgrade)
     populated_psql -Atq -c \
       "SELECT (SELECT version FROM roles WHERE id = 910006)::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = 910006 AND p.permission_key IN ('production.fact.read', 'production.wip.read'))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = 910003 AND p.permission_key IN ('production.fact.read', 'production.wip.read'))::text"
   )"
-  if [[ "$warehouse_inbound_readback" != '3|2|0' ]]; then
+  if [[ "$warehouse_inbound_readback" != '4|2|0' ]]; then
     echo "ERROR: warehouse finished-goods inbound permission migration mismatch: ${warehouse_inbound_readback:-empty}" >&2
+    exit 1
+  fi
+  warehouse_classification_readback="$(
+    populated_psql -Atq -v plush_warehouse_classification_readback=1 -f "$populated_contract_file"
+  )"
+  if [[ "$warehouse_classification_readback" != 'MAIN,AUXILIARY,PACKAGING,UNCLASSIFIED,OTHER|5|MATERIAL,FINISHED_GOODS,UNCLASSIFIED|1|2|0' ]]; then
+    echo "ERROR: warehouse classification upgrade mismatch: ${warehouse_classification_readback:-empty}" >&2
     exit 1
   fi
   migration_status_counts="$(

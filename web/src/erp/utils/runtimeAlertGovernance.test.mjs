@@ -89,7 +89,7 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
   assert(occurrenceCount(shipment, '<Alert') <= 2)
   assert(occurrenceCount(finance, '<Alert') <= 2)
 
-  assert.match(production, /message="未找到发布时明确归属/u)
+  assert.match(production, /message="请先选择本次外发的材料/u)
   assert.match(
     read('web/src/erp/components/permission-center/RoleNavigationEditor.jsx'),
     /message="有菜单入口已不在当前最终权限中"/u

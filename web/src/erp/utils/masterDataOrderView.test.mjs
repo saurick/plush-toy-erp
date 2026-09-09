@@ -2654,7 +2654,7 @@ test('FL_sales_order_source_no__clears_customer_order_no_on_source_clear masterD
   })
 })
 
-test('FL_sales_order_order_date__retains_signing_date_snapshot masterDataOrderView: sales order signing date stays on form list export and save params', () => {
+test('FL_sales_order_order_date__retains_signing_date_snapshot masterDataOrderView: sales order placement date stays on form list export and save params', () => {
   const params = buildSalesOrderParams({
     order_no: 'SO-DATE-001',
     customer_id: 3,
@@ -2684,15 +2684,15 @@ test('FL_sales_order_order_date__retains_signing_date_snapshot masterDataOrderVi
 
   assert.match(
     formSource,
-    /label="签约日期"[\s\S]*name="order_date"[\s\S]*<DateInput/u
+    /label="下单日期"[\s\S]*name="order_date"[\s\S]*<DateInput/u
   )
   assert.match(
     columnsSource,
-    /title: '签约日期'[\s\S]*exportTitle: '签约日期'[\s\S]*dataIndex: 'order_date'/u
+    /title: '下单日期'[\s\S]*exportTitle: '下单日期'[\s\S]*dataIndex: 'order_date'/u
   )
-  assert.match(pageConfigSource, /label: '签约日期'[\s\S]*value: 'order_date'/u)
-  assert.doesNotMatch(formSource, /label="下单日期"/u)
-  assert.doesNotMatch(columnsSource, /title: '下单日期'/u)
+  assert.match(pageConfigSource, /label: '下单日期'[\s\S]*value: 'order_date'/u)
+  assert.doesNotMatch(formSource, /label="签约日期"/u)
+  assert.doesNotMatch(columnsSource, /title: '签约日期'/u)
 })
 
 test('FL_sales_order_item_source_snapshot__retains_product_sku_snapshots masterDataOrderView: sales order item params retain product SKU source snapshots', () => {

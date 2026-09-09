@@ -146,11 +146,18 @@ var approvalSettingCatalog = []approvalSettingCatalogItem{
 		FactBoundary:   "批准不等于过账；只有财务领域命令写付款、核销或冲正事实",
 	},
 	{
-		Key: "pmc_engineering", Label: "PMC / 工程审批", Domain: "PMC / 工程",
+		Key: "pmc_engineering", Label: "PMC 计划与风险审批", Domain: "PMC",
 		Configurable:   false,
 		BlockedReasons: []string{"formal_approval_gate_missing"},
-		DomainBoundary: "BOM、计划和风险动作尚无正式人工审批门禁",
+		DomainBoundary: "PMC 计划和风险动作尚无正式人工审批门禁；工程用料另走老板审核、财务核价审批",
 		FactBoundary:   "不能因岗位名称创建虚假审批事实",
+	},
+	{
+		Key: "engineering_material", Label: "工程用料审批", Domain: "工程 / 采购",
+		Configurable:   false,
+		BlockedReasons: []string{approvalResponsibilityFixedByProcessContract},
+		DomainBoundary: "工程按已确认样品提交用料汇总，老板审核后由另一位财务人员核定采购数量、单价和交期",
+		FactBoundary:   "财务批准后按厂商生成采购订单；到货、质检、入库和付款仍分别办理",
 	},
 }
 

@@ -542,11 +542,6 @@ function normalizeProduction(source) {
     );
   }
   const materialIssues = source.materialIssues.map((record, index) => {
-    const productionOperationCode = String(
-      record?.productionOperationCode || "",
-    )
-      .trim()
-      .toUpperCase();
     return {
       materialId: positiveID(
         record?.materialId,
@@ -568,7 +563,6 @@ function normalizeProduction(source) {
         record?.quantity,
         `production.materialIssues[${index}].quantity`,
       ),
-      ...(productionOperationCode ? { productionOperationCode } : {}),
     };
   });
   const materialKeys = materialIssues.map(
@@ -580,13 +574,13 @@ function normalizeProduction(source) {
     );
   }
   const fabricBudgets = materialIssues.filter(
-    (record) => record.productionOperationCode === "FABRIC_PROCESSING",
+    (record) => record.materialId === Number(source.fabricOutsourcing?.item?.materialId) && record.unitId === Number(source.fabricOutsourcing?.item?.unitId),
   );
   let fabricOutsourcing;
   if (route) {
     if (fabricBudgets.length !== 1 || source?.fabricOutsourcing == null) {
       throw new SourceDrivenFactError(
-        "routed production requires one registered FABRIC_PROCESSING outsourcing source",
+        "routed production requires one explicitly selected fabric material outsourcing source",
       );
     }
     const fabricBudget = fabricBudgets[0];
@@ -658,7 +652,7 @@ function normalizeProduction(source) {
   }
   const directMaterialIssues = fabricOutsourcing
     ? materialIssues.filter(
-        (record) => record.productionOperationCode !== "FABRIC_PROCESSING",
+        (record) => record.materialId !== fabricOutsourcing.item.materialId || record.unitId !== fabricOutsourcing.item.unitId,
       )
     : materialIssues;
   let rework;
@@ -2420,7 +2414,7 @@ async function applyProduction(plan, rpc) {
   let fabricAllocation;
   if (source.fabricOutsourcing) {
     const fabricBudget = source.materialIssues.find(
-      (record) => record.productionOperationCode === "FABRIC_PROCESSING",
+      (record) => record.materialId === Number(source.fabricOutsourcing?.item?.materialId) && record.unitId === Number(source.fabricOutsourcing?.item?.unitId),
     );
     const requirement = matched.requirements.find(
       (entry) =>

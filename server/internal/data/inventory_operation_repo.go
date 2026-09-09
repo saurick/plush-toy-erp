@@ -163,6 +163,9 @@ func (r *inventoryRepo) inventoryOperationDraftItemValues(
 		if !warehouseRow.IsActive {
 			return nil, nil, decimal.Zero, nil, nil, biz.ErrWarehouseInactive
 		}
+		if err := validateIncomingWarehouse(ctx, tx.client, *requested.ToWarehouseID, item.SubjectType, item.SubjectID); err != nil {
+			return nil, nil, decimal.Zero, nil, nil, err
+		}
 		return nil, nil, requested.AdjustmentQuantity, requested.ToWarehouseID, item.FromLotID, nil
 	case biz.InventoryOperationManualAdjustment:
 		if requested.CountedQuantity != nil || requested.ToWarehouseID != nil || requested.AdjustmentQuantity.IsZero() {
@@ -732,8 +735,18 @@ func inventoryOperationByID(ctx context.Context, client *ent.Client, id int) (*b
 		return nil, err
 	}
 	out := &biz.InventoryOperation{ID: row.ID, OperationNo: row.OperationNo, OperationType: row.OperationType, Status: row.Status, Reason: row.Reason, Version: row.Version, SubmittedAt: row.SubmittedAt, SubmittedBy: row.SubmittedBy, ApprovedAt: row.ApprovedAt, ApprovedBy: row.ApprovedBy, RejectedAt: row.RejectedAt, RejectedBy: row.RejectedBy, RejectReason: row.RejectReason, PostedAt: row.PostedAt, PostedBy: row.PostedBy, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelReason: row.CancelReason, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	materialIDs := []int{}
 	for _, item := range row.Edges.Items {
-		out.Items = append(out.Items, &biz.InventoryOperationItem{ID: item.ID, OperationID: item.OperationID, LineNo: item.LineNo, SubjectType: item.SubjectType, SubjectID: item.SubjectID, ProductSkuID: item.ProductSkuID, FromWarehouseID: item.FromWarehouseID, FromLotID: item.FromLotID, ToWarehouseID: item.ToWarehouseID, ToLotID: item.ToLotID, UnitID: item.UnitID, ExpectedQuantity: item.ExpectedQuantity, CountedQuantity: item.CountedQuantity, AdjustmentQuantity: item.AdjustmentQuantity, Note: item.Note})
+		if item.SubjectType == biz.InventorySubjectMaterial {
+			materialIDs = append(materialIDs, item.SubjectID)
+		}
+	}
+	categories, err := loadInventoryMaterialStockCategories(ctx, client, materialIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range row.Edges.Items {
+		out.Items = append(out.Items, &biz.InventoryOperationItem{StockCategory: inventoryItemMaterialCategory(item.SubjectType, item.SubjectID, categories), ID: item.ID, OperationID: item.OperationID, LineNo: item.LineNo, SubjectType: item.SubjectType, SubjectID: item.SubjectID, ProductSkuID: item.ProductSkuID, FromWarehouseID: item.FromWarehouseID, FromLotID: item.FromLotID, ToWarehouseID: item.ToWarehouseID, ToLotID: item.ToLotID, UnitID: item.UnitID, ExpectedQuantity: item.ExpectedQuantity, CountedQuantity: item.CountedQuantity, AdjustmentQuantity: item.AdjustmentQuantity, Note: item.Note})
 	}
 	return out, nil
 }
@@ -790,4 +803,11 @@ func lockAndReadInventoryOperationBalance(ctx context.Context, tx *inventoryDBTx
 		return decimal.Zero, err
 	}
 	return row.Quantity, nil
+}
+
+func inventoryItemMaterialCategory(subjectType string, subjectID int, categories map[int]string) string {
+	if subjectType == biz.InventorySubjectMaterial {
+		return categories[subjectID]
+	}
+	return ""
 }

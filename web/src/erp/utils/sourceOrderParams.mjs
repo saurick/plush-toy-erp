@@ -113,6 +113,13 @@ function buildSalesOrderItemParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
     line_no: normalizeLineNo(extra.line_no, values.line_no),
+    requested_product_name: trimOptional(values.requested_product_name),
+    customer_product_no: trimOptional(values.customer_product_no),
+    order_category: trimOptional(values.order_category),
+    pre_shipment_sample_quantity: trimOptional(
+      values.pre_shipment_sample_quantity
+    ),
+    process_requirement: trimOptional(values.process_requirement),
     product_id: normalizeOptionalPositiveInteger(values.product_id),
     product_sku_id: normalizeOptionalPositiveInteger(values.product_sku_id),
     unit_id: normalizeOptionalPositiveInteger(values.unit_id),

@@ -18,10 +18,16 @@ const (
 	FieldCode = "code"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
+	// FieldSupplierID holds the string denoting the supplier_id field in the database.
+	FieldSupplierID = "supplier_id"
 	// FieldSupplierItemNo holds the string denoting the supplier_item_no field in the database.
 	FieldSupplierItemNo = "supplier_item_no"
 	// FieldCategory holds the string denoting the category field in the database.
 	FieldCategory = "category"
+	// FieldStockCategory holds the string denoting the stock_category field in the database.
+	FieldStockCategory = "stock_category"
+	// FieldDefaultWarehouseID holds the string denoting the default_warehouse_id field in the database.
+	FieldDefaultWarehouseID = "default_warehouse_id"
 	// FieldSpec holds the string denoting the spec field in the database.
 	FieldSpec = "spec"
 	// FieldColor holds the string denoting the color field in the database.
@@ -34,6 +40,10 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeDefaultWarehouse holds the string denoting the default_warehouse edge name in mutations.
+	EdgeDefaultWarehouse = "default_warehouse"
+	// EdgeSupplier holds the string denoting the supplier edge name in mutations.
+	EdgeSupplier = "supplier"
 	// EdgeDefaultUnit holds the string denoting the default_unit edge name in mutations.
 	EdgeDefaultUnit = "default_unit"
 	// EdgeBomItems holds the string denoting the bom_items edge name in mutations.
@@ -54,6 +64,20 @@ const (
 	EdgeOutsourcingOrderItems = "outsourcing_order_items"
 	// Table holds the table name of the material in the database.
 	Table = "materials"
+	// DefaultWarehouseTable is the table that holds the default_warehouse relation/edge.
+	DefaultWarehouseTable = "materials"
+	// DefaultWarehouseInverseTable is the table name for the Warehouse entity.
+	// It exists in this package in order to avoid circular dependency with the "warehouse" package.
+	DefaultWarehouseInverseTable = "warehouses"
+	// DefaultWarehouseColumn is the table column denoting the default_warehouse relation/edge.
+	DefaultWarehouseColumn = "default_warehouse_id"
+	// SupplierTable is the table that holds the supplier relation/edge.
+	SupplierTable = "materials"
+	// SupplierInverseTable is the table name for the Supplier entity.
+	// It exists in this package in order to avoid circular dependency with the "supplier" package.
+	SupplierInverseTable = "suppliers"
+	// SupplierColumn is the table column denoting the supplier relation/edge.
+	SupplierColumn = "supplier_id"
 	// DefaultUnitTable is the table that holds the default_unit relation/edge.
 	DefaultUnitTable = "materials"
 	// DefaultUnitInverseTable is the table name for the Unit entity.
@@ -124,8 +148,11 @@ var Columns = []string{
 	FieldID,
 	FieldCode,
 	FieldName,
+	FieldSupplierID,
 	FieldSupplierItemNo,
 	FieldCategory,
+	FieldStockCategory,
+	FieldDefaultWarehouseID,
 	FieldSpec,
 	FieldColor,
 	FieldDefaultUnitID,
@@ -149,10 +176,18 @@ var (
 	CodeValidator func(string) error
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
+	// SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
+	SupplierIDValidator func(int) error
 	// SupplierItemNoValidator is a validator for the "supplier_item_no" field. It is called by the builders before save.
 	SupplierItemNoValidator func(string) error
 	// CategoryValidator is a validator for the "category" field. It is called by the builders before save.
 	CategoryValidator func(string) error
+	// DefaultStockCategory holds the default value on creation for the "stock_category" field.
+	DefaultStockCategory string
+	// StockCategoryValidator is a validator for the "stock_category" field. It is called by the builders before save.
+	StockCategoryValidator func(string) error
+	// DefaultWarehouseIDValidator is a validator for the "default_warehouse_id" field. It is called by the builders before save.
+	DefaultWarehouseIDValidator func(int) error
 	// SpecValidator is a validator for the "spec" field. It is called by the builders before save.
 	SpecValidator func(string) error
 	// ColorValidator is a validator for the "color" field. It is called by the builders before save.
@@ -187,6 +222,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
 }
 
+// BySupplierID orders the results by the supplier_id field.
+func BySupplierID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSupplierID, opts...).ToFunc()
+}
+
 // BySupplierItemNo orders the results by the supplier_item_no field.
 func BySupplierItemNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSupplierItemNo, opts...).ToFunc()
@@ -195,6 +235,16 @@ func BySupplierItemNo(opts ...sql.OrderTermOption) OrderOption {
 // ByCategory orders the results by the category field.
 func ByCategory(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCategory, opts...).ToFunc()
+}
+
+// ByStockCategory orders the results by the stock_category field.
+func ByStockCategory(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStockCategory, opts...).ToFunc()
+}
+
+// ByDefaultWarehouseID orders the results by the default_warehouse_id field.
+func ByDefaultWarehouseID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultWarehouseID, opts...).ToFunc()
 }
 
 // BySpec orders the results by the spec field.
@@ -225,6 +275,20 @@ func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdatedAt orders the results by the updated_at field.
 func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
+}
+
+// ByDefaultWarehouseField orders the results by default_warehouse field.
+func ByDefaultWarehouseField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newDefaultWarehouseStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// BySupplierField orders the results by supplier field.
+func BySupplierField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSupplierStep(), sql.OrderByField(field, opts...))
+	}
 }
 
 // ByDefaultUnitField orders the results by default_unit field.
@@ -344,6 +408,20 @@ func ByOutsourcingOrderItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOp
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newOutsourcingOrderItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
+}
+func newDefaultWarehouseStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(DefaultWarehouseInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, DefaultWarehouseTable, DefaultWarehouseColumn),
+	)
+}
+func newSupplierStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SupplierInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, SupplierTable, SupplierColumn),
+	)
 }
 func newDefaultUnitStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(

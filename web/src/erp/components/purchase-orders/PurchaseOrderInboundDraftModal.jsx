@@ -1,15 +1,7 @@
 import React, { useMemo } from 'react'
-import {
-  Alert,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, Form, Input, Select, Space, Table, Tag, Typography } from 'antd'
+import { materialStockCategoryLabel } from '../../utils/warehouseClassification.mjs'
+import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import { formatQuantity } from '../../utils/businessLineItems.mjs'
@@ -30,7 +22,6 @@ export default function PurchaseOrderInboundDraftModal({
   loading,
   submitting,
   referenceDataReady = false,
-  warehouseOptions,
   hasRemaining,
   resolveSupplierName,
   onOk,
@@ -48,6 +39,40 @@ export default function PurchaseOrderInboundDraftModal({
         title: '材料',
         dataIndex: 'material',
         width: 180,
+      },
+      {
+        title: '库存类别',
+        key: 'stockCategory',
+        width: 100,
+        render: (_, row) => materialStockCategoryLabel(row.stockCategory),
+      },
+      {
+        title: '入库仓库',
+        key: 'warehouse',
+        width: 230,
+        render: (_, row) =>
+          row.canGenerate ? (
+            <Form.Item
+              name={['item_warehouses', String(row.key)]}
+              rules={[{ required: true, message: '请选择本行入库仓' }]}
+              style={{ marginBottom: 0 }}
+            >
+              <Select
+                aria-label={`第${row.lineNo}行入库仓库`}
+                showSearch
+                optionFilterProp="label"
+                allowClear
+                options={row.warehouseOptions || []}
+                placeholder={
+                  row.stockCategory && row.stockCategory !== 'UNCLASSIFIED'
+                    ? '确认入库仓'
+                    : '请先补齐材料库存类别'
+                }
+              />
+            </Form.Item>
+          ) : (
+            '-'
+          ),
       },
       {
         title: '采购数量',
@@ -111,7 +136,7 @@ export default function PurchaseOrderInboundDraftModal({
   )
 
   return (
-    <Modal
+    <BusinessFormModal
       title="生成采购入库草稿"
       open={open}
       centered
@@ -133,7 +158,7 @@ export default function PurchaseOrderInboundDraftModal({
             loading
               ? '正在加载采购订单来源明细'
               : hasRemaining
-                ? '将按服务端权威的剩余可生成数量生成入库草稿'
+                ? '按扣除已收货及草稿占用后的数量生成入库草稿'
                 : '当前采购订单没有可生成的剩余明细'
           }
           description={
@@ -144,28 +169,30 @@ export default function PurchaseOrderInboundDraftModal({
                 )}；供应商：${resolveSupplierName(order)}`}
               </Text>
               <Text type="secondary">
-                下方进度由采购订单、已过账入库及现有入库草稿统一计算；保存时系统仍会再次校验，库存仅在入库过账后更新。
+                本次仅生成待验收的入库草稿，完成质检和入库确认后才增加库存。
               </Text>
             </Space>
           }
-        />
-        <Table
-          aria-label="采购订单生成入库来源明细"
-          columns={columns}
-          dataSource={rows}
-          loading={loading}
-          pagination={false}
-          scroll={{ x: 1160 }}
-          size="small"
         />
       </Space>
       <Form
         form={form}
         layout="vertical"
         disabled={!referenceDataReady}
-        className="erp-business-form"
+        className="erp-business-action-form"
         style={{ marginTop: 16 }}
       >
+        <Form.Item className="erp-business-action-form__field--full">
+          <Table
+            aria-label="采购订单生成入库来源明细"
+            columns={columns}
+            dataSource={rows}
+            loading={loading}
+            pagination={false}
+            scroll={{ x: 1460 }}
+            size="small"
+          />
+        </Form.Item>
         <Form.Item
           name="receipt_no"
           label="入库单号"
@@ -173,19 +200,7 @@ export default function PurchaseOrderInboundDraftModal({
         >
           <Input maxLength={64} />
         </Form.Item>
-        <Form.Item
-          name="warehouse_id"
-          label="入库仓库"
-          rules={[{ required: true, message: '请选择入库仓库' }]}
-        >
-          <Select
-            allowClear
-            optionFilterProp="label"
-            options={warehouseOptions}
-            placeholder="请选择入库仓库"
-            showSearch
-          />
-        </Form.Item>
+
         <Form.Item
           name="received_at"
           label="入库日期"
@@ -201,6 +216,6 @@ export default function PurchaseOrderInboundDraftModal({
           <Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} />
         </Form.Item>
       </Form>
-    </Modal>
+    </BusinessFormModal>
   )
 }

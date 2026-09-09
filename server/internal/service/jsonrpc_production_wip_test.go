@@ -38,7 +38,6 @@ func productionWIPJSONRPCAggregate() *biz.ProductionWIPAggregate {
 	now := time.Unix(1784246400, 0)
 	routeCode := biz.ProductionWIPRoutePlushSewHandV1
 	mode := biz.ProductionWIPExecutionInHouse
-	fabricOperation := biz.ProductionWIPOperationFabricProcessing
 	packagingVersion := "PKG-V3"
 	confirmedBy := 7
 	confirmedAt := now
@@ -56,7 +55,7 @@ func productionWIPJSONRPCAggregate() *biz.ProductionWIPAggregate {
 		}},
 		MaterialRequirements: []*biz.ProductionOrderMaterialRequirement{{
 			ID: 51, ProductionOrderID: 1, ProductionOrderItemID: 11, BOMHeaderID: 61, BOMItemID: 71,
-			MaterialID: 81, UnitID: 31, ProductionOperationCode: &fabricOperation,
+			MaterialID: 81, UnitID: 31,
 			PlannedQuantity: decimal.RequireFromString("12"), MaterialCodeSnapshot: "FAB-01", MaterialNameSnapshot: "短毛绒",
 			UnitNameSnapshot: "米", CreatedAt: now, UpdatedAt: now,
 		}},
@@ -121,8 +120,7 @@ func TestProductionWIPJSONRPCCanonicalReadCancelAndSplit(t *testing.T) {
 	if data["production_order"].(map[string]any)["order_no"] != "MO-WIP-001" ||
 		data["production_order_operations"].([]any)[0].(map[string]any)["operation_code"] != biz.ProductionWIPOperationSewing ||
 		data["production_wip_batches"].([]any)[0].(map[string]any)["quantity"] != "10.5" ||
-		data["production_wip_batches"].([]any)[0].(map[string]any)["origin_rework_fact_id"] != float64(901) ||
-		data["material_requirements"].([]any)[0].(map[string]any)["production_operation_code"] != biz.ProductionWIPOperationFabricProcessing {
+		data["production_wip_batches"].([]any)[0].(map[string]any)["origin_rework_fact_id"] != float64(901) {
 		t.Fatalf("unexpected aggregate=%#v", data)
 	}
 

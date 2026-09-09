@@ -33,7 +33,7 @@ type productionOrderTestFixture struct {
 	bomID       int
 }
 
-func openProductionOrderRepoTest(t *testing.T, name string) productionOrderTestFixture {
+func openProductionOrderRepoTest(t *testing.T, name string, prepare ...func(context.Context, *ent.Client, int, int)) productionOrderTestFixture {
 	t.Helper()
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, name)
@@ -68,8 +68,11 @@ func openProductionOrderRepoTest(t *testing.T, name string) productionOrderTestF
 		SetQuantity(decimal.NewFromInt(2)).
 		SetUnitID(unitRow.ID).
 		SetLossRate(decimal.RequireFromString("0.1")).
-		SetProductionOperationCode(biz.ProductionWIPOperationFabricProcessing).
 		SaveX(ctx)
+	for _, setup := range prepare {
+		setup(ctx, client, unitRow.ID, bom.ID)
+	}
+	prepareProductionEngineeringFixture(t, ctx, data, salesItem.ID, bom.ID)
 	repo := NewProductionOrderRepo(data, log.NewStdLogger(io.Discard))
 	return productionOrderTestFixture{
 		uc: biz.NewProductionOrderUsecase(repo), data: data, client: client, actorID: actor.ID,

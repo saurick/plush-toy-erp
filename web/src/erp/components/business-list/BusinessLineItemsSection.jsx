@@ -16,6 +16,7 @@ export default function BusinessLineItemsSection({
   name = 'items',
   renderBeforeHeader,
   renderRow,
+  scrollWithinSection = true,
   title,
 }) {
   return (
@@ -45,7 +46,11 @@ export default function BusinessLineItemsSection({
               ) : (
                 <div
                   aria-label={addLineAriaLabel}
-                  className="erp-sales-order-lines-form__list"
+                  className={
+                    scrollWithinSection
+                      ? 'erp-sales-order-lines-form__list'
+                      : 'erp-business-line-items-flow'
+                  }
                 >
                   {fields.map((field, index) =>
                     renderRow({ ...context, field, index })

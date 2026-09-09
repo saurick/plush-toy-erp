@@ -18,6 +18,7 @@ import {
 } from 'antd'
 import { BranchesOutlined, ReloadOutlined } from '@ant-design/icons'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import ProductionOutsourcingPrepareModal from './ProductionOutsourcingPrepareModal.jsx'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -232,6 +233,7 @@ export default function ProductionRouteExecutionModal({
   const [aggregate, setAggregate] = useState(null)
   const [selectedBatchID, setSelectedBatchID] = useState(null)
   const [activeAction, setActiveAction] = useState('')
+  const [prepareOutsourcingOpen, setPrepareOutsourcingOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -243,6 +245,10 @@ export default function ProductionRouteExecutionModal({
   const outsourcingAbortControllerRef = useRef(null)
   const outsourcingLoadStateRef = useRef('idle')
   const executionMode = Form.useWatch('execution_mode', actionForm)
+  const selectedFabricRequirementIDs = Form.useWatch(
+    'fabric_requirement_ids',
+    actionForm
+  )
   const selectedOutsourcingItemID = Form.useWatch(
     'outsourcing_order_item_id',
     actionForm
@@ -372,6 +378,7 @@ export default function ProductionRouteExecutionModal({
     setOutsourcingSources([])
     setOutsourcingLoadState('idle')
     setOutsourcingLoadError('')
+    setPrepareOutsourcingOpen(false)
     outsourcingLoadStateRef.current = 'idle'
     outsourcingAbortControllerRef.current?.abort()
     outsourcingAbortControllerRef.current = null
@@ -475,9 +482,16 @@ export default function ProductionRouteExecutionModal({
   const isNormalFabricBatch =
     currentOperation?.operation_code === 'FABRIC_PROCESSING' &&
     selectedBatch?.flow_type === PRODUCTION_WIP_FLOW_TYPE.NORMAL
-  const fabricMaterialRequirements = useMemo(
+  const availableFabricRequirements = useMemo(
     () => productionWipFabricMaterialRequirements(aggregate, selectedBatch),
     [aggregate, selectedBatch]
+  )
+  const fabricMaterialRequirements = useMemo(
+    () =>
+      availableFabricRequirements.filter((item) =>
+        selectedFabricRequirementIDs?.includes(item.id)
+      ),
+    [availableFabricRequirements, selectedFabricRequirementIDs]
   )
   const fabricContractOptions = useMemo(
     () =>
@@ -848,6 +862,38 @@ export default function ProductionRouteExecutionModal({
             ) : null}
             {executionMode === PRODUCTION_WIP_EXECUTION_MODE.OUTSOURCED ? (
               <>
+                {isNormalFabricBatch ? (
+                  <Form.Item
+                    name="fabric_requirement_ids"
+                    label="本次外发的材料"
+                    rules={[
+                      { required: true, message: '请选择本次外发的材料' },
+                    ]}
+                  >
+                    <Select
+                      mode="multiple"
+                      optionFilterProp="label"
+                      options={availableFabricRequirements.map((item) => ({
+                        value: item.id,
+                        label: `${item.material_name_snapshot || item.material_code_snapshot} / ${item.planned_quantity} ${item.unit_name_snapshot || ''}`,
+                      }))}
+                      onChange={() =>
+                        actionForm.setFieldsValue({
+                          fabric_contract_order_id: undefined,
+                          fabric_contract_items: {},
+                        })
+                      }
+                    />
+                  </Form.Item>
+                ) : null}
+                {canAssign && canReadOutsourcingContracts ? (
+                  <Button
+                    disabled={saving || !selectedBatch}
+                    onClick={() => setPrepareOutsourcingOpen(true)}
+                  >
+                    按加工安排生成委外草稿
+                  </Button>
+                ) : null}
                 {outsourcingLoadState === 'loading' ? (
                   <div className="erp-business-inline-note" role="status">
                     正在读取已确认加工合同的未关闭明细…
@@ -874,7 +920,7 @@ export default function ProductionRouteExecutionModal({
                         <Alert
                           showIcon
                           type="error"
-                          message="未找到发布时明确归属“布料加工”的冻结材料需求，暂不能安排首道外发。"
+                          message="请先选择本次外发的材料；其余材料按后续车缝、手工安排领用。"
                         />
                       ) : fabricContractOptions.length === 0 ? (
                         <Alert
@@ -1707,6 +1753,18 @@ export default function ProductionRouteExecutionModal({
           ) : null}
 
           {actionPanel}
+          <ProductionOutsourcingPrepareModal
+            open={prepareOutsourcingOpen}
+            batch={selectedBatch}
+            operation={currentOperation}
+            requirements={availableFabricRequirements}
+            onCancel={() => setPrepareOutsourcingOpen(false)}
+            onPrepared={() => {
+              setPrepareOutsourcingOpen(false)
+              onChanged?.()
+              onCancel()
+            }}
+          />
         </Space>
       ) : null}
     </BusinessFormModal>

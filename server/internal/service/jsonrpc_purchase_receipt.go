@@ -5,6 +5,7 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
+	"server/internal/errcode"
 )
 
 func (d *jsonrpcDispatcher) handlePurchaseReceipt(
@@ -27,6 +28,18 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders", "purchase_receipts", "quality_inspections", "inventory"); res != nil {
 			return id, res, nil
+		}
+		scope, scopeResult := d.currentWarehouseDataScope(ctx)
+		if scopeResult != nil {
+			return id, scopeResult, nil
+		}
+		if in.WarehouseID > 0 && !scope.Allows(in.WarehouseID) {
+			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+		}
+		for _, warehouseID := range in.ItemWarehouses {
+			if !scope.Allows(warehouseID) {
+				return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+			}
 		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, in)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil

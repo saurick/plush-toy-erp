@@ -24,7 +24,7 @@ func TestProductSKUSchemaLinksCoreProductFlows(t *testing.T) {
 		SetCode("CUS-SKU-001").
 		SetName("SKU 测试客户").
 		SaveX(ctx)
-	warehouse := createTestWarehouse(t, ctx, client, "SKU-WH-01")
+	warehouse := createTestProductWarehouse(t, ctx, client, "SKU-WH-01")
 
 	sku := client.ProductSKU.Create().
 		SetProductID(product.ID).

@@ -328,19 +328,17 @@ func TestProductionWIPOutsourcingAllocationIntentIsDeterministic(t *testing.T) {
 	}
 }
 
-func TestSelectProductionWIPFabricRequirementsUsesOnlyExplicitOwnership(t *testing.T) {
-	fabric := ProductionWIPOperationFabricProcessing
+func TestSelectProductionWIPFabricRequirementsOffersMaterialsForManagerSelection(t *testing.T) {
 	requirements := []*ProductionOrderMaterialRequirement{
-		{ID: 2, ProductionOrderItemID: 10, PlannedQuantity: productionWIPTestDecimal("3"), ProductionOperationCode: &fabric},
+		{ID: 2, ProductionOrderItemID: 10, PlannedQuantity: productionWIPTestDecimal("3")},
 		{ID: 1, ProductionOrderItemID: 10, PlannedQuantity: productionWIPTestDecimal("4")},
 	}
 	selected, err := SelectProductionWIPFabricRequirements(10, requirements)
-	if err != nil || len(selected) != 1 || selected[0].ID != 2 {
+	if err != nil || len(selected) != 2 || selected[0].ID != 1 {
 		t.Fatalf("selected=%#v err=%v", selected, err)
 	}
-	requirements[0].ProductionOperationCode = nil
-	if _, err := SelectProductionWIPFabricRequirements(10, requirements); !errors.Is(err, ErrProductionWIPInvalidRoute) {
-		t.Fatalf("missing explicit owner error=%v", err)
+	if selected, err := SelectProductionWIPFabricRequirements(10, requirements); err != nil || len(selected) != 2 {
+		t.Fatalf("materials without engineering assignment: %v", err)
 	}
 }
 

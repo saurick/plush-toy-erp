@@ -391,13 +391,6 @@ func SelectProductionWIPFabricRequirements(itemID int, requirements []*Productio
 			return nil, ErrProductionWIPInvalidRoute
 		}
 		seen[requirement.ID] = struct{}{}
-		if requirement.ProductionOperationCode == nil {
-			continue
-		}
-		code := strings.ToUpper(strings.TrimSpace(*requirement.ProductionOperationCode))
-		if code != ProductionWIPOperationFabricProcessing {
-			return nil, ErrProductionWIPInvalidRoute
-		}
 		selected = append(selected, requirement)
 	}
 	if len(selected) == 0 {

@@ -18,6 +18,19 @@ function dataOf(result) {
   return result?.data || {}
 }
 
+export async function prepareProductionOutsourcingOrder(params) {
+  const value = dataOf(
+    await rpc.call('prepare_production_outsourcing_order', params)
+  )
+  if (
+    !positiveSafeInteger(value.outsourcing_order_id) ||
+    !String(value.outsourcing_order_no || '').trim()
+  ) {
+    throw new Error('委外草稿信息不完整，请重新读取后核对')
+  }
+  return value
+}
+
 function requireProductionOrderID(value) {
   if (!positiveSafeInteger(value)) {
     throw new Error('请选择有效的生产订单')

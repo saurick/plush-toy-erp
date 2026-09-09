@@ -14,6 +14,12 @@ const (
 	Label = "outsourcing_order"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldSourceWipBatchID holds the string denoting the source_wip_batch_id field in the database.
+	FieldSourceWipBatchID = "source_wip_batch_id"
+	// FieldSourceWipIntentHash holds the string denoting the source_wip_intent_hash field in the database.
+	FieldSourceWipIntentHash = "source_wip_intent_hash"
+	// FieldSourceWipPreparedBy holds the string denoting the source_wip_prepared_by field in the database.
+	FieldSourceWipPreparedBy = "source_wip_prepared_by"
 	// FieldOutsourcingOrderNo holds the string denoting the outsourcing_order_no field in the database.
 	FieldOutsourcingOrderNo = "outsourcing_order_no"
 	// FieldSupplierID holds the string denoting the supplier_id field in the database.
@@ -52,12 +58,21 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeSourceWipBatch holds the string denoting the source_wip_batch edge name in mutations.
+	EdgeSourceWipBatch = "source_wip_batch"
 	// EdgeSupplier holds the string denoting the supplier edge name in mutations.
 	EdgeSupplier = "supplier"
 	// EdgeItems holds the string denoting the items edge name in mutations.
 	EdgeItems = "items"
 	// Table holds the table name of the outsourcingorder in the database.
 	Table = "outsourcing_orders"
+	// SourceWipBatchTable is the table that holds the source_wip_batch relation/edge.
+	SourceWipBatchTable = "outsourcing_orders"
+	// SourceWipBatchInverseTable is the table name for the ProductionWIPBatch entity.
+	// It exists in this package in order to avoid circular dependency with the "productionwipbatch" package.
+	SourceWipBatchInverseTable = "production_wip_batches"
+	// SourceWipBatchColumn is the table column denoting the source_wip_batch relation/edge.
+	SourceWipBatchColumn = "source_wip_batch_id"
 	// SupplierTable is the table that holds the supplier relation/edge.
 	SupplierTable = "outsourcing_orders"
 	// SupplierInverseTable is the table name for the Supplier entity.
@@ -77,6 +92,9 @@ const (
 // Columns holds all SQL columns for outsourcingorder fields.
 var Columns = []string{
 	FieldID,
+	FieldSourceWipBatchID,
+	FieldSourceWipIntentHash,
+	FieldSourceWipPreparedBy,
 	FieldOutsourcingOrderNo,
 	FieldSupplierID,
 	FieldCurrency,
@@ -109,6 +127,12 @@ func ValidColumn(column string) bool {
 }
 
 var (
+	// SourceWipBatchIDValidator is a validator for the "source_wip_batch_id" field. It is called by the builders before save.
+	SourceWipBatchIDValidator func(int) error
+	// SourceWipIntentHashValidator is a validator for the "source_wip_intent_hash" field. It is called by the builders before save.
+	SourceWipIntentHashValidator func(string) error
+	// SourceWipPreparedByValidator is a validator for the "source_wip_prepared_by" field. It is called by the builders before save.
+	SourceWipPreparedByValidator func(int) error
 	// OutsourcingOrderNoValidator is a validator for the "outsourcing_order_no" field. It is called by the builders before save.
 	OutsourcingOrderNoValidator func(string) error
 	// SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
@@ -153,6 +177,21 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// BySourceWipBatchID orders the results by the source_wip_batch_id field.
+func BySourceWipBatchID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceWipBatchID, opts...).ToFunc()
+}
+
+// BySourceWipIntentHash orders the results by the source_wip_intent_hash field.
+func BySourceWipIntentHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceWipIntentHash, opts...).ToFunc()
+}
+
+// BySourceWipPreparedBy orders the results by the source_wip_prepared_by field.
+func BySourceWipPreparedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceWipPreparedBy, opts...).ToFunc()
 }
 
 // ByOutsourcingOrderNo orders the results by the outsourcing_order_no field.
@@ -240,6 +279,13 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
+// BySourceWipBatchField orders the results by source_wip_batch field.
+func BySourceWipBatchField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSourceWipBatchStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // BySupplierField orders the results by supplier field.
 func BySupplierField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -259,6 +305,13 @@ func ByItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
+}
+func newSourceWipBatchStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SourceWipBatchInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, SourceWipBatchTable, SourceWipBatchColumn),
+	)
 }
 func newSupplierStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(

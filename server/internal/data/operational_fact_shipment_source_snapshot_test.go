@@ -40,7 +40,7 @@ func newShipmentSourceSnapshotFixture(t *testing.T, name string) *shipmentSource
 		unitID:       fixtures.unitID,
 		productID:    fixtures.productID,
 		productSkuID: sku.ID,
-		warehouseID:  fixtures.warehouseID,
+		warehouseID:  fixtures.productWarehouseID,
 	}
 }
 

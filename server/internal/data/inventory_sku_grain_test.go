@@ -41,7 +41,7 @@ func TestInventorySKUGrainIsolationLotAndReversal(t *testing.T) {
 			SubjectType:     biz.InventorySubjectProduct,
 			SubjectID:       fixtures.productID,
 			ProductSkuID:    skuID,
-			WarehouseID:     fixtures.warehouseID,
+			WarehouseID:     fixtures.productWarehouseID,
 			LotID:           lotID,
 			TxnType:         txnType,
 			Direction:       direction,
@@ -147,7 +147,7 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 
 	production, err := uc.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 		FactNo: "PF-SKU-GRAIN", ProductionOrderID: order.Order.ID, ProductionOrderItemID: order.Items[0].ID,
-		WarehouseID: fixtures.warehouseID, LotID: &lot.ID, Quantity: decimal.NewFromInt(3), IdempotencyKey: "PF-SKU-GRAIN",
+		WarehouseID: fixtures.productWarehouseID, LotID: &lot.ID, Quantity: decimal.NewFromInt(3), IdempotencyKey: "PF-SKU-GRAIN",
 	})
 	if err != nil {
 		t.Fatalf("create SKU production fact: %v", err)
@@ -159,7 +159,7 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 	outsourcingSource := createOutsourcingFactSourceFixtureWithSKU(t, ctx, client, fixtures, "SKU-GRAIN", decimal.NewFromInt(2), &sku.ID)
 	outsourcing, err := uc.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
 		FactNo: "OF-SKU-GRAIN", OutsourcingOrderID: outsourcingSource.order.ID, OutsourcingOrderItemID: outsourcingSource.productLine.ID,
-		WarehouseID: fixtures.warehouseID, LotID: &lot.ID, Quantity: decimal.NewFromInt(2), IdempotencyKey: "OF-SKU-GRAIN",
+		WarehouseID: fixtures.productWarehouseID, LotID: &lot.ID, Quantity: decimal.NewFromInt(2), IdempotencyKey: "OF-SKU-GRAIN",
 	})
 	if err != nil {
 		t.Fatalf("create SKU outsourcing fact: %v", err)
@@ -171,7 +171,7 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 		SubjectType:  biz.InventorySubjectProduct,
 		SubjectID:    fixtures.productID,
 		ProductSkuID: &sku.ID,
-		WarehouseID:  fixtures.warehouseID,
+		WarehouseID:  fixtures.productWarehouseID,
 		LotID:        &lot.ID,
 		UnitID:       fixtures.unitID,
 	})
@@ -213,7 +213,7 @@ func TestShipmentAndReservationUseExactSKUAvailability(t *testing.T) {
 	}{{&skuA.ID, 2}, {&skuB.ID, 5}, {nil, 9}} {
 		if _, err := inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, ProductSkuID: item.sku,
-			WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 			TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(item.quantity),
 			SourceType: "SKU_ALLOCATION_TEST", IdempotencyKey: fmt.Sprintf("SKU-ALLOC-IN-%d", index),
 		}); err != nil {
@@ -222,7 +222,7 @@ func TestShipmentAndReservationUseExactSKUAvailability(t *testing.T) {
 	}
 	reservation, err := operationalUC.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo: "RSV-SKU-A", ProductID: fixtures.productID, ProductSkuID: &skuA.ID,
-		WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 		Quantity: decimal.NewFromInt(2), IdempotencyKey: "RSV-SKU-A",
 	})
 	if err != nil {
@@ -233,7 +233,7 @@ func TestShipmentAndReservationUseExactSKUAvailability(t *testing.T) {
 		shipment, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 			Shipment: &biz.ShipmentCreate{ShipmentNo: no, IdempotencyKey: no},
 			Items: []*biz.ShipmentItemCreate{{
-				ProductID: fixtures.productID, ProductSkuID: skuID, WarehouseID: fixtures.warehouseID,
+				ProductID: fixtures.productID, ProductSkuID: skuID, WarehouseID: fixtures.productWarehouseID,
 				UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(quantity),
 			}},
 		})

@@ -194,6 +194,9 @@ function getDevFlowStateHumanCondition(value) {
 export function getDevFlowStateHumanActionLabel(value) {
   const action = cleanText(value)
   const mappings = [
+    [/save_sales_order_engineering/iu, '保存工程资料与打样进度'],
+    [/boss_review_engineering_material_request/iu, '老板审核用料'],
+    [/finance_review_engineering_material_request/iu, '财务核价与审批'],
     [/post_purchase_rejection_disposition/iu, '过账拒收处置'],
     [/archive.*bom/iu, '归档版本'],
     [/ChangeInventoryLotStatus/iu, '调整批次状态'],

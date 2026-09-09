@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/supplier"
 
 	"entgo.io/ent"
@@ -21,12 +22,13 @@ import (
 // OutsourcingOrderQuery is the builder for querying OutsourcingOrder entities.
 type OutsourcingOrderQuery struct {
 	config
-	ctx          *QueryContext
-	order        []outsourcingorder.OrderOption
-	inters       []Interceptor
-	predicates   []predicate.OutsourcingOrder
-	withSupplier *SupplierQuery
-	withItems    *OutsourcingOrderItemQuery
+	ctx                *QueryContext
+	order              []outsourcingorder.OrderOption
+	inters             []Interceptor
+	predicates         []predicate.OutsourcingOrder
+	withSourceWipBatch *ProductionWIPBatchQuery
+	withSupplier       *SupplierQuery
+	withItems          *OutsourcingOrderItemQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -61,6 +63,28 @@ func (_q *OutsourcingOrderQuery) Unique(unique bool) *OutsourcingOrderQuery {
 func (_q *OutsourcingOrderQuery) Order(o ...outsourcingorder.OrderOption) *OutsourcingOrderQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QuerySourceWipBatch chains the current query on the "source_wip_batch" edge.
+func (_q *OutsourcingOrderQuery) QuerySourceWipBatch() *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorder.Table, outsourcingorder.FieldID, selector),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, outsourcingorder.SourceWipBatchTable, outsourcingorder.SourceWipBatchColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // QuerySupplier chains the current query on the "supplier" edge.
@@ -294,17 +318,29 @@ func (_q *OutsourcingOrderQuery) Clone() *OutsourcingOrderQuery {
 		return nil
 	}
 	return &OutsourcingOrderQuery{
-		config:       _q.config,
-		ctx:          _q.ctx.Clone(),
-		order:        append([]outsourcingorder.OrderOption{}, _q.order...),
-		inters:       append([]Interceptor{}, _q.inters...),
-		predicates:   append([]predicate.OutsourcingOrder{}, _q.predicates...),
-		withSupplier: _q.withSupplier.Clone(),
-		withItems:    _q.withItems.Clone(),
+		config:             _q.config,
+		ctx:                _q.ctx.Clone(),
+		order:              append([]outsourcingorder.OrderOption{}, _q.order...),
+		inters:             append([]Interceptor{}, _q.inters...),
+		predicates:         append([]predicate.OutsourcingOrder{}, _q.predicates...),
+		withSourceWipBatch: _q.withSourceWipBatch.Clone(),
+		withSupplier:       _q.withSupplier.Clone(),
+		withItems:          _q.withItems.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithSourceWipBatch tells the query-builder to eager-load the nodes that are connected to
+// the "source_wip_batch" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *OutsourcingOrderQuery) WithSourceWipBatch(opts ...func(*ProductionWIPBatchQuery)) *OutsourcingOrderQuery {
+	query := (&ProductionWIPBatchClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withSourceWipBatch = query
+	return _q
 }
 
 // WithSupplier tells the query-builder to eager-load the nodes that are connected to
@@ -335,12 +371,12 @@ func (_q *OutsourcingOrderQuery) WithItems(opts ...func(*OutsourcingOrderItemQue
 // Example:
 //
 //	var v []struct {
-//		OutsourcingOrderNo string `json:"outsourcing_order_no,omitempty"`
+//		SourceWipBatchID int `json:"source_wip_batch_id,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.OutsourcingOrder.Query().
-//		GroupBy(outsourcingorder.FieldOutsourcingOrderNo).
+//		GroupBy(outsourcingorder.FieldSourceWipBatchID).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *OutsourcingOrderQuery) GroupBy(field string, fields ...string) *OutsourcingOrderGroupBy {
@@ -358,11 +394,11 @@ func (_q *OutsourcingOrderQuery) GroupBy(field string, fields ...string) *Outsou
 // Example:
 //
 //	var v []struct {
-//		OutsourcingOrderNo string `json:"outsourcing_order_no,omitempty"`
+//		SourceWipBatchID int `json:"source_wip_batch_id,omitempty"`
 //	}
 //
 //	client.OutsourcingOrder.Query().
-//		Select(outsourcingorder.FieldOutsourcingOrderNo).
+//		Select(outsourcingorder.FieldSourceWipBatchID).
 //		Scan(ctx, &v)
 func (_q *OutsourcingOrderQuery) Select(fields ...string) *OutsourcingOrderSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)
@@ -407,7 +443,8 @@ func (_q *OutsourcingOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook)
 	var (
 		nodes       = []*OutsourcingOrder{}
 		_spec       = _q.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [3]bool{
+			_q.withSourceWipBatch != nil,
 			_q.withSupplier != nil,
 			_q.withItems != nil,
 		}
@@ -430,6 +467,12 @@ func (_q *OutsourcingOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook)
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withSourceWipBatch; query != nil {
+		if err := _q.loadSourceWipBatch(ctx, query, nodes, nil,
+			func(n *OutsourcingOrder, e *ProductionWIPBatch) { n.Edges.SourceWipBatch = e }); err != nil {
+			return nil, err
+		}
+	}
 	if query := _q.withSupplier; query != nil {
 		if err := _q.loadSupplier(ctx, query, nodes, nil,
 			func(n *OutsourcingOrder, e *Supplier) { n.Edges.Supplier = e }); err != nil {
@@ -446,6 +489,38 @@ func (_q *OutsourcingOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook)
 	return nodes, nil
 }
 
+func (_q *OutsourcingOrderQuery) loadSourceWipBatch(ctx context.Context, query *ProductionWIPBatchQuery, nodes []*OutsourcingOrder, init func(*OutsourcingOrder), assign func(*OutsourcingOrder, *ProductionWIPBatch)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*OutsourcingOrder)
+	for i := range nodes {
+		if nodes[i].SourceWipBatchID == nil {
+			continue
+		}
+		fk := *nodes[i].SourceWipBatchID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(productionwipbatch.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "source_wip_batch_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 func (_q *OutsourcingOrderQuery) loadSupplier(ctx context.Context, query *SupplierQuery, nodes []*OutsourcingOrder, init func(*OutsourcingOrder), assign func(*OutsourcingOrder, *Supplier)) error {
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*OutsourcingOrder)
@@ -530,6 +605,9 @@ func (_q *OutsourcingOrderQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != outsourcingorder.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withSourceWipBatch != nil {
+			_spec.Node.AddColumnOnce(outsourcingorder.FieldSourceWipBatchID)
 		}
 		if _q.withSupplier != nil {
 			_spec.Node.AddColumnOnce(outsourcingorder.FieldSupplierID)

@@ -25,6 +25,28 @@ const salesOrderRpc = new JsonRpc({
   authScope: AUTH_SCOPE.ADMIN,
 })
 
+export async function getEngineeringMaterialRequest(params, options = {}) {
+  return dataOf(
+    await salesOrderRpc.call(
+      'get_engineering_material_request',
+      params,
+      options
+    )
+  )
+}
+export async function submitEngineeringMaterialRequest(params) {
+  return dataOf(
+    await salesOrderRpc.call('submit_engineering_material_request', params)
+  )
+}
+export async function reviewEngineeringMaterialRequest(params, stage) {
+  const method =
+    stage === 'boss'
+      ? 'boss_review_engineering_material_request'
+      : 'finance_review_engineering_material_request'
+  return dataOf(await salesOrderRpc.call(method, params))
+}
+
 const purchaseOrderRpc = new JsonRpc({
   url: 'purchase_order',
   basePath: ADMIN_BASE_PATH,
@@ -211,6 +233,30 @@ export async function listWarehouses(params = {}, options = {}) {
 
 export async function listAllWarehouses(params = {}, options = {}) {
   return listAllReferenceRecords(listWarehouses, params, 'warehouses', options)
+}
+
+export async function listAllMaterialWarehouses(params = {}, options = {}) {
+  return listAllReferenceRecords(
+    async (page, requestOptions) =>
+      dataOf(
+        await masterDataRpc.call(
+          'list_material_warehouses',
+          page,
+          requestOptions
+        )
+      ),
+    params,
+    'warehouses',
+    options
+  )
+}
+
+export async function createWarehouse(params) {
+  return dataOf(await masterDataRpc.call('create_warehouse', params))?.warehouse
+}
+
+export async function updateWarehouse(params) {
+  return dataOf(await masterDataRpc.call('update_warehouse', params))?.warehouse
 }
 
 export async function createMaterial(params = {}) {
@@ -403,6 +449,14 @@ export async function reorderSalesOrderItems(params = {}) {
 export async function getSalesOrder(params = {}, options = {}) {
   const result = await salesOrderRpc.call('get_sales_order', params, options)
   return dataOf(result)?.sales_order || null
+}
+
+export async function saveSalesOrderEngineering(params = {}) {
+  const result = await salesOrderRpc.call(
+    'save_sales_order_engineering',
+    params
+  )
+  return dataOf(result)
 }
 
 export async function closeSalesOrder(params = {}) {

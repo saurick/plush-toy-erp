@@ -71,6 +71,7 @@ func TestProductionOrderReleaseFreezesMaterialRequirementsAndKeepsNoBOMExplicit(
 
 	withoutBOM := f.draft("MO-MATERIAL-NO-BOM", 1)
 	withoutBOM.Items[0].BOMHeaderID = nil
+	withoutBOM.Items[0].SalesOrderItemID = nil
 	createdWithoutBOM, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{
 		Draft: withoutBOM, ActorID: f.actorID, IdempotencyKey: "mo-material-no-bom-create",
 	})

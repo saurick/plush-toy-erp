@@ -88,17 +88,21 @@ type Warehouse struct {
 }
 
 type Material struct {
-	ID             int
-	Code           string
-	Name           string
-	SupplierItemNo *string
-	Category       *string
-	Spec           *string
-	Color          *string
-	DefaultUnitID  int
-	IsActive       bool
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	StockCategory      string
+	DefaultWarehouseID *int
+	ID                 int
+	SupplierID         *int
+	SupplierName       *string
+	Code               string
+	Name               string
+	SupplierItemNo     *string
+	Category           *string
+	Spec               *string
+	Color              *string
+	DefaultUnitID      int
+	IsActive           bool
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type Process struct {
@@ -198,14 +202,19 @@ type SupplierMutation struct {
 }
 
 type MaterialMutation struct {
-	Code           string
-	Name           string
-	SupplierItemNo *string
-	Category       *string
-	Spec           *string
-	Color          *string
-	DefaultUnitID  int
+	StockCategory      string
+	DefaultWarehouseID *int
+	SupplierID         *int
+	Code               string
+	Name               string
+	SupplierItemNo     *string
+	Category           *string
+	Spec               *string
+	Color              *string
+	DefaultUnitID      int
 }
+
+var ErrMaterialIdentityConflict = errors.New("material supplier identity already exists")
 
 type ProcessMutation struct {
 	Code                         string
@@ -272,6 +281,8 @@ type SupplierWithContacts struct {
 }
 
 type MasterDataFilter struct {
+	StockCategory  string
+	WarehouseTypes []string
 	Keyword        string
 	ActiveOnly     bool
 	LifecycleScope string
@@ -954,6 +965,16 @@ func (uc *MasterDataUsecase) validateSupplierProcessIDs(ctx context.Context, sup
 }
 
 func normalizeMaterialMutation(in MaterialMutation) (MaterialMutation, error) {
+	in.StockCategory = strings.TrimSpace(in.StockCategory)
+	if in.StockCategory == "" {
+		in.StockCategory = MaterialStockUnclassified
+	}
+	if !ValidMaterialStockCategory(in.StockCategory) || (in.DefaultWarehouseID != nil && *in.DefaultWarehouseID <= 0) {
+		return MaterialMutation{}, ErrBadParam
+	}
+	if in.SupplierID != nil && *in.SupplierID <= 0 {
+		return MaterialMutation{}, ErrBadParam
+	}
 	in.Code = strings.TrimSpace(in.Code)
 	in.Name = strings.TrimSpace(in.Name)
 	in.SupplierItemNo = normalizeOptionalString(in.SupplierItemNo)
@@ -1086,6 +1107,14 @@ func normalizeContactSaveMutations(in []*ContactSaveMutation) ([]*ContactSaveMut
 }
 
 func normalizeMasterDataFilter(in MasterDataFilter) (MasterDataFilter, error) {
+	if in.StockCategory != "" && !ValidMaterialStockCategory(in.StockCategory) {
+		return MasterDataFilter{}, ErrBadParam
+	}
+	for _, value := range in.WarehouseTypes {
+		if !ValidWarehouseType(value) {
+			return MasterDataFilter{}, ErrBadParam
+		}
+	}
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	var scopeOK bool
 	in.LifecycleScope, scopeOK = NormalizeLifecycleScope(in.LifecycleScope)

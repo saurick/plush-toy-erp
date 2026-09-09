@@ -146,7 +146,7 @@ func TestMasterDataRepoPaginatedListsDefaultToNewestFirst(t *testing.T) {
 			seed: func(ctx context.Context, client *ent.Client) []int {
 				ids := make([]int, 0, 3)
 				for index := 1; index <= 3; index++ {
-					row := client.Warehouse.Create().SetCode(fmt.Sprintf("PAGE-W-%d", index)).SetName(fmt.Sprintf("分页仓库 %d", index)).SetType("RAW_MATERIAL").SaveX(ctx)
+					row := client.Warehouse.Create().SetCode(fmt.Sprintf("PAGE-W-%d", index)).SetName(fmt.Sprintf("分页仓库 %d", index)).SetType("MATERIAL").SaveX(ctx)
 					ids = append(ids, row.ID)
 				}
 				return ids

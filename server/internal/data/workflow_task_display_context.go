@@ -258,7 +258,11 @@ func loadWorkflowDisplaySources(ctx context.Context, client *ent.Client, kind st
 		for _, row := range rows {
 			source := workflowDisplaySource{no: row.OrderNo}
 			for _, item := range row.Edges.Items {
-				source.items = append(source.items, workflowDisplayRef{kind: "product", id: item.ProductID, name: displayString(item.ProductNameSnapshot), code: displayString(item.ProductCodeSnapshot)})
+				name, code := displayString(item.ProductNameSnapshot), displayString(item.ProductCodeSnapshot)
+				if item.ProductID == 0 {
+					name, code = displayString(item.RequestedProductName), displayString(item.CustomerProductNo)
+				}
+				source.items = append(source.items, workflowDisplayRef{kind: "product", id: item.ProductID, name: name, code: code})
 			}
 			out[row.ID] = source
 		}

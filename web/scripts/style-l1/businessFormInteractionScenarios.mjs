@@ -231,7 +231,7 @@ export function createBusinessFormInteractionScenarios({
           /^MAT-\d{8}-\d{3}$/u.test(materialCodeValue),
           `材料编号应自动生成，不应要求用户手填: ${materialCodeValue}`
         )
-        const supplierItemInput = materialModal.getByLabel('款号', {
+        const supplierItemInput = materialModal.getByLabel('厂商料号', {
           exact: true,
         })
         assert.equal(await supplierItemInput.inputValue(), '')

@@ -25,6 +25,8 @@ func (d *jsonrpcDispatcher) handleProductionWIP(ctx context.Context, method, id 
 	}
 
 	switch method {
+	case "prepare_production_outsourcing_order":
+		return id, d.prepareProductionOutsourcing(ctx, pm), nil
 	case "get_production_wip":
 		return id, d.getProductionWIP(ctx, pm), nil
 	case "execute_production_wip_action":
@@ -383,6 +385,10 @@ func (d *jsonrpcDispatcher) mapProductionWIPError(ctx context.Context, err error
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前质量关口尚未全部通过，不能继续转序"}
 	case errors.Is(err, biz.ErrProductionWIPPackagingConfirmationPending):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "包材版面和包装版本尚未完成业务确认"}
+	case errors.Is(err, biz.ErrProductionWIPPreparedContractDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "批次已有委外草稿或合同，请先取消关联委外单，再拆分、取消批次或改为本厂加工"}
+	case errors.Is(err, biz.ErrSupplierInactive), errors.Is(err, biz.ErrProcessNotOutsourcingEnabled):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请核对加工厂状态及该工序是否允许外发"}
 	case errors.Is(err, biz.ErrProductionWIPInvalidTransition), errors.Is(err, biz.ErrProductionOrderInvalidState), errors.Is(err, biz.ErrBadParam):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前在制批次状态不允许该操作，请刷新后核对"}
 	default:

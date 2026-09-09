@@ -32,7 +32,7 @@ func TestOperationalFactRepo_CancelDraftShipmentRespectsReleaseTaskLifecycle(t *
 			},
 			Items: []*biz.ShipmentItemCreate{{
 				ProductID:   fixtures.productID,
-				WarehouseID: fixtures.warehouseID,
+				WarehouseID: fixtures.productWarehouseID,
 				UnitID:      fixtures.unitID,
 				Quantity:    decimal.NewFromInt(1),
 			}},

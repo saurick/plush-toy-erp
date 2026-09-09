@@ -73,6 +73,13 @@ import {
   normalizeSalesOrderItemFormValue,
   salesOrderLineOrderLabel,
 } from '../components/sales-orders/SalesOrderForm.jsx'
+import WorkflowTaskProductImage from '../components/workflow/WorkflowTaskProductImage.jsx'
+import SalesOrderEngineeringModal from '../components/sales-orders/SalesOrderEngineeringModal.jsx'
+import EngineeringMaterialRequestModal from '../components/sales-orders/EngineeringMaterialRequestModal.jsx'
+import {
+  salesOrderRequirementName,
+  salesOrderEngineeringLabel,
+} from '../utils/salesOrderRequirements.mjs'
 import SalesOrderBusinessModal from '../components/sales-orders/SalesOrderBusinessModal.jsx'
 import { buildSalesOrderColumns } from '../components/sales-orders/salesOrderColumns.jsx'
 import {
@@ -266,6 +273,8 @@ export default function V1SalesOrdersPage() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
+  const [engineeringOrderID, setEngineeringOrderID] = useState(null)
+  const [materialRequestOrderID, setMaterialRequestOrderID] = useState(null)
   const [editingOrder, setEditingOrder] = useState(null)
   const [detailOrder, setDetailOrder] = useState(null)
   const [orderColumnOrder, setOrderColumnOrder] = useState(null)
@@ -383,10 +392,38 @@ export default function V1SalesOrdersPage() {
   )
   const getSalesOrderItemFields = useCallback(
     (item, { view }) => [
+      {
+        label: '产品图',
+        value: (
+          <WorkflowTaskProductImage
+            item={{
+              kind: 'product',
+              name: salesOrderRequirementName(item),
+              productID: item?.product_id,
+              imageAttachmentID: item?.product_image_attachment_id,
+            }}
+            preview
+          />
+        ),
+      },
+      { label: '需求名称', value: salesOrderRequirementName(item) },
+      { label: '客户款号', value: item?.customer_product_no },
+      {
+        label: '类别',
+        value: item?.order_category === 'REPEAT' ? '返单' : '新单',
+      },
       { label: '产品编号', value: item?.product_code_snapshot },
       { label: '产品名称', value: item?.product_name_snapshot },
       { label: '颜色', value: item?.color_snapshot },
       { label: '订单数量', value: item?.ordered_quantity },
+      { label: '船头版数量', value: item?.pre_shipment_sample_quantity },
+      { label: '生产数量', value: item?.production_quantity },
+      { label: '已出货数', value: item?.shipped_quantity },
+      { label: '未出货数', value: item?.unshipped_quantity },
+      { label: '工程 / 打样', value: salesOrderEngineeringLabel(item) },
+      { label: '设计师', value: item?.designer },
+      { label: '工艺要求', value: item?.process_requirement },
+      { label: '打样说明', value: item?.sample_note },
       {
         label: '单位',
         value: referenceLabel(unitOptions, item?.unit_id, '单位'),
@@ -453,7 +490,7 @@ export default function V1SalesOrdersPage() {
     getItemFields: getSalesOrderItemFields,
     getItemLabel: (item, { index }) => `明细 ${item?.line_no || index + 1}`,
     getItemSummary: (item) =>
-      [item?.product_code_snapshot, item?.product_name_snapshot]
+      [item?.product_code_snapshot, salesOrderRequirementName(item)]
         .filter(Boolean)
         .join(' / '),
     getRecordLabel: (order) => order?.order_no || '当前销售订单',
@@ -1679,6 +1716,44 @@ export default function V1SalesOrdersPage() {
               setSelectedOrder(null)
             }}
           />
+          {hasActionPermission(
+            adminProfile,
+            'sales_order.engineering.update'
+          ) ? (
+            <BusinessActionTooltip
+              disabled={
+                !selectedOrder ||
+                !['draft', 'submitted', 'active'].includes(
+                  selectedOrder.lifecycle_status
+                ) ||
+                saving
+              }
+              disabledReason="请选择仍在办理的销售订单"
+            >
+              <Button
+                size="small"
+                disabled={
+                  !selectedOrder ||
+                  !['draft', 'submitted', 'active'].includes(
+                    selectedOrder.lifecycle_status
+                  ) ||
+                  saving
+                }
+                onClick={() => setEngineeringOrderID(selectedOrder.id)}
+              >
+                工程与打样
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {hasActionPermission(adminProfile, 'engineering.material.read') ? (
+            <Button
+              size="small"
+              disabled={!selectedOrder || saving}
+              onClick={() => setMaterialRequestOrderID(selectedOrder.id)}
+            >
+              材料汇总与审批
+            </Button>
+          ) : null}
           {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
               disabled={relatedActionAvailability.disabled}
@@ -1849,7 +1924,7 @@ export default function V1SalesOrdersPage() {
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
                 getItemSummary: (item) =>
-                  [item?.product_code_snapshot, item?.product_name_snapshot]
+                  [item?.product_code_snapshot, salesOrderRequirementName(item)]
                     .filter(Boolean)
                     .join(' / '),
                 load: loadAllSalesOrderItemsForPreview,
@@ -1894,6 +1969,38 @@ export default function V1SalesOrdersPage() {
         }}
       />
 
+      <SalesOrderEngineeringModal
+        orderID={engineeringOrderID}
+        onCancel={() => setEngineeringOrderID(null)}
+        onSaved={() => {
+          setEngineeringOrderID(null)
+          loadOrders()
+        }}
+      />
+      <EngineeringMaterialRequestModal
+        key={materialRequestOrderID || 'material-request-closed'}
+        orderID={materialRequestOrderID}
+        permissions={{
+          submit: hasActionPermission(
+            adminProfile,
+            'engineering.material.submit'
+          ),
+          boss: hasActionPermission(
+            adminProfile,
+            'engineering.material.boss_approve'
+          ),
+          finance: hasActionPermission(
+            adminProfile,
+            'engineering.material.finance_approve'
+          ),
+          purchaseRead: hasActionPermission(
+            adminProfile,
+            'purchase.order.read'
+          ),
+        }}
+        onCancel={() => setMaterialRequestOrderID(null)}
+        onChanged={loadOrders}
+      />
       <SalesOrderBusinessModal
         open={orderModalOpen}
         form={orderForm}

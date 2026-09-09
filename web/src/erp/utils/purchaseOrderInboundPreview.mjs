@@ -120,6 +120,7 @@ export function buildPurchaseInboundDraftPreviewRows(progress) {
   const validated = validatePurchaseOrderReceiptProgress(progress)
   return validated.items.map((item) => ({
     key: item.purchase_order_item_id,
+    materialID: item.material_id,
     lineNo: item.line_no,
     material: materialLabel(item),
     unit: item.unit_name || item.unit_code,

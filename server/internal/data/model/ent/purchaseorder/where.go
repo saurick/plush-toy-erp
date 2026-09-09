@@ -55,6 +55,11 @@ func IDLTE(id int) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldLTE(FieldID, id))
 }
 
+// EngineeringMaterialRequestID applies equality check predicate on the "engineering_material_request_id" field. It's identical to EngineeringMaterialRequestIDEQ.
+func EngineeringMaterialRequestID(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldEngineeringMaterialRequestID, v))
+}
+
 // PurchaseOrderNo applies equality check predicate on the "purchase_order_no" field. It's identical to PurchaseOrderNoEQ.
 func PurchaseOrderNo(v string) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldPurchaseOrderNo, v))
@@ -163,6 +168,36 @@ func CreatedAt(v time.Time) predicate.PurchaseOrder {
 // UpdatedAt applies equality check predicate on the "updated_at" field. It's identical to UpdatedAtEQ.
 func UpdatedAt(v time.Time) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldUpdatedAt, v))
+}
+
+// EngineeringMaterialRequestIDEQ applies the EQ predicate on the "engineering_material_request_id" field.
+func EngineeringMaterialRequestIDEQ(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldEQ(FieldEngineeringMaterialRequestID, v))
+}
+
+// EngineeringMaterialRequestIDNEQ applies the NEQ predicate on the "engineering_material_request_id" field.
+func EngineeringMaterialRequestIDNEQ(v int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNEQ(FieldEngineeringMaterialRequestID, v))
+}
+
+// EngineeringMaterialRequestIDIn applies the In predicate on the "engineering_material_request_id" field.
+func EngineeringMaterialRequestIDIn(vs ...int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIn(FieldEngineeringMaterialRequestID, vs...))
+}
+
+// EngineeringMaterialRequestIDNotIn applies the NotIn predicate on the "engineering_material_request_id" field.
+func EngineeringMaterialRequestIDNotIn(vs ...int) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotIn(FieldEngineeringMaterialRequestID, vs...))
+}
+
+// EngineeringMaterialRequestIDIsNil applies the IsNil predicate on the "engineering_material_request_id" field.
+func EngineeringMaterialRequestIDIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldEngineeringMaterialRequestID))
+}
+
+// EngineeringMaterialRequestIDNotNil applies the NotNil predicate on the "engineering_material_request_id" field.
+func EngineeringMaterialRequestIDNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldEngineeringMaterialRequestID))
 }
 
 // PurchaseOrderNoEQ applies the EQ predicate on the "purchase_order_no" field.
@@ -1428,6 +1463,29 @@ func UpdatedAtLT(v time.Time) predicate.PurchaseOrder {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldLTE(FieldUpdatedAt, v))
+}
+
+// HasEngineeringMaterialRequest applies the HasEdge predicate on the "engineering_material_request" edge.
+func HasEngineeringMaterialRequest() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, EngineeringMaterialRequestTable, EngineeringMaterialRequestColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasEngineeringMaterialRequestWith applies the HasEdge predicate on the "engineering_material_request" edge with a given conditions (other predicates).
+func HasEngineeringMaterialRequestWith(preds ...predicate.EngineeringMaterialRequest) predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(func(s *sql.Selector) {
+		step := newEngineeringMaterialRequestStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // HasSupplier applies the HasEdge predicate on the "supplier" edge.

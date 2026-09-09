@@ -111,7 +111,7 @@ func TestOutsourcingOrderLinkedDraftFactsCancelWithoutInventoryAndReleaseParent(
 	lotNo := "out-return-draft-cancel-lot"
 	returned, err := factUC.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
 		FactNo: "OUT-RETURN-DRAFT-CANCEL", OutsourcingOrderID: source.order.ID, OutsourcingOrderItemID: source.productLine.ID,
-		WarehouseID: fixtures.warehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(2), IdempotencyKey: "out-return-draft-cancel",
+		WarehouseID: fixtures.productWarehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(2), IdempotencyKey: "out-return-draft-cancel",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -156,14 +156,14 @@ func TestDraftOutsourcingReturnCancellationBlocksActiveQualityAndFinance(t *test
 	lotNo := "out-draft-dependency-lot"
 	fact, err := uc.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
 		FactNo: "OUT-DRAFT-DEPENDENCY", OutsourcingOrderID: source.order.ID, OutsourcingOrderItemID: source.productLine.ID,
-		WarehouseID: fixtures.warehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "out-draft-dependency",
+		WarehouseID: fixtures.productWarehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "out-draft-dependency",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	inspection := client.QualityInspection.Create().SetInspectionNo("QI-OUT-DRAFT-DEPENDENCY").SetStatus(biz.QualityInspectionStatusDraft).
 		SetInspectionType(biz.QualityInspectionTypeOutsourcingReturn).SetSubjectType(biz.QualityInspectionSubjectProduct).
-		SetSubjectID(fixtures.productID).SetInventoryLotID(*fact.LotID).SetWarehouseID(fixtures.warehouseID).
+		SetSubjectID(fixtures.productID).SetInventoryLotID(*fact.LotID).SetWarehouseID(fixtures.productWarehouseID).
 		SetSourceType(biz.QualityInspectionSourceOutsourcingFact).SetSourceID(fact.ID).SaveX(ctx)
 	actor := client.AdminUser.Create().SetUsername("out-draft-dependency-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 	supplierID := source.order.SupplierID

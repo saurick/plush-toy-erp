@@ -216,6 +216,7 @@ export const businessPageFlowDefinitions = Object.freeze(
           'get_purchase_order_receipt_progress',
         ],
         ['sales-orders', 'shipments', 'list_shipment_source_candidates'],
+        ['material-bom', 'sales-orders', 'get_engineering_material_request'],
         [
           'processing-contracts',
           'quality-inspections',
@@ -244,6 +245,16 @@ export const businessPageFlowDefinitions = Object.freeze(
       [
         // Explicit backend actions that create a downstream record or draft.
         ['material-bom', 'material-bom', 'copy_bom_version'],
+        [
+          'sales-orders',
+          'accessories-purchase',
+          'finance_review_engineering_material_request',
+        ],
+        [
+          'production-orders',
+          'processing-contracts',
+          'prepare_production_outsourcing_order',
+        ],
         [
           'accessories-purchase',
           'inbound',
@@ -467,6 +478,13 @@ export const businessPageFlowDefinitions = Object.freeze(
           'execute_sales_order_acceptance_submit',
         ],
         ['sales-orders', 'sales-orders', 'close_sales_order'],
+        ['sales-orders', 'sales-orders', 'save_sales_order_engineering'],
+        ['sales-orders', 'sales-orders', 'submit_engineering_material_request'],
+        [
+          'sales-orders',
+          'sales-orders',
+          'boss_review_engineering_material_request',
+        ],
         ['sales-orders', 'sales-orders', 'cancel_sales_order'],
         [
           'accessories-purchase',

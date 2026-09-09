@@ -22,6 +22,8 @@ import (
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/customerconfigrevision"
 	"server/internal/data/model/ent/deploymentmodulestate"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
+	"server/internal/data/model/ent/engineeringmaterialrequestitem"
 	"server/internal/data/model/ent/financeallocation"
 	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
@@ -118,6 +120,10 @@ type Client struct {
 	CustomerConfigRevision *CustomerConfigRevisionClient
 	// DeploymentModuleState is the client for interacting with the DeploymentModuleState builders.
 	DeploymentModuleState *DeploymentModuleStateClient
+	// EngineeringMaterialRequest is the client for interacting with the EngineeringMaterialRequest builders.
+	EngineeringMaterialRequest *EngineeringMaterialRequestClient
+	// EngineeringMaterialRequestItem is the client for interacting with the EngineeringMaterialRequestItem builders.
+	EngineeringMaterialRequestItem *EngineeringMaterialRequestItemClient
 	// FinanceAllocation is the client for interacting with the FinanceAllocation builders.
 	FinanceAllocation *FinanceAllocationClient
 	// FinanceCreditNote is the client for interacting with the FinanceCreditNote builders.
@@ -264,6 +270,8 @@ func (c *Client) init() {
 	c.Customer = NewCustomerClient(c.config)
 	c.CustomerConfigRevision = NewCustomerConfigRevisionClient(c.config)
 	c.DeploymentModuleState = NewDeploymentModuleStateClient(c.config)
+	c.EngineeringMaterialRequest = NewEngineeringMaterialRequestClient(c.config)
+	c.EngineeringMaterialRequestItem = NewEngineeringMaterialRequestItemClient(c.config)
 	c.FinanceAllocation = NewFinanceAllocationClient(c.config)
 	c.FinanceCreditNote = NewFinanceCreditNoteClient(c.config)
 	c.FinanceFact = NewFinanceFactClient(c.config)
@@ -429,6 +437,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Customer:                           NewCustomerClient(cfg),
 		CustomerConfigRevision:             NewCustomerConfigRevisionClient(cfg),
 		DeploymentModuleState:              NewDeploymentModuleStateClient(cfg),
+		EngineeringMaterialRequest:         NewEngineeringMaterialRequestClient(cfg),
+		EngineeringMaterialRequestItem:     NewEngineeringMaterialRequestItemClient(cfg),
 		FinanceAllocation:                  NewFinanceAllocationClient(cfg),
 		FinanceCreditNote:                  NewFinanceCreditNoteClient(cfg),
 		FinanceFact:                        NewFinanceFactClient(cfg),
@@ -521,6 +531,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Customer:                           NewCustomerClient(cfg),
 		CustomerConfigRevision:             NewCustomerConfigRevisionClient(cfg),
 		DeploymentModuleState:              NewDeploymentModuleStateClient(cfg),
+		EngineeringMaterialRequest:         NewEngineeringMaterialRequestClient(cfg),
+		EngineeringMaterialRequestItem:     NewEngineeringMaterialRequestItemClient(cfg),
 		FinanceAllocation:                  NewFinanceAllocationClient(cfg),
 		FinanceCreditNote:                  NewFinanceCreditNoteClient(cfg),
 		FinanceFact:                        NewFinanceFactClient(cfg),
@@ -614,16 +626,18 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.AccessEntitlement, c.AdminSession, c.AdminUser, c.AdminUserRole, c.BOMHeader,
 		c.BOMItem, c.BusinessAttachment, c.Contact, c.Customer,
-		c.CustomerConfigRevision, c.DeploymentModuleState, c.FinanceAllocation,
-		c.FinanceCreditNote, c.FinanceFact, c.FinancePayment, c.InventoryBalance,
-		c.InventoryLot, c.InventoryLotStatusEvent, c.InventoryOperation,
-		c.InventoryOperationItem, c.InventoryTxn, c.Material, c.OutsourcingFact,
-		c.OutsourcingOrder, c.OutsourcingOrderItem, c.OutsourcingReturnDisposition,
-		c.Permission, c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product,
-		c.ProductSKU, c.ProductionExceptionDecision, c.ProductionFact,
-		c.ProductionOrder, c.ProductionOrderEvent, c.ProductionOrderItem,
-		c.ProductionOrderMaterialRequirement, c.ProductionOrderOperation,
-		c.ProductionPackagingConfirmation, c.ProductionWIPBatch, c.ProductionWIPEvent,
+		c.CustomerConfigRevision, c.DeploymentModuleState,
+		c.EngineeringMaterialRequest, c.EngineeringMaterialRequestItem,
+		c.FinanceAllocation, c.FinanceCreditNote, c.FinanceFact, c.FinancePayment,
+		c.InventoryBalance, c.InventoryLot, c.InventoryLotStatusEvent,
+		c.InventoryOperation, c.InventoryOperationItem, c.InventoryTxn, c.Material,
+		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem,
+		c.OutsourcingReturnDisposition, c.Permission, c.Process, c.ProcessInstance,
+		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionExceptionDecision,
+		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
+		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
+		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
+		c.ProductionWIPBatch, c.ProductionWIPEvent,
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
@@ -644,16 +658,18 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.AccessEntitlement, c.AdminSession, c.AdminUser, c.AdminUserRole, c.BOMHeader,
 		c.BOMItem, c.BusinessAttachment, c.Contact, c.Customer,
-		c.CustomerConfigRevision, c.DeploymentModuleState, c.FinanceAllocation,
-		c.FinanceCreditNote, c.FinanceFact, c.FinancePayment, c.InventoryBalance,
-		c.InventoryLot, c.InventoryLotStatusEvent, c.InventoryOperation,
-		c.InventoryOperationItem, c.InventoryTxn, c.Material, c.OutsourcingFact,
-		c.OutsourcingOrder, c.OutsourcingOrderItem, c.OutsourcingReturnDisposition,
-		c.Permission, c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product,
-		c.ProductSKU, c.ProductionExceptionDecision, c.ProductionFact,
-		c.ProductionOrder, c.ProductionOrderEvent, c.ProductionOrderItem,
-		c.ProductionOrderMaterialRequirement, c.ProductionOrderOperation,
-		c.ProductionPackagingConfirmation, c.ProductionWIPBatch, c.ProductionWIPEvent,
+		c.CustomerConfigRevision, c.DeploymentModuleState,
+		c.EngineeringMaterialRequest, c.EngineeringMaterialRequestItem,
+		c.FinanceAllocation, c.FinanceCreditNote, c.FinanceFact, c.FinancePayment,
+		c.InventoryBalance, c.InventoryLot, c.InventoryLotStatusEvent,
+		c.InventoryOperation, c.InventoryOperationItem, c.InventoryTxn, c.Material,
+		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem,
+		c.OutsourcingReturnDisposition, c.Permission, c.Process, c.ProcessInstance,
+		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionExceptionDecision,
+		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
+		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
+		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
+		c.ProductionWIPBatch, c.ProductionWIPEvent,
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
@@ -693,6 +709,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.CustomerConfigRevision.mutate(ctx, m)
 	case *DeploymentModuleStateMutation:
 		return c.DeploymentModuleState.mutate(ctx, m)
+	case *EngineeringMaterialRequestMutation:
+		return c.EngineeringMaterialRequest.mutate(ctx, m)
+	case *EngineeringMaterialRequestItemMutation:
+		return c.EngineeringMaterialRequestItem.mutate(ctx, m)
 	case *FinanceAllocationMutation:
 		return c.FinanceAllocation.mutate(ctx, m)
 	case *FinanceCreditNoteMutation:
@@ -2426,6 +2446,368 @@ func (c *DeploymentModuleStateClient) mutate(ctx context.Context, m *DeploymentM
 		return (&DeploymentModuleStateDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown DeploymentModuleState mutation op: %q", m.Op())
+	}
+}
+
+// EngineeringMaterialRequestClient is a client for the EngineeringMaterialRequest schema.
+type EngineeringMaterialRequestClient struct {
+	config
+}
+
+// NewEngineeringMaterialRequestClient returns a client for the EngineeringMaterialRequest from the given config.
+func NewEngineeringMaterialRequestClient(c config) *EngineeringMaterialRequestClient {
+	return &EngineeringMaterialRequestClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `engineeringmaterialrequest.Hooks(f(g(h())))`.
+func (c *EngineeringMaterialRequestClient) Use(hooks ...Hook) {
+	c.hooks.EngineeringMaterialRequest = append(c.hooks.EngineeringMaterialRequest, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `engineeringmaterialrequest.Intercept(f(g(h())))`.
+func (c *EngineeringMaterialRequestClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EngineeringMaterialRequest = append(c.inters.EngineeringMaterialRequest, interceptors...)
+}
+
+// Create returns a builder for creating a EngineeringMaterialRequest entity.
+func (c *EngineeringMaterialRequestClient) Create() *EngineeringMaterialRequestCreate {
+	mutation := newEngineeringMaterialRequestMutation(c.config, OpCreate)
+	return &EngineeringMaterialRequestCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EngineeringMaterialRequest entities.
+func (c *EngineeringMaterialRequestClient) CreateBulk(builders ...*EngineeringMaterialRequestCreate) *EngineeringMaterialRequestCreateBulk {
+	return &EngineeringMaterialRequestCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EngineeringMaterialRequestClient) MapCreateBulk(slice any, setFunc func(*EngineeringMaterialRequestCreate, int)) *EngineeringMaterialRequestCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EngineeringMaterialRequestCreateBulk{err: fmt.Errorf("calling to EngineeringMaterialRequestClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EngineeringMaterialRequestCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EngineeringMaterialRequestCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EngineeringMaterialRequest.
+func (c *EngineeringMaterialRequestClient) Update() *EngineeringMaterialRequestUpdate {
+	mutation := newEngineeringMaterialRequestMutation(c.config, OpUpdate)
+	return &EngineeringMaterialRequestUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EngineeringMaterialRequestClient) UpdateOne(_m *EngineeringMaterialRequest) *EngineeringMaterialRequestUpdateOne {
+	mutation := newEngineeringMaterialRequestMutation(c.config, OpUpdateOne, withEngineeringMaterialRequest(_m))
+	return &EngineeringMaterialRequestUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EngineeringMaterialRequestClient) UpdateOneID(id int) *EngineeringMaterialRequestUpdateOne {
+	mutation := newEngineeringMaterialRequestMutation(c.config, OpUpdateOne, withEngineeringMaterialRequestID(id))
+	return &EngineeringMaterialRequestUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EngineeringMaterialRequest.
+func (c *EngineeringMaterialRequestClient) Delete() *EngineeringMaterialRequestDelete {
+	mutation := newEngineeringMaterialRequestMutation(c.config, OpDelete)
+	return &EngineeringMaterialRequestDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EngineeringMaterialRequestClient) DeleteOne(_m *EngineeringMaterialRequest) *EngineeringMaterialRequestDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EngineeringMaterialRequestClient) DeleteOneID(id int) *EngineeringMaterialRequestDeleteOne {
+	builder := c.Delete().Where(engineeringmaterialrequest.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EngineeringMaterialRequestDeleteOne{builder}
+}
+
+// Query returns a query builder for EngineeringMaterialRequest.
+func (c *EngineeringMaterialRequestClient) Query() *EngineeringMaterialRequestQuery {
+	return &EngineeringMaterialRequestQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEngineeringMaterialRequest},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EngineeringMaterialRequest entity by its id.
+func (c *EngineeringMaterialRequestClient) Get(ctx context.Context, id int) (*EngineeringMaterialRequest, error) {
+	return c.Query().Where(engineeringmaterialrequest.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EngineeringMaterialRequestClient) GetX(ctx context.Context, id int) *EngineeringMaterialRequest {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QuerySalesOrder queries the sales_order edge of a EngineeringMaterialRequest.
+func (c *EngineeringMaterialRequestClient) QuerySalesOrder(_m *EngineeringMaterialRequest) *SalesOrderQuery {
+	query := (&SalesOrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(engineeringmaterialrequest.Table, engineeringmaterialrequest.FieldID, id),
+			sqlgraph.To(salesorder.Table, salesorder.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, engineeringmaterialrequest.SalesOrderTable, engineeringmaterialrequest.SalesOrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryItems queries the items edge of a EngineeringMaterialRequest.
+func (c *EngineeringMaterialRequestClient) QueryItems(_m *EngineeringMaterialRequest) *EngineeringMaterialRequestItemQuery {
+	query := (&EngineeringMaterialRequestItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(engineeringmaterialrequest.Table, engineeringmaterialrequest.FieldID, id),
+			sqlgraph.To(engineeringmaterialrequestitem.Table, engineeringmaterialrequestitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, engineeringmaterialrequest.ItemsTable, engineeringmaterialrequest.ItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *EngineeringMaterialRequestClient) Hooks() []Hook {
+	return c.hooks.EngineeringMaterialRequest
+}
+
+// Interceptors returns the client interceptors.
+func (c *EngineeringMaterialRequestClient) Interceptors() []Interceptor {
+	return c.inters.EngineeringMaterialRequest
+}
+
+func (c *EngineeringMaterialRequestClient) mutate(ctx context.Context, m *EngineeringMaterialRequestMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EngineeringMaterialRequestCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EngineeringMaterialRequestUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EngineeringMaterialRequestUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EngineeringMaterialRequestDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EngineeringMaterialRequest mutation op: %q", m.Op())
+	}
+}
+
+// EngineeringMaterialRequestItemClient is a client for the EngineeringMaterialRequestItem schema.
+type EngineeringMaterialRequestItemClient struct {
+	config
+}
+
+// NewEngineeringMaterialRequestItemClient returns a client for the EngineeringMaterialRequestItem from the given config.
+func NewEngineeringMaterialRequestItemClient(c config) *EngineeringMaterialRequestItemClient {
+	return &EngineeringMaterialRequestItemClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `engineeringmaterialrequestitem.Hooks(f(g(h())))`.
+func (c *EngineeringMaterialRequestItemClient) Use(hooks ...Hook) {
+	c.hooks.EngineeringMaterialRequestItem = append(c.hooks.EngineeringMaterialRequestItem, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `engineeringmaterialrequestitem.Intercept(f(g(h())))`.
+func (c *EngineeringMaterialRequestItemClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EngineeringMaterialRequestItem = append(c.inters.EngineeringMaterialRequestItem, interceptors...)
+}
+
+// Create returns a builder for creating a EngineeringMaterialRequestItem entity.
+func (c *EngineeringMaterialRequestItemClient) Create() *EngineeringMaterialRequestItemCreate {
+	mutation := newEngineeringMaterialRequestItemMutation(c.config, OpCreate)
+	return &EngineeringMaterialRequestItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EngineeringMaterialRequestItem entities.
+func (c *EngineeringMaterialRequestItemClient) CreateBulk(builders ...*EngineeringMaterialRequestItemCreate) *EngineeringMaterialRequestItemCreateBulk {
+	return &EngineeringMaterialRequestItemCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EngineeringMaterialRequestItemClient) MapCreateBulk(slice any, setFunc func(*EngineeringMaterialRequestItemCreate, int)) *EngineeringMaterialRequestItemCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EngineeringMaterialRequestItemCreateBulk{err: fmt.Errorf("calling to EngineeringMaterialRequestItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EngineeringMaterialRequestItemCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EngineeringMaterialRequestItemCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EngineeringMaterialRequestItem.
+func (c *EngineeringMaterialRequestItemClient) Update() *EngineeringMaterialRequestItemUpdate {
+	mutation := newEngineeringMaterialRequestItemMutation(c.config, OpUpdate)
+	return &EngineeringMaterialRequestItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EngineeringMaterialRequestItemClient) UpdateOne(_m *EngineeringMaterialRequestItem) *EngineeringMaterialRequestItemUpdateOne {
+	mutation := newEngineeringMaterialRequestItemMutation(c.config, OpUpdateOne, withEngineeringMaterialRequestItem(_m))
+	return &EngineeringMaterialRequestItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EngineeringMaterialRequestItemClient) UpdateOneID(id int) *EngineeringMaterialRequestItemUpdateOne {
+	mutation := newEngineeringMaterialRequestItemMutation(c.config, OpUpdateOne, withEngineeringMaterialRequestItemID(id))
+	return &EngineeringMaterialRequestItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EngineeringMaterialRequestItem.
+func (c *EngineeringMaterialRequestItemClient) Delete() *EngineeringMaterialRequestItemDelete {
+	mutation := newEngineeringMaterialRequestItemMutation(c.config, OpDelete)
+	return &EngineeringMaterialRequestItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EngineeringMaterialRequestItemClient) DeleteOne(_m *EngineeringMaterialRequestItem) *EngineeringMaterialRequestItemDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EngineeringMaterialRequestItemClient) DeleteOneID(id int) *EngineeringMaterialRequestItemDeleteOne {
+	builder := c.Delete().Where(engineeringmaterialrequestitem.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EngineeringMaterialRequestItemDeleteOne{builder}
+}
+
+// Query returns a query builder for EngineeringMaterialRequestItem.
+func (c *EngineeringMaterialRequestItemClient) Query() *EngineeringMaterialRequestItemQuery {
+	return &EngineeringMaterialRequestItemQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEngineeringMaterialRequestItem},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EngineeringMaterialRequestItem entity by its id.
+func (c *EngineeringMaterialRequestItemClient) Get(ctx context.Context, id int) (*EngineeringMaterialRequestItem, error) {
+	return c.Query().Where(engineeringmaterialrequestitem.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EngineeringMaterialRequestItemClient) GetX(ctx context.Context, id int) *EngineeringMaterialRequestItem {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryRequest queries the request edge of a EngineeringMaterialRequestItem.
+func (c *EngineeringMaterialRequestItemClient) QueryRequest(_m *EngineeringMaterialRequestItem) *EngineeringMaterialRequestQuery {
+	query := (&EngineeringMaterialRequestClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(engineeringmaterialrequestitem.Table, engineeringmaterialrequestitem.FieldID, id),
+			sqlgraph.To(engineeringmaterialrequest.Table, engineeringmaterialrequest.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, engineeringmaterialrequestitem.RequestTable, engineeringmaterialrequestitem.RequestColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryMaterial queries the material edge of a EngineeringMaterialRequestItem.
+func (c *EngineeringMaterialRequestItemClient) QueryMaterial(_m *EngineeringMaterialRequestItem) *MaterialQuery {
+	query := (&MaterialClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(engineeringmaterialrequestitem.Table, engineeringmaterialrequestitem.FieldID, id),
+			sqlgraph.To(material.Table, material.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, engineeringmaterialrequestitem.MaterialTable, engineeringmaterialrequestitem.MaterialColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUnit queries the unit edge of a EngineeringMaterialRequestItem.
+func (c *EngineeringMaterialRequestItemClient) QueryUnit(_m *EngineeringMaterialRequestItem) *UnitQuery {
+	query := (&UnitClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(engineeringmaterialrequestitem.Table, engineeringmaterialrequestitem.FieldID, id),
+			sqlgraph.To(unit.Table, unit.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, engineeringmaterialrequestitem.UnitTable, engineeringmaterialrequestitem.UnitColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySupplier queries the supplier edge of a EngineeringMaterialRequestItem.
+func (c *EngineeringMaterialRequestItemClient) QuerySupplier(_m *EngineeringMaterialRequestItem) *SupplierQuery {
+	query := (&SupplierClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(engineeringmaterialrequestitem.Table, engineeringmaterialrequestitem.FieldID, id),
+			sqlgraph.To(supplier.Table, supplier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, engineeringmaterialrequestitem.SupplierTable, engineeringmaterialrequestitem.SupplierColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *EngineeringMaterialRequestItemClient) Hooks() []Hook {
+	return c.hooks.EngineeringMaterialRequestItem
+}
+
+// Interceptors returns the client interceptors.
+func (c *EngineeringMaterialRequestItemClient) Interceptors() []Interceptor {
+	return c.inters.EngineeringMaterialRequestItem
+}
+
+func (c *EngineeringMaterialRequestItemClient) mutate(ctx context.Context, m *EngineeringMaterialRequestItemMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EngineeringMaterialRequestItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EngineeringMaterialRequestItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EngineeringMaterialRequestItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EngineeringMaterialRequestItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EngineeringMaterialRequestItem mutation op: %q", m.Op())
 	}
 }
 
@@ -4371,6 +4753,38 @@ func (c *MaterialClient) GetX(ctx context.Context, id int) *Material {
 	return obj
 }
 
+// QueryDefaultWarehouse queries the default_warehouse edge of a Material.
+func (c *MaterialClient) QueryDefaultWarehouse(_m *Material) *WarehouseQuery {
+	query := (&WarehouseClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, id),
+			sqlgraph.To(warehouse.Table, warehouse.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, material.DefaultWarehouseTable, material.DefaultWarehouseColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySupplier queries the supplier edge of a Material.
+func (c *MaterialClient) QuerySupplier(_m *Material) *SupplierQuery {
+	query := (&SupplierClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, id),
+			sqlgraph.To(supplier.Table, supplier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, material.SupplierTable, material.SupplierColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryDefaultUnit queries the default_unit edge of a Material.
 func (c *MaterialClient) QueryDefaultUnit(_m *Material) *UnitQuery {
 	query := (&UnitClient{config: c.config}).Query()
@@ -4876,6 +5290,22 @@ func (c *OutsourcingOrderClient) GetX(ctx context.Context, id int) *OutsourcingO
 		panic(err)
 	}
 	return obj
+}
+
+// QuerySourceWipBatch queries the source_wip_batch edge of a OutsourcingOrder.
+func (c *OutsourcingOrderClient) QuerySourceWipBatch(_m *OutsourcingOrder) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorder.Table, outsourcingorder.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, outsourcingorder.SourceWipBatchTable, outsourcingorder.SourceWipBatchColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
 }
 
 // QuerySupplier queries the supplier edge of a OutsourcingOrder.
@@ -9037,6 +9467,22 @@ func (c *PurchaseOrderClient) GetX(ctx context.Context, id int) *PurchaseOrder {
 	return obj
 }
 
+// QueryEngineeringMaterialRequest queries the engineering_material_request edge of a PurchaseOrder.
+func (c *PurchaseOrderClient) QueryEngineeringMaterialRequest(_m *PurchaseOrder) *EngineeringMaterialRequestQuery {
+	query := (&EngineeringMaterialRequestClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchaseorder.Table, purchaseorder.FieldID, id),
+			sqlgraph.To(engineeringmaterialrequest.Table, engineeringmaterialrequest.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, purchaseorder.EngineeringMaterialRequestTable, purchaseorder.EngineeringMaterialRequestColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QuerySupplier queries the supplier edge of a PurchaseOrder.
 func (c *PurchaseOrderClient) QuerySupplier(_m *PurchaseOrder) *SupplierQuery {
 	query := (&SupplierClient{config: c.config}).Query()
@@ -12156,6 +12602,22 @@ func (c *SalesOrderItemClient) GetX(ctx context.Context, id int) *SalesOrderItem
 	return obj
 }
 
+// QuerySampleReusedFromItem queries the sample_reused_from_item edge of a SalesOrderItem.
+func (c *SalesOrderItemClient) QuerySampleReusedFromItem(_m *SalesOrderItem) *SalesOrderItemQuery {
+	query := (&SalesOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(salesorderitem.Table, salesorderitem.FieldID, id),
+			sqlgraph.To(salesorderitem.Table, salesorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, salesorderitem.SampleReusedFromItemTable, salesorderitem.SampleReusedFromItemColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QuerySalesOrder queries the sales_order edge of a SalesOrderItem.
 func (c *SalesOrderItemClient) QuerySalesOrder(_m *SalesOrderItem) *SalesOrderQuery {
 	query := (&SalesOrderClient{config: c.config}).Query()
@@ -12181,6 +12643,22 @@ func (c *SalesOrderItemClient) QueryProduct(_m *SalesOrderItem) *ProductQuery {
 			sqlgraph.From(salesorderitem.Table, salesorderitem.FieldID, id),
 			sqlgraph.To(product.Table, product.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, salesorderitem.ProductTable, salesorderitem.ProductColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySampleBom queries the sample_bom edge of a SalesOrderItem.
+func (c *SalesOrderItemClient) QuerySampleBom(_m *SalesOrderItem) *BOMHeaderQuery {
+	query := (&BOMHeaderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(salesorderitem.Table, salesorderitem.FieldID, id),
+			sqlgraph.To(bomheader.Table, bomheader.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, salesorderitem.SampleBomTable, salesorderitem.SampleBomColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -14698,43 +15176,47 @@ type (
 	hooks struct {
 		AccessEntitlement, AdminSession, AdminUser, AdminUserRole, BOMHeader, BOMItem,
 		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
-		DeploymentModuleState, FinanceAllocation, FinanceCreditNote, FinanceFact,
-		FinancePayment, InventoryBalance, InventoryLot, InventoryLotStatusEvent,
-		InventoryOperation, InventoryOperationItem, InventoryTxn, Material,
-		OutsourcingFact, OutsourcingOrder, OutsourcingOrderItem,
-		OutsourcingReturnDisposition, Permission, Process, ProcessInstance,
-		ProcessNodeInstance, Product, ProductSKU, ProductionExceptionDecision,
-		ProductionFact, ProductionOrder, ProductionOrderEvent, ProductionOrderItem,
-		ProductionOrderMaterialRequirement, ProductionOrderOperation,
-		ProductionPackagingConfirmation, ProductionWIPBatch, ProductionWIPEvent,
-		ProductionWIPOutsourcingAllocation, PurchaseOrder, PurchaseOrderItem,
-		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
-		PurchaseReceiptItem, PurchaseRejectionDisposition, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RoleDataScope, RolePermission,
-		RoleProfile, RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem,
-		Shipment, ShipmentItem, SourceOrderLifecycleEvent, StockReservation, Supplier,
-		Unit, Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState,
-		WorkflowTask, WorkflowTaskEvent []ent.Hook
+		DeploymentModuleState, EngineeringMaterialRequest,
+		EngineeringMaterialRequestItem, FinanceAllocation, FinanceCreditNote,
+		FinanceFact, FinancePayment, InventoryBalance, InventoryLot,
+		InventoryLotStatusEvent, InventoryOperation, InventoryOperationItem,
+		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
+		OutsourcingOrderItem, OutsourcingReturnDisposition, Permission, Process,
+		ProcessInstance, ProcessNodeInstance, Product, ProductSKU,
+		ProductionExceptionDecision, ProductionFact, ProductionOrder,
+		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
+		ProductionOrderOperation, ProductionPackagingConfirmation, ProductionWIPBatch,
+		ProductionWIPEvent, ProductionWIPOutsourcingAllocation, PurchaseOrder,
+		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
+		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
+		PurchaseRejectionDisposition, PurchaseReturn, PurchaseReturnItem,
+		QualityInspection, Role, RoleDataScope, RolePermission, RoleProfile,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
+		ShipmentItem, SourceOrderLifecycleEvent, StockReservation, Supplier, Unit,
+		Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
+		WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
 		AccessEntitlement, AdminSession, AdminUser, AdminUserRole, BOMHeader, BOMItem,
 		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
-		DeploymentModuleState, FinanceAllocation, FinanceCreditNote, FinanceFact,
-		FinancePayment, InventoryBalance, InventoryLot, InventoryLotStatusEvent,
-		InventoryOperation, InventoryOperationItem, InventoryTxn, Material,
-		OutsourcingFact, OutsourcingOrder, OutsourcingOrderItem,
-		OutsourcingReturnDisposition, Permission, Process, ProcessInstance,
-		ProcessNodeInstance, Product, ProductSKU, ProductionExceptionDecision,
-		ProductionFact, ProductionOrder, ProductionOrderEvent, ProductionOrderItem,
-		ProductionOrderMaterialRequirement, ProductionOrderOperation,
-		ProductionPackagingConfirmation, ProductionWIPBatch, ProductionWIPEvent,
-		ProductionWIPOutsourcingAllocation, PurchaseOrder, PurchaseOrderItem,
-		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
-		PurchaseReceiptItem, PurchaseRejectionDisposition, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RoleDataScope, RolePermission,
-		RoleProfile, RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem,
-		Shipment, ShipmentItem, SourceOrderLifecycleEvent, StockReservation, Supplier,
-		Unit, Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState,
-		WorkflowTask, WorkflowTaskEvent []ent.Interceptor
+		DeploymentModuleState, EngineeringMaterialRequest,
+		EngineeringMaterialRequestItem, FinanceAllocation, FinanceCreditNote,
+		FinanceFact, FinancePayment, InventoryBalance, InventoryLot,
+		InventoryLotStatusEvent, InventoryOperation, InventoryOperationItem,
+		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
+		OutsourcingOrderItem, OutsourcingReturnDisposition, Permission, Process,
+		ProcessInstance, ProcessNodeInstance, Product, ProductSKU,
+		ProductionExceptionDecision, ProductionFact, ProductionOrder,
+		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
+		ProductionOrderOperation, ProductionPackagingConfirmation, ProductionWIPBatch,
+		ProductionWIPEvent, ProductionWIPOutsourcingAllocation, PurchaseOrder,
+		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
+		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
+		PurchaseRejectionDisposition, PurchaseReturn, PurchaseReturnItem,
+		QualityInspection, Role, RoleDataScope, RolePermission, RoleProfile,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
+		ShipmentItem, SourceOrderLifecycleEvent, StockReservation, Supplier, Unit,
+		Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
+		WorkflowTaskEvent []ent.Interceptor
 	}
 )

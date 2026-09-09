@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CopyOutlined,
-  DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
   InboxOutlined,
@@ -11,16 +10,7 @@ import {
   SettingOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Form,
-  Input,
-  Popconfirm,
-  Select,
-  Space,
-  Tag,
-} from 'antd'
+import { Alert, Button, Form, Popconfirm, Select, Space } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -64,8 +54,7 @@ import {
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
-import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
-import BusinessLineItemsSection from '../components/business-list/BusinessLineItemsSection.jsx'
+import BOMMaterialGroupsForm from '../components/bom/BOMMaterialGroupsForm.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import { useLineItemAppendScroll } from '../components/business-list/useLineItemAppendScroll.mjs'
@@ -97,7 +86,6 @@ import {
   unixToDateInputValue,
 } from '../components/bom/BOMVersionForms.jsx'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
-import { buildBOMItemSourceValuesFromMaterial } from '../utils/sourceOrderLineValues.mjs'
 import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
@@ -115,19 +103,13 @@ import {
   uniqueReferenceOptions,
   unitOption,
 } from '../utils/referenceSelectOptions.mjs'
-import { createDuplicatedDraftLineItem } from '../utils/businessLineItems.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   MAX_BOM_XLSX_FILE_BYTES,
   buildBOMImportDraft,
   getBOMImportDraftIssues,
-  getBOMImportLineIssues,
   parseBOMXlsx,
 } from '../utils/bomXlsxImport.mjs'
-import {
-  BOM_PRODUCTION_OPERATION_OPTIONS,
-  bomProductionOperationLabel,
-} from '../utils/bomProductionOperation.mjs'
 import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   openPrintWorkspaceWindow,
@@ -183,29 +165,11 @@ function getPreferredColumnOrder({
   return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
 }
 
-function createBlankBOMLine(headerID) {
-  return {
-    bom_header_id: headerID,
-    material_id: undefined,
-    production_operation_code: undefined,
-    quantity: '',
-    unit_id: undefined,
-    loss_rate: '0',
-    position: '',
-    piece_count: '',
-    total_usage_snapshot: '',
-    process_base: '',
-    process_method: '',
-    note: '',
-  }
-}
-
 function normalizeBOMLineForForm(headerID, item = {}) {
   return {
     id: item.id,
     bom_header_id: item.bom_header_id || headerID,
     material_id: item.material_id || undefined,
-    production_operation_code: item.production_operation_code || undefined,
     quantity: item.quantity ?? '',
     unit_id: item.unit_id || undefined,
     loss_rate: item.loss_rate ?? '0',
@@ -221,48 +185,6 @@ function normalizeBOMLineForForm(headerID, item = {}) {
 function normalizeBOMLinesForForm(headerID, items = []) {
   return (Array.isArray(items) ? items : []).map((item) =>
     normalizeBOMLineForForm(headerID, item)
-  )
-}
-
-function BOMImportLineStatus({ fieldName, form }) {
-  const materialID = Form.useWatch(['items', fieldName, 'material_id'], form)
-  const unitID = Form.useWatch(['items', fieldName, 'unit_id'], form)
-  const quantity = Form.useWatch(['items', fieldName, 'quantity'], form)
-  const lossRate = Form.useWatch(['items', fieldName, 'loss_rate'], form)
-  const source = form.getFieldValue(['items', fieldName, '_import_source'])
-  if (!source) return null
-  const issues = getBOMImportLineIssues({
-    material_id: materialID,
-    unit_id: unitID,
-    quantity,
-    loss_rate: lossRate,
-    _import_source: source,
-  })
-  const sourceParts = [
-    source.materialName || '未识别材料',
-    source.supplierItemNo ? `款号 ${source.supplierItemNo}` : '',
-    source.materialSpec,
-    source.color,
-    source.unit,
-  ].filter(Boolean)
-  return (
-    <div
-      className="erp-bom-import-line-status"
-      data-bom-import-row-status={issues.length > 0 ? 'unresolved' : 'matched'}
-    >
-      <span
-        className="erp-bom-import-line-status__source"
-        title={sourceParts.join(' / ')}
-      >
-        Excel 第 {source.rowNumber} 行 · {sourceParts.join(' / ')}
-      </span>
-      <Tag
-        color={issues.length > 0 ? 'warning' : 'success'}
-        title={issues.map((issue) => issue.message).join('；') || undefined}
-      >
-        {issues.length > 0 ? `待补全 ${issues.length} 项` : '已匹配'}
-      </Tag>
-    </div>
   )
 }
 
@@ -311,269 +233,6 @@ function BOMImportReviewSummary({ issues, review }) {
     />
   )
 }
-
-const BOMLineItemsForm = React.memo(
-  ({
-    canEdit,
-    description,
-    form,
-    materialByID,
-    materialOptions,
-    registerLineItemRow,
-    requestLineItemScroll,
-    selectedVersionID,
-    unitOptions,
-  }) => {
-    const footerRef = useRef(null)
-    const footerScrollFrameRef = useRef(null)
-
-    useEffect(() => {
-      return () => {
-        if (footerScrollFrameRef.current !== null) {
-          window.cancelAnimationFrame(footerScrollFrameRef.current)
-        }
-      }
-    }, [])
-
-    const requestFooterScroll = useCallback(() => {
-      if (footerScrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(footerScrollFrameRef.current)
-      }
-      footerScrollFrameRef.current = window.requestAnimationFrame(() => {
-        footerScrollFrameRef.current = null
-        footerRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'end',
-          inline: 'nearest',
-        })
-      })
-    }, [])
-
-    return (
-      <BusinessLineItemsSection
-        className="erp-bom-modal-items"
-        title="BOM 明细"
-        description={description}
-        emptyDescription={
-          canEdit ? '暂无 BOM 明细，可在同一表单内新增' : '暂无 BOM 明细'
-        }
-        renderRow={({ add, field, fields, index, remove }) => {
-          return (
-            <div
-              className="erp-sales-order-lines-form__row"
-              key={field.key}
-              ref={(node) => registerLineItemRow(index, node)}
-            >
-              <div className="erp-sales-order-lines-form__row-head">
-                <div className="erp-bom-line-row-title">
-                  <strong>第 {index + 1} 行</strong>
-                  <BOMImportLineStatus fieldName={field.name} form={form} />
-                </div>
-                {canEdit ? (
-                  <Space
-                    className="erp-sales-order-lines-form__row-actions"
-                    size={4}
-                    wrap
-                  >
-                    <Button
-                      aria-label={`复制第 ${index + 1} 行`}
-                      type="text"
-                      icon={<CopyOutlined />}
-                      onClick={() => {
-                        const currentLines = form.getFieldValue('items') || []
-                        const sourceLine =
-                          currentLines[field.name] || currentLines[index] || {}
-                        const duplicatedLine =
-                          createDuplicatedDraftLineItem(sourceLine)
-                        delete duplicatedLine._import_source
-                        add(duplicatedLine, index + 1)
-                        requestLineItemScroll(index + 1)
-                      }}
-                    >
-                      复制行
-                    </Button>
-                    <Button
-                      danger
-                      type="text"
-                      icon={<DeleteOutlined />}
-                      disabled={fields.length <= 1}
-                      onClick={() => remove(field.name)}
-                    >
-                      移除行
-                    </Button>
-                  </Space>
-                ) : null}
-              </div>
-              <div className="erp-sales-order-lines-form__grid">
-                <Form.Item name={[field.name, 'id']} hidden>
-                  <Input />
-                </Form.Item>
-                <Form.Item name={[field.name, 'bom_header_id']} hidden>
-                  <Input />
-                </Form.Item>
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--source"
-                  label="材料"
-                  name={[field.name, 'material_id']}
-                  rules={[{ required: true, message: '请选择材料' }]}
-                >
-                  <Select
-                    allowClear
-                    disabled={!canEdit}
-                    onChange={(value) => {
-                      const materialID = Number(value || 0)
-                      const material = materialByID.get(materialID)
-                      const sourceValues =
-                        buildBOMItemSourceValuesFromMaterial(material)
-                      const currentItems = form.getFieldValue('items') || []
-                      const nextItems = [...currentItems]
-                      nextItems[field.name] = {
-                        ...(currentItems[field.name] || {}),
-                        ...sourceValues,
-                      }
-                      form.setFieldsValue({ items: nextItems })
-                    }}
-                    optionFilterProp="label"
-                    options={materialOptions}
-                    placeholder="请选择材料"
-                    showSearch
-                  />
-                </Form.Item>
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--date"
-                  label="生产工序归属"
-                  name={[field.name, 'production_operation_code']}
-                  extra="显式标记进入首道布料加工的材料；不按材料名称自动判断"
-                >
-                  <Select
-                    allowClear
-                    disabled={!canEdit}
-                    options={BOM_PRODUCTION_OPERATION_OPTIONS}
-                    placeholder="不指定"
-                  />
-                </Form.Item>
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--quantity"
-                  label="材料用量"
-                  name={[field.name, 'quantity']}
-                  rules={[{ required: true, message: '请填写材料用量' }]}
-                >
-                  <Input allowClear autoComplete="off" disabled={!canEdit} />
-                </Form.Item>
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--unit"
-                  label="单位"
-                  name={[field.name, 'unit_id']}
-                  rules={[{ required: true, message: '请选择单位' }]}
-                >
-                  <Select
-                    allowClear
-                    disabled={!canEdit}
-                    optionFilterProp="label"
-                    options={unitOptions}
-                    placeholder="请选择单位"
-                    showSearch
-                  />
-                </Form.Item>
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--quantity"
-                  label={
-                    <BusinessHelpLabel
-                      itemKey="loss-rate"
-                      label="损耗率"
-                      pageKey="material-bom"
-                    />
-                  }
-                  name={[field.name, 'loss_rate']}
-                  rules={[{ required: true, message: '请填写损耗率' }]}
-                >
-                  <Input allowClear autoComplete="off" disabled={!canEdit} />
-                </Form.Item>
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--date"
-                  label="部位"
-                  name={[field.name, 'position']}
-                >
-                  <Input allowClear autoComplete="off" disabled={!canEdit} />
-                </Form.Item>
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--quantity"
-                  label="片数"
-                  name={[field.name, 'piece_count']}
-                >
-                  <Input allowClear autoComplete="off" disabled={!canEdit} />
-                </Form.Item>
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--quantity"
-                  label="总用量"
-                  name={[field.name, 'total_usage_snapshot']}
-                >
-                  <Input
-                    allowClear
-                    autoComplete="off"
-                    disabled={!canEdit}
-                    placeholder="含损耗总用量"
-                  />
-                </Form.Item>
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--date"
-                  label="加工基础"
-                  name={[field.name, 'process_base']}
-                >
-                  <Input allowClear autoComplete="off" disabled={!canEdit} />
-                </Form.Item>
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--date"
-                  label="加工方式"
-                  name={[field.name, 'process_method']}
-                >
-                  <Input allowClear autoComplete="off" disabled={!canEdit} />
-                </Form.Item>
-                <Form.Item
-                  className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
-                  label="备注"
-                  name={[field.name, 'note']}
-                >
-                  <Input.TextArea
-                    allowClear
-                    autoSize={{ minRows: 1, maxRows: 3 }}
-                    disabled={!canEdit}
-                    maxLength={300}
-                    showCount
-                  />
-                </Form.Item>
-              </div>
-            </div>
-          )
-        }}
-        footerProps={({ add, fields }) => ({
-          addLabel: '添加条目',
-          addDisabled: !canEdit,
-          onAdd: canEdit
-            ? () => {
-                const currentLines = form.getFieldValue('items') || []
-                const nextIndex = Array.isArray(currentLines)
-                  ? currentLines.length
-                  : 0
-                add(createBlankBOMLine(selectedVersionID))
-                requestLineItemScroll(nextIndex)
-                requestFooterScroll()
-              }
-            : undefined,
-          ref: footerRef,
-          stats: [
-            {
-              key: 'count',
-              label: '已录入',
-              value: Array.isArray(fields) ? fields.length : 0,
-              suffix: '条',
-            },
-          ],
-        })}
-      />
-    )
-  }
-)
 
 export default function BOMVersionsPage() {
   const outletContext = useOutletContext()
@@ -698,11 +357,6 @@ export default function BOMVersionsPage() {
         label: '材料',
         value: referenceLabel(materialOptions, item?.material_id, '材料'),
         wide: true,
-      },
-      {
-        key: 'production_operation',
-        label: '生产工序归属',
-        value: bomProductionOperationLabel(item?.production_operation_code),
       },
       {
         key: 'quantity',
@@ -1984,7 +1638,7 @@ export default function BOMVersionsPage() {
               保存复制草稿后，可在编辑 BOM 草稿弹窗内原地维护材料明细。
             </p>
           ) : (
-            <BOMLineItemsForm
+            <BOMMaterialGroupsForm
               canEdit={
                 headerMode === 'create' || headerMode === 'import'
                   ? canCreate
@@ -1999,6 +1653,13 @@ export default function BOMVersionsPage() {
               }
               form={headerForm}
               materialByID={materialByID}
+              canCreateMaterial={hasActionPermission(
+                adminProfile,
+                'material.create'
+              )}
+              onMaterialCreated={(material) =>
+                setMaterials((current) => [material, ...current])
+              }
               materialOptions={materialOptions}
               registerLineItemRow={registerLineItemRow}
               requestLineItemScroll={requestLineItemScroll}

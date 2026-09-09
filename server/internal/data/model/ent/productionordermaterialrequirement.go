@@ -42,8 +42,6 @@ type ProductionOrderMaterialRequirement struct {
 	LossRateSnapshot decimal.Decimal `json:"loss_rate_snapshot,omitempty"`
 	// PlannedQuantity holds the value of the "planned_quantity" field.
 	PlannedQuantity decimal.Decimal `json:"planned_quantity,omitempty"`
-	// ProductionOperationCode holds the value of the "production_operation_code" field.
-	ProductionOperationCode *string `json:"production_operation_code,omitempty"`
 	// MaterialCodeSnapshot holds the value of the "material_code_snapshot" field.
 	MaterialCodeSnapshot string `json:"material_code_snapshot,omitempty"`
 	// MaterialNameSnapshot holds the value of the "material_name_snapshot" field.
@@ -167,7 +165,7 @@ func (*ProductionOrderMaterialRequirement) scanValues(columns []string) ([]any, 
 			values[i] = new(decimal.Decimal)
 		case productionordermaterialrequirement.FieldID, productionordermaterialrequirement.FieldProductionOrderID, productionordermaterialrequirement.FieldProductionOrderItemID, productionordermaterialrequirement.FieldBomHeaderID, productionordermaterialrequirement.FieldBomItemID, productionordermaterialrequirement.FieldMaterialID, productionordermaterialrequirement.FieldUnitID:
 			values[i] = new(sql.NullInt64)
-		case productionordermaterialrequirement.FieldProductionOperationCode, productionordermaterialrequirement.FieldMaterialCodeSnapshot, productionordermaterialrequirement.FieldMaterialNameSnapshot, productionordermaterialrequirement.FieldUnitCodeSnapshot, productionordermaterialrequirement.FieldUnitNameSnapshot:
+		case productionordermaterialrequirement.FieldMaterialCodeSnapshot, productionordermaterialrequirement.FieldMaterialNameSnapshot, productionordermaterialrequirement.FieldUnitCodeSnapshot, productionordermaterialrequirement.FieldUnitNameSnapshot:
 			values[i] = new(sql.NullString)
 		case productionordermaterialrequirement.FieldCreatedAt, productionordermaterialrequirement.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -245,13 +243,6 @@ func (_m *ProductionOrderMaterialRequirement) assignValues(columns []string, val
 				return fmt.Errorf("unexpected type %T for field planned_quantity", values[i])
 			} else if value != nil {
 				_m.PlannedQuantity = *value
-			}
-		case productionordermaterialrequirement.FieldProductionOperationCode:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field production_operation_code", values[i])
-			} else if value.Valid {
-				_m.ProductionOperationCode = new(string)
-				*_m.ProductionOperationCode = value.String
 			}
 		case productionordermaterialrequirement.FieldMaterialCodeSnapshot:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -386,11 +377,6 @@ func (_m *ProductionOrderMaterialRequirement) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("planned_quantity=")
 	builder.WriteString(fmt.Sprintf("%v", _m.PlannedQuantity))
-	builder.WriteString(", ")
-	if v := _m.ProductionOperationCode; v != nil {
-		builder.WriteString("production_operation_code=")
-		builder.WriteString(*v)
-	}
 	builder.WriteString(", ")
 	builder.WriteString("material_code_snapshot=")
 	builder.WriteString(_m.MaterialCodeSnapshot)

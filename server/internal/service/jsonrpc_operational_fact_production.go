@@ -411,8 +411,7 @@ func productionOrderMaterialRequirementToAny(item *biz.ProductionOrderMaterialRe
 	return map[string]any{
 		"id": item.ID, "production_order_id": item.ProductionOrderID, "production_order_item_id": item.ProductionOrderItemID,
 		"bom_header_id": item.BOMHeaderID, "bom_item_id": item.BOMItemID, "material_id": item.MaterialID, "unit_id": item.UnitID,
-		"production_operation_code": optionalStringToAny(item.ProductionOperationCode),
-		"unit_quantity_snapshot":    item.UnitQuantitySnapshot.String(), "loss_rate_snapshot": item.LossRateSnapshot.String(),
+		"unit_quantity_snapshot": item.UnitQuantitySnapshot.String(), "loss_rate_snapshot": item.LossRateSnapshot.String(),
 		"planned_quantity":             item.PlannedQuantity.String(),
 		"approved_over_issue_quantity": item.ApprovedOverIssueQuantity.String(),
 		"effective_limit_quantity":     item.EffectiveLimitQuantity.String(),

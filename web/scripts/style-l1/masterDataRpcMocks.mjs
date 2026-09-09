@@ -111,6 +111,8 @@ export async function installMasterDataRpcMocks(page, context) {
       name: '样式材料',
       supplier_item_no: '示例织造AB-001#-02#米白',
       category: '面料',
+      stock_category: 'MAIN',
+      default_warehouse_id: 1,
       spec: '短毛绒 300g',
       color: '米白',
       default_unit_id: 1,
@@ -184,7 +186,7 @@ export async function installMasterDataRpcMocks(page, context) {
       id: 1,
       code: 'WH-STYLE-L1',
       name: '样式仓库',
-      warehouse_type: 'RAW_MATERIAL',
+      type: 'MAIN_MATERIAL',
       is_active: true,
       created_at: nowUnix(),
       updated_at: nowUnix(),
@@ -223,6 +225,7 @@ export async function installMasterDataRpcMocks(page, context) {
       case 'list_units':
         data = stylePaginatedMasterData([unit], 'units', params)
         break
+      case 'list_material_warehouses':
       case 'list_warehouses':
         data = stylePaginatedMasterData([warehouse], 'warehouses', params)
         break

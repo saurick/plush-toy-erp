@@ -170,7 +170,7 @@ WHERE conrelid = $1::regclass
 
 	unit := createTestUnit(t, ctx, client, "PG-WEIGHT-U-"+suffix)
 	product := createTestProduct(t, ctx, client, unit.ID, "PG-WEIGHT-P-"+suffix)
-	warehouse := createTestWarehouse(t, ctx, client, "PG-WEIGHT-W-"+suffix)
+	warehouse := createTestProductWarehouse(t, ctx, client, "PG-WEIGHT-W-"+suffix)
 	weight := decimal.RequireFromString("0.425000")
 	weightedSKU, err := client.ProductSKU.Create().
 		SetProductID(product.ID).

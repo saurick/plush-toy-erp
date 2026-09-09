@@ -70,6 +70,21 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 }
 
 func salesOrderItemMutationFromParams(pm map[string]any) (*biz.SalesOrderItemMutation, bool) {
+	if !sourceOrderAllowsOnly(pm, "id", "sales_order_id", "line_no", "product_id", "product_sku_id", "unit_id", "requested_product_name", "customer_product_no", "order_category", "pre_shipment_sample_quantity", "process_requirement", "product_code_snapshot", "product_name_snapshot", "color_snapshot", "ordered_quantity", "unit_price", "amount", "planned_delivery_date", "note") {
+		return nil, false
+	}
+	productID, ok := getOptionalJSONRPCNonNegativeInt(pm, "product_id")
+	if !ok {
+		return nil, false
+	}
+	skuID, ok := getOptionalJSONRPCNonNegativeInt(pm, "product_sku_id")
+	if !ok || (skuID != nil && *skuID == 0) {
+		return nil, false
+	}
+	sampleQuantity, ok := getOptionalJSONRPCDecimalString(pm, "pre_shipment_sample_quantity")
+	if !ok {
+		return nil, false
+	}
 	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "ordered_quantity")
 	if !ok {
 		return nil, false
@@ -86,21 +101,31 @@ func salesOrderItemMutationFromParams(pm map[string]any) (*biz.SalesOrderItemMut
 	if !ok {
 		return nil, false
 	}
-	return &biz.SalesOrderItemMutation{
-		SalesOrderID:        getInt(pm, "sales_order_id", 0),
-		LineNo:              getInt(pm, "line_no", 0),
-		ProductID:           getInt(pm, "product_id", 0),
-		ProductSkuID:        getOptionalPositiveIntPtr(pm, "product_sku_id"),
-		UnitID:              getInt(pm, "unit_id", 0),
-		ProductCodeSnapshot: getWorkflowStringPtr(pm, "product_code_snapshot"),
-		ProductNameSnapshot: getWorkflowStringPtr(pm, "product_name_snapshot"),
-		ColorSnapshot:       getWorkflowStringPtr(pm, "color_snapshot"),
-		OrderedQuantity:     quantity,
-		UnitPrice:           unitPrice,
-		Amount:              amount,
-		PlannedDeliveryDate: plannedDeliveryDate,
-		Note:                getWorkflowStringPtr(pm, "note"),
-	}, true
+	in := &biz.SalesOrderItemMutation{
+		SalesOrderID:         getInt(pm, "sales_order_id", 0),
+		LineNo:               getInt(pm, "line_no", 0),
+		RequestedProductName: getWorkflowStringPtr(pm, "requested_product_name"),
+		CustomerProductNo:    getWorkflowStringPtr(pm, "customer_product_no"),
+		OrderCategory:        getString(pm, "order_category"),
+		ProcessRequirement:   getWorkflowStringPtr(pm, "process_requirement"),
+		ProductSkuID:         skuID,
+		UnitID:               getInt(pm, "unit_id", 0),
+		ProductCodeSnapshot:  getWorkflowStringPtr(pm, "product_code_snapshot"),
+		ProductNameSnapshot:  getWorkflowStringPtr(pm, "product_name_snapshot"),
+		ColorSnapshot:        getWorkflowStringPtr(pm, "color_snapshot"),
+		OrderedQuantity:      quantity,
+		UnitPrice:            unitPrice,
+		Amount:               amount,
+		PlannedDeliveryDate:  plannedDeliveryDate,
+		Note:                 getWorkflowStringPtr(pm, "note"),
+	}
+	if productID != nil {
+		in.ProductID = *productID
+	}
+	if sampleQuantity != nil {
+		in.PreShipmentSampleQuantity = *sampleQuantity
+	}
+	return in, true
 }
 
 func salesOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.SalesOrderItemSaveMutation, bool) {
@@ -133,6 +158,18 @@ func salesOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.SalesOrder
 func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrSalesOrderEngineeringNotReady):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先关联有效产品、上传产品主图并补齐该产品的 BOM 物料，再开始打样"}
+	case errors.Is(err, biz.ErrMaterialRequestNotReady):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先核对订单、样品确认、材料厂商和单位，再提交用料审批"}
+	case errors.Is(err, biz.ErrMaterialRequestConflict):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "订单、材料或审批资料已变化，请重新读取后核对"}
+	case errors.Is(err, biz.ErrMaterialRequestReviewInvalid):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请核对审批顺序、两位审批人、采购数量和调整原因"}
+	case errors.Is(err, biz.ErrSalesOrderEngineeringTransition):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请依次保存工程资料、开始打样、确认样品；确认或退回重做时请填写打样说明，切换产品或 BOM 后需重新准备"}
+	case errors.Is(err, biz.ErrSalesOrderEngineeringDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "订单明细已有用料审批、生产、备货或出货记录，请先处理关联单据再更换工程资料"}
 	case errors.Is(err, biz.ErrSalesOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete):
@@ -160,7 +197,7 @@ func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单仍有进行中的审批流程，不能取消"}
 	case errors.Is(err, biz.ErrCustomerNotFound), errors.Is(err, biz.ErrCustomerInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "客户不存在或已停用"}
-	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
+	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive), errors.Is(err, biz.ErrProductSKUNotFound), errors.Is(err, biz.ErrProductSKUInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "产品不存在或已停用"}
 	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "单位不存在或已停用"}
@@ -199,37 +236,38 @@ func salesOrderToMap(item *biz.SalesOrder) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                    item.ID,
-		"order_no":              item.OrderNo,
-		"customer_id":           item.CustomerID,
-		"currency":              item.Currency,
-		"customer_order_no":     optionalStringValue(item.CustomerOrderNo),
-		"customer_snapshot":     item.CustomerSnapshot,
-		"sales_owner":           optionalStringValue(item.SalesOwner),
-		"contact_snapshot":      item.ContactSnapshot,
-		"delivery_snapshot":     item.DeliverySnapshot,
-		"payment_method":        optionalStringValue(item.PaymentMethod),
-		"payment_term_days":     optionalIntValue(item.PaymentTermDays),
-		"price_condition_note":  optionalStringValue(item.PriceConditionNote),
-		"tax_mode":              optionalStringValue(item.TaxMode),
-		"tax_rate":              optionalDecimalString(item.TaxRate),
-		"freight_terms":         optionalStringValue(item.FreightTerms),
-		"quoted_freight_amount": optionalDecimalString(item.QuotedFreightAmount),
-		"goods_amount":          optionalDecimalString(item.GoodsAmount),
-		"tax_amount":            optionalDecimalString(item.TaxAmount),
-		"order_total":           optionalDecimalString(item.OrderTotal),
-		"order_date":            item.OrderDate.Unix(),
-		"planned_delivery_date": optionalTimeUnix(item.PlannedDeliveryDate),
-		"lifecycle_status":      item.LifecycleStatus,
-		"version":               item.Version,
-		"settlement_action":     optionalStringValue(item.SettlementAction),
-		"settlement_mode":       optionalStringValue(item.SettlementMode),
-		"settlement_reason":     optionalStringValue(item.SettlementReason),
-		"settled_at":            optionalTimeUnix(item.SettledAt),
-		"settled_by":            optionalIntValue(item.SettledBy),
-		"note":                  optionalStringValue(item.Note),
-		"created_at":            item.CreatedAt.Unix(),
-		"updated_at":            item.UpdatedAt.Unix(),
+		"id":                          item.ID,
+		"order_no":                    item.OrderNo,
+		"customer_id":                 item.CustomerID,
+		"currency":                    item.Currency,
+		"customer_order_no":           optionalStringValue(item.CustomerOrderNo),
+		"customer_snapshot":           item.CustomerSnapshot,
+		"sales_owner":                 optionalStringValue(item.SalesOwner),
+		"contact_snapshot":            item.ContactSnapshot,
+		"delivery_snapshot":           item.DeliverySnapshot,
+		"payment_method":              optionalStringValue(item.PaymentMethod),
+		"payment_term_days":           optionalIntValue(item.PaymentTermDays),
+		"price_condition_note":        optionalStringValue(item.PriceConditionNote),
+		"tax_mode":                    optionalStringValue(item.TaxMode),
+		"tax_rate":                    optionalDecimalString(item.TaxRate),
+		"freight_terms":               optionalStringValue(item.FreightTerms),
+		"quoted_freight_amount":       optionalDecimalString(item.QuotedFreightAmount),
+		"goods_amount":                optionalDecimalString(item.GoodsAmount),
+		"tax_amount":                  optionalDecimalString(item.TaxAmount),
+		"order_total":                 optionalDecimalString(item.OrderTotal),
+		"order_date":                  item.OrderDate.Unix(),
+		"planned_delivery_date":       optionalTimeUnix(item.PlannedDeliveryDate),
+		"lifecycle_status":            item.LifecycleStatus,
+		"engineering_material_status": optionalStringValue(item.EngineeringMaterialStatus),
+		"version":                     item.Version,
+		"settlement_action":           optionalStringValue(item.SettlementAction),
+		"settlement_mode":             optionalStringValue(item.SettlementMode),
+		"settlement_reason":           optionalStringValue(item.SettlementReason),
+		"settled_at":                  optionalTimeUnix(item.SettledAt),
+		"settled_by":                  optionalIntValue(item.SettledBy),
+		"note":                        optionalStringValue(item.Note),
+		"created_at":                  item.CreatedAt.Unix(),
+		"updated_at":                  item.UpdatedAt.Unix(),
 	}
 }
 
@@ -250,23 +288,38 @@ func salesOrderItemToMap(item *biz.SalesOrderItem) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                    item.ID,
-		"sales_order_id":        item.SalesOrderID,
-		"line_no":               item.LineNo,
-		"product_id":            item.ProductID,
-		"product_sku_id":        optionalIntValue(item.ProductSkuID),
-		"unit_id":               item.UnitID,
-		"product_code_snapshot": optionalStringValue(item.ProductCodeSnapshot),
-		"product_name_snapshot": optionalStringValue(item.ProductNameSnapshot),
-		"color_snapshot":        optionalStringValue(item.ColorSnapshot),
-		"ordered_quantity":      item.OrderedQuantity.String(),
-		"unit_price":            optionalDecimalString(item.UnitPrice),
-		"amount":                optionalDecimalString(item.Amount),
-		"planned_delivery_date": optionalTimeUnix(item.PlannedDeliveryDate),
-		"line_status":           item.LineStatus,
-		"note":                  optionalStringValue(item.Note),
-		"created_at":            item.CreatedAt.Unix(),
-		"updated_at":            item.UpdatedAt.Unix(),
+		"id":                           item.ID,
+		"sales_order_id":               item.SalesOrderID,
+		"line_no":                      item.LineNo,
+		"product_id":                   optionalIntValue(salesOrderProductIDForResponse(item.ProductID)),
+		"requested_product_name":       optionalStringValue(item.RequestedProductName),
+		"customer_product_no":          optionalStringValue(item.CustomerProductNo),
+		"order_category":               item.OrderCategory,
+		"pre_shipment_sample_quantity": item.PreShipmentSampleQuantity.String(),
+		"production_quantity":          item.OrderedQuantity.Add(item.PreShipmentSampleQuantity).String(),
+		"shipped_quantity":             optionalDecimalString(item.ShippedQuantity),
+		"unshipped_quantity":           optionalDecimalString(item.UnshippedQuantity),
+		"process_requirement":          optionalStringValue(item.ProcessRequirement),
+		"sample_bom_id":                optionalIntValue(item.SampleBOMID),
+		"engineering_status":           item.EngineeringStatus,
+		"sample_note":                  optionalStringValue(item.SampleNote),
+		"sample_confirmed_at":          optionalTimeUnix(item.SampleConfirmedAt),
+		"sample_confirmed_by":          optionalIntValue(item.SampleConfirmedBy),
+		"designer":                     optionalStringValue(item.Designer),
+		"product_image_attachment_id":  optionalIntValue(item.ProductImageAttachmentID),
+		"product_sku_id":               optionalIntValue(item.ProductSkuID),
+		"unit_id":                      item.UnitID,
+		"product_code_snapshot":        optionalStringValue(item.ProductCodeSnapshot),
+		"product_name_snapshot":        optionalStringValue(item.ProductNameSnapshot),
+		"color_snapshot":               optionalStringValue(item.ColorSnapshot),
+		"ordered_quantity":             item.OrderedQuantity.String(),
+		"unit_price":                   optionalDecimalString(item.UnitPrice),
+		"amount":                       optionalDecimalString(item.Amount),
+		"planned_delivery_date":        optionalTimeUnix(item.PlannedDeliveryDate),
+		"line_status":                  item.LineStatus,
+		"note":                         optionalStringValue(item.Note),
+		"created_at":                   item.CreatedAt.Unix(),
+		"updated_at":                   item.UpdatedAt.Unix(),
 	}
 }
 
@@ -276,4 +329,11 @@ func salesOrderItemsToAny(items []*biz.SalesOrderItem) []any {
 		out = append(out, salesOrderItemToMap(item))
 	}
 	return out
+}
+
+func salesOrderProductIDForResponse(id int) *int {
+	if id <= 0 {
+		return nil
+	}
+	return &id
 }

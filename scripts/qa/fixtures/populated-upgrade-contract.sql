@@ -238,3 +238,30 @@ VALUES
   (910004, 910002, CURRENT_TIMESTAMP),
   (910005, 910002, CURRENT_TIMESTAMP);
 \endif
+
+\if :{?plush_warehouse_classification_seed}
+INSERT INTO warehouses (id, code, name, type, is_active, created_at, updated_at)
+VALUES
+  (919101, 'QA-UPGRADE-RAW', 'QA material warehouse', 'RAW', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (919102, 'QA-UPGRADE-FG', 'QA finished goods warehouse', 'FINISHED_GOODS', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (919103, 'QA-UPGRADE-UNKNOWN', 'QA unspecified warehouse', 'CUSTOM', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO materials (id, code, name, category, default_unit_id, is_active, created_at, updated_at)
+VALUES
+  (919101, 'QA-UPGRADE-MAIN', 'QA main material', '主料', 910001, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (919102, 'QA-UPGRADE-AUX', 'QA auxiliary material', '辅料', 910001, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (919103, 'QA-UPGRADE-PACK', 'QA packaging material', '包装材料', 910001, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (919104, 'QA-UPGRADE-UNKNOWN', 'QA unspecified material', '面料', 910001, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (919105, 'QA-UPGRADE-OTHER', 'QA other material', '其他材料', 910001, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO inventory_balances (id, subject_type, subject_id, warehouse_id, unit_id, quantity, updated_at)
+VALUES (919101, 'MATERIAL', 919101, 919101, 910001, 12.5, CURRENT_TIMESTAMP);
+\endif
+
+\if :{?plush_warehouse_classification_readback}
+SELECT
+  (SELECT string_agg(stock_category, ',' ORDER BY id) FROM materials WHERE id BETWEEN 919101 AND 919105)
+  || '|' || (SELECT count(*) FROM materials WHERE id BETWEEN 919101 AND 919105 AND default_warehouse_id IS NULL)::text
+  || '|' || (SELECT string_agg(type, ',' ORDER BY id) FROM warehouses WHERE id BETWEEN 919101 AND 919103)
+  || '|' || (SELECT count(*) FROM inventory_balances WHERE id = 919101 AND subject_type = 'MATERIAL' AND subject_id = 919101 AND warehouse_id = 919101 AND unit_id = 910001 AND quantity = 12.5)::text
+  || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'warehouse.manage' AND rp.role_id IN (910004, 910006))::text
+  || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'warehouse.manage' AND rp.role_id IN (910001, 910002, 910003, 910005))::text;
+\endif

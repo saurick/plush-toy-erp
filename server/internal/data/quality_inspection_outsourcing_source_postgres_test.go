@@ -145,7 +145,7 @@ func createPostgresOutsourcingReturnForQuality(
 		FactNo:                 "PG-QI-OUT-RETURN-" + suffix,
 		OutsourcingOrderID:     order.ID,
 		OutsourcingOrderItemID: line.ID,
-		WarehouseID:            fixtures.warehouseID,
+		WarehouseID:            fixtures.productWarehouseID,
 		LotID:                  &lot.ID,
 		Quantity:               decimal.NewFromInt(2),
 		IdempotencyKey:         "PG-QI-OUT-RETURN-" + suffix,

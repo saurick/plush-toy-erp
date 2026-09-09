@@ -33,10 +33,10 @@
     { "key": "block", "code": "YS6-DW-11", "name": "块", "sourceLabel": "块", "precision": 0 }
   ],
   "warehouses": [
-    { "key": "material", "code": "YS6-CK-01", "name": "原料仓", "type": "RAW_MATERIAL" },
+    { "key": "material", "code": "YS6-CK-01", "name": "原料仓", "type": "MATERIAL" },
     { "key": "product", "code": "YS6-CK-02", "name": "成品仓", "type": "FINISHED_GOODS" },
-    { "key": "qualityHold", "code": "YS6-CK-03", "name": "待检仓", "type": "QC_HOLD" },
-    { "key": "workInProcess", "code": "YS6-CK-04", "name": "在制仓", "type": "WORK_IN_PROCESS" }
+    { "key": "qualityHold", "code": "YS6-CK-03", "name": "待检仓", "type": "MATERIAL" },
+    { "key": "workInProcess", "code": "YS6-CK-04", "name": "在制仓", "type": "MATERIAL" }
   ],
   "customerTrial133": {
     "target": "customer-trial-133",

@@ -606,6 +606,10 @@ func productionOrderItemToMap(item *biz.ProductionOrderItem) map[string]any {
 func (d *jsonrpcDispatcher) mapProductionOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
 	logger := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrSalesOrderEngineeringNotReady):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先确认当前样品，并选用与样品一致的量产 BOM，再下达生产"}
+	case errors.Is(err, biz.ErrMaterialRequestNotReady):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "订单用料尚未完成老板和财务审批，暂不能下达生产"}
 	case errors.Is(err, biz.ErrProductionOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrIdempotencyConflict):

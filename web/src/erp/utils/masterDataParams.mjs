@@ -34,6 +34,11 @@ function buildMasterDataParams(values = {}, extra = {}) {
       ? values.process_ids.map((value) => Number(value || 0))
       : undefined,
     category: trimOptional(values.category),
+    stock_category: trimOptional(values.stock_category),
+    default_warehouse_id: values.default_warehouse_id
+      ? Number(values.default_warehouse_id)
+      : undefined,
+    supplier_id: values.supplier_id ? Number(values.supplier_id) : undefined,
     supplier_item_no: trimOptional(values.supplier_item_no),
     spec: trimOptional(values.spec),
     color: trimOptional(values.color),

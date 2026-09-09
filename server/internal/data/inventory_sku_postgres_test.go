@@ -73,7 +73,7 @@ func TestInventoryPostgresSKUGrainsDoNotShareAvailability(t *testing.T) {
 	apply := func(key string, skuID *int, txnType string, direction int, quantity int64) error {
 		_, err := inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, ProductSkuID: skuID,
-			WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 			TxnType: txnType, Direction: direction, Quantity: decimal.NewFromInt(quantity),
 			SourceType: "SKU_GRAIN_PG", IdempotencyKey: key + "-" + fixtures.suffix,
 		})
@@ -92,7 +92,7 @@ func TestInventoryPostgresSKUGrainsDoNotShareAvailability(t *testing.T) {
 	reservation, err := operationalUC.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo: "PG-SKU-A-RSV-" + fixtures.suffix,
 		ProductID:     fixtures.productID, ProductSkuID: &skuA.ID,
-		WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 		Quantity: decimal.NewFromInt(2), IdempotencyKey: "pg-sku-a-rsv-" + fixtures.suffix,
 	})
 	if err != nil {
@@ -117,7 +117,7 @@ func TestInventoryPostgresSKUGrainsDoNotShareAvailability(t *testing.T) {
 	for name, skuID := range map[string]*int{"unclassified": nil, "sku_a": &skuA.ID, "sku_b": &skuB.ID} {
 		balance, err := inventoryUC.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
 			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, ProductSkuID: skuID,
-			WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 		})
 		if err != nil {
 			t.Fatalf("get %s balance: %v", name, err)
@@ -146,7 +146,7 @@ func TestInventoryPostgresConcurrentSKUReservationsDoNotUseUnclassifiedStock(t *
 	} {
 		if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, ProductSkuID: item.sku,
-			WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 			TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(item.quantity),
 			SourceType: "SKU_RESERVATION_PG", IdempotencyKey: "sku-rsv-" + key + "-" + fixtures.suffix,
 		}); err != nil {
@@ -167,7 +167,7 @@ func TestInventoryPostgresConcurrentSKUReservationsDoNotUseUnclassifiedStock(t *
 			_, err := operationalRepo.CreateStockReservation(ctx, &biz.StockReservationCreate{
 				ReservationNo: fmt.Sprintf("PG-SKU-RSV-%s-%02d", fixtures.suffix, index),
 				ProductID:     fixtures.productID, ProductSkuID: &sku.ID,
-				WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+				WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 				Quantity:       decimal.NewFromInt(1),
 				IdempotencyKey: fmt.Sprintf("pg-sku-rsv-%s-%02d", fixtures.suffix, index),
 			})
@@ -195,7 +195,7 @@ func TestInventoryPostgresConcurrentSKUReservationsDoNotUseUnclassifiedStock(t *
 	rows, err := client.StockReservation.Query().Where(
 		stockreservation.ProductID(fixtures.productID),
 		stockreservation.ProductSkuID(sku.ID),
-		stockreservation.WarehouseID(fixtures.warehouseID),
+		stockreservation.WarehouseID(fixtures.productWarehouseID),
 		stockreservation.UnitID(fixtures.unitID),
 		stockreservation.Status(biz.StockReservationStatusActive),
 	).All(ctx)

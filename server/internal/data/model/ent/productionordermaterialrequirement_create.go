@@ -82,20 +82,6 @@ func (_c *ProductionOrderMaterialRequirementCreate) SetPlannedQuantity(v decimal
 	return _c
 }
 
-// SetProductionOperationCode sets the "production_operation_code" field.
-func (_c *ProductionOrderMaterialRequirementCreate) SetProductionOperationCode(v string) *ProductionOrderMaterialRequirementCreate {
-	_c.mutation.SetProductionOperationCode(v)
-	return _c
-}
-
-// SetNillableProductionOperationCode sets the "production_operation_code" field if the given value is not nil.
-func (_c *ProductionOrderMaterialRequirementCreate) SetNillableProductionOperationCode(v *string) *ProductionOrderMaterialRequirementCreate {
-	if v != nil {
-		_c.SetProductionOperationCode(*v)
-	}
-	return _c
-}
-
 // SetMaterialCodeSnapshot sets the "material_code_snapshot" field.
 func (_c *ProductionOrderMaterialRequirementCreate) SetMaterialCodeSnapshot(v string) *ProductionOrderMaterialRequirementCreate {
 	_c.mutation.SetMaterialCodeSnapshot(v)
@@ -306,11 +292,6 @@ func (_c *ProductionOrderMaterialRequirementCreate) check() error {
 	if _, ok := _c.mutation.PlannedQuantity(); !ok {
 		return &ValidationError{Name: "planned_quantity", err: errors.New(`ent: missing required field "ProductionOrderMaterialRequirement.planned_quantity"`)}
 	}
-	if v, ok := _c.mutation.ProductionOperationCode(); ok {
-		if err := productionordermaterialrequirement.ProductionOperationCodeValidator(v); err != nil {
-			return &ValidationError{Name: "production_operation_code", err: fmt.Errorf(`ent: validator failed for field "ProductionOrderMaterialRequirement.production_operation_code": %w`, err)}
-		}
-	}
 	if _, ok := _c.mutation.MaterialCodeSnapshot(); !ok {
 		return &ValidationError{Name: "material_code_snapshot", err: errors.New(`ent: missing required field "ProductionOrderMaterialRequirement.material_code_snapshot"`)}
 	}
@@ -404,10 +385,6 @@ func (_c *ProductionOrderMaterialRequirementCreate) createSpec() (*ProductionOrd
 	if value, ok := _c.mutation.PlannedQuantity(); ok {
 		_spec.SetField(productionordermaterialrequirement.FieldPlannedQuantity, field.TypeOther, value)
 		_node.PlannedQuantity = value
-	}
-	if value, ok := _c.mutation.ProductionOperationCode(); ok {
-		_spec.SetField(productionordermaterialrequirement.FieldProductionOperationCode, field.TypeString, value)
-		_node.ProductionOperationCode = &value
 	}
 	if value, ok := _c.mutation.MaterialCodeSnapshot(); ok {
 		_spec.SetField(productionordermaterialrequirement.FieldMaterialCodeSnapshot, field.TypeString, value)

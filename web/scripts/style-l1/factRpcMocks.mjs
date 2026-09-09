@@ -451,7 +451,6 @@ export async function installFactRpcMocks(page, context) {
       bom_item_id: 7301,
       material_id: 1,
       unit_id: 1,
-      production_operation_code: 'FABRIC_PROCESSING',
       unit_quantity_snapshot: '0.500000',
       loss_rate_snapshot: '0.020000',
       planned_quantity: '10.200000',

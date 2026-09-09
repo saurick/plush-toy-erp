@@ -267,7 +267,7 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 	f := openProductionOrderRepoTest(t, "production_rework_source")
 	logger := log.NewStdLogger(io.Discard)
 	createProductionWIPRouteProcesses(t, ctx, f.client)
-	warehouse := createTestWarehouse(t, ctx, f.client, "REWORK-WH")
+	warehouse := createTestProductWarehouse(t, ctx, f.client, "REWORK-WH")
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, logger))
 	flow := releaseProductionWIPRoute(t, ctx, f, "MO-REWORK-001", 10, false)
 	flow, packaging := acceptProductionPackagingBatchForReworkTest(
@@ -402,7 +402,7 @@ func TestClosedProductionOrderReworkRequiresAcceptedReplacementPackaging(t *test
 	f := openProductionOrderRepoTest(t, "production_closed_rework_replacement")
 	logger := log.NewStdLogger(io.Discard)
 	createProductionWIPRouteProcesses(t, ctx, f.client)
-	warehouse := createTestWarehouse(t, ctx, f.client, "CLOSED-REWORK-WH")
+	warehouse := createTestProductWarehouse(t, ctx, f.client, "CLOSED-REWORK-WH")
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, logger))
 	flow := releaseProductionWIPRoute(t, ctx, f, "MO-CLOSED-REWORK", 10, false)
 	flow, originalPackaging := acceptProductionPackagingBatchForReworkTest(

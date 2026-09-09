@@ -14,6 +14,8 @@ const (
 	Label = "purchase_order"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldEngineeringMaterialRequestID holds the string denoting the engineering_material_request_id field in the database.
+	FieldEngineeringMaterialRequestID = "engineering_material_request_id"
 	// FieldPurchaseOrderNo holds the string denoting the purchase_order_no field in the database.
 	FieldPurchaseOrderNo = "purchase_order_no"
 	// FieldSupplierID holds the string denoting the supplier_id field in the database.
@@ -62,12 +64,21 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeEngineeringMaterialRequest holds the string denoting the engineering_material_request edge name in mutations.
+	EdgeEngineeringMaterialRequest = "engineering_material_request"
 	// EdgeSupplier holds the string denoting the supplier edge name in mutations.
 	EdgeSupplier = "supplier"
 	// EdgeItems holds the string denoting the items edge name in mutations.
 	EdgeItems = "items"
 	// Table holds the table name of the purchaseorder in the database.
 	Table = "purchase_orders"
+	// EngineeringMaterialRequestTable is the table that holds the engineering_material_request relation/edge.
+	EngineeringMaterialRequestTable = "purchase_orders"
+	// EngineeringMaterialRequestInverseTable is the table name for the EngineeringMaterialRequest entity.
+	// It exists in this package in order to avoid circular dependency with the "engineeringmaterialrequest" package.
+	EngineeringMaterialRequestInverseTable = "engineering_material_requests"
+	// EngineeringMaterialRequestColumn is the table column denoting the engineering_material_request relation/edge.
+	EngineeringMaterialRequestColumn = "engineering_material_request_id"
 	// SupplierTable is the table that holds the supplier relation/edge.
 	SupplierTable = "purchase_orders"
 	// SupplierInverseTable is the table name for the Supplier entity.
@@ -87,6 +98,7 @@ const (
 // Columns holds all SQL columns for purchaseorder fields.
 var Columns = []string{
 	FieldID,
+	FieldEngineeringMaterialRequestID,
 	FieldPurchaseOrderNo,
 	FieldSupplierID,
 	FieldCurrency,
@@ -124,6 +136,8 @@ func ValidColumn(column string) bool {
 }
 
 var (
+	// EngineeringMaterialRequestIDValidator is a validator for the "engineering_material_request_id" field. It is called by the builders before save.
+	EngineeringMaterialRequestIDValidator func(int) error
 	// PurchaseOrderNoValidator is a validator for the "purchase_order_no" field. It is called by the builders before save.
 	PurchaseOrderNoValidator func(string) error
 	// SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
@@ -174,6 +188,11 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByEngineeringMaterialRequestID orders the results by the engineering_material_request_id field.
+func ByEngineeringMaterialRequestID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEngineeringMaterialRequestID, opts...).ToFunc()
 }
 
 // ByPurchaseOrderNo orders the results by the purchase_order_no field.
@@ -286,6 +305,13 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
+// ByEngineeringMaterialRequestField orders the results by engineering_material_request field.
+func ByEngineeringMaterialRequestField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newEngineeringMaterialRequestStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // BySupplierField orders the results by supplier field.
 func BySupplierField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -305,6 +331,13 @@ func ByItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
+}
+func newEngineeringMaterialRequestStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(EngineeringMaterialRequestInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, EngineeringMaterialRequestTable, EngineeringMaterialRequestColumn),
+	)
 }
 func newSupplierStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(

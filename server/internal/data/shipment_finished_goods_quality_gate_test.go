@@ -28,7 +28,7 @@ func TestOperationalFactRepo_ShipmentFinishedGoodsQualityGate(t *testing.T) {
 		if _, err := inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 			SubjectType:    biz.InventorySubjectProduct,
 			SubjectID:      fixtures.productID,
-			WarehouseID:    fixtures.warehouseID,
+			WarehouseID:    fixtures.productWarehouseID,
 			LotID:          &lot.ID,
 			TxnType:        biz.InventoryTxnIn,
 			Direction:      1,
@@ -46,7 +46,7 @@ func TestOperationalFactRepo_ShipmentFinishedGoodsQualityGate(t *testing.T) {
 			},
 			Items: []*biz.ShipmentItemCreate{{
 				ProductID:   fixtures.productID,
-				WarehouseID: fixtures.warehouseID,
+				WarehouseID: fixtures.productWarehouseID,
 				UnitID:      fixtures.unitID,
 				LotID:       &lot.ID,
 				Quantity:    mustDecimal(t, "1"),
@@ -63,7 +63,7 @@ func TestOperationalFactRepo_ShipmentFinishedGoodsQualityGate(t *testing.T) {
 			InspectionNo:   "QI-GATE-" + suffix,
 			SourceID:       shipment.ID,
 			InventoryLotID: lot.ID,
-			WarehouseID:    fixtures.warehouseID,
+			WarehouseID:    fixtures.productWarehouseID,
 			SubjectID:      fixtures.productID,
 		})
 		if err != nil {

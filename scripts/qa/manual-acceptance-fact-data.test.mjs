@@ -197,7 +197,6 @@ function sourceReport({ remote = false } = {}) {
           unitId: 1001,
           quantity: "1",
           lossRate: "0",
-          productionOperationCode: "FABRIC_PROCESSING",
         },
       ],
     },

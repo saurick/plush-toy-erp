@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Form, Popconfirm, Space, Tabs } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../utils/warehouseClassification.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -163,6 +164,7 @@ export default function V1MasterDataPage({ type }) {
   const [keyword, setKeyword] = useState(
     () => searchParams.get('keyword') || ''
   )
+  const [stockCategory, setStockCategory] = useState('')
   const [lifecycleScope, setLifecycleScope] = useState(() =>
     lifecycleScopeFromSearchParams(searchParams)
   )
@@ -526,11 +528,14 @@ export default function V1MasterDataPage({ type }) {
     () => ({
       keyword,
       lifecycle_scope: lifecycleScope,
+      ...(effectiveType === 'materials' && stockCategory
+        ? { stock_category: stockCategory }
+        : {}),
       ...(effectiveType === 'suppliers' && supplierTypeFilter
         ? { supplier_types: [supplierTypeFilter] }
         : {}),
     }),
-    [effectiveType, keyword, lifecycleScope, supplierTypeFilter]
+    [effectiveType, keyword, lifecycleScope, supplierTypeFilter, stockCategory]
   )
 
   const loadRecords = useCallback(async () => {
@@ -634,17 +639,20 @@ export default function V1MasterDataPage({ type }) {
         : { current: 1, pageSize: 20 }
     )
     setKeyword((current) => (current ? '' : current))
+    setStockCategory('')
   }, [effectiveType])
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
       lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
-      (effectiveType === 'suppliers' && supplierTypeFilter)
+      (effectiveType === 'suppliers' && supplierTypeFilter) ||
+      (effectiveType === 'materials' && stockCategory)
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
     setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
     setSupplierTypeFilter('')
+    setStockCategory('')
     const nextParams = withLifecycleScopeSearchParam(
       searchParams,
       LIFECYCLE_SCOPE.CURRENT
@@ -1049,6 +1057,21 @@ export default function V1MasterDataPage({ type }) {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
+            {effectiveType === 'materials' ? (
+              <SelectFilter
+                aria-label="材料库存类别"
+                value={stockCategory}
+                options={[
+                  { label: '全部库存类别', value: '' },
+                  ...MATERIAL_STOCK_CATEGORY_OPTIONS,
+                  { label: '待分类', value: 'UNCLASSIFIED' },
+                ]}
+                onChange={(value) => {
+                  setStockCategory(value || '')
+                  resetBusinessPaginationCurrent(setPagination)
+                }}
+              />
+            ) : null}
             {effectiveType === 'suppliers' ? (
               <SelectFilter
                 aria-label="供应商与加工厂类型"

@@ -217,14 +217,19 @@ test('quality page names and filters the shared read model by business inspectio
   assert.doesNotMatch(source, /title="来料质检"/u)
 })
 
-test('quality page describes generic and production-stage sources without collapsing quality gates', () => {
-  assert.match(source, /采购到货、委外回货、出货关联成品和生产 WIP 分段关口/u)
-  assert.match(source, /裁片、皮套、成品、针检、抽检及订单要求的客户验货/u)
-  assert.match(source, /每张质检单只代表当前在制批次和当前关口/u)
-  assert.match(
-    source,
-    /首次到货检验不合格可按来源行和部分数量办理退厂或补换；补换确认生成新的待收与待检记录，原收货不会因部分处置被整单取消/u
+test('shared quality help keeps inspection sources and each quality gate separate', () => {
+  const help = readFileSync(
+    new URL('../config/businessUsabilityCatalog.mjs', import.meta.url),
+    'utf8'
   )
+  assert.match(
+    help,
+    /检验必须从采购入库、委外回货、生产在制批次或出货单等明确来源发起/u
+  )
+  assert.match(help, /每张质检单只代表当前来源和当前关口/u)
+  assert.match(help, /不能把一次判定当作其他批次或其他关口也已完成/u)
+  assert.match(source, /PRODUCTION_STAGE/u)
+  assert.match(source, /PurchaseRejectionDispositionModal/u)
 })
 
 test('production-stage filter uses the WIP read model without inventory lot or warehouse filters', () => {

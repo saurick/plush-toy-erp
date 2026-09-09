@@ -12,6 +12,7 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/productionorderitem"
@@ -359,17 +360,13 @@ func validateProductionWIPAggregateShape(aggregate *biz.ProductionWIPAggregate) 
 			return biz.ErrProductionWIPInvalidRoute
 		}
 		requirementByID[requirement.ID] = requirement
-		if requirement.ProductionOperationCode != nil {
-			if strings.TrimSpace(*requirement.ProductionOperationCode) != biz.ProductionWIPOperationFabricProcessing {
-				return biz.ErrProductionWIPInvalidRoute
-			}
-			byID := fabricRequirementIDsByItem[requirement.ProductionOrderItemID]
-			if byID == nil {
-				byID = make(map[int]struct{})
-				fabricRequirementIDsByItem[requirement.ProductionOrderItemID] = byID
-			}
-			byID[requirement.ID] = struct{}{}
+		byID := fabricRequirementIDsByItem[requirement.ProductionOrderItemID]
+		if byID == nil {
+			byID = make(map[int]struct{})
+			fabricRequirementIDsByItem[requirement.ProductionOrderItemID] = byID
 		}
+		byID[requirement.ID] = struct{}{}
+
 	}
 	for _, operation := range aggregate.Operations {
 		if operation == nil || operation.ProductionOrderID != aggregate.ProductionOrderID || itemByID[operation.ProductionOrderItemID] == nil {
@@ -447,7 +444,6 @@ func validateProductionWIPAggregateShape(aggregate *biz.ProductionWIPAggregate) 
 			}
 			requirement := requirementByID[*allocation.ProductionOrderMaterialRequirementID]
 			if requirement == nil || requirement.ProductionOrderItemID != batch.ProductionOrderItemID ||
-				requirement.ProductionOperationCode == nil || *requirement.ProductionOperationCode != biz.ProductionWIPOperationFabricProcessing ||
 				allocation.UnitID != requirement.UnitID || !allocation.AllocatedQuantity.Equal(requirement.PlannedQuantity) {
 				return biz.ErrProductionWIPInvalidRoute
 			}
@@ -476,11 +472,11 @@ func validateProductionWIPAggregateShape(aggregate *biz.ProductionWIPAggregate) 
 		item := itemByID[batch.ProductionOrderItemID]
 		expected := fabricRequirementIDsByItem[batch.ProductionOrderItemID]
 		covered := coveredFabricRequirementsByBatch[batch.ID]
-		if item == nil || batch.SourceBatchID != nil || !batch.Quantity.Equal(item.PlannedQuantity) || len(expected) == 0 || len(covered) != len(expected) {
+		if item == nil || batch.SourceBatchID != nil || !batch.Quantity.Equal(item.PlannedQuantity) || len(covered) == 0 {
 			return biz.ErrProductionWIPInvalidRoute
 		}
-		for requirementID := range expected {
-			if _, ok := covered[requirementID]; !ok {
+		for requirementID := range covered {
+			if _, ok := expected[requirementID]; !ok {
 				return biz.ErrProductionWIPInvalidRoute
 			}
 		}
@@ -669,6 +665,15 @@ func (r *productionOrderRepo) ApplyProductionWIPCommand(ctx context.Context, in 
 	}
 	if batchRow.ProductionOrderID != in.ProductionOrderID || batchRow.ProductionOrderItemID != preflightBatch.ProductionOrderItemID || batchRow.Version != in.ExpectedVersion {
 		return nil, biz.ErrProductionWIPInvalidTransition
+	}
+	if in.Action == biz.ProductionWIPActionSplitBatch || in.Action == biz.ProductionWIPActionCancelBatch || (in.Action == biz.ProductionWIPActionAssignExecution && in.ExecutionMode == biz.ProductionWIPExecutionInHouse) {
+		exists, err := tx.client.OutsourcingOrder.Query().Where(outsourcingorder.SourceWipBatchID(batchRow.ID), outsourcingorder.LifecycleStatusNEQ(biz.OutsourcingOrderStatusCanceled)).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			return nil, biz.ErrProductionWIPPreparedContractDependency
+		}
 	}
 	if batchRow.OriginReworkFactID != nil {
 		if in.Action == biz.ProductionWIPActionCancelBatch {
@@ -1052,7 +1057,7 @@ func validateProductionWIPOutsourcingAssignment(
 		if edgeErr != nil {
 			return nil, edgeErr
 		}
-		if parent.LifecycleStatus != biz.OutsourcingOrderStatusConfirmed || item.LineStatus != biz.OutsourcingOrderItemStatusOpen ||
+		if (parent.SourceWipBatchID != nil && *parent.SourceWipBatchID != batch.ID) || parent.LifecycleStatus != biz.OutsourcingOrderStatusConfirmed || item.LineStatus != biz.OutsourcingOrderItemStatusOpen ||
 			item.ProcessID != operation.ProcessID || (parentOrderID != 0 && parentOrderID != parent.ID) {
 			return nil, biz.ErrProductionWIPOutsourcingAllocationInvalid
 		}
@@ -1077,7 +1082,7 @@ func validateProductionWIPOutsourcingAssignment(
 			rowByID[row.ID] = row
 		}
 		fabricRequirements, err := biz.SelectProductionWIPFabricRequirements(orderItem.ID, requirements)
-		if err != nil || len(fabricRequirements) != len(inputs) {
+		if err != nil || len(inputs) == 0 || len(inputs) > len(fabricRequirements) {
 			return nil, biz.ErrProductionWIPOutsourcingAllocationInvalid
 		}
 		fabricByID := make(map[int]*biz.ProductionOrderMaterialRequirement, len(fabricRequirements))
@@ -1102,9 +1107,6 @@ func validateProductionWIPOutsourcingAssignment(
 				SubjectType: biz.OutsourcingOrderSubjectMaterial, AllocatedQuantity: requirement.PlannedQuantity, UnitID: requirement.UnitID,
 			})
 			delete(fabricByID, requirement.ID)
-		}
-		if len(fabricByID) != 0 {
-			return nil, biz.ErrProductionWIPOutsourcingAllocationInvalid
 		}
 		return allocations, nil
 	}

@@ -357,12 +357,21 @@ func (r *inventoryRepo) CreateInventoryTxn(ctx context.Context, in *biz.Inventor
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, err
 	}
-	if err := validateInventoryTxnReferences(ctx, r.data.postgres, in); err != nil {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	if err := validateInventoryTxnReferences(ctx, tx.Client(), in); err != nil {
 		return nil, err
 	}
 
-	row, err := createInventoryTxn(ctx, r.data.postgres.InventoryTxn.Create(), in)
+	row, err := createInventoryTxn(ctx, tx.InventoryTxn.Create(), in)
 	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return nil, rollbackErr
+		}
+		tx = nil
 		if ent.IsConstraintError(err) {
 			existing, lookupErr := r.data.postgres.InventoryTxn.Query().
 				Where(inventorytxn.IdempotencyKey(in.IdempotencyKey)).
@@ -381,6 +390,10 @@ func (r *inventoryRepo) CreateInventoryTxn(ctx context.Context, in *biz.Inventor
 		}
 		return nil, err
 	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entInventoryTxnToBiz(row), nil
 }
 
@@ -487,6 +500,9 @@ func (r *inventoryRepo) ListInventoryBalancesForAccess(ctx context.Context, filt
 
 func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.InventoryBalanceFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryBalance, int, error) {
 	query := r.data.postgres.InventoryBalance.Query()
+	if filter.StockCategory != "" {
+		query.Where(inventoryMaterialCategoryPredicate(filter.StockCategory))
+	}
 	switch scope.Mode {
 	case biz.DataScopeModeAssigned:
 		query = query.Where(inventorybalance.WarehouseIDIn(scope.WarehouseIDs...))
@@ -532,9 +548,22 @@ func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.In
 	if err != nil {
 		return nil, 0, err
 	}
+	materialIDs := []int{}
+	for _, row := range rows {
+		if row.SubjectType == biz.InventorySubjectMaterial {
+			materialIDs = append(materialIDs, row.SubjectID)
+		}
+	}
+	categories, err := loadInventoryMaterialStockCategories(ctx, r.data.postgres, materialIDs)
+	if err != nil {
+		return nil, 0, err
+	}
 	out := make([]*biz.InventoryBalance, 0, len(rows))
 	for _, row := range rows {
 		item := entInventoryBalanceToBiz(row)
+		if row.SubjectType == biz.InventorySubjectMaterial {
+			item.StockCategory = categories[row.SubjectID]
+		}
 		activeReserved, err := activeReservedQuantityForBalance(ctx, r.data.postgres, row)
 		if err != nil {
 			return nil, 0, err
@@ -570,6 +599,9 @@ func (r *inventoryRepo) ListInventoryLotsForAccess(ctx context.Context, filter b
 
 func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.InventoryLotFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryLot, int, error) {
 	query := r.data.postgres.InventoryLot.Query()
+	if filter.StockCategory != "" {
+		query.Where(inventoryMaterialCategoryPredicate(filter.StockCategory))
+	}
 	switch scope.Mode {
 	case biz.DataScopeModeAssigned:
 		query = query.Where(inventorylot.Or(
@@ -634,9 +666,23 @@ func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.Invent
 	if err != nil {
 		return nil, 0, err
 	}
+	materialIDs := []int{}
+	for _, row := range rows {
+		if row.SubjectType == biz.InventorySubjectMaterial {
+			materialIDs = append(materialIDs, row.SubjectID)
+		}
+	}
+	categories, err := loadInventoryMaterialStockCategories(ctx, r.data.postgres, materialIDs)
+	if err != nil {
+		return nil, 0, err
+	}
 	out := make([]*biz.InventoryLot, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, entInventoryLotToBiz(row))
+		item := entInventoryLotToBiz(row)
+		if row.SubjectType == biz.InventorySubjectMaterial {
+			item.StockCategory = categories[row.SubjectID]
+		}
+		out = append(out, item)
 	}
 	return out, total, nil
 }
@@ -651,6 +697,9 @@ func (r *inventoryRepo) ListInventoryTxnsForAccess(ctx context.Context, filter b
 
 func (r *inventoryRepo) listInventoryTxns(ctx context.Context, filter biz.InventoryTxnFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryTxn, int, error) {
 	query := r.data.postgres.InventoryTxn.Query()
+	if filter.StockCategory != "" {
+		query.Where(inventoryMaterialCategoryPredicate(filter.StockCategory))
+	}
 	switch scope.Mode {
 	case biz.DataScopeModeAssigned:
 		query = query.Where(inventorytxn.WarehouseIDIn(scope.WarehouseIDs...))
@@ -718,9 +767,23 @@ func (r *inventoryRepo) listInventoryTxns(ctx context.Context, filter biz.Invent
 	if err != nil {
 		return nil, 0, err
 	}
+	materialIDs := []int{}
+	for _, row := range rows {
+		if row.SubjectType == biz.InventorySubjectMaterial {
+			materialIDs = append(materialIDs, row.SubjectID)
+		}
+	}
+	categories, err := loadInventoryMaterialStockCategories(ctx, r.data.postgres, materialIDs)
+	if err != nil {
+		return nil, 0, err
+	}
 	out := make([]*biz.InventoryTxn, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, entInventoryTxnToBiz(row))
+		item := entInventoryTxnToBiz(row)
+		if row.SubjectType == biz.InventorySubjectMaterial {
+			item.StockCategory = categories[row.SubjectID]
+		}
+		out = append(out, item)
 	}
 	return out, total, nil
 }
@@ -936,6 +999,11 @@ func getInventoryBalance(ctx context.Context, query *ent.InventoryBalanceQuery, 
 func validateInventoryTxnReferences(ctx context.Context, client *ent.Client, in *biz.InventoryTxnCreate) error {
 	if err := validateInventorySubject(ctx, client, in); err != nil {
 		return err
+	}
+	if in.Direction > 0 && in.TxnType != biz.InventoryTxnReversal {
+		if err := validateIncomingWarehouse(ctx, client, in.WarehouseID, in.SubjectType, in.SubjectID); err != nil {
+			return err
+		}
 	}
 	if err := validateInventoryReversal(ctx, client, in); err != nil {
 		return err
@@ -1354,7 +1422,6 @@ func (r *inventoryRepo) CreateBOMItem(ctx context.Context, in *biz.BOMItemCreate
 		SetNillableTotalUsageSnapshot(in.TotalUsageSnapshot).
 		SetNillableProcessBase(in.ProcessBase).
 		SetNillableProcessMethod(in.ProcessMethod).
-		SetNillableProductionOperationCode(in.ProductionOperationCode).
 		SetNillableNote(in.Note).
 		Save(ctx)
 	if err != nil {
@@ -1445,11 +1512,6 @@ func (r *inventoryRepo) UpdateBOMDraftItem(ctx context.Context, id int, in *biz.
 		update.ClearProcessMethod()
 	} else {
 		update.SetProcessMethod(*in.ProcessMethod)
-	}
-	if in.ProductionOperationCode == nil {
-		update.ClearProductionOperationCode()
-	} else {
-		update.SetProductionOperationCode(*in.ProductionOperationCode)
 	}
 	if in.Note == nil {
 		update.ClearNote()
@@ -1713,7 +1775,6 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 			SetNillableTotalUsageSnapshot(sourceItem.TotalUsageSnapshot).
 			SetNillableProcessBase(sourceItem.ProcessBase).
 			SetNillableProcessMethod(sourceItem.ProcessMethod).
-			SetNillableProductionOperationCode(sourceItem.ProductionOperationCode).
 			SetNillableNote(sourceItem.Note).
 			Save(ctx)
 		if err != nil {
@@ -1984,20 +2045,19 @@ func entBOMItemToBiz(row *ent.BOMItem) *biz.BOMItem {
 		return nil
 	}
 	return &biz.BOMItem{
-		ID:                      row.ID,
-		BOMHeaderID:             row.BomHeaderID,
-		MaterialID:              row.MaterialID,
-		Quantity:                row.Quantity,
-		UnitID:                  row.UnitID,
-		LossRate:                row.LossRate,
-		Position:                row.Position,
-		PieceCount:              row.PieceCount,
-		TotalUsageSnapshot:      row.TotalUsageSnapshot,
-		ProcessBase:             row.ProcessBase,
-		ProcessMethod:           row.ProcessMethod,
-		ProductionOperationCode: row.ProductionOperationCode,
-		Note:                    row.Note,
-		CreatedAt:               row.CreatedAt,
-		UpdatedAt:               row.UpdatedAt,
+		ID:                 row.ID,
+		BOMHeaderID:        row.BomHeaderID,
+		MaterialID:         row.MaterialID,
+		Quantity:           row.Quantity,
+		UnitID:             row.UnitID,
+		LossRate:           row.LossRate,
+		Position:           row.Position,
+		PieceCount:         row.PieceCount,
+		TotalUsageSnapshot: row.TotalUsageSnapshot,
+		ProcessBase:        row.ProcessBase,
+		ProcessMethod:      row.ProcessMethod,
+		Note:               row.Note,
+		CreatedAt:          row.CreatedAt,
+		UpdatedAt:          row.UpdatedAt,
 	}
 }

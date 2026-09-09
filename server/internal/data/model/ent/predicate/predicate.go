@@ -39,6 +39,12 @@ type CustomerConfigRevision func(*sql.Selector)
 // DeploymentModuleState is the predicate function for deploymentmodulestate builders.
 type DeploymentModuleState func(*sql.Selector)
 
+// EngineeringMaterialRequest is the predicate function for engineeringmaterialrequest builders.
+type EngineeringMaterialRequest func(*sql.Selector)
+
+// EngineeringMaterialRequestItem is the predicate function for engineeringmaterialrequestitem builders.
+type EngineeringMaterialRequestItem func(*sql.Selector)
+
 // FinanceAllocation is the predicate function for financeallocation builders.
 type FinanceAllocation func(*sql.Selector)
 

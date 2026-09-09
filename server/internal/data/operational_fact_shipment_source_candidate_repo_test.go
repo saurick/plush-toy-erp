@@ -36,7 +36,7 @@ func newShipmentSourceCandidateFixture(t *testing.T, name string) *shipmentSourc
 	customerRow := client.Customer.Create().SetCode("CUS-" + name).SetName("候选客户-" + name).SaveX(ctx)
 	productRow := client.Product.Create().SetCode("PROD-" + name).SetName("候选产品-" + name).SetDefaultUnitID(unitRow.ID).SaveX(ctx)
 	skuRow := client.ProductSKU.Create().SetProductID(productRow.ID).SetSkuCode("SKU-" + name).SetSkuName("蓝色").SetColor("蓝").SetDefaultUnitID(unitRow.ID).SaveX(ctx)
-	warehouseRow := client.Warehouse.Create().SetCode("WH-" + name).SetName("成品仓").SetType("finished_goods").SaveX(ctx)
+	warehouseRow := client.Warehouse.Create().SetCode("WH-" + name).SetName("成品仓").SetType("FINISHED_GOODS").SaveX(ctx)
 	data := NewDataForTesting(client, nil)
 	return &shipmentSourceCandidateFixture{
 		client:       client,

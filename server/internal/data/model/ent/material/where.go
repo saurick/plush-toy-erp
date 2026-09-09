@@ -65,6 +65,11 @@ func Name(v string) predicate.Material {
 	return predicate.Material(sql.FieldEQ(FieldName, v))
 }
 
+// SupplierID applies equality check predicate on the "supplier_id" field. It's identical to SupplierIDEQ.
+func SupplierID(v int) predicate.Material {
+	return predicate.Material(sql.FieldEQ(FieldSupplierID, v))
+}
+
 // SupplierItemNo applies equality check predicate on the "supplier_item_no" field. It's identical to SupplierItemNoEQ.
 func SupplierItemNo(v string) predicate.Material {
 	return predicate.Material(sql.FieldEQ(FieldSupplierItemNo, v))
@@ -73,6 +78,16 @@ func SupplierItemNo(v string) predicate.Material {
 // Category applies equality check predicate on the "category" field. It's identical to CategoryEQ.
 func Category(v string) predicate.Material {
 	return predicate.Material(sql.FieldEQ(FieldCategory, v))
+}
+
+// StockCategory applies equality check predicate on the "stock_category" field. It's identical to StockCategoryEQ.
+func StockCategory(v string) predicate.Material {
+	return predicate.Material(sql.FieldEQ(FieldStockCategory, v))
+}
+
+// DefaultWarehouseID applies equality check predicate on the "default_warehouse_id" field. It's identical to DefaultWarehouseIDEQ.
+func DefaultWarehouseID(v int) predicate.Material {
+	return predicate.Material(sql.FieldEQ(FieldDefaultWarehouseID, v))
 }
 
 // Spec applies equality check predicate on the "spec" field. It's identical to SpecEQ.
@@ -235,6 +250,36 @@ func NameContainsFold(v string) predicate.Material {
 	return predicate.Material(sql.FieldContainsFold(FieldName, v))
 }
 
+// SupplierIDEQ applies the EQ predicate on the "supplier_id" field.
+func SupplierIDEQ(v int) predicate.Material {
+	return predicate.Material(sql.FieldEQ(FieldSupplierID, v))
+}
+
+// SupplierIDNEQ applies the NEQ predicate on the "supplier_id" field.
+func SupplierIDNEQ(v int) predicate.Material {
+	return predicate.Material(sql.FieldNEQ(FieldSupplierID, v))
+}
+
+// SupplierIDIn applies the In predicate on the "supplier_id" field.
+func SupplierIDIn(vs ...int) predicate.Material {
+	return predicate.Material(sql.FieldIn(FieldSupplierID, vs...))
+}
+
+// SupplierIDNotIn applies the NotIn predicate on the "supplier_id" field.
+func SupplierIDNotIn(vs ...int) predicate.Material {
+	return predicate.Material(sql.FieldNotIn(FieldSupplierID, vs...))
+}
+
+// SupplierIDIsNil applies the IsNil predicate on the "supplier_id" field.
+func SupplierIDIsNil() predicate.Material {
+	return predicate.Material(sql.FieldIsNull(FieldSupplierID))
+}
+
+// SupplierIDNotNil applies the NotNil predicate on the "supplier_id" field.
+func SupplierIDNotNil() predicate.Material {
+	return predicate.Material(sql.FieldNotNull(FieldSupplierID))
+}
+
 // SupplierItemNoEQ applies the EQ predicate on the "supplier_item_no" field.
 func SupplierItemNoEQ(v string) predicate.Material {
 	return predicate.Material(sql.FieldEQ(FieldSupplierItemNo, v))
@@ -383,6 +428,101 @@ func CategoryEqualFold(v string) predicate.Material {
 // CategoryContainsFold applies the ContainsFold predicate on the "category" field.
 func CategoryContainsFold(v string) predicate.Material {
 	return predicate.Material(sql.FieldContainsFold(FieldCategory, v))
+}
+
+// StockCategoryEQ applies the EQ predicate on the "stock_category" field.
+func StockCategoryEQ(v string) predicate.Material {
+	return predicate.Material(sql.FieldEQ(FieldStockCategory, v))
+}
+
+// StockCategoryNEQ applies the NEQ predicate on the "stock_category" field.
+func StockCategoryNEQ(v string) predicate.Material {
+	return predicate.Material(sql.FieldNEQ(FieldStockCategory, v))
+}
+
+// StockCategoryIn applies the In predicate on the "stock_category" field.
+func StockCategoryIn(vs ...string) predicate.Material {
+	return predicate.Material(sql.FieldIn(FieldStockCategory, vs...))
+}
+
+// StockCategoryNotIn applies the NotIn predicate on the "stock_category" field.
+func StockCategoryNotIn(vs ...string) predicate.Material {
+	return predicate.Material(sql.FieldNotIn(FieldStockCategory, vs...))
+}
+
+// StockCategoryGT applies the GT predicate on the "stock_category" field.
+func StockCategoryGT(v string) predicate.Material {
+	return predicate.Material(sql.FieldGT(FieldStockCategory, v))
+}
+
+// StockCategoryGTE applies the GTE predicate on the "stock_category" field.
+func StockCategoryGTE(v string) predicate.Material {
+	return predicate.Material(sql.FieldGTE(FieldStockCategory, v))
+}
+
+// StockCategoryLT applies the LT predicate on the "stock_category" field.
+func StockCategoryLT(v string) predicate.Material {
+	return predicate.Material(sql.FieldLT(FieldStockCategory, v))
+}
+
+// StockCategoryLTE applies the LTE predicate on the "stock_category" field.
+func StockCategoryLTE(v string) predicate.Material {
+	return predicate.Material(sql.FieldLTE(FieldStockCategory, v))
+}
+
+// StockCategoryContains applies the Contains predicate on the "stock_category" field.
+func StockCategoryContains(v string) predicate.Material {
+	return predicate.Material(sql.FieldContains(FieldStockCategory, v))
+}
+
+// StockCategoryHasPrefix applies the HasPrefix predicate on the "stock_category" field.
+func StockCategoryHasPrefix(v string) predicate.Material {
+	return predicate.Material(sql.FieldHasPrefix(FieldStockCategory, v))
+}
+
+// StockCategoryHasSuffix applies the HasSuffix predicate on the "stock_category" field.
+func StockCategoryHasSuffix(v string) predicate.Material {
+	return predicate.Material(sql.FieldHasSuffix(FieldStockCategory, v))
+}
+
+// StockCategoryEqualFold applies the EqualFold predicate on the "stock_category" field.
+func StockCategoryEqualFold(v string) predicate.Material {
+	return predicate.Material(sql.FieldEqualFold(FieldStockCategory, v))
+}
+
+// StockCategoryContainsFold applies the ContainsFold predicate on the "stock_category" field.
+func StockCategoryContainsFold(v string) predicate.Material {
+	return predicate.Material(sql.FieldContainsFold(FieldStockCategory, v))
+}
+
+// DefaultWarehouseIDEQ applies the EQ predicate on the "default_warehouse_id" field.
+func DefaultWarehouseIDEQ(v int) predicate.Material {
+	return predicate.Material(sql.FieldEQ(FieldDefaultWarehouseID, v))
+}
+
+// DefaultWarehouseIDNEQ applies the NEQ predicate on the "default_warehouse_id" field.
+func DefaultWarehouseIDNEQ(v int) predicate.Material {
+	return predicate.Material(sql.FieldNEQ(FieldDefaultWarehouseID, v))
+}
+
+// DefaultWarehouseIDIn applies the In predicate on the "default_warehouse_id" field.
+func DefaultWarehouseIDIn(vs ...int) predicate.Material {
+	return predicate.Material(sql.FieldIn(FieldDefaultWarehouseID, vs...))
+}
+
+// DefaultWarehouseIDNotIn applies the NotIn predicate on the "default_warehouse_id" field.
+func DefaultWarehouseIDNotIn(vs ...int) predicate.Material {
+	return predicate.Material(sql.FieldNotIn(FieldDefaultWarehouseID, vs...))
+}
+
+// DefaultWarehouseIDIsNil applies the IsNil predicate on the "default_warehouse_id" field.
+func DefaultWarehouseIDIsNil() predicate.Material {
+	return predicate.Material(sql.FieldIsNull(FieldDefaultWarehouseID))
+}
+
+// DefaultWarehouseIDNotNil applies the NotNil predicate on the "default_warehouse_id" field.
+func DefaultWarehouseIDNotNil() predicate.Material {
+	return predicate.Material(sql.FieldNotNull(FieldDefaultWarehouseID))
 }
 
 // SpecEQ applies the EQ predicate on the "spec" field.
@@ -643,6 +783,52 @@ func UpdatedAtLT(v time.Time) predicate.Material {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.Material {
 	return predicate.Material(sql.FieldLTE(FieldUpdatedAt, v))
+}
+
+// HasDefaultWarehouse applies the HasEdge predicate on the "default_warehouse" edge.
+func HasDefaultWarehouse() predicate.Material {
+	return predicate.Material(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, DefaultWarehouseTable, DefaultWarehouseColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasDefaultWarehouseWith applies the HasEdge predicate on the "default_warehouse" edge with a given conditions (other predicates).
+func HasDefaultWarehouseWith(preds ...predicate.Warehouse) predicate.Material {
+	return predicate.Material(func(s *sql.Selector) {
+		step := newDefaultWarehouseStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasSupplier applies the HasEdge predicate on the "supplier" edge.
+func HasSupplier() predicate.Material {
+	return predicate.Material(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, SupplierTable, SupplierColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSupplierWith applies the HasEdge predicate on the "supplier" edge with a given conditions (other predicates).
+func HasSupplierWith(preds ...predicate.Supplier) predicate.Material {
+	return predicate.Material(func(s *sql.Selector) {
+		step := newSupplierStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // HasDefaultUnit applies the HasEdge predicate on the "default_unit" edge.

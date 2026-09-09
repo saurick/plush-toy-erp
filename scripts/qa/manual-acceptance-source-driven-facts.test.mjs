@@ -60,7 +60,6 @@ function sourceReport({ includeFacts = true, includePurchase = true } = {}) {
           warehouseId: 202,
           lotId: 203,
           quantity: "2",
-          productionOperationCode: "FABRIC_PROCESSING",
         },
       ],
       fabricOutsourcing: {

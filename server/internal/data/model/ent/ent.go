@@ -18,6 +18,8 @@ import (
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/customerconfigrevision"
 	"server/internal/data/model/ent/deploymentmodulestate"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
+	"server/internal/data/model/ent/engineeringmaterialrequestitem"
 	"server/internal/data/model/ent/financeallocation"
 	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
@@ -156,6 +158,8 @@ func checkColumn(t, c string) error {
 			customer.Table:                           customer.ValidColumn,
 			customerconfigrevision.Table:             customerconfigrevision.ValidColumn,
 			deploymentmodulestate.Table:              deploymentmodulestate.ValidColumn,
+			engineeringmaterialrequest.Table:         engineeringmaterialrequest.ValidColumn,
+			engineeringmaterialrequestitem.Table:     engineeringmaterialrequestitem.ValidColumn,
 			financeallocation.Table:                  financeallocation.ValidColumn,
 			financecreditnote.Table:                  financecreditnote.ValidColumn,
 			financefact.Table:                        financefact.ValidColumn,

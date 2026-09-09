@@ -223,7 +223,7 @@ export function getRecordSearchPlaceholder(type = '') {
 
 export function getRecordSearchHint(type = '') {
   if (type === 'materials') {
-    return '可搜索：编号、名称、款号、分类、规格、颜色'
+    return '可搜索：编号、名称、厂商、料号、分类、规格、颜色'
   }
   if (type === 'processes') {
     return '可搜索：环节编号、名称、类别、备注'

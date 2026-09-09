@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -22,6 +23,32 @@ const (
 	FieldDisplayOrder = "display_order"
 	// FieldProductID holds the string denoting the product_id field in the database.
 	FieldProductID = "product_id"
+	// FieldRequestedProductName holds the string denoting the requested_product_name field in the database.
+	FieldRequestedProductName = "requested_product_name"
+	// FieldCustomerProductNo holds the string denoting the customer_product_no field in the database.
+	FieldCustomerProductNo = "customer_product_no"
+	// FieldOrderCategory holds the string denoting the order_category field in the database.
+	FieldOrderCategory = "order_category"
+	// FieldPreShipmentSampleQuantity holds the string denoting the pre_shipment_sample_quantity field in the database.
+	FieldPreShipmentSampleQuantity = "pre_shipment_sample_quantity"
+	// FieldProcessRequirement holds the string denoting the process_requirement field in the database.
+	FieldProcessRequirement = "process_requirement"
+	// FieldSampleBomID holds the string denoting the sample_bom_id field in the database.
+	FieldSampleBomID = "sample_bom_id"
+	// FieldSampleBomFingerprint holds the string denoting the sample_bom_fingerprint field in the database.
+	FieldSampleBomFingerprint = "sample_bom_fingerprint"
+	// FieldSampleReusedFromItemID holds the string denoting the sample_reused_from_item_id field in the database.
+	FieldSampleReusedFromItemID = "sample_reused_from_item_id"
+	// FieldSampleImageAttachmentID holds the string denoting the sample_image_attachment_id field in the database.
+	FieldSampleImageAttachmentID = "sample_image_attachment_id"
+	// FieldEngineeringStatus holds the string denoting the engineering_status field in the database.
+	FieldEngineeringStatus = "engineering_status"
+	// FieldSampleNote holds the string denoting the sample_note field in the database.
+	FieldSampleNote = "sample_note"
+	// FieldSampleConfirmedAt holds the string denoting the sample_confirmed_at field in the database.
+	FieldSampleConfirmedAt = "sample_confirmed_at"
+	// FieldSampleConfirmedBy holds the string denoting the sample_confirmed_by field in the database.
+	FieldSampleConfirmedBy = "sample_confirmed_by"
 	// FieldProductSkuID holds the string denoting the product_sku_id field in the database.
 	FieldProductSkuID = "product_sku_id"
 	// FieldUnitID holds the string denoting the unit_id field in the database.
@@ -48,10 +75,14 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeSampleReusedFromItem holds the string denoting the sample_reused_from_item edge name in mutations.
+	EdgeSampleReusedFromItem = "sample_reused_from_item"
 	// EdgeSalesOrder holds the string denoting the sales_order edge name in mutations.
 	EdgeSalesOrder = "sales_order"
 	// EdgeProduct holds the string denoting the product edge name in mutations.
 	EdgeProduct = "product"
+	// EdgeSampleBom holds the string denoting the sample_bom edge name in mutations.
+	EdgeSampleBom = "sample_bom"
 	// EdgeProductSku holds the string denoting the product_sku edge name in mutations.
 	EdgeProductSku = "product_sku"
 	// EdgeUnit holds the string denoting the unit edge name in mutations.
@@ -62,6 +93,10 @@ const (
 	EdgeStockReservations = "stock_reservations"
 	// Table holds the table name of the salesorderitem in the database.
 	Table = "sales_order_items"
+	// SampleReusedFromItemTable is the table that holds the sample_reused_from_item relation/edge.
+	SampleReusedFromItemTable = "sales_order_items"
+	// SampleReusedFromItemColumn is the table column denoting the sample_reused_from_item relation/edge.
+	SampleReusedFromItemColumn = "sample_reused_from_item_id"
 	// SalesOrderTable is the table that holds the sales_order relation/edge.
 	SalesOrderTable = "sales_order_items"
 	// SalesOrderInverseTable is the table name for the SalesOrder entity.
@@ -76,6 +111,13 @@ const (
 	ProductInverseTable = "products"
 	// ProductColumn is the table column denoting the product relation/edge.
 	ProductColumn = "product_id"
+	// SampleBomTable is the table that holds the sample_bom relation/edge.
+	SampleBomTable = "sales_order_items"
+	// SampleBomInverseTable is the table name for the BOMHeader entity.
+	// It exists in this package in order to avoid circular dependency with the "bomheader" package.
+	SampleBomInverseTable = "bom_headers"
+	// SampleBomColumn is the table column denoting the sample_bom relation/edge.
+	SampleBomColumn = "sample_bom_id"
 	// ProductSkuTable is the table that holds the product_sku relation/edge.
 	ProductSkuTable = "sales_order_items"
 	// ProductSkuInverseTable is the table name for the ProductSKU entity.
@@ -113,6 +155,19 @@ var Columns = []string{
 	FieldLineNo,
 	FieldDisplayOrder,
 	FieldProductID,
+	FieldRequestedProductName,
+	FieldCustomerProductNo,
+	FieldOrderCategory,
+	FieldPreShipmentSampleQuantity,
+	FieldProcessRequirement,
+	FieldSampleBomID,
+	FieldSampleBomFingerprint,
+	FieldSampleReusedFromItemID,
+	FieldSampleImageAttachmentID,
+	FieldEngineeringStatus,
+	FieldSampleNote,
+	FieldSampleConfirmedAt,
+	FieldSampleConfirmedBy,
 	FieldProductSkuID,
 	FieldUnitID,
 	FieldProductCodeSnapshot,
@@ -147,6 +202,34 @@ var (
 	DisplayOrderValidator func(int) error
 	// ProductIDValidator is a validator for the "product_id" field. It is called by the builders before save.
 	ProductIDValidator func(int) error
+	// RequestedProductNameValidator is a validator for the "requested_product_name" field. It is called by the builders before save.
+	RequestedProductNameValidator func(string) error
+	// CustomerProductNoValidator is a validator for the "customer_product_no" field. It is called by the builders before save.
+	CustomerProductNoValidator func(string) error
+	// DefaultOrderCategory holds the default value on creation for the "order_category" field.
+	DefaultOrderCategory string
+	// OrderCategoryValidator is a validator for the "order_category" field. It is called by the builders before save.
+	OrderCategoryValidator func(string) error
+	// DefaultPreShipmentSampleQuantity holds the default value on creation for the "pre_shipment_sample_quantity" field.
+	DefaultPreShipmentSampleQuantity decimal.Decimal
+	// ProcessRequirementValidator is a validator for the "process_requirement" field. It is called by the builders before save.
+	ProcessRequirementValidator func(string) error
+	// SampleBomIDValidator is a validator for the "sample_bom_id" field. It is called by the builders before save.
+	SampleBomIDValidator func(int) error
+	// SampleBomFingerprintValidator is a validator for the "sample_bom_fingerprint" field. It is called by the builders before save.
+	SampleBomFingerprintValidator func(string) error
+	// SampleReusedFromItemIDValidator is a validator for the "sample_reused_from_item_id" field. It is called by the builders before save.
+	SampleReusedFromItemIDValidator func(int) error
+	// SampleImageAttachmentIDValidator is a validator for the "sample_image_attachment_id" field. It is called by the builders before save.
+	SampleImageAttachmentIDValidator func(int) error
+	// DefaultEngineeringStatus holds the default value on creation for the "engineering_status" field.
+	DefaultEngineeringStatus string
+	// EngineeringStatusValidator is a validator for the "engineering_status" field. It is called by the builders before save.
+	EngineeringStatusValidator func(string) error
+	// SampleNoteValidator is a validator for the "sample_note" field. It is called by the builders before save.
+	SampleNoteValidator func(string) error
+	// SampleConfirmedByValidator is a validator for the "sample_confirmed_by" field. It is called by the builders before save.
+	SampleConfirmedByValidator func(int) error
 	// ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
 	ProductSkuIDValidator func(int) error
 	// UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
@@ -197,6 +280,71 @@ func ByDisplayOrder(opts ...sql.OrderTermOption) OrderOption {
 // ByProductID orders the results by the product_id field.
 func ByProductID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProductID, opts...).ToFunc()
+}
+
+// ByRequestedProductName orders the results by the requested_product_name field.
+func ByRequestedProductName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestedProductName, opts...).ToFunc()
+}
+
+// ByCustomerProductNo orders the results by the customer_product_no field.
+func ByCustomerProductNo(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCustomerProductNo, opts...).ToFunc()
+}
+
+// ByOrderCategory orders the results by the order_category field.
+func ByOrderCategory(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOrderCategory, opts...).ToFunc()
+}
+
+// ByPreShipmentSampleQuantity orders the results by the pre_shipment_sample_quantity field.
+func ByPreShipmentSampleQuantity(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPreShipmentSampleQuantity, opts...).ToFunc()
+}
+
+// ByProcessRequirement orders the results by the process_requirement field.
+func ByProcessRequirement(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProcessRequirement, opts...).ToFunc()
+}
+
+// BySampleBomID orders the results by the sample_bom_id field.
+func BySampleBomID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSampleBomID, opts...).ToFunc()
+}
+
+// BySampleBomFingerprint orders the results by the sample_bom_fingerprint field.
+func BySampleBomFingerprint(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSampleBomFingerprint, opts...).ToFunc()
+}
+
+// BySampleReusedFromItemID orders the results by the sample_reused_from_item_id field.
+func BySampleReusedFromItemID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSampleReusedFromItemID, opts...).ToFunc()
+}
+
+// BySampleImageAttachmentID orders the results by the sample_image_attachment_id field.
+func BySampleImageAttachmentID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSampleImageAttachmentID, opts...).ToFunc()
+}
+
+// ByEngineeringStatus orders the results by the engineering_status field.
+func ByEngineeringStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEngineeringStatus, opts...).ToFunc()
+}
+
+// BySampleNote orders the results by the sample_note field.
+func BySampleNote(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSampleNote, opts...).ToFunc()
+}
+
+// BySampleConfirmedAt orders the results by the sample_confirmed_at field.
+func BySampleConfirmedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSampleConfirmedAt, opts...).ToFunc()
+}
+
+// BySampleConfirmedBy orders the results by the sample_confirmed_by field.
+func BySampleConfirmedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSampleConfirmedBy, opts...).ToFunc()
 }
 
 // ByProductSkuID orders the results by the product_sku_id field.
@@ -264,6 +412,13 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
+// BySampleReusedFromItemField orders the results by sample_reused_from_item field.
+func BySampleReusedFromItemField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSampleReusedFromItemStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // BySalesOrderField orders the results by sales_order field.
 func BySalesOrderField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -275,6 +430,13 @@ func BySalesOrderField(field string, opts ...sql.OrderTermOption) OrderOption {
 func ByProductField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newProductStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// BySampleBomField orders the results by sample_bom field.
+func BySampleBomField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSampleBomStep(), sql.OrderByField(field, opts...))
 	}
 }
 
@@ -319,6 +481,13 @@ func ByStockReservations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption
 		sqlgraph.OrderByNeighborTerms(s, newStockReservationsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+func newSampleReusedFromItemStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.O2O, false, SampleReusedFromItemTable, SampleReusedFromItemColumn),
+	)
+}
 func newSalesOrderStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -331,6 +500,13 @@ func newProductStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ProductInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, ProductTable, ProductColumn),
+	)
+}
+func newSampleBomStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SampleBomInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, SampleBomTable, SampleBomColumn),
 	)
 }
 func newProductSkuStep() *sqlgraph.Step {

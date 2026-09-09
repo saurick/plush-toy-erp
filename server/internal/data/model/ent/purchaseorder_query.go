@@ -7,6 +7,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"math"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
@@ -21,12 +22,13 @@ import (
 // PurchaseOrderQuery is the builder for querying PurchaseOrder entities.
 type PurchaseOrderQuery struct {
 	config
-	ctx          *QueryContext
-	order        []purchaseorder.OrderOption
-	inters       []Interceptor
-	predicates   []predicate.PurchaseOrder
-	withSupplier *SupplierQuery
-	withItems    *PurchaseOrderItemQuery
+	ctx                            *QueryContext
+	order                          []purchaseorder.OrderOption
+	inters                         []Interceptor
+	predicates                     []predicate.PurchaseOrder
+	withEngineeringMaterialRequest *EngineeringMaterialRequestQuery
+	withSupplier                   *SupplierQuery
+	withItems                      *PurchaseOrderItemQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -61,6 +63,28 @@ func (_q *PurchaseOrderQuery) Unique(unique bool) *PurchaseOrderQuery {
 func (_q *PurchaseOrderQuery) Order(o ...purchaseorder.OrderOption) *PurchaseOrderQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryEngineeringMaterialRequest chains the current query on the "engineering_material_request" edge.
+func (_q *PurchaseOrderQuery) QueryEngineeringMaterialRequest() *EngineeringMaterialRequestQuery {
+	query := (&EngineeringMaterialRequestClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchaseorder.Table, purchaseorder.FieldID, selector),
+			sqlgraph.To(engineeringmaterialrequest.Table, engineeringmaterialrequest.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, purchaseorder.EngineeringMaterialRequestTable, purchaseorder.EngineeringMaterialRequestColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // QuerySupplier chains the current query on the "supplier" edge.
@@ -294,17 +318,29 @@ func (_q *PurchaseOrderQuery) Clone() *PurchaseOrderQuery {
 		return nil
 	}
 	return &PurchaseOrderQuery{
-		config:       _q.config,
-		ctx:          _q.ctx.Clone(),
-		order:        append([]purchaseorder.OrderOption{}, _q.order...),
-		inters:       append([]Interceptor{}, _q.inters...),
-		predicates:   append([]predicate.PurchaseOrder{}, _q.predicates...),
-		withSupplier: _q.withSupplier.Clone(),
-		withItems:    _q.withItems.Clone(),
+		config:                         _q.config,
+		ctx:                            _q.ctx.Clone(),
+		order:                          append([]purchaseorder.OrderOption{}, _q.order...),
+		inters:                         append([]Interceptor{}, _q.inters...),
+		predicates:                     append([]predicate.PurchaseOrder{}, _q.predicates...),
+		withEngineeringMaterialRequest: _q.withEngineeringMaterialRequest.Clone(),
+		withSupplier:                   _q.withSupplier.Clone(),
+		withItems:                      _q.withItems.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithEngineeringMaterialRequest tells the query-builder to eager-load the nodes that are connected to
+// the "engineering_material_request" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *PurchaseOrderQuery) WithEngineeringMaterialRequest(opts ...func(*EngineeringMaterialRequestQuery)) *PurchaseOrderQuery {
+	query := (&EngineeringMaterialRequestClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withEngineeringMaterialRequest = query
+	return _q
 }
 
 // WithSupplier tells the query-builder to eager-load the nodes that are connected to
@@ -335,12 +371,12 @@ func (_q *PurchaseOrderQuery) WithItems(opts ...func(*PurchaseOrderItemQuery)) *
 // Example:
 //
 //	var v []struct {
-//		PurchaseOrderNo string `json:"purchase_order_no,omitempty"`
+//		EngineeringMaterialRequestID int `json:"engineering_material_request_id,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.PurchaseOrder.Query().
-//		GroupBy(purchaseorder.FieldPurchaseOrderNo).
+//		GroupBy(purchaseorder.FieldEngineeringMaterialRequestID).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *PurchaseOrderQuery) GroupBy(field string, fields ...string) *PurchaseOrderGroupBy {
@@ -358,11 +394,11 @@ func (_q *PurchaseOrderQuery) GroupBy(field string, fields ...string) *PurchaseO
 // Example:
 //
 //	var v []struct {
-//		PurchaseOrderNo string `json:"purchase_order_no,omitempty"`
+//		EngineeringMaterialRequestID int `json:"engineering_material_request_id,omitempty"`
 //	}
 //
 //	client.PurchaseOrder.Query().
-//		Select(purchaseorder.FieldPurchaseOrderNo).
+//		Select(purchaseorder.FieldEngineeringMaterialRequestID).
 //		Scan(ctx, &v)
 func (_q *PurchaseOrderQuery) Select(fields ...string) *PurchaseOrderSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)
@@ -407,7 +443,8 @@ func (_q *PurchaseOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 	var (
 		nodes       = []*PurchaseOrder{}
 		_spec       = _q.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [3]bool{
+			_q.withEngineeringMaterialRequest != nil,
 			_q.withSupplier != nil,
 			_q.withItems != nil,
 		}
@@ -430,6 +467,12 @@ func (_q *PurchaseOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withEngineeringMaterialRequest; query != nil {
+		if err := _q.loadEngineeringMaterialRequest(ctx, query, nodes, nil,
+			func(n *PurchaseOrder, e *EngineeringMaterialRequest) { n.Edges.EngineeringMaterialRequest = e }); err != nil {
+			return nil, err
+		}
+	}
 	if query := _q.withSupplier; query != nil {
 		if err := _q.loadSupplier(ctx, query, nodes, nil,
 			func(n *PurchaseOrder, e *Supplier) { n.Edges.Supplier = e }); err != nil {
@@ -446,6 +489,38 @@ func (_q *PurchaseOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 	return nodes, nil
 }
 
+func (_q *PurchaseOrderQuery) loadEngineeringMaterialRequest(ctx context.Context, query *EngineeringMaterialRequestQuery, nodes []*PurchaseOrder, init func(*PurchaseOrder), assign func(*PurchaseOrder, *EngineeringMaterialRequest)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*PurchaseOrder)
+	for i := range nodes {
+		if nodes[i].EngineeringMaterialRequestID == nil {
+			continue
+		}
+		fk := *nodes[i].EngineeringMaterialRequestID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(engineeringmaterialrequest.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "engineering_material_request_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 func (_q *PurchaseOrderQuery) loadSupplier(ctx context.Context, query *SupplierQuery, nodes []*PurchaseOrder, init func(*PurchaseOrder), assign func(*PurchaseOrder, *Supplier)) error {
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*PurchaseOrder)
@@ -530,6 +605,9 @@ func (_q *PurchaseOrderQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != purchaseorder.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withEngineeringMaterialRequest != nil {
+			_spec.Node.AddColumnOnce(purchaseorder.FieldEngineeringMaterialRequestID)
 		}
 		if _q.withSupplier != nil {
 			_spec.Node.AddColumnOnce(purchaseorder.FieldSupplierID)

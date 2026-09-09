@@ -59,6 +59,8 @@ func masterDataFilterFromParams(pm map[string]any) biz.MasterDataFilter {
 		supplierTypes = append(supplierTypes, supplierType)
 	}
 	return biz.MasterDataFilter{
+		StockCategory:  getString(pm, "stock_category"),
+		WarehouseTypes: getStringSlice(pm, "warehouse_types"),
 		Keyword:        getString(pm, "keyword"),
 		ActiveOnly:     getBool(pm, "active_only", false),
 		LifecycleScope: getString(pm, "lifecycle_scope"),
@@ -69,6 +71,9 @@ func masterDataFilterFromParams(pm map[string]any) biz.MasterDataFilter {
 }
 
 func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := warehouseClassificationError(err); result != nil {
+		return result
+	}
 	l := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrDataScopeForbidden):
@@ -82,6 +87,8 @@ func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "供应商不存在"}
 	case errors.Is(err, biz.ErrMaterialNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "材料不存在"}
+	case errors.Is(err, biz.ErrMaterialIdentityConflict):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "物料编号或厂商、料号、色号组合已存在，请选择已有物料"}
 	case errors.Is(err, biz.ErrProcessNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "工序不存在"}
 	case errors.Is(err, biz.ErrProductSKUNotFound):

@@ -116,7 +116,9 @@ func TestSalesOrderRepoListProjectsItemCountsWithOneGroupedQuery(t *testing.T) {
 		counts[order.ID] = order.ItemCount
 	}
 	assertSourceDocumentItemCounts(t, counts, map[int]int{first.ID: 2, second.ID: 0})
-	assertBoundedItemCountListQueries(t, capture, "sales order")
+	if got := capture.selectCount(); got != 4 {
+		t.Fatalf("sales order list must batch counts and engineering review status with four queries, got %d", got)
+	}
 }
 
 func TestPurchaseOrderRepoListProjectsItemCountsWithOneGroupedQuery(t *testing.T) {

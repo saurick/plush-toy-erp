@@ -67,7 +67,7 @@ func TestInventoryRepo_ApplyTxnUpdatesBalances(t *testing.T) {
 	productIn, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       mustDecimal(t, "3.25"),

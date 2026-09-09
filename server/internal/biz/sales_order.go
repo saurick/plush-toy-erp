@@ -82,27 +82,42 @@ type SalesOrder struct {
 	UpdatedAt           time.Time
 	// ItemCount is populated only by the list read model. Nil means the
 	// repository did not load the detail count for this response.
-	ItemCount *int
+	ItemCount                 *int
+	EngineeringMaterialStatus *string
 }
 
 type SalesOrderItem struct {
-	ID                  int
-	SalesOrderID        int
-	LineNo              int
-	ProductID           int
-	ProductSkuID        *int
-	UnitID              int
-	ProductCodeSnapshot *string
-	ProductNameSnapshot *string
-	ColorSnapshot       *string
-	OrderedQuantity     decimal.Decimal
-	UnitPrice           *decimal.Decimal
-	Amount              *decimal.Decimal
-	PlannedDeliveryDate *time.Time
-	LineStatus          string
-	Note                *string
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	ID                        int
+	SalesOrderID              int
+	LineNo                    int
+	ProductID                 int
+	RequestedProductName      *string
+	CustomerProductNo         *string
+	OrderCategory             string
+	PreShipmentSampleQuantity decimal.Decimal
+	ShippedQuantity           *decimal.Decimal
+	UnshippedQuantity         *decimal.Decimal
+	ProcessRequirement        *string
+	SampleBOMID               *int
+	EngineeringStatus         string
+	SampleNote                *string
+	SampleConfirmedAt         *time.Time
+	SampleConfirmedBy         *int
+	Designer                  *string
+	ProductImageAttachmentID  *int
+	ProductSkuID              *int
+	UnitID                    int
+	ProductCodeSnapshot       *string
+	ProductNameSnapshot       *string
+	ColorSnapshot             *string
+	OrderedQuantity           decimal.Decimal
+	UnitPrice                 *decimal.Decimal
+	Amount                    *decimal.Decimal
+	PlannedDeliveryDate       *time.Time
+	LineStatus                string
+	Note                      *string
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
 }
 
 type SalesOrderMutation struct {
@@ -131,19 +146,24 @@ type SalesOrderMutation struct {
 }
 
 type SalesOrderItemMutation struct {
-	SalesOrderID        int
-	LineNo              int
-	ProductID           int
-	ProductSkuID        *int
-	UnitID              int
-	ProductCodeSnapshot *string
-	ProductNameSnapshot *string
-	ColorSnapshot       *string
-	OrderedQuantity     decimal.Decimal
-	UnitPrice           *decimal.Decimal
-	Amount              *decimal.Decimal
-	PlannedDeliveryDate *time.Time
-	Note                *string
+	SalesOrderID              int
+	LineNo                    int
+	ProductID                 int
+	RequestedProductName      *string
+	CustomerProductNo         *string
+	OrderCategory             string
+	PreShipmentSampleQuantity decimal.Decimal
+	ProcessRequirement        *string
+	ProductSkuID              *int
+	UnitID                    int
+	ProductCodeSnapshot       *string
+	ProductNameSnapshot       *string
+	ColorSnapshot             *string
+	OrderedQuantity           decimal.Decimal
+	UnitPrice                 *decimal.Decimal
+	Amount                    *decimal.Decimal
+	PlannedDeliveryDate       *time.Time
+	Note                      *string
 }
 
 type SalesOrderItemSaveMutation struct {
@@ -581,12 +601,14 @@ func (uc *SalesOrderUsecase) openSalesOrder(ctx context.Context, id int) (*Sales
 }
 
 func (uc *SalesOrderUsecase) validateProductAndUnitActive(ctx context.Context, productID int, productSkuID *int, unitID int) error {
-	productActive, err := uc.repo.ProductIsActive(ctx, productID)
-	if err != nil {
-		return err
-	}
-	if !productActive {
-		return ErrProductInactive
+	if productID > 0 {
+		productActive, err := uc.repo.ProductIsActive(ctx, productID)
+		if err != nil {
+			return err
+		}
+		if !productActive {
+			return ErrProductInactive
+		}
 	}
 	if productSkuID != nil {
 		active, err := uc.repo.ProductSKUIsActiveForProduct(ctx, *productSkuID, productID)
@@ -660,6 +682,25 @@ func normalizeSalesOrderItemMutation(in SalesOrderItemMutation) (SalesOrderItemM
 }
 
 func normalizeSalesOrderItemFields(in SalesOrderItemMutation) (SalesOrderItemMutation, error) {
+	in.RequestedProductName = normalizeOptionalString(in.RequestedProductName)
+	in.CustomerProductNo = normalizeOptionalString(in.CustomerProductNo)
+	in.ProcessRequirement = normalizeOptionalString(in.ProcessRequirement)
+	in.OrderCategory = strings.ToUpper(strings.TrimSpace(in.OrderCategory))
+	if in.OrderCategory == "" {
+		in.OrderCategory = "NEW"
+	}
+	if in.OrderCategory != "NEW" && in.OrderCategory != "REPEAT" {
+		return SalesOrderItemMutation{}, ErrBadParam
+	}
+	if in.PreShipmentSampleQuantity.IsNegative() || !in.PreShipmentSampleQuantity.Equal(in.PreShipmentSampleQuantity.Truncate(6)) || in.OrderedQuantity.Add(in.PreShipmentSampleQuantity).GreaterThan(maxPositiveNumeric20Scale6) {
+		return SalesOrderItemMutation{}, ErrBadParam
+	}
+	if in.ProductID == 0 {
+		if in.RequestedProductName == nil || in.ProductSkuID != nil {
+			return SalesOrderItemMutation{}, ErrBadParam
+		}
+		in.ProductCodeSnapshot, in.ProductNameSnapshot, in.ColorSnapshot = nil, nil, nil
+	}
 	in.ProductCodeSnapshot = normalizeOptionalString(in.ProductCodeSnapshot)
 	in.ProductNameSnapshot = normalizeOptionalString(in.ProductNameSnapshot)
 	in.ColorSnapshot = normalizeOptionalString(in.ColorSnapshot)
@@ -667,7 +708,7 @@ func normalizeSalesOrderItemFields(in SalesOrderItemMutation) (SalesOrderItemMut
 	if in.ProductSkuID != nil && *in.ProductSkuID <= 0 {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}
-	if in.SalesOrderID < 0 || in.LineNo <= 0 || in.ProductID <= 0 || in.UnitID <= 0 {
+	if in.SalesOrderID < 0 || in.LineNo <= 0 || in.ProductID < 0 || in.UnitID <= 0 {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}
 	if _, err := value.NewPositiveQuantity(in.OrderedQuantity); err != nil {

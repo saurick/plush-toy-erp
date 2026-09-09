@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/supplier"
 	"time"
 
@@ -20,6 +21,48 @@ type OutsourcingOrderCreate struct {
 	config
 	mutation *OutsourcingOrderMutation
 	hooks    []Hook
+}
+
+// SetSourceWipBatchID sets the "source_wip_batch_id" field.
+func (_c *OutsourcingOrderCreate) SetSourceWipBatchID(v int) *OutsourcingOrderCreate {
+	_c.mutation.SetSourceWipBatchID(v)
+	return _c
+}
+
+// SetNillableSourceWipBatchID sets the "source_wip_batch_id" field if the given value is not nil.
+func (_c *OutsourcingOrderCreate) SetNillableSourceWipBatchID(v *int) *OutsourcingOrderCreate {
+	if v != nil {
+		_c.SetSourceWipBatchID(*v)
+	}
+	return _c
+}
+
+// SetSourceWipIntentHash sets the "source_wip_intent_hash" field.
+func (_c *OutsourcingOrderCreate) SetSourceWipIntentHash(v string) *OutsourcingOrderCreate {
+	_c.mutation.SetSourceWipIntentHash(v)
+	return _c
+}
+
+// SetNillableSourceWipIntentHash sets the "source_wip_intent_hash" field if the given value is not nil.
+func (_c *OutsourcingOrderCreate) SetNillableSourceWipIntentHash(v *string) *OutsourcingOrderCreate {
+	if v != nil {
+		_c.SetSourceWipIntentHash(*v)
+	}
+	return _c
+}
+
+// SetSourceWipPreparedBy sets the "source_wip_prepared_by" field.
+func (_c *OutsourcingOrderCreate) SetSourceWipPreparedBy(v int) *OutsourcingOrderCreate {
+	_c.mutation.SetSourceWipPreparedBy(v)
+	return _c
+}
+
+// SetNillableSourceWipPreparedBy sets the "source_wip_prepared_by" field if the given value is not nil.
+func (_c *OutsourcingOrderCreate) SetNillableSourceWipPreparedBy(v *int) *OutsourcingOrderCreate {
+	if v != nil {
+		_c.SetSourceWipPreparedBy(*v)
+	}
+	return _c
 }
 
 // SetOutsourcingOrderNo sets the "outsourcing_order_no" field.
@@ -248,6 +291,11 @@ func (_c *OutsourcingOrderCreate) SetNillableUpdatedAt(v *time.Time) *Outsourcin
 	return _c
 }
 
+// SetSourceWipBatch sets the "source_wip_batch" edge to the ProductionWIPBatch entity.
+func (_c *OutsourcingOrderCreate) SetSourceWipBatch(v *ProductionWIPBatch) *OutsourcingOrderCreate {
+	return _c.SetSourceWipBatchID(v.ID)
+}
+
 // SetSupplier sets the "supplier" edge to the Supplier entity.
 func (_c *OutsourcingOrderCreate) SetSupplier(v *Supplier) *OutsourcingOrderCreate {
 	return _c.SetSupplierID(v.ID)
@@ -327,6 +375,21 @@ func (_c *OutsourcingOrderCreate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *OutsourcingOrderCreate) check() error {
+	if v, ok := _c.mutation.SourceWipBatchID(); ok {
+		if err := outsourcingorder.SourceWipBatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_wip_batch_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SourceWipIntentHash(); ok {
+		if err := outsourcingorder.SourceWipIntentHashValidator(v); err != nil {
+			return &ValidationError{Name: "source_wip_intent_hash", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_wip_intent_hash": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SourceWipPreparedBy(); ok {
+		if err := outsourcingorder.SourceWipPreparedByValidator(v); err != nil {
+			return &ValidationError{Name: "source_wip_prepared_by", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_wip_prepared_by": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.OutsourcingOrderNo(); !ok {
 		return &ValidationError{Name: "outsourcing_order_no", err: errors.New(`ent: missing required field "OutsourcingOrder.outsourcing_order_no"`)}
 	}
@@ -440,6 +503,14 @@ func (_c *OutsourcingOrderCreate) createSpec() (*OutsourcingOrder, *sqlgraph.Cre
 		_node = &OutsourcingOrder{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(outsourcingorder.Table, sqlgraph.NewFieldSpec(outsourcingorder.FieldID, field.TypeInt))
 	)
+	if value, ok := _c.mutation.SourceWipIntentHash(); ok {
+		_spec.SetField(outsourcingorder.FieldSourceWipIntentHash, field.TypeString, value)
+		_node.SourceWipIntentHash = &value
+	}
+	if value, ok := _c.mutation.SourceWipPreparedBy(); ok {
+		_spec.SetField(outsourcingorder.FieldSourceWipPreparedBy, field.TypeInt, value)
+		_node.SourceWipPreparedBy = &value
+	}
 	if value, ok := _c.mutation.OutsourcingOrderNo(); ok {
 		_spec.SetField(outsourcingorder.FieldOutsourcingOrderNo, field.TypeString, value)
 		_node.OutsourcingOrderNo = value
@@ -511,6 +582,23 @@ func (_c *OutsourcingOrderCreate) createSpec() (*OutsourcingOrder, *sqlgraph.Cre
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(outsourcingorder.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := _c.mutation.SourceWipBatchIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingorder.SourceWipBatchTable,
+			Columns: []string{outsourcingorder.SourceWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.SourceWipBatchID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.SupplierIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

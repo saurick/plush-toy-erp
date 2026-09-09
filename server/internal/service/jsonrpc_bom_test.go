@@ -52,16 +52,15 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 		"hair_direction":  "单方向",
 		"note":            "首版工程资料",
 		"items": []any{map[string]any{
-			"material_id":               float64(fixtures.materialID),
-			"quantity":                  "1.25",
-			"unit_id":                   float64(fixtures.unitID),
-			"loss_rate":                 "0.10",
-			"position":                  "面料",
-			"piece_count":               "2",
-			"total_usage_snapshot":      "378.75",
-			"process_base":              "布底贴12g纸朴",
-			"process_method":            "热裁",
-			"production_operation_code": biz.ProductionWIPOperationFabricProcessing,
+			"material_id":          float64(fixtures.materialID),
+			"quantity":             "1.25",
+			"unit_id":              float64(fixtures.unitID),
+			"loss_rate":            "0.10",
+			"position":             "面料",
+			"piece_count":          "2",
+			"total_usage_snapshot": "378.75",
+			"process_base":         "布底贴12g纸朴",
+			"process_method":       "热裁",
 		}},
 	}))
 	if err != nil {
@@ -89,7 +88,7 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected aggregate item map, got %#v", items[0])
 	}
-	if item["piece_count"] != "2" || item["process_method"] != "热裁" || item["production_operation_code"] != biz.ProductionWIPOperationFabricProcessing {
+	if item["piece_count"] != "2" || item["process_method"] != "热裁" {
 		t.Fatalf("expected engineering item fields in BOM item, got %#v", item)
 	}
 	if editVersion, ok := draft["edit_version"].(float64); !ok || editVersion <= 0 {

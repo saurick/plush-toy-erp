@@ -56,8 +56,8 @@ test('business chain catalog covers every business machine and process variant',
     new Set(catalog.businessChainCoverage.overviewChainKeys),
     new Set(EXPECTED_CHAIN_KEYS)
   )
-  assert.equal(catalog.businessChainCoverage.requiredMachineKeys.length, 27)
-  assert.equal(catalog.businessChainCoverage.coveredMachineKeys.length, 27)
+  assert.equal(catalog.businessChainCoverage.requiredMachineKeys.length, 29)
+  assert.equal(catalog.businessChainCoverage.coveredMachineKeys.length, 29)
   assert.deepEqual(
     new Set(catalog.businessChainCoverage.requiredMachineKeys),
     new Set(catalog.businessChainCoverage.coveredMachineKeys)

@@ -5,7 +5,9 @@ package ent
 import (
 	"fmt"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
+	"server/internal/data/model/ent/warehouse"
 	"strings"
 	"time"
 
@@ -22,10 +24,16 @@ type Material struct {
 	Code string `json:"code,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
+	// SupplierID holds the value of the "supplier_id" field.
+	SupplierID *int `json:"supplier_id,omitempty"`
 	// SupplierItemNo holds the value of the "supplier_item_no" field.
 	SupplierItemNo *string `json:"supplier_item_no,omitempty"`
 	// Category holds the value of the "category" field.
 	Category *string `json:"category,omitempty"`
+	// StockCategory holds the value of the "stock_category" field.
+	StockCategory string `json:"stock_category,omitempty"`
+	// DefaultWarehouseID holds the value of the "default_warehouse_id" field.
+	DefaultWarehouseID *int `json:"default_warehouse_id,omitempty"`
 	// Spec holds the value of the "spec" field.
 	Spec *string `json:"spec,omitempty"`
 	// Color holds the value of the "color" field.
@@ -46,6 +54,10 @@ type Material struct {
 
 // MaterialEdges holds the relations/edges for other nodes in the graph.
 type MaterialEdges struct {
+	// DefaultWarehouse holds the value of the default_warehouse edge.
+	DefaultWarehouse *Warehouse `json:"default_warehouse,omitempty"`
+	// Supplier holds the value of the supplier edge.
+	Supplier *Supplier `json:"supplier,omitempty"`
 	// DefaultUnit holds the value of the default_unit edge.
 	DefaultUnit *Unit `json:"default_unit,omitempty"`
 	// BomItems holds the value of the bom_items edge.
@@ -66,7 +78,29 @@ type MaterialEdges struct {
 	OutsourcingOrderItems []*OutsourcingOrderItem `json:"outsourcing_order_items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [9]bool
+	loadedTypes [11]bool
+}
+
+// DefaultWarehouseOrErr returns the DefaultWarehouse value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e MaterialEdges) DefaultWarehouseOrErr() (*Warehouse, error) {
+	if e.DefaultWarehouse != nil {
+		return e.DefaultWarehouse, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: warehouse.Label}
+	}
+	return nil, &NotLoadedError{edge: "default_warehouse"}
+}
+
+// SupplierOrErr returns the Supplier value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e MaterialEdges) SupplierOrErr() (*Supplier, error) {
+	if e.Supplier != nil {
+		return e.Supplier, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: supplier.Label}
+	}
+	return nil, &NotLoadedError{edge: "supplier"}
 }
 
 // DefaultUnitOrErr returns the DefaultUnit value or an error if the edge
@@ -74,7 +108,7 @@ type MaterialEdges struct {
 func (e MaterialEdges) DefaultUnitOrErr() (*Unit, error) {
 	if e.DefaultUnit != nil {
 		return e.DefaultUnit, nil
-	} else if e.loadedTypes[0] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: unit.Label}
 	}
 	return nil, &NotLoadedError{edge: "default_unit"}
@@ -83,7 +117,7 @@ func (e MaterialEdges) DefaultUnitOrErr() (*Unit, error) {
 // BomItemsOrErr returns the BomItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) BomItemsOrErr() ([]*BOMItem, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[3] {
 		return e.BomItems, nil
 	}
 	return nil, &NotLoadedError{edge: "bom_items"}
@@ -92,7 +126,7 @@ func (e MaterialEdges) BomItemsOrErr() ([]*BOMItem, error) {
 // ProductionOrderMaterialRequirementsOrErr returns the ProductionOrderMaterialRequirements value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) ProductionOrderMaterialRequirementsOrErr() ([]*ProductionOrderMaterialRequirement, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[4] {
 		return e.ProductionOrderMaterialRequirements, nil
 	}
 	return nil, &NotLoadedError{edge: "production_order_material_requirements"}
@@ -101,7 +135,7 @@ func (e MaterialEdges) ProductionOrderMaterialRequirementsOrErr() ([]*Production
 // PurchaseOrderItemsOrErr returns the PurchaseOrderItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) PurchaseOrderItemsOrErr() ([]*PurchaseOrderItem, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[5] {
 		return e.PurchaseOrderItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_order_items"}
@@ -110,7 +144,7 @@ func (e MaterialEdges) PurchaseOrderItemsOrErr() ([]*PurchaseOrderItem, error) {
 // PurchaseReceiptItemsOrErr returns the PurchaseReceiptItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) PurchaseReceiptItemsOrErr() ([]*PurchaseReceiptItem, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[6] {
 		return e.PurchaseReceiptItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_items"}
@@ -119,7 +153,7 @@ func (e MaterialEdges) PurchaseReceiptItemsOrErr() ([]*PurchaseReceiptItem, erro
 // PurchaseReturnItemsOrErr returns the PurchaseReturnItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnItem, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[7] {
 		return e.PurchaseReturnItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_return_items"}
@@ -128,7 +162,7 @@ func (e MaterialEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnItem, error)
 // PurchaseReceiptAdjustmentItemsOrErr returns the PurchaseReceiptAdjustmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseReceiptAdjustmentItem, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[8] {
 		return e.PurchaseReceiptAdjustmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_adjustment_items"}
@@ -137,7 +171,7 @@ func (e MaterialEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseReceipt
 // QualityInspectionsOrErr returns the QualityInspections value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[9] {
 		return e.QualityInspections, nil
 	}
 	return nil, &NotLoadedError{edge: "quality_inspections"}
@@ -146,7 +180,7 @@ func (e MaterialEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
 // OutsourcingOrderItemsOrErr returns the OutsourcingOrderItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) OutsourcingOrderItemsOrErr() ([]*OutsourcingOrderItem, error) {
-	if e.loadedTypes[8] {
+	if e.loadedTypes[10] {
 		return e.OutsourcingOrderItems, nil
 	}
 	return nil, &NotLoadedError{edge: "outsourcing_order_items"}
@@ -159,9 +193,9 @@ func (*Material) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case material.FieldIsActive:
 			values[i] = new(sql.NullBool)
-		case material.FieldID, material.FieldDefaultUnitID:
+		case material.FieldID, material.FieldSupplierID, material.FieldDefaultWarehouseID, material.FieldDefaultUnitID:
 			values[i] = new(sql.NullInt64)
-		case material.FieldCode, material.FieldName, material.FieldSupplierItemNo, material.FieldCategory, material.FieldSpec, material.FieldColor:
+		case material.FieldCode, material.FieldName, material.FieldSupplierItemNo, material.FieldCategory, material.FieldStockCategory, material.FieldSpec, material.FieldColor:
 			values[i] = new(sql.NullString)
 		case material.FieldCreatedAt, material.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -198,6 +232,13 @@ func (_m *Material) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Name = value.String
 			}
+		case material.FieldSupplierID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field supplier_id", values[i])
+			} else if value.Valid {
+				_m.SupplierID = new(int)
+				*_m.SupplierID = int(value.Int64)
+			}
 		case material.FieldSupplierItemNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field supplier_item_no", values[i])
@@ -211,6 +252,19 @@ func (_m *Material) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Category = new(string)
 				*_m.Category = value.String
+			}
+		case material.FieldStockCategory:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field stock_category", values[i])
+			} else if value.Valid {
+				_m.StockCategory = value.String
+			}
+		case material.FieldDefaultWarehouseID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field default_warehouse_id", values[i])
+			} else if value.Valid {
+				_m.DefaultWarehouseID = new(int)
+				*_m.DefaultWarehouseID = int(value.Int64)
 			}
 		case material.FieldSpec:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -261,6 +315,16 @@ func (_m *Material) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (_m *Material) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
+}
+
+// QueryDefaultWarehouse queries the "default_warehouse" edge of the Material entity.
+func (_m *Material) QueryDefaultWarehouse() *WarehouseQuery {
+	return NewMaterialClient(_m.config).QueryDefaultWarehouse(_m)
+}
+
+// QuerySupplier queries the "supplier" edge of the Material entity.
+func (_m *Material) QuerySupplier() *SupplierQuery {
+	return NewMaterialClient(_m.config).QuerySupplier(_m)
 }
 
 // QueryDefaultUnit queries the "default_unit" edge of the Material entity.
@@ -337,6 +401,11 @@ func (_m *Material) String() string {
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)
 	builder.WriteString(", ")
+	if v := _m.SupplierID; v != nil {
+		builder.WriteString("supplier_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	if v := _m.SupplierItemNo; v != nil {
 		builder.WriteString("supplier_item_no=")
 		builder.WriteString(*v)
@@ -345,6 +414,14 @@ func (_m *Material) String() string {
 	if v := _m.Category; v != nil {
 		builder.WriteString("category=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("stock_category=")
+	builder.WriteString(_m.StockCategory)
+	builder.WriteString(", ")
+	if v := _m.DefaultWarehouseID; v != nil {
+		builder.WriteString("default_warehouse_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	if v := _m.Spec; v != nil {

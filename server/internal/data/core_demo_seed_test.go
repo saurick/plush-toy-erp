@@ -45,10 +45,10 @@ func TestDefaultCoreDemoReferenceSeedDatasetIsExact(t *testing.T) {
 			{Code: "YS6-DW-11", Name: "块", Precision: 0},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
-			{Code: "YS6-CK-01", Name: "原料仓", Type: "RAW_MATERIAL"},
+			{Code: "YS6-CK-01", Name: "原料仓", Type: "MATERIAL"},
 			{Code: "YS6-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
-			{Code: "YS6-CK-03", Name: "待检仓", Type: "QC_HOLD"},
-			{Code: "YS6-CK-04", Name: "在制仓", Type: "WORK_IN_PROCESS"},
+			{Code: "YS6-CK-03", Name: "待检仓", Type: "MATERIAL"},
+			{Code: "YS6-CK-04", Name: "在制仓", Type: "MATERIAL"},
 		},
 	}
 	got := DefaultCoreDemoReferenceSeedDataset()
@@ -470,7 +470,7 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 			{Code: "SIM-TEST-PCS", Name: "件", Precision: 0},
 		},
 		Materials: []CoreDemoMaterialSeed{
-			{Code: "SIM-TEST-MAT", Name: "演示材料", Category: "fabric", DefaultUnitCode: "SIM-TEST-PCS"},
+			{Code: "SIM-TEST-MAT", Name: "演示材料", Category: "fabric", StockCategory: "MAIN", DefaultUnitCode: "SIM-TEST-PCS"},
 		},
 		Products: []CoreDemoProductSeed{
 			{Code: "SIM-TEST-PROD", Name: "演示产品", StyleNo: "SIM-TEST-STYLE", DefaultUnitCode: "SIM-TEST-PCS"},
@@ -498,7 +498,7 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 		WithArgs("SIM-TEST-PCS", "件", 0).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
 	mock.ExpectQuery("INSERT INTO materials").
-		WithArgs("SIM-TEST-MAT", "演示材料", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), 11).
+		WithArgs("SIM-TEST-MAT", "演示材料", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), 11, "MAIN").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21))
 	mock.ExpectQuery("INSERT INTO products").
 		WithArgs("SIM-TEST-PROD", "演示产品", sqlmock.AnyArg(), sqlmock.AnyArg(), 11).
@@ -516,7 +516,7 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 		WithArgs(51, 21).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectExec("INSERT INTO bom_items").
-		WithArgs(51, 21, "1.000000", 11, "0.000000", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(51, 21, "1.000000", 11, "0.000000", sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(61, 1))
 	mock.ExpectCommit()
 	mock.ExpectClose()

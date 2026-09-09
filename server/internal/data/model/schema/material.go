@@ -5,6 +5,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -22,6 +23,7 @@ func (Material) Fields() []ent.Field {
 		field.String("name").
 			NotEmpty().
 			MaxLen(255),
+		field.Int("supplier_id").Optional().Nillable().Positive(),
 		field.String("supplier_item_no").
 			Optional().
 			Nillable().
@@ -30,6 +32,8 @@ func (Material) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(64),
+		field.String("stock_category").Default("UNCLASSIFIED").MaxLen(32),
+		field.Int("default_warehouse_id").Optional().Nillable().Positive(),
 		field.String("spec").
 			Optional().
 			Nillable().
@@ -53,6 +57,10 @@ func (Material) Fields() []ent.Field {
 
 func (Material) Edges() []ent.Edge {
 	return []ent.Edge{
+		edge.To("default_warehouse", Warehouse.Type).Field("default_warehouse_id").Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("supplier", Supplier.Type).Field("supplier_id").Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("default_unit", Unit.Type).
 			Ref("materials").
 			Field("default_unit_id").
@@ -75,7 +83,18 @@ func (Material) Edges() []ent.Edge {
 func (Material) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("code").Unique(),
+		index.Fields("supplier_id", "supplier_item_no", "color").Unique().
+			Annotations(entsql.IndexWhere("supplier_id IS NOT NULL AND supplier_item_no IS NOT NULL AND color IS NOT NULL")),
+		index.Fields("supplier_id", "supplier_item_no").Unique().
+			Annotations(entsql.IndexWhere("supplier_id IS NOT NULL AND supplier_item_no IS NOT NULL AND color IS NULL")),
 		index.Fields("category"),
+		index.Fields("stock_category"),
 		index.Fields("name"),
 	}
+}
+
+func (Material) Annotations() []schema.Annotation {
+	return []schema.Annotation{entsql.Annotation{Checks: map[string]string{
+		"materials_stock_category_check": "stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')",
+	}}}
 }

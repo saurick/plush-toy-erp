@@ -316,7 +316,6 @@ func createBOMSaveItem(ctx context.Context, tx *ent.Tx, headerID int, item *biz.
 		SetNillableTotalUsageSnapshot(item.TotalUsageSnapshot).
 		SetNillableProcessBase(item.ProcessBase).
 		SetNillableProcessMethod(item.ProcessMethod).
-		SetNillableProductionOperationCode(item.ProductionOperationCode).
 		SetNillableNote(item.Note).
 		Save(ctx)
 }
@@ -346,11 +345,6 @@ func applyBOMItemOptionalUpdate(update *ent.BOMItemUpdate, in *biz.BOMItemUpdate
 		update.ClearProcessMethod()
 	} else {
 		update.SetProcessMethod(*in.ProcessMethod)
-	}
-	if in.ProductionOperationCode == nil {
-		update.ClearProductionOperationCode()
-	} else {
-		update.SetProductionOperationCode(*in.ProductionOperationCode)
 	}
 	if in.Note == nil {
 		update.ClearNote()

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
@@ -27,6 +28,26 @@ type PurchaseOrderUpdate struct {
 // Where appends a list predicates to the PurchaseOrderUpdate builder.
 func (_u *PurchaseOrderUpdate) Where(ps ...predicate.PurchaseOrder) *PurchaseOrderUpdate {
 	_u.mutation.Where(ps...)
+	return _u
+}
+
+// SetEngineeringMaterialRequestID sets the "engineering_material_request_id" field.
+func (_u *PurchaseOrderUpdate) SetEngineeringMaterialRequestID(v int) *PurchaseOrderUpdate {
+	_u.mutation.SetEngineeringMaterialRequestID(v)
+	return _u
+}
+
+// SetNillableEngineeringMaterialRequestID sets the "engineering_material_request_id" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableEngineeringMaterialRequestID(v *int) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetEngineeringMaterialRequestID(*v)
+	}
+	return _u
+}
+
+// ClearEngineeringMaterialRequestID clears the value of the "engineering_material_request_id" field.
+func (_u *PurchaseOrderUpdate) ClearEngineeringMaterialRequestID() *PurchaseOrderUpdate {
+	_u.mutation.ClearEngineeringMaterialRequestID()
 	return _u
 }
 
@@ -445,6 +466,11 @@ func (_u *PurchaseOrderUpdate) SetUpdatedAt(v time.Time) *PurchaseOrderUpdate {
 	return _u
 }
 
+// SetEngineeringMaterialRequest sets the "engineering_material_request" edge to the EngineeringMaterialRequest entity.
+func (_u *PurchaseOrderUpdate) SetEngineeringMaterialRequest(v *EngineeringMaterialRequest) *PurchaseOrderUpdate {
+	return _u.SetEngineeringMaterialRequestID(v.ID)
+}
+
 // SetSupplier sets the "supplier" edge to the Supplier entity.
 func (_u *PurchaseOrderUpdate) SetSupplier(v *Supplier) *PurchaseOrderUpdate {
 	return _u.SetSupplierID(v.ID)
@@ -468,6 +494,12 @@ func (_u *PurchaseOrderUpdate) AddItems(v ...*PurchaseOrderItem) *PurchaseOrderU
 // Mutation returns the PurchaseOrderMutation object of the builder.
 func (_u *PurchaseOrderUpdate) Mutation() *PurchaseOrderMutation {
 	return _u.mutation
+}
+
+// ClearEngineeringMaterialRequest clears the "engineering_material_request" edge to the EngineeringMaterialRequest entity.
+func (_u *PurchaseOrderUpdate) ClearEngineeringMaterialRequest() *PurchaseOrderUpdate {
+	_u.mutation.ClearEngineeringMaterialRequest()
+	return _u
 }
 
 // ClearSupplier clears the "supplier" edge to the Supplier entity.
@@ -535,6 +567,11 @@ func (_u *PurchaseOrderUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *PurchaseOrderUpdate) check() error {
+	if v, ok := _u.mutation.EngineeringMaterialRequestID(); ok {
+		if err := purchaseorder.EngineeringMaterialRequestIDValidator(v); err != nil {
+			return &ValidationError{Name: "engineering_material_request_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.engineering_material_request_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.PurchaseOrderNo(); ok {
 		if err := purchaseorder.PurchaseOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "purchase_order_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.purchase_order_no": %w`, err)}
@@ -751,6 +788,35 @@ func (_u *PurchaseOrderUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(purchaseorder.FieldUpdatedAt, field.TypeTime, value)
 	}
+	if _u.mutation.EngineeringMaterialRequestCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   purchaseorder.EngineeringMaterialRequestTable,
+			Columns: []string{purchaseorder.EngineeringMaterialRequestColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(engineeringmaterialrequest.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.EngineeringMaterialRequestIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   purchaseorder.EngineeringMaterialRequestTable,
+			Columns: []string{purchaseorder.EngineeringMaterialRequestColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(engineeringmaterialrequest.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.SupplierCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -843,6 +909,26 @@ type PurchaseOrderUpdateOne struct {
 	fields   []string
 	hooks    []Hook
 	mutation *PurchaseOrderMutation
+}
+
+// SetEngineeringMaterialRequestID sets the "engineering_material_request_id" field.
+func (_u *PurchaseOrderUpdateOne) SetEngineeringMaterialRequestID(v int) *PurchaseOrderUpdateOne {
+	_u.mutation.SetEngineeringMaterialRequestID(v)
+	return _u
+}
+
+// SetNillableEngineeringMaterialRequestID sets the "engineering_material_request_id" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableEngineeringMaterialRequestID(v *int) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetEngineeringMaterialRequestID(*v)
+	}
+	return _u
+}
+
+// ClearEngineeringMaterialRequestID clears the value of the "engineering_material_request_id" field.
+func (_u *PurchaseOrderUpdateOne) ClearEngineeringMaterialRequestID() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearEngineeringMaterialRequestID()
+	return _u
 }
 
 // SetPurchaseOrderNo sets the "purchase_order_no" field.
@@ -1260,6 +1346,11 @@ func (_u *PurchaseOrderUpdateOne) SetUpdatedAt(v time.Time) *PurchaseOrderUpdate
 	return _u
 }
 
+// SetEngineeringMaterialRequest sets the "engineering_material_request" edge to the EngineeringMaterialRequest entity.
+func (_u *PurchaseOrderUpdateOne) SetEngineeringMaterialRequest(v *EngineeringMaterialRequest) *PurchaseOrderUpdateOne {
+	return _u.SetEngineeringMaterialRequestID(v.ID)
+}
+
 // SetSupplier sets the "supplier" edge to the Supplier entity.
 func (_u *PurchaseOrderUpdateOne) SetSupplier(v *Supplier) *PurchaseOrderUpdateOne {
 	return _u.SetSupplierID(v.ID)
@@ -1283,6 +1374,12 @@ func (_u *PurchaseOrderUpdateOne) AddItems(v ...*PurchaseOrderItem) *PurchaseOrd
 // Mutation returns the PurchaseOrderMutation object of the builder.
 func (_u *PurchaseOrderUpdateOne) Mutation() *PurchaseOrderMutation {
 	return _u.mutation
+}
+
+// ClearEngineeringMaterialRequest clears the "engineering_material_request" edge to the EngineeringMaterialRequest entity.
+func (_u *PurchaseOrderUpdateOne) ClearEngineeringMaterialRequest() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearEngineeringMaterialRequest()
+	return _u
 }
 
 // ClearSupplier clears the "supplier" edge to the Supplier entity.
@@ -1363,6 +1460,11 @@ func (_u *PurchaseOrderUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *PurchaseOrderUpdateOne) check() error {
+	if v, ok := _u.mutation.EngineeringMaterialRequestID(); ok {
+		if err := purchaseorder.EngineeringMaterialRequestIDValidator(v); err != nil {
+			return &ValidationError{Name: "engineering_material_request_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.engineering_material_request_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.PurchaseOrderNo(); ok {
 		if err := purchaseorder.PurchaseOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "purchase_order_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.purchase_order_no": %w`, err)}
@@ -1595,6 +1697,35 @@ func (_u *PurchaseOrderUpdateOne) sqlSave(ctx context.Context) (_node *PurchaseO
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(purchaseorder.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.EngineeringMaterialRequestCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   purchaseorder.EngineeringMaterialRequestTable,
+			Columns: []string{purchaseorder.EngineeringMaterialRequestColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(engineeringmaterialrequest.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.EngineeringMaterialRequestIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   purchaseorder.EngineeringMaterialRequestTable,
+			Columns: []string{purchaseorder.EngineeringMaterialRequestColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(engineeringmaterialrequest.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.SupplierCleared() {
 		edge := &sqlgraph.EdgeSpec{

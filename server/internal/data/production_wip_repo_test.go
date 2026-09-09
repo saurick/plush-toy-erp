@@ -167,27 +167,13 @@ func TestProductionWIPReleaseFreezesExactRouteAndRollsBackInvalidResolution(t *t
 		}
 	})
 
-	t.Run("rejects routed item without explicit fabric material ownership", func(t *testing.T) {
+	t.Run("production manager selects materials without engineering assignment", func(t *testing.T) {
 		ctx := context.Background()
-		f := openProductionOrderRepoTest(t, "production_wip_release_missing_fabric_owner")
+		f := openProductionOrderRepoTest(t, "production_wip_manager_selects_materials")
 		createProductionWIPRouteProcesses(t, ctx, f.client)
-		f.client.BOMItem.Update().ClearProductionOperationCode().SaveX(ctx)
-		route := biz.ProductionWIPRoutePlushSewHandV1
-		draft := f.draft("MO-WIP-MISSING-FABRIC-OWNER", 10)
-		draft.Items[0].RouteCode = &route
-		created, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: draft, ActorID: f.actorID, IdempotencyKey: "missing-owner-create"})
-		if err != nil {
-			t.Fatalf("create routed order: %v", err)
-		}
-		if _, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
-			ID: created.Order.ID, ExpectedVersion: created.Order.Version, ActorID: f.actorID, IdempotencyKey: "missing-owner-release",
-		}); !errors.Is(err, biz.ErrProductionWIPInvalidRoute) {
-			t.Fatalf("release error = %v", err)
-		}
-		if count := f.client.ProductionOrderMaterialRequirement.Query().Where(
-			productionordermaterialrequirement.ProductionOrderID(created.Order.ID),
-		).CountX(ctx); count != 0 {
-			t.Fatalf("rolled-back requirements = %d", count)
+		aggregate := releaseProductionWIPRoute(t, ctx, f, "MO-WIP-MANAGER-MATERIALS", 10, false)
+		if len(aggregate.MaterialRequirements) != 1 {
+			t.Fatal("engineering must not assign materials to outsourcing")
 		}
 	})
 
@@ -460,7 +446,7 @@ func TestProductionWIPExternalReturnCreatesFirstQualityDraftAndReplaysExactly(t 
 	}); !errors.Is(err, biz.ErrProductionWIPOutsourcingMaterialIssuePending) {
 		t.Fatalf("start before material issue error = %v", err)
 	}
-	warehouse := f.client.Warehouse.Create().SetCode("WIP-OUT-WH").SetName("外发仓").SetType("RAW").SetIsActive(true).SaveX(ctx)
+	warehouse := f.client.Warehouse.Create().SetCode("WIP-OUT-WH").SetName("外发仓").SetType("MATERIAL").SetIsActive(true).SaveX(ctx)
 	lot := f.client.InventoryLot.Create().SetSubjectType(biz.InventorySubjectMaterial).SetSubjectID(f.materialID).SetLotNo("WIP-OUT-LOT").SetStatus(biz.InventoryLotActive).SaveX(ctx)
 	logger := log.NewStdLogger(io.Discard)
 	inventoryRepo := NewInventoryRepo(f.data, logger)
@@ -548,14 +534,14 @@ func TestProductionWIPExternalReturnCreatesFirstQualityDraftAndReplaysExactly(t 
 	}
 }
 
-func TestProductionWIPFabricAllocationRequiresCompleteSingleContractMaterialCoverage(t *testing.T) {
+func TestProductionWIPFabricAllocationUsesManagerSelectionAndSingleContract(t *testing.T) {
 	ctx := context.Background()
-	f := openProductionOrderRepoTest(t, "production_wip_fabric_multi_material")
+	var secondMaterial *ent.Material
+	f := openProductionOrderRepoTest(t, "production_wip_fabric_multi_material", func(ctx context.Context, client *ent.Client, unitID, bomID int) {
+		secondMaterial = createTestMaterial(t, ctx, client, unitID, "POR-M-SECOND")
+		client.BOMItem.Create().SetBomHeaderID(bomID).SetMaterialID(secondMaterial.ID).SetQuantity(decimal.NewFromInt(1)).SetUnitID(unitID).SetLossRate(decimal.Zero).SaveX(ctx)
+	})
 	processes := createProductionWIPRouteProcesses(t, ctx, f.client)
-	secondMaterial := createTestMaterial(t, ctx, f.client, f.unitID, "POR-M-SECOND")
-	f.client.BOMItem.Create().SetBomHeaderID(f.bomID).SetMaterialID(secondMaterial.ID).
-		SetQuantity(decimal.NewFromInt(1)).SetUnitID(f.unitID).SetLossRate(decimal.Zero).
-		SetProductionOperationCode(biz.ProductionWIPOperationFabricProcessing).SaveX(ctx)
 	aggregate := releaseProductionWIPRoute(t, ctx, f, "MO-WIP-MULTI-MATERIAL", 10, false)
 	if len(aggregate.MaterialRequirements) != 2 {
 		t.Fatalf("material requirements = %#v", aggregate.MaterialRequirements)
@@ -580,15 +566,6 @@ func TestProductionWIPFabricAllocationRequiresCompleteSingleContractMaterialCove
 	root := aggregate.Batches[0]
 	if _, err := f.uc.AssignProductionWIPExecution(ctx, &biz.ProductionWIPAction{
 		ProductionOrderID: aggregate.ProductionOrderID, BatchID: root.ID, ExpectedVersion: root.Version,
-		ActorID: f.actorID, IdempotencyKey: "fabric-incomplete-allocation", ExecutionMode: biz.ProductionWIPExecutionOutsourced,
-		OutsourcingAllocations: []biz.ProductionWIPOutsourcingAllocationInput{{
-			OutsourcingOrderItemID: firstLine.ID, ProductionOrderMaterialRequirementID: &firstRequirement.ID,
-		}},
-	}); !errors.Is(err, biz.ErrProductionWIPOutsourcingAllocationInvalid) {
-		t.Fatalf("incomplete material coverage error = %v", err)
-	}
-	if _, err := f.uc.AssignProductionWIPExecution(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID, BatchID: root.ID, ExpectedVersion: root.Version,
 		ActorID: f.actorID, IdempotencyKey: "fabric-cross-contract-allocation", ExecutionMode: biz.ProductionWIPExecutionOutsourced,
 		OutsourcingAllocations: []biz.ProductionWIPOutsourcingAllocationInput{
 			{OutsourcingOrderItemID: firstLine.ID, ProductionOrderMaterialRequirementID: &firstRequirement.ID},
@@ -597,6 +574,11 @@ func TestProductionWIPFabricAllocationRequiresCompleteSingleContractMaterialCove
 	}); !errors.Is(err, biz.ErrProductionWIPOutsourcingAllocationInvalid) {
 		t.Fatalf("cross-contract material allocation error = %v", err)
 	}
+	assigned, err := f.uc.AssignProductionWIPExecution(ctx, &biz.ProductionWIPAction{ProductionOrderID: aggregate.ProductionOrderID, BatchID: root.ID, ExpectedVersion: root.Version, ActorID: f.actorID, IdempotencyKey: "manager-selected-one-material", ExecutionMode: biz.ProductionWIPExecutionOutsourced, OutsourcingAllocations: []biz.ProductionWIPOutsourcingAllocationInput{{OutsourcingOrderItemID: firstLine.ID, ProductionOrderMaterialRequirementID: &firstRequirement.ID}}})
+	if err != nil || len(assigned.OutsourcingAllocations) != 1 {
+		t.Fatalf("manager selected a subset: %v", err)
+	}
+
 }
 
 func TestProductionWIPSplitTransferReworkPackagingAndCompletionGate(t *testing.T) {

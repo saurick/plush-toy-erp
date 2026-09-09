@@ -82,6 +82,17 @@ function salesOrderStatusTag(status) {
   )
 }
 
+function engineeringMaterialStatusLabel(value) {
+  return (
+    {
+      SUBMITTED: '待老板审核',
+      BOSS_APPROVED: '待财务核价',
+      APPROVED: '已批准采购',
+      REJECTED: '已退回工程',
+    }[value] || '待工程提交'
+  )
+}
+
 function lineStatusTag(status) {
   const key = String(status || '').trim()
   return <Tag>{statusText(key, SALES_ORDER_ITEM_STATUS_LABELS)}</Tag>
@@ -232,8 +243,8 @@ export function buildSalesOrderColumns() {
       exportValue: formatPaymentCondition,
     },
     {
-      title: '签约日期',
-      exportTitle: '签约日期',
+      title: '下单日期',
+      exportTitle: '下单日期',
       dataIndex: 'order_date',
       width: 120,
       sorter: (a, b) => compareNumber(a?.order_date, b?.order_date),
@@ -263,6 +274,14 @@ export function buildSalesOrderColumns() {
         ),
       render: deliveryText,
       exportValue: (record) => deliveryText(record?.delivery_snapshot),
+    },
+    {
+      title: '用料审批',
+      dataIndex: 'engineering_material_status',
+      width: 150,
+      render: engineeringMaterialStatusLabel,
+      exportValue: (record) =>
+        engineeringMaterialStatusLabel(record.engineering_material_status),
     },
     {
       title: '状态',

@@ -32,6 +32,7 @@ func (PurchaseOrder) Annotations() []schema.Annotation {
 
 func (PurchaseOrder) Fields() []ent.Field {
 	return []ent.Field{
+		field.Int("engineering_material_request_id").Optional().Nillable().Positive(),
 		field.String("purchase_order_no").
 			NotEmpty().
 			MaxLen(64),
@@ -92,6 +93,7 @@ func (PurchaseOrder) Fields() []ent.Field {
 
 func (PurchaseOrder) Edges() []ent.Edge {
 	return []ent.Edge{
+		edge.To("engineering_material_request", EngineeringMaterialRequest.Type).Field("engineering_material_request_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("supplier", Supplier.Type).
 			Ref("purchase_orders").
 			Field("supplier_id").
@@ -103,6 +105,7 @@ func (PurchaseOrder) Edges() []ent.Edge {
 
 func (PurchaseOrder) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("engineering_material_request_id", "supplier_id").Unique(),
 		index.Fields("purchase_order_no").Unique(),
 		index.Fields("supplier_id"),
 		index.Fields("supplier_purchase_order_no"),

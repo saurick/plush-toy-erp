@@ -280,7 +280,7 @@ func TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven(t *t
 		FactNo:                 "QI-RPC-OUT-RETURN",
 		OutsourcingOrderID:     order.ID,
 		OutsourcingOrderItemID: line.ID,
-		WarehouseID:            fixtures.warehouseID,
+		WarehouseID:            fixtures.productWarehouseID,
 		LotID:                  &lot.ID,
 		Quantity:               decimal.NewFromInt(2),
 		IdempotencyKey:         "QI-RPC-OUT-RETURN",
@@ -438,7 +438,7 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact(t 
 		Items: []*biz.ShipmentItemCreate{
 			{
 				ProductID:   fixtures.productID,
-				WarehouseID: fixtures.warehouseID,
+				WarehouseID: fixtures.productWarehouseID,
 				UnitID:      fixtures.unitID,
 				LotID:       &lot.ID,
 				Quantity:    mustDecimal(t, "2"),
@@ -455,7 +455,7 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact(t 
 		"shipment_id":           float64(shipment.ID),
 		"finished_goods_lot_id": float64(lot.ID),
 		"product_id":            float64(fixtures.productID),
-		"warehouse_id":          float64(fixtures.warehouseID),
+		"warehouse_id":          float64(fixtures.productWarehouseID),
 		"decision_note":         "成品质检待判定",
 	}
 	_, createRes, err := j.handleQuality(adminCtx, "create_finished_goods_quality_inspection_draft", "fg-create", mustJSONRPCStruct(t, createParams))
@@ -658,7 +658,7 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionRequiresShipmentModuleE
 		},
 		Items: []*biz.ShipmentItemCreate{{
 			ProductID:   fixtures.productID,
-			WarehouseID: fixtures.warehouseID,
+			WarehouseID: fixtures.productWarehouseID,
 			UnitID:      fixtures.unitID,
 			LotID:       &lot.ID,
 			Quantity:    mustDecimal(t, "1"),
@@ -681,7 +681,7 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionRequiresShipmentModuleE
 		"shipment_id":           float64(shipment.ID),
 		"finished_goods_lot_id": float64(lot.ID),
 		"product_id":            float64(fixtures.productID),
-		"warehouse_id":          float64(fixtures.warehouseID),
+		"warehouse_id":          float64(fixtures.productWarehouseID),
 	}))
 	if err != nil || createRes == nil || createRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("read_only shipments must reject finished goods quality creation, res=%#v err=%v", createRes, err)

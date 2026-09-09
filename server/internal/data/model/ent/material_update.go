@@ -16,7 +16,9 @@ import (
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
+	"server/internal/data/model/ent/warehouse"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -65,6 +67,26 @@ func (_u *MaterialUpdate) SetNillableName(v *string) *MaterialUpdate {
 	return _u
 }
 
+// SetSupplierID sets the "supplier_id" field.
+func (_u *MaterialUpdate) SetSupplierID(v int) *MaterialUpdate {
+	_u.mutation.SetSupplierID(v)
+	return _u
+}
+
+// SetNillableSupplierID sets the "supplier_id" field if the given value is not nil.
+func (_u *MaterialUpdate) SetNillableSupplierID(v *int) *MaterialUpdate {
+	if v != nil {
+		_u.SetSupplierID(*v)
+	}
+	return _u
+}
+
+// ClearSupplierID clears the value of the "supplier_id" field.
+func (_u *MaterialUpdate) ClearSupplierID() *MaterialUpdate {
+	_u.mutation.ClearSupplierID()
+	return _u
+}
+
 // SetSupplierItemNo sets the "supplier_item_no" field.
 func (_u *MaterialUpdate) SetSupplierItemNo(v string) *MaterialUpdate {
 	_u.mutation.SetSupplierItemNo(v)
@@ -102,6 +124,40 @@ func (_u *MaterialUpdate) SetNillableCategory(v *string) *MaterialUpdate {
 // ClearCategory clears the value of the "category" field.
 func (_u *MaterialUpdate) ClearCategory() *MaterialUpdate {
 	_u.mutation.ClearCategory()
+	return _u
+}
+
+// SetStockCategory sets the "stock_category" field.
+func (_u *MaterialUpdate) SetStockCategory(v string) *MaterialUpdate {
+	_u.mutation.SetStockCategory(v)
+	return _u
+}
+
+// SetNillableStockCategory sets the "stock_category" field if the given value is not nil.
+func (_u *MaterialUpdate) SetNillableStockCategory(v *string) *MaterialUpdate {
+	if v != nil {
+		_u.SetStockCategory(*v)
+	}
+	return _u
+}
+
+// SetDefaultWarehouseID sets the "default_warehouse_id" field.
+func (_u *MaterialUpdate) SetDefaultWarehouseID(v int) *MaterialUpdate {
+	_u.mutation.SetDefaultWarehouseID(v)
+	return _u
+}
+
+// SetNillableDefaultWarehouseID sets the "default_warehouse_id" field if the given value is not nil.
+func (_u *MaterialUpdate) SetNillableDefaultWarehouseID(v *int) *MaterialUpdate {
+	if v != nil {
+		_u.SetDefaultWarehouseID(*v)
+	}
+	return _u
+}
+
+// ClearDefaultWarehouseID clears the value of the "default_warehouse_id" field.
+func (_u *MaterialUpdate) ClearDefaultWarehouseID() *MaterialUpdate {
+	_u.mutation.ClearDefaultWarehouseID()
 	return _u
 }
 
@@ -177,6 +233,16 @@ func (_u *MaterialUpdate) SetNillableIsActive(v *bool) *MaterialUpdate {
 func (_u *MaterialUpdate) SetUpdatedAt(v time.Time) *MaterialUpdate {
 	_u.mutation.SetUpdatedAt(v)
 	return _u
+}
+
+// SetDefaultWarehouse sets the "default_warehouse" edge to the Warehouse entity.
+func (_u *MaterialUpdate) SetDefaultWarehouse(v *Warehouse) *MaterialUpdate {
+	return _u.SetDefaultWarehouseID(v.ID)
+}
+
+// SetSupplier sets the "supplier" edge to the Supplier entity.
+func (_u *MaterialUpdate) SetSupplier(v *Supplier) *MaterialUpdate {
+	return _u.SetSupplierID(v.ID)
 }
 
 // SetDefaultUnit sets the "default_unit" edge to the Unit entity.
@@ -307,6 +373,18 @@ func (_u *MaterialUpdate) AddOutsourcingOrderItems(v ...*OutsourcingOrderItem) *
 // Mutation returns the MaterialMutation object of the builder.
 func (_u *MaterialUpdate) Mutation() *MaterialMutation {
 	return _u.mutation
+}
+
+// ClearDefaultWarehouse clears the "default_warehouse" edge to the Warehouse entity.
+func (_u *MaterialUpdate) ClearDefaultWarehouse() *MaterialUpdate {
+	_u.mutation.ClearDefaultWarehouse()
+	return _u
+}
+
+// ClearSupplier clears the "supplier" edge to the Supplier entity.
+func (_u *MaterialUpdate) ClearSupplier() *MaterialUpdate {
+	_u.mutation.ClearSupplier()
+	return _u
 }
 
 // ClearDefaultUnit clears the "default_unit" edge to the Unit entity.
@@ -531,6 +609,11 @@ func (_u *MaterialUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Material.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SupplierID(); ok {
+		if err := material.SupplierIDValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "Material.supplier_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SupplierItemNo(); ok {
 		if err := material.SupplierItemNoValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_item_no", err: fmt.Errorf(`ent: validator failed for field "Material.supplier_item_no": %w`, err)}
@@ -539,6 +622,16 @@ func (_u *MaterialUpdate) check() error {
 	if v, ok := _u.mutation.Category(); ok {
 		if err := material.CategoryValidator(v); err != nil {
 			return &ValidationError{Name: "category", err: fmt.Errorf(`ent: validator failed for field "Material.category": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StockCategory(); ok {
+		if err := material.StockCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "stock_category", err: fmt.Errorf(`ent: validator failed for field "Material.stock_category": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultWarehouseID(); ok {
+		if err := material.DefaultWarehouseIDValidator(v); err != nil {
+			return &ValidationError{Name: "default_warehouse_id", err: fmt.Errorf(`ent: validator failed for field "Material.default_warehouse_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Spec(); ok {
@@ -592,6 +685,9 @@ func (_u *MaterialUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.CategoryCleared() {
 		_spec.ClearField(material.FieldCategory, field.TypeString)
 	}
+	if value, ok := _u.mutation.StockCategory(); ok {
+		_spec.SetField(material.FieldStockCategory, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.Spec(); ok {
 		_spec.SetField(material.FieldSpec, field.TypeString, value)
 	}
@@ -609,6 +705,64 @@ func (_u *MaterialUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(material.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.DefaultWarehouseCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   material.DefaultWarehouseTable,
+			Columns: []string{material.DefaultWarehouseColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(warehouse.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.DefaultWarehouseIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   material.DefaultWarehouseTable,
+			Columns: []string{material.DefaultWarehouseColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(warehouse.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SupplierCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   material.SupplierTable,
+			Columns: []string{material.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SupplierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   material.SupplierTable,
+			Columns: []string{material.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.DefaultUnitCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1047,6 +1201,26 @@ func (_u *MaterialUpdateOne) SetNillableName(v *string) *MaterialUpdateOne {
 	return _u
 }
 
+// SetSupplierID sets the "supplier_id" field.
+func (_u *MaterialUpdateOne) SetSupplierID(v int) *MaterialUpdateOne {
+	_u.mutation.SetSupplierID(v)
+	return _u
+}
+
+// SetNillableSupplierID sets the "supplier_id" field if the given value is not nil.
+func (_u *MaterialUpdateOne) SetNillableSupplierID(v *int) *MaterialUpdateOne {
+	if v != nil {
+		_u.SetSupplierID(*v)
+	}
+	return _u
+}
+
+// ClearSupplierID clears the value of the "supplier_id" field.
+func (_u *MaterialUpdateOne) ClearSupplierID() *MaterialUpdateOne {
+	_u.mutation.ClearSupplierID()
+	return _u
+}
+
 // SetSupplierItemNo sets the "supplier_item_no" field.
 func (_u *MaterialUpdateOne) SetSupplierItemNo(v string) *MaterialUpdateOne {
 	_u.mutation.SetSupplierItemNo(v)
@@ -1084,6 +1258,40 @@ func (_u *MaterialUpdateOne) SetNillableCategory(v *string) *MaterialUpdateOne {
 // ClearCategory clears the value of the "category" field.
 func (_u *MaterialUpdateOne) ClearCategory() *MaterialUpdateOne {
 	_u.mutation.ClearCategory()
+	return _u
+}
+
+// SetStockCategory sets the "stock_category" field.
+func (_u *MaterialUpdateOne) SetStockCategory(v string) *MaterialUpdateOne {
+	_u.mutation.SetStockCategory(v)
+	return _u
+}
+
+// SetNillableStockCategory sets the "stock_category" field if the given value is not nil.
+func (_u *MaterialUpdateOne) SetNillableStockCategory(v *string) *MaterialUpdateOne {
+	if v != nil {
+		_u.SetStockCategory(*v)
+	}
+	return _u
+}
+
+// SetDefaultWarehouseID sets the "default_warehouse_id" field.
+func (_u *MaterialUpdateOne) SetDefaultWarehouseID(v int) *MaterialUpdateOne {
+	_u.mutation.SetDefaultWarehouseID(v)
+	return _u
+}
+
+// SetNillableDefaultWarehouseID sets the "default_warehouse_id" field if the given value is not nil.
+func (_u *MaterialUpdateOne) SetNillableDefaultWarehouseID(v *int) *MaterialUpdateOne {
+	if v != nil {
+		_u.SetDefaultWarehouseID(*v)
+	}
+	return _u
+}
+
+// ClearDefaultWarehouseID clears the value of the "default_warehouse_id" field.
+func (_u *MaterialUpdateOne) ClearDefaultWarehouseID() *MaterialUpdateOne {
+	_u.mutation.ClearDefaultWarehouseID()
 	return _u
 }
 
@@ -1159,6 +1367,16 @@ func (_u *MaterialUpdateOne) SetNillableIsActive(v *bool) *MaterialUpdateOne {
 func (_u *MaterialUpdateOne) SetUpdatedAt(v time.Time) *MaterialUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
 	return _u
+}
+
+// SetDefaultWarehouse sets the "default_warehouse" edge to the Warehouse entity.
+func (_u *MaterialUpdateOne) SetDefaultWarehouse(v *Warehouse) *MaterialUpdateOne {
+	return _u.SetDefaultWarehouseID(v.ID)
+}
+
+// SetSupplier sets the "supplier" edge to the Supplier entity.
+func (_u *MaterialUpdateOne) SetSupplier(v *Supplier) *MaterialUpdateOne {
+	return _u.SetSupplierID(v.ID)
 }
 
 // SetDefaultUnit sets the "default_unit" edge to the Unit entity.
@@ -1289,6 +1507,18 @@ func (_u *MaterialUpdateOne) AddOutsourcingOrderItems(v ...*OutsourcingOrderItem
 // Mutation returns the MaterialMutation object of the builder.
 func (_u *MaterialUpdateOne) Mutation() *MaterialMutation {
 	return _u.mutation
+}
+
+// ClearDefaultWarehouse clears the "default_warehouse" edge to the Warehouse entity.
+func (_u *MaterialUpdateOne) ClearDefaultWarehouse() *MaterialUpdateOne {
+	_u.mutation.ClearDefaultWarehouse()
+	return _u
+}
+
+// ClearSupplier clears the "supplier" edge to the Supplier entity.
+func (_u *MaterialUpdateOne) ClearSupplier() *MaterialUpdateOne {
+	_u.mutation.ClearSupplier()
+	return _u
 }
 
 // ClearDefaultUnit clears the "default_unit" edge to the Unit entity.
@@ -1526,6 +1756,11 @@ func (_u *MaterialUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Material.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SupplierID(); ok {
+		if err := material.SupplierIDValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "Material.supplier_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SupplierItemNo(); ok {
 		if err := material.SupplierItemNoValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_item_no", err: fmt.Errorf(`ent: validator failed for field "Material.supplier_item_no": %w`, err)}
@@ -1534,6 +1769,16 @@ func (_u *MaterialUpdateOne) check() error {
 	if v, ok := _u.mutation.Category(); ok {
 		if err := material.CategoryValidator(v); err != nil {
 			return &ValidationError{Name: "category", err: fmt.Errorf(`ent: validator failed for field "Material.category": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StockCategory(); ok {
+		if err := material.StockCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "stock_category", err: fmt.Errorf(`ent: validator failed for field "Material.stock_category": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultWarehouseID(); ok {
+		if err := material.DefaultWarehouseIDValidator(v); err != nil {
+			return &ValidationError{Name: "default_warehouse_id", err: fmt.Errorf(`ent: validator failed for field "Material.default_warehouse_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Spec(); ok {
@@ -1604,6 +1849,9 @@ func (_u *MaterialUpdateOne) sqlSave(ctx context.Context) (_node *Material, err 
 	if _u.mutation.CategoryCleared() {
 		_spec.ClearField(material.FieldCategory, field.TypeString)
 	}
+	if value, ok := _u.mutation.StockCategory(); ok {
+		_spec.SetField(material.FieldStockCategory, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.Spec(); ok {
 		_spec.SetField(material.FieldSpec, field.TypeString, value)
 	}
@@ -1621,6 +1869,64 @@ func (_u *MaterialUpdateOne) sqlSave(ctx context.Context) (_node *Material, err 
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(material.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.DefaultWarehouseCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   material.DefaultWarehouseTable,
+			Columns: []string{material.DefaultWarehouseColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(warehouse.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.DefaultWarehouseIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   material.DefaultWarehouseTable,
+			Columns: []string{material.DefaultWarehouseColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(warehouse.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SupplierCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   material.SupplierTable,
+			Columns: []string{material.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SupplierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   material.SupplierTable,
+			Columns: []string{material.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.DefaultUnitCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -140,6 +140,30 @@ func (f DeploymentModuleStateFunc) Mutate(ctx context.Context, m ent.Mutation) (
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DeploymentModuleStateMutation", m)
 }
 
+// The EngineeringMaterialRequestFunc type is an adapter to allow the use of ordinary
+// function as EngineeringMaterialRequest mutator.
+type EngineeringMaterialRequestFunc func(context.Context, *ent.EngineeringMaterialRequestMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EngineeringMaterialRequestFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EngineeringMaterialRequestMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EngineeringMaterialRequestMutation", m)
+}
+
+// The EngineeringMaterialRequestItemFunc type is an adapter to allow the use of ordinary
+// function as EngineeringMaterialRequestItem mutator.
+type EngineeringMaterialRequestItemFunc func(context.Context, *ent.EngineeringMaterialRequestItemMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EngineeringMaterialRequestItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EngineeringMaterialRequestItemMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EngineeringMaterialRequestItemMutation", m)
+}
+
 // The FinanceAllocationFunc type is an adapter to allow the use of ordinary
 // function as FinanceAllocation mutator.
 type FinanceAllocationFunc func(context.Context, *ent.FinanceAllocationMutation) (ent.Value, error)

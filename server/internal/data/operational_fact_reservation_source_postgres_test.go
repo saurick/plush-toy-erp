@@ -24,7 +24,7 @@ func TestOperationalFactPostgresConcurrentSalesOrderStockReservationDoesNotExcee
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(20),
@@ -82,7 +82,7 @@ func TestOperationalFactPostgresConcurrentSalesOrderStockReservationDoesNotExcee
 				ReservationNo:    fmt.Sprintf("PG-RSV-SOURCE-%s-%02d", fixtures.suffix, index),
 				SalesOrderID:     order.ID,
 				SalesOrderItemID: item.ID,
-				WarehouseID:      fixtures.warehouseID,
+				WarehouseID:      fixtures.productWarehouseID,
 				Quantity:         decimal.NewFromInt(1),
 				IdempotencyKey:   fmt.Sprintf("reservation-source-pg-%s-%02d", fixtures.suffix, index),
 			})

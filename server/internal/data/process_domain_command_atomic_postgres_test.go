@@ -200,6 +200,7 @@ func TestSalesProcessCommandPostgresRollsBackOnResultConflictAndFailsClosedForLe
 		}
 		if _, createErr := salesRepo.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
 			SalesOrderID: row.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
+			OrderCategory:   "NEW",
 			OrderedQuantity: decimal.NewFromInt(1), UnitPrice: &unitPrice, Amount: &unitPrice,
 		}); createErr != nil {
 			t.Fatalf("create sales order item %s: %v", label, createErr)
@@ -307,7 +308,7 @@ func TestInventoryPostgresShipmentProcessCommandRollsBackSKUInventoryOnResultCon
 
 	if _, err := inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, ProductSkuID: &sku.ID,
-		WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: quantity,
 		SourceType: "ATOMIC_SHIPMENT_SEED", IdempotencyKey: "atomic-shipment-seed/" + fixtures.suffix,
 	}); err != nil {
@@ -339,7 +340,7 @@ func TestInventoryPostgresShipmentProcessCommandRollsBackSKUInventoryOnResultCon
 		ReservationNo: "RSV-ATOMIC-SHIP-" + fixtures.suffix,
 		SalesOrderID:  &order.ID, SalesOrderItemID: &orderItem.ID,
 		ProductID: fixtures.productID, ProductSkuID: &sku.ID,
-		WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: quantity,
+		WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: quantity,
 		IdempotencyKey: "atomic-shipment-reservation/" + fixtures.suffix,
 	})
 	if err != nil {
@@ -353,7 +354,7 @@ func TestInventoryPostgresShipmentProcessCommandRollsBackSKUInventoryOnResultCon
 		},
 		Items: []*biz.ShipmentItemCreate{{
 			SalesOrderItemID: &orderItem.ID, ProductID: fixtures.productID, ProductSkuID: &sku.ID,
-			WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: quantity,
+			WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: quantity,
 		}},
 	})
 	if err != nil {
@@ -384,7 +385,7 @@ func TestInventoryPostgresShipmentProcessCommandRollsBackSKUInventoryOnResultCon
 	}
 	balance, err := inventoryUC.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
 		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, ProductSkuID: &sku.ID,
-		WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 	})
 	if err != nil || !balance.Quantity.Equal(quantity) {
 		t.Fatalf("SKU balance must stay unchanged after rollback, balance=%#v err=%v", balance, err)
@@ -393,7 +394,7 @@ func TestInventoryPostgresShipmentProcessCommandRollsBackSKUInventoryOnResultCon
 		SubjectType:  biz.InventorySubjectProduct,
 		SubjectID:    fixtures.productID,
 		ProductSkuID: sku.ID,
-		WarehouseID:  fixtures.warehouseID,
+		WarehouseID:  fixtures.productWarehouseID,
 		Limit:        10,
 	})
 	if err != nil || total != 1 || len(balances) != 1 || !balances[0].Quantity.Equal(quantity) ||
@@ -435,7 +436,7 @@ func TestInventoryPostgresQualityProcessCommandRollsBackDecisionOnResultConflict
 		},
 		Items: []*biz.ShipmentItemCreate{{
 			ProductID: fixtures.productID, ProductSkuID: &sku.ID,
-			WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 			LotID: &lot.ID, Quantity: decimal.NewFromInt(1),
 		}},
 	})
@@ -445,7 +446,7 @@ func TestInventoryPostgresQualityProcessCommandRollsBackDecisionOnResultConflict
 	inspection, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
 		InspectionNo: "QI-ATOMIC-" + fixtures.suffix,
 		SourceID:     shipmentRow.ID, InventoryLotID: lot.ID,
-		WarehouseID: fixtures.warehouseID, SubjectID: fixtures.productID,
+		WarehouseID: fixtures.productWarehouseID, SubjectID: fixtures.productID,
 	})
 	if err != nil {
 		t.Fatalf("create finished-goods quality inspection: %v", err)
@@ -521,7 +522,7 @@ func TestInventoryPostgresConcurrentQualityProcessCommandDefaultedTimesConverge(
 		},
 		Items: []*biz.ShipmentItemCreate{{
 			ProductID: fixtures.productID, ProductSkuID: &sku.ID,
-			WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 			LotID: &lot.ID, Quantity: decimal.NewFromInt(1),
 		}},
 	})
@@ -531,7 +532,7 @@ func TestInventoryPostgresConcurrentQualityProcessCommandDefaultedTimesConverge(
 	inspection, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
 		InspectionNo: "QI-CONCURRENT-" + fixtures.suffix,
 		SourceID:     shipmentRow.ID, InventoryLotID: lot.ID,
-		WarehouseID: fixtures.warehouseID, SubjectID: fixtures.productID,
+		WarehouseID: fixtures.productWarehouseID, SubjectID: fixtures.productID,
 	})
 	if err != nil {
 		t.Fatalf("create concurrent quality inspection: %v", err)

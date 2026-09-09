@@ -34,6 +34,8 @@ import {
 const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url))
 
 const EXPECTED_FLOW_KEYS = [
+  'source.sales_order_engineering',
+  'source.engineering_material_request',
   'source.sales_order',
   'source.purchase_order',
   'source.outsourcing_order',
@@ -500,12 +502,12 @@ test('devFlowStateCatalog: route 与只读边界使用唯一真源', () => {
   )
 })
 
-test('devFlowStateCatalog: 覆盖清单固定为 33 个当前对象', () => {
+test('devFlowStateCatalog: 覆盖清单固定为 35 个当前对象', () => {
   assert.deepEqual(
     DEV_FLOW_STATE_CATALOG.flows.map((flow) => flow.key),
     EXPECTED_FLOW_KEYS
   )
-  assert.equal(new Set(EXPECTED_FLOW_KEYS).size, 33)
+  assert.equal(new Set(EXPECTED_FLOW_KEYS).size, 35)
 
   for (const flow of DEV_FLOW_STATE_CATALOG.flows) {
     assert.equal(flow.runtimeAuthority, 'backend_domain_contract')
@@ -1001,7 +1003,7 @@ test('devFlowStateCatalog: 搜索和筛选返回新对象且不改原目录', ()
     )?.scopeKey,
     'source_document'
   )
-  assert.equal(DEV_FLOW_STATE_CATALOG.flows.length, 33)
+  assert.equal(DEV_FLOW_STATE_CATALOG.flows.length, 35)
 })
 
 test('devFlowStateCatalog: 生产异常决策与执行状态属于同一来源单据且三类路径明确', () => {

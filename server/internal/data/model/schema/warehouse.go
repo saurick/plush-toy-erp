@@ -5,6 +5,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -57,4 +58,10 @@ func (Warehouse) Indexes() []ent.Index {
 		index.Fields("code").Unique(),
 		index.Fields("type"),
 	}
+}
+
+func (Warehouse) Annotations() []schema.Annotation {
+	return []schema.Annotation{entsql.Annotation{Checks: map[string]string{
+		"warehouses_type_check": "type IN ('MAIN_MATERIAL', 'AUXILIARY_MATERIAL', 'PACKAGING_MATERIAL', 'OTHER_MATERIAL', 'MATERIAL', 'FINISHED_GOODS', 'UNCLASSIFIED')",
+	}}}
 }

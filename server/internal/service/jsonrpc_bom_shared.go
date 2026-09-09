@@ -97,17 +97,16 @@ func bomItemUpdateFromParams(pm map[string]any) (*biz.BOMItemUpdate, bool) {
 		return nil, false
 	}
 	return &biz.BOMItemUpdate{
-		MaterialID:              getInt(pm, "material_id", 0),
-		Quantity:                quantity,
-		UnitID:                  getInt(pm, "unit_id", 0),
-		LossRate:                lossRate,
-		Position:                getWorkflowStringPtr(pm, "position"),
-		PieceCount:              getWorkflowStringPtr(pm, "piece_count"),
-		TotalUsageSnapshot:      getWorkflowStringPtr(pm, "total_usage_snapshot"),
-		ProcessBase:             getWorkflowStringPtr(pm, "process_base"),
-		ProcessMethod:           getWorkflowStringPtr(pm, "process_method"),
-		ProductionOperationCode: getWorkflowStringPtr(pm, "production_operation_code"),
-		Note:                    getWorkflowStringPtr(pm, "note"),
+		MaterialID:         getInt(pm, "material_id", 0),
+		Quantity:           quantity,
+		UnitID:             getInt(pm, "unit_id", 0),
+		LossRate:           lossRate,
+		Position:           getWorkflowStringPtr(pm, "position"),
+		PieceCount:         getWorkflowStringPtr(pm, "piece_count"),
+		TotalUsageSnapshot: getWorkflowStringPtr(pm, "total_usage_snapshot"),
+		ProcessBase:        getWorkflowStringPtr(pm, "process_base"),
+		ProcessMethod:      getWorkflowStringPtr(pm, "process_method"),
+		Note:               getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 
@@ -242,20 +241,19 @@ func bomItemToAny(item *biz.BOMItem) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                        item.ID,
-		"bom_header_id":             item.BOMHeaderID,
-		"material_id":               item.MaterialID,
-		"quantity":                  item.Quantity.String(),
-		"unit_id":                   item.UnitID,
-		"loss_rate":                 item.LossRate.String(),
-		"position":                  optionalStringToAny(item.Position),
-		"piece_count":               optionalStringToAny(item.PieceCount),
-		"total_usage_snapshot":      optionalStringToAny(item.TotalUsageSnapshot),
-		"process_base":              optionalStringToAny(item.ProcessBase),
-		"process_method":            optionalStringToAny(item.ProcessMethod),
-		"production_operation_code": optionalStringToAny(item.ProductionOperationCode),
-		"note":                      optionalStringToAny(item.Note),
-		"created_at":                item.CreatedAt.Unix(),
-		"updated_at":                item.UpdatedAt.Unix(),
+		"id":                   item.ID,
+		"bom_header_id":        item.BOMHeaderID,
+		"material_id":          item.MaterialID,
+		"quantity":             item.Quantity.String(),
+		"unit_id":              item.UnitID,
+		"loss_rate":            item.LossRate.String(),
+		"position":             optionalStringToAny(item.Position),
+		"piece_count":          optionalStringToAny(item.PieceCount),
+		"total_usage_snapshot": optionalStringToAny(item.TotalUsageSnapshot),
+		"process_base":         optionalStringToAny(item.ProcessBase),
+		"process_method":       optionalStringToAny(item.ProcessMethod),
+		"note":                 optionalStringToAny(item.Note),
+		"created_at":           item.CreatedAt.Unix(),
+		"updated_at":           item.UpdatedAt.Unix(),
 	}
 }

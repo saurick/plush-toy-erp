@@ -38,7 +38,7 @@ func TestQualityInspectionFromOutsourcingReturnDerivesSourceAndGuardsCancellatio
 		draft.InspectionType == nil || *draft.InspectionType != biz.QualityInspectionTypeOutsourcingReturn ||
 		draft.SubjectType == nil || *draft.SubjectType != biz.QualityInspectionSubjectProduct ||
 		draft.SubjectID == nil || *draft.SubjectID != fixtures.productID ||
-		draft.InventoryLotID != *fact.LotID || draft.WarehouseID != fixtures.warehouseID || draft.MaterialID != 0 ||
+		draft.InventoryLotID != *fact.LotID || draft.WarehouseID != fixtures.productWarehouseID || draft.MaterialID != 0 ||
 		draft.PurchaseReceiptID != 0 || draft.PurchaseReceiptItemID != nil {
 		t.Fatalf("outsourcing return source fields were not derived: %#v", draft)
 	}
@@ -129,7 +129,7 @@ func createPostedOutsourcingReturnForQuality(
 		FactNo:                 "QI-OUT-RETURN-" + suffix,
 		OutsourcingOrderID:     source.order.ID,
 		OutsourcingOrderItemID: source.productLine.ID,
-		WarehouseID:            fixtures.warehouseID,
+		WarehouseID:            fixtures.productWarehouseID,
 		LotID:                  &lot.ID,
 		Quantity:               decimal.NewFromInt(2),
 		IdempotencyKey:         "QI-OUT-RETURN-" + suffix,

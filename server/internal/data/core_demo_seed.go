@@ -31,6 +31,7 @@ type CoreDemoMaterialSeed struct {
 	Code            string
 	Name            string
 	Category        string
+	StockCategory   string
 	Spec            string
 	Color           string
 	DefaultUnitCode string
@@ -63,13 +64,12 @@ type CoreDemoProcessSeed struct {
 }
 
 type CoreDemoBOMItemSeed struct {
-	MaterialCode            string
-	Quantity                string
-	UnitCode                string
-	LossRate                string
-	Position                string
-	ProductionOperationCode string
-	Note                    string
+	MaterialCode string
+	Quantity     string
+	UnitCode     string
+	LossRate     string
+	Position     string
+	Note         string
 }
 
 type CoreDemoBOMSeed struct {
@@ -127,10 +127,10 @@ func LegacyCoreDemoReferenceSeedDatasets() []CoreDemoReferenceSeedDataset {
 				{Code: "YS5-DW-01", Name: "件", Precision: 0},
 			},
 			Warehouses: []CoreDemoWarehouseSeed{
-				{Code: "YS5-CK-01", Name: "原料仓", Type: "RAW_MATERIAL"},
+				{Code: "YS5-CK-01", Name: "原料仓", Type: "MATERIAL"},
 				{Code: "YS5-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
-				{Code: "YS5-CK-03", Name: "待检仓", Type: "QC_HOLD"},
-				{Code: "YS5-CK-04", Name: "在制仓", Type: "WORK_IN_PROCESS"},
+				{Code: "YS5-CK-03", Name: "待检仓", Type: "MATERIAL"},
+				{Code: "YS5-CK-04", Name: "在制仓", Type: "MATERIAL"},
 			},
 		},
 	}
@@ -187,6 +187,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Code:            prefix + "-MAT-FABRIC",
 				Name:            "核心演示短毛绒面料",
 				Category:        "fabric",
+				StockCategory:   "MAIN",
 				Spec:            "150cm 幅宽",
 				Color:           "米白",
 				DefaultUnitCode: meter,
@@ -195,6 +196,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Code:            prefix + "-MAT-FILLING",
 				Name:            "核心演示 PP 棉",
 				Category:        "filling",
+				StockCategory:   "MAIN",
 				Spec:            "7D",
 				Color:           "白",
 				DefaultUnitCode: kg,
@@ -203,6 +205,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Code:            prefix + "-MAT-EYE",
 				Name:            "核心演示安全眼",
 				Category:        "accessory",
+				StockCategory:   "AUXILIARY",
 				Spec:            "12mm",
 				Color:           "黑",
 				DefaultUnitCode: pcs,
@@ -211,6 +214,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Code:            prefix + "-MAT-THREAD",
 				Name:            "核心演示绣花线",
 				Category:        "accessory",
+				StockCategory:   "AUXILIARY",
 				Spec:            "120D",
 				Color:           "棕色",
 				DefaultUnitCode: meter,
@@ -219,6 +223,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Code:            prefix + "-MAT-PACKING",
 				Name:            "核心演示包装袋",
 				Category:        "packing",
+				StockCategory:   "PACKAGING",
 				Spec:            "单只装",
 				DefaultUnitCode: pcs,
 			},
@@ -226,6 +231,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Code:            prefix + "-MAT-CARTON",
 				Name:            "核心演示外箱",
 				Category:        "packing",
+				StockCategory:   "PACKAGING",
 				Spec:            "60x40x50cm",
 				DefaultUnitCode: box,
 			},
@@ -233,6 +239,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Code:            prefix + "-MAT-LABEL",
 				Name:            "核心演示洗水标",
 				Category:        "label",
+				StockCategory:   "AUXILIARY",
 				Spec:            "双语",
 				DefaultUnitCode: pcs,
 			},
@@ -268,10 +275,10 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
-			{Code: prefix + "-RM-WH", Name: "核心演示原料仓", Type: "RAW_MATERIAL"},
+			{Code: prefix + "-RM-WH", Name: "核心演示原料仓", Type: "MATERIAL"},
 			{Code: prefix + "-FG-WH", Name: "核心演示成品仓", Type: "FINISHED_GOODS"},
-			{Code: prefix + "-QC-HOLD", Name: "核心演示待检仓", Type: "QC_HOLD"},
-			{Code: prefix + "-WIP-WH", Name: "核心演示在制仓", Type: "WORK_IN_PROCESS"},
+			{Code: prefix + "-QC-HOLD", Name: "核心演示待检仓", Type: "MATERIAL"},
+			{Code: prefix + "-WIP-WH", Name: "核心演示在制仓", Type: "MATERIAL"},
 		},
 		Processes: []CoreDemoProcessSeed{
 			{Code: prefix + "-PROC-CHECKING", Name: "查货", Category: "查货", OutsourcingEnabled: true, InhouseEnabled: true, QualityRequired: true, SortOrder: 10, Note: "毛绒玩具行业默认候选工序；排序仅供列表展示，不代表工艺路线，可按实际工厂调整委外 / 内制 / 质检标记。"},
@@ -292,12 +299,11 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Note:        "核心演示 BOM，只用于本地试用和 QA，不代表真实客户资料。",
 				Items: []CoreDemoBOMItemSeed{
 					{
-						MaterialCode:            prefix + "-MAT-FABRIC",
-						Quantity:                "0.650000",
-						UnitCode:                meter,
-						LossRate:                "0.050000",
-						Position:                "面料",
-						ProductionOperationCode: biz.ProductionWIPOperationFabricProcessing,
+						MaterialCode: prefix + "-MAT-FABRIC",
+						Quantity:     "0.650000",
+						UnitCode:     meter,
+						LossRate:     "0.050000",
+						Position:     "面料",
 					},
 					{
 						MaterialCode: prefix + "-MAT-FILLING",
@@ -329,12 +335,11 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Note:        "核心演示 BOM，用于覆盖多材料、多单位和包装箱场景。",
 				Items: []CoreDemoBOMItemSeed{
 					{
-						MaterialCode:            prefix + "-MAT-FABRIC",
-						Quantity:                "0.950000",
-						UnitCode:                meter,
-						LossRate:                "0.060000",
-						Position:                "面料",
-						ProductionOperationCode: biz.ProductionWIPOperationFabricProcessing,
+						MaterialCode: prefix + "-MAT-FABRIC",
+						Quantity:     "0.950000",
+						UnitCode:     meter,
+						LossRate:     "0.060000",
+						Position:     "面料",
 					},
 					{
 						MaterialCode: prefix + "-MAT-FILLING",
@@ -686,7 +691,7 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		unitCodes[unit.Code] = struct{}{}
 	}
 	for _, material := range dataset.Materials {
-		if !safeSeedCode(material.Code, prefix) || strings.TrimSpace(material.Name) == "" {
+		if !safeSeedCode(material.Code, prefix) || strings.TrimSpace(material.Name) == "" || !biz.ValidMaterialStockCategory(material.StockCategory) {
 			return fmt.Errorf("%w: material %q", ErrCoreDemoSeedInvalidRecord, material.Code)
 		}
 		if _, ok := unitCodes[material.DefaultUnitCode]; !ok {
@@ -710,7 +715,7 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		productCodes[product.Code] = struct{}{}
 	}
 	for _, warehouse := range dataset.Warehouses {
-		if !safeSeedCode(warehouse.Code, prefix) || strings.TrimSpace(warehouse.Name) == "" || strings.TrimSpace(warehouse.Type) == "" {
+		if !safeSeedCode(warehouse.Code, prefix) || strings.TrimSpace(warehouse.Name) == "" || !biz.ValidWarehouseType(warehouse.Type) {
 			return fmt.Errorf("%w: warehouse %q", ErrCoreDemoSeedInvalidRecord, warehouse.Code)
 		}
 		if err := biz.ValidateNoNumberedImplementationStageLabels(warehouse.Code, warehouse.Name, warehouse.Type); err != nil {
@@ -829,11 +834,12 @@ RETURNING id`, unit.Code, unit.Name, unit.Precision).Scan(&id)
 func upsertCoreDemoMaterial(ctx context.Context, tx *sql.Tx, material CoreDemoMaterialSeed, unitID int) (int, error) {
 	var id int
 	err := tx.QueryRowContext(ctx, `
-INSERT INTO materials (code, name, category, spec, color, default_unit_id, is_active, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW())
+INSERT INTO materials (code, name, category, spec, color, default_unit_id, stock_category, is_active, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, NOW(), NOW())
 ON CONFLICT (code) DO UPDATE SET
   name = EXCLUDED.name,
   category = EXCLUDED.category,
+  stock_category = EXCLUDED.stock_category,
   spec = EXCLUDED.spec,
   color = EXCLUDED.color,
   default_unit_id = EXCLUDED.default_unit_id,
@@ -846,6 +852,7 @@ RETURNING id`,
 		nullString(material.Spec),
 		nullString(material.Color),
 		unitID,
+		material.StockCategory,
 	).Scan(&id)
 	return id, err
 }
@@ -941,15 +948,14 @@ LIMIT 1`, headerID, materialID).Scan(&id)
 	}
 	if err == sql.ErrNoRows {
 		_, err = tx.ExecContext(ctx, `
-INSERT INTO bom_items (bom_header_id, material_id, quantity, unit_id, loss_rate, position, production_operation_code, note, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
+INSERT INTO bom_items (bom_header_id, material_id, quantity, unit_id, loss_rate, position, note, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
 			headerID,
 			materialID,
 			item.Quantity,
 			unitID,
 			item.LossRate,
 			nullString(item.Position),
-			nullString(item.ProductionOperationCode),
 			nullString(item.Note),
 		)
 		return err
@@ -960,8 +966,7 @@ SET quantity = $3,
   unit_id = $4,
 	  loss_rate = $5,
 	  position = $6,
-	  production_operation_code = $7,
-	  note = $8,
+	  note = $7,
   updated_at = NOW()
 WHERE id = $1 AND material_id = $2`,
 		id,
@@ -970,7 +975,6 @@ WHERE id = $1 AND material_id = $2`,
 		unitID,
 		item.LossRate,
 		nullString(item.Position),
-		nullString(item.ProductionOperationCode),
 		nullString(item.Note),
 	)
 	return err

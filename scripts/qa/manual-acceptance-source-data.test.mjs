@@ -270,15 +270,6 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
     plan.records.bomVersions.length,
     DEFAULT_SOURCE_DATA_SCALE.bomVersions,
   );
-  assert.ok(
-    plan.records.bomVersions.every(
-      (bom) =>
-        bom.items[0]?.production_operation_code === "FABRIC_PROCESSING" &&
-        bom.items
-          .slice(1)
-          .every((item) => item.production_operation_code === undefined),
-    ),
-  );
   assert.ok(plan.records.customers.some((item) => item.contacts.length === 0));
   assert.ok(plan.records.customers.some((item) => item.contacts.length === 1));
   assert.ok(plan.records.customers.some((item) => item.contacts.length === 2));
@@ -2163,7 +2154,6 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
             unit_id: 1005,
             quantity: "0.2",
             loss_rate: "0",
-            production_operation_code: "FABRIC_PROCESSING",
           },
         ],
       },
@@ -2215,11 +2205,6 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
     sourceDrivenFacts.sourceCandidates.production.item.unitPrice,
     "12.50",
   );
-  assert.equal(
-    sourceDrivenFacts.sourceCandidates.production.bom.items[0]
-      .productionOperationCode,
-    "FABRIC_PROCESSING",
-  );
   assert.equal(sourceDrivenFacts.sourceCandidates.sales.order.customerId, 5001);
   assert.equal(
     sourceDrivenFacts.sourceCandidates.sales.order.paymentTermDays,
@@ -2267,7 +2252,6 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
         quantity: "1.2",
         loss_rate: "0.03",
         position: "面料",
-        production_operation_code: "FABRIC_PROCESSING",
       },
       {
         materialRef: "M-2",
@@ -2285,7 +2269,6 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
         quantity: "1.20",
         loss_rate: "0.030",
         position: "面料",
-        production_operation_code: "FABRIC_PROCESSING",
       },
     ],
     materialIds: new Map([
@@ -2315,7 +2298,7 @@ test("partial draft BOMs resume missing lines while settled BOMs fail closed", (
       planBOMItemReconciliation({
         ...input,
         actualItems: [
-          { ...input.actualItems[0], production_operation_code: null },
+          { ...input.actualItems[0], unit_id: 999 },
         ],
       }),
     /persisted BOM line differs/u,

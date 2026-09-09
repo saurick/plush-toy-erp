@@ -11,6 +11,7 @@ import {
   Switch,
 } from 'antd'
 import { renderProductOption } from './ProductIdentity.jsx'
+import MaterialStockFields from './MaterialStockFields.jsx'
 
 import {
   PURCHASE_INVOICE_CATEGORY_OPTIONS,
@@ -24,6 +25,7 @@ import {
 } from '../../utils/contactValidation.mjs'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import MaterialSupplierSelect from './MaterialSupplierSelect.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 import { productSKUParentFieldContract } from './productSKUParentField.mjs'
@@ -785,22 +787,30 @@ export function MasterDataFormFields({
       ) : null}
       {type === 'materials' ? (
         <>
+          <MaterialStockFields form={form} />
           <Form.Item
-            className="erp-business-action-form__field erp-business-action-form__field--full"
-            label="款号"
+            className="erp-business-action-form__field"
+            label="厂商"
+            name="supplier_id"
+          >
+            <MaterialSupplierSelect />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="厂商料号"
             name="supplier_item_no"
-            rules={[{ max: 255, message: '款号不能超过 255 个字符' }]}
+            rules={[{ max: 255, message: '厂商料号不能超过 255 个字符' }]}
           >
             <Input
               allowClear
               autoComplete="off"
               maxLength={255}
-              placeholder="按原资料填写，保留商家名及符号"
+              placeholder="填写料号，厂商在左侧选择"
             />
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
-            label="分类"
+            label="细分分类"
             name="category"
           >
             <TextSuggestionInput

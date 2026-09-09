@@ -22,7 +22,7 @@ func TestProductionCompletionFromOrderDerivesSourceAndReplays(t *testing.T) {
 	unitRow := createTestUnit(t, ctx, client, "PCO-U")
 	productRow := createTestProduct(t, ctx, client, unitRow.ID, "PCO-P")
 	skuRow := createInventoryTestSKU(t, ctx, client, productRow.ID, unitRow.ID, "PCO-SKU")
-	warehouseRow := createTestWarehouse(t, ctx, client, "PCO-WH")
+	warehouseRow := createTestProductWarehouse(t, ctx, client, "PCO-WH")
 
 	orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
@@ -98,7 +98,7 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	unitRow := createTestUnit(t, ctx, client, "POF-U")
 	productRow := createTestProduct(t, ctx, client, unitRow.ID, "POF-P")
 	skuRow := createInventoryTestSKU(t, ctx, client, productRow.ID, unitRow.ID, "POF-SKU")
-	warehouseRow := createTestWarehouse(t, ctx, client, "POF-WH")
+	warehouseRow := createTestProductWarehouse(t, ctx, client, "POF-WH")
 
 	orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
@@ -219,7 +219,7 @@ func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T)
 			actor := client.AdminUser.Create().SetUsername("production-draft-cancel-" + status).SetPasswordHash("test-password-hash").SaveX(ctx)
 			unitRow := createTestUnit(t, ctx, client, "PDC-U-"+status)
 			productRow := createTestProduct(t, ctx, client, unitRow.ID, "PDC-P-"+status)
-			warehouseRow := createTestWarehouse(t, ctx, client, "PDC-WH-"+status)
+			warehouseRow := createTestProductWarehouse(t, ctx, client, "PDC-WH-"+status)
 			orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
 			created, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
 				Draft: biz.ProductionOrderDraft{OrderNo: "MO-DRAFT-CANCEL-" + status, Items: []biz.ProductionOrderDraftItem{{
@@ -313,7 +313,7 @@ func TestProductionOrderFactLinkageRejectsWrongSourceShape(t *testing.T) {
 	otherProduct := createTestProduct(t, ctx, client, unitRow.ID, "POW-P2")
 	skuRow := createInventoryTestSKU(t, ctx, client, productRow.ID, unitRow.ID, "POW-SKU")
 	otherSKU := createInventoryTestSKU(t, ctx, client, otherProduct.ID, unitRow.ID, "POW-SKU2")
-	warehouseRow := createTestWarehouse(t, ctx, client, "POW-WH")
+	warehouseRow := createTestProductWarehouse(t, ctx, client, "POW-WH")
 	orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 	created, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: biz.ProductionOrderDraft{OrderNo: "MO-WRONG", Items: []biz.ProductionOrderDraftItem{{

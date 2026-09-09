@@ -72,7 +72,7 @@ func TestCancellationCompensationKeepsAuthenticatedActor(t *testing.T) {
 		inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 		factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 		if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 			TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(5), UnitID: fixtures.unitID,
 			SourceType: "COMPENSATION_ACTOR_TEST", IdempotencyKey: "COMPENSATION_ACTOR_TEST:SHIPMENT:IN",
 		}); err != nil {
@@ -81,7 +81,7 @@ func TestCancellationCompensationKeepsAuthenticatedActor(t *testing.T) {
 		shipment, err := factUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 			Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-COMP-ACTOR", IdempotencyKey: "SHP-COMP-ACTOR"},
 			Items: []*biz.ShipmentItemCreate{{
-				ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2),
+				ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2),
 			}},
 		})
 		if err != nil {

@@ -15,7 +15,9 @@ import (
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
+	"server/internal/data/model/ent/warehouse"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -38,6 +40,20 @@ func (_c *MaterialCreate) SetCode(v string) *MaterialCreate {
 // SetName sets the "name" field.
 func (_c *MaterialCreate) SetName(v string) *MaterialCreate {
 	_c.mutation.SetName(v)
+	return _c
+}
+
+// SetSupplierID sets the "supplier_id" field.
+func (_c *MaterialCreate) SetSupplierID(v int) *MaterialCreate {
+	_c.mutation.SetSupplierID(v)
+	return _c
+}
+
+// SetNillableSupplierID sets the "supplier_id" field if the given value is not nil.
+func (_c *MaterialCreate) SetNillableSupplierID(v *int) *MaterialCreate {
+	if v != nil {
+		_c.SetSupplierID(*v)
+	}
 	return _c
 }
 
@@ -65,6 +81,34 @@ func (_c *MaterialCreate) SetCategory(v string) *MaterialCreate {
 func (_c *MaterialCreate) SetNillableCategory(v *string) *MaterialCreate {
 	if v != nil {
 		_c.SetCategory(*v)
+	}
+	return _c
+}
+
+// SetStockCategory sets the "stock_category" field.
+func (_c *MaterialCreate) SetStockCategory(v string) *MaterialCreate {
+	_c.mutation.SetStockCategory(v)
+	return _c
+}
+
+// SetNillableStockCategory sets the "stock_category" field if the given value is not nil.
+func (_c *MaterialCreate) SetNillableStockCategory(v *string) *MaterialCreate {
+	if v != nil {
+		_c.SetStockCategory(*v)
+	}
+	return _c
+}
+
+// SetDefaultWarehouseID sets the "default_warehouse_id" field.
+func (_c *MaterialCreate) SetDefaultWarehouseID(v int) *MaterialCreate {
+	_c.mutation.SetDefaultWarehouseID(v)
+	return _c
+}
+
+// SetNillableDefaultWarehouseID sets the "default_warehouse_id" field if the given value is not nil.
+func (_c *MaterialCreate) SetNillableDefaultWarehouseID(v *int) *MaterialCreate {
+	if v != nil {
+		_c.SetDefaultWarehouseID(*v)
 	}
 	return _c
 }
@@ -143,6 +187,16 @@ func (_c *MaterialCreate) SetNillableUpdatedAt(v *time.Time) *MaterialCreate {
 		_c.SetUpdatedAt(*v)
 	}
 	return _c
+}
+
+// SetDefaultWarehouse sets the "default_warehouse" edge to the Warehouse entity.
+func (_c *MaterialCreate) SetDefaultWarehouse(v *Warehouse) *MaterialCreate {
+	return _c.SetDefaultWarehouseID(v.ID)
+}
+
+// SetSupplier sets the "supplier" edge to the Supplier entity.
+func (_c *MaterialCreate) SetSupplier(v *Supplier) *MaterialCreate {
+	return _c.SetSupplierID(v.ID)
 }
 
 // SetDefaultUnit sets the "default_unit" edge to the Unit entity.
@@ -305,6 +359,10 @@ func (_c *MaterialCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *MaterialCreate) defaults() {
+	if _, ok := _c.mutation.StockCategory(); !ok {
+		v := material.DefaultStockCategory
+		_c.mutation.SetStockCategory(v)
+	}
 	if _, ok := _c.mutation.IsActive(); !ok {
 		v := material.DefaultIsActive
 		_c.mutation.SetIsActive(v)
@@ -337,6 +395,11 @@ func (_c *MaterialCreate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Material.name": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.SupplierID(); ok {
+		if err := material.SupplierIDValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "Material.supplier_id": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.SupplierItemNo(); ok {
 		if err := material.SupplierItemNoValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_item_no", err: fmt.Errorf(`ent: validator failed for field "Material.supplier_item_no": %w`, err)}
@@ -345,6 +408,19 @@ func (_c *MaterialCreate) check() error {
 	if v, ok := _c.mutation.Category(); ok {
 		if err := material.CategoryValidator(v); err != nil {
 			return &ValidationError{Name: "category", err: fmt.Errorf(`ent: validator failed for field "Material.category": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.StockCategory(); !ok {
+		return &ValidationError{Name: "stock_category", err: errors.New(`ent: missing required field "Material.stock_category"`)}
+	}
+	if v, ok := _c.mutation.StockCategory(); ok {
+		if err := material.StockCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "stock_category", err: fmt.Errorf(`ent: validator failed for field "Material.stock_category": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DefaultWarehouseID(); ok {
+		if err := material.DefaultWarehouseIDValidator(v); err != nil {
+			return &ValidationError{Name: "default_warehouse_id", err: fmt.Errorf(`ent: validator failed for field "Material.default_warehouse_id": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.Spec(); ok {
@@ -419,6 +495,10 @@ func (_c *MaterialCreate) createSpec() (*Material, *sqlgraph.CreateSpec) {
 		_spec.SetField(material.FieldCategory, field.TypeString, value)
 		_node.Category = &value
 	}
+	if value, ok := _c.mutation.StockCategory(); ok {
+		_spec.SetField(material.FieldStockCategory, field.TypeString, value)
+		_node.StockCategory = value
+	}
 	if value, ok := _c.mutation.Spec(); ok {
 		_spec.SetField(material.FieldSpec, field.TypeString, value)
 		_node.Spec = &value
@@ -438,6 +518,40 @@ func (_c *MaterialCreate) createSpec() (*Material, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(material.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := _c.mutation.DefaultWarehouseIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   material.DefaultWarehouseTable,
+			Columns: []string{material.DefaultWarehouseColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(warehouse.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.DefaultWarehouseID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.SupplierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   material.SupplierTable,
+			Columns: []string{material.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.SupplierID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.DefaultUnitIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

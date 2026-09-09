@@ -61,6 +61,7 @@ type PurchaseReceiptCreate struct {
 }
 
 type PurchaseReceiptFromPurchaseOrderCreate struct {
+	ItemWarehouses         map[int]int
 	PurchaseOrderID        int
 	ReceiptNo              string
 	WarehouseID            int
@@ -162,7 +163,7 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptFromPurchaseOrder(ctx context.C
 			return replayed, nil
 		}
 	}
-	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
+	if err := uc.validatePurchaseReceiptWarehouseReferences(ctx, &normalized); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreatePurchaseReceiptFromPurchaseOrder(ctx, &normalized)
@@ -265,6 +266,11 @@ func normalizePurchaseReceiptFromPurchaseOrderCreate(in PurchaseReceiptFromPurch
 	in.Note = normalizeOptionalString(in.Note)
 	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
 	in.IdempotencyPayloadHash = ""
+	for itemID, warehouseID := range in.ItemWarehouses {
+		if itemID <= 0 || warehouseID <= 0 {
+			return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
+		}
+	}
 	if len(in.IdempotencyKey) > 128 {
 		return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
 	}
@@ -274,7 +280,7 @@ func normalizePurchaseReceiptFromPurchaseOrderCreate(in PurchaseReceiptFromPurch
 	if in.ReceivedAt.IsZero() {
 		in.ReceivedAt = time.Now()
 	}
-	if in.PurchaseOrderID <= 0 || in.WarehouseID <= 0 || in.ReceiptNo == "" {
+	if in.PurchaseOrderID <= 0 || in.WarehouseID < 0 || (in.WarehouseID == 0 && len(in.ItemWarehouses) == 0) || in.ReceiptNo == "" {
 		return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
 	}
 	return in, nil
@@ -286,12 +292,14 @@ func purchaseReceiptFromPurchaseOrderPayloadHash(in PurchaseReceiptFromPurchaseO
 		receivedAt = in.ReceivedAt.UTC().Format(time.RFC3339Nano)
 	}
 	payload := struct {
-		PurchaseOrderID int     `json:"purchase_order_id"`
-		ReceiptNo       string  `json:"receipt_no"`
-		WarehouseID     int     `json:"warehouse_id"`
-		ReceivedAt      string  `json:"received_at"`
-		Note            *string `json:"note"`
+		ItemWarehouses  map[int]int `json:"item_warehouses,omitempty"`
+		PurchaseOrderID int         `json:"purchase_order_id"`
+		ReceiptNo       string      `json:"receipt_no"`
+		WarehouseID     int         `json:"warehouse_id"`
+		ReceivedAt      string      `json:"received_at"`
+		Note            *string     `json:"note"`
 	}{
+		ItemWarehouses:  in.ItemWarehouses,
 		PurchaseOrderID: in.PurchaseOrderID,
 		ReceiptNo:       in.ReceiptNo,
 		WarehouseID:     in.WarehouseID,
@@ -444,6 +452,22 @@ func (uc *InventoryUsecase) validatePurchaseReceiptSupplierIdentity(ctx context.
 	}
 	if strings.TrimSpace(supplier.Name) != in.SupplierName {
 		return ErrBadParam
+	}
+	return nil
+}
+
+func (uc *InventoryUsecase) validatePurchaseReceiptWarehouseReferences(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) error {
+	ids := map[int]bool{}
+	if in.WarehouseID > 0 {
+		ids[in.WarehouseID] = true
+	}
+	for _, id := range in.ItemWarehouses {
+		ids[id] = true
+	}
+	for id := range ids {
+		if err := requireActiveReference(ctx, id, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
+			return err
+		}
 	}
 	return nil
 }

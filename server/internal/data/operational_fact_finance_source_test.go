@@ -31,7 +31,7 @@ func TestOperationalFactRepoShipmentItemFinanceSnapshotsComeFromSalesOrderLine(t
 	data, client := openInventoryRepoTestData(t, "shipment_item_finance_snapshots")
 	unit := createTestUnit(t, ctx, client, "PCS-SNAPSHOT")
 	product := createTestProduct(t, ctx, client, unit.ID, "PRD-SNAPSHOT")
-	warehouse := createTestWarehouse(t, ctx, client, "WH-SNAPSHOT")
+	warehouse := createTestProductWarehouse(t, ctx, client, "WH-SNAPSHOT")
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SNAPSHOT", true)
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
@@ -130,7 +130,7 @@ func TestOperationalFactRepoShipShipmentKeepsFinanceSnapshotsFromActiveSalesOrde
 	data, client := openInventoryRepoTestData(t, "shipment_finance_snapshot_refresh")
 	unit := createTestUnit(t, ctx, client, "PCS-SNAPSHOT-REFRESH")
 	product := createTestProduct(t, ctx, client, unit.ID, "PRD-SNAPSHOT-REFRESH")
-	warehouse := createTestWarehouse(t, ctx, client, "WH-SNAPSHOT-REFRESH")
+	warehouse := createTestProductWarehouse(t, ctx, client, "WH-SNAPSHOT-REFRESH")
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SNAPSHOT-REFRESH", true)
 	logger := log.NewStdLogger(io.Discard)
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
@@ -259,7 +259,7 @@ func TestOperationalFactRepoFinalShipmentAbsorbsFinanceRoundingTail(t *testing.T
 	data, client := openInventoryRepoTestData(t, "shipment_finance_rounding_tail")
 	unit := createTestUnit(t, ctx, client, "PCS-ROUNDING-TAIL")
 	product := createTestProduct(t, ctx, client, unit.ID, "PRD-ROUNDING-TAIL")
-	warehouse := createTestWarehouse(t, ctx, client, "WH-ROUNDING-TAIL")
+	warehouse := createTestProductWarehouse(t, ctx, client, "WH-ROUNDING-TAIL")
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-ROUNDING-TAIL", true)
 	logger := log.NewStdLogger(io.Discard)
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
@@ -378,7 +378,7 @@ func TestShipmentFinanceAmountRejectsSnapshotCurrencyMismatch(t *testing.T) {
 		SetShipmentID(shipment.ID).
 		SetSalesOrderItemID(orderItem.ID).
 		SetProductID(fixtures.productID).
-		SetWarehouseID(fixtures.warehouseID).
+		SetWarehouseID(fixtures.productWarehouseID).
 		SetUnitID(fixtures.unitID).
 		SetQuantity(decimal.NewFromInt(2)).
 		SetUnitPriceSnapshot(decimal.NewFromInt(10)).
@@ -852,7 +852,7 @@ func prepareShipmentFinanceSource(
 	t.Helper()
 	unit := createTestUnit(t, ctx, client, "U-"+suffix)
 	product := createTestProduct(t, ctx, client, unit.ID, "P-"+suffix)
-	warehouse := createTestWarehouse(t, ctx, client, "W-"+suffix)
+	warehouse := createTestProductWarehouse(t, ctx, client, "W-"+suffix)
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-"+suffix, true)
 	actor := client.AdminUser.Create().SetUsername("finance-actor-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))

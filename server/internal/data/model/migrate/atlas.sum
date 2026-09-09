@@ -1,4 +1,4 @@
-h1:LIoP9IKydKLXjpptpRzuRiklo/Zxn19w9Nb+4/iiuXI=
+h1:+bBKLD22VtqwIbEkbiPsAAChEnTxiboVxRzC9S0JmVw=
 20260315161316_migrate.sql h1:aW9ynfMUR5IdFF5E6zkq5zQdgTv9YEtXjRiZTSF6f+I=
 20260421140457_migrate.sql h1:Znvhutjs+bPceNgWeN7W2TxKXHUQtyBH+Yr1b5kmXwE=
 20260423081607_migrate.sql h1:ZXYJO5Kvb2GkCOhWtMP/2nIV3stabZ5wFouUxOPbzhM=
@@ -128,3 +128,7 @@ h1:LIoP9IKydKLXjpptpRzuRiklo/Zxn19w9Nb+4/iiuXI=
 20260823192005_migrate.sql h1:twN/7Y7wL42D92GqxDaNQGn4G0ezwZdFDHlQv31gHv0=
 20260904030457_migrate.sql h1:78C5GZ9pZqcKbfApzTQ54ERGt7EieXrGe3D/mwdWUWQ=
 20260908123839_migrate.sql h1:5E11iFftSaaj/RsKz1pRj3uupH9Oc51f9cjqgzmBb/4=
+20260908143821_sales_order_engineering_permission.sql h1:hvyJo5ntL8Wy6sva2QYB8yi9zdP3BZ03qs8Cu+zm/cU=
+20260908163241_engineering_material_permissions.sql h1:XhBBRa/b1UxCHQuX7IDct5odITnC58KrFtmFl/VvsaM=
+20260908172207_migrate.sql h1:Oa40Kmp6wgHylzD/tkNa82HoQi7uU9ghR923AFHVpFc=
+20260909031310_migrate.sql h1:WrLUSxfyLA1LkN/jvy2rDYRwdjnlsD5MU9fAbQaW8JY=

@@ -17,7 +17,9 @@ import (
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
+	"server/internal/data/model/ent/warehouse"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
@@ -32,6 +34,8 @@ type MaterialQuery struct {
 	order                                   []material.OrderOption
 	inters                                  []Interceptor
 	predicates                              []predicate.Material
+	withDefaultWarehouse                    *WarehouseQuery
+	withSupplier                            *SupplierQuery
 	withDefaultUnit                         *UnitQuery
 	withBomItems                            *BOMItemQuery
 	withProductionOrderMaterialRequirements *ProductionOrderMaterialRequirementQuery
@@ -75,6 +79,50 @@ func (_q *MaterialQuery) Unique(unique bool) *MaterialQuery {
 func (_q *MaterialQuery) Order(o ...material.OrderOption) *MaterialQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryDefaultWarehouse chains the current query on the "default_warehouse" edge.
+func (_q *MaterialQuery) QueryDefaultWarehouse() *WarehouseQuery {
+	query := (&WarehouseClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, selector),
+			sqlgraph.To(warehouse.Table, warehouse.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, material.DefaultWarehouseTable, material.DefaultWarehouseColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QuerySupplier chains the current query on the "supplier" edge.
+func (_q *MaterialQuery) QuerySupplier() *SupplierQuery {
+	query := (&SupplierClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, selector),
+			sqlgraph.To(supplier.Table, supplier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, material.SupplierTable, material.SupplierColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // QueryDefaultUnit chains the current query on the "default_unit" edge.
@@ -467,6 +515,8 @@ func (_q *MaterialQuery) Clone() *MaterialQuery {
 		order:                                   append([]material.OrderOption{}, _q.order...),
 		inters:                                  append([]Interceptor{}, _q.inters...),
 		predicates:                              append([]predicate.Material{}, _q.predicates...),
+		withDefaultWarehouse:                    _q.withDefaultWarehouse.Clone(),
+		withSupplier:                            _q.withSupplier.Clone(),
 		withDefaultUnit:                         _q.withDefaultUnit.Clone(),
 		withBomItems:                            _q.withBomItems.Clone(),
 		withProductionOrderMaterialRequirements: _q.withProductionOrderMaterialRequirements.Clone(),
@@ -480,6 +530,28 @@ func (_q *MaterialQuery) Clone() *MaterialQuery {
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithDefaultWarehouse tells the query-builder to eager-load the nodes that are connected to
+// the "default_warehouse" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *MaterialQuery) WithDefaultWarehouse(opts ...func(*WarehouseQuery)) *MaterialQuery {
+	query := (&WarehouseClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withDefaultWarehouse = query
+	return _q
+}
+
+// WithSupplier tells the query-builder to eager-load the nodes that are connected to
+// the "supplier" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *MaterialQuery) WithSupplier(opts ...func(*SupplierQuery)) *MaterialQuery {
+	query := (&SupplierClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withSupplier = query
+	return _q
 }
 
 // WithDefaultUnit tells the query-builder to eager-load the nodes that are connected to
@@ -659,7 +731,9 @@ func (_q *MaterialQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mat
 	var (
 		nodes       = []*Material{}
 		_spec       = _q.querySpec()
-		loadedTypes = [9]bool{
+		loadedTypes = [11]bool{
+			_q.withDefaultWarehouse != nil,
+			_q.withSupplier != nil,
 			_q.withDefaultUnit != nil,
 			_q.withBomItems != nil,
 			_q.withProductionOrderMaterialRequirements != nil,
@@ -688,6 +762,18 @@ func (_q *MaterialQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mat
 	}
 	if len(nodes) == 0 {
 		return nodes, nil
+	}
+	if query := _q.withDefaultWarehouse; query != nil {
+		if err := _q.loadDefaultWarehouse(ctx, query, nodes, nil,
+			func(n *Material, e *Warehouse) { n.Edges.DefaultWarehouse = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withSupplier; query != nil {
+		if err := _q.loadSupplier(ctx, query, nodes, nil,
+			func(n *Material, e *Supplier) { n.Edges.Supplier = e }); err != nil {
+			return nil, err
+		}
 	}
 	if query := _q.withDefaultUnit; query != nil {
 		if err := _q.loadDefaultUnit(ctx, query, nodes, nil,
@@ -770,6 +856,70 @@ func (_q *MaterialQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mat
 	return nodes, nil
 }
 
+func (_q *MaterialQuery) loadDefaultWarehouse(ctx context.Context, query *WarehouseQuery, nodes []*Material, init func(*Material), assign func(*Material, *Warehouse)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*Material)
+	for i := range nodes {
+		if nodes[i].DefaultWarehouseID == nil {
+			continue
+		}
+		fk := *nodes[i].DefaultWarehouseID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(warehouse.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "default_warehouse_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *MaterialQuery) loadSupplier(ctx context.Context, query *SupplierQuery, nodes []*Material, init func(*Material), assign func(*Material, *Supplier)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*Material)
+	for i := range nodes {
+		if nodes[i].SupplierID == nil {
+			continue
+		}
+		fk := *nodes[i].SupplierID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(supplier.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "supplier_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 func (_q *MaterialQuery) loadDefaultUnit(ctx context.Context, query *UnitQuery, nodes []*Material, init func(*Material), assign func(*Material, *Unit)) error {
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*Material)
@@ -1070,6 +1220,12 @@ func (_q *MaterialQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != material.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withDefaultWarehouse != nil {
+			_spec.Node.AddColumnOnce(material.FieldDefaultWarehouseID)
+		}
+		if _q.withSupplier != nil {
+			_spec.Node.AddColumnOnce(material.FieldSupplierID)
 		}
 		if _q.withDefaultUnit != nil {
 			_spec.Node.AddColumnOnce(material.FieldDefaultUnitID)

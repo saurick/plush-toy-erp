@@ -153,9 +153,6 @@ func (_u *ProductionOrderMaterialRequirementUpdate) sqlSave(ctx context.Context)
 			}
 		}
 	}
-	if _u.mutation.ProductionOperationCodeCleared() {
-		_spec.ClearField(productionordermaterialrequirement.FieldProductionOperationCode, field.TypeString)
-	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(productionordermaterialrequirement.FieldUpdatedAt, field.TypeTime, value)
 	}
@@ -377,9 +374,6 @@ func (_u *ProductionOrderMaterialRequirementUpdateOne) sqlSave(ctx context.Conte
 				ps[i](selector)
 			}
 		}
-	}
-	if _u.mutation.ProductionOperationCodeCleared() {
-		_spec.ClearField(productionordermaterialrequirement.FieldProductionOperationCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(productionordermaterialrequirement.FieldUpdatedAt, field.TypeTime, value)

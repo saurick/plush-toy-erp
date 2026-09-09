@@ -221,7 +221,7 @@ func runOutsourcingReturnPayable(t *testing.T, ctx context.Context, data *Data, 
 		FactNo:                 "OUT-FIN-RETURN-" + suffix,
 		OutsourcingOrderID:     source.order.ID,
 		OutsourcingOrderItemID: source.productLine.ID,
-		WarehouseID:            fixtures.warehouseID,
+		WarehouseID:            fixtures.productWarehouseID,
 		NewLotNo:               &returnLotNo,
 		Quantity:               decimal.NewFromInt(2),
 		IdempotencyKey:         "OUT-FIN-RETURN-" + suffix,
@@ -298,7 +298,7 @@ func runOutsourcingReturnPayable(t *testing.T, ctx context.Context, data *Data, 
 		FactNo:                 "OUT-FIN-REJECTED-" + suffix,
 		OutsourcingOrderID:     source.order.ID,
 		OutsourcingOrderItemID: source.productLine.ID,
-		WarehouseID:            fixtures.warehouseID,
+		WarehouseID:            fixtures.productWarehouseID,
 		NewLotNo:               &rejectedLotNo,
 		Quantity:               decimal.NewFromInt(1),
 		IdempotencyKey:         "OUT-FIN-REJECTED-" + suffix,
@@ -412,5 +412,6 @@ func createFinanceBusinessSourceFixtures(t *testing.T, ctx context.Context, clie
 	material := createTestMaterial(t, ctx, client, unit.ID, "FIN-M-"+suffix)
 	product := createTestProduct(t, ctx, client, unit.ID, "FIN-P-"+suffix)
 	warehouse := createTestWarehouse(t, ctx, client, "FIN-W-"+suffix)
-	return inventoryTestFixtures{unitID: unit.ID, materialID: material.ID, productID: product.ID, warehouseID: warehouse.ID}
+	finished := createTestProductWarehouse(t, ctx, client, "FIN-FG-"+suffix)
+	return inventoryTestFixtures{productWarehouseID: finished.ID, unitID: unit.ID, materialID: material.ID, productID: product.ID, warehouseID: warehouse.ID}
 }

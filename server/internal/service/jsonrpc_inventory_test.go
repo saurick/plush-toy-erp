@@ -176,7 +176,7 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 	if _, err := j.inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       inventoryDecimal(t, "12.5"),
@@ -191,7 +191,7 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 		SetReservationNo("RSV-LEDGER-ACTIVE-001").
 		SetStatus(biz.StockReservationStatusActive).
 		SetProductID(fixtures.productID).
-		SetWarehouseID(fixtures.warehouseID).
+		SetWarehouseID(fixtures.productWarehouseID).
 		SetUnitID(fixtures.unitID).
 		SetQuantity(inventoryDecimal(t, "4")).
 		SetIdempotencyKey("RSV-LEDGER-ACTIVE-001").
@@ -203,7 +203,7 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 		SetReservationNo("RSV-LEDGER-RELEASED-001").
 		SetStatus(biz.StockReservationStatusReleased).
 		SetProductID(fixtures.productID).
-		SetWarehouseID(fixtures.warehouseID).
+		SetWarehouseID(fixtures.productWarehouseID).
 		SetUnitID(fixtures.unitID).
 		SetQuantity(inventoryDecimal(t, "2")).
 		SetIdempotencyKey("RSV-LEDGER-RELEASED-001").
@@ -214,7 +214,7 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 	_, productBalanceRes, err := j.handleInventory(adminCtx, "list_inventory_balances", "4", mustJSONRPCStruct(t, map[string]any{
 		"subject_type": biz.InventorySubjectProduct,
 		"subject_id":   float64(fixtures.productID),
-		"warehouse_id": float64(fixtures.warehouseID),
+		"warehouse_id": float64(fixtures.productWarehouseID),
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)

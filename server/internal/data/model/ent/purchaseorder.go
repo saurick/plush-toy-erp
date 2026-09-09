@@ -5,6 +5,7 @@ package ent
 import (
 	"encoding/json"
 	"fmt"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/supplier"
 	"strings"
@@ -19,6 +20,8 @@ type PurchaseOrder struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// EngineeringMaterialRequestID holds the value of the "engineering_material_request_id" field.
+	EngineeringMaterialRequestID *int `json:"engineering_material_request_id,omitempty"`
 	// PurchaseOrderNo holds the value of the "purchase_order_no" field.
 	PurchaseOrderNo string `json:"purchase_order_no,omitempty"`
 	// SupplierID holds the value of the "supplier_id" field.
@@ -75,13 +78,26 @@ type PurchaseOrder struct {
 
 // PurchaseOrderEdges holds the relations/edges for other nodes in the graph.
 type PurchaseOrderEdges struct {
+	// EngineeringMaterialRequest holds the value of the engineering_material_request edge.
+	EngineeringMaterialRequest *EngineeringMaterialRequest `json:"engineering_material_request,omitempty"`
 	// Supplier holds the value of the supplier edge.
 	Supplier *Supplier `json:"supplier,omitempty"`
 	// Items holds the value of the items edge.
 	Items []*PurchaseOrderItem `json:"items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
+}
+
+// EngineeringMaterialRequestOrErr returns the EngineeringMaterialRequest value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e PurchaseOrderEdges) EngineeringMaterialRequestOrErr() (*EngineeringMaterialRequest, error) {
+	if e.EngineeringMaterialRequest != nil {
+		return e.EngineeringMaterialRequest, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: engineeringmaterialrequest.Label}
+	}
+	return nil, &NotLoadedError{edge: "engineering_material_request"}
 }
 
 // SupplierOrErr returns the Supplier value or an error if the edge
@@ -89,7 +105,7 @@ type PurchaseOrderEdges struct {
 func (e PurchaseOrderEdges) SupplierOrErr() (*Supplier, error) {
 	if e.Supplier != nil {
 		return e.Supplier, nil
-	} else if e.loadedTypes[0] {
+	} else if e.loadedTypes[1] {
 		return nil, &NotFoundError{label: supplier.Label}
 	}
 	return nil, &NotLoadedError{edge: "supplier"}
@@ -98,7 +114,7 @@ func (e PurchaseOrderEdges) SupplierOrErr() (*Supplier, error) {
 // ItemsOrErr returns the Items value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseOrderEdges) ItemsOrErr() ([]*PurchaseOrderItem, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.Items, nil
 	}
 	return nil, &NotLoadedError{edge: "items"}
@@ -113,7 +129,7 @@ func (*PurchaseOrder) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case purchaseorder.FieldInvoiceRequired:
 			values[i] = new(sql.NullBool)
-		case purchaseorder.FieldID, purchaseorder.FieldSupplierID, purchaseorder.FieldPaymentTermDays, purchaseorder.FieldVersion, purchaseorder.FieldSettledBy:
+		case purchaseorder.FieldID, purchaseorder.FieldEngineeringMaterialRequestID, purchaseorder.FieldSupplierID, purchaseorder.FieldPaymentTermDays, purchaseorder.FieldVersion, purchaseorder.FieldSettledBy:
 			values[i] = new(sql.NullInt64)
 		case purchaseorder.FieldPurchaseOrderNo, purchaseorder.FieldCurrency, purchaseorder.FieldPaymentMethod, purchaseorder.FieldInvoiceCategory, purchaseorder.FieldSupplierPurchaseOrderNo, purchaseorder.FieldDeliveryAddress, purchaseorder.FieldLifecycleStatus, purchaseorder.FieldSettlementAction, purchaseorder.FieldSettlementMode, purchaseorder.FieldSettlementReason, purchaseorder.FieldNote:
 			values[i] = new(sql.NullString)
@@ -140,6 +156,13 @@ func (_m *PurchaseOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int(value.Int64)
+		case purchaseorder.FieldEngineeringMaterialRequestID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field engineering_material_request_id", values[i])
+			} else if value.Valid {
+				_m.EngineeringMaterialRequestID = new(int)
+				*_m.EngineeringMaterialRequestID = int(value.Int64)
+			}
 		case purchaseorder.FieldPurchaseOrderNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field purchase_order_no", values[i])
@@ -315,6 +338,11 @@ func (_m *PurchaseOrder) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
+// QueryEngineeringMaterialRequest queries the "engineering_material_request" edge of the PurchaseOrder entity.
+func (_m *PurchaseOrder) QueryEngineeringMaterialRequest() *EngineeringMaterialRequestQuery {
+	return NewPurchaseOrderClient(_m.config).QueryEngineeringMaterialRequest(_m)
+}
+
 // QuerySupplier queries the "supplier" edge of the PurchaseOrder entity.
 func (_m *PurchaseOrder) QuerySupplier() *SupplierQuery {
 	return NewPurchaseOrderClient(_m.config).QuerySupplier(_m)
@@ -348,6 +376,11 @@ func (_m *PurchaseOrder) String() string {
 	var builder strings.Builder
 	builder.WriteString("PurchaseOrder(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	if v := _m.EngineeringMaterialRequestID; v != nil {
+		builder.WriteString("engineering_material_request_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("purchase_order_no=")
 	builder.WriteString(_m.PurchaseOrderNo)
 	builder.WriteString(", ")

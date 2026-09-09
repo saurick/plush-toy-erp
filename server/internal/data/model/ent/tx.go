@@ -34,6 +34,10 @@ type Tx struct {
 	CustomerConfigRevision *CustomerConfigRevisionClient
 	// DeploymentModuleState is the client for interacting with the DeploymentModuleState builders.
 	DeploymentModuleState *DeploymentModuleStateClient
+	// EngineeringMaterialRequest is the client for interacting with the EngineeringMaterialRequest builders.
+	EngineeringMaterialRequest *EngineeringMaterialRequestClient
+	// EngineeringMaterialRequestItem is the client for interacting with the EngineeringMaterialRequestItem builders.
+	EngineeringMaterialRequestItem *EngineeringMaterialRequestItemClient
 	// FinanceAllocation is the client for interacting with the FinanceAllocation builders.
 	FinanceAllocation *FinanceAllocationClient
 	// FinanceCreditNote is the client for interacting with the FinanceCreditNote builders.
@@ -300,6 +304,8 @@ func (tx *Tx) init() {
 	tx.Customer = NewCustomerClient(tx.config)
 	tx.CustomerConfigRevision = NewCustomerConfigRevisionClient(tx.config)
 	tx.DeploymentModuleState = NewDeploymentModuleStateClient(tx.config)
+	tx.EngineeringMaterialRequest = NewEngineeringMaterialRequestClient(tx.config)
+	tx.EngineeringMaterialRequestItem = NewEngineeringMaterialRequestItemClient(tx.config)
 	tx.FinanceAllocation = NewFinanceAllocationClient(tx.config)
 	tx.FinanceCreditNote = NewFinanceCreditNoteClient(tx.config)
 	tx.FinanceFact = NewFinanceFactClient(tx.config)

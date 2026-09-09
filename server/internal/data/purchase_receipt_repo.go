@@ -128,12 +128,7 @@ func (r *inventoryRepo) ValidatePurchaseReceiptFromPurchaseOrder(ctx context.Con
 	if order.LifecycleStatus != biz.PurchaseOrderStatusApproved || order.SupplierID <= 0 || supplierNameFromSnapshot(order.SupplierSnapshot) == "" {
 		return biz.ErrBadParam
 	}
-	if _, err := r.data.postgres.Warehouse.Get(ctx, in.WarehouseID); err != nil {
-		if ent.IsNotFound(err) {
-			return biz.ErrBadParam
-		}
-		return err
-	}
+
 	items, err := r.data.postgres.PurchaseOrderItem.Query().Where(
 		purchaseorderitem.PurchaseOrderID(order.ID),
 		purchaseorderitem.LineStatus(biz.PurchaseOrderItemStatusOpen),
@@ -148,12 +143,7 @@ func (r *inventoryRepo) ValidatePurchaseReceiptFromPurchaseOrder(ctx context.Con
 	if err != nil {
 		return err
 	}
-	for _, item := range items {
-		if remainingByItemID[item.ID].IsPositive() {
-			return nil
-		}
-	}
-	return biz.ErrBadParam
+	return validatePurchaseReceiptLineWarehouses(ctx, r.data.postgres, in, items, remainingByItemID)
 }
 
 func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (_ *biz.PurchaseReceipt, resultErr error) {
@@ -231,15 +221,18 @@ func (r *inventoryRepo) createPurchaseReceiptFromPurchaseOrder(
 	if order.LifecycleStatus != biz.PurchaseOrderStatusApproved {
 		return nil, biz.ErrBadParam
 	}
-	warehouseRow, err := tx.client.Warehouse.Get(ctx, in.WarehouseID)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, biz.ErrBadParam
+	if in.WarehouseID > 0 {
+		warehouseRow, err := tx.client.Warehouse.Get(ctx, in.WarehouseID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrBadParam
+			}
+			return nil, err
 		}
-		return nil, err
-	}
-	if !warehouseRow.IsActive {
-		return nil, biz.ErrWarehouseInactive
+		if !warehouseRow.IsActive {
+			return nil, biz.ErrWarehouseInactive
+		}
+
 	}
 
 	orderItems, err := tx.client.PurchaseOrderItem.Query().
@@ -286,6 +279,9 @@ func (r *inventoryRepo) createPurchaseReceiptFromPurchaseOrder(
 	}
 	remainingByItemID, err := purchaseOrderItemRemainingQuantities(ctx, tx.client, orderItems)
 	if err != nil {
+		return nil, err
+	}
+	if err := validatePurchaseReceiptLineWarehouses(ctx, tx.client, in, orderItems, remainingByItemID); err != nil {
 		return nil, err
 	}
 	plannedLineCount := 0
@@ -348,7 +344,7 @@ func (r *inventoryRepo) createPurchaseReceiptFromPurchaseOrder(
 		if _, _, err := createPreparedPurchaseReceiptItem(ctx, tx, receipt, &biz.PurchaseReceiptItemCreate{
 			ReceiptID:           receipt.ID,
 			MaterialID:          item.MaterialID,
-			WarehouseID:         in.WarehouseID,
+			WarehouseID:         purchaseReceiptLineWarehouse(in, item.ID),
 			UnitID:              item.UnitID,
 			PurchaseOrderItemID: &orderItemID,
 			Quantity:            remaining,
@@ -1636,6 +1632,9 @@ func (r *inventoryRepo) applyInventoryTxnAndUpdateBalanceInTx(ctx context.Contex
 }
 
 func validatePurchaseReceiptItemReferences(ctx context.Context, client *ent.Client, in *biz.PurchaseReceiptItemCreate) error {
+	if err := validateIncomingWarehouse(ctx, client, in.WarehouseID, biz.InventorySubjectMaterial, in.MaterialID); err != nil {
+		return err
+	}
 	if _, err := client.Material.Get(ctx, in.MaterialID); err != nil {
 		if ent.IsNotFound(err) {
 			return biz.ErrBadParam
@@ -2097,4 +2096,35 @@ func entPurchaseReceiptItemToBiz(row *ent.PurchaseReceiptItem) *biz.PurchaseRece
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,
 	}
+}
+
+func purchaseReceiptLineWarehouse(in *biz.PurchaseReceiptFromPurchaseOrderCreate, itemID int) int {
+	if id, ok := in.ItemWarehouses[itemID]; ok {
+		return id
+	}
+	return in.WarehouseID
+}
+
+func validatePurchaseReceiptLineWarehouses(ctx context.Context, client *ent.Client, in *biz.PurchaseReceiptFromPurchaseOrderCreate, items []*ent.PurchaseOrderItem, remaining map[int]decimal.Decimal) error {
+	validIDs := map[int]bool{}
+	hasRemaining := false
+	for _, item := range items {
+		validIDs[item.ID] = true
+		if !remaining[item.ID].IsPositive() {
+			continue
+		}
+		hasRemaining = true
+		if err := validateIncomingWarehouse(ctx, client, purchaseReceiptLineWarehouse(in, item.ID), biz.InventorySubjectMaterial, item.MaterialID); err != nil {
+			return err
+		}
+	}
+	for id := range in.ItemWarehouses {
+		if !validIDs[id] || !remaining[id].IsPositive() {
+			return biz.ErrBadParam
+		}
+	}
+	if !hasRemaining {
+		return biz.ErrBadParam
+	}
+	return nil
 }

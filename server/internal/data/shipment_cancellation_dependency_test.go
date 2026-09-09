@@ -81,7 +81,7 @@ func TestShipmentCancellationFinishedGoodsQualityStatusMatrix(t *testing.T) {
 			builder := client.QualityInspection.Create().
 				SetInspectionNo(fmt.Sprintf("SHIP-CANCEL-QI-%d", index)).
 				SetInventoryLotID(lot.ID).
-				SetWarehouseID(fixtures.warehouseID).
+				SetWarehouseID(fixtures.productWarehouseID).
 				SetSourceType(biz.QualityInspectionSourceShipment).
 				SetSourceID(shipment.ID).
 				SetInspectionType(biz.QualityInspectionTypeFinishedGoods).
@@ -124,7 +124,7 @@ func createShipmentCancellationDependencyDraft(
 	shipment, err := uc.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHIP-CANCEL-" + suffix, IdempotencyKey: "ship-cancel/" + suffix},
 		Items: []*biz.ShipmentItemCreate{{
-			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 			LotID: lotID, Quantity: decimal.NewFromInt(1),
 		}},
 	})

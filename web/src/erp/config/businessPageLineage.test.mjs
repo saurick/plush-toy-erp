@@ -108,6 +108,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_suppliers',
   'list_units',
   'list_warehouses',
+  'list_material_warehouses',
 ])
 
 const NON_LINEAGE_PAGE_LOCAL_CRUD_ACTIONS = Object.freeze([
@@ -132,6 +133,8 @@ const NON_LINEAGE_PAGE_LOCAL_CRUD_ACTIONS = Object.freeze([
   'update_contact',
   'update_customer',
   'update_material',
+  'create_warehouse',
+  'update_warehouse',
   'update_process',
   'update_product',
   'update_product_sku',

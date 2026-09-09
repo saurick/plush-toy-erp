@@ -57,6 +57,7 @@ type InventoryOperation struct {
 }
 
 type InventoryOperationItem struct {
+	StockCategory                     string
 	ID, OperationID                   int
 	LineNo, SubjectType               string
 	SubjectID                         int

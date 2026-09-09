@@ -140,7 +140,12 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     '销售订单经审批、工程资料和 PMC 评审后，关联有效 BOM、形成库存预留并进入生产准备。',
     [
       chainNode('sales_order', '销售订单与订单行', 'source_document', {
-        machineKeys: ['source.sales_order', 'source.order_item'],
+        machineKeys: [
+          'source.sales_order',
+          'source.order_item',
+          'source.sales_order_engineering',
+          'source.engineering_material_request',
+        ],
         sourceRefs: ['server/internal/biz/sales_order.go'],
       }),
       chainNode('sales_acceptance', '销售订单受理流程', 'process_runtime', {

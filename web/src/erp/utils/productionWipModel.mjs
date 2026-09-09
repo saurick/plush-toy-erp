@@ -437,8 +437,6 @@ function validateMaterialRequirement(value, productionOrderID) {
     !positiveSafeInteger(value.bom_item_id) ||
     !positiveSafeInteger(value.material_id) ||
     !positiveSafeInteger(value.unit_id) ||
-    (value.production_operation_code != null &&
-      value.production_operation_code !== 'FABRIC_PROCESSING') ||
     !canonicalQuantity(value.unit_quantity_snapshot) ||
     !canonicalNonNegativeQuantity(value.loss_rate_snapshot) ||
     !canonicalQuantity(value.planned_quantity) ||
@@ -685,8 +683,7 @@ export function validateProductionWipAggregate(data, expected = {}) {
           sourceBatch.production_order_item_id !==
             batch.production_order_item_id) ||
         (sourceBatch &&
-          sourceBatch.origin_rework_fact_id !==
-            batch.origin_rework_fact_id) ||
+          sourceBatch.origin_rework_fact_id !== batch.origin_rework_fact_id) ||
         (!sourceBatch &&
           positiveSafeInteger(batch.origin_rework_fact_id) &&
           (batch.flow_type !== PRODUCTION_WIP_FLOW_TYPE.REWORK ||
@@ -715,7 +712,6 @@ export function validateProductionWipAggregate(data, expected = {}) {
           !requirement ||
           requirement.production_order_item_id !==
             batch.production_order_item_id ||
-          requirement.production_operation_code !== 'FABRIC_PROCESSING' ||
           allocation.unit_id !== requirement.unit_id ||
           compareProductionWipQuantity(
             allocation.allocated_quantity,
@@ -747,22 +743,20 @@ export function validateProductionWipAggregate(data, expected = {}) {
           .filter(
             (requirement) =>
               requirement.production_order_item_id ===
-                batch.production_order_item_id &&
-              requirement.production_operation_code === 'FABRIC_PROCESSING'
+              batch.production_order_item_id
           )
           .map((requirement) => requirement.id)
         return (
           requirementIDs.length === 0 ||
-          allocations.length !== requirementIDs.length ||
+          allocations.length === 0 ||
+          allocations.length > requirementIDs.length ||
           allocations.some(
             (allocation) => allocation.subject_type !== 'MATERIAL'
           ) ||
-          requirementIDs.some(
-            (requirementID) =>
-              !allocations.some(
-                (allocation) =>
-                  allocation.production_order_material_requirement_id ===
-                  requirementID
+          allocations.some(
+            (allocation) =>
+              !requirementIDs.includes(
+                allocation.production_order_material_requirement_id
               )
           )
         )
@@ -1141,8 +1135,7 @@ export function productionWipFabricMaterialRequirements(aggregate, batch = {}) {
       .filter(
         (requirement) =>
           requirement.production_order_item_id ===
-            batch.production_order_item_id &&
-          requirement.production_operation_code === 'FABRIC_PROCESSING'
+          batch.production_order_item_id
       )
       .sort((left, right) => left.id - right.id)
   )
@@ -1164,7 +1157,6 @@ export function productionWipMaterialOutsourcingCandidateMatches(
       .trim()
       .toLowerCase() !== 'confirmed' ||
     String(operation.operation_code || '').trim() !== 'FABRIC_PROCESSING' ||
-    requirement.production_operation_code !== 'FABRIC_PROCESSING' ||
     !positiveSafeInteger(item.id) ||
     item.outsourcing_order_id !== order.id ||
     String(item.line_status || '')
@@ -1601,8 +1593,7 @@ export function partitionProductionCompletionItems(
               ...item,
               accepted_packaging_quantity:
                 eligibility.acceptedPackagingQuantity,
-              accepted_packaging_batches:
-                eligibility.acceptedPackagingBatches,
+              accepted_packaging_batches: eligibility.acceptedPackagingBatches,
             })
           : item
       )

@@ -30,7 +30,7 @@ func createShippedShipmentForFinanceFactFixture(
 	suffix := postgresTestSuffix()
 	unit := createTestUnit(t, ctx, client, "U-"+suffix)
 	product := createTestProduct(t, ctx, client, unit.ID, "P-"+suffix)
-	warehouse := createTestWarehouse(t, ctx, client, "W-"+suffix)
+	warehouse := createTestProductWarehouse(t, ctx, client, "W-"+suffix)
 	actor := client.AdminUser.Create().
 		SetUsername("finance-fixture-actor-" + suffix).
 		SetPasswordHash("test-password-hash").

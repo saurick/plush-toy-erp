@@ -76,7 +76,7 @@ func TestOperationalFactPostgresDraftCancellationOutsourcingPostVsCancelSerializ
 		lotNo := "PG-OUT-" + label
 		fact, err := uc.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
 			FactNo: "PG-OUT-" + label, OutsourcingOrderID: order.ID, OutsourcingOrderItemID: line.ID,
-			WarehouseID: fixtures.warehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1),
+			WarehouseID: fixtures.productWarehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1),
 			IdempotencyKey: "PG-OUT-" + label,
 		})
 		if err != nil {

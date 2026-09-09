@@ -313,7 +313,7 @@ func lockAndResolveStockReservationSalesOrderSource(ctx context.Context, tx *inv
 		}
 		return nil, err
 	}
-	if item.SalesOrderID != order.ID || item.LineStatus != biz.SalesOrderItemStatusOpen {
+	if item.ProductID <= 0 || item.SalesOrderID != order.ID || item.LineStatus != biz.SalesOrderItemStatusOpen {
 		return nil, biz.ErrStockReservationSourceMismatch
 	}
 	orderID := order.ID

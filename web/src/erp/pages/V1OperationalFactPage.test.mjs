@@ -38,10 +38,15 @@ test('invoice and reconciliation copy matches the available actions', () => {
   assert.doesNotMatch(source, /结清对账/u)
 })
 
-test('production progress explains the production-to-warehouse handoff', () => {
-  assert.match(source, /生产岗位在这里维护领料、返工和待入库完工报告/u)
-  assert.match(source, /仓库核对完工报告后确认成品入库/u)
-  assert.match(source, /只有仓库确认时才增加成品库存/u)
+test('production progress keeps its view and shared role help explains warehouse handoff', () => {
+  assert.match(source, /initialActiveKey: 'production'/u)
+  const help = readFileSync(
+    new URL('../config/roleHelpContent.mjs', import.meta.url),
+    'utf8'
+  )
+  assert.match(help, /办理领料、提交完工报告和返工来源记录/u)
+  assert.match(help, /核对实收数量、仓库和批次后确认成品入库/u)
+  assert.match(help, /生产提交完工报告不等于成品已经入库/u)
 })
 
 test('operational fact workspace enforces exact outsourcing read and mutation context', () => {

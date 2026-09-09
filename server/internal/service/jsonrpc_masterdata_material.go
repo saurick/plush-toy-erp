@@ -67,14 +67,27 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 }
 
 func materialMutationFromParams(pm map[string]any) *biz.MaterialMutation {
+	supplierID, valid := getOptionalJSONRPCNonNegativeInt(pm, "supplier_id")
+	if !valid {
+		invalid := -1
+		supplierID = &invalid
+	}
+	warehouseID, warehouseValid := getOptionalJSONRPCNonNegativeInt(pm, "default_warehouse_id")
+	if !warehouseValid {
+		invalid := -1
+		warehouseID = &invalid
+	}
 	return &biz.MaterialMutation{
-		Code:           getString(pm, "code"),
-		Name:           getString(pm, "name"),
-		SupplierItemNo: getWorkflowStringPtr(pm, "supplier_item_no"),
-		Category:       getWorkflowStringPtr(pm, "category"),
-		Spec:           getWorkflowStringPtr(pm, "spec"),
-		Color:          getWorkflowStringPtr(pm, "color"),
-		DefaultUnitID:  getInt(pm, "default_unit_id", 0),
+		StockCategory:      getString(pm, "stock_category"),
+		DefaultWarehouseID: warehouseID,
+		SupplierID:         supplierID,
+		Code:               getString(pm, "code"),
+		Name:               getString(pm, "name"),
+		SupplierItemNo:     getWorkflowStringPtr(pm, "supplier_item_no"),
+		Category:           getWorkflowStringPtr(pm, "category"),
+		Spec:               getWorkflowStringPtr(pm, "spec"),
+		Color:              getWorkflowStringPtr(pm, "color"),
+		DefaultUnitID:      getInt(pm, "default_unit_id", 0),
 	}
 }
 
@@ -90,17 +103,21 @@ func materialToMap(item *biz.Material) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":               item.ID,
-		"code":             item.Code,
-		"name":             item.Name,
-		"supplier_item_no": optionalStringValue(item.SupplierItemNo),
-		"category":         optionalStringValue(item.Category),
-		"spec":             optionalStringValue(item.Spec),
-		"color":            optionalStringValue(item.Color),
-		"default_unit_id":  item.DefaultUnitID,
-		"is_active":        item.IsActive,
-		"created_at":       item.CreatedAt.Unix(),
-		"updated_at":       item.UpdatedAt.Unix(),
+		"id":                   item.ID,
+		"code":                 item.Code,
+		"name":                 item.Name,
+		"supplier_item_no":     optionalStringValue(item.SupplierItemNo),
+		"supplier_id":          optionalIntValue(item.SupplierID),
+		"supplier_name":        optionalStringValue(item.SupplierName),
+		"category":             optionalStringValue(item.Category),
+		"stock_category":       item.StockCategory,
+		"default_warehouse_id": optionalIntValue(item.DefaultWarehouseID),
+		"spec":                 optionalStringValue(item.Spec),
+		"color":                optionalStringValue(item.Color),
+		"default_unit_id":      item.DefaultUnitID,
+		"is_active":            item.IsActive,
+		"created_at":           item.CreatedAt.Unix(),
+		"updated_at":           item.UpdatedAt.Unix(),
 	}
 }
 

@@ -969,6 +969,7 @@ func newPurchaseJSONRPCTestData(t *testing.T, data *datarepo.Data, admin *biz.Ad
 	logger := log.NewStdLogger(io.Discard)
 	customerConfigUC := biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo())
 	dispatcher := &jsonrpcDispatcher{
+		adminManageUC:    newAllWarehouseScopeAdminUsecase(),
 		log:              log.NewHelper(log.With(logger, "module", "service.jsonrpc.purchase.test")),
 		adminReader:      stubAdminAccountReader{admin: admin},
 		inventoryUC:      biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),

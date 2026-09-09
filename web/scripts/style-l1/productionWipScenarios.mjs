@@ -63,6 +63,72 @@ export function createProductionWipScenarios(deps) {
 
   return [
     {
+      name: 'production-wip-prepare-outsourcing-desktop',
+      path: '/erp/production/orders',
+      auth: 'admin',
+      effectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/production_wip', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method !== 'prepare_production_outsourcing_order')
+            return route.fallback()
+          assert.ok(params.production_wip_batch_id > 0)
+          assert.ok(params.supplier_id > 0)
+          assert.equal(params.expected_return_date, '2026-10-01')
+          assert.ok(!Object.hasOwn(params, 'quantity'))
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id,
+              result: {
+                code: 0,
+                message: 'ok',
+                data: {
+                  outsourcing_order_id: 1,
+                  outsourcing_order_no: 'OS-WIP-TEST-1',
+                },
+              },
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectHeading(page, '生产订单')
+        await releaseProductionOrder(page, expectText)
+        await clickVisibleAction(page, '工序办理')
+        const routeModal = page
+          .getByRole('dialog')
+          .filter({ hasText: '生产工序办理' })
+          .last()
+        await routeModal
+          .getByRole('button', { name: '安排加工', exact: true })
+          .click()
+        await routeModal.getByRole('radio', { name: '外发加工' }).check()
+        await routeModal
+          .getByRole('button', { name: '按加工安排生成委外草稿', exact: true })
+          .click()
+        const modal = page
+          .getByRole('dialog')
+          .filter({ hasText: '生成委外草稿' })
+          .last()
+        await modal.getByLabel('加工厂', { exact: true }).click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .first()
+          .click()
+        await modal.locator('input[type="date"]').fill('2026-10-01')
+        await page.screenshot({
+          path: path.join(outputDir, 'production-outsourcing-prepare.png'),
+          fullPage: true,
+        })
+        await modal.locator('.ant-modal-footer .ant-btn-primary').click()
+        await page.waitForURL(/processing-contracts.*outsourcing_order_id=1/u)
+      },
+    },
+    {
       name: 'production-wip-route-execution-desktop',
       path: '/erp/production/orders',
       auth: 'admin',
@@ -75,7 +141,6 @@ export function createProductionWipScenarios(deps) {
       effectiveSession,
       verify: async (page) => {
         await expectHeading(page, '生产订单')
-        await expectText(page, '先车缝、后手工')
         await releaseProductionOrder(page, expectText)
         await clickVisibleAction(page, '工序办理')
 
@@ -84,17 +149,7 @@ export function createProductionWipScenarios(deps) {
           .filter({ hasText: '生产工序办理' })
           .last()
         await routeModal.waitFor({ state: 'visible', timeout: 10_000 })
-        for (const copy of [
-          '布料加工 → 车缝 → 手工 → 包装',
-          '先车缝、后手工',
-          '正常首道布料加工固定按生产明细整单外发',
-          '车缝、手工两道分别独立决定',
-          '包装在本厂完成',
-          '车间移交 / WIP 转移',
-          '外发完成返回才叫回仓',
-          '在制批次',
-          '当前批次工序',
-        ]) {
+        for (const copy of ['布料加工', '车缝', '手工', '包装', '在制批次']) {
           assert(
             String((await routeModal.innerText()) || '').includes(copy),
             `生产工序弹窗缺少业务口径：${copy}`
@@ -133,10 +188,6 @@ export function createProductionWipScenarios(deps) {
         assert.equal(await outsourced.isEnabled(), true)
         assert.equal(await inhouse.isChecked(), true)
         await outsourced.check()
-        await expectText(
-          page,
-          '已按产品、规格、工序、单位和当前批次数量筛出 1 条候选'
-        )
         const outsourcingSelect = routeModal.getByLabel('关联加工合同明细')
         await outsourcingSelect.click()
         await page
@@ -159,7 +210,7 @@ export function createProductionWipScenarios(deps) {
         await inhouse.check()
         await expectText(
           page,
-          '本厂生产使用车间移交 / WIP 转移；只有外发加工完成返回才登记回仓。'
+          '本厂生产使用车间移交；外发加工完成返回才登记回仓。需要分开安排时，请先拆分批次。'
         )
         await routeModal.getByRole('button', { name: '返回工序' }).click()
 
@@ -175,7 +226,18 @@ export function createProductionWipScenarios(deps) {
         )
         await routeModal.getByRole('button', { name: '安排加工' }).click()
         await expectText(page, '安排布料整单外发')
-        await expectText(page, '已找到 1 份可完整覆盖 2 项布料需求的合同')
+        await routeModal.getByLabel('本次外发的材料', { exact: true }).click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '样式短毛绒布' })
+          .click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '样式里布' })
+          .click()
+        await routeModal
+          .getByLabel('本次外发的材料', { exact: true })
+          .press('Escape')
         const fabricContractSelect = routeModal.getByLabel('布料加工合同')
         await fabricContractSelect.click()
         await page
@@ -344,9 +406,7 @@ export function createProductionWipScenarios(deps) {
           .locator('.ant-message-notice-content:visible')
           .allInnerTexts()
         assert(
-          visibleModalSummaries.some(
-            (item) => item.title === '登记生产完工'
-          ),
+          visibleModalSummaries.some((item) => item.title === '登记生产完工'),
           `生产完工未进入可办理弹窗: ${JSON.stringify({
             modals: visibleModalSummaries,
             messages: visibleMessageTexts,

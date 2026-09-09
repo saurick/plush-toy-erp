@@ -121,6 +121,7 @@ var (
 )
 
 type InventoryLot struct {
+	StockCategory   string
 	ID              int
 	SubjectType     string
 	SubjectID       int
@@ -142,6 +143,7 @@ type InventoryLot struct {
 }
 
 type InventoryTxn struct {
+	StockCategory   string
 	ID              int
 	SubjectType     string
 	SubjectID       int
@@ -164,6 +166,7 @@ type InventoryTxn struct {
 }
 
 type InventoryBalance struct {
+	StockCategory          string
 	ID                     int
 	SubjectType            string
 	SubjectID              int
@@ -243,43 +246,46 @@ type InventoryBalanceKey struct {
 }
 
 type InventoryBalanceFilter struct {
-	SubjectType  string
-	SubjectID    int
-	ProductSkuID int
-	WarehouseID  int
-	LotID        int
-	Keyword      string
-	Limit        int
-	Offset       int
+	StockCategory string
+	SubjectType   string
+	SubjectID     int
+	ProductSkuID  int
+	WarehouseID   int
+	LotID         int
+	Keyword       string
+	Limit         int
+	Offset        int
 }
 
 type InventoryLotFilter struct {
-	SubjectType  string
-	SubjectID    int
-	ProductSkuID int
-	WarehouseID  int
-	Status       string
-	Keyword      string
-	DateFrom     *time.Time
-	DateTo       *time.Time
-	Limit        int
-	Offset       int
+	StockCategory string
+	SubjectType   string
+	SubjectID     int
+	ProductSkuID  int
+	WarehouseID   int
+	Status        string
+	Keyword       string
+	DateFrom      *time.Time
+	DateTo        *time.Time
+	Limit         int
+	Offset        int
 }
 
 type InventoryTxnFilter struct {
-	SubjectType  string
-	SubjectID    int
-	ProductSkuID int
-	WarehouseID  int
-	LotID        int
-	TxnType      string
-	SourceType   string
-	SourceID     int
-	Keyword      string
-	DateFrom     *time.Time
-	DateTo       *time.Time
-	Limit        int
-	Offset       int
+	StockCategory string
+	SubjectType   string
+	SubjectID     int
+	ProductSkuID  int
+	WarehouseID   int
+	LotID         int
+	TxnType       string
+	SourceType    string
+	SourceID      int
+	Keyword       string
+	DateFrom      *time.Time
+	DateTo        *time.Time
+	Limit         int
+	Offset        int
 }
 
 type BOMHeader struct {
@@ -307,21 +313,20 @@ type BOMHeader struct {
 }
 
 type BOMItem struct {
-	ID                      int
-	BOMHeaderID             int
-	MaterialID              int
-	Quantity                decimal.Decimal
-	UnitID                  int
-	LossRate                decimal.Decimal
-	Position                *string
-	PieceCount              *string
-	TotalUsageSnapshot      *string
-	ProcessBase             *string
-	ProcessMethod           *string
-	ProductionOperationCode *string
-	Note                    *string
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
+	ID                 int
+	BOMHeaderID        int
+	MaterialID         int
+	Quantity           decimal.Decimal
+	UnitID             int
+	LossRate           decimal.Decimal
+	Position           *string
+	PieceCount         *string
+	TotalUsageSnapshot *string
+	ProcessBase        *string
+	ProcessMethod      *string
+	Note               *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type BOMHeaderCreate struct {
@@ -357,32 +362,30 @@ type BOMHeaderUpdate struct {
 }
 
 type BOMItemCreate struct {
-	BOMHeaderID             int
-	MaterialID              int
-	Quantity                decimal.Decimal
-	UnitID                  int
-	LossRate                decimal.Decimal
-	Position                *string
-	PieceCount              *string
-	TotalUsageSnapshot      *string
-	ProcessBase             *string
-	ProcessMethod           *string
-	ProductionOperationCode *string
-	Note                    *string
+	BOMHeaderID        int
+	MaterialID         int
+	Quantity           decimal.Decimal
+	UnitID             int
+	LossRate           decimal.Decimal
+	Position           *string
+	PieceCount         *string
+	TotalUsageSnapshot *string
+	ProcessBase        *string
+	ProcessMethod      *string
+	Note               *string
 }
 
 type BOMItemUpdate struct {
-	MaterialID              int
-	Quantity                decimal.Decimal
-	UnitID                  int
-	LossRate                decimal.Decimal
-	Position                *string
-	PieceCount              *string
-	TotalUsageSnapshot      *string
-	ProcessBase             *string
-	ProcessMethod           *string
-	ProductionOperationCode *string
-	Note                    *string
+	MaterialID         int
+	Quantity           decimal.Decimal
+	UnitID             int
+	LossRate           decimal.Decimal
+	Position           *string
+	PieceCount         *string
+	TotalUsageSnapshot *string
+	ProcessBase        *string
+	ProcessMethod      *string
+	Note               *string
 }
 
 type BOMVersionMutation struct {
@@ -1170,6 +1173,9 @@ func isValidInventoryBalanceKey(key InventoryBalanceKey) bool {
 
 func normalizeInventoryBalanceFilter(in InventoryBalanceFilter) (InventoryBalanceFilter, error) {
 	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
+	if in.StockCategory != "" && (!ValidMaterialStockCategory(in.StockCategory) || in.SubjectType == InventorySubjectProduct) {
+		return InventoryBalanceFilter{}, ErrBadParam
+	}
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	if (in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType)) || in.ProductSkuID < 0 {
 		return InventoryBalanceFilter{}, ErrBadParam
@@ -1180,6 +1186,9 @@ func normalizeInventoryBalanceFilter(in InventoryBalanceFilter) (InventoryBalanc
 
 func normalizeInventoryLotFilter(in InventoryLotFilter) (InventoryLotFilter, error) {
 	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
+	if in.StockCategory != "" && (!ValidMaterialStockCategory(in.StockCategory) || in.SubjectType == InventorySubjectProduct) {
+		return InventoryLotFilter{}, ErrBadParam
+	}
 	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	if (in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType)) || in.ProductSkuID < 0 {
@@ -1197,6 +1206,9 @@ func normalizeInventoryLotFilter(in InventoryLotFilter) (InventoryLotFilter, err
 
 func normalizeInventoryTxnFilter(in InventoryTxnFilter) (InventoryTxnFilter, error) {
 	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
+	if in.StockCategory != "" && (!ValidMaterialStockCategory(in.StockCategory) || in.SubjectType == InventorySubjectProduct) {
+		return InventoryTxnFilter{}, ErrBadParam
+	}
 	in.TxnType = strings.ToUpper(strings.TrimSpace(in.TxnType))
 	in.SourceType = strings.ToUpper(strings.TrimSpace(in.SourceType))
 	in.Keyword = strings.TrimSpace(in.Keyword)
@@ -1338,14 +1350,6 @@ func normalizeBOMItemCreate(in BOMItemCreate) (BOMItemCreate, error) {
 	in.TotalUsageSnapshot = normalizeOptionalString(in.TotalUsageSnapshot)
 	in.ProcessBase = normalizeOptionalString(in.ProcessBase)
 	in.ProcessMethod = normalizeOptionalString(in.ProcessMethod)
-	in.ProductionOperationCode = normalizeOptionalString(in.ProductionOperationCode)
-	if in.ProductionOperationCode != nil {
-		value := strings.ToUpper(*in.ProductionOperationCode)
-		if value != ProductionWIPOperationFabricProcessing {
-			return BOMItemCreate{}, ErrBadParam
-		}
-		in.ProductionOperationCode = &value
-	}
 	in.Note = normalizeOptionalString(in.Note)
 	if in.BOMHeaderID <= 0 ||
 		in.MaterialID <= 0 ||
@@ -1365,14 +1369,6 @@ func normalizeBOMItemUpdate(in BOMItemUpdate) (BOMItemUpdate, error) {
 	in.TotalUsageSnapshot = normalizeOptionalString(in.TotalUsageSnapshot)
 	in.ProcessBase = normalizeOptionalString(in.ProcessBase)
 	in.ProcessMethod = normalizeOptionalString(in.ProcessMethod)
-	in.ProductionOperationCode = normalizeOptionalString(in.ProductionOperationCode)
-	if in.ProductionOperationCode != nil {
-		value := strings.ToUpper(*in.ProductionOperationCode)
-		if value != ProductionWIPOperationFabricProcessing {
-			return BOMItemUpdate{}, ErrBadParam
-		}
-		in.ProductionOperationCode = &value
-	}
 	in.Note = normalizeOptionalString(in.Note)
 	if in.MaterialID <= 0 ||
 		in.UnitID <= 0 ||

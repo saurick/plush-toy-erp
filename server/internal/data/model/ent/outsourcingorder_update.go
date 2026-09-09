@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/supplier"
 	"time"
 
@@ -27,6 +28,73 @@ type OutsourcingOrderUpdate struct {
 // Where appends a list predicates to the OutsourcingOrderUpdate builder.
 func (_u *OutsourcingOrderUpdate) Where(ps ...predicate.OutsourcingOrder) *OutsourcingOrderUpdate {
 	_u.mutation.Where(ps...)
+	return _u
+}
+
+// SetSourceWipBatchID sets the "source_wip_batch_id" field.
+func (_u *OutsourcingOrderUpdate) SetSourceWipBatchID(v int) *OutsourcingOrderUpdate {
+	_u.mutation.SetSourceWipBatchID(v)
+	return _u
+}
+
+// SetNillableSourceWipBatchID sets the "source_wip_batch_id" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdate) SetNillableSourceWipBatchID(v *int) *OutsourcingOrderUpdate {
+	if v != nil {
+		_u.SetSourceWipBatchID(*v)
+	}
+	return _u
+}
+
+// ClearSourceWipBatchID clears the value of the "source_wip_batch_id" field.
+func (_u *OutsourcingOrderUpdate) ClearSourceWipBatchID() *OutsourcingOrderUpdate {
+	_u.mutation.ClearSourceWipBatchID()
+	return _u
+}
+
+// SetSourceWipIntentHash sets the "source_wip_intent_hash" field.
+func (_u *OutsourcingOrderUpdate) SetSourceWipIntentHash(v string) *OutsourcingOrderUpdate {
+	_u.mutation.SetSourceWipIntentHash(v)
+	return _u
+}
+
+// SetNillableSourceWipIntentHash sets the "source_wip_intent_hash" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdate) SetNillableSourceWipIntentHash(v *string) *OutsourcingOrderUpdate {
+	if v != nil {
+		_u.SetSourceWipIntentHash(*v)
+	}
+	return _u
+}
+
+// ClearSourceWipIntentHash clears the value of the "source_wip_intent_hash" field.
+func (_u *OutsourcingOrderUpdate) ClearSourceWipIntentHash() *OutsourcingOrderUpdate {
+	_u.mutation.ClearSourceWipIntentHash()
+	return _u
+}
+
+// SetSourceWipPreparedBy sets the "source_wip_prepared_by" field.
+func (_u *OutsourcingOrderUpdate) SetSourceWipPreparedBy(v int) *OutsourcingOrderUpdate {
+	_u.mutation.ResetSourceWipPreparedBy()
+	_u.mutation.SetSourceWipPreparedBy(v)
+	return _u
+}
+
+// SetNillableSourceWipPreparedBy sets the "source_wip_prepared_by" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdate) SetNillableSourceWipPreparedBy(v *int) *OutsourcingOrderUpdate {
+	if v != nil {
+		_u.SetSourceWipPreparedBy(*v)
+	}
+	return _u
+}
+
+// AddSourceWipPreparedBy adds value to the "source_wip_prepared_by" field.
+func (_u *OutsourcingOrderUpdate) AddSourceWipPreparedBy(v int) *OutsourcingOrderUpdate {
+	_u.mutation.AddSourceWipPreparedBy(v)
+	return _u
+}
+
+// ClearSourceWipPreparedBy clears the value of the "source_wip_prepared_by" field.
+func (_u *OutsourcingOrderUpdate) ClearSourceWipPreparedBy() *OutsourcingOrderUpdate {
+	_u.mutation.ClearSourceWipPreparedBy()
 	return _u
 }
 
@@ -345,6 +413,11 @@ func (_u *OutsourcingOrderUpdate) SetUpdatedAt(v time.Time) *OutsourcingOrderUpd
 	return _u
 }
 
+// SetSourceWipBatch sets the "source_wip_batch" edge to the ProductionWIPBatch entity.
+func (_u *OutsourcingOrderUpdate) SetSourceWipBatch(v *ProductionWIPBatch) *OutsourcingOrderUpdate {
+	return _u.SetSourceWipBatchID(v.ID)
+}
+
 // SetSupplier sets the "supplier" edge to the Supplier entity.
 func (_u *OutsourcingOrderUpdate) SetSupplier(v *Supplier) *OutsourcingOrderUpdate {
 	return _u.SetSupplierID(v.ID)
@@ -368,6 +441,12 @@ func (_u *OutsourcingOrderUpdate) AddItems(v ...*OutsourcingOrderItem) *Outsourc
 // Mutation returns the OutsourcingOrderMutation object of the builder.
 func (_u *OutsourcingOrderUpdate) Mutation() *OutsourcingOrderMutation {
 	return _u.mutation
+}
+
+// ClearSourceWipBatch clears the "source_wip_batch" edge to the ProductionWIPBatch entity.
+func (_u *OutsourcingOrderUpdate) ClearSourceWipBatch() *OutsourcingOrderUpdate {
+	_u.mutation.ClearSourceWipBatch()
+	return _u
 }
 
 // ClearSupplier clears the "supplier" edge to the Supplier entity.
@@ -435,6 +514,21 @@ func (_u *OutsourcingOrderUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *OutsourcingOrderUpdate) check() error {
+	if v, ok := _u.mutation.SourceWipBatchID(); ok {
+		if err := outsourcingorder.SourceWipBatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_wip_batch_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SourceWipIntentHash(); ok {
+		if err := outsourcingorder.SourceWipIntentHashValidator(v); err != nil {
+			return &ValidationError{Name: "source_wip_intent_hash", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_wip_intent_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SourceWipPreparedBy(); ok {
+		if err := outsourcingorder.SourceWipPreparedByValidator(v); err != nil {
+			return &ValidationError{Name: "source_wip_prepared_by", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_wip_prepared_by": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.OutsourcingOrderNo(); ok {
 		if err := outsourcingorder.OutsourcingOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "outsourcing_order_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.outsourcing_order_no": %w`, err)}
@@ -512,6 +606,21 @@ func (_u *OutsourcingOrderUpdate) sqlSave(ctx context.Context) (_node int, err e
 				ps[i](selector)
 			}
 		}
+	}
+	if value, ok := _u.mutation.SourceWipIntentHash(); ok {
+		_spec.SetField(outsourcingorder.FieldSourceWipIntentHash, field.TypeString, value)
+	}
+	if _u.mutation.SourceWipIntentHashCleared() {
+		_spec.ClearField(outsourcingorder.FieldSourceWipIntentHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.SourceWipPreparedBy(); ok {
+		_spec.SetField(outsourcingorder.FieldSourceWipPreparedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSourceWipPreparedBy(); ok {
+		_spec.AddField(outsourcingorder.FieldSourceWipPreparedBy, field.TypeInt, value)
+	}
+	if _u.mutation.SourceWipPreparedByCleared() {
+		_spec.ClearField(outsourcingorder.FieldSourceWipPreparedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.OutsourcingOrderNo(); ok {
 		_spec.SetField(outsourcingorder.FieldOutsourcingOrderNo, field.TypeString, value)
@@ -606,6 +715,35 @@ func (_u *OutsourcingOrderUpdate) sqlSave(ctx context.Context) (_node int, err e
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(outsourcingorder.FieldUpdatedAt, field.TypeTime, value)
 	}
+	if _u.mutation.SourceWipBatchCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingorder.SourceWipBatchTable,
+			Columns: []string{outsourcingorder.SourceWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SourceWipBatchIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingorder.SourceWipBatchTable,
+			Columns: []string{outsourcingorder.SourceWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.SupplierCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -698,6 +836,73 @@ type OutsourcingOrderUpdateOne struct {
 	fields   []string
 	hooks    []Hook
 	mutation *OutsourcingOrderMutation
+}
+
+// SetSourceWipBatchID sets the "source_wip_batch_id" field.
+func (_u *OutsourcingOrderUpdateOne) SetSourceWipBatchID(v int) *OutsourcingOrderUpdateOne {
+	_u.mutation.SetSourceWipBatchID(v)
+	return _u
+}
+
+// SetNillableSourceWipBatchID sets the "source_wip_batch_id" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdateOne) SetNillableSourceWipBatchID(v *int) *OutsourcingOrderUpdateOne {
+	if v != nil {
+		_u.SetSourceWipBatchID(*v)
+	}
+	return _u
+}
+
+// ClearSourceWipBatchID clears the value of the "source_wip_batch_id" field.
+func (_u *OutsourcingOrderUpdateOne) ClearSourceWipBatchID() *OutsourcingOrderUpdateOne {
+	_u.mutation.ClearSourceWipBatchID()
+	return _u
+}
+
+// SetSourceWipIntentHash sets the "source_wip_intent_hash" field.
+func (_u *OutsourcingOrderUpdateOne) SetSourceWipIntentHash(v string) *OutsourcingOrderUpdateOne {
+	_u.mutation.SetSourceWipIntentHash(v)
+	return _u
+}
+
+// SetNillableSourceWipIntentHash sets the "source_wip_intent_hash" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdateOne) SetNillableSourceWipIntentHash(v *string) *OutsourcingOrderUpdateOne {
+	if v != nil {
+		_u.SetSourceWipIntentHash(*v)
+	}
+	return _u
+}
+
+// ClearSourceWipIntentHash clears the value of the "source_wip_intent_hash" field.
+func (_u *OutsourcingOrderUpdateOne) ClearSourceWipIntentHash() *OutsourcingOrderUpdateOne {
+	_u.mutation.ClearSourceWipIntentHash()
+	return _u
+}
+
+// SetSourceWipPreparedBy sets the "source_wip_prepared_by" field.
+func (_u *OutsourcingOrderUpdateOne) SetSourceWipPreparedBy(v int) *OutsourcingOrderUpdateOne {
+	_u.mutation.ResetSourceWipPreparedBy()
+	_u.mutation.SetSourceWipPreparedBy(v)
+	return _u
+}
+
+// SetNillableSourceWipPreparedBy sets the "source_wip_prepared_by" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdateOne) SetNillableSourceWipPreparedBy(v *int) *OutsourcingOrderUpdateOne {
+	if v != nil {
+		_u.SetSourceWipPreparedBy(*v)
+	}
+	return _u
+}
+
+// AddSourceWipPreparedBy adds value to the "source_wip_prepared_by" field.
+func (_u *OutsourcingOrderUpdateOne) AddSourceWipPreparedBy(v int) *OutsourcingOrderUpdateOne {
+	_u.mutation.AddSourceWipPreparedBy(v)
+	return _u
+}
+
+// ClearSourceWipPreparedBy clears the value of the "source_wip_prepared_by" field.
+func (_u *OutsourcingOrderUpdateOne) ClearSourceWipPreparedBy() *OutsourcingOrderUpdateOne {
+	_u.mutation.ClearSourceWipPreparedBy()
+	return _u
 }
 
 // SetOutsourcingOrderNo sets the "outsourcing_order_no" field.
@@ -1015,6 +1220,11 @@ func (_u *OutsourcingOrderUpdateOne) SetUpdatedAt(v time.Time) *OutsourcingOrder
 	return _u
 }
 
+// SetSourceWipBatch sets the "source_wip_batch" edge to the ProductionWIPBatch entity.
+func (_u *OutsourcingOrderUpdateOne) SetSourceWipBatch(v *ProductionWIPBatch) *OutsourcingOrderUpdateOne {
+	return _u.SetSourceWipBatchID(v.ID)
+}
+
 // SetSupplier sets the "supplier" edge to the Supplier entity.
 func (_u *OutsourcingOrderUpdateOne) SetSupplier(v *Supplier) *OutsourcingOrderUpdateOne {
 	return _u.SetSupplierID(v.ID)
@@ -1038,6 +1248,12 @@ func (_u *OutsourcingOrderUpdateOne) AddItems(v ...*OutsourcingOrderItem) *Outso
 // Mutation returns the OutsourcingOrderMutation object of the builder.
 func (_u *OutsourcingOrderUpdateOne) Mutation() *OutsourcingOrderMutation {
 	return _u.mutation
+}
+
+// ClearSourceWipBatch clears the "source_wip_batch" edge to the ProductionWIPBatch entity.
+func (_u *OutsourcingOrderUpdateOne) ClearSourceWipBatch() *OutsourcingOrderUpdateOne {
+	_u.mutation.ClearSourceWipBatch()
+	return _u
 }
 
 // ClearSupplier clears the "supplier" edge to the Supplier entity.
@@ -1118,6 +1334,21 @@ func (_u *OutsourcingOrderUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *OutsourcingOrderUpdateOne) check() error {
+	if v, ok := _u.mutation.SourceWipBatchID(); ok {
+		if err := outsourcingorder.SourceWipBatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_wip_batch_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SourceWipIntentHash(); ok {
+		if err := outsourcingorder.SourceWipIntentHashValidator(v); err != nil {
+			return &ValidationError{Name: "source_wip_intent_hash", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_wip_intent_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SourceWipPreparedBy(); ok {
+		if err := outsourcingorder.SourceWipPreparedByValidator(v); err != nil {
+			return &ValidationError{Name: "source_wip_prepared_by", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_wip_prepared_by": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.OutsourcingOrderNo(); ok {
 		if err := outsourcingorder.OutsourcingOrderNoValidator(v); err != nil {
 			return &ValidationError{Name: "outsourcing_order_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.outsourcing_order_no": %w`, err)}
@@ -1213,6 +1444,21 @@ func (_u *OutsourcingOrderUpdateOne) sqlSave(ctx context.Context) (_node *Outsou
 			}
 		}
 	}
+	if value, ok := _u.mutation.SourceWipIntentHash(); ok {
+		_spec.SetField(outsourcingorder.FieldSourceWipIntentHash, field.TypeString, value)
+	}
+	if _u.mutation.SourceWipIntentHashCleared() {
+		_spec.ClearField(outsourcingorder.FieldSourceWipIntentHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.SourceWipPreparedBy(); ok {
+		_spec.SetField(outsourcingorder.FieldSourceWipPreparedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSourceWipPreparedBy(); ok {
+		_spec.AddField(outsourcingorder.FieldSourceWipPreparedBy, field.TypeInt, value)
+	}
+	if _u.mutation.SourceWipPreparedByCleared() {
+		_spec.ClearField(outsourcingorder.FieldSourceWipPreparedBy, field.TypeInt)
+	}
 	if value, ok := _u.mutation.OutsourcingOrderNo(); ok {
 		_spec.SetField(outsourcingorder.FieldOutsourcingOrderNo, field.TypeString, value)
 	}
@@ -1305,6 +1551,35 @@ func (_u *OutsourcingOrderUpdateOne) sqlSave(ctx context.Context) (_node *Outsou
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(outsourcingorder.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.SourceWipBatchCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingorder.SourceWipBatchTable,
+			Columns: []string{outsourcingorder.SourceWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SourceWipBatchIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingorder.SourceWipBatchTable,
+			Columns: []string{outsourcingorder.SourceWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.SupplierCleared() {
 		edge := &sqlgraph.EdgeSpec{

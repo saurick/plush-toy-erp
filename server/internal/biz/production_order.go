@@ -116,7 +116,6 @@ type ProductionOrderMaterialRequirement struct {
 	BOMItemID                 int             `json:"bom_item_id"`
 	MaterialID                int             `json:"material_id"`
 	UnitID                    int             `json:"unit_id"`
-	ProductionOperationCode   *string         `json:"production_operation_code,omitempty"`
 	UnitQuantitySnapshot      decimal.Decimal `json:"unit_quantity_snapshot"`
 	LossRateSnapshot          decimal.Decimal `json:"loss_rate_snapshot"`
 	PlannedQuantity           decimal.Decimal `json:"planned_quantity"`

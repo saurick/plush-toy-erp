@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/supplier"
@@ -20,6 +21,20 @@ type PurchaseOrderCreate struct {
 	config
 	mutation *PurchaseOrderMutation
 	hooks    []Hook
+}
+
+// SetEngineeringMaterialRequestID sets the "engineering_material_request_id" field.
+func (_c *PurchaseOrderCreate) SetEngineeringMaterialRequestID(v int) *PurchaseOrderCreate {
+	_c.mutation.SetEngineeringMaterialRequestID(v)
+	return _c
+}
+
+// SetNillableEngineeringMaterialRequestID sets the "engineering_material_request_id" field if the given value is not nil.
+func (_c *PurchaseOrderCreate) SetNillableEngineeringMaterialRequestID(v *int) *PurchaseOrderCreate {
+	if v != nil {
+		_c.SetEngineeringMaterialRequestID(*v)
+	}
+	return _c
 }
 
 // SetPurchaseOrderNo sets the "purchase_order_no" field.
@@ -318,6 +333,11 @@ func (_c *PurchaseOrderCreate) SetNillableUpdatedAt(v *time.Time) *PurchaseOrder
 	return _c
 }
 
+// SetEngineeringMaterialRequest sets the "engineering_material_request" edge to the EngineeringMaterialRequest entity.
+func (_c *PurchaseOrderCreate) SetEngineeringMaterialRequest(v *EngineeringMaterialRequest) *PurchaseOrderCreate {
+	return _c.SetEngineeringMaterialRequestID(v.ID)
+}
+
 // SetSupplier sets the "supplier" edge to the Supplier entity.
 func (_c *PurchaseOrderCreate) SetSupplier(v *Supplier) *PurchaseOrderCreate {
 	return _c.SetSupplierID(v.ID)
@@ -397,6 +417,11 @@ func (_c *PurchaseOrderCreate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *PurchaseOrderCreate) check() error {
+	if v, ok := _c.mutation.EngineeringMaterialRequestID(); ok {
+		if err := purchaseorder.EngineeringMaterialRequestIDValidator(v); err != nil {
+			return &ValidationError{Name: "engineering_material_request_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.engineering_material_request_id": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.PurchaseOrderNo(); !ok {
 		return &ValidationError{Name: "purchase_order_no", err: errors.New(`ent: missing required field "PurchaseOrder.purchase_order_no"`)}
 	}
@@ -616,6 +641,23 @@ func (_c *PurchaseOrderCreate) createSpec() (*PurchaseOrder, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(purchaseorder.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := _c.mutation.EngineeringMaterialRequestIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   purchaseorder.EngineeringMaterialRequestTable,
+			Columns: []string{purchaseorder.EngineeringMaterialRequestColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(engineeringmaterialrequest.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.EngineeringMaterialRequestID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.SupplierIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

@@ -146,7 +146,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `REWORK`                                                                | `production_wip_batch_id`、`target_operation_id`、`quantity`、`reason`   | `production.wip.rework`                 |
 | `CONFIRM_PACKAGING_MATERIAL`                                            | `production_order_item_id`、`packaging_version_snapshot`、可选 `note`    | `production.packaging_material.confirm` |
 
-`production_orders` 与 `quality_inspections` 必须处于可读 / 可写的对应模块状态；外发安排和外发回仓还要求 `outsourcing_orders` 可写。`CANCEL_BATCH` 只接受尚未开工的 `PLANNED` 批次，要求非空取消原因，以 CAS 和幂等事件把状态改为 `CANCELLED`；它不重新拆分数量，也不冲正外发、库存或其它事实。批次拆分是一次原子动作，至少两个子批且总量必须精确等于父批；首道 `FABRIC_PROCESSING` 正常流禁止拆分，只能按生产订单行整单外发。其 allocation 必须且只能逐条覆盖冻结需求中显式标记 `production_operation_code=FABRIC_PROCESSING` 的 MATERIAL 合同行，开始前还要有足量已过账委外发料，不按材料名称或类别文本推断。裁片关口 `PASS` 并转入 `SEWING` 后，产品数量才可拆批；车缝和手工各自决定本厂或外发。返工回到 FABRIC 后若再次外发，返工批次使用新的 PRODUCT 合同行，不复用正常流 MATERIAL 行。生产订单仍有 `PLANNED / IN_PROGRESS / OUTSOURCED / WAITING_QUALITY` 批次时，`close_production_order` 和 `cancel_production_order` 都会失败；`SPLIT` 父批由子批承接，只有其非终态子批继续阻断，系统不会在关闭或取消订单时自动取消 WIP、冲正发料或替代外发收口。
+`production_orders` 与 `quality_inspections` 必须处于可读 / 可写的对应模块状态；外发安排和外发回仓还要求 `outsourcing_orders` 可写。`CANCEL_BATCH` 只接受尚未开工的 `PLANNED` 批次，要求非空取消原因，以 CAS 和幂等事件把状态改为 `CANCELLED`；它不重新拆分数量，也不冲正外发、库存或其它事实。批次拆分是一次原子动作，至少两个子批且总量必须精确等于父批；首道 `FABRIC_PROCESSING` 正常流禁止拆分，只能按生产订单行整单外发。其 allocation 必须且只能逐条覆盖生产负责人所选冻结材料需求对应的 MATERIAL 合同行，开始前还要有足量已过账委外发料，不按材料名称或类别文本推断。裁片关口 `PASS` 并转入 `SEWING` 后，产品数量才可拆批；车缝和手工各自决定本厂或外发。返工回到 FABRIC 后若再次外发，返工批次使用新的 PRODUCT 合同行，不复用正常流 MATERIAL 行。生产订单仍有 `PLANNED / IN_PROGRESS / OUTSOURCED / WAITING_QUALITY` 批次时，`close_production_order` 和 `cancel_production_order` 都会失败；`SPLIT` 父批由子批承接，只有其非终态子批继续阻断，系统不会在关闭或取消订单时自动取消 WIP、冲正发料或替代外发收口。
 
 内部完成后的下一道流转记录为 `WIP_TRANSFER`；只有外发完成返回记录为 `OUTSOURCE_RETURN`。裁片、皮套、成品、针检、抽检和订单条件性客户验货是独立质量关口，当前只有 `PASSED + PASS` 可继续转序，通用 `CONCESSION` 对生产 WIP fail closed。包装开始前还必须有独立包材业务确认；路线订单的最终完工入库数量不得超过已验收包装 WIP。
 
@@ -332,3 +332,27 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 - 邀请码
 
 如果后续需要这些能力，应按真实需求重新定义 schema、错误码、接口和前端消费层，而不是把历史逻辑直接加回主干。
+
+## 接单、工程打样与用料审批 / Order Engineering Material Review
+
+销售订单行可先填写 `requested_product_name`、`customer_product_no`、`order_category`、`process_requirement`、数量、单位及 `pre_shipment_sample_quantity`，此时 `product_id` / `product_sku_id` 可空。产品和 BOM 由 `sales_order.save_sales_order_engineering` 单独关联，要求 `expected_version`，关联 BOM 时还要求 `expected_bom_version`。工程状态为 `PREPARING / SAMPLING / CONFIRMED`；确认与退回说明均由服务端验证，返单 `reuse_confirmed_sample` 只复用同客户相同资料的已确认样品。工程动作不能修改商务价格。
+
+| 域 / 方法 | 输入与权限 | 结果与边界 |
+| --- | --- | --- |
+| `sales_order.get_engineering_material_request` | `sales_order_id`、可选 `preview`；`engineering.material.read` 和销售来源读取 | 最新审批或现时汇总、部位来源与阻塞原因，价格按敏感字段权限隐藏 |
+| `sales_order.submit_engineering_material_request` | `sales_order_id`、`expected_version`、`expected_source_hash`；`engineering.material.submit` | 生成不可改写的订单材料快照；版本变化拒绝提交 |
+| `sales_order.boss_review_engineering_material_request` | `id`、`expected_version`、`BOSS_APPROVE / REJECT`、备注；`engineering.material.boss_approve` | 老板审核或有原因退回 |
+| `sales_order.finance_review_engineering_material_request` | `id`、`expected_version`、`FINANCE_APPROVE / REJECT`、备注；精确财务审批和采购价格读取权限 | 每项须提供审批明细 `id`、`purchase_quantity`、`unit_price`、`expected_arrival_date`，采购数量调整须说明；另一位财务批准后按厂商原子生成 approved 采购单，精确重试返回同批单据 |
+| `production_wip.prepare_production_outsourcing_order` | `production_wip_batch_id`、`expected_version`、`supplier_id`、`expected_return_date`、首道的 `requirement_ids`；生产安排及来源读取权限 | 按生产负责人明确选择生成委外草稿，数量来自冻结需求或 WIP 批次；不接收客户端数量、价格或操作者覆盖 |
+
+用料审批不自动扣库存、付款或创建 Workflow 任务；委外草稿仍须补价确认，发料、回货、IQC 与入库沿用独立事实动作。材料接口增加 `supplier_id / supplier_name`；厂商、料号、色号构成材料身份。BOM 的部位行不再接收生产归属标记。
+
+### 材料库存类别与仓库
+
+`masterdata.create_material / update_material` 使用 `stock_category`（`MAIN / AUXILIARY / PACKAGING / OTHER / UNCLASSIFIED`）和可空 `default_warehouse_id`；`category` 仍保存细分分类。材料更新采用完整字段覆盖，默认仓为空即清除。默认仓必须启用且与库存类别相容。
+
+`masterdata.create_warehouse / update_warehouse` 接收 `code / name / type / is_active`，修改还要求正整数 `id`。用途为 `MAIN_MATERIAL / AUXILIARY_MATERIAL / PACKAGING_MATERIAL / OTHER_MATERIAL / MATERIAL / FINISHED_GOODS / UNCLASSIFIED`。要求 `warehouse.manage` 和仓库数据范围，新增要求全部仓库范围。冲突的正库存或默认仓关联阻止类别变更和停用。`list_warehouses` 保持库存读取权限与仓库范围；`list_material_warehouses` 只返回启用材料仓的主数据选项，要求 `material.read`，不返回库存事实。
+
+`purchase.create_purchase_receipt_from_purchase_order` 可通过 `item_warehouses: [{purchase_order_item_id, warehouse_id}]` 逐行选择入库仓；全部待收行均有选择时可省略整单 `warehouse_id`。指定不存在、已收完或非本订单的行会拒绝整单。每行仓库参与幂等请求摘要，重放不能偷偷替换仓库；当前账号必须有全部目标仓的访问范围。生成草稿不增加库存。
+
+`inventory.list_inventory_balances / list_inventory_lots / list_inventory_txns` 支持 `stock_category` 筛选（与 `PRODUCT` 互斥），列表返回材料当前 `stock_category`。分类在服务端计数和分页前过滤；库存作业详情的材料行也返回该只读字段。新入库与库存增加统一验证用途和启用状态，原始流水的合法冲正与原请求重放保留。

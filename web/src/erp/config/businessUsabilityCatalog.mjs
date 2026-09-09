@@ -82,7 +82,7 @@ function guide(definition) {
 const GUIDE_BY_PAGE_KEY = Object.freeze({
   'sales-orders': guide({
     completion:
-      '订单号、客户、产品、数量、价格和提交状态都能查到；需要审批的事项已经生成。只有显示“已生效”的订单，才可以继续按已批准订单办理。',
+      '订单号、客户需求、数量、价格和提交状态都能查到；需要审批的事项已经生成。只有显示“已生效”的订单，才可以继续按已批准订单办理。',
     handoff:
       '已生效订单交给 PMC、工程和生产继续准备；实际出货、应收、发票和收款仍分别到对应页面办理。',
     requiredHelpTypes: [
@@ -128,7 +128,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
         BUSINESS_HELP_TYPES.SOURCE,
         'customer-product-source',
         '客户和产品从哪里来',
-        '客户来自客户档案，产品和规格来自产品档案；选择后系统带入可用资料，订单保存后以当前订单记录为准。',
+        '客户来自客户档案；尚无产品时先填写需求名称，工程接单后建立产品和规格。选择已有产品时带入可用资料，订单保存后以当前订单记录为准。',
         {
           updateRule:
             '切换客户、产品或规格时必须重新核对旧值；档案以后变化不会被当作订单已经重新确认。',
@@ -146,7 +146,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     completion:
       '产品、版本号、材料、单件用量、损耗率和版本状态都能查到；需要用于新生产订单时，必须明确哪一个版本已经生效。',
     handoff:
-      '生效版本交给 PMC 和生产作为新生产订单的工程资料；采购和库存仍按真实需求及业务单据办理。',
+      '样品确认后的生效版本交给 PMC 和生产；工程在销售订单提交用料汇总，老板审核和财务核价后按厂商生成采购单。',
     requiredHelpTypes: [
       BUSINESS_HELP_TYPES.TERM,
       BUSINESS_HELP_TYPES.FORMULA,
@@ -155,7 +155,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
       BUSINESS_HELP_TYPES.DISABLED,
     ],
     flowSteps: [
-      '工程先选择产品，建立物料清单版本并维护材料明细。',
+      '工程先按订单需求建立产品图样，再建立 BOM；材料只选一次，同料各部位连续填写。',
       '核对每种材料的单位、单件用量和损耗率。',
       '确认无误后激活正确版本；同一产品只保留一个当前生效版本。',
       '新生产订单发布时读取并冻结当时的工程资料，后续变更不偷偷改写旧订单。',
@@ -175,7 +175,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
         BUSINESS_HELP_TYPES.FORMULA,
         'loss-rate',
         '损耗率怎么理解',
-        '损耗率表示在净用量之外需要考虑的额外比例；页面维护的是工程参数，实际生产需求以生产订单发布时冻结的结果为准。',
+        '页面按百分比填写部位损耗。部位用量为生产数量乘单位用量再乘一加损耗率，片数不重复相乘；采购汇总包含船头样，实际领料以发布时冻结的需求和领料事实为准。',
         {
           source: '物料清单明细中的单件用量和损耗率。',
           example: '净用量 100，损耗率 5%，可理解为额外考虑 5。',

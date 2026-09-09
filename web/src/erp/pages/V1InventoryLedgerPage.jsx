@@ -29,6 +29,11 @@ import {
   useSearchParams,
 } from 'react-router-dom'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
+import {
+  MATERIAL_STOCK_CATEGORY_OPTIONS,
+  materialStockCategoryLabel,
+} from '../utils/warehouseClassification.mjs'
+import WarehouseSettingsModal from '../components/inventory/WarehouseSettingsModal.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -423,6 +428,8 @@ export default function V1InventoryLedgerPage() {
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [subjectType, setSubjectType] = useState('')
+  const [stockCategory, setStockCategory] = useState('')
+  const [warehouseSettingsOpen, setWarehouseSettingsOpen] = useState(false)
   const [subjectID, setSubjectID] = useState('')
   const [productSkuID, setProductSkuID] = useState('')
   const [warehouseID, setWarehouseID] = useState('')
@@ -586,6 +593,7 @@ export default function V1InventoryLedgerPage() {
     () =>
       compactParams({
         subject_type: subjectType,
+        stock_category: stockCategory || undefined,
         subject_id: subjectID || undefined,
         product_sku_id: productSkuID || undefined,
         warehouse_id: warehouseID || undefined,
@@ -609,6 +617,7 @@ export default function V1InventoryLedgerPage() {
       routeSourceID,
       routeSourceType,
       subjectID,
+      stockCategory,
       subjectType,
       warehouseID,
     ]
@@ -1446,8 +1455,14 @@ export default function V1InventoryLedgerPage() {
           exportTitle: '存货类型',
           dataIndex: 'subject_type',
           width: 110,
-          render: subjectTypeTag,
-          exportValue: (record) => subjectTypeText(record?.subject_type),
+          render: (value, record) =>
+            value === 'MATERIAL'
+              ? materialStockCategoryLabel(record.stock_category)
+              : subjectTypeTag(value),
+          exportValue: (record) =>
+            record?.subject_type === 'MATERIAL'
+              ? materialStockCategoryLabel(record.stock_category)
+              : subjectTypeText(record?.subject_type),
         },
         {
           title: '材料 / 产品',
@@ -1555,8 +1570,14 @@ export default function V1InventoryLedgerPage() {
           exportTitle: '存货类型',
           dataIndex: 'subject_type',
           width: 110,
-          render: subjectTypeTag,
-          exportValue: (record) => subjectTypeText(record?.subject_type),
+          render: (value, record) =>
+            value === 'MATERIAL'
+              ? materialStockCategoryLabel(record.stock_category)
+              : subjectTypeTag(value),
+          exportValue: (record) =>
+            record?.subject_type === 'MATERIAL'
+              ? materialStockCategoryLabel(record.stock_category)
+              : subjectTypeText(record?.subject_type),
         },
         {
           title: '材料 / 产品',
@@ -1691,8 +1712,14 @@ export default function V1InventoryLedgerPage() {
         exportTitle: '存货类型',
         dataIndex: 'subject_type',
         width: 110,
-        render: subjectTypeTag,
-        exportValue: (record) => subjectTypeText(record?.subject_type),
+        render: (value, record) =>
+          value === 'MATERIAL'
+            ? materialStockCategoryLabel(record.stock_category)
+            : subjectTypeTag(value),
+        exportValue: (record) =>
+          record?.subject_type === 'MATERIAL'
+            ? materialStockCategoryLabel(record.stock_category)
+            : subjectTypeText(record?.subject_type),
       },
       {
         title: '材料 / 产品',
@@ -1829,6 +1856,7 @@ export default function V1InventoryLedgerPage() {
   const hasActiveFilters = Boolean(
     keyword.trim() ||
       subjectType ||
+      stockCategory ||
       subjectID ||
       productSkuID ||
       warehouseID ||
@@ -1846,6 +1874,7 @@ export default function V1InventoryLedgerPage() {
   const clearFilters = useCallback(() => {
     setKeyword('')
     setSubjectType('')
+    setStockCategory('')
     setSubjectID('')
     setProductSkuID('')
     setWarehouseID('')
@@ -2111,8 +2140,26 @@ export default function V1InventoryLedgerPage() {
               options={subjectTypeOptions}
               onChange={(nextType) => {
                 setSubjectType(nextType || '')
+                setStockCategory('')
                 setSubjectID('')
                 setProductSkuID('')
+                resetCurrentPage()
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              aria-label="材料库存类别"
+              value={stockCategory}
+              disabled={subjectType === 'PRODUCT'}
+              options={[
+                { value: '', label: '全部材料类别' },
+                ...MATERIAL_STOCK_CATEGORY_OPTIONS,
+                { value: 'UNCLASSIFIED', label: '待分类' },
+              ]}
+              onChange={(value) => {
+                setStockCategory(value || '')
+                setSubjectID('')
+                if (value) setSubjectType('MATERIAL')
                 resetCurrentPage()
               }}
             />
@@ -2259,6 +2306,11 @@ export default function V1InventoryLedgerPage() {
         }
         actions={
           <Space size={8} wrap>
+            {hasActionPermission(adminProfile, 'warehouse.manage') ? (
+              <Button onClick={() => setWarehouseSettingsOpen(true)}>
+                仓库设置
+              </Button>
+            ) : null}
             <BusinessListToolbarActions
               moduleTitle="库存台账"
               onExport={exportRows}
@@ -2484,6 +2536,14 @@ export default function V1InventoryLedgerPage() {
           onChange={(event) => setOperationCancelReason(event.target.value)}
         />
       </Modal>
+      <WarehouseSettingsModal
+        open={warehouseSettingsOpen}
+        onCancel={() => setWarehouseSettingsOpen(false)}
+        onSaved={() => {
+          loadReferenceOptions()
+          loadRows()
+        }}
+      />
     </BusinessPageLayout>
   )
 }

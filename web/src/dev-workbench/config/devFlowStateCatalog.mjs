@@ -45,6 +45,16 @@ const schemaStatusRef = (path, field = 'status') =>
   Object.freeze({ path, field })
 
 export const DEV_FLOW_STATUS_CONTRACT_REFS = Object.freeze({
+  'source.sales_order_engineering': entCheckContract(
+    'server/internal/data/model/schema/sales_order_item.go',
+    'sales_order_items_engineering_status_allowed',
+    'engineering_status'
+  ),
+  'source.engineering_material_request': entCheckContract(
+    'server/internal/data/model/schema/engineering_material_request.go',
+    'engineering_material_requests_status_allowed'
+  ),
+
   'source.sales_order': entCheckContract(
     'server/internal/data/model/schema/sales_order.go',
     'sales_orders_lifecycle_status_allowed',
@@ -742,6 +752,119 @@ function immutableRedEntryDefinition({ key, label, sourceRefs, summary }) {
 }
 
 const FLOW_DEFINITIONS = [
+  {
+    key: 'source.sales_order_engineering',
+    terminalPolicy: 'none_reactivatable',
+    scopeKey: 'source_document',
+    kind: 'state_machine',
+    label: '工程与打样',
+    summary: '客户先接单，工程补产品和材料，样品确认与订单生效分开管理。',
+    states: [
+      state('PREPARING', '资料准备'),
+      state('SAMPLING', '打样中'),
+      state('CONFIRMED', '样品已确认'),
+    ],
+    initialStates: ['PREPARING'],
+    terminalStates: [],
+    transitions: [
+      transition('PREPARING', 'SAMPLING', {
+        guard: '产品主图与 BOM 齐备。',
+        action: 'save_sales_order_engineering',
+        permission: ['sales_order.engineering.update'],
+        factBoundary: 'source_document_only',
+      }),
+      transition('SAMPLING', 'CONFIRMED', {
+        guard: '当前资料与打样资料一致，记录确认结果。',
+        action: 'save_sales_order_engineering',
+        permission: ['sales_order.engineering.update'],
+        factBoundary: 'source_document_only',
+      }),
+      transition('PREPARING', 'CONFIRMED', {
+        guard: '同客户返单复用已确认且内容一致的样品。',
+        action: 'save_sales_order_engineering',
+        permission: ['sales_order.engineering.update'],
+        factBoundary: 'source_document_only',
+      }),
+      transition('SAMPLING', 'PREPARING', {
+        guard: '填写重做原因，且没有用料审批及下游单据。',
+        action: 'save_sales_order_engineering',
+        permission: ['sales_order.engineering.update'],
+        factBoundary: 'source_document_only',
+      }),
+      transition('CONFIRMED', 'PREPARING', {
+        guard: '填写重做原因，且没有用料审批及下游单据。',
+        action: 'save_sales_order_engineering',
+        permission: ['sales_order.engineering.update'],
+        factBoundary: 'source_document_only',
+      }),
+    ],
+    factBoundary: 'source_document_only',
+    sourceRefs: [
+      'server/internal/biz/sales_order_engineering.go',
+      'server/internal/data/sales_order_engineering_repo.go',
+    ],
+    evidence: [
+      evidence(
+        'code',
+        'server/internal/data/sales_order_engineering_repo.go',
+        '订单行保存打样资料依据和返单复用来源。'
+      ),
+    ],
+  },
+  {
+    key: 'source.engineering_material_request',
+    scopeKey: 'source_document',
+    kind: 'state_machine',
+    label: '工程用料审批',
+    summary: '按订单汇总已确认材料，老板审核后由财务核价生成采购订单。',
+    states: [
+      state('SUBMITTED', '待老板审核'),
+      state('BOSS_APPROVED', '待财务核价'),
+      state('APPROVED', '已批准采购'),
+      state('REJECTED', '已退回'),
+    ],
+    initialStates: ['SUBMITTED'],
+    terminalStates: ['APPROVED', 'REJECTED'],
+    transitions: [
+      transition('SUBMITTED', 'BOSS_APPROVED', {
+        guard: '当前样品和材料与提交资料一致。',
+        action: 'boss_review_engineering_material_request',
+        permission: ['engineering.material.boss_approve'],
+        factBoundary: 'source_document_only',
+      }),
+      transition('SUBMITTED', 'REJECTED', {
+        guard: '老板填写退回原因。',
+        action: 'boss_review_engineering_material_request',
+        permission: ['engineering.material.boss_approve'],
+        factBoundary: 'source_document_only',
+      }),
+      transition('BOSS_APPROVED', 'APPROVED', {
+        guard: '另一位财务审批人核对数量、单价、交期，数量变更附原因。',
+        action: 'finance_review_engineering_material_request',
+        permission: ['engineering.material.finance_approve'],
+        factBoundary: 'source_document_only',
+      }),
+      transition('BOSS_APPROVED', 'REJECTED', {
+        guard: '财务填写退回原因。',
+        action: 'finance_review_engineering_material_request',
+        permission: ['engineering.material.finance_approve'],
+        factBoundary: 'source_document_only',
+      }),
+    ],
+    factBoundary: 'source_document_only',
+    sourceRefs: [
+      'server/internal/biz/engineering_material_request.go',
+      'server/internal/data/engineering_material_request_repo.go',
+    ],
+    evidence: [
+      evidence(
+        'code',
+        'server/internal/data/engineering_material_request_repo.go',
+        '审批记录与按厂商生成的采购源单在同一事务保存，不生成收货事实。'
+      ),
+    ],
+  },
+
   {
     key: 'source.sales_order',
     scopeKey: 'source_document',

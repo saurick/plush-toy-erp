@@ -71,6 +71,8 @@ func (d *jsonrpcDispatcher) handleMasterData(
 		"set_primary_contact",
 		"disable_contact":
 		return d.handleMasterDataContact(ctx, method, id, pm)
+	case "create_warehouse", "update_warehouse", "list_material_warehouses":
+		return d.handleWarehouseMasterData(ctx, method, id, pm)
 	case "list_units",
 		"list_warehouses":
 		return d.handleMasterDataReference(ctx, method, id, pm)

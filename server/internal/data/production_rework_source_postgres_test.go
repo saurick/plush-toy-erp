@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"server/internal/biz"
-	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/productionfact"
 
 	"github.com/shopspring/decimal"
@@ -20,18 +19,6 @@ func TestProductionReworkPostgresConcurrentQuantityAndSourceCancellation(t *test
 	if f.item.BOMHeaderID == nil {
 		t.Fatal("postgres rework fixture is missing active BOM")
 	}
-	fixtureBOMItem := f.client.BOMItem.Query().
-		Where(bomitem.BomHeaderID(*f.item.BOMHeaderID)).
-		OnlyX(ctx)
-	f.client.BOMItem.UpdateOneID(fixtureBOMItem.ID).
-		SetProductionOperationCode(biz.ProductionWIPOperationFabricProcessing).
-		SaveX(ctx)
-	fixtureBOMItem = f.client.BOMItem.GetX(ctx, fixtureBOMItem.ID)
-	if fixtureBOMItem.ProductionOperationCode == nil ||
-		*fixtureBOMItem.ProductionOperationCode != biz.ProductionWIPOperationFabricProcessing {
-		t.Fatalf("postgres rework fixture BOM operation = %#v", fixtureBOMItem.ProductionOperationCode)
-	}
-
 	newPostedCompletion := func(suffix string, quantity int64) (*biz.ProductionOrderAggregate, *biz.ProductionFact) {
 		t.Helper()
 		draft := f.draft("MO-PG-REWORK-" + suffix + "-" + f.suffix)

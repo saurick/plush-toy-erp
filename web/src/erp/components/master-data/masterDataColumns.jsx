@@ -1,6 +1,7 @@
 import React from 'react'
 import { Tag } from 'antd'
 import ProductIdentity from './ProductIdentity.jsx'
+import { materialStockCategoryLabel } from '../../utils/warehouseClassification.mjs'
 
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import {
@@ -381,8 +382,24 @@ function baseColumns({ type, unitDisplay, processOptions }) {
     ...(type === 'materials'
       ? [
           {
-            title: '款号',
-            exportTitle: '款号',
+            title: '库存类别',
+            dataIndex: 'stock_category',
+            width: 110,
+            render: materialStockCategoryLabel,
+            exportValue: (record) =>
+              materialStockCategoryLabel(record.stock_category),
+          },
+          {
+            title: '厂商',
+            exportTitle: '厂商',
+            dataIndex: 'supplier_name',
+            width: 160,
+            sorter: (a, b) => compareText(a?.supplier_name, b?.supplier_name),
+            render: (value) => value || '-',
+          },
+          {
+            title: '厂商料号',
+            exportTitle: '厂商料号',
             dataIndex: 'supplier_item_no',
             copyable: true,
             width: 240,

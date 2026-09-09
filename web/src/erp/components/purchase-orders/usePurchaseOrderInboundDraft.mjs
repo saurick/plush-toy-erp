@@ -1,4 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
+import {
+  materialWarehouseOptions,
+  recommendedMaterialWarehouse,
+} from '../../utils/warehouseClassification.mjs'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -19,6 +23,8 @@ export function usePurchaseOrderInboundDraft({
   form,
   navigate,
   selectedOrder,
+  materials = [],
+  warehouseOptions = [],
 }) {
   const [generatingInboundDraft, setGeneratingInboundDraft] = useState(false)
   const [inboundDraftModalOpen, setInboundDraftModalOpen] = useState(false)
@@ -45,7 +51,7 @@ export function usePurchaseOrderInboundDraft({
         receipt_no: record.purchase_order_no
           ? `IN-${record.purchase_order_no}`
           : undefined,
-        warehouse_id: undefined,
+        item_warehouses: {},
         received_at: todayInputValue(),
         note: `来源采购订单 ${sourceOrderNo}`,
       })
@@ -55,7 +61,32 @@ export function usePurchaseOrderInboundDraft({
         const progress = await getPurchaseOrderReceiptProgress({
           id: record.id,
         })
-        setInboundDraftPreviewRows(buildInboundDraftPreviewRows(progress))
+        const rows = buildInboundDraftPreviewRows(progress).map((row) => {
+          const material = materials.find(
+            (item) => Number(item.id) === row.materialID
+          )
+          return {
+            ...row,
+            stockCategory: material?.stock_category,
+            warehouseOptions: materialWarehouseOptions(
+              warehouseOptions,
+              material
+            ),
+            defaultWarehouseID: recommendedMaterialWarehouse(
+              material,
+              warehouseOptions
+            ),
+          }
+        })
+        setInboundDraftPreviewRows(rows)
+        form.setFieldValue(
+          'item_warehouses',
+          Object.fromEntries(
+            rows
+              .filter((row) => row.canGenerate)
+              .map((row) => [String(row.key), row.defaultWarehouseID])
+          )
+        )
       } catch (error) {
         setInboundDraftPreviewRows([])
         message.warning(getActionErrorMessage(error, '加载采购入库进度失败'))
@@ -63,7 +94,7 @@ export function usePurchaseOrderInboundDraft({
         setInboundDraftPreviewLoading(false)
       }
     },
-    [form]
+    [form, materials, warehouseOptions]
   )
 
   const createInboundDraftFromOrder = useCallback(async () => {
@@ -77,7 +108,14 @@ export function usePurchaseOrderInboundDraft({
       const payload = {
         purchase_order_id: selectedOrder.id,
         receipt_no: values.receipt_no,
-        warehouse_id: Number(values.warehouse_id || 0),
+        item_warehouses: inboundDraftPreviewRows
+          .filter((row) => row.canGenerate)
+          .map((row) => ({
+            purchase_order_item_id: row.key,
+            warehouse_id: Number(
+              values.item_warehouses?.[String(row.key)] || 0
+            ),
+          })),
         received_at: values.received_at,
         note: values.note || undefined,
       }
@@ -110,7 +148,13 @@ export function usePurchaseOrderInboundDraft({
     } finally {
       setGeneratingInboundDraft(false)
     }
-  }, [closeInboundDraftModal, form, navigate, selectedOrder])
+  }, [
+    inboundDraftPreviewRows,
+    closeInboundDraftModal,
+    form,
+    navigate,
+    selectedOrder,
+  ])
 
   const hasInboundDraftRemaining = useMemo(
     () => inboundDraftPreviewRows.some((row) => row.canGenerate),

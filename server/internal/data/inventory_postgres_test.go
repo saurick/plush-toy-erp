@@ -75,7 +75,7 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(5),
@@ -90,7 +90,7 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	requestedTotal := decimal.RequireFromString("9.900000")
 	shipmentInput := &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: shipmentNo, IdempotencyKey: shipmentNo, TotalNetWeightG: &requestedTotal},
-		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
+		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
 	}
 	created, err := repo.CreateShipmentDraftWithItems(ctx, shipmentInput)
 	if err != nil {
@@ -149,7 +149,7 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	incompleteNo := "PG-SHP-WEIGHT-MANUAL-" + fixtures.suffix
 	incomplete, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: incompleteNo, IdempotencyKey: incompleteNo, TotalNetWeightG: &manualTotal},
-		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)}},
+		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)}},
 	})
 	if err != nil {
 		t.Fatalf("create postgres manual-weight shipment: %v", err)
@@ -172,7 +172,7 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	rejectedNo := "PG-SHP-WEIGHT-ROLLBACK-" + fixtures.suffix
 	rejected, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: rejectedNo, IdempotencyKey: rejectedNo, TotalNetWeightG: &rejectedManualTotal},
-		Items:    []*biz.ShipmentItemCreate{{ProductID: rejectedProduct.ID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)}},
+		Items:    []*biz.ShipmentItemCreate{{ProductID: rejectedProduct.ID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)}},
 	})
 	if err != nil {
 		t.Fatalf("create postgres rollback shipment: %v", err)
@@ -204,7 +204,7 @@ func TestInventoryPostgresFactTimeIdempotency(t *testing.T) {
 	createInventory := func(at time.Time) (*biz.InventoryTxnApplyResult, error) {
 		return inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-			WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+			WarehouseID: fixtures.productWarehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
 			Quantity: decimal.NewFromInt(20), UnitID: fixtures.unitID,
 			SourceType: "PG_TIME_TEST", IdempotencyKey: inventoryKey, OccurredAt: at,
 		})
@@ -239,7 +239,7 @@ func TestInventoryPostgresFactTimeIdempotency(t *testing.T) {
 				row, err := operationalUC.CreateProductionFactDraft(ctx, &biz.OperationalFactMutation{
 					FactNo: key, FactType: biz.ProductionFactFinishedGoodsReceipt,
 					SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-					WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+					WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 					Quantity: decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
 				})
 				if err != nil {
@@ -261,7 +261,7 @@ func TestInventoryPostgresFactTimeIdempotency(t *testing.T) {
 				row, err := operationalUC.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
 					FactNo: key, FactType: biz.OutsourcingFactReturnReceipt,
 					SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-					WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+					WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 					Quantity: decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
 				})
 				if err != nil {
@@ -304,7 +304,7 @@ func TestInventoryPostgresFactTimeIdempotency(t *testing.T) {
 			create: func(key string, at time.Time) (int, error) {
 				row, err := operationalUC.CreateStockReservation(ctx, &biz.StockReservationCreate{
 					ReservationNo: key, ProductID: fixtures.productID,
-					WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+					WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 					Quantity: decimal.NewFromInt(1), IdempotencyKey: key, ReservedAt: at,
 				})
 				if err != nil {
@@ -396,7 +396,7 @@ func TestInventoryPostgresFlow(t *testing.T) {
 	productIn, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       mustDecimal(t, "4"),
@@ -510,7 +510,7 @@ func TestInventoryPostgresFlow(t *testing.T) {
 	_, err = uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      materialOnlyID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       mustDecimal(t, "1"),
@@ -715,7 +715,7 @@ func TestOperationalFactPostgresConcurrentStockReservationDoesNotOversubscribe(t
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(10),
@@ -739,7 +739,7 @@ func TestOperationalFactPostgresConcurrentStockReservationDoesNotOversubscribe(t
 			_, err := operationalRepo.CreateStockReservation(ctx, &biz.StockReservationCreate{
 				ReservationNo:  fmt.Sprintf("PG-RSV-%s-%02d", fixtures.suffix, i),
 				ProductID:      fixtures.productID,
-				WarehouseID:    fixtures.warehouseID,
+				WarehouseID:    fixtures.productWarehouseID,
 				UnitID:         fixtures.unitID,
 				Quantity:       decimal.NewFromInt(1),
 				IdempotencyKey: fmt.Sprintf("reservation-pg-concurrent-%s-%02d", fixtures.suffix, i),
@@ -769,7 +769,7 @@ func TestOperationalFactPostgresConcurrentStockReservationDoesNotOversubscribe(t
 	rows, err := client.StockReservation.Query().
 		Where(
 			stockreservation.ProductID(fixtures.productID),
-			stockreservation.WarehouseID(fixtures.warehouseID),
+			stockreservation.WarehouseID(fixtures.productWarehouseID),
 			stockreservation.UnitID(fixtures.unitID),
 			stockreservation.Status(biz.StockReservationStatusActive),
 		).
@@ -794,7 +794,7 @@ func TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine(t *
 	operationalRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(3), UnitID: fixtures.unitID,
 		SourceType: "SHIPMENT_PG_CONCURRENT", IdempotencyKey: "shipment-pg-concurrent-in-" + fixtures.suffix,
 	}); err != nil {
@@ -827,7 +827,7 @@ func TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine(t *
 		no := fmt.Sprintf("PG-SHP-%s-%d", fixtures.suffix, index)
 		created, err := operationalRepo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 			Shipment: &biz.ShipmentCreate{ShipmentNo: no, SalesOrderID: &order.ID, CustomerID: &customer.ID, IdempotencyKey: no},
-			Items:    []*biz.ShipmentItemCreate{{SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
+			Items:    []*biz.ShipmentItemCreate{{SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
 		})
 		if err != nil {
 			t.Fatalf("create postgres shipment %d failed: %v", index, err)
@@ -892,7 +892,7 @@ func TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine(t *
 	if !shippedCandidates[0].ShippedQuantity.Equal(decimal.NewFromInt(2)) || !shippedCandidates[0].RemainingQuantity.Equal(decimal.NewFromInt(1)) || !shippedCandidates[0].Selectable {
 		t.Fatalf("candidate must reflect only committed SHIPPED quantity: %#v", shippedCandidates[0])
 	}
-	balance, err := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID})
+	balance, err := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID})
 	if err != nil {
 		t.Fatalf("get postgres shipment balance failed: %v", err)
 	}
@@ -909,7 +909,7 @@ func TestOperationalFactPostgresCancelledShipmentRestoresSourceCandidateQuantity
 	operationalRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(4), UnitID: fixtures.unitID,
 		SourceType: "SHIPMENT_CANCEL_RESTORE_PG", IdempotencyKey: "shipment-cancel-restore-pg-in-" + fixtures.suffix,
 	}); err != nil {
@@ -946,7 +946,7 @@ func TestOperationalFactPostgresCancelledShipmentRestoresSourceCandidateQuantity
 				ShipmentNo: shipmentNo, SalesOrderID: &order.ID, CustomerID: &customer.ID, IdempotencyKey: shipmentNo,
 			},
 			Items: []*biz.ShipmentItemCreate{{
-				SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+				SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 				UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2),
 			}},
 		})
@@ -1006,7 +1006,7 @@ func TestOperationalFactPostgresCancelledShipmentRestoresSourceCandidateQuantity
 		t.Fatalf("first shipment reversal=%#v, outbound=%#v", reversal, firstOutbound)
 	}
 	if balance, balanceErr := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 	}); balanceErr != nil || !balance.Quantity.Equal(decimal.NewFromInt(4)) {
 		t.Fatalf("restored inventory balance=%#v err=%v, want 4", balance, balanceErr)
 	}
@@ -1030,7 +1030,7 @@ func TestOperationalFactPostgresCancelledShipmentRestoresSourceCandidateQuantity
 		t.Fatalf("shipment inventory transaction count=%d, want outbound + reversal + outbound", transactionCount)
 	}
 	if balance, balanceErr := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 	}); balanceErr != nil || !balance.Quantity.Equal(decimal.NewFromInt(2)) {
 		t.Fatalf("final inventory balance=%#v err=%v, want 2", balance, balanceErr)
 	}
@@ -1043,7 +1043,7 @@ func TestInventoryPostgresConcurrentReservationAndOutboundPreserveAvailableStock
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	operationalRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(10), UnitID: fixtures.unitID,
 		SourceType: "RESERVE_OUT_PG", IdempotencyKey: "reserve-out-pg-in-" + fixtures.suffix,
 	}); err != nil {
@@ -1065,7 +1065,7 @@ func TestInventoryPostgresConcurrentReservationAndOutboundPreserveAvailableStock
 			<-start
 			_, err := operationalRepo.CreateStockReservation(ctx, &biz.StockReservationCreate{
 				ReservationNo: fmt.Sprintf("PG-MIX-RSV-%s-%02d", fixtures.suffix, index), ProductID: fixtures.productID,
-				WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
+				WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
 				IdempotencyKey: fmt.Sprintf("pg-mix-rsv-%s-%02d", fixtures.suffix, index),
 			})
 			results <- operationResult{kind: "reservation", err: err}
@@ -1074,7 +1074,7 @@ func TestInventoryPostgresConcurrentReservationAndOutboundPreserveAvailableStock
 			defer wg.Done()
 			<-start
 			_, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-				SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+				SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 				TxnType: biz.InventoryTxnOut, Direction: -1, Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
 				SourceType: "RESERVE_OUT_PG", IdempotencyKey: fmt.Sprintf("pg-mix-out-%s-%02d", fixtures.suffix, index),
 			})
@@ -1097,12 +1097,12 @@ func TestInventoryPostgresConcurrentReservationAndOutboundPreserveAvailableStock
 	if successes["reservation"]+successes["outbound"] > 10 {
 		t.Fatalf("mixed successes exceed inventory: %#v", successes)
 	}
-	balance, err := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID})
+	balance, err := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID})
 	if err != nil {
 		t.Fatalf("get mixed-operation balance failed: %v", err)
 	}
 	active, err := client.StockReservation.Query().Where(
-		stockreservation.ProductID(fixtures.productID), stockreservation.WarehouseID(fixtures.warehouseID),
+		stockreservation.ProductID(fixtures.productID), stockreservation.WarehouseID(fixtures.productWarehouseID),
 		stockreservation.UnitID(fixtures.unitID), stockreservation.Status(biz.StockReservationStatusActive),
 	).All(ctx)
 	if err != nil {
@@ -1128,7 +1128,7 @@ func TestOperationalFactPostgresConcurrentReservationReleaseAndShipmentPreserveR
 	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(5), UnitID: fixtures.unitID,
 		SourceType: "RELEASE_SHIP_PG", IdempotencyKey: "release-ship-pg-in-" + fixtures.suffix,
 	}); err != nil {
@@ -1158,7 +1158,7 @@ func TestOperationalFactPostgresConcurrentReservationReleaseAndShipmentPreserveR
 	}
 	reservation, err := operationalUC.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo: "PG-RSV-RELEASE-SHIP-" + fixtures.suffix, SalesOrderID: &order.ID, SalesOrderItemID: &item.ID,
-		ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 		Quantity: decimal.NewFromInt(5), IdempotencyKey: "pg-rsv-release-ship-" + fixtures.suffix,
 	})
 	if err != nil {
@@ -1167,7 +1167,7 @@ func TestOperationalFactPostgresConcurrentReservationReleaseAndShipmentPreserveR
 	shipmentRow, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "PG-SHP-RELEASE-SHIP-" + fixtures.suffix, SalesOrderID: &order.ID, CustomerID: &customer.ID, IdempotencyKey: "pg-shp-release-ship-" + fixtures.suffix},
 		Items: []*biz.ShipmentItemCreate{{
-			SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(5),
 		}},
 	})
@@ -1220,11 +1220,11 @@ func TestOperationalFactPostgresShipmentRejectsRemainingReservationAcrossInvento
 	ctx := context.Background()
 	data, client := openInventoryPostgresTestData(t)
 	fixtures := createInventoryPostgresFixtures(t, ctx, client)
-	otherWarehouse := createTestWarehouse(t, ctx, client, "PG-WH-CROSS-"+fixtures.suffix)
+	otherWarehouse := createTestProductWarehouse(t, ctx, client, "PG-WH-CROSS-"+fixtures.suffix)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
-	for index, warehouseID := range []int{fixtures.warehouseID, otherWarehouse.ID} {
+	for index, warehouseID := range []int{fixtures.productWarehouseID, otherWarehouse.ID} {
 		if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: warehouseID,
 			TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(5), UnitID: fixtures.unitID,
@@ -1257,7 +1257,7 @@ func TestOperationalFactPostgresShipmentRejectsRemainingReservationAcrossInvento
 	}
 	reservation, err := operationalUC.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo: "PG-RSV-CROSS-" + fixtures.suffix, SalesOrderID: &order.ID, SalesOrderItemID: &item.ID,
-		ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 		Quantity: decimal.NewFromInt(5), IdempotencyKey: "pg-rsv-cross-" + fixtures.suffix,
 	})
 	if err != nil {
@@ -1313,11 +1313,12 @@ SELECT COALESCE((
 }
 
 type inventoryPostgresFixtures struct {
-	suffix      string
-	unitID      int
-	materialID  int
-	productID   int
-	warehouseID int
+	productWarehouseID int
+	suffix             string
+	unitID             int
+	materialID         int
+	productID          int
+	warehouseID        int
 }
 
 type inventoryLotPostgresFixtures = inventoryPostgresFixtures
@@ -1471,12 +1472,14 @@ func createInventoryPostgresFixtures(t *testing.T, ctx context.Context, client *
 	material := createTestMaterial(t, ctx, client, unit.ID, "PG-MAT-"+suffix)
 	product := createTestProduct(t, ctx, client, unit.ID, "PG-PRD-"+suffix)
 	warehouse := createTestWarehouse(t, ctx, client, "PG-WH-"+suffix)
+	productWarehouse := createTestProductWarehouse(t, ctx, client, "PG-FG-"+suffix)
 	return inventoryPostgresFixtures{
-		suffix:      suffix,
-		unitID:      unit.ID,
-		materialID:  material.ID,
-		productID:   product.ID,
-		warehouseID: warehouse.ID,
+		productWarehouseID: productWarehouse.ID,
+		suffix:             suffix,
+		unitID:             unit.ID,
+		materialID:         material.ID,
+		productID:          product.ID,
+		warehouseID:        warehouse.ID,
 	}
 }
 

@@ -391,14 +391,14 @@ func TestInventoryRepo_FinishedGoodsQualityInspectionReferenceValidation(t *test
 		Items: []*biz.ShipmentItemCreate{
 			{
 				ProductID:   fixtures.productID,
-				WarehouseID: fixtures.warehouseID,
+				WarehouseID: fixtures.productWarehouseID,
 				UnitID:      fixtures.unitID,
 				LotID:       &productLot.ID,
 				Quantity:    mustDecimal(t, "3"),
 			},
 			{
 				ProductID:   fixtures.productID,
-				WarehouseID: fixtures.warehouseID,
+				WarehouseID: fixtures.productWarehouseID,
 				UnitID:      fixtures.unitID,
 				LotID:       &productLot.ID,
 				Quantity:    mustDecimal(t, "2"),
@@ -417,7 +417,7 @@ func TestInventoryRepo_FinishedGoodsQualityInspectionReferenceValidation(t *test
 		InspectionNo:   "QI-FG-VALID",
 		SourceID:       shipment.ID,
 		InventoryLotID: productLot.ID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		SubjectID:      fixtures.productID,
 	}
 	draft, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, createInput)
@@ -497,7 +497,7 @@ func TestInventoryRepo_FinishedGoodsQualityInspectionReferenceValidation(t *test
 		SourceType:     biz.QualityInspectionSourceShipment,
 		SourceID:       shipment.ID,
 		InventoryLotID: productLot.ID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		SubjectID:      fixtures.productID,
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("incoming quality path must reject shipment source, got %v", err)
@@ -508,7 +508,7 @@ func TestInventoryRepo_FinishedGoodsQualityInspectionReferenceValidation(t *test
 		InspectionNo:   "QI-FG-MATERIAL-LOT",
 		SourceID:       shipment.ID,
 		InventoryLotID: materialLot.ID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		SubjectID:      fixtures.productID,
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("finished goods quality must reject material lot, got %v", err)
@@ -530,7 +530,7 @@ func TestInventoryRepo_FinishedGoodsQualityInspectionReferenceValidation(t *test
 	if _, err := inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		LotID:          &shippedLot.ID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
@@ -549,7 +549,7 @@ func TestInventoryRepo_FinishedGoodsQualityInspectionReferenceValidation(t *test
 		Items: []*biz.ShipmentItemCreate{
 			{
 				ProductID:   fixtures.productID,
-				WarehouseID: fixtures.warehouseID,
+				WarehouseID: fixtures.productWarehouseID,
 				UnitID:      fixtures.unitID,
 				LotID:       &shippedLot.ID,
 				Quantity:    mustDecimal(t, "1"),
@@ -567,7 +567,7 @@ func TestInventoryRepo_FinishedGoodsQualityInspectionReferenceValidation(t *test
 		InspectionNo:   "QI-FG-SHIPPED-SHIP",
 		SourceID:       shippedShipment.ID,
 		InventoryLotID: shippedLot.ID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		SubjectID:      fixtures.productID,
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("finished goods quality must reject non-draft shipment, got %v", err)

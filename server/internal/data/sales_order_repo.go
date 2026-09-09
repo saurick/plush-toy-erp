@@ -8,6 +8,7 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionorder"
@@ -175,6 +176,12 @@ func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOr
 			salesorder.CustomerOrderNoContains(filter.Keyword),
 			salesorder.SalesOwnerContains(filter.Keyword),
 			salesorder.PaymentMethodContains(filter.Keyword),
+			salesorder.HasItemsWith(salesorderitem.Or(
+				salesorderitem.RequestedProductNameContainsFold(filter.Keyword),
+				salesorderitem.CustomerProductNoContainsFold(filter.Keyword),
+				salesorderitem.ProductCodeSnapshotContainsFold(filter.Keyword),
+				salesorderitem.ProductNameSnapshotContainsFold(filter.Keyword),
+			)),
 		))
 	}
 	if filter.CustomerID > 0 {
@@ -241,6 +248,16 @@ func (r *salesOrderRepo) populateSalesOrderItemCounts(ctx context.Context, order
 		if order := byID[count.SalesOrderID]; order != nil {
 			itemCount := count.Count
 			order.ItemCount = &itemCount
+		}
+	}
+	requests, err := r.data.postgres.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.SalesOrderIDIn(orderIDs...)).Order(ent.Desc(engineeringmaterialrequest.FieldID)).All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, request := range requests {
+		if order := byID[request.SalesOrderID]; order != nil && order.EngineeringMaterialStatus == nil {
+			value := request.Status
+			order.EngineeringMaterialStatus = &value
 		}
 	}
 	return nil
@@ -885,8 +902,13 @@ func (r *salesOrderRepo) AddSalesOrderItem(ctx context.Context, in *biz.SalesOrd
 		SetSalesOrderID(in.SalesOrderID).
 		SetLineNo(in.LineNo).
 		SetDisplayOrder(in.LineNo).
-		SetProductID(in.ProductID).
+		SetNillableProductID(salesOrderProductPointer(in.ProductID)).
 		SetNillableProductSkuID(in.ProductSkuID).
+		SetNillableRequestedProductName(in.RequestedProductName).
+		SetNillableCustomerProductNo(in.CustomerProductNo).
+		SetOrderCategory(in.OrderCategory).
+		SetPreShipmentSampleQuantity(in.PreShipmentSampleQuantity).
+		SetNillableProcessRequirement(in.ProcessRequirement).
 		SetUnitID(in.UnitID).
 		SetNillableProductCodeSnapshot(in.ProductCodeSnapshot).
 		SetNillableProductNameSnapshot(in.ProductNameSnapshot).
@@ -917,12 +939,16 @@ func (r *salesOrderRepo) UpdateSalesOrderItem(ctx context.Context, id int, in *b
 		return nil, err
 	}
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	if err := validateSalesOrderCommercialEngineeringChange(ctx, tx.Client(), id, in); err != nil {
+		return nil, err
+	}
 	update := tx.SalesOrderItem.UpdateOneID(id).
 		SetSalesOrderID(in.SalesOrderID).
 		SetLineNo(in.LineNo).
-		SetProductID(in.ProductID).
+		SetNillableProductID(salesOrderProductPointer(in.ProductID)).
 		SetUnitID(in.UnitID).
 		SetOrderedQuantity(in.OrderedQuantity)
+	setSalesOrderDemandFieldsOnUpdate(update, in)
 	if in.ProductSkuID == nil {
 		update.ClearProductSkuID()
 	} else {
@@ -1044,7 +1070,11 @@ func (r *salesOrderRepo) ListSalesOrderItems(ctx context.Context, filter biz.Sal
 	if err != nil {
 		return nil, 0, err
 	}
-	return entSalesOrderItemsToBiz(rows), total, nil
+	items := entSalesOrderItemsToBiz(rows)
+	if err := populateSalesOrderItemDisplay(ctx, r.data.postgres, items); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
 }
 
 func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in *biz.SalesOrderMutation, items []*biz.SalesOrderItemSaveMutation) (*biz.SalesOrderWithItems, error) {
@@ -1208,8 +1238,13 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			SetSalesOrderID(mutation.SalesOrderID).
 			SetLineNo(mutation.LineNo).
 			SetDisplayOrder(displayOrder).
-			SetProductID(mutation.ProductID).
+			SetNillableProductID(salesOrderProductPointer(mutation.ProductID)).
 			SetNillableProductSkuID(mutation.ProductSkuID).
+			SetNillableRequestedProductName(mutation.RequestedProductName).
+			SetNillableCustomerProductNo(mutation.CustomerProductNo).
+			SetOrderCategory(mutation.OrderCategory).
+			SetPreShipmentSampleQuantity(mutation.PreShipmentSampleQuantity).
+			SetNillableProcessRequirement(mutation.ProcessRequirement).
 			SetUnitID(mutation.UnitID).
 			SetNillableProductCodeSnapshot(mutation.ProductCodeSnapshot).
 			SetNillableProductNameSnapshot(mutation.ProductNameSnapshot).
@@ -1415,13 +1450,17 @@ func (r *salesOrderRepo) UnitIsActive(ctx context.Context, id int) (bool, error)
 }
 
 func saveSalesOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, displayOrder int, in *biz.SalesOrderItemMutation) (*ent.SalesOrderItem, error) {
+	if err := validateSalesOrderCommercialEngineeringChange(ctx, tx.Client(), id, in); err != nil {
+		return nil, err
+	}
 	update := tx.SalesOrderItem.UpdateOneID(id).
 		SetSalesOrderID(in.SalesOrderID).
 		SetLineNo(in.LineNo).
 		SetDisplayOrder(displayOrder).
-		SetProductID(in.ProductID).
+		SetNillableProductID(salesOrderProductPointer(in.ProductID)).
 		SetUnitID(in.UnitID).
 		SetOrderedQuantity(in.OrderedQuantity)
+	setSalesOrderDemandFieldsOnUpdate(update, in)
 	if in.ProductSkuID == nil {
 		update.ClearProductSkuID()
 	} else {
@@ -1524,23 +1563,33 @@ func entSalesOrderItemToBiz(row *ent.SalesOrderItem) *biz.SalesOrderItem {
 		return nil
 	}
 	return &biz.SalesOrderItem{
-		ID:                  row.ID,
-		SalesOrderID:        row.SalesOrderID,
-		LineNo:              row.LineNo,
-		ProductID:           row.ProductID,
-		ProductSkuID:        row.ProductSkuID,
-		UnitID:              row.UnitID,
-		ProductCodeSnapshot: row.ProductCodeSnapshot,
-		ProductNameSnapshot: row.ProductNameSnapshot,
-		ColorSnapshot:       row.ColorSnapshot,
-		OrderedQuantity:     row.OrderedQuantity,
-		UnitPrice:           row.UnitPrice,
-		Amount:              row.Amount,
-		PlannedDeliveryDate: row.PlannedDeliveryDate,
-		LineStatus:          row.LineStatus,
-		Note:                row.Note,
-		CreatedAt:           row.CreatedAt,
-		UpdatedAt:           row.UpdatedAt,
+		ID:                        row.ID,
+		SalesOrderID:              row.SalesOrderID,
+		LineNo:                    row.LineNo,
+		ProductID:                 row.ProductID,
+		RequestedProductName:      row.RequestedProductName,
+		CustomerProductNo:         row.CustomerProductNo,
+		OrderCategory:             row.OrderCategory,
+		PreShipmentSampleQuantity: row.PreShipmentSampleQuantity,
+		ProcessRequirement:        row.ProcessRequirement,
+		SampleBOMID:               row.SampleBomID,
+		EngineeringStatus:         row.EngineeringStatus,
+		SampleNote:                row.SampleNote,
+		SampleConfirmedAt:         row.SampleConfirmedAt,
+		SampleConfirmedBy:         row.SampleConfirmedBy,
+		ProductSkuID:              row.ProductSkuID,
+		UnitID:                    row.UnitID,
+		ProductCodeSnapshot:       row.ProductCodeSnapshot,
+		ProductNameSnapshot:       row.ProductNameSnapshot,
+		ColorSnapshot:             row.ColorSnapshot,
+		OrderedQuantity:           row.OrderedQuantity,
+		UnitPrice:                 row.UnitPrice,
+		Amount:                    row.Amount,
+		PlannedDeliveryDate:       row.PlannedDeliveryDate,
+		LineStatus:                row.LineStatus,
+		Note:                      row.Note,
+		CreatedAt:                 row.CreatedAt,
+		UpdatedAt:                 row.UpdatedAt,
 	}
 }
 

@@ -27,7 +27,7 @@ func TestShipmentReleaseSourceTaskOwnsReleaseGate(t *testing.T) {
 	lot := createTestInventoryLot(t, ctx, inventoryUC, biz.InventorySubjectProduct, fixtures.productID, "SHIP-RELEASE-LOT")
 	if _, err := inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-		WarehouseID: fixtures.warehouseID, LotID: &lot.ID, UnitID: fixtures.unitID,
+		WarehouseID: fixtures.productWarehouseID, LotID: &lot.ID, UnitID: fixtures.unitID,
 		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: mustDecimal(t, "2"),
 		SourceType: "TEST_SHIPMENT_RELEASE", IdempotencyKey: "shipment-release-source-stock",
 	}); err != nil {
@@ -36,7 +36,7 @@ func TestShipmentReleaseSourceTaskOwnsReleaseGate(t *testing.T) {
 	shipment, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHIP-RELEASE-001", IdempotencyKey: "shipment-release-source"},
 		Items: []*biz.ShipmentItemCreate{{
-			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, LotID: &lot.ID,
+			ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, LotID: &lot.ID,
 			UnitID: fixtures.unitID, Quantity: mustDecimal(t, "1"),
 		}},
 	})
@@ -73,7 +73,7 @@ func TestShipmentReleaseSourceTaskOwnsReleaseGate(t *testing.T) {
 	}
 	if _, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
 		InspectionNo: "QI-AFTER-RELEASE", SourceID: shipment.ID, InventoryLotID: lot.ID,
-		WarehouseID: fixtures.warehouseID, SubjectID: fixtures.productID,
+		WarehouseID: fixtures.productWarehouseID, SubjectID: fixtures.productID,
 	}); !errors.Is(err, biz.ErrShipmentReleaseAlreadySubmitted) {
 		t.Fatalf("quality inspection after release submit error = %v", err)
 	}

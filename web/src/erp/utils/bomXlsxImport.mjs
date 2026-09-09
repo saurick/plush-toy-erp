@@ -1118,7 +1118,6 @@ export function buildBOMImportDraft(
     const unitMatch = matchUnit(row.unit, units)
     return {
       material_id: positiveID(materialMatch.record?.id),
-      production_operation_code: undefined,
       quantity: row.quantity || row.rawQuantity || '',
       unit_id: positiveID(unitMatch.record?.id),
       loss_rate: row.lossRate,

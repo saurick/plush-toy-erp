@@ -98,7 +98,7 @@ func TestOperationalFactPostgresShipmentCancelVsFinishedGoodsQualityCreateUsesOn
 					InspectionNo:   "SHIP-QUALITY-RACE-" + name + "-" + fixtures.suffix,
 					SourceID:       created.ID,
 					InventoryLotID: lot.ID,
-					WarehouseID:    fixtures.warehouseID,
+					WarehouseID:    fixtures.productWarehouseID,
 					SubjectID:      fixtures.productID,
 				})
 				return err
@@ -146,7 +146,7 @@ func createPostgresShipmentCancellationRaceDraft(
 			IdempotencyKey: fmt.Sprintf("shipment-cancel-race/%s/%s", label, fixtures.suffix),
 		},
 		Items: []*biz.ShipmentItemCreate{{
-			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 			LotID: lotID, Quantity: decimal.NewFromInt(1),
 		}},
 	})

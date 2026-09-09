@@ -50,7 +50,7 @@ func TestSourceDrivenInboundFactsCreateAndReplayDerivedLots(t *testing.T) {
 	productionLotNo := "PROD-SOURCE-LOT-001"
 	completionIn := &biz.ProductionCompletionFromOrderCreate{
 		FactNo: "PF-SOURCE-LOT-001", ProductionOrderID: released.Order.ID,
-		ProductionOrderItemID: released.Items[0].ID, WarehouseID: fixtures.warehouseID,
+		ProductionOrderItemID: released.Items[0].ID, WarehouseID: fixtures.productWarehouseID,
 		NewLotNo: &productionLotNo, Quantity: decimal.NewFromInt(2),
 		IdempotencyKey: "pf-source-lot-001",
 	}
@@ -81,7 +81,7 @@ func TestSourceDrivenInboundFactsCreateAndReplayDerivedLots(t *testing.T) {
 	outsourcingLotNo := "OUT-SOURCE-LOT-001"
 	returnIn := &biz.OutsourcingFactFromOrderCreate{
 		FactNo: "OUT-RETURN-SOURCE-LOT-001", OutsourcingOrderID: outsourcingSource.order.ID,
-		OutsourcingOrderItemID: outsourcingSource.productLine.ID, WarehouseID: fixtures.warehouseID,
+		OutsourcingOrderItemID: outsourcingSource.productLine.ID, WarehouseID: fixtures.productWarehouseID,
 		NewLotNo: &outsourcingLotNo, Quantity: decimal.NewFromInt(2),
 		IdempotencyKey: "out-return-source-lot-001",
 	}

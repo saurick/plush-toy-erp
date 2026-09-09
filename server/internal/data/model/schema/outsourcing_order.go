@@ -30,6 +30,9 @@ func (OutsourcingOrder) Annotations() []schema.Annotation {
 
 func (OutsourcingOrder) Fields() []ent.Field {
 	return []ent.Field{
+		field.Int("source_wip_batch_id").Optional().Nillable().Positive(),
+		field.String("source_wip_intent_hash").Optional().Nillable().MaxLen(64),
+		field.Int("source_wip_prepared_by").Optional().Nillable().Positive(),
 		field.String("outsourcing_order_no").
 			NotEmpty().
 			MaxLen(64),
@@ -83,6 +86,7 @@ func (OutsourcingOrder) Fields() []ent.Field {
 
 func (OutsourcingOrder) Edges() []ent.Edge {
 	return []ent.Edge{
+		edge.To("source_wip_batch", ProductionWIPBatch.Type).Field("source_wip_batch_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("supplier", Supplier.Type).
 			Ref("outsourcing_orders").
 			Field("supplier_id").
@@ -94,6 +98,7 @@ func (OutsourcingOrder) Edges() []ent.Edge {
 
 func (OutsourcingOrder) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("source_wip_batch_id").Unique().Annotations(entsql.IndexWhere("lifecycle_status <> 'canceled'")),
 		index.Fields("outsourcing_order_no").Unique(),
 		index.Fields("supplier_id"),
 		index.Fields("source_order_no"),

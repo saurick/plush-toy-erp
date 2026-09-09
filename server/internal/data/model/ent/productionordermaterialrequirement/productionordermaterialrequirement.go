@@ -33,8 +33,6 @@ const (
 	FieldLossRateSnapshot = "loss_rate_snapshot"
 	// FieldPlannedQuantity holds the string denoting the planned_quantity field in the database.
 	FieldPlannedQuantity = "planned_quantity"
-	// FieldProductionOperationCode holds the string denoting the production_operation_code field in the database.
-	FieldProductionOperationCode = "production_operation_code"
 	// FieldMaterialCodeSnapshot holds the string denoting the material_code_snapshot field in the database.
 	FieldMaterialCodeSnapshot = "material_code_snapshot"
 	// FieldMaterialNameSnapshot holds the string denoting the material_name_snapshot field in the database.
@@ -126,7 +124,6 @@ var Columns = []string{
 	FieldUnitQuantitySnapshot,
 	FieldLossRateSnapshot,
 	FieldPlannedQuantity,
-	FieldProductionOperationCode,
 	FieldMaterialCodeSnapshot,
 	FieldMaterialNameSnapshot,
 	FieldUnitCodeSnapshot,
@@ -164,8 +161,6 @@ var (
 	MaterialIDValidator func(int) error
 	// UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
 	UnitIDValidator func(int) error
-	// ProductionOperationCodeValidator is a validator for the "production_operation_code" field. It is called by the builders before save.
-	ProductionOperationCodeValidator func(string) error
 	// MaterialCodeSnapshotValidator is a validator for the "material_code_snapshot" field. It is called by the builders before save.
 	MaterialCodeSnapshotValidator func(string) error
 	// MaterialNameSnapshotValidator is a validator for the "material_name_snapshot" field. It is called by the builders before save.
@@ -233,11 +228,6 @@ func ByLossRateSnapshot(opts ...sql.OrderTermOption) OrderOption {
 // ByPlannedQuantity orders the results by the planned_quantity field.
 func ByPlannedQuantity(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPlannedQuantity, opts...).ToFunc()
-}
-
-// ByProductionOperationCode orders the results by the production_operation_code field.
-func ByProductionOperationCode(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldProductionOperationCode, opts...).ToFunc()
 }
 
 // ByMaterialCodeSnapshot orders the results by the material_code_snapshot field.

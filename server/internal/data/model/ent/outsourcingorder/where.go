@@ -55,6 +55,21 @@ func IDLTE(id int) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldLTE(FieldID, id))
 }
 
+// SourceWipBatchID applies equality check predicate on the "source_wip_batch_id" field. It's identical to SourceWipBatchIDEQ.
+func SourceWipBatchID(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceWipBatchID, v))
+}
+
+// SourceWipIntentHash applies equality check predicate on the "source_wip_intent_hash" field. It's identical to SourceWipIntentHashEQ.
+func SourceWipIntentHash(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipPreparedBy applies equality check predicate on the "source_wip_prepared_by" field. It's identical to SourceWipPreparedByEQ.
+func SourceWipPreparedBy(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceWipPreparedBy, v))
+}
+
 // OutsourcingOrderNo applies equality check predicate on the "outsourcing_order_no" field. It's identical to OutsourcingOrderNoEQ.
 func OutsourcingOrderNo(v string) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldOutsourcingOrderNo, v))
@@ -138,6 +153,161 @@ func CreatedAt(v time.Time) predicate.OutsourcingOrder {
 // UpdatedAt applies equality check predicate on the "updated_at" field. It's identical to UpdatedAtEQ.
 func UpdatedAt(v time.Time) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldUpdatedAt, v))
+}
+
+// SourceWipBatchIDEQ applies the EQ predicate on the "source_wip_batch_id" field.
+func SourceWipBatchIDEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceWipBatchID, v))
+}
+
+// SourceWipBatchIDNEQ applies the NEQ predicate on the "source_wip_batch_id" field.
+func SourceWipBatchIDNEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldSourceWipBatchID, v))
+}
+
+// SourceWipBatchIDIn applies the In predicate on the "source_wip_batch_id" field.
+func SourceWipBatchIDIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldSourceWipBatchID, vs...))
+}
+
+// SourceWipBatchIDNotIn applies the NotIn predicate on the "source_wip_batch_id" field.
+func SourceWipBatchIDNotIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSourceWipBatchID, vs...))
+}
+
+// SourceWipBatchIDIsNil applies the IsNil predicate on the "source_wip_batch_id" field.
+func SourceWipBatchIDIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldSourceWipBatchID))
+}
+
+// SourceWipBatchIDNotNil applies the NotNil predicate on the "source_wip_batch_id" field.
+func SourceWipBatchIDNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldSourceWipBatchID))
+}
+
+// SourceWipIntentHashEQ applies the EQ predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipIntentHashNEQ applies the NEQ predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashNEQ(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipIntentHashIn applies the In predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldSourceWipIntentHash, vs...))
+}
+
+// SourceWipIntentHashNotIn applies the NotIn predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashNotIn(vs ...string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSourceWipIntentHash, vs...))
+}
+
+// SourceWipIntentHashGT applies the GT predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashGT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipIntentHashGTE applies the GTE predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashGTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipIntentHashLT applies the LT predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashLT(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipIntentHashLTE applies the LTE predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashLTE(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipIntentHashContains applies the Contains predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashContains(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContains(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipIntentHashHasPrefix applies the HasPrefix predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashHasPrefix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasPrefix(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipIntentHashHasSuffix applies the HasSuffix predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashHasSuffix(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldHasSuffix(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipIntentHashIsNil applies the IsNil predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldSourceWipIntentHash))
+}
+
+// SourceWipIntentHashNotNil applies the NotNil predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldSourceWipIntentHash))
+}
+
+// SourceWipIntentHashEqualFold applies the EqualFold predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashEqualFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEqualFold(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipIntentHashContainsFold applies the ContainsFold predicate on the "source_wip_intent_hash" field.
+func SourceWipIntentHashContainsFold(v string) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldContainsFold(FieldSourceWipIntentHash, v))
+}
+
+// SourceWipPreparedByEQ applies the EQ predicate on the "source_wip_prepared_by" field.
+func SourceWipPreparedByEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceWipPreparedBy, v))
+}
+
+// SourceWipPreparedByNEQ applies the NEQ predicate on the "source_wip_prepared_by" field.
+func SourceWipPreparedByNEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldSourceWipPreparedBy, v))
+}
+
+// SourceWipPreparedByIn applies the In predicate on the "source_wip_prepared_by" field.
+func SourceWipPreparedByIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldSourceWipPreparedBy, vs...))
+}
+
+// SourceWipPreparedByNotIn applies the NotIn predicate on the "source_wip_prepared_by" field.
+func SourceWipPreparedByNotIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSourceWipPreparedBy, vs...))
+}
+
+// SourceWipPreparedByGT applies the GT predicate on the "source_wip_prepared_by" field.
+func SourceWipPreparedByGT(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldSourceWipPreparedBy, v))
+}
+
+// SourceWipPreparedByGTE applies the GTE predicate on the "source_wip_prepared_by" field.
+func SourceWipPreparedByGTE(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldSourceWipPreparedBy, v))
+}
+
+// SourceWipPreparedByLT applies the LT predicate on the "source_wip_prepared_by" field.
+func SourceWipPreparedByLT(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldSourceWipPreparedBy, v))
+}
+
+// SourceWipPreparedByLTE applies the LTE predicate on the "source_wip_prepared_by" field.
+func SourceWipPreparedByLTE(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldSourceWipPreparedBy, v))
+}
+
+// SourceWipPreparedByIsNil applies the IsNil predicate on the "source_wip_prepared_by" field.
+func SourceWipPreparedByIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldSourceWipPreparedBy))
+}
+
+// SourceWipPreparedByNotNil applies the NotNil predicate on the "source_wip_prepared_by" field.
+func SourceWipPreparedByNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldSourceWipPreparedBy))
 }
 
 // OutsourcingOrderNoEQ applies the EQ predicate on the "outsourcing_order_no" field.
@@ -1108,6 +1278,29 @@ func UpdatedAtLT(v time.Time) predicate.OutsourcingOrder {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldLTE(FieldUpdatedAt, v))
+}
+
+// HasSourceWipBatch applies the HasEdge predicate on the "source_wip_batch" edge.
+func HasSourceWipBatch() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, SourceWipBatchTable, SourceWipBatchColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSourceWipBatchWith applies the HasEdge predicate on the "source_wip_batch" edge with a given conditions (other predicates).
+func HasSourceWipBatchWith(preds ...predicate.ProductionWIPBatch) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(func(s *sql.Selector) {
+		step := newSourceWipBatchStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // HasSupplier applies the HasEdge predicate on the "supplier" edge.

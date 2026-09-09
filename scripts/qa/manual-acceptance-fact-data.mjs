@@ -4712,13 +4712,12 @@ export async function runSourceDrivenFactStage(
           warehouseId: stock.warehouseId,
           lotId: stock.lotId,
           quantity: productionMaterialQuantity(item, plannedQuantity),
-          productionOperationCode: item.productionOperationCode ?? null,
         };
       }),
     };
     if (candidate.fabricOutsourcing) {
       const fabricItem = candidate.bom.items.find(
-        (item) => item.productionOperationCode === "FABRIC_PROCESSING",
+        (item) => item.materialId === candidate.fabricOutsourcing.item.materialId && item.unitId === candidate.fabricOutsourcing.item.unitId,
       );
       const contractItem = candidate.fabricOutsourcing.item;
       if (!fabricItem) {

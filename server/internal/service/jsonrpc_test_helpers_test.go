@@ -16,10 +16,11 @@ import (
 )
 
 type inventoryTestFixtures struct {
-	unitID      int
-	materialID  int
-	productID   int
-	warehouseID int
+	unitID             int
+	materialID         int
+	productID          int
+	warehouseID        int
+	productWarehouseID int
 }
 
 func openInventoryRepoTestData(t *testing.T, name string) (*datarepo.Data, *ent.Client) {
@@ -48,11 +49,13 @@ func createInventoryTestFixtures(t *testing.T, ctx context.Context, client *ent.
 	material := createTestMaterial(t, ctx, client, unit.ID, "MAT-INV-001")
 	product := createTestProduct(t, ctx, client, unit.ID, "PRD-INV-001")
 	warehouse := createTestWarehouse(t, ctx, client, "WH-INV-001")
+	productWarehouse := client.Warehouse.Create().SetCode("WH-FINISHED-001").SetName("成品仓").SetType("FINISHED_GOODS").SaveX(ctx)
 	return inventoryTestFixtures{
-		unitID:      unit.ID,
-		materialID:  material.ID,
-		productID:   product.ID,
-		warehouseID: warehouse.ID,
+		productWarehouseID: productWarehouse.ID,
+		unitID:             unit.ID,
+		materialID:         material.ID,
+		productID:          product.ID,
+		warehouseID:        warehouse.ID,
 	}
 }
 
@@ -72,6 +75,7 @@ func createTestUnit(t *testing.T, ctx context.Context, client *ent.Client, code 
 func createTestMaterial(t *testing.T, ctx context.Context, client *ent.Client, unitID int, code string) *ent.Material {
 	t.Helper()
 	material, err := client.Material.Create().
+		SetStockCategory("MAIN").
 		SetCode(code).
 		SetName(code + "材料").
 		SetCategory("FABRIC").
@@ -103,7 +107,7 @@ func createTestWarehouse(t *testing.T, ctx context.Context, client *ent.Client, 
 	warehouse, err := client.Warehouse.Create().
 		SetCode(code).
 		SetName(code + "仓").
-		SetType("RAW_MATERIAL").
+		SetType("MATERIAL").
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create warehouse %s failed: %v", code, err)

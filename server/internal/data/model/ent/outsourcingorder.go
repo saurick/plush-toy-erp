@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"server/internal/data/model/ent/outsourcingorder"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/supplier"
 	"strings"
 	"time"
@@ -19,6 +20,12 @@ type OutsourcingOrder struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// SourceWipBatchID holds the value of the "source_wip_batch_id" field.
+	SourceWipBatchID *int `json:"source_wip_batch_id,omitempty"`
+	// SourceWipIntentHash holds the value of the "source_wip_intent_hash" field.
+	SourceWipIntentHash *string `json:"source_wip_intent_hash,omitempty"`
+	// SourceWipPreparedBy holds the value of the "source_wip_prepared_by" field.
+	SourceWipPreparedBy *int `json:"source_wip_prepared_by,omitempty"`
 	// OutsourcingOrderNo holds the value of the "outsourcing_order_no" field.
 	OutsourcingOrderNo string `json:"outsourcing_order_no,omitempty"`
 	// SupplierID holds the value of the "supplier_id" field.
@@ -65,13 +72,26 @@ type OutsourcingOrder struct {
 
 // OutsourcingOrderEdges holds the relations/edges for other nodes in the graph.
 type OutsourcingOrderEdges struct {
+	// SourceWipBatch holds the value of the source_wip_batch edge.
+	SourceWipBatch *ProductionWIPBatch `json:"source_wip_batch,omitempty"`
 	// Supplier holds the value of the supplier edge.
 	Supplier *Supplier `json:"supplier,omitempty"`
 	// Items holds the value of the items edge.
 	Items []*OutsourcingOrderItem `json:"items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
+}
+
+// SourceWipBatchOrErr returns the SourceWipBatch value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e OutsourcingOrderEdges) SourceWipBatchOrErr() (*ProductionWIPBatch, error) {
+	if e.SourceWipBatch != nil {
+		return e.SourceWipBatch, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: productionwipbatch.Label}
+	}
+	return nil, &NotLoadedError{edge: "source_wip_batch"}
 }
 
 // SupplierOrErr returns the Supplier value or an error if the edge
@@ -79,7 +99,7 @@ type OutsourcingOrderEdges struct {
 func (e OutsourcingOrderEdges) SupplierOrErr() (*Supplier, error) {
 	if e.Supplier != nil {
 		return e.Supplier, nil
-	} else if e.loadedTypes[0] {
+	} else if e.loadedTypes[1] {
 		return nil, &NotFoundError{label: supplier.Label}
 	}
 	return nil, &NotLoadedError{edge: "supplier"}
@@ -88,7 +108,7 @@ func (e OutsourcingOrderEdges) SupplierOrErr() (*Supplier, error) {
 // ItemsOrErr returns the Items value or an error if the edge
 // was not loaded in eager-loading.
 func (e OutsourcingOrderEdges) ItemsOrErr() ([]*OutsourcingOrderItem, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.Items, nil
 	}
 	return nil, &NotLoadedError{edge: "items"}
@@ -101,9 +121,9 @@ func (*OutsourcingOrder) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case outsourcingorder.FieldSupplierSnapshot, outsourcingorder.FieldContractPartySnapshot:
 			values[i] = new([]byte)
-		case outsourcingorder.FieldID, outsourcingorder.FieldSupplierID, outsourcingorder.FieldPaymentTermDays, outsourcingorder.FieldVersion, outsourcingorder.FieldSettledBy:
+		case outsourcingorder.FieldID, outsourcingorder.FieldSourceWipBatchID, outsourcingorder.FieldSourceWipPreparedBy, outsourcingorder.FieldSupplierID, outsourcingorder.FieldPaymentTermDays, outsourcingorder.FieldVersion, outsourcingorder.FieldSettledBy:
 			values[i] = new(sql.NullInt64)
-		case outsourcingorder.FieldOutsourcingOrderNo, outsourcingorder.FieldCurrency, outsourcingorder.FieldSourceOrderNo, outsourcingorder.FieldLifecycleStatus, outsourcingorder.FieldSettlementAction, outsourcingorder.FieldSettlementMode, outsourcingorder.FieldSettlementReason, outsourcingorder.FieldNote:
+		case outsourcingorder.FieldSourceWipIntentHash, outsourcingorder.FieldOutsourcingOrderNo, outsourcingorder.FieldCurrency, outsourcingorder.FieldSourceOrderNo, outsourcingorder.FieldLifecycleStatus, outsourcingorder.FieldSettlementAction, outsourcingorder.FieldSettlementMode, outsourcingorder.FieldSettlementReason, outsourcingorder.FieldNote:
 			values[i] = new(sql.NullString)
 		case outsourcingorder.FieldOrderDate, outsourcingorder.FieldExpectedReturnDate, outsourcingorder.FieldSettledAt, outsourcingorder.FieldCreatedAt, outsourcingorder.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -128,6 +148,27 @@ func (_m *OutsourcingOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int(value.Int64)
+		case outsourcingorder.FieldSourceWipBatchID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field source_wip_batch_id", values[i])
+			} else if value.Valid {
+				_m.SourceWipBatchID = new(int)
+				*_m.SourceWipBatchID = int(value.Int64)
+			}
+		case outsourcingorder.FieldSourceWipIntentHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field source_wip_intent_hash", values[i])
+			} else if value.Valid {
+				_m.SourceWipIntentHash = new(string)
+				*_m.SourceWipIntentHash = value.String
+			}
+		case outsourcingorder.FieldSourceWipPreparedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field source_wip_prepared_by", values[i])
+			} else if value.Valid {
+				_m.SourceWipPreparedBy = new(int)
+				*_m.SourceWipPreparedBy = int(value.Int64)
+			}
 		case outsourcingorder.FieldOutsourcingOrderNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field outsourcing_order_no", values[i])
@@ -268,6 +309,11 @@ func (_m *OutsourcingOrder) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
+// QuerySourceWipBatch queries the "source_wip_batch" edge of the OutsourcingOrder entity.
+func (_m *OutsourcingOrder) QuerySourceWipBatch() *ProductionWIPBatchQuery {
+	return NewOutsourcingOrderClient(_m.config).QuerySourceWipBatch(_m)
+}
+
 // QuerySupplier queries the "supplier" edge of the OutsourcingOrder entity.
 func (_m *OutsourcingOrder) QuerySupplier() *SupplierQuery {
 	return NewOutsourcingOrderClient(_m.config).QuerySupplier(_m)
@@ -301,6 +347,21 @@ func (_m *OutsourcingOrder) String() string {
 	var builder strings.Builder
 	builder.WriteString("OutsourcingOrder(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	if v := _m.SourceWipBatchID; v != nil {
+		builder.WriteString("source_wip_batch_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.SourceWipIntentHash; v != nil {
+		builder.WriteString("source_wip_intent_hash=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SourceWipPreparedBy; v != nil {
+		builder.WriteString("source_wip_prepared_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("outsourcing_order_no=")
 	builder.WriteString(_m.OutsourcingOrderNo)
 	builder.WriteString(", ")

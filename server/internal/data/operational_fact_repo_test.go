@@ -30,7 +30,7 @@ func TestOperationalFactRepo_SourceLessProductionDraftCannotPost(t *testing.T) {
 		FactType:       biz.ProductionFactFinishedGoodsReceipt,
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(3),
 		IdempotencyKey: "PF-001",
@@ -57,7 +57,7 @@ func TestOperationalFactRepo_FactCreationIdempotencyRequiresSamePayload(t *testi
 		FactType:       biz.ProductionFactFinishedGoodsReceipt,
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(2),
 		IdempotencyKey: "PF-IDEMPOTENT-001",
@@ -81,7 +81,7 @@ func TestOperationalFactRepo_FactCreationIdempotencyRequiresSamePayload(t *testi
 		FactType:       biz.OutsourcingFactMaterialIssue,
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(1),
 		IdempotencyKey: "OF-IDEMPOTENT-001",
@@ -140,7 +140,7 @@ func TestOperationalFactUsecase_IdempotencyDistinguishesExplicitFactTimes(t *tes
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 	if _, err := inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-		WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+		WarehouseID: fixtures.productWarehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
 		Quantity: decimal.NewFromInt(20), UnitID: fixtures.unitID,
 		SourceType: "FACT_TIME_TEST", IdempotencyKey: "FACT_TIME_TEST:IN",
 	}); err != nil {
@@ -159,7 +159,7 @@ func TestOperationalFactUsecase_IdempotencyDistinguishesExplicitFactTimes(t *tes
 				row, err := uc.CreateProductionFactDraft(ctx, &biz.OperationalFactMutation{
 					FactNo: key, FactType: biz.ProductionFactFinishedGoodsReceipt,
 					SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-					WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+					WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 					Quantity: decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
 				})
 				if err != nil {
@@ -181,7 +181,7 @@ func TestOperationalFactUsecase_IdempotencyDistinguishesExplicitFactTimes(t *tes
 				row, err := uc.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
 					FactNo: key, FactType: biz.OutsourcingFactReturnReceipt,
 					SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-					WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+					WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 					Quantity: decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
 				})
 				if err != nil {
@@ -224,7 +224,7 @@ func TestOperationalFactUsecase_IdempotencyDistinguishesExplicitFactTimes(t *tes
 			create: func(key string, at time.Time) (int, error) {
 				row, err := uc.CreateStockReservation(ctx, &biz.StockReservationCreate{
 					ReservationNo: key, ProductID: fixtures.productID,
-					WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+					WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 					Quantity: decimal.NewFromInt(1), IdempotencyKey: key, ReservedAt: at,
 				})
 				if err != nil {
@@ -303,7 +303,7 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(5),
@@ -331,7 +331,7 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	lotNo := "PF-INACTIVE-HISTORY-LOT"
 	fact, err := uc.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 		FactNo: "PF-INACTIVE-HISTORY", ProductionOrderID: order.Order.ID, ProductionOrderItemID: order.Items[0].ID,
-		WarehouseID: fixtures.warehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "PF-INACTIVE-HISTORY",
+		WarehouseID: fixtures.productWarehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "PF-INACTIVE-HISTORY",
 	})
 	if err != nil {
 		t.Fatalf("create production completion failed: %v", err)
@@ -343,7 +343,7 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	reservation, err := uc.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo:  "RSV-INACTIVE-HISTORY",
 		ProductID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(1),
 		IdempotencyKey: "RSV-INACTIVE-HISTORY",
@@ -374,7 +374,7 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 		FactType:       biz.ProductionFactFinishedGoodsReceipt,
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(1),
 		IdempotencyKey: "PF-INACTIVE-NEW",
@@ -383,13 +383,13 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	}
 
 	activeProduct := createTestProduct(t, ctx, client, fixtures.unitID, "PRD-OP-ACTIVE")
-	if _, err := client.Warehouse.UpdateOneID(fixtures.warehouseID).SetIsActive(false).Save(ctx); err != nil {
+	if _, err := client.Warehouse.UpdateOneID(fixtures.productWarehouseID).SetIsActive(false).Save(ctx); err != nil {
 		t.Fatalf("disable warehouse failed: %v", err)
 	}
 	if _, err := uc.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo:  "RSV-INACTIVE-NEW",
 		ProductID:      activeProduct.ID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(1),
 		IdempotencyKey: "RSV-INACTIVE-NEW",
@@ -415,7 +415,7 @@ func TestOperationalFactUsecase_ShipmentRejectsInactiveManualReferences(t *testi
 			IdempotencyKey: "SHP-INACTIVE-CUSTOMER",
 		},
 		Items: []*biz.ShipmentItemCreate{{
-			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
 		}},
 	}); !errors.Is(err, biz.ErrCustomerInactive) {
@@ -428,7 +428,7 @@ func TestOperationalFactUsecase_ShipmentRejectsInactiveManualReferences(t *testi
 	if _, err := uc.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-INACTIVE-ITEM", IdempotencyKey: "SHP-INACTIVE-ITEM"},
 		Items: []*biz.ShipmentItemCreate{{
-			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
 		}},
 	}); !errors.Is(err, biz.ErrProductInactive) {
@@ -450,7 +450,7 @@ func TestOperationalFactUsecase_ShipmentRejectsInactiveManualReferences(t *testi
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-INACTIVE-SKU", IdempotencyKey: "SHP-INACTIVE-SKU"},
 		Items: []*biz.ShipmentItemCreate{{
 			ProductID: activeProduct.ID, ProductSkuID: &inactiveSKU.ID,
-			WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 			Quantity: decimal.NewFromInt(1),
 		}},
 	}); !errors.Is(err, biz.ErrProductSKUInactive) {
@@ -523,7 +523,7 @@ func TestOperationalFactUsecase_SourceLinkedShipmentAndReservationAllowInactiveO
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(5),
@@ -542,7 +542,7 @@ func TestOperationalFactUsecase_SourceLinkedShipmentAndReservationAllowInactiveO
 		},
 		Items: []*biz.ShipmentItemCreate{{
 			SalesOrderItemID: &item.ID, ProductID: fixtures.productID,
-			ProductSkuID: &productSKU.ID, WarehouseID: fixtures.warehouseID,
+			ProductSkuID: &productSKU.ID, WarehouseID: fixtures.productWarehouseID,
 			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
 		}},
 	}); err != nil {
@@ -553,7 +553,7 @@ func TestOperationalFactUsecase_SourceLinkedShipmentAndReservationAllowInactiveO
 		SalesOrderID:     &order.ID,
 		SalesOrderItemID: &item.ID,
 		ProductID:        fixtures.productID,
-		WarehouseID:      fixtures.warehouseID,
+		WarehouseID:      fixtures.productWarehouseID,
 		UnitID:           fixtures.unitID,
 		Quantity:         decimal.NewFromInt(1),
 		IdempotencyKey:   "RSV-SOURCE-MISSING-SKU",
@@ -566,7 +566,7 @@ func TestOperationalFactUsecase_SourceLinkedShipmentAndReservationAllowInactiveO
 		SalesOrderItemID: &item.ID,
 		ProductID:        fixtures.productID,
 		ProductSkuID:     &productSKU.ID,
-		WarehouseID:      fixtures.warehouseID,
+		WarehouseID:      fixtures.productWarehouseID,
 		UnitID:           fixtures.unitID,
 		Quantity:         decimal.NewFromInt(3),
 		IdempotencyKey:   "RSV-SOURCE-OVER",
@@ -579,7 +579,7 @@ func TestOperationalFactUsecase_SourceLinkedShipmentAndReservationAllowInactiveO
 		SalesOrderItemID: &item.ID,
 		ProductID:        fixtures.productID,
 		ProductSkuID:     &productSKU.ID,
-		WarehouseID:      fixtures.warehouseID,
+		WarehouseID:      fixtures.productWarehouseID,
 		UnitID:           fixtures.unitID,
 		Quantity:         decimal.NewFromInt(1),
 		IdempotencyKey:   "RSV-SOURCE-INACTIVE",
@@ -606,7 +606,7 @@ func TestOperationalFactRepo_StockReservationChecksAvailableQuantity(t *testing.
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(5),
@@ -619,7 +619,7 @@ func TestOperationalFactRepo_StockReservationChecksAvailableQuantity(t *testing.
 	if _, err := repo.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo:  "RSV-001",
 		ProductID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(4),
 		IdempotencyKey: "RSV-001",
@@ -629,7 +629,7 @@ func TestOperationalFactRepo_StockReservationChecksAvailableQuantity(t *testing.
 	if _, err := repo.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo:  "RSV-002",
 		ProductID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(2),
 		IdempotencyKey: "RSV-002",
@@ -647,7 +647,7 @@ func TestOperationalFactRepo_StockReservationIdempotencyRequiresSamePayload(t *t
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(5),
@@ -660,7 +660,7 @@ func TestOperationalFactRepo_StockReservationIdempotencyRequiresSamePayload(t *t
 	input := &biz.StockReservationCreate{
 		ReservationNo:  "RSV-IDEMPOTENT-001",
 		ProductID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(2),
 		IdempotencyKey: "rsv-1",
@@ -697,7 +697,7 @@ func TestOperationalFactRepo_SourceLessOutsourcingDraftCannotPost(t *testing.T) 
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(5),
@@ -712,7 +712,7 @@ func TestOperationalFactRepo_SourceLessOutsourcingDraftCannotPost(t *testing.T) 
 		FactType:       biz.OutsourcingFactMaterialIssue,
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(2),
 		IdempotencyKey: "OF-001",
@@ -738,7 +738,7 @@ func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsC
 	lotNo := "OF-INACTIVE-HISTORY-LOT"
 	fact, err := uc.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
 		FactNo: "OF-INACTIVE-HISTORY", OutsourcingOrderID: source.order.ID, OutsourcingOrderItemID: source.productLine.ID,
-		WarehouseID: fixtures.warehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "OF-INACTIVE-HISTORY",
+		WarehouseID: fixtures.productWarehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "OF-INACTIVE-HISTORY",
 	})
 	if err != nil {
 		t.Fatalf("create outsourcing fact failed: %v", err)
@@ -760,7 +760,7 @@ func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsC
 		FactType:       biz.OutsourcingFactMaterialIssue,
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(1),
 		IdempotencyKey: "OF-INACTIVE-PRODUCT",
@@ -798,7 +798,7 @@ func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsC
 		FactType:       biz.OutsourcingFactMaterialIssue,
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      activeProduct.ID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		SupplierID:     &inactiveSupplier.ID,
 		Quantity:       decimal.NewFromInt(1),
@@ -806,7 +806,7 @@ func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsC
 	}); !errors.Is(err, biz.ErrSupplierInactive) {
 		t.Fatalf("expected inactive supplier rejected for new outsourcing fact, got %v", err)
 	}
-	if _, err := client.Warehouse.UpdateOneID(fixtures.warehouseID).SetIsActive(false).Save(ctx); err != nil {
+	if _, err := client.Warehouse.UpdateOneID(fixtures.productWarehouseID).SetIsActive(false).Save(ctx); err != nil {
 		t.Fatalf("disable warehouse failed: %v", err)
 	}
 	if _, err := uc.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
@@ -814,14 +814,14 @@ func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsC
 		FactType:       biz.OutsourcingFactMaterialIssue,
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      activeProduct.ID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(1),
 		IdempotencyKey: "OF-INACTIVE-WAREHOUSE",
 	}); !errors.Is(err, biz.ErrWarehouseInactive) {
 		t.Fatalf("expected inactive warehouse rejected for new outsourcing fact, got %v", err)
 	}
-	if _, err := client.Warehouse.UpdateOneID(fixtures.warehouseID).SetIsActive(true).Save(ctx); err != nil {
+	if _, err := client.Warehouse.UpdateOneID(fixtures.productWarehouseID).SetIsActive(true).Save(ctx); err != nil {
 		t.Fatalf("reactivate warehouse failed: %v", err)
 	}
 	if _, err := client.Unit.UpdateOneID(fixtures.unitID).SetIsActive(false).Save(ctx); err != nil {
@@ -832,7 +832,7 @@ func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsC
 		FactType:       biz.OutsourcingFactMaterialIssue,
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      activeProduct.ID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		UnitID:         fixtures.unitID,
 		Quantity:       decimal.NewFromInt(1),
 		IdempotencyKey: "OF-INACTIVE-UNIT",
@@ -855,7 +855,7 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(5),
@@ -873,7 +873,7 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 		Items: []*biz.ShipmentItemCreate{
 			{
 				ProductID:   fixtures.productID,
-				WarehouseID: fixtures.warehouseID,
+				WarehouseID: fixtures.productWarehouseID,
 				UnitID:      fixtures.unitID,
 				Quantity:    decimal.NewFromInt(2),
 			},
@@ -962,7 +962,7 @@ func TestOperationalFactRepo_ShipmentFinanceReleaseProcessCommandUsesExistingTra
 			},
 			Items: []*biz.ShipmentItemCreate{{
 				ProductID:   fixtures.productID,
-				WarehouseID: fixtures.warehouseID,
+				WarehouseID: fixtures.productWarehouseID,
 				UnitID:      fixtures.unitID,
 				Quantity:    decimal.NewFromInt(1),
 			}},
@@ -1069,7 +1069,7 @@ func TestOperationalFactRepo_ShipmentFinanceRejectionUsesExistingTransaction(t *
 			ShipmentNo: "SHP-FINANCE-REJECT", IdempotencyKey: "shipment-finance-reject",
 		},
 		Items: []*biz.ShipmentItemCreate{{
-			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
 		}},
 	})
@@ -1152,7 +1152,7 @@ func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testi
 			SubjectType:    biz.InventorySubjectProduct,
 			SubjectID:      seed.productID,
 			ProductSkuID:   seed.productSkuID,
-			WarehouseID:    fixtures.warehouseID,
+			WarehouseID:    fixtures.productWarehouseID,
 			TxnType:        biz.InventoryTxnIn,
 			Direction:      1,
 			Quantity:       decimal.NewFromInt(10),
@@ -1167,8 +1167,8 @@ func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testi
 	complete, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-WEIGHT-COMPLETE", IdempotencyKey: "SHP-WEIGHT-COMPLETE"},
 		Items: []*biz.ShipmentItemCreate{
-			{ProductID: fixtures.productID, ProductSkuID: &sku.ID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)},
-			{ProductID: productB.ID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(3)},
+			{ProductID: fixtures.productID, ProductSkuID: &sku.ID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)},
+			{ProductID: productB.ID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(3)},
 		},
 	})
 	if err != nil {
@@ -1195,8 +1195,8 @@ func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testi
 	incomplete, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-WEIGHT-INCOMPLETE", IdempotencyKey: "SHP-WEIGHT-INCOMPLETE", TotalNetWeightG: &manualTotal},
 		Items: []*biz.ShipmentItemCreate{
-			{ProductID: fixtures.productID, ProductSkuID: &sku.ID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)},
-			{ProductID: productB.ID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)},
+			{ProductID: fixtures.productID, ProductSkuID: &sku.ID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)},
+			{ProductID: productB.ID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)},
 		},
 	})
 	if err != nil {
@@ -1227,7 +1227,7 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 	manualTotal := decimal.RequireFromString("7.700000")
 	rejected, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-WEIGHT-ROLLBACK", IdempotencyKey: "SHP-WEIGHT-ROLLBACK", TotalNetWeightG: &manualTotal},
-		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
+		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
 	})
 	if err != nil {
 		t.Fatalf("create rollback shipment: %v", err)
@@ -1250,7 +1250,7 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 	}
 	overflow, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-WEIGHT-OVERFLOW", IdempotencyKey: "SHP-WEIGHT-OVERFLOW"},
-		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
+		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
 	})
 	if err != nil {
 		t.Fatalf("create overflow shipment: %v", err)
@@ -1274,7 +1274,7 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 	}
 	mismatched, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-WEIGHT-SKU-MISMATCH", IdempotencyKey: "SHP-WEIGHT-SKU-MISMATCH"},
-		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)}},
+		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)}},
 	})
 	if err != nil {
 		t.Fatalf("create shipment before mismatch corruption: %v", err)
@@ -1306,7 +1306,7 @@ func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *tes
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(10),
@@ -1360,7 +1360,7 @@ func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *tes
 			Items: []*biz.ShipmentItemCreate{{
 				SalesOrderItemID: &orderItem.ID,
 				ProductID:        fixtures.productID,
-				WarehouseID:      fixtures.warehouseID,
+				WarehouseID:      fixtures.productWarehouseID,
 				UnitID:           fixtures.unitID,
 				Quantity:         quantity,
 			}},
@@ -1381,7 +1381,7 @@ func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *tes
 		Items: []*biz.ShipmentItemCreate{{
 			SalesOrderItemID: &orderItem.ID,
 			ProductID:        fixtures.productID,
-			WarehouseID:      fixtures.warehouseID,
+			WarehouseID:      fixtures.productWarehouseID,
 			UnitID:           fixtures.unitID,
 			Quantity:         decimal.NewFromInt(1),
 		}},
@@ -1407,7 +1407,7 @@ func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *tes
 		Items: []*biz.ShipmentItemCreate{{
 			SalesOrderItemID: &orderItem.ID,
 			ProductID:        fixtures.productID,
-			WarehouseID:      fixtures.warehouseID,
+			WarehouseID:      fixtures.productWarehouseID,
 			UnitID:           fixtures.unitID,
 			Quantity:         decimal.NewFromInt(2),
 		}},
@@ -1434,7 +1434,7 @@ func TestOperationalFactRepo_ShipmentConsumesOwnReservationWithoutStealingAnothe
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(3),
@@ -1486,7 +1486,7 @@ func TestOperationalFactRepo_ShipmentConsumesOwnReservationWithoutStealingAnothe
 		SalesOrderID:     &orderA,
 		SalesOrderItemID: &itemA,
 		ProductID:        fixtures.productID,
-		WarehouseID:      fixtures.warehouseID,
+		WarehouseID:      fixtures.productWarehouseID,
 		UnitID:           fixtures.unitID,
 		Quantity:         decimal.NewFromInt(3),
 		IdempotencyKey:   "RSV-ORDER-A",
@@ -1499,7 +1499,7 @@ func TestOperationalFactRepo_ShipmentConsumesOwnReservationWithoutStealingAnothe
 		t.Helper()
 		created, createErr := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 			Shipment: &biz.ShipmentCreate{ShipmentNo: no, SalesOrderID: &orderID, CustomerID: &customerID, IdempotencyKey: no},
-			Items:    []*biz.ShipmentItemCreate{{SalesOrderItemID: &itemID, ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(3)}},
+			Items:    []*biz.ShipmentItemCreate{{SalesOrderItemID: &itemID, ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(3)}},
 		})
 		if createErr != nil {
 			t.Fatalf("create shipment %s failed: %v", no, createErr)
@@ -1543,7 +1543,7 @@ func TestOperationalFactRepo_ShipmentRejectsPartialAtomicReservationConsumption(
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(5), UnitID: fixtures.unitID,
 		SourceType: "TEST_PARTIAL_RESERVATION", IdempotencyKey: "TEST_PARTIAL_RESERVATION:IN",
 	}); err != nil {
@@ -1567,7 +1567,7 @@ func TestOperationalFactRepo_ShipmentRejectsPartialAtomicReservationConsumption(
 	}
 	reservation, err := operationalUC.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo: "RSV-PARTIAL", SalesOrderID: &order.ID, SalesOrderItemID: &item.ID,
-		ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 		Quantity: decimal.NewFromInt(3), IdempotencyKey: "RSV-PARTIAL",
 	})
 	if err != nil {
@@ -1575,7 +1575,7 @@ func TestOperationalFactRepo_ShipmentRejectsPartialAtomicReservationConsumption(
 	}
 	shipment, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-PARTIAL", SalesOrderID: &order.ID, CustomerID: &customer.ID, IdempotencyKey: "SHP-PARTIAL"},
-		Items:    []*biz.ShipmentItemCreate{{SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
+		Items:    []*biz.ShipmentItemCreate{{SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
 	})
 	if err != nil {
 		t.Fatalf("create shipment failed: %v", err)
@@ -1596,12 +1596,12 @@ func TestOperationalFactRepo_ShipmentRejectsRemainingReservationAcrossInventoryG
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_cross_grain_reservation")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
-	otherWarehouse := createTestWarehouse(t, ctx, client, "WH-CROSS-GRAIN")
+	otherWarehouse := createTestProductWarehouse(t, ctx, client, "WH-CROSS-GRAIN")
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 
-	for index, warehouseID := range []int{fixtures.warehouseID, otherWarehouse.ID} {
+	for index, warehouseID := range []int{fixtures.productWarehouseID, otherWarehouse.ID} {
 		if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: warehouseID,
 			TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(5), UnitID: fixtures.unitID,
@@ -1630,7 +1630,7 @@ func TestOperationalFactRepo_ShipmentRejectsRemainingReservationAcrossInventoryG
 	}
 	reservation, err := operationalUC.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo: "RSV-CROSS-GRAIN", SalesOrderID: &order.ID, SalesOrderItemID: &item.ID,
-		ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
 		Quantity: decimal.NewFromInt(5), IdempotencyKey: "RSV-CROSS-GRAIN",
 	})
 	if err != nil {
@@ -1670,7 +1670,7 @@ func TestConsumeActiveStockReservationRejectsReleasedState(t *testing.T) {
 		SetReservationNo("RSV-ALREADY-RELEASED").
 		SetStatus(biz.StockReservationStatusReleased).
 		SetProductID(fixtures.productID).
-		SetWarehouseID(fixtures.warehouseID).
+		SetWarehouseID(fixtures.productWarehouseID).
 		SetUnitID(fixtures.unitID).
 		SetQuantity(decimal.NewFromInt(1)).
 		SetIdempotencyKey("RSV-ALREADY-RELEASED").
@@ -1707,13 +1707,13 @@ func TestOperationalFactRepo_CreateShipmentDraftWithItemsRollsBackWhenItemFails(
 		Items: []*biz.ShipmentItemCreate{
 			{
 				ProductID:   fixtures.productID,
-				WarehouseID: fixtures.warehouseID,
+				WarehouseID: fixtures.productWarehouseID,
 				UnitID:      fixtures.unitID,
 				Quantity:    decimal.NewFromInt(1),
 			},
 			{
 				ProductID:   fixtures.productID,
-				WarehouseID: fixtures.warehouseID,
+				WarehouseID: fixtures.productWarehouseID,
 				UnitID:      0,
 				Quantity:    decimal.NewFromInt(1),
 			},
@@ -1740,7 +1740,7 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(5),
@@ -1759,7 +1759,7 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 		},
 		Items: []*biz.ShipmentItemCreate{{
 			ProductID:   fixtures.productID,
-			WarehouseID: fixtures.warehouseID,
+			WarehouseID: fixtures.productWarehouseID,
 			UnitID:      fixtures.unitID,
 			Quantity:    decimal.NewFromInt(2),
 		}},
@@ -1811,7 +1811,7 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 		Shipment: input.Shipment,
 		Items: []*biz.ShipmentItemCreate{{
 			ProductID:   fixtures.productID,
-			WarehouseID: fixtures.warehouseID,
+			WarehouseID: fixtures.productWarehouseID,
 			UnitID:      fixtures.unitID,
 			Quantity:    decimal.NewFromInt(3),
 		}},
@@ -1847,7 +1847,7 @@ func TestOperationalFactRepo_ListShipmentsFiltersByPlannedShipDate(t *testing.T)
 				ShipmentNo: item.no, PlannedShipAt: &plannedShipAt, IdempotencyKey: item.no,
 			},
 			Items: []*biz.ShipmentItemCreate{{
-				ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+				ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 				UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
 			}},
 		}); err != nil {
@@ -1881,7 +1881,7 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
+		WarehouseID:    fixtures.productWarehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
 		Quantity:       decimal.NewFromInt(5),
@@ -1910,7 +1910,7 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 			ShipmentNo: "SHP-FIN-001", CustomerID: &customer.ID, IdempotencyKey: "SHP-FIN-001",
 		},
 		Items: []*biz.ShipmentItemCreate{{
-			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			ProductID: fixtures.productID, WarehouseID: fixtures.productWarehouseID,
 			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2),
 		}},
 	})

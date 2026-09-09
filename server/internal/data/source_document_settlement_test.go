@@ -38,11 +38,11 @@ func TestSalesOrderCancellationRejectsLiveDownstreamAndAllowsSettledDownstream(t
 			client.Shipment.Create().SetShipmentNo("SHIP-CANCELLED-" + order.OrderNo).SetSalesOrderID(order.ID).SetStatus(biz.ShipmentStatusCancelled).SetIdempotencyKey("ship-cancelled-" + order.OrderNo).SaveX(ctx)
 		}},
 		{name: "active reservation blocks", want: biz.ErrSalesOrderCancellationReservationDependency, seed: func(order *ent.SalesOrder, item *ent.SalesOrderItem) {
-			client.StockReservation.Create().SetReservationNo("RSV-ACTIVE-" + order.OrderNo).SetStatus(biz.StockReservationStatusActive).SetSalesOrderID(order.ID).SetSalesOrderItemID(item.ID).SetProductID(fixtures.productID).SetWarehouseID(fixtures.warehouseID).SetUnitID(fixtures.unitID).SetQuantity(decimal.NewFromInt(1)).SetIdempotencyKey("rsv-active-" + order.OrderNo).SaveX(ctx)
+			client.StockReservation.Create().SetReservationNo("RSV-ACTIVE-" + order.OrderNo).SetStatus(biz.StockReservationStatusActive).SetSalesOrderID(order.ID).SetSalesOrderItemID(item.ID).SetProductID(fixtures.productID).SetWarehouseID(fixtures.productWarehouseID).SetUnitID(fixtures.unitID).SetQuantity(decimal.NewFromInt(1)).SetIdempotencyKey("rsv-active-" + order.OrderNo).SaveX(ctx)
 		}},
 		{name: "released reservation allows", seed: func(order *ent.SalesOrder, item *ent.SalesOrderItem) {
 			now := time.Now().UTC()
-			client.StockReservation.Create().SetReservationNo("RSV-RELEASED-" + order.OrderNo).SetStatus(biz.StockReservationStatusReleased).SetSalesOrderID(order.ID).SetSalesOrderItemID(item.ID).SetProductID(fixtures.productID).SetWarehouseID(fixtures.warehouseID).SetUnitID(fixtures.unitID).SetQuantity(decimal.NewFromInt(1)).SetIdempotencyKey("rsv-released-" + order.OrderNo).SetReleasedAt(now).SaveX(ctx)
+			client.StockReservation.Create().SetReservationNo("RSV-RELEASED-" + order.OrderNo).SetStatus(biz.StockReservationStatusReleased).SetSalesOrderID(order.ID).SetSalesOrderItemID(item.ID).SetProductID(fixtures.productID).SetWarehouseID(fixtures.productWarehouseID).SetUnitID(fixtures.unitID).SetQuantity(decimal.NewFromInt(1)).SetIdempotencyKey("rsv-released-" + order.OrderNo).SetReleasedAt(now).SaveX(ctx)
 		}},
 		{name: "draft production blocks", want: biz.ErrSalesOrderCancellationProductionDependency, seed: func(order *ent.SalesOrder, item *ent.SalesOrderItem) {
 			production := client.ProductionOrder.Create().SetOrderNo("PROD-DRAFT-" + order.OrderNo).SetStatus(biz.ProductionOrderStatusDraft).SetCreatedBy(actor.ID).SaveX(ctx)

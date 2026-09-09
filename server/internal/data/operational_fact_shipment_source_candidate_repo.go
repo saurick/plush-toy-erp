@@ -33,7 +33,7 @@ func (r *operationalFactRepo) ListShipmentSourceCandidates(
 		return nil, 0, biz.ErrBadParam
 	}
 
-	query := r.data.postgres.SalesOrderItem.Query().
+	query := r.data.postgres.SalesOrderItem.Query().Where(salesorderitem.ProductIDNotNil()).
 		Where(salesorderitem.HasSalesOrderWith(salesorder.LifecycleStatus(biz.SalesOrderStatusActive)))
 	if filter.SalesOrderID > 0 {
 		query = query.Where(salesorderitem.SalesOrderID(filter.SalesOrderID))

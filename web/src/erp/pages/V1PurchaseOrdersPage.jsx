@@ -1227,6 +1227,7 @@ export default function V1PurchaseOrdersPage() {
     form: inboundDraftForm,
     loadOrderItems,
     materials,
+    warehouseOptions,
     navigate,
     selectedOrder: singleSelectedOrder,
     unitOptions,
@@ -1713,7 +1714,6 @@ export default function V1PurchaseOrdersPage() {
         loading={inboundDraftPreviewLoading}
         submitting={generatingInboundDraft}
         referenceDataReady={inboundReferenceDataReady}
-        warehouseOptions={warehouseOptions}
         hasRemaining={hasInboundDraftRemaining}
         resolveSupplierName={resolveSupplierName}
         onOk={createInboundDraftWithReadySource}

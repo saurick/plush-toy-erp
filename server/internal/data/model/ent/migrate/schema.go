@@ -213,7 +213,6 @@ var (
 		{Name: "total_usage_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "process_base", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "process_method", Type: field.TypeString, Nullable: true, Size: 128},
-		{Name: "production_operation_code", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -229,19 +228,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "bom_items_bom_headers_items",
-				Columns:    []*schema.Column{BomItemsColumns[12]},
+				Columns:    []*schema.Column{BomItemsColumns[11]},
 				RefColumns: []*schema.Column{BomHeadersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "bom_items_materials_bom_items",
-				Columns:    []*schema.Column{BomItemsColumns[13]},
+				Columns:    []*schema.Column{BomItemsColumns[12]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "bom_items_units_bom_items",
-				Columns:    []*schema.Column{BomItemsColumns[14]},
+				Columns:    []*schema.Column{BomItemsColumns[13]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -250,7 +249,7 @@ var (
 			{
 				Name:    "bomitem_bom_header_id_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{BomItemsColumns[12], BomItemsColumns[13]},
+				Columns: []*schema.Column{BomItemsColumns[11], BomItemsColumns[12]},
 			},
 		},
 	}
@@ -497,6 +496,115 @@ var (
 				Name:    "deploymentmodulestate_state",
 				Unique:  false,
 				Columns: []*schema.Column{DeploymentModuleStatesColumns[5]},
+			},
+		},
+	}
+	// EngineeringMaterialRequestsColumns holds the columns for the "engineering_material_requests" table.
+	EngineeringMaterialRequestsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "source_order_version", Type: field.TypeInt},
+		{Name: "order_no_snapshot", Type: field.TypeString, Size: 64},
+		{Name: "status", Type: field.TypeString, Size: 24, Default: "SUBMITTED"},
+		{Name: "version", Type: field.TypeInt, Default: 1},
+		{Name: "source_snapshot", Type: field.TypeJSON},
+		{Name: "submitted_by", Type: field.TypeInt},
+		{Name: "submitted_at", Type: field.TypeTime},
+		{Name: "boss_reviewed_by", Type: field.TypeInt, Nullable: true},
+		{Name: "boss_reviewed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "finance_reviewed_by", Type: field.TypeInt, Nullable: true},
+		{Name: "finance_reviewed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "rejected_by", Type: field.TypeInt, Nullable: true},
+		{Name: "rejected_at", Type: field.TypeTime, Nullable: true},
+		{Name: "review_note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "boss_review_note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "finance_review_note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "sales_order_id", Type: field.TypeInt},
+	}
+	// EngineeringMaterialRequestsTable holds the schema information for the "engineering_material_requests" table.
+	EngineeringMaterialRequestsTable = &schema.Table{
+		Name:       "engineering_material_requests",
+		Columns:    EngineeringMaterialRequestsColumns,
+		PrimaryKey: []*schema.Column{EngineeringMaterialRequestsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "engineering_material_requests_sales_orders_sales_order",
+				Columns:    []*schema.Column{EngineeringMaterialRequestsColumns[17]},
+				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "engineeringmaterialrequest_sales_order_id",
+				Unique:  true,
+				Columns: []*schema.Column{EngineeringMaterialRequestsColumns[17]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status <> 'REJECTED'",
+				},
+			},
+			{
+				Name:    "engineeringmaterialrequest_status_submitted_at",
+				Unique:  false,
+				Columns: []*schema.Column{EngineeringMaterialRequestsColumns[3], EngineeringMaterialRequestsColumns[7]},
+			},
+		},
+	}
+	// EngineeringMaterialRequestItemsColumns holds the columns for the "engineering_material_request_items" table.
+	EngineeringMaterialRequestItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "material_code", Type: field.TypeString, Size: 64},
+		{Name: "material_name", Type: field.TypeString, Size: 255},
+		{Name: "supplier_name", Type: field.TypeString, Size: 255},
+		{Name: "supplier_item_no", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "color", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "spec", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "unit_name", Type: field.TypeString, Size: 64},
+		{Name: "required_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "purchase_quantity", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_price", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "expected_arrival_date", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "request_id", Type: field.TypeInt},
+		{Name: "material_id", Type: field.TypeInt},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "supplier_id", Type: field.TypeInt},
+	}
+	// EngineeringMaterialRequestItemsTable holds the schema information for the "engineering_material_request_items" table.
+	EngineeringMaterialRequestItemsTable = &schema.Table{
+		Name:       "engineering_material_request_items",
+		Columns:    EngineeringMaterialRequestItemsColumns,
+		PrimaryKey: []*schema.Column{EngineeringMaterialRequestItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "engineering_material_request_items_engineering_material_requests_items",
+				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[13]},
+				RefColumns: []*schema.Column{EngineeringMaterialRequestsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "engineering_material_request_items_materials_material",
+				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[14]},
+				RefColumns: []*schema.Column{MaterialsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "engineering_material_request_items_units_unit",
+				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[15]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "engineering_material_request_items_suppliers_supplier",
+				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[16]},
+				RefColumns: []*schema.Column{SuppliersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "engineeringmaterialrequestitem_request_id_material_id_unit_id",
+				Unique:  true,
+				Columns: []*schema.Column{EngineeringMaterialRequestItemsColumns[13], EngineeringMaterialRequestItemsColumns[14], EngineeringMaterialRequestItemsColumns[15]},
 			},
 		},
 	}
@@ -1131,11 +1239,14 @@ var (
 		{Name: "name", Type: field.TypeString, Size: 255},
 		{Name: "supplier_item_no", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "category", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "stock_category", Type: field.TypeString, Size: 32, Default: "UNCLASSIFIED"},
 		{Name: "spec", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "color", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "default_warehouse_id", Type: field.TypeInt, Nullable: true},
+		{Name: "supplier_id", Type: field.TypeInt, Nullable: true},
 		{Name: "default_unit_id", Type: field.TypeInt},
 	}
 	// MaterialsTable holds the schema information for the "materials" table.
@@ -1145,8 +1256,20 @@ var (
 		PrimaryKey: []*schema.Column{MaterialsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
+				Symbol:     "materials_warehouses_default_warehouse",
+				Columns:    []*schema.Column{MaterialsColumns[11]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "materials_suppliers_supplier",
+				Columns:    []*schema.Column{MaterialsColumns[12]},
+				RefColumns: []*schema.Column{SuppliersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
 				Symbol:     "materials_units_materials",
-				Columns:    []*schema.Column{MaterialsColumns[10]},
+				Columns:    []*schema.Column{MaterialsColumns[13]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1158,9 +1281,30 @@ var (
 				Columns: []*schema.Column{MaterialsColumns[1]},
 			},
 			{
+				Name:    "material_supplier_id_supplier_item_no_color",
+				Unique:  true,
+				Columns: []*schema.Column{MaterialsColumns[12], MaterialsColumns[3], MaterialsColumns[7]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "supplier_id IS NOT NULL AND supplier_item_no IS NOT NULL AND color IS NOT NULL",
+				},
+			},
+			{
+				Name:    "material_supplier_id_supplier_item_no",
+				Unique:  true,
+				Columns: []*schema.Column{MaterialsColumns[12], MaterialsColumns[3]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "supplier_id IS NOT NULL AND supplier_item_no IS NOT NULL AND color IS NULL",
+				},
+			},
+			{
 				Name:    "material_category",
 				Unique:  false,
 				Columns: []*schema.Column{MaterialsColumns[4]},
+			},
+			{
+				Name:    "material_stock_category",
+				Unique:  false,
+				Columns: []*schema.Column{MaterialsColumns[5]},
 			},
 			{
 				Name:    "material_name",
@@ -1284,6 +1428,8 @@ var (
 	// OutsourcingOrdersColumns holds the columns for the "outsourcing_orders" table.
 	OutsourcingOrdersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "source_wip_intent_hash", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "source_wip_prepared_by", Type: field.TypeInt, Nullable: true},
 		{Name: "outsourcing_order_no", Type: field.TypeString, Size: 64},
 		{Name: "currency", Type: field.TypeString, Size: 16, Default: "CNY"},
 		{Name: "payment_term_days", Type: field.TypeInt, Nullable: true},
@@ -1302,6 +1448,7 @@ var (
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "source_wip_batch_id", Type: field.TypeInt, Nullable: true},
 		{Name: "supplier_id", Type: field.TypeInt},
 	}
 	// OutsourcingOrdersTable holds the schema information for the "outsourcing_orders" table.
@@ -1311,42 +1458,56 @@ var (
 		PrimaryKey: []*schema.Column{OutsourcingOrdersColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
+				Symbol:     "outsourcing_orders_production_wip_batches_source_wip_batch",
+				Columns:    []*schema.Column{OutsourcingOrdersColumns[21]},
+				RefColumns: []*schema.Column{ProductionWipBatchesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
 				Symbol:     "outsourcing_orders_suppliers_outsourcing_orders",
-				Columns:    []*schema.Column{OutsourcingOrdersColumns[19]},
+				Columns:    []*schema.Column{OutsourcingOrdersColumns[22]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 		},
 		Indexes: []*schema.Index{
 			{
+				Name:    "outsourcingorder_source_wip_batch_id",
+				Unique:  true,
+				Columns: []*schema.Column{OutsourcingOrdersColumns[21]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "lifecycle_status <> 'canceled'",
+				},
+			},
+			{
 				Name:    "outsourcingorder_outsourcing_order_no",
 				Unique:  true,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[1]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[3]},
 			},
 			{
 				Name:    "outsourcingorder_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[19]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[22]},
 			},
 			{
 				Name:    "outsourcingorder_source_order_no",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[6]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[8]},
 			},
 			{
 				Name:    "outsourcingorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[9]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[11]},
 			},
 			{
 				Name:    "outsourcingorder_order_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[7]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[9]},
 			},
 			{
 				Name:    "outsourcingorder_expected_return_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[8]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[10]},
 			},
 		},
 	}
@@ -2361,7 +2522,6 @@ var (
 		{Name: "unit_quantity_snapshot", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "loss_rate_snapshot", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "planned_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
-		{Name: "production_operation_code", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "material_code_snapshot", Type: field.TypeString, Size: 64},
 		{Name: "material_name_snapshot", Type: field.TypeString, Size: 255},
 		{Name: "unit_code_snapshot", Type: field.TypeString, Size: 32},
@@ -2383,37 +2543,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "production_order_material_requirements_bom_headers_production_order_material_requirements",
-				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[11]},
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[10]},
 				RefColumns: []*schema.Column{BomHeadersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_order_material_requirements_bom_items_production_order_material_requirements",
-				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[12]},
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[11]},
 				RefColumns: []*schema.Column{BomItemsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_order_material_requirements_materials_production_order_material_requirements",
-				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[13]},
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[12]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_order_material_requirements_production_orders_material_requirements",
-				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[14]},
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[13]},
 				RefColumns: []*schema.Column{ProductionOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_order_material_requirements_production_order_items_material_requirements",
-				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[15]},
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[14]},
 				RefColumns: []*schema.Column{ProductionOrderItemsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_order_material_requirements_units_production_order_material_requirements",
-				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[16]},
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[15]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2422,22 +2582,17 @@ var (
 			{
 				Name:    "productionordermaterialrequirement_production_order_item_id_bom_item_id",
 				Unique:  true,
-				Columns: []*schema.Column{ProductionOrderMaterialRequirementsColumns[15], ProductionOrderMaterialRequirementsColumns[12]},
+				Columns: []*schema.Column{ProductionOrderMaterialRequirementsColumns[14], ProductionOrderMaterialRequirementsColumns[11]},
 			},
 			{
 				Name:    "productionordermaterialrequirement_production_order_id_production_order_item_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionOrderMaterialRequirementsColumns[14], ProductionOrderMaterialRequirementsColumns[15]},
+				Columns: []*schema.Column{ProductionOrderMaterialRequirementsColumns[13], ProductionOrderMaterialRequirementsColumns[14]},
 			},
 			{
 				Name:    "productionordermaterialrequirement_material_id_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionOrderMaterialRequirementsColumns[13], ProductionOrderMaterialRequirementsColumns[16]},
-			},
-			{
-				Name:    "productionordermaterialrequirement_production_order_item_id_production_operation_code",
-				Unique:  false,
-				Columns: []*schema.Column{ProductionOrderMaterialRequirementsColumns[15], ProductionOrderMaterialRequirementsColumns[4]},
+				Columns: []*schema.Column{ProductionOrderMaterialRequirementsColumns[12], ProductionOrderMaterialRequirementsColumns[15]},
 			},
 		},
 	}
@@ -2821,6 +2976,7 @@ var (
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "engineering_material_request_id", Type: field.TypeInt, Nullable: true},
 		{Name: "supplier_id", Type: field.TypeInt},
 	}
 	// PurchaseOrdersTable holds the schema information for the "purchase_orders" table.
@@ -2830,13 +2986,24 @@ var (
 		PrimaryKey: []*schema.Column{PurchaseOrdersColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "purchase_orders_suppliers_purchase_orders",
+				Symbol:     "purchase_orders_engineering_material_requests_engineering_material_request",
 				Columns:    []*schema.Column{PurchaseOrdersColumns[24]},
+				RefColumns: []*schema.Column{EngineeringMaterialRequestsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_orders_suppliers_purchase_orders",
+				Columns:    []*schema.Column{PurchaseOrdersColumns[25]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 		},
 		Indexes: []*schema.Index{
+			{
+				Name:    "purchaseorder_engineering_material_request_id_supplier_id",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseOrdersColumns[24], PurchaseOrdersColumns[25]},
+			},
 			{
 				Name:    "purchaseorder_purchase_order_no",
 				Unique:  true,
@@ -2845,7 +3012,7 @@ var (
 			{
 				Name:    "purchaseorder_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[24]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[25]},
 			},
 			{
 				Name:    "purchaseorder_supplier_purchase_order_no",
@@ -3946,6 +4113,17 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "line_no", Type: field.TypeInt},
 		{Name: "display_order", Type: field.TypeInt, Nullable: true},
+		{Name: "requested_product_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "customer_product_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "order_category", Type: field.TypeString, Size: 16, Default: "NEW"},
+		{Name: "pre_shipment_sample_quantity", Type: field.TypeOther, Default: "0", SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "process_requirement", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "sample_bom_fingerprint", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "sample_image_attachment_id", Type: field.TypeInt, Nullable: true},
+		{Name: "engineering_status", Type: field.TypeString, Size: 16, Default: "PREPARING"},
+		{Name: "sample_note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "sample_confirmed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "sample_confirmed_by", Type: field.TypeInt, Nullable: true},
 		{Name: "product_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "product_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "color_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
@@ -3959,7 +4137,9 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
 		{Name: "sales_order_id", Type: field.TypeInt},
-		{Name: "product_id", Type: field.TypeInt},
+		{Name: "sample_reused_from_item_id", Type: field.TypeInt, Unique: true, Nullable: true},
+		{Name: "product_id", Type: field.TypeInt, Nullable: true},
+		{Name: "sample_bom_id", Type: field.TypeInt, Nullable: true},
 		{Name: "unit_id", Type: field.TypeInt},
 	}
 	// SalesOrderItemsTable holds the schema information for the "sales_order_items" table.
@@ -3970,25 +4150,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sales_order_items_product_skus_sales_order_items",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[14]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[25]},
 				RefColumns: []*schema.Column{ProductSkusColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "sales_order_items_sales_orders_items",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[15]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[26]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
+				Symbol:     "sales_order_items_sales_order_items_sample_reused_from_item",
+				Columns:    []*schema.Column{SalesOrderItemsColumns[27]},
+				RefColumns: []*schema.Column{SalesOrderItemsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
 				Symbol:     "sales_order_items_products_product",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[16]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[28]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
+				Symbol:     "sales_order_items_bom_headers_sample_bom",
+				Columns:    []*schema.Column{SalesOrderItemsColumns[29]},
+				RefColumns: []*schema.Column{BomHeadersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
 				Symbol:     "sales_order_items_units_unit",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[17]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[30]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3997,32 +4189,32 @@ var (
 			{
 				Name:    "salesorderitem_sales_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{SalesOrderItemsColumns[15], SalesOrderItemsColumns[1]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[26], SalesOrderItemsColumns[1]},
 			},
 			{
 				Name:    "salesorderitem_product_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[16]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[28]},
 			},
 			{
 				Name:    "salesorderitem_product_sku_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[14]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[25]},
 			},
 			{
 				Name:    "salesorderitem_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[17]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[30]},
 			},
 			{
 				Name:    "salesorderitem_line_status",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[10]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[21]},
 			},
 			{
 				Name:    "salesorderitem_planned_delivery_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[9]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[20]},
 			},
 		},
 	}
@@ -4769,6 +4961,8 @@ var (
 		CustomersTable,
 		CustomerConfigRevisionsTable,
 		DeploymentModuleStatesTable,
+		EngineeringMaterialRequestsTable,
+		EngineeringMaterialRequestItemsTable,
 		FinanceAllocationsTable,
 		FinanceCreditNotesTable,
 		FinanceFactsTable,
@@ -4853,9 +5047,8 @@ func init() {
 	BomItemsTable.ForeignKeys[2].RefTable = UnitsTable
 	BomItemsTable.Annotation = &entsql.Annotation{}
 	BomItemsTable.Annotation.Checks = map[string]string{
-		"bom_items_loss_rate_non_negative":       "loss_rate >= 0",
-		"bom_items_production_operation_allowed": "production_operation_code IS NULL OR production_operation_code = 'FABRIC_PROCESSING'",
-		"bom_items_quantity_positive":            "quantity > 0",
+		"bom_items_loss_rate_non_negative": "loss_rate >= 0",
+		"bom_items_quantity_positive":      "quantity > 0",
 	}
 	BusinessAttachmentsTable.Annotation = &entsql.Annotation{}
 	BusinessAttachmentsTable.Annotation.Checks = map[string]string{
@@ -4875,6 +5068,23 @@ func init() {
 	CustomerConfigRevisionsTable.Annotation.Checks = map[string]string{
 		"customer_config_revisions_hash_version":   "config_hash_version = 1",
 		"customer_config_revisions_status_allowed": "status IN ('building', 'published', 'active', 'superseded')",
+	}
+	EngineeringMaterialRequestsTable.ForeignKeys[0].RefTable = SalesOrdersTable
+	EngineeringMaterialRequestsTable.Annotation = &entsql.Annotation{}
+	EngineeringMaterialRequestsTable.Annotation.Checks = map[string]string{
+		"engineering_material_requests_boss_evidence":      "status NOT IN ('BOSS_APPROVED', 'APPROVED') OR (boss_reviewed_by IS NOT NULL AND boss_reviewed_at IS NOT NULL)",
+		"engineering_material_requests_finance_evidence":   "status <> 'APPROVED' OR (finance_reviewed_by IS NOT NULL AND finance_reviewed_at IS NOT NULL)",
+		"engineering_material_requests_rejection_evidence": "status <> 'REJECTED' OR (rejected_by IS NOT NULL AND rejected_at IS NOT NULL AND review_note IS NOT NULL)",
+		"engineering_material_requests_status_allowed":     "status IN ('SUBMITTED', 'BOSS_APPROVED', 'APPROVED', 'REJECTED')",
+	}
+	EngineeringMaterialRequestItemsTable.ForeignKeys[0].RefTable = EngineeringMaterialRequestsTable
+	EngineeringMaterialRequestItemsTable.ForeignKeys[1].RefTable = MaterialsTable
+	EngineeringMaterialRequestItemsTable.ForeignKeys[2].RefTable = UnitsTable
+	EngineeringMaterialRequestItemsTable.ForeignKeys[3].RefTable = SuppliersTable
+	EngineeringMaterialRequestItemsTable.Annotation = &entsql.Annotation{}
+	EngineeringMaterialRequestItemsTable.Annotation.Checks = map[string]string{
+		"engineering_material_request_items_price_valid":    "unit_price IS NULL OR unit_price >= 0",
+		"engineering_material_request_items_quantity_valid": "required_quantity > 0 AND (purchase_quantity IS NULL OR purchase_quantity >= 0)",
 	}
 	FinanceAllocationsTable.ForeignKeys[0].RefTable = FinancePaymentsTable
 	FinanceAllocationsTable.Annotation = &entsql.Annotation{}
@@ -4985,7 +5195,13 @@ func init() {
 		"inventory_txns_subject_type_allowed":   "subject_type IN ('MATERIAL', 'PRODUCT')",
 		"inventory_txns_txn_type_allowed":       "txn_type IN ('IN', 'OUT', 'ADJUST_IN', 'ADJUST_OUT', 'TRANSFER_IN', 'TRANSFER_OUT', 'REVERSAL')",
 	}
-	MaterialsTable.ForeignKeys[0].RefTable = UnitsTable
+	MaterialsTable.ForeignKeys[0].RefTable = WarehousesTable
+	MaterialsTable.ForeignKeys[1].RefTable = SuppliersTable
+	MaterialsTable.ForeignKeys[2].RefTable = UnitsTable
+	MaterialsTable.Annotation = &entsql.Annotation{}
+	MaterialsTable.Annotation.Checks = map[string]string{
+		"materials_stock_category_check": "stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')",
+	}
 	OutsourcingFactsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	OutsourcingFactsTable.ForeignKeys[1].RefTable = AdminUsersTable
 	OutsourcingFactsTable.ForeignKeys[2].RefTable = AdminUsersTable
@@ -5002,7 +5218,8 @@ func init() {
 		"outsourcing_facts_type_allowed":        "fact_type IN ('MATERIAL_ISSUE', 'RETURN_RECEIPT')",
 		"outsourcing_facts_version_positive":    "version > 0",
 	}
-	OutsourcingOrdersTable.ForeignKeys[0].RefTable = SuppliersTable
+	OutsourcingOrdersTable.ForeignKeys[0].RefTable = ProductionWipBatchesTable
+	OutsourcingOrdersTable.ForeignKeys[1].RefTable = SuppliersTable
 	OutsourcingOrdersTable.Annotation = &entsql.Annotation{}
 	OutsourcingOrdersTable.Annotation.Checks = map[string]string{
 		"outsourcing_orders_currency_allowed":              "currency IN ('USD', 'CNY', 'HKD')",
@@ -5161,7 +5378,6 @@ func init() {
 	ProductionOrderMaterialRequirementsTable.Annotation = &entsql.Annotation{}
 	ProductionOrderMaterialRequirementsTable.Annotation.Checks = map[string]string{
 		"production_order_material_requirements_loss_rate_non_negative":    "loss_rate_snapshot >= 0",
-		"production_order_material_requirements_operation_allowed":         "production_operation_code IS NULL OR production_operation_code = 'FABRIC_PROCESSING'",
 		"production_order_material_requirements_planned_quantity_positive": "planned_quantity > 0",
 		"production_order_material_requirements_unit_quantity_positive":    "unit_quantity_snapshot > 0",
 	}
@@ -5231,7 +5447,8 @@ func init() {
 		"production_wip_outsourcing_allocations_subject_allowed":   "subject_type IN ('PRODUCT', 'MATERIAL')",
 		"production_wip_outsourcing_allocations_subject_bundle":    "\n(\n  (subject_type = 'PRODUCT' AND production_order_material_requirement_id IS NULL)\n  OR\n  (subject_type = 'MATERIAL' AND production_order_material_requirement_id IS NOT NULL)\n)",
 	}
-	PurchaseOrdersTable.ForeignKeys[0].RefTable = SuppliersTable
+	PurchaseOrdersTable.ForeignKeys[0].RefTable = EngineeringMaterialRequestsTable
+	PurchaseOrdersTable.ForeignKeys[1].RefTable = SuppliersTable
 	PurchaseOrdersTable.Annotation = &entsql.Annotation{}
 	PurchaseOrdersTable.Annotation.Checks = map[string]string{
 		"purchase_orders_currency_allowed":              "currency IN ('USD', 'CNY', 'HKD')",
@@ -5368,16 +5585,23 @@ func init() {
 	}
 	SalesOrderItemsTable.ForeignKeys[0].RefTable = ProductSkusTable
 	SalesOrderItemsTable.ForeignKeys[1].RefTable = SalesOrdersTable
-	SalesOrderItemsTable.ForeignKeys[2].RefTable = ProductsTable
-	SalesOrderItemsTable.ForeignKeys[3].RefTable = UnitsTable
+	SalesOrderItemsTable.ForeignKeys[2].RefTable = SalesOrderItemsTable
+	SalesOrderItemsTable.ForeignKeys[3].RefTable = ProductsTable
+	SalesOrderItemsTable.ForeignKeys[4].RefTable = BomHeadersTable
+	SalesOrderItemsTable.ForeignKeys[5].RefTable = UnitsTable
 	SalesOrderItemsTable.Annotation = &entsql.Annotation{}
 	SalesOrderItemsTable.Annotation.Checks = map[string]string{
-		"sales_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
-		"sales_order_items_display_order_positive":  "display_order IS NULL OR display_order > 0",
-		"sales_order_items_line_no_positive":        "line_no > 0",
-		"sales_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
-		"sales_order_items_ordered_qty_positive":    "ordered_quantity > 0",
-		"sales_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
+		"sales_order_items_amount_non_negative":         "amount IS NULL OR amount >= 0",
+		"sales_order_items_category_allowed":            "order_category IN ('NEW', 'REPEAT')",
+		"sales_order_items_display_order_positive":      "display_order IS NULL OR display_order > 0",
+		"sales_order_items_engineering_status_allowed":  "engineering_status IN ('PREPARING', 'SAMPLING', 'CONFIRMED')",
+		"sales_order_items_line_no_positive":            "line_no > 0",
+		"sales_order_items_line_status_allowed":         "line_status IN ('open', 'closed', 'canceled')",
+		"sales_order_items_ordered_qty_positive":        "ordered_quantity > 0",
+		"sales_order_items_sample_quantity_nonnegative": "pre_shipment_sample_quantity >= 0",
+		"sales_order_items_sampling_requires_sources":   "engineering_status = 'PREPARING' OR (product_id IS NOT NULL AND sample_bom_id IS NOT NULL)",
+		"sales_order_items_sku_requires_product":        "product_sku_id IS NULL OR product_id IS NOT NULL",
+		"sales_order_items_unit_price_non_negative":     "unit_price IS NULL OR unit_price >= 0",
 	}
 	ShipmentsTable.ForeignKeys[0].RefTable = CustomersTable
 	ShipmentsTable.ForeignKeys[1].RefTable = SalesOrdersTable
@@ -5435,6 +5659,10 @@ func init() {
 		"suppliers_default_invoice_category_allowed": "default_invoice_category IS NULL OR default_invoice_category IN ('EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
 		"suppliers_default_invoice_pair_valid":       "((default_invoice_required IS NULL AND default_invoice_category IS NULL) OR (default_invoice_required = false AND default_invoice_category IS NULL) OR (default_invoice_required = true AND default_invoice_category IS NOT NULL))",
 		"suppliers_supplier_type_allowed":            "supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service', 'mixed')",
+	}
+	WarehousesTable.Annotation = &entsql.Annotation{}
+	WarehousesTable.Annotation.Checks = map[string]string{
+		"warehouses_type_check": "type IN ('MAIN_MATERIAL', 'AUXILIARY_MATERIAL', 'PACKAGING_MATERIAL', 'OTHER_MATERIAL', 'MATERIAL', 'FINISHED_GOODS', 'UNCLASSIFIED')",
 	}
 	WorkflowBusinessStatesTable.Annotation = &entsql.Annotation{}
 	WorkflowBusinessStatesTable.Annotation.Checks = map[string]string{

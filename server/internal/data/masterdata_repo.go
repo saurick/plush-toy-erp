@@ -421,9 +421,24 @@ func (r *masterDataRepo) SupplierExists(ctx context.Context, id int) (bool, erro
 	return r.data.postgres.Supplier.Query().Where(supplier.ID(id)).Exist(ctx)
 }
 
-func (r *masterDataRepo) CreateMaterial(ctx context.Context, in *biz.MaterialMutation) (*biz.Material, error) {
-	row, err := r.data.postgres.Material.Create().
+func (r *masterDataRepo) CreateMaterial(ctx context.Context, in *biz.MaterialMutation) (_ *biz.Material, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrMaterialIdentityConflict) }()
+	if err := r.validateMaterialSupplier(ctx, in.SupplierID); err != nil {
+		return nil, err
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	if err := validateMaterialWarehouseChange(ctx, tx.Client(), 0, in); err != nil {
+		return nil, err
+	}
+	row, err := tx.Client().Material.Create().
+		SetNillableSupplierID(in.SupplierID).
 		SetCode(in.Code).
+		SetStockCategory(in.StockCategory).
+		SetNillableDefaultWarehouseID(in.DefaultWarehouseID).
 		SetName(in.Name).
 		SetNillableSupplierItemNo(in.SupplierItemNo).
 		SetNillableCategory(in.Category).
@@ -434,14 +449,41 @@ func (r *masterDataRepo) CreateMaterial(ctx context.Context, in *biz.MaterialMut
 	if err != nil {
 		return nil, err
 	}
-	return entMaterialToBiz(row), nil
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return r.GetMaterial(ctx, row.ID)
 }
 
-func (r *masterDataRepo) UpdateMaterial(ctx context.Context, id int, in *biz.MaterialMutation) (*biz.Material, error) {
-	update := r.data.postgres.Material.UpdateOneID(id).
+func (r *masterDataRepo) UpdateMaterial(ctx context.Context, id int, in *biz.MaterialMutation) (_ *biz.Material, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrMaterialIdentityConflict) }()
+	if err := r.validateMaterialSupplier(ctx, in.SupplierID); err != nil {
+		return nil, err
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	if err := validateMaterialWarehouseChange(ctx, tx.Client(), id, in); err != nil {
+		return nil, err
+	}
+	update := tx.Client().Material.UpdateOneID(id).
 		SetCode(in.Code).
+		SetStockCategory(in.StockCategory).
 		SetName(in.Name).
 		SetDefaultUnitID(in.DefaultUnitID)
+	if in.DefaultWarehouseID == nil {
+		update.ClearDefaultWarehouseID()
+	} else {
+		update.SetDefaultWarehouseID(*in.DefaultWarehouseID)
+	}
+	if in.SupplierID == nil {
+		update.ClearSupplierID()
+	} else {
+		update.SetSupplierID(*in.SupplierID)
+	}
 	if in.SupplierItemNo == nil {
 		update.ClearSupplierItemNo()
 	} else {
@@ -469,11 +511,15 @@ func (r *masterDataRepo) UpdateMaterial(ctx context.Context, id int, in *biz.Mat
 		}
 		return nil, err
 	}
-	return entMaterialToBiz(row), nil
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return r.GetMaterial(ctx, row.ID)
 }
 
 func (r *masterDataRepo) GetMaterial(ctx context.Context, id int) (*biz.Material, error) {
-	row, err := r.data.postgres.Material.Get(ctx, id)
+	row, err := r.data.postgres.Material.Query().Where(material.ID(id)).WithSupplier().Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrMaterialNotFound
@@ -485,11 +531,15 @@ func (r *masterDataRepo) GetMaterial(ctx context.Context, id int) (*biz.Material
 
 func (r *masterDataRepo) ListMaterials(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Material, int, error) {
 	query := r.data.postgres.Material.Query()
+	if filter.StockCategory != "" {
+		query.Where(material.StockCategory(filter.StockCategory))
+	}
 	if filter.Keyword != "" {
 		query = query.Where(material.Or(
 			material.CodeContains(filter.Keyword),
 			material.NameContains(filter.Keyword),
 			material.SupplierItemNoContainsFold(filter.Keyword),
+			material.HasSupplierWith(supplier.NameContainsFold(filter.Keyword)),
 			material.CategoryContains(filter.Keyword),
 			material.SpecContains(filter.Keyword),
 			material.ColorContains(filter.Keyword),
@@ -504,11 +554,25 @@ func (r *masterDataRepo) ListMaterials(ctx context.Context, filter biz.MasterDat
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Desc(material.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.WithSupplier().Order(ent.Desc(material.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 	return entMaterialsToBiz(rows), total, nil
+}
+
+func (r *masterDataRepo) validateMaterialSupplier(ctx context.Context, id *int) error {
+	if id == nil {
+		return nil
+	}
+	exists, err := r.data.postgres.Supplier.Query().Where(supplier.ID(*id), supplier.IsActive(true)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return biz.ErrSupplierNotFound
+	}
+	return nil
 }
 
 func (r *masterDataRepo) SetMaterialActive(ctx context.Context, id int, active bool) (*biz.Material, error) {
@@ -556,6 +620,9 @@ func (r *masterDataRepo) ListWarehousesForAccess(ctx context.Context, filter biz
 
 func (r *masterDataRepo) listWarehouses(ctx context.Context, filter biz.MasterDataFilter, scope biz.WarehouseDataScope) ([]*biz.Warehouse, int, error) {
 	query := r.data.postgres.Warehouse.Query()
+	if len(filter.WarehouseTypes) > 0 {
+		query.Where(warehouse.TypeIn(filter.WarehouseTypes...))
+	}
 	switch scope.Mode {
 	case biz.DataScopeModeAssigned:
 		query = query.Where(warehouse.IDIn(scope.WarehouseIDs...))
@@ -1507,18 +1574,26 @@ func entMaterialToBiz(row *ent.Material) *biz.Material {
 	if row == nil {
 		return nil
 	}
+	var supplierName *string
+	if row.Edges.Supplier != nil {
+		supplierName = &row.Edges.Supplier.Name
+	}
 	return &biz.Material{
-		ID:             row.ID,
-		Code:           row.Code,
-		Name:           row.Name,
-		SupplierItemNo: row.SupplierItemNo,
-		Category:       row.Category,
-		Spec:           row.Spec,
-		Color:          row.Color,
-		DefaultUnitID:  row.DefaultUnitID,
-		IsActive:       row.IsActive,
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
+		StockCategory:      row.StockCategory,
+		DefaultWarehouseID: row.DefaultWarehouseID,
+		SupplierID:         row.SupplierID,
+		SupplierName:       supplierName,
+		ID:                 row.ID,
+		Code:               row.Code,
+		Name:               row.Name,
+		SupplierItemNo:     row.SupplierItemNo,
+		Category:           row.Category,
+		Spec:               row.Spec,
+		Color:              row.Color,
+		DefaultUnitID:      row.DefaultUnitID,
+		IsActive:           row.IsActive,
+		CreatedAt:          row.CreatedAt,
+		UpdatedAt:          row.UpdatedAt,
 	}
 }
 

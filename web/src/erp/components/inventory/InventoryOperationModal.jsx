@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Card, Descriptions, Form, Input, Select } from 'antd'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { warehouseAcceptsSubject } from '../../utils/warehouseClassification.mjs'
 
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import {
@@ -164,7 +165,12 @@ export default function InventoryOperationModal({
                 source.from_warehouse_id || source.warehouse_id
               const targetWarehouseOptions = warehouseOptions.filter(
                 (option) =>
-                  Number(option?.value || 0) !== Number(fromWarehouseID || 0)
+                  Number(option?.value || 0) !== Number(fromWarehouseID || 0) &&
+                  warehouseAcceptsSubject(
+                    option,
+                    source.subject_type,
+                    source.stock_category
+                  )
               )
 
               return (

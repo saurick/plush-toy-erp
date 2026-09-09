@@ -4,6 +4,7 @@ package ent
 
 import (
 	"fmt"
+	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorder"
@@ -30,6 +31,32 @@ type SalesOrderItem struct {
 	DisplayOrder *int `json:"display_order,omitempty"`
 	// ProductID holds the value of the "product_id" field.
 	ProductID int `json:"product_id,omitempty"`
+	// RequestedProductName holds the value of the "requested_product_name" field.
+	RequestedProductName *string `json:"requested_product_name,omitempty"`
+	// CustomerProductNo holds the value of the "customer_product_no" field.
+	CustomerProductNo *string `json:"customer_product_no,omitempty"`
+	// OrderCategory holds the value of the "order_category" field.
+	OrderCategory string `json:"order_category,omitempty"`
+	// PreShipmentSampleQuantity holds the value of the "pre_shipment_sample_quantity" field.
+	PreShipmentSampleQuantity decimal.Decimal `json:"pre_shipment_sample_quantity,omitempty"`
+	// ProcessRequirement holds the value of the "process_requirement" field.
+	ProcessRequirement *string `json:"process_requirement,omitempty"`
+	// SampleBomID holds the value of the "sample_bom_id" field.
+	SampleBomID *int `json:"sample_bom_id,omitempty"`
+	// SampleBomFingerprint holds the value of the "sample_bom_fingerprint" field.
+	SampleBomFingerprint *string `json:"sample_bom_fingerprint,omitempty"`
+	// SampleReusedFromItemID holds the value of the "sample_reused_from_item_id" field.
+	SampleReusedFromItemID *int `json:"sample_reused_from_item_id,omitempty"`
+	// SampleImageAttachmentID holds the value of the "sample_image_attachment_id" field.
+	SampleImageAttachmentID *int `json:"sample_image_attachment_id,omitempty"`
+	// EngineeringStatus holds the value of the "engineering_status" field.
+	EngineeringStatus string `json:"engineering_status,omitempty"`
+	// SampleNote holds the value of the "sample_note" field.
+	SampleNote *string `json:"sample_note,omitempty"`
+	// SampleConfirmedAt holds the value of the "sample_confirmed_at" field.
+	SampleConfirmedAt *time.Time `json:"sample_confirmed_at,omitempty"`
+	// SampleConfirmedBy holds the value of the "sample_confirmed_by" field.
+	SampleConfirmedBy *int `json:"sample_confirmed_by,omitempty"`
 	// ProductSkuID holds the value of the "product_sku_id" field.
 	ProductSkuID *int `json:"product_sku_id,omitempty"`
 	// UnitID holds the value of the "unit_id" field.
@@ -64,10 +91,14 @@ type SalesOrderItem struct {
 
 // SalesOrderItemEdges holds the relations/edges for other nodes in the graph.
 type SalesOrderItemEdges struct {
+	// SampleReusedFromItem holds the value of the sample_reused_from_item edge.
+	SampleReusedFromItem *SalesOrderItem `json:"sample_reused_from_item,omitempty"`
 	// SalesOrder holds the value of the sales_order edge.
 	SalesOrder *SalesOrder `json:"sales_order,omitempty"`
 	// Product holds the value of the product edge.
 	Product *Product `json:"product,omitempty"`
+	// SampleBom holds the value of the sample_bom edge.
+	SampleBom *BOMHeader `json:"sample_bom,omitempty"`
 	// ProductSku holds the value of the product_sku edge.
 	ProductSku *ProductSKU `json:"product_sku,omitempty"`
 	// Unit holds the value of the unit edge.
@@ -78,7 +109,18 @@ type SalesOrderItemEdges struct {
 	StockReservations []*StockReservation `json:"stock_reservations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [8]bool
+}
+
+// SampleReusedFromItemOrErr returns the SampleReusedFromItem value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e SalesOrderItemEdges) SampleReusedFromItemOrErr() (*SalesOrderItem, error) {
+	if e.SampleReusedFromItem != nil {
+		return e.SampleReusedFromItem, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: salesorderitem.Label}
+	}
+	return nil, &NotLoadedError{edge: "sample_reused_from_item"}
 }
 
 // SalesOrderOrErr returns the SalesOrder value or an error if the edge
@@ -86,7 +128,7 @@ type SalesOrderItemEdges struct {
 func (e SalesOrderItemEdges) SalesOrderOrErr() (*SalesOrder, error) {
 	if e.SalesOrder != nil {
 		return e.SalesOrder, nil
-	} else if e.loadedTypes[0] {
+	} else if e.loadedTypes[1] {
 		return nil, &NotFoundError{label: salesorder.Label}
 	}
 	return nil, &NotLoadedError{edge: "sales_order"}
@@ -97,10 +139,21 @@ func (e SalesOrderItemEdges) SalesOrderOrErr() (*SalesOrder, error) {
 func (e SalesOrderItemEdges) ProductOrErr() (*Product, error) {
 	if e.Product != nil {
 		return e.Product, nil
-	} else if e.loadedTypes[1] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: product.Label}
 	}
 	return nil, &NotLoadedError{edge: "product"}
+}
+
+// SampleBomOrErr returns the SampleBom value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e SalesOrderItemEdges) SampleBomOrErr() (*BOMHeader, error) {
+	if e.SampleBom != nil {
+		return e.SampleBom, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: bomheader.Label}
+	}
+	return nil, &NotLoadedError{edge: "sample_bom"}
 }
 
 // ProductSkuOrErr returns the ProductSku value or an error if the edge
@@ -108,7 +161,7 @@ func (e SalesOrderItemEdges) ProductOrErr() (*Product, error) {
 func (e SalesOrderItemEdges) ProductSkuOrErr() (*ProductSKU, error) {
 	if e.ProductSku != nil {
 		return e.ProductSku, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: productsku.Label}
 	}
 	return nil, &NotLoadedError{edge: "product_sku"}
@@ -119,7 +172,7 @@ func (e SalesOrderItemEdges) ProductSkuOrErr() (*ProductSKU, error) {
 func (e SalesOrderItemEdges) UnitOrErr() (*Unit, error) {
 	if e.Unit != nil {
 		return e.Unit, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: unit.Label}
 	}
 	return nil, &NotLoadedError{edge: "unit"}
@@ -128,7 +181,7 @@ func (e SalesOrderItemEdges) UnitOrErr() (*Unit, error) {
 // ShipmentItemsOrErr returns the ShipmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e SalesOrderItemEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[6] {
 		return e.ShipmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "shipment_items"}
@@ -137,7 +190,7 @@ func (e SalesOrderItemEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
 // StockReservationsOrErr returns the StockReservations value or an error if the edge
 // was not loaded in eager-loading.
 func (e SalesOrderItemEdges) StockReservationsOrErr() ([]*StockReservation, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[7] {
 		return e.StockReservations, nil
 	}
 	return nil, &NotLoadedError{edge: "stock_reservations"}
@@ -150,13 +203,13 @@ func (*SalesOrderItem) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case salesorderitem.FieldUnitPrice, salesorderitem.FieldAmount:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
-		case salesorderitem.FieldOrderedQuantity:
+		case salesorderitem.FieldPreShipmentSampleQuantity, salesorderitem.FieldOrderedQuantity:
 			values[i] = new(decimal.Decimal)
-		case salesorderitem.FieldID, salesorderitem.FieldSalesOrderID, salesorderitem.FieldLineNo, salesorderitem.FieldDisplayOrder, salesorderitem.FieldProductID, salesorderitem.FieldProductSkuID, salesorderitem.FieldUnitID:
+		case salesorderitem.FieldID, salesorderitem.FieldSalesOrderID, salesorderitem.FieldLineNo, salesorderitem.FieldDisplayOrder, salesorderitem.FieldProductID, salesorderitem.FieldSampleBomID, salesorderitem.FieldSampleReusedFromItemID, salesorderitem.FieldSampleImageAttachmentID, salesorderitem.FieldSampleConfirmedBy, salesorderitem.FieldProductSkuID, salesorderitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
-		case salesorderitem.FieldProductCodeSnapshot, salesorderitem.FieldProductNameSnapshot, salesorderitem.FieldColorSnapshot, salesorderitem.FieldLineStatus, salesorderitem.FieldNote:
+		case salesorderitem.FieldRequestedProductName, salesorderitem.FieldCustomerProductNo, salesorderitem.FieldOrderCategory, salesorderitem.FieldProcessRequirement, salesorderitem.FieldSampleBomFingerprint, salesorderitem.FieldEngineeringStatus, salesorderitem.FieldSampleNote, salesorderitem.FieldProductCodeSnapshot, salesorderitem.FieldProductNameSnapshot, salesorderitem.FieldColorSnapshot, salesorderitem.FieldLineStatus, salesorderitem.FieldNote:
 			values[i] = new(sql.NullString)
-		case salesorderitem.FieldPlannedDeliveryDate, salesorderitem.FieldCreatedAt, salesorderitem.FieldUpdatedAt:
+		case salesorderitem.FieldSampleConfirmedAt, salesorderitem.FieldPlannedDeliveryDate, salesorderitem.FieldCreatedAt, salesorderitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -203,6 +256,94 @@ func (_m *SalesOrderItem) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field product_id", values[i])
 			} else if value.Valid {
 				_m.ProductID = int(value.Int64)
+			}
+		case salesorderitem.FieldRequestedProductName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field requested_product_name", values[i])
+			} else if value.Valid {
+				_m.RequestedProductName = new(string)
+				*_m.RequestedProductName = value.String
+			}
+		case salesorderitem.FieldCustomerProductNo:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field customer_product_no", values[i])
+			} else if value.Valid {
+				_m.CustomerProductNo = new(string)
+				*_m.CustomerProductNo = value.String
+			}
+		case salesorderitem.FieldOrderCategory:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field order_category", values[i])
+			} else if value.Valid {
+				_m.OrderCategory = value.String
+			}
+		case salesorderitem.FieldPreShipmentSampleQuantity:
+			if value, ok := values[i].(*decimal.Decimal); !ok {
+				return fmt.Errorf("unexpected type %T for field pre_shipment_sample_quantity", values[i])
+			} else if value != nil {
+				_m.PreShipmentSampleQuantity = *value
+			}
+		case salesorderitem.FieldProcessRequirement:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field process_requirement", values[i])
+			} else if value.Valid {
+				_m.ProcessRequirement = new(string)
+				*_m.ProcessRequirement = value.String
+			}
+		case salesorderitem.FieldSampleBomID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field sample_bom_id", values[i])
+			} else if value.Valid {
+				_m.SampleBomID = new(int)
+				*_m.SampleBomID = int(value.Int64)
+			}
+		case salesorderitem.FieldSampleBomFingerprint:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field sample_bom_fingerprint", values[i])
+			} else if value.Valid {
+				_m.SampleBomFingerprint = new(string)
+				*_m.SampleBomFingerprint = value.String
+			}
+		case salesorderitem.FieldSampleReusedFromItemID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field sample_reused_from_item_id", values[i])
+			} else if value.Valid {
+				_m.SampleReusedFromItemID = new(int)
+				*_m.SampleReusedFromItemID = int(value.Int64)
+			}
+		case salesorderitem.FieldSampleImageAttachmentID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field sample_image_attachment_id", values[i])
+			} else if value.Valid {
+				_m.SampleImageAttachmentID = new(int)
+				*_m.SampleImageAttachmentID = int(value.Int64)
+			}
+		case salesorderitem.FieldEngineeringStatus:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field engineering_status", values[i])
+			} else if value.Valid {
+				_m.EngineeringStatus = value.String
+			}
+		case salesorderitem.FieldSampleNote:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field sample_note", values[i])
+			} else if value.Valid {
+				_m.SampleNote = new(string)
+				*_m.SampleNote = value.String
+			}
+		case salesorderitem.FieldSampleConfirmedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field sample_confirmed_at", values[i])
+			} else if value.Valid {
+				_m.SampleConfirmedAt = new(time.Time)
+				*_m.SampleConfirmedAt = value.Time
+			}
+		case salesorderitem.FieldSampleConfirmedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field sample_confirmed_by", values[i])
+			} else if value.Valid {
+				_m.SampleConfirmedBy = new(int)
+				*_m.SampleConfirmedBy = int(value.Int64)
 			}
 		case salesorderitem.FieldProductSkuID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -303,6 +444,11 @@ func (_m *SalesOrderItem) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
+// QuerySampleReusedFromItem queries the "sample_reused_from_item" edge of the SalesOrderItem entity.
+func (_m *SalesOrderItem) QuerySampleReusedFromItem() *SalesOrderItemQuery {
+	return NewSalesOrderItemClient(_m.config).QuerySampleReusedFromItem(_m)
+}
+
 // QuerySalesOrder queries the "sales_order" edge of the SalesOrderItem entity.
 func (_m *SalesOrderItem) QuerySalesOrder() *SalesOrderQuery {
 	return NewSalesOrderItemClient(_m.config).QuerySalesOrder(_m)
@@ -311,6 +457,11 @@ func (_m *SalesOrderItem) QuerySalesOrder() *SalesOrderQuery {
 // QueryProduct queries the "product" edge of the SalesOrderItem entity.
 func (_m *SalesOrderItem) QueryProduct() *ProductQuery {
 	return NewSalesOrderItemClient(_m.config).QueryProduct(_m)
+}
+
+// QuerySampleBom queries the "sample_bom" edge of the SalesOrderItem entity.
+func (_m *SalesOrderItem) QuerySampleBom() *BOMHeaderQuery {
+	return NewSalesOrderItemClient(_m.config).QuerySampleBom(_m)
 }
 
 // QueryProductSku queries the "product_sku" edge of the SalesOrderItem entity.
@@ -369,6 +520,65 @@ func (_m *SalesOrderItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("product_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ProductID))
+	builder.WriteString(", ")
+	if v := _m.RequestedProductName; v != nil {
+		builder.WriteString("requested_product_name=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.CustomerProductNo; v != nil {
+		builder.WriteString("customer_product_no=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("order_category=")
+	builder.WriteString(_m.OrderCategory)
+	builder.WriteString(", ")
+	builder.WriteString("pre_shipment_sample_quantity=")
+	builder.WriteString(fmt.Sprintf("%v", _m.PreShipmentSampleQuantity))
+	builder.WriteString(", ")
+	if v := _m.ProcessRequirement; v != nil {
+		builder.WriteString("process_requirement=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SampleBomID; v != nil {
+		builder.WriteString("sample_bom_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.SampleBomFingerprint; v != nil {
+		builder.WriteString("sample_bom_fingerprint=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SampleReusedFromItemID; v != nil {
+		builder.WriteString("sample_reused_from_item_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.SampleImageAttachmentID; v != nil {
+		builder.WriteString("sample_image_attachment_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("engineering_status=")
+	builder.WriteString(_m.EngineeringStatus)
+	builder.WriteString(", ")
+	if v := _m.SampleNote; v != nil {
+		builder.WriteString("sample_note=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SampleConfirmedAt; v != nil {
+		builder.WriteString("sample_confirmed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.SampleConfirmedBy; v != nil {
+		builder.WriteString("sample_confirmed_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.ProductSkuID; v != nil {
 		builder.WriteString("product_sku_id=")

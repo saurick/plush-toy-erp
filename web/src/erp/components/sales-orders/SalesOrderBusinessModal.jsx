@@ -36,7 +36,7 @@ export default function SalesOrderBusinessModal({
   return (
     <BusinessFormModal
       title={editingOrder?.id ? '编辑销售订单' : '新建销售订单'}
-      description="只维护客户订单承诺，出货、库存或财务记录请到对应业务页面处理。"
+      description="先记录客户订单需求；订单生效后，工程补齐产品图和 BOM 并办理打样。"
       open={open}
       onOk={onOk}
       onCancel={onCancel}

@@ -138,7 +138,6 @@ func openOutsourcingWIPPostgresRaceFixture(t *testing.T, ctx context.Context) ou
 	}
 	bomID := *pg.item.BOMHeaderID
 	if affected := pg.client.BOMItem.Update().Where(bomitem.BomHeaderID(bomID)).
-		SetProductionOperationCode(biz.ProductionWIPOperationFabricProcessing).
 		SaveX(ctx); affected != 1 {
 		t.Fatalf("active BOM %d item count = %d, want 1", bomID, affected)
 	}

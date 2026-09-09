@@ -22,20 +22,21 @@ import (
 )
 
 type productionOrderPGFixture struct {
-	uc           *biz.ProductionOrderUsecase
-	factUC       *biz.OperationalFactUsecase
-	data         *Data
-	client       *ent.Client
-	actorID      int
-	unitID       int
-	materialID   int
-	productID    int
-	skuID        int
-	salesOrderID int
-	salesItemID  int
-	warehouseID  int
-	item         biz.ProductionOrderDraftItem
-	suffix       string
+	materialWarehouseID int
+	uc                  *biz.ProductionOrderUsecase
+	factUC              *biz.OperationalFactUsecase
+	data                *Data
+	client              *ent.Client
+	actorID             int
+	unitID              int
+	materialID          int
+	productID           int
+	skuID               int
+	salesOrderID        int
+	salesItemID         int
+	warehouseID         int
+	item                biz.ProductionOrderDraftItem
+	suffix              string
 }
 
 func openProductionOrderPGFixture(t *testing.T) productionOrderPGFixture {
@@ -61,11 +62,14 @@ func openProductionOrderPGFixture(t *testing.T) productionOrderPGFixture {
 		SetUnitID(unitRow.ID).
 		SetLossRate(decimal.Zero).
 		SaveX(ctx)
-	warehouse := createTestWarehouse(t, ctx, client, "POW-"+suffix)
+	prepareProductionEngineeringFixture(t, ctx, data, salesItem.ID, bom.ID)
+	warehouse := createTestProductWarehouse(t, ctx, client, "POW-"+suffix)
+	materialWarehouse := createTestWarehouse(t, ctx, client, "POMW-"+suffix)
 	logger := log.NewStdLogger(io.Discard)
 	return productionOrderPGFixture{
-		uc:     biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger)),
-		factUC: biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger)), data: data,
+		materialWarehouseID: materialWarehouse.ID,
+		uc:                  biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger)),
+		factUC:              biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger)), data: data,
 		client: client, actorID: actor.ID, unitID: unitRow.ID, materialID: materialRow.ID, productID: productRow.ID,
 		skuID: skuRow.ID, salesOrderID: salesOrder.ID, salesItemID: salesItem.ID, warehouseID: warehouse.ID, suffix: suffix,
 		item: biz.ProductionOrderDraftItem{LineNo: 1, ProductID: productRow.ID, ProductSKUID: &skuRow.ID, UnitID: unitRow.ID,
@@ -229,7 +233,7 @@ func TestProductionMaterialIssuePostgresConcurrentReplayAndQuantityWinner(t *tes
 	inventoryRepo := NewInventoryRepo(f.data, log.NewStdLogger(io.Discard))
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID,
-		WarehouseID: f.warehouseID, UnitID: f.unitID,
+		WarehouseID: f.materialWarehouseID, UnitID: f.unitID,
 		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(20),
 		SourceType: "PG_PRODUCTION_MATERIAL_ISSUE", IdempotencyKey: "pg-material-opening-" + f.suffix,
 	}); err != nil {
@@ -239,7 +243,7 @@ func TestProductionMaterialIssuePostgresConcurrentReplayAndQuantityWinner(t *tes
 	firstInput := &biz.ProductionMaterialIssueFromOrderCreate{
 		FactNo:            "PF-PG-MATERIAL-A-" + f.suffix,
 		ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
-		ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.warehouseID,
+		ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.materialWarehouseID,
 		Quantity: decimal.NewFromInt(6), IdempotencyKey: "pg-material-issue-a-" + f.suffix,
 	}
 	startCreate := make(chan struct{})
@@ -281,7 +285,7 @@ func TestProductionMaterialIssuePostgresConcurrentReplayAndQuantityWinner(t *tes
 	second, err := f.factUC.CreateProductionMaterialIssueFromOrder(ctx, &biz.ProductionMaterialIssueFromOrderCreate{
 		FactNo:            "PF-PG-MATERIAL-B-" + f.suffix,
 		ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
-		ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.warehouseID,
+		ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.materialWarehouseID,
 		Quantity: decimal.NewFromInt(6), IdempotencyKey: "pg-material-issue-b-" + f.suffix,
 	})
 	if err != nil {
@@ -318,7 +322,7 @@ func TestProductionMaterialIssuePostgresConcurrentReplayAndQuantityWinner(t *tes
 		inventorybalance.SubjectType(biz.InventorySubjectMaterial),
 		inventorybalance.SubjectID(f.materialID),
 		inventorybalance.ProductSkuIDIsNil(),
-		inventorybalance.WarehouseID(f.warehouseID),
+		inventorybalance.WarehouseID(f.materialWarehouseID),
 		inventorybalance.LotIDIsNil(),
 		inventorybalance.UnitID(f.unitID),
 	).Only(ctx)
@@ -346,7 +350,7 @@ func TestProductionMaterialIssuePostgresConcurrentOverIssueAllowanceHasOneWinner
 	inventoryRepo := NewInventoryRepo(f.data, log.NewStdLogger(io.Discard))
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID,
-		WarehouseID: f.warehouseID, UnitID: f.unitID,
+		WarehouseID: f.materialWarehouseID, UnitID: f.unitID,
 		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(20),
 		SourceType: "PG_PRODUCTION_OVER_ISSUE", IdempotencyKey: "pg-over-issue-opening-" + f.suffix,
 	}); err != nil {
@@ -356,7 +360,7 @@ func TestProductionMaterialIssuePostgresConcurrentOverIssueAllowanceHasOneWinner
 	base, err := f.factUC.CreateProductionMaterialIssueFromOrder(ctx, &biz.ProductionMaterialIssueFromOrderCreate{
 		FactNo:            "PF-PG-OVER-BASE-" + f.suffix,
 		ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
-		ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.warehouseID,
+		ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.materialWarehouseID,
 		Quantity: requirement.PlannedQuantity, IdempotencyKey: "pg-over-issue-base-" + f.suffix,
 	})
 	if err != nil {
@@ -392,7 +396,7 @@ func TestProductionMaterialIssuePostgresConcurrentOverIssueAllowanceHasOneWinner
 		overIssueFacts[index], err = f.factUC.CreateProductionMaterialIssueFromOrder(ctx, &biz.ProductionMaterialIssueFromOrderCreate{
 			FactNo:            "PF-PG-OVER-" + string(rune('A'+index)) + "-" + f.suffix,
 			ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
-			ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.warehouseID,
+			ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.materialWarehouseID,
 			Quantity: decimal.NewFromInt(1), IdempotencyKey: "pg-over-issue-fact-" + string(rune('A'+index)) + "-" + f.suffix,
 		})
 		if err != nil {
@@ -439,7 +443,7 @@ func TestProductionMaterialIssuePostgresConcurrentOverIssueAllowanceHasOneWinner
 		inventorybalance.SubjectType(biz.InventorySubjectMaterial),
 		inventorybalance.SubjectID(f.materialID),
 		inventorybalance.ProductSkuIDIsNil(),
-		inventorybalance.WarehouseID(f.warehouseID),
+		inventorybalance.WarehouseID(f.materialWarehouseID),
 		inventorybalance.LotIDIsNil(),
 		inventorybalance.UnitID(f.unitID),
 	).Only(ctx)

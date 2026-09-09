@@ -34,6 +34,9 @@ func (d *jsonrpcDispatcher) requireSensitiveFieldMutationPermission(
 			permissionKey = biz.PermissionFieldPartyPrivateRead
 		}
 	case "sales_order":
+		if normalizedMethod == "save_sales_order_engineering" {
+			return nil
+		}
 		permissionKey = biz.PermissionFieldSalesCommercialRead
 	case "purchase_order", "purchase", "outsourcing_order":
 		permissionKey = biz.PermissionFieldProcurementCommercialRead
@@ -108,6 +111,9 @@ func sensitiveFieldBusinessURL(url string) bool {
 func sensitiveCommercialDomain(url, method string) string {
 	switch strings.TrimSpace(url) {
 	case "sales_order":
+		if strings.HasSuffix(method, "engineering_material_request") {
+			return "procurement"
+		}
 		return "sales"
 	case "purchase_order", "purchase", "outsourcing_order":
 		return "procurement"

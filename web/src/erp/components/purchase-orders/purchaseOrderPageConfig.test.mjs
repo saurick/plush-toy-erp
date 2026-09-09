@@ -62,6 +62,7 @@ test('purchase inbound preview preserves authoritative numeric(20,6) values exac
   const [row] = buildInboundDraftPreviewRows(receiptProgress())
   assert.deepEqual(row, {
     key: 11,
+    materialID: 21,
     lineNo: 1,
     material: '短毛绒（MAT-PREVIEW）',
     unit: '千克',

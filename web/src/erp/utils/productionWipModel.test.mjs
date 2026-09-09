@@ -64,7 +64,6 @@ function aggregateFixture(patch = {}) {
         bom_item_id: 13,
         material_id: 301,
         unit_id: 302,
-        production_operation_code: 'FABRIC_PROCESSING',
         unit_quantity_snapshot: '0.5',
         loss_rate_snapshot: '0',
         planned_quantity: '60',
@@ -910,11 +909,7 @@ test('finished-goods rework lineage is explicit, inherited and business-labeled'
   }
   const valid = validateProductionWipAggregate({
     ...fixture,
-    production_wip_batches: [
-      ...fixture.production_wip_batches,
-      root,
-      child,
-    ],
+    production_wip_batches: [...fixture.production_wip_batches, root, child],
   })
   assert.equal(valid.batches.at(-1).origin_rework_fact_id, 901)
   assert.deepEqual(productionWipBatchLineageMeta(valid.batches.at(-1)), {

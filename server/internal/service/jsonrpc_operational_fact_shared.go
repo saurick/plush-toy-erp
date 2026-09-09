@@ -150,6 +150,9 @@ func unknownOperationalFactResult(method string) *v1.JsonrpcResult {
 }
 
 func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := warehouseClassificationError(err); result != nil {
+		return result
+	}
 	l := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrProcessRuntimeRequired):

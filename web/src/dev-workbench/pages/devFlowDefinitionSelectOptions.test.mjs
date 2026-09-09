@@ -91,7 +91,7 @@ test('state definition select keeps scope boundaries and splits the long Fact gr
   assert.deepEqual(
     options.map((group) => group.label),
     [
-      '源单生命周期 · 7',
+      '源单生命周期 · 9',
       'MasterData 生命周期 · 2',
       'Workflow 协同任务 · 1',
       '业务进度投影 · 1',

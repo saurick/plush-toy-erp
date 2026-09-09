@@ -7,6 +7,10 @@ import {
   currentBusinessDate,
   unixSecondsToBusinessDate,
 } from '../utils/businessDate.mjs'
+import {
+  bomLossRateToPercent,
+  calculateBOMUsage,
+} from '../utils/bomMaterialGroups.mjs'
 
 export const MATERIAL_DETAIL_TEMPLATE_KEY = 'engineering-material-detail'
 export const COLOR_CARD_TEMPLATE_KEY = 'engineering-color-card'
@@ -1150,15 +1154,21 @@ export function buildMaterialDetailDraftFromBOMVersion(
       return normalizeMaterialDetailLine({
         category: material.category || 'BOM',
         materialName: material.name || material.code || '材料已关联',
-        vendorCode: material.supplier_item_no || '',
+        vendorCode: [material.supplier_name, material.supplier_item_no]
+          .filter(Boolean)
+          .join(' / '),
         spec: material.spec || material.specification || '',
         color: material.color || item.color || '',
         unit: unit.name || unit.code || '',
         position: item.position || '',
         pieces: item.piece_count || item.pieceCount || '',
         unitUsage: item.quantity ?? '',
-        lossRate: item.loss_rate ?? '',
-        totalUsage: item.total_usage_snapshot || item.totalUsageSnapshot || '',
+        lossRate: bomLossRateToPercent(item.loss_rate),
+        totalUsage: calculateBOMUsage(
+          item.quantity,
+          item.loss_rate,
+          version.quantity_text
+        ),
         processBase: item.process_base || item.processBase || '',
         processMethod: item.process_method || item.processMethod || '',
         remark: item.note || '',

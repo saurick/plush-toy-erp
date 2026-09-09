@@ -1,16 +1,22 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-import { chromium } from "playwright";
+import { chromium } from 'playwright'
 
-const currentFile = fileURLToPath(import.meta.url);
-const webRoot = path.resolve(path.dirname(currentFile), "..");
-const repoRoot = path.resolve(webRoot, "..");
-const tempDir = path.join(repoRoot, "tmp", "pdfs");
-const outputDir = path.join(repoRoot, "output", "pdf");
-const htmlPath = path.join(tempDir, "plush_factory_formal_report_v4_mobile.html");
-const pdfPath = path.join(outputDir, "plush_factory_formal_report_v4_mobile.pdf");
+const currentFile = fileURLToPath(import.meta.url)
+const webRoot = path.resolve(path.dirname(currentFile), '..')
+const repoRoot = path.resolve(webRoot, '..')
+const tempDir = path.join(repoRoot, 'tmp', 'pdfs')
+const outputDir = path.join(repoRoot, 'output', 'pdf')
+const htmlPath = path.join(
+  tempDir,
+  'plush_factory_formal_report_v4_mobile.html'
+)
+const pdfPath = path.join(
+  outputDir,
+  'plush_factory_formal_report_v4_mobile.pdf'
+)
 
 const html = String.raw`<!doctype html>
 <html lang="zh-CN">
@@ -426,7 +432,7 @@ const html = String.raw`<!doctype html>
         <thead><tr><th>业务口径</th><th>系统真源</th><th>治理结果</th></tr></thead>
         <tbody>
           <tr><td>固定路线</td><td><span class="code">PLUSH_SEW_HAND_V1 / route_version=1</span></td><td>布料加工 → 车缝 → 手工 → 包装；订单行冻结路线与“是否客户验货”。首道布料加工整单外发，车缝与手工才允许拆量。</td></tr>
-          <tr><td>布料材料归属</td><td><span class="code">bom_items / production_order_material_requirements.production_operation_code</span></td><td>只认 BOM 中明确标记为 FABRIC_PROCESSING 的冻结材料需求，不从部位或备注猜测；每项必须精确绑定同一已确认合同的 MATERIAL 行。</td></tr>
+          <tr><td>布料材料归属</td><td><span class="code">production_order_material_requirements / production_wip_outsourcing_allocations</span></td><td>由生产负责人从冻结材料需求中选择本次加工材料，不从部位或备注猜测；每项必须精确绑定同一已确认合同的 MATERIAL 行。</td></tr>
           <tr><td>工序快照</td><td><span class="code">processes.production_route_operation_code → production_order_operations</span></td><td>四个标准位置由工序主档显式唯一绑定，发布时冻结步骤号、工序主档快照、产出类型、内外发允许范围和质量关口；不按名称、类别、普通编码或列表排序猜路线。</td></tr>
           <tr><td>在制品执行</td><td><span class="code">production_wip_batches / production_wip_events</span></td><td>保存父子批、数量、步骤、执行方式、版本与事件；拆量、取消、转序、外发回仓和返工均保留审计，取消不重新拆分数量。</td></tr>
           <tr><td>逐步内外发</td><td><span class="code">execution_mode + production_wip_outsourcing_allocations</span></td><td>正常布料加工逐条绑定 MATERIAL 行且须有足量已过账委外发料；车缝、手工及布料返工绑定 PRODUCT 行，本厂不伪造外发回仓。</td></tr>
@@ -465,27 +471,30 @@ const html = String.raw`<!doctype html>
       <div class="page-no">03 / 03</div>
     </section>
   </body>
-</html>`;
+</html>`
 
-await mkdir(tempDir, { recursive: true });
-await mkdir(outputDir, { recursive: true });
-await writeFile(htmlPath, html, "utf8");
+await mkdir(tempDir, { recursive: true })
+await mkdir(outputDir, { recursive: true })
+await writeFile(htmlPath, html, 'utf8')
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true })
 try {
-  const page = await browser.newPage({ viewport: { width: 1240, height: 1754 }, deviceScaleFactor: 1 });
-  await page.goto(`file://${htmlPath}`, { waitUntil: "networkidle" });
-  await page.emulateMedia({ media: "print" });
+  const page = await browser.newPage({
+    viewport: { width: 1240, height: 1754 },
+    deviceScaleFactor: 1,
+  })
+  await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle' })
+  await page.emulateMedia({ media: 'print' })
   await page.pdf({
     path: pdfPath,
-    format: "A4",
+    format: 'A4',
     printBackground: true,
     preferCSSPageSize: true,
-    margin: { top: "0", right: "0", bottom: "0", left: "0" },
-  });
+    margin: { top: '0', right: '0', bottom: '0', left: '0' },
+  })
 } finally {
-  await browser.close();
+  await browser.close()
 }
 
-console.log(`html=${htmlPath}`);
-console.log(`pdf=${pdfPath}`);
+console.log(`html=${htmlPath}`)
+console.log(`pdf=${pdfPath}`)
