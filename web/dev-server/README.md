@@ -7,6 +7,7 @@
 | 模块                                | 职责                                                                                                                                 |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `devWorkbenchPlugins.mjs`           | 聚合 development-serve 插件，供 `web/vite.shared.mjs` 单点注册                                                                       |
+| `devWebInstancePlugin.mjs`          | 仅向 loopback GET 提供前端进程、启动配置摘要和实时恢复状态，供启动器核对重复启动；不提供停服或写操作接口 |
 | `devCustomerConfigPlugin.mjs`       | 为本地客户调试提供受控配置和公开资源                                                                                                 |
 | `devCustomerImportDryRunPlugin.mjs` | 提供客户配置预检、Dry Run、runtime manifest 和发布准备读回                                                                           |
 | `devQaCoveragePlugin.mjs`           | 执行固定覆盖率采集并提供脱敏 operation 状态                                                                                          |

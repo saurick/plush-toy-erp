@@ -1,10 +1,10 @@
 import React from 'react'
 
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
-import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import { PurchaseOrderFormFields } from './PurchaseOrderForm.jsx'
 
-export default function PurchaseOrderBusinessModal({
+export default function PurchaseOrderEditor({
   open,
   form,
   editingOrder,
@@ -23,17 +23,17 @@ export default function PurchaseOrderBusinessModal({
   onMaterialChange,
 }) {
   return (
-    <BusinessFormModal
+    <BusinessFormPage
+      form={form}
       open={open}
       title={editingOrder ? '编辑采购订单' : '新建采购订单'}
       description="只维护采购承诺，入库、质检、库存或应付请到对应业务页面处理。"
       okText="保存"
-      confirmLoading={saving || itemsLoading}
+      confirmLoading={saving}
+      loading={itemsLoading || !referenceDataReady}
       okButtonProps={{ disabled: !referenceDataReady }}
       onOk={onOk}
       onCancel={onCancel}
-      destroyOnHidden
-      forceRender
     >
       <PurchaseOrderFormFields
         form={form}
@@ -56,6 +56,6 @@ export default function PurchaseOrderBusinessModal({
           />
         }
       />
-    </BusinessFormModal>
+    </BusinessFormPage>
   )
 }

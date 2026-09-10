@@ -29,7 +29,7 @@ import {
   normalizePurchaseLineFormValue,
   purchaseOrderLineOrderLabel,
 } from '../components/purchase-orders/PurchaseOrderForm.jsx'
-import PurchaseOrderBusinessModal from '../components/purchase-orders/PurchaseOrderBusinessModal.jsx'
+import PurchaseOrderEditor from '../components/purchase-orders/PurchaseOrderEditor.jsx'
 import PurchaseOrderInboundDraftModal from '../components/purchase-orders/PurchaseOrderInboundDraftModal.jsx'
 import PurchaseOrderOperationPanel from '../components/purchase-orders/PurchaseOrderOperationPanel.jsx'
 import { buildPurchaseOrderColumns } from '../components/purchase-orders/purchaseOrderColumns.jsx'
@@ -1684,7 +1684,7 @@ export default function V1PurchaseOrdersPage() {
         }}
       />
 
-      <PurchaseOrderBusinessModal
+      <PurchaseOrderEditor
         open={modalOpen}
         form={form}
         editingOrder={editingOrder}

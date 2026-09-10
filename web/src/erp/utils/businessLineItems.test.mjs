@@ -21,7 +21,7 @@ import {
 
 const stylesRoot = fileURLToPath(new URL('../styles', import.meta.url))
 const shipmentModalPath = fileURLToPath(
-  new URL('../components/shipments/ShipmentBusinessModal.jsx', import.meta.url)
+  new URL('../components/shipments/ShipmentEditor.jsx', import.meta.url)
 )
 
 function listCSSFiles(directory) {

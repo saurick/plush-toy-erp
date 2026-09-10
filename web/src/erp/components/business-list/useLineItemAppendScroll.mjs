@@ -37,8 +37,9 @@ export function useLineItemAppendScroll(itemCount) {
     const fallbackTarget = target || rowRefs.current[rowRefs.current.length - 1]
     pendingScrollIndexRef.current = null
     scrollFrameRef.current = null
+    // Finish positioning before another Add click can interrupt nested scrolling.
     fallbackTarget?.scrollIntoView?.({
-      behavior: 'smooth',
+      behavior: 'auto',
       block: 'nearest',
       inline: 'nearest',
     })

@@ -1,3 +1,4 @@
+import { assertBusinessFormPage, closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 export function createPermissionCenterScenarios({
   expectText,
   assertERPThemeMode,
@@ -1085,11 +1086,10 @@ export function createPermissionCenterScenarios({
         })
         await assertTextAbsent(page, '搜索菜单权限名称或路径')
         await page
-          .locator('.ant-modal-content')
+          .locator('.erp-business-form-page:not([hidden])')
           .filter({ hasText: '创建员工账号' })
           .last()
-          .locator('.ant-modal-footer button')
-          .first()
+          .getByRole('button', { name: '返回列表' })
           .click()
         await page
           .getByRole('row', { name: /assistant-admin/ })
@@ -1155,7 +1155,7 @@ export function createPermissionCenterScenarios({
 
         await page.getByRole('button', { name: '创建员工账号' }).click()
         const createModal = page
-          .locator('.ant-modal-content')
+          .locator('.erp-business-form-page:not([hidden])')
           .filter({ hasText: '创建员工账号' })
           .last()
         await expectText(createModal, '初始密码')
@@ -1163,7 +1163,7 @@ export function createPermissionCenterScenarios({
           scenarioName: 'permission-center-admin-dialogs-create',
           title: '创建员工账号',
         })
-        await createModal.locator('.ant-modal-footer button').first().click()
+        await closeBusinessFormPage(page, createModal)
 
         const assistantRow = page.getByRole('row', { name: /assistant-admin/ })
         await assistantRow.getByRole('button', { name: '分配岗位' }).click()
@@ -1184,11 +1184,16 @@ export function createPermissionCenterScenarios({
 
         await assistantRow.getByRole('button', { name: '修改资料' }).click()
         const phoneModal = page
-          .locator('.ant-modal-content')
+          .locator('.erp-business-form-page:not([hidden])')
           .filter({ hasText: '修改资料：业务助理（assistant-admin）' })
           .last()
         await phoneModal.locator('input[inputmode="tel"]').fill('13700137000')
-        await phoneModal.locator('.ant-modal-footer button').first().click()
+        await assertBusinessFormPage(page, phoneModal)
+        await phoneModal.getByRole('button', { name: '返回列表' }).click()
+        await page.getByRole('button', { name: '继续编辑', exact: true }).click()
+        await page.locator('.ant-modal-confirm').waitFor({ state: 'hidden' })
+        assert.equal(await phoneModal.locator('input[inputmode="tel"]').inputValue(), '13700137000')
+        await closeBusinessFormPage(page, phoneModal)
 
         await assistantRow.getByRole('button', { name: '重置密码' }).click()
         const resetModal = page

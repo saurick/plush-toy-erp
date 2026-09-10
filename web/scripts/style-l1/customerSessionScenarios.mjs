@@ -1617,7 +1617,7 @@ export function createCustomerSessionScenarios({
         await expectHeading(page, '生产订单')
         await page.getByText('MO-STYLE-L1-20260713', { exact: true }).dblclick()
         const detailModal = page
-          .locator('.ant-modal:visible')
+          .locator('.erp-business-form-page:not([hidden])')
           .filter({ hasText: '查看生产订单' })
           .last()
         await detailModal.waitFor({ state: 'visible', timeout: 10_000 })
@@ -1627,7 +1627,7 @@ export function createCustomerSessionScenarios({
           'WIP 只读查看必须只用订单冻结快照，不得调用 PMC 编辑候选接口'
         )
         await assertTextAbsent(page, '权限不足')
-        await detailModal.locator('.ant-modal-close').click()
+        await detailModal.getByRole('button', { name: '返回列表' }).click()
         await page.getByText('MO-STYLE-L1-20260713', { exact: true }).click()
 
         const viewRouteButton = page.getByRole('button', {
@@ -1708,7 +1708,7 @@ export function createCustomerSessionScenarios({
           '订单关联的销售订单行、BOM 版本不在当前账号读取范围内，已按只读方式打开'
         )
         await page
-          .locator('.ant-modal:visible')
+          .locator('.erp-business-form-page:not([hidden])')
           .filter({ hasText: '查看生产订单' })
           .last()
           .waitFor({ state: 'visible', timeout: 10_000 })

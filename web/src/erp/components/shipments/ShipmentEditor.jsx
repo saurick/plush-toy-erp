@@ -20,7 +20,7 @@ import ProductIdentity, {
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
-import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
@@ -928,7 +928,7 @@ function ShipmentItemsTable({
   )
 }
 
-export default function ShipmentBusinessModal({
+export default function ShipmentEditor({
   canCreate = false,
   canUpdate = false,
   canImportSalesOrderSource = false,
@@ -986,7 +986,9 @@ export default function ShipmentBusinessModal({
   }
 
   return (
-    <BusinessFormModal
+    <BusinessFormPage
+      form={form}
+      readOnly={isViewModal}
       title={
         isCreateModal
           ? '新建出货单'
@@ -1005,11 +1007,8 @@ export default function ShipmentBusinessModal({
       onCancel={onCancel}
       onOk={isWritableModal ? onOk : undefined}
       okText="保存"
-      cancelText={isWritableModal ? '取消' : '关闭'}
       confirmLoading={saving}
       okButtonProps={{ disabled: !canSave, hidden: isViewModal }}
-      forceRender
-      destroyOnHidden={false}
     >
       <Form layout="vertical" form={form} className="erp-business-action-form">
         <ShipmentFormFields
@@ -1084,7 +1083,7 @@ export default function ShipmentBusinessModal({
                   <div className="erp-line-items-form__import-copy">
                     <strong>从销售订单导入</strong>
                     <span>
-                      先选择销售订单来源；产品、SKU、单位和订单行追溯带回主弹窗，
+                      先选择销售订单来源；产品、SKU、单位和订单行追溯带回编辑页，
                       仓库 / 批次仍在出货明细里补齐。
                     </span>
                   </div>
@@ -1100,7 +1099,7 @@ export default function ShipmentBusinessModal({
                 <SourceImportPickerModal
                   open={salesOrderImportOpen}
                   title="从销售订单导入出货明细"
-                  description="选择同一张销售订单的来源行；导入后回到主弹窗维护仓库和批次。"
+                  description="选择同一张销售订单的来源行；导入后回到编辑页维护仓库和批次。"
                   rows={salesOrderSources}
                   columns={salesOrderImportColumns}
                   multiple
@@ -1197,6 +1196,6 @@ export default function ShipmentBusinessModal({
           />
         ) : null}
       </Form>
-    </BusinessFormModal>
+    </BusinessFormPage>
   )
 }

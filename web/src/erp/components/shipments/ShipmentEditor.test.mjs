@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const source = readFileSync(
-  new URL('./ShipmentBusinessModal.jsx', import.meta.url),
+  new URL('./ShipmentEditor.jsx', import.meta.url),
   'utf8'
 )
 

@@ -41,7 +41,7 @@ import {
   getPreferredColumnOrder,
   writeStoredColumnOrder,
 } from '../components/business-list/businessListPreferences.mjs'
-import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
@@ -1252,8 +1252,8 @@ export default function V1MasterDataPage({ type }) {
         onOpenRecord={openMasterDataRecord}
       />
 
-      <BusinessFormModal
-        size={showContactForm ? 'masterDataItems' : 'masterData'}
+      <BusinessFormPage
+        form={recordForm}
         title={
           editingRecord?.id
             ? `编辑${entityLabel}`
@@ -1268,12 +1268,8 @@ export default function V1MasterDataPage({ type }) {
           skuAttachmentRef.current?.clearPendingAttachments()
           setRecordModalOpen(false)
         }}
-        confirmLoading={saving || contactLoading}
-        cancelButtonProps={{ disabled: saving || contactLoading }}
-        closable={!(saving || contactLoading)}
-        keyboard={!(saving || contactLoading)}
-        forceRender
-        destroyOnHidden={false}
+        confirmLoading={saving}
+        loading={contactLoading || (needsUnitDictionary(effectiveType) && unitLoading)}
       >
         <Form
           form={recordForm}
@@ -1323,7 +1319,7 @@ export default function V1MasterDataPage({ type }) {
             <ContactFormList form={recordForm} entityLabel={entityLabel} />
           ) : null}
         </Form>
-      </BusinessFormModal>
+      </BusinessFormPage>
 
       <BusinessDetailsModal
         columns={recordColumns}

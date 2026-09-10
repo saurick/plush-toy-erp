@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>新建编辑业务弹窗标准样板</title>
+    <title>新建编辑业务编辑标准样板</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -63,9 +63,8 @@
           sans-serif;
       }
 
-      body.modal-open {
-        overflow: hidden;
-      }
+      .main:has(.business-form-page:not([hidden])) > .content { display: none; }
+      .business-form-page[hidden] { display: none; }
 
       button,
       input,
@@ -230,31 +229,27 @@
         box-shadow: var(--shadow);
       }
 
-      .business-modal {
-        width: min(1720px, calc(100vw - 96px));
+      .business-form-page {
+        width: calc(100% - 32px);
+        height: calc(100dvh - 120px);
         max-width: none;
-        max-height: calc(100dvh - 48px);
-        margin: auto;
+
+        margin: 16px;
         border: 1px solid var(--line-strong);
         border-radius: 14px;
         background: var(--panel);
         color: var(--text);
         padding: 0;
         overflow: hidden;
-        box-shadow: 0 28px 80px rgb(15 23 42 / 32%);
+
       }
 
-      .business-modal[open] {
+      .business-form-page:not([hidden]) {
         display: grid;
         grid-template-rows: auto minmax(0, 1fr) auto;
       }
 
-      .business-modal::backdrop {
-        background: rgb(15 23 42 / 64%);
-        backdrop-filter: blur(2px);
-      }
-
-      .modal-header {
+      .editor-header {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
@@ -264,28 +259,28 @@
         padding: 14px 18px;
       }
 
-      .modal-header h2,
-      .modal-header p {
+      .editor-header h2,
+      .editor-header p {
         margin-bottom: 0;
       }
 
-      .modal-header .btn {
+      .editor-header .btn {
         flex: 0 0 auto;
         white-space: nowrap;
       }
 
-      .modal-scroll {
+      .editor-scroll {
         min-height: 0;
         overflow: auto;
         overscroll-behavior: contain;
         scrollbar-gutter: stable;
       }
 
-      .business-modal .source-strip {
+      .business-form-page .source-strip {
         border-top: 0;
       }
 
-      .business-modal > .footer {
+      .business-form-page > .footer {
         border: 0;
         border-top: 1px solid var(--line);
         border-radius: 0;
@@ -739,27 +734,28 @@
           flex-direction: column;
         }
 
-        .business-modal {
-          width: calc(100vw - 16px);
-          max-height: calc(100dvh - 16px);
+        .business-form-page {
+          width: calc(100% - 16px);
+          height: calc(100dvh - 140px);
+          margin: 8px;
           border-radius: 10px;
         }
 
-        .modal-header {
+        .editor-header {
           padding: 12px;
         }
 
-        .business-modal .source-strip,
-        .business-modal .form-grid {
+        .business-form-page .source-strip,
+        .business-form-page .form-grid {
           padding-right: 12px;
           padding-left: 12px;
         }
 
-        .business-modal > .footer {
+        .business-form-page > .footer {
           padding: 10px 12px;
         }
 
-        .business-modal > .footer .actions {
+        .business-form-page > .footer .actions {
           width: 100%;
           justify-content: flex-end;
         }
@@ -773,7 +769,7 @@
           <div class="mark">样</div>
           <div>
             <strong>毛绒 ERP</strong>
-            <span>业务弹窗标准样板</span>
+            <span>业务编辑标准样板</span>
           </div>
         </div>
         <div class="nav-note">
@@ -795,17 +791,16 @@
         <header class="topbar">
           <div>
             <div class="crumb">销售链路 / 销售订单 / 新建草稿</div>
-            <h1>新建 / 编辑业务弹窗样板</h1>
+            <h1>新建 / 编辑业务编辑样板</h1>
           </div>
           <div class="actions">
             <button
               class="btn primary"
-              id="openFormModal"
+              id="openFormPage"
               type="button"
-              aria-haspopup="dialog"
-              aria-controls="businessFormDialog"
+              aria-controls="businessFormPage"
             >
-              打开业务表单弹窗
+              打开整页编辑
             </button>
           </div>
         </header>
@@ -816,9 +811,9 @@
               <div class="hero">
                 <div>
                   <div class="crumb">销售订单 / 业务表单</div>
-                  <h2>销售订单业务弹窗样板</h2>
+                  <h2>销售订单业务编辑样板</h2>
                   <p class="summary">
-                    新建和编辑复用同一个业务弹窗：上方维护订单信息，下方维护订单明细；客户与
+                    新建和编辑复用同一个编辑页：上方维护订单信息，下方维护订单明细；客户与
                     SKU 从主数据中选择，数量、价格和交期在当前订单中维护。
                   </p>
                 </div>
@@ -831,9 +826,9 @@
 
               <div class="review-grid" aria-label="进入真实实现前确认项">
                 <div class="review-card">
-                  <strong>弹窗主路径</strong>
+                  <strong>整页主路径</strong>
                   <span
-                    >新建和编辑复用业务表单弹窗；只读查看复用同一 Modal
+                    >新建和编辑复用整页表单；只读查看复用同一
                     视觉骨架，但从只读详情入口打开。</span
                   >
                 </div>
@@ -855,36 +850,27 @@
             </section>
           </div>
         </section>
-      </main>
-    </div>
 
-    <dialog
-      class="business-modal"
-      id="businessFormDialog"
-      aria-modal="true"
+    <section
+      class="business-form-page"
+      id="businessFormPage"
+      hidden
       aria-labelledby="businessFormTitle"
       aria-describedby="businessFormDescription"
     >
-      <header class="modal-header">
+      <header class="editor-header">
         <div>
           <div class="crumb">销售链路 / 销售订单</div>
           <h2 id="businessFormTitle">销售订单业务表单</h2>
           <p class="muted" id="businessFormDescription">
-            新建和编辑复用同一个业务表单弹窗；只读查看复用同一 Modal
+            新建和编辑复用同一个整页表单；只读查看复用同一
             视觉骨架，并由记录状态和岗位职责决定可用动作。
           </p>
         </div>
-        <button
-          class="btn"
-          id="closeFormModal"
-          type="button"
-          aria-label="关闭业务表单弹窗"
-        >
-          关闭
-        </button>
+
       </header>
 
-      <div class="modal-scroll">
+      <div class="editor-scroll">
         <div class="source-strip">
           <div class="field">
             <label for="formMode">原型评审状态（非运行态字段）</label>
@@ -1006,7 +992,7 @@
             <div class="items-head">
               <div>
                 <strong>订单行</strong>
-                <span>明细作为当前业务对象的一部分维护，整体随弹窗保存。</span>
+                <span>明细作为当前业务对象的一部分维护，整体随表单保存。</span>
               </div>
             </div>
 
@@ -1094,13 +1080,15 @@
           尚未保存，请检查客户、SKU 和订单明细。
         </span>
         <div class="actions">
-          <button class="btn" id="cancelFormModal" type="button">取消</button>
+          <button class="btn" id="returnToList" type="button">返回列表</button>
           <button class="btn primary save-action" id="footerSave" type="button">
             保存草稿
           </button>
         </div>
       </div>
-    </dialog>
+    </section>
+      </main>
+    </div>
 
     <script>
       const skuCatalog = {
@@ -1118,10 +1106,9 @@
 
       const formMode = document.querySelector("#formMode");
       const form = document.querySelector("#form");
-      const businessFormDialog = document.querySelector("#businessFormDialog");
-      const openFormModal = document.querySelector("#openFormModal");
-      const closeFormModal = document.querySelector("#closeFormModal");
-      const cancelFormModal = document.querySelector("#cancelFormModal");
+      const businessFormPage = document.querySelector("#businessFormPage");
+      const openFormPage = document.querySelector("#openFormPage");
+      const returnToList = document.querySelector("#returnToList");
       const itemImportApply = document.querySelector("#itemImportApply");
       const productOrder = document.querySelector("#productOrder");
       const itemList = document.querySelector("#itemList");
@@ -1132,14 +1119,6 @@
       const quotedFreightHint = document.querySelector("#quotedFreightHint");
       const taxMode = document.querySelector("#taxMode");
       const taxRate = document.querySelector("#taxRate");
-      const focusableSelector = [
-        "button:not([disabled])",
-        "a[href]",
-        "input:not([disabled])",
-        "select:not([disabled])",
-        "textarea:not([disabled])",
-        '[tabindex]:not([tabindex="-1"])',
-      ].join(",");
       const mutationControlSelector = [
         "#form input:not([readonly])",
         "#form select:not(#formMode)",
@@ -1150,7 +1129,7 @@
         "#addItem",
         "#footerSave",
       ].join(",");
-      let modalTrigger = openFormModal;
+      let editorTrigger = openFormPage;
       const requiredFields = [
         "customer",
         "orderNo",
@@ -1171,7 +1150,7 @@
       const modeNotes = {
         create: "新增态允许保存草稿；正式页面从新增入口进入。",
         edit: "编辑态允许覆盖草稿字段；已提交事实不得在前端直接改写。",
-        readonly: "只读态用于核对详情 Modal；保留回显但关闭保存动作。",
+        readonly: "只读态用于核对详情；保留回显但关闭保存动作。",
       };
 
       function clearErrors() {
@@ -1184,7 +1163,7 @@
       }
 
       function syncMutationControls(readonly) {
-        businessFormDialog
+        businessFormPage
           .querySelectorAll(mutationControlSelector)
           .forEach((control) => {
             if (!control.hasAttribute("data-mode-initially-disabled")) {
@@ -1252,26 +1231,21 @@
         return valid;
       }
 
-      function getFocusableElements() {
-        return Array.from(
-          businessFormDialog.querySelectorAll(focusableSelector),
-        ).filter((element) => element.getClientRects().length > 0);
-      }
-
+      let baseline = "";
+      const snapshot = () => JSON.stringify([...form.querySelectorAll("input, select, textarea")].map(field => [field.id, field.value]));
       function openBusinessForm(event) {
-        if (businessFormDialog.open) return;
-        modalTrigger = event?.currentTarget || openFormModal;
-        businessFormDialog.showModal();
-        document.body.classList.add("modal-open");
+        if (!businessFormPage.hidden) return;
+        editorTrigger = event?.currentTarget || openFormPage;
+        businessFormPage.hidden = false;
+        baseline = snapshot();
         requestAnimationFrame(() => {
-          businessFormDialog.querySelector("[data-initial-focus]")?.focus({
-            preventScroll: true,
-          });
+          businessFormPage.querySelector("[data-initial-focus]")?.focus({ preventScroll: true });
         });
       }
-
       function closeBusinessForm() {
-        if (businessFormDialog.open) businessFormDialog.close();
+        if (snapshot() !== baseline && !window.confirm("放弃未保存的修改？")) return;
+        businessFormPage.hidden = true;
+        requestAnimationFrame(() => editorTrigger?.focus({ preventScroll: true }));
       }
 
       function getLineField(card, name) {
@@ -1430,49 +1404,8 @@
       quotedFreightAmount.addEventListener("input", updateStats);
       taxMode.addEventListener("change", updateStats);
       taxRate.addEventListener("input", updateStats);
-      openFormModal.addEventListener("click", openBusinessForm);
-      closeFormModal.addEventListener("click", closeBusinessForm);
-      cancelFormModal.addEventListener("click", closeBusinessForm);
-      businessFormDialog.addEventListener("cancel", (event) => {
-        event.preventDefault();
-        closeBusinessForm();
-      });
-      businessFormDialog.addEventListener("close", () => {
-        document.body.classList.remove("modal-open");
-        requestAnimationFrame(() =>
-          modalTrigger?.focus({ preventScroll: true }),
-        );
-      });
-      businessFormDialog.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          closeBusinessForm();
-          return;
-        }
-        if (event.key !== "Tab") return;
-        const focusableElements = getFocusableElements();
-        if (!focusableElements.length) {
-          event.preventDefault();
-          businessFormDialog.focus();
-          return;
-        }
-        const firstFocusable = focusableElements[0];
-        const lastFocusable = focusableElements[focusableElements.length - 1];
-        if (
-          event.shiftKey &&
-          (document.activeElement === firstFocusable ||
-            !businessFormDialog.contains(document.activeElement))
-        ) {
-          event.preventDefault();
-          lastFocusable.focus();
-        } else if (
-          !event.shiftKey &&
-          document.activeElement === lastFocusable
-        ) {
-          event.preventDefault();
-          firstFocusable.focus();
-        }
-      });
+      openFormPage.addEventListener("click", openBusinessForm);
+      returnToList.addEventListener("click", closeBusinessForm);
       itemImportApply.addEventListener("click", () => {
         footerState.textContent =
           "将打开第二层 SKU 来源选择器；完整筛选和勾选交互由局部动作弹窗样板统一定义。";

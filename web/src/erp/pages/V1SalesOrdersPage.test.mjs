@@ -23,7 +23,7 @@ const form = readFileSync(
 )
 const businessModal = readFileSync(
   new URL(
-    '../components/sales-orders/SalesOrderBusinessModal.jsx',
+    '../components/sales-orders/SalesOrderEditor.jsx',
     import.meta.url
   ),
   'utf8'

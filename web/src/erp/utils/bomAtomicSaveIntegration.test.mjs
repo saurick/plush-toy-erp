@@ -36,14 +36,20 @@ test('BOM form no longer orchestrates split header and item writes', () => {
 })
 
 test('BOM form is mounted before open handlers initialize its form instance', () => {
-  const modalStart = pageSource.indexOf(
-    '<BusinessFormModal\n        open={headerModalOpen}'
+  const editorStart = pageSource.indexOf(
+    '<BusinessFormPage\n        open={headerModalOpen}'
   )
-  const modalContract = pageSource.slice(modalStart, modalStart + 1_200)
-
-  assert.ok(modalStart >= 0)
-  assert.match(modalContract, /forceRender/u)
-  assert.match(modalContract, /destroyOnHidden=\{false\}/u)
+  const editor = readFileSync(
+    new URL(
+      '../components/business-list/BusinessFormPage.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+  assert.ok(editorStart >= 0)
+  assert.match(editor, /hidden=\{!open\}/u)
+  assert.match(editor, /\{children\}/u)
+  assert.doesNotMatch(editor, /if\s*\(!open\)\s*return null/u)
   assert.match(
     pageSource,
     /const openCreate = \(\) => \{[\s\S]*headerForm\.resetFields/u

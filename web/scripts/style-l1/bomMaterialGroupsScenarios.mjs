@@ -1,3 +1,7 @@
+import {
+  assertBusinessFormPage,
+  closeBusinessFormPage,
+} from './businessFormPageAssertions.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
 
 export async function verifyBOMMaterialGroups(
@@ -8,7 +12,7 @@ export async function verifyBOMMaterialGroups(
   await expectText(page, 'BOM-STYLE-DRAFT')
   await page.getByText('BOM-STYLE-DRAFT', { exact: true }).dblclick()
   const modal = page
-    .getByRole('dialog')
+    .locator('.erp-business-form-page:not([hidden])')
     .filter({ hasText: '编辑 BOM 草稿' })
     .last()
   await modal.waitFor({ state: 'visible' })
@@ -24,17 +28,14 @@ export async function verifyBOMMaterialGroups(
   await first.getByLabel('单位用量 1', { exact: true }).fill('0.125')
   await first.getByLabel('损耗 % 1', { exact: true }).fill('10')
   await first.getByText('139.15', { exact: true }).waitFor({ state: 'visible' })
-  await first.getByRole('button', { name: '添加同料部位', exact: true }).click()
+  await first.getByRole('button', { name: '＋ 添加部位', exact: true }).click()
   assert.equal(
     await groups.count(),
     3,
     'adding a part must not ask for the material again'
   )
-  assert.equal(await first.locator('tbody tr').count(), 2)
-  assert.equal(
-    await first.locator('.erp-bom-material-group__header .ant-select').count(),
-    1
-  )
+  assert.equal(await first.locator('tr[data-bom-part-index]').count(), 2)
+  assert.equal(await first.locator('input[aria-label^="物料名称 "]').count(), 1)
   await first.getByLabel('部位 2', { exact: true }).fill('耳朵')
   await first.getByLabel('单位用量 2', { exact: true }).fill('0.025')
   await first.getByLabel('损耗 % 2', { exact: true }).fill('5')
@@ -61,9 +62,13 @@ export async function verifyBOMMaterialGroups(
   )
   const metrics = await modal.evaluate((node) => {
     const group = node.querySelector('.erp-bom-material-group')
-    const scroller = group.querySelector('.erp-bom-parts-scroll')
+    const scroller = group.closest('.erp-bom-parts-scroll')
     return {
-      modalWidth: node.clientWidth,
+      editorWidth: node.clientWidth,
+      scrollWidth: scroller.clientWidth,
+      tableHeadCount: node.querySelectorAll('.erp-bom-parts-table thead')
+        .length,
+      materialRowSpan: group.querySelector('td').rowSpan,
       groupWidth: group.getBoundingClientRect().width,
       scrollable: getComputedStyle(scroller).overflowX,
       ancestors: Array.from(
@@ -79,13 +84,18 @@ export async function verifyBOMMaterialGroups(
       })),
     }
   })
-  assert.ok(metrics.groupWidth <= metrics.modalWidth, JSON.stringify(metrics))
+  assert.ok(metrics.scrollWidth <= metrics.editorWidth, JSON.stringify(metrics))
+  assert.equal(metrics.tableHeadCount, 1)
+  assert.equal(metrics.materialRowSpan, 4)
+  assert.equal(await page.locator('.ant-modal-mask:visible').count(), 0)
   assert.equal(metrics.scrollable, 'auto')
   return modal
 }
 
 export function createBOMMaterialGroupsScenarios(deps) {
   let saves = []
+  let releaseSave
+  let saveAttempts = 0
   const scenarios = [
     {
       name: 'bom-material-groups-desktop',
@@ -108,7 +118,10 @@ export function createBOMMaterialGroupsScenarios(deps) {
           path: `${deps.outputDir}/bom-material-groups-form${page.viewportSize().width < 600 ? '-mobile' : ''}.png`,
           fullPage: true,
         })
-        await modal.locator('.ant-modal-footer .ant-btn-primary').last().click()
+        await modal
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .last()
+          .click()
         await modal.waitFor({ state: 'hidden', timeout: 10000 })
         deps.assert.equal(saves.length, 1)
         deps.assert.equal(saves[0].items.length, 5)
@@ -124,6 +137,291 @@ export function createBOMMaterialGroupsScenarios(deps) {
   ]
   return [
     ...scenarios,
+    {
+      ...scenarios[0],
+      name: 'bom-page-save-failure-retry',
+      beforeNavigate: async (page) => {
+        saveAttempts = 0
+        releaseSave = null
+        await page.route('**/rpc/bom', async (route) => {
+          const { id, method } = route.request().postDataJSON()
+          if (method !== 'save_bom_with_items') return route.fallback()
+          saveAttempts += 1
+          if (saveAttempts !== 1) return route.fallback()
+          await new Promise((resolve) => {
+            releaseSave = resolve
+          })
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id,
+              result: {
+                code: 40010,
+                message: '模拟保存失败，请重试',
+                data: {},
+              },
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        const editor = await verifyBOMMaterialGroups(page, deps)
+        const save = editor.locator(
+          '.erp-business-form-page__footer .ant-btn-primary'
+        )
+        await save.click()
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector('.erp-business-form-page:not([hidden])')
+              ?.getAttribute('aria-busy') === 'true'
+        )
+        deps.assert.equal(
+          await editor
+            .getByRole('button', { name: '返回列表', exact: true })
+            .isDisabled(),
+          true
+        )
+        await save.click({ force: true })
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        deps.assert.equal(saveAttempts, 1)
+        deps.assert.equal(
+          await editor
+            .locator('.erp-business-form-page__body')
+            .getAttribute('inert'),
+          ''
+        )
+        releaseSave()
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector('.erp-business-form-page:not([hidden])')
+              ?.getAttribute('aria-busy') === 'false'
+        )
+        deps.assert.equal(await editor.getAttribute('data-unsaved'), 'true')
+        deps.assert.equal(
+          await editor.getByLabel('单位用量 1', { exact: true }).inputValue(),
+          '0.125'
+        )
+        await save.click()
+        await editor.waitFor({ state: 'hidden' })
+        deps.assert.equal(saveAttempts, 2)
+      },
+    },
+    {
+      ...scenarios[0],
+      name: 'bom-page-editing-responsiveness',
+      verify: async (page) => {
+        await page.getByText('BOM-STYLE-DRAFT', { exact: true }).dblclick()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.getByLabel('部位 1', { exact: true }).evaluate((input) => {
+          const data = new DataTransfer()
+          data.setData(
+            'text/plain',
+            Array.from(
+              { length: 198 },
+              (_, i) => `部位${i + 1}\t1\t0.1\t5\t裁片\t激光\t备注`
+            ).join('\n')
+          )
+          input.dispatchEvent(
+            new ClipboardEvent('paste', {
+              clipboardData: data,
+              bubbles: true,
+              cancelable: true,
+            })
+          )
+        })
+        await editor.getByLabel('部位 200', { exact: true }).waitFor()
+        await editor.evaluate((node) => {
+          window.__BOM_INPUT_PERFORMANCE__ = { samples: [] }
+          node.addEventListener(
+            'input',
+            (event) => {
+              const started = performance.now()
+              const label =
+                event.target.getAttribute('aria-label') || event.target.id
+              requestAnimationFrame(() => {
+                window.__BOM_INPUT_PERFORMANCE__.samples.push({
+                  label,
+                  duration: performance.now() - started,
+                })
+              })
+            },
+            true
+          )
+        })
+        const quantity = editor.getByLabel('单位用量 100', { exact: true })
+        await quantity.fill('0.')
+        await quantity.pressSequentially('123456')
+        deps.assert.equal(await quantity.inputValue(), '0.123456')
+        const note = editor.locator('textarea').first()
+        await note.fill('')
+        await note.pressSequentially('typingcheck')
+        deps.assert.equal(await note.inputValue(), 'typingcheck')
+        const metrics = await page.evaluate(async () => {
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+          const samples = window.__BOM_INPUT_PERFORMANCE__.samples
+          return {
+            rows: document.querySelectorAll('tr[data-bom-part-index]').length,
+            samples,
+            averageMs:
+              samples.reduce((sum, item) => sum + item.duration, 0) /
+              samples.length,
+            maxMs: Math.max(...samples.map((item) => item.duration)),
+          }
+        })
+        console.log(
+          `[style:l1] bom-editing-performance=${JSON.stringify(metrics)}`
+        )
+        deps.assert.equal(metrics.rows, 200)
+        deps.assert.ok(
+          metrics.samples.length >= 16,
+          'capture continuous typing, not only a bulk fill'
+        )
+        deps.assert.ok(
+          metrics.averageMs <= 100,
+          `typing average exceeded 100 ms: ${JSON.stringify(metrics)}`
+        )
+        deps.assert.ok(
+          metrics.maxMs <= 200,
+          `a keystroke exceeded 200 ms: ${JSON.stringify(metrics)}`
+        )
+        await closeBusinessFormPage(page, editor)
+      },
+    },
+    {
+      ...scenarios[0],
+      name: 'bom-page-editing-derived-values',
+      verify: async (page) => {
+        const editor = await verifyBOMMaterialGroups(page, deps)
+        const group = editor.locator('.erp-bom-material-group').first()
+        const row = (index) =>
+          group.locator('tr[data-bom-part-index]').nth(index)
+        await editor.getByLabel('单位用量 2', { exact: true }).fill('0.037')
+        await editor.getByLabel('备注 2', { exact: true }).fill('修改后复制')
+        await row(1).getByText('39.3162', { exact: true }).waitFor()
+        await row(1).getByRole('button', { name: '复制', exact: true }).click()
+        deps.assert.equal(
+          await editor.getByLabel('单位用量 3', { exact: true }).inputValue(),
+          '0.037'
+        )
+        deps.assert.equal(
+          await editor.getByLabel('损耗 % 3', { exact: true }).inputValue(),
+          '5'
+        )
+        deps.assert.equal(
+          await editor.getByLabel('备注 3', { exact: true }).inputValue(),
+          '修改后复制'
+        )
+        await row(1).getByRole('button', { name: '移除', exact: true }).click()
+        await row(1).getByText('39.3162', { exact: true }).waitFor()
+        await editor.locator('input[id$="quantity_text"]').fill('2024')
+        await row(1).getByText('78.6324', { exact: true }).waitFor()
+        await row(0).getByRole('button', { name: '移除', exact: true }).click()
+        deps.assert.equal(
+          await editor.getByLabel('单位用量 1', { exact: true }).inputValue(),
+          '0.037'
+        )
+        await row(0).getByText('78.6324', { exact: true }).waitFor()
+        await group.getByText('0.052', { exact: false }).waitFor()
+        deps.assert.equal(
+          await group.locator('input[aria-label^="物料名称 "]').count(),
+          1
+        )
+        await closeBusinessFormPage(page, editor)
+      },
+    },
+    {
+      ...scenarios[0],
+      name: 'bom-page-many-parts-and-readonly',
+      verify: async (page) => {
+        await page.getByText('BOM-STYLE-DRAFT', { exact: true }).dblclick()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.getByLabel('部位 1', { exact: true }).evaluate((input) => {
+          const data = new DataTransfer()
+          data.setData(
+            'text/plain',
+            Array.from(
+              { length: 198 },
+              (_, i) => `部位${i + 1}\t1\t0.1\t5\t裁片\t激光\t长备注边界`
+            ).join('\n')
+          )
+          input.dispatchEvent(
+            new ClipboardEvent('paste', {
+              clipboardData: data,
+              bubbles: true,
+              cancelable: true,
+            })
+          )
+        })
+        await editor.getByLabel('部位 200', { exact: true }).waitFor()
+        deps.assert.equal(
+          await editor.locator('tr[data-bom-part-index]').count(),
+          200
+        )
+        deps.assert.equal(
+          await editor
+            .getByRole('button', { name: '＋ 添加物料', exact: true })
+            .isDisabled(),
+          true
+        )
+        deps.assert.equal(
+          await editor
+            .getByRole('button', { name: '＋ 添加部位', exact: true })
+            .first()
+            .isDisabled(),
+          true
+        )
+        await assertBusinessFormPage(page, editor)
+        await closeBusinessFormPage(page, editor)
+        await page.getByText('BOM-STYLE-L1', { exact: true }).dblclick()
+        await editor
+          .getByRole('heading', { name: '查看 BOM 版本', exact: true })
+          .waitFor()
+        deps.assert.equal(
+          await editor
+            .locator('.erp-business-form-page__footer .ant-btn-primary')
+            .count(),
+          0
+        )
+        deps.assert.equal(
+          await editor
+            .getByRole('button', { name: '＋ 添加部位', exact: true })
+            .count(),
+          0
+        )
+        deps.assert.equal(
+          await editor.getByLabel('单位用量 1', { exact: true }).isDisabled(),
+          true
+        )
+        await closeBusinessFormPage(page, editor)
+      },
+    },
+    {
+      ...scenarios[0],
+      name: 'bom-page-wide-desktop',
+      viewport: { width: 1920, height: 1080 },
+      verify: async (page) => {
+        const editor = await verifyBOMMaterialGroups(page, deps)
+        await editor
+          .locator('.erp-business-form-page__body')
+          .evaluate((node) => {
+            node.scrollTop = 0
+          })
+        await editor
+          .getByRole('heading', { name: '编辑 BOM 草稿', exact: true })
+          .focus()
+        await assertBusinessFormPage(page, editor)
+        await page.screenshot({
+          path: `${deps.outputDir}/bom-full-page-editor.png`,
+          fullPage: true,
+        })
+        await closeBusinessFormPage(page, editor)
+      },
+    },
+
     {
       ...scenarios[0],
       name: 'bom-material-create-and-reuse-desktop',
@@ -248,15 +546,16 @@ export function createBOMMaterialGroupsScenarios(deps) {
         })
         deps.assert.ok(
           (
-            await first.locator('.erp-bom-material-group__identity').innerText()
+            await first.locator('.erp-bom-material-cell__context').innerText()
           ).includes('样式供应商'),
           await first.innerText()
         )
-        deps.assert.equal(await first.locator('tbody tr').count(), 3)
         deps.assert.equal(
-          await first
-            .locator('.erp-bom-material-group__header .ant-select')
-            .count(),
+          await first.locator('tr[data-bom-part-index]').count(),
+          3
+        )
+        deps.assert.equal(
+          await first.locator('input[aria-label^="物料名称 "]').count(),
           1
         )
         await first.getByLabel('部位 1', { exact: true }).focus()
@@ -264,7 +563,10 @@ export function createBOMMaterialGroupsScenarios(deps) {
           path: `${deps.outputDir}/bom-material-created-and-reused.png`,
           fullPage: true,
         })
-        await modal.locator('.ant-modal-footer .ant-btn-primary').last().click()
+        await modal
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .last()
+          .click()
         await modal.waitFor({ state: 'hidden', timeout: 10000 })
         deps.assert.equal(saves.length, 1)
         const parts = saves[0].items.filter((item) => item.material_id === 77)
@@ -272,6 +574,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         deps.assert.ok(parts.every((item) => item.unit_id === 1))
       },
     },
+    { ...scenarios[0], name: 'bom-material-groups-dark', themeMode: 'dark' },
     {
       ...scenarios[0],
       name: 'bom-material-groups-mobile',

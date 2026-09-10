@@ -1,3 +1,4 @@
+import { assertBusinessFormPage, closeBusinessFormPage, isBusinessFormPageTitle } from './businessFormPageAssertions.mjs'
 import { assertAntdModalCentered } from './modalAssertions.mjs'
 import { expectText } from './pageAssertions.mjs'
 import {
@@ -26,20 +27,22 @@ export function createBusinessActionAssertions({ outputDir }) {
   ) {
     await page.getByRole('button', { name: buttonName }).click()
     const modal = page
-      .locator('.erp-business-action-modal--form.ant-modal:visible')
+      .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
       .last()
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(page, titleText)
-    await assertAntdModalCentered(page, modal, `${screenshotName}-centered`)
+    const isPage = isBusinessFormPageTitle(titleText)
+    if (isPage) await assertBusinessFormPage(page, modal)
+    else await assertAntdModalCentered(page, modal, `${screenshotName}-centered`)
     if (typeof beforeMeasure === 'function') {
       await beforeMeasure(modal)
     }
 
     const metrics = await modal.evaluate((node) => {
-      const body = node.querySelector('.ant-modal-body')
+      const body = node.querySelector('.erp-business-form-page__body, .ant-modal-body')
       const form = node.querySelector('.erp-business-action-form')
       const formStyle = form ? window.getComputedStyle(form) : null
-      const title = node.querySelector('.erp-business-action-modal__title')
+      const title = node.querySelector('.erp-business-form-page__header, .erp-business-action-modal__title')
       const modalRect = node.getBoundingClientRect()
       const contactItemLists = Array.from(
         node.querySelectorAll('.erp-master-contact-list__items')
@@ -268,7 +271,7 @@ export function createBusinessActionAssertions({ outputDir }) {
           .replace(/\s+/g, ' ')
           .trim(),
         titleText: title?.textContent?.replace(/\s+/g, ' ').trim() || '',
-        hasSubtitle: Boolean(title?.querySelector('small')),
+        hasSubtitle: Boolean(title?.querySelector('small, p')),
         viewportWidth: window.innerWidth,
         modal: {
           width: modalRect.width,
@@ -295,11 +298,11 @@ export function createBusinessActionAssertions({ outputDir }) {
     })
 
     assert(
-      metrics.className.includes('erp-business-action-modal--form'),
+      metrics.className.includes(isPage ? 'erp-business-form-page' : 'erp-business-action-modal--form'),
       `${screenshotName} 未使用业务表单弹窗标准类: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.titleText.includes(titleText) && metrics.hasSubtitle,
+      metrics.titleText.includes(titleText) && (isPage || metrics.hasSubtitle),
       `${screenshotName} 弹窗标题或说明未按业务样板展示: ${JSON.stringify(metrics)}`
     )
     assert(
@@ -334,11 +337,13 @@ export function createBusinessActionAssertions({ outputDir }) {
       )
     }
     if (expectContactItemsLayout) {
-      const expectedWidth = Math.min(1180, metrics.viewportWidth - 48)
-      assert(
-        metrics.modal.width >= expectedWidth - 2,
-        `${screenshotName} 联系人聚合表单未使用明细型主数据宽弹窗: ${JSON.stringify(metrics)}`
-      )
+      if (!isPage) {
+        const expectedWidth = Math.min(1180, metrics.viewportWidth - 48)
+        assert(
+          metrics.modal.width >= expectedWidth - 2,
+          `${screenshotName} 联系人聚合表单未使用明细型主数据宽弹窗: ${JSON.stringify(metrics)}`
+        )
+      }
       assert(
         metrics.contactItemLists.length > 0 &&
           metrics.contactItemLists.every(
@@ -537,7 +542,7 @@ export function createBusinessActionAssertions({ outputDir }) {
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
     await assertAntdModalCentered(page, modal, `${scenarioName}-centered`)
     const metrics = await modal.evaluate((node) => {
-      const body = node.querySelector('.ant-modal-body')
+      const body = node.querySelector('.erp-business-form-page__body, .ant-modal-body')
       const form = node.querySelector(
         '.erp-business-action-form, form.ant-form'
       )
@@ -611,15 +616,12 @@ export function createBusinessActionAssertions({ outputDir }) {
     }
 
     const modal = page
-      .locator('.erp-business-action-modal--form.ant-modal:visible')
+      .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
       .filter({ hasText: titleText })
       .last()
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
-    await assertAntdModalCentered(
-      page,
-      modal,
-      `${scenarioName}-double-click-modal`
-    )
+    if (isBusinessFormPageTitle(titleText)) await assertBusinessFormPage(page, modal)
+    else await assertAntdModalCentered(page, modal, `${scenarioName}-double-click-modal`)
     await expectText(page, titleText)
     if (afterModalOpen) {
       await afterModalOpen(modal)
@@ -645,7 +647,7 @@ export function createBusinessActionAssertions({ outputDir }) {
           )
         }
         return {
-          visibleEditModals: Array.from(document.querySelectorAll('.ant-modal'))
+          visibleEditModals: Array.from(document.querySelectorAll('.erp-business-form-page:not([hidden]), .ant-modal'))
             .filter(isVisible)
             .filter((node) =>
               String(node.textContent || '').includes(expectedTitle)
@@ -672,6 +674,10 @@ export function createBusinessActionAssertions({ outputDir }) {
   }
 
   async function closeBusinessFormModal(page, modal) {
+    if (await modal.evaluate(node => node.matches('.erp-business-form-page'))) {
+      await closeBusinessFormPage(page, modal)
+      return
+    }
     await modal
       .locator('.ant-modal-close')
       .click({ force: true })

@@ -808,7 +808,8 @@
   background: var(--erp-modal-mask);
 }
 
-[data-erp-theme='dark'] .erp-business-action-modal {
+[data-erp-theme='dark'] .erp-business-action-modal,
+[data-erp-theme='dark'] .erp-business-form-page {
   --erp-business-action-modal-bg: var(--erp-modal-bg);
   --erp-business-action-modal-border: var(--erp-modal-border);
   --erp-business-action-modal-divider: var(--erp-modal-divider);

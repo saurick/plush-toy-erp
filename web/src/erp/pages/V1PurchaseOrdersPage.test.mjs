@@ -15,7 +15,7 @@ const operationPanel = readFileSync(
 )
 const businessModal = readFileSync(
   new URL(
-    '../components/purchase-orders/PurchaseOrderBusinessModal.jsx',
+    '../components/purchase-orders/PurchaseOrderEditor.jsx',
     import.meta.url
   ),
   'utf8'

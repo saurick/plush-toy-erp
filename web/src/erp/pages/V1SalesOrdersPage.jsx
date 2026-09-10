@@ -80,7 +80,7 @@ import {
   salesOrderRequirementName,
   salesOrderEngineeringLabel,
 } from '../utils/salesOrderRequirements.mjs'
-import SalesOrderBusinessModal from '../components/sales-orders/SalesOrderBusinessModal.jsx'
+import SalesOrderEditor from '../components/sales-orders/SalesOrderEditor.jsx'
 import { buildSalesOrderColumns } from '../components/sales-orders/salesOrderColumns.jsx'
 import {
   SALES_ORDER_DATE_FILTER_OPTIONS,
@@ -255,6 +255,7 @@ export default function V1SalesOrdersPage() {
   )
   const [loading, setLoading] = useState(false)
   const [itemLoading, setItemLoading] = useState(false)
+  const [referencesLoading, setReferencesLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [lifecycleScope, setLifecycleScope] = useState(() =>
@@ -603,6 +604,7 @@ export default function V1SalesOrdersPage() {
   )
 
   const loadCustomers = useCallback(async () => {
+    setReferencesLoading(true)
     try {
       const [customerResult, skuResult, unitResult] = await Promise.all([
         listAllCustomers({ active_only: true }),
@@ -618,6 +620,8 @@ export default function V1SalesOrdersPage() {
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载客户、SKU 和单位选项'))
+    } finally {
+      setReferencesLoading(false)
     }
   }, [])
 
@@ -2001,12 +2005,13 @@ export default function V1SalesOrdersPage() {
         onCancel={() => setMaterialRequestOrderID(null)}
         onChanged={loadOrders}
       />
-      <SalesOrderBusinessModal
+      <SalesOrderEditor
         open={orderModalOpen}
         form={orderForm}
         editingOrder={editingOrder}
         saving={saving}
         itemLoading={itemLoading}
+        referencesLoading={referencesLoading}
         orderAttachmentRef={orderAttachmentRef}
         customers={customers}
         customerContacts={customerContacts}

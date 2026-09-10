@@ -1,3 +1,4 @@
+import { isBusinessFormPageTitle, assertBusinessFormPage } from './businessFormPageAssertions.mjs'
 export function createBusinessFormModalAssertions({ assert }) {
   async function assertBusinessFormModalKeyboardRecovery(
     page,
@@ -7,15 +8,17 @@ export function createBusinessFormModalAssertions({ assert }) {
     await trigger.focus()
     await page.keyboard.press('Enter')
     const modal = page
-      .locator('.erp-business-action-modal--form.ant-modal:visible')
+      .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
       .filter({ hasText: titleText })
       .last()
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
+    const isPage = isBusinessFormPageTitle(titleText)
+    if (isPage) await assertBusinessFormPage(page, modal)
     await page.waitForFunction(
       (text) => {
         const modals = Array.from(
           document.querySelectorAll(
-            '.erp-business-action-modal--form.ant-modal'
+            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal'
           )
         ).filter((node) => {
           const rect = node.getBoundingClientRect()
@@ -61,7 +64,7 @@ export function createBusinessFormModalAssertions({ assert }) {
     })
     assert.equal(
       openedFocusMetric.ariaModal,
-      'true',
+      isPage ? '' : 'true',
       `${scenarioName} 业务弹窗应声明 aria-modal=true: ${JSON.stringify(openedFocusMetric)}`
     )
     assert(
@@ -111,7 +114,10 @@ export function createBusinessFormModalAssertions({ assert }) {
       `${scenarioName} Tab 未进入业务弹窗内可操作控件: ${JSON.stringify(tabFocusMetric)}`
     )
 
-    if (closeMode === 'close-button') {
+    if (isPage) {
+      await modal.getByRole('button', { name: '返回列表', exact: true }).focus()
+      await page.keyboard.press('Enter')
+    } else if (closeMode === 'close-button') {
       await modal.locator('.ant-modal-close').focus()
       await page.keyboard.press('Enter')
     } else {

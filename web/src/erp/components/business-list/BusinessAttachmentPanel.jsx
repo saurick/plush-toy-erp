@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useCallback,
+  useContext,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -45,6 +46,7 @@ import { settleBusinessAttachmentBatchUpload } from '../../utils/businessAttachm
 import { resolveBusinessAttachmentPanelState } from '../../utils/businessAttachmentPanelState.mjs'
 import { PRINT_APPENDIX_ATTACHMENT_TYPE } from '../../utils/businessAttachmentPrintAppendix.mjs'
 import { isMutationResultUnknown } from '../../utils/sourceDocumentMutation.mjs'
+import { BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
 
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024
 const MAX_ATTACHMENT_SIZE_LABEL = '5MB'
@@ -329,6 +331,11 @@ const BusinessAttachmentPanel = forwardRef(
     const batchRetryResolveRef = useRef(null)
     const [attachments, setAttachments] = useState([])
     const [pendingAttachments, setPendingAttachments] = useState([])
+    const reportPendingAttachments = useContext(BusinessFormPendingAttachmentsContext)
+    useEffect(() => {
+      reportPendingAttachments?.(pendingAttachments.length)
+      return () => reportPendingAttachments?.(0)
+    }, [pendingAttachments.length, reportPendingAttachments])
     const [batchRetryState, setBatchRetryState] = useState(null)
     const [uploadMessageKey] = useState(createAttachmentPanelMessageKey)
     const [loading, setLoading] = useState(false)

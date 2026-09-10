@@ -1,3 +1,4 @@
+import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
 import assert from 'node:assert/strict'
 import {
   assertNoBlueFocusStyle,
@@ -276,12 +277,12 @@ async function assertAppAlertDialogLayout(
 }
 
 async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
-  const modal = page.locator('.ant-modal').filter({ hasText: title }).last()
+  const modal = page.locator('.erp-business-form-page:not([hidden])').filter({ hasText: title }).last()
   await modal.waitFor({ state: 'visible', timeout: 10_000 })
-  await assertAntdModalCentered(page, modal, scenarioName)
+  await assertBusinessFormPage(page, modal)
 
   const metrics = await modal.evaluate((node) => {
-    const body = node.querySelector('.ant-modal-body')
+    const body = node.querySelector('.erp-business-form-page__body')
     const formItems = [...node.querySelectorAll('.ant-form-item')]
     const controls = [
       ...node.querySelectorAll(
@@ -309,7 +310,7 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
     const bodyRect = body?.getBoundingClientRect()
 
     return {
-      hasPermissionModalClass: node.classList.contains('erp-permission-modal'),
+      hasPermissionModalClass: node.classList.contains('erp-permission-editor'),
       body: bodyRect
         ? {
             width: bodyRect.width,

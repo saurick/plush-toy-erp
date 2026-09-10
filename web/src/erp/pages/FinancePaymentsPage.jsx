@@ -59,6 +59,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
@@ -995,6 +996,8 @@ export default function FinancePaymentsPage() {
     }
   }
 
+  const isCreatingCredit = creditOpen !== 'reverse'
+  const CreditEditor = isCreatingCredit ? BusinessFormPage : BusinessFormModal
   const openCredit = async (reverse = false) => {
     if (!reverse) {
       const rows = await loadFinanceFactReferences()
@@ -1716,13 +1719,13 @@ export default function FinancePaymentsPage() {
       {paymentColumnOrderModal}
       {creditColumnOrderModal}
 
-      <BusinessFormModal
+      <BusinessFormPage
+        form={paymentForm}
         title="登记收付款"
         description="登记实际发生的收款或付款；创建后须完成审批，过账时再选择应收或应付核销。"
         open={paymentOpen}
-        width={760}
+        loading={referenceLoading}
         okText="创建收付款记录"
-        cancelText="取消"
         confirmLoading={loading}
         onCancel={() => !loading && setPaymentOpen(false)}
         onOk={createPayment}
@@ -1816,7 +1819,7 @@ export default function FinancePaymentsPage() {
             <Input maxLength={255} />
           </Form.Item>
         </Form>
-      </BusinessFormModal>
+      </BusinessFormPage>
 
       <BusinessFormModal
         className="erp-business-action-modal--operational-fact"
@@ -1957,7 +1960,8 @@ export default function FinancePaymentsPage() {
         </Form>
       </BusinessFormModal>
 
-      <BusinessFormModal
+      <CreditEditor
+        {...(isCreatingCredit ? { form: creditForm } : { width: 720, cancelText: '取消' })}
         title={creditOpen === 'reverse' ? '冲销红冲记录' : '登记红冲'}
         description={
           creditOpen === 'reverse'
@@ -1965,9 +1969,7 @@ export default function FinancePaymentsPage() {
             : '红冲金额不得超过来源应收或应付的当前未核销金额。'
         }
         open={Boolean(creditOpen)}
-        width={720}
         okText={creditOpen === 'reverse' ? '确认冲销' : '确认红冲'}
-        cancelText="取消"
         confirmLoading={loading}
         onCancel={() => !loading && setCreditOpen(false)}
         onOk={() => submitCredit(creditOpen === 'reverse')}
@@ -2042,7 +2044,7 @@ export default function FinancePaymentsPage() {
             <Input.TextArea rows={3} maxLength={255} showCount />
           </Form.Item>
         </Form>
-      </BusinessFormModal>
+      </CreditEditor>
       <BusinessDetailsModal
         open={Boolean(paymentDetail)}
         title="收付款详情"

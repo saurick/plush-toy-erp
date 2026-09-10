@@ -52,7 +52,8 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
-import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
+import { invalidateBOMUsageSnapshots } from '../utils/bomMaterialGroups.mjs'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import BOMMaterialGroupsForm from '../components/bom/BOMMaterialGroupsForm.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
@@ -188,7 +189,12 @@ function normalizeBOMLinesForForm(headerID, items = []) {
   )
 }
 
-function BOMImportReviewSummary({ issues, review }) {
+function BOMImportReviewSummary({ form, review }) {
+  const issues =
+    Form.useWatch(getBOMImportDraftIssues, {
+      form,
+      preserve: true,
+    }) || []
   if (!review) return null
   const affectedRows = new Set(
     issues
@@ -275,9 +281,9 @@ export default function BOMVersionsPage() {
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [headerModalOpen, setHeaderModalOpen] = useState(false)
   const [headerMode, setHeaderMode] = useState('create')
+  const [headerDetailsOpen, setHeaderDetailsOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importReview, setImportReview] = useState(null)
-  const [, setImportFormRevision] = useState(0)
   const [products, setProducts] = useState([])
   const [materials, setMaterials] = useState([])
   const [units, setUnits] = useState([])
@@ -330,9 +336,6 @@ export default function BOMVersionsPage() {
     () => uniqueReferenceOptions(units, unitOption),
     [units]
   )
-  const importIssues = importReview
-    ? getBOMImportDraftIssues(headerForm.getFieldsValue(true))
-    : []
   const bomItemsPreview = useBusinessRowItemsPreview({
     records: versions,
     getItemTotal: (record) => record?.item_count,
@@ -756,6 +759,7 @@ export default function BOMVersionsPage() {
       headerForm.setFieldsValue(draft.values)
       setHeaderProductIDForSuggestion(draft.values.product_id)
       setImportReview(draft.review)
+      setHeaderDetailsOpen(false)
       setHeaderModalOpen(true)
       const issues = getBOMImportDraftIssues(draft.values)
       message.success(
@@ -800,6 +804,7 @@ export default function BOMVersionsPage() {
       items: [],
     })
     setHeaderProductIDForSuggestion(undefined)
+    setHeaderDetailsOpen(false)
     setHeaderModalOpen(true)
   }
 
@@ -832,6 +837,7 @@ export default function BOMVersionsPage() {
     setHeaderMode('view')
     fillHeaderForm(detail)
     setHeaderProductIDForSuggestion(undefined)
+    setHeaderDetailsOpen(false)
     setHeaderModalOpen(true)
   }
 
@@ -847,6 +853,7 @@ export default function BOMVersionsPage() {
     setHeaderMode('edit')
     fillHeaderForm(detail)
     setHeaderProductIDForSuggestion(undefined)
+    setHeaderDetailsOpen(false)
     setHeaderModalOpen(true)
   }
 
@@ -878,10 +885,12 @@ export default function BOMVersionsPage() {
       items: [],
     })
     setHeaderProductIDForSuggestion(record.product_id)
+    setHeaderDetailsOpen(false)
     setHeaderModalOpen(true)
   }
 
   const saveHeader = async () => {
+    if (saving || headerMode === 'view') return
     if (headerMode === 'import') {
       const issues = getBOMImportDraftIssues(headerForm.getFieldsValue(true))
       if (issues.length > 0) {
@@ -901,7 +910,14 @@ export default function BOMVersionsPage() {
     let values
     try {
       values = await headerForm.validateFields()
-    } catch {
+    } catch (error) {
+      setHeaderDetailsOpen(true)
+      window.requestAnimationFrame(() => {
+        const firstField = error?.errorFields?.[0]?.name
+        if (firstField) {
+          headerForm.scrollToField(firstField, { focus: true, block: 'center' })
+        }
+      })
       message.warning('请先补全表单中的必填项')
       return
     }
@@ -1545,10 +1561,12 @@ export default function BOMVersionsPage() {
       />
       {bomItemsPreview.modal}
 
-      <BusinessFormModal
+      <BusinessFormPage
         open={headerModalOpen}
-        forceRender
-        destroyOnHidden={false}
+        form={headerForm}
+        className="erp-bom-editor"
+        readOnly={headerMode === 'view'}
+        initialDirty={headerMode === 'import'}
         title={
           headerMode === 'copy'
             ? '复制 BOM 新版本'
@@ -1560,35 +1578,39 @@ export default function BOMVersionsPage() {
                   ? '检查并保存导入草稿'
                   : '新建 BOM 草稿'
         }
-        description="BOM 只维护产品结构和材料用量，库存、采购或成本变动请到对应业务页面处理。"
-        okText={headerMode === 'import' ? '保存为草稿' : '保存'}
-        cancelText="取消"
-        confirmLoading={saving || detailLoading}
+        okText="保存草稿"
+        confirmLoading={saving}
+        loading={detailLoading}
         onOk={saveHeader}
         onCancel={() => {
           headerAttachmentRef.current?.clearPendingAttachments()
           setImportReview(null)
           setHeaderModalOpen(false)
         }}
-        footer={
-          headerMode === 'view' ? (
-            <Button
-              onClick={() => {
-                setHeaderModalOpen(false)
-              }}
-            >
-              关闭
-            </Button>
-          ) : undefined
-        }
       >
         <Form
           form={headerForm}
           layout="vertical"
           className="erp-business-action-form"
           onValuesChange={(changedValues) => {
-            if (headerMode === 'import') {
-              setImportFormRevision((current) => current + 1)
+            if (
+              Object.hasOwn(changedValues, 'quantity_text') ||
+              changedValues.items
+            ) {
+              const items = headerForm.getFieldValue('items') || []
+              invalidateBOMUsageSnapshots(items, changedValues).forEach(
+                (item, index) => {
+                  if (
+                    item.total_usage_snapshot !==
+                    items[index].total_usage_snapshot
+                  ) {
+                    headerForm.setFieldValue(
+                      ['items', index, 'total_usage_snapshot'],
+                      item.total_usage_snapshot
+                    )
+                  }
+                }
+              )
             }
             if (
               Object.prototype.hasOwnProperty.call(changedValues, 'product_id')
@@ -1599,6 +1621,8 @@ export default function BOMVersionsPage() {
         >
           <BOMHeaderFormFields
             form={headerForm}
+            detailsOpen={headerDetailsOpen}
+            onDetailsOpenChange={setHeaderDetailsOpen}
             includeProduct
             disabled={headerMode === 'view'}
             productDisabled={headerMode === 'edit'}
@@ -1608,10 +1632,7 @@ export default function BOMVersionsPage() {
             onUseVersionSuggestion={useHeaderVersionSuggestion}
           />
           {headerMode === 'import' ? (
-            <BOMImportReviewSummary
-              issues={importIssues}
-              review={importReview}
-            />
+            <BOMImportReviewSummary form={headerForm} review={importReview} />
           ) : null}
           <BusinessAttachmentPanel
             ref={headerAttachmentRef}
@@ -1622,7 +1643,7 @@ export default function BOMVersionsPage() {
                 : undefined
             }
             title="BOM 附件"
-            description="上传色卡、SOP、工艺图片或材料清单来源文件；附件不会改变库存、采购或成本记录。"
+            description="色卡、工艺图、作业说明和原始材料清单"
             canUpload={
               headerMode !== 'view' &&
               (headerMode === 'edit' ? modalActionCanEdit : canCreate)
@@ -1635,7 +1656,7 @@ export default function BOMVersionsPage() {
           />
           {headerMode === 'copy' ? (
             <p className="erp-business-selection-action-bar__hint">
-              保存复制草稿后，可在编辑 BOM 草稿弹窗内原地维护材料明细。
+              保存复制草稿后，可打开新版本继续维护物料和部位。
             </p>
           ) : (
             <BOMMaterialGroupsForm
@@ -1643,13 +1664,6 @@ export default function BOMVersionsPage() {
                 headerMode === 'create' || headerMode === 'import'
                   ? canCreate
                   : modalActionCanEdit
-              }
-              description={
-                headerMode === 'import'
-                  ? '逐行核对材料、单位、单位用量和损耗率；待补全项修正后才能保存。'
-                  : headerMode === 'create'
-                    ? '新建草稿时可先录入材料明细，保存后一起写入当前 BOM 草稿。'
-                    : '在当前弹窗内维护材料、用量、损耗率和备注。'
               }
               form={headerForm}
               materialByID={materialByID}
@@ -1672,7 +1686,7 @@ export default function BOMVersionsPage() {
             />
           )}
         </Form>
-      </BusinessFormModal>
+      </BusinessFormPage>
 
       <ColumnOrderModal
         open={columnOrderOpen}

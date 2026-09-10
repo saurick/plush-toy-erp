@@ -350,7 +350,7 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
   )
   const masterPageSource = readERPSource('../pages/V1MasterDataPage.jsx')
   const shipmentModalSource = readERPSource(
-    '../components/shipments/ShipmentBusinessModal.jsx'
+    '../components/shipments/ShipmentEditor.jsx'
   )
   const shipmentColumnsSource = readERPSource(
     '../components/shipments/shipmentColumns.jsx'

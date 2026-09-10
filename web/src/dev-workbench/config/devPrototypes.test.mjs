@@ -528,7 +528,7 @@ test('devPrototypes: 业务列表更多操作默认关闭并在窄屏收敛动�
   )
 })
 
-test('devPrototypes: 业务表单样板使用真实单弹窗与完整键盘边界', () => {
+test('devPrototypes: 业务表单样板使用整页编辑和未保存返回保护', () => {
   const html = readFileSync(
     path.join(
       repoRoot,
@@ -537,24 +537,22 @@ test('devPrototypes: 业务表单样板使用真实单弹窗与完整键盘边�
     'utf8'
   )
 
-  assert.equal([...html.matchAll(/<dialog\b/gu)].length, 1)
+  assert.equal([...html.matchAll(/<dialog\b/gu)].length, 0)
   assert.equal([...html.matchAll(/<div class="footer"/gu)].length, 1)
   assert.equal(
     [...html.matchAll(/class="btn primary save-action"/gu)].length,
     1
   )
-  assert.match(html, /id="openFormModal"[^>]*aria-haspopup="dialog"/su)
   assert.match(
     html,
-    /<dialog[\s\S]*?aria-modal="true"[\s\S]*?aria-labelledby="businessFormTitle"[\s\S]*?aria-describedby="businessFormDescription"/u
+    /class="business-form-page"[\s\S]*?hidden[\s\S]*?aria-labelledby="businessFormTitle"/u
   )
-  assert.match(html, /businessFormDialog\.showModal\(\)/u)
+  assert.match(html, /businessFormPage\.hidden = false/u)
+  assert.match(html, /businessFormPage\.hidden = true/u)
   assert.match(html, /querySelector\("\[data-initial-focus\]"\)\?\.focus/u)
-  assert.match(html, /businessFormDialog\.addEventListener\("keydown"/u)
-  assert.match(html, /event\.key === "Escape"/u)
-  assert.match(html, /event\.key !== "Tab"/u)
-  assert.match(html, /modalTrigger\?\.focus/u)
-  assert.doesNotMatch(html, /<dialog[^>]*\sopen(?:\s|>)/u)
+  assert.match(html, /editorTrigger\?\.focus/u)
+  assert.match(html, /window\.confirm\("放弃未保存的修改？"\)/u)
+  assert.doesNotMatch(html, /showModal|aria-modal="true"/u)
   assert.match(html, /<input id="lineAmount"[^>]*disabled/u)
   assert.doesNotMatch(html, /id="source"|sourceData|上游业务单据/u)
   assert.match(html, /<h3>订单与客户<\/h3>/u)
@@ -606,15 +604,7 @@ test('devPrototypes: 业务表单样板使用真实单弹窗与完整键盘边�
   assert.match(html, /"#footerSave"/u)
   assert.doesNotMatch(html, /footerReset|resetBusinessForm/u)
   assert.match(html, /原型评审状态（非运行态字段）/u)
-  assert.match(html, /width: min\(1720px, calc\(100vw - 96px\)\);/u)
-  const modalSizes = readFileSync(
-    path.join(repoRoot, 'web/src/erp/utils/modalSizes.mjs'),
-    'utf8'
-  )
-  assert.match(
-    modalSizes,
-    /businessForm: 'min\(1720px, calc\(100vw - 96px\)\)'/u
-  )
+  assert.match(html, /height: calc\(100dvh - 120px\)/u)
   assert.match(html, /function syncMutationControls\(readonly\)/u)
   assert.match(html, /if \(formMode\.value === "readonly"\) return/u)
   const skuCatalog = html.match(

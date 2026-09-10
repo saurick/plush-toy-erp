@@ -2,18 +2,19 @@ import React from 'react'
 import { Form } from 'antd'
 
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
-import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import {
   SalesOrderFormFields,
   SalesOrderItemsFormSection,
 } from './SalesOrderForm.jsx'
 
-export default function SalesOrderBusinessModal({
+export default function SalesOrderEditor({
   open,
   form,
   editingOrder,
   saving,
   itemLoading,
+  referencesLoading,
   orderAttachmentRef,
   customers,
   customerContacts,
@@ -34,15 +35,15 @@ export default function SalesOrderBusinessModal({
   onPaymentConditionBlur,
 }) {
   return (
-    <BusinessFormModal
+    <BusinessFormPage
+      form={form}
       title={editingOrder?.id ? '编辑销售订单' : '新建销售订单'}
       description="先记录客户订单需求；订单生效后，工程补齐产品图和 BOM 并办理打样。"
       open={open}
       onOk={onOk}
       onCancel={onCancel}
-      confirmLoading={saving || itemLoading}
-      forceRender
-      destroyOnHidden={false}
+      confirmLoading={saving}
+      loading={itemLoading || referencesLoading}
     >
       <Form form={form} layout="vertical" className="erp-business-action-form">
         <SalesOrderFormFields
@@ -75,6 +76,6 @@ export default function SalesOrderBusinessModal({
           unitOptions={unitOptions}
         />
       </Form>
-    </BusinessFormModal>
+    </BusinessFormPage>
   )
 }

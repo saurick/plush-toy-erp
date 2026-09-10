@@ -15,9 +15,9 @@ const formModalAttachmentEntrypoints = [
   '../pages/V1MasterDataPage.jsx',
   '../pages/V1OutsourcingOrdersPage.jsx',
   '../pages/V1QualityInspectionsPage.jsx',
-  '../components/shipments/ShipmentBusinessModal.jsx',
-  '../components/purchase-orders/PurchaseOrderBusinessModal.jsx',
-  '../components/sales-orders/SalesOrderBusinessModal.jsx',
+  '../components/shipments/ShipmentEditor.jsx',
+  '../components/purchase-orders/PurchaseOrderEditor.jsx',
+  '../components/sales-orders/SalesOrderEditor.jsx',
 ]
 
 test('page-level attachment entrypoints open attachments through modal actions', () => {
@@ -103,10 +103,12 @@ test('outsourcing attachment panel exposes a typed contract-image upload without
   assert.match(pageSource, /enablePrintAppendixUpload/u)
 })
 
-test('remaining direct attachment panels stay inside form-backed business modals', () => {
+test('direct attachment panels stay inside business editors and auxiliary forms', () => {
   const modalWrappers = [
     ['<BusinessFormModal', '</BusinessFormModal>'],
     ['<BusinessDetailsModal', '</BusinessDetailsModal>'],
+    ['<BusinessFormPage', '</BusinessFormPage>'],
+    ['<InspectionEditor', '</InspectionEditor>'],
   ]
   for (const relativePath of formModalAttachmentEntrypoints) {
     const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')

@@ -996,6 +996,7 @@ export default function ERPLayout() {
     if (loggingOut) {
       return
     }
+    if (pageLeaveGuard && !(await pageLeaveGuard({ intent: 'logout' }))) return
 
     setLoggingOut(true)
     try {
@@ -1012,6 +1013,7 @@ export default function ERPLayout() {
     if (refreshingCurrentPageRef.current) {
       return
     }
+    if (pageLeaveGuard && !(await pageLeaveGuard({ intent: 'refresh' }))) return
 
     if (!pageRefreshHandler) {
       window.location.reload()

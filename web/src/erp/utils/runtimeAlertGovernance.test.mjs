@@ -69,7 +69,7 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
   )
   const permissionCenter = read('web/src/erp/pages/PermissionCenterPage.jsx')
   const shipment = read(
-    'web/src/erp/components/shipments/ShipmentBusinessModal.jsx'
+    'web/src/erp/components/shipments/ShipmentEditor.jsx'
   )
   const finance = read('web/src/erp/pages/FinancePaymentsPage.jsx')
 

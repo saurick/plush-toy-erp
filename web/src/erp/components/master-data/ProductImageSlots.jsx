@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useCallback,
+  useContext,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -17,6 +18,7 @@ import {
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { BusinessFormPendingAttachmentsContext } from '../business-list/BusinessFormPageContext.js'
 import {
   clearProductImage,
   downloadBusinessAttachment,
@@ -293,6 +295,13 @@ const ProductImageSlots = forwardRef(
     const [preparingSlotKey, setPreparingSlotKey] = useState('')
     const [previewingSlotKey, setPreviewingSlotKey] = useState('')
     const [preview, setPreview] = useState(null)
+    const reportPendingChanges = useContext(BusinessFormPendingAttachmentsContext)
+    useEffect(() => {
+      reportPendingChanges?.(
+        open ? buildProductImageMutationPlan(session).length + Number(Boolean(preparingSlotKey)) : 0
+      )
+    }, [open, preparingSlotKey, reportPendingChanges, session])
+    useEffect(() => () => reportPendingChanges?.(0), [reportPendingChanges])
 
     const setCurrentSession = useCallback((nextSession) => {
       sessionRef.current = nextSession

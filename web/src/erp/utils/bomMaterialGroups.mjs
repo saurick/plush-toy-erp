@@ -5,6 +5,22 @@ import {
 
 const SCALE = BigInt(1000000)
 
+export function invalidateBOMUsageSnapshots(items, changes) {
+  const productionChanged = Object.hasOwn(changes, 'quantity_text')
+  return items.map((item, index) => {
+    const changed = changes.items?.[index] || {}
+    if (
+      !productionChanged &&
+      !['quantity', 'loss_rate', 'unit_id', 'material_id'].some((key) =>
+        Object.hasOwn(changed, key)
+      )
+    ) {
+      return item
+    }
+    return { ...item, total_usage_snapshot: undefined }
+  })
+}
+
 export function groupBOMMaterials(items = []) {
   const groups = new Map()
   items.forEach((item, index) => {

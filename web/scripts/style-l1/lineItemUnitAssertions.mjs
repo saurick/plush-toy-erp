@@ -488,7 +488,8 @@ export function createLineItemUnitAssertions({ assert }) {
         (button) => button.textContent?.includes('添加条目')
       )
       const modalBody =
-        node.querySelector('.ant-modal-body') || node.closest('.ant-modal-body')
+        node.querySelector('.erp-business-form-page__body, .ant-modal-body') ||
+        node.closest('.erp-business-form-page__body, .ant-modal-body')
       const section = node.querySelector('.erp-sales-order-lines-form')
       const footerStyle = footer ? window.getComputedStyle(footer) : null
 
@@ -547,7 +548,7 @@ export function createLineItemUnitAssertions({ assert }) {
     assert.equal(
       metrics.footerInModalBody,
       true,
-      `${scenarioName} 添加条目 footer 应随弹窗内容纵向滚动: ${JSON.stringify(
+      `${scenarioName} 添加条目 footer 应随表单内容纵向滚动: ${JSON.stringify(
         metrics
       )}`
     )
@@ -567,7 +568,7 @@ export function createLineItemUnitAssertions({ assert }) {
     )
     assert(
       metrics.footerPosition !== 'fixed' && metrics.footerPosition !== 'sticky',
-      `${scenarioName} 添加条目 footer 不应固定或吸附，应随弹窗滚动: ${JSON.stringify(
+      `${scenarioName} 添加条目 footer 不应固定或吸附，应随表单滚动: ${JSON.stringify(
         metrics
       )}`
     )
@@ -635,8 +636,8 @@ export function createLineItemUnitAssertions({ assert }) {
     const metrics = await modal.evaluate(
       (node, args) => {
         const modalBody =
-          node.querySelector('.ant-modal-body') ||
-          node.closest('.ant-modal-body')
+          node.querySelector('.erp-business-form-page__body, .ant-modal-body') ||
+          node.closest('.erp-business-form-page__body, .ant-modal-body')
         const list = node.querySelector(args.listSelector)
         const rows = Array.from(node.querySelectorAll(args.rowSelector))
         const latestRow = rows[rows.length - 1]

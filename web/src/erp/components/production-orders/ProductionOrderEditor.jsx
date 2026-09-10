@@ -13,13 +13,9 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import {
-  DeleteOutlined,
-  PlusOutlined,
-  ScheduleOutlined,
-} from '@ant-design/icons'
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
-import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import ProductionOrderReferenceSelect from './ProductionOrderReferenceSelect.jsx'
 import { isProductionMaterialIssueEligible } from '../../utils/productionMaterialIssueAction.mjs'
@@ -217,9 +213,7 @@ function RowReference({
         >
           <ProductionOrderReferenceSelect
             referenceType="sales_order_item"
-            disabled={
-              readOnly || referenceAccess.sales_order_item !== true
-            }
+            disabled={readOnly || referenceAccess.sales_order_item !== true}
             initialOptions={optionsByType.sales_order_item}
             filters={{
               ...(productID ? { product_id: productID } : {}),
@@ -283,9 +277,7 @@ function RowReference({
           <ProductionOrderReferenceSelect
             referenceType="product_sku"
             disabled={
-              readOnly ||
-              referenceAccess.product_sku !== true ||
-              !productID
+              readOnly || referenceAccess.product_sku !== true || !productID
             }
             initialOptions={optionsByType.product_sku}
             filters={productID ? { product_id: productID } : {}}
@@ -396,7 +388,7 @@ function RowReference({
   )
 }
 
-export default function ProductionOrderFormModal({
+export default function ProductionOrderEditor({
   form,
   open,
   mode,
@@ -421,12 +413,6 @@ export default function ProductionOrderFormModal({
       : readOnly
         ? '查看生产订单'
         : '编辑生产订单'
-  const footer = readOnly ? (
-    <Button key="close" onClick={onCancel}>
-      关闭
-    </Button>
-  ) : undefined
-
   const normalizedOptions = useMemo(
     () => ({
       product: [],
@@ -440,20 +426,16 @@ export default function ProductionOrderFormModal({
   )
 
   return (
-    <BusinessFormModal
+    <BusinessFormPage
+      form={form}
+      readOnly={readOnly}
       open={open}
       title={title}
       description="生产订单维护计划与工艺路线；发布后冻结路线和物料需求。工序办理、质量结论与正式入库分别记账。"
-      icon={<ScheduleOutlined />}
-      size="masterDataItems"
       confirmLoading={loading}
-      footer={footer}
       okText={mode === 'create' ? '创建草稿' : '保存草稿'}
-      cancelText="取消"
       onCancel={onCancel}
       onOk={readOnly ? undefined : () => form.submit()}
-      forceRender
-      destroyOnHidden
     >
       <Form form={form} layout="vertical" onFinish={onSubmit}>
         <Row gutter={16}>
@@ -551,6 +533,6 @@ export default function ProductionOrderFormModal({
           />
         ) : null}
       </Form>
-    </BusinessFormModal>
+    </BusinessFormPage>
   )
 }

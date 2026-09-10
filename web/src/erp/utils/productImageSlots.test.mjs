@@ -225,8 +225,8 @@ test('product page integrates dedicated slots without changing SKU attachment se
   )
   assert.match(
     pageSource,
-    /onCancel=\{\(\) => \{\s*if \(saving \|\| contactLoading\) return[\s\S]*?cancelButtonProps=\{\{ disabled: saving \|\| contactLoading \}\}[\s\S]*?closable=\{!\(saving \|\| contactLoading\)\}[\s\S]*?keyboard=\{!\(saving \|\| contactLoading\)\}/u,
-    'the modal must not close while product and image writes are in flight'
+    /onCancel=\{\(\) => \{\s*if \(saving \|\| contactLoading\) return[\s\S]*?confirmLoading=\{saving\}[\s\S]*?loading=\{contactLoading \|\|/u,
+    'the editor must protect product and image writes in flight'
   )
   assert.match(
     pageSource,

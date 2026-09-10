@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react'
 import { Alert, Descriptions, Form, Input, Modal, Select } from 'antd'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 
 import { inventoryLotOption } from '../../utils/referenceSelectOptions.mjs'
 import {
@@ -39,6 +40,7 @@ export default function ProductionMaterialIssueModal({
 }) {
   const [form] = Form.useForm()
   const editing = mode === 'edit'
+  const Editor = editing ? BusinessFormPage : Modal
   const formConnectedRef = useRef(false)
   const lotOptions = useMemo(
     () =>
@@ -62,9 +64,13 @@ export default function ProductionMaterialIssueModal({
 
   useEffect(() => {
     if (!open || !formConnectedRef.current) return
-    const currentLotID = Number(form.getFieldValue('lot_id') || 0)
-    if (!lotOptions.some((option) => option.value === currentLotID)) {
-      form.setFieldValue('lot_id', lotOptions[0]?.value)
+    const currentLot = form.getFieldValue('lot_id')
+    const nextLot = lotOptions[0]?.value
+    if (
+      !lotOptions.some((option) => option.value === Number(currentLot || 0)) &&
+      currentLot !== nextLot
+    ) {
+      form.setFieldsValue({ lot_id: nextLot })
     }
   }, [form, lotOptions, open])
 
@@ -74,18 +80,16 @@ export default function ProductionMaterialIssueModal({
   }
 
   return (
-    <Modal
+    <Editor
+      {...(editing ? { form } : { width: 720, cancelText: '取消', destroyOnHidden: true })}
       className="erp-production-material-issue-modal"
       title={editing ? '编辑生产领料草稿' : '生产领料'}
       open={open}
-      width={720}
       okText={editing ? '保存草稿' : '生成领料记录'}
-      cancelText="取消"
       confirmLoading={loading}
       okButtonProps={{
         disabled: loading || lotsLoading || lotOptions.length === 0,
       }}
-      destroyOnHidden
       afterOpenChange={initializeOpenForm}
       onCancel={onCancel}
       onOk={submit}
@@ -263,6 +267,6 @@ export default function ProductionMaterialIssueModal({
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>
-    </Modal>
+    </Editor>
   )
 }

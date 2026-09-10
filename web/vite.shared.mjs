@@ -9,6 +9,12 @@ import {
 } from './src/dev-workbench/config/devRuntimeRecovery.mjs'
 import { loadDevPorts } from '../scripts/dev-ports.mjs'
 import { normalizeAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
+import {
+  isCodexDevSession,
+  resolveERPDevServerPort as resolvePort,
+  resolveERPHMRClientPort,
+  selectWebDevPort,
+} from './scripts/localPort.mjs'
 
 const ROOT_DIR = fileURLToPath(new URL('.', import.meta.url))
 const PROJECT_ROOT = resolve(ROOT_DIR, '..')
@@ -17,44 +23,12 @@ const DEV_HOST = '127.0.0.1'
 const DEV_WORKBENCH_PLUGIN_MODULE = './dev-server/devWorkbenchPlugins.mjs'
 
 export function resolveERPDevServerPort(rawPort, ports = devPorts) {
-  const normalized = String(rawPort || '').trim()
-  const port = normalized ? Number(normalized) : ports.web
-  const auxEnd = ports.auxStart + 99
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
-    throw new Error('ERP_VITE_PORT must be an integer between 1024 and 65535')
-  }
-  if (
-    port !== ports.web &&
-    port !== ports.style &&
-    (port < ports.auxStart || port > auxEnd)
-  ) {
-    throw new Error(
-      `ERP_VITE_PORT=${port} must use web=${ports.web}, style=${ports.style}, or auxiliary range ${ports.auxStart}-${auxEnd}`
-    )
-  }
-  return port
+  return resolvePort(rawPort, ports)
 }
 
-export function resolveERPHMRClientPort(rawPort, serverPort) {
-  const normalized = String(rawPort || '').trim()
-  const port = normalized ? Number(normalized) : serverPort
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
-    throw new Error(
-      'ERP_VITE_HMR_CLIENT_PORT must be an integer between 1024 and 65535'
-    )
-  }
-  if (port !== serverPort) {
-    throw new Error(
-      `ERP_VITE_HMR_CLIENT_PORT=${port} must match ERP_VITE_PORT=${serverPort}`
-    )
-  }
-  return port
-}
+export { resolveERPHMRClientPort }
 
-export function assertERPResolvedVitePorts({
-  hmrClientPort,
-  serverPort,
-} = {}) {
+export function assertERPResolvedVitePorts({ hmrClientPort, serverPort } = {}) {
   if (
     !Number.isInteger(serverPort) ||
     !Number.isInteger(hmrClientPort) ||
@@ -133,11 +107,6 @@ const createDevResolvedPortGuard = () => ({
 
 export function createERPViteConfig(appId) {
   const app = getAppDefinition(appId)
-  const serverPort = resolveERPDevServerPort(process.env.ERP_VITE_PORT)
-  const hmrClientPort = resolveERPHMRClientPort(
-    process.env.ERP_VITE_HMR_CLIENT_PORT,
-    serverPort
-  )
   const apiOrigin = normalizeAPIOrigin(
     process.env.API_ORIGIN || `http://127.0.0.1:${devPorts.http}`
   )
@@ -146,6 +115,22 @@ export function createERPViteConfig(appId) {
   )
 
   return defineConfig(async ({ command, mode }) => {
+    const serverPort =
+      command === 'serve'
+        ? await selectWebDevPort({ ports: devPorts })
+        : resolveERPDevServerPort(process.env.ERP_VITE_PORT)
+    // 直接运行 Vite 时也固定本进程选中的辅助端口，配置热重载不能再次换端口。
+    if (
+      command === 'serve' &&
+      isCodexDevSession() &&
+      !process.env.ERP_VITE_PORT
+    ) {
+      process.env.ERP_VITE_PORT = String(serverPort)
+    }
+    const hmrClientPort = resolveERPHMRClientPort(
+      process.env.ERP_VITE_HMR_CLIENT_PORT,
+      serverPort
+    )
     const env = loadEnv(mode, process.cwd(), '')
     const isProd = mode === 'production'
     const isDev = mode === 'development'
@@ -213,12 +198,7 @@ export function createERPViteConfig(appId) {
           '.sass',
         ],
       },
-      cacheDir: resolveERPViteCacheDir(
-        ROOT_DIR,
-        app.id,
-        mode,
-        serverPort
-      ),
+      cacheDir: resolveERPViteCacheDir(ROOT_DIR, app.id, mode, serverPort),
       server: {
         host: '0.0.0.0',
         port: serverPort,

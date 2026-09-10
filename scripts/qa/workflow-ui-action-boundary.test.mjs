@@ -997,7 +997,7 @@ test("sales order page keeps write buttons behind projected actions", () => {
   const pagePath = path.join(erpSourceRoot, "pages/V1SalesOrdersPage.jsx");
   const modalPath = path.join(
     erpSourceRoot,
-    "components/sales-orders/SalesOrderBusinessModal.jsx",
+    "components/sales-orders/SalesOrderEditor.jsx",
   );
   const formPath = path.join(
     erpSourceRoot,
@@ -1065,7 +1065,7 @@ test("purchase order page keeps write buttons behind projected actions", () => {
   );
   const modalPath = path.join(
     erpSourceRoot,
-    "components/purchase-orders/PurchaseOrderBusinessModal.jsx",
+    "components/purchase-orders/PurchaseOrderEditor.jsx",
   );
   const pageSource = readFileSync(pagePath, "utf8");
   const panelSource = readFileSync(panelPath, "utf8");

@@ -28,6 +28,7 @@ import { modal } from '@/common/utils/antdApp'
 import ApprovalResponsibilityPanel from './ApprovalResponsibilityPanel.jsx'
 
 export default function PermissionCenterPage() {
+  const [editorContainer, setEditorContainer] = useState(null)
   const outletContext = useOutletContext()
   const onOpenRoleAccounts = useCallback((role) => {
     setAdminFilterRequest({ keyword: getRoleVisibleName(role || {}) })
@@ -283,6 +284,7 @@ export default function PermissionCenterPage() {
 
   const adminAccountTab = (
     <PermissionAdminAccounts
+      editorContainer={editorContainer}
       currentAdmin={currentAdmin}
       roles={roles}
       setSaving={setSaving}
@@ -296,28 +298,29 @@ export default function PermissionCenterPage() {
   )
 
   return (
-    <Space
-      className="erp-permission-page"
-      direction="vertical"
-      size={12}
-      style={{ width: '100%' }}
-    >
-      <Title level={1} className="erp-permission-page__title">
-        权限管理
-      </Title>
-      {permissionWarningMessages.length > 0 ? (
-        <Alert
-          type="warning"
-          showIcon
-          message="当前账号部分操作受限"
-          description={`${permissionWarningMessages.join('；')}。超级管理员账号只能由超级管理员维护。`}
-        />
+    <div className="erp-business-page-layout" ref={setEditorContainer}>
+      <Space
+        className="erp-permission-page"
+        direction="vertical"
+        size={12}
+        style={{ width: '100%' }}
+      >
+        <Title level={1} className="erp-permission-page__title">
+          权限管理
+        </Title>
+        {permissionWarningMessages.length > 0 ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="当前账号部分操作受限"
+            description={`${permissionWarningMessages.join('；')}。超级管理员账号只能由超级管理员维护。`}
+          />
       ) : null}
 
-      <Tabs
-        activeKey={activeTabKey}
-        className="erp-permission-tabs"
-        items={[
+        <Tabs
+          activeKey={activeTabKey}
+          className="erp-permission-tabs"
+          items={[
           {
             key: PERMISSION_CENTER_TAB_KEYS.ROLES,
             label: (
@@ -366,9 +369,10 @@ export default function PermissionCenterPage() {
               }
             : null,
         ].filter(Boolean)}
-        onChange={changePermissionCenterTab}
-      />
-    </Space>
+          onChange={changePermissionCenterTab}
+        />
+      </Space>
+    </div>
   )
 }
 

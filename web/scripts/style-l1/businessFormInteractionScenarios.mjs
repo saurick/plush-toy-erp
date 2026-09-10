@@ -220,7 +220,7 @@ export function createBusinessFormInteractionScenarios({
         })
         await page.getByRole('button', { name: '新建材料' }).click()
         const materialModal = page
-          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
           .last()
         await materialModal.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '新建材料档案')
@@ -473,7 +473,7 @@ export function createBusinessFormInteractionScenarios({
         )
         assert.equal(
           await page
-            .locator('.erp-business-action-modal--form.ant-modal:visible')
+            .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
             .count(),
           0,
           '采购基础资料尚在加载时不应打开空白采购订单弹窗'
@@ -868,7 +868,7 @@ export function createBusinessFormInteractionScenarios({
               .locator(
                 '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
               )
-              .filter({ hasText: /^PROD-STYLE-L1 \/ 样式产品$/u })
+              .filter({ has: page.getByText('PROD-STYLE-L1 / 样式产品', { exact: true }) })
               .first()
               .click()
             const productSKUInput = modal

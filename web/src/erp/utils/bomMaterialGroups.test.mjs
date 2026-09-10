@@ -2,11 +2,34 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   groupBOMMaterials,
+  invalidateBOMUsageSnapshots,
   calculateBOMUsage,
   bomLossRateToPercent,
   bomPercentToLossRate,
   parseBOMPartsPaste,
 } from './bomMaterialGroups.mjs'
+
+test('usage input changes clear imported totals without discarding untouched source evidence', () => {
+  const items = [
+    { quantity: '1', total_usage_snapshot: '100' },
+    { quantity: '2', total_usage_snapshot: '200' },
+  ]
+  const changed = invalidateBOMUsageSnapshots(items, {
+    items: [{ quantity: '' }],
+  })
+  assert.equal(changed[0].total_usage_snapshot, undefined)
+  assert.equal(changed[1], items[1])
+  assert.equal(items[0].total_usage_snapshot, '100')
+  assert.ok(
+    invalidateBOMUsageSnapshots(items, { quantity_text: '' }).every(
+      (item) => item.total_usage_snapshot === undefined
+    )
+  )
+  assert.equal(
+    invalidateBOMUsageSnapshots(items, { note: '保留用量' })[0],
+    items[0]
+  )
+})
 
 test('one material is selected once for multiple parts; supplier identities remain separate', () => {
   const groups = groupBOMMaterials([

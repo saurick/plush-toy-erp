@@ -7,8 +7,10 @@ import { createDevDeliveryBridgePlugin } from './devDeliveryBridgePlugin.mjs'
 import { createDevQaCoveragePlugin } from './devQaCoveragePlugin.mjs'
 import { createDevQaTestingPlugin } from './devQaTestingPlugin.mjs'
 import { createDevQualityGatePlugin } from './devQualityGatePlugin.mjs'
+import { createDevWebInstancePlugin } from './devWebInstancePlugin.mjs'
 
 export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
+  'plush-dev-web-instance',
   'plush-dev-customer-import-dry-run-api',
   'plush-dev-customer-config',
   'plush-dev-database-migration',
@@ -32,6 +34,7 @@ export function createDevWorkbenchServePlugins({
     mode: recoveryMode,
   })
   return [
+    createDevWebInstancePlugin({ isRecoveryActive: recovery.isActive }),
     recovery.plugin,
     createDevCustomerImportDryRunPlugin({
       projectRoot,

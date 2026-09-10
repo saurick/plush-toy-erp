@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DownloadOutlined,
   EditOutlined,
-  FileTextOutlined,
   OrderedListOutlined,
   PlusOutlined,
   PrinterOutlined,
@@ -46,7 +45,7 @@ import {
   getPreferredColumnOrder,
   writeStoredColumnOrder,
 } from '../components/business-list/businessListPreferences.mjs'
-import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessLineItemOrderModal from '../components/business-list/BusinessLineItemOrderModal.jsx'
 
@@ -1251,15 +1250,14 @@ export default function V1OutsourcingOrdersPage() {
         }}
       />
 
-      <BusinessFormModal
-        icon={<FileTextOutlined />}
+      <BusinessFormPage
+        form={form}
         title={editingRow ? '编辑加工合同' : '新建加工合同'}
         description="只维护委外订单和加工明细；车缝、手工等选产品 / 半成品，布料加工选材料。结果判定、库存和应付由后续业务处理。"
         open={modalOpen}
         onCancel={closeModal}
         onOk={submitForm}
         confirmLoading={saving}
-        forceRender
       >
         <OutsourcingOrderForm
           form={form}
@@ -1294,7 +1292,7 @@ export default function V1OutsourcingOrdersPage() {
             />
           }
         />
-      </BusinessFormModal>
+      </BusinessFormPage>
     </BusinessPageLayout>
   )
 }

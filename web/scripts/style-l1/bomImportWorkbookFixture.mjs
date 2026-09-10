@@ -135,7 +135,7 @@ export function createBOMImportWorkbookFixture() {
     ],
     [
       '样式材料',
-      'SUP-L1',
+      '示例织造AB-001#-02#米白',
       '短毛绒 300g',
       '核心演示单位-件',
       '前片*1',

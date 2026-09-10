@@ -62,10 +62,10 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
-import ShipmentBusinessModal, {
+import ShipmentEditor, {
   salesOrderCustomerText,
   sourceLineProductText,
-} from '../components/shipments/ShipmentBusinessModal.jsx'
+} from '../components/shipments/ShipmentEditor.jsx'
 import ShipmentFinanceSourceModal from '../components/shipments/ShipmentFinanceSourceModal.jsx'
 import ShipmentQualityInspectionModal from '../components/quality-inspections/ShipmentQualityInspectionModal.jsx'
 import {
@@ -1985,7 +1985,7 @@ export default function ShipmentsPage() {
       {shipmentItemsPreview.modal}
       {columnOrderModal}
 
-      <ShipmentBusinessModal
+      <ShipmentEditor
         canCreate={canCreate}
         canUpdate={canUpdate}
         canImportSalesOrderSource={canImportSalesOrderSource}

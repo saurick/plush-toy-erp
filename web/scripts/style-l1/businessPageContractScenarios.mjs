@@ -1,3 +1,4 @@
+import { assertBusinessFormPage, closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 export function createBusinessPageContractScenarios({
   customerRuntimeEffectiveSession,
   expectHeading,
@@ -28,7 +29,7 @@ export function createBusinessPageContractScenarios({
       `后台菜单应展示“${text}”，当前菜单文本：${menuText}`
     )
   }
-  const assertClassifiedBusinessFormModal = async (
+  const assertClassifiedBusinessFormPage = async (
     page,
     {
       buttonName,
@@ -41,10 +42,11 @@ export function createBusinessPageContractScenarios({
     const stableURL = page.url()
     await page.getByRole('button', { name: buttonName }).click()
     const modal = page
-      .locator('.erp-business-action-modal--form.ant-modal:visible')
+      .locator('.erp-business-form-page:not([hidden])')
       .last()
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(modal, titleText)
+    await assertBusinessFormPage(page, modal)
 
     const metrics = await modal.evaluate((node) => {
       const form = node.querySelector('.erp-business-action-form')
@@ -69,7 +71,7 @@ export function createBusinessPageContractScenarios({
           dividerColor: dividerStyle.backgroundColor,
         }
       })
-      const modalBody = node.querySelector('.ant-modal-body')
+      const modalBody = node.querySelector('.erp-business-form-page__body')
       return {
         form: formRect
           ? {
@@ -138,16 +140,15 @@ export function createBusinessPageContractScenarios({
     if (expectDark) {
       await assertDarkThemeContrast(page, {
         scenarioName,
-        selector: '.erp-business-action-modal--form',
+        selector: '.erp-business-form-page:not([hidden])',
       })
     }
     await assertNoHorizontalOverflow(page, scenarioName)
     await modal.screenshot({
       path: path.resolve(outputDir, `${scenarioName}.png`),
     })
-    await page.keyboard.press('Escape')
-    await modal.waitFor({ state: 'hidden', timeout: 10_000 })
-    assert.equal(page.url(), stableURL, `${scenarioName} 关闭弹窗不应改写 URL`)
+    await closeBusinessFormPage(page, modal)
+    assert.equal(page.url(), stableURL, `${scenarioName} 返回列表不应改写 URL`)
   }
   return [
     {
@@ -157,17 +158,20 @@ export function createBusinessPageContractScenarios({
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        const salesHeadings = ['订单与客户', '联系人与负责人', '结算与交付']
+        const salesHeadings = [
+          '订单与客户', '联系人与负责人', '结算条件',
+          '税费与运费条件', '交付与收货', '其他说明',
+        ]
         const paymentHeadings = ['往来与金额', '账户与凭据']
 
         await expectHeading(page, '销售订单')
-        await assertClassifiedBusinessFormModal(page, {
+        await assertClassifiedBusinessFormPage(page, {
           buttonName: '新建订单',
           titleText: '新建销售订单',
           expectedHeadings: salesHeadings,
           scenarioName: 'business-form-sections-sales-desktop',
         })
-        await assertClassifiedBusinessFormModal(page, {
+        await assertClassifiedBusinessFormPage(page, {
           buttonName: '新建订单',
           titleText: '新建销售订单',
           expectedHeadings: salesHeadings,
@@ -178,7 +182,7 @@ export function createBusinessPageContractScenarios({
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '收付款与核销')
-        await assertClassifiedBusinessFormModal(page, {
+        await assertClassifiedBusinessFormPage(page, {
           buttonName: '登记收付款',
           titleText: '登记收付款',
           expectedHeadings: paymentHeadings,
@@ -196,7 +200,7 @@ export function createBusinessPageContractScenarios({
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
-        await assertClassifiedBusinessFormModal(page, {
+        await assertClassifiedBusinessFormPage(page, {
           buttonName: '新建订单',
           titleText: '新建销售订单',
           expectedHeadings: salesHeadings,
@@ -208,7 +212,7 @@ export function createBusinessPageContractScenarios({
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '收付款与核销')
-        await assertClassifiedBusinessFormModal(page, {
+        await assertClassifiedBusinessFormPage(page, {
           buttonName: '登记收付款',
           titleText: '登记收付款',
           expectedHeadings: paymentHeadings,

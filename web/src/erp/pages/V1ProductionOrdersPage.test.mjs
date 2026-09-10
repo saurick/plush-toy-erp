@@ -9,7 +9,7 @@ const page = readFileSync(
 )
 const form = readFileSync(
   new URL(
-    '../components/production-orders/ProductionOrderFormModal.jsx',
+    '../components/production-orders/ProductionOrderEditor.jsx',
     import.meta.url
   ),
   'utf8'
@@ -130,12 +130,12 @@ test('production order release explains the atomic scheduling handoff', () => {
   assert.match(page, /生产订单已发布，排程任务已进入 PMC 待办/u)
 })
 
-test('production order forms initialize only after their modal is mounted', () => {
+test('production order forms remain connected before initialization', () => {
   assert.equal(page.match(/form\.setFieldsValue/gu)?.length, 1)
   assert.equal(page.match(/reasonForm\.resetFields/gu)?.length, 1)
   assert.match(page, /if \(!formMode \|\| !formValues\) return/u)
   assert.match(page, /if \(!reasonAction\) return/u)
-  assert.match(form, /forceRender/u)
+  assert.match(form, /<BusinessFormPage[\s\S]*?form=\{form\}/u)
 })
 
 test('closed production over-issue modal keeps its empty requirement null-safe', () => {

@@ -22,6 +22,7 @@ import React, {
   useState,
 } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import {
   TABLE_PAGE_SIZE_OPTIONS,
   IS_PRODUCTION_BUILD,
@@ -80,6 +81,7 @@ import {
 } from '../../utils/permissionCenterAdminDialog.mjs'
 
 export default function PermissionAdminAccounts({
+  editorContainer,
   currentAdmin,
   roles,
   setSaving,
@@ -968,20 +970,18 @@ export default function PermissionAdminAccounts({
     <>
       {' '}
       {adminAccountTab}
-      <Modal
+      <BusinessFormPage
+        container={editorContainer}
+        form={createForm}
         title="创建员工账号"
-        className="erp-permission-modal"
+        className="erp-permission-editor"
         open={createModalOpen}
         onCancel={closeCreateModal}
         onOk={() => createForm.submit()}
         confirmLoading={creating}
         okText="创建"
-        cancelText="取消"
-        centered
-        width={720}
-        forceRender
       >
-        <Form form={createForm} layout="vertical" onFinish={createAdmin}>
+        <Form form={createForm} className="erp-business-action-form" layout="vertical" onFinish={createAdmin}>
           <Form.Item
             label="姓名"
             name="display_name"
@@ -1069,7 +1069,7 @@ export default function PermissionAdminAccounts({
             </Paragraph>
           ) : null}
         </Form>
-      </Modal>
+      </BusinessFormPage>
       <Modal
         className="erp-permission-modal"
         title={
@@ -1105,8 +1105,13 @@ export default function PermissionAdminAccounts({
           </label>
         </Space>
       </Modal>
-      <Modal
-        className="erp-permission-modal"
+      <BusinessFormPage
+        container={editorContainer}
+        className="erp-permission-editor"
+        hasChanges={
+          editingDisplayName !== (profileAdmin?.display_name || '') ||
+          editingPhone !== (profileAdmin?.phone || '')
+        }
         title={
           profileAdmin?.username
             ? `修改资料：${formatAdminIdentity(profileAdmin)}`
@@ -1117,10 +1122,6 @@ export default function PermissionAdminAccounts({
         onOk={saveAdminProfile}
         confirmLoading={saving}
         okText="保存资料"
-        cancelText="取消"
-        centered
-        width={520}
-        forceRender
       >
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Paragraph type="secondary" className="erp-business-inline-note">
@@ -1148,7 +1149,7 @@ export default function PermissionAdminAccounts({
             />
           </label>
         </Space>
-      </Modal>
+      </BusinessFormPage>
       <Modal
         className="erp-permission-modal"
         title={

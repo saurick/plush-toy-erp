@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { Alert, Descriptions, Form, Input, Modal } from 'antd'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import {
@@ -25,6 +26,7 @@ export default function ProductionReworkModal({
 }) {
   const [form] = Form.useForm()
   const editing = mode === 'edit'
+  const Editor = editing ? BusinessFormPage : Modal
   const summary = productionReworkQuantitySummary(source, facts)
 
   useEffect(() => {
@@ -59,15 +61,12 @@ export default function ProductionReworkModal({
   }
 
   return (
-    <Modal
+    <Editor
+      {...(editing ? { form } : { width: 680, cancelText: '取消', destroyOnHidden: true, forceRender: true })}
       title={editing ? '编辑返工草稿' : '发起返工'}
       open={open}
       okText={editing ? '保存草稿' : '生成返工草稿'}
-      cancelText="取消"
       confirmLoading={loading}
-      destroyOnHidden
-      forceRender
-      width={680}
       onCancel={onCancel}
       onOk={submit}
     >
@@ -191,6 +190,6 @@ export default function ProductionReworkModal({
           />
         </Form.Item>
       </Form>
-    </Modal>
+    </Editor>
   )
 }

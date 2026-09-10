@@ -85,7 +85,13 @@ export function BOMHeaderFormFields({
   versionSuggestion = '',
   versionSuggestionLoading = false,
   onUseVersionSuggestion,
+  detailsOpen = false,
+  onDetailsOpenChange,
 }) {
+  const productID = Form.useWatch('product_id', form)
+  const selectedProduct = productOptions.find(
+    (option) => Number(option.value) === Number(productID)
+  )
   const effectiveFrom = Form.useWatch('effective_from', form)
   const effectiveTo = Form.useWatch('effective_to', form)
   const disableEffectiveFromOnOrAfterEnd = useCallback(
@@ -103,7 +109,7 @@ export function BOMHeaderFormFields({
     [effectiveFrom]
   )
   let versionHint = null
-  if (!disabled) {
+  if (!disabled && !productDisabled) {
     if (versionSuggestionLoading) {
       versionHint = '正在读取同产品已有 BOM 版本...'
     } else if (versionSuggestion) {
@@ -124,182 +130,182 @@ export function BOMHeaderFormFields({
 
   return (
     <>
-      <BusinessFormSectionTitle>版本信息</BusinessFormSectionTitle>
-      {includeProduct ? (
+      <div className="erp-bom-header-primary">
+        <BusinessFormSectionTitle>版本信息</BusinessFormSectionTitle>
+        {includeProduct ? (
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="产品"
+            extra={
+              productID ? (
+                <ProductIdentity
+                  productId={productID}
+                  name={selectedProduct?.label || '当前产品'}
+                  compact
+                />
+              ) : null
+            }
+            name="product_id"
+            rules={[{ required: true, message: '请选择产品' }]}
+          >
+            <Select
+              allowClear
+              disabled={disabled || productDisabled}
+              optionFilterProp="label"
+              options={productOptions}
+              listItemHeight={48}
+              optionRender={renderProductOption}
+              placeholder="请选择产品"
+              showSearch
+            />
+          </Form.Item>
+        ) : null}
         <Form.Item
           className="erp-business-action-form__field"
-          label="产品"
-          name="product_id"
-          rules={[{ required: true, message: '请选择产品' }]}
+          label="BOM 版本"
+          extra={versionHint}
+          name="version"
+          rules={[{ required: true, message: '请填写 BOM 版本' }]}
         >
-          <Select
+          <Input
             allowClear
-            disabled={disabled || productDisabled}
-            optionFilterProp="label"
-            options={productOptions}
-            listItemHeight={48}
-            optionRender={renderProductOption}
-            placeholder="请选择产品"
-            showSearch
+            autoComplete="off"
+            disabled={disabled}
+            placeholder="例如 V1、V2、打样版 A"
           />
         </Form.Item>
-      ) : null}
-      <Form.Item noStyle shouldUpdate>
-        {({ getFieldValue }) => {
-          const id = getFieldValue('product_id')
-          const product = productOptions.find(
-            (option) => Number(option.value) === Number(id)
-          )
-          return id ? (
-            <div className="erp-business-action-form__field">
-              <ProductIdentity
-                productId={id}
-                name={product?.label || '当前产品'}
-              />
-            </div>
-          ) : null
-        }}
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="BOM 版本"
-        name="version"
-        rules={[{ required: true, message: '请填写 BOM 版本' }]}
-      >
-        <Input
-          allowClear
-          autoComplete="off"
-          disabled={disabled}
-          placeholder="例如 V1、V2、打样版 A"
-        />
-      </Form.Item>
-      {versionHint ? (
-        <div className="erp-business-action-form__field erp-business-action-form__field--full">
-          <span className="erp-business-selection-action-bar__hint">
-            {versionHint}
-          </span>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="订单数量"
+          name="quantity_text"
+        >
+          <Input
+            allowClear
+            autoComplete="off"
+            disabled={disabled}
+            placeholder="例如 3030"
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field erp-bom-header-note"
+          label="备注"
+          name="note"
+        >
+          <Input.TextArea
+            allowClear
+            disabled={disabled}
+            autoSize={{ minRows: 1, maxRows: 3 }}
+            maxLength={300}
+          />
+        </Form.Item>
+      </div>
+      <details className="erp-bom-header-details" open={detailsOpen}>
+        <summary
+          onClick={(event) => {
+            event.preventDefault()
+            onDetailsOpenChange?.(!detailsOpen)
+          }}
+        >
+          订单、有效期与制表资料
+        </summary>
+        <div className="erp-business-action-form">
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="生效开始"
+            name="effective_from"
+            rules={[
+              dateInputNotAfterRule({
+                getEndValue: () => form.getFieldValue('effective_to'),
+                message: '生效开始必须早于生效结束',
+                allowSameDay: false,
+              }),
+            ]}
+          >
+            <DateInput
+              disabled={disabled}
+              disabledDate={
+                effectiveTo ? disableEffectiveFromOnOrAfterEnd : undefined
+              }
+            />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            dependencies={['effective_from']}
+            label="生效结束"
+            name="effective_to"
+            rules={[
+              dateInputNotBeforeRule({
+                getStartValue: () => form.getFieldValue('effective_from'),
+                message: '生效结束必须晚于生效开始',
+                allowSameDay: false,
+              }),
+            ]}
+          >
+            <DateInput
+              disabled={disabled}
+              disabledDate={
+                effectiveFrom ? disableEffectiveToOnOrBeforeStart : undefined
+              }
+            />
+          </Form.Item>
+          <BusinessFormSectionTitle>订单与数量</BusinessFormSectionTitle>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="来源订单号"
+            name="source_order_no"
+          >
+            <Input
+              allowClear
+              autoComplete="off"
+              disabled={disabled}
+              placeholder="例如 WL260102"
+            />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="备品"
+            name="spare_text"
+          >
+            <Input allowClear autoComplete="off" disabled={disabled} />
+          </Form.Item>
+          <BusinessFormSectionTitle>制表与说明</BusinessFormSectionTitle>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="制表日期"
+            name="print_date"
+          >
+            <DateInput disabled={disabled} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="设计师"
+            name="designer"
+          >
+            <Input allowClear autoComplete="off" disabled={disabled} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="制表人"
+            name="maker"
+          >
+            <Input allowClear autoComplete="off" disabled={disabled} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="审核人"
+            name="auditor"
+          >
+            <Input allowClear autoComplete="off" disabled={disabled} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="毛向"
+            name="hair_direction"
+          >
+            <Input allowClear autoComplete="off" disabled={disabled} />
+          </Form.Item>
         </div>
-      ) : null}
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="生效开始"
-        name="effective_from"
-        rules={[
-          dateInputNotAfterRule({
-            getEndValue: () => form.getFieldValue('effective_to'),
-            message: '生效开始必须早于生效结束',
-            allowSameDay: false,
-          }),
-        ]}
-      >
-        <DateInput
-          disabled={disabled}
-          disabledDate={
-            effectiveTo ? disableEffectiveFromOnOrAfterEnd : undefined
-          }
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['effective_from']}
-        label="生效结束"
-        name="effective_to"
-        rules={[
-          dateInputNotBeforeRule({
-            getStartValue: () => form.getFieldValue('effective_from'),
-            message: '生效结束必须晚于生效开始',
-            allowSameDay: false,
-          }),
-        ]}
-      >
-        <DateInput
-          disabled={disabled}
-          disabledDate={
-            effectiveFrom ? disableEffectiveToOnOrBeforeStart : undefined
-          }
-        />
-      </Form.Item>
-      <BusinessFormSectionTitle>订单与数量</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="来源订单号"
-        name="source_order_no"
-      >
-        <Input
-          allowClear
-          autoComplete="off"
-          disabled={disabled}
-          placeholder="例如 WL260102"
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="订单数量"
-        name="quantity_text"
-      >
-        <Input
-          allowClear
-          autoComplete="off"
-          disabled={disabled}
-          placeholder="例如 3030"
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="备品"
-        name="spare_text"
-      >
-        <Input allowClear autoComplete="off" disabled={disabled} />
-      </Form.Item>
-      <BusinessFormSectionTitle>制表与说明</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="制表日期"
-        name="print_date"
-      >
-        <DateInput disabled={disabled} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="设计师"
-        name="designer"
-      >
-        <Input allowClear autoComplete="off" disabled={disabled} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="制表人"
-        name="maker"
-      >
-        <Input allowClear autoComplete="off" disabled={disabled} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="审核人"
-        name="auditor"
-      >
-        <Input allowClear autoComplete="off" disabled={disabled} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="毛向"
-        name="hair_direction"
-      >
-        <Input allowClear autoComplete="off" disabled={disabled} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        label="备注"
-        name="note"
-      >
-        <Input.TextArea
-          allowClear
-          disabled={disabled}
-          autoSize={{ minRows: 1, maxRows: 3 }}
-          showCount
-          maxLength={300}
-        />
-      </Form.Item>
+      </details>
     </>
   )
 }

@@ -2119,90 +2119,12 @@ body
   border-bottom: 1px solid var(--erp-border-color, #e2e8f0);
 }
 
-.erp-bom-material-groups {
-  min-width: 0;
-  grid-column: 1 / -1;
-}
-
-.erp-bom-material-group {
-  min-width: 0;
-  max-width: 100%;
-  border: 1px solid var(--erp-sales-order-lines-row-border, #dfe7e2);
-  border-radius: 8px;
-}
-
 .erp-business-line-items-flow {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   width: 100%;
   min-width: 0;
-}
-
-.erp-bom-material-group__header {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--erp-business-action-modal-bg, #fff);
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(320px, 2fr) auto;
-  gap: 16px;
-  align-items: center;
-  padding: 12px;
-}
-
-.erp-bom-material-group__header .ant-form-item {
-  margin-bottom: 0;
-  min-width: 0;
-}
-
-.erp-bom-material-group__identity {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  overflow-wrap: anywhere;
-}
-
-.erp-bom-parts-scroll {
-  overflow-x: auto;
-  max-width: 100%;
-}
-
-.erp-bom-parts-table {
-  border-collapse: collapse;
-  table-layout: fixed;
-  width: 100%;
-  min-width: 1100px;
-}
-
-.erp-bom-parts-table th,
-.erp-bom-parts-table td {
-  padding: 7px;
-  border: 1px solid var(--erp-sales-order-lines-row-border, #dfe7e2);
-  vertical-align: top;
-  text-align: left;
-}
-
-.erp-bom-parts-table .ant-form-item {
-  margin-bottom: 0;
-}
-
-.erp-sales-order-lines-form__grid.erp-sales-order-demand-grid .ant-form-item {
-  width: 100%;
-}
-
-.erp-bom-material-group__footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  padding: 12px;
-}
-
-@media (max-width: 1000px) {
-  .erp-bom-material-group__header {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .erp-engineering-material-review,

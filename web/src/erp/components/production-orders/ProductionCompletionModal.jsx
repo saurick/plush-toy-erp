@@ -9,6 +9,7 @@ import {
   Select,
   Typography,
 } from 'antd'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
@@ -53,6 +54,7 @@ export default function ProductionCompletionModal({
 }) {
   const [form] = Form.useForm()
   const editing = mode === 'edit'
+  const Editor = editing ? BusinessFormPage : Modal
   const selectedItemID = Form.useWatch('production_order_item_id', form)
   const selectedBatchID = Form.useWatch('production_wip_batch_id', form)
   const lotSelection = Form.useWatch('lot_selection', form)
@@ -74,7 +76,14 @@ export default function ProductionCompletionModal({
   )
 
   React.useEffect(() => {
-    if (!open || !selectedChoice?.requiresBatch || selectedBatchID) return
+    // The batch field mounts after the source is selected; read the stored value
+    // so its first watch notification cannot replace an initialized quantity.
+    if (
+      !open ||
+      editing ||
+      !selectedChoice?.requiresBatch ||
+      form.getFieldValue('production_wip_batch_id')
+    ) return
     const firstBatch = selectedChoice.batchChoices.find(
       (batch) => !batch.disabled
     )
@@ -83,7 +92,7 @@ export default function ProductionCompletionModal({
       production_wip_batch_id: firstBatch.value,
       quantity: firstBatch.remaining,
     })
-  }, [form, open, selectedBatchID, selectedChoice])
+  }, [editing, form, open, selectedBatchID, selectedChoice])
 
   const initializeOpenForm = (visible) => {
     if (!visible) return
@@ -131,7 +140,8 @@ export default function ProductionCompletionModal({
   }
 
   return (
-    <Modal
+    <Editor
+      {...(editing ? { form } : { width: 720, cancelText: '取消', destroyOnHidden: true })}
       title={
         editing
           ? '核对待入库完工报告'
@@ -141,10 +151,7 @@ export default function ProductionCompletionModal({
       }
       open={open}
       okText={editing ? '保存待入库草稿' : '生成待入库草稿'}
-      cancelText="取消"
       confirmLoading={loading}
-      destroyOnHidden
-      width={720}
       afterOpenChange={initializeOpenForm}
       onCancel={onCancel}
       onOk={submit}
@@ -413,6 +420,6 @@ export default function ProductionCompletionModal({
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>
-    </Modal>
+    </Editor>
   )
 }

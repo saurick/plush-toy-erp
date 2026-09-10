@@ -14,6 +14,7 @@ import { DEV_DATABASE_MIGRATION_RECOVERY_ROUTE } from '../src/dev-workbench/conf
 
 test('development serve registry is exact and absent from all builds', async () => {
   assert.deepEqual(DEV_WORKBENCH_SERVE_PLUGIN_NAMES, [
+    'plush-dev-web-instance',
     'plush-dev-customer-import-dry-run-api',
     'plush-dev-customer-config',
     'plush-dev-database-migration',
@@ -58,6 +59,7 @@ test('development serve registry is exact and absent from all builds', async () 
     DEV_WORKBENCH_SERVE_PLUGIN_NAMES.includes(name)
   )
   assert.deepEqual(installedServePlugins, [
+    'plush-dev-web-instance',
     'plush-dev-customer-import-dry-run-api',
     'plush-dev-database-migration',
     'plush-dev-data-preparation',
@@ -155,7 +157,7 @@ test('Vite recovery mode opens the migration page and installs the guard only fo
     const build = await configFactory({ command: 'build', mode: 'production' })
     assert.equal(
       serve.server.open,
-      `http://127.0.0.1:5175${DEV_DATABASE_MIGRATION_RECOVERY_ROUTE}`
+      `http://127.0.0.1:${serve.server.port}${DEV_DATABASE_MIGRATION_RECOVERY_ROUTE}`
     )
     assert.equal(
       serve.plugins.some(

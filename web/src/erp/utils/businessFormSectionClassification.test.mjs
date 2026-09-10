@@ -56,7 +56,7 @@ test('all governed long forms use the shared section-title component', () => {
     '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx',
     '../components/outsourcing-orders/OutsourcingOrderForm.jsx',
     '../components/purchase-orders/PurchaseOrderForm.jsx',
-    '../components/shipments/ShipmentBusinessModal.jsx',
+    '../components/shipments/ShipmentEditor.jsx',
     '../components/bom/BOMVersionForms.jsx',
   ]
 
@@ -143,7 +143,7 @@ test('document-style long forms follow stable business section order', () => {
       ['合同与加工厂', '合同委托方信息', '合同乙方信息', '备注与附件'],
     ],
     [
-      '../components/shipments/ShipmentBusinessModal.jsx',
+      '../components/shipments/ShipmentEditor.jsx',
       ['单据与客户', '计划与收货', '运输与包装', '实际运费', '其他说明'],
     ],
     [

@@ -18,6 +18,8 @@ test('start web dev: 默认启用共享 runtime preflight', () => {
   assert.deepEqual(parseStartWebDevArgs([], {}), {
     apiOrigin: 'http://127.0.0.1:8300',
     frontendOnly: false,
+    isolated: false,
+    restart: false,
     viteArgs: [],
   })
 })
@@ -30,6 +32,8 @@ test('start web dev: frontend-only 必须显式启用且保留 Vite 参数', () 
     {
       apiOrigin: 'http://localhost:8300',
       frontendOnly: true,
+      isolated: false,
+      restart: false,
       viteArgs: ['--host', '127.0.0.1'],
     }
   )

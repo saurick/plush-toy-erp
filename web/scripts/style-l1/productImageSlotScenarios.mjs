@@ -159,7 +159,7 @@ async function openProductEditModal(page, assert) {
   assert.equal(await productRow.count(), 1, '产品列表应有且仅有一条目标记录')
   await productRow.getByText('PROD-STYLE-L1', { exact: true }).dblclick()
   const modal = page.locator(
-    '.erp-business-action-modal--form.ant-modal:visible'
+    '.erp-business-form-page:not([hidden])'
   )
   await modal.waitFor()
   await modal.getByText('产品图 1（主图）', { exact: true }).waitFor()
@@ -283,6 +283,11 @@ export function createProductImageSlotScenarios(deps) {
           0,
           '选择或清空图片时不得提前写附件接口'
         )
+        assert.equal(await modal.getAttribute('data-unsaved'), 'true', '只修改产品图也必须标记未保存')
+        await modal.getByRole('button', { name: '返回列表', exact: true }).click()
+        await page.getByRole('button', { name: '继续编辑', exact: true }).click()
+        await page.locator('.ant-modal-confirm').waitFor({ state: 'hidden' })
+        await primarySlot.getByText('保存产品后替换', { exact: true }).waitFor()
         await closeBusinessFormModal(page, modal)
         assert.equal(
           desktopState.calls.filter((call) =>
@@ -328,7 +333,7 @@ export function createProductImageSlotScenarios(deps) {
         desktopState.nextWriteGate = writeGate
         try {
           await modal
-            .locator('.ant-modal-footer .ant-btn-primary')
+            .locator('.erp-business-form-page__footer .ant-btn-primary')
             .click({ force: true })
           for (
             let attempt = 0;
@@ -346,14 +351,14 @@ export function createProductImageSlotScenarios(deps) {
           const savingModalState = await page.evaluate(() => {
             const currentModal = Array.from(
               document.querySelectorAll(
-                '.erp-business-action-modal--form.ant-modal'
+                '.erp-business-form-page:not([hidden])'
               )
             ).find((element) => element.getBoundingClientRect().width > 0)
             const buttons = Array.from(
-              currentModal?.querySelectorAll('.ant-modal-footer button') || []
+              currentModal?.querySelectorAll('.erp-business-form-page__footer button') || []
             )
             const cancelButton = buttons.find(
-              (button) => button.textContent?.replace(/\s+/g, '') === '取消'
+              (button) => button.textContent?.replace(/\s+/g, '') === '返回列表'
             )
             const closeButton = currentModal?.querySelector('.ant-modal-close')
             return {

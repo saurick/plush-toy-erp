@@ -1,9 +1,12 @@
-.ant-modal :is(.ant-input:focus, .ant-input-focused),
-.ant-modal :is(.ant-input-affix-wrapper-focused),
-.ant-modal .ant-input-number-focused,
-.ant-modal .ant-picker-focused,
-.ant-modal .ant-select-focused .ant-select-selector,
-.ant-modal .ant-select-open .ant-select-selector {
+:is(.ant-modal, .erp-business-form-page)
+  :is(.ant-input:focus, .ant-input-focused),
+:is(.ant-modal, .erp-business-form-page) :is(.ant-input-affix-wrapper-focused),
+:is(.ant-modal, .erp-business-form-page) .ant-input-number-focused,
+:is(.ant-modal, .erp-business-form-page) .ant-picker-focused,
+:is(.ant-modal, .erp-business-form-page)
+  .ant-select-focused
+  .ant-select-selector,
+:is(.ant-modal, .erp-business-form-page) .ant-select-open .ant-select-selector {
   border-color: var(--erp-control-focus-border);
   box-shadow: inset 0 0 0 2px var(--erp-control-focus-ring);
   outline: 0;

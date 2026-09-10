@@ -2,6 +2,7 @@
 import { execFile, spawn } from 'node:child_process'
 import path from 'node:path'
 import process from 'node:process'
+import { createRequire } from 'node:module'
 import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 
@@ -15,10 +16,17 @@ import {
   runWebRuntimePreflight,
 } from '../../scripts/local-runtime-preflight.mjs'
 import { resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
+import {
+  isCodexDevSession,
+  resolveERPHMRClientPort,
+  selectWebDevPort,
+} from './localPort.mjs'
+import { prepareWebInstance, webInstanceSignature } from './devWebInstance.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const devPorts = loadDevPorts(repoRoot)
 const execFileAsync = promisify(execFile)
+const require = createRequire(import.meta.url)
 
 export const DEV_GITLAB_KEYCHAIN = Object.freeze({
   account: 'simon',
@@ -72,9 +80,20 @@ export async function resolveDevGitlabCredential({
 export function parseStartWebDevArgs(argv, env = process.env) {
   const viteArgs = []
   let frontendOnly = false
+  let isolated = isCodexDevSession(env)
+  let restart = false
+  if (argv.includes('--local') && argv.includes('--isolated')) {
+    throw new Error('--local 与 --isolated 不能同时使用')
+  }
   for (const arg of argv) {
     if (arg === '--frontend-only') {
       frontendOnly = true
+    } else if (arg === '--isolated') {
+      isolated = true
+    } else if (arg === '--local') {
+      isolated = false
+    } else if (arg === '--restart') {
+      restart = true
     } else if (arg !== '--') {
       viteArgs.push(arg)
     }
@@ -82,6 +101,8 @@ export function parseStartWebDevArgs(argv, env = process.env) {
   return {
     apiOrigin: env.API_ORIGIN || `http://127.0.0.1:${devPorts.http}`,
     frontendOnly,
+    isolated,
+    restart,
     viteArgs,
   }
 }
@@ -167,42 +188,142 @@ export function createViteChildEnvironment({
   return childEnvironment
 }
 
-function runVite(viteArgs, startup, gitlabCredential) {
+export function runManagedVite(
+  viteArgs,
+  startup,
+  gitlabCredential,
+  env = process.env
+) {
   const childEnvironment = createViteChildEnvironment({
     ...startup,
     gitlabCredential,
+    env,
   })
+  const viteCLI = path.join(
+    path.dirname(require.resolve('vite/package.json')),
+    'bin',
+    'vite.js'
+  )
   const child = spawn(
-    'pnpm',
-    ['exec', 'vite', '--config', 'vite.config.mjs', ...viteArgs],
+    process.execPath,
+    [
+      '--import',
+      new URL('./viteParentLifetime.mjs', import.meta.url).href,
+      viteCLI,
+      '--config',
+      'vite.config.mjs',
+      ...viteArgs,
+    ],
     {
       env: childEnvironment,
-      stdio: 'inherit',
+      cwd: path.join(repoRoot, 'web'),
+      stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
     }
   )
-  child.on('error', (error) => {
-    process.stderr.write(`[start-web] ${error.message}\n`)
-    process.exit(1)
-  })
-  child.on('exit', (code, signal) => {
-    if (signal) {
-      process.kill(process.pid, signal)
-      return
+  return new Promise((resolve, reject) => {
+    let stoppingSignal = ''
+    const handlers = new Map(
+      ['SIGINT', 'SIGTERM', 'SIGHUP'].map((signal) => [
+        signal,
+        () => {
+          stoppingSignal = signal
+          if (child.connected) child.disconnect()
+        },
+      ])
+    )
+    const onExit = () => {
+      if (child.connected) child.disconnect()
     }
-    process.exit(code || 0)
+    for (const [signal, handler] of handlers) process.once(signal, handler)
+    process.once('exit', onExit)
+    child.once('error', reject)
+    child.once('close', (code, signal) => {
+      for (const [name, handler] of handlers) process.off(name, handler)
+      process.off('exit', onExit)
+      resolve(stoppingSignal || signal ? 130 : (code ?? 1))
+    })
   })
 }
 
 async function main() {
   const options = parseStartWebDevArgs(process.argv.slice(2))
+  if (options.restart && options.isolated && !process.env.ERP_VITE_PORT) {
+    throw new Error(
+      '重启需要明确端口；本地前端使用 pnpm start --local --restart'
+    )
+  }
+  const port = await selectWebDevPort({
+    ports: devPorts,
+    isolated: options.isolated,
+  })
+  const hmrClientPort = resolveERPHMRClientPort(
+    process.env.ERP_VITE_HMR_CLIENT_PORT,
+    port
+  )
   const startup = await resolveWebRuntimeStartup(options)
   const gitlabCredential = startup.recoveryMode
     ? { source: 'missing', token: '' }
     : await resolveDevGitlabCredential()
+  const signature = webInstanceSignature({
+    ...options,
+    projectRoot: repoRoot,
+    customerKey: process.env.ERP_DEV_CUSTOMER_KEY || '',
+  })
+  const instance = await prepareWebInstance({
+    ...startup,
+    port,
+    signature,
+    projectRoot: repoRoot,
+    restart: options.restart,
+  })
+  const url = `http://127.0.0.1:${port}${startup.recoveryMode ? '/__dev/database-migration' : '/'}`
+  if (instance.reused) {
+    process.stdout.write(
+      `[start-web] 已复用本工作区前端（PID ${instance.pid}）：${url}\n[start-web] 服务继续由原终端管理；需要重新加载启动配置时执行 pnpm start --restart\n`
+    )
+    return
+  }
+  process.stdout.write(
+    `[start-web] ${options.isolated ? '临时验证' : '本地开发'}：${url}\n`
+  )
   if (gitlabCredential.source === 'keychain') {
     process.stderr.write('[start-web] GitLab 只读凭据已从 macOS 钥匙串加载\n')
   }
-  runVite(options.viteArgs, startup, gitlabCredential)
+  const code = await runManagedVite(
+    options.viteArgs,
+    startup,
+    gitlabCredential,
+    {
+      ...process.env,
+      ERP_VITE_PORT: String(port),
+      ERP_VITE_HMR_CLIENT_PORT: String(hmrClientPort),
+      ERP_DEV_START_SIGNATURE: signature,
+      ...(isCodexDevSession() && !process.env.BROWSER
+        ? { BROWSER: 'none' }
+        : {}),
+    }
+  )
+  // 两个启动命令可能同时通过空闲探测；只有胜出的同配置服务可被复用。
+  if (code === 1) {
+    try {
+      const winner = await prepareWebInstance({
+        ...startup,
+        port,
+        signature,
+        projectRoot: repoRoot,
+        restart: false,
+      })
+      if (winner.reused) {
+        process.stdout.write(
+          `[start-web] 已复用同时启动的本工作区前端：${url}\n`
+        )
+        return
+      }
+    } catch {
+      // 保留 Vite 本次启动失败的退出码与诊断。
+    }
+  }
+  process.exitCode = code
 }
 
 const isDirectRun =

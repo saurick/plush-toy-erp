@@ -517,7 +517,7 @@ export function PurchaseOrderFormFields({
             <SourceImportPickerModal
               open={materialImportOpen}
               title="选择材料添加采购明细"
-              description="这里只选择材料档案；数量、单价和预计到货日期仍在主弹窗采购明细里维护。"
+              description="这里只选择材料档案；数量、单价和预计到货日期在编辑页的采购明细里维护。"
               rows={materials}
               columns={materialImportColumns}
               getSelectedLabel={materialLabel}

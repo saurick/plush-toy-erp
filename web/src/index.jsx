@@ -1,7 +1,7 @@
 // web/src/index.jsx
 import React, { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter as Router } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import 'antd/dist/reset.css'
 import './tailwind.css'
@@ -9,11 +9,6 @@ import './erp/styles/app.css'
 import App from './App'
 import { AppAlertProvider } from '@/common/components/modal/AppAlertProvider'
 import { redirectToCanonicalLocalDevHost } from '@/common/theme/localDevThemeOrigin.mjs'
-
-const routerFutureFlags = {
-  v7_startTransition: true,
-  v7_relativeSplatPath: true,
-}
 
 // 只在开发环境 & 打开开关时启用 mock
 const rpcMockEnabled =
@@ -37,14 +32,19 @@ if (!redirectedLocalDevHost) {
   }
 
   const root = ReactDOM.createRoot(rootElement)
+  const router = createBrowserRouter(
+    [{ path: '*', element: <App /> }],
+    {
+      basename: import.meta.env.BASE_URL,
+      future: { v7_relativeSplatPath: true },
+    }
+  )
 
   const application = (
     <HelmetProvider>
-      <Router basename={import.meta.env.BASE_URL} future={routerFutureFlags}>
-        <AppAlertProvider>
-          <App />
-        </AppAlertProvider>
-      </Router>
+      <AppAlertProvider>
+        <RouterProvider router={router} future={{ v7_startTransition: true }} />
+      </AppAlertProvider>
     </HelmetProvider>
   )
 

@@ -803,7 +803,7 @@ export function SalesOrderItemsFormSection({
             <SourceImportPickerModal
               open={skuImportOpen}
               title="选择 SKU 添加订单行"
-              description="这里只选择 SKU 档案；数量、单价和交期仍在主弹窗订单行里维护。"
+              description="这里只选择 SKU 档案；数量、单价和交期在编辑页的订单行里维护。"
               rows={productSKUs}
               columns={skuImportColumns}
               getSelectedLabel={skuLabel}

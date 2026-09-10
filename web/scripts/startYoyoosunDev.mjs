@@ -1,19 +1,16 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
 import { normalizeDevCustomerKey } from '../dev-server/devCustomerConfigPlugin.mjs'
-import {
-  loadDevPorts,
-  validateDevAuxPort,
-} from '../../scripts/dev-ports.mjs'
+import { loadDevPorts, validateDevAuxPort } from '../../scripts/dev-ports.mjs'
 import { resolveAvailablePort } from './localPort.mjs'
 import { normalizeAPIOrigin } from '../../scripts/local-runtime-preflight.mjs'
 import {
   createViteChildEnvironment,
+  runManagedVite,
   resolveWebRuntimeStartup,
 } from './startWebDev.mjs'
 
@@ -24,8 +21,7 @@ function parseArgs(argv) {
   const options = {
     customer: process.env.ERP_CUSTOMER_KEY || 'yoyoosun',
     port: process.env.PORT || String(devPorts.auxStart),
-    apiOrigin:
-      process.env.API_ORIGIN || `http://127.0.0.1:${devPorts.http}`,
+    apiOrigin: process.env.API_ORIGIN || `http://127.0.0.1:${devPorts.http}`,
     frontendOnly: false,
     printPlan: false,
   }
@@ -143,8 +139,11 @@ function printPlan(options) {
 }
 
 function runVite(options, startup) {
-  const child = spawn('pnpm', ['exec', 'vite', '--config', 'vite.config.mjs'], {
-    env: {
+  return runManagedVite(
+    [],
+    startup,
+    { source: 'missing', token: '' },
+    {
       ...createViteChildEnvironment({
         ...startup,
         gitlabCredential: { source: 'missing', token: '' },
@@ -153,22 +152,8 @@ function runVite(options, startup) {
       ERP_VITE_PORT: options.port,
       ERP_VITE_HMR_CLIENT_PORT: options.port,
       API_ORIGIN: options.apiOrigin,
-    },
-    stdio: 'inherit',
-  })
-
-  child.on('error', (error) => {
-    process.stderr.write(`[start-yoyoosun] ${error.message}\n`)
-    process.exit(1)
-  })
-
-  child.on('exit', (code, signal) => {
-    if (signal) {
-      process.kill(process.pid, signal)
-      return
     }
-    process.exit(code || 0)
-  })
+  )
 }
 
 async function main() {
@@ -195,7 +180,7 @@ async function main() {
   process.stdout.write(
     `[start-yoyoosun] 客户配置与公开资源预检通过：${options.customer}\n`
   )
-  runVite(options, startup)
+  process.exitCode = await runVite(options, startup)
 }
 
 const isDirectRun =

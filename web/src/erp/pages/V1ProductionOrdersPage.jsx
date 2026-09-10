@@ -40,7 +40,7 @@ import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilt
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
 import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
 import ProductionOverIssueRequestModal from '../components/production-orders/ProductionOverIssueRequestModal.jsx'
-import ProductionOrderFormModal from '../components/production-orders/ProductionOrderFormModal.jsx'
+import ProductionOrderEditor from '../components/production-orders/ProductionOrderEditor.jsx'
 import ProductionReworkProgressModal from '../components/production-orders/ProductionReworkProgressModal.jsx'
 import ProductionRouteExecutionModal from '../components/production-orders/ProductionRouteExecutionModal.jsx'
 import { listAllInventoryLots } from '../api/inventoryApi.mjs'
@@ -2028,7 +2028,7 @@ export default function V1ProductionOrdersPage() {
       {productionItemsPreview.modal}
       {columnOrderModal}
 
-      <ProductionOrderFormModal
+      <ProductionOrderEditor
         form={form}
         open={Boolean(formMode)}
         mode={formMode}

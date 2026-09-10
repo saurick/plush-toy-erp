@@ -498,7 +498,7 @@ export function createPurchaseReceiptAssertions(deps) {
       .waitFor({ state: 'visible', timeout: 10_000 })
 
     const metrics = await modal.evaluate((node) => {
-      const body = node.querySelector('.ant-modal-body')
+      const body = node.querySelector('.erp-business-form-page__body, .ant-modal-body')
       const scrollContainer = node.querySelector(
         '.erp-sales-order-lines-form__list'
       )

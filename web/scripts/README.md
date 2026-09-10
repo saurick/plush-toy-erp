@@ -56,7 +56,7 @@ pnpm preview:yoyoosun
 - 真实登录 smoke 可能读取本地开发配置中的管理员账号，也可能通过环境变量覆盖账号密码；不要把账号、token 或截图里的敏感信息提交。
 - 真实登录 smoke 的 `REAL_LOGIN_SMOKE_BASE_URL` 和 `REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL` 不得包含 URL 账号密码；账号密码只能走显式环境变量或本地开发配置读取。
 - `smoke:purchase-receipt-real-write` 会用采购入库 RPC 准备带 `PR-BROWSER-*` 前缀的模拟草稿，再到入库管理页完成过账和取消；收尾口径是取消冲正并保留可追踪记录，不物理删除已过账单据。入库管理页本身不提供页面级“新建入库单”，真实业务草稿从采购订单“生成入库”入口产生。
-- `pnpm start` 先运行仓库共享的 `scripts/local-runtime-preflight.mjs`，最多等待 15 秒。本地 pending、数据库配置或连接、安全检查、工具和后端检查失败或超时后仍启动 Vite，保留数据库迁移恢复页；普通 ERP 页面、其它 DEV API 与 `/rpc`、`/templates` 持续阻断，直到同一完整启动检查重新通过。恢复模式跳过可选 GitLab 钥匙串读取，不自动 apply 或重试 migration。外部 `API_ORIGIN`、非法代理地址、前端依赖和端口问题不属于本机数据库恢复范围。`pnpm start:frontend-only` 只适用于不登录、不调 RPC 的页面调试，会显式输出非绿色证据边界。
+- `pnpm start` 先运行仓库共享的 `scripts/local-runtime-preflight.mjs`，最多等待 15 秒。本地 pending、数据库配置或连接、安全检查、工具和后端检查失败或超时后仍启动 Vite，保留数据库迁移恢复页与启动器所需的只读实例摘要；普通 ERP 页面、其它 DEV API 与 `/rpc`、`/templates` 持续阻断，直到同一完整启动检查重新通过。恢复模式跳过可选 GitLab 钥匙串读取，不自动 apply 或重试 migration。外部 `API_ORIGIN`、非法代理地址、前端依赖和端口问题不属于本机数据库恢复范围。`pnpm start:frontend-only` 只适用于不登录、不调 RPC 的页面调试，会显式输出非绿色证据边界。
 - `pnpm start`、`pnpm start:frontend-only` 与 `start:yoyoosun` 在 Windows / WSL 共用 `openDevBrowser.js`：先按本项目可识别标题收窄 Chrome / Edge / Brave 候选，再以内存中的地址栏值核对精确 loopback authority；命中后激活并刷新原标签，未命中或 UI Automation 不可用才使用系统默认新开。脚本不输出候选地址、不检查无关标题标签、不自动关闭历史重复标签，并保留显式 `BROWSER` 覆盖。其他平台继续使用 Vite 默认行为。
 - `start:yoyoosun` 默认从清单中的独占辅助块 `15200-15299` 起探测可用端口，且耗尽时失败、不会跨块顺延；它复用同一 runtime preflight，再检查 `config/customers/yoyoosun/customer-config.example.js` 和 `public-assets/`，通过 dev-only middleware 提供 `/customer-config.js`、`/customer-assets/yoyoosun/*`；客户工程图和来源资料不会公开提供。它保留 HMR，不构建生产包，不调用 `customer_config.validate / publish / activate / rollback`，不写数据库。同 key `builtin_rbac_fallback` 只允许进入带警示的 DEV 桌面预览壳，不升级为 active customer runtime；工作台 / 任务看板不发出 Workflow RPC，客户业务数据页和岗位任务端仍 fail closed。静态包通过不代表后端 active revision 已就绪。
 - `preview:yoyoosun` 默认执行单入口 `build:all`、注入 `config/customers/yoyoosun/customer-config.example.js` 与客户静态资产，并以 `APP_ID=desktop API_ORIGIN=http://127.0.0.1:8300` 启动 `serve:prod`；端口默认从清单辅助块 `15200-15299` 起探测，遇占用只在块内顺延并在终端输出实际 URL，耗尽时失败。它只预览永绅前端静态包，不生成 `build/mobile-*`，不调用 `customer_config.validate / publish / activate / rollback`，不导入业务数据、不写数据库。
@@ -65,6 +65,8 @@ pnpm preview:yoyoosun
 - 本目录脚本不能绕过后端 RBAC、schema、migration、Workflow / Fact usecase 或客户配置边界。
 
 ## 维护规则
+
+`startWebDev.mjs` 管理固定主入口、Codex / `--isolated` 辅助端口和重复启动；`devWebInstance.mjs` 校验实例配置摘要与显式重启的进程归属，`viteParentLifetime.mjs` 通过 IPC 处理启动器异常退出。`start:yoyoosun` 复用同一 Vite 子进程生命周期。日常 `pnpm start`、安全重启 `pnpm start:restart` 与临时验证 `pnpm start:isolated` 的完整约定见 [`web/README.md`](../README.md#启动命令)。实例摘要不包含路径或凭据，不承担业务健康或发布证据语义。
 
 - 新增浏览器级页面回归时，优先复用 `style-l1/` 下已有 mock、assertion 和 scenario 拆分。
 - 修改 API shape、页面字段映射或业务页主路径时，同步更新对应 mock 和页面级浏览器回归场景（Style L1），避免脚本继续验证旧前端契约。

@@ -79,6 +79,7 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import QualityInspectionPurchaseReturnModal from '../components/quality-inspections/QualityInspectionPurchaseReturnModal.jsx'
@@ -1092,6 +1093,7 @@ export default function V1QualityInspectionsPage() {
 
   useEffect(() => {
     if (inspectionModal?.mode === 'create') {
+      inspectionForm.resetFields()
       inspectionForm.setFieldsValue({
         inspection_no: buildSequentialDraftCode(rows, {
           prefix: 'QI',
@@ -1443,6 +1445,8 @@ export default function V1QualityInspectionsPage() {
       }`
     : '请先选择一张质量检验单'
 
+  const isCreatingInspection = !inspectionModal || inspectionModal.mode === 'create'
+  const InspectionEditor = isCreatingInspection ? BusinessFormPage : BusinessFormModal
   const modalTitle = {
     create: '生成来料质检草稿',
     pass: '判定合格',
@@ -2209,7 +2213,10 @@ export default function V1QualityInspectionsPage() {
         />
       </BusinessDetailsModal>
 
-      <BusinessFormModal
+      <InspectionEditor
+        {...(isCreatingInspection
+          ? { form: inspectionForm, loading: referenceDataState === 'loading' }
+          : { destroyOnHidden: true, cancelText: '关闭' })}
         title={modalTitle}
         description={modalDescription}
         open={Boolean(inspectionModal)}
@@ -2225,11 +2232,9 @@ export default function V1QualityInspectionsPage() {
             inspectionModal?.mode === 'create' &&
             referenceDataState !== 'ready',
         }}
-        destroyOnHidden
         okText={modalOkText}
-        cancelText="关闭"
       >
-        {inspectionModal?.mode === 'create' ? (
+        {isCreatingInspection ? (
           <>
             {selectedPurchaseReceipt ? (
               <Alert
@@ -2359,7 +2364,7 @@ export default function V1QualityInspectionsPage() {
           canWithdraw={canCreate || canUpdate}
           variant="inline"
         />
-      </BusinessFormModal>
+      </InspectionEditor>
     </BusinessPageLayout>
   )
 }

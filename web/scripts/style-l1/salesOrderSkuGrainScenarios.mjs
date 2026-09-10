@@ -134,7 +134,7 @@ export function createSalesOrderSkuGrainScenarios(deps) {
         await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
         await page.getByRole('button', { name: '编辑订单' }).click()
         const modal = page
-          .getByRole('dialog')
+          .locator('.erp-business-form-page:not([hidden])')
           .filter({ hasText: '编辑销售订单' })
           .last()
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
@@ -181,7 +181,11 @@ export function createSalesOrderSkuGrainScenarios(deps) {
           '场景必须唯一定位销售订单头备注，不能命中订单行备注'
         )
         await headerNoteField.locator('textarea').fill(HEADER_NOTE)
-        await modal.locator('.ant-modal-footer .ant-btn-primary').last().click()
+        await modal.getByLabel('计税方式', { exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible').getByText('不计税', { exact: true }).click()
+        await modal.getByLabel('报价是否含运费', { exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible').getByText('报价含运费', { exact: true }).click()
+        await modal.locator('.erp-business-form-page__footer .ant-btn-primary').last().click()
         await page.waitForTimeout(250)
         const validationErrors = await modal
           .locator('.ant-form-item-explain-error')

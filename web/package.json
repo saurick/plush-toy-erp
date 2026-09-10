@@ -64,6 +64,8 @@
     "build:all": "node ../scripts/gen-error-codes.mjs && vite build --config vite.config.mjs",
     "build:committed": "vite build --config vite.config.mjs",
     "start": "node ./scripts/startWebDev.mjs",
+    "start:isolated": "node ./scripts/startWebDev.mjs --isolated",
+    "start:restart": "node ./scripts/startWebDev.mjs --local --restart",
     "start:frontend-only": "node ./scripts/startWebDev.mjs --frontend-only",
     "start:yoyoosun": "node ./scripts/startYoyoosunDev.mjs",
     "audit:yoyoosun-entry": "node ./scripts/yoyoosunLocalEntryAudit.mjs",
