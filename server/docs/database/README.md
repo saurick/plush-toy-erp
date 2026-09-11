@@ -24,7 +24,7 @@ go run ./cmd/schema-doc --write
 | 应用表 | 76 |
 | 字段 | 1275 |
 | 外键 | 154 |
-| 显式索引 | 342 |
+| 显式索引 | 343 |
 | 其中 partial index | 34 |
 | 命名 / 表级 CHECK | 313 |
 
@@ -50,7 +50,7 @@ go run ./cmd/schema-doc --write
 | [`admin_users`](账号权限与配置.md#table-admin-users) | 管理员账号 | 账号、权限与配置 | Config / 配置 | 保存后台登录身份、认证版本、超级管理员标记和账号状态。 |
 | [`bom_headers`](主数据与BOM.md#table-bom-headers) | BOM 版本 | 主数据与 BOM | MasterData / 主数据 | 保存产品 BOM 的版本、有效期、状态及工程资料头信息。 |
 | [`bom_items`](主数据与BOM.md#table-bom-items) | BOM 物料明细 | 主数据与 BOM | MasterData / 主数据 | 保存材料在各部位的单位用量、损耗、片数和工艺资料；界面按材料分组复用主数据。 |
-| [`business_attachments`](流程运行时.md#table-business-attachments) | 业务附件证据 | 流程运行时、协同与审计 | Fact / 事实 | 保存挂接到业务对象的文件内容、元数据、哈希、上传审计和撤销审计等证据。 |
+| [`business_attachments`](流程运行时.md#table-business-attachments) | 业务附件证据 | 流程运行时、协同与审计 | Fact / 事实 | 保存挂接到业务对象的文件元数据、私有对象 key、哈希、上传审计和撤销审计；文件内容存入 RAID5 上的 S3 对象存储。 |
 | [`contacts`](主数据与BOM.md#table-contacts) | 联系人 | 主数据与 BOM | MasterData / 主数据 | 保存客户或供应商联系人、联系方式、主联系人标记和启用状态。 |
 | [`customer_config_revisions`](账号权限与配置.md#table-customer-config-revisions) | 客户配置版本 | 账号、权限与配置 | Config / 配置 | 保存规范化客户配置的版本、哈希、编译快照和发布状态。 |
 | [`customers`](主数据与BOM.md#table-customers) | 客户 | 主数据与 BOM | MasterData / 主数据 | 保存销售、出货和应收等业务引用的客户主档。 |

@@ -545,6 +545,8 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 		return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message}
 	}
 	switch {
+	case errors.Is(err, biz.ErrBusinessAttachmentStorageUnavailable):
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: "文件存储暂不可用，请稍后重试；重复上传前请先查看附件列表"}
 	case errors.Is(err, biz.ErrBusinessAttachmentTooLarge):
 		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 5MB，请压缩后再上传"}
 	case errors.Is(err, biz.ErrBusinessAttachmentIntegrity):

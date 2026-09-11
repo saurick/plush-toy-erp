@@ -36,10 +36,10 @@ const businessFormInteractionScenarios = readFileSync(
 test('主数据选择器使用具体档案名称，不冒充来源单据', () => {
   assert.doesNotMatch(salesOrderForm, /从业务来源导入/u)
   assert.doesNotMatch(purchaseOrderForm, /从业务来源导入/u)
-  assert.match(salesOrderForm, /这里只选择 SKU 档案/u)
+  assert.match(salesOrderForm, /选中的产品规格将添加到本单/u)
   assert.match(purchaseOrderForm, /这里只选择材料档案/u)
-  assert.match(salesOrderForm, /从 SKU 库添加/u)
-  assert.match(salesOrderForm, /添加到订单行/u)
+  assert.match(salesOrderForm, /从已有规格添加/u)
+  assert.match(salesOrderForm, /添加到本单/u)
   assert.match(purchaseOrderForm, /从材料库添加/u)
   assert.match(purchaseOrderForm, /添加到采购明细/u)
   assert.doesNotMatch(salesOrderForm, /从 SKU 库导入|可导入 SKU/u)
@@ -49,6 +49,6 @@ test('主数据选择器使用具体档案名称，不冒充来源单据', () =>
 test('来源选择器空态与浏览器验证使用具体档案名', () => {
   assert.match(sourceImportPicker, /未选择\{selectedNoun\}/u)
   assert.match(styleL1, /未选择\$\{selectedNoun\}/u)
-  assert.match(businessFormalScenarios, /selectedNoun: 'SKU'/u)
+  assert.match(businessFormalScenarios, /selectedNoun: '规格'/u)
   assert.match(businessFormInteractionScenarios, /selectedNoun: '材料'/u)
 })

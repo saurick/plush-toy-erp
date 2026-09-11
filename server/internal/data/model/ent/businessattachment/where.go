@@ -94,9 +94,9 @@ func Sha256(v string) predicate.BusinessAttachment {
 	return predicate.BusinessAttachment(sql.FieldEQ(FieldSha256, v))
 }
 
-// Content applies equality check predicate on the "content" field. It's identical to ContentEQ.
-func Content(v []byte) predicate.BusinessAttachment {
-	return predicate.BusinessAttachment(sql.FieldEQ(FieldContent, v))
+// ObjectKey applies equality check predicate on the "object_key" field. It's identical to ObjectKeyEQ.
+func ObjectKey(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldEQ(FieldObjectKey, v))
 }
 
 // UploadedBy applies equality check predicate on the "uploaded_by" field. It's identical to UploadedByEQ.
@@ -609,44 +609,69 @@ func Sha256ContainsFold(v string) predicate.BusinessAttachment {
 	return predicate.BusinessAttachment(sql.FieldContainsFold(FieldSha256, v))
 }
 
-// ContentEQ applies the EQ predicate on the "content" field.
-func ContentEQ(v []byte) predicate.BusinessAttachment {
-	return predicate.BusinessAttachment(sql.FieldEQ(FieldContent, v))
+// ObjectKeyEQ applies the EQ predicate on the "object_key" field.
+func ObjectKeyEQ(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldEQ(FieldObjectKey, v))
 }
 
-// ContentNEQ applies the NEQ predicate on the "content" field.
-func ContentNEQ(v []byte) predicate.BusinessAttachment {
-	return predicate.BusinessAttachment(sql.FieldNEQ(FieldContent, v))
+// ObjectKeyNEQ applies the NEQ predicate on the "object_key" field.
+func ObjectKeyNEQ(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNEQ(FieldObjectKey, v))
 }
 
-// ContentIn applies the In predicate on the "content" field.
-func ContentIn(vs ...[]byte) predicate.BusinessAttachment {
-	return predicate.BusinessAttachment(sql.FieldIn(FieldContent, vs...))
+// ObjectKeyIn applies the In predicate on the "object_key" field.
+func ObjectKeyIn(vs ...string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldIn(FieldObjectKey, vs...))
 }
 
-// ContentNotIn applies the NotIn predicate on the "content" field.
-func ContentNotIn(vs ...[]byte) predicate.BusinessAttachment {
-	return predicate.BusinessAttachment(sql.FieldNotIn(FieldContent, vs...))
+// ObjectKeyNotIn applies the NotIn predicate on the "object_key" field.
+func ObjectKeyNotIn(vs ...string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNotIn(FieldObjectKey, vs...))
 }
 
-// ContentGT applies the GT predicate on the "content" field.
-func ContentGT(v []byte) predicate.BusinessAttachment {
-	return predicate.BusinessAttachment(sql.FieldGT(FieldContent, v))
+// ObjectKeyGT applies the GT predicate on the "object_key" field.
+func ObjectKeyGT(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldGT(FieldObjectKey, v))
 }
 
-// ContentGTE applies the GTE predicate on the "content" field.
-func ContentGTE(v []byte) predicate.BusinessAttachment {
-	return predicate.BusinessAttachment(sql.FieldGTE(FieldContent, v))
+// ObjectKeyGTE applies the GTE predicate on the "object_key" field.
+func ObjectKeyGTE(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldGTE(FieldObjectKey, v))
 }
 
-// ContentLT applies the LT predicate on the "content" field.
-func ContentLT(v []byte) predicate.BusinessAttachment {
-	return predicate.BusinessAttachment(sql.FieldLT(FieldContent, v))
+// ObjectKeyLT applies the LT predicate on the "object_key" field.
+func ObjectKeyLT(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldLT(FieldObjectKey, v))
 }
 
-// ContentLTE applies the LTE predicate on the "content" field.
-func ContentLTE(v []byte) predicate.BusinessAttachment {
-	return predicate.BusinessAttachment(sql.FieldLTE(FieldContent, v))
+// ObjectKeyLTE applies the LTE predicate on the "object_key" field.
+func ObjectKeyLTE(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldLTE(FieldObjectKey, v))
+}
+
+// ObjectKeyContains applies the Contains predicate on the "object_key" field.
+func ObjectKeyContains(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldContains(FieldObjectKey, v))
+}
+
+// ObjectKeyHasPrefix applies the HasPrefix predicate on the "object_key" field.
+func ObjectKeyHasPrefix(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldHasPrefix(FieldObjectKey, v))
+}
+
+// ObjectKeyHasSuffix applies the HasSuffix predicate on the "object_key" field.
+func ObjectKeyHasSuffix(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldHasSuffix(FieldObjectKey, v))
+}
+
+// ObjectKeyEqualFold applies the EqualFold predicate on the "object_key" field.
+func ObjectKeyEqualFold(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldEqualFold(FieldObjectKey, v))
+}
+
+// ObjectKeyContainsFold applies the ContainsFold predicate on the "object_key" field.
+func ObjectKeyContainsFold(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldContainsFold(FieldObjectKey, v))
 }
 
 // UploadedByEQ applies the EQ predicate on the "uploaded_by" field.

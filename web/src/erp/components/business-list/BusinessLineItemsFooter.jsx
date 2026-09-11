@@ -23,6 +23,7 @@ function BusinessLineItemsFooter(
           <Button
             type="dashed"
             icon={<PlusOutlined />}
+            aria-label={addLabel}
             {...addButtonProps}
             className={addButtonClassName}
             disabled={addDisabled}

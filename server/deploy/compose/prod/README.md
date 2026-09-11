@@ -2,11 +2,12 @@
 
 本目录是仓库内唯一的单宿主机 Compose 部署真源：
 
-- `compose.yml`：PostgreSQL、Jaeger、业务服务与单一 Web 入口。
+- `compose.yml`：PostgreSQL、SeaweedFS 私有对象存储、Jaeger、业务服务与单一 Web 入口。
 - `compose.demo-133.yml`：`demo-133` 的固定 Compose project 覆盖。
 - `compose.customer-test-133.yml`：`customer-test-133` 的固定 Compose project 覆盖。
 - `.env.example`：运行环境变量示例，不保存真实凭据。
-- `migrate_online.sh`：按登记目标执行受控 Atlas migration。
+- `migrate_online.sh`：按登记目标执行受控 Atlas migration，并在附件外置维护窗口完成导出与校验。
+- `attachment_raid_preflight.sh`：只读检查附件目录实际使用指定本机 RAID5 挂载。
 
 当前可执行环境只有 `demo-133` 与 `customer-test-133`。`erp` 是未来生产环境，尚未启用；根域临时跳转到 `erp.yoyoosun.net` 不会把它变成可执行 target。`admin.yoyoosun.net` 退役后仍不能进入 target、Compose、migration、清理、健康检查、发布或回滚矩阵。
 
@@ -45,7 +46,7 @@ docker compose --env-file .env -f compose.yml up -d
 首次启动前至少设置：
 
 - 固定版本的 `POSTGRES_IMAGE`、`JAEGER_IMAGE`、`APP_IMAGE`、`WEB_IMAGE`，不得使用 `latest` 或 `dev`。
-- 互不复用的 PostgreSQL 管理、迁移、备份和应用凭据。
+- 互不复用的 PostgreSQL 管理、迁移、备份和应用凭据，以及各环境独立的附件 S3 凭据。
 - `APP_JWT_SECRET` 与按目标登记的管理员初始化输入。
 - `POSTGRES_DATA_DIR`、`MIGRATION_LOCK_FILE`、宿主端口和 `PROJECT_SLUG` 必须与目标 registry 一致。
 - `POSTGRES_BIND_ADDR=127.0.0.1`、`APP_HTTP_BIND_ADDR=127.0.0.1`、`JAEGER_BIND_ADDR=127.0.0.1`。
@@ -148,3 +149,63 @@ git diff --check
 ```
 
 自动化绿色不替代目标 DNS/TLS、备份恢复、运行 SHA、数据身份和业务 smoke 的实时读回。
+
+## 附件存储与RAID5
+
+文件内容使用 SeaweedFS `4.46` 固定 digest，所有 volume、filer metadata 和 master 数据均挂载到 `ATTACHMENT_DATA_DIR`。`ATTACHMENT_RAID_MOUNT=/srv/raid5`；demo 建议目录 `/srv/raid5/plush-toy-erp/demo-133/attachments`、bucket `plush-demo-133-files`，test 使用对应 `customer-test-133` 路径和 bucket。新目标初始化按这组路径生成独立随机凭据；已存在目标在发布前准备运行 env、目录和固定镜像，不能直接套用新目标初始化。
+
+目标主机先确认 `/srv/raid5` 已挂载到预期块设备，再创建专用目录并限制权限。启动前执行：
+
+```bash
+bash server/deploy/compose/prod/attachment_raid_preflight.sh \
+  /srv/raid5 /srv/raid5/plush-toy-erp/demo-133/attachments
+```
+
+Compose 不自动创建缺失的附件目录，也不发布 S3 / filer / master / 管理界面端口；业务容器通过附件私有网络访问存储。`production-preflight --runtime` 会核对实际挂载、服务健康、S3 bucket 访问及管理界面的登录保护和凭据。目标机预装 `.env.example` 中固定的 SeaweedFS 镜像；低配目标不构建镜像。初始化或恢复失败时保留附件目录供核对，不沿用数据库清理脚本删除文件。
+
+已有库外置按正式 promotion 的停写窗口进行。发布前保留旧版本、完整 PG 备份及其恢复验证；候选镜像包含 `/app/attachment-storage`。`migrate_online.sh --reconcile-permissions` 和 `--apply` 在同一 Atlas 串行锁范围中导出、逐个读回校验并提供迁移摘要，回执保存在 migration receipt 旁。纯只读预检遇到待外置数据时会明确阻断，不会自行复制文件。迁移后继续走权限对账、health / ready 和附件上传下载 smoke。若尚未移除旧列，可回到旧版本和旧库；旧列移除后回滚旧代码必须同时恢复配套旧 PG dump，不能只切镜像。
+
+`cmd/attachment-storage` 提供以下维护入口，默认写操作均为 dry-run；实际操作要求 `-execute` 和精确 `-confirm`。连接只从 `POSTGRES_DSN` 与 `ATTACHMENT_S3_*` 环境变量读取，凭据放受控 `0600` 文件或临时进程环境，不进入命令参数、Git 或日志。
+
+| mode | 用途 | 额外参数 |
+| --- | --- | --- |
+| `inventory` | 只读盘点当前库数量、字节和存储结构 | `-database <exact-db>` |
+| `check` | 校验配置和 bucket 可访问 | `-database <exact-db>` |
+| `export` | 旧 PG 内容复制到不可覆盖的对象 key 并全量读回 | `-receipt <new-private-file> -execute -confirm ATTACHMENT_EXPORT:<db>` |
+| `verify` | 逐对象验证大小与 SHA-256 | 可加 `-receipt <file>` 约束原导出身份 |
+| `backup` | 导出可迁移的普通文件和 manifest，完成后才写 manifest | `-dir <new-directory> -execute -confirm ATTACHMENT_BACKUP:<db>` |
+| `restore` | 验证配套数据库元数据与备份，再恢复同一 key | `-dir <backup-directory> -execute -confirm ATTACHMENT_RESTORE:<db>` |
+
+本地开发也必须配置同一组 `ATTACHMENT_S3_*` 变量；使用 RAID5 上独立的开发 bucket，借助 SSH tunnel 暴露仅本机可用的 S3 接入，或在隔离本地验证中使用一次性 SeaweedFS。不要让开发和 demo/test 复用 bucket。共享开发库迁移前，停写后执行 `export`，再用 `verify -receipt <file> -pg-options` 的输出设置本次进程的 `PGOPTIONS`，然后按 `make migrate_prepare → make migrate_execute` 的同一 ready 输出执行，完成后 `unset PGOPTIONS`。运行 API 没有 PG 内容回退。
+
+备份时保持相关写入停止，在同一窗口生成 PG custom-format dump 和 `backup` 文件目录，外加当前 release 与 migration 身份；保存到独立磁盘、另一台机器或云端受控存储。已有 `scheduled-postgres-backup.sh` 只负责 PG，不能作为本次外置后的完整系统备份。不要直接打包运行中的 SeaweedFS 原始数据目录。
+
+恢复先把配套 PG dump 导入隔离目标，再使用新 S3 endpoint / bucket 执行 `restore` 和 `verify`，保留原 key、附件 ID、哈希和审计。全部核对通过后才切业务连接；源对象和旧备份保留到回滚窗口结束。文件服务不可用时上传下载明确失败，附件列表仍读 PG 元数据。
+
+隔离验证入口为 `bash scripts/qa/attachment-storage-integration.sh`：创建一次性 PostgreSQL 与 SeaweedFS 容器，验证 fresh / upgrade、未导出与过期凭证阻断、匿名访问拒绝、不可覆盖写入、撤销审计、PG dump 加文件备份恢复、现有附件并发回归及管理界面只读权限，最后清理本轮容器和临时文件。它不连接或修改共享开发、demo 或 test 库。
+
+### 只读查看存储
+
+管理界面复用同一 SeaweedFS 容器，查看存储状态、bucket 和底层文件。它供项目管理员排查存储使用，文件对应的产品、单据和撤销状态仍以 ERP 为准。界面显示的是存储服务信息，不证明 RAID 控制器或磁盘健康，也不证明备份完成。
+
+| 账号 | 配置 | 用途 |
+| --- | --- | --- |
+| `viewer` | `ATTACHMENT_VIEWER_PASSWORD` | 日常只读查看；服务端拒绝上传、删除及配置修改 |
+| `storage-admin` | `ATTACHMENT_ADMIN_PASSWORD` | SeaweedFS 原生鉴权要求的管理账号；受控保管，不作为日常查看账号 |
+
+两个密码各自随机生成至少 32 位，与 S3、数据库和 JWT 凭据独立；保存在目标权限为 `0600` 的 runtime env 和受控密码管理器中，不放入命令参数或日志。新目标初始化自动生成，已有目标须在升级前补齐。Compose 缺值会拒绝启动，生产预检同时拒绝占位、短密码和凭据复用。业务容器不接收这两个密码。
+
+目标部署完成后，在本机仓库运行：
+
+```bash
+node scripts/deploy/attachment-console.mjs --target demo-133
+# 查看 test 时使用 --target customer-test-133；同时查看可加 --port 23647。
+```
+
+命令只核对 registry 对应的 SSH 主机、唯一健康存储容器及登录保护，然后把本机 `127.0.0.1:23646` 经 SSH 转发到该容器私有地址，不启动或部署远端服务。打开 `http://127.0.0.1:23646`，使用 `viewer` 登录；密码取自对应目标的受控凭据。按 `Ctrl+C` 关闭通道。容器重建后重新运行命令，以重新取得私有地址。
+
+此通道依赖现有 SSH 密钥和已核实的主机指纹，不自动接受未知主机，也不加入公网反向代理。存储界面不继承 ERP 的业务权限；只读账号也能查看底层文件，仅分配给有整个环境文件访问权的项目管理员。附件撤销、替换等业务操作继续经过 ERP。
+
+固定版本的原生界面仍会显示部分新建、上传和删除按钮，`viewer` 的这些请求由服务端返回 `403` 拒绝；当前复用原版界面，不另行维护前端分支。
+
+单独验证界面时运行 `node scripts/qa/attachment-console-integration.mjs`。该入口从正式 Compose 创建一次性存储，测试覆盖文件临时增加浏览器访问所需的随机本机端口和测试网络，正式配置仍无端口发布；验证登录、只读浏览、服务端写入拒绝和退出登录后清理。

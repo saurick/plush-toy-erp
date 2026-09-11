@@ -48,6 +48,15 @@ function writeFixture({
       "POSTGRES_DB=plush_erp",
       "POSTGRES_USER=plush",
       "POSTGRES_DATA_DIR=/data/plush/postgres",
+      `ATTACHMENT_DATA_DIR=${root}/raid/attachments`,
+      `ATTACHMENT_RAID_MOUNT=${root}/raid`,
+      "ATTACHMENT_STORE_IMAGE=chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62",
+      "ATTACHMENT_S3_ENDPOINT=http://attachment-store:8333",
+      "ATTACHMENT_S3_BUCKET=plush-test-files",
+      "ATTACHMENT_S3_ACCESS_KEY_ID=fixture-access-key",
+      "ATTACHMENT_S3_SECRET_ACCESS_KEY=fixture-secret-key-for-local-tests-123456",
+      "ATTACHMENT_ADMIN_PASSWORD=fixture-admin-password-for-local-tests-123456",
+      "ATTACHMENT_VIEWER_PASSWORD=fixture-viewer-password-for-local-tests-123456",
       "MIGRATION_LOCK_FILE=/run/lock/plush-toy-erp/atlas-migrate.lock",
       "POSTGRES_BIND_ADDR=127.0.0.1",
       "POSTGRES_PORT=5435",
@@ -145,6 +154,8 @@ function writeFixture({
   );
   fs.chmodSync(path.join(composeDir, "database_roles.sh"), 0o755);
 
+  fs.mkdirSync(path.join(root, "raid/attachments"), { recursive: true });
+  fs.copyFileSync(path.join(repoRoot, "server/deploy/compose/prod/attachment_raid_preflight.sh"), path.join(composeDir, "attachment_raid_preflight.sh"));
   const migrateScript = path.join(composeDir, "migrate_online.sh");
   fs.writeFileSync(
     migrateScript,
@@ -407,7 +418,7 @@ if [[ "\${1:-}" == "compose" ]]; then
       index=$((index + 1))
       project="\${args[$index]:-}"
       ;;
-    config | ps)
+    config | ps | exec)
       action="\${args[$index]}"
       ;;
     esac
@@ -426,6 +437,7 @@ if [[ "\${1:-}" == "compose" ]]; then
     printf 'name: %s\nservices: {}\n' "$resolved"
     exit 0
   fi
+  if [[ "$action" == "exec" && "$*" == *"/app/attachment-storage -mode check"* ]]; then exit 0; fi
   if [[ "$action" == "ps" ]]; then
     service="\${args[\${#args[@]} - 1]}"
     printf '%s-cid\n' "$service"
@@ -442,6 +454,7 @@ if [[ "\${1:-}" == "image" && "\${2:-}" == "inspect" ]]; then
   postgres:18.1) image_id="sha256:1111111111111111111111111111111111111111111111111111111111111111" ;;
   jaegertracing/all-in-one:1.76.0) image_id="sha256:2222222222222222222222222222222222222222222222222222222222222222" ;;
   plush-toy-erp-server:20260628) image_id="sha256:3333333333333333333333333333333333333333333333333333333333333333" ;;
+  chrislusf/seaweedfs:4.46@sha256:*) image_id="sha256:5555555555555555555555555555555555555555555555555555555555555555" ;;
   plush-toy-erp-web:20260628) image_id="sha256:4444444444444444444444444444444444444444444444444444444444444444" ;;
   *) exit 1 ;;
   esac
@@ -455,6 +468,7 @@ if [[ "\${1:-}" == "port" ]]; then
   cid="\${2:-}"
   container_port="\${3:-}"
   case "$cid:$container_port" in
+  attachment-store-cid:) [[ "\${FAKE_ATTACHMENT_PUBLIC:-0}" == 0 ]] && exit 0; echo "0.0.0.0:8333"; exit 0 ;;
   postgres-cid:5432/tcp) host_port="\${FAKE_RUNTIME_POSTGRES_PORT:-5435}" ;;
   app-server-cid:8300/tcp) host_port="\${FAKE_RUNTIME_APP_HTTP_PORT:-8300}" ;;
   web-desktop-cid:5175/tcp) host_port="\${FAKE_RUNTIME_WEB_DESKTOP_PORT:-5175}" ;;
@@ -483,6 +497,10 @@ fi
 if [[ "\${1:-}" == "inspect" ]]; then
   cid="\${@: -1}"
   case "$cid" in
+  attachment-store-cid)
+    runtime_image_ref=chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62
+    runtime_image_id="sha256:5555555555555555555555555555555555555555555555555555555555555555"
+    ;;
   postgres-cid)
     runtime_image_ref=postgres:18.1
     runtime_image_id="sha256:1111111111111111111111111111111111111111111111111111111111111111"
@@ -525,7 +543,10 @@ if [[ "\${1:-}" == "inspect" ]]; then
     printf '/%s\n' "$container_name"
   elif [[ "$*" == *'com.docker.compose.project'* ]]; then
     printf '%s\n' "\${FAKE_RUNTIME_COMPOSE_PROJECT:-plush-toy-erp-prod}"
+  elif [[ "$*" == *'.State.Health.Status'* ]]; then
+    printf '%s\n' "\${FAKE_ATTACHMENT_HEALTH:-healthy}"
   elif [[ "$*" == *'.Mounts'* ]]; then
+    if [[ "$cid" == attachment-store-cid ]]; then printf '%s\n' "${root}/raid/attachments"; exit 0; fi
     printf '%s\n' "\${FAKE_RUNTIME_POSTGRES_MOUNT:-/data/plush/postgres}"
   elif [[ "$*" == *'.Config.User'* ]]; then
     printf '%s\n' "\${FAKE_RUNTIME_APP_USER:-app}"
@@ -533,6 +554,10 @@ if [[ "\${1:-}" == "inspect" ]]; then
     printf '%s\n' "\${FAKE_RUNTIME_SECURITY_OPT:-[\"seccomp=/fixture/chromium-seccomp.json\"]}"
   else
     runtime_release="\${FAKE_RUNTIME_EXPECTED_RELEASE:-0123456789abcdef0123456789abcdef01234567}"
+    if [[ "$cid" == "attachment-store-cid" ]]; then
+      printf 'WEED_ADMIN_USER=storage-admin\nWEED_ADMIN_PASSWORD=fixture-admin-password-for-local-tests-123456\n'
+      printf 'WEED_ADMIN_READONLY_USER=viewer\nWEED_ADMIN_READONLY_PASSWORD=%s\n' "\${FAKE_ATTACHMENT_VIEWER_PASSWORD:-fixture-viewer-password-for-local-tests-123456}"
+    fi
     if [[ "\${FAKE_RUNTIME_RELEASE_DRIFT_SERVICE:-}" == "$cid" ]]; then
       runtime_release="\${FAKE_RUNTIME_RELEASE_DRIFT_VALUE:-ffffffffffffffffffffffffffffffffffffffff}"
     fi
@@ -556,6 +581,10 @@ if [[ "\${1:-}" == "inspect" ]]; then
   exit 0
 fi
 if [[ "\${1:-}" == "exec" ]]; then
+  if [[ "$*" == *'http://127.0.0.1:23646/'* ]]; then
+    printf '%s' "\${FAKE_ATTACHMENT_CONSOLE_STATUS:-307}"
+    exit 0
+  fi
   if [[ "$*" == *' id -u' ]]; then
     printf '%s\n' "\${FAKE_RUNTIME_APP_UID:-10001}"
     exit 0
@@ -584,6 +613,14 @@ exit 0
 `,
     "utf8",
   );
+  fs.writeFileSync(path.join(binDir, "findmnt"), `#!/usr/bin/env bash
+case "\${@: -1}" in
+TARGET) echo "\${FAKE_ATTACHMENT_MOUNT:-${root}/raid}" ;;
+SOURCE) echo /dev/test-raid ;;
+FSTYPE) echo "\${FAKE_ATTACHMENT_FILESYSTEM:-ext4}" ;;
+OPTIONS) echo rw,relatime ;;
+esac
+`, { mode: 0o755 });
   fs.chmodSync(path.join(binDir, "docker"), 0o755);
   fs.chmodSync(path.join(binDir, "curl"), 0o755);
   return binDir;
@@ -1043,7 +1080,7 @@ test("production preflight verifies the runtime Chromium package exact pin", () 
   assert.match(
     result.stdout,
     new RegExp(
-      `Compose 四服务容器唯一，镜像引用 / content id 与 release=${fixture.expectedRelease} 一致`,
+      `Compose 服务容器唯一，镜像引用 / content id 与 release=${fixture.expectedRelease} 一致`,
       "u",
     ),
   );
@@ -1897,4 +1934,37 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
     customerCompose,
     /ERP_PDF_WARMUP: "\$\{ERP_PDF_WARMUP:-async\}"/,
   );
+});
+
+test("production preflight rejects a missing RAID mount, network storage and public S3", async (t) => {
+  for (const [name, env, expected] of [
+    ["missing mount", { FAKE_ATTACHMENT_MOUNT: "/" }, /RAID5 未挂载/u],
+    ["network storage", { FAKE_ATTACHMENT_FILESYSTEM: "nfs" }, /本地持久文件系统/u],
+    ["public S3", { FAKE_ATTACHMENT_PUBLIC: "1" }, /不允许发布宿主机端口/u],
+    ["unhealthy S3", { FAKE_ATTACHMENT_HEALTH: "unhealthy" }, /附件存储未就绪/u],
+    ["public console", { FAKE_ATTACHMENT_CONSOLE_STATUS: "200" }, /登录保护不符/u],
+    ["viewer credential drift", { FAKE_ATTACHMENT_VIEWER_PASSWORD: "wrong-runtime-secret" }, /运行凭据与受控配置不符/u],
+  ]) await t.test(name, () => {
+    const fixture = writeFixture();
+    const bin = createFakeRuntimeBin(fixture.root);
+    const result = runPreflight(fixture, ["--runtime"], { env: { ...env, PATH: `${bin}:${process.env.PATH}` } });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, expected);
+  });
+});
+
+test("production preflight rejects weak, placeholder or reused console passwords without exposing them", async (t) => {
+  for (const [name, value, expected] of [
+    ["short", "short-viewer-secret", /至少 32 位/u],
+    ["placeholder", "replace-with-random-viewer-password", /placeholder/u],
+    ["admin reuse", "fixture-admin-password-for-local-tests-123456", /密码必须独立/u],
+    ["S3 reuse", "fixture-secret-key-for-local-tests-123456", /不得复用/u],
+  ]) await t.test(name, () => {
+    const fixture = writeFixture();
+    fs.writeFileSync(fixture.envFile, fs.readFileSync(fixture.envFile, "utf8").replace(/^ATTACHMENT_VIEWER_PASSWORD=.*$/mu, `ATTACHMENT_VIEWER_PASSWORD=${value}`));
+    const result = runPreflight(fixture);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, expected);
+    assert.ok(!`${result.stdout}${result.stderr}`.includes(value));
+  });
 });

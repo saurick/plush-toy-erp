@@ -37,6 +37,35 @@ x-web-app-common: &web-app-common
   networks: {}
 
 services:
+  attachment-store:
+    image: "${ATTACHMENT_STORE_IMAGE:-chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62}"
+    restart: always
+    stop_grace_period: 60s
+    logging: *default-logging
+    command: ["mini", "-dir=/data", "-admin.ui=true", "-webdav=false", "-s3.iam=false", "-s3.port.iceberg=0", "-s3.port.lance=0"]
+    environment:
+      AWS_ACCESS_KEY_ID: "${ATTACHMENT_S3_ACCESS_KEY_ID:?ATTACHMENT_S3_ACCESS_KEY_ID is required}"
+      AWS_SECRET_ACCESS_KEY: "${ATTACHMENT_S3_SECRET_ACCESS_KEY:?ATTACHMENT_S3_SECRET_ACCESS_KEY is required}"
+      S3_BUCKET: "${ATTACHMENT_S3_BUCKET:?ATTACHMENT_S3_BUCKET is required}"
+      WEED_ADMIN_USER: storage-admin
+      WEED_ADMIN_PASSWORD: "${ATTACHMENT_ADMIN_PASSWORD:?ATTACHMENT_ADMIN_PASSWORD is required}"
+      WEED_ADMIN_READONLY_USER: viewer
+      WEED_ADMIN_READONLY_PASSWORD: "${ATTACHMENT_VIEWER_PASSWORD:?ATTACHMENT_VIEWER_PASSWORD is required}"
+    volumes:
+      - type: bind
+        source: "${ATTACHMENT_DATA_DIR:?ATTACHMENT_DATA_DIR on RAID5 is required}"
+        target: /data
+        bind:
+          create_host_path: false
+    mem_limit: "${ATTACHMENT_STORE_MEM_LIMIT:-768m}"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:9333/cluster/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    networks: [attachment-private]
+
   postgres:
     image: "${POSTGRES_IMAGE:-postgres:18.1}"
     container_name: "${PROJECT_SLUG:-plush-toy-erp}-postgres"
@@ -105,6 +134,8 @@ services:
     security_opt:
       - "seccomp=./chromium-seccomp.json"
     depends_on:
+      attachment-store:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       jaeger:
@@ -120,6 +151,11 @@ services:
       ERP_PDF_WARMUP: "${ERP_PDF_WARMUP:-}"
       # 应用只能使用 erp_app；容器初始化管理员和 erp_migrator/erp_backup 不进入应用容器。
       POSTGRES_DSN: "postgres://erp_app:${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-plush_erp}?sslmode=disable"
+      ATTACHMENT_S3_ENDPOINT: "${ATTACHMENT_S3_ENDPOINT:-http://attachment-store:8333}"
+      ATTACHMENT_S3_BUCKET: "${ATTACHMENT_S3_BUCKET:?ATTACHMENT_S3_BUCKET is required}"
+      ATTACHMENT_S3_REGION: "${ATTACHMENT_S3_REGION:-us-east-1}"
+      ATTACHMENT_S3_ACCESS_KEY_ID: "${ATTACHMENT_S3_ACCESS_KEY_ID:?ATTACHMENT_S3_ACCESS_KEY_ID is required}"
+      ATTACHMENT_S3_SECRET_ACCESS_KEY: "${ATTACHMENT_S3_SECRET_ACCESS_KEY:?ATTACHMENT_S3_SECRET_ACCESS_KEY is required}"
       POSTGRES_MAX_OPEN_CONNS: "${POSTGRES_MAX_OPEN_CONNS:-20}"
       POSTGRES_MAX_IDLE_CONNS: "${POSTGRES_MAX_IDLE_CONNS:-5}"
       POSTGRES_CONN_MAX_LIFETIME: "${POSTGRES_CONN_MAX_LIFETIME:-30m}"
@@ -163,7 +199,7 @@ services:
       timeout: 3s
       retries: 20
       start_period: 45s
-    networks: {}
+    networks: [default, attachment-private]
 
   web-desktop:
     <<: *web-app-common
@@ -174,3 +210,8 @@ services:
       <<: *web-app-environment
       APP_ID: desktop
       PORT: "5175"
+
+networks:
+  default: {}
+  attachment-private:
+    internal: true

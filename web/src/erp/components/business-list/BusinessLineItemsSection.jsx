@@ -2,6 +2,7 @@ import React from 'react'
 import { Empty, Form } from 'antd'
 
 import BusinessLineItemsFooter from './BusinessLineItemsFooter.jsx'
+import BusinessLineItemsTable from './BusinessLineItemsTable.jsx'
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ')
@@ -10,13 +11,13 @@ function classNames(...values) {
 export default function BusinessLineItemsSection({
   addLineAriaLabel,
   className,
+  columns,
   description,
   emptyDescription = '暂无明细',
   footerProps,
   name = 'items',
   renderBeforeHeader,
   renderRow,
-  scrollWithinSection = true,
   title,
 }) {
   return (
@@ -44,18 +45,14 @@ export default function BusinessLineItemsSection({
                   description={emptyDescription}
                 />
               ) : (
-                <div
-                  aria-label={addLineAriaLabel}
-                  className={
-                    scrollWithinSection
-                      ? 'erp-sales-order-lines-form__list'
-                      : 'erp-business-line-items-flow'
-                  }
+                <BusinessLineItemsTable
+                  columns={columns}
+                  label={addLineAriaLabel || title}
                 >
                   {fields.map((field, index) =>
                     renderRow({ ...context, field, index })
                   )}
-                </div>
+                </BusinessLineItemsTable>
               )}
               {normalizedFooterProps ? (
                 <BusinessLineItemsFooter {...normalizedFooterProps} />

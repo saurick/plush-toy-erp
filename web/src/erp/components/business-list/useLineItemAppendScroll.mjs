@@ -37,7 +37,7 @@ export function useLineItemAppendScroll(itemCount) {
     const fallbackTarget = target || rowRefs.current[rowRefs.current.length - 1]
     pendingScrollIndexRef.current = null
     scrollFrameRef.current = null
-    // Finish positioning before another Add click can interrupt nested scrolling.
+    // 在下一次加行前定位新明细；纵向滚动由编辑页承接。
     fallbackTarget?.scrollIntoView?.({
       behavior: 'auto',
       block: 'nearest',

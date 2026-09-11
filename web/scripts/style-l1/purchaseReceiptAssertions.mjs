@@ -521,9 +521,9 @@ export function createPurchaseReceiptAssertions(deps) {
           overflowX: style.overflowX,
         }
       })
-      const grids = Array.from(
+      const mainRows = Array.from(
         scrollContainer?.querySelectorAll(
-          '.erp-sales-order-lines-form__grid'
+          '.erp-line-item-table__main-row'
         ) || []
       ).map((grid) => {
         const rect = grid.getBoundingClientRect()
@@ -534,7 +534,8 @@ export function createPurchaseReceiptAssertions(deps) {
           scrollWidth: grid.scrollWidth,
           overflowX: style.overflowX,
           overflowY: style.overflowY,
-          gridAutoFlow: style.gridAutoFlow,
+          display: style.display,
+          cellCount: grid.children.length,
         }
       })
       return {
@@ -551,10 +552,13 @@ export function createPurchaseReceiptAssertions(deps) {
               scrollLeft: scrollContainer.scrollLeft,
               overflowX: scrollStyle?.overflowX || '',
               overflowY: scrollStyle?.overflowY || '',
+              clientHeight: scrollContainer.clientHeight,
+              scrollHeight: scrollContainer.scrollHeight,
             }
           : null,
         rows,
-        grids,
+        mainRows,
+        headerCellCount: scrollContainer?.querySelectorAll('thead th').length || 0,
       }
     })
 
@@ -581,13 +585,19 @@ export function createPurchaseReceiptAssertions(deps) {
       `${scenarioName} 多行明细应共享同一列宽和滚动面: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.grids.length >= minRows &&
-        metrics.grids.every(
-          (grid) =>
-            grid.gridAutoFlow === 'column' &&
-            !['auto', 'scroll'].includes(grid.overflowX)
+      metrics.mainRows.length >= minRows &&
+        metrics.headerCellCount > 0 &&
+        metrics.mainRows.every(
+          (row) =>
+            row.display === 'table-row' &&
+            row.cellCount === metrics.headerCellCount &&
+            !['auto', 'scroll'].includes(row.overflowX)
         ),
-      `${scenarioName} 每行明细 grid 不应再各自横向滚动: ${JSON.stringify(metrics)}`
+      `${scenarioName} 明细应共用表头和列宽，不应各自横向滚动: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.scrollContainer.scrollHeight <= metrics.scrollContainer.clientHeight + 2,
+      `${scenarioName} 明细区不应产生内部纵向滚动: ${JSON.stringify(metrics)}`
     )
   }
 

@@ -1,6 +1,7 @@
 package data
 
 import (
+	"server/internal/attachmentstore"
 	"context"
 	"errors"
 	"strings"
@@ -77,7 +78,7 @@ func TestSalesOrderDemandBeforeEngineeringAndSampling(t *testing.T) {
 	client.BOMItem.Create().SetBomHeaderID(bom.ID).SetMaterialID(material.ID).SetUnitID(unit.ID).SetQuantity(decimal.NewFromInt(1)).SetLossRate(decimal.Zero).SaveX(ctx)
 	apply(biz.ErrSalesOrderEngineeringNotReady)
 	client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerProduct).SetOwnerID(product.ID).SetAttachmentType(biz.BusinessAttachmentTypeProductImage).
-		SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("fixture.png").SetMimeType("image/png").SetFileSize(1).SetContent([]byte{1}).SetSha256(strings.Repeat("a", 64)).SaveX(ctx)
+		SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("fixture.png").SetMimeType("image/png").SetFileSize(1).SetObjectKey(attachmentstore.NewKey()).SetSha256(strings.Repeat("a", 64)).SaveX(ctx)
 	apply(nil)
 	mutation.EngineeringStatus = biz.SalesOrderEngineeringConfirmed
 	apply(biz.ErrSalesOrderEngineeringTransition)

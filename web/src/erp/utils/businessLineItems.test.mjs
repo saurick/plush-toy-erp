@@ -79,22 +79,22 @@ const horizontalLayoutContracts = [
       'max-width': '100%',
       overflow: 'auto',
     },
-    forbiddenInBase: ['overflow-x'],
+    forbiddenInBase: ['height', 'max-height', 'overflow-x', 'overscroll-behavior'],
     protectedProperties: [
       'width',
       'min-width',
       'max-width',
       'overflow',
       'overflow-x',
+      'height',
+      'max-height',
+      'overflow-y',
     ],
   },
   {
     className: '.erp-sales-order-lines-form__row',
-    expected: {
-      width: 'max-content',
-      'min-width': '100%',
-    },
-    forbiddenInBase: ['max-width', 'overflow', 'overflow-x'],
+    expected: {},
+    forbiddenInBase: ['width', 'min-width', 'max-width', 'height', 'max-height', 'overflow', 'overflow-x', 'overflow-y'],
     protectedProperties: [
       'width',
       'min-width',
@@ -104,12 +104,12 @@ const horizontalLayoutContracts = [
     ],
   },
   {
-    className: '.erp-sales-order-lines-form__grid',
+    className: '.erp-line-item-table',
     expected: {
-      'min-width': '0',
-      overflow: 'visible',
+      width: '100%',
+      'table-layout': 'fixed',
     },
-    forbiddenInBase: ['width', 'max-width', 'overflow-x'],
+    forbiddenInBase: ['max-height', 'height', 'overflow', 'overflow-x', 'overflow-y'],
     protectedProperties: [
       'width',
       'min-width',
@@ -176,7 +176,7 @@ test('businessLineItems: CSS guard detects page-level row geometry overrides', (
   ])
 })
 
-test('businessLineItems: shared CSS exclusively owns horizontal scroll geometry', () => {
+test('businessLineItems: shared table owns horizontal geometry without a second vertical scroller', () => {
   const cssFiles = listCSSFiles(stylesRoot)
 
   for (const contract of horizontalLayoutContracts) {

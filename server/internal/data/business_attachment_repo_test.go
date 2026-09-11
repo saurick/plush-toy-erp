@@ -30,7 +30,7 @@ func newBusinessAttachmentRepoTest(t *testing.T, name string) (*businessAttachme
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	repo := NewBusinessAttachmentRepo(&Data{postgres: client, sqldb: sqldb, sqlDialect: "sqlite3"}, log.NewStdLogger(io.Discard))
+	repo := NewBusinessAttachmentRepo(&Data{postgres: client, sqldb: sqldb, sqlDialect: "sqlite3"}, newAttachmentMemoryStore(), log.NewStdLogger(io.Discard))
 	return repo, func() {
 		_ = sqldb.Close()
 		mustCloseEntClient(t, client)
@@ -64,7 +64,7 @@ func workflowAttachmentCreate(taskID int, version int, actorID int, roles ...str
 		FileName:       "proof.pdf",
 		MimeType:       "application/pdf",
 		FileSize:       5,
-		SHA256:         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		SHA256:         attachmentSHA256([]byte("proof")),
 		Content:        []byte("proof"),
 		WorkflowGuard: &biz.WorkflowAttachmentWriteGuard{
 			ExpectedVersion:      version,
@@ -99,7 +99,7 @@ func productImageAttachmentCreate(productID int, slotKey string) *biz.BusinessAt
 		FileName:       "product.png",
 		MimeType:       "image/png",
 		FileSize:       5,
-		SHA256:         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		SHA256:         attachmentSHA256([]byte("image")),
 		Content:        []byte("image"),
 	}
 }
@@ -118,7 +118,7 @@ func TestBusinessAttachmentRepoListSelectsMetadataWithoutContent(t *testing.T) {
 		SetMimeType("application/pdf").
 		SetFileSize(len(large)).
 		SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
-		SetContent(large).
+		SetObjectKey(seedAttachmentObject(t, repo.objects, large)).
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create large attachment: %v", err)
@@ -154,7 +154,7 @@ func TestBusinessAttachmentRepoResolvesUploaderUsernameAndKeepsLegacyMissing(t *
 		SetMimeType("application/pdf").
 		SetFileSize(5).
 		SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
-		SetContent([]byte("proof")).
+		SetObjectKey(seedAttachmentObject(t, repo.objects, []byte("proof"))).
 		SetUploadedBy(uploader.ID).
 		Save(ctx)
 	if err != nil {
@@ -168,7 +168,7 @@ func TestBusinessAttachmentRepoResolvesUploaderUsernameAndKeepsLegacyMissing(t *
 		SetMimeType("application/pdf").
 		SetFileSize(5).
 		SetSha256("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789").
-		SetContent([]byte("proof")).
+		SetObjectKey(seedAttachmentObject(t, repo.objects, []byte("proof"))).
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create legacy attachment: %v", err)
@@ -221,7 +221,7 @@ func TestBusinessAttachmentRepoWithdrawsOnceAndKeepsReadableAuditMetadata(t *tes
 		SetMimeType("application/pdf").
 		SetFileSize(5).
 		SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
-		SetContent([]byte("proof")).
+		SetObjectKey(seedAttachmentObject(t, repo.objects, []byte("proof"))).
 		SetUploadedBy(actor.ID).
 		Save(ctx)
 	if err != nil {
@@ -297,7 +297,7 @@ func TestBusinessAttachmentRepoWithdrawalRechecksLockedWorkflowTask(t *testing.T
 				SetMimeType("application/pdf").
 				SetFileSize(5).
 				SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
-				SetContent([]byte("proof")).
+				SetObjectKey(seedAttachmentObject(t, repo.objects, []byte("proof"))).
 				Save(ctx)
 			if err != nil {
 				t.Fatalf("create attachment: %v", err)
@@ -403,7 +403,7 @@ func TestBusinessAttachmentRepoProductImageWriteSerializesAndReplacesSlot(t *tes
 				t.Fatalf("sqlmock.New: %v", err)
 			}
 			defer func() { _ = db.Close() }()
-			repo := NewBusinessAttachmentRepo(&Data{sqldb: db, sqlDialect: tc.dialect}, log.NewStdLogger(io.Discard))
+			repo := NewBusinessAttachmentRepo(&Data{sqldb: db, sqlDialect: tc.dialect}, newAttachmentMemoryStore(), log.NewStdLogger(io.Discard))
 			createdAt := time.Date(2026, 7, 16, 10, 0, 0, 0, time.UTC)
 			in := productImageAttachmentCreate(7, biz.BusinessAttachmentProductImageSlotPrimary)
 
@@ -424,7 +424,7 @@ func TestBusinessAttachmentRepoProductImageWriteSerializesAndReplacesSlot(t *tes
 					"image/png",
 					5,
 					in.SHA256,
-					[]byte("image"),
+					sqlmock.AnyArg(),
 					nil,
 					nil,
 				).
@@ -451,7 +451,7 @@ func TestBusinessAttachmentRepoClearProductImageLocksOwnerAndDeletesExactSlot(t 
 		t.Fatalf("sqlmock.New: %v", err)
 	}
 	defer func() { _ = db.Close() }()
-	repo := NewBusinessAttachmentRepo(&Data{sqldb: db, sqlDialect: "postgres"}, log.NewStdLogger(io.Discard))
+	repo := NewBusinessAttachmentRepo(&Data{sqldb: db, sqlDialect: "postgres"}, newAttachmentMemoryStore(), log.NewStdLogger(io.Discard))
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM products WHERE id = $1 FOR UPDATE")).
@@ -487,8 +487,8 @@ func TestBusinessAttachmentSchemaDefinesProductImageContract(t *testing.T) {
 	if got := checks["business_attachments_file_size_max"]; got != "file_size <= 5242880" {
 		t.Fatalf("file size check changed unexpectedly: %q", got)
 	}
-	if got := checks["business_attachments_content_size_matches"]; got != "length(content) = file_size" {
-		t.Fatalf("content size check changed unexpectedly: %q", got)
+	if got := checks["business_attachments_object_key_shape"]; !strings.Contains(got, "attachments/") {
+		t.Fatalf("object key check missing: %q", got)
 	}
 	sha256Check := checks["business_attachments_sha256_lower_hex"]
 	for _, fragment := range []string{"length(sha256) = 64", "sha256 = lower(sha256)"} {
@@ -547,7 +547,7 @@ func TestBusinessAttachmentSchemaRejectsNonCanonicalSHA256InSQLite(t *testing.T)
 		SetMimeType("application/pdf").
 		SetFileSize(5).
 		SetSha256(strings.Repeat("a", 64)).
-		SetContent([]byte("proof")).
+		SetObjectKey(seedAttachmentObject(t, repo.objects, []byte("proof"))).
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("valid lowercase sha256 must be accepted: %v", err)
@@ -556,14 +556,14 @@ func TestBusinessAttachmentSchemaRejectsNonCanonicalSHA256InSQLite(t *testing.T)
 		SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
 		SetOwnerID(taskID).
 		SetAttachmentType("evidence").
-		SetFileName("wrong-size.pdf").
+		SetFileName("invalid-key.pdf").
 		SetMimeType("application/pdf").
 		SetFileSize(4).
 		SetSha256(strings.Repeat("a", 64)).
-		SetContent([]byte("proof")).
+		SetObjectKey("attachments/invalid").
 		Save(ctx)
-	if err == nil || !strings.Contains(err.Error(), "business_attachments_content_size_matches") {
-		t.Fatalf("content size mismatch must be rejected by the database constraint: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "business_attachments_object_key_shape") {
+		t.Fatalf("invalid object key must be rejected by the database constraint: %v", err)
 	}
 
 	for _, tc := range []struct {
@@ -582,7 +582,7 @@ func TestBusinessAttachmentSchemaRejectsNonCanonicalSHA256InSQLite(t *testing.T)
 				SetMimeType("application/pdf").
 				SetFileSize(5).
 				SetSha256(tc.sha256).
-				SetContent([]byte("proof")).
+				SetObjectKey(seedAttachmentObject(t, repo.objects, []byte("proof"))).
 				Save(ctx)
 			if err == nil {
 				t.Fatal("non-canonical sha256 must be rejected")
@@ -591,5 +591,50 @@ func TestBusinessAttachmentSchemaRejectsNonCanonicalSHA256InSQLite(t *testing.T)
 				t.Fatalf("unexpected sha256 constraint error: %v", err)
 			}
 		})
+	}
+}
+
+func TestBusinessAttachmentStorageFailureKeepsOldProductImage(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	store := newAttachmentMemoryStore()
+	store.putErr = errors.New("offline")
+	repo := NewBusinessAttachmentRepo(&Data{sqldb: db, sqlDialect: "postgres"}, store, log.NewStdLogger(io.Discard))
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM products WHERE id = $1 FOR UPDATE")).WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
+	mock.ExpectRollback()
+	_, err = repo.CreateBusinessAttachment(context.Background(), productImageAttachmentCreate(7, "primary"))
+	if !errors.Is(err, biz.ErrBusinessAttachmentStorageUnavailable) {
+		t.Fatalf("got %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal("storage failure changed the old reference:", err)
+	}
+}
+
+func TestBusinessAttachmentCommitUncertaintyRetainsObject(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	store := newAttachmentMemoryStore()
+	repo := NewBusinessAttachmentRepo(&Data{sqldb: db, sqlDialect: "postgres"}, store, log.NewStdLogger(io.Discard))
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM products WHERE id = $1 FOR UPDATE")).WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
+	mock.ExpectExec("DELETE FROM business_attachments").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("INSERT INTO business_attachments").WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(101, time.Now()))
+	mock.ExpectCommit().WillReturnError(errors.New("connection lost after commit"))
+	if _, err := repo.CreateBusinessAttachment(context.Background(), productImageAttachmentCreate(7, "primary")); err == nil {
+		t.Fatal("commit uncertainty was hidden")
+	}
+	if len(store.files) != 1 {
+		t.Fatal("object was deleted despite unknown commit outcome")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
 	}
 }

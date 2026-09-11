@@ -29,8 +29,8 @@ const (
 	FieldFileSize = "file_size"
 	// FieldSha256 holds the string denoting the sha256 field in the database.
 	FieldSha256 = "sha256"
-	// FieldContent holds the string denoting the content field in the database.
-	FieldContent = "content"
+	// FieldObjectKey holds the string denoting the object_key field in the database.
+	FieldObjectKey = "object_key"
 	// FieldUploadedBy holds the string denoting the uploaded_by field in the database.
 	FieldUploadedBy = "uploaded_by"
 	// FieldNote holds the string denoting the note field in the database.
@@ -58,7 +58,7 @@ var Columns = []string{
 	FieldMimeType,
 	FieldFileSize,
 	FieldSha256,
-	FieldContent,
+	FieldObjectKey,
 	FieldUploadedBy,
 	FieldNote,
 	FieldWithdrawnAt,
@@ -96,6 +96,8 @@ var (
 	FileSizeValidator func(int) error
 	// Sha256Validator is a validator for the "sha256" field. It is called by the builders before save.
 	Sha256Validator func(string) error
+	// ObjectKeyValidator is a validator for the "object_key" field. It is called by the builders before save.
+	ObjectKeyValidator func(string) error
 	// UploadedByValidator is a validator for the "uploaded_by" field. It is called by the builders before save.
 	UploadedByValidator func(int) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
@@ -154,6 +156,11 @@ func ByFileSize(opts ...sql.OrderTermOption) OrderOption {
 // BySha256 orders the results by the sha256 field.
 func BySha256(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSha256, opts...).ToFunc()
+}
+
+// ByObjectKey orders the results by the object_key field.
+func ByObjectKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldObjectKey, opts...).ToFunc()
 }
 
 // ByUploadedBy orders the results by the uploaded_by field.

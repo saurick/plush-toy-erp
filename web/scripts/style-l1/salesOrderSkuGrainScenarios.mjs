@@ -158,6 +158,7 @@ export function createSalesOrderSkuGrainScenarios(deps) {
         const secondLineSKUSelect = lineRows
           .nth(1)
           .locator('.erp-line-item-field--source .ant-select-selector')
+        await lineRows.nth(1).locator('.erp-line-item-details > summary').click()
         await secondLineSKUSelect.click()
         const explicitOption = page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
@@ -195,7 +196,7 @@ export function createSalesOrderSkuGrainScenarios(deps) {
           [],
           `历史 NULL SKU 订单行保存不应触发表单错误: ${JSON.stringify(validationErrors)}`
         )
-        await expectText(page, '销售订单与订单行已更新')
+        await expectText(page, '销售订单已更新')
         await modal.waitFor({ state: 'hidden', timeout: 10_000 })
 
         for (let pollAttempt = 0; pollAttempt < 30; pollAttempt += 1) {

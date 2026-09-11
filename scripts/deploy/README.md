@@ -2,6 +2,8 @@
 
 本文是 `scripts/deploy/` 的入口。Compose、环境与运行边界以 [server/deploy/README.md](../../server/deploy/README.md)、[Compose 部署说明](../../server/deploy/compose/prod/README.md) 和 [部署约定](../../docs/部署约定.md) 为准。
 
+存储查看入口为 `node scripts/deploy/attachment-console.mjs --target demo-133|customer-test-133`：只核对登记目标并建立本机 SSH 通道，使用 SeaweedFS 原生只读账号，不启动或部署远端服务。凭据与访问边界见 [只读查看存储](../../server/deploy/compose/prod/README.md#只读查看存储)。
+
 ## 当前环境合同
 
 部署 target 的唯一真源是 `deployment-targets.json`：

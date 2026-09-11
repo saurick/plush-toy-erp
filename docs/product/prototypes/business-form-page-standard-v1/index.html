@@ -567,43 +567,60 @@
         min-width: 0;
       }
 
-      .item-list {
-        display: grid;
-        gap: 12px;
-        min-width: 0;
-      }
-
-      .item-card {
-        display: grid;
-        gap: 12px;
-        min-width: 0;
+      .items-scroll {
+        max-width: 100%;
+        container-type: inline-size;
+        overflow: auto;
         border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
-        padding: 14px;
+        border-radius: 6px;
       }
 
+      .item-list {
+        width: 100%;
+        min-width: 1100px;
+        table-layout: fixed;
+        border-collapse: separate;
+        border-spacing: 0;
+      }
+
+      .item-list th, .item-list td {
+        padding: 8px 6px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .item-list th, .item-card + .item-card td {
+        border-top: 1px solid var(--line);
+      }
+
+      .item-list th { background: var(--panel-soft); }
+      .item-card { background: var(--panel); }
+      .item-list .field { position: relative; min-width: 0; }
+      .item-main .field label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+      }
       .item-grid {
         display: grid;
-        grid-auto-columns: minmax(220px, 1fr);
-        grid-auto-flow: column;
-        gap: 14px 16px;
-        min-width: 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 4px;
-        scrollbar-gutter: stable;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+        gap: 12px;
+        padding: 12px 0;
       }
-
-      .item-grid .field {
-        min-width: 220px;
+      .item-details {
+        position: sticky;
+        left: 6px;
+        width: calc(100cqi - 12px);
+        max-width: 100%;
       }
-
-      .item-grid textarea {
-        height: 36px;
-        min-height: 36px;
-        resize: none;
+      .item-details > summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 12px;
       }
+      .item-grid textarea { min-height: 64px; }
 
       .items-footer {
         flex-wrap: wrap;
@@ -814,7 +831,7 @@
                   <h2>销售订单业务编辑样板</h2>
                   <p class="summary">
                     新建和编辑复用同一个编辑页：上方维护订单信息，下方维护订单明细；客户与
-                    SKU 从主数据中选择，数量、价格和交期在当前订单中维护。
+                    已有规格可按需选用，数量、价格和交期在当前订单中维护。
                   </p>
                 </div>
                 <div class="tags">
@@ -834,7 +851,7 @@
                 </div>
                 <div class="review-card">
                   <strong>字段依据</strong>
-                  <span>客户与 SKU 从主数据选择，订单数量、价格和交期单独维护。</span>
+                  <span>客户从档案选择，订货需求直接填写，已有产品规格按需选用。</span>
                 </div>
                 <div class="review-card">
                   <strong>状态覆盖</strong>
@@ -884,7 +901,7 @@
             >
           </div>
           <div class="source-note">
-            客户从客户档案选择，订单行从 SKU 主数据添加；两者都不会自动覆盖当前订单的数量、价格和交期。
+            本样板展示已有规格的填写示例；实际新建订单可先保存空明细草稿，再录入订货需求或选用已有规格。
           </div>
         </div>
 
@@ -973,73 +990,65 @@
           <section class="items-section" aria-label="订单行 items">
             <div class="import-row">
               <div class="import-copy">
-                <strong>从 SKU 库添加</strong>
+                <strong>订货明细</strong>
                 <span
-                  >选择产品 / SKU 后带入主数据，数量、价格和交期仍在当前单据中维护。</span
+                  >先录入客户订货需求；已有产品规格可直接选用。</span
                 >
               </div>
               <div class="import-action">
+                <button class="btn primary" id="addItem" type="button">+ 添加订货明细</button>
                 <button class="btn" id="itemImportApply" type="button">
-                  从 SKU 库添加
+                  从已有规格添加
                 </button>
-                <button class="btn" id="productOrder" type="button" disabled>产品顺序</button>
+                <button class="btn text" id="productOrder" type="button" hidden>调整明细顺序</button>
                 <span class="picker-rule"
-                  >按钮打开第二层来源选择器；SKU 只带入产品主数据，不覆盖当前订单的数量、价格、金额和交期。</span
+                  >按钮打开第二层来源选择器；已有规格只带入产品主数据，不覆盖当前订单的数量、价格、金额和交期。</span
                 >
               </div>
             </div>
 
             <div class="items-head">
               <div>
-                <strong>订单行</strong>
+                <strong>订货明细示例</strong>
                 <span>明细作为当前业务对象的一部分维护，整体随表单保存。</span>
               </div>
             </div>
 
-            <div class="item-list" id="itemList">
-              <article class="item-card">
-                <div class="item-head">
-                  <strong>第 1 行</strong>
-                  <div class="actions"><button class="btn text copy-item" type="button">复制行</button><button class="btn text remove-item" type="button" disabled>移除行</button></div>
-                </div>
-                <div class="item-grid">
-                  <div class="field" data-field="productSku">
-                    <label class="required" for="productSku">SKU / 产品来源</label>
-                    <select id="productSku" data-line-field="sku"><option value="sku-hanger-a">SKU-A001 - 毛绒挂件 A / 白色</option><option value="sku-keychain-b">SKU-B002 - 毛绒钥匙扣 B / 蓝色</option></select>
-                    <span class="error">请选择 SKU / 产品来源。</span>
-                  </div>
-                  <div class="field"><label for="sourceSummary">带出产品 / 单位</label><input id="sourceSummary" data-line-field="sourceSummary" value="P-A001 / 毛绒挂件 A / 白色 / 个" disabled /></div>
-                  <div class="field"><label for="unit">单位</label><select id="unit" data-line-field="unit"><option>个</option><option>箱</option></select></div>
-                  <div class="field" data-field="quantity">
+            <div class="items-scroll">
+              <table class="item-list" id="itemList">
+                <colgroup><col style="width: 76px"/><col style="width: 260px"/><col style="width: 150px"/><col style="width: 100px"/><col style="width: 110px"/><col style="width: 120px"/><col style="width: 140px"/><col style="width: 150px"/></colgroup>
+                <thead><tr><th>序号</th><th>已关联产品</th><th>订单数量</th><th>单位</th><th>单价</th><th>金额</th><th>交期</th><th>操作</th></tr></thead>
+                <tbody class="item-card">
+                  <tr class="item-main"><td><strong class="item-index">第 1 行</strong></td><td><div class="field"><label for="sourceSummary">带出产品 / 单位</label><input id="sourceSummary" data-line-field="sourceSummary" value="P-A001 / 毛绒挂件 A / 白色 / 个" disabled /></div></td><td><div class="field" data-field="quantity">
                     <label class="required" for="quantity">订单数量</label>
                     <input id="quantity" data-line-field="quantity" data-stat="quantity" value="3000" inputmode="numeric" />
                     <span class="error"
                       >数量必填，请填写当前订单数量。</span
                     >
-                  </div>
-                  <div class="field" data-field="unitPrice">
+                  </div></td><td><div class="field"><label for="unit">单位</label><select id="unit" data-line-field="unit"><option>个</option><option>箱</option></select></div></td><td><div class="field" data-field="unitPrice">
                     <label for="unitPrice">单价</label>
                     <input id="unitPrice" data-line-field="unitPrice" value="1.50" inputmode="decimal" />
-                  </div>
-                  <div class="field">
+                  </div></td><td><div class="field">
                     <label for="lineAmount">金额</label>
                     <input id="lineAmount" data-line-field="amount" data-stat="amount" value="4500.00" disabled />
-                  </div>
-                  <div class="field" data-field="dueDate">
+                  </div></td><td><div class="field" data-field="dueDate">
                     <label class="required" for="dueDate">交期</label>
                     <input id="dueDate" data-line-field="dueDate" value="2026-06-18" />
                     <span class="error">交期必填。</span>
-                  </div>
-                  <div class="field">
+                  </div></td><td><div class="actions"><button class="btn text copy-item" type="button">复制行</button><button class="btn text remove-item" type="button" disabled>移除行</button></div></td></tr>
+                  <tr><td colspan="8"><details class="item-details"><summary>补充信息</summary><div class="item-grid"><div class="field" data-field="productSku">
+                    <label for="productSku">已有规格（选填）</label>
+                    <select id="productSku" data-line-field="sku"><option value="sku-hanger-a">SKU-A001 - 毛绒挂件 A / 白色</option><option value="sku-keychain-b">SKU-B002 - 毛绒钥匙扣 B / 蓝色</option></select>
+                    <span class="error">可选用已有产品规格。</span>
+                  </div><div class="field">
                     <label for="itemNote">备注</label>
                     <textarea id="itemNote" data-line-field="itemNote">SKU 带出产品主数据；数量、单价和交期仍按本订单行维护。</textarea>
-                  </div>
-                </div>
-              </article>
+                  </div></div></details></td></tr>
+                </tbody>
+              </table>
             </div>
 
             <div class="items-footer">
-              <button class="btn" id="addItem" type="button">+ 添加条目</button>
               <div class="stats">
                 <span class="stat"
                   >已录入 <strong id="itemCount">1</strong> 条</span
@@ -1133,7 +1142,6 @@
       const requiredFields = [
         "customer",
         "orderNo",
-        "productSku",
         "quantity",
         "dueDate",
       ];
@@ -1267,7 +1275,7 @@
       function reindexItems() {
         itemList.querySelectorAll(".item-card").forEach((card, index) => {
           const lineNumber = index + 1;
-          card.querySelector(".item-head strong").textContent =
+          card.querySelector(".item-index").textContent =
             `第 ${lineNumber} 行`;
           Object.entries(lineFieldIds).forEach(([name, baseId]) => {
             const field = getLineField(card, name);
@@ -1289,7 +1297,8 @@
             removeButton.disabled = readonly || cards.length === 1;
           }
         });
-        productOrder.disabled = readonly || cards.length < 2;
+        productOrder.hidden = cards.length < 2;
+        productOrder.disabled = readonly;
       }
 
       function updateLineAmount(card) {
@@ -1389,6 +1398,7 @@
         }
         itemList.appendChild(article);
         reindexItems();
+        article.scrollIntoView({ block: "nearest" });
         syncMutationControls(formMode.value === "readonly");
         footerState.textContent = sourceCard
           ? "已复制所选订单行；数量、价格、金额和交期均保留原值。"
@@ -1408,11 +1418,11 @@
       returnToList.addEventListener("click", closeBusinessForm);
       itemImportApply.addEventListener("click", () => {
         footerState.textContent =
-          "将打开第二层 SKU 来源选择器；完整筛选和勾选交互由局部动作弹窗样板统一定义。";
+          "将打开已有产品规格选择器；完整筛选和勾选交互由局部动作弹窗样板统一定义。";
       });
       productOrder.addEventListener("click", () => {
         footerState.textContent =
-          "将打开产品顺序弹窗；保存顺序不改变各订单行的产品、数量和价格。";
+          "将打开调整明细顺序弹窗；保存顺序不改变各订单行的产品、数量和价格。";
       });
       itemList.addEventListener("click", (event) => {
         const card = event.target.closest(".item-card");

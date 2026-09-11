@@ -296,6 +296,7 @@ qa_full_server_upgrade() {
   cd "$ROOT_DIR/server"
   PURCHASE_RECEIPT_PG_DB_URL="$DISPOSABLE_DATABASE_BASE_URL" \
     make populated_upgrade_pg_test
+  bash "$ROOT_DIR/scripts/qa/attachment-storage-integration.sh"
 }
 
 qa_full_server_test_build() {

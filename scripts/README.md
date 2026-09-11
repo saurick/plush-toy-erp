@@ -2,6 +2,10 @@
 
 本文档只说明当前仓库仍在使用的本地脚本和推荐执行顺序。
 
+附件迁移与恢复工具为 `server/cmd/attachment-storage`，RAID5 检查及操作合同见 [Compose 附件说明](../server/deploy/compose/prod/README.md#附件存储与raid5)；本地隔离验证入口为 `bash scripts/qa/attachment-storage-integration.sh`。容量测试附件由 `server/cmd/seed-capacity-attachments` 复用受控 Go 仓储写入 S3，不直接插入文件二进制。
+
+存储界面的只读 SSH 入口为 `node scripts/deploy/attachment-console.mjs --target demo-133`（test 使用 `customer-test-133`），访问约定见 [只读查看存储](../server/deploy/compose/prod/README.md#只读查看存储)。
+
 ## 子目录入口
 
 `scripts/README.md` 保留仓库级脚本总览、推荐顺序和跨目录边界；高频子目录的局部说明在各自 README 维护，避免把所有命令细节继续堆到一个入口里。

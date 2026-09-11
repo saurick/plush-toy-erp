@@ -6,8 +6,8 @@ const formSources = [
   {
     name: 'sales order',
     path: new URL('../sales-orders/SalesOrderForm.jsx', import.meta.url),
-    button: '产品顺序',
-    title: '调整产品顺序',
+    button: '调整明细顺序',
+    title: '调整明细顺序',
   },
   {
     name: 'purchase order',
@@ -39,8 +39,8 @@ const toolbarSources = [
     name: 'sales order',
     page: new URL('../../pages/V1SalesOrdersPage.jsx', import.meta.url),
     action: new URL('../../pages/V1SalesOrdersPage.jsx', import.meta.url),
-    button: '产品顺序',
-    title: '调整产品顺序',
+    button: '明细顺序',
+    title: '调整明细顺序',
     apiFunction: 'reorderSalesOrderItems',
     documentType: 'sales_order',
   },
@@ -89,7 +89,12 @@ for (const form of formSources) {
     assert.ok(source.includes(form.button))
     assert.ok(source.includes(form.title))
     assert.match(source, /form\.setFieldsValue\(\{ items: orderedItems \}\)/u)
-    assert.match(source, /fields\.length < 2/u)
+    assert.match(
+      source,
+      form.name === 'sales order'
+        ? /fields\.length >= 2/u
+        : /fields\.length < 2/u
+    )
   })
 }
 

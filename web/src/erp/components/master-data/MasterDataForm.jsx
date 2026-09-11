@@ -964,11 +964,10 @@ export function ContactFormList({ form, entityLabel }) {
                       onClick={() => {
                         const currentRow =
                           form.getFieldValue(['contacts', field.name]) || {}
-                        add({
-                          ...currentRow,
-                          id: undefined,
-                          is_primary: false,
-                        })
+                        add(
+                          { ...currentRow, id: undefined, is_primary: false },
+                          index + 1
+                        )
                         requestLineItemScroll(index + 1)
                       }}
                     />

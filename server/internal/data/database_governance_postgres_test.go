@@ -1,6 +1,7 @@
 package data
 
 import (
+	"server/internal/attachmentstore"
 	"context"
 	"errors"
 	"strings"
@@ -298,17 +299,17 @@ func TestDatabaseGovernancePostgresQualityAndAttachmentConstraints(t *testing.T)
 		SetMimeType("text/plain").
 		SetFileSize(len(content)).
 		SetSha256(strings.Repeat("a", 64)).
-		SetContent(content).
+		SetObjectKey(attachmentstore.NewKey()).
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create valid business attachment: %v", err)
 	}
-	_, err = data.sqldb.ExecContext(ctx, `UPDATE business_attachments SET content = $2 WHERE id = $1`, attachment.ID, []byte("abcd"))
-	assertDatabaseGovernancePGError(t, err, "23514", "business_attachments_content_size_matches")
+	_, err = data.sqldb.ExecContext(ctx, `UPDATE business_attachments SET object_key = $2 WHERE id = $1`, attachment.ID, "attachments/invalid")
+	assertDatabaseGovernancePGError(t, err, "23514", "business_attachments_object_key_shape")
 	_, err = data.sqldb.ExecContext(ctx, `UPDATE business_attachments SET sha256 = 'NOT-A-SHA256' WHERE id = $1`, attachment.ID)
 	assertDatabaseGovernancePGError(t, err, "23514", "business_attachments_sha256_lower_hex")
 	tooLarge := make([]byte, 5*1024*1024+1)
-	_, err = data.sqldb.ExecContext(ctx, `UPDATE business_attachments SET file_size = $2, content = $3 WHERE id = $1`, attachment.ID, len(tooLarge), tooLarge)
+	_, err = data.sqldb.ExecContext(ctx, `UPDATE business_attachments SET file_size = $2 WHERE id = $1`, attachment.ID, len(tooLarge))
 	assertDatabaseGovernancePGError(t, err, "23514", "business_attachments_file_size_max")
 }
 

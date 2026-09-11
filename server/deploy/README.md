@@ -23,7 +23,7 @@ Atlas migration 在普通生产 / 低配服务器上使用宿主机 `/usr/local/
 ### `compose/prod`
 
 - 单机或单宿主机部署入口
-- 默认包含 PostgreSQL、Jaeger、业务服务、前端单入口静态服务和基础 smoke 检查
+- 默认包含 PostgreSQL、RAID5 上的私有 SeaweedFS 对象存储、Jaeger、业务服务、前端单入口静态服务和基础 smoke 检查
 - 服务端镜像内置固定 Chromium 和前端 Noto 字体资源用于 `/templates/render-pdf`，Compose 默认使用 `ERP_PDF_RENDER_CONCURRENCY=4` 和 `ERP_PDF_QUEUE_CAPACITY=2` 限制 PDF 执行与等待请求；只有容量压测证明宿主机仍有稳定余量时，才在独立部署配置中成对调整并发与内存预算
 - 提供迁移脚本，不再保留远端增量发布脚本
 

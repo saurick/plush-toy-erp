@@ -327,6 +327,15 @@ required_keys=(
   POSTGRES_DB
   POSTGRES_USER
   POSTGRES_DATA_DIR
+  ATTACHMENT_DATA_DIR
+  ATTACHMENT_RAID_MOUNT
+  ATTACHMENT_STORE_IMAGE
+  ATTACHMENT_S3_ENDPOINT
+  ATTACHMENT_S3_BUCKET
+  ATTACHMENT_S3_ACCESS_KEY_ID
+  ATTACHMENT_S3_SECRET_ACCESS_KEY
+  ATTACHMENT_ADMIN_PASSWORD
+  ATTACHMENT_VIEWER_PASSWORD
   MIGRATION_LOCK_FILE
   POSTGRES_BIND_ADDR
   TRACE_ENDPOINT
@@ -416,13 +425,31 @@ if [[ "$mode" == "example" ]]; then
   ok "example 模式仅检查结构，不作为生产放行"
 else
   placeholder_pattern='(change-this|placeholder|replace-with|<release-tag>|example\.invalid)'
-  for key in POSTGRES_DSN POSTGRES_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_BACKUP_PASSWORD APP_JWT_SECRET APP_IMAGE WEB_IMAGE POSTGRES_IMAGE JAEGER_IMAGE POSTGRES_DATA_DIR WEB_API_ORIGIN; do
+  for key in POSTGRES_DSN POSTGRES_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_BACKUP_PASSWORD APP_JWT_SECRET APP_IMAGE WEB_IMAGE POSTGRES_IMAGE JAEGER_IMAGE POSTGRES_DATA_DIR WEB_API_ORIGIN ATTACHMENT_S3_ACCESS_KEY_ID ATTACHMENT_S3_SECRET_ACCESS_KEY ATTACHMENT_STORE_IMAGE ATTACHMENT_ADMIN_PASSWORD ATTACHMENT_VIEWER_PASSWORD; do
     value="$(value_of "$key")"
     if grep -Eiq "$placeholder_pattern" <<<"$value"; then
       fail "$key 仍包含 placeholder"
     fi
   done
 
+  attachment_data_dir="$(value_of ATTACHMENT_DATA_DIR)"
+  attachment_raid_mount="$(value_of ATTACHMENT_RAID_MOUNT)"
+  attachment_store_image="$(value_of ATTACHMENT_STORE_IMAGE)"
+  validate_absolute_path_without_aliases "ATTACHMENT_DATA_DIR" "$attachment_data_dir"
+  validate_absolute_path_without_aliases "ATTACHMENT_RAID_MOUNT" "$attachment_raid_mount"
+  [[ "$attachment_data_dir" == "$attachment_raid_mount/"* ]] || fail "附件目录必须位于 RAID5 挂载点下"
+  [[ "$(value_of ATTACHMENT_S3_ENDPOINT)" == "http://attachment-store:8333" ]] || fail "私有化部署附件必须连接专用内部 S3 服务"
+  [[ "$(value_of ATTACHMENT_S3_BUCKET)" =~ ^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$ ]] || fail "附件 bucket 名称不合法"
+  [[ "$attachment_store_image" =~ ^chrislusf/seaweedfs:[0-9]+\.[0-9]+@sha256:[0-9a-f]{64}$ ]] || fail "附件存储镜像必须固定版本与 digest"
+  [[ ${#attachment_store_image} -gt 64 && $(value_of ATTACHMENT_S3_ACCESS_KEY_ID | wc -c) -ge 16 && $(value_of ATTACHMENT_S3_SECRET_ACCESS_KEY | wc -c) -ge 32 ]] || fail "附件存储必须使用独立随机凭据"
+  attachment_admin_password="$(value_of ATTACHMENT_ADMIN_PASSWORD)"
+  attachment_viewer_password="$(value_of ATTACHMENT_VIEWER_PASSWORD)"
+  [[ ${#attachment_admin_password} -ge 32 && ${#attachment_viewer_password} -ge 32 ]] || fail "附件管理与只读密码必须至少 32 位"
+  [[ "$attachment_admin_password" != "$attachment_viewer_password" ]] || fail "附件管理与只读密码必须独立"
+  for key in ATTACHMENT_S3_SECRET_ACCESS_KEY POSTGRES_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_BACKUP_PASSWORD APP_JWT_SECRET; do
+    value="$(value_of "$key")"
+    [[ "$attachment_admin_password" != "$value" && "$attachment_viewer_password" != "$value" ]] || fail "附件界面密码不得复用其他服务凭据"
+  done
   app_jwt_secret="$(value_of APP_JWT_SECRET)"
   app_image="$(value_of APP_IMAGE)"
   web_image="$(value_of WEB_IMAGE)"
@@ -723,13 +750,18 @@ if [[ "$runtime_check" -eq 1 ]]; then
     fail "--runtime 需要 docker compose / docker-compose"
   fi
 
+  bash "$compose_dir/attachment_raid_preflight.sh" "$attachment_raid_mount" "$attachment_data_dir"
   declare -A runtime_cids=()
-  for service in postgres jaeger app-server web-desktop; do
+  for service in postgres jaeger app-server web-desktop attachment-store; do
     runtime_service_cids="$("${compose_cmd[@]}" ps -q "$service" 2>/dev/null || true)"
     runtime_service_cid_count="$(printf '%s\n' "$runtime_service_cids" | awk 'NF { count++ } END { print count + 0 }')"
     [[ "$runtime_service_cid_count" == "1" ]] || fail "运行态 Compose 服务必须精确存在一个容器: $service"
     cid="$(printf '%s\n' "$runtime_service_cids" | awk 'NF { print; exit }')"
     case "$service" in
+    attachment-store)
+      runtime_service_key=attachment_store
+      runtime_expected_image_ref="$attachment_store_image"
+      ;;
     postgres)
       runtime_service_key=postgres
       runtime_expected_image_ref="$postgres_image"
@@ -769,7 +801,26 @@ if [[ "$runtime_check" -eq 1 ]]; then
   app_cid="${runtime_cids[app_server]}"
   postgres_cid="${runtime_cids[postgres]}"
   ok "Compose 运行服务存在"
-  ok "Compose 四服务容器唯一，镜像引用 / content id 与 release=$expected_release 一致"
+  attachment_cid="${runtime_cids[attachment_store]}"
+  [[ "$(docker inspect --format '{{.State.Health.Status}}' "$attachment_cid")" == healthy ]] || fail "附件存储未就绪"
+  [[ -z "$(docker port "$attachment_cid")" ]] || fail "附件存储不允许发布宿主机端口"
+  runtime_attachment_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$attachment_cid")"
+  for key in WEED_ADMIN_USER WEED_ADMIN_PASSWORD WEED_ADMIN_READONLY_USER WEED_ADMIN_READONLY_PASSWORD; do
+    case "$key" in
+    WEED_ADMIN_USER) expected_value=storage-admin ;;
+    WEED_ADMIN_PASSWORD) expected_value="$attachment_admin_password" ;;
+    WEED_ADMIN_READONLY_USER) expected_value=viewer ;;
+    WEED_ADMIN_READONLY_PASSWORD) expected_value="$attachment_viewer_password" ;;
+    esac
+    actual_value="$(printf '%s\n' "$runtime_attachment_env" | awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print }')"
+    [[ "$actual_value" == "$expected_value" ]] || fail "附件管理界面运行凭据与受控配置不符: $key"
+  done
+  attachment_console_status="$(docker exec "$attachment_cid" curl --silent --max-time 3 --output /dev/null --write-out '%{http_code}' http://127.0.0.1:23646/)"
+  [[ "$attachment_console_status" == 307 ]] || fail "附件管理界面未就绪或登录保护不符"
+  attachment_mount="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Source}}{{end}}{{end}}' "$attachment_cid")"
+  [[ "$attachment_mount" == "$attachment_data_dir" ]] || fail "附件容器实际挂载目录不符"
+  "${compose_cmd[@]}" exec -T app-server /app/attachment-storage -mode check -database "$postgres_database" >/dev/null || fail "附件存储凭据或 bucket 不可用"
+  ok "Compose 服务容器唯一，镜像引用 / content id 与 release=$expected_release 一致"
 
   runtime_cid_for_service() {
     case "$1" in

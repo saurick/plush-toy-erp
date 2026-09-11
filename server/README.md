@@ -1,5 +1,7 @@
 # server 后端说明
 
+图片与业务附件使用统一 S3 存储接口；PG 保存文件元数据和对象 key，文件内容落在 RAID5 上的私有 SeaweedFS。配置、旧文件迁移、独立备份与恢复见 [Compose 附件说明](deploy/compose/prod/README.md#附件存储与raid5)。开发启动同样需要 `ATTACHMENT_S3_*` 配置，迁移前必须先完成旧附件导出校验。
+
 ## 技术栈
 
 - Kratos

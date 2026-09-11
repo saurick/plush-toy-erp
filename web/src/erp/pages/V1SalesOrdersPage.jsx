@@ -69,7 +69,6 @@ import {
   listAllInventoryLots,
 } from '../api/inventoryApi.mjs'
 import {
-  createBlankOrderLine,
   normalizeSalesOrderItemFormValue,
   salesOrderLineOrderLabel,
 } from '../components/sales-orders/SalesOrderForm.jsx'
@@ -938,8 +937,6 @@ export default function V1SalesOrdersPage() {
     setEditingOrder(null)
     setCustomerContacts([])
     orderForm.resetFields()
-    const defaultUnitID =
-      unitOptions.length === 1 ? unitOptions[0].value : undefined
     orderForm.setFieldsValue({
       order_no: buildSequentialDraftCode(orders, {
         prefix: 'SO',
@@ -951,7 +948,7 @@ export default function V1SalesOrdersPage() {
       freight_terms: undefined,
       quoted_freight_amount: undefined,
       order_date: currentBusinessDate(),
-      items: [createBlankOrderLine(1, { unitID: defaultUnitID })],
+      items: [],
     })
     rememberPaymentCondition({})
     setOrderModalOpen(true)
@@ -1036,7 +1033,7 @@ export default function V1SalesOrdersPage() {
     const order = selectedOrder
     if (!selectedOrderCanReorder) {
       message.warning(
-        order ? '当前状态不能调整产品顺序' : '请先选择一条销售订单'
+        order ? '当前状态不能调整明细顺序' : '请先选择一条销售订单'
       )
       return
     }
@@ -1063,7 +1060,7 @@ export default function V1SalesOrdersPage() {
       if (isResourceVersionConflict(error)) {
         message.warning('销售订单已被其他操作更新，请刷新后重试')
       } else {
-        message.error(getActionErrorMessage(error, '加载销售订单产品顺序'))
+        message.error(getActionErrorMessage(error, '加载销售订单明细顺序'))
       }
     } finally {
       if (lineOrderRequestRef.current === requestID) {
@@ -1091,7 +1088,7 @@ export default function V1SalesOrdersPage() {
       )
       setSelectedOrder(savedOrder)
       setLineOrderContext({ order: savedOrder, items: openItems })
-      message.success('销售订单产品顺序已保存')
+      message.success('销售订单明细顺序已保存')
       return true
     } catch (error) {
       if (isResourceVersionConflict(error)) {
@@ -1100,12 +1097,12 @@ export default function V1SalesOrdersPage() {
         await loadOrders()
       } else if (isMutationResultUnknown(error)) {
         message.warning(
-          '产品顺序保存结果尚未确认，请先刷新核对，不要连续重复提交'
+          '明细顺序保存结果尚未确认，请先刷新核对，不要连续重复提交'
         )
         setLineOrderOpen(false)
         await loadOrders()
       } else {
-        message.error(getActionErrorMessage(error, '保存销售订单产品顺序'))
+        message.error(getActionErrorMessage(error, '保存销售订单明细顺序'))
       }
       return false
     } finally {
@@ -1177,9 +1174,7 @@ export default function V1SalesOrdersPage() {
             '保存结果尚未确认，请先核对该单据的最新状态，不要连续重复提交。'
           )
         } else {
-          message.error(
-            getActionErrorMessage(saveError, '保存销售订单与订单行')
-          )
+          message.error(getActionErrorMessage(saveError, '保存销售订单'))
         }
         return
       }
@@ -1199,7 +1194,7 @@ export default function V1SalesOrdersPage() {
       message.success(
         attachmentSaved
           ? editingOrder?.id
-            ? '销售订单与订单行已更新'
+            ? '销售订单已更新'
             : '销售订单已创建'
           : '销售订单已保存，未上传的附件请重新选择'
       )
@@ -1672,9 +1667,9 @@ export default function V1SalesOrdersPage() {
                   !selectedOrder
                     ? '请先选择一条销售订单'
                     : !selectedOrderCanReorder
-                      ? '当前状态不能调整产品顺序'
+                      ? '当前状态不能调整明细顺序'
                       : lineOrderLoading || saving
-                        ? '当前订单操作完成后可调整产品顺序'
+                        ? '当前订单操作完成后可调整明细顺序'
                         : ''
                 }
               >
@@ -1686,7 +1681,7 @@ export default function V1SalesOrdersPage() {
                   }
                   onClick={openSalesOrderLineOrder}
                 >
-                  产品顺序
+                  明细顺序
                 </ToolbarButton>
               </BusinessActionTooltip>
             ) : null}
@@ -1960,12 +1955,12 @@ export default function V1SalesOrdersPage() {
       />
 
       <BusinessLineItemOrderModal
-        description="保存后只调整当前销售订单的产品展示顺序，不修改产品、数量、价格或稳定行号。"
+        description="保存后只调整当前销售订单的订货明细顺序，不修改产品、数量、价格或稳定行号。"
         getItemLabel={salesOrderLineOrderLabel}
-        itemNoun="产品"
+        itemNoun="订货明细"
         items={lineOrderContext.items}
         open={lineOrderOpen}
-        title="调整产品顺序"
+        title="调整明细顺序"
         onApply={applySalesOrderLineOrder}
         onClose={() => {
           lineOrderRequestRef.current += 1

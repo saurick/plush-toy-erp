@@ -1061,6 +1061,38 @@ echo "==> [5/8] 只读审计关键数据库约束存量边界"
 run_migration_preflight database-constraints
 PREFLIGHT_RESULT=passed
 
+# The one-time file migration shares the existing stopped-writer/Atlas lock window.
+# Re-running the maintenance plan reuses immutable object keys and verifies every byte.
+if grep -Eq '^(20260911062436|20260911062537)$' "$PENDING_VERSIONS_FILE"; then
+  attachment_has_content=$(psql_target -X -At --set ON_ERROR_STOP=1 -c "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='business_attachments' AND column_name='content')")
+  if [ "$attachment_has_content" = t ]; then
+    attachment_count=$(psql_target -X -At --set ON_ERROR_STOP=1 -c "SELECT count(*) FROM business_attachments")
+    if [ "$attachment_count" -gt 0 ]; then
+      if [ "$APPLY_MODE" -ne 1 ] && [ "$RECONCILE_PERMISSIONS" -ne 1 ]; then
+        fail "附件迁移需要停写维护窗口内执行 export/verify；当前只读检查未移动文件"
+      fi
+      attachment_mount=${ATTACHMENT_RAID_MOUNT:-/srv/raid5}
+      if [ -n "$COMPOSE_ENV_FILE" ]; then attachment_mount=$(target_env_value ATTACHMENT_RAID_MOUNT); fi
+      attachment_directory=$(compose config --format json | jq -er '.services["attachment-store"].volumes[] | select(.target == "/data") | .source')
+      bash "$SCRIPT_DIR/attachment_raid_preflight.sh" "$attachment_mount" "$attachment_directory"
+      compose up -d --no-build --pull never --wait --wait-timeout 60 attachment-store
+      compose run --rm --no-deps -T --user "$(id -u):$(id -g)" \
+        --volume "$MIGRATION_RUN_DIR:/migration-proof" --entrypoint /app/attachment-storage \
+        "$APP_SERVICE" -mode export -database "$EXPECTED_DB_NAME" \
+        -receipt /migration-proof/attachments.json -execute -confirm "ATTACHMENT_EXPORT:$EXPECTED_DB_NAME"
+      attachment_proof=$(compose run --rm --no-deps -T --user "$(id -u):$(id -g)" \
+        --volume "$MIGRATION_RUN_DIR:/migration-proof" --entrypoint /app/attachment-storage \
+        "$APP_SERVICE" -mode verify -database "$EXPECTED_DB_NAME" \
+        -receipt /migration-proof/attachments.json -pg-options)
+      printf '%s' "$attachment_proof" | grep -Eq '^-c plush[.]attachment_export_sha256=[0-9a-f]{64}$' || fail "附件导出未取得有效校验凭证"
+      PGOPTIONS="${PGOPTIONS:+$PGOPTIONS }$attachment_proof"
+      export PGOPTIONS
+      unset attachment_proof
+      cp "$MIGRATION_RUN_DIR/attachments.json" "$RECEIPT_FILE.attachments.json"
+    fi
+  fi
+fi
+
 echo "==> [6/8] tx-mode=all dry-run"
 DRY_RUN_FILE=$MIGRATION_RUN_DIR/dry-run.sql
 atlas_migrate apply --dry-run --tx-mode all >"$DRY_RUN_FILE"

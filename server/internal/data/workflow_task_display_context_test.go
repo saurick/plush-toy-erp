@@ -1,6 +1,7 @@
 package data
 
 import (
+	"server/internal/attachmentstore"
 	"context"
 	"io"
 	"testing"
@@ -38,8 +39,8 @@ func TestWorkflowTaskDisplayContextSourceIdentityAndSearch(t *testing.T) {
 		return task
 	}
 
-	primary := client.BusinessAttachment.Create().SetOwnerType("product").SetOwnerID(product.ID).SetAttachmentType("product_image").SetSlotKey("primary").SetFileName("bear.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetContent([]byte{1}).SaveX(ctx)
-	client.BusinessAttachment.Create().SetOwnerType("product").SetOwnerID(other.ID).SetAttachmentType("product_image").SetSlotKey("secondary").SetFileName("other.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetContent([]byte{1}).SaveX(ctx)
+	primary := client.BusinessAttachment.Create().SetOwnerType("product").SetOwnerID(product.ID).SetAttachmentType("product_image").SetSlotKey("primary").SetFileName("bear.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetObjectKey(attachmentstore.NewKey()).SaveX(ctx)
+	client.BusinessAttachment.Create().SetOwnerType("product").SetOwnerID(other.ID).SetAttachmentType("product_image").SetSlotKey("secondary").SetFileName("other.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetObjectKey(attachmentstore.NewKey()).SaveX(ctx)
 	task := read()
 	if task.DisplayContext == nil || !task.DisplayContext.Available || task.DisplayContext.SourceNo != order.OrderNo || len(task.DisplayContext.Items) != 2 {
 		t.Fatalf("context=%#v", task.DisplayContext)

@@ -84,9 +84,9 @@ func (_c *BusinessAttachmentCreate) SetSha256(v string) *BusinessAttachmentCreat
 	return _c
 }
 
-// SetContent sets the "content" field.
-func (_c *BusinessAttachmentCreate) SetContent(v []byte) *BusinessAttachmentCreate {
-	_c.mutation.SetContent(v)
+// SetObjectKey sets the "object_key" field.
+func (_c *BusinessAttachmentCreate) SetObjectKey(v string) *BusinessAttachmentCreate {
+	_c.mutation.SetObjectKey(v)
 	return _c
 }
 
@@ -282,8 +282,13 @@ func (_c *BusinessAttachmentCreate) check() error {
 			return &ValidationError{Name: "sha256", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.sha256": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.Content(); !ok {
-		return &ValidationError{Name: "content", err: errors.New(`ent: missing required field "BusinessAttachment.content"`)}
+	if _, ok := _c.mutation.ObjectKey(); !ok {
+		return &ValidationError{Name: "object_key", err: errors.New(`ent: missing required field "BusinessAttachment.object_key"`)}
+	}
+	if v, ok := _c.mutation.ObjectKey(); ok {
+		if err := businessattachment.ObjectKeyValidator(v); err != nil {
+			return &ValidationError{Name: "object_key", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.object_key": %w`, err)}
+		}
 	}
 	if v, ok := _c.mutation.UploadedBy(); ok {
 		if err := businessattachment.UploadedByValidator(v); err != nil {
@@ -366,9 +371,9 @@ func (_c *BusinessAttachmentCreate) createSpec() (*BusinessAttachment, *sqlgraph
 		_spec.SetField(businessattachment.FieldSha256, field.TypeString, value)
 		_node.Sha256 = value
 	}
-	if value, ok := _c.mutation.Content(); ok {
-		_spec.SetField(businessattachment.FieldContent, field.TypeBytes, value)
-		_node.Content = value
+	if value, ok := _c.mutation.ObjectKey(); ok {
+		_spec.SetField(businessattachment.FieldObjectKey, field.TypeString, value)
+		_node.ObjectKey = value
 	}
 	if value, ok := _c.mutation.UploadedBy(); ok {
 		_spec.SetField(businessattachment.FieldUploadedBy, field.TypeInt, value)

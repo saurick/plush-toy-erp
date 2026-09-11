@@ -458,15 +458,30 @@
   min-width: 0;
 }
 
-.erp-item-field-unit-suffix.ant-input {
-  flex: 0 0 var(--erp-unit-suffix-width, max-content);
-  width: var(--erp-unit-suffix-width, auto);
-  min-width: 72px;
+.erp-item-field-unit-suffix {
+  display: inline-block;
   max-width: 168px;
-  text-align: center;
-  color: rgb(0 0 0 / 45%);
-  background: #fafafa;
-  pointer-events: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--erp-text-muted, rgb(0 0 0 / 45%));
+  vertical-align: middle;
+}
+
+.erp-item-field-with-unit .ant-input-number-affix-wrapper {
+  width: 100%;
+  min-width: 0;
+  border-radius: var(--erp-control-radius, 12px);
+  overflow: hidden;
+}
+
+body .ant-modal .erp-item-field-with-unit .ant-input-number-affix-wrapper > .ant-input-number,
+#root .erp-item-field-with-unit .ant-input-number-affix-wrapper > .ant-input-number {
+  height: calc(var(--erp-control-height, 36px) - 2px);
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .erp-item-card:hover {

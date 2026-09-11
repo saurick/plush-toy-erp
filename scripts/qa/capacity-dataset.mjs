@@ -310,45 +310,6 @@ BEGIN
     GREATEST(0, ${targets.financeFacts} - (SELECT count(*) FROM finance_facts))
   ) AS series(value);
 
-  INSERT INTO business_attachments (
-    owner_type,
-    owner_id,
-    attachment_type,
-    slot_key,
-    file_name,
-    mime_type,
-    file_size,
-    sha256,
-    content,
-    uploaded_by,
-    note,
-    created_at
-  )
-  SELECT
-    'workflow_task',
-    (
-      SELECT id
-      FROM workflow_tasks
-      WHERE task_code LIKE 'SIM-CAP-V1-%'
-        AND source_type = '${taskSourceType}'
-        AND source_id = ${sourceID}
-      ORDER BY id
-      LIMIT 1
-    ),
-    'evidence',
-    NULL,
-    'sim-capacity-' || lpad(series.value::text, 6, '0') || '.txt',
-    'text/plain',
-    1,
-    md5('sim-capacity-' || series.value) || md5('v1-' || series.value),
-    decode('30', 'hex'),
-    actor_id,
-    'simulated capacity attachment fixture',
-    clock_timestamp()
-  FROM generate_series(
-    1,
-    GREATEST(0, ${targets.attachments} - (SELECT count(*) FROM business_attachments))
-  ) AS series(value);
 END
 $capacity_guard$;
 
@@ -414,6 +375,16 @@ export function runCapacityDataset({
   const readCounts = runtime.counts || (() => datasetCounts(databaseURL));
   const before = readCounts();
   execute(sql);
+  const uploadAttachments = runtime.attachments || (() => {
+    const result = spawnSync("go", ["run", "./cmd/seed-capacity-attachments",
+      "-database", databaseName, "-execute", "-confirm", `LOAD_CAPACITY_ATTACHMENTS:${databaseName}`], {
+      cwd: new URL("../../server", import.meta.url),
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", POSTGRES_DSN: databaseURL },
+      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+    });
+    if (result.status !== 0) throw new Error(`capacity attachment upload failed: ${redact(result.stderr || result.error?.message || "")}`);
+  });
+  uploadAttachments();
   const after = readCounts();
   for (const [key, minimum] of Object.entries(CAPACITY_DATASET_TARGETS)) {
     if (!Number.isSafeInteger(Number(after[key])) || Number(after[key]) < minimum) {

@@ -33,8 +33,8 @@ type BusinessAttachment struct {
 	FileSize int `json:"file_size,omitempty"`
 	// Sha256 holds the value of the "sha256" field.
 	Sha256 string `json:"sha256,omitempty"`
-	// Content holds the value of the "content" field.
-	Content []byte `json:"content,omitempty"`
+	// ObjectKey holds the value of the "object_key" field.
+	ObjectKey string `json:"object_key,omitempty"`
 	// UploadedBy holds the value of the "uploaded_by" field.
 	UploadedBy *int `json:"uploaded_by,omitempty"`
 	// Note holds the value of the "note" field.
@@ -55,11 +55,9 @@ func (*BusinessAttachment) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case businessattachment.FieldContent:
-			values[i] = new([]byte)
 		case businessattachment.FieldID, businessattachment.FieldOwnerID, businessattachment.FieldFileSize, businessattachment.FieldUploadedBy, businessattachment.FieldWithdrawnBy:
 			values[i] = new(sql.NullInt64)
-		case businessattachment.FieldOwnerType, businessattachment.FieldAttachmentType, businessattachment.FieldSlotKey, businessattachment.FieldFileName, businessattachment.FieldMimeType, businessattachment.FieldSha256, businessattachment.FieldNote, businessattachment.FieldWithdrawalReason:
+		case businessattachment.FieldOwnerType, businessattachment.FieldAttachmentType, businessattachment.FieldSlotKey, businessattachment.FieldFileName, businessattachment.FieldMimeType, businessattachment.FieldSha256, businessattachment.FieldObjectKey, businessattachment.FieldNote, businessattachment.FieldWithdrawalReason:
 			values[i] = new(sql.NullString)
 		case businessattachment.FieldWithdrawnAt, businessattachment.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -133,11 +131,11 @@ func (_m *BusinessAttachment) assignValues(columns []string, values []any) error
 			} else if value.Valid {
 				_m.Sha256 = value.String
 			}
-		case businessattachment.FieldContent:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field content", values[i])
-			} else if value != nil {
-				_m.Content = *value
+		case businessattachment.FieldObjectKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field object_key", values[i])
+			} else if value.Valid {
+				_m.ObjectKey = value.String
 			}
 		case businessattachment.FieldUploadedBy:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -242,8 +240,8 @@ func (_m *BusinessAttachment) String() string {
 	builder.WriteString("sha256=")
 	builder.WriteString(_m.Sha256)
 	builder.WriteString(", ")
-	builder.WriteString("content=")
-	builder.WriteString(fmt.Sprintf("%v", _m.Content))
+	builder.WriteString("object_key=")
+	builder.WriteString(_m.ObjectKey)
 	builder.WriteString(", ")
 	if v := _m.UploadedBy; v != nil {
 		builder.WriteString("uploaded_by=")

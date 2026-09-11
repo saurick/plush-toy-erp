@@ -264,7 +264,7 @@ var (
 		{Name: "mime_type", Type: field.TypeString, Size: 128},
 		{Name: "file_size", Type: field.TypeInt},
 		{Name: "sha256", Type: field.TypeString, Size: 64},
-		{Name: "content", Type: field.TypeBytes},
+		{Name: "object_key", Type: field.TypeString, Size: 128},
 		{Name: "uploaded_by", Type: field.TypeInt, Nullable: true},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "withdrawn_at", Type: field.TypeTime, Nullable: true},
@@ -300,6 +300,11 @@ var (
 				Name:    "businessattachment_sha256",
 				Unique:  false,
 				Columns: []*schema.Column{BusinessAttachmentsColumns[8]},
+			},
+			{
+				Name:    "businessattachment_object_key",
+				Unique:  true,
+				Columns: []*schema.Column{BusinessAttachmentsColumns[9]},
 			},
 			{
 				Name:    "businessattachment_uploaded_by",
@@ -5052,9 +5057,9 @@ func init() {
 	}
 	BusinessAttachmentsTable.Annotation = &entsql.Annotation{}
 	BusinessAttachmentsTable.Annotation.Checks = map[string]string{
-		"business_attachments_content_size_matches":   "length(content) = file_size",
 		"business_attachments_file_size_max":          "file_size <= 5242880",
 		"business_attachments_file_size_positive":     "file_size > 0",
+		"business_attachments_object_key_shape":       "length(object_key) IN (44, 76) AND substr(object_key, 1, 12) = 'attachments/' AND object_key = lower(object_key)",
 		"business_attachments_owner_type_allowed":     "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task')",
 		"business_attachments_product_image_contract": "((owner_type = 'product' AND attachment_type = 'product_image' AND slot_key IS NOT NULL AND slot_key IN ('primary', 'secondary') AND mime_type IN ('image/png', 'image/jpeg', 'image/webp')) OR (owner_type <> 'product' AND attachment_type <> 'product_image'))",
 		"business_attachments_sha256_lower_hex":       "length(sha256) = 64 AND sha256 = lower(sha256)",

@@ -46,6 +46,18 @@ import {
   shipmentWeightItemsSignature,
 } from '../../utils/shipmentWeight.mjs'
 import { message } from '@/common/utils/antdApp'
+import BusinessLineItemsTable, {
+  BusinessLineItemRow,
+} from '../business-list/BusinessLineItemsTable.jsx'
+
+const SHIPMENT_ITEM_COLUMNS = [
+  { label: '产品', width: 220, required: true },
+  { label: 'SKU', width: 150 },
+  { label: '仓库', width: 128, required: true },
+  { label: '批次', width: 150 },
+  { label: '数量', width: 140, required: true },
+  { label: '单位', width: 94, required: true },
+]
 
 const { Text } = Typography
 const EMPTY_SHIPMENT_ITEMS = Object.freeze([])
@@ -312,7 +324,9 @@ function ShipmentFormFields({
         rules={[
           {
             validator: async (_, value) => {
-              if (value === undefined || value === null || value === '') return
+              if (value === undefined || value === null || value === '') {
+                return
+              }
               if (!isPositiveNumeric20Scale6(value)) {
                 throw new Error('毛重必须大于 0，且最多保留 6 位小数')
               }
@@ -336,7 +350,9 @@ function ShipmentFormFields({
         rules={[
           {
             validator: async (_, value) => {
-              if (value === undefined || value === null || value === '') return
+              if (value === undefined || value === null || value === '') {
+                return
+              }
               if (!isPositiveNumeric20Scale6(value)) {
                 throw new Error('体积必须大于 0，且最多保留 6 位小数')
               }
@@ -628,6 +644,9 @@ function ShipmentWeightDetailSummary({ shipment, products, productSKUs }) {
 }
 
 function ShipmentItemFormFields({
+  index,
+  rowRef,
+  actions,
   field,
   form,
   inventoryLots = [],
@@ -674,7 +693,113 @@ function ShipmentItemFormFields({
     form.setFieldValue(itemPath, { ...current, ...patch })
   }
   return (
-    <>
+    <BusinessLineItemRow
+      index={index}
+      rowRef={rowRef}
+      actions={actions}
+      cells={[
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="产品"
+          name={fieldName('product_id')}
+          rules={[{ required: true, message: '请选择产品' }]}
+        >
+          <Select
+            allowClear
+            disabled={sourceLocked}
+            optionFilterProp="label"
+            options={productOptions}
+            listItemHeight={48}
+            optionRender={renderProductOption}
+            placeholder="请选择产品"
+            showSearch
+            onChange={(nextID) =>
+              applyItemPatch(buildShipmentProductChangePatch(nextID, products))
+            }
+          />
+        </Form.Item>,
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="SKU"
+          name={fieldName('product_sku_id')}
+        >
+          <Select
+            allowClear
+            disabled={sourceLocked || !Number(productID || 0)}
+            optionFilterProp="label"
+            options={filteredProductSKUOptions}
+            placeholder="请选择 SKU"
+            showSearch
+            onChange={(nextID) =>
+              applyItemPatch(buildShipmentSKUChangePatch(nextID, productSKUs))
+            }
+          />
+        </Form.Item>,
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="仓库"
+          name={fieldName('warehouse_id')}
+          rules={[{ required: true, message: '请选择仓库' }]}
+        >
+          <Select
+            allowClear
+            optionFilterProp="label"
+            options={warehouseOptions}
+            placeholder="请选择仓库"
+            showSearch
+          />
+        </Form.Item>,
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="批次"
+          name={fieldName('lot_id')}
+        >
+          <Select
+            allowClear
+            disabled={!Number(productID || 0)}
+            optionFilterProp="label"
+            options={filteredInventoryLotOptions}
+            placeholder="请选择批次"
+            showSearch
+          />
+        </Form.Item>,
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="数量"
+          name={fieldName('quantity')}
+          rules={[
+            { required: true, message: '请填写数量' },
+            {
+              validator: async (_, value) => {
+                if (value === undefined || value === null || value === '') {
+                  return
+                }
+                if (!normalizeShipmentQuantity(value)) {
+                  throw new Error('数量必须大于 0，且最多保留 6 位小数')
+                }
+              },
+            },
+          ]}
+        >
+          <Input allowClear autoComplete="off" placeholder="例如：120.5" />
+        </Form.Item>,
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="单位"
+          name={fieldName('unit_id')}
+          rules={[{ required: true, message: '请选择单位' }]}
+        >
+          <Select
+            allowClear
+            disabled={sourceLocked}
+            optionFilterProp="label"
+            options={unitOptions}
+            placeholder="请选择单位"
+            showSearch
+          />
+        </Form.Item>,
+      ]}
+    >
       <Form.Item
         className="erp-business-action-form__field"
         label="销售订单行追溯"
@@ -694,26 +819,6 @@ function ShipmentItemFormFields({
           }
         />
       </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="产品"
-        name={fieldName('product_id')}
-        rules={[{ required: true, message: '请选择产品' }]}
-      >
-        <Select
-          allowClear
-          disabled={sourceLocked}
-          optionFilterProp="label"
-          options={productOptions}
-          listItemHeight={48}
-          optionRender={renderProductOption}
-          placeholder="请选择产品"
-          showSearch
-          onChange={(nextID) =>
-            applyItemPatch(buildShipmentProductChangePatch(nextID, products))
-          }
-        />
-      </Form.Item>
       {productID ? (
         <div className="erp-business-action-form__field">
           <ProductIdentity
@@ -722,84 +827,6 @@ function ShipmentItemFormFields({
           />
         </div>
       ) : null}
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="SKU"
-        name={fieldName('product_sku_id')}
-      >
-        <Select
-          allowClear
-          disabled={sourceLocked || !Number(productID || 0)}
-          optionFilterProp="label"
-          options={filteredProductSKUOptions}
-          placeholder="请选择 SKU"
-          showSearch
-          onChange={(nextID) =>
-            applyItemPatch(buildShipmentSKUChangePatch(nextID, productSKUs))
-          }
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="仓库"
-        name={fieldName('warehouse_id')}
-        rules={[{ required: true, message: '请选择仓库' }]}
-      >
-        <Select
-          allowClear
-          optionFilterProp="label"
-          options={warehouseOptions}
-          placeholder="请选择仓库"
-          showSearch
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="批次"
-        name={fieldName('lot_id')}
-      >
-        <Select
-          allowClear
-          disabled={!Number(productID || 0)}
-          optionFilterProp="label"
-          options={filteredInventoryLotOptions}
-          placeholder="请选择批次"
-          showSearch
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="单位"
-        name={fieldName('unit_id')}
-        rules={[{ required: true, message: '请选择单位' }]}
-      >
-        <Select
-          allowClear
-          disabled={sourceLocked}
-          optionFilterProp="label"
-          options={unitOptions}
-          placeholder="请选择单位"
-          showSearch
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="数量"
-        name={fieldName('quantity')}
-        rules={[
-          { required: true, message: '请填写数量' },
-          {
-            validator: async (_, value) => {
-              if (value === undefined || value === null || value === '') return
-              if (!normalizeShipmentQuantity(value)) {
-                throw new Error('数量必须大于 0，且最多保留 6 位小数')
-              }
-            },
-          },
-        ]}
-      >
-        <Input allowClear autoComplete="off" placeholder="例如：120.5" />
-      </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
         label="包装说明"
@@ -826,7 +853,7 @@ function ShipmentItemFormFields({
           showCount
         />
       </Form.Item>
-    </>
+    </BusinessLineItemRow>
   )
 }
 
@@ -1129,15 +1156,16 @@ export default function ShipmentEditor({
                     return importSalesOrderToShipment?.(sourceItems)
                   }}
                 />
-                <div className="erp-master-contact-list__items">
+                <BusinessLineItemsTable
+                  columns={SHIPMENT_ITEM_COLUMNS}
+                  label="出货明细"
+                >
                   {fields.map((field, index) => (
-                    <div
-                      className="erp-master-contact-list__row"
+                    <ShipmentItemFormFields
                       key={field.key}
-                      ref={(node) => registerLineItemRow(index, node)}
-                    >
-                      <div className="erp-master-contact-list__row-head">
-                        <strong>明细 {field.name + 1}</strong>
+                      index={index}
+                      rowRef={(node) => registerLineItemRow(index, node)}
+                      actions={
                         <Button
                           danger
                           size="small"
@@ -1147,27 +1175,23 @@ export default function ShipmentEditor({
                         >
                           移除明细
                         </Button>
-                      </div>
-                      <div className="erp-master-contact-list__grid">
-                        <ShipmentItemFormFields
-                          field={field}
-                          form={form}
-                          inventoryLots={inventoryLots}
-                          inventoryLotOptions={inventoryLotOptions}
-                          products={products}
-                          productOptions={productOptions}
-                          productSKUs={productSKUs}
-                          productSKUOptions={productSKUOptions}
-                          salesOrderItems={salesOrderItems}
-                          salesOrderItemOptions={salesOrderItemOptions}
-                          sourceSelectionDisabled={Boolean(selectedSalesOrder)}
-                          unitOptions={unitOptions}
-                          warehouseOptions={warehouseOptions}
-                        />
-                      </div>
-                    </div>
+                      }
+                      field={field}
+                      form={form}
+                      inventoryLots={inventoryLots}
+                      inventoryLotOptions={inventoryLotOptions}
+                      products={products}
+                      productOptions={productOptions}
+                      productSKUs={productSKUs}
+                      productSKUOptions={productSKUOptions}
+                      salesOrderItems={salesOrderItems}
+                      salesOrderItemOptions={salesOrderItemOptions}
+                      sourceSelectionDisabled={Boolean(selectedSalesOrder)}
+                      unitOptions={unitOptions}
+                      warehouseOptions={warehouseOptions}
+                    />
                   ))}
-                </div>
+                </BusinessLineItemsTable>
                 <BusinessLineItemsFooter
                   addDisabled={Boolean(selectedSalesOrder)}
                   addLabel="添加条目"

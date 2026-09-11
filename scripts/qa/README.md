@@ -2,6 +2,10 @@
 
 本文是 `scripts/qa/` 的目录入口。仓库级脚本总览仍在 [scripts/README.md](../README.md)；测试选择和验证层级真源仍在 [docs/product/自动化测试策略.md](../../docs/product/自动化测试策略.md)。
 
+附件存储的真实 PostgreSQL / S3 迁移与恢复验证使用 `bash scripts/qa/attachment-storage-integration.sh`；固定 SeaweedFS 镜像，一次性本地容器，包含导出摘要门禁、私有访问、完整性、PG 加文件恢复和附件并发回归。该入口不触碰登记数据库。
+
+该演练也包含管理界面验证；单独运行 `node scripts/qa/attachment-console-integration.mjs` 可验证正式 Compose 的原生登录、只读浏览、服务端写入拒绝和退出登录。只在一次性测试覆盖中开放随机本机端口，结束后精确清理测试容器、网络和目录。
+
 ## 目录职责
 
 `scripts/qa/` 只放本地验收、静态守卫、边界扫描和测试编排脚本。它可以读取代码、配置、文档和本地输出，必要时生成 ignored evidence；它不负责生产发布、不直接导入真实客户数据、不替代后端 RBAC / Workflow / Fact usecase。

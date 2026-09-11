@@ -632,6 +632,16 @@ chmod 700 "$runtime_dir" "$root/data" "$backups_root" "$run_root" "$root/tools" 
 cp /usr/local/bin/atlas "$tools_root/atlas"
 chmod 700 "$tools_root/atlas"
 
+attachment_dir="/srv/raid5/plush-toy-erp/$target/attachments"
+[[ "$(findmnt -rn --mountpoint /srv/raid5 -o TARGET)" == /srv/raid5 ]] || fail "RAID5 must be mounted before initializing attachment storage"
+[[ "$(realpath -m "$attachment_dir")" == "$attachment_dir" && ! -e "$attachment_dir" ]] || fail "attachment directory must be new and contain no symlinks"
+mkdir -p "$attachment_dir"
+chmod 700 "$attachment_dir"
+bash "$release_dir/server/deploy/compose/prod/attachment_raid_preflight.sh" /srv/raid5 "$attachment_dir"
+attachment_access_key=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+attachment_secret_key=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+attachment_admin_password=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+attachment_viewer_password=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
 postgres_dsn="postgres://erp_app:${secret_values[POSTGRES_APP_PASSWORD]}@postgres:5432/${database}?sslmode=disable"
 {
   printf 'PROJECT_SLUG=%s\n' "$project"
@@ -654,6 +664,12 @@ postgres_dsn="postgres://erp_app:${secret_values[POSTGRES_APP_PASSWORD]}@postgre
   printf 'POSTGRES_CONN_MAX_LIFETIME=30m\nPOSTGRES_CONN_MAX_IDLE_TIME=5m\nPOSTGRES_STARTUP_TIMEOUT=60s\n'
   printf 'POSTGRES_DB=%s\nPOSTGRES_USER=postgres\n' "$database"
   printf 'POSTGRES_DATA_DIR=%s\nMIGRATION_LOCK_FILE=%s\n' "$data_dir" "$root/run/atlas-migrate.lock"
+  printf 'ATTACHMENT_DATA_DIR=%s\nATTACHMENT_RAID_MOUNT=/srv/raid5\n' "$attachment_dir"
+  printf 'ATTACHMENT_STORE_IMAGE=chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62\n'
+  printf 'ATTACHMENT_S3_ENDPOINT=http://attachment-store:8333\nATTACHMENT_S3_REGION=us-east-1\n'
+  printf 'ATTACHMENT_S3_BUCKET=plush-%s-files\n' "$target"
+  printf 'ATTACHMENT_S3_ACCESS_KEY_ID=%s\nATTACHMENT_S3_SECRET_ACCESS_KEY=%s\n' "$attachment_access_key" "$attachment_secret_key"
+  printf 'ATTACHMENT_ADMIN_PASSWORD=%s\nATTACHMENT_VIEWER_PASSWORD=%s\n' "$attachment_admin_password" "$attachment_viewer_password"
   printf 'TRACE_ENDPOINT=jaeger:4318\nTRACE_RATIO=0.1\n'
   printf 'WEB_API_ORIGIN=http://app-server:8300\nWEB_PROXY_PREFIXES=/rpc,/templates,/readyz/runtime-identity\n'
   printf 'WEB_PROXY_TIMEOUT_MS=30000\nWEB_READINESS_TIMEOUT_MS=2000\nWEB_SHUTDOWN_TIMEOUT_MS=10000\n'
@@ -679,7 +695,7 @@ postgres_dsn="postgres://erp_app:${secret_values[POSTGRES_APP_PASSWORD]}@postgre
 } >"$runtime_env.next"
 chmod 600 "$runtime_env.next"
 mv "$runtime_env.next" "$runtime_env"
-unset postgres_dsn sms_access_key_id sms_access_key_secret sms_sign_name sms_template_code
+unset attachment_access_key attachment_secret_key postgres_dsn sms_access_key_id sms_access_key_secret sms_sign_name sms_template_code
 
 compose_dir=$release_dir/server/deploy/compose/prod
 compose_base=$compose_dir/compose.yml

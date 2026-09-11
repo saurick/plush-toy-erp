@@ -24,8 +24,8 @@ test("capacity SQL stays simulated, fixed-size, and leaves Fact rows draft", () 
   assert.match(sql, /'real_customer_data', false/u);
   assert.match(sql, /'DRAFT'/u);
   assert.match(sql, /'production_ready'/u);
-  assert.doesNotMatch(sql, /\bUPDATE\b|\bDELETE\b/u);
-  for (const minimum of Object.values(CAPACITY_DATASET_TARGETS)) {
+  assert.doesNotMatch(sql, /\bUPDATE\b|\bDELETE\b|INSERT INTO business_attachments/u);
+  for (const minimum of Object.values(CAPACITY_DATASET_TARGETS).filter((value) => value !== CAPACITY_DATASET_TARGETS.attachments)) {
     assert.match(sql, new RegExp(String(minimum), "u"));
   }
 });
@@ -40,6 +40,7 @@ test("capacity dataset binds confirmation, database identity, and post-load coun
     generatedAt: new Date("2026-07-28T00:00:00Z"),
     taskSourceID: 77,
     runtime: {
+      attachments: () => {},
       execute: (sql) => {
         executed = sql;
       },

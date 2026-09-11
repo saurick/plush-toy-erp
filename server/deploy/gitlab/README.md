@@ -152,6 +152,8 @@ GPT Review 按本次 GitLab push 前后的 base/head SHA 读取 GitHub main 提�
 
 ## 备份、恢复和升级
 
+Compose 固定 GitLab CE `19.3.2` 的镜像 digest；该版本包含 [GitLab 官方 2026-09-10 安全补丁](https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-3-2-released/)。配置版本不替代目标机运行版本与升级后检查。
+
 每日备份由 root 定时器调用：
 
 ```bash

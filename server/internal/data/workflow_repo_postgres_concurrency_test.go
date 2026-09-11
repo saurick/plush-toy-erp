@@ -213,7 +213,7 @@ func TestWorkflowPostgresAttachmentUploadRechecksTaskAfterConcurrentMutation(t *
 			defer cancel()
 			data, client := openPurchaseReceiptPostgresTestData(t)
 			workflowRepo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
-			attachmentRepo := NewBusinessAttachmentRepo(data, log.NewStdLogger(io.Discard))
+			attachmentRepo := NewBusinessAttachmentRepo(data, newAttachmentMemoryStore(), log.NewStdLogger(io.Discard))
 			suffix := postgresTestSuffix()
 			task, err := workflowRepo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
 				TaskCode:      "WF-ATTACHMENT-" + suffix,
@@ -294,7 +294,7 @@ func TestWorkflowPostgresAttachmentWithdrawalRechecksTaskAfterConcurrentMutation
 			defer cancel()
 			data, client := openPurchaseReceiptPostgresTestData(t)
 			workflowRepo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
-			attachmentRepo := NewBusinessAttachmentRepo(data, log.NewStdLogger(io.Discard))
+			attachmentRepo := NewBusinessAttachmentRepo(data, newAttachmentMemoryStore(), log.NewStdLogger(io.Discard))
 			suffix := postgresTestSuffix()
 			task, err := workflowRepo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
 				TaskCode:      "WF-ATTACHMENT-WITHDRAW-" + suffix,
@@ -317,7 +317,7 @@ func TestWorkflowPostgresAttachmentWithdrawalRechecksTaskAfterConcurrentMutation
 				SetMimeType("application/pdf").
 				SetFileSize(5).
 				SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
-				SetContent([]byte("proof")).
+				SetObjectKey(seedAttachmentObject(t, attachmentRepo.objects, []byte("proof"))).
 				Save(ctx)
 			if err != nil {
 				t.Fatalf("create attachment: %v", err)
@@ -365,7 +365,7 @@ func TestWorkflowPostgresAttachmentWithdrawalRechecksTaskAfterConcurrentMutation
 			}
 			stored, err := client.BusinessAttachment.Get(ctx, attachment.ID)
 			if err != nil || stored.WithdrawnAt != nil || stored.WithdrawnBy != nil || stored.WithdrawalReason != nil ||
-				string(stored.Content) != "proof" || stored.Sha256 != attachment.Sha256 {
+				string(mustAttachmentBytes(t, attachmentRepo.objects, stored.ObjectKey, stored.FileSize)) != "proof" || stored.Sha256 != attachment.Sha256 {
 				t.Fatalf("rejected withdrawal must preserve active evidence: row=%#v err=%v", stored, err)
 			}
 		})
@@ -387,7 +387,7 @@ func TestWorkflowPostgresConcurrentAttachmentWithdrawalsKeepFirstAudit(t *testin
 			defer cancel()
 			data, client := openPurchaseReceiptPostgresTestData(t)
 			workflowRepo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
-			attachmentRepo := NewBusinessAttachmentRepo(data, log.NewStdLogger(io.Discard))
+			attachmentRepo := NewBusinessAttachmentRepo(data, newAttachmentMemoryStore(), log.NewStdLogger(io.Discard))
 			task, err := workflowRepo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
 				TaskCode:      "WF-ATTACHMENT-WITHDRAW-RACE-" + postgresTestSuffix(),
 				TaskGroup:     "attachment_withdrawal_concurrency",
@@ -409,7 +409,7 @@ func TestWorkflowPostgresConcurrentAttachmentWithdrawalsKeepFirstAudit(t *testin
 				SetMimeType("application/pdf").
 				SetFileSize(5).
 				SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
-				SetContent([]byte("proof")).
+				SetObjectKey(seedAttachmentObject(t, attachmentRepo.objects, []byte("proof"))).
 				Save(ctx)
 			if err != nil {
 				t.Fatalf("create attachment: %v", err)
@@ -459,7 +459,7 @@ func TestWorkflowPostgresConcurrentAttachmentWithdrawalsKeepFirstAudit(t *testin
 			}
 			stored, err := client.BusinessAttachment.Get(ctx, attachment.ID)
 			if err != nil || stored.WithdrawnAt == nil || stored.WithdrawnBy == nil || stored.WithdrawalReason == nil ||
-				string(stored.Content) != "proof" || stored.Sha256 != attachment.Sha256 {
+				string(mustAttachmentBytes(t, attachmentRepo.objects, stored.ObjectKey, stored.FileSize)) != "proof" || stored.Sha256 != attachment.Sha256 {
 				t.Fatalf("concurrent withdrawal must keep one complete audit and original evidence: row=%#v err=%v", stored, err)
 			}
 			validFirstAudit := (*stored.WithdrawnBy == tc.actors[0] && *stored.WithdrawalReason == tc.reasons[0]) ||

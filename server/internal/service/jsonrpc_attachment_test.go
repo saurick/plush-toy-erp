@@ -1218,3 +1218,11 @@ func TestJsonrpcDispatcher_ProductThumbnailReturnsDerivativeAndPreservesOriginal
 		t.Fatal("thumbnail changed original")
 	}
 }
+
+func TestAttachmentStorageFailureMessageIsActionable(t *testing.T) {
+	dispatcher := &jsonrpcDispatcher{}
+	result := dispatcher.mapBusinessAttachmentError(context.Background(), biz.ErrBusinessAttachmentStorageUnavailable)
+	if result.Code != errcode.Internal.Code || !strings.Contains(result.Message, "文件存储暂不可用") || !strings.Contains(result.Message, "查看附件列表") {
+		t.Fatalf("unexpected storage error: %#v", result)
+	}
+}

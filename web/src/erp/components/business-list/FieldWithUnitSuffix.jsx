@@ -1,18 +1,7 @@
 import React from 'react'
-import { Input, Space } from 'antd'
 
 function normalizeText(value) {
   return String(value ?? '').trim()
-}
-
-function unitSuffixWidthPx(text) {
-  const visualWidth = Array.from(text).reduce((width, char) => {
-    if (/[\u3400-\u9fff\uff00-\uffef]/u.test(char)) {
-      return width + 16
-    }
-    return width + 9
-  }, 28)
-  return Math.min(168, Math.max(72, Math.ceil(visualWidth)))
 }
 
 function positiveID(value) {
@@ -105,19 +94,19 @@ export default function FieldWithUnitSuffix({
   }
 
   return (
-    <Space.Compact className="erp-item-field-with-unit">
-      {React.cloneElement(control, mergedProps)}
-      <Input
-        className="erp-item-field-unit-suffix"
-        value={suffixText}
-        readOnly
-        tabIndex={-1}
-        aria-label={suffixAriaLabel || `单位 ${suffixText}`}
-        title={suffixText}
-        style={{
-          '--erp-unit-suffix-width': `${unitSuffixWidthPx(suffixText)}px`,
-        }}
-      />
-    </Space.Compact>
+    <div className="erp-item-field-with-unit">
+      {React.cloneElement(control, {
+        ...mergedProps,
+        suffix: (
+          <span
+            className="erp-item-field-unit-suffix"
+            aria-label={suffixAriaLabel || `单位 ${suffixText}`}
+            title={suffixText}
+          >
+            {suffixText}
+          </span>
+        ),
+      })}
+    </div>
   )
 }

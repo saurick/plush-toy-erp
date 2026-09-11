@@ -575,7 +575,8 @@ test('devPrototypes: 业务表单样板使用整页编辑和未保存返回保�
   assert.match(html, /id="productSku"/u)
   assert.match(html, /id="productSku" data-line-field="sku"/u)
   assert.match(html, /id="sourceSummary"[^>]*disabled/u)
-  assert.match(html, /id="productOrder"[^>]*disabled/u)
+  assert.match(html, /id="productOrder"[^>]*hidden/u)
+  assert.match(html, /productOrder\.hidden = cards\.length < 2/u)
   assert.doesNotMatch(html, /id="copyItem"/u)
   assert.match(html, /function addItem\(sourceCard = null\)/u)
   assert.match(html, /copyItemValues\(template, article\)/u)
@@ -589,7 +590,7 @@ test('devPrototypes: 业务表单样板使用整页编辑和未保存返回保�
   )
   assert.match(
     html,
-    /SKU 只带入产品主数据，不覆盖当前订单的数量、价格、金额和交期/u
+    /已有规格只带入产品主数据，不覆盖当前订单的数量、价格、金额和交期/u
   )
   assert.match(html, /const mutationControlSelector = \[/u)
   assert.match(html, /"#itemImportApply"/u)

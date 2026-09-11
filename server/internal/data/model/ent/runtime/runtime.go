@@ -582,6 +582,24 @@ func init() {
 			return nil
 		}
 	}()
+	// businessattachmentDescObjectKey is the schema descriptor for object_key field.
+	businessattachmentDescObjectKey := businessattachmentFields[8].Descriptor()
+	// businessattachment.ObjectKeyValidator is a validator for the "object_key" field. It is called by the builders before save.
+	businessattachment.ObjectKeyValidator = func() func(string) error {
+		validators := businessattachmentDescObjectKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(object_key string) error {
+			for _, fn := range fns {
+				if err := fn(object_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// businessattachmentDescUploadedBy is the schema descriptor for uploaded_by field.
 	businessattachmentDescUploadedBy := businessattachmentFields[9].Descriptor()
 	// businessattachment.UploadedByValidator is a validator for the "uploaded_by" field. It is called by the builders before save.

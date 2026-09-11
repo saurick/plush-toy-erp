@@ -239,15 +239,31 @@ export default function BusinessFormPage({
   const save = async () => {
     if (submittingRef.current || confirmLoading || loading) return
     submittingRef.current = true
+    let validationErrors = []
     try {
       await onOk?.()
+      validationErrors = (form?.getFieldsError() || []).filter(
+        (field) => field.errors.length > 0
+      )
     } catch (error) {
       if (!error?.errorFields) throw error
-      const firstField = error.errorFields[0]?.name
-      if (firstField) {
-        form?.scrollToField(firstField, { focus: true, block: 'nearest' })
-      }
+      validationErrors = error.errorFields
     } finally {
+      if (validationErrors.length > 0) {
+        // 页面保存器可能自行处理校验异常；仍需展开错误所在明细并定位。
+        await new Promise((resolve) => window.requestAnimationFrame(resolve))
+        pageRef.current
+          ?.querySelectorAll('.erp-line-item-details')
+          .forEach((details) => {
+            if (details.querySelector('.ant-form-item-has-error')) {
+              details.open = true
+            }
+          })
+        form?.scrollToField(validationErrors[0].name, {
+          focus: true,
+          block: 'nearest',
+        })
+      }
       submittingRef.current = false
     }
   }

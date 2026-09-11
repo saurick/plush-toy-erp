@@ -212,10 +212,12 @@ BEGIN
       FROM information_schema.columns
      WHERE table_schema = 'public'
        AND table_name = 'business_attachments'
-       AND column_name IN ('content', 'file_size', 'sha256');
-    IF column_count <> 3 THEN
+       AND column_name IN ('file_size', 'sha256');
+    IF column_count <> 2 THEN
       blockers := array_append(blockers, 'business_attachments target columns are incomplete');
     ELSE
+      -- This audit runs both before the one-time export and after the bytea retirement.
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='business_attachments' AND column_name='content') THEN
       EXECUTE $sql$
         SELECT count(*)
           FROM public.business_attachments
@@ -223,10 +225,19 @@ BEGIN
             OR octet_length(content) <> file_size
             OR sha256 !~ '^[0-9a-f]{64}$'
       $sql$ INTO invalid_count;
+      ELSE
+        EXECUTE $sql$
+          SELECT count(*) FROM public.business_attachments
+          WHERE file_size NOT BETWEEN 1 AND 5242880
+             OR sha256 !~ '^[0-9a-f]{64}$'
+             OR object_key IS NULL
+             OR object_key !~ '^attachments/([0-9a-f]{32}|[0-9a-f]{64})$'
+        $sql$ INTO invalid_count;
+      END IF;
       IF invalid_count > 0 THEN
         blockers := array_append(
           blockers,
-          format('business_attachments has %s invalid size, content length or sha256 rows', invalid_count)
+          format('business_attachments has %s invalid size, storage reference or sha256 rows', invalid_count)
         );
       END IF;
     END IF;

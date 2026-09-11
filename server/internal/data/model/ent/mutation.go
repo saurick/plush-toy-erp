@@ -6583,7 +6583,7 @@ type BusinessAttachmentMutation struct {
 	file_size         *int
 	addfile_size      *int
 	sha256            *string
-	content           *[]byte
+	object_key        *string
 	uploaded_by       *int
 	adduploaded_by    *int
 	note              *string
@@ -7037,40 +7037,40 @@ func (m *BusinessAttachmentMutation) ResetSha256() {
 	m.sha256 = nil
 }
 
-// SetContent sets the "content" field.
-func (m *BusinessAttachmentMutation) SetContent(b []byte) {
-	m.content = &b
+// SetObjectKey sets the "object_key" field.
+func (m *BusinessAttachmentMutation) SetObjectKey(s string) {
+	m.object_key = &s
 }
 
-// Content returns the value of the "content" field in the mutation.
-func (m *BusinessAttachmentMutation) Content() (r []byte, exists bool) {
-	v := m.content
+// ObjectKey returns the value of the "object_key" field in the mutation.
+func (m *BusinessAttachmentMutation) ObjectKey() (r string, exists bool) {
+	v := m.object_key
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldContent returns the old "content" field's value of the BusinessAttachment entity.
+// OldObjectKey returns the old "object_key" field's value of the BusinessAttachment entity.
 // If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *BusinessAttachmentMutation) OldContent(ctx context.Context) (v []byte, err error) {
+func (m *BusinessAttachmentMutation) OldObjectKey(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldContent is only allowed on UpdateOne operations")
+		return v, errors.New("OldObjectKey is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldContent requires an ID field in the mutation")
+		return v, errors.New("OldObjectKey requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldContent: %w", err)
+		return v, fmt.Errorf("querying old value for OldObjectKey: %w", err)
 	}
-	return oldValue.Content, nil
+	return oldValue.ObjectKey, nil
 }
 
-// ResetContent resets all changes to the "content" field.
-func (m *BusinessAttachmentMutation) ResetContent() {
-	m.content = nil
+// ResetObjectKey resets all changes to the "object_key" field.
+func (m *BusinessAttachmentMutation) ResetObjectKey() {
+	m.object_key = nil
 }
 
 // SetUploadedBy sets the "uploaded_by" field.
@@ -7455,8 +7455,8 @@ func (m *BusinessAttachmentMutation) Fields() []string {
 	if m.sha256 != nil {
 		fields = append(fields, businessattachment.FieldSha256)
 	}
-	if m.content != nil {
-		fields = append(fields, businessattachment.FieldContent)
+	if m.object_key != nil {
+		fields = append(fields, businessattachment.FieldObjectKey)
 	}
 	if m.uploaded_by != nil {
 		fields = append(fields, businessattachment.FieldUploadedBy)
@@ -7500,8 +7500,8 @@ func (m *BusinessAttachmentMutation) Field(name string) (ent.Value, bool) {
 		return m.FileSize()
 	case businessattachment.FieldSha256:
 		return m.Sha256()
-	case businessattachment.FieldContent:
-		return m.Content()
+	case businessattachment.FieldObjectKey:
+		return m.ObjectKey()
 	case businessattachment.FieldUploadedBy:
 		return m.UploadedBy()
 	case businessattachment.FieldNote:
@@ -7539,8 +7539,8 @@ func (m *BusinessAttachmentMutation) OldField(ctx context.Context, name string) 
 		return m.OldFileSize(ctx)
 	case businessattachment.FieldSha256:
 		return m.OldSha256(ctx)
-	case businessattachment.FieldContent:
-		return m.OldContent(ctx)
+	case businessattachment.FieldObjectKey:
+		return m.OldObjectKey(ctx)
 	case businessattachment.FieldUploadedBy:
 		return m.OldUploadedBy(ctx)
 	case businessattachment.FieldNote:
@@ -7618,12 +7618,12 @@ func (m *BusinessAttachmentMutation) SetField(name string, value ent.Value) erro
 		}
 		m.SetSha256(v)
 		return nil
-	case businessattachment.FieldContent:
-		v, ok := value.([]byte)
+	case businessattachment.FieldObjectKey:
+		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetContent(v)
+		m.SetObjectKey(v)
 		return nil
 	case businessattachment.FieldUploadedBy:
 		v, ok := value.(int)
@@ -7830,8 +7830,8 @@ func (m *BusinessAttachmentMutation) ResetField(name string) error {
 	case businessattachment.FieldSha256:
 		m.ResetSha256()
 		return nil
-	case businessattachment.FieldContent:
-		m.ResetContent()
+	case businessattachment.FieldObjectKey:
+		m.ResetObjectKey()
 		return nil
 	case businessattachment.FieldUploadedBy:
 		m.ResetUploadedBy()

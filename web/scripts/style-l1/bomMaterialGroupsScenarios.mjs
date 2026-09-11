@@ -4,6 +4,19 @@ import {
 } from './businessFormPageAssertions.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
 
+async function waitForMaterialDropdown(page) {
+  const dropdown = page.locator('.ant-select-dropdown:visible')
+  await dropdown.waitFor({ state: 'visible' })
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.ant-select-dropdown')].some(
+      (node) =>
+        node.getBoundingClientRect().height > 0 &&
+        getComputedStyle(node).opacity === '1'
+    )
+  )
+  return dropdown
+}
+
 export async function verifyBOMMaterialGroups(
   page,
   { assert, expectHeading, expectText }
@@ -19,6 +32,11 @@ export async function verifyBOMMaterialGroups(
   const groups = modal.locator('.erp-bom-material-group')
   await groups.first().waitFor({ state: 'visible' })
   assert.equal(await groups.count(), 3)
+  assert.equal(
+    await page.getByRole('button', { name: /^新建物料/ }).count(),
+    0,
+    'material creation is only offered inside the open material dropdown'
+  )
   assert.equal(
     await modal.getByText('生产工序归属', { exact: true }).count(),
     0
@@ -118,6 +136,22 @@ export function createBOMMaterialGroupsScenarios(deps) {
           path: `${deps.outputDir}/bom-material-groups-form${page.viewportSize().width < 600 ? '-mobile' : ''}.png`,
           fullPage: true,
         })
+        const material = modal.getByRole('combobox', {
+          name: '物料名称 1',
+          exact: true,
+        })
+        await material.press('ArrowDown')
+        const dropdown = await waitForMaterialDropdown(page)
+        await dropdown
+          .getByRole('button', { name: '新建物料并使用', exact: true })
+          .waitFor({ state: 'visible' })
+        const theme = await page.locator('html').getAttribute('data-erp-theme')
+        await page.screenshot({
+          path: `${deps.outputDir}/bom-material-dropdown-${theme}-${page.viewportSize().width}.png`,
+          fullPage: true,
+        })
+        await material.press('Escape')
+        await dropdown.waitFor({ state: 'hidden' })
         await modal
           .locator('.erp-business-form-page__footer .ant-btn-primary')
           .last()
@@ -396,6 +430,12 @@ export function createBOMMaterialGroupsScenarios(deps) {
           await editor.getByLabel('单位用量 1', { exact: true }).isDisabled(),
           true
         )
+        deps.assert.equal(
+          await editor
+            .getByRole('combobox', { name: '物料名称 1', exact: true })
+            .isDisabled(),
+          true
+        )
         await closeBusinessFormPage(page, editor)
       },
     },
@@ -456,15 +496,61 @@ export function createBOMMaterialGroupsScenarios(deps) {
       },
       verify: async (page) => {
         const modal = await verifyBOMMaterialGroups(page, deps)
-        await modal
+        const material = modal.getByRole('combobox', {
+          name: '物料名称 1',
+          exact: true,
+        })
+        const selectedMaterial = modal
           .locator('.erp-bom-material-group')
           .first()
-          .getByRole('button', { name: '新建物料', exact: true })
-          .click()
+          .locator('.ant-select-selection-item')
+          .first()
+        const originalMaterial = await selectedMaterial.innerText()
+        const dropdown = page.locator('.ant-select-dropdown:visible')
+        const createButton = dropdown.getByRole('button', {
+          name: '新建物料并使用',
+          exact: true,
+        })
+        await material.press('ArrowDown')
+        await waitForMaterialDropdown(page)
+        await createButton.waitFor({ state: 'visible' })
+        deps.assert.equal(await createButton.count(), 1)
+        const popupBox = await dropdown.boundingBox()
+        const buttonBox = await createButton.boundingBox()
+        deps.assert.ok(buttonBox.x >= popupBox.x)
+        deps.assert.ok(
+          buttonBox.x + buttonBox.width <= popupBox.x + popupBox.width
+        )
+        deps.assert.ok(
+          buttonBox.y + buttonBox.height <= popupBox.y + popupBox.height
+        )
+        await page.screenshot({
+          path: `${deps.outputDir}/bom-material-create-dropdown.png`,
+          fullPage: true,
+        })
+        await material.press('Tab')
+        await page.waitForFunction(
+          () => document.activeElement?.textContent.trim() === '新建物料并使用'
+        )
+        await createButton.press('Enter')
         const create = page
           .getByRole('dialog')
           .filter({ hasText: '新建物料并使用' })
           .last()
+        await create.waitFor({ state: 'visible' })
+        await dropdown.waitFor({ state: 'hidden' })
+        await create.locator('.ant-modal-footer .ant-btn-default').click()
+        await create.waitFor({ state: 'hidden' })
+        await page.waitForFunction(
+          () =>
+            document.activeElement?.getAttribute('aria-label') === '物料名称 1'
+        )
+        deps.assert.equal(await selectedMaterial.innerText(), originalMaterial)
+        deps.assert.equal(await dropdown.count(), 0)
+        await material.fill('找不到的模拟物料')
+        await dropdown.locator('.ant-select-item-empty').waitFor()
+        await createButton.click()
+        await create.waitFor({ state: 'visible' })
         await create.locator('input[id="name"]').fill('模拟新建短毛绒')
         await create
           .locator('.ant-select')
@@ -572,6 +658,41 @@ export function createBOMMaterialGroupsScenarios(deps) {
         const parts = saves[0].items.filter((item) => item.material_id === 77)
         deps.assert.equal(parts.length, 3)
         deps.assert.ok(parts.every((item) => item.unit_id === 1))
+        deps.assert.equal(saves[0].items.length, 5)
+        deps.assert.equal(
+          saves[0].items.filter((item) => item.material_id !== 77).length,
+          2
+        )
+      },
+    },
+    {
+      ...scenarios[0],
+      name: 'bom-material-select-without-create-permission',
+      adminProfile: {
+        is_super_admin: false,
+        permissions: deps.customerRuntimeEffectiveSession.actions.filter(
+          (action) => action !== 'material.create'
+        ),
+      },
+      verify: async (page) => {
+        const editor = await verifyBOMMaterialGroups(page, deps)
+        const material = editor.getByRole('combobox', {
+          name: '物料名称 1',
+          exact: true,
+        })
+        await material.press('ArrowDown')
+        const dropdown = page.locator('.ant-select-dropdown:visible')
+        await dropdown.waitFor({ state: 'visible' })
+        deps.assert.equal(
+          await dropdown.getByRole('button', { name: /^新建物料/ }).count(),
+          0
+        )
+        deps.assert.ok(
+          await dropdown.locator('.ant-select-item-option').count()
+        )
+        await material.press('Escape')
+        await dropdown.waitFor({ state: 'hidden' })
+        await closeBusinessFormPage(page, editor)
       },
     },
     { ...scenarios[0], name: 'bom-material-groups-dark', themeMode: 'dark' },

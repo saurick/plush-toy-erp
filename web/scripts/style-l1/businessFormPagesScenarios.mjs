@@ -174,6 +174,9 @@ export function createBusinessFormPagesScenarios(deps) {
       return {
         ...original,
         name,
+        themeMode: ['purchase', 'shipment', 'suppliers'].includes(key)
+          ? 'dark'
+          : 'light',
         verify: async (page) => {
           await page.getByRole('button', { name: document[2] }).click()
           const editor = page.locator('.erp-business-form-page:not([hidden])')
@@ -185,13 +188,91 @@ export function createBusinessFormPagesScenarios(deps) {
             createLineItemUnitAssertions(deps)
           await assertLineItemAddActionScrollsToNewRow(editor, {
             scenarioName: name,
-            ...(['customers', 'suppliers', 'shipment'].includes(key)
+            ...(key === 'sales' ? { addButtonName: '添加订货明细' } : {}),
+            ...(['customers', 'suppliers'].includes(key)
               ? {
                   listSelector: '.erp-master-contact-list__items',
                   rowSelector: '.erp-master-contact-list__row',
                 }
               : {}),
           })
+          const contacts = ['customers', 'suppliers'].includes(key)
+          const list = editor.locator(
+            contacts
+              ? '.erp-master-contact-list__items'
+              : '.erp-sales-order-lines-form__list'
+          )
+          if (contacts) {
+            const rows = list.locator('.erp-master-contact-list__row')
+            await rows
+              .nth(0)
+              .getByLabel('联系人', { exact: true })
+              .fill('采购联系人')
+            await rows
+              .nth(1)
+              .getByLabel('联系人', { exact: true })
+              .fill('收货联系人')
+            await editor
+              .getByRole('button', { name: '复制联系人条目 1', exact: true })
+              .click()
+            deps.assert.equal(
+              await rows
+                .nth(1)
+                .getByLabel('联系人', { exact: true })
+                .inputValue(),
+              '采购联系人'
+            )
+            deps.assert.equal(
+              await rows
+                .nth(2)
+                .getByLabel('联系人', { exact: true })
+                .inputValue(),
+              '收货联系人'
+            )
+          }
+          for (const [variant, viewport] of [
+            ['desktop', { width: 1440, height: 900 }],
+            ['narrow', { width: 390, height: 844 }],
+          ]) {
+            await page.setViewportSize(viewport)
+            await assertBusinessFormPage(page, editor)
+            if (!contacts) {
+              const details = list.locator('.erp-line-item-details').first()
+              if (!(await details.evaluate((node) => node.open))) {
+                await details.locator('summary').click()
+              }
+            }
+            const flow = await list.evaluate((node) => {
+              const body = node.closest('.erp-business-form-page__body')
+              return {
+                listHeight: node.clientHeight,
+                contentHeight: node.scrollHeight,
+                bodyWidth: body.clientWidth,
+                contentWidth: body.scrollWidth,
+              }
+            })
+            deps.assert(
+              flow.contentHeight <= flow.listHeight + 2,
+              `${name}-${variant}: 展开补充信息后仍不应出现明细区纵向滚动 ${JSON.stringify(flow)}`
+            )
+            deps.assert(
+              flow.contentWidth <= flow.bodyWidth + 1,
+              `${name}-${variant}: 宽表不能撑开页面 ${JSON.stringify(flow)}`
+            )
+            const firstRow = list
+              .locator(
+                contacts ? '.erp-master-contact-list__row-head' : 'thead'
+              )
+              .first()
+            await firstRow.evaluate((node) =>
+              node.scrollIntoView({ block: 'start', inline: 'start' })
+            )
+            await page.waitForTimeout(350)
+            await page.screenshot({
+              path: `${deps.outputDir}/${name}-${variant}.png`,
+              fullPage: true,
+            })
+          }
           await closeBusinessFormPage(page, editor)
         },
       }

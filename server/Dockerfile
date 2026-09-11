@@ -131,7 +131,9 @@ RUN --mount=type=cache,id=plush-gomod,target=/go/pkg/mod \
     GOOS=${GO_TARGETOS} GOARCH=${GO_TARGETARCH} go build \
       -trimpath \
       -ldflags "-s -w -X main.Version=${GIT_SHA}" \
-      -o ./bin/rotate-manual-acceptance-passwords ./cmd/rotate-manual-acceptance-passwords
+      -o ./bin/rotate-manual-acceptance-passwords ./cmd/rotate-manual-acceptance-passwords && \
+    GOOS=${GO_TARGETOS} GOARCH=${GO_TARGETARCH} go build \
+      -trimpath -ldflags "-s -w" -o ./bin/attachment-storage ./cmd/attachment-storage
 
 # ======================
 # 4) Server runtime；复用同一 web-builder，不再次编译前端
@@ -195,6 +197,7 @@ WORKDIR /app
 COPY --from=go-builder /src/bin/server /app/server
 COPY --from=go-builder /src/bin/bootstrap-manual-acceptance-core /app/bootstrap-manual-acceptance-core
 COPY --from=go-builder /src/bin/rotate-manual-acceptance-passwords /app/rotate-manual-acceptance-passwords
+COPY --from=go-builder /src/bin/attachment-storage /app/attachment-storage
 RUN install -d -o app -g app -m 0555 /app/configs
 COPY --chown=app:app --chmod=0444 --from=go-builder /src/configs/prod/config.yaml /app/configs/config.yaml
 COPY --from=web-builder /web/build /app/public

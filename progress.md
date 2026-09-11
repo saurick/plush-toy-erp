@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### R640 GitLab 安全补丁升级（2026-09-11）
+
+- 运行：133 的 `plush-gitlab` 从 CE `19.3.0` 升至 `19.3.2`，镜像固定为 `sha256:05453dd1d9aba27c2c487613141596868409b4d03247647f7d66cb0b36f321b8`；Compose、端口、挂载、资源限制与 Omnibus 配置已读回，只有镜像版本变化。GitLab 服务健康、完整 readiness、数据库迁移检查、自检、公网登录页和内网 Git 读取均通过，Runner 已恢复 204 作业轮询。
+- 数据与恢复：项目 1、用户 11、Release 25、Package 文件 386、artifact 3955，升级前后数量相同，HEAD 为 `e3a7a3b1969e5af95bb3f597d23badaa28099c40`；抽样 Package SHA-256 与 artifact 可读性通过。升级前完整备份 `1789098799_2026_09_11_19.3.0_gitlab_backup.tar`、配置归档和 `backup-20260911T040800Z.sha256` 已校验，旧镜像、原 Compose 与运维回执保留在目标机；未做恢复演练或新 CI 流水线验证。
+- 任务外发现：原有定时备份服务因 `ProtectHome` 隔离与全局存储检查冲突而失败；宿主机同一检查及备份脚本预检通过，本次直接执行既有备份与校验入口完成升级备份，未修改定时器或放宽存储检查。Prometheus 的 Kubernetes discovery CA 缺失错误在升级前日志已存在，未扩域调整。
+- Git 交接：本轮仅修改 `server/deploy/gitlab/compose.yml`、同目录 `README.md` 和本记录，意图为“升级 R640 GitLab 至 19.3.2 安全补丁”；3 项 GitLab 存储保护测试与 scoped diff 检查通过。仅获 GitLab 升级授权，未 stage / commit / push；保留其他任务的业务页面、样式与文档改动。
+
 ### 材料库存类别与仓库用途区分（2026-09-09，本地实现与验证完成）
 
 - 业务与字段：材料档案保留细分分类，新增主料、辅料、包材、其他材料及待分类库存类别，并可指定匹配的默认入库仓。工程从材料档案或 BOM 内建料时维护一次，后续引用复用。仓库用途包含对应材料仓、原辅料综合仓和成品仓；成品仍使用产品 / SKU 真源，与材料分账。
@@ -276,3 +283,14 @@
 - 已撤销：切换并验证引用后，旧发布令牌 ID `5`、旧永久只读令牌 ID `17` 均回读 `revoked=true / active=false`；此前个人临时令牌 `codex-delivery-20260831`、项目临时令牌 ID `14` 及旧 Deploy Token 均已失效。当前本项目有效凭据只有项目令牌 `21 / 22` 与永久制品下载 Deploy Token `10`，个人 active token 为 `0`；失效审计记录保留，SSH 推送密钥不变。
 - 验证：旧只读令牌认证返回 `401`；两个新令牌自身状态、固定 SHA 的 CI / Release 和主分支读取成功，撤销后 Pipeline `140` 仍返回 `200 / success`。现有 Deploy Token 从目标内网取得固定 release manifest，SHA-256 与发布证据一致。未重新运行 CI/CD 或部署；本机后端未就绪的原有恢复模式仍阻断工作台，未因此修改数据库或启动后端。
 - 安全待办：此前读取 GitLab 个人令牌页时，RSS feed token 意外进入工具输出；未复述或写入仓库，需要用户通过正常入口重置，尚未完成。本轮不记录任何令牌值，不改业务代码、AGENTS 或密码；此记录未提交推送。
+
+### 图片与附件外置到 RAID5 对象存储（2026-09-11，本地实现）
+
+- 决策与实现：用户明确不用 NAS，采用 RAID5 本机目录上的 SeaweedFS 私有 S3 服务。`server/internal/attachmentstore/` 统一对象传输，`business_attachment_repo.go` 先写不可覆盖对象再提交引用；PG 仅保留元数据、key 与审计。原 owner / RBAC / Workflow、产品图槽位、5MiB 和 base64 API 保持既有合同。
+- 迁移与恢复：`server/cmd/attachment-storage/` 和 `internal/attachmentmigration/` 支持盘点、导出、校验、文件备份和恢复。Atlas 新增 `20260911062305`、`20260911062436`、`20260911062537`，缺失或过期导出摘要阻断删除旧内容；Ent 与数据字典已同步。正式 `migrate_online.sh` 复用停写和串行锁窗口完成导出验证；RAID5 未挂载、对象服务故障或凭据不可用时阻断放行。
+- 相关入口：生产 Compose / env / Dockerfile、生产 preflight、新目标初始化、本地发布演练、容量测试附件写入及 `database-constraint-preflight.sql` 已接入。操作合同位于 `server/deploy/compose/prod/README.md`，架构边界位于 `docs/architecture/业务附件证据边界评审.md`；旧图片和无引用对象暂不自动删除。
+- 存储查看：同一 SeaweedFS 容器启用原生管理界面，`viewer` 与 `storage-admin` 使用独立随机密码；仍无宿主机端口发布。`scripts/deploy/attachment-console.mjs` 只核对固定目标并建立本机 SSH 转发，目标初始化、演练和生产预检同步凭据合同，不增加 ERP 页面。原版界面仍显示部分写入按钮，但 viewer 的请求由服务端拒绝。
+- 已验证：`make data` 再运行零结构漂移，`db-guard`、schema-doc、ShellCheck、Compose config / example preflight 通过；后端 data / biz / service、存储包与三个命令构建通过。`attachment-storage-integration.sh` 使用本地一次性 PostgreSQL 18.1 与 SeaweedFS 4.46，存储 / 迁移 6 项、附件数据库回归 37 项均通过且零 skip，另完成 PG dump 与文件备份向新库 / 空 bucket 的完整恢复；测试容器和其匿名卷已清理。部署 / 初始化 / 演练 / QA 编排相关 Node 回归通过，数据字典索引期望已随新增唯一索引更新并单独复验。
+- 界面验证：相关 Node 回归 115 项通过、零 skip；文档与查看入口检查 9 项通过。一次性真实 Compose 验证匿名拦截、错误密码、只读登录、文件列表和下载、上传与删除拒绝、退出登录；浏览器验证登录页、viewer 会话、文件预览、新建文件夹被 403 拒绝及退出后重新要求登录。ShellCheck、example preflight 和 diff 格式检查通过；截图为本地合成文件，目标 SSH 通道尚无部署后运行证据。
+- 交付边界：未对共享开发、demo 或 customer-test 执行迁移、部署或真实文件导出。外置发布前还需准备各环境 RAID5 目录、独立凭据和固定镜像，并按正式制品 / 目标流程切换。现有定时 PostgreSQL 备份仍只覆盖数据库，完整恢复须配套文件备份；本地验证不代替目标运行、恢复或客户验收。
+- Git handoff：本轮范围为附件存储 / 迁移 / 部署 / 相关测试和上述文档，建议中文提交意图 `feat(storage): 将业务附件外置到 RAID5 对象存储`。既有前端表单、原型、订单采购文档、GitLab 部署配置及本文件原有改动归其他任务，保留并排除；仅本追加段属于本轮。未获 stage / commit / push 授权，未执行 Git 写操作；收口发现现有空 index.lock，保留未处理，后续 Git 动作前须按既有门禁重新核对。

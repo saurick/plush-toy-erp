@@ -92,6 +92,8 @@ export function createBusinessActionAssertions({ outputDir }) {
         return {
           clientWidth: list.clientWidth,
           scrollWidth: list.scrollWidth,
+          scrollHeight: list.scrollHeight,
+          clientHeight: list.clientHeight,
           scrollLeft: list.scrollLeft,
           initialScrollLeft,
           defaultScrollLeft,
@@ -113,13 +115,14 @@ export function createBusinessActionAssertions({ outputDir }) {
             '.erp-business-action-form textarea.ant-input',
             '.erp-business-action-form .ant-input-affix-wrapper',
             '.erp-business-action-form .ant-input-number',
+            '.erp-business-action-form .ant-input-number-affix-wrapper',
             '.erp-business-action-form .ant-picker',
             '.erp-business-action-form .ant-select-selector',
           ].join(', ')
         )
       )
         .filter((control) => {
-          if (control.matches('.erp-item-field-unit-suffix')) {
+          if (control.matches('.ant-input-number-affix-wrapper > .ant-input-number')) {
             return false
           }
           if (
@@ -146,6 +149,7 @@ export function createBusinessActionAssertions({ outputDir }) {
             width: rect.width,
             height: rect.height,
             borderRadius: style.borderRadius,
+            compactCell: Boolean(control.closest('.erp-line-item-table__cell')),
           }
         })
       const singleLineControls = Array.from(
@@ -154,12 +158,16 @@ export function createBusinessActionAssertions({ outputDir }) {
             '.erp-business-action-form input.ant-input:not([type="hidden"])',
             '.erp-business-action-form .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)',
             '.erp-business-action-form .ant-input-number',
+            '.erp-business-action-form .ant-input-number-affix-wrapper',
             '.erp-business-action-form .ant-picker',
             '.erp-business-action-form .ant-select-single .ant-select-selector',
           ].join(', ')
         )
       )
         .filter((control) => {
+          if (control.matches('.ant-input-number-affix-wrapper > .ant-input-number')) {
+            return false
+          }
           if (
             control.matches('input.ant-input') &&
             control.closest(
@@ -348,36 +356,35 @@ export function createBusinessActionAssertions({ outputDir }) {
         metrics.contactItemLists.length > 0 &&
           metrics.contactItemLists.every(
             (list) =>
-              ['auto', 'scroll'].includes(list.overflowX) &&
-              ['auto', 'visible'].includes(list.overflowY) &&
-              list.scrollWidth > list.clientWidth &&
+              list.scrollHeight <= list.clientHeight + 2 &&
+              list.scrollWidth <= list.clientWidth + 1 &&
               list.scrollLeft === 0 &&
               list.defaultScrollLeft === 0 &&
-              list.maxScrollLeft > 0 &&
+              list.maxScrollLeft === 0 &&
               list.clientWidth >= Math.min(1000, metrics.modal.width - 110)
           ),
-        `${screenshotName} 联系人区未由同一个外层列表稳定横向滚动，或默认态未停在首列: ${JSON.stringify(metrics)}`
+        `${screenshotName} 联系人区应随页面展开，不能产生内部滚动: ${JSON.stringify(metrics)}`
       )
       assert(
         metrics.contactItemLists.every(
           (list) =>
             list.rows.length > 0 &&
-            list.rows.every((row) => row.width > list.clientWidth + 16) &&
+            list.rows.every((row) => row.width <= list.clientWidth + 1) &&
             Math.max(...list.rows.map((row) => row.width)) -
               Math.min(...list.rows.map((row) => row.width)) <=
               2
         ),
-        `${screenshotName} 多个联系人条目未共享同一列宽和滚动面: ${JSON.stringify(metrics)}`
+        `${screenshotName} 联系人条目应适应明细区宽度: ${JSON.stringify(metrics)}`
       )
       assert(
         metrics.contactItemLists.every((list) =>
           list.grids.every(
             (grid) =>
-              grid.gridAutoFlow === 'column' &&
+              grid.gridAutoFlow === 'row' &&
               !['auto', 'scroll'].includes(grid.overflowX) &&
               grid.fields.every(
                 (field) =>
-                  field.width >= 220 && field.scrollWidth <= field.width + 2
+                  field.width >= 160 && field.scrollWidth <= field.width + 2
               )
           )
         ),
@@ -396,7 +403,7 @@ export function createBusinessActionAssertions({ outputDir }) {
     }
     assert(
       metrics.controls.every(
-        (control) => control.width >= 120 && control.height >= 30
+        (control) => control.width >= (control.compactCell ? 80 : 120) && control.height >= 30
       ),
       `${screenshotName} 表单控件尺寸异常: ${JSON.stringify(metrics)}`
     )

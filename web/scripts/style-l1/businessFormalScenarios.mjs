@@ -95,7 +95,6 @@ export function createBusinessFormalScenarios(deps) {
   const {
     assertLineItemAddActionScrollsToNewRow,
     assertLineItemDuplicateAction,
-    assertLineItemFooterFollowsModalScroll,
     assertLineItemFieldLayout,
     assertLineAmountCalculation,
     assertLineQuantityPrecisionBlocksAmount,
@@ -252,7 +251,7 @@ export function createBusinessFormalScenarios(deps) {
         const candidates = Array.from(node.querySelectorAll('.ant-form-item'))
           .filter(
             (item) =>
-              !item.closest('.erp-sales-order-lines-form__grid') &&
+              !item.closest('.erp-line-item-details__fields') &&
               !item.closest('.erp-master-contact-list__grid') &&
               !item.closest('.erp-purchase-receipt-inline-item-form') &&
               item.querySelector('textarea')
@@ -806,12 +805,14 @@ export function createBusinessFormalScenarios(deps) {
     )
     await modal.getByLabel('实际运费金额').fill('12.5')
     assert.equal(
-      await modal.getByLabel('实际运费币种（自动）').inputValue(),
+      (await modal.getByLabel('实际运费币种（自动）').textContent()).trim(),
       'USD',
       '实际运费应展示销售订单币种'
     )
     assert.equal(
-      await modal.getByLabel('实际运费币种（自动）').isEditable(),
+      await modal.getByLabel('实际运费币种（自动）').evaluate(
+        (node) => node.isContentEditable || node.matches('input, textarea, select')
+      ),
       false,
       '自动带出的实际运费币种不可编辑'
     )
@@ -819,6 +820,7 @@ export function createBusinessFormalScenarios(deps) {
     await modal.screenshot({
       path: path.join(outputDir, 'shipment-source-one-currency-modal.png'),
     })
+    await modal.locator('.erp-line-item-details > summary').first().click()
     await expectText(page, '销售订单行追溯')
     assert.equal(
       await modal.getByText('销售订单行追溯', { exact: true }).count(),
@@ -888,7 +890,329 @@ export function createBusinessFormalScenarios(deps) {
     await assertTextAbsent(page, 'sales_order_item_id 追溯')
   }
 
+  const verifySalesOrderDemandEntry = async (page) => {
+    await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', {
+      waitUntil: 'domcontentloaded',
+    })
+    await expectHeading(page, '销售订单')
+    await expectButton(page, '新建订单')
+    await expectText(page, '当前操作')
+    await assertCurrentOperationBarCompact(page, {
+      scenarioName: 'business-v1-sales-orders',
+    })
+    await page.getByRole('button', { name: /展开SO-STYLE-L1明细/u }).waitFor()
+    await assertBusinessCollaborationPanelAbsent(
+      page,
+      'business-v1-sales-orders'
+    )
+    await assertNoListDeleteTrashToolbar(page)
+    await assertBusinessMainTableInitialSelectionEmpty(page, {
+      scenarioName: 'business-v1-sales-orders',
+    })
+    await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
+    await assertOrderLifecycleActionsConsolidated(page, {
+      scenarioName: 'business-v1-sales-orders',
+      primaryActionLabel: '提交',
+      menuActionLabels: ['取消'],
+      absentButtonLabels: ['生效', '关闭', '取消'],
+    })
+    await assertBusinessPageRefreshEntrypoint(page, {
+      scenarioName: 'business-v1-sales-orders',
+    })
+    await assertBusinessHeaderHasNoSectionTitle(page, {
+      scenarioName: 'business-v1-sales-orders',
+    })
+    await assertBusinessModuleToolbarControlStyle(page, {
+      scenarioName: 'business-v1-sales-orders',
+    })
+    await assertBusinessMainTableSortableColumns(page, {
+      scenarioName: 'business-v1-sales-orders',
+    })
+    await assertBusinessFormModalKeyboardRecovery(page, {
+      triggerName: '新建订单',
+      titleText: '新建销售订单',
+      scenarioName: 'business-v1-sales-orders',
+    })
+    await page.getByRole('button', { name: '新建订单' }).click()
+    const draftForm = page.locator('.erp-business-form-page:not([hidden])')
+    await draftForm.getByLabel('客户', { exact: true }).click()
+    await page.getByText('CUS-STYLE-L1 - 暗色客户', { exact: true }).click()
+    const [draftSaved] = await Promise.all([
+      page.waitForRequest(
+        (request) =>
+          request.url().endsWith('/rpc/sales_order') &&
+          request.postDataJSON()?.method === 'save_sales_order_with_items'
+      ),
+      draftForm.locator('.erp-business-form-page__footer .ant-btn-primary').click(),
+    ])
+    assert.deepEqual(
+      draftSaved.postDataJSON().params.items,
+      [],
+      '草稿不得自动提交空白明细'
+    )
+    await draftForm.waitFor({ state: 'hidden' })
+    await verifyBusinessActionFormModal(page, {
+      buttonName: '新建订单',
+      titleText: '新建销售订单',
+      minFieldCount: 6,
+      screenshotName: 'business-v1-sales-order-form-modal',
+      expectedTexts: ['订货明细', '添加订货明细', '暂无订货明细'],
+      absentTexts: ['产品引用 ID', '单位引用 ID'],
+      afterOpen: async (modal) => {
+        assert.equal(
+          await modal.locator('.erp-sales-order-lines-form__row').count(),
+          0
+        )
+        assert.equal(
+          await modal
+            .getByRole('button', { name: '调整明细顺序', exact: true })
+            .count(),
+          0
+        )
+        await modal
+          .getByRole('button', { name: '添加订货明细', exact: true })
+          .click()
+        await modal
+          .getByLabel('订货产品名称', { exact: true })
+          .fill('客户新款毛绒挂件')
+        assert.equal(
+          await modal
+            .getByRole('button', { name: '调整明细顺序', exact: true })
+            .count(),
+          0
+        )
+        await modal.locator('.erp-business-form-page__footer .ant-btn-primary').click()
+        await modal.getByText('请填写订单数量', { exact: true }).waitFor()
+        assert.equal(
+          await modal.getByLabel('订货产品名称', { exact: true }).inputValue(),
+          '客户新款毛绒挂件',
+          '校验失败应保留已填写的需求'
+        )
+        await modal.getByLabel('订货产品名称', { exact: true }).scrollIntoViewIfNeeded()
+        await assertNonItemTextareaFullRow(modal, {
+          labels: ['报价备注', '备注'],
+          scenarioName: 'business-v1-sales-order-form-modal',
+        })
+        await assertLineQuantityUnitSuffix(modal, {
+          label: '订单数量',
+          expectedText: '件（PCS）',
+          scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+        })
+        await assertLineItemFieldLayout(modal, {
+          scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+          visibleThroughLabel: '单位',
+          absentLabels: ['产品编号快照', '产品名称快照', '颜色快照'],
+        })
+        const amountInput = modal
+          .locator('.erp-line-item-field--money input[readonly]')
+          .first()
+        await amountInput.scrollIntoViewIfNeeded()
+        assert(
+          await amountInput.evaluate((node) => {
+            const rect = node.getBoundingClientRect()
+            const list = node
+              .closest('.erp-sales-order-lines-form__list')
+              ?.getBoundingClientRect()
+            return Boolean(
+              list && rect.left >= list.left - 1 && rect.right <= list.right + 1
+            )
+          }),
+          '销售订单金额须可通过明细区横向滚动完整查看'
+        )
+        await assertLineQuantityPrecisionBlocksAmount(modal, {
+          quantityLabel: '订单数量',
+          unitPriceLabel: '单价',
+          amountLabel: '金额',
+          quantity: '123.11',
+          unitPrice: '12.11',
+          expectedErrorText: '当前单位只允许整数数量',
+          scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+        })
+        await assertLineAmountCalculation(modal, {
+          quantityLabel: '订单数量',
+          unitPriceLabel: '单价',
+          amountLabel: '金额',
+          quantity: '11',
+          unitPrice: '12.11',
+          expected: '133.21',
+          scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+        })
+        assert.equal(
+          await modal.locator('.erp-line-items-form__stat').filter({ hasText: '货款金额' }).locator('strong').innerText(),
+          'CNY 133.21',
+          '数量和单价齐全时，货款应显示真实计算结果'
+        )
+        const demandRow = modal.locator('.erp-sales-order-lines-form__row').first()
+        const details = demandRow.locator('.erp-line-item-details')
+        assert.equal(await details.evaluate((node) => node.open), false)
+        await details.locator('summary').click()
+        await demandRow.getByLabel('备注', { exact: true }).fill('分两批交货')
+        const sampleQuantity = demandRow.getByLabel('船头版数量', { exact: true })
+        await sampleQuantity.fill('-1')
+        await details.locator('summary').click()
+        await modal.getByLabel('客户', { exact: true }).click()
+        await page.getByText('CUS-STYLE-L1 - 暗色客户', { exact: true }).click()
+        await modal.locator('.erp-business-form-page__footer .ant-btn-primary').click()
+        await demandRow.getByText('请填写符合单位精度的非负数量', { exact: true }).waitFor()
+        assert.equal(await details.evaluate((node) => node.open), true, '校验应自动展开含错误的补充信息')
+        assert.equal(await sampleQuantity.evaluate((node) => document.activeElement === node), true, '校验应聚焦出错字段')
+        await sampleQuantity.fill('0')
+        await details.locator('summary').click()
+        assert.equal(await demandRow.getByLabel('备注', { exact: true }).inputValue(), '分两批交货')
+        const [savedDemand] = await Promise.all([
+          page.waitForRequest((request) => request.url().endsWith('/rpc/sales_order') && request.postDataJSON()?.method === 'save_sales_order_with_items'),
+          modal.locator('.erp-business-form-page__footer .ant-btn-primary').click(),
+        ])
+        const savedItems = savedDemand.postDataJSON().params.items
+        assert.equal(savedItems.length, 1)
+        assert.equal(savedItems[0].note, '分两批交货', '收起补充信息不能丢失保存内容')
+        assert.equal(savedItems[0].requested_product_name, '客户新款毛绒挂件')
+        await modal.waitFor({ state: 'hidden' })
+        await page.getByRole('button', { name: '新建订单' }).click()
+        await modal.getByRole('button', { name: '添加订货明细', exact: true }).click()
+        await modal.getByLabel('订货产品名称', { exact: true }).fill('客户新款毛绒挂件')
+        await modal.getByLabel('订单数量', { exact: true }).fill('11')
+        await modal.getByLabel('单价', { exact: true }).fill('12.11')
+        await verifySourceImportPicker(page, {
+          parentModal: modal,
+          triggerButton: '从已有规格添加',
+          titleText: '选择已有产品规格',
+          expectedTexts: ['规格编号', '产品名称', 'SKU-STYLE-L1'],
+          emptyDescriptionText: '暂无可选产品规格',
+          selectText: 'SKU-STYLE-L1',
+          selectedNoun: '规格',
+          scenarioName: 'sales-order-source-import-picker',
+        })
+        await assertLineQuantityUnitSuffix(modal, {
+          label: '订单数量',
+          expectedText: '件（PCS）',
+          scenarioName: 'business-v1-sales-order-form-modal',
+        })
+        await assertLineSourceSummaryReadableUnit(modal, {
+          label: '已关联产品',
+          expectedText: '件（PCS）',
+          scenarioName: 'business-v1-sales-order-form-modal',
+        })
+        const readDemandRows = () =>
+          modal
+            .locator('.erp-sales-order-lines-form__row')
+            .evaluateAll((rows) =>
+              rows.map((row) =>
+                [
+                  'requested_product_name',
+                  'product_id',
+                  'product_sku_id',
+                  'ordered_quantity',
+                  'unit_price',
+                ].map(
+                  (field) => row.querySelector(`[id$="_${field}"]`)?.value || ''
+                )
+              )
+            )
+        const beforeOrder = await readDemandRows()
+        assert.equal(beforeOrder.length, 2, '选用规格只追加选中的明细')
+        const reorder = modal.getByRole('button', {
+          name: '调整明细顺序',
+          exact: true,
+        })
+        await reorder.click()
+        const orderDialog = page
+          .locator('.erp-business-action-modal--columns')
+          .filter({ hasText: '调整明细顺序' })
+          .last()
+        await orderDialog
+          .getByRole('button', { name: / 上移$/u })
+          .last()
+          .click()
+        await orderDialog
+          .getByRole('button', { name: /^取\s*消$/u })
+          .click()
+        await orderDialog.waitFor({ state: 'hidden' })
+        assert.deepEqual(
+          await readDemandRows(),
+          beforeOrder,
+          '取消排序应保留原始明细及内容'
+        )
+        await reorder.click()
+        await orderDialog
+          .getByRole('button', { name: / 上移$/u })
+          .last()
+          .click()
+        await orderDialog
+          .getByRole('button', { name: '应用顺序', exact: true })
+          .click()
+        await orderDialog.waitFor({ state: 'hidden' })
+        assert.deepEqual(
+          await readDemandRows(),
+          [...beforeOrder].reverse(),
+          '排序应整体移动明细，保持需求、产品、数量与单价的对应关系'
+        )
+        await page.setViewportSize({ width: 760, height: 900 })
+        await assertNoHorizontalOverflow(
+          page,
+          'sales-order-demand-entry-narrow'
+        )
+        await modal
+          .getByLabel('订货产品名称', { exact: true })
+          .first()
+          .scrollIntoViewIfNeeded()
+        await page.screenshot({
+          path: path.join(outputDir, 'sales-order-demand-entry-narrow.png'),
+        })
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await assertLineItemDuplicateAction(modal, {
+          scenarioName: 'business-v1-sales-order-form-modal',
+        })
+        await assertLineItemAddActionScrollsToNewRow(modal, {
+          addButtonName: '添加订货明细',
+          scenarioName: 'business-v1-sales-order-form-modal',
+        })
+        assert.equal(
+          await modal.locator('.erp-line-items-form__stat').filter({ hasText: '货款金额' }).locator('strong').innerText(),
+          '待补齐',
+          '存在未填写数量或单价的明细时，货款不能被显示成零'
+        )
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await modal.locator('.erp-sales-order-demand-toolbar').evaluate(
+          (node) => node.scrollIntoView({ block: 'start' })
+        )
+        await page.waitForTimeout(350)
+        await page.screenshot({ path: path.join(outputDir, 'sales-order-lines-wide.png') })
+        await page.setViewportSize({ width: 1440, height: 900 })
+      },
+    })
+    await assertNoHorizontalOverflow(page, 'business-standard-sales-orders')
+    await verifyBusinessRowDoubleClickModal(page, {
+      rowText: 'SO-STYLE-L1',
+      titleText: '编辑销售订单',
+      scenarioName: 'business-v1-sales-orders',
+      afterModalOpen: async () => {
+        await expectText(page, '订货明细')
+        await page.locator('.erp-business-form-page:not([hidden]) .erp-line-item-details > summary').first().click()
+        await expectText(page, '已有规格（选填）')
+        await expectText(page, '已关联产品')
+        await assertTextAbsent(page, '产品引用 ID')
+        await assertTextAbsent(page, '单位引用 ID')
+      },
+    })
+  }
+
   return [
+    {
+      name: 'sales-order-demand-entry',
+      path: '/erp/sales/project-orders/sales-orders',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        try {
+          await verifySalesOrderDemandEntry(page)
+        } catch (error) {
+          await page.screenshot({ path: path.join(outputDir, 'sales-order-demand-entry-failed.png') })
+          throw error
+        }
+      },
+    },
     ...createSalesOrderSkuGrainScenarios(deps),
     ...createBOMMaterialGroupsScenarios(deps),
     ...createBusinessFormPagesScenarios(deps),
@@ -1184,8 +1508,8 @@ export function createBusinessFormalScenarios(deps) {
           )
           assert.equal(
             metrics.visibleLineRowCount,
-            1,
-            `新建表单应保留自己的空白行: ${JSON.stringify(evidence)}`
+            0,
+            `新建草稿应保持无明细，不能被迟到响应注入旧行: ${JSON.stringify(evidence)}`
           )
           assert.equal(
             lateRouteOutcome,
@@ -1272,8 +1596,6 @@ export function createBusinessFormalScenarios(deps) {
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'shipment-net-weight-incomplete',
               targetRowCount: 5,
-              listSelector: '.erp-master-contact-list__items',
-              rowSelector: '.erp-master-contact-list__row',
             })
           },
         })
@@ -1368,13 +1690,25 @@ export function createBusinessFormalScenarios(deps) {
           '',
           '默认单位变更后应清除旧产品单重'
         )
-        const suffixMetrics = await suffix.evaluate((node) => ({
-          text: String(node.value || '').trim(),
-          clientWidth: node.clientWidth,
-          scrollWidth: node.scrollWidth,
-          clientHeight: node.clientHeight,
-          scrollHeight: node.scrollHeight,
-        }))
+        const suffixMetrics = await suffix.evaluate((node) => {
+          const wrapper = node.closest('.ant-input-number-affix-wrapper')
+          const input = wrapper?.querySelector('.ant-input-number')
+          return {
+            text: String(node.textContent || '').trim(),
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+            clientHeight: node.clientHeight,
+            scrollHeight: node.scrollHeight,
+            inputCount: wrapper?.querySelectorAll('input').length,
+            innerBorder: input && getComputedStyle(input).borderLeftWidth,
+            radius: wrapper && getComputedStyle(wrapper).borderRadius,
+            height: wrapper?.getBoundingClientRect().height,
+          }
+        })
+        assert.equal(suffixMetrics.inputCount, 1, '单位不得成为第二个输入框')
+        assert.equal(suffixMetrics.innerBorder, '0px', '数值与单位共用外边框')
+        assert.equal(suffixMetrics.radius, '12px')
+        assert.equal(suffixMetrics.height, 36, '单位框与相邻控件等高')
         assert.equal(
           suffixMetrics.text,
           '克',
@@ -2756,142 +3090,7 @@ export function createBusinessFormalScenarios(deps) {
           },
         })
 
-        await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', {
-          waitUntil: 'domcontentloaded',
-        })
-        await expectHeading(page, '销售订单')
-        await expectButton(page, '新建订单')
-        await expectText(page, '当前操作')
-        await assertCurrentOperationBarCompact(page, {
-          scenarioName: 'business-v1-sales-orders',
-        })
-        await page.getByRole('button', { name: /展开SO-STYLE-L1明细/u }).waitFor()
-        await assertBusinessCollaborationPanelAbsent(
-          page,
-          'business-v1-sales-orders'
-        )
-        await assertNoListDeleteTrashToolbar(page)
-        await assertBusinessMainTableInitialSelectionEmpty(page, {
-          scenarioName: 'business-v1-sales-orders',
-        })
-        await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
-        await assertOrderLifecycleActionsConsolidated(page, {
-          scenarioName: 'business-v1-sales-orders',
-          primaryActionLabel: '提交',
-          menuActionLabels: ['取消'],
-          absentButtonLabels: ['生效', '关闭', '取消'],
-        })
-        await assertBusinessPageRefreshEntrypoint(page, {
-          scenarioName: 'business-v1-sales-orders',
-        })
-        await assertBusinessHeaderHasNoSectionTitle(page, {
-          scenarioName: 'business-v1-sales-orders',
-        })
-        await assertBusinessModuleToolbarControlStyle(page, {
-          scenarioName: 'business-v1-sales-orders',
-        })
-        await assertBusinessMainTableSortableColumns(page, {
-          scenarioName: 'business-v1-sales-orders',
-        })
-        await assertBusinessFormModalKeyboardRecovery(page, {
-          triggerName: '新建订单',
-          titleText: '新建销售订单',
-          scenarioName: 'business-v1-sales-orders',
-        })
-        await verifyBusinessActionFormModal(page, {
-          buttonName: '新建订单',
-          titleText: '新建销售订单',
-          minFieldCount: 6,
-          screenshotName: 'business-v1-sales-order-form-modal',
-          expectedTexts: ['已有规格（选填）', '已关联产品'],
-          absentTexts: ['产品引用 ID', '单位引用 ID'],
-          afterOpen: async (modal) => {
-            await assertNonItemTextareaFullRow(modal, {
-              labels: ['报价备注', '备注'],
-              scenarioName: 'business-v1-sales-order-form-modal',
-            })
-            await assertLineQuantityUnitSuffix(modal, {
-              label: '订单数量',
-              expectedText: '件（PCS）',
-              scenarioName: 'business-v1-sales-order-form-modal-empty-line',
-            })
-            await assertLineItemFieldLayout(modal, {
-              scenarioName: 'business-v1-sales-order-form-modal-empty-line',
-              visibleThroughLabel: '类别',
-              absentLabels: ['产品编号快照', '产品名称快照', '颜色快照'],
-            })
-            const amountInput = modal.locator('.erp-line-item-field--money input[readonly]').first()
-            await amountInput.scrollIntoViewIfNeeded()
-            assert(
-              await amountInput.evaluate((node) => {
-                const rect = node.getBoundingClientRect()
-                const list = node.closest('.erp-sales-order-lines-form__list')?.getBoundingClientRect()
-                return Boolean(list && rect.left >= list.left - 1 && rect.right <= list.right + 1)
-              }),
-              '销售订单金额须可通过明细区横向滚动完整查看'
-            )
-            await assertLineQuantityPrecisionBlocksAmount(modal, {
-              quantityLabel: '订单数量',
-              unitPriceLabel: '单价',
-              amountLabel: '金额',
-              quantity: '123.11',
-              unitPrice: '12.11',
-              expectedErrorText: '当前单位只允许整数数量',
-              scenarioName: 'business-v1-sales-order-form-modal-empty-line',
-            })
-            await assertLineAmountCalculation(modal, {
-              quantityLabel: '订单数量',
-              unitPriceLabel: '单价',
-              amountLabel: '金额',
-              quantity: '11',
-              unitPrice: '12.11',
-              expected: '133.21',
-              scenarioName: 'business-v1-sales-order-form-modal-empty-line',
-            })
-            await verifySourceImportPicker(page, {
-              parentModal: modal,
-              triggerButton: '从 SKU 库添加',
-              titleText: '选择 SKU 添加订单行',
-              expectedTexts: ['SKU 编码', '产品名称', 'SKU-STYLE-L1'],
-              emptyDescriptionText: '暂无可选 SKU',
-              selectText: 'SKU-STYLE-L1',
-              selectedNoun: 'SKU',
-              scenarioName: 'sales-order-source-import-picker',
-            })
-            await assertLineQuantityUnitSuffix(modal, {
-              label: '订单数量',
-              expectedText: '件（PCS）',
-              scenarioName: 'business-v1-sales-order-form-modal',
-            })
-            await assertLineSourceSummaryReadableUnit(modal, {
-              label: '已关联产品',
-              expectedText: '件（PCS）',
-              scenarioName: 'business-v1-sales-order-form-modal',
-            })
-            await assertLineItemDuplicateAction(modal, {
-              scenarioName: 'business-v1-sales-order-form-modal',
-            })
-            await assertLineItemFooterFollowsModalScroll(modal, {
-              scenarioName: 'business-v1-sales-order-form-modal',
-            })
-            await assertLineItemAddActionScrollsToNewRow(modal, {
-              scenarioName: 'business-v1-sales-order-form-modal',
-            })
-          },
-        })
-        await assertNoHorizontalOverflow(page, 'business-standard-sales-orders')
-        await verifyBusinessRowDoubleClickModal(page, {
-          rowText: 'SO-STYLE-L1',
-          titleText: '编辑销售订单',
-          scenarioName: 'business-v1-sales-orders',
-          afterModalOpen: async () => {
-            await expectText(page, '订单行')
-            await expectText(page, '已有规格（选填）')
-            await expectText(page, '已关联产品')
-            await assertTextAbsent(page, '产品引用 ID')
-            await assertTextAbsent(page, '单位引用 ID')
-          },
-        })
+        await verifySalesOrderDemandEntry(page)
 
         const masterDataMethods = []
         page.on('request', (request) => {
@@ -3590,8 +3789,6 @@ export function createBusinessFormalScenarios(deps) {
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-shipment-create-form-modal',
               targetRowCount: 5,
-              listSelector: '.erp-master-contact-list__items',
-              rowSelector: '.erp-master-contact-list__row',
             })
             await verifyShipmentSourceCandidateContract(
               page,

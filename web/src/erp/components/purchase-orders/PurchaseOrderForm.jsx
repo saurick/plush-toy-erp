@@ -42,6 +42,25 @@ import {
   buildCatalogFillRowsPlan,
 } from '../../utils/catalogFillRows.mjs'
 import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
+import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx'
+
+const PURCHASE_ORDER_COLUMNS = [
+  { label: '材料', width: 220, required: true },
+  { label: '采购数量', width: 284, required: true },
+  { label: '单位', width: 120, required: true },
+  { label: '单价', width: 125 },
+  {
+    label: (
+      <BusinessHelpLabel
+        itemKey="purchase-line-amount"
+        label="金额"
+        pageKey="accessories-purchase"
+      />
+    ),
+    width: 112,
+  },
+  { label: '预计到货日期', width: 176 },
+]
 
 function getNextLineNo(lines = []) {
   const maxLineNo = lines.reduce((maxValue, line) => {
@@ -464,6 +483,7 @@ export function PurchaseOrderFormFields({
       {attachmentPanel}
 
       <BusinessLineItemsSection
+        columns={PURCHASE_ORDER_COLUMNS}
         title="采购明细"
         description="同一个采购订单内维护多条供应商承诺明细。"
         emptyDescription="暂无采购明细"
@@ -548,6 +568,7 @@ export function PurchaseOrderFormFields({
                 importedLines.forEach(() => {
                   add()
                 })
+                requestLineItemScroll(startIndex)
                 window.setTimeout(() => {
                   form.setFields(
                     importedLines.flatMap((line, index) =>
@@ -564,13 +585,11 @@ export function PurchaseOrderFormFields({
           </>
         )}
         renderRow={({ add, field, fields, index, remove }) => (
-          <div
-            className="erp-sales-order-lines-form__row"
+          <BusinessLineItemRow
             key={field.key}
-            ref={(node) => registerLineItemRow(index, node)}
-          >
-            <div className="erp-sales-order-lines-form__row-head">
-              <strong>第 {index + 1} 行</strong>
+            index={index}
+            rowRef={(node) => registerLineItemRow(index, node)}
+            actions={
               <Space
                 className="erp-sales-order-lines-form__row-actions"
                 size={4}
@@ -600,14 +619,18 @@ export function PurchaseOrderFormFields({
                   移除行
                 </Button>
               </Space>
-            </div>
-            <div className="erp-sales-order-lines-form__grid">
-              <Form.Item name={[field.name, 'id']} hidden>
-                <Input />
-              </Form.Item>
-              <Form.Item name={[field.name, 'line_no']} hidden>
-                <Input />
-              </Form.Item>
+            }
+            hiddenFields={
+              <>
+                <Form.Item name={[field.name, 'id']} hidden>
+                  <Input />
+                </Form.Item>
+                <Form.Item name={[field.name, 'line_no']} hidden>
+                  <Input />
+                </Form.Item>
+              </>
+            }
+            cells={[
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--source"
                 name={[field.name, 'material_id']}
@@ -621,70 +644,7 @@ export function PurchaseOrderFormFields({
                   optionFilterProp="label"
                   onChange={(value) => onMaterialChange(field.name, value)}
                 />
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--unit"
-                name={[field.name, 'unit_id']}
-                label="单位"
-                rules={[{ required: true, message: '请选择单位' }]}
-              >
-                <Select
-                  allowClear
-                  optionFilterProp="searchText"
-                  options={unitOptions}
-                  placeholder="请选择单位"
-                  showSearch
-                  onChange={() => {
-                    form
-                      .validateFields([
-                        ['items', field.name, 'purchased_quantity'],
-                      ])
-                      .catch(() => {})
-                  }}
-                />
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--snapshot-code"
-                name={[field.name, 'material_code_snapshot']}
-                label="下单材料编码"
-              >
-                <Input maxLength={64} />
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--snapshot-name"
-                name={[field.name, 'material_name_snapshot']}
-                label="下单材料名称"
-              >
-                <Input maxLength={255} />
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--snapshot-small"
-                name={[field.name, 'color_snapshot']}
-                label="下单颜色"
-              >
-                <Input maxLength={64} />
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--snapshot-code"
-                name={[field.name, 'product_order_no_snapshot']}
-                label="产品订单编号"
-              >
-                <Input maxLength={128} />
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--snapshot-code"
-                name={[field.name, 'product_no_snapshot']}
-                label="产品编号"
-              >
-                <Input maxLength={128} />
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--snapshot-name"
-                name={[field.name, 'product_name_snapshot']}
-                label="产品名称"
-              >
-                <Input maxLength={255} />
-              </Form.Item>
+              </Form.Item>,
               <Form.Item
                 noStyle
                 shouldUpdate={(previous, current) =>
@@ -715,27 +675,42 @@ export function PurchaseOrderFormFields({
                     />
                   </Form.Item>
                 )}
-              </Form.Item>
+              </Form.Item>,
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--unit"
+                name={[field.name, 'unit_id']}
+                label="单位"
+                rules={[{ required: true, message: '请选择单位' }]}
+              >
+                <Select
+                  allowClear
+                  optionFilterProp="searchText"
+                  options={unitOptions}
+                  placeholder="请选择单位"
+                  showSearch
+                  onChange={() => {
+                    form
+                      .validateFields([
+                        ['items', field.name, 'purchased_quantity'],
+                      ])
+                      .catch(() => {})
+                  }}
+                />
+              </Form.Item>,
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--money"
                 name={[field.name, 'unit_price']}
                 label="单价"
               >
                 <Input />
-              </Form.Item>
+              </Form.Item>,
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--money"
                 name={[field.name, 'amount']}
-                label={
-                  <BusinessHelpLabel
-                    itemKey="purchase-line-amount"
-                    label="金额"
-                    pageKey="accessories-purchase"
-                  />
-                }
+                label="金额"
               >
                 <Input placeholder="留空时根据数量和单价自动计算" />
-              </Form.Item>
+              </Form.Item>,
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--date"
                 name={[field.name, 'expected_arrival_date']}
@@ -755,21 +730,64 @@ export function PurchaseOrderFormFields({
                       : undefined
                   }
                 />
-              </Form.Item>
-              <Form.Item
-                className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
-                name={[field.name, 'note']}
-                label="备注"
-              >
-                <Input.TextArea
-                  allowClear
-                  autoSize={{ minRows: 1, maxRows: 3 }}
-                  showCount
-                  maxLength={255}
-                />
-              </Form.Item>
-            </div>
-          </div>
+              </Form.Item>,
+            ]}
+          >
+            <Form.Item
+              className="erp-line-item-field erp-line-item-field--snapshot-code"
+              name={[field.name, 'material_code_snapshot']}
+              label="下单材料编码"
+            >
+              <Input maxLength={64} />
+            </Form.Item>
+            <Form.Item
+              className="erp-line-item-field erp-line-item-field--snapshot-name"
+              name={[field.name, 'material_name_snapshot']}
+              label="下单材料名称"
+            >
+              <Input maxLength={255} />
+            </Form.Item>
+            <Form.Item
+              className="erp-line-item-field erp-line-item-field--snapshot-small"
+              name={[field.name, 'color_snapshot']}
+              label="下单颜色"
+            >
+              <Input maxLength={64} />
+            </Form.Item>
+            <Form.Item
+              className="erp-line-item-field erp-line-item-field--snapshot-code"
+              name={[field.name, 'product_order_no_snapshot']}
+              label="产品订单编号"
+            >
+              <Input maxLength={128} />
+            </Form.Item>
+            <Form.Item
+              className="erp-line-item-field erp-line-item-field--snapshot-code"
+              name={[field.name, 'product_no_snapshot']}
+              label="产品编号"
+            >
+              <Input maxLength={128} />
+            </Form.Item>
+            <Form.Item
+              className="erp-line-item-field erp-line-item-field--snapshot-name"
+              name={[field.name, 'product_name_snapshot']}
+              label="产品名称"
+            >
+              <Input maxLength={255} />
+            </Form.Item>
+            <Form.Item
+              className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
+              name={[field.name, 'note']}
+              label="备注"
+            >
+              <Input.TextArea
+                allowClear
+                autoSize={{ minRows: 1, maxRows: 3 }}
+                showCount
+                maxLength={255}
+              />
+            </Form.Item>
+          </BusinessLineItemRow>
         )}
         footerProps={({ add, fields }) => ({
           addLabel: '添加条目',

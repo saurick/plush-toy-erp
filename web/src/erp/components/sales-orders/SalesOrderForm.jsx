@@ -4,6 +4,7 @@ import {
   DeleteOutlined,
   FolderOpenOutlined,
   OrderedListOutlined,
+  PlusOutlined,
 } from '@ant-design/icons'
 import {
   AutoComplete,
@@ -14,7 +15,6 @@ import {
   InputNumber,
   Select,
   Space,
-  Tag,
 } from 'antd'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
@@ -71,12 +71,33 @@ import {
   formatNumeric20Scale6Summary,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessLineItemsTable, {
+  BusinessLineItemRow,
+} from '../business-list/BusinessLineItemsTable.jsx'
+
+const SALES_ORDER_COLUMNS = [
+  { label: '订货产品名称', width: 210 },
+  { label: '订单数量', width: 284, required: true },
+  { label: '单位', width: 120, required: true },
+  { label: '单价', width: 125 },
+  {
+    label: (
+      <BusinessHelpLabel
+        itemKey="line-amount"
+        label="金额"
+        pageKey="sales-orders"
+      />
+    ),
+    width: 112,
+  },
+  { label: '计划交付日期', width: 176 },
+]
 
 function skuLabel(sku = {}) {
   return (
     [sku.sku_code, sku.sku_name || sku.customer_sku || sku.barcode]
       .filter(Boolean)
-      .join(' / ') || 'SKU 已关联'
+      .join(' / ') || '规格已关联'
   )
 }
 
@@ -452,14 +473,13 @@ export function SalesOrderFormFields({
         className="erp-business-action-form__field"
         label="计税方式"
         name="tax_mode"
-        rules={[{ required: true, message: '请选择计税方式' }]}
       >
         <Select
           allowClear
           options={SALES_ORDER_TAX_MODE_OPTIONS}
-          placeholder="请选择计税方式"
+          placeholder="草稿可暂缺，提交前补齐"
           onChange={(value) => {
-            if (value === 'NONE') {
+            if (!value || value === 'NONE') {
               form.setFieldValue('tax_rate', undefined)
             }
           }}
@@ -472,12 +492,8 @@ export function SalesOrderFormFields({
         name="tax_rate"
         rules={[
           {
-            required: taxMode === 'INCLUSIVE' || taxMode === 'EXCLUSIVE',
-            message: '请填写税率',
-          },
-          {
             validator: async (_, value) => {
-              if (taxMode === 'NONE') return
+              if (!taxMode || taxMode === 'NONE') return
               if (value === undefined || value === null || value === '') return
               const units = numeric20Scale6Units(value)
               if (
@@ -496,7 +512,7 @@ export function SalesOrderFormFields({
         <FieldWithUnitSuffix
           control={
             <InputNumber
-              disabled={taxMode === 'NONE'}
+              disabled={!taxMode || taxMode === 'NONE'}
               max="100"
               min="0.000001"
               precision={6}
@@ -510,12 +526,11 @@ export function SalesOrderFormFields({
         className="erp-business-action-form__field"
         label="报价是否含运费"
         name="freight_terms"
-        rules={[{ required: true, message: '请选择报价是否含运费' }]}
       >
         <Select
           allowClear
           options={SALES_ORDER_FREIGHT_TERMS_OPTIONS}
-          placeholder="请选择运费条件"
+          placeholder="草稿可暂缺，提交前补齐"
           onChange={(value) => {
             if (value !== 'EXCLUDED') {
               form.setFieldValue('quoted_freight_amount', undefined)
@@ -720,7 +735,7 @@ export function SalesOrderItemsFormSection({
   }))
   const skuImportColumns = [
     {
-      title: 'SKU 编码',
+      title: '规格编号',
       dataIndex: 'sku_code',
       width: 150,
       searchText: (sku) => skuLabel(sku),
@@ -758,60 +773,74 @@ export function SalesOrderItemsFormSection({
       <Form.List name="items">
         {(fields, { add, remove }) => (
           <>
-            <div className="erp-line-items-form__import-row">
-              <div className="erp-line-items-form__import-copy">
-                <strong>订单需求明细</strong>
-                <span>
-                  先填写客户需求，工程后续补齐产品图和 BOM，再安排打样。
-                </span>
-              </div>
-              <Space className="erp-line-item-order-actions" wrap>
+            <div className="erp-sales-order-demand-toolbar">
+              <strong className="erp-sales-order-demand-toolbar__title">
+                订货明细
+              </strong>
+              <Space wrap>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined aria-hidden="true" />}
+                  disabled={!canCreateItem}
+                  onClick={() => {
+                    const currentLines = form.getFieldValue('items') || []
+                    add(
+                      createBlankOrderLine(getNextLineNo(currentLines), {
+                        unitID: defaultUnitID,
+                      })
+                    )
+                    requestLineItemScroll(currentLines.length)
+                  }}
+                >
+                  添加订货明细
+                </Button>
                 <Button
                   icon={<FolderOpenOutlined aria-hidden="true" />}
-                  className="erp-line-items-form__import-button erp-action-button"
                   disabled={!canCreateItem}
                   onClick={() => setSkuImportOpen(true)}
                 >
-                  从 SKU 库添加
+                  从已有规格添加
                 </Button>
+              </Space>
+              {fields.length >= 2 ? (
                 <Button
-                  icon={<OrderedListOutlined />}
-                  disabled={
-                    fields.length < 2 || (!canCreateItem && !canUpdateItem)
-                  }
+                  type="text"
+                  className="erp-sales-order-demand-toolbar__reorder"
+                  icon={<OrderedListOutlined aria-hidden="true" />}
+                  disabled={!canCreateItem && !canUpdateItem}
                   onClick={() => {
                     const currentLines = form.getFieldValue('items') || []
                     setLineOrderItems([...currentLines])
                     setLineOrderOpen(true)
                   }}
                 >
-                  产品顺序
+                  调整明细顺序
                 </Button>
-              </Space>
+              ) : null}
             </div>
             <BusinessLineItemOrderModal
               getItemLabel={salesOrderLineOrderLabel}
-              itemNoun="产品明细"
+              itemNoun="订货明细"
               items={lineOrderItems}
               onApply={(orderedItems) =>
                 form.setFieldsValue({ items: orderedItems })
               }
               onClose={() => setLineOrderOpen(false)}
               open={lineOrderOpen}
-              title="调整产品顺序"
+              title="调整明细顺序"
             />
             <SourceImportPickerModal
               open={skuImportOpen}
-              title="选择 SKU 添加订单行"
-              description="这里只选择 SKU 档案；数量、单价和交期在编辑页的订单行里维护。"
+              title="选择已有产品规格"
+              description="选中的产品规格将添加到本单，数量、单价和交期在订货明细中填写。"
               rows={productSKUs}
               columns={skuImportColumns}
               getSelectedLabel={skuLabel}
-              searchPlaceholder="搜索 SKU"
-              searchHint="可搜索：SKU 编码、名称、颜色、包装"
-              importText="添加到订单行"
-              selectedNoun="SKU"
-              emptyDescription="暂无可选 SKU"
+              searchPlaceholder="搜索产品名称或规格编号"
+              searchHint="可搜索：规格编号、名称、颜色、包装"
+              importText="添加到本单"
+              selectedNoun="规格"
+              emptyDescription="暂无可选产品规格"
               onCancel={() => setSkuImportOpen(false)}
               onImport={(selectedSKUs) => {
                 const currentLines = form.getFieldValue('items') || []
@@ -845,19 +874,16 @@ export function SalesOrderItemsFormSection({
                 setSkuImportOpen(false)
               }}
             />
-            <div className="erp-sales-order-lines-form__head">
-              <div>
-                <strong>订单行</strong>
-                <span>同一个销售订单内维护多条客户承诺明细。</span>
-              </div>
-            </div>
             {fields.length === 0 ? (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="暂无订单行，可在同一表单内新增"
+                description="暂无订货明细，可先保存订单草稿"
               />
             ) : (
-              <div className="erp-sales-order-lines-form__list">
+              <BusinessLineItemsTable
+                columns={SALES_ORDER_COLUMNS}
+                label="订货明细"
+              >
                 {fields.map((field, index) => {
                   const lineId = form.getFieldValue(['items', field.name, 'id'])
                   const isExistingLine = Boolean(lineId)
@@ -869,16 +895,12 @@ export function SalesOrderItemsFormSection({
                     : canCreateItem
 
                   return (
-                    <div
+                    <BusinessLineItemRow
                       key={field.key}
-                      className="erp-sales-order-lines-form__row"
-                      ref={(node) => registerLineItemRow(index, node)}
-                    >
-                      <div className="erp-sales-order-lines-form__row-head">
-                        <Space wrap size={8}>
-                          <strong>第 {index + 1} 行</strong>
-                          {isExistingLine ? <Tag>已保存</Tag> : <Tag>新增</Tag>}
-                        </Space>
+                      index={index}
+                      rowRef={(node) => registerLineItemRow(index, node)}
+                      status={isExistingLine ? '已保存' : '新增'}
+                      actions={
                         <Space
                           className="erp-sales-order-lines-form__row-actions"
                           size={4}
@@ -916,11 +938,42 @@ export function SalesOrderItemsFormSection({
                             移除行
                           </Button>
                         </Space>
-                      </div>
-                      <div className="erp-sales-order-lines-form__grid erp-sales-order-demand-grid">
+                      }
+                      hiddenFields={
+                        <>
+                          <Form.Item name={[field.name, 'id']} hidden>
+                            <Input />
+                          </Form.Item>
+                          <Form.Item name={[field.name, 'line_no']} hidden>
+                            <Input />
+                          </Form.Item>
+                          <Form.Item name={[field.name, 'product_id']} hidden>
+                            <InputNumber />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'product_code_snapshot']}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'product_name_snapshot']}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'color_snapshot']}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
+                        </>
+                      }
+                      cells={[
                         <Form.Item
                           className="erp-line-item-field erp-line-item-field--snapshot-name"
-                          label="需求名称"
+                          label="订货产品名称"
                           name={[field.name, 'requested_product_name']}
                           rules={[
                             {
@@ -937,7 +990,7 @@ export function SalesOrderItemsFormSection({
                                 ) {
                                   return
                                 }
-                                throw new Error('请填写客户要订购的产品名称')
+                                throw new Error('请填写订货产品名称')
                               },
                             },
                           ]}
@@ -945,209 +998,15 @@ export function SalesOrderItemsFormSection({
                           <Input
                             disabled={!canEditLine}
                             maxLength={255}
-                            placeholder="客户要订购的产品，无需先建档"
-                          />
-                        </Form.Item>
-                        <Form.Item
-                          className="erp-line-item-field erp-line-item-field--snapshot-code"
-                          label="客户款号"
-                          name={[field.name, 'customer_product_no']}
-                        >
-                          <Input
-                            disabled={!canEditLine}
-                            maxLength={128}
-                            placeholder="客户提供时填写"
-                          />
-                        </Form.Item>
-                        <Form.Item
-                          className="erp-line-item-field erp-line-item-field--snapshot-small"
-                          label="类别"
-                          name={[field.name, 'order_category']}
-                        >
-                          <Select
-                            disabled={!canEditLine}
-                            options={SALES_ORDER_CATEGORY_OPTIONS}
-                          />
-                        </Form.Item>
-                        <Form.Item name={[field.name, 'id']} hidden>
-                          <Input />
-                        </Form.Item>
-                        <Form.Item name={[field.name, 'line_no']} hidden>
-                          <Input />
-                        </Form.Item>
-                        <Form.Item name={[field.name, 'product_id']} hidden>
-                          <InputNumber />
-                        </Form.Item>
-                        <Form.Item
-                          className="erp-line-item-field erp-line-item-field--source"
-                          label="已有规格（选填）"
-                          name={[field.name, 'product_sku_id']}
-                        >
-                          <Select
-                            showSearch
-                            allowClear
-                            disabled={!canEditLine}
-                            optionFilterProp="label"
-                            options={skuOptions}
-                            placeholder="工程可后续关联"
-                            onChange={(value, option) => {
-                              const sku =
-                                option?.sku ||
-                                skuByID.get(value) ||
-                                productSKUs.find((item) => item.id === value)
-                              setOrderLineSourceFromSKU(form, field.name, sku)
-                            }}
-                          />
-                        </Form.Item>
-                        <Form.Item
-                          noStyle
-                          shouldUpdate={(previous, current) =>
-                            previous?.items?.[field.name]?.product_id !==
-                              current?.items?.[field.name]?.product_id ||
-                            previous?.items?.[field.name]?.unit_id !==
-                              current?.items?.[field.name]?.unit_id ||
-                            previous?.items?.[field.name]
-                              ?.product_code_snapshot !==
-                              current?.items?.[field.name]
-                                ?.product_code_snapshot ||
-                            previous?.items?.[field.name]
-                              ?.product_name_snapshot !==
-                              current?.items?.[field.name]
-                                ?.product_name_snapshot ||
-                            previous?.items?.[field.name]?.color_snapshot !==
-                              current?.items?.[field.name]?.color_snapshot
-                          }
-                        >
-                          {({ getFieldValue }) => {
-                            const line = getFieldValue(['items', field.name])
-                            const unitText = unitSuffixTextFromOptions(
-                              unitOptions,
-                              line?.unit_id
-                            )
-                            const hasProductSource = Boolean(
-                              line?.product_id ||
-                                line?.product_code_snapshot ||
-                                line?.product_name_snapshot
-                            )
-                            const sourceText = [
-                              line?.product_code_snapshot ||
-                                (line?.product_id ? '产品已关联' : ''),
-                              line?.product_name_snapshot,
-                              line?.color_snapshot,
-                              hasProductSource ? unitText : '',
-                            ]
-                              .filter(Boolean)
-                              .join(' / ')
-                            return (
-                              <Form.Item
-                                className="erp-line-item-field erp-line-item-field--source-summary"
-                                label="已关联产品"
-                              >
-                                <Input
-                                  title={sourceText}
-                                  value={sourceText}
-                                  disabled
-                                  readOnly
-                                  placeholder="自动带出"
-                                />
-                              </Form.Item>
-                            )
-                          }}
-                        </Form.Item>
-                        <Form.Item
-                          name={[field.name, 'product_code_snapshot']}
-                          hidden
-                        >
-                          <Input />
-                        </Form.Item>
-                        <Form.Item
-                          name={[field.name, 'product_name_snapshot']}
-                          hidden
-                        >
-                          <Input />
-                        </Form.Item>
-                        <Form.Item
-                          className="erp-line-item-field erp-line-item-field--unit"
-                          label="单位"
-                          name={[field.name, 'unit_id']}
-                          rules={[{ required: true, message: '请选择单位' }]}
-                        >
-                          <Select
-                            allowClear
-                            showSearch
-                            disabled={!canEditLine}
-                            optionFilterProp="searchText"
-                            options={unitOptions}
-                            placeholder="自动带出，可调整"
-                            onChange={() => {
-                              form
-                                .validateFields([
-                                  ['items', field.name, 'ordered_quantity'],
-                                ])
-                                .catch(() => {})
-                            }}
-                          />
-                        </Form.Item>
-                        <Form.Item
-                          className="erp-line-item-field erp-line-item-field--snapshot-small"
-                          label="船头版数量"
-                          name={[field.name, 'pre_shipment_sample_quantity']}
-                          rules={[
-                            {
-                              validator: async (_, value) => {
-                                if (
-                                  numeric20Scale6Units(value || '0') !== null &&
-                                  isQuantityTextWithinUnitPrecision(
-                                    value || '0',
-                                    unitPrecisionFromOptions(
-                                      unitOptions,
-                                      form.getFieldValue([
-                                        'items',
-                                        field.name,
-                                        'unit_id',
-                                      ])
-                                    )
+                            placeholder={
+                              watchedItems?.[field.name]?.product_name_snapshot
+                                ? salesOrderRequirementName(
+                                    watchedItems[field.name]
                                   )
-                                ) {
-                                  return
-                                }
-                                throw new Error('请填写符合单位精度的非负数量')
-                              },
-                            },
-                          ]}
-                        >
-                          <Input disabled={!canEditLine} placeholder="0" />
-                        </Form.Item>
-                        <Form.Item noStyle shouldUpdate>
-                          {({ getFieldValue }) => (
-                            <Form.Item
-                              className="erp-line-item-field erp-line-item-field--snapshot-small"
-                              label="生产数量"
-                            >
-                              <Input
-                                value={salesOrderProductionQuantity(
-                                  getFieldValue(['items', field.name]) || {}
-                                )}
-                                readOnly
-                                placeholder="订单数量＋船头版"
-                              />
-                            </Form.Item>
-                          )}
-                        </Form.Item>
-                        <Form.Item
-                          className="erp-line-item-field erp-line-item-field--note"
-                          label="工艺要求"
-                          name={[field.name, 'process_requirement']}
-                        >
-                          <Input
-                            disabled={!canEditLine}
-                            maxLength={255}
-                            placeholder="客户要求或工艺说明"
+                                : '客户要订的产品，无需先建档'
+                            }
                           />
-                        </Form.Item>
-                        <Form.Item name={[field.name, 'color_snapshot']} hidden>
-                          <Input />
-                        </Form.Item>
+                        </Form.Item>,
                         <Form.Item
                           noStyle
                           shouldUpdate={(previous, current) =>
@@ -1193,7 +1052,29 @@ export function SalesOrderItemsFormSection({
                               />
                             </Form.Item>
                           )}
-                        </Form.Item>
+                        </Form.Item>,
+                        <Form.Item
+                          className="erp-line-item-field erp-line-item-field--unit"
+                          label="单位"
+                          name={[field.name, 'unit_id']}
+                          rules={[{ required: true, message: '请选择单位' }]}
+                        >
+                          <Select
+                            allowClear
+                            showSearch
+                            disabled={!canEditLine}
+                            optionFilterProp="searchText"
+                            options={unitOptions}
+                            placeholder="选择单位"
+                            onChange={() => {
+                              form
+                                .validateFields([
+                                  ['items', field.name, 'ordered_quantity'],
+                                ])
+                                .catch(() => {})
+                            }}
+                          />
+                        </Form.Item>,
                         <Form.Item
                           className="erp-line-item-field erp-line-item-field--money"
                           label="单价"
@@ -1206,7 +1087,7 @@ export function SalesOrderItemsFormSection({
                             disabled={!canEditLine}
                             placeholder="草稿可暂缺，提交前补齐"
                           />
-                        </Form.Item>
+                        </Form.Item>,
                         <Form.Item
                           noStyle
                           shouldUpdate={(previous, current) =>
@@ -1231,13 +1112,7 @@ export function SalesOrderItemsFormSection({
                             return (
                               <Form.Item
                                 className="erp-line-item-field erp-line-item-field--money"
-                                label={
-                                  <BusinessHelpLabel
-                                    itemKey="line-amount"
-                                    label="金额"
-                                    pageKey="sales-orders"
-                                  />
-                                }
+                                label="金额"
                               >
                                 <Input
                                   value={
@@ -1261,7 +1136,7 @@ export function SalesOrderItemsFormSection({
                               </Form.Item>
                             )
                           }}
-                        </Form.Item>
+                        </Form.Item>,
                         <Form.Item
                           className="erp-line-item-field erp-line-item-field--date"
                           label="计划交付日期"
@@ -1271,7 +1146,7 @@ export function SalesOrderItemsFormSection({
                             dateInputNotBeforeRule({
                               getStartValue: () =>
                                 form.getFieldValue('order_date'),
-                              message: '订单行计划交付日期不能早于下单日期',
+                              message: '明细交付日期不能早于下单日期',
                             }),
                           ]}
                         >
@@ -1283,38 +1158,183 @@ export function SalesOrderItemsFormSection({
                                 : undefined
                             }
                           />
-                        </Form.Item>
-                        <Form.Item
-                          className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
-                          label="备注"
-                          name={[field.name, 'note']}
-                        >
-                          <Input.TextArea
-                            allowClear
-                            autoSize={{ minRows: 1, maxRows: 3 }}
-                            showCount
-                            maxLength={300}
-                            disabled={!canEditLine}
-                          />
-                        </Form.Item>
-                      </div>
-                    </div>
+                        </Form.Item>,
+                      ]}
+                    >
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--snapshot-code"
+                        label="客户款号"
+                        name={[field.name, 'customer_product_no']}
+                      >
+                        <Input
+                          disabled={!canEditLine}
+                          maxLength={128}
+                          placeholder="客户提供时填写"
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--snapshot-small"
+                        label="类别"
+                        name={[field.name, 'order_category']}
+                      >
+                        <Select
+                          disabled={!canEditLine}
+                          options={SALES_ORDER_CATEGORY_OPTIONS}
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--snapshot-small"
+                        label="船头版数量"
+                        name={[field.name, 'pre_shipment_sample_quantity']}
+                        rules={[
+                          {
+                            validator: async (_, value) => {
+                              if (
+                                numeric20Scale6Units(value || '0') !== null &&
+                                isQuantityTextWithinUnitPrecision(
+                                  value || '0',
+                                  unitPrecisionFromOptions(
+                                    unitOptions,
+                                    form.getFieldValue([
+                                      'items',
+                                      field.name,
+                                      'unit_id',
+                                    ])
+                                  )
+                                )
+                              ) {
+                                return
+                              }
+                              throw new Error('请填写符合单位精度的非负数量')
+                            },
+                          },
+                        ]}
+                      >
+                        <Input disabled={!canEditLine} placeholder="0" />
+                      </Form.Item>
+                      <Form.Item noStyle shouldUpdate>
+                        {({ getFieldValue }) => (
+                          <Form.Item
+                            className="erp-line-item-field erp-line-item-field--snapshot-small"
+                            label="生产数量"
+                          >
+                            <Input
+                              value={salesOrderProductionQuantity(
+                                getFieldValue(['items', field.name]) || {}
+                              )}
+                              readOnly
+                              placeholder="订单数量＋船头版"
+                            />
+                          </Form.Item>
+                        )}
+                      </Form.Item>
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--note"
+                        label="工艺要求"
+                        name={[field.name, 'process_requirement']}
+                      >
+                        <Input
+                          disabled={!canEditLine}
+                          maxLength={255}
+                          placeholder="客户要求或工艺说明"
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
+                        label="备注"
+                        name={[field.name, 'note']}
+                      >
+                        <Input.TextArea
+                          allowClear
+                          autoSize={{ minRows: 1, maxRows: 3 }}
+                          showCount
+                          maxLength={300}
+                          disabled={!canEditLine}
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--source"
+                        label="已有规格（选填）"
+                        name={[field.name, 'product_sku_id']}
+                      >
+                        <Select
+                          showSearch
+                          allowClear
+                          disabled={!canEditLine}
+                          optionFilterProp="label"
+                          options={skuOptions}
+                          placeholder="工程可后续关联"
+                          onChange={(value, option) => {
+                            const sku =
+                              option?.sku ||
+                              skuByID.get(value) ||
+                              productSKUs.find((item) => item.id === value)
+                            setOrderLineSourceFromSKU(form, field.name, sku)
+                          }}
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        noStyle
+                        shouldUpdate={(previous, current) =>
+                          previous?.items?.[field.name]?.product_id !==
+                            current?.items?.[field.name]?.product_id ||
+                          previous?.items?.[field.name]?.unit_id !==
+                            current?.items?.[field.name]?.unit_id ||
+                          previous?.items?.[field.name]
+                            ?.product_code_snapshot !==
+                            current?.items?.[field.name]
+                              ?.product_code_snapshot ||
+                          previous?.items?.[field.name]
+                            ?.product_name_snapshot !==
+                            current?.items?.[field.name]
+                              ?.product_name_snapshot ||
+                          previous?.items?.[field.name]?.color_snapshot !==
+                            current?.items?.[field.name]?.color_snapshot
+                        }
+                      >
+                        {({ getFieldValue }) => {
+                          const line = getFieldValue(['items', field.name])
+                          const unitText = unitSuffixTextFromOptions(
+                            unitOptions,
+                            line?.unit_id
+                          )
+                          const hasProductSource = Boolean(
+                            line?.product_id ||
+                              line?.product_code_snapshot ||
+                              line?.product_name_snapshot
+                          )
+                          if (!hasProductSource) return null
+                          const sourceText = [
+                            line?.product_code_snapshot ||
+                              (line?.product_id ? '产品已关联' : ''),
+                            line?.product_name_snapshot,
+                            line?.color_snapshot,
+                            hasProductSource ? unitText : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' / ')
+                          return (
+                            <Form.Item
+                              className="erp-line-item-field erp-line-item-field--source-summary"
+                              label="已关联产品"
+                            >
+                              <Input
+                                title={sourceText}
+                                value={sourceText}
+                                disabled
+                                readOnly
+                                placeholder="自动带出"
+                              />
+                            </Form.Item>
+                          )
+                        }}
+                      </Form.Item>
+                    </BusinessLineItemRow>
                   )
                 })}
-              </div>
+              </BusinessLineItemsTable>
             )}
             <BusinessLineItemsFooter
-              addLabel="添加条目"
-              addDisabled={!canCreateItem}
-              onAdd={() => {
-                const currentLines = form.getFieldValue('items') || []
-                add(
-                  createBlankOrderLine(getNextLineNo(currentLines), {
-                    unitID: defaultUnitID,
-                  })
-                )
-                requestLineItemScroll(currentLines.length)
-              }}
               stats={[
                 {
                   key: 'count',
@@ -1337,10 +1357,13 @@ export function SalesOrderItemsFormSection({
                 {
                   key: 'goods-amount',
                   label: '货款金额',
-                  value: `${currency || ''} ${formatNumeric20Scale6Summary(
-                    commercialAmounts.goodsAmount,
-                    2
-                  )}`.trim(),
+                  value:
+                    numeric20Scale6Units(commercialAmounts.goodsAmount) !== null
+                      ? `${currency || ''} ${formatNumeric20Scale6Summary(
+                          commercialAmounts.goodsAmount,
+                          2
+                        )}`.trim()
+                      : '待补齐',
                 },
                 {
                   key: 'quoted-freight-amount',

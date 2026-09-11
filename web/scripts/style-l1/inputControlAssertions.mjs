@@ -23,7 +23,8 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
     ].join(',')
     const candidateSelector = [
       '.ant-input-affix-wrapper',
-      '.ant-input-number',
+      '.ant-input-number-affix-wrapper',
+      '.ant-input-number:not(.ant-input-number-affix-wrapper > .ant-input-number)',
       '.ant-picker',
       '.ant-select-selector',
       'input.ant-input:not([type="hidden"])',
@@ -291,7 +292,8 @@ async function assertVisibleRoundedInputWrapperClipping(page, scenarioName) {
     ].join(',')
     const wrapperSelector = [
       '.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)',
-      '.ant-input-number',
+      '.ant-input-number-affix-wrapper',
+      '.ant-input-number:not(.ant-input-number-affix-wrapper > .ant-input-number)',
       '.ant-picker',
     ].join(',')
     const nestedInputSelector = [
@@ -455,6 +457,7 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
       }
       return (
         node.closest('.ant-input-affix-wrapper') ||
+        node.closest('.ant-input-number-affix-wrapper') ||
         node.closest('.ant-input-number') ||
         node.closest('.ant-picker') ||
         node
@@ -824,7 +827,8 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
     const formSelector = '.erp-business-form, .erp-business-action-form'
     const candidateSelector = [
       '.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)',
-      '.ant-input-number',
+      '.ant-input-number-affix-wrapper',
+      '.ant-input-number:not(.ant-input-number-affix-wrapper > .ant-input-number)',
       '.ant-picker',
       '.ant-select-single',
       'input.ant-input:not([type="hidden"])',

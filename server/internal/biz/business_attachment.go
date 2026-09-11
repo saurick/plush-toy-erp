@@ -56,6 +56,7 @@ var (
 	ErrBusinessAttachmentOwnerNotFound               = errors.New("business attachment owner not found")
 	ErrBusinessAttachmentOwnerInvalid                = errors.New("business attachment owner invalid")
 	ErrBusinessAttachmentContentInvalid              = errors.New("business attachment content invalid")
+	ErrBusinessAttachmentStorageUnavailable          = errors.New("business attachment storage unavailable")
 	ErrBusinessAttachmentIntegrity                   = errors.New("business attachment integrity check failed")
 	ErrBusinessAttachmentTooLarge                    = errors.New("business attachment too large")
 	ErrBusinessAttachmentMimeNotAllowed              = errors.New("business attachment mime type not allowed")

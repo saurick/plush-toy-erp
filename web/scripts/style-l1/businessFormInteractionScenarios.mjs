@@ -874,6 +874,7 @@ export function createBusinessFormInteractionScenarios({
             const productSKUInput = modal
               .locator('input[id$="_product_sku_id"]')
               .first()
+            await modal.locator('.erp-line-item-details > summary').first().click()
             await productSKUInput.click()
             await productSKUInput.fill('SKU-OUTSOURCE-CATALOG-L1')
             const secondPageSKUOption = page

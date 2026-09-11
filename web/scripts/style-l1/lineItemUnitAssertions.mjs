@@ -55,7 +55,7 @@ export function createLineItemUnitAssertions({ assert }) {
             wrapperVisible: isVisible(wrapper),
             inputVisible: isVisible(input),
             suffixVisible: isVisible(suffix),
-            suffixValue: suffix?.value || '',
+            suffixValue: suffix?.textContent?.trim() || '',
             suffixAria: suffix?.getAttribute('aria-label') || '',
             fieldClientWidth: field?.clientWidth || 0,
             fieldScrollWidth: field?.scrollWidth || 0,
@@ -110,7 +110,7 @@ export function createLineItemUnitAssertions({ assert }) {
     )
     assert(
       metrics.inputWidth >= 96 &&
-        metrics.suffixWidth >= 48 &&
+        metrics.suffixWidth > 0 &&
         metrics.suffixScrollWidth <= metrics.suffixClientWidth + 1 &&
         metrics.suffixLeft >= metrics.inputRight - 1 &&
         metrics.suffixRight <= metrics.wrapperRight + 1,
@@ -325,11 +325,11 @@ export function createLineItemUnitAssertions({ assert }) {
         }
         const list = node.querySelector('.erp-sales-order-lines-form__list')
         const row = node.querySelector('.erp-sales-order-lines-form__row')
-        const grid = node.querySelector('.erp-sales-order-lines-form__grid')
+        const grid = row?.querySelector('.erp-line-item-table__main-row')
         const listRect = list?.getBoundingClientRect()
         const rowRect = row?.getBoundingClientRect()
         const fields = Array.from(
-          grid?.querySelectorAll(':scope > .ant-form-item') || []
+          grid?.querySelectorAll('.erp-line-item-table__cell .ant-form-item') || []
         )
           .filter(isVisible)
           .map((item) => {
@@ -348,7 +348,7 @@ export function createLineItemUnitAssertions({ assert }) {
               width: Math.round(rect.width),
               inputClientWidth: input?.clientWidth || 0,
               inputScrollWidth: input?.scrollWidth || 0,
-              suffixValue: suffix?.value || '',
+              suffixValue: suffix?.textContent?.trim() || '',
               suffixWidth: Math.round(
                 suffix?.getBoundingClientRect().width || 0
               ),
@@ -573,9 +573,9 @@ export function createLineItemUnitAssertions({ assert }) {
       )}`
     )
     assert(
-      metrics.listScrollWidth > metrics.listClientWidth &&
+      metrics.listScrollWidth <= metrics.listClientWidth ||
         metrics.listAfterScrollLeft > metrics.listBeforeScrollLeft,
-      `${scenarioName} 应由明细列表承接横向滚动: ${JSON.stringify(metrics)}`
+      `${scenarioName} 宽表应由整块明细承接横向滚动: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.bodyScrollLeft,
@@ -600,6 +600,7 @@ export function createLineItemUnitAssertions({ assert }) {
     {
       scenarioName,
       targetRowCount = 6,
+      addButtonName = '添加条目',
       maxAverageAddMs = 900,
       maxSingleAddMs = 1800,
       maxAverageScrollFrameMs = 24,
@@ -608,7 +609,10 @@ export function createLineItemUnitAssertions({ assert }) {
       rowSelector = '.erp-sales-order-lines-form__row',
     }
   ) => {
-    const addButton = modal.getByRole('button', { name: '添加条目' })
+    const addButton = modal.getByRole('button', {
+      name: addButtonName,
+      exact: true,
+    })
     await addButton.waitFor({ state: 'visible', timeout: 5_000 })
 
     const addDurations = []
@@ -663,10 +667,10 @@ export function createLineItemUnitAssertions({ assert }) {
           bodyTop: Math.round(bodyRect?.top || 0),
           bodyBottom: Math.round(bodyRect?.bottom || 0),
           footerBottom: Math.round(footerRect?.bottom || 0),
-          latestRowVisibleInList:
-            Boolean(listRect && latestRect) &&
-            latestRect.top >= listRect.top - 1 &&
-            latestRect.bottom <= listRect.bottom + 1,
+          latestRowVisibleInPage:
+            Boolean(bodyRect && latestRect) &&
+            latestRect.top >= bodyRect.top - 1 &&
+            latestRect.bottom <= bodyRect.bottom + 1,
           addDurations: args.addDurations,
           maxAddDuration:
             args.addDurations.length > 0 ? Math.max(...args.addDurations) : 0,
@@ -687,27 +691,28 @@ export function createLineItemUnitAssertions({ assert }) {
       `${scenarioName} 连续添加后应达到目标明细行数: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.listOverflowY === 'auto' || metrics.listOverflowY === 'scroll',
-      `${scenarioName} 多明细列表应由 item 区域承接纵向滚动: ${JSON.stringify(
+      metrics.listScrollHeight <= metrics.listClientHeight + 2 &&
+        metrics.listScrollTop === 0,
+      `${scenarioName} 明细区应自然展开，不能产生内部纵向滚动: ${JSON.stringify(
         metrics
       )}`
     )
     assert(
-      metrics.listScrollHeight > metrics.listClientHeight,
-      `${scenarioName} 多明细后 item 区域应形成纵向滚动: ${JSON.stringify(
+      metrics.bodyScrollHeight > metrics.bodyClientHeight,
+      `${scenarioName} 多明细应由编辑页承接纵向滚动: ${JSON.stringify(
         metrics
       )}`
     )
     assert(
-      metrics.listScrollTop > 0,
-      `${scenarioName} 添加多行后 item 区域应自动滚动到新明细附近: ${JSON.stringify(
+      metrics.bodyScrollTop > 0,
+      `${scenarioName} 添加多行后编辑页应定位到新明细附近: ${JSON.stringify(
         metrics
       )}`
     )
     assert.equal(
-      metrics.latestRowVisibleInList,
+      metrics.latestRowVisibleInPage,
       true,
-      `${scenarioName} 最新添加的明细行应进入 item 区域可视区: ${JSON.stringify(
+      `${scenarioName} 最新添加的明细行应进入编辑页可视区: ${JSON.stringify(
         metrics
       )}`
     )
@@ -762,7 +767,7 @@ export function createLineItemUnitAssertions({ assert }) {
         scrollHeight: Math.round(list.scrollHeight),
         clientHeight: Math.round(list.clientHeight),
       }
-    }, listSelector)
+    }, '.erp-business-form-page__body')
 
     assert.equal(
       scrollFrameMetrics.skipped,

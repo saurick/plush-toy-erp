@@ -1,6 +1,7 @@
 package data
 
 import (
+	"server/internal/attachmentstore"
 	"context"
 	"fmt"
 	"testing"
@@ -20,7 +21,7 @@ func TestProductImageReferencesPrimaryOnlyAndClear(t *testing.T) {
 	}
 	first, second := productIDs[0], productIDs[1]
 	add := func(owner string, id int, kind, slot string) int {
-		c := repo.data.postgres.BusinessAttachment.Create().SetOwnerType(owner).SetOwnerID(id).SetAttachmentType(kind).SetFileName("image.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetContent([]byte{1})
+		c := repo.data.postgres.BusinessAttachment.Create().SetOwnerType(owner).SetOwnerID(id).SetAttachmentType(kind).SetFileName("image.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetObjectKey(attachmentstore.NewKey())
 		if slot != "" {
 			c.SetSlotKey(slot)
 		}

@@ -326,7 +326,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'business-form-page-standard-v1/index.html',
     readmePath: 'business-form-page-standard-v1/README.md',
     description:
-      '对齐销售订单运行态整页编辑：覆盖订单与客户、联系人与负责人、结算、交付、附件，以及 SKU 来源、带出摘要、单位、复制行、产品顺序、保存 / 返回列表和只读评审状态；不提供通用整表重置。',
+      '对齐销售订单运行态整页编辑：覆盖订单与客户、联系人与负责人、结算、交付、附件，以及订货明细、已有规格选择、带出摘要、单位、复制行、明细排序、保存 / 返回列表和只读评审状态；不提供通用整表重置。',
     appliesTo:
       '菜单主列表已有的新增 / 编辑统一参照，涵盖主数据、完整单据、生产事实草稿与员工资料；快捷新建、来源选择和专项动作参照局部动作弹窗样板。生产、库存、质检和财务事实不得因此增加无来源新建入口。',
   },

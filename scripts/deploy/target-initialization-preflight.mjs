@@ -88,7 +88,7 @@ if [[ ! -x /usr/local/bin/atlas ]] ||
   block initialization_atlas_unavailable
 fi
 
-for image in postgres:18.1 jaegertracing/all-in-one:1.76.0; do
+for image in postgres:18.1 jaegertracing/all-in-one:1.76.0 chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62; do
   if ! docker image inspect "$image" >/dev/null 2>&1 ||
     [[ "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image" 2>/dev/null || true)" != linux/amd64 ]]; then
     base_images_status=blocked

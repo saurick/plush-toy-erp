@@ -160,9 +160,17 @@ func (_u *BusinessAttachmentUpdate) SetNillableSha256(v *string) *BusinessAttach
 	return _u
 }
 
-// SetContent sets the "content" field.
-func (_u *BusinessAttachmentUpdate) SetContent(v []byte) *BusinessAttachmentUpdate {
-	_u.mutation.SetContent(v)
+// SetObjectKey sets the "object_key" field.
+func (_u *BusinessAttachmentUpdate) SetObjectKey(v string) *BusinessAttachmentUpdate {
+	_u.mutation.SetObjectKey(v)
+	return _u
+}
+
+// SetNillableObjectKey sets the "object_key" field if the given value is not nil.
+func (_u *BusinessAttachmentUpdate) SetNillableObjectKey(v *string) *BusinessAttachmentUpdate {
+	if v != nil {
+		_u.SetObjectKey(*v)
+	}
 	return _u
 }
 
@@ -354,6 +362,11 @@ func (_u *BusinessAttachmentUpdate) check() error {
 			return &ValidationError{Name: "sha256", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.sha256": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ObjectKey(); ok {
+		if err := businessattachment.ObjectKeyValidator(v); err != nil {
+			return &ValidationError{Name: "object_key", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.object_key": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.UploadedBy(); ok {
 		if err := businessattachment.UploadedByValidator(v); err != nil {
 			return &ValidationError{Name: "uploaded_by", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.uploaded_by": %w`, err)}
@@ -422,8 +435,8 @@ func (_u *BusinessAttachmentUpdate) sqlSave(ctx context.Context) (_node int, err
 	if value, ok := _u.mutation.Sha256(); ok {
 		_spec.SetField(businessattachment.FieldSha256, field.TypeString, value)
 	}
-	if value, ok := _u.mutation.Content(); ok {
-		_spec.SetField(businessattachment.FieldContent, field.TypeBytes, value)
+	if value, ok := _u.mutation.ObjectKey(); ok {
+		_spec.SetField(businessattachment.FieldObjectKey, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.UploadedBy(); ok {
 		_spec.SetField(businessattachment.FieldUploadedBy, field.TypeInt, value)
@@ -613,9 +626,17 @@ func (_u *BusinessAttachmentUpdateOne) SetNillableSha256(v *string) *BusinessAtt
 	return _u
 }
 
-// SetContent sets the "content" field.
-func (_u *BusinessAttachmentUpdateOne) SetContent(v []byte) *BusinessAttachmentUpdateOne {
-	_u.mutation.SetContent(v)
+// SetObjectKey sets the "object_key" field.
+func (_u *BusinessAttachmentUpdateOne) SetObjectKey(v string) *BusinessAttachmentUpdateOne {
+	_u.mutation.SetObjectKey(v)
+	return _u
+}
+
+// SetNillableObjectKey sets the "object_key" field if the given value is not nil.
+func (_u *BusinessAttachmentUpdateOne) SetNillableObjectKey(v *string) *BusinessAttachmentUpdateOne {
+	if v != nil {
+		_u.SetObjectKey(*v)
+	}
 	return _u
 }
 
@@ -820,6 +841,11 @@ func (_u *BusinessAttachmentUpdateOne) check() error {
 			return &ValidationError{Name: "sha256", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.sha256": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ObjectKey(); ok {
+		if err := businessattachment.ObjectKeyValidator(v); err != nil {
+			return &ValidationError{Name: "object_key", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.object_key": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.UploadedBy(); ok {
 		if err := businessattachment.UploadedByValidator(v); err != nil {
 			return &ValidationError{Name: "uploaded_by", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.uploaded_by": %w`, err)}
@@ -905,8 +931,8 @@ func (_u *BusinessAttachmentUpdateOne) sqlSave(ctx context.Context) (_node *Busi
 	if value, ok := _u.mutation.Sha256(); ok {
 		_spec.SetField(businessattachment.FieldSha256, field.TypeString, value)
 	}
-	if value, ok := _u.mutation.Content(); ok {
-		_spec.SetField(businessattachment.FieldContent, field.TypeBytes, value)
+	if value, ok := _u.mutation.ObjectKey(); ok {
+		_spec.SetField(businessattachment.FieldObjectKey, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.UploadedBy(); ok {
 		_spec.SetField(businessattachment.FieldUploadedBy, field.TypeInt, value)

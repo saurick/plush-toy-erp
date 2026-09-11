@@ -270,6 +270,12 @@ export function buildRehearsalEnvironment({
     POSTGRES_USER: "postgres",
     POSTGRES_DSN: `postgres://postgres:${encodedPassword}@postgres:5432/${database}?sslmode=disable`,
     POSTGRES_DATA_DIR: path.join(workspace, "postgres"),
+    ATTACHMENT_DATA_DIR: path.join(workspace, "attachments"),
+    ATTACHMENT_S3_BUCKET: "plush-release-files",
+    ATTACHMENT_S3_ACCESS_KEY_ID: randomSecret(24),
+    ATTACHMENT_S3_SECRET_ACCESS_KEY: randomSecret(48),
+    ATTACHMENT_ADMIN_PASSWORD: randomSecret(48),
+    ATTACHMENT_VIEWER_PASSWORD: randomSecret(48),
     POSTGRES_BIND_ADDR: "127.0.0.1",
     POSTGRES_PORT: ports.postgres,
     APP_HTTP_BIND_ADDR: "127.0.0.1",
@@ -1757,6 +1763,7 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
   writeFileSync(envFile, formatRehearsalEnv(environment.values), {
     mode: 0o600,
   });
+  mkdirSync(environment.values.ATTACHMENT_DATA_DIR, { mode: 0o700 });
   const encodedPassword = encodeURIComponent(postgresPassword);
   const context = {
     repoRoot,

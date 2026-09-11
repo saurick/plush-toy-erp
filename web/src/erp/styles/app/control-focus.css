@@ -24,6 +24,10 @@ body
 
 body
   :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
+  .ant-input-number-affix-wrapper:focus-within,
+#root .ant-input-number-affix-wrapper:focus-within,
+body
+  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
   .ant-input-affix-wrapper.ant-input-affix-wrapper-focused,
 #root .ant-input-affix-wrapper.ant-input-affix-wrapper-focused {
   border-color: var(--erp-control-focus-border);

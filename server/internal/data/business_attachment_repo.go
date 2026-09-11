@@ -2,11 +2,14 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
 	stdsql "database/sql"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
 
+	"server/internal/attachmentstore"
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/adminuser"
@@ -30,14 +33,16 @@ import (
 )
 
 type businessAttachmentRepo struct {
-	data *Data
-	log  *log.Helper
+	data    *Data
+	log     *log.Helper
+	objects attachmentstore.Store
 }
 
-func NewBusinessAttachmentRepo(d *Data, logger log.Logger) *businessAttachmentRepo {
+func NewBusinessAttachmentRepo(d *Data, objects attachmentstore.Store, logger log.Logger) *businessAttachmentRepo {
 	return &businessAttachmentRepo{
-		data: d,
-		log:  log.NewHelper(log.With(logger, "module", "data.business_attachment_repo")),
+		data:    d,
+		log:     log.NewHelper(log.With(logger, "module", "data.business_attachment_repo")),
+		objects: objects,
 	}
 }
 
@@ -88,6 +93,14 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		in.SlotKey == nil ||
 		!biz.IsBusinessAttachmentProductImageSlotAllowed(*in.SlotKey)) {
 		return nil, biz.ErrBadParam
+	}
+	if r.objects == nil {
+		return nil, biz.ErrBusinessAttachmentStorageUnavailable
+	}
+	digest := sha256.Sum256(in.Content)
+	if len(in.Content) != in.FileSize || in.FileSize <= 0 || in.FileSize > biz.BusinessAttachmentMaxBytes ||
+		hex.EncodeToString(digest[:]) != in.SHA256 {
+		return nil, biz.ErrBusinessAttachmentIntegrity
 	}
 	tx, err := r.data.sqldb.BeginTx(ctx, nil)
 	if err != nil {
@@ -149,6 +162,13 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		}
 		return nil, err
 	}
+	// Keep the owner lock through the bounded object write. The SQL transaction
+	// still owns slot replacement and reference publication; it never deletes blobs.
+	objectKey := attachmentstore.NewKey()
+	if err := r.objects.Put(ctx, objectKey, in.Content); err != nil {
+		r.log.WithContext(ctx).Warnw("msg", "attachment object write failed", "object_key", objectKey)
+		return nil, biz.ErrBusinessAttachmentStorageUnavailable
+	}
 	if productImageWrite {
 		if _, err := tx.ExecContext(ctx, businessAttachmentProductImageDeleteSQL(r.data.sqlDialect), in.OwnerID, *in.SlotKey); err != nil {
 			return nil, err
@@ -157,13 +177,13 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 
 	insertQuery := `
 		INSERT INTO business_attachments
-			(owner_type, owner_id, attachment_type, slot_key, file_name, mime_type, file_size, sha256, content, uploaded_by, note, created_at)
+			(owner_type, owner_id, attachment_type, slot_key, file_name, mime_type, file_size, sha256, object_key, uploaded_by, note, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
 		RETURNING id, created_at`
 	if r.data.sqlDialect == "sqlite3" {
 		insertQuery = `
 			INSERT INTO business_attachments
-				(owner_type, owner_id, attachment_type, slot_key, file_name, mime_type, file_size, sha256, content, uploaded_by, note, created_at)
+				(owner_type, owner_id, attachment_type, slot_key, file_name, mime_type, file_size, sha256, object_key, uploaded_by, note, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 			RETURNING id, created_at`
 	}
@@ -180,13 +200,16 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		in.MimeType,
 		in.FileSize,
 		in.SHA256,
-		in.Content,
+		objectKey,
 		in.UploadedBy,
 		in.Note,
 	).Scan(&id, &createdAt); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
+		// A commit error can be an unknown outcome. Retain the object for
+		// reconciliation; deleting it here could destroy a committed attachment.
+		r.log.WithContext(ctx).Warnw("msg", "attachment commit requires reconciliation", "object_key", objectKey)
 		return nil, err
 	}
 	return &biz.BusinessAttachment{
@@ -482,10 +505,10 @@ func (r *businessAttachmentRepo) GetBusinessAttachmentContent(ctx context.Contex
 	}
 	defer func() { _ = tx.Rollback() }()
 	ownerQuery := fmt.Sprintf("SELECT id FROM %s WHERE id = $1 FOR KEY SHARE", ownerTable)
-	contentQuery := "SELECT content FROM business_attachments WHERE id = $1 AND owner_type = $2 AND owner_id = $3 AND withdrawn_at IS NULL"
+	contentQuery := "SELECT object_key, file_size FROM business_attachments WHERE id = $1 AND owner_type = $2 AND owner_id = $3 AND withdrawn_at IS NULL"
 	if r.data.sqlDialect == "sqlite3" {
 		ownerQuery = fmt.Sprintf("SELECT id FROM %s WHERE id = ?", ownerTable)
-		contentQuery = "SELECT content FROM business_attachments WHERE id = ? AND owner_type = ? AND owner_id = ? AND withdrawn_at IS NULL"
+		contentQuery = "SELECT object_key, file_size FROM business_attachments WHERE id = ? AND owner_type = ? AND owner_id = ? AND withdrawn_at IS NULL"
 	}
 	var lockedOwnerID int
 	if err := tx.QueryRowContext(ctx, ownerQuery, ownerID).Scan(&lockedOwnerID); err != nil {
@@ -494,12 +517,27 @@ func (r *businessAttachmentRepo) GetBusinessAttachmentContent(ctx context.Contex
 		}
 		return nil, err
 	}
-	var content []byte
-	if err := tx.QueryRowContext(ctx, contentQuery, id, ownerType, ownerID).Scan(&content); err != nil {
+	var objectKey string
+	var fileSize int64
+	if err := tx.QueryRowContext(ctx, contentQuery, id, ownerType, ownerID).Scan(&objectKey, &fileSize); err != nil {
 		if err == stdsql.ErrNoRows {
 			return nil, biz.ErrBusinessAttachmentNotFound
 		}
 		return nil, err
+	}
+	if r.objects == nil {
+		return nil, biz.ErrBusinessAttachmentStorageUnavailable
+	}
+	if !attachmentstore.ValidKey(objectKey) || fileSize <= 0 || fileSize > biz.BusinessAttachmentMaxBytes {
+		return nil, biz.ErrBusinessAttachmentIntegrity
+	}
+	content, err := r.objects.Get(ctx, objectKey, fileSize)
+	if err != nil {
+		r.log.WithContext(ctx).Warnw("msg", "attachment object read failed", "attachment_id", id)
+		if err == attachmentstore.ErrIntegrity || err == attachmentstore.ErrNotFound {
+			return nil, biz.ErrBusinessAttachmentIntegrity
+		}
+		return nil, biz.ErrBusinessAttachmentStorageUnavailable
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err

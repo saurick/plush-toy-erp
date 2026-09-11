@@ -10,6 +10,7 @@ import (
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
 	"go.opentelemetry.io/otel/sdk/trace"
+	"server/internal/attachmentstore"
 	"server/internal/biz"
 	"server/internal/conf"
 	"server/internal/data"
@@ -63,7 +64,12 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger, tr
 	inventoryUsecase := biz.NewInventoryUsecase(inventoryRepo)
 	operationalFactRepo := data.NewOperationalFactRepo(dataData, logger)
 	operationalFactUsecase := biz.NewOperationalFactUsecase(operationalFactRepo)
-	businessAttachmentRepo := data.NewBusinessAttachmentRepo(dataData, logger)
+	store, err := attachmentstore.NewFromEnv()
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	businessAttachmentRepo := data.NewBusinessAttachmentRepo(dataData, store, logger)
 	businessAttachmentUsecase := biz.NewBusinessAttachmentUsecase(businessAttachmentRepo)
 	jsonrpcService := service.NewJsonrpcService(confData, logger, adminAuthUsecase, adminManageUsecase, workflowUsecase, processRuntimeUsecase, debugUsecase, masterDataUsecase, salesOrderUsecase, purchaseOrderUsecase, productionOrderUsecase, outsourcingOrderUsecase, inventoryUsecase, operationalFactUsecase, businessAttachmentUsecase, customerConfigUsecase, adminAuthRepo)
 	httpServer := server.NewHTTPServer(confServer, logger, jsonrpcService, tracerProvider, dataData, customerConfigUsecase, adminAuthUsecase, confData)

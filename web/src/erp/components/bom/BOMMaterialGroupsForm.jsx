@@ -1,5 +1,6 @@
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex -- The horizontal table region needs keyboard scrolling. */
 import React, {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -46,6 +47,66 @@ const blankPart = (source = {}) => ({
   process_method: '',
   note: '',
 })
+
+function BOMMaterialSelect({ canCreateMaterial, onCreateMaterial, ...props }) {
+  const [open, setOpen] = useState(false)
+  const selectRef = useRef(null)
+  const createRef = useRef(null)
+  const renderPopup = useCallback(
+    (menu) => (
+      <>
+        {menu}
+        {canCreateMaterial ? (
+          <Button
+            ref={createRef}
+            type="link"
+            block
+            onMouseDown={(event) => event.preventDefault()}
+            onKeyDown={(event) => {
+              event.stopPropagation()
+              if (
+                event.key === 'Escape' ||
+                (event.key === 'Tab' && event.shiftKey)
+              ) {
+                event.preventDefault()
+                selectRef.current?.focus()
+                if (event.key === 'Escape') setOpen(false)
+              }
+            }}
+            onClick={() => {
+              selectRef.current?.focus()
+              setOpen(false)
+              onCreateMaterial()
+            }}
+          >
+            新建物料并使用
+          </Button>
+        ) : null}
+      </>
+    ),
+    [canCreateMaterial, onCreateMaterial]
+  )
+  return (
+    <Select
+      {...props}
+      ref={selectRef}
+      open={open}
+      onOpenChange={setOpen}
+      onInputKeyDown={(event) => {
+        if (
+          open &&
+          canCreateMaterial &&
+          event.key === 'Tab' &&
+          !event.shiftKey
+        ) {
+          event.preventDefault()
+          createRef.current?.focus()
+        }
+      }}
+      popupRender={renderPopup}
+    />
+  )
+}
 
 function LossRateInput({ value, onChange, ...props }) {
   const [text, setText] = useState(() => bomLossRateToPercent(value))
@@ -288,7 +349,11 @@ export default function BOMMaterialGroupsForm({
                           {label}
                         </th>
                       ))}
-                      {canEdit ? <th scope="col">操作</th> : null}
+                      {canEdit ? (
+                        <th scope="col" className="erp-bom-part-actions">
+                          操作
+                        </th>
+                      ) : null}
                     </tr>
                   </thead>
                   {groups.map((group) => {
@@ -336,9 +401,15 @@ export default function BOMMaterialGroupsForm({
                                         },
                                       ]}
                                     >
-                                      <Select
+                                      <BOMMaterialSelect
                                         aria-label={`物料名称 ${index + 1}`}
                                         disabled={!canEdit}
+                                        canCreateMaterial={
+                                          canEdit && canCreateMaterial
+                                        }
+                                        onCreateMaterial={() =>
+                                          setCreatingFor(group.indexes)
+                                        }
                                         showSearch
                                         allowClear
                                         optionFilterProp="label"
@@ -366,17 +437,6 @@ export default function BOMMaterialGroupsForm({
                                           .filter(Boolean)
                                           .join(' · ')}
                                       </span>
-                                    ) : null}
-                                    {canEdit && canCreateMaterial ? (
-                                      <Button
-                                        type="link"
-                                        size="small"
-                                        onClick={() =>
-                                          setCreatingFor(group.indexes)
-                                        }
-                                      >
-                                        新建物料
-                                      </Button>
                                     ) : null}
                                     {!material && source ? (
                                       <span className="erp-bom-material-cell__context">

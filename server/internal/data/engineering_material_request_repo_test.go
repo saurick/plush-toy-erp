@@ -1,6 +1,7 @@
 package data
 
 import (
+	"server/internal/attachmentstore"
 	"context"
 	"errors"
 	"fmt"
@@ -39,7 +40,7 @@ func prepareProductionEngineeringFixture(t *testing.T, ctx context.Context, data
 			client.Material.UpdateOneID(m.ID).SetSupplierID(s.ID).SaveX(ctx)
 		}
 	}
-	client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerProduct).SetOwnerID(line.ProductID).SetAttachmentType(biz.BusinessAttachmentTypeProductImage).SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("fixture.png").SetMimeType("image/png").SetFileSize(1).SetContent([]byte{1}).SetSha256(strings.Repeat("b", 64)).SaveX(ctx)
+	client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerProduct).SetOwnerID(line.ProductID).SetAttachmentType(biz.BusinessAttachmentTypeProductImage).SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("fixture.png").SetMimeType("image/png").SetFileSize(1).SetObjectKey(attachmentstore.NewKey()).SetSha256(strings.Repeat("b", 64)).SaveX(ctx)
 	uc := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	for _, state := range []string{biz.SalesOrderEngineeringPreparing, biz.SalesOrderEngineeringSampling, biz.SalesOrderEngineeringConfirmed} {
 		order := client.SalesOrder.GetX(ctx, line.SalesOrderID)
@@ -84,7 +85,7 @@ func prepareMaterialRequestFixture(t *testing.T, ctx context.Context, data *Data
 			client.BOMItem.Create().SetBomHeaderID(bom.ID).SetMaterialID(material.ID).SetUnitID(unit.ID).SetPosition(fmt.Sprintf("部位%d", j)).SetPieceCount("2").SetQuantity(decimal.RequireFromString("0.1")).SetLossRate(decimal.RequireFromString("0.1")).SaveX(ctx)
 		}
 	}
-	client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerProduct).SetOwnerID(product.ID).SetAttachmentType(biz.BusinessAttachmentTypeProductImage).SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("sample.png").SetMimeType("image/png").SetFileSize(1).SetContent([]byte{1}).SetSha256(strings.Repeat("a", 64)).SaveX(ctx)
+	client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerProduct).SetOwnerID(product.ID).SetAttachmentType(biz.BusinessAttachmentTypeProductImage).SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("sample.png").SetMimeType("image/png").SetFileSize(1).SetObjectKey(attachmentstore.NewKey()).SetSha256(strings.Repeat("a", 64)).SaveX(ctx)
 	for _, state := range []string{biz.SalesOrderEngineeringPreparing, biz.SalesOrderEngineeringSampling, biz.SalesOrderEngineeringConfirmed} {
 		note := "样品已核对"
 		order = client.SalesOrder.GetX(ctx, order.ID)
