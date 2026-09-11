@@ -48,6 +48,8 @@ function writeFixture({
       "POSTGRES_DB=plush_erp",
       "POSTGRES_USER=plush",
       "POSTGRES_DATA_DIR=/data/plush/postgres",
+      "ATTACHMENT_STORAGE_MODE=managed",
+      "COMPOSE_PROFILES=attachment-local",
       `ATTACHMENT_DATA_DIR=${root}/raid/attachments`,
       `ATTACHMENT_RAID_MOUNT=${root}/raid`,
       "ATTACHMENT_STORE_IMAGE=chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62",
@@ -155,7 +157,13 @@ function writeFixture({
   fs.chmodSync(path.join(composeDir, "database_roles.sh"), 0o755);
 
   fs.mkdirSync(path.join(root, "raid/attachments"), { recursive: true });
-  fs.copyFileSync(path.join(repoRoot, "server/deploy/compose/prod/attachment_raid_preflight.sh"), path.join(composeDir, "attachment_raid_preflight.sh"));
+  fs.copyFileSync(
+    path.join(
+      repoRoot,
+      "server/deploy/compose/prod/attachment_raid_preflight.sh",
+    ),
+    path.join(composeDir, "attachment_raid_preflight.sh"),
+  );
   const migrateScript = path.join(composeDir, "migrate_online.sh");
   fs.writeFileSync(
     migrateScript,
@@ -440,6 +448,7 @@ if [[ "\${1:-}" == "compose" ]]; then
   if [[ "$action" == "exec" && "$*" == *"/app/attachment-storage -mode check"* ]]; then exit 0; fi
   if [[ "$action" == "ps" ]]; then
     service="\${args[\${#args[@]} - 1]}"
+    if [[ "$service" == attachment-store && "\${FAKE_ATTACHMENT_EXTERNAL:-0}" == 1 ]]; then exit 0; fi
     printf '%s-cid\n' "$service"
     if [[ "\${FAKE_RUNTIME_DUPLICATE_SERVICE:-}" == "$service" ]]; then
       printf '%s-second-cid\n' "$service"
@@ -565,6 +574,8 @@ if [[ "\${1:-}" == "inspect" ]]; then
       printf 'GIT_SHA=%s\n' "$runtime_release"
     fi
     if [[ "$cid" == "app-server-cid" ]]; then
+      printf 'ATTACHMENT_S3_ENDPOINT=%s\n' "\${FAKE_ATTACHMENT_ENDPOINT:-http://attachment-store:8333}"
+      printf 'ATTACHMENT_S3_BUCKET=plush-test-files\nATTACHMENT_S3_ACCESS_KEY_ID=fixture-access-key\nATTACHMENT_S3_SECRET_ACCESS_KEY=fixture-secret-key-for-local-tests-123456\n'
       printf 'ERP_PDF_WARMUP=%s\n' "\${FAKE_RUNTIME_PDF_WARMUP:-async}"
       printf 'APP_AUTH_SMS_MODE=%s\n' "\${FAKE_RUNTIME_AUTH_SMS_MODE:-disabled}"
       printf 'BOOTSTRAP_ADMIN_ONCE=%s\n' "\${FAKE_RUNTIME_BOOTSTRAP_ADMIN_ONCE:-false}"
@@ -613,14 +624,18 @@ exit 0
 `,
     "utf8",
   );
-  fs.writeFileSync(path.join(binDir, "findmnt"), `#!/usr/bin/env bash
+  fs.writeFileSync(
+    path.join(binDir, "findmnt"),
+    `#!/usr/bin/env bash
 case "\${@: -1}" in
 TARGET) echo "\${FAKE_ATTACHMENT_MOUNT:-${root}/raid}" ;;
 SOURCE) echo /dev/test-raid ;;
 FSTYPE) echo "\${FAKE_ATTACHMENT_FILESYSTEM:-ext4}" ;;
 OPTIONS) echo rw,relatime ;;
 esac
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   fs.chmodSync(path.join(binDir, "docker"), 0o755);
   fs.chmodSync(path.join(binDir, "curl"), 0o755);
   return binDir;
@@ -1939,32 +1954,134 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
 test("production preflight rejects a missing RAID mount, network storage and public S3", async (t) => {
   for (const [name, env, expected] of [
     ["missing mount", { FAKE_ATTACHMENT_MOUNT: "/" }, /RAID5 未挂载/u],
-    ["network storage", { FAKE_ATTACHMENT_FILESYSTEM: "nfs" }, /本地持久文件系统/u],
+    [
+      "network storage",
+      { FAKE_ATTACHMENT_FILESYSTEM: "nfs" },
+      /本地持久文件系统/u,
+    ],
     ["public S3", { FAKE_ATTACHMENT_PUBLIC: "1" }, /不允许发布宿主机端口/u],
-    ["unhealthy S3", { FAKE_ATTACHMENT_HEALTH: "unhealthy" }, /附件存储未就绪/u],
-    ["public console", { FAKE_ATTACHMENT_CONSOLE_STATUS: "200" }, /登录保护不符/u],
-    ["viewer credential drift", { FAKE_ATTACHMENT_VIEWER_PASSWORD: "wrong-runtime-secret" }, /运行凭据与受控配置不符/u],
-  ]) await t.test(name, () => {
-    const fixture = writeFixture();
-    const bin = createFakeRuntimeBin(fixture.root);
-    const result = runPreflight(fixture, ["--runtime"], { env: { ...env, PATH: `${bin}:${process.env.PATH}` } });
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, expected);
-  });
+    [
+      "unhealthy S3",
+      { FAKE_ATTACHMENT_HEALTH: "unhealthy" },
+      /附件存储未就绪/u,
+    ],
+    [
+      "public console",
+      { FAKE_ATTACHMENT_CONSOLE_STATUS: "200" },
+      /登录保护不符/u,
+    ],
+    [
+      "viewer credential drift",
+      { FAKE_ATTACHMENT_VIEWER_PASSWORD: "wrong-runtime-secret" },
+      /运行凭据与受控配置不符/u,
+    ],
+  ])
+    await t.test(name, () => {
+      const fixture = writeFixture();
+      const bin = createFakeRuntimeBin(fixture.root);
+      const result = runPreflight(fixture, ["--runtime"], {
+        env: { ...env, PATH: `${bin}:${process.env.PATH}` },
+      });
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, expected);
+    });
 });
 
 test("production preflight rejects weak, placeholder or reused console passwords without exposing them", async (t) => {
   for (const [name, value, expected] of [
     ["short", "short-viewer-secret", /至少 32 位/u],
     ["placeholder", "replace-with-random-viewer-password", /placeholder/u],
-    ["admin reuse", "fixture-admin-password-for-local-tests-123456", /密码必须独立/u],
+    [
+      "admin reuse",
+      "fixture-admin-password-for-local-tests-123456",
+      /密码必须独立/u,
+    ],
     ["S3 reuse", "fixture-secret-key-for-local-tests-123456", /不得复用/u],
-  ]) await t.test(name, () => {
+  ])
+    await t.test(name, () => {
+      const fixture = writeFixture();
+      fs.writeFileSync(
+        fixture.envFile,
+        fs
+          .readFileSync(fixture.envFile, "utf8")
+          .replace(
+            /^ATTACHMENT_VIEWER_PASSWORD=.*$/mu,
+            `ATTACHMENT_VIEWER_PASSWORD=${value}`,
+          ),
+      );
+      const result = runPreflight(fixture);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, expected);
+      assert.ok(!`${result.stdout}${result.stderr}`.includes(value));
+    });
+});
+
+function useExternalStorage(fixture, endpoint = "http://192.168.0.133:8333") {
+  const source = fs
+    .readFileSync(fixture.envFile, "utf8")
+    .replace(
+      /^ATTACHMENT_STORAGE_MODE=.*$/mu,
+      "ATTACHMENT_STORAGE_MODE=external",
+    )
+    .replace(/^COMPOSE_PROFILES=.*$/mu, "COMPOSE_PROFILES=")
+    .replace(
+      /^ATTACHMENT_S3_ENDPOINT=.*$/mu,
+      `ATTACHMENT_S3_ENDPOINT=${endpoint}`,
+    )
+    .replace(
+      /^ATTACHMENT_(?:DATA_DIR|RAID_MOUNT|STORE_IMAGE|ADMIN_PASSWORD|VIEWER_PASSWORD)=.*\n/gmu,
+      "",
+    );
+  fs.writeFileSync(fixture.envFile, source);
+}
+
+test("external storage validates endpoint and avoids starting a second file store", async (t) => {
+  for (const [endpoint, valid] of [
+    ["http://192.168.0.133:8333", true],
+    ["https://storage.example.net", true],
+    ["http://8.8.8.8:8333", false],
+    ["http://169.254.169.254", false],
+    ["https://user:password@storage.example.net", false],
+    ["http://192.168.0.133:8333/buckets/files", false],
+  ])
+    await t.test(endpoint, () => {
+      const fixture = writeFixture();
+      useExternalStorage(fixture, endpoint);
+      const result = runPreflight(fixture);
+      assert.equal(result.status === 0, valid, result.stderr);
+    });
+  await t.test("runtime checks the external client credentials", () => {
     const fixture = writeFixture();
-    fs.writeFileSync(fixture.envFile, fs.readFileSync(fixture.envFile, "utf8").replace(/^ATTACHMENT_VIEWER_PASSWORD=.*$/mu, `ATTACHMENT_VIEWER_PASSWORD=${value}`));
+    useExternalStorage(fixture);
+    const bin = createFakeRuntimeBin(fixture.root);
+    const result = runPreflight(fixture, ["--runtime"], {
+      env: {
+        PATH: `${bin}:${process.env.PATH}`,
+        FAKE_ATTACHMENT_EXTERNAL: "1",
+        FAKE_ATTACHMENT_ENDPOINT: "http://192.168.0.133:8333",
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const drift = runPreflight(fixture, ["--runtime"], {
+      env: {
+        PATH: `${bin}:${process.env.PATH}`,
+        FAKE_ATTACHMENT_EXTERNAL: "1",
+      },
+    });
+    assert.notEqual(drift.status, 0);
+    assert.match(drift.stderr, /附件客户端运行配置不符/u);
+  });
+  await t.test("external storage rejects an enabled embedded store", () => {
+    const fixture = writeFixture();
+    useExternalStorage(fixture);
+    fs.writeFileSync(
+      fixture.envFile,
+      fs
+        .readFileSync(fixture.envFile, "utf8")
+        .replace("COMPOSE_PROFILES=", "COMPOSE_PROFILES=attachment-local"),
+    );
     const result = runPreflight(fixture);
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, expected);
-    assert.ok(!`${result.stdout}${result.stderr}`.includes(value));
+    assert.match(result.stderr, /不能同时启动/u);
   });
 });

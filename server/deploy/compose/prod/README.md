@@ -152,7 +152,16 @@ git diff --check
 
 ## 附件存储与RAID5
 
-文件内容使用 SeaweedFS `4.46` 固定 digest，所有 volume、filer metadata 和 master 数据均挂载到 `ATTACHMENT_DATA_DIR`。`ATTACHMENT_RAID_MOUNT=/srv/raid5`；demo 建议目录 `/srv/raid5/plush-toy-erp/demo-133/attachments`、bucket `plush-demo-133-files`，test 使用对应 `customer-test-133` 路径和 bucket。新目标初始化按这组路径生成独立随机凭据；已存在目标在发布前准备运行 env、目录和固定镜像，不能直接套用新目标初始化。
+附件通过 S3 访问，每个环境使用独立 bucket 和凭据，支持以下两种部署方式：
+
+| 模式 | 运行配置 | 存储检查 |
+| --- | --- | --- |
+| `managed` | `ATTACHMENT_STORAGE_MODE=managed`、`COMPOSE_PROFILES=attachment-local`；由 ERP Compose 启动 SeaweedFS | 校验 RAID5 实际挂载、固定镜像、健康和管理登录保护 |
+| `external` | `ATTACHMENT_STORAGE_MODE=external`、`COMPOSE_PROFILES=`；填写独立 `ATTACHMENT_S3_*` | 使用已部署服务，校验运行连接、独立 bucket 和凭据；RAID5、备份与管理入口由存储服务负责 |
+
+外部模式不启动 `attachment-store`，无需在 ERP env 中保存存储管理员密码或数据目录。S3 origin 允许 HTTPS 或局域网 HTTP IP 地址，不接受带凭据、文件路径、query 的 URL。Compose profile 只允许表中值，宿主环境仍不得覆盖受控 env。业务服务会在存储不可用时拒绝文件操作，不能用数据库内容回退。
+
+本机模式使用 SeaweedFS `4.46` 固定 digest，所有 volume、filer metadata 和 master 数据均挂载到 `ATTACHMENT_DATA_DIR`。`ATTACHMENT_RAID_MOUNT=/srv/raid5`；demo 建议目录 `/srv/raid5/plush-toy-erp/demo-133/attachments`、bucket `plush-demo-133-files`，test 使用对应 `customer-test-133` 路径和 bucket。新目标初始化按这组路径生成独立随机凭据；已存在目标在发布前准备运行 env、目录和固定镜像，不能直接套用新目标初始化。
 
 目标主机先确认 `/srv/raid5` 已挂载到预期块设备，再创建专用目录并限制权限。启动前执行：
 
@@ -161,7 +170,7 @@ bash server/deploy/compose/prod/attachment_raid_preflight.sh \
   /srv/raid5 /srv/raid5/plush-toy-erp/demo-133/attachments
 ```
 
-Compose 不自动创建缺失的附件目录，也不发布 S3 / filer / master / 管理界面端口；业务容器通过附件私有网络访问存储。`production-preflight --runtime` 会核对实际挂载、服务健康、S3 bucket 访问及管理界面的登录保护和凭据。目标机预装 `.env.example` 中固定的 SeaweedFS 镜像；低配目标不构建镜像。初始化或恢复失败时保留附件目录供核对，不沿用数据库清理脚本删除文件。
+本机模式的 Compose 不自动创建缺失的附件目录，也不发布 S3 / filer / master / 管理界面端口；业务容器通过附件私有网络访问存储。`production-preflight --runtime` 会核对实际挂载、服务健康、S3 bucket 访问及管理界面的登录保护和凭据。目标机预装 `.env.example` 中固定的 SeaweedFS 镜像；低配目标不构建镜像。初始化或恢复失败时保留附件目录供核对，不沿用数据库清理脚本删除文件。
 
 已有库外置按正式 promotion 的停写窗口进行。发布前保留旧版本、完整 PG 备份及其恢复验证；候选镜像包含 `/app/attachment-storage`。`migrate_online.sh --reconcile-permissions` 和 `--apply` 在同一 Atlas 串行锁范围中导出、逐个读回校验并提供迁移摘要，回执保存在 migration receipt 旁。纯只读预检遇到待外置数据时会明确阻断，不会自行复制文件。迁移后继续走权限对账、health / ready 和附件上传下载 smoke。若尚未移除旧列，可回到旧版本和旧库；旧列移除后回滚旧代码必须同时恢复配套旧 PG dump，不能只切镜像。
 
@@ -176,17 +185,19 @@ Compose 不自动创建缺失的附件目录，也不发布 S3 / filer / master 
 | `backup` | 导出可迁移的普通文件和 manifest，完成后才写 manifest | `-dir <new-directory> -execute -confirm ATTACHMENT_BACKUP:<db>` |
 | `restore` | 验证配套数据库元数据与备份，再恢复同一 key | `-dir <backup-directory> -execute -confirm ATTACHMENT_RESTORE:<db>` |
 
-本地开发也必须配置同一组 `ATTACHMENT_S3_*` 变量；使用 RAID5 上独立的开发 bucket，借助 SSH tunnel 暴露仅本机可用的 S3 接入，或在隔离本地验证中使用一次性 SeaweedFS。不要让开发和 demo/test 复用 bucket。共享开发库迁移前，停写后执行 `export`，再用 `verify -receipt <file> -pg-options` 的输出设置本次进程的 `PGOPTIONS`，然后按 `make migrate_prepare → make migrate_execute` 的同一 ready 输出执行，完成后 `unset PGOPTIONS`。运行 API 没有 PG 内容回退。
+本地开发也必须配置同一组 `ATTACHMENT_S3_*` 变量；使用 RAID5 上独立的开发 bucket，可通过受控局域网端点或 SSH tunnel 连接已有服务，或在隔离本地验证中使用一次性 SeaweedFS。开发配置保存在忽略 Git 的 `server/.env`（`0600`），`make run / dev_restart` 会读取同一组变量。不要让开发和 demo/test 复用 bucket。共享开发库迁移前，停写后执行 `export`，再用 `verify -receipt <file> -pg-options` 的输出设置本次进程的 `PGOPTIONS`，然后按 `make migrate_prepare → make migrate_execute` 的同一 ready 输出执行，完成后 `unset PGOPTIONS`。运行 API 没有 PG 内容回退。
 
 备份时保持相关写入停止，在同一窗口生成 PG custom-format dump 和 `backup` 文件目录，外加当前 release 与 migration 身份；保存到独立磁盘、另一台机器或云端受控存储。已有 `scheduled-postgres-backup.sh` 只负责 PG，不能作为本次外置后的完整系统备份。不要直接打包运行中的 SeaweedFS 原始数据目录。
 
 恢复先把配套 PG dump 导入隔离目标，再使用新 S3 endpoint / bucket 执行 `restore` 和 `verify`，保留原 key、附件 ID、哈希和审计。全部核对通过后才切业务连接；源对象和旧备份保留到回滚窗口结束。文件服务不可用时上传下载明确失败，附件列表仍读 PG 元数据。
 
+共享开发库的备份恢复演练遇到旧 PG 附件迁移时，会另外启动一次性 SeaweedFS，把恢复库中的文件导出并全量校验，以恢复库身份生成迁移凭证；原库凭证不能跨库复用。完成 Atlas 升级后再次验证文件，演练服务和临时凭据随该次演练清理。
+
 隔离验证入口为 `bash scripts/qa/attachment-storage-integration.sh`：创建一次性 PostgreSQL 与 SeaweedFS 容器，验证 fresh / upgrade、未导出与过期凭证阻断、匿名访问拒绝、不可覆盖写入、撤销审计、PG dump 加文件备份恢复、现有附件并发回归及管理界面只读权限，最后清理本轮容器和临时文件。它不连接或修改共享开发、demo 或 test 库。
 
 ### 只读查看存储
 
-管理界面复用同一 SeaweedFS 容器，查看存储状态、bucket 和底层文件。它供项目管理员排查存储使用，文件对应的产品、单据和撤销状态仍以 ERP 为准。界面显示的是存储服务信息，不证明 RAID 控制器或磁盘健康，也不证明备份完成。
+本机模式的管理界面复用同一 SeaweedFS 容器，查看存储状态、bucket 和底层文件。外部模式使用存储服务的管理入口；在 File Browser 中打开 `/buckets/<ATTACHMENT_S3_BUCKET>/attachments`。已识别的 PNG、JPEG、GIF、WebP 对象写入图片类型，便于只读预览；其他格式保留下载类型。它供项目管理员排查存储使用，文件对应的产品、单据和撤销状态仍以 ERP 为准。界面显示的是存储服务信息，不证明 RAID 控制器或磁盘健康，也不证明备份完成。
 
 | 账号 | 配置 | 用途 |
 | --- | --- | --- |

@@ -327,15 +327,10 @@ required_keys=(
   POSTGRES_DB
   POSTGRES_USER
   POSTGRES_DATA_DIR
-  ATTACHMENT_DATA_DIR
-  ATTACHMENT_RAID_MOUNT
-  ATTACHMENT_STORE_IMAGE
   ATTACHMENT_S3_ENDPOINT
   ATTACHMENT_S3_BUCKET
   ATTACHMENT_S3_ACCESS_KEY_ID
   ATTACHMENT_S3_SECRET_ACCESS_KEY
-  ATTACHMENT_ADMIN_PASSWORD
-  ATTACHMENT_VIEWER_PASSWORD
   MIGRATION_LOCK_FILE
   POSTGRES_BIND_ADDR
   TRACE_ENDPOINT
@@ -388,6 +383,14 @@ value_of() {
   ' "$normalized_env"
 }
 
+attachment_storage_mode="$(value_of ATTACHMENT_STORAGE_MODE)"
+attachment_storage_mode=${attachment_storage_mode:-managed}
+case "$attachment_storage_mode" in
+managed) required_keys+=(COMPOSE_PROFILES ATTACHMENT_DATA_DIR ATTACHMENT_RAID_MOUNT ATTACHMENT_STORE_IMAGE ATTACHMENT_ADMIN_PASSWORD ATTACHMENT_VIEWER_PASSWORD) ;;
+external) ;;
+*) fail "附件存储模式必须为 managed 或 external" ;;
+esac
+
 for key in "${required_keys[@]}"; do
   has_value "$key" || fail "缺少必需变量: $key"
 done
@@ -406,7 +409,9 @@ if [[ "$mode" != "example" ]]; then
     DOCKER_CERT_PATH
   )
   for key in "${compose_docker_control_keys[@]}"; do
-    has_value "$key" && fail "运行 env 文件禁止定义 Compose / Docker 控制变量: $key"
+    if [[ "$key" != COMPOSE_PROFILES ]]; then
+      has_value "$key" && fail "运行 env 文件禁止定义 Compose / Docker 控制变量: $key"
+    fi
     [[ -z "${!key+x}" ]] || fail "宿主环境变量会改写受控 Compose 运行身份，请 unset 后重试: $key"
   done
 
@@ -432,24 +437,45 @@ else
     fi
   done
 
-  attachment_data_dir="$(value_of ATTACHMENT_DATA_DIR)"
-  attachment_raid_mount="$(value_of ATTACHMENT_RAID_MOUNT)"
-  attachment_store_image="$(value_of ATTACHMENT_STORE_IMAGE)"
-  validate_absolute_path_without_aliases "ATTACHMENT_DATA_DIR" "$attachment_data_dir"
-  validate_absolute_path_without_aliases "ATTACHMENT_RAID_MOUNT" "$attachment_raid_mount"
-  [[ "$attachment_data_dir" == "$attachment_raid_mount/"* ]] || fail "附件目录必须位于 RAID5 挂载点下"
-  [[ "$(value_of ATTACHMENT_S3_ENDPOINT)" == "http://attachment-store:8333" ]] || fail "私有化部署附件必须连接专用内部 S3 服务"
   [[ "$(value_of ATTACHMENT_S3_BUCKET)" =~ ^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$ ]] || fail "附件 bucket 名称不合法"
-  [[ "$attachment_store_image" =~ ^chrislusf/seaweedfs:[0-9]+\.[0-9]+@sha256:[0-9a-f]{64}$ ]] || fail "附件存储镜像必须固定版本与 digest"
-  [[ ${#attachment_store_image} -gt 64 && $(value_of ATTACHMENT_S3_ACCESS_KEY_ID | wc -c) -ge 16 && $(value_of ATTACHMENT_S3_SECRET_ACCESS_KEY | wc -c) -ge 32 ]] || fail "附件存储必须使用独立随机凭据"
-  attachment_admin_password="$(value_of ATTACHMENT_ADMIN_PASSWORD)"
-  attachment_viewer_password="$(value_of ATTACHMENT_VIEWER_PASSWORD)"
-  [[ ${#attachment_admin_password} -ge 32 && ${#attachment_viewer_password} -ge 32 ]] || fail "附件管理与只读密码必须至少 32 位"
-  [[ "$attachment_admin_password" != "$attachment_viewer_password" ]] || fail "附件管理与只读密码必须独立"
-  for key in ATTACHMENT_S3_SECRET_ACCESS_KEY POSTGRES_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_BACKUP_PASSWORD APP_JWT_SECRET; do
-    value="$(value_of "$key")"
-    [[ "$attachment_admin_password" != "$value" && "$attachment_viewer_password" != "$value" ]] || fail "附件界面密码不得复用其他服务凭据"
-  done
+  [[ $(value_of ATTACHMENT_S3_ACCESS_KEY_ID | wc -c) -ge 16 && $(value_of ATTACHMENT_S3_SECRET_ACCESS_KEY | wc -c) -ge 32 ]] || fail "附件存储必须使用独立随机凭据"
+  attachment_profiles="$(value_of COMPOSE_PROFILES)"
+  if [[ "$attachment_storage_mode" == managed ]]; then
+    [[ "$attachment_profiles" == attachment-local ]] || fail "本机附件服务只能启用 attachment-local profile"
+    attachment_data_dir="$(value_of ATTACHMENT_DATA_DIR)"
+    attachment_raid_mount="$(value_of ATTACHMENT_RAID_MOUNT)"
+    attachment_store_image="$(value_of ATTACHMENT_STORE_IMAGE)"
+    validate_absolute_path_without_aliases "ATTACHMENT_DATA_DIR" "$attachment_data_dir"
+    validate_absolute_path_without_aliases "ATTACHMENT_RAID_MOUNT" "$attachment_raid_mount"
+    [[ "$attachment_data_dir" == "$attachment_raid_mount/"* ]] || fail "附件目录必须位于 RAID5 挂载点下"
+    [[ "$(value_of ATTACHMENT_S3_ENDPOINT)" == "http://attachment-store:8333" ]] || fail "私有化部署附件必须连接专用内部 S3 服务"
+    [[ "$(value_of ATTACHMENT_S3_BUCKET)" =~ ^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$ ]] || fail "附件 bucket 名称不合法"
+    [[ "$attachment_store_image" =~ ^chrislusf/seaweedfs:[0-9]+\.[0-9]+@sha256:[0-9a-f]{64}$ ]] || fail "附件存储镜像必须固定版本与 digest"
+    [[ ${#attachment_store_image} -gt 64 && $(value_of ATTACHMENT_S3_ACCESS_KEY_ID | wc -c) -ge 16 && $(value_of ATTACHMENT_S3_SECRET_ACCESS_KEY | wc -c) -ge 32 ]] || fail "附件存储必须使用独立随机凭据"
+    attachment_admin_password="$(value_of ATTACHMENT_ADMIN_PASSWORD)"
+    attachment_viewer_password="$(value_of ATTACHMENT_VIEWER_PASSWORD)"
+    [[ ${#attachment_admin_password} -ge 32 && ${#attachment_viewer_password} -ge 32 ]] || fail "附件管理与只读密码必须至少 32 位"
+    [[ "$attachment_admin_password" != "$attachment_viewer_password" ]] || fail "附件管理与只读密码必须独立"
+    for key in ATTACHMENT_S3_SECRET_ACCESS_KEY POSTGRES_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_BACKUP_PASSWORD APP_JWT_SECRET; do
+      value="$(value_of "$key")"
+      [[ "$attachment_admin_password" != "$value" && "$attachment_viewer_password" != "$value" ]] || fail "附件界面密码不得复用其他服务凭据"
+    done
+  else
+    [[ -z "$attachment_profiles" ]] || fail "外部存储不能同时启动本机附件服务或其他 profile"
+    python3 - "$(value_of ATTACHMENT_S3_ENDPOINT)" <<'PY_ENDPOINT' || fail "外部 S3 必须使用 HTTPS 或局域网 HTTP origin"
+import ipaddress, sys, urllib.parse
+try:
+    u = urllib.parse.urlsplit(sys.argv[1])
+    assert u.scheme in ('http', 'https') and u.hostname and not u.username and not u.password
+    assert u.path in ('', '/') and not u.query and not u.fragment
+    assert u.port is None or 0 < u.port <= 65535
+    if u.scheme == 'http':
+        ip = ipaddress.ip_address(u.hostname)
+        assert any(ip in ipaddress.ip_network(n) for n in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '::1/128'))
+except (ValueError, AssertionError):
+    sys.exit(1)
+PY_ENDPOINT
+  fi
   app_jwt_secret="$(value_of APP_JWT_SECRET)"
   app_image="$(value_of APP_IMAGE)"
   web_image="$(value_of WEB_IMAGE)"
@@ -750,9 +776,15 @@ if [[ "$runtime_check" -eq 1 ]]; then
     fail "--runtime 需要 docker compose / docker-compose"
   fi
 
-  bash "$compose_dir/attachment_raid_preflight.sh" "$attachment_raid_mount" "$attachment_data_dir"
+  runtime_services=(postgres jaeger app-server web-desktop)
+  if [[ "$attachment_storage_mode" == managed ]]; then
+    bash "$compose_dir/attachment_raid_preflight.sh" "$attachment_raid_mount" "$attachment_data_dir"
+    runtime_services+=(attachment-store)
+  else
+    [[ -z "$("${compose_cmd[@]}" ps -q attachment-store 2>/dev/null || true)" ]] || fail "外部存储模式存在未退出的本机附件服务"
+  fi
   declare -A runtime_cids=()
-  for service in postgres jaeger app-server web-desktop attachment-store; do
+  for service in "${runtime_services[@]}"; do
     runtime_service_cids="$("${compose_cmd[@]}" ps -q "$service" 2>/dev/null || true)"
     runtime_service_cid_count="$(printf '%s\n' "$runtime_service_cids" | awk 'NF { count++ } END { print count + 0 }')"
     [[ "$runtime_service_cid_count" == "1" ]] || fail "运行态 Compose 服务必须精确存在一个容器: $service"
@@ -801,24 +833,31 @@ if [[ "$runtime_check" -eq 1 ]]; then
   app_cid="${runtime_cids[app_server]}"
   postgres_cid="${runtime_cids[postgres]}"
   ok "Compose 运行服务存在"
-  attachment_cid="${runtime_cids[attachment_store]}"
-  [[ "$(docker inspect --format '{{.State.Health.Status}}' "$attachment_cid")" == healthy ]] || fail "附件存储未就绪"
-  [[ -z "$(docker port "$attachment_cid")" ]] || fail "附件存储不允许发布宿主机端口"
-  runtime_attachment_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$attachment_cid")"
-  for key in WEED_ADMIN_USER WEED_ADMIN_PASSWORD WEED_ADMIN_READONLY_USER WEED_ADMIN_READONLY_PASSWORD; do
-    case "$key" in
-    WEED_ADMIN_USER) expected_value=storage-admin ;;
-    WEED_ADMIN_PASSWORD) expected_value="$attachment_admin_password" ;;
-    WEED_ADMIN_READONLY_USER) expected_value=viewer ;;
-    WEED_ADMIN_READONLY_PASSWORD) expected_value="$attachment_viewer_password" ;;
-    esac
-    actual_value="$(printf '%s\n' "$runtime_attachment_env" | awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print }')"
-    [[ "$actual_value" == "$expected_value" ]] || fail "附件管理界面运行凭据与受控配置不符: $key"
+  if [[ "$attachment_storage_mode" == managed ]]; then
+    attachment_cid="${runtime_cids[attachment_store]}"
+    [[ "$(docker inspect --format '{{.State.Health.Status}}' "$attachment_cid")" == healthy ]] || fail "附件存储未就绪"
+    [[ -z "$(docker port "$attachment_cid")" ]] || fail "附件存储不允许发布宿主机端口"
+    runtime_attachment_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$attachment_cid")"
+    for key in WEED_ADMIN_USER WEED_ADMIN_PASSWORD WEED_ADMIN_READONLY_USER WEED_ADMIN_READONLY_PASSWORD; do
+      case "$key" in
+      WEED_ADMIN_USER) expected_value=storage-admin ;;
+      WEED_ADMIN_PASSWORD) expected_value="$attachment_admin_password" ;;
+      WEED_ADMIN_READONLY_USER) expected_value=viewer ;;
+      WEED_ADMIN_READONLY_PASSWORD) expected_value="$attachment_viewer_password" ;;
+      esac
+      actual_value="$(printf '%s\n' "$runtime_attachment_env" | awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print }')"
+      [[ "$actual_value" == "$expected_value" ]] || fail "附件管理界面运行凭据与受控配置不符: $key"
+    done
+    attachment_console_status="$(docker exec "$attachment_cid" curl --silent --max-time 3 --output /dev/null --write-out '%{http_code}' http://127.0.0.1:23646/)"
+    [[ "$attachment_console_status" == 307 ]] || fail "附件管理界面未就绪或登录保护不符"
+    attachment_mount="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Source}}{{end}}{{end}}' "$attachment_cid")"
+    [[ "$attachment_mount" == "$attachment_data_dir" ]] || fail "附件容器实际挂载目录不符"
+  fi
+  runtime_attachment_client_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$app_cid")"
+  for key in ATTACHMENT_S3_ENDPOINT ATTACHMENT_S3_BUCKET ATTACHMENT_S3_ACCESS_KEY_ID ATTACHMENT_S3_SECRET_ACCESS_KEY; do
+    actual_value="$(printf '%s\n' "$runtime_attachment_client_env" | awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print }')"
+    [[ "$actual_value" == "$(value_of "$key")" ]] || fail "附件客户端运行配置不符: $key"
   done
-  attachment_console_status="$(docker exec "$attachment_cid" curl --silent --max-time 3 --output /dev/null --write-out '%{http_code}' http://127.0.0.1:23646/)"
-  [[ "$attachment_console_status" == 307 ]] || fail "附件管理界面未就绪或登录保护不符"
-  attachment_mount="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Source}}{{end}}{{end}}' "$attachment_cid")"
-  [[ "$attachment_mount" == "$attachment_data_dir" ]] || fail "附件容器实际挂载目录不符"
   "${compose_cmd[@]}" exec -T app-server /app/attachment-storage -mode check -database "$postgres_database" >/dev/null || fail "附件存储凭据或 bucket 不可用"
   ok "Compose 服务容器唯一，镜像引用 / content id 与 release=$expected_release 一致"
 

@@ -271,6 +271,7 @@ export function buildRehearsalEnvironment({
     POSTGRES_DSN: `postgres://postgres:${encodedPassword}@postgres:5432/${database}?sslmode=disable`,
     POSTGRES_DATA_DIR: path.join(workspace, "postgres"),
     ATTACHMENT_DATA_DIR: path.join(workspace, "attachments"),
+    COMPOSE_PROFILES: "attachment-local",
     ATTACHMENT_S3_BUCKET: "plush-release-files",
     ATTACHMENT_S3_ACCESS_KEY_ID: randomSecret(24),
     ATTACHMENT_S3_SECRET_ACCESS_KEY: randomSecret(48),

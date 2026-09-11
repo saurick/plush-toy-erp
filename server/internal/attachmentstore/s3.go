@@ -92,6 +92,17 @@ func MigrationKey(id int64, digest string) string {
 	return "attachments/" + hex.EncodeToString(h[:])
 }
 
+// Only passive image formats are exposed for the storage console's preview.
+// Other bytes stay downloads; sniffed HTML/SVG must not become active content.
+func objectContentType(content []byte) string {
+	switch kind := http.DetectContentType(content); kind {
+	case "image/png", "image/jpeg", "image/gif", "image/webp":
+		return kind
+	default:
+		return "application/octet-stream"
+	}
+}
+
 func (s *S3) Put(ctx context.Context, key string, content []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
@@ -101,7 +112,7 @@ func (s *S3) Put(ctx context.Context, key string, content []byte) error {
 	sum := sha256.Sum256(content)
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket), Key: aws.String(key), Body: bytes.NewReader(content),
-		ContentLength: aws.Int64(int64(len(content))), ContentType: aws.String("application/octet-stream"),
+		ContentLength: aws.Int64(int64(len(content))), ContentType: aws.String(objectContentType(content)),
 		ChecksumAlgorithm: types.ChecksumAlgorithmSha256, ChecksumSHA256: aws.String(base64.StdEncoding.EncodeToString(sum[:])),
 		IfNoneMatch: aws.String("*"),
 	})

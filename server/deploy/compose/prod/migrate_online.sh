@@ -287,6 +287,12 @@ validate_registered_target_inputs() {
   [ -z "$duplicate_env_key" ] || fail "$DEPLOYMENT_TARGET_KEY env 变量必须唯一: $duplicate_env_key"
   for env_key in $TARGET_ENV_KEYS; do
     case "$env_key" in
+    COMPOSE_PROFILES)
+      case "$(target_env_value ATTACHMENT_STORAGE_MODE):$(target_env_value COMPOSE_PROFILES)" in
+      managed:attachment-local | :attachment-local | external:) ;;
+      *) fail "$DEPLOYMENT_TARGET_KEY 附件存储模式与 profile 不符" ;;
+      esac
+      ;;
     COMPOSE_* | DOCKER_* | DEPLOYMENT_TARGET_KEY | DB_URL | POSTGRES_HOST | POSTGRES_HOST_PORT | POSTGRES_SERVICE | APP_SERVICE | MIG_DIR | ATLAS_BIN | PSQL_BIN | POPULATED_UPGRADE_PREFLIGHT)
       fail "$DEPLOYMENT_TARGET_KEY env 不得声明目标覆盖变量: $env_key"
       ;;
@@ -1071,11 +1077,19 @@ if grep -Eq '^(20260911062436|20260911062537)$' "$PENDING_VERSIONS_FILE"; then
       if [ "$APPLY_MODE" -ne 1 ] && [ "$RECONCILE_PERMISSIONS" -ne 1 ]; then
         fail "附件迁移需要停写维护窗口内执行 export/verify；当前只读检查未移动文件"
       fi
-      attachment_mount=${ATTACHMENT_RAID_MOUNT:-/srv/raid5}
-      if [ -n "$COMPOSE_ENV_FILE" ]; then attachment_mount=$(target_env_value ATTACHMENT_RAID_MOUNT); fi
-      attachment_directory=$(compose config --format json | jq -er '.services["attachment-store"].volumes[] | select(.target == "/data") | .source')
-      bash "$SCRIPT_DIR/attachment_raid_preflight.sh" "$attachment_mount" "$attachment_directory"
-      compose up -d --no-build --pull never --wait --wait-timeout 60 attachment-store
+      attachment_storage_mode=${ATTACHMENT_STORAGE_MODE:-managed}
+      if [ -n "$COMPOSE_ENV_FILE" ]; then attachment_storage_mode=$(target_env_value ATTACHMENT_STORAGE_MODE); fi
+      case "${attachment_storage_mode:-managed}" in
+      managed)
+        attachment_mount=${ATTACHMENT_RAID_MOUNT:-/srv/raid5}
+        if [ -n "$COMPOSE_ENV_FILE" ]; then attachment_mount=$(target_env_value ATTACHMENT_RAID_MOUNT); fi
+        attachment_directory=$(compose config --format json | jq -er '.services["attachment-store"].volumes[] | select(.target == "/data") | .source')
+        bash "$SCRIPT_DIR/attachment_raid_preflight.sh" "$attachment_mount" "$attachment_directory"
+        compose up -d --no-build --pull never --wait --wait-timeout 60 attachment-store
+        ;;
+      external) ;;
+      *) fail "附件存储模式无效" ;;
+      esac
       compose run --rm --no-deps -T --user "$(id -u):$(id -g)" \
         --volume "$MIGRATION_RUN_DIR:/migration-proof" --entrypoint /app/attachment-storage \
         "$APP_SERVICE" -mode export -database "$EXPECTED_DB_NAME" \

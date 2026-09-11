@@ -38,6 +38,7 @@ x-web-app-common: &web-app-common
 
 services:
   attachment-store:
+    profiles: [attachment-local]
     image: "${ATTACHMENT_STORE_IMAGE:-chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62}"
     restart: always
     stop_grace_period: 60s
@@ -48,12 +49,12 @@ services:
       AWS_SECRET_ACCESS_KEY: "${ATTACHMENT_S3_SECRET_ACCESS_KEY:?ATTACHMENT_S3_SECRET_ACCESS_KEY is required}"
       S3_BUCKET: "${ATTACHMENT_S3_BUCKET:?ATTACHMENT_S3_BUCKET is required}"
       WEED_ADMIN_USER: storage-admin
-      WEED_ADMIN_PASSWORD: "${ATTACHMENT_ADMIN_PASSWORD:?ATTACHMENT_ADMIN_PASSWORD is required}"
+      WEED_ADMIN_PASSWORD: "${ATTACHMENT_ADMIN_PASSWORD:-}"
       WEED_ADMIN_READONLY_USER: viewer
-      WEED_ADMIN_READONLY_PASSWORD: "${ATTACHMENT_VIEWER_PASSWORD:?ATTACHMENT_VIEWER_PASSWORD is required}"
+      WEED_ADMIN_READONLY_PASSWORD: "${ATTACHMENT_VIEWER_PASSWORD:-}"
     volumes:
       - type: bind
-        source: "${ATTACHMENT_DATA_DIR:?ATTACHMENT_DATA_DIR on RAID5 is required}"
+        source: "${ATTACHMENT_DATA_DIR:-/unconfigured-attachment-store}"
         target: /data
         bind:
           create_host_path: false
@@ -136,6 +137,7 @@ services:
     depends_on:
       attachment-store:
         condition: service_healthy
+        required: false
       postgres:
         condition: service_healthy
       jaeger:

@@ -665,6 +665,7 @@ postgres_dsn="postgres://erp_app:${secret_values[POSTGRES_APP_PASSWORD]}@postgre
   printf 'POSTGRES_DB=%s\nPOSTGRES_USER=postgres\n' "$database"
   printf 'POSTGRES_DATA_DIR=%s\nMIGRATION_LOCK_FILE=%s\n' "$data_dir" "$root/run/atlas-migrate.lock"
   printf 'ATTACHMENT_DATA_DIR=%s\nATTACHMENT_RAID_MOUNT=/srv/raid5\n' "$attachment_dir"
+  printf 'ATTACHMENT_STORAGE_MODE=managed\nCOMPOSE_PROFILES=attachment-local\n'
   printf 'ATTACHMENT_STORE_IMAGE=chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62\n'
   printf 'ATTACHMENT_S3_ENDPOINT=http://attachment-store:8333\nATTACHMENT_S3_REGION=us-east-1\n'
   printf 'ATTACHMENT_S3_BUCKET=plush-%s-files\n' "$target"

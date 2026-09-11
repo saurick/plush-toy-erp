@@ -398,8 +398,17 @@ restore_db="plush_restore"
 restore_port=""
 restore_dsn=""
 role_secret_file=""
+attachment_container=""
+attachment_secret_file=""
+attachment_binary=""
+attachment_restore_status="not-required"
 
 cleanup() {
+  if [[ -n "$attachment_container" ]]; then
+    docker rm -fv "$attachment_container" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$attachment_secret_file" ]]; then rm -f -- "$attachment_secret_file"; fi
+  if [[ -n "$attachment_binary" ]]; then rm -f -- "$attachment_binary"; fi
   if [[ -n "$role_secret_file" ]]; then
     rm -f -- "$role_secret_file"
   fi
@@ -569,6 +578,51 @@ jq -r '
 ' "$pre_migration_status_json" >"$pending_versions_file"
 chmod 600 "$pending_versions_file"
 pending_before="$(awk 'NF {count++} END {print count + 0}' "$pending_versions_file")"
+
+# The export proof binds current_database(). A source proof must never be reused
+# for the restored database. Exercise the real export against an isolated store.
+if grep -Eq '^(20260911062436|20260911062537)$' "$pending_versions_file"; then
+  attachment_has_content="$(docker exec "$container_name" psql -U postgres -d "$restore_db" -X -At -c "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='business_attachments' AND column_name='content')")"
+  if [[ "$attachment_has_content" == t ]]; then
+    attachment_count="$(docker exec "$container_name" psql -U postgres -d "$restore_db" -X -At -c 'SELECT count(*) FROM business_attachments')"
+    if [[ "$attachment_count" -gt 0 ]]; then
+      echo "[backup-restore-rehearsal] verifying attachment export in isolated storage"
+      attachment_container="$container_name-attachments"
+      attachment_secret_file="$run_dir/attachment-store.env"
+      attachment_binary="$(cd "$run_dir" && pwd)/attachment-storage"
+      attachment_access="$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
+      attachment_secret="$(python3 -c 'import secrets; print(secrets.token_urlsafe(36))')"
+      printf 'AWS_ACCESS_KEY_ID=%s\nAWS_SECRET_ACCESS_KEY=%s\nS3_BUCKET=plush-restore-files\n' "$attachment_access" "$attachment_secret" >"$attachment_secret_file"
+      chmod 600 "$attachment_secret_file"
+      docker run -d --name "$attachment_container" --env-file "$attachment_secret_file" \
+        -p 127.0.0.1::8333 \
+        chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62 \
+        mini -dir=/data -admin.ui=false -webdav=false -s3.iam=false -s3.port.iceberg=0 -s3.port.lance=0 >/dev/null
+      attachment_ready=0
+      for ((attempt=0; attempt<30; attempt++)); do
+        if docker exec "$attachment_container" curl -fsS --max-time 2 http://127.0.0.1:9333/cluster/healthz >/dev/null 2>&1; then
+          attachment_ready=1; break
+        fi
+        sleep 1
+      done
+      [[ "$attachment_ready" == 1 ]] || { echo "[backup-restore-rehearsal] isolated attachment storage not ready" >&2; exit 1; }
+      attachment_port="$(docker port "$attachment_container" 8333/tcp | awk -F: 'NR==1 {print $NF}')"
+      (cd "$repo_root/server" && go build -o "$attachment_binary" ./cmd/attachment-storage)
+      restore_attachments() {
+        POSTGRES_DSN="$restore_dsn" \
+          ATTACHMENT_S3_ENDPOINT="http://127.0.0.1:$attachment_port" ATTACHMENT_S3_BUCKET=plush-restore-files \
+          ATTACHMENT_S3_REGION=us-east-1 ATTACHMENT_S3_ACCESS_KEY_ID="$attachment_access" ATTACHMENT_S3_SECRET_ACCESS_KEY="$attachment_secret" \
+          "$attachment_binary" -database "$restore_db" "$@"
+      }
+      restore_attachments -mode export -receipt "$run_dir/attachment-export.json" -execute -confirm "ATTACHMENT_EXPORT:$restore_db"
+      attachment_proof="$(restore_attachments -mode verify -receipt "$run_dir/attachment-export.json" -pg-options)"
+      [[ "$attachment_proof" =~ ^-c\ plush\.attachment_export_sha256=[0-9a-f]{64}$ ]] || exit 1
+      PGOPTIONS="${PGOPTIONS:+$PGOPTIONS }$attachment_proof"
+      export PGOPTIONS
+      attachment_restore_status=exported-verified
+    fi
+  fi
+fi
 rollback_rehearsal_status="not-required"
 if [[ "$pending_before" -gt 0 ]]; then
   rehearsal_sql="$run_dir/migration-rollback-rehearsal.sql"
@@ -635,6 +689,11 @@ fi
 echo "[backup-restore-rehearsal] applying migrations against restored DB"
 PGOPTIONS="${PGOPTIONS:+$PGOPTIONS }-c lock_timeout=5s -c statement_timeout=120s" \
   atlas_restore_migrate apply --lock-timeout 10s --tx-mode all
+
+if [[ "$attachment_restore_status" == exported-verified ]]; then
+  restore_attachments -mode verify
+  attachment_restore_status=passed
+fi
 
 echo "[backup-restore-rehearsal] running post-apply migration status against restored DB"
 atlas_restore_migrate status >"$migration_status_file"
@@ -857,7 +916,8 @@ printf '%s\n' "{
     \"permissionReadbackStatus\": \"$permission_readback_status\",
     \"populatedUpgradeAuditStatus\": \"$populated_upgrade_audit_status\",
     \"customerConfigCutoverAuditStatus\": \"$customer_config_cutover_audit_status\",
-    \"databaseConstraintAuditStatus\": \"$database_constraint_audit_status\"
+    \"databaseConstraintAuditStatus\": \"$database_constraint_audit_status\",
+    \"attachmentMigrationStatus\": \"$attachment_restore_status\"
   },
   \"smoke\": {
     \"smokeQueryStatus\": \"$smoke_query_status\",

@@ -78,3 +78,35 @@ func TestS3ImmutableWriteAndBoundedRead(t *testing.T) {
 		t.Fatalf("unavailable: %v", err)
 	}
 }
+
+func TestS3PreviewContentType(t *testing.T) {
+	for _, tc := range []struct{ name, content, want string }{
+		{"png", "\x89PNG\r\n\x1a\n", "image/png"},
+		{"jpeg", "\xff\xd8\xff\xe0", "image/jpeg"},
+		{"gif", "GIF89a", "image/gif"},
+		{"webp", "RIFF\x00\x00\x00\x00WEBPVP8 ", "image/webp"},
+		{"html", "<html><script>alert(1)</script></html>", "application/octet-stream"},
+		{"svg", "<svg xmlns=\"http://www.w3.org/2000/svg\"><script/></svg>", "application/octet-stream"},
+		{"text", "ordinary attachment", "application/octet-stream"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPut || r.Header.Get("Content-Type") != tc.want {
+					t.Errorf("unexpected upload %s Content-Type=%q", r.Method, r.Header.Get("Content-Type"))
+				}
+				body, _ := io.ReadAll(r.Body)
+				if string(body) != tc.content {
+					t.Error("preview metadata changed file bytes")
+				}
+			}))
+			defer ts.Close()
+			store, err := New(Config{Endpoint: ts.URL, Bucket: "test-files", AccessKey: "test-access", SecretKey: "test-secret"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Put(context.Background(), NewKey(), []byte(tc.content)); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

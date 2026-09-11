@@ -272,6 +272,8 @@ exec /usr/bin/mktemp "$template"
       "POSTGRES_USER=postgres",
       `POSTGRES_DATA_DIR=${trialDataDir}`,
       "ATTACHMENT_DATA_DIR=/srv/raid5/plush-test/attachments",
+      "ATTACHMENT_STORAGE_MODE=managed",
+      "COMPOSE_PROFILES=attachment-local",
       "ATTACHMENT_RAID_MOUNT=/srv/raid5",
       "ATTACHMENT_STORE_IMAGE=chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62",
       "ATTACHMENT_S3_ENDPOINT=http://attachment-store:8333",
