@@ -212,8 +212,13 @@ test("formal frontend customer config boundary: page, action, and field projecti
   );
   assert.match(
     mobileTasksSource,
-    /const taskAccessIdentity =\s*workflowTaskAdminAccessRequestIdentity\(adminProfile\)[\s\S]*const taskScopeKey = `\$\{activeRoleKey\}\|access:\$\{taskAccessIdentity\}\|\$\{canMountCustomerTasks \? 'ready' : 'blocked'\}`/u,
-    "role, customer, revision, or runtime access changes must invalidate the visible task scope",
+    /const taskAccessIdentity =\s*workflowTaskAdminAccessRequestIdentity\(adminProfile\)[\s\S]*const taskAccessScopeKey = `\$\{activeRoleKey\}\|access:\$\{taskAccessIdentity\}\|\$\{canMountCustomerTasks \? 'ready' : 'blocked'\}`/u,
+    "role, customer, revision, or runtime access changes must invalidate the access scope",
+  );
+  assert.match(
+    mobileTasksSource,
+    /const taskScopeKey = `\$\{taskAccessScopeKey\}\|search:\$\{taskKeyword\}`/u,
+    "visible tasks must stay bound to both access identity and the current search",
   );
   assert.match(
     mobileTasksSource,

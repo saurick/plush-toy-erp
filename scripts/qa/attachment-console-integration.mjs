@@ -2,13 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import {
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  rmSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -32,7 +26,6 @@ export async function createConsoleFixture() {
     ATTACHMENT_S3_SECRET_ACCESS_KEY: secret(),
     ATTACHMENT_S3_BUCKET: "plush-console-fixture",
   };
-  mkdirSync(values.ATTACHMENT_DATA_DIR, { mode: 0o700 });
   const example = readFileSync(
     path.join(root, "server/deploy/compose/prod/.env.example"),
     "utf8",
@@ -49,7 +42,7 @@ export async function createConsoleFixture() {
   // network and loopback port exist only in the disposable browser fixture.
   writeFileSync(
     path.join(directory, "compose.fixture.yml"),
-    "services:\n  attachment-store:\n    ports:\n      - '127.0.0.1::23646'\n    networks: [attachment-private, console-fixture]\n    restart: 'no'\nnetworks:\n  console-fixture: {}\n",
+    "services:\n  attachment-store:\n    ports:\n      - '127.0.0.1::23646'\n    networks: [attachment-private, console-fixture]\n    volumes:\n      - type: volume\n        source: console-data\n        target: /data\n    restart: 'no'\nnetworks:\n  console-fixture: {}\nvolumes:\n  console-data: {}\n",
   );
   const composeArgs = [
     "compose",
@@ -73,6 +66,18 @@ export async function createConsoleFixture() {
   const compose = (...args) => docker([...composeArgs, ...args]);
   const cleanup = () => {
     compose("down", "--volumes", "--timeout", "5");
+    assert.equal(
+      docker([
+        "volume",
+        "ls",
+        "--filter",
+        `label=com.docker.compose.project=${project}`,
+        "--format",
+        "{{.Name}}",
+      ]).trim(),
+      "",
+      "disposable console volumes must be removed",
+    );
     rmSync(directory, { recursive: true, force: true });
   };
   try {
@@ -88,6 +93,18 @@ export async function createConsoleFixture() {
       !service.command.some(
         (arg) => arg.includes(viewerPassword) || arg.includes(adminPassword),
       ),
+    );
+    // A project-scoped Docker volume keeps container-owned files out of the
+    // runner's temporary directory and lets Compose remove them on Linux.
+    const fixtureConfig = JSON.parse(compose("config", "--format", "json"));
+    const mounts = fixtureConfig.services["attachment-store"].volumes;
+    assert.equal(mounts.length, 1);
+    assert.equal(mounts[0].type, "volume");
+    assert.equal(mounts[0].source, "console-data");
+    assert.equal(mounts[0].target, "/data");
+    assert.equal(
+      fixtureConfig.volumes["console-data"].name,
+      `${project}_console-data`,
     );
     compose("up", "-d", "--no-deps", "attachment-store");
     const cid = compose("ps", "-q", "attachment-store").trim();

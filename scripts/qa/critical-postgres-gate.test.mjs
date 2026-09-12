@@ -482,7 +482,7 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   assert.match(pgScript, /p\.permission_key = 'process_runtime\.recover'/u)
   assert.match(
     pgScript,
-    /admin:1,boss:6,pmc:5,qa_business_default:2,qa_custom:3/u,
+    /admin:1,boss:8,pmc:6,qa_business_default:2,qa_custom:3/u,
   )
   assert.match(cutoverPreflight, /BEGIN TRANSACTION READ ONLY/u)
   assert.match(cutoverPreflight, /version = '20260714055825'/u)

@@ -657,7 +657,7 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   assert.match(compose, /^name: plush-gitlab-control$/mu);
   assert.match(
     compose,
-    /gitlab\/gitlab-ce@sha256:f7e453ff51d1910235365085fe836e4589716d26b44d99a8aa3e2c41377f034f/u,
+    /gitlab\/gitlab-ce@sha256:05453dd1d9aba27c2c487613141596868409b4d03247647f7d66cb0b36f321b8/u,
   );
   assert.match(compose, /127[.]0[.]0[.]1:\$\{GITLAB_HTTP_PORT:-8929\}:8929/u);
   assert.match(compose, /\/srv\/gitlab\/data/u);

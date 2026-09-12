@@ -146,11 +146,7 @@ export default function SalesOrderExcelImport({
       setWorkbook(parsed)
     } catch (error) {
       if (sequence !== readSequence.current) return
-      message.error(
-        error instanceof XlsxImportError
-          ? error.message
-          : getActionErrorMessage(error, '读取销售订单 Excel')
-      )
+      message.error(getActionErrorMessage(error, '读取销售订单 Excel'))
     } finally {
       if (sequence === readSequence.current) {
         readingRef.current = false

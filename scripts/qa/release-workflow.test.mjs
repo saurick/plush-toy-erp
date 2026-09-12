@@ -114,7 +114,7 @@ test("release recovers only provenance-bound strict evidence before starting the
   assert.match(strictRuns, /\bmake data\b/u);
   assert.match(
     strictRuns,
-    /git -C \.\. status --porcelain --untracked-files=all/u,
+    /git --no-optional-locks -C \.\. status --porcelain --untracked-files=all/u,
   );
   assert.match(SOURCE, /strict-terminal-current-\$\{\{ inputs\.sha \}\}/u);
   assert.match(SOURCE, /strict-terminal-\$\{\{ inputs\.sha \}\}/u);

@@ -37,7 +37,7 @@ test("V6 core contract keeps source units distinct and simulation-only", () => {
   );
   assert.equal(
     MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST,
-    "40f88c17fe4b2bd4d95085fe89ab6a587dcdc0f8d1b5b007552c0ab5e253d0b0",
+    "c4b5c9aa3c55783842d1a66038ae523b46f52c5cac250825d093f6709c90dac9",
   );
   assert.equal(Object.isFrozen(MANUAL_ACCEPTANCE_CORE_CONTRACT.units), true);
 });

@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
 
+import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import { buildLocalTestApplyRuntimeManifest } from "./customer-config-runtime-manifest.mjs";
+
 import {
   LONG_LIVED_DATABASE_NAMES,
   classifyDatabaseName,
@@ -32,11 +35,17 @@ export const CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION =
   MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion;
 export const CURRENT_MANUAL_ACCEPTANCE_RUN_ID =
   MANUAL_ACCEPTANCE_CORE_CONTRACT.runId;
+// Local acceptance follows the content-addressed tracked package. Remote
+// acceptance remains pinned to its separately registered deployment identity.
+const localConfigManifest = buildLocalTestApplyRuntimeManifest(
+  yoyoosunCustomerPackage,
+);
 export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION =
-  "yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1";
+  localConfigManifest.revision;
 export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION =
-  "local-customer-package-test-apply";
-export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE = "local_test_apply";
+  localConfigManifest.product_version;
+export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE =
+  localConfigManifest.compiled_snapshot.applyPurpose;
 export const CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION =
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
 export const CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION =

@@ -18,6 +18,8 @@ import {
   completeMaterialPurchaseContractDraft,
   completeProcessingContractDraft,
 } from "../../web/src/erp/utils/contractPrintDraftCompleteness.mjs";
+import { warehouseAcceptsSubject } from "../../web/src/erp/utils/warehouseClassification.mjs";
+import { BOM_PART_FIELDS } from "../../web/src/erp/utils/bomMaterialGroups.mjs";
 import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from "../../web/src/erp/utils/purchaseOrderPrintDraft.mjs";
 
 const syntheticSourceId = "__synthetic_yoyoosun_trial__";
@@ -252,7 +254,7 @@ const materialPurchaseLinePrintFieldCoverage = Object.freeze([
   ["productNo", "采购订单明细.product_no_snapshot"],
   ["productName", "采购订单明细.product_name_snapshot"],
   ["materialName", "采购订单明细.material_name_snapshot"],
-  ["vendorCode", "采购订单明细.material_code_snapshot"],
+  ["vendorCode", "采购订单明细.material_id -> 材料主数据.supplier_item_no"],
   ["spec", "材料主数据.spec"],
   ["unit", "单位主数据.name"],
   ["unitPrice", "采购订单明细.unit_price"],
@@ -319,7 +321,7 @@ const engineeringMaterialDetailPrintFieldCoverage = Object.freeze([
 const engineeringMaterialDetailLinePrintFieldCoverage = Object.freeze([
   ["category", "材料主数据.category"],
   ["materialName", "BOM明细.material_id -> 材料名称"],
-  ["vendorCode", "材料主数据.vendor_code"],
+  ["vendorCode", "材料主数据.supplier_name / supplier_item_no"],
   ["spec", "材料主数据.spec"],
   ["color", "材料主数据.color"],
   ["unit", "BOM明细.unit_id -> 单位名称"],
@@ -384,7 +386,7 @@ function buildFixtureLookups() {
       code: material.materialCode,
       name: material.materialName,
       category: material.category,
-      vendor_code: material.vendorCode,
+      supplier_item_no: material.supplierItemNo,
       spec: material.spec,
       color: material.color,
       default_unit_id: unitByCode.get(material.unitCode)?.id || 0,
@@ -1387,7 +1389,14 @@ test("yoyoosun warehouse fixture uses typed master data and valid references", (
         (warehouse) => warehouse.warehouseType,
       ),
     ),
-    new Set(["RAW_MATERIAL", "FINISHED_GOODS", "OTHER", "QC_HOLD"]),
+    new Set([
+      "MAIN_MATERIAL",
+      "AUXILIARY_MATERIAL",
+      "PACKAGING_MATERIAL",
+      "OTHER_MATERIAL",
+      "MATERIAL",
+      "FINISHED_GOODS",
+    ]),
   );
   for (const collectionKey of [
     "purchaseReceipts",
@@ -1402,11 +1411,27 @@ test("yoyoosun warehouse fixture uses typed master data and valid references", (
     }
   }
 
+  const materialByCode = new Map(
+    yoyoosunTrialDataFixture.materials.map((material) => [
+      material.materialCode,
+      material,
+    ]),
+  );
+  for (const lot of yoyoosunTrialDataFixture.inventoryLots) {
+    assert.ok(
+      warehouseAcceptsSubject(
+        { type: warehouseByCode.get(lot.warehouseCode)?.warehouseType },
+        "MATERIAL",
+        materialByCode.get(lot.materialCode)?.stockCategory,
+      ),
+      `${lot.lotNo} warehouse must accept the material stock category`,
+    );
+  }
   assert.equal(
     warehouseByCode.get(
       yoyoosunTrialDataFixture.purchaseReceipts[0].warehouseCode,
     )?.warehouseType,
-    "RAW_MATERIAL",
+    "MAIN_MATERIAL",
   );
   assert.equal(
     warehouseByCode.get(
@@ -1414,7 +1439,7 @@ test("yoyoosun warehouse fixture uses typed master data and valid references", (
         (lot) => lot.materialCode === "SIM-MAT-CARTON-001",
       )?.warehouseCode,
     )?.warehouseType,
-    "OTHER",
+    "PACKAGING_MATERIAL",
   );
   assert.ok(
     yoyoosunTrialDataFixture.shipments.every(
@@ -1928,16 +1953,36 @@ test("yoyoosun engineering print source pages expose every business-owned print 
   assertSourceContainsAll(
     bomPage,
     [
-      "name={[field.name, 'piece_count']}",
-      "name={[field.name, 'total_usage_snapshot']}",
-      "name={[field.name, 'process_base']}",
-      "name={[field.name, 'process_method']}",
+      "<BOMMaterialGroupsForm",
+      "['items', index, 'total_usage_snapshot']",
       "openPrintWorkspaceWindow",
       "buildMaterialDetailDraftFromBOMVersion",
       "buildColorCardDraftFromBOMVersion",
       "buildWorkInstructionDraftFromBOMVersion",
     ],
     "bom version page",
+  );
+  const materialGroupsForm = readFileSync(
+    "web/src/erp/components/bom/BOMMaterialGroupsForm.jsx",
+    "utf8",
+  );
+  for (const field of ["piece_count", "process_base", "process_method"]) {
+    assert.ok(
+      BOM_PART_FIELDS.includes(field),
+      `BOM part field required: ${field}`,
+    );
+  }
+  assertSourceContainsAll(
+    materialGroupsForm,
+    [
+      "BOM_PART_FIELDS.map((key, column)",
+      "name={[partField.name, key]}",
+      "<BOMUsageCell index={itemIndex}",
+      "getBOMUsage(",
+      "getFieldValue(['items', index])",
+      "getFieldValue('quantity_text')",
+    ],
+    "BOM material groups form",
   );
   assertSourceContainsAll(
     bomColumns,
