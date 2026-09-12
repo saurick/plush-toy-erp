@@ -804,7 +804,14 @@
       "purpose": "保存客户需求、客户款号、新单或返单、订单数量、船头样和工程产品关联；产品可在接单后补建。",
       "boundary": "工程样品状态与订单生效分开。样品确认绑定 BOM 内容指纹、产品图片和确认人；返单只能沿用同客户已确认的同款资料。实际出货量只由出货事实派生。",
       "lifecycle": "草稿聚合内可维护；行状态 open、closed 或 canceled；正式行不独立物理删除。",
-      "writeBoundary": "SalesOrderUsecase 分别控制商务草稿和工程资料事务；用料提交后不允许改写对应工程来源。"
+      "writeBoundary": "SalesOrderUsecase 分别控制商务草稿和工程资料事务；用料提交后不允许改写对应工程来源。",
+      "sensitiveFields": ["import_source"],
+      "fieldNotes": [
+        {
+          "name": "import_source",
+          "note": "首次导入的文件名、SHA256、工作表、行号、原始单元格及随单图片文件名；创建后不可改写。原表内容可能包含联系人、价格或结算信息，回传遵循敏感字段权限；不用于派生工程、出货或财务事实。"
+        }
+      ]
     },
     {
       "name": "sales_orders",

@@ -1028,12 +1028,14 @@ export default function FinancePaymentsPage() {
 
     return [
       {
+        defaultPriority: 10,
         title: '收付款单号',
         dataIndex: 'payment_no',
         copyable: { label: '收付款单号' },
         width: 200,
       },
       {
+        defaultPriority: 40,
         title: '方向',
         dataIndex: 'direction',
         width: 100,
@@ -1041,9 +1043,10 @@ export default function FinancePaymentsPage() {
         exportValue: (record) =>
           record?.direction === 'RECEIPT' ? '收款' : '付款',
       },
-      { title: '金额', dataIndex: 'amount', width: 140 },
-      { title: '币种', dataIndex: 'currency', width: 90 },
+      { defaultPriority: 50, title: '金额', dataIndex: 'amount', width: 140 },
+      { defaultPriority: 60, title: '币种', dataIndex: 'currency', width: 90 },
       {
+        defaultPriority: 30,
         title: '往来方',
         key: 'counterparty',
         copyable: {
@@ -1056,6 +1059,7 @@ export default function FinancePaymentsPage() {
         exportValue: counterpartyLabel,
       },
       {
+        defaultPriority: 20,
         title: '状态',
         dataIndex: 'status',
         width: 110,
@@ -1063,6 +1067,7 @@ export default function FinancePaymentsPage() {
         exportValue: (record) => paymentStatusLabel(record?.status),
       },
       {
+        defaultPriority: 80,
         title: '核销明细',
         dataIndex: 'allocations',
         width: 110,
@@ -1082,6 +1087,7 @@ export default function FinancePaymentsPage() {
         width: 200,
       },
       {
+        defaultPriority: 70,
         title: '发生时间',
         dataIndex: 'occurred_at',
         width: 170,
@@ -1093,12 +1099,14 @@ export default function FinancePaymentsPage() {
   const creditColumns = useMemo(
     () => [
       {
+        defaultPriority: 10,
         title: '红冲单号',
         dataIndex: 'credit_note_no',
         copyable: { label: '红冲单号' },
         width: 200,
       },
       {
+        defaultPriority: 30,
         title: '来源财务记录',
         dataIndex: 'finance_fact_no',
         copyable: { label: '来源财务记录' },
@@ -1107,6 +1115,7 @@ export default function FinancePaymentsPage() {
         exportValue: (record) => record?.finance_fact_no || '已关联财务记录',
       },
       {
+        defaultPriority: 40,
         title: '来源类型',
         dataIndex: 'finance_fact_type',
         width: 110,
@@ -1114,19 +1123,27 @@ export default function FinancePaymentsPage() {
         exportValue: (record) =>
           financeFactTypeLabel(record?.finance_fact_type),
       },
-      { title: '红冲金额', dataIndex: 'amount', width: 140 },
-      { title: '币种', dataIndex: 'currency', width: 90 },
       {
+        defaultPriority: 50,
+        title: '红冲金额',
+        dataIndex: 'amount',
+        width: 140,
+      },
+      { defaultPriority: 60, title: '币种', dataIndex: 'currency', width: 90 },
+      {
+        defaultPriority: 80,
         title: '来源原金额',
         dataIndex: 'finance_fact_original_amount',
         width: 140,
       },
       {
+        defaultPriority: 70,
         title: '红冲后未核销',
         dataIndex: 'finance_fact_outstanding_amount',
         width: 150,
       },
       {
+        defaultPriority: 20,
         title: '状态',
         dataIndex: 'status',
         width: 110,

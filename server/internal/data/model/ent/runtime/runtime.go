@@ -6534,57 +6534,57 @@ func init() {
 	// salesorderitem.ProcessRequirementValidator is a validator for the "process_requirement" field. It is called by the builders before save.
 	salesorderitem.ProcessRequirementValidator = salesorderitemDescProcessRequirement.Validators[0].(func(string) error)
 	// salesorderitemDescSampleBomID is the schema descriptor for sample_bom_id field.
-	salesorderitemDescSampleBomID := salesorderitemFields[9].Descriptor()
+	salesorderitemDescSampleBomID := salesorderitemFields[10].Descriptor()
 	// salesorderitem.SampleBomIDValidator is a validator for the "sample_bom_id" field. It is called by the builders before save.
 	salesorderitem.SampleBomIDValidator = salesorderitemDescSampleBomID.Validators[0].(func(int) error)
 	// salesorderitemDescSampleBomFingerprint is the schema descriptor for sample_bom_fingerprint field.
-	salesorderitemDescSampleBomFingerprint := salesorderitemFields[10].Descriptor()
+	salesorderitemDescSampleBomFingerprint := salesorderitemFields[11].Descriptor()
 	// salesorderitem.SampleBomFingerprintValidator is a validator for the "sample_bom_fingerprint" field. It is called by the builders before save.
 	salesorderitem.SampleBomFingerprintValidator = salesorderitemDescSampleBomFingerprint.Validators[0].(func(string) error)
 	// salesorderitemDescSampleReusedFromItemID is the schema descriptor for sample_reused_from_item_id field.
-	salesorderitemDescSampleReusedFromItemID := salesorderitemFields[11].Descriptor()
+	salesorderitemDescSampleReusedFromItemID := salesorderitemFields[12].Descriptor()
 	// salesorderitem.SampleReusedFromItemIDValidator is a validator for the "sample_reused_from_item_id" field. It is called by the builders before save.
 	salesorderitem.SampleReusedFromItemIDValidator = salesorderitemDescSampleReusedFromItemID.Validators[0].(func(int) error)
 	// salesorderitemDescSampleImageAttachmentID is the schema descriptor for sample_image_attachment_id field.
-	salesorderitemDescSampleImageAttachmentID := salesorderitemFields[12].Descriptor()
+	salesorderitemDescSampleImageAttachmentID := salesorderitemFields[13].Descriptor()
 	// salesorderitem.SampleImageAttachmentIDValidator is a validator for the "sample_image_attachment_id" field. It is called by the builders before save.
 	salesorderitem.SampleImageAttachmentIDValidator = salesorderitemDescSampleImageAttachmentID.Validators[0].(func(int) error)
 	// salesorderitemDescEngineeringStatus is the schema descriptor for engineering_status field.
-	salesorderitemDescEngineeringStatus := salesorderitemFields[13].Descriptor()
+	salesorderitemDescEngineeringStatus := salesorderitemFields[14].Descriptor()
 	// salesorderitem.DefaultEngineeringStatus holds the default value on creation for the engineering_status field.
 	salesorderitem.DefaultEngineeringStatus = salesorderitemDescEngineeringStatus.Default.(string)
 	// salesorderitem.EngineeringStatusValidator is a validator for the "engineering_status" field. It is called by the builders before save.
 	salesorderitem.EngineeringStatusValidator = salesorderitemDescEngineeringStatus.Validators[0].(func(string) error)
 	// salesorderitemDescSampleNote is the schema descriptor for sample_note field.
-	salesorderitemDescSampleNote := salesorderitemFields[14].Descriptor()
+	salesorderitemDescSampleNote := salesorderitemFields[15].Descriptor()
 	// salesorderitem.SampleNoteValidator is a validator for the "sample_note" field. It is called by the builders before save.
 	salesorderitem.SampleNoteValidator = salesorderitemDescSampleNote.Validators[0].(func(string) error)
 	// salesorderitemDescSampleConfirmedBy is the schema descriptor for sample_confirmed_by field.
-	salesorderitemDescSampleConfirmedBy := salesorderitemFields[16].Descriptor()
+	salesorderitemDescSampleConfirmedBy := salesorderitemFields[17].Descriptor()
 	// salesorderitem.SampleConfirmedByValidator is a validator for the "sample_confirmed_by" field. It is called by the builders before save.
 	salesorderitem.SampleConfirmedByValidator = salesorderitemDescSampleConfirmedBy.Validators[0].(func(int) error)
 	// salesorderitemDescProductSkuID is the schema descriptor for product_sku_id field.
-	salesorderitemDescProductSkuID := salesorderitemFields[17].Descriptor()
+	salesorderitemDescProductSkuID := salesorderitemFields[18].Descriptor()
 	// salesorderitem.ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
 	salesorderitem.ProductSkuIDValidator = salesorderitemDescProductSkuID.Validators[0].(func(int) error)
 	// salesorderitemDescUnitID is the schema descriptor for unit_id field.
-	salesorderitemDescUnitID := salesorderitemFields[18].Descriptor()
+	salesorderitemDescUnitID := salesorderitemFields[19].Descriptor()
 	// salesorderitem.UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
 	salesorderitem.UnitIDValidator = salesorderitemDescUnitID.Validators[0].(func(int) error)
 	// salesorderitemDescProductCodeSnapshot is the schema descriptor for product_code_snapshot field.
-	salesorderitemDescProductCodeSnapshot := salesorderitemFields[19].Descriptor()
+	salesorderitemDescProductCodeSnapshot := salesorderitemFields[20].Descriptor()
 	// salesorderitem.ProductCodeSnapshotValidator is a validator for the "product_code_snapshot" field. It is called by the builders before save.
 	salesorderitem.ProductCodeSnapshotValidator = salesorderitemDescProductCodeSnapshot.Validators[0].(func(string) error)
 	// salesorderitemDescProductNameSnapshot is the schema descriptor for product_name_snapshot field.
-	salesorderitemDescProductNameSnapshot := salesorderitemFields[20].Descriptor()
+	salesorderitemDescProductNameSnapshot := salesorderitemFields[21].Descriptor()
 	// salesorderitem.ProductNameSnapshotValidator is a validator for the "product_name_snapshot" field. It is called by the builders before save.
 	salesorderitem.ProductNameSnapshotValidator = salesorderitemDescProductNameSnapshot.Validators[0].(func(string) error)
 	// salesorderitemDescColorSnapshot is the schema descriptor for color_snapshot field.
-	salesorderitemDescColorSnapshot := salesorderitemFields[21].Descriptor()
+	salesorderitemDescColorSnapshot := salesorderitemFields[22].Descriptor()
 	// salesorderitem.ColorSnapshotValidator is a validator for the "color_snapshot" field. It is called by the builders before save.
 	salesorderitem.ColorSnapshotValidator = salesorderitemDescColorSnapshot.Validators[0].(func(string) error)
 	// salesorderitemDescLineStatus is the schema descriptor for line_status field.
-	salesorderitemDescLineStatus := salesorderitemFields[26].Descriptor()
+	salesorderitemDescLineStatus := salesorderitemFields[27].Descriptor()
 	// salesorderitem.DefaultLineStatus holds the default value on creation for the line_status field.
 	salesorderitem.DefaultLineStatus = salesorderitemDescLineStatus.Default.(string)
 	// salesorderitem.LineStatusValidator is a validator for the "line_status" field. It is called by the builders before save.
@@ -6604,15 +6604,15 @@ func init() {
 		}
 	}()
 	// salesorderitemDescNote is the schema descriptor for note field.
-	salesorderitemDescNote := salesorderitemFields[27].Descriptor()
+	salesorderitemDescNote := salesorderitemFields[28].Descriptor()
 	// salesorderitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	salesorderitem.NoteValidator = salesorderitemDescNote.Validators[0].(func(string) error)
 	// salesorderitemDescCreatedAt is the schema descriptor for created_at field.
-	salesorderitemDescCreatedAt := salesorderitemFields[28].Descriptor()
+	salesorderitemDescCreatedAt := salesorderitemFields[29].Descriptor()
 	// salesorderitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	salesorderitem.DefaultCreatedAt = salesorderitemDescCreatedAt.Default.(func() time.Time)
 	// salesorderitemDescUpdatedAt is the schema descriptor for updated_at field.
-	salesorderitemDescUpdatedAt := salesorderitemFields[29].Descriptor()
+	salesorderitemDescUpdatedAt := salesorderitemFields[30].Descriptor()
 	// salesorderitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	salesorderitem.DefaultUpdatedAt = salesorderitemDescUpdatedAt.Default.(func() time.Time)
 	// salesorderitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

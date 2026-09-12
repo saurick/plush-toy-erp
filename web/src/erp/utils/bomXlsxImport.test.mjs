@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { deflateRawSync } from 'node:zlib'
+import { groupBOMMaterials } from './bomMaterialGroups.mjs'
 
 import {
   BOMXlsxImportError,
@@ -137,6 +138,9 @@ function createSheetXml(rows, merges = []) {
         .map((value, columnIndex) => {
           if (value === null || value === undefined || value === '') return ''
           const reference = `${columnLetters(columnIndex + 1)}${rowIndex + 1}`
+          if (typeof value === 'object') {
+            return `<c r="${reference}"><f>${escapeXml(value.formula)}</f><v>${escapeXml(value.value)}</v></c>`
+          }
           return `<c r="${reference}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`
         })
         .join('')
@@ -357,7 +361,8 @@ test('parseBOMXlsx: first material-detail shape keeps unit usage canonical and d
   assert.equal(result.rows[0].quantity, '0.5')
   assert.equal(result.rows[0].totalUsageSnapshot, '110')
   assert.equal(result.rows[0].lossRate, '0.1')
-  assert.equal(result.rows[0].processMethod, '贴衬 / 激光')
+  assert.equal(result.rows[0].processBase, '贴衬')
+  assert.equal(result.rows[0].processMethod, '激光')
   assert.equal(result.rows[1].materialName, '测试布料')
   assert.equal(result.rows[1].lossRate, '0')
 })
@@ -373,11 +378,182 @@ test('parseBOMXlsx: second shape normalizes explicit percentages and infers blan
   assert.equal(result.rows.length, 3)
   assert.equal(result.rows[0].lossRate, '0.1')
   assert.equal(result.rows[0].lossSource, 'explicit')
-  assert.equal(result.rows[0].processMethod, '贴纸朴 / 热裁')
+  assert.equal(result.rows[0].processBase, '贴纸朴')
+  assert.equal(result.rows[0].processMethod, '热裁')
   assert.equal(result.rows[1].lossRate, '0.1')
   assert.equal(result.rows[1].lossSource, 'calculated')
   assert.equal(result.rows[2].lossRate, '0')
   assert.equal(result.rows[2].pieceCount, '2')
+})
+
+test('subtotal formulas are excluded before carrying identity, while actual parts without positions remain', async () => {
+  const parsed = await parseBOMXlsx(
+    createWorkbook([
+      {
+        name: '材料分析明细表',
+        merges: ['H1:I1', 'H6:I6'],
+        rows: [
+          [
+            '物料名称',
+            '厂商料号',
+            '规格',
+            '单位',
+            '组装部位',
+            '单位用量',
+            '总用量',
+            '加工程序',
+            null,
+            '备注',
+          ],
+          [
+            '合成面料',
+            'SUP-A',
+            '58寸',
+            'Y',
+            '前片',
+            '0.1',
+            '11',
+            '贴衬',
+            '热裁',
+          ],
+          [null, null, null, null, '后片', '0.2', '22'],
+          [
+            null,
+            null,
+            '777',
+            null,
+            null,
+            { formula: 'SUM($F$2:F3)', value: '0.3' },
+            { formula: 'SUM(G2:G3)', value: '33' },
+          ],
+          [null, null, null, null, '尾片', '0.02', '2.2'],
+          ['合成配件', 'SUP-B', null, '套', null, '1', '100', '整套配对加工'],
+          [null, null, null, null, null, '2', '200', null, '整套加工'],
+          [
+            '合成垫片',
+            'SUP-C',
+            null,
+            '套',
+            null,
+            { formula: 'SUM(F6:F7)', value: '3' },
+            '300',
+          ],
+        ],
+      },
+    ])
+  )
+  assert.deepEqual(
+    parsed.rows.map((row) => row.rowNumber),
+    [2, 3, 5, 6, 7, 8]
+  )
+  assert.equal(parsed.rows[2].materialSpec, '58寸')
+  assert.equal(parsed.rows[0].processBase, '贴衬')
+  assert.equal(parsed.rows[0].processMethod, '热裁')
+  assert.equal(parsed.rows[3].processBase, '')
+  assert.equal(parsed.rows[3].processMethod, '整套配对加工')
+  assert.equal(parsed.rows[3].materialSpec, '')
+  const draft = buildBOMImportDraft(parsed)
+  assert.deepEqual(
+    groupBOMMaterials(draft.values.items).map((group) => group.indexes),
+    [[0, 1, 2], [3, 4], [5]]
+  )
+})
+
+test('merged processing instructions crossing remarks become one row note without swallowing independent processing', async () => {
+  for (const explicitBase of [false, true]) {
+    const parsed = await parseBOMXlsx(
+      createWorkbook([
+        {
+          name: '材料分析明细表',
+          merges: [
+            ...(!explicitBase ? ['D1:E1'] : []),
+            'D2:F2',
+            'E3:F3',
+            'D4:E4',
+          ],
+          rows: [
+            [
+              '物料名称',
+              '单位',
+              '单位用量',
+              explicitBase ? '加工基础' : '加工程序',
+              explicitBase ? '加工方式' : null,
+              '备注',
+            ],
+            ['合成配件', '套', '1', '衣片两端缝合，腰带留孔'],
+            ['合成挂绳', '条', '1', '布底贴12g衬', '长度61mm，每端留一个孔'],
+            ['合成布料', '米', '0.2', '配套激光裁剪', null, '纹向一致'],
+            ['合成布料', '米', '0.1', '贴衬', '热裁', '单独备注'],
+            ['合成空白', '件', '1'],
+          ],
+        },
+      ])
+    )
+    const actual = parsed.rows.map(({ processBase, processMethod, note }) => ({
+      processBase,
+      processMethod,
+      note,
+    }))
+    assert.deepEqual(actual, [
+      { processBase: '', processMethod: '', note: '衣片两端缝合,腰带留孔' },
+      {
+        processBase: '布底贴12g衬',
+        processMethod: '',
+        note: '长度61mm,每端留一个孔',
+      },
+      {
+        processBase: explicitBase ? '配套激光裁剪' : '',
+        processMethod: explicitBase ? '' : '配套激光裁剪',
+        note: '纹向一致',
+      },
+      { processBase: '贴衬', processMethod: '热裁', note: '单独备注' },
+      { processBase: '', processMethod: '', note: '' },
+    ])
+    assert.deepEqual(
+      buildBOMImportDraft(parsed).values.items.map(({ note }) => note || ''),
+      actual.map(({ note }) => note)
+    )
+  }
+})
+
+test('unmatched import grouping uses full source identity and yields to selected material and unit', () => {
+  const source = {
+    materialName: '合成面料',
+    supplierItemNo: 'SUP-A',
+    materialSpec: '58寸',
+    color: '白',
+    unit: 'Y',
+  }
+  const parsed = {
+    rows: [
+      source,
+      { ...source, position: '后片', rowNumber: 7 },
+      { ...source, supplierItemNo: 'SUP-B' },
+      { ...source, materialSpec: '36寸' },
+      { ...source, color: '黑' },
+      { ...source, unit: '米' },
+      { ...source, materialCode: 'MAT-OTHER' },
+      {},
+      {},
+    ],
+  }
+  const { items } = buildBOMImportDraft(parsed).values
+  assert.deepEqual(
+    groupBOMMaterials(items).map((group) => group.indexes),
+    [[0, 1], [2], [3], [4], [5], [6], [7], [8]]
+  )
+  const selected = items.map((item, index) =>
+    index < 3 ? { ...item, material_id: 1, unit_id: 2 } : item
+  )
+  assert.deepEqual(groupBOMMaterials(selected)[0].indexes, [0, 1, 2])
+  assert.deepEqual(
+    groupBOMMaterials(
+      selected.map((item) => ({ ...item, material_id: undefined }))
+    )[0].indexes,
+    [0, 1]
+  )
+  assert.equal(items[0].material_id, undefined)
+  assert.ok(getBOMImportDraftIssues({ items }).length > 0)
 })
 
 test('buildBOMImportDraft: only unique existing master data is linked and source identity stays reviewable', async () => {

@@ -863,6 +863,7 @@ export default function V1PurchaseReceiptsPage() {
     () =>
       applyBusinessColumnSorters([
         {
+          defaultPriority: 10,
           title: '入库单号',
           exportTitle: '入库单号',
           dataIndex: 'receipt_no',
@@ -871,6 +872,7 @@ export default function V1PurchaseReceiptsPage() {
           sortType: 'text',
         },
         {
+          defaultPriority: 20,
           title: '状态',
           exportTitle: '状态',
           dataIndex: 'status',
@@ -881,6 +883,7 @@ export default function V1PurchaseReceiptsPage() {
             STATUS_LABELS[record?.status] || (record?.status ? '入库状态' : ''),
         },
         {
+          defaultPriority: 30,
           title: '供应商',
           exportTitle: '供应商',
           dataIndex: 'supplier_name',
@@ -889,6 +892,7 @@ export default function V1PurchaseReceiptsPage() {
           sortType: 'text',
         },
         {
+          defaultPriority: 40,
           title: '收货日期',
           exportTitle: '收货日期',
           dataIndex: 'received_at',
@@ -898,6 +902,7 @@ export default function V1PurchaseReceiptsPage() {
           exportValue: (record) => formatUnixDate(record?.received_at),
         },
         {
+          defaultPriority: 70,
           title: '过账时间',
           exportTitle: '过账时间',
           dataIndex: 'posted_at',
@@ -907,6 +912,7 @@ export default function V1PurchaseReceiptsPage() {
           exportValue: (record) => formatUnixDateTime(record?.posted_at),
         },
         {
+          defaultPriority: 60,
           title: '明细行数',
           exportTitle: '明细行数',
           key: 'item_count',
@@ -917,6 +923,7 @@ export default function V1PurchaseReceiptsPage() {
           exportValue: receiptItemCount,
         },
         {
+          defaultPriority: 50,
           title: '入库数量',
           exportTitle: '入库数量',
           key: 'quantity_total',

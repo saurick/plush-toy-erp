@@ -1444,6 +1444,7 @@ export default function V1InventoryLedgerPage() {
     if (activeView === VIEW_LOTS) {
       return [
         {
+          defaultPriority: 10,
           title: '批次号',
           dataIndex: 'lot_no',
           copyable: { label: '批次号' },
@@ -1451,6 +1452,7 @@ export default function V1InventoryLedgerPage() {
           render: (value, record) => value || (record.id ? '已登记批次' : '-'),
         },
         {
+          defaultPriority: 50,
           title: '存货类型',
           exportTitle: '存货类型',
           dataIndex: 'subject_type',
@@ -1465,6 +1467,7 @@ export default function V1InventoryLedgerPage() {
               : subjectTypeText(record?.subject_type),
         },
         {
+          defaultPriority: 30,
           title: '材料 / 产品',
           dataIndex: 'subject_id',
           copyable: {
@@ -1481,6 +1484,7 @@ export default function V1InventoryLedgerPage() {
             renderSubjectReference(record?.subject_id, record),
         },
         {
+          defaultPriority: 40,
           title: '产品规格',
           dataIndex: 'product_sku_id',
           copyable: {
@@ -1522,6 +1526,7 @@ export default function V1InventoryLedgerPage() {
           render: dash,
         },
         {
+          defaultPriority: 20,
           title: '状态',
           exportTitle: '状态',
           dataIndex: 'status',
@@ -1530,6 +1535,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => lotStatusText(record?.status),
         },
         {
+          defaultPriority: 60,
           title: '接收日期',
           exportTitle: '接收日期',
           dataIndex: 'received_at',
@@ -1543,6 +1549,7 @@ export default function V1InventoryLedgerPage() {
     if (activeView === VIEW_TXNS) {
       return [
         {
+          defaultPriority: 150,
           title: '变动记录',
           dataIndex: 'id',
           width: 130,
@@ -1550,6 +1557,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => (record?.id ? '已记录' : ''),
         },
         {
+          defaultPriority: 90,
           title: '类型',
           exportTitle: '类型',
           dataIndex: 'txn_type',
@@ -1558,6 +1566,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => txnTypeText(record?.txn_type),
         },
         {
+          defaultPriority: 40,
           title: '方向',
           exportTitle: '方向',
           dataIndex: 'direction',
@@ -1566,6 +1575,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => directionText(record?.direction),
         },
         {
+          defaultPriority: 100,
           title: '存货类型',
           exportTitle: '存货类型',
           dataIndex: 'subject_type',
@@ -1580,6 +1590,7 @@ export default function V1InventoryLedgerPage() {
               : subjectTypeText(record?.subject_type),
         },
         {
+          defaultPriority: 20,
           title: '材料 / 产品',
           dataIndex: 'subject_id',
           copyable: {
@@ -1596,6 +1607,7 @@ export default function V1InventoryLedgerPage() {
             renderSubjectReference(record?.subject_id, record),
         },
         {
+          defaultPriority: 30,
           title: '产品规格',
           dataIndex: 'product_sku_id',
           copyable: {
@@ -1609,6 +1621,7 @@ export default function V1InventoryLedgerPage() {
             renderProductSKUReference(record?.product_sku_id, record),
         },
         {
+          defaultPriority: 70,
           title: '仓库',
           dataIndex: 'warehouse_id',
           copyable: {
@@ -1622,6 +1635,7 @@ export default function V1InventoryLedgerPage() {
             renderWarehouseReference(record?.warehouse_id),
         },
         {
+          defaultPriority: 80,
           title: '批次',
           dataIndex: 'lot_id',
           copyable: {
@@ -1634,6 +1648,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => renderLotReference(record?.lot_id),
         },
         {
+          defaultPriority: 50,
           title: '数量',
           exportTitle: '数量',
           dataIndex: 'quantity',
@@ -1642,6 +1657,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => formatQuantity(record?.quantity),
         },
         {
+          defaultPriority: 60,
           title: '单位',
           dataIndex: 'unit_id',
           width: 130,
@@ -1649,6 +1665,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => renderUnitReference(record?.unit_id),
         },
         {
+          defaultPriority: 110,
           title: '来源',
           exportTitle: '来源',
           key: 'source_type_label',
@@ -1657,6 +1674,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => sourceTypeText(record?.source_type),
         },
         {
+          defaultPriority: 120,
           title: '来源单据',
           key: 'source_document',
           copyable: {
@@ -1672,6 +1690,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: formatSourceDocumentRef,
         },
         {
+          defaultPriority: 130,
           title: '来源明细',
           dataIndex: 'source_line_id',
           width: 130,
@@ -1680,6 +1699,7 @@ export default function V1InventoryLedgerPage() {
             relationRef('来源明细', record?.source_line_id),
         },
         {
+          defaultPriority: 140,
           title: '原库存变动记录',
           dataIndex: 'reversal_of_txn_id',
           width: 130,
@@ -1688,6 +1708,7 @@ export default function V1InventoryLedgerPage() {
             relationRef('原库存变动记录', record?.reversal_of_txn_id),
         },
         {
+          defaultPriority: 10,
           title: '发生时间',
           exportTitle: '发生时间',
           dataIndex: 'occurred_at',
@@ -1701,6 +1722,7 @@ export default function V1InventoryLedgerPage() {
 
     return [
       {
+        defaultPriority: 90,
         title: '库存项',
         dataIndex: 'id',
         width: 130,
@@ -1708,6 +1730,7 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => (record?.id ? '已登记库存' : ''),
       },
       {
+        defaultPriority: 80,
         title: '存货类型',
         exportTitle: '存货类型',
         dataIndex: 'subject_type',
@@ -1722,6 +1745,7 @@ export default function V1InventoryLedgerPage() {
             : subjectTypeText(record?.subject_type),
       },
       {
+        defaultPriority: 10,
         title: '材料 / 产品',
         dataIndex: 'subject_id',
         copyable: {
@@ -1738,6 +1762,7 @@ export default function V1InventoryLedgerPage() {
           renderSubjectReference(record?.subject_id, record),
       },
       {
+        defaultPriority: 20,
         title: '产品规格',
         dataIndex: 'product_sku_id',
         copyable: {
@@ -1751,6 +1776,7 @@ export default function V1InventoryLedgerPage() {
           renderProductSKUReference(record?.product_sku_id, record),
       },
       {
+        defaultPriority: 30,
         title: '仓库',
         dataIndex: 'warehouse_id',
         copyable: {
@@ -1763,6 +1789,7 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => renderWarehouseReference(record?.warehouse_id),
       },
       {
+        defaultPriority: 70,
         title: '批次',
         dataIndex: 'lot_id',
         copyable: {
@@ -1774,6 +1801,7 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => renderLotReference(record?.lot_id),
       },
       {
+        defaultPriority: 45,
         title: '单位',
         dataIndex: 'unit_id',
         width: 130,
@@ -1781,6 +1809,7 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => renderUnitReference(record?.unit_id),
       },
       {
+        defaultPriority: 50,
         title: '当前数量',
         exportTitle: '当前数量',
         dataIndex: 'quantity',
@@ -1789,6 +1818,7 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => formatQuantity(record?.quantity),
       },
       {
+        defaultPriority: 60,
         title: '已预留',
         exportTitle: '已预留',
         dataIndex: 'active_reserved_quantity',
@@ -1798,6 +1828,7 @@ export default function V1InventoryLedgerPage() {
           formatQuantity(record?.active_reserved_quantity),
       },
       {
+        defaultPriority: 40,
         title: (
           <BusinessHelpLabel
             itemKey="available-quantity"

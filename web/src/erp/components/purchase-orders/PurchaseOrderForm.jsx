@@ -6,6 +6,7 @@ import {
   OrderedListOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Select, Space } from 'antd'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
@@ -424,12 +425,7 @@ export function PurchaseOrderFormFields({
         label="收货地址"
         name="delivery_address"
       >
-        <Input.TextArea
-          allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
-          maxLength={512}
-          showCount
-        />
+        <BusinessTextArea allowClear maxLength={512} showCount />
       </Form.Item>
       <BusinessFormSectionTitle>合同订购方信息</BusinessFormSectionTitle>
       <Form.Item
@@ -473,12 +469,7 @@ export function PurchaseOrderFormFields({
         name="note"
         label="备注"
       >
-        <Input.TextArea
-          allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
-          showCount
-          maxLength={255}
-        />
+        <BusinessTextArea allowClear showCount maxLength={255} />
       </Form.Item>
       {attachmentPanel}
 
@@ -745,7 +736,7 @@ export function PurchaseOrderFormFields({
               name={[field.name, 'material_name_snapshot']}
               label="下单材料名称"
             >
-              <Input maxLength={255} />
+              <BusinessTextArea maxLength={255} />
             </Form.Item>
             <Form.Item
               className="erp-line-item-field erp-line-item-field--snapshot-small"
@@ -773,19 +764,14 @@ export function PurchaseOrderFormFields({
               name={[field.name, 'product_name_snapshot']}
               label="产品名称"
             >
-              <Input maxLength={255} />
+              <BusinessTextArea maxLength={255} />
             </Form.Item>
             <Form.Item
               className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
               name={[field.name, 'note']}
               label="备注"
             >
-              <Input.TextArea
-                allowClear
-                autoSize={{ minRows: 1, maxRows: 3 }}
-                showCount
-                maxLength={255}
-              />
+              <BusinessTextArea allowClear showCount maxLength={255} />
             </Form.Item>
           </BusinessLineItemRow>
         )}

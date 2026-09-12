@@ -70,8 +70,13 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 }
 
 func salesOrderItemMutationFromParams(pm map[string]any) (*biz.SalesOrderItemMutation, bool) {
-	if !sourceOrderAllowsOnly(pm, "id", "sales_order_id", "line_no", "product_id", "product_sku_id", "unit_id", "requested_product_name", "customer_product_no", "order_category", "pre_shipment_sample_quantity", "process_requirement", "product_code_snapshot", "product_name_snapshot", "color_snapshot", "ordered_quantity", "unit_price", "amount", "planned_delivery_date", "note") {
+	if !sourceOrderAllowsOnly(pm, "id", "sales_order_id", "line_no", "product_id", "product_sku_id", "unit_id", "requested_product_name", "customer_product_no", "order_category", "pre_shipment_sample_quantity", "process_requirement", "import_source", "product_code_snapshot", "product_name_snapshot", "color_snapshot", "ordered_quantity", "unit_price", "amount", "planned_delivery_date", "note") {
 		return nil, false
+	}
+	if source, present := pm["import_source"]; present && source != nil {
+		if _, ok := source.(map[string]any); !ok {
+			return nil, false
+		}
 	}
 	productID, ok := getOptionalJSONRPCNonNegativeInt(pm, "product_id")
 	if !ok {
@@ -108,6 +113,7 @@ func salesOrderItemMutationFromParams(pm map[string]any) (*biz.SalesOrderItemMut
 		CustomerProductNo:    getWorkflowStringPtr(pm, "customer_product_no"),
 		OrderCategory:        getString(pm, "order_category"),
 		ProcessRequirement:   getWorkflowStringPtr(pm, "process_requirement"),
+		ImportSource:         getMap(pm, "import_source"),
 		ProductSkuID:         skuID,
 		UnitID:               getInt(pm, "unit_id", 0),
 		ProductCodeSnapshot:  getWorkflowStringPtr(pm, "product_code_snapshot"),
@@ -300,6 +306,7 @@ func salesOrderItemToMap(item *biz.SalesOrderItem) map[string]any {
 		"shipped_quantity":             optionalDecimalString(item.ShippedQuantity),
 		"unshipped_quantity":           optionalDecimalString(item.UnshippedQuantity),
 		"process_requirement":          optionalStringValue(item.ProcessRequirement),
+		"import_source":                item.ImportSource,
 		"sample_bom_id":                optionalIntValue(item.SampleBOMID),
 		"engineering_status":           item.EngineeringStatus,
 		"sample_note":                  optionalStringValue(item.SampleNote),

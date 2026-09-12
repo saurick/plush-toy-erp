@@ -10,6 +10,7 @@ import {
   buildModuleColumnOrder,
   compareBusinessTableValues,
   createBusinessColumnSorter,
+  filterBusinessListColumns,
   moveModuleColumnOrder,
   repositionModuleColumnOrder,
   resolveModuleColumnKey,
@@ -56,6 +57,157 @@ test('moduleTableColumns: 会按用户顺序重排列，并把新增列补到末
     columns[0],
     columns[1],
   ])
+})
+
+test('moduleTableColumns: 默认优先级前置业务判断字段，不改变原始列定义', () => {
+  const businessColumns = [
+    { dataIndex: 'order_no', defaultPriority: 10 },
+    { dataIndex: 'note' },
+    { dataIndex: 'amount', defaultPriority: 40 },
+    { dataIndex: 'status', defaultPriority: 20 },
+    { dataIndex: 'due_at', defaultPriority: 30 },
+  ]
+  const originalColumns = businessColumns.slice()
+  const expected = ['order_no', 'status', 'due_at', 'amount', 'note']
+  assert.deepEqual(buildModuleColumnOrder(businessColumns), expected)
+  assert.deepEqual(
+    applyModuleColumnOrder(businessColumns).map((column) => column.dataIndex),
+    expected
+  )
+  assert.deepEqual(businessColumns, originalColumns)
+  assert.deepEqual(
+    buildModuleColumnOrder([{ dataIndex: 'name' }, { dataIndex: 'status' }]),
+    ['name', 'status'],
+    '没有显式优先级的列表继续使用自身顺序，不根据字段名猜测业务'
+  )
+})
+
+test('moduleTableColumns: 个人顺序优先，新增列按默认优先级追加，清空恢复新默认', () => {
+  const businessColumns = [
+    { dataIndex: 'order_no', defaultPriority: 10 },
+    { dataIndex: 'note' },
+    { dataIndex: 'amount', defaultPriority: 40 },
+    { dataIndex: 'status', defaultPriority: 20 },
+    { dataIndex: 'due_at', defaultPriority: 30 },
+  ]
+  const savedOrder = ['note', 'amount', 'order_no', 'status']
+  assert.deepEqual(
+    applyModuleColumnOrder(businessColumns, savedOrder).map(
+      (column) => column.dataIndex
+    ),
+    [...savedOrder, 'due_at']
+  )
+  assert.deepEqual(
+    applyModuleColumnOrder(businessColumns, []).map(
+      (column) => column.dataIndex
+    ),
+    ['order_no', 'status', 'due_at', 'amount', 'note']
+  )
+  assert.deepEqual(moveModuleColumnOrder([], businessColumns, 'status', 1), [
+    'order_no',
+    'due_at',
+    'status',
+    'amount',
+    'note',
+  ])
+})
+
+test('moduleTableColumns: 默认排序不改变展示列的已保存标识或快捷移动对象', () => {
+  const businessColumns = [
+    { title: '单号', dataIndex: 'order_no', defaultPriority: 10 },
+    { title: '收货信息' },
+    { title: '出货日期', defaultPriority: 30 },
+    { title: '状态', dataIndex: 'status', defaultPriority: 20 },
+  ]
+  assert.deepEqual(buildModuleColumnOrder(businessColumns), [
+    'order_no',
+    'status',
+    '__column__2',
+    '__column__1',
+  ])
+  const savedOrder = ['__column__1', 'order_no', '__column__2', 'status']
+  assert.deepEqual(
+    applyModuleColumnOrder(businessColumns, savedOrder).map(
+      (column) => column.title
+    ),
+    ['收货信息', '单号', '出货日期', '状态']
+  )
+  assert.equal(
+    resolveModuleColumnKey(businessColumns[2], businessColumns),
+    '__column__2'
+  )
+  assert.deepEqual(
+    repositionModuleColumnOrder([], businessColumns, '__column__2', 0),
+    ['__column__2', 'order_no', 'status', '__column__1']
+  )
+})
+
+test('moduleTableColumns: 相同优先级保持声明顺序，非法优先级和隐藏字段不抢占前列', () => {
+  const businessColumns = [
+    { dataIndex: 'note', defaultPriority: '1' },
+    { dataIndex: 'amount', defaultPriority: 20 },
+    { dataIndex: 'currency', defaultPriority: 20 },
+    { dataIndex: 'status', defaultPriority: 10 },
+    {
+      dataIndex: 'hidden',
+      defaultPriority: 0,
+      hiddenByEffectiveFieldPolicy: true,
+    },
+    { dataIndex: 'tail', defaultPriority: NaN },
+  ]
+  assert.deepEqual(buildModuleColumnOrder(businessColumns), [
+    'status',
+    'amount',
+    'currency',
+    'note',
+    'tail',
+  ])
+})
+
+test('moduleTableColumns: 辅助字段退出列表但保留详情和导出，权限隐藏仍优先', () => {
+  const allColumns = [
+    { dataIndex: 'code', defaultPriority: 10 },
+    { dataIndex: 'short_name', listHidden: true },
+    { title: '业务摘要', defaultPriority: 30 },
+    { dataIndex: 'status', defaultPriority: 20 },
+    { dataIndex: 'tax_no', listHidden: true, hiddenByEffectiveFieldPolicy: true },
+  ]
+  const original = structuredClone(allColumns)
+  const saved = ['short_name', '__column__2', 'tax_no', 'code']
+  assert.deepEqual(buildModuleColumnOrder(allColumns), [
+    'code', 'status', '__column__2',
+  ])
+  assert.deepEqual(sanitizeModuleColumnOrder(saved, allColumns), [
+    '__column__2', 'code',
+  ])
+  const ordered = applyModuleColumnOrder(allColumns, saved)
+  assert.deepEqual(ordered, [
+    allColumns[2], allColumns[0], allColumns[3], allColumns[1],
+  ])
+  assert.deepEqual(filterBusinessListColumns(ordered), [
+    allColumns[2], allColumns[0], allColumns[3],
+  ])
+  assert.deepEqual(allColumns, original)
+})
+
+test('moduleTableColumns: 快捷移动和恢复默认不经过辅助列，展示列标识稳定', () => {
+  const allColumns = [
+    { dataIndex: 'code' },
+    { dataIndex: 'short_name', listHidden: true },
+    { title: '摘要' },
+    { dataIndex: 'status' },
+  ]
+  assert.deepEqual(moveModuleColumnOrder([], allColumns, 'code', 1), [
+    '__column__2', 'code', 'status',
+  ])
+  assert.deepEqual(repositionModuleColumnOrder([], allColumns, 'status', 0), [
+    'status', 'code', '__column__2',
+  ])
+  assert.deepEqual(
+    filterBusinessListColumns(applyModuleColumnOrder(allColumns, [])),
+    [allColumns[0], allColumns[2], allColumns[3]]
+  )
+  assert.deepEqual(filterBusinessListColumns(undefined), [])
 })
 
 test('moduleTableColumns: 支持列顺序上移和下移', () => {

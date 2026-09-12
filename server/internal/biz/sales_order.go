@@ -98,6 +98,7 @@ type SalesOrderItem struct {
 	ShippedQuantity           *decimal.Decimal
 	UnshippedQuantity         *decimal.Decimal
 	ProcessRequirement        *string
+	ImportSource              map[string]any
 	SampleBOMID               *int
 	EngineeringStatus         string
 	SampleNote                *string
@@ -154,6 +155,7 @@ type SalesOrderItemMutation struct {
 	OrderCategory             string
 	PreShipmentSampleQuantity decimal.Decimal
 	ProcessRequirement        *string
+	ImportSource              map[string]any
 	ProductSkuID              *int
 	UnitID                    int
 	ProductCodeSnapshot       *string
@@ -682,6 +684,11 @@ func normalizeSalesOrderItemMutation(in SalesOrderItemMutation) (SalesOrderItemM
 }
 
 func normalizeSalesOrderItemFields(in SalesOrderItemMutation) (SalesOrderItemMutation, error) {
+	var err error
+	in.ImportSource, err = normalizeSalesOrderImportSource(in.ImportSource)
+	if err != nil {
+		return SalesOrderItemMutation{}, err
+	}
 	in.RequestedProductName = normalizeOptionalString(in.RequestedProductName)
 	in.CustomerProductNo = normalizeOptionalString(in.CustomerProductNo)
 	in.ProcessRequirement = normalizeOptionalString(in.ProcessRequirement)

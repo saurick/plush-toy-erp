@@ -10,10 +10,11 @@ import React, {
 import { Button, Empty, Form, Input, Select, Space } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import BOMMaterialCreateModal from './BOMMaterialCreateModal.jsx'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import {
   BOM_PART_FIELDS,
   groupBOMMaterials,
-  calculateBOMUsage,
+  getBOMUsage,
   bomLossRateToPercent,
   bomPercentToLossRate,
   parseBOMPartsPaste,
@@ -37,6 +38,7 @@ const PART_LABELS = [
   '备注',
 ]
 const blankPart = (source = {}) => ({
+  _material_group_key: source._material_group_key,
   material_id: source.material_id,
   unit_id: source.unit_id,
   quantity: '',
@@ -133,7 +135,9 @@ function usageChanged(previous, current, index) {
   return (
     previous.quantity_text !== current.quantity_text ||
     previous.items?.[index]?.quantity !== current.items?.[index]?.quantity ||
-    previous.items?.[index]?.loss_rate !== current.items?.[index]?.loss_rate
+    previous.items?.[index]?.loss_rate !== current.items?.[index]?.loss_rate ||
+    previous.items?.[index]?.total_usage_snapshot !==
+      current.items?.[index]?.total_usage_snapshot
   )
 }
 
@@ -147,9 +151,8 @@ function BOMUsageCell({ index }) {
         }
       >
         {({ getFieldValue }) =>
-          calculateBOMUsage(
-            getFieldValue(['items', index, 'quantity']),
-            getFieldValue(['items', index, 'loss_rate']),
+          getBOMUsage(
+            getFieldValue(['items', index]),
             getFieldValue('quantity_text')
           ) || '—'
         }
@@ -169,11 +172,7 @@ function BOMMaterialTotals({ indexes, unit }) {
       {({ getFieldValue }) => {
         const items = indexes.map((index) => getFieldValue(['items', index]))
         const usages = items.map((item) =>
-          calculateBOMUsage(
-            item?.quantity,
-            item?.loss_rate,
-            getFieldValue('quantity_text')
-          )
+          getBOMUsage(item, getFieldValue('quantity_text'))
         )
         return (
           <span>
@@ -234,7 +233,11 @@ export default function BOMMaterialGroupsForm({
   // Group structure changes on material/unit selection or row insertion/removal.
   Form.useWatch(
     (values) =>
-      (values.items || []).map((item) => [item?.material_id, item?.unit_id]),
+      (values.items || []).map((item) => [
+        item?.material_id,
+        item?.unit_id,
+        item?._material_group_key,
+      ]),
     form
   )
   const items = form.getFieldValue('items') || []
@@ -249,7 +252,7 @@ export default function BOMMaterialGroupsForm({
     const row = rowRefs.current.get(focusRequest.index)
     const selector = focusRequest.material
       ? 'input[role="combobox"]'
-      : `input[aria-label="部位 ${focusRequest.index + 1}"]`
+      : `textarea[aria-label="部位 ${focusRequest.index + 1}"]`
     row?.querySelector(selector)?.focus({ preventScroll: true })
     requestLineItemScroll?.(focusRequest.index)
   }, [focusRequest, items.length, requestLineItemScroll])
@@ -270,6 +273,8 @@ export default function BOMMaterialGroupsForm({
   const pasteParts = (event, index, column, add) => {
     const text = event.clipboardData.getData('text/plain')
     if (!canEdit || (!text.includes('\t') && !text.includes('\n'))) return
+    // A multiline instruction pasted into one text field remains one value.
+    if (column >= 4 && !text.includes('\t')) return
     event.preventDefault()
     try {
       const pasted = parseBOMPartsPaste(text, column)
@@ -361,6 +366,9 @@ export default function BOMMaterialGroupsForm({
                     const field = fields[index]
                     if (!field) return null
                     const material = materialByID.get(Number(group.materialID))
+                    const importSource = group.indexes
+                      .map((itemIndex) => items[itemIndex]?._import_source)
+                      .find(Boolean)
                     const unit = referenceLabel(
                       unitOptions,
                       items[index]?.unit_id,
@@ -371,7 +379,7 @@ export default function BOMMaterialGroupsForm({
                       <tbody
                         key={field.key}
                         className="erp-bom-material-group"
-                        aria-label={`${material?.name || '待选物料'}的部位`}
+                        aria-label={`${material?.name || importSource?.materialName || '待选物料'}的部位`}
                       >
                         {group.indexes.map((itemIndex, partIndex) => {
                           const partField = fields[itemIndex]
@@ -392,6 +400,12 @@ export default function BOMMaterialGroupsForm({
                                     rowSpan={rowSpan}
                                     className="erp-bom-material-cell"
                                   >
+                                    {!material && importSource ? (
+                                      <div>
+                                        {importSource.materialName ||
+                                          '原表未填写物料名称'}
+                                      </div>
+                                    ) : null}
                                     <Form.Item
                                       name={[field.name, 'material_id']}
                                       rules={[
@@ -418,7 +432,11 @@ export default function BOMMaterialGroupsForm({
                                           materialByID.get(Number(value))
                                             ?.name || '材料已关联'
                                         }
-                                        placeholder="搜索并选择物料"
+                                        placeholder={
+                                          importSource && !material
+                                            ? '选择对应材料档案'
+                                            : '搜索并选择物料'
+                                        }
                                         onChange={(id) =>
                                           changeMaterial(
                                             group.indexes,
@@ -438,10 +456,12 @@ export default function BOMMaterialGroupsForm({
                                           .join(' · ')}
                                       </span>
                                     ) : null}
-                                    {!material && source ? (
+                                    {!material && importSource ? (
                                       <span className="erp-bom-material-cell__context">
-                                        原表：{source.materialName} ·{' '}
-                                        {source.supplierItemNo}
+                                        原表物料 · 待匹配
+                                        {importSource.color
+                                          ? ` · ${importSource.color}`
+                                          : ''}
                                       </span>
                                     ) : null}
                                   </td>
@@ -449,13 +469,17 @@ export default function BOMMaterialGroupsForm({
                                     rowSpan={rowSpan}
                                     className="erp-bom-material-cell"
                                   >
-                                    {material?.supplier_item_no || '—'}
+                                    {(material
+                                      ? material.supplier_item_no
+                                      : importSource?.supplierItemNo) || '—'}
                                   </td>
                                   <td
                                     rowSpan={rowSpan}
                                     className="erp-bom-material-cell"
                                   >
-                                    {material?.spec || '—'}
+                                    {(material
+                                      ? material.spec
+                                      : importSource?.materialSpec) || '—'}
                                   </td>
                                   <td
                                     rowSpan={rowSpan}
@@ -543,6 +567,20 @@ export default function BOMMaterialGroupsForm({
                                             )
                                           }
                                         />
+                                      ) : key === 'position' || column >= 4 ? (
+                                        <BusinessTextArea
+                                          disabled={!canEdit}
+                                          aria-label={`${PART_LABELS[column]} ${itemIndex + 1}`}
+                                          maxLength={key === 'note' ? 255 : 128}
+                                          onPaste={(event) =>
+                                            pasteParts(
+                                              event,
+                                              itemIndex,
+                                              column,
+                                              add
+                                            )
+                                          }
+                                        />
                                       ) : (
                                         <Input
                                           disabled={!canEdit}
@@ -554,7 +592,7 @@ export default function BOMMaterialGroupsForm({
                                               ? 'decimal'
                                               : undefined
                                           }
-                                          maxLength={key === 'note' ? 255 : 128}
+                                          maxLength={128}
                                           onPaste={(event) =>
                                             pasteParts(
                                               event,

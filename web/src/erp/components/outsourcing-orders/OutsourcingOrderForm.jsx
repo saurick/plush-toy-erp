@@ -13,6 +13,7 @@ import {
   Select,
   Space,
 } from 'antd'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import ProductIdentity, {
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
@@ -403,12 +404,7 @@ export default function OutsourcingOrderForm({
         name="note"
         label="备注"
       >
-        <Input.TextArea
-          allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
-          showCount
-          maxLength={255}
-        />
+        <BusinessTextArea allowClear showCount maxLength={255} />
       </Form.Item>
       {attachmentPanel}
 
@@ -619,7 +615,11 @@ export default function OutsourcingOrderForm({
                 name={[field.name, 'processing_item']}
                 label="加工项目"
               >
-                <Input allowClear maxLength={255} placeholder="如 脸*1" />
+                <BusinessTextArea
+                  allowClear
+                  maxLength={255}
+                  placeholder="如 脸*1"
+                />
               </Form.Item>,
               <Form.Item
                 noStyle
@@ -826,12 +826,7 @@ export default function OutsourcingOrderForm({
               name={[field.name, 'note']}
               label="备注"
             >
-              <Input.TextArea
-                allowClear
-                autoSize={{ minRows: 1, maxRows: 3 }}
-                showCount
-                maxLength={255}
-              />
+              <BusinessTextArea allowClear showCount maxLength={255} />
             </Form.Item>
             <p className="erp-line-item-details__help">
               查货只表示加工环节；合格、不合格、让步、返工等结果不在加工合同里维护。

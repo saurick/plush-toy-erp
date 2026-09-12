@@ -16,6 +16,7 @@ import { Button, Dropdown, Modal, Space } from 'antd'
 import {
   applyModuleColumnOrder,
   buildModuleColumnOrder,
+  filterBusinessListColumns,
   moveModuleColumnOrder,
   repositionModuleColumnOrder,
   resolveModuleColumnKey,
@@ -187,7 +188,8 @@ export function ColumnOrderModal({
       : buildModuleColumnOrder(columns)
   }, [columns, draftOrder])
   const orderedColumns = useMemo(
-    () => applyModuleColumnOrder(columns, normalizedOrder),
+    () =>
+      filterBusinessListColumns(applyModuleColumnOrder(columns, normalizedOrder)),
     [columns, normalizedOrder]
   )
 

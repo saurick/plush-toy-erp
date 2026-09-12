@@ -55,6 +55,8 @@ func (SalesOrderItem) Fields() []ent.Field {
 		field.String("order_category").Default("NEW").MaxLen(16),
 		decimalQuantityFieldWithDefault("pre_shipment_sample_quantity", decimal.Zero),
 		field.String("process_requirement").Optional().Nillable().MaxLen(255),
+		// Import evidence remains separate from editable demand and engineering facts.
+		field.JSON("import_source", map[string]any{}).Optional().Immutable(),
 		field.Int("sample_bom_id").Optional().Nillable().Positive(),
 		field.String("sample_bom_fingerprint").Optional().Nillable().MaxLen(64),
 		field.Int("sample_reused_from_item_id").Optional().Nillable().Positive(),

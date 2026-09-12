@@ -1280,7 +1280,7 @@ body
 
 .erp-line-item-details__fields :where(.ant-input-textarea-affix-wrapper),
 .erp-master-contact-list__grid :where(.ant-input-textarea-affix-wrapper) {
-  height: var(--erp-control-height, 36px);
+  height: auto;
   min-height: var(--erp-control-height, 36px);
 }
 

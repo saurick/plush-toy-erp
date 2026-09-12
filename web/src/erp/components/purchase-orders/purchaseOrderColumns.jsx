@@ -31,6 +31,7 @@ function statusTag(status) {
 export function buildPurchaseOrderColumns({ resolveSupplierName }) {
   return applyBusinessColumnSorters([
     {
+      defaultPriority: 10,
       title: '采购单号',
       exportTitle: '采购单号',
       dataIndex: 'purchase_order_no',
@@ -40,6 +41,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       sorter: (a, b) => compareText(a?.purchase_order_no, b?.purchase_order_no),
     },
     {
+      defaultPriority: 20,
       title: '供应商',
       exportTitle: '供应商',
       dataIndex: 'supplier_id',
@@ -55,6 +57,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       exportValue: (record) => resolveSupplierName(record),
     },
     {
+      defaultPriority: 30,
       title: '状态',
       exportTitle: '状态',
       dataIndex: 'lifecycle_status',
@@ -66,6 +69,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
         statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS),
     },
     {
+      defaultPriority: 70,
       title: '币种',
       exportTitle: '币种',
       dataIndex: 'currency',
@@ -74,6 +78,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 80,
       title: '付款条件',
       exportTitle: '付款条件',
       key: 'payment_condition',
@@ -84,6 +89,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       exportValue: formatPaymentCondition,
     },
     {
+      defaultPriority: 90,
       title: '发票要求',
       exportTitle: '发票要求',
       key: 'invoice_preference',
@@ -111,6 +117,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
         ),
     },
     {
+      defaultPriority: 60,
       title: '下单日期',
       exportTitle: '下单日期',
       dataIndex: 'purchase_date',
@@ -120,6 +127,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       exportValue: (record) => formatUnixDate(record?.purchase_date),
     },
     {
+      defaultPriority: 40,
       title: '预计到货日期',
       exportTitle: '预计到货日期',
       dataIndex: 'expected_arrival_date',
@@ -130,6 +138,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       exportValue: (record) => formatUnixDate(record?.expected_arrival_date),
     },
     {
+      defaultPriority: 50,
       title: '供应商确认到货日期',
       exportTitle: '供应商确认到货日期',
       dataIndex: 'supplier_confirmed_arrival_date',
@@ -147,6 +156,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       title: '收货地址',
       exportTitle: '收货地址',
       dataIndex: 'delivery_address',
+      listHidden: true,
       width: 320,
       sorter: (a, b) => compareText(a?.delivery_address, b?.delivery_address),
       render: (value) => value || '-',

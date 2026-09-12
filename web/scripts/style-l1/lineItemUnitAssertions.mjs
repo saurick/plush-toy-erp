@@ -432,6 +432,11 @@ export function createLineItemUnitAssertions({ assert }) {
     const duplicateButton = modal.getByRole('button', { name: '复制第 1 行' })
     await duplicateButton.waitFor({ state: 'visible', timeout: 5_000 })
     await duplicateButton.click()
+    await modal
+      .locator('.erp-sales-order-lines-form__row')
+      .nth(1)
+      .locator('input:focus, textarea:focus, select:focus')
+      .waitFor({ state: 'visible', timeout: 5_000 })
 
     const metrics = await modal.evaluate((node) => {
       const visibleText = node.textContent?.replace(/\s+/g, ' ').trim() || ''
@@ -614,6 +619,13 @@ export function createLineItemUnitAssertions({ assert }) {
       exact: true,
     })
     await addButton.waitFor({ state: 'visible', timeout: 5_000 })
+    assert.equal(
+      await addButton.evaluate((button) =>
+        Boolean(button.closest('.erp-line-items-form__footer'))
+      ),
+      true,
+      `${scenarioName} 连续新增入口应位于明细底部`
+    )
 
     const addDurations = []
     let rowCount = await modal.locator(rowSelector).count()
@@ -625,6 +637,7 @@ export function createLineItemUnitAssertions({ assert }) {
       await modal
         .locator(rowSelector)
         .nth(rowCount - 1)
+        .locator('input:focus, textarea:focus, select:focus')
         .waitFor({
           state: 'visible',
           timeout: 5_000,

@@ -438,6 +438,7 @@ export function buildQualityInspectionDataColumns({
   }
   return applyBusinessColumnSorters([
     {
+      defaultPriority: 10,
       title: '质检单号',
       exportTitle: '质检单号',
       dataIndex: 'inspection_no',
@@ -445,6 +446,7 @@ export function buildQualityInspectionDataColumns({
       width: 170,
     },
     {
+      defaultPriority: 20,
       title: '状态',
       exportTitle: '状态',
       dataIndex: 'status',
@@ -455,6 +457,7 @@ export function buildQualityInspectionDataColumns({
       render: qualityStatusTag,
     },
     {
+      defaultPriority: 30,
       title: '判定',
       exportTitle: '判定',
       dataIndex: 'result',
@@ -465,6 +468,7 @@ export function buildQualityInspectionDataColumns({
       render: qualityResultTag,
     },
     {
+      defaultPriority: 60,
       title: '估算不良比例',
       exportTitle: '估算不良比例',
       dataIndex: 'defect_rate_percent',
@@ -474,6 +478,7 @@ export function buildQualityInspectionDataColumns({
       render: (_value, record) => qualityDefectRateText(record),
     },
     {
+      defaultPriority: 50,
       title: '检验来源',
       exportTitle: '检验来源',
       dataIndex: 'inspection_type',
@@ -498,6 +503,7 @@ export function buildQualityInspectionDataColumns({
         ].join(' / '),
     },
     {
+      defaultPriority: 40,
       title: '产品 / 材料 / 在制品',
       exportTitle: '产品 / 材料 / 在制品',
       dataIndex: 'subject_type',
@@ -517,6 +523,7 @@ export function buildQualityInspectionDataColumns({
           .join(' / '),
     },
     {
+      defaultPriority: 70,
       title: '检验信息',
       exportTitle: '检验信息',
       dataIndex: 'inspected_at',

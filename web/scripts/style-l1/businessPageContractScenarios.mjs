@@ -1,4 +1,5 @@
 import { assertBusinessFormPage, closeBusinessFormPage } from './businessFormPageAssertions.mjs'
+import { createBusinessColumnPriorityScenarios } from './businessColumnPriorityScenarios.mjs'
 export function createBusinessPageContractScenarios({
   customerRuntimeEffectiveSession,
   expectHeading,
@@ -151,6 +152,14 @@ export function createBusinessPageContractScenarios({
     assert.equal(page.url(), stableURL, `${scenarioName} 返回列表不应改写 URL`)
   }
   return [
+    ...createBusinessColumnPriorityScenarios({
+      assert,
+      customerRuntimeEffectiveSession,
+      gotoScenarioPath,
+      assertNoHorizontalOverflow,
+      outputDir,
+      path,
+    }),
     {
       name: 'business-form-section-classification-readonly',
       path: '/erp/sales/project-orders/sales-orders',

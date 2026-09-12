@@ -26,10 +26,26 @@ const isModuleColumnVisible = (column = {}) =>
 const visibleModuleColumns = (columns = []) =>
   (Array.isArray(columns) ? columns : []).filter(isModuleColumnVisible)
 
+export const filterBusinessListColumns = (columns = []) =>
+  visibleModuleColumns(columns).filter((column) => column?.listHidden !== true)
+
 export const buildModuleColumnOrder = (columns = []) =>
-  visibleModuleColumns(columns).map((column, index) =>
-    getModuleColumnKey(column, index)
-  )
+  visibleModuleColumns(columns)
+    // 先确定列标识，再调整默认顺序，避免展示列的已保存偏好随位置改变。
+    .map((column, index) => ({
+      key: getModuleColumnKey(column, index),
+      priority: Number.isFinite(column.defaultPriority)
+        ? column.defaultPriority
+        : Number.MAX_SAFE_INTEGER,
+      listHidden: column.listHidden === true,
+      index,
+    }))
+    .filter((column) => !column.listHidden)
+    .sort(
+      (left, right) =>
+        left.priority - right.priority || left.index - right.index
+    )
+    .map(({ key }) => key)
 
 export const sanitizeModuleColumnOrder = (order = [], columns = []) => {
   const validKeys = new Set(buildModuleColumnOrder(columns))
@@ -58,10 +74,14 @@ export const applyModuleColumnOrder = (columns = [], order = []) => {
     .map((key) => keyToColumn.get(key))
     .filter(Boolean)
   const orderedKeySet = new Set(sanitizedOrder)
-  const remainingColumns = normalizedColumns.filter(
-    (column, index) => !orderedKeySet.has(getModuleColumnKey(column, index))
+  const remainingColumns = buildModuleColumnOrder(normalizedColumns)
+    .filter((key) => !orderedKeySet.has(key))
+    .map((key) => keyToColumn.get(key))
+  // 辅助列退出列表排列，但详情和导出仍使用完整的获权列定义。
+  const detailColumns = normalizedColumns.filter(
+    (column) => column.listHidden === true
   )
-  return [...orderedColumns, ...remainingColumns]
+  return [...orderedColumns, ...remainingColumns, ...detailColumns]
 }
 
 export const moveModuleColumnOrder = (

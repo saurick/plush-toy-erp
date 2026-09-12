@@ -593,7 +593,7 @@ test('devPrototypes: 业务表单样板使用整页编辑和未保存返回保�
     /已有规格只带入产品主数据，不覆盖当前订单的数量、价格、金额和交期/u
   )
   assert.match(html, /const mutationControlSelector = \[/u)
-  assert.match(html, /"#itemImportApply"/u)
+  assert.doesNotMatch(html, /itemImportApply/u)
   assert.match(html, /"#attachment"/u)
   assert.match(html, /function syncItemControls\(/u)
   assert.doesNotMatch(

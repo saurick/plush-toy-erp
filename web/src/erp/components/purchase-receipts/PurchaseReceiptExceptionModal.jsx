@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Button, Form, Input, Modal, Select, Space } from 'antd'
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import { PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS } from '../../utils/purchaseReceiptExceptionAction.mjs'
 import {
   isPositiveNumeric20Scale6Units,
@@ -42,6 +44,8 @@ export default function PurchaseReceiptExceptionModal({
   onSubmit,
 }) {
   const [form] = Form.useForm()
+  const { registerLineItemRow, requestLineItemScroll } =
+    useLineItemAppendScroll()
   const isReturn = mode === 'return'
   const itemOptions = useMemo(
     () =>
@@ -114,7 +118,7 @@ export default function PurchaseReceiptExceptionModal({
                 { required: true, whitespace: true, message: '请填写调整原因' },
               ]}
             >
-              <Input maxLength={255} />
+              <BusinessTextArea maxLength={255} />
             </Form.Item>
           ) : null}
         </Space>
@@ -124,9 +128,12 @@ export default function PurchaseReceiptExceptionModal({
         <Form.List name="items">
           {(fields, { add, remove }) => (
             <>
-              {fields.map((field, index) => (
+              {fields.map(({ key, ...field }, index) => (
                 <Space
-                  key={field.key}
+                  key={key}
+                  ref={(node) => registerLineItemRow(index, node)}
+                  role="group"
+                  aria-label={`${isReturn ? '退货' : '调整'}明细 ${index + 1}`}
                   align="start"
                   wrap
                   style={{ display: 'flex', marginBottom: 8 }}
@@ -228,7 +235,7 @@ export default function PurchaseReceiptExceptionModal({
                     name={[field.name, 'note']}
                     label="明细备注"
                   >
-                    <Input maxLength={255} style={{ width: 180 }} />
+                    <BusinessTextArea maxLength={255} style={{ width: 180 }} />
                   </Form.Item>
                   {fields.length > 1 ? (
                     <Button
@@ -243,8 +250,11 @@ export default function PurchaseReceiptExceptionModal({
               ))}
               <Button
                 type="dashed"
-                icon={<PlusOutlined />}
-                onClick={() => add()}
+                icon={<PlusOutlined aria-hidden="true" />}
+                onClick={() => {
+                  add()
+                  requestLineItemScroll(fields.length)
+                }}
               >
                 添加明细
               </Button>
@@ -253,7 +263,7 @@ export default function PurchaseReceiptExceptionModal({
         </Form.List>
         <BusinessFormSectionTitle>整单备注</BusinessFormSectionTitle>
         <Form.Item name="note" label="备注说明" style={{ marginTop: 16 }}>
-          <Input.TextArea rows={3} maxLength={255} showCount />
+          <BusinessTextArea minRows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>
     </Modal>

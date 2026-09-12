@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Card, Descriptions, Form, Input, Select } from 'antd'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { warehouseAcceptsSubject } from '../../utils/warehouseClassification.mjs'
 
@@ -151,7 +152,7 @@ export default function InventoryOperationModal({
             { required: true, whitespace: true, message: '请填写业务原因' },
           ]}
         >
-          <Input.TextArea rows={2} maxLength={255} showCount />
+          <BusinessTextArea minRows={2} maxLength={255} showCount />
         </Form.Item>
 
         <Form.List name="items">
@@ -276,7 +277,7 @@ export default function InventoryOperationModal({
                     </Form.Item>
                   ) : null}
                   <Form.Item name={[name, 'note']} label="明细备注">
-                    <Input maxLength={255} />
+                    <BusinessTextArea maxLength={255} />
                   </Form.Item>
                 </Card>
               )

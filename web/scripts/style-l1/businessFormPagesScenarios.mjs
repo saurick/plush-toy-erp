@@ -188,6 +188,7 @@ export function createBusinessFormPagesScenarios(deps) {
             createLineItemUnitAssertions(deps)
           await assertLineItemAddActionScrollsToNewRow(editor, {
             scenarioName: name,
+            targetRowCount: 10,
             ...(key === 'sales' ? { addButtonName: '添加订货明细' } : {}),
             ...(['customers', 'suppliers'].includes(key)
               ? {
@@ -215,6 +216,10 @@ export function createBusinessFormPagesScenarios(deps) {
             await editor
               .getByRole('button', { name: '复制联系人条目 1', exact: true })
               .click()
+            await rows
+              .nth(1)
+              .locator('input:focus')
+              .waitFor({ state: 'visible' })
             deps.assert.equal(
               await rows
                 .nth(1)
@@ -230,12 +235,66 @@ export function createBusinessFormPagesScenarios(deps) {
               '收货联系人'
             )
           }
+          if (['sales', 'purchase', 'outsourcing'].includes(key)) {
+            const rows = list.locator('.erp-sales-order-lines-form__row')
+            const count = await rows.count()
+            await rows
+              .first()
+              .getByRole('button', { name: '复制第 1 行' })
+              .click()
+            await rows
+              .nth(1)
+              .locator('input:focus, textarea:focus, select:focus')
+              .waitFor({ state: 'visible' })
+            deps.assert.equal(await rows.count(), count + 1)
+          }
           for (const [variant, viewport] of [
             ['desktop', { width: 1440, height: 900 }],
             ['narrow', { width: 390, height: 844 }],
           ]) {
             await page.setViewportSize(viewport)
             await assertBusinessFormPage(page, editor)
+            const rowSelector = contacts
+              ? '.erp-master-contact-list__row'
+              : '.erp-sales-order-lines-form__row'
+            const rowCount = await editor.locator(rowSelector).count()
+            await editor
+              .getByRole('button', {
+                name: key === 'sales' ? '添加订货明细' : '添加条目',
+                exact: true,
+              })
+              .click()
+            const focused = editor
+              .locator(rowSelector)
+              .nth(rowCount)
+              .locator('input:focus, textarea:focus, select:focus')
+            await focused.waitFor({ state: 'visible' })
+            const focusBox = await focused.boundingBox()
+            const bodyBox = await editor
+              .locator('.erp-business-form-page__body')
+              .boundingBox()
+            deps.assert(
+              focusBox.y >= bodyBox.y - 1 &&
+                focusBox.y + focusBox.height <=
+                  bodyBox.y + bodyBox.height + 1 &&
+                focusBox.x >= bodyBox.x - 1 &&
+                focusBox.x + focusBox.width <= bodyBox.x + bodyBox.width + 1,
+              `${name}-${variant}: 新行输入应进入正文可视区`
+            )
+            if (key === 'sales') {
+              await page.keyboard.type(`连续录入 ${variant}`)
+              deps.assert.equal(
+                await focused.inputValue(),
+                `连续录入 ${variant}`,
+                '新增后应能直接输入订货产品名称'
+              )
+              await editor
+                .getByRole('button', { name: '添加订货明细', exact: true })
+                .scrollIntoViewIfNeeded()
+            }
+            await page.screenshot({
+              path: `${deps.outputDir}/${name}-${variant}-appended.png`,
+            })
             if (!contacts) {
               const details = list.locator('.erp-line-item-details').first()
               if (!(await details.evaluate((node) => node.open))) {
@@ -277,6 +336,58 @@ export function createBusinessFormPagesScenarios(deps) {
         },
       }
     }),
+    {
+      ...scenarios.find(
+        (scenario) => scenario.name === 'business-form-page-production-desktop'
+      ),
+      name: 'business-form-page-production-rapid-add',
+      verify: async (page) => {
+        await page.getByRole('button', { name: '新建生产订单' }).click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.getByRole('heading', { name: '新建生产订单' }).waitFor()
+        for (const viewport of [
+          { width: 1440, height: 900 },
+          { width: 390, height: 844 },
+        ]) {
+          await page.setViewportSize(viewport)
+          for (let count = 0; count < 3; count += 1) {
+            const rows = editor.locator('.erp-production-order-line')
+            const before = await rows.count()
+            deps.assert.equal(
+              await editor
+                .getByRole('button', { name: '添加明细', exact: true })
+                .count(),
+              1,
+              `production-${viewport.width}-${count}: ${await editor.innerText()}`
+            )
+            await editor
+              .getByRole('button', { name: '添加明细', exact: true })
+              .click()
+            const input = rows.nth(before).locator('input:focus')
+            await input.waitFor({ state: 'visible' })
+            deps.assert.equal(await rows.count(), before + 1)
+            const inputBox = await input.boundingBox()
+            const bodyBox = await editor
+              .locator('.erp-business-form-page__body')
+              .boundingBox()
+            deps.assert(
+              inputBox.y >= bodyBox.y &&
+                inputBox.y + inputBox.height <= bodyBox.y + bodyBox.height
+            )
+          }
+          await assertBusinessFormPage(page, editor)
+        }
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await closeBusinessFormPage(page, editor)
+        await page.getByRole('button', { name: '新建生产订单' }).click()
+        await editor.getByRole('heading', { name: '新建生产订单' }).waitFor()
+        deps.assert.equal(
+          await editor.locator('.erp-production-order-line').count(),
+          1
+        )
+        await closeBusinessFormPage(page, editor)
+      },
+    },
     ...[
       ['customers', 'mobile', { width: 390, height: 844 }, 'light'],
       ['suppliers', 'dark', { width: 1440, height: 900 }, 'dark'],

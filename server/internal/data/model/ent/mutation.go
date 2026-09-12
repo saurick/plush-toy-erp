@@ -97975,6 +97975,7 @@ type SalesOrderItemMutation struct {
 	order_category                 *string
 	pre_shipment_sample_quantity   *decimal.Decimal
 	process_requirement            *string
+	import_source                  *map[string]interface{}
 	sample_bom_fingerprint         *string
 	sample_image_attachment_id     *int
 	addsample_image_attachment_id  *int
@@ -98544,6 +98545,55 @@ func (m *SalesOrderItemMutation) ProcessRequirementCleared() bool {
 func (m *SalesOrderItemMutation) ResetProcessRequirement() {
 	m.process_requirement = nil
 	delete(m.clearedFields, salesorderitem.FieldProcessRequirement)
+}
+
+// SetImportSource sets the "import_source" field.
+func (m *SalesOrderItemMutation) SetImportSource(value map[string]interface{}) {
+	m.import_source = &value
+}
+
+// ImportSource returns the value of the "import_source" field in the mutation.
+func (m *SalesOrderItemMutation) ImportSource() (r map[string]interface{}, exists bool) {
+	v := m.import_source
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImportSource returns the old "import_source" field's value of the SalesOrderItem entity.
+// If the SalesOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderItemMutation) OldImportSource(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImportSource is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImportSource requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImportSource: %w", err)
+	}
+	return oldValue.ImportSource, nil
+}
+
+// ClearImportSource clears the value of the "import_source" field.
+func (m *SalesOrderItemMutation) ClearImportSource() {
+	m.import_source = nil
+	m.clearedFields[salesorderitem.FieldImportSource] = struct{}{}
+}
+
+// ImportSourceCleared returns if the "import_source" field was cleared in this mutation.
+func (m *SalesOrderItemMutation) ImportSourceCleared() bool {
+	_, ok := m.clearedFields[salesorderitem.FieldImportSource]
+	return ok
+}
+
+// ResetImportSource resets all changes to the "import_source" field.
+func (m *SalesOrderItemMutation) ResetImportSource() {
+	m.import_source = nil
+	delete(m.clearedFields, salesorderitem.FieldImportSource)
 }
 
 // SetSampleBomID sets the "sample_bom_id" field.
@@ -99843,7 +99893,7 @@ func (m *SalesOrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesOrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 30)
+	fields := make([]string, 0, 31)
 	if m.sales_order != nil {
 		fields = append(fields, salesorderitem.FieldSalesOrderID)
 	}
@@ -99870,6 +99920,9 @@ func (m *SalesOrderItemMutation) Fields() []string {
 	}
 	if m.process_requirement != nil {
 		fields = append(fields, salesorderitem.FieldProcessRequirement)
+	}
+	if m.import_source != nil {
+		fields = append(fields, salesorderitem.FieldImportSource)
 	}
 	if m.sample_bom != nil {
 		fields = append(fields, salesorderitem.FieldSampleBomID)
@@ -99960,6 +100013,8 @@ func (m *SalesOrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.PreShipmentSampleQuantity()
 	case salesorderitem.FieldProcessRequirement:
 		return m.ProcessRequirement()
+	case salesorderitem.FieldImportSource:
+		return m.ImportSource()
 	case salesorderitem.FieldSampleBomID:
 		return m.SampleBomID()
 	case salesorderitem.FieldSampleBomFingerprint:
@@ -100029,6 +100084,8 @@ func (m *SalesOrderItemMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldPreShipmentSampleQuantity(ctx)
 	case salesorderitem.FieldProcessRequirement:
 		return m.OldProcessRequirement(ctx)
+	case salesorderitem.FieldImportSource:
+		return m.OldImportSource(ctx)
 	case salesorderitem.FieldSampleBomID:
 		return m.OldSampleBomID(ctx)
 	case salesorderitem.FieldSampleBomFingerprint:
@@ -100142,6 +100199,13 @@ func (m *SalesOrderItemMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetProcessRequirement(v)
+		return nil
+	case salesorderitem.FieldImportSource:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImportSource(v)
 		return nil
 	case salesorderitem.FieldSampleBomID:
 		v, ok := value.(int)
@@ -100386,6 +100450,9 @@ func (m *SalesOrderItemMutation) ClearedFields() []string {
 	if m.FieldCleared(salesorderitem.FieldProcessRequirement) {
 		fields = append(fields, salesorderitem.FieldProcessRequirement)
 	}
+	if m.FieldCleared(salesorderitem.FieldImportSource) {
+		fields = append(fields, salesorderitem.FieldImportSource)
+	}
 	if m.FieldCleared(salesorderitem.FieldSampleBomID) {
 		fields = append(fields, salesorderitem.FieldSampleBomID)
 	}
@@ -100459,6 +100526,9 @@ func (m *SalesOrderItemMutation) ClearField(name string) error {
 		return nil
 	case salesorderitem.FieldProcessRequirement:
 		m.ClearProcessRequirement()
+		return nil
+	case salesorderitem.FieldImportSource:
+		m.ClearImportSource()
 		return nil
 	case salesorderitem.FieldSampleBomID:
 		m.ClearSampleBomID()
@@ -100539,6 +100609,9 @@ func (m *SalesOrderItemMutation) ResetField(name string) error {
 		return nil
 	case salesorderitem.FieldProcessRequirement:
 		m.ResetProcessRequirement()
+		return nil
+	case salesorderitem.FieldImportSource:
+		m.ResetImportSource()
 		return nil
 	case salesorderitem.FieldSampleBomID:
 		m.ResetSampleBomID()

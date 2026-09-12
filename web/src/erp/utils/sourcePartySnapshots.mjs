@@ -66,6 +66,17 @@ function buildOrderContactSnapshot(values = {}) {
   })
 }
 
+function buildSalesOrderContactFormValues(source = {}) {
+  const snapshot = source?.contact_snapshot || source || {}
+  return {
+    contact_name: snapshot.name || '',
+    contact_phone: snapshot.mobile || snapshot.phone || '',
+    contact_mobile: snapshot.mobile || '',
+    contact_email: snapshot.email || '',
+    contact_title: snapshot.title || '',
+  }
+}
+
 const SUPPLIER_CONTACT_OWNER_TYPE = 'SUPPLIER'
 
 function selectPrimaryContact(contacts = []) {
@@ -217,6 +228,7 @@ function contractPartySnapshotFromPrintTemplateDefaults(
 export {
   buildDeliverySnapshot,
   buildOrderContactSnapshot,
+  buildSalesOrderContactFormValues,
   buildContractPartySnapshot,
   contractPartySnapshotFromPrintTemplateDefaults,
   buildCustomerSnapshot,

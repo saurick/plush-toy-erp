@@ -251,6 +251,70 @@ export function createPurchaseReceiptScenarios(deps) {
   }
 
   return [
+    ...[
+      ['return', '生成采购退货', '从入库单生成采购退货'],
+      ['adjustment', '登记入库调整', '登记采购入库调整'],
+    ].map(([mode, triggerName, title]) => ({
+      name: `purchase-receipt-${mode}-rapid-add`,
+      path: '/erp/warehouse/inbound',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '入库管理')
+        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
+        await page
+          .getByRole('button', { name: triggerName, exact: true })
+          .click()
+        const modal = page.getByRole('dialog', { name: title, exact: true })
+        await modal.waitFor({ state: 'visible' })
+        for (const viewport of [
+          { width: 1440, height: 900 },
+          { width: 390, height: 844 },
+        ]) {
+          await page.setViewportSize(viewport)
+          for (let count = 0; count < 3; count += 1) {
+            const rows = modal.getByRole('group', {
+              name: /^(退货|调整)明细 \d+$/u,
+            })
+            const before = await rows.count()
+            assert.equal(
+              await modal
+                .getByRole('button', { name: '添加明细', exact: true })
+                .count(),
+              1,
+              `${mode}-${viewport.width}-${count}: ${await modal.innerText()}`
+            )
+            await modal
+              .getByRole('button', { name: '添加明细', exact: true })
+              .click()
+            const added = rows.nth(before).locator('input:focus')
+            await added.waitFor({ state: 'visible' })
+            assert.equal(await rows.count(), before + 1)
+            assert.equal(await added.getAttribute('role'), 'combobox')
+            const rect = await added.boundingBox()
+            assert(
+              rect.y >= 0 && rect.y + rect.height <= viewport.height,
+              '追加后来源明细输入应可见并获得焦点'
+            )
+          }
+        }
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await modal.getByRole('button', { name: /^取\s*消$/u }).click()
+        await modal.waitFor({ state: 'hidden' })
+        await page
+          .getByRole('button', { name: triggerName, exact: true })
+          .click()
+        await modal.waitFor({ state: 'visible' })
+        assert.equal(
+          await modal
+            .getByRole('group', { name: /^(退货|调整)明细 \d+$/u })
+            .count(),
+          1
+        )
+        await modal.getByRole('button', { name: /^取\s*消$/u }).click()
+      },
+    })),
     {
       name: 'purchase-receipts-table-control-columns-desktop',
       path: '/erp/warehouse/inbound',

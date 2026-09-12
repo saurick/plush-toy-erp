@@ -42,6 +42,7 @@ import {
 } from '../../utils/dateRange.mjs'
 import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
 import { normalizeBusinessPageHeaderStats } from '../../utils/businessPageHeader.mjs'
+import { filterBusinessListColumns } from '../../utils/moduleTableColumns.mjs'
 import {
   businessTableCopyColumnKey,
   resolveBusinessTableCopyLabel,
@@ -390,7 +391,7 @@ function normalizeBusinessTableColumn(column) {
   const nextColumn = { ...column }
   delete nextColumn.ellipsis
   if (Array.isArray(nextColumn.children)) {
-    nextColumn.children = nextColumn.children.map(normalizeBusinessTableColumn)
+    nextColumn.children = normalizeBusinessTableColumns(nextColumn.children)
   }
   if (nextColumn.copyable) {
     const renderCell = nextColumn.render
@@ -415,9 +416,7 @@ function normalizeBusinessTableColumn(column) {
 }
 
 export function normalizeBusinessTableColumns(columns = []) {
-  return (Array.isArray(columns) ? columns : []).map(
-    normalizeBusinessTableColumn
-  )
+  return filterBusinessListColumns(columns).map(normalizeBusinessTableColumn)
 }
 
 function resolveBusinessTableScrollX({ columns = [], rowSelection, scrollX }) {

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Form, Input, Space, Spin, Table, Tag } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import {
   getEngineeringMaterialRequest,
@@ -171,15 +172,18 @@ export default function EngineeringMaterialRequestModal({
     }
   }
 
-  const field = (index, key, label, options = {}) => (
-    <Form.Item name={['items', index, key]} rules={options.rules} noStyle>
-      <Input
-        aria-label={`${label} ${index + 1}`}
-        disabled={!canFinance || saving}
-        {...options.input}
-      />
-    </Form.Item>
-  )
+  const field = (index, key, label, options = {}) => {
+    const Control = key === 'note' ? BusinessTextArea : Input
+    return (
+      <Form.Item name={['items', index, key]} rules={options.rules} noStyle>
+        <Control
+          aria-label={`${label} ${index + 1}`}
+          disabled={!canFinance || saving}
+          {...options.input}
+        />
+      </Form.Item>
+    )
+  }
   const columns = [
     { title: '物料名称', dataIndex: 'material_name', width: 145 },
     {
@@ -375,7 +379,11 @@ export default function EngineeringMaterialRequestModal({
               ) : null}
               {canBoss || canFinance ? (
                 <Form.Item label="审批备注 / 退回原因" name="note">
-                  <Input.TextArea maxLength={255} rows={2} disabled={saving} />
+                  <BusinessTextArea
+                    maxLength={255}
+                    minRows={2}
+                    disabled={saving}
+                  />
                 </Form.Item>
               ) : null}
               {request.purchase_orders.length ? (

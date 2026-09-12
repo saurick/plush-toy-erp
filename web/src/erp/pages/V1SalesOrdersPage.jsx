@@ -80,6 +80,7 @@ import {
   salesOrderEngineeringLabel,
 } from '../utils/salesOrderRequirements.mjs'
 import SalesOrderEditor from '../components/sales-orders/SalesOrderEditor.jsx'
+import SalesOrderExcelImport from '../components/sales-orders/SalesOrderExcelImport.jsx'
 import { buildSalesOrderColumns } from '../components/sales-orders/salesOrderColumns.jsx'
 import {
   SALES_ORDER_DATE_FILTER_OPTIONS,
@@ -106,6 +107,7 @@ import {
 } from '../utils/sourceOrderParams.mjs'
 import {
   buildOrderContactSnapshot,
+  buildSalesOrderContactFormValues,
   buildSalesOrderCustomerSourceValues,
   deliverySnapshotFormValues,
 } from '../utils/sourcePartySnapshots.mjs'
@@ -174,21 +176,6 @@ import {
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
 const CUSTOMER_CONTACT_OWNER_TYPE = 'CUSTOMER'
-
-function contactPhoneText(contact = {}) {
-  return contact.mobile || contact.phone || ''
-}
-
-function buildSalesOrderContactFormValues(source = {}) {
-  const snapshot = source.contact_snapshot || source
-  return {
-    contact_name: snapshot?.name || '',
-    contact_phone: contactPhoneText(snapshot),
-    contact_mobile: snapshot?.mobile || '',
-    contact_email: snapshot?.email || '',
-    contact_title: snapshot?.title || '',
-  }
-}
 
 function salesOwnerOptionFromText(text) {
   const value = String(text || '').trim()
@@ -1644,6 +1631,18 @@ export default function V1SalesOrdersPage() {
         }
         actions={
           <Space wrap>
+            {canCreateOrder ? (
+              <SalesOrderExcelImport
+                customers={customers}
+                units={units}
+                unitOptions={unitOptions}
+                disabled={referencesLoading || saving || orderModalOpen}
+                productSKUs={productSKUs}
+                salesOwnerOptions={salesOwnerOptions}
+                customerKey={activeCustomerKey}
+                onSaved={loadOrders}
+              />
+            ) : null}
             <ToolbarButton
               icon={<DownloadOutlined />}
               loading={exporting}
@@ -1882,7 +1881,6 @@ export default function V1SalesOrdersPage() {
         columns={orderColumns}
         dataSource={orders}
         expandable={salesOrderItemsPreview.expandable}
-        scroll={{ x: 2740 }}
         pagination={createBusinessTablePagination({
           pagination,
           total,

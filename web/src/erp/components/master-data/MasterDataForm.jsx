@@ -10,6 +10,7 @@ import {
   Space,
   Switch,
 } from 'antd'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { renderProductOption } from './ProductIdentity.jsx'
 import MaterialStockFields from './MaterialStockFields.jsx'
 
@@ -537,12 +538,7 @@ export function MasterDataFormFields({
           label="备注"
           name="note"
         >
-          <Input.TextArea
-            allowClear
-            autoSize={{ minRows: 1, maxRows: 3 }}
-            showCount
-            maxLength={300}
-          />
+          <BusinessTextArea allowClear showCount maxLength={300} />
         </Form.Item>
       </>
     )
@@ -600,9 +596,8 @@ export function MasterDataFormFields({
             label="经营 / 加工地址"
             name="address"
           >
-            <Input.TextArea
+            <BusinessTextArea
               allowClear
-              autoSize={{ minRows: 1, maxRows: 3 }}
               maxLength={512}
               placeholder="填写合同中需要带出的加工厂或供应商地址"
               showCount
@@ -738,12 +733,7 @@ export function MasterDataFormFields({
             label="默认收货地址"
             name="default_delivery_address"
           >
-            <Input.TextArea
-              allowClear
-              autoSize={{ minRows: 1, maxRows: 3 }}
-              maxLength={512}
-              showCount
-            />
+            <BusinessTextArea allowClear maxLength={512} showCount />
           </Form.Item>
           <BusinessFormSectionTitle>结算方式</BusinessFormSectionTitle>
           <Form.Item
@@ -857,12 +847,7 @@ export function MasterDataFormFields({
         label="备注"
         name="note"
       >
-        <Input.TextArea
-          allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
-          showCount
-          maxLength={300}
-        />
+        <BusinessTextArea allowClear showCount maxLength={300} />
       </Form.Item>
     </>
   )
@@ -1044,12 +1029,7 @@ export function ContactFormList({ form, entityLabel }) {
                     label="备注"
                     name={[field.name, 'note']}
                   >
-                    <Input.TextArea
-                      allowClear
-                      autoSize={{ minRows: 1, maxRows: 3 }}
-                      showCount
-                      maxLength={200}
-                    />
+                    <BusinessTextArea allowClear showCount maxLength={200} />
                   </Form.Item>
                 </div>
               </div>

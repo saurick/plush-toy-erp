@@ -4,6 +4,7 @@ import {
   groupBOMMaterials,
   invalidateBOMUsageSnapshots,
   calculateBOMUsage,
+  getBOMUsage,
   bomLossRateToPercent,
   bomPercentToLossRate,
   parseBOMPartsPaste,
@@ -42,6 +43,31 @@ test('one material is selected once for multiple parts; supplier identities rema
   assert.deepEqual(
     groups.map((group) => group.indexes),
     [[0, 2], [1], [3], [4]]
+  )
+})
+test('imported totals retain Excel precision until an input changes', () => {
+  const item = {
+    quantity: '0.00438',
+    loss_rate: '0.1',
+    total_usage_snapshot: '14.599795',
+  }
+  assert.equal(getBOMUsage(item, '3030'), '14.599795')
+  for (const changes of [
+    { quantity_text: '3030' },
+    { items: [{ quantity: '0.00438' }] },
+    { items: [{ loss_rate: '0.1' }] },
+    { items: [{ material_id: 1 }] },
+    { items: [{ unit_id: 1 }] },
+  ]) {
+    assert.equal(
+      getBOMUsage(invalidateBOMUsageSnapshots([item], changes)[0], '3030'),
+      '14.59854'
+    )
+  }
+  assert.equal(getBOMUsage({ ...item, total_usage_snapshot: '0' }, '3030'), '0')
+  assert.equal(
+    getBOMUsage({ ...item, total_usage_snapshot: 'invalid' }, '3030'),
+    '14.59854'
   )
 })
 test('BOM totals include loss once; piece count does not multiply recorded unit usage again', () => {

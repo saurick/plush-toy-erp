@@ -97,7 +97,7 @@ test('product table headers keep the shared single-line browser regression', () 
   const scenario = source.slice(startIndex, startIndex + 6_000)
 
   assert.ok(startIndex >= 0)
-  assert.match(scenario, /海关编码（HS Code）/u)
+  assert.match(scenario, /产品单重（净重）/u)
   assert.match(scenario, /assertBusinessMainTableSortableColumns/u)
   assert.match(scenario, /assertNoHorizontalOverflow/u)
   assert.match(scenario, /tableScrollableWidth > 1/u)

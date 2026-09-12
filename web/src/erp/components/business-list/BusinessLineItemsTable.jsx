@@ -64,6 +64,8 @@ export function BusinessLineItemRow({
   children,
   rowRef,
   status,
+  detailsOpen = false,
+  detailsLabel = '补充信息',
 }) {
   return (
     <tbody
@@ -86,9 +88,9 @@ export function BusinessLineItemRow({
       {children ? (
         <tr>
           <td colSpan={cells.length + 2} className="erp-line-item-table__more">
-            <details className="erp-line-item-details">
+            <details className="erp-line-item-details" open={detailsOpen || undefined}>
               <summary>
-                补充信息
+                {detailsLabel}
                 {status ? (
                   <span className="erp-line-item-details__status">
                     {status}

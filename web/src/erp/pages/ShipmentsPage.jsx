@@ -1966,7 +1966,6 @@ export default function ShipmentsPage() {
           onChange: (current, pageSize) => setPagination({ current, pageSize }),
         })}
         emptyDescription="暂无出货单"
-        scroll={{ x: 2700 }}
         rowSelection={{
           type: 'radio',
           selectedRowKeys: selectedRow ? [selectedRow.id] : [],

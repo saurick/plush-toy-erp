@@ -1,5 +1,18 @@
 import { useCallback, useEffect, useRef } from 'react'
 
+function canFocusLineInput(input) {
+  const rect = input.getBoundingClientRect()
+  return (
+    !input.matches(':disabled') &&
+    (!input.readOnly || input.getAttribute('role') === 'combobox') &&
+    input.tabIndex >= 0 &&
+    !input.closest('[inert], [aria-hidden="true"], [aria-disabled="true"]') &&
+    rect.width > 0 &&
+    rect.height > 0 &&
+    window.getComputedStyle(input).visibility === 'visible'
+  )
+}
+
 export function useLineItemAppendScroll(itemCount) {
   const pendingScrollIndexRef = useRef(null)
   const rowRefs = useRef([])
@@ -34,15 +47,25 @@ export function useLineItemAppendScroll(itemCount) {
       return
     }
 
-    const fallbackTarget = target || rowRefs.current[rowRefs.current.length - 1]
     pendingScrollIndexRef.current = null
     scrollFrameRef.current = null
-    // 在下一次加行前定位新明细；纵向滚动由编辑页承接。
-    fallbackTarget?.scrollIntoView?.({
+    if (!target?.isConnected) return
+
+    const inputs = Array.from(
+      target.querySelectorAll('input:not([type="hidden"]), textarea, select')
+    ).filter(canFocusLineInput)
+    // 保留 BOM 等表单已指定的字段；其余新行从首个可编辑控件开始录入。
+    const focusTarget = inputs.includes(document.activeElement)
+      ? document.activeElement
+      : inputs[0]
+    const scrollOptions = {
       behavior: 'auto',
       block: 'nearest',
       inline: 'nearest',
-    })
+    }
+    target.scrollIntoView(scrollOptions)
+    focusTarget?.focus({ preventScroll: true })
+    focusTarget?.scrollIntoView(scrollOptions)
   }, [])
 
   const requestLineItemScroll = useCallback(

@@ -120,6 +120,7 @@ function buildSalesOrderItemParams(values = {}, extra = {}) {
       values.pre_shipment_sample_quantity
     ),
     process_requirement: trimOptional(values.process_requirement),
+    import_source: values.import_source || undefined,
     product_id: normalizeOptionalPositiveInteger(values.product_id),
     product_sku_id: normalizeOptionalPositiveInteger(values.product_sku_id),
     unit_id: normalizeOptionalPositiveInteger(values.unit_id),

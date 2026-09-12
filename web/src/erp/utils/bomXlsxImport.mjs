@@ -1,21 +1,20 @@
-/* eslint-disable no-bitwise -- ZIP flags and CRC32 require bit operations. */
 import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from './numeric20Scale6.mjs'
+import {
+  XlsxImportError as BOMXlsxImportError,
+  columnIndex,
+  normalizeText,
+  readXlsxWorkbook,
+} from './xlsxWorkbook.mjs'
 
-export const MAX_BOM_XLSX_FILE_BYTES = 20 * 1024 * 1024
+export {
+  XlsxImportError as BOMXlsxImportError,
+  MAX_XLSX_FILE_BYTES as MAX_BOM_XLSX_FILE_BYTES,
+} from './xlsxWorkbook.mjs'
 
-const MAX_ZIP_ENTRIES = 1024
-const MAX_ZIP_ENTRY_BYTES = 16 * 1024 * 1024
-const MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
-const MAX_WORKSHEET_ROWS = 5000
-const MAX_WORKSHEET_CELLS = 100000
 const MAX_BOM_IMPORT_ROWS = 1000
-
-const ZIP_EOCD_SIGNATURE = 0x06054b50
-const ZIP_CENTRAL_SIGNATURE = 0x02014b50
-const ZIP_LOCAL_SIGNATURE = 0x04034b50
 
 const HEADER_ALIASES = {
   materialCode: ['材料编号', '物料编号'],
@@ -34,16 +33,6 @@ const HEADER_ALIASES = {
   note: ['备注'],
 }
 
-const textDecoder = new TextDecoder('utf-8')
-
-export class BOMXlsxImportError extends Error {
-  constructor(message, code = 'invalid_xlsx') {
-    super(message)
-    this.name = 'BOMXlsxImportError'
-    this.code = code
-  }
-}
-
 function fail(message, code) {
   throw new BOMXlsxImportError(message, code)
 }
@@ -51,476 +40,6 @@ function fail(message, code) {
 function normalizedFileName(value) {
   const parts = String(value || 'BOM.xlsx').split(/[\\/]/u)
   return parts.at(-1)?.trim() || 'BOM.xlsx'
-}
-
-function toBytes(input) {
-  if (input instanceof Uint8Array) {
-    return new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
-  }
-  if (input instanceof ArrayBuffer) return new Uint8Array(input)
-  if (ArrayBuffer.isView(input)) {
-    return new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
-  }
-  fail('无法读取该 Excel 文件，请重新选择 .xlsx 文件', 'invalid_input')
-}
-
-function assertRange(bytes, offset, length, message) {
-  if (
-    !Number.isSafeInteger(offset) ||
-    !Number.isSafeInteger(length) ||
-    offset < 0 ||
-    length < 0 ||
-    offset + length > bytes.byteLength
-  ) {
-    fail(message, 'invalid_zip')
-  }
-}
-
-function readUint16(view, offset) {
-  if (offset < 0 || offset + 2 > view.byteLength) {
-    fail('Excel 文件结构不完整，无法读取', 'invalid_zip')
-  }
-  return view.getUint16(offset, true)
-}
-
-function readUint32(view, offset) {
-  if (offset < 0 || offset + 4 > view.byteLength) {
-    fail('Excel 文件结构不完整，无法读取', 'invalid_zip')
-  }
-  return view.getUint32(offset, true)
-}
-
-function findEndOfCentralDirectory(bytes, view) {
-  if (bytes.byteLength < 22) {
-    fail('所选文件不是有效的 .xlsx 文件', 'invalid_zip')
-  }
-  const minOffset = Math.max(0, bytes.byteLength - 65557)
-  for (let offset = bytes.byteLength - 22; offset >= minOffset; offset -= 1) {
-    if (readUint32(view, offset) === ZIP_EOCD_SIGNATURE) return offset
-  }
-  fail('所选文件不是有效的 .xlsx 文件', 'invalid_zip')
-}
-
-function validateZipEntryName(name) {
-  if (!name || name.includes('\\') || name.startsWith('/')) {
-    fail('Excel 文件包含不安全的内部路径', 'invalid_zip_path')
-  }
-  const normalized = name.endsWith('/') ? name.slice(0, -1) : name
-  const parts = normalized.split('/')
-  if (
-    !normalized ||
-    parts.some((part) => !part || part === '.' || part === '..')
-  ) {
-    fail('Excel 文件包含不安全的内部路径', 'invalid_zip_path')
-  }
-}
-
-function parseZip(input) {
-  const bytes = toBytes(input)
-  if (bytes.byteLength <= 0) {
-    fail('所选 Excel 文件为空', 'empty_file')
-  }
-  if (bytes.byteLength > MAX_BOM_XLSX_FILE_BYTES) {
-    fail('Excel 文件超过 20MB，请精简图片或拆分后再导入', 'file_too_large')
-  }
-
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  const eocdOffset = findEndOfCentralDirectory(bytes, view)
-  assertRange(bytes, eocdOffset, 22, 'Excel 文件尾部结构不完整')
-  const diskNumber = readUint16(view, eocdOffset + 4)
-  const centralDiskNumber = readUint16(view, eocdOffset + 6)
-  const diskEntryCount = readUint16(view, eocdOffset + 8)
-  const entryCount = readUint16(view, eocdOffset + 10)
-  const centralSize = readUint32(view, eocdOffset + 12)
-  const centralOffset = readUint32(view, eocdOffset + 16)
-  const commentLength = readUint16(view, eocdOffset + 20)
-
-  if (
-    diskNumber !== 0 ||
-    centralDiskNumber !== 0 ||
-    diskEntryCount !== entryCount ||
-    entryCount === 0xffff ||
-    centralSize === 0xffffffff ||
-    centralOffset === 0xffffffff ||
-    entryCount > MAX_ZIP_ENTRIES
-  ) {
-    fail('该 Excel 使用了暂不支持的压缩结构', 'unsupported_zip')
-  }
-  if (eocdOffset + 22 + commentLength !== bytes.byteLength) {
-    fail('Excel 文件尾部结构不完整', 'invalid_zip')
-  }
-  if (centralOffset + centralSize > eocdOffset) {
-    fail('Excel 文件目录结构不完整', 'invalid_zip')
-  }
-  assertRange(bytes, centralOffset, centralSize, 'Excel 文件目录结构不完整')
-
-  const entries = new Map()
-  const centralEnd = centralOffset + centralSize
-  let totalUncompressedBytes = 0
-  let offset = centralOffset
-
-  for (let index = 0; index < entryCount; index += 1) {
-    assertRange(bytes, offset, 46, 'Excel 文件目录项不完整')
-    if (readUint32(view, offset) !== ZIP_CENTRAL_SIGNATURE) {
-      fail('Excel 文件目录项无效', 'invalid_zip')
-    }
-    const flags = readUint16(view, offset + 8)
-    const method = readUint16(view, offset + 10)
-    const checksum = readUint32(view, offset + 16)
-    const compressedSize = readUint32(view, offset + 20)
-    const uncompressedSize = readUint32(view, offset + 24)
-    const nameLength = readUint16(view, offset + 28)
-    const extraLength = readUint16(view, offset + 30)
-    const entryCommentLength = readUint16(view, offset + 32)
-    const localHeaderOffset = readUint32(view, offset + 42)
-    const entryEnd = offset + 46 + nameLength + extraLength + entryCommentLength
-
-    if (entryEnd > centralEnd) {
-      fail('Excel 文件目录项越界', 'invalid_zip')
-    }
-    const name = textDecoder.decode(
-      bytes.subarray(offset + 46, offset + 46 + nameLength)
-    )
-    validateZipEntryName(name)
-    if ((flags & 1) !== 0) {
-      fail('不支持加密的 Excel 文件，请先取消文件密码', 'encrypted_xlsx')
-    }
-    if (method !== 0 && method !== 8) {
-      fail('该 Excel 使用了暂不支持的压缩方式', 'unsupported_zip')
-    }
-    if (
-      compressedSize > MAX_BOM_XLSX_FILE_BYTES ||
-      uncompressedSize > MAX_ZIP_ENTRY_BYTES
-    ) {
-      fail('Excel 内部数据过大，请精简文件后再导入', 'xlsx_too_large')
-    }
-    totalUncompressedBytes += uncompressedSize
-    if (totalUncompressedBytes > MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES) {
-      fail('Excel 解压后的内容过大，请精简文件后再导入', 'xlsx_too_large')
-    }
-    if (entries.has(name)) {
-      fail('Excel 文件包含重复的内部条目', 'invalid_zip')
-    }
-    assertRange(bytes, localHeaderOffset, 30, 'Excel 文件数据项不完整')
-    entries.set(name, {
-      name,
-      flags,
-      method,
-      checksum,
-      compressedSize,
-      uncompressedSize,
-      localHeaderOffset,
-    })
-    offset = entryEnd
-  }
-  if (offset !== centralEnd) {
-    fail('Excel 文件目录长度不一致', 'invalid_zip')
-  }
-  return { bytes, view, centralOffset, entries }
-}
-
-async function inflateRawLimited(compressed, expectedSize) {
-  if (typeof DecompressionStream !== 'function') {
-    fail(
-      '当前浏览器无法解压 Excel，请改用项目支持的最新版 Chrome',
-      'unsupported_browser'
-    )
-  }
-  let reader
-  try {
-    reader = new Blob([compressed])
-      .stream()
-      .pipeThrough(new DecompressionStream('deflate-raw'))
-      .getReader()
-    const chunks = []
-    let total = 0
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      const chunk = value instanceof Uint8Array ? value : new Uint8Array(value)
-      total += chunk.byteLength
-      if (total > expectedSize || total > MAX_ZIP_ENTRY_BYTES) {
-        await reader.cancel()
-        fail('Excel 内部数据大小异常', 'invalid_zip')
-      }
-      chunks.push(chunk)
-    }
-    if (total !== expectedSize) {
-      fail('Excel 内部数据长度不一致', 'invalid_zip')
-    }
-    const output = new Uint8Array(total)
-    let offset = 0
-    for (const chunk of chunks) {
-      output.set(chunk, offset)
-      offset += chunk.byteLength
-    }
-    return output
-  } catch (error) {
-    if (error instanceof BOMXlsxImportError) throw error
-    try {
-      await reader?.cancel()
-    } catch {
-      // The decompressor is already closed.
-    }
-    fail('Excel 内部压缩数据损坏，无法读取', 'invalid_zip')
-  }
-}
-
-async function extractZipEntry(zip, name) {
-  const entry = zip.entries.get(name)
-  if (!entry) fail('Excel 缺少必要的工作簿数据', 'missing_xlsx_entry')
-
-  const offset = entry.localHeaderOffset
-  if (readUint32(zip.view, offset) !== ZIP_LOCAL_SIGNATURE) {
-    fail('Excel 文件数据项无效', 'invalid_zip')
-  }
-  const localFlags = readUint16(zip.view, offset + 6)
-  const localMethod = readUint16(zip.view, offset + 8)
-  const nameLength = readUint16(zip.view, offset + 26)
-  const extraLength = readUint16(zip.view, offset + 28)
-  const dataStart = offset + 30 + nameLength + extraLength
-  const dataEnd = dataStart + entry.compressedSize
-  if (
-    localFlags !== entry.flags ||
-    localMethod !== entry.method ||
-    dataEnd > zip.centralOffset
-  ) {
-    fail('Excel 文件数据项范围无效', 'invalid_zip')
-  }
-  assertRange(
-    zip.bytes,
-    dataStart,
-    entry.compressedSize,
-    'Excel 文件数据项越界'
-  )
-  const localName = textDecoder.decode(
-    zip.bytes.subarray(offset + 30, offset + 30 + nameLength)
-  )
-  if (localName !== entry.name) {
-    fail('Excel 文件内部条目名称不一致', 'invalid_zip')
-  }
-
-  const compressed = zip.bytes.subarray(dataStart, dataEnd)
-  let output
-  if (entry.method === 0) {
-    if (entry.compressedSize !== entry.uncompressedSize) {
-      fail('Excel 内部数据长度不一致', 'invalid_zip')
-    }
-    output = new Uint8Array(compressed)
-  } else {
-    output = await inflateRawLimited(compressed, entry.uncompressedSize)
-  }
-  if (crc32(output) !== entry.checksum) {
-    fail('Excel 内部数据校验失败', 'invalid_zip')
-  }
-  return output
-}
-
-async function readZipText(zip, name) {
-  return textDecoder.decode(await extractZipEntry(zip, name))
-}
-
-function decodeXml(text) {
-  return String(text ?? '')
-    .replace(/&#(x[0-9a-f]+|\d+);/giu, (_match, rawCode) => {
-      const hexadecimal = String(rawCode).toLowerCase().startsWith('x')
-      const codePoint = Number.parseInt(
-        hexadecimal ? String(rawCode).slice(1) : rawCode,
-        hexadecimal ? 16 : 10
-      )
-      if (!Number.isSafeInteger(codePoint) || codePoint < 0) return ''
-      try {
-        return String.fromCodePoint(codePoint)
-      } catch {
-        return ''
-      }
-    })
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&apos;', "'")
-    .replaceAll('&amp;', '&')
-}
-
-function parseXmlAttributes(text) {
-  const attributes = {}
-  for (const match of String(text || '').matchAll(
-    /([A-Za-z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gu
-  )) {
-    attributes[match[1]] = decodeXml(match[2] ?? match[3] ?? '')
-  }
-  return attributes
-}
-
-function parseRelationships(xml) {
-  const relationships = new Map()
-  for (const match of xml.matchAll(/<Relationship\b([^>]*)\/?\s*>/gu)) {
-    const attributes = parseXmlAttributes(match[1])
-    if (!attributes.Id || !attributes.Target) continue
-    if (String(attributes.TargetMode || '').toLowerCase() === 'external') {
-      continue
-    }
-    relationships.set(attributes.Id, attributes.Target)
-  }
-  return relationships
-}
-
-function parseWorkbookSheets(xml) {
-  const sheets = []
-  for (const match of xml.matchAll(/<sheet\b([^>]*)\/?\s*>/gu)) {
-    const attributes = parseXmlAttributes(match[1])
-    if (attributes.name && attributes['r:id']) {
-      sheets.push({
-        name: attributes.name,
-        relationshipId: attributes['r:id'],
-      })
-    }
-  }
-  return sheets
-}
-
-function workbookUses1904Dates(xml) {
-  const match = xml.match(/<workbookPr\b([^>]*)\/?\s*>/u)
-  if (!match) return false
-  const value = String(parseXmlAttributes(match[1]).date1904 || '')
-    .trim()
-    .toLowerCase()
-  return value === '1' || value === 'true'
-}
-
-function normalizeWorkbookTarget(target) {
-  const value = String(target || '')
-  if (!value || value.includes('\\') || value.includes('://')) {
-    fail('Excel 工作表路径无效', 'invalid_relationship')
-  }
-  const withoutLeadingSlash = value.replace(/^\/+/, '')
-  const candidate = withoutLeadingSlash.startsWith('xl/')
-    ? withoutLeadingSlash
-    : `xl/${withoutLeadingSlash}`
-  const parts = candidate.split('/')
-  if (parts.some((part) => !part || part === '.' || part === '..')) {
-    fail('Excel 工作表路径无效', 'invalid_relationship')
-  }
-  return candidate
-}
-
-function stripXml(text) {
-  return String(text ?? '').replace(/<[^>]*>/gu, '')
-}
-
-function extractTextRuns(xml) {
-  const parts = []
-  const withoutPhonetics = String(xml || '').replace(
-    /<rPh\b[^>]*>[\s\S]*?<\/rPh>/gu,
-    ''
-  )
-  for (const match of withoutPhonetics.matchAll(
-    /<t\b[^>]*>([\s\S]*?)<\/t>/gu
-  )) {
-    parts.push(decodeXml(match[1]))
-  }
-  return parts.join('')
-}
-
-function parseSharedStrings(xml) {
-  const strings = []
-  for (const match of xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/gu)) {
-    strings.push(extractTextRuns(match[1]))
-  }
-  return strings
-}
-
-function columnIndex(cellRef) {
-  const letters = String(cellRef || '').match(/[A-Z]+/iu)?.[0]
-  if (!letters) return null
-  let index = 0
-  for (const letter of letters.toUpperCase()) {
-    index = index * 26 + letter.charCodeAt(0) - 64
-  }
-  return index > 0 ? index : null
-}
-
-function cellRowNumber(cellRef) {
-  const digits = String(cellRef || '').match(/\d+/u)?.[0]
-  const value = Number(digits)
-  return Number.isSafeInteger(value) && value > 0 ? value : null
-}
-
-function extractCellValue(cellXml, attributes, sharedStrings) {
-  if (attributes.t === 'inlineStr') {
-    const inlineMatch = cellXml.match(/<is\b[^>]*>([\s\S]*?)<\/is>/u)
-    return inlineMatch ? extractTextRuns(inlineMatch[1]) : ''
-  }
-  const valueMatch = cellXml.match(/<v\b[^>]*>([\s\S]*?)<\/v>/u)
-  if (!valueMatch) return ''
-  const rawValue = decodeXml(stripXml(valueMatch[1]))
-  if (attributes.t === 's') {
-    const index = Number(rawValue)
-    return Number.isSafeInteger(index) && index >= 0
-      ? (sharedStrings[index] ?? '')
-      : ''
-  }
-  return rawValue
-}
-
-function normalizeText(value) {
-  const text = String(value ?? '')
-    .normalize('NFKC')
-    .replace(/[\u00a0\u2005]/gu, ' ')
-    .replace(/\s+/gu, ' ')
-    .trim()
-  return text || ''
-}
-
-function parseSheetRows(xml, sharedStrings) {
-  const rows = []
-  let cellCount = 0
-  for (const rowMatch of xml.matchAll(/<row\b([^>]*)>([\s\S]*?)<\/row>/gu)) {
-    if (rows.length >= MAX_WORKSHEET_ROWS) {
-      fail('Excel 工作表行数过多，请拆分后再导入', 'worksheet_too_large')
-    }
-    const rowAttributes = parseXmlAttributes(rowMatch[1])
-    const rowNumber = Number(rowAttributes.r)
-    const values = []
-    for (const cellMatch of rowMatch[2].matchAll(
-      /<c\b([^>]*)\/>|<c\b([^>]*)>([\s\S]*?)<\/c>/gu
-    )) {
-      cellCount += 1
-      if (cellCount > MAX_WORKSHEET_CELLS) {
-        fail('Excel 工作表单元格过多，请拆分后再导入', 'worksheet_too_large')
-      }
-      const attributes = parseXmlAttributes(cellMatch[1] ?? cellMatch[2])
-      const column = columnIndex(attributes.r)
-      if (!column) continue
-      values[column - 1] = normalizeText(
-        extractCellValue(cellMatch[3] ?? '', attributes, sharedStrings)
-      )
-    }
-    const normalizedRow = {
-      rowNumber:
-        Number.isSafeInteger(rowNumber) && rowNumber > 0
-          ? rowNumber
-          : rows.length + 1,
-      values,
-    }
-    if (values.some(Boolean)) rows.push(normalizedRow)
-  }
-  return rows
-}
-
-function parseMergeRanges(xml) {
-  const ranges = []
-  for (const match of xml.matchAll(/<mergeCell\b([^>]*)\/?\s*>/gu)) {
-    const reference = parseXmlAttributes(match[1]).ref
-    const [startRef, endRef = startRef] = String(reference || '').split(':')
-    const startColumn = columnIndex(startRef)
-    const endColumn = columnIndex(endRef)
-    const startRow = cellRowNumber(startRef)
-    const endRow = cellRowNumber(endRef)
-    if (!startColumn || !endColumn || !startRow || !endRow) continue
-    ranges.push({ startColumn, endColumn, startRow, endRow })
-  }
-  return ranges
 }
 
 function normalizeHeader(value) {
@@ -809,6 +328,105 @@ function isFooterRow(row) {
   return /^(?:合计|审核|制表)|#REF!/u.test(joined)
 }
 
+function isMaterialSubtotal(row, header, current) {
+  if (
+    current.materialName ||
+    current.materialCode ||
+    valueByAlias(row, header, 'position')
+  ) {
+    return false
+  }
+  // Unlabelled SUM rows summarize preceding parts; their cached values and
+  // annotations must not become another part or overwrite material identity.
+  return descriptorsByAlias(header, 'unitQuantity').some((descriptor) => {
+    const formula = row.formulas[descriptor.startColumn - 1] || ''
+    const match = formula
+      .replace(/\s+/gu, '')
+      .match(/^SUM\(\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)\)$/iu)
+    return Boolean(
+      match &&
+        columnIndex(match[1]) === descriptor.startColumn &&
+        columnIndex(match[3]) === descriptor.startColumn &&
+        Number(match[2]) > header.rowNumber &&
+        Number(match[2]) <= Number(match[4]) &&
+        Number(match[4]) < row.rowNumber
+    )
+  })
+}
+
+function extractProcessing(row, header, mergeRanges) {
+  const processBase = valuesByAlias(row, header, 'processBase').join(' / ')
+  const processMethod = valuesByAlias(row, header, 'processMethod').join(' / ')
+  const columns = descriptorsByAlias(header, 'processMethod').flatMap(
+    ({ startColumn, endColumn }) =>
+      Array.from(
+        { length: endColumn - startColumn + 1 },
+        (_, i) => startColumn + i
+      )
+  )
+  if (hasAlias(header, 'processBase') || columns.length !== 2) {
+    return { processBase, processMethod }
+  }
+  const [baseColumn, methodColumn] = columns
+  const merged = mergeRanges.some(
+    (range) =>
+      range.startRow <= row.rowNumber &&
+      range.endRow >= row.rowNumber &&
+      range.startColumn <= baseColumn &&
+      range.endColumn >= methodColumn
+  )
+  // A merged row contains one instruction, while two separate cells describe
+  // preparation and the following cutting/processing method.
+  return merged
+    ? { processBase, processMethod }
+    : {
+        processBase: normalizeText(row.values[baseColumn - 1]),
+        processMethod: normalizeText(row.values[methodColumn - 1]),
+      }
+}
+
+function extractProcessingAndNote(row, header, mergeRanges) {
+  const processingColumns = ['processBase', 'processMethod'].flatMap((key) =>
+    descriptorsByAlias(header, key).flatMap(({ startColumn, endColumn }) =>
+      Array.from(
+        { length: endColumn - startColumn + 1 },
+        (_, i) => startColumn + i
+      )
+    )
+  )
+  const noteDescriptors = descriptorsByAlias(header, 'note')
+  const values = [...row.values]
+  const notes = valuesByAlias(row, header, 'note')
+  for (const range of mergeRanges) {
+    if (
+      range.startRow > row.rowNumber ||
+      range.endRow < row.rowNumber ||
+      !processingColumns.includes(range.startColumn) ||
+      !noteDescriptors.some(
+        ({ startColumn, endColumn }) =>
+          range.startColumn <= endColumn && range.endColumn >= startColumn
+      )
+    ) {
+      continue
+    }
+    // A source instruction spanning processing and remarks is one remark;
+    // keep independent processing cells on the same row in their own fields.
+    for (
+      let column = range.startColumn;
+      column <= range.endColumn;
+      column += 1
+    ) {
+      const text = normalizeText(values[column - 1])
+      if (text) notes.push(text)
+      values[column - 1] = ''
+    }
+  }
+  return {
+    ...extractProcessing({ ...row, values }, header, mergeRanges),
+    note: [...new Set(notes)].join(' / '),
+  }
+}
+
 function carryMaterialIdentity(carried, current) {
   const startsNewMaterial = Boolean(
     current.materialName || current.materialCode
@@ -861,6 +479,7 @@ function extractBOMRows(sheet, header, context) {
       color: valueByAlias(row, header, 'color'),
       unit: valueByAlias(row, header, 'unit'),
     }
+    if (isMaterialSubtotal(row, header, current)) continue
     carryMaterialIdentity(carried, current)
 
     const position = valueByAlias(row, header, 'position')
@@ -875,8 +494,10 @@ function extractBOMRows(sheet, header, context) {
       totalQuantity,
       unitQuantity: rawUnitQuantity,
     })
-    const processMethod = valuesByAlias(row, header, 'processMethod').join(
-      ' / '
+    const { processBase, processMethod, note } = extractProcessingAndNote(
+      row,
+      header,
+      sheet.mergeRanges
     )
     rows.push({
       rowNumber: row.rowNumber,
@@ -897,12 +518,9 @@ function extractBOMRows(sheet, header, context) {
         nonNegative: true,
       }),
       rawTotalUsage: totalQuantity,
-      processBase: truncateText(
-        valuesByAlias(row, header, 'processBase').join(' / '),
-        255
-      ),
+      processBase: truncateText(processBase, 255),
       processMethod: truncateText(processMethod, 255),
-      note: truncateText(valuesByAlias(row, header, 'note').join(' / '), 300),
+      note: truncateText(note, 300),
     })
     if (rows.length > MAX_BOM_IMPORT_ROWS) {
       fail('BOM 明细超过 1000 行，请拆分文件后再导入', 'too_many_bom_rows')
@@ -920,47 +538,24 @@ export async function parseBOMXlsx(input, options = {}) {
     fail('仅支持 .xlsx 格式的 BOM Excel 文件', 'unsupported_file_type')
   }
 
-  const zip = parseZip(input)
-  const workbookXml = await readZipText(zip, 'xl/workbook.xml')
-  const relationshipsXml = await readZipText(zip, 'xl/_rels/workbook.xml.rels')
-  const relationships = parseRelationships(relationshipsXml)
-  const matchingSheets = parseWorkbookSheets(workbookXml).filter((sheet) =>
-    /材料分析明细/u.test(normalizeText(sheet.name))
-  )
-  if (matchingSheets.length <= 0) {
+  const workbook = await readXlsxWorkbook(input, {
+    sheetFilter: (sheet) => /材料分析明细/u.test(normalizeText(sheet.name)),
+  })
+  if (workbook.sheets.length <= 0) {
     fail(
       '未找到“材料分析明细表”工作表，请选择现有 BOM 明细格式',
       'missing_bom_sheet'
     )
   }
-  if (matchingSheets.length > 1) {
+  if (workbook.sheets.length > 1) {
     fail(
       '一个 Excel 中只能保留一张材料分析明细表，请拆成一个文件一个 BOM',
       'multiple_bom_sheets'
     )
   }
-
-  const sharedStrings = zip.entries.has('xl/sharedStrings.xml')
-    ? parseSharedStrings(await readZipText(zip, 'xl/sharedStrings.xml'))
-    : []
-  const sheetInfo = matchingSheets[0]
-  const target = relationships.get(sheetInfo.relationshipId)
-  if (!target) {
-    fail('材料分析明细表缺少内部关联，无法读取', 'missing_sheet_relation')
-  }
-  const sheetPath = normalizeWorkbookTarget(target)
-  const sheetXml = await readZipText(zip, sheetPath)
-  const sheet = {
-    name: normalizeText(sheetInfo.name),
-    rows: parseSheetRows(sheetXml, sharedStrings),
-    mergeRanges: parseMergeRanges(sheetXml),
-  }
+  const sheet = workbook.sheets[0]
   const header = findMaterialDetailHeader(sheet.rows, sheet.mergeRanges)
-  const context = extractProductContext(
-    sheet,
-    header,
-    workbookUses1904Dates(workbookXml)
-  )
+  const context = extractProductContext(sheet, header, workbook.uses1904Dates)
   return {
     fileName,
     sheetName: sheet.name,
@@ -1117,6 +712,19 @@ export function buildBOMImportDraft(
     const materialMatch = matchMaterial(row, materials)
     const unitMatch = matchUnit(row.unit, units)
     return {
+      _material_group_key:
+        row.materialName || row.materialCode
+          ? JSON.stringify(
+              [
+                row.materialCode,
+                row.materialName,
+                row.supplierItemNo,
+                row.materialSpec,
+                row.color,
+                row.unit,
+              ].map(comparisonText)
+            )
+          : undefined,
       material_id: positiveID(materialMatch.record?.id),
       quantity: row.quantity || row.rawQuantity || '',
       unit_id: positiveID(unitMatch.record?.id),
@@ -1240,19 +848,3 @@ export function getBOMImportDraftIssues(values = {}) {
   })
   return issues
 }
-
-function crc32(bytes) {
-  let crc = 0xffffffff
-  for (const byte of bytes) {
-    crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8)
-  }
-  return (crc ^ 0xffffffff) >>> 0
-}
-
-const CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
-  let entry = value
-  for (let bit = 0; bit < 8; bit += 1) {
-    entry = (entry >>> 1) ^ (0xedb88320 & -(entry & 1))
-  }
-  return entry >>> 0
-})

@@ -992,17 +992,13 @@
               <div class="import-copy">
                 <strong>订货明细</strong>
                 <span
-                  >先录入客户订货需求；已有产品规格可直接选用。</span
+                  >先录入客户订货需求；已有产品规格可在行内补充信息中关联。</span
                 >
               </div>
               <div class="import-action">
-                <button class="btn primary" id="addItem" type="button">+ 添加订货明细</button>
-                <button class="btn" id="itemImportApply" type="button">
-                  从已有规格添加
-                </button>
                 <button class="btn text" id="productOrder" type="button" hidden>调整明细顺序</button>
                 <span class="picker-rule"
-                  >按钮打开第二层来源选择器；已有规格只带入产品主数据，不覆盖当前订单的数量、价格、金额和交期。</span
+                  >已有规格只带入产品主数据，不覆盖当前订单的数量、价格、金额和交期。</span
                 >
               </div>
             </div>
@@ -1049,6 +1045,7 @@
             </div>
 
             <div class="items-footer">
+              <button class="btn" id="addItem" type="button">+ 添加订货明细</button>
               <div class="stats">
                 <span class="stat"
                   >已录入 <strong id="itemCount">1</strong> 条</span
@@ -1118,7 +1115,6 @@
       const businessFormPage = document.querySelector("#businessFormPage");
       const openFormPage = document.querySelector("#openFormPage");
       const returnToList = document.querySelector("#returnToList");
-      const itemImportApply = document.querySelector("#itemImportApply");
       const productOrder = document.querySelector("#productOrder");
       const itemList = document.querySelector("#itemList");
       const modeNote = document.querySelector("#modeNote");
@@ -1133,7 +1129,6 @@
         "#form select:not(#formMode)",
         "#form textarea",
         "#attachment",
-        "#itemImportApply",
         ".copy-item",
         "#addItem",
         "#footerSave",
@@ -1396,10 +1391,12 @@
           setLineField(article, "amount", "2640.00");
           setLineField(article, "dueDate", "2026-06-22");
         }
-        itemList.appendChild(article);
+        if (sourceCard) sourceCard.after(article);
+        else itemList.appendChild(article);
         reindexItems();
         article.scrollIntoView({ block: "nearest" });
         syncMutationControls(formMode.value === "readonly");
+        getLineField(article, "quantity")?.focus();
         footerState.textContent = sourceCard
           ? "已复制所选订单行；数量、价格、金额和交期均保留原值。"
           : "已新增条目；请继续维护数量、价格和交期。";
@@ -1416,10 +1413,6 @@
       taxRate.addEventListener("input", updateStats);
       openFormPage.addEventListener("click", openBusinessForm);
       returnToList.addEventListener("click", closeBusinessForm);
-      itemImportApply.addEventListener("click", () => {
-        footerState.textContent =
-          "将打开已有产品规格选择器；完整筛选和勾选交互由局部动作弹窗样板统一定义。";
-      });
       productOrder.addEventListener("click", () => {
         footerState.textContent =
           "将打开调整明细顺序弹窗；保存顺序不改变各订单行的产品、数量和价格。";

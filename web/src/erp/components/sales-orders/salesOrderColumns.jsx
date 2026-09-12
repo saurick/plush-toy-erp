@@ -101,6 +101,7 @@ function lineStatusTag(status) {
 export function buildSalesOrderColumns() {
   return applyBusinessColumnSorters([
     {
+      defaultPriority: 10,
       title: '订单号',
       exportTitle: '订单号',
       dataIndex: 'order_no',
@@ -109,6 +110,7 @@ export function buildSalesOrderColumns() {
       sorter: (a, b) => compareText(a?.order_no, b?.order_no),
     },
     {
+      defaultPriority: 20,
       title: '客户',
       exportTitle: '客户',
       dataIndex: 'customer_snapshot',
@@ -125,6 +127,7 @@ export function buildSalesOrderColumns() {
         (record?.customer_id ? '客户已关联' : ''),
     },
     {
+      defaultPriority: 90,
       title: '客户订单号',
       exportTitle: '客户订单号',
       dataIndex: 'customer_order_no',
@@ -135,6 +138,7 @@ export function buildSalesOrderColumns() {
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 70,
       title: '业务员 / 跟单人',
       exportTitle: '业务员 / 跟单人',
       dataIndex: 'sales_owner',
@@ -147,6 +151,7 @@ export function buildSalesOrderColumns() {
       title: '联系人',
       exportTitle: '联系人',
       dataIndex: 'contact_snapshot',
+      listHidden: true,
       copyable: {
         resolveValue: (value) => contactText(value, ''),
       },
@@ -160,6 +165,7 @@ export function buildSalesOrderColumns() {
       exportValue: (record) => contactText(record?.contact_snapshot),
     },
     {
+      defaultPriority: 60,
       title: '币种',
       exportTitle: '币种',
       dataIndex: 'currency',
@@ -171,6 +177,7 @@ export function buildSalesOrderColumns() {
       title: '货款金额',
       exportTitle: '货款金额',
       dataIndex: 'goods_amount',
+      listHidden: true,
       width: 140,
       sorter: (a, b) =>
         compareNumeric20Scale6Values(a?.goods_amount, b?.goods_amount),
@@ -182,6 +189,7 @@ export function buildSalesOrderColumns() {
       title: '计税方式 / 税率',
       exportTitle: '计税方式 / 税率',
       key: 'tax_terms',
+      listHidden: true,
       width: 200,
       sorter: (a, b) => compareText(taxTermsText(a), taxTermsText(b)),
       render: (_, record) => taxTermsText(record),
@@ -191,6 +199,7 @@ export function buildSalesOrderColumns() {
       title: '税额',
       exportTitle: '税额',
       dataIndex: 'tax_amount',
+      listHidden: true,
       width: 130,
       sorter: (a, b) =>
         compareNumeric20Scale6Values(a?.tax_amount, b?.tax_amount),
@@ -199,6 +208,7 @@ export function buildSalesOrderColumns() {
         moneyText(record?.tax_amount, record?.currency, ''),
     },
     {
+      defaultPriority: 50,
       title: '订单总额',
       exportTitle: '订单总额',
       dataIndex: 'order_total',
@@ -213,6 +223,7 @@ export function buildSalesOrderColumns() {
       title: '运费条件',
       exportTitle: '运费条件',
       dataIndex: 'freight_terms',
+      listHidden: true,
       width: 150,
       sorter: (a, b) => compareText(a?.freight_terms, b?.freight_terms),
       render: salesOrderFreightTermsText,
@@ -223,6 +234,7 @@ export function buildSalesOrderColumns() {
       title: '报价运费',
       exportTitle: '报价运费',
       dataIndex: 'quoted_freight_amount',
+      listHidden: true,
       width: 140,
       sorter: (a, b) =>
         compareNumeric20Scale6Values(
@@ -243,6 +255,7 @@ export function buildSalesOrderColumns() {
       exportValue: formatPaymentCondition,
     },
     {
+      defaultPriority: 100,
       title: '下单日期',
       exportTitle: '下单日期',
       dataIndex: 'order_date',
@@ -252,6 +265,7 @@ export function buildSalesOrderColumns() {
       exportValue: (record) => formatUnixDate(record?.order_date),
     },
     {
+      defaultPriority: 40,
       title: '计划交付日期',
       exportTitle: '计划交付日期',
       dataIndex: 'planned_delivery_date',
@@ -266,6 +280,7 @@ export function buildSalesOrderColumns() {
       title: '收货信息',
       exportTitle: '收货信息',
       dataIndex: 'delivery_snapshot',
+      listHidden: true,
       width: 360,
       sorter: (a, b) =>
         compareText(
@@ -276,6 +291,7 @@ export function buildSalesOrderColumns() {
       exportValue: (record) => deliveryText(record?.delivery_snapshot),
     },
     {
+      defaultPriority: 80,
       title: '用料审批',
       dataIndex: 'engineering_material_status',
       width: 150,
@@ -284,6 +300,7 @@ export function buildSalesOrderColumns() {
         engineeringMaterialStatusLabel(record.engineering_material_status),
     },
     {
+      defaultPriority: 30,
       title: '状态',
       exportTitle: '状态',
       dataIndex: 'lifecycle_status',

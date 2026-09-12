@@ -46,6 +46,7 @@ function bomStatusTag(status) {
 export function buildBOMVersionColumns({ productOptions = [] }) {
   return applyBusinessColumnSorters([
     {
+      defaultPriority: 10,
       title: '产品',
       exportTitle: '产品',
       dataIndex: 'product_id',
@@ -69,6 +70,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
         referenceLabel(productOptions, record?.product_id, '产品'),
     },
     {
+      defaultPriority: 20,
       title: 'BOM 版本',
       exportTitle: 'BOM 版本',
       dataIndex: 'version',
@@ -78,6 +80,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
         String(a?.version || '').localeCompare(String(b?.version || '')),
     },
     {
+      defaultPriority: 30,
       title: '状态',
       exportTitle: '状态',
       dataIndex: 'status',
@@ -87,6 +90,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       exportValue: (record) => bomStatusText(record.status),
     },
     {
+      defaultPriority: 60,
       title: '来源订单号',
       exportTitle: '来源订单号',
       dataIndex: 'source_order_no',
@@ -99,6 +103,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 70,
       title: '设计师',
       exportTitle: '设计师',
       dataIndex: 'designer',
@@ -109,6 +114,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 80,
       title: '制表日期',
       exportTitle: '制表日期',
       dataIndex: 'print_date',
@@ -118,6 +124,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       exportValue: (record) => formatUnixDate(record.print_date),
     },
     {
+      defaultPriority: 40,
       title: '生效开始',
       exportTitle: '生效开始',
       dataIndex: 'effective_from',
@@ -127,6 +134,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       exportValue: (record) => formatUnixDate(record.effective_from),
     },
     {
+      defaultPriority: 50,
       title: '生效结束',
       exportTitle: '生效结束',
       dataIndex: 'effective_to',

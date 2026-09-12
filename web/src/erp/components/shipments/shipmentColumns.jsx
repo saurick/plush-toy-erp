@@ -85,6 +85,7 @@ function freightText(record = {}, fallback = '-') {
 export function buildShipmentColumns({ salesOrdersByID }) {
   return applyBusinessColumnSorters([
     {
+      defaultPriority: 10,
       title: '出货单号',
       exportTitle: '出货单号',
       dataIndex: 'shipment_no',
@@ -93,6 +94,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       sortType: 'text',
     },
     {
+      defaultPriority: 20,
       title: '状态',
       exportTitle: '状态',
       dataIndex: 'status',
@@ -102,6 +104,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => shipmentStatusText(record?.status),
     },
     {
+      defaultPriority: 50,
       title: '来源单据',
       exportTitle: '来源单据',
       dataIndex: 'sales_order_id',
@@ -131,6 +134,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       },
     },
     {
+      defaultPriority: 30,
       title: '客户',
       exportTitle: '客户',
       copyable: {
@@ -155,6 +159,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => record.items?.length || 0,
     },
     {
+      defaultPriority: 60,
       title: '实际 / 最终总净重（克）',
       exportTitle: '总净重（克）',
       dataIndex: 'total_net_weight_g',
@@ -174,6 +179,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => String(record?.total_net_weight_g ?? '').trim(),
     },
     {
+      defaultPriority: 100,
       title: '收货信息',
       exportTitle: '收货信息',
       dataIndex: 'delivery_snapshot',
@@ -183,6 +189,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => deliveryText(record?.delivery_snapshot),
     },
     {
+      defaultPriority: 80,
       title: '运输 / 承运 / 单号',
       exportTitle: '运输 / 承运 / 单号',
       key: 'transport',
@@ -196,6 +203,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: transportText,
     },
     {
+      defaultPriority: 90,
       title: '包装 / 毛重 / 体积',
       exportTitle: '包装 / 毛重 / 体积',
       key: 'package_summary',
@@ -205,6 +213,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: packageText,
     },
     {
+      defaultPriority: 70,
       title: '实际运费',
       exportTitle: '实际运费',
       key: 'freight',
@@ -214,14 +223,17 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => freightText(record, ''),
     },
     {
+      defaultPriority: 110,
       title: '唛头',
       exportTitle: '唛头',
       dataIndex: 'shipping_mark',
+      listHidden: true,
       width: 220,
       sortable: false,
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 40,
       title: '计划出货日期 / 实际出货日期',
       exportTitle: '计划出货日期 / 实际出货日期',
       width: 180,

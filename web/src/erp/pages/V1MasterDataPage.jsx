@@ -1230,7 +1230,7 @@ export default function V1MasterDataPage({ type }) {
         columns={orderedRecordColumns}
         dataSource={records}
         tableLayout={isProductCatalogPage ? 'fixed' : undefined}
-        scroll={{ x: isProcessDictionaryPage ? 1000 : 1300 }}
+        scroll={isProcessDictionaryPage ? { x: 1000 } : undefined}
         pagination={createBusinessTablePagination({
           pagination,
           total,

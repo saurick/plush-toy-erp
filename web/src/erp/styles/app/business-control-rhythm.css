@@ -359,6 +359,38 @@ body
 body .ant-modal .erp-business-form textarea.ant-input,
 #root .erp-business-form textarea.ant-input {
   height: auto;
-  min-height: calc(var(--erp-control-height) * 2);
+  min-height: calc(var(--erp-control-height) * var(--erp-textarea-rows, 2));
   line-height: 1.45;
+}
+
+.erp-business-textarea:where(textarea),
+.erp-business-textarea textarea {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+:is(#root, .ant-modal)
+  :is(.erp-business-form, .erp-business-action-form)
+  td
+  .ant-select-single,
+:is(#root, .ant-modal)
+  :is(.erp-business-form, .erp-business-action-form)
+  td
+  .ant-select-single
+  .ant-select-selector {
+  height: auto;
+  min-height: var(--erp-control-height, 36px);
+}
+
+:is(#root, .ant-modal)
+  :is(.erp-business-form, .erp-business-action-form)
+  td
+  .ant-select-single
+  .ant-select-selection-item {
+  height: auto;
+  padding-block: 6px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
 }

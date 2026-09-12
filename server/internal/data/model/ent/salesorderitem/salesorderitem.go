@@ -33,6 +33,8 @@ const (
 	FieldPreShipmentSampleQuantity = "pre_shipment_sample_quantity"
 	// FieldProcessRequirement holds the string denoting the process_requirement field in the database.
 	FieldProcessRequirement = "process_requirement"
+	// FieldImportSource holds the string denoting the import_source field in the database.
+	FieldImportSource = "import_source"
 	// FieldSampleBomID holds the string denoting the sample_bom_id field in the database.
 	FieldSampleBomID = "sample_bom_id"
 	// FieldSampleBomFingerprint holds the string denoting the sample_bom_fingerprint field in the database.
@@ -160,6 +162,7 @@ var Columns = []string{
 	FieldOrderCategory,
 	FieldPreShipmentSampleQuantity,
 	FieldProcessRequirement,
+	FieldImportSource,
 	FieldSampleBomID,
 	FieldSampleBomFingerprint,
 	FieldSampleReusedFromItemID,

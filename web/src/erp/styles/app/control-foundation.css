@@ -156,7 +156,7 @@ body
   box-shadow: none;
 }
 
-/* Select 收起态保持单行稳定高度，展开列表承接完整文本阅读。 */
+/* 默认选择器保持单行；业务明细表在 control-rhythm 中按内容换行。 */
 #root .ant-select-single .ant-select-selection-item {
   min-width: 0;
   overflow: hidden;

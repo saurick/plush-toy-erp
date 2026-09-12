@@ -51,7 +51,6 @@ export function createBusinessFormalScenarios(deps) {
     verifyBusinessActionFormModal,
     verifyBusinessModuleColumnOrderDialog,
     verifyBusinessRowDoubleClickModal,
-    verifySourceImportPicker,
     customerRuntimeEffectiveSession,
   } = deps
   const compactVisibleText = (value) =>
@@ -957,7 +956,7 @@ export function createBusinessFormalScenarios(deps) {
       minFieldCount: 6,
       screenshotName: 'business-v1-sales-order-form-modal',
       expectedTexts: ['订货明细', '添加订货明细', '暂无订货明细'],
-      absentTexts: ['产品引用 ID', '单位引用 ID'],
+      absentTexts: ['产品引用 ID', '单位引用 ID', '从已有规格添加'],
       afterOpen: async (modal) => {
         assert.equal(
           await modal.locator('.erp-sales-order-lines-form__row').count(),
@@ -1073,16 +1072,15 @@ export function createBusinessFormalScenarios(deps) {
         await modal.getByLabel('订货产品名称', { exact: true }).fill('客户新款毛绒挂件')
         await modal.getByLabel('订单数量', { exact: true }).fill('11')
         await modal.getByLabel('单价', { exact: true }).fill('12.11')
-        await verifySourceImportPicker(page, {
-          parentModal: modal,
-          triggerButton: '从已有规格添加',
-          titleText: '选择已有产品规格',
-          expectedTexts: ['规格编号', '产品名称', 'SKU-STYLE-L1'],
-          emptyDescriptionText: '暂无可选产品规格',
-          selectText: 'SKU-STYLE-L1',
-          selectedNoun: '规格',
-          scenarioName: 'sales-order-source-import-picker',
-        })
+        const linkedRow = modal.locator('.erp-sales-order-lines-form__row').first()
+        await linkedRow.locator('.erp-line-item-details > summary').click()
+        const skuSelect = linkedRow.getByLabel('已有规格（选填）', { exact: true })
+        await skuSelect.click()
+        await skuSelect.fill('SKU-STYLE-L1')
+        await page.getByText('SKU-STYLE-L1 / 样式产品 SKU', { exact: true }).click()
+        assert.equal(await linkedRow.getByLabel('订货产品名称', { exact: true }).inputValue(), '客户新款毛绒挂件')
+        assert.equal(await linkedRow.getByLabel('订单数量', { exact: true }).inputValue(), '11')
+        assert.equal(await linkedRow.getByLabel('单价', { exact: true }).inputValue(), '12.11')
         await assertLineQuantityUnitSuffix(modal, {
           label: '订单数量',
           expectedText: '件（PCS）',
@@ -1093,6 +1091,16 @@ export function createBusinessFormalScenarios(deps) {
           expectedText: '件（PCS）',
           scenarioName: 'business-v1-sales-order-form-modal',
         })
+        const skuField = linkedRow.locator('.erp-line-item-field--source .ant-select')
+        await skuField.hover()
+        await skuField.locator('.ant-select-clear').click()
+        assert.equal(await linkedRow.getByText('已关联产品', { exact: true }).count(), 0)
+        assert.equal(await linkedRow.getByLabel('订单数量', { exact: true }).inputValue(), '11')
+        assert.equal(await linkedRow.getByLabel('单价', { exact: true }).inputValue(), '12.11')
+        await skuSelect.click()
+        await skuSelect.fill('SKU-STYLE-L1')
+        await page.getByText('SKU-STYLE-L1 / 样式产品 SKU', { exact: true }).click()
+        await modal.getByRole('button', { name: '添加订货明细', exact: true }).click()
         const readDemandRows = () =>
           modal
             .locator('.erp-sales-order-lines-form__row')
@@ -1110,7 +1118,7 @@ export function createBusinessFormalScenarios(deps) {
               )
             )
         const beforeOrder = await readDemandRows()
-        assert.equal(beforeOrder.length, 2, '选用规格只追加选中的明细')
+        assert.equal(beforeOrder.length, 2, '行内关联规格不新增明细，添加按钮每次新增一行')
         const reorder = modal.getByRole('button', {
           name: '调整明细顺序',
           exact: true,
@@ -1188,8 +1196,15 @@ export function createBusinessFormalScenarios(deps) {
       scenarioName: 'business-v1-sales-orders',
       afterModalOpen: async () => {
         await expectText(page, '订货明细')
-        await page.locator('.erp-business-form-page:not([hidden]) .erp-line-item-details > summary').first().click()
+        const editedRow = page.locator('.erp-business-form-page:not([hidden]) .erp-sales-order-lines-form__row').first()
+        await editedRow.getByText('已保存', { exact: true }).waitFor()
+        const editedDetails = editedRow.locator('.erp-line-item-details')
+        if (!(await editedDetails.evaluate((node) => node.open))) {
+          await editedDetails.locator('summary').click()
+        }
+        await editedRow.getByLabel('已有规格（选填）', { exact: true }).scrollIntoViewIfNeeded()
         await expectText(page, '已有规格（选填）')
+        await editedRow.getByText('已关联产品', { exact: true }).scrollIntoViewIfNeeded()
         await expectText(page, '已关联产品')
         await assertTextAbsent(page, '产品引用 ID')
         await assertTextAbsent(page, '单位引用 ID')
@@ -2823,7 +2838,7 @@ export function createBusinessFormalScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '产品档案')
         await expectText(page, 'PROD-STYLE-L1')
-        await expectText(page, '海关编码（HS Code）')
+        await expectText(page, '产品单重（净重）')
         await assertERPThemeMode(page, {
           scenarioName: 'business-table-headers-single-line-desktop',
           expectedMode: 'dark',

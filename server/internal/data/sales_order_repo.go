@@ -909,6 +909,7 @@ func (r *salesOrderRepo) AddSalesOrderItem(ctx context.Context, in *biz.SalesOrd
 		SetOrderCategory(in.OrderCategory).
 		SetPreShipmentSampleQuantity(in.PreShipmentSampleQuantity).
 		SetNillableProcessRequirement(in.ProcessRequirement).
+		SetImportSource(in.ImportSource).
 		SetUnitID(in.UnitID).
 		SetNillableProductCodeSnapshot(in.ProductCodeSnapshot).
 		SetNillableProductNameSnapshot(in.ProductNameSnapshot).
@@ -1245,6 +1246,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			SetOrderCategory(mutation.OrderCategory).
 			SetPreShipmentSampleQuantity(mutation.PreShipmentSampleQuantity).
 			SetNillableProcessRequirement(mutation.ProcessRequirement).
+			SetImportSource(mutation.ImportSource).
 			SetUnitID(mutation.UnitID).
 			SetNillableProductCodeSnapshot(mutation.ProductCodeSnapshot).
 			SetNillableProductNameSnapshot(mutation.ProductNameSnapshot).
@@ -1572,6 +1574,7 @@ func entSalesOrderItemToBiz(row *ent.SalesOrderItem) *biz.SalesOrderItem {
 		OrderCategory:             row.OrderCategory,
 		PreShipmentSampleQuantity: row.PreShipmentSampleQuantity,
 		ProcessRequirement:        row.ProcessRequirement,
+		ImportSource:              row.ImportSource,
 		SampleBOMID:               row.SampleBomID,
 		EngineeringStatus:         row.EngineeringStatus,
 		SampleNote:                row.SampleNote,

@@ -50,6 +50,7 @@ function activeTag(active) {
 
 function statusColumn() {
   return {
+    defaultPriority: 30,
     title: '状态',
     exportTitle: '状态',
     dataIndex: 'is_active',
@@ -62,6 +63,7 @@ function statusColumn() {
 
 function unitColumn(unitDisplay) {
   return {
+    defaultPriority: 70,
     title: '默认单位',
     exportTitle: '默认单位',
     dataIndex: 'default_unit_id',
@@ -79,6 +81,7 @@ function unitColumn(unitDisplay) {
 function productColumns({ unitDisplay }) {
   return [
     {
+      defaultPriority: 10,
       title: '产品编号',
       exportTitle: '产品编号',
       dataIndex: 'code',
@@ -87,6 +90,7 @@ function productColumns({ unitDisplay }) {
       sorter: (a, b) => compareText(a?.code, b?.code),
     },
     {
+      defaultPriority: 20,
       title: '产品名称',
       exportTitle: '产品名称',
       dataIndex: 'name',
@@ -106,6 +110,7 @@ function productColumns({ unitDisplay }) {
       title: '英文品名',
       exportTitle: '英文品名',
       dataIndex: 'english_name',
+      listHidden: true,
       copyable: true,
       width: 220,
       sorter: (a, b) => compareText(a?.english_name, b?.english_name),
@@ -115,12 +120,14 @@ function productColumns({ unitDisplay }) {
       title: '海关编码（HS Code）',
       exportTitle: '海关编码（HS Code）',
       dataIndex: 'hs_code',
+      listHidden: true,
       copyable: true,
       width: 180,
       sorter: (a, b) => compareText(a?.hs_code, b?.hs_code),
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 40,
       title: '内部款号',
       exportTitle: '内部款号',
       dataIndex: 'style_no',
@@ -130,6 +137,7 @@ function productColumns({ unitDisplay }) {
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 50,
       title: '客户款号',
       exportTitle: '客户款号',
       dataIndex: 'customer_style_no',
@@ -159,6 +167,7 @@ function productColumns({ unitDisplay }) {
 function productSKUColumns({ productOptions, unitDisplay }) {
   return [
     {
+      defaultPriority: 10,
       title: '产品',
       exportTitle: '产品',
       dataIndex: 'product_id',
@@ -181,6 +190,7 @@ function productSKUColumns({ productOptions, unitDisplay }) {
         referenceLabel(productOptions, record?.product_id, '产品'),
     },
     {
+      defaultPriority: 20,
       title: 'SKU 编号',
       exportTitle: 'SKU 编号',
       dataIndex: 'sku_code',
@@ -189,6 +199,7 @@ function productSKUColumns({ productOptions, unitDisplay }) {
       sorter: (a, b) => compareText(a?.sku_code, b?.sku_code),
     },
     {
+      defaultPriority: 25,
       title: 'SKU 名称',
       exportTitle: 'SKU 名称',
       dataIndex: 'sku_name',
@@ -216,6 +227,7 @@ function productSKUColumns({ productOptions, unitDisplay }) {
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 40,
       title: '颜色',
       exportTitle: '颜色',
       dataIndex: 'color',
@@ -224,6 +236,7 @@ function productSKUColumns({ productOptions, unitDisplay }) {
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 45,
       title: '色号',
       exportTitle: '色号',
       dataIndex: 'color_no',
@@ -233,6 +246,7 @@ function productSKUColumns({ productOptions, unitDisplay }) {
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 50,
       title: '尺码',
       exportTitle: '尺码',
       dataIndex: 'size',
@@ -241,6 +255,7 @@ function productSKUColumns({ productOptions, unitDisplay }) {
       render: (value) => value || '-',
     },
     {
+      defaultPriority: 60,
       title: '包装版本',
       exportTitle: '包装版本',
       dataIndex: 'packaging_version',
@@ -265,6 +280,7 @@ function productSKUColumns({ productOptions, unitDisplay }) {
 function processColumns() {
   return [
     {
+      defaultPriority: 10,
       title: '环节编号',
       exportTitle: '环节编号',
       dataIndex: 'code',
@@ -273,6 +289,7 @@ function processColumns() {
       sorter: (a, b) => compareText(a?.code, b?.code),
     },
     {
+      defaultPriority: 20,
       title: '环节名称',
       exportTitle: '环节名称',
       dataIndex: 'name',
@@ -281,6 +298,7 @@ function processColumns() {
       sorter: (a, b) => compareText(a?.name, b?.name),
     },
     {
+      defaultPriority: 40,
       title: '环节类别',
       exportTitle: '环节类别',
       dataIndex: 'category',
@@ -358,6 +376,7 @@ function supplierProcessLabels(processIDs, processOptions) {
 function baseColumns({ type, unitDisplay, processOptions }) {
   return [
     {
+      defaultPriority: 10,
       title: type === 'materials' ? '系统物料编号' : '编号',
       exportTitle: type === 'materials' ? '系统物料编号' : '编号',
       dataIndex: 'code',
@@ -372,6 +391,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
       sorter: (a, b) => compareText(a?.code, b?.code),
     },
     {
+      defaultPriority: 20,
       title: '名称',
       exportTitle: '名称',
       dataIndex: 'name',
@@ -382,6 +402,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
     ...(type === 'materials'
       ? [
           {
+            defaultPriority: 45,
             title: '库存类别',
             dataIndex: 'stock_category',
             width: 110,
@@ -390,6 +411,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
               materialStockCategoryLabel(record.stock_category),
           },
           {
+            defaultPriority: 80,
             title: '厂商',
             exportTitle: '厂商',
             dataIndex: 'supplier_name',
@@ -398,6 +420,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             render: (value) => value || '-',
           },
           {
+            defaultPriority: 90,
             title: '厂商料号',
             exportTitle: '厂商料号',
             dataIndex: 'supplier_item_no',
@@ -410,9 +433,11 @@ function baseColumns({ type, unitDisplay, processOptions }) {
         ]
       : [
           {
+            defaultPriority: 40,
             title: '简称',
             exportTitle: '简称',
             dataIndex: 'short_name',
+            listHidden: true,
             copyable: true,
             effectiveFieldKey:
               type === 'customers' ? 'display_name' : undefined,
@@ -424,6 +449,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
     ...(type === 'customers'
       ? [
           {
+            defaultPriority: 80,
             title: '付款条件',
             exportTitle: '付款条件',
             dataIndex: 'default_payment_method',
@@ -445,6 +471,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             },
           },
           {
+            defaultPriority: 50,
             title: '国家 / 地区',
             exportTitle: '国家 / 地区',
             dataIndex: 'country_region',
@@ -456,6 +483,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             title: '默认收货信息',
             exportTitle: '默认收货信息',
             key: 'default_delivery',
+            listHidden: true,
             width: 320,
             sorter: (a, b) =>
               compareText(
@@ -504,6 +532,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             render: (value) => value || '-',
           },
           {
+            defaultPriority: 40,
             title: '规格',
             exportTitle: '规格',
             dataIndex: 'spec',
@@ -513,6 +542,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             render: (value) => value || '-',
           },
           {
+            defaultPriority: 50,
             title: '颜色',
             exportTitle: '颜色',
             dataIndex: 'color',
@@ -526,6 +556,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
     ...(type === 'suppliers'
       ? [
           {
+            defaultPriority: 40,
             title: '类型',
             exportTitle: '类型',
             dataIndex: 'supplier_type',
@@ -539,6 +570,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
               (record?.supplier_type ? '供应商类型' : ''),
           },
           {
+            defaultPriority: 50,
             title: '主联系人',
             exportTitle: '主联系人',
             dataIndex: ['primary_contact', 'name'],
@@ -550,6 +582,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             exportValue: (record) => record?.primary_contact?.name || '',
           },
           {
+            defaultPriority: 60,
             title: '联系电话',
             exportTitle: '联系电话',
             dataIndex: ['primary_contact', 'mobile'],
@@ -578,11 +611,13 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             title: '经营 / 加工地址',
             exportTitle: '经营 / 加工地址',
             dataIndex: 'address',
+            listHidden: true,
             width: 240,
             sorter: (a, b) => compareText(a?.address, b?.address),
             render: (value) => value || '-',
           },
           {
+            defaultPriority: 80,
             title: '默认付款方式',
             exportTitle: '默认付款方式',
             dataIndex: 'default_payment_method',
@@ -661,6 +696,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             title: '税号',
             exportTitle: '税号',
             dataIndex: 'tax_no',
+            listHidden: true,
             copyable: true,
             width: 180,
             sorter: (a, b) => compareText(a?.tax_no, b?.tax_no),

@@ -142,6 +142,7 @@
 
 .erp-admin-brand__logo-mark {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   width: 36px;
@@ -165,6 +166,7 @@
   font-weight: 800;
   letter-spacing: 0.05em;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .erp-admin-brand__logo-subtitle {

@@ -40,7 +40,8 @@
 
 .erp-business-form-page__header {
   padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--erp-business-action-modal-border, #d8e3dc);
+  border-bottom: 1px solid var(--erp-border-strong, #c6d5ca);
+  background: var(--erp-surface-bg-soft, #eef4f0);
 }
 
 .erp-business-form-page__header h1 {
@@ -61,6 +62,7 @@
   min-width: 0;
   overflow: auto;
   padding: 16px 20px;
+  background: var(--erp-business-action-modal-bg, #fff);
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
@@ -69,14 +71,19 @@
   min-width: 0;
 }
 
+.erp-business-form-page__body .erp-business-action-form__section-title::after {
+  background: var(--erp-border, #e5ece7);
+}
+
 .erp-business-form-page__footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px 20px;
-  border-top: 1px solid var(--erp-business-action-modal-border, #d8e3dc);
-  background: var(--erp-business-action-modal-bg, #fff);
+  border-top: 1px solid var(--erp-border-strong, #c6d5ca);
+  background: var(--erp-surface-bg-soft, #eef4f0);
+  box-shadow: 0 -4px 12px rgb(0 0 0 / 0.06);
 }
 
 .erp-business-form-page__status {

@@ -98,31 +98,22 @@ test('catalog fill rows: unstable sources and incomplete controlled policies fai
   )
 })
 
-test('catalog fill rows: sales and purchase batch pickers declare their business policies', () => {
-  const salesForm = readFileSync(
-    resolve(testDir, '../components/sales-orders/SalesOrderForm.jsx'),
-    'utf8'
-  )
+test('catalog fill rows: purchase batch picker declares its business policy', () => {
   const purchaseForm = readFileSync(
     resolve(testDir, '../components/purchase-orders/PurchaseOrderForm.jsx'),
     'utf8'
   )
 
-  for (const [label, source] of [
-    ['sales order SKU fill', salesForm],
-    ['purchase order material fill', purchaseForm],
-  ]) {
-    assert.match(
-      source,
-      /buildCatalogFillRowsPlan\(\{/u,
-      `${label} must use the shared planner`
-    )
-    assert.match(
-      source,
-      /mode:\s*CATALOG_FILL_MODES\.APPEND[\s\S]*?duplicatePolicy:\s*CATALOG_FILL_DUPLICATE_POLICIES\.ALLOW/u,
-      `${label} must explicitly allow append duplicates`
-    )
-  }
+  assert.match(
+    purchaseForm,
+    /buildCatalogFillRowsPlan\(\{/u,
+    'purchase order material fill must use the shared planner'
+  )
+  assert.match(
+    purchaseForm,
+    /mode:\s*CATALOG_FILL_MODES\.APPEND[\s\S]*?duplicatePolicy:\s*CATALOG_FILL_DUPLICATE_POLICIES\.ALLOW/u,
+    'purchase order material fill must explicitly allow append duplicates'
+  )
 
   assert.match(
     purchaseForm,

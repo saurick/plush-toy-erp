@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CopyOutlined,
   DeleteOutlined,
-  FolderOpenOutlined,
   OrderedListOutlined,
-  PlusOutlined,
 } from '@ant-design/icons'
 import {
   AutoComplete,
@@ -16,8 +14,8 @@ import {
   Select,
   Space,
 } from 'antd'
-import ProductIdentity from '../master-data/ProductIdentity.jsx'
-
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import SalesOrderSourceEvidence from './SalesOrderSourceEvidence.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import FieldWithUnitSuffix, {
@@ -27,7 +25,6 @@ import FieldWithUnitSuffix, {
   unitPrecisionFromOptions,
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
-import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import BusinessLineItemOrderModal from '../business-list/BusinessLineItemOrderModal.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
@@ -62,11 +59,6 @@ import {
   optionalContactPhoneRule,
 } from '../../utils/contactValidation.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
-import {
-  CATALOG_FILL_DUPLICATE_POLICIES,
-  CATALOG_FILL_MODES,
-  buildCatalogFillRowsPlan,
-} from '../../utils/catalogFillRows.mjs'
 import {
   formatNumeric20Scale6Summary,
   numeric20Scale6Units,
@@ -113,17 +105,6 @@ function contactPhoneText(contact = {}) {
   return contact.mobile || contact.phone || ''
 }
 
-function sourceDefaultUnitText(unitOptions, unitID) {
-  const normalizedID = Number(unitID || 0)
-  if (!Number.isFinite(normalizedID) || normalizedID <= 0) {
-    return '-'
-  }
-  return (
-    unitSuffixTextFromOptions(unitOptions, normalizedID, '单位已关联') ||
-    '单位已关联'
-  )
-}
-
 export function createBlankOrderLine(lineNo = 1, { unitID } = {}) {
   return {
     line_no: lineNo,
@@ -146,13 +127,6 @@ export function createBlankOrderLine(lineNo = 1, { unitID } = {}) {
   }
 }
 
-function createOrderLineFromSKU(sku = {}, lineNo = 1) {
-  return {
-    ...createBlankOrderLine(lineNo),
-    ...buildSalesOrderItemSourceValuesFromSKU(sku),
-  }
-}
-
 function optionalFormValue(value) {
   return value === null || value === undefined ? '' : value
 }
@@ -168,6 +142,9 @@ export function normalizeSalesOrderItemFormValue(item = {}) {
     pre_shipment_sample_quantity:
       optionalFormValue(item.pre_shipment_sample_quantity) || '0',
     process_requirement: item.process_requirement || '',
+    import_source: item.import_source || undefined,
+    designer: item.designer || '',
+    unshipped_quantity: item.unshipped_quantity ?? '',
     product_sku_id: productSkuID,
     product_id: item.product_id,
     unit_id: item.unit_id,
@@ -570,9 +547,8 @@ export function SalesOrderFormFields({
         label="报价备注"
         name="price_condition_note"
       >
-        <Input.TextArea
+        <BusinessTextArea
           allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
           showCount
           maxLength={255}
           placeholder="账期影响报价时记录核对结论"
@@ -627,9 +603,8 @@ export function SalesOrderFormFields({
         label="收货地址"
         name="delivery_address"
       >
-        <Input.TextArea
+        <BusinessTextArea
           allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
           maxLength={512}
           showCount
         />
@@ -658,9 +633,8 @@ export function SalesOrderFormFields({
         label="备注"
         name="note"
       >
-        <Input.TextArea
+        <BusinessTextArea
           allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
           showCount
           maxLength={300}
         />
@@ -676,8 +650,10 @@ export function SalesOrderItemsFormSection({
   canCancelItem,
   productSKUs,
   unitOptions = [],
+  importImages = [],
+  orderAttachments = [],
+  orderID,
 }) {
-  const [skuImportOpen, setSkuImportOpen] = useState(false)
   const [lineOrderOpen, setLineOrderOpen] = useState(false)
   const [lineOrderItems, setLineOrderItems] = useState([])
   const orderDate = Form.useWatch('order_date', form)
@@ -733,40 +709,6 @@ export function SalesOrderItemsFormSection({
     value: sku.id,
     sku,
   }))
-  const skuImportColumns = [
-    {
-      title: '规格编号',
-      dataIndex: 'sku_code',
-      width: 150,
-      searchText: (sku) => skuLabel(sku),
-    },
-    {
-      title: '产品名称',
-      width: 190,
-      render: (_, sku) => (
-        <ProductIdentity
-          productId={sku.product_id}
-          name={sku.sku_name || sku.customer_sku || sku.barcode || '产品'}
-          preview={false}
-        />
-      ),
-      searchText: (sku) => skuLabel(sku),
-    },
-    { title: '颜色', dataIndex: 'color', width: 110 },
-    {
-      title: '规格 / 包装',
-      width: 170,
-      render: (_, sku) =>
-        [sku.size, sku.packaging_version].filter(Boolean).join(' / ') || '-',
-    },
-    {
-      title: '默认单位',
-      key: 'default_unit',
-      width: 100,
-      render: (_, sku) =>
-        sourceDefaultUnitText(unitOptions, sku.default_unit_id),
-    },
-  ]
 
   return (
     <section className="erp-sales-order-lines-form">
@@ -777,31 +719,6 @@ export function SalesOrderItemsFormSection({
               <strong className="erp-sales-order-demand-toolbar__title">
                 订货明细
               </strong>
-              <Space wrap>
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined aria-hidden="true" />}
-                  disabled={!canCreateItem}
-                  onClick={() => {
-                    const currentLines = form.getFieldValue('items') || []
-                    add(
-                      createBlankOrderLine(getNextLineNo(currentLines), {
-                        unitID: defaultUnitID,
-                      })
-                    )
-                    requestLineItemScroll(currentLines.length)
-                  }}
-                >
-                  添加订货明细
-                </Button>
-                <Button
-                  icon={<FolderOpenOutlined aria-hidden="true" />}
-                  disabled={!canCreateItem}
-                  onClick={() => setSkuImportOpen(true)}
-                >
-                  从已有规格添加
-                </Button>
-              </Space>
               {fields.length >= 2 ? (
                 <Button
                   type="text"
@@ -829,51 +746,6 @@ export function SalesOrderItemsFormSection({
               open={lineOrderOpen}
               title="调整明细顺序"
             />
-            <SourceImportPickerModal
-              open={skuImportOpen}
-              title="选择已有产品规格"
-              description="选中的产品规格将添加到本单，数量、单价和交期在订货明细中填写。"
-              rows={productSKUs}
-              columns={skuImportColumns}
-              getSelectedLabel={skuLabel}
-              searchPlaceholder="搜索产品名称或规格编号"
-              searchHint="可搜索：规格编号、名称、颜色、包装"
-              importText="添加到本单"
-              selectedNoun="规格"
-              emptyDescription="暂无可选产品规格"
-              onCancel={() => setSkuImportOpen(false)}
-              onImport={(selectedSKUs) => {
-                const currentLines = form.getFieldValue('items') || []
-                const nextLineNo = getNextLineNo(currentLines)
-                const startIndex = currentLines.length
-                const { rowsToAdd: importedLines } = buildCatalogFillRowsPlan({
-                  currentRows: currentLines,
-                  selectedRows: selectedSKUs,
-                  mode: CATALOG_FILL_MODES.APPEND,
-                  // 同一 SKU 可因交期、价格或客户要求拆成多行。
-                  duplicatePolicy: CATALOG_FILL_DUPLICATE_POLICIES.ALLOW,
-                  getCurrentSourceKey: (line) => line.product_sku_id,
-                  getSelectedSourceKey: (sku) => sku.id,
-                  mapSelectedRow: (sku, { acceptedIndex }) =>
-                    createOrderLineFromSKU(sku, nextLineNo + acceptedIndex),
-                })
-                importedLines.forEach(() => {
-                  add()
-                })
-                requestLineItemScroll(startIndex)
-                window.setTimeout(() => {
-                  form.setFields(
-                    importedLines.flatMap((line, index) =>
-                      Object.entries(line).map(([key, value]) => ({
-                        name: ['items', startIndex + index, key],
-                        value,
-                      }))
-                    )
-                  )
-                })
-                setSkuImportOpen(false)
-              }}
-            />
             {fields.length === 0 ? (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -900,6 +772,8 @@ export function SalesOrderItemsFormSection({
                       index={index}
                       rowRef={(node) => registerLineItemRow(index, node)}
                       status={isExistingLine ? '已保存' : '新增'}
+                      detailsOpen={Boolean(watchedItems?.[field.name]?.import_source)}
+                      detailsLabel="款号、船头版、工艺与原表资料"
                       actions={
                         <Space
                           className="erp-sales-order-lines-form__row-actions"
@@ -995,7 +869,7 @@ export function SalesOrderItemsFormSection({
                             },
                           ]}
                         >
-                          <Input
+                          <BusinessTextArea
                             disabled={!canEditLine}
                             maxLength={255}
                             placeholder={
@@ -1161,6 +1035,9 @@ export function SalesOrderItemsFormSection({
                         </Form.Item>,
                       ]}
                     >
+                      <Form.Item name={[field.name, 'import_source']} noStyle>
+                        <SalesOrderSourceEvidence images={importImages} attachments={orderAttachments} ownerID={orderID} />
+                      </Form.Item>
                       <Form.Item
                         className="erp-line-item-field erp-line-item-field--snapshot-code"
                         label="客户款号"
@@ -1228,12 +1105,22 @@ export function SalesOrderItemsFormSection({
                           </Form.Item>
                         )}
                       </Form.Item>
+                      {isExistingLine ? (
+                        <>
+                          <Form.Item label="未出货数" name={[field.name, 'unshipped_quantity']} className="erp-line-item-field erp-line-item-field--snapshot-small">
+                            <Input readOnly placeholder="由出货记录计算" />
+                          </Form.Item>
+                          <Form.Item label="工程设计师" name={[field.name, 'designer']} className="erp-line-item-field erp-line-item-field--snapshot-small">
+                            <Input readOnly placeholder="工程关联物料清单后显示" />
+                          </Form.Item>
+                        </>
+                      ) : null}
                       <Form.Item
                         className="erp-line-item-field erp-line-item-field--note"
                         label="工艺要求"
                         name={[field.name, 'process_requirement']}
                       >
-                        <Input
+                        <BusinessTextArea
                           disabled={!canEditLine}
                           maxLength={255}
                           placeholder="客户要求或工艺说明"
@@ -1244,11 +1131,10 @@ export function SalesOrderItemsFormSection({
                         label="备注"
                         name={[field.name, 'note']}
                       >
-                        <Input.TextArea
+                        <BusinessTextArea
                           allowClear
-                          autoSize={{ minRows: 1, maxRows: 3 }}
                           showCount
-                          maxLength={300}
+                          maxLength={255}
                           disabled={!canEditLine}
                         />
                       </Form.Item>
@@ -1335,6 +1221,17 @@ export function SalesOrderItemsFormSection({
               </BusinessLineItemsTable>
             )}
             <BusinessLineItemsFooter
+              addLabel="添加订货明细"
+              addDisabled={!canCreateItem}
+              onAdd={() => {
+                const currentLines = form.getFieldValue('items') || []
+                add(
+                  createBlankOrderLine(getNextLineNo(currentLines), {
+                    unitID: defaultUnitID,
+                  })
+                )
+                requestLineItemScroll(currentLines.length)
+              }}
               stats={[
                 {
                   key: 'count',

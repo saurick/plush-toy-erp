@@ -1240,13 +1240,13 @@ export default function ERPLayout() {
           effectiveSessionDiagnostic.dataRuntimeScope
         }
       >
-        <Sider width={320} className="erp-admin-sider">
+        <Sider width={240} className="erp-admin-sider">
           {sideNav}
         </Sider>
 
         <Drawer
           placement="left"
-          width={320}
+          width={240}
           open={mobileNavOpen}
           onClose={() => setMobileNavOpen(false)}
           className="erp-admin-drawer"

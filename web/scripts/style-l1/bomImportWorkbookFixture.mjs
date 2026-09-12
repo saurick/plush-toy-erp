@@ -81,23 +81,30 @@ function escapeXml(value) {
     .replaceAll('"', '&quot;')
 }
 
-function createSheetXml(rows) {
+function createSheetXml(rows, merges) {
   const rowXml = rows
     .map((values, rowIndex) => {
       const cells = values
         .map((value, columnIndex) => {
           if (value === null || value === undefined || value === '') return ''
           const reference = `${columnLetters(columnIndex + 1)}${rowIndex + 1}`
+          if (typeof value === 'object') {
+            return `<c r="${reference}"><f>${escapeXml(value.formula)}</f><v>${escapeXml(value.value)}</v></c>`
+          }
           return `<c r="${reference}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`
         })
         .join('')
       return `<row r="${rowIndex + 1}">${cells}</row>`
     })
     .join('')
-  return `<?xml version="1.0" encoding="UTF-8"?><worksheet><sheetData>${rowXml}</sheetData><mergeCells count="1"><mergeCell ref="H5:I5"/></mergeCells></worksheet>`
+  return `<?xml version="1.0" encoding="UTF-8"?><worksheet><sheetData>${rowXml}</sheetData><mergeCells count="${merges.length}">${merges.map((ref) => `<mergeCell ref="${ref}"/>`).join('')}</mergeCells></worksheet>`
 }
 
-export function createBOMImportWorkbookFixture() {
+export function createBOMImportWorkbookFixture({
+  grouped = false,
+  mergedNotes = false,
+} = {}) {
+  const merges = ['H5:I5']
   const rows = [
     ['样式测试公司', null, null, null, null, '毛向:单方向'],
     ['物 料 分 析 明 细 表'],
@@ -159,11 +166,57 @@ export function createBOMImportWorkbookFixture() {
     ],
     ['审核：', null, null, null, '制表：样式制表员'],
   ]
+  if (grouped) {
+    rows.splice(
+      rows.length - 1,
+      0,
+      [
+        null,
+        null,
+        null,
+        null,
+        '袖片*2',
+        '0.123456789',
+        '13.58024679',
+        '贴衬',
+        '激光',
+      ],
+      [
+        null,
+        null,
+        '999',
+        null,
+        null,
+        { formula: 'SUM(F7:F8)', value: '1.123456789' },
+        { formula: 'SUM(G7:G8)', value: '113.58024679' },
+      ],
+      [
+        '尚未建档材料',
+        'SUP-OTHER',
+        '另一规格',
+        '核心演示单位-件',
+        '尾片*1',
+        '1',
+        '100',
+      ]
+    )
+  }
+  if (mergedNotes) {
+    merges.push('H6:J6', 'I7:J7')
+    rows[5].splice(
+      7,
+      3,
+      '衣片、披肩与腰带按尺寸配套，每端保留缝合位置。'.repeat(3),
+      null,
+      null
+    )
+    rows[6].splice(7, 3, '布底贴12g衬', '长度61mm，每端留一个孔', null)
+  }
   return createStoredZip({
     'xl/workbook.xml':
       '<?xml version="1.0"?><workbook xmlns:r="relationships"><sheets><sheet name="材料分析明细表" sheetId="1" r:id="rId1"/></sheets></workbook>',
     'xl/_rels/workbook.xml.rels':
       '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
-    'xl/worksheets/sheet1.xml': createSheetXml(rows),
+    'xl/worksheets/sheet1.xml': createSheetXml(rows, merges),
   })
 }

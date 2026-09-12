@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Form } from 'antd'
+import { listBusinessAttachments } from '../../api/attachmentApi.mjs'
 
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
@@ -34,6 +35,13 @@ export default function SalesOrderEditor({
   onPaymentMethodChange,
   onPaymentConditionBlur,
 }) {
+  const [attachments, setAttachments] = useState([])
+  useEffect(() => {
+    let active = true
+    setAttachments([])
+    if (open && editingOrder?.id) listBusinessAttachments({ owner_type: 'sales_order', owner_id: editingOrder.id }).then((items) => { if (active) setAttachments(items) }).catch(() => { if (active) setAttachments([]) })
+    return () => { active = false }
+  }, [open, editingOrder?.id])
   return (
     <BusinessFormPage
       form={form}
@@ -74,6 +82,8 @@ export default function SalesOrderEditor({
           canCancelItem={canCancelItem}
           productSKUs={productSKUs}
           unitOptions={unitOptions}
+          orderID={editingOrder?.id}
+          orderAttachments={attachments}
         />
       </Form>
     </BusinessFormPage>

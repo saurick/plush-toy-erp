@@ -2,9 +2,32 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  customerOption,
+  supplierOption,
   unitOption,
   warehouseOptionFromRecord,
 } from './referenceSelectOptions.mjs'
+
+test('referenceSelectOptions: 客户和供应商的同名简称不重复，独立简称仍可搜索', () => {
+  for (const toOption of [customerOption, supplierOption]) {
+    assert.deepEqual(
+      toOption({ id: 1, code: 'PARTY-1', name: '晴空品牌', short_name: ' 晴空品牌 ' }),
+      { value: 1, label: 'PARTY-1 / 晴空品牌' }
+    )
+    assert.deepEqual(
+      toOption({ id: 1, code: 'PARTY-1', name: '晴空品牌有限公司', short_name: '晴空' }),
+      { value: 1, label: 'PARTY-1 / 晴空品牌有限公司 / 晴空' }
+    )
+    assert.deepEqual(
+      toOption({ id: 1, code: 'PARTY-1', name: '晴空品牌', short_name: ' ' }),
+      { value: 1, label: 'PARTY-1 / 晴空品牌' }
+    )
+    assert.deepEqual(
+      toOption({ id: 1, code: 'PARTY-1', short_name: '晴空' }),
+      { value: 1, label: 'PARTY-1 / 晴空' }
+    )
+  }
+})
 
 test('referenceSelectOptions: warehouse option supports master data records', () => {
   assert.deepEqual(

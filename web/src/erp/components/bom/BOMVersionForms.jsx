@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react'
 import { Button, Form, Input, Select, Space } from 'antd'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import ProductIdentity, {
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
@@ -191,12 +192,7 @@ export function BOMHeaderFormFields({
           label="备注"
           name="note"
         >
-          <Input.TextArea
-            allowClear
-            disabled={disabled}
-            autoSize={{ minRows: 1, maxRows: 3 }}
-            maxLength={300}
-          />
+          <BusinessTextArea allowClear disabled={disabled} maxLength={300} />
         </Form.Item>
       </div>
       <details className="erp-bom-header-details" open={detailsOpen}>
@@ -368,7 +364,7 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
         label="部位"
         name="position"
       >
-        <Input allowClear autoComplete="off" />
+        <BusinessTextArea allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -389,26 +385,21 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
         label="加工基础"
         name="process_base"
       >
-        <Input allowClear autoComplete="off" />
+        <BusinessTextArea allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
         label="加工方式"
         name="process_method"
       >
-        <Input allowClear autoComplete="off" />
+        <BusinessTextArea allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="备注"
         name="note"
       >
-        <Input.TextArea
-          allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
-          showCount
-          maxLength={300}
-        />
+        <BusinessTextArea allowClear showCount maxLength={300} />
       </Form.Item>
     </>
   )

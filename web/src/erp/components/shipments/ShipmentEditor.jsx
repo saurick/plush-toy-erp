@@ -13,6 +13,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import ProductIdentity, {
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
@@ -252,9 +253,8 @@ function ShipmentFormFields({
         label="收货地址"
         name="delivery_address"
       >
-        <Input.TextArea
+        <BusinessTextArea
           allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
           disabled={disabled}
           maxLength={512}
           showCount
@@ -374,9 +374,8 @@ function ShipmentFormFields({
         label="唛头"
         name="shipping_mark"
       >
-        <Input.TextArea
+        <BusinessTextArea
           allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
           disabled={disabled}
           maxLength={255}
           showCount
@@ -425,10 +424,9 @@ function ShipmentFormFields({
         label="备注"
         name="note"
       >
-        <Input.TextArea
+        <BusinessTextArea
           allowClear
           disabled={disabled}
-          autoSize={{ minRows: 1, maxRows: 3 }}
           maxLength={300}
           showCount
         />
@@ -832,7 +830,7 @@ function ShipmentItemFormFields({
         label="包装说明"
         name={fieldName('package_description')}
       >
-        <Input allowClear autoComplete="off" maxLength={255} />
+        <BusinessTextArea allowClear autoComplete="off" maxLength={255} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -846,12 +844,7 @@ function ShipmentItemFormFields({
         label="备注"
         name={fieldName('note')}
       >
-        <Input.TextArea
-          allowClear
-          autoSize={{ minRows: 1, maxRows: 3 }}
-          maxLength={300}
-          showCount
-        />
+        <BusinessTextArea allowClear maxLength={300} showCount />
       </Form.Item>
     </BusinessLineItemRow>
   )

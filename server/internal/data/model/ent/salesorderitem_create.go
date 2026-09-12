@@ -138,6 +138,12 @@ func (_c *SalesOrderItemCreate) SetNillableProcessRequirement(v *string) *SalesO
 	return _c
 }
 
+// SetImportSource sets the "import_source" field.
+func (_c *SalesOrderItemCreate) SetImportSource(v map[string]interface{}) *SalesOrderItemCreate {
+	_c.mutation.SetImportSource(v)
+	return _c
+}
+
 // SetSampleBomID sets the "sample_bom_id" field.
 func (_c *SalesOrderItemCreate) SetSampleBomID(v int) *SalesOrderItemCreate {
 	_c.mutation.SetSampleBomID(v)
@@ -738,6 +744,10 @@ func (_c *SalesOrderItemCreate) createSpec() (*SalesOrderItem, *sqlgraph.CreateS
 	if value, ok := _c.mutation.ProcessRequirement(); ok {
 		_spec.SetField(salesorderitem.FieldProcessRequirement, field.TypeString, value)
 		_node.ProcessRequirement = &value
+	}
+	if value, ok := _c.mutation.ImportSource(); ok {
+		_spec.SetField(salesorderitem.FieldImportSource, field.TypeJSON, value)
+		_node.ImportSource = value
 	}
 	if value, ok := _c.mutation.SampleBomFingerprint(); ok {
 		_spec.SetField(salesorderitem.FieldSampleBomFingerprint, field.TypeString, value)

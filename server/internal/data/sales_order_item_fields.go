@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/shopspring/decimal"
 	"server/internal/biz"
@@ -100,6 +101,9 @@ func validateSalesOrderCommercialEngineeringChange(ctx context.Context, client *
 	current, err := client.SalesOrderItem.Get(ctx, id)
 	if err != nil {
 		return err
+	}
+	if in.ImportSource != nil && !reflect.DeepEqual(current.ImportSource, in.ImportSource) {
+		return biz.ErrBadParam
 	}
 	if current.SampleBomID != nil || current.EngineeringStatus != biz.SalesOrderEngineeringPreparing {
 		if current.ProductID != in.ProductID || !sameOptionalInt(current.ProductSkuID, in.ProductSkuID) {

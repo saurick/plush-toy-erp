@@ -134,6 +134,12 @@ func sensitiveCommercialDomain(url, method string) string {
 func redactSensitiveFieldMap(value map[string]any, commercialDomain string, policy sensitiveFieldReadPolicy) {
 	for key, item := range value {
 		normalizedKey := strings.ToLower(strings.TrimSpace(key))
+		// Imported cells can include unlabelled payment and contact notes. Do not
+		// let the original-file evidence bypass any of the existing read policies.
+		if normalizedKey == "import_source" && (!policy.partyPrivate || !policy.salesCommercial || !policy.financeSettlement) {
+			delete(value, key)
+			continue
+		}
 		if !policy.partyPrivate && isSensitiveFieldKey(normalizedKey, partyPrivateFieldKeys) {
 			delete(value, key)
 			continue

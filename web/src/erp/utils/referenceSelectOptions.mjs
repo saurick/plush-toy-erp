@@ -117,30 +117,27 @@ export function unitOption(unit = {}) {
   }
 }
 
-export function customerOption(customer = {}) {
-  const value = positiveID(customer.id)
+function partyOption(party, fallbackLabel) {
+  const value = positiveID(party.id)
   if (!value) return null
+  const name = String(party.name ?? '').trim()
+  const shortName = String(party.short_name ?? '').trim()
   return {
     value,
     label: compactParts([
-      customer.code || '客户已关联',
-      customer.name,
-      customer.short_name,
+      party.code || `${fallbackLabel}已关联`,
+      name,
+      shortName !== name ? shortName : '',
     ]),
   }
 }
 
+export function customerOption(customer = {}) {
+  return partyOption(customer, '客户')
+}
+
 export function supplierOption(supplier = {}) {
-  const value = positiveID(supplier.id)
-  if (!value) return null
-  return {
-    value,
-    label: compactParts([
-      supplier.code || '供应商已关联',
-      supplier.name,
-      supplier.short_name,
-    ]),
-  }
+  return partyOption(supplier, '供应商')
 }
 
 export function processOption(process = {}) {

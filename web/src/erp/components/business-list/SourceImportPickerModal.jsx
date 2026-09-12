@@ -114,6 +114,8 @@ export default function SourceImportPickerModal({
   onPageChange,
   onSearchChange,
   searchDebounceMs = 250,
+  allowSelectAll = false,
+  expandable,
 }) {
   const [keyword, setKeyword] = useState('')
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
@@ -368,6 +370,11 @@ export default function SourceImportPickerModal({
           >
             清空筛选
           </Button>
+          {allowSelectAll && multiple && !serverPagination ? (
+            <Button onClick={() => updateSelectedRowKeys(filteredRows.filter((row) => !isRowDisabled?.(row)).map(getKey))} disabled={loading || !filteredRows.length}>
+              全选筛选结果
+            </Button>
+          ) : null}
         </div>
         <div className="erp-source-import-picker__selection">
           <div
@@ -457,6 +464,7 @@ export default function SourceImportPickerModal({
           loading={loading}
           dataSource={pagedRows}
           columns={tableColumns}
+          expandable={expandable}
           pagination={false}
           locale={{
             emptyText: <Empty description={emptyDescription} />,

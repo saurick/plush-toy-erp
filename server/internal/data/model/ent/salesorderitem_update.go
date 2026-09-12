@@ -933,6 +933,9 @@ func (_u *SalesOrderItemUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if _u.mutation.ProcessRequirementCleared() {
 		_spec.ClearField(salesorderitem.FieldProcessRequirement, field.TypeString)
 	}
+	if _u.mutation.ImportSourceCleared() {
+		_spec.ClearField(salesorderitem.FieldImportSource, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.SampleBomFingerprint(); ok {
 		_spec.SetField(salesorderitem.FieldSampleBomFingerprint, field.TypeString, value)
 	}
@@ -2233,6 +2236,9 @@ func (_u *SalesOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrd
 	}
 	if _u.mutation.ProcessRequirementCleared() {
 		_spec.ClearField(salesorderitem.FieldProcessRequirement, field.TypeString)
+	}
+	if _u.mutation.ImportSourceCleared() {
+		_spec.ClearField(salesorderitem.FieldImportSource, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.SampleBomFingerprint(); ok {
 		_spec.SetField(salesorderitem.FieldSampleBomFingerprint, field.TypeString, value)

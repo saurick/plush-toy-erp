@@ -21,6 +21,7 @@ export function renderOutsourcingOrderStatusTag(status) {
 export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
   return applyBusinessColumnSorters([
     {
+      defaultPriority: 10,
       title: '加工合同号',
       exportTitle: '加工合同号',
       dataIndex: 'outsourcing_order_no',
@@ -30,6 +31,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       sortType: 'text',
     },
     {
+      defaultPriority: 20,
       title: '加工厂',
       exportTitle: '加工厂',
       dataIndex: 'supplier_id',
@@ -45,6 +47,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       exportValue: resolveSupplierName,
     },
     {
+      defaultPriority: 30,
       title: '状态',
       exportTitle: '状态',
       dataIndex: 'lifecycle_status',
@@ -56,6 +59,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
         statusText(record?.lifecycle_status, OUTSOURCING_ORDER_STATUS_LABELS),
     },
     {
+      defaultPriority: 60,
       title: '来源订单',
       exportTitle: '来源订单',
       dataIndex: 'source_order_no',
@@ -66,6 +70,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       exportValue: (record) => record?.source_order_no || '',
     },
     {
+      defaultPriority: 50,
       title: '下单日期',
       exportTitle: '下单日期',
       dataIndex: 'order_date',
@@ -75,6 +80,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       exportValue: (record) => formatUnixDate(record?.order_date),
     },
     {
+      defaultPriority: 40,
       title: '预计回货日期',
       exportTitle: '预计回货日期',
       dataIndex: 'expected_return_date',

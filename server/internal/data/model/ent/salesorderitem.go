@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/product"
@@ -41,6 +42,8 @@ type SalesOrderItem struct {
 	PreShipmentSampleQuantity decimal.Decimal `json:"pre_shipment_sample_quantity,omitempty"`
 	// ProcessRequirement holds the value of the "process_requirement" field.
 	ProcessRequirement *string `json:"process_requirement,omitempty"`
+	// ImportSource holds the value of the "import_source" field.
+	ImportSource map[string]interface{} `json:"import_source,omitempty"`
 	// SampleBomID holds the value of the "sample_bom_id" field.
 	SampleBomID *int `json:"sample_bom_id,omitempty"`
 	// SampleBomFingerprint holds the value of the "sample_bom_fingerprint" field.
@@ -203,6 +206,8 @@ func (*SalesOrderItem) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case salesorderitem.FieldUnitPrice, salesorderitem.FieldAmount:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
+		case salesorderitem.FieldImportSource:
+			values[i] = new([]byte)
 		case salesorderitem.FieldPreShipmentSampleQuantity, salesorderitem.FieldOrderedQuantity:
 			values[i] = new(decimal.Decimal)
 		case salesorderitem.FieldID, salesorderitem.FieldSalesOrderID, salesorderitem.FieldLineNo, salesorderitem.FieldDisplayOrder, salesorderitem.FieldProductID, salesorderitem.FieldSampleBomID, salesorderitem.FieldSampleReusedFromItemID, salesorderitem.FieldSampleImageAttachmentID, salesorderitem.FieldSampleConfirmedBy, salesorderitem.FieldProductSkuID, salesorderitem.FieldUnitID:
@@ -289,6 +294,14 @@ func (_m *SalesOrderItem) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ProcessRequirement = new(string)
 				*_m.ProcessRequirement = value.String
+			}
+		case salesorderitem.FieldImportSource:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field import_source", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.ImportSource); err != nil {
+					return fmt.Errorf("unmarshal field import_source: %w", err)
+				}
 			}
 		case salesorderitem.FieldSampleBomID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -541,6 +554,9 @@ func (_m *SalesOrderItem) String() string {
 		builder.WriteString("process_requirement=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	builder.WriteString("import_source=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ImportSource))
 	builder.WriteString(", ")
 	if v := _m.SampleBomID; v != nil {
 		builder.WriteString("sample_bom_id=")

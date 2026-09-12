@@ -14,8 +14,10 @@ import {
   Typography,
 } from 'antd'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import ProductionOrderReferenceSelect from './ProductionOrderReferenceSelect.jsx'
 import { isProductionMaterialIssueEligible } from '../../utils/productionMaterialIssueAction.mjs'
@@ -378,7 +380,7 @@ function RowReference({
       </Col>
       <Col xs={24} md={16}>
         <Form.Item name={[field.name, 'note']} label="明细备注">
-          <Input disabled={readOnly} maxLength={255} />
+          <BusinessTextArea disabled={readOnly} maxLength={255} />
         </Form.Item>
       </Col>
       <Form.Item name={[field.name, 'line_no']} hidden>
@@ -407,6 +409,8 @@ export default function ProductionOrderEditor({
   onSubmit,
 }) {
   const readOnly = mode === 'view'
+  const { registerLineItemRow, requestLineItemScroll } =
+    useLineItemAppendScroll()
   const title =
     mode === 'create'
       ? '新建生产订单'
@@ -462,10 +466,10 @@ export default function ProductionOrderEditor({
           </Col>
           <Col span={24}>
             <Form.Item name="note" label="备注">
-              <Input.TextArea
+              <BusinessTextArea
                 disabled={readOnly}
                 maxLength={255}
-                rows={2}
+                minRows={2}
                 showCount={!readOnly}
               />
             </Form.Item>
@@ -475,7 +479,11 @@ export default function ProductionOrderEditor({
           {(fields, { add, remove }) => (
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               {fields.map((field, index) => (
-                <section key={field.key} className="erp-production-order-line">
+                <section
+                  key={field.key}
+                  className="erp-production-order-line"
+                  ref={(node) => registerLineItemRow(index, node)}
+                >
                   <Space
                     style={{ width: '100%', justifyContent: 'space-between' }}
                   >
@@ -504,15 +512,16 @@ export default function ProductionOrderEditor({
                 <Button
                   type="dashed"
                   block
-                  icon={<PlusOutlined />}
-                  onClick={() =>
+                  icon={<PlusOutlined aria-hidden="true" />}
+                  onClick={() => {
                     add({
                       line_no: fields.length + 1,
                       planned_quantity: '1',
                       route_code: PRODUCTION_WIP_ROUTE_CODE,
                       customer_inspection_required: false,
                     })
-                  }
+                    requestLineItemScroll(fields.length)
+                  }}
                 >
                   添加明细
                 </Button>

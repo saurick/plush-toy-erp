@@ -676,6 +676,16 @@ func ProcessRequirementContainsFold(v string) predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(sql.FieldContainsFold(FieldProcessRequirement, v))
 }
 
+// ImportSourceIsNil applies the IsNil predicate on the "import_source" field.
+func ImportSourceIsNil() predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldIsNull(FieldImportSource))
+}
+
+// ImportSourceNotNil applies the NotNil predicate on the "import_source" field.
+func ImportSourceNotNil() predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldNotNull(FieldImportSource))
+}
+
 // SampleBomIDEQ applies the EQ predicate on the "sample_bom_id" field.
 func SampleBomIDEQ(v int) predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleBomID, v))

@@ -3,6 +3,7 @@ import {
   closeBusinessFormPage,
 } from './businessFormPageAssertions.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
+import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 
 async function waitForMaterialDropdown(page) {
   const dropdown = page.locator('.ant-select-dropdown:visible')
@@ -90,7 +91,7 @@ export async function verifyBOMMaterialGroups(
       groupWidth: group.getBoundingClientRect().width,
       scrollable: getComputedStyle(scroller).overflowX,
       ancestors: Array.from(
-        (function* () {
+        (function* parentElements() {
           for (let p = group; p && p !== node; p = p.parentElement) yield p
         })()
       ).map((p) => ({
@@ -125,8 +126,9 @@ export function createBOMMaterialGroupsScenarios(deps) {
         saves = []
         await page.route('**/rpc/bom', async (route) => {
           const request = route.request().postDataJSON()
-          if (request.method === 'save_bom_with_items')
+          if (request.method === 'save_bom_with_items') {
             saves.push(request.params)
+          }
           await route.fallback()
         })
       },
@@ -171,6 +173,220 @@ export function createBOMMaterialGroupsScenarios(deps) {
   ]
   return [
     ...scenarios,
+    {
+      name: 'bom-xlsx-merged-remarks',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: deps.customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      verify: async (page) => {
+        await page
+          .locator('button[data-business-action-key="import-bom-xlsx"]:enabled')
+          .waitFor()
+        await page.getByLabel('选择 BOM Excel 文件').setInputFiles({
+          name: 'BOM-MERGED-REMARKS.xlsx',
+          mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          buffer: createBOMImportWorkbookFixture({ mergedNotes: true }),
+        })
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.waitFor({ state: 'visible' })
+        deps.assert.equal(
+          await editor.locator('tr[data-bom-part-index]').count(),
+          2
+        )
+        deps.assert.equal(
+          await editor.getByLabel('加工基础 1', { exact: true }).inputValue(),
+          ''
+        )
+        deps.assert.equal(
+          await editor.getByLabel('加工方式 1', { exact: true }).inputValue(),
+          ''
+        )
+        deps.assert.equal(
+          await editor.getByLabel('备注 1', { exact: true }).inputValue(),
+          '衣片、披肩与腰带按尺寸配套,每端保留缝合位置。'.repeat(3)
+        )
+        deps.assert.equal(
+          await editor.getByLabel('加工基础 2', { exact: true }).inputValue(),
+          '布底贴12g衬'
+        )
+        deps.assert.equal(
+          await editor.getByLabel('加工方式 2', { exact: true }).inputValue(),
+          ''
+        )
+        deps.assert.equal(
+          await editor.getByLabel('备注 2', { exact: true }).inputValue(),
+          '长度61mm,每端留一个孔'
+        )
+        await page.waitForFunction(() =>
+          [...document.querySelectorAll('.erp-bom-parts-table textarea')].every(
+            (node) =>
+              node.scrollHeight <= node.clientHeight + 1 &&
+              node.scrollWidth <= node.clientWidth + 1
+          )
+        )
+        await editor
+          .locator('.erp-bom-material-groups')
+          .screenshot({
+            path: `${deps.outputDir}/bom-xlsx-merged-remarks-expanded.png`,
+          })
+        await closeBusinessFormPage(page, editor)
+      },
+    },
+    {
+      name: 'bom-xlsx-import-material-groups',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: deps.customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      verify: async (page) => {
+        const { assert } = deps
+        await deps.expectHeading(page, '物料清单（BOM）')
+        await page
+          .locator('button[data-business-action-key="import-bom-xlsx"]:enabled')
+          .waitFor()
+        await page.getByLabel('选择 BOM Excel 文件').setInputFiles({
+          name: 'BOM-GROUPED-IMPORT.xlsx',
+          mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          buffer: createBOMImportWorkbookFixture({ grouped: true }),
+        })
+        const editor = page
+          .locator('.erp-business-form-page:not([hidden])')
+          .last()
+        await editor.waitFor({ state: 'visible' })
+        await deps.expectText(page, '已读取 4 条 BOM 明细')
+        const groups = editor.locator('.erp-bom-material-group')
+        assert.equal(await groups.count(), 3)
+        const unresolved = groups.nth(1)
+        const parts = unresolved.locator('tr[data-bom-part-index]')
+        assert.equal(await parts.count(), 2)
+        assert.equal(
+          await unresolved
+            .getByRole('combobox', { name: /^物料名称 / })
+            .count(),
+          1
+        )
+        await unresolved.getByText('尚未建档材料', { exact: true }).waitFor()
+        await unresolved.getByText('SUP-MISSING', { exact: true }).waitFor()
+        await unresolved.getByText('测试规格', { exact: true }).waitFor()
+        assert.equal(
+          await unresolved
+            .getByLabel('加工基础 3', { exact: true })
+            .inputValue(),
+          '贴衬'
+        )
+        assert.equal(
+          await unresolved
+            .getByLabel('加工方式 3', { exact: true })
+            .inputValue(),
+          '激光'
+        )
+        assert.equal(
+          await parts.nth(1).locator('.erp-bom-number-cell').innerText(),
+          '13.580247'
+        )
+        assert.ok((await unresolved.innerText()).includes('总用量：113.580247'))
+        await unresolved.getByLabel('单位用量 3', { exact: true }).fill('0.25')
+        await parts.nth(1).getByText('27.5', { exact: true }).waitFor()
+
+        await unresolved
+          .getByRole('button', { name: '＋ 添加部位', exact: true })
+          .click()
+        assert.equal(await groups.count(), 3)
+        assert.equal(await parts.count(), 3)
+        await parts
+          .last()
+          .getByRole('button', { name: '移除', exact: true })
+          .click()
+        await parts
+          .first()
+          .getByRole('button', { name: '复制', exact: true })
+          .click()
+        assert.equal(await groups.count(), 3)
+        assert.equal(await parts.count(), 3)
+        await parts
+          .nth(1)
+          .getByRole('button', { name: '移除', exact: true })
+          .click()
+        assert.equal(await parts.count(), 2)
+
+        await editor
+          .locator('.erp-bom-material-groups__heading')
+          .scrollIntoViewIfNeeded()
+        await editor.locator('.erp-bom-parts-scroll').evaluate((node) => {
+          node.scrollLeft = 0
+        })
+        const metrics = await editor
+          .locator('.erp-bom-parts-scroll')
+          .evaluate((node) => ({
+            overflow:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+            contained:
+              node.clientWidth <=
+              node.closest('.erp-business-form-page').clientWidth,
+            rowSpan: node.querySelectorAll('tbody')[1].querySelector('td')
+              .rowSpan,
+            overflowX: getComputedStyle(node).overflowX,
+          }))
+        assert.deepEqual(metrics, {
+          overflow: 0,
+          contained: true,
+          rowSpan: 3,
+          overflowX: 'auto',
+        })
+        await page.screenshot({
+          path: `${deps.outputDir}/bom-import-grouped-source.png`,
+          fullPage: true,
+        })
+
+        const materialSelect = unresolved.getByRole('combobox', {
+          name: '物料名称 2',
+          exact: true,
+        })
+        await materialSelect.fill('MAT-STYLE-L1')
+        await materialSelect.press('Enter')
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll('.erp-bom-material-group').length === 2
+        )
+        assert.equal(
+          await groups.first().locator('tr[data-bom-part-index]').count(),
+          3
+        )
+        assert.equal(
+          await editor
+            .locator('[data-bom-import-row-status="unresolved"]')
+            .count(),
+          1
+        )
+        assert.equal(
+          await groups
+            .first()
+            .getByText('SUP-MISSING', { exact: true })
+            .count(),
+          0
+        )
+
+        await groups
+          .first()
+          .locator('.ant-select-clear')
+          .first()
+          .click({ force: true })
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll('.erp-bom-material-group').length === 3
+        )
+        assert.equal(
+          await unresolved.locator('tr[data-bom-part-index]').count(),
+          2
+        )
+        await unresolved.getByText('SUP-MISSING', { exact: true }).waitFor()
+        await unresolved.getByText('测试规格', { exact: true }).waitFor()
+      },
+    },
     {
       ...scenarios[0],
       name: 'bom-page-save-failure-retry',
@@ -296,7 +512,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         deps.assert.equal(await note.inputValue(), 'typingcheck')
         const metrics = await page.evaluate(async () => {
           await new Promise((resolve) => requestAnimationFrame(resolve))
-          const samples = window.__BOM_INPUT_PERFORMANCE__.samples
+          const { samples } = window.__BOM_INPUT_PERFORMANCE__
           return {
             rows: document.querySelectorAll('tr[data-bom-part-index]').length,
             samples,

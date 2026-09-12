@@ -1569,7 +1569,6 @@ export default function V1PurchaseOrdersPage() {
         columns={columns}
         dataSource={orders}
         expandable={purchaseOrderItemsPreview.expandable}
-        scroll={{ x: 1900 }}
         rowSelection={{
           type: 'radio',
           selectedRowKeys,

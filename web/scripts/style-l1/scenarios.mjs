@@ -28,6 +28,9 @@ import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliverySce
 
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
 import { createProductPaginationScenarios } from './productPaginationScenarios.mjs'
+import { createSalesOrderImportScenarios } from './salesOrderImportScenarios.mjs'
+import { createBusinessCellTextScenarios } from './businessCellTextScenarios.mjs'
+import { createBusinessFieldDensityScenarios } from './businessFieldDensityScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
   const {
@@ -309,6 +312,9 @@ export function createStyleL1Scenarios(deps) {
   }
 
   return [
+    ...createBusinessFieldDensityScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createBusinessCellTextScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createSalesOrderImportScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createDevWorkbenchDesktopScenarios({
       assert,
       assertNoHorizontalOverflow,

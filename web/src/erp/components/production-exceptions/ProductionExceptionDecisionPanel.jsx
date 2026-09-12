@@ -421,19 +421,26 @@ export default function ProductionExceptionDecisionPanel({
 
   const columns = useMemo(
     () => [
-      { title: '异常单号', dataIndex: 'decision_no' },
+      { defaultPriority: 10, title: '异常单号', dataIndex: 'decision_no' },
       {
+        defaultPriority: 20,
         title: '异常类型',
         dataIndex: 'decision_type',
         render: (value) => TYPE_LABELS[value] || '生产异常',
       },
-      { title: '申请数量', dataIndex: 'requested_quantity' },
       {
+        defaultPriority: 50,
+        title: '申请数量',
+        dataIndex: 'requested_quantity',
+      },
+      {
+        defaultPriority: 30,
         title: '审批状态',
         dataIndex: 'status',
         render: (value) => <Tag>{STATUS_LABELS[value] || '状态待确认'}</Tag>,
       },
       {
+        defaultPriority: 40,
         title: '业务状态',
         dataIndex: 'execution_status',
         render: (value, record) => (

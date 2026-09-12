@@ -26,7 +26,9 @@ export function groupBOMMaterials(items = []) {
   items.forEach((item, index) => {
     const key = item?.material_id
       ? `${item.material_id}:${item.unit_id || ''}`
-      : `empty-${index}`
+      : item?._material_group_key
+        ? `import:${item._material_group_key}:${item.unit_id || ''}`
+        : `empty-${index}`
     if (!groups.has(key)) {
       groups.set(key, { key, materialID: item?.material_id, indexes: [] })
     }
@@ -50,6 +52,13 @@ export function calculateBOMUsage(quantity, lossRate, productionQuantity) {
       ).toString()
     ) || ''
   )
+}
+
+export function getBOMUsage(item = {}, productionQuantity = '') {
+  const snapshot = numeric20Scale6Units(item.total_usage_snapshot)
+  return snapshot !== null
+    ? numeric20Scale6TextFromUnits(snapshot)
+    : calculateBOMUsage(item.quantity, item.loss_rate, productionQuantity)
 }
 
 export function bomLossRateToPercent(rate) {
