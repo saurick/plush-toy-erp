@@ -14,10 +14,10 @@ BOM、采购和质检的持久化约束错误在 repo 返回边界统一转换�
 
 数据库变更前，必须先读：
 
-- [`AI_DB_WORKFLOW.md`](./AI_DB_WORKFLOW.md)
+- [`../../docs/ent.md`](../../docs/ent.md)
 
 补充说明见：
 
 - `server/docs/ent.md`
 - `server/docs/config.md`
-- `server/docs/observability.md`
+- `docs/observability/日志链路追踪审计第一版.md`

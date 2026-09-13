@@ -16,6 +16,19 @@ test("yoyoosun deployment package passes lint", () => {
   assert(result.checkedFiles >= result.requiredFiles);
 });
 
+test("deployment package lint retains inspection coverage after checklist consolidation", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-package-inspection-lint-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const targetPackage = path.join(root, "deployments/yoyoosun");
+  fs.cpSync(path.join(process.cwd(), "deployments/yoyoosun"), targetPackage, { recursive: true });
+  const runbook = path.join(targetPackage, "runbooks/08-daily-ops.md");
+  fs.writeFileSync(runbook, fs.readFileSync(runbook, "utf8").replace("## 每周", "## 检查"));
+  assert.throws(
+    () => validateDeploymentPackage({ repoRoot: root, customer: "yoyoosun" }),
+    /runbooks\/08-daily-ops\.md missing ## 每周/,
+  );
+});
+
 test("deployment package lint keeps the temporary root redirect", (t) => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-domain-lint-"),

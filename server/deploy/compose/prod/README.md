@@ -16,7 +16,7 @@
 所有精确身份以 [`scripts/deploy/deployment-targets.json`](../../../../scripts/deploy/deployment-targets.json) 为唯一真源，浏览器或命令行不能临时覆盖。
 
 | target              | 业务用途                                         | 公网入口            | Compose project         | 数据库                       | PostgreSQL / API / Web |
-| ------------------- | ------------------------------------------------ | ------------------- | ----------------------- | ---------------------------- | ---------------------- |
+| --- | --- | --- | --- | --- | --- |
 | `demo-133`          | 项目方造数、演练、培训与回归；允许受控重建       | `demo.yoyoosun.net` | `plush-toy-erp-demo-v1` | `plush_erp_demo_v1`          | `55436 / 8325 / 5195`  |
 | `customer-test-133` | 甲方测试与验收；普通部署保留数据，需要时独立重建 | `test.yoyoosun.net` | `plush-toy-erp-test-v1` | `plush_erp_customer_test_v1` | `55437 / 8335 / 5205`  |
 
@@ -220,3 +220,46 @@ node scripts/deploy/attachment-console.mjs --target demo-133
 固定版本的原生界面仍会显示部分新建、上传和删除按钮，`viewer` 的这些请求由服务端返回 `403` 拒绝；当前复用原版界面，不另行维护前端分支。
 
 单独验证界面时运行 `node scripts/qa/attachment-console-integration.mjs`。该入口从正式 Compose 创建一次性存储，测试覆盖文件临时增加浏览器访问所需的随机本机端口和测试网络，正式配置仍无端口发布；验证登录、只读浏览、服务端写入拒绝和退出登录后清理。
+
+
+## 前端静态服务
+
+下列构建命令只在开发机或 CI 执行；目标机加载固定制品。
+
+前端生产镜像使用一个镜像、一个实例启动：运行时固定 `APP_ID=desktop`、`PORT=5175`，桌面后台和岗位任务端都由这一组静态服务承载。岗位任务端访问路径为 `/m/<role>/tasks`，不再启动独立岗位任务端生产容器。
+
+构建镜像：
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
+```
+
+默认命令构建中性产品包。客户私有化前端包必须在本地或 CI 构建时显式传入客户 key，Dockerfile 会把经过审查的 `config/customers/<customer-key>/customer-config.example.js` 覆盖到构建产物的 `customer-config.js`，并且只复制 `public-assets/` 到 `customer-assets/<customer-key>/`。原始表格、工程图和员工信息不会进入公开产物：
+
+```bash
+docker build \
+  --build-arg ERP_CUSTOMER_PACKAGE=yoyoosun \
+  -f web/Dockerfile \
+  -t plush-toy-erp-web:yoyoosun-dev .
+```
+
+本地验证生产入口：
+
+```bash
+cd "$(git rev-parse --show-toplevel)/web"
+pnpm build:all
+APP_ID=desktop PORT=5175 API_ORIGIN=http://127.0.0.1:8300 pnpm serve:prod
+```
+
+生产入口：
+
+| APP_ID | 入口 | 构建产物 | 生产端口 |
+| --- | --- | --- | --- |
+| `desktop` | 桌面后台与 `/m/<role>/tasks` | `build/` | `5175` |
+
+生产静态服务约定：
+
+- `/healthz` 和 `/readyz` 返回当前入口健康状态，供容器健康检查或网关探活。
+- `/rpc` 和 `/templates` 默认反代到 `API_ORIGIN`，Compose 内默认是 `http://app-server:8300`。
+- 默认构建 `VITE_BASE_URL=/`，网关应让前端实例看到根路径流量；如果使用路径前缀且不做前缀剥离，需要先评审构建期 `VITE_BASE_URL`。

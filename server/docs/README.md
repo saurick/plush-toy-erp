@@ -1,40 +1,15 @@
 # server/docs 文档索引
 
-`server/docs` 只保留当前后端真正会用到的专题说明。
+服务端专题按问题进入，启动命令与分层总览见 [后端入口](../README.md)。
 
-## 建议阅读顺序
+| 问题 | 入口 |
+| --- | --- |
+| 启动、端口、HTTP、健康检查与来源任务修复 | [服务运行](runtime.md) |
+| 环境字段、管理员初始化与配置来源 | [配置说明](config.md) |
+| JSON-RPC 方法、领域状态、权限与幂等 | [API 合同](api.md) |
+| 日志、Trace、控制面与业务审计 | [日志、审计与 Trace](../../docs/observability/日志链路追踪审计第一版.md) |
+| Ent / Atlas 生成、迁移、回执和恢复 | [模型与迁移](ent.md) |
+| 应用表、字段、约束、生命周期与写入归属 | [生成的数据字典](database/README.md) |
+| 固定制品、目标迁移与运行检查 | [部署入口](../deploy/README.md) |
 
-1. `server/README.md`
-2. `server/docs/runtime.md`
-3. `server/docs/config.md`
-4. `server/docs/api.md`
-5. `server/docs/observability.md`
-6. `server/docs/ent.md`
-7. `server/docs/database/README.md`
-
-## 文档说明
-
-- `runtime.md`
-  - 服务如何启动
-  - 默认端口、静态资源和健康检查
-- `config.md`
-  - `server/configs/*/config.yaml` 字段说明
-  - 需要尽快替换的默认占位
-- `api.md`
-  - 当前保留的 JSON-RPC 入口
-  - 鉴权边界和后台账号能力
-- `observability.md`
-  - 日志、trace、健康检查基线
-- `ent.md`
-  - Ent + Atlas 数据模型和迁移工作流
-- `database/README.md`
-  - 当前 74 张 Product Core 应用表的分域数据字典入口
-  - 字段、主外键、显式索引、CHECK、用途、生命周期和写入边界的生成投影
-  - Atlas 内部 revision 表、目标库 apply 与 PostgreSQL `COMMENT` 的明确边界
-
-## 相关入口
-
-- 服务端总览：`server/README.md`
-- Compose 部署：`server/deploy/README.md`
-- 数据库工作流：`server/internal/data/AI_DB_WORKFLOW.md`
-- 数据库表数据字典：`server/docs/database/README.md`
+数据字典是 schema 与语义 catalog 的生成投影；表数量、字段与约束由生成器给出，目标是否已 apply 另取运行证据。

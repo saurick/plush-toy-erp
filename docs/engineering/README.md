@@ -1,31 +1,13 @@
 # 工程效能与交付自动化 / Engineering Enablement
 
-本目录维护研发反馈、CI、不可变制品、测试环境发布、回滚和本地研发效能工作台之间的长期边界。
+本目录维护本地工作台、CI、不可变制品与目标交付之间的职责和证据边界。阅读入口如下：
 
-它不记录产品业务能力，也不把本地绿色、GitLab pipeline 绿色、GitHub 镜像状态、133 技术发布或客户 UAT 混成同一种完成状态。
+| 任务 | 入口 |
+| --- | --- |
+| 理解 CI / 发布架构和完成标准 | [工作台与 CI/CD 设计](研发效能工作台与CI-CD设计.md)、[验收证据](研发效能工作台与CI-CD设计.md#验收证据-acceptance-evidence) |
+| 查看 DEV 页面与受控操作边界 | [本地开发入口](研发效能工作台与CI-CD设计.md#本地开发入口-dev-only-surfaces) |
+| 选择验证与执行脚本 | [测试策略](../product/自动化测试策略.md)、[QA 脚本](../../scripts/qa/README.md) |
+| 安装 GitLab / Runner、备份和恢复 | [GitLab 运维](../../server/deploy/gitlab/README.md) |
+| 发布与目标运行 | [部署约定](../部署约定.md)、[部署脚本](../../scripts/deploy/README.md) |
 
-## 阅读顺序
-
-1. [研发效能工作台与 CI/CD 设计](研发效能工作台与CI-CD设计.md)：长期架构、身份模型、安全边界和维护原则。
-2. [研发效能工作台与 CI/CD 实施计划](研发效能工作台与CI-CD实施计划.md)：当前实施切片、验收、阻塞和停止条件。
-3. [自动化测试策略](../product/自动化测试策略.md)：验证范围（内部键 T0–T8）与最小充分验证。
-4. [部署约定](../部署约定.md)：目标机、迁移、发布证据和回滚边界。
-5. [QA 脚本说明](../../scripts/qa/README.md) 与 [部署脚本说明](../../scripts/deploy/README.md)：真实执行入口。
-
-## 目录职责
-
-- 设计文档维护长期不随一次实现变化的职责边界。
-- 实施计划只记录当前阶段、待办、验收和阻塞；实施完成后归档到 `docs/archive/engineering/`。
-- `scripts/qa/` 是质量执行真源，`scripts/deploy/` 是制品、部署和回滚执行真源。
-- `.gitlab-ci.yml` 是 canonical CI/CD 编排；`.github/workflows/` 只做镜像审查与显式应急，不复制脚本实现。
-- `/__dev` 工作台只提供本地控制面，不进入生产构建，也不成为新的 QA 或部署真源。
-
-## 更新规则
-
-新增、删除、重命名本目录长期文档时，同步：
-
-- `docs/README.md`
-- `docs/文档清单.md`
-- 本 README
-
-只有正文细节变化、文件职责和路径不变时，不机械更新全量文档清单。
+`.gitlab-ci.yml` 是 canonical CI/CD 编排，GitHub 只接收只读镜像并保留显式应急保护壳；DEV 工作台只投影正式脚本与 Provider 证据，不进入生产构建。当前 SHA、pipeline、Runner、备份和目标状态使用实时读回，不再维护独立的实施勾选表。

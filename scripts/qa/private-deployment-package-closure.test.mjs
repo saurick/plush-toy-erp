@@ -22,11 +22,7 @@ test("private-deployment template report proves boundaries without claiming deli
   assert.equal(result.report.finalDecision.releaseEvidencePresent, false);
   assert.equal(result.report.finalDecision.customerAccepted, false);
   assert(result.report.packageChecklist.packageRoots.includes("docs/customers/<customer-key>/"));
-  assert.deepEqual(result.report.packageChecklist.customerDocs, [
-    "README.md",
-    "差异与边界.md",
-    "实施测试部署验收.md",
-  ]);
+  assert.deepEqual(result.report.packageChecklist.customerDocs, ["README.md"]);
   assert.deepEqual(result.report.packageChecklist.customerConfigFiles, [
     "README.md",
     "customerPackage.mjs",

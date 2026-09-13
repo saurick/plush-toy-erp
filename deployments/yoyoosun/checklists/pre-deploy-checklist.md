@@ -30,7 +30,7 @@
 - [ ] Docker / Compose 可用。
 - [ ] `/usr/local/bin/atlas` 可用。
 - [ ] `MIGRATION_LOCK_FILE` 使用专用私有绝对路径，不在 `/tmp` / `/var/tmp` / `/dev/shm`。
-- [ ] PostgreSQL 数据目录、本地备份目录和异地备份挂载存在；业务附件随数据库备份。
+- [ ] PostgreSQL 数据目录、本地备份目录和异地备份挂载存在；S3 附件备份与同一停写窗口的 PG dump 成套验证。
 - [ ] 磁盘空间充足。
 - [ ] 不在目标服务器执行构建命令。
 - [ ] 旧镜像回滚信息已记录。

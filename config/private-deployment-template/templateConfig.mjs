@@ -33,11 +33,7 @@ export const privateDeploymentPackageTemplate = Object.freeze({
     "config/customers/<customer-key>/",
     "deployments/<customer-key>/",
   ]),
-  requiredCustomerDocs: Object.freeze([
-    "README.md",
-    "差异与边界.md",
-    "实施测试部署验收.md",
-  ]),
+  requiredCustomerDocs: Object.freeze(["README.md"]),
   requiredCustomerConfigFiles: Object.freeze([
     "README.md",
     "customerPackage.mjs",

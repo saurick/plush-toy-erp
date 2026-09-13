@@ -3,11 +3,14 @@
 ## 备份范围
 
 | 范围                    | 说明                                                                          | 是否提交到 Git          |
-| ----------------------- | ----------------------------------------------------------------------------- | ----------------------- |
-| PostgreSQL              | 业务数据库；当前业务附件正文也存于 `business_attachments.content`，随整库备份 | 否                      |
+| --- | --- | --- |
+| PostgreSQL | 业务数据库和附件元数据；使用 custom-format dump | 否 |
+| S3 业务附件 | 同一停写窗口用 `attachment-storage backup` 导出的文件与 manifest，绑定配套 PG dump | 否 |
 | 受控 `.env` 指纹        | 只记录 hash，不记录明文                                                       | 可记录 hash             |
 | release evidence        | 发布审计资料                                                                  | 可入库，必须脱敏        |
 | import / dry-run report | 导入报告摘要                                                                  | 可入库，不能含 raw rows |
+
+运行存储、工具参数和新 bucket 恢复步骤以 [附件备份与恢复合同](../../../server/deploy/compose/prod/README.md#附件存储与raid5) 为准。PG dump、文件备份、release / migration 身份必须成套保存；不能直接打包运行中的 SeaweedFS 数据目录。
 
 ## 备份频率
 
@@ -16,16 +19,16 @@
 - 真实导入 apply 前：必须备份；当前 yoyoosun 真实导入未开放。
 - 日常目标：每日整库备份到本地受控目录，通过 `age` 加密后复制到独立挂载的异地目录，保留 35 天；每周从异地加密副本做一次临时库真实恢复。
 
-仓库已提供 `scripts/deploy/scheduled-postgres-backup.sh`、`scripts/deploy/verify-scheduled-postgres-backup.sh` 和 [`systemd` 安装模板](../systemd/README.md)。只有目标机已安装 timer、手工首跑通过、异地副本读回且恢复报告为 `passed`，才可宣称日常备份已启用；本地代码存在不等于目标机已安装。
+仓库已提供 `scripts/deploy/scheduled-postgres-backup.sh`、`scripts/deploy/verify-scheduled-postgres-backup.sh` 和 [`systemd` 安装模板](../systemd/README.md)。只有目标机已安装 timer、手工首跑通过、异地副本读回且恢复报告为 `passed`，才可宣称日常备份已启用；本地代码存在不等于目标机已安装。这组定时脚本只备份 PostgreSQL；附件外置后的完整系统备份还需要配套文件备份及恢复验证。
 
 ## 备份步骤
 
 1. 确认数据库、本地备份目录、独立异地挂载目录和 `age` recipient；异地目录已按 systemd 安装说明写入固定挂载标记，且与本地目录不在同一文件系统。
-2. 使用只读 `erp_backup` 生成数据库备份到受控备份目录。
-3. 计算本地 dump 的 hash、大小和时间。
+2. 停止相关业务写入，使用只读 `erp_backup` 生成数据库备份，并按附件合同执行 `backup`；成功写出 manifest 后才结束该备份窗口。
+3. 计算本地 dump 的 hash、大小和时间，并记录附件备份 manifest、数量、字节和校验结果。
 4. 使用 `age` 公钥加密异地副本，并计算加密文件 hash；identity 不与异地副本同存。
 5. 记录 backup evidence，不记录下载链接或 secret。
-6. 定期抽样恢复到测试库。
+6. 在隔离目标恢复配套 PG dump 和附件备份，再逐对象 `verify`；PG 定时恢复报告只证明数据库这一部分。
 
 本地 / 试用前最小恢复演练入口：
 
@@ -48,7 +51,7 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 1. 选择 backup id，并确认 hash。
 2. 准备隔离恢复环境或明确恢复窗口。
 3. 恢复数据库。
-4. 业务附件随 PostgreSQL 一起恢复；当前没有独立运行时附件目录。
+4. 按附件合同向新的 S3 endpoint / bucket 执行 `restore` 和 `verify`，核对配套 PG 元数据、原 key、附件 ID、大小与 SHA-256；旧对象和备份保留到回滚窗口结束。
 5. 记录恢复后的 migrationBefore。
 6. 在隔离库执行 populated upgrade read-only audit；发现 blocker 时停止，不执行 apply。
 7. 执行 customer config cutover read-only audit；发现遗留流程实例或任务配置 revision 锚点时停止，由人工治理，不执行自动 DML。
@@ -61,7 +64,7 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 
 恢复演练报告必须至少记录：
 
-- `backupId`、备份大小和 hash。
+- `backupId`、备份大小和 hash，以及配套附件 manifest / 校验结果；数据库恢复通过不能代替附件恢复。
 - `restoreTarget` alias，不记录完整 DSN。
 - `command-summary.txt` 的 backup、release、source、restore target 和脱敏执行步骤。
 - `restoreTestStatus`、`restoreMigrationVersion`、`populatedUpgradeAuditStatus`、`customerConfigCutoverAuditStatus` 和 `smokeQueryStatus`。
@@ -71,8 +74,8 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 ## RPO / RTO
 
 | 指标 | 当前建议                                                                                                                          |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------- |
-| RPO  | 发布 / migration 前为 0；日常名义周期为 24 小时，恢复检查按 36 小时 freshness 上限阻断，实际值以目标 timer 和最新成功备份时间为准 |
+| --- | --- |
+| RPO | 发布 / migration 前在停写窗口保存配套 PG 与附件备份；PG 日常名义周期为 24 小时，36 小时 freshness 只约束 PG 定时检查。系统实际 RPO 以两者共同且已验证的恢复点为准。 |
 | RTO  | 先以单机恢复演练结果为准，未演练前不得承诺固定时长                                                                                |
 
 ## 禁止

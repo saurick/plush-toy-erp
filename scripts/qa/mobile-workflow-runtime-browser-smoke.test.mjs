@@ -1058,13 +1058,13 @@ test("mobile workflow runtime browser smoke docs keep no-write and report bounda
     path.join(repoRoot, "web/README.md"),
     "utf8",
   );
+  assert.match(webReadme, /scripts\/qa\/README\.md/u, "web README must route detailed smoke instructions to QA");
   const testStrategyDoc = await readFile(
     path.join(repoRoot, "docs/product/自动化测试策略.md"),
     "utf8",
   );
   for (const [source, context] of [
     [scriptReadme, "QA scripts README"],
-    [webReadme, "web README"],
     [testStrategyDoc, "automation test strategy"],
   ]) {
     assert.match(
@@ -1124,11 +1124,6 @@ test("mobile workflow runtime browser smoke docs keep no-write and report bounda
     /只写本地 \/ 试用模拟 Workflow 证据，不绑定正式领域命令，不导入真实客户数据，也不写库存、采购、质检或财务事实/u,
   );
   assert.match(scriptReadme, /external-base-url-not-yoyoosun-entry/u);
-  assert.match(
-    webReadme,
-    /该回归只覆盖本地 \/ 试用模拟 Workflow 证据，不代表真实客户导入、生产写入或 Fact 落账/u,
-  );
-  assert.match(webReadme, /external-base-url-not-yoyoosun-entry/u);
   assert.match(
     testStrategyDoc,
     /报告只写本地脱敏结果，包含模拟任务计划 coverage 摘要和未证明项，不保存密码、token、Authorization header、raw customer package 或 action 列表，也不进入 release evidence/u,

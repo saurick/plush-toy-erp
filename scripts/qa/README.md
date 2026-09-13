@@ -12,80 +12,80 @@
 
 ## 常用入口
 
-| 入口                                                                                                                                | 用途                                                                                                                                                                                                                                                                                                                                                                           | 建议时机                                            |
-| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| `bash scripts/qa/affected.sh --plan`                                                                                                | 读取当前工作树、staged、指定 base 或显式文件，按验证范围（内部键 T0-T8）和受影响领域输出最小必要测试；默认只计划，未知路径保守升级为 `full.sh`                                                                                                                                                                                                                                 | 开发过程中、准备验证前                              |
-| `bash scripts/qa/affected.sh --run`                                                                                                 | 执行 affected 选出的安全本地命令并记录逐项耗时；页面级浏览器回归（Style L1）、`make data` 和目标环境证据仍作为 required follow-up 单列                                                                                                                                                                                                                                         | 完成一个可验证切片后                                |
-| `node --test scripts/qa/dev-page-governance.test.mjs`                                                                               | 检查 DEV 菜单 route 唯一且留在 `/__dev`，普通页面由单一模块登记 affected 桌面渲染/溢出 smoke，专属页面保留各自唯一桌面场景；full/strict 默认不运行 DEV 视觉场景，且不登记 DEV 移动端、暗色、成功截图、固定密度或通用键盘合同                                                                                                                                                   | 新增菜单、页面或修改工作台可见内容时                |
-| `node --test scripts/qa/dev-quality-gate-provider-boundary.test.mjs`                                                                | 检查质量工作台直接投影服务器 provider 返回的 CI Job，并只用正式流水线与终态门禁判定结果；前端不保存需随 Job 增删改名同步的第二份拓扑                                                                                                                                                                                                                                           | 修改 GitLab CI 证据 provider、质量工作台或 Job 编排时 |
-| `node --test scripts/qa/ci-job-guide.test.mjs`                                                                                      | 校验每个正式 push-CI Job 都有一份简短用途说明；说明源不保存依赖、状态、耗时、等待或历史，未知 Job 只标记“说明待登记”并继续投影                                                                                                                                                                                                                                                 | 新增、删除、改名或拆分 GitLab CI Job 时             |
-| `bash scripts/qa/fast.sh`                                                                                                           | 高频快速检查，只运行显式 `fast` Node 测试组，并覆盖文档清单、客户配置、菜单、Web 静态检查和 server quick；阶段编号只由 affected 扫描本次变更文件                                                                                                                                                                                                                               | 日常开发后                                          |
-| `node scripts/qa/yoyoosun-role-jsonrpc-access.mjs --report output/qa/yoyoosun-role-jsonrpc-access/report.json`                      | 使用九岗位演示账号真实登录，逐岗验证允许读取、越权写入被拒绝和前后任务总量不串权；凭据只从服务端进程环境读取，预期业务写入为零，不等于完整角色协同闭环                                                                                                                                                                                                                         | 本地后端与演示账号凭据就绪后                        |
-| `bash scripts/qa/prepare-push.sh`                                                                                                   | 默认仅对单一 `origin/main` 签发 30 分钟 `server-ci` 回执：复算 affected 风险，但本地只运行 remote/ref/range、git-log、严格 secrets 与源码完整性短门禁；高成本测试/构建由 GitLab exact-SHA CI 执行。非标准目标保持 affected/full 保守合同                                                                                                                                         | commit 后、立即 push 前                             |
-| `bash scripts/qa/prepare-push.sh --full`                                                                                            | 经明确授权的本地完整诊断；完整执行 full，并在前后身份和容器清理读回一致后签发短期回执，不作为默认 `origin/main` 的前置步骤                                                                                                                                                                                                                                                     | full 已明确确认、需要独立本地诊断时                 |
-| `node scripts/qa/skill-health.mjs`                                                                                                  | 检查项目 Skill frontmatter、目录名、metadata、README 索引和相对引用；`affected` 对 Skill 变更会直接执行，不再只提示 follow-up                                                                                                                                                                                                                                                  | 修改 `.agents/skills/**` 后                         |
-| `node scripts/qa/erp-field-linkage.mjs`                                                                                             | 运行字段联动专项，前后绑定同一仓库指纹，并把脱敏结构化证据写入 `output/qa/coverage/field-linkage.latest.json`；只证明该专项，不代表整仓覆盖                                                                                                                                                                                                                                    | 修改字段来源、映射、回显或打印链路后                |
-| `node scripts/qa/test-coverage-collect.mjs --profile baseline --write`                                                              | 在同一仓库身份下运行非数据库 baseline，采集 Go / Web 代码覆盖、显式业务场景、字段联动、导入合同和受影响验证范围（内部键 T0-T8），再原子写入证据并聚合 latest；运行期身份变化即失败                                                                                                                                                                                             | 刷新开发工作台真实覆盖证据前                        |
-| `node scripts/qa/test-coverage-report.mjs --write`                                                                                  | 聚合当前 commit / worktree 指纹、真实代码覆盖制品、业务场景、验证范围（内部键 T0-T8）与验收状态到 `output/qa/coverage/latest.json`；缺制品写 `missing`，不自动运行全量测试                                                                                                                                                                                                     | 刷新开发工作台覆盖状态前                            |
-| `bash scripts/qa/strict.sh`                                                                                                         | full 的真实覆盖超集：先运行独有 shell / YAML 检查，再以 strict profile 单次运行 full；扩展视口、零 warning 和严格 govulncheck 各执行一次；各阶段输出统一耗时标记                                                                                                                                                                                                               | 发版前 / 大改后                                     |
-| `bash scripts/qa/full.sh`                                                                                                           | 完整本地检查；一次运行五个显式 Node 测试组，不复跑会由 Web / server 全集覆盖的 fast 子集；资源敏感发布合同在 shared / Web / server 汇合后单独执行；另含 secrets、Chromium、根入口浏览器 smoke、存量升级、当前 schema PostgreSQL、前后端测试 / 构建和 govulncheck；DEV 页面与共享布局桌面 smoke 由 affected 选择，不进入默认场景集                                              | 独立完整诊断、prepare-push 或 strict 内部           |
-| `node scripts/qa/run-gate-with-receipt.mjs --gate <full\|strict>`                                                                   | 执行正式门禁并写入同一脱敏回执；passed 必须具备完整阶段耗时、非零测试、零失败、零 skip 和运行前后仓库身份一致，工作台据此展示总耗时与瓶颈                                                                                                                                                                                                                                      | 需要可核验效能证据时                                |
-| `node scripts/qa/run-gate-with-managed-database.mjs --exact-sha <40sha> --main-ref HEAD --operation-id <uuid>`                      | 本地 clean 候选的唯一受管 exact-SHA 入口；复用固定 `postgres:18.1`、随机凭据、loopback 动态端口和精确 cleanup，再以无 shell 的固定参数执行 `exact-sha-gate.mjs`；DSN 只进入子进程环境，终态仍以 exact-SHA gate 为唯一真源                                                                                                                                                      | 需要独立本地受管诊断时                              |
-| `run-gate-with-managed-database.mjs`                                                                                                | 质量门禁页面的 full / strict 内部包装器；固定使用本机 `postgres:18.1`，为每次 operation 生成随机凭据和 loopback 动态端口，执行原正式 runner 后按精确 label 删除容器并读回零残留；不接受浏览器提供命令、DSN、镜像或凭据                                                                                                                                                         | DEV 页面未显式登记本机数据库 base 时                |
-| `node scripts/qa/exact-sha-gate.mjs --sha <40sha> [--run]`                                                                          | 绑定 clean SHA、strict profile、锁文件和门禁实现形成 fingerprint；已有同 fingerprint 终态时复用，不自动新开 lifecycle                                                                                                                                                                                                                                                          | 不可变 Release workflow                             |
-| `node scripts/qa/ci-quality-shard.mjs --shard <name>`                                                                               | 只在 protected main 的 GitLab 上生成七类固定外部 strict 分片之一；Node 类聚合内部 `core / release_preflight_a / release_preflight_b / release_a / release_b / release_c`，resource-sensitive 类聚合内部 `contract_a / contract_b / runtime_a / runtime_b`，两者对外仍各自只保留一个规范回执；所有回执继续绑定同一 plan/range/exact SHA，并保留资源清理读回                | GitLab main 普通 CI；不提供本地通用入口             |
-| `node scripts/qa/pnpm-audit-retry.mjs`                                                                                              | 对 npm 官方接口执行固定的 production/high pnpm 审计；首次强制直连，只对网络、429 和 5xx 瞬态错误重试一次，若环境已配置代理则仅第二次使用该代理；单次 100 秒、总计 205 秒封顶，合法漏洞报告不重试，高危或严重漏洞立即阻断，错误只输出有界脱敏诊断                                                                                                                               | GitLab security 分片内部；可作本地只读诊断          |
-| `node scripts/qa/ci-quality-aggregate.mjs`                                                                                          | 精确聚合七个分片、可信 plan 与资源清理证据，签发标准 v3 exact-SHA strict terminal 和可上传的 CI evidence manifest；缺任一分片、分类执行数或身份均失败关闭                                                                                                                                                                                                                      | GitLab main 普通 CI 聚合；不证明 Release 或目标部署 |
-| `node scripts/qa/candidate-sha-freeze.mjs --sha <40sha> --terminal <strict-terminal.json>`                                          | 在已通过 strict 的 clean exact HEAD 上固定执行复用/失败/公网读回/DEV 隔离合同，以及版本中心桌面真实浏览器 smoke；生成单一候选冻结回执，不建立 DEV 移动端或暗色验收承诺，也不替代远端 CI、Release 或 133 发布                                                                                                                                                                   | 最终候选第一次正式 push 前                          |
-| `node scripts/qa/output-retention-preview.mjs --protect-sha <40sha> --out output/dev-workbench/retention/previews/<name>.json`      | 对登记的 managed output 生成数量与 5GiB 容量预算预览，保护最新状态、operation 引用和显式 SHA；无 `--apply`，不删除文件                                                                                                                                                                                                                                                         | 定期检查本地证据膨胀                                |
-| `node scripts/qa/database-inventory.mjs --out <report.json>`                                                                        | 从环境中的固定数据库 URL 只读盘点同服务器项目库、连接数、migration、仓库引用和 disposable 分类；不授权删除                                                                                                                                                                                                                                                                     | 发布演练前后或发现临时库堆积时                      |
-| `node scripts/qa/database-archive.mjs --database-name <name> --out <dir>`                                                           | 只接受已登记 disposable 库且要求零连接；生成归档并在临时 restore 库核对 migration、schema 与逐表计数，最后删除 restore 库并读回零残留                                                                                                                                                                                                                                          | 清理候选库取得可恢复证据时                          |
-| `node scripts/qa/database-cleanup.mjs --database-name <name> --inventory <report> --manifest <manifest> --print-confirmation`       | 从同一 inventory 与 archive manifest 生成精确确认串；正式 cleanup 还需通过环境提供 admin URL、传入确认串和输出报告，成功后读回源库已不存在。登记 133 仅在三个命令均显式加 `--allow-registered-development` 时开放；长期或未分类库始终拒绝                                                                                                                                      | archive / restore 已通过后清理同一 disposable 库    |
-| `sh scripts/qa/populated-upgrade-preflight.sh --audit <populated-upgrade\|customer-config-cutover\|database-constraints> ...`       | 对指定数据库运行固定 allowlist 的 migration 只读审计；不执行 migration 或自动数据治理                                                                                                                                                                                                                                                                                          | 跨越存量升级、客户配置切换或关键约束收紧前          |
-| `.gitlab-ci.yml`                                                                                                                    | canonical `plan → prepare → 七类外部证据 DAG → aggregate → CI Gate`；Node 与 resource-sensitive 分别在内部按真实资源边界 fan-in，并保留每条 lane 的时间窗，对外仍只有七类规范回执；MR 保留 affected，main 普通 CI 签发可复用 exact-SHA 证据，受保护 release 不重跑 strict，同 SHA 只构建一次候选制品并冻结演练回执后登记 GitLab Package/Release                                | GitLab main、merge request、受保护 release          |
-| `.github/workflows/release.yml`                                                                                                     | GitHub 应急发布保护壳；在 canonical v2 七资产与同一演练回执完整接入前，于 checkout、登录、构建或上传前固定失败关闭，禁止六资产部分发布                                                                                                                                                                                                                                         | 应急发布合同回归                                    |
-| `node scripts/qa/docs-inventory.test.mjs`                                                                                           | 检查当前维护 Markdown 是否登记到 `docs/文档清单.md`                                                                                                                                                                                                                                                                                                                            | 新增、删除、重命名 README 或长期文档后              |
-| `node --test scripts/qa/schema-docs.test.mjs`                                                                                       | 校验 Ent generated migration descriptor、业务语义 catalog 与 8 份生成数据字典零漂移；不连接数据库                                                                                                                                                                                                                                                                         | 调整 schema、catalog、生成器或数据库文档后          |
-| `node --test scripts/qa/dev-entry-boundary.test.mjs`                                                                                | 锁住 `make dev_restart`先预检再停服、启动预检只读，以及 Product Core / 客户开发入口共用同一 web preflight                                                                                                                                                                                                                                                                      | 调整本地启动命令、Vite 代理或 migration 预检后      |
-| `node scripts/qa/customer-package-lint.mjs --all`                                                                                   | 从构建期客户索引校验 demo、reference-customer 和 yoyoosun raw package；不 publish/activate                                                                                                                                                                                                                                                                                     | 调整客户包、catalog 或 schema 后                    |
-| `node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview`                                                         | 以 preview 模式编译并验证全部登记 draft 客户包的不可发布 manifest；不调用后端或写事实                                                                                                                                                                                                                                                                                          | 调整 manifest compiler/effective-session 输入后     |
-| `node scripts/qa/private-deployment-boundaries.mjs`                                                                                 | 检查三份客户文档、三份配置和最小部署参数边界，并禁止 reference 部署目录                                                                                                                                                                                                                                                                                                        | 调整私有化模板或 reference 文档后                   |
-| `node scripts/qa/phase-label-boundaries.mjs` + `node --test scripts/qa/phase-label-boundaries.test.mjs`                             | 全仓扫描活跃代码、脚本和正式文档中的编号阶段命名，并验证完整 Phase 编号、P 子阶段编号和 P 编号发布目标会被拒绝；P0/P1 风险等级、p95 百分位和产品编码不受影响                                                                                                                                                                                                                   | 改脚本、API、命名或治理文档后                       |
-| `node scripts/qa/experimental/canonical-runtime-audit.mjs`                                                                          | 非阻断实验审计；宽泛 keyword 命中只作只读复核线索，不进入 fast / affected，不代表产品缺陷或发布证据；恢复阻断前必须改成逐域 status key / API field / function / runtime branch 精确合同                                                                                                                                                                                        | 需要人工盘点历史词命中时                            |
-| `node scripts/qa/test-data-isolation-boundary.mjs --json`                                                                           | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力                                                                                                                                                                                                                                                                            | 改 seed、fixture、模拟数据或导入准备工具后          |
-| `node scripts/qa/manual-acceptance-catalog.mjs`                                                                                     | 生成 51 项只读基线验收目录，覆盖登录入口、30 个电脑业务页、九岗位任务端、打印预览与打印工作台；默认只输出、不连接后端                                                                                                                                                                                                                                                          | 准备全页面试用验收范围时                            |
-| `node scripts/qa/local-acceptance-lifecycle.mjs --commit <sha> --run-id <run>`                                                      | 默认输出本地统一生命周期 plan；显式 `--execute` 后在两个按批隔离库串行完成 migration、九岗位数据、51 项只读浏览器与三条真实写异常流，并在成功或失败后停服、删库和读回残留                                                                                                                                                                                                      | 对 clean exact SHA 做本地完整技术验收时             |
-| `node scripts/qa/scenario-demo-data.mjs`                                                                                            | 默认只读输出固定 V6 长期数据计划；本地开发与 `customer-trial-133` 复用同一 canonical 业务语义和九阶段 runner，但数据库、release、migration、客户配置、账号命名、attestation 与回执独立。133 的密码值由固定公开测试凭据合同约束，不构成数据共库。精确 plan digest 和确认串匹配后才通过正式 API exact-create-or-readback；不清理、不重置，不把查询读回写成人工验收或真实客户导入 | 需要为本地或 133 长期保留固定业务场景数据时         |
-| `node --test scripts/qa/customer-trial-133-data.test.mjs`                                                                           | 锁住 133 数据写入前的新回滚点：固定目标 SSH 脚本使用 `erp_backup` 只读角色，复核 exact release / database / migration，完成 custom dump、`pg_restore --list`、SHA-256、原子落盘和脱敏回执；不接受浏览器主机、路径、DSN 或命令输入                                                                                                                                              | 调整 133 数据准备或备份回执合同后                   |
-| `node scripts/qa/manual-acceptance-dataset.mjs`                                                                                     | 默认生成 local 与 133 同语义计划；显式 `--apply --target` 后由唯一串行 runner 调用同一组正式 API 入口并校验严格阶段回执                                                                                                                                                                                                                                                        | 准备或重放双环境全页面模拟数据时                    |
-| `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version 2026.08.15-v6 --run-id 20260815-V6 --json`     | 生成带稳定批次前缀的客户、供应商、产品规格、材料、加工环节及销售 / 采购 / 委外 / BOM 源数据计划；默认只读                                                                                                                                                                                                                                                                      | 写入模拟源数据前确认数量、状态和边界时              |
-| `node scripts/qa/manual-acceptance-account-scenarios.mjs --json`                                                                    | 生成停用、多岗位和无业务入口三种补充账号计划；在已完成首个管理员 bootstrap 的 fresh 本地 / 133 验收库中，创建或精确核对十个正式岗位账号，再调和三类场景账号                                                                                                                                                                                                                    | 核对登录与入口异常场景前                            |
-| `node scripts/qa/manual-acceptance-task-data.mjs --source-report <report> --data-version 2026.08.15-v6 --run-id 20260815-V6`        | 生成九岗位各 20 条、共 180 条仅供列表 / 办理交互的模拟任务；apply 时另从同批 source report 选择 5 张模拟销售订单，走正式 ProcessRuntime 路径形成已启动、待办、阻塞、退回和完成证据。整批仍为 `simulatedOnly`，不代表真实客户数据或 UAT                                                                                                                                         | 准备岗位任务端数据与流程位置证据前                  |
-| `node scripts/qa/manual-acceptance-fact-data.mjs --source-report <report> --data-version 2026.08.15-v6 --run-id 20260815-V6 --json` | 复用已核验源数据，按正式来源驱动 API 统一准备采购、质检、库存、生产、出货和财务事实；默认只读                                                                                                                                                                                                                                                                                  | 写入模拟业务事实前                                  |
-| `node scripts/qa/manual-acceptance-readiness.mjs`                                                                                   | 生成 51 项只读就绪核验计划，并校验每页只引用共享 role / source / task / facts / catalog 阶段；显式 `--verify --backend-url` 才查询运行数据                                                                                                                                                                                                                                     | 写入后核对页面数据是否达到手工验收门槛时            |
-| `node scripts/qa/manual-acceptance-browser.mjs --plan --base-url <local-url> --backend-url <local-url>`                             | 生成 51 项本机浏览器验收计划；真实模式只登录、逐页读取和切换只读任务页签，列表及两个数据看板都必须取得当前页面数据证据，不点击业务写动作                                                                                                                                                                                                                                       | 核对真实账号、页面、岗位端和打印入口时              |
-| `node scripts/qa/exception-flow-real-write-browser.mjs ...`                                                                         | 仅在显式确认的全新本地 `browser_actions` 隔离库中，用真实 Chromium 和真实后端办理 Finance Payment、Inventory Adjustment、Production OVER_ISSUE 三条业务写链；它补充 51 项只读页面检查中的真实写动作证据，不是长期场景数据来源或客户 UAT                                                                                                                                        | 异常流主路径完成 API / 单元验证后的本地写验收       |
-| `node scripts/qa/manual-acceptance-source-retire.mjs --data-version 2026.08.15-v6 --run-id 20260815-V6`                             | 默认 dry-run，预览无活动流程阻断的源单取消 / 归档与主数据停用；不处理 active / blocked ProcessRuntime、已过账事实或物理删除。上一固定 V5 批次的流程位置证据要完整清理时必须重建专用验收库                                                                                                                                                                                      | 无流程阻断的旧批次退出前                            |
-| `node scripts/qa/customer-config-effective-session-probe.mjs --json`                                                                | 无 Authorization 探测本地 `customer_config.get_effective_session`，确认后端可达和 `40302 未登录` 边界                                                                                                                                                                                                                                                                          | yoyoosun 静态入口已命中、但还没有真实登录证据时     |
-| `node --test scripts/qa/customer-package-preview-boundary.test.mjs`                                                                 | 锁住客户配置包 businessFlows / stateMachines / processPolicies 仍为 preview-only，不写 Fact、不覆盖 usecase 生命周期                                                                                                                                                                                                                                                           | 调整客户包流程、状态机或策略预览后                  |
+| 入口 | 用途 | 建议时机 |
+| --- | --- | --- |
+| `bash scripts/qa/affected.sh --plan` | 读取当前工作树、staged、指定 base 或显式文件，按验证范围（内部键 T0-T8）和受影响领域输出最小必要测试；默认只计划，未知路径保守升级为 `full.sh` | 开发过程中、准备验证前 |
+| `bash scripts/qa/affected.sh --run` | 执行 affected 选出的安全本地命令并记录逐项耗时；页面级浏览器回归（Style L1）、`make data` 和目标环境证据仍作为 required follow-up 单列 | 完成一个可验证切片后 |
+| `node --test scripts/qa/dev-page-governance.test.mjs` | 检查 DEV 菜单 route 唯一且留在 `/__dev`，普通页面由单一模块登记 affected 桌面渲染/溢出 smoke，专属页面保留各自唯一桌面场景；full/strict 默认不运行 DEV 视觉场景，且不登记 DEV 移动端、暗色、成功截图、固定密度或通用键盘合同 | 新增菜单、页面或修改工作台可见内容时 |
+| `node --test scripts/qa/dev-quality-gate-provider-boundary.test.mjs` | 检查质量工作台直接投影服务器 provider 返回的 CI Job，并只用正式流水线与终态门禁判定结果；前端不保存需随 Job 增删改名同步的第二份拓扑 | 修改 GitLab CI 证据 provider、质量工作台或 Job 编排时 |
+| `node --test scripts/qa/ci-job-guide.test.mjs` | 校验每个正式 push-CI Job 都有一份简短用途说明；说明源不保存依赖、状态、耗时、等待或历史，未知 Job 只标记“说明待登记”并继续投影 | 新增、删除、改名或拆分 GitLab CI Job 时 |
+| `bash scripts/qa/fast.sh` | 高频快速检查，只运行显式 `fast` Node 测试组，并覆盖文档清单、客户配置、菜单、Web 静态检查和 server quick；阶段编号只由 affected 扫描本次变更文件 | 日常开发后 |
+| `node scripts/qa/yoyoosun-role-jsonrpc-access.mjs --report output/qa/yoyoosun-role-jsonrpc-access/report.json` | 使用九岗位演示账号真实登录，逐岗验证允许读取、越权写入被拒绝和前后任务总量不串权；凭据只从服务端进程环境读取，预期业务写入为零，不等于完整角色协同闭环 | 本地后端与演示账号凭据就绪后 |
+| `bash scripts/qa/prepare-push.sh` | 默认仅对单一 `origin/main` 签发 30 分钟 `server-ci` 回执：复算 affected 风险，但本地只运行 remote/ref/range、git-log、严格 secrets 与源码完整性短门禁；高成本测试/构建由 GitLab exact-SHA CI 执行。非标准目标保持 affected/full 保守合同 | commit 后、立即 push 前 |
+| `bash scripts/qa/prepare-push.sh --full` | 经明确授权的本地完整诊断；完整执行 full，并在前后身份和容器清理读回一致后签发短期回执，不作为默认 `origin/main` 的前置步骤 | full 已明确确认、需要独立本地诊断时 |
+| `node scripts/qa/skill-health.mjs` | 检查项目 Skill frontmatter、目录名、metadata、README 索引和相对引用；`affected` 对 Skill 变更会直接执行，不再只提示 follow-up | 修改 `.agents/skills/**` 后 |
+| `node scripts/qa/erp-field-linkage.mjs` | 运行字段联动专项，前后绑定同一仓库指纹，并把脱敏结构化证据写入 `output/qa/coverage/field-linkage.latest.json`；只证明该专项，不代表整仓覆盖 | 修改字段来源、映射、回显或打印链路后 |
+| `node scripts/qa/test-coverage-collect.mjs --profile baseline --write` | 在同一仓库身份下运行非数据库 baseline，采集 Go / Web 代码覆盖、显式业务场景、字段联动、导入合同和受影响验证范围（内部键 T0-T8），再原子写入证据并聚合 latest；运行期身份变化即失败 | 刷新开发工作台真实覆盖证据前 |
+| `node scripts/qa/test-coverage-report.mjs --write` | 聚合当前 commit / worktree 指纹、真实代码覆盖制品、业务场景、验证范围（内部键 T0-T8）与验收状态到 `output/qa/coverage/latest.json`；缺制品写 `missing`，不自动运行全量测试 | 刷新开发工作台覆盖状态前 |
+| `bash scripts/qa/strict.sh` | full 的真实覆盖超集：先运行独有 shell / YAML 检查，再以 strict profile 单次运行 full；扩展视口、零 warning 和严格 govulncheck 各执行一次；各阶段输出统一耗时标记 | 发版前 / 大改后 |
+| `bash scripts/qa/full.sh` | 完整本地检查；一次运行五个显式 Node 测试组，不复跑会由 Web / server 全集覆盖的 fast 子集；资源敏感发布合同在 shared / Web / server 汇合后单独执行；另含 secrets、Chromium、根入口浏览器 smoke、存量升级、当前 schema PostgreSQL、前后端测试 / 构建和 govulncheck；DEV 页面与共享布局桌面 smoke 由 affected 选择，不进入默认场景集 | 独立完整诊断、prepare-push 或 strict 内部 |
+| `node scripts/qa/run-gate-with-receipt.mjs --gate <full\|strict>` | 执行正式门禁并写入同一脱敏回执；passed 必须具备完整阶段耗时、非零测试、零失败、零 skip 和运行前后仓库身份一致，工作台据此展示总耗时与瓶颈 | 需要可核验效能证据时 |
+| `node scripts/qa/run-gate-with-managed-database.mjs --exact-sha <40sha> --main-ref HEAD --operation-id <uuid>` | 本地 clean 候选的唯一受管 exact-SHA 入口；复用固定 `postgres:18.1`、随机凭据、loopback 动态端口和精确 cleanup，再以无 shell 的固定参数执行 `exact-sha-gate.mjs`；DSN 只进入子进程环境，终态仍以 exact-SHA gate 为唯一真源 | 需要独立本地受管诊断时 |
+| `run-gate-with-managed-database.mjs` | 质量门禁页面的 full / strict 内部包装器；固定使用本机 `postgres:18.1`，为每次 operation 生成随机凭据和 loopback 动态端口，执行原正式 runner 后按精确 label 删除容器并读回零残留；不接受浏览器提供命令、DSN、镜像或凭据 | DEV 页面未显式登记本机数据库 base 时 |
+| `node scripts/qa/exact-sha-gate.mjs --sha <40sha> [--run]` | 绑定 clean SHA、strict profile、锁文件和门禁实现形成 fingerprint；已有同 fingerprint 终态时复用，不自动新开 lifecycle | 不可变 Release workflow |
+| `node scripts/qa/ci-quality-shard.mjs --shard <name>` | 只在 protected main 的 GitLab 上生成七类固定外部 strict 分片之一；Node 类聚合内部 `core / release_preflight_a / release_preflight_b / release_a / release_b / release_c`，resource-sensitive 类聚合内部 `contract_a / contract_b / runtime_a / runtime_b`，两者对外仍各自只保留一个规范回执；所有回执继续绑定同一 plan/range/exact SHA，并保留资源清理读回 | GitLab main 普通 CI；不提供本地通用入口 |
+| `node scripts/qa/pnpm-audit-retry.mjs` | 对 npm 官方接口执行固定的 production/high pnpm 审计；首次强制直连，只对网络、429 和 5xx 瞬态错误重试一次，若环境已配置代理则仅第二次使用该代理；单次 100 秒、总计 205 秒封顶，合法漏洞报告不重试，高危或严重漏洞立即阻断，错误只输出有界脱敏诊断 | GitLab security 分片内部；可作本地只读诊断 |
+| `node scripts/qa/ci-quality-aggregate.mjs` | 精确聚合七个分片、可信 plan 与资源清理证据，签发标准 v3 exact-SHA strict terminal 和可上传的 CI evidence manifest；缺任一分片、分类执行数或身份均失败关闭 | GitLab main 普通 CI 聚合；不证明 Release 或目标部署 |
+| `node scripts/qa/candidate-sha-freeze.mjs --sha <40sha> --terminal <strict-terminal.json>` | 在已通过 strict 的 clean exact HEAD 上固定执行复用/失败/公网读回/DEV 隔离合同，以及版本中心桌面真实浏览器 smoke；生成单一候选冻结回执，不建立 DEV 移动端或暗色验收承诺，也不替代远端 CI、Release 或 133 发布 | 最终候选第一次正式 push 前 |
+| `node scripts/qa/output-retention-preview.mjs --protect-sha <40sha> --out output/dev-workbench/retention/previews/<name>.json` | 对登记的 managed output 生成数量与 5GiB 容量预算预览，保护最新状态、operation 引用和显式 SHA；无 `--apply`，不删除文件 | 定期检查本地证据膨胀 |
+| `node scripts/qa/database-inventory.mjs --out <report.json>` | 从环境中的固定数据库 URL 只读盘点同服务器项目库、连接数、migration、仓库引用和 disposable 分类；不授权删除 | 发布演练前后或发现临时库堆积时 |
+| `node scripts/qa/database-archive.mjs --database-name <name> --out <dir>` | 只接受已登记 disposable 库且要求零连接；生成归档并在临时 restore 库核对 migration、schema 与逐表计数，最后删除 restore 库并读回零残留 | 清理候选库取得可恢复证据时 |
+| `node scripts/qa/database-cleanup.mjs --database-name <name> --inventory <report> --manifest <manifest> --print-confirmation` | 从同一 inventory 与 archive manifest 生成精确确认串；正式 cleanup 还需通过环境提供 admin URL、传入确认串和输出报告，成功后读回源库已不存在。登记 133 仅在三个命令均显式加 `--allow-registered-development` 时开放；长期或未分类库始终拒绝 | archive / restore 已通过后清理同一 disposable 库 |
+| `sh scripts/qa/populated-upgrade-preflight.sh --audit <populated-upgrade\|customer-config-cutover\|database-constraints> ...` | 对指定数据库运行固定 allowlist 的 migration 只读审计；不执行 migration 或自动数据治理 | 跨越存量升级、客户配置切换或关键约束收紧前 |
+| `.gitlab-ci.yml` | canonical `plan → prepare → 七类外部证据 DAG → aggregate → CI Gate`；Node 与 resource-sensitive 分别在内部按真实资源边界 fan-in，并保留每条 lane 的时间窗，对外仍只有七类规范回执；MR 保留 affected，main 普通 CI 签发可复用 exact-SHA 证据，受保护 release 不重跑 strict，同 SHA 只构建一次候选制品并冻结演练回执后登记 GitLab Package/Release | GitLab main、merge request、受保护 release |
+| `.github/workflows/release.yml` | GitHub 应急发布保护壳；在 canonical v2 七资产与同一演练回执完整接入前，于 checkout、登录、构建或上传前固定失败关闭，禁止六资产部分发布 | 应急发布合同回归 |
+| `node scripts/qa/docs-inventory.test.mjs` | 检查当前维护 Markdown 是否登记到 `docs/文档清单.md` | 新增、删除、重命名 README 或长期文档后 |
+| `node --test scripts/qa/schema-docs.test.mjs` | 校验 Ent generated migration descriptor、业务语义 catalog 与 8 份生成数据字典零漂移；不连接数据库 | 调整 schema、catalog、生成器或数据库文档后 |
+| `node --test scripts/qa/dev-entry-boundary.test.mjs` | 锁住 `make dev_restart`先预检再停服、启动预检只读，以及 Product Core / 客户开发入口共用同一 web preflight | 调整本地启动命令、Vite 代理或 migration 预检后 |
+| `node scripts/qa/customer-package-lint.mjs --all` | 从构建期客户索引校验 demo、reference-customer 和 yoyoosun raw package；不 publish/activate | 调整客户包、catalog 或 schema 后 |
+| `node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview` | 以 preview 模式编译并验证全部登记 draft 客户包的不可发布 manifest；不调用后端或写事实 | 调整 manifest compiler/effective-session 输入后 |
+| `node scripts/qa/private-deployment-boundaries.mjs` | 检查客户 README 的差异 / 验收章节、三份配置和最小部署参数边界，并禁止 reference 部署目录 | 调整私有化模板或 reference 文档后 |
+| `node scripts/qa/phase-label-boundaries.mjs` + `node --test scripts/qa/phase-label-boundaries.test.mjs` | 全仓扫描活跃代码、脚本和正式文档中的编号阶段命名，并验证完整 Phase 编号、P 子阶段编号和 P 编号发布目标会被拒绝；P0/P1 风险等级、p95 百分位和产品编码不受影响 | 改脚本、API、命名或治理文档后 |
+| `node scripts/qa/experimental/canonical-runtime-audit.mjs` | 非阻断实验审计；宽泛 keyword 命中只作只读复核线索，不进入 fast / affected，不代表产品缺陷或发布证据；恢复阻断前必须改成逐域 status key / API field / function / runtime branch 精确合同 | 需要人工盘点历史词命中时 |
+| `node scripts/qa/test-data-isolation-boundary.mjs --json` | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力 | 改 seed、fixture、模拟数据或导入准备工具后 |
+| `node scripts/qa/manual-acceptance-catalog.mjs` | 生成只读页面验收目录，默认只输出；范围与步骤见下文全页面试用验收数据。 | 准备全页面试用验收范围时 |
+| `node scripts/qa/local-acceptance-lifecycle.mjs --commit <sha> --run-id <run>` | 默认只输出计划；显式执行在按批隔离库完成技术验收并清理，详见下文。 | 对 clean exact SHA 做本地完整技术验收时 |
+| `node scripts/qa/scenario-demo-data.mjs` | 默认只读输出固定 V6 长期数据计划；本地开发与 `customer-trial-133` 复用同一 canonical 业务语义和九阶段 runner，但数据库、release、migration、客户配置、账号命名、attestation 与回执独立。133 的密码值由固定公开测试凭据合同约束，不构成数据共库。精确 plan digest 和确认串匹配后才通过正式 API exact-create-or-readback；不清理、不重置，不把查询读回写成人工验收或真实客户导入 | 需要为本地或 133 长期保留固定业务场景数据时 |
+| `node --test scripts/qa/customer-trial-133-data.test.mjs` | 锁住 133 数据写入前的新回滚点：固定目标 SSH 脚本使用 `erp_backup` 只读角色，复核 exact release / database / migration，完成 custom dump、`pg_restore --list`、SHA-256、原子落盘和脱敏回执；不接受浏览器主机、路径、DSN 或命令输入 | 调整 133 数据准备或备份回执合同后 |
+| `node scripts/qa/manual-acceptance-dataset.mjs` | 默认生成双环境计划；显式 apply 才由串行 runner 写入模拟数据并校验回执。 | 准备或重放双环境全页面模拟数据时 |
+| `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version 2026.08.15-v6 --run-id 20260815-V6 --json` | 生成模拟主数据和源单计划，默认只读；身份、批次与允许写入见下文。 | 写入模拟源数据前确认数量、状态和边界时 |
+| `node scripts/qa/manual-acceptance-account-scenarios.mjs --json` | 生成账号异常场景计划；实际 bootstrap 与补齐沿用下文固定目标合同。 | 核对登录与入口异常场景前 |
+| `node scripts/qa/manual-acceptance-task-data.mjs --source-report <report> --data-version 2026.08.15-v6 --run-id 20260815-V6` | 准备九岗位模拟列表任务及正式流程位置证据；不代表真实客户数据或 UAT。 | 准备岗位任务端数据与流程位置证据前 |
+| `node scripts/qa/manual-acceptance-fact-data.mjs --source-report <report> --data-version 2026.08.15-v6 --run-id 20260815-V6 --json` | 按正式来源驱动 API 生成事实准备计划，默认只读。 | 写入模拟业务事实前 |
+| `node scripts/qa/manual-acceptance-readiness.mjs` | 默认生成就绪核验计划；显式 verify 才读取运行数据。 | 写入后核对页面数据是否达到手工验收门槛时 |
+| `node scripts/qa/manual-acceptance-browser.mjs --plan --base-url <local-url> --backend-url <local-url>` | 默认生成浏览器计划；真实模式登录并只读检查页面，不点击业务写动作。 | 核对真实账号、页面、岗位端和打印入口时 |
+| `node scripts/qa/exception-flow-real-write-browser.mjs ...` | 仅在精确确认的全新 browser_actions 隔离库验证三条异常流真实写链；详见下文。 | 异常流主路径完成 API / 单元验证后的本地写验收 |
+| `node scripts/qa/manual-acceptance-source-retire.mjs --data-version 2026.08.15-v6 --run-id 20260815-V6` | 默认 dry-run；仅预览受控退出，不物理删除、不处理活动流程或已过账事实。 | 无流程阻断的旧批次退出前 |
+| `node scripts/qa/customer-config-effective-session-probe.mjs --json` | 无 Authorization 探测本地 `customer_config.get_effective_session`，确认后端可达和 `40302 未登录` 边界 | yoyoosun 静态入口已命中、但还没有真实登录证据时 |
+| `node --test scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住客户配置包 businessFlows / stateMachines / processPolicies 仍为 preview-only，不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
 
 `affected` 的 v2 计划协议把验证范围与本地门禁强度分开：`affectedScopes` / `maxAffectedScope` 只使用 T0-T8 稳定键，`localGate` 只取 `focused` 或 `full`。本地完整门禁命令使用独立的 `LOCAL_FULL` scope，不会因此把 T8 写入受影响范围；T8 只用于真实发布、部署、恢复或回滚证据。
 
 ## 主要脚本分组
 
-| 分组                 | 典型脚本                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 边界                                                                                                                                                                                                         |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 编排入口             | `fast.sh`、`strict.sh`、`full.sh`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 只编排本地检查，不代表目标环境 release evidence 已完成                                                                                                                                                       |
-| 文档、命名与真源守卫 | `docs-inventory.test.mjs`、`schema-docs.test.mjs`、`phase-label-boundaries.mjs`、`experimental/canonical-runtime-audit.mjs`                                                                                                                                                                                                                                                                                                                                                                                                                                                       | 前三者阻断 Product Core 路径、数据字典和命名漂移；canonical broad scan 仅为显式非阻断实验审计，不进入 fast / affected，不能替代逐域合同、migration、目标结构读回或 runtime 验证                              |
-| 客户交付文档专项     | `yoyoosun-role-flow-handbook.test.mjs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | 只在包含受控永绅文档的完整 checkout 中显式运行；由 `affected` 在客户资料变化时选择，不进入 Core fast / full / strict 或源码包                                                                                |
-| 开发测试固定动作     | `dev-testing-operation-store.mjs`、`dev-qa-execution-lock.mjs`、`run-gate-with-receipt.mjs`、`yoyoosun-role-jsonrpc-access.mjs`                                                                                                                                                                                                                                                                                                                                                                                                                                                   | DEV 入口只接受 `fast / role-access / field-linkage` 固定意图；计划只读，三项结果独立，浏览器不能提供命令、参数、路径、环境变量或凭据                                                                         |
-| 质量门禁运行与治理   | `run-gate-with-receipt.mjs`、`run-gate-with-managed-database.mjs`、`dev-quality-gate-operation-store.mjs`、`quality-gate-catalog.mjs`、`../../web/dev-server/devQualityGatePlugin.mjs`                                                                                                                                                                                                                                                                                                                                                                                            | DEV 页面只接受 `full / strict` 固定动作；正式 runner 与回执仍是唯一执行和结果真源，托管数据库包装器只负责本机隔离环境生命周期，本地 operation 只保存有界脱敏状态                                             |
-| 覆盖证据             | `erp-field-linkage.mjs`、`test-coverage-collect.mjs`、`test-coverage-report.mjs`、`dev-coverage-operation-store.mjs`                                                                                                                                                                                                                                                                                                                                                                                                                                                              | baseline 只执行明确列出的非数据库本地测试；DEV 入口只接受固定 collect intent，以幂等索引和全局 QA 锁串行执行；业务域只按显式场景 ID 计数，未采集、过期、跳过、阻塞和零执行必须单列，不把历史绿色换算成覆盖率 |
-| 本地开发库迁移       | `../local-migration-workflow.mjs`、`dev-database-migration-operation-store.mjs`、`../../web/dev-server/devDatabaseMigrationPlugin.mjs`、`../../web/dev-server/devDatabaseMigrationRuntime.mjs`                                                                                                                                                                                                                                                                                                                                                                                    | CLI 与 DEV 页面复用登记共享开发库的 status / plan / backup-restore / apply / readback / restart 服务；固定意图、幂等、单执行锁、执行前复核备份、无自动重试，不接受任意目标、命令、SQL 或凭据                 |
-| 客户配置与私有化边界 | `config/customers/index.test.mjs`、`scripts/build/apply-customer-web-config.test.mjs`、`customer-config-boundaries.mjs`、`customer-config-effective-session-probe.mjs`、`customer-package-lint.mjs`、`customer-package-preview-boundary.test.mjs`、`customer-config-runtime-manifest.mjs`、`private-deployment-boundaries.mjs`、`private-deployment-package-closure.test.mjs`                                                                                                                                                                                                     | 只做构建期索引、overlay、lint / preview / manifest 编译、无凭据读回探针和模板边界检查；`boundariesSatisfied` 不等于交付、evidence 或签收完成，不写 Fact                                                      |
-| Workflow / Fact 边界 | `workflow-fact-boundary.test.mjs`、`workflow-ui-action-boundary.test.mjs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | 防止协同任务路径越界写入事实层                                                                                                                                                                               |
-| 测试数据隔离         | `test-data-isolation-boundary.mjs`、`local-acceptance-lifecycle.mjs`、`manual-acceptance-dataset.mjs`、`manual-acceptance-dataset-runner.mjs`、`manual-acceptance-page-data-contract.mjs`、`manual-acceptance-catalog.mjs`、`manual-acceptance-account-scenarios.mjs`、`manual-acceptance-source-data.mjs`、`manual-acceptance-task-data.mjs`、`manual-acceptance-fact-data.mjs`、`manual-acceptance-source-driven-facts.mjs`、`manual-acceptance-attachment-data.mjs`、`manual-acceptance-readiness.mjs`、`manual-acceptance-browser.mjs`、`manual-acceptance-source-retire.mjs` | Product Core、本地 / 133 同版模拟数据、页面归属、真实导入准备和执行门禁分桶检查；本地完整入口按批建库并自动回收，当前事实只走正式来源驱动 API，旧通用写入器不得回流                                          |
-| 代码质量和安全       | `secrets.sh`、`error-codes.sh`、`go-vet.sh`、`govulncheck.sh`、`shellcheck.sh`、`shfmt.sh`、`yamllint.sh`                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | 按对应语言 / 配置类型补充检查，不替代业务回归                                                                                                                                                                |
+| 分组 | 典型脚本 | 边界 |
+| --- | --- | --- |
+| 编排入口 | `fast.sh`、`strict.sh`、`full.sh` | 只编排本地检查，不代表目标环境 release evidence 已完成 |
+| 文档、命名与真源守卫 | `docs-inventory.test.mjs`、`schema-docs.test.mjs`、`phase-label-boundaries.mjs`、`experimental/canonical-runtime-audit.mjs` | 前三者阻断 Product Core 路径、数据字典和命名漂移；canonical broad scan 仅为显式非阻断实验审计，不进入 fast / affected，不能替代逐域合同、migration、目标结构读回或 runtime 验证 |
+| 客户交付文档专项 | `yoyoosun-role-flow-handbook.test.mjs` | 只在包含受控永绅文档的完整 checkout 中显式运行；由 `affected` 在客户资料变化时选择，不进入 Core fast / full / strict 或源码包 |
+| 开发测试固定动作 | `dev-testing-operation-store.mjs`、`dev-qa-execution-lock.mjs`、`run-gate-with-receipt.mjs`、`yoyoosun-role-jsonrpc-access.mjs` | DEV 入口只接受 `fast / role-access / field-linkage` 固定意图；计划只读，三项结果独立，浏览器不能提供命令、参数、路径、环境变量或凭据 |
+| 质量门禁运行与治理 | `run-gate-with-receipt.mjs`、`run-gate-with-managed-database.mjs`、`dev-quality-gate-operation-store.mjs`、`quality-gate-catalog.mjs`、`../../web/dev-server/devQualityGatePlugin.mjs` | DEV 页面只接受 `full / strict` 固定动作；正式 runner 与回执仍是唯一执行和结果真源，托管数据库包装器只负责本机隔离环境生命周期，本地 operation 只保存有界脱敏状态 |
+| 覆盖证据 | `erp-field-linkage.mjs`、`test-coverage-collect.mjs`、`test-coverage-report.mjs`、`dev-coverage-operation-store.mjs` | baseline 只执行明确列出的非数据库本地测试；DEV 入口只接受固定 collect intent，以幂等索引和全局 QA 锁串行执行；业务域只按显式场景 ID 计数，未采集、过期、跳过、阻塞和零执行必须单列，不把历史绿色换算成覆盖率 |
+| 本地开发库迁移 | `../local-migration-workflow.mjs`、`dev-database-migration-operation-store.mjs`、`../../web/dev-server/devDatabaseMigrationPlugin.mjs`、`../../web/dev-server/devDatabaseMigrationRuntime.mjs` | CLI 与 DEV 页面复用登记共享开发库的 status / plan / backup-restore / apply / readback / restart 服务；固定意图、幂等、单执行锁、执行前复核备份、无自动重试，不接受任意目标、命令、SQL 或凭据 |
+| 客户配置与私有化边界 | `config/customers/index.test.mjs`、`scripts/build/apply-customer-web-config.test.mjs`、`customer-config-boundaries.mjs`、`customer-config-effective-session-probe.mjs`、`customer-package-lint.mjs`、`customer-package-preview-boundary.test.mjs`、`customer-config-runtime-manifest.mjs`、`private-deployment-boundaries.mjs`、`private-deployment-package-closure.test.mjs` | 只做构建期索引、overlay、lint / preview / manifest 编译、无凭据读回探针和模板边界检查；`boundariesSatisfied` 不等于交付、evidence 或签收完成，不写 Fact |
+| Workflow / Fact 边界 | `workflow-fact-boundary.test.mjs`、`workflow-ui-action-boundary.test.mjs` | 防止协同任务路径越界写入事实层 |
+| 测试数据隔离 | `test-data-isolation-boundary.mjs`、`local-acceptance-lifecycle.mjs`、`manual-acceptance-dataset.mjs`、`manual-acceptance-dataset-runner.mjs`、`manual-acceptance-page-data-contract.mjs`、`manual-acceptance-catalog.mjs`、`manual-acceptance-account-scenarios.mjs`、`manual-acceptance-source-data.mjs`、`manual-acceptance-task-data.mjs`、`manual-acceptance-fact-data.mjs`、`manual-acceptance-source-driven-facts.mjs`、`manual-acceptance-attachment-data.mjs`、`manual-acceptance-readiness.mjs`、`manual-acceptance-browser.mjs`、`manual-acceptance-source-retire.mjs` | Product Core、本地 / 133 同版模拟数据、页面归属、真实导入准备和执行门禁分桶检查；本地完整入口按批建库并自动回收，当前事实只走正式来源驱动 API，旧通用写入器不得回流 |
+| 代码质量和安全 | `secrets.sh`、`error-codes.sh`、`go-vet.sh`、`govulncheck.sh`、`shellcheck.sh`、`shfmt.sh`、`yamllint.sh` | 按对应语言 / 配置类型补充检查，不替代业务回归 |
 
 ## 门禁完整性与 CI 边界
 
@@ -151,23 +151,23 @@ demo 造数前必须先在固定 release 上完成登记 target 的 migration、
 
 计划和规范总回执同时保存 `chainDataDigest` 与 `chainVerificationDigest`。代码变化后按下表处理，不需要 Codex 定时同步平行清单：
 
-| 摘要比较                                   | 旧数据结论   | 现在做什么                                                                                       |
-| ------------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------ |
-| 两个摘要都相同                             | 仍可用       | 保持当前 `dataVersion`，以新 operation / batch 绑定 exact commit 后继续回归                      |
+| 摘要比较 | 旧数据结论 | 现在做什么 |
+| --- | --- | --- |
+| 两个摘要都相同 | 仍可用 | 保持当前 `dataVersion`，以新 operation / batch 绑定 exact commit 后继续回归 |
 | 数据摘要相同，验证摘要变化或旧验证摘要缺失 | 只需重新核验 | 保持当前 `dataVersion` 和长期数据，以新 operation / batch 重跑合同、readiness 与受影响浏览器场景 |
-| 数据摘要变化或旧数据摘要缺失               | 必须重新造数 | 先在新隔离批次修正；仅语义不兼容或冻结下一轮 UAT 基线时升级 `dataVersion`，不覆盖旧回执          |
+| 数据摘要变化或旧数据摘要缺失 | 必须重新造数 | 先在新隔离批次修正；仅语义不兼容或冻结下一轮 UAT 基线时升级 `dataVersion`，不覆盖旧回执 |
 
 上述三类判断适用于需要保留的同批数据；完整回归本身默认每次新建隔离批次，因此不会把旧数据库继续当作本次回归输入。旧回执仍保留用于比较对应旧计划和耗时，但不能证明最新代码已经回归。
 
 模拟数据沿用永绅原文件的简短习惯，例如款号与品名分开、规格写成“米白·小号”、材料写成“米白短毛绒”、环节写成“裁片 / 车缝 / 电绣”，备注用“分两批交货”“颜色按样板”这类日常说法。用户可见来源编号使用 `YS6-*`，岗位任务使用 `YS-V6-*`；模拟身份还由 `datasetKey / dataVersion / runId` 和报告统一证明。原文件只用于理解字段和用词，不直接导入真实行。
 
-| 阶段                                                     | 本地                                                                                                    | demo-133 演练造数库                                                                                         |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| fresh 前置与基础资料                                     | 全新专用库 migration 后显式应用 local-test 配置并只创建 1 个单位、4 个仓库；runner 先做空业务库基线门禁 | 全新独立库先 bootstrap 管理员、应用 customer-trial 配置，再运行镜像内受控 core bootstrap；禁止通用远程 seed |
-| 岗位账号                                                 | runner 在空库基线通过后创建或精确核对十个岗位账号，并调和三类场景账号                                   | 同一入口、同一规则；不得复用本地账号行或数据库 ID                                                           |
-| 客户、供应商、产品、材料、工序、销售 / 采购 / 委外 / BOM | 按稳定编号写入并读回                                                                                    | 通过已登记目标、精确确认和带外证明写入并读回                                                                |
-| 采购收货、质检、库存、生产、预留、出货、财务             | 统一由 `manual-acceptance-fact-data.mjs` 调用正式来源驱动 API                                           | 同一入口；不得复制本地报告或数据库 ID                                                                       |
-| 附件与就绪核对                                           | 绑定同批源单、事实和任务报告                                                                            | 额外绑定 release、migration 和全部 debug=false 证明                                                         |
+| 阶段 | 本地 | demo-133 演练造数库 |
+| --- | --- | --- |
+| fresh 前置与基础资料 | 全新专用库 migration 后显式应用 local-test 配置并只创建 1 个单位、4 个仓库；runner 先做空业务库基线门禁 | 全新独立库先 bootstrap 管理员、应用 customer-trial 配置，再运行镜像内受控 core bootstrap；禁止通用远程 seed |
+| 岗位账号 | runner 在空库基线通过后创建或精确核对十个岗位账号，并调和三类场景账号 | 同一入口、同一规则；不得复用本地账号行或数据库 ID |
+| 客户、供应商、产品、材料、工序、销售 / 采购 / 委外 / BOM | 按稳定编号写入并读回 | 通过已登记目标、精确确认和带外证明写入并读回 |
+| 采购收货、质检、库存、生产、预留、出货、财务 | 统一由 `manual-acceptance-fact-data.mjs` 调用正式来源驱动 API | 同一入口；不得复制本地报告或数据库 ID |
+| 附件与就绪核对 | 绑定同批源单、事实和任务报告 | 额外绑定 release、migration 和全部 debug=false 证明 |
 
 先生成当前双环境计划。以下命令只输出计划，不连接后端：
 
@@ -502,18 +502,18 @@ bash scripts/qa/affected.sh --file web/src/erp/utils/dateRange.mjs --run
 
 角色演示账号只服务开发 / 验收登录测试，不写入 `server/configs/*/config.yaml`，也不是客户配置包。脚本会先确保内置 RBAC 权限和角色已 seed，再创建或更新以下账号并绑定真实角色：
 
-| 账号               | 角色          |
-| ------------------ | ------------- |
-| `demo_boss`        | `boss`        |
-| `demo_sales`       | `sales`       |
-| `demo_purchase`    | `purchase`    |
-| `demo_production`  | `production`  |
-| `demo_warehouse`   | `warehouse`   |
-| `demo_quality`     | `quality`     |
-| `demo_finance`     | `finance`     |
-| `demo_pmc`         | `pmc`         |
+| 账号 | 角色 |
+| --- | --- |
+| `demo_boss` | `boss` |
+| `demo_sales` | `sales` |
+| `demo_purchase` | `purchase` |
+| `demo_production` | `production` |
+| `demo_warehouse` | `warehouse` |
+| `demo_quality` | `quality` |
+| `demo_finance` | `finance` |
+| `demo_pmc` | `pmc` |
 | `demo_engineering` | `engineering` |
-| `demo_admin`       | `admin`       |
+| `demo_admin` | `admin` |
 
 默认不生成 `debug_operator` 账号；如确需调试权限账号，必须显式加 `--include-debug`，此时会额外生成 `demo_debug`。
 
@@ -687,12 +687,12 @@ go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJson
 
 此门禁的漏洞阻断范围为 Chromium 所在的 Debian 系统包（Trivy `Class=os-pkgs`、`Type=debian`）。Trivy 同时发现的 Go 二进制依赖问题按原分类完整保留，并单独计数；它们由既有 Go 安全检查继续判定调用路径和升级范围。打印运行时通过不代表全镜像无漏洞，也不把暂无修复版本的系统包发现当作已修复。
 
-| 入口                                                                      | 验证与输出                                                                                                                                  |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node scripts/qa/pdf-runtime.mjs check-source`                            | 检查固定浏览器 / 包源 / base digest 及前端字体精确版本，相关测试进入普通 Node CI                                                            |
-| `bash scripts/qa/pdf-runtime.sh verify IMAGE OUTPUT_DIR [FIXTURE_DIR]`    | 在最终非 root + sandbox 镜像中运行 Go PDF 安全与业务快照测试；核对 A4、中文文本、字体嵌入、系统包、实际浏览器和体积，运行固定校验值的 Trivy |
-| `bash scripts/qa/pdf-runtime.sh monitor IMAGE OUTPUT_DIR`                 | 对固定镜像重新扫描漏洞，并查询 Google Linux stable；不重建镜像、不渲染全套模板                                                              |
-| `web/scripts/printPdfFixtures.mjs STATIC_ROOT OUTPUT_DIR [TEMPLATE_KEYS]` | 用实际生产前端和脱敏模拟数据打开登记模板，采集真实下载请求的纸面 HTML；不维护第二套服务端模板                                               |
+| 入口 | 验证与输出 |
+| --- | --- |
+| `node scripts/qa/pdf-runtime.mjs check-source` | 检查固定浏览器 / 包源 / base digest 及前端字体精确版本，相关测试进入普通 Node CI |
+| `bash scripts/qa/pdf-runtime.sh verify IMAGE OUTPUT_DIR [FIXTURE_DIR]` | 在最终非 root + sandbox 镜像中运行 Go PDF 安全与业务快照测试；核对 A4、中文文本、字体嵌入、系统包、实际浏览器和体积，运行固定校验值的 Trivy |
+| `bash scripts/qa/pdf-runtime.sh monitor IMAGE OUTPUT_DIR` | 对固定镜像重新扫描漏洞，并查询 Google Linux stable；不重建镜像、不渲染全套模板 |
+| `web/scripts/printPdfFixtures.mjs STATIC_ROOT OUTPUT_DIR [TEMPLATE_KEYS]` | 用实际生产前端和脱敏模拟数据打开登记模板，采集真实下载请求的纸面 HTML；不维护第二套服务端模板 |
 
 `verify` / `monitor` 面向 Linux amd64 Runner。宿主需有 Docker、Go、Node、pnpm；`verify` 另需 Poppler（`pdfinfo`、`pdftotext`、`pdffonts`）与已核验的 Playwright 运行包。Poppler 在 Runner cloud-init 中声明，已有 Runner 由运维按正式流程补齐；Job 不自行安装系统包。CI 沿用已有 Chromium sandbox helper；最终镜像使用正式 Compose 的 seccomp，缺条件明确失败。输出目录每次使用唯一目录；只清理本次容器、测试二进制和本次安装的浏览器 sandbox，不清理外部镜像、缓存或卷。
 
@@ -701,3 +701,88 @@ go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJson
 `.gitlab-ci.yml` 提供独立 `pdf_runtime_monitor` 定时入口：受保护 `main`、pipeline source 为 `schedule`，配置 `PDF_RUNTIME_MONITOR=1` 与已有固定 `PDF_RUNTIME_IMAGE`（本地 image ID 或仓库 digest）。该入口不会触发普通全量质量或发布。仓库配置不自动创建 GitLab Schedule；启用时间与镜像由运维在既有 CI 中设置，缺失镜像 / 安全数据库 / 上游响应不会被当成通过。
 
 本地 PDF 回归按[测试策略](../../docs/product/自动化测试策略.md#原则)依据任务范围、资源预算和副作用选择；当前目标必要的验证直接执行，明显超出范围或预算时确认。传入明确模板子集只证明该子集，不据此宣称所有模板或最终镜像通过。体积使用专用 Runner 上同一 Docker image store 的 `image inspect Size`，不混用压缩 tar、`docker images` 或共享层磁盘数字；当前门限是旧固定制品的回归上限，不能当作本次已实现的瘦身百分比。
+
+
+## PostgreSQL 领域事务验证
+
+以下命令均在 `server/` 执行，只使用各自登记的隔离测试库。
+
+库存事实 PostgreSQL 本地验收使用专用防呆 target，默认库名为 `plush_erp_inventory_test`：
+
+```bash
+make inventory_pg_createdb
+make inventory_migrate_status
+make inventory_migrate_apply
+make inventory_pg_test
+```
+
+BOM + 批次库存 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_bom_lot_test`：
+
+```bash
+make bom_lot_pg_createdb
+make bom_lot_migrate_status
+make bom_lot_migrate_apply
+make bom_lot_pg_test
+```
+
+采购入库 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_ci_purchase_receipt_fixture`：
+
+```bash
+make purchase_receipt_pg_createdb
+make purchase_receipt_migrate_status
+make purchase_receipt_migrate_apply
+make purchase_receipt_pg_test
+make critical_transactions_pg_test
+```
+
+`inventory_pg_test` 同时覆盖 `TestInventoryPostgres*` 与 `TestOperationalFactPostgres*`，包括 SKU grain、库存预留、出货来源数量、预留消费，以及生产 / 委外 / 财务 draft post-vs-cancel 的事实行锁与库存 / 审计串行边界。
+
+`critical_transactions_pg_test` 复用同一隔离测试库，强制运行采购入库 / 退货 / 调整 draft post-vs-cancel、child-create-vs-parent-cancel、生产 / 委外 / 财务事实并发、Source Document 聚合保存、库存 / SKU / 预留 / 出货、ProcessRuntime 领域命令和 Workflow 终态并发测试；脚本会同时开启 purchase receipt 与 inventory 两组 PostgreSQL 测试标志。`full/strict` 会先创建并 apply 该测试库再执行此门禁，不把普通 `go test ./...` 中的 PostgreSQL skip 冒充事务验收。
+
+验证证据必须分层报告：SQLite / usecase 测试证明状态、依赖、零库存与父单解除；真实 PostgreSQL 用例证明行锁和并发赢家；Web 组件与页面级浏览器回归 mock（Style L1）只证明 canonical RPC、按钮状态、文案和写后重读可达；真实后端浏览器 + 数据库读回才证明岗位操作已持久写入当前数据库；目标 release、health / ready、smoke 和客户 UAT 仍是独立关口。任一 PostgreSQL 用例失败或被环境变量跳过，都不能用组件、mock 浏览器或普通 `go test ./...` 绿色覆盖。
+
+采购退货 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_purchase_return_test`：
+
+```bash
+make purchase_return_pg_createdb
+make purchase_return_migrate_status
+make purchase_return_migrate_apply
+make purchase_return_pg_test
+```
+
+
+## full 与 strict
+
+- 环境阶段先校验当前 Bash 与后续子脚本解析到的 `PATH` Bash，避免 macOS Bash 3.2 在部署合同的关联数组处延迟失败
+- 复用 fast 的基础守卫，按 `node-test-groups.mjs` 一次执行全部已登记 scripts Node 组；不重复稍后由 Web 全集和 server 全集覆盖的 fast Web / Go 子集
+- 补充 secrets、前端 lint / css / test / build、本地 PostgreSQL 关键事务门禁和服务端 `go test ./...` / `make build`；最后运行一次固定的 govulncheck v1.6.0，避免外部网络异常先扰动本地并发测试。govulncheck 进程级禁止启动 Go 遥测 sidecar，单次默认限时 300 秒；仅在扫描器/官方漏洞库返回 exit 1 或扫描超时时固定重试一次。真实漏洞 exit 3、参数错误、未知状态和第二次失败仍立即阻断 strict；可用 `GOVULNCHECK_TIMEOUT_SECONDS=1..3600` 调整单次上限
+- 若定义了前端 `test`，会一并执行；它仍不替代浏览器里的样式 / box 模型回归
+- 始终真实执行固定门禁，不读取或签发本地推送回执；CI strict 也永不读取该回执
+
+研发效能工作台的质量门禁页仍调用同一 full / strict 正式入口。开发服务没有显式 loopback `DISPOSABLE_DATABASE_BASE_URL` 时，会使用本机已有的固定 `postgres:18.1` 镜像自动创建本次专用容器；凭据、DSN、容器命令和本机路径不会返回浏览器。该包装不改变 full / strict 的命令或阶段顺序，容器与内部临时数据库任一清理读回缺失都会使本次结果失败。
+
+### strict
+
+- 先执行 strict 独有的 shellcheck、shfmt 和 yamllint，再以 strict profile 单次运行 full
+- 前端零 warning、扩展浏览器视口和严格 govulncheck 都在该次 full 中完成，不二次执行同一 lint、测试或漏洞扫描
+
+## 推送准备与回执
+
+- 准备阶段在 Git 建立 receive-pack 连接前查询远端 ref，计算每个目标 range 和 aggregate range，并按目标与选项选择 `server-ci`、`affected` 或 `full`。默认单一 `origin/main` 只执行上文约定的签名短门禁；非标准目标和显式 `--full` 按当次计划执行保守本地门禁。首次把同名分支镜像到空远端时，aggregate range 和严格 secrets 仍覆盖 `empty-tree..HEAD`；只有目标恰为单个缺失同名分支、另一个已配置 upstream tracking ref 存在且为 HEAD 祖先时，数据库守卫和实时 `git log --check` 才使用该 upstream SHA 到 HEAD 的范围。两类范围、remote/ref/SHA 及使用模式都会进入签名回执并由 hook 重算；缺失、分叉、多 ref、改名或同远端场景保持完整聚合 / push 范围或直接失败。
+- 每次远端 ref 查询受 20 秒硬超时约束；只有明确的瞬时传输失败才按固定短间隔最多重试两次，权限、仓库、ref 或响应合同错误立即失败。
+- 只有选定 profile 的门禁成功，且前后 HEAD/tree、worktree、remote/ref、gate contract 和关键工具/依赖环境均未变化时，才在 `git rev-parse --git-common-dir` 下按 worktree 隔离签发 HMAC 回执；采用并发锁、私有权限、同目录临时文件和原子 rename。
+- 环境指纹只归一化 Git 启动 hook 时自动添加在 `PATH` 首部的 `git --exec-path`；其他 `PATH`、工具版本、依赖元数据、数据库 / 浏览器门禁参数或代理环境变化仍会使回执失效。
+- 并发 owner 仍存活、owner 信息不可读或 PID 状态不确定时锁保持 fail closed；只有带脚本 token 且 owner PID 已确认不存在的中断残留锁会被原子隔离并清理。
+- hook 必须读取真实 push stdin，重算 refs/aggregate range、签名内数据库守卫及 live-check 合同，复核 local SHA 等于 HEAD、clean 状态、回执签名/profile/version/environment/TTL，并实时执行 `git log --check` 和严格 secrets。精确的首次同名镜像只把已验证 upstream..HEAD 用于提交空白检查，严格 secrets 仍扫描新 ref 暴露的完整历史；其他 ref 继续使用原 push range。纯删除/空 stdin 是 no-op，混合删除与更新 fail closed；调用者不能通过 `QA_BASE_RANGE`、`QA_DB_GUARD_RANGE` 或自定义 live range 覆盖准备合同。
+- 缺失、过期、远端漂移或任何代码/依赖/migration/测试/门禁/环境变化都会拒绝复用；hook 不回退到 full，因此不会在已经打开的 SSH 连接上长时间等待。`SKIP_PRE_PUSH`、`--no-verify`、调用者指定的 range、回执路径/token/TTL 都不是常规接口。
+
+
+## 定向边界检查
+
+| 入口 | 验证范围 |
+| --- | --- |
+| `node --test scripts/qa/trial-role-entry-docs.test.mjs` | 核对岗位账号、入口文档与模拟登录边界，详细说明集中在本页和前端脚本 |
+| `node --test scripts/qa/sales-order-field-chain-boundary.test.mjs` | 锁住销售订单字段来源、明细映射与相关输出链 |
+| `node --test scripts/qa/trial-account-rbac.test.mjs` | 无后端单测拒绝多角色、多 mobile 权限、admin mobile 泄漏、debug 权限、super admin 和 disabled 账号 |
+
+fast 保留试用账号 RBAC、浏览器 smoke 脚本语法与真实登录共享 URL 的无后端边界单测，不触发真实登录；实际分组以 `node-test-groups.mjs` 和 `fast.sh` 为准。

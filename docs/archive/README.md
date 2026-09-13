@@ -19,8 +19,6 @@
 | `docs/archive/progress-2026-06-13-before-workbench-prototype-redesign.md`               | 工作台原型重做前的 `progress.md` 过程记录归档                                                   |
 | `docs/archive/progress-2026-06-14-before-business-modal-alignment.md`                   | 业务新建 / 编辑弹窗统一前的 `progress.md` 过程记录归档                                          |
 | `docs/archive/progress-2026-06-15-before-final-bom-closeout.md`                         | BOM 收口和文档治理前的 `progress.md` 过程记录归档                                               |
-| `docs/archive/progress-2026-06-16-before-audit-log-readable.md`                         | 审计日志可读性治理前的 `progress.md` 过程记录归档                                               |
-| `docs/archive/progress-2026-06-16-before-backup-restore-rehearsal.md`                   | 备份恢复演练前的 `progress.md` 过程记录归档                                                     |
 | `docs/archive/progress-2026-07-01-before-action-projection-l1.md`                       | action projection L1 收口前的 `progress.md` 过程记录归档                                        |
 | `docs/archive/progress-2026-07-01-before-progress-archive-and-next-no-write.md`         | 下一轮 no-write 闭环前的 `progress.md` 过程记录归档                                             |
 | `docs/archive/progress-2026-07-01-before-readme-preflight-sync-closeout.md`             | Web README mobile preflight 口径同步后的 `progress.md` 过程记录归档                             |
@@ -54,3 +52,5 @@
 | `docs/archive/progress-2026-07-30-before-dev-testing-oneclick.md`                       | 开发测试固定动作接入前的 `progress.md` 完整过程记录归档                                         |
 | `docs/archive/progress-2026-08-09-before-active-page-compaction.md`                     | 活跃页收缩前的非当前页面、移动任务、附件与协作治理过程摘要                                      |
 | `docs/archive/progress-2026-09-08-before-test-print-release.md` | 打印修复测试环境发布前的已完成事项过程归档 |
+
+同日进度快照：[备份恢复演练前记录](progress-2026-06-16-before-backup-restore-rehearsal.md)。原名称 progress-2026-06-16-before-audit-log-readable.md 与该文件全文相同，现共用此原文；其他归档中的旧名称保留历史语境。

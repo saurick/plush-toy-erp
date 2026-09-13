@@ -53,7 +53,7 @@
       "description": "采购收退货、库存作业、批次、余额、流水、预留与质量判定。",
       "references": [
         "docs/warehouse/仓库与品质第一版.md",
-        "docs/architecture/业务事实扩展总评审.md",
+        "docs/architecture/主数据源单据事实边界评审.md",
         "docs/product/业务数据生命周期与页面动作规则.md"
       ]
     },
@@ -66,7 +66,7 @@
       "references": [
         "docs/architecture/生产订单源单边界评审.md",
         "docs/architecture/生产工艺路线与在制品边界评审.md",
-        "docs/architecture/业务事实扩展总评审.md"
+        "docs/architecture/主数据源单据事实边界评审.md"
       ]
     },
     {
@@ -77,7 +77,7 @@
       "description": "销售出货、财务事实、收付款、核销和红冲。",
       "references": [
         "docs/finance/财务第一版.md",
-        "docs/architecture/业务事实扩展总评审.md",
+        "docs/architecture/主数据源单据事实边界评审.md",
         "docs/product/业务数据生命周期与页面动作规则.md"
       ]
     },

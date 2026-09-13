@@ -11,7 +11,7 @@ const FORBIDDEN_SIMULATED_DIRS = [
   "deployments/SIM-PRIVATE-DEPLOYMENT",
 ];
 
-const REQUIRED_CUSTOMER_DOCS = ["README.md", "差异与边界.md", "实施测试部署验收.md"];
+const REQUIRED_CUSTOMER_DOCS = ["README.md"];
 const REQUIRED_CUSTOMER_CONFIG_FILES = [
   "README.md",
   "customerPackage.mjs",
@@ -113,6 +113,17 @@ function validateTemplate(config, repoRoot = process.cwd()) {
     "config/private-deployment-template/reference-customer.override.example.yml",
   ]) {
     assertPathExists(repoRoot, relativePath);
+  }
+
+  const referenceDoc = fs.readFileSync(
+    path.join(repoRoot, "docs/customers/reference-customer/README.md"),
+    "utf8",
+  );
+  for (const heading of ["## 差异与边界", "## 实施与验收"]) {
+    assert(
+      referenceDoc.split("\n").includes(heading),
+      `reference customer README missing ${heading}`,
+    );
   }
 
   const referenceEnv = fs.readFileSync(

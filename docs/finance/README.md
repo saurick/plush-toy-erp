@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 看财务 V1 范围 | `财务第一版.md` | `docs/当前真源与交接顺序.md`、产品能力台账 |
 | 判断出货后财务门禁 | `docs/architecture/状态工作流事实边界.md` | Shipment status、finance usecase 和测试 |
-| 评审财务事实实现 | `docs/architecture/业务事实扩展总评审.md` | Ent schema、operational fact / finance usecase、RBAC |
+| 评审财务事实实现 | `docs/architecture/主数据源单据事实边界评审.md` | Ent schema、operational fact / finance usecase、RBAC |
 
 ## 真源边界 / Source Boundary
 

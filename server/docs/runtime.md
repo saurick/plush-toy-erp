@@ -94,9 +94,32 @@ go test ./...
 `make migrate_prepare`，再原样使用同一次 ready 输出运行 `make migrate_execute`；
 prepare 成功不表示数据库已经升级。133 上演示、验收和生产实例不使用这些本地目标。
 
-## 后续扩展时建议确认
+## 启动与观测
 
-- 是否仍保留 JSON-RPC 作为主入口
-- HTTP 端口是否需要调整
-- 是否需要静态资源托管，或改由独立前端服务提供
-- `/readyz` 是否需要新增 Redis、MQ、OSS 等真实项目依赖检查
+`data.NewData(...)` 初始化 PostgreSQL 时对瞬时连接失败做有界重试，不能代替目标数据库迁移或就绪检查。HTTP 健康路由有定向回归；PDF 异步预热完成前 `/readyz` 保持未就绪。
+
+Compose 保留 PostgreSQL healthcheck，业务发布分别读回 health / ready 和业务 smoke。Jaeger 只绑定 loopback，远程查看通过 SSH tunnel；它不承担长期审计或业务事实存储。日志、Trace、控制面审计和已知盲区统一见 [日志、审计与 Trace](../../docs/observability/日志链路追踪审计第一版.md#服务端观测接入-server-instrumentation)。
+
+
+## 来源任务修复
+
+以下命令在 `server/` 执行。
+
+存量来源任务修复使用后端专用命令，并先由受控环境注入 `POSTGRES_DSN`，不要把连接串写入命令或报告：
+
+```bash
+# 默认在事务中执行与正式修复相同的检查和写入，然后回滚
+go run ./cmd/backfill-workflow-source-tasks
+
+# 核对 dry-run 的数据库名、扫描数和新增数后，才允许显式提交
+go run ./cmd/backfill-workflow-source-tasks \
+  --apply \
+  --confirm-database=<精确数据库名>
+```
+
+该命令只扫描当前仍为 `RELEASED` 的生产订单和当前仍为 `POSTED REWORK` 的返工事实，补齐缺失的 task / `created` event / business state 包；确定性编号被占用、已有包不完整或来源不合法时整批失败。新建任务保持 `ready`，由真实责任岗位处理，不推断历史 `done / rejected`。它不扫描 `DRAFT` 出货单，也不猜测历史上是否点过提交；出货放行仍必须从出货页显式提交。命令可执行不表示任何共享库、目标环境或客户数据库已经 dry-run / apply。
+
+
+## 实现命名写入边界
+
+自动生成的 Workflow 任务名称 / payload、核心演示 seed 和试用 MasterData seed 复用 `internal/biz/implementation_naming.go`，避免自动化重新写入编号阶段标签。普通 MasterData 和客户业务数据不套用开发阶段命名规则；风险等级（内部优先级 P0/P1/P2）、p50/p95/p99 百分位、产品编码和部署技术步骤按原业务 / 技术语义保留。历史数据库残值按需使用只读 SQL 专项盘点，不建立常驻全表扫描流程。

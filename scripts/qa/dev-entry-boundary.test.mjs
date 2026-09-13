@@ -391,17 +391,16 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "verify customer config",
     "dev testing web scripts README source",
   );
-  const scriptsDoc = docs.find((item) => item.path === "scripts/README.md");
   const qaDoc = docs.find((item) => item.path === "scripts/qa/README.md");
   assertIncludes(
-    scriptsDoc?.source || "",
+    qaDoc?.source || "",
     "trial-role-entry-docs",
-    "dev testing scripts README source",
+    "dev testing QA README source",
   );
   assertIncludes(
-    scriptsDoc?.source || "",
+    qaDoc?.source || "",
     "sales-order-field-chain-boundary",
-    "dev testing scripts README source",
+    "dev testing QA README source",
   );
   assertIncludes(
     qaDoc?.source || "",
@@ -414,9 +413,9 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "dev testing QA README source",
   );
   assertIncludes(
-    scriptsDoc?.source || "",
+    qaDoc?.source || "",
     "workflow-fact-boundary",
-    "dev testing scripts README source",
+    "dev testing QA README source",
   );
   assertIncludes(
     devTestingPageSource,

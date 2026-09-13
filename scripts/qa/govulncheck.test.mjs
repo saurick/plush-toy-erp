@@ -160,7 +160,7 @@ test("govulncheck times out a stalled scan, retries once, and remains fail-close
 test("govulncheck keeps the release scanner pin and default timeout documented", async () => {
   const [script, readme] = await Promise.all([
     readFile(SCRIPT, "utf8"),
-    readFile(path.join(ROOT_DIR, "scripts/README.md"), "utf8"),
+    readFile(path.join(ROOT_DIR, "scripts/qa/README.md"), "utf8"),
   ]);
 
   assert.match(script, /required_version="v1\.6\.0"/u);

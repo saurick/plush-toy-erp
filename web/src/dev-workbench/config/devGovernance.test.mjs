@@ -216,7 +216,7 @@ test('devGovernance: parses explicit task-first routing without guessing relatio
     tasks
       .find((item) => item.key === 'product-core-boundary')
       ?.firstHopLinks.some(
-        (link) => link.path === 'docs/product/客户差异策略.md'
+        (link) => link.path === 'docs/product/配置与权限策略.md'
       )
   )
   assert.match(

@@ -149,44 +149,17 @@ pnpm style:l1
 
 ## 文档索引
 
-- 协作约定：[AGENTS.md](AGENTS.md)
-- 阅读顺序与真源：[docs/当前真源与交接顺序.md](docs/当前真源与交接顺序.md)
-- 文档清单：[docs/文档清单.md](docs/文档清单.md)
-- 产品模块边界：[docs/product/模块边界.md](docs/product/模块边界.md)
-- 产品完成路线图：[docs/product/产品完成路线图.md](docs/product/产品完成路线图.md)
-- 自动化测试策略：[docs/product/自动化测试策略.md](docs/product/自动化测试策略.md)
-- 菜单与正式入口合同：[docs/product/菜单与正式入口合同.md](docs/product/菜单与正式入口合同.md)
-- 产品能力进度台账（全局唯一）：[docs/product/产品能力进度台账.md](docs/product/产品能力进度台账.md)
-- 客户实施与资料边界：[docs/product/新增甲方客户实施流程.md](docs/product/新增甲方客户实施流程.md)、[docs/product/客户实例策略.md](docs/product/客户实例策略.md)
-- 状态 / Workflow / Fact 边界：[docs/architecture/状态工作流事实边界.md](docs/architecture/状态工作流事实边界.md)
-- 永绅原件、交付矩阵、角色确认、UAT 与签收资料由受控客户资料仓和完整客户交付包维护，不属于 Product Core 源码包
-- architecture 历史评审归档：[docs/archive/architecture-history/README.md](docs/archive/architecture-history/README.md)
-- 业务与协同流程地图：[docs/workflow/业务与协同流程地图.md](docs/workflow/业务与协同流程地图.md)
-- 通知 / 预警 v1：[docs/workflow/通知预警催办与升级第一版.md](docs/workflow/通知预警催办与升级第一版.md)
-- 角色权限矩阵 v1：[docs/roles/角色权限矩阵第一版.md](docs/roles/角色权限矩阵第一版.md)
-- 财务 v1：[docs/finance/财务第一版.md](docs/finance/财务第一版.md)
-- 仓库与品质 v1：[docs/warehouse/仓库与品质第一版.md](docs/warehouse/仓库与品质第一版.md)
-- 日志 / 审计 / Trace v1：[docs/observability/日志链路追踪审计第一版.md](docs/observability/日志链路追踪审计第一版.md)
-- 主数据、源单据与事实边界：[docs/architecture/主数据源单据事实边界评审.md](docs/architecture/主数据源单据事实边界评审.md)
-- 打印模板字段与编辑行为：[docs/打印模板字段与编辑行为清单.md](docs/打印模板字段与编辑行为清单.md)
-- 打印模板实现原理：[docs/打印模板实现原理.md](docs/打印模板实现原理.md)
-- 前端说明：[web/README.md](web/README.md)
-- 后端说明：[server/README.md](server/README.md)
+按任务查找从 [文档入口](docs/README.md) 开始；其中按上手维护、业务领域、页面打印、开发交付、客户验收、参考历史六类导航。
+
+- 判断当前状态：[当前真源与交接顺序](docs/当前真源与交接顺序.md)。
+- 查询全部文档：[文档清单](docs/文档清单.md)。
+- 开发入口：[前端](web/README.md)、[后端](server/README.md)、[脚本](scripts/README.md)。
+- 协作与维护：[AGENTS.md](AGENTS.md)。
+
+客户原件与私密 manifest 留在客户专属 Private 仓库；产品仓内的客户资料与交付包只保存脱敏合同和证据。
 
 ## 数据库约束
 
-`server` 继续使用 Ent + Atlas 工作流：
+Ent schema 是结构真源，`make data` 生成 Ent 与 Atlas 产物，不会修改开发库。登记共享开发库交互使用 `make migrate`；非交互使用同一次 `make migrate_prepare` 回执执行 `make migrate_execute`。准备成功不等于已迁移，实际 apply 与同目标读回分别留证。
 
-- 禁止手写结构性 SQL
-- schema 变更必须通过 `make data`
-- `make data` 只生成 Ent / Atlas 产物，不会修改开发库。登记共享开发库在人机
-  终端使用 `make migrate` 完成准备、一次明确确认、apply、同目标读回和后端
-  重启；CI / Codex 等非交互环境先显式运行 `make migrate_prepare`，再原样使用
-  ready 输出的 operation ID 与确认串运行 `make migrate_execute`。准备成功只表示
-  `writes=0 / ready`，不能冒充迁移完成；只有 execute 读回 `pending=0`、Ent /
-  PostgreSQL schema 零差异且 health / ready 通过才报告成功。`migrate_status` 保留
-  为只读检查；裸 `migrate_plan` 兼容路由到 prepare，裸 TTY `migrate_apply`
-  恢复唯一 ready operation 或重新准备后确认，不会再直接因缺内部 token 失败。
-  只有携带完整内部确认的调用才进入高层服务复用的底层 plan / apply 守卫。启动
-  命令仍不会自动 apply，演示、验收与生产环境继续走正式发布流程
-- 工作流协同与各领域事实分别使用自己的 Ent schema；后续新增或调整领域对象仍必须先稳定字段关系，再改 `server/internal/data/model/schema/*.go`
+完整生成、预演、备份恢复、未知结果与目标边界统一见 [Ent + Atlas](server/docs/ent.md)；演示、验收与生产仍走正式发布流程。

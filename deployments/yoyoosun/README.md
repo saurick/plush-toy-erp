@@ -57,7 +57,7 @@ server/deploy/compose/prod
 - 升级：`runbooks/02-upgrade.md`
 - 回滚：`runbooks/03-rollback.md`
 - 备份恢复：`runbooks/04-backup-restore.md`
-- 导入执行边界：`runbooks/06-import-apply.md`
+- 导入执行边界：`../../docs/customers/yoyoosun/导入策略.md`
 - 部署前检查：`checklists/pre-deploy-checklist.md`
 - smoke 检查：`checklists/smoke-test-checklist.md`
 - 安全检查：`checklists/security-checklist.md`

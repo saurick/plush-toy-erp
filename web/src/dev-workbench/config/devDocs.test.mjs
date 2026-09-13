@@ -109,6 +109,31 @@ test('devDocs: 搜索空结果不保留越界选中项或阅读动作', () => {
   )
 })
 
+test('devDocs: 合并后的专题和操作说明仍能在查看器内查阅', () => {
+  for (const source of [
+    '../../../../server/docs/**/*.md',
+    '../../../../server/deploy/gitlab/README.md',
+    '../../../../scripts/qa/README.md',
+    '../../../../scripts/deploy/README.md',
+    '../../../../scripts/import/README.md',
+    '../../../../deployments/*/runbooks/*.md',
+    '../../../../deployments/*/checklists/*.md',
+  ]) {
+    assert(devDocsPageSource.includes(source), `missing documentation source: ${source}`)
+  }
+  const items = buildDevDocsItems({
+    '../../../../server/docs/api.md': '# JSON-RPC API 说明',
+    '../../../../server/docs/ent.md': '# Ent + Atlas 数据模型与迁移',
+    '../../../../scripts/qa/README.md': '# QA 操作',
+    '../../../../scripts/import/README.md': '# 导入准备',
+    '../../../../deployments/yoyoosun/runbooks/08-daily-ops.md': '# 日常巡检',
+  })
+  assert.equal(items.length, 5)
+  assert(items.every((item) => item.lifecycle === DEV_DOCS_LIFECYCLE_CURRENT))
+  assert(items.some((item) => item.path === 'server/docs/api.md'))
+  assert(items.some((item) => item.path === 'deployments/yoyoosun/runbooks/08-daily-ops.md'))
+})
+
 test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registry', () => {
   const docs = buildDevDocsItems({
     '../../../../README.md': '# 仓库 README',

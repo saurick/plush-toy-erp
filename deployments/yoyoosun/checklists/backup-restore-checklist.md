@@ -5,7 +5,7 @@
 - [ ] 备份脚本或运维命令已确认。
 - [ ] 备份目录存在。
 - [ ] 数据库备份生成。
-- [ ] 已确认业务附件正文位于 PostgreSQL，随本次整库备份覆盖；没有虚构独立附件目录。
+- [ ] 同一停写窗口的 S3 附件文件备份和 manifest 已生成，并与本次 PG dump、release / migration 身份绑定。
 - [ ] 备份 hash 已记录。
 - [ ] 备份大小已记录。
 - [ ] 备份加密状态已记录。
@@ -23,6 +23,7 @@
 - [ ] 已在 restored DB 上依次执行 populated upgrade 与 customer config cutover read-only audit；任一审计失败时未执行 migration apply。
 - [ ] 恢复后 migration status 正常。
 - [ ] 每周恢复检查使用异地副本，报告为 `plush.scheduled-backup-restore-check/v2` 且 `status=passed`。
+- [ ] 配套附件已恢复到新的 S3 bucket，逐对象 `verify` 通过；PG 定时恢复报告不代替文件恢复证据。
 - [ ] 恢复后 smoke query 通过。
 - [ ] 恢复后 web / server 健康检查通过。
 - [ ] `command-summary.txt` 已生成，只记录脱敏命令摘要，不包含完整 DSN、secret、dump 内容或客户 raw rows。

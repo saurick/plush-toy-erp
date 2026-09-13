@@ -6,13 +6,13 @@
 
 ## 存储与隔离结论
 
-| 资源                                    | 放置                                                                    | 原因                                           | 恢复边界                                                                      |
-| --------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------- |
-| GitLab config、PostgreSQL、repositories | GitLab 宿主 SSD：`/srv/gitlab`                                                 | 随机 I/O 和数据库延迟敏感                      | 由 GitLab backup + config archive 恢复                                        |
-| CI artifacts、Package Registry          | GitLab 宿主 RAID5：`/srv/raid5/gitlab/artifacts`、`/srv/raid5/gitlab/packages` | 大文件容量优先；正式制品通过原 GitLab URL 读取 | 保留正式 Release、源码、演练与门禁证据，纳入 GitLab backup                    |
-| GitLab 备份生成、临时文件与归档         | GitLab 宿主 RAID5：`/srv/raid5/gitlab/backups/repository`                      | 直接在 RAID5 生成，避免 SSD 再保留一套全量备份 | config archive 与 checksum 同属 `backups`；仍需异机/离线副本，RAID 不是备份   |
-| Runner VM 系统盘与 job cache            | GitLab 宿主 SSD 上的独立 KVM qcow2                                             | 构建 I/O 与 GitLab 数据隔离                    | Runner 可重建，不保存业务真源                                                 |
-| 发布镜像                                | GHCR digest                                                             | 复用现有目标机加载和 release manifest 合同     | 新 GitLab Release 保存 v2 七资产（含同一演练回执）；legacy v1 六资产只读/回滚 |
+| 资源 | 放置 | 原因 | 恢复边界 |
+| --- | --- | --- | --- |
+| GitLab config、PostgreSQL、repositories | GitLab 宿主 SSD：`/srv/gitlab` | 随机 I/O 和数据库延迟敏感 | 由 GitLab backup + config archive 恢复 |
+| CI artifacts、Package Registry | GitLab 宿主 RAID5：`/srv/raid5/gitlab/artifacts`、`/srv/raid5/gitlab/packages` | 大文件容量优先；正式制品通过原 GitLab URL 读取 | 保留正式 Release、源码、演练与门禁证据，纳入 GitLab backup |
+| GitLab 备份生成、临时文件与归档 | GitLab 宿主 RAID5：`/srv/raid5/gitlab/backups/repository` | 直接在 RAID5 生成，避免 SSD 再保留一套全量备份 | config archive 与 checksum 同属 `backups`；仍需异机/离线副本，RAID 不是备份 |
+| Runner VM 系统盘与 job cache | GitLab 宿主 SSD 上的独立 KVM qcow2 | 构建 I/O 与 GitLab 数据隔离 | Runner 可重建，不保存业务真源 |
+| 发布镜像 | GHCR digest | 复用现有目标机加载和 release manifest 合同 | 新 GitLab Release 保存 v2 七资产（含同一演练回执）；legacy v1 六资产只读/回滚 |
 
 GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数据目录。Runner 运行在独立 KVM VM 内，只获得 VM 内的 Docker socket；不得挂载 GitLab 宿主机 `/var/run/docker.sock`。
 
@@ -46,11 +46,11 @@ exact SHA `3aba488752b04e3b930ea181aa04e11d5f143cb8` 的自然 push pipeline `16
 
 CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1.58.2 / Chromium 145.0.7632.6 / revision 1208 / FFmpeg 1011`，并绑定下列原始 ZIP：
 
-| 文件                                |      字节数 | SHA-256                                                            |
-| ----------------------------------- | ----------: | ------------------------------------------------------------------ |
-| `chrome-linux64.zip`                | `175440843` | `b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38` |
+| 文件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| `chrome-linux64.zip` | `175440843` | `b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38` |
 | `chrome-headless-shell-linux64.zip` | `116288461` | `2536e97d8f410df0394b3e7c4252e88ce9f239f04f3af4e247a26caf45baf49e` |
-| `ffmpeg-linux.zip`                  |   `2376500` | `ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc` |
+| `ffmpeg-linux.zip` | `2376500` | `ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc` |
 
 只有 protected main 的自然 push `prepare` job 在同项目 Generic Package 精确返回 404 时，才允许消费一次 Runner 本地冷种子。运维 owner 在 CI 外下载上述三个公开固定文件，逐项核对长度和 SHA-256，再通过受信 SSH 写入 `/home/gitlab-runner/.plush-ci-playwright-runtime-seed-playwright-1.58.2-linux-x64-r1208-v1`：目录必须为当前 `gitlab-runner` uid、真实目录、`0700`，且只含三个当前 uid、真实普通文件、`0600` 的精确 basename。`prepare` 会在任何 package 写入前再次检查身份、mode、inventory、长度和 SHA-256，只把校验后的副本打为 `runtime.tar`，用内存中的 job token 上传 GitLab Generic Package，再下载、解包并复核同一内层集合；成功或失败后仅删除已经完整接受的精确本地种子目录。种子缺失或任何身份/内容歧义立即失败，不回退到 Runner 公网下载。
 
@@ -180,3 +180,30 @@ GitLab、独立 KVM Runner、公网入口、protected main、GitHub 单向 mirro
 ## 打印引擎 CI
 
 打印引擎的固定版本、最终镜像业务 PDF、真实系统包清单、漏洞和体积规则见 [`scripts/qa/README.md`](../../../scripts/qa/README.md#打印引擎验证--pdf-runtime)。正式制品构建会执行该门禁；已有 VM 需先由运维核对 Poppler 已安装，不由普通 Job 取得 apt 权限。上游版本检查使用独立的受保护定时入口及不可变镜像引用，不自动升级，也不改变普通 push 的质量 DAG。
+
+
+## GitLab 部署前置证据
+
+在取得部署授权后，重新只读检查并记录：
+
+| 事项 | 必须证明 | 停止条件 |
+| --- | --- | --- |
+| GitLab 宿主存储 | `/srv` SSD 与 `/srv/raid5` 实际 mount、余量、inode、SMART/RAID 状态 | mount 不符、降级或余量不足 |
+| 现有容器 | 名称、端口、数据目录和 restart 状态 | 8929/2224 冲突或路径重叠 |
+| KVM | `/dev/kvm`、libvirt network、VM 磁盘与资源预算 | 需要复用 GitLab 宿主 Docker socket |
+| 公网 | DNS、阿里云现有 vhost、FRP remote 18226、证书与回滚配置 | 同名站点来源不明或切换不可回滚 |
+| GitLab 镜像 | digest 与目标 CE 版本、升级路径和备份兼容 | 浮动 tag 或不支持的跳版本 |
+| Secrets | root 初始化、MFA、Runner token、project token、GHCR token、mirror key 的最小权限 | token 需要进入仓库/浏览器/日志 |
+
+## 回滚与停止条件
+
+| 故障层 | 回滚/处置 | 禁止动作 |
+| --- | --- | --- |
+| GitLab 容器首次启动失败 | 保留 `/srv/gitlab` 和日志，修正单一配置或回到已固定 digest | 删除 data/config、全局 Docker prune |
+| 公网入口失败 | 恢复备份的阿里云 vhost/FRP upstream，GitLab LAN 入口保持 | 临时开放 8929 公网 |
+| Runner 不可信 | pause/delete Runner token，保留 GitLab；重建一次性 VM | 改挂宿主 Docker socket |
+| mirror 异常 | pause push mirror，GitLab main 继续作为真源 | 从 GitHub 强推覆盖 GitLab |
+| release 身份不一致 | 终止 job，保留 package/release 证据，使用新版本修复 | 覆盖同名 asset/tag 或猜 digest |
+| backup/restore 未通过 | 阻断 GitLab 升级和正式依赖切换 | 把 RAID 健康当恢复证据 |
+
+遇到以下任一条件立即停止：目标身份/挂载漂移、活动 writer/部署、端口重叠、备份不可验证、secret 可能落盘/输出、Runner 需要越过 VM、GitLab/GitHub 同时发布、release SHA 与 main 不一致、目标结果 `not_proven`、或需要数据库/域名破坏性动作但没有独立授权。

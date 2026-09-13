@@ -20,7 +20,7 @@
 | 类型 | 建议受控位置 | 是否入 Git |
 | --- | --- | --- |
 | PostgreSQL 数据目录 | `/data/plush-toy-erp-yoyoosun/postgres` | 否 |
-| 业务附件正文 | PostgreSQL `business_attachments.content`，随整库备份 | 否 |
+| 业务附件正文 | 独立环境的 S3 bucket；PG 只存元数据，备份与恢复见 [附件备份与恢复合同](../../../server/deploy/compose/prod/README.md#附件存储与raid5) | 否 |
 | 生产 `.env` | `/secure/path/yoyoosun/.env` 或等价受控目录 | 否 |
 | 备份文件 | `/var/backups/plush-toy-erp-yoyoosun` 或外部备份存储 | 否 |
 | release evidence | `deployments/yoyoosun/evidence/releases/<date>/` | 可入库，必须脱敏 |

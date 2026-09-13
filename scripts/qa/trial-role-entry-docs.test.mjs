@@ -41,7 +41,6 @@ function assertIncludes(source, token, context) {
 }
 
 test("trial role docs cover all current role demo accounts and mobile task paths", () => {
-  const scriptReadme = read("scripts/README.md");
   const qaReadme = read("scripts/qa/README.md");
   const webReadme = read("web/README.md");
   const webScriptsReadme = read("web/scripts/README.md");
@@ -95,6 +94,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     );
   }
 
+  assertIncludes(webReadme, "scripts/README.md", "web README script navigation");
   const rootReadme = read("README.md");
   assertIncludes(
     rootReadme,
@@ -245,18 +245,18 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     "trial browser smoke post-login admin denial guidance",
   );
   assertIncludes(
-    scriptReadme,
-    "高频快速检查；scripts Node 测试使用显式 `fast / database / browser / release` 清单",
+    qaReadme,
+    "高频快速检查，只运行显式 `fast` Node 测试组",
     "scripts README fast QA summary",
   );
   assertIncludes(
-    scriptReadme,
-    "严格检查；先运行独有 shell / YAML 静态检查，再以 strict profile 单次复用 full",
+    qaReadme,
+    "先运行独有 shell / YAML 检查，再以 strict profile 单次运行 full",
     "scripts README strict QA summary",
   );
   assertIncludes(
-    scriptReadme,
-    "无后端单测锁住试用账号 RBAC 检查脚本必须拒绝多角色、多 mobile 权限、admin mobile 泄漏、debug 权限、super admin 和 disabled 账号",
+    qaReadme,
+    "无后端单测拒绝多角色、多 mobile 权限、admin mobile 泄漏、debug 权限、super admin 和 disabled 账号",
     "scripts README trial account RBAC test entry",
   );
   assertIncludes(
@@ -275,8 +275,8 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     "scripts README trial account RBAC report redaction boundary",
   );
   assertIncludes(
-    scriptReadme,
-    "试用账号真实 RBAC 无后端边界单测、RBAC / 浏览器 smoke 脚本语法检查、真实登录 smoke 共享 URL 边界单测；不触发真实登录",
+    qaReadme,
+    "fast 保留试用账号 RBAC、浏览器 smoke 脚本语法与真实登录共享 URL 的无后端边界单测，不触发真实登录",
     "scripts README fast QA detail",
   );
   assertIncludes(
@@ -360,7 +360,6 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     "scripts README trial browser report redaction boundary",
   );
   for (const [docSource, context] of [
-    [webReadme, "web README yoyoosun entry verification boundary"],
     [
       webScriptsReadme,
       "web scripts README yoyoosun entry verification boundary",
@@ -374,8 +373,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   }
   for (const [docSource, context] of [
     [qaReadme, "QA README effective session probe entry"],
-    [qaReadme, "scripts qa README effective session probe entry"],
-    [webReadme, "web README effective session probe command"],
+    [webScriptsReadme, "web scripts README effective session probe command"],
   ]) {
     assertIncludes(
       docSource,

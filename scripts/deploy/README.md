@@ -8,31 +8,31 @@
 
 部署 target 的唯一真源是 `deployment-targets.json`：
 
-| target              | 用途                         | 公网入口            | 数据规则                                                       |
-| ------------------- | ---------------------------- | ------------------- | -------------------------------------------------------------- |
-| `demo-133`          | 项目方造数、演练、培训与回归 | `demo.yoyoosun.net` | 可经受控 rebuild 恢复 seed / fixture / 模拟数据                |
-| `customer-test-133` | 甲方测试与验收               | `test.yoyoosun.net` | 普通部署默认保留现有数据；新一轮测试前可显式清空并重建干净基线 |
+| target | 用途 | 公网入口 | 数据规则 |
+| --- | --- | --- | --- |
+| `demo-133` | 项目方造数、演练、培训与回归 | `demo.yoyoosun.net` | 可经受控 rebuild 恢复 seed / fixture / 模拟数据 |
+| `customer-test-133` | 甲方测试与验收 | `test.yoyoosun.net` | 普通部署默认保留现有数据；新一轮测试前可显式清空并重建干净基线 |
 
 `erp` 是未来生产环境，尚未登记为可执行 target；`yoyoosun.net` 临时 `302` 跳转到 `https://erp.yoyoosun.net` 也不改变这一点。`admin.yoyoosun.net` 退役后仍不能进入 target registry、环境变量映射、数据清理、preflight、健康检查、release、promotion、smoke 或 rollback。`customer-trial-133` 只是 `demo-133` 内部模拟数据合同，不是第三个部署 target。
 
 ## 常用入口
 
-| 入口                                                        | 职责                                                                                               | 写入边界                                          |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `deployment-targets.mjs`                                    | 读取两个固定 target 的脱敏投影                                                                     | 只读                                              |
-| `target-preflight.mjs`                                      | 读回容量、Compose、端口、数据库、当前 SHA、锁、rollback point 与对应公网入口                       | 只读，不创建备份或切换版本                        |
-| `production-preflight.sh`                                   | 校验 runtime env、固定镜像、Compose、migration、PDF、健康与目标身份                                | 默认只读；`--runtime` 仍只核对                    |
-| `release-artifact-bundle.mjs`                               | 从 clean committed archive 构建一次 `linux/amd64` Server/Web 制品、SBOM 与 manifest                | `--execute` 才构建本机制品                        |
-| `release-artifact-verify.mjs`                               | 校验 manifest、SBOM、image tar 与内置 release identity                                             | 默认只读；`--load` 会加载本地镜像                 |
-| `local-release-rehearsal.mjs`                               | 用同一不可变 bytes 在一次性环境完成 migration、health/ready、登录、PDF、备份恢复与零残留           | `--execute` 才启动隔离环境                        |
-| `promotion-controller.mjs`                                  | 校验 v2 七资产、rehearsal、即时 target preflight；工作台在最终传输资格核对后才创建 ready operation | 不写目标                                          |
-| `promotion-executor.mjs`                                    | 执行已确认的固定 target promotion 并读回公网 exact SHA                                             | 写单一目标；失败按 operation 回滚                 |
-| `rollback-controller.mjs`                                   | 校验旧 manifest、migration 与客户配置兼容性                                                        | 不写目标                                          |
-| `rollback-executor.mjs`                                     | 回滚 Compose / 公网入口到兼容旧版本                                                                | 不 down migration，不自动恢复数据库               |
-| `database-rebuild-controller.mjs`                           | 为指定 target 生成备份、物理数据代和空基线资格计划                                                 | 不停服务、不备份、不迁移                          |
-| `database-rebuild-executor.mjs`                             | 执行 ready rebuild operation                                                                       | 会停单一 target、备份并切换其 PostgreSQL 数据目录 |
-| `bootstrap-production-admin.sh`                             | 在已迁移 fresh 数据库创建首个管理员并读回 marker/audit/RBAC                                        | 只允许 fresh target 的一次性确认窗口              |
-| `release-evidence-status.mjs` / `release-evidence-gate.mjs` | 汇总并校验 release evidence                                                                        | 只读                                              |
+| 入口 | 职责 | 写入边界 |
+| --- | --- | --- |
+| `deployment-targets.mjs` | 读取两个固定 target 的脱敏投影 | 只读 |
+| `target-preflight.mjs` | 读回容量、Compose、端口、数据库、当前 SHA、锁、rollback point 与对应公网入口 | 只读，不创建备份或切换版本 |
+| `production-preflight.sh` | 校验 runtime env、固定镜像、Compose、migration、PDF、健康与目标身份 | 默认只读；`--runtime` 仍只核对 |
+| `release-artifact-bundle.mjs` | 从 clean committed archive 构建一次 `linux/amd64` Server/Web 制品、SBOM 与 manifest | `--execute` 才构建本机制品 |
+| `release-artifact-verify.mjs` | 校验 manifest、SBOM、image tar 与内置 release identity | 默认只读；`--load` 会加载本地镜像 |
+| `local-release-rehearsal.mjs` | 用同一不可变 bytes 在一次性环境完成 migration、health/ready、登录、PDF、备份恢复与零残留 | `--execute` 才启动隔离环境 |
+| `promotion-controller.mjs` | 校验 v2 七资产、rehearsal、即时 target preflight；工作台在最终传输资格核对后才创建 ready operation | 不写目标 |
+| `promotion-executor.mjs` | 执行已确认的固定 target promotion 并读回公网 exact SHA | 写单一目标；失败按 operation 回滚 |
+| `rollback-controller.mjs` | 校验旧 manifest、migration 与客户配置兼容性 | 不写目标 |
+| `rollback-executor.mjs` | 回滚 Compose / 公网入口到兼容旧版本 | 不 down migration，不自动恢复数据库 |
+| `database-rebuild-controller.mjs` | 为指定 target 生成备份、物理数据代和空基线资格计划 | 不停服务、不备份、不迁移 |
+| `database-rebuild-executor.mjs` | 执行 ready rebuild operation | 会停单一 target、备份并切换其 PostgreSQL 数据目录 |
+| `bootstrap-production-admin.sh` | 在已迁移 fresh 数据库创建首个管理员并读回 marker/audit/RBAC | 只允许 fresh target 的一次性确认窗口 |
+| `release-evidence-status.mjs` / `release-evidence-gate.mjs` | 汇总并校验 release evidence | 只读 |
 
 所有浏览器动作只传 operation intent、固定 target、版本和确认串；浏览器不能传 repo、路径、SSH、env、shell、SQL、Docker 命令或凭据。
 
@@ -166,3 +166,74 @@ git diff --check
 ```
 
 根据影响面再补 full、strict、真实浏览器、release 或目标 smoke；不要用局部绿色冒充完整交付。
+
+
+## 发布预检与存量审计
+
+生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足，包括 secret 占位、固定镜像 tag、SMS mock、debug seed / cleanup、PostgreSQL / 后端 HTTP / Jaeger loopback 和低配部署边界：
+
+```bash
+bash scripts/deploy/production-preflight.sh \
+  --deployment-target <demo-133|customer-test-133> \
+  --env-file server/deploy/compose/prod/.env
+```
+
+写入 release evidence 时只保存脱敏检查输出，不保存真实 `.env`：
+
+```bash
+bash scripts/deploy/production-preflight.sh \
+  --deployment-target <demo-133|customer-test-133> \
+  --env-file server/deploy/compose/prod/.env \
+  --runtime \
+  --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.txt
+```
+
+不写 evidence 的发布前 env-only 预检可以不带 `--runtime`；但正式 release evidence 必须在部署后带 `--runtime`，同时记录 Compose 服务、容器实际 `ERP_PDF_WARMUP=async`、Chromium / chromium-common exact pin 和 `/healthz` / `/readyz`。
+
+产品级 production preflight 只核配置与部署边界，不读取业务行。现存数据库升级链在 apply 前必须依次完成两项独立只读审计：`populated-upgrade` 同时覆盖 `20260714055504_migrate.sql` 的存量边界和 WIP `20260717035245 -> 20260717043625` 委外关联切换，`customer-config-cutover` 覆盖 `20260714055825_customer_config_append_only_and_role_backfill.sql` 的切换边界。`migrate_online.sh` 的非 `--status-only` 路径会在 Atlas status 后按此顺序调用；任一失败都不会进入 dry-run 或 apply。需要单独复核时，使用固定 `--audit` 值，并通过容器模式或环境变量名传入 DSN，不能把连接串直接写进命令或报告：
+
+```bash
+sh scripts/qa/populated-upgrade-preflight.sh \
+  --audit populated-upgrade \
+  --docker-container <postgres-container> \
+  --database <database> \
+  --username <username>
+
+sh scripts/qa/populated-upgrade-preflight.sh \
+  --audit customer-config-cutover \
+  --docker-container <postgres-container> \
+  --database <database> \
+  --username <username>
+
+# POPULATED_UPGRADE_DATABASE_URL 先由受控运行环境注入，不在命令行赋值或输出
+sh scripts/qa/populated-upgrade-preflight.sh \
+  --audit populated-upgrade \
+  --database-url-env POPULATED_UPGRADE_DATABASE_URL
+
+sh scripts/qa/populated-upgrade-preflight.sh \
+  --audit customer-config-cutover \
+  --database-url-env POPULATED_UPGRADE_DATABASE_URL
+```
+
+两项审计都以 `BEGIN TRANSACTION READ ONLY` 执行，只报告 blocker。发现不兼容存量行、WIP 旧委外链接、切换后缺失 allocation、遗留流程实例或任务配置 revision 锚点后应停止 apply，由人工治理任务明确数据映射、审计、备份与回滚点；不得向审计、migration 或发布脚本补自动 `INSERT / UPDATE / DELETE`。fresh schema、静态 DDL、Ent 零漂移、Atlas validate 或空库迁移不能替代存量升级证明。备份恢复演练同样先恢复 dump、记录 pre-apply status、依次运行两项审计，再允许 Atlas apply。
+
+## 回滚演练报告
+
+rollback / forward-fix 演练完成并取得 post-smoke report 后，用报告生成器收口 release gate 需要的 JSON：
+
+```bash
+node scripts/deploy/rollback-rehearsal-report.mjs \
+  --environment customer-trial \
+  --release-version <release-version> \
+  --rehearsal-type rollback-forward-fix \
+  --trigger-scenario "smoke failed after activation" \
+  --rollback-target-release <previous-release-version> \
+  --step "identify rollback target=pass" \
+  --step "verify rollback command path=pass" \
+  --step "verify forward-fix owner path=pass" \
+  --post-smoke-report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json \
+  --customer-config-revision yoyoosun-customer-package-v3.runtime-manifest-v1 \
+  --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
+```
+
+该生成器要求步骤非空且全部 `pass / passed / ok`，post-smoke report 的 checks 非空且全部通过，并声明不含 secret / raw customer rows；提供 `--evidence-dir` 时默认写入同目录 `rollback-rehearsal-report.json`。生成的 `postCheck` 会记录 `smokeReport` 和 `smokeCheckCount`，release gate 会要求 `smokeReport` 指向同一 release evidence 目录内的 `smoke-test-report.json`，且 `smokeCheckCount` 与该文件 checks 数量一致，避免只手写 `smokeStatus=passed` 或引用其他批次 smoke。生成器本身也会拒绝绝对路径、非 `smoke-test-report.json` 文件名，或无法解析到输出目录同层 `smoke-test-report.json` 的路径；使用仓库相对路径或 `smoke-test-report.json`。如果提供 `--customer-config-revision`，还会要求 post-smoke report 包含 `customer-config-effective-session`，且 `target=jsonrpc:customer_config.get_effective_session`、`expectedRevision` 匹配传入 revision、记录 token 来源 env 名并声明 `responseBodyStored=false`，生成的 `postCheck.customerConfigEffectiveSession` 才能作为回滚 / 前向修复后读回 active revision 的脱敏证据。它不执行回滚、不恢复备份、不跑 migration、不调用后端。

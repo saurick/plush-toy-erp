@@ -21,7 +21,6 @@ const REQUIRED_FILES = [
   "runbooks/03-rollback.md",
   "runbooks/04-backup-restore.md",
   "runbooks/05-migration.md",
-  "runbooks/06-import-apply.md",
   "runbooks/07-incident-response.md",
   "runbooks/08-daily-ops.md",
   "checklists/pre-deploy-checklist.md",
@@ -29,10 +28,6 @@ const REQUIRED_FILES = [
   "checklists/smoke-test-checklist.md",
   "checklists/security-checklist.md",
   "checklists/backup-restore-checklist.md",
-  "checklists/upgrade-checklist.md",
-  "checklists/rollback-checklist.md",
-  "checklists/weekly-inspection-checklist.md",
-  "checklists/monthly-inspection-checklist.md",
   "evidence/README.md",
   "evidence/releases/README.md",
   "evidence/releases/release-evidence-template.md",
@@ -161,6 +156,22 @@ function readText(filePath) {
 function assert(condition, message, errors) {
   if (!condition) {
     errors.push(message);
+  }
+}
+
+function validateRunbookCoverage(packageDir, errors) {
+  const sections = {
+    "runbooks/02-upgrade.md": ["## 升级检查"],
+    "runbooks/03-rollback.md": ["## 回滚检查"],
+    "runbooks/08-daily-ops.md": ["## 每周", "## 每月"],
+  };
+  for (const [relativePath, headings] of Object.entries(sections)) {
+    const filePath = path.join(packageDir, relativePath);
+    if (!fs.existsSync(filePath)) continue;
+    const lines = readText(filePath).split(/\r?\n/);
+    for (const heading of headings) {
+      assert(lines.includes(heading), `${relativePath} missing ${heading}`, errors);
+    }
   }
 }
 
@@ -681,6 +692,7 @@ export function validateDeploymentPackage({
   validateEnvExample(packageDir, errors);
   validateCompose(packageDir, errors);
   validateNginxRouting(packageDir, errors);
+  validateRunbookCoverage(packageDir, errors);
   validateContent(packageDir, errors);
   validateReleaseEvidenceTemplate(packageDir, errors);
   validateBackupEvidenceTemplate(packageDir, errors);

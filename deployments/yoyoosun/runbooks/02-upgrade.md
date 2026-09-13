@@ -9,7 +9,7 @@
 1. 阅读 release notes、migration diff、配置变更和 known limitations。
 2. 确认停机窗口、回滚负责人和客户通知方式。
 3. 记录当前 Git commit、server/web image digest、migration version 和配置指纹。
-4. 执行数据库整库备份；当前业务附件正文位于 PostgreSQL，随整库备份，不存在独立运行时附件目录。
+4. 在同一停写窗口生成 PostgreSQL 整库备份和附件文件备份，绑定当前 release / migration 身份，按 [附件备份与恢复合同](../../../server/deploy/compose/prod/README.md#附件存储与raid5) 校验。
 5. 验证备份可读，至少记录 backup id、hash、大小和存储别名。
 6. 校验新 `.env` 不含 placeholder，且 debug / mock / public register 保持关闭。
 
@@ -112,3 +112,24 @@ node scripts/deploy/release-evidence-gate.mjs \
 - 登录、RBAC、关键只读页面和岗位任务入口 smoke 通过。
 - evidence 只记录版本、hash、状态和脱敏摘要。
 - release evidence gate 通过后才允许把本次 release 写成可继续客户试用。
+
+## 升级检查
+
+- [ ] Release notes 已阅读。
+- [ ] known limitations 已确认。
+- [ ] 旧 server image digest 已记录。
+- [ ] 旧 web image digest 已记录。
+- [ ] 新 server image digest 已记录。
+- [ ] 新 web image digest 已记录。
+- [ ] migration diff 已确认。
+- [ ] 配置变更已确认。
+- [ ] 数据库已备份。
+- [ ] 同一停写窗口的 S3 附件备份、manifest 和配套 PostgreSQL dump 已验证。
+- [ ] 停机窗口已确认。
+- [ ] 回滚方案已确认。
+- [ ] `.env` 已校验且不含 placeholder。
+- [ ] migration status 已记录。
+- [ ] 升级后 health / ready 通过。
+- [ ] 升级后 smoke 通过。
+- [ ] upgrade evidence 已生成。
+- [ ] 客户确认或内部试用确认已记录。

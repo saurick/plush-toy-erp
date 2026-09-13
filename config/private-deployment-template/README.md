@@ -18,7 +18,7 @@
 
 | 层级 | 必须内容 | 说明 |
 | --- | --- | --- |
-| 客户文档 | `README.md`、`差异与边界.md`、`实施测试部署验收.md` | 面向开发、测试、运维和业务验收 |
+| 客户文档 | `README.md` 中的“差异与边界”“实施与验收” | 面向开发、测试、运维和业务验收 |
 | 客户配置 | `README.md`、`customerPackage.mjs`、`customer-config.example.js` | 只声明当前编译器和前端配置实际消费的内容 |
 | 部署资料 | `README.md`、客户 env 文件 | 复用生产 Compose，不复制部署架构 |
 

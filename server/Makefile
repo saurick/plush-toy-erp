@@ -2,7 +2,7 @@
 export GIT_OPTIONAL_LOCKS := 0
 
 GOHOSTOS:=$(shell go env GOHOSTOS)
-# ⚠️ 注意：数据库迁移必须使用 `make data` 生成，严禁手动修改 SQL 文件！详见 internal/data/AI_DB_WORKFLOW.md
+# 数据模型与版本化迁移由 `make data` 生成；自定义迁移和目标执行边界见 docs/ent.md。
 GOPATH:=$(shell go env GOPATH)
 ATLAS_BIN ?= atlas
 ATLAS_VERSION ?= v1.2.0

@@ -794,7 +794,7 @@ test('devTesting: 只索引当前测试入口白名单文档', () => {
       deliveryEvidenceMarkdown,
     '../../../../docs/reference/第一次20260519/自动化测试计划.md':
       deliveryEvidenceMarkdown,
-    '../../../../docs/product/模块边界.md': unrelatedMarkdown,
+    '../../../../docs/architecture/主数据源单据事实边界评审.md': unrelatedMarkdown,
     '../../../../README.md': unrelatedMarkdown,
   })
 

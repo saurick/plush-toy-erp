@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 看日志 / 审计 / Trace V1 口径 | `日志链路追踪审计第一版.md` | `server/README.md`、server docs 和当前代码 |
 | 改系统审计页或审计 API | `server/README.md` | `docs/当前真源与交接顺序.md`、RBAC、service / biz / data tests |
-| 改部署健康检查或 tracing | `docs/部署约定.md` | `server/deploy/README.md`、`server/docs/observability.md` |
+| 改部署健康检查或 tracing | `docs/部署约定.md` | `server/deploy/README.md`、`docs/observability/日志链路追踪审计第一版.md` |
 
 ## 真源边界 / Source Boundary
 
