@@ -43,6 +43,7 @@ COPY config /config
 # CI 已生成并校验 committed error-code projection；Node-only builder 不安装 Go。
 # 生产 Vite 配置只读取端口/API 规范；客户配置叠加只需要一个构建脚本。
 COPY scripts/dev-ports.mjs scripts/local-runtime-preflight-core.mjs /scripts/
+COPY web/scripts/localPort.mjs ./scripts/localPort.mjs
 COPY scripts/build/apply-customer-web-config.mjs /scripts/build/apply-customer-web-config.mjs
 ARG ERP_CUSTOMER_PACKAGE=
 ARG GIT_SHA=
