@@ -7,6 +7,7 @@ import { groupBOMMaterials } from './bomMaterialGroups.mjs'
 import {
   BOMXlsxImportError,
   buildBOMImportDraft,
+  describeBOMImportIssues,
   getBOMImportDraftIssues,
   parseBOMXlsx,
 } from './bomXlsxImport.mjs'
@@ -647,6 +648,84 @@ test('buildBOMImportDraft: missing or ambiguous mappings stay blank until the us
     item.unit_id = 31
   })
   assert.equal(getBOMImportDraftIssues(resolvedValues).length, 0)
+})
+
+test('import review counts shared selectors once and keeps each invalid part actionable', () => {
+  const { values } = buildBOMImportDraft(
+    {
+      rows: Array.from({ length: 34 }, (_, index) => ({
+        materialName: `合成材料 ${Math.floor(index / 2) + 1}`,
+        unit: '件',
+        rowNumber: index + 6,
+        quantity: '1',
+        lossRate: '0',
+      })),
+    },
+    { units: [{ id: 1, name: '件' }] }
+  )
+  const issues = getBOMImportDraftIssues(values)
+  assert.equal(issues.length, 18)
+  assert.equal(issues[0].field, 'product_id')
+  assert.deepEqual(issues[1], {
+    scope: 'item',
+    field: 'material_id',
+    message: '请选择现有材料',
+    itemIndex: 0,
+    itemIndexes: [0, 1],
+    rowNumber: 6,
+  })
+  assert.equal(describeBOMImportIssues(issues), '选择产品、关联 17 种物料')
+  assert.equal(
+    new Set(issues.flatMap((issue) => issue.itemIndexes || [])).size,
+    34
+  )
+
+  const resolved = {
+    ...values,
+    product_id: 1,
+    items: values.items.map((item, index) => ({
+      ...item,
+      material_id: Math.floor(index / 2) + 1,
+    })),
+  }
+  assert.deepEqual(getBOMImportDraftIssues(resolved), [])
+  const invalidParts = structuredClone(resolved)
+  invalidParts.items[0].quantity = '0'
+  invalidParts.items[1].quantity = ''
+  invalidParts.items[1].loss_rate = '-1'
+  assert.deepEqual(
+    getBOMImportDraftIssues(invalidParts).map(({ field, itemIndex }) => [
+      field,
+      itemIndex,
+    ]),
+    [['quantity', 0], ['quantity', 1], ['loss_rate', 1]]
+  )
+  assert.equal(
+    describeBOMImportIssues(getBOMImportDraftIssues(invalidParts)),
+    '核对 2 个部位的用量、核对 1 个部位的损耗'
+  )
+
+  const cleared = structuredClone(resolved)
+  cleared.product_id = undefined
+  cleared.items.slice(0, 2).forEach((item) => {
+    item.material_id = undefined
+    item.unit_id = undefined
+  })
+  assert.equal(
+    describeBOMImportIssues(getBOMImportDraftIssues(cleared)),
+    '选择产品、关联 1 种物料、补全 1 组物料的单位'
+  )
+  cleared.items[1].unit_id = 2
+  assert.equal(
+    describeBOMImportIssues(getBOMImportDraftIssues(cleared)),
+    '选择产品、关联 2 种物料、补全 1 组物料的单位'
+  )
+  cleared.items.splice(0, 2)
+  assert.equal(describeBOMImportIssues(getBOMImportDraftIssues(cleared)), '选择产品')
+  assert.equal(
+    describeBOMImportIssues(getBOMImportDraftIssues({ items: [] })),
+    '选择产品、添加 BOM 明细'
+  )
 })
 
 test('parseBOMXlsx: rejects workbooks without exactly one supported detail sheet', async () => {

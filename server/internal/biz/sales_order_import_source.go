@@ -26,9 +26,10 @@ func normalizeSalesOrderImportSource(source map[string]any) (map[string]any, err
 		RowNumber  int      `json:"row_number"`
 		ImageFiles []string `json:"image_files,omitempty"`
 		Cells      []struct {
-			Column int    `json:"column"`
-			Label  string `json:"label"`
-			Value  string `json:"value"`
+			Column     int    `json:"column"`
+			Label      string `json:"label"`
+			Value      string `json:"value"`
+			MergedRows []int  `json:"merged_rows,omitempty"`
 		} `json:"cells"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -46,6 +47,9 @@ func normalizeSalesOrderImportSource(source map[string]any) (map[string]any, err
 	seen := map[int]bool{}
 	for _, cell := range evidence.Cells {
 		if cell.Column < 1 || cell.Column > 16384 || seen[cell.Column] || !validName(cell.Label, 128) || utf8.RuneCountInString(cell.Value) > 2048 || strings.ContainsRune(cell.Value, 0) {
+			return nil, ErrBadParam
+		}
+		if span := cell.MergedRows; len(span) != 0 && (len(span) != 2 || span[0] < 1 || span[1] > 5000 || span[0] >= span[1] || evidence.RowNumber < span[0] || evidence.RowNumber > span[1]) {
 			return nil, ErrBadParam
 		}
 		seen[cell.Column] = true

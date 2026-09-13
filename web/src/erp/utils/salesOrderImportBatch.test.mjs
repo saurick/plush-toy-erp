@@ -3,6 +3,7 @@ import test from 'node:test'
 import { sha256 } from 'js-sha256'
 import {
   salesOrderImportIssues,
+  reviewSalesOrderImportEntries,
   saveSalesOrderImportBatch,
 } from './salesOrderImportBatch.mjs'
 
@@ -45,14 +46,85 @@ test('batch preflight identifies missing references, currencies and unit precisi
     salesOrderImportIssues(
       { ...values, customer_id: undefined, currency: '' },
       { customers, units }
-    ).join(' '),
+    )
+      .flatMap((issue) => issue.errors)
+      .join(' '),
     /客户.*币种/u
   )
   values.items[1].ordered_quantity = '0.1'
-  assert.match(
-    salesOrderImportIssues(values, { customers, units }).join(' '),
-    /第 2 条明细.*单位精度/u
+  assert.deepEqual(salesOrderImportIssues(values, { customers, units }), [
+    {
+      name: ['items', 1, 'ordered_quantity'],
+      errors: ['订单数量不符合单位精度'],
+    },
+  ])
+})
+
+test('batch review deduplicates each field and preserves distinct line and optional form errors', () => {
+  const entries = makeEntries()
+  const first = entries[0]
+  first.values.customer_id = undefined
+  first.values.currency = undefined
+  first.values.items.forEach((item) => {
+    item.unit_id = undefined
+  })
+  first.formErrors = [
+    { name: ['customer_id'], errors: ['请选择客户'] },
+    { name: ['currency'], errors: ['请选择币种'] },
+    { name: ['items', 0, 'unit_id'], errors: ['请选择单位'] },
+    { name: ['items', 1, 'unit_id'], errors: ['请选择单位'] },
+    { name: ['contact_email'], errors: ['请输入正确的邮箱地址'] },
+  ]
+  let reviewed = reviewSalesOrderImportEntries(entries, { customers, units })
+  assert.equal(reviewed[0].issues.length, 5)
+  assert.equal(
+    reviewed[0].errors.filter((error) => error.includes('客户')).length,
+    1
   )
+  assert.deepEqual(reviewed[0].errors.slice(2), [
+    '第 1 条明细：请选择单位',
+    '第 2 条明细：请选择单位',
+    '请输入正确的邮箱地址',
+  ])
+  assert.equal(reviewed[1].status, 'pending')
+
+  reviewed[0].values = makeEntries()[0].values
+  reviewed[0].formErrors = []
+  reviewed = reviewSalesOrderImportEntries(reviewed, { customers, units })
+  assert.equal(reviewed[0].status, 'pending')
+  assert.deepEqual(reviewed[0].errors, [])
+  reviewed[0].values.customer_id = undefined
+  reviewed = reviewSalesOrderImportEntries(reviewed, { customers, units })
+  assert.equal(reviewed[0].status, 'invalid')
+  assert.equal(reviewed[0].issues.length, 1)
+})
+
+test('duplicate-number review updates both drafts and respects completed and uncertain orders', () => {
+  const entries = makeEntries()
+  entries[1].values.order_no = ` ${entries[0].values.order_no} `
+  let reviewed = reviewSalesOrderImportEntries(entries, { customers, units })
+  assert.deepEqual(
+    reviewed.map((entry) => entry.status),
+    ['invalid', 'invalid']
+  )
+  assert.ok(reviewed.every((entry) => entry.issues[0].name[0] === 'order_no'))
+  reviewed[1].values.order_no = 'SO-CORRECTED'
+  reviewed = reviewSalesOrderImportEntries(reviewed, { customers, units })
+  assert.deepEqual(
+    reviewed.map((entry) => entry.status),
+    ['pending', 'pending']
+  )
+
+  for (const locked of [
+    { status: 'complete', savedOrder: { id: 1 } },
+    { status: 'unconfirmed', uncertainOrder: true },
+  ]) {
+    entries[0] = { ...entries[0], ...locked, errors: ['保留处理结果'] }
+    entries[1].values.order_no = entries[0].values.order_no
+    const next = reviewSalesOrderImportEntries(entries, { customers, units })
+    assert.equal(next[0], entries[0])
+    assert.equal(next[1].status, 'invalid')
+  }
 })
 
 test('saves every order with all its lines and retries only failed orders', async () => {
@@ -65,8 +137,9 @@ test('saves every order with all its lines and retries only failed orders', asyn
       params.items.map((item) => item.line_no),
       [1, 2]
     )
-    if (params.order_no.endsWith('2') && calls.length === 2)
-      { throw Object.assign(new Error('invalid request'), { code: 400 }) }
+    if (params.order_no.endsWith('2') && calls.length === 2) {
+      throw Object.assign(new Error('invalid request'), { code: 400 })
+    }
     return { sales_order: { id: calls.length, order_no: params.order_no } }
   }
   let result = await saveSalesOrderImportBatch(makeEntries(), {
@@ -127,8 +200,9 @@ test('image failure retains the saved order and retries only missing images', as
     uploadImage: async (params) => {
       uploads += 1
       assert.equal(params.owner_id, 1)
-      if (uploads === 1)
-        { throw Object.assign(new Error('invalid request'), { code: 400 }) }
+      if (uploads === 1) {
+        throw Object.assign(new Error('invalid request'), { code: 400 })
+      }
       return { id: 100 }
     },
   }
@@ -142,20 +216,37 @@ test('image failure retains the saved order and retries only missing images', as
 
 test('unknown image result is checked by file name and bytes without uploading it again', async () => {
   const entries = makeEntries().slice(0, 1)
-  const image = { fileName: '订单图片.png', bytes: new Uint8Array([1, 2, 3]), mimeType: 'image/png' }
+  const image = {
+    fileName: '订单图片.png',
+    bytes: new Uint8Array([1, 2, 3]),
+    mimeType: 'image/png',
+  }
   entries[0].images = [image]
   entries[0].values.items[0].import_source = { image_files: [image.fileName] }
   let uploads = 0
   const deps = {
     ...defaults,
-    saveOrder: async (params) => ({ sales_order: { id: 1, order_no: params.order_no } }),
-    uploadImage: async () => { uploads += 1; throw Object.assign(new Error('unknown'), { isInvalidResponse: true }) },
+    saveOrder: async (params) => ({
+      sales_order: { id: 1, order_no: params.order_no },
+    }),
+    uploadImage: async () => {
+      uploads += 1
+      throw Object.assign(new Error('unknown'), { isInvalidResponse: true })
+    },
   }
   let result = await saveSalesOrderImportBatch(entries, deps)
-  result = await saveSalesOrderImportBatch(result, { ...deps, saveOrder: async () => assert.fail('saved order was recreated') })
+  result = await saveSalesOrderImportBatch(result, {
+    ...deps,
+    saveOrder: async () => assert.fail('saved order was recreated'),
+  })
   assert.equal(result[0].status, 'attachments_pending')
   assert.equal(uploads, 1)
-  result = await saveSalesOrderImportBatch(result, { ...deps, listAttachments: async () => [{ id: 100, file_name: image.fileName, sha256: sha256(image.bytes) }] })
+  result = await saveSalesOrderImportBatch(result, {
+    ...deps,
+    listAttachments: async () => [
+      { id: 100, file_name: image.fileName, sha256: sha256(image.bytes) },
+    ],
+  })
   assert.equal(result[0].status, 'complete')
   assert.equal(uploads, 1)
 })

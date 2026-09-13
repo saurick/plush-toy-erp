@@ -103,6 +103,7 @@ function createSheetXml(rows, merges) {
 export function createBOMImportWorkbookFixture({
   grouped = false,
   mergedNotes = false,
+  unmatchedProduct = false,
 } = {}) {
   const merges = ['H5:I5']
   const rows = [
@@ -110,7 +111,7 @@ export function createBOMImportWorkbookFixture({
     ['物 料 分 析 明 细 表'],
     [
       '产品编号：',
-      'PROD-STYLE-L1',
+      unmatchedProduct ? 'PROD-UNMATCHED' : 'PROD-STYLE-L1',
       '订单编号:',
       'ORDER-IMPORT-L1',
       null,
@@ -120,7 +121,7 @@ export function createBOMImportWorkbookFixture({
     ],
     [
       '产品名称:',
-      '样式产品',
+      unmatchedProduct ? '未关联样式产品' : '样式产品',
       null,
       null,
       null,

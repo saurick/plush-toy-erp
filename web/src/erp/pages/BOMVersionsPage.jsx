@@ -108,6 +108,7 @@ import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   MAX_BOM_XLSX_FILE_BYTES,
   buildBOMImportDraft,
+  describeBOMImportIssues,
   getBOMImportDraftIssues,
   parseBOMXlsx,
 } from '../utils/bomXlsxImport.mjs'
@@ -189,23 +190,24 @@ function normalizeBOMLinesForForm(headerID, items = []) {
   )
 }
 
-function BOMImportReviewSummary({ form, review }) {
+function BOMImportReviewSummary({ form, review, productOptions }) {
   const issues =
     Form.useWatch(getBOMImportDraftIssues, {
       form,
       preserve: true,
     }) || []
+  const productID = Form.useWatch('product_id', { form, preserve: true })
   if (!review) return null
   const affectedRows = new Set(
     issues
       .filter((issue) => issue.scope === 'item')
-      .map((issue) => issue.itemIndex)
+      .flatMap((issue) => issue.itemIndexes)
   ).size
   const lossEvidence = review.lossEvidence || {}
   const issueText =
     issues.length > 0
-      ? `待补全 ${issues.length} 项${
-          affectedRows > 0 ? `，涉及 ${affectedRows} 行` : ''
+      ? `请先${describeBOMImportIssues(issues)}${
+          affectedRows > 0 ? `（涉及 ${affectedRows} 个部位）` : ''
         }`
       : '明细已全部关联，可继续核对并保存'
 
@@ -213,14 +215,20 @@ function BOMImportReviewSummary({ form, review }) {
     <Alert
       className="erp-business-source-summary erp-bom-import-review"
       data-bom-import-issue-count={issues.length}
+      data-bom-import-product-status={productID ? 'matched' : 'unresolved'}
       description={
         <div className="erp-bom-import-review__details">
           <span>
             来源：{review.fileName} / {review.sheetName}
           </span>
           <span>
-            产品：{review.productCode || review.productName || '原表未填写'}，
-            {review.productMatchLabel}
+            原表产品：{review.productCode || review.productName || '原表未填写'}
+            ；{productID
+              ? `已关联：${referenceLabel(productOptions, productID, '产品')}`
+              : '尚未关联，请在上方选择对应产品档案'}
+          </span>
+          <span>
+            原表名称用于核对，保存需关联产品、材料和单位档案；同种物料选择一次即可应用到全部部位。
           </span>
           <span>
             损耗核对：原表明确 {Number(lossEvidence.explicit || 0)}{' '}
@@ -764,7 +772,7 @@ export default function BOMVersionsPage() {
       const issues = getBOMImportDraftIssues(draft.values)
       message.success(
         issues.length > 0
-          ? `已读取 ${draft.review.rowCount} 条明细，请先补全 ${issues.length} 项`
+          ? `已读取 ${draft.review.rowCount} 条明细，请先${describeBOMImportIssues(issues)}`
           : `已读取 ${draft.review.rowCount} 条明细，请核对后保存草稿`
       )
     } catch (error) {
@@ -894,15 +902,21 @@ export default function BOMVersionsPage() {
     if (headerMode === 'import') {
       const issues = getBOMImportDraftIssues(headerForm.getFieldsValue(true))
       if (issues.length > 0) {
-        const firstLineIssue = issues.find((issue) => issue.scope === 'item')
-        if (firstLineIssue) {
-          requestLineItemScroll(firstLineIssue.itemIndex)
-        } else {
-          headerForm.scrollToField([issues[0].field], {
+        const fields = issues.map((issue) => ({
+          name:
+            issue.scope === 'item'
+              ? ['items', issue.itemIndex, issue.field]
+              : [issue.field],
+          errors: [issue.message],
+        }))
+        headerForm.setFields(fields)
+        window.requestAnimationFrame(() => {
+          headerForm.scrollToField(fields[0].name, {
+            focus: true,
             block: 'center',
           })
-        }
-        message.warning(`还有 ${issues.length} 项导入内容需要补全，暂未保存`)
+        })
+        message.warning(`暂未保存：请先${describeBOMImportIssues(issues)}`)
         return
       }
     }
@@ -1632,7 +1646,11 @@ export default function BOMVersionsPage() {
             onUseVersionSuggestion={useHeaderVersionSuggestion}
           />
           {headerMode === 'import' ? (
-            <BOMImportReviewSummary form={headerForm} review={importReview} />
+            <BOMImportReviewSummary
+              form={headerForm}
+              review={importReview}
+              productOptions={productOptions}
+            />
           ) : null}
           <BusinessAttachmentPanel
             ref={headerAttachmentRef}

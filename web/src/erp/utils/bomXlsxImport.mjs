@@ -2,6 +2,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from './numeric20Scale6.mjs'
+import { groupBOMMaterials } from './bomMaterialGroups.mjs'
 import {
   XlsxImportError as BOMXlsxImportError,
   columnIndex,
@@ -836,15 +837,41 @@ export function getBOMImportDraftIssues(values = {}) {
       message: '至少保留一条 BOM 明细',
     })
   }
+  const groupByIndex = new Map(
+    groupBOMMaterials(items).flatMap((group) =>
+      group.indexes.map((index) => [index, group])
+    )
+  )
   items.forEach((line, index) => {
     for (const issue of getBOMImportLineIssues(line)) {
+      // Material and unit selectors are shared by all parts in a rendered group.
+      const itemIndexes = ['material_id', 'unit_id'].includes(issue.field)
+        ? groupByIndex.get(index).indexes
+        : [index]
+      if (index !== itemIndexes[0]) continue
       issues.push({
         ...issue,
         scope: 'item',
         itemIndex: index,
+        itemIndexes,
         rowNumber: line?._import_source?.rowNumber,
       })
     }
   })
   return issues
+}
+
+export function describeBOMImportIssues(issues = []) {
+  const count = (field) =>
+    issues.filter((issue) => issue.field === field).length
+  return [
+    count('product_id') && '选择产品',
+    count('items') && '添加 BOM 明细',
+    count('material_id') && `关联 ${count('material_id')} 种物料`,
+    count('unit_id') && `补全 ${count('unit_id')} 组物料的单位`,
+    count('quantity') && `核对 ${count('quantity')} 个部位的用量`,
+    count('loss_rate') && `核对 ${count('loss_rate')} 个部位的损耗`,
+  ]
+    .filter(Boolean)
+    .join('、')
 }

@@ -21,7 +21,11 @@ func TestSalesOrderImportedLinesPersistEvidenceWithoutWritingFacts(t *testing.T)
 	order := &biz.SalesOrderMutation{OrderNo: "SO-IMPORT-PERSIST", CustomerID: customer.ID, Currency: "CNY", OrderDate: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)}
 	line := biz.SalesOrderItemMutation{LineNo: 1, UnitID: unit.ID, RequestedProductName: &name, OrderedQuantity: decimal.NewFromInt(1000), PreShipmentSampleQuantity: decimal.NewFromInt(12), ImportSource: map[string]any{
 		"file_name": "订单.xlsx", "file_sha256": strings.Repeat("a", 64), "sheet_name": "订单", "row_number": 5,
-		"cells": []any{map[string]any{"column": 16, "label": "设计师", "value": "原表设计师"}, map[string]any{"column": 11, "label": "未出货数", "value": "123"}},
+		"cells": []any{
+			map[string]any{"column": 16, "label": "设计师", "value": "原表设计师"},
+			map[string]any{"column": 11, "label": "未出货数", "value": "123"},
+			map[string]any{"column": 20, "label": "收款说明", "value": "收5000定金", "merged_rows": []int{5, 6}},
+		},
 	}}
 	created, err := uc.SaveSalesOrderWithItems(ctx, 0, order, []*biz.SalesOrderItemSaveMutation{{SalesOrderItemMutation: line}, {SalesOrderItemMutation: func() biz.SalesOrderItemMutation {
 		other := line
@@ -40,10 +44,13 @@ func TestSalesOrderImportedLinesPersistEvidenceWithoutWritingFacts(t *testing.T)
 		t.Fatal(err)
 	}
 	item := readItems[0]
+	if !reflect.DeepEqual(item.ImportSource["cells"].([]any)[2].(map[string]any)["merged_rows"], []any{float64(5), float64(6)}) {
+		t.Fatalf("lost original payment note range: %v", item.ImportSource)
+	}
 	if item.Designer != nil || item.ProductID != 0 || item.UnshippedQuantity == nil || item.UnshippedQuantity.String() != "1000" {
 		t.Fatalf("source evidence became a business fact: %+v", item)
 	}
-	if client.Shipment.Query().CountX(ctx) != 0 || client.InventoryTxn.Query().CountX(ctx) != 0 || client.FinanceFact.Query().CountX(ctx) != 0 {
+	if client.Shipment.Query().CountX(ctx) != 0 || client.InventoryTxn.Query().CountX(ctx) != 0 || client.FinanceFact.Query().CountX(ctx) != 0 || client.FinancePayment.Query().CountX(ctx) != 0 {
 		t.Fatal("import generated downstream facts")
 	}
 	if _, err := uc.SaveSalesOrderWithItems(ctx, 0, order, []*biz.SalesOrderItemSaveMutation{{SalesOrderItemMutation: line}}); err == nil {

@@ -57,6 +57,16 @@ const headerText = (value) =>
     .replace(/[\s：:]/gu, '')
     .toUpperCase()
 
+export function salesOrderSourceFieldValue(cells, field) {
+  return (
+    cells.find((cell) =>
+      HEADER_ALIASES[field]?.some(
+        (label) => headerText(label) === headerText(cell.label)
+      )
+    )?.value || ''
+  )
+}
+
 function fail(message, code = 'invalid_sales_order') {
   throw new XlsxImportError(message, code)
 }
@@ -101,6 +111,9 @@ function sheetCell(sheet, rowsByNumber, row, column) {
     value: normalizeText(source.values[column]),
     type: source.cellTypes[column] || '',
     formula: source.formulas[column] || '',
+    ...(merge && merge.endRow > merge.startRow
+      ? { merged_rows: [merge.startRow, merge.endRow] }
+      : {}),
   }
 }
 
@@ -342,7 +355,18 @@ export async function parseSalesOrderXlsx(
         fileName: `订单图片-${fileSHA256.slice(0, 12)}-${workbook.sheets.indexOf(sheet) + 1}-${row.rowNumber}-${index + 1}.${image.mimeType.split('/')[1].replace('jpeg', 'jpg')}`,
       }))
       const sourceCells = []
-      const maxColumns = Math.max(headerRow.values.length, row.values.length)
+      const maxColumns = Math.max(
+        headerRow.values.length,
+        row.values.length,
+        ...sheet.mergeRanges
+          .filter(
+            (range) =>
+              range.startColumn === range.endColumn &&
+              range.startRow <= row.rowNumber &&
+              range.endRow >= row.rowNumber
+          )
+          .map((range) => range.endColumn)
+      )
       for (let column = 0; column < maxColumns; column += 1) {
         const source = sheetCell(sheet, rowsByNumber, row, column)
         const label = normalizeText(headerRow.values[column])
@@ -357,6 +381,7 @@ export async function parseSalesOrderXlsx(
           column: column + 1,
           label: boundedText(label || `第 ${column + 1} 列（无标题）`, 128, location, '原表字段名'),
           value: boundedText(value, 2048, location, label || '无标题字段'),
+          ...(source.merged_rows ? { merged_rows: source.merged_rows } : {}),
         })
       }
       if (sourceCells.length > 64 || images.length > 10) {

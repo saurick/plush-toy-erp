@@ -46,7 +46,7 @@
   border-right: 1px solid var(--erp-business-action-modal-border, #d8e3dc);
   border-bottom: 1px solid var(--erp-business-action-modal-border, #d8e3dc);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
   overflow-wrap: anywhere;
 }
 
@@ -72,6 +72,31 @@
   background: transparent;
   border-radius: 4px;
   box-shadow: none;
+}
+
+.erp-bom-parts-table .erp-bom-center-cell,
+.erp-bom-center-cell .ant-input {
+  text-align: center;
+}
+
+.erp-bom-center-cell .ant-select-single .ant-select-selector {
+  padding-inline: 24px;
+}
+
+.erp-bom-center-cell .ant-select-selection-item,
+.erp-bom-center-cell .ant-select-selection-placeholder {
+  padding-inline: 0;
+  text-align: center;
+}
+
+.erp-bom-center-cell .erp-bom-import-line-status {
+  justify-content: center;
+}
+
+.erp-bom-parts-table .erp-bom-number-cell,
+.erp-bom-number-input-cell .ant-input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .erp-bom-parts-table .ant-input:hover,
@@ -100,12 +125,6 @@
 .erp-bom-material-cell__context {
   display: block;
   padding: 4px 8px;
-}
-
-.erp-bom-parts-table .erp-bom-number-cell {
-  text-align: right;
-  padding-top: 12px;
-  font-variant-numeric: tabular-nums;
 }
 
 .erp-bom-parts-table .erp-bom-part-actions {

@@ -475,7 +475,7 @@ export default function BOMMaterialGroupsForm({
                                   </td>
                                   <td
                                     rowSpan={rowSpan}
-                                    className="erp-bom-material-cell"
+                                    className="erp-bom-material-cell erp-bom-center-cell"
                                   >
                                     {(material
                                       ? material.spec
@@ -483,7 +483,7 @@ export default function BOMMaterialGroupsForm({
                                   </td>
                                   <td
                                     rowSpan={rowSpan}
-                                    className="erp-bom-material-cell"
+                                    className="erp-bom-material-cell erp-bom-center-cell"
                                   >
                                     <Form.Item
                                       name={[field.name, 'unit_id']}
@@ -523,7 +523,15 @@ export default function BOMMaterialGroupsForm({
                                   {key === 'process_base' ? (
                                     <BOMUsageCell index={itemIndex} />
                                   ) : null}
-                                  <td>
+                                  <td
+                                    className={
+                                      key === 'quantity' || key === 'loss_rate'
+                                        ? 'erp-bom-number-input-cell'
+                                        : key === 'note'
+                                          ? undefined
+                                          : 'erp-bom-center-cell'
+                                    }
+                                  >
                                     <Form.Item
                                       name={[partField.name, key]}
                                       rules={

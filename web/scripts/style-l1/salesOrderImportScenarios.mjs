@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { createSalesOrderWorkbook } from './salesOrderImportWorkbookFixture.mjs'
 import { parseSalesOrderXlsx } from '../../src/erp/utils/salesOrderXlsxImport.mjs'
+import { salesOrderSourcePayment } from '../../src/erp/utils/salesOrderSourcePayment.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 export function createSalesOrderImportScenarios(deps) {
@@ -14,14 +15,14 @@ export function createSalesOrderImportScenarios(deps) {
   } = deps
   const importPath = '/erp/sales/project-orders/sales-orders'
   function scenario(name, failSecond = false) {
-    let parsed,
-      file,
-      customers,
-      savedOrders,
-      savedItems,
-      mutations,
-      attachments,
-      failedOnce
+    let parsed
+      let file
+      let customers
+      let savedOrders
+      let savedItems
+      let mutations
+      let attachments
+      let failedOnce
     return {
       name,
       path: importPath,
@@ -33,6 +34,7 @@ export function createSalesOrderImportScenarios(deps) {
         const buffer = filePath
           ? await fs.readFile(filePath)
           : createSalesOrderWorkbook({
+              paymentRecords: true,
               cellImages: [
                 {
                   id: 'untrusted',
@@ -78,11 +80,11 @@ export function createSalesOrderImportScenarios(deps) {
         await page.route('**/rpc/masterdata', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
           if (method === 'list_customers')
-            return respond(
+            { return respond(
               route,
               id,
               stylePaginatedRpcData(customers, 'customers', params)
-            )
+            ) }
           return route.fallback()
         })
         await page.route('**/rpc/sales_order', async (route) => {
@@ -121,32 +123,32 @@ export function createSalesOrderImportScenarios(deps) {
             savedItems.push(...items)
             data = { sales_order: order, sales_order_items: items }
           } else if (method === 'list_sales_orders')
-            data = stylePaginatedRpcData(savedOrders, 'sales_orders', params)
+            { data = stylePaginatedRpcData(savedOrders, 'sales_orders', params) }
           else if (method === 'get_sales_order')
-            data = {
+            { data = {
               sales_order: savedOrders.find((order) => order.id === params.id),
-            }
+            } }
           else if (method === 'list_sales_order_items')
-            data = stylePaginatedRpcData(
+            { data = stylePaginatedRpcData(
               savedItems.filter(
                 (item) => item.sales_order_id === params.sales_order_id
               ),
               'sales_order_items',
               params
-            )
+            ) }
           else return route.fallback()
           return respond(route, id, data)
         })
         await page.route('**/rpc/attachment', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
           if (method === 'list_attachments')
-            return respond(route, id, {
+            { return respond(route, id, {
               attachments: attachments.filter(
                 (item) =>
                   item.owner_type === params.owner_type &&
                   item.owner_id === params.owner_id
               ),
-            })
+            }) }
           if (method === 'upload_attachment') {
             const attachment = {
               ...params,
@@ -159,9 +161,9 @@ export function createSalesOrderImportScenarios(deps) {
             return respond(route, id, { attachment })
           }
           if (method === 'download_attachment')
-            return respond(route, id, {
+            { return respond(route, id, {
               attachment: attachments.find((item) => item.id === params.id),
-            })
+            }) }
           return route.fallback()
         })
       },
@@ -207,7 +209,14 @@ export function createSalesOrderImportScenarios(deps) {
           .getByText(parsed.orders[0].lines[0].item.requested_product_name, {
             exact: true,
           })
+          .first()
           .waitFor()
+        const previewRecords = picker.getByRole('region', { name: '原表收款记录', exact: true })
+        if (salesOrderSourcePayment(parsed.orders[0].lines.map((line) => line.item)).rows.length) {
+          await previewRecords.waitFor()
+        } else {
+          assert.equal(await previewRecords.count(), 0)
+        }
         await picker.locator('img').first().waitFor()
         await picker
           .getByRole('combobox', { name: '原表缺少单位时使用' })
@@ -237,6 +246,25 @@ export function createSalesOrderImportScenarios(deps) {
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.waitFor()
         assert.equal(mutations.length, 0)
+        const checkPaymentRecords = async (order) => {
+          const expected = salesOrderSourcePayment(order.lines.map((line) => line.item))
+          const records = editor.getByRole('region', { name: '原表收款记录', exact: true })
+          if (!expected.rows.length) {
+            assert.equal(await records.count(), 0)
+            return
+          }
+          await records.waitFor()
+          const rows = records.locator('.ant-table-tbody > tr[data-row-key]')
+          assert.equal(await rows.count(), expected.rows.length)
+          for (const [index, row] of expected.rows.entries()) {
+            const cells = await rows.nth(index).locator('td').allTextContents()
+            assert.deepEqual(cells, [row.location, row.productName, row.amounts.join('；') || '未填写', row.deposit.join('；') || '未标记', row.balance.join('；') || '未标记'])
+          }
+          for (const note of expected.notes) {
+            assert.equal(await records.getByText(note.text, { exact: true }).count(), 1)
+            await records.getByText(note.locations.join('；'), { exact: true }).waitFor()
+          }
+        }
         const chooseOrder = async (position) => {
           const select = editor.getByRole('combobox', { name: '切换导入订单' })
           await select.fill(parsed.orders[position].order_no)
@@ -256,6 +284,7 @@ export function createSalesOrderImportScenarios(deps) {
         }
         for (const [position, order] of parsed.orders.entries()) {
           if (position > 0) await chooseOrder(position)
+          await checkPaymentRecords(order)
           assert.equal(
             await editor.locator('.erp-sales-order-lines-form__row').count(),
             order.lines.length
@@ -284,6 +313,10 @@ export function createSalesOrderImportScenarios(deps) {
                 .getAttribute('open'),
               ''
             )
+          }
+          if (salesOrderSourcePayment(order.lines.map((line) => line.item)).notes.length) {
+            const records = editor.getByRole('region', { name: '原表收款记录', exact: true })
+            await records.screenshot({ path: path.join(outputDir, `sales-order-source-payment-${position + 1}.png`) })
           }
         }
         await chooseOrder(0)
@@ -393,7 +426,7 @@ export function createSalesOrderImportScenarios(deps) {
               'note',
               'process_requirement',
             ])
-              assert.equal(item[key] || '', expected[key] || '', `saved ${key}`)
+              { assert.equal(item[key] || '', expected[key] || '', `saved ${key}`) }
             assert.deepEqual(item.import_source, expected.import_source)
             assert.equal(item.product_id, undefined)
             assert.equal(item.product_sku_id, undefined)
@@ -406,6 +439,7 @@ export function createSalesOrderImportScenarios(deps) {
         await page.locator('.ant-table-tbody > tr[data-row-key]').filter({ hasText: parsed.orders[0].order_no }).first().click()
         await page.getByRole('button', { name: /编辑订单$/u }).click()
         await editor.getByRole('heading', { name: '编辑销售订单', exact: true }).waitFor()
+        await checkPaymentRecords(parsed.orders[0])
         assert.equal(await editor.locator('.erp-sales-order-lines-form__row').count(), parsed.orders[0].lines.length)
         await editor.locator('img[alt="订单产品原表图片"]').first().waitFor()
         const sourceButton = editor.getByRole('button', { name: `核对原表：${parsed.orders[0].lines[0].sheetName} 第 ${parsed.orders[0].lines[0].rowNumber} 行`, exact: true })
@@ -416,6 +450,7 @@ export function createSalesOrderImportScenarios(deps) {
         await editor.waitFor({ state: 'hidden' })
         await page.getByRole('button', { name: /新建订单/u }).click()
         await editor.waitFor()
+        assert.equal(await editor.getByRole('region', { name: '原表收款记录', exact: true }).count(), 0)
         assert.equal(
           await editor.locator('.erp-sales-order-lines-form__row').count(),
           0

@@ -1890,7 +1890,7 @@ export function createBusinessFormalScenarios(deps) {
         await modal.waitFor({ state: 'visible' })
         await expectText(page, '检查并保存导入草稿')
         await expectText(page, '已读取 2 条 BOM 明细')
-        await expectText(page, '待补全 1 项')
+        await expectText(page, '请先关联 1 种物料')
         await modal.locator('summary').click()
         assert.equal(
           await modal.getByLabel('来源订单号', { exact: true }).inputValue(),
@@ -1957,7 +1957,7 @@ export function createBusinessFormalScenarios(deps) {
 
         await modal.getByLabel('BOM 版本', { exact: true }).fill('V-IMPORT-L1')
         await modal.getByRole('button', { name: '保存草稿' }).click()
-        await expectText(page, '还有 1 项导入内容需要补全，暂未保存')
+        await expectText(page, '暂未保存：请先关联 1 种物料')
         assert.equal(
           rpcMutations.filter((item) => item.method === 'save_bom_with_items')
             .length,

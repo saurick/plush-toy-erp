@@ -71,9 +71,14 @@ export function createSalesOrderWorkbook({
   date1904 = false,
   prefixed = false,
   cellImages = [],
+  paymentRecords = false,
 } = {}) {
   sheets ||= [
-    { name: '订单汇总', rows: salesOrderFixtureRows(), merges: ['Q4:Q5'] },
+    {
+      name: '订单汇总',
+      rows: salesOrderFixtureRows({ paymentRecords }),
+      merges: ['Q4:Q5', ...(paymentRecords ? ['V4:V5'] : [])],
+    },
     {
       name: '辅助来货表',
       rows: [
@@ -130,8 +135,8 @@ export function createSalesOrderWorkbook({
   return zip(entries)
 }
 
-export function salesOrderFixtureRows() {
-  return [
+export function salesOrderFixtureRows({ paymentRecords = false } = {}) {
+  const rows = [
     ['模拟工厂订单汇总'],
     [
       '下单日期',
@@ -218,4 +223,17 @@ export function salesOrderFixtureRows() {
     ['注意条件：'],
     ['1、自动生成款号并从外部路径抓取图片'],
   ]
+  if (paymentRecords) {
+    rows[2][20] = '定金已付'
+    rows[2][22] = 15800
+    rows[2][23] = '尾款已付'
+    rows[3][20] = '定金已付'
+    rows[3][21] = '收5000定金'
+    rows[3][22] = 37800
+    rows[4][20] = '定金已付'
+    rows[4][14] = 26.4
+    rows[4][22] = 73920
+    rows[4][24] = '定金加尾款请款单'
+  }
+  return rows
 }

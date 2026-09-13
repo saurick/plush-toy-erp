@@ -16,6 +16,7 @@ import {
 } from 'antd'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import SalesOrderSourceEvidence from './SalesOrderSourceEvidence.jsx'
+import SalesOrderSourcePaymentSection from './SalesOrderSourcePaymentSection.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import FieldWithUnitSuffix, {
@@ -445,6 +446,7 @@ export function SalesOrderFormFields({
           onBlur={onPaymentConditionBlur}
         />
       </Form.Item>
+      <SalesOrderSourcePaymentSection form={form} />
       <BusinessFormSectionTitle>税费与运费条件</BusinessFormSectionTitle>
       <Form.Item
         className="erp-business-action-form__field"

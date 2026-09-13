@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Alert, Button, Form, Select, Space, Tag, Typography } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -9,7 +9,7 @@ import {
 } from './SalesOrderForm.jsx'
 import { useSalesOrderPaymentReview } from './useSalesOrderPaymentReview.mjs'
 import {
-  salesOrderImportIssues,
+  reviewSalesOrderImportEntries,
   saveSalesOrderImportBatch,
 } from '../../utils/salesOrderImportBatch.mjs'
 import {
@@ -52,13 +52,16 @@ export default function SalesOrderBatchImportEditor({
 }) {
   const [form] = Form.useForm()
   const [entries, setEntries] = useState(() =>
-    drafts.map((draft, index) => ({
-      ...draft,
-      key: index,
-      status: 'pending',
-      errors: [],
-      uploadStates: {},
-    }))
+    reviewSalesOrderImportEntries(
+      drafts.map((draft, index) => ({
+        ...draft,
+        key: index,
+        status: 'pending',
+        errors: [],
+        uploadStates: {},
+      })),
+      { customers, units }
+    )
   )
   const entriesRef = useRef(entries)
   const [index, setIndex] = useState(0)
@@ -67,6 +70,10 @@ export default function SalesOrderBatchImportEditor({
   const switchingRef = useRef(false)
   const [contacts, setContacts] = useState([])
   const customerID = Form.useWatch('customer_id', form)
+  const watchedValues = Form.useWatch((values) => values, {
+    form,
+    preserve: true,
+  })
   const payment = useSalesOrderPaymentReview({ customers, form })
   const { rememberPaymentCondition } = payment
   const current = entries[index]
@@ -74,21 +81,47 @@ export default function SalesOrderBatchImportEditor({
     (entry) => entry.status === 'complete'
   ).length
   const saved = entries.filter((entry) => entry.savedOrder).length
-  const submitLabel = entries.some((entry) => entry.savedOrder || entry.uncertainOrder)
+  const submitLabel = entries.some(
+    (entry) => entry.savedOrder || entry.uncertainOrder
+  )
     ? '重试未完成项 / 核对结果'
     : `保存全部 ${entries.length} 张草稿`
   const locked = saving || Boolean(current.savedOrder || current.uncertainOrder)
-  const updateEntries = (next) => {
+  const updateEntries = useCallback((next) => {
     entriesRef.current = next
     setEntries(next)
-  }
+  }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const next = entriesRef.current[index]
     form.resetFields()
     form.setFieldsValue(next.values)
+    form.setFields(next.formErrors || [])
     rememberPaymentCondition(next.values)
   }, [index, form, rememberPaymentCondition])
+
+  const refreshReview = useCallback(() => {
+    if (savingRef.current || switchingRef.current) return
+    const next = [...entriesRef.current]
+    const entry = next[index]
+    if (entry.savedOrder || entry.uncertainOrder) return
+    const values = form.getFieldsValue(true)
+    const edited =
+      businessFormSnapshot(values) !== businessFormSnapshot(entry.values)
+    next[index] = {
+      ...entry,
+      values,
+      formErrors: form.getFieldsError().filter((field) => field.errors.length),
+      ...(edited && entry.status === 'failed'
+        ? { status: 'pending', errors: [] }
+        : {}),
+    }
+    updateEntries(reviewSalesOrderImportEntries(next, { customers, units }))
+  }, [customers, form, index, units, updateEntries])
+
+  useEffect(() => {
+    refreshReview()
+  }, [watchedValues, refreshReview])
 
   useEffect(() => {
     let active = true
@@ -120,7 +153,7 @@ export default function SalesOrderBatchImportEditor({
       try {
         await form.validateFields()
       } catch (error) {
-        formErrors = (error.errorFields || []).flatMap((field) => field.errors)
+        formErrors = error.errorFields || []
       }
       next[index] = {
         ...next[index],
@@ -128,7 +161,7 @@ export default function SalesOrderBatchImportEditor({
         formErrors,
       }
     }
-    return next
+    return reviewSalesOrderImportEntries(next, { customers, units })
   }
   const selectOrder = async (nextIndex) => {
     if (savingRef.current || switchingRef.current || nextIndex === index) return
@@ -206,29 +239,21 @@ export default function SalesOrderBatchImportEditor({
     setSaving(true)
     try {
       let next = await capture()
-      const numbers = new Set()
-      next = next.map((entry) => {
-        if (entry.savedOrder || entry.uncertainOrder) return entry
-        const issues = [
-          ...salesOrderImportIssues(entry.values, { customers, units }),
-          ...(entry.formErrors || []),
-        ]
-        if (numbers.has(entry.values.order_no)) {
-          issues.push('所选订单编号重复，请先更正')
-        }
-        numbers.add(entry.values.order_no)
-        return {
-          ...entry,
-          status: issues.length ? 'invalid' : 'pending',
-          errors: issues,
-        }
-      })
       const invalid = next.findIndex((entry) => entry.status === 'invalid')
       updateEntries(next)
       if (invalid >= 0) {
         setIndex(invalid)
-        message.warning('请先补齐标记的订单信息，再批量保存')
-        return
+        setSaving(false)
+        // Load and unlock the selected order before the shared form page opens
+        // collapsed details and focuses its ordered field errors.
+        await new Promise((resolve) => window.requestAnimationFrame(resolve))
+        form.setFields(next[invalid].issues)
+        message.warning(
+          `订单 ${next[invalid].values.order_no || '未编号'}：${next[invalid].errors[0]}，暂未保存`
+        )
+        throw Object.assign(new Error('请补齐订单信息'), {
+          errorFields: next[invalid].issues,
+        })
       }
       next = await saveSalesOrderImportBatch(next, {
         customers,
@@ -254,6 +279,7 @@ export default function SalesOrderBatchImportEditor({
       }
       await onSaved?.()
     } catch (error) {
+      if (error?.errorFields) throw error
       message.warning(getActionErrorMessage(error, '刷新导入结果'))
     } finally {
       savingRef.current = false
@@ -311,6 +337,9 @@ export default function SalesOrderBatchImportEditor({
       </Space>
       {current.errors?.length ? (
         <Alert
+          data-sales-import-issue-count={
+            current.status === 'invalid' ? current.issues.length : undefined
+          }
           showIcon
           type="warning"
           message={statusLabels[current.status]}
@@ -336,6 +365,7 @@ export default function SalesOrderBatchImportEditor({
         layout="vertical"
         className="erp-business-action-form"
         disabled={locked}
+        onFieldsChange={refreshReview}
       >
         <SalesOrderFormFields
           form={form}

@@ -3,6 +3,7 @@ import { UploadOutlined } from '@ant-design/icons'
 import { Select, Space, Table, Typography } from 'antd'
 import SalesOrderBatchImportEditor from './SalesOrderBatchImportEditor.jsx'
 import { SalesOrderImportImage } from './SalesOrderSourceEvidence.jsx'
+import { SalesOrderSourcePaymentRecords } from './SalesOrderSourcePaymentSection.jsx'
 import { BUSINESS_CURRENCY_OPTIONS } from '../../utils/masterDataOrderView.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -75,14 +76,20 @@ const detailColumns = [
 
 function renderOrderLines(order) {
   return (
-    <Table
-      size="small"
-      rowKey={(line) => `${line.sheetName}:${line.rowNumber}`}
-      dataSource={order.lines}
-      columns={detailColumns}
-      pagination={false}
-      scroll={{ x: 1800, y: 340 }}
-    />
+    <Space direction="vertical" size="middle" style={{ display: 'flex' }}>
+      <Table
+        size="small"
+        rowKey={(line) => `${line.sheetName}:${line.rowNumber}`}
+        dataSource={order.lines}
+        columns={detailColumns}
+        pagination={false}
+        scroll={{ x: 1800, y: 340 }}
+      />
+      <SalesOrderSourcePaymentRecords
+        showTitle
+        items={order.lines.map((line) => line.item)}
+      />
+    </Space>
   )
 }
 

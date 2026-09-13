@@ -2,6 +2,7 @@ package biz
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -31,5 +32,30 @@ func TestSalesOrderImportSourceValidation(t *testing.T) {
 	}
 	if result, err := normalizeSalesOrderImportSource(nil); err != nil || result != nil {
 		t.Fatal("manual orders must not require import evidence")
+	}
+}
+
+func TestSalesOrderImportSourceMergedRows(t *testing.T) {
+	for _, span := range [][]int{{4, 6}, {5, 6}, {4, 5}, nil, {4}, {4, 5, 6}, {0, 5}, {5, 5}, {6, 4}, {6, 7}, {1, 4}, {4, 5001}} {
+		cell := map[string]any{"column": 20, "label": "收款说明", "value": "收5000定金", "merged_rows": span}
+		source := map[string]any{
+			"file_name": "订单.xlsx", "file_sha256": strings.Repeat("a", 64), "sheet_name": "订单", "row_number": 5,
+			"cells": []any{cell},
+		}
+		result, err := normalizeSalesOrderImportSource(source)
+		valid := span == nil || (len(span) == 2 && span[0] >= 1 && span[0] < span[1] && span[0] <= 5 && span[1] >= 5 && span[1] <= 5000)
+		if !valid {
+			if !errors.Is(err, ErrBadParam) {
+				t.Fatalf("accepted invalid merge range %v", span)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("rejected valid merge range %v: %v", span, err)
+		}
+		normalized := result["cells"].([]any)[0].(map[string]any)
+		if span != nil && !reflect.DeepEqual(normalized["merged_rows"], []any{float64(span[0]), float64(span[1])}) {
+			t.Fatalf("lost original merge range: %v", result)
+		}
 	}
 }

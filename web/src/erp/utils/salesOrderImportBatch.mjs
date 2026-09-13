@@ -14,54 +14,111 @@ const text = (value) => String(value ?? '').trim()
 
 export function salesOrderImportIssues(
   values,
-  { customers = [], units = [] } = {}
+  { customers = [], units = [], formErrors = [] } = {}
 ) {
-  const issues = []
-  if (!text(values.order_no)) issues.push('请填写订单编号')
+  const issues = new Map()
+  const add = (name, message) => {
+    const key = JSON.stringify(name)
+    if (!issues.has(key)) issues.set(key, { name, errors: [message] })
+  }
+  if (!text(values.order_no)) add(['order_no'], '请填写订单编号')
   if (
     !customers.some(
       (customer) =>
         customer.id === values.customer_id && customer.is_active !== false
     )
-  )
-    { issues.push('请选择有效客户') }
-  if (!['CNY', 'USD', 'HKD'].includes(values.currency))
-    { issues.push('请选择币种') }
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(values.order_date || ''))
-    { issues.push('请填写下单日期') }
-  if (!values.items?.length) issues.push('至少保留一条订货明细')
+  ) {
+    add(['customer_id'], '请选择有效客户')
+  }
+  if (!['CNY', 'USD', 'HKD'].includes(values.currency)) {
+    add(['currency'], '请选择币种')
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(values.order_date || '')) {
+    add(['order_date'], '请填写下单日期')
+  }
+  if (!values.items?.length) add(['items'], '至少保留一条订货明细')
   for (const [index, item] of (values.items || []).entries()) {
-    const prefix = `第 ${index + 1} 条明细：`
     const unit = units.find(
       (candidate) =>
         candidate.id === item.unit_id && candidate.is_active !== false
     )
-    if (!text(item.requested_product_name) && !item.product_id)
-      { issues.push(`${prefix}请填写产品名称`) }
-    if (!unit) issues.push(`${prefix}请选择单位`)
+    if (!text(item.requested_product_name) && !item.product_id) {
+      add(['items', index, 'requested_product_name'], '请填写产品名称')
+    }
+    if (!unit) add(['items', index, 'unit_id'], '请选择单位')
     for (const [key, label, positive] of [
       ['ordered_quantity', '订单数量', true],
       ['pre_shipment_sample_quantity', '船头版数量', false],
     ]) {
       const amount = numeric20Scale6Units(item[key] || (positive ? '' : '0'))
-      if (amount === null || (positive && amount === '0'))
-        { issues.push(`${prefix}${label}无效`) }
-      else if (
+      if (amount === null || (positive && amount === '0')) {
+        add(['items', index, key], `${label}无效`)
+      } else if (
         unit &&
         Number.isInteger(unit.precision) &&
         unit.precision >= 0 &&
         unit.precision < 6 &&
         !amount.padStart(6, '0').endsWith('0'.repeat(6 - unit.precision))
-      )
-        { issues.push(`${prefix}${label}不符合单位精度`) }
+      ) {
+        add(['items', index, key], `${label}不符合单位精度`)
+      }
     }
     if (
       item.planned_delivery_date &&
       item.planned_delivery_date < values.order_date
-    )
-      { issues.push(`${prefix}交付日期早于下单日期`) }
+    ) {
+      add(['items', index, 'planned_delivery_date'], '交付日期早于下单日期')
+    }
   }
-  return issues
+  for (const field of formErrors) {
+    if (!field.errors?.length) continue
+    add(field.name, field.errors[0])
+  }
+  return [...issues.values()]
+}
+
+export function reviewSalesOrderImportEntries(entries, references) {
+  const numbers = new Map()
+  for (const entry of entries) {
+    const number = text(entry.values.order_no)
+    if (number) numbers.set(number, (numbers.get(number) || 0) + 1)
+  }
+  return entries.map((entry) => {
+    if (entry.savedOrder || entry.uncertainOrder) return entry
+    const issues = salesOrderImportIssues(entry.values, {
+      ...references,
+      formErrors: entry.formErrors || [],
+    })
+    if (
+      numbers.get(text(entry.values.order_no)) > 1 &&
+      !issues.some((issue) => issue.name[0] === 'order_no')
+    ) {
+      issues.unshift({
+        name: ['order_no'],
+        errors: ['所选订单编号重复，请先更正'],
+      })
+    }
+    return {
+      ...entry,
+      issues,
+      status: issues.length
+        ? 'invalid'
+        : entry.status === 'invalid'
+          ? 'pending'
+          : entry.status,
+      errors: issues.length
+        ? issues.map((issue) => {
+            const prefix =
+              issue.name[0] === 'items' && issue.name.length > 1
+                ? `第 ${Number(issue.name[1]) + 1} 条明细：`
+                : ''
+            return `${prefix}${issue.errors[0]}`
+          })
+        : entry.status === 'invalid'
+          ? []
+          : entry.errors || [],
+    }
+  })
 }
 
 export function salesOrderImportParams(values, customers) {

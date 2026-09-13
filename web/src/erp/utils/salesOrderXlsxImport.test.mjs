@@ -121,6 +121,22 @@ test('resolves embedded DISPIMG images by relationship without executing formula
   )
 })
 
+test('keeps merged payment note provenance even when continuation rows have no trailing cells', async () => {
+  const rows = salesOrderFixtureRows()
+  rows[3][21] = '收5000定金'
+  rows[3][22] = '尾款已付'
+  const result = await parseSalesOrderXlsx(createSalesOrderWorkbook({
+    sheets: [{ name: '订单', rows, merges: ['V4:V5'] }],
+  }))
+  const [, second] = result.orders
+  for (const line of second.lines) {
+    assert.deepEqual(line.item.import_source.cells.find((cell) => cell.column === 22), {
+      column: 22, label: '第 22 列（无标题）', value: '收5000定金', merged_rows: [4, 5],
+    })
+  }
+  assert.equal(second.lines[1].item.import_source.cells.find((cell) => cell.column === 23), undefined)
+})
+
 test('matches only unique active customer and unit records and never replaces an explicit unrecognized unit', async () => {
   const result = await parseSalesOrderXlsx(createSalesOrderWorkbook())
   const order = result.orders[0]

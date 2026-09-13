@@ -235,6 +235,105 @@ export function createBOMMaterialGroupsScenarios(deps) {
       },
     },
     {
+      name: 'bom-xlsx-import-save-review',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: deps.customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const { assert } = deps
+        const saves = []
+        await page.route('**/rpc/bom', async (route) => {
+          const body = route.request().postDataJSON()
+          if (body.method === 'save_bom_with_items') saves.push(body.params)
+          await route.fallback()
+        })
+        await deps.expectHeading(page, '物料清单（BOM）')
+        await page
+          .locator('button[data-business-action-key="import-bom-xlsx"]:enabled')
+          .waitFor()
+        await page.getByLabel('选择 BOM Excel 文件').setInputFiles({
+          name: 'BOM-UNMATCHED-GROUPED.xlsx',
+          mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          buffer: createBOMImportWorkbookFixture({
+            grouped: true,
+            unmatchedProduct: true,
+          }),
+        })
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        const review = editor.locator('.erp-bom-import-review')
+        await review.waitFor()
+        assert.equal(await review.getAttribute('data-bom-import-issue-count'), '3')
+        assert.ok((await review.innerText()).includes('选择产品、关联 2 种物料（涉及 3 个部位）'))
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        await deps.expectText(page, '暂未保存：请先选择产品、关联 2 种物料')
+        await page.waitForFunction(() => document.activeElement?.id === 'product_id')
+        assert.equal(saves.length, 0)
+        await page.screenshot({
+          path: `${deps.outputDir}/bom-import-save-product-required.png`,
+          fullPage: true,
+        })
+
+        const product = editor.locator('input#product_id')
+        await product.fill('PROD-STYLE-L1')
+        await product.press('Enter')
+        await editor.locator('[data-bom-import-product-status="matched"]').waitFor()
+        assert.ok((await review.innerText()).includes('已关联：PROD-STYLE-L1'))
+        assert.equal((await review.innerText()).includes('尚未关联'), false)
+        await editor.locator('.ant-select:has(input#product_id) .ant-select-clear')
+          .click({ force: true })
+        await editor.locator('[data-bom-import-product-status="unresolved"]').waitFor()
+        assert.ok((await review.innerText()).includes('尚未关联'))
+        await product.fill('PROD-STYLE-L1')
+        await product.press('Enter')
+        await editor.locator('[data-bom-import-issue-count="2"]').waitFor()
+
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        await page.waitForFunction(() =>
+          document.activeElement?.getAttribute('aria-label') === '物料名称 2'
+        )
+        assert.equal(saves.length, 0)
+        const material = editor.getByRole('combobox', { name: '物料名称 2', exact: true })
+        await material.fill('MAT-STYLE-L1')
+        await material.press('Enter')
+        await editor.locator('[data-bom-import-issue-count="1"]').waitFor()
+        assert.equal(
+          await editor.locator('.erp-bom-material-group').first()
+            .locator('tr[data-bom-part-index]').count(),
+          3,
+          '关联一次应补齐同一物料的全部部位'
+        )
+        const lastMaterial = editor.getByRole('combobox', { name: '物料名称 4', exact: true })
+        await lastMaterial.fill('MAT-STYLE-L1')
+        await lastMaterial.press('Enter')
+        await editor.locator('[data-bom-import-issue-count="0"]').waitFor()
+
+        await editor.getByLabel('单位用量 3', { exact: true }).fill('0')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        await deps.expectText(page, '暂未保存：请先核对 1 个部位的用量')
+        await page.waitForFunction(() =>
+          document.activeElement?.getAttribute('aria-label') === '单位用量 3'
+        )
+        assert.equal(saves.length, 0)
+        await editor.getByLabel('单位用量 3', { exact: true }).fill('0.25')
+        await editor.getByLabel('BOM 版本', { exact: true }).fill('V-REVIEW')
+        await editor.locator('[data-bom-import-issue-count="0"]').waitFor()
+        await review.scrollIntoViewIfNeeded()
+        await page.screenshot({
+          path: `${deps.outputDir}/bom-import-save-review-resolved.png`,
+          fullPage: true,
+        })
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        await editor.waitFor({ state: 'hidden' })
+        assert.equal(saves.length, 1)
+        assert.equal(saves[0].product_id, 1)
+        assert.equal(saves[0].items.length, 4)
+        assert.ok(saves[0].items.every((item) => item.material_id === 1 && item.unit_id === 1))
+        assert.equal(saves[0].items[2].quantity, '0.25')
+      },
+    },
+    {
       name: 'bom-xlsx-import-material-groups',
       path: '/erp/purchase/material-bom',
       auth: 'admin',
