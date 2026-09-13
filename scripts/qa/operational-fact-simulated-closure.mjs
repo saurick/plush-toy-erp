@@ -302,10 +302,10 @@ function buildInputTemplate(options = {}) {
     roleAccounts: ROLE_USERS,
     commands: {
       printInputTemplate:
-        "PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template",
-      reportOnly: `PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --customer-id <active_customer_id> --product-id <active_product_id> --material-id <active_material_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id> --run-id ${runId} --out ${out}`,
+        "node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template",
+      reportOnly: `node scripts/qa/operational-fact-simulated-closure.mjs --customer-id <active_customer_id> --product-id <active_product_id> --material-id <active_material_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id> --run-id ${runId} --out ${out}`,
       seedCoreDemo:
-        "PATH=/usr/local/bin:$PATH bash scripts/seed-core-demo-data.sh",
+        "bash scripts/seed-core-demo-data.sh",
     },
     boundary:
       "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write formal business data, or create operational facts.",

@@ -122,7 +122,7 @@ test("remote promotion reports failed only after proving the previous runtime an
   assert.match(source, /runtime_stop_started=1\n"\$\{clean_env\[@\]\}"/u);
 });
 
-test("remote promotion acquires the exact formal release on R640 before package verification", () => {
+test("remote promotion acquires the exact formal release on the target host before package verification", () => {
   assert.match(source, /source "\$incoming\/remote-release-acquire[.]sh"/u);
   assert.match(source, /acquire_target_release/u);
   assert.match(source, /target-release-fetch[.]json/u);

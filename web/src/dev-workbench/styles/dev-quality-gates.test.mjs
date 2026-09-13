@@ -37,7 +37,7 @@ test('quality gates styles: environment readiness stays page-owned and compact',
   assert.doesNotMatch(css, /^\.ant-alert\s*\{/mu)
 })
 
-test('quality gates styles: R640 evidence stays compact and source-backed', () => {
+test('quality gates styles: GitLab CI evidence stays compact and source-backed', () => {
   assert.match(css, /\.erp-dev-quality-server-evidence/u)
   assert.match(
     css,

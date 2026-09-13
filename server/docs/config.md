@@ -2,9 +2,9 @@
 
 本文档对应：
 
-- `/Users/simon/projects/plush-toy-erp/server/internal/conf/conf.proto`
-- `/Users/simon/projects/plush-toy-erp/server/configs/dev/config.yaml`
-- `/Users/simon/projects/plush-toy-erp/server/configs/prod/config.yaml`
+- `server/internal/conf/conf.proto`
+- `server/configs/dev/config.yaml`
+- `server/configs/prod/config.yaml`
 
 ## 顶层结构
 
@@ -142,7 +142,7 @@ CSP 当前保留 `script-src 'unsafe-inline'` 和 `style-src 'unsafe-inline'`，
 角色演示账号不属于 `data.auth` 配置，不写入 `conf.proto`，也不进入 `server/configs/dev|prod/config.yaml`。需要切换角色或同时登录多个岗位做开发 / 验收时，应显式执行：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
+bash scripts/seed-role-demo-admins.sh
 ```
 
 该脚本可生成 `demo_boss`、`demo_sales`、`demo_purchase`、`demo_production`、`demo_warehouse`、`demo_quality`、`demo_finance`、`demo_pmc`、`demo_engineering` 和 `demo_admin`，每个账号只绑定对应内置角色，权限仍来自 `roles -> role_permissions` 真源。默认不生成 `debug_operator` 账号；如果确需调试权限账号，必须显式加 `--include-debug`。

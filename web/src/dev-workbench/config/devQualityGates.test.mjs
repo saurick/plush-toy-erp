@@ -217,7 +217,7 @@ function summary(overrides = {}) {
           ],
         },
       ],
-      message: 'R640 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。',
+      message: 'GitLab CI 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。',
       notProven: ['不可变 Release', '目标部署', '客户 UAT'],
     },
     status: {
@@ -692,7 +692,7 @@ test('quality gates config: summary preserves one shared operation truth', () =>
   )
 })
 
-test('quality gates config: R640 DAG is derived from exact needs and actual Job states', () => {
+test('quality gates config: GitLab CI DAG is derived from exact needs and actual Job states', () => {
   const dag = buildQualityGateServerDag({
     status: 'running',
     topology: {
@@ -775,7 +775,7 @@ test('quality gates config: R640 DAG is derived from exact needs and actual Job 
   )
 })
 
-test('quality gates config: R640 timing ranks bottlenecks without summing parallel jobs', () => {
+test('quality gates config: GitLab CI timing ranks bottlenecks without summing parallel jobs', () => {
   const timing = buildQualityGateServerTiming({
     status: 'running',
     pipeline: { durationMs: 120_000, queueMs: 5_000 },
@@ -852,7 +852,7 @@ test('quality gates config: R640 timing ranks bottlenecks without summing parall
   assert.equal('totalDurationMs' in timing, false)
 })
 
-test('quality gates config: R640 history separates execution limits from fan-in and queue delay', () => {
+test('quality gates config: GitLab CI history separates execution limits from fan-in and queue delay', () => {
   function historyJob(
     pipelineId,
     index,
@@ -982,7 +982,7 @@ test('quality gates config: R640 history separates execution limits from fan-in 
   assert.equal(retried.attention, 'unstable')
 })
 
-test('quality gates config: R640 timing does not invent jobs without evidence', () => {
+test('quality gates config: GitLab CI timing does not invent jobs without evidence', () => {
   const timing = buildQualityGateServerTiming({
     status: 'unavailable',
     pipeline: null,
@@ -994,7 +994,7 @@ test('quality gates config: R640 timing does not invent jobs without evidence', 
   assert.equal(timing.longestJob, null)
 })
 
-test('quality gates config: R640 missing evidence is distinct from unreadable evidence', () => {
+test('quality gates config: GitLab CI missing evidence is distinct from unreadable evidence', () => {
   const timing = buildQualityGateServerTiming({
     status: 'missing',
     pipeline: null,
@@ -1004,7 +1004,7 @@ test('quality gates config: R640 missing evidence is distinct from unreadable ev
   assert.deepEqual(timing.flowJobs, [])
 })
 
-test('quality gates config: R640 queued and in-progress jobs keep distinct states', () => {
+test('quality gates config: GitLab CI queued and in-progress jobs keep distinct states', () => {
   const timing = buildQualityGateServerTiming({
     status: 'running',
     pipeline: { durationMs: null, queueMs: 2_000 },
@@ -1187,7 +1187,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /buildQualityGateHistoryTrend/u)
   assert.match(pageSource, /buildQualityGateCoverageMatrix/u)
   assert.match(pageSource, /当前正式回执/u)
-  assert.match(pageSource, /R640 服务器门禁/u)
+  assert.match(pageSource, /GitLab CI 门禁/u)
   assert.match(pageSource, /正式主路径/u)
   assert.match(
     pageSource,
@@ -1203,7 +1203,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /data-server-view="performance"/u)
   assert.match(pageSource, /data-server-view="history"/u)
   assert.doesNotMatch(pageSource, /serverJobLocalStageLabels/u)
-  assert.doesNotMatch(pageSource, /本机阶段与 R640 CI Job 对照/u)
+  assert.doesNotMatch(pageSource, /本机阶段与 GitLab CI Job 对照/u)
   assert.doesNotMatch(pageSource, /CI：\{ciJob\.label\}/u)
   assert.equal((pageSource.match(/label: '本次流水线'/gu) || []).length, 1)
   assert.equal((pageSource.match(/label: 'Job 性能'/gu) || []).length, 1)
@@ -1213,7 +1213,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /unavailable: '读取失败'/u)
   assert.match(pageSource, /连接正常 · 当前提交无 CI/u)
   assert.match(pageSource, /GitLab 读取正常/u)
-  assert.match(pageSource, /R640 正在读取服务器证据/u)
+  assert.match(pageSource, /GitLab CI 正在读取服务器证据/u)
   assert.match(pageSource, /最近 CI/u)
   assert.match(pageSource, /历史结果不代表当前提交已通过/u)
   assert.match(pageSource, /最近普通 push CI 历史/u)

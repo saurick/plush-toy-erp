@@ -100,7 +100,7 @@ function buildProductCorePlan() {
     realCustomerImport: false,
     writesCustomerRuntimeFacts: false,
     seedCommand:
-      "PATH=/usr/local/bin:$PATH bash scripts/seed-core-demo-data.sh",
+      "bash scripts/seed-core-demo-data.sh",
     expectedCoverage: {
       units: 4,
       materials: 7,
@@ -192,16 +192,16 @@ function buildYoyoosunPlan() {
     ],
     commands: {
       fixtureBoundary:
-        "PATH=/usr/local/bin:$PATH node --test scripts/qa/yoyoosun-customer-closure.test.mjs",
+        "node --test scripts/qa/yoyoosun-customer-closure.test.mjs",
       datasetPlan:
-        "PATH=/usr/local/bin:$PATH node scripts/qa/manual-acceptance-dataset.mjs",
+        "node scripts/qa/manual-acceptance-dataset.mjs",
       sourcePlan:
-        `PATH=/usr/local/bin:$PATH node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version ${identity.dataVersion} --run-id ${identity.runId} --json`,
+        `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version ${identity.dataVersion} --run-id ${identity.runId} --json`,
       factsEntrypoint: "scripts/qa/manual-acceptance-fact-data.mjs",
       factsHelper:
         "scripts/qa/manual-acceptance-source-driven-facts.mjs",
       readinessPlan:
-        "PATH=/usr/local/bin:$PATH node scripts/qa/manual-acceptance-readiness.mjs",
+        "node scripts/qa/manual-acceptance-readiness.mjs",
     },
   };
 }
@@ -221,12 +221,12 @@ export function buildManualRegressionDataPlan() {
       {
         id: "review-pass-1-runtime-contract-and-fixture-unit-tests",
         command:
-          "PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs scripts/qa/yoyoosun-customer-closure.test.mjs scripts/qa/manual-regression-data-plan.test.mjs",
+          "node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs scripts/qa/yoyoosun-customer-closure.test.mjs scripts/qa/manual-regression-data-plan.test.mjs",
       },
       {
         id: "review-pass-2-data-isolation-and-browser-regression",
         command:
-          "PATH=/usr/local/bin:$PATH node scripts/qa/test-data-isolation-boundary.mjs --json && STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-action-projection-business-pages pnpm --dir web style:l1",
+          "node scripts/qa/test-data-isolation-boundary.mjs --json && STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-action-projection-business-pages pnpm --dir web style:l1",
       },
     ],
     boundaries: [

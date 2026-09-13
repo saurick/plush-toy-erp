@@ -12,26 +12,23 @@ description: 项目代码审查治理（plush-toy-erp）。Use when reviewing pl
 ## 范围解析 Scope
 
 1. 用户指定 commit、branch、文件、目录或 PR 时，只审指定范围。
-2. side chat 或新会话未指定范围时，审当前仓库 `GIT_OPTIONAL_LOCKS=0 git status`、staged diff、unstaged diff 和最近相关提交。
+2. side chat 或新会话未指定范围时，审当前仓库只读 status、staged diff、unstaged diff 和最近相关提交。
 3. 当前主会话里“实现后 review”时，审本轮相关改动；若工作区有多组无关改动，先按最近用户请求收窄。
 4. 不依赖主会话说法。任何结论都要回到仓库代码、正式文档、测试和当前 diff。
 
-## 必读真源 Truth Chain
+## Truth Routing / 按范围读取
 
 先运行：
 
 ```bash
-GIT_OPTIONAL_LOCKS=0 git status --short
-git diff --stat
+GIT_OPTIONAL_LOCKS=0 git status --short --untracked-files=all
+GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 ```
 
-再按触达范围读：
+再只读触达范围需要的真源：
 
-- `AGENTS.md`
-- `README.md`
-- `docs/当前真源与交接顺序.md`
-- `docs/product/自动化测试策略.md`
-- `scripts/README.md`
+- 范围、目录职责或当前入口不清时，读 `README.md` 与 `docs/当前真源与交接顺序.md`。
+- 测试策略或证据边界受影响时读 `docs/product/自动化测试策略.md`；QA / 脚本合同受影响时读 `scripts/README.md` 与对应脚本说明。
 - 前端任务读 `web/README.md` 和相关页面/组件/测试。
 - 服务端、schema、事实层任务读 `server/README.md`、相关 `biz / data / service / schema / migration` 和测试。
 - 文档或页面设计相关改动需要同时按项目 docs/page governance skill 的规则审查，但本 skill 不要求它们必须一起触发。
@@ -80,5 +77,5 @@ git diff --stat
 1. Findings first，按严重度排序，带文件行号、影响和建议。
 2. 无问题时明确写“未发现阻塞问题”。
 3. 写清审查范围、已读真源、已跑或未跑的验证。
-4. 单列剩余盲区，尤其是未覆盖的测试、浏览器状态、migration、部署或文档同步。
+4. 只列与本次改动相关的剩余盲区，不机械枚举未触达的测试或环境。
 5. 默认不附长篇改动总结，除非用户要求。

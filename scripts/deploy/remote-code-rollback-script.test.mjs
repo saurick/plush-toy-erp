@@ -77,7 +77,7 @@ test("remote code rollback requires exact confirmation, lock and receipt", () =>
   );
 });
 
-test("remote rollback acquires the exact formal release on R640 before package verification", () => {
+test("remote rollback acquires the exact formal release on the target host before package verification", () => {
   assert.match(source, /source "\$live_acquire_script"/u);
   assert.match(source, /acquire_target_release/u);
   assert.match(source, /target-release-fetch[.]json/u);

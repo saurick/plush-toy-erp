@@ -36,7 +36,7 @@ export const productionArtifactForbiddenMarkers = Object.freeze([
   "favicon-dev.svg",
   "plush_erp_dev_hub",
   "customer-yoyoosun-private",
-  "/Users/simon/",
+  "/Users/",
 ]);
 
 function listArtifactFiles(rootDir) {

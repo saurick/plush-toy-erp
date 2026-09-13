@@ -4,15 +4,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 COMPOSE_FILE="$SCRIPT_DIR/compose.yml"
 ENV_FILE="$SCRIPT_DIR/.env"
+EXPECTED_CONTROL_HOSTNAME=r640
+EXPECTED_GITLAB_HOSTNAME=gitlab.saurick.me
+EXPECTED_CONFIRMATION="INSTALL_GITLAB:${EXPECTED_CONTROL_HOSTNAME}:${EXPECTED_GITLAB_HOSTNAME}"
 EXECUTE=false
 CONFIRMATION=""
 
 usage() {
-  cat <<'USAGE'
+  cat <<USAGE
 用法:
-  bash server/deploy/gitlab/install-r640.sh
-  sudo bash server/deploy/gitlab/install-r640.sh --execute \
-    --confirm INSTALL_GITLAB:R640:gitlab.saurick.me
+  bash server/deploy/gitlab/install-gitlab.sh
+  sudo bash server/deploy/gitlab/install-gitlab.sh --execute \\
+    --confirm $EXPECTED_CONFIRMATION
 
 默认只读预检。执行模式只创建 /srv/gitlab 与已挂载 RAID5 的精确目录并启动 plush-gitlab；
 不会停止、删除、重建其他容器，也不会配置公网 FRP、DNS 或 GitHub 镜像。
@@ -89,7 +92,7 @@ GITLAB_MEMORY_LIMIT="$(read_env_value GITLAB_MEMORY_LIMIT)"
 : "${GITLAB_DATA_DIR:?missing GITLAB_DATA_DIR}"
 : "${GITLAB_RAID_BACKUP_DIR:?missing GITLAB_RAID_BACKUP_DIR}"
 
-[[ "$GITLAB_HOSTNAME" == "gitlab.saurick.me" ]]
+[[ "$GITLAB_HOSTNAME" == "$EXPECTED_GITLAB_HOSTNAME" ]]
 [[ "$GITLAB_CONFIG_DIR" == "/srv/gitlab/config" ]]
 [[ "$GITLAB_LOG_DIR" == "/srv/gitlab/logs" ]]
 [[ "$GITLAB_DATA_DIR" == "/srv/gitlab/data" ]]
@@ -102,6 +105,10 @@ GITLAB_MEMORY_LIMIT="$(read_env_value GITLAB_MEMORY_LIMIT)"
 [[ "$GITLAB_BACKUP_KEEP_SECONDS" =~ ^[1-9][0-9]*$ ]]
 [[ "$GITLAB_BACKUP_RETENTION_DAYS" =~ ^[1-9][0-9]*$ ]]
 [[ "$GITLAB_MEMORY_LIMIT" =~ ^[1-9][0-9]*G$ ]]
+if [[ "$(hostname -s)" != "$EXPECTED_CONTROL_HOSTNAME" ]]; then
+  echo "[gitlab-install] control host identity mismatch" >&2
+  exit 2
+fi
 
 RUNTIME_ENV="$(mktemp)"
 chmod 0600 "$RUNTIME_ENV"
@@ -155,7 +162,7 @@ if [[ "$EUID" -ne 0 ]]; then
   echo "[gitlab-install] --execute requires root"
   exit 2
 fi
-if [[ "$CONFIRMATION" != "INSTALL_GITLAB:R640:gitlab.saurick.me" ]]; then
+if [[ "$CONFIRMATION" != "$EXPECTED_CONFIRMATION" ]]; then
   echo "[gitlab-install] exact confirmation mismatch"
   exit 2
 fi

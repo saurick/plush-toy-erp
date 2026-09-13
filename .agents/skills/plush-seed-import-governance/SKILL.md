@@ -7,9 +7,9 @@ description: 数据准备与导入（plush-toy-erp）；验收目录、检查与
 
 用这个 skill 处理 `plush-toy-erp` seed data、fixtures、demo data、import dry-runs、manual-test data 和 cleanup，保证数据可查、可回收、不冒充产品真源。
 
-## 真源链 Truth Chain
+## Truth Routing / 真源路由
 
-- 先读 `AGENTS.md`、`README.md`、`docs/当前真源与交接顺序.md`、相关 module docs/code/tests。
+- 范围、数据入口或模块责任不清时，才用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位；否则直接读取相关 module docs、代码和测试。
 - 写数据前确认 target DB/env、schema/migration state、run id/prefix 和 cleanup path。
 
 ## 项目规则 Project Rules

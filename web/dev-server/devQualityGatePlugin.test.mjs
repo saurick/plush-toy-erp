@@ -130,7 +130,7 @@ test('quality gate action accepts only fixed full or strict intent', () => {
   }
 })
 
-test('quality gate projects R640 exact-SHA CI separately from local dirty state', () => {
+test('quality gate projects GitLab exact-SHA CI separately from local dirty state', () => {
   const names = [
     'plan',
     'prepare',
@@ -960,7 +960,7 @@ test('quality gate summary reuses only a passed receipt for the current clean SH
       pipeline: null,
       jobs: [],
       history: [],
-      message: 'R640 exact-SHA CI 已通过',
+      message: 'GitLab exact-SHA CI 已通过',
       notProven: ['不可变 Release'],
     }),
   })
@@ -970,10 +970,10 @@ test('quality gate summary reuses only a passed receipt for the current clean SH
   assert.equal(summary.proofs.strict.releaseEligible, true)
   assert.equal(summary.proofs.strict.reused, true)
   assert.equal(summary.status.tone, 'success')
-  assert.match(summary.status.title, /R640/u)
+  assert.match(summary.status.title, /GitLab CI/u)
 })
 
-test('quality gate never promotes a local receipt without R640 exact-SHA evidence', async (t) => {
+test('quality gate never promotes a local receipt without GitLab CI exact-SHA evidence', async (t) => {
   const root = await project(t)
   const cleanRepository = {
     ...REPOSITORY,
@@ -998,7 +998,7 @@ test('quality gate never promotes a local receipt without R640 exact-SHA evidenc
       jobs: [],
       history: [],
       message: '当前 SHA 无服务器证据',
-      notProven: ['当前 exact SHA 的 R640 普通 CI'],
+      notProven: ['当前 exact SHA 的 GitLab 普通 push CI'],
     }),
   })
 
@@ -1006,7 +1006,7 @@ test('quality gate never promotes a local receipt without R640 exact-SHA evidenc
   assert.equal(summary.proofs.strict.releaseEligible, false)
   assert.equal(summary.status.releaseEligible, false)
   assert.equal(summary.status.tone, 'warning')
-  assert.match(summary.status.title, /仍缺 R640/u)
+  assert.match(summary.status.title, /仍缺 GitLab CI/u)
 })
 
 test('quality gate summary keeps current proof authoritative when rerun environment is unavailable', async (t) => {
@@ -1038,7 +1038,7 @@ test('quality gate summary keeps current proof authoritative when rerun environm
       pipeline: null,
       jobs: [],
       history: [],
-      message: 'R640 exact-SHA CI 已通过',
+      message: 'GitLab exact-SHA CI 已通过',
       notProven: ['不可变 Release'],
     }),
   })
@@ -1046,7 +1046,7 @@ test('quality gate summary keeps current proof authoritative when rerun environm
   const summary = await service.summary()
   assert.equal(summary.environment.disposableDatabaseReady, false)
   assert.equal(summary.status.tone, 'success')
-  assert.match(summary.status.title, /当前版本已通过 R640/u)
+  assert.match(summary.status.title, /当前版本已通过 GitLab CI/u)
 })
 
 test('quality gate recovery stops an orphaned process group and then fails closed', async (t) => {

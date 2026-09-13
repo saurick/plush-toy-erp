@@ -31,7 +31,7 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
 
 1. Establish the page state and truth source.
    - Determine whether the work is Draft, To Implement, or Current.
-   - Read the relevant current truth before editing: project `AGENTS.md`, `docs/当前真源与交接顺序.md`, `web/README.md`, and `docs/product/prototypes/README.md` when prototypes are involved.
+   - 范围或页面入口不清时，用 `docs/当前真源与交接顺序.md` 与 `web/README.md` 定位；涉及原型时才读 `docs/product/prototypes/README.md` 和对应原型说明。
    - Inspect the real runtime page and existing components when the task touches layout, density, spacing, styles, interactions, or visible page structure.
 
 2. 根据影响面读取上表的语义或实现分支，在现有组件、helper 和真实后端能力上修改。

@@ -26,7 +26,7 @@ Usage:
   sudo /usr/local/sbin/plush-runner-capacity --slots <positive-integer>
   sudo /usr/local/sbin/plush-runner-capacity --slots <positive-integer> \
     --expect-slots <positive-integer> --execute \
-    --confirm SET_RUNNER_CAPACITY:R640:<expected>:<requested>
+    --confirm SET_RUNNER_CAPACITY:r640-kvm-isolated-shell:<expected>:<requested>
   sudo /usr/local/sbin/plush-runner-capacity --initialize \
     --slots <positive-integer>
   sudo /usr/local/sbin/plush-runner-capacity --evidence
@@ -220,7 +220,7 @@ fi
 if [[ "$MODE" == execute ]]; then
   [[ -n "$EXPECTED_SLOTS" ]]
   [[ "$CURRENT_SLOTS" == "$EXPECTED_SLOTS" ]]
-  [[ "$CONFIRMATION" == "SET_RUNNER_CAPACITY:R640:$EXPECTED_SLOTS:$SLOTS" ]]
+  [[ "$CONFIRMATION" == "SET_RUNNER_CAPACITY:$EXPECTED_RUNNER_NAME:$EXPECTED_SLOTS:$SLOTS" ]]
   if [[ "$CAPACITY_STATE" == managed ]]; then
     [[ "$CAPACITY_SLOTS" == "$CURRENT_SLOTS" ]]
   fi

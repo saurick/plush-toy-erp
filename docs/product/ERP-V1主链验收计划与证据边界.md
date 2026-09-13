@@ -46,7 +46,7 @@ V1 主链验收计划回答的是：**当前候选版本需要按什么顺序验
 生成 V1 主链验收计划和本地 evidence：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 node scripts/qa/v1-acceptance-plan.mjs \
   --out output/customers/yoyoosun/v1-acceptance-plan
 ```
@@ -54,7 +54,7 @@ node scripts/qa/v1-acceptance-plan.mjs \
 需要同时运行现有 no-write report-only 工具时：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 node scripts/qa/v1-acceptance-plan.mjs \
   --run-report-tools \
   --out output/customers/yoyoosun/v1-acceptance-plan

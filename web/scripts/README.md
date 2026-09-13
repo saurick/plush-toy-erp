@@ -16,7 +16,7 @@
 ## 常用命令
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm style:l1
 STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 node scripts/realLoginSmokeShared.mjs --print-input-template

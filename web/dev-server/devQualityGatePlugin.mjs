@@ -563,7 +563,7 @@ function statusProjection({
   ) {
     return {
       tone: 'success',
-      title: '当前版本已通过 R640 严格门禁',
+      title: '当前版本已通过 GitLab CI 严格门禁',
       description:
         '普通 push CI、七个固定分片、聚合回执与 CI Gate 均绑定当前干净 exact SHA，可以进入版本发布。',
       releaseEligible: true,
@@ -574,45 +574,45 @@ function statusProjection({
   if (serverEvidence?.status === 'running') {
     return {
       tone: 'info',
-      title: 'R640 正在验证当前版本',
+      title: 'GitLab CI 正在验证当前版本',
       description: '服务器普通 push CI 尚未形成终态，当前不能进入版本发布。',
       releaseEligible: false,
-      recommendation: '等待 R640 exact-SHA CI Gate 形成终态。',
-      notProven: ['当前版本 R640 严格门禁', '目标环境发布', '客户 UAT'],
+      recommendation: '等待 GitLab exact-SHA CI Gate 形成终态。',
+      notProven: ['当前版本 GitLab CI 严格门禁', '目标环境发布', '客户 UAT'],
     }
   }
   if (serverEvidence?.status === 'failed') {
     return {
       tone: 'error',
-      title: '当前版本 R640 严格门禁未通过',
+      title: '当前版本 GitLab CI 严格门禁未通过',
       description: '服务器普通 push CI 未形成完整通过证据，不能进入版本发布。',
       releaseEligible: false,
-      recommendation: '先修复 R640 第一失败阶段，再由新 exact SHA 重新运行。',
-      notProven: ['当前版本 R640 严格门禁', '目标环境发布', '客户 UAT'],
+      recommendation: '先修复 GitLab CI 第一失败阶段，再由新 exact SHA 重新运行。',
+      notProven: ['当前版本 GitLab CI 严格门禁', '目标环境发布', '客户 UAT'],
     }
   }
   if (strictProof.current) {
     if (strictProof.receipt?.status === 'passed') {
       return {
         tone: 'warning',
-        title: '本地严格门禁已通过，仍缺 R640 证据',
+        title: '本地严格门禁已通过，仍缺 GitLab CI 证据',
         description:
           '本地回执属于当前干净版本，但不能替代 protected main 的服务器 exact-SHA CI。',
         releaseEligible: false,
-        recommendation: '等待或运行当前 SHA 的 R640 普通 push CI。',
-        notProven: ['当前版本 R640 严格门禁', '目标环境发布', '客户 UAT'],
+        recommendation: '等待或运行当前 SHA 的 GitLab 普通 push CI。',
+        notProven: ['当前版本 GitLab CI 严格门禁', '目标环境发布', '客户 UAT'],
       }
     }
     return {
       tone: 'error',
       title: '当前版本本地严格门禁未通过',
       description:
-        '最近本地失败结果属于当前干净版本，且没有可复用的 R640 通过证据。',
+        '最近本地失败结果属于当前干净版本，且没有可复用的 GitLab CI 通过证据。',
       releaseEligible: false,
       recommendation: '先修复第一失败阶段，再重新运行严格门禁。',
       notProven: [
         '当前版本本地严格门禁',
-        '当前版本 R640 严格门禁',
+        '当前版本 GitLab CI 严格门禁',
         '目标环境发布',
         '客户 UAT',
       ],
@@ -740,7 +740,7 @@ function unavailableServerEvidence(message) {
     },
     history: [],
     message,
-    notProven: ['当前 exact SHA 的 R640 普通 CI'],
+    notProven: ['当前 exact SHA 的 GitLab 普通 push CI'],
   }
 }
 
@@ -882,8 +882,8 @@ export function projectDevQualityGateServerEvidence(
       topology: projectServerTopology(topology, repository, []),
       history,
       message:
-        'GitLab 凭据与 API 读取正常；R640 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
-      notProven: ['当前 exact SHA 的 R640 普通 CI'],
+        'GitLab 凭据与 API 读取正常；GitLab CI 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
+      notProven: ['当前 exact SHA 的 GitLab 普通 push CI'],
     }
   }
   const selected =
@@ -912,11 +912,11 @@ export function projectDevQualityGateServerEvidence(
     history,
     message: selected.passed
       ? repository.dirty
-        ? 'R640 已证明当前提交 SHA；该证据不覆盖本机未提交改动。'
-        : 'R640 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。'
+        ? 'GitLab CI 已证明当前提交 SHA；该证据不覆盖本机未提交改动。'
+        : 'GitLab CI 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。'
       : active
-        ? 'R640 正在验证当前 exact SHA。'
-        : 'R640 当前 exact SHA 的普通 CI 未形成完整通过证据。',
+        ? 'GitLab CI 正在验证当前 exact SHA。'
+        : 'GitLab 当前 exact SHA 的普通 push CI 未形成完整通过证据。',
     notProven: repository.dirty
       ? ['本机未提交改动', '不可变 Release', '目标部署', '客户 UAT']
       : ['不可变 Release', '目标部署', '客户 UAT'],
@@ -1075,7 +1075,7 @@ export function createDevQualityGateService({
       }
     } catch {
       value = unavailableServerEvidence(
-        'R640 CI 证据暂时不可读取，本机回执不受影响。'
+        'GitLab CI 证据暂时不可读取，本机回执不受影响。'
       )
     }
     serverEvidenceCache = {

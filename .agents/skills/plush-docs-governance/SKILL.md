@@ -9,7 +9,7 @@ description: 项目文档治理（plush-toy-erp）。Use to review or maintain p
 
 ## Scope and Truth
 
-- 读取项目 `AGENTS.md`、`docs/当前真源与交接顺序.md` 及相关目录 README；使用 `GIT_OPTIONAL_LOCKS=0` 核对当前 diff 并保护外部改动。已读且未变化的入口无需重复加载。
+- 范围、文档职责或读者入口不清时，按需读取 `docs/当前真源与交接顺序.md` 及相关目录 README；范围明确时直接检查目标文档、消费者与 scoped diff。已读且未变化的入口不重复加载。
 - 正式 docs 描述合同；当前实现核对代码、Ent schema、Atlas migration 和测试；目标交付需运行证据。`progress.md`、`docs/archive/**`、外部规划和客户样本不能替代当前真源。
 - 外部 GPT / 其他项目原文不进入产品仓；采纳结论先核实，再写成项目自身合同。客户原件与私密 manifest 继续留受控私有存储。
 - 普通文档维护不编辑 AGENTS；用户明确要求治理长期规则时直接在授权范围内完成，保留 Workflow / Fact、RBAC、迁移、隐私、Git 与恢复门禁。

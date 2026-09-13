@@ -27,15 +27,15 @@
 ## 快速开始（仅本地或新建隔离环境）
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod
+cd "$(git rev-parse --show-toplevel)/server/deploy/compose/prod"
 cp .env.example .env
 ${EDITOR:-vi} .env
 
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 bash scripts/deploy/production-preflight.sh \
   --env-file server/deploy/compose/prod/.env
 
-cd /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod
+cd "$(git rev-parse --show-toplevel)/server/deploy/compose/prod"
 docker compose --env-file .env -f compose.yml up -d
 ```
 

@@ -30,7 +30,7 @@ const SERVER_JOB_TIMINGS = Object.freeze([
   ['quality_web_checks', 64_000, 1_400, 'execution', 'web', 1],
   ['quality_web_build', 71_000, 1_500, 'execution', 'web', 1],
   ['quality_server_schema', 38_000, 1_300, 'execution', 'server', 1],
-  ['quality_server_upgrade', 82_000, 1_800, 'execution', 'server', 1],
+  ['quality_server_upgrade', 132_000, 1_800, 'execution', 'server', 1],
   ['quality_server_test_build', 96_000, 2_000, 'execution', 'server', 1],
   ['quality_server_critical_postgres', 70_000, 1_800, 'execution', 'server', 1],
   ['quality_browser 1/2', 81_000, 2_400, 'execution', 'browser', 1],
@@ -397,7 +397,7 @@ function createServerEvidence(status = 'passed') {
       },
       history: [],
       message: '未登记只读 GitLab 凭据，当前仅显示本机回执。',
-      notProven: ['当前 exact SHA 的 R640 普通 CI'],
+      notProven: ['当前 exact SHA 的 GitLab 普通 push CI'],
     }
   }
   if (status === 'missing') {
@@ -418,8 +418,8 @@ function createServerEvidence(status = 'passed') {
       },
       history: SERVER_CI_HISTORY.slice(1),
       message:
-        'GitLab 凭据与 API 读取正常；R640 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
-      notProven: ['当前 exact SHA 的 R640 普通 CI'],
+        'GitLab 凭据与 API 读取正常；GitLab CI 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
+      notProven: ['当前 exact SHA 的 GitLab 普通 push CI'],
     }
   }
   return {
@@ -463,7 +463,7 @@ function createServerEvidence(status = 'passed') {
         '依赖来自当前 exact SHA 的 GitLab CI Lint，状态来自本次实际 Pipeline。',
     },
     history: SERVER_CI_HISTORY,
-    message: 'R640 已证明当前提交 SHA；该证据不覆盖本机未提交改动。',
+    message: 'GitLab CI 已证明当前提交 SHA；该证据不覆盖本机未提交改动。',
     notProven: ['本机未提交改动', '不可变 Release', '目标部署', '客户 UAT'],
   }
 }
@@ -839,10 +839,10 @@ export function createDevQualityGateScenarios({
       },
       verify: async (page) => {
         await expectHeading(page, '质量门禁')
-        await page.getByText('R640 普通 CI 已通过', { exact: true }).waitFor()
+        await page.getByText('GitLab 普通 CI 已通过', { exact: true }).waitFor()
 
         const serverPanel = page.getByRole('region', {
-          name: 'R640 服务器质量证据',
+          name: 'GitLab CI 质量证据',
         })
         await serverPanel.waitFor()
         await serverPanel
@@ -862,7 +862,7 @@ export function createDevQualityGateScenarios({
         assert.equal(
           await serverPanel
             .getByRole('table', {
-              name: '本机阶段与 R640 CI Job 对照',
+              name: '本机阶段与 GitLab CI Job 对照',
             })
             .count(),
           0

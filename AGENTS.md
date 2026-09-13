@@ -6,16 +6,9 @@
 
 运行 `bash scripts/qa/agents-size.sh`；阈值、精简顺序及只检查不改写的边界沿用全局 AGENTS，项目安全和业务约束必须保留。
 
-## 阅读顺序与当前真源
+## 按需读取与当前真源
 
-新任务按相关性读取：
-
-1. `README.md`
-2. `docs/当前真源与交接顺序.md`
-3. `server/README.md`
-4. `server/deploy/README.md`
-5. `scripts/README.md`
-6. 对应产品/架构专题、代码和测试
+新任务只读目标所需真源，已确认且未变化的入口不重复读取。范围不清才读 `README.md` 与 `docs/当前真源与交接顺序.md`；其余按触达面直达 `server/README.md`、`server/deploy/README.md`、`scripts/README.md` 或对应专题、代码和测试。
 
 关键边界：
 
@@ -111,9 +104,9 @@
 
 ## 测试与验收
 
-按 `docs/product/自动化测试策略.md` 和 `$plush-test-governance` 选择 T0-T8 与测试形态。
+验证范围本身需要判断，或涉及浏览器、数据库、migration、CI 证据时使用 `$plush-test-governance`；T0-T8 定义见 `docs/product/自动化测试策略.md`。
 
-- 实现授权包含当前目标所需的最小充分验证；按影响面自主执行，明显超出任务范围或资源预算时按 `$plush-test-governance` 说明影响后确认。同一目标内修复后的必要复验沿用已有授权，证据绑定当前代码。共享环境配置、真实数据、Git 和发布仍遵守各自授权边界。`prepare-push.sh` 默认单一 `origin/main` 使用 `server-ci` 短门禁，高成本验证由 R640 exact-SHA CI 执行；非标准目标和显式本地 `--full` 按 `scripts/qa/README.md` 的保守合同处理，禁止静默升级。
+- 实现授权包括目标所需的最小充分验证和修复后的相关复验；明显超出范围或资源预算时才说明影响并确认。共享环境配置、真实数据、Git 和发布仍各自授权。push 与 exact-SHA CI 的当前合同只在相关任务中读取 `scripts/qa/README.md`；非标准目标和显式本地 `--full` 不得静默升级。
 
 - 各领域的正常、边界、异常、权限和证据边界由测试策略、对应代码与测试真源守住，不在本文件重复目录。
 

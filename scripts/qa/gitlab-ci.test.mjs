@@ -40,7 +40,7 @@ const compose = readFileSync(
   "utf8",
 );
 const installer = readFileSync(
-  new URL("../../server/deploy/gitlab/install-r640.sh", import.meta.url),
+  new URL("../../server/deploy/gitlab/install-gitlab.sh", import.meta.url),
   "utf8",
 );
 const backup = readFileSync(
@@ -390,14 +390,14 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(
     workflow,
     new RegExp(
-      `^[.]pnpm_cache_pull: &pnpm_cache_pull\\n  cache:\\n    - &pnpm_cache_entry\\n      key:\\n        prefix: r640-node-${nodeVersion}-pnpm-v1\\n        files:\\n          - web/pnpm-lock[.]yaml\\n      paths:\\n        - output/cache/gitlab/pnpm-store/\\n      policy: pull`,
+      `^[.]pnpm_cache_pull: &pnpm_cache_pull\\n  cache:\\n    - &pnpm_cache_entry\\n      key:\\n        prefix: plush-ci-node-${nodeVersion}-pnpm-v1\\n        files:\\n          - web/pnpm-lock[.]yaml\\n      paths:\\n        - output/cache/gitlab/pnpm-store/\\n      policy: pull`,
       "mu",
     ),
   );
   assert.match(
     workflow,
     new RegExp(
-      `^[.]browser_cache_pull: &browser_cache_pull\\n  cache:\\n    - \\*pnpm_cache_entry\\n    - &playwright_cache_entry\\n      key:\\n        prefix: r640-node-${nodeVersion}-playwright-v3\\n        files:\\n          - scripts/qa/ci-playwright-runtime[.]mjs\\n          - web/pnpm-lock[.]yaml\\n      paths:\\n        - output/cache/gitlab/playwright-runtime/\\n      policy: pull`,
+      `^[.]browser_cache_pull: &browser_cache_pull\\n  cache:\\n    - \\*pnpm_cache_entry\\n    - &playwright_cache_entry\\n      key:\\n        prefix: plush-ci-node-${nodeVersion}-playwright-v3\\n        files:\\n          - scripts/qa/ci-playwright-runtime[.]mjs\\n          - web/pnpm-lock[.]yaml\\n      paths:\\n        - output/cache/gitlab/playwright-runtime/\\n      policy: pull`,
       "mu",
     ),
   );
@@ -640,7 +640,7 @@ test("historical source backfill is one protected internal job and cannot rewrit
   assert.doesNotMatch(backfill, /--header\s+"(?:PRIVATE|DEPLOY)-TOKEN:/u);
 });
 
-test("GitLab jobs stay on the isolated runner and never receive the R640 host socket", () => {
+test("GitLab jobs stay on the isolated runner and never receive the control-host socket", () => {
   assert.match(workflow, /tags:\n    - plush\n    - isolated\n    - amd64/u);
   assert.doesNotMatch(workflow, /\/var\/run\/docker[.]sock/u);
   assert.doesNotMatch(workflow, /privileged:\s*true/u);
@@ -648,7 +648,7 @@ test("GitLab jobs stay on the isolated runner and never receive the R640 host so
   assert.doesNotMatch(workflow, /PRIVATE-TOKEN:\s*[A-Za-z0-9_-]{16,}/u);
 });
 
-test("R640 GitLab definitions pin identity, separate SSD data and require exact execution", () => {
+test("GitLab definitions pin identity, separate SSD data and require exact execution", () => {
   const runnerRegistration = runnerCloudInit.match(
     /path: \/usr\/local\/sbin\/plush-register-gitlab-runner[\s\S]+?\n\nruncmd:/u,
   )?.[0];
@@ -672,12 +672,24 @@ test("R640 GitLab definitions pin identity, separate SSD data and require exact 
   );
   assert.match(runnerCloudInit, /\[systemctl, enable, --now, fstrim.timer\]/u);
   assert.match(installer, /preview_only=true/u);
-  assert.match(installer, /INSTALL_GITLAB:R640:gitlab[.]saurick[.]me/u);
+  assert.match(installer, /EXPECTED_CONTROL_HOSTNAME=r640/u);
+  assert.match(installer, /EXPECTED_GITLAB_HOSTNAME=gitlab[.]saurick[.]me/u);
+  assert.match(
+    installer,
+    /EXPECTED_CONFIRMATION="INSTALL_GITLAB:\$\{EXPECTED_CONTROL_HOSTNAME\}:\$\{EXPECTED_GITLAB_HOSTNAME\}"/u,
+  );
+  assert.match(installer, /CONFIRMATION" != "\$EXPECTED_CONFIRMATION/u);
   assert.match(installer, /RUNTIME_ENV="\$\(mktemp\)"/u);
   assert.doesNotMatch(installer, /source "\$ENV_FILE"/u);
   assert.doesNotMatch(installer, /docker\s+(?:rm|stop|system prune)|rm\s+-rf/u);
   assert.match(backup, /\/srv\/raid5\/gitlab\/backups/u);
-  assert.match(backup, /BACKUP_GITLAB:R640/u);
+  assert.match(backup, /EXPECTED_CONTROL_HOSTNAME=r640/u);
+  assert.match(backup, /EXPECTED_GITLAB_HOSTNAME=gitlab[.]saurick[.]me/u);
+  assert.match(
+    backup,
+    /EXPECTED_CONFIRMATION="BACKUP_GITLAB:\$\{EXPECTED_CONTROL_HOSTNAME\}:\$\{EXPECTED_GITLAB_HOSTNAME\}"/u,
+  );
+  assert.match(backup, /CONFIRMATION" != "\$EXPECTED_CONFIRMATION/u);
   assert.match(backup, /backup mount mismatch/u);
   assert.match(backup, /flock -n 9/u);
   assert.ok(backup.includes('exec 9>"$GITLAB_RAID_BACKUP_DIR/.backup.lock"'));
@@ -806,7 +818,8 @@ test("Runner provisioning and capacity stay explicit and fail closed", () => {
   assert.doesNotMatch(runnerVm, /--slot-safety-max/u);
   assert.match(runnerVm, /SOURCE_CAPACITY_FILE/u);
   assert.equal(runnerCapacityPolicy, "RUNNER_CONCURRENT_SLOTS=19\n");
-  assert.match(runnerVm, /PROVISION_PLUSH_RUNNER:R640:/u);
+  assert.match(runnerVm, /EXPECTED_CONTROL_HOSTNAME=r640/u);
+  assert.match(runnerVm, /PROVISION_PLUSH_RUNNER:\$EXPECTED_CONTROL_HOSTNAME:/u);
   assert.match(runnerVm, /BASE_VOLUME_SHA256/u);
   assert.match(runnerVm, /timeout 600 sha256sum/u);
   assert.match(runnerVm, /TEMPLATE_SHA256/u);
@@ -862,7 +875,10 @@ test("Runner provisioning and capacity stay explicit and fail closed", () => {
   );
   assert.match(runnerCapacity, /flock -n/u);
   assert.match(runnerCapacity, /--expect-slots/u);
-  assert.match(runnerCapacity, /SET_RUNNER_CAPACITY:R640:/u);
+  assert.match(
+    runnerCapacity,
+    /SET_RUNNER_CAPACITY:\$EXPECTED_RUNNER_NAME:/u,
+  );
   assert.match(runnerCapacity, /CURRENT_SLOTS.*EXPECTED_SLOTS/u);
   assert.match(runnerCapacity, /LIMIT_VALUES\[0\].*SLOTS/u);
   assert.match(runnerCapacity, /status=rollback_incomplete/u);

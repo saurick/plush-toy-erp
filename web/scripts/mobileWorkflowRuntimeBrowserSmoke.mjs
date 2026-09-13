@@ -578,11 +578,11 @@ function buildInputTemplate(options = parseCliArgs(['--run-id', 'TEMPLATE'])) {
     realSmokeRequires: [...REAL_SMOKE_REQUIREMENTS],
     notProvenByThisTemplate: [...PREFLIGHT_NOT_PROVEN],
     commands: [
-      'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web --silent audit:yoyoosun-entry -- --json',
-      'PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report output/mobile-workflow-runtime-browser-smoke/preflight.json',
-      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-workflow-runtime-browser",
-      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --report output/mobile-workflow-runtime-browser-smoke/report.json",
-      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='<local-demo-password>' MOBILE_WORKFLOW_BROWSER_SMOKE_BASE_URL='<audited-yoyoosun-url>' PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --report output/mobile-workflow-runtime-browser-smoke/report.json",
+      'pnpm --dir web --silent audit:yoyoosun-entry -- --json',
+      'node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report output/mobile-workflow-runtime-browser-smoke/preflight.json',
+      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='<local-demo-password>' pnpm --dir web smoke:mobile-workflow-runtime-browser",
+      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='<local-demo-password>' node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --report output/mobile-workflow-runtime-browser-smoke/report.json",
+      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='<local-demo-password>' MOBILE_WORKFLOW_BROWSER_SMOKE_BASE_URL='<audited-yoyoosun-url>' node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --report output/mobile-workflow-runtime-browser-smoke/report.json",
     ],
     boundary:
       'This template does not prove mobile workflow browser behavior, backend health, login, task creation, action submission, notification hints, yoyoosun entry ownership, or customer config active revision until a local backend, audited frontend runtime or managed Vite, and demo password are provided. The real smoke writes simulated_only workflow task evidence only.',
@@ -592,7 +592,7 @@ function buildInputTemplate(options = parseCliArgs(['--run-id', 'TEMPLATE'])) {
 function buildYoyoosunEntryAuditPlan(options) {
   return {
     command:
-      'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web --silent audit:yoyoosun-entry -- --json',
+      'pnpm --dir web --silent audit:yoyoosun-entry -- --json',
     scope: 'mobile-workflow-frontend-entry-preflight',
     requiredForExternalBaseURL: true,
     externalBaseURLProvided: Boolean(options.externalBaseURLProvided),
@@ -659,7 +659,6 @@ async function buildPreflightReport(options, runtime = {}) {
     yoyoosunEntryAudit.suggestedExternalBaseURL
       ? `MOBILE_WORKFLOW_BROWSER_SMOKE_BASE_URL='${yoyoosunEntryAudit.suggestedExternalBaseURL}'`
       : '',
-    'PATH=/usr/local/bin:$PATH',
     'node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs',
     '--report output/mobile-workflow-runtime-browser-smoke/report.json',
   ]

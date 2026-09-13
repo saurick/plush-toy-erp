@@ -16,11 +16,11 @@
 前端依赖 pnpm，版本由 `web/package.json` 的 `packageManager` 固定为 `pnpm@10.13.1`；Node.js 版本由仓库根目录 `.n-node-version`、`.node-version` 和 `.nvmrc` 共同锁定为 `24.14.0`。
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 corepack enable
 bash scripts/doctor.sh
 
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm install
 ```
 
@@ -46,7 +46,7 @@ pnpm install
 ### 桌面后台
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm install
 pnpm start
 ```
@@ -65,7 +65,7 @@ Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:y
 
 `pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查工作区 schema / versioned migration、开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，只开放 `/__dev/database-migration` 恢复页；恢复期间除启动器所需的只读实例摘要外，普通 ERP 页面、其它 DEV API 与 `/rpc`、`/templates` 失败关闭，修正环境后刷新状态，重新通过同一完整启动检查和同目标 health / ready，才能进入完整工作台。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 
-开发工作台读取 GitLab R640 CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`；macOS 未显式提供时，`pnpm start` 会自动读取钥匙串 service `plush-toy-erp.gitlab-read-api`、account `simon`。该凭据只允许当前项目的最小读取权限，只保存在本机钥匙串和 DEV 服务私有内存；版本中心将它收口到不含发布方法的只读 Provider，不进入浏览器、仓库、日志、质量门禁子进程或部署执行子进程，也不替代创建新发布使用的短期 `PLUSH_GITLAB_TOKEN`。钥匙串未登记时业务开发仍可启动，但 GitLab 服务端证据保持失败关闭，不以本机结果补证。
+开发工作台读取 GitLab CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`；macOS 未显式提供时，`pnpm start` 会自动读取钥匙串 service `plush-toy-erp.gitlab-read-api`，account 使用当前 macOS 登录用户名。该凭据只允许当前项目的最小读取权限，只保存在本机钥匙串和 DEV 服务私有内存；版本中心将它收口到不含发布方法的只读 Provider，不进入浏览器、仓库、日志、质量门禁子进程或部署执行子进程，也不替代创建新发布使用的短期 `PLUSH_GITLAB_TOKEN`。钥匙串未登记时业务开发仍可启动，但 GitLab 服务端证据保持失败关闭，不以本机结果补证。
 
 桌面构建提供单端口岗位任务端主路径：
 
@@ -148,7 +148,7 @@ http://127.0.0.1:5175/m/engineering/tasks
 岗位任务端不再启动独立前端容器、独立 Vite 配置或独立端口。本地开发先启动同一个前端入口：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm start
 ```
 
@@ -169,7 +169,7 @@ http://127.0.0.1:5175/m/engineering/tasks
 ## 构建命令
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm build:all
 ```
 
@@ -187,7 +187,7 @@ pnpm build:all
 构建镜像：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 ```
 
@@ -203,7 +203,7 @@ docker build \
 本地验证生产入口：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm build:all
 APP_ID=desktop PORT=5175 API_ORIGIN=http://127.0.0.1:8300 pnpm serve:prod
 ```
@@ -211,7 +211,7 @@ APP_ID=desktop PORT=5175 API_ORIGIN=http://127.0.0.1:8300 pnpm serve:prod
 本地预览永绅 yoyoosun 前端包可使用一键脚本。它会先检查 `http://127.0.0.1:8300/healthz`，再构建桌面和岗位任务端产物、注入 `config/customers/yoyoosun/customer-config.example.js` 和客户静态资产，并从本项目独占辅助块 `15200-15299` 起自动选择可用端口启动静态服务；该脚本只处理前端静态包，不会调用后端 `customer_config.validate / publish / activate / rollback`，也不会导入业务数据：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm preview:yoyoosun --print-plan
 pnpm preview:yoyoosun
 ```
@@ -243,7 +243,7 @@ node ../scripts/qa/customer-config-effective-session-probe.mjs --json --report o
 本地开发调试永绅前端时使用热更新入口。它不打包，直接启动 Vite dev server，并通过 dev-only middleware 提供永绅 `/customer-config.js` 和 `public-assets/` 下的 `/customer-assets/yoyoosun/*`：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm start:yoyoosun --print-plan
 pnpm start:yoyoosun
 ```
@@ -271,7 +271,7 @@ pnpm start:yoyoosun
 ## 当前回归命令
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm lint
 pnpm css
 pnpm test
@@ -294,10 +294,10 @@ Mock 和 Style L1 运行保留 React StrictMode，用于暴露非幂等 effect �
 `node scripts/realLoginSmokeShared.mjs --print-input-template` 只打印真实登录 smoke 所需输入和命令模板，不读取配置、不校验账号、不调用后端、不启动浏览器、不登录、不写库；`node scripts/realLoginSmokeShared.mjs --preflight-report output/real-login-smoke-shared/preflight.json` 只探测后端 health 和管理员凭据来源候选，不读取 config 内容、不读取密码值、不校验账号、不调用 auth JSON-RPC、不启动 Vite / Playwright、不登录、不写数据库。真实 smoke 仍需要本地后端和开发账号。`node scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template` 只打印采购入库页面真实写入 e2e 的前置输入、持久测试数据确认、`PR-BROWSER-*` 记录边界和真实命令，不启动 Vite、不启动 Playwright、不调用后端、不登录、不写库；`--preflight-report` 只写本地前置报告，探测后端 health、显式管理员凭据 env、持久测试数据确认和页面目标安全性，不读取本地配置、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不写数据库。
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/server
+cd "$(git rev-parse --show-toplevel)/server"
 make run
 
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm smoke:purchase-receipt-real-write
 pnpm smoke:purchase-contract-real-login
 pnpm smoke:processing-contract-real-login
@@ -340,7 +340,7 @@ pnpm smoke:processing-contract-real-login
 `pnpm style:l1` 支持用逗号分隔的 `STYLE_L1_SCENARIOS` 跑指定场景，适合局部页面回归，例如：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 ```
 
@@ -470,9 +470,9 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 #### 质量门禁 `/__dev/quality-gates`
 
 - 一级“质量验证”入口 `/__dev/quality` 会使用 replace 导航规范化到 `/__dev/quality-gates?view=server`，直接展示正式服务器门禁轨道；不保留另一张只做分流的质量首页，也不复制第二套服务器证据。
-- 页面首屏优先读取当前 committed SHA 的 R640 普通 push CI，始终按正式合同展示 `plan → prepare → 质量检查 → aggregate → CI Gate` 执行轨道；质量检查最终汇入七个固定分片，其中 Node 核心 / 发布测试先行汇合，浏览器分片等待 Web 构建。服务器门禁在轨道前使用一张七行对照表，集中展示本机 strict 步骤、检查名称与对应 CI Job；本机诊断不重复显示 CI 标签。阶段编号按当前 runner 顺序动态计算，映射由 CI shard 合同测试守住。取得当前流水线证据后，再把真实状态与耗时填入十一个主路径节点，并展示墙钟时间、排队耗时、最长主路径 job 和相对耗时条。耗时条以最长主路径 job 为基准，不把可重叠的并行 job 相加成墙钟时间。该服务器证据只覆盖对应提交，不覆盖 Local dirty。未登记只读 token 或 API 不可达时明确标记“GitLab 读取失败”；凭据与 API 已读通但当前 SHA 尚无普通 push CI 时，分别显示“GitLab 读取正常”和“当前提交未产生 CI 记录”；流水线已形成但对应 job 尚未启动时标记“等待运行”。三者均保留完整轨道，且不使用本机回执或静态结构补造绿色结果与耗时。当前证据之后只读列出同一次 GitLab 查询中最近取得的最多 8 条 `main` 普通 push CI，展示结果、short SHA、真实事件时间、墙钟耗时、失败环节和 GitLab 详情链接；历史行不写本地缓存、不触发或重跑 CI，也不升级为当前 SHA 的通过证据。
+- 页面首屏优先读取当前 committed SHA 的 GitLab 普通 push CI，始终按正式合同展示 `plan → prepare → 质量检查 → aggregate → CI Gate` 执行轨道；质量检查最终汇入七个固定分片，其中 Node 核心 / 发布测试先行汇合，浏览器分片等待 Web 构建。服务器门禁在轨道前使用一张七行对照表，集中展示本机 strict 步骤、检查名称与对应 CI Job；本机诊断不重复显示 CI 标签。阶段编号按当前 runner 顺序动态计算，映射由 CI shard 合同测试守住。取得当前流水线证据后，再把真实状态与耗时填入十一个主路径节点，并展示墙钟时间、排队耗时、最长主路径 job 和相对耗时条。耗时条以最长主路径 job 为基准，不把可重叠的并行 job 相加成墙钟时间。该服务器证据只覆盖对应提交，不覆盖 Local dirty。未登记只读 token 或 API 不可达时明确标记“GitLab 读取失败”；凭据与 API 已读通但当前 SHA 尚无普通 push CI 时，分别显示“GitLab 读取正常”和“当前提交未产生 CI 记录”；流水线已形成但对应 job 尚未启动时标记“等待运行”。三者均保留完整轨道，且不使用本机回执或静态结构补造绿色结果与耗时。当前证据之后只读列出同一次 GitLab 查询中最近取得的最多 8 条 `main` 普通 push CI，展示结果、short SHA、真实事件时间、墙钟耗时、失败环节和 GitLab 详情链接；历史行不写本地缓存、不触发或重跑 CI，也不升级为当前 SHA 的通过证据。
 - 页面内部只保留 `server / run / governance / gaps` 四个 URL-backed 一级视图，对外分别命名为“服务器门禁 / 本机诊断 / 门禁治理 / 覆盖缺口”；默认进入服务器门禁，服务器证据和本机操作不再同时铺开，也不叠加第二组 Tab。四视图复用 `DevTaskNav` 的 roving tabIndex、方向键、Home / End、焦点与主题合同。每个视图只接受固定 query；未知、重复、过期或跨视图参数 fail closed。切换视图会清理无关 query，不启动、不取消或清空 operation；公共仓库身份与当前 operation 摘要由页面级唯一状态源读取，只有活动 operation 启用一个 polling，治理与缺口请求在切换时取消并以请求序号防止旧结果覆盖。
-- “本机诊断”只在定位工作区问题时，通过固定 `full / strict + idempotencyKey` 动作异步调用正式 runner，不替代 R640 exact-SHA CI。显式 loopback database base 仍受支持，没有显式 base 时自动使用本机已有的固定 `postgres:18.1` 创建本次专用容器、随机凭据和动态 loopback 端口，正式回执、内部临时数据库、容器与进程组清理全部读回后才可通过。浏览器不能提交 DSN、凭据、镜像、命令或路径，也不会清理外部容器。本机历史与 GitLab 流水线分开记录；页面支持刷新恢复、精确取消、有界超时、中文阶段、正式回执、可比环境耗时和最近 20 次脱敏本机记录。当前版本回执优先于旧本机历史，dirty 结果不会升级成发布证明，样本不足时不估算剩余时间，终态不再显示“预计剩余”。诊断执行轨道直接消费服务端 `profiles` 阶段序列与 operation `stageTimings`，自动分出 strict 附加检查和 full 共用主路径；运行前、运行中和终态原位展示阶段状态、第一失败、最长阶段、正式回执与清理读回，回执和清理不计入 runner 阶段。共享基础检查与 Web 阶段的固定子步骤也只从 runner 登记表投影，不在页面复制命令或推测子步骤实时状态；已记录阶段耗时按阶段耗时之和归一化，并明确标注可并行阶段不能相加推算墙钟时间。只有至少 3 个 profile、环境指纹和 dirty / clean 状态相同的正式通过回执才绘制零基线耗时趋势，精确历史表始终保留。技术 ID、完整 SHA、指纹和原始 stage key 默认折叠。
+- “本机诊断”只在定位工作区问题时，通过固定 `full / strict + idempotencyKey` 动作异步调用正式 runner，不替代 GitLab exact-SHA CI。显式 loopback database base 仍受支持，没有显式 base 时自动使用本机已有的固定 `postgres:18.1` 创建本次专用容器、随机凭据和动态 loopback 端口，正式回执、内部临时数据库、容器与进程组清理全部读回后才可通过。浏览器不能提交 DSN、凭据、镜像、命令或路径，也不会清理外部容器。本机历史与 GitLab 流水线分开记录；页面支持刷新恢复、精确取消、有界超时、中文阶段、正式回执、可比环境耗时和最近 20 次脱敏本机记录。当前版本回执优先于旧本机历史，dirty 结果不会升级成发布证明，样本不足时不估算剩余时间，终态不再显示“预计剩余”。诊断执行轨道直接消费服务端 `profiles` 阶段序列与 operation `stageTimings`，自动分出 strict 附加检查和 full 共用主路径；运行前、运行中和终态原位展示阶段状态、第一失败、最长阶段、正式回执与清理读回，回执和清理不计入 runner 阶段。共享基础检查与 Web 阶段的固定子步骤也只从 runner 登记表投影，不在页面复制命令或推测子步骤实时状态；已记录阶段耗时按阶段耗时之和归一化，并明确标注可并行阶段不能相加推算墙钟时间。只有至少 3 个 profile、环境指纹和 dirty / clean 状态相同的正式通过回执才绘制零基线耗时趋势，精确历史表始终保留。技术 ID、完整 SHA、指纹和原始 stage key 默认折叠。
 - 本机托管数据库只提供一张默认折叠、展开后才加载的静态 Mermaid 生命周期图，并同步提供有序文字说明；它解释“登记环境或创建本次专用环境—运行正式门禁—精确清理—回执与清理读回”的固定边界，不承担实时运行状态。实时状态仍只读取当前 environment、operation 和正式回执，页面不为每种门禁重复绘制 Mermaid。
 - “门禁治理”只读登记风险、触发条件、正式来源引用、唯一证据与退出条件；不复制命令或测试列表，不提供新增、编辑、跳过、禁用或删除。“覆盖缺口”复用 affected 与七类风险边界，按当前或 staged 改动展示应运行门禁、当前结果和仍缺证据，并以语义化“风险 × 门禁”矩阵支持横向比较；原有逐类风险、原因和证据详情继续保留。本地门禁通过不证明目标发布、回滚、客户 UAT 或签收。
 - 页面及 `/__dev/api/qa/quality-gates` 仅在 development serve 存在，生产构建和正式部署不包含路由、页面 chunk、operation bridge、本地回执或 DEV 文案。测试数据仍由独立测试数据页管理，版本发布只读当前 exact SHA 的 strict 摘要与深链，不复制阶段、历史、治理或缺口。

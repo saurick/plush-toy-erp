@@ -75,7 +75,7 @@
 
 仓库级观测要求见：
 
-- `/Users/simon/projects/plush-toy-erp/AGENTS.md`
+- `AGENTS.md`
 
 其中要求的重点是：
 

@@ -122,10 +122,10 @@ function extractLocalCommandFilePaths(commands = []) {
   const paths = []
   for (const command of commands) {
     const matches = String(command).matchAll(
-      /(?:^|\s)(\/Users\/simon\/projects\/plush-toy-erp\/)?((?:web|scripts|server|deployments)\/[\w./-]+\.(?:mjs|js|sh))(?:\s|$)/g
+      /(?:^|\s)((?:web|scripts|server|deployments)\/[\w./-]+\.(?:mjs|js|sh))(?:\s|$)/g
     )
     for (const match of matches) {
-      paths.push(match[2])
+      paths.push(match[1])
     }
   }
   return paths

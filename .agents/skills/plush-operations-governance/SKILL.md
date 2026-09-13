@@ -7,10 +7,10 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 
 只读回答“现在做到哪里、已有证据能证明什么”时切 `$plush-capability-evidence-audit`；本 skill 从实时运行态核验、敏感访问或任何配置、数据、migration、发布、回滚动作开始负责。
 
-## Truth Chain / 必读真源
+## Truth Routing / 真源路由
 
-- 先读 `AGENTS.md`、`README.md`、`docs/当前真源与交接顺序.md`。
-- 诊断或错误治理按需读 `server/README.md`、`web/README.md`、错误码真源、相关日志/代码/测试；发布、迁移或回滚读取 `docs/部署约定.md`、`docs/product/发布门禁.md`、`server/deploy/README.md`、`scripts/deploy/README.md` 和当前 Compose/config。
+- target、模块责任或运行入口不清时，才用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位。
+- 诊断或错误治理按需读相关服务 README、错误码真源、日志、代码和测试；发布、迁移或回滚才读取部署约定、发布门禁、deploy README 和当前 Compose/config。
 - 运行态判断必须核对 environment、commit/image、config、DB/migration、日志和请求证据。
 
 ## Project Rules / 项目边界
@@ -35,16 +35,13 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 
 任务真实跨分支时才组合；先由本 skill 固定 plush 真源与 target，再按表中专项 workflow 深入。
 
-## Workflow / 共用工作流
+## Shared Workflow / 共用工作流
 
-1. 明确动作分支、target/environment、允许写入、禁止路径、验收和停止条件。诊断默认只读；发布、migration apply、secret 变更、恢复和清理必须有明确授权。
-2. 记录 current revision、image/config revision、请求时间窗口、DB/migration 与凭据来源；不输出 secret、完整 token/DSN 或不必要 PII。
-3. Diagnose 先最小复现并逐层排除；Observe/Error 先确认错误码和日志真源；Secure 先做资产/权限边界；Release/Rollback 先冻结制品、迁移序列和恢复点。
-4. 执行任何写动作前跑对应 preflight，并保留 before evidence。blocker、target 不一致、共享/生产库归属不清或 migration 预检失败时停止，不“顺手修数据”。
-5. 发布前检查 worktree、upstream、当前树 QA、固定 image、config、migration lock、备份与 rollback；提交推送收口搭配 `$git-closeout-coordination`。
-6. 从目标环境采集 after evidence：health/ready、migration/config readback、日志、业务 smoke、数据对账与 rollback/recovery 可用性。自动化绿色与人工/客户验收分开。
-7. 只按正式保留策略清理项目未使用制品；不无条件 `docker image prune -a`，不碰 volume、数据库、`/data`、env、证书或运行容器依赖。
-8. 行为、配置、部署或运行真源变化时同步相关正式文档与 `progress.md`。
+1. 明确分支、target/environment、允许写入、验收和停止条件。诊断默认只读；发布、migration apply、secret 变更、恢复和清理必须有明确授权。
+2. 按路由进入对应专项 workflow；不同时加载无关分支。记录 current revision、image/config revision、请求窗口、DB/migration 与凭据来源，不输出 secret、完整 token/DSN 或不必要 PII。
+3. 写动作前运行对应 preflight 并保留 before evidence；target、数据归属或 migration 状态不清时停止对应动作，不顺手修数据。
+4. 从目标环境采集 after evidence；本地 QA、制品、migration/config、target runtime、recovery 和客户验收分开判定。
+5. 只按正式保留策略清理明确制品；不无条件 prune，不碰 volume、数据库、`/data`、env、证书或运行依赖。正式真源变化时同步相关文档与 `progress.md`。
 
 ## Stop Conditions / 停止条件
 
@@ -52,14 +49,6 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 - 生产/共享数据需要修复、破坏性 migration、历史改写、强推或不可逆 secret 轮换，且未获得明确授权和恢复方案。
 - preflight、migration status、health/ready、业务 smoke、readback 或数据对账失败；不得跳过失败继续宣称发布完成。
 - 只有本地 QA、历史报告或仓库配置，没有当前目标环境证据。此时最多报告本地/定义层完成。
-
-## Validation / 验证要求
-
-- 诊断：保留可复现请求、浏览器 network/console、日志或只读数据库证据。
-- 可观测性/错误：覆盖成功、业务失败、系统失败、脱敏和用户提示。
-- 安全：运行相关 RBAC、secret scan、preflight 或日志脱敏检查。
-- 发布：记录 commit/image、migration、health/ready、smoke、rollback 和未验证项。
-- 恢复：记录备份标识、restore target、演练结果、数据对账和恢复后 smoke；只有备份文件不算恢复验证。
 
 ## Output / 输出要求
 

@@ -1,8 +1,8 @@
 # server/deploy 说明
 
-R640 自建 GitLab、隔离 Runner、备份与 GitHub 单向镜像的仓库内定义见 [`gitlab/README.md`](gitlab/README.md)。它与业务服务部署分离，不会由生产 Compose 自动启动。
+GitLab 宿主上的自建 GitLab、隔离 Runner、备份与 GitHub 单向镜像定义见 [`gitlab/README.md`](gitlab/README.md)。它与业务服务部署分离，不会由生产 Compose 自动启动。
 
-当前仓库只保留一条部署主路径：`/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`。
+当前仓库只保留一条部署主路径：`server/deploy/compose/prod`。
 
 部署构建边界：目标服务器配置较低，只负责从受控 Package 直接取得并加载已构建镜像、启动 Compose、执行 migration 和部署后检查；服务端/前端镜像必须先在 CI 构建并登记为不可变制品，不能由 Mac 二次中转。不要在服务器上执行 `docker build`、`pnpm build`、`go build`、`make build_server` 等重构建步骤。
 
@@ -10,7 +10,7 @@ R640 自建 GitLab、隔离 Runner、备份与 GitHub 单向镜像的仓库内�
 
 GitLab `.gitlab-ci.yml` 是 main / MR 的 canonical CI/CD；GitHub main 只接收单向镜像，不运行仓库 CI，`.github/workflows/release.yml` 仅保留显式应急发布。GitLab release pipeline 对 main 的 exact SHA 恢复并校验同一 protected push pipeline 的完整 `CI Gate` 证据，不重复 strict；随后只构建一次不可变候选，将镜像按 digest 发布到 GHCR，并把含同一演练回执的 v2 七资产登记到 GitLab Generic Package 与 Release，同时把同 SHA 的 `source.tar` 单独登记为目标内部物化输入。发布中断后只续传已校验远端子集所缺的资产，最后必须读回完整七资产和精确 source 包。
 
-`demo-133` 与 `customer-test-133` 的 promotion 由 `scripts/deploy/promotion-controller.mjs` 与 `promotion-executor.mjs` 编排，代码回滚由对应 rollback controller / executor 编排。Mac 只传 operation、manifest、执行脚本和目标取件描述符；专用 `read_package_registry` deploy token 只经唯一 SSH 进程标准输入交给已加锁的远端执行器，不进入参数、控制包或目标 secret 文件。R640 目标通过固定内网 GitLab TLS 入口直接取得七资产与 `source.tar`，再校验名称、大小、SHA-256、manifest、演练回执、image content ID 和 cache v2 身份。Mac 不再下载后回传镜像、SBOM 或 source，也没有大文件中转 fallback。首次升级前还必须证明当前运行 SHA 具备同样的直接取件回滚输入；已有 v2 七资产但缺少 source 包时，只能由 protected main 的受控 `backfill_release_source` job 在 Runner 内校验旧 Release 后补齐该 SHA 的单一 source 包，不改写七资产或 Release。
+`demo-133` 与 `customer-test-133` 的 promotion 由 `scripts/deploy/promotion-controller.mjs` 与 `promotion-executor.mjs` 编排，代码回滚由对应 rollback controller / executor 编排。Mac 只传 operation、manifest、执行脚本和目标取件描述符；专用 `read_package_registry` deploy token 只经唯一 SSH 进程标准输入交给已加锁的远端执行器，不进入参数、控制包或目标 secret 文件。目标宿主通过固定内网 GitLab TLS 入口直接取得七资产与 `source.tar`，再校验名称、大小、SHA-256、manifest、演练回执、image content ID 和 cache v2 身份。Mac 不再下载后回传镜像、SBOM 或 source，也没有大文件中转 fallback。首次升级前还必须证明当前运行 SHA 具备同样的直接取件回滚输入；已有 v2 七资产但缺少 source 包时，只能由 protected main 的受控 `backfill_release_source` job 在 Runner 内校验旧 Release 后补齐该 SHA 的单一 source 包，不改写七资产或 Release。
 
 执行器复用既有 digest，不在目标机重新构建，并分别读回 `demo.yoyoosun.net` 与 `test.yoyoosun.net` 的 Compose、`GIT_SHA`、健康和 Provider 能力。普通 promotion 保留目标现有数据；清空重建只能通过独立 database rebuild operation 显式执行。根域 `yoyoosun.net` 临时 `302` 跳转到未来可能使用的 `erp.yoyoosun.net`，但不会把它登记为生产 target；`admin.yoyoosun.net` 退役后也不进入目标、检查、发布或回滚矩阵。目标 registry、只读 preflight、operation 和安全边界见 `scripts/deploy/README.md` 与 `docs/engineering/研发效能工作台与CI-CD设计.md`。
 
@@ -33,7 +33,7 @@ Atlas migration 在普通生产 / 低配服务器上使用宿主机 `/usr/local/
 - `.env.example`
 - `migrate_online.sh`
 
-详细说明见 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod/README.md`。
+详细说明见 `server/deploy/compose/prod/README.md`。
 
 ## 必须替换的占位
 
@@ -60,11 +60,11 @@ Atlas migration 在普通生产 / 低配服务器上使用宿主机 `/usr/local/
 建议先执行：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh
+bash scripts/project-scan.sh
 ```
 
 然后再执行：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
+bash scripts/project-scan.sh --strict
 ```

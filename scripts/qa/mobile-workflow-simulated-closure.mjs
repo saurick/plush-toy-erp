@@ -225,10 +225,10 @@ function buildInputTemplate(options = {}) {
     ],
     commands: {
       printInputTemplate:
-        "PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --print-input-template",
-      reportOnly: `PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --run-id ${runId} --out ${out}`,
+        "node scripts/qa/mobile-workflow-simulated-closure.mjs --print-input-template",
+      reportOnly: `node scripts/qa/mobile-workflow-simulated-closure.mjs --run-id ${runId} --out ${out}`,
       applySimulated:
-        "MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS MOBILE_WORKFLOW_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300",
+        "MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS MOBILE_WORKFLOW_SIM_PASSWORD='<local-demo-password>' node scripts/qa/mobile-workflow-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300",
     },
     boundary:
       "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write formal business data, create workflow tasks, or post operational facts.",

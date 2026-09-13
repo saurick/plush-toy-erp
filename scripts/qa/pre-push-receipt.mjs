@@ -1711,7 +1711,7 @@ function printHelp() {
 说明:
   默认 origin refs/heads/main -> refs/heads/main 普通推送会在连接前校验 clean HEAD/tree、
   真实 remote/ref/range、git log、strict secrets 与 source-integrity，并签发 server-ci
-  回执；高成本门禁交由 R640 exact-SHA GitLab CI。回执只授权普通非强制 push；
+  回执；高成本门禁交由 GitLab exact-SHA CI。回执只授权普通非强制 push；
   release、package promotion 或 protected deploy 必须等待同一 exact SHA 的
   terminal-success CI Gate。显式 --full 与任何非规范目标仍保守处理。
   普通当前分支可不传 remote/ref；多 ref 或非默认目标逐项传 --ref。

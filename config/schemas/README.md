@@ -11,7 +11,7 @@
 ## 校验入口
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 node scripts/qa/customer-package-lint.mjs --customer yoyoosun
 ```
 

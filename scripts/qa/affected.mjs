@@ -1061,8 +1061,8 @@ export function formatPlan(plan, { root = DEFAULT_ROOT } = {}) {
   }
   lines.push(
     prePush.recommendedProfile === "affected"
-      ? `[qa:affected] 本计划用于开发期快速反馈；非 origin/main 可由 ${plan.prePushGate} 签发 affected 回执，正式 origin/main 默认签发 server-ci 回执并由 R640 exact-SHA CI 执行高成本门禁。`
-      : `[qa:affected] 本地独立诊断需要 full（${prePush.reasons.join(",")}），须逐次显式使用 --full；正式 origin/main 默认签发 server-ci 回执并由 R640 exact-SHA CI 执行高成本门禁。`,
+      ? `[qa:affected] 本计划用于开发期快速反馈；非 origin/main 可由 ${plan.prePushGate} 签发 affected 回执，正式 origin/main 默认签发 server-ci 回执并由 GitLab exact-SHA CI 执行高成本门禁。`
+      : `[qa:affected] 本地独立诊断需要 full（${prePush.reasons.join(",")}），须逐次显式使用 --full；正式 origin/main 默认签发 server-ci 回执并由 GitLab exact-SHA CI 执行高成本门禁。`,
   );
   lines.push(
     "[qa:affected] server-ci 回执只授权普通非强制 push；发布、制品提升或受保护部署仍须 exact-SHA CI Gate 终态成功，且不替代目标 migration、smoke 或客户验收。",
@@ -1192,7 +1192,7 @@ function printHelp() {
 边界:
   最终 clean HEAD 仍由 prepare-push 复算同一 affected 计划。默认 origin
   refs/heads/main -> refs/heads/main 仅运行签名的本地 git-log、strict-secrets 与
-  source-integrity 检查，高成本门禁交由 R640 exact-SHA GitLab CI；回执只授权普通
+  source-integrity 检查，高成本门禁交由 GitLab exact-SHA CI；回执只授权普通
   非强制 push，同一 exact SHA 的 terminal-success CI Gate 是 release、package
   promotion 与 protected deploy 的前置条件。显式 --full、review 与任何非规范目标
   仍保守处理；本地回执也不替代目标环境 migration、smoke 或发布证据。`);

@@ -18,6 +18,6 @@ BOM、采购和质检的持久化约束错误在 repo 返回边界统一转换�
 
 补充说明见：
 
-- `/Users/simon/projects/plush-toy-erp/server/docs/ent.md`
-- `/Users/simon/projects/plush-toy-erp/server/docs/config.md`
-- `/Users/simon/projects/plush-toy-erp/server/docs/observability.md`
+- `server/docs/ent.md`
+- `server/docs/config.md`
+- `server/docs/observability.md`

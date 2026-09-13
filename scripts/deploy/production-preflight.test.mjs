@@ -1650,7 +1650,7 @@ test("production preflight enforces exact registered data and migration lock pat
   for (const [key, replacement, expected] of [
     [
       "POSTGRES_DATA_DIR",
-      "/Users/simon/plush-toy-erp-demo-v1/data/postgres",
+      "/Users/example/plush-toy-erp-demo-v1/data/postgres",
       /demo-133 的 POSTGRES_DATA_DIR 不符合登记合同/u,
     ],
     [

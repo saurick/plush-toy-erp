@@ -7,12 +7,11 @@ description: 已有证据的只读能力审计（plush-toy-erp），不执行实
 
 只读回答“现在做到哪里、还缺什么、能不能使用或交付”。只核对当前问题需要的证据类型，不为简单状态题展开固定层级、全仓扫描或新建第二份台账。
 
-## 真源顺序
+## 按问题选真源
 
-1. 先读 `AGENTS.md`、`README.md`、`docs/当前真源与交接顺序.md`。
-2. 从 `docs/product/产品能力进度台账.md` 定位业务能力；细节回到对应专题文档、代码、migration 和测试。
-3. 涉及 Workflow / ProcessRuntime 时先看台账聚合能力行和 `docs/architecture/状态工作流事实边界.md`。
-4. 涉及客户状态时读取对应客户受控资料和当前目标证据；历史 changes、`progress.md`、聊天和截图只作辅助。
+1. 范围或仓库入口不清时，才用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位；能力已明确时直接从 `docs/product/产品能力进度台账.md` 进入对应专题、代码、migration 和测试。
+2. Workflow / ProcessRuntime 问题补读台账聚合能力行和 `docs/architecture/状态工作流事实边界.md`。
+3. 客户状态问题读取对应客户受控资料和当前目标证据；历史 changes、`progress.md`、聊天和截图只作辅助。
 
 ## 按问题选择证据
 

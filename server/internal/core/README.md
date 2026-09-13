@@ -72,10 +72,10 @@ core -> config / env / filesystem
 涉及本目录的改动至少执行：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 node --test scripts/qa/core-boundary.test.mjs
 
-cd /Users/simon/projects/plush-toy-erp/server
+cd "$(git rev-parse --show-toplevel)/server"
 go test ./internal/core/...
 ```
 

@@ -366,11 +366,11 @@ function buildInputTemplate() {
     realSmokeRequires: [...realSmokeRequires],
     notProvenByThisTemplate: [...browserSmokeNotProven],
     commands: [
-      'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web --silent audit:yoyoosun-entry -- --json',
-      'PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --preflight-report output/trial-demo-account-browser-smoke/preflight.json',
-      "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
-      `TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --report ${defaultRealSmokeReportPath}`,
-      "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' TRIAL_BROWSER_SMOKE_BASE_URL='<audited-yoyoosun-url>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
+      'pnpm --dir web --silent audit:yoyoosun-entry -- --json',
+      'node web/scripts/trialDemoAccountBrowserSmoke.mjs --preflight-report output/trial-demo-account-browser-smoke/preflight.json',
+      "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' pnpm --dir web smoke:trial-demo-browser",
+      `TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' node web/scripts/trialDemoAccountBrowserSmoke.mjs --report ${defaultRealSmokeReportPath}`,
+      "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' TRIAL_BROWSER_SMOKE_BASE_URL='<audited-yoyoosun-url>' pnpm --dir web smoke:trial-demo-browser",
     ],
     boundary:
       'This template does not prove browser login, menu projection, mobile task access, backend health, yoyoosun entry ownership, effective session diagnostic readback, or customer config active revision until a local backend, audited yoyoosun frontend runtime, and demo password are provided.',
@@ -536,7 +536,7 @@ function buildEffectiveSessionDiagnosticPlan() {
 function buildYoyoosunEntryAuditPlan() {
   return {
     command:
-      'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web --silent audit:yoyoosun-entry -- --json',
+      'pnpm --dir web --silent audit:yoyoosun-entry -- --json',
     scope: 'local-frontend-entry-preflight',
     requiredForExternalBaseURL: true,
     defaultPorts: [...defaultYoyoosunEntryAuditPorts],
@@ -658,7 +658,6 @@ async function buildPreflightReport(runtime = {}) {
     yoyoosunEntryAudit.suggestedExternalBaseURL
       ? `TRIAL_BROWSER_SMOKE_BASE_URL='${yoyoosunEntryAudit.suggestedExternalBaseURL}'`
       : '',
-    'PATH=/usr/local/bin:$PATH',
     'node web/scripts/trialDemoAccountBrowserSmoke.mjs',
     `--report ${defaultRealSmokeReportPath}`,
   ]

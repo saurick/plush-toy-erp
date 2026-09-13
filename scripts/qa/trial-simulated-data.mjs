@@ -227,14 +227,14 @@ function buildInputTemplate(options = {}) {
     ],
     commands: {
       printInputTemplate:
-        "PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --print-input-template",
-      reportOnly: `PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --out ${out}`,
+        "node scripts/qa/trial-simulated-data.mjs --print-input-template",
+      reportOnly: `node scripts/qa/trial-simulated-data.mjs --out ${out}`,
       applySimulated:
-        "TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA TRIAL_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --apply --backend-url http://127.0.0.1:8300 --product-id <active_product_id> --unit-id <active_unit_id>",
+        "TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA TRIAL_SIM_PASSWORD='<local-demo-password>' node scripts/qa/trial-simulated-data.mjs --apply --backend-url http://127.0.0.1:8300 --product-id <active_product_id> --unit-id <active_unit_id>",
       seedCoreDemo:
-        "PATH=/usr/local/bin:$PATH bash scripts/seed-core-demo-data.sh",
+        "bash scripts/seed-core-demo-data.sh",
       seedMinimalTrial:
-        "PATH=/usr/local/bin:$PATH bash scripts/seed-trial-sim-masterdata.sh",
+        "bash scripts/seed-trial-sim-masterdata.sh",
     },
     boundary:
       "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write formal business data, create schema/migrations, or create shipment/inventory/finance facts.",

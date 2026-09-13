@@ -17,11 +17,11 @@
 | `bash scripts/qa/affected.sh --plan`                                                                                                | 读取当前工作树、staged、指定 base 或显式文件，按验证范围（内部键 T0-T8）和受影响领域输出最小必要测试；默认只计划，未知路径保守升级为 `full.sh`                                                                                                                                                                                                                                 | 开发过程中、准备验证前                              |
 | `bash scripts/qa/affected.sh --run`                                                                                                 | 执行 affected 选出的安全本地命令并记录逐项耗时；页面级浏览器回归（Style L1）、`make data` 和目标环境证据仍作为 required follow-up 单列                                                                                                                                                                                                                                         | 完成一个可验证切片后                                |
 | `node --test scripts/qa/dev-page-governance.test.mjs`                                                                               | 检查 DEV 菜单 route 唯一且留在 `/__dev`，普通页面由单一模块登记 affected 桌面渲染/溢出 smoke，专属页面保留各自唯一桌面场景；full/strict 默认不运行 DEV 视觉场景，且不登记 DEV 移动端、暗色、成功截图、固定密度或通用键盘合同                                                                                                                                                   | 新增菜单、页面或修改工作台可见内容时                |
-| `node --test scripts/qa/dev-quality-gate-provider-boundary.test.mjs`                                                                | 检查质量工作台直接投影服务器 provider 返回的 CI Job，并只用正式流水线与终态门禁判定结果；前端不保存需随 Job 增删改名同步的第二份拓扑                                                                                                                                                                                                                                           | 修改 R640 CI 证据 provider、质量工作台或 Job 编排时 |
+| `node --test scripts/qa/dev-quality-gate-provider-boundary.test.mjs`                                                                | 检查质量工作台直接投影服务器 provider 返回的 CI Job，并只用正式流水线与终态门禁判定结果；前端不保存需随 Job 增删改名同步的第二份拓扑                                                                                                                                                                                                                                           | 修改 GitLab CI 证据 provider、质量工作台或 Job 编排时 |
 | `node --test scripts/qa/ci-job-guide.test.mjs`                                                                                      | 校验每个正式 push-CI Job 都有一份简短用途说明；说明源不保存依赖、状态、耗时、等待或历史，未知 Job 只标记“说明待登记”并继续投影                                                                                                                                                                                                                                                 | 新增、删除、改名或拆分 GitLab CI Job 时             |
 | `bash scripts/qa/fast.sh`                                                                                                           | 高频快速检查，只运行显式 `fast` Node 测试组，并覆盖文档清单、客户配置、菜单、Web 静态检查和 server quick；阶段编号只由 affected 扫描本次变更文件                                                                                                                                                                                                                               | 日常开发后                                          |
 | `node scripts/qa/yoyoosun-role-jsonrpc-access.mjs --report output/qa/yoyoosun-role-jsonrpc-access/report.json`                      | 使用九岗位演示账号真实登录，逐岗验证允许读取、越权写入被拒绝和前后任务总量不串权；凭据只从服务端进程环境读取，预期业务写入为零，不等于完整角色协同闭环                                                                                                                                                                                                                         | 本地后端与演示账号凭据就绪后                        |
-| `bash scripts/qa/prepare-push.sh`                                                                                                   | 默认仅对单一 `origin/main` 签发 30 分钟 `server-ci` 回执：复算 affected 风险，但本地只运行 remote/ref/range、git-log、严格 secrets 与源码完整性短门禁；高成本测试/构建由 R640 exact-SHA CI 执行。非标准目标保持 affected/full 保守合同                                                                                                                                         | commit 后、立即 push 前                             |
+| `bash scripts/qa/prepare-push.sh`                                                                                                   | 默认仅对单一 `origin/main` 签发 30 分钟 `server-ci` 回执：复算 affected 风险，但本地只运行 remote/ref/range、git-log、严格 secrets 与源码完整性短门禁；高成本测试/构建由 GitLab exact-SHA CI 执行。非标准目标保持 affected/full 保守合同                                                                                                                                         | commit 后、立即 push 前                             |
 | `bash scripts/qa/prepare-push.sh --full`                                                                                            | 经明确授权的本地完整诊断；完整执行 full，并在前后身份和容器清理读回一致后签发短期回执，不作为默认 `origin/main` 的前置步骤                                                                                                                                                                                                                                                     | full 已明确确认、需要独立本地诊断时                 |
 | `node scripts/qa/skill-health.mjs`                                                                                                  | 检查项目 Skill frontmatter、目录名、metadata、README 索引和相对引用；`affected` 对 Skill 变更会直接执行，不再只提示 follow-up                                                                                                                                                                                                                                                  | 修改 `.agents/skills/**` 后                         |
 | `node scripts/qa/erp-field-linkage.mjs`                                                                                             | 运行字段联动专项，前后绑定同一仓库指纹，并把脱敏结构化证据写入 `output/qa/coverage/field-linkage.latest.json`；只证明该专项，不代表整仓覆盖                                                                                                                                                                                                                                    | 修改字段来源、映射、回显或打印链路后                |
@@ -33,7 +33,7 @@
 | `node scripts/qa/run-gate-with-managed-database.mjs --exact-sha <40sha> --main-ref HEAD --operation-id <uuid>`                      | 本地 clean 候选的唯一受管 exact-SHA 入口；复用固定 `postgres:18.1`、随机凭据、loopback 动态端口和精确 cleanup，再以无 shell 的固定参数执行 `exact-sha-gate.mjs`；DSN 只进入子进程环境，终态仍以 exact-SHA gate 为唯一真源                                                                                                                                                      | 需要独立本地受管诊断时                              |
 | `run-gate-with-managed-database.mjs`                                                                                                | 质量门禁页面的 full / strict 内部包装器；固定使用本机 `postgres:18.1`，为每次 operation 生成随机凭据和 loopback 动态端口，执行原正式 runner 后按精确 label 删除容器并读回零残留；不接受浏览器提供命令、DSN、镜像或凭据                                                                                                                                                         | DEV 页面未显式登记本机数据库 base 时                |
 | `node scripts/qa/exact-sha-gate.mjs --sha <40sha> [--run]`                                                                          | 绑定 clean SHA、strict profile、锁文件和门禁实现形成 fingerprint；已有同 fingerprint 终态时复用，不自动新开 lifecycle                                                                                                                                                                                                                                                          | 不可变 Release workflow                             |
-| `node scripts/qa/ci-quality-shard.mjs --shard <name>`                                                                               | 只在 protected main 的 R640 GitLab 上生成七类固定外部 strict 分片之一；Node 类聚合内部 `core / release_preflight_a / release_preflight_b / release_a / release_b / release_c`，resource-sensitive 类聚合内部 `contract_a / contract_b / runtime_a / runtime_b`，两者对外仍各自只保留一个规范回执；所有回执继续绑定同一 plan/range/exact SHA，并保留资源清理读回                | GitLab main 普通 CI；不提供本地通用入口             |
+| `node scripts/qa/ci-quality-shard.mjs --shard <name>`                                                                               | 只在 protected main 的 GitLab 上生成七类固定外部 strict 分片之一；Node 类聚合内部 `core / release_preflight_a / release_preflight_b / release_a / release_b / release_c`，resource-sensitive 类聚合内部 `contract_a / contract_b / runtime_a / runtime_b`，两者对外仍各自只保留一个规范回执；所有回执继续绑定同一 plan/range/exact SHA，并保留资源清理读回                | GitLab main 普通 CI；不提供本地通用入口             |
 | `node scripts/qa/pnpm-audit-retry.mjs`                                                                                              | 对 npm 官方接口执行固定的 production/high pnpm 审计；首次强制直连，只对网络、429 和 5xx 瞬态错误重试一次，若环境已配置代理则仅第二次使用该代理；单次 100 秒、总计 205 秒封顶，合法漏洞报告不重试，高危或严重漏洞立即阻断，错误只输出有界脱敏诊断                                                                                                                               | GitLab security 分片内部；可作本地只读诊断          |
 | `node scripts/qa/ci-quality-aggregate.mjs`                                                                                          | 精确聚合七个分片、可信 plan 与资源清理证据，签发标准 v3 exact-SHA strict terminal 和可上传的 CI evidence manifest；缺任一分片、分类执行数或身份均失败关闭                                                                                                                                                                                                                      | GitLab main 普通 CI 聚合；不证明 Release 或目标部署 |
 | `node scripts/qa/candidate-sha-freeze.mjs --sha <40sha> --terminal <strict-terminal.json>`                                          | 在已通过 strict 的 clean exact HEAD 上固定执行复用/失败/公网读回/DEV 隔离合同，以及版本中心桌面真实浏览器 smoke；生成单一候选冻结回执，不建立 DEV 移动端或暗色验收承诺，也不替代远端 CI、Release 或 133 发布                                                                                                                                                                   | 最终候选第一次正式 push 前                          |
@@ -95,17 +95,17 @@
 
 页面的最近记录保存在 ignored `output/dev-workbench/quality-gate-operations/**`，每个 profile 只保留最近 20 个已结束 operation；记录不保存日志、DSN、密码、token 或私有路径。`quality-gate-catalog.mjs` 只登记门禁职责、风险、正式来源引用、证据与退出条件，当前改动映射继续复用 `affected` 真源，阶段与最终结果继续读取同一正式 receipt。dirty / clean、full / strict 和不同 environment fingerprint 不混算；少于 3 个可比样本时明确报告样本不足，不生成健康分数，也不会自动禁用或删除门禁。
 
-R640 历史不写入上述本地 operation 目录。development-only Bridge 每次从 GitLab 读取最近 20 次普通 push pipeline 及其全部 Job，将运行、排队、最新 attempt、重试数和 GitLab 链接放入同一质量门禁摘要；当前流水线的 DAG 另由同一 exact SHA 的 GitLab CI Lint `needs` 投影，配置依赖与实际 Job 不一致时不画推测连线。`ci-job-guide.mjs` 只补充每个 Job 的名称、用途、检查项与结果用途，并按 GitLab 实际 Job 名单投影，不保存运行事实。页面和 Codex 都可读取该结构化投影，但 GitLab 仍是唯一 CI 历史真源。
+GitLab CI 历史不写入上述本地 operation 目录。development-only Bridge 每次从 GitLab 读取最近 20 次普通 push pipeline 及其全部 Job，将运行、排队、最新 attempt、重试数和 GitLab 链接放入同一质量门禁摘要；当前流水线的 DAG 另由同一 exact SHA 的 GitLab CI Lint `needs` 投影，配置依赖与实际 Job 不一致时不画推测连线。`ci-job-guide.mjs` 只补充每个 Job 的名称、用途、检查项与结果用途，并按 GitLab 实际 Job 名单投影，不保存运行事实。页面和 Codex 都可读取该结构化投影，但 GitLab 仍是唯一 CI 历史真源。
 
 CI 拆分采用 `90 / 120 / 40 / 20` 性能观察线：最近 5 次受保护 `main` 成功流水线中，实质工作 Job 的目标区间为 45–90 秒；中位数超过 90 秒时分析拆分，至少 3 次超过 120 秒时拆分或记录不可拆原因。新子 Job 原则上不少于 40 秒，且拆分应让关键路径至少缩短 20%；汇总 Job 不适用工作下限，但目标不超过 30 秒。该规则只触发评审，不因单次波动阻断 CI；数据库、端口、Chromium、临时目录、exact SHA、测试完整性和清理回读无法独立时不得为时长数字强拆。
 
-`node-test-groups.mjs` 将 scripts Node 测试显式登记为 `fast / database / browser / release / resource_sensitive`，新增 tracked 测试未登记、重复登记或路径失效都会阻断。`fast.sh` 只跑高频组；本地 `full.sh` 保持 shared / Web / server 三路并行，再串行资源敏感、关键 PostgreSQL、browser 和 govulncheck，用于独立诊断。R640 普通 main CI 对外仍固定为 static、Node contracts、Web、Server/PostgreSQL、resource-sensitive、browser 和 security 七类：Node contracts 内部将 `fast + database + browser` 合并为 `core` lane；`production-preflight` 由同一测试源按稳定登记顺序交替分到 `release_preflight_a / b`，其余 release 测试保留慢项锚点并均衡分到 `release_a / b / c`。每条 lane 都保持 `--test-concurrency=1`，两个 preflight lane 合并后仍要求完整覆盖和 zero-skip。资源敏感合同把 39 个顶层测试按唯一 registry 和实测耗时均衡分为 `contract_a / b` 与 `runtime_a / b`；每条 lane 内仍串行，跨 lane 才并行，且继续核对一次性容器、file/advisory lock、并发、timeout 和异常清理。Web 内部把 lint/stylelint/测试与 production build 拆为 `checks` / `build`；Server/PostgreSQL 内部拆为 `schema`、`upgrade`、`test_build` 与 `critical_postgres`，只有需要真实 PostgreSQL 的 upgrade 和 critical lane 各自持有并清理独立数据库，只有 test/build lane 消费 Chromium，只有 schema lane 执行并读回 `make data` 零漂移。所有 Node/resource/Web/Server 内部 lane 的每个 Job 都按 exact SHA、plan/range、完整清单、zero-skip 和清理读回 fan-in 为唯一 `node.json`、`web.json`、`server.json` / `resource.json`。Browser 另保留一条场景串行 lane，只读复用同一 SHA 的唯一 Web build digest，并按 pipeline/job/lane 隔离端口、Chromium、临时目录、lock 和输出；场景穷尽/互斥、取消/超时清理及 fan-in 仍只产出规范 `browser.json`。外部七类合同不变。每个可进入 Core CI 的分组 Node 测试因此恰好归属一次；客户交付文档专项仍只按 affected 或显式入口运行，不进入 Core CI。缺少、重复、额外、身份漂移或新 fixture 残留都会阻断，既存 fixture 现场不会被清理。每个 strict 阶段仍只归属一个外部分片，聚合后仍要满足完整分类执行数、零 skip、source integrity、`make data`、依赖审计和资源清理读回，不以并行代替覆盖。Node runner 失败时只在 ignored `output/qa/node-tests/<profile>-latest-failure.json` 写入有上限、已脱敏的结构化失败身份和耗时；不持久化原始 TAP、环境变量、参数、stdout / stderr、DSN、密码或 token，成功重跑会删除同 profile 的旧失败诊断。
+`node-test-groups.mjs` 将 scripts Node 测试显式登记为 `fast / database / browser / release / resource_sensitive`，新增 tracked 测试未登记、重复登记或路径失效都会阻断。`fast.sh` 只跑高频组；本地 `full.sh` 保持 shared / Web / server 三路并行，再串行资源敏感、关键 PostgreSQL、browser 和 govulncheck，用于独立诊断。GitLab 普通 main CI 对外仍固定为 static、Node contracts、Web、Server/PostgreSQL、resource-sensitive、browser 和 security 七类：Node contracts 内部将 `fast + database + browser` 合并为 `core` lane；`production-preflight` 由同一测试源按稳定登记顺序交替分到 `release_preflight_a / b`，其余 release 测试保留慢项锚点并均衡分到 `release_a / b / c`。每条 lane 都保持 `--test-concurrency=1`，两个 preflight lane 合并后仍要求完整覆盖和 zero-skip。资源敏感合同把 39 个顶层测试按唯一 registry 和实测耗时均衡分为 `contract_a / b` 与 `runtime_a / b`；每条 lane 内仍串行，跨 lane 才并行，且继续核对一次性容器、file/advisory lock、并发、timeout 和异常清理。Web 内部把 lint/stylelint/测试与 production build 拆为 `checks` / `build`；Server/PostgreSQL 内部拆为 `schema`、`upgrade`、`test_build` 与 `critical_postgres`，只有需要真实 PostgreSQL 的 upgrade 和 critical lane 各自持有并清理独立数据库，只有 test/build lane 消费 Chromium，只有 schema lane 执行并读回 `make data` 零漂移。所有 Node/resource/Web/Server 内部 lane 的每个 Job 都按 exact SHA、plan/range、完整清单、zero-skip 和清理读回 fan-in 为唯一 `node.json`、`web.json`、`server.json` / `resource.json`。Browser 另保留一条场景串行 lane，只读复用同一 SHA 的唯一 Web build digest，并按 pipeline/job/lane 隔离端口、Chromium、临时目录、lock 和输出；场景穷尽/互斥、取消/超时清理及 fan-in 仍只产出规范 `browser.json`。外部七类合同不变。每个可进入 Core CI 的分组 Node 测试因此恰好归属一次；客户交付文档专项仍只按 affected 或显式入口运行，不进入 Core CI。缺少、重复、额外、身份漂移或新 fixture 残留都会阻断，既存 fixture 现场不会被清理。每个 strict 阶段仍只归属一个外部分片，聚合后仍要满足完整分类执行数、零 skip、source integrity、`make data`、依赖审计和资源清理读回，不以并行代替覆盖。Node runner 失败时只在 ignored `output/qa/node-tests/<profile>-latest-failure.json` 写入有上限、已脱敏的结构化失败身份和耗时；不持久化原始 TAP、环境变量、参数、stdout / stderr、DSN、密码或 token，成功重跑会删除同 profile 的旧失败诊断。
 
-R640 的 Playwright 运行包固定为 `playwright 1.58.2 / Chromium 145.0.7632.6 / revision 1208 / FFmpeg 1011`。`ci-playwright-runtime.mjs` 只接受三个固定 ZIP 的精确长度与 SHA-256，普通 job 只读取同项目 GitLab Generic Package 中的 `runtime.tar` 并再次校验内层 ZIP；仅当该 package 返回 404 时，protected main 的 push `prepare` job 才能消费一次已由运维 owner 在 CI 外下载、校验并通过受信 SSH 放入精确私有目录的 Runner 本地冷种子。脚本再次检查当前 uid、真实目录/普通文件、`0700/0600`、精确 inventory、长度和 SHA-256，随后上传 package、读回同一内容，并只删除已完整接受的种子；缺失或歧义不回退到 Runner 公网下载。Runner cache 只保存已校验的原始 ZIP，不信任已解压目录；需要 Chromium 的 job 在自己的 `output/runtime/gitlab/playwright-$CI_JOB_ID` 解压，校验可执行文件后使用，并在成功或失败时精确清理。不得回退到普通 job 的 live `playwright install`、备用 URL、浮动版本或未校验缓存。
+GitLab CI 的 Playwright 运行包固定为 `playwright 1.58.2 / Chromium 145.0.7632.6 / revision 1208 / FFmpeg 1011`。`ci-playwright-runtime.mjs` 只接受三个固定 ZIP 的精确长度与 SHA-256，普通 job 只读取同项目 GitLab Generic Package 中的 `runtime.tar` 并再次校验内层 ZIP；仅当该 package 返回 404 时，protected main 的 push `prepare` job 才能消费一次已由运维 owner 在 CI 外下载、校验并通过受信 SSH 放入精确私有目录的 Runner 本地冷种子。脚本再次检查当前 uid、真实目录/普通文件、`0700/0600`、精确 inventory、长度和 SHA-256，随后上传 package、读回同一内容，并只删除已完整接受的种子；缺失或歧义不回退到 Runner 公网下载。Runner cache 只保存已校验的原始 ZIP，不信任已解压目录；需要 Chromium 的 job 在自己的 `output/runtime/gitlab/playwright-$CI_JOB_ID` 解压，校验可执行文件后使用，并在成功或失败时精确清理。不得回退到普通 job 的 live `playwright install`、备用 URL、浮动版本或未校验缓存。
 
 本地 clean 提交需要 exact-SHA 终态时，只使用上表的受管命令；`--exact-sha` 只接受 40 位小写 SHA，`--main-ref` 只接受 `HEAD`，不能混入 full / strict 或任意命令参数。包装器只负责一次性数据库和进程清理，`exact-sha-gate.mjs` 仍是 terminal / receipt 的唯一真源。失败终态是该 SHA 与 fingerprint 的最终证据，不得删除、覆盖或重试；修复必须产生新提交和新 SHA 后再运行。
 
-`full.sh` 默认拒绝继承的 `STYLE_L1_BASE_URL`，仅在本项目 `15200-15299` AUX 段为本轮选择空闲端口，并只清理自身启动的 Vite 进程。同一 worktree 的浏览器证据使用原子 PID 锁串行运行；活动锁直接阻断，stale lock 也保守失败且保留现场，只能在确认 owner 已不存在且没有门禁运行后手工清理。外部 base URL 只能用于显式单项 browser smoke，不能替代 full 的当前 worktree 证据。Server 阶段在唯一临时数据库中从历史 checkpoint 装载合成存量行，验证 055504 / 055825 两项只读 blocker、克重 kg→g 非空/NULL 存量转换和 latest pending=0；关键 PostgreSQL 矩阵使用同一 R640 Server 分片中的另一座唯一临时库，完成 migration、测试和 fail-closed 清理，不复用固定开发测试库。Server 阶段还启用真实 Chromium PDF 安全集成，本机自动发现 Chrome/Chromium，CI 则传入本 job 从已校验运行包解压出的精确可执行路径。安全集成未执行会以 Go skip 阻断 full。fast / full 的固定 Node 与 Go 测试除子进程退出码外，还要求可解析结果、实际执行数大于 0、失败数与跳过数均为 0；缺 summary、零执行或 skip 一律阻断。R640 CI 的 Web / Server 测试仍在进程内解析完整 TAP / Go JSON，但 job 只输出有界汇总，避免原始逐测试 trace 超过 GitLab 日志上限；本地 full 保留完整诊断输出。
+`full.sh` 默认拒绝继承的 `STYLE_L1_BASE_URL`，仅在本项目 `15200-15299` AUX 段为本轮选择空闲端口，并只清理自身启动的 Vite 进程。同一 worktree 的浏览器证据使用原子 PID 锁串行运行；活动锁直接阻断，stale lock 也保守失败且保留现场，只能在确认 owner 已不存在且没有门禁运行后手工清理。外部 base URL 只能用于显式单项 browser smoke，不能替代 full 的当前 worktree 证据。Server 阶段在唯一临时数据库中从历史 checkpoint 装载合成存量行，验证 055504 / 055825 两项只读 blocker、克重 kg→g 非空/NULL 存量转换和 latest pending=0；关键 PostgreSQL 矩阵使用同一 GitLab Server 分片中的另一座唯一临时库，完成 migration、测试和 fail-closed 清理，不复用固定开发测试库。Server 阶段还启用真实 Chromium PDF 安全集成，本机自动发现 Chrome/Chromium，CI 则传入本 job 从已校验运行包解压出的精确可执行路径。安全集成未执行会以 Go skip 阻断 full。fast / full 的固定 Node 与 Go 测试除子进程退出码外，还要求可解析结果、实际执行数大于 0、失败数与跳过数均为 0；缺 summary、零执行或 skip 一律阻断。GitLab CI 的 Web / Server 测试仍在进程内解析完整 TAP / Go JSON，但 job 只输出有界汇总，避免原始逐测试 trace 超过 GitLab 日志上限；本地 full 保留完整诊断输出。
 
 `populated-upgrade-preflight.sh` 只接受 `populated-upgrade`、`customer-config-cutover` 和 `database-constraints` 三个 audit key，并把 DSN 仅从调用方指定的环境变量传给 `psql`。第一项检查 20260714055504 的状态、生命周期、取消审计束、流程锚点、版本和待删除时间字段，同时检查 WIP `20260717035245 -> 20260717043625` 委外关联切换：旧列仍有链接时阻断删除，切换后活动外发批次缺少 durable allocation 时也阻断；第二项检查 20260714055825 前必须显式治理的流程运行态与任务配置锚点；第三项在关键数据库约束收紧前只读核对现有约束和存量数据，任何不满足项都 fail closed。三项都使用 read-only 事务，不能修复或清理生产数据；出现 blocker 后必须停止 apply，由单独评审的治理动作处理，完成后重跑审计。
 
@@ -113,7 +113,7 @@ R640 的 Playwright 运行包固定为 `playwright 1.58.2 / Chromium 145.0.7632.
 
 同一次 `prepare-push` 的远端 ref 读回每次尝试都受 20 秒硬超时约束，只对明确的超时、断连、拒绝连接、网络不可达和临时 DNS 失败做最多两次短间隔重试；权限、仓库、ref、响应合同及其他错误立即失败。三次尝试仍不可读时形成该次调用的终态失败，不补跑同一 SHA 的 affected/full，也不得绕过 pre-push hook。
 
-开发阶段只跑 affected、同名测试和受影响单链浏览器。用户明确授权推送但未指定远端时，只准备并推送 GitLab `origin/main`；GitHub `main` 只接受 GitLab protected-main 的同 SHA mirror，不从本地直接更新，也不运行仓库 CI。所有 writer 收口且 clean `main` 只做必要的 fast-forward-only 上游同步后，用普通 `prepare-push` 签发 `server-ci` 短门禁回执，高成本 affected/full/strict 由 R640 对推送后的 exact SHA 执行。GitLab `CI Gate` 成功并确认 GitHub main 镜像到同一 SHA 后，GPT 才按目标提交范围做事后审查；有效 finding 回到仓库形成新候选。显式本地 `--full` 仍可用于独立诊断，非标准目标继续保守执行本地计划。只有影响生产正确性、安全、数据完整性、权限或可恢复发布的缺陷才允许改候选并重新进入 affected。fixture、mock、选择器、测试文案、开发工作台或证据展示问题若不使生产结论失效，记录为后续事项，不扩展当前 QA 或重新跑全套。真实 CI / 目标阻塞只报告精确阻塞、清理状态和回滚点，不再新造一层门禁。
+开发阶段只跑 affected、同名测试和受影响单链浏览器。用户明确授权推送但未指定远端时，只准备并推送 GitLab `origin/main`；GitHub `main` 只接受 GitLab protected-main 的同 SHA mirror，不从本地直接更新，也不运行仓库 CI。所有 writer 收口且 clean `main` 只做必要的 fast-forward-only 上游同步后，用普通 `prepare-push` 签发 `server-ci` 短门禁回执，高成本 affected/full/strict 由 GitLab CI 对推送后的 exact SHA 执行。GitLab `CI Gate` 成功并确认 GitHub main 镜像到同一 SHA 后，GPT 才按目标提交范围做事后审查；有效 finding 回到仓库形成新候选。显式本地 `--full` 仍可用于独立诊断，非标准目标继续保守执行本地计划。只有影响生产正确性、安全、数据完整性、权限或可恢复发布的缺陷才允许改候选并重新进入 affected。fixture、mock、选择器、测试文案、开发工作台或证据展示问题若不使生产结论失效，记录为后续事项，不扩展当前 QA 或重新跑全套。真实 CI / 目标阻塞只报告精确阻塞、清理状态和回滚点，不再新造一层门禁。
 
 GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManager` 和 `server/go.mod`。`.gitlab-ci.yml` 的唯一 cache writer 是 `prepare`；它在下载或写入 cache 前先核对 Chromium sandbox 清理 helper 的 root 身份、mode 和当前 job 的精确无交互 sudo policy。四条 Node 内部 lane、Node fan-in 与 Web 分片只从同一 pnpm store 离线安装精确锁定的 Web 依赖，不写 cache；两条 resource 内部 lane 不消费该缓存。Server test/build 与 Browser lane 另需消费同 key 的 Playwright ZIP，其他 Server/PostgreSQL 分片与 aggregate 不重复下载、解压无用缓存。Browser lane 只读消费 `quality_web_build` 的同一 digest；动态 PostgreSQL 端口、job 唯一 Chromium sandbox、浏览器锁与输出目录都按 pipeline/job/lane 隔离。main 普通 push 聚合后的 exact-SHA terminal 绑定 repository、40 位 SHA、source archive、policy / workflow / toolchain / migration / lock / 客户配置指纹、分类执行数和真实 `gitlab-ci` push provenance，`CI Gate` 再将 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 Generic Package。release 只接受 `CI_COMMIT_SHA == RELEASE_SHA` 的 protected main，服务器端回读该普通 CI 证据而不重跑 strict；同 SHA 候选制品只构建一次，以 `candidate.tar` 冻结后复用同一 bytes 做 migration、health/ready、smoke、备份恢复和重启演练，最后生成含同一 `release-rehearsal.json` 的 v2 七资产 Release。v1 六资产只允许精确读取、目录展示、校验和既有回滚，不能补传、重封装或 promotion；GitHub emergency 在完整接入 v2 七资产前于任何副作用前失败关闭。缓存只能缩短安装，不能跳过 checksum、依赖合同或门禁。`db-guard` 仍只是提前阻断的静态启发式，不能替代 Ent / Atlas 零漂移、冻结树 fresh / upgrade 验证或目标环境 evidence。
 
@@ -496,7 +496,7 @@ bash scripts/qa/affected.sh --file web/src/erp/utils/dateRange.mjs --run
 
 `gate-profiles.mjs` 只保存 fast/full/strict 的语义层级、直接入口和可执行位合同，当前 required files 保持小而累积。下游脚本和测试是否存在由真实执行、`node-test-groups.mjs` 的唯一登记以及各领域测试发现证明，不再在 profile 中复制整条传递依赖清单。
 
-`affected` 是开发期快速反馈和非标准目标的保守执行入口；默认 `origin/main` 的 `prepare-push` 会在 clean HEAD 和真实 aggregate range 上独立重算风险，但只签发 `server-ci` 短门禁回执，不在 Mac 执行 affected/full。显式 `--full` 只作本地完整诊断；随后必须按准备时相同 remote/ref push，hook 复核短期回执、真实 stdin/range、clean HEAD、gate/environment/TTL，并实时运行 `git log --check` 与逐 range 严格 secrets。推送后必须由 R640 exact-SHA CI Gate 终态成功才能发布、提升制品或进入受保护部署；目标 migration、health/smoke、备份恢复及回滚 evidence 仍独立取得。
+`affected` 是开发期快速反馈和非标准目标的保守执行入口；默认 `origin/main` 的 `prepare-push` 会在 clean HEAD 和真实 aggregate range 上独立重算风险，但只签发 `server-ci` 短门禁回执，不在 Mac 执行 affected/full。显式 `--full` 只作本地完整诊断；随后必须按准备时相同 remote/ref push，hook 复核短期回执、真实 stdin/range、clean HEAD、gate/environment/TTL，并实时运行 `git log --check` 与逐 range 严格 secrets。推送后必须由 GitLab exact-SHA CI Gate 终态成功才能发布、提升制品或进入受保护部署；目标 migration、health/smoke、备份恢复及回滚 evidence 仍独立取得。
 
 ## 角色演示账号与登录核验
 
@@ -522,20 +522,20 @@ bash scripts/qa/affected.sh --file web/src/erp/utils/dateRange.mjs --run
 无显式密码时，脚本只允许连接登记的 `192.168.0.133:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并使用公开测试密码 `12345678` 生成十个角色演示账号（包括普通演示管理员 `demo_admin`）；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。本入口及其 `demo_*` 账号不得用于 133 上其他实例、其他共享 / 试用、staging 或生产目标；`customer-trial-133` 复用相同公开密码值时只能走其独立 `uat_*` 凭据合同与受控轮换器。独立命令行调试账号和其他人工验收账号操作仍必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码；唯一例外是 DEV-only 测试数据中心的固定 `scenario-demo` 编排，它在精确证明本机 8300 与登记 133 开发库后，可复用本机公开测试账号约定实现页面生成，且没有通往演示、验收、staging 或生产实例的逃逸开关。管理员和演示账号的创建、重置密码仍统一要求 8～20 个 Unicode 字符，且 UTF-8 编码后不超过 bcrypt 的 72 字节边界。
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
+bash scripts/seed-role-demo-admins.sh
 ```
 
 如需覆盖公开测试默认值，或在受控场景中生成 `demo_debug` / 重置人工验收账号，必须显式传入非默认密码：
 
 ```bash
 ERP_ROLE_DEMO_PASSWORD='<explicit-demo-password>' \
-  bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
+  bash scripts/seed-role-demo-admins.sh
 ```
 
 已有账号重跑时会恢复 `disabled=false`、`is_super_admin=false` 和对应单一角色绑定；默认不重置已有账号密码。如需统一重置演示账号密码：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh --reset-password
+bash scripts/seed-role-demo-admins.sh --reset-password
 ```
 
 无输入重置只处理登记的 `192.168.0.133:5432/plush_erp` / `plush_erp_*_dev` 本地开发库中的十个角色演示账号。重置 `demo_debug` 或人工验收场景账号时必须用 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。脚本默认拒绝 `configs/prod` 或 `APP_ENV / ERP_ENV / GO_ENV=prod|production`；公开测试值即使显式传入也不能离开登记的本地开发库族，`--allow-prod` 必须使用非默认密码。常规开发和验收不要对生产库执行该脚本。
@@ -545,32 +545,32 @@ bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh --rese
 如果只想先核对输入和账号清单，可打印输入模板。该模式只输出所需环境变量、账号清单、可选脱敏报告路径、effective session 脱敏诊断读取计划和真实核对命令，不读密码、不登录、不调用后端、不启动浏览器、不启动 Vite、不读取客户配置脚本、不写报告、不写数据库：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs --print-input-template
-node /Users/simon/projects/plush-toy-erp/web/scripts/trialDemoAccountBrowserSmoke.mjs --print-input-template
+node scripts/qa/trial-account-rbac.mjs --print-input-template
+node web/scripts/trialDemoAccountBrowserSmoke.mjs --print-input-template
 ```
 
 试用账号 RBAC 也可先写前置检查报告。该模式只探测后端健康检查、演示账号密码环境变量是否存在，并静态核对 Go seed、后端 RBAC mobile 权限、前端移动角色入口、浏览器 smoke 账号和文档入口里的试用角色投影是否一致；报告内 `preflightOnly=true`，并会列出真实 RBAC 检查前置和本报告未证明项。不读密码、不登录、不调用 `admin_login / me`，不写数据库，也不保存 access token 或 Authorization header；也不证明真实 RBAC、customer config active revision、桌面菜单投影或岗位任务端真实可用：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs \
+node scripts/qa/trial-account-rbac.mjs \
   --preflight-report output/trial-account-rbac/preflight.json
 ```
 
 浏览器 smoke 还可先写前置检查报告。该模式只探测后端健康检查、演示账号密码环境变量是否存在、是否需要脚本托管 Vite、yoyoosun customer config 脚本是否存在，并复用 `audit:yoyoosun-entry` 做只读端口审计；如果显式传入 `TRIAL_BROWSER_SMOKE_BASE_URL`，该端口必须命中 yoyoosun config 和 yoyoosun asset，否则报告会以 `external-base-url-not-yoyoosun-entry` 阻止进入真实 smoke，避免把 Product Core、HTML fallback 或其他项目端口误当试用前端。报告还会静态输出桌面账号菜单应见 / 禁见、客户隐藏菜单、旧入口清理、岗位任务端路径、`demo_admin` 移动端拒绝态和 effective session DEV-only 脱敏诊断读取计划；报告内 `preflightOnly=true`，并会列出真实 smoke 前置和本报告未证明项。不读密码、不登录、不调用 JSON-RPC、不启动浏览器、不启动 Vite、不读取客户配置脚本、不创建任务、不写数据库，也不保存 access token 或 Authorization header。真实浏览器 smoke 在脚本托管 Vite 时会在桌面账号登录后读取 `window.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__`，确认只包含脱敏摘要、投影模式、空阻塞项和可见菜单计数；同时检查法律告知弹窗的标题、链接和确认回执。真实登录会写入认证会话，未确认的账号会写入法律告知确认回执，但脚本不调用业务办理动作，不写 Source Document、Workflow 或 Fact。需要留下本地读回记录时，可在真实命令上追加 `--report output/trial-demo-account-browser-smoke/report.json`，报告只保存账号通过数、岗位任务端通过数、拒绝态结果、法律告知检查结果、source / projectionMode / configRevision / customerKey / 计数 / blockers 等脱敏摘要，不保存密码、token、Authorization header、raw customer package 或 action 列表，也不证明目标环境发布、真实客户导入或 release evidence 已完成。外部 base URL 默认不强制读取该 DEV-only 变量，如外部地址确认是 Vite DEV，可设置 `TRIAL_BROWSER_SMOKE_EXPECT_EFFECTIVE_SESSION_DIAGNOSTIC=1`：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/web/scripts/trialDemoAccountBrowserSmoke.mjs \
+node web/scripts/trialDemoAccountBrowserSmoke.mjs \
   --preflight-report output/trial-demo-account-browser-smoke/preflight.json
 ```
 
 真实登录 smoke 共享前置也可先打印输入模板，或写 no-write shared preflight 报告。模板只输出后端健康检查 URL、前端 URL、管理员凭据来源和具体 smoke 命令，不读取配置、不校验凭据、不调用后端、不启动浏览器、不登录、不写数据库；shared preflight 只探测后端 health 和管理员凭据来源候选，不读取 config 内容、不读取密码值、不校验账号、不调用 auth JSON-RPC、不启动 Vite / Playwright、不登录、不写数据库，也不保存密码、token 或 Authorization header。采购入库真实写入浏览器 e2e 还可以打印自己的持久化测试数据输入模板：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/web/scripts/realLoginSmokeShared.mjs --print-input-template
-node /Users/simon/projects/plush-toy-erp/web/scripts/realLoginSmokeShared.mjs \
+node web/scripts/realLoginSmokeShared.mjs --print-input-template
+node web/scripts/realLoginSmokeShared.mjs \
   --preflight-report output/real-login-smoke-shared/preflight.json
-node /Users/simon/projects/plush-toy-erp/web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template
-node /Users/simon/projects/plush-toy-erp/web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs \
+node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template
+node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs \
   --preflight-report output/purchase-receipt-real-write-browser-e2e/preflight.json
 ```
 
@@ -578,14 +578,14 @@ node /Users/simon/projects/plush-toy-erp/web/scripts/purchaseReceiptRealWriteBro
 
 ```bash
 TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
-  node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs
+  node scripts/qa/trial-account-rbac.mjs
 ```
 
 如需留下本地可审计证据，可写入脱敏报告。报告只包含后端 endpoint alias、账号名、角色、岗位权限、debug 权限数量、super admin / disabled 布尔结果和汇总，不保存密码、access token 或 Authorization header：
 
 ```bash
 TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
-  node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs \
+  node scripts/qa/trial-account-rbac.mjs \
     --report output/trial-account-rbac/report.json
 ```
 
@@ -594,14 +594,14 @@ TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
 ```bash
 TRIAL_ACCOUNT_BACKEND_URL='http://127.0.0.1:8300' \
 TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
-  node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs
+  node scripts/qa/trial-account-rbac.mjs
 ```
 
 需要用真实浏览器核对桌面菜单、岗位任务端和无岗位权限拒绝态时，先确认后端已启动，再执行：
 
 ```bash
 TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
-  pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:trial-demo-browser
+  pnpm --dir web smoke:trial-demo-browser
 ```
 
 该浏览器回归会自动启动单端口桌面 Vite，并使用 yoyoosun 菜单配置；它会同时检查各角色应看见的桌面菜单和不应看见的菜单，例如非 admin 不应看到权限管理，`demo_admin` 不应看到业务主入口。如需核对已启动前端地址，可设置 `TRIAL_BROWSER_SMOKE_BASE_URL`。如需保存本地脱敏读回报告，直接运行脚本并追加报告路径：
@@ -609,7 +609,7 @@ TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
 
 ```bash
 TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
-  node /Users/simon/projects/plush-toy-erp/web/scripts/trialDemoAccountBrowserSmoke.mjs \
+  node web/scripts/trialDemoAccountBrowserSmoke.mjs \
     --report output/trial-demo-account-browser-smoke/report.json
 ```
 
@@ -618,17 +618,17 @@ TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
 如果只想先核对该 smoke 的输入、岗位角色、phone / iPad 视口和执行边界，先打印输入模板。该模式不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template
+node web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template
 ```
 
 如需在不启动 Vite / Playwright、不调用后端和不登录的情况下，先写一份本地前置报告核对岗位路由计划、phone / iPad 视口和 mock 覆盖口径：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json
+node web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json
 ```
 
 ```bash
-pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-auth-login-route
+pnpm --dir web smoke:mobile-auth-login-route
 ```
 
 该回归默认验证 `/m/<role>/tasks`，与当前生产 `web-desktop` 单容器主路径一致，使用 mock auth / admin / customer-config / workflow RPC 覆盖未登录拦截、`admin.me` 与 effective session 刷新、登录回跳、当前已加载任务分布 / 风险提醒 / 已办列表和 phone / iPad 布局；preflight 只写本地 JSON，不证明真实后端 RBAC、customer config active revision 或真实账号可用。旧的 `mobile-*` 多实例 `/tasks` 路径已退出，不再作为本地兼容调试入口。
@@ -639,34 +639,34 @@ pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-auth-login-route
 
 ```bash
 node --test \
-  /Users/simon/projects/plush-toy-erp/scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs \
-  /Users/simon/projects/plush-toy-erp/web/src/erp/mobile/utils/mobileRoleTaskModel.test.mjs \
-  /Users/simon/projects/plush-toy-erp/web/src/erp/utils/workflowTaskBoard.test.mjs
+  scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs \
+  web/src/erp/mobile/utils/mobileRoleTaskModel.test.mjs \
+  web/src/erp/utils/workflowTaskBoard.test.mjs
 ```
 
 如果还没有本地演示账号密码或后端地址，先打印输入模板。该模式只输出所需环境变量、模拟任务计划和真实回归命令，不登录、不调用后端、不启动浏览器、不写数据库：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template
+node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template
 ```
 
 本地前置看起来齐全但还不确定能否跑真实浏览器 smoke 时，先写 no-write preflight 报告。该报告只探测 backend health、演示密码 env 是否存在、是否需要脚本托管 Vite、试用 customer-config 脚本是否存在，并复用 `audit:yoyoosun-entry` 做只读端口审计；若显式传入 `MOBILE_WORKFLOW_BROWSER_SMOKE_BASE_URL`，该端口必须命中 yoyoosun config 和 yoyoosun asset，否则报告会以 `external-base-url-not-yoyoosun-entry` 阻止真实 smoke，避免把 Product Core、HTML fallback 或其他项目端口误当移动端任务端运行入口。报告还会记录模拟任务动作计划 coverage：老板阻塞、老板完成、老板退回、品质模拟完成、仓库模拟完成、跨角色催办、reason 必填、完成反馈、阻塞 / 退回原因事件、动作页证据输入已移除、新动作 evidence refs 为空和内部 `notification_type` 线索；不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建 workflow 任务、不写数据库，也不保存 token 或 Authorization header：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \
+node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \
   --preflight-report output/mobile-workflow-runtime-browser-smoke/preflight.json
 ```
 
 ```bash
 MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' \
-  pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-workflow-runtime-browser
+  pnpm --dir web smoke:mobile-workflow-runtime-browser
 ```
 
 如需留下本地真实浏览器读回记录，直接运行脚本并追加报告路径：
 
 ```bash
 MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' \
-  node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \
+  node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \
     --report output/mobile-workflow-runtime-browser-smoke/report.json
 ```
 

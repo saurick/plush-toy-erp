@@ -6,7 +6,7 @@
 
 协议定义见：
 
-- `/Users/simon/projects/plush-toy-erp/server/api/jsonrpc/v1/jsonrpc.proto`
+- `server/api/jsonrpc/v1/jsonrpc.proto`
 
 HTTP 路由：
 
@@ -256,7 +256,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 其中：
 
 - `result.code=0` 表示成功
-- 其他错误码统一来源于 `/Users/simon/projects/plush-toy-erp/server/internal/errcode/catalog.go`
+- 其他错误码统一来源于 `server/internal/errcode/catalog.go`
 
 ## 当前默认保留的数据字段
 

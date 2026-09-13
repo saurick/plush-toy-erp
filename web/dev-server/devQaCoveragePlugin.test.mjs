@@ -465,14 +465,14 @@ test('middleware reads only output/qa/coverage/latest.json', async () => {
     readRepositoryState: async () => REPOSITORY,
   })
   const response = await requestMiddleware(middleware, {
-    url: `${DEV_QA_COVERAGE_API_PATH}?path=/Users/simon/private.json`,
+    url: `${DEV_QA_COVERAGE_API_PATH}?path=/Users/example/private.json`,
   })
   assert.equal(response.statusCode, 200)
   assert.equal(
     receivedPath,
     path.join(projectRoot, 'output', 'qa', 'coverage', 'latest.json')
   )
-  assert.doesNotMatch(response.body, /Users\/simon/u)
+  assert.doesNotMatch(response.body, /Users\//u)
 })
 
 test('middleware distinguishes current and stale repository state', async () => {
@@ -536,7 +536,7 @@ test('middleware fails closed for oversized and invalid-schema reports', async (
   const invalidRoot = await createProject(t)
   await writeReport(invalidRoot, {
     schemaVersion: 'unsupported/v1',
-    repoRoot: '/Users/simon/private/project',
+    repoRoot: '/Users/example/private/project',
     token: 'github_pat_do-not-return',
   })
   const invalid = await requestMiddleware(
@@ -546,14 +546,14 @@ test('middleware fails closed for oversized and invalid-schema reports', async (
     })
   )
   assert.equal(invalid.statusCode, 500)
-  assert.doesNotMatch(invalid.body, /Users|simon|github_pat|token/u)
+  assert.doesNotMatch(invalid.body, /Users|github_pat|token/u)
 })
 
 test('middleware rejects restricted fields even when the schema is valid', async (t) => {
   const projectRoot = await createProject(t)
   await writeReport(
     projectRoot,
-    buildReport({ repoRoot: '/Users/simon/projects/plush-toy-erp' })
+    buildReport({ repoRoot: '/workspace/plush-toy-erp' })
   )
   const response = await requestMiddleware(
     createDevQaCoverageMiddleware({
@@ -562,7 +562,7 @@ test('middleware rejects restricted fields even when the schema is valid', async
     })
   )
   assert.equal(response.statusCode, 500)
-  assert.doesNotMatch(response.body, /Users|simon|repoRoot/u)
+  assert.doesNotMatch(response.body, /workspace|repoRoot/u)
 })
 
 test('middleware rejects ambiguous blended overall coverage keys', async (t) => {
@@ -618,9 +618,9 @@ test('middleware rejects absolute paths regardless of report key name', async (t
 
 test('middleware rejects absolute paths embedded in commands and notes', async (t) => {
   for (const embeddedPath of [
-    'node /Users/simon/private.mjs',
+    'node /Users/example/private.mjs',
     'read /home/runner/private.json',
-    'run C:\\Users\\simon\\private.mjs',
+    'run C:\\Users\\example\\private.mjs',
     'read \\\\server\\share\\private.json',
   ]) {
     const projectRoot = await createProject(t)

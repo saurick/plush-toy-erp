@@ -9,20 +9,15 @@ description: 项目打印模板源治理（plush-toy-erp）。Use to interpret c
 
 本技能负责本项目的源文件识别、纸面编辑和 PDF / print 保真。直接使用本项目规则，不预先加载内容等价的通用打印技能。
 
-## Truth Chain / 必读真源
+## Truth Routing / 真源路由
 
 按任务范围读取，不机械全量展开：
 
-- `AGENTS.md`
-- `README.md`
-- `docs/当前真源与交接顺序.md`
-- `web/README.md`
-- `docs/打印模板字段与编辑行为清单.md`
-- `docs/打印模板实现原理.md`
+- 范围、模板职责或入口不清时，用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位。
+- 修改模板 runtime 时读 `web/README.md`、打印模板字段与编辑行为清单、打印模板实现原理以及相关代码和测试。
 - `docs/product/prototypes/README.md`；涉及 UI / prototype intent 时再读对应 prototype README
 - `scripts/import/README.md` 和 `scripts/import/customerSourceManifestCheck.mjs`；涉及客户原件时，由客户 Private 仓库显式传入 `<private-root>/manifests/source-manifest.json` 与 `<private-root>/sources`，不在 Product Core 猜测路径
 - `config/customers/<customer-key>/README.md`；涉及 runtime samples、extracted image assets 或 `printTemplateDefaults` 时必读
-- 当前代码真源，重点是 `web/src/erp/pages/PrintCenterPage.jsx`、`web/src/erp/config/printTemplates.mjs`、`web/src/erp/data/engineeringPrintTemplates.mjs`、`web/src/erp/pages/EngineeringPrintWorkspacePage.jsx`、`web/src/erp/utils/engineeringPrintEditor.mjs`、`web/src/erp/utils/printWorkspace.js` 以及相关 print components / styles / tests
 
 ## Project Rules / 项目边界
 

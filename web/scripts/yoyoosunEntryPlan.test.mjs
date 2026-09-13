@@ -287,8 +287,8 @@ test('audit:yoyoosun-entry classifies product core, other app fallback, and yoyo
         command: `vite-${port}`,
         cwd:
           port === '5176'
-            ? '/Users/simon/projects/openai-oauth-api-service/web'
-            : '/Users/simon/projects/plush-toy-erp/web',
+            ? path.resolve(repoRoot, '..', 'openai-oauth-api-service', 'web')
+            : webRoot,
       }),
       fetchText: async (url) => {
         if (url.endsWith('/healthz')) {

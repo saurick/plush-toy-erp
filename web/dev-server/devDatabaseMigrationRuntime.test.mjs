@@ -261,9 +261,9 @@ test('database migration runtime rejects a backup symlink', async (t) => {
 test('database migration runtime redacts DSN, confirmations, and local paths', () => {
   const redacted = redactDatabaseMigrationDiagnostic(
     'postgres://user:secret@192.168.0.133:5432/plush_erp ' +
-      'APPLY_DEV_MIGRATIONS:abc123 /Users/simon/private.log'
+      'APPLY_DEV_MIGRATIONS:abc123 /Users/example/private.log'
   )
-  assert.doesNotMatch(redacted, /secret|abc123|\/Users\/simon/u)
+  assert.doesNotMatch(redacted, /secret|abc123|\/Users\//u)
   assert.match(redacted, /postgres:\/\/<redacted>@/u)
   assert.match(redacted, /<confirmation-redacted>/u)
   assert.match(redacted, /<local-path>/u)

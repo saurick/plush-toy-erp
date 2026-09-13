@@ -28,13 +28,13 @@ export const VIEW_ITEMS = Object.freeze([
     value: 'server',
     label: '服务器门禁',
     description:
-      '查看当前 committed SHA 的 R640 CI、逐 Job 运行等待与历史退化；不混入本机诊断记录。',
+      '查看当前 committed SHA 的 GitLab CI、逐 Job 运行等待与历史退化；不混入本机诊断记录。',
   }),
   Object.freeze({
     value: 'run',
     label: '本机诊断',
     description:
-      '按需运行本机 full 或 strict 诊断；正式主路径以当前 SHA 的 R640 CI Gate 为准。',
+      '按需运行本机 full 或 strict 诊断；正式主路径以当前 SHA 的 GitLab CI Gate 为准。',
   }),
   Object.freeze({
     value: 'governance',

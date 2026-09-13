@@ -16,7 +16,7 @@
 | `scripts/deploy/` | [scripts/deploy/README.md](deploy/README.md) | 生产 preflight、release evidence、closeout、客户配置发布和部署证据工具 |
 | `scripts/import/` | [scripts/import/README.md](import/README.md) | 客户来源 manifest、只读提取、freeze 和 dry-run 准备边界 |
 
-当前 CI/CD 入口已经收敛为：GitLab main / MR 主链按变更运行 `affected` 或 `full`；不可变 Release 从 protected main 的同一 exact SHA 普通 push pipeline 恢复完整 `CI Gate` 证据，不重跑 strict，再只构建一次 Server/Web 候选。正式版本由 Bridge 服务端按上海日历日和 live Release catalog 唯一推导，工作台只读展示，GitLab 在首次候选构建前再校验同一版本及调度时刻。正式 v2 Release 固定发布七资产、同一演练回执及独立 source Package；同版本中断后只允许校验并续传内容完全一致的缺失资产，随后必须整包读回。Mac 只发送显式 operation 与小型控制包，R640 目标经固定同机内网 GitLab TLS 入口直接取得、校验和缓存七资产与 `source.tar`；promotion、smoke 与 rollback 复用相同 digest，不允许回退到 Mac 大文件中转。GitHub 仅接收 protected main 的单向只读镜像并保留显式应急 workflow，不运行仓库 CI；GPT 审查读取已镜像的目标提交范围。固定 133 目标、GitLab/GitHub provider、operation、部署与回滚命令见 [scripts/deploy/README.md](deploy/README.md)，测试分组、exact-SHA gate 与只预览的 output 保留策略见 [scripts/qa/README.md](qa/README.md)。目标机不执行源码构建。
+当前 CI/CD 入口已经收敛为：GitLab main / MR 主链按变更运行 `affected` 或 `full`；不可变 Release 从 protected main 的同一 exact SHA 普通 push pipeline 恢复完整 `CI Gate` 证据，不重跑 strict，再只构建一次 Server/Web 候选。正式版本由 Bridge 服务端按上海日历日和 live Release catalog 唯一推导，工作台只读展示，GitLab 在首次候选构建前再校验同一版本及调度时刻。正式 v2 Release 固定发布七资产、同一演练回执及独立 source Package；同版本中断后只允许校验并续传内容完全一致的缺失资产，随后必须整包读回。Mac 只发送显式 operation 与小型控制包，目标宿主经固定同机内网 GitLab TLS 入口直接取得、校验和缓存七资产与 `source.tar`；promotion、smoke 与 rollback 复用相同 digest，不允许回退到 Mac 大文件中转。GitHub 仅接收 protected main 的单向只读镜像并保留显式应急 workflow，不运行仓库 CI；GPT 审查读取已镜像的目标提交范围。固定 133 目标、GitLab/GitHub provider、operation、部署与回滚命令见 [scripts/deploy/README.md](deploy/README.md)，测试分组、exact-SHA gate 与只预览的 output 保留策略见 [scripts/qa/README.md](qa/README.md)。目标机不执行源码构建。
 
 ## 总览
 
@@ -101,7 +101,7 @@
 | `scripts/qa/customer-config-runtime-manifest.mjs` | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、受控流程定义、打印 snapshot 和 forbidden payload；正式编译与 `local_test_apply` 分开校验，revision 长度不超过 64，只允许白名单 ProcessRuntime 读取，不写 Fact | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、打印配置草案、流程定义证据或 runtime 发布输入后 |
 | `scripts/qa/erp-field-linkage.mjs` | 字段联动专项测试并刷新 latest 覆盖报告 | 改字段真源、保存转换、合同金额、打印快照后 |
 | `scripts/qa/test-coverage-collect.mjs` | 绑定当前 commit / worktree 指纹运行非数据库 baseline，采集 Go / Web 覆盖、显式业务场景、字段联动、导入合同和受影响门禁状态，并刷新开发测试入口 latest 报告 | 需要刷新开发工作台真实覆盖证据时 |
-| `scripts/qa/prepare-push.sh` | 最终 clean HEAD 推送准备；默认 `origin/main` 只执行签名的 remote/ref/range、git-log、严格 secrets 与源码完整性检查，高成本门禁交给 R640 exact-SHA CI；显式 `--full` 保留为本地完整诊断，非标准远端或 ref 保持保守门禁 | commit 后、立即 push 前 |
+| `scripts/qa/prepare-push.sh` | 最终 clean HEAD 推送准备；默认 `origin/main` 只执行签名的 remote/ref/range、git-log、严格 secrets 与源码完整性检查，高成本门禁交给 GitLab exact-SHA CI；显式 `--full` 保留为本地完整诊断，非标准远端或 ref 保持保守门禁 | commit 后、立即 push 前 |
 | `scripts/qa/full.sh` | 完整本地检查；复用 fast 基础守卫但不复跑稍后由 Web / server 全集覆盖的合同和 quick 子集，一次运行四个显式 scripts Node 组、secrets、前端 test / build、历史 populated upgrade、同批唯一 PostgreSQL、Chromium / PDF、安全集成、服务端 test / build和 govulncheck | 独立完整诊断、`prepare-push --full` / strict 内部 |
 | `scripts/qa/run-gate-with-managed-database.mjs` | DEV 质量门禁的本机隔离数据库生命周期包装器；固定 `postgres:18.1`、随机运行凭据、`127.0.0.1` 动态端口和 operation label，容器内部 healthy 后还要求宿主回环 `SELECT 1` 连续三次通过，再原样调用正式 full / strict 回执入口，并要求精确容器清理读回 | 质量门禁页没有显式 loopback database base 时 |
 | `scripts/qa/strict.sh` | 严格检查；先运行独有 shell / YAML 静态检查，再以 strict profile 单次复用 full，扩展视口、前端零 warning 与严格 govulncheck 均只执行一次 | 发版前 |
@@ -120,17 +120,17 @@
 前端浏览器级样式回归不在 `scripts/qa` 下，统一执行：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm style:l1
 ```
 
 如需按真实管理员登录流程回归合同编辑、在线预览时延、下载 PDF 和浏览器打印入口，再执行：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/server
+cd "$(git rev-parse --show-toplevel)/server"
 make run
 
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm smoke:purchase-contract-real-login
 pnpm smoke:processing-contract-real-login
 ```
@@ -154,17 +154,17 @@ pnpm smoke:processing-contract-real-login
 先确认本机工具链满足仓库锁定版本，再安装依赖和启用 hooks：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 corepack enable
-bash /Users/simon/projects/plush-toy-erp/scripts/doctor.sh
-bash /Users/simon/projects/plush-toy-erp/scripts/bootstrap.sh
+bash scripts/doctor.sh
+bash scripts/bootstrap.sh
 ```
 
 ### 2. 收口默认占位和配置
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh
-bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
+bash scripts/project-scan.sh
+bash scripts/project-scan.sh --strict
 ```
 
 ### 2A. 生成角色演示账号
@@ -188,13 +188,13 @@ Workflow 完成与业务事实过账分别核验，规则和代码以各领域�
 ### 3. 日常开发检查
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/qa/fast.sh
+bash scripts/qa/fast.sh
 ```
 
 前端样式任务额外执行：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/web
+cd "$(git rev-parse --show-toplevel)/web"
 pnpm lint
 pnpm css
 pnpm test
@@ -204,14 +204,14 @@ pnpm style:l1
 字段联动、残值、缺值或打印快照字段改动后额外执行：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 node scripts/qa/erp-field-linkage.mjs
 ```
 
 刷新开发测试入口的代码覆盖、显式业务场景和验证范围状态（内部键 T0-T8）：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 node scripts/qa/test-coverage-collect.mjs --profile baseline --write
 ```
 
@@ -222,11 +222,11 @@ node scripts/qa/test-coverage-collect.mjs --profile baseline --write
 ### 4. 最终推送准备
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/qa/prepare-push.sh
+bash scripts/qa/prepare-push.sh
 git push
 ```
 
-切换 GitLab 主链后，本地 remote 固定为 `origin=GitLab`、`github=GitHub`，普通 `git push` 只更新 GitLab。先完成 commit 并确认 worktree clean。默认且仅限单一 `origin refs/heads/main:refs/heads/main` 时，准备脚本按真实 aggregate range 复算 affected 风险，但不在 Mac 重复执行 affected/full/托管数据库；它执行并签名 HEAD/tree、remote/ref/range、git-log、逐范围严格 secrets、源码完整性、gate/environment 指纹与 30 分钟 TTL，hook 按真实 push stdin 重新计算。高成本测试和构建由推送后 R640 GitLab Runner 对 exact SHA 执行，`server-ci` 回执只授权普通非强制 push，不代表流水线已成功。其他 remote/ref、多 ref 和显式 `--full` 保持保守本地行为；代码、测试、依赖、migration、门禁、关键环境或远端 ref 变化后必须重新准备。
+切换 GitLab 主链后，本地 remote 固定为 `origin=GitLab`、`github=GitHub`，普通 `git push` 只更新 GitLab。先完成 commit 并确认 worktree clean。默认且仅限单一 `origin refs/heads/main:refs/heads/main` 时，准备脚本按真实 aggregate range 复算 affected 风险，但不在 Mac 重复执行 affected/full/托管数据库；它执行并签名 HEAD/tree、remote/ref/range、git-log、逐范围严格 secrets、源码完整性、gate/environment 指纹与 30 分钟 TTL，hook 按真实 push stdin 重新计算。高成本测试和构建由推送后 GitLab Runner 对 exact SHA 执行，`server-ci` 回执只授权普通非强制 push，不代表流水线已成功。其他 remote/ref、多 ref 和显式 `--full` 保持保守本地行为；代码、测试、依赖、migration、门禁、关键环境或远端 ref 变化后必须重新准备。
 
 GitHub `main` 只由 GitLab protected-main push mirror 更新，不从本地直接推送，也不运行仓库 CI。需要网页 GPT 审查时，先完成已授权的 GitLab 正式推送并等待 `CI Gate`，再读回 GitHub `main` 已镜像到相同 SHA；GPT 按本次推送前的 base SHA 到该 head SHA 比较。审查意见只是外部输入，发现有效问题后回到当前仓库形成新提交并重新走 GitLab 门禁。
 
@@ -239,13 +239,13 @@ GitHub `main` 只由 GitLab protected-main push mirror 更新，不从本地直�
 只想独立诊断完整本地门禁、不准备 push 时运行：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/qa/full.sh
+bash scripts/qa/full.sh
 ```
 
 ### 5. 发版前检查
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/qa/strict.sh
+bash scripts/qa/strict.sh
 ```
 
 开发库 migration 不由启动命令自动执行。登记共享开发库在人机终端进入 `server/`
@@ -332,19 +332,19 @@ ready，并重新通过完整启动检查。旧 ready 计划可显式重新检�
 生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足，包括 secret 占位、固定镜像 tag、SMS mock、debug seed / cleanup、PostgreSQL / 后端 HTTP / Jaeger loopback 和低配部署边界：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh \
+bash scripts/deploy/production-preflight.sh \
   --deployment-target <demo-133|customer-test-133> \
-  --env-file /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod/.env
+  --env-file server/deploy/compose/prod/.env
 ```
 
 写入 release evidence 时只保存脱敏检查输出，不保存真实 `.env`：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh \
+bash scripts/deploy/production-preflight.sh \
   --deployment-target <demo-133|customer-test-133> \
-  --env-file /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod/.env \
+  --env-file server/deploy/compose/prod/.env \
   --runtime \
-  --out /Users/simon/projects/plush-toy-erp/deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.txt
+  --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.txt
 ```
 
 不写 evidence 的发布前 env-only 预检可以不带 `--runtime`；但正式 release evidence 必须在部署后带 `--runtime`，同时记录 Compose 服务、容器实际 `ERP_PDF_WARMUP=async`、Chromium / chromium-common exact pin 和 `/healthz` / `/readyz`。
@@ -352,24 +352,24 @@ bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh 
 产品级 production preflight 只核配置与部署边界，不读取业务行。现存数据库升级链在 apply 前必须依次完成两项独立只读审计：`populated-upgrade` 同时覆盖 `20260714055504_migrate.sql` 的存量边界和 WIP `20260717035245 -> 20260717043625` 委外关联切换，`customer-config-cutover` 覆盖 `20260714055825_customer_config_append_only_and_role_backfill.sql` 的切换边界。`migrate_online.sh` 的非 `--status-only` 路径会在 Atlas status 后按此顺序调用；任一失败都不会进入 dry-run 或 apply。需要单独复核时，使用固定 `--audit` 值，并通过容器模式或环境变量名传入 DSN，不能把连接串直接写进命令或报告：
 
 ```bash
-sh /Users/simon/projects/plush-toy-erp/scripts/qa/populated-upgrade-preflight.sh \
+sh scripts/qa/populated-upgrade-preflight.sh \
   --audit populated-upgrade \
   --docker-container <postgres-container> \
   --database <database> \
   --username <username>
 
-sh /Users/simon/projects/plush-toy-erp/scripts/qa/populated-upgrade-preflight.sh \
+sh scripts/qa/populated-upgrade-preflight.sh \
   --audit customer-config-cutover \
   --docker-container <postgres-container> \
   --database <database> \
   --username <username>
 
 # POPULATED_UPGRADE_DATABASE_URL 先由受控运行环境注入，不在命令行赋值或输出
-sh /Users/simon/projects/plush-toy-erp/scripts/qa/populated-upgrade-preflight.sh \
+sh scripts/qa/populated-upgrade-preflight.sh \
   --audit populated-upgrade \
   --database-url-env POPULATED_UPGRADE_DATABASE_URL
 
-sh /Users/simon/projects/plush-toy-erp/scripts/qa/populated-upgrade-preflight.sh \
+sh scripts/qa/populated-upgrade-preflight.sh \
   --audit customer-config-cutover \
   --database-url-env POPULATED_UPGRADE_DATABASE_URL
 ```
@@ -390,7 +390,7 @@ sh /Users/simon/projects/plush-toy-erp/scripts/qa/populated-upgrade-preflight.sh
 rollback / forward-fix 演练完成并取得 post-smoke report 后，用报告生成器收口 release gate 需要的 JSON：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-report.mjs \
+node scripts/deploy/rollback-rehearsal-report.mjs \
   --environment customer-trial \
   --release-version <release-version> \
   --rehearsal-type rollback-forward-fix \
@@ -437,7 +437,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 - 支持 `--staged`、`--base <ref-or-range>`、重复 `--file <path>` 和 `--json`，适合开发过程中按影响面取得快速反馈。
 - 优先运行同名 Node 测试；前端、服务端 API、业务事实 PostgreSQL、客户配置 / 导入、schema 和发布路径按风险逐级升级。
 - 页面级浏览器回归（Style L1）、`make data` 和目标环境证据作为 required follow-up 明示；未知路径保守升级到 `full.sh`。
-- 不修改 hooks；最终 clean HEAD 仍由 `prepare-push.sh` 复算风险并签发短期回执。默认 `origin/main` 的高成本验证由 R640 exact-SHA CI Gate 执行，显式本地 `--full` 仅作独立诊断。
+- 不修改 hooks；最终 clean HEAD 仍由 `prepare-push.sh` 复算风险并签发短期回执。默认 `origin/main` 的高成本验证由 GitLab exact-SHA CI Gate 执行，显式本地 `--full` 仅作独立诊断。
 
 ### `fast.sh`
 
@@ -518,5 +518,5 @@ migration apply 和各隔离 PostgreSQL apply 入口都会执行该读回；外�
 示例：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/qa/strict.sh --help
+bash scripts/qa/strict.sh --help
 ```

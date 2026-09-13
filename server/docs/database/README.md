@@ -12,7 +12,7 @@
 - 目标数据库是否已 apply、是否有漂移或人工 `COMMENT`，必须通过目标环境 migration status 与结构读回单独证明。
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/server
+cd "$(git rev-parse --show-toplevel)/server"
 go run ./cmd/schema-doc --check
 go run ./cmd/schema-doc --write
 ```

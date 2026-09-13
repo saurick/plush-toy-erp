@@ -20,7 +20,7 @@ const devPorts = loadDevPorts(repoRoot)
 const INPUT_TEMPLATE_SCOPE = 'mobile-auth-login-route-smoke-input-template'
 const PREFLIGHT_SCOPE = 'mobile-auth-login-route-smoke-preflight-report'
 const suggestedMockSmokeCommand =
-  'PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route'
+  'pnpm --dir web smoke:mobile-auth-login-route'
 const preflightNotProven = [
   'real backend RBAC',
   'real demo account login',
@@ -116,11 +116,11 @@ export function buildInputTemplate() {
       },
     ],
     commands: [
-      'PATH=/usr/local/bin:$PATH node web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json',
+      'node web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template',
+      'node web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json',
       suggestedMockSmokeCommand,
-      "MOBILE_AUTH_SMOKE_ROLE_KEY='boss' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route",
-      "MOBILE_AUTH_SMOKE_ROLE_KEY='boss' MOBILE_AUTH_SMOKE_BASE_URL='http://127.0.0.1:5175' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route",
+      "MOBILE_AUTH_SMOKE_ROLE_KEY='boss' pnpm --dir web smoke:mobile-auth-login-route",
+      "MOBILE_AUTH_SMOKE_ROLE_KEY='boss' MOBILE_AUTH_SMOKE_BASE_URL='http://127.0.0.1:5175' pnpm --dir web smoke:mobile-auth-login-route",
     ],
     boundary:
       'This template only prints mobile auth route smoke prerequisites. The preflight report only writes a local JSON route plan. Neither mode starts Vite, starts Playwright, calls a real backend, logs in to a real account, writes database rows, or proves real RBAC/customer-config active revision. The real smoke uses mocked auth/admin/customer-config/workflow RPC responses to verify mobile route guards, session refresh, login return paths, authoritative task counts, risk and overdue views, logout, phone/iPad layout, and production single-port /m/<role>/tasks routing.',

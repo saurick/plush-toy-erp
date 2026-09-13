@@ -2,13 +2,13 @@
 
 ## 当前结论
 
-仓库与运行主链已从“GitHub 托管主链”切换为“R640 GitLab canonical + KVM Runner + GitHub Review mirror”。本计划只记录稳定合同和完成标准；当前 SHA、pipeline、Release、Runner 资源、backup/restore 和目标环境必须从对应真源实时读回，不从勾选或历史结论推导。
+仓库与运行主链已从“GitHub 托管主链”切换为“GitLab canonical + KVM Runner + GitHub Review mirror”。本计划只记录稳定合同和完成标准；当前 SHA、pipeline、Release、Runner 资源、backup/restore 和目标环境必须从对应真源实时读回，不从勾选或历史结论推导。
 
 | 状态            | 当前结论                                                                                                        | 证据                                                                                                                                                                                       |
 | --------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 仓库定义        | R640 分片 DAG、普通 CI evidence 复用、单次制品构建、冻结演练和 v2 Release 合同由正式代码/测试/文档守住          | `.gitlab-ci.yml`、CI/release 脚本、R640 cloud-init、工作台与合同测试                                                                                                                       |
+| 仓库定义        | GitLab 分片 DAG、普通 CI evidence 复用、单次制品构建、冻结演练和 v2 Release 合同由正式代码/测试/文档守住          | `.gitlab-ci.yml`、CI/release 脚本、Runner cloud-init、工作台与合同测试                                                                                                                       |
 | Git/远端        | GitLab `origin/main` 是 canonical，GitHub 是 protected-main 单向 mirror 和应急路径                              | 当前结论以 exact remote SHA、protected branch 与 pipeline API 读回为准                                                                                                                     |
-| R640/公网运行态 | GitLab、公网入口和独立 KVM Runner 已是实际主链；VM 资源由唯一 provisioning 入口参数化，槽位是独立的受控容量策略 | 每次 Pipeline 通过 root-owned helper 的窄只读 evidence 投影验证 live `concurrent=limit` 与服务状态，并读回 guest vCPU、内存、swap、磁盘；本次 exact-SHA aggregate 绿后才成为已验证容量证据 |
+| GitLab 宿主/公网运行态 | GitLab、公网入口和独立 KVM Runner 已是实际主链；VM 资源由唯一 provisioning 入口参数化，槽位是独立的受控容量策略 | 每次 Pipeline 通过 root-owned helper 的窄只读 evidence 投影验证 live `concurrent=limit` 与服务状态，并读回 guest vCPU、内存、swap、磁盘；本次 exact-SHA aggregate 绿后才成为已验证容量证据 |
 | 业务目标        | `demo-133` 是项目方模拟数据环境，`customer-test-133` 是甲方测试/验收环境；二者均非生产                          | 两目标同 digest、运行与数据完全隔离；test 普通部署保留数据，未来 `erp` 需另行正式启用                                                                                                      |
 
 任何本地绿色都不能改写远端、不可变制品、发布演练、目标部署或客户 UAT 层的状态。
@@ -22,10 +22,10 @@
 - [x] GitLab Provider：固定 URL/project/package/release/pipeline、受限下载根、token 服务端边界和 pipeline/job timing。
 - [x] Delivery Bridge 默认 GitLab，只有 `PLUSH_DELIVERY_PROVIDER=github` 才选择 GitHub fallback。
 - [x] GitHub 仓库 CI 与专用审查分支已移除；protected main 只接收 GitLab 单向镜像，GPT 审查读取目标提交范围。GitHub emergency release 在完整接入 canonical v2 七资产与同一演练回执前，于任何 checkout、登录、构建或上传前失败关闭。
-- [x] 质量工程页面分开展示当前 committed SHA 的 R640 普通 CI 与 Local dirty/本地回执；只有服务器 exact-SHA 证据可提升发布资格，版本中心只从 GitLab 的真实 pipeline、Release/Package 和 target operation 展示效能与交付状态。
-- [x] 性能证据区分 R640 宿主与 Runner guest，按冷/热缓存保存 job、关键路径、CPU/内存/IO 峰值、p50、波动和近似 p95；阶段目标不是停止线，资源仍有余量时继续提速且不降低覆盖、隔离、清理或 fail-closed。
+- [x] 质量工程页面分开展示当前 committed SHA 的 GitLab 普通 CI 与 Local dirty/本地回执；只有服务器 exact-SHA 证据可提升发布资格，版本中心只从 GitLab 的真实 pipeline、Release/Package 和 target operation 展示效能与交付状态。
+- [x] 性能证据区分 GitLab 宿主与 Runner guest，按冷/热缓存保存 job、关键路径、CPU/内存/IO 峰值、p50、波动和近似 p95；阶段目标不是停止线，资源仍有余量时继续提速且不降低覆盖、隔离、清理或 fail-closed。
 - [x] Runner VM vCPU、内存和磁盘由 `runner-vm.sh` 显式参数化；唯一槽位参数 `RUNNER_CONCURRENT_SLOTS` 只在 `runner-capacity.env` 保存，并由同一个 `runner-capacity.sh` 管理旧值、idle、锁、服务读回和回滚。DAG 按实际就绪状态使用该全局安全上限；protected main 自然 push 自动取消旧的可中断 Pipeline，重资源 lane 与 Job 内串行合同不变。
-- [x] R640 GitLab Compose、精确安装、备份/校验和 Runner VM cloud-init 定义。
+- [x] GitLab Compose、精确安装、备份/校验和 Runner VM cloud-init 定义。
 - [x] affected mapping、quality gate catalog、Node 分组、fast web 合同和 GitLab CI 静态门禁。
 - [x] 正式部署、QA、Web 与工程文档同步。
 
@@ -45,7 +45,7 @@
 
 | 事项        | 必须证明                                                                         | 停止条件                           |
 | ----------- | -------------------------------------------------------------------------------- | ---------------------------------- |
-| R640 存储   | `/srv` SSD 与 `/srv/raid5` 实际 mount、余量、inode、SMART/RAID 状态              | mount 不符、降级或余量不足         |
+| GitLab 宿主存储   | `/srv` SSD 与 `/srv/raid5` 实际 mount、余量、inode、SMART/RAID 状态              | mount 不符、降级或余量不足         |
 | 现有容器    | 名称、端口、数据目录和 restart 状态                                              | 8929/2224 冲突或路径重叠           |
 | KVM         | `/dev/kvm`、libvirt network、VM 磁盘与资源预算                                   | 需要复用 GitLab 宿主 Docker socket |
 | 公网        | DNS、阿里云现有 vhost、FRP remote 18226、证书与回滚配置                          | 同名站点来源不明或切换不可回滚     |
@@ -55,14 +55,14 @@
 ## 目标搭建顺序
 
 1. 为 GitLab SSD 数据和 RAID5 backup 建立精确目录、权限和容量告警。
-2. 以 `server/deploy/gitlab/install-r640.sh` preview 检查，再用精确确认启动单个 `plush-gitlab`。
-3. 只在 R640 本机处理初始密码，立即修改、启用 MFA，创建非 root 管理员。
+2. 以 `server/deploy/gitlab/install-gitlab.sh` preview 检查，再用精确确认启动单个 `plush-gitlab`。
+3. 只在 GitLab 宿主本机处理初始密码，立即修改、启用 MFA，创建非 root 管理员。
 4. 创建私有项目 `saurick/plush-toy-erp`，保护 main、禁止 force push，要求 merge pipeline 成功并以 `CI Gate` 作为稳定汇总 job。
 5. 创建 protected `release` environment 和三项最小权限 protected variables。
 6. 用唯一 `runner-vm.sh` 显式传入 VM 资源与独立槽位参数并渲染 cloud-init；完成后通过 `0600` 一次性 token 文件注册 locked project runner，读回动态资源、`concurrent=limit`、tags 与 untagged=false。
 7. 配置 GitLab push mirror 到 GitHub，只同步 protected main；GitHub main 禁止直接更新，仓库不配置 GitHub CI 或专用审查分支。
 8. 在阿里云备份旧 vhost，切换 `gitlab.saurick.me -> 18226`，完成 Nginx config test、TLS、health 和登录读回。
-9. 运行非发布 MR/main pipeline，核对 `CI Gate`、缓存、一次性 PostgreSQL 清理、Runner VM 与 R640 宿主隔离。
+9. 运行非发布 MR/main pipeline，核对 `CI Gate`、缓存、一次性 PostgreSQL 清理、Runner VM 与 GitLab 宿主隔离。
 10. 用合法正式版本运行 release pipeline，核对普通 push CI terminal 复用、单次 candidate build、同 bytes rehearsal、v2 manifest、GHCR digest、含同一 `release-rehearsal.json` 的七资产 package、GitLab Release 和工作台读取。
 11. 配置每日 backup；立即生成一份备份、checksum 和在线 verify，再在一次性同版本 VM 完成恢复演练。
 
@@ -124,7 +124,7 @@ demo 与 test 共享同一 Product Core 与不可变 release digest，不复制�
 本任务只有在以下证据分别存在时才能说“GitLab CI/CD 已搭建完成”：
 
 1. 仓库实现通过定向检查并完成获准 commit/push；
-2. R640 GitLab、KVM Runner、域名/FRP/Nginx、保护规则、变量和 mirror 已实际读回；
+2. GitLab、KVM Runner、域名/FRP/Nginx、保护规则、变量和 mirror 已实际读回；
 3. main `CI Gate` 与 exact-SHA release pipeline 各成功一次；
 4. GHCR digest、GitLab Package/Release v2 七资产、同一演练回执和工作台一致；
 5. backup、checksum、在线 verify 与隔离 restore drill 均有证据；

@@ -1592,7 +1592,7 @@ test('a synchronous executor start failure is terminal and is not retried', asyn
       spawnCount += 1
       spawnedOptions = options
       throw new Error(
-        'executor unavailable token=start-secret /Users/simon/private/runner'
+        'executor unavailable token=start-secret /Users/example/private/runner'
       )
     },
   })
@@ -1619,7 +1619,7 @@ test('a synchronous executor start failure is terminal and is not retried', asyn
   assert.match(failed.issues[0].message, /executor unavailable/u)
   assert.doesNotMatch(
     failed.issues[0].message,
-    /start-secret|\/Users\/simon|private\/runner/u
+    /start-secret|\/Users\/|private\/runner/u
   )
   await assert.rejects(
     service.act({

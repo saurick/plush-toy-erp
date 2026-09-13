@@ -4,13 +4,13 @@
 
 ## 建议阅读顺序
 
-1. `/Users/simon/projects/plush-toy-erp/server/README.md`
-2. `/Users/simon/projects/plush-toy-erp/server/docs/runtime.md`
-3. `/Users/simon/projects/plush-toy-erp/server/docs/config.md`
-4. `/Users/simon/projects/plush-toy-erp/server/docs/api.md`
-5. `/Users/simon/projects/plush-toy-erp/server/docs/observability.md`
-6. `/Users/simon/projects/plush-toy-erp/server/docs/ent.md`
-7. `/Users/simon/projects/plush-toy-erp/server/docs/database/README.md`
+1. `server/README.md`
+2. `server/docs/runtime.md`
+3. `server/docs/config.md`
+4. `server/docs/api.md`
+5. `server/docs/observability.md`
+6. `server/docs/ent.md`
+7. `server/docs/database/README.md`
 
 ## 文档说明
 
@@ -34,7 +34,7 @@
 
 ## 相关入口
 
-- 服务端总览：`/Users/simon/projects/plush-toy-erp/server/README.md`
-- Compose 部署：`/Users/simon/projects/plush-toy-erp/server/deploy/README.md`
-- 数据库工作流：`/Users/simon/projects/plush-toy-erp/server/internal/data/AI_DB_WORKFLOW.md`
-- 数据库表数据字典：`/Users/simon/projects/plush-toy-erp/server/docs/database/README.md`
+- 服务端总览：`server/README.md`
+- Compose 部署：`server/deploy/README.md`
+- 数据库工作流：`server/internal/data/AI_DB_WORKFLOW.md`
+- 数据库表数据字典：`server/docs/database/README.md`

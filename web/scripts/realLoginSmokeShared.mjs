@@ -56,13 +56,13 @@ export function buildRealLoginSmokeInputTemplate({
       },
     ],
     commands: [
-      'PATH=/usr/local/bin:$PATH node web/scripts/realLoginSmokeShared.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node web/scripts/realLoginSmokeShared.mjs --preflight-report output/real-login-smoke-shared/preflight.json',
-      'PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template',
-      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-contract-real-login",
-      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:processing-contract-real-login",
-      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route",
-      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA=1 PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-receipt-real-write",
+      'node web/scripts/realLoginSmokeShared.mjs --print-input-template',
+      'node web/scripts/realLoginSmokeShared.mjs --preflight-report output/real-login-smoke-shared/preflight.json',
+      'node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template',
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' pnpm --dir web smoke:purchase-contract-real-login",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' pnpm --dir web smoke:processing-contract-real-login",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' pnpm --dir web smoke:mobile-auth-login-route",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA=1 pnpm --dir web smoke:purchase-receipt-real-write",
     ],
     boundary:
       'This template only prints shared real-login smoke prerequisites. The preflight report probes backend health and credential-source presence without reading config contents or validating credentials. Neither mode calls auth endpoints, starts Vite, starts Playwright, logs in, writes database rows, or proves contract/mobile/purchase receipt browser behavior. Downstream smoke scripts define their own write boundary; purchase-receipt-real-write persists local/development test facts and requires explicit acceptance.',
@@ -221,7 +221,7 @@ export async function buildRealLoginSmokePreflightReport({
     blockers,
     nextCommand: blockers.length
       ? 'Resolve blockers, then rerun this preflight before real login smoke.'
-      : 'PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-contract-real-login',
+      : 'pnpm --dir web smoke:purchase-contract-real-login',
     boundary:
       'This preflight only probes backend health and credential-source presence. It does not read config contents, read password values, validate credentials, call auth JSON-RPC, start Vite, start Playwright, log in, write database rows, or prove downstream browser smoke behavior.',
   }

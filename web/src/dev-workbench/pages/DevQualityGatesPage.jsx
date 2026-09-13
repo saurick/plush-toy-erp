@@ -444,7 +444,7 @@ function ContextStrip({ summary, view, summaryError, onReturnLocal }) {
           <dd>{summary?.repository?.dirty ? '有未提交改动' : '干净'}</dd>
         </div>
         <div>
-          <dt>R640 CI</dt>
+          <dt>GitLab CI</dt>
           <dd>{serverLabel}</dd>
         </div>
         <div>
@@ -497,7 +497,7 @@ const SERVER_EVIDENCE_STATUS = Object.freeze({
     alert: 'info',
   }),
   unavailable: Object.freeze({
-    label: 'GitLab 读取失败',
+    label: '读取失败',
     color: 'error',
     alert: 'warning',
   }),
@@ -606,14 +606,14 @@ function qualityGateViewStatus(summary, view, summaryError) {
     return summaryError
       ? {
           tone: 'error',
-          title: 'R640 页面状态读取失败',
+          title: 'GitLab CI 页面状态读取失败',
           description: summaryError,
           recommendation: '确认本机开发服务可用后刷新状态。',
           notProven: [],
         }
       : {
           tone: 'info',
-          title: 'R640 正在读取服务器证据',
+          title: 'GitLab CI 正在读取服务器证据',
           description: '正在读取当前提交的 GitLab CI 证据。',
           recommendation: '',
           notProven: [],
@@ -624,7 +624,7 @@ function qualityGateViewStatus(summary, view, summaryError) {
     SERVER_EVIDENCE_STATUS.unavailable
   return {
     tone: status.alert,
-    title: `R640 ${status.label}`,
+    title: `GitLab ${status.label}`,
     description: evidence?.message || '正在读取当前提交的服务器门禁证据。',
     recommendation:
       evidence?.status === 'passed'
@@ -851,11 +851,11 @@ function ServerJobPerformance({ evidence }) {
   return (
     <section
       className="erp-dev-quality-server-performance"
-      aria-labelledby="r640-job-performance-title"
+      aria-labelledby="gitlab-job-performance-title"
     >
       <div className="erp-dev-quality-server-performance__heading">
         <div>
-          <Title level={3} id="r640-job-performance-title">
+          <Title level={3} id="gitlab-job-performance-title">
             历史 Job 性能
           </Title>
           <Text type="secondary">
@@ -904,11 +904,11 @@ function ServerCiHistory({ evidence, currentCommit }) {
   return (
     <section
       className="erp-dev-quality-server-history"
-      aria-labelledby="r640-ci-history-title"
+      aria-labelledby="gitlab-ci-history-title"
     >
       <div className="erp-dev-quality-server-history__heading">
         <div>
-          <Title level={3} id="r640-ci-history-title">
+          <Title level={3} id="gitlab-ci-history-title">
             最近 CI
           </Title>
           <Text type="secondary">
@@ -1222,11 +1222,11 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
   return (
     <section
       className="erp-dev-quality-server-pipeline"
-      aria-labelledby="r640-pipeline-flow-title"
+      aria-labelledby="gitlab-pipeline-flow-title"
     >
       <div className="erp-dev-quality-server-pipeline__heading">
         <div>
-          <Text id="r640-pipeline-flow-title" strong>
+          <Text id="gitlab-pipeline-flow-title" strong>
             本次 GitLab Pipeline DAG
           </Text>
           <Text type="secondary">
@@ -1399,10 +1399,10 @@ function ServerCurrentPipelineView({ evidence, timing, onOpenJobGuide }) {
       {timing.jobs.length ? (
         <section
           className="erp-dev-quality-server-evidence__timing"
-          aria-labelledby="r640-job-timing-title"
+          aria-labelledby="gitlab-job-timing-title"
         >
           <div className="erp-dev-quality-server-evidence__timing-heading">
-            <Text id="r640-job-timing-title" strong>
+            <Text id="gitlab-job-timing-title" strong>
               当前最慢 Job
             </Text>
             <Text type="secondary">条长相对本次最长 Job，不是总耗时占比</Text>
@@ -1461,11 +1461,11 @@ function ServerCiEvidencePanel({ summary, serverView, onServerViewChange }) {
   return (
     <section
       className="erp-dev-quality-server-evidence"
-      aria-label="R640 服务器质量证据"
+      aria-label="GitLab CI 质量证据"
     >
       <div className="erp-dev-quality-section-heading">
         <div className="erp-dev-quality-server-evidence__heading-copy">
-          <Title level={2}>R640 服务器门禁</Title>
+          <Title level={2}>GitLab CI 门禁</Title>
           <Text type="secondary">
             正式主路径 · 当前提交的普通 push CI、实际 Job、聚合回执与 CI Gate
           </Text>
@@ -2139,7 +2139,7 @@ function LocalDiagnosticsActions({
         <div>
           <Text strong>本机诊断（按需）</Text>
           <Text type="secondary">
-            用于定位当前工作区问题；正式 main 门禁由推送后的 R640 CI 执行。
+            用于定位当前工作区问题；正式 main 门禁由推送后的 GitLab CI 执行。
           </Text>
         </div>
         <Tag>不替代服务器 CI</Tag>
@@ -2411,7 +2411,7 @@ function RunView({
       <Text type="secondary" className="erp-dev-quality-action-status">
         {actionProfile
           ? `正在启动${PROFILE_LABELS[actionProfile]}`
-          : '本机诊断完成后不会自动提交、推送、发布或部署，也不替代 R640 CI Gate。'}
+          : '本机诊断完成后不会自动提交、推送、发布或部署，也不替代 GitLab CI Gate。'}
       </Text>
     </div>
   )
@@ -2988,7 +2988,7 @@ export default function DevQualityGatesPage() {
             </Title>
           </Space>
           <Paragraph>
-            先核对当前提交的 R640 exact-SHA CI，再按需使用本机 full / strict
+            先核对当前提交的 GitLab exact-SHA CI，再按需使用本机 full / strict
             诊断未提交改动；两类证据分开记录。
           </Paragraph>
         </div>

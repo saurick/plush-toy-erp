@@ -27,5 +27,5 @@ JSON-RPC dispatcher 继续按职责拆文件维护：
 
 补充说明见：
 
-- `/Users/simon/projects/plush-toy-erp/server/docs/api.md`
-- `/Users/simon/projects/plush-toy-erp/server/docs/runtime.md`
+- `server/docs/api.md`
+- `server/docs/runtime.md`

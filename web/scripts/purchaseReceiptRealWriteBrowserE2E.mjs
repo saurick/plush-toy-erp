@@ -79,12 +79,12 @@ export function buildInputTemplate() {
       '--seed-core-demo',
     ],
     commands: [
-      'PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --preflight-report output/purchase-receipt-real-write-browser-e2e/preflight.json',
-      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-receipt-real-write",
-      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-receipt-real-write -- --seed-core-demo",
-      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --accept-persistent-test-data",
-      `REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' REAL_LOGIN_SMOKE_BASE_URL='http://127.0.0.1:${DEFAULT_PORT}' PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --accept-persistent-test-data`,
+      'node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template',
+      'node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --preflight-report output/purchase-receipt-real-write-browser-e2e/preflight.json',
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' pnpm --dir web smoke:purchase-receipt-real-write",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' pnpm --dir web smoke:purchase-receipt-real-write -- --seed-core-demo",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --accept-persistent-test-data",
+      `REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' REAL_LOGIN_SMOKE_BASE_URL='http://127.0.0.1:${DEFAULT_PORT}' node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --accept-persistent-test-data`,
     ],
     boundary:
       'This template only prints purchase receipt browser E2E prerequisites. It does not read local config, validate credentials, call backend health/auth endpoints, start Vite, start Playwright, log in, create purchase receipts, post inventory facts, cancel/reverse receipts, write reports, or write database rows. The real smoke writes local/development simulated purchase receipt facts and requires explicit persistent test data acceptance.',
@@ -148,7 +148,7 @@ export async function buildPreflightReport() {
     blockers,
     nextCommand: blockers.length
       ? 'Resolve blockers, then rerun this preflight before real browser write smoke.'
-      : "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-receipt-real-write",
+      : "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' pnpm --dir web smoke:purchase-receipt-real-write",
   }
 }
 
@@ -543,7 +543,7 @@ async function resolveReferenceData(page) {
       [
         '采购入库浏览器 e2e 缺少供应商 / 材料 / 单位 / 仓库前置数据。',
         '本地开发库可先执行：',
-        '  bash /Users/simon/projects/plush-toy-erp/scripts/seed-core-demo-data.sh',
+        '  bash "$(git rev-parse --show-toplevel)/scripts/seed-core-demo-data.sh"',
         '或本脚本追加参数：',
         '  pnpm smoke:purchase-receipt-real-write -- --seed-core-demo',
       ].join('\n')

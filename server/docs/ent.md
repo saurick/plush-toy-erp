@@ -7,9 +7,9 @@
 
 核心目录：
 
-- schema：`/Users/simon/projects/plush-toy-erp/server/internal/data/model/schema`
-- ent 生成代码：`/Users/simon/projects/plush-toy-erp/server/internal/data/model/ent`
-- migration：`/Users/simon/projects/plush-toy-erp/server/internal/data/model/migrate`
+- schema：`server/internal/data/model/schema`
+- ent 生成代码：`server/internal/data/model/ent`
+- migration：`server/internal/data/model/migrate`
 
 ## 正确工作流
 
@@ -20,7 +20,7 @@
 常用命令：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/server
+cd "$(git rev-parse --show-toplevel)/server"
 
 # 生成 migration + ent 代码
 make data
@@ -60,7 +60,7 @@ make migrate_hash
 generated migration descriptor，不连接数据库：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/server
+cd "$(git rev-parse --show-toplevel)/server"
 
 # 校验 catalog 与 74 张应用表、生成 Markdown 是否一致
 go run ./cmd/schema-doc --check
@@ -82,7 +82,7 @@ migration status 与结构读回；数据字典绿色不能替代这两项证据
 
 如果需要完整操作手册，优先阅读：
 
-- `/Users/simon/projects/plush-toy-erp/server/internal/data/AI_DB_WORKFLOW.md`
+- `server/internal/data/AI_DB_WORKFLOW.md`
 
 ## 什么时候才需要重新导入旧库
 

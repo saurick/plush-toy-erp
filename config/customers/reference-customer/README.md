@@ -17,7 +17,7 @@
 ## 验证
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 node scripts/qa/customer-package-lint.mjs --customer reference-customer
 node scripts/qa/customer-config-runtime-manifest.mjs --customer reference-customer --mode preview
 node --test scripts/build/apply-customer-web-config.test.mjs

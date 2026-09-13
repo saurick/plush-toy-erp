@@ -47,7 +47,7 @@
 ## 校验命令
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 node scripts/qa/customer-config-boundaries.mjs
 node scripts/qa/customer-package-lint.mjs --customer yoyoosun
 node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview

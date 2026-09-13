@@ -47,7 +47,7 @@ test("production artifact boundary: rejects DEV routes, styles and private paths
     "erp-dev-permission-relationships",
     "权限关系 / Effective Access",
     "customer-yoyoosun-private",
-    "/Users/simon/",
+    "/Users/",
   ]) {
     withArtifact(
       {

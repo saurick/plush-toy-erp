@@ -423,7 +423,7 @@ test('delivery summary requires both target contracts and no-shell boundaries', 
       schemaVersion: 'plush.remote-target-initialization-preflight/v1',
       status: 'eligible',
       target: 'customer-test-133',
-      host: { hostname: 'R640', user: 'simon' },
+      host: { hostname: 'r640', user: 'simon' },
       rootState: 'absent',
       conflicts: {
         targetContainers: 0,

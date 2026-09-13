@@ -4,6 +4,9 @@ umask 077
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ENV_FILE="$SCRIPT_DIR/.env"
+EXPECTED_CONTROL_HOSTNAME=r640
+EXPECTED_GITLAB_HOSTNAME=gitlab.saurick.me
+EXPECTED_CONFIRMATION="BACKUP_GITLAB:${EXPECTED_CONTROL_HOSTNAME}:${EXPECTED_GITLAB_HOSTNAME}"
 EXECUTE=false
 CONFIRMATION=""
 
@@ -18,7 +21,7 @@ while [[ $# -gt 0 ]]; do
     shift 2
     ;;
   -h | --help)
-    echo "usage: sudo bash server/deploy/gitlab/gitlab-backup.sh --execute --confirm BACKUP_GITLAB:R640"
+    echo "usage: sudo bash server/deploy/gitlab/gitlab-backup.sh --execute --confirm $EXPECTED_CONFIRMATION"
     exit 0
     ;;
   *)
@@ -57,6 +60,10 @@ GITLAB_BACKUP_RETENTION_DAYS="$(read_env_value GITLAB_BACKUP_RETENTION_DAYS)"
 [[ "$GITLAB_CONFIG_DIR" == "/srv/gitlab/config" ]]
 [[ "$GITLAB_RAID_BACKUP_DIR" == "/srv/raid5/gitlab/backups" ]]
 [[ "$GITLAB_BACKUP_RETENTION_DAYS" =~ ^[1-9][0-9]*$ ]]
+if [[ "$(hostname -s)" != "$EXPECTED_CONTROL_HOSTNAME" ]]; then
+  echo "[gitlab-backup] control host identity mismatch" >&2
+  exit 2
+fi
 
 docker inspect plush-gitlab >/dev/null
 test "$(docker inspect --format '{{.State.Health.Status}}' plush-gitlab)" = healthy
@@ -75,7 +82,7 @@ if [[ "$EXECUTE" != "true" ]]; then
   echo "[gitlab-backup] preview_only=true"
   exit 0
 fi
-if [[ "$EUID" -ne 0 || "$CONFIRMATION" != "BACKUP_GITLAB:R640" ]]; then
+if [[ "$EUID" -ne 0 || "$CONFIRMATION" != "$EXPECTED_CONFIRMATION" ]]; then
   echo "[gitlab-backup] root and exact confirmation are required"
   exit 2
 fi

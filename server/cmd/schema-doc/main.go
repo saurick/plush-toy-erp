@@ -846,7 +846,7 @@ func renderReadme(db databaseSchema, value catalog, index catalogIndex) ([]byte,
 	output.WriteString("- Ent 的 Go 侧 `Default(time.Now)`、`UpdateDefault`、`Immutable`、`Sensitive` 和 validators 不一定进入 generated migration descriptor；重要边界仍应回到链接的 schema/usecase/正式文档核对。\n")
 	output.WriteString("- 目标数据库是否已 apply、是否有漂移或人工 `COMMENT`，必须通过目标环境 migration status 与结构读回单独证明。\n\n")
 	output.WriteString("```bash\n")
-	output.WriteString("cd /Users/simon/projects/plush-toy-erp/server\n")
+	output.WriteString("cd \"$(git rev-parse --show-toplevel)/server\"\n")
 	output.WriteString("go run ./cmd/schema-doc --check\n")
 	output.WriteString("go run ./cmd/schema-doc --write\n")
 	output.WriteString("```\n\n")

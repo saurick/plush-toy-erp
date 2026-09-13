@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import os from 'node:os'
 import test from 'node:test'
 
 import { createERPViteConfig } from '../vite.shared.mjs'
@@ -197,7 +198,7 @@ test('start web dev: macOS 自动读取固定钥匙串凭据', async () => {
   })
 
   assert.deepEqual(DEV_GITLAB_KEYCHAIN, {
-    account: 'simon',
+    account: os.userInfo().username,
     service: 'plush-toy-erp.gitlab-read-api',
   })
   assert.deepEqual(credential, {

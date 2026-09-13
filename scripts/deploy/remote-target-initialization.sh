@@ -454,7 +454,7 @@ for file in "${control_files[@]}"; do
   [[ "$(stat -c '%a' "$incoming/$file")" == 600 ]] || fail "incoming control file mode is invalid"
 done
 # The helper is a control-plane script bound to the exact release commit by the
-# transfer checksum. It materializes large payloads on R640 before the complete
+# transfer checksum. It materializes large payloads on the target host before the complete
 # immutable transfer checksum is evaluated.
 # shellcheck source=/dev/null
 source "$incoming/remote-release-acquire.sh"

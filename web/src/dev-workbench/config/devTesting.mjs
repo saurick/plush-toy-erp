@@ -100,6 +100,15 @@ const DEV_TESTING_DOCUMENT_ROLE_BY_PATH = new Map(
   DEV_TESTING_CURRENT_DOCS.map((item) => [item.path, item.documentRole])
 )
 
+// Copy presets must follow the checkout that is currently open, including an
+// App Worktree, instead of pointing back to one developer's main checkout.
+const CURRENT_CHECKOUT_ROOT_COMMAND =
+  'cd "$(git rev-parse --show-toplevel)"'
+const CURRENT_CHECKOUT_SERVER_COMMAND =
+  'cd "$(git rev-parse --show-toplevel)/server"'
+const CURRENT_CHECKOUT_WEB_COMMAND =
+  'cd "$(git rev-parse --show-toplevel)/web"'
+
 export const DEV_TESTING_COPY_PRESETS = Object.freeze([
   {
     key: 'frontend',
@@ -107,7 +116,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '页面、路由、样式或前端 helper 改动时优先复制 / use for frontend changes.',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp/web',
+      CURRENT_CHECKOUT_WEB_COMMAND,
       'pnpm lint',
       'pnpm css',
       'pnpm test',
@@ -120,7 +129,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '任务动作、reason、事件 / actor role、payload 或任务端后端读回改动时复制；只证明本地后端合同。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp/server',
+      CURRENT_CHECKOUT_SERVER_COMMAND,
       "go test ./internal/data -run 'TestWorkflowRepo_(TaskStatusReasonEventAndCompletionCleanup|CreateAndUpdateTaskStatus|UrgeWorkflowTaskWritesEventAndPayload)'",
       "go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJsonrpcDispatcher_Workflow(CompleteTaskAction|ControlledTaskActions)'",
     ],
@@ -131,8 +140,8 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '试用账号、岗位任务端入口、角色菜单或 README 口径改动时复制；不登录真实后端。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/trial-role-entry-docs.test.mjs',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test scripts/qa/trial-role-entry-docs.test.mjs',
     ],
   },
   {
@@ -141,8 +150,8 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '角色菜单、岗位任务端入口、seedData、正式菜单权限或业务状态前端真源改动时复制；只证明本地前端配置合同，不替代后端 RBAC、customer config active revision 或真实登录。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/src/erp/config/entryConfig.test.mjs web/src/erp/config/menuPermissions.test.mjs web/src/erp/config/seedData.test.mjs web/src/erp/config/workflowStatus.test.mjs',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test web/src/erp/config/entryConfig.test.mjs web/src/erp/config/menuPermissions.test.mjs web/src/erp/config/seedData.test.mjs web/src/erp/config/workflowStatus.test.mjs',
     ],
   },
   {
@@ -151,17 +160,17 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '生成试用账号、角色模板、岗位入口、菜单权限或 effective session 诊断后复制；先打印无写入输入模板，真实验证需要本地后端和演示账号密码，只读核对登录、角色、岗位入口权限、脱敏投影诊断和 debug 权限边界。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/trial-account-rbac.test.mjs web/scripts/trialDemoAccountBrowserSmoke.test.mjs',
-      'PATH=/usr/local/bin:$PATH node --check scripts/qa/trial-account-rbac.mjs',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --preflight-report output/trial-account-rbac/preflight.json',
-      'PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --preflight-report output/trial-demo-account-browser-smoke/preflight.json',
-      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs",
-      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --report output/trial-account-rbac/report.json",
-      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
-      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --report output/trial-demo-account-browser-smoke/report.json",
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test scripts/qa/trial-account-rbac.test.mjs web/scripts/trialDemoAccountBrowserSmoke.test.mjs',
+      'node --check scripts/qa/trial-account-rbac.mjs',
+      'node scripts/qa/trial-account-rbac.mjs --print-input-template',
+      'node scripts/qa/trial-account-rbac.mjs --preflight-report output/trial-account-rbac/preflight.json',
+      'node web/scripts/trialDemoAccountBrowserSmoke.mjs --print-input-template',
+      'node web/scripts/trialDemoAccountBrowserSmoke.mjs --preflight-report output/trial-demo-account-browser-smoke/preflight.json',
+      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' node scripts/qa/trial-account-rbac.mjs",
+      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' node scripts/qa/trial-account-rbac.mjs --report output/trial-account-rbac/report.json",
+      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' pnpm --dir web smoke:trial-demo-browser",
+      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' node web/scripts/trialDemoAccountBrowserSmoke.mjs --report output/trial-demo-account-browser-smoke/report.json",
     ],
   },
   {
@@ -170,18 +179,18 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '真实登录 smoke 共享 helper、采购合同 / 加工合同 / 岗位任务端认证回跳 / 采购入库真实浏览器脚本入口改动时复制；先打印 no-write 输入模板和 shared / mobile-auth / 采购入库浏览器 preflight，单测只证明 URL 凭据边界、凭据来源前置、持久测试数据确认和前置清单，不执行真实登录、不启动浏览器；mobile-auth 回归使用 mock RPC 验证生产单端口岗位路由。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/scripts/realLoginSmokeShared.test.mjs web/scripts/mobileAuthLoginRouteSmoke.test.mjs web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs',
-      'PATH=/usr/local/bin:$PATH node web/scripts/realLoginSmokeShared.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node web/scripts/realLoginSmokeShared.mjs --preflight-report output/real-login-smoke-shared/preflight.json',
-      'PATH=/usr/local/bin:$PATH node web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json',
-      'PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --preflight-report output/purchase-receipt-real-write-browser-e2e/preflight.json',
-      "REAL_LOGIN_ADMIN_USERNAME='replace-with-local-admin' REAL_LOGIN_ADMIN_PASSWORD='replace-with-local-password' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-contract-real-login",
-      "REAL_LOGIN_ADMIN_USERNAME='replace-with-local-admin' REAL_LOGIN_ADMIN_PASSWORD='replace-with-local-password' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:processing-contract-real-login",
-      'PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route',
-      "REAL_LOGIN_ADMIN_USERNAME='replace-with-local-admin' REAL_LOGIN_ADMIN_PASSWORD='replace-with-local-password' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-receipt-real-write",
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test web/scripts/realLoginSmokeShared.test.mjs web/scripts/mobileAuthLoginRouteSmoke.test.mjs web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs',
+      'node web/scripts/realLoginSmokeShared.mjs --print-input-template',
+      'node web/scripts/realLoginSmokeShared.mjs --preflight-report output/real-login-smoke-shared/preflight.json',
+      'node web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template',
+      'node web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json',
+      'node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template',
+      'node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --preflight-report output/purchase-receipt-real-write-browser-e2e/preflight.json',
+      "REAL_LOGIN_ADMIN_USERNAME='replace-with-local-admin' REAL_LOGIN_ADMIN_PASSWORD='replace-with-local-password' pnpm --dir web smoke:purchase-contract-real-login",
+      "REAL_LOGIN_ADMIN_USERNAME='replace-with-local-admin' REAL_LOGIN_ADMIN_PASSWORD='replace-with-local-password' pnpm --dir web smoke:processing-contract-real-login",
+      'pnpm --dir web smoke:mobile-auth-login-route',
+      "REAL_LOGIN_ADMIN_USERNAME='replace-with-local-admin' REAL_LOGIN_ADMIN_PASSWORD='replace-with-local-password' pnpm --dir web smoke:purchase-receipt-real-write",
     ],
   },
   {
@@ -190,13 +199,13 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '试用账号、seed / fixture、模拟主数据或本地闭环工具改动时复制；先打印 no-write 输入模板，再按需生成仍受支持的 report-only 证据；旧业务事实通用 apply 已停用，岗位任务模拟计划仍覆盖完成、阻塞、退回和催办；no-write 命令不连接后端，这些命令只证明本地 simulated-only / no real import 守卫。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/trial-simulated-data.test.mjs scripts/qa/operational-fact-simulated-closure.test.mjs scripts/qa/mobile-workflow-simulated-closure.test.mjs',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --out output/customers/yoyoosun/trial-simulated-data-dev-testing-report',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --run-id DEV-TESTING-REPORT --out output/customers/yoyoosun/mobile-workflow-simulated-closure-dev-testing-report',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test scripts/qa/trial-simulated-data.test.mjs scripts/qa/operational-fact-simulated-closure.test.mjs scripts/qa/mobile-workflow-simulated-closure.test.mjs',
+      'node scripts/qa/trial-simulated-data.mjs --print-input-template',
+      'node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template',
+      'node scripts/qa/mobile-workflow-simulated-closure.mjs --print-input-template',
+      'node scripts/qa/trial-simulated-data.mjs --out output/customers/yoyoosun/trial-simulated-data-dev-testing-report',
+      'node scripts/qa/mobile-workflow-simulated-closure.mjs --run-id DEV-TESTING-REPORT --out output/customers/yoyoosun/mobile-workflow-simulated-closure-dev-testing-report',
     ],
   },
   {
@@ -205,12 +214,12 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       'V1 主链验收口径或采购入库服务层真实写入 e2e 前置改动时复制；先打印真实写入输入模板，V1 acceptance plan 只生成本地 plan-only / no-write evidence，不替代领域测试、浏览器回归、本地完整技术验收、目标发布或客户 UAT。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/v1-acceptance-plan.test.mjs scripts/qa/purchase-receipt-real-write-e2e.test.mjs',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/v1-acceptance-plan.mjs --out output/customers/yoyoosun/v1-acceptance-plan',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/v1-acceptance-plan.mjs --run-report-tools --out output/customers/yoyoosun/v1-acceptance-plan',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test scripts/qa/v1-acceptance-plan.test.mjs scripts/qa/purchase-receipt-real-write-e2e.test.mjs',
+      'node scripts/qa/purchase-receipt-real-write-e2e.mjs --print-input-template',
+      'node scripts/qa/purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json',
+      'node scripts/qa/v1-acceptance-plan.mjs --out output/customers/yoyoosun/v1-acceptance-plan',
+      'node scripts/qa/v1-acceptance-plan.mjs --run-report-tools --out output/customers/yoyoosun/v1-acceptance-plan',
     ],
   },
   {
@@ -219,11 +228,11 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '移动端任务动作、内部提醒、完成反馈或跨角色催办改动时复制；先打印无写入输入模板并生成动作计划 preflight，真实浏览器命令需本地后端和演示账号密码。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs web/src/erp/mobile/utils/mobileRoleTaskModel.test.mjs web/src/erp/utils/workflowTaskBoard.test.mjs',
-      'PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report output/mobile-workflow-runtime-browser-smoke/preflight.json',
-      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --report output/mobile-workflow-runtime-browser-smoke/report.json",
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs web/src/erp/mobile/utils/mobileRoleTaskModel.test.mjs web/src/erp/utils/workflowTaskBoard.test.mjs',
+      'node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template',
+      'node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report output/mobile-workflow-runtime-browser-smoke/preflight.json',
+      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --report output/mobile-workflow-runtime-browser-smoke/report.json",
     ],
   },
   {
@@ -232,9 +241,9 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '客户配置预检、moduleStates、导入 tooling 或 /__dev/customer-config 页面改动时复制；只证明 dev-only 控制台和本地证据。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/src/dev-workbench/config/devCustomerConfig.test.mjs web/src/erp/config/printTemplates.test.mjs scripts/qa/dev-entry-boundary.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-page-customer-config-desktop-light pnpm --dir web style:l1',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test web/src/dev-workbench/config/devCustomerConfig.test.mjs web/src/erp/config/printTemplates.test.mjs scripts/qa/dev-entry-boundary.test.mjs',
+      'STYLE_L1_SCENARIOS=dev-page-customer-config-desktop-light pnpm --dir web style:l1',
     ],
   },
   {
@@ -243,9 +252,9 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       'docs/product/prototypes、原型资产登记或 /__dev/prototypes 查看器改动时复制；只证明 dev-only 原型查看器和本地资产登记，不晋级 Current、不改正式菜单。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/src/dev-workbench/config/devPrototypes.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-page-prototypes-desktop-light pnpm --dir web style:l1',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test web/src/dev-workbench/config/devPrototypes.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
+      'STYLE_L1_SCENARIOS=dev-page-prototypes-desktop-light pnpm --dir web style:l1',
     ],
   },
   {
@@ -254,9 +263,9 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '仓库 Markdown 查看器或项目治理地图改动时复制；只证明 dev-only 导航与只读查看，不改正式文档真源、不进入正式菜单。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/src/dev-workbench/config/devDocs.test.mjs web/src/dev-workbench/config/devGovernance.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-page-overview-desktop-light,dev-page-docs-desktop-light,dev-page-governance-desktop-light pnpm --dir web style:l1',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test web/src/dev-workbench/config/devDocs.test.mjs web/src/dev-workbench/config/devGovernance.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
+      'STYLE_L1_SCENARIOS=dev-page-overview-desktop-light,dev-page-docs-desktop-light,dev-page-governance-desktop-light pnpm --dir web style:l1',
     ],
   },
   {
@@ -265,20 +274,20 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '客户配置包结构、moduleStates、角色池、页面 / 字段投影、runtime manifest 或 active revision 读回前置改动时复制；永绅 tracked draft 只可在 start:yoyoosun + loopback 后端下显式应用内容寻址的本地测试版本。正式 manifest 仍要求 release-ready；本预设只生成输入模板，不发布、不激活、不调用后端，release readiness 必须在 /__dev/customer-config 显式选择证据批次后检查。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web start:yoyoosun -- --print-plan',
-      'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web preview:yoyoosun -- --print-plan',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/customer-package-lint.test.mjs scripts/qa/customer-config-runtime-manifest.test.mjs scripts/deploy/customer-config-release-execute.test.mjs scripts/deploy/customer-config-release-readiness.test.mjs scripts/deploy/run-smoke-script.test.mjs web/scripts/yoyoosunEntryPlan.test.mjs web/dev-server/devCustomerConfigPlugin.test.mjs',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer demo',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer demo --mode compile',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer yoyoosun',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode compile',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-effective-session-probe.mjs --json --report output/customers/yoyoosun/customer-config-effective-session-probe/current.json',
-      'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-execute.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-readiness.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'pnpm --dir web start:yoyoosun -- --print-plan',
+      'pnpm --dir web preview:yoyoosun -- --print-plan',
+      'node --test scripts/qa/customer-package-lint.test.mjs scripts/qa/customer-config-runtime-manifest.test.mjs scripts/deploy/customer-config-release-execute.test.mjs scripts/deploy/customer-config-release-readiness.test.mjs scripts/deploy/run-smoke-script.test.mjs web/scripts/yoyoosunEntryPlan.test.mjs web/dev-server/devCustomerConfigPlugin.test.mjs',
+      'node scripts/qa/customer-package-lint.mjs --customer demo',
+      'node scripts/qa/customer-package-lint.mjs --customer demo --mode compile',
+      'node scripts/qa/customer-package-lint.mjs --customer yoyoosun',
+      'node scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode compile',
+      'node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview',
+      'node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json',
+      'node scripts/qa/customer-config-effective-session-probe.mjs --json --report output/customers/yoyoosun/customer-config-effective-session-probe/current.json',
+      'node scripts/deploy/customer-config-release-execute.mjs --print-input-template',
+      'node scripts/deploy/customer-config-release-readiness.mjs --print-input-template',
+      'bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template',
     ],
   },
   {
@@ -287,8 +296,8 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '客户 source manifest、extract、freeze 或 dry-run 门禁改动时复制；只跑无后端测试，不执行真实客户导入、不连接目标环境，仓库也不提供真实导入执行入口。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/import/customerSourceManifestCheck.test.mjs scripts/import/customerSourceExtract.test.mjs scripts/import/customerSourceSnapshotFreezeCheck.test.mjs scripts/import/customerImportDryRun.test.mjs',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test scripts/import/customerSourceManifestCheck.test.mjs scripts/import/customerSourceExtract.test.mjs scripts/import/customerSourceSnapshotFreezeCheck.test.mjs scripts/import/customerImportDryRun.test.mjs',
     ],
   },
   {
@@ -297,9 +306,9 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '正式前端 effective session、菜单、动作、字段投影或脱敏诊断改动时复制；只证明本地投影合同，不读取 raw customer package。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-configured-customer-sync-failure-blocked,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-permission-menu-falls-back-history-center,erp-effective-session-action-projection-business-pages pnpm --dir web style:l1',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs',
+      'STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-configured-customer-sync-failure-blocked,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-permission-menu-falls-back-history-center,erp-effective-session-action-projection-business-pages pnpm --dir web style:l1',
     ],
   },
   {
@@ -308,8 +317,8 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       '正式页面、组件、岗位任务端、共享 PDF 预览、用户可见错误或技术字段展示改动时复制；只证明本地用户可见错误不透传底层英文异常，且业务界面不展示 raw id / 内部字段。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/frontend-error-message-boundary.test.mjs web/src/common/utils/errorMessage.test.mjs web/src/erp/utils/userVisibleTechnicalFields.test.mjs web/src/erp/utils/dashboardTaskDisplay.test.mjs',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test scripts/qa/frontend-error-message-boundary.test.mjs web/src/common/utils/errorMessage.test.mjs web/src/erp/utils/userVisibleTechnicalFields.test.mjs web/src/erp/utils/dashboardTaskDisplay.test.mjs',
     ],
   },
   {
@@ -318,8 +327,8 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     description:
       'Workflow 动作入口、Source Document 生命周期、销售订单字段策略、导出或打印边界改动时复制；只证明本地前端、文档和后端登记表静态边界守卫。',
     commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/workflowTaskActionAccess.test.mjs scripts/qa/workflow-ui-action-boundary.test.mjs scripts/qa/sales-order-field-chain-boundary.test.mjs web/src/erp/config/printTemplates.test.mjs',
+      CURRENT_CHECKOUT_ROOT_COMMAND,
+      'node --test web/src/erp/utils/workflowTaskActionAccess.test.mjs scripts/qa/workflow-ui-action-boundary.test.mjs scripts/qa/sales-order-field-chain-boundary.test.mjs web/src/erp/config/printTemplates.test.mjs',
     ],
   },
 ])
@@ -332,7 +341,7 @@ const DEV_TESTING_TIER_HEADINGS = Object.freeze([
 
 const DEV_TESTING_TIER_COPY_FALLBACKS = Object.freeze({
   T1: [
-    'cd /Users/simon/projects/plush-toy-erp',
+    CURRENT_CHECKOUT_ROOT_COMMAND,
     'git --no-optional-locks status --short',
     'git --no-optional-locks -c diff.autoRefreshIndex=false diff --stat',
     'git --no-optional-locks -c diff.autoRefreshIndex=false diff --check',
@@ -341,12 +350,12 @@ const DEV_TESTING_TIER_COPY_FALLBACKS = Object.freeze({
   ],
   T7: [
     '# T7 当前没有完整业务 E2E runner；按触达事实层选择下列当前可用检查，不要伪造全链路自动化。',
-    'cd /Users/simon/projects/plush-toy-erp/server',
+    CURRENT_CHECKOUT_SERVER_COMMAND,
     'go test ./internal/biz ./internal/data',
     '# 如本轮明确触达对应库存、BOM、采购入库或采购退货 PG 防呆测试，再按领域选择 server Makefile 中的对应 target',
   ],
   T8: [
-    'cd /Users/simon/projects/plush-toy-erp',
+    CURRENT_CHECKOUT_ROOT_COMMAND,
     'bash scripts/qa/full.sh',
     'bash scripts/qa/strict.sh',
     '# 部署、备份、migration、health、smoke 和回滚按 server/deploy/README.md 与目标环境执行，浏览器入口不直接运行。',

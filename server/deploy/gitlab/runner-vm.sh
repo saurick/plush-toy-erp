@@ -15,6 +15,7 @@ DISK_VOLUME=plush-gitlab-runner.qcow2
 SEED_VOLUME=plush-gitlab-runner-seed.iso
 LOCK_DIR=/run/plush-runner-vm
 LOCK_FILE=/run/plush-runner-vm/provision.lock
+EXPECTED_CONTROL_HOSTNAME=r640
 
 MODE=preview
 VCPUS=
@@ -89,9 +90,10 @@ done
 [[ -n "$SSH_PUBLIC_KEY_FILE" ]]
 ((DISK_GIB >= 50))
 
-for command in awk base64 cloud-localds flock grep install mktemp rm rmdir sha256sum stat timeout virsh virt-install; do
+for command in awk base64 cloud-localds flock grep hostname install mktemp rm rmdir sha256sum stat timeout virsh virt-install; do
   command -v "$command" >/dev/null
 done
+[[ "$(hostname -s)" == "$EXPECTED_CONTROL_HOSTNAME" ]]
 [[ -f "$TEMPLATE_FILE" && ! -L "$TEMPLATE_FILE" ]]
 [[ -f "$CAPACITY_HELPER" && ! -L "$CAPACITY_HELPER" ]]
 [[ -f "$CHROMIUM_SANDBOX_HELPER" && ! -L "$CHROMIUM_SANDBOX_HELPER" ]]
@@ -163,7 +165,7 @@ for volume in "$DISK_VOLUME" "$SEED_VOLUME"; do
   fi
 done
 
-EXPECTED_CONFIRMATION="PROVISION_PLUSH_RUNNER:R640:$DOMAIN:$POOL:$NETWORK:$VCPUS:$MEMORY_MIB:$DISK_GIB:$RUNNER_CONCURRENT_SLOTS:$BASE_VOLUME_SHA256:$TEMPLATE_SHA256:$HELPER_SHA256:$CHROMIUM_SANDBOX_HELPER_SHA256:$SOURCE_CAPACITY_SHA256:$SSH_PUBLIC_KEY_SHA256"
+EXPECTED_CONFIRMATION="PROVISION_PLUSH_RUNNER:$EXPECTED_CONTROL_HOSTNAME:$DOMAIN:$POOL:$NETWORK:$VCPUS:$MEMORY_MIB:$DISK_GIB:$RUNNER_CONCURRENT_SLOTS:$BASE_VOLUME_SHA256:$TEMPLATE_SHA256:$HELPER_SHA256:$CHROMIUM_SANDBOX_HELPER_SHA256:$SOURCE_CAPACITY_SHA256:$SSH_PUBLIC_KEY_SHA256"
 [[ "$EUID" -eq 0 ]]
 if [[ "$MODE" == execute ]]; then
   [[ "$CONFIRMATION" == "$EXPECTED_CONFIRMATION" ]]

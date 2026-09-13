@@ -14,7 +14,7 @@
 后端 Go 版本以 `server/go.mod` 为准：`go 1.25.0`，当前 toolchain 为 `go1.26.6`。本机检查走仓库根目录的 `scripts/doctor.sh`，该脚本会在 `server/` 模块内读取实际 Go toolchain，避免只看仓库根目录默认 Go 版本造成误判。
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp
+cd "$(git rev-parse --show-toplevel)"
 bash scripts/doctor.sh
 ```
 
@@ -218,7 +218,7 @@ ProcessRuntime 当前 handler registry 同时保留当前图所需命令和旧�
 ## 快速开始
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/server
+cd "$(git rev-parse --show-toplevel)/server"
 make init
 make run
 ```
@@ -368,14 +368,14 @@ server/
 
 ## 文档索引
 
-- 后端专题入口：`/Users/simon/projects/plush-toy-erp/server/docs/README.md`
-- 部署总览：`/Users/simon/projects/plush-toy-erp/server/deploy/README.md`
-- 运行说明：`/Users/simon/projects/plush-toy-erp/server/docs/runtime.md`
-- 配置说明：`/Users/simon/projects/plush-toy-erp/server/docs/config.md`
-- API 说明：`/Users/simon/projects/plush-toy-erp/server/docs/api.md`
-- 可观测性：`/Users/simon/projects/plush-toy-erp/server/docs/observability.md`
-- Ent / Atlas：`/Users/simon/projects/plush-toy-erp/server/docs/ent.md`
-- DB 工作流：`/Users/simon/projects/plush-toy-erp/server/internal/data/AI_DB_WORKFLOW.md`
+- 后端专题入口：`server/docs/README.md`
+- 部署总览：`server/deploy/README.md`
+- 运行说明：`server/docs/runtime.md`
+- 配置说明：`server/docs/config.md`
+- API 说明：`server/docs/api.md`
+- 可观测性：`server/docs/observability.md`
+- Ent / Atlas：`server/docs/ent.md`
+- DB 工作流：`server/internal/data/AI_DB_WORKFLOW.md`
 
 ## 实现命名写入边界
 
@@ -383,5 +383,5 @@ server/
 
 ## 部署
 
-- 当前只保留 Compose：`/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
-- 如需查看部署占位符和发布脚本入口，优先看 `/Users/simon/projects/plush-toy-erp/server/deploy/README.md`
+- 当前只保留 Compose：`server/deploy/compose/prod`
+- 如需查看部署占位符和发布脚本入口，优先看 `server/deploy/README.md`

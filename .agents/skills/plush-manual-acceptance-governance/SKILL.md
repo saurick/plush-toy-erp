@@ -7,12 +7,12 @@ description: 验收编排与证据（plush-toy-erp），目标环境操作使用
 
 本 skill 编排 plush 的人工验收工具链。它负责选择档位、标注写入边界、绑定同一数据批次、收集证据并安全退出；不把模拟数据、浏览器可打开、本地报告或目标试用自动写成正式发布与客户签收。
 
-## Truth Chain / 必读真源
+## Truth Routing / 真源路由
 
-- `AGENTS.md`、`README.md`、`docs/当前真源与交接顺序.md`。
-- `scripts/qa/README.md` 和当前 `scripts/qa/manual-acceptance-*.mjs` 的 `--help` / tests；脚本合同优先于本 skill 中的示例。
-- `docs/customers/<customer-key>/试用人员全页面手工验收清单.md`、`客户交付矩阵.md`、`客户闭环交付验收清单.md`。
-- 涉及目标环境、客户配置或发布时，再读 `server/deploy/README.md`、`scripts/deploy/README.md` 与正式 release evidence。
+- 范围、客户或验收入口不清时，才用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位。
+- 生成或执行验收计划时读 `scripts/qa/README.md` 和当前 `scripts/qa/manual-acceptance-*.mjs` 的 `--help` / tests；脚本合同优先于本 skill 中的示例。
+- 客户验收任务读取 `docs/customers/<customer-key>/试用人员全页面手工验收清单.md`、`客户交付矩阵.md` 和 `客户闭环交付验收清单.md`。
+- 目标环境、客户配置或发布任务再读 `server/deploy/README.md`、`scripts/deploy/README.md` 与正式 release evidence。
 
 验收项数量、账号数、模板数和数据版本会变化。每次从 `manual-acceptance-catalog.mjs --format json` 与当前脚本合同读取，不在 skill 中写死。
 
@@ -31,7 +31,7 @@ description: 验收编排与证据（plush-toy-erp），目标环境操作使用
 ## Workflow / 工作流
 
 1. 冻结 scope：customer、target、profile、dataset key/data version/run id、允许写入、禁止路径、验收与停止条件。先运行 `GIT_OPTIONAL_LOCKS=0 git status --short`，保留其他会话改动。
-2. 生成当前目录与数据计划。先读 `scripts/qa/README.md`，运行 catalog 的 JSON 模式；不要复制旧清单数量或依赖历史报告。
+2. 生成当前目录与数据计划。按当前脚本说明运行 catalog 的 JSON 模式；不要复制旧清单数量或依赖历史报告。
 3. 检查环境门禁：URL/host、DB、migration、active customer config revision、账号/RBAC、凭据分离、报告目录和精确确认词。凭据只经环境变量传入，不写入命令记录、报告或仓库。
 4. 按当前脚本能力准备 source data、账号、任务、附件和 source-driven Fact。计划入口与 apply 入口分开；脚本声明 plan-only、retired 或 unsupported 的阶段立即停止，不用旧报告、generic RPC、直接 SQL 或局部事实代替。
 5. 每次写入后以同一 dataset/version/run id 做 readback。校验数量、状态、权限、幂等与报告绑定；单个子链绿色不能扩写为完整验收就绪。
@@ -56,4 +56,4 @@ description: 验收编排与证据（plush-toy-erp），目标环境操作使用
 
 ## Output / 输出合同
 
-汇报 profile、target、dataset/version/run id、每步写入分类、实际命令与结果、records/readback、浏览器/PDF 与人工结果、报告位置、retire/cleanup 状态。最后分开给出：本地验收准备、目标试用、正式发布、恢复证据、客户签收五个 verdict，以及 blocker 和 owner。
+汇报本次 profile 实际涉及的 target、批次、写入分类、执行结果、readback、浏览器/PDF 或人工结果、报告与 cleanup。只列适用 verdict；涉及交付时再分开本地准备、目标试用、正式发布、恢复证据和客户签收，未触达层级不机械枚举。

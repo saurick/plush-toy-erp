@@ -57,12 +57,15 @@ function buildDevTestingCopyPresetSource(preset = {}) {
 }
 
 function resolveCommandCwd(command, currentCwd) {
+  const checkoutMatch = String(command).match(
+    /(?:^|&&\s*)cd\s+["']?\$\(git rev-parse --show-toplevel\)(\/[^\s"']*)?["']?/u,
+  );
+  if (checkoutMatch) {
+    return path.resolve(repoRoot, `.${checkoutMatch[1] || ""}`);
+  }
   const cdMatch = String(command).match(/(?:^|&&\s*)cd\s+([^\s;&]+)/);
   if (!cdMatch) return currentCwd;
   const target = cdMatch[1].replace(/^['"]|['"]$/g, "");
-  if (target.startsWith("/Users/simon/projects/plush-toy-erp")) {
-    return target;
-  }
   if (target.startsWith("/")) return target;
   return path.resolve(currentCwd, target);
 }
@@ -71,13 +74,10 @@ function extractLocalCommandScriptPaths(command = "", currentCwd = repoRoot) {
   const paths = [];
   const source = String(command);
   const pattern =
-    /(?:^|\s)(\/Users\/simon\/projects\/plush-toy-erp\/)?((?:web|scripts|server|deployments)\/[\w./-]+\.(?:mjs|js|sh))(?:\s|$)/g;
+    /(?:^|\s)((?:web|scripts|server|deployments)\/[\w./-]+\.(?:mjs|js|sh))(?:\s|$)/g;
   for (const match of source.matchAll(pattern)) {
-    const absolutePrefix = match[1] || "";
-    const localPath = match[2];
-    const resolvedPath = absolutePrefix
-      ? path.join(repoRoot, localPath)
-      : path.resolve(currentCwd, localPath);
+    const localPath = match[1];
+    const resolvedPath = path.resolve(currentCwd, localPath);
     if (resolvedPath.startsWith(repoRoot)) {
       paths.push(path.relative(repoRoot, resolvedPath));
     }
@@ -438,6 +438,14 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "dev testing source action navigation",
   );
   const presetKeys = DEV_TESTING_COPY_PRESETS.map((item) => item.key);
+  const presetSource = DEV_TESTING_COPY_PRESETS.map(
+    buildDevTestingCopyPresetSource,
+  ).join("\n");
+  assert.doesNotMatch(
+    presetSource,
+    /\/Users\/|PATH=\/usr\/local\/bin|\/usr\/local\/bin\/(?:node|pnpm)/u,
+    "dev testing copy presets must follow the current checkout and PATH",
+  );
   assert.deepEqual(
     presetKeys,
     [

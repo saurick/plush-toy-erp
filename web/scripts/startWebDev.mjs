@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFile, spawn } from 'node:child_process'
+import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { createRequire } from 'node:module'
@@ -29,7 +30,7 @@ const execFileAsync = promisify(execFile)
 const require = createRequire(import.meta.url)
 
 export const DEV_GITLAB_KEYCHAIN = Object.freeze({
-  account: 'simon',
+  account: os.userInfo().username,
   service: 'plush-toy-erp.gitlab-read-api',
 })
 

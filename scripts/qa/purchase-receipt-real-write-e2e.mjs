@@ -106,10 +106,10 @@ export function buildInputTemplate() {
       "PURCHASE_RECEIPT_PG_DB_URL when using --with-postgres through scripts/purchase-receipt-pg.sh",
     ],
     commands: [
-      "PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --print-input-template",
-      "PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json",
-      "PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --out output/qa/purchase-receipt-real-write-e2e",
-      "PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --with-postgres --out output/qa/purchase-receipt-real-write-e2e",
+      "node scripts/qa/purchase-receipt-real-write-e2e.mjs --print-input-template",
+      "node scripts/qa/purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json",
+      "node scripts/qa/purchase-receipt-real-write-e2e.mjs --out output/qa/purchase-receipt-real-write-e2e",
+      "node scripts/qa/purchase-receipt-real-write-e2e.mjs --with-postgres --out output/qa/purchase-receipt-real-write-e2e",
     ],
     coverage: [
       "JSON-RPC purchase receipt service-layer write chain",
@@ -369,9 +369,9 @@ export function buildPreflightReport(options = {}, runtime = {}) {
     readyForRequestedCommand: serviceReady && postgresReady,
     blockers,
     nextCommands: [
-      "PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json",
-      "PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --out output/qa/purchase-receipt-real-write-e2e",
-      "PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --with-postgres --out output/qa/purchase-receipt-real-write-e2e",
+      "node scripts/qa/purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json",
+      "node scripts/qa/purchase-receipt-real-write-e2e.mjs --out output/qa/purchase-receipt-real-write-e2e",
+      "node scripts/qa/purchase-receipt-real-write-e2e.mjs --with-postgres --out output/qa/purchase-receipt-real-write-e2e",
     ],
     boundary:
       "This preflight writes only a sanitized local JSON report. It does not run Go tests, invoke make, connect to PostgreSQL with credentials, call a backend, write database rows, import customer data, or prove the purchase receipt fact chain passed. When --with-postgres is requested it only runs pg_isready against the sanitized local host and port.",

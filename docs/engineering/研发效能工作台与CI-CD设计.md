@@ -4,17 +4,17 @@
 
 本项目采用一条主链：
 
-**R640 GitLab 代码真源与 CI/CD + 独立 KVM Runner VM + GitHub 单向 GPT Review 镜像 + GHCR digest 镜像 + GitLab Release 可移植制品 + 本地 loopback Bridge + 固定目标 operation。**
+**GitLab 代码真源与 CI/CD + 独立 KVM Runner VM + GitHub 单向 GPT Review 镜像 + GHCR digest 镜像 + GitLab Release 可移植制品 + 本地 loopback Bridge + 固定目标 operation。**
 
 GitLab 独立承担 main CI。GitLab 负责 protected main、merge request、七分片 exact-SHA aggregate、`CI Gate`、Generic Package 与 Release；GitHub main 只接收 protected-main push mirror，供 GPT 审查和外部只读浏览，并保留明确应急 release，不运行仓库 CI。工作台读取 GitLab 证据，不复制一套 CI 状态机。
 
-R640 GitLab、KVM Runner、公网入口、protected main 和 mirror 已是实际主链，但仓库定义和历史绿灯都不能代替当前读回。每次结论仍分别绑定当前 pipeline/job、CI evidence Package、Release Package、Runner 配置、backup/restore、目标 operation 与 UAT。
+GitLab、KVM Runner、公网入口、protected main 和 mirror 已是实际主链，但仓库定义和历史绿灯都不能代替当前读回。每次结论仍分别绑定当前 pipeline/job、CI evidence Package、Release Package、Runner 配置、backup/restore、目标 operation 与 UAT。
 
 ## 拓扑与职责
 
 ```mermaid
 flowchart LR
-  L["开发机 / Codex"] -->|commit + explicit push| G["R640 GitLab<br/>canonical repository"]
+  L["开发机 / Codex"] -->|commit + explicit push| G["GitLab<br/>canonical repository"]
   L -.->|explicit review snapshot| H
   G -->|main / MR pipeline| R["KVM Runner VM<br/>isolated shell + VM Docker"]
   G -->|protected push mirror| H["GitHub<br/>GPT Review mirror"]
@@ -37,13 +37,13 @@ flowchart LR
 | 研发效能工作台    | 展示证据、选择固定版本、显式确认                | 不成为 CI、部署、数据库或凭据真源                           |
 | demo / test 目标  | load/pull 制品、migration、运行与 readback      | 不从源码构建，不共用持久数据，不把 smoke 冒充客户验收       |
 
-## R640 存储与进程隔离
+## GitLab 宿主存储与进程隔离
 
 GitLab 的 PostgreSQL、repositories、artifacts、config 与日志放 SSD `/srv/gitlab`。RAID5 `/srv/raid5/gitlab/backups` 只放应用备份、config archive 和 checksum；RAID 能容忍部分磁盘故障，但不能替代异机/离线备份。
 
-Runner 使用独立 KVM VM 和独立 qcow2，不直接跑在 GitLab 容器或现有业务容器旁。VM 内可以使用自己的 Docker daemon 构建镜像和启动一次性 PostgreSQL；R640 宿主 `/var/run/docker.sock` 永不传入 job。Runner cache 可重建，不作为 release、测试结果或业务数据真源。
+Runner 使用独立 KVM VM 和独立 qcow2，不直接跑在 GitLab 容器或现有业务容器旁。VM 内可以使用自己的 Docker daemon 构建镜像和启动一次性 PostgreSQL；GitLab 宿主 `/var/run/docker.sock` 永不传入 job。Runner cache 可重建，不作为 release、测试结果或业务数据真源。
 
-GitLab HTTP 只绑定 R640 `127.0.0.1:8929`，由 FRP 到阿里云 `18226`，再由 Nginx 为 `gitlab.saurick.me` 终止 TLS。Git over SSH 默认只开放 LAN `192.168.0.133:2224`。详细安装、备份和公网切换见 `server/deploy/gitlab/README.md`。
+GitLab HTTP 只绑定 GitLab 宿主 `127.0.0.1:8929`，由 FRP 到阿里云 `18226`，再由 Nginx 为 `gitlab.saurick.me` 终止 TLS。Git over SSH 默认只开放 LAN `192.168.0.133:2224`。详细安装、备份和公网切换见 `server/deploy/gitlab/README.md`。
 
 ## CI 主链
 
@@ -60,7 +60,7 @@ GitLab HTTP 只绑定 R640 `127.0.0.1:8929`，由 FRP 到阿里云 `18226`，再
 
 缓存只缩短依赖和浏览器准备时间，不能跳过 checksum、locked/offline install、门禁、source archive 或 clean-tree 读回。分片只 pull cache，不并发回写同一 key。pipeline artifacts 是本次运行内证据；只有 `CI Gate` 上传且经 release 服务器端重新校验的 exact Package 才能跨 pipeline 复用，仍不等于不可变 Release。
 
-性能结论必须把 R640 宿主与 Runner guest 分开，并同时报告冷/热缓存、各 job 时长、关键路径、CPU / 内存 / IO 峰值、p50、波动和近似 p95。执行 Job 以 90 秒为目标线、120 秒为红线：90–120 秒进入优化复核，超过 120 秒进入拆分候选；但单次慢不自动拆分，必须结合近 20 次有效样本的中位数、近似 P95、覆盖边界与重复成本判断。`plan` / `prepare`、领域 fan-in、`quality_aggregate` 和 `CI Gate` 不套执行 Job 的 90 / 120 秒拆分线；排队超过 30 秒先查 Runner 容量和资源争用，不用拆 Job 掩盖等待。7–9 分钟普通 CI 与 10–15 分钟热缓存提交到部署只是阶段目标；若 guest 和宿主仍有实测余量且没有排队、IO 争用、OOM、flaky 或波动扩大，就继续调整 Runner 并发、DAG shard 和各语言测试并行度，冲刺 6–8 分钟与 8–12 分钟，稳定更快也接受。停止条件是资源饱和或复杂度收益明显失衡，不是达到某个时间；完整覆盖、fail-closed、exact-SHA、数据库/浏览器/端口隔离和清理始终不降级。
+性能结论必须把 GitLab 宿主与 Runner guest 分开，并同时报告冷/热缓存、各 job 时长、关键路径、CPU / 内存 / IO 峰值、p50、波动和近似 p95。执行 Job 以 90 秒为目标线、120 秒为红线：90–120 秒进入优化复核，超过 120 秒进入拆分候选；但单次慢不自动拆分，必须结合近 20 次有效样本的中位数、近似 P95、覆盖边界与重复成本判断。`plan` / `prepare`、领域 fan-in、`quality_aggregate` 和 `CI Gate` 不套执行 Job 的 90 / 120 秒拆分线；排队超过 30 秒先查 Runner 容量和资源争用，不用拆 Job 掩盖等待。7–9 分钟普通 CI 与 10–15 分钟热缓存提交到部署只是阶段目标；若 guest 和宿主仍有实测余量且没有排队、IO 争用、OOM、flaky 或波动扩大，就继续调整 Runner 并发、DAG shard 和各语言测试并行度，冲刺 6–8 分钟与 8–12 分钟，稳定更快也接受。停止条件是资源饱和或复杂度收益明显失衡，不是达到某个时间；完整覆盖、fail-closed、exact-SHA、数据库/浏览器/端口隔离和清理始终不降级。
 
 ### exact-SHA release
 
@@ -90,7 +90,7 @@ Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。重试时
 
 `scripts/deploy/gitlab-delivery-provider.mjs` 是默认 Provider，固定 GitLab base URL、项目、Generic Package、release tag、pipeline API 和本地下载根。它从服务端环境读取 `PLUSH_GITLAB_TOKEN`，限制 JSON 大小、asset 名、文件大小、URL、SHA、版本和符号链接路径，返回值不含 token。
 
-质量门禁与版本中心读取 R640 pipeline / job、不可变版本目录、发布状态和控制制品时使用独立的 `PLUSH_GITLAB_READ_TOKEN`，不复用发布与部署写凭据。macOS 本地 `pnpm start` 可从固定钥匙串项自动加载该令牌；服务端只把它映射给不暴露发布方法的只读 GitLab Provider，浏览器、本机质量门禁进程和部署执行子进程均不得继承。创建新发布仍只使用短期 `PLUSH_GITLAB_TOKEN`；未加载时只停用该动作，不影响已有版本与流水线证据读取。实例强制的最大有效期届满前需要按同一最小权限重新登记，不能以扩大为写权限换取自动轮换。
+质量门禁与版本中心读取 GitLab pipeline / job、不可变版本目录、发布状态和控制制品时使用独立的 `PLUSH_GITLAB_READ_TOKEN`，不复用发布与部署写凭据。macOS 本地 `pnpm start` 可从固定钥匙串项自动加载该令牌；服务端只把它映射给不暴露发布方法的只读 GitLab Provider，浏览器、本机质量门禁进程和部署执行子进程均不得继承。创建新发布仍只使用短期 `PLUSH_GITLAB_TOKEN`；未加载时只停用该动作，不影响已有版本与流水线证据读取。实例强制的最大有效期届满前需要按同一最小权限重新登记，不能以扩大为写权限换取自动轮换。
 
 `scripts/deploy/github-delivery-provider.mjs` 继续读取 GitHub 历史/应急 Release，并把 v1 六资产投影为只读、可回滚但不可用于显式版本提升（Explicit Promotion）。当前 GitHub emergency workflow 在 checkout、registry 登录、构建和上传前固定失败关闭；只有未来完整支持 canonical v2 七资产与同一演练回执后，才能另行恢复写入。浏览器不知道 token，也不能选择 Provider。
 
@@ -116,11 +116,11 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 工作台不把本地绿色、GitLab pipeline、GitLab Release、目标 smoke、备份恢复、岗位矩阵或客户 UAT 合成一个“全部完成”。每层单独显示来源与时间；缺失或非法时间显示“未证明”。
 
-`/__dev/quality-gates` 另外读取当前 committed SHA 的 R640 普通 push CI，动态展示 GitLab 实际返回的全部 Job，不在前端复制 Job 目录或 DAG。“本次流水线”用同一 exact SHA 的 GitLab CI Lint `needs` 生成有向图，再与实际 Pipeline Job 取交集；依赖不可读或两者不一致时只保留可靠耗时并让 DAG 失败关闭，不画推测连线。服务器门禁内部只保留“本次流水线、Job 性能、CI 历史”三个轻量切换视图，顶部同 SHA 证据摘要始终可见。Job 只按“编排、执行、汇总、终态”和领域分组投影；默认突出异常与最慢执行 Job，其余以可展开明细保留。
+`/__dev/quality-gates` 另外读取当前 committed SHA 的 GitLab 普通 push CI，动态展示 GitLab 实际返回的全部 Job，不在前端复制 Job 目录或 DAG。“本次流水线”用同一 exact SHA 的 GitLab CI Lint `needs` 生成有向图，再与实际 Pipeline Job 取交集；依赖不可读或两者不一致时只保留可靠耗时并让 DAG 失败关闭，不画推测连线。服务器门禁内部只保留“本次流水线、Job 性能、CI 历史”三个轻量切换视图，顶部同 SHA 证据摘要始终可见。Job 只按“编排、执行、汇总、终态”和领域分组投影；默认突出异常与最慢执行 Job，其余以可展开明细保留。
 
 `scripts/qa/ci-job-guide.mjs` 只登记 Job 的岗位化名称、用途、包含检查和结果用途，不保存 `needs`、状态、耗时、等待或历史。服务端按当前 GitLab 实际 Job 名单投影这份说明；新增但未登记的 Job 继续展示，并明确标记“说明待登记”。页面通过一个全局“Job 说明”入口和 Job 卡片上的按需说明按钮复用同一抽屉，不增加第四个子视图，也不在主页面常驻长文。抽屉把阶段职责、Job 说明、本次运行等待和 GitLab 日志放在同一上下文中；依赖仍来自 exact-SHA CI Lint，运行数据与历史仍来自 GitLab。
 
-同一 development-only API 同时返回最近 20 次普通 push CI 的 pipeline 与逐 Job 数据，便于页面和 Codex 直接读取后定位慢 Job、排队、重试和回归；GitLab 仍是唯一历史真源。该服务器证据不覆盖 Local dirty 状态或本地 full/strict 回执；只有当前干净 SHA 的 R640 普通 CI 完整通过，质量工程与版本中心才把 `releaseEligible` 提升为真。本地 strict 即使通过也只保留为 Local 回执，不能替代 protected main 证据；未登记只读 token、API 不可达或 SHA 无 push 记录时只显示不可读/缺失，不制造绿色证据。
+同一 development-only API 同时返回最近 20 次普通 push CI 的 pipeline 与逐 Job 数据，便于页面和 Codex 直接读取后定位慢 Job、排队、重试和回归；GitLab 仍是唯一历史真源。该服务器证据不覆盖 Local dirty 状态或本地 full/strict 回执；只有当前干净 SHA 的 GitLab 普通 CI 完整通过，质量工程与版本中心才把 `releaseEligible` 提升为真。本地 strict 即使通过也只保留为 Local 回执，不能替代 protected main 证据；未登记只读 token、API 不可达或 SHA 无 push 记录时只显示不可读/缺失，不制造绿色证据。
 
 ### 本地数据库恢复启动
 
@@ -162,7 +162,7 @@ GitLab 升级固定镜像 digest，遵循官方逐版本路径。升级前固定
 
 | 状态                    | 能证明                                                                                                                       | 不能证明                           |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| 仓库定义已实现          | YAML、Provider、脚本、文档和测试合同存在                                                                                     | GitLab/R640 已部署                 |
+| 仓库定义已实现          | YAML、Provider、脚本、文档和测试合同存在                                                                                     | GitLab 已部署                 |
 | 本地定向测试通过        | 受影响代码合同当前可执行                                                                                                     | Runner、mirror、域名、备份运行正常 |
 | GitLab pipeline 通过    | 固定 SHA 的远端 QA/strict 与 artifact                                                                                        | 目标环境已发布                     |
 | Release/Package 完整    | v2 七资产、GHCR digest、manifest 与同一演练回执身份；或明确标记不可用于显式版本提升（Explicit Promotion）的 legacy v1 六资产 | migration、health、UAT             |
@@ -171,8 +171,8 @@ GitLab 升级固定镜像 digest，遵循官方逐版本路径。升级前固定
 
 ## 明确不做
 
-- 不让 R640 GitLab 容器兼任 Runner。
-- 不给 Runner VM 挂 R640 宿主 Docker socket。
+- 不让 GitLab 容器兼任 Runner。
+- 不给 Runner VM 挂 GitLab 宿主 Docker socket。
 - 不同时运行 GitLab release 与 GitHub emergency release。
 - 不在 133 或客户 UAT 目标构建源码。
 - 不把 GitLab 改造成业务多租户、license、计费或客户工单系统。

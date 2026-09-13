@@ -33,7 +33,7 @@ test("affected: help explains the server-CI trust boundary", () => {
   );
 
   assert.match(output, /origin\s+refs\/heads\/main -> refs\/heads\/main/u);
-  assert.match(output, /R640 exact-SHA GitLab CI/u);
+  assert.match(output, /GitLab exact-SHA CI/u);
   assert.match(output, /回执只授权普通\s+非强制 push/u);
   assert.match(output, /terminal-success CI Gate/u);
   assert.doesNotMatch(output, /有 full local gate/u);
@@ -777,7 +777,7 @@ test("affected: focused plan selects an affected pre-push receipt", () => {
   );
 
   assert.match(output, /非 origin\/main.*affected 回执/u);
-  assert.match(output, /正式 origin\/main.*server-ci.*R640 exact-SHA CI/u);
+  assert.match(output, /正式 origin\/main.*server-ci.*GitLab exact-SHA CI/u);
   assert.match(output, /只授权普通非强制 push/u);
   assert.match(output, /受保护部署.*CI Gate 终态成功/u);
   assert.match(output, /scopes=T0,T1 max_scope=T1 local_gate=focused/u);

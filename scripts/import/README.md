@@ -20,15 +20,17 @@ Numbers 原件可使用 `.numbers` 和 `application/vnd.apple.numbers` 登记到
 永绅客户明确使用专属 Private Git 仓库保存真实原件、私密 manifest 和验证入口。客户仓库与 Product Core 使用兄弟目录或 CI multi-checkout，不使用 submodule；Product Core 只提供客户无关的通用校验与提取工具。
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp-customer-yoyoosun-private
-PRODUCT_ROOT=/Users/simon/projects/plush-toy-erp bash scripts/validate.sh
+PRODUCT_ROOT="$(git rev-parse --show-toplevel)"
+CUSTOMER_PRIVATE_ROOT="$(dirname "$PRODUCT_ROOT")/plush-toy-erp-customer-yoyoosun-private"
+cd "$CUSTOMER_PRIVATE_ROOT"
+PRODUCT_ROOT="$PRODUCT_ROOT" bash scripts/validate.sh
 ```
 
 直接调用时必须显式传入所有路径：
 
 ```bash
-export PRODUCT_ROOT=/Users/simon/projects/plush-toy-erp
-export CUSTOMER_PRIVATE_ROOT=/Users/simon/projects/plush-toy-erp-customer-yoyoosun-private
+export PRODUCT_ROOT="$(git rev-parse --show-toplevel)"
+export CUSTOMER_PRIVATE_ROOT="$(dirname "$PRODUCT_ROOT")/plush-toy-erp-customer-yoyoosun-private"
 
 node "$PRODUCT_ROOT/scripts/import/customerSourceManifestCheck.mjs" \
   --customer yoyoosun \

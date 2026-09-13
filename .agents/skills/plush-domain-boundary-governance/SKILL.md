@@ -9,9 +9,9 @@ description: 领域设计与生成（plush-toy-erp），不执行目标库迁移
 
 后端边界：这是 plush 后端业务实现前的主治理入口，覆盖 schema / migration / repo / usecase / JSON-RPC / API / RBAC / transaction / idempotency / error code / Workflow-Fact boundary。页面治理 skill 只核对可见能力是否有真实后端支撑；一旦需要新增或修改这些后端能力，应切换到本 skill。
 
-## 真源链 Truth Chain
+## Truth Routing / 真源路由
 
-- 先读 `AGENTS.md`、`README.md`、`docs/当前真源与交接顺序.md`、相关 module docs/code/tests。
+- 范围、模块责任或入口不清时，才用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位；否则直接读取相关 module docs、代码、schema/migration 和测试。
 - 代码、schema/migrations、tests、formal docs 强于聊天规划或旧 reference notes。
 
 ## 项目规则 Project Rules

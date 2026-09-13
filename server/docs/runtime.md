@@ -7,7 +7,7 @@
 最常用的本地启动命令：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/server
+cd "$(git rev-parse --show-toplevel)/server"
 make init
 make run
 ```
@@ -15,7 +15,7 @@ make run
 如果要显式指定配置文件：
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/server
+cd "$(git rev-parse --show-toplevel)/server"
 go run ./cmd/server -conf ./configs/dev/config.yaml
 ```
 
@@ -32,8 +32,8 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 
 配置来源：
 
-- `/Users/simon/projects/plush-toy-erp/server/configs/dev/config.yaml`
-- `/Users/simon/projects/plush-toy-erp/server/configs/prod/config.yaml`
+- `server/configs/dev/config.yaml`
+- `server/configs/prod/config.yaml`
 
 ## HTTP 入口
 
@@ -75,7 +75,7 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 ## 本地开发常用命令
 
 ```bash
-cd /Users/simon/projects/plush-toy-erp/server
+cd "$(git rev-parse --show-toplevel)/server"
 
 # 代码生成
 make config

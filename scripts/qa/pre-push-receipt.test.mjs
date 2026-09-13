@@ -451,7 +451,7 @@ test("prepare wrapper exposes help without running full or creating receipt stat
       /origin refs\/heads\/main -> refs\/heads\/main/u,
     );
     assert.match(result.stdout, /server-ci/u);
-    assert.match(result.stdout, /R640 exact-SHA GitLab CI/u);
+    assert.match(result.stdout, /GitLab exact-SHA CI/u);
     assert.match(result.stdout, /回执只授权普通非强制 push/u);
     assert.match(result.stdout, /terminal-success CI Gate/u);
     assert.doesNotMatch(result.stdout, /--review|review\/gpt/u);

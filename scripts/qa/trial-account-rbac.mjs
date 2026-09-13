@@ -329,12 +329,12 @@ export const buildInputTemplate = () => ({
     buildExpectedAccountSummary,
   ),
   commands: [
-    "PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --preflight-report output/trial-account-rbac/preflight.json",
-    "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs",
-    "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --report output/trial-account-rbac/report.json",
-    `PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --preflight-report ${trialBrowserSmokePreflightReportPath}`,
-    `TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --report ${trialBrowserSmokeReportPath}`,
-    "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
+    "node scripts/qa/trial-account-rbac.mjs --preflight-report output/trial-account-rbac/preflight.json",
+    "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' node scripts/qa/trial-account-rbac.mjs",
+    "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' node scripts/qa/trial-account-rbac.mjs --report output/trial-account-rbac/report.json",
+    `node web/scripts/trialDemoAccountBrowserSmoke.mjs --preflight-report ${trialBrowserSmokePreflightReportPath}`,
+    `TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' node web/scripts/trialDemoAccountBrowserSmoke.mjs --report ${trialBrowserSmokeReportPath}`,
+    "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' pnpm --dir web smoke:trial-demo-browser",
   ],
   browserSmokeEvidencePlan: buildBrowserSmokeEvidencePlan(),
   realRBACCheckRequires: [...realRBACCheckRequirements],
@@ -562,7 +562,6 @@ export const buildPreflightReport = async ({
   const suggestedRealRBACCommand = [
     `TRIAL_ACCOUNT_PASSWORD=${shellQuote("<local-demo-password>")}`,
     `TRIAL_ACCOUNT_BACKEND_URL=${shellQuote(backendURL)}`,
-    "PATH=/usr/local/bin:$PATH",
     "node scripts/qa/trial-account-rbac.mjs",
     "--report output/trial-account-rbac/report.json",
   ].join(" ");

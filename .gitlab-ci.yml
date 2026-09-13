@@ -53,7 +53,7 @@ variables:
   cache:
     - &pnpm_cache_entry
       key:
-        prefix: r640-node-24.14.0-pnpm-v1
+        prefix: plush-ci-node-24.14.0-pnpm-v1
         files:
           - web/pnpm-lock.yaml
       paths:
@@ -65,7 +65,7 @@ variables:
     - *pnpm_cache_entry
     - &playwright_cache_entry
       key:
-        prefix: r640-node-24.14.0-playwright-v3
+        prefix: plush-ci-node-24.14.0-playwright-v3
         files:
           - scripts/qa/ci-playwright-runtime.mjs
           - web/pnpm-lock.yaml
