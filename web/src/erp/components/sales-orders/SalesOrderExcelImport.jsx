@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { UploadOutlined } from '@ant-design/icons'
-import { Select, Space, Table, Typography } from 'antd'
+import { Select, Space, Typography } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import SalesOrderBatchImportEditor from './SalesOrderBatchImportEditor.jsx'
 import { SalesOrderImportImage } from './SalesOrderSourceEvidence.jsx'
 import { SalesOrderSourcePaymentRecords } from './SalesOrderSourcePaymentSection.jsx'
@@ -20,7 +21,7 @@ import {
 
 const columns = [
   { title: '订单编号', dataIndex: 'order_no', width: 180 },
-  { title: '原表客户', dataIndex: 'customer', width: 140 },
+  { align: 'left', title: '原表客户', dataIndex: 'customer', width: 140 },
   { title: '下单日期', dataIndex: 'order_date', width: 120 },
   {
     title: '明细',
@@ -44,19 +45,20 @@ const detailColumns = [
     ),
   },
   ...[
-    ['customer_product_no', '原表产品编号', 130],
-    ['requested_product_name', '产品名称', 220],
-    ['ordered_quantity', '订单数量', 95],
-    ['pre_shipment_sample_quantity', '船头版', 80],
-    ['unit_price', '单价', 80],
-    ['planned_delivery_date', '交付日期', 120],
-    ['order_category', '类别', 80],
-    ['process_requirement', '工艺', 150],
-    ['note', '备注', 220],
-  ].map(([key, title, width]) => ({
+    ['customer_product_no', '原表产品编号', 130, 'center'],
+    ['requested_product_name', '产品名称', 220, 'left'],
+    ['ordered_quantity', '订单数量', 95, 'right'],
+    ['pre_shipment_sample_quantity', '船头版', 80, 'right'],
+    ['unit_price', '单价', 80, 'right'],
+    ['planned_delivery_date', '交付日期', 120, 'center'],
+    ['order_category', '类别', 80, 'center'],
+    ['process_requirement', '工艺', 150, 'left'],
+    ['note', '备注', 220, 'left'],
+  ].map(([key, title, width, align]) => ({
     title,
     key,
     width,
+    align,
     render: (_, line) =>
       key === 'order_category'
         ? line.item[key] === 'REPEAT'
@@ -68,6 +70,7 @@ const detailColumns = [
     title: label,
     key: label,
     width: 110,
+    align: label === '设计师' ? 'center' : 'right',
     render: (_, line) =>
       line.item.import_source.cells.find((cell) => cell.label === label)
         ?.value || '未填写',
@@ -181,6 +184,7 @@ export default function SalesOrderExcelImport({
   const previewColumns = [
     ...columns,
     {
+      align: 'left',
       title: '保存到客户',
       key: 'mapped_customer',
       width: 240,

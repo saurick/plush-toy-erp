@@ -998,6 +998,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     () =>
       applyBusinessColumnSorters([
         {
+          align: 'left',
           title: '任务编号',
           exportTitle: '任务编号',
           dataIndex: 'task_code',
@@ -1016,6 +1017,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           exportValue: getWorkflowTaskCodeLabel,
         },
         {
+          align: 'left',
           title: '来源',
           exportTitle: '来源',
           dataIndex: 'source_no',
@@ -1043,7 +1045,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           title: '负责岗位',
           exportTitle: '负责岗位',
           key: 'owner_role',
-          width: 120,
+          width: 160,
           render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
           exportValue: (record) => getWorkflowTaskOwnerRoleLabel(record),
         },
@@ -1057,6 +1059,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           exportValue: getWorkflowTaskDueLabel,
         },
         {
+          align: 'left',
           title: '原因 / 备注',
           exportTitle: '原因 / 备注',
           dataIndex: 'blocked_reason',

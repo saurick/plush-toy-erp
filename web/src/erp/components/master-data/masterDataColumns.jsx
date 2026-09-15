@@ -90,6 +90,7 @@ function productColumns({ unitDisplay }) {
       sorter: (a, b) => compareText(a?.code, b?.code),
     },
     {
+      align: 'left',
       defaultPriority: 20,
       title: '产品名称',
       exportTitle: '产品名称',
@@ -107,6 +108,7 @@ function productColumns({ unitDisplay }) {
       exportValue: (record) => record.name || '',
     },
     {
+      align: 'left',
       title: '英文品名',
       exportTitle: '英文品名',
       dataIndex: 'english_name',
@@ -148,6 +150,7 @@ function productColumns({ unitDisplay }) {
     },
     unitColumn(unitDisplay),
     {
+      align: 'right',
       title: '产品单重（净重）',
       exportTitle: '产品单重（克）',
       dataIndex: 'unit_net_weight_g',
@@ -167,6 +170,7 @@ function productColumns({ unitDisplay }) {
 function productSKUColumns({ productOptions, unitDisplay }) {
   return [
     {
+      align: 'left',
       defaultPriority: 10,
       title: '产品',
       exportTitle: '产品',
@@ -199,6 +203,7 @@ function productSKUColumns({ productOptions, unitDisplay }) {
       sorter: (a, b) => compareText(a?.sku_code, b?.sku_code),
     },
     {
+      align: 'left',
       defaultPriority: 25,
       title: 'SKU 名称',
       exportTitle: 'SKU 名称',
@@ -265,6 +270,7 @@ function productSKUColumns({ productOptions, unitDisplay }) {
     },
     unitColumn(unitDisplay),
     {
+      align: 'right',
       title: 'SKU 单重（净重）',
       exportTitle: 'SKU 单重（克）',
       dataIndex: 'unit_net_weight_g',
@@ -289,6 +295,7 @@ function processColumns() {
       sorter: (a, b) => compareText(a?.code, b?.code),
     },
     {
+      align: 'left',
       defaultPriority: 20,
       title: '环节名称',
       exportTitle: '环节名称',
@@ -391,6 +398,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
       sorter: (a, b) => compareText(a?.code, b?.code),
     },
     {
+      align: 'left',
       defaultPriority: 20,
       title: '名称',
       exportTitle: '名称',
@@ -411,6 +419,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
               materialStockCategoryLabel(record.stock_category),
           },
           {
+            align: 'left',
             defaultPriority: 80,
             title: '厂商',
             exportTitle: '厂商',
@@ -449,6 +458,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
     ...(type === 'customers'
       ? [
           {
+            align: 'left',
             defaultPriority: 80,
             title: '付款条件',
             exportTitle: '付款条件',
@@ -480,6 +490,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             render: (value) => value || '-',
           },
           {
+            align: 'left',
             title: '默认收货信息',
             exportTitle: '默认收货信息',
             key: 'default_delivery',
@@ -532,6 +543,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             render: (value) => value || '-',
           },
           {
+            align: 'left',
             defaultPriority: 40,
             title: '规格',
             exportTitle: '规格',
@@ -570,6 +582,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
               (record?.supplier_type ? '供应商类型' : ''),
           },
           {
+            align: 'left',
             defaultPriority: 50,
             title: '主联系人',
             exportTitle: '主联系人',
@@ -608,6 +621,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
               '',
           },
           {
+            align: 'left',
             title: '经营 / 加工地址',
             exportTitle: '经营 / 加工地址',
             dataIndex: 'address',
@@ -669,6 +683,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
               ),
           },
           {
+            align: 'left',
             title: '可加工工序',
             exportTitle: '可加工工序',
             dataIndex: 'process_ids',

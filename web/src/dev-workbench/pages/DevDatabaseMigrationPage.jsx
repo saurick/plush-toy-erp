@@ -19,11 +19,11 @@ import {
   Modal,
   Space,
   Steps,
-  Table,
   Tag,
   Tooltip,
   Typography,
 } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
@@ -353,6 +353,7 @@ export default function DevDatabaseMigrationPage() {
       render: (value) => <StatusTag status={value} />,
     },
     {
+      align: 'left',
       title: '结果',
       dataIndex: 'message',
       key: 'message',
@@ -368,7 +369,7 @@ export default function DevDatabaseMigrationPage() {
     {
       title: '操作',
       key: 'action',
-      align: 'right',
+      align: 'center',
       width: 96,
       render: (_value, record) => (
         <Button onClick={() => setOperationDetail(record)}>查看</Button>

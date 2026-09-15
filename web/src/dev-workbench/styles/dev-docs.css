@@ -810,7 +810,11 @@
 .erp-dev-docs-markdown td {
   border: 1px solid #dce8dd;
   padding: 8px 10px;
-  vertical-align: top;
+  vertical-align: middle;
+}
+
+.erp-dev-docs-markdown thead th {
+  text-align: center;
 }
 
 .erp-dev-docs-markdown blockquote {

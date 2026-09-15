@@ -6,10 +6,10 @@ import {
   Modal,
   Pagination,
   Popover,
-  Table,
   Tag,
   Typography,
 } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
@@ -292,6 +292,7 @@ export default function SourceImportPickerModal({
     return [
       ...baseColumns,
       {
+        align: 'left',
         title: '限制说明',
         key: '__disabled_reason',
         width: 180,

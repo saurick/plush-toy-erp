@@ -31,6 +31,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       sortType: 'text',
     },
     {
+      align: 'left',
       defaultPriority: 20,
       title: '加工厂',
       exportTitle: '加工厂',
@@ -90,6 +91,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       exportValue: (record) => formatUnixDate(record?.expected_return_date),
     },
     {
+      align: 'left',
       title: '备注',
       exportTitle: '备注',
       dataIndex: 'note',

@@ -402,7 +402,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'mobile-role-tasks-v1/implemented-reference.html',
     readmePath: 'mobile-role-tasks-v1/README.md',
     description:
-      '只覆盖当前待办 / 已办 / 消息 / 我的、主筛选、分批展开、刷新和任务选择；详情、处理与结果回执由 v2 唯一定义。',
+      '覆盖当前待办 / 已办 / 风险 / 我的、紧凑顶部、我的显示设置、主筛选、分批展开、局部刷新反馈和任务选择；详情、处理与结果回执由 v2 唯一定义。',
     appliesTo:
       '岗位任务端 `/m/<role>/tasks` 当前列表基线；与 v2 当前选中任务流程共同组成完整移动任务主路径。',
   },

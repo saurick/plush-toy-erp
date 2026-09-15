@@ -96,8 +96,8 @@
 }
 
 .erp-login-card .ant-segmented {
-  --erp-login-segmented-motion-duration: 420ms;
-  --erp-login-segmented-motion-easing: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --erp-login-segmented-motion-duration: var(--erp-tab-motion-duration, 420ms);
+  --erp-login-segmented-motion-easing: var(--erp-tab-motion-easing, cubic-bezier(0.215, 0.61, 0.355, 1));
   --erp-login-segmented-indicator-bg: #ffffff;
   --erp-login-segmented-indicator-shadow: 0 8px 20px rgb(15 23 42 / 0.08);
   padding: 4px;
@@ -172,8 +172,6 @@
   font-weight: 700;
   transition:
     color var(--erp-login-segmented-motion-duration)
-      var(--erp-login-segmented-motion-easing),
-    font-weight var(--erp-login-segmented-motion-duration)
       var(--erp-login-segmented-motion-easing);
   white-space: normal;
 }

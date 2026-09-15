@@ -19,7 +19,6 @@ import {
   Modal,
   Popconfirm,
   Space,
-  Table,
   Tabs,
   Tag,
 } from 'antd'
@@ -28,6 +27,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import Table from '@/common/components/table/AppTable'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import {
   MATERIAL_STOCK_CATEGORY_OPTIONS,
@@ -1467,6 +1467,7 @@ export default function V1InventoryLedgerPage() {
               : subjectTypeText(record?.subject_type),
         },
         {
+          align: 'left',
           defaultPriority: 30,
           title: '材料 / 产品',
           dataIndex: 'subject_id',
@@ -1484,6 +1485,7 @@ export default function V1InventoryLedgerPage() {
             renderSubjectReference(record?.subject_id, record),
         },
         {
+          align: 'left',
           defaultPriority: 40,
           title: '产品规格',
           dataIndex: 'product_sku_id',
@@ -1590,6 +1592,7 @@ export default function V1InventoryLedgerPage() {
               : subjectTypeText(record?.subject_type),
         },
         {
+          align: 'left',
           defaultPriority: 20,
           title: '材料 / 产品',
           dataIndex: 'subject_id',
@@ -1607,6 +1610,7 @@ export default function V1InventoryLedgerPage() {
             renderSubjectReference(record?.subject_id, record),
         },
         {
+          align: 'left',
           defaultPriority: 30,
           title: '产品规格',
           dataIndex: 'product_sku_id',
@@ -1648,6 +1652,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => renderLotReference(record?.lot_id),
         },
         {
+          align: 'right',
           defaultPriority: 50,
           title: '数量',
           exportTitle: '数量',
@@ -1665,6 +1670,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => renderUnitReference(record?.unit_id),
         },
         {
+          align: 'left',
           defaultPriority: 110,
           title: '来源',
           exportTitle: '来源',
@@ -1674,6 +1680,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => sourceTypeText(record?.source_type),
         },
         {
+          align: 'left',
           defaultPriority: 120,
           title: '来源单据',
           key: 'source_document',
@@ -1716,12 +1723,13 @@ export default function V1InventoryLedgerPage() {
           render: formatUnixDateTime,
           exportValue: (record) => formatUnixDateTime(record?.occurred_at),
         },
-        { title: '备注', dataIndex: 'note', width: 300 },
+        { align: 'left', title: '备注', dataIndex: 'note', width: 300 },
       ]
     }
 
     return [
       {
+        align: 'left',
         defaultPriority: 90,
         title: '库存项',
         dataIndex: 'id',
@@ -1745,6 +1753,7 @@ export default function V1InventoryLedgerPage() {
             : subjectTypeText(record?.subject_type),
       },
       {
+        align: 'left',
         defaultPriority: 10,
         title: '材料 / 产品',
         dataIndex: 'subject_id',
@@ -1762,6 +1771,7 @@ export default function V1InventoryLedgerPage() {
           renderSubjectReference(record?.subject_id, record),
       },
       {
+        align: 'left',
         defaultPriority: 20,
         title: '产品规格',
         dataIndex: 'product_sku_id',
@@ -1809,6 +1819,7 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => renderUnitReference(record?.unit_id),
       },
       {
+        align: 'right',
         defaultPriority: 50,
         title: '当前数量',
         exportTitle: '当前数量',
@@ -1818,6 +1829,7 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => formatQuantity(record?.quantity),
       },
       {
+        align: 'right',
         defaultPriority: 60,
         title: '已预留',
         exportTitle: '已预留',
@@ -1828,6 +1840,7 @@ export default function V1InventoryLedgerPage() {
           formatQuantity(record?.active_reserved_quantity),
       },
       {
+        align: 'right',
         defaultPriority: 40,
         title: (
           <BusinessHelpLabel

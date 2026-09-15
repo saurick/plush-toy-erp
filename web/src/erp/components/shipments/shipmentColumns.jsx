@@ -104,6 +104,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => shipmentStatusText(record?.status),
     },
     {
+      align: 'left',
       defaultPriority: 50,
       title: '来源单据',
       exportTitle: '来源单据',
@@ -134,6 +135,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       },
     },
     {
+      align: 'left',
       defaultPriority: 30,
       title: '客户',
       exportTitle: '客户',
@@ -159,6 +161,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => record.items?.length || 0,
     },
     {
+      align: 'right',
       defaultPriority: 60,
       title: '实际 / 最终总净重（克）',
       exportTitle: '总净重（克）',
@@ -179,6 +182,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => String(record?.total_net_weight_g ?? '').trim(),
     },
     {
+      align: 'left',
       defaultPriority: 100,
       title: '收货信息',
       exportTitle: '收货信息',
@@ -189,6 +193,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => deliveryText(record?.delivery_snapshot),
     },
     {
+      align: 'left',
       defaultPriority: 80,
       title: '运输 / 承运 / 单号',
       exportTitle: '运输 / 承运 / 单号',
@@ -203,6 +208,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: transportText,
     },
     {
+      align: 'left',
       defaultPriority: 90,
       title: '包装 / 毛重 / 体积',
       exportTitle: '包装 / 毛重 / 体积',
@@ -213,6 +219,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: packageText,
     },
     {
+      align: 'right',
       defaultPriority: 70,
       title: '实际运费',
       exportTitle: '实际运费',
@@ -223,6 +230,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => freightText(record, ''),
     },
     {
+      align: 'left',
       defaultPriority: 110,
       title: '唛头',
       exportTitle: '唛头',
@@ -249,6 +257,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
         )}`,
     },
     {
+      align: 'left',
       title: '备注',
       exportTitle: '备注',
       dataIndex: 'note',

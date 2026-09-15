@@ -231,13 +231,14 @@ export function PurchaseOrderFormFields({
         searchText: (material) => materialLabel(material),
       },
       {
+        align: 'left',
         title: '材料名称',
         dataIndex: 'name',
         width: 190,
         searchText: (material) => materialLabel(material),
       },
       { title: '分类', dataIndex: 'category', width: 120 },
-      { title: '规格', dataIndex: 'spec', width: 170 },
+      { align: 'left', title: '规格', dataIndex: 'spec', width: 170 },
       { title: '颜色', dataIndex: 'color', width: 110 },
       {
         title: '默认单位',

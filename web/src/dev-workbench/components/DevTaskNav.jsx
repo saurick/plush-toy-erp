@@ -1,5 +1,6 @@
 import React, { useRef } from 'react'
 import { theme } from 'antd'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 
 export default function DevTaskNav({
   ariaLabel,
@@ -38,7 +39,7 @@ export default function DevTaskNav({
   }
 
   return (
-    <div
+    <SlidingTabList
       className={[
         'erp-dev-task-nav',
         level === 'primary' ? 'erp-dev-task-nav--primary' : '',
@@ -97,6 +98,6 @@ export default function DevTaskNav({
           </button>
         )
       })}
-    </div>
+    </SlidingTabList>
   )
 }

@@ -11,7 +11,6 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tag,
 } from 'antd'
 import React, {
@@ -22,6 +21,7 @@ import React, {
   useState,
 } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import Table from '@/common/components/table/AppTable'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import {
   TABLE_PAGE_SIZE_OPTIONS,
@@ -611,6 +611,7 @@ export default function PermissionAdminAccounts({
 
   const columns = [
     {
+      align: 'left',
       title: '姓名 / 账号',
       dataIndex: 'display_name',
       width: 210,
@@ -632,6 +633,7 @@ export default function PermissionAdminAccounts({
       render: (phone) => phone || <Text type="secondary">未录入</Text>,
     },
     {
+      align: 'left',
       title: '岗位',
       dataIndex: 'roles',
       render: (_, record) => {
@@ -652,6 +654,7 @@ export default function PermissionAdminAccounts({
       },
     },
     {
+      align: 'left',
       title: '可用功能',
       dataIndex: 'permission_count',
       width: 120,
@@ -758,6 +761,7 @@ export default function PermissionAdminAccounts({
       },
     },
     {
+      align: 'center',
       title: '操作',
       width: 240,
       render: (_, record) => {

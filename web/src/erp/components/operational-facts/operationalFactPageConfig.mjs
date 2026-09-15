@@ -386,6 +386,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
 
   const quantityColumns = [
     {
+      align: 'left',
       defaultPriority: 40,
       title: '产品 / 材料',
       exportTitle: '产品 / 材料',
@@ -395,6 +396,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       exportValue: subjectColumnText,
     },
     {
+      align: 'left',
       defaultPriority: 60,
       title: '仓库 / 批次 / 单位',
       exportTitle: '仓库 / 批次 / 单位',
@@ -404,6 +406,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       exportValue: stockContextText,
     },
     {
+      align: 'right',
       defaultPriority: 50,
       title: '数量',
       exportTitle: '数量',
@@ -418,6 +421,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
 
   const sourceColumns = [
     {
+      align: 'left',
       defaultPriority: 90,
       title: '来源',
       exportTitle: '来源',
@@ -448,6 +452,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         ),
     },
     {
+      align: 'left',
       title: '备注',
       dataIndex: 'note',
       width: 300,
@@ -458,6 +463,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
   const normalizedFinanceFactType = normalizeFinanceFactType(financeFactType)
   const financeColumnByKey = {
     counterparty: {
+      align: 'left',
       defaultPriority: 30,
       key: 'counterparty',
       title:
@@ -469,6 +475,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       exportValue: counterpartyColumnText,
     },
     amount: {
+      align: 'right',
       defaultPriority: 50,
       title: '金额',
       exportTitle: '金额',
@@ -480,6 +487,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       exportValue: (record) => formatQuantity(record?.amount),
     },
     fee_amount: {
+      align: 'right',
       defaultPriority: 70,
       title: '手续费',
       exportTitle: '手续费',
@@ -567,6 +575,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         ]),
     ...financeColumnKeys.map((key) => financeColumnByKey[key]),
     {
+      align: 'left',
       title: '取消记录',
       key: 'cancellation',
       width: 320,
@@ -604,6 +613,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         exportValue: (record) => factTypeLabel(record?.fact_type),
       },
       {
+        align: 'left',
         defaultPriority: 35,
         title: '供应商',
         width: 220,
@@ -627,6 +637,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
           record?.sales_order_id ? '销售订单已关联' : '',
       },
       {
+        align: 'left',
         defaultPriority: 30,
         title: '客户',
         dataIndex: 'customer_id',
@@ -662,6 +673,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         exportValue: reservationSalesOrderLineText,
       },
       {
+        align: 'left',
         defaultPriority: 40,
         title: '产品 / 规格',
         width: 240,
@@ -670,6 +682,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         exportValue: reservationProductText,
       },
       {
+        align: 'left',
         defaultPriority: 65,
         title: '仓库 / 批次',
         width: 240,
@@ -678,6 +691,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         exportValue: reservationWarehouseLotText,
       },
       {
+        align: 'right',
         defaultPriority: 50,
         title: '预留数量',
         exportTitle: '预留数量',
@@ -706,6 +720,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         exportValue: (record) => formatUnixDate(record?.reserved_at),
       },
       {
+        align: 'left',
         title: '备注',
         dataIndex: 'note',
         width: 260,

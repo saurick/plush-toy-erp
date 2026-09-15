@@ -41,6 +41,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       sorter: (a, b) => compareText(a?.purchase_order_no, b?.purchase_order_no),
     },
     {
+      align: 'left',
       defaultPriority: 20,
       title: '供应商',
       exportTitle: '供应商',
@@ -78,6 +79,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       render: (value) => value || '-',
     },
     {
+      align: 'left',
       defaultPriority: 80,
       title: '付款条件',
       exportTitle: '付款条件',
@@ -153,6 +155,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
         formatUnixDate(record?.supplier_confirmed_arrival_date),
     },
     {
+      align: 'left',
       title: '收货地址',
       exportTitle: '收货地址',
       dataIndex: 'delivery_address',

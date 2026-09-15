@@ -4,7 +4,8 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Modal, Popconfirm, Space, Table, Tabs, Tag } from 'antd'
+import { Alert, Button, Modal, Popconfirm, Space, Tabs, Tag } from 'antd'
+import Table from '@/common/components/table/AppTable'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -222,6 +223,7 @@ export default function PurchaseReceiptExceptionRecordsModal({
 
   const actionColumn = useCallback(
     (kind, permissions) => ({
+      align: 'center',
       title: '操作',
       key: 'actions',
       width: 240,
@@ -316,11 +318,17 @@ export default function PurchaseReceiptExceptionRecordsModal({
         render: formatDateTime,
       },
       {
+        align: 'left',
         title: '退货明细',
         key: 'items',
         render: (_, record) => lineSummary(record, '合计'),
       },
-      { title: '备注', dataIndex: 'note', render: (value) => value || '-' },
+      {
+        align: 'left',
+        title: '备注',
+        dataIndex: 'note',
+        render: (value) => value || '-',
+      },
       actionColumn('return', {
         post: canPostReturns,
         cancel: canCancelReturns,
@@ -340,11 +348,13 @@ export default function PurchaseReceiptExceptionRecordsModal({
         render: formatDateTime,
       },
       {
+        align: 'left',
         title: '调整明细',
         key: 'items',
         render: (_, record) => lineSummary(record, '数量'),
       },
       {
+        align: 'left',
         title: '调整原因',
         dataIndex: 'reason',
         render: (value) => value || '-',

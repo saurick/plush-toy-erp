@@ -1102,20 +1102,18 @@
 
 [data-erp-theme='dark'] .erp-dev-customer-view-switch.ant-segmented,
 [data-erp-theme='dark'] .erp-dev-testing-reader__toolbar .ant-segmented {
+  --erp-segmented-bg: #1e3a8a;
+  --erp-segmented-shadow: inset 3px 0 0 #60a5fa;
+  --erp-segmented-text: var(--erp-text-muted);
+  --erp-segmented-selected-text: #f8fafc;
   border-color: #334155;
   background: #0b1220;
-}
-
-[data-erp-theme='dark'] .erp-dev-customer-view-switch .ant-segmented-thumb,
-[data-erp-theme='dark'] .erp-dev-testing-reader__toolbar .ant-segmented-thumb {
-  background: #1e3a8a;
-  box-shadow: inset 3px 0 0 #60a5fa;
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-view-switch .ant-segmented-item,
 [data-erp-theme='dark'] .erp-dev-testing-reader__toolbar .ant-segmented-item {
   border-color: #334155;
-  background: #111827;
+  background: transparent;
   color: var(--erp-text-muted);
 }
 
@@ -1130,20 +1128,16 @@
   .erp-dev-testing-reader__toolbar
   .ant-segmented-item:focus-visible {
   border-color: #60a5fa;
-  background: #172554;
   color: #dbeafe;
 }
 
 [data-erp-theme='dark']
   .erp-dev-customer-view-switch
-  .ant-segmented-item-selected,
+  .erp-segmented-item-selected,
 [data-erp-theme='dark']
   .erp-dev-testing-reader__toolbar
-  .ant-segmented-item-selected {
+  .erp-segmented-item-selected {
   border-color: #60a5fa;
-  background: #1e3a8a;
-  color: #f8fafc;
-  box-shadow: inset 3px 0 0 #60a5fa;
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-view-switch .ant-segmented-item-label,
@@ -1234,7 +1228,7 @@
 
 [data-erp-theme='dark']
   .erp-dev-hub-group-filter
-  .ant-segmented-item-selected
+  .erp-segmented-item-selected
   .ant-segmented-item-label {
   color: var(--erp-text);
 }

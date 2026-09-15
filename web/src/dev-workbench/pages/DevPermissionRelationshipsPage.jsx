@@ -11,15 +11,15 @@ import {
   Alert,
   Button,
   Empty,
-  Segmented,
   Select,
   Space,
   Statistic,
-  Table,
   Tabs,
   Tag,
   Typography,
 } from 'antd'
+import Table from '@/common/components/table/AppTable'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
 import { MermaidDiagram } from '@/common/components/markdown'
@@ -521,16 +521,17 @@ export default function DevPermissionRelationshipsPage() {
   ]
 
   const columns = [
-    { title: '来源', dataIndex: 'source', width: 180 },
+    { align: 'left', title: '来源', dataIndex: 'source', width: 180 },
     {
       title: '类型',
       dataIndex: 'kind',
       width: 100,
       render: (value) => RELATIONSHIP_KIND_LABELS[value] || '其他',
     },
-    { title: '关系', dataIndex: 'relation', width: 140 },
-    { title: '结果对象', dataIndex: 'target', width: 220 },
+    { align: 'left', title: '关系', dataIndex: 'relation', width: 140 },
+    { align: 'left', title: '结果对象', dataIndex: 'target', width: 220 },
     {
+      align: 'left',
       title: '生效说明',
       dataIndex: 'result',
       render: (value) => <Text>{value}</Text>,

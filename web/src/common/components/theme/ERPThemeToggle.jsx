@@ -1,6 +1,7 @@
 import React from 'react'
 import { DesktopOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Segmented } from 'antd'
+import { Button, Dropdown } from 'antd'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { ERP_THEME_MODE, useERPTheme } from '@/common/theme/erpTheme'
 
 const themeOptions = [

@@ -46,6 +46,7 @@ function bomStatusTag(status) {
 export function buildBOMVersionColumns({ productOptions = [] }) {
   return applyBusinessColumnSorters([
     {
+      align: 'left',
       defaultPriority: 10,
       title: '产品',
       exportTitle: '产品',
@@ -144,6 +145,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       exportValue: (record) => formatUnixDate(record.effective_to),
     },
     {
+      align: 'left',
       title: '备注',
       exportTitle: '备注',
       dataIndex: 'note',

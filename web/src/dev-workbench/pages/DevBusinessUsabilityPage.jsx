@@ -11,11 +11,11 @@ import {
   Empty,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
 } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
+import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import {
   BUSINESS_HELP_TYPE_PRESENTATION,
@@ -76,6 +76,7 @@ export default function DevBusinessUsabilityPage() {
   const columns = useMemo(
     () => [
       {
+        align: 'left',
         title: '业务页面',
         key: 'page',
         width: 300,
@@ -108,6 +109,7 @@ export default function DevBusinessUsabilityPage() {
         ),
       },
       {
+        align: 'left',
         title: '员工自己完成的依据',
         key: 'self-service',
         width: 380,
@@ -125,6 +127,7 @@ export default function DevBusinessUsabilityPage() {
         ),
       },
       {
+        align: 'left',
         title: '岗位帮助推荐',
         key: 'roles',
         width: 210,
@@ -142,6 +145,7 @@ export default function DevBusinessUsabilityPage() {
         },
       },
       {
+        align: 'left',
         title: '继续核对',
         key: 'actions',
         width: 170,

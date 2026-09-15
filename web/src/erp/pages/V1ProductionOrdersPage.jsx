@@ -1564,6 +1564,7 @@ export default function V1ProductionOrdersPage() {
         exportValue: (record) => displayTime(record?.planned_end_at),
       },
       {
+        align: 'left',
         title: '备注',
         dataIndex: 'note',
         width: 260,

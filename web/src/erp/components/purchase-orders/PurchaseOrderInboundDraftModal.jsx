@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
-import { Alert, Form, Input, Select, Space, Table, Tag, Typography } from 'antd'
+import { Alert, Form, Input, Select, Space, Tag, Typography } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import { materialStockCategoryLabel } from '../../utils/warehouseClassification.mjs'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 
@@ -35,11 +36,7 @@ export default function PurchaseOrderInboundDraftModal({
         width: 88,
         render: (value) => value || '-',
       },
-      {
-        title: '材料',
-        dataIndex: 'material',
-        width: 180,
-      },
+      { align: 'left', title: '材料', dataIndex: 'material', width: 180 },
       {
         title: '库存类别',
         key: 'stockCategory',
@@ -75,30 +72,35 @@ export default function PurchaseOrderInboundDraftModal({
           ),
       },
       {
+        align: 'right',
         title: '采购数量',
         dataIndex: 'purchasedQuantity',
         width: 120,
         render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
       },
       {
+        align: 'right',
         title: '已过账入库',
         dataIndex: 'effectiveReceivedQuantity',
         width: 130,
         render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
       },
       {
+        align: 'right',
         title: '草稿占用',
         dataIndex: 'draftReservedQuantity',
         width: 120,
         render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
       },
       {
+        align: 'right',
         title: '剩余可收',
         dataIndex: 'remainingReceivableQuantity',
         width: 120,
         render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
       },
       {
+        align: 'right',
         title: '剩余可生成',
         dataIndex: 'remainingGeneratableQuantity',
         width: 130,
@@ -112,6 +114,7 @@ export default function PurchaseOrderInboundDraftModal({
         },
       },
       {
+        align: 'right',
         title: '本次生成',
         key: 'nextInbound',
         width: 120,
@@ -125,6 +128,7 @@ export default function PurchaseOrderInboundDraftModal({
           ),
       },
       {
+        align: 'left',
         title: '不可生成原因',
         dataIndex: 'disabledReason',
         width: 140,

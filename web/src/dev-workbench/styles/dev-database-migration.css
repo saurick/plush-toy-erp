@@ -21,10 +21,6 @@
   max-width: 190px;
 }
 
-.erp-dev-database-migration-page .ant-table-cell {
-  vertical-align: top;
-}
-
 .erp-dev-database-migration-page .ant-typography-danger {
   display: block;
   max-width: 520px;

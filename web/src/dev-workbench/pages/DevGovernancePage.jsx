@@ -12,6 +12,7 @@ import {
 import { Button, Empty, Space, Tag, Typography } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Markdown } from '@/common/components/markdown'
+import useSlidingIndicator from '@/common/components/navigation/useSlidingIndicator'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
@@ -91,9 +92,17 @@ function SourceLinks({ links = [] }) {
   )
 }
 
-function TaskNav({ tasks = [], selectedKey = '', onSelect }) {
+export function TaskNav({ tasks = [], selectedKey = '', onSelect }) {
+  const ref = useSlidingIndicator({
+    itemSelector: ':scope > button',
+    selectedSelector: ':scope > button[aria-current="page"]',
+  })
   return (
-    <nav className="erp-dev-governance-task-nav" aria-label="本轮改动类型">
+    <nav
+      ref={ref}
+      className="erp-dev-governance-task-nav erp-sliding-tab-list"
+      aria-label="本轮改动类型"
+    >
       {tasks.map((task, index) => (
         <button
           key={task.key}

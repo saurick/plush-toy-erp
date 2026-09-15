@@ -1,13 +1,20 @@
 import React from 'react'
-import { Form, Table, Typography } from 'antd'
+import { Form, Typography } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import { salesOrderSourcePayment } from '../../utils/salesOrderSourcePayment.mjs'
 
 const showValues = (values) => [...new Set(values)].join('；') || '未标记'
 const columns = [
   { title: '原表行', dataIndex: 'location', width: 180 },
-  { title: '原表产品名称', dataIndex: 'productName', width: 200 },
   {
+    align: 'left',
+    title: '原表产品名称',
+    dataIndex: 'productName',
+    width: 200,
+  },
+  {
+    align: 'right',
     title: '原表货款金额',
     dataIndex: 'amounts',
     width: 150,

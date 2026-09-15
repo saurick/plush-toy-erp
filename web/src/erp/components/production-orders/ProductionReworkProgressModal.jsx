@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
-import { Alert, Button, Empty, Space, Spin, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Empty, Space, Spin, Tag, Typography } from 'antd'
 import { BranchesOutlined } from '@ant-design/icons'
+import Table from '@/common/components/table/AppTable'
 
 import {
   currentProductionWipOperation,
@@ -245,6 +246,7 @@ export default function ProductionReworkProgressModal({
   const hasPending = progressItems.some((item) => item.pending)
   const columns = [
     {
+      align: 'left',
       title: '返工记录',
       dataIndex: 'recordLabel',
       width: 190,
@@ -256,6 +258,7 @@ export default function ProductionReworkProgressModal({
       ),
     },
     {
+      align: 'left',
       title: '产品与返工数量',
       key: 'product',
       width: 260,
@@ -285,11 +288,7 @@ export default function ProductionReworkProgressModal({
         </Space>
       ),
     },
-    {
-      title: '返工原因',
-      dataIndex: 'reason',
-      width: 220,
-    },
+    { align: 'left', title: '返工原因', dataIndex: 'reason', width: 220 },
   ]
 
   return (

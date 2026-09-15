@@ -23,11 +23,11 @@ import {
   Popover,
   Select,
   Space,
-  Table,
   Tag,
   Tooltip,
   Typography,
 } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import SharedSearchInput from '@/common/components/SearchInput'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -362,6 +362,7 @@ function CopyableBusinessTableCell({ column, value, record, children }) {
     <div
       className="erp-business-table-copyable-cell"
       data-copyable-column={businessTableCopyColumnKey(column) || undefined}
+      data-align={column.align || 'center'}
     >
       <div
         className="erp-business-table-copyable-cell__content"

@@ -9,9 +9,9 @@ import {
   Popconfirm,
   Select,
   Space,
-  Table,
   Tag,
 } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
@@ -319,7 +319,7 @@ export default function PurchaseRejectionDispositionModal({
               render: (value) =>
                 value === 'REPLACE' ? '供应商补换' : '退回供应商',
             },
-            { title: '数量', dataIndex: 'quantity' },
+            { align: 'right', title: '数量', dataIndex: 'quantity' },
             {
               title: '状态',
               dataIndex: 'status',

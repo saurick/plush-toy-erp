@@ -6,7 +6,8 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Modal, Space, Table, Tag } from 'antd'
+import { Alert, Button, Modal, Space, Tag } from 'antd'
+import Table from '@/common/components/table/AppTable'
 
 import {
   OUTSOURCING_RETURN_QUALITY_GATE_STATES,
@@ -196,12 +197,9 @@ export default function OutsourcingReturnRecordsModal({
         )
       },
     },
+    { align: 'right', title: '数量', dataIndex: 'quantity', width: 120 },
     {
-      title: '数量',
-      dataIndex: 'quantity',
-      width: 120,
-    },
-    {
+      align: 'left',
       title: '产品规格',
       key: 'product_sku',
       width: 180,
@@ -213,11 +211,7 @@ export default function OutsourcingReturnRecordsModal({
       width: 170,
       render: formatDateTime,
     },
-    {
-      title: '备注',
-      dataIndex: 'note',
-      width: 240,
-    },
+    { align: 'left', title: '备注', dataIndex: 'note', width: 240 },
   ]
 
   return (

@@ -54,6 +54,11 @@
 }
 
 .erp-dev-customer-view-switch.ant-segmented {
+  --erp-segmented-bg: #eaf4ee;
+  --erp-segmented-radius: 9px;
+  --erp-segmented-shadow: inset 3px 0 0 #2f8f4b;
+  --erp-segmented-text: #475569;
+  --erp-segmented-selected-text: #14532d;
   border: 1px solid #d6e2dc;
   border-radius: 12px;
   background: #f4faf6;
@@ -64,17 +69,11 @@
   gap: 4px;
 }
 
-.erp-dev-customer-view-switch .ant-segmented-thumb {
-  border-radius: 9px;
-  background: #eaf4ee;
-  box-shadow: inset 3px 0 0 #2f8f4b;
-}
-
 .erp-dev-customer-view-switch .ant-segmented-item {
   min-height: 34px;
   border: 1px solid #d6e2dc;
   border-radius: 9px;
-  background: #ffffff;
+  background: transparent;
   color: #475569;
   cursor: pointer;
 }
@@ -82,15 +81,11 @@
 .erp-dev-customer-view-switch .ant-segmented-item:hover,
 .erp-dev-customer-view-switch .ant-segmented-item:focus-visible {
   border-color: #7dbeb7;
-  background: #edf8f6;
   color: #0f766e;
 }
 
-.erp-dev-customer-view-switch .ant-segmented-item-selected {
+.erp-dev-customer-view-switch .erp-segmented-item-selected {
   border-color: #2f8f4b;
-  background: #eaf4ee;
-  color: #14532d;
-  box-shadow: inset 3px 0 0 #2f8f4b;
 }
 
 .erp-dev-customer-view-switch .ant-segmented-item-label {

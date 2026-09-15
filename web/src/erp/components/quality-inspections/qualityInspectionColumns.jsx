@@ -299,6 +299,7 @@ export function buildQualityInspectionExportColumns({
       render: qualityResultTag,
     },
     {
+      align: 'right',
       title: '估算不良比例',
       exportTitle: '估算不良比例',
       dataIndex: 'defect_rate_percent',
@@ -308,6 +309,7 @@ export function buildQualityInspectionExportColumns({
       render: (_value, record) => qualityDefectRateText(record),
     },
     {
+      align: 'left',
       title: '检验来源',
       exportTitle: '检验来源',
       dataIndex: 'inspection_type',
@@ -323,6 +325,7 @@ export function buildQualityInspectionExportColumns({
         ].join(' / '),
     },
     {
+      align: 'left',
       title: '产品 / 材料 / 在制品',
       exportTitle: '产品 / 材料 / 在制品',
       dataIndex: 'subject_type',
@@ -397,6 +400,7 @@ export function buildQualityInspectionExportColumns({
       exportValue: qualityInspectorText,
     },
     {
+      align: 'left',
       title: '判定备注',
       exportTitle: '判定备注',
       dataIndex: 'decision_note',
@@ -468,6 +472,7 @@ export function buildQualityInspectionDataColumns({
       render: qualityResultTag,
     },
     {
+      align: 'right',
       defaultPriority: 60,
       title: '估算不良比例',
       exportTitle: '估算不良比例',
@@ -478,6 +483,7 @@ export function buildQualityInspectionDataColumns({
       render: (_value, record) => qualityDefectRateText(record),
     },
     {
+      align: 'left',
       defaultPriority: 50,
       title: '检验来源',
       exportTitle: '检验来源',
@@ -503,6 +509,7 @@ export function buildQualityInspectionDataColumns({
         ].join(' / '),
     },
     {
+      align: 'left',
       defaultPriority: 40,
       title: '产品 / 材料 / 在制品',
       exportTitle: '产品 / 材料 / 在制品',
@@ -523,6 +530,7 @@ export function buildQualityInspectionDataColumns({
           .join(' / '),
     },
     {
+      align: 'left',
       defaultPriority: 70,
       title: '检验信息',
       exportTitle: '检验信息',
@@ -539,6 +547,7 @@ export function buildQualityInspectionDataColumns({
           .join(' / '),
     },
     {
+      align: 'left',
       title: '判定备注',
       exportTitle: '判定备注',
       dataIndex: 'decision_note',

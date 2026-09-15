@@ -13,11 +13,11 @@ import {
   Empty,
   Grid,
   Pagination,
-  Segmented,
   Select,
   Tag,
   Typography,
 } from 'antd'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import SearchInput from '@/common/components/SearchInput'
 import { Loading } from '@/common/components/loading'

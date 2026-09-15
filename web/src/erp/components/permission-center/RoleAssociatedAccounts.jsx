@@ -1,6 +1,7 @@
-import { Typography, Alert, Button, Empty, Space, Table, Tag } from 'antd'
+import { Typography, Alert, Button, Empty, Space, Tag } from 'antd'
 
 import React from 'react'
+import Table from '@/common/components/table/AppTable'
 import {
   getPermissionCenterRoleKey as getRoleKey,
   getPermissionCenterRoleName as getRoleVisibleName,
@@ -145,6 +146,7 @@ function RoleAssociatedAccounts({
   const sortedAdmins = [...admins].sort(compareAssociatedAdmins)
   const columns = [
     {
+      align: 'left',
       title: '关联员工',
       dataIndex: 'display_name',
       width: 220,
@@ -157,6 +159,7 @@ function RoleAssociatedAccounts({
       render: (_, record) => renderAssociatedAdminStatus(record),
     },
     {
+      align: 'left',
       title: '同时拥有的其他岗位',
       dataIndex: 'roles',
       render: (_, record) => {

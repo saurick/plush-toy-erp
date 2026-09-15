@@ -360,7 +360,9 @@ test('devPrototypes: 岗位任务端 v1 Current 只保留列表职责', () => {
   assert.match(html, /let selectedTaskId = ""/u)
   assert.match(html, /data-task-id="\$\{task\.id\}"/u)
   assert.match(html, /责任岗位：\$\{task\.ownerRole\}/u)
-  assert.match(html, /function renderLoading\(\)/u)
+  assert.doesNotMatch(html, /renderLoading|class="header-meta"/u)
+  assert.match(html, /<legend>显示设置<\/legend>/u)
+  assert.match(html, /refreshButton\.textContent = "刷新中"/u)
   assert.match(html, /refreshButton\.addEventListener\("click"/u)
   assert.match(html, /<strong>仓库<\/strong>/u)
   assert.doesNotMatch(

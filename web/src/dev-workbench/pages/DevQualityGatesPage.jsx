@@ -16,14 +16,14 @@ import {
   Empty,
   List,
   Progress,
-  Segmented,
   Space,
-  Table,
   Tag,
   Tooltip,
   Typography,
 } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import Table from '@/common/components/table/AppTable'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import { MermaidDiagram } from '@/common/components/markdown'
 import { message, modal } from '@/common/utils/antdApp'
@@ -2231,12 +2231,14 @@ function RunView({
   const history = (summary?.operations || []).slice(0, 20)
   const historyColumns = [
     {
+      align: 'left',
       title: '门禁',
       dataIndex: 'profile',
       key: 'profile',
       render: (profile) => PROFILE_LABELS[profile] || '未登记门禁',
     },
     {
+      align: 'left',
       title: '结果',
       dataIndex: 'status',
       key: 'status',
@@ -2267,6 +2269,7 @@ function RunView({
       ),
     },
     {
+      align: 'left',
       title: '版本',
       key: 'version',
       render: (_, row) => (
@@ -2421,9 +2424,27 @@ function GovernanceView({ data, loading, error, values, onSearch, onFilter }) {
   const [draft, setDraft] = useState(values.q || '')
   useEffect(() => setDraft(values.q || ''), [values.q])
   const columns = [
-    { title: '门禁', dataIndex: 'label', key: 'label', width: 160 },
-    { title: '防什么问题', dataIndex: 'prevents', key: 'prevents', width: 260 },
-    { title: '什么时候跑', dataIndex: 'trigger', key: 'trigger', width: 260 },
+    {
+      align: 'left',
+      title: '门禁',
+      dataIndex: 'label',
+      key: 'label',
+      width: 160,
+    },
+    {
+      align: 'left',
+      title: '防什么问题',
+      dataIndex: 'prevents',
+      key: 'prevents',
+      width: 260,
+    },
+    {
+      align: 'left',
+      title: '什么时候跑',
+      dataIndex: 'trigger',
+      key: 'trigger',
+      width: 260,
+    },
     {
       title: '最近耗时',
       key: 'duration',
@@ -2445,7 +2466,13 @@ function GovernanceView({ data, loading, error, values, onSearch, onFilter }) {
         </Tag>
       ),
     },
-    { title: '建议', dataIndex: 'advice', key: 'advice', width: 220 },
+    {
+      align: 'left',
+      title: '建议',
+      dataIndex: 'advice',
+      key: 'advice',
+      width: 220,
+    },
   ]
 
   return (

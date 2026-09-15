@@ -120,6 +120,7 @@ async function assertBusinessMainTableSortableColumns(
             ),
             whiteSpace: window.getComputedStyle(node).whiteSpace,
             verticalAlign: window.getComputedStyle(node).verticalAlign,
+            textAlign: window.getComputedStyle(node).textAlign,
             hasSorter: Boolean(
               node.querySelector(
                 '.ant-table-column-sorters, .ant-table-column-sorter'
@@ -155,6 +156,7 @@ async function assertBusinessMainTableSortableColumns(
         ).map((node) => {
           const style = window.getComputedStyle(node)
           const textRect = node.getBoundingClientRect()
+          const cellRect = node.closest('th').getBoundingClientRect()
           const triggerRect = node
             .closest('.erp-module-column-header')
             ?.querySelector('.erp-module-column-header-trigger')
@@ -170,6 +172,8 @@ async function assertBusinessMainTableSortableColumns(
             text: String(node.textContent || '')
               .replace(/\s+/g, ' ')
               .trim(),
+            centerOffset:
+              textRect.x + textRect.width / 2 - cellRect.x - cellRect.width / 2,
             clientWidth: node.clientWidth,
             scrollWidth: node.scrollWidth,
             textOverflow: style.textOverflow,
@@ -225,7 +229,17 @@ async function assertBusinessMainTableSortableColumns(
   const missingSorters = sortableHeaders.filter((header) => !header.hasSorter)
   const unstableHeaders = sortableHeaders.filter(
     (header) =>
-      header.whiteSpace !== 'nowrap' || header.verticalAlign !== 'middle'
+      header.whiteSpace !== 'nowrap' ||
+      header.verticalAlign !== 'middle' ||
+      header.textAlign !== 'center'
+  )
+  const offCenterHeaders = metrics.columnHeaderTexts.filter(
+    (header) => Math.abs(header.centerOffset) > 1
+  )
+  assert.equal(
+    offCenterHeaders.length,
+    0,
+    `${scenarioName} 表头文字应与单元格中心对齐: ${JSON.stringify(offCenterHeaders)}`
   )
   const unstableSorters = sortableHeaders.filter(
     (header) => header.hasSorter && header.sorterAlignItems !== 'center'

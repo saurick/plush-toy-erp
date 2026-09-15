@@ -1,6 +1,7 @@
 import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Checkbox, Modal, Select, Space, Table, Tag } from 'antd'
+import { Alert, Button, Checkbox, Modal, Select, Space, Tag } from 'antd'
+import Table from '@/common/components/table/AppTable'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -177,11 +178,13 @@ export default function InventoryOperationRecordsModal({
         render: statusTag,
       },
       {
+        align: 'left',
         title: '业务原因',
         dataIndex: 'reason',
         render: (value) => value || '-',
       },
       {
+        align: 'left',
         title: '作业明细',
         key: 'items',
         width: 130,
@@ -194,6 +197,7 @@ export default function InventoryOperationRecordsModal({
         render: formatDateTime,
       },
       {
+        align: 'center',
         title: '操作',
         key: 'actions',
         fixed: 'right',

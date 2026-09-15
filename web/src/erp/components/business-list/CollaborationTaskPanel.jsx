@@ -6,6 +6,7 @@ import {
   UpOutlined,
 } from '@ant-design/icons'
 import { Button, Card, Space, Tag, Typography } from 'antd'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import WorkflowTaskActionDrawer, {
@@ -592,7 +593,7 @@ export function CollaborationTaskPanel({
           </div>
           {expanded ? (
             <div className="erp-business-collaboration-task-panel__panel">
-              <div
+              <SlidingTabList
                 className="erp-business-collaboration-task-panel__tabs"
                 role="tablist"
                 aria-label="当前记录任务分类"
@@ -619,7 +620,7 @@ export function CollaborationTaskPanel({
                     <strong>{item.count}</strong>
                   </button>
                 ))}
-              </div>
+              </SlidingTabList>
               <div
                 id={activeTabPanelID}
                 className="erp-business-collaboration-task-panel__list erp-business-module-task-list"

@@ -883,6 +883,7 @@ export default function V1PurchaseReceiptsPage() {
             STATUS_LABELS[record?.status] || (record?.status ? '入库状态' : ''),
         },
         {
+          align: 'left',
           defaultPriority: 30,
           title: '供应商',
           exportTitle: '供应商',
@@ -923,6 +924,7 @@ export default function V1PurchaseReceiptsPage() {
           exportValue: receiptItemCount,
         },
         {
+          align: 'right',
           defaultPriority: 50,
           title: '入库数量',
           exportTitle: '入库数量',
@@ -935,6 +937,7 @@ export default function V1PurchaseReceiptsPage() {
           exportValue: (record) => formatQuantity(receiptQuantityTotal(record)),
         },
         {
+          align: 'left',
           title: '备注',
           exportTitle: '备注',
           dataIndex: 'note',

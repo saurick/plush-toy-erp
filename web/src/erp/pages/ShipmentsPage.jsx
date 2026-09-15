@@ -814,29 +814,34 @@ export default function ShipmentsPage() {
         render: (value) => (value ? `第 ${value} 行` : '-'),
       },
       {
+        align: 'left',
         title: '客户',
         width: 160,
         render: (_, item) => salesOrderCustomerText(item) || '-',
       },
       {
+        align: 'left',
         title: '产品 / SKU',
         width: 220,
         render: (_, item) =>
           sourceLineProductText(item, productOptions, productSKUOptions),
       },
       {
+        align: 'right',
         title: '订单数量',
         dataIndex: 'orderedQuantity',
         width: 100,
         render: formatQuantity,
       },
       {
+        align: 'right',
         title: '已生成出货',
         dataIndex: 'shippedQuantity',
         width: 100,
         render: formatQuantity,
       },
       {
+        align: 'right',
         title: '剩余可出货',
         dataIndex: 'remainingQuantity',
         width: 120,

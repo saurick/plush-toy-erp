@@ -14,7 +14,6 @@ import {
 import {
   Button,
   Empty,
-  Segmented,
   Space,
   Spin,
   Tag,
@@ -22,6 +21,7 @@ import {
   Typography,
 } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'

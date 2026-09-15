@@ -8,6 +8,7 @@ import React, {
 } from 'react'
 import { Checkbox, Input, Modal } from 'antd'
 import { DeleteOutlined, DragOutlined } from '@ant-design/icons'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { PrintToolButton } from './PrintWorkspaceTools.jsx'
 import {
   WORK_INSTRUCTION_IMAGE_ANNOTATION_LIMITS,
@@ -881,7 +882,7 @@ export default function WorkInstructionImageAnnotationEditor({
       <div className="erp-work-instruction-annotation-modal__layout">
         <section className="erp-work-instruction-annotation-modal__stage">
           {imageEntries.length > 1 ? (
-            <div
+            <SlidingTabList
               aria-label="选择要标注的图片"
               className="erp-work-instruction-annotation-modal__image-tabs"
               role="tablist"
@@ -898,7 +899,7 @@ export default function WorkInstructionImageAnnotationEditor({
                   图片 {visibleIndex + 1}
                 </button>
               ))}
-            </div>
+            </SlidingTabList>
           ) : null}
           {activeImage ? (
             <div

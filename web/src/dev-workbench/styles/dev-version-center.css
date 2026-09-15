@@ -190,10 +190,6 @@
   padding-top: 14px;
 }
 
-.erp-dev-version-table-card .ant-table-cell {
-  vertical-align: top;
-}
-
 .erp-dev-version-table-card .ant-typography-danger {
   display: block;
   max-width: 420px;

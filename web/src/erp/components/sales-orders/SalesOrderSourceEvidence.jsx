@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Button, Image, Popover, Table, Typography } from 'antd'
+import { Button, Image, Popover, Typography } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import { downloadBusinessAttachment } from '../../api/attachmentApi.mjs'
 
 export function SalesOrderImportImage({
@@ -89,6 +90,7 @@ export default function SalesOrderSourceEvidence({
               columns={[
                 { title: '原表字段', dataIndex: 'label', width: 145 },
                 {
+                  align: 'left',
                   title: '原表值',
                   dataIndex: 'value',
                   render: (text) => (

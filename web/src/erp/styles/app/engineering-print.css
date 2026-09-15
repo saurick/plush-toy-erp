@@ -305,6 +305,17 @@
   gap: 8px;
 }
 
+.erp-work-instruction-annotation-modal__image-tabs {
+  --erp-slider-bg: #eff6ff;
+  --erp-slider-radius: 6px;
+  --erp-slider-shadow: inset 0 0 0 1px #2563eb;
+}
+
+.erp-work-instruction-annotation-modal
+  .erp-work-instruction-annotation-modal__image-tabs > button[role='tab'] {
+  background: transparent;
+}
+
 .erp-work-instruction-annotation-modal
   :where(button:not([data-annotation-control]), select) {
   min-height: 32px;

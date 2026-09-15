@@ -12,11 +12,11 @@ import {
   Space,
   Spin,
   Steps,
-  Table,
   Tag,
   Typography,
 } from 'antd'
 import { BranchesOutlined, ReloadOutlined } from '@ant-design/icons'
+import Table from '@/common/components/table/AppTable'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import ProductionOutsourcingPrepareModal from './ProductionOutsourcingPrepareModal.jsx'
 
@@ -723,6 +723,7 @@ export default function ProductionRouteExecutionModal({
       : PRODUCTION_WIP_ACTION.COMPLETE_OPERATION
   const batchColumns = [
     {
+      align: 'left',
       title: '在制批次',
       key: 'batch',
       width: 300,
@@ -742,6 +743,7 @@ export default function ProductionRouteExecutionModal({
       },
     },
     {
+      align: 'right',
       title: '数量',
       key: 'quantity',
       width: 130,

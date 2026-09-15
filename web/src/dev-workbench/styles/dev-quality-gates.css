@@ -468,10 +468,19 @@
 }
 
 .erp-dev-quality-server-performance__table th {
+  text-align: center;
   color: var(--erp-text-muted, #637266);
   background: var(--erp-surface-bg-soft, #f7faf7);
   font-size: 12px;
   font-weight: 600;
+}
+
+.erp-dev-quality-server-performance__table td {
+  text-align: center;
+}
+
+.erp-dev-quality-server-performance__table td:where(:first-child, :last-child) {
+  text-align: left;
 }
 
 .erp-dev-quality-server-performance__table tbody tr[data-attention='critical'] {
@@ -553,10 +562,19 @@
 }
 
 .erp-dev-quality-server-history__table th {
+  text-align: center;
   color: var(--erp-text-muted, #637266);
   background: var(--erp-surface-bg-soft, #f7faf7);
   font-size: 12px;
   font-weight: 600;
+}
+
+.erp-dev-quality-server-history__table td {
+  text-align: center;
+}
+
+.erp-dev-quality-server-history__table td[data-label='失败环节'] {
+  text-align: left;
 }
 
 .erp-dev-quality-server-history__table tbody tr[data-current='true'] {
@@ -1174,7 +1192,6 @@
 
 .erp-dev-quality-governance-view .ant-table-cell,
 .erp-dev-quality-history .ant-table-cell {
-  vertical-align: top;
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -1283,11 +1300,12 @@
   padding: 9px 10px;
   border: 1px solid var(--erp-border, #dce8dd);
   text-align: start;
-  vertical-align: top;
+  vertical-align: middle;
   overflow-wrap: anywhere;
 }
 
 .erp-dev-quality-coverage thead th {
+  text-align: center;
   background: var(--erp-surface-bg-soft, #f7faf7);
 }
 

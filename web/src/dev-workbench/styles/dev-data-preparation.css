@@ -221,10 +221,11 @@
   padding: 10px 12px;
   border: 1px solid var(--dev-data-border);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .erp-dev-data-table-wrap thead th {
+  text-align: center;
   background: color-mix(in srgb, var(--dev-data-selected) 62%, transparent);
 }
 

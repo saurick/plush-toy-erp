@@ -1,0 +1,31 @@
+.app-table.ant-table-wrapper .ant-table-tbody > tr > .ant-table-cell,
+.app-table.ant-table-wrapper .ant-table-summary > tr > .ant-table-cell {
+  vertical-align: middle;
+}
+
+.app-table.ant-table-wrapper .ant-table-thead > tr > .ant-table-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.app-table.ant-table-wrapper .ant-table-column-sorters,
+.app-table.ant-table-wrapper .ant-table-filter-column {
+  justify-content: center;
+}
+
+.app-table.ant-table-wrapper .ant-table-column-title {
+  flex: 0 1 auto;
+}
+
+.app-table.ant-table-wrapper .ant-table-column-sorters::before {
+  content: '';
+  flex: 0 0 12px;
+}
+
+.app-table.ant-table-wrapper .ant-table-cell > .ant-tag:only-child {
+  margin-inline-end: 0;
+}
+
+.app-table.ant-table-wrapper .ant-table-cell > .ant-space-vertical {
+  align-items: inherit;
+}

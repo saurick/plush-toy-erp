@@ -9,11 +9,11 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tag,
   Typography,
 } from 'antd'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import Table from '@/common/components/table/AppTable'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
@@ -79,6 +79,7 @@ function ProductionMaterialRequirementsPanel({
 
   const columns = [
     {
+      align: 'left',
       title: '需求物料',
       key: 'material',
       width: 220,
@@ -91,26 +92,31 @@ function ProductionMaterialRequirementsPanel({
       render: (_, requirement) => materialUnitLabel(requirement),
     },
     {
+      align: 'right',
       title: '计划需求',
       dataIndex: 'planned_quantity',
       width: 120,
     },
     {
+      align: 'right',
       title: '已批准超领',
       dataIndex: 'approved_over_issue_quantity',
       width: 120,
     },
     {
+      align: 'right',
       title: '当前可领上限',
       dataIndex: 'effective_limit_quantity',
       width: 120,
     },
     {
+      align: 'right',
       title: '已过账领料',
       dataIndex: 'issued_quantity',
       width: 120,
     },
     {
+      align: 'right',
       title: '剩余可领',
       dataIndex: 'remaining_quantity',
       width: 120,
@@ -121,6 +127,7 @@ function ProductionMaterialRequirementsPanel({
       ),
     },
     {
+      align: 'center',
       title: '操作',
       key: 'action',
       width: 190,

@@ -16,10 +16,10 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tag,
   Typography,
 } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -749,6 +749,7 @@ export default function ApprovalResponsibilityPanel({
 
   const columns = [
     {
+      align: 'left',
       title: '审批事项',
       dataIndex: 'label',
       width: 210,
@@ -793,6 +794,7 @@ export default function ApprovalResponsibilityPanel({
         ),
     },
     {
+      align: 'left',
       title: '检查',
       width: 190,
       render: (_, item) => {
@@ -819,6 +821,7 @@ export default function ApprovalResponsibilityPanel({
       },
     },
     {
+      align: 'center',
       title: '操作',
       width: 76,
       render: (_, item) =>

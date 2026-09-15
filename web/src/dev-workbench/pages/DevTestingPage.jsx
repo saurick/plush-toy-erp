@@ -13,13 +13,13 @@ import {
   Button,
   Empty,
   Progress,
-  Segmented,
   Skeleton,
   Space,
   Tag,
   Typography,
 } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'

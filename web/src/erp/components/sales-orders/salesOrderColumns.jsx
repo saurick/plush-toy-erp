@@ -110,6 +110,7 @@ export function buildSalesOrderColumns() {
       sorter: (a, b) => compareText(a?.order_no, b?.order_no),
     },
     {
+      align: 'left',
       defaultPriority: 20,
       title: '客户',
       exportTitle: '客户',
@@ -148,6 +149,7 @@ export function buildSalesOrderColumns() {
       render: (value) => value || '-',
     },
     {
+      align: 'left',
       title: '联系人',
       exportTitle: '联系人',
       dataIndex: 'contact_snapshot',
@@ -174,6 +176,7 @@ export function buildSalesOrderColumns() {
       render: (value) => value || '-',
     },
     {
+      align: 'right',
       title: '货款金额',
       exportTitle: '货款金额',
       dataIndex: 'goods_amount',
@@ -196,6 +199,7 @@ export function buildSalesOrderColumns() {
       exportValue: taxTermsText,
     },
     {
+      align: 'right',
       title: '税额',
       exportTitle: '税额',
       dataIndex: 'tax_amount',
@@ -208,6 +212,7 @@ export function buildSalesOrderColumns() {
         moneyText(record?.tax_amount, record?.currency, ''),
     },
     {
+      align: 'right',
       defaultPriority: 50,
       title: '订单总额',
       exportTitle: '订单总额',
@@ -220,6 +225,7 @@ export function buildSalesOrderColumns() {
         moneyText(record?.order_total, record?.currency, ''),
     },
     {
+      align: 'left',
       title: '运费条件',
       exportTitle: '运费条件',
       dataIndex: 'freight_terms',
@@ -231,6 +237,7 @@ export function buildSalesOrderColumns() {
         salesOrderFreightTermsText(record?.freight_terms),
     },
     {
+      align: 'right',
       title: '报价运费',
       exportTitle: '报价运费',
       dataIndex: 'quoted_freight_amount',
@@ -245,6 +252,7 @@ export function buildSalesOrderColumns() {
       exportValue: (record) => quotedFreightText(record, ''),
     },
     {
+      align: 'left',
       title: '付款条件',
       exportTitle: '付款条件',
       dataIndex: 'payment_method',
@@ -277,6 +285,7 @@ export function buildSalesOrderColumns() {
       exportValue: (record) => formatUnixDate(record?.planned_delivery_date),
     },
     {
+      align: 'left',
       title: '收货信息',
       exportTitle: '收货信息',
       dataIndex: 'delivery_snapshot',
@@ -332,6 +341,7 @@ export function buildSalesOrderItemColumns() {
       render: (value) => value || '-',
     },
     {
+      align: 'left',
       title: '产品名称',
       exportTitle: '产品名称',
       dataIndex: 'product_name_snapshot',
@@ -349,6 +359,7 @@ export function buildSalesOrderItemColumns() {
       render: (value) => value || '-',
     },
     {
+      align: 'right',
       title: '订单数量',
       exportTitle: '订单数量',
       dataIndex: 'ordered_quantity',
@@ -357,6 +368,7 @@ export function buildSalesOrderItemColumns() {
         compareNumeric20Scale6Values(a?.ordered_quantity, b?.ordered_quantity),
     },
     {
+      align: 'right',
       title: '单价',
       exportTitle: '单价',
       dataIndex: 'unit_price',
@@ -366,6 +378,7 @@ export function buildSalesOrderItemColumns() {
       render: (value) => displayOptionalValue(value),
     },
     {
+      align: 'right',
       title: '金额',
       exportTitle: '金额',
       dataIndex: 'amount',

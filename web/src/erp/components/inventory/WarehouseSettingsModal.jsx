@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Form, Input, Select, Switch, Table } from 'antd'
+import { Alert, Button, Form, Input, Select, Switch } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
@@ -95,7 +96,7 @@ export default function WarehouseSettingsModal({ open, onCancel, onSaved }) {
         scroll={{ x: 540 }}
         columns={[
           { title: '编号', dataIndex: 'code' },
-          { title: '仓库名称', dataIndex: 'name' },
+          { align: 'left', title: '仓库名称', dataIndex: 'name' },
           { title: '用途', dataIndex: 'type', render: warehouseTypeLabel },
           {
             title: '状态',
@@ -103,6 +104,7 @@ export default function WarehouseSettingsModal({ open, onCancel, onSaved }) {
             render: (value) => (value ? '启用' : '停用'),
           },
           {
+            align: 'center',
             title: '操作',
             key: 'edit',
             render: (_, row) => (

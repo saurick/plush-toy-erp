@@ -4,13 +4,13 @@ import {
   Button,
   Empty,
   Popover,
-  Segmented,
   Select,
   Space,
-  Table,
   Tag,
 } from 'antd'
 import React, { useState } from 'react'
+import Table from '@/common/components/table/AppTable'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { normalizeStringList } from '../../utils/permissionCenterAccess.mjs'
 
 import {
@@ -54,8 +54,9 @@ function PermissionImpactMap({ permissions = [], permissionKeys = [] }) {
         dataSource={rows}
         locale={{ emptyText: <Empty description="当前岗位尚未选择功能" /> }}
         columns={[
-          { title: '功能', dataIndex: 'label', width: 220 },
+          { align: 'left', title: '功能', dataIndex: 'label', width: 220 },
           {
+            align: 'left',
             title: '适用页面',
             dataIndex: 'pages',
             render: (items, record) => {
@@ -79,6 +80,7 @@ function PermissionImpactMap({ permissions = [], permissionKeys = [] }) {
             },
           },
           {
+            align: 'left',
             title: '页面区域',
             width: 180,
             render: (_, record) => {
@@ -91,6 +93,7 @@ function PermissionImpactMap({ permissions = [], permissionKeys = [] }) {
             },
           },
           {
+            align: 'left',
             title: '可用操作',
             width: 190,
             render: (_, record) => {
@@ -224,8 +227,9 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
         scroll={{ x: 720 }}
         locale={{ emptyText: <Empty description="暂无最终权限解释" /> }}
         columns={[
-          { title: '页面', dataIndex: 'label', width: 190 },
+          { align: 'left', title: '页面', dataIndex: 'label', width: 190 },
           {
+            align: 'left',
             title: '岗位已选功能',
             dataIndex: 'rbac_granted',
             width: 130,
@@ -237,6 +241,7 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
               ),
           },
           {
+            align: 'left',
             title: '当前页面结果',
             dataIndex: 'effective',
             width: 130,
@@ -248,6 +253,7 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
               ),
           },
           {
+            align: 'left',
             title: '原因',
             dataIndex: 'reasons',
             render: (reasons = []) =>

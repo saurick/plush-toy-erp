@@ -18,16 +18,16 @@ import {
   List,
   Modal,
   Popover,
-  Segmented,
   Select,
   Space,
-  Table,
   Tag,
   Tabs,
   Tooltip,
   Typography,
 } from 'antd'
 import { Link as RouterLink, useSearchParams } from 'react-router-dom'
+import Table from '@/common/components/table/AppTable'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevDeliveryTimestamp from '../components/DevDeliveryTimestamp.jsx'
@@ -1310,6 +1310,7 @@ export default function DevVersionCenterPage() {
 
   const versionColumns = [
     {
+      align: 'left',
       title: '版本',
       dataIndex: 'version',
       key: 'version',
@@ -1348,6 +1349,7 @@ export default function DevVersionCenterPage() {
       ),
     },
     {
+      align: 'left',
       title: '制品与缓存',
       key: 'artifacts',
       render: (_value, record) => (
@@ -1371,6 +1373,7 @@ export default function DevVersionCenterPage() {
       ),
     },
     {
+      align: 'left',
       title: selectedTargetDefinition.shortLabel,
       key: 'target',
       render: (_value, record) =>
@@ -1383,7 +1386,7 @@ export default function DevVersionCenterPage() {
     {
       title: '操作',
       key: 'actions',
-      align: 'right',
+      align: 'center',
       render: (_value, record) => {
         const actionKind = deliveryVersionActionKind(record)
         const initialCustomerConfigActivationReady =
@@ -1597,11 +1600,13 @@ export default function DevVersionCenterPage() {
       ),
     },
     {
+      align: 'left',
       title: '目标',
       key: 'target',
       render: (_value, record) => deliveryTargetLabel(record.target),
     },
     {
+      align: 'left',
       title: '版本身份',
       key: 'identity',
       render: (_value, record) => (
@@ -1614,6 +1619,7 @@ export default function DevVersionCenterPage() {
       ),
     },
     {
+      align: 'left',
       title: '状态',
       key: 'status',
       render: (_value, record) => (
@@ -1679,7 +1685,7 @@ export default function DevVersionCenterPage() {
     {
       title: '操作',
       key: 'actions',
-      align: 'right',
+      align: 'center',
       render: (_value, record) => renderOperationActions(record),
     },
   ]

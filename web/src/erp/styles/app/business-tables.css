@@ -425,6 +425,14 @@
   word-break: break-word;
 }
 
+.erp-business-table-copyable-cell[data-align='center'] {
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
+}
+
+.erp-business-table-copyable-cell[data-align='center']::before {
+  content: '';
+}
+
 .erp-business-table-copyable-cell__button.ant-btn {
   width: 24px;
   min-width: 24px;
@@ -1668,6 +1676,12 @@
   gap: 6px;
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* Balance the column menu so the label stays centered with its data. */
+.erp-module-column-header::before {
+  content: '';
+  flex: 0 0 24px;
 }
 
 .erp-business-module-table-card .erp-module-column-header {

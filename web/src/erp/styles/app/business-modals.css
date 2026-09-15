@@ -776,14 +776,24 @@
 .erp-line-item-table td {
   padding: 8px 6px;
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
   overflow-wrap: anywhere;
 }
 
 .erp-line-item-table th {
+  text-align: center;
   background: var(--erp-sales-order-lines-bg, #f8fbf9);
   border-bottom: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
   font-weight: 650;
+}
+
+.erp-line-item-table .erp-line-item-table__index,
+.erp-line-item-table .erp-line-item-table__actions {
+  text-align: center;
+}
+
+.erp-line-item-table input[inputmode='decimal'] {
+  text-align: right;
 }
 
 .erp-sales-order-lines-form__row {
@@ -827,7 +837,6 @@
 }
 
 .erp-line-item-table .erp-line-item-table__index {
-  padding-top: 16px;
   color: var(--erp-text-muted, #64748b);
   text-align: center;
 }

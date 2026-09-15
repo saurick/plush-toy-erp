@@ -1,3 +1,4 @@
+import { createTabMotionScenarios } from './tabMotionScenarios.mjs'
 import { createBusinessFormInteractionScenarios } from './businessFormInteractionScenarios.mjs'
 import { createBusinessPageContractScenarios } from './businessPageContractScenarios.mjs'
 import { createAuditLogScenarios } from './auditLogScenarios.mjs'
@@ -379,6 +380,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
+    ...createTabMotionScenarios({ outputDir }),
     ...createAuthenticationEntryScenarios({
       expectHeading,
       expectButton,

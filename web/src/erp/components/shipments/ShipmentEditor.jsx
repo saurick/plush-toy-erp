@@ -9,10 +9,10 @@ import {
   Input,
   InputNumber,
   Select,
-  Table,
   Tag,
   Typography,
 } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import ProductIdentity, {
   renderProductOption,
@@ -877,6 +877,7 @@ function ShipmentItemsTable({
             referenceLabel(salesOrderItemOptions, value, '销售订单行'),
         },
         {
+          align: 'left',
           title: '产品',
           dataIndex: 'product_id',
           width: 280,
@@ -895,6 +896,7 @@ function ShipmentItemsTable({
           render: (value) => referenceLabel(productSKUOptions, value, 'SKU'),
         },
         {
+          align: 'left',
           title: '仓库 / 批次 / 单位',
           width: 260,
           render: (_, record) =>
@@ -904,8 +906,9 @@ function ShipmentItemsTable({
               referenceLabel(unitOptions, record.unit_id, '单位'),
             ].join(' / '),
         },
-        { title: '数量', dataIndex: 'quantity', width: 120 },
+        { align: 'right', title: '数量', dataIndex: 'quantity', width: 120 },
         {
+          align: 'left',
           title: '包装说明',
           dataIndex: 'package_description',
           width: 180,
@@ -920,6 +923,7 @@ function ShipmentItemsTable({
         ...(hasFinalShipmentWeight(status)
           ? [
               {
+                align: 'right',
                 title: '确认出货单重（克）',
                 dataIndex: 'unit_net_weight_g_snapshot',
                 width: 180,
@@ -930,6 +934,7 @@ function ShipmentItemsTable({
                 },
               },
               {
+                align: 'right',
                 title: '行净重（克）',
                 width: 140,
                 render: (_, record) => {
@@ -942,7 +947,7 @@ function ShipmentItemsTable({
               },
             ]
           : []),
-        { title: '备注', dataIndex: 'note' },
+        { align: 'left', title: '备注', dataIndex: 'note' },
       ]}
     />
   )

@@ -1,16 +1,7 @@
 import { RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  Alert,
-  Button,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-} from 'antd'
+import { Alert, Button, Form, Input, Modal, Select, Space, Tag } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
@@ -313,7 +304,7 @@ export default function OutsourcingReturnDispositionModal({
             dataIndex: 'disposition_type',
             render: (value) => (value === 'REWORK' ? '返工' : '返厂'),
           },
-          { title: '数量', dataIndex: 'quantity' },
+          { align: 'right', title: '数量', dataIndex: 'quantity' },
           {
             title: '状态',
             dataIndex: 'status',

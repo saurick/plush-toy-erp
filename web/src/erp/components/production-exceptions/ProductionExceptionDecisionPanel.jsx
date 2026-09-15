@@ -1,7 +1,8 @@
 import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Input, Modal, Table, Tag } from 'antd'
+import { Alert, Button, Card, Input, Modal, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -429,6 +430,7 @@ export default function ProductionExceptionDecisionPanel({
         render: (value) => TYPE_LABELS[value] || '生产异常',
       },
       {
+        align: 'right',
         defaultPriority: 50,
         title: '申请数量',
         dataIndex: 'requested_quantity',
@@ -453,7 +455,7 @@ export default function ProductionExceptionDecisionPanel({
           </Tag>
         ),
       },
-      { title: '原因', dataIndex: 'reason' },
+      { align: 'left', title: '原因', dataIndex: 'reason' },
     ],
     []
   )

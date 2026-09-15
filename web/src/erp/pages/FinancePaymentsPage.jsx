@@ -1043,9 +1043,16 @@ export default function FinancePaymentsPage() {
         exportValue: (record) =>
           record?.direction === 'RECEIPT' ? '收款' : '付款',
       },
-      { defaultPriority: 50, title: '金额', dataIndex: 'amount', width: 140 },
+      {
+        align: 'right',
+        defaultPriority: 50,
+        title: '金额',
+        dataIndex: 'amount',
+        width: 140,
+      },
       { defaultPriority: 60, title: '币种', dataIndex: 'currency', width: 90 },
       {
+        align: 'left',
         defaultPriority: 30,
         title: '往来方',
         key: 'counterparty',
@@ -1067,6 +1074,7 @@ export default function FinancePaymentsPage() {
         exportValue: (record) => paymentStatusLabel(record?.status),
       },
       {
+        align: 'left',
         defaultPriority: 80,
         title: '核销明细',
         dataIndex: 'allocations',
@@ -1075,12 +1083,14 @@ export default function FinancePaymentsPage() {
         exportValue: paymentAllocationExportValue,
       },
       {
+        align: 'left',
         title: '账户摘要',
         dataIndex: 'account_ref',
         copyable: { label: '账户摘要' },
         width: 200,
       },
       {
+        align: 'left',
         title: '业务凭据',
         dataIndex: 'evidence_ref',
         copyable: { label: '业务凭据' },
@@ -1124,6 +1134,7 @@ export default function FinancePaymentsPage() {
           financeFactTypeLabel(record?.finance_fact_type),
       },
       {
+        align: 'right',
         defaultPriority: 50,
         title: '红冲金额',
         dataIndex: 'amount',
@@ -1131,12 +1142,14 @@ export default function FinancePaymentsPage() {
       },
       { defaultPriority: 60, title: '币种', dataIndex: 'currency', width: 90 },
       {
+        align: 'right',
         defaultPriority: 80,
         title: '来源原金额',
         dataIndex: 'finance_fact_original_amount',
         width: 140,
       },
       {
+        align: 'right',
         defaultPriority: 70,
         title: '红冲后未核销',
         dataIndex: 'finance_fact_outstanding_amount',
@@ -1154,7 +1167,7 @@ export default function FinancePaymentsPage() {
         ),
         exportValue: (record) => creditStatusLabel(record?.status),
       },
-      { title: '原因', dataIndex: 'reason', width: 260 },
+      { align: 'left', title: '原因', dataIndex: 'reason', width: 260 },
     ],
     []
   )

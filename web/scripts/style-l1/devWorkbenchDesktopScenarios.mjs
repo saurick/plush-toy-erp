@@ -4,6 +4,7 @@ import {
   DEV_DRILL_RECOVERY_ROUTE,
   DEV_GOVERNANCE_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
+  DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
   DEV_QUALITY_ROUTE,
   DEV_SECONDARY_NAV_ITEMS,
@@ -54,6 +55,7 @@ export function createDevWorkbenchDesktopScenarios({
   return ORDINARY_DEV_ROUTES.map((item) => ({
     name: `dev-page-${item.key}-desktop-light`,
     path: item.route,
+    mockAdminRpc: item.route === DEV_PERMISSION_RELATIONSHIPS_ROUTE,
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectHeading(page, item.title)

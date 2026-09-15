@@ -177,12 +177,14 @@ export default function HistoryRecordsPage() {
         render: (value) => <Tag>{value}</Tag>,
       },
       {
+        align: 'left',
         title: '编号 / 名称',
         dataIndex: 'primary',
         copyable: { label: '编号或名称' },
         width: 180,
       },
       {
+        align: 'left',
         title: '名称 / 往来方',
         dataIndex: 'secondary',
         copyable: { label: '名称或往来方' },
@@ -194,7 +196,7 @@ export default function HistoryRecordsPage() {
         width: 120,
         render: (value) => <Tag color="default">{value}</Tag>,
       },
-      { title: '摘要', dataIndex: 'summary', width: 260 },
+      { align: 'left', title: '摘要', dataIndex: 'summary', width: 260 },
       {
         title: '最后更新',
         dataIndex: 'updatedAt',
@@ -202,6 +204,7 @@ export default function HistoryRecordsPage() {
         render: formatHistoryTime,
       },
       {
+        align: 'center',
         title: '操作',
         key: 'actions',
         detailHidden: true,

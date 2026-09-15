@@ -320,6 +320,11 @@
 }
 
 .erp-dev-testing-reader__toolbar .ant-segmented {
+  --erp-segmented-bg: #e8f7f4;
+  --erp-segmented-radius: 9px;
+  --erp-segmented-shadow: inset 3px 0 0 #0f766e;
+  --erp-segmented-text: #475569;
+  --erp-segmented-selected-text: #0f766e;
   border: 1px solid #d6e2dc;
   border-radius: 12px;
   background: #f4faf6;
@@ -330,17 +335,11 @@
   gap: 4px;
 }
 
-.erp-dev-testing-reader__toolbar .ant-segmented-thumb {
-  border-radius: 9px;
-  background: #e8f7f4;
-  box-shadow: inset 3px 0 0 #0f766e;
-}
-
 .erp-dev-testing-reader__toolbar .ant-segmented-item {
   min-height: 34px;
   border: 1px solid #d6e2dc;
   border-radius: 9px;
-  background: #ffffff;
+  background: transparent;
   color: #475569;
   cursor: pointer;
 }
@@ -348,15 +347,11 @@
 .erp-dev-testing-reader__toolbar .ant-segmented-item:hover,
 .erp-dev-testing-reader__toolbar .ant-segmented-item:focus-visible {
   border-color: #7dbeb7;
-  background: #edf8f6;
   color: #0f766e;
 }
 
-.erp-dev-testing-reader__toolbar .ant-segmented-item-selected {
+.erp-dev-testing-reader__toolbar .erp-segmented-item-selected {
   border-color: #0f766e;
-  background: #e8f7f4;
-  color: #0f766e;
-  box-shadow: inset 3px 0 0 #0f766e;
 }
 
 .erp-dev-testing-tier-view,

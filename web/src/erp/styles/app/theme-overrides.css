@@ -1095,7 +1095,7 @@
 [data-erp-theme='dark']
   .erp-role-navigation-workspace-tabs
   .ant-tabs-tab-active {
-  background: rgb(96 165 250 / 10%);
+  background: transparent;
 }
 
 [data-erp-theme='dark']
@@ -1284,7 +1284,7 @@
 
 [data-erp-theme='dark'] .erp-business-collaboration-task-panel__tab {
   border-color: var(--erp-border);
-  background: var(--erp-surface-bg-soft);
+  background: transparent;
   color: var(--erp-text);
 }
 
@@ -1293,7 +1293,11 @@
   .erp-business-collaboration-task-panel__tab:focus-visible,
 [data-erp-theme='dark'] .erp-business-collaboration-task-panel__tab--active {
   border-color: var(--erp-interactive-border-hover);
-  background: #172033;
+}
+
+[data-erp-theme='dark'] .erp-business-collaboration-task-panel__tabs {
+  --erp-slider-bg: #172033;
+  --erp-slider-shadow: inset 0 0 0 1px var(--erp-interactive-border-hover);
 }
 
 [data-erp-theme='dark'] .erp-business-collaboration-task-panel__more-note {
