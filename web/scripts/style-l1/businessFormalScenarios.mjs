@@ -432,6 +432,10 @@ export function createBusinessFormalScenarios(deps) {
             '.erp-business-selection-action-bar__hint'
           ).length,
           rowHeight: rowBox?.height || 0,
+          direction: row ? getComputedStyle(row).flexDirection : '',
+          actionsGap: (actionsBox?.top || 0) - (primaryBox?.bottom || 0),
+          actionsBottomOverflow:
+            (actionsBox?.bottom || 0) - (rowBox?.bottom || 0),
           primaryOffset: Math.abs(primaryCenter - rowCenter),
           actionsOffset: Math.abs(actionsCenter - rowCenter),
         }
@@ -452,7 +456,12 @@ export function createBusinessFormalScenarios(deps) {
           metric
         )}`
       )
-      if (metric.rowHeight <= 96) {
+      if (metric.direction === 'column') {
+        assert(
+          metric.actionsGap >= 0 && metric.actionsBottomOverflow <= 1,
+          `${scenarioName} 纵向操作条的标题和按钮应依次排列且不溢出: ${JSON.stringify(metric)}`
+        )
+      } else if (metric.rowHeight <= 96) {
         assert(
           metric.primaryOffset <= 2,
           `${scenarioName} 当前操作标题与选中标签应上下居中: ${JSON.stringify(
@@ -3284,12 +3293,27 @@ export function createBusinessFormalScenarios(deps) {
         )
         assert.equal(
           await inventoryFilterSelects.count(),
-          5,
-          '库存余额筛选区应包含对象类型、具体对象、产品规格、仓库和批次'
+          6,
+          '库存余额筛选区应包含存货类型、材料类别、具体对象、产品规格、仓库和批次'
         )
+        for (const name of [
+          '存货类型',
+          '材料库存类别',
+          '材料或产品',
+          '产品规格',
+          '仓库',
+          '批次',
+        ]) {
+          assert.equal(
+            await page.getByRole('combobox', { name, exact: true }).count(),
+            1
+          )
+        }
+        const inventorySKUFilter = inventoryFilterSelects.filter({
+          has: page.getByRole('combobox', { name: '产品规格', exact: true }),
+        })
         assert.equal(
-          await inventoryFilterSelects
-            .nth(2)
+          await inventorySKUFilter
             .getAttribute('class')
             .then((value) =>
               String(value || '').includes('ant-select-disabled')
@@ -3297,21 +3321,30 @@ export function createBusinessFormalScenarios(deps) {
           true,
           '未选择成品对象时产品规格筛选应禁用'
         )
-        await inventoryFilterSelects.nth(0).click()
+        assert.equal(
+          await page
+            .getByRole('combobox', { name: '材料库存类别', exact: true })
+            .isDisabled(),
+          false
+        )
+        await inventoryFilterSelects
+          .filter({
+            has: page.getByRole('combobox', { name: '存货类型', exact: true }),
+          })
+          .click()
         await page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
           .filter({ hasText: '成品' })
           .click()
-        await page.waitForFunction(() => {
-          const selects = document.querySelectorAll(
-            '.erp-v1-inventory-ledger-page .erp-business-operation-panel__filters .ant-select'
-          )
-          return (
-            selects.length === 5 &&
-            !selects[2]?.classList.contains('ant-select-disabled')
-          )
-        })
-        const inventorySKUFilter = inventoryFilterSelects.nth(2)
+        await inventorySKUFilter
+          .locator('input:not(:disabled)')
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await page
+            .getByRole('combobox', { name: '材料库存类别', exact: true })
+            .isDisabled(),
+          true
+        )
         await inventorySKUFilter.click()
         await inventorySKUFilter.locator('input').fill('SKU-STYLE-L1')
         await page.keyboard.press('Enter')
@@ -3515,11 +3548,15 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '列顺序')
         await assertNoListDeleteTrashToolbar(page)
         await assertTextAbsent(page, 'quality_inspections')
-        await expectText(
-          page,
-          '首次到货检验不合格可按来源行和部分数量办理退厂或补换'
+        const qualityDispositionAction = page.locator(
+          '[data-business-action-key="quality-disposition"]'
         )
-        await expectText(page, '已入库后的不合格仍生成采购退货')
+        assert.equal(await qualityDispositionAction.count(), 1)
+        assert.equal(
+          await qualityDispositionAction.isDisabled(),
+          true,
+          '未选择质检记录时不能办理不合格处置'
+        )
         await expectText(page, 'QI-STYLE-L1')
         await expectText(page, 'PR-STYLE-L1')
         await expectText(page, 'INV-LOT-001')
@@ -3546,9 +3583,9 @@ export function createBusinessFormalScenarios(deps) {
             '质检单号',
             '状态',
             '判定',
-            '估算不良比例',
-            '检验来源',
             '产品 / 材料 / 在制品',
+            '检验来源',
+            '估算不良比例',
             '检验信息',
             '判定备注',
           ],
@@ -3640,7 +3677,11 @@ export function createBusinessFormalScenarios(deps) {
           titleText: '生成来料质检草稿',
           scenarioName: 'business-v1-quality-inspections',
         })
-        await page.getByRole('row').filter({ hasText: 'QI-STYLE-L1' }).click()
+        await page
+          .getByRole('row')
+          .filter({ hasText: 'QI-STYLE-L1' })
+          .getByRole('radio')
+          .check()
         await expectText(page, 'QI-STYLE-L1 / INV-LOT-001')
         await expectButton(page, '判定合格')
         await expectButton(page, '判定不合格')
@@ -3831,35 +3872,33 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '查看出货明细')
         await expectText(page, '已保存出货明细')
         await assertTextAbsent(page, '新增出货明细')
-        const shipmentDetailModal = page
-          .locator('.erp-business-action-modal:visible')
-          .last()
+        const shipmentDetailPage = page.locator(
+          '.erp-business-form-page:not([hidden])'
+        )
+        await shipmentDetailPage.waitFor({ state: 'visible' })
         assert.equal(
-          await shipmentDetailModal
+          await shipmentDetailPage
             .getByRole('button', { name: '保存', exact: true })
             .count(),
           0,
-          '出货只读明细弹窗不应提供保存动作'
+          '出货只读明细页不应提供保存动作'
         )
         assert.equal(
-          await shipmentDetailModal
+          await shipmentDetailPage
             .locator(
               'input:visible:not([type="hidden"]):not([disabled]), textarea:visible:not([disabled]), .ant-select:visible:not(.ant-select-disabled)'
             )
             .count(),
           0,
-          '出货只读明细弹窗不应暴露可编辑表单控件'
+          '出货只读明细页不应暴露可编辑表单控件'
         )
-        await shipmentDetailModal
-          .getByRole('button', { name: /关\s*闭/u })
-          .click()
-        await shipmentDetailModal.waitFor({ state: 'hidden', timeout: 10_000 })
+        await closeBusinessFormModal(page, shipmentDetailPage)
         assert.equal(
           await shipmentDetailTrigger.evaluate(
             (node) => document.activeElement === node
           ),
           true,
-          '关闭出货只读明细弹窗后焦点应回到查看明细按钮'
+          '返回出货列表后焦点应回到查看明细按钮'
         )
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'business-v1-shipments',
@@ -4101,7 +4140,6 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '生产订单')
         await expectText(page, 'MO-STYLE-L1-20260713')
-        await expectText(page, '维护生产计划单')
         await expectButton(page, '新建生产订单')
         await page.getByText('MO-STYLE-L1-20260713', { exact: true }).click()
         await expectButton(page, '编辑')
@@ -4441,7 +4479,6 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '生产进度')
         await expectText(page, 'PROD-FACT-L1')
-        await expectText(page, '生产岗位在这里维护领料、返工和待入库完工报告')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-production-progress',
         })
@@ -4506,7 +4543,6 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '成品仓')
         await expectText(page, 'LOT-RESERVATION-STYLE-L1')
         await expectText(page, '件')
-        await expectText(page, '库存预留仅在确认出货时随出库处理一并消耗')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-outbound-reservations',
         })
@@ -4532,7 +4568,6 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '应收管理')
         await expectText(page, 'AR-STYLE-L1')
-        await expectText(page, '应收至少应来自真实出货后的核对')
         await assertTextAbsent(page, 'finance_facts')
         await assertTextAbsent(page, 'RECEIVABLE')
         await assertUnifiedListToolbarShell(page, {

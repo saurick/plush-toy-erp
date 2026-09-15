@@ -17,7 +17,7 @@ export function createQualitySourceActionScenarios(deps) {
       .filter({ has: page.getByText(businessNo, { exact: true }) })
       .first()
     await row.waitFor({ state: 'visible', timeout: 10_000 })
-    await row.click()
+    await row.getByRole('radio').check()
   }
 
   const findSelectionActionButton = async (page, actionName) => {
@@ -802,18 +802,33 @@ export function createQualitySourceActionScenarios(deps) {
         },
         verify: async (page) => {
           await expectHeading(page, '质量检验')
-          await page
-            .getByRole('row')
-            .filter({ hasText: 'QI-REJECT-STYLE-L1' })
-            .click()
+          await selectRow(page, 'QI-REJECT-STYLE-L1')
           const returnButton = await findSelectionActionButton(
             page,
             '不合格处置'
           )
-          await page.waitForFunction(
-            (button) => button instanceof HTMLButtonElement && !button.disabled,
-            await returnButton.elementHandle()
-          )
+          try {
+            await page.waitForFunction(() => {
+              const button = document.querySelector(
+                'button[data-business-action-key="quality-disposition"]'
+              )
+              return button instanceof HTMLButtonElement && !button.disabled
+            })
+          } catch (cause) {
+            const state = await page
+              .locator('[data-business-action-key="quality-disposition"]')
+              .evaluateAll((buttons) =>
+                buttons.map((button) => ({
+                  disabled: button.disabled,
+                  text: button.textContent,
+                  reason: button.parentElement?.getAttribute('aria-label'),
+                }))
+              )
+            throw new Error(
+              `质检处置未就绪: ${JSON.stringify({ state, exactReceiptIDs })}`,
+              { cause }
+            )
+          }
           assert(
             exactReceiptIDs.includes(601),
             '已入库来源不在首批列表时应按 ID 精确读取'
@@ -954,18 +969,15 @@ export function createQualitySourceActionScenarios(deps) {
             '当前质检的不合格处置已完成',
             '退货已生成后的置灰动作应向键盘和读屏用户解释原因'
           )
-          await expectText(
-            page,
-            '首次到货检验不合格可按来源行和部分数量办理退厂或补换'
-          )
           await selectRow(page, 'QI-INITIAL-REJECT-STYLE-L1')
           const initialRejectDispositionButton =
             await findSelectionActionButton(page, '不合格处置')
-          await page.waitForFunction(
-            (button) =>
-              button instanceof HTMLButtonElement && !button.disabled,
-            await initialRejectDispositionButton.elementHandle()
-          )
+          await page.waitForFunction(() => {
+            const button = document.querySelector(
+              'button[data-business-action-key="quality-disposition"]'
+            )
+            return button instanceof HTMLButtonElement && !button.disabled
+          })
           assert(
             exactReceiptIDs.includes(603),
             '首次 IQC 来源不在首批列表时也应按 ID 精确读取'

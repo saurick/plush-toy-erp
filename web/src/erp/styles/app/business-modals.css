@@ -922,6 +922,10 @@
   padding: 14px 14px 12px 16px;
 }
 
+.erp-shipment-modal-items {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .erp-master-contact-list__head {
   display: flex;
   align-items: center;

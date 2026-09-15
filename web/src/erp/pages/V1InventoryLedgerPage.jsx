@@ -2180,6 +2180,7 @@ export default function V1InventoryLedgerPage() {
             />
             <SelectFilter
               className="erp-business-filter-control--status"
+              aria-label="存货类型"
               value={subjectType}
               options={subjectTypeOptions}
               onChange={(nextType) => {
@@ -2209,6 +2210,7 @@ export default function V1InventoryLedgerPage() {
             />
             <SelectFilter
               className="erp-business-filter-control--status"
+              aria-label="材料或产品"
               value={subjectID}
               options={[
                 { label: '全部材料或产品', value: '' },
@@ -2226,6 +2228,7 @@ export default function V1InventoryLedgerPage() {
             />
             <SelectFilter
               className="erp-business-filter-control--status"
+              aria-label="产品规格"
               value={productSkuID}
               options={[
                 { label: '全部产品规格', value: '' },
@@ -2244,6 +2247,7 @@ export default function V1InventoryLedgerPage() {
             />
             <SelectFilter
               className="erp-business-filter-control--status"
+              aria-label="仓库"
               value={warehouseID}
               options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
               placeholder={
@@ -2258,6 +2262,7 @@ export default function V1InventoryLedgerPage() {
             />
             <SelectFilter
               className="erp-business-filter-control--status"
+              aria-label="批次"
               value={lotID}
               options={[
                 { label: '全部批次', value: '' },
