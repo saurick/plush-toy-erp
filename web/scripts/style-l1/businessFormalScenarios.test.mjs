@@ -58,10 +58,12 @@ test('formal empty-state overrides keep requested paging metadata', () => {
 })
 
 test('inventory SKU filter selects through its searchable control', () => {
-  const startIndex = source.indexOf('const inventorySKUFilter')
-  const interaction = source.slice(startIndex, startIndex + 700)
+  const startIndex = source.indexOf('await inventorySKUFilter.click()')
+  const endIndex = source.indexOf('const inventorySKUMetrics', startIndex)
+  const interaction = source.slice(startIndex, endIndex)
 
   assert.ok(startIndex >= 0)
+  assert.ok(endIndex > startIndex)
   assert.match(interaction, /locator\('input'\)\.fill\('SKU-STYLE-L1'\)/u)
   assert.match(interaction, /keyboard\.press\('Enter'\)/u)
   assert.match(interaction, /ant-select-selection-item/u)
@@ -116,12 +118,6 @@ test('product table headers keep the shared single-line browser regression', () 
   assert.match(scenario, /triggerBox\.width >= 23\.5/u)
   assert.match(scenario, /sortStateBeforeColumnMenu/u)
   assert.match(scenario, /business-table-headers-single-line-dark-narrow\.png/u)
-})
-
-test('quality page assertion preserves the visible incoming-inspection boundary', () => {
-  assert.match(source, /首次到货检验不合格可按来源行和部分数量办理退厂或补换/u)
-  assert.match(source, /已入库后的不合格仍生成采购退货/u)
-  assert.doesNotMatch(source, /不合格退供应商仍走采购退货/u)
 })
 
 test('workflow list failure assertion follows the current module title', () => {

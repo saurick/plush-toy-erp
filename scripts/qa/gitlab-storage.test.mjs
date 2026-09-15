@@ -15,6 +15,7 @@ import test from "node:test";
 function preview(
   t,
   {
+    hostname = "r640",
     mount = "/srv/raid5",
     backupSource = "/srv/raid5/gitlab/backups/repository",
   } = {},
@@ -30,6 +31,11 @@ function preview(
   copyFileSync(
     new URL("../../server/deploy/gitlab/.env.example", import.meta.url),
     path.join(root, ".env"),
+  );
+  writeFileSync(
+    path.join(bin, "hostname"),
+    "#!/bin/sh\nprintf '%s\\n' \"$FAKE_HOSTNAME\"\n",
+    { mode: 0o755 },
   );
   writeFileSync(
     path.join(bin, "findmnt"),
@@ -50,11 +56,13 @@ esac
     { mode: 0o755 },
   );
   const callsFile = path.join(root, "calls");
+  writeFileSync(callsFile, "");
   const result = spawnSync("bash", [path.join(root, "gitlab-backup.sh")], {
     encoding: "utf8",
     env: {
       ...process.env,
       PATH: `${bin}:${process.env.PATH}`,
+      FAKE_HOSTNAME: hostname,
       FAKE_MOUNT: mount,
       FAKE_BACKUP_SOURCE: backupSource,
       FAKE_CALLS: callsFile,
@@ -66,8 +74,15 @@ esac
     /^exec /mu,
     "preview and rejected preflights must never create a backup",
   );
-  return result;
+  return { ...result, calls };
 }
+
+test("a different control host blocks backup before any container access", (t) => {
+  const result = preview(t, { hostname: "unrelated-host" });
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /control host identity mismatch/u);
+  assert.equal(result.calls, "");
+});
 
 test("missing RAID mount blocks backup even when the root filesystem is available", (t) => {
   const result = preview(t, { mount: "/" });

@@ -217,8 +217,8 @@ test("formal frontend customer config boundary: page, action, and field projecti
   );
   assert.match(
     mobileTasksSource,
-    /const taskScopeKey = `\$\{taskAccessScopeKey\}\|search:\$\{taskKeyword\}`/u,
-    "visible tasks must stay bound to both access identity and the current search",
+    /const taskScopeKey = mobileTaskQueryScope\(\s*taskAccessScopeKey,\s*taskQueryOptions\s*\)/u,
+    "visible tasks must stay bound to access identity and the current search, sort, and status",
   );
   assert.match(
     mobileTasksSource,
@@ -349,7 +349,12 @@ test("formal customer frontend copy uses the current account and business perspe
   const layoutSource = readRelative("web/src/erp/components/ERPLayout.jsx");
   assert(layoutSource.includes("正在进入工作台"));
   assert(layoutSource.includes("正在准备您的工作内容"));
-  assert(layoutSource.includes("暂时无法进入工作台"));
+  assert(layoutSource.includes("<SessionRecoveryDialog"));
+  const recoverySource = readRelative(
+    "web/src/erp/components/SessionRecoveryDialog.jsx",
+  );
+  assert(recoverySource.includes("暂时无法连接服务"));
+  assert(recoverySource.includes("当前页面已暂停操作"));
 
   const mobileLayoutSource = readRelative(
     "web/src/erp/mobile/MobileAppLayout.jsx",
