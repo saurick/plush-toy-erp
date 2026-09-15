@@ -79,6 +79,17 @@ test("customer-config-runtime-manifest: runtime page allowlist follows desktop n
   assert(!RUNTIME_PAGE_KEYS.includes("operations-facts"));
 });
 
+test("customer-config-runtime-manifest: warehouse maintenance stays with the warehouse role", () => {
+  const manifest = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
+  const maintenanceRoles = manifest.access_entitlements
+    .filter((entry) => entry.enabled && entry.capability_key === "warehouse.manage")
+    .map((entry) => entry.role_key);
+  assert.deepEqual(maintenanceRoles, ["warehouse"]);
+  assert.ok(manifest.access_entitlements.some((entry) =>
+    entry.enabled && entry.role_key === "boss" && entry.capability_key === "warehouse.inventory.read",
+  ));
+});
+
 test("customer-config-runtime-manifest: formal compile rejects every tracked draft package", () => {
   for (const config of [
     demoCustomerPackage,

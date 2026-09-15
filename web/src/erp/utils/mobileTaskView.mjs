@@ -611,9 +611,10 @@ export function buildMobileTaskListForRole(
 ) {
   // list_role_tasks 已在服务端完成 RBAC、岗位、直接指派和风险视图过滤。
   // 前端再按岗位或领域过滤会丢失已授权的跨岗位任务。
-  return (Array.isArray(tasks) ? tasks : [])
-    .map((task) => buildMobileTaskView(task, options))
-    .sort(sortMobileTaskViews)
+  const views = (Array.isArray(tasks) ? tasks : []).map((task) =>
+    buildMobileTaskView(task, options)
+  )
+  return options.preserveServerOrder ? views : views.sort(sortMobileTaskViews)
 }
 
 export function buildMobileTaskSummary(taskViews = []) {

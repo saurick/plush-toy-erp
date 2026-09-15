@@ -2,6 +2,46 @@ import { normalizeRoleKey } from './roleKeys.mjs'
 
 export const MOBILE_ROLE_TASK_PAGE_LIMIT = 50
 
+export const MOBILE_TASK_SORT_OPTIONS = Object.freeze([
+  { value: 'newest', label: '最近进入' },
+  { value: 'due', label: '截止最早' },
+  { value: 'oldest', label: '等待最久' },
+])
+
+export const MOBILE_TASK_STATUS_OPTIONS = Object.freeze([
+  { value: '', label: '全部状态' },
+  { value: 'ready', label: '待处理' },
+  { value: 'blocked', label: '阻塞' },
+])
+
+export function mobileTaskQueryScope(
+  accessScope,
+  { keyword = '', sortKey = 'newest', statusKey = '' } = {}
+) {
+  return `${accessScope}|search:${keyword}|sort:${sortKey}|status:${statusKey}`
+}
+
+export function readMobileTaskQueryHistory(history, accessScope) {
+  const keyword = String(history?.mobileRoleTasksKeyword || '')
+    .trim()
+    .slice(0, 100)
+  const sortKey = MOBILE_TASK_SORT_OPTIONS.some(
+    (option) => option.value === history?.mobileRoleTasksSort
+  )
+    ? history.mobileRoleTasksSort
+    : 'newest'
+  const statusKey = MOBILE_TASK_STATUS_OPTIONS.some(
+    (option) => option.value === history?.mobileRoleTasksStatus
+  )
+    ? history.mobileRoleTasksStatus
+    : ''
+  const options = { keyword, sortKey, statusKey }
+  return history?.mobileRoleTasksScope ===
+    mobileTaskQueryScope(accessScope, options)
+    ? options
+    : { keyword: '', sortKey: 'newest', statusKey: '' }
+}
+
 export const MOBILE_ROLE_TASK_VIEW_KEYS = Object.freeze({
   TODO: 'todo',
   HISTORY: 'history',
@@ -280,6 +320,8 @@ export function buildMobileRoleTaskQuery({
   viewKey,
   cursor = '',
   keyword = '',
+  sortKey = '',
+  statusKey = '',
   limit = MOBILE_ROLE_TASK_PAGE_LIMIT,
 } = {}) {
   const normalizedRoleKey = normalizeRoleKey(roleKey)
@@ -297,9 +339,20 @@ export function buildMobileRoleTaskQuery({
   }
 
   const normalizedKeyword = typeof keyword === 'string' ? keyword.trim() : null
-  if (normalizedKeyword === null || [...normalizedKeyword].length > 100)
-    { throw new TypeError('搜索内容最多 100 个字') }
+  if (normalizedKeyword === null || [...normalizedKeyword].length > 100) {
+    throw new TypeError('搜索内容最多 100 个字')
+  }
+  if (
+    (sortKey &&
+      !MOBILE_TASK_SORT_OPTIONS.some((option) => option.value === sortKey)) ||
+    !MOBILE_TASK_STATUS_OPTIONS.some((option) => option.value === statusKey) ||
+    (normalizedViewKey === 'history' && statusKey)
+  ) {
+    throw new TypeError('任务筛选或排序无效')
+  }
   return {
+    ...(sortKey ? { sort_key: sortKey } : {}),
+    ...(statusKey ? { status_key: statusKey } : {}),
     ...(normalizedKeyword ? { keyword: normalizedKeyword } : {}),
     view_key: normalizedViewKey,
     role_key: normalizedRoleKey,

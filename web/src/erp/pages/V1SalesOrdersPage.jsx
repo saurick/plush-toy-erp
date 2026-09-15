@@ -75,6 +75,7 @@ import {
 import WorkflowTaskProductImage from '../components/workflow/WorkflowTaskProductImage.jsx'
 import SalesOrderEngineeringModal from '../components/sales-orders/SalesOrderEngineeringModal.jsx'
 import EngineeringMaterialRequestModal from '../components/sales-orders/EngineeringMaterialRequestModal.jsx'
+import { getEngineeringMaterialPermissions } from '../utils/engineeringMaterialTask.mjs'
 import {
   salesOrderRequirementName,
   salesOrderEngineeringLabel,
@@ -289,6 +290,10 @@ export default function V1SalesOrdersPage() {
   const routeSalesOrderID = searchParamPositiveInt(
     searchParams,
     'sales_order_id'
+  )
+  const routeMaterialRequestID = searchParamPositiveInt(
+    searchParams,
+    'material_request_id'
   )
   const linkedKeyword = linkedDocumentContext(searchParams).keyword
   const resolvedRouteKeyword =
@@ -1975,27 +1980,24 @@ export default function V1SalesOrdersPage() {
         }}
       />
       <EngineeringMaterialRequestModal
-        key={materialRequestOrderID || 'material-request-closed'}
-        orderID={materialRequestOrderID}
+        key={`${materialRequestOrderID || routeSalesOrderID || 'closed'}:${routeMaterialRequestID || 'latest'}`}
+        orderID={
+          materialRequestOrderID ||
+          (routeMaterialRequestID ? routeSalesOrderID : null)
+        }
+        requestID={materialRequestOrderID ? undefined : routeMaterialRequestID}
         permissions={{
-          submit: hasActionPermission(
-            adminProfile,
-            'engineering.material.submit'
-          ),
-          boss: hasActionPermission(
-            adminProfile,
-            'engineering.material.boss_approve'
-          ),
-          finance: hasActionPermission(
-            adminProfile,
-            'engineering.material.finance_approve'
-          ),
-          purchaseRead: hasActionPermission(
-            adminProfile,
-            'purchase.order.read'
-          ),
+          ...getEngineeringMaterialPermissions(adminProfile),
+          submit: !routeMaterialRequestID && getEngineeringMaterialPermissions(adminProfile).submit,
         }}
-        onCancel={() => setMaterialRequestOrderID(null)}
+        onCancel={() => {
+          setMaterialRequestOrderID(null)
+          if (routeMaterialRequestID) {
+            const next = new URLSearchParams(searchParams)
+            next.delete('material_request_id')
+            setSearchParams(next, { replace: true })
+          }
+        }}
         onChanged={loadOrders}
       />
       <SalesOrderEditor

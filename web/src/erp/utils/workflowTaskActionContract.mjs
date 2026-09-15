@@ -1,8 +1,12 @@
+import { isEngineeringMaterialTask } from './engineeringMaterialTask.mjs'
+
 export const WORKFLOW_APPROVAL_CAPABILITY_KEYS = Object.freeze([
   'workflow.task.approve',
   'finance.payment.approve',
   'warehouse.adjustment.approve',
   'production.exception.approve',
+  'engineering.material.boss_approve',
+  'engineering.material.finance_approve',
 ])
 
 const WORKFLOW_APPROVAL_CAPABILITY_KEY_SET = new Set(
@@ -75,6 +79,12 @@ const WORKFLOW_TASK_ACTION_MODES_BY_STATUS = Object.freeze({
 })
 
 export function getWorkflowTaskStatusActionModes(taskOrStatus = '') {
+  if (
+    typeof taskOrStatus === 'object' &&
+    isEngineeringMaterialTask(taskOrStatus)
+  ) {
+    return taskOrStatus?.task_status_key === 'ready' ? ['urge'] : []
+  }
   const statusKey = String(
     typeof taskOrStatus === 'string'
       ? taskOrStatus

@@ -73,6 +73,7 @@ export default function MobileTaskReceiptScreen({
   evidenceRefs = [],
   feedback = '',
   message = '',
+  statusLabel = '',
   onBackToList = () => {},
   onOpenProcess = null,
   onRetryConfirm = null,
@@ -88,9 +89,9 @@ export default function MobileTaskReceiptScreen({
   const outcomeMeta = OUTCOME_META[outcome] || OUTCOME_META.unknown
   const OutcomeIcon = outcomeMeta.icon
   const taskName = readableText(task?.task_name, '任务处理结果')
-  const taskStatus = task
-    ? resolveMobileTaskStatusLabel(task)
-    : '任务状态暂不可用'
+  const taskStatus =
+    statusLabel ||
+    (task ? resolveMobileTaskStatusLabel(task) : '任务状态暂不可用')
   const taskSource = task ? resolveTaskSourceLabel(task) : '来源信息暂不可用'
   const actionLabel = resolveReceiptActionLabel({ action, outcome, task })
   const approvalTask = isWorkflowApprovalTask(task)

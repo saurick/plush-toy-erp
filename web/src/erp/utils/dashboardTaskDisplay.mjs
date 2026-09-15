@@ -2,12 +2,14 @@ import { businessModuleDefinitions } from '../config/businessModules.mjs'
 import { dashboardModules } from '../config/dashboardModules.mjs'
 import { V1_ROUTE_PATHS } from './masterDataOrderView.mjs'
 import { routeWithQuery } from './routeQuery.mjs'
+import { engineeringMaterialTaskEntryPath } from './engineeringMaterialTask.mjs'
 import {
   isInternalWorkflowDocumentRef,
   resolveReadableWorkflowSourceNo,
 } from './workflowDocumentRefs.mjs'
 
 const TASK_SOURCE_TITLE_MAP = new Map([
+  ['engineering_material_request', '工程用料审批'],
   ...dashboardModules.map((moduleItem) => [moduleItem.key, moduleItem.title]),
   ['project-orders', '销售订单'],
   ['sales_order', '销售订单'],
@@ -312,6 +314,8 @@ export function resolveWorkflowTaskSourceEntryPath(task = {}) {
 }
 
 export function resolveWorkflowTaskEntryPath(task = {}) {
+  const materialEntry = engineeringMaterialTaskEntryPath(task)
+  if (materialEntry) return materialEntry
   const sourceTaskContract = standaloneSourceTaskContract(task)
   if (sourceTaskContract && !isTrustedStandaloneSourceTask(task)) {
     return ''

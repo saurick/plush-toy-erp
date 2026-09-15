@@ -469,6 +469,42 @@ test('workflowApi: mobile role task view uses the strict server cursor contract'
   ])
 })
 
+test('workflowApi: 排序状态传递给服务端并拒绝状态不匹配的响应', async () => {
+  let sent
+  let status = 'blocked'
+  const api = await loadWorkflowApi(async (_method, params) => {
+    sent = params
+    return {
+      data: {
+        items: [validTask({ task_status_key: status })],
+        has_more: false,
+        next_cursor: '',
+        server_time: 1_788_840_000,
+        counts: roleTaskCounts({ blocked: 1 }),
+        risk_scope: 'role',
+      },
+    }
+  })
+  const query = {
+    role_key: 'boss',
+    view_key: 'todo',
+    limit: 50,
+    sort_key: 'due',
+    status_key: 'blocked',
+  }
+  await api.listWorkflowRoleTasks(query)
+  assert.deepEqual(sent, query)
+  status = 'ready'
+  await assert.rejects(
+    api.listWorkflowRoleTasks(query),
+    /岗位任务暂时无法显示/u
+  )
+  await assert.rejects(
+    api.listWorkflowRoleTasks({ ...query, sort_key: 'updated_at' }),
+    /任务查询条件有误/u
+  )
+})
+
 test('workflowApi: approval role view accepts only registered active approval tasks', async () => {
   const approvalTask = {
     id: 43,
@@ -1231,8 +1267,14 @@ test('workflow dashboard consumes one bounded server workbench projection', () =
   assert.match(source, /getWorkflowWorkbench\(workbenchRequest/u)
   assert.match(source, /queue_key:\s*workbenchQueueKey/u)
   assert.match(source, /limit:\s*workbenchQueuePageSize/u)
-  assert.match(source, /offset:\s*\(workbenchQueuePage - 1\) \* workbenchQueuePageSize/u)
-  assert.match(source, /const nextPageSize = normalizeWorkflowTaskPageSize\(pageSize\)/u)
+  assert.match(
+    source,
+    /offset:\s*\(workbenchQueuePage - 1\) \* workbenchQueuePageSize/u
+  )
+  assert.match(
+    source,
+    /const nextPageSize = normalizeWorkflowTaskPageSize\(pageSize\)/u
+  )
   assert.match(source, /setWorkbenchQueuePageSize\(nextPageSize\)/u)
   assert.doesNotMatch(source, /listAllWorkflowWorkbenchRoleTasks/u)
   assert.doesNotMatch(source, /\blistAllWorkflowRoleTasks\b/u)

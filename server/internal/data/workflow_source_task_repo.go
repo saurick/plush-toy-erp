@@ -25,9 +25,26 @@ func ensureSourceWorkflowTaskWithClient(
 	state *biz.WorkflowBusinessStateUpsert,
 	actorID int,
 ) (*biz.WorkflowTask, bool, error) {
-	if client == nil || task == nil || state == nil || task.TaskCode == "" ||
-		!biz.IsSourceProducedWorkflowTaskGroup(task.TaskGroup) || task.SourceID <= 0 ||
+	if task == nil || state == nil ||
 		state.SourceType != task.SourceType || state.SourceID != task.SourceID {
+		return nil, false, biz.ErrBadParam
+	}
+	current, created, err := ensureSourceWorkflowTaskRecordWithClient(ctx, client, task, actorID)
+	if err != nil || !created {
+		return current, created, err
+	}
+	state.Payload = cloneSourceWorkflowPayload(state.Payload)
+	state.Payload[workflowSourceTaskIntentHashPayloadKey] = task.Payload[workflowSourceTaskIntentHashPayloadKey]
+	if err := createInitialWorkflowSourceStateWithClient(ctx, client, state); err != nil {
+		return nil, false, err
+	}
+	return current, true, nil
+}
+
+// Source-owned approvals already have an authoritative state row and need only
+// a task and event; callers supply the transaction containing the source write.
+func ensureSourceWorkflowTaskRecordWithClient(ctx context.Context, client *ent.Client, task *biz.WorkflowTaskCreate, actorID int) (*biz.WorkflowTask, bool, error) {
+	if client == nil || task == nil || task.TaskCode == "" || !biz.IsSourceProducedWorkflowTaskGroup(task.TaskGroup) || task.SourceID <= 0 {
 		return nil, false, biz.ErrBadParam
 	}
 	if err := validateWorkflowTaskProcessAnchors(
@@ -44,8 +61,6 @@ func ensureSourceWorkflowTaskWithClient(
 	}
 	task.Payload = cloneSourceWorkflowPayload(task.Payload)
 	task.Payload[workflowSourceTaskIntentHashPayloadKey] = intentHash
-	state.Payload = cloneSourceWorkflowPayload(state.Payload)
-	state.Payload[workflowSourceTaskIntentHashPayloadKey] = intentHash
 
 	existing, err := client.WorkflowTask.Query().Where(workflowtask.TaskCode(task.TaskCode)).Only(ctx)
 	if err == nil {
@@ -106,9 +121,6 @@ func ensureSourceWorkflowTaskWithClient(
 		eventBuilder.SetActorID(actorID)
 	}
 	if _, err := eventBuilder.Save(ctx); err != nil {
-		return nil, false, err
-	}
-	if err := createInitialWorkflowSourceStateWithClient(ctx, client, state); err != nil {
 		return nil, false, err
 	}
 	return entWorkflowTaskToBiz(row), true, nil

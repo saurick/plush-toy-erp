@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/businessattachment"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/inventoryoperation"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingorder"
@@ -39,6 +40,8 @@ type workflowDisplaySource struct {
 
 func workflowDisplaySourceKind(value string) string {
 	switch value {
+	case biz.WorkflowMaterialRequestSourceType:
+		return value
 	case "sales_order", "sales-orders", "project-orders":
 		return "sales_order"
 	case "purchase_order", "purchase-order", "accessories-purchase":
@@ -109,7 +112,7 @@ func hydrateWorkflowTaskDisplayContexts(ctx context.Context, client *ent.Client,
 		if kind == "" || task.SourceID <= 0 {
 			continue
 		}
-		trusted := biz.IsTrustedProductionSchedulingSourceTask(task) || biz.IsTrustedProductionExceptionSourceTask(task) || biz.IsTrustedShipmentReleaseSourceTask(task)
+		trusted := biz.IsTrustedEngineeringMaterialTask(task) || biz.IsTrustedProductionSchedulingSourceTask(task) || biz.IsTrustedProductionExceptionSourceTask(task) || biz.IsTrustedShipmentReleaseSourceTask(task)
 		if instance := instances[displayInt(task.ProcessInstanceID)]; instance != nil {
 			trusted = instance.BusinessRefID == task.SourceID && workflowDisplaySourceKind(instance.BusinessRefType) == kind
 		}
@@ -250,6 +253,25 @@ func hydrateWorkflowTaskDisplayContexts(ctx context.Context, client *ent.Client,
 func loadWorkflowDisplaySources(ctx context.Context, client *ent.Client, kind string, ids []int) (map[int]workflowDisplaySource, error) {
 	out := map[int]workflowDisplaySource{}
 	switch kind {
+	case biz.WorkflowMaterialRequestSourceType:
+		rows, err := client.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.IDIn(ids...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			source := workflowDisplaySource{no: row.OrderNoSnapshot}
+			seen := map[int]bool{}
+			for _, part := range row.SourceSnapshot {
+				productID := workflowPayloadInt(part, "product_id")
+				if productID <= 0 || seen[productID] {
+					continue
+				}
+				seen[productID] = true
+				name, _ := part["product_name"].(string)
+				source.items = append(source.items, workflowDisplayRef{kind: "product", id: productID, name: name, orderNo: row.OrderNoSnapshot})
+			}
+			out[row.ID] = source
+		}
 	case "sales_order":
 		rows, err := client.SalesOrder.Query().Where(salesorder.IDIn(ids...)).WithItems(func(q *ent.SalesOrderItemQuery) { q.Order(ent.Asc(salesorderitem.FieldLineNo)) }).All(ctx)
 		if err != nil {

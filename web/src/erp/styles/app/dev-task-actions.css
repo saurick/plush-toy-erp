@@ -41,7 +41,6 @@
 
 @media (max-width: 1280px) {
   .erp-command-center-hero,
-  .erp-business-board-hero,
   .erp-business-board-lower-grid,
   .erp-business-board-workspace,
   .erp-product-core-dashboard__grid,
@@ -81,7 +80,6 @@
     padding: 10px;
   }
 
-  .erp-workbench-command-head,
   .erp-product-core-dashboard__hero,
   .erp-workbench-panel-head {
     align-items: stretch;

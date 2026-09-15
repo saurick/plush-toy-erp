@@ -22,6 +22,8 @@ import { WorkflowTaskSource } from '../../components/workflow/WorkflowTaskCopy.j
 import WorkflowTaskTiming from '../../components/workflow/WorkflowTaskTiming.jsx'
 import { getWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
 import MobileTaskListSkeleton from './MobileTaskListSkeleton.jsx'
+import MobileTaskListToolbar from './MobileTaskListToolbar.jsx'
+import MobileTaskPullRefresh from './MobileTaskPullRefresh.jsx'
 import {
   MOBILE_LIST_COLLAPSED_LIMITS,
   MOBILE_LIST_KEYS,
@@ -74,6 +76,7 @@ export default function MobileTaskListScreen({
   riskTasks,
   riskScope,
   roleLabel,
+  refreshScopeKey,
   runtimeBuildIdentity,
   serverDataTime,
   scrollContainerRef,
@@ -86,6 +89,9 @@ export default function MobileTaskListScreen({
   setSelectedTaskID,
   showScrollTopButton,
   taskKeyword,
+  taskSortKey,
+  taskStatusKey,
+  onTaskListOptionsChange,
   onSearchTasks,
   visibleListLimitsByKey,
   setVisibleListLimitsByKey,
@@ -225,7 +231,12 @@ export default function MobileTaskListScreen({
     }
     setSelectedTaskID(null)
     setDetailAction(null)
-    resetVisibleListLimit(listKey)
+    if (
+      mainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE &&
+      activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE
+    ) {
+      resetVisibleListLimit(listKey)
+    }
   }
 
   const renderTaskRow = (task) => {
@@ -359,12 +370,79 @@ export default function MobileTaskListScreen({
     )
   }
 
+  const renderListOptions = (tabs) => (
+    <MobileTaskListToolbar
+      tabs={tabs}
+      scrollContainerRef={scrollContainerRef}
+      resetKey={`${activeMainTabKey}|${activeFilterKey}|${activeMessageTabKey}|${taskKeyword}|${taskSortKey}|${taskStatusKey}`}
+      sortKey={taskSortKey}
+      statusKey={taskStatusKey}
+      onChange={onTaskListOptionsChange}
+      resetDisabled={
+        taskSortKey === 'newest' &&
+        !taskStatusKey &&
+        !keywordDraft &&
+        activeFilterKey === MOBILE_TASK_FILTER_KEYS.ALL
+      }
+      onReset={() => {
+        clearTimeout(searchTimerRef.current)
+        composingSearchRef.current = false
+        submittedKeywordRef.current = ''
+        setKeywordDraft('')
+        setActiveFilterKey(MOBILE_TASK_FILTER_KEYS.ALL)
+        setVisibleListLimitsByKey({})
+        scrollMainToTop()
+        onTaskListOptionsChange({
+          keyword: '',
+          sortKey: 'newest',
+          statusKey: '',
+        })
+      }}
+    />
+  )
+
+  const renderListFeedback = () => (
+    <>
+      <MobileTaskPullRefresh
+        key={`${refreshScopeKey}|${activeMainTabKey}|${activeFilterKey}|${activeMessageTabKey}`}
+        scrollContainerRef={scrollContainerRef}
+        enabled
+        busy={loading || loadingMore || initialLoading}
+        onRefresh={loadTasks}
+        lastUpdated={serverDataTime}
+      />
+      {loadError ? (
+        <section
+          className="mobile-role-load-error mx-4 mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-red-800"
+          role="alert"
+        >
+          <strong className="block text-base">任务加载失败</strong>
+          <p className="mt-1 text-sm leading-6">
+            {loadError}。
+            {activeViewHasData
+              ? '当前保留上次已加载内容。'
+              : '当前没有可确认的任务数据，请重试。'}
+          </p>
+          <button
+            type="button"
+            className="mt-3 min-h-11 rounded-xl border border-red-300 bg-white px-4 text-sm font-semibold text-red-700"
+            onClick={() => loadTasks()}
+            disabled={loading}
+          >
+            {loading ? '重新加载中' : '重新加载'}
+          </button>
+        </section>
+      ) : null}
+    </>
+  )
+
   const renderTodoPanel = () =>
     initialLoading ? (
       <MobileTaskListSkeleton filterCount={canViewApprovalInbox ? 4 : 3} />
     ) : (
       <>
-        {renderTaskFilters()}
+        {renderListOptions(renderTaskFilters())}
+        {renderListFeedback()}
         <section className="mx-4 mt-4 pb-4">
           <div
             className="pb-3 text-sm text-slate-500"
@@ -466,49 +544,52 @@ export default function MobileTaskListScreen({
   }
 
   const renderDonePanel = () => (
-    <section className="mx-4 mt-5 space-y-4 pb-5">
-      <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-slate-950">已办任务</h2>
-          <span
-            className="mobile-role-count-tag mobile-role-section-count"
-            data-testid="mobile-role-done-count"
-            aria-label={
-              authoritativeTaskCounts
-                ? `已办任务共 ${authoritativeTaskCounts.history} 条，当前已加载 ${doneTasks.length} 条`
-                : `已办任务总数暂不可用，当前已加载 ${doneTasks.length} 条`
-            }
-          >
-            {authoritativeTaskCounts?.history ?? '—'}
-          </span>
-        </div>
-        <div className="mt-3 space-y-3">
-          {doneTasks.length === 0 ? (
-            <>
-              <div className="rounded-xl border border-dashed border-slate-200 px-3 py-5 text-center text-sm text-slate-500">
-                暂无已办任务
-              </div>
-              {renderListLimitControl(
-                doneTasks,
-                MOBILE_LIST_KEYS.DONE,
-                '条已办'
-              )}
-            </>
-          ) : (
-            <>
-              {getVisibleListItems(doneTasks, MOBILE_LIST_KEYS.DONE).map(
-                renderDoneTaskItem
-              )}
-              {renderListLimitControl(
-                doneTasks,
-                MOBILE_LIST_KEYS.DONE,
-                '条已办'
-              )}
-            </>
-          )}
-        </div>
+    <>
+      {renderListFeedback()}
+      <section className="mx-4 mt-5 space-y-4 pb-5">
+        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-slate-950">已办任务</h2>
+            <span
+              className="mobile-role-count-tag mobile-role-section-count"
+              data-testid="mobile-role-done-count"
+              aria-label={
+                authoritativeTaskCounts
+                  ? `已办任务共 ${authoritativeTaskCounts.history} 条，当前已加载 ${doneTasks.length} 条`
+                  : `已办任务总数暂不可用，当前已加载 ${doneTasks.length} 条`
+              }
+            >
+              {authoritativeTaskCounts?.history ?? '—'}
+            </span>
+          </div>
+          <div className="mt-3 space-y-3">
+            {doneTasks.length === 0 ? (
+              <>
+                <div className="rounded-xl border border-dashed border-slate-200 px-3 py-5 text-center text-sm text-slate-500">
+                  暂无已办任务
+                </div>
+                {renderListLimitControl(
+                  doneTasks,
+                  MOBILE_LIST_KEYS.DONE,
+                  '条已办'
+                )}
+              </>
+            ) : (
+              <>
+                {getVisibleListItems(doneTasks, MOBILE_LIST_KEYS.DONE).map(
+                  renderDoneTaskItem
+                )}
+                {renderListLimitControl(
+                  doneTasks,
+                  MOBILE_LIST_KEYS.DONE,
+                  '条已办'
+                )}
+              </>
+            )}
+          </div>
+        </section>
       </section>
-    </section>
+    </>
   )
 
   const renderMessageTabs = () => {
@@ -668,12 +749,15 @@ export default function MobileTaskListScreen({
   )
 
   const renderMessagesPanel = () => (
-    <section className="mobile-role-messages mx-4 mt-5 space-y-4 pb-5">
-      {renderMessageTabs()}
-      {activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.WARNING
-        ? renderWarningMessages()
-        : renderNoticeMessages()}
-    </section>
+    <>
+      {renderListOptions(renderMessageTabs())}
+      {renderListFeedback()}
+      <section className="mobile-role-messages mx-4 mt-5 space-y-4 pb-5">
+        {activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.WARNING
+          ? renderWarningMessages()
+          : renderNoticeMessages()}
+      </section>
+    </>
   )
 
   const renderMinePanel = () => {
@@ -717,6 +801,12 @@ export default function MobileTaskListScreen({
                 {availableEntryLabel}
               </div>
             </div>
+          </div>
+          <div className="mobile-task-display-settings mt-4 border-t border-slate-200 pt-4">
+            <h2 className="mb-3 text-base font-semibold text-slate-950">
+              显示设置
+            </h2>
+            <ERPThemeToggle size="large" />
           </div>
         </section>
 
@@ -834,7 +924,15 @@ export default function MobileTaskListScreen({
             className={`mobile-role-bottom-nav__item ${
               active ? 'mobile-role-bottom-nav__item--active' : ''
             }`}
-            onClick={() => openTaskBucket({ mainTabKey: key })}
+            onClick={() =>
+              openTaskBucket({
+                mainTabKey: key,
+                filterKey:
+                  activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MINE
+                    ? activeFilterKey
+                    : MOBILE_TASK_FILTER_KEYS.ALL,
+              })
+            }
           >
             <Icon aria-hidden="true" />
             <span>{label}</span>
@@ -852,70 +950,54 @@ export default function MobileTaskListScreen({
     <div className="mobile-role-tasks-page mobile-role-tasks-page--tabs surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
       <div
         ref={scrollContainerRef}
-        className="mobile-role-tasks-page__scroll"
+        className={`mobile-role-tasks-page__scroll${
+          activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE
+            ? ' mobile-role-tasks-page__scroll--pull-refresh'
+            : ''
+        }`}
         data-testid="mobile-role-scroll"
         aria-busy={initialLoading ? 'true' : 'false'}
         onScroll={handleMainScroll}
       >
-        <header className="flex items-center justify-between gap-3 px-5 pb-2 pt-6">
-          <div className="flex min-w-0 items-center gap-3">
+        <header
+          className="mobile-task-list-header"
+          data-testid="mobile-task-list-header"
+        >
+          <div className="flex min-w-0 items-center gap-2">
             <h1
-              className="shrink-0 text-3xl font-semibold tracking-normal text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500"
+              className="shrink-0 text-xl font-semibold tracking-normal text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500"
               data-testid="mobile-role-list-heading"
               tabIndex={-1}
             >
               {activeTabLabel}
             </h1>
-            <span className="inline-flex shrink-0 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-base font-semibold text-emerald-700">
+            <span
+              className="min-w-0 truncate text-sm text-slate-500"
+              aria-label={`当前岗位：${roleLabel}`}
+            >
               {roleLabel}
             </span>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <ERPThemeToggle size="small" variant="menu" />
+          {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE ? (
             <button
               type="button"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-emerald-700"
+              className="mobile-task-list-header__refresh"
               onClick={() => loadTasks({ showRefreshFeedback: true })}
-              disabled={loading}
+              disabled={loading || loadingMore}
             >
-              <ReloadOutlined className={loading ? 'animate-spin' : ''} />
+              <ReloadOutlined
+                className={loading ? 'animate-spin' : ''}
+                aria-hidden="true"
+              />
               <span>{loading ? '刷新中' : '刷新'}</span>
             </button>
-          </div>
+          ) : null}
         </header>
-
-        <div className="flex flex-wrap items-center gap-3 px-5 text-sm text-slate-500">
-          <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-          <span>更新于 {serverDataTime}</span>
-        </div>
-
-        {loadError ? (
-          <section
-            className="mobile-role-load-error mx-4 mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-red-800"
-            role="alert"
-          >
-            <strong className="block text-base">任务加载失败</strong>
-            <p className="mt-1 text-sm leading-6">
-              {loadError}。
-              {activeViewHasData
-                ? '当前保留上次已加载内容。'
-                : '当前没有可确认的任务数据，请重试。'}
-            </p>
-            <button
-              type="button"
-              className="mt-3 min-h-11 rounded-xl border border-red-300 bg-white px-4 text-sm font-semibold text-red-700"
-              onClick={() => loadTasks()}
-              disabled={loading}
-            >
-              {loading ? '重新加载中' : '重新加载'}
-            </button>
-          </section>
-        ) : null}
 
         {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE ? (
           <form
             ref={searchFormRef}
-            className="mobile-role-task-search mx-4 mt-4"
+            className="mobile-role-task-search mx-4 mt-1"
             role="search"
             onSubmit={(event) => event.preventDefault()}
           >

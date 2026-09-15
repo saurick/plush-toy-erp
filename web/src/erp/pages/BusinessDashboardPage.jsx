@@ -5,8 +5,9 @@ import {
   InfoCircleOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Card, Space, Spin, Table, Typography } from 'antd'
+import { Alert, Button, Card, Space, Spin, Typography } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import Table from '@/common/components/table/AppTable'
 import WorkflowTaskIdentity from '../components/workflow/WorkflowTaskIdentity.jsx'
 import WorkflowTaskTiming from '../components/workflow/WorkflowTaskTiming.jsx'
 import { message } from '@/common/utils/antdApp'
@@ -353,16 +354,6 @@ export default function BusinessDashboardPage() {
       size={10}
       className="erp-dashboard-page erp-business-dashboard-page"
     >
-      <Card className="erp-dashboard-card" variant="borderless">
-        <div className="erp-business-board-hero erp-business-board-hero--compact">
-          <div className="erp-business-board-hero-main">
-            <Title level={4} className="erp-dashboard-title">
-              业务看板
-            </Title>
-          </div>
-        </div>
-      </Card>
-
       <div className="erp-business-board-workspace">
         <Card
           className="erp-dashboard-card erp-business-board-attention-card"
@@ -450,6 +441,7 @@ export default function BusinessDashboardPage() {
             }
             columns={[
               {
+                align: 'left',
                 title: '业务环节',
                 dataIndex: 'module',
                 fixed: 'left',
@@ -457,6 +449,7 @@ export default function BusinessDashboardPage() {
                 render: (value) => <Text strong>{value}</Text>,
               },
               {
+                align: 'left',
                 title: '业务记录',
                 dataIndex: 'label',
                 width: 155,
@@ -479,6 +472,7 @@ export default function BusinessDashboardPage() {
                 ),
               },
               {
+                align: 'left',
                 title: '统计口径',
                 dataIndex: 'truthKind',
                 width: 120,

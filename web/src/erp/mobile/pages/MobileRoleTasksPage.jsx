@@ -18,6 +18,8 @@ import {
   MOBILE_ROLE_TASK_PAGE_LIMIT,
   MOBILE_ROLE_TASK_VIEW_KEYS,
   buildMobileRoleTaskQuery,
+  mobileTaskQueryScope,
+  readMobileTaskQueryHistory,
   createMobileRoleTaskScopeState,
   isMobileRoleTaskHistoryScope,
   readMobileRoleTaskLoadedCounts,
@@ -35,6 +37,11 @@ import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { canViewWorkflowApprovalInbox } from '../../utils/workflowApprovalInbox.mjs'
 import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
 import MobileTaskDetailScreen from '../components/MobileTaskDetailScreen.jsx'
+import EngineeringMaterialTaskAction from '../../components/sales-orders/EngineeringMaterialTaskAction.jsx'
+import {
+  canProcessEngineeringMaterialTask,
+  ENGINEERING_MATERIAL_STATUS,
+} from '../../utils/engineeringMaterialTask.mjs'
 import MobileTaskActionScreen from '../components/MobileTaskActionScreen.jsx'
 import MobileTaskListScreen from '../components/MobileTaskListScreen.jsx'
 import MobileTaskReceiptScreen from '../components/MobileTaskReceiptScreen.jsx'
@@ -76,7 +83,10 @@ const MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY =
   'mobileRoleTasksLoadedCountsByView'
 const MOBILE_TASK_HISTORY_SCOPE_KEY = 'mobileRoleTasksScope'
 const MOBILE_TASK_HISTORY_KEYWORD_KEY = 'mobileRoleTasksKeyword'
+const MOBILE_TASK_HISTORY_SORT_KEY = 'mobileRoleTasksSort'
+const MOBILE_TASK_HISTORY_STATUS_KEY = 'mobileRoleTasksStatus'
 const MOBILE_TASK_HISTORY_REASON_KEY = 'mobileRoleTasksReason'
+const MOBILE_TASK_HISTORY_MATERIAL_DRAFT_KEY = 'mobileRoleTasksMaterialDraft'
 const MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY =
   'mobileRoleTasksApprovedQuantity'
 const MOBILE_TASK_DRAFT_STORAGE_PREFIX = 'plush-toy-erp:mobile-task-draft:v1:'
@@ -198,18 +208,21 @@ export default function MobileRoleTasksPage() {
   const taskAccessScopeKey = `${activeRoleKey}|access:${taskAccessIdentity}|${canMountCustomerTasks ? 'ready' : 'blocked'}`
   const initialHistoryStateRef = useRef(readMobileTaskHistoryState())
   const initialHistoryCandidate = initialHistoryStateRef.current
-  const [taskKeyword, setTaskKeyword] = useState(() => {
-    const keyword = String(
-      initialHistoryCandidate[MOBILE_TASK_HISTORY_KEYWORD_KEY] || ''
-    )
-      .trim()
-      .slice(0, 100)
-    return initialHistoryCandidate[MOBILE_TASK_HISTORY_SCOPE_KEY] ===
-      `${taskAccessScopeKey}|search:${keyword}`
-      ? keyword
-      : ''
-  })
-  const taskScopeKey = `${taskAccessScopeKey}|search:${taskKeyword}`
+  const [taskQueryOptions, setTaskQueryOptions] = useState(() =>
+    readMobileTaskQueryHistory(initialHistoryCandidate, taskAccessScopeKey)
+  )
+  const {
+    keyword: taskKeyword,
+    sortKey: taskSortKey,
+    statusKey: taskStatusKey,
+  } = taskQueryOptions
+  const setTaskKeyword = useCallback((keyword) => {
+    setTaskQueryOptions((current) => ({ ...current, keyword }))
+  }, [])
+  const taskScopeKey = mobileTaskQueryScope(
+    taskAccessScopeKey,
+    taskQueryOptions
+  )
 
   const initialHistoryScopeKey = String(
     initialHistoryCandidate[MOBILE_TASK_HISTORY_SCOPE_KEY] || ''
@@ -325,6 +338,8 @@ export default function MobileRoleTasksPage() {
     [activeMainTabKey, visibleActiveFilterKey]
   )
   const activeTaskSlot = taskSlots[activeTaskViewKey]
+  const taskFeedbackScopeRef = useRef('')
+  taskFeedbackScopeRef.current = `${activeMainTabKey}|${activeTaskViewKey}|${selectedTaskID || ''}`
   const authoritativeCountSummary = activeTaskSlot.count_summary || null
   const authoritativeTaskCounts = authoritativeCountSummary?.counts || null
   const riskScope = authoritativeCountSummary?.risk_scope || 'role'
@@ -340,7 +355,10 @@ export default function MobileRoleTasksPage() {
       buildMobileTaskListForRole(
         taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO].items,
         activeRoleKey,
-        { nowMs: taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO].server_time * 1000 }
+        {
+          nowMs: taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO].server_time * 1000,
+          preserveServerOrder: true,
+        }
       ),
     [activeRoleKey, taskSlots]
   )
@@ -361,7 +379,10 @@ export default function MobileRoleTasksPage() {
       buildMobileTaskListForRole(
         taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.RISK].items,
         activeRoleKey,
-        { nowMs: taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.RISK].server_time * 1000 }
+        {
+          nowMs: taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.RISK].server_time * 1000,
+          preserveServerOrder: true,
+        }
       ),
     [activeRoleKey, taskSlots]
   )
@@ -373,6 +394,7 @@ export default function MobileRoleTasksPage() {
         {
           nowMs:
             taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL].server_time * 1000,
+          preserveServerOrder: true,
         }
       ),
     [activeRoleKey, taskSlots]
@@ -521,7 +543,10 @@ export default function MobileRoleTasksPage() {
     previousMainTabKeyRef.current = activeMainTabKey
     receiptDetailSnapshotRef.current = null
     setReceiptDetailSnapshot(null)
-    if (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO) {
+    if (
+      activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO ||
+      activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MINE
+    ) {
       return
     }
     setActiveFilterKey('all')
@@ -553,6 +578,7 @@ export default function MobileRoleTasksPage() {
       if (!canMountCustomerTasks) return false
 
       const requestScopeKey = taskScopeKey
+      const feedbackScope = taskFeedbackScopeRef.current
       const currentScopeState = readMobileRoleTaskScopeState(
         taskScopeStateRef.current,
         requestScopeKey
@@ -584,6 +610,9 @@ export default function MobileRoleTasksPage() {
           buildMobileRoleTaskQuery({
             roleKey: activeRoleKey,
             keyword: taskKeyword,
+            ...(viewKey !== MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY
+              ? { sortKey: taskSortKey, statusKey: taskStatusKey }
+              : {}),
             viewKey,
             cursor: append ? currentSlot.next_cursor : '',
           })
@@ -609,8 +638,14 @@ export default function MobileRoleTasksPage() {
         if (settledState === taskScopeStateRef.current) return false
         taskScopeStateRef.current = settledState
         setTaskScopeState(settledState)
-        if (showRefreshFeedback) {
-          message.success('数据已刷新')
+        if (
+          showRefreshFeedback &&
+          feedbackScope === taskFeedbackScopeRef.current
+        ) {
+          message.success({
+            key: 'mobile-role-task-load',
+            content: '数据已刷新',
+          })
         }
         return true
       } catch (error) {
@@ -641,11 +676,23 @@ export default function MobileRoleTasksPage() {
         taskScopeStateRef.current = settledState
         setTaskScopeState(settledState)
         if (rejectOnError) throw error
-        message.error(errorMessage)
+        if (feedbackScope === taskFeedbackScopeRef.current) {
+          message.error({
+            key: 'mobile-role-task-load',
+            content: errorMessage,
+          })
+        }
         return false
       }
     },
-    [activeRoleKey, canMountCustomerTasks, taskScopeKey, taskKeyword]
+    [
+      activeRoleKey,
+      canMountCustomerTasks,
+      taskScopeKey,
+      taskKeyword,
+      taskSortKey,
+      taskStatusKey,
+    ]
   )
 
   useEffect(() => {
@@ -783,6 +830,8 @@ export default function MobileRoleTasksPage() {
           canonicalTask.task_status_key || ''
         ).trim()
         const terminal = TERMINAL_TASK_STATUS_KEYS.has(canonicalStatusKey)
+        const matchesStatus =
+          !taskStatusKey || canonicalStatusKey === taskStatusKey
         const keepInActiveView =
           activeTaskViewKey === MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY
             ? terminal
@@ -792,12 +841,12 @@ export default function MobileRoleTasksPage() {
                 ? !terminal && isWorkflowApprovalTask(canonicalTask)
                 : !terminal
         const keepInViews = {
-          [MOBILE_ROLE_TASK_VIEW_KEYS.TODO]: !terminal,
+          [MOBILE_ROLE_TASK_VIEW_KEYS.TODO]: !terminal && matchesStatus,
           [MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY]: terminal,
           [MOBILE_ROLE_TASK_VIEW_KEYS.RISK]:
-            !terminal && isTaskRisk(canonicalTask),
+            !terminal && matchesStatus && isTaskRisk(canonicalTask),
           [MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL]:
-            !terminal && isWorkflowApprovalTask(canonicalTask),
+            !terminal && matchesStatus && isWorkflowApprovalTask(canonicalTask),
         }
         const nextState = reconcileMobileRoleTaskMutation(currentState, {
           scopeKey: taskScopeKey,
@@ -866,7 +915,13 @@ export default function MobileRoleTasksPage() {
       }
       return true
     },
-    [activeTaskViewKey, historyRestoreItemLimit, loadTaskView, taskScopeKey]
+    [
+      activeTaskViewKey,
+      historyRestoreItemLimit,
+      loadTaskView,
+      taskScopeKey,
+      taskStatusKey,
+    ]
   )
 
   const roleLabel = getMobileRoleLabel(activeRoleKey)
@@ -874,7 +929,12 @@ export default function MobileRoleTasksPage() {
   const activeViewInitialLoading =
     loading && !activeTaskSlot.loaded && activeTaskSlot.items.length === 0
   const hasLoadedTaskView = Object.values(taskSlots).some((slot) => slot.loaded)
-  const initialLoading = activeViewInitialLoading && !hasLoadedTaskView
+  const loadedAccessScopeRef = useRef('')
+  if (hasLoadedTaskView) loadedAccessScopeRef.current = taskAccessScopeKey
+  const initialLoading =
+    activeViewInitialLoading &&
+    !hasLoadedTaskView &&
+    loadedAccessScopeRef.current !== taskAccessScopeKey
   const serverDataTime = activeTaskSlot.server_time
     ? new Intl.DateTimeFormat('zh-CN', {
         month: '2-digit',
@@ -1229,6 +1289,8 @@ export default function MobileRoleTasksPage() {
         [MOBILE_TASK_HISTORY_MESSAGE_TAB_KEY]: activeMessageTabKey,
         [MOBILE_TASK_HISTORY_FILTER_KEY]: activeFilterKey,
         [MOBILE_TASK_HISTORY_KEYWORD_KEY]: taskKeyword,
+        [MOBILE_TASK_HISTORY_SORT_KEY]: taskSortKey,
+        [MOBILE_TASK_HISTORY_STATUS_KEY]: taskStatusKey,
         [MOBILE_TASK_HISTORY_SCROLL_TOP_KEY]: listScrollTopRef.current,
         [MOBILE_TASK_HISTORY_LIST_LIMITS_KEY]: visibleListLimitsByKey,
         [MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY]: loadedCounts,
@@ -1247,6 +1309,8 @@ export default function MobileRoleTasksPage() {
       activeMainTabKey,
       activeMessageTabKey,
       taskKeyword,
+      taskSortKey,
+      taskStatusKey,
       taskScopeKey,
       visibleListLimitsByKey,
     ]
@@ -1275,6 +1339,36 @@ export default function MobileRoleTasksPage() {
     },
     [activeTaskViewKey, clearActionReceipt, pushMobileTaskScreen]
   )
+
+  const materialDraftRef = useRef(initialHistoryState[MOBILE_TASK_HISTORY_MATERIAL_DRAFT_KEY] || null)
+  const materialDraftScopeRef = useRef(taskAccessScopeKey)
+  const materialBusyRef = useRef(false)
+  const materialTaskSettled =
+    selectedTaskReceipt?.status === 'confirmed' &&
+    Boolean(selectedTaskReceipt?.statusLabel)
+  useEffect(() => {
+    if (materialDraftScopeRef.current !== taskAccessScopeKey) {
+      materialDraftRef.current = null
+      materialDraftScopeRef.current = taskAccessScopeKey
+    }
+  }, [taskAccessScopeKey])
+  const saveMaterialDraft = useCallback((draft) => {
+    materialDraftRef.current = draft
+    try {
+      window.history.replaceState({
+        ...window.history.state,
+        [MOBILE_TASK_HISTORY_MATERIAL_DRAFT_KEY]: draft,
+      }, '')
+    } catch {
+      // 浏览器不允许更新历史记录时，仍保留当前页面内的草稿。
+    }
+  }, [])
+  const canProcessMaterial =
+    !materialTaskSettled &&
+    canProcessEngineeringMaterialTask(adminProfile, selectedTask)
+  const setMaterialBusy = useCallback((value) => {
+    materialBusyRef.current = value
+  }, [])
 
   const availableActions = useMemo(
     () =>
@@ -1318,6 +1412,15 @@ export default function MobileRoleTasksPage() {
   const handleOpenAction = useCallback(
     (preferredAction = '') => {
       if (!selectedTask) return
+      if (canProcessMaterial && preferredAction !== 'urge') {
+        setDetailAction('done')
+        pushMobileTaskScreen({
+          action: 'done',
+          screen: 'action',
+          taskID: selectedTask.id,
+        })
+        return
+      }
       const nextAction = availableActions.includes(preferredAction)
         ? preferredAction
         : ['resume', 'done', 'blocked', 'rejected', 'urge'].find((action) =>
@@ -1331,7 +1434,13 @@ export default function MobileRoleTasksPage() {
         taskID: selectedTask.id,
       })
     },
-    [availableActions, handleTaskAction, pushMobileTaskScreen, selectedTask]
+    [
+      availableActions,
+      canProcessMaterial,
+      handleTaskAction,
+      pushMobileTaskScreen,
+      selectedTask,
+    ]
   )
 
   const handleOpenSelectedTaskAction = useCallback(
@@ -1374,6 +1483,7 @@ export default function MobileRoleTasksPage() {
     })
   }, [clearActionReceipt, handleScreenBack, selectedTaskID, taskScopeKey])
   const handleActionBack = useCallback(() => {
+    if (materialBusyRef.current) return
     flushMobileTaskDraftHistory()
     handleScreenBack('action', () => {
       setDetailAction(null)
@@ -1494,6 +1604,10 @@ export default function MobileRoleTasksPage() {
       const targetScreen = historyState[MOBILE_TASK_HISTORY_SCREEN_KEY]
       const targetTaskID = historyState[MOBILE_TASK_HISTORY_TASK_KEY]
       const previousScreen = currentTaskScreenRef.current
+      if (previousScreen === 'action' && materialBusyRef.current) {
+        if (targetScreen !== 'action') window.history.forward()
+        return
+      }
       if (previousScreen === 'action') {
         persistMobileTaskDraftBackup(
           taskScopeKey,
@@ -1709,6 +1823,7 @@ export default function MobileRoleTasksPage() {
         evidenceRefs={actionReceipt.evidence_refs}
         feedback={actionReceipt.feedback}
         message={actionReceipt.message}
+        statusLabel={actionReceipt.statusLabel}
         onBackToList={handleReceiptBackToList}
         onOpenProcess={
           actionReceiptRetryable &&
@@ -1743,6 +1858,33 @@ export default function MobileRoleTasksPage() {
   if (selectedTask && detailAction) {
     return (
       <MobileTaskActionScreen
+        renderSourceAction={
+          canProcessMaterial && detailAction !== 'urge'
+            ? (render) => (
+              <EngineeringMaterialTaskAction
+                task={selectedTask}
+                profile={adminProfile}
+                mobile
+                render={render}
+                draftRef={materialDraftRef}
+                onDraftChange={saveMaterialDraft}
+                onBusyChange={setMaterialBusy}
+                onChanged={(value, result) => {
+                    restoreActionReceipt({
+                      task: selectedTask,
+                      action: result.action === 'REJECT' ? 'rejected' : 'done',
+                      status: 'confirmed',
+                      statusLabel: ENGINEERING_MATERIAL_STATUS[value.status],
+                      reason: result.reason,
+                      message: result.successMessage,
+                      scope_key: taskScopeKey,
+                    })
+                    refreshTasksAfterMutation().catch(() => {})
+                  }}
+              />
+              )
+            : null
+        }
         accessMessage={selectedTaskActionAccess.readonlyReason}
         accessState={actionAccessState}
         approvedQuantity={detailApprovedQuantityValue}
@@ -1781,6 +1923,7 @@ export default function MobileRoleTasksPage() {
             : selectedTaskActionAccess
         }
         onBack={handleDetailBack}
+        processingComplete={receiptSnapshotOnly || materialTaskSettled}
         onOpenAction={receiptSnapshotOnly ? null : handleOpenSelectedTaskAction}
         onViewReceipt={
           receiptSnapshotOnly && receiptDetailSnapshot
@@ -1853,6 +1996,7 @@ export default function MobileRoleTasksPage() {
       roleLabel={roleLabel}
       runtimeBuildIdentity={runtimeBuildIdentity}
       serverDataTime={serverDataTime}
+      refreshScopeKey={`${taskScopeKey}|${activeTaskViewKey}`}
       scrollContainerRef={scrollContainerRef}
       scrollMainToTop={scrollMainToTop}
       selectedTask={selectedTask}
@@ -1864,6 +2008,11 @@ export default function MobileRoleTasksPage() {
       setVisibleListLimitsByKey={setVisibleListLimitsByKey}
       showScrollTopButton={showScrollTopButton}
       taskKeyword={taskKeyword}
+      taskSortKey={taskSortKey}
+      taskStatusKey={taskStatusKey}
+      onTaskListOptionsChange={(options) =>
+        setTaskQueryOptions((current) => ({ ...current, ...options }))
+      }
       onSearchTasks={setTaskKeyword}
       visibleListLimitsByKey={visibleListLimitsByKey}
     />

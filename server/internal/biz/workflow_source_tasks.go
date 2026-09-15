@@ -44,6 +44,9 @@ type ProductionExceptionSourceTaskInput struct {
 }
 
 func IsSourceProducedWorkflowTaskGroup(taskGroup string) bool {
+	if IsEngineeringMaterialTaskGroup(taskGroup) {
+		return true
+	}
 	switch strings.TrimSpace(taskGroup) {
 	case WorkflowSourceTaskProductionSchedulingGroup,
 		WorkflowSourceTaskProductionExceptionGroup,
@@ -56,6 +59,12 @@ func IsSourceProducedWorkflowTaskGroup(taskGroup string) bool {
 
 func WorkflowSourceTaskCode(taskGroup string, sourceID int) string {
 	switch strings.TrimSpace(taskGroup) {
+	case WorkflowMaterialBossReviewGroup:
+		return fmt.Sprintf("source-material-boss-review-%d", sourceID)
+	case WorkflowMaterialFinanceReviewGroup:
+		return fmt.Sprintf("source-material-finance-review-%d", sourceID)
+	case WorkflowMaterialRevisionGroup:
+		return fmt.Sprintf("source-material-revision-%d", sourceID)
 	case WorkflowSourceTaskProductionSchedulingGroup:
 		return fmt.Sprintf("source-production-scheduling-%d", sourceID)
 	case WorkflowSourceTaskProductionExceptionGroup:

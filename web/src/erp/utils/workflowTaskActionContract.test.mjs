@@ -15,6 +15,8 @@ const ALL_APPROVAL_CAPABILITIES = Object.freeze([
   'finance.payment.approve',
   'warehouse.adjustment.approve',
   'production.exception.approve',
+  'engineering.material.boss_approve',
+  'engineering.material.finance_approve',
 ])
 const APPROVAL_CAPABILITIES = Object.freeze([
   'finance.payment.approve',
@@ -42,10 +44,7 @@ test('workflow task action contract binds every domain approval to its exact cap
     const task = { required_capability_key: capability }
     assert.equal(isWorkflowApprovalTask(task), true)
     assert.equal(isWorkflowProcessDecisionTask(task), true)
-    assert.equal(
-      getWorkflowTaskActionPermission('complete', task),
-      capability
-    )
+    assert.equal(getWorkflowTaskActionPermission('complete', task), capability)
     assert.equal(
       getWorkflowProcessDecisionApprovalProfile(task),
       PROFILE_BY_CAPABILITY[capability]

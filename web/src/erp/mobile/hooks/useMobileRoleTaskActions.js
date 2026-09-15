@@ -81,6 +81,9 @@ function normalizeMobileTaskReceipt(value) {
     reason: String(value.reason || '').trim(),
     scope_key: String(value.scope_key || '').trim(),
     status,
+    ...(value.statusLabel
+      ? { statusLabel: String(value.statusLabel).trim() }
+      : {}),
     task,
   }
 }

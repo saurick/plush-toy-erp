@@ -34,6 +34,15 @@ export async function getEngineeringMaterialRequest(params, options = {}) {
     )
   )
 }
+export async function listEngineeringMaterialRequests(params, options = {}) {
+  return dataOf(
+    await salesOrderRpc.call(
+      'list_engineering_material_requests',
+      params,
+      options
+    )
+  )
+}
 export async function submitEngineeringMaterialRequest(params) {
   return dataOf(
     await salesOrderRpc.call('submit_engineering_material_request', params)
@@ -412,6 +421,17 @@ export async function disableContact(params = {}) {
 export async function listSalesOrders(params = {}, options = {}) {
   const result = await salesOrderRpc.call('list_sales_orders', params, options)
   return dataOf(result)
+}
+
+export async function listSalesOrderSummary(params = {}, options = {}) {
+  const result = await salesOrderRpc.call('list_sales_order_summary', params, options)
+  return dataOf(result)
+}
+
+export async function listAllSalesOrderSummary(params = {}, options = {}) {
+  return listAllPaginatedRecords(listSalesOrderSummary, params, 'items', options, {
+    invalidResponseMessage: '服务器返回的销售汇总不完整，请刷新后重试',
+  })
 }
 
 export async function listAllSalesOrders(params = {}, options = {}) {

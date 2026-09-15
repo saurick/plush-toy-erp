@@ -59,7 +59,7 @@ func (r *salesOrderRepo) lockEngineeringOrder(ctx context.Context, client *ent.C
 }
 
 func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, client *ent.Client, order *ent.SalesOrder, lock bool) (*biz.EngineeringMaterialRequest, error) {
-	result := &biz.EngineeringMaterialRequest{SalesOrderID: order.ID, OrderNo: order.OrderNo, SourceOrderVersion: order.Version, Status: "PREVIEW", Items: []*biz.EngineeringMaterialRequestItem{}, Sources: []map[string]any{}, Issues: []string{}, PurchaseOrders: []biz.EngineeringMaterialPurchaseOrder{}}
+	result := &biz.EngineeringMaterialRequest{SalesOrderID: order.ID, OrderNo: order.OrderNo, OrderStatus: order.LifecycleStatus, SourceOrderVersion: order.Version, Status: "PREVIEW", Items: []*biz.EngineeringMaterialRequestItem{}, Sources: []map[string]any{}, Issues: []string{}, PurchaseOrders: []biz.EngineeringMaterialPurchaseOrder{}}
 	if order.LifecycleStatus != biz.SalesOrderStatusActive {
 		result.Issues = append(result.Issues, "订单生效后才能提交采购用料审批")
 	}
@@ -109,6 +109,10 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 		if len(header.Edges.Items) == 0 {
 			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行 BOM 没有材料明细", line.LineNo))
 		}
+		productUnit, err := client.Unit.Get(ctx, line.UnitID)
+		if err != nil {
+			return nil, err
+		}
 		productionQuantity := line.OrderedQuantity.Add(line.PreShipmentSampleQuantity)
 		for _, part := range header.Edges.Items {
 			mq := client.Material.Query().Where(material.ID(part.MaterialID)).WithSupplier().WithDefaultUnit()
@@ -145,7 +149,7 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 				result.Items = append(result.Items, group)
 			}
 			group.RequiredQuantity = group.RequiredQuantity.Add(usage)
-			result.Sources = append(result.Sources, map[string]any{"sales_order_item_id": line.ID, "line_no": line.LineNo, "product_id": line.ProductID, "product_name": line.ProductNameSnapshot, "product_sku_id": line.ProductSkuID, "bom_id": header.ID, "bom_version": header.Version, "bom_edit_version": header.UpdatedAt.UnixMicro(), "sample_image_attachment_id": imageID, "bom_item_id": part.ID, "material_id": m.ID, "unit_id": u.ID, "position": part.Position, "piece_count": part.PieceCount, "unit_usage": part.Quantity.String(), "loss_rate": part.LossRate.String(), "production_quantity": productionQuantity.String(), "total_usage": usage.String(), "process_base": part.ProcessBase, "process_method": part.ProcessMethod})
+			result.Sources = append(result.Sources, map[string]any{"sales_order_item_id": line.ID, "line_no": line.LineNo, "product_id": line.ProductID, "product_name": line.ProductNameSnapshot, "product_code": line.ProductCodeSnapshot, "customer_product_no": line.CustomerProductNo, "order_date": order.OrderDate.Format("2006-01-02"), "ordered_quantity": line.OrderedQuantity.String(), "pre_shipment_sample_quantity": line.PreShipmentSampleQuantity.String(), "product_unit_name": productUnit.Name, "process_requirement": line.ProcessRequirement, "product_sku_id": line.ProductSkuID, "bom_id": header.ID, "bom_version": header.Version, "bom_edit_version": header.UpdatedAt.UnixMicro(), "sample_image_attachment_id": imageID, "bom_item_id": part.ID, "material_id": m.ID, "unit_id": u.ID, "position": part.Position, "piece_count": part.PieceCount, "unit_usage": part.Quantity.String(), "loss_rate": part.LossRate.String(), "production_quantity": productionQuantity.String(), "total_usage": usage.String(), "process_base": part.ProcessBase, "process_method": part.ProcessMethod, "material_note": part.Note})
 		}
 	}
 	if len(result.Items) > 2000 {
@@ -176,7 +180,22 @@ func engineeringMaterialSourceHash(in *biz.EngineeringMaterialRequest) string {
 		}
 		return items[i].UnitID < items[j].UnitID
 	})
-	payload, _ := json.Marshal([]any{in.SalesOrderID, in.SourceOrderVersion, in.Sources, items})
+	// Header annotations do not add procurement inputs. Their source changes are
+	// guarded by the order version and the confirmed BOM version/fingerprint.
+	// Keep the digest tied to manufacturing inputs as the read model grows.
+	sources := make([]map[string]any, len(in.Sources))
+	for index, source := range in.Sources {
+		entry := make(map[string]any, len(source))
+		for key, value := range source {
+			switch key {
+			case "product_code", "customer_product_no", "order_date", "ordered_quantity", "pre_shipment_sample_quantity", "product_unit_name", "process_requirement", "material_note":
+				continue
+			}
+			entry[key] = value
+		}
+		sources[index] = entry
+	}
+	payload, _ := json.Marshal([]any{in.SalesOrderID, in.SourceOrderVersion, sources, items})
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:])
 }
@@ -201,6 +220,16 @@ func (r *salesOrderRepo) SubmitEngineeringMaterialRequest(ctx context.Context, i
 		if result.SourceOrderVersion != in.ExpectedVersion || result.SourceHash != in.ExpectedSourceHash {
 			return nil, biz.ErrMaterialRequestConflict
 		}
+		if order.LifecycleStatus != biz.SalesOrderStatusActive {
+			return nil, biz.ErrMaterialRequestNotReady
+		}
+		if _, err := ensureEngineeringMaterialTask(ctx, tx.Client(), result, in.ActorID); err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
 		return result, nil
 	}
 	if !ent.IsNotFound(err) {
@@ -219,6 +248,9 @@ func (r *salesOrderRepo) SubmitEngineeringMaterialRequest(ctx context.Context, i
 	if len(preview.Issues) > 0 || len(preview.Items) == 0 {
 		return nil, biz.ErrMaterialRequestNotReady
 	}
+	if err := r.settleMaterialRevisionForResubmit(ctx, tx.Client(), order.ID, in.ActorID, in.WorkflowTaskID, in.ExpectedTaskVersion); err != nil {
+		return nil, err
+	}
 	row, err := tx.EngineeringMaterialRequest.Create().SetSalesOrderID(order.ID).SetSourceOrderVersion(order.Version).SetOrderNoSnapshot(order.OrderNo).SetSourceSnapshot(preview.Sources).SetSubmittedBy(in.ActorID).Save(ctx)
 	if err != nil {
 		return nil, err
@@ -231,6 +263,9 @@ func (r *salesOrderRepo) SubmitEngineeringMaterialRequest(ctx context.Context, i
 	}
 	result, err := loadEngineeringMaterialRequest(ctx, tx.Client(), row)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := ensureEngineeringMaterialTask(ctx, tx.Client(), result, in.ActorID); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -271,6 +306,16 @@ func (r *salesOrderRepo) ReviewEngineeringMaterialRequest(ctx context.Context, i
 	}
 	if row.Version != in.ExpectedVersion {
 		return nil, biz.ErrMaterialRequestConflict
+	}
+	if order.LifecycleStatus != biz.SalesOrderStatusActive {
+		return nil, biz.ErrMaterialRequestNotReady
+	}
+	if row.Status != biz.MaterialRequestSubmitted && row.Status != biz.MaterialRequestBossApproved {
+		return nil, biz.ErrMaterialRequestReviewInvalid
+	}
+	task, err := r.requireEngineeringMaterialTask(ctx, tx.Client(), current, in.ActorID, in.WorkflowTaskID, in.ExpectedTaskVersion)
+	if err != nil {
+		return nil, err
 	}
 	now := time.Now()
 	update := tx.EngineeringMaterialRequest.UpdateOneID(row.ID).AddVersion(1)
@@ -317,8 +362,18 @@ func (r *salesOrderRepo) ReviewEngineeringMaterialRequest(ctx context.Context, i
 	if err != nil {
 		return nil, err
 	}
+	taskStatus := "done"
+	if in.Action == "REJECT" {
+		taskStatus = "rejected"
+	}
+	if err := settleEngineeringMaterialTask(ctx, tx.Client(), task, taskStatus, in.ActorID, in.Note); err != nil {
+		return nil, err
+	}
 	result, err := loadEngineeringMaterialRequest(ctx, tx.Client(), row)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := ensureEngineeringMaterialTask(ctx, tx.Client(), result, in.ActorID); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -406,7 +461,12 @@ func (r *salesOrderRepo) generateMaterialPurchaseOrders(ctx context.Context, cli
 }
 
 func loadEngineeringMaterialRequest(ctx context.Context, client *ent.Client, row *ent.EngineeringMaterialRequest) (*biz.EngineeringMaterialRequest, error) {
+	order, err := client.SalesOrder.Get(ctx, row.SalesOrderID)
+	if err != nil {
+		return nil, err
+	}
 	result := &biz.EngineeringMaterialRequest{ID: row.ID, SalesOrderID: row.SalesOrderID, OrderNo: row.OrderNoSnapshot, SourceOrderVersion: row.SourceOrderVersion, Status: row.Status, Version: row.Version, Sources: row.SourceSnapshot, Items: []*biz.EngineeringMaterialRequestItem{}, Issues: []string{}, SubmittedBy: row.SubmittedBy, SubmittedAt: &row.SubmittedAt, BossReviewedBy: row.BossReviewedBy, BossReviewedAt: row.BossReviewedAt, FinanceReviewedBy: row.FinanceReviewedBy, FinanceReviewedAt: row.FinanceReviewedAt, RejectedBy: row.RejectedBy, RejectedAt: row.RejectedAt, ReviewNote: row.ReviewNote, BossReviewNote: row.BossReviewNote, FinanceReviewNote: row.FinanceReviewNote, PurchaseOrders: []biz.EngineeringMaterialPurchaseOrder{}}
+	result.OrderStatus = order.LifecycleStatus
 	items, err := client.EngineeringMaterialRequestItem.Query().Where(engineeringmaterialrequestitem.RequestID(row.ID)).Order(ent.Asc(engineeringmaterialrequestitem.FieldID)).All(ctx)
 	if err != nil {
 		return nil, err

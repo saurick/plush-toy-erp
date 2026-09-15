@@ -27,7 +27,9 @@ func (d *jsonrpcDispatcher) handleSalesOrder(
 	}
 
 	switch method {
-	case "get_engineering_material_request", "submit_engineering_material_request", "boss_review_engineering_material_request", "finance_review_engineering_material_request":
+	case "list_sales_order_summary":
+		return d.handleSalesOrderSummary(ctx, id, pm)
+	case "list_engineering_material_requests", "get_engineering_material_request", "submit_engineering_material_request", "boss_review_engineering_material_request", "finance_review_engineering_material_request":
 		return d.handleEngineeringMaterialRequest(ctx, method, id, pm, claims.UserID)
 	case "save_sales_order_engineering":
 		return d.handleSalesOrderEngineering(ctx, id, pm, claims.UserID)

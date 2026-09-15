@@ -20,6 +20,8 @@ var workflowApprovalCapabilityKeys = []string{
 	PermissionFinancePaymentApprove,
 	PermissionWarehouseAdjustmentApprove,
 	PermissionProductionExceptionApprove,
+	PermissionEngineeringMaterialBossApprove,
+	PermissionEngineeringMaterialFinanceApprove,
 }
 
 func WorkflowApprovalCapabilityKeys() []string {

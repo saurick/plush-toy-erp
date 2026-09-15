@@ -11,6 +11,8 @@ func TestWorkflowApprovalCapabilityKeysReturnsCompleteCopy(t *testing.T) {
 		PermissionFinancePaymentApprove,
 		PermissionWarehouseAdjustmentApprove,
 		PermissionProductionExceptionApprove,
+		PermissionEngineeringMaterialBossApprove,
+		PermissionEngineeringMaterialFinanceApprove,
 	}
 	got := WorkflowApprovalCapabilityKeys()
 	if !reflect.DeepEqual(got, want) {

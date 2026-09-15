@@ -60,7 +60,11 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
     ERP_MENU_PERMISSION_GROUPS.find(
       (section) => section.title === '看板中心'
     )?.items.map((item) => item.key),
-    ['/erp/dashboard', '/erp/task-board', '/erp/business-dashboard']
+    [
+      '/erp/dashboard',
+      '/erp/task-board',
+      '/erp/business-dashboard',
+    ]
   )
   assert.deepEqual(
     ERP_MENU_PERMISSION_GROUPS.find(

@@ -2526,9 +2526,11 @@ export async function installFactRpcMocks(page, context) {
           .toLowerCase()
         const roleKey = String(params.role_key || '').trim()
         const viewKey = String(params.view_key || '').trim()
+        const sortKey = params.sort_key || ''
+        const statusKey = params.status_key || ''
         const limit = Math.min(Math.max(Number(params.limit || 50), 1), 100)
         const cursor = String(params.cursor || '').trim()
-        const cursorSnapshotKey = `${viewKey}|${roleKey}|${keyword}|${cursor}`
+        const cursorSnapshotKey = `${viewKey}|${roleKey}|${keyword}|${sortKey}|${statusKey}|${cursor}`
         const snapshotAt = cursor
           ? workflowRoleTaskSnapshotByCursor.get(cursorSnapshotKey) ||
             Number(nowUnix())
@@ -2550,7 +2552,8 @@ export async function installFactRpcMocks(page, context) {
             effectiveSession,
             'workflow.task.supervise'
           )
-        const matchesView = (task, targetViewKey, targetBeforeID = 0) => {
+        const matchesView = (task, targetViewKey) => {
+          if (statusKey && task.task_status_key !== statusKey) return false
           if (
             keyword &&
             ![
@@ -2589,20 +2592,29 @@ export async function installFactRpcMocks(page, context) {
           return (
             roleMatched &&
             viewMatched &&
-            (!targetBeforeID || task.id < targetBeforeID) &&
             workflowMockCanViewTask(adminProfile, effectiveSession, task)
           )
         }
         const matchingTasks = workflowTasks
-          .filter((task) => matchesView(task, viewKey, beforeID))
-          .sort((left, right) => right.id - left.id)
-        const items = matchingTasks.slice(0, limit)
-        const hasMore = matchingTasks.length > limit
+          .filter((task) => matchesView(task, viewKey))
+          .sort((left, right) => {
+            if (sortKey === 'due') {
+              const delta = (left.due_at || Infinity) - (right.due_at || Infinity)
+              if (delta) return delta
+            } else if (sortKey === 'newest' || sortKey === 'oldest') {
+              const delta = Number(left.created_at || 0) - Number(right.created_at || 0)
+              if (delta) return sortKey === 'newest' ? -delta : delta
+            }
+            return right.id - left.id
+          })
+        const startIndex = beforeID ? matchingTasks.findIndex((task) => task.id === beforeID) + 1 : 0
+        const items = matchingTasks.slice(startIndex, startIndex + limit)
+        const hasMore = matchingTasks.length > startIndex + limit
         const nextCursor =
           hasMore && items.length > 0 ? String(items[items.length - 1].id) : ''
         if (nextCursor) {
           workflowRoleTaskSnapshotByCursor.set(
-            `${viewKey}|${roleKey}|${keyword}|${nextCursor}`,
+            `${viewKey}|${roleKey}|${keyword}|${sortKey}|${statusKey}|${nextCursor}`,
             snapshotAt
           )
         }

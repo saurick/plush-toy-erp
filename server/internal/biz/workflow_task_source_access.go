@@ -133,6 +133,10 @@ func ResolveWorkflowTaskSourceAccessContract(task *WorkflowTask) WorkflowTaskSou
 	}
 
 	switch {
+	case IsTrustedEngineeringMaterialTask(task):
+		return WorkflowTaskSourceAccessContract{Applicable: true, Resolved: true,
+			Kind: WorkflowMaterialRequestSourceType, SourceType: sourceType,
+			RequiredAll: []string{PermissionEngineeringMaterialRead}}
 	case trustedProductionSchedulingSourceLink(task):
 		return WorkflowTaskSourceAccessContract{
 			Applicable:  true,

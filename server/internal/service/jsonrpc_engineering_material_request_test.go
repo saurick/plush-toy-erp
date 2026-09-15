@@ -12,6 +12,41 @@ type engineeringMaterialJSONRPCRepo struct {
 	*stubSalesOrderJSONRPCRepo
 	review *biz.EngineeringMaterialReview
 	submit *biz.EngineeringMaterialSubmit
+	list   *biz.EngineeringMaterialListFilter
+}
+
+func (r *engineeringMaterialJSONRPCRepo) ListEngineeringMaterialRequests(_ context.Context, filter biz.EngineeringMaterialListFilter) (*biz.EngineeringMaterialList, error) {
+	r.list = &filter
+	return &biz.EngineeringMaterialList{Items: []*biz.EngineeringMaterialListItem{}, Total: 0}, nil
+}
+
+func TestEngineeringMaterialListJSONRPCRequiresSourceReadAndValidFilters(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		permissions []string
+		params      map[string]any
+		allowed     bool
+	}{
+		{"workbench and source reads", []string{biz.PermissionERPWorkbenchRead, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, map[string]any{"keyword": "order", "page": 2, "limit": 10, "status": "APPROVED"}, true},
+		{"missing workbench read", []string{biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, map[string]any{}, false},
+		{"missing material read", []string{biz.PermissionSalesOrderRead}, map[string]any{}, false},
+		{"missing order read", []string{biz.PermissionEngineeringMaterialRead}, map[string]any{}, false},
+		{"invalid status", []string{biz.PermissionERPWorkbenchRead, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, map[string]any{"status": "PREVIEW"}, false},
+		{"invalid limit", []string{biz.PermissionERPWorkbenchRead, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, map[string]any{"limit": 101}, false},
+		{"invalid page type", []string{biz.PermissionERPWorkbenchRead, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, map[string]any{"page": "2"}, false},
+		{"unknown filter", []string{biz.PermissionERPWorkbenchRead, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, map[string]any{"actor_id": 99}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := &stubSalesOrderJSONRPCRepo{}
+			d := newSalesOrderJSONRPCTestData(t, base, workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, tc.permissions...))
+			repo := &engineeringMaterialJSONRPCRepo{stubSalesOrderJSONRPCRepo: base}
+			d.salesOrderUC = biz.NewSalesOrderUsecase(repo)
+			_, result, err := d.handleSalesOrder(workflowJSONRPCAdminContext(), "list_engineering_material_requests", "list", mustJSONRPCStruct(t, tc.params))
+			if err != nil || (result.Code == errcode.OK.Code) != tc.allowed || (repo.list != nil) != tc.allowed {
+				t.Fatalf("result: %+v error: %v filter: %+v", result, err, repo.list)
+			}
+		})
+	}
 }
 
 func (r *engineeringMaterialJSONRPCRepo) GetEngineeringMaterialRequest(context.Context, int, bool) (*biz.EngineeringMaterialRequest, error) {
@@ -36,6 +71,10 @@ func TestEngineeringMaterialJSONRPCSeparatesReviewersAndRejectsSourceOverrides(t
 		{name: "engineering submit", method: "submit_engineering_material_request", permissions: []string{biz.PermissionEngineeringMaterialSubmit}, allowed: true},
 		{name: "sales cannot submit", method: "submit_engineering_material_request", permissions: []string{biz.PermissionSalesOrderUpdate}},
 		{name: "boss reviews", method: "boss_review_engineering_material_request", action: "BOSS_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialBossApprove}, allowed: true},
+		{name: "boss reviews from task", method: "boss_review_engineering_material_request", action: "BOSS_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialBossApprove}, extra: map[string]any{"task_id": 7, "expected_task_version": 2}, allowed: true},
+		{name: "task version required", method: "boss_review_engineering_material_request", action: "BOSS_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialBossApprove}, extra: map[string]any{"task_id": 7}},
+		{name: "task ID required", method: "boss_review_engineering_material_request", action: "BOSS_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialBossApprove}, extra: map[string]any{"expected_task_version": 2}},
+		{name: "positive task ID required", method: "boss_review_engineering_material_request", action: "BOSS_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialBossApprove}, extra: map[string]any{"task_id": -1, "expected_task_version": 2}},
 		{name: "boss cannot take finance action", method: "boss_review_engineering_material_request", action: "FINANCE_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialBossApprove}},
 		{name: "finance requires readable sources", method: "finance_review_engineering_material_request", action: "FINANCE_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialFinanceApprove, biz.PermissionFieldProcurementCommercialRead}},
 		{name: "finance approves with source read", method: "finance_review_engineering_material_request", action: "FINANCE_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialFinanceApprove, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead, biz.PermissionFieldProcurementCommercialRead}, allowed: true},
@@ -74,6 +113,9 @@ func TestEngineeringMaterialJSONRPCSeparatesReviewersAndRejectsSourceOverrides(t
 			}
 			if tc.allowed && repo.review != nil && repo.review.ActorID <= 0 {
 				t.Fatal("missing authenticated reviewer")
+			}
+			if tc.allowed && tc.extra["task_id"] != nil && (repo.review.WorkflowTaskID != 7 || repo.review.ExpectedTaskVersion != 2) {
+				t.Fatal("task concurrency context was discarded")
 			}
 		})
 	}

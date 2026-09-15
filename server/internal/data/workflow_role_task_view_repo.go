@@ -85,8 +85,7 @@ func loadWorkflowRoleTaskView(ctx context.Context, client *ent.Client, query biz
 		}
 	}
 
-	rows, err := dbQuery.
-		Order(ent.Desc(workflowtask.FieldID)).
+	rows, err := orderWorkflowRoleTasks(dbQuery, query.SortKey).
 		Limit(query.Limit + 1).
 		All(ctx)
 	if err != nil {
@@ -104,12 +103,21 @@ func loadWorkflowRoleTaskView(ctx context.Context, client *ent.Client, query biz
 		return nil, err
 	}
 	nextID := 0
+	var nextTime *time.Time
 	if hasMore && len(rows) > 0 {
-		nextID = rows[len(rows)-1].ID
+		last := rows[len(rows)-1]
+		nextID = last.ID
+		switch query.SortKey {
+		case biz.WorkflowRoleTaskSortNewest, biz.WorkflowRoleTaskSortOldest:
+			nextTime = &last.CreatedAt
+		case biz.WorkflowRoleTaskSortDue:
+			nextTime = last.DueAt
+		}
 	}
 	return &biz.WorkflowRoleTaskViewPage{
 		Items:      items,
 		NextID:     nextID,
+		NextTime:   nextTime,
 		HasMore:    hasMore,
 		SnapshotAt: query.SnapshotAt,
 		Counts:     counts,
@@ -124,7 +132,7 @@ func buildWorkflowRoleTaskEntQuery(
 ) *ent.WorkflowTaskQuery {
 	dbQuery := buildWorkflowRoleTaskVisibilityEntQuery(client, query, viewKey)
 	if beforeID > 0 {
-		dbQuery = dbQuery.Where(workflowtask.IDLT(beforeID))
+		dbQuery = dbQuery.Where(workflowRoleTaskPageAfter(query, beforeID))
 	}
 
 	switch viewKey {
@@ -216,6 +224,9 @@ func buildWorkflowRoleTaskVisibilityEntQuery(
 	viewKey string,
 ) *ent.WorkflowTaskQuery {
 	dbQuery := client.WorkflowTask.Query()
+	if query.StatusKey != "" {
+		dbQuery = dbQuery.Where(workflowtask.TaskStatusKey(query.StatusKey))
+	}
 	if query.Keyword != "" {
 		dbQuery = dbQuery.Where(workflowTaskKeywordPredicate(query.Keyword))
 	}
@@ -240,6 +251,45 @@ func buildWorkflowRoleTaskVisibilityEntQuery(
 		visibility = append(visibility, workflowtask.AssigneeID(*query.VisibleAssigneeID))
 	}
 	return dbQuery.Where(workflowtask.Or(visibility...))
+}
+
+func orderWorkflowRoleTasks(query *ent.WorkflowTaskQuery, sortKey string) *ent.WorkflowTaskQuery {
+	switch sortKey {
+	case biz.WorkflowRoleTaskSortNewest:
+		query = query.Order(ent.Desc(workflowtask.FieldCreatedAt))
+	case biz.WorkflowRoleTaskSortOldest:
+		query = query.Order(ent.Asc(workflowtask.FieldCreatedAt))
+	case biz.WorkflowRoleTaskSortDue:
+		query = query.Order(workflowtask.ByDueAt(entsql.OrderNullsLast()))
+	}
+	return query.Order(ent.Desc(workflowtask.FieldID))
+}
+
+// The timestamp and ID form a stable cursor, including the final no-deadline bucket.
+func workflowRoleTaskPageAfter(query biz.WorkflowRoleTaskViewQuery, beforeID int) predicate.WorkflowTask {
+	idAfter := workflowtask.IDLT(beforeID)
+	switch query.SortKey {
+	case biz.WorkflowRoleTaskSortNewest, biz.WorkflowRoleTaskSortOldest:
+		if query.BeforeTime == nil {
+			return workflowtask.IDEQ(0)
+		}
+		afterTime := workflowtask.CreatedAtLT(*query.BeforeTime)
+		if query.SortKey == biz.WorkflowRoleTaskSortOldest {
+			afterTime = workflowtask.CreatedAtGT(*query.BeforeTime)
+		}
+		return workflowtask.Or(afterTime, workflowtask.And(workflowtask.CreatedAtEQ(*query.BeforeTime), idAfter))
+	case biz.WorkflowRoleTaskSortDue:
+		if query.BeforeTime == nil {
+			return workflowtask.And(workflowtask.DueAtIsNil(), idAfter)
+		}
+		return workflowtask.Or(
+			workflowtask.DueAtGT(*query.BeforeTime),
+			workflowtask.And(workflowtask.DueAtEQ(*query.BeforeTime), idAfter),
+			workflowtask.DueAtIsNil(),
+		)
+	default:
+		return idAfter
+	}
 }
 
 func workflowRoleTaskRiskPredicate(snapshotAt time.Time) predicate.WorkflowTask {

@@ -1,7 +1,8 @@
-import { createTabMotionScenarios } from './tabMotionScenarios.mjs'
 import { createBusinessFormInteractionScenarios } from './businessFormInteractionScenarios.mjs'
 import { createBusinessPageContractScenarios } from './businessPageContractScenarios.mjs'
 import { createAuditLogScenarios } from './auditLogScenarios.mjs'
+import { createTabMotionScenarios } from './tabMotionScenarios.mjs'
+import { createTableAlignmentScenarios } from './tableAlignmentScenarios.mjs'
 import { createMobileTaskScenarios } from './mobileTaskScenarios.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
 import { createTaskImagePreviewScenarios } from './taskImagePreviewScenarios.mjs'
@@ -30,6 +31,7 @@ import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliverySce
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
 import { createProductPaginationScenarios } from './productPaginationScenarios.mjs'
 import { createSalesOrderImportScenarios } from './salesOrderImportScenarios.mjs'
+import { createWorkbenchSummaryScenarios } from './workbenchSummaryScenarios.mjs'
 import { createSalesOrderImportValidationScenarios } from './salesOrderImportValidationScenarios.mjs'
 import { createBusinessCellTextScenarios } from './businessCellTextScenarios.mjs'
 import { createBusinessFieldDensityScenarios } from './businessFieldDensityScenarios.mjs'
@@ -317,6 +319,7 @@ export function createStyleL1Scenarios(deps) {
     ...createBusinessFieldDensityScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createBusinessCellTextScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createSalesOrderImportScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createWorkbenchSummaryScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createSalesOrderImportValidationScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createDevWorkbenchDesktopScenarios({
       assert,
@@ -381,6 +384,11 @@ export function createStyleL1Scenarios(deps) {
       path,
     }),
     ...createTabMotionScenarios({ outputDir }),
+    ...createTableAlignmentScenarios({
+      outputDir,
+      customerRuntimeEffectiveSession,
+      gotoScenarioPath,
+    }),
     ...createAuthenticationEntryScenarios({
       expectHeading,
       expectButton,

@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+import { yoyoosunMenuConfig } from "../../config/customers/yoyoosun/menuConfig.mjs";
 
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import { yoyoosunFlowOrchestrationCoverage } from "../../config/customers/yoyoosun/flowOrchestrationCoverage.mjs";
@@ -23,6 +25,11 @@ import { BOM_PART_FIELDS } from "../../web/src/erp/utils/bomMaterialGroups.mjs";
 import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from "../../web/src/erp/utils/purchaseOrderPrintDraft.mjs";
 
 const syntheticSourceId = "__synthetic_yoyoosun_trial__";
+test("browser customer menu follows the customer package menu source", () => {
+  const context = { window: {} };
+  runInNewContext(readFileSync("config/customers/yoyoosun/customer-config.example.js", "utf8"), context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.window.__PLUSH_ERP_CUSTOMER_CONFIG__.desktopMenu)), yoyoosunMenuConfig.desktopMenu);
+});
 const requiredSourceCategories = new Set([
   "purchase_material_summary",
   "outsourcing_summary",

@@ -250,6 +250,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	// Shared ERP entries.
 	add(PermissionERPWorkbenchRead,
 		menuPermissionSurface("global-dashboard", "role-workbench", "岗位工作台", "dashboard-content", "工作台内容", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "get_workbench", "list_workbench_role_tasks"), workflowUsageConditions),
+		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "workbench-summary-list", "按来源权限查看汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary", "list_engineering_material_requests"), businessUsageConditions),
 	)
 	add(PermissionERPBusinessDashboardRead,
 		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "业务看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "dashboard_stats"), businessUsageConditions),
@@ -301,11 +302,15 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	// Sales orders.
 	salesOrderReadMethods := append(permissionMethods("sales_order", "get_sales_order", "list_sales_orders"), permissionMethods("customer_config", "get_sales_order_acceptance_process", "start_sales_order_acceptance_process")...)
 	add(PermissionSalesOrderRead,
+		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "sales-order-summary", "销售订单产品明细汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary"), businessUsageConditions),
 		menuPermissionSurface("sales-orders", "sales-orders", "销售订单", "sales-order-list", "销售订单列表和详情", permissionControlPage, "允许进入并查看", salesOrderReadMethods, businessUsageConditions),
 		menuPermissionSurface("shipping-release", "sales-order-release-context", "销售订单", "sales-order-release-reference", "出货放行的订单依据", permissionControlSection, "允许查看", permissionMethods("sales_order", "get_sales_order", "list_sales_orders"), businessUsageConditions),
 		menuPermissionSurface("shipments", "shipment-source", "销售订单来源", "shipment-source-order-reference", "出货单可导入的销售订单", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), businessUsageConditions),
 	)
-	addMenu(PermissionEngineeringMaterialRead, "sales-orders", "sales-order-actions", "销售订单", "engineering-material-read", "查看工程用料汇总", permissionControlForm, "查看工程用料汇总", permissionMethods("sales_order", "get_engineering_material_request"), businessUsageConditions)
+	add(PermissionEngineeringMaterialRead,
+		menuPermissionSurface("sales-orders", "sales-order-actions", "销售订单", "engineering-material-read", "查看工程用料汇总", permissionControlForm, "查看工程用料汇总", permissionMethods("sales_order", "get_engineering_material_request"), businessUsageConditions),
+		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "material-summary-list", "材料汇总清单与详情", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_engineering_material_requests", "get_engineering_material_request"), businessUsageConditions),
+	)
 	addMenu(PermissionEngineeringMaterialSubmit, "sales-orders", "sales-order-actions", "销售订单", "engineering-material-submit", "提交工程用料审批", permissionControlForm, "提交工程用料审批", permissionMethods("sales_order", "submit_engineering_material_request"), businessUsageConditions)
 	addMenu(PermissionEngineeringMaterialBossApprove, "sales-orders", "sales-order-actions", "销售订单", "engineering-material-boss_approve", "审核工程用料", permissionControlForm, "审核工程用料", permissionMethods("sales_order", "boss_review_engineering_material_request"), businessUsageConditions)
 	addMenu(PermissionEngineeringMaterialFinanceApprove, "sales-orders", "sales-order-actions", "销售订单", "engineering-material-finance_approve", "核价批准工程采购", permissionControlForm, "核价批准工程采购", permissionMethods("sales_order", "finance_review_engineering_material_request"), businessUsageConditions)
@@ -318,6 +323,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionSalesOrderClose, "sales-orders", "sales-order-actions", "订单动作", "close-sales-order", "关闭销售订单", permissionControlButton, "显示并允许关闭", permissionMethods("sales_order", "close_sales_order"), businessUsageConditions)
 	addMenu(PermissionSalesOrderCancel, "sales-orders", "sales-order-actions", "订单动作", "cancel-sales-order", "取消销售订单", permissionControlButton, "显示并允许取消", permissionMethods("sales_order", "cancel_sales_order"), businessUsageConditions)
 	add(PermissionSalesOrderItemRead,
+		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "sales-order-summary-items", "销售订单产品明细汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary"), businessUsageConditions),
 		menuPermissionSurface("sales-orders", "sales-order-items", "订单明细", "sales-order-item-list", "销售订单明细", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_items"), businessUsageConditions),
 		menuPermissionSurface("shipments", "shipment-source", "销售订单来源", "shipment-source-item-reference", "出货单可导入的销售订单行", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), businessUsageConditions),
 	)

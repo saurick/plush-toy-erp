@@ -1,4 +1,7 @@
 .erp-command-center-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   min-width: 0;
 }
 
@@ -179,18 +182,6 @@
   gap: 12px;
   min-width: 0;
   padding: 16px;
-}
-
-.erp-workbench-command-head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 16px;
-  min-width: 0;
-}
-
-.erp-workbench-command-head > div {
-  min-width: 0;
 }
 
 .erp-product-core-dashboard .ant-card-body {
@@ -513,6 +504,11 @@
   outline-offset: 3px;
 }
 
+.erp-dashboard-page[data-task-focus-input='pointer']
+  .erp-task-title-entry:focus {
+  outline: none;
+}
+
 .erp-task-processing-hint {
   display: flex;
   width: 100%;
@@ -588,28 +584,6 @@
   grid-template-columns: minmax(84px, 120px) minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-}
-
-.erp-business-board-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 360px);
-  gap: 16px;
-  align-items: stretch;
-}
-
-.erp-business-board-hero--compact {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-}
-
-.erp-business-board-hero-main,
-.erp-business-board-hero-side {
-  min-width: 0;
-}
-
-.erp-business-board-hero-side {
-  display: grid;
-  gap: 12px;
 }
 
 .erp-business-board-mini-chart {

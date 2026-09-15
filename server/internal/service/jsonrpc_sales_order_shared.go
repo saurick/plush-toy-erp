@@ -164,6 +164,8 @@ func salesOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.SalesOrder
 func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrForbidden):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "当前用料待办已指定其他处理人，请刷新后核对"}
 	case errors.Is(err, biz.ErrSalesOrderEngineeringNotReady):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先关联有效产品、上传产品主图并补齐该产品的 BOM 物料，再开始打样"}
 	case errors.Is(err, biz.ErrMaterialRequestNotReady):

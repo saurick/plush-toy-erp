@@ -364,13 +364,14 @@
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-task-action-drawer__step--active {
-  background: var(--erp-surface-bg-soft);
+[data-erp-theme='dark'] .erp-task-action-drawer__guide-steps {
+  --erp-slider-bg: var(--erp-surface-bg-soft);
 }
 
 [data-erp-theme='dark']
   .erp-task-action-drawer__step:hover:not(
-    .erp-task-action-drawer__step--disabled
+    .erp-task-action-drawer__step--disabled,
+    .erp-task-action-drawer__step--active
   ),
 [data-erp-theme='dark'] .erp-task-action-drawer__action-option:hover,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-option:focus-visible,

@@ -197,7 +197,7 @@
 | `action-modal-drawer-standard-v1/index.html` | To Implement | Core | 局部动作弹窗标准样板，只承接来源选择器、列顺序、状态规则说明和危险确认；不再复制完整业务表单或只读详情。目录名保留历史 `drawer` 字样仅为引用兼容。 |
 | `business-module-page-standard-v1/images/` | Reference | Exploration / Evidence | 早期三张协同入口方向图，用于追溯方案比较。 |
 | `mobile-role-tasks-v2/index.html` | Current | Core | 当前选中任务查看、处理、任务附件和可信回执流程；与 v1 当前列表基线共同组成移动任务主路径。 |
-| `mobile-role-tasks-v1/implemented-reference.html` | Current | Core | 岗位任务端当前列表基线，只保留标签、筛选、分批展开、刷新和任务选择；详情、处理与结果回执由 v2 唯一定义。 |
+| `mobile-role-tasks-v1/implemented-reference.html` | Current | Core | 岗位任务端当前列表基线，包含紧凑顶部、我的显示设置、标签、筛选、分批展开、局部刷新反馈和任务选择；详情、处理与结果回执由 v2 唯一定义。 |
 | `mobile-role-tasks-v1/images/` | Reference | Exploration / Evidence | 岗位任务端改版三张 PNG 原型图，作为早期视觉方向和历史参考。 |
 
 当前中央登记共 27 项资产：17 个 HTML、10 个 PNG；15 个 HTML 保持 `To Implement`。`mobile-role-tasks-v1/implemented-reference.html` 和 `mobile-role-tasks-v2/index.html` 都是 `Current`，分别登记列表基线和选中任务流程。方向 PNG 统一作为 `Draft / Exploration` 参考，不因同轮运行态重构而晋级为实现真源。

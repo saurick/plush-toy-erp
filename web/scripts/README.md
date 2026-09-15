@@ -78,6 +78,10 @@ pnpm preview:yoyoosun
 
 `global-tab-sliding-light` / `global-tab-sliding-dark` 检查共享页签的逐帧滑动、快速反向切换、尺寸变化、面板重新打开、键盘、禁用项与减少动态效果设置。场景通过浏览器拦截加载 `test/SlidingTabsFixture.jsx`，复用真实组件和样式，不添加产品路由或写入业务数据；输出 `global-tab-sliding-*-frames.json` 留存中间位置。可用 `STYLE_L1_SCENARIOS=global-tab-sliding-light,global-tab-sliding-dark pnpm style:l1` 定向运行。
 
+`global-table-alignment-light` / `global-table-alignment-dark` / `global-table-alignment-mobile` 使用 `test/TableAlignmentFixture.html` 和真实共用表格、材料汇总表、单据编辑明细，验证表头及单元格的对齐、独立序号、长文本、排序、列顺序、复制、展开与收起、核价输入及空表恢复；使用模拟数据，不调用业务写入。输出同名 JSON 几何证据与材料表截图。
+
+`global-table-alignment-business-pages` 按正式业务模块目录逐页检查表头、单元格、列设置和复制按钮的实际对齐，并覆盖产品规格、库存批次及库存变动视图；复用 Style L1 模拟接口，输出逐页 JSON 证据。
+
 ## 本地启动与进程范围
 
 ```bash

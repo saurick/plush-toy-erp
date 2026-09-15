@@ -1,4 +1,5 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
 
 export function createCustomerSessionScenarios({
   expectHeading,
@@ -391,7 +392,9 @@ export function createCustomerSessionScenarios({
       },
       viewport: { width: 1440, height: 600 },
       verify: async (page) => {
-        await expectHeading(page, '工作台')
+        await page
+          .getByRole('region', { name: '工作台', exact: true })
+          .waitFor({ state: 'visible' })
         await expectText(page, '待我处理')
         await expectText(page, '待我审批')
         await expectText(page, '阻塞/逾期')
@@ -964,6 +967,7 @@ export function createCustomerSessionScenarios({
         await assertDashboardWorkbenchLayout(page, {
           scenarioName: '全宽工作台',
         })
+        await assertTaskTitleFocusInteractions(page, queueRows.first())
         const mobileRiskRead = waitForWorkbenchRead('risk')
         await riskFilter.click()
         await mobileRiskRead
@@ -1002,6 +1006,7 @@ export function createCustomerSessionScenarios({
           scenarioName: 'erp-yoyo-global-dashboard-dark-long-queue',
           selector: '.erp-workbench-queue-panel',
         })
+        await assertTaskTitleFocusInteractions(page, queueRows.first())
         await page.locator('.erp-workbench-command-card').screenshot({
           path: path.resolve(
             outputDir,
@@ -1332,7 +1337,9 @@ export function createCustomerSessionScenarios({
         })
       },
       verify: async (page) => {
-        await expectHeading(page, '工作台')
+        await page
+          .getByRole('region', { name: '工作台', exact: true })
+          .waitFor({ state: 'visible' })
         await expectText(page, '待我处理')
         await assertTextAbsent(page, '暂时无法进入工作台')
         assert.equal(
@@ -1534,7 +1541,9 @@ export function createCustomerSessionScenarios({
         })
       },
       verify: async (page) => {
-        await expectHeading(page, '工作台')
+        await page
+          .getByRole('region', { name: '工作台', exact: true })
+          .waitFor({ state: 'visible' })
         assert.equal(
           unauthorizedProductionFactRequests,
           0,

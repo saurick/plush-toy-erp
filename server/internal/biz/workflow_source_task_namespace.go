@@ -3,6 +3,9 @@ package biz
 import "strings"
 
 var workflowSourceTaskGroups = [...]string{
+	WorkflowMaterialBossReviewGroup,
+	WorkflowMaterialFinanceReviewGroup,
+	WorkflowMaterialRevisionGroup,
 	WorkflowSourceTaskProductionSchedulingGroup,
 	WorkflowSourceTaskProductionExceptionGroup,
 	WorkflowSourceTaskShipmentReleaseGroup,

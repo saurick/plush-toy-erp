@@ -24,6 +24,7 @@ type EngineeringMaterialRequest struct {
 	ID                 int                                `json:"id"`
 	SalesOrderID       int                                `json:"sales_order_id"`
 	OrderNo            string                             `json:"order_no"`
+	OrderStatus        string                             `json:"order_status"`
 	SourceOrderVersion int                                `json:"source_order_version"`
 	SourceHash         string                             `json:"source_hash"`
 	Status             string                             `json:"status"`
@@ -68,19 +69,23 @@ type EngineeringMaterialPurchaseOrder struct {
 	SupplierID      int    `json:"supplier_id"`
 }
 type EngineeringMaterialSubmit struct {
-	SalesOrderID       int
-	ExpectedVersion    int
-	ExpectedSourceHash string
-	ActorID            int
+	SalesOrderID        int
+	ExpectedVersion     int
+	ExpectedSourceHash  string
+	ActorID             int
+	WorkflowTaskID      int
+	ExpectedTaskVersion int
 }
 type EngineeringMaterialReview struct {
-	ID              int
-	ExpectedVersion int
-	ActorID         int
-	Action          string
-	ReviewStage     string
-	Note            *string
-	Items           []EngineeringMaterialFinanceLine
+	ID                  int
+	ExpectedVersion     int
+	ActorID             int
+	Action              string
+	ReviewStage         string
+	Note                *string
+	Items               []EngineeringMaterialFinanceLine
+	WorkflowTaskID      int
+	ExpectedTaskVersion int
 }
 type EngineeringMaterialFinanceLine struct {
 	ID                  int
@@ -95,6 +100,16 @@ type EngineeringMaterialRequestRepo interface {
 	ReviewEngineeringMaterialRequest(context.Context, *EngineeringMaterialReview) (*EngineeringMaterialRequest, error)
 }
 
+func (uc *SalesOrderUsecase) GetEngineeringMaterialRequestByID(ctx context.Context, orderID, requestID int) (*EngineeringMaterialRequest, error) {
+	repo, ok := uc.repo.(interface {
+		GetEngineeringMaterialRequestByID(context.Context, int, int) (*EngineeringMaterialRequest, error)
+	})
+	if !ok || orderID <= 0 || requestID <= 0 {
+		return nil, ErrBadParam
+	}
+	return repo.GetEngineeringMaterialRequestByID(ctx, orderID, requestID)
+}
+
 func (uc *SalesOrderUsecase) GetEngineeringMaterialRequest(ctx context.Context, orderID int, preview bool) (*EngineeringMaterialRequest, error) {
 	repo, ok := uc.repo.(EngineeringMaterialRequestRepo)
 	if !ok || orderID <= 0 {
@@ -107,6 +122,9 @@ func (uc *SalesOrderUsecase) SubmitEngineeringMaterialRequest(ctx context.Contex
 	if !ok || in == nil || in.SalesOrderID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 || len(in.ExpectedSourceHash) != 64 {
 		return nil, ErrBadParam
 	}
+	if !validMaterialTaskVersion(in.WorkflowTaskID, in.ExpectedTaskVersion) {
+		return nil, ErrBadParam
+	}
 	return repo.SubmitEngineeringMaterialRequest(ctx, in)
 }
 func (uc *SalesOrderUsecase) ReviewEngineeringMaterialRequest(ctx context.Context, in *EngineeringMaterialReview) (*EngineeringMaterialRequest, error) {
@@ -114,9 +132,12 @@ func (uc *SalesOrderUsecase) ReviewEngineeringMaterialRequest(ctx context.Contex
 	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 {
 		return nil, ErrBadParam
 	}
+	if !validMaterialTaskVersion(in.WorkflowTaskID, in.ExpectedTaskVersion) {
+		return nil, ErrBadParam
+	}
 	copy := *in
 	copy.Note = normalizeOptionalString(in.Note)
-	if copy.Note != nil && len([]rune(*copy.Note)) > 255 {
+	if copy.Note != nil && len(*copy.Note) > 255 {
 		return nil, ErrBadParam
 	}
 	if copy.Action == "REJECT" && (copy.Note == nil || (copy.ReviewStage != "BOSS" && copy.ReviewStage != "FINANCE")) {
@@ -136,7 +157,7 @@ func (uc *SalesOrderUsecase) ReviewEngineeringMaterialRequest(ctx context.Contex
 		for i := range copy.Items {
 			line := &copy.Items[i]
 			line.Note = normalizeOptionalString(line.Note)
-			if line.ID <= 0 || seen[line.ID] || line.PurchaseQuantity.IsNegative() || !line.PurchaseQuantity.Equal(line.PurchaseQuantity.Round(6)) || line.UnitPrice.IsNegative() || !line.UnitPrice.Equal(line.UnitPrice.Round(6)) || line.ExpectedArrivalDate.IsZero() || (line.Note != nil && len([]rune(*line.Note)) > 255) {
+			if line.ID <= 0 || seen[line.ID] || line.PurchaseQuantity.IsNegative() || !line.PurchaseQuantity.Equal(line.PurchaseQuantity.Round(6)) || line.UnitPrice.IsNegative() || !line.UnitPrice.Equal(line.UnitPrice.Round(6)) || line.ExpectedArrivalDate.IsZero() || (line.Note != nil && len(*line.Note) > 255) {
 				return nil, ErrBadParam
 			}
 			if line.PurchaseQuantity.GreaterThanOrEqual(decimal.New(1, 14)) || line.UnitPrice.GreaterThanOrEqual(decimal.New(1, 14)) || line.PurchaseQuantity.Mul(line.UnitPrice).GreaterThanOrEqual(decimal.New(1, 14)) {
@@ -148,6 +169,10 @@ func (uc *SalesOrderUsecase) ReviewEngineeringMaterialRequest(ctx context.Contex
 		return nil, ErrBadParam
 	}
 	return repo.ReviewEngineeringMaterialRequest(ctx, &copy)
+}
+
+func validMaterialTaskVersion(taskID, version int) bool {
+	return (taskID == 0 && version == 0) || (taskID > 0 && version > 0)
 }
 
 // MaterialPartUsage matches the engineering sheet: usage already includes the

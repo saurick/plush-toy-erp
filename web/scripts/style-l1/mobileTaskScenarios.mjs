@@ -1,6 +1,8 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { mobileTaskListOptionsScenario } from './mobileTaskListOptionsScenario.mjs'
+import { mobileTaskRefreshScenario } from './mobileTaskRefreshScenario.mjs'
 import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
-import { clickERPThemeOption } from './themeAssertions.mjs'
+import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import {
   assertReadableOnBackground,
   isDarkControlBackground,
@@ -29,6 +31,8 @@ export function createMobileTaskScenarios({
   assertNoDashboardCenterLocalRefreshButton,
 }) {
   return [
+    mobileTaskListOptionsScenario({ assert, path, outputDir }),
+    mobileTaskRefreshScenario({ assert, path, outputDir }),
     {
       name: 'mobile-task-search-and-product-image',
       path: '/m/engineering/tasks',
@@ -335,14 +339,14 @@ export function createMobileTaskScenarios({
           .boundingBox()
         assert.ok(clearBox.width >= 44 && clearBox.height >= 44)
 
-        await clickERPThemeOption(page, '暗色')
+        await clickMobileThemeOption(page, '暗色')
         await assertERPThemeMode(page, {
           scenarioName: 'mobile-task-search',
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
         await assertSearchFocus('mobile-task-search-focused-dark')
-        await clickERPThemeOption(page, '浅色')
+        await clickMobileThemeOption(page, '浅色')
         await assertERPThemeMode(page, {
           scenarioName: 'mobile-task-search',
           expectedMode: 'light',
@@ -606,7 +610,7 @@ export function createMobileTaskScenarios({
         await page
           .locator('.erp-task-product-image[data-image-state="failed"]')
           .waitFor({ state: 'visible' })
-        await clickERPThemeOption(page, '暗色')
+        await clickMobileThemeOption(page, '暗色')
         const failedFrame = page.locator(
           '.erp-task-product-image[data-image-state="failed"]'
         )

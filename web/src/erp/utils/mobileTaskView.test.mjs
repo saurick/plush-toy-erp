@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-
 import {
   buildMobileTaskActionPayload,
   buildMobileTaskListForRole,
@@ -11,6 +10,24 @@ import {
   normalizeMobileActionEvidenceRefs,
   normalizeRelatedDocuments,
 } from './mobileTaskView.mjs'
+
+test('mobileTaskView: 服务端排序不被当前页优先级或更新时间重排', () => {
+  const tasks = [
+    { id: 1, task_status_key: 'ready', priority: 1, updated_at: 100 },
+    { id: 2, task_status_key: 'blocked', priority: 5, updated_at: 300 },
+    { id: 3, task_status_key: 'ready', priority: 3, updated_at: 200 },
+  ]
+  assert.deepEqual(
+    buildMobileTaskListForRole(tasks, 'boss', {
+      preserveServerOrder: true,
+    }).map((task) => task.id),
+    [1, 2, 3]
+  )
+  assert.deepEqual(
+    tasks.map((task) => task.id),
+    [1, 2, 3]
+  )
+})
 
 const NOW_SEC = 1_800_000_000
 const NOW_MS = NOW_SEC * 1000

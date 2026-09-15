@@ -102,6 +102,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_purchase_returns',
   'list_quality_inspections',
   'list_sales_order_items',
+  'list_sales_order_summary',
   'list_sales_orders',
   'list_shipments',
   'list_stock_reservations',

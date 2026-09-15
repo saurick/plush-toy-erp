@@ -43,6 +43,11 @@ import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
 import WorkflowProcessStageTrack from '../../components/workflow/WorkflowProcessStageTrack.jsx'
 import WorkflowTaskEventTrail from '../../components/workflow/WorkflowTaskEventTrail.jsx'
 import { resolveMobileProductionArrangementContext } from '../utils/mobileProductionArrangement.mjs'
+import EngineeringMaterialTaskSummaryEntry from '../../components/sales-orders/EngineeringMaterialTaskSummaryEntry.jsx'
+import {
+  canProcessEngineeringMaterialTask,
+  getEngineeringMaterialTaskContext,
+} from '../../utils/engineeringMaterialTask.mjs'
 
 function mobileFactValueText(value) {
   if (value === null || value === undefined) return ''
@@ -54,6 +59,7 @@ function mobileFactValueText(value) {
 export default function MobileTaskDetailScreen({
   actionAccess,
   onBack,
+  processingComplete = false,
   onOpenAction,
   onViewReceipt,
   savedEvidenceRefs,
@@ -65,6 +71,13 @@ export default function MobileTaskDetailScreen({
   selectedTask,
 }) {
   const { adminProfile } = useOutletContext() || {}
+  const materialContext = React.useMemo(
+    () => getEngineeringMaterialTaskContext(selectedTask),
+    [selectedTask]
+  )
+  const canProcessMaterial =
+    !processingComplete &&
+    canProcessEngineeringMaterialTask(adminProfile, selectedTask)
   const approvalTask = isWorkflowApprovalTask(selectedTask)
   const [taskEvents, setTaskEvents] = React.useState([])
   const [taskEventsTruncated, setTaskEventsTruncated] = React.useState(false)
@@ -180,9 +193,16 @@ export default function MobileTaskDetailScreen({
   const exceptionContact =
     getWorkflowTaskExceptionContactPresentation(selectedTask)
   const exceptionContactHint = exceptionContact.text
-  const taskStatusLabel = resolveMobileTaskStatusLabel(selectedTask)
+  const taskStatusLabel = processingComplete
+    ? '本次已办理'
+    : resolveMobileTaskStatusLabel(selectedTask)
+  const completeCondition = materialContext
+    ? '核对工程用料，在“处理任务”中提交本次处理结果。'
+    : selectedTask.complete_condition
   const canManageAttachments = selectedCanManageAttachments === true
-  const canOpenProcess = selectedCanOperate || selectedCanUrge
+  const canOpenProcess = materialContext
+    ? canProcessMaterial || selectedCanUrge
+    : selectedCanOperate || selectedCanUrge
   const canViewReceipt = typeof onViewReceipt === 'function'
   const retryAccess =
     actionAccess?.failed && typeof actionAccess?.retry === 'function'
@@ -199,16 +219,18 @@ export default function MobileTaskDetailScreen({
     : actionAccess?.failed
       ? '权限确认失败'
       : '当前仅供查看'
-  const actionGuidance = actionAccess?.loading
-    ? '正在确认当前账号的处理范围，请稍候。'
-    : actionAccess?.failed
-      ? '暂时无法确认处理权限，请点击下方重试。'
-      : !selectedCanOperate
-        ? selectedCanUrge
-          ? `这条任务由${ownerRoleLabel}办理，您可以查看并发起催办。`
-          : actionAccess?.readonlyReason ||
-            `这条任务由${ownerRoleLabel}办理，当前页面只供查看。`
-        : ''
+  const actionGuidance = canProcessMaterial
+    ? ''
+    : actionAccess?.loading
+      ? '正在确认当前账号的处理范围，请稍候。'
+      : actionAccess?.failed
+        ? '暂时无法确认处理权限，请点击下方重试。'
+        : !selectedCanOperate
+          ? selectedCanUrge
+            ? `这条任务由${ownerRoleLabel}办理，您可以查看并发起催办。`
+            : actionAccess?.readonlyReason ||
+              `这条任务由${ownerRoleLabel}办理，当前页面只供查看。`
+          : ''
 
   return (
     <div
@@ -221,9 +243,11 @@ export default function MobileTaskDetailScreen({
         currentStep="detail"
         onBack={onBack}
         onOpenProcess={() =>
-          onOpenAction?.(
-            selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
-          )
+          canProcessMaterial
+            ? onOpenAction?.()
+            : onOpenAction?.(
+                selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
+              )
         }
         onOpenReceipt={onViewReceipt}
         processUnavailableLabel={processUnavailableLabel}
@@ -256,6 +280,12 @@ export default function MobileTaskDetailScreen({
               <WorkflowTaskSource task={selectedTask} label={relatedSource} />
             </span>
           </div>
+          <EngineeringMaterialTaskSummaryEntry
+            key={selectedTask.id}
+            task={selectedTask}
+            profile={adminProfile}
+            mobile
+          />
           <div
             className="mobile-task-detail-meta mt-3 text-sm text-slate-600"
             data-testid="mobile-task-detail-summary"
@@ -338,11 +368,11 @@ export default function MobileTaskDetailScreen({
           </div>
         </section>
 
-        {selectedTask.complete_condition ? (
+        {completeCondition ? (
           <section className="erp-mobile-card rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
             <div className="text-sm font-semibold text-blue-700">完成条件</div>
             <p className="mt-2 break-words text-base leading-7 text-slate-800">
-              {selectedTask.complete_condition}
+              {completeCondition}
             </p>
           </section>
         ) : null}
@@ -529,7 +559,15 @@ export default function MobileTaskDetailScreen({
 
       {showFooterAction ? (
         <div className="mobile-role-action-bar border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
-          {canOpenProcess ? (
+          {canProcessMaterial ? (
+            <button
+              type="button"
+              className="mobile-role-action-bar__button mobile-role-action-bar__button--done min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
+              onClick={() => onOpenAction?.()}
+            >
+              处理任务 <RightOutlined aria-hidden="true" />
+            </button>
+          ) : canOpenProcess ? (
             <button
               type="button"
               className="mobile-role-action-bar__button mobile-role-action-bar__button--done min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"

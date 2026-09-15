@@ -5,6 +5,8 @@ import {
   MOBILE_ROLE_TASK_PAGE_LIMIT,
   MOBILE_ROLE_TASK_VIEW_KEYS,
   buildMobileRoleTaskQuery,
+  mobileTaskQueryScope,
+  readMobileTaskQueryHistory,
   createMobileRoleTaskScopeState,
   createMobileRoleTaskSlots,
   isMobileRoleTaskHistoryScope,
@@ -19,6 +21,71 @@ import {
   resolveMobileRoleTaskViewState,
   settleMobileRoleTaskRequest,
 } from './mobileTaskQueries.mjs'
+
+test('mobileTaskQueries: 排序和状态进入分页查询及历史范围，切换后旧响应失效', () => {
+  const options = { keyword: 'SO-12', sortKey: 'due', statusKey: 'blocked' }
+  assert.deepEqual(
+    buildMobileRoleTaskQuery({
+      roleKey: 'boss',
+      viewKey: 'approval',
+      cursor: 'next-page',
+      ...options,
+    }),
+    {
+      role_key: 'boss',
+      view_key: 'approval',
+      limit: 50,
+      cursor: 'next-page',
+      keyword: 'SO-12',
+      sort_key: 'due',
+      status_key: 'blocked',
+    }
+  )
+  const access = 'boss|access:admin-1|ready'
+  const scope = mobileTaskQueryScope(access, options)
+  const history = {
+    mobileRoleTasksScope: scope,
+    mobileRoleTasksKeyword: options.keyword,
+    mobileRoleTasksSort: options.sortKey,
+    mobileRoleTasksStatus: options.statusKey,
+  }
+  assert.deepEqual(readMobileTaskQueryHistory(history, access), options)
+  assert.deepEqual(
+    readMobileTaskQueryHistory(history, 'boss|access:admin-2|ready'),
+    { keyword: '', sortKey: 'newest', statusKey: '' }
+  )
+  const nextScope = mobileTaskQueryScope(access, {
+    ...options,
+    sortKey: 'oldest',
+  })
+  const state = createMobileRoleTaskScopeState(nextScope)
+  assert.equal(
+    settleMobileRoleTaskRequest(state, {
+      currentScopeKey: nextScope,
+      requestScopeKey: scope,
+      viewKey: 'approval',
+      currentRequestSeq: 1,
+      requestSeq: 1,
+      response: { items: [{ id: 99 }] },
+    }),
+    state
+  )
+  for (const invalid of [
+    { sortKey: 'updated_at' },
+    { statusKey: 'done' },
+    { viewKey: 'history', statusKey: 'blocked' },
+  ]) {
+    assert.throws(
+      () =>
+        buildMobileRoleTaskQuery({
+          roleKey: 'boss',
+          viewKey: 'todo',
+          ...invalid,
+        }),
+      /筛选或排序无效/u
+    )
+  }
+})
 
 function roleTaskCounts({
   ready = 0,
@@ -737,7 +804,21 @@ test('mobileTaskQueries: 同范围刷新失败保留任务、游标和服务端�
 })
 
 test('mobileTaskQueries: keyword stays bound to each pagination request', () => {
-  assert.deepEqual(buildMobileRoleTaskQuery({ roleKey: 'engineering', viewKey: 'todo', keyword: ' RB-018 ', cursor: 'next' }), { role_key: 'engineering', view_key: 'todo', keyword: 'RB-018', cursor: 'next', limit: 50 })
+  assert.deepEqual(
+    buildMobileRoleTaskQuery({
+      roleKey: 'engineering',
+      viewKey: 'todo',
+      keyword: ' RB-018 ',
+      cursor: 'next',
+    }),
+    {
+      role_key: 'engineering',
+      view_key: 'todo',
+      keyword: 'RB-018',
+      cursor: 'next',
+      limit: 50,
+    }
+  )
   assert.throws(() =>
     buildMobileRoleTaskQuery({
       roleKey: 'engineering',

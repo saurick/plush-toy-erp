@@ -22,7 +22,7 @@ test('mobile task filter cold load keeps full skeleton exclusive to the first pa
   )
   assert.match(
     roleTaskPageSource,
-    /const initialLoading = activeViewInitialLoading && !hasLoadedTaskView/u
+    /const initialLoading =\s*activeViewInitialLoading &&\s*!hasLoadedTaskView &&\s*loadedAccessScopeRef\.current !== taskAccessScopeKey/u
   )
   assert.match(
     listScreenSource,

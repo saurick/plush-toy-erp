@@ -217,6 +217,7 @@ export const businessPageFlowDefinitions = Object.freeze(
         ],
         ['sales-orders', 'shipments', 'list_shipment_source_candidates'],
         ['material-bom', 'sales-orders', 'get_engineering_material_request'],
+        ['sales-orders', 'sales-orders', 'list_engineering_material_requests'],
         [
           'processing-contracts',
           'quality-inspections',

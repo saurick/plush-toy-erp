@@ -1,5 +1,6 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
+import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
 
 export function createDashboardTaskScenarios({
   expectText,
@@ -227,7 +228,9 @@ export function createDashboardTaskScenarios({
         await expectText(page, '超级管理员')
         await expectText(page, 'style-l1-admin')
         await expectText(page, '看板中心')
-        await expectHeading(page, '任务看板')
+        await page
+          .getByRole('region', { name: '任务看板', exact: true })
+          .waitFor({ state: 'visible' })
         await expectText(page, '常规待办')
         await expectText(page, '阻塞')
         await expectText(page, '到期提醒')
@@ -359,18 +362,20 @@ export function createDashboardTaskScenarios({
           .locator('.ant-segmented-item-selected')
           .filter({ hasText: '待我审批' })
           .waitFor({ state: 'visible', timeout: 2_000 })
-        await expectHeading(page, '任务看板')
+        await page
+          .getByRole('region', { name: '任务看板', exact: true })
+          .waitFor({ state: 'visible' })
         await expectText(page, '待我审批')
         await expectText(page, '出货财务审批')
         await expectText(page, 'SHIP-L1-501')
         const approvalInboxLayout = await page.evaluate(() => {
           const card = document.querySelector('.erp-dashboard-task-board-card')
-          const filters = document.querySelector('.erp-task-board-heading')
+          const filters = document.querySelector('.erp-task-board-filters')
           const scopeFilter = document.querySelector(
             '.erp-task-board-scope-filter'
           )
-          const heading = [...document.querySelectorAll('h1, h2, h3')].find(
-            (element) => element.textContent?.trim() === '任务看板'
+          const search = filters?.querySelector(
+            '.erp-business-filter-control--search'
           )
           const selectedScope = scopeFilter?.querySelector(
             '.ant-segmented-item-selected'
@@ -378,15 +383,19 @@ export function createDashboardTaskScenarios({
           const cardRect = card?.getBoundingClientRect()
           const filtersRect = filters?.getBoundingClientRect()
           const scopeFilterRect = scopeFilter?.getBoundingClientRect()
-          const headingRect = heading?.getBoundingClientRect()
+          const searchRect = search?.getBoundingClientRect()
           return {
             cardFits:
               Boolean(card) &&
               Number(card?.scrollWidth || 0) <= Number(card?.clientWidth || 0),
-            headingVisible:
-              Boolean(cardRect && headingRect) &&
-              headingRect.left >= cardRect.left &&
-              headingRect.right <= cardRect.right,
+            filtersInsideCard:
+              Boolean(cardRect && filtersRect) &&
+              filtersRect.left >= cardRect.left &&
+              filtersRect.right <= cardRect.right,
+            scopeSharesSearchRow:
+              Boolean(scopeFilterRect && searchRect) &&
+              scopeFilterRect.top < searchRect.bottom &&
+              searchRect.top < scopeFilterRect.bottom,
             scopeInsideFilters: Boolean(
               filters && scopeFilter && scopeFilter.parentElement === filters
             ),
@@ -399,7 +408,8 @@ export function createDashboardTaskScenarios({
         })
         assert(
           approvalInboxLayout.cardFits &&
-            approvalInboxLayout.headingVisible &&
+            approvalInboxLayout.filtersInsideCard &&
+            approvalInboxLayout.scopeSharesSearchRow &&
             approvalInboxLayout.scopeInsideFilters &&
             approvalInboxLayout.scopeFilterVisible &&
             approvalInboxLayout.selectedScope === '待我审批',
@@ -818,7 +828,9 @@ export function createDashboardTaskScenarios({
             new URL(window.location.href).searchParams.get('mode') !==
             'approval'
         )
-        await expectHeading(page, '任务看板')
+        await page
+          .getByRole('region', { name: '任务看板', exact: true })
+          .waitFor({ state: 'visible' })
         await assertTextAbsent(
           page,
           '按产品、单据和任务状态查找需要处理的事项。'
@@ -978,6 +990,11 @@ export function createDashboardTaskScenarios({
               '.erp-dashboard-task-board-card'
             )
             const summary = document.querySelector('.erp-task-center-summary')
+            const contentRect = document
+              .querySelector(
+                '.erp-dashboard-task-board-card .erp-dashboard-block'
+              )
+              ?.getBoundingClientRect()
             const lanes = document.querySelector('.erp-task-board-lanes')
             const metricButtons = [
               ...document.querySelectorAll(
@@ -1007,7 +1024,7 @@ export function createDashboardTaskScenarios({
                   '.erp-task-board-categories .ant-tabs-tab-active .erp-task-board-category > span:first-child'
                 ),
               ].map((node) => node.textContent.trim()),
-              summaryTop: summaryRect?.top || 0,
+              summaryTop: summaryRect?.top ?? contentRect?.top ?? 0,
               summaryHeight: summaryRect?.height || 0,
               boardCardTop: boardCardRect?.top || 0,
               boardCardHeight: boardCardRect?.height || 0,
@@ -1130,23 +1147,7 @@ export function createDashboardTaskScenarios({
           ['任务 / 产品与物料', '关联单据 / 时间', '状态与说明 / 负责'],
           '分类列表应将空间用于三组任务信息，无独立操作列'
         )
-        for (const key of ['Enter', 'Space']) {
-          await focusedListEntry.focus()
-          await page.keyboard.press(key)
-          await focusedListDrawer.waitFor({ state: 'visible', timeout: 10_000 })
-          assert.equal(
-            await page.locator('.erp-task-action-drawer:visible').count(),
-            1
-          )
-          await page.keyboard.press('Escape')
-          await focusedListDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
-          assert.equal(
-            await focusedListEntry.evaluate(
-              (button) => document.activeElement === button
-            ),
-            true
-          )
-        }
+        await assertTaskTitleFocusInteractions(page, focusedListRow)
         const sourceText = focusedListRow
           .locator('td')
           .nth(1)
@@ -1531,7 +1532,9 @@ export function createDashboardTaskScenarios({
           }
         })
         await page.reload({ waitUntil: 'domcontentloaded' })
-        await expectHeading(page, '任务看板')
+        await page
+          .getByRole('region', { name: '任务看板', exact: true })
+          .waitFor({ state: 'visible' })
         await page.getByText('全部可见岗位').click()
         await page.getByTitle('仓库', { exact: true }).click()
         await page.reload({ waitUntil: 'domcontentloaded' })
@@ -2100,7 +2103,9 @@ export function createDashboardTaskScenarios({
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '任务看板')
+        await page
+          .getByRole('region', { name: '任务看板', exact: true })
+          .waitFor({ state: 'visible' })
         await page.waitForFunction(
           () => !new URLSearchParams(window.location.search).has('role')
         )
@@ -2189,7 +2194,7 @@ export function createDashboardTaskScenarios({
         await expectText(page, '毛绒玩具管理系统')
         await expectText(page, '超级管理员')
         await expectText(page, '看板中心')
-        await expectHeading(page, '业务看板')
+        await expectHeading(page, '需要关注')
         await expectText(page, '基础资料')
         await expectText(page, '业务单据')
         await expectText(page, '办理结果')
@@ -2354,14 +2359,14 @@ export function createDashboardTaskScenarios({
         await waitForPath(page, '/erp/master/partners/customers')
         await page.goBack()
         await waitForPath(page, '/erp/business-dashboard')
-        await expectHeading(page, '业务看板')
+        await expectHeading(page, '需要关注')
         await page
           .getByRole('button', { name: '查看客户', exact: true })
           .click()
         await waitForPath(page, '/erp/master/partners/customers')
         await page.goBack()
         await waitForPath(page, '/erp/business-dashboard')
-        await expectHeading(page, '业务看板')
+        await expectHeading(page, '需要关注')
         await page.locator('.erp-admin-content').evaluate((node) => {
           node.scrollTop = 0
         })
@@ -2379,7 +2384,7 @@ export function createDashboardTaskScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '业务管理')
-        await expectHeading(page, '业务看板')
+        await expectHeading(page, '需要关注')
         await expectText(page, '基础资料')
         await expectText(page, '业务数据')
         await expectText(page, '需要关注')
@@ -2430,7 +2435,7 @@ export function createDashboardTaskScenarios({
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '业务看板')
+        await expectHeading(page, '需要关注')
         await expectText(page, '业务统计暂不可用')
         await page
           .getByRole('group', { name: '阻塞，27 项', exact: true })
@@ -2480,7 +2485,7 @@ export function createDashboardTaskScenarios({
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '业务看板')
+        await expectHeading(page, '需要关注')
         await expectText(page, '待办概览暂不可用')
         await expectText(page, '60')
         await page
@@ -2516,7 +2521,7 @@ export function createDashboardTaskScenarios({
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '业务看板')
+        await expectHeading(page, '需要关注')
         await expectText(page, '1,234,567')
         await page
           .getByRole('button', { name: '查看客户', exact: true })
@@ -2573,7 +2578,9 @@ export function createDashboardTaskScenarios({
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectText(page, '超级管理员')
-        await expectText(page, '业务管理')
+        await page
+          .getByRole('region', { name: '工作台', exact: true })
+          .waitFor({ state: 'visible' })
         await expectText(page, '系统功能总览')
         await expectText(page, '业务功能')
         await expectText(page, '系统设置')
@@ -2643,7 +2650,9 @@ export function createDashboardTaskScenarios({
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '移动端任务处理回归')
         await expectText(page, '超级管理员')
-        await expectText(page, '业务管理')
+        await page
+          .getByRole('region', { name: '任务看板', exact: true })
+          .waitFor({ state: 'visible' })
         await expectText(page, '任务看板')
         await expectText(page, '常规待办')
         await expectText(page, '到期提醒')
@@ -2660,29 +2669,34 @@ export function createDashboardTaskScenarios({
           .evaluate((element) => ({
             clientWidth: element.clientWidth,
             scrollWidth: element.scrollWidth,
-            controlWidths: [
-              element.querySelector('.erp-business-filter-control--search'),
-              ...element.querySelectorAll(':scope > .ant-select'),
-              [...element.querySelectorAll(':scope > .ant-btn')].find((node) =>
-                node.textContent?.includes('清空筛选')
-              ),
-            ]
-              .filter(Boolean)
-              .map((node) => node.getBoundingClientRect().width),
+            searchWidth: element
+              .querySelector('.erp-business-filter-control--search')
+              ?.getBoundingClientRect().width,
+            filterButtonHeight: element
+              .querySelector('[aria-controls="task-board-extra-filters"]')
+              ?.getBoundingClientRect().height,
           }))
         assert(
           mobileFilterMetrics.scrollWidth <=
             mobileFilterMetrics.clientWidth + 1 &&
-            mobileFilterMetrics.controlWidths.length === 5 &&
-            mobileFilterMetrics.controlWidths.every(
-              (width) =>
-                width >= mobileFilterMetrics.clientWidth - 1 &&
-                width <= mobileFilterMetrics.clientWidth + 1
-            ),
-          `移动端任务筛选控件应保持整行触控且不溢出: ${JSON.stringify(
+            Math.abs(
+              mobileFilterMetrics.searchWidth - mobileFilterMetrics.clientWidth
+            ) <= 1 &&
+            mobileFilterMetrics.filterButtonHeight >= 44,
+          `移动端搜索应占满一行，筛选入口可触控且不溢出: ${JSON.stringify(
             mobileFilterMetrics
           )}`
         )
+        await page.getByRole('button', { name: '筛选', exact: true }).click()
+        const extraFilters = page.getByRole('group', { name: '更多筛选条件' })
+        await extraFilters.waitFor({ state: 'visible' })
+        assert.equal(await extraFilters.getByRole('combobox').count(), 3)
+        await assertNoHorizontalOverflow(
+          page,
+          'erp-task-board-mobile-filters-open'
+        )
+        await page.getByRole('button', { name: '筛选', exact: true }).click()
+        await extraFilters.waitFor({ state: 'hidden' })
         await page.locator('.erp-task-board-filters').screenshot({
           path: path.resolve(outputDir, 'erp-task-board-mobile-filters.png'),
         })
@@ -2728,7 +2742,9 @@ export function createDashboardTaskScenarios({
       themeMode: 'dark',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '业务管理')
+        await page
+          .getByRole('region', { name: '工作台', exact: true })
+          .waitFor({ state: 'visible' })
         await expectText(page, '系统功能总览')
         await expectText(page, '业务功能')
         await expectText(page, '不显示客户业务数据')
@@ -2782,7 +2798,9 @@ export function createDashboardTaskScenarios({
       themeMode: 'dark',
       viewport: { width: 2048, height: 1024 },
       verify: async (page) => {
-        await expectText(page, '业务管理')
+        await page
+          .getByRole('region', { name: '任务看板', exact: true })
+          .waitFor({ state: 'visible' })
         await expectText(page, '任务看板')
         await expectText(page, '常规待办')
         await assertTextAbsent(page, '内部来源')

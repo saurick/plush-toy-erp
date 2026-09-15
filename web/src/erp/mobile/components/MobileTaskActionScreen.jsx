@@ -140,7 +140,7 @@ function validationErrorsFor({
   }
 }
 
-export default function MobileTaskActionScreen({
+function MobileWorkflowTaskActionScreen({
   accessMessage = '',
   accessState = MOBILE_TASK_ACTION_ACCESS_STATES.CHECKING,
   approvedQuantity = '',
@@ -717,4 +717,52 @@ export default function MobileTaskActionScreen({
       ) : null}
     </form>
   )
+}
+
+export default function MobileTaskActionScreen(props) {
+  const { renderSourceAction, onBack, task } = props
+  if (!renderSourceAction)
+    { return <MobileWorkflowTaskActionScreen {...props} /> }
+  return renderSourceAction(({ content, footer, saving }) => (
+    <div
+      className="mobile-role-tasks-page mobile-role-tasks-page--detail surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
+      aria-busy={saving}
+      data-testid="mobile-task-action-screen"
+      onKeyDown={(event) => {
+        if (saving) return
+        if (event.key === 'Escape') onBack?.()
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+          event.preventDefault()
+          event.currentTarget.querySelector('form')?.requestSubmit()
+        }
+      }}
+    >
+      <MobileTaskFlowHeader
+        backLabel="返回任务详情"
+        busy={saving}
+        currentStep="process"
+        onBack={onBack}
+        onOpenDetail={onBack}
+        receiptUnavailableLabel="提交后开放"
+        title="处理任务"
+      />
+      <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-4">
+        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <h2 className="break-words text-base font-semibold leading-6 text-slate-950">
+            {task.task_name}
+          </h2>
+          <WorkflowTaskIdentity task={task} compact />
+          <p className="mt-1 break-words text-sm leading-5 text-slate-500">
+            {resolveTaskSourceLabel(task)}
+          </p>
+        </section>
+        <div className="erp-material-task-action erp-material-task-action--mobile">
+          {content}
+        </div>
+      </main>
+      <div className="mobile-role-action-bar shrink-0 border-t border-slate-200 bg-white/95 p-3">
+        {footer}
+      </div>
+    </div>
+  ))
 }

@@ -12,10 +12,21 @@ const (
 	WorkflowRoleTaskViewHistory  = "history"
 	WorkflowRoleTaskViewRisk     = "risk"
 	WorkflowRoleTaskViewApproval = "approval"
+	WorkflowRoleTaskSortNewest   = "newest"
+	WorkflowRoleTaskSortOldest   = "oldest"
+	WorkflowRoleTaskSortDue      = "due"
 )
+
+func ValidWorkflowRoleTaskListOptions(sortKey, statusKey string) bool {
+	return (sortKey == "" || sortKey == WorkflowRoleTaskSortNewest || sortKey == WorkflowRoleTaskSortOldest || sortKey == WorkflowRoleTaskSortDue) &&
+		(statusKey == "" || statusKey == "ready" || statusKey == "blocked")
+}
 
 type WorkflowRoleTaskViewQuery struct {
 	Keyword                  string
+	SortKey                  string
+	StatusKey                string
+	BeforeTime               *time.Time
 	ViewKey                  string
 	RoleKey                  string
 	Limit                    int
@@ -88,6 +99,7 @@ func (counts WorkflowRoleTaskViewCounts) ViewTotal(viewKey string) (int, bool) {
 type WorkflowRoleTaskViewPage struct {
 	Items      []*WorkflowTask
 	NextID     int
+	NextTime   *time.Time
 	HasMore    bool
 	SnapshotAt time.Time
 	Counts     *WorkflowRoleTaskViewCounts
@@ -113,7 +125,10 @@ func (uc *WorkflowUsecase) ListRoleTaskView(ctx context.Context, query WorkflowR
 	query.RoleKey = NormalizeRoleKey(query.RoleKey)
 	query.VisibilityScope = NormalizeWorkflowTaskVisibilityScope(query.VisibilityScope)
 	query.ApprovalVisibilityScopes = NormalizeWorkflowApprovalVisibilityScopes(query.ApprovalVisibilityScopes)
-	if query.RoleKey == "" || query.BeforeID < 0 {
+	if query.RoleKey == "" || query.BeforeID < 0 ||
+		!ValidWorkflowRoleTaskListOptions(query.SortKey, query.StatusKey) ||
+		(query.ViewKey == WorkflowRoleTaskViewHistory && query.StatusKey != "") ||
+		(query.BeforeID > 0 && (query.SortKey == WorkflowRoleTaskSortNewest || query.SortKey == WorkflowRoleTaskSortOldest) && query.BeforeTime == nil) {
 		return nil, ErrBadParam
 	}
 	if query.BeforeID > 0 {

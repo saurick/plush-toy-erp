@@ -56,7 +56,11 @@ test('seedData: 权限菜单不混入前端文档、开发验收或通用帮助�
     navigationSections
       .find((section) => section.title === '看板中心')
       ?.items.map((item) => item.path),
-    ['/erp/dashboard', '/erp/task-board', '/erp/business-dashboard']
+    [
+      '/erp/dashboard',
+      '/erp/task-board',
+      '/erp/business-dashboard',
+    ]
   )
   assert.equal(
     navigationSections.find((section) => section.title === '事实闭环'),

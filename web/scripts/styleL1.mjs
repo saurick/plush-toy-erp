@@ -780,7 +780,10 @@ async function runScenario(browser, scenario) {
 }
 
 async function runScenarioOnce(browser, scenario) {
-  const context = await browser.newContext({ viewport: scenario.viewport })
+  const context = await browser.newContext({
+    viewport: scenario.viewport,
+    hasTouch: scenario.hasTouch ?? false,
+  })
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
     origin: baseURL,
   })

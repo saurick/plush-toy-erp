@@ -32,7 +32,10 @@ test('mobile task page uses backend action projection and does not restore local
     /workflowTaskAdminAccessRequestIdentity\(adminProfile\)/u
   )
   assert.match(pageSource, /taskAccessScopeKey = `\$\{activeRoleKey\}\|access:\$\{taskAccessIdentity\}/u)
-  assert.match(pageSource, /taskScopeKey = `\$\{taskAccessScopeKey\}\|search:\$\{taskKeyword\}`/u)
+  assert.match(
+    pageSource,
+    /taskScopeKey = mobileTaskQueryScope\(\s*taskAccessScopeKey,\s*taskQueryOptions\s*\)/u
+  )
   assert.match(pageSource, /persistMobileTaskDraftBackup/u)
   assert.match(pageSource, /readMobileTaskDraftBackup/u)
   assert.match(pageSource, /restoreActionDraft/u)

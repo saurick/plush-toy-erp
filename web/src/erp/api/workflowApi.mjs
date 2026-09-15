@@ -42,6 +42,8 @@ const WORKFLOW_ROLE_TASK_QUERY_KEYS = new Set([
   'limit',
   'cursor',
   'keyword',
+  'sort_key',
+  'status_key',
 ])
 const WORKFLOW_ROLE_TASK_STATUS_KEYS_BY_VIEW = Object.freeze({
   todo: new Set(['ready', 'blocked']),
@@ -124,6 +126,11 @@ function requireWorkflowRoleTaskQuery(params = {}) {
   const roleKey = typeof params.role_key === 'string' ? params.role_key : ''
   const { cursor } = params
   if (
+    (params.sort_key !== undefined &&
+      !['newest', 'oldest', 'due'].includes(params.sort_key)) ||
+    (params.status_key !== undefined &&
+      (!['ready', 'blocked'].includes(params.status_key) ||
+        viewKey === 'history')) ||
     (params.keyword !== undefined &&
       (typeof params.keyword !== 'string' ||
         !params.keyword.trim() ||
@@ -146,6 +153,8 @@ function requireWorkflowRoleTaskQuery(params = {}) {
     role_key: roleKey,
     limit: params.limit,
     ...(params.keyword ? { keyword: params.keyword } : {}),
+    ...(params.sort_key ? { sort_key: params.sort_key } : {}),
+    ...(params.status_key ? { status_key: params.status_key } : {}),
     ...(cursor ? { cursor } : {}),
   }
 }
@@ -239,6 +248,7 @@ function requireWorkflowRoleTaskResponse(result, query, method) {
         task.version <= 0 ||
         !WORKFLOW_TASK_STATUS_KEYS.has(task.task_status_key) ||
         !allowedStatusKeys.has(task.task_status_key) ||
+        (query.status_key && task.task_status_key !== query.status_key) ||
         (query.view_key === 'approval' && !isWorkflowApprovalTask(task))
     )
   ) {

@@ -462,6 +462,9 @@ func (r *salesOrderRepo) ApplySalesOrderLifecycleAction(
 	if err := createSourceOrderLifecycleActionReceipt(ctx, tx.Client(), "sales_order", current.LifecycleStatus, lifecycleStatus, in, lineResults); err != nil {
 		return nil, err
 	}
+	if err := withdrawEngineeringMaterialTasks(ctx, tx.Client(), in.ID, in.ActorID, in.Reason); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}

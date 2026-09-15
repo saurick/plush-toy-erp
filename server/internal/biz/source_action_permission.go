@@ -34,6 +34,7 @@ const (
 )
 
 var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionContract{
+	{Domain: "sales_order", Method: "list_engineering_material_requests", Rules: sourceReadRules(PermissionEngineeringMaterialRead, PermissionSalesOrderRead)},
 	{Domain: "sales_order", Method: "get_engineering_material_request", Rules: sourceReadRules(PermissionEngineeringMaterialRead, PermissionSalesOrderRead)},
 	{Domain: "sales_order", Method: "finance_review_engineering_material_request", Rules: sourceReadRules(PermissionEngineeringMaterialRead, PermissionSalesOrderRead)},
 	{Domain: "production_wip", Method: "prepare_production_outsourcing_order", Rules: sourceReadRules(PermissionProductionWIPRead, PermissionOutsourcingOrderRead, PermissionSupplierRead)},
