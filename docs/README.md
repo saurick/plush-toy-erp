@@ -10,10 +10,12 @@
 | 业务与领域 | 产品范围、主数据、源单、事实、状态与协作 | [产品与路线](product/README.md)、[架构与领域边界](architecture/README.md)、[工作流](workflow/README.md)、[角色](roles/README.md)、[仓库与品质](warehouse/README.md)、[财务](finance/README.md) |
 | 页面与打印 | 页面任务、菜单、移动岗位端、合同与打印实现 | [前端入口](../web/README.md)、[菜单与正式入口](product/菜单与正式入口合同.md)、[页面动作与生命周期](product/业务数据生命周期与页面动作规则.md)、[打印文档](打印模板实现原理.md) |
 | 开发测试与运行交付 | API、数据字典、测试、CI、发布、迁移与恢复 | [后端专题](../server/docs/README.md)、[测试策略](product/自动化测试策略.md)、[QA 操作](../scripts/qa/README.md)、[工程与交付](engineering/README.md)、[部署约定](部署约定.md)、[可观测性](observability/README.md) |
-| 客户实施与验收 | 客户输入、配置差异、资料、验收与交付 | [客户资料](customers/README.md)、[实施流程](product/新增甲方客户实施流程.md)、[配置与权限](product/配置与权限策略.md)、[安全与隐私](security/README.md)、[客户交付包](../deployments/README.md) |
-| 参考与历史 | 样板、原型、历史决策和过程追溯 | [原型说明](product/prototypes/README.md)、[工程样例](customers/reference-customer/README.md)、[归档](archive/README.md) |
+| 客户实施与验收 | 客户输入、配置差异、资料、验收与交付 | 完整仓库内的客户资料索引 `customers/README.md`、[实施流程](product/新增甲方客户实施流程.md)、[配置与权限](product/配置与权限策略.md)、[安全与隐私](security/README.md)、[客户交付包](../deployments/README.md) |
+| 参考与历史 | 样板、原型、历史决策和过程追溯 | [原型说明](product/prototypes/README.md)、完整仓库内的工程样例 `customers/reference-customer/README.md`、[归档](archive/README.md) |
 
 这些是阅读分类，保留现有主题目录和稳定路径。全量文件、用途与归属查 [文档清单](文档清单.md)；不在多个 README 重复整份清单。
+
+`docs/customers/**` 是仓库内的实施与客户资料，按 `.gitattributes` 排除在 `git archive` 源码包之外。仅持有源码包时，应使用上表随包提供的通用实施、配置与交付文档；客户资料需从完整仓库或对应受控存储取得。
 
 开发环境 `/__dev/docs` 默认展示当前长期文档；“评审与参考”“历史”分开查看，历史正文按需加载。原型是设计输入，归档与 `progress.md` 是历史 / 过程证据，都不证明当前实现。
 
