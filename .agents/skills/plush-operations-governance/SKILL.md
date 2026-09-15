@@ -11,7 +11,7 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 
 - target、模块责任或运行入口不清时，才用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位。
 - 诊断或错误治理按需读相关服务 README、错误码真源、日志、代码和测试；发布、迁移或回滚才读取部署约定、发布门禁、deploy README 和当前 Compose/config。
-- 运行态判断必须核对 environment、commit/image、config、DB/migration、日志和请求证据。
+- 诊断先确认 environment 和最小请求/错误证据，再按失败层补查版本、config、DB/migration 或日志；发布/回滚结论须完整绑定制品、配置、迁移和目标运行证据。
 
 ## Project Rules / 项目边界
 
@@ -33,19 +33,19 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 | Release / Migration | 哪个不可变制品进入哪个 target，DB/config 如何推进？ | `$release-governance` | preflight、commit/image、migration lock、health/ready、smoke |
 | Rollback / Recovery | 回退代码、配置或 migration 的安全点是什么，数据如何恢复？ | `$release-governance` | rollback point、备份、restore drill、对账、恢复后 smoke |
 
-任务真实跨分支时才组合；先由本 skill 固定 plush 真源与 target，再按表中专项 workflow 深入。
+先由本 Skill 固定 plush 真源与 target；表中配套 Skill 仅在当前分支需要其专项步骤时加载，已有充分规则和证据时直接完成。真实跨分支才组合。
 
 ## Shared Workflow / 共用工作流
 
 1. 明确分支、target/environment、允许写入、验收和停止条件。诊断默认只读；发布、migration apply、secret 变更、恢复和清理必须有明确授权。
-2. 按路由进入对应专项 workflow；不同时加载无关分支。记录 current revision、image/config revision、请求窗口、DB/migration 与凭据来源，不输出 secret、完整 token/DSN 或不必要 PII。
+2. 按当前分支取证，不同时加载无关分支；只记录支撑本次判断需要的 revision、请求窗口、配置/迁移与凭据来源，不输出 secret、完整 token/DSN 或不必要 PII。
 3. 写动作前运行对应 preflight 并保留 before evidence；target、数据归属或 migration 状态不清时停止对应动作，不顺手修数据。
 4. 从目标环境采集 after evidence；本地 QA、制品、migration/config、target runtime、recovery 和客户验收分开判定。
 5. 只按正式保留策略清理明确制品；不无条件 prune，不碰 volume、数据库、`/data`、env、证书或运行依赖。正式真源变化时同步相关文档与 `progress.md`。
 
 ## Stop Conditions / 停止条件
 
-- target、commit/image、config revision、DB 或 migration 序列无法唯一确认。
+- 拟执行的写入/发布/恢复所需 target、commit/image、config revision、DB 或 migration 序列无法唯一确认；只阻断依赖该身份的动作。
 - 生产/共享数据需要修复、破坏性 migration、历史改写、强推或不可逆 secret 轮换，且未获得明确授权和恢复方案。
 - preflight、migration status、health/ready、业务 smoke、readback 或数据对账失败；不得跳过失败继续宣称发布完成。
 - 只有本地 QA、历史报告或仓库配置，没有当前目标环境证据。此时最多报告本地/定义层完成。

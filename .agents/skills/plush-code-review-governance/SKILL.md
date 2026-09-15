@@ -12,7 +12,7 @@ description: 项目代码审查治理（plush-toy-erp）。Use when reviewing pl
 ## 范围解析 Scope
 
 1. 用户指定 commit、branch、文件、目录或 PR 时，只审指定范围。
-2. side chat 或新会话未指定范围时，审当前仓库只读 status、staged diff、unstaged diff 和最近相关提交。
+2. 独立会话未指定范围时，先盘点只读 status/diff，再依据当前请求和可核对交接确定范围；不将全部脏文件推定为另一会话成果。
 3. 当前主会话里“实现后 review”时，审本轮相关改动；若工作区有多组无关改动，先按最近用户请求收窄。
 4. 不依赖主会话说法。任何结论都要回到仓库代码、正式文档、测试和当前 diff。
 
@@ -29,8 +29,8 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 
 - 范围、目录职责或当前入口不清时，读 `README.md` 与 `docs/当前真源与交接顺序.md`。
 - 测试策略或证据边界受影响时读 `docs/product/自动化测试策略.md`；QA / 脚本合同受影响时读 `scripts/README.md` 与对应脚本说明。
-- 前端任务读 `web/README.md` 和相关页面/组件/测试。
-- 服务端、schema、事实层任务读 `server/README.md`、相关 `biz / data / service / schema / migration` 和测试。
+- 前端任务直达相关页面/组件/测试，入口或设计系统合同不清时才读 `web/README.md`。
+- 服务端、schema、事实层任务读相关 `biz / data / service / schema / migration` 和测试，职责或运行入口不清时才读 `server/README.md`。
 - 文档或页面设计相关改动需要同时按项目 docs/page governance skill 的规则审查，但本 skill 不要求它们必须一起触发。
 
 ## 高风险检查 Risk Checklist
@@ -54,7 +54,7 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 
 - 复用优先：新增 helper、组件、schema、migration、API、RBAC 权限、Workflow 规则、客户配置、QA 脚本或部署步骤时，检查现有能力是否可以承接；如果新增复杂度没有清晰收益，应作为风险指出。
 - 主路径优先：警惕为通过当前页面或当前测试而加入局部 fallback、重复派生、页面私有真源、宽松校验、隐藏兼容分支或后处理补丁。
-- 范围克制：实现如果把一个可验证切片扩张成 schema、RBAC、runtime、docs、deployment 多层大改，要检查是否越界、是否能拆小、是否缺少中间验收。
+- 范围克制：按当前目标判断各层必要性；必要的 schema、API、UI、文档和测试可组成同一闭环，不因层数多就要求拆任务或中间审批，任务外扩展才指出。
 - 可回归：功能、页面、文档或部署变化必须能说明验证层级；“测试通过”不能替代业务真源、权限、旧数据、浏览器状态、migration 和文档同步检查。
 - 视觉证据：涉及页面、打印/PDF、布局、焦点、选择、拖拽、插入/删除、hover、disabled、移动端或暗色态时，review 要检查是否有真实浏览器截图调试、DOM / box metrics、目标行/单元格/焦点断言和对应页面级浏览器回归（Style L1）/ Playwright 回归。
 - 截图证据充足性：review 不要求截图数量越多越好，但要能证明 exact changed / problem state、修复后状态、至少一个相关边界状态，以及目标行/单元格/按钮/焦点、overflow / clipping / adjacent layout 没有错。

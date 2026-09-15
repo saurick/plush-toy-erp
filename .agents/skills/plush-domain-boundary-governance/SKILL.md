@@ -18,7 +18,7 @@ description: 领域设计与生成（plush-toy-erp），不执行目标库迁移
 
 - 先按 `MasterData / Workflow / Fact / RBAC / API-UI / Productization` 分层定位责任。
 - `Workflow task done` 不等于 `Fact posted`；`WorkflowUsecase` 不直接写库存、出货、财务事实。
-- 禁止新增 `tenant_id`、SaaS 多租户、license server，禁止把当前客户字段硬编码进 Product Core。
+- 单客户私有化边界遵循项目 AGENTS；SaaS 多租户、license 等只有用户明确提出并完成专项评审才可扩展，客户字段不硬编码进 Product Core。
 - 后端实现先确认 schema/migration、repo、usecase、JSON-RPC/API、RBAC、transaction、idempotency、error code 和测试责任，不让前端或临时脚本承接业务事实一致性。
 
 ## 项目边界门禁 Project Boundary Gates
@@ -26,14 +26,14 @@ description: 领域设计与生成（plush-toy-erp），不执行目标库迁移
 - 新增 schema、migration、repo、usecase、API、RBAC 权限、状态、字段或配置前，先证明现有真源不能承接，并说明新增复杂度的收益和退出边界。
 - 优先主路径修复：不要用页面私有逻辑、脚本补写、兼容 fallback、重复派生字段或宽松校验掩盖 usecase / repo / API 合同缺口。
 - Workflow / Fact、客户差异、字段残值 / 缺值、幂等和事务边界必须可测试、可解释、可回滚；不能只让当前 happy path 通过。
-- 若任务跨太多层，先收窄成一个可验证切片；不在一轮里无约束扩张到 schema、RBAC、UI、docs、deploy 全链路。
+- 当前目标所需的 schema、API、UI、文档和测试按同一闭环连续完成；只排除任务外扩展，发布仍核对独立授权。
 
 ## 工作流 Workflow
 
 1. 写出 single domain outcome 和 owning layer。
 2. 找到 source-of-truth fields、states、identifiers、permissions、derived values。
 3. 检查现有 table/usecase/API/helper 是否已经拥有该行为。
-4. 覆盖 stale/missing value paths：defaults、edits、source switch/clear、list/detail/print/export/search、historical fallback。
+4. 按字段影响检查 defaults、edits、source switch/clear 和相关 list/detail/print/export/search；旧实验不构成兼容对象，已落库残留按正式 migration 清理。
 5. UI 不补造 backend facts；客户/模板特例不污染 generic core。
 6. 按影响面选择 unit、integration、contract、browser、migration validation。
 

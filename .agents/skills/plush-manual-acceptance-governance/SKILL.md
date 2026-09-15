@@ -26,7 +26,7 @@ description: 验收编排与证据（plush-toy-erp），目标环境操作使用
 | Target trial/UAT | 经 target attestation、隧道和独立凭据执行允许的目标试用动作 | 与正式 release evidence、生产写入分开 |
 | Release/customer acceptance | 读取正式发布、恢复与签收证据 | 自动化不能代替业务负责人签收 |
 
-每一步必须标注 `no-write`、`simulated-write`、`target-write` 或 `human-only`。不清楚时按高风险档位处理。
+每一步必须标注 `no-write`、`simulated-write`、`target-write` 或 `human-only`。不清楚时按高风险档位处理。下方流程只执行当前 profile 所需步骤：Local plan 不读取运行凭据或连接服务，已有批次的只读检查不重新准备数据；apply、目标访问、签收和 cleanup 各自核对需要与授权。
 
 ## Workflow / 工作流
 

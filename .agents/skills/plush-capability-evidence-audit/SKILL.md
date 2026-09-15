@@ -22,7 +22,7 @@ description: 已有证据的只读能力审计（plush-toy-erp），不执行实
 | 目标运行与交付 | 问“某环境能用吗、发布或恢复了吗” | commit/image、config、migration、health/smoke、readback、backup/restore 和 rollback |
 | 客户结果 | 问“甲方认可或使用正常吗” | 固定版本、反馈记录、UAT、问题闭环和签收 |
 
-这些证据相互独立。产品事实不能推出目标环境已发布；本地绿色不能推出恢复可用；自动化和内部判断不能替代客户实际使用结果。只检查问题成立所必需的类型，无关类型写“本题不需要”，不逐项补齐。
+这些证据相互独立。产品事实不能推出目标环境已发布；本地绿色不能推出恢复可用；自动化和内部判断不能替代客户实际使用结果。只检查和报告本题需要的类型，省略无关类型。
 
 结论词使用 `confirmed`、`partial`、`blocked`、`absent`、`not checked`。`passed` 只描述实际执行的验证；`skipped`、`0 tests executed` 和环境阻断必须单列。
 
