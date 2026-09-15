@@ -9,7 +9,6 @@ import {
   ReloadOutlined,
   StopOutlined,
 } from '@ant-design/icons'
-import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
 import {
   MOBILE_TASK_ACTION_ACCESS_STATES,
   resolveMobileActionLabel,
@@ -416,9 +415,6 @@ function MobileWorkflowTaskActionScreen({
           <h2 className="break-words text-base font-semibold leading-6 text-slate-950 [overflow-wrap:anywhere]">
             {taskName}
           </h2>
-          <div className="mt-2">
-            <WorkflowTaskIdentity task={task} compact />
-          </div>
           <p className="mt-1 break-words text-sm leading-5 text-slate-500 [overflow-wrap:anywhere]">
             {taskSource}
           </p>
@@ -751,7 +747,6 @@ export default function MobileTaskActionScreen(props) {
           <h2 className="break-words text-base font-semibold leading-6 text-slate-950">
             {task.task_name}
           </h2>
-          <WorkflowTaskIdentity task={task} compact />
           <p className="mt-1 break-words text-sm leading-5 text-slate-500">
             {resolveTaskSourceLabel(task)}
           </p>

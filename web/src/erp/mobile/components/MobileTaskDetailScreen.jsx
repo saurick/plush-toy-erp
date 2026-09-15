@@ -22,11 +22,6 @@ import {
 } from '../../api/workflowApi.mjs'
 import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
 import {
-  formatProcessStartedAt,
-  getProcessLabel,
-  getProcessStatusLabel,
-} from '../../utils/processRuntimePresentation.mjs'
-import {
   buildTaskFactRows,
   getMobileRoleLabel,
   isTaskRisk,
@@ -40,7 +35,7 @@ import BusinessAttachmentModalButton from '../../components/business-list/Busine
 import ProductionRouteExecutionModal from '../../components/production-orders/ProductionRouteExecutionModal.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
-import WorkflowProcessStageTrack from '../../components/workflow/WorkflowProcessStageTrack.jsx'
+import WorkflowTaskHandlingChain from '../../components/workflow/WorkflowTaskHandlingChain.jsx'
 import WorkflowTaskEventTrail from '../../components/workflow/WorkflowTaskEventTrail.jsx'
 import { resolveMobileProductionArrangementContext } from '../utils/mobileProductionArrangement.mjs'
 import EngineeringMaterialTaskSummaryEntry from '../../components/sales-orders/EngineeringMaterialTaskSummaryEntry.jsx'
@@ -61,6 +56,8 @@ export default function MobileTaskDetailScreen({
   onBack,
   processingComplete = false,
   onOpenAction,
+  materialDraftRef,
+  onMaterialDraftChange,
   onViewReceipt,
   savedEvidenceRefs,
   selectedCanManageAttachments,
@@ -84,6 +81,7 @@ export default function MobileTaskDetailScreen({
   const [taskEventsState, setTaskEventsState] = React.useState('idle')
   const [processContext, setProcessContext] = React.useState(null)
   const [processContextState, setProcessContextState] = React.useState('idle')
+  const [processContextReloadKey, setProcessContextReloadKey] = React.useState(0)
   const [productionArrangementOpen, setProductionArrangementOpen] =
     React.useState(false)
   const productionArrangementContext = React.useMemo(
@@ -157,6 +155,7 @@ export default function MobileTaskDetailScreen({
       signal: controller.signal,
     })
       .then((context) => {
+        if (controller.signal.aborted) return
         setProcessContext(context)
         setProcessContextState('ready')
       })
@@ -171,6 +170,7 @@ export default function MobileTaskDetailScreen({
     selectedTask?.process_instance_id,
     selectedTask?.process_node_instance_id,
     selectedTask?.version,
+    processContextReloadKey,
   ])
 
   if (!selectedTask || !selectedSeverity) return null
@@ -284,6 +284,8 @@ export default function MobileTaskDetailScreen({
             key={selectedTask.id}
             task={selectedTask}
             profile={adminProfile}
+            draftRef={materialDraftRef}
+            onDraftChange={onMaterialDraftChange}
             mobile
           />
           <div
@@ -435,50 +437,14 @@ export default function MobileTaskDetailScreen({
           </section>
         ) : null}
 
-        {selectedTask.process_instance_id ? (
-          <section
-            className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-            data-testid="mobile-task-process-context"
-          >
-            <h2 className="text-xl font-semibold text-slate-950">业务轨迹</h2>
-            {processContextState === 'loading' ? (
-              <p className="mt-3 text-sm text-slate-500">正在读取业务轨迹</p>
-            ) : processContextState === 'error' ? (
-              <p className="mt-3 text-sm text-red-600">
-                业务轨迹暂时无法确认，请刷新后重试。
-              </p>
-            ) : processContext ? (
-              <div className="mt-4 space-y-4 text-sm leading-6 text-slate-700">
-                <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-slate-500">业务流程</dt>
-                    <dd className="font-semibold text-slate-900">
-                      {getProcessLabel(processContext.process_instance)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">流程发起</dt>
-                    <dd className="font-semibold text-slate-900">
-                      {formatProcessStartedAt(
-                        processContext.process_instance.started_at
-                      )}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">流程状态</dt>
-                    <dd className="font-semibold text-slate-900">
-                      {getProcessStatusLabel(processContext.process_instance)}
-                    </dd>
-                  </div>
-                </dl>
-                <WorkflowProcessStageTrack
-                  context={processContext}
-                  variant="mobile"
-                />
-              </div>
-            ) : null}
-          </section>
-        ) : null}
+        <WorkflowTaskHandlingChain
+          task={selectedTask}
+          profile={adminProfile}
+          processContext={processContext}
+          processContextState={processContextState}
+          onRetryProcess={() => setProcessContextReloadKey((value) => value + 1)}
+          variant="mobile"
+        />
 
         <WorkflowTaskEventTrail
           approvalTask={approvalTask}

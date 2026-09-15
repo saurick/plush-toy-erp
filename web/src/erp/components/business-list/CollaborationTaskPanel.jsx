@@ -639,6 +639,7 @@ export function CollaborationTaskPanel({
       </Card>
       <WorkflowTaskActionDrawer
         task={actionDrawerTask}
+        profile={adminProfile}
         actionReceipt={actionDrawerReceipt}
         actionMode={actionDrawerMode}
         actionReason={actionDrawerReason}

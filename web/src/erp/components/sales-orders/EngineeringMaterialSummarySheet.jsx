@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Form, Input, Space, Tooltip } from 'antd'
+import React, { useMemo, useRef, useState } from 'react'
+import { Button, Form, Space, Tooltip } from 'antd'
 import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
@@ -9,13 +9,9 @@ import {
 } from '@ant-design/icons'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
-import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
 import { bomLossRateToPercent } from '../../utils/bomMaterialGroups.mjs'
-import {
-  numeric20Scale6Units,
-  multiplyNumeric20Scale6Values,
-} from '../../utils/numeric20Scale6.mjs'
+import { multiplyNumeric20Scale6Values } from '../../utils/numeric20Scale6.mjs'
 import {
   formatMaterialQuantity as quantity,
   materialRowKey,
@@ -24,11 +20,6 @@ import {
   materialSummaryRows,
   materialSummaryTotals,
 } from '../../utils/engineeringMaterialSummary.mjs'
-
-const validNumber = (_, value) =>
-  numeric20Scale6Units(value) !== null
-    ? Promise.resolve()
-    : Promise.reject(new Error('请输入非负数，最多六位小数'))
 
 function MaterialParts({ parts }) {
   return (
@@ -148,44 +139,22 @@ function MaterialNotes({ notes, compact = false }) {
 
 export default function EngineeringMaterialSummarySheet({
   request,
-  form,
-  canFinance,
   saving,
   mobile,
   commercialRead,
-  financeIssue,
   onReload,
 }) {
   const [mobileView, setMobileView] = useState('cards')
   const [expanded, setExpanded] = useState([])
   const tableHost = useRef(null)
-  const sheet = useRef(null)
-  const focusedIssue = useRef(null)
-  useEffect(() => {
-    if (!financeIssue || focusedIssue.current === financeIssue) return undefined
-    const frame = requestAnimationFrame(() => {
-      const label = `${financeIssue.label} ${financeIssue.index + 1}`
-      const input = [
-        ...(sheet.current?.querySelectorAll('input, textarea') || []),
-      ].find((element) => element.getAttribute('aria-label') === label)
-      input?.focus({ preventScroll: true })
-      input?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-      focusedIssue.current = financeIssue
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [financeIssue])
-  const values = Form.useWatch('items', { form, preserve: true })
   const rows = useMemo(() => materialSummaryRows(request), [request])
   const products = useMemo(
     () => materialSummaryProducts(request.sources),
     [request.sources]
   )
-  const totals = materialSummaryTotals(
-    request.items,
-    canFinance ? values : request.items
-  )
+  const totals = materialSummaryTotals(request.items, request.items)
   const inventory = request.inventory_reference
-  const showMoney = commercialRead || canFinance
+  const showMoney = commercialRead
   const displayQuantity = (value) => (
     <span
       className="erp-material-number"
@@ -201,37 +170,6 @@ export default function EngineeringMaterialSummarySheet({
         : [...previous, key]
     )
 
-  const field = (item, key, label, options = {}) => {
-    const Control = key === 'note' ? BusinessTextArea : Input
-    return (
-      <Form.Item
-        name={['items', item.index, key]}
-        rules={options.rules}
-        noStyle
-      >
-        <Control
-          aria-label={`${label} ${item.index + 1}`}
-          disabled={saving}
-          {...options.input}
-        />
-      </Form.Item>
-    )
-  }
-  const adjustmentRule =
-    (item) =>
-    ({ getFieldValue }) => ({
-      validator: (_, value) => {
-        const actual = numeric20Scale6Units(
-          getFieldValue(['items', item.index, 'purchase_quantity'])
-        )
-        const required = numeric20Scale6Units(item.required_quantity)
-        return actual !== null &&
-          actual !== required &&
-          !String(value || '').trim()
-          ? Promise.reject(new Error('调整数量请填写原因'))
-          : Promise.resolve()
-      },
-    })
   const stock = (item) => {
     if (inventory?.status === 'FORBIDDEN') {
       return <span className="erp-material-summary-hint">未开放查看</span>
@@ -251,13 +189,7 @@ export default function EngineeringMaterialSummarySheet({
       key: 'purchase',
       width: 132,
       align: 'right',
-      render: (_, item) =>
-        canFinance
-          ? field(item, 'purchase_quantity', '实购数量', {
-              rules: [{ validator: validNumber }],
-              input: { inputMode: 'decimal' },
-            })
-          : displayQuantity(item.purchase_quantity),
+      render: (_, item) => displayQuantity(item.purchase_quantity),
     },
     {
       title: '补采数量',
@@ -273,13 +205,7 @@ export default function EngineeringMaterialSummarySheet({
             key: 'price',
             width: 120,
             align: 'right',
-            render: (_, item) =>
-              canFinance
-                ? field(item, 'unit_price', '单价', {
-                    rules: [{ validator: validNumber }],
-                    input: { inputMode: 'decimal', placeholder: '待核价' },
-                  })
-                : displayQuantity(item.unit_price),
+            render: (_, item) => displayQuantity(item.unit_price),
           },
           {
             title: '金额（元）',
@@ -287,7 +213,7 @@ export default function EngineeringMaterialSummarySheet({
             width: 120,
             align: 'right',
             render: (_, item) => {
-              const line = canFinance ? values?.[item.index] : item
+              const line = item
               const amount = multiplyNumeric20Scale6Values(
                 line?.purchase_quantity,
                 line?.unit_price,
@@ -306,26 +232,14 @@ export default function EngineeringMaterialSummarySheet({
       title: '预计到货',
       key: 'arrival',
       width: 150,
-      render: (_, item) =>
-        canFinance
-          ? field(item, 'expected_arrival_date', '到货日期', {
-              rules: [{ required: true, message: '请填写到货日期' }],
-              input: { type: 'date' },
-            })
-          : item.expected_arrival_date?.slice(0, 10) || '—',
+      render: (_, item) => item.expected_arrival_date?.slice(0, 10) || '—',
     },
     {
       align: 'left',
       title: '采购调整原因',
       key: 'adjustment',
       width: 200,
-      render: (_, item) =>
-        canFinance
-          ? field(item, 'note', '调整原因', {
-              rules: [adjustmentRule(item)],
-              input: { maxLength: 255, placeholder: '实购不同于总用量时必填' },
-            })
-          : item.note || '—',
+      render: (_, item) => item.note || '—',
     },
   ]
   const columns = [
@@ -404,11 +318,7 @@ export default function EngineeringMaterialSummarySheet({
   }
 
   return (
-    <section
-      ref={sheet}
-      className="erp-material-sheet"
-      aria-label="材料汇总明细"
-    >
+    <section className="erp-material-sheet" aria-label="材料汇总明细">
       {mobile ? (
         <p className="erp-material-sheet__order">订单号：{request.order_no}</p>
       ) : null}

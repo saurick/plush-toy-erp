@@ -806,6 +806,18 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           body,
           textArea,
           metaItems,
+          activeStep: drawerElement?.querySelector(
+            '.erp-task-action-drawer__step[role="tab"][aria-selected="true"]'
+          )?.getAttribute('aria-controls'),
+          hasActionReceipt: Boolean(drawerElement?.querySelector(
+            '[data-testid="workflow-task-action-receipt"]'
+          )),
+          viewButtons: Array.from(drawerElement?.querySelectorAll(
+            '.erp-task-action-drawer__footer button'
+          ) || []).filter((button) => /查看/.test(button.textContent || '')).length,
+          visibleChains: Array.from(drawerElement?.querySelectorAll(
+            '[aria-label="任务处理链"]'
+          ) || []).filter(isVisible).length,
           timingKeys: Array.from(
             drawerElement?.querySelectorAll(
               '.erp-task-timing [data-task-time]'
@@ -830,23 +842,35 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     )
     assert(
       metrics.summary?.height > 0 &&
-        metrics.metaGrid?.height > 0 &&
         metrics.guide?.height > 0 &&
         metrics.guideSteps?.height > 0 &&
         metrics.actionPanel?.height > 0 &&
         metrics.footer?.height > 0,
       `${scenarioName} 任务处理抽屉缺少关键分区: ${JSON.stringify(metrics)}`
     )
+    const isContext = metrics.activeStep === 'erp-task-action-step-context'
+    if (isContext || metrics.hasActionReceipt) {
+      assert(
+        metrics.metaGrid?.height > 0 && metrics.metaItems === 2,
+        `${scenarioName} 核对任务和办理回执应展示来源与责任岗位: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        metrics.timingKeys.includes('arrived') &&
+          metrics.timingKeys.includes('due'),
+        `${scenarioName} 核对任务和办理回执应显示入岗和处理截止时间: ${JSON.stringify(metrics)}`
+      )
+    } else {
+      assert.equal(metrics.metaItems, 0, `${scenarioName} 办理步骤不应重复任务详情`)
+      assert.equal(metrics.timingKeys.length, 0, `${scenarioName} 办理步骤不应重复任务日期`)
+    }
     assert.equal(
-      metrics.metaItems,
-      2,
-      `${scenarioName} 任务详情基础摘要应展示来源和负责人，日期集中展示: ${JSON.stringify(metrics)}`
+      metrics.visibleChains,
+      isContext ? 1 : 0,
+      `${scenarioName} 任务处理链只在核对任务步骤展示`
     )
-    assert(
-      metrics.timingKeys.includes('arrived') &&
-        metrics.timingKeys.includes('due'),
-      `${scenarioName} 任务详情应同时显示入岗和处理截止时间: ${JSON.stringify(metrics)}`
-    )
+    if (!isContext) {
+      assert.equal(metrics.viewButtons, 0, `${scenarioName} 办理与结果步骤不应提供查看入口`)
+    }
     assert.equal(
       metrics.guideNoteCount,
       0,
@@ -877,7 +901,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     )
     assert(
       metrics.summary.right <= metrics.scopeRect.right + 2 &&
-        metrics.metaGrid.right <= metrics.scopeRect.right + 2 &&
+        (!metrics.metaGrid || metrics.metaGrid.right <= metrics.scopeRect.right + 2) &&
         metrics.guide.right <= metrics.scopeRect.right + 2 &&
         metrics.guideSteps.right <= metrics.scopeRect.right + 2 &&
         metrics.actionPanel.right <= metrics.scopeRect.right + 2,

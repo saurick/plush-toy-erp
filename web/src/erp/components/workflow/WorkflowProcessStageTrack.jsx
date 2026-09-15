@@ -12,9 +12,10 @@ const STAGE_MARKERS = Object.freeze({
 export default function WorkflowProcessStageTrack({
   className = '',
   context,
+  model: suppliedModel,
   variant = 'desktop',
 }) {
-  const model = buildWorkflowProcessStageModel(context)
+  const model = suppliedModel || buildWorkflowProcessStageModel(context)
 
   return (
     <div
@@ -60,6 +61,11 @@ export default function WorkflowProcessStageTrack({
                 {item.attemptLabel ? ` · ${item.attemptLabel}` : ''}
                 {item.linked ? ' · 本任务' : ''}
               </span>
+              {item.detail ? (
+                <span className="workflow-process-stage__meta">
+                  {item.detail}
+                </span>
+              ) : null}
             </span>
           </li>
         ))}

@@ -1912,6 +1912,8 @@ export default function MobileRoleTasksPage() {
     const receiptSnapshotOnly = Boolean(receiptDetailTask && !selectedTask)
     return (
       <MobileTaskDetailScreen
+        materialDraftRef={materialDraftRef}
+        onMaterialDraftChange={saveMaterialDraft}
         actionAccess={
           receiptSnapshotOnly
             ? {

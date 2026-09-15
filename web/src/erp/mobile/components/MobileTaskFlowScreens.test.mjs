@@ -10,6 +10,7 @@ const detailScreenSource = readFileSync(
   new URL('./MobileTaskDetailScreen.jsx', import.meta.url),
   'utf8'
 )
+const handlingChainSource = readFileSync(new URL('../../components/workflow/WorkflowTaskHandlingChain.jsx', import.meta.url), 'utf8')
 const listScreenSource = readFileSync(
   new URL('./MobileTaskListScreen.jsx', import.meta.url),
   'utf8'
@@ -317,13 +318,14 @@ test('mobile task detail keeps one compact task summary and leaves completion fe
 })
 
 test('mobile task detail loads formal process position without QA-only banners', () => {
+  assert.doesNotMatch(actionScreenSource, /WorkflowTaskIdentity/u)
   assert.match(detailScreenSource, /getWorkflowTaskProcessContext/u)
-  assert.match(detailScreenSource, /mobile-task-process-context/u)
-  assert.match(detailScreenSource, />\s*业务轨迹\s*</u)
-  assert.match(detailScreenSource, /业务流程/u)
-  assert.match(detailScreenSource, /流程发起/u)
-  assert.match(detailScreenSource, /流程状态/u)
-  assert.match(detailScreenSource, /WorkflowProcessStageTrack/u)
+  assert.match(handlingChainSource, /mobile-task-process-context/u)
+  assert.match(handlingChainSource, />\s*任务处理链\s*</u)
+  assert.match(handlingChainSource, /业务流程/u)
+  assert.match(handlingChainSource, /发起时间/u)
+  assert.match(handlingChainSource, /流程状态/u)
+  assert.match(detailScreenSource, /WorkflowTaskHandlingChain/u)
   assert.match(processStageSource, /data-testid="workflow-process-stage"/u)
   assert.match(processStageSource, /aria-current=\{item\.current \? 'step'/u)
   assert.match(processStageSource, /data-linked-task=/u)
@@ -351,7 +353,7 @@ test('mobile task detail loads current-task records for every task and keeps the
   assert.doesNotMatch(detailScreenSource, /mobile-approval-trajectory/u)
 
   const keyInformationIndex = detailScreenSource.indexOf('业务信息')
-  const businessTrajectoryIndex = detailScreenSource.indexOf('>业务轨迹</h2>')
+  const businessTrajectoryIndex = detailScreenSource.indexOf('<WorkflowTaskHandlingChain')
   const taskEventTrailIndex = detailScreenSource.indexOf(
     '<WorkflowTaskEventTrail'
   )
@@ -383,7 +385,7 @@ test('mobile task detail separates real attachments from historical text referen
   assert.doesNotMatch(detailScreenSource, /当前任务尚无可显示的处理证据/u)
   assert.ok(
     detailScreenSource.indexOf('mobile-task-attachment-action') <
-      detailScreenSource.indexOf('>业务轨迹</h2>')
+      detailScreenSource.indexOf('<WorkflowTaskHandlingChain')
   )
   assert.match(
     roleTaskPageSource,

@@ -461,7 +461,7 @@ export function createDashboardTaskScenarios({
           await assertTextAbsent(page, 'PROC-701-NODE-702-A1')
           await assertTextAbsent(page, '核对审批事项')
           await assertTextAbsent(page, '当前状态')
-          await expectText(page, '暂时无法读取业务进度')
+          await expectText(page, '暂时无法读取任务处理链')
           await expectButton(page, '重新读取')
           await assertTextAbsent(page, '系统不会根据任务文案猜测流程节点')
           await page.waitForFunction(() => {
@@ -490,7 +490,7 @@ export function createDashboardTaskScenarios({
         }
         await expectText(page, '本任务处理记录')
         await expectText(page, '等待审批人核对来源单据与放行条件')
-        await expectText(page, '业务进度')
+        await expectText(page, '任务处理链')
         await expectText(page, '出货财务放行')
         await expectText(page, '流程状态')
         await expectText(page, '办理中')
@@ -2057,7 +2057,7 @@ export function createDashboardTaskScenarios({
         )
         await taskDrawer.waitFor({ state: 'visible', timeout: 10_000 })
         await taskDrawer
-          .getByText('看板跳转测试任务', { exact: true })
+          .getByRole('heading', { name: '看板跳转测试任务', exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         await page.screenshot({
           path: path.resolve(outputDir, 'erp-task-board-card-single-click.png'),

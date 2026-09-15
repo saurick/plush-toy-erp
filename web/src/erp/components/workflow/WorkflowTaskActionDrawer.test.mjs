@@ -13,6 +13,7 @@ const source = readFileSync(
   fileURLToPath(new URL('./WorkflowTaskActionDrawer.jsx', import.meta.url)),
   'utf8'
 )
+const handlingChainSource = readFileSync(new URL('./WorkflowTaskHandlingChain.jsx', import.meta.url), 'utf8')
 const processStageSource = readFileSync(
   fileURLToPath(new URL('./WorkflowProcessStageTrack.jsx', import.meta.url)),
   'utf8'
@@ -68,13 +69,13 @@ test('task action drawer separates business trajectory from current-task process
 
 test('task action drawer shows task-scoped process position without exposing QA-only copy', () => {
   assert.match(source, /getWorkflowTaskProcessContext\(task\.id/u)
-  assert.match(source, /业务流程/u)
-  assert.match(source, /业务进度/u)
+  assert.match(handlingChainSource, /业务流程/u)
+  assert.match(handlingChainSource, /任务处理链/u)
   assert.match(source, /来源单据/u)
-  assert.match(source, /流程状态/u)
-  assert.match(source, /暂时无法读取业务进度/u)
+  assert.match(handlingChainSource, /流程状态/u)
+  assert.match(handlingChainSource, /暂时无法读取任务处理链/u)
   assert.match(source, /setProcessContextReloadKey/u)
-  assert.match(source, />\s*重新读取\s*<\/Button>/u)
+  assert.match(handlingChainSource, />\s*重新读取\s*<\/Button>/u)
   assert.match(source, /WorkflowProcessStageTrack context=\{processContext\}/u)
   assert.match(processStageSource, /执行轨迹/u)
   assert.match(processStageSource, /aria-current=\{item\.current \? 'step'/u)
@@ -119,7 +120,7 @@ test('task action drawer keeps one compact business-facing task summary', () => 
     '<section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">'
   )
   const taskSummaryEnd = source.indexOf(
-    '{!hasActionReceipt && task.process_instance_id ? (',
+    "{!hasActionReceipt && activeStepKey === 'context' ? (",
     taskSummaryStart
   )
   const taskSummarySource = source.slice(taskSummaryStart, taskSummaryEnd)
@@ -300,6 +301,20 @@ test('drawer step navigation and keyboard selection never submit an action', asy
   assert.equal(ui.submissions.length, 0)
   await ui.click(ui.button('确认完成'))
   assert.deepEqual(ui.submissions, [{ processDecision: null }])
+})
+
+test('all task types keep document viewing and the processing chain in the context step', async (t) => {
+  const ui = await mountDrawer(t, { canOpenEntry: true })
+  assert.ok(ui.button('查看相关单据'))
+  assert.ok(document.querySelector('[aria-label="任务处理链"]'))
+  await ui.click(ui.tabs()[1])
+  assert.equal(ui.button('查看相关单据'), undefined)
+  assert.equal(document.querySelector('[aria-label="任务处理链"]'), null)
+  assert.equal(document.querySelector('.erp-task-action-drawer__task-meta'), null)
+  await ui.click(ui.tabs()[0])
+  assert.ok(ui.button('查看相关单据'))
+  assert.ok(document.querySelector('[aria-label="任务处理链"]'))
+  assert.equal(ui.submissions.length, 0)
 })
 
 test('drawer requires a reason and disables submission while saving or access is withdrawn', async (t) => {

@@ -45,9 +45,6 @@ import {
   workflowProcessDecisionAllowsApprovedQuantity,
 } from '../../utils/workflowProcessDecision.mjs'
 import {
-  formatProcessStartedAt,
-  getProcessLabel,
-  getProcessStatusLabel,
   getWorkflowTaskDisplayName,
 } from '../../utils/processRuntimePresentation.mjs'
 import {
@@ -59,6 +56,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import BusinessAttachmentModalButton from '../business-list/BusinessAttachmentModalButton.jsx'
 import WorkflowProcessStageTrack from './WorkflowProcessStageTrack.jsx'
+import WorkflowTaskHandlingChain from './WorkflowTaskHandlingChain.jsx'
 import WorkflowTaskEventTrail from './WorkflowTaskEventTrail.jsx'
 
 const { Paragraph, Text, Title } = Typography
@@ -206,6 +204,7 @@ function getTaskActionTone(actionMode = '') {
 
 export default function WorkflowTaskActionDrawer({
   task,
+  profile,
   actionReceipt = null,
   actionMode = '',
   actionReason = '',
@@ -258,14 +257,8 @@ export default function WorkflowTaskActionDrawer({
     ? String(task.id || task.task_code || task.task_name || '')
     : ''
   const [activeStepKey, setActiveStepKey] = React.useState('context')
-  const sourceActionActive = hasSourceAction && activeStepKey === 'action'
-  const [sourceActionTaskID, setSourceActionTaskID] = React.useState('')
+  const showTaskContext = activeStepKey === 'context' && !hasActionReceipt
   const [sourceFooter, setSourceFooter] = React.useState(null)
-  React.useEffect(() => {
-    if (hasSourceAction && activeStepKey === 'action') {
-      setSourceActionTaskID(taskIdentity)
-    }
-  }, [hasSourceAction, activeStepKey, taskIdentity])
   const [taskEvents, setTaskEvents] = React.useState([])
   const [taskEventsTruncated, setTaskEventsTruncated] = React.useState(false)
   const [taskEventsState, setTaskEventsState] = React.useState('idle')
@@ -353,7 +346,6 @@ export default function WorkflowTaskActionDrawer({
   React.useEffect(() => {
     if (taskIdentity === previousTaskIdentityRef.current) return
     previousTaskIdentityRef.current = taskIdentity
-    setSourceActionTaskID('')
     setApprovedQuantity('')
     setActiveStepKey(resolveWorkflowTaskActionInitialStep(actionMode))
   }, [actionMode, taskIdentity])
@@ -412,6 +404,7 @@ export default function WorkflowTaskActionDrawer({
     setProcessContextState('loading')
     getWorkflowTaskProcessContext(task.id, { signal: controller.signal })
       .then((context) => {
+        if (controller.signal.aborted) return
         setProcessContext(context)
         setProcessContextState('ready')
       })
@@ -619,7 +612,7 @@ export default function WorkflowTaskActionDrawer({
                   上一步
                 </Button>
               ) : null}
-              {canOpenRelatedEntry ? (
+              {showTaskContext && canOpenRelatedEntry ? (
                 <Button
                   icon={<LinkOutlined />}
                   disabled={actionSaving}
@@ -628,7 +621,7 @@ export default function WorkflowTaskActionDrawer({
                   查看相关单据
                 </Button>
               ) : null}
-              {canViewAttachments ? (
+              {showTaskContext && canViewAttachments ? (
                 <BusinessAttachmentModalButton
                   ownerType="workflow_task"
                   ownerId={task.id}
@@ -789,10 +782,10 @@ export default function WorkflowTaskActionDrawer({
                 assigneeLabel={hasActionReceipt ? '' : currentAssigneeLabel}
               />
             </div>
-            {sourceActionActive ? (
+            {showTaskContext ? <WorkflowTaskIdentity task={task} /> : !hasActionReceipt ? (
               <WorkflowTaskSource task={taskWithSource} />
-            ) : <WorkflowTaskIdentity task={task} />}
-            {!sourceActionActive ? (
+            ) : null}
+            {showTaskContext || hasActionReceipt ? (
               <div className="erp-task-action-drawer__meta-grid erp-task-action-drawer__task-meta">
                 <div>
                   <span>来源单据</span>
@@ -832,14 +825,14 @@ export default function WorkflowTaskActionDrawer({
               </div>
             ) : null}
             {activeStepKey === 'context' ? sourceSummary : null}
-            {!sourceActionActive ? (
+            {showTaskContext || hasActionReceipt ? (
               <WorkflowTaskTiming
                 task={task}
                 detail
                 events={taskEventsState === 'ready' ? taskEvents : []}
               />
             ) : null}
-            {taskReason || exceptionContactHint ? (
+            {showTaskContext && (taskReason || exceptionContactHint) ? (
               <div className="erp-task-action-drawer__reason">
                 <span>{taskReason ? '当前原因' : '处理建议'}</span>
                 {taskReason ? <strong>{taskReason}</strong> : null}
@@ -867,65 +860,14 @@ export default function WorkflowTaskActionDrawer({
             ) : null}
           </section>
 
-          {!hasActionReceipt && task.process_instance_id ? (
-            <section
-              className="erp-task-action-drawer__summary"
-              aria-labelledby="erp-task-action-process-title"
-            >
-              <h3
-                id="erp-task-action-process-title"
-                className="erp-task-action-drawer__section-title"
-              >
-                业务进度
-              </h3>
-              {processContextState === 'loading' ? (
-                <Text type="secondary" role="status">
-                  正在读取业务进度
-                </Text>
-              ) : processContextState === 'error' ? (
-                <Alert
-                  type="error"
-                  showIcon
-                  message="暂时无法读取业务进度"
-                  action={
-                    <Button
-                      size="small"
-                      onClick={() =>
-                        setProcessContextReloadKey((current) => current + 1)
-                      }
-                    >
-                      重新读取
-                    </Button>
-                  }
-                />
-              ) : processContext ? (
-                <>
-                  <div className="erp-task-action-drawer__meta-grid erp-task-action-drawer__process-meta">
-                    <div>
-                      <span>业务流程</span>
-                      <strong>
-                        {getProcessLabel(processContext.process_instance)}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>发起时间</span>
-                      <strong>
-                        {formatProcessStartedAt(
-                          processContext.process_instance.started_at
-                        )}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>流程状态</span>
-                      <strong>
-                        {getProcessStatusLabel(processContext.process_instance)}
-                      </strong>
-                    </div>
-                  </div>
-                  <WorkflowProcessStageTrack context={processContext} />
-                </>
-              ) : null}
-            </section>
+          {!hasActionReceipt && activeStepKey === 'context' ? (
+            <WorkflowTaskHandlingChain
+              task={task}
+              profile={profile}
+              processContext={processContext}
+              processContextState={processContextState}
+              onRetryProcess={() => setProcessContextReloadKey((current) => current + 1)}
+            />
           ) : null}
 
           <section
@@ -966,7 +908,7 @@ export default function WorkflowTaskActionDrawer({
             className="erp-task-action-drawer__step-panel"
           >
             {hasSourceAction ? (
-              !hasActionReceipt && sourceActionTaskID === taskIdentity ? (
+              !hasActionReceipt && activeStepKey === 'action' ? (
                 renderSourceAction(({ content, footer }) => (
                   <div className="erp-material-task-action">
                     {content}

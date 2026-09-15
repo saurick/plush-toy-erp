@@ -645,6 +645,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [selectedTask, setSelectedTask] = useState(null)
   const [materialSaving, setMaterialSaving] = useState(false)
   const materialLeaveGuardRef = useRef(null)
+  const materialDraftRef = useRef(null)
   const [actionMode, setActionMode] = useState('')
   const [actionReason, setActionReason] = useState('')
   const [assignmentTarget, setAssignmentTarget] = useState()
@@ -707,6 +708,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   )
   const workflowWorkbenchScopeKeyRef = useRef(workflowWorkbenchScopeKey)
   workflowWorkbenchScopeKeyRef.current = workflowWorkbenchScopeKey
+  useEffect(() => {
+    materialDraftRef.current = null
+  }, [selectedTask?.id, selectedTask?.version, workflowWorkbenchScopeKey])
   const requestedFilters = useMemo(
     () => readWorkflowTaskBoardFiltersFromSearch(searchParams),
     [searchParams]
@@ -1997,11 +2001,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
       <WorkflowTaskActionDrawer
         task={selectedTask}
+        profile={adminProfile}
         sourceSummary={
           <EngineeringMaterialTaskSummaryEntry
             key={selectedTask?.id}
             task={selectedTask}
             profile={adminProfile}
+            draftRef={materialDraftRef}
           />
         }
         renderSourceAction={
@@ -2013,6 +2019,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 profile={adminProfile}
                 render={render}
                 leaveGuardRef={materialLeaveGuardRef}
+                draftRef={materialDraftRef}
                 onBusyChange={setMaterialSaving}
                 onChanged={(value, result) => {
                     setActionReceipt({

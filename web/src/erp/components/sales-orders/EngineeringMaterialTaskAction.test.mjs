@@ -38,12 +38,14 @@ async function setup(t, { stage = 'boss', mobile = false } = {}) {
     { default: TaskAction },
     { default: Drawer },
     { default: ActionScreen },
+    { default: SummaryEntry },
     { MemoryRouter },
     { JsonRpc },
   ] = await Promise.all([
     import('./EngineeringMaterialTaskAction.jsx'),
     import('../workflow/WorkflowTaskActionDrawer.jsx'),
     import('../../mobile/components/MobileTaskActionScreen.jsx'),
+    import('./EngineeringMaterialTaskSummaryEntry.jsx'),
     import('react-router-dom'),
     import('../../../common/utils/jsonRpc.js'),
   ])
@@ -160,6 +162,7 @@ async function setup(t, { stage = 'boss', mobile = false } = {}) {
       ? createElement(ActionScreen, { task, renderSourceAction })
       : createElement(Drawer, {
           task,
+          sourceSummary: createElement(SummaryEntry, { task, profile, draftRef }),
           actionSaving: busy,
           actionReceipt: result,
           renderSourceAction,
@@ -208,6 +211,24 @@ async function setup(t, { stage = 'boss', mobile = false } = {}) {
   })
   return {
     render,
+    prepareFinance: async () => {
+      if (mobile) {
+        await act(async () => root.render(
+          createElement(MemoryRouter,
+            { future: { v7_startTransition: true, v7_relativeSplatPath: true } },
+            createElement(SummaryEntry, { task, profile, mobile, draftRef })
+          )
+        ))
+      } else {
+        await click(document.querySelector('#erp-task-action-step-context-tab'))
+      }
+      await click(button('填写核价'))
+    },
+    resumeFinance: async () => {
+      await click(button('保留填写，返回核对'))
+      if (mobile) await render()
+      else await click(document.querySelector('#erp-task-action-step-action-tab'))
+    },
     hide: async () => act(async () => root.render(null)),
     button,
     click,
@@ -352,11 +373,16 @@ test('mobile processing uses the active process tab, requires a rejection reason
   assert.equal(ui.draftRef.current, null)
 })
 
-test('finance validates all material rows and submits the original row identities from the embedded form', async (t) => {
-  const ui = await setup(t, { stage: 'finance', mobile: true })
+for (const mobile of [false, true]) {
+test(`${mobile ? 'mobile' : 'desktop'} finance prepares pricing outside the approval step and submits it only with approval`, async (t) => {
+  const ui = await setup(t, { stage: 'finance', mobile })
   await ui.render()
-  assert.ok(document.querySelector('.erp-material-sheet'))
-  assert.ok(document.querySelector('[aria-label="采购金额合计"]'))
+  if (!mobile) await ui.click(ui.button('处理任务'))
+  assert.equal(document.querySelector('.erp-material-sheet'), null)
+  assert.equal(document.querySelector('[aria-label="采购核价录入"]'), null)
+  assert.equal(document.querySelector('.erp-material-product'), null)
+  assert.equal(document.querySelector('[aria-label="采购金额合计"]'), null)
+  assert.match(document.querySelector('input[value="approve"]').closest('label').textContent, /审批通过/)
   await ui.click(ui.button('批准并生成采购订单'))
   assert.equal(
     ui.calls.some(
@@ -364,8 +390,17 @@ test('finance validates all material rows and submits the original row identitie
     ),
     false
   )
+  await ui.prepareFinance()
+  assert.ok(document.querySelector('[aria-label="采购核价录入"]'))
+  assert.equal(document.querySelector('.erp-material-sheet'), null)
+  assert.match(document.querySelector('.erp-material-finance-fields__amount').textContent, /待核价/)
+  assert.equal(document.querySelector('input[value="approve"]'), null)
   await ui.fill('input[aria-label="单价 1"]', '2.50')
   await ui.fill('input[aria-label="到货日期 1"]', '2026-10-01')
+  await ui.resumeFinance()
+  assert.ok(ui.calls.every(({ method }) => method !== 'finance_review_engineering_material_request'))
+  assert.equal(document.querySelector('[aria-label="采购核价录入"]'), null)
+  assert.equal(document.querySelector('[aria-label="采购金额合计"]'), null)
   await ui.click(ui.button('批准并生成采购订单'))
   const write = ui.calls.find(
     ({ method }) => method === 'finance_review_engineering_material_request'
@@ -378,6 +413,7 @@ test('finance validates all material rows and submits the original row identitie
   assert.equal(write.params.items[0].unit_price, '2.50')
   assert.equal(ui.receipt.value.status, 'APPROVED')
 })
+}
 
 test('engineering revision reloads current saved sources before resubmitting in the processing tab', async (t) => {
   const ui = await setup(t, { stage: 'revision', mobile: true })
@@ -387,7 +423,7 @@ test('engineering revision reloads current saved sources before resubmitting in 
   await ui.click(ui.button('按当前资料重新整理'))
   assert.equal(ui.calls.at(-1).params.preview, true)
   assert.equal(ui.calls.at(-1).params.request_id, undefined)
-  assert.ok(document.querySelector('.erp-material-sheet'))
+  assert.equal(document.querySelector('.erp-material-sheet'), null)
   await ui.click(ui.button('提交老板审核'))
   assert.deepEqual(ui.calls.at(-1).params, {
     sales_order_id: 8,
@@ -397,6 +433,90 @@ test('engineering revision reloads current saved sources before resubmitting in 
     expected_task_version: 4,
   })
   assert.equal(ui.receipt.value.status, 'SUBMITTED')
+})
+
+for (const mobile of [false, true]) {
+  test(`${mobile ? 'mobile' : 'desktop'} finance rejection skips pricing validation and switching decisions preserves pricing`, async (t) => {
+    const ui = await setup(t, { stage: 'finance', mobile })
+    await ui.render()
+    if (!mobile) await ui.click(ui.button('处理任务'))
+    await ui.prepareFinance()
+    await ui.fill('input[aria-label="单价 1"]', '0')
+    assert.equal(document.querySelector('.erp-material-finance-fields__amount strong').textContent, '0')
+    await ui.fill('input[aria-label="实购数量 1"]', '4')
+    await ui.resumeFinance()
+    await ui.click(document.querySelector('input[value="reject"]'))
+    assert.equal(document.querySelector('[aria-label="采购核价录入"]'), null)
+    assert.equal(document.querySelector('[aria-label="采购金额合计"]'), null)
+    await ui.click(document.querySelector('input[value="approve"]'))
+    assert.equal(ui.draftRef.current.values.items[0].unit_price, '0')
+    assert.equal(ui.draftRef.current.values.items[0].purchase_quantity, '4')
+    await ui.click(ui.button('批准并生成采购订单'))
+    assert.equal(ui.receipt, undefined)
+    assert.ok(ui.calls.every(({ method }) => method !== 'finance_review_engineering_material_request'))
+    await ui.click(document.querySelector('input[value="reject"]'))
+    await ui.fill('textarea', '请工程重新核对用量')
+    await ui.click(ui.button('确认退回工程'))
+    const write = ui.calls.find(({ method }) => method === 'finance_review_engineering_material_request')
+    assert.equal(write.params.action, 'REJECT')
+    assert.equal(write.params.items, undefined)
+    assert.equal(write.params.note, '请工程重新核对用量')
+  })
+}
+
+test('desktop finance can return to task context and continue with its original pricing values', async (t) => {
+  const ui = await setup(t, { stage: 'finance' })
+  await ui.render()
+  await ui.click(ui.button('处理任务'))
+  await ui.fill('textarea', '按核价结果批准')
+  await ui.prepareFinance()
+  await ui.fill('input[aria-label="单价 1"]', '2.5')
+  await ui.resumeFinance()
+  assert.equal(document.querySelector('textarea').value, '按核价结果批准')
+  await ui.click(document.querySelector('#erp-task-action-step-context-tab'))
+  assert.equal(document.querySelector('#erp-task-action-step-action').hidden, true)
+  assert.equal(document.querySelector('[aria-label="采购核价录入"]'), null)
+  assert.ok(document.querySelector('[aria-label="任务处理链"]'))
+  await ui.prepareFinance()
+  assert.equal(document.querySelector('input[aria-label="单价 1"]').value, '2.5')
+  await ui.resumeFinance()
+  assert.equal(document.querySelector('input[aria-label="单价 1"]'), null)
+  assert.equal(document.querySelector('[aria-label="任务处理链"]'), null)
+  assert.equal(ui.receipt, undefined)
+})
+
+test('finance preparation discards stale source pricing before a later approval', async (t) => {
+  const ui = await setup(t, { stage: 'finance' })
+  await ui.render()
+  await ui.prepareFinance()
+  await ui.fill('input[aria-label="单价 1"]', '2.5')
+  await ui.fill('input[aria-label="到货日期 1"]', '2026-10-01')
+  await ui.resumeFinance()
+  ui.request.version += 1
+  await ui.prepareFinance()
+  assert.equal(document.querySelector('input[aria-label="单价 1"]').value, '')
+  assert.equal(document.querySelector('input[aria-label="到货日期 1"]').value, '')
+  await ui.resumeFinance()
+  await ui.click(ui.button('批准并生成采购订单'))
+  assert.ok(ui.calls.every(({ method }) => method !== 'finance_review_engineering_material_request'))
+})
+
+test('finance preparation closes when the action permission is withdrawn', async (t) => {
+  const ui = await setup(t, { stage: 'finance' })
+  await ui.render()
+  await ui.prepareFinance()
+  assert.ok(document.querySelector('input[aria-label="单价 1"]'))
+  assert.equal(document.querySelector('input[value="approve"]'), null)
+  assert.equal(ui.button('批准并生成采购订单'), undefined)
+  const actions = ui.profile.effective_session.actions
+  ui.profile.effective_session.actions = ['engineering.material.read', 'sales_order.read']
+  await ui.render()
+  assert.equal(ui.button('填写核价'), undefined)
+  assert.equal(document.querySelector('.erp-material-summary-modal'), null)
+  ui.profile.effective_session.actions = actions
+  await ui.render()
+  assert.ok(ui.button('填写核价'))
+  assert.equal(document.querySelector('input[aria-label="单价 1"]'), null)
 })
 
 test('source reads recover without exposing submit controls before the source is available', async (t) => {

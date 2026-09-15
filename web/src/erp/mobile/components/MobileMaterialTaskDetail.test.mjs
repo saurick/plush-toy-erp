@@ -47,6 +47,8 @@ test('mobile material task separates on-demand reading from versioned task proce
   const request = {
     id: 3,
     version: 2,
+    sales_order_id: 8,
+    submitted_at: '2026-09-14T01:00:00Z',
     order_no: 'ORDER-8',
     order_status: 'active',
     status: 'SUBMITTED',
@@ -125,9 +127,11 @@ test('mobile material task separates on-demand reading from versioned task proce
   await render()
   assert.equal(document.querySelector('[role="dialog"]'), null)
   assert.equal(
-    calls.some(({ method }) => method === 'get_engineering_material_request'),
-    false
+    calls.filter(({ method }) => method === 'get_engineering_material_request').length,
+    1
   )
+  assert.match(document.querySelector('[aria-label="任务处理链"]').textContent, /工程提交用料/)
+  assert.match(document.querySelector('[aria-label="任务处理链"]').textContent, /老板审核/)
   await click(button('查看材料汇总'))
   assert.equal(document.querySelector('.ant-modal-footer'), null)
   assert.equal(button('审核通过，交财务'), undefined)
@@ -143,7 +147,7 @@ test('mobile material task separates on-demand reading from versioned task proce
   assert.equal(
     calls.filter(({ method }) => method === 'get_engineering_material_request')
       .length,
-    1
+    2
   )
   const processTab = document.querySelector('[data-step-key="process"]')
   await click(processTab)

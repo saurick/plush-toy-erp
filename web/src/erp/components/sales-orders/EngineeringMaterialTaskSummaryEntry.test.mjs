@@ -157,4 +157,24 @@ test('task summary loads on demand, stays read-only and clears on source or acce
   assert.ok(
     calls.every(({ method }) => method === 'get_engineering_material_request')
   )
+  await render({
+    task: {
+      ...approvalTask,
+      id: 15,
+      task_status_key: 'ready',
+      task_group: 'engineering_material_revision',
+      task_code: 'source-material-revision-3',
+      owner_role_key: 'engineering',
+      required_capability_key: 'engineering.material.submit',
+    },
+  })
+  await act(async () => button('查看待重提用料').click())
+  assert.deepEqual(calls.at(-1).params, { sales_order_id: 8, preview: true })
+  assert.match(document.body.textContent, /待重提用料预览/)
+  assert.equal(document.querySelector('textarea'), null)
+  await act(async () => document.querySelector('button[aria-label="重新读取"]').click())
+  assert.deepEqual(calls.at(-1).params, { sales_order_id: 8, preview: true })
+  await act(async () => document.querySelector('.ant-modal-close').click())
+  await act(async () => button('查看材料汇总').click())
+  assert.deepEqual(calls.at(-1).params, { sales_order_id: 8, request_id: 3, preview: false })
 })
