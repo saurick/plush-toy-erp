@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   AlertOutlined,
   ApartmentOutlined,
@@ -45,6 +52,7 @@ import {
   getCurrentUser,
   getLoginPath,
   getStoredAdminProfile,
+  getToken,
   logout,
   persistAuthMeta,
 } from '@/common/auth/auth'
@@ -57,7 +65,8 @@ import useRuntimeBuildIdentity from '@/common/runtime/useRuntimeBuildIdentity'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { JsonRpc } from '@/common/utils/jsonRpc'
+import { JsonRpc, pauseAuthenticatedRpcCalls } from '@/common/utils/jsonRpc'
+import SessionRecoveryDialog from './SessionRecoveryDialog'
 import {
   getBusinessModule,
   isCustomerBusinessDataPageKey,
@@ -91,6 +100,8 @@ import {
   buildEffectiveSessionDiagnosticSummary,
   filterNavigationSectionsByAdminProfile,
   getAdminProfileSyncErrorAction,
+  getAdminProfileAccessKey,
+  getProfileSyncFailure,
   hasExpectedDesktopCustomerSession,
   isLocalCustomerDesktopPreviewSession,
   loadProfileSyncReadWithRetry,
@@ -219,21 +230,30 @@ function ProductCoreCapabilityReview({ currentEntry }) {
   )
 }
 
-function CustomerRuntimeUnavailable({ loggingOut, onRetry, onLogout }) {
+function CustomerRuntimeUnavailable({
+  failure,
+  retrying,
+  loggingOut,
+  onRetry,
+  onLogout,
+}) {
   return (
     <Layout className="erp-admin-shell" data-customer-runtime-boundary="true">
       <Content className="erp-admin-content">
         <div className="erp-admin-outlet">
           <Alert
-            type="error"
+            type={failure?.kind === 'service' ? 'warning' : 'error'}
             showIcon
-            message="暂时无法进入工作台"
-            description="尚未确认当前账号可访问的页面和业务内容。为避免显示错误内容，系统没有加载工作台；请重试或退出后重新登录。"
+            message={failure?.title || getProfileSyncFailure().title}
+            description={
+              failure?.description || getProfileSyncFailure().description
+            }
             action={
               <Space size={8} wrap>
                 <Button
                   icon={<ReloadOutlined aria-hidden="true" />}
                   className="erp-action-button"
+                  loading={retrying}
                   onClick={onRetry}
                 >
                   重试
@@ -302,7 +322,7 @@ function buildUnavailableCachedAdminProfile(profile) {
   })
 }
 
-export default function ERPLayout() {
+export default function ERPLayout({ legalNotice }) {
   const navigate = useNavigate()
   const location = useLocation()
   const tokenAdmin = getCurrentUser(AUTH_SCOPE.ADMIN)
@@ -316,6 +336,14 @@ export default function ERPLayout() {
     getStoredAdminProfile()
   )
   const [profileSyncCompleted, setProfileSyncCompleted] = useState(false)
+  const [profileSyncFailure, setProfileSyncFailure] = useState(null)
+  const [profileSyncing, setProfileSyncing] = useState(false)
+  const [businessPageGeneration, setBusinessPageGeneration] = useState(0)
+  const verifiedAccessKeyRef = useRef('')
+  const recoveryPathRef = useRef('')
+  const locationPathRef = useRef(location.pathname)
+  locationPathRef.current = location.pathname
+  const resumeRpcRef = useRef(null)
   const adminProfileRef = useRef(adminProfile)
   const profileSyncInFlightRef = useRef(null)
   const profileSyncGenerationRef = useRef(0)
@@ -422,6 +450,26 @@ export default function ERPLayout() {
     runtimeUnavailable: customerRuntimeUnavailable,
     pageRequiresCustomerRuntime: currentPageRequiresConfiguredCustomerRuntime,
   })
+  const pageRequiresCustomerRuntimeRef = useRef(
+    currentPageRequiresConfiguredCustomerRuntime
+  )
+  pageRequiresCustomerRuntimeRef.current =
+    currentPageRequiresConfiguredCustomerRuntime
+
+  const pauseBusinessRequests = useCallback(() => {
+    if (!resumeRpcRef.current) {
+      resumeRpcRef.current = pauseAuthenticatedRpcCalls(AUTH_SCOPE.ADMIN)
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!profileSyncFailure && profileSyncCompleted) {
+      resumeRpcRef.current?.()
+      resumeRpcRef.current = null
+    }
+  }, [profileSyncFailure, profileSyncCompleted])
+
+  useEffect(() => () => resumeRpcRef.current?.(), [])
 
   const loadProfile = useCallback(
     ({ showLoading = false } = {}) => {
@@ -430,9 +478,12 @@ export default function ERPLayout() {
       }
 
       const syncGeneration = profileSyncGenerationRef.current
-      const isCurrentSync = () =>
+      const syncToken = getToken(AUTH_SCOPE.ADMIN)
+      const isCurrentGeneration = () =>
         profileSyncActiveRef.current &&
         profileSyncGenerationRef.current === syncGeneration
+      const isCurrentSync = () =>
+        isCurrentGeneration() && getToken(AUTH_SCOPE.ADMIN) === syncToken
       const loadCurrentSyncRead = (load, retryDelaysMs) =>
         loadProfileSyncReadWithRetry(
           () => {
@@ -446,8 +497,10 @@ export default function ERPLayout() {
           { retryDelaysMs }
         )
       const syncPromise = (async () => {
+        let verifiedProfile = null
+        setProfileSyncing(true)
         if (showLoading) {
-          setProfileSyncCompleted(false)
+          if (!verifiedAccessKeyRef.current) setProfileSyncCompleted(false)
           setProfileLoading(true)
         }
         try {
@@ -461,7 +514,8 @@ export default function ERPLayout() {
           if (!isCurrentSync()) {
             return
           }
-          let nextProfile = result?.data || null
+          verifiedProfile = result?.data || null
+          let nextProfile = verifiedProfile
           if (nextProfile) {
             try {
               const effectiveSessionCustomerKey =
@@ -486,27 +540,14 @@ export default function ERPLayout() {
                 )
               }
             } catch (sessionError) {
-              if (!isCurrentSync()) {
+              if (!isCurrentGeneration()) {
                 return
-              }
-              const syncErrorAction = getAdminProfileSyncErrorAction(
-                sessionError,
-                {
-                  hasCachedProfile: Boolean(
-                    nextProfile || adminProfileRef.current
-                  ),
-                  alreadyNotified: profileSyncErrorNotifiedRef.current,
-                }
-              )
-              if (syncErrorAction === 'reauth') {
-                throw sessionError
               }
               console.warn(
                 '客户有效配置同步失败，当前业务投影已停用',
                 sessionError
               )
-              nextProfile =
-                attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
+              throw sessionError
             }
           }
           if (!isCurrentSync()) {
@@ -530,10 +571,39 @@ export default function ERPLayout() {
               AUTH_SCOPE.ADMIN
             )
           }
+          const sessionVerified = hasExpectedDesktopCustomerSession(
+            nextProfile,
+            configuredCustomerKey,
+            { isLocalDev: import.meta.env.DEV === true }
+          )
+          if (sessionVerified) {
+            const accessKey = getAdminProfileAccessKey(nextProfile)
+            if (
+              verifiedAccessKeyRef.current &&
+              verifiedAccessKeyRef.current !== accessKey
+            ) {
+              setBusinessPageGeneration((generation) => generation + 1)
+            }
+            verifiedAccessKeyRef.current = accessKey
+          } else {
+            verifiedAccessKeyRef.current = ''
+          }
+          recoveryPathRef.current = ''
+          setProfileSyncFailure(
+            configuredCustomerKey &&
+              !sessionVerified &&
+              pageRequiresCustomerRuntimeRef.current
+              ? getProfileSyncFailure()
+              : null
+          )
           setAdminProfile(nextProfile)
           profileSyncErrorNotifiedRef.current = false
         } catch (error) {
-          if (!isCurrentSync()) {
+          if (
+            !isCurrentGeneration() ||
+            (!isCurrentSync() &&
+              !(isAuthFailureCode(error?.code) && !getToken(AUTH_SCOPE.ADMIN)))
+          ) {
             return
           }
           const syncErrorAction = getAdminProfileSyncErrorAction(error, {
@@ -545,19 +615,55 @@ export default function ERPLayout() {
               return
             }
             profileSessionUnavailableHandledRef.current = true
+            verifiedAccessKeyRef.current = ''
+            pauseBusinessRequests()
+            setProfileSyncFailure(getProfileSyncFailure(error))
             logout(AUTH_SCOPE.ADMIN)
             setAdminProfile(null)
-            authBus.emitUnauthorized?.({
-              from: {
-                pathname: window.location.pathname,
-                search: window.location.search,
-                hash: window.location.hash,
-              },
-              message: getActionErrorMessage(error, '加载账号权限'),
-              loginPath: getLoginPath(AUTH_SCOPE.ADMIN),
-            })
+            setProfileLoading(false)
+            setProfileSyncing(false)
+            setProfileSyncCompleted(true)
+            if (!isAuthFailureCode(error?.code)) {
+              authBus.emitUnauthorized?.({
+                from: {
+                  pathname: window.location.pathname,
+                  search: window.location.search,
+                  hash: window.location.hash,
+                },
+                message: getActionErrorMessage(error, '加载账号权限'),
+                loginPath: getLoginPath(AUTH_SCOPE.ADMIN),
+              })
+            }
             return
           }
+          if (verifiedProfile && !pageRequiresCustomerRuntimeRef.current) {
+            // 系统管理页沿用本次 me 的权限，不依赖客户业务配置。
+            verifiedAccessKeyRef.current = ''
+            recoveryPathRef.current = ''
+            setAdminProfile(
+              attachUnavailableEffectiveSessionToAdminProfile(verifiedProfile)
+            )
+            setProfileSyncFailure(null)
+            return
+          }
+          const failure = getProfileSyncFailure(error)
+          pauseBusinessRequests()
+          const retainPage =
+            failure.kind === 'service' &&
+            Boolean(verifiedAccessKeyRef.current) &&
+            (!recoveryPathRef.current ||
+              recoveryPathRef.current === locationPathRef.current)
+          recoveryPathRef.current ||= locationPathRef.current
+          setProfileSyncFailure({
+            ...failure,
+            retainPage,
+            path: recoveryPathRef.current,
+          })
+          if (retainPage) {
+            console.warn('服务连接中断，当前页面和业务请求已暂停', error)
+            return
+          }
+          verifiedAccessKeyRef.current = ''
           if (syncErrorAction === 'keep_cached') {
             console.warn('管理员权限同步失败，缓存授权已停用', error)
           } else if (
@@ -589,6 +695,7 @@ export default function ERPLayout() {
           setAdminProfile(unavailableProfile)
         } finally {
           if (isCurrentSync()) {
+            setProfileSyncing(false)
             if (showLoading) {
               setProfileLoading(false)
             }
@@ -603,7 +710,7 @@ export default function ERPLayout() {
       profileSyncInFlightRef.current = syncPromise
       return syncPromise
     },
-    [activeBrand, adminRpc]
+    [activeBrand, adminRpc, configuredCustomerKey, pauseBusinessRequests]
   )
 
   useEffect(() => {
@@ -644,6 +751,11 @@ export default function ERPLayout() {
 
       setProfileSyncCompleted(false)
       setProfileLoading(true)
+      verifiedAccessKeyRef.current = ''
+      recoveryPathRef.current = ''
+      pauseBusinessRequests()
+      setProfileSyncFailure(null)
+      setAdminProfile(null)
       profileSyncGenerationRef.current += 1
       profileSyncInFlightRef.current = null
       loadProfile({ showLoading: true })
@@ -653,7 +765,7 @@ export default function ERPLayout() {
     return () => {
       window.removeEventListener('storage', handleAdminAuthStorageChange)
     }
-  }, [loadProfile])
+  }, [loadProfile, pauseBusinessRequests])
 
   useEffect(() => {
     adminProfileRef.current = adminProfile
@@ -1109,9 +1221,6 @@ export default function ERPLayout() {
               <div className="erp-admin-brand__logo-title">
                 {activeBrand.companyName}
               </div>
-              <div className="erp-admin-brand__logo-subtitle">
-                {activeBrand.systemName}
-              </div>
             </div>
           </div>
         </button>
@@ -1220,9 +1329,17 @@ export default function ERPLayout() {
     )
   }
 
-  if (customerRuntimeGate === CUSTOMER_RUNTIME_GATE.UNAVAILABLE) {
+  const retainingBusinessPage =
+    profileSyncFailure?.retainPage &&
+    profileSyncFailure.path === location.pathname
+  if (
+    customerRuntimeGate === CUSTOMER_RUNTIME_GATE.UNAVAILABLE ||
+    (profileSyncFailure && !retainingBusinessPage)
+  ) {
     return (
       <CustomerRuntimeUnavailable
+        failure={profileSyncFailure}
+        retrying={profileSyncing}
         loggingOut={loggingOut}
         onRetry={() => loadProfile({ showLoading: true })}
         onLogout={handleLogout}
@@ -1232,6 +1349,11 @@ export default function ERPLayout() {
 
   return (
     <>
+      <SessionRecoveryDialog
+        open={Boolean(retainingBusinessPage)}
+        retrying={profileSyncing}
+        onRetry={() => loadProfile({ showLoading: true })}
+      />
       <Layout
         className="erp-admin-shell"
         data-effective-session-source={effectiveSessionDiagnostic.source}
@@ -1264,9 +1386,6 @@ export default function ERPLayout() {
                   className="erp-admin-header__menu-button"
                   onClick={() => setMobileNavOpen(true)}
                 />
-                <div>
-                  <div className="erp-admin-header__title">业务管理</div>
-                </div>
               </Space>
 
               <Space size={12} wrap className="erp-admin-header__right">
@@ -1308,10 +1427,10 @@ export default function ERPLayout() {
           </Header>
 
           <Content className="erp-admin-content">
+            {!retainingBusinessPage ? legalNotice : null}
             <div className="erp-admin-breadcrumb">
               <Breadcrumb
                 items={[
-                  { title: '业务管理' },
                   { title: currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label },
                 ]}
               />
@@ -1354,7 +1473,7 @@ export default function ERPLayout() {
               ) : shouldGuardProductCoreBusinessData ? (
                 <ProductCoreCapabilityReview currentEntry={currentEntry} />
               ) : (
-                <Outlet context={outletContext} />
+                <Outlet context={outletContext} key={businessPageGeneration} />
               )}
             </div>
           </Content>

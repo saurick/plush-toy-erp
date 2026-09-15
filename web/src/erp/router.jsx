@@ -268,7 +268,7 @@ function DesktopShellRoute() {
   return (
     <AuthGuard requireAdmin>
       <LegalNoticeGate>
-        <ERPLayout />
+        {(notice) => <ERPLayout legalNotice={notice} />}
       </LegalNoticeGate>
     </AuthGuard>
   )
@@ -278,7 +278,7 @@ function MobileShellRoute() {
   return (
     <AuthGuard requireAdmin>
       <LegalNoticeGate>
-        <MobileAppLayout />
+        {(notice) => <MobileAppLayout legalNotice={notice} />}
       </LegalNoticeGate>
     </AuthGuard>
   )
@@ -307,7 +307,7 @@ export default function ERPRouter() {
             element={
               <AuthGuard requireAdmin>
                 <LegalNoticeGate>
-                  <EntrySelectionPage />
+                  {(notice) => <EntrySelectionPage legalNotice={notice} />}
                 </LegalNoticeGate>
               </AuthGuard>
             }

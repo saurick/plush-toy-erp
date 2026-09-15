@@ -20,6 +20,7 @@ import {
   getEffectiveFieldPolicy,
   getEffectivePrintTemplateDefaults,
   getAdminProfileSyncErrorAction,
+  getProfileSyncFailure,
   hasExpectedDesktopCustomerSession,
   hasExpectedCustomerRuntime,
   hasEffectiveSessionAction,
@@ -75,7 +76,7 @@ test('ERPLayout: 管理员 profile 后台同步调度合同', () => {
   )
   assert.match(
     source,
-    /const isCurrentSync = \(\) =>\s*profileSyncActiveRef\.current &&\s*profileSyncGenerationRef\.current === syncGeneration/u
+    /const isCurrentGeneration = \(\) =>\s*profileSyncActiveRef\.current &&\s*profileSyncGenerationRef\.current === syncGeneration/u
   )
   assert.match(
     source,
@@ -140,7 +141,7 @@ test('ERPLayout: profile 同步只由首次挂载、前台恢复和 visible 定�
   )
   assert.match(
     source,
-    /\},\s*\[\s*activeBrand,\s*adminRpc\s*\]\s*\)/u,
+    /\},\s*\[\s*activeBrand,\s*adminRpc,\s*configuredCustomerKey,\s*pauseBusinessRequests\s*\]\s*\)/u,
     'loadProfile should not depend on location or selected menu state'
   )
   assert.match(
@@ -150,7 +151,7 @@ test('ERPLayout: profile 同步只由首次挂载、前台恢复和 visible 定�
   )
   assert.match(
     source,
-    /if \(showLoading\) \{\s*setProfileSyncCompleted\(false\)\s*setProfileLoading\(true\)\s*\}/u,
+    /if \(showLoading\) \{\s*if \(!verifiedAccessKeyRef\.current\) setProfileSyncCompleted\(false\)\s*setProfileLoading\(true\)\s*\}/u,
     'only the first explicit loading sync should reset visible loading/completed state'
   )
 })
@@ -195,7 +196,7 @@ test('ERPLayout: 客户构建在有效会话完成前不渲染产品核心页面
   )
   assert.match(
     source,
-    /if \(customerRuntimeGate === CUSTOMER_RUNTIME_GATE\.UNAVAILABLE\) \{[\s\S]*?<CustomerRuntimeUnavailable/u
+    /customerRuntimeGate === CUSTOMER_RUNTIME_GATE\.UNAVAILABLE \|\|[\s\S]*?<CustomerRuntimeUnavailable/u
   )
   assert.match(
     source,
@@ -223,7 +224,7 @@ test('ERPLayout: profile 或 effective session 同步失败时不复用缓存授
   assert.doesNotMatch(source, /继续使用本地缓存 profile/u)
   assert.match(
     source,
-    /客户有效配置同步失败，当前业务投影已停用[\s\S]*?nextProfile =\s*attachUnavailableEffectiveSessionToAdminProfile\(nextProfile\)/u
+    /pauseBusinessRequests\(\)[\s\S]*?const retainPage =[\s\S]*?failure\.kind === 'service' &&\s*Boolean\(verifiedAccessKeyRef\.current\)/u
   )
   assert.match(
     source,
@@ -247,7 +248,7 @@ test('ERPLayout: 系统页只按本次 admin.me 的 RBAC 判断，不借客户�
 test('ERPLayout: 无权直达页在跳转前不挂载业务 Outlet', () => {
   const source = readERPLayoutSource()
   const guardIndex = source.indexOf('{shouldBlockOutlet ?')
-  const outletIndex = source.indexOf('<Outlet context={outletContext} />')
+  const outletIndex = source.indexOf('<Outlet context={outletContext}')
 
   assert.match(source, /const shouldBlockOutlet = currentPageShouldRedirect/u)
   assert.doesNotMatch(
@@ -290,6 +291,36 @@ test('adminProfileSync: 有缓存 profile 时后台同步失败走静默失败�
     ),
     'keep_cached'
   )
+})
+
+test('adminProfileSync: 断连与权限及配置异常分别展示，登录失效不重试', () => {
+  for (const error of [
+    { isNetworkError: true },
+    { httpStatus: 503 },
+    { code: RpcErrorCode.INTERNAL },
+  ]) {
+    assert.equal(getProfileSyncFailure(error).kind, 'service')
+  }
+  assert.equal(
+    getProfileSyncFailure({ code: RpcErrorCode.PERMISSION_DENIED }).kind,
+    'permission'
+  )
+  assert.equal(
+    getProfileSyncFailure({ httpStatus: 403, isInvalidResponse: true }).kind,
+    'permission'
+  )
+  assert.equal(getProfileSyncFailure().kind, 'configuration')
+  for (const error of [
+    { code: RpcErrorCode.AUTH_EXPIRED },
+    { code: RpcErrorCode.AUTH_INVALID },
+    { httpStatus: 401 },
+  ]) {
+    assert.equal(
+      getAdminProfileSyncErrorAction(error, { hasCachedProfile: true }),
+      'reauth'
+    )
+    assert.equal(isTransientProfileSyncError(error), false)
+  }
 })
 
 test('adminProfileSync: 没有缓存 profile 时普通失败最多提示一次', () => {

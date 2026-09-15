@@ -6,6 +6,29 @@ import { isAuthFailureCode } from '@/common/consts/errorCodes'
 import { getUserFacingErrorMessage } from '@/common/utils/errorMessage'
 
 let globalRpcId = 0
+const pausedScopes = new Map()
+
+// 暂停期间直接拒绝新业务请求，不排队、不自动重放写操作。
+export function pauseAuthenticatedRpcCalls(authScope) {
+  const owner = Symbol(authScope)
+  const owners = pausedScopes.get(authScope) || new Set()
+  owners.add(owner)
+  pausedScopes.set(authScope, owners)
+  return () => {
+    owners.delete(owner)
+    if (owners.size === 0 && pausedScopes.get(authScope) === owners) {
+      pausedScopes.delete(authScope)
+    }
+  }
+}
+
+function isSessionRecoveryRequest(url, method) {
+  return (
+    (url === 'admin' && method === 'me') ||
+    (url === 'customer_config' && method === 'get_effective_session') ||
+    (url === 'auth' && method === 'logout')
+  )
+}
 
 function isAbortLikeError(error) {
   return error?.name === 'AbortError' || error?.cause?.name === 'AbortError'
@@ -57,6 +80,15 @@ export class JsonRpc {
 
   async call(method, params = {}, options = {}) {
     const { receiveError = false, signal, withAuth = this.withAuth } = options
+    if (
+      withAuth &&
+      pausedScopes.has(this.authScope) &&
+      !isSessionRecoveryRequest(this.url, method)
+    ) {
+      throw new RpcError('当前页面已暂停操作，请恢复连接后重试', {
+        isAbortError: true,
+      })
+    }
     const id = String(++globalRpcId)
 
     let response
@@ -106,14 +138,14 @@ export class JsonRpc {
     // 1) HTTP 非 2xx
     if (!response.ok) {
       const err = RpcError.fromHttp(response.status, json)
-      emitAuthFailureIfNeeded(err, this.authScope, withAuth)
+      emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       throw err
     }
 
     // 2) Kratos 框架级错误
     if (typeof json?.code === 'number' && json.message) {
       const err = RpcError.fromKratos(json)
-      emitAuthFailureIfNeeded(err, this.authScope, withAuth)
+      emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       if (receiveError) return err
       throw err
     }
@@ -121,7 +153,7 @@ export class JsonRpc {
     // 3) JSON-RPC error 字段
     if (json?.error) {
       const err = RpcError.fromJsonRpc(json)
-      emitAuthFailureIfNeeded(err, this.authScope, withAuth)
+      emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       if (receiveError) return err
       throw err
     }
@@ -130,7 +162,7 @@ export class JsonRpc {
     const result = validateSuccessResponse(json, id, response.status)
     if (result && typeof result.code === 'number' && result.code !== 0) {
       const err = RpcError.fromBiz(json)
-      emitAuthFailureIfNeeded(err, this.authScope, withAuth)
+      emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       if (receiveError) return err
       throw err
     }
@@ -139,8 +171,8 @@ export class JsonRpc {
   }
 }
 
-function emitAuthFailureIfNeeded(error, authScope, withAuth) {
-  if (!withAuth) return
+function emitAuthFailureIfNeeded(error, authScope, withAuth, requestToken) {
+  if (!withAuth || getToken(authScope) !== requestToken) return
   handleAuthError(error?.code, error?.message, authScope)
 }
 

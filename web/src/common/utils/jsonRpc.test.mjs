@@ -68,7 +68,13 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
     )
     .replace(/export class JsonRpc/u, 'class JsonRpc')
     .replace(/export function isRpcAbortError/u, 'function isRpcAbortError')
-    .concat('\nmodule.exports = { JsonRpc, isRpcAbortError };\n')
+    .replace(
+      /export function pauseAuthenticatedRpcCalls/u,
+      'function pauseAuthenticatedRpcCalls'
+    )
+    .concat(
+      '\nmodule.exports = { JsonRpc, isRpcAbortError, pauseAuthenticatedRpcCalls };\n'
+    )
 
   const sandbox = {
     module: { exports: {} },
@@ -88,7 +94,7 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
         async json() {
           return {
             jsonrpc: '2.0',
-            id: '1',
+            id: JSON.parse(init.body).id,
             result: { code: 0, data: { ok: true } },
           }
         },
@@ -97,7 +103,7 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
     __rpcError__: { RpcError },
     __auth__: {
       getToken(scope) {
-        return `${token}:${scope}`
+        return `${typeof token === 'function' ? token() : token}:${scope}`
       },
       logout(scope) {
         logoutCalls.push(scope)
@@ -132,6 +138,8 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
   return {
     JsonRpc: sandbox.module.exports.JsonRpc,
     isRpcAbortError: sandbox.module.exports.isRpcAbortError,
+    pauseAuthenticatedRpcCalls:
+      sandbox.module.exports.pauseAuthenticatedRpcCalls,
     fetchCalls,
     logoutCalls,
     events,
@@ -155,6 +163,56 @@ test('jsonRpc: withAuth=false 不携带旧 token', async () => {
   assert.equal(harness.fetchCalls[0].init.headers.Authorization, undefined)
   assert.deepEqual(harness.logoutCalls, [])
   assert.deepEqual(harness.events, [])
+})
+
+test('jsonRpc: 暂停期间拒绝业务读写，不排队，恢复读取与其他认证域独立', async () => {
+  const harness = loadJsonRpcModule()
+  const resume = harness.pauseAuthenticatedRpcCalls('admin')
+  const releaseSecondPause = harness.pauseAuthenticatedRpcCalls('admin')
+  const business = new harness.JsonRpc({ url: 'sales_order' })
+  for (const method of ['list', 'save']) {
+    await assert.rejects(business.call(method), { isAbortError: true })
+  }
+  assert.equal(harness.fetchCalls.length, 0)
+  await new harness.JsonRpc({ url: 'admin' }).call('me')
+  await new harness.JsonRpc({ url: 'customer_config' }).call(
+    'get_effective_session'
+  )
+  await new harness.JsonRpc({ url: 'auth' }).call('logout')
+  await new harness.JsonRpc({ url: 'auth', withAuth: false }).call('login')
+  await new harness.JsonRpc({ url: 'orders', authScope: 'customer' }).call(
+    'list'
+  )
+  assert.equal(harness.fetchCalls.length, 5)
+  resume()
+  await assert.rejects(business.call('save'), { isAbortError: true })
+  releaseSecondPause()
+  resume()
+  assert.equal(harness.fetchCalls.length, 5, '恢复不会补发断连期间的写操作')
+  await business.call('list')
+  assert.equal(harness.fetchCalls.length, 6)
+})
+
+test('jsonRpc: 旧登录请求的迟到鉴权失败不能清除新登录', async () => {
+  let token = 'old-session'
+  const harness = loadJsonRpcModule({ token: () => token })
+  let complete
+  harness.setFetch(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve
+      })
+  )
+  const request = new harness.JsonRpc({ url: 'admin' }).call('me')
+  token = 'new-session'
+  complete({
+    ok: false,
+    status: 401,
+    json: async () => ({ code: 10005, message: 'expired' }),
+  })
+  await assert.rejects(request)
+  assert.equal(harness.logoutCalls.length, 0)
+  assert.equal(harness.events.length, 0)
 })
 
 test('jsonRpc: AbortError 标记为取消请求而不是网络错误', async () => {

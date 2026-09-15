@@ -1,0 +1,25 @@
+.erp-session-recovery-dialog {
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  border-radius: 8px;
+  background: var(--erp-surface-bg, #fff);
+  color: inherit;
+}
+
+.erp-session-recovery-dialog::backdrop {
+  background: var(--erp-surface-bg, #f5f7fa);
+}
+
+.erp-session-recovery-dialog .ant-alert {
+  flex-wrap: wrap;
+  gap: 12px 8px;
+  padding: 20px;
+}
+
+.erp-session-recovery-dialog .ant-alert-content {
+  flex: 1 1 220px;
+}

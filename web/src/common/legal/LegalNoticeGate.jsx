@@ -97,9 +97,9 @@ export default function LegalNoticeGate({ children }) {
 
   const fromPath = `${location.pathname}${location.search}${location.hash}`
 
-  return (
+  // 请求状态由此处维护，提示由入口页面放入正常布局，避让启动和断连边界。
+  return children(
     <>
-      {children}
       {status === 'unavailable' ? (
         <Alert
           className="legal-notice-status-banner"

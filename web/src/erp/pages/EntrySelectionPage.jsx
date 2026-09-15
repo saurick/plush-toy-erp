@@ -18,7 +18,7 @@ import { getAllowedMobileRoleKeys } from '../utils/mobileRolePermissions.mjs'
 
 const { Title } = Typography
 
-export default function EntrySelectionPage() {
+export default function EntrySelectionPage({ legalNotice }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [loggingOut, setLoggingOut] = useState(false)
@@ -99,6 +99,7 @@ export default function EntrySelectionPage() {
       <div className="erp-login-page__bg" />
       <Card variant="borderless" className="erp-login-card erp-entry-card">
         <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          {legalNotice}
           <div className="erp-login-logo" aria-label={activeBrand.companyName}>
             <span className="erp-admin-brand__logo-mark erp-login-logo__mark">
               {activeBrand.brandMark}

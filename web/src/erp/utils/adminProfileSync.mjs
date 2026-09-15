@@ -640,7 +640,11 @@ export function getAdminProfileSyncErrorAction(
   error,
   { hasCachedProfile = false, alreadyNotified = false } = {}
 ) {
-  if (isAdminSessionUnavailableCode(error?.code)) {
+  if (
+    isAdminSessionUnavailableCode(error?.code) ||
+    isAuthFailureCode(error?.code) ||
+    Number(error?.httpStatus) === 401
+  ) {
     return 'reauth'
   }
   if (hasCachedProfile) {
@@ -650,6 +654,44 @@ export function getAdminProfileSyncErrorAction(
     return 'silent'
   }
   return 'notify'
+}
+
+export function getProfileSyncFailure(error) {
+  if (isTransientProfileSyncError(error)) {
+    return {
+      kind: 'service',
+      title: '暂时无法连接服务',
+      description: '服务暂时不可用或网络连接中断，请稍后重试。',
+    }
+  }
+  if (
+    Number(error?.code) === RpcErrorCode.PERMISSION_DENIED ||
+    Number(error?.httpStatus) === 403
+  ) {
+    return {
+      kind: 'permission',
+      title: '暂时无法进入工作台',
+      description:
+        '当前账号无法读取工作台所需内容。请联系管理员核对岗位和可用页面。',
+    }
+  }
+  return {
+    kind: 'configuration',
+    title: '暂时无法进入工作台',
+    description:
+      '工作台所需的业务设置暂时无法加载，请重试；如仍无法进入，请联系管理员。',
+  }
+}
+
+export function getAdminProfileAccessKey(profile) {
+  return JSON.stringify({
+    id: profile?.id,
+    isSuperAdmin: profile?.is_super_admin === true,
+    roles: profile?.roles,
+    permissions: profile?.permissions,
+    menus: profile?.menus,
+    session: profile?.effective_session,
+  })
 }
 
 export function isTransientProfileSyncError(error) {

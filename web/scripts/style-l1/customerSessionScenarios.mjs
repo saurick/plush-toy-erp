@@ -1,4 +1,5 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { createSessionRecoveryScenarios } from './sessionRecoveryScenarios.mjs'
 import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
 
 export function createCustomerSessionScenarios({
@@ -73,6 +74,7 @@ export function createCustomerSessionScenarios({
   let permissionSafeInventoryReferenceRequests = []
   let permissionSafeProductReferenceRequests = []
   return [
+    ...createSessionRecoveryScenarios({ customerRuntimeEffectiveSession, outputDir }),
     {
       name: 'erp-dashboard-redirect',
       path: '/erp/dashboard',
@@ -1401,8 +1403,8 @@ export function createCustomerSessionScenarios({
         await expectText(page, '正在进入工作台')
         await expectText(page, '正在准备您的工作内容，请稍候...')
         await assertTextAbsent(page, '正在进入客户工作台')
-        await expectText(page, '暂时无法进入工作台')
-        await expectText(page, '为避免显示错误内容，系统没有加载工作台')
+        await expectText(page, '暂时无法连接服务')
+        await expectText(page, '服务暂时不可用或网络连接中断，请稍后重试。')
         await assertTextAbsent(page, '当前客户')
         await assertTextAbsent(page, '权限管理')
         await assertTextAbsent(page, '岗位设置')
