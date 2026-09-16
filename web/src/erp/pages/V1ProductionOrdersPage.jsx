@@ -308,6 +308,24 @@ export default function V1ProductionOrdersPage() {
   )
   const [productionRouteOpen, setProductionRouteOpen] = useState(false)
   const [reworkProgressOpen, setReworkProgressOpen] = useState(false)
+  const linkedWipBatchID = searchParamPositiveInt(searchParams, 'wip_batch_id')
+  const linkedProductionItemID = searchParamPositiveInt(
+    searchParams,
+    'production_order_item_id'
+  )
+  useEffect(() => {
+    if (
+      (linkedWipBatchID || linkedProductionItemID) &&
+      Number(selected?.id) === Number(routeProductionOrderID)
+    ) {
+      setProductionRouteOpen(true)
+    }
+  }, [
+    linkedWipBatchID,
+    linkedProductionItemID,
+    selected?.id,
+    routeProductionOrderID,
+  ])
   const [reworkProgressLoading, setReworkProgressLoading] = useState(false)
   const [reworkProgressContext, setReworkProgressContext] = useState(
     EMPTY_REWORK_PROGRESS_CONTEXT
@@ -390,6 +408,10 @@ export default function V1ProductionOrdersPage() {
     adminProfile,
     'production.wip.execute'
   )
+  const canReceiveProductionReturn = hasActionPermission(
+    adminProfile,
+    'outsourcing.return_receipt.create'
+  )
   const canReworkProductionWip = hasActionPermission(
     adminProfile,
     'production.wip.rework'
@@ -405,6 +427,7 @@ export default function V1ProductionOrdersPage() {
   const canManageProductionWip =
     canAssignProductionWip ||
     canExecuteProductionWip ||
+    canReceiveProductionReturn ||
     canReworkProductionWip ||
     canConfirmPackagingMaterial
   const productionRouteReadOnly =
@@ -2088,6 +2111,9 @@ export default function V1ProductionOrdersPage() {
         productionOrder={selected}
         canAssign={canAssignProductionWip}
         canExecute={canExecuteProductionWip}
+        canReceiveReturn={canReceiveProductionReturn}
+        initialBatchID={linkedWipBatchID}
+        initialItemID={linkedProductionItemID}
         canRework={canReworkProductionWip}
         canConfirmPackaging={canConfirmPackagingMaterial}
         canReadOutsourcingContracts={canReadOutsourcingContracts}

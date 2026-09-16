@@ -25,7 +25,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 
 	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
-		[]string{biz.PurchaseRoleKey},
+		[]string{biz.WarehouseRoleKey},
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseReceiptCreate,
 		biz.PermissionPurchaseReceiptRead,
@@ -490,7 +490,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	}
 
 	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
-		[]string{biz.PurchaseRoleKey},
+		[]string{biz.WarehouseRoleKey},
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseReceiptCreate,
 		biz.PermissionPurchaseReceiptRead,
@@ -637,6 +637,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresDomainPermissions(t *testin
 		t.Fatalf("expected create permission denied, got %#v", createRes)
 	}
 
+	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionPurchaseReceiptCreate, biz.PermissionPurchaseReceiptRead)}
 	_, postRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "post_purchase_receipt", "2", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -677,7 +678,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptSourceMethodsRequirePurchaseOrderRead(
 	})
 
 	denied := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
-		[]string{biz.PurchaseRoleKey},
+		[]string{biz.WarehouseRoleKey},
 		biz.PermissionPurchaseReceiptCreate,
 	))
 	denied.inventoryUC = biz.NewInventoryUsecase(captureRepo)
@@ -688,7 +689,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptSourceMethodsRequirePurchaseOrderRead(
 		{method: "create_purchase_receipt_from_purchase_order", params: createParams},
 		{method: "add_purchase_receipt_item", params: addParams},
 	} {
-		_, result, err := denied.handlePurchase(workflowJSONRPCAdminContext(), request.method, "denied", request.params)
+		_, result, err := denied.Handle(workflowJSONRPCAdminContext(), "purchase", "2.0", request.method, "denied", request.params)
 		if err != nil || result == nil || result.Code != errcode.PermissionDenied.Code {
 			t.Fatalf("%s without purchase_order.read result=%#v err=%v", request.method, result, err)
 		}
@@ -698,7 +699,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptSourceMethodsRequirePurchaseOrderRead(
 	}
 
 	allowed := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
-		[]string{biz.PurchaseRoleKey},
+		[]string{biz.WarehouseRoleKey},
 		biz.PermissionPurchaseReceiptCreate,
 		biz.PermissionPurchaseOrderRead,
 	))
@@ -710,13 +711,19 @@ func TestJsonrpcDispatcher_PurchaseReceiptSourceMethodsRequirePurchaseOrderRead(
 		{method: "create_purchase_receipt_from_purchase_order", params: createParams},
 		{method: "add_purchase_receipt_item", params: addParams},
 	} {
-		_, result, err := allowed.handlePurchase(workflowJSONRPCAdminContext(), request.method, "allowed", request.params)
+		_, result, err := allowed.Handle(workflowJSONRPCAdminContext(), "purchase", "2.0", request.method, "allowed", request.params)
 		if err != nil || result == nil || result.Code != errcode.OK.Code {
 			t.Fatalf("%s with source permissions result=%#v err=%v", request.method, result, err)
 		}
 	}
 	if captureRepo.createFromOrderCalls != 1 || captureRepo.addItemCalls != 1 {
 		t.Fatalf("allowed source method calls: create=%d add=%d, want 1/1", captureRepo.createFromOrderCalls, captureRepo.addItemCalls)
+	}
+	forged := createParams.AsMap()
+	forged["unit_price"] = "999"
+	_, forgedResult, err := allowed.Handle(workflowJSONRPCAdminContext(), "purchase", "2.0", "create_purchase_receipt_from_purchase_order", "forged-price", mustJSONRPCStruct(t, forged))
+	if err != nil || forgedResult.Code != errcode.InvalidParam.Code || captureRepo.createFromOrderCalls != 1 {
+		t.Fatalf("warehouse must not provide receipt price: result=%#v err=%v calls=%d", forgedResult, err, captureRepo.createFromOrderCalls)
 	}
 }
 

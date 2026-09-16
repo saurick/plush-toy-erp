@@ -39,7 +39,7 @@ export function mockSalesOrderItemsList(params = {}, salesOrderItem = null) {
 }
 
 export async function installOrderRpcMocks(page, context) {
-  const { nowUnix } = context
+  const { nowUnix, productionOrderReleased = false } = context
 
   await page.route('**/rpc/sales_order', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -610,8 +610,8 @@ export async function installOrderRpcMocks(page, context) {
   const productionOrder = {
     id: 71,
     order_no: 'MO-STYLE-L1-20260713',
-    status: 'DRAFT',
-    version: 1,
+    status: productionOrderReleased ? 'RELEASED' : 'DRAFT',
+    version: productionOrderReleased ? 2 : 1,
     item_count: 22,
     planned_start_at: nowUnix() + 86_400,
     planned_end_at: nowUnix() + 86_400 * 7,
@@ -619,10 +619,10 @@ export async function installOrderRpcMocks(page, context) {
     close_reason: null,
     cancel_reason: null,
     created_by: 1,
-    released_by: null,
+    released_by: productionOrderReleased ? 1 : null,
     closed_by: null,
     cancelled_by: null,
-    released_at: null,
+    released_at: productionOrderReleased ? nowUnix() : null,
     closed_at: null,
     cancelled_at: null,
     created_at: nowUnix(),
@@ -739,7 +739,7 @@ export async function installOrderRpcMocks(page, context) {
       updated_at: nowUnix(),
     },
   ]
-  let productionRequirementsFrozen = false
+  let productionRequirementsFrozen = productionOrderReleased
   const productionMaterialRequirementProjection = () => ({
     production_material_requirements: productionRequirementsFrozen
       ? productionMaterialRequirements

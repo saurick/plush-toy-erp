@@ -1,3 +1,4 @@
+import { isFulfillmentTask } from './fulfillmentTask.mjs'
 import { isEngineeringMaterialTask } from './engineeringMaterialTask.mjs'
 
 export const WORKFLOW_APPROVAL_CAPABILITY_KEYS = Object.freeze([
@@ -81,7 +82,7 @@ const WORKFLOW_TASK_ACTION_MODES_BY_STATUS = Object.freeze({
 export function getWorkflowTaskStatusActionModes(taskOrStatus = '') {
   if (
     typeof taskOrStatus === 'object' &&
-    isEngineeringMaterialTask(taskOrStatus)
+    (isEngineeringMaterialTask(taskOrStatus) || isFulfillmentTask(taskOrStatus))
   ) {
     return taskOrStatus?.task_status_key === 'ready' ? ['urge'] : []
   }

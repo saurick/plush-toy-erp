@@ -226,7 +226,6 @@ export function createProductionReworkScenarios(deps) {
       },
       verify: async (page) => {
         await expectHeading(page, '生产进度')
-        await expectText(page, '生产岗位在这里维护领料、返工和待入库完工报告')
 
         const draftCompletionRow = page
           .locator(

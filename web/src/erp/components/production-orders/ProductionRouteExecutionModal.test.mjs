@@ -15,6 +15,7 @@ test('production route modal is a self-contained production-order surface', () =
   for (const permissionProp of [
     'canAssign',
     'canExecute',
+    'canReceiveReturn',
     'canRework',
     'canConfirmPackaging',
     'canReadOutsourcingContracts',
@@ -37,7 +38,8 @@ test('route actions use separate business permissions and cancellation is assign
   assert.match(source, /canRunAction/u)
   assert.match(source, /PRODUCTION_WIP_ACTION\.CANCEL_BATCH/u)
   assert.match(source, /canAssign \? \(/u)
-  assert.match(source, /canExecute && !assignmentOnly \? \(/u)
+  assert.match(source, /\(canExecute \|\| canReceiveReturn\) && !assignmentOnly \? \(/u)
+  assert.match(source, /action === PRODUCTION_WIP_ACTION\.RECEIVE_OUTSOURCING_RETURN[\s\S]*?return canReceiveReturn/u)
   assert.match(source, /canConfirmPackaging && !assignmentOnly \? \(/u)
   assert.match(source, /canRework && !assignmentOnly \? \(/u)
   assert.match(source, /取消只终止当前尚未开工的批次/u)

@@ -174,6 +174,9 @@ func (r *productionOrderRepo) PrepareProductionOutsourcing(ctx context.Context, 
 			return nil, err
 		}
 	}
+	if err := syncOutsourcingHandoffs(ctx, client, contract.ID, in.ActorID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}

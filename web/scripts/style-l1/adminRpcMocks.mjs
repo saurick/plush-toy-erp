@@ -116,6 +116,7 @@ export async function installAdminRpcMocks(
     workflowProcessContextFixtures = [],
     approvalSettingsMode = 'configured',
     legalNoticeAcknowledged = true,
+    productionOrderReleased = false,
   } = {}
 ) {
   const nowUnix = () => Math.floor(Date.now() / 1000)
@@ -629,6 +630,7 @@ export async function installAdminRpcMocks(
     workflowTaskFixtures,
     workflowProcessContextFixtures,
     legalNoticeAcknowledged,
+    productionOrderReleased,
   }
 
   await installSystemRpcMocks(page, mockContext)

@@ -2506,7 +2506,7 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
     '加工品类',
     '产品 / 半成品（车缝、手工等）',
     '材料（布料加工等）',
-    '金额预览',
+    '加工金额',
     '保存时由系统按数量和单价核算',
   ]) {
     assert.match(formSource, new RegExp(visibleText, 'u'))

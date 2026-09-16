@@ -235,8 +235,7 @@ export default function V1PurchaseReceiptsPage() {
 
   const canRead = hasActionPermission(adminProfile, 'purchase.receipt.read')
   const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')
-  const canPost =
-    canCreate || hasActionPermission(adminProfile, 'warehouse.inbound.confirm')
+  const canPost = hasActionPermission(adminProfile, 'warehouse.inbound.confirm')
   const canCreateReturn = hasActionPermission(
     adminProfile,
     'purchase.return.create'
@@ -927,8 +926,8 @@ export default function V1PurchaseReceiptsPage() {
         {
           align: 'right',
           defaultPriority: 50,
-          title: '入库数量',
-          exportTitle: '入库数量',
+          title: '收货数量',
+          exportTitle: '收货数量',
           key: 'quantity_total',
           width: 120,
           sortValue: receiptQuantityTotal,

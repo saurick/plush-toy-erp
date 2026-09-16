@@ -584,6 +584,9 @@ func (r *productionOrderRepo) closeProductionOrder(ctx context.Context, in *biz.
 		tx = nil
 		return r.resolveNonCreateAfterWriteFailure(ctx, in.ID, in.ActorID, in.CommandKey, in.IdempotencyKey, in.IntentHash, err)
 	}
+	if err := syncProductionHandoffs(ctx, tx.client, in.ID, in.ActorID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		rollbackInventoryDBTx(ctx, tx, r.log)
 		tx = nil
@@ -848,6 +851,9 @@ func (r *productionOrderRepo) cancelProductionOrder(ctx context.Context, in *biz
 		rollbackInventoryDBTx(ctx, tx, r.log)
 		tx = nil
 		return r.resolveNonCreateAfterWriteFailure(ctx, in.ID, in.ActorID, in.CommandKey, in.IdempotencyKey, in.IntentHash, err)
+	}
+	if err := syncProductionHandoffs(ctx, tx.client, in.ID, in.ActorID); err != nil {
+		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		rollbackInventoryDBTx(ctx, tx, r.log)

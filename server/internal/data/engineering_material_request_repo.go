@@ -410,6 +410,9 @@ func (r *salesOrderRepo) generateMaterialPurchaseOrders(ctx context.Context, cli
 				return err
 			}
 		}
+		if err := syncPurchaseOrderHandoffs(ctx, client, po.ID, 0); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -62,6 +62,8 @@ func TestPurchaseRejectionDispositionPostsWithoutInventoryAndKeepsDraftReceipt(t
 	if after != before {
 		t.Fatalf("disposition wrote inventory before=%d after=%d", before, after)
 	}
+	assertFulfillmentTask(t, ctx, client, "receipt_exception", receipt.ID, "done", biz.PurchaseRoleKey)
+	assertFulfillmentTask(t, ctx, client, "receipt_inbound", receipt.ID, "withdrawn", biz.WarehouseRoleKey)
 	gotReceipt, err := uc.GetPurchaseReceipt(ctx, receipt.ID)
 	if err != nil || gotReceipt.Status != biz.PurchaseReceiptStatusDraft {
 		t.Fatalf("receipt=%#v err=%v", gotReceipt, err)
@@ -73,6 +75,8 @@ func TestPurchaseRejectionDispositionPostsWithoutInventoryAndKeepsDraftReceipt(t
 	if cancelled, err := uc.CancelPurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionMutation{ID: posted.ID, ExpectedVersion: posted.Version, ActorID: 3, Reason: "错误撤销"}); err != nil || cancelled.Status != biz.PurchaseRejectionStatusCancelled {
 		t.Fatalf("posted cancellation=%#v err=%v", cancelled, err)
 	}
+	assertFulfillmentTask(t, ctx, client, "receipt_exception", receipt.ID, "ready", biz.PurchaseRoleKey)
+	assertFulfillmentTask(t, ctx, client, "receipt_inbound", receipt.ID, "blocked", biz.WarehouseRoleKey)
 }
 
 func TestPurchaseRejectionDispositionRejectsPostedReceiptSource(t *testing.T) {

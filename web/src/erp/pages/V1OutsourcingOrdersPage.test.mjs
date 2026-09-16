@@ -77,7 +77,7 @@ test('outsourcing contract keeps editable party B snapshot and checks it before 
   assert.match(editor, /supplier_types: \['outsourcing', 'mixed'\]/u)
   assert.match(editor, /buildOutsourcingSupplierSnapshot/u)
   assert.match(editor, /loadSupplierContacts/u)
-  assert.match(formSource, /合同乙方信息/u)
+  assert.match(formSource, /aria-label="加工方信息"/u)
   assert.match(formSource, /乙方联系人/u)
   assert.match(formSource, /乙方签约人/u)
   assert.match(source, /inspectOutsourcingContractReadiness/u)

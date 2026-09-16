@@ -1606,6 +1606,13 @@ func (r *operationalFactRepo) createProductionOrderLinkedFactDraft(ctx context.C
 		}
 		return nil, err
 	}
+	sourceRow, err := tx.client.ProductionFact.Get(ctx, row.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := syncProductionFactHandoffs(ctx, tx.client, sourceRow); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -2243,6 +2250,9 @@ func productionFactInventoryDirection(factType string) (int, string) {
 }
 
 func commitProductionFact(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact) (*biz.ProductionFact, error) {
+	if err := syncProductionFactHandoffs(ctx, tx.client, row); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}

@@ -1,3 +1,4 @@
+import { getWorkflowTaskDisplayName } from '../utils/processRuntimePresentation.mjs'
 import React, {
   lazy,
   Suspense,
@@ -350,7 +351,7 @@ function getWorkflowTaskStableKey(task) {
 }
 
 function TaskTitleEntry({ task, onOpenTask }) {
-  const name = task.task_name || '未命名任务'
+  const name = getWorkflowTaskDisplayName(task)
   return (
     <button
       type="button"
@@ -515,12 +516,12 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
                 key={`${lane.key}-${taskId || task.id}`}
                 data-task-code={task.task_code || undefined}
                 data-task-group={task.task_group || undefined}
-                label={`查看${task.task_name || '任务'}详情`}
+                label={`查看${getWorkflowTaskDisplayName(task)}详情`}
                 onOpen={() => onOpenTask(task)}
               >
                 <span className="erp-task-board-card-head">
                   <Text strong className="erp-task-board-card-title">
-                    {task.task_name || '未命名任务'}
+                    {getWorkflowTaskDisplayName(task)}
                   </Text>
                   <Tag color={statusMeta.color}>{statusMeta.label}</Tag>
                 </span>

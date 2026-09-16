@@ -80,6 +80,9 @@ func (r *inventoryRepo) CreatePurchaseReceiptWithItems(ctx context.Context, in *
 	if err != nil {
 		return nil, err
 	}
+	if err := syncPurchaseReceiptHandoffs(ctx, tx.client, receipt.ID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -374,6 +377,9 @@ func (r *inventoryRepo) createPurchaseReceiptFromPurchaseOrder(
 			return nil, err
 		}
 	}
+	if err := syncPurchaseReceiptHandoffs(ctx, tx.client, receipt.ID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		commitErr := err
 		rollbackInventoryDBTx(ctx, tx, r.log)
@@ -483,6 +489,9 @@ func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.Purc
 			return replayed, nil
 		}
 		return nil, writeErr
+	}
+	if err := syncPurchaseReceiptHandoffs(ctx, tx.client, row.ReceiptID); err != nil {
+		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		commitErr := err
@@ -631,6 +640,9 @@ func (r *inventoryRepo) postPurchaseReceipt(
 			return nil, err
 		}
 	}
+	if err := syncPurchaseReceiptHandoffs(ctx, tx.client, receipt.ID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -771,6 +783,9 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 				return nil, err
 			}
 		}
+		if err := syncPurchaseReceiptHandoffs(ctx, tx.client, receipt.ID); err != nil {
+			return nil, err
+		}
 		if err := tx.sqlTx.Commit(); err != nil {
 			return nil, err
 		}
@@ -797,6 +812,9 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 		}
 		out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
 		if err != nil {
+			return nil, err
+		}
+		if err := syncPurchaseReceiptHandoffs(ctx, tx.client, receipt.ID); err != nil {
 			return nil, err
 		}
 		if err := tx.sqlTx.Commit(); err != nil {
@@ -896,6 +914,9 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 		"采购收货已取消并完成库存冲正，原入库流程结果需要核对",
 		actorID,
 	); err != nil {
+		return nil, err
+	}
+	if err := syncPurchaseReceiptHandoffs(ctx, tx.client, receipt.ID); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {

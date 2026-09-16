@@ -237,6 +237,28 @@ func TestProductionWIPJSONRPCAuthPermissionAndOutsourcingModule(t *testing.T) {
 	}
 }
 
+func TestFulfillmentWIPReturnBelongsToWarehouse(t *testing.T) {
+	repo := &productionWIPJSONRPCRepo{aggregate: productionWIPJSONRPCAggregate()}
+	dispatcher := newProductionWIPJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin([]string{biz.ProductionRoleKey}, biz.PermissionProductionWIPExecute, biz.PermissionProductionWIPRead))
+	enabled := customerConfigPublishParamsWithRevisionAndModuleState(t, customerConfigPublishParamsForRevision(t, "2026.09.16.warehouse-return"), "2026.09.16.warehouse-return", "outsourcing_orders", "enabled")
+	activateOperationalFactTestCustomerConfig(t, dispatcher, enabled)
+	params := mustJSONRPCStruct(t, map[string]any{"action": biz.ProductionWIPActionReceiveOutsourcingReturn, "production_order_id": float64(1), "production_wip_batch_id": float64(201), "expected_version": float64(3), "idempotency_key": "warehouse-return"})
+	_, denied, _ := dispatcher.handleProductionWIP(workflowJSONRPCAdminContext(), "execute_production_wip_action", "production", params)
+	if denied.Code != errcode.PermissionDenied.Code || repo.actionCall != nil {
+		t.Fatalf("production bypassed warehouse handoff: %+v", denied)
+	}
+	dispatcher.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionOutsourcingReturnReceiptCreate, biz.PermissionProductionWIPRead)}
+	_, accepted, _ := dispatcher.handleProductionWIP(workflowJSONRPCAdminContext(), "execute_production_wip_action", "warehouse", params)
+	if accepted.Code != errcode.OK.Code || repo.actionCall == nil {
+		t.Fatalf("warehouse return: %+v", accepted)
+	}
+	start := mustJSONRPCStruct(t, map[string]any{"action": biz.ProductionWIPActionStartOperation, "production_order_id": float64(1), "production_wip_batch_id": float64(201), "expected_version": float64(3), "idempotency_key": "warehouse-start"})
+	_, denied, _ = dispatcher.handleProductionWIP(workflowJSONRPCAdminContext(), "execute_production_wip_action", "warehouse-start", start)
+	if denied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("warehouse gained production execution: %+v", denied)
+	}
+}
+
 func TestProductionWIPPackagingConfirmationDoesNotDependOnQualityModule(t *testing.T) {
 	_, modules, allowed, ok := productionWIPActionContract(biz.ProductionWIPActionConfirmPackagingMaterial)
 	if !ok || len(modules) != 1 || modules[0] != productionOrderModuleKey {

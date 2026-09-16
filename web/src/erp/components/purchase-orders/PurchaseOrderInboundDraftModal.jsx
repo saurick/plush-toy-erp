@@ -207,7 +207,7 @@ export default function PurchaseOrderInboundDraftModal({
 
         <Form.Item
           name="received_at"
-          label="入库日期"
+          label="收货日期"
           rules={[{ required: true, message: '请选择入库日期' }]}
         >
           <DateInput />

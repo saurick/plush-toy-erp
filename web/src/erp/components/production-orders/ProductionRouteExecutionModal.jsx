@@ -224,6 +224,9 @@ export default function ProductionRouteExecutionModal({
   originReworkFactID = null,
   canAssign = false,
   canExecute = false,
+  canReceiveReturn = false,
+  initialBatchID = null,
+  initialItemID = null,
   canRework = false,
   canConfirmPackaging = false,
   canReadOutsourcingContracts = false,
@@ -268,6 +271,7 @@ export default function ProductionRouteExecutionModal({
     !assignmentOnly &&
     !canAssign &&
     !canExecute &&
+    !canReceiveReturn &&
     !canRework &&
     !canConfirmPackaging
   const scopedReworkFactID = Number(originReworkFactID || 0)
@@ -285,11 +289,13 @@ export default function ProductionRouteExecutionModal({
       ) {
         return canAssign
       }
+      if (action === PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN) {
+        return canReceiveReturn
+      }
       if (
         [
           PRODUCTION_WIP_ACTION.START_OPERATION,
           PRODUCTION_WIP_ACTION.COMPLETE_OPERATION,
-          PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN,
           PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION,
         ].includes(action)
       ) {
@@ -301,7 +307,14 @@ export default function ProductionRouteExecutionModal({
       }
       return false
     },
-    [assignmentOnly, canAssign, canConfirmPackaging, canExecute, canRework]
+    [
+      assignmentOnly,
+      canAssign,
+      canConfirmPackaging,
+      canExecute,
+      canReceiveReturn,
+      canRework,
+    ]
   )
 
   const loadOutsourcingSources = useCallback(
@@ -374,7 +387,7 @@ export default function ProductionRouteExecutionModal({
     if (!open || !positiveSafeInteger(orderID)) return undefined
     const controller = new AbortController()
     setAggregate(null)
-    setSelectedBatchID(null)
+    setSelectedBatchID(initialBatchID)
     setActiveAction('')
     setOutsourcingSources([])
     setOutsourcingLoadState('idle')
@@ -394,7 +407,14 @@ export default function ProductionRouteExecutionModal({
     }
     // Opening a different order is a new source context; stale form values and
     // route responses must not cross that boundary.
-  }, [actionForm, loadCurrentRoute, open, orderID])
+  }, [
+    actionForm,
+    loadCurrentRoute,
+    open,
+    orderID,
+    initialBatchID,
+    initialItemID,
+  ])
 
   const displayedBatches = useMemo(() => {
     const batches = Array.isArray(aggregate?.batches) ? aggregate.batches : []
@@ -420,6 +440,14 @@ export default function ProductionRouteExecutionModal({
               positiveSafeInteger(batch.origin_rework_fact_id)
             )
           : displayedBatches
+      const linkedBatch =
+        selectableBatches.find(
+          (batch) => Number(batch.id) === Number(initialBatchID)
+        ) ||
+        selectableBatches.find(
+          (batch) =>
+            Number(batch.production_order_item_id) === Number(initialItemID)
+        )
       const preferredBatch = [...selectableBatches]
         .reverse()
         .find((batch) =>
@@ -432,10 +460,19 @@ export default function ProductionRouteExecutionModal({
           ].includes(batch.status)
         )
       setSelectedBatchID(
-        preferredBatch?.id || selectableBatches.at(-1)?.id || null
+        linkedBatch?.id ||
+          preferredBatch?.id ||
+          selectableBatches.at(-1)?.id ||
+          null
       )
     }
-  }, [displayedBatches, orderStatus, selectedBatchID])
+  }, [
+    displayedBatches,
+    orderStatus,
+    selectedBatchID,
+    initialBatchID,
+    initialItemID,
+  ])
 
   const selectedBatch = useMemo(
     () =>
@@ -1582,7 +1619,7 @@ export default function ProductionRouteExecutionModal({
                       ) : null}
                     </>
                   ) : null}
-                  {canExecute && !assignmentOnly ? (
+                  {(canExecute || canReceiveReturn) && !assignmentOnly ? (
                     <>
                       <Button
                         disabled={
@@ -1612,7 +1649,7 @@ export default function ProductionRouteExecutionModal({
                             currentOperation,
                             nextOperation,
                             selectedPackagingConfirmation,
-                            canExecute,
+                            canRunAction(completionAction),
                             authoritativeOrder
                           )
                         }

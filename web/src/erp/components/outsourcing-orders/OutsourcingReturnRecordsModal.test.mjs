@@ -24,7 +24,7 @@ test('outsourcing records project material issues and return receipts together',
   assert.match(source, /暂无委外记录/u)
   assert.doesNotMatch(source, /dataIndex:\s*'source_/u)
   assert.doesNotMatch(source, /dataIndex:\s*'idempotency_key'/u)
-  assert.match(source, /title: '事实单号'/u)
+  assert.match(source, /title: '业务单号'/u)
   assert.match(source, /title: '业务类型'/u)
   assert.match(source, /title: '产品规格'/u)
   assert.match(source, /outsourcingFactProductSKUText\(fact\)/u)

@@ -58,7 +58,10 @@ func TestEngineeringMaterialWorkflowApprovalHandoffAndReplay(t *testing.T) {
 	if _, err := f.uc.ReviewEngineeringMaterialRequest(ctx, in); err != nil {
 		t.Fatal(err)
 	}
-	if client.WorkflowTask.Query().CountX(ctx) != 2 || client.WorkflowTaskEvent.Query().CountX(ctx) != 4 || client.PurchaseOrder.Query().CountX(ctx) != 2 {
+	for _, order := range approved.PurchaseOrders {
+		assertFulfillmentTask(t, ctx, client, "purchase_arrival", order.ID, "ready", biz.WarehouseRoleKey)
+	}
+	if client.WorkflowTask.Query().CountX(ctx) != 4 || client.WorkflowTaskEvent.Query().CountX(ctx) != 6 || client.PurchaseOrder.Query().CountX(ctx) != 2 {
 		t.Fatal("finance replay duplicated task, event or purchase order")
 	}
 }

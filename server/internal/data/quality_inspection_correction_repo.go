@@ -88,6 +88,9 @@ func (r *inventoryRepo) CreateQualityInspectionCorrection(ctx context.Context, i
 	); err != nil {
 		return nil, err
 	}
+	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}

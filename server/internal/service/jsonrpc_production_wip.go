@@ -109,6 +109,7 @@ func productionWIPActionContract(action string) (string, []string, []string, boo
 		biz.ProductionWIPActionReceiveOutsourcingReturn:
 		if action == biz.ProductionWIPActionReceiveOutsourcingReturn {
 			modules = append(modules, "outsourcing_orders")
+			return biz.PermissionOutsourcingReturnReceiptCreate, modules, append(base, "production_wip_batch_id"), true
 		}
 		return biz.PermissionProductionWIPExecute, modules, append(base, "production_wip_batch_id"), true
 	case biz.ProductionWIPActionTransferToNextOperation:

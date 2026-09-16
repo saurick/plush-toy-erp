@@ -140,7 +140,7 @@ test('document-style long forms follow stable business section order', () => {
     ],
     [
       '../components/outsourcing-orders/OutsourcingOrderForm.jsx',
-      ['合同与加工厂', '合同委托方信息', '合同乙方信息', '备注与附件'],
+      ['合同与加工厂', '加工方信息', '委托方信息', '备注与附件'],
     ],
     [
       '../components/shipments/ShipmentEditor.jsx',

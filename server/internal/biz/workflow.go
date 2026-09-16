@@ -92,7 +92,7 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 	if err != nil {
 		return nil, err
 	}
-	if IsEngineeringMaterialTaskGroup(current.TaskGroup) {
+	if IsEngineeringMaterialTaskGroup(current.TaskGroup) || IsFulfillmentTaskGroup(current.TaskGroup) {
 		return nil, ErrWorkflowTaskSourceGeneratedOnly
 	}
 	if IsTerminalWorkflowTaskStatus(current.TaskStatusKey) {

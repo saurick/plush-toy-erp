@@ -62,6 +62,73 @@ export function createProductionWipScenarios(deps) {
   }
 
   return [
+    ...[
+      ['warehouse', 'wip_batch_id=91021', 'outsourcing.return_receipt.create'],
+      [
+        'sales',
+        'production_order_item_id=7101',
+        'production.packaging_material.confirm',
+      ],
+    ].map(([role, query, capability]) => ({
+      name: `production-handoff-${role}-source-desktop`,
+      productionOrderReleased: true,
+      path: `/erp/production/orders?production_order_id=71&${query}`,
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      adminProfile: {
+        username: `style-handoff-${role}`,
+        is_super_admin: false,
+        roles: [{ role_key: role, name: role === 'sales' ? '业务' : '仓库' }],
+        permissions: ['production.wip.read', capability],
+        menus: [
+          {
+            key: 'production-orders',
+            label: '生产订单',
+            path: '/erp/production/orders',
+            required_any: ['production.wip.read'],
+            required_all: [],
+          },
+        ],
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: ['production-orders'],
+        actions: ['production.wip.read', capability],
+      },
+      verify: async (page) => {
+        const modal = page
+          .locator('.ant-modal:visible')
+          .filter({ hasText: '生产工序办理' })
+          .last()
+        await modal.waitFor({ state: 'visible' })
+        await expectText(page, '当前：布料加工')
+        assert.equal(
+          await modal
+            .getByRole('button', { name: '安排加工', exact: true })
+            .count(),
+          0
+        )
+        if (role === 'warehouse') {
+          assert.equal(
+            await modal
+              .getByRole('button', { name: '开始工序', exact: true })
+              .isEnabled(),
+            false
+          )
+        } else {
+          assert.equal(
+            await modal
+              .getByRole('button', { name: '确认包材要求', exact: true })
+              .isEnabled(),
+            true
+          )
+        }
+        await page.screenshot({
+          path: path.resolve(outputDir, `production-handoff-${role}.png`),
+          fullPage: true,
+        })
+      },
+    })),
     {
       name: 'production-wip-prepare-outsourcing-desktop',
       path: '/erp/production/orders',
@@ -71,8 +138,9 @@ export function createProductionWipScenarios(deps) {
       beforeNavigate: async (page) => {
         await page.route('**/rpc/production_wip', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
-          if (method !== 'prepare_production_outsourcing_order')
+          if (method !== 'prepare_production_outsourcing_order') {
             return route.fallback()
+          }
           assert.ok(params.production_wip_batch_id > 0)
           assert.ok(params.supplier_id > 0)
           assert.equal(params.expected_return_date, '2026-10-01')

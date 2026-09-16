@@ -1,3 +1,4 @@
+import { fulfillmentTaskEntryPath, isFulfillmentTask } from './fulfillmentTask.mjs'
 import { businessModuleDefinitions } from '../config/businessModules.mjs'
 import { dashboardModules } from '../config/dashboardModules.mjs'
 import { V1_ROUTE_PATHS } from './masterDataOrderView.mjs'
@@ -10,6 +11,13 @@ import {
 
 const TASK_SOURCE_TITLE_MAP = new Map([
   ['engineering_material_request', '工程用料审批'],
+  ['purchase_receipt', '采购收货单'],
+  ['quality_inspection', '质量检验'],
+  ['outsourcing_order', '加工合同'],
+  ['outsourcing_fact', '加工收发记录'],
+  ['production_wip_batch', '生产工序批次'],
+  ['production_packaging_confirmation', '包装版本确认'],
+  ['production_fact', '生产记录'],
   ...dashboardModules.map((moduleItem) => [moduleItem.key, moduleItem.title]),
   ['project-orders', '销售订单'],
   ['sales_order', '销售订单'],
@@ -314,6 +322,7 @@ export function resolveWorkflowTaskSourceEntryPath(task = {}) {
 }
 
 export function resolveWorkflowTaskEntryPath(task = {}) {
+  if (isFulfillmentTask(task)) return fulfillmentTaskEntryPath(task)
   const materialEntry = engineeringMaterialTaskEntryPath(task)
   if (materialEntry) return materialEntry
   const sourceTaskContract = standaloneSourceTaskContract(task)

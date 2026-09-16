@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react'
+import './outsourcingContractForm.css'
 import {
   CopyOutlined,
   DeleteOutlined,
@@ -50,24 +51,27 @@ import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
 import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx'
 
 const OUTSOURCING_ORDER_COLUMNS = [
+  { label: '产品订单编号', width: 168 },
   { label: '加工品类', width: 150, required: true },
   { label: '产品 / 材料', width: 200, required: true },
-  { label: '工序', width: 150, required: true },
   { label: '加工项目', width: 140 },
-  { label: '加工数量', width: 284, required: true },
+  { label: '工序名称', width: 150, required: true },
+  { label: '工序类别', width: 120 },
   { label: '单位', width: 120, required: true },
   { label: '单价', width: 125 },
+  { label: '加工数量', width: 284, required: true },
   {
     label: (
       <BusinessHelpLabel
         itemKey="outsourcing-line-amount"
-        label="金额预览"
+        label="加工金额"
         pageKey="processing-contracts"
       />
     ),
     width: 112,
   },
-  { label: '行预计回货日期', width: 176 },
+  { label: '备注', width: 180 },
+  { label: '回货日期', width: 176 },
 ]
 
 function quantityPrecisionRule({ form, fieldName, unitOptions }) {
@@ -197,7 +201,7 @@ export default function OutsourcingOrderForm({
       form={form}
       layout="vertical"
       preserve={false}
-      className="erp-business-action-form"
+      className="erp-business-action-form erp-outsourcing-contract-form"
     >
       <BusinessFormSectionTitle>合同与加工厂</BusinessFormSectionTitle>
       <Form.Item
@@ -288,130 +292,126 @@ export default function OutsourcingOrderForm({
           }
         />
       </Form.Item>
-      <BusinessFormSectionTitle>合同委托方信息</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['contract_party_snapshot', 'buyerCompany']}
-        label="委托单位"
-      >
-        <Input maxLength={128} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['contract_party_snapshot', 'buyerContact']}
-        label="委托人"
-      >
-        <Input maxLength={64} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['contract_party_snapshot', 'buyerPhone']}
-        label="委托方电话"
-      >
-        <Input maxLength={64} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['contract_party_snapshot', 'buyerAddress']}
-        label="公司地址"
-      >
-        <Input maxLength={255} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['contract_party_snapshot', 'buyerSigner']}
-        label="委托方签字人"
-      >
-        <Input maxLength={64} />
-      </Form.Item>
-      <BusinessFormSectionTitle>合同乙方信息</BusinessFormSectionTitle>
-      <Form.Item name={['supplier_snapshot', 'id']} hidden>
-        <Input />
-      </Form.Item>
-      <Form.Item name={['supplier_snapshot', 'code']} hidden>
-        <Input />
-      </Form.Item>
-      <Form.Item name={['supplier_snapshot', 'short_name']} hidden>
-        <Input />
-      </Form.Item>
-      <Form.Item name={['supplier_snapshot', 'contact_id']} hidden>
-        <Input />
-      </Form.Item>
-      <Form.Item name={['supplier_snapshot', 'contact_mobile']} hidden>
-        <Input />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['supplier_snapshot', 'name']}
-        label="乙方单位"
-        extra="单位名称随所选加工厂带入并冻结在当前合同中。"
-      >
-        <Input readOnly />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['supplier_snapshot', 'contact_name']}
-        label="乙方联系人"
-        extra="可从加工厂联系人中选择，也可按本合同直接填写。"
-      >
-        <AutoComplete
-          allowClear
-          autoComplete="off"
-          loading={supplierContactsLoading}
-          maxLength={128}
-          options={supplierContacts.map((contact) => ({
-            value: contact.name,
-            label: [
-              contact.name,
-              contact.title,
-              contact.mobile || contact.phone,
-            ]
-              .filter(Boolean)
-              .join(' / '),
-            contact,
-          }))}
-          onChange={onSupplierContactNameChange}
-          onSelect={(_value, option) =>
-            onSupplierContactSelect?.(option?.contact)
-          }
-          placeholder="选择或填写乙方联系人"
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['supplier_snapshot', 'contact_phone']}
-        label="乙方联系电话"
-      >
-        <Input maxLength={64} placeholder="座机或手机" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['supplier_snapshot', 'address']}
-        label="乙方地址"
-      >
-        <Input maxLength={512} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['supplier_snapshot', 'signer_name']}
-        label="乙方签约人"
-      >
-        <Input maxLength={64} />
-      </Form.Item>
-      <BusinessFormSectionTitle>备注与附件</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        name="note"
-        label="备注"
-      >
-        <BusinessTextArea allowClear showCount maxLength={255} />
-      </Form.Item>
-      {attachmentPanel}
-
+      <div className="erp-outsourcing-contract-form__parties">
+        <section aria-label="加工方信息">
+          <h3>加工方</h3>
+          <Form.Item name={['supplier_snapshot', 'id']} hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name={['supplier_snapshot', 'code']} hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name={['supplier_snapshot', 'short_name']} hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name={['supplier_snapshot', 'contact_id']} hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name={['supplier_snapshot', 'contact_mobile']} hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name={['supplier_snapshot', 'name']}
+            label="乙方单位"
+            extra="单位名称随所选加工厂带入并冻结在当前合同中。"
+          >
+            <Input readOnly />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name={['supplier_snapshot', 'contact_name']}
+            label="乙方联系人"
+            extra="可从加工厂联系人中选择，也可按本合同直接填写。"
+          >
+            <AutoComplete
+              allowClear
+              autoComplete="off"
+              loading={supplierContactsLoading}
+              maxLength={128}
+              options={supplierContacts.map((contact) => ({
+                value: contact.name,
+                label: [
+                  contact.name,
+                  contact.title,
+                  contact.mobile || contact.phone,
+                ]
+                  .filter(Boolean)
+                  .join(' / '),
+                contact,
+              }))}
+              onChange={onSupplierContactNameChange}
+              onSelect={(_value, option) =>
+                onSupplierContactSelect?.(option?.contact)
+              }
+              placeholder="选择或填写乙方联系人"
+            />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name={['supplier_snapshot', 'contact_phone']}
+            label="乙方联系电话"
+          >
+            <Input maxLength={64} placeholder="座机或手机" />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name={['supplier_snapshot', 'address']}
+            label="乙方地址"
+          >
+            <Input maxLength={512} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name={['supplier_snapshot', 'signer_name']}
+            label="乙方签约人"
+          >
+            <Input maxLength={64} />
+          </Form.Item>
+        </section>
+        <section aria-label="委托方信息">
+          <h3>委托方</h3>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name={['contract_party_snapshot', 'buyerCompany']}
+            label="委托单位"
+          >
+            <Input maxLength={128} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name={['contract_party_snapshot', 'buyerContact']}
+            label="委托人"
+          >
+            <Input maxLength={64} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name={['contract_party_snapshot', 'buyerPhone']}
+            label="委托方电话"
+          >
+            <Input maxLength={64} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name={['contract_party_snapshot', 'buyerAddress']}
+            label="公司地址"
+          >
+            <Input maxLength={255} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name={['contract_party_snapshot', 'buyerSigner']}
+            label="委托方签字人"
+          >
+            <Input maxLength={64} />
+          </Form.Item>
+        </section>
+      </div>
       <BusinessLineItemsSection
         columns={OUTSOURCING_ORDER_COLUMNS}
         title="加工明细"
-        description="同一份加工合同内维护产品、工序、数量、单价和预计回货。加工布料等材料时，请在“加工品类”中选择“材料”。"
+        description="按行填写加工项目、单位、单价和数量，金额自动计算。"
         emptyDescription="暂无加工明细"
         renderBeforeHeader={({ fields }) => (
           <>
@@ -522,6 +522,17 @@ export default function OutsourcingOrderForm({
             cells={[
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--source"
+                name={[field.name, 'product_order_no_snapshot']}
+                label="产品订单编号"
+              >
+                <Input
+                  allowClear
+                  maxLength={128}
+                  placeholder="如 SO-YOYO-TRIAL-001"
+                />
+              </Form.Item>,
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--source"
                 name={[field.name, 'subject_type']}
                 label="加工品类"
                 rules={[{ required: true, message: '请选择加工品类' }]}
@@ -599,8 +610,19 @@ export default function OutsourcingOrderForm({
               </Form.Item>,
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--source"
+                name={[field.name, 'processing_item']}
+                label="加工项目"
+              >
+                <BusinessTextArea
+                  allowClear
+                  maxLength={255}
+                  placeholder="如 脸*1"
+                />
+              </Form.Item>,
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--source"
                 name={[field.name, 'process_id']}
-                label="工序"
+                label="工序名称"
                 rules={[{ required: true, message: '请选择工序' }]}
               >
                 <Select
@@ -611,15 +633,53 @@ export default function OutsourcingOrderForm({
                 />
               </Form.Item>,
               <Form.Item
-                className="erp-line-item-field erp-line-item-field--source"
-                name={[field.name, 'processing_item']}
-                label="加工项目"
+                noStyle
+                shouldUpdate={(previous, current) =>
+                  previous?.items?.[field.name]?.process_category_snapshot !==
+                  current?.items?.[field.name]?.process_category_snapshot
+                }
               >
-                <BusinessTextArea
-                  allowClear
-                  maxLength={255}
-                  placeholder="如 脸*1"
+                {({ getFieldValue }) => (
+                  <Form.Item label="工序类别">
+                    <Input
+                      readOnly
+                      value={
+                        getFieldValue([
+                          'items',
+                          field.name,
+                          'process_category_snapshot',
+                        ]) || ''
+                      }
+                    />
+                  </Form.Item>
+                )}
+              </Form.Item>,
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--unit"
+                name={[field.name, 'unit_id']}
+                label="单位"
+                rules={[{ required: true, message: '请选择单位' }]}
+              >
+                <Select
+                  showSearch
+                  options={unitOptions}
+                  optionFilterProp="searchText"
+                  onChange={(value) => {
+                    onUnitChange(field.name, value)
+                    form
+                      .validateFields([
+                        ['items', field.name, 'outsourcing_quantity'],
+                      ])
+                      .catch(() => {})
+                  }}
                 />
+              </Form.Item>,
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--money"
+                name={[field.name, 'unit_price']}
+                label="单价"
+              >
+                <Input />
               </Form.Item>,
               <Form.Item
                 noStyle
@@ -660,33 +720,6 @@ export default function OutsourcingOrderForm({
                 )}
               </Form.Item>,
               <Form.Item
-                className="erp-line-item-field erp-line-item-field--unit"
-                name={[field.name, 'unit_id']}
-                label="单位"
-                rules={[{ required: true, message: '请选择单位' }]}
-              >
-                <Select
-                  showSearch
-                  options={unitOptions}
-                  optionFilterProp="searchText"
-                  onChange={(value) => {
-                    onUnitChange(field.name, value)
-                    form
-                      .validateFields([
-                        ['items', field.name, 'outsourcing_quantity'],
-                      ])
-                      .catch(() => {})
-                  }}
-                />
-              </Form.Item>,
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--money"
-                name={[field.name, 'unit_price']}
-                label="单价"
-              >
-                <Input />
-              </Form.Item>,
-              <Form.Item
                 noStyle
                 shouldUpdate={(previous, current) =>
                   previous?.items?.[field.name]?.outsourcing_quantity !==
@@ -698,7 +731,7 @@ export default function OutsourcingOrderForm({
                 {({ getFieldValue }) => (
                   <Form.Item
                     className="erp-line-item-field erp-line-item-field--money"
-                    label="金额预览"
+                    label="加工金额"
                   >
                     <Input
                       readOnly
@@ -712,9 +745,16 @@ export default function OutsourcingOrderForm({
                 )}
               </Form.Item>,
               <Form.Item
+                className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
+                name={[field.name, 'note']}
+                label="备注"
+              >
+                <BusinessTextArea allowClear showCount maxLength={255} />
+              </Form.Item>,
+              <Form.Item
                 className="erp-line-item-field erp-line-item-field--date"
                 name={[field.name, 'expected_return_date']}
-                label="行预计回货日期"
+                label="回货日期"
                 dependencies={['order_date']}
                 rules={[
                   dateInputNotBeforeRule({
@@ -809,25 +849,6 @@ export default function OutsourcingOrderForm({
                 ) : null
               }}
             </Form.Item>
-            <Form.Item
-              className="erp-line-item-field erp-line-item-field--source"
-              name={[field.name, 'product_order_no_snapshot']}
-              label="来源产品订单编号"
-              extra="产品或材料加工都可保留来源产品订单编号，用于合同逐行追溯。"
-            >
-              <Input
-                allowClear
-                maxLength={128}
-                placeholder="如 SO-YOYO-TRIAL-001"
-              />
-            </Form.Item>
-            <Form.Item
-              className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
-              name={[field.name, 'note']}
-              label="备注"
-            >
-              <BusinessTextArea allowClear showCount maxLength={255} />
-            </Form.Item>
             <p className="erp-line-item-details__help">
               查货只表示加工环节；合格、不合格、让步、返工等结果不在加工合同里维护。
             </p>
@@ -880,6 +901,15 @@ export default function OutsourcingOrderForm({
           ],
         })}
       />
+      <BusinessFormSectionTitle>备注与附件</BusinessFormSectionTitle>
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+        name="note"
+        label="备注"
+      >
+        <BusinessTextArea allowClear showCount maxLength={255} />
+      </Form.Item>
+      {attachmentPanel}
     </Form>
   )
 }

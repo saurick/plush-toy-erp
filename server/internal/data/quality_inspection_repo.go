@@ -31,10 +31,15 @@ import (
 
 func (r *inventoryRepo) CreateQualityInspectionDraft(ctx context.Context, in *biz.QualityInspectionCreate) (_ *biz.QualityInspection, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
-	if err := validateQualityInspectionReferences(ctx, r.data.postgres, in); err != nil {
+	tx, err := r.beginInventoryDBTx(ctx)
+	if err != nil {
 		return nil, err
 	}
-	row, err := r.data.postgres.QualityInspection.Create().
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := validateQualityInspectionReferences(ctx, tx.client, in); err != nil {
+		return nil, err
+	}
+	row, err := tx.client.QualityInspection.Create().
 		SetInspectionNo(in.InspectionNo).
 		SetNillablePurchaseReceiptID(positiveIntPtr(in.PurchaseReceiptID)).
 		SetNillablePurchaseReceiptItemID(in.PurchaseReceiptItemID).
@@ -55,6 +60,13 @@ func (r *inventoryRepo) CreateQualityInspectionDraft(ctx context.Context, in *bi
 	if err != nil {
 		return nil, err
 	}
+	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entQualityInspectionToBiz(row), nil
 }
 
@@ -222,6 +234,9 @@ func (r *inventoryRepo) SubmitQualityInspection(ctx context.Context, inspectionI
 		}
 		return nil, err
 	}
+	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -348,6 +363,9 @@ func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionI
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrQualityInspectionNotFound
 		}
+		return nil, err
+	}
+	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
@@ -910,6 +928,9 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(
 			return nil, err
 		}
 	}
+	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -1010,6 +1031,9 @@ func (r *inventoryRepo) submitProductionWIPQualityInspection(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
+	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -1095,6 +1119,9 @@ func (r *inventoryRepo) decideProductionWIPQualityInspection(
 	if err != nil {
 		return nil, err
 	}
+	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -1138,6 +1165,9 @@ func (r *inventoryRepo) cancelProductionWIPQualityInspection(
 	}
 	row, err := tx.client.QualityInspection.Get(ctx, action.inspection.ID)
 	if err != nil {
+		return nil, err
+	}
+	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {

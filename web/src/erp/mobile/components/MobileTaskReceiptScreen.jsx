@@ -1,3 +1,4 @@
+import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import React from 'react'
 import {
   CheckCircleFilled,
@@ -46,11 +47,6 @@ const OUTCOME_META = Object.freeze({
   },
 })
 
-function readableText(value, fallback) {
-  const text = String(value || '').trim()
-  return text || fallback
-}
-
 function resolveReceiptActionLabel({ action, outcome, task }) {
   const candidate =
     outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
@@ -88,7 +84,7 @@ export default function MobileTaskReceiptScreen({
 }) {
   const outcomeMeta = OUTCOME_META[outcome] || OUTCOME_META.unknown
   const OutcomeIcon = outcomeMeta.icon
-  const taskName = readableText(task?.task_name, '任务处理结果')
+  const taskName = getWorkflowTaskDisplayName(task)
   const taskStatus =
     statusLabel ||
     (task ? resolveMobileTaskStatusLabel(task) : '任务状态暂不可用')

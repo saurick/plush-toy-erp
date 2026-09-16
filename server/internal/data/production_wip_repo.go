@@ -200,7 +200,7 @@ func freezeProductionOrderWIPRoute(ctx context.Context, client *ent.Client, orde
 			return err
 		}
 	}
-	return nil
+	return syncProductionHandoffs(ctx, client, orderID, actorID)
 }
 
 func requireProductionWIPRouteEmpty(ctx context.Context, client *ent.Client, orderID int) error {
@@ -722,6 +722,9 @@ func (r *productionOrderRepo) ApplyProductionWIPCommand(ctx context.Context, in 
 		_ = tx.sqlTx.Rollback()
 		committed = true
 		return r.resolveProductionWIPAfterWriteFailure(ctx, in, eventAction, err)
+	}
+	if err := syncProductionHandoffs(ctx, tx.client, in.ProductionOrderID, in.ActorID); err != nil {
+		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		committed = true
@@ -1315,6 +1318,9 @@ func (r *productionOrderRepo) confirmProductionWIPPackagingMaterial(ctx context.
 	}
 	aggregate, err := loadProductionWIPAggregate(ctx, tx.client, in.ProductionOrderID)
 	if err != nil {
+		return nil, err
+	}
+	if err := syncProductionHandoffs(ctx, tx.client, in.ProductionOrderID, in.ActorID); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {

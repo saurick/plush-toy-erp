@@ -797,6 +797,7 @@ async function runScenarioOnce(browser, scenario) {
       workflowTaskFixtures: scenario.workflowTaskFixtures,
       workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
       approvalSettingsMode: scenario.approvalSettingsMode,
+      productionOrderReleased: scenario.productionOrderReleased,
       workflowSourceTaskProducerFixtures:
         scenario.workflowSourceTaskProducerFixtures,
     })
@@ -818,6 +819,7 @@ async function runScenarioOnce(browser, scenario) {
         workflowTaskFixtures: scenario.workflowTaskFixtures,
         workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
         approvalSettingsMode: scenario.approvalSettingsMode,
+        productionOrderReleased: scenario.productionOrderReleased,
         workflowSourceTaskProducerFixtures:
           scenario.workflowSourceTaskProducerFixtures,
       })
@@ -830,6 +832,7 @@ async function runScenarioOnce(browser, scenario) {
         workflowTaskFixtures: scenario.workflowTaskFixtures,
         workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
         approvalSettingsMode: scenario.approvalSettingsMode,
+        productionOrderReleased: scenario.productionOrderReleased,
         workflowSourceTaskProducerFixtures:
           scenario.workflowSourceTaskProducerFixtures,
       })

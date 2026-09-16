@@ -92,7 +92,7 @@ func TestOutsourcingFactRPCUsesExactPermissionsAndRetiresGenericCreate(t *testin
 	}
 
 	returnAdmin := workflowJSONRPCAdmin(
-		[]string{biz.PurchaseRoleKey},
+		[]string{biz.WarehouseRoleKey},
 		biz.PermissionOutsourcingReturnReceiptCreate,
 		biz.PermissionOutsourcingOrderRead,
 	)

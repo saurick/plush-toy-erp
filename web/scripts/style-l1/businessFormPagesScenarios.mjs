@@ -69,6 +69,42 @@ export function createBusinessFormPagesScenarios(deps) {
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       await editor.getByRole('heading', { name: title, exact: true }).waitFor()
       await assertBusinessFormPage(page, editor)
+      if (key === 'outsourcing') {
+        const headers = await editor
+          .locator('.erp-line-item-table thead th')
+          .allTextContents()
+        deps.assert.deepEqual(
+          headers.map((value) => value.replace(/\*|\s/gu, '')),
+          [
+            '序号',
+            '产品订单编号',
+            '加工品类',
+            '产品/材料',
+            '加工项目',
+            '工序名称',
+            '工序类别',
+            '单位',
+            '单价',
+            '加工数量',
+            '加工金额',
+            '备注',
+            '回货日期',
+            '操作',
+          ]
+        )
+        const parties = editor.locator(
+          '.erp-outsourcing-contract-form__parties section'
+        )
+        const left = await parties.nth(0).boundingBox()
+        const right = await parties.nth(1).boundingBox()
+        deps.assert.ok(
+          left &&
+            right &&
+            Math.abs(left.y - right.y) < 2 &&
+            left.x + left.width <= right.x + 2,
+          'contract parties retain the paired Excel header'
+        )
+      }
       await page.waitForFunction(() =>
         document.activeElement?.closest('.erp-business-form-page:not([hidden])')
       )
@@ -117,6 +153,33 @@ export function createBusinessFormPagesScenarios(deps) {
       await note.fill(originalNote)
       await editor.getByRole('status').getByText('尚未修改').waitFor()
       await note.fill('整页编辑保留输入')
+      if (key === 'outsourcing') {
+        const row = editor.locator('.erp-line-item-table__main-row').first()
+        const price = row.locator('input[id$="_unit_price"]')
+        const quantity = row.locator('input[id$="_outsourcing_quantity"]')
+        const amount = row.locator('td').nth(10).locator('input')
+        const originalPrice = await price.inputValue()
+        const originalQuantity = await quantity.inputValue()
+        await price.fill('2.5')
+        await quantity.fill('12')
+        deps.assert.equal(
+          Number(await amount.inputValue()),
+          30,
+          'amount follows the edited quantity and price'
+        )
+        await page.screenshot({
+          path: `${deps.outputDir}/outsourcing-excel-form.png`,
+          fullPage: true,
+        })
+        await price.fill('')
+        deps.assert.equal(
+          await amount.inputValue(),
+          '',
+          'clearing price clears the amount'
+        )
+        await price.fill(originalPrice)
+        await quantity.fill(originalQuantity)
+      }
       await page.screenshot({
         path: `${deps.outputDir}/business-form-page-${key}.png`,
         fullPage: true,

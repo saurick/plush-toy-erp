@@ -168,7 +168,7 @@ export default function OutsourcingReturnRecordsModal({
   const actionBusy = Boolean(actionLoading)
   const columns = [
     {
-      title: '事实单号',
+      title: '业务单号',
       dataIndex: 'fact_no',
       width: 180,
     },

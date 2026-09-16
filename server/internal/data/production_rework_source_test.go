@@ -458,6 +458,7 @@ func TestClosedProductionOrderReworkRequiresAcceptedReplacementPackaging(t *test
 		productionwipbatch.OriginReworkFactID(postedRework.ID),
 		productionwipbatch.SourceBatchIDIsNil(),
 	).OnlyX(ctx)
+	assertFulfillmentTask(t, ctx, f.client, "production_execute", rootRow.ID, "ready", biz.ProductionRoleKey)
 	aggregate, err := f.uc.GetProductionWIP(ctx, flow.ProductionOrderID)
 	if err != nil {
 		t.Fatalf("read finished-goods rework WIP: %v", err)
@@ -480,6 +481,7 @@ func TestClosedProductionOrderReworkRequiresAcceptedReplacementPackaging(t *test
 	aggregate, replacementPackaging := acceptProductionReworkReplacementPackagingForTest(
 		t, ctx, f.data, f.client, f.uc, f.actorID, aggregate, root, "closed-rework-replacement",
 	)
+	assertFulfillmentTask(t, ctx, f.client, "production_completion", replacementPackaging.ID, "ready", biz.ProductionRoleKey)
 	replacementLotNo := "CLOSED-REWORK-REPLACEMENT"
 	replacement, err := factUC.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 		FactNo: "PF-CLOSED-REWORK-REPLACEMENT", ProductionOrderID: aggregate.ProductionOrderID,

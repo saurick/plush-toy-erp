@@ -60,7 +60,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		item, err := d.inventoryUC.AddPurchaseReceiptItem(ctx, in)
 		return id, purchaseReceiptItemResult(ctx, d, item, err), nil
 	case "post_purchase_receipt":
-		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptCreate, biz.PermissionWarehouseInboundConfirm); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInboundConfirm); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {
@@ -69,7 +69,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		item, err := d.inventoryUC.PostPurchaseReceipt(ctx, getInt(pm, "id", 0))
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "cancel_purchase_receipt":
-		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptCreate, biz.PermissionWarehouseInboundConfirm); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInboundConfirm); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {

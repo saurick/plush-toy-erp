@@ -1,3 +1,4 @@
+import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   ArrowUpOutlined,
@@ -254,7 +255,7 @@ export default function MobileTaskListScreen({
     return (
       <WorkflowTaskCard
         key={task.id}
-        label={`查看${task.task_name}详情`}
+        label={`查看${getWorkflowTaskDisplayName(task)}详情`}
         data-mobile-task-id={task.id}
         data-task-code={task.task_code || undefined}
         className={`erp-mobile-list-item mobile-task-list-row w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${severity.rowClass} ${
@@ -267,7 +268,7 @@ export default function MobileTaskListScreen({
       >
         <div className="mobile-task-list-row__head">
           <span className="min-w-0 break-words text-base font-semibold leading-snug text-slate-950">
-            {task.task_name}
+            {getWorkflowTaskDisplayName(task)}
           </span>
           <span
             className={`inline-flex min-w-[52px] items-center justify-center rounded-md border px-2 py-1 text-sm font-semibold ${severity.badgeClass}`}
@@ -513,7 +514,7 @@ export default function MobileTaskListScreen({
         data-mobile-task-id={task.id}
         data-task-code={task.task_code || undefined}
         className="erp-mobile-list-item w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
-        label={`查看${task.task_name}处理结果`}
+        label={`查看${getWorkflowTaskDisplayName(task)}处理结果`}
         onOpen={() => {
           setSelectedTaskID(task.id)
           setDetailAction(null)
@@ -522,7 +523,7 @@ export default function MobileTaskListScreen({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="break-words text-base font-semibold text-slate-950">
-              {task.task_name}
+              {getWorkflowTaskDisplayName(task)}
             </div>
             <WorkflowTaskIdentity task={task} compact />
             <div className="mt-1 break-all text-sm text-slate-500">
@@ -662,7 +663,7 @@ export default function MobileTaskListScreen({
               (task) => (
                 <WorkflowTaskCard
                   key={task.id}
-                  label={`查看${task.task_name}详情`}
+                  label={`查看${getWorkflowTaskDisplayName(task)}详情`}
                   data-mobile-task-id={task.id}
                   className="mobile-role-message-card mobile-role-message-card--warning w-full rounded-xl border border-amber-200 bg-white/80 px-3 py-3 text-left"
                   onOpen={() => setSelectedTaskID(task.id)}
@@ -671,7 +672,7 @@ export default function MobileTaskListScreen({
                     {getTaskQueueTone(task)}
                   </div>
                   <div className="mobile-role-message-card__title mt-1 text-sm text-slate-900">
-                    {task.task_name}
+                    {getWorkflowTaskDisplayName(task)}
                   </div>
                   <WorkflowTaskIdentity task={task} compact />
                   <div className="mobile-role-message-card__source mt-1 break-all text-xs text-amber-700">
@@ -720,14 +721,14 @@ export default function MobileTaskListScreen({
               (task) => (
                 <WorkflowTaskCard
                   key={task.id}
-                  label={`查看${task.task_name}详情`}
+                  label={`查看${getWorkflowTaskDisplayName(task)}详情`}
                   data-mobile-task-id={task.id}
                   className="mobile-role-message-card mobile-role-message-card--notice w-full rounded-xl bg-slate-50 px-3 py-3 text-left"
                   onOpen={() => setSelectedTaskID(task.id)}
                 >
                   <span className="min-w-0">
                     <span className="mobile-role-message-card__title text-sm font-medium text-slate-700">
-                      {task.task_name}
+                      {getWorkflowTaskDisplayName(task)}
                     </span>
                     <WorkflowTaskIdentity task={task} compact />
                     <span className="mobile-role-message-card__source mt-1 block break-all text-xs text-slate-500">

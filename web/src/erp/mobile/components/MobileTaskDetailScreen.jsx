@@ -1,3 +1,4 @@
+import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import React from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
@@ -264,7 +265,7 @@ export default function MobileTaskDetailScreen({
         <section className="mobile-task-detail-hero erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="erp-task-copy-heading">
             <h2 className="break-words text-xl font-semibold leading-7 text-slate-950 [overflow-wrap:anywhere]">
-              {selectedTask.task_name}
+              {getWorkflowTaskDisplayName(selectedTask)}
             </h2>
             <WorkflowTaskCopySummary task={selectedTask} />
           </div>

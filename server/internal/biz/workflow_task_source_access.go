@@ -133,6 +133,9 @@ func ResolveWorkflowTaskSourceAccessContract(task *WorkflowTask) WorkflowTaskSou
 	}
 
 	switch {
+	case IsTrustedFulfillmentTask(task):
+		spec, _ := FulfillmentTaskSpecFor(task.TaskGroup)
+		return WorkflowTaskSourceAccessContract{Applicable: true, Resolved: true, Kind: "fulfillment", SourceType: sourceType, RequiredAll: []string{spec.ReadCapability}}
 	case IsTrustedEngineeringMaterialTask(task):
 		return WorkflowTaskSourceAccessContract{Applicable: true, Resolved: true,
 			Kind: WorkflowMaterialRequestSourceType, SourceType: sourceType,

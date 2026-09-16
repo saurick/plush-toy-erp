@@ -121,9 +121,6 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 			has: []string{
 				PermissionERPPrintTemplateRead,
 				PermissionOutsourcingOrderRead,
-				PermissionOutsourcingOrderCreate,
-				PermissionOutsourcingOrderUpdate,
-				PermissionOutsourcingOrderConfirm,
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
@@ -131,7 +128,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskReject,
 				PermissionMobileProductionAccess,
 			},
-			omits: []string{PermissionDebugBusinessClear},
+			omits: []string{PermissionDebugBusinessClear, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionOutsourcingOrderConfirm, PermissionOutsourcingReturnReceiptCreate, PermissionOutsourcingFactPost},
 		},
 		{
 			roleKey: EngineeringRoleKey,

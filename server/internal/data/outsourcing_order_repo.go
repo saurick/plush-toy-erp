@@ -274,6 +274,9 @@ func (r *outsourcingOrderRepo) UpdateOutsourcingOrderLifecycle(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
+	if err := syncOutsourcingHandoffs(ctx, tx.client, id, 0); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -436,6 +439,9 @@ func (r *outsourcingOrderRepo) ApplyOutsourcingOrderLifecycleAction(
 		return nil, err
 	}
 	if err := createSourceOrderLifecycleActionReceipt(ctx, tx.client, "outsourcing_order", current.LifecycleStatus, lifecycleStatus, in, lineResults); err != nil {
+		return nil, err
+	}
+	if err := syncOutsourcingHandoffs(ctx, tx.client, in.ID, in.ActorID); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
@@ -716,6 +722,9 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 		)).
 		All(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := syncOutsourcingHandoffs(ctx, tx.Client(), orderRow.ID, 0); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

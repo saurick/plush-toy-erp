@@ -45,6 +45,9 @@ func IsReservedWorkflowSourceTaskNamespace(taskGroup, taskCode string) bool {
 		return true
 	}
 	taskCode = strings.TrimSpace(taskCode)
+	if strings.HasPrefix(taskCode, "source-handoff-") {
+		return true
+	}
 	if taskCode == "" {
 		return false
 	}

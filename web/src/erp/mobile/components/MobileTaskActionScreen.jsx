@@ -1,3 +1,4 @@
+import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import { useEffect, useId, useRef, useState } from 'react'
 import {
   BellOutlined,
@@ -207,7 +208,7 @@ function MobileWorkflowTaskActionScreen({
   const showDisabledSubmit =
     !canSubmit && !showFooterRetry && hasActionCapability === true
   const accessCopy = resolveAccessCopy(accessState, accessMessage)
-  const taskName = readableText(task?.task_name, '任务处理')
+  const taskName = getWorkflowTaskDisplayName(task)
   const taskStatus = task
     ? resolveMobileTaskStatusLabel(task)
     : '任务状态暂不可用'
@@ -745,7 +746,7 @@ export default function MobileTaskActionScreen(props) {
       <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-4">
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <h2 className="break-words text-base font-semibold leading-6 text-slate-950">
-            {task.task_name}
+            {getWorkflowTaskDisplayName(task)}
           </h2>
           <p className="mt-1 break-words text-sm leading-5 text-slate-500">
             {resolveTaskSourceLabel(task)}

@@ -736,6 +736,15 @@ func commitProductionException(ctx context.Context, tx *inventoryDBTx, id int) (
 	if err != nil {
 		return nil, err
 	}
+	if row.ProductionWipBatchID != nil {
+		batch, err := tx.client.ProductionWIPBatch.Get(ctx, *row.ProductionWipBatchID)
+		if err != nil {
+			return nil, err
+		}
+		if err := syncProductionHandoffs(ctx, tx.client, batch.ProductionOrderID, 0); err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}

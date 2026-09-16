@@ -225,7 +225,7 @@ test('product page integrates dedicated slots without changing SKU attachment se
   )
   assert.match(
     pageSource,
-    /onCancel=\{\(\) => \{\s*if \(saving \|\| contactLoading\) return[\s\S]*?confirmLoading=\{saving\}[\s\S]*?loading=\{contactLoading \|\|/u,
+    /onCancel=\{\(\) => \{\s*if \(saving \|\| contactLoading\) return[\s\S]*?confirmLoading=\{saving\}[\s\S]*?loading=\{\s*contactLoading \|\|/u,
     'the editor must protect product and image writes in flight'
   )
   assert.match(

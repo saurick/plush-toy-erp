@@ -38,7 +38,14 @@ func (d *jsonrpcDispatcher) requireSensitiveFieldMutationPermission(
 			return nil
 		}
 		permissionKey = biz.PermissionFieldSalesCommercialRead
-	case "purchase_order", "purchase", "outsourcing_order":
+	case "purchase":
+		// This command accepts only receipt metadata and warehouse selections;
+		// commercial values come from the order and remain redacted on readback.
+		if normalizedMethod == "create_purchase_receipt_from_purchase_order" {
+			return nil
+		}
+		permissionKey = biz.PermissionFieldProcurementCommercialRead
+	case "purchase_order", "outsourcing_order":
 		permissionKey = biz.PermissionFieldProcurementCommercialRead
 	case "operational_fact":
 		switch {

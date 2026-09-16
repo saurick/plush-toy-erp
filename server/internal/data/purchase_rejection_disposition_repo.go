@@ -306,6 +306,14 @@ func commitPurchaseRejectionDisposition(ctx context.Context, tx *inventoryDBTx, 
 		return nil, err
 	}
 	out := entPurchaseRejectionDispositionToBiz(row)
+	if err := syncPurchaseReceiptHandoffs(ctx, tx.client, row.PurchaseReceiptID); err != nil {
+		return nil, err
+	}
+	if row.ReplacementReceiptID != nil {
+		if err := syncPurchaseReceiptHandoffs(ctx, tx.client, *row.ReplacementReceiptID); err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}

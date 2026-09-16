@@ -6,6 +6,10 @@ const stylesheet = readFileSync(
   new URL('./business-tables.css', import.meta.url),
   'utf8'
 )
+const tableStylesheet = readFileSync(
+  new URL('../../../common/components/table/app-table.css', import.meta.url),
+  'utf8'
+)
 
 test('business header stat labels can use the full tile width', () => {
   const rule = stylesheet.match(
@@ -45,8 +49,8 @@ test('copyable table content keeps the project full-text wrapping contract', () 
 })
 
 test('screen table header labels stay on one line without clipping', () => {
-  const genericTitleRule = stylesheet.match(
-    /\.ant-table-wrapper \.ant-table-thead > tr > th \.ant-table-column-title\s*\{([^}]*)\}/u
+  const genericTitleRule = tableStylesheet.match(
+    /\.app-table\.ant-table-wrapper\s+\.ant-table-thead\s*>\s*tr\s*>\s*th\s+\.ant-table-column-title\s*\{([^}]*)\}/u
   )
   assert.ok(genericTitleRule, 'expected the shared Ant table title rule')
   assert.match(genericTitleRule[1], /min-width:\s*max-content\s*;/u)

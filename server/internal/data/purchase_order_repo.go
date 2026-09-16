@@ -255,7 +255,12 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrderLifecycle(ctx context.Context, id
 	if len(allowedCurrent) == 0 {
 		return nil, biz.ErrBadParam
 	}
-	affected, err := r.data.postgres.PurchaseOrder.Update().
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	affected, err := tx.PurchaseOrder.Update().
 		Where(
 			purchaseorder.ID(id),
 			purchaseorder.LifecycleStatusIn(allowedCurrent...),
@@ -265,7 +270,7 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrderLifecycle(ctx context.Context, id
 	if err != nil {
 		return nil, err
 	}
-	row, err := r.data.postgres.PurchaseOrder.Get(ctx, id)
+	row, err := tx.PurchaseOrder.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrPurchaseOrderNotFound
@@ -275,6 +280,13 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrderLifecycle(ctx context.Context, id
 	if affected == 0 && row.LifecycleStatus != lifecycleStatus {
 		return nil, biz.ErrBadParam
 	}
+	if err := syncPurchaseOrderHandoffs(ctx, tx.Client(), id, 0); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entPurchaseOrderToBiz(row), nil
 }
 
@@ -446,6 +458,9 @@ func (r *purchaseOrderRepo) updatePurchaseOrderForProcessCommand(
 	if _, err := recordProcessNodeDomainCommandResultWithClient(ctx, tx.Client(), record, actorID); err != nil {
 		return nil, err
 	}
+	if err := syncPurchaseOrderHandoffs(ctx, tx.Client(), purchaseOrderID, actorID); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -485,6 +500,9 @@ func (r *purchaseOrderRepo) settlePurchaseOrderLifecycle(ctx context.Context, id
 	}
 	row, err = tx.PurchaseOrder.UpdateOneID(id).SetLifecycleStatus(lifecycleStatus).Save(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := syncPurchaseOrderHandoffs(ctx, tx.Client(), id, 0); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -606,6 +624,9 @@ func (r *purchaseOrderRepo) ApplyPurchaseOrderLifecycleAction(
 		}
 	}
 	if err := createSourceOrderLifecycleActionReceipt(ctx, tx.Client(), "purchase_order", current.LifecycleStatus, lifecycleStatus, in, lineResults); err != nil {
+		return nil, err
+	}
+	if err := syncPurchaseOrderHandoffs(ctx, tx.Client(), in.ID, in.ActorID); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
