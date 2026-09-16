@@ -124,9 +124,9 @@ test('engineeringPrintTemplates: BOM 版本带值生成物料明细并保留产�
       products: [
         {
           id: 11,
-          code: '26204#',
+          code: 'INTERNAL-PRODUCT-001',
           name: '抱抱猴子',
-          style_no: '黑色',
+          style_no: '26204#',
           customer_style_no: '客户款 A',
         },
       ],
@@ -159,7 +159,7 @@ test('engineeringPrintTemplates: BOM 版本带值生成物料明细并保留产�
 
   assert.equal(draft.companyName, '东莞市永绅玩具有限公司')
   assert.equal(draft.productNo, '26204#')
-  assert.equal(draft.productName, '抱抱猴子 / 黑色 / 客户款 A')
+  assert.equal(draft.productName, '抱抱猴子')
   assert.equal(draft.orderNo, 'WL260102')
   assert.equal(draft.quantityText, '(PCS) 3030')
   assert.equal(draft.spareText, '备品 30')
@@ -185,7 +185,7 @@ test('engineeringPrintTemplates: BOM 版本带值生成物料明细并保留产�
     pieces: '1',
     unitUsage: '0.125',
     lossRate: '8',
-    totalUsage: '409.05',
+    totalUsage: '47.64',
     processBase: '布底贴12g纸朴',
     processMethod: '热裁',
     remark: '热裁',
@@ -226,7 +226,7 @@ test('engineeringPrintTemplates: BOM 版本带值生成色卡并用材料快照�
 
   assert.equal(draft.companyName, '东莞市永绅玩具有限公司')
   assert.equal(draft.productNo, '26204#')
-  assert.equal(draft.productName, '抱抱猴子 / 黑色')
+  assert.equal(draft.productName, '抱抱猴子')
   assert.equal(draft.maker, '成慧怡')
   assert.equal(draft.dateText, '2026-07-10')
   assert.equal(draft.auditor, '工程审核')

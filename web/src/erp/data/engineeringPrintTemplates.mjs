@@ -3,13 +3,10 @@ import {
   resolveWorkInstructionAnnotationLayout,
 } from '../utils/workInstructionImageAnnotations.mjs'
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
-import {
-  currentBusinessDate,
-  unixSecondsToBusinessDate,
-} from '../utils/businessDate.mjs'
+import { unixSecondsToBusinessDate } from '../utils/businessDate.mjs'
 import {
   bomLossRateToPercent,
-  calculateBOMUsage,
+  getBOMUsage,
 } from '../utils/bomMaterialGroups.mjs'
 
 export const MATERIAL_DETAIL_TEMPLATE_KEY = 'engineering-material-detail'
@@ -121,8 +118,6 @@ function compactTextParts(parts = [], separator = ' / ') {
     })
     .join(separator)
 }
-
-const todayText = () => currentBusinessDate()
 
 const dateTextFromUnix = (value) => {
   const numberValue = Number(value || 0)
@@ -1074,29 +1069,7 @@ function workInstructionImagesFromProductImages(productImages = {}) {
   }
 }
 
-function sourceProductSnapshot(
-  record = {},
-  { productOptions = [], products = [] } = {}
-) {
-  const productRecord = recordByID(products, record.product_id)
-  const productLabel = optionLabelByID(productOptions, record.product_id)
-  const [code = '', ...nameParts] = productLabel.split(' / ')
-  const productName = productRecord
-    ? compactTextParts([
-        productRecord.name,
-        productRecord.style_no,
-        productRecord.customer_style_no,
-      ])
-    : compactTextParts([record.product_name, nameParts.join(' / ')])
-  return {
-    productNo: toText(
-      record.product_code || productRecord?.code || code || record.product_no
-    ),
-    productName: productName || toText(productLabel),
-  }
-}
-
-function workInstructionProductSnapshot(
+function bomProductSnapshot(
   record = {},
   { productOptions = [], products = [] } = {}
 ) {
@@ -1134,7 +1107,7 @@ export function buildMaterialDetailDraftFromBOMVersion(
     productImages = {},
   } = {}
 ) {
-  const product = sourceProductSnapshot(version, { productOptions, products })
+  const product = bomProductSnapshot(version, { productOptions, products })
   const materialByID = new Map(
     (Array.isArray(materials) ? materials : []).map((material) => [
       Number(material?.id || 0),
@@ -1152,8 +1125,8 @@ export function buildMaterialDetailDraftFromBOMVersion(
       const material = materialByID.get(Number(item?.material_id || 0)) || {}
       const unit = unitByID.get(Number(item?.unit_id || 0)) || {}
       return normalizeMaterialDetailLine({
-        category: material.category || 'BOM',
-        materialName: material.name || material.code || '材料已关联',
+        category: material.category || '',
+        materialName: material.name || '',
         vendorCode: [material.supplier_name, material.supplier_item_no]
           .filter(Boolean)
           .join(' / '),
@@ -1164,11 +1137,7 @@ export function buildMaterialDetailDraftFromBOMVersion(
         pieces: item.piece_count || item.pieceCount || '',
         unitUsage: item.quantity ?? '',
         lossRate: bomLossRateToPercent(item.loss_rate),
-        totalUsage: calculateBOMUsage(
-          item.quantity,
-          item.loss_rate,
-          version.quantity_text
-        ),
+        totalUsage: getBOMUsage(item, version.quantity_text),
         processBase: item.process_base || item.processBase || '',
         processMethod: item.process_method || item.processMethod || '',
         remark: item.note || '',
@@ -1180,17 +1149,18 @@ export function buildMaterialDetailDraftFromBOMVersion(
     companyName,
     productNo: product.productNo,
     productName: product.productName,
-    orderNo:
-      version.source_order_no ||
-      (version.version ? `BOM ${version.version}` : ''),
+    orderNo: version.source_order_no || '',
     quantityText: version.quantity_text || '',
     spareText: version.spare_text || '',
-    dateText: dateTextFromUnix(version.print_date) || todayText(),
+    dateText: dateTextFromUnix(version.print_date),
     designer: version.designer || '',
     maker: version.maker || '',
     auditor: version.auditor || '',
     hairDirection: version.hair_direction || '',
     topRemark: version.note || '',
+    columnLabels: MATERIAL_DETAIL_COLUMNS.map((column) =>
+      column.key === 'remark' ? '备注' : column.label
+    ),
     images: materialDetailImagesFromProductImages(productImages),
     lines,
   })
@@ -1200,7 +1170,7 @@ export function buildColorCardDraftFromBOMVersion(
   version = {},
   { productOptions = [], products = [], materials = [], companyName = '' } = {}
 ) {
-  const product = sourceProductSnapshot(version, { productOptions, products })
+  const product = bomProductSnapshot(version, { productOptions, products })
   const materialByID = new Map(
     (Array.isArray(materials) ? materials : []).map((material) => [
       Number(material?.id || 0),
@@ -1245,7 +1215,7 @@ export function buildColorCardDraftFromBOMVersion(
     productNo: product.productNo,
     productName: product.productName,
     maker: version.maker || '',
-    dateText: dateTextFromUnix(version.print_date) || todayText(),
+    dateText: dateTextFromUnix(version.print_date),
     auditor: version.auditor || '',
     reviewer: '',
     blocks,
@@ -1263,7 +1233,7 @@ export function buildWorkInstructionDraftFromBOMVersion(
     productImages = {},
   } = {}
 ) {
-  const product = workInstructionProductSnapshot(version, {
+  const product = bomProductSnapshot(version, {
     productOptions,
     products,
   })

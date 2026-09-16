@@ -31,6 +31,7 @@ import {
 } from '../api/attachmentApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
+  getProduct,
   listAllMaterials,
   listAllProducts,
   listAllUnits,
@@ -54,6 +55,7 @@ import {
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import { invalidateBOMUsageSnapshots } from '../utils/bomMaterialGroups.mjs'
+import { loadBOMPrintSnapshot } from '../utils/bomPrintSnapshot.mjs'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import BOMMaterialGroupsForm from '../components/bom/BOMMaterialGroupsForm.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
@@ -677,12 +679,10 @@ export default function BOMVersionsPage() {
     if (!activeActionVersion?.id || selectedRowKeys.length !== 1) return
     setPrintingTemplateKey(templateKey)
     try {
-      const detail =
-        selectedVersion?.id === activeActionVersion.id &&
-        Array.isArray(selectedVersion?.items)
-          ? selectedVersion
-          : await loadDetail(activeActionVersion.id)
-      if (!detail) return
+      const { detail, ...references } = await loadBOMPrintSnapshot(
+        activeActionVersion.id,
+        { getBOMVersion, getProduct, listAllMaterials, listAllUnits }
+      )
       const builder =
         templateKey === COLOR_CARD_TEMPLATE_KEY
           ? buildColorCardDraftFromBOMVersion
@@ -699,10 +699,7 @@ export default function BOMVersionsPage() {
           })
         : {}
       const initialDraft = builder(detail, {
-        productOptions,
-        products,
-        materials,
-        units,
+        ...references,
         companyName: resolveRuntimeCustomerPrintCompanyName(),
         productImages,
       })
