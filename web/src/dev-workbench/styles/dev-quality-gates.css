@@ -1712,6 +1712,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* stylelint-disable declaration-no-important -- 保留无障碍约束，覆盖页面及第三方控件的动画和过渡。 */
   .erp-dev-quality-gates-page *,
   .erp-dev-quality-gates-page *::before,
   .erp-dev-quality-gates-page *::after {
@@ -1720,4 +1721,5 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+  /* stylelint-enable declaration-no-important */
 }

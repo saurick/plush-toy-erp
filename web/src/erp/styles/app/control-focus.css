@@ -1,103 +1,45 @@
-:is(.ant-modal, .erp-business-form-page)
-  :is(.ant-input:focus, .ant-input-focused),
-:is(.ant-modal, .erp-business-form-page) :is(.ant-input-affix-wrapper-focused),
-:is(.ant-modal, .erp-business-form-page) .ant-input-number-focused,
-:is(.ant-modal, .erp-business-form-page) .ant-picker-focused,
-:is(.ant-modal, .erp-business-form-page)
-  .ant-select-focused
-  .ant-select-selector,
-:is(.ant-modal, .erp-business-form-page) .ant-select-open .ant-select-selector {
+/* 只在外观所属节点绘制焦点；body 同时覆盖应用根与 AntD portal。
+   Select 沿用 AntD outlined 的 disabled/customize/pagination 条件。 */
+body
+  :is(
+    .ant-input:not(
+        :where(
+          .ant-input-affix-wrapper > input,
+          .erp-login-sms-code-compact > input
+        )
+      ):focus,
+    .ant-input-affix-wrapper:focus-within,
+    .ant-input-number-affix-wrapper:focus-within,
+    .ant-input-number:not(
+        :where(.ant-input-number-affix-wrapper > .ant-input-number)
+      ):focus-within,
+    .ant-picker:focus-within,
+    .ant-checkbox-wrapper:focus-within .ant-checkbox-inner,
+    .erp-business-date-range-filter:focus-within
+  ),
+body
+  .ant-select-outlined:not(.ant-select-disabled):not(
+    .ant-select-customize-input
+  ):not(.ant-pagination-size-changer):is(:focus-within, .ant-select-open)
+  > .ant-select-selector {
   border-color: var(--erp-control-focus-border);
-  box-shadow: inset 0 0 0 2px var(--erp-control-focus-ring);
+  box-shadow: var(
+    --erp-control-focus-shadow,
+    inset 0 0 0 2px var(--erp-control-focus-ring)
+  );
   outline: 0;
 }
 
+/* 内层输入负责文字与键盘交互，原生/Tailwind focus 不再绘制第二层边框。 */
 body
-  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
-  .ant-select:focus-within
-  .ant-select-selector,
-#root .ant-select:focus-within .ant-select-selector {
-  border-color: var(--erp-control-focus-border);
-  box-shadow: inset 0 0 0 2px var(--erp-control-focus-ring);
-  outline: 0;
-}
-
-body
-  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
-  .ant-input-number-affix-wrapper:focus-within,
-#root .ant-input-number-affix-wrapper:focus-within,
-body
-  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
-  .ant-input-affix-wrapper.ant-input-affix-wrapper-focused,
-#root .ant-input-affix-wrapper.ant-input-affix-wrapper-focused {
-  border-color: var(--erp-control-focus-border);
-  box-shadow: inset 0 0 0 2px var(--erp-control-focus-ring);
-  outline: 0;
-}
-
-body
-  .ant-modal.ant-modal
-  .erp-business-form.erp-business-form
-  .ant-input.ant-input:focus,
-body
-  .ant-modal.ant-modal
-  .erp-business-form.erp-business-form
-  .ant-input.ant-input-focused,
-body
-  .ant-modal.ant-modal
-  .erp-business-form.erp-business-form
-  .ant-input-number.ant-input-number-focused,
-body
-  .ant-modal.ant-modal
-  .erp-business-form.erp-business-form
-  .ant-picker.ant-picker-focused,
-#root .erp-business-form.erp-business-form .ant-input.ant-input:focus,
-#root .erp-business-form.erp-business-form .ant-input.ant-input-focused,
-#root
-  .erp-business-form.erp-business-form
-  .ant-input-number.ant-input-number-focused,
-#root .erp-business-form.erp-business-form .ant-picker.ant-picker-focused {
-  border-color: var(--erp-control-focus-border);
-  box-shadow: inset 0 0 0 2px var(--erp-control-focus-ring);
-  outline: 0;
-}
-
-body
-  .ant-modal.ant-modal
-  .erp-business-form.erp-business-form
-  .ant-select.ant-select-focused
-  .ant-select-selector.ant-select-selector,
-body
-  .ant-modal.ant-modal
-  .erp-business-form.erp-business-form
-  .ant-select.ant-select-open
-  .ant-select-selector.ant-select-selector,
-body
-  .ant-modal.ant-modal
-  .erp-business-form.erp-business-form
-  .ant-select.ant-select:focus-within
-  .ant-select-selector.ant-select-selector,
-#root
-  .erp-business-form.erp-business-form
-  .ant-select.ant-select-focused
-  .ant-select-selector.ant-select-selector,
-#root
-  .erp-business-form.erp-business-form
-  .ant-select.ant-select-open
-  .ant-select-selector.ant-select-selector,
-#root
-  .erp-business-form.erp-business-form
-  .ant-select.ant-select:focus-within
-  .ant-select-selector.ant-select-selector {
-  border-color: var(--erp-control-focus-border);
-  box-shadow: inset 0 0 0 2px var(--erp-control-focus-ring);
-  outline: 0;
-}
-
-.ant-modal .ant-input-affix-wrapper > input.ant-input:focus,
-.ant-modal .ant-input-affix-wrapper > textarea.ant-input:focus,
-.ant-modal .ant-input-number-input:focus,
-.ant-modal .ant-picker-input > input:focus {
+  :is(
+    .ant-input-affix-wrapper > input:focus,
+    .ant-input-number-input:focus,
+    .ant-picker-input > input:focus,
+    .ant-select-selection-search-input:focus,
+    .ant-checkbox-input:focus,
+    .ant-radio-input:focus
+  ) {
   --tw-ring-color: transparent;
   --tw-ring-offset-shadow: 0 0 #0000;
   --tw-ring-shadow: 0 0 #0000;
@@ -106,24 +48,14 @@ body
   outline: 0;
 }
 
-.ant-modal .ant-select-selection-search-input:focus,
-.ant-modal .ant-checkbox-input:focus {
-  --tw-ring-color: transparent;
-  --tw-ring-offset-shadow: 0 0 #0000;
-  --tw-ring-shadow: 0 0 #0000;
-  border-color: transparent;
-  box-shadow: none;
-  outline: 0;
+/* 组合框子控件通过变量声明外观归属，不再以另一组焦点选择器争夺优先级。 */
+.erp-business-date-range-filter :is(.ant-picker, .ant-select-selector) {
+  --erp-control-focus-border: transparent;
+  --erp-control-focus-shadow: none;
 }
 
-.ant-modal .ant-checkbox-wrapper:focus-within .ant-checkbox-inner {
+/* 短信组合框在输入和验证码按钮之上统一绘制边框。 */
+.erp-login-sms-code-compact.ant-space-compact:focus-within::after {
   border-color: var(--erp-control-focus-border);
   box-shadow: inset 0 0 0 2px var(--erp-control-focus-ring);
-}
-
-/* The compact control paints its outline above both the input and code button. */
-.erp-login-card
-  .erp-login-sms-code-compact.ant-space-compact:focus-within::after {
-  border-color: var(--erp-login-sms-focus);
-  box-shadow: inset 0 0 0 2px var(--erp-login-sms-focus-ring);
 }

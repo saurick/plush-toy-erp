@@ -1849,7 +1849,7 @@
 }
 
 @media print {
-  @page {
+  @page customer-review {
     size: A4 portrait;
     margin: 11mm 10mm 13mm;
   }
@@ -1859,18 +1859,20 @@
     margin: 6mm 9mm;
   }
 
-  html,
-  body {
-    color: #17221b !important;
-    background: #fff !important;
+  html:has(> body > .erp-dev-flow-customer-review-print),
+  body:has(> .erp-dev-flow-customer-review-print) {
+    color: #17221b;
+    background: #fff;
   }
 
-  body > :not(.erp-dev-flow-customer-review-print) {
-    display: none !important;
+  body:has(> .erp-dev-flow-customer-review-print)
+    > :not(.erp-dev-flow-customer-review-print) {
+    display: none;
   }
 
   .erp-dev-flow-customer-review-print {
-    display: block !important;
+    page: customer-review;
+    display: block;
     width: 100%;
     min-height: 0;
     margin: 0;
@@ -1904,7 +1906,7 @@
   .erp-dev-flow-customer-review-print h1,
   .erp-dev-flow-customer-review-print h2,
   .erp-dev-flow-customer-review-print h3 {
-    color: #173f2a !important;
+    color: #173f2a;
     break-after: avoid-page;
   }
 
@@ -2003,12 +2005,12 @@
 
   .erp-dev-flow-customer-review__diagram .erp-markdown-mermaid {
     border: 0;
-    color: #17221b !important;
-    background: #fff !important;
+    color: #17221b;
+    background: #fff;
   }
 
   .erp-dev-flow-customer-review__diagram .erp-markdown-mermaid__toolbar {
-    display: none !important;
+    display: none;
   }
 
   .erp-dev-flow-customer-review__diagram .erp-markdown-mermaid__viewport {
@@ -2019,21 +2021,24 @@
     display: flex;
     justify-content: center;
     width: 100%;
+    /* stylelint-disable-next-line declaration-no-important -- 打印时覆盖缩放交互写入的内联 transform。 */
     transform: none !important;
   }
 
   .erp-dev-flow-customer-review__diagram .erp-markdown-mermaid__canvas > svg {
+    /* stylelint-disable declaration-no-important -- Mermaid 的内联尺寸需按打印内容盒约束。 */
     display: block;
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
+    /* stylelint-enable declaration-no-important */
     max-height: 112mm;
-    background: #fff !important;
+    background: #fff;
   }
 
   .erp-dev-flow-customer-review__diagram .erp-markdown-mermaid__source,
   .erp-dev-flow-customer-review__diagram .erp-markdown-mermaid__loading {
-    display: none !important;
+    display: none;
   }
 
   .erp-dev-flow-customer-review__legend {

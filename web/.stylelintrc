@@ -1,6 +1,10 @@
 {
   "extends": ["stylelint-config-recommended", "stylelint-config-tailwindcss"],
+  "plugins": ["./scripts/stylelint/styleBoundaries.mjs"],
+  "reportDescriptionlessDisables": true,
   "rules": {
+    "erp/style-boundaries": true,
+    "declaration-no-important": true,
     "selector-pseudo-class-no-unknown": [
       true,
       {

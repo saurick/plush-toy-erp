@@ -5,6 +5,62 @@ import {
   isBluePrimaryColor,
 } from './colorAssertions.mjs'
 
+function assertAffixInputMetric(metric, scenarioName) {
+  assert(
+    metric.radii.every((radius) => Number.parseFloat(radius) === 0) &&
+      metric.borderWidth === '0px' &&
+      metric.padding === '0px' &&
+      metric.background === 'rgba(0, 0, 0, 0)' &&
+      metric.boxShadow === 'none' &&
+      Number.parseFloat(metric.outlineWidth) === 0 &&
+      metric.contained,
+    `${scenarioName} 组合输入框内层必须无圆角、边框、背景、内边距和焦点阴影，外观由外层负责: ${JSON.stringify(metric)}`
+  )
+}
+
+async function assertVisibleAffixInputIsolation(page, scenarioName) {
+  const metrics = await page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll('.ant-input-affix-wrapper > input.ant-input')
+    )
+      .filter((input) => {
+        const rect = input.getBoundingClientRect()
+        return rect.width > 0 && rect.height > 0
+      })
+      .map((input) => {
+        const style = getComputedStyle(input)
+        const wrapper = input.parentElement
+        const rect = input.getBoundingClientRect()
+        const outer = wrapper.getBoundingClientRect()
+        return {
+          id: input.id,
+          type: input.type,
+          focused: input === document.activeElement,
+          disabled: input.disabled,
+          wrapper: wrapper.className,
+          radii: [
+            style.borderTopLeftRadius,
+            style.borderTopRightRadius,
+            style.borderBottomLeftRadius,
+            style.borderBottomRightRadius,
+          ],
+          borderWidth: style.borderWidth,
+          padding: style.padding,
+          background: style.backgroundColor,
+          boxShadow: style.boxShadow,
+          outlineWidth: style.outlineWidth,
+          contained:
+            rect.left >= outer.left &&
+            rect.right <= outer.right &&
+            rect.top >= outer.top &&
+            rect.bottom <= outer.bottom,
+        }
+      })
+  )
+  metrics.forEach((metric) => assertAffixInputMetric(metric, scenarioName))
+  return metrics.length
+}
+
 async function assertVisibleInputControlRadius(page, scenarioName) {
   const issues = await page.evaluate(() => {
     const minRadius = 10
@@ -103,15 +159,28 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
       if (node.matches('.erp-item-field-unit-suffix')) continue
 
       // A clipped compact group owns the visible outline; its children meet at square seams.
-      const compactGroup = node.parentElement?.matches('.ant-space-compact')
-        ? node.parentElement
-        : null
+      const dateRange = node.closest('.erp-business-date-range-filter')
+      const compactGroup =
+        dateRange ||
+        (node.parentElement?.matches('.ant-space-compact')
+          ? node.parentElement
+          : null)
       const groupStyle = compactGroup && window.getComputedStyle(compactGroup)
       const groupClips =
         groupStyle &&
         ['hidden', 'clip'].includes(groupStyle.overflowX) &&
         ['hidden', 'clip'].includes(groupStyle.overflowY)
       const style = groupClips ? groupStyle : window.getComputedStyle(node)
+      if (
+        dateRange &&
+        groupClips &&
+        Number.parseFloat(getComputedStyle(node).borderRadius) !== 0
+      ) {
+        failures.push({
+          ...describe(node),
+          reason: 'compound-control-inner-seam-must-be-square',
+        })
+      }
       const radii = [
         style.borderTopLeftRadius,
         style.borderTopRightRadius,
@@ -452,8 +521,9 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
         if (
           ['hidden', 'clip'].includes(style.overflowX) &&
           ['hidden', 'clip'].includes(style.overflowY)
-        )
+        ) {
           return compactGroup
+        }
       }
       return (
         node.closest('.ant-input-affix-wrapper') ||
@@ -535,8 +605,34 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
         overflow: ownerStyle.overflow,
         overflowX: ownerStyle.overflowX,
         overflowY: ownerStyle.overflowY,
+        targetContained: (() => {
+          const rect = node.getBoundingClientRect()
+          return (
+            rect.left >= ownerRect.left &&
+            rect.right <= ownerRect.right &&
+            rect.top >= ownerRect.top &&
+            rect.bottom <= ownerRect.bottom
+          )
+        })(),
         targetBorderColor: nodeStyle.borderColor,
         targetBoxShadow: nodeStyle.boxShadow,
+        targetBorderRadius: nodeStyle.borderRadius,
+        targetBorderWidth: nodeStyle.borderWidth,
+        targetPadding: nodeStyle.padding,
+        targetBackground: nodeStyle.backgroundColor,
+        targetOutlineWidth: nodeStyle.outlineWidth,
+        isAffixInput: node.matches('.ant-input-affix-wrapper > input'),
+        compoundChildren: owner.matches('.erp-business-date-range-filter')
+          ? Array.from(
+              owner.querySelectorAll('.ant-picker, .ant-select-selector')
+            ).map((child) => {
+              const style = getComputedStyle(child)
+              return {
+                boxShadow: style.boxShadow,
+                borderColor: style.borderColor,
+              }
+            })
+          : [],
         activeTagName: document.activeElement?.tagName || '',
         activeClassName: String(document.activeElement?.className || ''),
         theme: document.documentElement.dataset.erpTheme || 'light',
@@ -613,6 +709,28 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
     )}`
   )
   metrics.forEach((item) => {
+    assert(
+      item.compoundChildren.every(
+        (child) =>
+          child.boxShadow === 'none' && child.borderColor === 'rgba(0, 0, 0, 0)'
+      ),
+      `${scenarioName} 组合日期框只允许外层绘制焦点，内部控件不能出现第二层边框或阴影: ${JSON.stringify(item)}`
+    )
+    if (item.isAffixInput) {
+      assertAffixInputMetric(
+        {
+          ...item,
+          radii: item.targetBorderRadius.split(' '),
+          borderWidth: item.targetBorderWidth,
+          padding: item.targetPadding,
+          background: item.targetBackground,
+          boxShadow: item.targetBoxShadow,
+          outlineWidth: item.targetOutlineWidth,
+          contained: item.targetContained,
+        },
+        scenarioName
+      )
+    }
     if (item.theme === 'dark') {
       assert(
         isBluePrimaryColor(item.borderColor),
@@ -691,6 +809,7 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
         alignItems: style.alignItems,
         heightCss: style.height,
         lineHeight: style.lineHeight,
+        whiteSpace: style.whiteSpace,
         paddingTop: style.paddingTop,
         paddingBottom: style.paddingBottom,
         borderTopWidth: style.borderTopWidth,
@@ -804,6 +923,19 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
         const centerDelta = Math.abs(node.center - item.owner.center)
         const lineHeight = Number.parseFloat(node.lineHeight || '0')
         if (centerDelta > 1.5) return true
+        if (
+          node.className.includes('ant-select-selection-item') &&
+          node.whiteSpace === 'normal'
+        ) {
+          const padding =
+            Number.parseFloat(node.paddingTop) +
+            Number.parseFloat(node.paddingBottom)
+          return (
+            lineHeight <= 0 ||
+            node.height < lineHeight + padding - 1 ||
+            node.height > item.ownerInnerHeight + 1
+          )
+        }
         return (
           lineHeight > 0 && Math.abs(lineHeight - item.ownerInnerHeight) > 1.5
         )
@@ -816,7 +948,7 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
   assert.deepEqual(
     issues,
     [],
-    `${scenarioName} 单行输入控件文字、placeholder 和 caret 的垂直节奏应由控件内高接管，不能被 AntD 默认 line-height 或 affix wrapper stretch 污染: ${JSON.stringify(
+    `${scenarioName} 控件文字与 caret 应垂直居中；单行文字行高匹配内高，换行选项的内容盒完整落在控件内: ${JSON.stringify(
       issues
     )}`
   )
@@ -929,6 +1061,7 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
 }
 
 export {
+  assertVisibleAffixInputIsolation,
   assertVisibleInputControlRadius,
   assertVisibleSearchPlaceholdersFit,
   assertVisibleRoundedInputWrapperClipping,

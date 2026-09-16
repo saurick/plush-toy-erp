@@ -66,11 +66,10 @@
   margin-bottom: 0;
 }
 
-.erp-bom-parts-table .ant-input,
+.erp-bom-parts-table .ant-input:not(:where(.ant-input-affix-wrapper > input)),
 .erp-bom-parts-table .ant-select .ant-select-selector {
   border-color: transparent;
   background: transparent;
-  border-radius: 4px;
   box-shadow: none;
 }
 
@@ -99,18 +98,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-.erp-bom-parts-table .ant-input:hover,
+.erp-bom-parts-table
+  .ant-input:not(:where(.ant-input-affix-wrapper > input)):hover,
 .erp-bom-parts-table .ant-select:hover .ant-select-selector {
   border-color: var(--erp-business-control-hover, #abc5b3);
 }
 
-.erp-bom-parts-table .ant-input:focus,
+.erp-bom-parts-table
+  .ant-input:not(:where(.ant-input-affix-wrapper > input)):focus,
 .erp-bom-parts-table .ant-select.ant-select-focused .ant-select-selector {
-  border-color: var(--erp-business-control-focus, #2b8a3e);
   background: var(--erp-business-action-modal-bg, #fff);
 }
 
-.erp-bom-parts-table .ant-input-status-error {
+.erp-bom-parts-table
+  .ant-input-status-error:not(:where(.ant-input-affix-wrapper > input)) {
   border-color: #d43838;
 }
 

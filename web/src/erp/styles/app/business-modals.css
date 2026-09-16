@@ -1,155 +1,3 @@
-@media print {
-  @page {
-    size: A4;
-    margin: 0;
-  }
-
-  body {
-    margin: 0;
-    background: white;
-  }
-
-  .erp-print-shell__toolbar,
-  .erp-print-shell__formula-panel,
-  .erp-print-shell__panel,
-  .erp-processing-contract-upload-bar,
-  .erp-sidebar-panel,
-  .erp-mobile-strip,
-  .erp-primary-button,
-  .erp-secondary-button,
-  .erp-material-contract-toolbar,
-  .erp-material-contract-toolbar__status,
-  .erp-material-contract-formula-panel,
-  .ant-modal-root {
-    display: none;
-  }
-
-  .erp-print-paper,
-  .erp-print-paper--landscape {
-    width: auto;
-    box-shadow: none;
-    border-radius: 0;
-    padding: 0;
-  }
-
-  .erp-material-contract-stage {
-    padding: 0;
-    background: white;
-  }
-
-  .erp-print-shell {
-    padding: 0;
-    background: white;
-  }
-
-  .erp-print-shell__content {
-    display: block;
-    margin-top: 0;
-  }
-
-  .erp-print-shell__stage-wrap {
-    display: block;
-    min-width: 0;
-  }
-
-  .erp-print-shell__stage {
-    padding: 0;
-    border: 0;
-    background: white;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .erp-material-contract-paper {
-    width: 210mm;
-    min-height: 297mm;
-    margin: 0 auto;
-    box-shadow: none;
-    border-radius: 0;
-    border: 0;
-    padding: 10mm 5mm;
-    box-sizing: border-box;
-    background: white;
-    overflow: visible;
-  }
-
-  .erp-processing-contract-paper {
-    width: 210mm;
-    min-height: 297mm;
-    margin: 0 auto;
-    padding: 10.5mm 5mm 10mm;
-    box-sizing: border-box;
-    box-shadow: none;
-    border-radius: 0;
-    background: white;
-    overflow: visible;
-  }
-
-  .erp-material-contract-table,
-  .erp-processing-contract-table {
-    break-inside: auto;
-    page-break-inside: auto;
-  }
-
-  .erp-material-contract-table thead,
-  .erp-processing-contract-table thead {
-    display: table-header-group;
-  }
-
-  .erp-material-contract-table tbody,
-  .erp-processing-contract-table tbody {
-    display: table-row-group;
-  }
-
-  .erp-material-contract-table tr,
-  .erp-material-contract-table th,
-  .erp-material-contract-table td,
-  .erp-material-contract-table__editable,
-  .erp-material-contract-clauses,
-  .erp-material-contract-clause-block,
-  .erp-material-contract-clause-block__item,
-  .erp-material-contract-signature,
-  .erp-material-contract-signature__block,
-  .erp-processing-contract-paper__header,
-  .erp-processing-contract-meta,
-  .erp-processing-contract-table tr,
-  .erp-processing-contract-table th,
-  .erp-processing-contract-table td,
-  .erp-processing-contract-table__cell,
-  .erp-processing-contract-clauses,
-  .erp-processing-contract-clauses__group,
-  .erp-processing-contract-clauses__item,
-  .erp-processing-contract-signature,
-  .erp-processing-contract-signature__block {
-    break-inside: avoid-page;
-    page-break-inside: avoid;
-  }
-
-  .erp-material-contract-editable,
-  .erp-material-contract-table td,
-  .erp-processing-contract-meta__value,
-  .erp-processing-contract-table td,
-  .erp-processing-contract-table__cell,
-  .erp-processing-contract-clauses__editable,
-  .erp-processing-contract-signature__name-value,
-  .erp-processing-contract-signature__date-value {
-    outline: 0;
-    box-shadow: none;
-  }
-
-  .erp-material-contract-editable:focus,
-  .erp-material-contract-table td:focus-within,
-  .erp-processing-contract-meta__value:focus,
-  .erp-processing-contract-table td:focus-within,
-  .erp-processing-contract-table__cell:focus,
-  .erp-processing-contract-clauses__editable:focus,
-  .erp-processing-contract-signature__name-value:focus,
-  .erp-processing-contract-signature__date-value:focus {
-    outline: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-}
 .erp-permission-modal.ant-modal,
 .erp-business-entry-modal.ant-modal {
   max-width: calc(100vw - 32px);
@@ -637,11 +485,6 @@
   background: rgb(37 99 235 / 0.06);
 }
 
-.erp-source-import-picker__clear-selection.erp-source-import-picker__clear-selection:hover,
-.erp-source-import-picker__clear-selection.erp-source-import-picker__clear-selection:focus-visible {
-  box-shadow: inset 0 0 0 1px currentColor;
-}
-
 .erp-source-import-picker__selection-tag.ant-tag {
   max-width: min(280px, 100%);
   margin-inline-end: 0;
@@ -1107,7 +950,12 @@
 }
 
 .erp-business-action-form
-  :where(.ant-input, .ant-input-number, .ant-picker, .ant-select),
+  :where(
+    .ant-input:not(:where(.ant-input-affix-wrapper > input)),
+    .ant-input-number,
+    .ant-picker,
+    .ant-select
+  ),
 .erp-business-action-form
   :where(.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)),
 :where(.erp-business-action-form) .ant-select-selector {
@@ -1117,7 +965,6 @@
   height: var(--erp-control-height, 36px);
   min-height: var(--erp-control-height, 36px);
   border-color: var(--erp-business-action-field-border, #becdc4);
-  border-radius: var(--erp-business-control-radius, 12px);
   background: var(--erp-business-action-field-bg, #ffffff);
   box-shadow: inset 0 1px 0 rgb(15 23 42 / 2%);
 }
@@ -1129,7 +976,7 @@
 
 .erp-business-action-form
   :where(
-    .ant-input,
+    .ant-input:not(:where(.ant-input-affix-wrapper > input)),
     .ant-input-number,
     .ant-picker,
     .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)
@@ -1139,56 +986,11 @@
 
 .erp-business-action-form
   :where(
-    .ant-input:focus,
-    .ant-input-focused,
-    .ant-input-number-focused,
-    .ant-picker-focused,
-    .ant-input-affix-wrapper-focused:not(.ant-input-textarea-affix-wrapper)
+    input.ant-input:not(:where(.ant-input-affix-wrapper > input)):not(
+        [type='hidden']
+      )
   ) {
-  border-color: #2f8f4e;
-  box-shadow: inset 0 0 0 2px rgb(47 143 78 / 16%);
-  outline: 0;
-}
-
-body
-  .ant-modal.ant-modal
-  .erp-business-action-form.erp-business-action-form
-  .ant-select.ant-select-focused:not(.ant-select-disabled)
-  .ant-select-selector,
-body
-  .ant-modal.ant-modal
-  .erp-business-action-form.erp-business-action-form
-  .ant-select.ant-select-open:not(.ant-select-disabled)
-  .ant-select-selector,
-body
-  .ant-modal.ant-modal
-  .erp-business-action-form.erp-business-action-form
-  .ant-select:not(.ant-select-disabled):focus-within
-  .ant-select-selector,
-#root
-  .erp-business-action-form.erp-business-action-form
-  .ant-select.ant-select-focused:not(.ant-select-disabled)
-  .ant-select-selector,
-#root
-  .erp-business-action-form.erp-business-action-form
-  .ant-select.ant-select-open:not(.ant-select-disabled)
-  .ant-select-selector,
-#root
-  .erp-business-action-form.erp-business-action-form
-  .ant-select:not(.ant-select-disabled):focus-within
-  .ant-select-selector {
-  border-color: #2f8f4e;
-  box-shadow: inset 0 0 0 2px rgb(47 143 78 / 16%);
-  outline: 0;
-}
-
-.erp-business-action-form :where(input.ant-input:not([type='hidden'])) {
   height: var(--erp-control-height, 36px);
-  border-radius: var(--erp-business-control-radius, 12px);
-}
-
-.erp-business-action-form .erp-business-date-input.ant-picker {
-  border-radius: var(--erp-business-control-radius, 12px);
 }
 
 .erp-business-action-form .erp-item-field-with-unit {
@@ -1200,7 +1002,6 @@ body
   flex: 1 1 auto;
   min-width: 0;
 }
-
 
 .erp-business-action-form :where(.ant-input-affix-wrapper input.ant-input) {
   height: auto;
@@ -1236,33 +1037,7 @@ body
   min-height: calc(
     var(--erp-control-height, 36px) * var(--erp-textarea-rows, 3)
   );
-  border-radius: var(--erp-business-control-radius, 12px);
   padding-block: 9px;
-}
-
-.ant-input-textarea-show-count {
-  position: relative;
-  display: block;
-}
-
-.ant-input-textarea-show-count > textarea.ant-input,
-.ant-input-textarea-show-count .ant-input-textarea-affix-wrapper {
-  padding-block-end: max(30px, 1.8em);
-}
-
-.ant-input-textarea-show-count .ant-input-data-count {
-  position: absolute;
-  z-index: 1;
-  inset-block-end: 8px;
-  inset-inline-end: 28px;
-  max-width: calc(100% - 40px);
-  margin: 0;
-  color: var(--erp-textarea-count-color, #7a838d);
-  font-size: 14px;
-  line-height: 1.35;
-  pointer-events: none;
-  text-align: end;
-  white-space: nowrap;
 }
 
 .erp-business-action-form :where(.ant-input-textarea-affix-wrapper) {
@@ -1341,7 +1116,11 @@ body
   word-break: break-word;
 }
 
-.erp-business-action-form :where(.ant-input[disabled], .ant-input-disabled),
+.erp-business-action-form
+  :where(
+    .ant-input:not(:where(.ant-input-affix-wrapper > input))[disabled],
+    .ant-input-disabled:not(:where(.ant-input-affix-wrapper > input))
+  ),
 .erp-business-action-form :where(.ant-input-affix-wrapper-disabled) {
   border-color: #d8e3dc;
   background: #f6faf7;

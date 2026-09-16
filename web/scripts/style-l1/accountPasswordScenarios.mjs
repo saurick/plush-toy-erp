@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import {
+  assertVisibleAffixInputIsolation,
+  assertVisibleInputFocusRingNotClipped,
+} from './inputControlAssertions.mjs'
+import {
+  assertControlStyleSurvivesVisits,
+  assertInactivePrintStylesDoNotHideApp,
+  navigateWithinApp,
+} from './styleIsolationAssertions.mjs'
 
 const mobileActions = ['mobile.sales.access', 'workflow.task.read']
 
@@ -16,18 +25,26 @@ export function createAccountPasswordScenarios({
   expectText,
   assertNoHorizontalOverflow,
   outputDir,
+  customerRuntimeEffectiveSession,
 }) {
   return [
-    ...[false, true].map((mobile) => ({
-      name: mobile
-        ? 'account-password-mobile-dark'
-        : 'account-password-desktop',
+    ...[
+      { mobile: false, themeMode: 'light', name: 'account-password-desktop' },
+      {
+        mobile: false,
+        themeMode: 'dark',
+        name: 'account-password-desktop-dark',
+      },
+      { mobile: true, themeMode: 'dark', name: 'account-password-mobile-dark' },
+    ].map(({ mobile, themeMode, name }) => ({
+      name,
       path: mobile ? '/m/sales/tasks' : '/erp/system/permissions',
       auth: 'admin',
       viewport: mobile
         ? { width: 390, height: 844 }
         : { width: 1440, height: 900 },
-      themeMode: mobile ? 'dark' : 'light',
+      themeMode,
+      effectiveSession: customerRuntimeEffectiveSession,
       ...(mobile
         ? {
             customerKey: 'yoyoosun',
@@ -103,10 +120,84 @@ export function createAccountPasswordScenarios({
         const newPassword = dialog.getByLabel('新密码', { exact: true })
         const confirmation = dialog.getByLabel('确认新密码', { exact: true })
         const submit = dialog.getByRole('button', { name: '修改并重新登录' })
+        const assertInputStyle = async (state) => {
+          assert.equal(
+            await assertVisibleAffixInputIsolation(page, `${name}/${state}`),
+            3,
+            '必须检查弹窗中三个真实密码输入框'
+          )
+        }
+        if (!mobile) {
+          await assertControlStyleSurvivesVisits(page, {
+            input: oldPassword,
+            label: name,
+            close: async () => {
+              await dialog.getByRole('button', { name: /取\s*消/u }).click()
+              await dialog.waitFor({ state: 'hidden' })
+            },
+            reopen: async () => {
+              await navigateWithinApp(
+                page,
+                '/erp/system/permissions',
+                page.getByRole('button', { name: /^账号菜单：/u })
+              )
+              await openPassword()
+              await oldPassword.waitFor({ state: 'visible' })
+              await assertInactivePrintStylesDoNotHideApp(page)
+            },
+            visits: [
+              async () => {
+                await navigateWithinApp(
+                  page,
+                  '/erp/purchase/material-bom',
+                  page.getByText('BOM-STYLE-DRAFT', { exact: true })
+                )
+                await page
+                  .getByText('BOM-STYLE-DRAFT', { exact: true })
+                  .dblclick()
+                await page
+                  .locator('.erp-bom-material-group')
+                  .first()
+                  .waitFor({ state: 'visible' })
+              },
+            ],
+          })
+        }
+        await oldPassword.hover()
+        await assertInputStyle('hover')
+        for (const input of [oldPassword, newPassword, confirmation]) {
+          await input.focus()
+          await assertInputStyle('empty-focused')
+        }
+        await assertVisibleInputFocusRingNotClipped(page, `${name}/empty`)
+        await oldPassword.focus()
+        await dialog.evaluate(async (node) => {
+          await Promise.all(
+            node
+              .getAnimations({ subtree: true })
+              .map((animation) => animation.finished.catch(() => {}))
+          )
+        })
+        await page.screenshot({
+          path: path.join(outputDir, `${name}-empty-focused.png`),
+          caret: 'initial',
+        })
+        const visibility = dialog.locator('.ant-input-password-icon').first()
+        await visibility.click()
+        assert.equal(await oldPassword.getAttribute('type'), 'text')
+        await oldPassword.focus()
+        await assertInputStyle('visible-empty-focused')
+        await visibility.click()
+        await oldPassword.fill('draft-password')
+        await assertInputStyle('filled')
+        await oldPassword.fill('')
+        await assertInputStyle('cleared-focused')
         await oldPassword.fill('draft-password')
         await dialog.getByRole('button', { name: /取\s*消/u }).click()
         await dialog.waitFor({ state: 'hidden' })
         await openPassword()
+        await oldPassword.focus()
+        await assertInputStyle('reopened-empty-focused')
         assert.equal(
           await oldPassword.inputValue(),
           '',
@@ -121,6 +212,8 @@ export function createAccountPasswordScenarios({
         await confirmation.fill('new-password')
         await submit.click()
         await expectText(dialog, '旧密码不正确')
+        await oldPassword.focus()
+        await assertInputStyle('error-focused')
         assert.equal(await newPassword.inputValue(), 'new-password')
         assert.equal(calls.length, 1)
         await oldPassword.fill('uncertain-password')
@@ -135,6 +228,7 @@ export function createAccountPasswordScenarios({
           true
         )
         assert.equal(await oldPassword.isDisabled(), true)
+        await assertInputStyle('disabled')
         await page.keyboard.press('Escape')
         assert.equal(await dialog.isVisible(), true, '保存中不能关闭弹窗')
         assert.equal(calls.length, 3)

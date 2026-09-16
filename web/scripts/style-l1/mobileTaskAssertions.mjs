@@ -1153,9 +1153,10 @@ export function createMobileTaskAssertions(deps) {
         timingText:
           document.querySelector('.mobile-task-detail-hero .erp-task-timing')
             ?.textContent || '',
-        redundantCopy: ['当前任务', '当前办理状态', '关联来源'].filter((copy) =>
-          shell?.textContent?.includes(copy)
-        ),
+        redundantCopy: Array.from(shell.querySelectorAll('h1, h2, h3, h4, [role="heading"]'))
+          .filter((heading) => heading.getClientRects().length > 0)
+          .map((heading) => heading.textContent.trim())
+          .filter((heading) => ['当前任务', '当前办理状态', '关联来源'].includes(heading)),
         buttons,
         flowSteps,
         scrollTopButtonCount: document.querySelectorAll(

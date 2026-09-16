@@ -1206,7 +1206,8 @@ export function BusinessDataTable({
   rowKey,
   columns,
   dataSource,
-  tableLayout,
+  // Let complete headers determine minimum column widths even with sticky columns.
+  tableLayout = 'auto',
   expandable,
   scroll,
   rowSelection,

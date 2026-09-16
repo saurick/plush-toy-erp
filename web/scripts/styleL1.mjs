@@ -1,3 +1,11 @@
+import assert from 'node:assert/strict'
+import net from 'node:net'
+import { spawn } from 'node:child_process'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import process from 'node:process'
+import { setTimeout as delay } from 'node:timers/promises'
+import { chromium } from 'playwright'
 import { createBusinessActionAssertions } from './style-l1/businessActionAssertions.mjs'
 import { createBusinessListAssertions } from './style-l1/businessListAssertions.mjs'
 import {
@@ -49,21 +57,14 @@ import {
 } from './style-l1/businessTableAssertions.mjs'
 import {
   assertVisibleInputControlRadius,
+  assertVisibleAffixInputIsolation,
   assertVisibleSearchPlaceholdersFit,
   assertVisibleRoundedInputWrapperClipping,
   assertVisibleInputFocusRingNotClipped,
   assertVisibleInputTextVerticalRhythm,
   assertVisibleBusinessFormControlHeight,
 } from './style-l1/inputControlAssertions.mjs'
-import assert from 'node:assert/strict'
-import net from 'node:net'
-import { spawn } from 'node:child_process'
-import fs from 'node:fs/promises'
-import path from 'node:path'
-import process from 'node:process'
-import { setTimeout as delay } from 'node:timers/promises'
 
-import { chromium } from 'playwright'
 import {
   createMockAdminToken,
   installAdminDisabledRpcMocks,
@@ -243,12 +244,10 @@ const {
   assertShellRefreshButton,
   assertNoDuplicatedAdminPageTitle,
   verifyBusinessModuleColumnOrderDialog,
-  verifyBusinessModuleColumnOrderHeaderMenu,
   verifySourceImportPicker,
   assertBusinessToolbarDisabledButtons,
   assertBusinessPageRefreshEntrypoint,
   assertBusinessModuleToolbarControlStyle,
-  assertBusinessDateRangePickerOrderGuard,
   assertPaginationSizeChangerFocusStyle,
   assertRowSelectionClearsAfterCancel,
 } = createBusinessListAssertions({ outputDir })
@@ -991,6 +990,7 @@ async function runScenarioOnce(browser, scenario) {
     }
 
     await scenario.verify(page)
+    await assertVisibleAffixInputIsolation(page, scenario.name)
     await assertVisibleInputControlRadius(page, scenario.name)
     await assertVisibleRoundedInputWrapperClipping(page, scenario.name)
     await assertVisibleInputFocusRingNotClipped(page, scenario.name)

@@ -1229,7 +1229,6 @@ export default function V1MasterDataPage({ type }) {
         loading={loading}
         columns={orderedRecordColumns}
         dataSource={records}
-        tableLayout={isProductCatalogPage ? 'fixed' : undefined}
         scroll={isProcessDictionaryPage ? { x: 1000 } : undefined}
         pagination={createBusinessTablePagination({
           pagination,
@@ -1269,7 +1268,9 @@ export default function V1MasterDataPage({ type }) {
           setRecordModalOpen(false)
         }}
         confirmLoading={saving}
-        loading={contactLoading || (needsUnitDictionary(effectiveType) && unitLoading)}
+        loading={
+          contactLoading || (needsUnitDictionary(effectiveType) && unitLoading)
+        }
       >
         <Form
           form={recordForm}

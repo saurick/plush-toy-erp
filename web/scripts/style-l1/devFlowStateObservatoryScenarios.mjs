@@ -1,3 +1,5 @@
+import { assertInactivePrintStylesDoNotHideApp } from './styleIsolationAssertions.mjs'
+
 const DEV_FLOW_STATE_OBSERVATORY_PATH =
   '/__dev/status-flows?view=chain&chain=all'
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -45,6 +47,7 @@ export function createDevFlowStateObservatoryScenarios({
           page,
           'dev-flow-state-observatory-desktop-light'
         )
+        await assertInactivePrintStylesDoNotHideApp(page)
         assert.deepEqual(
           writeRequestsByPage.get(page) || [],
           [],

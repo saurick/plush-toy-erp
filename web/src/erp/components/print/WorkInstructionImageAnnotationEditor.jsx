@@ -1123,6 +1123,7 @@ export default function WorkInstructionImageAnnotationEditor({
               <label>
                 线条颜色
                 <select
+                  className="form-select"
                   value={selectedAnnotation.color}
                   onChange={(event) =>
                     updateSelectedAnnotation((annotation) => ({
@@ -1143,6 +1144,7 @@ export default function WorkInstructionImageAnnotationEditor({
                   <label>
                     说明框样式
                     <select
+                      className="form-select"
                       value={selectedAnnotation.tone}
                       onChange={(event) =>
                         updateSelectedAnnotation((annotation) => ({

@@ -769,14 +769,6 @@
   padding: 28px 0;
 }
 
-.erp-dev-docs-markdown .erp-markdown-mermaid__canvas svg {
-  display: block;
-  width: 100%;
-  /* Mermaid injects inline max-width; zoom needs to override that generated cap. */
-  max-width: none !important;
-  height: auto;
-}
-
 .erp-dev-docs-markdown .erp-markdown-mermaid__loading,
 .erp-dev-docs-markdown .erp-markdown-mermaid__error {
   color: #334155;

@@ -1,6 +1,159 @@
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    margin: 0;
+    background: white;
+  }
+
+  .erp-print-shell__toolbar,
+  .erp-print-shell__formula-panel,
+  .erp-print-shell__panel,
+  .erp-processing-contract-upload-bar,
+  .erp-sidebar-panel,
+  .erp-mobile-strip,
+  .erp-primary-button,
+  .erp-secondary-button,
+  .erp-material-contract-toolbar,
+  .erp-material-contract-toolbar__status,
+  .erp-material-contract-formula-panel,
+  .ant-modal-root {
+    display: none;
+  }
+
+  .erp-print-paper,
+  .erp-print-paper--landscape {
+    width: auto;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .erp-material-contract-stage {
+    padding: 0;
+    background: white;
+  }
+
+  .erp-print-shell {
+    padding: 0;
+    background: white;
+  }
+
+  .erp-print-shell__content {
+    display: block;
+    margin-top: 0;
+  }
+
+  .erp-print-shell__stage-wrap {
+    display: block;
+    min-width: 0;
+  }
+
+  .erp-print-shell__stage {
+    padding: 0;
+    border: 0;
+    background: white;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .erp-material-contract-paper {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    box-shadow: none;
+    border-radius: 0;
+    border: 0;
+    padding: 10mm 5mm;
+    box-sizing: border-box;
+    background: white;
+    overflow: visible;
+  }
+
+  .erp-processing-contract-paper {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 10.5mm 5mm 10mm;
+    box-sizing: border-box;
+    box-shadow: none;
+    border-radius: 0;
+    background: white;
+    overflow: visible;
+  }
+
+  .erp-material-contract-table,
+  .erp-processing-contract-table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .erp-material-contract-table thead,
+  .erp-processing-contract-table thead {
+    display: table-header-group;
+  }
+
+  .erp-material-contract-table tbody,
+  .erp-processing-contract-table tbody {
+    display: table-row-group;
+  }
+
+  .erp-material-contract-table tr,
+  .erp-material-contract-table th,
+  .erp-material-contract-table td,
+  .erp-material-contract-table__editable,
+  .erp-material-contract-clauses,
+  .erp-material-contract-clause-block,
+  .erp-material-contract-clause-block__item,
+  .erp-material-contract-signature,
+  .erp-material-contract-signature__block,
+  .erp-processing-contract-paper__header,
+  .erp-processing-contract-meta,
+  .erp-processing-contract-table tr,
+  .erp-processing-contract-table th,
+  .erp-processing-contract-table td,
+  .erp-processing-contract-table__cell,
+  .erp-processing-contract-clauses,
+  .erp-processing-contract-clauses__group,
+  .erp-processing-contract-clauses__item,
+  .erp-processing-contract-signature,
+  .erp-processing-contract-signature__block {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .erp-material-contract-editable,
+  .erp-material-contract-table td,
+  .erp-processing-contract-meta__value,
+  .erp-processing-contract-table td,
+  .erp-processing-contract-table__cell,
+  .erp-processing-contract-clauses__editable,
+  .erp-processing-contract-signature__name-value,
+  .erp-processing-contract-signature__date-value {
+    outline: 0;
+    box-shadow: none;
+  }
+
+  .erp-material-contract-editable:focus,
+  .erp-material-contract-table td:focus-within,
+  .erp-processing-contract-meta__value:focus,
+  .erp-processing-contract-table td:focus-within,
+  .erp-processing-contract-table__cell:focus,
+  .erp-processing-contract-clauses__editable:focus,
+  .erp-processing-contract-signature__name-value:focus,
+  .erp-processing-contract-signature__date-value:focus {
+    outline: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
 @media screen and (max-width: 991px) {
   .erp-admin-sider {
-    display: none !important;
+    display: none;
   }
 
   .erp-admin-header {
@@ -79,7 +232,6 @@
 }
 
 @media screen and (max-width: 1023px) {
-
   .erp-admin-page-head {
     flex-direction: column;
   }
@@ -134,7 +286,6 @@
 }
 
 @media screen and (max-width: 767px) {
-
   .erp-admin-page-head__aside {
     grid-template-columns: 1fr;
   }

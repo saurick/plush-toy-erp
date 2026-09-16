@@ -402,6 +402,7 @@ export default function PrintWorkspaceShell({
               显示比例
               <span className="print-zoom-select">
                 <select
+                  className="form-select"
                   aria-label="显示比例"
                   value={zoomMode}
                   onChange={(event) => setZoomMode(event.target.value)}

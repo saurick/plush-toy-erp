@@ -516,7 +516,7 @@ function MobileWorkflowTaskActionScreen({
                         <input
                           ref={index === 0 ? actionChoiceRef : null}
                           type="radio"
-                          className="mobile-task-action-choice__radio"
+                          className="mobile-task-action-choice__radio form-radio"
                           checked={selected}
                           disabled={busy}
                           name={`${fieldID}-action`}
@@ -599,7 +599,7 @@ function MobileWorkflowTaskActionScreen({
                 <textarea
                   ref={reasonRef}
                   id={`${fieldID}-reason`}
-                  className="mt-3 min-h-[120px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-base leading-6 text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  className="form-textarea mt-3 min-h-[120px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-base leading-6 text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                   aria-describedby={
                     validationErrors.reason
                       ? `${fieldID}-reason-error`
@@ -650,7 +650,7 @@ function MobileWorkflowTaskActionScreen({
                 </div>
                 <input
                   id={`${fieldID}-approved-quantity`}
-                  className="mt-3 min-h-[48px] w-full rounded-xl border border-slate-200 px-3 py-3 text-base text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  className="form-input mt-3 min-h-[48px] w-full rounded-xl border border-slate-200 px-3 py-3 text-base text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                   inputMode="decimal"
                   disabled={busy}
                   placeholder="留空表示按申请数量批准"

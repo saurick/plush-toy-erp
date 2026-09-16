@@ -29,3 +29,47 @@
 .app-table.ant-table-wrapper .ant-table-cell > .ant-space-vertical {
   align-items: inherit;
 }
+
+.app-table.ant-table-wrapper .ant-table-thead > tr > th {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th
+  .ant-table-column-sorters {
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th
+  .ant-table-column-title {
+  min-width: max-content;
+  overflow: visible;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th
+  .ant-table-column-title:has(.erp-module-column-header) {
+  pointer-events: none;
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th
+  .ant-table-column-sorter {
+  flex: 0 0 auto;
+  margin-inline-start: 0;
+}

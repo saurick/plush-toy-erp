@@ -51,6 +51,7 @@
     "lodash": "^4.17.21",
     "playwright": "^1.58.2",
     "postcss": "^8.4.47",
+    "postcss-selector-parser": "6.1.2",
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.7.1",
     "stylelint": "^16.8.2",

@@ -11,7 +11,7 @@ export default {
     extend: {}, // 扩展主题
   },
   plugins: [
-    formsPlugin, // 常用表单样式优化
+    formsPlugin({ strategy: 'class' }), // 原生表单显式使用 form-*，不重置 AntD 内层输入。
     typographyPlugin, // 文章内容优化（prose）
     aspectRatioPlugin, // 支持 aspect-ratio 工具
   ],

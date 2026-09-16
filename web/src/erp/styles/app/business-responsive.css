@@ -473,12 +473,18 @@
 .erp-item-field-with-unit .ant-input-number-affix-wrapper {
   width: 100%;
   min-width: 0;
-  border-radius: var(--erp-control-radius, 12px);
   overflow: hidden;
 }
 
-body .ant-modal .erp-item-field-with-unit .ant-input-number-affix-wrapper > .ant-input-number,
-#root .erp-item-field-with-unit .ant-input-number-affix-wrapper > .ant-input-number {
+body
+  .ant-modal
+  .erp-item-field-with-unit
+  .ant-input-number-affix-wrapper
+  > .ant-input-number,
+#root
+  .erp-item-field-with-unit
+  .ant-input-number-affix-wrapper
+  > .ant-input-number {
   height: calc(var(--erp-control-height, 36px) - 2px);
   min-height: 0;
   border: 0;

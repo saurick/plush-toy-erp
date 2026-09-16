@@ -136,7 +136,7 @@
 .erp-markdown-mermaid__canvas svg {
   display: block;
   width: 100%;
-  /* Mermaid injects an inline max-width; zoom must override that generated cap. */
+  /* stylelint-disable-next-line declaration-no-important -- Mermaid 生成内联 max-width，缩放由组件接管。 */
   max-width: none !important;
   height: auto;
 }

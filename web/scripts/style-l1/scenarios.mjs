@@ -492,6 +492,7 @@ export function createStyleL1Scenarios(deps) {
       expectText,
       assertNoHorizontalOverflow,
       outputDir,
+      customerRuntimeEffectiveSession,
     }),
     ...createPermissionCenterScenarios({
       expectText,

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { businessModuleDefinitions } from '../../src/erp/config/businessModules.mjs'
+import { assertTableHeaderControlsFit } from './businessTableAssertions.mjs'
 
 async function measureTables(page) {
   return page.evaluate(() => {
@@ -117,6 +118,9 @@ export function createTableAlignmentScenarios({
       const evidence = []
       evidence.push(await measureTables(page))
       assertAligned(evidence.at(-1))
+      await assertTableHeaderControlsFit(page, {
+        scenarioName: `global-table-alignment-${mode}`,
+      })
       const firstRow = page.locator('#business-table tr[data-row-key="1"]')
       await firstRow.getByRole('checkbox').check()
       assert.equal(await page.locator('#selection-count').textContent(), '1')
@@ -180,6 +184,9 @@ export function createTableAlignmentScenarios({
       await page.locator('#toggle-empty').click()
       evidence.push(await measureTables(page))
       assertAligned(evidence.at(-1))
+      await assertTableHeaderControlsFit(page, {
+        scenarioName: `global-table-alignment-${mode}-restored`,
+      })
       await writeFile(
         path.join(outputDir, `global-table-alignment-${mode}.json`),
         JSON.stringify(evidence, null, 2)
@@ -223,6 +230,7 @@ export function createTableAlignmentScenarios({
           evidence.push({ route, ...measurement })
           try {
             assertCommonAlignment(measurement)
+            await assertTableHeaderControlsFit(page, { scenarioName: route })
           } catch (error) {
             failures.push({ route, error: error.message })
           }

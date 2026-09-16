@@ -42,6 +42,7 @@ const columns = [
     dataIndex: 'code',
     key: 'code',
     width: 180,
+    fixed: 'left',
     copyable: true,
   },
   {
@@ -57,7 +58,7 @@ const columns = [
     title: '数量',
     dataIndex: 'quantity',
     key: 'quantity',
-    width: 160,
+    width: 90,
     align: 'right',
     sorter: (a, b) => a.quantity - b.quantity,
   },

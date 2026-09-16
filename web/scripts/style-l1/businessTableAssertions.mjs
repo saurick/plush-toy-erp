@@ -1,5 +1,51 @@
 import assert from 'node:assert/strict'
 
+export async function assertTableHeaderControlsFit(
+  page,
+  { scenarioName, tableSelector = '.app-table' }
+) {
+  const controls = await page.locator(tableSelector).evaluateAll((tables) =>
+    tables.flatMap((table) =>
+      [...table.querySelectorAll('thead th')].flatMap((cell) => {
+        const outer = cell.getBoundingClientRect()
+        if (outer.height < 1) return []
+        return [
+          ...cell.querySelectorAll(
+            '.erp-module-column-header-trigger, .ant-table-column-sorter'
+          ),
+        ].map((control) => {
+          const inner = control.getBoundingClientRect()
+          return {
+            header:
+              cell.querySelector('.erp-module-column-header-text')
+                ?.textContent || cell.textContent,
+            control: control.getAttribute('aria-label') || '排序图标',
+            width: inner.width,
+            height: inner.height,
+            gaps: [
+              inner.left - outer.left,
+              outer.right - inner.right,
+              inner.top - outer.top,
+              outer.bottom - inner.bottom,
+            ],
+          }
+        })
+      })
+    )
+  )
+  assert(controls.length > 0, `${scenarioName} 应有可检查的表头按钮`)
+  assert.deepEqual(
+    controls.filter(
+      (control) =>
+        control.width < 1 ||
+        control.height < 1 ||
+        control.gaps.some((gap) => gap < -1)
+    ),
+    [],
+    `${scenarioName} 表头按钮应完整位于所属单元格内，不能越界或被相邻列遮挡`
+  )
+}
+
 async function assertBusinessMainTableHasNoOperationColumn(
   page,
   { scenarioName }
@@ -97,6 +143,7 @@ async function assertBusinessMainTableSortableColumns(
   page,
   { scenarioName, unsortableHeaders = [] }
 ) {
+  await assertTableHeaderControlsFit(page, { scenarioName })
   await page.mouse.move(0, 0)
   await page.waitForTimeout(220)
   const metrics = await page.evaluate(() => {
