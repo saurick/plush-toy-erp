@@ -158,7 +158,7 @@ portable_archive_manifest_digest() {
   fail "invalid promotion fingerprint"
 [[ "$confirmation" == "PROMOTE:$target:$release_sha:$operation_id" ]] ||
   fail "promotion confirmation does not match"
-[[ "$(hostname)" == r640 && "$(id -un)" == simon ]] ||
+[[ "$(hostname)" == r740xd && "$(id -un)" == simon ]] ||
   fail "remote host/user identity does not match"
 
 incoming=$incoming_root/$operation_id

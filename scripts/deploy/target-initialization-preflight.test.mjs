@@ -14,7 +14,7 @@ function remoteReport(overrides = {}) {
     SCHEMA_VERSION: "plush.remote-target-initialization-preflight/v1",
     STATUS: "eligible",
     TARGET: "demo-133",
-    HOSTNAME: "r640",
+    HOSTNAME: "r740xd",
     USER: "simon",
     ROOT_STATE: "absent",
     TARGET_CONTAINER_COUNT: "0",

@@ -35,7 +35,7 @@ function remoteReport(overrides = {}) {
     SCHEMA_VERSION: REMOTE_TARGET_PREFLIGHT_CONTRACT,
     STATUS: "passed",
     TARGET: "demo-133",
-    HOSTNAME: "r640",
+    HOSTNAME: "r740xd",
     USER: "simon",
     ROOT_AVAILABLE_BYTES: String(40 * 1024 ** 3),
     MINIMUM_AVAILABLE_BYTES: String(30 * 1024 ** 3),

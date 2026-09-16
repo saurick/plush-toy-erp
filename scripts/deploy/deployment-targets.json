@@ -11,7 +11,7 @@
         "host": "192.168.0.133",
         "port": 22,
         "user": "simon",
-        "expectedHostname": "r640"
+        "expectedHostname": "r740xd"
       },
       "filesystem": {
         "root": "/home/simon/plush-toy-erp-demo-v1",
@@ -88,7 +88,7 @@
         "host": "192.168.0.133",
         "port": 22,
         "user": "simon",
-        "expectedHostname": "r640"
+        "expectedHostname": "r740xd"
       },
       "filesystem": {
         "root": "/home/simon/plush-toy-erp-test-v1",

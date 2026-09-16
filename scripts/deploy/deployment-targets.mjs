@@ -222,7 +222,7 @@ export function validateDeploymentTarget(target) {
     HOSTNAME_PATTERN,
     "target expected hostname",
   );
-  if (target.ssh.expectedHostname !== "r640") {
+  if (target.ssh.expectedHostname !== "r740xd") {
     throw new Error("target hostname identity is invalid");
   }
 

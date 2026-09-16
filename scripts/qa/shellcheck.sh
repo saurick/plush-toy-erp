@@ -7,7 +7,7 @@ print_help() {
   bash scripts/qa/shellcheck.sh [shell 文件...]
 
 作用:
-  - 传入参数：仅检查指定 shell 文件
+  - 传入参数：检查指定 shell 文件及其 source 引用
   - 不传参数：检查 scripts 与 .githooks 下的全部 shell 文件
 
 环境变量:
@@ -63,6 +63,6 @@ if [[ "${#files[@]}" -eq 0 ]]; then
   exit 0
 fi
 
-shellcheck "${files[@]}"
+shellcheck --external-sources "${files[@]}"
 
 echo "[qa:shellcheck] 通过"

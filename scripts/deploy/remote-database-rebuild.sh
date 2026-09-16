@@ -81,7 +81,7 @@ fail() {
   fail "invalid database rebuild fingerprint"
 [[ "$confirmation" == "REBUILD_DATABASE:$target:$release_sha:$operation_id" ]] ||
   fail "database rebuild confirmation does not match"
-[[ "$(hostname)" == r640 && "$(id -un)" == simon ]] ||
+[[ "$(hostname)" == r740xd && "$(id -un)" == simon ]] ||
   fail "remote host/user identity does not match"
 
 incoming=$incoming_root/$operation_id

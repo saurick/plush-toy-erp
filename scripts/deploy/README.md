@@ -8,6 +8,8 @@
 
 部署 target 的唯一真源是 `deployment-targets.json`：
 
+两个目标均登记在 `r740xd` 宿主机；只读预检及部署、回滚、重建、初始化执行器均校验同一主机名和操作用户。
+
 | target | 用途 | 公网入口 | 数据规则 |
 | --- | --- | --- | --- |
 | `demo-133` | 项目方造数、演练、培训与回归 | `demo.yoyoosun.net` | 可经受控 rebuild 恢复 seed / fixture / 模拟数据 |

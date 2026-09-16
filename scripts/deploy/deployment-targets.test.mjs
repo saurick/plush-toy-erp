@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
@@ -9,6 +10,22 @@ import {
   loadDeploymentTargetRegistry,
   validateDeploymentTargetRegistry,
 } from "./deployment-targets.mjs";
+
+test("remote deployment writers enforce the registered host identity", () => {
+  const target = getDeploymentTarget("demo-133");
+  for (const script of [
+    "remote-promotion.sh",
+    "remote-code-rollback.sh",
+    "remote-database-rebuild.sh",
+    "remote-target-initialization.sh",
+  ]) {
+    const source = readFileSync(new URL(script, import.meta.url), "utf8");
+    assert.ok(
+      source.includes(`[[ "$(hostname)" == ${target.ssh.expectedHostname} && "$(id -un)" == ${target.ssh.user} ]]`),
+      `${script} must enforce the same host identity as target preflight`,
+    );
+  }
+});
 
 test("deployment registry exposes only the isolated demo and customer-test targets", () => {
   const registry = loadDeploymentTargetRegistry();
@@ -21,6 +38,7 @@ test("deployment registry exposes only the isolated demo and customer-test targe
   const demo = getDeploymentTarget("demo-133", registry);
   assert.equal(demo.purpose, "project-demo-simulated");
   assert.equal(demo.ssh.host, "192.168.0.133");
+  assert.equal(demo.ssh.expectedHostname, "r740xd");
   assert.equal(demo.filesystem.root, "/home/simon/plush-toy-erp-demo-v1");
   assert.equal(demo.compose.projectName, "plush-toy-erp-demo-v1");
   assert.equal(demo.database.name, "plush_erp_demo_v1");
@@ -58,6 +76,7 @@ test("deployment registry exposes only the isolated demo and customer-test targe
   assert.equal(demo.capacity.minimumAvailableBytes, 30 * 1024 ** 3);
 
   const customerTest = getDeploymentTarget("customer-test-133", registry);
+  assert.equal(customerTest.ssh.expectedHostname, "r740xd");
   assert.equal(customerTest.purpose, "customer-clean-acceptance");
   assert.equal(customerTest.trialTarget, "none");
   assert.equal(

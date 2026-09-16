@@ -94,7 +94,7 @@ test("target initializer keeps bootstrap secrets transient and rollback owner-bo
   );
   const trapIndex = source.indexOf("trap on_error ERR");
   const actionGateIndex = source.indexOf('[[ "$action" == initialize ]]');
-  const identityGateIndex = source.indexOf('[[ "$(hostname)" == r640');
+  const identityGateIndex = source.indexOf('[[ "$(hostname)" == r740xd');
   assert.ok(trapIndex >= 0 && trapIndex < actionGateIndex);
   assert.ok(trapIndex < identityGateIndex);
   const lockIndex = source.indexOf('flock -n 9 || fail "target operation lock is held"');

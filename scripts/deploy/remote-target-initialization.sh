@@ -423,7 +423,7 @@ trap on_exit EXIT
 [[ "$release_rehearsal_sha256" =~ $sha256_pattern ]] || fail "invalid rehearsal checksum"
 [[ "$initialization_fingerprint" =~ $sha256_pattern ]] || fail "invalid initialization fingerprint"
 [[ "$confirmation" == "PROMOTE:$target:$release_sha:$operation_id" ]] || fail "confirmation does not match"
-[[ "$(hostname)" == r640 && "$(id -un)" == simon ]] || fail "remote identity does not match"
+[[ "$(hostname)" == r740xd && "$(id -un)" == simon ]] || fail "remote identity does not match"
 
 plain_owned_directory "$root" || fail "target root is invalid"
 plain_owned_file "$owner_marker" || fail "initialization owner marker is invalid"

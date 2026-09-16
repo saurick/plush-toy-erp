@@ -206,7 +206,7 @@ function targetInitializationPreflight(status = "blocked") {
       schemaVersion: "plush.remote-target-initialization-preflight/v1",
       status,
       target: "demo-133",
-      host: { hostname: "r640", user: "simon" },
+      host: { hostname: "r740xd", user: "simon" },
       rootState: eligible ? "absent" : "present",
       conflicts: {
         targetContainers: 0,
