@@ -1633,6 +1633,7 @@ export function cleanupRehearsalWorkspace(context) {
     !Number.isSafeInteger(uid) ||
     !Number.isSafeInteger(gid) ||
     !workspace.startsWith(expectedPrefix) ||
+    lstatIsSymlink(context.workspace) ||
     workspaceStat.isSymbolicLink() ||
     !workspaceStat.isDirectory() ||
     workspaceStat.uid !== uid
@@ -1643,14 +1644,18 @@ export function cleanupRehearsalWorkspace(context) {
     );
   }
 
-  const postgresPath = path.join(workspace, "postgres");
-  if (existsSync(postgresPath)) {
-    if (lstatIsSymlink(postgresPath) || !statSync(postgresPath).isDirectory()) {
+  const dataPaths = ["postgres", "attachments"]
+    .map((directory) => path.join(workspace, directory))
+    .filter((directory) => existsSync(directory));
+  for (const dataPath of dataPaths) {
+    if (lstatIsSymlink(dataPath) || !statSync(dataPath).isDirectory()) {
       throw new RehearsalError(
         "cleanup",
-        "release rehearsal PostgreSQL path is unsafe",
+        "release rehearsal container data path is unsafe",
       );
     }
+  }
+  for (const dataPath of dataPaths) {
     context.runCommand({
       command: "docker",
       args: [
@@ -1667,7 +1672,7 @@ export function cleanupRehearsalWorkspace(context) {
         "--memory=64m",
         "--cpus=0.25",
         "--mount",
-        `type=bind,src=${postgresPath},dst=/cleanup`,
+        `type=bind,src=${dataPath},dst=/cleanup`,
         "--entrypoint",
         "/bin/sh",
         REHEARSAL_POSTGRES_IMAGE,
@@ -1678,12 +1683,12 @@ export function cleanupRehearsalWorkspace(context) {
         String(gid),
       ],
       cwd: context.repoRoot,
-      label: "clear isolated release PostgreSQL workspace",
+      label: "clear isolated release container data",
     });
-    if (readdirSync(postgresPath).length !== 0) {
+    if (readdirSync(dataPath).length !== 0) {
       throw new RehearsalError(
         "cleanup",
-        "release rehearsal PostgreSQL workspace is not empty",
+        "release rehearsal container data directory is not empty",
       );
     }
   }
@@ -1984,7 +1989,6 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
         receipt.cleanup.temporaryDatabaseRetained = false;
       }
     } catch (error) {
-      receipt.cleanup.residualContainers = null;
       receipt.cleanup.passed = false;
       receipt.cleanup.temporaryDatabaseRetained = true;
       if (!failure) {

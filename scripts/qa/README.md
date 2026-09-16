@@ -695,6 +695,8 @@ go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJson
 
 Server 镜像切换到固定 Debian snapshot 后，先升级基础镜像已有的系统包，再安装固定 Chromium；仅安装新依赖可能保留已有包的旧漏洞版本。最终镜像的实际包清单和扫描结果决定是否可发布。
 
+发布作业始终保留脱敏的 `release-rehearsal.json` 与 PDF 扫描产物；演练结束时必须清理当前临时工作区内由容器持有的 PostgreSQL 和附件目录，确认容器与工作区均无残留后才允许登记版本。
+
 Trivy 漏洞库固定从官方 `ghcr.io/aquasecurity/trivy-db:2` 获取，避免默认优先连接 Runner 不可达的 Google 镜像站。下载与扫描继续使用既有超时和完整性校验，失败仍阻断发布。
 
 此门禁的漏洞阻断范围为 Chromium 所在的 Debian 系统包（Trivy `Class=os-pkgs`、`Type=debian`）。Trivy 同时发现的 Go 二进制依赖问题按原分类完整保留，并单独计数；它们由既有 Go 安全检查继续判定调用路径和升级范围。打印运行时通过不代表全镜像无漏洞，也不把暂无修复版本的系统包发现当作已修复。

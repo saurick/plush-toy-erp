@@ -829,6 +829,7 @@ publish_release:
     when: always
     expire_in: 90 days
     paths:
+      - output/ci/release-rehearsal.json
       - output/ci/pdf-runtime/**/report.json
       - output/ci/pdf-runtime/**/vulnerabilities.json
       - output/ci/pdf-runtime/**/pdf-runtime.log

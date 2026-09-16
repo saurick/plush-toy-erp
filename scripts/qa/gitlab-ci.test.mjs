@@ -492,6 +492,10 @@ test("GitLab release reuses push CI, builds one candidate and freezes rehearsal 
     /^publish_release:[\s\S]+?(?=^backfill_release_source:)/mu,
   )?.[0];
   assert.ok(publish);
+  assert.match(
+    publish,
+    /artifacts:\n    when: always[\s\S]+?      - output\/ci\/release-rehearsal[.]json/u,
+  );
   assert.doesNotMatch(workflow, /\$RELEASE_SHA != ""/u);
   assert.match(
     workflow,

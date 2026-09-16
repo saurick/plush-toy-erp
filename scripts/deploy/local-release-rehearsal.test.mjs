@@ -3,7 +3,9 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -143,13 +145,18 @@ test("local release rehearsal command wrapper carries SQL only through stdin", (
   assert.equal(output, "SELECT 1;\n");
 });
 
-test("local release rehearsal removes container-owned PostgreSQL state through one locked-down helper", () => {
+test("local release rehearsal removes PostgreSQL and attachment state through scoped helpers", (t) => {
   const workspace = mkdtempSync(
     path.join(os.tmpdir(), "plush-release-rehearsal-cleanup_test-"),
   );
-  const postgresPath = path.join(workspace, "postgres");
-  mkdirSync(postgresPath, { mode: 0o700 });
-  writeFileSync(path.join(postgresPath, "PG_VERSION"), "18\n");
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  const dataPaths = ["postgres", "attachments"].map((directory) =>
+    path.join(realpathSync(workspace), directory),
+  );
+  for (const directory of dataPaths) {
+    mkdirSync(directory, { mode: 0o700 });
+    writeFileSync(path.join(directory, "container-owned-data"), "fixture\n");
+  }
   writeFileSync(path.join(workspace, "release.env"), "SECRET=not-forwarded\n", {
     mode: 0o600,
   });
@@ -160,14 +167,18 @@ test("local release rehearsal removes container-owned PostgreSQL state through o
     workspace,
     runCommand(call) {
       calls.push(call);
-      rmSync(postgresPath, { recursive: true, force: true });
-      mkdirSync(postgresPath, { mode: 0o700 });
+      const target = dataPaths.find((directory) =>
+        call.args.includes(`type=bind,src=${directory},dst=/cleanup`),
+      );
+      assert.ok(target, "helper must mount only a known data child");
+      rmSync(target, { recursive: true, force: true });
+      mkdirSync(target, { mode: 0o700 });
       return "";
     },
   });
 
   assert.equal(existsSync(workspace), false);
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal(calls[0].command, "docker");
   assert.deepEqual(calls[0].args.slice(0, 13), [
     "run",
@@ -193,6 +204,53 @@ test("local release rehearsal removes container-owned PostgreSQL state through o
     calls[0].args.some((value) => value.includes("not-forwarded")),
     false,
   );
+});
+
+test("rehearsal cleanup rejects attachment symlinks before clearing any data", (t) => {
+  const workspace = mkdtempSync(
+    path.join(os.tmpdir(), "plush-release-rehearsal-cleanup_link-"),
+  );
+  const outside = mkdtempSync(path.join(os.tmpdir(), "plush-cleanup-outside-"));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  mkdirSync(path.join(workspace, "postgres"));
+  const sentinel = path.join(outside, "keep");
+  writeFileSync(sentinel, "keep");
+  symlinkSync(outside, path.join(workspace, "attachments"));
+  assert.throws(
+    () =>
+      cleanupRehearsalWorkspace({
+        repoRoot: "/workspace/plush-toy-erp",
+        workspace,
+        runCommand() {
+          assert.fail("unsafe data paths must be rejected before Docker runs");
+        },
+      }),
+    /container data path is unsafe/u,
+  );
+  assert.equal(existsSync(sentinel), true);
+});
+
+test("rehearsal cleanup retains the workspace when attachment cleanup fails", (t) => {
+  const workspace = mkdtempSync(
+    path.join(os.tmpdir(), "plush-release-rehearsal-cleanup_failure-"),
+  );
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  mkdirSync(path.join(workspace, "attachments"));
+  const sentinel = path.join(workspace, "attachments", "keep");
+  writeFileSync(sentinel, "keep");
+  assert.throws(
+    () =>
+      cleanupRehearsalWorkspace({
+        repoRoot: "/workspace/plush-toy-erp",
+        workspace,
+        runCommand() {
+          throw new Error("helper failed");
+        },
+      }),
+    /helper failed/u,
+  );
+  assert.equal(existsSync(sentinel), true);
 });
 
 test("local release rehearsal keeps workbench artifact paths inside the repository", () => {
