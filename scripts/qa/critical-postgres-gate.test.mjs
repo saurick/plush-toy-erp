@@ -31,13 +31,13 @@ function helperBackedPostgresTests() {
         if (!testName) return []
         const end = functions[index + 1]?.index ?? source.length
         const body = source.slice(match.index, end)
-        return body.includes('openPurchaseReceiptPostgresTestData(t)') ? [testName] : []
+        return /open(?:PurchaseReceipt|PurchaseReturn|Inventory|BOMLot)PostgresTestData\(t\)/u.test(body) ? [testName] : []
       })
     })
     .sort()
 }
 
-test('critical PostgreSQL registry covers every purchase-receipt helper-backed test', () => {
+test('critical PostgreSQL registry covers every database helper-backed test', () => {
   const criticalTestConfig = read('scripts/qa/critical-postgres-tests.sh')
   const patternSource = criticalTestConfig.match(
     /CRITICAL_POSTGRES_TEST_PATTERN='([^']+)'/u,
@@ -46,6 +46,7 @@ test('critical PostgreSQL registry covers every purchase-receipt helper-backed t
   const criticalPattern = new RegExp(patternSource, 'u')
   const helperBackedTests = helperBackedPostgresTests()
   const newlyCoveredTests = [
+    'TestBusinessDocumentSearchPostgres',
     'TestDatabaseGovernancePostgresInventoryConstraints',
     'TestDatabaseGovernancePostgresPurchaseStatusConstraints',
     'TestDatabaseGovernancePostgresQualityAndAttachmentConstraints',
