@@ -749,6 +749,7 @@ func (r *operationalFactRepo) listFinanceFacts(
 	}
 	if filter.Keyword != "" {
 		q = q.Where(financefact.Or(
+			businessDocumentKeyword("finance", filter.Keyword),
 			financefact.FactNoContainsFold(filter.Keyword),
 			financefact.FactTypeContainsFold(filter.Keyword),
 			financefact.StatusContainsFold(filter.Keyword),

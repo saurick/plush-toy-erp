@@ -15,6 +15,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -1551,8 +1552,7 @@ export default function V1SalesOrdersPage() {
         filters={
           <>
             <SearchInput
-              placeholder="搜索订单"
-              searchHint="可搜索：订单号、客户订单号、业务员、付款方式"
+              {...BUSINESS_SEARCH_SCOPES.sales}
               value={resolvedRouteKeyword || linkedKeyword || keyword}
               onChange={(event) => {
                 if (linkedKeyword || routeSalesOrderID) {

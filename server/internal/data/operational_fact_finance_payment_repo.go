@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"server/internal/biz"
@@ -754,6 +755,9 @@ func (r *operationalFactRepo) GetFinancePayment(ctx context.Context, id int) (*b
 }
 func (r *operationalFactRepo) ListFinancePayments(ctx context.Context, filter biz.FinancePaymentFilter) ([]*biz.FinancePayment, int, error) {
 	query := r.data.postgres.FinancePayment.Query()
+	if strings.TrimSpace(filter.Keyword) != "" {
+		query = query.Where(businessDocumentKeyword("payment", filter.Keyword))
+	}
 	if filter.Status != "" {
 		query = query.Where(financepayment.Status(filter.Status))
 	}
@@ -789,6 +793,9 @@ func (r *operationalFactRepo) GetFinanceCreditNote(ctx context.Context, id int) 
 }
 func (r *operationalFactRepo) ListFinanceCreditNotes(ctx context.Context, filter biz.FinanceCreditNoteFilter) ([]*biz.FinanceCreditNote, int, error) {
 	query := r.data.postgres.FinanceCreditNote.Query()
+	if strings.TrimSpace(filter.Keyword) != "" {
+		query = query.Where(businessDocumentKeyword("credit", filter.Keyword))
+	}
 	if filter.Status != "" {
 		query = query.Where(financecreditnote.Status(filter.Status))
 	}

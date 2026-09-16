@@ -176,7 +176,8 @@ func (r *productionOrderRepo) ListProductionOrders(ctx context.Context, filter b
 	}
 	query := r.data.postgres.ProductionOrder.Query()
 	if filter.Keyword != "" {
-		query = query.Where(productionorder.Or(productionorder.OrderNoContainsFold(filter.Keyword), productionorder.NoteContainsFold(filter.Keyword)))
+		query = query.Where(productionorder.Or(
+			businessDocumentKeyword("production", filter.Keyword), productionorder.OrderNoContainsFold(filter.Keyword), productionorder.NoteContainsFold(filter.Keyword)))
 	}
 	if filter.Status != "" {
 		query = query.Where(productionorder.Status(filter.Status))

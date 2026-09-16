@@ -15,6 +15,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -1630,7 +1631,7 @@ export default function V1ProductionOrdersPage() {
           <>
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || query.keyword}
-              placeholder="搜索生产单号或备注"
+              {...BUSINESS_SEARCH_SCOPES.production}
               onChange={(event) =>
                 writeQuery({ keyword: event.target.value, page: 1 })
               }

@@ -27,6 +27,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -1667,8 +1668,7 @@ export default function V1QualityInspectionsPage() {
           <>
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || keyword}
-              placeholder="搜索质检单"
-              searchHint="可搜索：质检单号、业务来源、批次"
+              {...BUSINESS_SEARCH_SCOPES.quality}
               onChange={(event) => {
                 if (
                   resolvedRouteKeyword ||

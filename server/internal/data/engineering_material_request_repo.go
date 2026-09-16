@@ -433,7 +433,8 @@ func loadEngineeringMaterialRequest(ctx context.Context, client *ent.Client, row
 		return nil, err
 	}
 	for _, v := range orders {
-		result.PurchaseOrders = append(result.PurchaseOrders, biz.EngineeringMaterialPurchaseOrder{ID: v.ID, PurchaseOrderNo: v.PurchaseOrderNo, SupplierID: v.SupplierID})
+		supplierName, _ := v.SupplierSnapshot["name"].(string)
+		result.PurchaseOrders = append(result.PurchaseOrders, biz.EngineeringMaterialPurchaseOrder{ID: v.ID, PurchaseOrderNo: v.PurchaseOrderNo, SupplierID: v.SupplierID, SupplierName: supplierName})
 	}
 	result.SourceHash = engineeringMaterialSourceHash(result)
 	return result, nil

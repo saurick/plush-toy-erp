@@ -1850,6 +1850,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 <SearchInput
                   placeholder="订单 / 产品 / 物料 / 款号"
                   searchHint="可搜索：任务、单号、产品、款号、物料、处理原因"
+                  showSearchScope
                   value={taskBoardKeywordDraft}
                   onChange={(event) => {
                     const nextKeyword = event.target.value

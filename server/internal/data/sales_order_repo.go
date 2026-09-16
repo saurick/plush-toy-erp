@@ -172,6 +172,7 @@ func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOr
 	query := r.data.postgres.SalesOrder.Query()
 	if filter.Keyword != "" {
 		query = query.Where(salesorder.Or(
+			businessDocumentKeyword("sales", filter.Keyword),
 			salesorder.OrderNoContains(filter.Keyword),
 			salesorder.CustomerOrderNoContains(filter.Keyword),
 			salesorder.SalesOwnerContains(filter.Keyword),

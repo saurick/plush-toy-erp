@@ -16,6 +16,8 @@ import {
   getProcessStatusLabel,
 } from '../../utils/processRuntimePresentation.mjs'
 import WorkflowProcessStageTrack from './WorkflowProcessStageTrack.jsx'
+import EngineeringMaterialPurchaseOrders from '../sales-orders/EngineeringMaterialPurchaseOrders.jsx'
+import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 
 export default function WorkflowTaskHandlingChain({
   task,
@@ -45,7 +47,7 @@ export default function WorkflowTaskHandlingChain({
       .then((request) => {
         if (controller.signal.aborted) return
         const model = buildEngineeringMaterialStageModel(task, request)
-        setResult({ key: sourceKey, model, state: model ? 'ready' : 'error' })
+        setResult({ key: sourceKey, model, request, state: model ? 'ready' : 'error' })
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -127,6 +129,12 @@ export default function WorkflowTaskHandlingChain({
         </>
       ) : model ? (
         <WorkflowProcessStageTrack model={model} variant={variant} />
+      ) : null}
+      {state === 'ready' && current?.model ? (
+        <EngineeringMaterialPurchaseOrders
+          request={current.request}
+          canOpen={variant !== 'mobile' && hasActionPermission(profile, 'purchase.order.read')}
+        />
       ) : null}
       {materialTask && !processLinked && (!source || !canRead) ? (
         <p className="erp-material-summary-hint">

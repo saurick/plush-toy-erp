@@ -1678,6 +1678,7 @@ func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter bi
 	}
 	if filter.Keyword != "" {
 		q = q.Where(productionfact.Or(
+			businessDocumentKeyword("production_fact", filter.Keyword),
 			productionfact.FactNoContainsFold(filter.Keyword),
 			productionfact.FactTypeContainsFold(filter.Keyword),
 			productionfact.SubjectTypeContainsFold(filter.Keyword),

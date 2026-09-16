@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import { Alert, Button, Form, Popconfirm, Select, Space } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -1188,7 +1189,7 @@ export default function BOMVersionsPage() {
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索 BOM 版本"
+              {...BUSINESS_SEARCH_SCOPES.bom}
               onChange={(event) => {
                 setKeyword(event.target.value)
                 resetBusinessPaginationCurrent(setPagination)

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Alert, Button, Select, Tag } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import SearchInput from '@/common/components/SearchInput'
 import { listEngineeringMaterialRequests } from '../../api/masterDataOrderApi.mjs'
@@ -99,8 +100,8 @@ export default function EngineeringMaterialSummaryPanel() {
     <>
       <SearchInput
         type="search"
-        aria-label="搜索材料汇总订单号"
-        placeholder="搜索订单号"
+        aria-label={BUSINESS_SEARCH_SCOPES.engineering.searchHint}
+        {...BUSINESS_SEARCH_SCOPES.engineering}
         value={draft}
         allowClear
         maxLength={100}

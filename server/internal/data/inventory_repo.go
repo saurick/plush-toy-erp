@@ -527,6 +527,7 @@ func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.In
 	}
 	if filter.Keyword != "" {
 		query = query.Where(inventorybalance.Or(
+			businessDocumentKeyword("balance", filter.Keyword),
 			inventorybalance.SubjectTypeContainsFold(filter.Keyword),
 			inventorybalance.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorybalance.SubjectIDEQ(parsePositiveIntOrZero(filter.Keyword)),
@@ -636,6 +637,7 @@ func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.Invent
 	}
 	if filter.Keyword != "" {
 		query = query.Where(inventorylot.Or(
+			businessDocumentKeyword("lot", filter.Keyword),
 			inventorylot.SubjectTypeContainsFold(filter.Keyword),
 			inventorylot.LotNoContainsFold(filter.Keyword),
 			inventorylot.SupplierLotNoContainsFold(filter.Keyword),
@@ -733,6 +735,7 @@ func (r *inventoryRepo) listInventoryTxns(ctx context.Context, filter biz.Invent
 	}
 	if filter.Keyword != "" {
 		query = query.Where(inventorytxn.Or(
+			businessDocumentKeyword("inventory_txn", filter.Keyword),
 			inventorytxn.SubjectTypeContainsFold(filter.Keyword),
 			inventorytxn.TxnTypeContainsFold(filter.Keyword),
 			inventorytxn.SourceTypeContainsFold(filter.Keyword),
@@ -1569,7 +1572,7 @@ func (r *inventoryRepo) ListBOMHeaders(ctx context.Context, filter biz.BOMHeader
 		query = query.Where(bomheader.StatusIn(statuses...))
 	}
 	if filter.Keyword != "" {
-		query = query.Where(bomheader.VersionContainsFold(filter.Keyword))
+		query = query.Where(businessDocumentKeyword("bom", filter.Keyword))
 	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {

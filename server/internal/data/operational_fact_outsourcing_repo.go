@@ -584,6 +584,7 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	}
 	if filter.Keyword != "" {
 		q = q.Where(outsourcingfact.Or(
+			businessDocumentKeyword("outsourcing_fact", filter.Keyword),
 			outsourcingfact.FactNoContainsFold(filter.Keyword),
 			outsourcingfact.FactTypeContainsFold(filter.Keyword),
 			outsourcingfact.SubjectTypeContainsFold(filter.Keyword),

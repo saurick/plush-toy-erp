@@ -138,6 +138,7 @@ func (r *purchaseOrderRepo) ListPurchaseOrders(ctx context.Context, filter biz.P
 	query := r.data.postgres.PurchaseOrder.Query()
 	if filter.Keyword != "" {
 		query = query.Where(purchaseorder.Or(
+			businessDocumentKeyword("purchase", filter.Keyword),
 			purchaseorder.PurchaseOrderNoContains(filter.Keyword),
 			purchaseorder.SupplierPurchaseOrderNoContains(filter.Keyword),
 		))

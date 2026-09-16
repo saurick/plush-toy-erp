@@ -63,6 +63,7 @@ type EngineeringMaterialPurchaseOrder struct {
 	ID              int    `json:"id"`
 	PurchaseOrderNo string `json:"purchase_order_no"`
 	SupplierID      int    `json:"supplier_id"`
+	SupplierName    string `json:"supplier_name"`
 }
 type EngineeringMaterialSubmit struct {
 	SalesOrderID        int

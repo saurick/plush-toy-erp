@@ -13,6 +13,7 @@ import {
   Typography,
 } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -49,6 +50,7 @@ import {
   BusinessPageLayout,
   PageHeaderCard,
   SelectFilter,
+  SearchInput,
   SelectionActionBar,
   SelectionClearAction,
   ToolbarButton,
@@ -260,6 +262,8 @@ export default function FinancePaymentsPage() {
     current: 1,
     pageSize: 20,
   })
+  const [paymentKeyword, setPaymentKeyword] = useState('')
+  const [creditKeyword, setCreditKeyword] = useState('')
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('')
   const [paymentDirectionFilter, setPaymentDirectionFilter] = useState('')
   const [creditStatusFilter, setCreditStatusFilter] = useState('')
@@ -345,6 +349,7 @@ export default function FinancePaymentsPage() {
       const result = await listFinancePayments(
         compactParams({
           status: paymentStatusFilter,
+          keyword: paymentKeyword.trim(),
           direction: paymentDirectionFilter,
           ...getBusinessPaginationParams(paymentPagination),
         }),
@@ -374,6 +379,7 @@ export default function FinancePaymentsPage() {
     paymentDirectionFilter,
     paymentPagination,
     paymentStatusFilter,
+    paymentKeyword,
   ])
 
   const loadCreditRows = useCallback(async () => {
@@ -383,6 +389,7 @@ export default function FinancePaymentsPage() {
       const result = await listFinanceCreditNotes(
         compactParams({
           status: creditStatusFilter,
+          keyword: creditKeyword.trim(),
           ...getBusinessPaginationParams(creditPagination),
         }),
         { signal: request.signal }
@@ -408,7 +415,7 @@ export default function FinancePaymentsPage() {
       }
       request.finish()
     }
-  }, [beginLatestRequest, creditPagination, creditStatusFilter])
+  }, [beginLatestRequest, creditPagination, creditStatusFilter, creditKeyword])
 
   const loadPartyReferences = useCallback(async () => {
     const request = beginLatestRequest('finance-party-references')
@@ -1202,6 +1209,7 @@ export default function FinancePaymentsPage() {
       const result = await listAllFinancePayments(
         compactParams({
           status: paymentStatusFilter,
+          keyword: paymentKeyword.trim(),
           direction: paymentDirectionFilter,
         }),
         { signal: request.signal }
@@ -1231,6 +1239,7 @@ export default function FinancePaymentsPage() {
     paymentDirectionFilter,
     paymentExportColumns,
     paymentStatusFilter,
+    paymentKeyword,
   ])
   const exportCreditRows = useCallback(async () => {
     if (exportInFlightRef.current) return
@@ -1239,7 +1248,7 @@ export default function FinancePaymentsPage() {
     const request = beginLatestRequest('finance-credit-export')
     try {
       const result = await listAllFinanceCreditNotes(
-        compactParams({ status: creditStatusFilter }),
+        compactParams({ status: creditStatusFilter, keyword: creditKeyword.trim() }),
         { signal: request.signal }
       )
       if (!request.isCurrent()) return
@@ -1264,7 +1273,7 @@ export default function FinancePaymentsPage() {
       exportInFlightRef.current = false
       request.finish()
     }
-  }, [beginLatestRequest, creditExportColumns, creditStatusFilter])
+  }, [beginLatestRequest, creditExportColumns, creditStatusFilter, creditKeyword])
   const paymentDetailLineItems = {
     title: '核销明细',
     items: Array.isArray(paymentDetail?.allocations)
@@ -1384,6 +1393,14 @@ export default function FinancePaymentsPage() {
             compact
             filters={
               <Space wrap>
+                <SearchInput
+                  {...BUSINESS_SEARCH_SCOPES.payment}
+                  value={paymentKeyword}
+                  onChange={(event) => {
+                    setPaymentKeyword(event.target.value)
+                    setPaymentPagination((current) => ({ ...current, current: 1 }))
+                  }}
+                />
                 <SelectFilter
                   className="erp-business-filter-control--status"
                   value={paymentStatusFilter}
@@ -1611,18 +1628,28 @@ export default function FinancePaymentsPage() {
           <BusinessOperationPanel
             compact
             filters={
-              <SelectFilter
-                className="erp-business-filter-control--status"
-                value={creditStatusFilter}
-                options={CREDIT_STATUS_OPTIONS}
-                onChange={(value) => {
-                  setCreditStatusFilter(value || '')
-                  setCreditPagination((current) => ({
-                    ...current,
-                    current: 1,
-                  }))
-                }}
-              />
+              <Space wrap>
+                <SearchInput
+                  {...BUSINESS_SEARCH_SCOPES.credit}
+                  value={creditKeyword}
+                  onChange={(event) => {
+                    setCreditKeyword(event.target.value)
+                    setCreditPagination((current) => ({ ...current, current: 1 }))
+                  }}
+                />
+                <SelectFilter
+                  className="erp-business-filter-control--status"
+                  value={creditStatusFilter}
+                  options={CREDIT_STATUS_OPTIONS}
+                  onChange={(value) => {
+                    setCreditStatusFilter(value || '')
+                    setCreditPagination((current) => ({
+                      ...current,
+                      current: 1,
+                    }))
+                  }}
+                />
+              </Space>
             }
             actions={
               <BusinessListToolbarActions

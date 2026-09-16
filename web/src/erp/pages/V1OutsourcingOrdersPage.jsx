@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Space, Tag } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { useOutsourcingOrderLifecycle } from '../components/outsourcing-orders/useOutsourcingOrderLifecycle.jsx'
 import { useOutsourcingOrderLineOrder } from '../components/outsourcing-orders/useOutsourcingOrderLineOrder.mjs'
 import { useOutsourcingOrderEditor } from '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs'
@@ -766,8 +767,7 @@ export default function V1OutsourcingOrdersPage() {
           <>
             <SearchInput
               value={resolvedLinkedKeyword || linkedKeyword || keyword}
-              placeholder="搜索合同"
-              searchHint="可搜索：合同号、来源订单"
+              {...BUSINESS_SEARCH_SCOPES.outsourcing}
               onChange={(event) => {
                 if (
                   linkedKeyword ||

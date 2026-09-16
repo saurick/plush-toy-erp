@@ -27,6 +27,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import Table from '@/common/components/table/AppTable'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import {
@@ -231,18 +232,6 @@ const TXN_DATE_FILTER_OPTIONS = [{ label: '发生时间', value: 'occurred_at' }
 const SUBJECT_TYPE_LABELS = Object.freeze({
   MATERIAL: '材料',
   PRODUCT: '成品',
-})
-
-const SEARCH_PLACEHOLDERS = Object.freeze({
-  [VIEW_BALANCES]: '搜索存货类型',
-  [VIEW_LOTS]: '搜索批次',
-  [VIEW_TXNS]: '搜索库存变动',
-})
-
-const SEARCH_HINTS = Object.freeze({
-  [VIEW_BALANCES]: '可搜索：存货类型',
-  [VIEW_LOTS]: '可搜索：批次号、供应商批次、色号',
-  [VIEW_TXNS]: '可搜索：变动类型、来源、备注',
 })
 
 const LOT_STATUS_LABELS = Object.freeze({
@@ -2155,16 +2144,7 @@ export default function V1InventoryLedgerPage() {
           <>
             <SearchInput
               value={linkedKeyword || keyword}
-              placeholder={
-                activeView === VIEW_BALANCES
-                  ? SEARCH_PLACEHOLDERS[VIEW_BALANCES]
-                  : SEARCH_PLACEHOLDERS[activeView]
-              }
-              searchHint={
-                activeView === VIEW_BALANCES
-                  ? SEARCH_HINTS[VIEW_BALANCES]
-                  : SEARCH_HINTS[activeView]
-              }
+              {...BUSINESS_SEARCH_SCOPES[activeView]}
               onChange={(event) => {
                 if (
                   linkedKeyword ||

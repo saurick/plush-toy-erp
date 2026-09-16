@@ -120,7 +120,7 @@ test('task action drawer keeps one compact business-facing task summary', () => 
     '<section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">'
   )
   const taskSummaryEnd = source.indexOf(
-    "{!hasActionReceipt && activeStepKey === 'context' ? (",
+    '</section>',
     taskSummaryStart
   )
   const taskSummarySource = source.slice(taskSummaryStart, taskSummaryEnd)

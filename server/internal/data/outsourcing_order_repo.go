@@ -56,6 +56,7 @@ func (r *outsourcingOrderRepo) ListOutsourcingOrders(ctx context.Context, filter
 	query := r.data.postgres.OutsourcingOrder.Query()
 	if filter.Keyword != "" {
 		query = query.Where(outsourcingorder.Or(
+			businessDocumentKeyword("outsourcing", filter.Keyword),
 			outsourcingorder.OutsourcingOrderNoContains(filter.Keyword),
 			outsourcingorder.SourceOrderNoContains(filter.Keyword),
 		))

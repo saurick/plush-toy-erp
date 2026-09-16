@@ -12,7 +12,7 @@ import (
 func (r *salesOrderRepo) ListEngineeringMaterialRequests(ctx context.Context, filter biz.EngineeringMaterialListFilter) (*biz.EngineeringMaterialList, error) {
 	query := r.data.postgres.EngineeringMaterialRequest.Query()
 	if filter.Keyword != "" {
-		query.Where(engineeringmaterialrequest.OrderNoSnapshotContainsFold(filter.Keyword))
+		query.Where(businessDocumentKeyword("engineering", filter.Keyword))
 	}
 	if filter.Status != "" {
 		query.Where(engineeringmaterialrequest.Status(filter.Status))

@@ -487,7 +487,7 @@ for (const purchaseRead of [false, true]) {
     await ui.render()
     await ui.click(ui.button('查看材料汇总'))
     assert.ok(document.querySelector('.erp-material-sheet'))
-    assert.equal(Boolean(ui.button('PO-TEST-91')), purchaseRead)
+    assert.equal(Boolean(document.querySelector('a[href="/erp/purchase/accessories?purchase_order_id=91"]')), purchaseRead)
     assert.equal(ui.button('填写核价'), undefined)
   })
 }

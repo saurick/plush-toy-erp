@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button, Form, Radio, Space, Spin, Tag } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import EngineeringMaterialPurchaseOrders from './EngineeringMaterialPurchaseOrders.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import {
   getEngineeringMaterialRequest,
@@ -32,7 +32,6 @@ export default function EngineeringMaterialRequestForm({
   render,
 }) {
   const [form] = Form.useForm()
-  const navigate = useNavigate()
   const [request, setRequest] = useState(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -482,28 +481,11 @@ export default function EngineeringMaterialRequestForm({
                 />
               </Form.Item>
             ) : null}
-            {request.purchase_orders.length ? (
-              <Space wrap>
-                {request.purchase_orders.map((po) =>
-                  mobile || !permissions.purchaseRead ? (
-                    <Tag key={po.id}>{po.purchase_order_no}</Tag>
-                  ) : (
-                    <Button
-                      key={po.id}
-                      disabled={saving}
-                      onClick={() => {
-                        onCancel?.()
-                        navigate(
-                          `/erp/purchase/accessories?purchase_order_id=${po.id}`
-                        )
-                      }}
-                    >
-                      {po.purchase_order_no}
-                    </Button>
-                  )
-                )}
-              </Space>
-            ) : null}
+            <EngineeringMaterialPurchaseOrders
+              request={request}
+              canOpen={!mobile && permissions.purchaseRead && !saving}
+              onOpen={onCancel}
+            />
           </>
         ) : null}
       </Form>

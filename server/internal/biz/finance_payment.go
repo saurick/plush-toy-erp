@@ -126,6 +126,7 @@ type FinancePaymentReverse struct {
 	Reason          string
 }
 type FinancePaymentFilter struct {
+	Keyword          string
 	Status           string
 	Direction        string
 	CounterpartyType string
@@ -147,6 +148,7 @@ type FinanceCreditNoteReverse struct {
 	IdempotencyKey string
 }
 type FinanceCreditNoteFilter struct {
+	Keyword       string
 	Status        string
 	FinanceFactID int
 	Limit         int
@@ -258,6 +260,7 @@ func (uc *OperationalFactUsecase) ListFinanceCreditNotes(ctx context.Context, fi
 	if !ok {
 		return nil, 0, ErrBadParam
 	}
+	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
 	if filter.Status != "" && filter.Status != "POSTED" && filter.Status != "REVERSED" {
 		return nil, 0, ErrBadParam
@@ -282,6 +285,7 @@ func (uc *OperationalFactUsecase) ListFinancePayments(ctx context.Context, filte
 	if !ok {
 		return nil, 0, ErrBadParam
 	}
+	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
 	filter.Direction = strings.ToUpper(strings.TrimSpace(filter.Direction))
 	filter.CounterpartyType = strings.ToUpper(strings.TrimSpace(filter.CounterpartyType))

@@ -3,6 +3,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { act, createElement } from 'react'
+import { registerJSXTestLoader, installTestDOM } from '../../../scripts/test/reactRuntime.mjs'
 
 const testDir = dirname(fileURLToPath(import.meta.url))
 const srcRoot = resolve(testDir, '../..')
@@ -66,4 +68,41 @@ test('search icons and connected search inputs only come from the shared compone
 
   assert.deepEqual(directPrefixSources, ['common/components/SearchInput.jsx'])
   assert.deepEqual(connectedSearchSources, [])
+})
+
+test('search scope is discoverable on focus, dismisses on Escape and blur, and preserves handlers', async (t) => {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [{ createRoot }, { default: SearchInput }] = await Promise.all([
+    import('react-dom/client'), import('./SearchInput.jsx'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  const calls = []
+  t.after(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    dom.restore()
+  })
+  await act(async () => root.render(createElement(SearchInput, {
+    showSearchScope: true,
+    searchHint: '可搜索：单号、产品、来源订单',
+    onFocus: () => calls.push('focus'),
+    onBlur: () => calls.push('blur'),
+    onPressEnter: () => calls.push('enter'),
+  })))
+  const input = container.querySelector('input')
+  const initialDescription = input.getAttribute('aria-describedby')
+  assert.equal(document.getElementById(initialDescription), null)
+  await act(async () => input.focus())
+  assert.match(document.getElementById(input.getAttribute('aria-describedby')).textContent, /来源订单/)
+  await act(async () => input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+  await act(async () => input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  assert.equal(input.getAttribute('aria-describedby'), initialDescription)
+  await act(async () => { input.blur(); input.focus() })
+  assert.ok(input.getAttribute('aria-describedby'))
+  await act(async () => input.blur())
+  assert.equal(input.getAttribute('aria-describedby'), initialDescription)
+  assert.deepEqual(calls, ['focus', 'enter', 'blur', 'focus', 'blur'])
 })

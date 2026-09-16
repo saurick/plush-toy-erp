@@ -12,6 +12,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -1050,8 +1051,7 @@ export default function V1PurchaseReceiptsPage() {
           <>
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || keyword}
-              placeholder="搜索入库单"
-              searchHint="可搜索：入库单号、供应商"
+              {...BUSINESS_SEARCH_SCOPES.receipt}
               onChange={(event) => {
                 if (
                   resolvedRouteKeyword ||

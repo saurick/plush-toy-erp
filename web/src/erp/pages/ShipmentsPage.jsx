@@ -14,6 +14,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -1619,8 +1620,7 @@ export default function ShipmentsPage() {
           <>
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || keyword}
-              placeholder="搜索出货"
-              searchHint="可搜索：出货单号、客户、运输方式、承运商、物流单号、唛头"
+              {...BUSINESS_SEARCH_SCOPES.shipment}
               onChange={(event) => {
                 if (linkedKeyword || routeSalesOrderID || routeShipmentID) {
                   clearRouteContext()

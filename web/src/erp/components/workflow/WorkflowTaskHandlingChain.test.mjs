@@ -208,3 +208,37 @@ test('shared chain handles read errors, retry, source switching and permission w
   assert.match(container.textContent, /尚无可核对的跨岗处理链/)
   assert.equal(calls.length, count)
 })
+
+test('approved material task exposes supplier-specific purchase links only with purchase access', async (t) => {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [{ createRoot }, { MemoryRouter }, { default: Chain }, { JsonRpc }] = await Promise.all([
+    import('react-dom/client'), import('react-router-dom'), import('./WorkflowTaskHandlingChain.jsx'), import('../../../common/utils/jsonRpc.js'),
+  ])
+  const original = JsonRpc.prototype.call
+  JsonRpc.prototype.call = async () => ({ data: {
+    ...request,
+status: 'APPROVED',
+finance_reviewed_at: '2026-09-16T02:38:04Z',
+    purchase_orders: [{ id: 91, purchase_order_no: 'PO-91', supplier_name: '面料厂' }, { id: 92, purchase_order_no: 'PO-92', supplier_name: '辅料厂' }],
+  } })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    JsonRpc.prototype.call = original
+    dom.restore()
+  })
+  const render = (canOpen) => act(async () => root.render(createElement(MemoryRouter, {}, createElement(Chain, {
+    task: taskFor(), profile: { ...profile, permissions: [...profile.permissions, ...(canOpen ? ['purchase.order.read'] : [])], effective_session: { actions: [...profile.effective_session.actions, ...(canOpen ? ['purchase.order.read'] : [])] } },
+  }))))
+  await render(true)
+  assert.match(container.textContent, /已生成 2 张采购订单/)
+  assert.match(container.textContent, /面料厂.*辅料厂/)
+  assert.deepEqual([...container.querySelectorAll('a')].map((a) => a.getAttribute('href')), ['/erp/purchase/accessories?purchase_order_id=91', '/erp/purchase/accessories?purchase_order_id=92'])
+  await render(false)
+  assert.equal(container.querySelectorAll('a').length, 0)
+  assert.match(container.textContent, /PO-91/)
+})

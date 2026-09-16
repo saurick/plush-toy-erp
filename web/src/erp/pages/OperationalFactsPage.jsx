@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Input, Modal, Popconfirm, Tabs, Tag } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { useOperationalFactQuery } from '../components/operational-facts/useOperationalFactQuery.mjs'
 import { useOperationalFactMutations } from '../components/operational-facts/useOperationalFactMutations.mjs'
 import {
@@ -676,8 +677,7 @@ export function OperationalFactWorkspace({
           <>
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || keyword}
-              placeholder="搜索单号"
-              searchHint="可搜索：单号、来源、备注"
+              {...BUSINESS_SEARCH_SCOPES[{ production: 'production_fact', outsourcing: 'outsourcing_fact', finance: 'finance' }[currentActiveKey]]}
               onChange={(event) => {
                 if (
                   resolvedRouteKeyword ||

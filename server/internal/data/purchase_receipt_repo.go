@@ -1110,6 +1110,7 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 	}
 	if filter.Keyword != "" {
 		query = query.Where(purchasereceipt.Or(
+			businessDocumentKeyword("receipt", filter.Keyword),
 			purchasereceipt.ReceiptNoContainsFold(filter.Keyword),
 			purchasereceipt.SupplierNameContainsFold(filter.Keyword),
 		))

@@ -13,7 +13,9 @@ import (
 
 type financePaymentServiceRepo struct {
 	stubBusinessDashboardOperationalFactRepo
-	item *biz.FinancePayment
+	item          *biz.FinancePayment
+	paymentFilter biz.FinancePaymentFilter
+	creditFilter  biz.FinanceCreditNoteFilter
 }
 
 func (r *financePaymentServiceRepo) CreateFinancePayment(_ context.Context, in *biz.FinancePaymentCreate, actorID int, _ string) (*biz.FinancePayment, error) {
@@ -45,7 +47,8 @@ func (r *financePaymentServiceRepo) ReverseFinanceCreditNote(_ context.Context, 
 func (r *financePaymentServiceRepo) GetFinancePayment(_ context.Context, _ int) (*biz.FinancePayment, error) {
 	return r.item, nil
 }
-func (r *financePaymentServiceRepo) ListFinancePayments(_ context.Context, _ biz.FinancePaymentFilter) ([]*biz.FinancePayment, int, error) {
+func (r *financePaymentServiceRepo) ListFinancePayments(_ context.Context, filter biz.FinancePaymentFilter) ([]*biz.FinancePayment, int, error) {
+	r.paymentFilter = filter
 	if r.item == nil {
 		return nil, 0, nil
 	}
@@ -54,7 +57,8 @@ func (r *financePaymentServiceRepo) ListFinancePayments(_ context.Context, _ biz
 func (r *financePaymentServiceRepo) GetFinanceCreditNote(_ context.Context, id int) (*biz.FinanceCreditNote, error) {
 	return &biz.FinanceCreditNote{ID: id, CreditNoteNo: "CN-RPC-1", Status: "POSTED", Amount: decimal.NewFromInt(10), Currency: "CNY"}, nil
 }
-func (r *financePaymentServiceRepo) ListFinanceCreditNotes(_ context.Context, _ biz.FinanceCreditNoteFilter) ([]*biz.FinanceCreditNote, int, error) {
+func (r *financePaymentServiceRepo) ListFinanceCreditNotes(_ context.Context, filter biz.FinanceCreditNoteFilter) ([]*biz.FinanceCreditNote, int, error) {
+	r.creditFilter = filter
 	return []*biz.FinanceCreditNote{{ID: 1, CreditNoteNo: "CN-RPC-1", Status: "POSTED", Amount: decimal.NewFromInt(10), Currency: "CNY"}}, 1, nil
 }
 func (r *financePaymentServiceRepo) GetFinanceFact(_ context.Context, id int) (*biz.FinanceFact, error) {
@@ -100,7 +104,7 @@ func TestOperationalFactFinancePaymentCreateAndListContract(t *testing.T) {
 	if amount := jsonRPCNestedMap(t, created, "payment")["amount"]; amount != decimal.RequireFromString("88.50").String() {
 		t.Fatalf("amount=%v", amount)
 	}
-	_, listed, err := d.handleOperationalFact(ctx, "list_finance_payments", "list", mustJSONRPCStruct(t, map[string]any{"status": biz.FinancePaymentStatusDraft, "limit": float64(10), "offset": float64(0)}))
+	_, listed, err := d.handleOperationalFact(ctx, "list_finance_payments", "list", mustJSONRPCStruct(t, map[string]any{"keyword": "抱抱猴子", "status": biz.FinancePaymentStatusDraft, "limit": float64(10), "offset": float64(0)}))
 	if err != nil || listed == nil || listed.Code != errcode.OK.Code || jsonRPCInt(t, listed.Data.AsMap(), "total") != 1 {
 		t.Fatalf("listed=%#v err=%v", listed, err)
 	}
@@ -117,9 +121,12 @@ func TestOperationalFactFinancePaymentCreateAndListContract(t *testing.T) {
 		cancelledPayment["cancel_reason"] != "原付款信息有误" {
 		t.Fatalf("cancel receipt=%#v", cancelledPayment)
 	}
-	_, listedCredits, err := d.handleOperationalFact(ctx, "list_finance_credit_notes", "list-credit", mustJSONRPCStruct(t, map[string]any{"status": "POSTED", "limit": float64(10), "offset": float64(0)}))
+	_, listedCredits, err := d.handleOperationalFact(ctx, "list_finance_credit_notes", "list-credit", mustJSONRPCStruct(t, map[string]any{"keyword": "抱抱猴子", "status": "POSTED", "limit": float64(10), "offset": float64(0)}))
 	if err != nil || listedCredits == nil || listedCredits.Code != errcode.OK.Code || jsonRPCInt(t, listedCredits.Data.AsMap(), "total") != 1 {
 		t.Fatalf("listed credits=%#v err=%v", listedCredits, err)
+	}
+	if repo.paymentFilter.Keyword != "抱抱猴子" || repo.creditFilter.Keyword != "抱抱猴子" {
+		t.Fatal("keyword must reach both finance list repositories")
 	}
 	creditParams := mustJSONRPCStruct(t, map[string]any{
 		"credit_note_no": "CN-RPC-DENIED", "finance_fact_id": float64(9), "amount": "10", "reason": "退货红冲", "idempotency_key": "cn-rpc-denied",

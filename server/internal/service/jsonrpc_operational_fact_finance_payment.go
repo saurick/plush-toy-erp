@@ -61,10 +61,10 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		out, err := d.operationalFactUC.GetFinancePayment(ctx, getInt(pm, "id", 0))
 		return id, financePaymentResult(d, ctx, out, err), nil
 	case "list_finance_payments":
-		if !jsonRPCParamsAllowed(pm, "customer_key", "status", "direction", "counterparty_type", "counterparty_id", "limit", "offset") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "keyword", "status", "direction", "counterparty_type", "counterparty_id", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.operationalFactUC.ListFinancePayments(ctx, biz.FinancePaymentFilter{Status: getString(pm, "status"), Direction: getString(pm, "direction"), CounterpartyType: getString(pm, "counterparty_type"), CounterpartyID: getInt(pm, "counterparty_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)})
+		items, total, err := d.operationalFactUC.ListFinancePayments(ctx, biz.FinancePaymentFilter{Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), Direction: getString(pm, "direction"), CounterpartyType: getString(pm, "counterparty_type"), CounterpartyID: getInt(pm, "counterparty_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)})
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -80,11 +80,11 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		out, err := d.operationalFactUC.GetFinanceCreditNote(ctx, getInt(pm, "id", 0))
 		return id, financeCreditNoteResult(d, ctx, out, err), nil
 	case "list_finance_credit_notes":
-		if !jsonRPCParamsAllowed(pm, "customer_key", "status", "finance_fact_id", "limit", "offset") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "keyword", "status", "finance_fact_id", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
 		limit, offset := getInt(pm, "limit", 50), getInt(pm, "offset", 0)
-		items, total, err := d.operationalFactUC.ListFinanceCreditNotes(ctx, biz.FinanceCreditNoteFilter{Status: getString(pm, "status"), FinanceFactID: getInt(pm, "finance_fact_id", 0), Limit: limit, Offset: offset})
+		items, total, err := d.operationalFactUC.ListFinanceCreditNotes(ctx, biz.FinanceCreditNoteFilter{Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), FinanceFactID: getInt(pm, "finance_fact_id", 0), Limit: limit, Offset: offset})
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}

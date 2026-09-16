@@ -17,6 +17,7 @@ import {
   getWorkflowTaskProcessContext,
   listWorkflowTaskEvents,
 } from '../../api/workflowApi.mjs'
+import { isEngineeringMaterialTask } from '../../utils/engineeringMaterialTask.mjs'
 import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import {
   getWorkflowTaskOwnerRoleLabel,
@@ -860,7 +861,7 @@ export default function WorkflowTaskActionDrawer({
             ) : null}
           </section>
 
-          {!hasActionReceipt && activeStepKey === 'context' ? (
+          {(hasActionReceipt && isEngineeringMaterialTask(task)) || activeStepKey === 'context' ? (
             <WorkflowTaskHandlingChain
               task={task}
               profile={profile}

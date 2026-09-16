@@ -986,6 +986,7 @@ func (r *operationalFactRepo) ListShipments(ctx context.Context, filter biz.Oper
 	}
 	if filter.Keyword != "" {
 		q = q.Where(shipment.Or(
+			businessDocumentKeyword("shipment", filter.Keyword),
 			shipment.ShipmentNoContainsFold(filter.Keyword),
 			shipment.CustomerSnapshotContainsFold(filter.Keyword),
 			shipment.TransportMethodContainsFold(filter.Keyword),

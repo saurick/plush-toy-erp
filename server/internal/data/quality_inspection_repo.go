@@ -392,6 +392,7 @@ func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.Q
 	}
 	if filter.Keyword != "" {
 		query = query.Where(qualityinspection.Or(
+			businessDocumentKeyword("quality", filter.Keyword),
 			qualityinspection.InspectionNoContainsFold(filter.Keyword),
 			qualityinspection.PurchaseReceiptIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			qualityinspection.PurchaseReceiptItemIDEQ(parsePositiveIntOrZero(filter.Keyword)),

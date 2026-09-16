@@ -11,6 +11,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Space } from 'antd'
+import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 
 import {
   BusinessActionTooltip,
@@ -131,8 +132,7 @@ export default function PurchaseOrderOperationPanel({
         <>
           <SearchInput
             value={keyword}
-            placeholder="搜索采购单"
-            searchHint="可搜索：采购单号、供应商单号"
+            {...BUSINESS_SEARCH_SCOPES.purchase}
             onChange={(event) => {
               resetPagination()
               setKeyword(event.target.value)
