@@ -113,7 +113,7 @@ function customerTrial133Attestation(overrides = {}) {
     customerKey: "yoyoosun",
     environment: "prod",
     release: "20c96d38a7b9e6d4f3c2b1a09876543210fedcba",
-    migration: "20260714165115",
+    migration: "20260916090000",
     debug: {
       seedEnabled: false,
       seedAllowed: false,
@@ -296,28 +296,28 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
   assert.ok(plan.records.bomVersions.some((item) => item.items.length === 25));
 });
 
-test("current V6 plans use short yoyoosun-style visible business numbers", () => {
+test("current V7 plans use short yoyoosun-style visible business numbers", () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
   });
-  assert.equal(plan.prefix, "YS6");
-  assert.equal(plan.records.customers[0].code, "YS6-KH-001");
-  assert.equal(plan.records.suppliers[0].code, "YS6-GYS-001");
-  assert.equal(plan.records.materials[0].code, "YS6-WL-001");
-  assert.equal(plan.records.products[0].code, "YS6-CP-001");
-  assert.equal(plan.records.products[0].skus[0].sku_code, "YS6-GG-001-01");
-  assert.equal(plan.records.processes[0].code, "YS6-GX-001");
-  assert.equal(plan.records.salesOrders[0].order_no, "YS6-XD-001");
-  assert.equal(plan.records.purchaseOrders[0].purchase_order_no, "YS6-CG-001");
+  assert.equal(plan.prefix, "YS7");
+  assert.equal(plan.records.customers[0].code, "YS7-KH-001");
+  assert.equal(plan.records.suppliers[0].code, "YS7-GYS-001");
+  assert.equal(plan.records.materials[0].code, "YS7-WL-001");
+  assert.equal(plan.records.products[0].code, "YS7-CP-001");
+  assert.equal(plan.records.products[0].skus[0].sku_code, "YS7-GG-001-01");
+  assert.equal(plan.records.processes[0].code, "YS7-GX-001");
+  assert.equal(plan.records.salesOrders[0].order_no, "YS7-XD-001");
+  assert.equal(plan.records.purchaseOrders[0].purchase_order_no, "YS7-CG-001");
   assert.equal(
     plan.records.outsourcingOrders[0].outsourcing_order_no,
-    "YS6-WW-001",
+    "YS7-WW-001",
   );
-  assert.match(plan.records.bomVersions[0].version, /^YS6-BOM-/u);
+  assert.match(plan.records.bomVersions[0].version, /^YS7-BOM-/u);
 });
 
-test("V6 source apply retires and replaces only the exact registered V5 route holders", async () => {
+test("V7 source apply retires and replaces only the exact registered V6 route holders", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -328,7 +328,7 @@ test("V6 source apply retires and replaces only the exact registered V5 route ho
   const previous = expectedRoutes.map((item, index) => ({
     ...item,
     id: index + 1,
-    code: item.code.replace(/^YS6-/u, "YS5-"),
+    code: item.code.replace(/^YS7-/u, "YS6-"),
     is_active: true,
   }));
   const state = new Map(previous.map((item) => [item.code, { ...item }]));
@@ -338,7 +338,7 @@ test("V6 source apply retires and replaces only the exact registered V5 route ho
     if (body.method === "list_processes") {
       const keyword = body.params.keyword;
       const processes =
-        keyword === "YS5-GX-"
+        keyword === "YS6-GX-"
           ? [...state.values()].filter((item) => item.code.startsWith(keyword))
           : [...state.values()].filter(
               (item) => item.production_route_operation_code === keyword,
@@ -423,7 +423,7 @@ test("V6 source apply retires and replaces only the exact registered V5 route ho
   );
 });
 
-test("V6 route upgrade blocks every unregistered holder before mutations", async () => {
+test("V7 route upgrade blocks every unregistered holder before mutations", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -462,7 +462,7 @@ test("V6 route upgrade blocks every unregistered holder before mutations", async
   assert.deepEqual(writes, []);
 });
 
-test("V6 route upgrade resumes after an already released predecessor without rewriting it", async () => {
+test("V7 route upgrade resumes after an already released predecessor without rewriting it", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -473,7 +473,7 @@ test("V6 route upgrade resumes after an already released predecessor without rew
   const previous = {
     ...expected,
     id: 1,
-    code: expected.code.replace(/^YS6-/u, "YS5-"),
+    code: expected.code.replace(/^YS7-/u, "YS6-"),
     production_route_operation_code: null,
     is_active: false,
   };
@@ -481,7 +481,7 @@ test("V6 route upgrade resumes after an already released predecessor without rew
   const fetchImpl = async (_url, init) => {
     const body = JSON.parse(init.body);
     if (body.method === "list_processes") {
-      const processes = body.params.keyword === "YS5-GX-" ? [previous] : [];
+      const processes = body.params.keyword === "YS6-GX-" ? [previous] : [];
       return ok({ processes, total: processes.length });
     }
     writes.push(body.method);
@@ -500,13 +500,13 @@ test("V6 route upgrade resumes after an already released predecessor without rew
   assert.deepEqual(migrated, [
     {
       operationCode: "FABRIC_PROCESSING",
-      previousCode: "YS5-GX-001",
-      currentCode: "YS6-GX-001",
+      previousCode: "YS6-GX-001",
+      currentCode: "YS7-GX-001",
     },
   ]);
 });
 
-test("V6 route upgrade restores the previous binding when replacement creation fails", async () => {
+test("V7 route upgrade restores the previous binding when replacement creation fails", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -517,7 +517,7 @@ test("V6 route upgrade restores the previous binding when replacement creation f
   const previous = {
     ...expected,
     id: 1,
-    code: expected.code.replace(/^YS6-/u, "YS5-"),
+    code: expected.code.replace(/^YS7-/u, "YS6-"),
     is_active: true,
   };
   const state = { ...previous };
@@ -526,7 +526,7 @@ test("V6 route upgrade restores the previous binding when replacement creation f
     const body = JSON.parse(init.body);
     if (body.method === "list_processes") {
       const processes =
-        body.params.keyword === "YS5-GX-" ||
+        body.params.keyword === "YS6-GX-" ||
         body.params.keyword === "FABRIC_PROCESSING"
           ? [{ ...state }]
           : [];
@@ -616,8 +616,8 @@ test("outsourcing source plans satisfy the current contract readiness boundary",
       item.outsourcing_quantity,
     ]),
     [
-      [3, "MATERIAL", "YS6-GX-001", "0.600000"],
-      [4, "MATERIAL", "YS6-GX-001", "0.600000"],
+      [3, "MATERIAL", "YS7-GX-001", "0.600000"],
+      [4, "MATERIAL", "YS7-GX-001", "0.600000"],
     ],
   );
   assert.ok(
@@ -640,7 +640,7 @@ test("versioned source plans use a stable date anchor and semantic digest across
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
   });
 
-  assert.equal(localPlan.anchorDate, "2026-08-15");
+  assert.equal(localPlan.anchorDate, "2026-09-16");
   assert.equal(remotePlan.anchorDate, localPlan.anchorDate);
   assert.equal(remotePlan.semanticDigest, localPlan.semanticDigest);
   assert.equal(localPlan.roleUsers.sales, "demo_sales");
@@ -725,6 +725,11 @@ test("manual acceptance source plan covers supported business lifecycle states",
     products: 2,
     processes: 3,
   });
+  for (const material of plan.records.materials) {
+    assert.match(material.supplier_item_no, /^CL-\d+$/u);
+    assert.ok(plan.records.suppliers.some((supplier) => supplier.code === material.supplierRef && supplier.isActive));
+    assert.equal(Object.hasOwn(material, "supplier_material_code"), false);
+  }
   assert.deepEqual(
     [
       ...new Set(plan.records.suppliers.map((item) => item.supplier_type)),
@@ -956,8 +961,8 @@ test("CLI help points only to the dedicated current local acceptance database", 
     help.text,
     /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
-  assert.match(help.text, /--data-version 2026\.08\.15-v6/u);
-  assert.match(help.text, /--run-id 20260815-V6/u);
+  assert.match(help.text, /--data-version 2026\.09\.16-v7/u);
+  assert.match(help.text, /--run-id 20260916-V7/u);
   assert.doesNotMatch(help.text, /127\.0\.0\.1:8300/u);
 });
 
@@ -1825,8 +1830,8 @@ test("sales source replay accepts only the exact downstream ProcessRuntime lifec
     target: "scenario-demo",
     backendURL: "http://127.0.0.1:8300",
     databaseName: "plush_erp",
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
   });
   const candidates = plan.records.salesOrders
     .filter((record) => record.targetStatus === "DRAFT")

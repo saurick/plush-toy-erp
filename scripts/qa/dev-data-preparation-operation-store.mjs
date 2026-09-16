@@ -43,13 +43,20 @@ const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{2,39}$/u;
 const CURRENT_SCENARIO_READBACK_BASELINE = Object.freeze({
-  dataVersion: "2026.08.15-v6",
-  runId: "20260815-V6",
+  dataVersion: "2026.09.16-v7",
+  runId: "20260916-V7",
   catalogReadyCount: 41,
   catalogTargetCount: 51,
   browserChecksPending: 10,
 });
 const HISTORICAL_SCENARIO_READBACK_BASELINES = Object.freeze([
+  Object.freeze({
+    dataVersion: "2026.08.15-v6",
+    runId: "20260815-V6",
+    catalogReadyCount: 41,
+    catalogTargetCount: 51,
+    browserChecksPending: 10,
+  }),
   Object.freeze({
     dataVersion: "2026.07.16-v5",
     runId: "20260716-V5",
@@ -339,7 +346,7 @@ function validateReadback(
       );
     const matchesHistoricalBaseline =
       allowHistoricalScenarioBaseline &&
-      legacy &&
+      (legacy || current || remoteCurrent) &&
       HISTORICAL_SCENARIO_READBACK_BASELINES.some((baseline) =>
         matchesScenarioReadbackBaseline(value, baseline),
       );

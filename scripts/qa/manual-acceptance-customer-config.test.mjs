@@ -31,14 +31,14 @@ import {
 
 const CONFIG_HASH = "a".repeat(64);
 const CONFIRMATION =
-  "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.08.15-v6:20260815-V6";
+  "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.09.16-v7:20260916-V7";
 const ATTESTATION = Object.freeze({
   target: CUSTOMER_TRIAL_133_TARGET,
   origin: CUSTOMER_TRIAL_133_ORIGIN,
   customerKey: "yoyoosun",
   environment: "prod",
   release: "929ec0b3a563bec0796274d033a97277519bcb51",
-  migration: "20260714165115",
+  migration: "20260916090000",
   debug: {
     seedEnabled: false,
     seedAllowed: false,
@@ -294,15 +294,15 @@ test("builds a stable, explicit trial manifest without mutating preview input", 
   );
   assert.equal(manifest.compiled_snapshot.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(manifest.compiled_snapshot.package.status, "draft");
-  assert.equal(CUSTOMER_CONFIG_DATA_VERSION, "2026.08.15-v6");
-  assert.equal(CUSTOMER_CONFIG_RUN_ID, "20260815-V6");
+  assert.equal(CUSTOMER_CONFIG_DATA_VERSION, "2026.09.16-v7");
+  assert.equal(CUSTOMER_CONFIG_RUN_ID, "20260916-V7");
   assert.equal(
     CUSTOMER_CONFIG_PRODUCT_VERSION,
-    "customer-trial-133-test-2026.08.15-v6",
+    "customer-trial-133-test-2026.09.16-v7",
   );
   assert.equal(
     CUSTOMER_CONFIG_REVISION,
-    "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
+    "yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1",
   );
 });
 
@@ -437,7 +437,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         dataVersion: "2026.07.15-v1",
         runId: CUSTOMER_CONFIG_RUN_ID,
       }),
-    /dataVersion must be 2026\.08\.15-v6/u,
+    /dataVersion must be 2026\.09\.16-v7/u,
   );
   assert.throws(
     () =>
@@ -445,7 +445,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         dataVersion: CUSTOMER_CONFIG_DATA_VERSION,
         runId: "20260715-V1",
       }),
-    /runId must be 20260815-V6/u,
+    /runId must be 20260916-V7/u,
   );
 
   const currentManifest = buildCustomerTrial133Manifest(previewManifest());
@@ -457,7 +457,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         dataVersion: "2026.07.15-v1",
         runId: "20260715-V1",
       }),
-    /requires dataVersion=2026\.08\.15-v6 and runId=20260815-V6/u,
+    /requires dataVersion=2026\.09\.16-v7 and runId=20260916-V7/u,
   );
   let calls = 0;
 

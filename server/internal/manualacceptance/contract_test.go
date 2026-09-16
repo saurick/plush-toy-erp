@@ -13,8 +13,8 @@ func TestCurrentContractIsExactAndDefensivelyCopied(t *testing.T) {
 	if contract.CustomerTrial133.DatabaseLifecycle != "long-lived-registered-target" ||
 		contract.CustomerTrial133.DeploymentTarget != "demo-133" ||
 		contract.CustomerTrial133.DatabaseName != "plush_erp_demo_v1" ||
-		contract.CustomerTrial133.PreviousConfigProductVersion != "customer-trial-133-test-2026.07.16-v5" ||
-		contract.CustomerTrial133.PreviousDatasetVersion != "2026.07.16-v5" {
+		contract.CustomerTrial133.PreviousConfigProductVersion != "customer-trial-133-test-2026.08.15-v6" ||
+		contract.CustomerTrial133.PreviousDatasetVersion != "2026.08.15-v6" {
 		t.Fatalf("unexpected stable customer-trial database identity: %#v", contract.CustomerTrial133)
 	}
 	contract.Units[0].Name = "changed"

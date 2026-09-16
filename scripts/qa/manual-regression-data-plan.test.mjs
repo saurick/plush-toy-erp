@@ -27,8 +27,8 @@ test("manual-regression-data-plan: keeps read-only simulated boundary", () => {
   assert.equal(plan.productCore.prefix, "SIM-PLUSH-CORE");
   assert.equal(plan.productCore.realCustomerImport, false);
   assert.equal(plan.yoyoosun.customerKey, "yoyoosun");
-  assert.equal(plan.yoyoosun.dataVersion, "2026.08.15-v6");
-  assert.equal(plan.yoyoosun.runId, "20260815-V6");
+  assert.equal(plan.yoyoosun.dataVersion, "2026.09.16-v7");
+  assert.equal(plan.yoyoosun.runId, "20260916-V7");
   assert.equal(plan.yoyoosun.simulatedOnly, true);
   assert.equal(plan.yoyoosun.realCustomerImport, false);
   assert.equal(plan.yoyoosun.fixtureStatus, "preview_only");
@@ -98,8 +98,8 @@ test("manual-regression-data-plan: current dataset uses one source-driven fact p
   const plan = buildManualRegressionDataPlan();
   const commands = plan.yoyoosun.commands;
 
-  assert.equal(plan.yoyoosun.currentContract.version, "2026.08.15-v6");
-  assert.equal(plan.yoyoosun.currentContract.runId, "20260815-V6");
+  assert.equal(plan.yoyoosun.currentContract.version, "2026.09.16-v7");
+  assert.equal(plan.yoyoosun.currentContract.runId, "20260916-V7");
   assert.deepEqual(plan.yoyoosun.currentContract.targets, [
     "local",
     "customer-trial-133",
@@ -116,7 +116,7 @@ test("manual-regression-data-plan: current dataset uses one source-driven fact p
     commands.factsEntrypoint,
     "scripts/qa/manual-acceptance-fact-data.mjs",
   );
-  assert.match(commands.sourcePlan, /2026\.08\.15-v6.*20260815-V6/u);
+  assert.match(commands.sourcePlan, /2026\.09\.16-v7.*20260916-V7/u);
   assert.doesNotMatch(
     JSON.stringify(plan),
     /purchase-quality-simulated-matrix|operational-fact-simulated-closure/u,
@@ -130,7 +130,7 @@ test("manual-regression-data-plan: formatted output is reviewable", () => {
   assert.match(output, /本地通用基础资料/u);
   assert.match(output, /SIM-PLUSH-CORE/u);
   assert.match(output, /永绅模拟验收数据/u);
-  assert.match(output, /2026\.08\.15-v6 \/ 20260815-V6/u);
+  assert.match(output, /2026\.09\.16-v7 \/ 20260916-V7/u);
   assert.match(output, /统一数据合同: units=11, warehouses=4/u);
   assert.match(output, /单位候选: 件, Y, 套, PCS, 对, 片, 码, 个, 条, kg, 块/u);
   assert.match(output, /review-pass-1-runtime-contract-and-fixture-unit-tests/u);

@@ -10,16 +10,16 @@ import (
 )
 
 func TestSeedCoreDemoModeSelection(t *testing.T) {
-	if _, err := seedCoreDemo(context.Background(), nil, data.CoreDemoSeedPrefix, true); !errors.Is(err, data.ErrCoreDemoSeedMissingDB) {
+	if _, err := seedCoreDemo(context.Background(), nil, data.CoreDemoSeedPrefix, true, false); !errors.Is(err, data.ErrCoreDemoSeedMissingDB) {
 		t.Fatalf("expected exact references-only mode to reach the references writer, got %v", err)
 	}
-	if _, err := seedCoreDemo(context.Background(), nil, "SIM-CUSTOM", false); !errors.Is(err, data.ErrCoreDemoSeedMissingDB) {
+	if _, err := seedCoreDemo(context.Background(), nil, "SIM-CUSTOM", false, false); !errors.Is(err, data.ErrCoreDemoSeedMissingDB) {
 		t.Fatalf("expected default mode to retain the complete seed writer, got %v", err)
 	}
 }
 
 func TestSeedCoreDemoReferencesOnlyRejectsAlternatePrefix(t *testing.T) {
-	_, err := seedCoreDemo(context.Background(), nil, "SIM-CUSTOM", true)
+	_, err := seedCoreDemo(context.Background(), nil, "SIM-CUSTOM", true, false)
 	if err == nil || !strings.Contains(err.Error(), "does not accept a custom prefix") {
 		t.Fatalf("expected references-only mode to reject alternate prefix, got %v", err)
 	}
@@ -36,7 +36,7 @@ func TestReferenceModeReadbackKeepsAcceptanceAndScenarioModesDistinct(t *testing
 
 func TestManualAcceptanceReferenceTargetIsBoundToTheExactFreshDatabase(t *testing.T) {
 	const database = "plush_erp_acceptance_20260728_delivery_dev"
-	const confirmation = "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:" + database + ":2026.08.15-v6:20260815-V6"
+	const confirmation = "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:" + database + ":2026.09.16-v7:20260916-V7"
 	validLoopback := "postgres://acceptance:secret@127.0.0.1:55432/" + database + "?sslmode=disable"
 	validRegisteredDevelopment := "postgres://acceptance:secret@192.168.0.133:5432/" + database + "?sslmode=disable"
 	for _, valid := range []string{validLoopback, validRegisteredDevelopment} {
@@ -94,14 +94,14 @@ func TestManualAcceptanceReferenceTargetIsBoundToTheExactFreshDatabase(t *testin
 
 func TestScenarioDemoReferenceTargetIsBoundToRegisteredLongLivedDevelopmentDatabase(t *testing.T) {
 	for _, database := range []string{"plush_erp", "plush_erp_simon_dev"} {
-		confirmation := "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:" + database + ":2026.08.15-v6:20260815-V6"
+		confirmation := "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:" + database + ":2026.09.16-v7:20260916-V7"
 		dsn := "postgres://acceptance:secret@192.168.0.133:5432/" + database + "?sslmode=disable"
 		if err := validateScenarioDemoReferenceTarget(dsn, database, confirmation); err != nil {
 			t.Fatalf("valid scenario reference target rejected: %v", err)
 		}
 	}
 	const database = "plush_erp"
-	const confirmation = "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:plush_erp:2026.08.15-v6:20260815-V6"
+	const confirmation = "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:plush_erp:2026.09.16-v7:20260916-V7"
 	for name, input := range map[string]struct {
 		dsn      string
 		database string

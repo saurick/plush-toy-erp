@@ -32,8 +32,8 @@ const remotePolicyInput = Object.freeze({
   target: CUSTOMER_TRIAL_133_TARGET,
   backendURL: CUSTOMER_TRIAL_133_ORIGIN,
   datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
-  dataVersion: "2026.08.15-v6",
-  runId: "20260815-V6",
+  dataVersion: "2026.09.16-v7",
+  runId: "20260916-V7",
 });
 
 const safeRemoteCapabilities = Object.freeze({
@@ -77,8 +77,8 @@ const scenarioPolicyInput = Object.freeze({
   target: SCENARIO_DEMO_TARGET,
   backendURL: SCENARIO_DEMO_ORIGIN,
   datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
-  dataVersion: "2026.08.15-v6",
-  runId: "20260815-V6",
+  dataVersion: "2026.09.16-v7",
+  runId: "20260916-V7",
   databaseName: "plush_erp",
 });
 
@@ -109,14 +109,14 @@ test("scenario demo is fixed to loopback 8300 and registered long-lived developm
     datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
     backendURL: SCENARIO_DEMO_ORIGIN,
     origin: SCENARIO_DEMO_ORIGIN,
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
     external: false,
     transport: "loopback",
     databaseName: "plush_erp",
   });
   const expected =
-    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:scenario-demo:2026.08.15-v6:20260815-V6:plush_erp";
+    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:scenario-demo:2026.09.16-v7:20260916-V7:plush_erp";
   assert.equal(manualAcceptanceTargetConfirmation(policy), expected);
   assert.equal(
     assertManualAcceptanceMutationTarget(policy, {
@@ -259,13 +259,13 @@ test("customer-trial-133 requires explicit safe dataVersion and runId", () => {
 
 test("customer-trial-133 mutation confirmation binds target, version, and run", () => {
   const expected =
-    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.08.15-v6:20260815-V6";
+    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.09.16-v7:20260916-V7";
   assert.equal(manualAcceptanceTargetConfirmation(remotePolicyInput), expected);
   for (const confirmation of [
     undefined,
     "yes",
-    expected.replace("2026.08.15-v6", "2026.07.16-v6"),
-    expected.replace("20260815-V6", "20260716-V6"),
+    expected.replace("2026.09.16-v7", "2026.07.16-v6"),
+    expected.replace("20260916-V7", "20260716-V6"),
   ]) {
     assert.throws(
       () =>
@@ -288,11 +288,11 @@ test("local dedicated apply confirmation and runtime database identity are exact
     target: LOCAL_DEV_TARGET,
     backendURL: "http://127.0.0.1:18376",
     datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
     databaseName: LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE,
   };
-  const confirmation = `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:${LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE}`;
+  const confirmation = `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.09.16-v7:20260916-V7:${LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE}`;
   assert.equal(manualAcceptanceTargetConfirmation(localPolicy), confirmation);
   assert.throws(
     () => assertManualAcceptanceMutationTarget(localPolicy),
@@ -363,7 +363,7 @@ test("customer-trial-133 out-of-band attestation pins origin, customer, release,
     customerKey: "yoyoosun",
     environment: "prod",
     release: "20c96d38a7b9e6d4f3c2b1a09876543210fedcba",
-    migration: "20260714165115",
+    migration: "20260916090000",
     debug: { ...safeRemoteCapabilities, environment: undefined },
   };
   delete attestation.debug.environment;
@@ -373,7 +373,7 @@ test("customer-trial-133 out-of-band attestation pins origin, customer, release,
     attestation: JSON.stringify(attestation),
   });
   assert.equal(checked.release, "20c96d38a7b9e6d4f3c2b1a09876543210fedcba");
-  assert.equal(checked.migration, "20260714165115");
+  assert.equal(checked.migration, "20260916090000");
   assert.deepEqual(
     manualAcceptanceRuntimeCapabilitiesFromAttestation({
       policy: remotePolicyInput,
@@ -413,7 +413,7 @@ test("runtime identity precondition requires the dedicated proof marker before a
     customerKey: "yoyoosun",
     environment: "prod",
     release: "20c96d38a7b9e6d4f3c2b1a09876543210fedcba",
-    migration: "20260714165115",
+    migration: "20260916090000",
     debug: Object.fromEntries(
       [
         "seedEnabled",
@@ -562,8 +562,8 @@ test("local runtime accepts only the tracked local-test package without trial ma
   const policy = {
     backendURL: "http://127.0.0.1:8310",
     databaseName: "plush_erp_acceptance_local_fixture_dev",
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
   };
   const runtime = assertManualAcceptanceRuntimePolicy({
     policy,

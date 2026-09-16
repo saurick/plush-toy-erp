@@ -96,6 +96,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "expected_version",
     "idempotency_key",
   ]),
+  "production_order.get_production_order": Object.freeze(["production_order_id"]),
   "operational_fact.create_production_material_issue_from_order": Object.freeze(
     [
       "customer_key",
@@ -2356,15 +2357,20 @@ async function applyProduction(plan, rpc) {
     "DRAFT",
     "create_production_order",
   );
-  const release = await invoke(
+  const current = await invoke(rpc, "production_order", "get_production_order", { production_order_id: order.id });
+  const currentOrder = current.production_order;
+  if (Number(currentOrder?.id) !== Number(order.id) || !["DRAFT", "RELEASED"].includes(currentOrder.status)) {
+    throw new SourceDrivenFactError("production order changed before release");
+  }
+  const release = currentOrder.status === "RELEASED" ? current : await invoke(
     rpc,
     "production_order",
     "release_production_order",
     {
       production_order_id: order.id,
       expected_version: positiveID(
-        order.version,
-        "create_production_order.production_order.version",
+        currentOrder.version,
+        "get_production_order.production_order.version",
       ),
       idempotency_key: identity.release.idempotencyKey,
     },

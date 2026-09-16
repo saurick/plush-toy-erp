@@ -17,6 +17,7 @@ import {
   manualAcceptanceFactRPCParams,
   mergeManualAcceptanceFactReferences,
   readManualAcceptanceFinalInventoryReferences,
+  readManualAcceptanceFulfillmentHandoffs,
   parseManualAcceptanceFactArgs,
   readPurchaseReceiptQualities,
   readManualAcceptanceSalesPlan,
@@ -72,11 +73,13 @@ test("runtime admin guard consumes the formal top-level auth.me profile", () => 
   }
 });
 
-test("routed WIP writes use the verified admin and keep customer_key out of the strict WIP contract", () => {
+test("routed WIP writes use production, warehouse and sales roles and keep customer_key out of the strict WIP contract", () => {
   assert.equal(
     manualAcceptanceFactRole("production_wip", "execute_production_wip_action"),
-    "admin",
+    "production",
   );
+  assert.equal(manualAcceptanceFactRole("production_wip", "execute_production_wip_action", { action: "RECEIVE_OUTSOURCING_RETURN" }), "warehouse");
+  assert.equal(manualAcceptanceFactRole("production_wip", "execute_production_wip_action", { action: "CONFIRM_PACKAGING_MATERIAL" }), "sales");
   assert.deepEqual(
     manualAcceptanceFactRPCParams(
       "production_wip",
@@ -247,7 +250,7 @@ function sourceReport({ remote = false } = {}) {
             targetAttestation: {
               source: "out-of-band",
               release: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-              migration: "20260714165115",
+              migration: "20260916090000",
             },
           }
         : {}),
@@ -847,7 +850,7 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
   }
   assert.equal(
     manualAcceptanceFactRole("purchase", "list_purchase_receipts"),
-    "purchase",
+    "warehouse",
   );
   assert.equal(
     manualAcceptanceFactRole("production_order", "create_production_order"),
@@ -1650,6 +1653,16 @@ function phaseLookupRPC(specs, rows, productionDetail) {
     return { [spec.listKey]: record ? [structuredClone(record)] : [] };
   };
 }
+
+test("a sole exact production draft can resume but a draft with material requirements cannot", async () => {
+  const f = productionResumeFixture();
+  const draft = { ...f.records[0], status: "DRAFT" };
+  const detail = { ...f.detail, production_material_requirements: [] };
+  assert.equal(f.specs[0].statuses.has("DRAFT"), false);
+  assert.equal(f.specs[0].partialStatuses.has("DRAFT"), true);
+  await validateProductionPhasePartialRecords(async () => detail, f.sourcePlan, [draft]);
+  await assert.rejects(validateProductionPhasePartialRecords(async () => f.detail, f.sourcePlan, [draft]), /conflicting production lines/);
+});
 
 test("sales readback preserves the exact completed finance approval task anchor", async () => {
   const sales = salesResumeFixture();
@@ -2689,7 +2702,7 @@ function attestation() {
     customerKey: "yoyoosun",
     environment: "prod",
     release: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    migration: "20260714165115",
+    migration: "20260916090000",
     debug: {
       seedEnabled: false,
       seedAllowed: false,
@@ -2730,7 +2743,7 @@ test("remote apply rejects missing target confirmation and attestation before ex
         targetAttestation: {
           source: "out-of-band",
           release: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          migration: "20260714165115",
+          migration: "20260916090000",
         },
       },
     },
@@ -2783,7 +2796,7 @@ test("remote runtime release drift fails before any fact stage", async () => {
             targetAttestation: {
               source: "out-of-band",
               release: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-              migration: "20260714165115",
+              migration: "20260916090000",
             },
           },
         },
@@ -2851,4 +2864,33 @@ test("source contains no direct SQL or retired generic writer import", async () 
   );
   assert.match(source, /applySourceDrivenFactPlan/u);
   assert.match(source, /assertManualAcceptanceTargetAttestation/u);
+});
+
+test("fulfillment readback binds warehouse tasks to posted sources and rejects wrong roles or statuses", async () => {
+  const purchase = { purchaseReceipts: [{ id: 11, status: "POSTED" }] };
+  const facts = { productionFacts: [
+    { id: 22, fact_type: "FINISHED_GOODS_RECEIPT", status: "POSTED" },
+    { id: 23, fact_type: "FINISHED_GOODS_RECEIPT", status: "DRAFT" },
+    { id: 24, fact_type: "FINISHED_GOODS_RECEIPT", status: "CANCELLED" },
+  ] };
+  const rpc = async ({ actor, domain, method, params }) => {
+    assert.equal(actor, "warehouse");
+    assert.equal(domain, "workflow");
+    assert.equal(method, "list_tasks");
+    return { total: 1, tasks: [{ id: params.source_id + 100, ...params,
+      owner_role_key: "warehouse", task_status_key: params.source_id === 23 ? "ready" : params.source_id === 24 ? "withdrawn" : "done",
+      payload: { source_task_producer: "fulfillment.source", entry_path: "/erp/warehouse/inbound" },
+    }] };
+  };
+  const result = await readManualAcceptanceFulfillmentHandoffs(rpc, purchase, facts);
+  assert.equal(result.verified, true);
+  assert.equal(result.count, 4);
+  for (const patch of [{ owner_role_key: "purchase" }, { task_status_key: "blocked" }, { source_id: 999 }]) {
+    await assert.rejects(() => readManualAcceptanceFulfillmentHandoffs(async (request) => {
+      const data = await rpc(request);
+      Object.assign(data.tasks[0], patch);
+      return data;
+    }, purchase, facts), /does not match its source and responsible role/u);
+  }
+  await assert.rejects(() => readManualAcceptanceFulfillmentHandoffs(rpc, {}, {}), /requires both/u);
 });

@@ -32,23 +32,23 @@ func TestDefaultCoreDemoReferenceSeedDatasetIsExact(t *testing.T) {
 	want := CoreDemoReferenceSeedDataset{
 		Prefix: CoreDemoReferenceSeedPrefix,
 		Units: []CoreDemoUnitSeed{
-			{Code: "YS6-DW-01", Name: "件", Precision: 0},
-			{Code: "YS6-DW-02", Name: "Y", Precision: 6},
-			{Code: "YS6-DW-03", Name: "套", Precision: 0},
-			{Code: "YS6-DW-04", Name: "PCS", Precision: 0},
-			{Code: "YS6-DW-05", Name: "对", Precision: 0},
-			{Code: "YS6-DW-06", Name: "片", Precision: 0},
-			{Code: "YS6-DW-07", Name: "码", Precision: 6},
-			{Code: "YS6-DW-08", Name: "个", Precision: 0},
-			{Code: "YS6-DW-09", Name: "条", Precision: 0},
-			{Code: "YS6-DW-10", Name: "kg", Precision: 3},
-			{Code: "YS6-DW-11", Name: "块", Precision: 0},
+			{Code: "YS7-DW-01", Name: "件", Precision: 0},
+			{Code: "YS7-DW-02", Name: "Y", Precision: 6},
+			{Code: "YS7-DW-03", Name: "套", Precision: 0},
+			{Code: "YS7-DW-04", Name: "PCS", Precision: 0},
+			{Code: "YS7-DW-05", Name: "对", Precision: 0},
+			{Code: "YS7-DW-06", Name: "片", Precision: 0},
+			{Code: "YS7-DW-07", Name: "码", Precision: 6},
+			{Code: "YS7-DW-08", Name: "个", Precision: 0},
+			{Code: "YS7-DW-09", Name: "条", Precision: 0},
+			{Code: "YS7-DW-10", Name: "kg", Precision: 3},
+			{Code: "YS7-DW-11", Name: "块", Precision: 0},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
-			{Code: "YS6-CK-01", Name: "原料仓", Type: "MATERIAL"},
-			{Code: "YS6-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
-			{Code: "YS6-CK-03", Name: "待检仓", Type: "MATERIAL"},
-			{Code: "YS6-CK-04", Name: "在制仓", Type: "MATERIAL"},
+			{Code: "YS7-CK-01", Name: "原料仓", Type: "MATERIAL"},
+			{Code: "YS7-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
+			{Code: "YS7-CK-03", Name: "待检仓", Type: "MATERIAL"},
+			{Code: "YS7-CK-04", Name: "在制仓", Type: "MATERIAL"},
 		},
 	}
 	got := DefaultCoreDemoReferenceSeedDataset()
@@ -74,7 +74,7 @@ func TestCoreDemoReferenceSeedRejectsAnythingOutsideExactAllowlist(t *testing.T)
 		{
 			name: "extra unit",
 			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
-				dataset.Units = append(dataset.Units, CoreDemoUnitSeed{Code: "YS6-DW-12", Name: "箱"})
+				dataset.Units = append(dataset.Units, CoreDemoUnitSeed{Code: "YS7-DW-12", Name: "箱"})
 			},
 		},
 		{
@@ -92,7 +92,7 @@ func TestCoreDemoReferenceSeedRejectsAnythingOutsideExactAllowlist(t *testing.T)
 		{
 			name: "extra warehouse",
 			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
-				dataset.Warehouses = append(dataset.Warehouses, CoreDemoWarehouseSeed{Code: "YS6-CK-05", Name: "其他仓", Type: "OTHER"})
+				dataset.Warehouses = append(dataset.Warehouses, CoreDemoWarehouseSeed{Code: "YS7-CK-05", Name: "其他仓", Type: "OTHER"})
 			},
 		},
 		{
@@ -435,7 +435,7 @@ func TestSeedCoreDemoDataRejectsForeignRouteOwnerBeforeWrites(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery("SELECT code\\s+FROM processes\\s+WHERE production_route_operation_code = \\$1\\s+FOR UPDATE").
 		WithArgs(biz.ProductionWIPOperationSewing).
-		WillReturnRows(sqlmock.NewRows([]string{"code"}).AddRow("YS6-GX-005"))
+		WillReturnRows(sqlmock.NewRows([]string{"code"}).AddRow("YS7-GX-005"))
 	mock.ExpectRollback()
 	mock.ExpectClose()
 
@@ -539,5 +539,40 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestSeedScenarioDemoReferencesPreservesEveryEarlierReference(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		mock.ExpectClose()
+		if err := db.Close(); err != nil {
+			t.Errorf("close seed test database: %v", err)
+		}
+	})
+	dataset := DefaultCoreDemoReferenceSeedDataset()
+	mock.ExpectBegin()
+	for i, unit := range dataset.Units {
+		mock.ExpectQuery("INSERT INTO units").WithArgs(unit.Code, unit.Name, unit.Precision).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11 + i))
+	}
+	for i, warehouse := range dataset.Warehouses {
+		mock.ExpectQuery("INSERT INTO warehouses").WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31 + i))
+	}
+	// No query, update, or identity assumption is allowed for a previous batch.
+	mock.ExpectCommit()
+	result, err := SeedScenarioDemoReferences(context.Background(), db, dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.RetiredUnitIDs) != 0 || len(result.RetiredWarehouseIDs) != 0 {
+		t.Fatal("shared development references were retired")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -31,24 +31,19 @@ function deepFreeze(value) {
 
 function dataSemanticValue(contract) {
   const value = structuredClone(contract);
-  // Deployment placement is not part of the V6 business-data topology. Keep
-  // existing V6 Scenario receipts stable while moving the simulated dataset
-  // from the customer-data test database to the isolated demo target.
-  value.customerTrial133.databaseName = "plush_erp_uat_20260716_v5";
-  delete value.customerTrial133.deploymentTarget;
-  delete value.customerTrial133.previousConfigProductVersion;
-  delete value.customerTrial133.previousDatasetVersion;
+  // Environment placement does not change the business-data contract.
+  delete value.customerTrial133;
   return value;
 }
 
 export function validateManualAcceptanceCoreContract(contract) {
   if (
-    contract?.schemaVersion !== "plush.manual-acceptance-contract/v6" ||
+    contract?.schemaVersion !== "plush.manual-acceptance-contract/v7" ||
     contract?.datasetKey !== "yoyoosun-manual-acceptance" ||
-    contract?.dataVersion !== "2026.08.15-v6" ||
-    contract?.runId !== "20260815-V6" ||
-    contract?.anchorDateUtc !== "2026-08-15T12:00:00.000Z" ||
-    contract?.visiblePrefix !== "YS6" ||
+    contract?.dataVersion !== "2026.09.16-v7" ||
+    contract?.runId !== "20260916-V7" ||
+    contract?.anchorDateUtc !== "2026-09-16T12:00:00.000Z" ||
+    contract?.visiblePrefix !== "YS7" ||
     contract?.simulatedOnly !== true ||
     contract?.realCustomerImport !== false ||
     contract?.sourceNormalization?.trimWhitespace !== true ||
@@ -95,14 +90,14 @@ export function validateManualAcceptanceCoreContract(contract) {
     target?.databaseName !== "plush_erp_demo_v1" ||
     target?.databaseLifecycle !== "long-lived-registered-target" ||
     !/^[0-9]{14}$/u.test(String(target?.minimumMigration || "")) ||
-    !String(target?.configRevision || "").includes("package-v8") ||
+    !String(target?.configRevision || "").includes("package-v9") ||
     !String(target?.configProductVersion || "").endsWith(
       contract.dataVersion,
     ) ||
-    !String(target?.previousConfigRevision || "").includes("package-v7") ||
+    !String(target?.previousConfigRevision || "").includes("package-v8") ||
     target?.previousConfigProductVersion !==
-      "customer-trial-133-test-2026.07.16-v5" ||
-    target?.previousDatasetVersion !== "2026.07.16-v5" ||
+      "customer-trial-133-test-2026.08.15-v6" ||
+    target?.previousDatasetVersion !== "2026.08.15-v6" ||
     !String(target.previousConfigProductVersion).endsWith(
       target.previousDatasetVersion,
     )

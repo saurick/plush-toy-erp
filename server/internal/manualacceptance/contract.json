@@ -1,10 +1,10 @@
 {
-  "schemaVersion": "plush.manual-acceptance-contract/v6",
+  "schemaVersion": "plush.manual-acceptance-contract/v7",
   "datasetKey": "yoyoosun-manual-acceptance",
-  "dataVersion": "2026.08.15-v6",
-  "runId": "20260815-V6",
-  "anchorDateUtc": "2026-08-15T12:00:00.000Z",
-  "visiblePrefix": "YS6",
+  "dataVersion": "2026.09.16-v7",
+  "runId": "20260916-V7",
+  "anchorDateUtc": "2026-09-16T12:00:00.000Z",
+  "visiblePrefix": "YS7",
   "simulatedOnly": true,
   "realCustomerImport": false,
   "sourceNormalization": {
@@ -20,34 +20,34 @@
   },
   "primaryUnitKey": "piece",
   "units": [
-    { "key": "piece", "code": "YS6-DW-01", "name": "件", "sourceLabel": "件", "precision": 0 },
-    { "key": "yard", "code": "YS6-DW-02", "name": "Y", "sourceLabel": "Y", "precision": 6 },
-    { "key": "set", "code": "YS6-DW-03", "name": "套", "sourceLabel": "套", "precision": 0 },
-    { "key": "pcs", "code": "YS6-DW-04", "name": "PCS", "sourceLabel": "PCS", "precision": 0 },
-    { "key": "pair", "code": "YS6-DW-05", "name": "对", "sourceLabel": "对", "precision": 0 },
-    { "key": "sheet", "code": "YS6-DW-06", "name": "片", "sourceLabel": "片", "precision": 0 },
-    { "key": "chineseYard", "code": "YS6-DW-07", "name": "码", "sourceLabel": "码", "precision": 6 },
-    { "key": "individual", "code": "YS6-DW-08", "name": "个", "sourceLabel": "个", "precision": 0 },
-    { "key": "strip", "code": "YS6-DW-09", "name": "条", "sourceLabel": "条", "precision": 0 },
-    { "key": "kilogram", "code": "YS6-DW-10", "name": "kg", "sourceLabel": "kg", "precision": 3 },
-    { "key": "block", "code": "YS6-DW-11", "name": "块", "sourceLabel": "块", "precision": 0 }
+    { "key": "piece", "code": "YS7-DW-01", "name": "件", "sourceLabel": "件", "precision": 0 },
+    { "key": "yard", "code": "YS7-DW-02", "name": "Y", "sourceLabel": "Y", "precision": 6 },
+    { "key": "set", "code": "YS7-DW-03", "name": "套", "sourceLabel": "套", "precision": 0 },
+    { "key": "pcs", "code": "YS7-DW-04", "name": "PCS", "sourceLabel": "PCS", "precision": 0 },
+    { "key": "pair", "code": "YS7-DW-05", "name": "对", "sourceLabel": "对", "precision": 0 },
+    { "key": "sheet", "code": "YS7-DW-06", "name": "片", "sourceLabel": "片", "precision": 0 },
+    { "key": "chineseYard", "code": "YS7-DW-07", "name": "码", "sourceLabel": "码", "precision": 6 },
+    { "key": "individual", "code": "YS7-DW-08", "name": "个", "sourceLabel": "个", "precision": 0 },
+    { "key": "strip", "code": "YS7-DW-09", "name": "条", "sourceLabel": "条", "precision": 0 },
+    { "key": "kilogram", "code": "YS7-DW-10", "name": "kg", "sourceLabel": "kg", "precision": 3 },
+    { "key": "block", "code": "YS7-DW-11", "name": "块", "sourceLabel": "块", "precision": 0 }
   ],
   "warehouses": [
-    { "key": "material", "code": "YS6-CK-01", "name": "原料仓", "type": "MATERIAL" },
-    { "key": "product", "code": "YS6-CK-02", "name": "成品仓", "type": "FINISHED_GOODS" },
-    { "key": "qualityHold", "code": "YS6-CK-03", "name": "待检仓", "type": "MATERIAL" },
-    { "key": "workInProcess", "code": "YS6-CK-04", "name": "在制仓", "type": "MATERIAL" }
+    { "key": "material", "code": "YS7-CK-01", "name": "原料仓", "type": "MATERIAL" },
+    { "key": "product", "code": "YS7-CK-02", "name": "成品仓", "type": "FINISHED_GOODS" },
+    { "key": "qualityHold", "code": "YS7-CK-03", "name": "待检仓", "type": "MATERIAL" },
+    { "key": "workInProcess", "code": "YS7-CK-04", "name": "在制仓", "type": "MATERIAL" }
   ],
   "customerTrial133": {
     "target": "customer-trial-133",
     "deploymentTarget": "demo-133",
     "databaseName": "plush_erp_demo_v1",
     "databaseLifecycle": "long-lived-registered-target",
-    "minimumMigration": "20260714165115",
-    "configRevision": "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
-    "configProductVersion": "customer-trial-133-test-2026.08.15-v6",
-    "previousConfigRevision": "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1",
-    "previousConfigProductVersion": "customer-trial-133-test-2026.07.16-v5",
-    "previousDatasetVersion": "2026.07.16-v5"
+    "minimumMigration": "20260916090000",
+    "configRevision": "yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1",
+    "configProductVersion": "customer-trial-133-test-2026.09.16-v7",
+    "previousConfigRevision": "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
+    "previousConfigProductVersion": "customer-trial-133-test-2026.08.15-v6",
+    "previousDatasetVersion": "2026.08.15-v6"
   }
 }

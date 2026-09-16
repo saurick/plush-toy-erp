@@ -138,7 +138,7 @@ function successfulRunner(calls) {
     if (args.some((arg) => arg.endsWith('seed-core-demo-data.sh'))) {
       return {
         stdout:
-          'core demo seed completed prefix=YS6 units=11 materials=0 products=0 warehouses=4 processes=0 bom_headers=0\n' +
+          'core demo seed completed prefix=YS7 units=11 materials=0 products=0 warehouses=4 processes=0 bom_headers=0\n' +
           'simulated_only=true real_customer_import=false no_direct_fact_posting=true\n' +
           'references_only=false scenario_references=true exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0\n',
         stderr: '',
@@ -258,7 +258,7 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
           '--expected-database',
           'plush_erp',
           '--confirm',
-          'SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:plush_erp:2026.08.15-v6:20260815-V6',
+          'SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:plush_erp:2026.09.16-v7:20260916-V7',
         ],
       },
     ]
@@ -418,7 +418,7 @@ test('core demo prepares an immutable plan, reuses idempotency, executes asynchr
   )
 })
 
-test('scenario demo binds the fixed V6 plan, needs no browser credential input, and stores exact readback', async (t) => {
+test('scenario demo binds the fixed V7 plan, needs no browser credential input, and stores exact readback', async (t) => {
   const fixture = createFixture(t)
   const calls = []
   const planDigest = 'd'.repeat(64)
@@ -438,12 +438,12 @@ test('scenario demo binds the fixed V6 plan, needs no browser credential input, 
           profileKey: 'scenario-demo',
           targetAlias: 'scenario-demo',
           datasetKey: 'yoyoosun-manual-acceptance',
-          dataVersion: '2026.08.15-v6',
-          runId: '20260815-V6',
+          dataVersion: '2026.09.16-v7',
+          runId: '20260916-V7',
           semanticDigest: SCENARIO_SEMANTIC_DIGEST,
           backendURL: 'http://127.0.0.1:8300',
           databaseName: 'plush_erp',
-          migrationVersion: '20260728100514',
+          migrationVersion: '20260916090000',
           repository: REPOSITORY,
           target: {
             targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
@@ -495,7 +495,7 @@ test('scenario demo binds the fixed V6 plan, needs no browser credential input, 
       assert.equal(options.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD, undefined)
       assert.equal(
         options.env.SCENARIO_DEMO_CONFIRM,
-        `APPLY_SCENARIO_DEMO:scenario-demo:plush_erp:2026.08.15-v6:20260815-V6:${planDigest}`
+        `APPLY_SCENARIO_DEMO:scenario-demo:plush_erp:2026.09.16-v7:20260916-V7:${planDigest}`
       )
       return {
         stdout: JSON.stringify({
@@ -506,12 +506,12 @@ test('scenario demo binds the fixed V6 plan, needs no browser credential input, 
           targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
           databaseName: 'plush_erp',
           release: REPOSITORY.commit,
-          migrationVersion: '20260728100514',
+          migrationVersion: '20260916090000',
           customerConfigRevision:
             'yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1',
           datasetKey: 'yoyoosun-manual-acceptance',
-          dataVersion: '2026.08.15-v6',
-          runId: '20260815-V6',
+          dataVersion: '2026.09.16-v7',
+          runId: '20260916-V7',
           semanticDigest: SCENARIO_SEMANTIC_DIGEST,
           stageCount: 9,
           sourceDocumentCount: 135,
@@ -563,7 +563,7 @@ test('scenario demo binds the fixed V6 plan, needs no browser credential input, 
     prepared.operation.id,
     'passed'
   )
-  assert.equal(passed.readback.runId, '20260815-V6')
+  assert.equal(passed.readback.runId, '20260916-V7')
   assert.equal(passed.readback.catalogReadyCount, 41)
   assert.equal(passed.readback.browserChecksPending, 10)
   assert.equal(passed.readback.cleanupSupported, false)
@@ -581,11 +581,11 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
   const fixture = createFixture(t)
   const order = []
   const planDigest = '8'.repeat(64)
-  const migrationVersion = '20260728100514'
+  const migrationVersion = '20260916090000'
   const databaseName = 'plush_erp_demo_v1'
   const configRevision =
-    'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1'
-  const configProductVersion = 'customer-trial-133-test-2026.08.15-v6'
+    'yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1'
+  const configProductVersion = 'customer-trial-133-test-2026.09.16-v7'
   const targetFingerprint = hashDataPreparationPlan({
     targetAlias: 'customer-trial-133',
     databaseName,
@@ -607,7 +607,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
         activeCustomerConfig: {
           revision: configRevision,
           productVersion: configProductVersion,
-          datasetVersion: '2026.08.15-v6',
+          datasetVersion: '2026.09.16-v7',
         },
         debug: {
           environment: 'prod',
@@ -644,8 +644,8 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
           profileKey: 'scenario-demo',
           targetAlias: 'customer-trial-133',
           datasetKey: 'yoyoosun-manual-acceptance',
-          dataVersion: '2026.08.15-v6',
-          runId: '20260815-V6',
+          dataVersion: '2026.09.16-v7',
+          runId: '20260916-V7',
           semanticDigest: SCENARIO_SEMANTIC_DIGEST,
           backendURL: 'https://demo.yoyoosun.net',
           databaseName,
@@ -693,8 +693,8 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
         migrationVersion,
         customerConfigRevision: configRevision,
         datasetKey: 'yoyoosun-manual-acceptance',
-        dataVersion: '2026.08.15-v6',
-        runId: '20260815-V6',
+        dataVersion: '2026.09.16-v7',
+        runId: '20260916-V7',
         semanticDigest: SCENARIO_SEMANTIC_DIGEST,
         stageCount: 9,
         sourceDocumentCount: 135,
@@ -943,11 +943,11 @@ test('summary keeps legacy scenario receipts on disk but omits them from the cur
       targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
       databaseName: 'plush_erp',
       release: REPOSITORY.commit,
-      migrationVersion: '20260728100514',
+      migrationVersion: '20260916090000',
       customerConfigRevision: 'yoyoosun-local-test.runtime-v1',
       datasetKey: 'yoyoosun-manual-acceptance',
-      dataVersion: '2026.08.15-v6',
-      runId: '20260815-V6',
+      dataVersion: '2026.09.16-v7',
+      runId: '20260916-V7',
       semanticDigest: SCENARIO_SEMANTIC_DIGEST,
       stageCount: 9,
       sourceDocumentCount: 16,
@@ -1151,8 +1151,8 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
         summary.datasetContract.customerTrial133.databaseLifecycle,
     },
     {
-      dataVersion: '2026.08.15-v6',
-      runId: '20260815-V6',
+      dataVersion: '2026.09.16-v7',
+      runId: '20260916-V7',
       unitCount: 11,
       warehouseCount: 4,
       simulatedOnly: true,
@@ -1197,7 +1197,7 @@ test('full acceptance receipt binds the latest chain contract and nine stage tim
       evidence: {
         dataset: {
           ok: true,
-          dataVersion: '2026.08.15-v6',
+          dataVersion: '2026.09.16-v7',
           chainDataDigest: acceptancePlan.chainDataDigest,
           chainVerificationDigest: acceptancePlan.chainVerificationDigest,
           startedAt: '2026-07-29T02:03:00.000Z',
@@ -1225,7 +1225,7 @@ test('full acceptance receipt binds the latest chain contract and nine stage tim
             dataset: {
               ...readback,
               ok: true,
-              dataVersion: '2026.08.15-v6',
+              dataVersion: '2026.09.16-v7',
               chainDataDigest: '0'.repeat(64),
               chainVerificationDigest: acceptancePlan.chainVerificationDigest,
               startedAt: '2026-07-29T02:03:00.000Z',
@@ -1466,8 +1466,8 @@ test('a later authoritative scenario readback releases the resolved unknown outc
     updatedAt: '2026-07-29T02:06:04.000Z',
     targetSummary,
     readback: {
-      dataVersion: '2026.08.15-v6',
-      runId: '20260815-V6',
+      dataVersion: '2026.09.16-v7',
+      runId: '20260916-V7',
     },
   }
 

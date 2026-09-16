@@ -117,6 +117,13 @@ function buildAccountSet(target) {
   const normalizedTarget = requiredTarget(target);
   const contract = TARGET_CONTRACTS[normalizedTarget];
   const profiles = formalProfiles(contract.usernamePrefix);
+  const contractOperatorProfile = Object.freeze({
+    username: `${contract.usernamePrefix}_finance_purchase`,
+    displayName: `${displayNamePrefix(contract.usernamePrefix)}财务兼采购`,
+    roleKey: "finance",
+    roleKeys: Object.freeze(["finance", "purchase"]),
+  });
+  const managedProfiles = Object.freeze([...profiles, contractOperatorProfile]);
   const roleUsernames = Object.freeze(
     Object.fromEntries(
       profiles.map(({ username, roleKey }) => [roleKey, username]),
@@ -128,8 +135,9 @@ function buildAccountSet(target) {
     usernamePrefix: contract.usernamePrefix,
     passwordEnvironmentVariable: contract.passwordEnvironmentVariable,
     fixedTestPassword: contract.fixedTestPassword,
-    formalProfiles: Object.freeze(profiles),
-    formalUsernames: Object.freeze(profiles.map(({ username }) => username)),
+    formalProfiles: managedProfiles,
+    formalUsernames: Object.freeze(managedProfiles.map(({ username }) => username)),
+    contractOperatorProfile,
     browserProfiles: Object.freeze(
       profiles.map(({ username, displayName, roleKey }) =>
         Object.freeze({
@@ -174,6 +182,17 @@ export function manualAcceptanceAccountSetForTarget(target) {
     default:
       throw new Error("unreachable manual acceptance account target");
   }
+}
+
+export function manualAcceptanceAccountProfilesMatch(target, accounts) {
+  const profiles = manualAcceptanceAccountSetForTarget(target).formalProfiles;
+  if (!Array.isArray(accounts) || accounts.length !== profiles.length) return false;
+  return profiles.every((profile) => {
+    const matches = accounts.filter((account) => account.username === profile.username);
+    const account = matches[0];
+    return matches.length === 1 && account.accountStatus === "active" && account.isSuperAdmin === false &&
+      JSON.stringify([...(account.roleKeys || [])].sort()) === JSON.stringify([...(profile.roleKeys || [profile.roleKey])].sort());
+  });
 }
 
 export function assertManualAcceptanceRoleUsernames(target, roleUsernames) {

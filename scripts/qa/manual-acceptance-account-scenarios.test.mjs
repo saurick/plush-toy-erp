@@ -51,7 +51,7 @@ function customerTrial133Attestation() {
     customerKey: "yoyoosun",
     environment: "prod",
     release: "56ecf873796ffafc53f12a3cd5f8b7adb0214581",
-    migration: "20260714165115",
+    migration: "20260916090000",
     debug: {
       seedEnabled: false,
       seedAllowed: false,
@@ -106,12 +106,12 @@ function admin({
 }
 
 function formalAccounts(profiles = FORMAL_DEMO_ACCOUNT_PROFILES) {
-  return profiles.map(({ username, displayName, roleKey }, index) =>
+  return profiles.map(({ username, displayName, roleKey, roleKeys }, index) =>
     admin({
       id: index + 1,
       username,
       displayName,
-      roleKeys: [roleKey],
+      roleKeys: roleKeys || [roleKey],
     }),
   );
 }
@@ -161,7 +161,7 @@ function ok(data, url, extras = {}) {
 function coreWarehouseScopeOptions() {
   return [1, 2, 3, 4].map((id) => ({
     id,
-    code: `YS6-CK-0${id}`,
+    code: `YS7-CK-0${id}`,
     name: `仓库 ${id}`,
   }));
 }
@@ -497,10 +497,10 @@ test("report-only plan keeps ten formal accounts and describes three clear scena
   assert.equal(plan.realCustomerImport, false);
   assert.equal(plan.directSQL, false);
   assert.equal(plan.target, "local-dev");
-  assert.equal(plan.dataVersion, "2026.08.15-v6");
-  assert.equal(plan.runId, "20260815-V6");
+  assert.equal(plan.dataVersion, "2026.09.16-v7");
+  assert.equal(plan.runId, "20260916-V7");
   assert.deepEqual(plan.protectedAccounts, FORMAL_DEMO_ACCOUNTS);
-  assert.equal(plan.protectedAccounts.length, 10);
+  assert.equal(plan.protectedAccounts.length, 11);
   assert.equal(plan.scenarios.length, 3);
   assert.equal(plan.roleCapabilityBaseline.length, 9);
   assert.deepEqual(
@@ -550,8 +550,8 @@ test("registered 133 plan uses only UAT account identities", () => {
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
   });
   assert.equal(plan.accountKind, "customer-uat");
   assert.equal(plan.accountPrefix, "uat");
@@ -588,7 +588,7 @@ test("fresh database bootstraps exact formal accounts before customer configurat
   assert.equal(result.databaseName, LOCAL_DATABASE_NAME);
   assert.equal(result.environment, "local");
   assert.equal(result.runtimeIdentityProof, "matched-v1");
-  assert.equal(result.created, 10);
+  assert.equal(result.created, 11);
   assert.equal(result.profilesUpdated, 0);
   assert.equal(result.verified, 0);
   assert.deepEqual(
@@ -607,7 +607,7 @@ test("fresh database bootstraps exact formal accounts before customer configurat
     backend.calls.filter(
       (call) => call.domain === "admin" && call.method === "create",
     ).length,
-    10,
+    11,
   );
   assert.deepEqual(
     backend.calls
@@ -635,7 +635,7 @@ test("formal account bootstrap repairs missing employee names and replay is idem
   const first = await bootstrapManualAcceptanceFormalAccounts(plan, options);
   assert.equal(first.created, 0);
   assert.equal(first.profilesUpdated, 2);
-  assert.equal(first.verified, 8);
+  assert.equal(first.verified, 9);
   assert.deepEqual(
     profileUpdateCalls(backend).map((call) => ({
       username: backend.state.find((item) => item.id === call.params.id)
@@ -658,7 +658,7 @@ test("formal account bootstrap repairs missing employee names and replay is idem
   const second = await bootstrapManualAcceptanceFormalAccounts(plan, options);
   assert.equal(second.created, 0);
   assert.equal(second.profilesUpdated, 0);
-  assert.equal(second.verified, 10);
+  assert.equal(second.verified, 11);
   assert.equal(profileUpdateCalls(backend).length, writesAfterFirst);
 });
 
@@ -690,9 +690,9 @@ test("formal-accounts-only CLI exposes the pre-configuration bootstrap without r
       fetchImpl: backend.fetchImpl,
     },
   );
-  assert.equal(result.report.created, 10);
+  assert.equal(result.report.created, 11);
   assert.equal(result.report.verified, 0);
-  assert.equal(result.report.accounts.length, 10);
+  assert.equal(result.report.accounts.length, 11);
   assert.equal(
     backend.calls.some(
       (call) =>
@@ -853,7 +853,7 @@ test("local SQL runtime is accepted only through the shared debug-disabled polic
   );
   assert.equal(report.runtime.target, "local-dev");
   assert.equal(report.runtime.environment, "sql");
-  assert.equal(report.runtime.dataVersion, "2026.08.15-v6");
+  assert.equal(report.runtime.dataVersion, "2026.09.16-v7");
 });
 
 test("registered 133 target reconciles the same three scenario accounts without changing role permissions", async () => {
@@ -873,8 +873,8 @@ test("registered 133 target reconciles the same three scenario accounts without 
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
     auditMinimum: 30,
   });
   const report = await applyManualAcceptanceAccountScenarios(plan, {
@@ -889,8 +889,8 @@ test("registered 133 target reconciles the same three scenario accounts without 
   });
 
   assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
-  assert.equal(report.dataVersion, "2026.08.15-v6");
-  assert.equal(report.runId, "20260815-V6");
+  assert.equal(report.dataVersion, "2026.09.16-v7");
+  assert.equal(report.runId, "20260916-V7");
   assert.equal(report.roleDataScopeBaseline.mode, "reconcile");
   assert.equal(report.roleDataScopeBaseline.updated, 2);
   assert.equal(rolePermissionCalls(backend).length, 0);
@@ -901,7 +901,7 @@ test("registered 133 target reconciles the same three scenario accounts without 
   assert.equal(report.summary.created, 3);
   assert.equal(report.scenarios.length, 3);
   assert.equal(report.formalAccountBootstrap.created, 0);
-  assert.equal(report.formalAccountBootstrap.verified, 10);
+  assert.equal(report.formalAccountBootstrap.verified, 11);
   assert.equal(
     report.targetAttestation.release,
     customerTrial133Attestation().release,
@@ -917,8 +917,8 @@ test("fresh registered 133 target creates the exact ten formal accounts before s
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
   });
   const options = {
     password: "12345678",
@@ -932,7 +932,7 @@ test("fresh registered 133 target creates the exact ten formal accounts before s
   };
 
   const first = await applyManualAcceptanceAccountScenarios(plan, options);
-  assert.equal(first.formalAccountBootstrap.created, 10);
+  assert.equal(first.formalAccountBootstrap.created, 11);
   assert.equal(first.formalAccountBootstrap.verified, 0);
   assert.deepEqual(
     first.formalAccountBootstrap.accounts.map((item) => ({
@@ -944,13 +944,13 @@ test("fresh registered 133 target creates the exact ten formal accounts before s
       roleKey: item.roleKey,
     })),
   );
-  assert.equal(first.protectedAccounts.length, 10);
+  assert.equal(first.protectedAccounts.length, 11);
   assert.equal(first.summary.created, 3);
   assert.doesNotMatch(JSON.stringify(first), /demo-pass/u);
 
   const second = await applyManualAcceptanceAccountScenarios(plan, options);
   assert.equal(second.formalAccountBootstrap.created, 0);
-  assert.equal(second.formalAccountBootstrap.verified, 10);
+  assert.equal(second.formalAccountBootstrap.verified, 11);
   assert.equal(
     backend.calls.filter(
       (call) =>
@@ -958,7 +958,7 @@ test("fresh registered 133 target creates the exact ten formal accounts before s
         call.method === "create" &&
         CUSTOMER_UAT_ACCOUNT_SET.formalUsernames.includes(call.params.username),
     ).length,
-    10,
+    11,
   );
 });
 
@@ -976,7 +976,7 @@ test("fresh dedicated local database creates the exact formal accounts before sc
   };
 
   const first = await applyManualAcceptanceAccountScenarios(plan, options);
-  assert.equal(first.formalAccountBootstrap.created, 10);
+  assert.equal(first.formalAccountBootstrap.created, 11);
   assert.equal(first.formalAccountBootstrap.verified, 0);
   assert.deepEqual(
     first.formalAccountBootstrap.accounts.map((item) => ({
@@ -992,7 +992,7 @@ test("fresh dedicated local database creates the exact formal accounts before sc
 
   const second = await applyManualAcceptanceAccountScenarios(plan, options);
   assert.equal(second.formalAccountBootstrap.created, 0);
-  assert.equal(second.formalAccountBootstrap.verified, 10);
+  assert.equal(second.formalAccountBootstrap.verified, 11);
   assert.equal(
     backend.calls.filter(
       (call) =>
@@ -1000,7 +1000,7 @@ test("fresh dedicated local database creates the exact formal accounts before sc
         call.method === "create" &&
         FORMAL_DEMO_ACCOUNTS.includes(call.params.username),
     ).length,
-    10,
+    11,
   );
 });
 
@@ -1031,8 +1031,8 @@ test("fresh registered 133 target requires the exact formal-account confirmation
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
   });
 
   await assert.rejects(
@@ -1060,8 +1060,8 @@ test("registered 133 target rejects the old active configuration before account 
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
   });
 
   await assert.rejects(
@@ -1103,8 +1103,8 @@ test("registered 133 target requires the fixed UAT password and a different admi
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
   });
   for (const [password, adminPassword, expected] of [
     ["remote-uat-secret", "guard-pass", /fixed UAT test credential/u],
@@ -1247,7 +1247,7 @@ test("acceptance warehouse scope rejects missing or duplicate canonical warehous
     coreWarehouseScopeOptions().slice(0, 3),
     [
       ...coreWarehouseScopeOptions(),
-      { id: 99, code: "YS6-CK-04", name: "重复核心仓" },
+      { id: 99, code: "YS7-CK-04", name: "重复核心仓" },
     ],
   ]) {
     const backend = createBackend({ warehouseScopeOptions });
@@ -1368,7 +1368,7 @@ test("first apply creates three accounts and every repeated apply resets all pas
     unchanged: 0,
   });
   assert.equal(first.ready, true);
-  assert.equal(first.protectedAccounts.length, 10);
+  assert.equal(first.protectedAccounts.length, 11);
   assert.equal(first.scenarios.length, 3);
   assert.ok(first.scenarios.every((scenario) => scenario.passwordReset));
   assert.equal(
@@ -1470,8 +1470,8 @@ test("CLI help points only to the dedicated current local acceptance database", 
     help.text,
     /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
-  assert.match(help.text, /--data-version 2026\.08\.15-v6/u);
-  assert.match(help.text, /--run-id 20260815-V6/u);
+  assert.match(help.text, /--data-version 2026\.09\.16-v7/u);
+  assert.match(help.text, /--run-id 20260916-V7/u);
   assert.match(help.text, /--formal-accounts-only/u);
   assert.doesNotMatch(help.text, /127\.0\.0\.1:8300/u);
 });

@@ -21,9 +21,9 @@ import {
 
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
 
-test("local acceptance lifecycle reads the exact V6 core reference contract", () => {
+test("local acceptance lifecycle reads the exact V7 core reference contract", () => {
   const output = [
-    "core demo seed completed prefix=YS6 units=11 materials=0 products=0 warehouses=4 processes=0 bom_headers=0",
+    "core demo seed completed prefix=YS7 units=11 materials=0 products=0 warehouses=4 processes=0 bom_headers=0",
     "simulated_only=true real_customer_import=false no_direct_fact_posting=true",
     "references_only=true scenario_references=false exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0",
   ].join("\n");
@@ -103,7 +103,7 @@ test("local acceptance lifecycle keeps the cloned-write report inside the except
   assert.equal(options.databaseName, identity.browserActionsDatabase);
   assert.equal(
     path.relative(datasetOutputRoot, reportPath),
-    "2026.08.15-v6/local/browser-actions/report.json",
+    "2026.09.16-v7/local/browser-actions/report.json",
   );
 });
 
@@ -219,7 +219,7 @@ function fakeRuntime({ failAt = "", residual = "" } = {}) {
         ok: true,
         completedStages: 9,
         report: "output/dataset.json",
-        dataVersion: "2026.08.15-v6",
+        dataVersion: "2026.09.16-v7",
         chainDataDigest: "a".repeat(64),
         chainVerificationDigest: "b".repeat(64),
         startedAt: "2026-07-28T00:01:00.000Z",

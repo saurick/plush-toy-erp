@@ -146,7 +146,7 @@ func TestCoreCodeNamespacePatternUsesDefaultBusinessCodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("coreCodeNamespacePattern(warehouse) error = %v", err)
 	}
-	if unitPattern != "YS6-DW-%" || warehousePattern != "YS6-CK-%" {
+	if unitPattern != "YS7-DW-%" || warehousePattern != "YS7-CK-%" {
 		t.Fatalf("unexpected reference namespaces unit=%q warehouse=%q", unitPattern, warehousePattern)
 	}
 	if strings.Contains(unitPattern+warehousePattern, data.CoreDemoSeedPrefix) {

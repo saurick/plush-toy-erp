@@ -407,7 +407,7 @@ test("attachment report batch binds exact dataset identity and registered target
     targetAttestation: {
       source: "out-of-band",
       release: "929ec0b3a563bec0796274d033a97277519bcb51",
-      migration: "20260715120000",
+      migration: "20260916090000",
     },
   };
   const remote = reports({ target, backendURL, runtime: remoteRuntime });
@@ -426,7 +426,7 @@ test("attachment report batch binds exact dataset identity and registered target
     customerKey: "yoyoosun",
     environment: "prod",
     release: "929ec0b3a563bec0796274d033a97277519bcb51",
-    migration: "20260715120000",
+    migration: "20260916090000",
     debug: {
       seedEnabled: false,
       seedAllowed: false,

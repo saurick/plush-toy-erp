@@ -206,7 +206,7 @@ function migrationPreflightEvidence(stdout) {
     /migration 已是最新版本（([^，\r\n]+)，(\d+)\/(\d+)）/u,
   );
   if (
-    !/schema\/migration 守卫通过/u.test(output) ||
+    !/\[local-preflight\] 工作区数据库规则检查通过/u.test(output) ||
     !migration ||
     migration[2] !== migration[3] ||
     !/non-system-schema function=0 procedure=0 non-internal-trigger=0/u.test(
@@ -701,8 +701,8 @@ function usage() {
 只读计划与前置核对：
   node scripts/qa/scenario-demo-data.mjs
 
-执行本地长期 V6 批次：
-  SCENARIO_DEMO_CONFIRM='APPLY_SCENARIO_DEMO:scenario-demo:<database>:2026.08.15-v6:20260815-V6:<plan-digest>' \\
+执行本地长期 V7 批次：
+  SCENARIO_DEMO_CONFIRM='APPLY_SCENARIO_DEMO:scenario-demo:<database>:2026.09.16-v7:20260916-V7:<plan-digest>' \\
     node scripts/qa/scenario-demo-data.mjs --apply --expected-plan-digest <plan-digest>
 
 133 使用同一 canonical semantic digest，但必须显式 --target customer-trial-133、

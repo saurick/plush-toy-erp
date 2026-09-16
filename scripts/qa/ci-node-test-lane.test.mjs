@@ -120,7 +120,7 @@ test("Node lane catalog covers parallel_safe with one controlled preflight parti
     ]);
   }
   assert.equal(expectedCiNodeTestLaneFiles("release_a").length, 31);
-  assert.equal(expectedCiNodeTestLaneFiles("release_b").length, 31);
+  assert.equal(expectedCiNodeTestLaneFiles("release_b").length, 32);
   assert.equal(expectedCiNodeTestLaneFiles("release_c").length, 29);
   assert.ok(
     expectedCiNodeTestLaneFiles("release_a").includes(

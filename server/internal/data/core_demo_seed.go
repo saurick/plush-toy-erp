@@ -377,6 +377,16 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 }
 
 func SeedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoReferenceSeedDataset) (*CoreDemoSeedResult, error) {
+	return seedCoreDemoReferences(ctx, db, dataset, true)
+}
+
+// SeedScenarioDemoReferences prepares the current batch in a shared development
+// database. Earlier references may be used by manual work and remain untouched.
+func SeedScenarioDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoReferenceSeedDataset) (*CoreDemoSeedResult, error) {
+	return seedCoreDemoReferences(ctx, db, dataset, false)
+}
+
+func seedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoReferenceSeedDataset, retireLegacy bool) (*CoreDemoSeedResult, error) {
 	if db == nil {
 		return nil, ErrCoreDemoSeedMissingDB
 	}
@@ -390,7 +400,7 @@ func SeedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoRef
 	}
 	defer rollbackSQLTx(ctx, tx, nil)
 
-	result, err := ReconcileCoreDemoReferencesInTx(ctx, tx, dataset)
+	result, err := reconcileCoreDemoReferencesInTx(ctx, tx, dataset, retireLegacy)
 	if err != nil {
 		return nil, err
 	}
@@ -415,6 +425,10 @@ func SeedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoRef
 // checks; this function only writes the exact current allowlist and retires
 // exact previously managed references.
 func ReconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset CoreDemoReferenceSeedDataset) (*CoreDemoSeedResult, error) {
+	return reconcileCoreDemoReferencesInTx(ctx, tx, dataset, true)
+}
+
+func reconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset CoreDemoReferenceSeedDataset, retireLegacy bool) (*CoreDemoSeedResult, error) {
 	if tx == nil {
 		return nil, ErrCoreDemoSeedMissingDB
 	}
@@ -446,8 +460,10 @@ func ReconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset Co
 		}
 		result.WarehouseIDs[warehouse.Code] = id
 	}
-	if err := retireLegacyCoreDemoReferences(ctx, tx, result); err != nil {
-		return nil, err
+	if retireLegacy {
+		if err := retireLegacyCoreDemoReferences(ctx, tx, result); err != nil {
+			return nil, err
+		}
 	}
 	result.PrimaryUnitID = result.UnitIDs[dataset.Units[0].Code]
 	for _, warehouse := range dataset.Warehouses {

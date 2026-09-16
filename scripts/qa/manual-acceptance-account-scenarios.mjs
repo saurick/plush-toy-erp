@@ -432,10 +432,10 @@ function assertOwnedFormalAccount(account, profile) {
     account.isSuperAdmin ||
     account.disabled ||
     account.accountStatus !== "active" ||
-    !sameStringList(account.roleKeys, [profile.roleKey])
+    !sameStringList(account.roleKeys, profile.roleKeys || [profile.roleKey])
   ) {
     throw new CliError(
-      `formal acceptance account is not the exact safe single-role account: ${profile.username}`,
+      `formal acceptance account does not match the exact registered role profile: ${profile.username}`,
       2,
     );
   }
@@ -521,7 +521,7 @@ async function bootstrapMissingFormalAccounts({
         display_name: profile.displayName,
         password,
         phone: "",
-        role_keys: [profile.roleKey],
+        role_keys: profile.roleKeys || [profile.roleKey],
       },
       context: `admin.create ${profile.username}`,
     });
@@ -706,6 +706,7 @@ export function buildManualAcceptanceAccountScenarioPlan({
       username: profile.username,
       displayName: profile.displayName,
       roleKey: profile.roleKey,
+      ...(profile.roleKeys ? { roleKeys: [...profile.roleKeys] } : {}),
     })),
     protectedAccounts: [...accountSet.formalUsernames],
     scenarios: accountSet.scenarios.map((scenario) => ({
@@ -1695,8 +1696,8 @@ function usage() {
 只读查看：
   node scripts/qa/manual-acceptance-account-scenarios.mjs --json
 
-fresh 库配置激活前只创建或读回固定十个单岗位账号：
-  MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS:<target>:2026.08.15-v6:20260815-V6 \
+fresh 库配置激活前只创建或读回固定十个单岗位账号及一个财务兼采购账号：
+  MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS:<target>:2026.09.16-v7:20260916-V7 \
   MANUAL_ACCEPTANCE_TARGET_CONFIRM='<exact-target-confirmation>' \
   <target-role-password-env>='<target-role-password>' \
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
@@ -1704,34 +1705,34 @@ fresh 库配置激活前只创建或读回固定十个单岗位账号：
       --target <target> \
       --backend-url <registered-loopback-backend-url> \
       --database-name <registered-database-name> \
-      --data-version 2026.08.15-v6 \
-      --run-id 20260815-V6 \
+      --data-version 2026.09.16-v7 \
+      --run-id 20260916-V7 \
       --json
 
 写入本机开发环境：
   MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.09.16-v7:20260916-V7:plush_erp_acceptance_20260728_delivery_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-super-admin-password>' \\
     node scripts/qa/manual-acceptance-account-scenarios.mjs --apply \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.08.15-v6 \\
-      --run-id 20260815-V6 \\
+      --data-version 2026.09.16-v7 \\
+      --run-id 20260916-V7 \\
       --audit-minimum 30 \\
       --json
 
-本入口保留目标环境的十个正式验收账号，只准备“已停用”“业务与采购兼任”
+本入口保留目标环境的十一个正式验收账号，只准备“已停用”“业务与采购兼任”
 和“未分配岗位”三个补充验收账号。密码必须为 8 到 20 位。
 
   本地只允许 demo_* 和 MANUAL_ACCEPTANCE_PASSWORD；demo-133 只允许 uat_*，并固定
   使用 12345678。MANUAL_ACCEPTANCE_UAT_PASSWORD 如提供只能等于该固定值。
   fresh 本地专用库和 demo-133 都必须设置精确的 MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM，
-  只创建或读回固定十个单岗位账号。
+  只创建或读回固定十个单岗位账号及一个财务兼采购账号。
 
   demo 演练造数环境必须通过 https://demo.yoyoosun.net 系统信任 TLS 入口，并显式提供：
-  --target customer-trial-133 --data-version 2026.08.15-v6 --run-id 20260815-V6 --database-name plush_erp_demo_v1
+  --target customer-trial-133 --data-version 2026.09.16-v7 --run-id 20260916-V7 --database-name plush_erp_demo_v1
 同时设置绑定目标的 MANUAL_ACCEPTANCE_TARGET_CONFIRM 与
   MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
 远端只核对岗位权限，不修改岗位权限。`;

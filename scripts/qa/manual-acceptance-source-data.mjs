@@ -81,7 +81,7 @@ export const DEFAULT_SOURCE_DATA_SCALE = Object.freeze({
 });
 const ROUTED_PRODUCTION_SAMPLE_OFFSETS = Object.freeze([3, 4]);
 const ROUTED_PRODUCTION_PLANNED_QUANTITY = 3;
-const REGISTERED_PREVIOUS_ROUTE_PREFIX = "YS5";
+const REGISTERED_PREVIOUS_ROUTE_PREFIX = "YS6";
 const CURRENT_ROUTE_PREFIX = manualAcceptanceVisibleSourcePrefix(
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
 );
@@ -109,6 +109,7 @@ export const ROLE_USERS = Object.freeze({
   purchase: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.purchase,
   engineering: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.engineering,
   production: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.production,
+  finance: LOCAL_DEMO_ACCOUNT_SET.contractOperatorProfile.username,
   boss: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.boss,
   pmc: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.pmc,
 });
@@ -122,6 +123,7 @@ function sourceRoleUsersForTarget(target) {
     purchase: roleUsernames.purchase,
     engineering: roleUsernames.engineering,
     production: roleUsernames.production,
+    finance: manualAcceptanceAccountSetForTarget(target).contractOperatorProfile.username,
     boss: roleUsernames.boss,
     pmc: roleUsernames.pmc,
   });
@@ -423,7 +425,11 @@ function buildSuppliers(prefix, count) {
       name,
       short_name: name,
       supplier_type: supplierType,
+      address: "模拟工业区加工路 8 号",
+      default_payment_method: index % 3 === 0 ? "月结" : "银行转账",
       default_payment_term_days: [0, 30, 45, 60][offset % 4],
+      default_invoice_required: index % 3 !== 0,
+      default_invoice_category: index % 3 !== 0 ? "VAT_GENERAL_1" : undefined,
       note: longBusinessNote(index),
       isActive: index <= count - 5,
       contacts:
@@ -453,7 +459,8 @@ function buildSuppliers(prefix, count) {
   });
 }
 
-function buildMaterials(prefix, count) {
+function buildMaterials(prefix, count, suppliers) {
+  const materialSuppliers = suppliers.filter((supplier) => supplier.isActive && ["material", "mixed"].includes(supplier.supplier_type));
   const templates = [
     ["短毛绒", "面料", "58 英寸 / 280g", "米白", "yard"],
     ["提花布", "面料", "57 英寸", "浅粉", "chineseYard"],
@@ -480,6 +487,8 @@ function buildMaterials(prefix, count) {
     return {
       code: `${prefix}-WL-${pad(index, 3)}`,
       name: `${displayColor}${label}`,
+      supplierRef: materialSuppliers[offset % materialSuppliers.length].code,
+      supplier_item_no: `CL-${1000 + index}`,
       category,
       stock_category: category === "包装" ? "PACKAGING" : ["面料", "填充"].includes(category) ? "MAIN" : "AUXILIARY",
       spec,
@@ -727,7 +736,22 @@ function buildPurchaseOrders(
       purchase_order_no: `${prefix}-CG-${pad(index, 3)}`,
       supplierRef: supplier.code,
       supplier_purchase_order_no: `CG${anchorDate.slice(2, 7).replace("-", "")}${pad(index, 3)}`,
-      supplier_snapshot: { name: supplier.name, simulated_only: true },
+      supplier_snapshot: {
+        name: supplier.name,
+        short_name: supplier.short_name,
+        contact_name: supplier.contacts[0]?.name || "演示联系人",
+        contact_phone: "0769-00000000",
+        address: "模拟工业区加工路 8 号",
+        simulated_only: true,
+      },
+      currency: "CNY",
+      payment_method: supplier.default_payment_method,
+      payment_term_days: supplier.default_payment_term_days,
+      invoice_required: supplier.default_invoice_required,
+      invoice_category: supplier.default_invoice_category,
+      supplier_confirmed_arrival_date: index % 3 === 0
+        ? isoDate(6 + (index % 15), anchorDate) : undefined,
+      delivery_address: "模拟工业区收货路 1 号",
       contract_party_snapshot: {
         buyerCompany: "永绅演示工厂",
         buyerContact: "采购部",
@@ -825,10 +849,10 @@ function buildOutsourcingOrders(
       },
       contract_party_snapshot: {
         buyerCompany: "永绅演示工厂",
-        buyerContact: "生产部",
+        buyerContact: "采购部",
         buyerPhone: "0769-00000000",
         buyerAddress: "演示地址",
-        buyerSigner: "生产部",
+        buyerSigner: "采购部",
       },
       source_order_no: sourceOrder.customer_order_no,
       order_date: isoDate(-index + 4, anchorDate),
@@ -1124,7 +1148,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
   );
   const customers = buildCustomers(prefix, scale.customers);
   const suppliers = buildSuppliers(prefix, scale.suppliers);
-  const materials = buildMaterials(prefix, scale.materials);
+  const materials = buildMaterials(prefix, scale.materials, suppliers);
   const products = buildProducts(prefix, scale.products, scale.skusPerProduct);
   const processes = buildProcesses(prefix, scale.processes);
   const salesOrders = buildSalesOrders(
@@ -2052,7 +2076,11 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
         "name",
         "short_name",
         "supplier_type",
+        "address",
+        "default_payment_method",
         "default_payment_term_days",
+        "default_invoice_required",
+        "default_invoice_category",
         "tax_no",
         "note",
       ],
@@ -2096,9 +2124,10 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     "code",
   );
   for (const record of plan.records.materials) {
-    const { unitKey, ...material } = record;
+    const { unitKey, supplierRef, ...material } = record;
     const expected = {
       ...material,
+      supplier_id: suppliers.get(supplierRef).id,
       default_unit_id: unitsByKey[unitKey].id,
     };
     if (materials.has(record.code)) {
@@ -2110,6 +2139,9 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
           "code",
           "name",
           "category",
+          "stock_category",
+          "supplier_id",
+          "supplier_item_no",
           "spec",
           "color",
           "default_unit_id",
@@ -2129,7 +2161,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
       label: `material ${record.code}`,
       expected,
       actual: data.material,
-      fields: ["code", "name", "category", "stock_category", "spec", "color", "default_unit_id"],
+      fields: ["code", "name", "category", "stock_category", "supplier_id", "supplier_item_no", "spec", "color", "default_unit_id"],
     });
     materials.set(record.code, data.material);
     report.steps.push({
@@ -3588,13 +3620,20 @@ async function createSourceDocuments({
       "purchase_order_no",
       "supplier_id",
       "supplier_purchase_order_no",
+      "currency",
+      "payment_method",
+      "payment_term_days",
+      "invoice_required",
+      "invoice_category",
+      "supplier_confirmed_arrival_date",
+      "delivery_address",
       "supplier_snapshot",
       "contract_party_snapshot",
       "purchase_date",
       "expected_arrival_date",
       "note",
     ],
-    headerDateFields: ["purchase_date", "expected_arrival_date"],
+    headerDateFields: ["purchase_date", "expected_arrival_date", "supplier_confirmed_arrival_date"],
     itemMethod: "list_purchase_order_items",
     itemListKey: "purchase_order_items",
     itemForeignKey: "purchase_order_id",
@@ -3667,7 +3706,7 @@ async function createSourceDocuments({
   const outsourcing = mapBy(
     await listAll({
       plan,
-      token: tokens.production,
+      token: tokens.finance,
       domain: "outsourcing_order",
       method: "list_outsourcing_orders",
       listKey: "outsourcing_orders",
@@ -3695,7 +3734,7 @@ async function createSourceDocuments({
   };
   await applyDocumentGroup({
     plan,
-    token: tokens.production,
+    token: tokens.finance,
     fetchImpl,
     records: plan.records.outsourcingOrders,
     existing: outsourcing,
@@ -3787,7 +3826,7 @@ async function createSourceDocuments({
       domain: "outsourcing_order",
       method: "list_outsourcing_order_items",
       params: { outsourcing_order_id: order.id, limit: 50, offset: 0 },
-      token: tokens.production,
+      token: tokens.finance,
       fetchImpl,
     });
     outsourcingOrderItems.set(
@@ -4438,7 +4477,7 @@ export async function applyManualAcceptanceSourceData(
   });
   const sourceDocuments = await createSourceDocuments({
     plan,
-    tokens: writeTokens,
+    tokens: { ...writeTokens, finance: tokens.finance },
     roleTokens: tokens,
     refs,
     fetchImpl,
@@ -4811,7 +4850,7 @@ export async function verifyManualAcceptanceSourceData(
     ],
     [
       "outsourcing_orders",
-      tokens.production,
+      tokens.finance,
       "outsourcing_order",
       "list_outsourcing_orders",
       "outsourcing_orders",
@@ -5009,20 +5048,20 @@ function usage() {
 
 写入本地开发环境：
   MANUAL_ACCEPTANCE_SIM_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.09.16-v7:20260916-V7:plush_erp_acceptance_20260728_delivery_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
     node scripts/qa/manual-acceptance-source-data.mjs --apply \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.08.15-v6 \\
-      --run-id 20260815-V6 \\
-      --out output/qa/manual-acceptance/datasets/2026.08.15-v6/local/source
+      --data-version 2026.09.16-v7 \\
+      --run-id 20260916-V7 \\
+      --out output/qa/manual-acceptance/datasets/2026.09.16-v7/local/source
 
 写入已登记的 133 客户试用环境还必须显式提供：
   --target customer-trial-133 --backend-url https://demo.yoyoosun.net \\
-  --data-version 2026.08.15-v6 --run-id 20260815-V6
+  --data-version 2026.09.16-v7 --run-id 20260916-V7
 并设置绑定 target / dataVersion / runId 的 MANUAL_ACCEPTANCE_TARGET_CONFIRM，
 以及包含精确 origin/customer/release/migration/debug 开关的
 MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
@@ -5034,8 +5073,8 @@ MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.08.15-v6 \\
-      --run-id 20260815-V6
+      --data-version 2026.09.16-v7 \\
+      --run-id 20260916-V7
 
 默认生成：60 客户、60 供应商、80 材料、20 产品/60 规格、30 加工环节、
 45 销售订单、45 采购订单、45 委外订单、45 BOM 版本。

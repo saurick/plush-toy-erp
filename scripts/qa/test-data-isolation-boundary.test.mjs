@@ -59,7 +59,7 @@ test("test-data-isolation-boundary: v6 target checks stay atomic and fail closed
       ),
     ),
   );
-  assert.equal(CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION, "2026.08.15-v6");
+  assert.equal(CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION, "2026.09.16-v7");
   assert(
     dataset.forbidden.some((rule) =>
       rule.pattern.test('const legacy = "2026.07.15-v1";'),

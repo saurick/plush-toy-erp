@@ -44,8 +44,8 @@ function scenarioReadback(overrides = {}) {
     customerConfigRevision:
       "yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1",
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
     semanticDigest: "f".repeat(64),
     stageCount: 9,
     sourceDocumentCount: 135,
@@ -105,7 +105,7 @@ function runningScenarioOperation(store) {
   });
 }
 
-test("scenario-demo operation store accepts only the fixed V6 41+10 forward-only readback", (t) => {
+test("scenario-demo operation store accepts only the fixed V7 41+10 forward-only readback", (t) => {
   const store = createFixture(t);
   const running = runningScenarioOperation(store);
   const passed = transitionDataPreparationOperation(store, running.id, {
@@ -114,7 +114,7 @@ test("scenario-demo operation store accepts only the fixed V6 41+10 forward-only
     readback: scenarioReadback(),
     now: "2026-07-29T02:03:07.000Z",
   });
-  assert.equal(passed.readback.runId, "20260815-V6");
+  assert.equal(passed.readback.runId, "20260916-V7");
   assert.equal(passed.readback.catalogReadyCount, 41);
   assert.equal(passed.readback.browserChecksPending, 10);
   assert.equal(passed.readback.cleanupSupported, false);
@@ -152,8 +152,8 @@ test("scenario-demo operation store rejects run drift, inflated catalog readines
         status: "passed",
         message: "scenario demo V6 readback without target binding",
         readback: historicalScenarioReadback({
-          dataVersion: "2026.08.15-v6",
-          runId: "20260815-V6",
+          dataVersion: "2026.09.16-v7",
+          runId: "20260916-V7",
           catalogReadyCount: 41,
           catalogTargetCount: 51,
         }),
@@ -204,4 +204,21 @@ test("scenario-demo operation store reads a frozen V5 receipt without accepting 
     () => listDataPreparationOperations(store),
     /scenario demo readback is invalid/u,
   );
+});
+
+test("persisted V6 receipts remain readable but cannot be newly written as V7", (t) => {
+  const store = createFixture(t);
+  const running = runningScenarioOperation(store);
+  const oldReadback = scenarioReadback({ dataVersion: "2026.08.15-v6", runId: "20260815-V6" });
+  assert.throws(() => transitionDataPreparationOperation(store, running.id, {
+    status: "passed", message: "old receipt cannot replace current proof", readback: oldReadback,
+  }), /scenario demo readback is invalid/u);
+  const passed = transitionDataPreparationOperation(store, running.id, {
+    status: "passed", message: "current proof", readback: scenarioReadback(),
+  });
+  const file = path.join(store, "operations", `${passed.id}.json`);
+  const record = JSON.parse(readFileSync(file, "utf8"));
+  record.readback = oldReadback;
+  writeFileSync(file, JSON.stringify(record), { mode: 0o600 });
+  assert.equal(listDataPreparationOperations(store)[0].readback.runId, "20260815-V6");
 });

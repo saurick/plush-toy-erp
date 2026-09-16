@@ -1486,6 +1486,7 @@ test("default plan covers all 51 targets and never connects to a backend", async
     "sales",
     "boss",
     "pmc",
+    "warehouse",
     "quality",
     "production",
   ]);
@@ -2239,7 +2240,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   );
   assert.equal(
     report.targets.find((item) => item.id === "entries:admin-login").actual,
-    14,
+    15,
   );
   assert.equal(
     report.targets.find((item) => item.id === "desktopPages:reconciliation")
@@ -2558,7 +2559,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
     targetAttestation: {
       source: "out-of-band",
       release: "929ec0b3a563bec0796274d033a97277519bcb51",
-      migration: "20260715120000",
+      migration: "20260916090000",
     },
   };
   const plan = buildManualAcceptanceReadinessPlan({
@@ -2591,7 +2592,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
     customerKey: "yoyoosun",
     environment: "prod",
     release: "929ec0b3a563bec0796274d033a97277519bcb51",
-    migration: "20260715120000",
+    migration: "20260916090000",
     debug: {
       seedEnabled: false,
       seedAllowed: false,
@@ -2705,7 +2706,7 @@ test("local and 133 database mismatches stop before the first network request", 
     targetAttestation: {
       source: "out-of-band",
       release: "929ec0b3a563bec0796274d033a97277519bcb51",
-      migration: "20260715120000",
+      migration: "20260916090000",
     },
   };
   const remotePlan = buildManualAcceptanceReadinessPlan({

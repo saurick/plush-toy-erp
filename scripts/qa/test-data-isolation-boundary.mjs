@@ -934,7 +934,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
       {
         path: "scripts/qa/manual-acceptance-source-retire.mjs",
-        pattern: /--data-version 2026\.08\.15-v6 --run-id 20260815-V6/u,
+        pattern: /--data-version 2026\.09\.16-v7 --run-id 20260916-V7/u,
         message:
           "manual acceptance retirement usage must show the current v6 batch",
       },

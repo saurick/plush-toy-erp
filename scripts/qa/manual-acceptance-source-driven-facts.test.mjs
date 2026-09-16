@@ -250,6 +250,8 @@ function createRPC({
           production_material_requirements: [],
           material_requirements_state: "NOT_REQUIRED",
         };
+      case "get_production_order":
+        return { production_order: { id: 600, status: "DRAFT", version: 1 } };
       case "release_production_order":
         return {
           production_order: { id: 600, status: "RELEASED", version: 2 },

@@ -40,6 +40,7 @@ import {
   retireLegacyManualAcceptanceTaskBatch,
 } from "./manual-acceptance-task-data.mjs";
 import {
+  SCENARIO_DEMO_TARGET,
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceDatabaseIdentity,
   assertManualAcceptanceRuntimePolicy,
@@ -843,6 +844,7 @@ export async function verifyManualAcceptanceCoreReferences({
   ]);
   try {
     assertManualAcceptanceActiveCoreReferenceIntegrity({
+      target: policy.target,
       units: unitData.units,
       unitTotal: unitData.total,
       warehouses: warehouseData.warehouses,
@@ -955,6 +957,7 @@ function assertNoManagedNameConflict(items, definitions, label) {
 }
 
 export function assertManualAcceptanceActiveCoreReferenceIntegrity({
+  target,
   units,
   unitTotal,
   warehouses,
@@ -972,16 +975,20 @@ export function assertManualAcceptanceActiveCoreReferenceIntegrity({
   MANUAL_ACCEPTANCE_CORE_WAREHOUSES.forEach((definition) =>
     assertExactManagedReference(warehouses, definition, "core warehouses"),
   );
-  assertNoManagedNameConflict(
-    units,
-    MANUAL_ACCEPTANCE_CORE_UNITS,
-    "core units",
-  );
-  assertNoManagedNameConflict(
-    warehouses,
-    MANUAL_ACCEPTANCE_CORE_WAREHOUSES,
-    "core warehouses",
-  );
+  // Persistent development batches resolve by exact code and retain older
+  // references. Fresh acceptance targets also require unambiguous names.
+  if (target !== SCENARIO_DEMO_TARGET) {
+    assertNoManagedNameConflict(
+      units,
+      MANUAL_ACCEPTANCE_CORE_UNITS,
+      "core units",
+    );
+    assertNoManagedNameConflict(
+      warehouses,
+      MANUAL_ACCEPTANCE_CORE_WAREHOUSES,
+      "core warehouses",
+    );
+  }
   return true;
 }
 

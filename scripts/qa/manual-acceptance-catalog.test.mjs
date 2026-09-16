@@ -321,6 +321,7 @@ test("manual acceptance catalog gives quality production context without changin
     "sales",
     "boss",
     "pmc",
+    "warehouse",
     "quality",
     "production",
   ]);

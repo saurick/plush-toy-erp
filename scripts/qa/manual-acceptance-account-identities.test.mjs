@@ -15,6 +15,11 @@ test("account identities bind demo and uat prefixes to exact targets", () => {
   assert.equal(SCENARIO_DEMO_ACCOUNT_SET.roleUsernames.boss, "demo_boss");
   assert.equal(CUSTOMER_UAT_ACCOUNT_SET.businessAdminUsername, "uat_admin");
   assert.equal(CUSTOMER_UAT_ACCOUNT_SET.roleUsernames.finance, "uat_finance");
+  assert.equal(LOCAL_DEMO_ACCOUNT_SET.contractOperatorProfile.username, "demo_finance_purchase");
+  assert.deepEqual(LOCAL_DEMO_ACCOUNT_SET.contractOperatorProfile.roleKeys, ["finance", "purchase"]);
+  assert.equal(LOCAL_DEMO_ACCOUNT_SET.formalProfiles.length, 11);
+  assert.equal(LOCAL_DEMO_ACCOUNT_SET.browserProfiles.length, 10);
+  assert.equal(LOCAL_DEMO_ACCOUNT_SET.roleUsernames.finance, "demo_finance");
   assert.equal(
     LOCAL_DEMO_ACCOUNT_SET.formalProfiles.find(
       (item) => item.roleKey === "finance",

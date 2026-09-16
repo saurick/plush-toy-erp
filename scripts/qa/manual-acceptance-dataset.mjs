@@ -28,6 +28,7 @@ import {
   MANUAL_ACCEPTANCE_FORMAL_ROLE_KEYS,
   LOCAL_DEMO_ACCOUNT_SET,
   manualAcceptanceAccountSetForTarget,
+  manualAcceptanceAccountProfilesMatch,
 } from "./manual-acceptance-account-identities.mjs";
 import { buildAttachmentFixtures } from "./manual-acceptance-attachment-data.mjs";
 import {
@@ -431,7 +432,7 @@ export function normalizeManualAcceptanceDataVersion(value) {
   const match = raw.match(DATA_VERSION_PATTERN);
   if (!match) {
     throw new ManualAcceptanceDatasetError(
-      "dataVersion must use the current YYYY.MM.DD-vN contract, for example 2026.08.15-v6",
+      "dataVersion must use the current YYYY.MM.DD-vN contract, for example 2026.09.16-v7",
     );
   }
   const [, yearText, monthText, dayText, versionText] = match;
@@ -806,7 +807,7 @@ function buildStages(identity, businessChainContract) {
             "--expected-database",
             "plush_erp_acceptance_20260728_delivery_dev",
             "--confirm",
-            "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260728_delivery_dev:2026.08.15-v6:20260815-V6",
+            "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260728_delivery_dev:2026.09.16-v7:20260916-V7",
           ],
           {
             execution: "out-of-band-explicit-only",
@@ -885,7 +886,7 @@ function buildStages(identity, businessChainContract) {
       key: "role",
       applyCapability: capabilityForStage("role"),
       purpose:
-        "两端只通过正式账号场景 API 调和十个岗位账号和三类模拟场景账号，不保留可绕过 exact V6 数据库绑定的本地 seed 写入口。",
+        "两端只通过正式账号场景 API 调和十个岗位账号和三类模拟场景账号，不保留可绕过 exact V7 数据库绑定的本地 seed 写入口。",
       writesBusinessData: true,
       targetExecution: roleStageExecution(),
       commands: [
@@ -1897,6 +1898,14 @@ async function prepareManualAcceptanceResume({
         );
       }
       completedStageKeys.push(stage.key);
+      if (stage.key === "role" && !manualAcceptanceAccountProfilesMatch(
+        plan.target.policyTarget,
+        componentReport.formalAccountBootstrap?.accounts,
+      )) {
+        // Reconcile the current registered profiles before reusing business
+        // data; a valid older receipt cannot prove newly required operators.
+        continue;
+      }
       if (
         stage.key === "facts" &&
         !manualAcceptanceOutsourcingInventoryCoverageIsComplete(componentReport)
@@ -2484,16 +2493,16 @@ function helpText() {
   return [
     "手工验收数据集编排器 / Manual Acceptance Dataset",
     "",
-    `当前唯一数据合同为 ${DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION} / 20260815-V6。`,
+    `当前唯一数据合同为 ${DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION} / 20260916-V7。`,
     "包含 11 个审定模拟单位、4 个仓库，业务语义由同一 canonical contract 生成。",
     "默认只生成 scenario-demo 与 customer-trial-133 两份长期目标同语义计划，",
     "不连接服务、不写文件、不写数据库：",
-    "  node scripts/qa/manual-acceptance-dataset.mjs --data-version 2026.08.15-v6 --run-id 20260815-V6",
+    "  node scripts/qa/manual-acceptance-dataset.mjs --data-version 2026.09.16-v7 --run-id 20260916-V7",
     "  node scripts/qa/manual-acceptance-dataset.mjs --chain delivery_to_settlement",
     "--chain 只读展开一条业务链的步骤、绑定、合法场景和现有阶段，不创建第二个局部造数入口。",
     "",
     `CLI --apply 固定使用 ${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}，并要求显式目标。`,
-    "--run-id 可用于 plan 与 apply，但必须精确等于当前 dataVersion 唯一派生的 20260815-V6。",
+    "--run-id 可用于 plan 与 apply，但必须精确等于当前 dataVersion 唯一派生的 20260916-V7。",
     "完整 apply 会 fail-closed：每个阶段只允许走唯一注册 handler 与严格组件回执。",
     "core 两端都只走正式 RPC 稳定码核对；默认 runner 不执行任何数据库 seed 脚本。",
     "baseline 紧跟 core：隔离 local 精确证明业务对象为 0；scenario-demo 与未绑定重建回执的 133 保留历史并逐项 exact-create-or-readback。",

@@ -85,7 +85,10 @@ const MOBILE_PERMISSION_BY_ROLE = Object.freeze(
 );
 
 function accountProjectionsForTarget(target) {
-  return manualAcceptanceAccountSetForTarget(target).formalProfiles.map(
+  const accountSet = manualAcceptanceAccountSetForTarget(target);
+  return accountSet.formalProfiles.filter(
+    ({ username, roleKey }) => accountSet.roleUsernames[roleKey] === username,
+  ).map(
     ({ username, roleKey }) => ({
       username,
       roleKey,
@@ -97,11 +100,11 @@ function accountProjectionsForTarget(target) {
 function accountStateExpectationsForTarget(target) {
   const accountSet = manualAcceptanceAccountSetForTarget(target);
   return Object.freeze([
-    ...accountSet.formalProfiles.map(({ username, roleKey }) =>
+    ...accountSet.formalProfiles.map(({ username, roleKey, roleKeys }) =>
       Object.freeze({
         username,
         accountStatus: "active",
-        roleKeys: Object.freeze([roleKey]),
+        roleKeys: Object.freeze([...(roleKeys || [roleKey])].sort()),
       }),
     ),
     ...accountSet.scenarios.map((scenario) =>

@@ -90,7 +90,7 @@ func main() {
 	}
 
 	referenceMode := *referencesOnly || *scenarioReferences
-	result, err := seedCoreDemo(ctx, db, *prefix, referenceMode)
+	result, err := seedCoreDemo(ctx, db, *prefix, *referencesOnly, *scenarioReferences)
 	if err != nil {
 		fail("seed core demo data failed: %v", err)
 	}
@@ -233,10 +233,13 @@ func validateManualAcceptanceReferenceTarget(dsn, expectedDatabase, confirmation
 	return nil
 }
 
-func seedCoreDemo(ctx context.Context, db *sql.DB, prefix string, referencesOnly bool) (*data.CoreDemoSeedResult, error) {
-	if referencesOnly {
+func seedCoreDemo(ctx context.Context, db *sql.DB, prefix string, referencesOnly, scenarioReferences bool) (*data.CoreDemoSeedResult, error) {
+	if referencesOnly || scenarioReferences {
 		if strings.TrimSpace(prefix) != data.CoreDemoSeedPrefix {
 			return nil, fmt.Errorf("references-only does not accept a custom prefix")
+		}
+		if scenarioReferences {
+			return data.SeedScenarioDemoReferences(ctx, db, data.DefaultCoreDemoReferenceSeedDataset())
 		}
 		return data.SeedCoreDemoReferences(ctx, db, data.DefaultCoreDemoReferenceSeedDataset())
 	}

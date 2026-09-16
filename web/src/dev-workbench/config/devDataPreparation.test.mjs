@@ -66,7 +66,7 @@ const TARGET_FINGERPRINT = 'b'.repeat(64)
 const REPOSITORY_FINGERPRINT = 'c'.repeat(64)
 const RUN_ID = 'core_demo_20260729'
 const SCENARIO_OPERATION_RUN_ID = 'scenario_demo_20260729'
-const SCENARIO_DATASET_RUN_ID = '20260815-V6'
+const SCENARIO_DATASET_RUN_ID = '20260916-V7'
 const CREATED_AT = '2026-07-29T02:00:00.000Z'
 const UPDATED_AT = '2026-07-29T02:01:00.000Z'
 const ACCEPTANCE_PLAN = buildManualAcceptanceBusinessChainReviewPlan({
@@ -139,7 +139,7 @@ function scenarioReadbackFixture(overrides = {}) {
     customerConfigRevision:
       'yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1',
     datasetKey: 'yoyoosun-manual-acceptance',
-    dataVersion: '2026.08.15-v6',
+    dataVersion: '2026.09.16-v7',
     runId: SCENARIO_DATASET_RUN_ID,
     semanticDigest: '6'.repeat(64),
     stageCount: 9,
@@ -209,7 +209,7 @@ function fullOperationFixture(overrides = {}) {
       reportStatus: 'passed',
       cleanupComplete: true,
       residualDatabaseCount: 0,
-      dataVersion: '2026.08.15-v6',
+      dataVersion: '2026.09.16-v7',
       chainDataDigest: ACCEPTANCE_PLAN.chainDataDigest,
       chainVerificationDigest: ACCEPTANCE_PLAN.chainVerificationDigest,
       chainCount: ACCEPTANCE_PLAN.chainCount,
@@ -240,8 +240,8 @@ function summaryFixture() {
     datasetContract: {
       schemaVersion: 'plush.dev-data-environment-contract/v1',
       datasetKey: 'yoyoosun-manual-acceptance',
-      dataVersion: '2026.08.15-v6',
-      runId: '20260815-V6',
+      dataVersion: '2026.09.16-v7',
+      runId: '20260916-V7',
       semanticDigest: '6'.repeat(64),
       simulatedOnly: true,
       realCustomerImport: false,
@@ -255,7 +255,7 @@ function summaryFixture() {
         minimumMigration: '20260728100514',
         configRevision:
           'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-        configProductVersion: 'customer-trial-133-test-2026.08.15-v6',
+        configProductVersion: 'customer-trial-133-test-2026.09.16-v7',
       },
     },
     target: {
@@ -285,7 +285,7 @@ function summaryFixture() {
         migrationVersion: '20260728100514',
         customerConfigRevision:
           'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-        customerConfigProductVersion: 'customer-trial-133-test-2026.08.15-v6',
+        customerConfigProductVersion: 'customer-trial-133-test-2026.09.16-v7',
         targetFingerprint: '7'.repeat(64),
       },
       fullAcceptance: {
@@ -611,7 +611,7 @@ test('scenario demo readback binds the fixed batch and rejects half batches or d
     migrationVersion: '20260728100514',
     customerConfigRevision:
       'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-    datasetVersion: '2026.08.15-v6',
+    datasetVersion: '2026.09.16-v7',
     datasetRunId: SCENARIO_DATASET_RUN_ID,
     semanticDigest: '6'.repeat(64),
     rollbackPoint: 'pre-data-dddddddddddd-d260729020304_01020304',

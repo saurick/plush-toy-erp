@@ -70,11 +70,11 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo]: Object.freeze({
     title: '本地长期基础数据',
     shortTitle: 'Core Demo',
-    purpose: '准备本地长期开发库的演示账号与当前 V6 单位、仓库',
+    purpose: '准备本地长期开发库的演示账号与当前 V7 单位、仓库',
     retention: '稳定 upsert，可持续保留',
     cleanup:
       '不承诺按批次删除；退出时按账号停用、单据取消或冲正等正常生命周期处理。',
-    scope: '十个演示账号、11 个当前 V6 单位与 4 个当前 V6 仓库。',
+    scope: '十个演示账号、11 个当前 V7 单位与 4 个当前 V7 仓库。',
     targetKey: 'coreDemo',
     targetTitle: '本地开发目标',
     badgeLabel: '长期保留',
@@ -87,7 +87,7 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     cleanupBoundary: '不支持批次删除，按正常生命周期退出',
     steps: Object.freeze([
       '确认共享开发库身份与基础前置',
-      '稳定 upsert 演示账号、当前 V6 单位与仓库',
+      '稳定 upsert 演示账号、当前 V7 单位与仓库',
       '读回固定数据计数并保留长期使用',
     ]),
   }),
@@ -207,8 +207,8 @@ const COMMIT_PATTERN = /^[0-9a-f]{40}$/u
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{2,39}$/u
 const DATASET_KEY_PATTERN = /^[a-z][a-z0-9_-]{2,63}$/u
 const SCENARIO_DEMO_DATASET_KEY = 'yoyoosun-manual-acceptance'
-const SCENARIO_DEMO_DATA_VERSION = '2026.08.15-v6'
-const SCENARIO_DEMO_RUN_ID = '20260815-V6'
+const SCENARIO_DEMO_DATA_VERSION = '2026.09.16-v7'
+const SCENARIO_DEMO_RUN_ID = '20260916-V7'
 const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 51
 const SCENARIO_DEMO_CATALOG_READY_COUNT = 41
 const SCENARIO_DEMO_BROWSER_CHECKS_PENDING = 10

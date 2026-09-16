@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const SchemaVersion = "plush.manual-acceptance-contract/v6"
+const SchemaVersion = "plush.manual-acceptance-contract/v7"
 
 var (
 	//go:embed contract.json
@@ -89,12 +89,12 @@ func mustParseContract(raw []byte) Contract {
 func Validate(contract Contract) error {
 	if contract.SchemaVersion != SchemaVersion ||
 		contract.DatasetKey != "yoyoosun-manual-acceptance" ||
-		contract.DataVersion != "2026.08.15-v6" ||
-		contract.RunID != "20260815-V6" ||
-		contract.AnchorDateUTC != "2026-08-15T12:00:00.000Z" ||
-		contract.VisiblePrefix != "YS6" ||
+		contract.DataVersion != "2026.09.16-v7" ||
+		contract.RunID != "20260916-V7" ||
+		contract.AnchorDateUTC != "2026-09-16T12:00:00.000Z" ||
+		contract.VisiblePrefix != "YS7" ||
 		!contract.SimulatedOnly || contract.RealCustomerImport {
-		return fmt.Errorf("dataset identity is not the registered V6 simulation")
+		return fmt.Errorf("dataset identity is not the registered V7 simulation")
 	}
 	if !contract.SourceNormalization.TrimWhitespace ||
 		!contract.SourceNormalization.PreserveCase ||
@@ -153,11 +153,11 @@ func Validate(contract Contract) error {
 		target.DatabaseName != "plush_erp_demo_v1" ||
 		target.DatabaseLifecycle != "long-lived-registered-target" ||
 		!regexp.MustCompile(`^[0-9]{14}$`).MatchString(target.MinimumMigration) ||
-		!strings.Contains(target.ConfigRevision, "package-v8") ||
+		!strings.Contains(target.ConfigRevision, "package-v9") ||
 		!strings.HasSuffix(target.ConfigProductVersion, contract.DataVersion) ||
-		!strings.Contains(target.PreviousConfigRevision, "package-v7") ||
-		target.PreviousConfigProductVersion != "customer-trial-133-test-2026.07.16-v5" ||
-		target.PreviousDatasetVersion != "2026.07.16-v5" ||
+		!strings.Contains(target.PreviousConfigRevision, "package-v8") ||
+		target.PreviousConfigProductVersion != "customer-trial-133-test-2026.08.15-v6" ||
+		target.PreviousDatasetVersion != "2026.08.15-v6" ||
 		!strings.HasSuffix(target.PreviousConfigProductVersion, target.PreviousDatasetVersion) {
 		return fmt.Errorf("customer-trial-133 identity is incomplete")
 	}

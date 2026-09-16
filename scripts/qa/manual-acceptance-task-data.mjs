@@ -37,15 +37,26 @@ const SOURCE_TYPE = TASK_SOURCE_TYPE;
 const SIMULATION_PREFIX = TASK_SIMULATION_PREFIX;
 export const TASK_PROFILE_ACCEPTANCE_SNAPSHOT = "acceptance-snapshot";
 export const TASK_PROFILE_LONG_LIVED_WORKBENCH = "long-lived-workbench";
-export const TASK_COPY_REVISION = "PLAIN6";
-export const PREVIOUS_TASK_COPY_REVISION = "PLAIN5";
-export const PREVIOUS_TASK_RUN_ID = "20260716-V5";
-export const PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH1";
+export const TASK_COPY_REVISION = "PLAIN7";
+export const PREVIOUS_TASK_COPY_REVISION = "PLAIN6";
+export const PREVIOUS_TASK_RUN_ID = "20260815-V6";
+export const PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH2";
 export const PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID = PREVIOUS_TASK_RUN_ID;
-export const LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH2";
-export const LONG_LIVED_WORKBENCH_BATCH_RUN_ID = "20260815-V6";
+export const LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH3";
+export const LONG_LIVED_WORKBENCH_BATCH_RUN_ID = "20260916-V7";
 export const LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE = 12;
 export const TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
+  boss: "YS-V7-LD",
+  sales: "YS-V7-XS",
+  purchase: "YS-V7-CG",
+  production: "YS-V7-SC",
+  warehouse: "YS-V7-CK",
+  finance: "YS-V7-CW",
+  pmc: "YS-V7-JH",
+  quality: "YS-V7-ZJ",
+  engineering: "YS-V7-GC",
+});
+const PREVIOUS_TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   boss: "YS-V6-LD",
   sales: "YS-V6-XS",
   purchase: "YS-V6-CG",
@@ -56,39 +67,28 @@ export const TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   quality: "YS-V6-ZJ",
   engineering: "YS-V6-GC",
 });
-const PREVIOUS_TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
-  boss: "YS-V5-LD",
-  sales: "YS-V5-XS",
-  purchase: "YS-V5-CG",
-  production: "YS-V5-SC",
-  warehouse: "YS-V5-CK",
-  finance: "YS-V5-CW",
-  pmc: "YS-V5-JH",
-  quality: "YS-V5-ZJ",
-  engineering: "YS-V5-GC",
-});
 export const LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
-  boss: "YS-WB2-LD",
-  sales: "YS-WB2-XS",
-  purchase: "YS-WB2-CG",
-  production: "YS-WB2-SC",
-  warehouse: "YS-WB2-CK",
-  finance: "YS-WB2-CW",
-  pmc: "YS-WB2-JH",
-  quality: "YS-WB2-ZJ",
-  engineering: "YS-WB2-GC",
+  boss: "YS-WB3-LD",
+  sales: "YS-WB3-XS",
+  purchase: "YS-WB3-CG",
+  production: "YS-WB3-SC",
+  warehouse: "YS-WB3-CK",
+  finance: "YS-WB3-CW",
+  pmc: "YS-WB3-JH",
+  quality: "YS-WB3-ZJ",
+  engineering: "YS-WB3-GC",
 });
 const PREVIOUS_LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze(
   {
-    boss: "YS-WB1-LD",
-    sales: "YS-WB1-XS",
-    purchase: "YS-WB1-CG",
-    production: "YS-WB1-SC",
-    warehouse: "YS-WB1-CK",
-    finance: "YS-WB1-CW",
-    pmc: "YS-WB1-JH",
-    quality: "YS-WB1-ZJ",
-    engineering: "YS-WB1-GC",
+    boss: "YS-WB2-LD",
+    sales: "YS-WB2-XS",
+    purchase: "YS-WB2-CG",
+    production: "YS-WB2-SC",
+    warehouse: "YS-WB2-CK",
+    finance: "YS-WB2-CW",
+    pmc: "YS-WB2-JH",
+    quality: "YS-WB2-ZJ",
+    engineering: "YS-WB2-GC",
   },
 );
 const TASK_PROFILE_CONTRACTS = Object.freeze({
@@ -102,9 +102,9 @@ const TASK_PROFILE_CONTRACTS = Object.freeze({
   [TASK_PROFILE_LONG_LIVED_WORKBENCH]: Object.freeze({
     key: TASK_PROFILE_LONG_LIVED_WORKBENCH,
     copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-    // WORKBENCH2 was first created under this immutable lineage. Current
+    // WORKBENCH3 was first created under this immutable lineage. Current
     // dataVersion/runId still describe each Scenario run; changing the batch
-    // lineage would orphan the stable YS-WB2-* codes and create duplicates.
+    // lineage would orphan the stable YS-WB3-* codes and create duplicates.
     batchRunId: LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
     visibleCodePrefixByRole: LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE,
     stableActionablePerRole: LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
@@ -615,18 +615,18 @@ Usage:
 
 Apply to the dedicated local acceptance runtime:
   MANUAL_ACCEPTANCE_TASK_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.08.15-v6:20260815-V6:plush_erp_acceptance_20260728_delivery_dev \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.09.16-v7:20260916-V7:plush_erp_acceptance_20260728_delivery_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
     node scripts/qa/manual-acceptance-task-data.mjs --apply \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.08.15-v6 \\
-      --run-id 20260815-V6 \\
+      --data-version 2026.09.16-v7 \\
+      --run-id 20260916-V7 \\
       --schedule-anchor-utc 2026-07-17T09:00:00.000Z \\
-      --source-report output/qa/manual-acceptance/datasets/2026.08.15-v6/local/source/apply-report.json \\
-      --out output/qa/manual-acceptance/datasets/2026.08.15-v6/local/task
+      --source-report output/qa/manual-acceptance/datasets/2026.09.16-v7/local/source/apply-report.json \\
+      --out output/qa/manual-acceptance/datasets/2026.09.16-v7/local/task
 
 The registered customer trial target additionally requires
 --target customer-trial-133, the exact registered backend origin, an explicit

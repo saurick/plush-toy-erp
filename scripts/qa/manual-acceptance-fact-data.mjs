@@ -32,6 +32,7 @@ import {
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import { approvePurchaseOrderThroughProcess } from "./purchase-order-approval-process.mjs";
+import { prepareManualAcceptanceEngineering } from "./manual-acceptance-engineering-data.mjs";
 import {
   LOCAL_DEMO_ACCOUNT_SET,
   manualAcceptanceAccountSetForTarget,
@@ -74,6 +75,7 @@ const ROLE_USERS = Object.freeze({
   pmc: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.pmc,
   sales: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.sales,
   finance: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.finance,
+  engineering: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.engineering,
 });
 
 function factRoleUsersForTarget(target) {
@@ -738,10 +740,15 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
   if (domain === "purchase") {
     return /purchase_return|receipt_adjustment/u.test(method)
       ? "admin"
-      : "purchase";
+      : "warehouse";
   }
   if (domain === "quality") return "quality";
   if (domain === "inventory") return "warehouse";
+  if (domain === "production_wip") {
+    if (params.action === "CONFIRM_PACKAGING_MATERIAL") return "sales";
+    if (params.action === "RECEIVE_OUTSOURCING_RETURN") return "warehouse";
+    return "production";
+  }
   if (domain === "workflow") {
     if (method === "get_task_process_context") return "finance";
     const surfaceKey = String(
@@ -786,7 +793,6 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
   if (
     domain === "purchase_order" ||
     domain === "production_order" ||
-    domain === "production_wip" ||
     domain === "operational_fact"
   )
     return "admin";
@@ -2197,14 +2203,14 @@ export function sourceDrivenPhaseIdentitySpecs(sourcePlan, phase) {
   if (phase === "production") {
     const identity = sourcePlan.identities.production;
     return [
-      phaseIdentitySpec({
+      { ...phaseIdentitySpec({
         domain: "production_order",
         method: "list_production_orders",
         listKey: "production_orders",
         businessField: "order_no",
         identity: identity.order,
         statuses: ["RELEASED", "CLOSED"],
-      }),
+      }), partialStatuses: new Set(["DRAFT", "RELEASED", "CLOSED"]) },
       ...identity.materialIssues.map((item) =>
         phaseIdentitySpec({
           domain: "operational_fact",
@@ -2382,9 +2388,10 @@ export async function validateProductionPhasePartialRecords(
   const requirements = Array.isArray(detail?.production_material_requirements)
     ? detail.production_material_requirements
     : [];
+  const draftOnly = order.status === "DRAFT" && records.length === 1;
   if (
     items.length !== 1 ||
-    requirements.length !== source.materialIssues.length
+    requirements.length !== (draftOnly ? 0 : source.materialIssues.length)
   ) {
     throw new CliError(
       `${identity.order.businessNo} has conflicting production lines`,
@@ -2410,6 +2417,7 @@ export async function validateProductionPhasePartialRecords(
     },
     new Set(["planned_quantity"]),
   );
+  if (draftOnly) return;
   const issueRecords = records.slice(
     1,
     Math.min(records.length, 1 + directMaterialIssues.length),
@@ -2766,7 +2774,7 @@ export async function reuseOrApplyManualAcceptanceFactPhase({
     }
     for (let index = 0; index < firstMissing; index += 1) {
       const status = String(records[index].status || "").toUpperCase();
-      if (!specs[index].statuses.has(status)) {
+      if (!(specs[index].partialStatuses || specs[index].statuses).has(status)) {
         throw new CliError(
           `${phase} phase record ${specs[index].businessNo} has conflicting status ${status || "missing"}`,
           2,
@@ -5248,6 +5256,40 @@ function assertReferenceRecords(plan, records) {
   return records;
 }
 
+export async function readManualAcceptanceFulfillmentHandoffs(rpc, purchase, facts) {
+  const expected = [
+    ...dedupeByID(purchase.purchaseReceipts).filter((record) => record.status === "POSTED").map((record) => ({
+      group: "handoff_receipt_inbound", sourceType: "purchase_receipt", id: record.id, status: "done",
+    })),
+    ...dedupeByID(facts.productionFacts).filter((record) => record.fact_type === "FINISHED_GOODS_RECEIPT").map((record) => ({
+      group: "handoff_production_inbound", sourceType: "production_fact", id: record.id,
+      status: record.status === "POSTED" ? "done" : record.status === "CANCELLED" ? "withdrawn" : "ready",
+    })),
+  ];
+  if (!expected.some((item) => item.group === "handoff_receipt_inbound") ||
+      !expected.some((item) => item.group === "handoff_production_inbound")) {
+    throw new CliError("fulfillment handoff readback requires both material and finished goods sources");
+  }
+  const tasks = [];
+  for (const item of expected) {
+    const data = await rpc({ actor: "warehouse", domain: "workflow", method: "list_tasks", params: {
+      task_group: item.group, source_type: item.sourceType, source_id: item.id, limit: 20, offset: 0,
+    } });
+    const rows = data.tasks || [];
+    const task = rows[0];
+    if (Number(data.total) !== 1 || rows.length !== 1 ||
+        task.task_group !== item.group || task.source_type !== item.sourceType ||
+        Number(task.source_id) !== Number(item.id) || task.owner_role_key !== "warehouse" ||
+        task.task_status_key !== item.status || task.payload?.source_task_producer !== "fulfillment.source" ||
+        !String(task.payload?.entry_path || "").startsWith("/erp/")) {
+      throw new CliError(`fulfillment handoff ${item.group}/${item.id} does not match its source and responsible role`);
+    }
+    tasks.push({ id: task.id, taskGroup: item.group, sourceType: item.sourceType, sourceId: item.id,
+      role: task.owner_role_key, status: task.task_status_key, entryPath: task.payload.entry_path });
+  }
+  return { verified: true, count: tasks.length, tasks };
+}
+
 function buildFactReport({
   mode,
   plan,
@@ -5255,6 +5297,7 @@ function buildFactReport({
   purchase,
   facts,
   finalInventory,
+  fulfillmentHandoffs,
 }) {
   const referenceRecords = assertReferenceRecords(plan, {
     productionOrders: dedupeByID(facts.productionOrders),
@@ -5330,6 +5373,7 @@ function buildFactReport({
       financeFieldCoverage: financeFieldContract.coveragePercent,
     },
     financeFieldContract,
+    fulfillmentHandoffs,
     statusCounts: {
       purchaseReceipts: countBy(referenceRecords.purchaseReceipts, "status"),
       purchaseReturns: countBy(referenceRecords.purchaseReturns, "status"),
@@ -5463,6 +5507,7 @@ export async function applyManualAcceptanceFactPlan(
       purchase,
     });
   }
+  const engineeringPreparation = options.factStage ? undefined : await prepareManualAcceptanceEngineering({ plan, sourceReport, rpc: context.rpc });
   const facts = options.factStage
     ? await options.factStage(plan, sourceReport, purchase, {
         ...context,
@@ -5480,14 +5525,15 @@ export async function applyManualAcceptanceFactPlan(
           ...purchase.inventoryLots,
           ...facts.inventoryLots,
         ]);
-  return buildFactReport({
+  return { ...buildFactReport({
     mode: "apply",
     plan,
     runtime: context.runtime,
     purchase,
     facts,
     finalInventory,
-  });
+    fulfillmentHandoffs: options.factStage ? undefined : await readManualAcceptanceFulfillmentHandoffs(context.rpc, purchase, facts),
+  }), engineeringPreparation };
 }
 
 export async function verifyManualAcceptanceFactPlan(
@@ -5509,6 +5555,7 @@ export async function verifyManualAcceptanceFactPlan(
       purchase,
     });
   }
+  const engineeringPreparation = options.factStage ? undefined : await prepareManualAcceptanceEngineering({ plan, sourceReport, rpc: context.rpc, apply: false });
   const facts = options.factStage
     ? await options.factStage(plan, sourceReport, purchase, {
         ...context,
@@ -5526,14 +5573,15 @@ export async function verifyManualAcceptanceFactPlan(
           ...purchase.inventoryLots,
           ...facts.inventoryLots,
         ]);
-  return buildFactReport({
+  return { ...buildFactReport({
     mode: "verify",
     plan,
     runtime: context.runtime,
     purchase,
     facts,
     finalInventory,
-  });
+    fulfillmentHandoffs: options.factStage ? undefined : await readManualAcceptanceFulfillmentHandoffs(context.rpc, purchase, facts),
+  }), engineeringPreparation };
 }
 
 export function parseManualAcceptanceFactArgs(argv = []) {

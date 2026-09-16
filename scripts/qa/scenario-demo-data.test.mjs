@@ -42,7 +42,7 @@ const LOCAL_DATABASE = Object.freeze({
   safeTarget: "registered-development:plush_erp",
   targetFingerprint: "a".repeat(64),
 });
-const MIGRATION_VERSION = "20260729043852";
+const MIGRATION_VERSION = "20260916090000";
 
 function trialAttestation() {
   return {
@@ -127,8 +127,8 @@ test("local and 133 plans share one canonical semantic contract with independent
   assert.equal(local.targetEnvironment, "local-development");
   assert.equal(local.backendURL, SCENARIO_DEMO_ORIGIN);
   assert.equal(local.databaseName, "plush_erp");
-  assert.equal(local.dataVersion, "2026.08.15-v6");
-  assert.equal(local.runId, "20260815-V6");
+  assert.equal(local.dataVersion, "2026.09.16-v7");
+  assert.equal(local.runId, "20260916-V7");
   assert.equal(local.canonicalRunner.stageCount, 9);
   assert.equal(local.canonicalRunner.persistentBaseline, true);
   assert.equal(local.execution.replayMode, SCENARIO_DEMO_REPLAY_MODE);
@@ -214,8 +214,8 @@ test("readback requires every canonical stage and reports target-bound evidence"
     migrationVersion: MIGRATION_VERSION,
     customerConfigRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
+    dataVersion: "2026.09.16-v7",
+    runId: "20260916-V7",
     semanticDigest: plan.semanticDigest,
     stageCount: 9,
     sourceDocumentCount: 3,
@@ -345,7 +345,7 @@ test("local CLI plan proves database, migration, runtime, and repository", async
     }
     return {
       stdout: [
-        "schema/migration 守卫通过",
+        "[local-preflight] 工作区数据库规则检查通过",
         `migration 已是最新版本（${MIGRATION_VERSION}，42/42）`,
         "non-system-schema function=0 procedure=0 non-internal-trigger=0",
       ].join("\n"),
