@@ -1,6 +1,7 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
+import { assertTaskEventTrailMarkers } from './taskEventTrailAssertions.mjs'
 
 export function createDashboardTaskScenarios({
   expectText,
@@ -139,7 +140,7 @@ export function createDashboardTaskScenarios({
           process_instance_id: 701,
           process_node_instance_id: 702,
           process_definition_revision_id: 703,
-          version: 1,
+          version: 2,
           payload: { approval_scope: 'shipment_finance_release' },
         },
       ],
@@ -320,9 +321,7 @@ export function createDashboardTaskScenarios({
           0
         )
         await moreFilters.click()
-        const layoutSearch = page.getByPlaceholder(
-          '订单 / 产品 / 物料 / 款号'
-        )
+        const layoutSearch = page.getByPlaceholder('订单 / 产品 / 物料 / 款号')
         await layoutSearch.fill('布局验证无匹配任务')
         await layoutSearch.press('Enter')
         await expectText(page, '当前分类暂无匹配任务')
@@ -421,6 +420,51 @@ export function createDashboardTaskScenarios({
           path: path.resolve(outputDir, 'erp-task-board-approval-inbox.png'),
         })
         let processContextRequestCount = 0
+        const taskEventHistory = async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            body.method !== 'list_task_events' ||
+            body.params?.task_id !== 9101
+          ) {
+            await route.fallback()
+            return
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: body.id,
+              result: {
+                code: 0,
+                data: {
+                  items: [
+                    {
+                      id: 91012,
+                      task_id: 9101,
+                      event_type: 'payload_refreshed',
+                      to_status_key: 'ready',
+                      task_version: 2,
+                      created_at: 1_800_000_060,
+                    },
+                    {
+                      id: 91011,
+                      task_id: 9101,
+                      event_type: 'created',
+                      to_status_key: 'ready',
+                      task_version: 1,
+                      created_at: 1_800_000_000,
+                      reason: '等待审批人核对来源单据与放行条件',
+                    },
+                  ],
+                  total: 2,
+                  truncated: false,
+                },
+              },
+            }),
+          })
+        }
+        await page.route('**/rpc/workflow', taskEventHistory)
         const transientProcessContextFailure = async (route) => {
           const body = route.request().postDataJSON() || {}
           if (body.method !== 'get_task_process_context') {
@@ -497,6 +541,11 @@ export function createDashboardTaskScenarios({
         const taskEventTrail = page.getByTestId('workflow-task-event-trail')
         await taskEventTrail.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(taskEventTrail, '审批已发起')
+        await expectText(taskEventTrail, '任务信息已更新')
+        await assertTaskEventTrailMarkers(
+          taskEventTrail,
+          'erp-task-board-desktop'
+        )
         assert(
           (await taskEventTrail.getByText('完整审批链').count()) === 0,
           '本任务处理记录不应常驻显示完整审批链说明'
@@ -513,7 +562,7 @@ export function createDashboardTaskScenarios({
           })
         )
         assert(
-          taskEventTrailMetrics.itemCount === 1 &&
+          taskEventTrailMetrics.itemCount === 2 &&
             taskEventTrailMetrics.responsibilityCount === 0 &&
             taskEventTrailMetrics.overflowX <= 1,
           `任务抽屉处理记录状态或布局不完整: ${JSON.stringify(
@@ -523,6 +572,7 @@ export function createDashboardTaskScenarios({
         await taskEventTrail.screenshot({
           path: path.resolve(outputDir, 'erp-task-board-task-event-trail.png'),
         })
+        await page.unroute('**/rpc/workflow', taskEventHistory)
         const executionTrail = page.getByTestId('workflow-process-stage')
         await executionTrail.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(
@@ -1467,9 +1517,8 @@ export function createDashboardTaskScenarios({
             document.querySelectorAll('.erp-task-board-lane').length === 4
           )
         })
-        const taskBoardSearch = page.getByPlaceholder(
-          '订单 / 产品 / 物料 / 款号'
-        )
+        const taskBoardSearch =
+          page.getByPlaceholder('订单 / 产品 / 物料 / 款号')
         await taskBoardSearch.fill('RB-018')
         await taskBoardSearch.press('Enter')
         await page.waitForFunction(
@@ -2864,9 +2913,7 @@ export function createDashboardTaskScenarios({
         await page
           .getByPlaceholder('订单 / 产品 / 物料 / 款号')
           .fill('OUT-DASH-WIDE-LAYOUT')
-        await page
-          .getByPlaceholder('订单 / 产品 / 物料 / 款号')
-          .press('Enter')
+        await page.getByPlaceholder('订单 / 产品 / 物料 / 款号').press('Enter')
         await expectText(page, '宽屏重叠回归任务')
         await assertTextAbsent(page, '当前选中任务')
         await page

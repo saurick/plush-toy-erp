@@ -3,6 +3,7 @@ import { mobileTaskListOptionsScenario } from './mobileTaskListOptionsScenario.m
 import { mobileTaskRefreshScenario } from './mobileTaskRefreshScenario.mjs'
 import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
+import { assertTaskEventTrailMarkers } from './taskEventTrailAssertions.mjs'
 import {
   assertReadableOnBackground,
   isDarkControlBackground,
@@ -2973,6 +2974,10 @@ export function createMobileTaskScenarios({
           .locator('.workflow-task-event-trail__meta')
           .first()
         await mobileEventMeta.waitFor({ state: 'visible', timeout: 10_000 })
+        await assertTaskEventTrailMarkers(
+          page.getByTestId('workflow-task-event-trail'),
+          'mobile-tasks-dark'
+        )
         const mobileEventMetaMetrics = await mobileEventMeta.evaluate(
           (node) => {
             const actorName = node.querySelector(

@@ -1,4 +1,7 @@
 .workflow-task-event-trail {
+  --workflow-event-marker-size: 12px;
+  --workflow-event-marker-offset: 4px;
+  --workflow-event-marker-color: #64748b;
   display: grid;
   min-width: 0;
   gap: 14px;
@@ -94,16 +97,18 @@
   position: relative;
   display: grid;
   min-width: 0;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: var(--workflow-event-marker-size) minmax(0, 1fr);
   gap: 10px;
   padding-bottom: 14px;
 }
 
 .workflow-task-event-trail__item::after {
   position: absolute;
-  top: 24px;
-  bottom: 0;
-  left: 12px;
+  top: calc(
+    var(--workflow-event-marker-offset) + var(--workflow-event-marker-size)
+  );
+  bottom: calc(-1 * var(--workflow-event-marker-offset));
+  left: calc(var(--workflow-event-marker-size) / 2 - 1px);
   width: 2px;
   background: #d8e1ea;
   content: '';
@@ -120,23 +125,15 @@
 .workflow-task-event-trail__marker {
   position: relative;
   z-index: 1;
-  display: inline-flex;
-  width: 26px;
-  height: 26px;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #cbd5e1;
-  border-radius: 999px;
-  background: #fff;
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
+  width: var(--workflow-event-marker-size);
+  height: var(--workflow-event-marker-size);
+  margin-top: var(--workflow-event-marker-offset);
+  border-radius: 50%;
+  background: var(--workflow-event-marker-color);
 }
 
 .workflow-task-event-trail__content {
   min-width: 0;
-  padding-top: 1px;
 }
 
 .workflow-task-event-trail__item-head {
@@ -209,28 +206,20 @@
   color: #b42318;
 }
 
-.workflow-task-event-trail__item--success .workflow-task-event-trail__marker {
-  border-color: #86c89c;
-  background: #edf9f0;
-  color: #287a40;
+.workflow-task-event-trail__item--success {
+  --workflow-event-marker-color: #287a40;
 }
 
-.workflow-task-event-trail__item--info .workflow-task-event-trail__marker {
-  border-color: #5288c7;
-  background: #edf5ff;
-  color: #245c9f;
+.workflow-task-event-trail__item--info {
+  --workflow-event-marker-color: #245c9f;
 }
 
-.workflow-task-event-trail__item--warning .workflow-task-event-trail__marker {
-  border-color: #d7a34e;
-  background: #fff7e8;
-  color: #a14d05;
+.workflow-task-event-trail__item--warning {
+  --workflow-event-marker-color: #a14d05;
 }
 
-.workflow-task-event-trail__item--danger .workflow-task-event-trail__marker {
-  border-color: #dc6d6d;
-  background: #fff1f1;
-  color: #b42318;
+.workflow-task-event-trail__item--danger {
+  --workflow-event-marker-color: #b42318;
 }
 
 .workflow-task-event-trail--mobile {
@@ -269,6 +258,7 @@
 }
 
 [data-erp-theme='dark'] .workflow-task-event-trail {
+  --workflow-event-marker-color: #94a3b8;
   border-color: var(--erp-border, #334155);
   background: var(--erp-surface-bg, #172033);
   color: var(--erp-text, #e5e7eb);
@@ -295,8 +285,20 @@
   background: rgb(30 41 59 / 0.78);
 }
 
-[data-erp-theme='dark'] .workflow-task-event-trail__marker {
-  background: var(--erp-surface-bg, #172033);
+[data-erp-theme='dark'] .workflow-task-event-trail__item--success {
+  --workflow-event-marker-color: #86c89c;
+}
+
+[data-erp-theme='dark'] .workflow-task-event-trail__item--info {
+  --workflow-event-marker-color: #60a5fa;
+}
+
+[data-erp-theme='dark'] .workflow-task-event-trail__item--warning {
+  --workflow-event-marker-color: #fbbf24;
+}
+
+[data-erp-theme='dark'] .workflow-task-event-trail__item--danger {
+  --workflow-event-marker-color: #f87171;
 }
 
 [data-erp-theme='dark'] .workflow-task-event-trail__item::after {

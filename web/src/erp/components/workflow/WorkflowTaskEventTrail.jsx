@@ -2,14 +2,6 @@ import React from 'react'
 import { buildWorkflowTaskEventTrailModel } from '../../utils/workflowTaskEventPresentation.mjs'
 import './workflowTaskEventTrail.css'
 
-const EVENT_MARKERS = Object.freeze({
-  danger: '!',
-  info: '●',
-  neutral: '·',
-  success: '✓',
-  warning: '↑',
-})
-
 export default function WorkflowTaskEventTrail({
   approvalTask = false,
   className = '',
@@ -88,9 +80,7 @@ export default function WorkflowTaskEventTrail({
                 <span
                   className="workflow-task-event-trail__marker"
                   aria-hidden="true"
-                >
-                  {EVENT_MARKERS[item.tone] || EVENT_MARKERS.neutral}
-                </span>
+                />
                 <div className="workflow-task-event-trail__content">
                   <div className="workflow-task-event-trail__item-head">
                     <strong>{item.label}</strong>
@@ -147,8 +137,7 @@ export default function WorkflowTaskEventTrail({
               data-testid="workflow-task-event-trail-truncated"
               role="status"
             >
-              仅显示最近 {model.items.length}{' '}
-              条，更早记录未加载。
+              仅显示最近 {model.items.length} 条，更早记录未加载。
             </p>
           ) : null}
         </>
