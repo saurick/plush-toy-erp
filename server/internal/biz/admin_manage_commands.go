@@ -33,7 +33,15 @@ type AdminProfileChange struct {
 }
 
 type AdminPasswordReset struct {
-	AdminID      int
-	OperatorID   int
-	PasswordHash string
+	AdminID            int
+	OperatorID         int
+	PasswordHash       string
+	UseDefaultPassword bool
+}
+
+type AdminPasswordChange struct {
+	AdminID              int
+	ExpectedAuthVersion  int64
+	ExpectedPasswordHash string
+	PasswordHash         string
 }

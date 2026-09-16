@@ -378,6 +378,19 @@ func (r *memAdminManageRepoForData) ResetAdminPasswordWithAudit(ctx context.Cont
 	return r.GetAdminByID(ctx, reset.AdminID)
 }
 
+func (r *memAdminManageRepoForData) ChangeAdminPasswordWithAudit(ctx context.Context, change *biz.AdminPasswordChange) error {
+	admin, err := r.GetAdminByID(ctx, change.AdminID)
+	if err != nil {
+		return err
+	}
+	if admin.AuthVersion != change.ExpectedAuthVersion || admin.PasswordHash != change.ExpectedPasswordHash {
+		return biz.ErrAuthVersionStale
+	}
+	r.admins[admin.ID].PasswordHash = change.PasswordHash
+	r.admins[admin.ID].AuthVersion++
+	return nil
+}
+
 func (r *memAdminManageRepoForData) RecordRuntimeAuditEvent(_ context.Context, event *biz.RuntimeAuditEventCreate) error {
 	if event == nil {
 		return biz.ErrBadParam

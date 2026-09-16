@@ -18,6 +18,7 @@ import React, {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from 'react'
 import { useOutletContext } from 'react-router-dom'
@@ -95,6 +96,9 @@ export default function PermissionAdminAccounts({
   const outletContext = useOutletContext()
 
   const [creating, setCreating] = useState(false)
+  const passwordResetPendingRef = useRef(false)
+  const [resettingDefaultPassword, setResettingDefaultPassword] =
+    useState(false)
 
   const [statusUpdatingAdminID, setStatusUpdatingAdminID] = useState(null)
 
@@ -336,6 +340,7 @@ export default function PermissionAdminAccounts({
   }
 
   const closeResetModal = () => {
+    if (passwordResetPendingRef.current) return
     dispatchAdminDialog({ type: 'close' })
     resetForm.resetFields()
   }
@@ -513,27 +518,40 @@ export default function PermissionAdminAccounts({
     }
   }
 
-  const resetAdminPassword = async (values) => {
+  const resetAdminPassword = async (values, useDefaultPassword = false) => {
     const accountStatus = getAdminAccountStatus(resettingAdmin)
     if (
+      passwordResetPendingRef.current ||
+      (useDefaultPassword && currentAdmin?.is_super_admin !== true) ||
       !resettingAdmin?.id ||
       !accountStatus ||
       accountStatus === ADMIN_ACCOUNT_STATUS.REVOKED
     ) {
       return
     }
+    passwordResetPendingRef.current = true
+    setResettingDefaultPassword(useDefaultPassword)
     setSaving(true)
     try {
-      await adminRpc.call('reset_password', {
-        id: resettingAdmin.id,
-        password: values.password,
-      })
-      message.success(`已重置 ${formatAdminIdentity(resettingAdmin)} 的密码`)
+      await adminRpc.call(
+        useDefaultPassword ? 'reset_default_password' : 'reset_password',
+        useDefaultPassword
+          ? { id: resettingAdmin.id }
+          : { id: resettingAdmin.id, password: values.password }
+      )
+      message.success(
+        useDefaultPassword
+          ? `已将 ${formatAdminIdentity(resettingAdmin)} 重置为默认密码，请提醒本人登录后修改`
+          : `已重置 ${formatAdminIdentity(resettingAdmin)} 的密码`
+      )
+      passwordResetPendingRef.current = false
       closeResetModal()
       await loadData()
     } catch (err) {
       message.error(getActionErrorMessage(err, '重置员工账号密码'))
     } finally {
+      passwordResetPendingRef.current = false
+      setResettingDefaultPassword(false)
       setSaving(false)
     }
   }
@@ -985,7 +1003,12 @@ export default function PermissionAdminAccounts({
         confirmLoading={creating}
         okText="创建"
       >
-        <Form form={createForm} className="erp-business-action-form" layout="vertical" onFinish={createAdmin}>
+        <Form
+          form={createForm}
+          className="erp-business-action-form"
+          layout="vertical"
+          onFinish={createAdmin}
+        >
           <Form.Item
             label="姓名"
             name="display_name"
@@ -1167,10 +1190,44 @@ export default function PermissionAdminAccounts({
         confirmLoading={saving}
         okText="重置"
         cancelText="取消"
+        closable={!saving}
+        keyboard={!saving}
+        maskClosable={!saving}
+        footer={[
+          <Button key="cancel" disabled={saving} onClick={closeResetModal}>
+            取消
+          </Button>,
+          currentAdmin?.is_super_admin === true ? (
+            <Button
+              key="default"
+              disabled={saving}
+              loading={saving && resettingDefaultPassword}
+              onClick={() => resetAdminPassword({}, true)}
+            >
+              重置为 12345678
+            </Button>
+          ) : null,
+          <Button
+            key="reset"
+            type="primary"
+            disabled={saving}
+            loading={saving && !resettingDefaultPassword}
+            onClick={() => resetForm.submit()}
+          >
+            重置
+          </Button>,
+        ]}
         centered
         forceRender
       >
-        <Form form={resetForm} layout="vertical" onFinish={resetAdminPassword}>
+        <p>重置后，该账号所有设备上的当前登录都会失效。</p>
+        <Form
+          form={resetForm}
+          name="admin-password-reset"
+          layout="vertical"
+          onFinish={resetAdminPassword}
+          disabled={saving}
+        >
           <Form.Item
             label="新密码"
             name="password"

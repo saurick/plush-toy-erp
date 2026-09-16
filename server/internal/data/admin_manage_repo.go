@@ -51,6 +51,7 @@ const (
 	adminSessionRevokeReasonAccountEnabled  = "account_enabled"
 	adminSessionRevokeReasonAccountRevoked  = "account_revoked"
 	adminSessionRevokeReasonPasswordReset   = "password_reset"
+	adminSessionRevokeReasonPasswordChange  = "password_change"
 )
 
 func (r *adminManageRepo) toBizAdmin(ctx context.Context, a *ent.AdminUser) (*biz.AdminUser, error) {
@@ -1421,6 +1422,9 @@ func (r *adminManageRepo) ResetAdminPasswordWithAudit(ctx context.Context, reset
 	if err != nil {
 		return nil, err
 	}
+	if reset.UseDefaultPassword && !operator.IsSuperAdmin {
+		return nil, biz.ErrNoPermission
+	}
 	if err := biz.ValidateAdminControlTarget(operator, before); err != nil {
 		return nil, err
 	}
@@ -1461,6 +1465,7 @@ func (r *adminManageRepo) ResetAdminPasswordWithAudit(ctx context.Context, reset
 		map[string]any{"password_reset": false},
 		map[string]any{
 			"password_reset":        true,
+			"reset_to_default":      reset.UseDefaultPassword,
 			"revoked_session_count": revokedSessionCount,
 			"session_revoke_reason": adminSessionRevokeReasonPasswordReset,
 		},
@@ -1476,6 +1481,57 @@ func (r *adminManageRepo) ResetAdminPasswordWithAudit(ctx context.Context, reset
 	}
 	tx = nil
 	return after, nil
+}
+
+func (r *adminManageRepo) ChangeAdminPasswordWithAudit(ctx context.Context, change *biz.AdminPasswordChange) error {
+	if change == nil || change.AdminID <= 0 || change.ExpectedAuthVersion <= 0 || change.ExpectedPasswordHash == "" || change.PasswordHash == "" {
+		return biz.ErrBadParam
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { r.rollbackAdminManageTx(ctx, tx) }()
+	admin, err := r.loadOperatorForUpdate(ctx, tx, change.AdminID)
+	if err != nil {
+		return err
+	}
+	if admin.AuthVersion != change.ExpectedAuthVersion || admin.PasswordHash != change.ExpectedPasswordHash {
+		return biz.ErrAuthVersionStale
+	}
+	affected, err := tx.AdminUser.Update().Where(
+		adminuser.ID(admin.ID), adminuser.Disabled(false), adminuser.RevokedAtIsNil(),
+		adminuser.AuthVersion(change.ExpectedAuthVersion), adminuser.PasswordHash(change.ExpectedPasswordHash),
+	).SetPasswordHash(change.PasswordHash).AddAuthVersion(1).Save(ctx)
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return biz.ErrAuthVersionStale
+	}
+	revokedSessionCount, err := revokeActiveAdminSessionsInTx(ctx, tx, admin.ID, time.Now(), adminSessionRevokeReasonPasswordChange)
+	if err != nil {
+		return err
+	}
+	event, err := biz.BuildAdminControlAuditEvent(
+		admin, "admin_user.password.change", "admin_user", admin.ID, admin.Username,
+		map[string]any{"password_changed": false},
+		map[string]any{
+			"password_changed": true, "revoked_session_count": revokedSessionCount,
+			"session_revoke_reason": adminSessionRevokeReasonPasswordChange,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	if err := createRuntimeAuditEventInTx(ctx, tx, event); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	tx = nil
+	return nil
 }
 
 func revokeActiveAdminSessionsInTx(

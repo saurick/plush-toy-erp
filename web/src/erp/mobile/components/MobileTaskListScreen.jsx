@@ -6,6 +6,7 @@ import {
   CheckSquareOutlined,
   FileTextOutlined,
   InfoCircleOutlined,
+  KeyOutlined,
   InboxOutlined,
   LogoutOutlined,
   ReloadOutlined,
@@ -17,6 +18,7 @@ import {
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import SearchInput from '@/common/components/SearchInput'
 import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
+import AccountPasswordModal from '../../components/AccountPasswordModal.jsx'
 import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
 import { WorkflowTaskSource } from '../../components/workflow/WorkflowTaskCopy.jsx'
 import WorkflowTaskTiming from '../../components/workflow/WorkflowTaskTiming.jsx'
@@ -97,6 +99,7 @@ export default function MobileTaskListScreen({
   setVisibleListLimitsByKey,
 }) {
   const [keywordDraft, setKeywordDraft] = useState(taskKeyword || '')
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const searchFormRef = useRef(null)
   const searchTimerRef = useRef(null)
   const composingSearchRef = useRef(false)
@@ -812,6 +815,17 @@ export default function MobileTaskListScreen({
 
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-950">入口与安全</h2>
+          <button
+            type="button"
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
+            onClick={() => setPasswordModalOpen(true)}
+          >
+            <KeyOutlined aria-hidden="true" />
+            修改密码
+          </button>
+          {passwordModalOpen ? (
+            <AccountPasswordModal onClose={() => setPasswordModalOpen(false)} />
+          ) : null}
           {canEnterDesktop ? (
             <button
               type="button"

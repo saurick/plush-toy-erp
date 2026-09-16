@@ -470,6 +470,9 @@ func (r *stubAdminManageRepo) ResetAdminPasswordWithAudit(ctx context.Context, r
 	if !ok {
 		return nil, ErrAdminNotFound
 	}
+	if reset.UseDefaultPassword && !operator.IsSuperAdmin {
+		return nil, ErrNoPermission
+	}
 	admin.PasswordHash = reset.PasswordHash
 	admin.AuthVersion++
 	event, err := BuildAdminControlAuditEvent(
@@ -483,6 +486,27 @@ func (r *stubAdminManageRepo) ResetAdminPasswordWithAudit(ctx context.Context, r
 		return nil, err
 	}
 	return r.clone(admin), nil
+}
+
+func (r *stubAdminManageRepo) ChangeAdminPasswordWithAudit(ctx context.Context, change *AdminPasswordChange) error {
+	admin, ok := r.adminsByID[change.AdminID]
+	if !ok {
+		return ErrAdminNotFound
+	}
+	if !admin.IsActive() {
+		return ErrUserDisabled
+	}
+	if admin.AuthVersion != change.ExpectedAuthVersion || admin.PasswordHash != change.ExpectedPasswordHash {
+		return ErrAuthVersionStale
+	}
+	admin.PasswordHash = change.PasswordHash
+	admin.AuthVersion++
+	event, err := BuildAdminControlAuditEvent(admin, "admin_user.password.change", "admin_user", admin.ID, admin.Username,
+		map[string]any{"password_changed": false}, map[string]any{"password_changed": true})
+	if err != nil {
+		return err
+	}
+	return r.RecordRuntimeAuditEvent(ctx, event)
 }
 
 func (r *stubAdminManageRepo) RecordRuntimeAuditEvent(_ context.Context, event *RuntimeAuditEventCreate) error {

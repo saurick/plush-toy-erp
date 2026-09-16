@@ -494,6 +494,34 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			}),
 		}, nil
 
+	case "change_password":
+		if res := rejectUnknownAdminParams(pm, "old_password", "new_password"); res != nil {
+			return id, res, nil
+		}
+		oldPassword, validOld := pm["old_password"].(string)
+		newPassword, validNew := pm["new_password"].(string)
+		if !validOld || !validNew {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		if err := d.adminManageUC.ChangePassword(ctx, oldPassword, newPassword); err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "密码已修改，请重新登录"}, nil
+	case "reset_default_password":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "id"); res != nil {
+			return id, res, nil
+		}
+		adminID, validID := strictJSONRPCPositiveInt(pm["id"])
+		if !validID {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		if _, err := d.adminManageUC.ResetDefaultPassword(ctx, adminID); err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "已重置为默认密码"}, nil
 	case "reset_password":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
 			return id, res, nil
@@ -572,6 +600,12 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 	l := d.log.WithContext(ctx)
 
 	switch {
+	case errors.Is(err, biz.ErrInvalidPassword):
+		return &v1.JsonrpcResult{Code: errcode.AuthInvalidPassword.Code, Message: errcode.AuthInvalidPassword.Message}
+	case errors.Is(err, biz.ErrAdminPasswordUnchanged):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "新密码不能与旧密码相同"}
+	case errors.Is(err, biz.ErrAuthVersionStale):
+		return &v1.JsonrpcResult{Code: errcode.AuthCredentialsChanged.Code, Message: errcode.AuthCredentialsChanged.Message}
 	case errors.Is(err, biz.ErrForbidden), errors.Is(err, biz.ErrNoPermission):
 		l.Warnf("[admin] permission denied err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}

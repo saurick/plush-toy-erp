@@ -1208,7 +1208,7 @@ export function createPermissionCenterScenarios({
         await resetModal
           .locator('.ant-input-affix-wrapper input')
           .fill('new-secret')
-        await resetModal.getByRole('button', { name: /重\s*置/u }).click()
+        await resetModal.getByRole('button', { name: /^重\s*置$/u }).click()
         await expectText(page, '已重置 业务助理（assistant-admin） 的密码')
 
         await assistantRow.getByRole('switch').click()

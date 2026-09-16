@@ -19,6 +19,7 @@ import {
   HomeOutlined,
   InboxOutlined,
   InfoCircleOutlined,
+  KeyOutlined,
   LogoutOutlined,
   MenuOutlined,
   PrinterOutlined,
@@ -67,6 +68,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc, pauseAuthenticatedRpcCalls } from '@/common/utils/jsonRpc'
 import SessionRecoveryDialog from './SessionRecoveryDialog'
+import AccountPasswordModal from './AccountPasswordModal.jsx'
 import {
   getBusinessModule,
   isCustomerBusinessDataPageKey,
@@ -331,6 +333,7 @@ export default function ERPLayout({ legalNotice }) {
   const [loggingOut, setLoggingOut] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [systemVersionOpen, setSystemVersionOpen] = useState(false)
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [profileLoading, setProfileLoading] = useState(!getStoredAdminProfile())
   const [adminProfile, setAdminProfile] = useState(() =>
     getStoredAdminProfile()
@@ -1181,7 +1184,14 @@ export default function ERPLayout({ legalNotice }) {
     setMobileNavOpen(false)
   }
 
-  const handleAccountMenuClick = ({ key }) => {
+  const handleAccountMenuClick = async ({ key }) => {
+    if (key === 'change-password') {
+      if (pageLeaveGuard && !(await pageLeaveGuard({ intent: 'logout' }))) {
+        return undefined
+      }
+      setPasswordModalOpen(true)
+      return undefined
+    }
     if (key === 'privacy-and-rules') {
       return handleNavigate('/legal/privacy', {
         state: {
@@ -1263,6 +1273,11 @@ export default function ERPLayout({ legalNotice }) {
     { fallback: 'admin' }
   )
   const accountMenuItems = [
+    {
+      key: 'change-password',
+      icon: <KeyOutlined />,
+      label: '修改密码',
+    },
     {
       key: 'privacy-and-rules',
       icon: <SafetyCertificateOutlined />,
@@ -1479,6 +1494,9 @@ export default function ERPLayout({ legalNotice }) {
           </Content>
         </Layout>
       </Layout>
+      {passwordModalOpen ? (
+        <AccountPasswordModal onClose={() => setPasswordModalOpen(false)} />
+      ) : null}
       <SystemVersionModal
         buildIdentity={runtimeBuildIdentity}
         onClose={() => setSystemVersionOpen(false)}

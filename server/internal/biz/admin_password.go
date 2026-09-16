@@ -3,9 +3,10 @@ package biz
 import "unicode/utf8"
 
 const (
-	AdminPasswordMinLength = 8
-	AdminPasswordMaxLength = 20
-	AdminPasswordMaxBytes  = 72
+	AdminPasswordMinLength    = 8
+	AdminPasswordMaxLength    = 20
+	AdminPasswordMaxBytes     = 72
+	AdminDefaultResetPassword = "12345678"
 )
 
 // ValidateAdminPassword keeps every administrator credential creation path

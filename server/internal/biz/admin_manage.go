@@ -22,6 +22,7 @@ var (
 	ErrAdminExists                       = errors.New("admin already exists")
 	ErrAdminUsernameInvalid              = errors.New("admin username is invalid")
 	ErrAdminPhoneExists                  = errors.New("admin phone already exists")
+	ErrAdminPasswordUnchanged            = errors.New("new password is unchanged")
 	ErrAdminRevoked                      = errors.New("admin account revoked")
 	ErrRoleNotFound                      = errors.New("role not found")
 	ErrRoleExists                        = errors.New("role already exists")
@@ -122,6 +123,7 @@ type AdminManageRepo interface {
 	SetAdminProfileWithAudit(ctx context.Context, change *AdminProfileChange) (*AdminUser, error)
 	ChangeAdminLifecycle(ctx context.Context, change *AdminLifecycleChange) (updated *AdminUser, releasedTaskCount int, err error)
 	ResetAdminPasswordWithAudit(ctx context.Context, reset *AdminPasswordReset) (*AdminUser, error)
+	ChangeAdminPasswordWithAudit(ctx context.Context, change *AdminPasswordChange) error
 	RecordRuntimeAuditEvent(ctx context.Context, event *RuntimeAuditEventCreate) error
 	ListRuntimeAuditEvents(ctx context.Context, filter RuntimeAuditEventListFilter) (RuntimeAuditEventListResult, error)
 }
@@ -526,6 +528,8 @@ func runtimeAuditActionLabelAndRisk(eventKey string) (string, string) {
 		return "账号正式注销", "high"
 	case "admin_user.password.reset":
 		return "密码重置", "high"
+	case "admin_user.password.change":
+		return "自行修改密码", "normal"
 	case "role.permissions.set":
 		return "角色权限变更", "high"
 	case "role.settings.set":
@@ -569,7 +573,12 @@ func runtimeAuditSummary(event RuntimeAuditEvent) string {
 	}
 	switch event.EventKey {
 	case "admin_user.password.reset":
+		if boolValue(after["reset_to_default"]) {
+			return actor + " 将 " + target + " 的密码重置为默认密码"
+		}
 		return actor + " 重置了 " + target + " 的密码"
+	case "admin_user.password.change":
+		return actor + " 修改了自己的密码"
 	case "admin_user.disabled.set":
 		if boolValue(after["disabled"]) {
 			return actor + " 禁用了 " + target
@@ -1216,6 +1225,19 @@ func (uc *AdminManageUsecase) ResetPassword(
 	adminID int,
 	password string,
 ) (updated *AdminUser, err error) {
+	return uc.resetPassword(ctx, adminID, password, false)
+}
+
+func (uc *AdminManageUsecase) ResetDefaultPassword(ctx context.Context, adminID int) (*AdminUser, error) {
+	return uc.resetPassword(ctx, adminID, AdminDefaultResetPassword, true)
+}
+
+func (uc *AdminManageUsecase) resetPassword(
+	ctx context.Context,
+	adminID int,
+	password string,
+	useDefaultPassword bool,
+) (updated *AdminUser, err error) {
 	ctx, span := uc.Tracer().Start(ctx, "admin_manage.reset_password",
 		trace.WithAttributes(attribute.Int("admin.id", adminID)),
 	)
@@ -1226,6 +1248,9 @@ func (uc *AdminManageUsecase) ResetPassword(
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
+	}
+	if useDefaultPassword && !operator.IsSuperAdmin {
+		return nil, ErrNoPermission
 	}
 	if adminID <= 0 || ValidateAdminPassword(password) != nil {
 		span.SetStatus(codes.Error, ErrBadParam.Error())
@@ -1255,6 +1280,7 @@ func (uc *AdminManageUsecase) ResetPassword(
 
 	updated, err = uc.repo.ResetAdminPasswordWithAudit(ctx, &AdminPasswordReset{
 		AdminID: adminID, OperatorID: operator.ID, PasswordHash: string(hash),
+		UseDefaultPassword: useDefaultPassword,
 	})
 	if err != nil {
 		span.RecordError(err)
@@ -1264,4 +1290,35 @@ func (uc *AdminManageUsecase) ResetPassword(
 
 	span.SetStatus(codes.Ok, "OK")
 	return updated, nil
+}
+
+func (uc *AdminManageUsecase) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
+	ctx, span := uc.Tracer().Start(ctx, "admin_manage.change_password")
+	defer span.End()
+	admin, err := uc.requireActiveAdmin(ctx)
+	if err != nil {
+		return err
+	}
+	claims, _ := GetClaimsFromContext(ctx)
+	if claims.AuthVersion <= 0 || claims.AuthVersion != admin.AuthVersion {
+		return ErrAuthVersionStale
+	}
+	if oldPassword == "" || !utf8.ValidString(oldPassword) || len(oldPassword) > AdminPasswordMaxBytes || ValidateAdminPassword(newPassword) != nil {
+		return ErrBadParam
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(oldPassword)); err != nil {
+		return ErrInvalidPassword
+	}
+	if oldPassword == newPassword {
+		return ErrAdminPasswordUnchanged
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	// Recheck the verified credentials under the account row lock before writing.
+	return uc.repo.ChangeAdminPasswordWithAudit(ctx, &AdminPasswordChange{
+		AdminID: admin.ID, ExpectedAuthVersion: admin.AuthVersion,
+		ExpectedPasswordHash: admin.PasswordHash, PasswordHash: string(hash),
+	})
 }

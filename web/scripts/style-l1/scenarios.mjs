@@ -11,6 +11,7 @@ import { createCustomerSessionScenarios } from './customerSessionScenarios.mjs'
 import { createAuthenticationEntryScenarios } from './authenticationEntryScenarios.mjs'
 import { createPrintWorkspaceScenarios } from './printWorkspaceScenarios.mjs'
 import { createPermissionCenterScenarios } from './permissionCenterScenarios.mjs'
+import { createAccountPasswordScenarios } from './accountPasswordScenarios.mjs'
 
 import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 
@@ -486,6 +487,11 @@ export function createStyleL1Scenarios(deps) {
       assertNoDuplicatedAdminPageTitle,
       assertDashboardMetricInteractionSemantics,
       assertNoDashboardCenterLocalRefreshButton,
+    }),
+    ...createAccountPasswordScenarios({
+      expectText,
+      assertNoHorizontalOverflow,
+      outputDir,
     }),
     ...createPermissionCenterScenarios({
       expectText,

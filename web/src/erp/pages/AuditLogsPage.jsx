@@ -93,6 +93,12 @@ const actionMetaMap = {
     intent: '确认谁重置了哪个账号密码',
     next: '核对操作人和员工账号；系统只记录重置操作，不记录密码内容。',
   },
+  'admin_user.password.change': {
+    label: '自行修改密码',
+    risk: 'normal',
+    intent: '确认账号本人何时修改了密码',
+    next: '修改后旧登录全部失效；系统只记录操作，不记录密码内容。',
+  },
   'role.permissions.set': {
     label: '岗位功能变更',
     risk: 'high',
@@ -171,6 +177,8 @@ const fieldLabelMap = {
   role_keys: '岗位',
   permission_keys: '可用功能',
   password_reset: '密码',
+  password_changed: '密码',
+  reset_to_default: '重置方式',
   session_revoke_reason: '登录状态',
   status_reason: '状态说明',
   version: '岗位信息',
@@ -335,6 +343,12 @@ function compactValue(value, key) {
   if (key === 'password_reset') {
     return value ? '已重置' : '未重置'
   }
+  if (key === 'password_changed') {
+    return value ? '本人已修改' : '修改前'
+  }
+  if (key === 'reset_to_default') {
+    return value ? '默认密码' : '指定新密码'
+  }
   if (key === 'account_status') {
     return accountStatusLabelMap[String(value || '').toUpperCase()] || '已更新'
   }
@@ -420,7 +434,13 @@ function buildAuditConclusion(event = {}) {
   const target = getEventTargetText(event)
   const after = event.payload?.after || {}
   if (event.event_key === 'admin_user.password.reset') {
+    if (after.reset_to_default) {
+      return `${actor} 将 ${target} 的密码重置为默认密码`
+    }
     return `${actor} 重置了 ${target} 的密码`
+  }
+  if (event.event_key === 'admin_user.password.change') {
+    return `${actor} 修改了自己的密码`
   }
   if (event.event_key === 'admin_user.disabled.set') {
     return `${actor} ${after.disabled ? '禁用了' : '恢复了'} ${target}`
