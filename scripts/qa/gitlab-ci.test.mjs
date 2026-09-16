@@ -222,6 +222,15 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       ),
     );
     assert.match(job, /job: quality_web_build\n      artifacts: true/u);
+    for (const serverLane of Object.values(CI_SERVER_QUALITY_LANES)) {
+      if (serverLane.postgres) {
+        assert.match(
+          job,
+          new RegExp(`job: ${serverLane.job}\\n      artifacts: false`, "u"),
+          "Browser must wait for PostgreSQL and attachment network cleanup",
+        );
+      }
+    }
     assert.match(
       job,
       new RegExp(

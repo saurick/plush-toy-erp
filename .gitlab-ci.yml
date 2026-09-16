@@ -563,6 +563,11 @@ quality_node:
       artifacts: false
     - job: quality_web_build
       artifacts: true
+    # Docker bridge teardown invalidates Chromium's in-flight loopback requests.
+    - job: quality_server_upgrade
+      artifacts: false
+    - job: quality_server_critical_postgres
+      artifacts: false
   script:
     - node scripts/qa/ci-quality-stage-lane.mjs --shard browser --lane boundary_entry_print
   artifacts:
