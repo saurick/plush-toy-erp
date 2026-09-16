@@ -104,10 +104,10 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
       maxBuffer: 4 * 1024 * 1024,
     },
     runtime,
-    "工作区 schema 与 versioned migration 不一致；请先修复 db-guard 报告的问题",
+    "工作区数据库规则检查未通过；请先修复下方 db-guard 报告的问题",
     { includeOutput: true, code: "workspace_migration_invalid" },
   );
-  writeLine(runtime, "[local-preflight] 工作区 schema/migration 守卫通过");
+  writeLine(runtime, "[local-preflight] 工作区数据库规则检查通过");
 
   const dbURLResult = await runCommand(
     "go",

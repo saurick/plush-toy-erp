@@ -52,5 +52,6 @@
 | `docs/archive/progress-2026-07-30-before-dev-testing-oneclick.md`                       | 开发测试固定动作接入前的 `progress.md` 完整过程记录归档                                         |
 | `docs/archive/progress-2026-08-09-before-active-page-compaction.md`                     | 活跃页收缩前的非当前页面、移动任务、附件与协作治理过程摘要                                      |
 | `docs/archive/progress-2026-09-08-before-test-print-release.md` | 打印修复测试环境发布前的已完成事项过程归档 |
+| `docs/archive/progress-2026-09-16-before-ci-migration-closeout.md` | CI 与共享开发库收口前的报价运费和双目标发布原文归档 |
 
 同日进度快照：[备份恢复演练前记录](progress-2026-06-16-before-backup-restore-rehearsal.md)。原名称 progress-2026-06-16-before-audit-log-readable.md 与该文件全文相同，现共用此原文；其他归档中的旧名称保留历史语境。

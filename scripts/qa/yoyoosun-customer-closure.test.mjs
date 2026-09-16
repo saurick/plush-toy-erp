@@ -27,8 +27,19 @@ import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from "../../web/s
 const syntheticSourceId = "__synthetic_yoyoosun_trial__";
 test("browser customer menu follows the customer package menu source", () => {
   const context = { window: {} };
-  runInNewContext(readFileSync("config/customers/yoyoosun/customer-config.example.js", "utf8"), context);
-  assert.deepEqual(JSON.parse(JSON.stringify(context.window.__PLUSH_ERP_CUSTOMER_CONFIG__.desktopMenu)), yoyoosunMenuConfig.desktopMenu);
+  runInNewContext(
+    readFileSync(
+      "config/customers/yoyoosun/customer-config.example.js",
+      "utf8",
+    ),
+    context,
+  );
+  assert.deepEqual(
+    JSON.parse(
+      JSON.stringify(context.window.__PLUSH_ERP_CUSTOMER_CONFIG__.desktopMenu),
+    ),
+    yoyoosunMenuConfig.desktopMenu,
+  );
 });
 const requiredSourceCategories = new Set([
   "purchase_material_summary",
@@ -148,6 +159,7 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "payables",
     "finance-payments",
     "invoices",
+    "accessories-purchase",
     "processing-contracts",
     "sales-orders",
     "quality-inspections",
@@ -681,7 +693,7 @@ test("yoyoosun WIP role projection stays within Product Core ownership", () => {
   );
 });
 
-test("yoyoosun finance purchase-contract responsibility uses role composition", () => {
+test("yoyoosun finance reads purchase contracts while write responsibility uses role composition", () => {
   const roleByKey = new Map(
     yoyoosunRoleFlowMatrix.roles.map((role) => [role.roleKey, role]),
   );
@@ -713,10 +725,12 @@ test("yoyoosun finance purchase-contract responsibility uses role composition", 
     false,
     "retired purchase-specific approval capability must not return",
   );
-  assert.equal(
-    financeRole.capabilityKeys.some((key) => key.startsWith("purchase.order.")),
-    false,
-    "finance core role must not absorb purchase source-document permissions",
+  assert.deepEqual(
+    financeRole.capabilityKeys.filter((key) =>
+      key.startsWith("purchase.order."),
+    ),
+    ["purchase.order.read"],
+    "finance can read purchase orders without gaining source-document write permissions",
   );
   assert.deepEqual(
     new Set(assignmentProfile.roleKeys),
@@ -724,7 +738,7 @@ test("yoyoosun finance purchase-contract responsibility uses role composition", 
   );
   assert.match(
     assignmentProfile.guardrail,
-    /不把 purchase\.order\.\* 权限并入/,
+    /新建、修改、提交、关闭和取消仍由采购岗位办理/,
   );
 });
 

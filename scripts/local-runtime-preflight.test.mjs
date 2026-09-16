@@ -195,27 +195,34 @@ test("local runtime preflight: frontend-only 是显式降级且不产生绿色�
   assert.match(output.join("\n"), /降级模式.*不可作为有效验证证据/u);
 });
 
-test("local runtime preflight: db-guard 失败保留可操作诊断且不继续解析数据库", async () => {
-  const calls = [];
-  await assert.rejects(
-    checkLocalDatabaseMigrations({
-      writeLine: () => {},
-      execFile: async (command) => {
-        calls.push(command);
-        const error = new Error("db guard failed");
-        error.stderr = "[db-guard] product_skus 缺少 versioned DDL proof";
-        throw error;
+for (const diagnostic of [
+  "[db-guard] product_skus 缺少 versioned DDL proof",
+  "[qa:db-guard] 禁止新增数据库 Function、Procedure、非内部 Trigger 或其执行语句: server/internal/data/admin_password_repo_test.go",
+]) {
+  test(`local runtime preflight: db-guard 失败保留诊断且不误报目标库待迁移 ${diagnostic}`, async () => {
+    const calls = [];
+    await assert.rejects(
+      checkLocalDatabaseMigrations({
+        writeLine: () => {},
+        execFile: async (command) => {
+          calls.push(command);
+          const error = new Error("db guard failed");
+          error.stderr = diagnostic;
+          throw error;
+        },
+      }),
+      (error) => {
+        assert.equal(error.code, "workspace_migration_invalid");
+        assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+        assert.match(error.message, /工作区数据库规则检查未通过/u);
+        assert.doesNotMatch(error.message, /不一致|make migrate|未到最新版本/u);
+        assert.equal(error.diagnostic, diagnostic);
+        return true;
       },
-    }),
-    (error) => {
-      assert.equal(error.code, "workspace_migration_invalid");
-      assert.equal(isRecoverableWebRuntimePreflightError(error), true);
-      assert.match(error.diagnostic, /product_skus 缺少 versioned DDL proof/u);
-      return true;
-    },
-  );
-  assert.deepEqual(calls, ["bash"]);
-});
+    );
+    assert.deepEqual(calls, ["bash"]);
+  });
+}
 
 test("local runtime preflight: 数据库配置失败不回显 DSN 或密码", async () => {
   const calls = [];

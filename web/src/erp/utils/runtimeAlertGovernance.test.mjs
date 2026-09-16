@@ -41,6 +41,9 @@ test('routine task and help guidance use compact content instead of alerts', () 
   const drawer = read(
     'web/src/erp/components/workflow/WorkflowTaskActionDrawer.jsx'
   )
+  const handlingChain = read(
+    'web/src/erp/components/workflow/WorkflowTaskHandlingChain.jsx'
+  )
   const dashboard = read('web/src/erp/pages/DashboardPage.jsx')
   const helpCenter = read('web/src/erp/pages/HelpCenterPage.jsx')
   const pageHelp = read('web/src/erp/components/help/BusinessContextHelp.jsx')
@@ -59,7 +62,9 @@ test('routine task and help guidance use compact content instead of alerts', () 
   assert.doesNotMatch(pageHelp, /<Alert|showIcon/u)
   assert.doesNotMatch(taskDisplay, /模拟任务批次/u)
   assert(occurrenceCount(drawer, '<Alert') <= 8)
-  assert.match(drawer, /message="暂时无法读取业务进度"/u)
+  assert.match(drawer, /<WorkflowTaskHandlingChain/u)
+  assert.match(handlingChain, /role="alert"/u)
+  assert.match(handlingChain, /暂时无法读取任务处理链，请重新读取。/u)
   assert.match(drawer, /message="当前只能查看任务"/u)
 })
 
@@ -68,9 +73,7 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
     'web/src/erp/components/production-orders/ProductionRouteExecutionModal.jsx'
   )
   const permissionCenter = read('web/src/erp/pages/PermissionCenterPage.jsx')
-  const shipment = read(
-    'web/src/erp/components/shipments/ShipmentEditor.jsx'
-  )
+  const shipment = read('web/src/erp/components/shipments/ShipmentEditor.jsx')
   const finance = read('web/src/erp/pages/FinancePaymentsPage.jsx')
 
   assert(occurrenceCount(production, '<Alert') <= 10)
