@@ -163,6 +163,7 @@ RUN --mount=type=cache,id=plush-apt-lists,target=/var/lib/apt/lists,sharing=lock
       "deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT} bookworm-security main" \
       > /etc/apt/sources.list && \
     apt-get -o Acquire::Retries=3 -o Acquire::https::Timeout=30 update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::https::Timeout=30 upgrade -y --no-install-recommends && \
     DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::https::Timeout=30 install -y --no-install-recommends \
       tzdata \
       ca-certificates \

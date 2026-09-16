@@ -85,6 +85,15 @@ test("actual image packages, executable, user and bytes determine acceptance", (
   assert(result.errors.some((error) => error.includes("exceeds")));
 });
 
+test("runtime upgrades inherited packages from the pinned snapshot before installing Chromium", () => {
+  const runtime = source.split(" AS server-runtime\n")[1];
+  assert.ok(runtime);
+  assert.match(
+    runtime,
+    /https:\/\/snapshot[.]debian[.]org\/archive\/debian-security\/\$\{DEBIAN_SNAPSHOT\}[\s\S]+?apt-get[^\n]+ update && \\\n\s+DEBIAN_FRONTEND=noninteractive apt-get[^\n]+ upgrade -y --no-install-recommends && \\\n\s+DEBIAN_FRONTEND=noninteractive apt-get[^\n]+ install/u,
+  );
+});
+
 test("image security retains unresolved findings and rejects available high severity fixes", () => {
   const scan = structuredClone(cleanScan);
   scan.Results[0].Vulnerabilities = [
