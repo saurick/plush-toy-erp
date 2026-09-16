@@ -320,6 +320,8 @@
 ## 2026-09-16 财务采购单查看
 
 - 补齐财务采购单只读权限、客户菜单与权限迁移；采购办理动作仍独立授权。
-- 独立副本通过权限、配置、迁移及浏览器验证；目标迁移和配置激活尚未执行。
+- 独立副本通过权限、配置、迁移及浏览器验证；共享开发库已完成迁移 `20260915160215`。本轮通过正式 validate / publish / transition check / activate / effective-session 链路，将本机 yoyoosun 测试配置更新为 `yoyoosun-customer-package-v7.local-e8a485100acfae6f.runtime-v1`，原配置 `yoyoosun-customer-package-v7.local-11df2d5dc696907a.runtime-v1` 保留为回退点。
+- 运行验证：复用 Chrome 中现有财务会话，在独立页面确认“更多功能 → 采购管理 → 采购订单”可见、列表正常返回，审批生成的采购单可展开全部明细并打开合同打印工作台；采购新增、编辑、提交和作废入口未开放。后端财务有效权限读回及 health / ready 均通过。证据在 ignored 的 `web/output/playwright/finance-purchase-read/runtime-activation.json`；本次只更新本机开发环境，不代表客户试用环境已发布。
+- Git handoff：本轮仅修改本节运行记录，建议单独提交 `docs: 记录财务采购订单配置生效验证`；既有业务动作文档、样式、依赖和浏览器检查改动归其他任务。本轮未获 commit / push 授权，未执行 Git 写操作。
 
 2026-09-16：用料审批移除核价，财务通过即按应需量生成采购单。迁移 `20260915155801` 已在隔离库验证；本轮未对共享库迁移，未提交。
