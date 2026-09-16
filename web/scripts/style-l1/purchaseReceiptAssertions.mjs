@@ -7,7 +7,7 @@ export function createPurchaseReceiptAssertions(deps) {
       .filter({ has: page.getByText(receiptNo, { exact: true }) })
       .first()
     await row.scrollIntoViewIfNeeded()
-    await row.click()
+    await row.getByRole('radio').check()
     await expectText(page, `${receiptNo} /`)
     return row
   }

@@ -454,7 +454,13 @@ export function createProductionWipScenarios(deps) {
           .filter({ hasText: '生产工序办理' })
           .last()
         await routeModal.waitFor({ state: 'visible', timeout: 10_000 })
-        await expectText(page, '固定顺序：布料加工 → 车缝 → 手工 → 包装')
+        await routeModal
+          .getByRole('note')
+          .filter({
+            hasText:
+              /按布料加工\s*→\s*车缝\s*→\s*手工\s*→\s*包装顺序办理/u,
+          })
+          .waitFor({ state: 'visible', timeout: 10_000 })
         const mobileMetrics = await routeModal.evaluate((element) => {
           const rect = element.getBoundingClientRect()
           const table = element.querySelector('.ant-table-content')

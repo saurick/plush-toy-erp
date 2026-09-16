@@ -4,6 +4,7 @@ import { Alert, Button, Empty, Modal, Pagination, Spin } from 'antd'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 import {
   BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE,
   BUSINESS_ROW_ITEMS_PREVIEW_LIMIT,
@@ -677,7 +678,7 @@ export function useBusinessRowItemsPreview({
       title={
         modalRecordLabel ? `${modalTitle} · ${modalRecordLabel}` : modalTitle
       }
-      width={1040}
+      width={ERP_MODAL_WIDTHS.lineItems}
       onCancel={closeModal}
     >
       <section aria-label="完整明细" className="erp-business-row-items-modal">

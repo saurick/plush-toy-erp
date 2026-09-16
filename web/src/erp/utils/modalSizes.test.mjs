@@ -14,6 +14,14 @@ test('modalSizes: keep ERP modal width tiers explicit', () => {
     'min(1280px, calc(100vw - 48px))'
   )
   assert.equal(ERP_MODAL_WIDTHS.businessForm, 'min(1720px, calc(100vw - 96px))')
+  assert.equal(
+    ERP_MODAL_WIDTHS.recordDetails,
+    'min(1120px, calc(100vw - 48px))'
+  )
+  assert.equal(
+    ERP_MODAL_WIDTHS.lineItems,
+    'min(1800px, 94vw, calc(100vw - 32px))'
+  )
   assert.equal(ERP_MODAL_WIDTHS.localAction, 'min(860px, calc(100vw - 96px))')
   assert.equal(ERP_MODAL_WIDTHS.columnOrder, 'min(960px, calc(100vw - 48px))')
 })

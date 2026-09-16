@@ -12,6 +12,7 @@ import {
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 import { getColumnLabel } from './ColumnOrderModal.jsx'
 import BusinessFormModal from './BusinessFormModal.jsx'
@@ -224,7 +225,9 @@ export default function BusinessDetailsModal({
   open,
   record,
   title = '记录详情',
-  width = 'min(1120px, calc(100vw - 48px))',
+  width = lineItems
+    ? ERP_MODAL_WIDTHS.lineItems
+    : ERP_MODAL_WIDTHS.recordDetails,
 }) {
   const detailColumns = columns.filter(
     (column) =>
@@ -238,6 +241,7 @@ export default function BusinessDetailsModal({
   return (
     <BusinessFormModal
       description={description}
+      destroyOnHidden
       footer={
         <Button key="close" onClick={onClose}>
           关闭

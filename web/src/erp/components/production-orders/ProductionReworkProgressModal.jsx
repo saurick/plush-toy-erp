@@ -15,6 +15,7 @@ import {
   sumNumeric20Scale6Values,
 } from '../../utils/numeric20Scale6.mjs'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const { Text } = Typography
 
@@ -294,7 +295,7 @@ export default function ProductionReworkProgressModal({
   return (
     <BusinessFormModal
       open={open}
-      width="min(1160px, calc(100vw - 48px))"
+      width={ERP_MODAL_WIDTHS.lineItems}
       title="成品返工进度"
       description="从返工记录追踪手工补制、质量关口、包装验收到补完工过账。"
       icon={<BranchesOutlined />}

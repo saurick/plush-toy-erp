@@ -62,6 +62,7 @@ import {
   productionWipUUID,
 } from '../../utils/productionWipModel.mjs'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const { Text, Title } = Typography
 
@@ -1286,7 +1287,7 @@ export default function ProductionRouteExecutionModal({
       width={
         assignmentOnly
           ? 'min(760px, calc(100vw - 32px))'
-          : 'min(1280px, calc(100vw - 48px))'
+          : ERP_MODAL_WIDTHS.lineItems
       }
       title={
         assignmentOnly

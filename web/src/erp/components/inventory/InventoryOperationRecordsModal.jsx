@@ -8,6 +8,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { listInventoryOperations } from '../../api/inventoryApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
+import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const TYPE_LABELS = Object.freeze({
   CYCLE_COUNT: '库存盘点',
@@ -243,7 +244,7 @@ export default function InventoryOperationRecordsModal({
       className="erp-inventory-operation-records-modal"
       title="库存作业记录"
       open={open}
-      width={1120}
+      width={ERP_MODAL_WIDTHS.lineItems}
       footer={null}
       destroyOnHidden
       onCancel={onCancel}

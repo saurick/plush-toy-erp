@@ -3,6 +3,8 @@ export const ERP_MODAL_WIDTHS = Object.freeze({
   masterDataForm: 'min(880px, calc(100vw - 48px))',
   masterDataItemsForm: 'min(1280px, calc(100vw - 48px))',
   businessForm: 'min(1720px, calc(100vw - 96px))',
+  recordDetails: 'min(1120px, calc(100vw - 48px))',
+  lineItems: 'min(1800px, 94vw, calc(100vw - 32px))',
   localAction: 'min(860px, calc(100vw - 96px))',
   columnOrder: 'min(960px, calc(100vw - 48px))',
 })

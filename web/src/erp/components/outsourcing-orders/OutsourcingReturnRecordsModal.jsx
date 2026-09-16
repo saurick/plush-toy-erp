@@ -14,6 +14,7 @@ import {
   resolveOutsourcingReturnQualityGate,
 } from '../../utils/qualityInspectionSourceAction.mjs'
 import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
+import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
@@ -218,7 +219,7 @@ export default function OutsourcingReturnRecordsModal({
     <Modal
       title={`委外记录 · ${order?.outsourcing_order_no || '当前委外订单'}`}
       open={open}
-      width={980}
+      width={ERP_MODAL_WIDTHS.lineItems}
       footer={
         <Space wrap>
           {selectedDraft && canPostFact ? (

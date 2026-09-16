@@ -21,6 +21,7 @@ import {
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
 import { formatPurchaseReceiptQuantityTotal } from '../../utils/purchaseReceiptDecimal.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
+import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
@@ -409,7 +410,7 @@ export default function PurchaseReceiptExceptionRecordsModal({
     <Modal
       title={`退货与调整记录 · ${receipt?.receipt_no || '采购入库单'}`}
       open={open}
-      width={1080}
+      width={ERP_MODAL_WIDTHS.lineItems}
       footer={
         <Space>
           <Button
