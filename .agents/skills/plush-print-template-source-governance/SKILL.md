@@ -37,7 +37,7 @@ description: 项目打印模板源治理（plush-toy-erp）。Use to interpret c
 | 当前任务 | 必要读取 |
 | --- | --- |
 | 引入、替换源文件，判断版本、重复区域、噪点或图片锚点 | [Source Analysis](references/source-analysis.md) |
-| 修改模板字段、布局、编辑、图片、分页或 PDF | [Template Runtime](references/template-runtime.md) |
+| 修改模板字段、布局、编辑、图片、分页或 PDF，或执行打印窗口交互验收 | [Template Runtime](references/template-runtime.md) |
 | 只改说明或技能本身 | validator、YAML / metadata、引用和 scoped diff 检查 |
 
 仅加载命中的分支。局部模板修订可复用未变化的源版本证据；源基准或字段 / 版式解释受影响时才重新解析客户原件。模板内编辑属于当前技能；触达共享页面壳或普通业务页面时才补 `$plush-page-design-governance`，字段真源、API、RBAC 或业务事实变化使用 `$plush-domain-boundary-governance`。按 `$plush-test-governance` 选择验证及高成本授权。

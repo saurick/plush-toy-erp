@@ -1,6 +1,6 @@
 # Plush Template Runtime / 模板实现与验证
 
-模板字段、布局、编辑、图片、分页或输出变化时读取。仅执行本次影响面相关的分支；代码块以当前任务仓库根为工作目录。
+模板字段、布局、编辑、图片、分页、输出变化或执行打印窗口交互验收时读取。仅执行本次影响面相关的分支；代码块以当前任务仓库根为工作目录。
 
 - Product Core 默认样例应使用中性展示值；模板样例文字默认黑色，颜色/加粗是编辑能力，不是默认样式证据。
 - Product Core 默认样例不要按甲方长表塞满。若编号作业行、材料行、色卡行或合同明细行行为一致，默认只保留 2-5 条代表行；长清单、分页和性能用 fixture、页面级浏览器回归（Style L1）和 PDF 回归覆盖，不靠默认样例复制所有源行。
@@ -35,6 +35,14 @@
 - 修 layout 时不要隐藏或删除正式 docs / source files；只在 runtime template 中排除 duplicate source regions，并写明原因。
 - 约束 runtime cost：images / rows 只 normalize 一次，避免 repeated full-paper remeasure loops；localStorage / window snapshots 保持在现有 print workspace model 内；shared row / image model 足够时，不做 per-customer special branches。
 - 新增 official template 或大改模板时，更新 coverage matrix：source version、template key、mapper / view model、renderer、PDF module guard、interaction coverage 和 known blind spots。
+
+## Window Lifecycle / 打印验收窗口管理
+
+1. 打开前记录当前标签页和可见独立窗口，核对工具能否识别、操作及关闭打印弹窗。按本次打开动作、窗口标识和来源记录归属，不能仅凭 `localhost`、标题或打开时间认领用户窗口。
+2. 交互验收默认在后台串行进行：完成当前打印窗口后关闭它，再打开下一份；PDF 验证只保留当前打印窗口及其预览子窗口。用户明确要求对照或保留的窗口按其要求处理。
+3. 记录实际创建的窗口句柄或工具返回标识，成功、失败和中断后都清理本次创建的临时窗口。脚本使用 `finally`，先关闭 PDF 子窗口，再关闭打印窗口；交互工具执行等价收口并回读窗口状态。支持同源页面调试的工具可在点击前临时包装来源页的 `window.open`，仅记录原函数返回的窗口句柄，保留原参数和返回值；用该句柄关闭并核对 `closed === true`，最后恢复原函数、移除本次临时引用。此方式只管理捕获到的本次新窗口，不能补领已经丢失句柄的旧窗口。
+4. 独立原生弹窗不一定出现在标签页列表中；标签页消失或列表为空不能证明弹窗已关闭。若工具无法控制原生弹窗，停止继续打开，说明能力限制；禁止反复点击打印、复制弹窗地址另开标签页来掩盖失控窗口，或关闭整个浏览器进程。
+5. 收口时核对本次窗口已消失，并保留用户原有窗口。最小化问题只在归属明确的测试窗口上复现，以实际状态变化判断；未完成桌面窗口核对时，明确标注未验证，不报告“窗口已全部清理”或“最小化已修复”。
 
 ## Validation / 验证要求
 
