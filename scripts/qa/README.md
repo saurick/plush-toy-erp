@@ -691,6 +691,8 @@ go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJson
 
 打印运行时采用“固定、验证后升级”：`server/Dockerfile` 是 Chromium、Debian snapshot 和基础镜像 digest 的唯一版本真源，禁止构建时解析浮动 latest。`pdf-runtime-policy.json` 只保存体积观察基线、允许增长和 Trivy 工具校验值。安全检查阻断有修复版本的 HIGH / CRITICAL 系统包漏洞，同时保留其余发现；上游有新稳定版本时报告需要评审，不自动修改代码或发布。
 
+Trivy 漏洞库固定从官方 `ghcr.io/aquasecurity/trivy-db:2` 获取，避免默认优先连接 Runner 不可达的 Google 镜像站。下载与扫描继续使用既有超时和完整性校验，失败仍阻断发布。
+
 此门禁的漏洞阻断范围为 Chromium 所在的 Debian 系统包（Trivy `Class=os-pkgs`、`Type=debian`）。Trivy 同时发现的 Go 二进制依赖问题按原分类完整保留，并单独计数；它们由既有 Go 安全检查继续判定调用路径和升级范围。打印运行时通过不代表全镜像无漏洞，也不把暂无修复版本的系统包发现当作已修复。
 
 | 入口 | 验证与输出 |

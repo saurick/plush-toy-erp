@@ -101,6 +101,7 @@ fi
 test "$(sha256sum "$TRIVY_ARCHIVE" | cut -d ' ' -f 1)" = "$TRIVY_SHA"
 tar -xzf "$TRIVY_ARCHIVE" -C "$TRIVY_DIR" trivy
 "$TRIVY_DIR/trivy" image --image-src docker --scanners vuln --list-all-pkgs --skip-version-check \
+  --db-repository ghcr.io/aquasecurity/trivy-db:2 \
   --cache-dir "$ROOT_DIR/output/cache/pdf-runtime/trivy-db" --timeout 10m --parallel 2 \
   --format json --output "$OUTPUT/vulnerabilities.json" "$IMAGE_ID"
 RESULT=0
