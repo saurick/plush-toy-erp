@@ -8,15 +8,9 @@ import {
   reviewEngineeringMaterialRequest,
 } from '../../api/masterDataOrderApi.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { message, modal } from '@/common/utils/antdApp'
-import EngineeringMaterialSummarySheet, {
-  EngineeringMaterialAmountSummary,
-} from './EngineeringMaterialSummarySheet.jsx'
-import EngineeringMaterialFinanceFields from './EngineeringMaterialFinanceFields.jsx'
-import {
-  materialFinanceIssue,
-  materialNoteFits,
-} from '../../utils/engineeringMaterialSummary.mjs'
+import { message } from '@/common/utils/antdApp'
+import EngineeringMaterialSummarySheet from './EngineeringMaterialSummarySheet.jsx'
+import { materialNoteFits } from '../../utils/engineeringMaterialSummary.mjs'
 import { ENGINEERING_MATERIAL_STATUS as STATUS } from '../../utils/engineeringMaterialTask.mjs'
 import './EngineeringMaterialRequest.css'
 
@@ -27,7 +21,6 @@ export default function EngineeringMaterialRequestForm({
   mobile = false,
   readOnly = false,
   preview = false,
-  financeDraftOnly = false,
   permissions,
   onCancel,
   onChanged,
@@ -44,11 +37,9 @@ export default function EngineeringMaterialRequestForm({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
-  const [financeIssue, setFinanceIssue] = useState(null)
   const [decision, setDecision] = useState('approve')
   const submitting = useRef(false)
   const draftKey = `${workflowTask?.id}:${workflowTask?.version}:${orderID}:${requestID}`
-  const confirming = useRef(false)
   const [taskSettled, setTaskSettled] = useState(false)
   const [error, setError] = useState('')
   const [reload, setReload] = useState({ key: 0, preview })
@@ -56,21 +47,12 @@ export default function EngineeringMaterialRequestForm({
     (value) => {
       setRequest(value)
       setDirty(false)
-      setFinanceIssue(null)
       form.resetFields()
-      form.setFieldsValue({
-        note: '',
-        items: value.items.map((item) => ({
-          id: item.id,
-          purchase_quantity: item.purchase_quantity ?? item.required_quantity,
-          unit_price: item.unit_price ?? '',
-          expected_arrival_date: item.expected_arrival_date?.slice(0, 10) ?? '',
-          note: item.note ?? '',
-        })),
-      })
+      form.setFieldsValue({ note: '' })
+      setDecision('approve')
       const draft = draftRef?.current
       if (draft?.key === draftKey && draft.requestVersion === value.version) {
-        form.setFieldsValue(draft.values)
+        form.setFieldsValue({ note: draft.values?.note || '' })
         setDecision(draft.decision)
         setDirty(true)
       }
@@ -126,31 +108,8 @@ export default function EngineeringMaterialRequestForm({
     !taskSettled &&
     request?.status === 'PREVIEW' &&
     permissions.submit
-  const validateFinance = async () => {
-    const values = form.getFieldsValue(true)
-    const issue = materialFinanceIssue(request.items, values.items)
-    if (issue) {
-      setFinanceIssue({ ...issue })
-      form.setFields([
-        { name: ['items', issue.index, issue.field], errors: [issue.message] },
-      ])
-      message.warning(
-        taskProcessing
-          ? '核价尚未填齐，请返回核对任务，在“填写核价”中补齐后再批准。'
-          : issue.message
-      )
-      return null
-    }
-    try {
-      await form.validateFields()
-      return form.getFieldsValue(true)
-    } catch {
-      message.warning('请检查实购数量、单价、到货日期与调整原因；数量和单价最多六位小数')
-      return null
-    }
-  }
   const act = async (action) => {
-    if (readOnly || financeDraftOnly || submitting.current || saving || loading || !request) return
+    if (readOnly || submitting.current || saving || loading || !request) return
     if (
       (action === 'SUBMIT' && !canSubmit) ||
       (action === 'BOSS_APPROVE' && !canBoss) ||
@@ -159,14 +118,10 @@ export default function EngineeringMaterialRequestForm({
     ) {
       return
     }
-    let values = form.getFieldsValue(true)
+    const values = form.getFieldsValue(true)
     if (!materialNoteFits(values.note)) {
       message.warning('审批备注过长，请适当精简')
       return
-    }
-    if (action === 'FINANCE_APPROVE') {
-      values = await validateFinance()
-      if (!values) return
     }
     if (action === 'REJECT' && !String(values.note || '').trim()) {
       form.setFields([{ name: 'note', errors: ['请填写退回原因'] }])
@@ -200,20 +155,6 @@ export default function EngineeringMaterialRequestForm({
                 action,
                 ...taskVersion,
                 note: values.note || null,
-                ...(action === 'FINANCE_APPROVE'
-                  ? {
-                      items: values.items.map((item, index) => ({
-                        ...item,
-                        id: request.items[index].id,
-                        purchase_quantity: String(item.purchase_quantity)
-                          .replace(/,/gu, '')
-                          .trim(),
-                        unit_price: String(item.unit_price)
-                          .replace(/,/gu, '')
-                          .trim(),
-                      })),
-                    }
-                  : {}),
               },
               canBoss ? 'boss' : 'finance'
             )
@@ -230,6 +171,9 @@ export default function EngineeringMaterialRequestForm({
         value.id <= 0 ||
         !Number.isSafeInteger(value.version) ||
         value.version <= 0 ||
+        (action === 'FINANCE_APPROVE' &&
+          (!Array.isArray(value.purchase_orders) ||
+            !value.purchase_orders.length)) ||
         (action !== 'SUBMIT' &&
           (value.id !== request.id || value.version <= request.version))
       ) {
@@ -241,14 +185,12 @@ export default function EngineeringMaterialRequestForm({
       if (workflowTask) setTaskSettled(true)
       const successMessage =
         action === 'FINANCE_APPROVE'
-          ? value.purchase_orders.length
-            ? `已批准，已生成 ${value.purchase_orders.length} 张采购订单`
-            : '已批准，本次无需采购'
+          ? `已批准，已生成 ${value.purchase_orders.length} 张采购订单`
           : action === 'REJECT'
             ? '已退回工程修改'
             : action === 'SUBMIT'
               ? '已提交老板审核'
-              : '审核已通过，已交财务核价'
+              : '审核已通过，已交财务审核'
       onChanged?.(value, { action, reason: values.note || '', successMessage })
       message.success(successMessage)
     } catch (cause) {
@@ -259,38 +201,15 @@ export default function EngineeringMaterialRequestForm({
     }
   }
 
-  const shouldConfirmLeave = canFinance && dirty
   const discardThen = (next) => {
-    if (submitting.current || saving || confirming.current) return
-    if (!shouldConfirmLeave) {
-      next()
-      return
-    }
-    confirming.current = true
-    modal.confirm({
-      centered: true,
-      title: '放弃未保存的核价内容？',
-      content: '已填写的实购数量、单价、交期和备注尚未保存。',
-      okText: '放弃修改',
-      cancelText: '继续编辑',
-      onOk: () => {
-        confirming.current = false
-        setDirty(false)
-        if (draftRef) draftRef.current = null
-        onDraftChange?.(null)
-        next()
-      },
-      onCancel: () => {
-        confirming.current = false
-      },
-    })
+    if (!submitting.current && !saving) next()
   }
   const title = readOnly
-    ? preview ? '待重提用料预览' : '材料汇总'
-    : financeDraftOnly
-      ? '填写核价'
+    ? preview
+      ? '待重提用料预览'
+      : '材料汇总'
     : permissions.finance
-      ? '核价并批准采购'
+      ? '审核工程用料'
       : permissions.boss
         ? '审核工程用料'
         : '处理工程用料'
@@ -317,14 +236,14 @@ export default function EngineeringMaterialRequestForm({
     }
   })
   useEffect(() => {
-    if (!shouldConfirmLeave && !saving) return undefined
+    if (!saving) return undefined
     const beforeUnload = (event) => {
       event.preventDefault()
       event.returnValue = ''
     }
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
-  }, [shouldConfirmLeave, saving])
+  }, [saving])
   const selectedAction = canSubmit
     ? 'SUBMIT'
     : decision === 'reject'
@@ -339,28 +258,7 @@ export default function EngineeringMaterialRequestForm({
       : canBoss
         ? '确认通过，交财务'
         : '批准并生成采购订单'
-  const footer = financeDraftOnly ? (
-    <div className="erp-material-summary-footer">
-      {canFinance ? (
-        <EngineeringMaterialAmountSummary request={request} form={form} canFinance />
-      ) : null}
-      <Button disabled={saving || loading} onClick={() => discardThen(onCancel)}>
-        取消
-      </Button>
-      {canFinance ? (
-        <Button
-          type="primary"
-          disabled={loading}
-          onClick={() => {
-            saveDraft(decision)
-            onCancel?.()
-          }}
-        >
-          保留填写，返回核对
-        </Button>
-      ) : null}
-    </div>
-  ) : taskProcessing ? (
+  const footer = taskProcessing ? (
     <div className="erp-material-task-action__footer">
       {!orderClosed &&
       !taskSettled &&
@@ -389,13 +287,6 @@ export default function EngineeringMaterialRequestForm({
     </div>
   ) : readOnly ? null : (
     <div className="erp-material-summary-footer">
-      {request && (permissions.commercialRead || canFinance) ? (
-        <EngineeringMaterialAmountSummary
-          request={request}
-          form={form}
-          canFinance={canFinance}
-        />
-      ) : null}
       <Space wrap className="erp-material-summary-actions">
         <Button disabled={saving} onClick={() => discardThen(onCancel)}>
           关闭
@@ -500,11 +391,7 @@ export default function EngineeringMaterialRequestForm({
               <Space wrap>
                 <Tag>{STATUS[request.status] || request.status}</Tag>
                 {orderClosed ? <Tag>订单已结束，仅供查看</Tag> : null}
-                {dirty ? (
-                  <Tag color="orange">
-                    {canFinance ? '核价内容尚未保存' : '审核意见尚未保存'}
-                  </Tag>
-                ) : null}
+                {dirty ? <Tag color="orange">审核意见尚未保存</Tag> : null}
               </Space>
             ) : null}
             {request.status === 'PREVIEW' ? (
@@ -524,13 +411,6 @@ export default function EngineeringMaterialRequestForm({
                   </ul>
                 }
               />
-            ) : null}
-            {canFinance && !taskProcessing ? (
-              <p className="erp-material-summary-hint">
-                {financeDraftOnly
-                  ? '填写暂存在当前任务，批准时一并提交。调整实购数量请填写原因。'
-                  : '核对实购数量、人民币单价和到货日期。调整数量请填写原因；库存不会自动抵扣。采购付款及开票约定沿用厂商档案。'}
-              </p>
             ) : null}
             {taskProcessing && (canBoss || canFinance) ? (
               <Form.Item
@@ -554,18 +434,9 @@ export default function EngineeringMaterialRequestForm({
                 />
               </Form.Item>
             ) : null}
-            {canFinance && !taskProcessing ? (
-              <EngineeringMaterialFinanceFields
-                request={request}
-                form={form}
-                saving={saving}
-                financeIssue={financeIssue}
-              />
-            ) : null}
-            {!taskProcessing && !financeDraftOnly && !canFinance ? (
+            {!taskProcessing ? (
               <EngineeringMaterialSummarySheet
                 request={request}
-                commercialRead={permissions.commercialRead}
                 onReload={() =>
                   discardThen(() =>
                     setReload({ key: reload.key + 1, preview: reload.preview })
@@ -575,29 +446,24 @@ export default function EngineeringMaterialRequestForm({
                 saving={saving}
               />
             ) : null}
-            {readOnly && permissions.commercialRead ? (
-              <EngineeringMaterialAmountSummary
-                request={request}
-                form={form}
-                canFinance={false}
-              />
-            ) : null}
-            {!taskProcessing && !financeDraftOnly && request.status === 'REJECTED' && request.review_note ? (
+            {!taskProcessing &&
+            request.status === 'REJECTED' &&
+            request.review_note ? (
               <p>审批备注：{request.review_note}</p>
             ) : null}
-            {!taskProcessing && !financeDraftOnly && request.boss_reviewed_at ? (
+            {!taskProcessing && request.boss_reviewed_at ? (
               <p>
                 老板审核：{request.boss_reviewed_at.slice(0, 10)}{' '}
                 {request.boss_review_note || ''}
               </p>
             ) : null}
-            {!taskProcessing && !financeDraftOnly && request.finance_reviewed_at ? (
+            {!taskProcessing && request.finance_reviewed_at ? (
               <p>
                 财务批准：{request.finance_reviewed_at.slice(0, 10)}{' '}
                 {request.finance_review_note || ''}
               </p>
             ) : null}
-            {!financeDraftOnly && (canBoss || canFinance) ? (
+            {canBoss || canFinance ? (
               <Form.Item
                 className="erp-material-task-action__field"
                 label={

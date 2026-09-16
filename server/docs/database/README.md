@@ -22,11 +22,11 @@ go run ./cmd/schema-doc --write
 | 项目 | 数量 |
 | --- | ---: |
 | 应用表 | 76 |
-| 字段 | 1276 |
+| 字段 | 1272 |
 | 外键 | 154 |
 | 显式索引 | 343 |
 | 其中 partial index | 34 |
-| 命名 / 表级 CHECK | 313 |
+| 命名 / 表级 CHECK | 312 |
 
 ## 分域入口
 
@@ -55,8 +55,8 @@ go run ./cmd/schema-doc --write
 | [`customer_config_revisions`](账号权限与配置.md#table-customer-config-revisions) | 客户配置版本 | 账号、权限与配置 | Config / 配置 | 保存规范化客户配置的版本、哈希、编译快照和发布状态。 |
 | [`customers`](主数据与BOM.md#table-customers) | 客户 | 主数据与 BOM | MasterData / 主数据 | 保存销售、出货和应收等业务引用的客户主档。 |
 | [`deployment_module_states`](账号权限与配置.md#table-deployment-module-states) | 模块状态投影 | 账号、权限与配置 | Derived / 派生投影 | 保存客户配置版本编译出的模块 enabled、read_only 或 disabled 状态。 |
-| [`engineering_material_request_items`](销售与采购.md#table-engineering-material-request-items) | 工程用料汇总明细 | 销售与采购 | Source Document / 源单据 | 按材料和单位归并本订单各部位用料，保留厂商和规格快照、应需数量及财务核定的采购数量、单价、交期和调整原因。 |
-| [`engineering_material_requests`](销售与采购.md#table-engineering-material-requests) | 工程用料审批 | 销售与采购 | Source Document / 源单据 | 保存订单用料汇总的提交、老板审核、财务核价、退回和不可改写的来源快照。 |
+| [`engineering_material_request_items`](销售与采购.md#table-engineering-material-request-items) | 工程用料汇总明细 | 销售与采购 | Source Document / 源单据 | 按材料和单位归并本订单各部位用料，冻结厂商、规格快照和应需数量；财务批准时直接以应需数量生成采购行。 |
+| [`engineering_material_requests`](销售与采购.md#table-engineering-material-requests) | 工程用料审批 | 销售与采购 | Source Document / 源单据 | 保存订单用料汇总的提交、老板审核、财务审核、退回和不可改写的来源快照。 |
 | [`finance_allocations`](出货与财务.md#table-finance-allocations) | 财务核销分配 | 出货与财务 | Fact / 事实 | 保存一笔已过账收付款对一条财务事实的核销金额。 |
 | [`finance_credit_notes`](出货与财务.md#table-finance-credit-notes) | 财务红冲 | 出货与财务 | Fact / 事实 | 保存针对财务事实的红冲及反向红冲记录。 |
 | [`finance_facts`](出货与财务.md#table-finance-facts) | 业务财务事实 | 出货与财务 | Fact / 事实 | 保存来源可追溯的应收、应付、发票和对账事实。 |

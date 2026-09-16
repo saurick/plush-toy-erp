@@ -1108,10 +1108,6 @@ func init() {
 	engineeringmaterialrequestitemDescUnitName := engineeringmaterialrequestitemFields[10].Descriptor()
 	// engineeringmaterialrequestitem.UnitNameValidator is a validator for the "unit_name" field. It is called by the builders before save.
 	engineeringmaterialrequestitem.UnitNameValidator = engineeringmaterialrequestitemDescUnitName.Validators[0].(func(string) error)
-	// engineeringmaterialrequestitemDescNote is the schema descriptor for note field.
-	engineeringmaterialrequestitemDescNote := engineeringmaterialrequestitemFields[15].Descriptor()
-	// engineeringmaterialrequestitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
-	engineeringmaterialrequestitem.NoteValidator = engineeringmaterialrequestitemDescNote.Validators[0].(func(string) error)
 	financeallocationHooks := schema.FinanceAllocation{}.Hooks()
 	financeallocation.Hooks[0] = financeallocationHooks[0]
 	financeallocationFields := schema.FinanceAllocation{}.Fields()

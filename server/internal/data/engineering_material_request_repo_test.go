@@ -1,13 +1,13 @@
 package data
 
 import (
-	"server/internal/attachmentstore"
 	"context"
 	"errors"
 	"fmt"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
 	"io"
+	"server/internal/attachmentstore"
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/bomitem"
@@ -122,9 +122,6 @@ func submitMaterialRequestFixture(t *testing.T, ctx context.Context, f materialR
 }
 func financeMaterialRequestInput(request *biz.EngineeringMaterialRequest) *biz.EngineeringMaterialReview {
 	in := &biz.EngineeringMaterialReview{ID: request.ID, ExpectedVersion: request.Version, ActorID: 33, Action: "FINANCE_APPROVE"}
-	for _, item := range request.Items {
-		in.Items = append(in.Items, biz.EngineeringMaterialFinanceLine{ID: item.ID, PurchaseQuantity: item.RequiredQuantity, UnitPrice: decimal.NewFromInt(10), ExpectedArrivalDate: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)})
-	}
 	return in
 }
 func TestEngineeringMaterialRequestApprovalAndPurchaseGeneration(t *testing.T) {
@@ -146,15 +143,8 @@ func TestEngineeringMaterialRequestApprovalAndPurchaseGeneration(t *testing.T) {
 		t.Fatalf("same reviewer twice: %v", err)
 	}
 	in.ActorID = 33
-	in.Items[0].PurchaseQuantity = decimal.NewFromInt(200)
-	if _, err := f.uc.ReviewEngineeringMaterialRequest(ctx, in); !errors.Is(err, biz.ErrMaterialRequestReviewInvalid) {
-		t.Fatalf("quantity change without reason: %v", err)
-	}
-	if client.PurchaseOrder.Query().CountX(ctx) != 0 {
-		t.Fatal("invalid approval generated a purchase order")
-	}
-	note := "使用已核对的库存 22.64"
-	in.Items[0].Note = &note
+	note := "用料已核对"
+	in.Note = &note
 	approved, err := f.uc.ReviewEngineeringMaterialRequest(ctx, in)
 	if err != nil {
 		t.Fatal(err)
@@ -167,11 +157,35 @@ func TestEngineeringMaterialRequestApprovalAndPurchaseGeneration(t *testing.T) {
 		if row.LifecycleStatus != biz.PurchaseOrderStatusApproved || row.EngineeringMaterialRequestID == nil || *row.EngineeringMaterialRequestID != request.ID {
 			t.Fatalf("purchase trace: %+v", row)
 		}
+		if row.ExpectedArrivalDate != nil {
+			t.Fatal("approval invented an arrival date")
+		}
+		lines := row.QueryItems().AllX(ctx)
+		if len(lines) != 1 {
+			t.Fatalf("expected one grouped material per supplier: %+v", lines)
+		}
+		for _, line := range lines {
+			if line.UnitPrice != nil || line.Amount != nil || line.ExpectedArrivalDate != nil {
+				t.Fatal("approval invented price, amount or arrival date")
+			}
+			for _, source := range request.Items {
+				if source.MaterialID == line.MaterialID && !source.RequiredQuantity.Equal(line.PurchasedQuantity) {
+					t.Fatalf("purchase quantity differs from frozen demand: %s != %s", line.PurchasedQuantity, source.RequiredQuantity)
+				}
+			}
+		}
 	}
 	again, err := f.uc.ReviewEngineeringMaterialRequest(ctx, in)
 	if err != nil || again.ID != approved.ID || client.PurchaseOrder.Query().CountX(ctx) != 2 {
 		t.Fatalf("approval replay duplicated orders: %v", err)
 	}
+	changedNote := "不同的审核意见"
+	changed := *in
+	changed.Note = &changedNote
+	if _, err := f.uc.ReviewEngineeringMaterialRequest(ctx, &changed); !errors.Is(err, biz.ErrMaterialRequestConflict) {
+		t.Fatalf("different approval intent replayed: %v", err)
+	}
+
 	if client.InventoryTxn.Query().CountX(ctx) != 0 || client.PurchaseReceipt.Query().CountX(ctx) != 0 {
 		t.Fatal("approval fabricated warehouse facts")
 	}

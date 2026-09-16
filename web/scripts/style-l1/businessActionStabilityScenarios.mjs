@@ -1,4 +1,5 @@
 import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
+import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
 
 const SALES_ORDER_PATH = '/erp/sales/project-orders/sales-orders'
@@ -776,6 +777,164 @@ export function createBusinessActionStabilityScenarios(deps) {
   const productionIdentity = roleIdentity('production')
 
   return [
+    {
+      name: 'finance-purchase-order-read-and-print-desktop',
+      path: `${SALES_ORDER_PATH}?sales_order_id=1103&material_request_id=5`,
+      auth: 'admin',
+      ...financeIdentity,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, { includePurchase: true })
+        await page.route('**/rpc/sales_order', async (route) => {
+          const { id, method } = route.request().postDataJSON()
+          if (method !== 'get_engineering_material_request')
+            return route.fallback()
+          return fulfillRpc(route, id, {
+            id: 5,
+            sales_order_id: 1103,
+            order_no: 'SO-ACTION-ACTIVE',
+            order_status: 'active',
+            status: 'APPROVED',
+            version: 3,
+            issues: [],
+            sources: [],
+            items: [],
+            purchase_orders: [
+              {
+                id: 1202,
+                purchase_order_no: 'PO-ACTION-APPROVED',
+                supplier_id: 1,
+              },
+            ],
+          })
+        })
+        await page.route('**/rpc/purchase_order', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          const approvedOrder = {
+            ...createPurchaseOrderRows().find((order) => order.id === 1202),
+            currency: 'CNY',
+            item_count: 1,
+          }
+          if (method === 'list_purchase_orders') {
+            return fulfillRpc(
+              route,
+              id,
+              rpcPage([approvedOrder], 'purchase_orders', params)
+            )
+          }
+          if (method === 'get_purchase_order' && Number(params.id) === 1202) {
+            return fulfillRpc(route, id, { purchase_order: approvedOrder })
+          }
+          if (
+            method !== 'list_purchase_order_items' ||
+            Number(params.purchase_order_id) !== 1202
+          )
+            return route.fallback()
+          return fulfillRpc(route, id, {
+            purchase_order_items: [
+              {
+                id: 1,
+                purchase_order_id: 1202,
+                line_no: 1,
+                display_order: 1,
+                material_id: 1,
+                material_code_snapshot: 'MAT-FINANCE-READ',
+                material_name_snapshot: '核价短绒',
+                unit_id: 1,
+                purchased_quantity: '20',
+                unit_price: '3.50',
+                amount: '70.00',
+                line_status: 'open',
+              },
+            ],
+            total: 1,
+            limit: Number(params.limit || 100),
+            offset: 0,
+          })
+        })
+      },
+      verify: async (page) => {
+        const requestDialog = page.getByRole('dialog')
+        await requestDialog
+          .getByRole('button', { name: 'PO-ACTION-APPROVED', exact: true })
+          .click()
+        await waitForBusinessPage(page, '采购订单')
+        assert.equal(
+          new URL(page.url()).searchParams.get('purchase_order_id'),
+          '1202'
+        )
+        await page.getByText('1条', { exact: true }).click()
+        await page
+          .getByText('核价短绒', { exact: true })
+          .first()
+          .waitFor({ state: 'visible' })
+        const printButton = page.locator(
+          '[data-business-action-key="print-contract"]'
+        )
+        await printButton.waitFor({ state: 'visible' })
+        assert.equal(await printButton.isEnabled(), true)
+        assert.equal(
+          await page
+            .getByRole('button', { name: '新建采购订单', exact: true })
+            .count(),
+          0
+        )
+        for (const key of [
+          'purchase-edit',
+          'lifecycle-primary',
+          'lifecycle-more',
+          'generate-inbound',
+        ]) {
+          await assertDesktopActionState(page, assert, key, { visible: false })
+        }
+        await installAdminRpcMocks(page.context(), {
+          baseURL: new URL(page.url()).origin,
+          adminProfileOverride: financeIdentity.adminProfile,
+          effectiveSessionOverride: financeIdentity.effectiveSession,
+        })
+        const popupPromise = page.waitForEvent('popup')
+        await printButton.click()
+        const popup = await popupPromise
+        try {
+          await popup
+            .getByText('模板内容', { exact: true })
+            .waitFor({ state: 'visible', timeout: 15_000 })
+          await popup
+            .getByText('核价短绒', { exact: true })
+            .waitFor({ state: 'visible' })
+          assert.match(
+            popup.url(),
+            /print-workspace\/material-purchase-contract/u
+          )
+          await popup
+            .getByRole('button', { name: '打印', exact: true })
+            .waitFor({ state: 'visible' })
+          await popup.screenshot({
+            path: path.join(outputDir, 'finance-purchase-print-workspace.png'),
+            fullPage: true,
+          })
+        } catch (error) {
+          await popup.screenshot({
+            path: path.join(outputDir, 'finance-purchase-print-failed.png'),
+          })
+          throw new Error(
+            `${error.message}\n${await popup.locator('body').innerText()}`
+          )
+        } finally {
+          await popup.close()
+        }
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'finance-purchase-order-read-and-print-desktop.png'
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          'finance-purchase-order-read-and-print-desktop'
+        )
+      },
+    },
     ...['light', 'dark'].map((themeMode) => ({
       name: `business-button-spacing-${themeMode}`,
       path: FINANCE_PAYMENT_PATH,

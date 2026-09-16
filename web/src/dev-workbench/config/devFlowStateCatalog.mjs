@@ -816,10 +816,10 @@ const FLOW_DEFINITIONS = [
     scopeKey: 'source_document',
     kind: 'state_machine',
     label: '工程用料审批',
-    summary: '按订单汇总已确认材料，老板审核后由财务核价生成采购订单。',
+    summary: '按订单汇总已确认材料，老板审核后由财务审核生成采购订单。',
     states: [
       state('SUBMITTED', '待老板审核'),
-      state('BOSS_APPROVED', '待财务核价'),
+      state('BOSS_APPROVED', '待财务审核'),
       state('APPROVED', '已批准采购'),
       state('REJECTED', '已退回'),
     ],

@@ -53,7 +53,7 @@ test('material chain uses recorded approvals and identifies the selected task wi
   const model = buildEngineeringMaterialStageModel(taskFor(), request)
   assert.deepEqual(
     model.items.map(({ label }) => label),
-    ['工程提交用料', '老板审核', '财务核价']
+    ['工程提交用料', '老板审核', '财务审核']
   )
   assert.deepEqual(
     model.items.map(({ tone }) => tone),

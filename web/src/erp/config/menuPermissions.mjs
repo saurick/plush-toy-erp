@@ -226,7 +226,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'finance',
     label: '财务',
     description:
-      '可使用工作台、任务看板、业务看板、基础资料、委外、出货、财务管理和打印中心。',
+      '可使用工作台、任务看板、业务看板、基础资料、采购订单核对、委外、出货、财务管理和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['finance']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -234,6 +234,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/business-dashboard',
       '/erp/print-center',
       ...masterModulePaths,
+      '/erp/purchase/accessories',
       ...outsourcingModulePaths,
       ...shipmentModulePaths,
       ...financeModulePaths,

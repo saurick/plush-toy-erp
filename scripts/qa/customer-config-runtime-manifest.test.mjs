@@ -403,6 +403,25 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
   );
 });
 
+test("customer-config-runtime-manifest: finance purchase read survives customer compilation without purchase mutations", () => {
+  for (const config of [yoyoosunReleasePackage, demoCustomerPackage]) {
+    const manifest = buildRuntimeManifest(config);
+    const finance = new Set(
+      manifest.access_entitlements
+        .filter((item) => item.role_key === "finance")
+        .map((item) => item.capability_key),
+    );
+    assert(finance.has("purchase.order.read"));
+    assert(finance.has("erp.print_template.read"));
+    assert(
+      manifest.compiled_snapshot.rolePageProjections.finance.includes("accessories-purchase"),
+    );
+    for (const action of ["create", "update", "submit", "close", "cancel"]) {
+      assert(!finance.has(`purchase.order.${action}`));
+    }
+  }
+});
+
 test("customer-config-runtime-manifest: finance and quality can reach outsourcing source actions without cross-domain mutations", () => {
   const manifest = buildRuntimeManifest();
   const pages = manifest.compiled_snapshot.rolePageProjections;

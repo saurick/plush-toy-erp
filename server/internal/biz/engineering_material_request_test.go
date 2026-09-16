@@ -3,10 +3,8 @@ package biz
 import (
 	"context"
 	"errors"
-	"github.com/shopspring/decimal"
 	"strings"
 	"testing"
-	"time"
 )
 
 type materialNoteTestRepo struct{ SalesOrderRepo }
@@ -38,8 +36,7 @@ func TestEngineeringMaterialNotesMatchStorageLimit(t *testing.T) {
 			if (err == nil) != tc.valid || (!tc.valid && !errors.Is(err, ErrBadParam)) {
 				t.Fatal(err)
 			}
-			in.Action, in.Note = "FINANCE_APPROVE", nil
-			in.Items = []EngineeringMaterialFinanceLine{{ID: 1, PurchaseQuantity: decimal.NewFromInt(1), UnitPrice: decimal.NewFromInt(1), ExpectedArrivalDate: time.Now(), Note: &tc.note}}
+			in.Action = "FINANCE_APPROVE"
 			_, err = uc.ReviewEngineeringMaterialRequest(context.Background(), in)
 			if (err == nil) != tc.valid || (!tc.valid && !errors.Is(err, ErrBadParam)) {
 				t.Fatal(err)

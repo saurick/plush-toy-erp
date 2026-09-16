@@ -36,24 +36,38 @@ func ensureEngineeringMaterialTask(ctx context.Context, client *ent.Client, requ
 	return current, err
 }
 
-func (r *salesOrderRepo) requireEngineeringMaterialTask(ctx context.Context, client *ent.Client, request *biz.EngineeringMaterialRequest, actorID, taskID, expectedVersion int) (*biz.WorkflowTask, error) {
-	task, err := ensureEngineeringMaterialTask(ctx, client, request, actorID)
+func (r *salesOrderRepo) getEngineeringMaterialTask(ctx context.Context, client *ent.Client, request *biz.EngineeringMaterialRequest) (*biz.WorkflowTask, error) {
+	expected, err := biz.BuildEngineeringMaterialTask(request)
 	if err != nil {
 		return nil, err
 	}
-	if task == nil {
-		return nil, biz.ErrMaterialRequestConflict
-	}
-	query := client.WorkflowTask.Query().Where(workflowtask.ID(task.ID))
+	query := client.WorkflowTask.Query().Where(workflowtask.TaskCode(expected.TaskCode))
 	if r.data.sqlDialect == dialect.Postgres {
 		query.Where(func(s *sql.Selector) { s.ForUpdate() })
 	}
 	row, err := query.Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrMaterialRequestConflict
+	}
 	if err != nil {
 		return nil, err
 	}
-	task = entWorkflowTaskToBiz(row)
-	if !biz.IsTrustedEngineeringMaterialTask(task) || task.TaskStatusKey != "ready" ||
+	// Approval uses the frozen source and task identity. The creation intent is
+	// historical evidence; later changes to display text must not recreate it.
+	task := entWorkflowTaskToBiz(row)
+	if !biz.IsTrustedEngineeringMaterialTask(task) || !biz.WorkflowTaskMatchesSourceProducer(task, expected) ||
+		!sameOptionalString(task.SourceNo, expected.SourceNo) || workflowPayloadInt(task.Payload, "sales_order_id") != request.SalesOrderID {
+		return nil, biz.ErrMaterialRequestConflict
+	}
+	return task, nil
+}
+
+func (r *salesOrderRepo) requireEngineeringMaterialTask(ctx context.Context, client *ent.Client, request *biz.EngineeringMaterialRequest, actorID, taskID, expectedVersion int) (*biz.WorkflowTask, error) {
+	task, err := r.getEngineeringMaterialTask(ctx, client, request)
+	if err != nil {
+		return nil, err
+	}
+	if task.TaskStatusKey != "ready" ||
 		(taskID > 0 && (taskID != task.ID || expectedVersion != task.Version)) {
 		return nil, biz.ErrMaterialRequestConflict
 	}

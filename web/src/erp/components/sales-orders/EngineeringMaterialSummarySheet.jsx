@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react'
-import { Button, Form, Space, Tooltip } from 'antd'
+import { Button, Space } from 'antd'
 import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
@@ -11,7 +11,6 @@ import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
 import { bomLossRateToPercent } from '../../utils/bomMaterialGroups.mjs'
-import { multiplyNumeric20Scale6Values } from '../../utils/numeric20Scale6.mjs'
 import {
   formatMaterialQuantity as quantity,
   materialRowKey,
@@ -85,35 +84,6 @@ function MaterialParts({ parts }) {
 
 const renderMaterialParts = (item) => <MaterialParts parts={item.parts} />
 
-export function EngineeringMaterialAmountSummary({
-  request,
-  form,
-  canFinance,
-}) {
-  const values = Form.useWatch('items', { form, preserve: true })
-  const totals = materialSummaryTotals(
-    request.items,
-    canFinance ? values : request.items
-  )
-  return (
-    <div className="erp-material-amount-summary" aria-label="采购金额合计">
-      <span>
-        {totals.priced === request.items.length && totals.priced > 0
-          ? '采购金额合计'
-          : '已核价小计'}
-      </span>
-      <strong
-        title={totals.priced ? `精确金额：${totals.amount} 元` : undefined}
-      >
-        {totals.priced ? `¥ ${quantity(totals.amount)}` : '待核价'}
-      </strong>
-      <small>
-        {totals.priced} / {request.items.length} 项
-      </small>
-    </div>
-  )
-}
-
 function MaterialNotes({ notes, compact = false }) {
   if (!notes.length) return '—'
   if (!compact || (notes.length === 1 && notes[0].length <= 50)) {
@@ -141,7 +111,6 @@ export default function EngineeringMaterialSummarySheet({
   request,
   saving,
   mobile,
-  commercialRead,
   onReload,
 }) {
   const [mobileView, setMobileView] = useState('cards')
@@ -152,9 +121,8 @@ export default function EngineeringMaterialSummarySheet({
     () => materialSummaryProducts(request.sources),
     [request.sources]
   )
-  const totals = materialSummaryTotals(request.items, request.items)
+  const totals = materialSummaryTotals(request.items)
   const inventory = request.inventory_reference
-  const showMoney = commercialRead
   const displayQuantity = (value) => (
     <span
       className="erp-material-number"
@@ -183,65 +151,6 @@ export default function EngineeringMaterialSummarySheet({
   const notes = (item, compact = false) => (
     <MaterialNotes notes={item.material_notes} compact={compact} />
   )
-  const purchasing = [
-    {
-      title: '实际采购数量',
-      key: 'purchase',
-      width: 132,
-      align: 'right',
-      render: (_, item) => displayQuantity(item.purchase_quantity),
-    },
-    {
-      title: '补采数量',
-      key: 'supplement',
-      width: 90,
-      align: 'right',
-      render: () => <Tooltip title="本表暂不汇总补采数量">—</Tooltip>,
-    },
-    ...(showMoney
-      ? [
-          {
-            title: '单价（元）',
-            key: 'price',
-            width: 120,
-            align: 'right',
-            render: (_, item) => displayQuantity(item.unit_price),
-          },
-          {
-            title: '金额（元）',
-            key: 'amount',
-            width: 120,
-            align: 'right',
-            render: (_, item) => {
-              const line = item
-              const amount = multiplyNumeric20Scale6Values(
-                line?.purchase_quantity,
-                line?.unit_price,
-                6
-              )
-              return amount ? (
-                displayQuantity(amount)
-              ) : (
-                <span className="erp-material-summary-hint">待核价</span>
-              )
-            },
-          },
-        ]
-      : []),
-    {
-      title: '预计到货',
-      key: 'arrival',
-      width: 150,
-      render: (_, item) => item.expected_arrival_date?.slice(0, 10) || '—',
-    },
-    {
-      align: 'left',
-      title: '采购调整原因',
-      key: 'adjustment',
-      width: 200,
-      render: (_, item) => item.note || '—',
-    },
-  ]
   const columns = [
     {
       title: '序号',
@@ -300,7 +209,6 @@ export default function EngineeringMaterialSummarySheet({
       align: 'right',
       render: (_, item) => stock(item),
     },
-    ...purchasing,
     {
       align: 'left',
       title: '材料备注',
@@ -421,7 +329,7 @@ export default function EngineeringMaterialSummarySheet({
               icon={<ArrowRightOutlined aria-hidden />}
               onClick={() => scrollToSide(true)}
             >
-              采购 / 备注
+              库存 / 备注
             </Button>
           </Space>
         )}
@@ -455,19 +363,6 @@ export default function EngineeringMaterialSummarySheet({
                   <dt>当前库存</dt>
                   <dd>{stock(item)}</dd>
                 </div>
-                {purchasing.map((column) => (
-                  <div
-                    key={column.key}
-                    className={
-                      column.key === 'adjustment' || column.key === 'arrival'
-                        ? 'erp-material-card__wide'
-                        : undefined
-                    }
-                  >
-                    <dt>{column.title}</dt>
-                    <dd>{column.render(null, item)}</dd>
-                  </div>
-                ))}
               </dl>
               {item.material_notes.length ? (
                 <div className="erp-material-card__notes">
@@ -541,10 +436,10 @@ export default function EngineeringMaterialSummarySheet({
             : inventory?.status === 'FORBIDDEN'
               ? '当前岗位未开放库存查看。'
               : '当前库存暂不可用，可重新读取。'}
-          库存仅作参考，不代表已为此订单预留，不自动抵扣实购数量。
+          库存仅作参考，不代表已为此订单预留，不自动抵扣采购数量。
         </p>
         <p>
-          实际采购数量由财务确认；单价及金额以人民币计，未核价显示“待核价”。本表暂不汇总补采数量。财务批准后按厂商生成采购订单。
+          财务审核通过后，按厂商和本表总用数量生成采购订单。采购单的单价、金额和预计到货日期留空。
         </p>
       </details>
     </section>

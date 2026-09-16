@@ -12,7 +12,6 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
-	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -219,86 +218,6 @@ func (_u *EngineeringMaterialRequestItemUpdate) SetNillableRequiredQuantity(v *d
 	return _u
 }
 
-// SetPurchaseQuantity sets the "purchase_quantity" field.
-func (_u *EngineeringMaterialRequestItemUpdate) SetPurchaseQuantity(v decimal.Decimal) *EngineeringMaterialRequestItemUpdate {
-	_u.mutation.SetPurchaseQuantity(v)
-	return _u
-}
-
-// SetNillablePurchaseQuantity sets the "purchase_quantity" field if the given value is not nil.
-func (_u *EngineeringMaterialRequestItemUpdate) SetNillablePurchaseQuantity(v *decimal.Decimal) *EngineeringMaterialRequestItemUpdate {
-	if v != nil {
-		_u.SetPurchaseQuantity(*v)
-	}
-	return _u
-}
-
-// ClearPurchaseQuantity clears the value of the "purchase_quantity" field.
-func (_u *EngineeringMaterialRequestItemUpdate) ClearPurchaseQuantity() *EngineeringMaterialRequestItemUpdate {
-	_u.mutation.ClearPurchaseQuantity()
-	return _u
-}
-
-// SetUnitPrice sets the "unit_price" field.
-func (_u *EngineeringMaterialRequestItemUpdate) SetUnitPrice(v decimal.Decimal) *EngineeringMaterialRequestItemUpdate {
-	_u.mutation.SetUnitPrice(v)
-	return _u
-}
-
-// SetNillableUnitPrice sets the "unit_price" field if the given value is not nil.
-func (_u *EngineeringMaterialRequestItemUpdate) SetNillableUnitPrice(v *decimal.Decimal) *EngineeringMaterialRequestItemUpdate {
-	if v != nil {
-		_u.SetUnitPrice(*v)
-	}
-	return _u
-}
-
-// ClearUnitPrice clears the value of the "unit_price" field.
-func (_u *EngineeringMaterialRequestItemUpdate) ClearUnitPrice() *EngineeringMaterialRequestItemUpdate {
-	_u.mutation.ClearUnitPrice()
-	return _u
-}
-
-// SetExpectedArrivalDate sets the "expected_arrival_date" field.
-func (_u *EngineeringMaterialRequestItemUpdate) SetExpectedArrivalDate(v time.Time) *EngineeringMaterialRequestItemUpdate {
-	_u.mutation.SetExpectedArrivalDate(v)
-	return _u
-}
-
-// SetNillableExpectedArrivalDate sets the "expected_arrival_date" field if the given value is not nil.
-func (_u *EngineeringMaterialRequestItemUpdate) SetNillableExpectedArrivalDate(v *time.Time) *EngineeringMaterialRequestItemUpdate {
-	if v != nil {
-		_u.SetExpectedArrivalDate(*v)
-	}
-	return _u
-}
-
-// ClearExpectedArrivalDate clears the value of the "expected_arrival_date" field.
-func (_u *EngineeringMaterialRequestItemUpdate) ClearExpectedArrivalDate() *EngineeringMaterialRequestItemUpdate {
-	_u.mutation.ClearExpectedArrivalDate()
-	return _u
-}
-
-// SetNote sets the "note" field.
-func (_u *EngineeringMaterialRequestItemUpdate) SetNote(v string) *EngineeringMaterialRequestItemUpdate {
-	_u.mutation.SetNote(v)
-	return _u
-}
-
-// SetNillableNote sets the "note" field if the given value is not nil.
-func (_u *EngineeringMaterialRequestItemUpdate) SetNillableNote(v *string) *EngineeringMaterialRequestItemUpdate {
-	if v != nil {
-		_u.SetNote(*v)
-	}
-	return _u
-}
-
-// ClearNote clears the value of the "note" field.
-func (_u *EngineeringMaterialRequestItemUpdate) ClearNote() *EngineeringMaterialRequestItemUpdate {
-	_u.mutation.ClearNote()
-	return _u
-}
-
 // SetRequest sets the "request" edge to the EngineeringMaterialRequest entity.
 func (_u *EngineeringMaterialRequestItemUpdate) SetRequest(v *EngineeringMaterialRequest) *EngineeringMaterialRequestItemUpdate {
 	return _u.SetRequestID(v.ID)
@@ -432,11 +351,6 @@ func (_u *EngineeringMaterialRequestItemUpdate) check() error {
 			return &ValidationError{Name: "unit_name", err: fmt.Errorf(`ent: validator failed for field "EngineeringMaterialRequestItem.unit_name": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.Note(); ok {
-		if err := engineeringmaterialrequestitem.NoteValidator(v); err != nil {
-			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "EngineeringMaterialRequestItem.note": %w`, err)}
-		}
-	}
 	if _u.mutation.RequestCleared() && len(_u.mutation.RequestIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "EngineeringMaterialRequestItem.request"`)
 	}
@@ -496,30 +410,6 @@ func (_u *EngineeringMaterialRequestItemUpdate) sqlSave(ctx context.Context) (_n
 	}
 	if value, ok := _u.mutation.RequiredQuantity(); ok {
 		_spec.SetField(engineeringmaterialrequestitem.FieldRequiredQuantity, field.TypeOther, value)
-	}
-	if value, ok := _u.mutation.PurchaseQuantity(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldPurchaseQuantity, field.TypeOther, value)
-	}
-	if _u.mutation.PurchaseQuantityCleared() {
-		_spec.ClearField(engineeringmaterialrequestitem.FieldPurchaseQuantity, field.TypeOther)
-	}
-	if value, ok := _u.mutation.UnitPrice(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldUnitPrice, field.TypeOther, value)
-	}
-	if _u.mutation.UnitPriceCleared() {
-		_spec.ClearField(engineeringmaterialrequestitem.FieldUnitPrice, field.TypeOther)
-	}
-	if value, ok := _u.mutation.ExpectedArrivalDate(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldExpectedArrivalDate, field.TypeTime, value)
-	}
-	if _u.mutation.ExpectedArrivalDateCleared() {
-		_spec.ClearField(engineeringmaterialrequestitem.FieldExpectedArrivalDate, field.TypeTime)
-	}
-	if value, ok := _u.mutation.Note(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldNote, field.TypeString, value)
-	}
-	if _u.mutation.NoteCleared() {
-		_spec.ClearField(engineeringmaterialrequestitem.FieldNote, field.TypeString)
 	}
 	if _u.mutation.RequestCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -843,86 +733,6 @@ func (_u *EngineeringMaterialRequestItemUpdateOne) SetNillableRequiredQuantity(v
 	return _u
 }
 
-// SetPurchaseQuantity sets the "purchase_quantity" field.
-func (_u *EngineeringMaterialRequestItemUpdateOne) SetPurchaseQuantity(v decimal.Decimal) *EngineeringMaterialRequestItemUpdateOne {
-	_u.mutation.SetPurchaseQuantity(v)
-	return _u
-}
-
-// SetNillablePurchaseQuantity sets the "purchase_quantity" field if the given value is not nil.
-func (_u *EngineeringMaterialRequestItemUpdateOne) SetNillablePurchaseQuantity(v *decimal.Decimal) *EngineeringMaterialRequestItemUpdateOne {
-	if v != nil {
-		_u.SetPurchaseQuantity(*v)
-	}
-	return _u
-}
-
-// ClearPurchaseQuantity clears the value of the "purchase_quantity" field.
-func (_u *EngineeringMaterialRequestItemUpdateOne) ClearPurchaseQuantity() *EngineeringMaterialRequestItemUpdateOne {
-	_u.mutation.ClearPurchaseQuantity()
-	return _u
-}
-
-// SetUnitPrice sets the "unit_price" field.
-func (_u *EngineeringMaterialRequestItemUpdateOne) SetUnitPrice(v decimal.Decimal) *EngineeringMaterialRequestItemUpdateOne {
-	_u.mutation.SetUnitPrice(v)
-	return _u
-}
-
-// SetNillableUnitPrice sets the "unit_price" field if the given value is not nil.
-func (_u *EngineeringMaterialRequestItemUpdateOne) SetNillableUnitPrice(v *decimal.Decimal) *EngineeringMaterialRequestItemUpdateOne {
-	if v != nil {
-		_u.SetUnitPrice(*v)
-	}
-	return _u
-}
-
-// ClearUnitPrice clears the value of the "unit_price" field.
-func (_u *EngineeringMaterialRequestItemUpdateOne) ClearUnitPrice() *EngineeringMaterialRequestItemUpdateOne {
-	_u.mutation.ClearUnitPrice()
-	return _u
-}
-
-// SetExpectedArrivalDate sets the "expected_arrival_date" field.
-func (_u *EngineeringMaterialRequestItemUpdateOne) SetExpectedArrivalDate(v time.Time) *EngineeringMaterialRequestItemUpdateOne {
-	_u.mutation.SetExpectedArrivalDate(v)
-	return _u
-}
-
-// SetNillableExpectedArrivalDate sets the "expected_arrival_date" field if the given value is not nil.
-func (_u *EngineeringMaterialRequestItemUpdateOne) SetNillableExpectedArrivalDate(v *time.Time) *EngineeringMaterialRequestItemUpdateOne {
-	if v != nil {
-		_u.SetExpectedArrivalDate(*v)
-	}
-	return _u
-}
-
-// ClearExpectedArrivalDate clears the value of the "expected_arrival_date" field.
-func (_u *EngineeringMaterialRequestItemUpdateOne) ClearExpectedArrivalDate() *EngineeringMaterialRequestItemUpdateOne {
-	_u.mutation.ClearExpectedArrivalDate()
-	return _u
-}
-
-// SetNote sets the "note" field.
-func (_u *EngineeringMaterialRequestItemUpdateOne) SetNote(v string) *EngineeringMaterialRequestItemUpdateOne {
-	_u.mutation.SetNote(v)
-	return _u
-}
-
-// SetNillableNote sets the "note" field if the given value is not nil.
-func (_u *EngineeringMaterialRequestItemUpdateOne) SetNillableNote(v *string) *EngineeringMaterialRequestItemUpdateOne {
-	if v != nil {
-		_u.SetNote(*v)
-	}
-	return _u
-}
-
-// ClearNote clears the value of the "note" field.
-func (_u *EngineeringMaterialRequestItemUpdateOne) ClearNote() *EngineeringMaterialRequestItemUpdateOne {
-	_u.mutation.ClearNote()
-	return _u
-}
-
 // SetRequest sets the "request" edge to the EngineeringMaterialRequest entity.
 func (_u *EngineeringMaterialRequestItemUpdateOne) SetRequest(v *EngineeringMaterialRequest) *EngineeringMaterialRequestItemUpdateOne {
 	return _u.SetRequestID(v.ID)
@@ -1069,11 +879,6 @@ func (_u *EngineeringMaterialRequestItemUpdateOne) check() error {
 			return &ValidationError{Name: "unit_name", err: fmt.Errorf(`ent: validator failed for field "EngineeringMaterialRequestItem.unit_name": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.Note(); ok {
-		if err := engineeringmaterialrequestitem.NoteValidator(v); err != nil {
-			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "EngineeringMaterialRequestItem.note": %w`, err)}
-		}
-	}
 	if _u.mutation.RequestCleared() && len(_u.mutation.RequestIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "EngineeringMaterialRequestItem.request"`)
 	}
@@ -1150,30 +955,6 @@ func (_u *EngineeringMaterialRequestItemUpdateOne) sqlSave(ctx context.Context) 
 	}
 	if value, ok := _u.mutation.RequiredQuantity(); ok {
 		_spec.SetField(engineeringmaterialrequestitem.FieldRequiredQuantity, field.TypeOther, value)
-	}
-	if value, ok := _u.mutation.PurchaseQuantity(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldPurchaseQuantity, field.TypeOther, value)
-	}
-	if _u.mutation.PurchaseQuantityCleared() {
-		_spec.ClearField(engineeringmaterialrequestitem.FieldPurchaseQuantity, field.TypeOther)
-	}
-	if value, ok := _u.mutation.UnitPrice(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldUnitPrice, field.TypeOther, value)
-	}
-	if _u.mutation.UnitPriceCleared() {
-		_spec.ClearField(engineeringmaterialrequestitem.FieldUnitPrice, field.TypeOther)
-	}
-	if value, ok := _u.mutation.ExpectedArrivalDate(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldExpectedArrivalDate, field.TypeTime, value)
-	}
-	if _u.mutation.ExpectedArrivalDateCleared() {
-		_spec.ClearField(engineeringmaterialrequestitem.FieldExpectedArrivalDate, field.TypeTime)
-	}
-	if value, ok := _u.mutation.Note(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldNote, field.TypeString, value)
-	}
-	if _u.mutation.NoteCleared() {
-		_spec.ClearField(engineeringmaterialrequestitem.FieldNote, field.TypeString)
 	}
 	if _u.mutation.RequestCleared() {
 		edge := &sqlgraph.EdgeSpec{

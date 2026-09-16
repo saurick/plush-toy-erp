@@ -56,8 +56,6 @@ export default function MobileTaskDetailScreen({
   onBack,
   processingComplete = false,
   onOpenAction,
-  materialDraftRef,
-  onMaterialDraftChange,
   onViewReceipt,
   savedEvidenceRefs,
   selectedCanManageAttachments,
@@ -284,8 +282,6 @@ export default function MobileTaskDetailScreen({
             key={selectedTask.id}
             task={selectedTask}
             profile={adminProfile}
-            draftRef={materialDraftRef}
-            onDraftChange={onMaterialDraftChange}
             mobile
           />
           <div

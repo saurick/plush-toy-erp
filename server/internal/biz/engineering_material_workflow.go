@@ -28,7 +28,7 @@ func materialTaskResponsibility(group string) (string, string, string) {
 	case WorkflowMaterialBossReviewGroup:
 		return BossRoleKey, PermissionEngineeringMaterialBossApprove, "审核工程用料"
 	case WorkflowMaterialFinanceReviewGroup:
-		return FinanceRoleKey, PermissionEngineeringMaterialFinanceApprove, "核价并批准采购用料"
+		return FinanceRoleKey, PermissionEngineeringMaterialFinanceApprove, "审核并批准采购用料"
 	case WorkflowMaterialRevisionGroup:
 		return EngineeringRoleKey, PermissionEngineeringMaterialSubmit, "修改用料并重新提交"
 	default:
@@ -83,7 +83,7 @@ func BuildEngineeringMaterialTask(request *EngineeringMaterialRequest) (*Workflo
 		"product_names":                   productNames,
 		"record_title":                    "工程用料 · " + request.OrderNo,
 		"entry_path":                      fmt.Sprintf("/erp/sales/project-orders/sales-orders?material_request_id=%d&sales_order_id=%d", request.ID, request.SalesOrderID),
-		"complete_condition":              "打开材料汇总表核对用料，并在表内提交或审批。",
+		"complete_condition":              "核对工程用料，在“处理任务”中提交本次处理结果。",
 	}
 	if group == WorkflowMaterialRevisionGroup && request.ReviewNote != nil {
 		payload["business_status_reason"] = *request.ReviewNote

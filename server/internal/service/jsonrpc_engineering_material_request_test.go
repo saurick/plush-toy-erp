@@ -77,7 +77,9 @@ func TestEngineeringMaterialJSONRPCSeparatesReviewersAndRejectsSourceOverrides(t
 		{name: "positive task ID required", method: "boss_review_engineering_material_request", action: "BOSS_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialBossApprove}, extra: map[string]any{"task_id": -1, "expected_task_version": 2}},
 		{name: "boss cannot take finance action", method: "boss_review_engineering_material_request", action: "FINANCE_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialBossApprove}},
 		{name: "finance requires readable sources", method: "finance_review_engineering_material_request", action: "FINANCE_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialFinanceApprove, biz.PermissionFieldProcurementCommercialRead}},
-		{name: "finance approves with source read", method: "finance_review_engineering_material_request", action: "FINANCE_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialFinanceApprove, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead, biz.PermissionFieldProcurementCommercialRead}, allowed: true},
+		{name: "finance approves with source read and no pricing permission", method: "finance_review_engineering_material_request", action: "FINANCE_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialFinanceApprove, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, allowed: true},
+		{name: "finance rejects removed pricing payload", method: "finance_review_engineering_material_request", action: "FINANCE_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialFinanceApprove, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, extra: map[string]any{"items": []any{map[string]any{"id": 2, "purchase_quantity": "3.5", "unit_price": "10", "expected_arrival_date": "2026-10-01"}}}},
+
 		{name: "cannot override actor", method: "boss_review_engineering_material_request", action: "BOSS_APPROVE", permissions: []string{biz.PermissionEngineeringMaterialBossApprove}, extra: map[string]any{"actor_id": 999}},
 		{name: "cannot override required quantity", method: "submit_engineering_material_request", permissions: []string{biz.PermissionEngineeringMaterialSubmit}, extra: map[string]any{"required_quantity": "1"}},
 	} {
@@ -97,9 +99,6 @@ func TestEngineeringMaterialJSONRPCSeparatesReviewersAndRejectsSourceOverrides(t
 			pm := map[string]any{"id": 1, "expected_version": 1, "action": tc.action}
 			if tc.method == "submit_engineering_material_request" {
 				pm = map[string]any{"sales_order_id": 1, "expected_version": 1, "expected_source_hash": strings.Repeat("a", 64)}
-			}
-			if tc.action == "FINANCE_APPROVE" {
-				pm["items"] = []any{map[string]any{"id": 2, "purchase_quantity": "3.5", "unit_price": "10", "expected_arrival_date": "2026-10-01"}}
 			}
 			for k, v := range tc.extra {
 				pm[k] = v

@@ -282,20 +282,18 @@
       "title": "工程用料汇总明细",
       "domain": "sales-purchase",
       "kind": "SourceDocument",
-      "purpose": "按材料和单位归并本订单各部位用料，保留厂商和规格快照、应需数量及财务核定的采购数量、单价、交期和调整原因。",
+      "purpose": "按材料和单位归并本订单各部位用料，冻结厂商、规格快照和应需数量；财务批准时直接以应需数量生成采购行。",
       "boundary": "逐部位来源见审批头的 source_snapshot；不重复扣库存、不预造实收量。",
-      "lifecycle": "随工程提交创建；只在财务批准事务中补齐核价字段，批准后只读。",
+      "lifecycle": "随工程提交创建并只读；退回重提创建新审批及明细，不覆盖原快照。",
       "writeBoundary": "EngineeringMaterialRequest 受控事务维护；禁止前端写入应需数量。",
-      "sensitiveFields": [
-        "unit_price"
-      ]
+      "sensitiveFields": []
     },
     {
       "name": "engineering_material_requests",
       "title": "工程用料审批",
       "domain": "sales-purchase",
       "kind": "SourceDocument",
-      "purpose": "保存订单用料汇总的提交、老板审核、财务核价、退回和不可改写的来源快照。",
+      "purpose": "保存订单用料汇总的提交、老板审核、财务审核、退回和不可改写的来源快照。",
       "boundary": "不作为库存和付款事实。已确认样品与启用 BOM 才能提交；来源变动阻断审批；同单最多一份未退回审批。",
       "lifecycle": "SUBMITTED 到 BOSS_APPROVED 到 APPROVED；前两态可有原因退回 REJECTED，重新提交生成新记录。",
       "writeBoundary": "SalesOrderUsecase 的用料提交与审批事务写入；财务批准和采购单生成同一事务。",

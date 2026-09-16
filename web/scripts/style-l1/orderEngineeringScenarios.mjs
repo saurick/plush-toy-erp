@@ -8,7 +8,10 @@ const fulfill = (route, id, data) =>
   })
 
 export function createOrderEngineeringScenarios(deps) {
-  let calls, request, order, item
+  let calls
+  let request
+  let order
+  let item
   return [
     {
       name: 'sales-order-demand-and-material-approval-desktop',
@@ -140,10 +143,6 @@ export function createOrderEngineeringScenarios(deps) {
                 ...request,
                 status: 'APPROVED',
                 version: 3,
-                items: request.items.map((line, index) => ({
-                  ...line,
-                  ...params.items[index],
-                })),
                 purchase_orders: [{ id: 77, purchase_order_no: 'PO-MR-5-1' }],
               }
               return fulfill(route, id, request)
@@ -156,14 +155,16 @@ export function createOrderEngineeringScenarios(deps) {
         await deps.expectHeading(page, '销售订单')
         await page.getByText(order.order_no, { exact: true }).first().dblclick()
         const edit = page
-          .getByRole('dialog')
+          .locator('[data-business-form-page]')
           .filter({ hasText: '编辑销售订单' })
           .last()
         await edit.waitFor({ state: 'visible' })
         await edit
-          .locator('input[id$="requested_product_name"]')
+          .locator('textarea[id$="requested_product_name"]')
           .fill('需求先录入，工程后开发')
-        await edit.locator('.ant-modal-footer .ant-btn-primary').last().click()
+        await edit
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .click()
         try {
           await edit.waitFor({ state: 'hidden', timeout: 12000 })
         } catch (error) {
@@ -212,13 +213,14 @@ export function createOrderEngineeringScenarios(deps) {
           .locator('.erp-sales-order-engineering-section')
           .evaluate((node) =>
             Array.from(
-              (function* () {
+              (function* ancestors() {
                 for (
                   let p = node;
                   p && !p.matches('[role=dialog]');
                   p = p.parentElement
-                )
+                ) {
                   yield p
+                }
               })()
             ).map((p) => ({
               class: p.className,
@@ -252,7 +254,7 @@ export function createOrderEngineeringScenarios(deps) {
           .click()
         const modal = page
           .getByRole('dialog')
-          .filter({ hasText: '材料汇总与审批' })
+          .filter({ hasText: '审核工程用料' })
           .last()
         await modal
           .getByText('111.32', { exact: true })
@@ -267,14 +269,8 @@ export function createOrderEngineeringScenarios(deps) {
         await modal
           .getByRole('button', { name: '审核通过，交财务', exact: true })
           .click()
-        await modal.getByLabel('实购数量 1', { exact: true }).fill('110')
-        await modal.getByLabel('单价 1', { exact: true }).fill('8.5')
-        await modal.getByLabel('到货日期 1', { exact: true }).fill('2026-10-01')
-        await modal
-          .getByLabel('调整原因 1', { exact: true })
-          .fill('经核对使用库存 1.32 米')
         const tableWidth = await modal
-          .locator('.erp-engineering-material-review > .ant-table-wrapper')
+          .locator('.erp-material-sheet__table')
           .evaluate((node) => node.getBoundingClientRect().width)
         const modalWidth = await modal.evaluate((node) => node.clientWidth)
         deps.assert.ok(
@@ -289,7 +285,7 @@ export function createOrderEngineeringScenarios(deps) {
             })
           )
         await page.screenshot({
-          path: `${deps.outputDir}/engineering-material-finance-form.png`,
+          path: `${deps.outputDir}/engineering-material-finance-review.png`,
           fullPage: true,
         })
         await modal
@@ -303,12 +299,7 @@ export function createOrderEngineeringScenarios(deps) {
             call.method === 'finance_review_engineering_material_request'
         )
         deps.assert.equal(approvals.length, 1)
-        deps.assert.equal(approvals[0].params.items[0].id, 11)
-        deps.assert.equal(approvals[0].params.items[0].purchase_quantity, '110')
-        deps.assert.equal(approvals[0].params.items[0].unit_price, '8.5')
-        deps.assert.ok(
-          !Object.hasOwn(approvals[0].params.items[0], 'material_id')
-        )
+        deps.assert.equal(approvals[0].params.items, undefined)
       },
     },
   ]

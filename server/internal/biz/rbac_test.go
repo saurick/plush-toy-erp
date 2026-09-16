@@ -183,13 +183,14 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskComplete,
 				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
+				PermissionPurchaseOrderRead,
 				PermissionPurchaseReceiptRead,
 				PermissionPurchaseReceiptAdjustmentRead,
 				PermissionPurchaseReturnRead,
 				PermissionShipmentRead,
 				PermissionMobileFinanceAccess,
 			},
-			omits: []string{PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionDebugBusinessClear},
+			omits: []string{PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: PMCRoleKey,
@@ -295,6 +296,20 @@ func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
 	assertPermissionSetOmits(t, finance, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionQualityInspectionCreate)
 
 	assertPermissionSetContains(t, production, PermissionProductSKURead, PermissionWarehouseInventoryRead, PermissionOutsourcingFactRead)
+}
+
+func TestFinanceCanReadAndPrintPurchaseOrdersWithoutPurchasingMutations(t *testing.T) {
+	permissions := builtinRolePermissionSet(t, FinanceRoleKey)
+	assertPermissionSetContains(t, permissions, PermissionEngineeringMaterialFinanceApprove, PermissionPurchaseOrderRead, PermissionERPPrintTemplateRead, PermissionFieldProcurementCommercialRead)
+	assertPermissionSetOmits(t, permissions, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseOrderSubmit, PermissionPurchaseOrderClose, PermissionPurchaseOrderCancel)
+	admin := &AdminUser{Permissions: make([]string, 0, len(permissions))}
+	for permission := range permissions {
+		admin.Permissions = append(admin.Permissions, permission)
+	}
+	menus := AdminVisibleMenus(admin)
+	if !adminMenusContainKey(menus, "accessories-purchase") || !adminMenusContainKey(menus, "print-center") {
+		t.Fatal("finance must be able to open purchase orders and the print center")
+	}
 }
 
 func TestMobileRoleAccessPermissionIncludesEngineering(t *testing.T) {

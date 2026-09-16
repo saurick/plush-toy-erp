@@ -46,22 +46,18 @@ type EngineeringMaterialRequest struct {
 	PurchaseOrders     []EngineeringMaterialPurchaseOrder `json:"purchase_orders"`
 }
 type EngineeringMaterialRequestItem struct {
-	ID                  int              `json:"id"`
-	MaterialID          int              `json:"material_id"`
-	UnitID              int              `json:"unit_id"`
-	SupplierID          int              `json:"supplier_id"`
-	MaterialCode        string           `json:"material_code"`
-	MaterialName        string           `json:"material_name"`
-	SupplierName        string           `json:"supplier_name"`
-	SupplierItemNo      *string          `json:"supplier_item_no"`
-	Color               *string          `json:"color"`
-	Spec                *string          `json:"spec"`
-	UnitName            string           `json:"unit_name"`
-	RequiredQuantity    decimal.Decimal  `json:"required_quantity"`
-	PurchaseQuantity    *decimal.Decimal `json:"purchase_quantity"`
-	UnitPrice           *decimal.Decimal `json:"unit_price"`
-	ExpectedArrivalDate *time.Time       `json:"expected_arrival_date"`
-	Note                *string          `json:"note"`
+	ID               int             `json:"id"`
+	MaterialID       int             `json:"material_id"`
+	UnitID           int             `json:"unit_id"`
+	SupplierID       int             `json:"supplier_id"`
+	MaterialCode     string          `json:"material_code"`
+	MaterialName     string          `json:"material_name"`
+	SupplierName     string          `json:"supplier_name"`
+	SupplierItemNo   *string         `json:"supplier_item_no"`
+	Color            *string         `json:"color"`
+	Spec             *string         `json:"spec"`
+	UnitName         string          `json:"unit_name"`
+	RequiredQuantity decimal.Decimal `json:"required_quantity"`
 }
 type EngineeringMaterialPurchaseOrder struct {
 	ID              int    `json:"id"`
@@ -83,16 +79,8 @@ type EngineeringMaterialReview struct {
 	Action              string
 	ReviewStage         string
 	Note                *string
-	Items               []EngineeringMaterialFinanceLine
 	WorkflowTaskID      int
 	ExpectedTaskVersion int
-}
-type EngineeringMaterialFinanceLine struct {
-	ID                  int
-	PurchaseQuantity    decimal.Decimal
-	UnitPrice           decimal.Decimal
-	ExpectedArrivalDate time.Time
-	Note                *string
 }
 type EngineeringMaterialRequestRepo interface {
 	GetEngineeringMaterialRequest(context.Context, int, bool) (*EngineeringMaterialRequest, error)
@@ -144,27 +132,7 @@ func (uc *SalesOrderUsecase) ReviewEngineeringMaterialRequest(ctx context.Contex
 		return nil, ErrMaterialRequestReviewInvalid
 	}
 	switch copy.Action {
-	case "BOSS_APPROVE", "REJECT":
-		if len(copy.Items) != 0 {
-			return nil, ErrBadParam
-		}
-	case "FINANCE_APPROVE":
-		if len(copy.Items) == 0 || len(copy.Items) > 2000 {
-			return nil, ErrBadParam
-		}
-		copy.Items = append([]EngineeringMaterialFinanceLine(nil), in.Items...)
-		seen := map[int]bool{}
-		for i := range copy.Items {
-			line := &copy.Items[i]
-			line.Note = normalizeOptionalString(line.Note)
-			if line.ID <= 0 || seen[line.ID] || line.PurchaseQuantity.IsNegative() || !line.PurchaseQuantity.Equal(line.PurchaseQuantity.Round(6)) || line.UnitPrice.IsNegative() || !line.UnitPrice.Equal(line.UnitPrice.Round(6)) || line.ExpectedArrivalDate.IsZero() || (line.Note != nil && len(*line.Note) > 255) {
-				return nil, ErrBadParam
-			}
-			if line.PurchaseQuantity.GreaterThanOrEqual(decimal.New(1, 14)) || line.UnitPrice.GreaterThanOrEqual(decimal.New(1, 14)) || line.PurchaseQuantity.Mul(line.UnitPrice).GreaterThanOrEqual(decimal.New(1, 14)) {
-				return nil, ErrBadParam
-			}
-			seen[line.ID] = true
-		}
+	case "BOSS_APPROVE", "FINANCE_APPROVE", "REJECT":
 	default:
 		return nil, ErrBadParam
 	}

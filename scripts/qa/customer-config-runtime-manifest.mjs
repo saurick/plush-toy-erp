@@ -174,6 +174,7 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "product.read",
     "product_sku.read",
     "process.read",
+    "purchase.order.read",
     "outsourcing.order.read",
     "outsourcing.fact.read",
     "purchase.receipt.read",

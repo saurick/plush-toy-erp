@@ -17,8 +17,7 @@ func (EngineeringMaterialRequestItem) Fields() []ent.Field {
 		field.String("material_code").MaxLen(64), field.String("material_name").MaxLen(255), field.String("supplier_name").MaxLen(255),
 		field.String("supplier_item_no").Optional().Nillable().MaxLen(255), field.String("color").Optional().Nillable().MaxLen(64),
 		field.String("spec").Optional().Nillable().MaxLen(255), field.String("unit_name").MaxLen(64),
-		decimalQuantityField("required_quantity"), optionalDecimalField("purchase_quantity"), optionalDecimalField("unit_price"),
-		field.Time("expected_arrival_date").Optional().Nillable(), field.String("note").Optional().Nillable().MaxLen(255),
+		decimalQuantityField("required_quantity"),
 	}
 }
 func (EngineeringMaterialRequestItem) Edges() []ent.Edge {
@@ -34,7 +33,6 @@ func (EngineeringMaterialRequestItem) Indexes() []ent.Index {
 }
 func (EngineeringMaterialRequestItem) Annotations() []schema.Annotation {
 	return []schema.Annotation{entsql.Annotation{Checks: map[string]string{
-		"engineering_material_request_items_quantity_valid": "required_quantity > 0 AND (purchase_quantity IS NULL OR purchase_quantity >= 0)",
-		"engineering_material_request_items_price_valid":    "unit_price IS NULL OR unit_price >= 0",
+		"engineering_material_request_items_quantity_valid": "required_quantity > 0",
 	}}}
 }

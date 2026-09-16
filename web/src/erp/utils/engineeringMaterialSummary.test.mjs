@@ -6,7 +6,6 @@ import {
   materialSummaryRows,
   materialSummaryTotals,
   materialStockQuantity,
-  materialFinanceIssue,
   materialNoteFits,
 } from './engineeringMaterialSummary.mjs'
 
@@ -63,23 +62,17 @@ test('quantities preserve null versus zero, precision and large exact decimal va
   assert.equal(formatMaterialQuantity('12.100010', true), '12.10001')
 })
 
-test('totals separate units and show partial pricing without interpreting blanks as zero', () => {
+test('totals preserve all demand and keep different units separate', () => {
   const items = [
     { unit_id: 1, unit_name: '码', required_quantity: '1.000001' },
     { unit_id: 1, unit_name: '码', required_quantity: '2.999999' },
     { unit_id: 2, unit_name: '套', required_quantity: '10' },
   ]
-  const totals = materialSummaryTotals(items, [
-    { purchase_quantity: '3.333333', unit_price: '0.333333' },
-    { purchase_quantity: '2', unit_price: '' },
-    { purchase_quantity: '0', unit_price: '0' },
-  ])
+  const totals = materialSummaryTotals(items)
   assert.deepEqual(totals.units, [
     { id: 1, name: '码', quantity: '4' },
     { id: 2, name: '套', quantity: '10' },
   ])
-  assert.equal(totals.amount, '1.11111')
-  assert.equal(totals.priced, 2)
 })
 
 test('inventory missing access and incompatible units never become zero stock', () => {
@@ -106,46 +99,6 @@ test('inventory missing access and incompatible units never become zero stock', 
       item
     ),
     '9.25'
-  )
-})
-
-test('finance validates all source rows, dates, adjusted quantities and amount limits', () => {
-  const items = [{ required_quantity: '2' }, { required_quantity: '5' }]
-  const complete = {
-    purchase_quantity: '2',
-    unit_price: '10',
-    expected_arrival_date: '2026-10-01',
-    note: '',
-  }
-  assert.equal(materialFinanceIssue(items, [complete])?.index, 1)
-  assert.equal(
-    materialFinanceIssue(items, [
-      complete,
-      { ...complete, purchase_quantity: '5' },
-    ]),
-    null
-  )
-  assert.equal(
-    materialFinanceIssue(items, [complete, { ...complete, note: '' }])?.field,
-    'note'
-  )
-  assert.equal(
-    materialFinanceIssue(items, [
-      { ...complete, expected_arrival_date: '2026-02-30' },
-    ])?.field,
-    'expected_arrival_date'
-  )
-  assert.equal(
-    materialFinanceIssue(items, [{ ...complete, unit_price: '99999999999999' }])
-      ?.field,
-    'unit_price'
-  )
-  assert.equal(
-    materialFinanceIssue(
-      [{ required_quantity: '0' }],
-      [{ ...complete, purchase_quantity: '0', unit_price: '0' }]
-    ),
-    null
   )
 })
 

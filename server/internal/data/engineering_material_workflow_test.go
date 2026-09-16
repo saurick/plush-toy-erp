@@ -148,6 +148,41 @@ func TestEngineeringMaterialWorkflowRejectsStaleOrAssignedTaskAndRollsBack(t *te
 	}
 }
 
+func TestEngineeringMaterialWorkflowRequiresExistingMatchingTask(t *testing.T) {
+	for _, mismatch := range []string{"missing", "order", "capability", "producer"} {
+		t.Run(mismatch, func(t *testing.T) {
+			ctx := context.Background()
+			_, client := openSalesOrderRepoTest(t, "material_task_identity_"+mismatch)
+			defer mustCloseEntClient(t, client)
+			f := prepareMaterialRequestFixture(t, ctx, &Data{postgres: client}, "MATERIAL-ID-"+mismatch)
+			request := submitMaterialRequestFixture(t, ctx, f)
+			task := materialWorkflowTask(t, ctx, client, biz.WorkflowMaterialBossReviewGroup, request.ID, "ready")
+			update := client.WorkflowTask.UpdateOneID(task.ID)
+			switch mismatch {
+			case "missing":
+				update.SetTaskCode("unrelated-task")
+			case "order":
+				task.Payload["sales_order_id"] = request.SalesOrderID + 1
+				update.SetPayload(task.Payload)
+			case "capability":
+				update.SetRequiredCapabilityKey(biz.PermissionEngineeringMaterialFinanceApprove)
+			case "producer":
+				task.Payload["source_task_producer"] = "unrelated"
+				update.SetPayload(task.Payload)
+			}
+			update.SaveX(ctx)
+			if _, err := f.uc.ReviewEngineeringMaterialRequest(ctx, &biz.EngineeringMaterialReview{
+				ID: request.ID, ExpectedVersion: request.Version, ActorID: 22, Action: "BOSS_APPROVE",
+			}); !errors.Is(err, biz.ErrMaterialRequestConflict) {
+				t.Fatalf("approval accepted %s task: %v", mismatch, err)
+			}
+			if client.WorkflowTask.Query().CountX(ctx) != 1 || client.WorkflowTaskEvent.Query().CountX(ctx) != 1 || client.PurchaseOrder.Query().CountX(ctx) != 0 {
+				t.Fatal("invalid approval created tasks, audit events or purchase orders")
+			}
+		})
+	}
+}
+
 func TestEngineeringMaterialWorkflowOrderSettlementWithdrawsPendingTasks(t *testing.T) {
 	for _, action := range []string{biz.SourceOrderActionCancel, biz.SourceOrderActionClose} {
 		t.Run(action, func(t *testing.T) {
@@ -198,7 +233,7 @@ func TestEngineeringMaterialWorkflowFinanceAuditFailureRollsBackPurchaseOrders(t
 		t.Fatal("expected transaction failure")
 	}
 	current, err := f.uc.GetEngineeringMaterialRequest(ctx, f.order.ID, false)
-	if err != nil || current.Status != biz.MaterialRequestBossApproved || current.Items[0].PurchaseQuantity != nil {
+	if err != nil || current.Status != biz.MaterialRequestBossApproved {
 		t.Fatalf("finance source write survived rollback: %+v %v", current, err)
 	}
 	materialWorkflowTask(t, ctx, client, biz.WorkflowMaterialFinanceReviewGroup, request.ID, "ready")

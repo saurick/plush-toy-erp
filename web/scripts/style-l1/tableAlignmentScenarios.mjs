@@ -165,21 +165,15 @@ export function createTableAlignmentScenarios({
         .locator('#material-table .ant-table-row-expand-icon')
         .first()
         .click()
-      await page.locator('#toggle-edit').click()
       await page
-        .getByRole('textbox', { name: '实购数量 1', exact: true })
+        .getByRole('textbox', { name: '编辑数量', exact: true })
         .fill('435')
       assert.equal(
         await page
-          .getByRole('textbox', { name: '实购数量 1', exact: true })
+          .getByRole('textbox', { name: '编辑数量', exact: true })
           .inputValue(),
         '435'
       )
-      const inputAlignment = await page
-        .getByRole('textbox', { name: '实购数量 1', exact: true })
-        .evaluate((input) => getComputedStyle(input).textAlign)
-      assert.equal(inputAlignment, 'right')
-      await page.locator('#toggle-edit').click()
 
       await page.locator('#toggle-empty').click()
       await page.getByText('暂无匹配记录', { exact: true }).waitFor()

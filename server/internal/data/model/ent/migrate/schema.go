@@ -565,10 +565,6 @@ var (
 		{Name: "spec", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "unit_name", Type: field.TypeString, Size: 64},
 		{Name: "required_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
-		{Name: "purchase_quantity", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
-		{Name: "unit_price", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
-		{Name: "expected_arrival_date", Type: field.TypeTime, Nullable: true},
-		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "request_id", Type: field.TypeInt},
 		{Name: "material_id", Type: field.TypeInt},
 		{Name: "unit_id", Type: field.TypeInt},
@@ -582,25 +578,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "engineering_material_request_items_engineering_material_requests_items",
-				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[13]},
+				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[9]},
 				RefColumns: []*schema.Column{EngineeringMaterialRequestsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "engineering_material_request_items_materials_material",
-				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[14]},
+				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[10]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "engineering_material_request_items_units_unit",
-				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[15]},
+				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[11]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "engineering_material_request_items_suppliers_supplier",
-				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[16]},
+				Columns:    []*schema.Column{EngineeringMaterialRequestItemsColumns[12]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -609,7 +605,7 @@ var (
 			{
 				Name:    "engineeringmaterialrequestitem_request_id_material_id_unit_id",
 				Unique:  true,
-				Columns: []*schema.Column{EngineeringMaterialRequestItemsColumns[13], EngineeringMaterialRequestItemsColumns[14], EngineeringMaterialRequestItemsColumns[15]},
+				Columns: []*schema.Column{EngineeringMaterialRequestItemsColumns[9], EngineeringMaterialRequestItemsColumns[10], EngineeringMaterialRequestItemsColumns[11]},
 			},
 		},
 	}
@@ -5089,8 +5085,7 @@ func init() {
 	EngineeringMaterialRequestItemsTable.ForeignKeys[3].RefTable = SuppliersTable
 	EngineeringMaterialRequestItemsTable.Annotation = &entsql.Annotation{}
 	EngineeringMaterialRequestItemsTable.Annotation.Checks = map[string]string{
-		"engineering_material_request_items_price_valid":    "unit_price IS NULL OR unit_price >= 0",
-		"engineering_material_request_items_quantity_valid": "required_quantity > 0 AND (purchase_quantity IS NULL OR purchase_quantity >= 0)",
+		"engineering_material_request_items_quantity_valid": "required_quantity > 0",
 	}
 	FinanceAllocationsTable.ForeignKeys[0].RefTable = FinancePaymentsTable
 	FinanceAllocationsTable.Annotation = &entsql.Annotation{}

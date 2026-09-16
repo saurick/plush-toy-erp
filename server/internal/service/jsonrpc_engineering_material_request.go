@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"github.com/shopspring/decimal"
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
@@ -114,7 +113,7 @@ func (d *jsonrpcDispatcher) handleEngineeringMaterialRequest(ctx context.Context
 		}
 		result, err = d.salesOrderUC.SubmitEngineeringMaterialRequest(ctx, &biz.EngineeringMaterialSubmit{SalesOrderID: orderID, ExpectedVersion: version, ExpectedSourceHash: getString(pm, "expected_source_hash"), ActorID: actorID, WorkflowTaskID: taskID, ExpectedTaskVersion: taskVersion})
 	default:
-		if !sourceOrderAllowsOnly(pm, "customer_key", "id", "expected_version", "action", "note", "items", "task_id", "expected_task_version") {
+		if !sourceOrderAllowsOnly(pm, "customer_key", "id", "expected_version", "action", "note", "task_id", "expected_task_version") {
 			return id, invalidParamResult(), nil
 		}
 		requestID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
@@ -137,41 +136,6 @@ func (d *jsonrpcDispatcher) handleEngineeringMaterialRequest(ctx context.Context
 			stage = "FINANCE"
 		}
 		in := &biz.EngineeringMaterialReview{ReviewStage: stage, ID: requestID, ExpectedVersion: version, ActorID: actorID, Action: action, Note: getWorkflowStringPtr(pm, "note"), WorkflowTaskID: taskID, ExpectedTaskVersion: taskVersion}
-		if raw, exists := pm["items"]; exists {
-			if action != "FINANCE_APPROVE" {
-				return id, invalidParamResult(), nil
-			}
-			if res := d.RequireAdminPermission(ctx, biz.PermissionFieldProcurementCommercialRead); res != nil {
-				return id, res, nil
-			}
-			items, ok := raw.([]any)
-			if !ok {
-				return id, invalidParamResult(), nil
-			}
-			for _, value := range items {
-				fields, ok := value.(map[string]any)
-				if !ok || !sourceOrderAllowsOnly(fields, "id", "purchase_quantity", "unit_price", "expected_arrival_date", "note") {
-					return id, invalidParamResult(), nil
-				}
-				itemID, ok := getRequiredJSONRPCPositiveInt(fields, "id")
-				if !ok {
-					return id, invalidParamResult(), nil
-				}
-				quantity, e := decimal.NewFromString(getString(fields, "purchase_quantity"))
-				if e != nil {
-					return id, invalidParamResult(), nil
-				}
-				price, e := decimal.NewFromString(getString(fields, "unit_price"))
-				if e != nil {
-					return id, invalidParamResult(), nil
-				}
-				arrival, e := time.Parse("2006-01-02", getString(fields, "expected_arrival_date"))
-				if e != nil {
-					return id, invalidParamResult(), nil
-				}
-				in.Items = append(in.Items, biz.EngineeringMaterialFinanceLine{ID: itemID, PurchaseQuantity: quantity, UnitPrice: price, ExpectedArrivalDate: arrival, Note: getWorkflowStringPtr(fields, "note")})
-			}
-		}
 		result, err = d.salesOrderUC.ReviewEngineeringMaterialRequest(ctx, in)
 	}
 	if err != nil {

@@ -81,9 +81,6 @@ const request = {
     supplier_item_no: 'TEST-001',
     supplier_name: '模拟厂商',
     required_quantity: String(row.quantity),
-    purchase_quantity: String(row.quantity),
-    unit_price: '2.50',
-    expected_arrival_date: '2026-10-01',
   })),
   sources: rows.map((row) => ({
     material_id: row.key,
@@ -110,10 +107,8 @@ const request = {
 }
 
 function Fixture() {
-  const [form] = Form.useForm()
   const [dark, setDark] = useState(false)
   const [mobile, setMobile] = useState(false)
-  const [editing, setEditing] = useState(false)
   const [empty, setEmpty] = useState(false)
   const [order, setOrder] = useState(columns.map((column) => column.key))
   const [selected, setSelected] = useState([])
@@ -158,9 +153,6 @@ function Fixture() {
           <Button id="toggle-mobile" onClick={() => setMobile(!mobile)}>
             切换手机查看
           </Button>
-          <Button id="toggle-edit" onClick={() => setEditing(!editing)}>
-            切换核价
-          </Button>
           <Button id="toggle-empty" onClick={() => setEmpty(!empty)}>
             切换空表
           </Button>
@@ -199,20 +191,11 @@ function Fixture() {
           style={{ minWidth: 0 }}
         >
           <h2>材料汇总明细</h2>
-          <Form
-            className="erp-business-form"
-            form={form}
-            initialValues={{ items: request.items }}
-          >
-            <EngineeringMaterialSummarySheet
-              request={request}
-              form={form}
-              canFinance={editing}
-              mobile={mobile}
-              commercialRead
-              onReload={() => {}}
-            />
-          </Form>
+          <EngineeringMaterialSummarySheet
+            request={request}
+            mobile={mobile}
+            onReload={() => {}}
+          />
         </section>
         <section id="native-table" style={{ minWidth: 0 }}>
           <h2>单据编辑明细</h2>

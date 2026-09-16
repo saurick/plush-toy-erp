@@ -24,6 +24,12 @@ function readRepoFile(relativePath) {
   return readFileSync(path.join(repoRoot, relativePath), 'utf8')
 }
 
+test('menuPermissions: 财务岗位包含采购订单和打印核对入口', () => {
+  const finance = ERP_PERMISSION_PRESETS.find((preset) => preset.key === 'finance')
+  assert(finance.permissions.includes('/erp/purchase/accessories'))
+  assert(finance.permissions.includes('/erp/print-center'))
+})
+
 test('menuPermissions: 包含权限管理和审计日志入口', () => {
   assert(
     ERP_MENU_PERMISSION_OPTIONS.some(

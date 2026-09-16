@@ -10,7 +10,6 @@ import (
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
 	"strings"
-	"time"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
@@ -46,14 +45,6 @@ type EngineeringMaterialRequestItem struct {
 	UnitName string `json:"unit_name,omitempty"`
 	// RequiredQuantity holds the value of the "required_quantity" field.
 	RequiredQuantity decimal.Decimal `json:"required_quantity,omitempty"`
-	// PurchaseQuantity holds the value of the "purchase_quantity" field.
-	PurchaseQuantity *decimal.Decimal `json:"purchase_quantity,omitempty"`
-	// UnitPrice holds the value of the "unit_price" field.
-	UnitPrice *decimal.Decimal `json:"unit_price,omitempty"`
-	// ExpectedArrivalDate holds the value of the "expected_arrival_date" field.
-	ExpectedArrivalDate *time.Time `json:"expected_arrival_date,omitempty"`
-	// Note holds the value of the "note" field.
-	Note *string `json:"note,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the EngineeringMaterialRequestItemQuery when eager-loading is set.
 	Edges        EngineeringMaterialRequestItemEdges `json:"edges"`
@@ -124,16 +115,12 @@ func (*EngineeringMaterialRequestItem) scanValues(columns []string) ([]any, erro
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case engineeringmaterialrequestitem.FieldPurchaseQuantity, engineeringmaterialrequestitem.FieldUnitPrice:
-			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case engineeringmaterialrequestitem.FieldRequiredQuantity:
 			values[i] = new(decimal.Decimal)
 		case engineeringmaterialrequestitem.FieldID, engineeringmaterialrequestitem.FieldRequestID, engineeringmaterialrequestitem.FieldMaterialID, engineeringmaterialrequestitem.FieldUnitID, engineeringmaterialrequestitem.FieldSupplierID:
 			values[i] = new(sql.NullInt64)
-		case engineeringmaterialrequestitem.FieldMaterialCode, engineeringmaterialrequestitem.FieldMaterialName, engineeringmaterialrequestitem.FieldSupplierName, engineeringmaterialrequestitem.FieldSupplierItemNo, engineeringmaterialrequestitem.FieldColor, engineeringmaterialrequestitem.FieldSpec, engineeringmaterialrequestitem.FieldUnitName, engineeringmaterialrequestitem.FieldNote:
+		case engineeringmaterialrequestitem.FieldMaterialCode, engineeringmaterialrequestitem.FieldMaterialName, engineeringmaterialrequestitem.FieldSupplierName, engineeringmaterialrequestitem.FieldSupplierItemNo, engineeringmaterialrequestitem.FieldColor, engineeringmaterialrequestitem.FieldSpec, engineeringmaterialrequestitem.FieldUnitName:
 			values[i] = new(sql.NullString)
-		case engineeringmaterialrequestitem.FieldExpectedArrivalDate:
-			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -229,34 +216,6 @@ func (_m *EngineeringMaterialRequestItem) assignValues(columns []string, values 
 				return fmt.Errorf("unexpected type %T for field required_quantity", values[i])
 			} else if value != nil {
 				_m.RequiredQuantity = *value
-			}
-		case engineeringmaterialrequestitem.FieldPurchaseQuantity:
-			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field purchase_quantity", values[i])
-			} else if value.Valid {
-				_m.PurchaseQuantity = new(decimal.Decimal)
-				*_m.PurchaseQuantity = *value.S.(*decimal.Decimal)
-			}
-		case engineeringmaterialrequestitem.FieldUnitPrice:
-			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field unit_price", values[i])
-			} else if value.Valid {
-				_m.UnitPrice = new(decimal.Decimal)
-				*_m.UnitPrice = *value.S.(*decimal.Decimal)
-			}
-		case engineeringmaterialrequestitem.FieldExpectedArrivalDate:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field expected_arrival_date", values[i])
-			} else if value.Valid {
-				_m.ExpectedArrivalDate = new(time.Time)
-				*_m.ExpectedArrivalDate = value.Time
-			}
-		case engineeringmaterialrequestitem.FieldNote:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field note", values[i])
-			} else if value.Valid {
-				_m.Note = new(string)
-				*_m.Note = value.String
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -355,26 +314,6 @@ func (_m *EngineeringMaterialRequestItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("required_quantity=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RequiredQuantity))
-	builder.WriteString(", ")
-	if v := _m.PurchaseQuantity; v != nil {
-		builder.WriteString("purchase_quantity=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
-	builder.WriteString(", ")
-	if v := _m.UnitPrice; v != nil {
-		builder.WriteString("unit_price=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
-	builder.WriteString(", ")
-	if v := _m.ExpectedArrivalDate; v != nil {
-		builder.WriteString("expected_arrival_date=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
-	builder.WriteString(", ")
-	if v := _m.Note; v != nil {
-		builder.WriteString("note=")
-		builder.WriteString(*v)
-	}
 	builder.WriteByte(')')
 	return builder.String()
 }

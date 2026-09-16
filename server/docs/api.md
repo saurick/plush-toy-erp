@@ -525,7 +525,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `sales_order.get_engineering_material_request` | `sales_order_id`、可选 `preview`；`engineering.material.read` 和销售来源读取 | 最新审批或现时汇总、部位来源与阻塞原因，价格按敏感字段权限隐藏 |
 | `sales_order.submit_engineering_material_request` | `sales_order_id`、`expected_version`、`expected_source_hash`；`engineering.material.submit` | 生成不可改写的订单材料快照；版本变化拒绝提交 |
 | `sales_order.boss_review_engineering_material_request` | `id`、`expected_version`、`BOSS_APPROVE / REJECT`、备注；`engineering.material.boss_approve` | 老板审核或有原因退回 |
-| `sales_order.finance_review_engineering_material_request` | `id`、`expected_version`、`FINANCE_APPROVE / REJECT`、备注；精确财务审批和采购价格读取权限 | 每项须提供审批明细 `id`、`purchase_quantity`、`unit_price`、`expected_arrival_date`，采购数量调整须说明；另一位财务批准后按厂商原子生成 approved 采购单，精确重试返回同批单据 |
+| `sales_order.finance_review_engineering_material_request` | `id`、`expected_version`、`FINANCE_APPROVE / REJECT`、备注及可选任务版本；财务审批和工程用料、销售订单读取权限 | 不接收 `items` 或核价参数；另一位财务批准后按冻结应需数量、按厂商原子生成 approved 采购单，单价、金额和预计到货日期留空；精确重试返回同批单据，退回必须说明原因且不生成采购单 |
 | `production_wip.prepare_production_outsourcing_order` | `production_wip_batch_id`、`expected_version`、`supplier_id`、`expected_return_date`、首道的 `requirement_ids`；生产安排及来源读取权限 | 按生产负责人明确选择生成委外草稿，数量来自冻结需求或 WIP 批次；不接收客户端数量、价格或操作者覆盖 |
 
 用料审批不自动扣库存、付款或创建 Workflow 任务；委外草稿仍须补价确认，发料、回货、IQC 与入库沿用独立事实动作。材料接口增加 `supplier_id / supplier_name`；厂商、料号、色号构成材料身份。BOM 的部位行不再接收生产归属标记。

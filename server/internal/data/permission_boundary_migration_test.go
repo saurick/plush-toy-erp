@@ -1,11 +1,92 @@
 package data
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	_ "github.com/mattn/go-sqlite3"
 )
+
+func TestFinancePurchaseReadMigrationPreservesRoleBoundaries(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join("model", "migrate", "20260915160215_grant_finance_purchase_order_read.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name           string
+		roleType       string
+		alreadyGranted bool
+		disabled       bool
+	}{
+		{name: "existing default finance", roleType: "business_default"},
+		{name: "already granted", roleType: "business_default", alreadyGranted: true},
+		{name: "custom role is preserved", roleType: "custom"},
+		{name: "disabled role stays disabled", roleType: "business_default", disabled: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, err := sql.Open("sqlite3", ":memory:")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := db.Close(); err != nil {
+					t.Errorf("close test database: %v", err)
+				}
+			})
+			db.SetMaxOpenConns(1)
+			_, err = db.Exec(`
+CREATE TABLE roles (id integer PRIMARY KEY, role_key text UNIQUE, role_type text, version integer, disabled boolean, updated_at text);
+CREATE TABLE permissions (id integer PRIMARY KEY, permission_key text UNIQUE);
+CREATE TABLE role_permissions (role_id integer, permission_id integer, created_at text, PRIMARY KEY (role_id, permission_id));
+INSERT INTO permissions VALUES (1, 'purchase.order.read'), (2, 'purchase.order.update'), (3, 'finance.payable.read');
+INSERT INTO roles VALUES (2, 'finance_custom', 'custom', 11, false, 'unchanged'), (3, 'sales', 'business_default', 13, false, 'unchanged');
+INSERT INTO role_permissions VALUES (1, 3, 'unchanged'), (2, 3, 'unchanged'), (3, 1, 'unchanged');`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec(`INSERT INTO roles VALUES (1, 'finance', ?, 7, ?, 'unchanged')`, tc.roleType, tc.disabled); err != nil {
+				t.Fatal(err)
+			}
+			if tc.alreadyGranted {
+				if _, err := db.Exec(`INSERT INTO role_permissions VALUES (1, 1, 'unchanged')`); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for replay := 0; replay < 2; replay++ {
+				if _, err := db.Exec(string(content)); err != nil {
+					t.Fatalf("execute migration: %v", err)
+				}
+				wantVersion, wantBindings := 7, 3
+				if tc.roleType == "business_default" && !tc.alreadyGranted {
+					wantVersion++
+				}
+				if tc.roleType == "business_default" || tc.alreadyGranted {
+					wantBindings++
+				}
+				var version, bindings, invalidBindings, changedOtherRoles int
+				var disabled bool
+				if err := db.QueryRow(`SELECT version, disabled FROM roles WHERE id = 1`).Scan(&version, &disabled); err != nil {
+					t.Fatal(err)
+				}
+				if err := db.QueryRow(`SELECT count(*) FROM role_permissions`).Scan(&bindings); err != nil {
+					t.Fatal(err)
+				}
+				if err := db.QueryRow(`SELECT count(*) FROM role_permissions WHERE permission_id = 2 OR (role_id = 2 AND permission_id = 1)`).Scan(&invalidBindings); err != nil {
+					t.Fatal(err)
+				}
+				if err := db.QueryRow(`SELECT count(*) FROM roles WHERE id <> 1 AND updated_at <> 'unchanged'`).Scan(&changedOtherRoles); err != nil {
+					t.Fatal(err)
+				}
+				if version != wantVersion || bindings != wantBindings || disabled != tc.disabled || invalidBindings != 0 || changedOtherRoles != 0 {
+					t.Fatalf("replay %d: version=%d bindings=%d disabled=%t invalid=%d changedOtherRoles=%d", replay, version, bindings, disabled, invalidBindings, changedOtherRoles)
+				}
+			}
+		})
+	}
+}
 
 func TestPermissionBoundaryMigrationRemovesProcessRecoveryFromBusinessRoles(t *testing.T) {
 	migrationPath := filepath.Join(

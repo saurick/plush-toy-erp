@@ -3,7 +3,7 @@ import { hasActionPermission } from './masterDataOrderView.mjs'
 export const ENGINEERING_MATERIAL_STATUS = Object.freeze({
   PREVIEW: '待提交',
   SUBMITTED: '待老板审核',
-  BOSS_APPROVED: '待财务核价',
+  BOSS_APPROVED: '待财务审核',
   APPROVED: '已批准采购',
   REJECTED: '已退回',
 })
@@ -114,15 +114,9 @@ export function getEngineeringMaterialPermissions(profile, task = null) {
       'engineering.material.boss_approve',
       'engineering_material_boss_review'
     ),
-    finance:
-      hasActionPermission(profile, 'field.procurement_commercial.read') &&
-      can(
-        'engineering.material.finance_approve',
-        'engineering_material_finance_review'
-      ),
-    commercialRead: hasActionPermission(
-      profile,
-      'field.procurement_commercial.read'
+    finance: can(
+      'engineering.material.finance_approve',
+      'engineering_material_finance_review'
     ),
     purchaseRead: hasActionPermission(profile, 'purchase.order.read'),
   }

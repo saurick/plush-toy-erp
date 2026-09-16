@@ -49,57 +49,6 @@
   min-width: 0;
 }
 
-.erp-material-finance-fields {
-  display: grid;
-  min-width: 0;
-  gap: 18px;
-}
-
-.erp-material-finance-fields__item {
-  min-width: 0;
-  border-top: 1px solid var(--erp-border, #e2e8f0);
-  padding-top: 14px;
-  overflow-wrap: anywhere;
-}
-
-.erp-material-finance-fields__item h3 {
-  margin: 0 0 4px;
-  font-size: 15px;
-}
-
-.erp-material-finance-fields__item p {
-  margin: 0 0 8px;
-  color: var(--erp-text-muted, #64748b);
-}
-
-.erp-material-finance-fields__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 14px;
-}
-
-.erp-material-finance-fields__grid .ant-form-item {
-  min-width: 0;
-  margin: 0;
-}
-
-.erp-material-finance-fields__grid input {
-  min-width: 0;
-  min-height: 44px;
-  font-variant-numeric: tabular-nums;
-}
-
-.erp-material-finance-fields__reason {
-  grid-column: 1 / -1;
-}
-
-.erp-material-finance-fields__amount {
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
 .erp-material-sheet__products {
   display: grid;
   gap: 10px;
@@ -247,32 +196,12 @@
   gap: 8px 16px;
 }
 
-
 .erp-material-summary-footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 10px 16px;
-}
-
-.erp-material-amount-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 12px;
-  margin-right: auto;
-}
-
-.erp-material-amount-summary strong {
-  overflow-wrap: anywhere;
-  max-width: 100%;
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-}
-
-.erp-material-amount-summary small {
-  color: var(--erp-text-muted, #64748b);
 }
 
 .erp-material-sheet__help {
@@ -326,10 +255,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.erp-material-card__wide {
-  grid-column: 1 / -1;
-}
-
 .erp-material-card__notes {
   padding-top: 12px;
   line-height: 1.7;
@@ -354,7 +279,6 @@
   align-items: baseline;
   text-align: left;
 }
-
 
 .erp-material-summary-modal--mobile .erp-material-view-switch.ant-segmented,
 .erp-material-task-action--mobile .erp-material-view-switch.ant-segmented {
@@ -424,8 +348,6 @@
   font-size: 16px;
 }
 
-
-
 .erp-material-task-action .ant-radio-group {
   display: flex;
   flex-wrap: wrap;
@@ -448,7 +370,8 @@
 
 .erp-material-task-action
   .erp-material-task-action__field
-  .ant-form-item-label > label {
+  .ant-form-item-label
+  > label {
   font-size: 18px;
   font-weight: 600;
   line-height: 28px;

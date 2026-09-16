@@ -97,7 +97,7 @@ export function buildEngineeringMaterialStageModel(task, request) {
   if (financeApproved) {
     append(
       'finance_review',
-      '财务核价',
+      '财务审核',
       '已批准采购',
       'completed',
       request.finance_reviewed_at,
@@ -107,7 +107,7 @@ export function buildEngineeringMaterialStageModel(task, request) {
   if (rejected) {
     append(
       bossApproved ? 'finance_review' : 'boss_review',
-      bossApproved ? '财务核价' : '老板审核',
+      bossApproved ? '财务审核' : '老板审核',
       '已退回',
       'rejected',
       request.rejected_at,
@@ -120,7 +120,7 @@ export function buildEngineeringMaterialStageModel(task, request) {
     const finance = request.status === 'BOSS_APPROVED'
     append(
       finance ? 'finance_review' : 'boss_review',
-      finance ? '财务核价' : '老板审核',
+      finance ? '财务审核' : '老板审核',
       '待处理',
       'active',
       null,
@@ -159,7 +159,7 @@ export function buildEngineeringMaterialStageModel(task, request) {
           : request.status === 'APPROVED'
             ? '本次用料已批准采购。'
             : request.status === 'BOSS_APPROVED'
-              ? '老板已通过，当前由财务核价。'
+              ? '老板已通过，当前由财务审核。'
               : '工程已提交，当前由老板审核。',
     items,
   }

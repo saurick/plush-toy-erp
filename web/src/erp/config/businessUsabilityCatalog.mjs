@@ -146,7 +146,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     completion:
       '产品、版本号、材料、单件用量、损耗率和版本状态都能查到；需要用于新生产订单时，必须明确哪一个版本已经生效。',
     handoff:
-      '样品确认后的生效版本交给 PMC 和生产；工程在销售订单提交用料汇总，老板审核和财务核价后按厂商生成采购单。',
+      '样品确认后的生效版本交给 PMC 和生产；工程在销售订单提交用料汇总，老板审核和财务审核后按厂商生成采购单。',
     requiredHelpTypes: [
       BUSINESS_HELP_TYPES.TERM,
       BUSINESS_HELP_TYPES.FORMULA,

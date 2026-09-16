@@ -1,6 +1,6 @@
 const WORKFLOW_TASK_GROUP_LABELS = Object.freeze({
   engineering_material_boss_review: '用料老板审核',
-  engineering_material_finance_review: '用料财务核价',
+  engineering_material_finance_review: '用料财务审核',
   engineering_material_revision: '用料退回修改',
   cycle_count: '库存盘点',
   finished_goods_inbound: '成品入库',

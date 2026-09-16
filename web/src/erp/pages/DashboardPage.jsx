@@ -2007,7 +2007,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             key={selectedTask?.id}
             task={selectedTask}
             profile={adminProfile}
-            draftRef={materialDraftRef}
           />
         }
         renderSourceAction={

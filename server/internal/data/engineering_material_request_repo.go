@@ -169,10 +169,6 @@ func engineeringMaterialSourceHash(in *biz.EngineeringMaterialRequest) string {
 	for i, item := range in.Items {
 		items[i] = *item
 		items[i].ID = 0
-		items[i].PurchaseQuantity = nil
-		items[i].UnitPrice = nil
-		items[i].ExpectedArrivalDate = nil
-		items[i].Note = nil
 	}
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].MaterialID != items[j].MaterialID {
@@ -223,8 +219,10 @@ func (r *salesOrderRepo) SubmitEngineeringMaterialRequest(ctx context.Context, i
 		if order.LifecycleStatus != biz.SalesOrderStatusActive {
 			return nil, biz.ErrMaterialRequestNotReady
 		}
-		if _, err := ensureEngineeringMaterialTask(ctx, tx.Client(), result, in.ActorID); err != nil {
-			return nil, err
+		if result.Status != biz.MaterialRequestApproved {
+			if _, err := r.getEngineeringMaterialTask(ctx, tx.Client(), result); err != nil {
+				return nil, err
+			}
 		}
 		if err := tx.Commit(); err != nil {
 			return nil, err
@@ -301,7 +299,7 @@ func (r *salesOrderRepo) ReviewEngineeringMaterialRequest(ctx context.Context, i
 	if err != nil {
 		return nil, err
 	}
-	if in.Action == "FINANCE_APPROVE" && row.Status == biz.MaterialRequestApproved && row.FinanceReviewedBy != nil && *row.FinanceReviewedBy == in.ActorID && sameOptionalString(current.FinanceReviewNote, in.Note) && financeMaterialLinesMatch(current.Items, in.Items) {
+	if in.Action == "FINANCE_APPROVE" && row.Status == biz.MaterialRequestApproved && row.FinanceReviewedBy != nil && *row.FinanceReviewedBy == in.ActorID && sameOptionalString(current.FinanceReviewNote, in.Note) {
 		return current, nil
 	}
 	if row.Version != in.ExpectedVersion {
@@ -350,7 +348,7 @@ func (r *salesOrderRepo) ReviewEngineeringMaterialRequest(ctx context.Context, i
 			if row.Status != biz.MaterialRequestBossApproved || row.BossReviewedBy == nil || *row.BossReviewedBy == in.ActorID {
 				return nil, biz.ErrMaterialRequestReviewInvalid
 			}
-			if err := r.generateMaterialPurchaseOrders(ctx, tx.Client(), current, in); err != nil {
+			if err := r.generateMaterialPurchaseOrders(ctx, tx.Client(), current); err != nil {
 				return nil, err
 			}
 			update.SetStatus(biz.MaterialRequestApproved).SetFinanceReviewedBy(in.ActorID).SetFinanceReviewedAt(now).SetNillableFinanceReviewNote(in.Note)
@@ -383,46 +381,10 @@ func (r *salesOrderRepo) ReviewEngineeringMaterialRequest(ctx context.Context, i
 	return result, nil
 }
 
-func financeMaterialLinesMatch(items []*biz.EngineeringMaterialRequestItem, inputs []biz.EngineeringMaterialFinanceLine) bool {
-	if len(items) != len(inputs) {
-		return false
-	}
-	byID := map[int]biz.EngineeringMaterialFinanceLine{}
-	for _, v := range inputs {
-		byID[v.ID] = v
-	}
-	for _, item := range items {
-		v, ok := byID[item.ID]
-		if !ok || item.PurchaseQuantity == nil || item.UnitPrice == nil || !item.PurchaseQuantity.Equal(v.PurchaseQuantity) || !item.UnitPrice.Equal(v.UnitPrice) || item.ExpectedArrivalDate == nil || !item.ExpectedArrivalDate.Equal(v.ExpectedArrivalDate) || !sameOptionalString(item.Note, v.Note) {
-			return false
-		}
-	}
-	return true
-}
-
-func (r *salesOrderRepo) generateMaterialPurchaseOrders(ctx context.Context, client *ent.Client, request *biz.EngineeringMaterialRequest, in *biz.EngineeringMaterialReview) error {
-	if len(in.Items) != len(request.Items) {
-		return biz.ErrMaterialRequestReviewInvalid
-	}
-	byID := map[int]biz.EngineeringMaterialFinanceLine{}
-	for _, item := range in.Items {
-		byID[item.ID] = item
-	}
+func (r *salesOrderRepo) generateMaterialPurchaseOrders(ctx context.Context, client *ent.Client, request *biz.EngineeringMaterialRequest) error {
 	groups := map[int][]*biz.EngineeringMaterialRequestItem{}
 	for _, item := range request.Items {
-		line, ok := byID[item.ID]
-		if !ok {
-			return biz.ErrMaterialRequestReviewInvalid
-		}
-		if !line.PurchaseQuantity.Equal(item.RequiredQuantity) && line.Note == nil {
-			return biz.ErrMaterialRequestReviewInvalid
-		}
-		if _, err := client.EngineeringMaterialRequestItem.UpdateOneID(item.ID).SetPurchaseQuantity(line.PurchaseQuantity).SetUnitPrice(line.UnitPrice).SetExpectedArrivalDate(line.ExpectedArrivalDate).SetNillableNote(line.Note).Save(ctx); err != nil {
-			return err
-		}
-		if line.PurchaseQuantity.IsPositive() {
-			groups[item.SupplierID] = append(groups[item.SupplierID], item)
-		}
+		groups[item.SupplierID] = append(groups[item.SupplierID], item)
 	}
 	supplierIDs := make([]int, 0, len(groups))
 	for id := range groups {
@@ -438,20 +400,12 @@ func (r *salesOrderRepo) generateMaterialPurchaseOrders(ctx context.Context, cli
 			return err
 		}
 		lines := groups[supplierID]
-		arrival := byID[lines[0].ID].ExpectedArrivalDate
-		for _, line := range lines {
-			if byID[line.ID].ExpectedArrivalDate.After(arrival) {
-				arrival = byID[line.ID].ExpectedArrivalDate
-			}
-		}
-		po, err := client.PurchaseOrder.Create().SetEngineeringMaterialRequestID(request.ID).SetPurchaseOrderNo(fmt.Sprintf("PO-MR-%d-%d", request.ID, supplierID)).SetSupplierID(supplierID).SetCurrency("CNY").SetPaymentTermDays(s.DefaultPaymentTermDays).SetNillablePaymentMethod(s.DefaultPaymentMethod).SetNillableInvoiceRequired(s.DefaultInvoiceRequired).SetNillableInvoiceCategory(s.DefaultInvoiceCategory).SetSupplierSnapshot(map[string]any{"name": s.Name, "code": s.Code}).SetPurchaseDate(time.Now()).SetExpectedArrivalDate(arrival).SetLifecycleStatus(biz.PurchaseOrderStatusApproved).SetNote("工程用料审批：" + request.OrderNo).Save(ctx)
+		po, err := client.PurchaseOrder.Create().SetEngineeringMaterialRequestID(request.ID).SetPurchaseOrderNo(fmt.Sprintf("PO-MR-%d-%d", request.ID, supplierID)).SetSupplierID(supplierID).SetCurrency("CNY").SetPaymentTermDays(s.DefaultPaymentTermDays).SetNillablePaymentMethod(s.DefaultPaymentMethod).SetNillableInvoiceRequired(s.DefaultInvoiceRequired).SetNillableInvoiceCategory(s.DefaultInvoiceCategory).SetSupplierSnapshot(map[string]any{"name": s.Name, "code": s.Code}).SetPurchaseDate(time.Now()).SetLifecycleStatus(biz.PurchaseOrderStatusApproved).SetNote("工程用料审批：" + request.OrderNo).Save(ctx)
 		if err != nil {
 			return err
 		}
 		for i, item := range lines {
-			line := byID[item.ID]
-			amount := line.PurchaseQuantity.Mul(line.UnitPrice).Round(6)
-			_, err := client.PurchaseOrderItem.Create().SetPurchaseOrderID(po.ID).SetLineNo(i + 1).SetDisplayOrder(i + 1).SetMaterialID(item.MaterialID).SetUnitID(item.UnitID).SetMaterialCodeSnapshot(item.MaterialCode).SetMaterialNameSnapshot(item.MaterialName).SetNillableColorSnapshot(item.Color).SetProductOrderNoSnapshot(request.OrderNo).SetPurchasedQuantity(line.PurchaseQuantity).SetUnitPrice(line.UnitPrice).SetAmount(amount).SetExpectedArrivalDate(line.ExpectedArrivalDate).SetNillableNote(line.Note).Save(ctx)
+			_, err := client.PurchaseOrderItem.Create().SetPurchaseOrderID(po.ID).SetLineNo(i + 1).SetDisplayOrder(i + 1).SetMaterialID(item.MaterialID).SetUnitID(item.UnitID).SetMaterialCodeSnapshot(item.MaterialCode).SetMaterialNameSnapshot(item.MaterialName).SetNillableColorSnapshot(item.Color).SetProductOrderNoSnapshot(request.OrderNo).SetPurchasedQuantity(item.RequiredQuantity).Save(ctx)
 			if err != nil {
 				return err
 			}
@@ -472,7 +426,7 @@ func loadEngineeringMaterialRequest(ctx context.Context, client *ent.Client, row
 		return nil, err
 	}
 	for _, v := range items {
-		result.Items = append(result.Items, &biz.EngineeringMaterialRequestItem{ID: v.ID, MaterialID: v.MaterialID, UnitID: v.UnitID, SupplierID: v.SupplierID, MaterialCode: v.MaterialCode, MaterialName: v.MaterialName, SupplierName: v.SupplierName, SupplierItemNo: v.SupplierItemNo, Color: v.Color, Spec: v.Spec, UnitName: v.UnitName, RequiredQuantity: v.RequiredQuantity, PurchaseQuantity: v.PurchaseQuantity, UnitPrice: v.UnitPrice, ExpectedArrivalDate: v.ExpectedArrivalDate, Note: v.Note})
+		result.Items = append(result.Items, &biz.EngineeringMaterialRequestItem{ID: v.ID, MaterialID: v.MaterialID, UnitID: v.UnitID, SupplierID: v.SupplierID, MaterialCode: v.MaterialCode, MaterialName: v.MaterialName, SupplierName: v.SupplierName, SupplierItemNo: v.SupplierItemNo, Color: v.Color, Spec: v.Spec, UnitName: v.UnitName, RequiredQuantity: v.RequiredQuantity})
 	}
 	orders, err := client.PurchaseOrder.Query().Where(purchaseorder.EngineeringMaterialRequestID(row.ID)).Order(ent.Asc(purchaseorder.FieldID)).All(ctx)
 	if err != nil {

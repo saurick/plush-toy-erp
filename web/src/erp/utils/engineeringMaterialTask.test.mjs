@@ -46,7 +46,6 @@ function fixture(stage = 'boss') {
     'engineering.material.read',
     'sales_order.read',
     'erp.workbench.read',
-    'field.procurement_commercial.read',
   ]
   const profile = {
     id: 12,
@@ -78,7 +77,7 @@ test('each material stage opens its exact source; approval stages appear in the 
   }
 })
 
-test('fixed entry and approval require effective source access; finance also requires commercial read', () => {
+test('fixed entry and approval require effective source access without a pricing dependency', () => {
   const { profile, task } = fixture('finance')
   assert.equal(canListEngineeringMaterial(profile), true)
   assert.equal(
@@ -88,11 +87,7 @@ test('fixed entry and approval require effective source access; finance also req
     }),
     false
   )
-  for (const missing of [
-    'engineering.material.read',
-    'sales_order.read',
-    'field.procurement_commercial.read',
-  ]) {
+  for (const missing of ['engineering.material.read', 'sales_order.read']) {
     const limited = {
       ...profile,
       permissions: profile.permissions.filter((value) => value !== missing),
@@ -135,7 +130,6 @@ test('engineering task summary reads its source order without gaining material a
     submit: false,
     boss: false,
     finance: false,
-    commercialRead: true,
     purchaseRead: false,
   })
   for (const patch of [

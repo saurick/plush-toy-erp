@@ -149,7 +149,7 @@ var approvalSettingCatalog = []approvalSettingCatalogItem{
 		Key: "pmc_engineering", Label: "PMC 计划与风险审批", Domain: "PMC",
 		Configurable:   false,
 		BlockedReasons: []string{"formal_approval_gate_missing"},
-		DomainBoundary: "PMC 计划和风险动作尚无正式人工审批门禁；工程用料另走老板审核、财务核价审批",
+		DomainBoundary: "PMC 计划和风险动作尚无正式人工审批门禁；工程用料另走老板审核、财务审核审批",
 		FactBoundary:   "不能因岗位名称创建虚假审批事实",
 	},
 	{

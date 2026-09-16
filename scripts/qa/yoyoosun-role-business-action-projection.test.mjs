@@ -80,6 +80,21 @@ test("永绅九岗位：每个角色至少一个本域动作可用，跨域写�
   }
 });
 
+test("财务可核对和打印采购单，采购办理动作仍独立授权", () => {
+  const role = roleByKey("finance");
+  const profile = profileFromActions(role.capabilityKeys);
+  assert.ok(role.menuSurfaces.includes("accessories-purchase"));
+  assert.equal(hasActionPermission(profile, "purchase.order.read"), true);
+  assert.equal(hasActionPermission(profile, "erp.print_template.read"), true);
+  for (const action of ["create", "update", "submit", "close", "cancel"]) {
+    assert.equal(hasActionPermission(profile, `purchase.order.${action}`), false);
+  }
+  const narrowedProfile = profileFromActions(
+    role.capabilityKeys.filter((key) => key !== "purchase.order.read"),
+  );
+  assert.equal(hasActionPermission(narrowedProfile, "purchase.order.read"), false);
+});
+
 test("控制面管理员默认不获得业务动作，超级管理员仍受有效会话动作收窄", () => {
   const adminProfile = profileFromActions([
     "admin.read",

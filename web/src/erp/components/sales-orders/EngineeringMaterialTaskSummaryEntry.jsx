@@ -13,18 +13,13 @@ export default function EngineeringMaterialTaskSummaryEntry({
   task,
   profile,
   mobile = false,
-  draftRef,
-  onDraftChange,
 }) {
   const context =
     getEngineeringMaterialTaskContext(task) ||
     getEngineeringMaterialOrderContext(task)
   const canRead = Boolean(context && canReadEngineeringMaterial(profile))
-  const permissions = getEngineeringMaterialPermissions(profile, task)
-  const canPrepareFinance = Boolean(draftRef && permissions.finance)
-  const sourceKey = `${profile?.id}:${task?.id}:${task?.version}:${task?.task_group}:${context?.orderID}:${context?.requestID}:${canPrepareFinance}`
+  const sourceKey = `${profile?.id}:${task?.id}:${task?.version}:${task?.task_group}:${context?.orderID}:${context?.requestID}`
   const entryRef = React.useRef(null)
-  const financeEntryRef = React.useRef(null)
   const [openedSourceKey, setOpenedSourceKey] = React.useState(null)
   const [view, setView] = React.useState('summary')
   React.useEffect(() => {
@@ -46,20 +41,8 @@ export default function EngineeringMaterialTaskSummaryEntry({
       >
         查看材料汇总
       </Button>
-      {canPrepareFinance ? (
-        <Button
-          ref={financeEntryRef}
-          block
-          size={mobile ? 'large' : 'middle'}
-          onClick={() => {
-            setView('pricing')
-            setOpenedSourceKey(sourceKey)
-          }}
-        >
-          填写核价
-        </Button>
-      ) : null}
-      {task.task_group === 'engineering_material_revision' && task.task_status_key === 'ready' ? (
+      {task.task_group === 'engineering_material_revision' &&
+      task.task_status_key === 'ready' ? (
         <Button
           block
           size={mobile ? 'large' : 'middle'}
@@ -76,18 +59,13 @@ export default function EngineeringMaterialTaskSummaryEntry({
           key={`${sourceKey}:${view}`}
           {...context}
           mobile={mobile}
-          readOnly={view !== 'pricing'}
+          readOnly
           preview={view === 'preview'}
-          financeDraftOnly={view === 'pricing'}
-          workflowTask={view === 'pricing' ? task : undefined}
-          draftRef={view === 'pricing' ? draftRef : undefined}
-          onDraftChange={view === 'pricing' ? onDraftChange : undefined}
-          permissions={permissions}
+          permissions={getEngineeringMaterialPermissions(profile, task)}
           onCancel={() => {
             setOpenedSourceKey(null)
             requestAnimationFrame(() => {
-              const entry = view === 'pricing' ? financeEntryRef : entryRef
-              entry.current?.focus()
+              entryRef.current?.focus()
             })
           }}
         />

@@ -36,14 +36,6 @@ const (
 	FieldUnitName = "unit_name"
 	// FieldRequiredQuantity holds the string denoting the required_quantity field in the database.
 	FieldRequiredQuantity = "required_quantity"
-	// FieldPurchaseQuantity holds the string denoting the purchase_quantity field in the database.
-	FieldPurchaseQuantity = "purchase_quantity"
-	// FieldUnitPrice holds the string denoting the unit_price field in the database.
-	FieldUnitPrice = "unit_price"
-	// FieldExpectedArrivalDate holds the string denoting the expected_arrival_date field in the database.
-	FieldExpectedArrivalDate = "expected_arrival_date"
-	// FieldNote holds the string denoting the note field in the database.
-	FieldNote = "note"
 	// EdgeRequest holds the string denoting the request edge name in mutations.
 	EdgeRequest = "request"
 	// EdgeMaterial holds the string denoting the material edge name in mutations.
@@ -99,10 +91,6 @@ var Columns = []string{
 	FieldSpec,
 	FieldUnitName,
 	FieldRequiredQuantity,
-	FieldPurchaseQuantity,
-	FieldUnitPrice,
-	FieldExpectedArrivalDate,
-	FieldNote,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -138,8 +126,6 @@ var (
 	SpecValidator func(string) error
 	// UnitNameValidator is a validator for the "unit_name" field. It is called by the builders before save.
 	UnitNameValidator func(string) error
-	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
-	NoteValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the EngineeringMaterialRequestItem queries.
@@ -208,26 +194,6 @@ func ByUnitName(opts ...sql.OrderTermOption) OrderOption {
 // ByRequiredQuantity orders the results by the required_quantity field.
 func ByRequiredQuantity(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequiredQuantity, opts...).ToFunc()
-}
-
-// ByPurchaseQuantity orders the results by the purchase_quantity field.
-func ByPurchaseQuantity(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldPurchaseQuantity, opts...).ToFunc()
-}
-
-// ByUnitPrice orders the results by the unit_price field.
-func ByUnitPrice(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUnitPrice, opts...).ToFunc()
-}
-
-// ByExpectedArrivalDate orders the results by the expected_arrival_date field.
-func ByExpectedArrivalDate(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldExpectedArrivalDate, opts...).ToFunc()
-}
-
-// ByNote orders the results by the note field.
-func ByNote(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldNote, opts...).ToFunc()
 }
 
 // ByRequestField orders the results by request field.

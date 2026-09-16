@@ -11,7 +11,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       responsibility:
         "永绅由财务人员根据已确认工程资料制作采购合同和维护采购源单时，为同一管理员账号同时分配财务与采购两个内置角色。",
       guardrail:
-        "不把 purchase.order.* 权限并入 Product Core 的 finance 角色；采购任务和日常审批仍归 purchase 主办，boss 只承接备用 / 升级。",
+        "财务可查看、核对和打印采购订单；采购订单的新建、修改、提交、关闭和取消仍由采购岗位办理，采购任务和日常审批仍归 purchase 主办，boss 只承接备用 / 升级。",
     }),
   ]),
   roles: Object.freeze([
@@ -479,6 +479,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "payables",
         "finance-payments",
         "invoices",
+        "accessories-purchase",
         "processing-contracts",
         "sales-orders",
         "quality-inspections",
@@ -505,6 +506,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "product.read",
         "product_sku.read",
         "process.read",
+        "purchase.order.read",
         "outsourcing.order.read",
         "outsourcing.fact.read",
         "purchase.receipt.read",
@@ -542,7 +544,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "delivery_to_settlement.receivable_review",
       ]),
       guardrail:
-        "入库页只用于核对采购入库来源，财务不能创建、调整、确认入库或办理采购退货；财务放行、应收 / 应付草稿和对账线索不等于收付款事实，也不等于银行直连、税控、总账或完整财务系统。收付款及多单核销必须走独立 PAYMENT 动作。",
+        "采购订单页用于查看、核对和打印审批生成的采购单；入库页只用于核对采购入库来源，财务不能创建、调整、确认入库或办理采购退货；财务放行、应收 / 应付草稿和对账线索不等于收付款事实，也不等于银行直连、税控、总账或完整财务系统。收付款及多单核销必须走独立 PAYMENT 动作。",
     }),
     Object.freeze({
       roleKey: "production",

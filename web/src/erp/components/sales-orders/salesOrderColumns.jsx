@@ -86,7 +86,7 @@ function engineeringMaterialStatusLabel(value) {
   return (
     {
       SUBMITTED: '待老板审核',
-      BOSS_APPROVED: '待财务核价',
+      BOSS_APPROVED: '待财务审核',
       APPROVED: '已批准采购',
       REJECTED: '已退回工程',
     }[value] || '待工程提交'

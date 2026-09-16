@@ -11,7 +11,6 @@ import (
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
-	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -118,62 +117,6 @@ func (_c *EngineeringMaterialRequestItemCreate) SetUnitName(v string) *Engineeri
 // SetRequiredQuantity sets the "required_quantity" field.
 func (_c *EngineeringMaterialRequestItemCreate) SetRequiredQuantity(v decimal.Decimal) *EngineeringMaterialRequestItemCreate {
 	_c.mutation.SetRequiredQuantity(v)
-	return _c
-}
-
-// SetPurchaseQuantity sets the "purchase_quantity" field.
-func (_c *EngineeringMaterialRequestItemCreate) SetPurchaseQuantity(v decimal.Decimal) *EngineeringMaterialRequestItemCreate {
-	_c.mutation.SetPurchaseQuantity(v)
-	return _c
-}
-
-// SetNillablePurchaseQuantity sets the "purchase_quantity" field if the given value is not nil.
-func (_c *EngineeringMaterialRequestItemCreate) SetNillablePurchaseQuantity(v *decimal.Decimal) *EngineeringMaterialRequestItemCreate {
-	if v != nil {
-		_c.SetPurchaseQuantity(*v)
-	}
-	return _c
-}
-
-// SetUnitPrice sets the "unit_price" field.
-func (_c *EngineeringMaterialRequestItemCreate) SetUnitPrice(v decimal.Decimal) *EngineeringMaterialRequestItemCreate {
-	_c.mutation.SetUnitPrice(v)
-	return _c
-}
-
-// SetNillableUnitPrice sets the "unit_price" field if the given value is not nil.
-func (_c *EngineeringMaterialRequestItemCreate) SetNillableUnitPrice(v *decimal.Decimal) *EngineeringMaterialRequestItemCreate {
-	if v != nil {
-		_c.SetUnitPrice(*v)
-	}
-	return _c
-}
-
-// SetExpectedArrivalDate sets the "expected_arrival_date" field.
-func (_c *EngineeringMaterialRequestItemCreate) SetExpectedArrivalDate(v time.Time) *EngineeringMaterialRequestItemCreate {
-	_c.mutation.SetExpectedArrivalDate(v)
-	return _c
-}
-
-// SetNillableExpectedArrivalDate sets the "expected_arrival_date" field if the given value is not nil.
-func (_c *EngineeringMaterialRequestItemCreate) SetNillableExpectedArrivalDate(v *time.Time) *EngineeringMaterialRequestItemCreate {
-	if v != nil {
-		_c.SetExpectedArrivalDate(*v)
-	}
-	return _c
-}
-
-// SetNote sets the "note" field.
-func (_c *EngineeringMaterialRequestItemCreate) SetNote(v string) *EngineeringMaterialRequestItemCreate {
-	_c.mutation.SetNote(v)
-	return _c
-}
-
-// SetNillableNote sets the "note" field if the given value is not nil.
-func (_c *EngineeringMaterialRequestItemCreate) SetNillableNote(v *string) *EngineeringMaterialRequestItemCreate {
-	if v != nil {
-		_c.SetNote(*v)
-	}
 	return _c
 }
 
@@ -313,11 +256,6 @@ func (_c *EngineeringMaterialRequestItemCreate) check() error {
 	if _, ok := _c.mutation.RequiredQuantity(); !ok {
 		return &ValidationError{Name: "required_quantity", err: errors.New(`ent: missing required field "EngineeringMaterialRequestItem.required_quantity"`)}
 	}
-	if v, ok := _c.mutation.Note(); ok {
-		if err := engineeringmaterialrequestitem.NoteValidator(v); err != nil {
-			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "EngineeringMaterialRequestItem.note": %w`, err)}
-		}
-	}
 	if len(_c.mutation.RequestIDs()) == 0 {
 		return &ValidationError{Name: "request", err: errors.New(`ent: missing required edge "EngineeringMaterialRequestItem.request"`)}
 	}
@@ -387,22 +325,6 @@ func (_c *EngineeringMaterialRequestItemCreate) createSpec() (*EngineeringMateri
 	if value, ok := _c.mutation.RequiredQuantity(); ok {
 		_spec.SetField(engineeringmaterialrequestitem.FieldRequiredQuantity, field.TypeOther, value)
 		_node.RequiredQuantity = value
-	}
-	if value, ok := _c.mutation.PurchaseQuantity(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldPurchaseQuantity, field.TypeOther, value)
-		_node.PurchaseQuantity = &value
-	}
-	if value, ok := _c.mutation.UnitPrice(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldUnitPrice, field.TypeOther, value)
-		_node.UnitPrice = &value
-	}
-	if value, ok := _c.mutation.ExpectedArrivalDate(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldExpectedArrivalDate, field.TypeTime, value)
-		_node.ExpectedArrivalDate = &value
-	}
-	if value, ok := _c.mutation.Note(); ok {
-		_spec.SetField(engineeringmaterialrequestitem.FieldNote, field.TypeString, value)
-		_node.Note = &value
 	}
 	if nodes := _c.mutation.RequestIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

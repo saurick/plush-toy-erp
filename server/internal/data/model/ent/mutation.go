@@ -13978,33 +13978,29 @@ func (m *EngineeringMaterialRequestMutation) ResetEdge(name string) error {
 // EngineeringMaterialRequestItemMutation represents an operation that mutates the EngineeringMaterialRequestItem nodes in the graph.
 type EngineeringMaterialRequestItemMutation struct {
 	config
-	op                    Op
-	typ                   string
-	id                    *int
-	material_code         *string
-	material_name         *string
-	supplier_name         *string
-	supplier_item_no      *string
-	color                 *string
-	spec                  *string
-	unit_name             *string
-	required_quantity     *decimal.Decimal
-	purchase_quantity     *decimal.Decimal
-	unit_price            *decimal.Decimal
-	expected_arrival_date *time.Time
-	note                  *string
-	clearedFields         map[string]struct{}
-	request               *int
-	clearedrequest        bool
-	material              *int
-	clearedmaterial       bool
-	unit                  *int
-	clearedunit           bool
-	supplier              *int
-	clearedsupplier       bool
-	done                  bool
-	oldValue              func(context.Context) (*EngineeringMaterialRequestItem, error)
-	predicates            []predicate.EngineeringMaterialRequestItem
+	op                Op
+	typ               string
+	id                *int
+	material_code     *string
+	material_name     *string
+	supplier_name     *string
+	supplier_item_no  *string
+	color             *string
+	spec              *string
+	unit_name         *string
+	required_quantity *decimal.Decimal
+	clearedFields     map[string]struct{}
+	request           *int
+	clearedrequest    bool
+	material          *int
+	clearedmaterial   bool
+	unit              *int
+	clearedunit       bool
+	supplier          *int
+	clearedsupplier   bool
+	done              bool
+	oldValue          func(context.Context) (*EngineeringMaterialRequestItem, error)
+	predicates        []predicate.EngineeringMaterialRequestItem
 }
 
 var _ ent.Mutation = (*EngineeringMaterialRequestItemMutation)(nil)
@@ -14576,202 +14572,6 @@ func (m *EngineeringMaterialRequestItemMutation) ResetRequiredQuantity() {
 	m.required_quantity = nil
 }
 
-// SetPurchaseQuantity sets the "purchase_quantity" field.
-func (m *EngineeringMaterialRequestItemMutation) SetPurchaseQuantity(d decimal.Decimal) {
-	m.purchase_quantity = &d
-}
-
-// PurchaseQuantity returns the value of the "purchase_quantity" field in the mutation.
-func (m *EngineeringMaterialRequestItemMutation) PurchaseQuantity() (r decimal.Decimal, exists bool) {
-	v := m.purchase_quantity
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldPurchaseQuantity returns the old "purchase_quantity" field's value of the EngineeringMaterialRequestItem entity.
-// If the EngineeringMaterialRequestItem object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *EngineeringMaterialRequestItemMutation) OldPurchaseQuantity(ctx context.Context) (v *decimal.Decimal, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldPurchaseQuantity is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldPurchaseQuantity requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldPurchaseQuantity: %w", err)
-	}
-	return oldValue.PurchaseQuantity, nil
-}
-
-// ClearPurchaseQuantity clears the value of the "purchase_quantity" field.
-func (m *EngineeringMaterialRequestItemMutation) ClearPurchaseQuantity() {
-	m.purchase_quantity = nil
-	m.clearedFields[engineeringmaterialrequestitem.FieldPurchaseQuantity] = struct{}{}
-}
-
-// PurchaseQuantityCleared returns if the "purchase_quantity" field was cleared in this mutation.
-func (m *EngineeringMaterialRequestItemMutation) PurchaseQuantityCleared() bool {
-	_, ok := m.clearedFields[engineeringmaterialrequestitem.FieldPurchaseQuantity]
-	return ok
-}
-
-// ResetPurchaseQuantity resets all changes to the "purchase_quantity" field.
-func (m *EngineeringMaterialRequestItemMutation) ResetPurchaseQuantity() {
-	m.purchase_quantity = nil
-	delete(m.clearedFields, engineeringmaterialrequestitem.FieldPurchaseQuantity)
-}
-
-// SetUnitPrice sets the "unit_price" field.
-func (m *EngineeringMaterialRequestItemMutation) SetUnitPrice(d decimal.Decimal) {
-	m.unit_price = &d
-}
-
-// UnitPrice returns the value of the "unit_price" field in the mutation.
-func (m *EngineeringMaterialRequestItemMutation) UnitPrice() (r decimal.Decimal, exists bool) {
-	v := m.unit_price
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldUnitPrice returns the old "unit_price" field's value of the EngineeringMaterialRequestItem entity.
-// If the EngineeringMaterialRequestItem object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *EngineeringMaterialRequestItemMutation) OldUnitPrice(ctx context.Context) (v *decimal.Decimal, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldUnitPrice is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldUnitPrice requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldUnitPrice: %w", err)
-	}
-	return oldValue.UnitPrice, nil
-}
-
-// ClearUnitPrice clears the value of the "unit_price" field.
-func (m *EngineeringMaterialRequestItemMutation) ClearUnitPrice() {
-	m.unit_price = nil
-	m.clearedFields[engineeringmaterialrequestitem.FieldUnitPrice] = struct{}{}
-}
-
-// UnitPriceCleared returns if the "unit_price" field was cleared in this mutation.
-func (m *EngineeringMaterialRequestItemMutation) UnitPriceCleared() bool {
-	_, ok := m.clearedFields[engineeringmaterialrequestitem.FieldUnitPrice]
-	return ok
-}
-
-// ResetUnitPrice resets all changes to the "unit_price" field.
-func (m *EngineeringMaterialRequestItemMutation) ResetUnitPrice() {
-	m.unit_price = nil
-	delete(m.clearedFields, engineeringmaterialrequestitem.FieldUnitPrice)
-}
-
-// SetExpectedArrivalDate sets the "expected_arrival_date" field.
-func (m *EngineeringMaterialRequestItemMutation) SetExpectedArrivalDate(t time.Time) {
-	m.expected_arrival_date = &t
-}
-
-// ExpectedArrivalDate returns the value of the "expected_arrival_date" field in the mutation.
-func (m *EngineeringMaterialRequestItemMutation) ExpectedArrivalDate() (r time.Time, exists bool) {
-	v := m.expected_arrival_date
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldExpectedArrivalDate returns the old "expected_arrival_date" field's value of the EngineeringMaterialRequestItem entity.
-// If the EngineeringMaterialRequestItem object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *EngineeringMaterialRequestItemMutation) OldExpectedArrivalDate(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldExpectedArrivalDate is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldExpectedArrivalDate requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldExpectedArrivalDate: %w", err)
-	}
-	return oldValue.ExpectedArrivalDate, nil
-}
-
-// ClearExpectedArrivalDate clears the value of the "expected_arrival_date" field.
-func (m *EngineeringMaterialRequestItemMutation) ClearExpectedArrivalDate() {
-	m.expected_arrival_date = nil
-	m.clearedFields[engineeringmaterialrequestitem.FieldExpectedArrivalDate] = struct{}{}
-}
-
-// ExpectedArrivalDateCleared returns if the "expected_arrival_date" field was cleared in this mutation.
-func (m *EngineeringMaterialRequestItemMutation) ExpectedArrivalDateCleared() bool {
-	_, ok := m.clearedFields[engineeringmaterialrequestitem.FieldExpectedArrivalDate]
-	return ok
-}
-
-// ResetExpectedArrivalDate resets all changes to the "expected_arrival_date" field.
-func (m *EngineeringMaterialRequestItemMutation) ResetExpectedArrivalDate() {
-	m.expected_arrival_date = nil
-	delete(m.clearedFields, engineeringmaterialrequestitem.FieldExpectedArrivalDate)
-}
-
-// SetNote sets the "note" field.
-func (m *EngineeringMaterialRequestItemMutation) SetNote(s string) {
-	m.note = &s
-}
-
-// Note returns the value of the "note" field in the mutation.
-func (m *EngineeringMaterialRequestItemMutation) Note() (r string, exists bool) {
-	v := m.note
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldNote returns the old "note" field's value of the EngineeringMaterialRequestItem entity.
-// If the EngineeringMaterialRequestItem object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *EngineeringMaterialRequestItemMutation) OldNote(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldNote is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldNote requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldNote: %w", err)
-	}
-	return oldValue.Note, nil
-}
-
-// ClearNote clears the value of the "note" field.
-func (m *EngineeringMaterialRequestItemMutation) ClearNote() {
-	m.note = nil
-	m.clearedFields[engineeringmaterialrequestitem.FieldNote] = struct{}{}
-}
-
-// NoteCleared returns if the "note" field was cleared in this mutation.
-func (m *EngineeringMaterialRequestItemMutation) NoteCleared() bool {
-	_, ok := m.clearedFields[engineeringmaterialrequestitem.FieldNote]
-	return ok
-}
-
-// ResetNote resets all changes to the "note" field.
-func (m *EngineeringMaterialRequestItemMutation) ResetNote() {
-	m.note = nil
-	delete(m.clearedFields, engineeringmaterialrequestitem.FieldNote)
-}
-
 // ClearRequest clears the "request" edge to the EngineeringMaterialRequest entity.
 func (m *EngineeringMaterialRequestItemMutation) ClearRequest() {
 	m.clearedrequest = true
@@ -14914,7 +14714,7 @@ func (m *EngineeringMaterialRequestItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *EngineeringMaterialRequestItemMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 12)
 	if m.request != nil {
 		fields = append(fields, engineeringmaterialrequestitem.FieldRequestID)
 	}
@@ -14951,18 +14751,6 @@ func (m *EngineeringMaterialRequestItemMutation) Fields() []string {
 	if m.required_quantity != nil {
 		fields = append(fields, engineeringmaterialrequestitem.FieldRequiredQuantity)
 	}
-	if m.purchase_quantity != nil {
-		fields = append(fields, engineeringmaterialrequestitem.FieldPurchaseQuantity)
-	}
-	if m.unit_price != nil {
-		fields = append(fields, engineeringmaterialrequestitem.FieldUnitPrice)
-	}
-	if m.expected_arrival_date != nil {
-		fields = append(fields, engineeringmaterialrequestitem.FieldExpectedArrivalDate)
-	}
-	if m.note != nil {
-		fields = append(fields, engineeringmaterialrequestitem.FieldNote)
-	}
 	return fields
 }
 
@@ -14995,14 +14783,6 @@ func (m *EngineeringMaterialRequestItemMutation) Field(name string) (ent.Value, 
 		return m.UnitName()
 	case engineeringmaterialrequestitem.FieldRequiredQuantity:
 		return m.RequiredQuantity()
-	case engineeringmaterialrequestitem.FieldPurchaseQuantity:
-		return m.PurchaseQuantity()
-	case engineeringmaterialrequestitem.FieldUnitPrice:
-		return m.UnitPrice()
-	case engineeringmaterialrequestitem.FieldExpectedArrivalDate:
-		return m.ExpectedArrivalDate()
-	case engineeringmaterialrequestitem.FieldNote:
-		return m.Note()
 	}
 	return nil, false
 }
@@ -15036,14 +14816,6 @@ func (m *EngineeringMaterialRequestItemMutation) OldField(ctx context.Context, n
 		return m.OldUnitName(ctx)
 	case engineeringmaterialrequestitem.FieldRequiredQuantity:
 		return m.OldRequiredQuantity(ctx)
-	case engineeringmaterialrequestitem.FieldPurchaseQuantity:
-		return m.OldPurchaseQuantity(ctx)
-	case engineeringmaterialrequestitem.FieldUnitPrice:
-		return m.OldUnitPrice(ctx)
-	case engineeringmaterialrequestitem.FieldExpectedArrivalDate:
-		return m.OldExpectedArrivalDate(ctx)
-	case engineeringmaterialrequestitem.FieldNote:
-		return m.OldNote(ctx)
 	}
 	return nil, fmt.Errorf("unknown EngineeringMaterialRequestItem field %s", name)
 }
@@ -15137,34 +14909,6 @@ func (m *EngineeringMaterialRequestItemMutation) SetField(name string, value ent
 		}
 		m.SetRequiredQuantity(v)
 		return nil
-	case engineeringmaterialrequestitem.FieldPurchaseQuantity:
-		v, ok := value.(decimal.Decimal)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetPurchaseQuantity(v)
-		return nil
-	case engineeringmaterialrequestitem.FieldUnitPrice:
-		v, ok := value.(decimal.Decimal)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetUnitPrice(v)
-		return nil
-	case engineeringmaterialrequestitem.FieldExpectedArrivalDate:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetExpectedArrivalDate(v)
-		return nil
-	case engineeringmaterialrequestitem.FieldNote:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetNote(v)
-		return nil
 	}
 	return fmt.Errorf("unknown EngineeringMaterialRequestItem field %s", name)
 }
@@ -15207,18 +14951,6 @@ func (m *EngineeringMaterialRequestItemMutation) ClearedFields() []string {
 	if m.FieldCleared(engineeringmaterialrequestitem.FieldSpec) {
 		fields = append(fields, engineeringmaterialrequestitem.FieldSpec)
 	}
-	if m.FieldCleared(engineeringmaterialrequestitem.FieldPurchaseQuantity) {
-		fields = append(fields, engineeringmaterialrequestitem.FieldPurchaseQuantity)
-	}
-	if m.FieldCleared(engineeringmaterialrequestitem.FieldUnitPrice) {
-		fields = append(fields, engineeringmaterialrequestitem.FieldUnitPrice)
-	}
-	if m.FieldCleared(engineeringmaterialrequestitem.FieldExpectedArrivalDate) {
-		fields = append(fields, engineeringmaterialrequestitem.FieldExpectedArrivalDate)
-	}
-	if m.FieldCleared(engineeringmaterialrequestitem.FieldNote) {
-		fields = append(fields, engineeringmaterialrequestitem.FieldNote)
-	}
 	return fields
 }
 
@@ -15241,18 +14973,6 @@ func (m *EngineeringMaterialRequestItemMutation) ClearField(name string) error {
 		return nil
 	case engineeringmaterialrequestitem.FieldSpec:
 		m.ClearSpec()
-		return nil
-	case engineeringmaterialrequestitem.FieldPurchaseQuantity:
-		m.ClearPurchaseQuantity()
-		return nil
-	case engineeringmaterialrequestitem.FieldUnitPrice:
-		m.ClearUnitPrice()
-		return nil
-	case engineeringmaterialrequestitem.FieldExpectedArrivalDate:
-		m.ClearExpectedArrivalDate()
-		return nil
-	case engineeringmaterialrequestitem.FieldNote:
-		m.ClearNote()
 		return nil
 	}
 	return fmt.Errorf("unknown EngineeringMaterialRequestItem nullable field %s", name)
@@ -15297,18 +15017,6 @@ func (m *EngineeringMaterialRequestItemMutation) ResetField(name string) error {
 		return nil
 	case engineeringmaterialrequestitem.FieldRequiredQuantity:
 		m.ResetRequiredQuantity()
-		return nil
-	case engineeringmaterialrequestitem.FieldPurchaseQuantity:
-		m.ResetPurchaseQuantity()
-		return nil
-	case engineeringmaterialrequestitem.FieldUnitPrice:
-		m.ResetUnitPrice()
-		return nil
-	case engineeringmaterialrequestitem.FieldExpectedArrivalDate:
-		m.ResetExpectedArrivalDate()
-		return nil
-	case engineeringmaterialrequestitem.FieldNote:
-		m.ResetNote()
 		return nil
 	}
 	return fmt.Errorf("unknown EngineeringMaterialRequestItem field %s", name)
