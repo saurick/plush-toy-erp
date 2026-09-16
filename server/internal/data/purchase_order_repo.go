@@ -812,7 +812,11 @@ func (r *purchaseOrderRepo) GetPurchaseOrderItem(ctx context.Context, id int) (*
 		}
 		return nil, err
 	}
-	return entPurchaseOrderItemToBiz(row), nil
+	items, err := purchaseOrderItemsWithEngineeringSource(ctx, r.data.postgres, row.PurchaseOrderID, []*biz.PurchaseOrderItem{entPurchaseOrderItemToBiz(row)})
+	if err != nil {
+		return nil, err
+	}
+	return items[0], nil
 }
 
 func (r *purchaseOrderRepo) UpdatePurchaseOrderItemStatus(ctx context.Context, id int, lineStatus string) (*biz.PurchaseOrderItem, error) {
@@ -849,7 +853,11 @@ func (r *purchaseOrderRepo) ListPurchaseOrderItems(ctx context.Context, filter b
 	if err != nil {
 		return nil, 0, err
 	}
-	return entPurchaseOrderItemsToBiz(rows), total, nil
+	items, err := purchaseOrderItemsWithEngineeringSource(ctx, r.data.postgres, filter.PurchaseOrderID, entPurchaseOrderItemsToBiz(rows))
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
 }
 
 func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id int, in *biz.PurchaseOrderMutation, items []*biz.PurchaseOrderItemSaveMutation) (*biz.PurchaseOrderWithItems, error) {
@@ -1142,13 +1150,17 @@ func (r *purchaseOrderRepo) ReorderPurchaseOrderItems(ctx context.Context, id, e
 	if err != nil {
 		return nil, err
 	}
+	items, err := purchaseOrderItemsWithEngineeringSource(ctx, tx.Client(), id, entPurchaseOrderItemsToBiz(itemRows))
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	tx = nil
 	return &biz.PurchaseOrderWithItems{
 		Order: entPurchaseOrderToBiz(orderRow),
-		Items: entPurchaseOrderItemsToBiz(itemRows),
+		Items: items,
 	}, nil
 }
 

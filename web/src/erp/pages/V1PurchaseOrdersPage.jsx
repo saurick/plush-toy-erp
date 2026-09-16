@@ -551,25 +551,16 @@ export default function V1PurchaseOrdersPage() {
 
   const loadPrintReferenceData = useCallback(async () => {
     const [materialData, unitData] = await Promise.all([
-      listAllMaterials({ active_only: true }),
+      listAllMaterials({ active_only: false }),
       listAllUnits(),
     ])
     const nextMaterials = materialData?.materials || []
     const nextUnits = unitData?.units || []
-    if (nextMaterials.length > 0) {
-      setMaterials(nextMaterials)
-    }
-    if (nextUnits.length > 0) {
-      setUnits(nextUnits)
-    }
     return {
-      materials: nextMaterials.length > 0 ? nextMaterials : materials,
-      unitOptions:
-        nextUnits.length > 0
-          ? uniqueReferenceOptions(nextUnits, unitOption)
-          : unitOptions,
+      materials: nextMaterials,
+      unitOptions: uniqueReferenceOptions(nextUnits, unitOption),
     }
-  }, [materials, unitOptions])
+  }, [])
 
   useEffect(() => {
     loadReferenceData()

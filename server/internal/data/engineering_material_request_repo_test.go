@@ -76,13 +76,13 @@ func prepareMaterialRequestFixture(t *testing.T, ctx context.Context, data *Data
 	unit := createSalesOrderTestUnit(t, ctx, client, key+"-U", true)
 	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, key+"-P", true)
 	order := client.SalesOrder.Create().SetOrderNo(key).SetCustomerID(customer.ID).SetOrderDate(time.Now()).SetCurrency("CNY").SaveX(ctx)
-	line := client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetUnitID(unit.ID).SetRequestedProductName("定制玩偶").SetOrderedQuantity(decimal.NewFromInt(1000)).SetPreShipmentSampleQuantity(decimal.NewFromInt(12)).SaveX(ctx)
+	line := client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetUnitID(unit.ID).SetCustomerProductNo(key + "-STYLE").SetRequestedProductName("定制玩偶").SetOrderedQuantity(decimal.NewFromInt(1000)).SetPreShipmentSampleQuantity(decimal.NewFromInt(12)).SaveX(ctx)
 	bom := client.BOMHeader.Create().SetProductID(product.ID).SetVersion("V1").SaveX(ctx)
 	for i := 0; i < 2; i++ {
 		vendor := client.Supplier.Create().SetCode(fmt.Sprintf("%s-V%d", key, i)).SetName(fmt.Sprintf("材料厂%d", i)).SetDefaultPaymentMethod("货到付款").SetDefaultInvoiceRequired(false).SaveX(ctx)
 		material := client.Material.Create().SetCode(fmt.Sprintf("%s-M%d", key, i)).SetName("短绒").SetDefaultUnitID(unit.ID).SetSupplierID(vendor.ID).SetSupplierItemNo("A10").SetColor("01").SaveX(ctx)
 		for j := 0; j < 2-i; j++ {
-			client.BOMItem.Create().SetBomHeaderID(bom.ID).SetMaterialID(material.ID).SetUnitID(unit.ID).SetPosition(fmt.Sprintf("部位%d", j)).SetPieceCount("2").SetQuantity(decimal.RequireFromString("0.1")).SetLossRate(decimal.RequireFromString("0.1")).SaveX(ctx)
+			client.BOMItem.Create().SetBomHeaderID(bom.ID).SetMaterialID(material.ID).SetUnitID(unit.ID).SetPosition(fmt.Sprintf("部位%d", j)).SetNote(fmt.Sprintf("按样核对部位%d", j)).SetPieceCount("2").SetQuantity(decimal.RequireFromString("0.1")).SetLossRate(decimal.RequireFromString("0.1")).SaveX(ctx)
 		}
 	}
 	client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerProduct).SetOwnerID(product.ID).SetAttachmentType(biz.BusinessAttachmentTypeProductImage).SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("sample.png").SetMimeType("image/png").SetFileSize(1).SetObjectKey(attachmentstore.NewKey()).SetSha256(strings.Repeat("a", 64)).SaveX(ctx)
