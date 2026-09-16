@@ -1,4 +1,3 @@
-import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   ArrowUpOutlined,
@@ -16,6 +15,7 @@ import {
   SwapOutlined,
   UserOutlined,
 } from '@ant-design/icons'
+import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import SearchInput from '@/common/components/SearchInput'
 import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'

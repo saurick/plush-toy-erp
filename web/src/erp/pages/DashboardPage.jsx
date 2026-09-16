@@ -1,4 +1,3 @@
-import { getWorkflowTaskDisplayName } from '../utils/processRuntimePresentation.mjs'
 import React, {
   lazy,
   Suspense,
@@ -35,6 +34,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { getWorkflowTaskDisplayName } from '../utils/processRuntimePresentation.mjs'
 import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'

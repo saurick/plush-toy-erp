@@ -147,7 +147,7 @@ case "$url" in
     [[ -z "$write_out" ]] || printf '200'
     ;;
   */rpc/customer_config)
-    response='{"jsonrpc":"2.0","id":"customer-config-smoke","result":{"code":0,"data":{"session":{"configRevision":"yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1","source":"active_customer_config_revision","pages":["global-dashboard"],"fieldPolicies":{"customers.default":{},"suppliers.default":{},"sales_orders.default":{}}}}}}'
+    response='{"jsonrpc":"2.0","id":"customer-config-smoke","result":{"code":0,"data":{"session":{"configRevision":"yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1","source":"active_customer_config_revision","pages":["global-dashboard"],"fieldPolicies":{"customers.default":{},"suppliers.default":{},"sales_orders.default":{}}}}}}'
     [[ -z "$output_file" ]] && printf '%s\n' "$response" || printf '%s\n' "$response" >"$output_file"
     ;;
   */rpc/auth)
@@ -251,7 +251,7 @@ test("run smoke input template is no-write and does not require endpoint", () =>
   );
   assert(
     template.requiredReadbackEvidence.some((item) =>
-      item.includes("demo totalAuthenticated=11"),
+      item.includes(`demo totalAuthenticated=${credentialContract.credentials.uat.usernames.length + 1}`),
     ),
   );
   assert(
@@ -266,7 +266,7 @@ test("run smoke input template is no-write and does not require endpoint", () =>
   );
   assert.match(
     template.commands.join("\n"),
-    /--customer-config-revision yoyoosun-customer-trial-133-package-v8\.runtime-manifest-v1/,
+    /--customer-config-revision yoyoosun-customer-trial-133-package-v9\.runtime-manifest-v1/,
   );
   assert.match(
     template.commands.join("\n"),
@@ -302,7 +302,7 @@ test("run smoke writes release-gate compatible report", async () => {
       "--report",
       reportPath,
       "--customer-config-revision",
-      "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
+      "yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1",
       "--admin-token-env",
       "SMOKE_ADMIN_TOKEN",
       ...credentialArgs,
@@ -383,12 +383,12 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.equal(credentialCheck.phoneBound, true);
   assert.equal(credentialCheck.deploymentTarget, "demo-133");
   assert.equal(credentialCheck.commandTarget, "customer-trial-133");
-  assert.equal(credentialCheck.targetIdentity, "customer-trial-133:2026.08.15-v6");
+  assert.equal(credentialCheck.targetIdentity, credentialContract.targets["demo-133"].targetIdentity);
   assert.equal(credentialCheck.database, "plush_erp_demo_v1");
-  assert.equal(credentialCheck.nonAdminExpected, 10);
-  assert.equal(credentialCheck.nonAdminAuthenticated, 10);
-  assert.equal(credentialCheck.totalExpected, 11);
-  assert.equal(credentialCheck.totalAuthenticated, 11);
+  assert.equal(credentialCheck.nonAdminExpected, credentialContract.credentials.uat.usernames.length);
+  assert.equal(credentialCheck.nonAdminAuthenticated, credentialContract.credentials.uat.usernames.length);
+  assert.equal(credentialCheck.totalExpected, credentialContract.credentials.uat.usernames.length + 1);
+  assert.equal(credentialCheck.totalAuthenticated, credentialContract.credentials.uat.usernames.length + 1);
   assert.equal(credentialCheck.uniqueTokensObserved, true);
   assert.deepEqual(credentialCheck.usernames, [
     credentialContract.credentials.admin.username,
@@ -429,7 +429,7 @@ test("run smoke writes release-gate compatible report", async () => {
   );
   assert.equal(
     customerConfigCheck.expectedRevision,
-    "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
+    "yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1",
   );
   assert.equal(customerConfigCheck.tokenSourceEnv, "SMOKE_ADMIN_TOKEN");
   assert.equal(customerConfigCheck.responseBodyStored, false);
@@ -539,7 +539,7 @@ test("run smoke fails authenticated release smoke for a non-PDF response", async
       "--report",
       reportPath,
       "--customer-config-revision",
-      "yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1",
+      "yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1",
       "--admin-token-env",
       "SMOKE_ADMIN_TOKEN",
       ...credentialArgs,
@@ -607,8 +607,8 @@ test("run smoke fails when one contracted UAT credential cannot log in", async (
   assert.equal(credentialCheck.status, "fail");
   assert.equal(credentialCheck.adminAuthenticated, true);
   assert.equal(credentialCheck.phoneBound, true);
-  assert.equal(credentialCheck.nonAdminAuthenticated, 9);
-  assert.equal(credentialCheck.totalAuthenticated, 10);
+  assert.equal(credentialCheck.nonAdminAuthenticated, credentialContract.credentials.uat.usernames.length - 1);
+  assert.equal(credentialCheck.totalAuthenticated, credentialContract.credentials.uat.usernames.length);
   assert.equal(credentialCheck.uniqueTokensObserved, false);
   assert.equal(credentialCheck.responseBodyStored, false);
   assert.equal(report.summary.failed, 1);
@@ -619,7 +619,7 @@ test("run smoke fails when one contracted UAT credential cannot log in", async (
 });
 
 for (const [name, fakeEnv, authenticated] of [
-  ["mismatched admin phone", { FAKE_ADMIN_PHONE: "13900139000" }, 10],
+  ["mismatched admin phone", { FAKE_ADMIN_PHONE: "13900139000" }, credentialContract.credentials.uat.usernames.length],
   ["mismatched JSON-RPC id", { FAKE_LOGIN_RESPONSE_ID: "wrong-id" }, 0],
   ["legacy token alias", { FAKE_LOGIN_TOKEN_KEY: "token" }, 0],
 ]) {

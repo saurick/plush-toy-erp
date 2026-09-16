@@ -509,6 +509,11 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   assert(pages.warehouse.includes("production-progress"));
   const warehouse = entitlementsFor("warehouse");
   for (const key of [
+    "purchase.receipt.create",
+    "outsourcing.material_issue.create",
+    "outsourcing.return_receipt.create",
+    "outsourcing.fact.post",
+    "outsourcing.fact.cancel",
     "purchase.return.read",
     "purchase.return.create",
     "purchase.return.post",
@@ -555,12 +560,16 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
     "production.fact.post",
     "production.fact.cancel",
     "outsourcing.fact.read",
+  ]) {
+    assert(production.has(key), `production must receive ${key}`);
+  }
+  for (const key of [
     "outsourcing.material_issue.create",
     "outsourcing.return_receipt.create",
     "outsourcing.fact.post",
     "outsourcing.fact.cancel",
   ]) {
-    assert(production.has(key), `production must receive ${key}`);
+    assert(!production.has(key), `production must not receive warehouse action ${key}`);
   }
 
   const finance = entitlementsFor("finance");

@@ -1,4 +1,3 @@
-import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import { useEffect, useId, useRef, useState } from 'react'
 import {
   BellOutlined,
@@ -10,6 +9,7 @@ import {
   ReloadOutlined,
   StopOutlined,
 } from '@ant-design/icons'
+import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import {
   MOBILE_TASK_ACTION_ACCESS_STATES,
   resolveMobileActionLabel,
@@ -69,11 +69,6 @@ const REASON_REQUIRED_ACTIONS = new Set([
   'resume',
   'urge',
 ])
-
-function readableText(value, fallback) {
-  const text = String(value || '').trim()
-  return text || fallback
-}
 
 function resolveAccessCopy(accessState, accessMessage) {
   if (accessMessage) return accessMessage

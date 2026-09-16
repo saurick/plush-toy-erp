@@ -580,7 +580,7 @@ test-populated-upgrade)
     populated_psql -Atq -c \
       "SELECT (SELECT version FROM roles WHERE id = 910006)::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = 910006 AND p.permission_key IN ('production.fact.read', 'production.wip.read'))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = 910003 AND p.permission_key IN ('production.fact.read', 'production.wip.read'))::text"
   )"
-  if [[ "$warehouse_inbound_readback" != '4|2|0' ]]; then
+  if [[ "$warehouse_inbound_readback" != '5|2|0' ]]; then
     echo "ERROR: warehouse finished-goods inbound permission migration mismatch: ${warehouse_inbound_readback:-empty}" >&2
     exit 1
   fi

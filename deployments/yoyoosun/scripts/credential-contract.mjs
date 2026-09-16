@@ -49,6 +49,7 @@ const EXPECTED_UAT_USERNAMES = Object.freeze([
   "uat_pmc",
   "uat_engineering",
   "uat_admin",
+  "uat_finance_purchase",
 ]);
 
 function plainObject(value) {
@@ -130,7 +131,7 @@ export function loadYoyoosunCredentialContract({
     demo.deploymentTarget === "demo-133" &&
     demo.commandTarget === "customer-trial-133" &&
     demo.database === demoRegistry.database.name &&
-    demo.datasetVersion === "2026.08.15-v6" &&
+    demo.datasetVersion === "2026.09.16-v7" &&
     demo.targetIdentity === `customer-trial-133:${demo.datasetVersion}` &&
     demo.adminCredential === "admin" &&
     demo.nonAdminPolicy === "rotate" &&

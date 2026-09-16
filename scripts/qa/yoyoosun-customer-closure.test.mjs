@@ -125,6 +125,9 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "print-center",
   ],
   warehouse: [
+    "production-orders",
+    "processing-contracts",
+    "accessories-purchase",
     "global-dashboard",
     "materials",
     "products",
@@ -623,12 +626,13 @@ test("yoyoosun approval candidates can approve or reject only through controlled
   }
 });
 
-test("yoyoosun production owns the complete processing contract lifecycle", () => {
+test("yoyoosun purchase owns processing contracts while production and pure finance remain read-only", () => {
   const roleByKey = new Map(
     yoyoosunRoleFlowMatrix.roles.map((role) => [role.roleKey, role]),
   );
   const productionRole = roleByKey.get("production");
   const purchaseRole = roleByKey.get("purchase");
+  const financeRole = roleByKey.get("finance");
 
   for (const permissionKey of [
     "outsourcing.order.create",
@@ -639,26 +643,20 @@ test("yoyoosun production owns the complete processing contract lifecycle", () =
     "outsourcing.order.cancel",
   ]) {
     assert.ok(
-      productionRole.capabilityKeys.includes(permissionKey),
-      `永绅生产 / 委外岗位应保留加工合同完整生命周期动作 ${permissionKey}`,
+      purchaseRole.capabilityKeys.includes(permissionKey),
+      `永绅采购岗位应具备加工合同完整生命周期动作 ${permissionKey}`,
     );
+    for (const role of [productionRole, financeRole]) {
+      assert.equal(
+        role.capabilityKeys.includes(permissionKey),
+        false,
+        `${role.displayName}不应越权获得 ${permissionKey}`,
+      );
+    }
   }
   assert.ok(productionRole.printTemplates.includes("processing-contract"));
-  assert.ok(purchaseRole.capabilityKeys.includes("outsourcing.order.read"));
-  for (const permissionKey of [
-    "outsourcing.order.create",
-    "outsourcing.order.update",
-    "outsourcing.order.submit",
-    "outsourcing.order.confirm",
-    "outsourcing.order.close",
-    "outsourcing.order.cancel",
-  ]) {
-    assert.equal(
-      purchaseRole.capabilityKeys.includes(permissionKey),
-      false,
-      `永绅采购岗位不应越权获得 ${permissionKey}`,
-    );
-  }
+  assert.ok(productionRole.capabilityKeys.includes("outsourcing.order.read"));
+  assert.ok(purchaseRole.printTemplates.includes("processing-contract"));
 });
 
 test("yoyoosun WIP role projection stays within Product Core ownership", () => {
@@ -1924,7 +1922,7 @@ test("yoyoosun contract print source pages expose every business-owned print fie
       "name={[field.name, 'unit_id']}",
       "name={[field.name, 'outsourcing_quantity']}",
       "name={[field.name, 'unit_price']}",
-      'label="金额预览"',
+      'label="加工金额"',
       "name={[field.name, 'note']}",
     ],
     "outsourcing order form",

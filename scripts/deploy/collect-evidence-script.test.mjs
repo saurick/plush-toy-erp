@@ -5,6 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { validateReleaseEvidenceGate } from "./release-evidence-gate.mjs";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../qa/manual-acceptance-core-contract.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const scriptPath = path.join(
@@ -81,7 +82,7 @@ test("collect evidence draft includes backup restore artifact placeholders compa
     ),
   );
   assert.equal(credentialRotation.target, "customer-trial-133");
-  assert.equal(credentialRotation.datasetVersion, "2026.08.15-v6");
+  assert.equal(credentialRotation.datasetVersion, MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion);
   assert.equal(
     credentialRotation.schemaVersion,
     "plush.manual-acceptance-credential-rotation-receipt/v1",

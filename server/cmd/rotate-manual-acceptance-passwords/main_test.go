@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -156,8 +157,8 @@ func TestAcceptanceAccountUsernamesSeparatesLocalDemoCustomerUATAndCustomerTest(
 		if nonAdminPolicy != wantPolicy {
 			t.Fatalf("%s non-admin policy = %q, want %q", target, nonAdminPolicy, wantPolicy)
 		}
-		if target != targetCustomerTest133 && len(roleUsernames) == 0 {
-			t.Fatalf("%s role usernames must not be empty", target)
+		if target != targetCustomerTest133 && (len(roleUsernames) != 11 || !slices.Contains(roleUsernames, wantPrefix+"finance_purchase")) {
+			t.Fatalf("%s must rotate all 11 managed accounts including finance and purchase, got %v", target, roleUsernames)
 		}
 		if target == targetCustomerTest133 && len(roleUsernames) != 0 {
 			t.Fatalf("customer-test-133 role usernames = %v, want none", roleUsernames)

@@ -843,8 +843,11 @@ func TestAdminManageUsecase_SetRolesReplacesUserRoles(t *testing.T) {
 	if len(updated.Roles) != 1 || updated.Roles[0].Key != WarehouseRoleKey {
 		t.Fatalf("expected warehouse role, got %#v", updated.Roles)
 	}
-	if AdminHasPermission(updated, PermissionPurchaseOrderRead) {
-		t.Fatalf("expected purchase permissions to be removed")
+	if AdminHasPermission(updated, PermissionPurchaseOrderUpdate) {
+		t.Fatalf("expected purchase write permissions to be removed")
+	}
+	if !AdminHasPermission(updated, PermissionPurchaseOrderRead) {
+		t.Fatalf("expected warehouse receiving to retain purchase order read permission")
 	}
 	if !AdminHasPermission(updated, PermissionWarehouseInventoryRead) {
 		t.Fatalf("expected warehouse permissions to be granted")

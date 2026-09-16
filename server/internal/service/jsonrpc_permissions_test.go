@@ -124,6 +124,7 @@ func TestRequireAdminPermissionIntersectsRBACWithActiveCustomerEntitlement(t *te
 			adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
 				[]string{roleKey},
 				biz.PermissionOutsourcingOrderConfirm,
+				biz.PermissionOutsourcingOrderSubmit,
 				biz.PermissionCustomerConfigRead,
 				biz.PermissionProcessRuntimeRecover,
 			)},
@@ -139,8 +140,12 @@ func TestRequireAdminPermissionIntersectsRBACWithActiveCustomerEntitlement(t *te
 		t.Fatalf("revision-aware workflow guard must preserve the RBAC upper bound before applying its immutable revision, got %#v", got)
 	}
 	ctx = withAdminPermissionCache(workflowJSONRPCAdminContext())
-	if got := newDispatcher(biz.ProductionRoleKey).RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderConfirm); got != nil {
-		t.Fatalf("production role must retain configured processing-contract confirmation, got %#v", got)
+	if got := newDispatcher(biz.ProductionRoleKey).RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderConfirm); got == nil || got.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("production role must not confirm processing contracts, got %#v", got)
+	}
+	ctx = withAdminPermissionCache(workflowJSONRPCAdminContext())
+	if got := newDispatcher(biz.PurchaseRoleKey).RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderSubmit); got != nil {
+		t.Fatalf("purchase role must retain other configured processing-contract actions, got %#v", got)
 	}
 	ctx = withAdminPermissionCache(workflowJSONRPCAdminContext())
 	if got := newDispatcher(biz.PurchaseRoleKey).RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); got != nil {

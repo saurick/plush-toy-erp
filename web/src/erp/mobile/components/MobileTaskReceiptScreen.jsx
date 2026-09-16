@@ -1,4 +1,3 @@
-import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import React from 'react'
 import {
   CheckCircleFilled,
@@ -7,6 +6,7 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
 import {
   normalizeMobileTaskActionKey,

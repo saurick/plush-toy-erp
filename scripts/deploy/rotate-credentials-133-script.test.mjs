@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../qa/manual-acceptance-core-contract.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const script = path.join(
@@ -68,7 +69,7 @@ printf '%s\n' "$*" >"$FAKE_SSH_LOG"
 cat >"$FAKE_STDIN_LOG"
 case "$FAKE_DEPLOYMENT_TARGET" in
   demo-133)
-    printf '%s\n' '{"schemaVersion":"${receiptSchema}","generatedAt":"2026-07-22T08:00:00Z","operationId":"${operationId}","deploymentTarget":"demo-133","target":"customer-trial-133","targetIdentity":"customer-trial-133:2026.08.15-v6","database":"plush_erp_demo_v1","datasetVersion":"2026.08.15-v6","migrationVersion":"${migration}","customerRevision":"yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1","release":"${release}","rollbackPoint":{"backupAlias":"${backupAlias}","backupSha256":"${backupSha}","backupSizeBytes":1024,"restoreChecked":true},"adminAccounts":1,"accountKind":"customer-uat","roleAccounts":10,"nonAdminPolicy":"rotate","nonAdminAccounts":10,"revokedSessions":3,"authVersionIncremented":true,"auditSource":"manual_acceptance_password_rotation","phoneBound":true,"replayed":false,"accounts":[{"username":"admin","authVersion":2,"revokedSessions":1,"phoneBound":true},{"username":"uat_admin","authVersion":2,"revokedSessions":1,"phoneBound":false},{"username":"uat_boss","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_engineering","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_finance","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_pmc","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_production","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_purchase","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_quality","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_sales","authVersion":2,"revokedSessions":0,"phoneBound":false},{"username":"uat_warehouse","authVersion":2,"revokedSessions":1,"phoneBound":false}]}'
+    printf '%s\n' '{"schemaVersion":"${receiptSchema}","generatedAt":"2026-07-22T08:00:00Z","operationId":"${operationId}","deploymentTarget":"demo-133","target":"customer-trial-133","targetIdentity":"${contract.targets["demo-133"].targetIdentity}","database":"plush_erp_demo_v1","datasetVersion":"${contract.targets["demo-133"].datasetVersion}","migrationVersion":"${migration}","customerRevision":"${MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision}","release":"${release}","rollbackPoint":{"backupAlias":"${backupAlias}","backupSha256":"${backupSha}","backupSizeBytes":1024,"restoreChecked":true},"adminAccounts":1,"accountKind":"customer-uat","roleAccounts":${contract.credentials.uat.usernames.length},"nonAdminPolicy":"rotate","nonAdminAccounts":${contract.credentials.uat.usernames.length},"revokedSessions":3,"authVersionIncremented":true,"auditSource":"manual_acceptance_password_rotation","phoneBound":true,"replayed":false,"accounts":[{"username":"admin","authVersion":2,"revokedSessions":1,"phoneBound":true},${contract.credentials.uat.usernames.map((username) => JSON.stringify({ username, authVersion: 2, revokedSessions: ["uat_admin", "uat_warehouse"].includes(username) ? 1 : 0, phoneBound: false })).join(",")}]}'
     ;;
   customer-test-133)
     printf '%s\n' '{"schemaVersion":"${receiptSchema}","generatedAt":"2026-07-22T08:00:00Z","operationId":"${operationId}","deploymentTarget":"customer-test-133","target":"customer-test-133","targetIdentity":"deployment-target:customer-test-133:clean-acceptance","database":"plush_erp_customer_test_v1","migrationVersion":"${migration}","release":"${release}","rollbackPoint":{"backupAlias":"${backupAlias}","backupSha256":"${backupSha}","backupSizeBytes":1024,"restoreChecked":true},"adminAccounts":1,"accountKind":"customer-test-admin-only","roleAccounts":0,"nonAdminPolicy":"preserve","nonAdminAccounts":4,"nonAdminAccountsPreserved":true,"revokedSessions":1,"authVersionIncremented":true,"auditSource":"manual_acceptance_password_rotation","phoneBound":false,"replayed":false,"accounts":[{"username":"admin","authVersion":2,"revokedSessions":1,"phoneBound":false}]}'
@@ -172,7 +173,7 @@ test("demo rotation binds registry paths and injects admin role and optional SMS
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   const receipt = JSON.parse(fs.readFileSync(f.report, "utf8"));
   assert.equal(receipt.deploymentTarget, "demo-133");
-  assert.equal(receipt.roleAccounts, 10);
+  assert.equal(receipt.roleAccounts, contract.credentials.uat.usernames.length);
   assert.equal(receipt.nonAdminPolicy, "rotate");
   assert.equal(receipt.phoneBound, true);
   const preamble = injectedPreamble(f);

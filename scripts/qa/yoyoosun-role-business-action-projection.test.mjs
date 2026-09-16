@@ -38,7 +38,7 @@ const ROLE_EXPECTATIONS = Object.freeze({
     denied: "purchase.order.update",
   }),
   production: Object.freeze({
-    allowed: "outsourcing.order.submit",
+    allowed: "production.wip.execute",
     denied: "quality.inspection.update",
   }),
 });

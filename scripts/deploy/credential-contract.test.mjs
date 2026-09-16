@@ -3,6 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { CUSTOMER_UAT_ACCOUNT_SET } from "../qa/manual-acceptance-account-identities.mjs";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../qa/manual-acceptance-core-contract.mjs";
 
 import {
   defaultYoyoosunCredentialContractPath,
@@ -20,7 +22,12 @@ test("credential contract exposes isolated demo and customer-test projections", 
 
   assert.equal(demo.database, "plush_erp_demo_v1");
   assert.equal(demo.nonAdmin.policy, "rotate");
-  assert.equal(demo.nonAdmin.usernames.length, 10);
+  assert.deepEqual(demo.nonAdmin.usernames, CUSTOMER_UAT_ACCOUNT_SET.formalUsernames);
+  assert.equal(demo.datasetVersion, MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion);
+  assert.equal(
+    demo.targetIdentity,
+    `${CUSTOMER_UAT_ACCOUNT_SET.target}:${MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion}`,
+  );
   assert.equal(demo.sms.policy, "bind-when-configured");
   assert.equal(customerTest.database, "plush_erp_customer_test_v1");
   assert.equal(customerTest.nonAdmin.policy, "preserve");
