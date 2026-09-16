@@ -29,14 +29,9 @@ export default function WorkflowProcessStageTrack({
       data-testid="workflow-process-stage"
       data-handoff-kind={model.handoffKind}
     >
-      <div className="workflow-process-stage__head">
-        <div className="workflow-process-stage__title">
-          <strong>执行轨迹</strong>
-        </div>
-        <span className="workflow-process-stage__summary">
-          {model.summaryLabel}
-        </span>
-      </div>
+      <span className="workflow-process-stage__summary">
+        {model.summaryLabel}
+      </span>
 
       <ol
         className="workflow-process-stage__list"

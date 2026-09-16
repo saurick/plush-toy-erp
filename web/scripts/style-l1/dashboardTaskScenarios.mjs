@@ -525,7 +525,11 @@ export function createDashboardTaskScenarios({
         })
         const executionTrail = page.getByTestId('workflow-process-stage')
         await executionTrail.waitFor({ state: 'visible', timeout: 10_000 })
-        await expectText(executionTrail, '执行轨迹')
+        await expectText(
+          page.getByTestId('workflow-task-handling-chain'),
+          '任务处理链'
+        )
+        await assertTextAbsent(executionTrail, '执行轨迹')
         await expectText(executionTrail, '成品质检')
         await expectText(executionTrail, '出货财务审批')
         const executionTrailMetrics = await executionTrail.evaluate(

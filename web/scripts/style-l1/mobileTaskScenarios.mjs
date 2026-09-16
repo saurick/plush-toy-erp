@@ -1316,7 +1316,8 @@ export function createMobileTaskScenarios({
         const mobileExecutionTrail = processContextCard.getByTestId(
           'workflow-process-stage'
         )
-        await expectText(mobileExecutionTrail, '执行轨迹')
+        await expectText(processContextCard, '任务处理链')
+        await assertTextAbsent(mobileExecutionTrail, '执行轨迹')
         await expectText(mobileExecutionTrail, '提交销售订单')
         await expectText(mobileExecutionTrail, '订单审批')
         await expectText(mobileExecutionTrail, '工程资料')
