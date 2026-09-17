@@ -100,6 +100,7 @@ import {
   formatUnixDate,
   hasActionPermission,
   SALES_ORDER_ITEM_STATUS_LABELS,
+  SOURCE_DOCUMENT_ITEM_STATUS_TONES,
   statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
@@ -387,6 +388,7 @@ export default function V1SalesOrdersPage() {
     (item, { view }) => [
       {
         label: '产品图',
+        media: true,
         value: (
           <WorkflowTaskProductImage
             item={{
@@ -399,44 +401,59 @@ export default function V1SalesOrdersPage() {
           />
         ),
       },
-      { label: '需求名称', value: salesOrderRequirementName(item) },
+      {
+        label: '需求名称',
+        value: salesOrderRequirementName(item),
+        strong: true,
+        wide: true,
+      },
       { label: '客户款号', value: item?.customer_product_no },
       {
         label: '类别',
         value: item?.order_category === 'REPEAT' ? '返单' : '新单',
       },
-      { label: '产品编号', value: item?.product_code_snapshot },
-      { label: '产品名称', value: item?.product_name_snapshot },
-      { label: '颜色', value: item?.color_snapshot },
-      { label: '订单数量', value: item?.ordered_quantity },
-      { label: '船头版数量', value: item?.pre_shipment_sample_quantity },
-      { label: '生产数量', value: item?.production_quantity },
-      { label: '已出货数', value: item?.shipped_quantity },
-      { label: '未出货数', value: item?.unshipped_quantity },
-      { label: '工程 / 打样', value: salesOrderEngineeringLabel(item) },
-      { label: '设计师', value: item?.designer },
-      { label: '工艺要求', value: item?.process_requirement },
-      { label: '打样说明', value: item?.sample_note },
-      {
-        label: '单位',
-        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
-      },
-      { label: '单价', value: item?.unit_price },
-      { label: '金额', value: item?.amount },
-      {
-        label: '计划交付日期',
-        value: formatUnixDate(item?.planned_delivery_date),
-      },
       {
         label: '行状态',
+        tone: SOURCE_DOCUMENT_ITEM_STATUS_TONES[item?.line_status],
         value: statusText(
           item?.line_status,
           SALES_ORDER_ITEM_STATUS_LABELS,
           '明细状态待核对'
         ),
       },
+      { label: '产品编号', value: item?.product_code_snapshot },
+      {
+        label: '产品名称',
+        value: item?.product_name_snapshot,
+        strong: true,
+        wide: true,
+      },
+      { label: '颜色', value: item?.color_snapshot },
+      {
+        label: '计划交付日期',
+        value: formatUnixDate(item?.planned_delivery_date),
+      },
+      { label: '订单数量', value: item?.ordered_quantity, rowStart: true },
+      { label: '船头版数量', value: item?.pre_shipment_sample_quantity },
+      { label: '生产数量', value: item?.production_quantity },
+      { label: '已出货数', value: item?.shipped_quantity },
+      { label: '未出货数', value: item?.unshipped_quantity },
+      {
+        label: '单位',
+        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
+      },
+      { label: '单价', value: item?.unit_price, rowStart: true },
+      { label: '金额', value: item?.amount },
+      {
+        label: '工程 / 打样',
+        value: salesOrderEngineeringLabel(item),
+        wide: true,
+      },
+      { label: '设计师', value: item?.designer, wide: true },
+      { label: '工艺要求', value: item?.process_requirement, fullWidth: true },
+      { label: '打样说明', value: item?.sample_note, fullWidth: true },
       ...(view !== 'preview'
-        ? [{ label: '备注', value: item?.note, wide: true }]
+        ? [{ label: '备注', value: item?.note, fullWidth: true }]
         : []),
     ],
     [unitOptions]
@@ -479,15 +496,10 @@ export default function V1SalesOrdersPage() {
       Number(order?.id || 0) > 0 &&
       Number(order?.version || 0) > 0,
     loadPreview: loadSalesOrderItemsPreview,
-    loadAll: loadAllSalesOrderItemsForPreview,
+    onOpenDetails: (order) => openSalesOrderDetails(order),
     getItemFields: getSalesOrderItemFields,
     getItemLabel: (item, { index }) => `明细 ${item?.line_no || index + 1}`,
-    getItemSummary: (item) =>
-      [item?.product_code_snapshot, salesOrderRequirementName(item)]
-        .filter(Boolean)
-        .join(' / '),
     getRecordLabel: (order) => order?.order_no || '当前销售订单',
-    modalTitle: '销售订单全部明细',
     emptyDescription: '当前销售订单暂无明细',
   })
   const {
@@ -1913,8 +1925,6 @@ export default function V1SalesOrdersPage() {
         onOpenRecord={saving ? undefined : openSalesOrderRecord}
       />
 
-      {salesOrderItemsPreview.modal}
-
       <BusinessDetailsModal
         columns={orderDataColumns}
         description="查看订单摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
@@ -1925,10 +1935,6 @@ export default function V1SalesOrdersPage() {
                 getItemFields: getSalesOrderItemFields,
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
-                getItemSummary: (item) =>
-                  [item?.product_code_snapshot, salesOrderRequirementName(item)]
-                    .filter(Boolean)
-                    .join(' / '),
                 load: loadAllSalesOrderItemsForPreview,
                 title: '销售订单明细',
               }

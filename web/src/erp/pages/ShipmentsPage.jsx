@@ -557,7 +557,6 @@ export default function ShipmentsPage() {
     getRecordLabel: (record) => record?.shipment_no || '当前出货单',
     getItemKey: (item) => item?.id,
     getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
-    getItemSummary: (item) => `数量 ${formatQuantity(item?.quantity)}`,
     getItemFields: (item, { record, view }) => [
       {
         key: 'sales_order_item',
@@ -572,6 +571,7 @@ export default function ShipmentsPage() {
       {
         key: 'product',
         label: '产品',
+        strong: true,
         value: (
           <ProductIdentity
             productId={item?.product_id}
@@ -595,11 +595,16 @@ export default function ShipmentsPage() {
         value: referenceLabel(inventoryLotOptions, item?.lot_id, '批次'),
       },
       {
+        key: 'quantity',
+        label: '数量',
+        value: formatQuantity(item?.quantity),
+        rowStart: true,
+      },
+      {
         key: 'unit',
         label: '单位',
         value: referenceLabel(unitOptions, item?.unit_id, '单位'),
       },
-      { key: 'quantity', label: '数量', value: formatQuantity(item?.quantity) },
       ...(hasFinalShipmentWeight(record?.status)
         ? [
             {
@@ -626,7 +631,7 @@ export default function ShipmentsPage() {
               key: 'note',
               label: '备注',
               value: item?.note || '-',
-              wide: true,
+              fullWidth: true,
             },
           ]
         : []),

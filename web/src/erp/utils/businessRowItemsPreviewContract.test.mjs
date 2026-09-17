@@ -41,11 +41,20 @@ test('seven document aggregate pages use the shared row item preview contract', 
       /expandable=\{\w+ItemsPreview\.expandable\}/,
       `${relativePath} should pass the shared controlled expandable config`
     )
-    assert.match(
-      pageSource,
-      /\{\w+ItemsPreview\.modal\}/,
-      `${relativePath} should render the shared read-only all-items modal`
+  }
+})
+
+test('aggregate pages reuse existing record details or keep the shared full-items modal', () => {
+  for (const relativePath of aggregatePages) {
+    const hasRecordDetails = source(relativePath).includes(
+      '<BusinessDetailsModal'
     )
+    if (hasRecordDetails) {
+      assert.match(previewSource(relativePath), /onOpenDetails[,:]/)
+      assert.doesNotMatch(source(relativePath), /\{\w+ItemsPreview\.modal\}/)
+    } else {
+      assert.match(source(relativePath), /\{\w+ItemsPreview\.modal\}/)
+    }
   }
 })
 

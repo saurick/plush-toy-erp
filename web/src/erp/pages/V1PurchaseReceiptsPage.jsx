@@ -345,11 +345,6 @@ export default function V1PurchaseReceiptsPage() {
     () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
     [warehouses]
   )
-  const getPurchaseReceiptItemSummary = useCallback(
-    (item) =>
-      `数量 ${formatQuantity(item?.quantity)} / 金额 ${optionalText(item?.amount)}`,
-    []
-  )
   const getPurchaseReceiptItemFields = useCallback(
     (item) => [
       {
@@ -357,16 +352,12 @@ export default function V1PurchaseReceiptsPage() {
         label: '材料',
         value: referenceLabel(materialOptions, item?.material_id, '材料'),
         wide: true,
+        strong: true,
       },
       {
         key: 'warehouse',
         label: '仓库',
         value: referenceLabel(warehouseOptions, item?.warehouse_id, '仓库'),
-      },
-      {
-        key: 'unit',
-        label: '单位',
-        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
       },
       {
         key: 'lot',
@@ -379,6 +370,12 @@ export default function V1PurchaseReceiptsPage() {
         key: 'quantity',
         label: '数量',
         value: formatQuantity(item?.quantity),
+        rowStart: true,
+      },
+      {
+        key: 'unit',
+        label: '单位',
+        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
       },
       {
         key: 'unit_price',
@@ -404,7 +401,7 @@ export default function V1PurchaseReceiptsPage() {
         key: 'note',
         label: '备注',
         value: optionalText(item?.note),
-        wide: true,
+        fullWidth: true,
       },
     ],
     [inventoryLotOptions, materialOptions, unitOptions, warehouseOptions]
@@ -419,9 +416,8 @@ export default function V1PurchaseReceiptsPage() {
     getRecordLabel: (record) => record?.receipt_no || '当前采购入库单',
     getItemKey: (item) => item?.id,
     getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
-    getItemSummary: getPurchaseReceiptItemSummary,
     getItemFields: getPurchaseReceiptItemFields,
-    modalTitle: '采购入库单完整明细',
+    onOpenDetails: (receipt) => openPurchaseReceiptDetails(receipt),
   })
 
   const openRelatedTable = ({ key }) => {
@@ -1490,8 +1486,6 @@ export default function V1PurchaseReceiptsPage() {
         expandable={receiptItemsPreview.expandable}
         emptyDescription="暂无采购入库单"
       />
-      {receiptItemsPreview.modal}
-
       <BusinessDetailsModal
         columns={visibleColumns}
         description="查看采购入库单头、状态、数量汇总和完整材料明细。"
@@ -1500,7 +1494,6 @@ export default function V1PurchaseReceiptsPage() {
           getItemFields: getPurchaseReceiptItemFields,
           getItemKey: (item) => item?.id,
           getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
-          getItemSummary: getPurchaseReceiptItemSummary,
           items: detailReceipt?.items,
           title: '采购入库明细',
         }}

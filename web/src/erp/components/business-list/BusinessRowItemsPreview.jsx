@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DownOutlined, RedoOutlined, RightOutlined } from '@ant-design/icons'
-import { Alert, Button, Empty, Modal, Pagination, Spin } from 'antd'
+import { Alert, Button, Empty, Spin } from 'antd'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
+import BusinessRowItemCards from './BusinessRowItemCards.jsx'
+import BusinessFormModal from './BusinessFormModal.jsx'
+import BusinessDetailsPagination from './BusinessDetailsPagination.jsx'
 import {
   BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE,
   BUSINESS_ROW_ITEMS_PREVIEW_LIMIT,
@@ -33,61 +36,6 @@ function errorLoadState(error, previous) {
 
 function loadState(entry, mode) {
   return entry?.[mode] || IDLE_LOAD_STATE
-}
-
-function itemValue(value) {
-  if (value === undefined || value === null || value === '') return '-'
-  return value
-}
-
-function BusinessRowItemCards({
-  getItemFields,
-  getItemKey,
-  getItemLabel,
-  getItemSummary,
-  items,
-  record,
-  startIndex = 0,
-  view,
-}) {
-  return (
-    <div className="erp-business-row-items-preview__items">
-      {items.map((item, localIndex) => {
-        const index = startIndex + localIndex
-        const fields = getItemFields(item, { index, record, view }) || []
-        const label =
-          getItemLabel?.(item, { index, record, view }) || `明细 ${index + 1}`
-        const summary = getItemSummary?.(item, { index, record, view })
-        const key = getItemKey?.(item, { index, record, view })
-        return (
-          <article
-            className="erp-business-row-item-card"
-            key={key ?? item?.id ?? `${label}-${index}`}
-          >
-            <div className="erp-business-row-item-card__head">
-              <strong>{label}</strong>
-              {summary ? <span>{summary}</span> : null}
-            </div>
-            <dl className="erp-business-row-item-card__grid">
-              {fields.map((field, fieldIndex) => (
-                <div
-                  className={
-                    field?.wide
-                      ? 'erp-business-row-item-card__field erp-business-row-item-card__field--wide'
-                      : 'erp-business-row-item-card__field'
-                  }
-                  key={field?.key || field?.label || fieldIndex}
-                >
-                  <dt>{field?.label || '字段'}</dt>
-                  <dd>{itemValue(field?.value)}</dd>
-                </div>
-              ))}
-            </dl>
-          </article>
-        )
-      })}
-    </div>
-  )
 }
 
 function BusinessRowItemsLoadState({
@@ -275,6 +223,7 @@ export function useBusinessRowItemsPreview({
   loadAll,
   loadPreview,
   modalTitle = '查看全部明细',
+  onOpenDetails,
   previewLimit = BUSINESS_ROW_ITEMS_PREVIEW_LIMIT,
   records = [],
   rowExpandable = () => true,
@@ -283,6 +232,7 @@ export function useBusinessRowItemsPreview({
   const [expandedRowKey, setExpandedRowKey] = useState(null)
   const [modalRecord, setModalRecord] = useState(null)
   const [modalPage, setModalPage] = useState(1)
+  const modalContentRef = useRef(null)
   const entriesRef = useRef(entries)
   const mountedRef = useRef(true)
   const requestsRef = useRef(new Map())
@@ -294,6 +244,7 @@ export function useBusinessRowItemsPreview({
     getRecordKey,
     loadAll,
     loadPreview,
+    onOpenDetails,
     previewLimit,
     rowExpandable,
   }
@@ -556,6 +507,10 @@ export function useBusinessRowItemsPreview({
 
   const openAll = useCallback(
     (record) => {
+      if (configRef.current.onOpenDetails) {
+        configRef.current.onOpenDetails(record)
+        return
+      }
       setModalRecord(record)
       setModalPage(1)
       ensureLoaded(record, 'all')
@@ -666,13 +621,25 @@ export function useBusinessRowItemsPreview({
     },
   }
 
-  const modal = (
-    <Modal
+  const modal = onOpenDetails ? null : (
+    <BusinessFormModal
+      className="erp-business-details-modal"
       cancelText="关闭"
       footer={
-        <Button key="close" onClick={closeModal}>
-          关闭
-        </Button>
+        <>
+          {modalLoad.status === 'success' ? (
+            <BusinessDetailsPagination
+              current={modalPageData.page}
+              pageSize={modalPageData.pageSize}
+              total={modalItems.length}
+              onChange={setModalPage}
+              contentRef={modalContentRef}
+            />
+          ) : null}
+          <Button key="close" onClick={closeModal}>
+            关闭
+          </Button>
+        </>
       }
       open={Boolean(modalRecord)}
       title={
@@ -681,7 +648,11 @@ export function useBusinessRowItemsPreview({
       width={ERP_MODAL_WIDTHS.lineItems}
       onCancel={closeModal}
     >
-      <section aria-label="完整明细" className="erp-business-row-items-modal">
+      <section
+        aria-label="完整明细"
+        className="erp-business-row-items-modal"
+        ref={modalContentRef}
+      >
         <BusinessRowItemsLoadState
           emptyDescription={emptyDescription}
           load={modalLoad}
@@ -699,18 +670,9 @@ export function useBusinessRowItemsPreview({
             startIndex={(modalPageData.page - 1) * modalPageData.pageSize}
             view="modal"
           />
-          {modalItems.length > modalPageData.pageSize ? (
-            <Pagination
-              current={modalPageData.page}
-              pageSize={modalPageData.pageSize}
-              showSizeChanger={false}
-              total={modalItems.length}
-              onChange={setModalPage}
-            />
-          ) : null}
         </BusinessRowItemsLoadState>
       </section>
-    </Modal>
+    </BusinessFormModal>
   )
 
   return { expandable, invalidate, modal, prime }

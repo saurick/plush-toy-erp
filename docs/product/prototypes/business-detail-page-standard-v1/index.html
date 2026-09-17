@@ -126,8 +126,9 @@
       }
 
       dialog {
-        width: min(1120px, calc(100vw - 48px));
-        max-height: calc(100vh - 48px);
+        width: min(94vw, 1800px, calc(100vw - 32px));
+        max-width: calc(100vw - 32px);
+        max-height: calc(100vh - 64px);
         overflow: hidden;
         border: 1px solid var(--line);
         border-radius: 10px;
@@ -278,36 +279,61 @@
       }
 
       .item-card {
+        display: grid;
+        grid-template-columns: 80px minmax(0, 1fr);
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--panel);
         overflow: hidden;
+        padding: 14px 12px 14px 0;
       }
 
       .item-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        background: var(--panel-soft);
-        padding: 10px 12px;
+        color: var(--muted);
+        font-size: 13px;
+        padding: 2px 12px;
       }
 
-      .item-head span {
-        color: var(--muted);
-        font-size: 12px;
+      .item-content {
+        min-width: 0;
+        border-left: 1px solid var(--line);
       }
 
       .item-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
+        row-gap: 12px;
         margin: 0;
-        padding: 12px;
+        padding: 10px 0;
+      }
+
+      .item-grid:first-child {
+        padding-top: 0;
+      }
+
+      .item-grid:last-child {
+        padding-bottom: 0;
+      }
+
+      .item-grid + .item-grid {
+        border-top: 1px solid var(--line);
       }
 
       .item-grid div {
         min-width: 0;
+        border-left: 1px solid var(--line);
+        padding: 0 14px;
+      }
+
+      .item-grid div:first-child {
+        border-left: 0;
+      }
+
+      .item-grid .item-note {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: 6em minmax(0, 1fr);
+        gap: 12px;
       }
 
       .item-grid dt,
@@ -323,6 +349,10 @@
       }
 
       .item-grid dd {
+        white-space: pre-wrap;
+      }
+
+      .item-name {
         font-weight: 650;
       }
 
@@ -361,7 +391,7 @@
         display: flex;
         justify-content: flex-end;
         gap: 6px;
-        margin-top: 12px;
+        margin: 0;
       }
 
       .pagination button {
@@ -376,10 +406,19 @@
 
       .modal-foot {
         display: flex;
+        flex-wrap: wrap;
+        align-items: center;
         justify-content: flex-end;
+        gap: 8px;
         border-top: 1px solid var(--line);
         background: var(--panel-soft);
         padding: 12px 22px;
+      }
+
+      #itemsTotal {
+        margin-right: auto;
+        color: var(--muted);
+        font-size: 13px;
       }
 
       @media (prefers-color-scheme: dark) {
@@ -413,6 +452,20 @@
       }
 
       @media (max-width: 560px) {
+        .item-card {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 10px;
+          padding: 12px;
+        }
+
+        .item-head {
+          padding: 0;
+        }
+
+        .item-content {
+          border-left: 0;
+        }
+
         .page {
           width: calc(100vw - 16px);
           padding: 8px 0;
@@ -523,6 +576,8 @@
       </div>
 
       <footer class="modal-foot">
+        <span id="itemsTotal"></span>
+        <nav id="itemsPagination" class="pagination" aria-label="明细分页"></nav>
         <button id="closeDetails" type="button">关闭</button>
       </footer>
     </dialog>
@@ -534,6 +589,8 @@
       const stateButtons = Array.from(document.querySelectorAll("[data-state]"));
       const itemsRegion = document.querySelector("#itemsRegion");
       const itemsTitle = document.querySelector("#itemsTitle");
+      const itemsTotal = document.querySelector("#itemsTotal");
+      const itemsPagination = document.querySelector("#itemsPagination");
       let currentState = "items";
       let currentPage = 1;
 
@@ -547,18 +604,23 @@
       function itemCard(item, index) {
         return `
           <article class="item-card">
-            <header class="item-head"><strong>明细 ${index + 1}</strong><span>${item.name}</span></header>
+            <header class="item-head"><strong>明细 ${index + 1}</strong></header>
+            <div class="item-content">
             <dl class="item-grid">
-              <div><dt>产品</dt><dd>${item.name}</dd></div>
+              <div><dt>产品</dt><dd class="item-name">${item.name}</dd></div>
               <div><dt>规格 / SKU</dt><dd>${item.sku}</dd></div>
               <div><dt>数量</dt><dd>${item.quantity}</dd></div>
               <div><dt>含税单价</dt><dd>${item.price}</dd></div>
             </dl>
+            <dl class="item-grid"><div class="item-note"><dt>备注</dt><dd>-</dd></div></dl>
+            </div>
           </article>`;
       }
 
       function renderItems() {
         itemsTitle.textContent = `完整明细（共 ${currentState === "empty" ? 0 : items.length} 条）`;
+        itemsTotal.textContent = currentState === "items" ? `共 ${items.length} 条` : currentState === "empty" ? "共 0 条" : "";
+        itemsPagination.innerHTML = "";
         if (currentState === "loading") {
           itemsRegion.innerHTML = '<div class="state-box"><div><div class="spinner" aria-hidden="true"></div><strong>正在加载明细…</strong></div></div>';
           return;
@@ -583,16 +645,16 @@
         }
         const start = (currentPage - 1) * 10;
         const pageItems = items.slice(start, start + 10);
-        itemsRegion.innerHTML = `<div class="items">${pageItems.map((item, index) => itemCard(item, start + index)).join("")}</div>
-          <nav class="pagination" aria-label="明细分页">
+        itemsRegion.innerHTML = `<div class="items">${pageItems.map((item, index) => itemCard(item, start + index)).join("")}</div>`;
+        itemsPagination.innerHTML = `
             <button type="button" data-page="1" aria-current="${currentPage === 1 ? "page" : "false"}">1</button>
             <button type="button" data-page="2" aria-current="${currentPage === 2 ? "page" : "false"}">2</button>
-          </nav>`;
-        itemsRegion.querySelectorAll("[data-page]").forEach((button) => {
+          `;
+        itemsPagination.querySelectorAll("[data-page]").forEach((button) => {
           button.addEventListener("click", () => {
             currentPage = Number(button.dataset.page);
             renderItems();
-            itemsTitle.scrollIntoView({ block: "nearest" });
+            itemsTitle.scrollIntoView({ block: "start" });
           });
         });
       }

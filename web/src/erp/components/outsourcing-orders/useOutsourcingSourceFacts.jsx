@@ -28,6 +28,7 @@ import {
 } from '../../api/qualityApi.mjs'
 import {
   OUTSOURCING_ORDER_ITEM_STATUS_LABELS,
+  SOURCE_DOCUMENT_ITEM_STATUS_TONES,
   formatUnixDate,
   V1_ROUTE_PATHS,
   statusText,
@@ -91,6 +92,7 @@ export function useOutsourcingSourceFacts({
   unitOptions,
   rows,
   canRead,
+  onOpenDetails,
 }) {
   const [sourceFactOpen, setSourceFactOpen] = useState(false)
 
@@ -809,14 +811,19 @@ export function useOutsourcingSourceFacts({
         },
         ...(isMaterial
           ? [
+              {
+                label: '材料名称',
+                value: item?.material_name_snapshot,
+                strong: true,
+              },
               { label: '材料编码', value: item?.material_code_snapshot },
-              { label: '材料名称', value: item?.material_name_snapshot },
             ]
           : [
               { label: '产品编号', value: item?.product_no_snapshot },
               { label: '产品规格', value: item?.sku_code_snapshot },
               {
                 label: '产品名称',
+                strong: true,
                 value: (
                   <ProductIdentity
                     productId={item?.product_id}
@@ -828,7 +835,11 @@ export function useOutsourcingSourceFacts({
         { label: '加工项目', value: item?.processing_item },
         { label: '工序', value: item?.process_name_snapshot },
         { label: '工序分类', value: item?.process_category_snapshot },
-        { label: '加工数量', value: item?.outsourcing_quantity },
+        {
+          label: '加工数量',
+          value: item?.outsourcing_quantity,
+          rowStart: true,
+        },
         {
           label: '单位',
           value:
@@ -843,6 +854,7 @@ export function useOutsourcingSourceFacts({
         },
         {
           label: '行状态',
+          tone: SOURCE_DOCUMENT_ITEM_STATUS_TONES[item?.line_status],
           value: statusText(
             item?.line_status,
             OUTSOURCING_ORDER_ITEM_STATUS_LABELS,
@@ -850,10 +862,10 @@ export function useOutsourcingSourceFacts({
           ),
         },
         ...(view !== 'preview'
-          ? [{ label: '备注', value: item?.note, wide: true }]
+          ? [{ label: '备注', value: item?.note, fullWidth: true }]
           : []),
         ...(sourceAction && view === 'details'
-          ? [{ label: '业务操作', value: sourceAction, wide: true }]
+          ? [{ label: '业务操作', value: sourceAction, fullWidth: true }]
           : []),
       ]
     },
@@ -900,25 +912,10 @@ export function useOutsourcingSourceFacts({
     rowExpandable: (order) =>
       canRead && Number(order?.id || 0) > 0 && Number(order?.version || 0) > 0,
     loadPreview: loadOutsourcingOrderItemsPreview,
-    loadAll: loadAllOutsourcingOrderItemsForPreview,
+    onOpenDetails,
     getItemFields: getOutsourcingOrderItemFields,
     getItemLabel: (item, { index }) => `明细 ${item?.line_no || index + 1}`,
-    getItemSummary: (item) => {
-      const isMaterial =
-        item?.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
-      const subject = isMaterial
-        ? [item?.material_code_snapshot, item?.material_name_snapshot]
-        : [
-            item?.product_no_snapshot,
-            item?.sku_code_snapshot,
-            item?.product_name_snapshot,
-          ]
-      return [...subject, item?.process_name_snapshot]
-        .filter(Boolean)
-        .join(' / ')
-    },
     getRecordLabel: (order) => order?.outsourcing_order_no || '当前加工合同',
-    modalTitle: '加工合同全部明细',
     emptyDescription: '当前加工合同暂无明细',
   })
 

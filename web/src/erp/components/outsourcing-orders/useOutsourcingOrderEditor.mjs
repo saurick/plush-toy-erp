@@ -664,6 +664,7 @@ export function useOutsourcingOrderEditor({
     processingPrintTemplateDefaults,
     openCreate,
     openEdit,
+    openOutsourcingOrderDetails,
     openOutsourcingOrderRecord,
     closeModal,
     handleSubjectTypeChange,

@@ -637,11 +637,11 @@ export default function V1ProductionOrdersPage() {
     getItemKey: (item) => item?.id,
     getItemLabel: (item, { index }) =>
       item?.line_no ? `第 ${item.line_no} 行` : `明细 ${index + 1}`,
-    getItemSummary: (item) => `计划数量 ${item?.planned_quantity || '-'}`,
     getItemFields: (item, { view }) => [
       {
         key: 'product',
         label: '产品',
+        strong: true,
         value: (
           <ProductIdentity
             productId={item?.product_id}
@@ -670,6 +670,11 @@ export default function V1ProductionOrdersPage() {
         ),
       },
       {
+        key: 'quantity',
+        label: '计划数量',
+        value: item?.planned_quantity || '-',
+      },
+      {
         key: 'unit',
         label: '单位',
         value:
@@ -677,12 +682,8 @@ export default function V1ProductionOrdersPage() {
           productionOptionLabel(optionsByType.unit, item?.unit_id, '单位'),
       },
       {
-        key: 'quantity',
-        label: '计划数量',
-        value: item?.planned_quantity || '-',
-      },
-      {
         key: 'sales_order_item',
+        rowStart: true,
         label: '销售订单行',
         value: productionOptionLabel(
           optionsByType.sales_order_item,
@@ -708,7 +709,7 @@ export default function V1ProductionOrdersPage() {
               key: 'note',
               label: '备注',
               value: item?.note || '-',
-              wide: true,
+              fullWidth: true,
             },
           ]
         : []),

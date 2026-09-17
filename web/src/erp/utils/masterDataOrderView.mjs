@@ -55,6 +55,12 @@ export const SALES_ORDER_ITEM_STATUS_LABELS = Object.freeze({
   canceled: '已取消',
 })
 
+export const SOURCE_DOCUMENT_ITEM_STATUS_TONES = Object.freeze({
+  open: 'positive',
+  closed: 'neutral',
+  canceled: 'negative',
+})
+
 export { BUSINESS_CURRENCY_OPTIONS }
 
 export const SALES_ORDER_TAX_MODE_OPTIONS = Object.freeze([

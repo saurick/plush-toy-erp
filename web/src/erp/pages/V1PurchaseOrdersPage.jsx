@@ -70,6 +70,7 @@ import {
   formatUnixDate,
   hasActionPermission,
   PURCHASE_ORDER_ITEM_STATUS_LABELS,
+  SOURCE_DOCUMENT_ITEM_STATUS_TONES,
   statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
@@ -269,33 +270,39 @@ export default function V1PurchaseOrdersPage() {
   )
   const getPurchaseOrderItemFields = useCallback(
     (item, { view }) => [
+      {
+        label: '下单材料名称',
+        value: item?.material_name_snapshot,
+        strong: true,
+      },
       { label: '下单材料编码', value: item?.material_code_snapshot },
-      { label: '下单材料名称', value: item?.material_name_snapshot },
       { label: '下单颜色', value: item?.color_snapshot },
-      { label: '产品订单编号', value: item?.product_order_no_snapshot },
-      { label: '产品编号', value: item?.product_no_snapshot },
-      { label: '产品名称', value: item?.product_name_snapshot },
-      { label: '采购数量', value: item?.purchased_quantity },
-      {
-        label: '单位',
-        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
-      },
-      { label: '单价', value: item?.unit_price },
-      { label: '金额', value: item?.amount },
-      {
-        label: '预计到货日期',
-        value: formatUnixDate(item?.expected_arrival_date),
-      },
       {
         label: '行状态',
+        tone: SOURCE_DOCUMENT_ITEM_STATUS_TONES[item?.line_status],
         value: statusText(
           item?.line_status,
           PURCHASE_ORDER_ITEM_STATUS_LABELS,
           '明细状态待核对'
         ),
       },
+      { label: '采购数量', value: item?.purchased_quantity },
+      {
+        label: '单位',
+        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
+      },
+      {
+        label: '预计到货日期',
+        value: formatUnixDate(item?.expected_arrival_date),
+        rowStart: true,
+      },
+      { label: '单价', value: item?.unit_price },
+      { label: '金额', value: item?.amount },
+      { label: '产品订单编号', value: item?.product_order_no_snapshot },
+      { label: '产品编号', value: item?.product_no_snapshot },
+      { label: '产品名称', value: item?.product_name_snapshot, strong: true },
       ...(view !== 'preview'
-        ? [{ label: '备注', value: item?.note, wide: true }]
+        ? [{ label: '备注', value: item?.note, fullWidth: true }]
         : []),
     ],
     [unitOptions]
@@ -338,15 +345,10 @@ export default function V1PurchaseOrdersPage() {
     rowExpandable: (order) =>
       canRead && Number(order?.id || 0) > 0 && Number(order?.version || 0) > 0,
     loadPreview: loadPurchaseOrderItemsPreview,
-    loadAll: loadAllPurchaseOrderItemsForPreview,
+    onOpenDetails: (order) => openPurchaseOrderDetails(order),
     getItemFields: getPurchaseOrderItemFields,
     getItemLabel: (item, { index }) => `明细 ${item?.line_no || index + 1}`,
-    getItemSummary: (item) =>
-      [item?.material_code_snapshot, item?.material_name_snapshot]
-        .filter(Boolean)
-        .join(' / '),
     getRecordLabel: (order) => order?.purchase_order_no || '当前采购订单',
-    modalTitle: '采购订单全部明细',
     emptyDescription: '当前采购订单暂无明细',
   })
   const warehouseOptions = useMemo(
@@ -1603,8 +1605,6 @@ export default function V1PurchaseOrdersPage() {
         emptyDescription="暂无采购订单"
       />
 
-      {purchaseOrderItemsPreview.modal}
-
       <BusinessDetailsModal
         columns={dataColumns}
         description="查看采购订单摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
@@ -1615,10 +1615,6 @@ export default function V1PurchaseOrdersPage() {
                 getItemFields: getPurchaseOrderItemFields,
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
-                getItemSummary: (item) =>
-                  [item?.material_code_snapshot, item?.material_name_snapshot]
-                    .filter(Boolean)
-                    .join(' / '),
                 load: loadAllPurchaseOrderItemsForPreview,
                 title: '采购订单明细',
               }

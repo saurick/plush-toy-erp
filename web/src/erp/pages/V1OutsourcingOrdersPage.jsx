@@ -225,6 +225,7 @@ export default function V1OutsourcingOrdersPage() {
     processingPrintTemplateDefaults,
     openCreate,
     openEdit,
+    openOutsourcingOrderDetails,
     openOutsourcingOrderRecord,
     closeModal,
     handleSubjectTypeChange,
@@ -375,6 +376,7 @@ export default function V1OutsourcingOrdersPage() {
     unitOptions,
     rows,
     canRead,
+    onOpenDetails: openOutsourcingOrderDetails,
   })
 
   const {
@@ -1082,8 +1084,6 @@ export default function V1OutsourcingOrdersPage() {
         scroll={{ x: 1220 }}
       />
 
-      {outsourcingOrderItemsPreview.modal}
-
       <BusinessDetailsModal
         columns={detailColumns}
         description="查看加工合同摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
@@ -1094,24 +1094,6 @@ export default function V1OutsourcingOrdersPage() {
                 getItemFields: getOutsourcingOrderItemFields,
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
-                getItemSummary: (item) => {
-                  const isMaterial =
-                    item?.subject_type ===
-                    OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
-                  const subject = isMaterial
-                    ? [
-                        item?.material_code_snapshot,
-                        item?.material_name_snapshot,
-                      ]
-                    : [
-                        item?.product_no_snapshot,
-                        item?.sku_code_snapshot,
-                        item?.product_name_snapshot,
-                      ]
-                  return [...subject, item?.process_name_snapshot]
-                    .filter(Boolean)
-                    .join(' / ')
-                },
                 load: loadAllOutsourcingOrderItemsForPreview,
                 title: '加工合同明细',
               }

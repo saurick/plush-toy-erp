@@ -1,14 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { RedoOutlined } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Descriptions,
-  Divider,
-  Empty,
-  Pagination,
-  Spin,
-} from 'antd'
+import { Alert, Button, Descriptions, Divider, Empty, Spin } from 'antd'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -16,6 +8,10 @@ import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 import { getColumnLabel } from './ColumnOrderModal.jsx'
 import BusinessFormModal from './BusinessFormModal.jsx'
+import BusinessDetailsPagination from './BusinessDetailsPagination.jsx'
+import BusinessRowItemCards, {
+  visibleDetailValue,
+} from './BusinessRowItemCards.jsx'
 
 const LINE_ITEM_PAGE_SIZE = 10
 const EMPTY_LINE_ITEMS = Object.freeze([])
@@ -44,33 +40,14 @@ function detailValue(column, record) {
   return rawValue
 }
 
-function visibleDetailValue(value) {
-  if (React.isValidElement(value)) return value
-  if (value === undefined || value === null || value === '') return '-'
-  if (typeof value === 'boolean') return value ? '是' : '否'
-  if (['string', 'number', 'bigint'].includes(typeof value)) {
-    return String(value)
-  }
-  return '-'
-}
-
 function normalizeLineItems(result) {
   const items = Array.isArray(result) ? result : result?.items
   if (!Array.isArray(items)) throw new Error('返回的明细数据无效')
   return items
 }
 
-function BusinessLineItems({ config, open, record }) {
-  const {
-    emptyDescription = '当前记录暂无明细',
-    getItemFields,
-    getItemKey,
-    getItemLabel,
-    getItemSummary,
-    items: embeddedItems,
-    load: loadItems,
-    title = '完整明细',
-  } = config
+function useBusinessLineItems(config, open, record) {
+  const { items: embeddedItems, load: loadItems } = config || {}
   const [loadState, setLoadState] = useState({
     status: 'idle',
     items: EMPTY_LINE_ITEMS,
@@ -117,10 +94,32 @@ function BusinessLineItems({ config, open, record }) {
     pageStart + LINE_ITEM_PAGE_SIZE
   )
 
+  return {
+    loadState,
+    page,
+    setPage,
+    pageStart,
+    pageItems,
+    retry: () => setRetryKey((value) => value + 1),
+  }
+}
+
+function BusinessLineItems({ config, record, state, contentRef }) {
+  const {
+    emptyDescription = '当前记录暂无明细',
+    getItemFields,
+    getItemKey,
+    getItemLabel,
+    getItemSummary,
+    title = '完整明细',
+  } = config
+  const { loadState, pageItems, pageStart, retry } = state
   return (
-    <section aria-label={title}>
+    <section aria-label={title} ref={contentRef}>
       <Divider orientation="left" plain>
-        {`${title}（共 ${loadState.items.length} 条）`}
+        {loadState.status === 'success'
+          ? `${title}（共 ${loadState.items.length} 条）`
+          : title}
       </Divider>
       {loadState.status === 'loading' || loadState.status === 'idle' ? (
         <div className="erp-business-row-items-preview__loading">
@@ -135,7 +134,7 @@ function BusinessLineItems({ config, open, record }) {
               size="small"
               className="erp-business-retry-button"
               icon={<RedoOutlined aria-hidden="true" />}
-              onClick={() => setRetryKey((value) => value + 1)}
+              onClick={retry}
             >
               重试
             </Button>
@@ -153,63 +152,16 @@ function BusinessLineItems({ config, open, record }) {
       ) : null}
       {loadState.status === 'success' && pageItems.length > 0 ? (
         <div className="erp-business-row-items-preview__items">
-          {pageItems.map((item, localIndex) => {
-            const index = pageStart + localIndex
-            const label =
-              getItemLabel?.(item, { index, record, view: 'details' }) ||
-              `明细 ${index + 1}`
-            const summary = getItemSummary?.(item, {
-              index,
-              record,
-              view: 'details',
-            })
-            const fields =
-              getItemFields?.(item, {
-                index,
-                record,
-                view: 'details',
-              }) || []
-            const key = getItemKey?.(item, {
-              index,
-              record,
-              view: 'details',
-            })
-            return (
-              <article
-                className="erp-business-row-item-card"
-                key={key ?? item?.id ?? `${label}-${index}`}
-              >
-                <div className="erp-business-row-item-card__head">
-                  <strong>{label}</strong>
-                  {summary ? <span>{summary}</span> : null}
-                </div>
-                <dl className="erp-business-row-item-card__grid">
-                  {fields.map((field, fieldIndex) => (
-                    <div
-                      className={
-                        field?.wide
-                          ? 'erp-business-row-item-card__field erp-business-row-item-card__field--wide'
-                          : 'erp-business-row-item-card__field'
-                      }
-                      key={field?.key || field?.label || fieldIndex}
-                    >
-                      <dt>{field?.label || '字段'}</dt>
-                      <dd>{visibleDetailValue(field?.value)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </article>
-            )
-          })}
-          {loadState.items.length > LINE_ITEM_PAGE_SIZE ? (
-            <Pagination
-              current={page}
-              pageSize={LINE_ITEM_PAGE_SIZE}
-              showSizeChanger={false}
-              total={loadState.items.length}
-              onChange={setPage}
-            />
-          ) : null}
+          <BusinessRowItemCards
+            getItemFields={getItemFields}
+            getItemKey={getItemKey}
+            getItemLabel={getItemLabel}
+            getItemSummary={getItemSummary}
+            items={pageItems}
+            record={record}
+            startIndex={pageStart}
+            view="details"
+          />
         </div>
       ) : null}
     </section>
@@ -229,6 +181,8 @@ export default function BusinessDetailsModal({
     ? ERP_MODAL_WIDTHS.lineItems
     : ERP_MODAL_WIDTHS.recordDetails,
 }) {
+  const lineItemsState = useBusinessLineItems(lineItems, open, record)
+  const lineItemsRef = useRef(null)
   const detailColumns = columns.filter(
     (column) =>
       column &&
@@ -240,12 +194,24 @@ export default function BusinessDetailsModal({
 
   return (
     <BusinessFormModal
+      className="erp-business-details-modal"
       description={description}
       destroyOnHidden
       footer={
-        <Button key="close" onClick={onClose}>
-          关闭
-        </Button>
+        <>
+          {lineItems && lineItemsState.loadState.status === 'success' ? (
+            <BusinessDetailsPagination
+              current={lineItemsState.page}
+              pageSize={LINE_ITEM_PAGE_SIZE}
+              total={lineItemsState.loadState.items.length}
+              onChange={lineItemsState.setPage}
+              contentRef={lineItemsRef}
+            />
+          ) : null}
+          <Button key="close" onClick={onClose}>
+            关闭
+          </Button>
+        </>
       }
       open={open}
       title={title}
@@ -272,7 +238,12 @@ export default function BusinessDetailsModal({
         })}
       />
       {lineItems ? (
-        <BusinessLineItems config={lineItems} open={open} record={record} />
+        <BusinessLineItems
+          config={lineItems}
+          record={record}
+          state={lineItemsState}
+          contentRef={lineItemsRef}
+        />
       ) : null}
       {children}
     </BusinessFormModal>

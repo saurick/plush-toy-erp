@@ -1281,29 +1281,37 @@ export default function FinancePaymentsPage() {
       : [],
     emptyDescription: '当前收付款尚未形成核销明细',
     getItemKey: (item) => item?.id,
-    getItemLabel: (item, { index }) =>
-      item?.finance_fact_no || `核销明细 ${index + 1}`,
-    getItemSummary: (item) => `${item?.amount || '-'} ${item?.currency || ''}`,
+    getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
     getItemFields: (item) => [
+      {
+        key: 'source',
+        label: '来源单号',
+        value: item?.finance_fact_no,
+        strong: true,
+        wide: true,
+      },
       {
         key: 'type',
         label: '来源类型',
         value: item?.finance_fact_type === 'RECEIVABLE' ? '应收' : '应付',
       },
       {
+        key: 'status',
+        label: '核销状态',
+        value: item?.status === 'REVERSED' ? '已冲销' : '已过账',
+      },
+      { key: 'amount', label: '核销金额', value: item?.amount },
+      { key: 'currency', label: '币种', value: item?.currency },
+      {
         key: 'original',
         label: '来源原金额',
         value: item?.finance_fact_original_amount || '-',
+        rowStart: true,
       },
       {
         key: 'outstanding',
         label: '当前未核销',
         value: item?.finance_fact_outstanding_amount ?? '-',
-      },
-      {
-        key: 'status',
-        label: '核销状态',
-        value: item?.status === 'REVERSED' ? '已冲销' : '已过账',
       },
     ],
   }

@@ -195,10 +195,10 @@ export function createPurchaseReceiptScenarios(deps) {
     const expectedHeaders = [
       '材料',
       '仓库',
-      '单位',
       '批次',
       '批次号',
       '数量',
+      '单位',
       '单价',
       '金额',
       '采购订单行',
@@ -233,7 +233,7 @@ export function createPurchaseReceiptScenarios(deps) {
     assert(
       metrics.fields.every(
         (field) =>
-          field.whiteSpace === 'normal' &&
+          field.whiteSpace === 'pre-wrap' &&
           ['anywhere', 'break-word'].includes(field.overflowWrap) &&
           field.valueScrollWidth <= field.valueClientWidth + 1
       ),
@@ -438,9 +438,9 @@ export function createPurchaseReceiptScenarios(deps) {
           receiptNo: 'PR-STYLE-L1',
           scenarioName: 'purchase-receipts-expanded-items-readable-desktop',
         })
+        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await assertPageAttachmentModalEntrypoint(page, {
           scenarioName: 'purchase-receipts-attachment-modal-desktop',
-          rowText: 'PR-STYLE-L1',
           modalTitle: '入库附件',
           panelTitle: '入库附件',
         })

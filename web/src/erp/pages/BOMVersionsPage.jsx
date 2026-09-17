@@ -363,15 +363,15 @@ export default function BOMVersionsPage() {
     },
     getItemKey: (item) => item?.id,
     getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
-    getItemSummary: (item) =>
-      `用量 ${item?.quantity || '-'} ${referenceLabel(unitOptions, item?.unit_id, '单位')}`,
     getItemFields: (item, { view }) => [
       {
         key: 'material',
         label: '材料',
         value: referenceLabel(materialOptions, item?.material_id, '材料'),
         wide: true,
+        strong: true,
       },
+      { key: 'position', label: '部位', value: item?.position || '-' },
       {
         key: 'quantity',
         label: '材料用量',
@@ -387,8 +387,12 @@ export default function BOMVersionsPage() {
         label: '损耗率',
         value: item?.loss_rate || '0',
       },
-      { key: 'position', label: '部位', value: item?.position || '-' },
-      { key: 'piece_count', label: '片数', value: item?.piece_count || '-' },
+      {
+        key: 'piece_count',
+        label: '片数',
+        value: item?.piece_count || '-',
+        rowStart: true,
+      },
       {
         key: 'total_usage',
         label: '总用量',
@@ -398,11 +402,13 @@ export default function BOMVersionsPage() {
         key: 'process_base',
         label: '加工基础',
         value: item?.process_base || '-',
+        wide: true,
       },
       {
         key: 'process_method',
         label: '加工方式',
         value: item?.process_method || '-',
+        wide: true,
       },
       ...(view === 'modal'
         ? [
@@ -410,7 +416,7 @@ export default function BOMVersionsPage() {
               key: 'note',
               label: '备注',
               value: item?.note || '-',
-              wide: true,
+              fullWidth: true,
             },
           ]
         : []),

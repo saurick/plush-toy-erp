@@ -1,4 +1,5 @@
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 
 export function createBusinessRowItemsPreviewScenarios(deps) {
   const {
@@ -12,6 +13,25 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
     path,
   } = deps
 
+  async function assertFixedDetailPagination(page, modal) {
+    const footer = modal.locator('.ant-modal-footer')
+    const pagination = footer.locator('.ant-pagination')
+    await pagination.waitFor()
+    const before = await footer.boundingBox()
+    await modal.locator('.ant-modal-body').evaluate((node) => {
+      node.scrollTop = node.scrollHeight
+    })
+    const after = await footer.boundingBox()
+    assert(Math.abs(before.y - after.y) <= 1, '滚动明细时底部分页应保持固定')
+    assert(
+      after.y >= 0 && after.y + after.height <= page.viewportSize().height,
+      '底部分页必须完整留在可视区域'
+    )
+    await modal.locator('.ant-modal-body').evaluate((node) => {
+      node.scrollTop = 0
+    })
+  }
+
   async function assertWideDetailsModal(page, modal) {
     await page.waitForFunction(() =>
       [...document.querySelectorAll('.ant-modal')]
@@ -24,6 +44,8 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
     const metrics = await modal.evaluate((node) => {
       const box = node.getBoundingClientRect()
       const cards = [...node.querySelectorAll('.erp-business-row-item-card')]
+      const grid = cards[0]?.querySelector('.erp-business-row-item-card__grid')
+      const head = cards[0]?.querySelector('.erp-business-row-item-card__head')
       return {
         viewport: window.innerWidth,
         width: box.width,
@@ -45,6 +67,26 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
             ) || []),
           ].map((field) => Math.round(field.getBoundingClientRect().top))
         ).size,
+        columns: grid
+          ? getComputedStyle(grid).gridTemplateColumns.split(' ').length
+          : 0,
+        numberBesideFields:
+          head && grid
+            ? head.getBoundingClientRect().right <=
+              grid.getBoundingClientRect().left + 1
+            : false,
+        fullFieldGaps: cards.flatMap((card) => {
+          const gridWidth = card
+            .querySelector('.erp-business-row-item-card__grid')
+            .getBoundingClientRect().width
+          return [
+            ...card.querySelectorAll(
+              '.erp-business-row-item-card__field--full'
+            ),
+          ].map((field) =>
+            Math.abs(field.getBoundingClientRect().width - gridWidth)
+          )
+        }),
       }
     })
     assert(
@@ -75,10 +117,299 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
       metrics.overflow <= 1 && metrics.fieldOverflow <= 1,
       `明细字段应完整换行且不溢出弹窗: ${JSON.stringify(metrics)}`
     )
+    assert(
+      [1, 2, 4, 6].includes(metrics.columns) &&
+        metrics.fullFieldGaps.every((gap) => gap <= 1),
+      `明细最多六列，长文本字段应占满一行: ${JSON.stringify(metrics)}`
+    )
+    if (metrics.viewport >= 1000) {
+      assert(metrics.numberBesideFields, '桌面明细编号应位于字段左侧窄栏')
+    }
     return metrics
   }
 
   return [
+    ...[
+      {
+        domain: 'sales_order',
+        path: '/erp/sales/project-orders/sales-orders',
+        heading: '销售订单',
+        title: '销售订单详情',
+        numberKey: 'order_no',
+      },
+      {
+        domain: 'outsourcing_order',
+        path: '/erp/purchase/processing-contracts',
+        heading: '委外订单',
+        title: '加工合同详情',
+        numberKey: 'outsourcing_order_no',
+      },
+      {
+        domain: 'purchase_receipt',
+        rpc: 'purchase',
+        path: '/erp/warehouse/inbound',
+        heading: '入库管理',
+        title: '采购入库详情',
+        numberKey: 'receipt_no',
+      },
+    ].map((config) => {
+      let fullReads = 0
+      const isReceipt = config.domain === 'purchase_receipt'
+      const retryFailure = config.domain === 'sales_order'
+      const recordNo = `STYLE-DETAIL-${config.domain}`
+      return {
+        name: `business-details-entry-${config.domain}`,
+        path: config.path,
+        auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width: 1440, height: 1000 },
+        beforeNavigate: async (page) => {
+          fullReads = 0
+          const items = Array.from({ length: 22 }, (_, index) => ({
+            id: index + 1,
+            [`${config.domain}_id`]: 1,
+            line_no: index + 1,
+            subject_type: 'PRODUCT',
+            product_id: 1,
+            product_name_snapshot:
+              index === 1
+                ? '长名称产品用于验证多字段明细'.repeat(4)
+                : '样式产品',
+            product_code_snapshot: `PROD-${index + 1}`,
+            product_no_snapshot: `PROD-${index + 1}`,
+            process_requirement: '缝线颜色按确认样品执行。'.repeat(6),
+            sample_note: '打样说明第一行。\n第二行请核对尺寸。',
+            material_id: 1,
+            warehouse_id: 1,
+            unit_id: 1,
+            ordered_quantity: index === 1 ? '123456789.1234' : '130',
+            outsourcing_quantity: '20',
+            quantity: '20',
+            unit_price: '1.80',
+            amount: '36.00',
+            line_status: 'open',
+            note: `明细备注 ${index + 1}。\n${'请按单据逐项核对。'.repeat(10)}`,
+          }))
+          const record = {
+            id: 1,
+            [config.numberKey]: recordNo,
+            version: 1,
+            lifecycle_status: 'draft',
+            status: 'POSTED',
+            currency: 'CNY',
+            supplier_id: 1,
+            supplier_snapshot: { id: 1, name: '样式供应商' },
+            supplier_name: '样式供应商',
+            customer_id: 1,
+            customer_snapshot: { id: 1, name: '样式客户' },
+            item_count: items.length,
+            ...(isReceipt ? { items } : {}),
+          }
+          await page.route(
+            `**/rpc/${config.rpc || config.domain}`,
+            async (route) => {
+              const { id, method, params } = route.request().postDataJSON()
+              let data
+              if (method === `list_${config.domain}s`) {
+                data = stylePaginatedRpcData(
+                  [record],
+                  `${config.domain}s`,
+                  params
+                )
+              } else if (method === `get_${config.domain}`) {
+                data = { [config.domain]: record }
+              } else if (method === `list_${config.domain}_items`) {
+                if (params.limit > 5) fullReads += 1
+                if (retryFailure && params.limit > 5 && fullReads === 1) {
+                  await route.fulfill({
+                    json: {
+                      jsonrpc: '2.0',
+                      id,
+                      result: {
+                        code: RpcErrorCode.INTERNAL,
+                        message: '明细暂时无法加载',
+                        data: {},
+                      },
+                    },
+                  })
+                  return
+                }
+                data = stylePaginatedRpcData(
+                  items,
+                  `${config.domain}_items`,
+                  params
+                )
+              } else {
+                return route.fallback()
+              }
+              await route.fulfill({
+                json: { jsonrpc: '2.0', id, result: styleRpcResult(data) },
+              })
+            }
+          )
+        },
+        verify: async (page) => {
+          await expectHeading(page, config.heading)
+          const row = page
+            .getByRole('row')
+            .filter({ has: page.getByText(recordNo, { exact: true }) })
+            .first()
+          await row
+            .getByRole('button', {
+              name: `展开${recordNo}明细，共 22 条`,
+              exact: true,
+            })
+            .click()
+          const preview = page.getByRole('region', { name: '明细快速预览' })
+          const viewAll = preview.getByRole('button', { name: '查看全部' })
+          await viewAll.waitFor()
+          const previewBounds = await preview.evaluate((node) => {
+            const viewport = node
+              .closest('.ant-table-container')
+              .querySelector('.ant-table-content, .ant-table-body')
+            const viewportBox = viewport.getBoundingClientRect()
+            const box = node.getBoundingClientRect()
+            return {
+              width: box.width,
+              viewportWidth: viewportBox.width,
+              overflow: node.scrollWidth - node.clientWidth,
+            }
+          })
+          assert(
+            previewBounds.width <= previewBounds.viewportWidth + 1 &&
+              previewBounds.overflow <= 1,
+            `桌面展开明细应留在表格可视区域内: ${JSON.stringify(previewBounds)}`
+          )
+          await viewAll.focus()
+          await page.keyboard.press('Enter')
+          const modal = page.getByRole('dialog', {
+            name: new RegExp(`^${config.title}`),
+          })
+          await modal.waitFor()
+          assert.equal(await page.getByRole('dialog').count(), 1)
+          if (retryFailure) {
+            await modal.getByRole('button', { name: '重试' }).click()
+          }
+          await modal.getByText('明细 1', { exact: true }).waitFor()
+          assert.equal(
+            await modal.locator('.erp-business-row-item-card').count(),
+            10
+          )
+          assert.equal(fullReads, isReceipt ? 0 : retryFailure ? 2 : 1)
+          const metrics = await assertWideDetailsModal(page, modal)
+          assert.equal(metrics.columns, 6)
+          assert.equal(metrics.fullFieldGaps.length, retryFailure ? 30 : 10)
+          await assertFixedDetailPagination(page, modal)
+          if (retryFailure) {
+            const rows = await modal
+              .locator('.erp-business-row-item-card')
+              .first()
+              .locator('.erp-business-row-item-card__grid')
+              .evaluateAll((nodes) =>
+                nodes.map((node) =>
+                  [...node.querySelectorAll('dt')].map(
+                    (field) => field.textContent
+                  )
+                )
+              )
+            assert.deepEqual(rows[1], [
+              '订单数量',
+              '船头版数量',
+              '生产数量',
+              '已出货数',
+              '未出货数',
+              '单位',
+            ])
+            assert.deepEqual(rows[2], ['单价', '金额', '工程 / 打样', '设计师'])
+            assert.equal(
+              await modal
+                .locator('.erp-business-row-item-card')
+                .first()
+                .locator('dt')
+                .count(),
+              22,
+              '销售明细所有字段均应保留'
+            )
+            const sample = modal
+              .locator('.erp-business-row-item-card')
+              .first()
+              .locator('dd')
+              .filter({ hasText: '打样说明第一行' })
+            assert.equal(
+              await sample.innerText(),
+              '打样说明第一行。\n第二行请核对尺寸。'
+            )
+          }
+          await modal.screenshot({
+            animations: 'disabled',
+            path: path.join(
+              outputDir,
+              `business-details-entry-${config.domain}-open.png`
+            ),
+          })
+          if (retryFailure) {
+            for (const width of [1000, 390]) {
+              await page.setViewportSize({ width, height: 1000 })
+              await assertWideDetailsModal(page, modal)
+              await assertFixedDetailPagination(page, modal)
+              await modal.screenshot({
+                animations: 'disabled',
+                path: path.join(
+                  outputDir,
+                  `business-details-entry-${config.domain}-${width}.png`
+                ),
+              })
+            }
+            await page.setViewportSize({ width: 1440, height: 1000 })
+          }
+          await modal.locator('.ant-pagination-next button').click()
+          await modal.getByText('明细 11', { exact: true }).waitFor()
+          await page.waitForFunction(() => {
+            const body = document.querySelector(
+              '.erp-business-details-modal .ant-modal-body'
+            )
+            const card = body?.querySelector('.erp-business-row-item-card')
+            if (!body || !card) return false
+            const bodyBox = body.getBoundingClientRect()
+            const cardBox = card.getBoundingClientRect()
+            return (
+              cardBox.top >= bodyBox.top - 1 &&
+              cardBox.top < bodyBox.bottom - 20
+            )
+          })
+          if (retryFailure) {
+            await page.setViewportSize({ width: 390, height: 1000 })
+            await modal
+              .locator('section')
+              .evaluate((node) => node.scrollIntoView({ block: 'start' }))
+            await modal.screenshot({
+              animations: 'disabled',
+              path: path.join(
+                outputDir,
+                'business-details-entry-sales_order-mobile-fields.png'
+              ),
+            })
+          }
+          await page.keyboard.press('Escape')
+          await modal.waitFor({ state: 'hidden' })
+          await page.waitForFunction(
+            () => document.activeElement?.textContent?.trim() === '查看全部'
+          )
+          assert.equal(
+            await preview.locator('.erp-business-row-item-card').count(),
+            5
+          )
+          await viewAll.click()
+          await modal.getByText('明细 1', { exact: true }).waitFor()
+          await modal.getByRole('button', { name: /关\s*闭/u }).click()
+          await modal.waitFor({ state: 'hidden' })
+          await assertNoHorizontalOverflow(
+            page,
+            `business-details-entry-${config.domain}`
+          )
+        },
+      }
+    }),
     ...['light', 'dark'].map((theme) => ({
       name: `business-details-wide-${theme}`,
       path: '/erp/purchase/accessories',
@@ -121,10 +452,10 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           unit_price: '1.80',
           amount: '657.00',
           expected_arrival_date: now + 86_400,
-          line_status: 'open',
+          line_status: ['open', 'closed', 'canceled'][index % 3],
           note:
             index === 1
-              ? '按产品订单分别分包，标签与送货单对应。'.repeat(8)
+              ? `${'按产品订单分别分包，标签与送货单对应。'.repeat(8)}\n末行交货说明。`
               : '外箱按订单分开',
         }))
         await page.route('**/rpc/purchase_order', async (route) => {
@@ -159,11 +490,37 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
         const orderCell = page
           .locator('.erp-business-data-table-card')
           .getByText('PO-STYLE-WIDE', { exact: true })
-        await orderCell.dblclick()
+        const itemReads = []
+        page.on('request', (request) => {
+          if (!request.url().endsWith('/rpc/purchase_order')) return
+          const { method, params } = request.postDataJSON()
+          if (method === 'list_purchase_order_items') itemReads.push(params)
+        })
+        await page
+          .getByRole('button', {
+            name: '展开PO-STYLE-WIDE明细，共 25 条',
+            exact: true,
+          })
+          .click()
+        const preview = page.getByRole('region', { name: '明细快速预览' })
+        const viewAll = preview.getByRole('button', { name: '查看全部' })
+        await viewAll.click()
         const modal = page.getByRole('dialog', { name: /采购订单详情/u })
         await modal
           .getByText('采购订单明细（共 25 条）', { exact: true })
           .waitFor()
+        assert.equal(
+          await page.getByRole('dialog').count(),
+          1,
+          '查看全部只打开已有单据详情'
+        )
+        assert.equal(
+          itemReads.length,
+          2,
+          '预览与详情各读取一次，不能再加载独立明细弹窗'
+        )
+        assert.equal(itemReads[0].limit, 5)
+        assert(itemReads[1].limit > 5)
         if (theme === 'dark') {
           await assertDarkThemeContrast(page, {
             scenarioName: 'business-details-wide-dark',
@@ -175,15 +532,64 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           await modal.locator('.erp-business-row-item-card').count(),
           10
         )
-        for (const width of [1920, 1440, 2560, 390]) {
+        await assertFixedDetailPagination(page, modal)
+        const fieldRows = await modal
+          .locator('.erp-business-row-item-card')
+          .first()
+          .locator('.erp-business-row-item-card__grid')
+          .evaluateAll((nodes) =>
+            nodes.map((node) =>
+              [...node.querySelectorAll('dt')].map((field) => field.textContent)
+            )
+          )
+        assert.deepEqual(fieldRows, [
+          [
+            '下单材料名称',
+            '下单材料编码',
+            '下单颜色',
+            '行状态',
+            '采购数量',
+            '单位',
+          ],
+          [
+            '预计到货日期',
+            '单价',
+            '金额',
+            '产品订单编号',
+            '产品编号',
+            '产品名称',
+          ],
+          ['备注'],
+        ])
+        assert.deepEqual(
+          await modal
+            .locator('.erp-business-row-item-card__field[data-tone]')
+            .evaluateAll((nodes) =>
+              nodes.slice(0, 3).map((node) => ({
+                tone: node.dataset.tone,
+                text: node.querySelector('dd').textContent,
+              }))
+            ),
+          [
+            { tone: 'positive', text: '未关闭' },
+            { tone: 'neutral', text: '已关闭' },
+            { tone: 'negative', text: '已取消' },
+          ]
+        )
+        for (const width of [1920, 1440, 2560, 1000, 680, 390]) {
           await page.setViewportSize({ width, height: 1000 })
           const metrics = await assertWideDetailsModal(page, modal)
           if (width >= 1440) {
             assert(
-              metrics.firstCardRows <= 2,
-              `加宽后常规采购明细应在两排字段内展示: ${JSON.stringify(metrics)}`
+              metrics.columns === 6 && metrics.firstCardRows === 3,
+              `常规采购明细应为两排字段加独立备注: ${JSON.stringify(metrics)}`
             )
           }
+          assert.equal(
+            metrics.fullFieldGaps.length,
+            10,
+            '每条采购明细均保留完整备注'
+          )
           await assertNoHorizontalOverflow(
             page,
             `business-details-wide-${theme}-${width}`
@@ -207,6 +613,14 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
         await modal.getByRole('button', { name: /关\s*闭/u }).click()
         await modal.waitFor({ state: 'hidden' })
         await page.setViewportSize({ width: 1920, height: 1000 })
+        await page.waitForFunction(
+          () => document.activeElement?.textContent?.trim() === '查看全部'
+        )
+        assert.equal(
+          await preview.locator('.erp-business-row-item-card').count(),
+          5,
+          '返回列表保留原展开预览'
+        )
         await orderCell.dblclick()
         await modal.getByText('明细 1', { exact: true }).waitFor()
         assert.equal(
@@ -395,10 +809,7 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
             `大条数控件不得溢出明细列: ${JSON.stringify(largeCountMetrics)}`
           )
           await page.locator('.erp-business-data-table-card').screenshot({
-            path: path.join(
-              outputDir,
-              'business-row-items-counts-default.png'
-            ),
+            path: path.join(outputDir, 'business-row-items-counts-default.png'),
           })
 
           const expand = row.getByRole('button', {
@@ -467,10 +878,7 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
             '未知条数只应在用户展开后读取一次明细并更新缓存 total'
           )
           await page.locator('.erp-business-data-table-card').screenshot({
-            path: path.join(
-              outputDir,
-              'business-row-items-unknown-loaded.png'
-            ),
+            path: path.join(outputDir, 'business-row-items-unknown-loaded.png'),
           })
           await assertNoHorizontalOverflow(
             page,
@@ -572,6 +980,7 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           await modal.waitFor({ state: 'visible', timeout: 10_000 })
           const fullItems = modal.getByRole('region', { name: '完整明细' })
           await assertWideDetailsModal(page, modal)
+          await assertFixedDetailPagination(page, modal)
           assert.equal(
             await fullItems.locator('.erp-business-row-item-card').count(),
             20
@@ -677,7 +1086,9 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
             '.erp-business-row-expand-button[aria-expanded="true"]'
           )
           const scrollViewport =
-            node.closest('.ant-table-container')?.querySelector('.ant-table-content') ||
+            node
+              .closest('.ant-table-container')
+              ?.querySelector('.ant-table-content') ||
             node.closest('.ant-table-body') ||
             node.closest('.ant-table-container')
           const cardStyle = card ? window.getComputedStyle(card) : null
