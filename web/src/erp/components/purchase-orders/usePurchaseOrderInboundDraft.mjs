@@ -126,7 +126,7 @@ export function usePurchaseOrderInboundDraft({
       )
       mutationAttemptsRef.current.settle(scope, attempt)
       closeInboundDraftModal()
-      message.success('采购入库草稿已生成')
+      message.success('到货已登记，已生成待检记录；检验通过后由仓库确认入库')
       navigate(
         routeWithQuery(V1_ROUTE_PATHS.purchaseReceipts, {
           receipt_id: receipt?.id,
@@ -143,7 +143,7 @@ export function usePurchaseOrderInboundDraft({
           '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
         )
       } else {
-        message.error(getActionErrorMessage(error, '生成采购入库草稿失败'))
+        message.error(getActionErrorMessage(error, '登记采购到货失败'))
       }
     } finally {
       setGeneratingInboundDraft(false)

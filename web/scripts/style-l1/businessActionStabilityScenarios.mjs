@@ -181,6 +181,7 @@ function createShipmentRows() {
     shipment_no: `SHIP-ACTION-${suffix}`,
     status,
     finance_release_status: financeReleaseStatus,
+    finance_release_version: financeReleaseStatus === 'PENDING' ? 1 : 2,
     sales_order_id: 1,
     customer_id: 1,
     customer_snapshot: '稳定动作客户',
@@ -520,7 +521,9 @@ async function selectBusinessRow(page, recordNo) {
 
 async function captureDesktopActionLayout(page) {
   const actionBar = page.locator('.erp-business-module-current-action').first()
-  await assertButtonSpacing(actionBar, '桌面当前操作', { contentSized: true })
+  if (await actionBar.locator('button').count()) {
+    await assertButtonSpacing(actionBar, '桌面当前操作', { contentSized: true })
+  }
   return actionBar.evaluate((bar) => {
     const actions = bar.querySelector(
       '.erp-business-selection-action-bar__actions'
@@ -584,23 +587,28 @@ async function assertDesktopActionState(
   key,
   { visible, disabled }
 ) {
-  const action = page
-    .locator('.erp-business-module-current-action')
-    .first()
-    .locator(`[data-business-action-key="${key}"]`)
-  const count = await action.count()
+  const scope =
+    '.erp-business-module-current-action, .erp-business-selection-action-drawer.ant-drawer-open'
+  const selector = `[data-business-action-key="${key}"]:visible`
+  let action = page.locator(scope).locator(selector)
+  const more = page.locator(
+    '.erp-business-module-current-action .erp-business-selection-action-bar__compact-more:visible'
+  )
+  const opened = (await action.count()) === 0 && (await more.count()) > 0
+  if (opened) await openMobileActionDrawer(page)
+  action = page.locator(scope).locator(selector)
   assert.equal(
-    count > 0,
+    (await action.count()) > 0,
     visible,
     `${key} 可见性应为 ${visible ? '显示' : '隐藏'}`
   )
-  if (visible && typeof disabled === 'boolean') {
+  if (visible && typeof disabled === 'boolean')
     assert.equal(
       await action.isDisabled(),
       disabled,
       `${key} 禁用态应为 ${disabled}`
     )
-  }
+  if (opened) await closeMobileActionDrawer(page)
 }
 
 function assertStableDesktopLayout(
@@ -620,7 +628,7 @@ function assertStableDesktopLayout(
   assert.deepEqual(
     currentCoreButtons.map((button) => button.key),
     baselineCoreButtons.map((button) => button.key),
-    `${scenarioName} 状态切换不得改变核心动作槽顺序`
+    `${scenarioName} 临时加载和恢复不得改变动作顺序`
   )
   assert.equal(
     current.actionOverflow,
@@ -955,21 +963,24 @@ export function createBusinessActionStabilityScenarios(deps) {
           expectedMode: themeMode,
           expectedEffectiveTheme: themeMode,
         })
+        await selectBusinessRow(page, 'PAY-ACTION-DRAFT')
         for (const width of [1440, 1280, 1024, 992, 991, 768, 390, 320]) {
           await page.setViewportSize({ width, height: 900 })
           const compact = width < 992
           const actions = page
-            .locator('.erp-business-module-current-action')
+            .locator('.erp-business-selection-action-bar__record-actions')
             .first()
           await actions
             .locator('.erp-business-selection-action-bar__compact-more')
-            .waitFor({ state: compact ? 'visible' : 'hidden' })
+            .waitFor({ state: 'visible' })
           if (compact) {
             const visibleCount = width >= 768 ? 2 : 1
             const primaryButtons = actions.locator(
               '.erp-business-selection-action-bar__compact-visible .ant-btn'
             )
-            await primaryButtons.nth(visibleCount - 1).waitFor({ state: 'visible' })
+            await primaryButtons
+              .nth(visibleCount - 1)
+              .waitFor({ state: 'visible' })
             await primaryButtons.nth(visibleCount).waitFor({ state: 'hidden' })
           }
           const name = `button-spacing-${themeMode}-${width}`
@@ -1039,6 +1050,12 @@ export function createBusinessActionStabilityScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await waitForBusinessPage(page, '应收管理')
+        await page
+          .locator(
+            '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+          )
+          .first()
+          .click()
         const shortActions = page
           .locator('.erp-business-module-current-action')
           .first()
@@ -1080,88 +1097,29 @@ export function createBusinessActionStabilityScenarios(deps) {
       verify: async (page) => {
         await waitForBusinessPage(page, '销售订单')
         const emptyLayout = await captureDesktopActionLayout(page)
-        assert.deepEqual(emptyLayout.keys, [
-          'clear-selection',
-          'view-details',
-          'edit',
-          'reserve-stock',
-          'lifecycle-primary',
-          'lifecycle-more',
-        ])
-        assert(
-          emptyLayout.buttons
-            .filter((button) => button.key !== 'lifecycle-more')
-            .every((button) => button.disabled) &&
-            emptyLayout.buttons.find(
-              (button) => button.key === 'lifecycle-more'
-            )?.disabled === false,
-          `未选择销售订单时执行动作应置灰，更多操作仍可打开: ${JSON.stringify(
-            emptyLayout
-          )}`
-        )
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-sales-none-desktop.png'
-        )
-
-        const editButton = page
-          .locator('.erp-business-module-current-action')
-          .first()
-          .locator('[data-business-action-key="edit"]')
-        await editButton.evaluate((button) => button.parentElement?.focus())
-        await page
-          .getByRole('tooltip')
-          .filter({ hasText: '请先选择一条销售订单' })
-          .waitFor({ state: 'visible', timeout: 5_000 })
-
+        assert.deepEqual(emptyLayout.keys, [])
         let draftLayout = null
         for (const [status] of SALES_ORDER_STATUSES) {
-          const orderNo = `SO-ACTION-${status.toUpperCase()}`
-          await selectBusinessRow(page, orderNo)
-          const layout = await captureDesktopActionLayout(page)
-          assert.equal(
-            layout.actionOverflow,
-            0,
-            `销售订单 ${status} 动作区不应横向溢出`
-          )
-          assert.equal(
-            layout.pageOverflow,
-            0,
-            `销售订单 ${status} 页面不应横向溢出`
-          )
-          assertStableDesktopLayout(
-            assert,
-            emptyLayout,
-            layout,
-            `销售订单 ${status}`,
-            { contextualKeys: ['related-records'] }
-          )
-          if (status === 'draft') draftLayout = layout
-          assert.equal(
-            layout.buttons.find((button) => button.key === 'edit')?.disabled,
-            status !== 'draft',
-            `销售订单 ${status} 的编辑入口应保留并按草稿状态启用`
-          )
-          assert.equal(
-            layout.buttons.find((button) => button.key === 'reserve-stock')
-              ?.disabled,
-            status !== 'active',
-            `销售订单 ${status} 的预留库存入口应保留并按生效状态启用`
-          )
-          assert.equal(
-            layout.buttons.find((button) => button.key === 'lifecycle-primary')
-              ?.disabled,
-            status !== 'draft',
-            `销售订单 ${status} 的固定主动作应保留并独立置灰`
-          )
-          assert.equal(
-            layout.buttons.find((button) => button.key === 'lifecycle-more')
-              ?.disabled,
-            false,
-            `销售订单 ${status} 应始终可打开更多操作查看原因`
-          )
+          await selectBusinessRow(page, `SO-ACTION-${status.toUpperCase()}`)
+          await assertDesktopActionState(page, assert, 'edit', {
+            visible: status === 'draft',
+            disabled: false,
+          })
+          await assertDesktopActionState(page, assert, 'reserve-stock', {
+            visible: ['draft', 'submitted', 'active'].includes(status),
+            disabled: status !== 'active',
+          })
+          await assertDesktopActionState(page, assert, 'lifecycle-primary', {
+            visible: ['draft', 'active'].includes(status),
+            disabled: false,
+          })
+          await assertDesktopActionState(page, assert, 'lifecycle-more', {
+            visible: ['draft', 'submitted', 'active'].includes(status),
+            disabled: false,
+          })
+          if (status === 'draft')
+            draftLayout = await captureDesktopActionLayout(page)
+          await assertNoHorizontalOverflow(page, `销售订单 ${status}`)
           await screenshot(
             page,
             path,
@@ -1171,10 +1129,10 @@ export function createBusinessActionStabilityScenarios(deps) {
         }
 
         await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
-        const lifecycleMoreButton = page
-          .locator('.erp-business-module-current-action')
-          .first()
-          .locator('[data-business-action-key="lifecycle-more"]')
+        await openMobileActionDrawer(page)
+        const lifecycleMoreButton = page.locator(
+          '.erp-business-selection-action-drawer [data-business-action-key="lifecycle-more"]'
+        )
         await lifecycleMoreButton.click()
         const lifecycleMenu = page
           .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
@@ -1269,6 +1227,12 @@ export function createBusinessActionStabilityScenarios(deps) {
           .last()
           .click()
         await closeDialog.waitFor({ state: 'hidden', timeout: 5_000 })
+        if (
+          await page
+            .locator('.erp-business-selection-action-drawer.ant-drawer-open')
+            .count()
+        )
+          await closeMobileActionDrawer(page)
         await page.setViewportSize({ width: 1440, height: 900 })
 
         await page
@@ -1298,18 +1262,16 @@ export function createBusinessActionStabilityScenarios(deps) {
           savingLayout,
           '销售订单保存中'
         )
-        for (const key of ['edit', 'reserve-stock', 'lifecycle-primary']) {
+        for (const key of ['edit', 'lifecycle-primary']) {
           assert.equal(
             savingLayout.buttons.find((button) => button.key === key)?.disabled,
             true,
             `销售订单保存中应保留并禁用 ${key}: ${JSON.stringify(savingLayout)}`
           )
         }
-        assert.equal(
-          savingLayout.buttons.find((button) => button.key === 'lifecycle-more')
-            ?.disabled,
-          false,
-          '销售订单保存中仍可打开更多操作查看禁用原因'
+        assert(
+          savingLayout.keys.includes('更多操作'),
+          '保存中仍可查看辅助动作与原因'
         )
         await screenshot(
           page,
@@ -1463,244 +1425,98 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
       verify: async (page) => {
         await waitForBusinessPage(page, '采购订单')
-        const purchaseEmpty = await captureDesktopActionLayout(page)
-        assert.deepEqual(purchaseEmpty.keys, [
-          'clear-selection',
-          'purchase-edit',
-          'lifecycle-primary',
-          'generate-inbound',
-          'print-contract',
-          'lifecycle-more',
-        ])
-        assert(
-          purchaseEmpty.buttons
-            .filter((button) => button.key !== 'lifecycle-more')
-            .every((button) => button.disabled) &&
-            purchaseEmpty.buttons.find(
-              (button) => button.key === 'lifecycle-more'
-            )?.disabled === false,
-          `采购订单未选择记录时执行动作应置灰，更多操作仍可打开: ${JSON.stringify(
-            purchaseEmpty
-          )}`
-        )
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-purchase-none-desktop.png'
-        )
+        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
         for (const status of ['DRAFT', 'APPROVED', 'CLOSED']) {
-          await selectBusinessRow(page, `PO-ACTION-${status}`)
-          const layout = await captureDesktopActionLayout(page)
-          assertStableDesktopLayout(
-            assert,
-            purchaseEmpty,
-            layout,
-            `采购订单 ${status}`,
-            { contextualKeys: ['related-records'] }
-          )
-          await assertDesktopActionState(page, assert, 'purchase-edit', {
-            visible: true,
-            disabled: status !== 'DRAFT',
-          })
-          await assertDesktopActionState(page, assert, 'generate-inbound', {
-            visible: true,
-            disabled: status !== 'APPROVED',
-          })
-          await assertDesktopActionState(page, assert, 'lifecycle-primary', {
-            visible: true,
-            disabled: status !== 'DRAFT',
-          })
-          await assertDesktopActionState(page, assert, 'lifecycle-more', {
+          await selectBusinessRow(page, 'PO-ACTION-' + status)
+          await assertDesktopActionState(page, assert, 'purchase-details', {
             visible: true,
             disabled: false,
           })
-          await screenshot(
-            page,
-            path,
-            outputDir,
-            `business-action-stability-purchase-${status.toLowerCase()}-desktop.png`
-          )
+          await assertDesktopActionState(page, assert, 'purchase-edit', {
+            visible: status === 'DRAFT',
+            disabled: false,
+          })
+          await assertDesktopActionState(page, assert, 'generate-inbound', {
+            visible: status !== 'CLOSED',
+            disabled: status !== 'APPROVED',
+          })
+          await assertDesktopActionState(page, assert, 'lifecycle-primary', {
+            visible: status !== 'CLOSED',
+            disabled: false,
+          })
+          await assertDesktopActionState(page, assert, 'lifecycle-more', {
+            visible: status !== 'CLOSED',
+            disabled: false,
+          })
+          await assertNoHorizontalOverflow(page, '采购订单 ' + status)
         }
-
-        await page
-          .locator('.erp-business-module-current-action')
-          .first()
-          .locator('[data-business-action-key="clear-selection"]')
-          .click()
-        assertStableDesktopLayout(
-          assert,
-          purchaseEmpty,
-          await captureDesktopActionLayout(page),
-          '采购订单清空选择恢复'
-        )
         await gotoScenarioPath(page, PURCHASE_RECEIPT_PATH)
         await waitForBusinessPage(page, '入库管理')
-        const receiptEmpty = await captureDesktopActionLayout(page)
+        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
         await selectBusinessRow(page, 'PR-STYLE-L1-DRAFT')
-        assertStableDesktopLayout(
-          assert,
-          receiptEmpty,
-          await captureDesktopActionLayout(page),
-          '采购入库 DRAFT',
-          { contextualKeys: ['related-records', 'view-payable'] }
-        )
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-receipt-draft-desktop.png'
-        )
+        await assertDesktopActionState(page, assert, 'post', {
+          visible: true,
+          disabled: false,
+        })
+        for (const key of ['create-return', 'create-adjustment'])
+          await assertDesktopActionState(page, assert, key, { visible: false })
         await selectBusinessRow(page, 'PR-STYLE-L1-CANCELLED')
-        const receiptCancelled = await captureDesktopActionLayout(page)
-        assertStableDesktopLayout(
-          assert,
-          receiptEmpty,
-          receiptCancelled,
-          '采购入库 CANCELLED',
-          { contextualKeys: ['related-records', 'view-payable'] }
-        )
         for (const key of [
           'create-return',
           'create-adjustment',
           'create-payable',
           'post',
           'cancel',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
-        }
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-receipt-cancelled-desktop.png'
-        )
-
+        ])
+          await assertDesktopActionState(page, assert, key, { visible: false })
         await gotoScenarioPath(page, QUALITY_INSPECTION_PATH)
         await waitForBusinessPage(page, '质量检验')
-        const qualityEmpty = await captureDesktopActionLayout(page)
-        assert(
-          qualityEmpty.buttons.every((button) => button.disabled),
-          '质量检验未选择记录时，已授权动作应置灰'
-        )
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-quality-none-desktop.png'
-        )
+        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
         for (const status of ['DRAFT', 'SUBMITTED', 'CANCELLED']) {
-          await selectBusinessRow(page, `QI-ACTION-${status}`)
-          const layout = await captureDesktopActionLayout(page)
-          assertStableDesktopLayout(
-            assert,
-            qualityEmpty,
-            layout,
-            `质量检验 ${status}`,
-            {
-              contextualKeys: [
-                'related-records',
-                'outsourcing-disposition-view',
-              ],
-            }
-          )
-          if (status === 'DRAFT') {
-            await assertDesktopActionState(page, assert, 'submit', {
-              visible: true,
-              disabled: false,
+          await selectBusinessRow(page, 'QI-ACTION-' + status)
+          await assertDesktopActionState(page, assert, 'submit', {
+            visible: status === 'DRAFT',
+            disabled: false,
+          })
+          for (const key of ['pass', 'reject'])
+            await assertDesktopActionState(page, assert, key, {
+              visible: status !== 'CANCELLED',
+              disabled: status !== 'SUBMITTED',
             })
-          }
-          if (status === 'SUBMITTED') {
-            for (const key of ['pass', 'reject']) {
-              await assertDesktopActionState(page, assert, key, {
-                visible: true,
-                disabled: false,
-              })
-            }
-          }
-          if (status === 'CANCELLED') {
-            for (const key of [
-              'submit',
-              'pass',
-              'reject',
-              'quality-disposition',
-              'cancel',
-            ]) {
-              await assertDesktopActionState(page, assert, key, {
-                visible: true,
-                disabled: true,
-              })
-            }
-          }
-          await screenshot(
-            page,
-            path,
-            outputDir,
-            `business-action-stability-quality-${status.toLowerCase()}-desktop.png`
-          )
+          await assertDesktopActionState(page, assert, 'quality-disposition', {
+            visible: status !== 'CANCELLED',
+            disabled: true,
+          })
+          await assertDesktopActionState(page, assert, 'cancel', {
+            visible: status !== 'CANCELLED',
+            disabled: false,
+          })
+          await assertNoHorizontalOverflow(page, '质检 ' + status)
         }
         await selectBusinessRow(page, 'QI-ACTION-PRODUCTION-WIP')
         await assertDesktopActionState(page, assert, 'related-records', {
           visible: false,
         })
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-quality-unrelated-desktop.png'
-        )
-
         await gotoScenarioPath(page, SHIPMENT_PATH)
         await waitForBusinessPage(page, '出货单')
-        const shipmentEmpty = await captureDesktopActionLayout(page)
-        assert(
-          shipmentEmpty.buttons.every((button) => button.disabled),
-          '出货单未选择记录时，已授权动作应置灰'
-        )
+        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        await selectBusinessRow(page, 'SHIP-ACTION-CANCELLED')
+        for (const key of [
+          'shipment-edit',
+          'shipment-quality',
+          'shipment-release',
+          'shipment-ship',
+          'shipment-cancel',
+          'shipment-receivable',
+          'shipment-invoice',
+        ])
+          await assertDesktopActionState(page, assert, key, { visible: false })
+        await assertNoHorizontalOverflow(page, '取消出货')
         await screenshot(
           page,
           path,
           outputDir,
-          'business-action-stability-shipment-none-desktop.png'
-        )
-        for (const status of ['DRAFT', 'SHIPPED', 'CANCELLED']) {
-          await selectBusinessRow(page, `SHIP-ACTION-${status}`)
-          const layout = await captureDesktopActionLayout(page)
-          assertStableDesktopLayout(
-            assert,
-            shipmentEmpty,
-            layout,
-            `出货单 ${status}`,
-            { contextualKeys: ['related-records'] }
-          )
-          if (status === 'CANCELLED') {
-            for (const key of [
-              'shipment-quality',
-              'shipment-release',
-              'shipment-ship',
-              'shipment-cancel',
-              'shipment-receivable',
-              'shipment-invoice',
-            ]) {
-              await assertDesktopActionState(page, assert, key, {
-                visible: true,
-                disabled: true,
-              })
-            }
-          }
-          await screenshot(
-            page,
-            path,
-            outputDir,
-            `business-action-stability-shipment-${status.toLowerCase()}-desktop.png`
-          )
-        }
-        await assertNoHorizontalOverflow(
-          page,
-          'business-action-stability-representative-pages-desktop'
+          'business-action-stability-representative-pages-desktop.png'
         )
       },
     },
@@ -1718,137 +1534,47 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
       verify: async (page) => {
         await waitForBusinessPage(page, '收付款与核销')
-        const financeEmpty = await captureDesktopActionLayout(page)
-        for (const key of [
-          'payment-details',
-          'payment-allocation',
-          'payment-approval',
-          'payment-cancel',
-          'payment-reverse',
-          'payment-reload',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
+        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        const states = {
+          DRAFT: {
+            allocation: true,
+            approval: false,
+            cancel: false,
+            reverse: true,
+          },
+          APPROVED: { allocation: false, cancel: false, reverse: true },
+          POSTED: { reverse: false },
+          REVERSED: {},
+          CANCELLED: {},
         }
+        for (const [status, actions] of Object.entries(states)) {
+          await selectBusinessRow(page, 'PAY-ACTION-' + status)
+          for (const action of [
+            'allocation',
+            'approval',
+            'cancel',
+            'reverse',
+          ]) {
+            await assertDesktopActionState(page, assert, 'payment-' + action, {
+              visible: Object.hasOwn(actions, action),
+              disabled: actions[action],
+            })
+          }
+          await assertDesktopActionState(page, assert, 'payment-details', {
+            visible: true,
+            disabled: false,
+          })
+          await assertNoHorizontalOverflow(page, '收付款 ' + status)
+        }
+        await page
+          .locator('[data-business-action-key="clear-selection"]')
+          .click()
+        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
         await screenshot(
           page,
           path,
           outputDir,
           'business-action-stability-finance-none-desktop.png'
-        )
-
-        await selectBusinessRow(page, 'PAY-ACTION-DRAFT')
-        assertStableDesktopLayout(
-          assert,
-          financeEmpty,
-          await captureDesktopActionLayout(page),
-          '收付款 DRAFT'
-        )
-        await assertDesktopActionState(page, assert, 'payment-allocation', {
-          visible: true,
-          disabled: true,
-        })
-        await assertDesktopActionState(page, assert, 'payment-approval', {
-          visible: true,
-          disabled: false,
-        })
-        await assertDesktopActionState(page, assert, 'payment-cancel', {
-          visible: true,
-          disabled: false,
-        })
-        await assertDesktopActionState(page, assert, 'payment-reverse', {
-          visible: true,
-          disabled: true,
-        })
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-finance-draft-desktop.png'
-        )
-
-        await selectBusinessRow(page, 'PAY-ACTION-APPROVED')
-        assertStableDesktopLayout(
-          assert,
-          financeEmpty,
-          await captureDesktopActionLayout(page),
-          '收付款 APPROVED'
-        )
-        await assertDesktopActionState(page, assert, 'payment-allocation', {
-          visible: true,
-          disabled: false,
-        })
-        await assertDesktopActionState(page, assert, 'payment-approval', {
-          visible: true,
-          disabled: true,
-        })
-        await assertDesktopActionState(page, assert, 'payment-reverse', {
-          visible: true,
-          disabled: true,
-        })
-
-        await selectBusinessRow(page, 'PAY-ACTION-POSTED')
-        assertStableDesktopLayout(
-          assert,
-          financeEmpty,
-          await captureDesktopActionLayout(page),
-          '收付款 POSTED'
-        )
-        for (const key of [
-          'payment-allocation',
-          'payment-approval',
-          'payment-cancel',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
-        }
-        await assertDesktopActionState(page, assert, 'payment-reverse', {
-          visible: true,
-          disabled: false,
-        })
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-finance-posted-desktop.png'
-        )
-
-        await selectBusinessRow(page, 'PAY-ACTION-REVERSED')
-        assertStableDesktopLayout(
-          assert,
-          financeEmpty,
-          await captureDesktopActionLayout(page),
-          '收付款 REVERSED'
-        )
-        for (const key of [
-          'payment-allocation',
-          'payment-approval',
-          'payment-cancel',
-          'payment-reverse',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
-        }
-        await page
-          .locator('.erp-business-module-current-action')
-          .first()
-          .locator('[data-business-action-key="clear-selection"]')
-          .click()
-        assertStableDesktopLayout(
-          assert,
-          financeEmpty,
-          await captureDesktopActionLayout(page),
-          '收付款清空选择恢复'
-        )
-        await assertNoHorizontalOverflow(
-          page,
-          'business-action-stability-finance-payments-desktop'
         )
       },
     },
@@ -1917,87 +1643,40 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
       verify: async (page) => {
         await waitForBusinessPage(page, '出货单')
-        const shipmentEmpty = await captureDesktopActionLayout(page)
-        await selectBusinessRow(page, 'SHIP-ACTION-DRAFT')
-        assert.deepEqual(
-          (await captureDesktopActionLayout(page)).keys,
-          shipmentEmpty.keys,
-          '出货单 DRAFT 不得增删动作槽'
-        )
-        await assertDesktopActionState(page, assert, 'shipment-release', {
-          visible: true,
-          disabled: false,
-        })
-        await assertDesktopActionState(page, assert, 'shipment-ship', {
-          visible: true,
-          disabled: true,
-        })
-        await assertDesktopActionState(page, assert, 'shipment-cancel', {
-          visible: true,
-          disabled: false,
-        })
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-shipment-pending-desktop.png'
-        )
-
-        await selectBusinessRow(page, 'SHIP-ACTION-DRAFT-APPROVED')
-        assert.deepEqual(
-          (await captureDesktopActionLayout(page)).keys,
-          shipmentEmpty.keys,
-          '出货单 APPROVED 不得增删动作槽'
-        )
-        await assertDesktopActionState(page, assert, 'shipment-release', {
-          visible: true,
-          disabled: true,
-        })
-        await assertDesktopActionState(page, assert, 'shipment-ship', {
-          visible: true,
-          disabled: false,
-        })
-
-        await selectBusinessRow(page, 'SHIP-ACTION-DRAFT-REJECTED')
-        assert.deepEqual(
-          (await captureDesktopActionLayout(page)).keys,
-          shipmentEmpty.keys,
-          '出货单 REJECTED 不得增删动作槽'
-        )
-        for (const key of ['shipment-release', 'shipment-ship']) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
+        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        for (const [suffix, visible, disabled] of [
+          ['DRAFT', true, true],
+          ['DRAFT-APPROVED', true, false],
+          ['DRAFT-REJECTED', false],
+          ['SHIPPED', false],
+          ['CANCELLED', false],
+        ]) {
+          await selectBusinessRow(page, 'SHIP-ACTION-' + suffix)
+          await assertDesktopActionState(page, assert, 'shipment-ship', {
+            visible,
+            disabled,
           })
+          await assertDesktopActionState(page, assert, 'shipment-cancel', {
+            visible: suffix !== 'CANCELLED',
+            disabled: false,
+          })
+          for (const key of [
+            'shipment-release',
+            'shipment-receivable',
+            'shipment-invoice',
+            'shipment-quality',
+          ]) {
+            await assertDesktopActionState(page, assert, key, {
+              visible: false,
+            })
+          }
+          await assertNoHorizontalOverflow(page, '仓库出货 ' + suffix)
         }
-        await assertDesktopActionState(page, assert, 'shipment-cancel', {
-          visible: true,
-          disabled: false,
-        })
-
-        await selectBusinessRow(page, 'SHIP-ACTION-SHIPPED')
-        assert.deepEqual(
-          (await captureDesktopActionLayout(page)).keys,
-          shipmentEmpty.keys,
-          '出货单 SHIPPED 不得增删动作槽'
-        )
-        await assertDesktopActionState(page, assert, 'shipment-ship', {
-          visible: true,
-          disabled: true,
-        })
-        await assertDesktopActionState(page, assert, 'shipment-cancel', {
-          visible: true,
-          disabled: false,
-        })
         await screenshot(
           page,
           path,
           outputDir,
-          'business-action-stability-shipment-shipped-desktop.png'
-        )
-        await assertNoHorizontalOverflow(
-          page,
-          'business-action-stability-warehouse-shipments-desktop'
+          'business-action-stability-warehouse-shipments-desktop.png'
         )
       },
     },
@@ -2015,164 +1694,46 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
       verify: async (page) => {
         await waitForBusinessPage(page, '生产异常处置')
-        const exceptionEmpty = await captureDesktopActionLayout(page)
-        for (const key of [
-          'production-exception-approval',
-          'production-exception-withdraw',
-          'production-exception-execute',
-          'production-exception-reverse',
-          'production-exception-revoke-quota',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
+        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        const cases = {
+          'SUBMITTED-SCRAP': {
+            approval: false,
+            withdraw: false,
+            execute: true,
+            reverse: true,
+          },
+          'APPROVED-SCRAP': { execute: false, reverse: true },
+          'APPLIED-SCRAP': { reverse: false },
+          'APPROVED-OVER-ISSUE': { 'revoke-quota': false },
+          'CANCELLED-SCRAP': {},
         }
-        await assertDesktopActionState(
-          page,
-          assert,
-          'production-exception-decide',
-          { visible: false }
-        )
-
-        await selectBusinessRow(page, 'PEX-ACTION-SUBMITTED-SCRAP')
-        assertStableDesktopLayout(
-          assert,
-          exceptionEmpty,
-          await captureDesktopActionLayout(page),
-          '生产异常 SUBMITTED SCRAP'
-        )
-        for (const key of [
-          'production-exception-approval',
-          'production-exception-withdraw',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: false,
-          })
+        for (const [suffix, actions] of Object.entries(cases)) {
+          await selectBusinessRow(page, 'PEX-ACTION-' + suffix)
+          for (const action of [
+            'approval',
+            'withdraw',
+            'execute',
+            'reverse',
+            'revoke-quota',
+            'decide',
+          ]) {
+            await assertDesktopActionState(
+              page,
+              assert,
+              'production-exception-' + action,
+              {
+                visible: Object.hasOwn(actions, action),
+                disabled: actions[action],
+              }
+            )
+          }
+          await assertNoHorizontalOverflow(page, '生产异常 ' + suffix)
         }
-        for (const key of [
-          'production-exception-execute',
-          'production-exception-reverse',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
-        }
-        await assertDesktopActionState(
-          page,
-          assert,
-          'production-exception-revoke-quota',
-          { visible: true, disabled: true }
-        )
         await screenshot(
           page,
           path,
           outputDir,
-          'business-action-stability-production-submitted-desktop.png'
-        )
-
-        await selectBusinessRow(page, 'PEX-ACTION-APPROVED-SCRAP')
-        assertStableDesktopLayout(
-          assert,
-          exceptionEmpty,
-          await captureDesktopActionLayout(page),
-          '生产异常 APPROVED SCRAP'
-        )
-        for (const key of [
-          'production-exception-approval',
-          'production-exception-withdraw',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
-        }
-        await assertDesktopActionState(
-          page,
-          assert,
-          'production-exception-execute',
-          { visible: true, disabled: false }
-        )
-        await assertDesktopActionState(
-          page,
-          assert,
-          'production-exception-reverse',
-          { visible: true, disabled: true }
-        )
-
-        await selectBusinessRow(page, 'PEX-ACTION-APPLIED-SCRAP')
-        assertStableDesktopLayout(
-          assert,
-          exceptionEmpty,
-          await captureDesktopActionLayout(page),
-          '生产异常 APPLIED SCRAP'
-        )
-        await assertDesktopActionState(
-          page,
-          assert,
-          'production-exception-execute',
-          { visible: true, disabled: true }
-        )
-        await assertDesktopActionState(
-          page,
-          assert,
-          'production-exception-reverse',
-          { visible: true, disabled: false }
-        )
-
-        await selectBusinessRow(page, 'PEX-ACTION-APPROVED-OVER-ISSUE')
-        assertStableDesktopLayout(
-          assert,
-          exceptionEmpty,
-          await captureDesktopActionLayout(page),
-          '生产异常 APPROVED OVER ISSUE'
-        )
-        for (const key of [
-          'production-exception-execute',
-          'production-exception-reverse',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
-        }
-        await assertDesktopActionState(
-          page,
-          assert,
-          'production-exception-revoke-quota',
-          { visible: true, disabled: false }
-        )
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-production-quota-desktop.png'
-        )
-
-        await selectBusinessRow(page, 'PEX-ACTION-CANCELLED-SCRAP')
-        assertStableDesktopLayout(
-          assert,
-          exceptionEmpty,
-          await captureDesktopActionLayout(page),
-          '生产异常 CANCELLED SCRAP'
-        )
-        for (const key of [
-          'production-exception-approval',
-          'production-exception-withdraw',
-          'production-exception-execute',
-          'production-exception-reverse',
-          'production-exception-revoke-quota',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
-        }
-        await assertNoHorizontalOverflow(
-          page,
-          'business-action-stability-production-exceptions-desktop'
+          'business-action-stability-production-exceptions-desktop.png'
         )
       },
     },
@@ -2193,160 +1754,53 @@ export function createBusinessActionStabilityScenarios(deps) {
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
-        const emptyLayout = await captureMobileActionLayout(page)
-        assert.deepEqual(emptyLayout.visible, ['lifecycle-primary'])
-        assert.equal(
-          emptyLayout.moreDisabled,
-          false,
-          '手机未选择记录时仍应允许查看全部已授权动作'
-        )
-        assert.equal(emptyLayout.pageOverflow, 0)
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-sales-none-mobile-dark.png'
-        )
+        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        await selectBusinessRow(page, 'SO-ACTION-DRAFT')
+        assert.deepEqual((await captureMobileActionLayout(page)).visible, [
+          'lifecycle-primary',
+        ])
         await openMobileActionDrawer(page)
-        const emptyDrawerKeys = await captureMobileDrawerKeys(page)
-        assert.equal(
-          emptyDrawerKeys.includes('related-records'),
-          false,
-          '手机未选择订单时不展示关联记录入口'
+        const draftKeys = await captureMobileDrawerKeys(page)
+        assert(draftKeys.includes('edit'))
+        assert(draftKeys.includes('reserve-stock'))
+        assert(draftKeys.includes('lifecycle-more'))
+        const reserve = page.locator(
+          '.erp-business-selection-action-drawer [data-business-action-key="reserve-stock"]'
         )
-        assert(
-          emptyDrawerKeys.includes('lifecycle-more'),
-          '手机未选择记录时应在更多抽屉保留低频状态动作入口'
-        )
-        await page.waitForFunction(
-          () =>
-            document.activeElement?.classList.contains(
-              'erp-business-action-tooltip-anchor'
-            ) === true
-        )
-        const emptyDrawerState = await page
-          .locator('.erp-business-selection-action-drawer__list')
-          .evaluate((list) => ({
-            actions: Array.from(list.querySelectorAll('button')).map(
-              (button) => ({
-                key:
-                  button.getAttribute('data-business-action-key') ||
-                  String(button.textContent || '')
-                    .replace(/\s+/gu, '')
-                    .trim(),
-                disabled: button.disabled,
-              })
-            ),
-            focusedOnDisabledReason:
-              document.activeElement?.classList.contains(
-                'erp-business-action-tooltip-anchor'
-              ) === true,
-          }))
-        assert(
-          emptyDrawerState.actions.length > 0 &&
-            emptyDrawerState.actions
-              .filter((action) => action.key !== 'lifecycle-more')
-              .every((action) => action.disabled) &&
-            emptyDrawerState.actions.find(
-              (action) => action.key === 'lifecycle-more'
-            )?.disabled === false,
-          `手机未选择记录时抽屉内执行动作必须置灰，更多操作仍可打开: ${JSON.stringify(
-            emptyDrawerState
-          )}`
-        )
-        assert.equal(
-          emptyDrawerState.focusedOnDisabledReason,
-          true,
-          '手机未选择记录时打开抽屉应把焦点交给首个禁用原因'
-        )
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-sales-none-drawer-mobile-dark.png'
-        )
-        await closeMobileActionDrawer(page)
-
-        await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
-        const activeLayout = await captureMobileActionLayout(page)
-        assert(activeLayout.visible.length > 0)
-        assert.equal(activeLayout.moreDisabled, false)
-        assert.equal(activeLayout.pageOverflow, 0)
-        await openMobileActionDrawer(page)
-        const activeDrawerKeys = await captureMobileDrawerKeys(page)
-        assert.equal(
-          activeDrawerKeys.includes('related-records'),
-          true,
-          '手机选中订单后应提供关联记录入口'
-        )
-        const lifecycleMore = page
-          .locator('.erp-business-selection-action-drawer')
-          .locator('[data-business-action-key="lifecycle-more"]')
-        await lifecycleMore.click()
+        assert.equal(await reserve.isDisabled(), true)
+        await reserve.evaluate((button) => button.parentElement.focus())
         await page
-          .locator('.ant-dropdown-menu')
-          .filter({ hasText: '取消' })
-          .waitFor({ state: 'visible', timeout: 5_000 })
-        await page
-          .locator('.erp-business-selection-action-drawer')
+          .getByRole('tooltip')
+          .filter({ hasText: '销售订单生效后可预留库存' })
           .waitFor({ state: 'visible' })
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-sales-active-drawer-mobile-dark.png'
-        )
-        await page.keyboard.press('Escape')
         await closeMobileActionDrawer(page)
-
+        await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
+        assert.deepEqual((await captureMobileActionLayout(page)).visible, [
+          'lifecycle-primary',
+        ])
+        await assertDesktopActionState(page, assert, 'edit', { visible: false })
+        await assertDesktopActionState(page, assert, 'reserve-stock', {
+          visible: true,
+          disabled: false,
+        })
         await selectBusinessRow(page, 'SO-ACTION-CLOSED')
-        const closedLayout = await captureMobileActionLayout(page)
-        assert.equal(
-          closedLayout.visible.includes('lifecycle-primary'),
-          true,
-          '手机终态订单仍应保留固定生命周期主动作'
-        )
-        assert.equal(
-          await page
-            .locator('.erp-business-module-current-action')
-            .first()
-            .locator('[data-business-action-key="lifecycle-primary"]')
-            .isDisabled(),
-          true,
-          '手机终态订单的固定主动作应置灰'
-        )
-        assert.equal(closedLayout.moreDisabled, false)
-        await openMobileActionDrawer(page)
-        const closedDrawerKeys = await captureMobileDrawerKeys(page)
-        assert.equal(
-          closedDrawerKeys.includes('lifecycle-primary'),
-          false,
-          '手机固定主动作始终留在主区，不重复进入抽屉'
-        )
-        assert.equal(
-          closedDrawerKeys.includes('lifecycle-more'),
-          true,
-          '手机终态订单抽屉应保留更多操作并在菜单内说明禁用原因'
-        )
-        assert.deepEqual(
-          closedDrawerKeys,
-          activeDrawerKeys,
-          '手机订单状态切换不得改变抽屉动作目录'
-        )
-        assert.deepEqual(
-          closedDrawerKeys.filter((key) => key !== 'related-records'),
-          emptyDrawerKeys,
-          '手机选择前后应保留核心动作目录，关联记录按所选订单展示'
-        )
+        for (const key of [
+          'edit',
+          'reserve-stock',
+          'lifecycle-primary',
+          'lifecycle-more',
+        ])
+          await assertDesktopActionState(page, assert, key, { visible: false })
+        await assertDesktopActionState(page, assert, 'view-details', {
+          visible: true,
+          disabled: false,
+        })
+        await assertNoHorizontalOverflow(page, '终态销售订单手机暗色')
         await screenshot(
           page,
           path,
           outputDir,
-          'business-action-stability-sales-closed-drawer-mobile-dark.png'
-        )
-        await assertNoHorizontalOverflow(
-          page,
-          'business-action-stability-sales-mobile-dark'
+          'business-action-stability-sales-mobile-dark.png'
         )
       },
     },

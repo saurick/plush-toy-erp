@@ -190,7 +190,7 @@ export const businessModuleDefinitions = Object.freeze([
       'inventory_txns',
     ],
     currentScope: [
-      '从已审核采购订单生成入库草稿',
+      '仓库从已审核采购订单登记到货',
       '待收货',
       '待质检',
       '已入库',

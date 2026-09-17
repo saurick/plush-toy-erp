@@ -1674,33 +1674,6 @@ export default function V1SalesOrdersPage() {
             >
               列顺序
             </ToolbarButton>
-            {canUpdateOrder ? (
-              <BusinessActionTooltip
-                disabled={
-                  !selectedOrderCanReorder || lineOrderLoading || saving
-                }
-                disabledReason={
-                  !selectedOrder
-                    ? '请先选择一条销售订单'
-                    : !selectedOrderCanReorder
-                      ? '当前状态不能调整明细顺序'
-                      : lineOrderLoading || saving
-                        ? '当前订单操作完成后可调整明细顺序'
-                        : ''
-                }
-              >
-                <ToolbarButton
-                  icon={<OrderedListOutlined />}
-                  loading={lineOrderLoading}
-                  disabled={
-                    !selectedOrderCanReorder || lineOrderLoading || saving
-                  }
-                  onClick={openSalesOrderLineOrder}
-                >
-                  明细顺序
-                </ToolbarButton>
-              </BusinessActionTooltip>
-            ) : null}
           </Space>
         }
         primaryAction={
@@ -1731,11 +1704,46 @@ export default function V1SalesOrdersPage() {
               setSelectedOrder(null)
             }}
           />
+          {canUpdateOrder ? (
+            <BusinessActionTooltip
+              selectionActionPriority={20}
+              visible={!selectedOrder || selectedOrderCanReorder}
+              disabled={!selectedOrderCanReorder || lineOrderLoading || saving}
+              disabledReason={
+                !selectedOrder
+                  ? '请先选择一条销售订单'
+                  : !selectedOrderCanReorder
+                    ? '当前状态不能调整明细顺序'
+                    : lineOrderLoading || saving
+                      ? '当前订单操作完成后可调整明细顺序'
+                      : ''
+              }
+            >
+              <Button
+                size="small"
+                data-business-action-key="line-order"
+                icon={<OrderedListOutlined />}
+                loading={lineOrderLoading}
+                disabled={
+                  !selectedOrderCanReorder || lineOrderLoading || saving
+                }
+                onClick={openSalesOrderLineOrder}
+              >
+                明细顺序
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
           {hasActionPermission(
             adminProfile,
             'sales_order.engineering.update'
           ) ? (
             <BusinessActionTooltip
+              visible={
+                !selectedOrder ||
+                ['draft', 'submitted', 'active'].includes(
+                  selectedOrderLifecycleStatus
+                )
+              }
               disabled={
                 !selectedOrder ||
                 !['draft', 'submitted', 'active'].includes(
@@ -1746,6 +1754,7 @@ export default function V1SalesOrdersPage() {
               disabledReason="请选择仍在办理的销售订单"
             >
               <Button
+                data-business-action-key="engineering"
                 size="small"
                 disabled={
                   !selectedOrder ||
@@ -1762,11 +1771,23 @@ export default function V1SalesOrdersPage() {
           ) : null}
           {hasActionPermission(adminProfile, 'engineering.material.read') ? (
             <Button
+              data-business-action-key="engineering-material"
               size="small"
               disabled={!selectedOrder || saving}
               onClick={() => setMaterialRequestOrderID(selectedOrder.id)}
             >
-              材料汇总与审批
+              {hasActionPermission(adminProfile, 'engineering.material.submit')
+                ? '提交用料汇总'
+                : hasActionPermission(
+                      adminProfile,
+                      'engineering.material.boss_approve'
+                    ) ||
+                    hasActionPermission(
+                      adminProfile,
+                      'engineering.material.finance_approve'
+                    )
+                  ? '审核用料汇总'
+                  : '查看用料汇总'}
             </Button>
           ) : null}
           {relatedActionAvailability.visible ? (
@@ -1812,6 +1833,9 @@ export default function V1SalesOrdersPage() {
           </BusinessActionTooltip>
           {canUpdateOrder ? (
             <BusinessActionTooltip
+              visible={
+                !selectedOrder || selectedOrderLifecycleStatus === 'draft'
+              }
               disabled={!selectedOrderCanEdit || itemLoading || saving}
               disabledReason={
                 !selectedOrder
@@ -1837,6 +1861,12 @@ export default function V1SalesOrdersPage() {
           ) : null}
           {canCreateReservation ? (
             <BusinessActionTooltip
+              visible={
+                !selectedOrder ||
+                ['draft', 'submitted', 'active'].includes(
+                  selectedOrderLifecycleStatus
+                )
+              }
               disabled={
                 !selectedOrder ||
                 selectedOrderLifecycleStatus !== 'active' ||
@@ -1994,7 +2024,9 @@ export default function V1SalesOrdersPage() {
         requestID={materialRequestOrderID ? undefined : routeMaterialRequestID}
         permissions={{
           ...getEngineeringMaterialPermissions(adminProfile),
-          submit: !routeMaterialRequestID && getEngineeringMaterialPermissions(adminProfile).submit,
+          submit:
+            !routeMaterialRequestID &&
+            getEngineeringMaterialPermissions(adminProfile).submit,
         }}
         onCancel={() => {
           setMaterialRequestOrderID(null)

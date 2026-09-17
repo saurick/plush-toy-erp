@@ -1264,6 +1264,7 @@ export default function V1PurchaseReceiptsPage() {
           ) : null}
           {canCreateReturn ? (
             <BusinessActionTooltip
+              visible={!selectedRow || selectedRow.status === 'POSTED'}
               disabled={
                 !selectedRow || selectedRow.status !== 'POSTED' || saving
               }
@@ -1291,6 +1292,7 @@ export default function V1PurchaseReceiptsPage() {
           ) : null}
           {canCreateAdjustment ? (
             <BusinessActionTooltip
+              visible={!selectedRow || selectedRow.status === 'POSTED'}
               disabled={
                 !selectedRow || selectedRow.status !== 'POSTED' || saving
               }
@@ -1333,6 +1335,9 @@ export default function V1PurchaseReceiptsPage() {
           ) : null}
           {canCreatePayable ? (
             <BusinessActionTooltip
+              visible={
+                !selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)
+              }
               disabled={
                 !selectedRow ||
                 selectedRow.status !== 'POSTED' ||
@@ -1364,6 +1369,7 @@ export default function V1PurchaseReceiptsPage() {
           ) : null}
           {canPost ? (
             <BusinessActionTooltip
+              visible={!selectedRow || selectedRow.status === 'DRAFT'}
               disabled={
                 !selectedRow || selectedRow.status !== 'DRAFT' || saving
               }
@@ -1399,13 +1405,16 @@ export default function V1PurchaseReceiptsPage() {
                     !selectedRow || selectedRow.status !== 'DRAFT' || saving
                   }
                 >
-                  过账入库
+                  确认材料入库
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
           {canPost ? (
             <BusinessActionTooltip
+              visible={
+                !selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)
+              }
               disabled={
                 !selectedRow ||
                 !['DRAFT', 'POSTED'].includes(selectedRow.status) ||

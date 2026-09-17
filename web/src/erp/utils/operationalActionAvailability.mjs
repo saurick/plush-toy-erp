@@ -87,6 +87,18 @@ export function resolveFinancePaymentActionAvailability({
   }
 }
 
+// The server also checks related inspections and workflow records before saving.
+export function canEditShipmentDraft(shipment) {
+  return Boolean(
+    shipment?.status === 'DRAFT' &&
+      shipment.finance_release_status === 'PENDING' &&
+      shipment.finance_release_version === 1 &&
+      !shipment.finance_release_process_instance_id &&
+      !shipment.finance_release_process_node_id &&
+      !shipment.finance_released_at
+  )
+}
+
 export function resolveShipmentActionAvailability({
   action,
   authorized = false,
@@ -105,10 +117,10 @@ export function resolveShipmentActionAvailability({
     case 'quality':
       return resolveAction({
         ...common,
-        relevant: status === 'DRAFT',
-        applicable: status === 'DRAFT',
+        relevant: status === 'DRAFT' && releaseStatus === 'PENDING',
+        applicable: status === 'DRAFT' && releaseStatus === 'PENDING',
         busy,
-        unavailableReason: '只有出货草稿可以发起出货前检验',
+        unavailableReason: '只有尚未财务放行的出货草稿可以发起检验',
         busyReason: '当前操作完成后可发起检验',
       })
     case 'release':

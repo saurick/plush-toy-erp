@@ -634,12 +634,12 @@ async function createReceiptWithItemForUI(page, refs, baseURL) {
 }
 
 async function postReceiptFromUI(page) {
-  await page.getByRole('button', { name: /过账入库/ }).click()
-  await page.getByText('确认过账并写库存入库事实？').waitFor({
+  await page.getByRole('button', { name: /确认材料入库/ }).click()
+  await page.getByText('确认过账并更新库存？').waitFor({
     state: 'visible',
     timeout: 15_000,
   })
-  await confirmVisiblePopover(page, '确认过账并写库存入库事实？')
+  await confirmVisiblePopover(page, '确认过账并更新库存？')
   await page.getByText('采购入库已过账').waitFor({
     state: 'visible',
     timeout: 15_000,
@@ -648,12 +648,16 @@ async function postReceiptFromUI(page) {
 }
 
 async function cancelReceiptFromUI(page) {
-  await page.getByRole('button', { name: /取消入库/ }).click()
-  await page.getByText('确认取消已过账入库并写库存冲正？').waitFor({
+  const cancelButton = page.getByRole('button', { name: /取消入库/ })
+  if (!(await cancelButton.isVisible())) {
+    await page.getByRole('button', { name: /^更多操作，共/u }).click()
+  }
+  await cancelButton.click()
+  await page.getByText('确认取消已过账入库并恢复相应库存？').waitFor({
     state: 'visible',
     timeout: 15_000,
   })
-  await confirmVisiblePopover(page, '确认取消已过账入库并写库存冲正？')
+  await confirmVisiblePopover(page, '确认取消已过账入库并恢复相应库存？')
   await page.getByText('采购入库已取消').waitFor({
     state: 'visible',
     timeout: 15_000,

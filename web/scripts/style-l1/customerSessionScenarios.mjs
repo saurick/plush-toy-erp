@@ -2733,7 +2733,7 @@ export function createCustomerSessionScenarios({
         await expectText(page, 'PR-STYLE-L1-DRAFT')
         await page.getByText('PR-STYLE-L1-DRAFT', { exact: false }).click()
         await expectNoButton(page, '添加明细')
-        await expectNoButton(page, '过账入库')
+        await expectNoButton(page, '确认材料入库')
 
         await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', {
           waitUntil: 'domcontentloaded',
@@ -2753,7 +2753,7 @@ export function createCustomerSessionScenarios({
         await expectNoButton(page, '新建采购订单')
         await page.getByText('PO-STYLE-L1', { exact: false }).first().click()
         await expectNoButton(page, '编辑')
-        await expectNoButton(page, '生成入库')
+        await expectNoButton(page, '登记到货')
         await expectNoButton(page, '提交')
         await expectNoButton(page, '取消')
 

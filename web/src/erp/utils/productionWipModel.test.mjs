@@ -16,6 +16,7 @@ import {
   normalizeProductionWipQuantity,
   partitionProductionCompletionItems,
   productionWipActionAllowedForOrder,
+  productionWipActionRelevant,
   productionWipBatchForOperation,
   productionWipBatchLabel,
   productionWipBatchLineageMeta,
@@ -29,6 +30,100 @@ import {
   productionWipQualitySummary,
   validateProductionWipAggregate,
 } from './productionWipModel.mjs'
+
+test('WIP actions follow the batch stage and execution mode without hiding pending prerequisites', () => {
+  const visible = (action, batch, extra = {}) =>
+    productionWipActionRelevant({
+      action,
+      batch,
+      order: { status: 'RELEASED' },
+      operation: { operation_code: 'SEWING' },
+      nextOperation: { id: 2 },
+      ...extra,
+    })
+  const internal = { status: 'IN_PROGRESS', execution_mode: 'IN_HOUSE' }
+  const external = { status: 'OUTSOURCED', execution_mode: 'OUTSOURCED' }
+  assert.equal(
+    visible(PRODUCTION_WIP_ACTION.COMPLETE_OPERATION, internal),
+    true
+  )
+  assert.equal(
+    visible(PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN, internal),
+    false
+  )
+  assert.equal(
+    visible(PRODUCTION_WIP_ACTION.COMPLETE_OPERATION, external),
+    false
+  )
+  assert.equal(
+    visible(PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN, external),
+    true
+  )
+  assert.equal(
+    visible(PRODUCTION_WIP_ACTION.START_OPERATION, { status: 'PLANNED' }),
+    true
+  )
+  assert.equal(visible(PRODUCTION_WIP_ACTION.START_OPERATION, external), false)
+  assert.equal(
+    visible(PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION, {
+      status: 'PLANNED',
+      execution_mode: 'OUTSOURCED',
+    }),
+    false
+  )
+  assert.equal(
+    visible(PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION, {
+      status: 'WAITING_QUALITY',
+    }),
+    true
+  )
+  assert.equal(
+    visible(
+      PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION,
+      { status: 'ACCEPTED' },
+      { nextOperation: null }
+    ),
+    false
+  )
+  assert.equal(
+    visible(PRODUCTION_WIP_ACTION.REWORK, { status: 'REJECTED' }),
+    true
+  )
+  assert.equal(visible(PRODUCTION_WIP_ACTION.REWORK, internal), false)
+  for (const status of ['SPLIT', 'CANCELLED']) {
+    for (const action of Object.values(PRODUCTION_WIP_ACTION)) {
+      assert.equal(visible(action, { status }), false)
+    }
+  }
+  assert.equal(
+    visible(
+      PRODUCTION_WIP_ACTION.SPLIT_BATCH,
+      { status: 'PLANNED' },
+      { operation: { operation_code: 'FABRIC_PROCESSING' } }
+    ),
+    false
+  )
+  assert.equal(
+    visible(PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL, internal, {
+      packagingConfirmation: { status: 'CONFIRMED' },
+    }),
+    false
+  )
+  assert.equal(
+    visible(PRODUCTION_WIP_ACTION.COMPLETE_OPERATION, internal, {
+      order: { status: 'CLOSED' },
+    }),
+    false
+  )
+  assert.equal(
+    visible(
+      PRODUCTION_WIP_ACTION.COMPLETE_OPERATION,
+      { ...internal, origin_rework_fact_id: 3 },
+      { order: { status: 'CLOSED' } }
+    ),
+    true
+  )
+})
 
 function aggregateFixture(patch = {}) {
   return {

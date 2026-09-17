@@ -141,7 +141,7 @@ export default function PurchaseOrderInboundDraftModal({
 
   return (
     <BusinessFormModal
-      title="生成采购入库草稿"
+      title="登记采购到货"
       open={open}
       centered
       width={1080}

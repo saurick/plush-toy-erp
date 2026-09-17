@@ -74,7 +74,11 @@ import {
   getWorkflowTaskStatusMeta,
 } from '../utils/workflowTaskBoard.mjs'
 import { resolveReadableWorkflowSourceNo } from '../utils/workflowDocumentRefs.mjs'
-import { isWorkflowProcessDecisionTask } from '../utils/workflowTaskActionContract.mjs'
+import {
+  canWorkflowTaskStatusRunAction,
+  getWorkflowTaskActionPermission,
+  isWorkflowProcessDecisionTask,
+} from '../utils/workflowTaskActionContract.mjs'
 import {
   buildWorkflowProcessDecision,
   getWorkflowProcessDecisionApprovalForm,
@@ -1206,9 +1210,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         actions={
           <BusinessListToolbarActions
             moduleTitle={moduleItem.title}
-            showExport={!isProductionExceptionPage}
-            exportDisabled
-            exportDisabledReason="当前页面只用于处理任务，暂不提供业务数据导出。"
+            showExport={false}
             onOpenColumnOrder={openColumnOrder}
           />
         }
@@ -1261,6 +1263,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           </BusinessActionTooltip>
           {canCompleteOrApproveWorkflowTasks ? (
             <BusinessActionTooltip
+              visible={
+                !selectedTask ||
+                (canWorkflowTaskStatusRunAction(selectedTask, 'complete') &&
+                  hasActionPermission(
+                    adminProfile,
+                    getWorkflowTaskActionPermission('complete', selectedTask)
+                  ))
+              }
               disabled={
                 !canCompleteSelected ||
                 taskActionLoadingID > 0 ||
@@ -1299,6 +1309,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           ) : null}
           {canUpdateWorkflowTasks ? (
             <BusinessActionTooltip
+              visible={
+                !selectedTask ||
+                (canWorkflowTaskStatusRunAction(selectedTask, 'block') &&
+                  hasActionPermission(
+                    adminProfile,
+                    getWorkflowTaskActionPermission('block', selectedTask)
+                  ))
+              }
               disabled={
                 !canBlockSelected || taskActionLoadingID > 0 || urgingTaskID > 0
               }
@@ -1323,6 +1341,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           ) : null}
           {canRejectWorkflowTasks ? (
             <BusinessActionTooltip
+              visible={
+                !selectedTask ||
+                (canWorkflowTaskStatusRunAction(selectedTask, 'reject') &&
+                  hasActionPermission(
+                    adminProfile,
+                    getWorkflowTaskActionPermission('reject', selectedTask)
+                  ))
+              }
               disabled={
                 !canRejectSelected ||
                 taskActionLoadingID > 0 ||
@@ -1352,6 +1378,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           ) : null}
           {canUpdateWorkflowTasks ? (
             <BusinessActionTooltip
+              visible={
+                !selectedTask ||
+                (canWorkflowTaskStatusRunAction(selectedTask, 'resume') &&
+                  hasActionPermission(
+                    adminProfile,
+                    getWorkflowTaskActionPermission('resume', selectedTask)
+                  ))
+              }
               disabled={
                 !canResumeSelected ||
                 taskActionLoadingID > 0 ||
@@ -1381,6 +1415,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           ) : null}
           {canUpdateWorkflowTasks ? (
             <BusinessActionTooltip
+              visible={
+                !selectedTask ||
+                (canWorkflowTaskStatusRunAction(selectedTask, 'urge') &&
+                  hasActionPermission(
+                    adminProfile,
+                    getWorkflowTaskActionPermission('urge', selectedTask)
+                  ))
+              }
               disabled={
                 !canUrgeSelected || taskActionLoadingID > 0 || urgingTaskID > 0
               }

@@ -102,6 +102,7 @@ import {
   unixSecondsToBusinessDate,
 } from '../utils/businessDate.mjs'
 import {
+  canEditShipmentDraft,
   resolveRelatedRecordActionAvailability,
   resolveShipmentActionAvailability,
 } from '../utils/operationalActionAvailability.mjs'
@@ -1114,7 +1115,7 @@ export default function ShipmentsPage() {
       message.warning('当前账号没有编辑出货草稿的权限')
       return
     }
-    if (!shipment?.id || shipment.status !== 'DRAFT') {
+    if (!shipment?.id || !canEditShipmentDraft(shipment)) {
       message.warning('只有尚未进入下游流程的销售出货草稿可以编辑')
       return
     }
@@ -1125,7 +1126,7 @@ export default function ShipmentsPage() {
       const detail = await getShipment({ id: shipment.id })
       if (
         !detail?.id ||
-        detail.status !== 'DRAFT' ||
+        !canEditShipmentDraft(detail) ||
         !Array.isArray(detail.items) ||
         detail.items.length === 0
       ) {
@@ -1248,7 +1249,7 @@ export default function ShipmentsPage() {
   }
 
   const openShipmentRecord = (shipment) => {
-    if (canUpdate && shipment?.status === 'DRAFT') {
+    if (canUpdate && canEditShipmentDraft(shipment)) {
       openEdit(shipment)
       return
     }
@@ -1778,6 +1779,7 @@ export default function ShipmentsPage() {
           </BusinessActionTooltip>
           {canUpdate ? (
             <BusinessActionTooltip
+              visible={!selectedRow || canEditShipmentDraft(selectedRow)}
               disabled={
                 !selectedRow || saving || selectedRow?.status !== 'DRAFT'
               }

@@ -677,7 +677,13 @@ export function OperationalFactWorkspace({
           <>
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || keyword}
-              {...BUSINESS_SEARCH_SCOPES[{ production: 'production_fact', outsourcing: 'outsourcing_fact', finance: 'finance' }[currentActiveKey]]}
+              {...BUSINESS_SEARCH_SCOPES[
+                {
+                  production: 'production_fact',
+                  outsourcing: 'outsourcing_fact',
+                  finance: 'finance',
+                }[currentActiveKey]
+              ]}
               onChange={(event) => {
                 if (
                   resolvedRouteKeyword ||
@@ -840,6 +846,10 @@ export function OperationalFactWorkspace({
           {['production', 'outsourcing'].includes(currentActiveKey) &&
           canPostActive ? (
             <BusinessActionTooltip
+              visible={
+                !activeSelectedRow ||
+                (activeSelectedRow.status === 'DRAFT' && canPostSelected)
+              }
               disabled={
                 !activeSelectedRow ||
                 activeSelectedRow.status !== 'DRAFT' ||
@@ -897,6 +907,12 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'production' && canEditAnyProductionDraft ? (
             <BusinessActionTooltip
+              visible={
+                !activeSelectedRow ||
+                (activeSelectedRow.status === 'DRAFT' &&
+                  Boolean(selectedProductionDraftSaveAction) &&
+                  canEditSelectedProductionDraft)
+              }
               disabled={
                 !activeSelectedRow ||
                 activeSelectedRow.status !== 'DRAFT' ||
@@ -938,6 +954,7 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'production' && canCreateProductionRework ? (
             <BusinessActionTooltip
+              visible={!activeSelectedRow || selectedCanStartProductionRework}
               disabled={
                 !activeSelectedRow ||
                 !selectedCanStartProductionRework ||
@@ -990,6 +1007,9 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'finance' && canFinanceAction ? (
             <BusinessActionTooltip
+              visible={
+                !activeSelectedRow || activeSelectedRow.status === 'DRAFT'
+              }
               disabled={
                 !activeSelectedRow ||
                 activeSelectedRow.status !== 'DRAFT' ||
@@ -1036,6 +1056,9 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'finance' && canCreateSingleReconciliation ? (
             <BusinessActionTooltip
+              visible={
+                !activeSelectedRow || selectedIsSingleReconciliationSource
+              }
               disabled={
                 !activeSelectedRow ||
                 !selectedIsSingleReconciliationSource ||
@@ -1072,6 +1095,10 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'finance' && canFinanceAction ? (
             <BusinessActionTooltip
+              visible={
+                !activeSelectedRow ||
+                ['DRAFT', 'POSTED'].includes(activeSelectedRow.status)
+              }
               disabled={
                 !activeSelectedRow ||
                 !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
@@ -1160,6 +1187,9 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'shipments' && canPostActive ? (
             <BusinessActionTooltip
+              visible={
+                !activeSelectedRow || activeSelectedRow.status === 'DRAFT'
+              }
               disabled={
                 !activeSelectedRow ||
                 activeSelectedRow.status !== 'DRAFT' ||
@@ -1202,6 +1232,9 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'reservations' && canReleaseActive ? (
             <BusinessActionTooltip
+              visible={
+                !activeSelectedRow || activeSelectedRow.status === 'ACTIVE'
+              }
               disabled={
                 !activeSelectedRow ||
                 activeSelectedRow.status !== 'ACTIVE' ||
@@ -1248,6 +1281,7 @@ export function OperationalFactWorkspace({
           ) : null}
           {financeSettlementAction && canFinanceAction ? (
             <BusinessActionTooltip
+              visible={!activeSelectedRow || selectedCanSettleFinance}
               disabled={
                 !activeSelectedRow || !selectedCanSettleFinance || saving
               }
@@ -1293,6 +1327,11 @@ export function OperationalFactWorkspace({
           {['production', 'outsourcing'].includes(currentActiveKey) &&
           canCancelActive ? (
             <BusinessActionTooltip
+              visible={
+                !activeSelectedRow ||
+                (['DRAFT', 'POSTED'].includes(activeSelectedRow.status) &&
+                  canCancelSelected)
+              }
               disabled={
                 !activeSelectedRow ||
                 !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
@@ -1341,6 +1380,10 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'shipments' && canCancelActive ? (
             <BusinessActionTooltip
+              visible={
+                !activeSelectedRow ||
+                ['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status)
+              }
               disabled={
                 !activeSelectedRow ||
                 !['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status) ||

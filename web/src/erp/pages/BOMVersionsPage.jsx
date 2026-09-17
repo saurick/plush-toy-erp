@@ -226,7 +226,8 @@ function BOMImportReviewSummary({ form, review, productOptions }) {
           </span>
           <span>
             原表产品：{review.productCode || review.productName || '原表未填写'}
-            ；{productID
+            ；
+            {productID
               ? `已关联：${referenceLabel(productOptions, productID, '产品')}`
               : '尚未关联，请在上方选择对应产品档案'}
           </span>
@@ -1334,6 +1335,7 @@ export default function BOMVersionsPage() {
           </BusinessActionTooltip>
           {canUpdate ? (
             <BusinessActionTooltip
+              visible={!activeActionVersion || activeActionCanEdit}
               disabled={
                 selectedRowKeys.length !== 1 ||
                 !activeActionCanEdit ||
@@ -1440,6 +1442,9 @@ export default function BOMVersionsPage() {
             : null}
           {canActivate ? (
             <BusinessActionTooltip
+              visible={
+                !activeActionVersion || canActivateBOM(activeActionVersion)
+              }
               disabled={
                 selectedRowKeys.length !== 1 ||
                 !canActivateBOM(activeActionVersion) ||
@@ -1478,6 +1483,10 @@ export default function BOMVersionsPage() {
           ) : null}
           {canUpdate ? (
             <BusinessActionTooltip
+              visible={
+                selectedRowKeys.length === 0 ||
+                archivableSelectedVersions.length > 0
+              }
               disabled={
                 selectedRowKeys.length === 0 ||
                 !canRequestSelectedArchive ||

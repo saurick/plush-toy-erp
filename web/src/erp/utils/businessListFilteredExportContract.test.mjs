@@ -138,6 +138,6 @@ test('finance keeps complete filtered export and production exceptions stay non-
 
   assert.match(finance, /listAllFinancePayments\(/u)
   assert.match(finance, /listAllFinanceCreditNotes\(/u)
-  assert.match(workflowModule, /showExport=\{!isProductionExceptionPage\}/u)
+  assert.match(workflowModule, /showExport=\{false\}/u)
   assert.match(productionException, /showExport=\{false\}/u)
 })

@@ -329,9 +329,7 @@ export function createQualitySourceActionScenarios(deps) {
               'quality-production-stage-decision-source-desktop.png'
             ),
           })
-          await modal
-            .getByRole('button', { name: /关\s*闭/u })
-            .click()
+          await modal.getByRole('button', { name: /关\s*闭/u }).click()
           await modal.waitFor({ state: 'hidden', timeout: 10_000 })
           await page
             .getByRole('button', { name: '清空已选', exact: true })
@@ -954,20 +952,8 @@ export function createQualitySourceActionScenarios(deps) {
           )
           assert.equal(
             await completedDispositionAction.count(),
-            1,
-            '退货已生成后应保留稳定的不合格处置动作位置'
-          )
-          assert.equal(
-            await completedDispositionAction.isDisabled(),
-            true,
-            '退货已生成后不得再次办理不合格处置'
-          )
-          assert.equal(
-            await completedDispositionAction.evaluate((element) =>
-              element.parentElement?.getAttribute('aria-label')
-            ),
-            '当前质检的不合格处置已完成',
-            '退货已生成后的置灰动作应向键盘和读屏用户解释原因'
+            0,
+            '退货已生成后隐藏重复处置入口，结果从关联退货追溯'
           )
           await selectRow(page, 'QI-INITIAL-REJECT-STYLE-L1')
           const initialRejectDispositionButton =

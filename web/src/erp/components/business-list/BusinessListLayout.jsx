@@ -61,6 +61,7 @@ const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 88
 const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
 const PHONE_SELECTION_ACTION_LIMIT = 1
 const TABLET_SELECTION_ACTION_LIMIT = 2
+const DESKTOP_SELECTION_ACTION_LIMIT = 4
 function joinClassNames(...items) {
   return items.filter(Boolean).join(' ')
 }
@@ -73,7 +74,9 @@ function flattenSelectionActions(children) {
       actions.push(...flattenSelectionActions(child.props.children))
       return
     }
-    if (child != null && child !== false) actions.push(child)
+    if (child != null && child !== false && child.props?.visible !== false) {
+      actions.push(child)
+    }
   })
 
   return actions
@@ -113,7 +116,11 @@ function inspectSelectionAction(action) {
       actionable: true,
       enabled:
         action.props.disabled !== true && enabledNestedActions.length > 0,
-      score: action.type === Dropdown ? Math.min(nestedScore, 30) : nestedScore,
+      score: Number.isFinite(action.props.selectionActionPriority)
+        ? action.props.selectionActionPriority
+        : action.type === Dropdown
+          ? Math.min(nestedScore, 30)
+          : nestedScore,
     }
   }
 
@@ -218,10 +225,11 @@ function ResponsiveSelectionActions({ children }) {
   const [moreActionsOpen, setMoreActionsOpen] = React.useState(false)
   const moreActionsButtonRef = React.useRef(null)
   const moreActionsListRef = React.useRef(null)
-  const compact = !screens.lg
-  const visibleLimit = screens.md
-    ? TABLET_SELECTION_ACTION_LIMIT
-    : PHONE_SELECTION_ACTION_LIMIT
+  const visibleLimit = screens.lg
+    ? DESKTOP_SELECTION_ACTION_LIMIT
+    : screens.md
+      ? TABLET_SELECTION_ACTION_LIMIT
+      : PHONE_SELECTION_ACTION_LIMIT
   const { context, visible, overflow } = React.useMemo(
     () => partitionSelectionActions(children, visibleLimit),
     [children, visibleLimit]
@@ -231,10 +239,10 @@ function ResponsiveSelectionActions({ children }) {
   }, [])
 
   React.useEffect(() => {
-    if (!compact) setMoreActionsOpen(false)
-  }, [compact])
+    if (overflow.length === 0) setMoreActionsOpen(false)
+  }, [overflow.length])
 
-  if (!compact || overflow.length === 0) {
+  if (overflow.length === 0) {
     return (
       <Space
         wrap
@@ -247,7 +255,14 @@ function ResponsiveSelectionActions({ children }) {
 
   return (
     <>
-      <div className="erp-business-selection-action-bar__actions erp-business-selection-action-bar__actions--compact erp-business-module-selection-actions">
+      <div
+        className={joinClassNames(
+          'erp-business-selection-action-bar__actions erp-business-module-selection-actions',
+          screens.lg
+            ? 'erp-business-selection-action-bar__actions--overflow'
+            : 'erp-business-selection-action-bar__actions--compact'
+        )}
+      >
         {context.length > 0 ? (
           <div className="erp-business-selection-action-bar__compact-context">
             {context}
@@ -889,6 +904,13 @@ export function SelectionActionBar({
   embedded = false,
 }) {
   const hasSelection = Number(selectedCount) > 0
+  const actionNodes = flattenSelectionActions(children)
+  const clearActions = actionNodes.filter(
+    (child) => child.type === SelectionClearAction
+  )
+  const recordActions = actionNodes.filter(
+    (child) => child.type !== SelectionClearAction
+  )
   const className = joinClassNames(
     'erp-business-selection-action-bar erp-business-module-current-action',
     hasSelection
@@ -906,6 +928,7 @@ export function SelectionActionBar({
             selectedLabel={selectedLabel}
             selectedItems={selectedItems}
           />
+          {hasSelection ? clearActions : null}
         </div>
         {summaryItems.length > 0 ? (
           <div className="erp-business-selection-action-bar__summary">
@@ -933,7 +956,17 @@ export function SelectionActionBar({
           </div>
         ) : null}
       </div>
-      <ResponsiveSelectionActions>{children}</ResponsiveSelectionActions>
+      {hasSelection ? (
+        <div
+          className="erp-business-selection-action-bar__record-actions"
+          role="group"
+          aria-label="当前记录操作"
+        >
+          <ResponsiveSelectionActions>
+            {recordActions}
+          </ResponsiveSelectionActions>
+        </div>
+      ) : null}
     </div>
   )
 
@@ -946,9 +979,11 @@ export function SelectionActionBar({
 
 export function BusinessActionTooltip({
   children,
+  visible = true,
   disabled = false,
   disabledReason = '',
 }) {
+  if (!visible) return null
   return (
     <Tooltip
       title={disabled && disabledReason ? disabledReason : null}
@@ -1024,6 +1059,7 @@ export function BusinessLifecyclePrimaryAction({
   onAction = () => {},
   placeholder = '状态办理',
 }) {
+  if (!action) return null
   return (
     <BusinessActionTooltip disabled={disabled} disabledReason={disabledReason}>
       <Button
@@ -1053,7 +1089,7 @@ export function BusinessLifecycleMoreAction({
   disabled = false,
   disabledReason = '',
   getPopupContainer,
-  label = '更多操作',
+  label = '其他状态操作',
   onAction = () => {},
 }) {
   if (actions.length === 0) return null

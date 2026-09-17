@@ -134,7 +134,11 @@ test('quality disposition separates mutation permissions from read-only access a
   )
   assert.match(
     source,
-    /const showQualityDispositionAction = hasAnyDispositionCapability/u
+    /const showQualityDispositionAction =\s*hasAnyDispositionCapability &&/u
+  )
+  assert.match(
+    source,
+    /selectedDispositionSourceSupported &&\s*selectedDispositionAuthorized &&\s*!selectedDispositionCompleted/u
   )
   assert.match(source, />\s*不合格处置\s*</u)
   assert.match(source, />\s*查看委外处置\s*</u)

@@ -114,7 +114,7 @@ test('全部正式业务选择页复用稳定动作条、清空入口和禁用�
   }
 })
 
-test('全部正式业务选择页保留核心动作键，不直接用选择或状态拼装动作节点', () => {
+test('全部正式业务选择页保留动作标识，由能力与记录生命周期控制可见性', () => {
   assert.deepEqual(
     Object.keys(FORMAL_SELECTION_STABLE_ACTION_EVIDENCE).sort(),
     Object.keys(FORMAL_SELECTION_PAGE_CONSUMERS).sort(),
@@ -129,25 +129,6 @@ test('全部正式业务选择页保留核心动作键，不直接用选择或�
       source,
       FORMAL_SELECTION_STABLE_ACTION_EVIDENCE[pageFile],
       `${pageFile} 必须保留稳定动作目录证据`
-    )
-    assert.doesNotMatch(
-      source,
-      /\{\s*(?:selected(?:Order|Row|Task|Record)?|singleSelectedOrder|activeSelectedRow|hasSelection)\s*&&\s*\(?\s*<(?:BusinessActionTooltip|BusinessLifecyclePrimaryAction|BusinessLifecycleMoreAction|Button|Dropdown|Popconfirm)/u,
-      `${pageFile} 不得把动作入口直接写成选中后才渲染`
-    )
-    const actionBarStart = source.indexOf('<SelectionActionBar')
-    const actionBarEnd = source.indexOf('</SelectionActionBar>', actionBarStart)
-    assert.ok(actionBarStart >= 0 && actionBarEnd > actionBarStart)
-    const actionBarSource = source.slice(actionBarStart, actionBarEnd)
-    assert.doesNotMatch(
-      actionBarSource,
-      /\{\s*(?:\w+\s*&&\s*)?\(?\s*!?(?:selected(?:Order|Row|Task|Record)?|singleSelectedOrder|activeSelectedRow|hasSelection)\b[^{}]{0,180}\?\s*\(\s*<(?:BusinessActionTooltip|BusinessLifecyclePrimaryAction|BusinessLifecycleMoreAction|Button|Dropdown|Popconfirm)/u,
-      `${pageFile} 不得按选中记录增删当前操作节点`
-    )
-    assert.doesNotMatch(
-      actionBarSource,
-      /\{\s*(?:\w+\s*&&\s*)?\(?[^{}]{0,160}(?:\.status|lifecycleStatus)[^{}]{0,120}\?\s*\(\s*<(?:BusinessActionTooltip|BusinessLifecyclePrimaryAction|BusinessLifecycleMoreAction|Button|Dropdown|Popconfirm)/u,
-      `${pageFile} 不得按记录状态增删当前操作节点`
     )
   }
 })
@@ -195,4 +176,55 @@ test('采购订单页通过唯一操作面板消费共享动作合同', () => {
   )
   assert.match(purchasePanel, /<BusinessLifecyclePrimaryAction/u)
   assert.match(purchasePanel, /<BusinessLifecycleMoreAction/u)
+})
+
+test('共享操作区未选择时只提示选择，桌面和窄屏均限制常驻动作数量', () => {
+  const layout = readFileSync(
+    resolve(
+      currentDirectory,
+      '../components/business-list/BusinessListLayout.jsx'
+    ),
+    'utf8'
+  )
+  assert.match(layout, /DESKTOP_SELECTION_ACTION_LIMIT = 4/u)
+  assert.match(layout, /TABLET_SELECTION_ACTION_LIMIT = 2/u)
+  assert.match(layout, /PHONE_SELECTION_ACTION_LIMIT = 1/u)
+  assert.match(layout, /child\.props\?\.visible !== false/u)
+  assert.match(
+    layout,
+    /hasSelection \? \(\s*<div\s*className="erp-business-selection-action-bar__record-actions"/u
+  )
+  assert.match(layout, /aria-label="当前记录操作"/u)
+  assert.match(layout, /if \(!action\) return null/u)
+  assert.match(layout, /if \(actions\.length === 0\) return null/u)
+})
+
+test('采购和加工合同补齐详情入口，任务页不展示未实现的导出', () => {
+  assert.match(
+    readFileSync(purchasePanelPath, 'utf8'),
+    /data-business-action-key="purchase-details"/u
+  )
+  assert.match(
+    pageSource('V1OutsourcingOrdersPage.jsx'),
+    /data-business-action-key="outsourcing-details"/u
+  )
+  assert.match(
+    pageSource('WorkflowBusinessModulePage.jsx'),
+    /showExport=\{false\}/u
+  )
+  for (const source of [
+    pageSource('V1SalesOrdersPage.jsx'),
+    pageSource('V1OutsourcingOrdersPage.jsx'),
+    readFileSync(purchasePanelPath, 'utf8'),
+  ]) {
+    const toolbar = source.slice(
+      source.indexOf('<BusinessOperationPanel'),
+      source.indexOf('<SelectionActionBar')
+    )
+    assert.doesNotMatch(toolbar, /onClick=\{openLineOrder\}/u)
+    assert.match(
+      source.slice(source.indexOf('<SelectionActionBar')),
+      /data-business-action-key="line-order"/u
+    )
+  }
 })

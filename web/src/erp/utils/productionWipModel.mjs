@@ -1467,6 +1467,63 @@ export function productionWipActionAllowedForOrder(
   ].includes(action)
 }
 
+export function productionWipActionRelevant({
+  action,
+  order,
+  batch,
+  operation,
+  nextOperation,
+  packagingConfirmation,
+} = {}) {
+  if (
+    !batch ||
+    !operation ||
+    !productionWipActionAllowedForOrder(order, batch, action)
+  ) {
+    return false
+  }
+  const { status, execution_mode: mode } = batch
+  if (['SPLIT', 'CANCELLED'].includes(status)) return false
+  switch (action) {
+    case PRODUCTION_WIP_ACTION.SPLIT_BATCH:
+      return (
+        status === 'PLANNED' && operation.operation_code !== 'FABRIC_PROCESSING'
+      )
+    case PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION:
+      return status === 'PLANNED' && !mode
+    case PRODUCTION_WIP_ACTION.CANCEL_BATCH:
+    case PRODUCTION_WIP_ACTION.START_OPERATION:
+      return status === 'PLANNED'
+    case PRODUCTION_WIP_ACTION.COMPLETE_OPERATION:
+      return (
+        ['PLANNED', 'IN_PROGRESS'].includes(status) &&
+        mode === PRODUCTION_WIP_EXECUTION_MODE.IN_HOUSE
+      )
+    case PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN:
+      return (
+        ['PLANNED', 'OUTSOURCED'].includes(status) &&
+        mode === PRODUCTION_WIP_EXECUTION_MODE.OUTSOURCED
+      )
+    case PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION:
+      return (
+        Boolean(nextOperation) &&
+        [
+          'PLANNED',
+          'IN_PROGRESS',
+          'OUTSOURCED',
+          'WAITING_QUALITY',
+          'ACCEPTED',
+        ].includes(status)
+      )
+    case PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL:
+      return packagingConfirmation?.status === 'PENDING'
+    case PRODUCTION_WIP_ACTION.REWORK:
+      return status === 'REJECTED'
+    default:
+      return false
+  }
+}
+
 export function productionWipCompletionEligibility(
   aggregate,
   item = {},

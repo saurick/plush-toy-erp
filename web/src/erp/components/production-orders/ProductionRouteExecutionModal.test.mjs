@@ -38,10 +38,33 @@ test('route actions use separate business permissions and cancellation is assign
   assert.match(source, /canRunAction/u)
   assert.match(source, /PRODUCTION_WIP_ACTION\.CANCEL_BATCH/u)
   assert.match(source, /canAssign \? \(/u)
-  assert.match(source, /\(canExecute \|\| canReceiveReturn\) && !assignmentOnly \? \(/u)
-  assert.match(source, /action === PRODUCTION_WIP_ACTION\.RECEIVE_OUTSOURCING_RETURN[\s\S]*?return canReceiveReturn/u)
-  assert.match(source, /canConfirmPackaging && !assignmentOnly \? \(/u)
-  assert.match(source, /canRework && !assignmentOnly \? \(/u)
+  assert.match(
+    source,
+    /\(canExecute \|\| canReceiveReturn\) && !assignmentOnly \? \(/u
+  )
+  assert.match(
+    source,
+    /action === PRODUCTION_WIP_ACTION\.RECEIVE_OUTSOURCING_RETURN[\s\S]*?return canReceiveReturn/u
+  )
+  assert.match(
+    source,
+    /canRunAction\(action\) &&\s*productionWipActionRelevant/u
+  )
+  for (const action of [
+    'START_OPERATION',
+    'TRANSFER_TO_NEXT_OPERATION',
+    'CONFIRM_PACKAGING_MATERIAL',
+    'REWORK',
+  ]) {
+    assert.match(
+      source,
+      new RegExp(
+        `actionVisible\\(\\s*PRODUCTION_WIP_ACTION\\.${action}\\s*\\)`,
+        'u'
+      )
+    )
+  }
+  assert.match(source, /actionVisible\(completionAction\)/u)
   assert.match(source, /取消只终止当前尚未开工的批次/u)
   assert.match(source, /不会重新拆分数量/u)
   assert.match(source, /请填写取消原因/u)

@@ -1238,7 +1238,7 @@ export default function V1PurchaseOrdersPage() {
       if (!inboundReferenceDataReady) {
         message.warning(
           inboundReferenceDataState === 'loading'
-            ? '入库仓库资料正在加载，请稍后再生成采购入库草稿'
+            ? '仓库资料正在加载，请稍后再登记到货'
             : '入库仓库资料加载失败，请先刷新当前页后重试'
         )
         return
@@ -1517,6 +1517,7 @@ export default function V1PurchaseOrdersPage() {
         loadOrders={loadOrders}
         openCreateModal={openCreateModal}
         openEditModal={openEditModal}
+        openDetails={openPurchaseOrderDetails}
         openInboundDraftModal={openInboundDraftModal}
         openLineOrder={openPurchaseOrderLineOrder}
         openRelatedTable={openRelatedTable}

@@ -22,6 +22,14 @@ export function createPurchaseReceiptScenarios(deps) {
       assertAntdModalCentered,
     })
 
+  const clickSelectionAction = async (page, name) => {
+    const button = page.getByRole('button', { name, exact: true })
+    if (!(await button.isVisible())) {
+      await page.getByRole('button', { name: /^更多操作，共/u }).click()
+    }
+    await button.click()
+  }
+
   const assertPurchaseReceiptToolbarShell = async (page, scenarioName) => {
     for (const label of ['导出筛选结果', '列顺序']) {
       await expectButton(page, label)
@@ -263,9 +271,7 @@ export function createPurchaseReceiptScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '入库管理')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
-        await page
-          .getByRole('button', { name: triggerName, exact: true })
-          .click()
+        await clickSelectionAction(page, triggerName)
         const modal = page.getByRole('dialog', { name: title, exact: true })
         await modal.waitFor({ state: 'visible' })
         for (const viewport of [
@@ -302,9 +308,7 @@ export function createPurchaseReceiptScenarios(deps) {
         await page.setViewportSize({ width: 1440, height: 900 })
         await modal.getByRole('button', { name: /^取\s*消$/u }).click()
         await modal.waitFor({ state: 'hidden' })
-        await page
-          .getByRole('button', { name: triggerName, exact: true })
-          .click()
+        await clickSelectionAction(page, triggerName)
         await modal.waitFor({ state: 'visible' })
         assert.equal(
           await modal
@@ -484,7 +488,7 @@ export function createPurchaseReceiptScenarios(deps) {
         await expectText(page, '已显示 1 / 1 条')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
-        await page.getByRole('button', { name: /相关单据/u }).click()
+        await clickSelectionAction(page, /相关单据/u)
         const purchaseOrderMenuItem = page.getByRole('menuitem', {
           name: '采购订单',
           exact: true,
@@ -498,21 +502,15 @@ export function createPurchaseReceiptScenarios(deps) {
           state: 'hidden',
           timeout: 10_000,
         })
-        const actionBar = page.locator(
-          '.erp-business-selection-action-bar__actions'
-        )
-        const actionBarText = String(await actionBar.innerText()).replace(
-          /\s+/gu,
-          ''
-        )
-        assert.match(
-          actionBarText,
-          /作废草稿/u,
-          `选中采购入库草稿后必须保留作废入口: ${actionBarText}`
-        )
-        const discardDraftButton = actionBar.getByRole('button', {
+        const actionBarText = await page
+          .locator('.erp-business-module-current-action')
+          .innerText()
+        const discardDraftButton = page.getByRole('button', {
           name: /作废草稿/u,
         })
+        if (!(await discardDraftButton.isVisible())) {
+          await page.getByRole('button', { name: /^更多操作，共/u }).click()
+        }
         await discardDraftButton.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await discardDraftButton.isDisabled(),
@@ -552,7 +550,7 @@ export function createPurchaseReceiptScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '入库管理')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
-        await page.getByRole('button', { name: '退货与调整记录' }).click()
+        await clickSelectionAction(page, '退货与调整记录')
 
         const modal = page
           .getByRole('dialog', {
@@ -632,7 +630,8 @@ export function createPurchaseReceiptScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '入库管理')
         await assertERPThemeMode(page, {
-          scenarioName: 'purchase-receipt-source-generated-boundary-dark-desktop',
+          scenarioName:
+            'purchase-receipt-source-generated-boundary-dark-desktop',
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })

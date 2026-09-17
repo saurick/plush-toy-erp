@@ -14,6 +14,11 @@
   white-space: nowrap;
 }
 
+.erp-business-selection-action-bar__record-actions {
+  max-width: 100%;
+  min-width: 0;
+}
+
 .erp-business-selection-action-bar__compact-context {
   display: flex;
   min-width: 0;
@@ -27,6 +32,16 @@
   flex: 1 1 0;
   align-items: stretch;
   gap: 8px;
+}
+
+.erp-business-selection-action-bar__actions--overflow,
+.erp-business-selection-action-bar__actions--overflow
+  .erp-business-selection-action-bar__compact-visible {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .erp-business-selection-action-drawer .ant-drawer-body {

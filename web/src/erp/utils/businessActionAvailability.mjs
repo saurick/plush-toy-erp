@@ -7,11 +7,9 @@ export function resolveBusinessActionAvailability({
   busy = false,
   selectionReason = '请先选择一条记录',
   unavailableReason = '当前记录状态暂不支持此操作',
-  irrelevantReason = unavailableReason,
-  completedReason = '当前记录已完成此操作',
   busyReason = '当前操作完成后可继续',
 } = {}) {
-  if (!authorized) {
+  if (!authorized || (selected && (!relevant || completed))) {
     return {
       visible: false,
       disabled: true,
@@ -24,23 +22,6 @@ export function resolveBusinessActionAvailability({
       visible: true,
       disabled: true,
       disabledReason: selectionReason,
-    }
-  }
-
-  if (completed) {
-    return {
-      visible: true,
-      disabled: true,
-      disabledReason: completedReason || '当前记录已完成此操作',
-    }
-  }
-
-  if (!relevant) {
-    return {
-      visible: true,
-      disabled: true,
-      disabledReason:
-        irrelevantReason || unavailableReason || '当前记录不适用此操作',
     }
   }
 
@@ -105,9 +86,11 @@ export function resolveBusinessLifecycleActions({
   const availableActions = selected
     ? authorizedActions.filter((action) => canRun(action))
     : []
+  // Lifecycle predicates describe legal transitions, independently of transient loading.
+  const visibleActions = selected ? availableActions : []
   const primaryAction =
-    authorizedActions.find((action) => isPrimary(action)) || null
-  const secondaryActions = authorizedActions.filter(
+    visibleActions.find((action) => isPrimary(action)) || null
+  const secondaryActions = visibleActions.filter(
     (action) => action.key !== primaryAction?.key
   )
   const actionStates = Object.fromEntries(

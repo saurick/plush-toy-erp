@@ -272,7 +272,7 @@ export function createWarehouseClassificationScenarios(deps) {
           .click()
         const modal = page
           .getByRole('dialog')
-          .filter({ hasText: '生成采购入库草稿' })
+          .filter({ hasText: '登记采购到货' })
           .last()
         await modal.getByText('模拟主料仓 / WH-MAIN', { exact: true }).waitFor()
         await modal.getByText('模拟辅料仓 / WH-AUX', { exact: true }).waitFor()

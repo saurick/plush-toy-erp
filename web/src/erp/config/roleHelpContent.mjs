@@ -122,7 +122,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       },
       {
         title: '跟进到料入库',
-        description: '从已审核采购订单生成入库草稿并继续办理。',
+        description: '跟催已批准采购订单的到货，查看仓库登记和品质检验进度。',
         path: '/erp/warehouse/inbound',
         actionLabel: '打开入库管理',
       },
@@ -130,7 +130,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     workflow: [
       '先核对供应商付款 / 开票默认值、材料、单位和物料清单。',
       '创建采购订单，核对付款方式、是否需要发票、收货地址和到货日期后提交审核。',
-      '从已审核采购订单生成入库草稿，跟进收货和来料检验。',
+      '跟催已批准采购订单；实际到货交仓库登记，检验交品质办理。',
       '入库过账后再衔接应付；委外回货要先完成合格或让步判定。',
     ],
     completion:

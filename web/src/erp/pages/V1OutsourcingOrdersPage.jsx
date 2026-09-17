@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DownloadOutlined,
   EditOutlined,
+  EyeOutlined,
   OrderedListOutlined,
   PlusOutlined,
   PrinterOutlined,
@@ -875,33 +876,6 @@ export default function V1OutsourcingOrdersPage() {
             >
               列顺序
             </ToolbarButton>
-            {canUpdate ? (
-              <BusinessActionTooltip
-                disabled={
-                  !selectedOrderCanReorder || lineOrderLoading || saving
-                }
-                disabledReason={
-                  !selectedRow
-                    ? '请先选择一条加工合同'
-                    : !selectedOrderCanReorder
-                      ? '当前状态不能调整加工明细顺序'
-                      : lineOrderLoading || saving
-                        ? '当前合同操作完成后可调整加工明细顺序'
-                        : ''
-                }
-              >
-                <ToolbarButton
-                  icon={<OrderedListOutlined />}
-                  loading={lineOrderLoading}
-                  disabled={
-                    !selectedOrderCanReorder || lineOrderLoading || saving
-                  }
-                  onClick={openOutsourcingOrderLineOrder}
-                >
-                  加工明细顺序
-                </ToolbarButton>
-              </BusinessActionTooltip>
-            ) : null}
           </Space>
         }
         primaryAction={
@@ -947,6 +921,36 @@ export default function V1OutsourcingOrdersPage() {
           />
           {canUpdate ? (
             <BusinessActionTooltip
+              selectionActionPriority={20}
+              visible={!selectedRow || selectedOrderCanReorder}
+              disabled={!selectedOrderCanReorder || lineOrderLoading || saving}
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条加工合同'
+                  : !selectedOrderCanReorder
+                    ? '当前状态不能调整加工明细顺序'
+                    : lineOrderLoading || saving
+                      ? '当前合同操作完成后可调整加工明细顺序'
+                      : ''
+              }
+            >
+              <Button
+                size="small"
+                data-business-action-key="line-order"
+                icon={<OrderedListOutlined />}
+                loading={lineOrderLoading}
+                disabled={
+                  !selectedOrderCanReorder || lineOrderLoading || saving
+                }
+                onClick={openOutsourcingOrderLineOrder}
+              >
+                加工明细顺序
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canUpdate ? (
+            <BusinessActionTooltip
+              visible={!selectedRow || canEditOutsourcingOrder(selectedRow)}
               disabled={
                 !selectedRow ||
                 !canEditOutsourcingOrder(selectedRow) ||
@@ -978,6 +982,22 @@ export default function V1OutsourcingOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
+          <BusinessActionTooltip
+            disabled={!selectedRow || itemsLoading}
+            disabledReason={
+              itemsLoading ? '合同资料加载完成后可查看' : '请先选择一条加工合同'
+            }
+          >
+            <Button
+              data-business-action-key="outsourcing-details"
+              size="small"
+              icon={<EyeOutlined />}
+              disabled={!selectedRow || itemsLoading}
+              onClick={() => openOutsourcingOrderDetails(selectedRow)}
+            >
+              查看详情
+            </Button>
+          </BusinessActionTooltip>
           {relatedOutsourcingFactsAvailability.visible ? (
             <BusinessActionTooltip
               disabled={relatedOutsourcingFactsAvailability.disabled}

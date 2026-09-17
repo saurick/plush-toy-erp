@@ -3551,11 +3551,10 @@ export function createBusinessFormalScenarios(deps) {
         const qualityDispositionAction = page.locator(
           '[data-business-action-key="quality-disposition"]'
         )
-        assert.equal(await qualityDispositionAction.count(), 1)
         assert.equal(
-          await qualityDispositionAction.isDisabled(),
-          true,
-          '未选择质检记录时不能办理不合格处置'
+          await qualityDispositionAction.count(),
+          0,
+          '未选择记录时不展示本单处置入口'
         )
         await expectText(page, 'QI-STYLE-L1')
         await expectText(page, 'PR-STYLE-L1')
@@ -3683,8 +3682,18 @@ export function createBusinessFormalScenarios(deps) {
           .getByRole('radio')
           .check()
         await expectText(page, 'QI-STYLE-L1 / INV-LOT-001')
-        await expectButton(page, '判定合格')
-        await expectButton(page, '判定不合格')
+        await findSelectionActionButton(page, '判定合格')
+        await findSelectionActionButton(page, '判定不合格')
+        if (
+          await page
+            .locator('.erp-business-selection-action-drawer.ant-drawer-open')
+            .count()
+        ) {
+          await page.keyboard.press('Escape')
+          await page
+            .locator('.erp-business-selection-action-drawer')
+            .waitFor({ state: 'hidden' })
+        }
         await verifyBusinessActionFormModal(page, {
           buttonName: '补建来料质检',
           titleText: '生成来料质检草稿',
@@ -4039,7 +4048,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertOrderLifecycleActionsConsolidated(page, {
           scenarioName: 'business-v1-processing-contracts',
           primaryActionLabel: '提交',
-          menuActionLabels: ['确认下单', '正常关闭', '提前关闭', '取消'],
+          menuActionLabels: ['取消'],
           absentButtonLabels: ['确认下单', '关闭', '取消'],
         })
         await page.keyboard.press('Escape')
@@ -5166,8 +5175,11 @@ export function createBusinessFormalScenarios(deps) {
             .getByText('SO-RESERVE-L1', { exact: false })
             .first()
             .click()
-          await expectButton(page, '预留库存')
-          await page.getByRole('button', { name: '预留库存' }).click()
+          const reserveButton = await findSelectionActionButton(
+            page,
+            '预留库存'
+          )
+          await reserveButton.click()
 
           const modal = page
             .locator('.ant-modal')

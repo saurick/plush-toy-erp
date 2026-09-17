@@ -132,6 +132,9 @@ export function isOpenSourceDocumentItem(item) {
 }
 
 export function canReorderSourceDocumentItems(documentType, document) {
+  if (Number.isInteger(document?.item_count) && document.item_count < 2) {
+    return false
+  }
   const statuses = SOURCE_DOCUMENT_ITEM_ORDER_STATUSES[documentType]
   const status = String(document?.lifecycle_status || '')
     .trim()

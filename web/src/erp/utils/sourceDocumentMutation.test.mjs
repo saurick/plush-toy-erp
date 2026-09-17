@@ -124,6 +124,37 @@ test('source document item order fails closed for terminal or mismatched lifecyc
   )
 })
 
+test('单行或空单据不提供明细排序，未知条数仍由打开时的完整明细校验', () => {
+  for (const documentType of [
+    'sales_order',
+    'purchase_order',
+    'outsourcing_order',
+  ]) {
+    for (const item_count of [0, 1]) {
+      assert.equal(
+        canReorderSourceDocumentItems(documentType, {
+          lifecycle_status: 'draft',
+          item_count,
+        }),
+        false
+      )
+    }
+    assert.equal(
+      canReorderSourceDocumentItems(documentType, {
+        lifecycle_status: 'draft',
+        item_count: 2,
+      }),
+      true
+    )
+    assert.equal(
+      canReorderSourceDocumentItems(documentType, {
+        lifecycle_status: 'draft',
+      }),
+      true
+    )
+  }
+})
+
 for (const scenario of [
   {
     name: 'sales order',

@@ -125,7 +125,7 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     "surface_key: 'workflow_business_module'",
     "entry_path: moduleItem?.path || ''",
     'BusinessListToolbarActions',
-    '当前页面只用于处理任务，暂不提供业务数据导出。',
+    'showExport={false}',
     '当前操作只更新任务状态；生产、库存、出货、财务、开票和收付款仍需在对应业务页面完成。',
   ]) {
     assert.equal(

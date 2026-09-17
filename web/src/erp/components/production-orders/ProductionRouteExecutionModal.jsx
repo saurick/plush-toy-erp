@@ -53,6 +53,7 @@ import {
   productionWipOperationLabel,
   productionWipOperationsForBatch,
   productionWipActionAllowedForOrder,
+  productionWipActionRelevant,
   productionWipOrderItem,
   productionWipOutputLabel,
   productionWipPackagingConfirmationForBatch,
@@ -483,9 +484,6 @@ export default function ProductionRouteExecutionModal({
     () => currentProductionWipOperation(aggregate, selectedBatch),
     [aggregate, selectedBatch]
   )
-  const canSplitSelectedBatch = Boolean(
-    !assignmentOnly && currentOperation?.operation_code !== 'FABRIC_PROCESSING'
-  )
   const selectedOrderItem = useMemo(
     () => productionWipOrderItem(aggregate, selectedBatch),
     [aggregate, selectedBatch]
@@ -759,6 +757,16 @@ export default function ProductionRouteExecutionModal({
     selectedBatch?.execution_mode === PRODUCTION_WIP_EXECUTION_MODE.OUTSOURCED
       ? PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN
       : PRODUCTION_WIP_ACTION.COMPLETE_OPERATION
+  const actionVisible = (action) =>
+    canRunAction(action) &&
+    productionWipActionRelevant({
+      action,
+      order: authoritativeOrder,
+      batch: selectedBatch,
+      operation: currentOperation,
+      nextOperation,
+      packagingConfirmation: selectedPackagingConfirmation,
+    })
   const batchColumns = [
     {
       align: 'left',
@@ -1552,7 +1560,7 @@ export default function ProductionRouteExecutionModal({
                 <Space wrap>
                   {canAssign ? (
                     <>
-                      {canSplitSelectedBatch ? (
+                      {actionVisible(PRODUCTION_WIP_ACTION.SPLIT_BATCH) ? (
                         <Button
                           disabled={
                             saving ||
@@ -1573,7 +1581,7 @@ export default function ProductionRouteExecutionModal({
                           拆分批次
                         </Button>
                       ) : null}
-                      {canRunAction(PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION) ? (
+                      {actionVisible(PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION) ? (
                         <Button
                           type="primary"
                           disabled={
@@ -1595,7 +1603,7 @@ export default function ProductionRouteExecutionModal({
                           安排加工
                         </Button>
                       ) : null}
-                      {!assignmentOnly ? (
+                      {actionVisible(PRODUCTION_WIP_ACTION.CANCEL_BATCH) ? (
                         <Button
                           danger
                           disabled={
@@ -1621,67 +1629,77 @@ export default function ProductionRouteExecutionModal({
                   ) : null}
                   {(canExecute || canReceiveReturn) && !assignmentOnly ? (
                     <>
-                      <Button
-                        disabled={
-                          saving ||
-                          !actionButtonEnabled(
-                            PRODUCTION_WIP_ACTION.START_OPERATION,
-                            selectedBatch,
-                            currentOperation,
-                            nextOperation,
-                            selectedPackagingConfirmation,
-                            canExecute,
-                            authoritativeOrder
-                          )
-                        }
-                        onClick={() =>
-                          selectAction(PRODUCTION_WIP_ACTION.START_OPERATION)
-                        }
-                      >
-                        开始工序
-                      </Button>
-                      <Button
-                        disabled={
-                          saving ||
-                          !actionButtonEnabled(
-                            completionAction,
-                            selectedBatch,
-                            currentOperation,
-                            nextOperation,
-                            selectedPackagingConfirmation,
-                            canRunAction(completionAction),
-                            authoritativeOrder
-                          )
-                        }
-                        onClick={() => selectAction(completionAction)}
-                      >
-                        {ACTION_TITLE[completionAction]}
-                      </Button>
-                      <Button
-                        type="primary"
-                        disabled={
-                          saving ||
-                          !actionButtonEnabled(
-                            PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION,
-                            selectedBatch,
-                            currentOperation,
-                            nextOperation,
-                            selectedPackagingConfirmation,
-                            canExecute,
-                            authoritativeOrder
-                          )
-                        }
-                        onClick={() =>
-                          selectAction(
-                            PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION
-                          )
-                        }
-                      >
-                        转下道工序
-                      </Button>
+                      {actionVisible(PRODUCTION_WIP_ACTION.START_OPERATION) ? (
+                        <Button
+                          disabled={
+                            saving ||
+                            !actionButtonEnabled(
+                              PRODUCTION_WIP_ACTION.START_OPERATION,
+                              selectedBatch,
+                              currentOperation,
+                              nextOperation,
+                              selectedPackagingConfirmation,
+                              canExecute,
+                              authoritativeOrder
+                            )
+                          }
+                          onClick={() =>
+                            selectAction(PRODUCTION_WIP_ACTION.START_OPERATION)
+                          }
+                        >
+                          开始工序
+                        </Button>
+                      ) : null}
+                      {actionVisible(completionAction) ? (
+                        <Button
+                          disabled={
+                            saving ||
+                            !actionButtonEnabled(
+                              completionAction,
+                              selectedBatch,
+                              currentOperation,
+                              nextOperation,
+                              selectedPackagingConfirmation,
+                              canRunAction(completionAction),
+                              authoritativeOrder
+                            )
+                          }
+                          onClick={() => selectAction(completionAction)}
+                        >
+                          {ACTION_TITLE[completionAction]}
+                        </Button>
+                      ) : null}
+                      {actionVisible(
+                        PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION
+                      ) ? (
+                        <Button
+                          type="primary"
+                          disabled={
+                            saving ||
+                            !actionButtonEnabled(
+                              PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION,
+                              selectedBatch,
+                              currentOperation,
+                              nextOperation,
+                              selectedPackagingConfirmation,
+                              canExecute,
+                              authoritativeOrder
+                            )
+                          }
+                          onClick={() =>
+                            selectAction(
+                              PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION
+                            )
+                          }
+                        >
+                          转下道工序
+                        </Button>
+                      ) : null}
                     </>
                   ) : null}
-                  {canConfirmPackaging && !assignmentOnly ? (
+                  {actionVisible(
+                    PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL
+                  ) ? (
                     <Button
                       disabled={
                         saving ||
@@ -1704,7 +1722,7 @@ export default function ProductionRouteExecutionModal({
                       确认包材要求
                     </Button>
                   ) : null}
-                  {canRework && !assignmentOnly ? (
+                  {actionVisible(PRODUCTION_WIP_ACTION.REWORK) ? (
                     <Button
                       danger
                       disabled={

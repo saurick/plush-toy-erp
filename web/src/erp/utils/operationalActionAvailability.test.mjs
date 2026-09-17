@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  canEditShipmentDraft,
   resolveFinancePaymentActionAvailability,
   resolveProductionExceptionActionAvailability,
   resolveRelatedRecordActionAvailability,
@@ -12,7 +13,7 @@ function state(result) {
   return [result.visible, result.disabled, result.disabledReason]
 }
 
-test('收付款动作：只有无权限隐藏，未选中、前置不足和终态都保留槽位', () => {
+test('收付款动作：前置不足保留原因，无权限和已完成动作隐藏', () => {
   for (const action of ['allocation', 'approval', 'cancel', 'reverse']) {
     assert.deepEqual(
       state(
@@ -86,7 +87,7 @@ test('收付款动作：只有无权限隐藏，未选中、前置不足和终�
         payment: approved,
       })
     ),
-    [true, true, '只有待审批收付款可以核对审批流']
+    [false, true, '']
   )
 
   const posted = { status: 'POSTED' }
@@ -107,14 +108,14 @@ test('收付款动作：只有无权限隐藏，未选中、前置不足和终�
         authorized: true,
         payment: { status },
       })
-      assert.equal(result.visible, true, `${status}/${action} 应保留`)
+      assert.equal(result.visible, false, `${status}/${action} 应隐藏`)
       assert.equal(result.disabled, true, `${status}/${action} 应置灰`)
-      assert.ok(result.disabledReason, `${status}/${action} 应说明原因`)
+      assert.equal(result.disabledReason, '')
     }
   }
 })
 
-test('出货动作：放行前置、已完成和驳回都保留已授权动作并置灰', () => {
+test('出货动作：放行前置保留原因，已完成和驳回后不再显示无效动作', () => {
   const draftPending = {
     status: 'DRAFT',
     finance_release_status: 'PENDING',
@@ -149,7 +150,7 @@ test('出货动作：放行前置、已完成和驳回都保留已授权动作�
       authorized: true,
       shipment: draftApproved,
     }).visible,
-    true
+    false
   )
   assert.equal(
     resolveShipmentActionAvailability({
@@ -178,9 +179,9 @@ test('出货动作：放行前置、已完成和驳回都保留已授权动作�
       authorized: true,
       shipment: draftRejected,
     })
-    assert.equal(result.visible, true, `${action} 在放行驳回后应保留`)
+    assert.equal(result.visible, false, `${action} 在放行驳回后应隐藏`)
     assert.equal(result.disabled, true, `${action} 在放行驳回后应置灰`)
-    assert.ok(result.disabledReason)
+    assert.equal(result.disabledReason, '')
   }
   assert.equal(
     resolveShipmentActionAvailability({
@@ -198,7 +199,7 @@ test('出货动作：放行前置、已完成和驳回都保留已授权动作�
       authorized: true,
       shipment: shipped,
     }).visible,
-    true
+    false
   )
   assert.equal(
     resolveShipmentActionAvailability({
@@ -234,7 +235,7 @@ test('生产异常动作：按异常类型、审批状态、执行状态和申�
       productionException: submittedScrap,
       requesterOwned: false,
     }).visible,
-    true
+    false
   )
   assert.equal(
     resolveProductionExceptionActionAvailability({
@@ -308,7 +309,7 @@ test('生产异常动作：按异常类型、审批状态、执行状态和申�
       authorized: true,
       productionException: approvedQuota,
     }).visible,
-    true
+    false
   )
   assert.equal(
     resolveProductionExceptionActionAvailability({
@@ -335,7 +336,7 @@ test('生产异常动作：按异常类型、审批状态、执行状态和申�
         execution_status: 'REVERSED',
       },
     }).visible,
-    true
+    false
   )
   assert.equal(
     resolveProductionExceptionActionAvailability({
@@ -398,4 +399,27 @@ test('相关单据动作：无选择或无关联时不占操作位，记录相�
     ),
     [true, true, '当前操作完成后可查看相关单据']
   )
+})
+
+test('出货草稿编辑：进入财务流程后禁止编辑，缺少版本信息时不猜测可编辑', () => {
+  const draft = {
+    status: 'DRAFT',
+    finance_release_status: 'PENDING',
+    finance_release_version: 1,
+  }
+  assert.equal(canEditShipmentDraft(draft), true)
+  for (const patch of [
+    { status: 'SHIPPED' },
+    { status: 'CANCELLED' },
+    { finance_release_status: 'APPROVED' },
+    { finance_release_status: 'REJECTED' },
+    { finance_release_version: 2 },
+    { finance_release_version: undefined },
+    { finance_release_process_instance_id: 7 },
+    { finance_release_process_node_id: 8 },
+    { finance_released_at: 1789657200 },
+  ]) {
+    assert.equal(canEditShipmentDraft({ ...draft, ...patch }), false)
+  }
+  assert.equal(canEditShipmentDraft(null), false)
 })

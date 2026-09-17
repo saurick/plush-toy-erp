@@ -610,7 +610,12 @@ export default function V1QualityInspectionsPage() {
     canCreatePurchaseReturn ||
     canManageOutsourcingDisposition ||
     canSubmitProductionException
-  const showQualityDispositionAction = hasAnyDispositionCapability
+  const showQualityDispositionAction =
+    hasAnyDispositionCapability &&
+    (!selectedRow ||
+      (selectedDispositionSourceSupported &&
+        selectedDispositionAuthorized &&
+        !selectedDispositionCompleted))
   const selectedPurchaseReceiptStatus = String(
     selectedRowPurchaseReceipt?.status || ''
   ).toUpperCase()
@@ -1446,8 +1451,11 @@ export default function V1QualityInspectionsPage() {
       }`
     : '请先选择一张质量检验单'
 
-  const isCreatingInspection = !inspectionModal || inspectionModal.mode === 'create'
-  const InspectionEditor = isCreatingInspection ? BusinessFormPage : BusinessFormModal
+  const isCreatingInspection =
+    !inspectionModal || inspectionModal.mode === 'create'
+  const InspectionEditor = isCreatingInspection
+    ? BusinessFormPage
+    : BusinessFormModal
   const modalTitle = {
     create: '生成来料质检草稿',
     pass: '判定合格',
@@ -1950,6 +1958,7 @@ export default function V1QualityInspectionsPage() {
           </BusinessActionTooltip>
           {canUpdate ? (
             <BusinessActionTooltip
+              visible={!selectedRow || selectedQualityStatus === 'DRAFT'}
               disabled={
                 !selectedRow || selectedRow.status !== 'DRAFT' || saving
               }
@@ -1977,6 +1986,7 @@ export default function V1QualityInspectionsPage() {
               >
                 <Button
                   data-business-action-key="submit"
+                  type="primary"
                   size="small"
                   className="erp-business-module-status-action"
                   icon={<FileDoneOutlined />}
@@ -1992,6 +2002,10 @@ export default function V1QualityInspectionsPage() {
           {canUpdate ? (
             <>
               <BusinessActionTooltip
+                visible={
+                  !selectedRow ||
+                  ['DRAFT', 'SUBMITTED'].includes(selectedQualityStatus)
+                }
                 disabled={
                   !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
                 }
@@ -2008,7 +2022,11 @@ export default function V1QualityInspectionsPage() {
                 <Button
                   data-business-action-key="pass"
                   size="small"
-                  type="primary"
+                  type={
+                    selectedQualityStatus === 'SUBMITTED'
+                      ? 'primary'
+                      : 'default'
+                  }
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   disabled={
@@ -2020,6 +2038,10 @@ export default function V1QualityInspectionsPage() {
                 </Button>
               </BusinessActionTooltip>
               <BusinessActionTooltip
+                visible={
+                  !selectedRow ||
+                  ['DRAFT', 'SUBMITTED'].includes(selectedQualityStatus)
+                }
                 disabled={
                   !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
                 }
@@ -2086,6 +2108,10 @@ export default function V1QualityInspectionsPage() {
           ) : null}
           {canUpdate ? (
             <BusinessActionTooltip
+              visible={
+                !selectedRow ||
+                ['DRAFT', 'SUBMITTED'].includes(selectedQualityStatus)
+              }
               disabled={
                 !selectedRow ||
                 !['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||

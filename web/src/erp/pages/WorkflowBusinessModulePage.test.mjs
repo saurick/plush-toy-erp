@@ -264,10 +264,7 @@ test('production exception tabs keep column order controls without exposing data
   assert.match(productionExceptionPanel, /\{columnOrderModal\}/u)
   assert.match(
     source,
-    /<BusinessListToolbarActions[\s\S]{0,180}showExport=\{!isProductionExceptionPage\}[\s\S]{0,240}onOpenColumnOrder=\{openColumnOrder\}/u
+    /<BusinessListToolbarActions[\s\S]{0,180}showExport=\{false\}[\s\S]{0,240}onOpenColumnOrder=\{openColumnOrder\}/u
   )
-  assert.match(
-    source,
-    /exportDisabledReason="当前页面只用于处理任务，暂不提供业务数据导出。"/u
-  )
+  assert.doesNotMatch(source, /exportDisabledReason=/u)
 })

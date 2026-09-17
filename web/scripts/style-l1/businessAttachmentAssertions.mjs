@@ -27,9 +27,14 @@ export function createBusinessAttachmentAssertions({
     }
 
     const button = page
-      .locator('.erp-business-selection-action-bar__actions button')
+      .locator(
+        '.erp-business-selection-action-bar__actions button, .erp-business-selection-action-drawer.ant-drawer-open button'
+      )
       .filter({ hasText: buttonName })
       .first()
+    const more = page.getByRole('button', { name: /^更多操作，共/u })
+    const openedMore = !(await button.isVisible()) && (await more.isVisible())
+    if (openedMore) await more.click()
     await button.waitFor({ state: 'visible', timeout: 10_000 })
     const buttonMetrics = await button.evaluate((node) => ({
       text: node.textContent?.replace(/\s+/g, ' ').trim() || '',

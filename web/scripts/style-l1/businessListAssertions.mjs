@@ -81,9 +81,12 @@ export function createBusinessListAssertions({ outputDir }) {
       )
     }
 
-    const menuButton = actionBar
-      .getByRole('button', { name: /更多操作/ })
-      .first()
+    const menuButton = page.locator(
+      '[data-business-action-key="lifecycle-more"]:visible'
+    )
+    if ((await menuButton.count()) === 0) {
+      await actionBar.getByRole('button', { name: /更多操作/ }).click()
+    }
     await menuButton.waitFor({ state: 'visible', timeout: 10_000 })
     await menuButton.click()
     const menuDropdown = page
@@ -136,6 +139,16 @@ export function createBusinessListAssertions({ outputDir }) {
       `${scenarioName} 状态动作按钮应保持可见尺寸: ${JSON.stringify(metrics)}`
     )
     await page.keyboard.press('Escape')
+    if (
+      await page
+        .locator('.erp-business-selection-action-drawer.ant-drawer-open')
+        .count()
+    ) {
+      await page.keyboard.press('Escape')
+      await page
+        .locator('.erp-business-selection-action-drawer')
+        .waitFor({ state: 'hidden' })
+    }
   }
 
   async function _assertBusinessSelectionActionBarBoxModel(
@@ -224,24 +237,19 @@ export function createBusinessListAssertions({ outputDir }) {
         `${scenarioName} 桌面当前操作行左右区域应上下居中对齐: ${JSON.stringify(metrics)}`
       )
     }
-    if (metrics.viewport.width > 768 && expectedMode === 'empty') {
-      const primaryCenter =
-        metrics.primary && (metrics.primary.top + metrics.primary.bottom) / 2
-      const actionsCenter =
-        metrics.actions && (metrics.actions.top + metrics.actions.bottom) / 2
-      assert(
-        Number.isFinite(primaryCenter) &&
-          Number.isFinite(actionsCenter) &&
-          Math.abs(primaryCenter - actionsCenter) <= 2,
-        `${scenarioName} 未选中态当前操作文字与右侧按钮未在同一中线: ${JSON.stringify(metrics)}`
+    if (expectedMode === 'empty')
+      assert.equal(
+        metrics.actions,
+        null,
+        `${scenarioName} 未选中只显示选择提示`
       )
-    }
     assert(
       metrics.actionBar.scrollWidth <= metrics.actionBar.clientWidth + 2,
       `${scenarioName} 选中操作条出现横向溢出: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.actions.scrollWidth <= metrics.actions.clientWidth + 2,
+      !metrics.actions ||
+        metrics.actions.scrollWidth <= metrics.actions.clientWidth + 2,
       `${scenarioName} 选中操作按钮区出现横向溢出: ${JSON.stringify(metrics)}`
     )
     assert(

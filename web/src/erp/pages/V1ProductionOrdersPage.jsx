@@ -1763,6 +1763,9 @@ export default function V1ProductionOrdersPage() {
           </BusinessActionTooltip>
           {canUpdate ? (
             <BusinessActionTooltip
+              visible={
+                !selected || selected.status === PRODUCTION_ORDER_STATUS.DRAFT
+              }
               disabled={
                 !selected ||
                 selected.status !== PRODUCTION_ORDER_STATUS.DRAFT ||
@@ -1794,6 +1797,14 @@ export default function V1ProductionOrdersPage() {
           ) : null}
           {canCreateCompletion ? (
             <BusinessActionTooltip
+              visible={
+                !selected ||
+                [
+                  PRODUCTION_ORDER_STATUS.DRAFT,
+                  PRODUCTION_ORDER_STATUS.RELEASED,
+                  PRODUCTION_ORDER_STATUS.CLOSED,
+                ].includes(selected.status)
+              }
               disabled={
                 !selected ||
                 ![
@@ -1818,7 +1829,11 @@ export default function V1ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="completion"
-                type="primary"
+                type={
+                  selected?.status === PRODUCTION_ORDER_STATUS.DRAFT
+                    ? 'default'
+                    : 'primary'
+                }
                 disabled={
                   !selected ||
                   ![
@@ -1889,6 +1904,9 @@ export default function V1ProductionOrdersPage() {
           ) : null}
           {canUpdate ? (
             <BusinessActionTooltip
+              visible={
+                !selected || selected.status === PRODUCTION_ORDER_STATUS.DRAFT
+              }
               disabled={
                 !selected ||
                 selected.status !== PRODUCTION_ORDER_STATUS.DRAFT ||
@@ -1909,6 +1927,7 @@ export default function V1ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="release"
+                type="primary"
                 className="erp-business-module-status-action"
                 disabled={
                   !selected ||
@@ -1931,6 +1950,13 @@ export default function V1ProductionOrdersPage() {
           ) : null}
           {canUpdate ? (
             <BusinessActionTooltip
+              visible={
+                !selected ||
+                [
+                  PRODUCTION_ORDER_STATUS.DRAFT,
+                  PRODUCTION_ORDER_STATUS.RELEASED,
+                ].includes(selected.status)
+              }
               disabled={
                 !selected ||
                 selected.status !== PRODUCTION_ORDER_STATUS.RELEASED ||
@@ -1966,6 +1992,13 @@ export default function V1ProductionOrdersPage() {
           ) : null}
           {canUpdate ? (
             <BusinessActionTooltip
+              visible={
+                !selected ||
+                [
+                  PRODUCTION_ORDER_STATUS.DRAFT,
+                  PRODUCTION_ORDER_STATUS.RELEASED,
+                ].includes(selected.status)
+              }
               disabled={
                 !selected ||
                 ![

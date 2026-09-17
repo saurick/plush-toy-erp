@@ -1248,7 +1248,10 @@ export default function FinancePaymentsPage() {
     const request = beginLatestRequest('finance-credit-export')
     try {
       const result = await listAllFinanceCreditNotes(
-        compactParams({ status: creditStatusFilter, keyword: creditKeyword.trim() }),
+        compactParams({
+          status: creditStatusFilter,
+          keyword: creditKeyword.trim(),
+        }),
         { signal: request.signal }
       )
       if (!request.isCurrent()) return
@@ -1273,7 +1276,12 @@ export default function FinancePaymentsPage() {
       exportInFlightRef.current = false
       request.finish()
     }
-  }, [beginLatestRequest, creditExportColumns, creditStatusFilter, creditKeyword])
+  }, [
+    beginLatestRequest,
+    creditExportColumns,
+    creditStatusFilter,
+    creditKeyword,
+  ])
   const paymentDetailLineItems = {
     title: '核销明细',
     items: Array.isArray(paymentDetail?.allocations)
@@ -1406,7 +1414,10 @@ export default function FinancePaymentsPage() {
                   value={paymentKeyword}
                   onChange={(event) => {
                     setPaymentKeyword(event.target.value)
-                    setPaymentPagination((current) => ({ ...current, current: 1 }))
+                    setPaymentPagination((current) => ({
+                      ...current,
+                      current: 1,
+                    }))
                   }}
                 />
                 <SelectFilter
@@ -1502,13 +1513,18 @@ export default function FinancePaymentsPage() {
               </BusinessActionTooltip>
               {canPostPayment ? (
                 <BusinessActionTooltip
+                  visible={paymentActionAvailability.allocation.visible}
                   disabled={paymentActionAvailability.allocation.disabled}
                   disabledReason={
                     paymentActionAvailability.allocation.disabledReason
                   }
                 >
                   <Button
-                    type="primary"
+                    type={
+                      currentPayment?.status === 'APPROVED'
+                        ? 'primary'
+                        : 'default'
+                    }
                     className="erp-business-module-status-action"
                     data-business-action-key="payment-allocation"
                     disabled={paymentActionAvailability.allocation.disabled}
@@ -1520,6 +1536,7 @@ export default function FinancePaymentsPage() {
               ) : null}
               {canCreatePayment ? (
                 <BusinessActionTooltip
+                  visible={paymentActionAvailability.approval.visible}
                   disabled={paymentActionAvailability.approval.disabled}
                   disabledReason={
                     paymentActionAvailability.approval.disabledReason
@@ -1527,6 +1544,7 @@ export default function FinancePaymentsPage() {
                 >
                   <Button
                     data-business-action-key="payment-approval"
+                    type="primary"
                     disabled={paymentActionAvailability.approval.disabled}
                     onClick={ensurePaymentApprovalProcess}
                   >
@@ -1536,6 +1554,7 @@ export default function FinancePaymentsPage() {
               ) : null}
               {canCancelPayment ? (
                 <BusinessActionTooltip
+                  visible={paymentActionAvailability.cancel.visible}
                   disabled={paymentActionAvailability.cancel.disabled}
                   disabledReason={
                     paymentActionAvailability.cancel.disabledReason
@@ -1553,6 +1572,7 @@ export default function FinancePaymentsPage() {
               ) : null}
               {canReversePayment ? (
                 <BusinessActionTooltip
+                  visible={paymentActionAvailability.reverse.visible}
                   disabled={paymentActionAvailability.reverse.disabled}
                   disabledReason={
                     paymentActionAvailability.reverse.disabledReason
@@ -1573,21 +1593,23 @@ export default function FinancePaymentsPage() {
                   </Button>
                 </BusinessActionTooltip>
               ) : null}
-              <ExceptionProcessRecoveryButton
-                canRecover={canRecoverProcess}
-                disabled={!currentPayment || loading}
-                disabledReason="请先选择一条收付款记录"
-                loadProcess={() =>
-                  getFinancePaymentApprovalProcess({
-                    ...(customerKey ? { customer_key: customerKey } : {}),
-                    finance_payment_id: currentPayment.id,
-                  })
-                }
-                onRecovered={async () => {
-                  await recoverPayment(currentPayment.id)
-                  await loadReferences()
-                }}
-              />
+              {canRecoverProcess ? (
+                <ExceptionProcessRecoveryButton
+                  canRecover={canRecoverProcess}
+                  disabled={!currentPayment || loading}
+                  disabledReason="请先选择一条收付款记录"
+                  loadProcess={() =>
+                    getFinancePaymentApprovalProcess({
+                      ...(customerKey ? { customer_key: customerKey } : {}),
+                      finance_payment_id: currentPayment.id,
+                    })
+                  }
+                  onRecovered={async () => {
+                    await recoverPayment(currentPayment.id)
+                    await loadReferences()
+                  }}
+                />
+              ) : null}
               <BusinessActionTooltip
                 disabled={!currentPayment || loading}
                 disabledReason={
@@ -1642,7 +1664,10 @@ export default function FinancePaymentsPage() {
                   value={creditKeyword}
                   onChange={(event) => {
                     setCreditKeyword(event.target.value)
-                    setCreditPagination((current) => ({ ...current, current: 1 }))
+                    setCreditPagination((current) => ({
+                      ...current,
+                      current: 1,
+                    }))
                   }}
                 />
                 <SelectFilter
@@ -1725,6 +1750,7 @@ export default function FinancePaymentsPage() {
               </BusinessActionTooltip>
               {canReverseCredit ? (
                 <BusinessActionTooltip
+                  visible={!currentCredit || currentCreditCanReverse}
                   disabled={!currentCreditCanReverse || loading}
                   disabledReason={
                     !currentCredit
@@ -2026,7 +2052,9 @@ export default function FinancePaymentsPage() {
       </BusinessFormModal>
 
       <CreditEditor
-        {...(isCreatingCredit ? { form: creditForm } : { width: 720, cancelText: '取消' })}
+        {...(isCreatingCredit
+          ? { form: creditForm }
+          : { width: 720, cancelText: '取消' })}
         title={creditOpen === 'reverse' ? '冲销红冲记录' : '登记红冲'}
         description={
           creditOpen === 'reverse'

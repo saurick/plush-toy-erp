@@ -3,6 +3,7 @@ import {
   DownOutlined,
   DownloadOutlined,
   EditOutlined,
+  EyeOutlined,
   FileTextOutlined,
   ImportOutlined,
   LinkOutlined,
@@ -64,6 +65,7 @@ export default function PurchaseOrderOperationPanel({
   loadOrders,
   openCreateModal,
   openEditModal,
+  openDetails,
   openInboundDraftModal,
   openLineOrder,
   openRelatedTable,
@@ -213,29 +215,6 @@ export default function PurchaseOrderOperationPanel({
           >
             列顺序
           </ToolbarButton>
-          {canUpdate ? (
-            <BusinessActionTooltip
-              disabled={!selectedOrderCanReorder || recordActionBusy}
-              disabledReason={
-                !singleSelectedOrder
-                  ? '请先选择一条采购订单'
-                  : !selectedOrderCanReorder
-                    ? '当前状态不能调整材料顺序'
-                    : recordActionBusy
-                      ? '当前订单操作完成后可调整材料顺序'
-                      : ''
-              }
-            >
-              <ToolbarButton
-                icon={<OrderedListOutlined />}
-                loading={lineOrderLoading}
-                disabled={!selectedOrderCanReorder || recordActionBusy}
-                onClick={openLineOrder}
-              >
-                材料顺序
-              </ToolbarButton>
-            </BusinessActionTooltip>
-          ) : null}
         </Space>
       }
       primaryAction={
@@ -277,10 +256,56 @@ export default function PurchaseOrderOperationPanel({
         />
         {canUpdate ? (
           <BusinessActionTooltip
+            selectionActionPriority={20}
+            visible={!singleSelectedOrder || selectedOrderCanReorder}
+            disabled={!selectedOrderCanReorder || recordActionBusy}
+            disabledReason={
+              !singleSelectedOrder
+                ? '请先选择一条采购订单'
+                : !selectedOrderCanReorder
+                  ? '当前状态不能调整材料顺序'
+                  : recordActionBusy
+                    ? '当前订单操作完成后可调整材料顺序'
+                    : ''
+            }
+          >
+            <Button
+              size="small"
+              data-business-action-key="line-order"
+              icon={<OrderedListOutlined />}
+              loading={lineOrderLoading}
+              disabled={!selectedOrderCanReorder || recordActionBusy}
+              onClick={openLineOrder}
+            >
+              材料顺序
+            </Button>
+          </BusinessActionTooltip>
+        ) : null}
+        <BusinessActionTooltip
+          disabled={!hasSingleSelection || recordActionBusy}
+          disabledReason={
+            recordActionBusy
+              ? '当前订单操作完成后可查看'
+              : '请先选择一条采购订单'
+          }
+        >
+          <Button
+            data-business-action-key="purchase-details"
+            size="small"
+            icon={<EyeOutlined />}
+            disabled={!hasSingleSelection || recordActionBusy}
+            onClick={() => openDetails(singleSelectedOrder)}
+          >
+            查看详情
+          </Button>
+        </BusinessActionTooltip>
+        {canUpdate ? (
+          <BusinessActionTooltip
+            visible={
+              !singleSelectedOrder || selectedLifecycleStatus === 'draft'
+            }
             disabled={
-              !selectedOrderCanEdit ||
-              !referenceDataReady ||
-              recordActionBusy
+              !selectedOrderCanEdit || !referenceDataReady || recordActionBusy
             }
             disabledReason={
               !singleSelectedOrder
@@ -300,9 +325,7 @@ export default function PurchaseOrderOperationPanel({
               icon={<EditOutlined />}
               loading={itemsLoading}
               disabled={
-                !selectedOrderCanEdit ||
-                !referenceDataReady ||
-                recordActionBusy
+                !selectedOrderCanEdit || !referenceDataReady || recordActionBusy
               }
               onClick={() => openEditModal(singleSelectedOrder)}
             >
@@ -348,6 +371,12 @@ export default function PurchaseOrderOperationPanel({
         ) : null}
         {canCreateInboundDraftAction ? (
           <BusinessActionTooltip
+            visible={
+              !singleSelectedOrder ||
+              ['draft', 'submitted', 'approved'].includes(
+                selectedLifecycleStatus
+              )
+            }
             disabled={
               !canGenerateInboundDraft ||
               inboundReferenceDataState !== 'ready' ||
@@ -359,7 +388,7 @@ export default function PurchaseOrderOperationPanel({
               !singleSelectedOrder
                 ? '请先选择一条采购订单'
                 : selectedLifecycleStatus !== 'approved'
-                  ? '采购订单审核通过后可生成入库'
+                  ? '采购订单审核通过后，由仓库登记实际到货'
                   : inboundReferenceDataState !== 'ready'
                     ? inboundReferenceDataState === 'loading'
                       ? '入库仓库资料加载完成后可生成'
@@ -386,7 +415,7 @@ export default function PurchaseOrderOperationPanel({
               loading={generatingInboundDraft}
               onClick={() => openInboundDraftModal(singleSelectedOrder)}
             >
-              生成入库
+              登记到货
             </Button>
           </BusinessActionTooltip>
         ) : null}
