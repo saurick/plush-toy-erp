@@ -19,7 +19,7 @@
 | `node --test scripts/qa/dev-page-governance.test.mjs` | 检查 DEV 菜单 route 唯一且留在 `/__dev`，普通页面由单一模块登记 affected 桌面渲染/溢出 smoke，专属页面保留各自唯一桌面场景；full/strict 默认不运行 DEV 视觉场景，且不登记 DEV 移动端、暗色、成功截图、固定密度或通用键盘合同 | 新增菜单、页面或修改工作台可见内容时 |
 | `node --test scripts/qa/dev-quality-gate-provider-boundary.test.mjs` | 检查质量工作台直接投影服务器 provider 返回的 CI Job，并只用正式流水线与终态门禁判定结果；前端不保存需随 Job 增删改名同步的第二份拓扑 | 修改 GitLab CI 证据 provider、质量工作台或 Job 编排时 |
 | `node --test scripts/qa/ci-job-guide.test.mjs` | 校验每个正式 push-CI Job 都有一份简短用途说明；说明源不保存依赖、状态、耗时、等待或历史，未知 Job 只标记“说明待登记”并继续投影 | 新增、删除、改名或拆分 GitLab CI Job 时 |
-| `bash scripts/qa/fast.sh` | 高频快速检查，只运行显式 `fast` Node 测试组，并覆盖文档清单、客户配置、菜单、Web 静态检查和 server quick；阶段编号只由 affected 扫描本次变更文件 | 日常开发后 |
+| `bash scripts/qa/fast.sh` | 跨模块基础检查集合，运行显式 `fast` Node 测试组，并覆盖文档清单、客户配置、菜单、Web 静态检查和 server quick；阶段编号只由 affected 扫描本次变更文件 | 需要跨模块基础验证时；小改优先 affected / 定向测试 |
 | `node scripts/qa/yoyoosun-role-jsonrpc-access.mjs --report output/qa/yoyoosun-role-jsonrpc-access/report.json` | 使用九岗位演示账号真实登录，逐岗验证允许读取、越权写入被拒绝和前后任务总量不串权；凭据只从服务端进程环境读取，预期业务写入为零，不等于完整角色协同闭环 | 本地后端与演示账号凭据就绪后 |
 | `bash scripts/qa/prepare-push.sh` | 默认仅对单一 `origin/main` 签发 30 分钟 `server-ci` 回执：复算 affected 风险，但本地只运行 remote/ref/range、git-log、严格 secrets 与源码完整性短门禁；高成本测试/构建由 GitLab exact-SHA CI 执行。非标准目标保持 affected/full 保守合同 | commit 后、立即 push 前 |
 | `bash scripts/qa/prepare-push.sh --full` | 经明确授权的本地完整诊断；完整执行 full，并在前后身份和容器清理读回一致后签发短期回执，不作为默认 `origin/main` 的前置步骤 | full 已明确确认、需要独立本地诊断时 |
@@ -70,6 +70,10 @@
 | `node --test scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住客户配置包 businessFlows / stateMachines / processPolicies 仍为 preview-only，不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
 
 `affected` 的 v2 计划协议把验证范围与本地门禁强度分开：`affectedScopes` / `maxAffectedScope` 只使用 T0-T8 稳定键，`localGate` 只取 `focused` 或 `full`。本地完整门禁命令使用独立的 `LOCAL_FULL` scope，不会因此把 T8 写入受影响范围；T8 只用于真实发布、部署、恢复或回滚证据。
+
+普通前端 JS / JSX / MJS 的选测在每次计划中读取现有 Web 源码及测试，沿字面量文件引用反查间接调用方，支持相对路径、`@/`、目录入口和重新导出，并保留同名测试。读取源码、遍历目录或动态导入的测试及其调用方保守保留，因为静态引用不能证明它们的完整范围；不维护第二份逐页面测试清单或持久缓存。没有可识别覆盖、文件删除、全局入口或 CSS 变更仍选择 Web 全集；页面的真实浏览器 follow-up 继续单列。纯测试文件修改只运行相关测试，不机械追加业务页面 lint 或浏览器。
+
+`scripts/deploy/` 中已登记在现有 `release` 测试组且仍存在的 `.test.mjs` 可定向串行执行。发布执行逻辑、删除或未登记的测试以及 `resource_sensitive` 组仍走完整门禁；定向测试不等于发布或恢复验证。main 的完整 CI、发布前置证据和测试执行数检查保持原有合同。
 
 ## 主要脚本分组
 

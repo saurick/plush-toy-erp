@@ -8,6 +8,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { collectGitChangedFiles } from "./lib/git-range.mjs";
+import { NODE_TEST_GROUPS } from "./node-test-groups.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "../..");
@@ -32,8 +33,7 @@ const CUSTOMER_SOURCE_BOUNDARY_TEST =
   "scripts/qa/customer-source-repository-boundary.test.mjs";
 const DEV_PAGE_GOVERNANCE_TEST = "scripts/qa/dev-page-governance.test.mjs";
 const DEV_ENTRY_BOUNDARY_TEST = "scripts/qa/dev-entry-boundary.test.mjs";
-const DEV_SERVER_SECURITY_TEST =
-  "web/dev-server/devServerSecurity.test.mjs";
+const DEV_SERVER_SECURITY_TEST = "web/dev-server/devServerSecurity.test.mjs";
 const DEV_WORKBENCH_PLUGINS_TEST =
   "web/dev-server/devWorkbenchPlugins.test.mjs";
 const DEV_QUALITY_GATE_PROVIDER_BOUNDARY_TEST =
@@ -295,6 +295,100 @@ function listTests(root, relativeDirectory) {
     .sort();
 }
 
+function createWebTestSelector(root) {
+  const sources = new Map();
+  const importers = new Map();
+  const opaqueReaders = new Set();
+  const extensions = [
+    "",
+    ".mjs",
+    ".js",
+    ".jsx",
+    ".css",
+    "/index.mjs",
+    "/index.js",
+    "/index.jsx",
+  ];
+
+  function readDirectory(directory) {
+    if (!fs.existsSync(path.join(root, directory))) return;
+    for (const entry of fs.readdirSync(path.join(root, directory), {
+      withFileTypes: true,
+    })) {
+      if (
+        entry.isSymbolicLink() ||
+        entry.name.startsWith(".") ||
+        entry.name === "node_modules"
+      )
+        continue;
+      const file = `${directory}/${entry.name}`;
+      if (entry.isDirectory()) readDirectory(file);
+      else if (/\.(?:mjs|js|jsx|css)$/u.test(file)) {
+        sources.set(file, fs.readFileSync(path.join(root, file), "utf8"));
+      }
+    }
+  }
+
+  for (const directory of ["web/src", "web/scripts", "web/dev-server"])
+    readDirectory(directory);
+  for (const [file, source] of sources) {
+    // Include literal source reads as well as imports. Extra matches only widen
+    // the plan; filesystem readers and dynamic imports remain conservative.
+    for (const match of source.matchAll(
+      /(["'`])((?:\.\.?\/|@\/|web\/|src\/)[^"'`\r\n]+)\1/gu,
+    )) {
+      const reference = match[2].split(/[?#]/u)[0];
+      if (reference.includes("${")) continue;
+      const base = reference.startsWith("@/")
+        ? `web/src/${reference.slice(2)}`
+        : reference.startsWith("web/")
+          ? reference
+          : reference.startsWith("src/")
+            ? `web/${reference}`
+            : path.posix.join(path.posix.dirname(file), reference);
+      for (const extension of extensions) {
+        const dependency = path.posix.normalize(`${base}${extension}`);
+        if (!sources.has(dependency)) continue;
+        if (!importers.has(dependency)) importers.set(dependency, new Set());
+        importers.get(dependency).add(file);
+      }
+    }
+    if (
+      /["'](?:node:)?fs(?:\/promises)?["']/u.test(source) ||
+      /\bimport\s*\(\s*(?!["'])[^\s)]/u.test(source) ||
+      /import\.meta\.glob/u.test(source)
+    )
+      opaqueReaders.add(file);
+  }
+
+  function relatedTests(seeds) {
+    const seen = new Set(seeds);
+    const queue = [...seen];
+    for (const file of queue) {
+      for (const importer of importers.get(file) || []) {
+        if (seen.has(importer)) continue;
+        seen.add(importer);
+        queue.push(importer);
+      }
+    }
+    return [...seen].filter(
+      (file) => file.endsWith(".test.mjs") && sources.has(file),
+    );
+  }
+
+  const readerTests = relatedTests(opaqueReaders);
+  return (file) => {
+    const related = relatedTests([
+      file,
+      ...siblingTestCandidates(file).filter((candidate) =>
+        sources.has(candidate),
+      ),
+    ]);
+    // A global source scanner alone cannot establish coverage of a new page.
+    return related.length > 0 ? uniqueSorted([...related, ...readerTests]) : [];
+  };
+}
+
 function addNodeTests(state, files, reason, scope) {
   const normalized = uniqueSorted(files);
   if (normalized.length === 0) {
@@ -321,6 +415,9 @@ function addNodeTests(state, files, reason, scope) {
       "--",
       "node",
       "--test",
+      ...(normalized.some((file) => file.startsWith("scripts/deploy/"))
+        ? ["--test-concurrency=1"]
+        : []),
       ...normalized,
     ]),
   );
@@ -351,13 +448,10 @@ function addAffectedPhaseLabelCheck(state, files) {
   const id = "phase-labels:affected";
   state.commands.set(
     id,
-    command(
-      id,
-      "T0",
-      "检查本次变更文件的阶段编号命名边界",
-      "node",
-      ["scripts/qa/phase-label-boundaries.mjs", ...files],
-    ),
+    command(id, "T0", "检查本次变更文件的阶段编号命名边界", "node", [
+      "scripts/qa/phase-label-boundaries.mjs",
+      ...files,
+    ]),
   );
   for (const file of files) addReason(state, id, file);
 }
@@ -430,7 +524,10 @@ function isDevQualityGateProviderBoundaryPath(file) {
 
 function devBrowserScenarioNames(file) {
   const mappings = [
-    [/BusinessUsability|business-usability/u, ["dev-business-usability-desktop-light"]],
+    [
+      /BusinessUsability|business-usability/u,
+      ["dev-business-usability-desktop-light"],
+    ],
     [/DrillRecovery|drill-recovery/u, ["dev-drill-recovery-desktop-light"]],
     [
       /FlowState|BusinessChain|FactLedger|status-flows|flow-state-observatory/u,
@@ -449,10 +546,7 @@ function devBrowserScenarioNames(file) {
     [/Governance|governance/u, ["dev-page-governance-desktop-light"]],
     [/DevDocs|devDocs|dev-docs/u, ["dev-page-docs-desktop-light"]],
     [/Prototype|prototypes/u, ["dev-page-prototypes-desktop-light"]],
-    [
-      /DevTesting|devTesting/u,
-      ["dev-page-testing-desktop-light"],
-    ],
+    [/DevTesting|devTesting/u, ["dev-page-testing-desktop-light"]],
     [
       /DataPreparation|data-preparation/u,
       ["dev-page-data-preparation-desktop-light"],
@@ -554,6 +648,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     webNeedsAllTests: false,
   };
   const directTests = new Set();
+  let selectWebTests;
 
   addFixed(state, "diff", "所有改动");
   addAffectedPhaseLabelCheck(
@@ -633,6 +728,16 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         "确认 GitHub 只保留显式应急发布 workflow，main 镜像不会重复运行 CI，且未与 GitLab 主链并行发布。仓库 workflow 不能替代远端镜像规则证据。",
         file,
       );
+      continue;
+    }
+
+    if (
+      file.startsWith("scripts/deploy/") &&
+      file.endsWith(".test.mjs") &&
+      NODE_TEST_GROUPS.release.includes(file) &&
+      fs.existsSync(path.join(root, file))
+    ) {
+      directTests.add(file);
       continue;
     }
 
@@ -742,9 +847,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
 
     if (file.startsWith("web/src/")) {
-      const isDevWorkbenchSource = file.startsWith(
-        "web/src/dev-workbench/",
-      );
+      const isDevWorkbenchSource = file.startsWith("web/src/dev-workbench/");
       if (file.endsWith(".test.mjs")) {
         if (fs.existsSync(path.join(root, file))) {
           directTests.add(file);
@@ -756,11 +859,22 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
           state.webNeedsAllTests = true;
         }
       } else {
-        const siblingTests = siblingTestCandidates(file).filter((candidate) =>
+        let relatedTests = siblingTestCandidates(file).filter((candidate) =>
           fs.existsSync(path.join(root, candidate)),
         );
-        siblingTests.forEach((candidate) => directTests.add(candidate));
-        if (siblingTests.length === 0 && /\.(?:js|jsx|mjs|css)$/u.test(file)) {
+        if (
+          !isDevWorkbenchSource &&
+          /\.(?:js|jsx|mjs)$/u.test(file) &&
+          !/^web\/src\/(?:index\.|erp\/router\.)/u.test(file) &&
+          fs.existsSync(path.join(root, file))
+        ) {
+          selectWebTests ||= createWebTestSelector(root);
+          relatedTests = selectWebTests(file);
+        } else if (!isDevWorkbenchSource) {
+          relatedTests = [];
+        }
+        relatedTests.forEach((candidate) => directTests.add(candidate));
+        if (relatedTests.length === 0 && /\.(?:js|jsx|mjs|css)$/u.test(file)) {
           if (isDevWorkbenchSource) {
             directTests.add(DEV_ENTRY_BOUNDARY_TEST);
             directTests.add(DEV_PAGE_GOVERNANCE_TEST);
@@ -770,17 +884,18 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
           }
         }
       }
-      if (/\.(?:js|jsx|mjs)$/u.test(file)) {
+      if (!file.endsWith(".test.mjs") && /\.(?:js|jsx|mjs)$/u.test(file)) {
         addFixed(state, "webLint", file);
       }
       if (file.endsWith(".css")) {
         addFixed(state, "webCss", file);
       }
       if (
-        isDevPageGovernancePath(file) ||
-        file.endsWith(".css") ||
-        /\/(?:pages|components|mobile)\//u.test(file) ||
-        /\/router(?:\.[^/]+)?$/u.test(file)
+        !file.endsWith(".test.mjs") &&
+        (isDevPageGovernancePath(file) ||
+          file.endsWith(".css") ||
+          /\/(?:pages|components|mobile)\//u.test(file) ||
+          /\/router(?:\.[^/]+)?$/u.test(file))
       ) {
         addFollowUp(
           state,
@@ -1050,7 +1165,9 @@ export function formatPlan(plan, { root = DEFAULT_ROOT } = {}) {
   }
   lines.push("[qa:affected] commands:");
   plan.commands.forEach((selected, index) => {
-    lines.push(`  ${index + 1}. [${scopeLabel(selected.scope)}] ${selected.label}`);
+    lines.push(
+      `  ${index + 1}. [${scopeLabel(selected.scope)}] ${selected.label}`,
+    );
     lines.push(`     ${formatCommand(selected, root)}`);
   });
   if (plan.followUps.length > 0) {

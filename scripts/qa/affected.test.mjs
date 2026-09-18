@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -20,6 +20,26 @@ const ROOT = path.resolve(
 
 function ids(plan) {
   return plan.commands.map((item) => item.id);
+}
+
+function selectedTests(plan) {
+  return plan.commands
+    .filter((item) => item.id.startsWith("node-tests:"))
+    .flatMap((item) => item.args.filter((arg) => arg.endsWith(".test.mjs")))
+    .sort();
+}
+
+async function withSourceFixture(files, callback) {
+  const root = await mkdtemp(path.join(os.tmpdir(), "plush-affected-source-"));
+  try {
+    for (const [file, source] of Object.entries(files)) {
+      await mkdir(path.dirname(path.join(root, file)), { recursive: true });
+      await writeFile(path.join(root, file), source);
+    }
+    await callback(root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 }
 
 test("affected: help explains the server-CI trust boundary", () => {
@@ -233,17 +253,15 @@ test("affected: broad canonical audit is non-blocking and explicit", () => {
   assert.equal(auditPlan.localGate, "focused");
 });
 
-test("affected: a web helper with a sibling test uses the focused test", () => {
+test("affected: a web helper retains its own test within related coverage", () => {
   const plan = buildAffectedPlan(["web/src/erp/utils/dateRange.mjs"], {
     root: ROOT,
   });
 
   assert(ids(plan).includes("web-lint"));
-  assert(
-    ids(plan).some((id) => id.includes("web/src/erp/utils/dateRange.test.mjs")),
-  );
+  assert(selectedTests(plan).includes("web/src/erp/utils/dateRange.test.mjs"));
   const focusedCommand = plan.commands.find((item) =>
-    item.id.includes("web/src/erp/utils/dateRange.test.mjs"),
+    item.args.includes("web/src/erp/utils/dateRange.test.mjs"),
   );
   assert.deepEqual(focusedCommand?.args.slice(0, 8), [
     "scripts/qa/run-test-gate.mjs",
@@ -259,17 +277,170 @@ test("affected: a web helper with a sibling test uses the focused test", () => {
   assert.equal(plan.maxAffectedScope, "T5");
 });
 
-test("affected: a page without a sibling test expands to web tests and browser follow-up", () => {
-  const plan = buildAffectedPlan(
-    ["web/src/erp/pages/V1InventoryLedgerPage.jsx"],
+test("affected: a page without identifiable coverage retains web tests and browser proof", async () => {
+  await withSourceFixture(
     {
-      root: ROOT,
+      "web/src/pages/Uncovered.jsx": "export default () => null;",
+      "web/src/scanner.test.mjs": "import fs from 'node:fs';",
+    },
+    (root) => {
+      const plan = buildAffectedPlan(["web/src/pages/Uncovered.jsx"], { root });
+      assert(ids(plan).includes("web-lint"));
+      assert(ids(plan).includes("web-test"));
+      assert(plan.followUps.some((item) => item.id === "browser-regression"));
     },
   );
+});
 
-  assert(ids(plan).includes("web-lint"));
-  assert(ids(plan).includes("web-test"));
-  assert(plan.followUps.some((item) => item.id === "browser-regression"));
+test("affected: shared helpers include transitive consumers, aliases, cycles and opaque readers", async () => {
+  await withSourceFixture(
+    {
+      "web/src/amount.mjs": "export const amount = 1;",
+      "web/src/amount.test.mjs": "import './amount.mjs';",
+      "web/src/money/index.js": "export * from '../amount.mjs';",
+      "web/src/order.mjs": "import './money'; import './cycle.mjs';",
+      "web/src/cycle.mjs": "import './order.mjs';",
+      "web/src/order.test.mjs": "import './order.mjs';",
+      "web/src/components/Amount.jsx": "import '@/amount.mjs';",
+      "web/src/components/Amount.test.mjs": "import './Amount.jsx';",
+      "web/src/scanner.test.mjs": "import fs from 'node:fs/promises';",
+      "web/src/loader.mjs": "export const load = (name) => import(name);",
+      "web/src/loader.test.mjs": "import './loader.mjs';",
+      "web/src/unrelated.test.mjs": "export const unrelated = true;",
+    },
+    (root) => {
+      const plan = buildAffectedPlan(["web/src/amount.mjs"], { root });
+      assert.deepEqual(selectedTests(plan), [
+        "web/src/amount.test.mjs",
+        "web/src/components/Amount.test.mjs",
+        "web/src/loader.test.mjs",
+        "web/src/order.test.mjs",
+        "web/src/scanner.test.mjs",
+      ]);
+      assert(!ids(plan).includes("web-test"));
+    },
+  );
+});
+
+test("affected: a page can use a differently named source contract without all Web tests", async () => {
+  await withSourceFixture(
+    {
+      "web/src/pages/Order.jsx": "export default () => null;",
+      "web/src/contracts.test.mjs":
+        "const source = new URL('./pages/Order.jsx', import.meta.url);",
+      "web/src/unrelated.test.mjs": "export const unrelated = true;",
+    },
+    (root) => {
+      const plan = buildAffectedPlan(["web/src/pages/Order.jsx"], { root });
+      assert.deepEqual(selectedTests(plan), ["web/src/contracts.test.mjs"]);
+      assert(!ids(plan).includes("web-test"));
+      assert(plan.followUps.some((item) => item.id === "browser-regression"));
+    },
+  );
+});
+
+test("affected: entrypoints, styles and deleted modules cannot be narrowed by nearby tests", async () => {
+  await withSourceFixture(
+    {
+      "web/src/index.jsx": "export default () => null;",
+      "web/src/index.test.mjs": "import './index.jsx';",
+      "web/src/erp/router.jsx": "export default [];",
+      "web/src/theme.css": "body { color: black; }",
+      "web/src/removed.test.mjs": "import './removed.mjs';",
+    },
+    (root) => {
+      for (const file of [
+        "web/src/index.jsx",
+        "web/src/erp/router.jsx",
+        "web/src/theme.css",
+        "web/src/removed.mjs",
+      ]) {
+        assert(
+          ids(buildAffectedPlan([file], { root })).includes("web-test"),
+          file,
+        );
+      }
+    },
+  );
+});
+
+test("affected: changing only a Web test does not require product lint or browser execution", () => {
+  const file = "web/src/erp/pages/V1SalesOrdersPage.test.mjs";
+  const plan = buildAffectedPlan([file], { root: ROOT });
+  assert.deepEqual(selectedTests(plan), [file]);
+  assert(!ids(plan).includes("web-lint"));
+  assert(!ids(plan).includes("web-test"));
+  assert(!plan.followUps.some((item) => item.id === "browser-regression"));
+});
+
+test("affected: Web references are refreshed between plans", async () => {
+  await withSourceFixture(
+    {
+      "web/src/amount.mjs": "export const amount = 1;",
+      "web/src/amount.test.mjs": "import './amount.mjs';",
+      "web/src/consumer.test.mjs": "export const unrelated = true;",
+    },
+    async (root) => {
+      assert(
+        !selectedTests(
+          buildAffectedPlan(["web/src/amount.mjs"], { root }),
+        ).includes("web/src/consumer.test.mjs"),
+      );
+      await writeFile(
+        path.join(root, "web/src/consumer.test.mjs"),
+        "import './amount.mjs';",
+      );
+      assert(
+        selectedTests(
+          buildAffectedPlan(["web/src/amount.mjs"], { root }),
+        ).includes("web/src/consumer.test.mjs"),
+      );
+    },
+  );
+});
+
+test("affected: registered release test edits run only those tests serially", () => {
+  const files = [
+    "scripts/deploy/release-evidence-gate.test.mjs",
+    "scripts/deploy/git-ancestry-relation.test.mjs",
+  ];
+  const plan = buildAffectedPlan(files, { root: ROOT });
+  assert.deepEqual(selectedTests(plan), [...files].sort());
+  assert.equal(plan.localGate, "focused");
+  assert(!plan.affectedScopes.includes("T8"));
+  assert(
+    plan.commands
+      .find((item) => item.id.startsWith("node-tests:"))
+      .args.includes("--test-concurrency=1"),
+  );
+});
+
+test("affected: runtime, resource-sensitive, unknown and deleted release paths retain full gates", async () => {
+  for (const file of [
+    "scripts/deploy/release-evidence-gate.mjs",
+    "scripts/deploy/bootstrap-production-admin.runtime.test.mjs",
+  ]) {
+    assert.equal(
+      buildAffectedPlan([file], { root: ROOT }).localGate,
+      "full",
+      file,
+    );
+  }
+  await withSourceFixture(
+    { "scripts/deploy/new.test.mjs": "export const fixture = true;" },
+    (root) => {
+      for (const file of [
+        "scripts/deploy/new.test.mjs",
+        "scripts/deploy/release-evidence-gate.test.mjs",
+      ]) {
+        assert.equal(
+          buildAffectedPlan([file], { root }).localGate,
+          "full",
+          file,
+        );
+      }
+    },
+  );
 });
 
 test("affected: DEV 页面改动只选择聚焦合同与受影响桌面 smoke", () => {
@@ -345,7 +516,11 @@ test("affected: DEV server ordinary plugins stay focused while privileged bridge
       item.args.includes("web/dev-server/devCustomerConfigPlugin.test.mjs"),
     ),
   );
-  assert(ids(ordinary).includes("node-check:web/dev-server/devCustomerConfigPlugin.mjs"));
+  assert(
+    ids(ordinary).includes(
+      "node-check:web/dev-server/devCustomerConfigPlugin.mjs",
+    ),
+  );
   assert.equal(ids(ordinary).includes("full"), false);
   assert.equal(ordinary.followUps.length, 0);
 
@@ -721,15 +896,14 @@ test("affected: deployment changes conservatively select full plus release follo
     root: ROOT,
   });
 
-  assert.deepEqual(ids(plan), [
-    "diff-check",
-    "phase-labels:affected",
-    "full",
-  ]);
+  assert.deepEqual(ids(plan), ["diff-check", "phase-labels:affected", "full"]);
   assert.equal(plan.localGate, "full");
   assert.equal(plan.maxAffectedScope, "T8");
   assert(plan.affectedScopes.includes("T8"));
-  assert.equal(plan.commands.find((item) => item.id === "full")?.scope, "LOCAL_FULL");
+  assert.equal(
+    plan.commands.find((item) => item.id === "full")?.scope,
+    "LOCAL_FULL",
+  );
   assert(plan.followUps.some((item) => item.id === "release-validation"));
 });
 
@@ -740,7 +914,10 @@ test("affected: unknown paths fail safe to full instead of silently skipping", (
   assert.equal(plan.localGate, "full");
   assert.deepEqual(plan.affectedScopes, ["T0"]);
   assert.equal(plan.maxAffectedScope, "T0");
-  assert.equal(plan.commands.find((item) => item.id === "full")?.scope, "LOCAL_FULL");
+  assert.equal(
+    plan.commands.find((item) => item.id === "full")?.scope,
+    "LOCAL_FULL",
+  );
 });
 
 test("affected: full subsumes focused commands but keeps browser follow-up visible", () => {
@@ -749,11 +926,7 @@ test("affected: full subsumes focused commands but keeps browser follow-up visib
     { root: ROOT },
   );
 
-  assert.deepEqual(ids(plan), [
-    "diff-check",
-    "phase-labels:affected",
-    "full",
-  ]);
+  assert.deepEqual(ids(plan), ["diff-check", "phase-labels:affected", "full"]);
   assert(plan.followUps.some((item) => item.id === "browser-regression"));
 });
 
@@ -769,12 +942,9 @@ test("affected: focused plan selects an affected pre-push receipt", () => {
     reasons: [],
   });
 
-  const output = formatPlan(
-    plan,
-    {
-      root: ROOT,
-    },
-  );
+  const output = formatPlan(plan, {
+    root: ROOT,
+  });
 
   assert.match(output, /非 origin\/main.*affected 回执/u);
   assert.match(output, /正式 origin\/main.*server-ci.*GitLab exact-SHA CI/u);
