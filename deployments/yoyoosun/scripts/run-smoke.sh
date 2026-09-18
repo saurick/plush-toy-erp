@@ -16,7 +16,8 @@ endpoint=""
 backend_url=""
 environment=""
 deployment_target=""
-release_version=""
+profile="base-release"
+product_commit=""
 migration_version=""
 report=""
 customer_config_revision=""
@@ -45,8 +46,12 @@ while [[ $# -gt 0 ]]; do
     deployment_target="${2:-}"
     shift 2
     ;;
-  --release-version)
-    release_version="${2:-}"
+  --profile)
+    profile="${2:-}"
+    shift 2
+    ;;
+  --product-commit)
+    product_commit="${2:-}"
     shift 2
     ;;
   --migration-version)
@@ -101,7 +106,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$endpoint" || -z "$release_version" || -z "$migration_version" || -z "$deployment_target" || -z "$environment" || -z "$report" ]]; then
+if [[ -z "$endpoint" || -z "$product_commit" || -z "$migration_version" || -z "$deployment_target" || -z "$environment" || -z "$report" ]]; then
   print_help
   exit 1
 fi
@@ -131,8 +136,8 @@ try {
 
 reject_url_credentials "--endpoint" "$endpoint"
 validate_http_url "--endpoint" "$endpoint"
-[[ "$release_version" =~ ^[a-f0-9]{40}$ ]] || {
-  echo "[run-smoke] --release-version must be a 40-character lowercase git sha"
+[[ "$product_commit" =~ ^[a-f0-9]{40}$ ]] || {
+  echo "[run-smoke] --product-commit must be a 40-character lowercase git sha"
   exit 1
 }
 [[ "$migration_version" =~ ^[0-9]{14}$ ]] || {
@@ -150,31 +155,51 @@ demo-133 | customer-test-133) ;;
   exit 1
   ;;
 esac
+case "$profile" in
+base-release | customer-trial-acceptance) ;;
+*)
+  echo "[run-smoke] --profile must be base-release or customer-trial-acceptance"
+  exit 1
+  ;;
+esac
 [[ "$environment" == "$deployment_target" ]] || {
   echo "[run-smoke] --environment must exactly match --deployment-target"
   exit 1
 }
-credential_contract="$script_dir/../env/credential.contract.json"
-[[ -f "$credential_contract" ]] || {
-  echo "[run-smoke] credential contract is missing: $credential_contract"
-  exit 1
-}
-IFS=$'\t' read -r contract_admin_username contract_admin_password contract_admin_password_env contract_admin_password_source contract_non_admin_password contract_non_admin_password_env contract_non_admin_password_source contract_non_admin_usernames_csv credential_contract_schema contract_sms_phone_env contract_deployment_target contract_command_target contract_database contract_dataset contract_target_identity contract_sha256 contract_non_admin_policy contract_sms_policy < <(
-  node "$support_script" credential-contract "$credential_contract" "$deployment_target"
-)
-[[ "$contract_deployment_target" == "$deployment_target" ]] || {
-  echo "[run-smoke] credential deployment target drifted"
-  exit 1
-}
-if [[ "$deployment_target" == "customer-test-133" ]]; then
-  IFS=$'\t' read -r isolated_uat_password_env isolated_sms_phone_env < <(
-    node "$support_script" credential-isolation-envs "$credential_contract"
-  )
-  [[ "$isolated_uat_password_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "$isolated_sms_phone_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || {
-    echo "[run-smoke] customer-test-133 secret isolation contract is invalid"
+contract_database="$(node "$support_script" target-database "$deployment_target")"
+uat_usernames=()
+sms_phone=""
+credential_contract=""
+if [[ "$profile" == "customer-trial-acceptance" ]]; then
+  [[ -n "$backend_url" ]] || {
+    echo "[run-smoke] customer-trial-acceptance requires --backend-url"
     exit 1
   }
-  unset "$isolated_uat_password_env" "$isolated_sms_phone_env"
+  credential_contract="$script_dir/../env/credential.contract.json"
+  [[ -f "$credential_contract" ]] || {
+    echo "[run-smoke] credential contract is missing: $credential_contract"
+    exit 1
+  }
+  IFS=$'\t' read -r contract_admin_username contract_admin_password contract_admin_password_env contract_admin_password_source contract_non_admin_password contract_non_admin_password_env contract_non_admin_password_source contract_non_admin_usernames_csv credential_contract_schema contract_sms_phone_env contract_deployment_target contract_command_target contract_database contract_dataset contract_target_identity contract_sha256 contract_non_admin_policy contract_sms_policy < <(
+    node "$support_script" credential-contract "$credential_contract" "$deployment_target"
+  )
+  [[ "$contract_deployment_target" == "$deployment_target" ]] || {
+    echo "[run-smoke] credential deployment target drifted"
+    exit 1
+  }
+  if [[ "$deployment_target" == "customer-test-133" ]]; then
+    IFS=$'\t' read -r isolated_uat_password_env isolated_sms_phone_env < <(
+      node "$support_script" credential-isolation-envs "$credential_contract"
+    )
+    [[ "$isolated_uat_password_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "$isolated_sms_phone_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || {
+      echo "[run-smoke] customer-test-133 secret isolation contract is invalid"
+      exit 1
+    }
+    unset "$isolated_uat_password_env" "$isolated_sms_phone_env"
+  fi
+elif [[ -n "$customer_config_revision" || -n "$admin_token_env" || -n "$admin_username" || -n "$admin_password_env" || -n "$uat_password_env" || -n "$sms_phone_env" || -n "$credential_operation_id" ]]; then
+  echo "[run-smoke] base-release forbids customer acceptance credential, SMS, PDF and customer config arguments"
+  exit 1
 fi
 [[ -z "$customer_config_revision" || "$customer_config_revision" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$ ]] || {
   echo "[run-smoke] --customer-config-revision is invalid"
@@ -187,6 +212,8 @@ fi
 if [[ -n "$backend_url" ]]; then
   reject_url_credentials "--backend-url" "$backend_url"
   validate_http_url "--backend-url" "$backend_url"
+fi
+if [[ "$profile" == "customer-trial-acceptance" ]]; then
   [[ "$credential_operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] || {
     echo "[run-smoke] --credential-operation-id must be a lowercase UUID v4 when --backend-url is provided"
     exit 1
@@ -296,13 +323,13 @@ write_report() {
   chmod 600 "$items_file"
   node -e '
 const fs = require("node:fs");
-const [deploymentTarget, environment, releaseVersion, generatedAt, endpointAlias, backendEndpointAlias, total, passed, failed] = process.argv.slice(1);
+const [deploymentTarget, environment, productCommit, generatedAt, endpointAlias, backendEndpointAlias, total, passed, failed] = process.argv.slice(1);
 const checks = fs.readFileSync(0, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
 const report = {
   customerCode: "yoyoosun",
   deploymentTarget,
   environment,
-  releaseVersion,
+  productCommit,
   generatedAt,
   operatorRole: "deployment-operator",
   endpointAlias,
@@ -313,7 +340,7 @@ const report = {
 };
 if (checks.length !== report.summary.total || report.summary.passed + report.summary.failed !== report.summary.total) process.exit(1);
 process.stdout.write(JSON.stringify(report, null, 2) + "\n");
-' "$deployment_target" "$environment" "$release_version" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$endpoint" "$backend_url" "${#checks[@]}" "$passed" "$failed" <"$items_file" >"$report_file"
+' "$deployment_target" "$environment" "$product_commit" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$endpoint" "$backend_url" "${#checks[@]}" "$passed" "$failed" <"$items_file" >"$report_file"
   chmod 600 "$report_file"
   mv "$report_file" "$report"
 }
@@ -323,7 +350,7 @@ if [[ -n "$backend_url" ]]; then
   runtime_identity_base_url="$backend_url"
 fi
 runtime_identity_digest="$(
-  node "$support_script" runtime-identity-digest "$contract_database" "$release_version" "$migration_version"
+  node "$support_script" runtime-identity-digest "$contract_database" "$product_commit" "$migration_version"
 )"
 runtime_identity_headers="$smoke_tmp_dir/runtime-identity.headers"
 : >"$runtime_identity_headers"
@@ -360,7 +387,7 @@ process.stdout.write(JSON.stringify({
   proof,
   responseBodyStored: false,
 }));
-' "$runtime_identity_status" "$runtime_identity_http_code" "$contract_database" "$release_version" "$migration_version" "$runtime_identity_digest" "$runtime_identity_proof")"
+' "$runtime_identity_status" "$runtime_identity_http_code" "$contract_database" "$product_commit" "$migration_version" "$runtime_identity_digest" "$runtime_identity_proof")"
 items+=("$runtime_identity_check_json")
 if [[ "$runtime_identity_status" == "pass" ]]; then
   passed=$((passed + 1))
@@ -405,7 +432,7 @@ for check in "${checks[@]}"; do
 done
 checks+=("runtime-identity")
 
-if [[ -n "$backend_url" ]]; then
+if [[ "$profile" == "customer-trial-acceptance" ]]; then
   credential_expected=$((${#uat_usernames[@]} + 1))
   credential_authenticated=0
   credential_admin_authenticated=false
@@ -565,31 +592,30 @@ process.stdout.write(JSON.stringify(report));
   items+=("$credential_check_json")
 fi
 
-auth_rpc_base_url="$endpoint"
-if [[ -n "$backend_url" ]]; then
+if [[ "$profile" == "customer-trial-acceptance" ]]; then
   auth_rpc_base_url="$backend_url"
+  auth_payload='{"jsonrpc":"2.0","id":"auth-capabilities-smoke","method":"capabilities","params":{}}'
+  auth_response="$(
+    curl --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused \
+      -sS \
+      -H "Content-Type: application/json" \
+      -H "Accept: application/json" \
+      -d "$auth_payload" \
+      "$auth_rpc_base_url/rpc/auth" || true
+  )"
+  auth_status="fail"
+  if SMOKE_RESPONSE="$auth_response" node "$support_script" auth-capabilities; then
+    auth_status="pass"
+  fi
+  if [[ "$auth_status" == "pass" ]]; then
+    passed=$((passed + 1))
+  else
+    failed=$((failed + 1))
+  fi
+  checks+=("auth-sms-capabilities")
+  items+=("{\"name\":\"auth-sms-capabilities\",\"status\":\"$auth_status\",\"target\":\"jsonrpc:auth.capabilities\",\"expectedMode\":\"provider\",\"enabled\":$([[ \"$auth_status\" == \"pass\" ]] && printf true || printf false),\"mode\":\"$([[ \"$auth_status\" == \"pass\" ]] && printf provider || printf unknown)\",\"mockDelivery\":false,\"responseBodyStored\":false}")
+  unset auth_response
 fi
-auth_payload='{"jsonrpc":"2.0","id":"auth-capabilities-smoke","method":"capabilities","params":{}}'
-auth_response="$(
-  curl --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused \
-    -sS \
-    -H "Content-Type: application/json" \
-    -H "Accept: application/json" \
-    -d "$auth_payload" \
-    "$auth_rpc_base_url/rpc/auth" || true
-)"
-auth_status="fail"
-if SMOKE_RESPONSE="$auth_response" node "$support_script" auth-capabilities; then
-  auth_status="pass"
-fi
-if [[ "$auth_status" == "pass" ]]; then
-  passed=$((passed + 1))
-else
-  failed=$((failed + 1))
-fi
-checks+=("auth-sms-capabilities")
-items+=("{\"name\":\"auth-sms-capabilities\",\"status\":\"$auth_status\",\"target\":\"jsonrpc:auth.capabilities\",\"expectedMode\":\"provider\",\"enabled\":$([[ \"$auth_status\" == \"pass\" ]] && printf true || printf false),\"mode\":\"$([[ \"$auth_status\" == \"pass\" ]] && printf provider || printf unknown)\",\"mockDelivery\":false,\"responseBodyStored\":false}")
-unset auth_response
 
 rpc_base_url="$endpoint"
 if [[ -n "$backend_url" ]]; then

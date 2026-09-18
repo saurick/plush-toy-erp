@@ -3,6 +3,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  RELEASE_EVIDENCE_PROFILES,
+  normalizeReleaseEvidenceProfile,
+  releaseEvidenceFieldFromMarkdown,
+} from "./release-evidence-contract.mjs";
 import { buildReleaseEvidenceStatus } from "./release-evidence-status.mjs";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
@@ -12,10 +17,10 @@ const RUNTIME_ENV_FILE_ALIAS = "<runtime-env-file>";
 const DIGEST_RE = /^sha256:[a-f0-9]{64}$/i;
 const RELEASE_EVIDENCE_FILE = "release-evidence.md";
 const IMMUTABLE_VERSION_INPUTS = [
-  ["RELEASE_VERSION", "releaseVersion"],
+  ["RELEASE_ID", "releaseId"],
   ["RELEASE_ENVIRONMENT", "environment"],
   ["OPERATOR_ROLE", "operatorRole"],
-  ["GIT_COMMIT", "gitCommit"],
+  ["PRODUCT_COMMIT", "productCommit"],
   ["SERVER_IMAGE", "serverImage"],
   ["SERVER_IMAGE_DIGEST", "serverImageDigest"],
   ["WEB_IMAGE", "webImage"],
@@ -39,10 +44,11 @@ const CLOSEOUT_PLAN_SCOPE = {
 };
 
 const OPERATOR_INPUT_GUIDE = {
-  RELEASE_VERSION: {
+  RELEASE_ID: {
     sourceHint: "release batch id chosen for this target deployment",
-    evidenceTarget: "release-evidence.md field releaseVersion",
-    validation: "real non-placeholder release identifier shared by all evidence in this directory",
+    evidenceTarget: "release-evidence.md field releaseId",
+    validation:
+      "real non-placeholder release identifier shared by all evidence in this directory",
     secret: false,
   },
   RELEASE_ENVIRONMENT: {
@@ -57,21 +63,23 @@ const OPERATOR_INPUT_GUIDE = {
     validation: "real non-placeholder operator role",
     secret: false,
   },
-  GIT_COMMIT: {
+  PRODUCT_COMMIT: {
     sourceHint: "git commit used to build the immutable server and web images",
-    evidenceTarget: "release-evidence.md field gitCommit",
-    validation: "7-40 character git hash",
+    evidenceTarget: "release-evidence.md field productCommit",
+    validation: "40 character lowercase git commit",
     secret: false,
   },
   SERVER_IMAGE: {
     sourceHint: "server image reference produced by the release build",
-    evidenceTarget: "release-evidence.md field serverImage and image-digests.txt",
+    evidenceTarget:
+      "release-evidence.md field serverImage and image-digests.txt",
     validation: "pinned image reference for the same release batch",
     secret: false,
   },
   SERVER_IMAGE_DIGEST: {
     sourceHint: "server image digest from the registry or build output",
-    evidenceTarget: "release-evidence.md field serverImageDigest and image-digests.txt",
+    evidenceTarget:
+      "release-evidence.md field serverImageDigest and image-digests.txt",
     validation: "sha256:<64-hex>",
     secret: false,
   },
@@ -83,18 +91,21 @@ const OPERATOR_INPUT_GUIDE = {
   },
   WEB_IMAGE_DIGEST: {
     sourceHint: "web image digest from the registry or build output",
-    evidenceTarget: "release-evidence.md field webImageDigest and image-digests.txt",
+    evidenceTarget:
+      "release-evidence.md field webImageDigest and image-digests.txt",
     validation: "sha256:<64-hex>",
     secret: false,
   },
   MIGRATION_BEFORE: {
-    sourceHint: "Atlas migration status captured before applying target migrations",
+    sourceHint:
+      "Atlas migration status captured before applying target migrations",
     evidenceTarget: "release-evidence.md field migrationBefore",
     validation: "14 digit Atlas migration version",
     secret: false,
   },
   MIGRATION_AFTER: {
-    sourceHint: "Atlas migration version expected after this release is applied",
+    sourceHint:
+      "Atlas migration version expected after this release is applied",
     evidenceTarget: "release-evidence.md field migrationAfter",
     validation: "14 digit Atlas migration version",
     secret: false,
@@ -109,12 +120,15 @@ const OPERATOR_INPUT_GUIDE = {
   BACKUP_ID: {
     sourceHint: "backup id from the same release batch backup evidence",
     evidenceTarget: "release-evidence.md field backupId and backup-evidence.md",
-    validation: "real backup id reused by restore rehearsal and recovery plan evidence",
+    validation:
+      "real backup id reused by restore rehearsal and recovery plan evidence",
     secret: false,
   },
   SOURCE_POSTGRES_DSN: {
-    sourceHint: "secure operator shell or secret manager for the source database DSN",
-    evidenceTarget: "not stored; only sanitized backup restore artifacts are written",
+    sourceHint:
+      "secure operator shell or secret manager for the source database DSN",
+    evidenceTarget:
+      "not stored; only sanitized backup restore artifacts are written",
     validation: "required only while running backup restore rehearsal",
     secret: true,
   },
@@ -131,9 +145,12 @@ const OPERATOR_INPUT_GUIDE = {
     secret: false,
   },
   CUSTOMER_CONFIG_ADMIN_TOKEN: {
-    sourceHint: "secure operator shell or secret manager for the target admin token",
-    evidenceTarget: "not stored; smoke report records only sanitized pass/fail evidence",
-    validation: "required only while running target customer config readback smoke",
+    sourceHint:
+      "secure operator shell or secret manager for the target admin token",
+    evidenceTarget:
+      "not stored; smoke report records only sanitized pass/fail evidence",
+    validation:
+      "required only while running target customer config readback smoke",
     secret: true,
   },
   ROLLBACK_TARGET_RELEASE: {
@@ -149,19 +166,21 @@ const OPERATOR_INPUT_GUIDE = {
     secret: false,
   },
   REVIEWER_NAME: {
-    sourceHint: "human reviewer who approved the customer config manifest evidence",
+    sourceHint:
+      "human reviewer who approved the customer config manifest evidence",
     evidenceTarget: "customer-config-manifest-evidence.json reviewer field",
     validation: "real reviewer name or role",
     secret: false,
   },
   "prod-env-file": {
     sourceHint: "production runtime env file path on the release workstation",
-    evidenceTarget: "production-preflight-report.txt",
+    evidenceTarget: "production-preflight-report.json",
     validation: "file exists and is not an example env file",
     secret: true,
   },
   "manual-release-signoff": {
-    sourceHint: "human sign-off after evidence gate, known limitations, smoke, restore and rollback evidence are reviewed",
+    sourceHint:
+      "human sign-off after evidence gate, known limitations, smoke, restore and rollback evidence are reviewed",
     evidenceTarget: "release-signoff-checklist.md",
     validation: "manual approval cannot be generated by runner",
     secret: false,
@@ -179,6 +198,7 @@ class CliError extends Error {
 export function parseCliArgs(argv) {
   const options = {
     customer: DEFAULT_CUSTOMER,
+    profile: RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
     envFile: DEFAULT_ENV_FILE,
     json: false,
     failOnBlocked: false,
@@ -215,6 +235,9 @@ export function parseCliArgs(argv) {
       case "customer":
         options.customer = value;
         break;
+      case "profile":
+        options.profile = value;
+        break;
       case "evidence-dir":
         options.evidenceDir = value;
         break;
@@ -240,6 +263,7 @@ Usage:
   node scripts/deploy/release-evidence-closeout-plan.mjs \\
     --deployment-target <demo-133|customer-test-133> \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
+    [--profile <base-release|customer-trial-acceptance>] \\
     [--runtime-env-file server/deploy/compose/prod/.env] \\
     [--json] [--fail-on-blocked]
 
@@ -282,14 +306,6 @@ function isMeaningfulValue(value) {
   return Boolean(text) && !/待填写|placeholder|sample|example/i.test(text);
 }
 
-function findMarkdownTableValue(content, key) {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = content.match(
-    new RegExp(`^\\|\\s*${escaped}\\s*\\|\\s*([^|]+?)\\s*\\|\\s*$`, "im"),
-  );
-  return match ? match[1].trim() : "";
-}
-
 function readReleaseEvidenceInputs({ repoRoot, evidenceDir }) {
   const releaseEvidencePath = path.resolve(
     repoRoot,
@@ -300,7 +316,7 @@ function readReleaseEvidenceInputs({ repoRoot, evidenceDir }) {
   const content = fs.readFileSync(releaseEvidencePath, "utf8");
   const inputs = {};
   for (const [envKey, field] of IMMUTABLE_VERSION_INPUTS) {
-    const value = findMarkdownTableValue(content, field);
+    const value = releaseEvidenceFieldFromMarkdown(content, field);
     if (isMeaningfulValue(value)) {
       inputs[envKey] = {
         value,
@@ -312,7 +328,13 @@ function readReleaseEvidenceInputs({ repoRoot, evidenceDir }) {
   return inputs;
 }
 
-function checkEnvOrEvidence({ env, evidenceInputs, key, label = key, validate }) {
+function checkEnvOrEvidence({
+  env,
+  evidenceInputs,
+  key,
+  label = key,
+  validate,
+}) {
   const envValue = String(env[key] ?? "").trim();
   const evidenceInput = evidenceInputs[key];
   const value = envValue || evidenceInput?.value || "";
@@ -428,7 +450,7 @@ function buildChecksForAction({
   switch (action.id) {
     case "immutable-version":
       checks.push(
-        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_VERSION" }),
+        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ID" }),
         checkEnvOrEvidence({
           env,
           evidenceInputs,
@@ -439,8 +461,8 @@ function buildChecksForAction({
         checkEnvOrEvidence({
           env,
           evidenceInputs,
-          key: "GIT_COMMIT",
-          validate: (value) => /^[a-f0-9]{7,40}$/i.test(value),
+          key: "PRODUCT_COMMIT",
+          validate: (value) => /^[a-f0-9]{40}$/u.test(value),
         }),
         checkEnvOrEvidence({ env, evidenceInputs, key: "SERVER_IMAGE" }),
         checkEnvOrEvidence({
@@ -476,7 +498,7 @@ function buildChecksForAction({
         checkEnvOrEvidence({
           env,
           evidenceInputs,
-          key: "GIT_COMMIT",
+          key: "PRODUCT_COMMIT",
           validate: (value) => /^[0-9a-f]{40}$/u.test(value),
         }),
         checkFile({
@@ -496,12 +518,23 @@ function buildChecksForAction({
       }
       break;
     case "backup-restore-rehearsal":
+      if (!commandText.includes("run-backup-restore-rehearsal.sh")) {
+        checks.push({
+          id: "current-backup-evidence",
+          ok: false,
+          kind: "manual",
+          message:
+            "Record and review the current pre-deploy backup and migration status.",
+        });
+        break;
+      }
       checks.push(
-        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_VERSION" }),
+        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ID" }),
         checkEnv({ env, key: "SOURCE_POSTGRES_DSN" }),
         checkFile({
           repoRoot,
-          filePath: "deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh",
+          filePath:
+            "deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh",
           id: "backup-restore-script",
           label: "backup restore rehearsal script",
         }),
@@ -512,7 +545,7 @@ function buildChecksForAction({
         checkEnvOrEvidence({
           env,
           evidenceInputs,
-          key: "GIT_COMMIT",
+          key: "PRODUCT_COMMIT",
           validate: (value) => /^[0-9a-f]{40}$/u.test(value),
         }),
         checkEnvOrEvidence({
@@ -521,14 +554,6 @@ function buildChecksForAction({
           key: "MIGRATION_AFTER",
           validate: (value) => /^\d{14}$/u.test(value),
         }),
-        checkEnv({
-          env,
-          key: "CREDENTIAL_ROTATION_OPERATION_ID",
-          validate: (value) =>
-            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
-              value,
-            ),
-        }),
         checkEnvOrEvidence({
           env,
           evidenceInputs,
@@ -536,7 +561,6 @@ function buildChecksForAction({
           validate: (value) => value === deploymentTarget,
         }),
         checkRuntimeUrl({ env, key: "SMOKE_ENDPOINT" }),
-        checkRuntimeUrl({ env, key: "SMOKE_BACKEND_URL" }),
         checkFile({
           repoRoot,
           filePath: "deployments/yoyoosun/scripts/run-smoke.sh",
@@ -544,6 +568,18 @@ function buildChecksForAction({
           label: "target smoke script",
         }),
       );
+      if (commandText.includes("--credential-operation-id")) {
+        checks.push(
+          checkEnv({
+            env,
+            key: "CREDENTIAL_ROTATION_OPERATION_ID",
+            validate: (value) =>
+              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+                value,
+              ),
+          }),
+        );
+      }
       if (commandText.includes("--backend-url")) {
         checks.push(checkRuntimeUrl({ env, key: "SMOKE_BACKEND_URL" }));
       }
@@ -552,8 +588,17 @@ function buildChecksForAction({
       }
       break;
     case "rollback-forward-fix":
+      if (!commandText.includes("rollback-rehearsal-report.mjs")) {
+        checks.push({
+          id: "current-rollback-plan",
+          ok: false,
+          kind: "manual",
+          message: "Review the fixed rollback version and recovery path.",
+        });
+        break;
+      }
       checks.push(
-        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_VERSION" }),
+        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ID" }),
         checkEnvOrEvidence({
           env,
           evidenceInputs,
@@ -588,7 +633,7 @@ function buildChecksForAction({
           checkEnvOrEvidence({
             env,
             evidenceInputs,
-            key: "GIT_COMMIT",
+            key: "PRODUCT_COMMIT",
             validate: (value) => /^[0-9a-f]{40}$/u.test(value),
           }),
           checkEnvOrEvidence({
@@ -596,14 +641,6 @@ function buildChecksForAction({
             evidenceInputs,
             key: "MIGRATION_AFTER",
             validate: (value) => /^\d{14}$/u.test(value),
-          }),
-          checkEnv({
-            env,
-            key: "CREDENTIAL_ROTATION_OPERATION_ID",
-            validate: (value) =>
-              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
-                value,
-              ),
           }),
           checkEnvOrEvidence({
             env,
@@ -615,10 +652,22 @@ function buildChecksForAction({
           checkRuntimeUrl({ env, key: "SMOKE_BACKEND_URL" }),
           checkEnv({ env, key: "CUSTOMER_CONFIG_ADMIN_TOKEN" }),
         );
+        if (commandText.includes("--credential-operation-id")) {
+          checks.push(
+            checkEnv({
+              env,
+              key: "CREDENTIAL_ROTATION_OPERATION_ID",
+              validate: (value) =>
+                /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+                  value,
+                ),
+            }),
+          );
+        }
       }
       if (commandText.includes("rollback-rehearsal-report.mjs")) {
         checks.push(
-          checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_VERSION" }),
+          checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ID" }),
           checkEnvOrEvidence({
             env,
             evidenceInputs,
@@ -712,7 +761,9 @@ function buildInputTemplateCommand({ actionId }) {
     "--evidence-dir",
     EVIDENCE_DIR_ALIAS,
     "--print-input-template",
-  ].map(shellToken).join(" ");
+  ]
+    .map(shellToken)
+    .join(" ");
 }
 
 function collectResolvedInputs(checks) {
@@ -730,12 +781,14 @@ function collectResolvedInputs(checks) {
 }
 
 function operatorGuideFor(id) {
-  return OPERATOR_INPUT_GUIDE[id] ?? {
-    sourceHint: "operator supplied release prerequisite",
-    evidenceTarget: "release evidence closeout action",
-    validation: "must be real, current, and non-placeholder",
-    secret: false,
-  };
+  return (
+    OPERATOR_INPUT_GUIDE[id] ?? {
+      sourceHint: "operator supplied release prerequisite",
+      evidenceTarget: "release evidence closeout action",
+      validation: "must be real, current, and non-placeholder",
+      secret: false,
+    }
+  );
 }
 
 function buildOperatorChecklist({ resolvedInputs, missingPrerequisites }) {
@@ -776,6 +829,7 @@ function buildOperatorChecklist({ resolvedInputs, missingPrerequisites }) {
 
 export function buildReleaseEvidenceCloseoutPlan({
   customer = DEFAULT_CUSTOMER,
+  profile = RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
   deploymentTarget,
   evidenceDir,
   envFile = DEFAULT_ENV_FILE,
@@ -791,8 +845,14 @@ export function buildReleaseEvidenceCloseoutPlan({
       2,
     );
   }
+  try {
+    profile = normalizeReleaseEvidenceProfile(profile);
+  } catch (error) {
+    throw new CliError(error.message, 2);
+  }
   const status = buildReleaseEvidenceStatus({
     customer,
+    profile,
     deploymentTarget,
     evidenceDir,
     repoRoot,
@@ -841,6 +901,7 @@ export function buildReleaseEvidenceCloseoutPlan({
 
   return {
     customer,
+    profile,
     deploymentTarget,
     evidenceDir: EVIDENCE_DIR_ALIAS,
     envFile: RUNTIME_ENV_FILE_ALIAS,

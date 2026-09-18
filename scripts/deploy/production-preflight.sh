@@ -5,9 +5,9 @@ umask 077
 print_help() {
   cat <<'USAGE'
 用法:
-  bash scripts/deploy/production-preflight.sh --deployment-target demo-133 --env-file <path>
-  bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --runtime
-  bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.txt
+  bash scripts/deploy/production-preflight.sh --profile base-release --deployment-target demo-133 --env-file <path>
+  bash scripts/deploy/production-preflight.sh --profile base-release --env-file server/deploy/compose/prod/.env --runtime
+  bash scripts/deploy/production-preflight.sh --profile customer-trial-acceptance --env-file server/deploy/compose/prod/.env --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.json
   bash scripts/deploy/production-preflight.sh --example
 
 作用:
@@ -19,6 +19,8 @@ print_help() {
   --compose-dir <path>   Compose 目录，默认 server/deploy/compose/prod
   --deployment-target <demo-133|customer-test-133>
                          登记的非生产部署目标；admin 不是部署环境
+  --profile <base-release|customer-trial-acceptance>
+                         默认 base-release；验收档才检查 SMS、PDF 与 Chromium 运行能力
   --compose-override <path>
                          登记目标必须使用的受控 Compose project override
   --runtime              额外检查容器运行状态和健康检查
@@ -26,7 +28,7 @@ print_help() {
                          runtime 期望的不可变 Git release；登记目标必须显式传入
   --example              只检查 .env.example 结构，允许 placeholder，不能当生产放行
   --skip-compose-config  仅 example / 非 runtime 诊断可跳过 Compose config；登记目标与 --runtime 禁止跳过
-  --out <path>           同步写入脱敏检查报告；父目录必须已存在
+  --out <path>           成功后原子写入脱敏 JSON 回执；父目录必须已存在
 USAGE
 }
 
@@ -154,6 +156,7 @@ skip_compose_config=0
 out_file=""
 expected_release=""
 deployment_target=""
+profile="base-release"
 registered_target_mode=0
 target_project=""
 target_database=""
@@ -170,6 +173,14 @@ env_snapshot=""
 normalized_env=""
 runtime_contract_file="$root_dir/deployments/yoyoosun/env/runtime.contract.json"
 expected_auth_sms_mode=""
+env_required_keys_checked=0
+production_boundaries_checked=0
+compose_and_migration_checked=0
+compose_runtime_services_checked=0
+runtime_health_ready_checked=0
+sms_provider_runtime_checked=0
+pdf_runtime_checked=0
+chromium_runtime_checked=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -187,6 +198,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --deployment-target)
     deployment_target="${2:-}"
+    shift 2
+    ;;
+  --profile)
+    profile="${2:-}"
     shift 2
     ;;
   --runtime)
@@ -222,11 +237,15 @@ done
 
 cd "$root_dir"
 
+case "$profile" in
+base-release | customer-trial-acceptance) ;;
+*) fail "--profile 必须是 base-release 或 customer-trial-acceptance" ;;
+esac
+
 if [[ -n "$out_file" ]]; then
   out_dir="$(dirname "$out_file")"
   [[ -d "$out_dir" ]] || fail "输出目录不存在: $out_dir"
-  : >"$out_file"
-  exec > >(tee "$out_file") 2>&1
+  [[ ! -L "$out_file" ]] || fail "--out 不得是符号链接"
 fi
 
 compose_file="$compose_dir/compose.yml"
@@ -395,6 +414,7 @@ for key in "${required_keys[@]}"; do
   has_value "$key" || fail "缺少必需变量: $key"
 done
 ok "env 必需变量齐全"
+env_required_keys_checked=1
 
 if [[ "$mode" != "example" ]]; then
   compose_docker_control_keys=(
@@ -527,7 +547,7 @@ PY_ENDPOINT
 
   [[ "$erp_customer_key" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "ERP_CUSTOMER_KEY 必须是稳定小写 customer key"
   [[ "$erp_customer_key" != "current" ]] || fail "ERP_CUSTOMER_KEY 不能使用旧 current 别名"
-  if [[ "$erp_customer_key" == "yoyoosun" ]]; then
+  if [[ "$profile" == "customer-trial-acceptance" && "$erp_customer_key" == "yoyoosun" ]]; then
     command -v python3 >/dev/null 2>&1 || fail "yoyoosun 运行合同校验需要 python3"
     [[ -f "$runtime_contract_file" && ! -L "$runtime_contract_file" ]] || fail "缺少 yoyoosun 运行合同: $runtime_contract_file"
     expected_auth_sms_mode="$(python3 -c '
@@ -634,7 +654,10 @@ print(sms["requiredMode"])
     fi
     [[ -z "$erp_customer_trial_target" ]] || fail "试用配置关闭时 ERP_CUSTOMER_TRIAL_TARGET 必须为空"
   fi
-  [[ "$erp_pdf_warmup" == "async" ]] || fail "ERP_PDF_WARMUP 生产发布必须显式为 async；off 只允许故障隔离，不能作为 release-ready 配置"
+  [[ "$erp_pdf_warmup" == "async" || "$erp_pdf_warmup" == "off" ]] || fail "ERP_PDF_WARMUP 只允许 async 或 off"
+  if [[ "$profile" == "customer-trial-acceptance" ]]; then
+    [[ "$erp_pdf_warmup" == "async" ]] || fail "ERP_PDF_WARMUP 客户试用验收必须显式为 async；off 只允许故障隔离"
+  fi
   [[ "$postgres_bind_addr" == "127.0.0.1" ]] || fail "POSTGRES_BIND_ADDR 必须为 127.0.0.1，避免 PostgreSQL 暴露到公网或办公网"
   [[ "$app_http_bind_addr" == "127.0.0.1" ]] || fail "APP_HTTP_BIND_ADDR 必须为 127.0.0.1，外部流量应先进入前端 / 网关"
   [[ "$web_desktop_bind_addr" == "0.0.0.0" || "$web_desktop_bind_addr" == "127.0.0.1" ]] || fail "WEB_DESKTOP_BIND_ADDR 只允许 0.0.0.0 或 127.0.0.1"
@@ -661,7 +684,10 @@ print(sms["requiredMode"])
     fail "TRACE_RATIO 必须在 0 到 1 之间"
   fi
   ok "生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过"
-  ok "PDF warmup=async 发布边界通过"
+  if [[ "$profile" == "customer-trial-acceptance" ]]; then
+    ok "PDF warmup=async 客户试用验收边界通过"
+  fi
+  production_boundaries_checked=1
 fi
 
 grep -Eq '^name:[[:space:]]+plush-toy-erp-prod[[:space:]]*$' "$compose_file" || fail "生产 Compose 必须保留 canonical project name=plush-toy-erp-prod"
@@ -693,8 +719,28 @@ if grep -Eq 'seccomp[=:][[:space:]]*unconfined|apparmor[=:][[:space:]]*unconfine
   fail "Compose app-server 不得关闭 seccomp / AppArmor、启用 privileged 或授予 SYS_ADMIN"
 fi
 [[ -f "$chromium_seccomp_profile" ]] || fail "缺少 Chromium seccomp profile: $chromium_seccomp_profile"
-chromium_seccomp_sha256="$(sha256_file "$chromium_seccomp_profile")"
-[[ "$chromium_seccomp_sha256" == "31a5d2fa9743f7ae2461df9e47460d895daee2a575b3a577838e11560b52c4fc" ]] || fail "Chromium seccomp profile 已漂移，必须重新评审并更新门禁"
+command -v python3 >/dev/null 2>&1 || fail "Chromium seccomp profile 校验需要 python3"
+python3 - "$chromium_seccomp_profile" <<'PY_SECCOMP' || fail "Chromium seccomp profile 缺少默认拒绝或已改变受审查的安全规则"
+import hashlib
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    profile = json.load(handle)
+
+def normalize(value):
+    if isinstance(value, dict):
+        return {key: normalize(item) for key, item in value.items() if key != "comment"}
+    if isinstance(value, list):
+        return sorted((normalize(item) for item in value), key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")))
+    return value
+
+# Pin security semantics, not file bytes: formatting, comments and rule order
+# do not change permissions. Any effective policy change requires review.
+canonical = json.dumps(normalize(profile), sort_keys=True, separators=(",", ":")).encode()
+expected = "90cdabf9e0e329b3a80f8fa2bd9f64439f58623745aed0c4bdac31617147c6cc"
+raise SystemExit(0 if hashlib.sha256(canonical).hexdigest() == expected else 1)
+PY_SECCOMP
 grep -q '/usr/local/bin/atlas' "$migrate_script" || fail "migration 脚本必须使用宿主机 /usr/local/bin/atlas"
 grep -q 'flock' "$migrate_script" || fail "migration 脚本必须使用 flock 串行化"
 grep -q '^umask 077$' "$migrate_script" || fail "migration 脚本必须使用 umask 077 创建私有锁"
@@ -703,6 +749,7 @@ grep -Fq "[ -L \"\$MIGRATION_LOCK_FILE\" ]" "$migrate_script" || fail "migration
 grep -Fq "exec 9>>\"\$MIGRATION_LOCK_FILE\"" "$migrate_script" || fail "migration 脚本锁文件不得被截断"
 [[ -x "$migrate_script" ]] || fail "migration 脚本不可执行: $migrate_script"
 ok "Compose、低配部署边界和 migration 脚本通过"
+compose_and_migration_checked=1
 
 if [[ "$runtime_check" -eq 1 ]]; then
   [[ "$mode" != "example" ]] || fail "--example 不得与 --runtime 同时使用"
@@ -833,6 +880,7 @@ if [[ "$runtime_check" -eq 1 ]]; then
   app_cid="${runtime_cids[app_server]}"
   postgres_cid="${runtime_cids[postgres]}"
   ok "Compose 运行服务存在"
+  compose_runtime_services_checked=1
   if [[ "$attachment_storage_mode" == managed ]]; then
     attachment_cid="${runtime_cids[attachment_store]}"
     [[ "$(docker inspect --format '{{.State.Health.Status}}' "$attachment_cid")" == healthy ]] || fail "附件存储未就绪"
@@ -954,11 +1002,6 @@ if [[ "$runtime_check" -eq 1 ]]; then
   fi
   ok "运行态 admin bootstrap secret 已清理且 once=false"
 
-  runtime_pdf_warmup="$(printf '%s\n' "$runtime_app_env" | awk -F= '$1 == "ERP_PDF_WARMUP" { value = $0; sub(/^[^=]*=/, "", value) } END { print value }')"
-  runtime_pdf_warmup="$(trim "$runtime_pdf_warmup" | tr '[:upper:]' '[:lower:]')"
-  [[ "$runtime_pdf_warmup" == "async" ]] || fail "app-server 运行态 ERP_PDF_WARMUP 必须为 async：runtime=${runtime_pdf_warmup:-missing}"
-  ok "运行态 ERP_PDF_WARMUP=async"
-
   runtime_app_user="$(docker inspect --format '{{.Config.User}}' "$app_cid" 2>/dev/null || true)"
   runtime_app_user="$(trim "$runtime_app_user")"
   [[ -n "$runtime_app_user" ]] || fail "app-server 运行态未声明非 root 用户"
@@ -975,19 +1018,28 @@ if [[ "$runtime_check" -eq 1 ]]; then
   [[ "$runtime_security_opt" != *unconfined* ]] || fail "app-server 运行态禁止关闭 seccomp / AppArmor"
   ok "运行态 app-server 已加载受控 Chromium seccomp profile"
 
-  chromium_dockerfile="$root_dir/server/Dockerfile"
-  [[ -f "$chromium_dockerfile" ]] || fail "缺少 Chromium 版本真源: $chromium_dockerfile"
-  expected_chromium_version="$(sed -nE 's/^ARG CHROMIUM_VERSION=([^[:space:]]+)$/\1/p' "$chromium_dockerfile" | head -n1)"
-  [[ -n "$expected_chromium_version" ]] || fail "server/Dockerfile 缺少 CHROMIUM_VERSION exact pin"
-  runtime_chromium_version="$(docker exec "$app_cid" dpkg-query -W '-f=${Version}' chromium 2>/dev/null || true)"
-  runtime_chromium_version="$(trim "$runtime_chromium_version")"
-  runtime_chromium_common_version="$(docker exec "$app_cid" dpkg-query -W '-f=${Version}' chromium-common 2>/dev/null || true)"
-  runtime_chromium_common_version="$(trim "$runtime_chromium_common_version")"
-  [[ -n "$runtime_chromium_version" ]] || fail "app-server 无法读取 Chromium dpkg 版本"
-  [[ -n "$runtime_chromium_common_version" ]] || fail "app-server 无法读取 chromium-common dpkg 版本"
-  [[ "$runtime_chromium_version" == "$expected_chromium_version" ]] || fail "app-server Chromium 版本不匹配：runtime=$runtime_chromium_version expected=$expected_chromium_version"
-  [[ "$runtime_chromium_common_version" == "$expected_chromium_version" ]] || fail "app-server chromium-common 版本不匹配：runtime=$runtime_chromium_common_version expected=$expected_chromium_version"
-  ok "运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: $runtime_chromium_version"
+  if [[ "$profile" == "customer-trial-acceptance" ]]; then
+    runtime_pdf_warmup="$(printf '%s\n' "$runtime_app_env" | awk -F= '$1 == "ERP_PDF_WARMUP" { value = $0; sub(/^[^=]*=/, "", value) } END { print value }')"
+    runtime_pdf_warmup="$(trim "$runtime_pdf_warmup" | tr '[:upper:]' '[:lower:]')"
+    [[ "$runtime_pdf_warmup" == "async" ]] || fail "app-server 运行态 ERP_PDF_WARMUP 必须为 async：runtime=${runtime_pdf_warmup:-missing}"
+    ok "运行态 ERP_PDF_WARMUP=async"
+    pdf_runtime_checked=1
+
+    chromium_dockerfile="$root_dir/server/Dockerfile"
+    [[ -f "$chromium_dockerfile" ]] || fail "缺少 Chromium 版本真源: $chromium_dockerfile"
+    expected_chromium_version="$(sed -nE 's/^ARG CHROMIUM_VERSION=([^[:space:]]+)$/\1/p' "$chromium_dockerfile" | head -n1)"
+    [[ -n "$expected_chromium_version" ]] || fail "server/Dockerfile 缺少 CHROMIUM_VERSION exact pin"
+    runtime_chromium_version="$(docker exec "$app_cid" dpkg-query -W '-f=${Version}' chromium 2>/dev/null || true)"
+    runtime_chromium_version="$(trim "$runtime_chromium_version")"
+    runtime_chromium_common_version="$(docker exec "$app_cid" dpkg-query -W '-f=${Version}' chromium-common 2>/dev/null || true)"
+    runtime_chromium_common_version="$(trim "$runtime_chromium_common_version")"
+    [[ -n "$runtime_chromium_version" ]] || fail "app-server 无法读取 Chromium dpkg 版本"
+    [[ -n "$runtime_chromium_common_version" ]] || fail "app-server 无法读取 chromium-common dpkg 版本"
+    [[ "$runtime_chromium_version" == "$expected_chromium_version" ]] || fail "app-server Chromium 版本不匹配：runtime=$runtime_chromium_version expected=$expected_chromium_version"
+    [[ "$runtime_chromium_common_version" == "$expected_chromium_version" ]] || fail "app-server chromium-common 版本不匹配：runtime=$runtime_chromium_common_version expected=$expected_chromium_version"
+    ok "运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: $runtime_chromium_version"
+    chromium_runtime_checked=1
+  fi
 
   if command -v curl >/dev/null 2>&1; then
     app_port="$(value_of APP_HTTP_PORT)"
@@ -995,6 +1047,7 @@ if [[ "$runtime_check" -eq 1 ]]; then
     curl -fsS "http://127.0.0.1:${app_port}/healthz" >/dev/null || fail "healthz 失败"
     curl -fsS "http://127.0.0.1:${app_port}/readyz" >/dev/null || fail "readyz 失败"
     ok "healthz / readyz 通过"
+    runtime_health_ready_checked=1
     if [[ -n "$expected_auth_sms_mode" ]]; then
       auth_capabilities_response="$(curl -fsS \
         -H 'Content-Type: application/json' \
@@ -1017,6 +1070,7 @@ raise SystemExit(0 if ok else 1)
       fi
       unset auth_capabilities_response
       ok "auth.capabilities 已读回 provider/enabled/not-mock"
+      sms_provider_runtime_checked=1
     fi
   else
     warn "未找到 curl，跳过 healthz / readyz"
@@ -1024,4 +1078,65 @@ raise SystemExit(0 if ok else 1)
 fi
 
 assert_env_source_unchanged
+if [[ -n "$out_file" ]]; then
+  receipt_args=(
+    --out "$out_file"
+    --deployment-target "${deployment_target:-unregistered}"
+    --mode "$mode"
+    --profile "$profile"
+  )
+  if [[ -n "$expected_release" ]]; then
+    receipt_args+=(--product-commit "$expected_release")
+  fi
+  [[ "$env_required_keys_checked" -eq 1 ]] && receipt_args+=(--check env-required-keys)
+  [[ "$production_boundaries_checked" -eq 1 ]] && receipt_args+=(--check production-boundaries)
+  [[ "$compose_and_migration_checked" -eq 1 ]] && receipt_args+=(--check compose-and-migration)
+  [[ "$compose_runtime_services_checked" -eq 1 ]] && receipt_args+=(--check compose-runtime-services)
+  [[ "$runtime_health_ready_checked" -eq 1 ]] && receipt_args+=(--check runtime-health-ready)
+  [[ "$sms_provider_runtime_checked" -eq 1 ]] && receipt_args+=(--check sms-provider-runtime)
+  [[ "$pdf_runtime_checked" -eq 1 ]] && receipt_args+=(--check pdf-runtime)
+  [[ "$chromium_runtime_checked" -eq 1 ]] && receipt_args+=(--check chromium-runtime)
+  python3 - "$script_dir/release-evidence-contract.json" "${receipt_args[@]}" <<'PY_RECEIPT'
+import argparse
+import datetime
+import json
+import os
+import sys
+import tempfile
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    contract = json.load(handle)
+parser = argparse.ArgumentParser()
+for field in ("out", "deployment-target", "mode", "profile"):
+    parser.add_argument("--" + field, required=True)
+parser.add_argument("--product-commit", default="")
+parser.add_argument("--check", action="append", default=[])
+args = parser.parse_args(sys.argv[2:])
+checks = list(dict.fromkeys(args.check))
+assert args.profile in contract["profiles"].values()
+assert checks and set(checks).issubset(contract["preflightChecks"].values())
+receipt = {
+    "evidenceContract": contract["evidenceContract"], "kind": "production-preflight",
+    "generatedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds"),
+    "deploymentTarget": args.deployment_target, "mode": args.mode, "profile": args.profile,
+    "productCommit": args.product_commit or None,
+    "checks": [{"id": check, "status": "passed"} for check in checks],
+    "summary": {"total": len(checks), "passed": len(checks), "failed": 0},
+    "redaction": {"containsSecrets": False, "containsRawCustomerRows": False, "containsFullDsn": False},
+}
+destination = os.path.abspath(args.out)
+assert not os.path.islink(destination), "--out must not be a symbolic link"
+temporary = None
+try:
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=os.path.dirname(destination), delete=False) as handle:
+        temporary = handle.name
+        json.dump(receipt, handle, indent=2)
+        handle.write("\n")
+    os.replace(temporary, destination)
+finally:
+    if temporary and os.path.exists(temporary):
+        os.unlink(temporary)
+PY_RECEIPT
+  ok "脱敏 JSON 回执已写入: $out_file"
+fi
 echo "[production-preflight] all checks passed"

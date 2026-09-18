@@ -7,6 +7,13 @@ import {
   REQUIRED_FILES,
   validateReleaseEvidenceGate,
 } from "./release-evidence-gate.mjs";
+import {
+  RELEASE_EVIDENCE_CONTRACT,
+  RELEASE_EVIDENCE_PROFILES,
+  classifyReleaseEvidenceContract,
+  normalizeReleaseEvidenceProfile,
+  releaseEvidenceRequiredFiles,
+} from "./release-evidence-contract.mjs";
 import { getDeploymentTarget } from "./deployment-targets.mjs";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
@@ -18,10 +25,12 @@ const USAGE = `Release evidence status
 Usage:
   node scripts/deploy/release-evidence-status.mjs \\
     --deployment-target <demo-133|customer-test-133> \\
-    --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
+    --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
+    [--profile <base-release|customer-trial-acceptance>]
 
 Options:
   --customer <key>       Default: yoyoosun.
+  --profile <name>       Default: base-release.
   --json                 Print machine-readable JSON.
   --fail-on-not-ready    Exit non-zero unless the release evidence gate passes.
   --help                 Print this help.
@@ -90,6 +99,7 @@ const CLOSEOUT_EVIDENCE_GROUPS = [
     files: [REQUIRED_FILES.credentialRotation, REQUIRED_FILES.smoke],
     reason:
       "证明 admin 与十个 UAT 岗位账号已轮换、旧会话已撤销且目标环境 11/11 真实登录通过",
+    profile: RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE,
   },
   {
     id: "target-smoke",
@@ -107,7 +117,8 @@ const CLOSEOUT_EVIDENCE_GROUPS = [
     id: "release-signoff",
     label: "发布签收",
     files: [REQUIRED_FILES.signoff],
-    reason: "证明 releaseVersion / environment / backupId 与签收结论绑定",
+    reason: "证明 releaseId / environment / backupId 与签收结论绑定",
+    profile: RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE,
   },
 ];
 
@@ -122,6 +133,7 @@ class CliError extends Error {
 export function parseCliArgs(argv) {
   const options = {
     customer: DEFAULT_CUSTOMER,
+    profile: RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
     json: false,
     failOnNotReady: false,
     help: false,
@@ -164,6 +176,9 @@ export function parseCliArgs(argv) {
       case "customer":
         options.customer = value;
         break;
+      case "profile":
+        options.profile = value;
+        break;
       default:
         throw new CliError(`Unknown option --${key}`, 2);
     }
@@ -171,26 +186,46 @@ export function parseCliArgs(argv) {
   return options;
 }
 
-function collectFileStatus(absoluteDir) {
-  return [...Object.values(REQUIRED_FILES), ...SUPPORTING_ARTIFACT_FILES].map(
-    (relativePath) => {
-      const absolutePath = path.join(absoluteDir, relativePath);
-      if (!fs.existsSync(absolutePath)) {
-        return {
-          path: relativePath,
-          exists: false,
-          bytes: 0,
-        };
-      }
-      const stat = fs.statSync(absolutePath);
+function collectFileStatus(absoluteDir, profile) {
+  const releasePath = path.join(absoluteDir, REQUIRED_FILES.release);
+  const releaseContent = fs.existsSync(releasePath)
+    ? fs.readFileSync(releasePath, "utf8")
+    : "";
+  const required = releaseEvidenceRequiredFiles(profile, releaseContent);
+  return [
+    ...required,
+    ...(required.includes(REQUIRED_FILES.backupRestore)
+      ? SUPPORTING_ARTIFACT_FILES
+      : []),
+  ].map((relativePath) => {
+    const absolutePath = path.join(absoluteDir, relativePath);
+    if (!fs.existsSync(absolutePath)) {
       return {
         path: relativePath,
-        exists: true,
-        bytes: stat.size,
-        mtime: stat.mtime.toISOString(),
+        exists: false,
+        bytes: 0,
       };
-    },
-  );
+    }
+    const stat = fs.statSync(absolutePath);
+    return {
+      path: relativePath,
+      exists: true,
+      bytes: stat.size,
+      mtime: stat.mtime.toISOString(),
+    };
+  });
+}
+
+function readReleaseEvidenceContract(absoluteDir) {
+  const absolutePath = path.join(absoluteDir, REQUIRED_FILES.release);
+  if (!fs.existsSync(absolutePath)) {
+    return {
+      status: "missing",
+      current: RELEASE_EVIDENCE_CONTRACT,
+      declared: null,
+    };
+  }
+  return classifyReleaseEvidenceContract(fs.readFileSync(absolutePath, "utf8"));
 }
 
 function readCustomerConfigManifestEvidence(absoluteDir) {
@@ -264,18 +299,25 @@ function readCustomerConfigSmokeEvidence(absoluteDir) {
 }
 
 function buildSmokeCommand({
+  profile,
   deploymentTarget,
   evidenceDir,
   customerConfigRevision = "",
 }) {
-  const customerConfigSmokeArgs = customerConfigRevision
-    ? ` --customer-config-revision ${customerConfigRevision} --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN`
-    : "";
+  const acceptance =
+    profile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE;
+  const customerConfigSmokeArgs =
+    acceptance && customerConfigRevision
+      ? ` --customer-config-revision ${customerConfigRevision} --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN`
+      : "";
   const demoCredentialArgs =
-    deploymentTarget === "demo-133"
+    acceptance && deploymentTarget === "demo-133"
       ? " --uat-password-env MANUAL_ACCEPTANCE_UAT_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE"
       : "";
-  return `bash deployments/yoyoosun/scripts/run-smoke.sh --release-version <40-character-git-commit> --migration-version <migration-after> --credential-operation-id <credential-rotation-operation-id> --deployment-target ${deploymentTarget} --environment ${deploymentTarget} --endpoint <public-endpoint> --backend-url <backend-endpoint> --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD${demoCredentialArgs}${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
+  const acceptanceArgs = acceptance
+    ? " --credential-operation-id <credential-rotation-operation-id> --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD"
+    : "";
+  return `bash deployments/yoyoosun/scripts/run-smoke.sh --profile ${profile} --product-commit <40-character-git-commit> --migration-version <migration-after> --deployment-target ${deploymentTarget} --environment ${deploymentTarget} --endpoint <public-endpoint> --backend-url <backend-endpoint>${acceptanceArgs}${demoCredentialArgs}${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
 }
 
 function buildRollbackRehearsalCommand({
@@ -286,10 +328,12 @@ function buildRollbackRehearsalCommand({
   const customerConfigArg = customerConfigRevision
     ? ` --customer-config-revision ${customerConfigRevision}`
     : "";
-  return `node scripts/deploy/rollback-rehearsal-report.mjs --environment ${deploymentTarget} --release-version <release-version> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "identify rollback target=pass" --post-smoke-report smoke-test-report.json${customerConfigArg} --evidence-dir ${evidenceDir}`;
+  return `node scripts/deploy/rollback-rehearsal-report.mjs --environment ${deploymentTarget} --release-id <release-id> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "identify rollback target=pass" --post-smoke-report smoke-test-report.json${customerConfigArg} --evidence-dir ${evidenceDir}`;
 }
 
 function buildNextCommands({
+  profile,
+  recoveryRehearsalRequired,
   deploymentTarget,
   evidenceDir,
   missingFiles,
@@ -304,20 +348,21 @@ function buildNextCommands({
   );
   if (status === "missing") {
     return [
-      `bash deployments/yoyoosun/scripts/collect-evidence.sh --deployment-target ${deploymentTarget} --release-version <release-version> --output ${evidenceDir || "deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>"}`,
+      `bash deployments/yoyoosun/scripts/collect-evidence.sh --deployment-target ${deploymentTarget} --profile ${profile} --release-id <release-id> --output ${evidenceDir || "deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>"}`,
     ];
   }
 
   const commands = [];
   const missing = new Set(missingFiles);
   if (
-    (customerConfigManifestEvidence?.exists &&
+    profile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE &&
+    ((customerConfigManifestEvidence?.exists &&
       (customerConfigManifestEvidence.parseError ||
         !customerConfigManifestEvidence.revision)) ||
-    (customerConfigSmokeEvidence?.hasCustomerConfigCheck &&
-      (!customerConfigManifestEvidence?.exists ||
-        customerConfigManifestEvidence.revision !==
-          customerConfigSmokeEvidence.expectedRevision))
+      (customerConfigSmokeEvidence?.hasCustomerConfigCheck &&
+        (!customerConfigManifestEvidence?.exists ||
+          customerConfigManifestEvidence.revision !==
+            customerConfigSmokeEvidence.expectedRevision)))
   ) {
     commands.push(
       `node scripts/deploy/customer-config-manifest-evidence.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir ${evidenceDir} --reviewer <reviewer-name>`,
@@ -325,34 +370,42 @@ function buildNextCommands({
   }
   if (missing.has(REQUIRED_FILES.preflight)) {
     commands.push(
-      `bash scripts/deploy/production-preflight.sh --deployment-target ${deploymentTarget} --env-file ${target.filesystem.runtimeEnv} --compose-dir ${target.compose.directory} --compose-override ${composeOverride} --runtime --expected-release <git-commit> --out ${evidenceDir}/production-preflight-report.txt`,
+      `bash scripts/deploy/production-preflight.sh --profile ${profile} --deployment-target ${deploymentTarget} --env-file ${target.filesystem.runtimeEnv} --compose-dir ${target.compose.directory} --compose-override ${composeOverride} --runtime --expected-release <product-commit> --out ${evidenceDir}/production-preflight-report.json`,
     );
   }
   if (missing.has(REQUIRED_FILES.imageDigests)) {
     commands.push(
-      `node scripts/deploy/immutable-version-evidence.mjs --evidence-dir ${evidenceDir} --release-version <release-version> --environment ${deploymentTarget} --operator-role <operator-role> --git-commit <git-commit> --server-image <server-image-ref> --server-digest sha256:<64-hex> --web-image <web-image-ref> --web-digest sha256:<64-hex> --migration-before <migration-before> --migration-after <migration-after> --backup-id <backup-id>`,
+      `node scripts/deploy/immutable-version-evidence.mjs --evidence-dir ${evidenceDir} --release-id <release-id> --environment ${deploymentTarget} --operator-role <operator-role> --product-commit <product-commit> --server-image <server-image-ref> --server-digest sha256:<64-hex> --web-image <web-image-ref> --web-digest sha256:<64-hex> --migration-before <migration-before> --migration-after <migration-after> --backup-id <backup-id>`,
     );
   }
   if (
-    missing.has(REQUIRED_FILES.backup) ||
-    missing.has(REQUIRED_FILES.backupRestore) ||
-    missing.has("migration-status-before-apply.txt") ||
-    missing.has("command-summary.txt") ||
-    missing.has(REQUIRED_FILES.migration)
+    recoveryRehearsalRequired &&
+    (missing.has(REQUIRED_FILES.backup) ||
+      missing.has(REQUIRED_FILES.backupRestore) ||
+      missing.has("migration-status-before-apply.txt") ||
+      missing.has("command-summary.txt") ||
+      missing.has(REQUIRED_FILES.migration))
   ) {
     commands.push(
-      `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-version <release-version> --environment ${deploymentTarget} --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
+      `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-id <release-id> --environment ${deploymentTarget} --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
+    );
+  }
+  if (!recoveryRehearsalRequired && missing.has(REQUIRED_FILES.backup)) {
+    commands.push(
+      `cp deployments/yoyoosun/evidence/backups/backup-evidence-template.md ${evidenceDir}/${REQUIRED_FILES.backup}`,
     );
   }
   if (missing.has(REQUIRED_FILES.smoke)) {
     commands.push(
       buildSmokeCommand({
+        profile,
         deploymentTarget,
         evidenceDir,
         customerConfigRevision: customerConfigManifestEvidence?.revision,
       }),
     );
   } else if (
+    profile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE &&
     customerConfigManifestEvidence?.exists &&
     customerConfigManifestEvidence.revision &&
     customerConfigSmokeEvidence?.exists &&
@@ -360,6 +413,7 @@ function buildNextCommands({
   ) {
     commands.push(
       buildSmokeCommand({
+        profile,
         deploymentTarget,
         evidenceDir,
         customerConfigRevision: customerConfigManifestEvidence.revision,
@@ -373,16 +427,18 @@ function buildNextCommands({
   }
   if (missing.has(REQUIRED_FILES.rollbackRehearsal)) {
     commands.push(
-      `node scripts/deploy/rollback-rehearsal-report.mjs --environment ${deploymentTarget} --release-version <release-version> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "identify rollback target=pass" --post-smoke-report smoke-test-report.json --evidence-dir ${evidenceDir}`,
+      `node scripts/deploy/rollback-rehearsal-report.mjs --environment ${deploymentTarget} --release-id <release-id> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "identify rollback target=pass" --post-smoke-report smoke-test-report.json --evidence-dir ${evidenceDir}`,
     );
   }
   commands.push(
-    `node scripts/deploy/release-evidence-gate.mjs --deployment-target ${deploymentTarget} --evidence-dir ${evidenceDir}`,
+    `node scripts/deploy/release-evidence-gate.mjs --profile ${profile} --deployment-target ${deploymentTarget} --evidence-dir ${evidenceDir}`,
   );
   return commands;
 }
 
 function buildCloseoutNextActions({
+  profile,
+  recoveryRehearsalRequired,
   deploymentTarget,
   evidenceDir,
   closeoutChecklist,
@@ -411,23 +467,29 @@ function buildCloseoutNextActions({
       switch (item.id) {
         case "immutable-version":
           action.commands.push(
-            `node scripts/deploy/immutable-version-evidence.mjs --evidence-dir ${evidenceDir} --release-version <release-version> --environment ${deploymentTarget} --operator-role <operator-role> --git-commit <git-commit> --server-image <server-image-ref> --server-digest sha256:<64-hex> --web-image <web-image-ref> --web-digest sha256:<64-hex> --migration-before <migration-before> --migration-after <migration-after> --backup-id <backup-id>`,
+            `node scripts/deploy/immutable-version-evidence.mjs --evidence-dir ${evidenceDir} --release-id <release-id> --environment ${deploymentTarget} --operator-role <operator-role> --product-commit <product-commit> --server-image <server-image-ref> --server-digest sha256:<64-hex> --web-image <web-image-ref> --web-digest sha256:<64-hex> --migration-before <migration-before> --migration-after <migration-after> --backup-id <backup-id>`,
           );
           action.manualChecks.push(
-            "Use releaseVersion, environment, gitCommit, image digests, migrationBefore, migrationAfter, and backupId from the same release batch; do not invent image digests or migration versions.",
+            "Use releaseId, environment, productCommit, image digests, migrationBefore, migrationAfter, and backupId from the same release batch; do not invent image digests or migration versions.",
           );
           break;
         case "production-preflight":
           action.commands.push(
-            `bash scripts/deploy/production-preflight.sh --deployment-target ${deploymentTarget} --env-file ${target.filesystem.runtimeEnv} --compose-dir ${target.compose.directory} --compose-override ${composeOverride} --runtime --expected-release <git-commit> --out ${evidenceDir}/production-preflight-report.txt`,
+            `bash scripts/deploy/production-preflight.sh --profile ${profile} --deployment-target ${deploymentTarget} --env-file ${target.filesystem.runtimeEnv} --compose-dir ${target.compose.directory} --compose-override ${composeOverride} --runtime --expected-release <product-commit> --out ${evidenceDir}/production-preflight-report.json`,
           );
           action.manualChecks.push(
             "Run after the target Compose services start, using the real runtime .env; do not use .env.example, example-mode output, or an env-only preflight report.",
           );
           break;
         case "backup-restore-rehearsal":
+          if (!recoveryRehearsalRequired) {
+            action.manualChecks.push(
+              "Record the current pre-deploy backup identity/hash/size and actual migration status; no new restore rehearsal is required for unchanged migration and recovery procedures.",
+            );
+            break;
+          }
           action.commands.push(
-            `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-version <release-version> --environment ${deploymentTarget} --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
+            `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-id <release-id> --environment ${deploymentTarget} --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
           );
           action.manualChecks.push(
             "Bind backupId, migrationBefore, migrationAfter, backup hash, restore target, command summary, and smoke query evidence to the same release batch.",
@@ -436,13 +498,14 @@ function buildCloseoutNextActions({
         case "credential-rotation":
           action.manualChecks.push(
             deploymentTarget === "demo-133"
-              ? "Rotate the target admin and the exact ten UAT identities, revoke prior sessions, then bind the rotation operation id and positive admin auth version into target smoke."
+              ? "Rotate the target admin and the contract UAT identities, revoke prior sessions, then bind the rotation operation id and positive admin auth version into target smoke."
               : "Rotate and verify only the customer-test admin; preserve every non-admin identity atomically and do not read or pass UAT/SMS credential inputs.",
           );
           break;
         case "target-smoke":
           action.commands.push(
             buildSmokeCommand({
+              profile,
               deploymentTarget,
               evidenceDir,
               customerConfigRevision,
@@ -453,13 +516,14 @@ function buildCloseoutNextActions({
           );
           break;
         case "rollback-forward-fix":
-          action.commands.push(
-            buildRollbackRehearsalCommand({
-              deploymentTarget,
-              evidenceDir,
-              customerConfigRevision,
-            }),
-          );
+          if (recoveryRehearsalRequired)
+            action.commands.push(
+              buildRollbackRehearsalCommand({
+                deploymentTarget,
+                evidenceDir,
+                customerConfigRevision,
+              }),
+            );
           action.manualChecks.push(
             "Fill rollback-forward-fix-plan.md with rollback decision, trigger, target release, owner, and post-action verification scope.",
           );
@@ -487,6 +551,7 @@ function buildCloseoutNextActions({
           ) {
             action.commands.push(
               buildSmokeCommand({
+                profile,
                 deploymentTarget,
                 evidenceDir,
                 customerConfigRevision: customerConfigManifestEvidence.revision,
@@ -516,6 +581,8 @@ function buildCloseoutNextActions({
 }
 
 function buildCloseoutChecklist({
+  profile,
+  recoveryRehearsalRequired,
   deploymentTarget,
   files,
   gate,
@@ -550,22 +617,38 @@ function buildCloseoutChecklist({
     };
   };
 
-  const checklist = CLOSEOUT_EVIDENCE_GROUPS.map((group) => ({
-    id: group.id,
-    label: group.label,
-    files: group.files,
-    reason:
-      group.id === "credential-rotation"
-        ? deploymentTarget === "demo-133"
-          ? "证明 admin 与十个 UAT 岗位账号已轮换、旧会话已撤销且目标环境 11/11 真实登录通过"
-          : "证明 customer-test admin 已轮换并真实登录，且非 admin 身份集合原子保留、未读取或改动 UAT/SMS 凭据"
-        : group.reason,
-    ...baseStatus(group.files),
-  }));
+  const checklist = CLOSEOUT_EVIDENCE_GROUPS.filter(
+    (group) => !group.profile || group.profile === profile,
+  ).map((group) => {
+    const groupFiles = group.files.filter((file) => existingFiles.has(file));
+    return {
+      id: group.id,
+      label:
+        !recoveryRehearsalRequired && group.id === "backup-restore-rehearsal"
+          ? "发布前备份与迁移状态"
+          : !recoveryRehearsalRequired && group.id === "rollback-forward-fix"
+            ? "回滚路径"
+            : group.label,
+      files: groupFiles,
+      reason:
+        group.id === "credential-rotation"
+          ? deploymentTarget === "demo-133"
+            ? "证明合同登记的 admin 与 UAT 岗位账号已轮换、旧会话已撤销且真实登录通过"
+            : "证明 customer-test admin 已轮换并真实登录，且非 admin 身份集合原子保留、未读取或改动 UAT/SMS 凭据"
+          : !recoveryRehearsalRequired &&
+              group.id === "backup-restore-rehearsal"
+            ? "证明本次发布前备份和无待执行迁移；恢复流程未变，不重复恢复演练"
+            : !recoveryRehearsalRequired && group.id === "rollback-forward-fix"
+              ? "确认可回退的固定版本和回滚路径；不重复回滚演练"
+              : group.reason,
+      ...baseStatus(groupFiles),
+    };
+  });
 
   const customerConfigRequired =
-    customerConfigManifestEvidence?.exists ||
-    customerConfigSmokeEvidence?.hasCustomerConfigCheck;
+    profile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE &&
+    (customerConfigManifestEvidence?.exists ||
+      customerConfigSmokeEvidence?.hasCustomerConfigCheck);
   if (customerConfigRequired) {
     const item = {
       id: "customer-config-effective-session",
@@ -664,11 +747,17 @@ export function buildReleaseEvidenceStatus({
   deploymentTarget,
   customer = DEFAULT_CUSTOMER,
   repoRoot = process.cwd(),
+  profile = RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
 } = {}) {
   const errors = [];
   const warnings = [];
   if (!evidenceDir) {
     throw new CliError("Missing required --evidence-dir", 2);
+  }
+  try {
+    profile = normalizeReleaseEvidenceProfile(profile);
+  } catch (error) {
+    throw new CliError(error.message, 2);
   }
   if (!["demo-133", "customer-test-133"].includes(deploymentTarget)) {
     throw new CliError(
@@ -679,12 +768,24 @@ export function buildReleaseEvidenceStatus({
   const absoluteDir = path.resolve(repoRoot, evidenceDir);
   const directoryExists =
     fs.existsSync(absoluteDir) && fs.statSync(absoluteDir).isDirectory();
-  const files = directoryExists
-    ? collectFileStatus(absoluteDir)
-    : collectFileStatus(absoluteDir);
-  const missingFiles = files
+  const files = collectFileStatus(absoluteDir, profile);
+  const recoveryRehearsalRequired = files.some(
+    (file) => file.path === REQUIRED_FILES.backupRestore,
+  );
+  const currentContractMissingFiles = files
     .filter((file) => !file.exists)
     .map((file) => file.path);
+  const evidenceContract = directoryExists
+    ? readReleaseEvidenceContract(absoluteDir)
+    : {
+        status: "missing",
+        current: RELEASE_EVIDENCE_CONTRACT,
+        declared: null,
+      };
+  const skipsCurrentContract = ["legacy", "unsupported"].includes(
+    evidenceContract.status,
+  );
+  const missingFiles = skipsCurrentContract ? [] : currentContractMissingFiles;
   const customerConfigManifestEvidence = directoryExists
     ? readCustomerConfigManifestEvidence(absoluteDir)
     : {
@@ -698,63 +799,83 @@ export function buildReleaseEvidenceStatus({
         exists: false,
         hasCustomerConfigCheck: false,
       };
-  if (customerConfigManifestEvidence.exists) {
-    if (customerConfigManifestEvidence.parseError) {
-      warnings.push(
-        `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} is not valid JSON: ${customerConfigManifestEvidence.parseError}`,
-      );
-    } else if (!customerConfigManifestEvidence.revision) {
-      warnings.push(
-        `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} is missing revision; customer config smoke command cannot be bound to an expected active revision`,
-      );
+  if (
+    !skipsCurrentContract &&
+    profile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE
+  ) {
+    if (customerConfigManifestEvidence.exists) {
+      if (customerConfigManifestEvidence.parseError) {
+        warnings.push(
+          `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} is not valid JSON: ${customerConfigManifestEvidence.parseError}`,
+        );
+      } else if (!customerConfigManifestEvidence.revision) {
+        warnings.push(
+          `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} is missing revision; customer config smoke command cannot be bound to an expected active revision`,
+        );
+      }
     }
-  }
-  if (customerConfigSmokeEvidence.parseError) {
-    warnings.push(
-      `${REQUIRED_FILES.smoke} is not valid JSON: ${customerConfigSmokeEvidence.parseError}`,
-    );
-  } else if (customerConfigSmokeEvidence.hasCustomerConfigCheck) {
-    if (!customerConfigSmokeEvidence.expectedRevision) {
+    if (customerConfigSmokeEvidence.parseError) {
       warnings.push(
-        `${REQUIRED_FILES.smoke} customer-config-effective-session is missing expectedRevision; manifest evidence cannot be cross-checked`,
+        `${REQUIRED_FILES.smoke} is not valid JSON: ${customerConfigSmokeEvidence.parseError}`,
       );
-    } else if (!customerConfigManifestEvidence.exists) {
-      warnings.push(
-        `${REQUIRED_FILES.smoke} contains customer-config-effective-session for ${customerConfigSmokeEvidence.expectedRevision}, but ${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} is missing`,
-      );
+    } else if (customerConfigSmokeEvidence.hasCustomerConfigCheck) {
+      if (!customerConfigSmokeEvidence.expectedRevision) {
+        warnings.push(
+          `${REQUIRED_FILES.smoke} customer-config-effective-session is missing expectedRevision; manifest evidence cannot be cross-checked`,
+        );
+      } else if (!customerConfigManifestEvidence.exists) {
+        warnings.push(
+          `${REQUIRED_FILES.smoke} contains customer-config-effective-session for ${customerConfigSmokeEvidence.expectedRevision}, but ${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} is missing`,
+        );
+      } else if (
+        customerConfigManifestEvidence.revision &&
+        customerConfigManifestEvidence.revision !==
+          customerConfigSmokeEvidence.expectedRevision
+      ) {
+        warnings.push(
+          `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} revision ${customerConfigManifestEvidence.revision} does not match ${REQUIRED_FILES.smoke} expectedRevision ${customerConfigSmokeEvidence.expectedRevision}`,
+        );
+      }
     } else if (
+      customerConfigManifestEvidence.exists &&
       customerConfigManifestEvidence.revision &&
-      customerConfigManifestEvidence.revision !==
-        customerConfigSmokeEvidence.expectedRevision
+      !customerConfigSmokeEvidence.hasCustomerConfigCheck
     ) {
       warnings.push(
-        `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} revision ${customerConfigManifestEvidence.revision} does not match ${REQUIRED_FILES.smoke} expectedRevision ${customerConfigSmokeEvidence.expectedRevision}`,
+        `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} exists for ${customerConfigManifestEvidence.revision}, but ${REQUIRED_FILES.smoke} does not contain customer-config-effective-session; rerun target smoke with --customer-config-revision ${customerConfigManifestEvidence.revision}`,
       );
     }
-  } else if (
-    customerConfigManifestEvidence.exists &&
-    customerConfigManifestEvidence.revision
-  ) {
-    warnings.push(
-      `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} exists for ${customerConfigManifestEvidence.revision}, but ${REQUIRED_FILES.smoke} does not contain customer-config-effective-session; rerun target smoke with --customer-config-revision ${customerConfigManifestEvidence.revision}`,
-    );
   }
 
   let gate = {
     passed: false,
+    skipped: false,
     errorCount: 0,
     errors: [],
   };
-  if (directoryExists) {
+  if (directoryExists && skipsCurrentContract) {
+    gate = {
+      passed: false,
+      skipped: true,
+      reason:
+        evidenceContract.status === "legacy"
+          ? "legacy-contract"
+          : "unsupported-contract",
+      errorCount: 0,
+      errors: [],
+    };
+  } else if (directoryExists) {
     try {
       validateReleaseEvidenceGate({
         evidenceDir,
         deploymentTarget,
         customer,
         repoRoot,
+        profile,
       });
       gate = {
         passed: true,
+        skipped: false,
         errorCount: 0,
         errors: [],
       };
@@ -766,6 +887,7 @@ export function buildReleaseEvidenceStatus({
             .filter(Boolean);
       gate = {
         passed: false,
+        skipped: false,
         errorCount: gateErrors.length,
         errors: gateErrors,
       };
@@ -774,62 +896,83 @@ export function buildReleaseEvidenceStatus({
     errors.push(`evidence dir not found: ${evidenceDir}`);
   }
 
-  const status = directoryExists
-    ? missingFiles.length > 0
-      ? "incomplete"
-      : gate.passed
-        ? warnings.length > 0
-          ? "attention"
-          : "ready"
-        : "draft"
-    : "missing";
+  let status = "missing";
+  if (directoryExists) {
+    if (evidenceContract.status === "legacy") {
+      status = "legacy";
+    } else if (evidenceContract.status === "unsupported") {
+      status = "unsupported-contract";
+    } else if (missingFiles.length > 0) {
+      status = "incomplete";
+    } else if (!gate.passed) {
+      status = "draft";
+    } else {
+      status = warnings.length > 0 ? "attention" : "ready";
+    }
+  }
 
-  const closeoutChecklist = buildCloseoutChecklist({
-    deploymentTarget,
-    files,
-    gate,
-    warnings,
-    customerConfigManifestEvidence,
-    customerConfigSmokeEvidence,
-  });
+  const closeoutChecklist = skipsCurrentContract
+    ? []
+    : buildCloseoutChecklist({
+        profile,
+        recoveryRehearsalRequired,
+        deploymentTarget,
+        files,
+        gate,
+        warnings,
+        customerConfigManifestEvidence,
+        customerConfigSmokeEvidence,
+      });
   const closeoutSummary = buildCloseoutSummary(closeoutChecklist);
   const closeoutGateSummary = buildCloseoutGateSummary({
     closeoutChecklist,
     gate,
     warnings,
   });
-  const closeoutNextActions = buildCloseoutNextActions({
-    deploymentTarget,
-    evidenceDir,
-    closeoutChecklist,
-    customerConfigManifestEvidence,
-    customerConfigSmokeEvidence,
-  });
+  const closeoutNextActions = skipsCurrentContract
+    ? []
+    : buildCloseoutNextActions({
+        profile,
+        recoveryRehearsalRequired,
+        deploymentTarget,
+        evidenceDir,
+        closeoutChecklist,
+        customerConfigManifestEvidence,
+        customerConfigSmokeEvidence,
+      });
 
   return {
     customer,
+    profile,
+    recoveryRehearsalRequired,
     deploymentTarget,
     evidenceDir,
     absoluteDir,
+    evidenceContract,
     status,
     ready: status === "ready",
     gateReady: gate.passed,
     directoryExists,
     requiredFileCount: files.length,
-    presentFileCount: files.length - missingFiles.length,
+    presentFileCount: files.filter((file) => file.exists).length,
     missingFiles,
+    currentContractMissingFiles,
     files,
     gate,
     errors,
     warnings,
-    nextCommands: buildNextCommands({
-      deploymentTarget,
-      evidenceDir,
-      missingFiles,
-      status,
-      customerConfigManifestEvidence,
-      customerConfigSmokeEvidence,
-    }),
+    nextCommands: skipsCurrentContract
+      ? []
+      : buildNextCommands({
+          profile,
+          recoveryRehearsalRequired,
+          deploymentTarget,
+          evidenceDir,
+          missingFiles,
+          status,
+          customerConfigManifestEvidence,
+          customerConfigSmokeEvidence,
+        }),
     readOnly: true,
     scope: STATUS_SCOPE,
     customerConfigManifestEvidence,
@@ -845,10 +988,12 @@ function formatText(status) {
   const lines = [
     `release evidence status: ${status.status}`,
     `customer: ${status.customer}`,
+    `profile: ${status.profile}`,
     `deploymentTarget: ${status.deploymentTarget}`,
     `evidenceDir: ${status.evidenceDir}`,
+    `evidenceContract: ${status.evidenceContract.declared ?? "not declared"} (${status.evidenceContract.status}; current=${status.evidenceContract.current})`,
     `files: ${status.presentFileCount}/${status.requiredFileCount}`,
-    `gate: ${status.gate.passed ? "passed" : `failed (${status.gate.errorCount})`}`,
+    `gate: ${status.gate.skipped ? `skipped (${status.gate.reason})` : status.gate.passed ? "passed" : `failed (${status.gate.errorCount})`}`,
     `closeout: ${status.closeoutSummary.gateVerified}/${status.closeoutSummary.total} gate-verified; blockers=${status.closeoutSummary.blockers}`,
     `ready means: ${status.scope.readyMeaning}`,
     "not proven by this helper:",
@@ -913,9 +1058,11 @@ function formatText(status) {
       }
     }
   }
-  lines.push("next commands:");
-  for (const command of status.nextCommands) {
-    lines.push(`- ${command}`);
+  if (status.nextCommands.length > 0) {
+    lines.push("next commands:");
+    for (const command of status.nextCommands) {
+      lines.push(`- ${command}`);
+    }
   }
   return `${lines.join("\n")}\n`;
 }

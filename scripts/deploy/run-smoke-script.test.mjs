@@ -40,10 +40,17 @@ const credentialOperationId = "00000000-0000-4000-8000-000000000001";
 
 function withDemoTarget(args) {
   const normalized = [...args];
+  if (!normalized.includes("--profile")) {
+    normalized.push("--profile", "customer-trial-acceptance");
+  }
+  const profile = normalized[normalized.indexOf("--profile") + 1];
   if (!normalized.includes("--migration-version")) {
     normalized.push("--migration-version", migrationVersion);
   }
-  if (!normalized.includes("--credential-operation-id")) {
+  if (
+    profile === "customer-trial-acceptance" &&
+    !normalized.includes("--credential-operation-id")
+  ) {
     normalized.push("--credential-operation-id", credentialOperationId);
   }
   if (!normalized.includes("--deployment-target")) {
@@ -205,7 +212,8 @@ test("run smoke help is runnable", () => {
   const result = runScript(["--help"]);
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /--release-version/);
+  assert.match(result.stdout, /--product-commit/);
+  assert.match(result.stdout, /--profile/);
   assert.match(result.stdout, /--migration-version/);
   assert.match(result.stdout, /--environment/);
   assert.match(result.stdout, /--deployment-target/);
@@ -247,11 +255,15 @@ test("run smoke input template is no-write and does not require endpoint", () =>
     template.checks.some((item) => item.startsWith("credential-login-matrix")),
   );
   assert(
-    template.checks.includes("runtime-identity release-v1 before authentication"),
+    template.checks.includes(
+      "runtime-identity release-v1 before authentication",
+    ),
   );
   assert(
     template.requiredReadbackEvidence.some((item) =>
-      item.includes(`demo totalAuthenticated=${credentialContract.credentials.uat.usernames.length + 1}`),
+      item.includes(
+        `demo totalAuthenticated=${credentialContract.credentials.uat.usernames.length + 1}`,
+      ),
     ),
   );
   assert(
@@ -295,7 +307,7 @@ test("run smoke writes release-gate compatible report", async () => {
       endpoint,
       "--backend-url",
       backendUrl,
-      "--release-version",
+      "--product-commit",
       releaseSha,
       "--environment",
       "customer-trial",
@@ -322,7 +334,7 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   assert.equal(report.customerCode, "yoyoosun");
-  assert.equal(report.releaseVersion, releaseSha);
+  assert.equal(report.productCommit, releaseSha);
   assert.equal(report.deploymentTarget, "demo-133");
   assert.equal(report.environment, "demo-133");
   assert.equal(report.operatorRole, "deployment-operator");
@@ -347,12 +359,9 @@ test("run smoke writes release-gate compatible report", async () => {
     expectedDigestSha256: crypto
       .createHash("sha256")
       .update(
-        [
-          "release-v1",
-          "plush_erp_demo_v1",
-          releaseSha,
-          migrationVersion,
-        ].join("\n"),
+        ["release-v1", "plush_erp_demo_v1", releaseSha, migrationVersion].join(
+          "\n",
+        ),
       )
       .digest("hex"),
     proof: "matched-v1",
@@ -383,12 +392,27 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.equal(credentialCheck.phoneBound, true);
   assert.equal(credentialCheck.deploymentTarget, "demo-133");
   assert.equal(credentialCheck.commandTarget, "customer-trial-133");
-  assert.equal(credentialCheck.targetIdentity, credentialContract.targets["demo-133"].targetIdentity);
+  assert.equal(
+    credentialCheck.targetIdentity,
+    credentialContract.targets["demo-133"].targetIdentity,
+  );
   assert.equal(credentialCheck.database, "plush_erp_demo_v1");
-  assert.equal(credentialCheck.nonAdminExpected, credentialContract.credentials.uat.usernames.length);
-  assert.equal(credentialCheck.nonAdminAuthenticated, credentialContract.credentials.uat.usernames.length);
-  assert.equal(credentialCheck.totalExpected, credentialContract.credentials.uat.usernames.length + 1);
-  assert.equal(credentialCheck.totalAuthenticated, credentialContract.credentials.uat.usernames.length + 1);
+  assert.equal(
+    credentialCheck.nonAdminExpected,
+    credentialContract.credentials.uat.usernames.length,
+  );
+  assert.equal(
+    credentialCheck.nonAdminAuthenticated,
+    credentialContract.credentials.uat.usernames.length,
+  );
+  assert.equal(
+    credentialCheck.totalExpected,
+    credentialContract.credentials.uat.usernames.length + 1,
+  );
+  assert.equal(
+    credentialCheck.totalAuthenticated,
+    credentialContract.credentials.uat.usernames.length + 1,
+  );
   assert.equal(credentialCheck.uniqueTokensObserved, true);
   assert.deepEqual(credentialCheck.usernames, [
     credentialContract.credentials.admin.username,
@@ -409,10 +433,7 @@ test("run smoke writes release-gate compatible report", async () => {
     credentialContract.smsLoginIdentity.environmentVariable,
   );
   assert.equal(credentialCheck.adminAuthVersion, 2);
-  assert.equal(
-    credentialCheck.credentialOperationId,
-    credentialOperationId,
-  );
+  assert.equal(credentialCheck.credentialOperationId, credentialOperationId);
   for (const check of report.checks) {
     assert.match(check.status, /^pass$/);
     if (check.target.startsWith("http://")) {
@@ -475,7 +496,7 @@ test("run smoke proves PDF before activation without claiming candidate effectiv
       "http://127.0.0.1:19096",
       "--backend-url",
       "http://127.0.0.1:18306",
-      "--release-version",
+      "--product-commit",
       releaseSha,
       "--environment",
       "demo-133",
@@ -532,7 +553,7 @@ test("run smoke fails authenticated release smoke for a non-PDF response", async
       "http://127.0.0.1:19092",
       "--backend-url",
       "http://127.0.0.1:18302",
-      "--release-version",
+      "--product-commit",
       releaseSha,
       "--environment",
       "customer-trial",
@@ -582,7 +603,7 @@ test("run smoke fails when one contracted UAT credential cannot log in", async (
       "http://127.0.0.1:19093",
       "--backend-url",
       "http://127.0.0.1:18303",
-      "--release-version",
+      "--product-commit",
       releaseSha,
       "--environment",
       "customer-trial",
@@ -607,8 +628,14 @@ test("run smoke fails when one contracted UAT credential cannot log in", async (
   assert.equal(credentialCheck.status, "fail");
   assert.equal(credentialCheck.adminAuthenticated, true);
   assert.equal(credentialCheck.phoneBound, true);
-  assert.equal(credentialCheck.nonAdminAuthenticated, credentialContract.credentials.uat.usernames.length - 1);
-  assert.equal(credentialCheck.totalAuthenticated, credentialContract.credentials.uat.usernames.length);
+  assert.equal(
+    credentialCheck.nonAdminAuthenticated,
+    credentialContract.credentials.uat.usernames.length - 1,
+  );
+  assert.equal(
+    credentialCheck.totalAuthenticated,
+    credentialContract.credentials.uat.usernames.length,
+  );
   assert.equal(credentialCheck.uniqueTokensObserved, false);
   assert.equal(credentialCheck.responseBodyStored, false);
   assert.equal(report.summary.failed, 1);
@@ -619,7 +646,11 @@ test("run smoke fails when one contracted UAT credential cannot log in", async (
 });
 
 for (const [name, fakeEnv, authenticated] of [
-  ["mismatched admin phone", { FAKE_ADMIN_PHONE: "13900139000" }, credentialContract.credentials.uat.usernames.length],
+  [
+    "mismatched admin phone",
+    { FAKE_ADMIN_PHONE: "13900139000" },
+    credentialContract.credentials.uat.usernames.length,
+  ],
   ["mismatched JSON-RPC id", { FAKE_LOGIN_RESPONSE_ID: "wrong-id" }, 0],
   ["legacy token alias", { FAKE_LOGIN_TOKEN_KEY: "token" }, 0],
 ]) {
@@ -635,7 +666,7 @@ for (const [name, fakeEnv, authenticated] of [
         "http://127.0.0.1:19095",
         "--backend-url",
         "http://127.0.0.1:18305",
-        "--release-version",
+        "--product-commit",
         releaseSha,
         "--environment",
         "customer-trial",
@@ -683,7 +714,7 @@ test("run smoke ignores external password overrides and uses the fixed contract"
       "http://127.0.0.1:19094",
       "--backend-url",
       "http://127.0.0.1:18304",
-      "--release-version",
+      "--product-commit",
       releaseSha,
       "--environment",
       "customer-trial",
@@ -711,7 +742,10 @@ test("run smoke ignores external password overrides and uses the fixed contract"
   assert.equal(check.status, "pass");
   assert.equal(check.adminPasswordSource, "contract-fixed-test");
   assert.equal(check.uatPasswordSource, "contract-fixed-test");
-  assert.doesNotMatch(fs.readFileSync(curlArgvPath, "utf8"), /same-secret-value/u);
+  assert.doesNotMatch(
+    fs.readFileSync(curlArgvPath, "utf8"),
+    /same-secret-value/u,
+  );
 });
 
 test("run smoke keeps backend checks optional", async () => {
@@ -724,7 +758,9 @@ test("run smoke keeps backend checks optional", async () => {
     [
       "--endpoint",
       endpoint,
-      "--release-version",
+      "--profile",
+      "base-release",
+      "--product-commit",
       releaseSha,
       "--environment",
       "customer-trial",
@@ -738,7 +774,7 @@ test("run smoke keeps backend checks optional", async () => {
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   assert.equal(report.endpointAlias, endpoint);
   assert.equal(report.backendEndpointAlias, undefined);
-  assert.equal(report.checks.length, 6);
+  assert.equal(report.checks.length, 5);
   assert.deepEqual(
     report.checks.map((check) => check.name),
     [
@@ -747,11 +783,10 @@ test("run smoke keeps backend checks optional", async () => {
       "web-readyz",
       "login-page",
       "mobile-role-route",
-      "auth-sms-capabilities",
     ],
   );
-  assert.equal(report.summary.total, 6);
-  assert.equal(report.summary.passed, 6);
+  assert.equal(report.summary.total, 5);
+  assert.equal(report.summary.passed, 5);
   assert.equal(report.summary.failed, 0);
 });
 
@@ -766,7 +801,7 @@ test("customer-test smoke authenticates only admin and omits non-admin receipt f
       "http://127.0.0.1:19101",
       "--backend-url",
       "http://127.0.0.1:18311",
-      "--release-version",
+      "--product-commit",
       releaseSha,
       "--deployment-target",
       "customer-test-133",
@@ -820,7 +855,7 @@ test("customer-test smoke rejects UAT or SMS credential arguments", () => {
     "http://127.0.0.1:19102",
     "--backend-url",
     "http://127.0.0.1:18312",
-    "--release-version",
+    "--product-commit",
     releaseSha,
     "--deployment-target",
     "customer-test-133",
@@ -847,7 +882,7 @@ test("run smoke stops before authentication when runtime identity proof mismatch
       "http://127.0.0.1:19103",
       "--backend-url",
       "http://127.0.0.1:18313",
-      "--release-version",
+      "--product-commit",
       releaseSha,
       "--environment",
       "demo-133",
@@ -867,9 +902,10 @@ test("run smoke stops before authentication when runtime identity proof mismatch
 
   assert.notEqual(result.status, 0);
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-  assert.deepEqual(report.checks.map((check) => check.name), [
-    "runtime-identity",
-  ]);
+  assert.deepEqual(
+    report.checks.map((check) => check.name),
+    ["runtime-identity"],
+  );
   assert.equal(report.checks[0].status, "fail");
   assert.equal(report.checks[0].proof, "unmatched");
   assert.equal(report.checks[0].responseBodyStored, false);
@@ -892,7 +928,7 @@ test("credential smoke rejects a missing positive JWT auth version", async () =>
       "http://127.0.0.1:19104",
       "--backend-url",
       "http://127.0.0.1:18314",
-      "--release-version",
+      "--product-commit",
       releaseSha,
       "--environment",
       "demo-133",
@@ -921,11 +957,15 @@ test("credential smoke rejects a missing positive JWT auth version", async () =>
 });
 
 test("run smoke requires migration and credential operation identity", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-identity-input-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "run-smoke-identity-input-"),
+  );
   const baseArgs = [
     "--endpoint",
     "http://127.0.0.1:19105",
-    "--release-version",
+    "--profile",
+    "customer-trial-acceptance",
+    "--product-commit",
     releaseSha,
     "--deployment-target",
     "demo-133",
@@ -968,7 +1008,7 @@ test("run smoke rejects credentialed endpoint URL before writing report", () => 
   const result = runScript([
     "--endpoint",
     "https://deploy:secret@erp.example.invalid",
-    "--release-version",
+    "--product-commit",
     releaseSha,
     "--environment",
     "customer-trial",
@@ -995,7 +1035,7 @@ test("run smoke rejects credentialed backend URL before writing report", () => {
     "https://erp.example.invalid",
     "--backend-url",
     "https://deploy:secret@api.example.invalid",
-    "--release-version",
+    "--product-commit",
     releaseSha,
     "--environment",
     "customer-trial",

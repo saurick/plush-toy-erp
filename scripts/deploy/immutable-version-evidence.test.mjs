@@ -15,18 +15,26 @@ import {
 } from "./immutable-version-evidence.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
-const scriptPath = path.join(repoRoot, "scripts/deploy/immutable-version-evidence.mjs");
-const collectEvidencePath = path.join(repoRoot, "deployments/yoyoosun/scripts/collect-evidence.sh");
+const scriptPath = path.join(
+  repoRoot,
+  "scripts/deploy/immutable-version-evidence.mjs",
+);
+const collectEvidencePath = path.join(
+  repoRoot,
+  "deployments/yoyoosun/scripts/collect-evidence.sh",
+);
 
 const VALID_INPUT = {
-  releaseVersion: "20260629T1200-yoyoosun",
+  releaseId: "20260629T1200-yoyoosun",
   environment: "customer-trial",
   operatorRole: "release-operator",
-  gitCommit: "6da29ddcde7b",
+  productCommit: "a".repeat(40),
   serverImage: "registry.example.invalid/plush/server:20260629T1200",
-  serverDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  serverDigest:
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   webImage: "registry.example.invalid/plush/web:20260629T1200",
-  webDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  webDigest:
+    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   migrationBefore: "20260601000000",
   migrationAfter: "20260628123354",
   backupId: "backup-20260629T1200",
@@ -41,7 +49,7 @@ function writeDraftEvidence(root) {
       collectEvidencePath,
       "--deployment-target",
       "demo-133",
-      "--release-version",
+      "--release-id",
       "20260629T0802-draft",
       "--output",
       absoluteDir,
@@ -62,14 +70,14 @@ function runCli({ cwd, args = [] }) {
 
 function cliArgs(input = VALID_INPUT) {
   return [
-    "--release-version",
-    input.releaseVersion,
+    "--release-id",
+    input.releaseId,
     "--environment",
     input.environment,
     "--operator-role",
     input.operatorRole,
-    "--git-commit",
-    input.gitCommit,
+    "--product-commit",
+    input.productCommit,
     "--server-image",
     input.serverImage,
     "--server-digest",
@@ -88,25 +96,31 @@ function cliArgs(input = VALID_INPUT) {
 }
 
 test("parseCliArgs supports immutable version options", () => {
-  assert.deepEqual(parseCliArgs([
-    "--evidence-dir",
-    "deployments/yoyoosun/evidence/releases/2026-06-29",
-    ...cliArgs(),
-  ]), {
-    help: false,
-    printInputTemplate: false,
-    evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
-    ...VALID_INPUT,
-  });
-  assert.deepEqual(parseCliArgs([
-    "--evidence-dir",
-    "deployments/yoyoosun/evidence/releases/2026-06-29",
-    "--print-input-template",
-  ]), {
-    help: false,
-    printInputTemplate: true,
-    evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
-  });
+  assert.deepEqual(
+    parseCliArgs([
+      "--evidence-dir",
+      "deployments/yoyoosun/evidence/releases/2026-06-29",
+      ...cliArgs(),
+    ]),
+    {
+      help: false,
+      printInputTemplate: false,
+      evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
+      ...VALID_INPUT,
+    },
+  );
+  assert.deepEqual(
+    parseCliArgs([
+      "--evidence-dir",
+      "deployments/yoyoosun/evidence/releases/2026-06-29",
+      "--print-input-template",
+    ]),
+    {
+      help: false,
+      printInputTemplate: true,
+      evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
+    },
+  );
 });
 
 test("immutable version input template is read-only and complete", () => {
@@ -126,21 +140,15 @@ test("immutable version input template is read-only and complete", () => {
         item.placeholder === "sha256:<64-hex>",
     ),
   );
-  assert.match(
-    template.command,
-    /--server-digest "\$SERVER_IMAGE_DIGEST"/,
-  );
-  assert.match(
-    formatted,
-    /RELEASE_ENVIRONMENT='<target-environment>'/,
-  );
+  assert.match(template.command, /--server-digest "\$SERVER_IMAGE_DIGEST"/);
+  assert.match(formatted, /RELEASE_ENVIRONMENT='<target-environment>'/);
   assert.deepEqual(
     template.env.map((item) => item.envKey),
     [
-      "RELEASE_VERSION",
+      "RELEASE_ID",
       "RELEASE_ENVIRONMENT",
       "OPERATOR_ROLE",
-      "GIT_COMMIT",
+      "PRODUCT_COMMIT",
       "SERVER_IMAGE",
       "SERVER_IMAGE_DIGEST",
       "WEB_IMAGE",
@@ -163,7 +171,7 @@ test("buildImmutableVersionEvidence validates release fields and image digests",
     ...VALID_INPUT,
   });
 
-  assert.equal(evidence.releaseVersion, VALID_INPUT.releaseVersion);
+  assert.equal(evidence.releaseId, VALID_INPUT.releaseId);
   assert.equal(evidence.environment, VALID_INPUT.environment);
   assert.equal(evidence.serverImageDigest, VALID_INPUT.serverDigest);
   assert.equal(evidence.webImageDigest, VALID_INPUT.webDigest);
@@ -194,10 +202,10 @@ test("applyImmutableVersionEvidenceToMarkdown updates only the first matching fi
   const markdown = [
     "| 字段 | 值 |",
     "| --- | --- |",
-    "| releaseVersion | 待填写 |",
+    "| releaseId | 待填写 |",
     "| environment | 待填写 |",
     "| operatorRole | 待填写 |",
-    "| gitCommit | 待填写 |",
+    "| productCommit | 待填写 |",
     "| serverImage | 待填写 |",
     "| serverImageDigest | 待填写 |",
     "| webImage | 待填写 |",
@@ -215,10 +223,10 @@ test("applyImmutableVersionEvidenceToMarkdown updates only the first matching fi
   ].join("\n");
 
   const updated = applyImmutableVersionEvidenceToMarkdown(markdown, {
-    releaseVersion: "20260629T1200-yoyoosun",
+    releaseId: "20260629T1200-yoyoosun",
     environment: "customer-trial",
     operatorRole: "release-operator",
-    gitCommit: "6da29ddcde7b",
+    productCommit: "a".repeat(40),
     serverImage: "registry.example.invalid/plush/server:20260629T1200",
     serverImageDigest: VALID_INPUT.serverDigest,
     webImage: "registry.example.invalid/plush/web:20260629T1200",
@@ -233,7 +241,9 @@ test("applyImmutableVersionEvidenceToMarkdown updates only the first matching fi
 });
 
 test("writeImmutableVersionEvidence updates release evidence and image digest artifact", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "immutable-version-evidence-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "immutable-version-evidence-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
 
   const result = await writeImmutableVersionEvidence(
@@ -244,29 +254,39 @@ test("writeImmutableVersionEvidence updates release evidence and image digest ar
     { repoRoot: root },
   );
 
-  assert.equal(result.releaseEvidencePath, path.join(absoluteDir, "release-evidence.md"));
-  const releaseEvidence = fs.readFileSync(path.join(absoluteDir, "release-evidence.md"), "utf8");
+  assert.equal(
+    result.releaseEvidencePath,
+    path.join(absoluteDir, "release-evidence.md"),
+  );
+  const releaseEvidence = fs.readFileSync(
+    path.join(absoluteDir, "release-evidence.md"),
+    "utf8",
+  );
   assert.match(releaseEvidence, /\| environment \| customer-trial \|/);
-  assert.match(releaseEvidence, /\| gitCommit \| 6da29ddcde7b \|/);
+  assert.match(releaseEvidence, /\| productCommit \| a{40} \|/);
   assert.match(releaseEvidence, /\| serverImageDigest \| sha256:a{64} \|/);
   assert.match(releaseEvidence, /\| migrationAfter \| 20260628123354 \|/);
 
-  const imageDigests = fs.readFileSync(path.join(absoluteDir, "image-digests.txt"), "utf8");
-  assert.match(imageDigests, /serverImage=registry\.example\.invalid\/plush\/server:20260629T1200/);
+  const imageDigests = fs.readFileSync(
+    path.join(absoluteDir, "image-digests.txt"),
+    "utf8",
+  );
+  assert.match(
+    imageDigests,
+    /serverImage=registry\.example\.invalid\/plush\/server:20260629T1200/,
+  );
   assert.match(imageDigests, /webImageDigest=sha256:b{64}/);
 });
 
 test("immutable version CLI writes evidence", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "immutable-version-evidence-cli-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "immutable-version-evidence-cli-"),
+  );
   const { evidenceDir } = writeDraftEvidence(root);
 
   const result = runCli({
     cwd: root,
-    args: [
-      "--evidence-dir",
-      evidenceDir,
-      ...cliArgs(),
-    ],
+    args: ["--evidence-dir", evidenceDir, ...cliArgs()],
   });
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
@@ -275,7 +295,9 @@ test("immutable version CLI writes evidence", () => {
 });
 
 test("immutable version CLI rejects invalid input without partial evidence writes", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "immutable-version-invalid-cli-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "immutable-version-invalid-cli-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
   const releaseEvidencePath = path.join(absoluteDir, "release-evidence.md");
   const imageDigestsPath = path.join(absoluteDir, "image-digests.txt");
@@ -295,13 +317,21 @@ test("immutable version CLI rejects invalid input without partial evidence write
   });
 
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /--migration-after must be a 14-digit Atlas migration version/);
-  assert.equal(fs.readFileSync(releaseEvidencePath, "utf8"), releaseEvidenceBefore);
+  assert.match(
+    result.stderr,
+    /--migration-after must be a 14-digit Atlas migration version/,
+  );
+  assert.equal(
+    fs.readFileSync(releaseEvidencePath, "utf8"),
+    releaseEvidenceBefore,
+  );
   assert.equal(fs.readFileSync(imageDigestsPath, "utf8"), imageDigestsBefore);
 });
 
 test("immutable version CLI rejects malformed release evidence without partial writes", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "immutable-version-malformed-cli-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "immutable-version-malformed-cli-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
   const releaseEvidencePath = path.join(absoluteDir, "release-evidence.md");
   const imageDigestsPath = path.join(absoluteDir, "image-digests.txt");
@@ -313,30 +343,30 @@ test("immutable version CLI rejects malformed release evidence without partial w
 
   const result = runCli({
     cwd: root,
-    args: [
-      "--evidence-dir",
-      evidenceDir,
-      ...cliArgs(),
-    ],
+    args: ["--evidence-dir", evidenceDir, ...cliArgs()],
   });
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /release-evidence\.md is missing field: serverImageDigest/);
-  assert.equal(fs.readFileSync(releaseEvidencePath, "utf8"), malformedReleaseEvidence);
+  assert.match(
+    result.stderr,
+    /release-evidence\.md is missing field: serverImageDigest/,
+  );
+  assert.equal(
+    fs.readFileSync(releaseEvidencePath, "utf8"),
+    malformedReleaseEvidence,
+  );
   assert.equal(fs.readFileSync(imageDigestsPath, "utf8"), imageDigestsBefore);
 });
 
 test("immutable version CLI prints input template without writing evidence", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "immutable-version-template-cli-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "immutable-version-template-cli-"),
+  );
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-29";
 
   const result = runCli({
     cwd: root,
-    args: [
-      "--evidence-dir",
-      evidenceDir,
-      "--print-input-template",
-    ],
+    args: ["--evidence-dir", evidenceDir, "--print-input-template"],
   });
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);

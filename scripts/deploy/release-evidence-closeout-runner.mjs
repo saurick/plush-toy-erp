@@ -6,6 +6,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildReleaseEvidenceCloseoutPlan } from "./release-evidence-closeout-plan.mjs";
 import { getDeploymentTarget } from "./deployment-targets.mjs";
+import {
+  RELEASE_EVIDENCE_PROFILES,
+  normalizeReleaseEvidenceProfile,
+} from "./release-evidence-contract.mjs";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 const DEFAULT_ENV_FILE = "server/deploy/compose/prod/.env";
@@ -24,6 +28,7 @@ class CliError extends Error {
 export function parseCliArgs(argv) {
   const options = {
     customer: DEFAULT_CUSTOMER,
+    profile: RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
     envFile: DEFAULT_ENV_FILE,
     execute: false,
     json: false,
@@ -62,6 +67,9 @@ export function parseCliArgs(argv) {
       case "customer":
         options.customer = value;
         break;
+      case "profile":
+        options.profile = value;
+        break;
       case "evidence-dir":
         options.evidenceDir = value;
         break;
@@ -98,6 +106,7 @@ Usage:
   node scripts/deploy/release-evidence-closeout-runner.mjs \\
     --deployment-target <demo-133|customer-test-133> \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
+    [--profile <base-release|customer-trial-acceptance>] \\
     [--runtime-env-file server/deploy/compose/prod/.env] \\
     [--only immutable-version,target-smoke] \\
     [--report output/release-evidence-closeout/<YYYY-MM-DD>/closeout-runner-report.json] \\
@@ -196,6 +205,7 @@ function sanitizeDisplayCommand(command, { evidenceDir, envFile }) {
 function materializeCommandFromText({
   commandText,
   action,
+  profile,
   deploymentTarget,
   evidenceDir,
   envFile,
@@ -208,14 +218,14 @@ function materializeCommandFromText({
       "scripts/deploy/immutable-version-evidence.mjs",
       "--evidence-dir",
       evidenceDir,
-      "--release-version",
-      requireInput({ env, action, key: "RELEASE_VERSION" }),
+      "--release-id",
+      requireInput({ env, action, key: "RELEASE_ID" }),
       "--environment",
       deploymentTarget,
       "--operator-role",
       requireInput({ env, action, key: "OPERATOR_ROLE" }),
-      "--git-commit",
-      requireInput({ env, action, key: "GIT_COMMIT" }),
+      "--product-commit",
+      requireInput({ env, action, key: "PRODUCT_COMMIT" }),
       "--server-image",
       requireInput({ env, action, key: "SERVER_IMAGE" }),
       "--server-digest",
@@ -255,6 +265,8 @@ function materializeCommandFromText({
     const cmd = "bash";
     const args = [
       "scripts/deploy/production-preflight.sh",
+      "--profile",
+      profile,
       "--deployment-target",
       deploymentTarget,
       "--env-file",
@@ -265,9 +277,9 @@ function materializeCommandFromText({
       path.join(target.compose.directory, target.compose.overrideFile),
       "--runtime",
       "--expected-release",
-      requireInput({ env, action, key: "GIT_COMMIT" }),
+      requireInput({ env, action, key: "PRODUCT_COMMIT" }),
       "--out",
-      path.join(evidenceDir, "production-preflight-report.txt"),
+      path.join(evidenceDir, "production-preflight-report.json"),
     ];
     return { cmd, args, displayCommand: buildDisplayCommand(cmd, args) };
   }
@@ -275,8 +287,8 @@ function materializeCommandFromText({
     const cmd = "bash";
     const args = [
       "deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh",
-      "--release-version",
-      requireInput({ env, action, key: "RELEASE_VERSION" }),
+      "--release-id",
+      requireInput({ env, action, key: "RELEASE_ID" }),
       "--environment",
       deploymentTarget,
       "--backup-purpose",
@@ -297,16 +309,12 @@ function materializeCommandFromText({
     const cmd = "bash";
     const args = [
       "deployments/yoyoosun/scripts/run-smoke.sh",
-      "--release-version",
-      requireInput({ env, action, key: "GIT_COMMIT" }),
+      "--profile",
+      profile,
+      "--product-commit",
+      requireInput({ env, action, key: "PRODUCT_COMMIT" }),
       "--migration-version",
       requireInput({ env, action, key: "MIGRATION_AFTER" }),
-      "--credential-operation-id",
-      requireInput({
-        env,
-        action,
-        key: "CREDENTIAL_ROTATION_OPERATION_ID",
-      }),
       "--deployment-target",
       deploymentTarget,
       "--environment",
@@ -314,16 +322,28 @@ function materializeCommandFromText({
       "--endpoint",
       requireRuntimeUrl(env, "SMOKE_ENDPOINT"),
     ];
+    if (commandText.includes("--credential-operation-id")) {
+      args.push(
+        "--credential-operation-id",
+        requireInput({
+          env,
+          action,
+          key: "CREDENTIAL_ROTATION_OPERATION_ID",
+        }),
+      );
+    }
     if (commandText.includes("--backend-url")) {
       args.push("--backend-url", requireRuntimeUrl(env, "SMOKE_BACKEND_URL"));
     }
-    args.push(
-      "--admin-username",
-      "admin",
-      "--admin-password-env",
-      "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-    );
-    if (deploymentTarget === "demo-133") {
+    if (commandText.includes("--admin-password-env")) {
+      args.push(
+        "--admin-username",
+        "admin",
+        "--admin-password-env",
+        "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+      );
+    }
+    if (commandText.includes("--uat-password-env")) {
       args.push(
         "--uat-password-env",
         "MANUAL_ACCEPTANCE_UAT_PASSWORD",
@@ -369,8 +389,8 @@ function materializeCommandFromText({
       "scripts/deploy/rollback-rehearsal-report.mjs",
       "--environment",
       deploymentTarget,
-      "--release-version",
-      requireInput({ env, action, key: "RELEASE_VERSION" }),
+      "--release-id",
+      requireInput({ env, action, key: "RELEASE_ID" }),
       "--rehearsal-type",
       "rollback-forward-fix",
       "--trigger-scenario",
@@ -406,6 +426,7 @@ function materializeCommandFromText({
 
 function materializeAction({
   action,
+  profile,
   deploymentTarget,
   evidenceDir,
   envFile,
@@ -416,6 +437,7 @@ function materializeAction({
       materializeCommandFromText({
         commandText,
         action,
+        profile,
         deploymentTarget,
         evidenceDir,
         envFile,
@@ -443,6 +465,7 @@ function attachExecutionCommands(action, executionCommands) {
 
 export function buildCloseoutRunPlan({
   customer = DEFAULT_CUSTOMER,
+  profile = RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
   deploymentTarget,
   evidenceDir,
   envFile = DEFAULT_ENV_FILE,
@@ -451,6 +474,11 @@ export function buildCloseoutRunPlan({
   env = process.env,
 } = {}) {
   requireOption({ evidenceDir }, "evidenceDir");
+  try {
+    profile = normalizeReleaseEvidenceProfile(profile);
+  } catch (error) {
+    throw new CliError(error.message, 2);
+  }
   if (!["demo-133", "customer-test-133"].includes(deploymentTarget)) {
     throw new CliError(
       "Missing or invalid --deployment-target (demo-133|customer-test-133)",
@@ -459,6 +487,7 @@ export function buildCloseoutRunPlan({
   }
   const closeoutPlan = buildReleaseEvidenceCloseoutPlan({
     customer,
+    profile,
     deploymentTarget,
     evidenceDir,
     envFile,
@@ -484,6 +513,7 @@ export function buildCloseoutRunPlan({
       action.canRun && !action.manualOnly
         ? materializeAction({
             action,
+            profile,
             deploymentTarget,
             evidenceDir,
             envFile,
@@ -507,6 +537,7 @@ export function buildCloseoutRunPlan({
   });
   return {
     customer,
+    profile,
     deploymentTarget,
     evidenceDir: EVIDENCE_DIR_ALIAS,
     envFile: RUNTIME_ENV_FILE_ALIAS,
@@ -607,6 +638,7 @@ function writeSanitizedReport(reportPath, report, repoRoot) {
 
 export function runCloseoutActions({
   customer = DEFAULT_CUSTOMER,
+  profile = RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
   deploymentTarget,
   evidenceDir,
   envFile = DEFAULT_ENV_FILE,
@@ -618,6 +650,7 @@ export function runCloseoutActions({
 } = {}) {
   const plan = buildCloseoutRunPlan({
     customer,
+    profile,
     deploymentTarget,
     evidenceDir,
     envFile,
@@ -726,6 +759,7 @@ if (isCli) {
     }
     const report = runCloseoutActions({
       customer: options.customer,
+      profile: options.profile,
       deploymentTarget: options.deploymentTarget,
       evidenceDir: options.evidenceDir,
       envFile: options.envFile,

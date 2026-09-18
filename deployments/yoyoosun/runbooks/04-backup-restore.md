@@ -35,7 +35,7 @@
 ```bash
 SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>' \
   bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
-    --release-version <release-version> \
+    --release-id <release-id> \
     --environment <environment> \
     --backup-purpose pre-migration \
     --out output/customers/yoyoosun/backup-restore-rehearsal \
@@ -44,7 +44,7 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
     --web-url http://127.0.0.1:5175/erp
 ```
 
-该脚本会把 dump 放在 `output/` 下并恢复到临时隔离 PostgreSQL 容器；`output/` 不纳入 git。`--environment` 必须绑定本次真实环境，目标演练不能沿用默认 `local-dev`；`--backup-purpose` 必须明确是 `pre-migration`、`pre-deploy`、发布前或 migration 前语义，方便 release evidence gate 证明这是 migration 前备份。脚本恢复 dump 后会先记录 `migration-status-before-apply.txt`，再对隔离库依次运行 populated upgrade 与 customer config cutover read-only audit；两项都通过后才执行 `atlas migrate apply`，最后生成 release gate 使用的 `migration-status.txt`。因此 `backup-evidence.md` 与 `backup-restore-report.json backup.migrationVersion / restore.migrationBeforeApply` 记录的是 migrationBefore，`backup-restore-report.json restore.restoreMigrationVersion` 记录的是恢复后 migrationAfter。跨越 `20260714055504` 时，四处 `populatedUpgradeAuditStatus` 必须为 `passed`；跨越 `20260714055825` 时，四处 `customerConfigCutoverAuditStatus` 必须为 `passed`；command summary 的步骤还必须包含对应 read-only audit。提供 `--evidence-dir` 时，脚本只把脱敏后的 `backup-evidence.md`、`migration-status-before-apply.txt`、`migration-status.txt`、`command-summary.txt` 和 `backup-restore-report.json` 复制到 release evidence 目录，不复制 dump。`backup-restore-report.json` 中的 artifact 路径必须保持为当前 release evidence 目录内的相对路径，不能指向 `output/`、绝对路径、完整 DSN 或不存在的文件；`command-summary.txt` 必须绑定同一 `backupId / releaseVersion / sourceAlias / restoreTarget`，并记录 pg_dump、restore、atlas、smoke 的脱敏步骤。
+该脚本会把 dump 放在 `output/` 下并恢复到临时隔离 PostgreSQL 容器；`output/` 不纳入 git。提供 `--evidence-dir` 时只复制脱敏报告和迁移状态，不复制 dump。`command-summary.txt` 必须绑定同一 `backupId / releaseId / sourceAlias / restoreTarget`。字段级检查由 release evidence gate 维护。
 
 ## 恢复步骤
 
@@ -57,8 +57,8 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 7. 执行 customer config cutover read-only audit；发现遗留流程实例或任务配置 revision 锚点时停止，由人工治理，不执行自动 DML。
 8. 两项审计通过后执行 migration apply，再执行 migration status，确认 migrationAfter 和 pending files。
 9. 完成 customer config active revision 读回，保持客户入口关闭。
-10. 按目标凭据合同恢复并撤销备份中恢复出的旧会话：两个 target 的 `admin` 都恢复为 `adminadmin`；只有 `demo-133` 恢复十个 `uat_*` 为 `12345678`；`customer-test-133` 不读取、猜测或改写非管理员密码，只证明其 `id/username` 身份集合保持不变。轮换闭包必须先在目标锁内创建并 restore-check 独立的 operation-bound 备份，脱敏回执绑定其 alias/hash/size，调用者不得提供备份路径。禁止 Keychain、环境变量或发布输入覆盖公开测试凭据。
-11. 启动 steady 后端并运行适用的真实登录矩阵：demo 必须由 11 个合同账号全部取得新 token；test 只登录 admin 并证明非管理员身份集合未变化。人工录入 SMS 手机号时仅对 demo 指定身份执行绑定读回。全部适用门禁通过后才允许恢复 Web 入口；未录入手机号不阻断 demo 密码登录验收。
+10. 客户试用验收时按目标凭据合同恢复并撤销旧会话：`demo-133` 处理 admin 与 11 个 `uat_*`；`customer-test-133` 只处理 admin，并证明非管理员身份集合未变化。
+11. 启动 steady 后端并运行适用登录矩阵：demo 共 12 个身份；test 只登录 admin。普通基础发布不要求这组验收专项证明。
 12. 执行 smoke query、健康检查和关键页面 smoke。
 13. 写入恢复演练报告。
 

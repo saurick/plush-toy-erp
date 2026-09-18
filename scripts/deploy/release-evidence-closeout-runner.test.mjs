@@ -14,6 +14,7 @@ import {
 function buildCloseoutRunPlan(options) {
   return buildCloseoutRunPlanImpl({
     deploymentTarget: "demo-133",
+    profile: "customer-trial-acceptance",
     ...options,
   });
 }
@@ -21,6 +22,7 @@ function buildCloseoutRunPlan(options) {
 function runCloseoutActions(options) {
   return runCloseoutActionsImpl({
     deploymentTarget: "demo-133",
+    profile: "customer-trial-acceptance",
     ...options,
   });
 }
@@ -37,10 +39,10 @@ const collectEvidencePath = path.join(
 
 const VALID_ENV = {
   RELEASE_CLOSEOUT_CONFIRM: "RUN_YOOSUN_RELEASE_CLOSEOUT_INVALID",
-  RELEASE_VERSION: "20260629T1200-draft",
+  RELEASE_ID: "20260629T1200-draft",
   RELEASE_ENVIRONMENT: "demo-133",
   OPERATOR_ROLE: "release-operator",
-  GIT_COMMIT: "6da29ddcde7b0000000000000000000000000000",
+  PRODUCT_COMMIT: "6da29ddcde7b0000000000000000000000000000",
   SERVER_IMAGE: "registry.example.invalid/plush/server:20260629T1200",
   SERVER_IMAGE_DIGEST:
     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -49,8 +51,7 @@ const VALID_ENV = {
     "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   MIGRATION_BEFORE: "20260601000000",
   MIGRATION_AFTER: "20260628123354",
-  CREDENTIAL_ROTATION_OPERATION_ID:
-    "123e4567-e89b-42d3-a456-426614174000",
+  CREDENTIAL_ROTATION_OPERATION_ID: "123e4567-e89b-42d3-a456-426614174000",
   BACKUP_ID: "backup-20260629T1200",
   SOURCE_POSTGRES_DSN: "postgres://release-source.example.invalid/plush",
   SMOKE_ENDPOINT: "https://erp.example.invalid",
@@ -76,7 +77,9 @@ function writeDraftEvidence() {
       collectEvidencePath,
       "--deployment-target",
       "demo-133",
-      "--release-version",
+      "--profile",
+      "customer-trial-acceptance",
+      "--release-id",
       "20260629T1200-draft",
       "--output",
       evidenceDir,
@@ -124,7 +127,13 @@ function writeCustomerConfigManifestEvidence(evidenceDir) {
 function runCli(args = [], env = {}) {
   const targetArgs = args.includes("--help")
     ? args
-    : ["--deployment-target", "demo-133", ...args];
+    : [
+        "--deployment-target",
+        "demo-133",
+        "--profile",
+        "customer-trial-acceptance",
+        ...args,
+      ];
   return spawnSync(process.execPath, [scriptPath, ...targetArgs], {
     cwd: repoRoot,
     env: {
@@ -151,6 +160,7 @@ test("parseCliArgs supports runner options", () => {
     ]),
     {
       customer: "yoyoosun",
+      profile: "base-release",
       deploymentTarget: "demo-133",
       envFile: "server/deploy/compose/prod/.env",
       evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
@@ -202,13 +212,10 @@ test("closeout runner report-only materializes commands without writing evidence
     /immutable-version-evidence\.mjs/,
   );
   assert.equal(
-    report.plan.actions[0].resolvedInputs.RELEASE_VERSION.value,
-    VALID_ENV.RELEASE_VERSION,
+    report.plan.actions[0].resolvedInputs.RELEASE_ID.value,
+    VALID_ENV.RELEASE_ID,
   );
-  assert.equal(
-    report.plan.actions[0].resolvedInputs.RELEASE_VERSION.source,
-    "env",
-  );
+  assert.equal(report.plan.actions[0].resolvedInputs.RELEASE_ID.source, "env");
   assert.equal("env" in report.plan.actions[0].commands[0], false);
   assert.equal(
     fs.existsSync(path.join(evidenceDir, "image-digests.txt")),
@@ -237,7 +244,7 @@ test("closeout runner materializes production preflight with runtime checks", ()
   assert.equal(plan.actions[0].canRun, true);
   assert.match(
     plan.actions[0].commands[0].displayCommand,
-    /production-preflight\.sh --deployment-target demo-133 .*--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml --runtime --expected-release [0-9a-f]{40} --out /,
+    /production-preflight\.sh --profile customer-trial-acceptance --deployment-target demo-133 .*--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml --runtime --expected-release [0-9a-f]{40} --out /,
   );
 });
 
@@ -264,8 +271,8 @@ test("closeout runner writes sanitized report without raw env or command output"
   assert.equal(payload.generatedAt.length > 0, true);
   assert.equal("stdout" in payload.results, false);
   assert.equal(
-    payload.plan.actions[0].resolvedInputs.RELEASE_VERSION.value,
-    VALID_ENV.RELEASE_VERSION,
+    payload.plan.actions[0].resolvedInputs.RELEASE_ID.value,
+    VALID_ENV.RELEASE_ID,
   );
   assert.equal(
     payload.plan.actions[0].resolvedInputs.SERVER_IMAGE_DIGEST.value,
@@ -299,7 +306,7 @@ test("closeout runner report-only keeps secret env values out of sanitized repor
     evidenceDir,
     only: ["backup-restore-rehearsal"],
     env: {
-      RELEASE_VERSION: VALID_ENV.RELEASE_VERSION,
+      RELEASE_ID: VALID_ENV.RELEASE_ID,
       SOURCE_POSTGRES_DSN:
         "postgres://release-user:secret-password@release-source.example.invalid/plush",
     },
@@ -497,7 +504,7 @@ test("closeout runner CLI execute requires explicit confirmation phrase", () => 
 test("closeout runner reuses evidence-backed release fields for later actions", () => {
   const { evidenceDir } = writeDraftEvidence();
   updateReleaseEvidenceField(evidenceDir, "environment", "demo-133");
-  const { RELEASE_VERSION, RELEASE_ENVIRONMENT, ...envWithoutReleaseBatch } =
+  const { RELEASE_ID, RELEASE_ENVIRONMENT, ...envWithoutReleaseBatch } =
     VALID_ENV;
 
   const plan = buildCloseoutRunPlan({
@@ -510,8 +517,8 @@ test("closeout runner reuses evidence-backed release fields for later actions", 
   assert.equal(plan.executeReady, true);
   assert.equal(plan.actions[0].canRun, true);
   assert.equal(
-    plan.actions[0].resolvedInputs.GIT_COMMIT.value,
-    VALID_ENV.GIT_COMMIT,
+    plan.actions[0].resolvedInputs.PRODUCT_COMMIT.value,
+    VALID_ENV.PRODUCT_COMMIT,
   );
   assert.equal(
     plan.actions[0].resolvedInputs.RELEASE_ENVIRONMENT.source,
@@ -520,11 +527,11 @@ test("closeout runner reuses evidence-backed release fields for later actions", 
   assert.match(
     plan.actions[0].commands[0].displayCommand,
     new RegExp(
-      `--release-version ${VALID_ENV.GIT_COMMIT} --migration-version ${VALID_ENV.MIGRATION_AFTER} --credential-operation-id ${VALID_ENV.CREDENTIAL_ROTATION_OPERATION_ID} --deployment-target demo-133 --environment demo-133`,
+      `--profile customer-trial-acceptance --product-commit ${VALID_ENV.PRODUCT_COMMIT} --migration-version ${VALID_ENV.MIGRATION_AFTER} --deployment-target demo-133 --environment demo-133 --endpoint https://erp.example.invalid --credential-operation-id ${VALID_ENV.CREDENTIAL_ROTATION_OPERATION_ID}`,
     ),
   );
   assert.equal(
-    plan.actions[0].commands[0].envKeys.includes("RELEASE_VERSION"),
+    plan.actions[0].commands[0].envKeys.includes("RELEASE_ID"),
     false,
   );
   assert.equal(
@@ -535,7 +542,7 @@ test("closeout runner reuses evidence-backed release fields for later actions", 
 
 test("closeout runner executes only selected runnable action", () => {
   const { evidenceDir } = writeDraftEvidence();
-  const { RELEASE_VERSION, GIT_COMMIT, ...envWithoutEvidenceBackedInputs } =
+  const { RELEASE_ID, PRODUCT_COMMIT, ...envWithoutEvidenceBackedInputs } =
     VALID_ENV;
   const report = runCloseoutActions({
     repoRoot,
@@ -570,7 +577,7 @@ test("closeout runner executes only selected runnable action", () => {
     path.join(evidenceDir, "release-evidence.md"),
     "utf8",
   );
-  assert.match(releaseEvidence, /\| releaseVersion \| 20260629T1200-draft \|/);
+  assert.match(releaseEvidence, /\| releaseId \| 20260629T1200-draft \|/);
   assert.match(releaseEvidence, /\| environment \| demo-133 \|/);
   assert.match(releaseEvidence, /\| migrationBefore \| 20260601000000 \|/);
   assert.match(releaseEvidence, /\| backupId \| backup-20260629T1200 \|/);
@@ -582,7 +589,7 @@ test("closeout runner CLI execute writes sanitized success report", () => {
     root,
     "immutable-version-execute-runner-report.json",
   );
-  const { RELEASE_VERSION, GIT_COMMIT, ...envWithoutEvidenceBackedInputs } =
+  const { RELEASE_ID, PRODUCT_COMMIT, ...envWithoutEvidenceBackedInputs } =
     VALID_ENV;
   const result = runCli(
     [
@@ -919,7 +926,7 @@ test("closeout runner CLI report writes sanitized JSON report", () => {
       "--json",
     ],
     {
-      RELEASE_VERSION: VALID_ENV.RELEASE_VERSION,
+      RELEASE_ID: VALID_ENV.RELEASE_ID,
       SOURCE_POSTGRES_DSN:
         "postgres://release-user:secret-password@release-source.example.invalid/plush",
     },

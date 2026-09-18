@@ -1272,7 +1272,7 @@ enter_stage runtime_verified
   --compose-override "$compose_override" \
   --runtime \
   --expected-release "$to_sha" \
-  --out "$operation_dir/rollback-preflight-report.txt" \
+  --out "$operation_dir/rollback-preflight-report.json" \
   >>"$log_file" 2>&1
 curl --fail --silent --show-error --max-time 10 \
   "$server_endpoint/healthz" >/dev/null

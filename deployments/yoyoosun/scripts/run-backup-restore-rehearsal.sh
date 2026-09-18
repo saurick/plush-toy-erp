@@ -7,7 +7,7 @@ print_help() {
     '用法:' \
     "  SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>' \\" \
     "  bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \\" \
-    "    --release-version local-dev-20260616 \\" \
+    "    --release-id local-dev-20260616 \\" \
     "    --environment local-dev \\" \
     "    --backup-purpose pre-migration \\" \
     "    --source-policy dedicated-backup \\" \
@@ -40,7 +40,7 @@ repo_root="$(git rev-parse --show-toplevel)"
 populated_upgrade_preflight="$repo_root/scripts/qa/populated-upgrade-preflight.sh"
 customer="yoyoosun"
 environment="local-dev"
-release_version=""
+release_id=""
 backup_purpose="pre-migration"
 out_root="output/customers/yoyoosun/backup-restore-rehearsal"
 postgres_image="${POSTGRES_REHEARSAL_IMAGE:-postgres:18.1}"
@@ -64,8 +64,8 @@ while [[ $# -gt 0 ]]; do
     environment="${2:-}"
     shift 2
     ;;
-  --release-version)
-    release_version="${2:-}"
+  --release-id)
+    release_id="${2:-}"
     shift 2
     ;;
   --backup-purpose)
@@ -125,8 +125,8 @@ if [[ "$customer" != "yoyoosun" ]]; then
   exit 1
 fi
 
-if [[ -z "$release_version" ]]; then
-  release_version="local-dev-$(git rev-parse --short=8 HEAD 2>/dev/null || date +%Y%m%d%H%M%S)"
+if [[ -z "$release_id" ]]; then
+  release_id="local-dev-$(git rev-parse --short=8 HEAD 2>/dev/null || date +%Y%m%d%H%M%S)"
 fi
 
 if [[ -n "$evidence_dir" && ! -d "$evidence_dir" ]]; then
@@ -424,7 +424,7 @@ echo "[backup-restore-rehearsal] output=$run_dir"
 printf '%s\n' "backupId=$backup_id
 customer=$customer
 environment=$environment
-releaseVersion=$release_version
+releaseId=$release_id
 backupPurpose=$backup_purpose
 postgresImage=$postgres_image
 pgDumpBin=$pg_dump_bin
@@ -831,7 +831,7 @@ printf '%s\n' "# yoyoosun Backup Restore Rehearsal Evidence
 | backupPurpose | $backup_purpose |
 | environment | $environment |
 | operatorRole | local-developer |
-| releaseVersion | $release_version |
+| releaseId | $release_id |
 | migrationVersion | ${pre_migration_version:-unknown} |
 | sourcePolicy | $source_policy |
 | sourceRole | $source_role_alias |
@@ -881,7 +881,7 @@ printf '%s\n' "# yoyoosun Backup Restore Rehearsal Evidence
 printf '%s\n' "{
   \"customerCode\": \"$customer\",
   \"environment\": \"$environment\",
-  \"releaseVersion\": \"$release_version\",
+  \"releaseId\": \"$release_id\",
   \"backupId\": \"$backup_id\",
   \"verifiedAt\": \"$verified_at\",
   \"sourceAlias\": \"env:$source_env\",

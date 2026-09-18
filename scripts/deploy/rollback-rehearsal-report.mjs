@@ -6,9 +6,14 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 const DEFAULT_RUNBOOK = "deployments/yoyoosun/runbooks/03-rollback.md";
-const VALID_REHEARSAL_TYPES = new Set(["rollback", "forward-fix", "rollback-forward-fix"]);
+const VALID_REHEARSAL_TYPES = new Set([
+  "rollback",
+  "forward-fix",
+  "rollback-forward-fix",
+]);
 const PASS_STATUSES = new Set(["pass", "passed", "ok"]);
-const PLACEHOLDER_PATTERN = /^(|待填写|todo|tbd|n\/a|unknown|replace.*|<.*>|-+)$/i;
+const PLACEHOLDER_PATTERN =
+  /^(|待填写|todo|tbd|n\/a|unknown|replace.*|<.*>|-+)$/i;
 
 function parseArgs(argv) {
   const options = {
@@ -30,8 +35,8 @@ function parseArgs(argv) {
       index += 1;
       continue;
     }
-    if (arg === "--release-version") {
-      options.releaseVersion = argv[index + 1];
+    if (arg === "--release-id") {
+      options.releaseId = argv[index + 1];
       index += 1;
       continue;
     }
@@ -93,7 +98,10 @@ function parseArgs(argv) {
   }
 
   if (options.evidenceDir && !options.out) {
-    options.out = path.join(options.evidenceDir, "rollback-rehearsal-report.json");
+    options.out = path.join(
+      options.evidenceDir,
+      "rollback-rehearsal-report.json",
+    );
   }
 
   return options;
@@ -103,7 +111,7 @@ function printHelp() {
   console.log(`Usage:
   node scripts/deploy/rollback-rehearsal-report.mjs \\
     --environment customer-trial \\
-    --release-version 20260629T1200 \\
+    --release-id 20260629T1200 \\
     --rehearsal-type rollback-forward-fix \\
     --trigger-scenario "smoke failed after activation" \\
     --rollback-target-release previous-stable-release \\
@@ -111,7 +119,7 @@ function printHelp() {
     --step "verify rollback command path=pass" \\
     --step "verify forward-fix owner path=pass" \\
     --post-smoke-report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json \\
-    --customer-config-revision yoyoosun-customer-package-v7.runtime-manifest-v1 \\
+    --customer-config-revision <approved-runtime-revision> \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 
 Purpose:
@@ -128,7 +136,11 @@ function isMeaningful(value) {
 }
 
 function isPassStatus(value) {
-  return PASS_STATUSES.has(String(value ?? "").trim().toLowerCase());
+  return PASS_STATUSES.has(
+    String(value ?? "")
+      .trim()
+      .toLowerCase(),
+  );
 }
 
 function hasSecretLikeValue(value) {
@@ -182,12 +194,19 @@ function resolvePostSmokeReportPath(options) {
     return outDirResolvedPath;
   }
 
-  throw new Error("postSmokeReport must point to smoke-test-report.json in the same output directory");
+  throw new Error(
+    "postSmokeReport must point to smoke-test-report.json in the same output directory",
+  );
 }
 
 function validateSmokeReport(smokeReport, smokeReportPath, options = {}) {
-  if (smokeReport.customerCode && smokeReport.customerCode !== DEFAULT_CUSTOMER) {
-    throw new Error(`post smoke report customerCode must be ${DEFAULT_CUSTOMER}`);
+  if (
+    smokeReport.customerCode &&
+    smokeReport.customerCode !== DEFAULT_CUSTOMER
+  ) {
+    throw new Error(
+      `post smoke report customerCode must be ${DEFAULT_CUSTOMER}`,
+    );
   }
   const checks = Array.isArray(smokeReport.checks) ? smokeReport.checks : [];
   if (checks.length === 0) {
@@ -201,8 +220,13 @@ function validateSmokeReport(smokeReport, smokeReportPath, options = {}) {
     if (!isMeaningful(target)) {
       throw new Error(`post smoke report checks[${index}].target is missing`);
     }
-    if (/^(https?:\/\/|\/)/i.test(target) && !/^[1-5]\d{2}$/.test(String(check?.httpCode ?? "").trim())) {
-      throw new Error(`post smoke report checks[${index}].httpCode must be a 100-599 HTTP status for URL targets`);
+    if (
+      /^(https?:\/\/|\/)/i.test(target) &&
+      !/^[1-5]\d{2}$/.test(String(check?.httpCode ?? "").trim())
+    ) {
+      throw new Error(
+        `post smoke report checks[${index}].httpCode must be a 100-599 HTTP status for URL targets`,
+      );
     }
     if (!isPassStatus(check?.status)) {
       throw new Error(`post smoke report checks[${index}].status must be pass`);
@@ -212,7 +236,9 @@ function validateSmokeReport(smokeReport, smokeReportPath, options = {}) {
     throw new Error("post smoke report summary.total must equal checks length");
   }
   if (Number(smokeReport.summary?.passed) !== checks.length) {
-    throw new Error("post smoke report summary.passed must equal checks length");
+    throw new Error(
+      "post smoke report summary.passed must equal checks length",
+    );
   }
   if (Number(smokeReport.summary?.failed) !== 0) {
     throw new Error("post smoke report summary.failed must be 0");
@@ -221,10 +247,14 @@ function validateSmokeReport(smokeReport, smokeReportPath, options = {}) {
     throw new Error("post smoke report must declare containsSecrets=false");
   }
   if (smokeReport.redaction?.containsRawCustomerRows !== false) {
-    throw new Error("post smoke report must declare containsRawCustomerRows=false");
+    throw new Error(
+      "post smoke report must declare containsRawCustomerRows=false",
+    );
   }
   if (hasSecretLikeValue(JSON.stringify(smokeReport))) {
-    throw new Error(`post smoke report contains secret-like value: ${smokeReportPath}`);
+    throw new Error(
+      `post smoke report contains secret-like value: ${smokeReportPath}`,
+    );
   }
   if (isMeaningful(options.customerConfigRevision)) {
     const check = checks.find(
@@ -233,19 +263,29 @@ function validateSmokeReport(smokeReport, smokeReportPath, options = {}) {
         item?.target === "jsonrpc:customer_config.get_effective_session",
     );
     if (!check) {
-      throw new Error("post smoke report must include customer-config-effective-session when customerConfigRevision is provided");
+      throw new Error(
+        "post smoke report must include customer-config-effective-session when customerConfigRevision is provided",
+      );
     }
     if (check.target !== "jsonrpc:customer_config.get_effective_session") {
-      throw new Error("customer-config-effective-session target must be jsonrpc:customer_config.get_effective_session");
+      throw new Error(
+        "customer-config-effective-session target must be jsonrpc:customer_config.get_effective_session",
+      );
     }
     if (check.expectedRevision !== options.customerConfigRevision) {
-      throw new Error("customer-config-effective-session expectedRevision must match customerConfigRevision");
+      throw new Error(
+        "customer-config-effective-session expectedRevision must match customerConfigRevision",
+      );
     }
     if (!isMeaningful(check.tokenSourceEnv)) {
-      throw new Error("customer-config-effective-session tokenSourceEnv must be recorded");
+      throw new Error(
+        "customer-config-effective-session tokenSourceEnv must be recorded",
+      );
     }
     if (check.responseBodyStored !== false) {
-      throw new Error("customer-config-effective-session responseBodyStored must be false");
+      throw new Error(
+        "customer-config-effective-session responseBodyStored must be false",
+      );
     }
   }
 }
@@ -254,7 +294,7 @@ function buildReport(options, now = new Date()) {
   const requiredFields = [
     "customer",
     "environment",
-    "releaseVersion",
+    "releaseId",
     "rehearsalType",
     "triggerScenario",
     "rollbackTargetRelease",
@@ -274,10 +314,17 @@ function buildReport(options, now = new Date()) {
     throw new Error(`customer must be ${DEFAULT_CUSTOMER}`);
   }
   if (!VALID_REHEARSAL_TYPES.has(String(options.rehearsalType).toLowerCase())) {
-    throw new Error(`rehearsalType must be one of: ${[...VALID_REHEARSAL_TYPES].join(", ")}`);
+    throw new Error(
+      `rehearsalType must be one of: ${[...VALID_REHEARSAL_TYPES].join(", ")}`,
+    );
   }
-  if (options.customerConfigRevision !== undefined && !isMeaningful(options.customerConfigRevision)) {
-    throw new Error("customerConfigRevision must be provided and must not be a placeholder");
+  if (
+    options.customerConfigRevision !== undefined &&
+    !isMeaningful(options.customerConfigRevision)
+  ) {
+    throw new Error(
+      "customerConfigRevision must be provided and must not be a placeholder",
+    );
   }
 
   const steps = options.steps.map(parseStep);
@@ -302,7 +349,7 @@ function buildReport(options, now = new Date()) {
   return {
     customerCode: DEFAULT_CUSTOMER,
     environment: options.environment,
-    releaseVersion: options.releaseVersion,
+    releaseId: options.releaseId,
     rehearsedAt: now.toISOString(),
     rehearsalType: String(options.rehearsalType).toLowerCase(),
     triggerScenario: options.triggerScenario,
@@ -314,14 +361,15 @@ function buildReport(options, now = new Date()) {
       smokeReport: options.postSmokeReport,
       smokeCheckCount: smokeReport.checks.length,
       evidenceReviewStatus: options.evidenceReviewStatus,
-      customerConfigEffectiveSession:
-        isMeaningful(options.customerConfigRevision)
-          ? {
-              status: "verified",
-              expectedRevision: options.customerConfigRevision,
-              target: "jsonrpc:customer_config.get_effective_session",
-            }
-          : null,
+      customerConfigEffectiveSession: isMeaningful(
+        options.customerConfigRevision,
+      )
+        ? {
+            status: "verified",
+            expectedRevision: options.customerConfigRevision,
+            target: "jsonrpc:customer_config.get_effective_session",
+          }
+        : null,
     },
     summary: {
       rehearsalCompleted: true,
@@ -363,9 +411,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
 }
 
-export {
-  buildReport,
-  parseArgs,
-  parseStep,
-  validateSmokeReport,
-};
+export { buildReport, parseArgs, parseStep, validateSmokeReport };

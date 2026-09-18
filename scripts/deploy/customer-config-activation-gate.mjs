@@ -109,7 +109,11 @@ function validateManifestEvidence({
   if (!evidence) {
     return null;
   }
-  assert(evidence.customerKey === customer, `${MANIFEST_EVIDENCE_FILE} customerKey must be ${customer}`, errors);
+  assert(
+    evidence.customerKey === customer,
+    `${MANIFEST_EVIDENCE_FILE} customerKey must be ${customer}`,
+    errors,
+  );
   assert(
     evidence.revision === manifestPayload.revision,
     `${MANIFEST_EVIDENCE_FILE} revision must match manifest revision`,
@@ -151,18 +155,25 @@ export function validateCustomerConfigActivationGate({
   repoRoot = process.cwd(),
 } = {}) {
   const errors = [];
-  assert(customer === DEFAULT_CUSTOMER, `Only ${DEFAULT_CUSTOMER} is supported by this gate today`, errors);
+  assert(
+    customer === DEFAULT_CUSTOMER,
+    `Only ${DEFAULT_CUSTOMER} is supported by this gate today`,
+    errors,
+  );
   assert(Boolean(manifest), "--manifest is required", errors);
   assert(Boolean(evidenceDir), "--evidence-dir is required", errors);
   assert(
-    deploymentTarget === "demo-133" ||
-      deploymentTarget === "customer-test-133",
+    deploymentTarget === "demo-133" || deploymentTarget === "customer-test-133",
     "--deployment-target must be demo-133 or customer-test-133",
     errors,
   );
 
   const absoluteManifest = manifest ? path.resolve(repoRoot, manifest) : "";
-  assert(Boolean(absoluteManifest) && fs.existsSync(absoluteManifest), `manifest not found: ${manifest}`, errors);
+  assert(
+    Boolean(absoluteManifest) && fs.existsSync(absoluteManifest),
+    `manifest not found: ${manifest}`,
+    errors,
+  );
 
   let manifestPayload = null;
   let manifestSha256 = "";
@@ -192,7 +203,9 @@ export function validateCustomerConfigActivationGate({
   }
 
   let releaseGateResult = null;
-  const absoluteEvidenceDir = evidenceDir ? path.resolve(repoRoot, evidenceDir) : "";
+  const absoluteEvidenceDir = evidenceDir
+    ? path.resolve(repoRoot, evidenceDir)
+    : "";
   if (evidenceDir) {
     try {
       releaseGateResult = validateReleaseEvidenceGate({
@@ -200,13 +213,7 @@ export function validateCustomerConfigActivationGate({
         deploymentTarget,
         evidenceDir,
         repoRoot,
-        // This gate runs before activation, so the target cannot yet prove the
-        // candidate revision through get_effective_session or render a
-        // module-gated PDF when no active revision exists. Final release
-        // closeout still uses the strict release-evidence gate directly and
-        // requires both checks after activation.
-        allowMissingCustomerConfigEffectiveSession: true,
-        allowMissingTemplatePdfRender: true,
+        profile: "base-release",
       });
     } catch (error) {
       if (Array.isArray(error.errors)) {
@@ -217,7 +224,11 @@ export function validateCustomerConfigActivationGate({
     }
   }
   let manifestEvidence = null;
-  if (manifestPayload && absoluteEvidenceDir && fs.existsSync(absoluteEvidenceDir)) {
+  if (
+    manifestPayload &&
+    absoluteEvidenceDir &&
+    fs.existsSync(absoluteEvidenceDir)
+  ) {
     manifestEvidence = validateManifestEvidence({
       evidenceDir: absoluteEvidenceDir,
       manifestPayload,
@@ -228,7 +239,9 @@ export function validateCustomerConfigActivationGate({
   }
 
   if (errors.length > 0) {
-    const error = new Error(`customer config activation gate failed:\n- ${errors.join("\n- ")}`);
+    const error = new Error(
+      `customer config activation gate failed:\n- ${errors.join("\n- ")}`,
+    );
     error.errors = errors;
     error.scope = ACTIVATION_GATE_SCOPE;
     if (evidenceDir) {

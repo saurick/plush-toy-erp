@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | `deployment-targets.mjs` | 读取两个固定 target 的脱敏投影 | 只读 |
 | `target-preflight.mjs` | 读回容量、Compose、端口、数据库、当前 SHA、锁、rollback point 与对应公网入口 | 只读，不创建备份或切换版本 |
-| `production-preflight.sh` | 校验 runtime env、固定镜像、Compose、migration、PDF、健康与目标身份 | 默认只读；`--runtime` 仍只核对 |
+| `production-preflight.sh` | 校验 runtime env、固定镜像、Compose、migration、健康与目标身份；验收档追加 SMS、PDF、Chromium | 默认只读；`--runtime` 仍只核对 |
 | `release-artifact-bundle.mjs` | 从 clean committed archive 构建一次 `linux/amd64` Server/Web 制品、SBOM 与 manifest | `--execute` 才构建本机制品 |
 | `release-artifact-verify.mjs` | 校验 manifest、SBOM、image tar 与内置 release identity | 默认只读；`--load` 会加载本地镜像 |
 | `local-release-rehearsal.mjs` | 用同一不可变 bytes 在一次性环境完成 migration、health/ready、登录、PDF、备份恢复与零残留 | `--execute` 才启动隔离环境 |
@@ -134,6 +134,8 @@ steady env 必须保持 `BOOTSTRAP_ADMIN_ONCE=false` 且不包含 `APP_ADMIN_PAS
 
 `release-evidence-gate.mjs` 通过只说明 evidence 文件满足合同，不替代目标实时运行、数据身份、客户 UAT 或签收。
 
+普通发布和客户验收使用两个 profile；无迁移且确认恢复流程未变的普通发布不重复要求恢复 / 回滚演练或客户签收，但保留当前备份和固定回滚路径。详细条件见 [发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。预检 JSON 回执由目标机已有 Python 标准库生成，不新增宿主 Node.js 依赖；JS / Python 共用 `release-evidence-contract.json` 的合同、profile 和检查项。
+
 ## 安全边界
 
 - 目标机只 load / pull 制品、migration、启动和检查，不从源码构建。
@@ -142,6 +144,7 @@ steady env 必须保持 `BOOTSTRAP_ADMIN_ONCE=false` 且不包含 `APP_ADMIN_PAS
 - secret 只从受控进程环境、stdin 或凭据存储进入需要它的单一进程。
 - 不把 demo/test 的数据库、上传、backup、operation 或 rollback point 交叉复用。
 - 不把 `admin.yoyoosun.net` 作为环境别名或兼容 target。
+- Chromium seccomp 校验固定的是经审查的权限语义，忽略 JSON 格式、注释和规则顺序；新增 syscall 权限、撤掉 capability 条件或改变 sandbox 参数仍会阻断，不能用“存在几个关键字段”代替完整安全边界。
 
 ## 修改后验证
 
@@ -172,10 +175,11 @@ git diff --check
 
 ## 发布预检与存量审计
 
-生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足，包括 secret 占位、固定镜像 tag、SMS mock、debug seed / cleanup、PostgreSQL / 后端 HTTP / Jaeger loopback 和低配部署边界：
+生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认配置、Compose、运行身份与健康边界：
 
 ```bash
 bash scripts/deploy/production-preflight.sh \
+  --profile base-release \
   --deployment-target <demo-133|customer-test-133> \
   --env-file server/deploy/compose/prod/.env
 ```
@@ -184,13 +188,14 @@ bash scripts/deploy/production-preflight.sh \
 
 ```bash
 bash scripts/deploy/production-preflight.sh \
+  --profile <base-release|customer-trial-acceptance> \
   --deployment-target <demo-133|customer-test-133> \
   --env-file server/deploy/compose/prod/.env \
   --runtime \
-  --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.txt
+  --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.json
 ```
 
-不写 evidence 的发布前 env-only 预检可以不带 `--runtime`；但正式 release evidence 必须在部署后带 `--runtime`，同时记录 Compose 服务、容器实际 `ERP_PDF_WARMUP=async`、Chromium / chromium-common exact pin 和 `/healthz` / `/readyz`。
+不写 evidence 的 env-only 预检可以不带 `--runtime`。正式 evidence 必须在部署后带 `--runtime`；`--out` 写入稳定 JSON 检查 ID，中文日志只供操作人阅读，不参与 release gate 解析。`base-release` 只执行配置、隔离、镜像、迁移、运行身份和 health / ready 底线；`customer-trial-acceptance` 才追加 SMS provider、PDF warmup 与 Chromium exact pin，并把 profile 写入回执供 release gate 交叉验证。
 
 产品级 production preflight 只核配置与部署边界，不读取业务行。现存数据库升级链在 apply 前必须依次完成两项独立只读审计：`populated-upgrade` 同时覆盖 `20260714055504_migrate.sql` 的存量边界和 WIP `20260717035245 -> 20260717043625` 委外关联切换，`customer-config-cutover` 覆盖 `20260714055825_customer_config_append_only_and_role_backfill.sql` 的切换边界。`migrate_online.sh` 的非 `--status-only` 路径会在 Atlas status 后按此顺序调用；任一失败都不会进入 dry-run 或 apply。需要单独复核时，使用固定 `--audit` 值，并通过容器模式或环境变量名传入 DSN，不能把连接串直接写进命令或报告：
 
@@ -226,7 +231,7 @@ rollback / forward-fix 演练完成并取得 post-smoke report 后，用报告�
 ```bash
 node scripts/deploy/rollback-rehearsal-report.mjs \
   --environment customer-trial \
-  --release-version <release-version> \
+  --release-id <release-id> \
   --rehearsal-type rollback-forward-fix \
   --trigger-scenario "smoke failed after activation" \
   --rollback-target-release <previous-release-version> \
@@ -234,7 +239,7 @@ node scripts/deploy/rollback-rehearsal-report.mjs \
   --step "verify rollback command path=pass" \
   --step "verify forward-fix owner path=pass" \
   --post-smoke-report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json \
-  --customer-config-revision yoyoosun-customer-package-v3.runtime-manifest-v1 \
+  --customer-config-revision <approved-runtime-revision> \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 

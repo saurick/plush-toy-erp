@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { writeBaseReleaseEvidenceTestFixture } from "./base-release-evidence-test-fixture.mjs";
 
 import {
   buildReleaseEvidenceCloseoutPlan as buildReleaseEvidenceCloseoutPlanImpl,
@@ -13,6 +14,7 @@ import {
 function buildReleaseEvidenceCloseoutPlan(options) {
   return buildReleaseEvidenceCloseoutPlanImpl({
     deploymentTarget: "demo-133",
+    profile: "customer-trial-acceptance",
     ...options,
   });
 }
@@ -28,10 +30,10 @@ const collectEvidencePath = path.join(
 );
 
 const VALID_ENV = {
-  RELEASE_VERSION: "20260629T1200-draft",
+  RELEASE_ID: "20260629T1200-draft",
   RELEASE_ENVIRONMENT: "demo-133",
   OPERATOR_ROLE: "release-operator",
-  GIT_COMMIT: "6da29ddcde7b0000000000000000000000000000",
+  PRODUCT_COMMIT: "6da29ddcde7b0000000000000000000000000000",
   SERVER_IMAGE: "registry.example.invalid/plush/server:20260629T1200",
   SERVER_IMAGE_DIGEST:
     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -40,8 +42,7 @@ const VALID_ENV = {
     "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   MIGRATION_BEFORE: "20260601000000",
   MIGRATION_AFTER: "20260628123354",
-  CREDENTIAL_ROTATION_OPERATION_ID:
-    "123e4567-e89b-42d3-a456-426614174000",
+  CREDENTIAL_ROTATION_OPERATION_ID: "123e4567-e89b-42d3-a456-426614174000",
   BACKUP_ID: "backup-20260629T1200",
   SOURCE_POSTGRES_DSN: "postgres://release-source.example.invalid/plush",
   SMOKE_ENDPOINT: "https://erp.example.invalid",
@@ -62,7 +63,9 @@ function writeDraftEvidence(root) {
       collectEvidencePath,
       "--deployment-target",
       "demo-133",
-      "--release-version",
+      "--profile",
+      "customer-trial-acceptance",
+      "--release-id",
       "20260629T1200-draft",
       "--output",
       absoluteDir,
@@ -102,7 +105,13 @@ function writeToolScripts(root) {
 function runPlan({ cwd, args = [], env = {} }) {
   const targetArgs = args.includes("--help")
     ? args
-    : ["--deployment-target", "demo-133", ...args];
+    : [
+        "--deployment-target",
+        "demo-133",
+        "--profile",
+        "customer-trial-acceptance",
+        ...args,
+      ];
   return spawnSync(process.execPath, [scriptPath, ...targetArgs], {
     cwd,
     env: {
@@ -127,12 +136,57 @@ test("parseCliArgs supports closeout plan options", () => {
     ]),
     {
       customer: "yoyoosun",
+      profile: "base-release",
       deploymentTarget: "demo-133",
       evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
       envFile: "server/deploy/compose/prod/.env",
       json: true,
       failOnBlocked: true,
     },
+  );
+});
+
+test("unchanged base release closeout keeps backup and rollback review without rehearsal prerequisites", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-plan-base-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const evidenceDir = "release";
+  const absoluteDir = path.join(root, evidenceDir);
+  writeBaseReleaseEvidenceTestFixture(absoluteDir, {
+    migrationBefore: "20260628123354",
+    migrationAfter: "20260628123354",
+    recoveryProcedureChanged: false,
+  });
+  const options = {
+    repoRoot: root,
+    evidenceDir,
+    profile: "base-release",
+    env: {},
+  };
+  const complete = buildReleaseEvidenceCloseoutPlan(options);
+  assert.equal(complete.status.ready, true);
+  assert.equal(complete.actions.length, 0);
+
+  fs.rmSync(path.join(absoluteDir, "backup-evidence.md"));
+  fs.rmSync(path.join(absoluteDir, "rollback-forward-fix-plan.md"));
+  const incomplete = buildReleaseEvidenceCloseoutPlan(options);
+  for (const [actionId, checkId] of [
+    ["backup-restore-rehearsal", "current-backup-evidence"],
+    ["rollback-forward-fix", "current-rollback-plan"],
+  ]) {
+    const action = incomplete.actions.find((item) => item.id === actionId);
+    assert.equal(action.canRun, false);
+    assert.deepEqual(
+      action.prerequisiteChecks.map((item) => item.id),
+      ["evidence-dir", checkId],
+    );
+    assert.equal(
+      action.prerequisiteChecks.find((item) => item.id === checkId).kind,
+      "manual",
+    );
+  }
+  assert.doesNotMatch(
+    JSON.stringify(incomplete.actions),
+    /SOURCE_POSTGRES_DSN|ROLLBACK_TRIGGER_SCENARIO|ROLLBACK_TARGET_RELEASE|manual-release-signoff/u,
   );
 });
 
@@ -160,22 +214,19 @@ test("closeout plan reports missing local prerequisites for draft evidence", () 
     (action) => action.id === "immutable-version",
   );
   assert.equal(
-    immutable.resolvedInputs.RELEASE_VERSION.value,
+    immutable.resolvedInputs.RELEASE_ID.value,
     "20260629T1200-draft",
   );
   assert.equal(
-    immutable.resolvedInputs.RELEASE_VERSION.source,
+    immutable.resolvedInputs.RELEASE_ID.source,
     "release-evidence.md",
   );
   assert.equal(
-    immutable.prerequisiteChecks.find((item) => item.id === "RELEASE_VERSION")
-      .kind,
+    immutable.prerequisiteChecks.find((item) => item.id === "RELEASE_ID").kind,
     "evidence",
   );
   assert.equal(
-    immutable.missingPrerequisites.some(
-      (item) => item.id === "RELEASE_VERSION",
-    ),
+    immutable.missingPrerequisites.some((item) => item.id === "RELEASE_ID"),
     false,
   );
   assert.match(
@@ -206,7 +257,7 @@ test("closeout plan reports missing local prerequisites for draft evidence", () 
   assert(
     immutable.operatorChecklist.some(
       (item) =>
-        item.id === "RELEASE_VERSION" &&
+        item.id === "RELEASE_ID" &&
         item.status === "resolved" &&
         item.source === "release-evidence.md",
     ),
@@ -219,11 +270,11 @@ test("closeout plan reports missing local prerequisites for draft evidence", () 
   assert.equal(preflight.gateSummary.errorCount > 0, true);
   assert.match(
     preflight.commands.join("\n"),
-    /production-preflight\.sh .*--runtime/,
+    /production-preflight\.sh --profile customer-trial-acceptance .*--runtime/,
   );
   assert.match(
     preflight.commands.join("\n"),
-    /--deployment-target demo-133 .*--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml .*--expected-release <git-commit>/,
+    /--deployment-target demo-133 .*--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml .*--expected-release <product-commit>/,
   );
   assert.match(
     preflight.missingPrerequisites.map((item) => item.message).join("\n"),
@@ -237,13 +288,10 @@ test("closeout plan reports missing local prerequisites for draft evidence", () 
     /SOURCE_POSTGRES_DSN/,
   );
   assert.equal(
-    backup.missingPrerequisites.some((item) => item.id === "RELEASE_VERSION"),
+    backup.missingPrerequisites.some((item) => item.id === "RELEASE_ID"),
     false,
   );
-  assert.equal(
-    backup.resolvedInputs.RELEASE_VERSION.value,
-    "20260629T1200-draft",
-  );
+  assert.equal(backup.resolvedInputs.RELEASE_ID.value, "20260629T1200-draft");
 });
 
 test("closeout plan marks machine actions runnable when prerequisites are present", () => {
@@ -368,15 +416,12 @@ test("closeout plan deduplicates missing prerequisites for composite actions", (
   assert(action);
   const missingIds = action.missingPrerequisites.map((item) => item.id);
   assert.deepEqual(missingIds, [...new Set(missingIds)]);
-  assert.equal(missingIds.filter((id) => id === "RELEASE_VERSION").length, 0);
+  assert.equal(missingIds.filter((id) => id === "RELEASE_ID").length, 0);
   assert.equal(
     missingIds.filter((id) => id === "RELEASE_ENVIRONMENT").length,
     0,
   );
-  assert.equal(
-    action.resolvedInputs.RELEASE_VERSION.value,
-    "20260629T1200-draft",
-  );
+  assert.equal(action.resolvedInputs.RELEASE_ID.value, "20260629T1200-draft");
 });
 
 test("closeout plan reuses release batch fields from evidence across machine actions", () => {
@@ -397,7 +442,7 @@ test("closeout plan reuses release batch fields from evidence across machine act
       MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "admin-secret-distinct",
       MANUAL_ACCEPTANCE_UAT_PASSWORD: "uat-secret-distinct",
       MANUAL_ACCEPTANCE_SMS_PHONE: "13800138000",
-      GIT_COMMIT: VALID_ENV.GIT_COMMIT,
+      PRODUCT_COMMIT: VALID_ENV.PRODUCT_COMMIT,
       MIGRATION_AFTER: VALID_ENV.MIGRATION_AFTER,
       CREDENTIAL_ROTATION_OPERATION_ID:
         VALID_ENV.CREDENTIAL_ROTATION_OPERATION_ID,
@@ -411,16 +456,13 @@ test("closeout plan reuses release batch fields from evidence across machine act
     (action) => action.id === "backup-restore-rehearsal",
   );
   assert.equal(backup.canRun, true);
-  assert.equal(
-    backup.resolvedInputs.RELEASE_VERSION.source,
-    "release-evidence.md",
-  );
+  assert.equal(backup.resolvedInputs.RELEASE_ID.source, "release-evidence.md");
 
   const smoke = plan.actions.find((action) => action.id === "target-smoke");
   assert.equal(smoke.canRun, true);
   assert.equal(
-    smoke.resolvedInputs.GIT_COMMIT.value,
-    VALID_ENV.GIT_COMMIT,
+    smoke.resolvedInputs.PRODUCT_COMMIT.value,
+    VALID_ENV.PRODUCT_COMMIT,
   );
   assert.equal(
     smoke.resolvedInputs.MIGRATION_AFTER.value,
@@ -432,10 +474,7 @@ test("closeout plan reuses release batch fields from evidence across machine act
     ).ok,
     true,
   );
-  assert.equal(
-    smoke.resolvedInputs.RELEASE_ENVIRONMENT.value,
-    "demo-133",
-  );
+  assert.equal(smoke.resolvedInputs.RELEASE_ENVIRONMENT.value, "demo-133");
 
   const rollback = plan.actions.find(
     (action) => action.id === "rollback-forward-fix",
@@ -518,8 +557,5 @@ test("closeout plan text output includes gate summary for present unverified act
     result.stdout,
     /input template: node scripts\/deploy\/immutable-version-evidence\.mjs .*--print-input-template/,
   );
-  assert.match(
-    result.stdout,
-    /--environment demo-133/,
-  );
+  assert.match(result.stdout, /--environment demo-133/);
 });

@@ -1135,7 +1135,7 @@ enter_stage runtime_verified
   --compose-override "$compose_override" \
   --runtime \
   --expected-release "$release_sha" \
-  --out "$operation_dir/production-preflight-report.txt" \
+  --out "$operation_dir/production-preflight-report.json" \
   >>"$log_file" 2>&1
 curl --fail --silent --show-error --max-time 10 \
   "$server_endpoint/healthz" >/dev/null

@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { validateReleaseEvidenceGate } from "./release-evidence-gate.mjs";
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../qa/manual-acceptance-core-contract.mjs";
+import { RELEASE_EVIDENCE_CONTRACT } from "./release-evidence-contract.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const scriptPath = path.join(
@@ -24,8 +25,43 @@ test("collect evidence help is runnable", () => {
   const result = runScript(["--help"]);
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /--release-version <version>/);
+  assert.match(result.stdout, /--release-id <id>/);
+  assert.match(
+    result.stdout,
+    /--profile <base-release\|customer-trial-acceptance>/,
+  );
   assert.match(result.stdout, /不采集 secret/);
+});
+
+test("base release draft does not create credential rotation or customer signoff evidence", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "collect-evidence-base-"));
+  const output = path.join(root, "release");
+  const result = runScript([
+    "--deployment-target",
+    "demo-133",
+    "--release-id",
+    "20260629T1200-base",
+    "--output",
+    output,
+  ]);
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(
+    fs.existsSync(path.join(output, "credential-rotation-report.json")),
+    false,
+  );
+  assert.equal(
+    fs.existsSync(path.join(output, "release-signoff-checklist.md")),
+    false,
+  );
+  assert.equal(
+    fs.existsSync(path.join(output, "acceptance-checklist.md")),
+    false,
+  );
+  assert.match(
+    fs.readFileSync(path.join(output, "release-evidence.md"), "utf8"),
+    /\| recoveryProcedureChanged \| true \|/u,
+  );
 });
 
 test("collect evidence draft includes backup restore artifact placeholders compatible with gate shape", () => {
@@ -38,7 +74,9 @@ test("collect evidence draft includes backup restore artifact placeholders compa
   const result = runScript([
     "--deployment-target",
     "demo-133",
-    "--release-version",
+    "--profile",
+    "customer-trial-acceptance",
+    "--release-id",
     "20260629T1200-draft",
     "--output",
     output,
@@ -47,7 +85,7 @@ test("collect evidence draft includes backup restore artifact placeholders compa
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   for (const relativePath of [
     "release-evidence.md",
-    "production-preflight-report.txt",
+    "production-preflight-report.json",
     "image-digests.txt",
     "backup-evidence.md",
     "migration-status-before-apply.txt",
@@ -66,6 +104,16 @@ test("collect evidence draft includes backup restore artifact placeholders compa
     );
   }
 
+  const releaseEvidence = fs.readFileSync(
+    path.join(output, "release-evidence.md"),
+    "utf8",
+  );
+  assert.ok(
+    releaseEvidence.includes(
+      `| evidenceContract | ${RELEASE_EVIDENCE_CONTRACT} |`,
+    ),
+  );
+
   const report = JSON.parse(
     fs.readFileSync(path.join(output, "backup-restore-report.json"), "utf8"),
   );
@@ -82,7 +130,10 @@ test("collect evidence draft includes backup restore artifact placeholders compa
     ),
   );
   assert.equal(credentialRotation.target, "customer-trial-133");
-  assert.equal(credentialRotation.datasetVersion, MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion);
+  assert.equal(
+    credentialRotation.datasetVersion,
+    MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+  );
   assert.equal(
     credentialRotation.schemaVersion,
     "plush.manual-acceptance-credential-rotation-receipt/v1",
@@ -125,29 +176,37 @@ test("collect evidence draft includes backup restore artifact placeholders compa
   assert.match(commandSummary, /customerConfigCutoverAuditStatus/u);
   assert.match(commandSummary, /populated upgrade read-only audit/u);
   assert.match(commandSummary, /customer config cutover read-only audit/u);
-  const preflightReport = fs.readFileSync(
-    path.join(output, "production-preflight-report.txt"),
-    "utf8",
-  );
-  assert.match(
-    preflightReport,
-    new RegExp(
-      `--out "?${output.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/production-preflight-report\\.txt"?`,
+  const preflightReport = JSON.parse(
+    fs.readFileSync(
+      path.join(output, "production-preflight-report.json"),
+      "utf8",
     ),
   );
-  assert.match(preflightReport, /--runtime/);
-  assert.match(preflightReport, /--deployment-target demo-133/u);
+  assert.equal(preflightReport.profile, "customer-trial-acceptance");
   assert.match(
-    preflightReport,
+    preflightReport.nextCommand,
+    /--profile customer-trial-acceptance/u,
+  );
+  assert.match(
+    preflightReport.nextCommand,
+    new RegExp(
+      `--out "?${output.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/production-preflight-report\\.json"?`,
+    ),
+  );
+  assert.match(preflightReport.nextCommand, /--runtime/);
+  assert.match(preflightReport.nextCommand, /--deployment-target demo-133/u);
+  assert.match(
+    preflightReport.nextCommand,
     /--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml/u,
   );
-  assert.match(preflightReport, /--expected-release [0-9a-f]{40}/u);
-  assert.doesNotMatch(preflightReport, /"\$output_dir/);
+  assert.match(preflightReport.nextCommand, /--expected-release [0-9a-f]{40}/u);
+  assert.doesNotMatch(preflightReport.nextCommand, /"\$output_dir/);
 
   assert.throws(
     () =>
       validateReleaseEvidenceGate({
         repoRoot: root,
+        profile: "customer-trial-acceptance",
         deploymentTarget: "demo-133",
         evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
       }),

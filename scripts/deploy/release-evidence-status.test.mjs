@@ -9,15 +9,22 @@ import {
   parseCliArgs,
 } from "./release-evidence-status.mjs";
 import { writeCredentialEvidenceTestFixture } from "./credential-evidence-test-fixture.mjs";
+import { writeBaseReleaseEvidenceTestFixture } from "./base-release-evidence-test-fixture.mjs";
 import {
   loadYoyoosunCredentialContract,
   selectYoyoosunCredentialTarget,
 } from "../../deployments/yoyoosun/scripts/credential-contract.mjs";
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../qa/manual-acceptance-core-contract.mjs";
+import { RELEASE_EVIDENCE_PROFILES } from "./release-evidence-contract.mjs";
+import {
+  PRODUCTION_PREFLIGHT_CHECKS,
+  buildProductionPreflightReceipt,
+} from "./production-preflight-receipt.mjs";
 
 function buildReleaseEvidenceStatus(options) {
   return buildReleaseEvidenceStatusImpl({
     deploymentTarget: "demo-133",
+    profile: RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE,
     ...options,
   });
 }
@@ -45,7 +52,14 @@ const collectEvidencePath = path.join(
 function runStatus(args = [], options = {}) {
   const targetArgs = args.includes("--help")
     ? args
-    : ["--deployment-target", "demo-133", ...args];
+    : [
+        "--deployment-target",
+        "demo-133",
+        ...(args.includes("--profile")
+          ? []
+          : ["--profile", "customer-trial-acceptance"]),
+        ...args,
+      ];
   return spawnSync("node", [scriptPath, ...targetArgs], {
     cwd: options.cwd || repoRoot,
     encoding: "utf8",
@@ -61,7 +75,9 @@ function writeDraftEvidence(root, deploymentTarget = "demo-133") {
       collectEvidencePath,
       "--deployment-target",
       deploymentTarget,
-      "--release-version",
+      "--profile",
+      "customer-trial-acceptance",
+      "--release-id",
       "20260629T1200-draft",
       "--output",
       absoluteDir,
@@ -83,9 +99,9 @@ function writeGatePassingEvidence(root) {
 | 字段 | 值 |
 | --- | --- |
 | customerCode | yoyoosun |
-| releaseVersion | 20260616T1200-test |
+| releaseId | 20260616T1200-test |
 | environment | customer-trial |
-| gitCommit | ${releaseGitCommit} |
+| productCommit | ${releaseGitCommit} |
 | serverImageDigest | sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
 | webImageDigest | sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb |
 | migrationBefore | 20260601000000 |
@@ -94,20 +110,19 @@ function writeGatePassingEvidence(root) {
 `,
   );
   fs.writeFileSync(
-    path.join(absoluteDir, "production-preflight-report.txt"),
-    `[production-preflight] ok: env 必需变量齐全
-[production-preflight] ok: 生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过
-[production-preflight] ok: Compose、低配部署边界和 migration 脚本通过
-[production-preflight] ok: docker compose config -q 通过
-[production-preflight] ok: Compose 运行服务存在
-[production-preflight] ok: yoyoosun SMS 运行合同已绑定: mode=provider contract_sha256=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-[production-preflight] ok: 运行态 SMS 模式匹配合同: mode=provider
-[production-preflight] ok: auth.capabilities 已读回 provider/enabled/not-mock
-[production-preflight] ok: 运行态 ERP_PDF_WARMUP=async
-[production-preflight] ok: 运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: 150.0.7871.100-1~deb12u1
-[production-preflight] ok: healthz / readyz 通过
-[production-preflight] all checks passed
-`,
+    path.join(absoluteDir, "production-preflight-report.json"),
+    JSON.stringify(
+      buildProductionPreflightReceipt({
+        deploymentTarget: "demo-133",
+        mode: "runtime-env",
+        profile: RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE,
+        productCommit: releaseGitCommit,
+        generatedAt: "2026-06-16T04:15:00Z",
+        checks: Object.values(PRODUCTION_PREFLIGHT_CHECKS),
+      }),
+      null,
+      2,
+    ),
   );
   fs.writeFileSync(
     path.join(absoluteDir, "image-digests.txt"),
@@ -123,7 +138,7 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 | 字段 | 值 |
 | --- | --- |
-| releaseVersion | 20260616T1200-test |
+| releaseId | 20260616T1200-test |
 | environment | customer-trial |
 | backupId | backup-20260616 |
 | backupTime | 2026-06-16T12:00:00+08:00 |
@@ -155,7 +170,7 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
   fs.writeFileSync(
     path.join(absoluteDir, "artifacts/command-summary.txt"),
     `backupId=backup-20260616
-releaseVersion=20260616T1200-test
+releaseId=20260616T1200-test
 sourceAlias=env:SOURCE_POSTGRES_DSN
 restoreTarget=temp-postgres-container:postgres:18:removed-after-run
 steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> atlas migrate apply -> post-apply atlas status -> smoke queries
@@ -164,7 +179,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
   fs.writeFileSync(
     path.join(absoluteDir, "command-summary.txt"),
     `backupId=backup-20260616
-releaseVersion=20260616T1200-test
+releaseId=20260616T1200-test
 sourceAlias=env:SOURCE_POSTGRES_DSN
 restoreTarget=temp-postgres-container:postgres:18:removed-after-run
 steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> atlas migrate apply -> post-apply atlas status -> smoke queries
@@ -176,7 +191,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
       {
         customerCode: "yoyoosun",
         environment: "customer-trial",
-        releaseVersion: "20260616T1200-test",
+        releaseId: "20260616T1200-test",
         backupId: "backup-20260616",
         verifiedAt: "2026-06-16T04:00:00Z",
         sourceAlias: "env:SOURCE_POSTGRES_DSN",
@@ -231,7 +246,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
       {
         customerCode: "yoyoosun",
         environment: "customer-trial",
-        releaseVersion: "20260616T1200-test",
+        productCommit: releaseGitCommit,
         endpointAlias: "https://erp.example.invalid",
         backendEndpointAlias: "https://api.example.invalid",
         summary: { total: 7, passed: 7, failed: 0 },
@@ -345,7 +360,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
       {
         customerCode: "yoyoosun",
         environment: "customer-trial",
-        releaseVersion: "20260616T1200-test",
+        releaseId: "20260616T1200-test",
         rehearsedAt: "2026-06-16T05:00:00Z",
         rehearsalType: "rollback-forward-fix",
         triggerScenario: "smoke failed after activation",
@@ -389,7 +404,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
 
 | 字段 | 值 |
 | --- | --- |
-| releaseVersion | 20260616T1200-test |
+| releaseId | 20260616T1200-test |
 | environment | customer-trial |
 | backupId | backup-20260616 |
 | releaseConclusion | customer-trial-approved |
@@ -449,6 +464,7 @@ test("parseCliArgs supports status options", () => {
     ]),
     {
       customer: "yoyoosun",
+      profile: "base-release",
       evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-29",
       json: true,
       failOnNotReady: true,
@@ -514,6 +530,53 @@ test("release evidence status reports missing evidence directory without throwin
   assert.match(status.nextCommands[0], /collect-evidence\.sh/);
 });
 
+test("unchanged base release status does not request rehearsal or signoff evidence", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-status-base-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const evidenceDir = "release";
+  const absoluteDir = path.join(root, evidenceDir);
+  writeBaseReleaseEvidenceTestFixture(absoluteDir, {
+    migrationBefore: "20260628123354",
+    migrationAfter: "20260628123354",
+    recoveryProcedureChanged: false,
+  });
+  for (const file of [
+    "backup-restore-report.json",
+    "rollback-rehearsal-report.json",
+    "release-signoff-checklist.md",
+  ]) {
+    fs.rmSync(path.join(absoluteDir, file), { force: true });
+  }
+  const options = { repoRoot: root, evidenceDir, profile: "base-release" };
+  const status = buildReleaseEvidenceStatus(options);
+  assert.equal(status.ready, true, JSON.stringify(status.errors));
+  assert.equal(status.requiredFileCount, 7);
+  assert.equal(status.recoveryRehearsalRequired, false);
+  assert.equal(
+    status.closeoutChecklist.some((item) => item.id === "release-signoff"),
+    false,
+  );
+  assert.equal(
+    status.closeoutChecklist.find(
+      (item) => item.id === "backup-restore-rehearsal",
+    ).label,
+    "发布前备份与迁移状态",
+  );
+
+  fs.rmSync(path.join(absoluteDir, "backup-evidence.md"));
+  fs.rmSync(path.join(absoluteDir, "rollback-forward-fix-plan.md"));
+  const missing = buildReleaseEvidenceStatus(options);
+  assert.equal(missing.ready, false);
+  assert.deepEqual(
+    new Set(missing.missingFiles),
+    new Set(["backup-evidence.md", "rollback-forward-fix-plan.md"]),
+  );
+  assert.doesNotMatch(
+    JSON.stringify([missing.nextCommands, missing.closeoutNextActions]),
+    /run-backup-restore-rehearsal|rollback-rehearsal-report|SOURCE_POSTGRES_DSN|release-signoff/u,
+  );
+});
+
 test("release evidence status reports gate-verified closeout checklist", () => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "release-evidence-status-checklist-ready-"),
@@ -564,6 +627,54 @@ test("release evidence status reports gate-verified closeout checklist", () => {
     "smoke-test-report.json",
     "rollback-rehearsal-report.json",
   ]);
+});
+
+test("release evidence status preserves unversioned historical evidence as legacy", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-legacy-"),
+  );
+  const { evidenceDir, absoluteDir } = writeGatePassingEvidence(root);
+  const releasePath = path.join(absoluteDir, "release-evidence.md");
+  fs.writeFileSync(
+    releasePath,
+    fs
+      .readFileSync(releasePath, "utf8")
+      .replace(/^\| evidenceContract \|.*\|\n/mu, ""),
+  );
+
+  const status = buildReleaseEvidenceStatus({ repoRoot: root, evidenceDir });
+
+  assert.equal(status.status, "legacy");
+  assert.equal(status.ready, false);
+  assert.equal(status.evidenceContract.status, "legacy");
+  assert.equal(status.gate.skipped, true);
+  assert.equal(status.gate.reason, "legacy-contract");
+  assert.deepEqual(status.missingFiles, []);
+  assert.deepEqual(status.nextCommands, []);
+  assert.deepEqual(status.closeoutChecklist, []);
+});
+
+test("release evidence status does not reinterpret an unsupported contract", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-unsupported-"),
+  );
+  const { evidenceDir, absoluteDir } = writeGatePassingEvidence(root);
+  const releasePath = path.join(absoluteDir, "release-evidence.md");
+  fs.writeFileSync(
+    releasePath,
+    fs
+      .readFileSync(releasePath, "utf8")
+      .replace("plush.release-evidence/v1", "plush.release-evidence/v2"),
+  );
+
+  const status = buildReleaseEvidenceStatus({ repoRoot: root, evidenceDir });
+
+  assert.equal(status.status, "unsupported-contract");
+  assert.equal(status.ready, false);
+  assert.equal(status.evidenceContract.declared, "plush.release-evidence/v2");
+  assert.equal(status.gate.skipped, true);
+  assert.equal(status.gate.reason, "unsupported-contract");
+  assert.deepEqual(status.nextCommands, []);
 });
 
 test("release evidence status exposes credentialed image digest gate errors", () => {
@@ -671,7 +782,7 @@ test("release evidence status reports draft evidence gate errors", () => {
   assert.equal(preflightGate.errorCount >= 1, true);
   assert.match(
     preflightGate.sampleErrors.join("\n"),
-    /production-preflight-report\.txt/,
+    /production-preflight-report\.json/,
   );
   const backupGate = status.closeoutGateSummary.find(
     (item) => item.id === "backup-restore-rehearsal",
@@ -705,7 +816,7 @@ test("release evidence status reports draft evidence gate errors", () => {
     immutableVersion.commands.join("\n"),
     /--migration-before <migration-before>/,
   );
-  assert.match(immutableVersion.manualChecks.join("\n"), /gitCommit/);
+  assert.match(immutableVersion.manualChecks.join("\n"), /productCommit/);
   const productionPreflight = status.closeoutNextActions.find(
     (item) => item.id === "production-preflight",
   );
@@ -716,7 +827,7 @@ test("release evidence status reports draft evidence gate errors", () => {
   assert.match(productionPreflight.commands.join("\n"), /--runtime/);
   assert.match(
     productionPreflight.commands.join("\n"),
-    /--deployment-target demo-133 .*--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml .*--expected-release <git-commit>/,
+    /--deployment-target demo-133 .*--compose-override server\/deploy\/compose\/prod\/compose\.demo-133\.yml .*--expected-release <product-commit>/,
   );
   assert.match(
     productionPreflight.manualChecks.join("\n"),
@@ -733,10 +844,7 @@ test("release evidence status reports draft evidence gate errors", () => {
     backupRestore.commands.join("\n"),
     /--backup-purpose pre-migration/,
   );
-  assert.match(
-    backupRestore.commands.join("\n"),
-    /--environment demo-133/,
-  );
+  assert.match(backupRestore.commands.join("\n"), /--environment demo-133/);
   const targetSmoke = status.closeoutNextActions.find(
     (item) => item.id === "target-smoke",
   );
@@ -799,8 +907,14 @@ test("customer-test status keeps credential closeout admin-only and smoke omits 
   const credentialAction = status.closeoutNextActions.find(
     (item) => item.id === "credential-rotation",
   );
-  assert.match(credentialAction.manualChecks.join("\n"), /only the customer-test admin/u);
-  assert.match(credentialAction.manualChecks.join("\n"), /preserve every non-admin identity/u);
+  assert.match(
+    credentialAction.manualChecks.join("\n"),
+    /only the customer-test admin/u,
+  );
+  assert.match(
+    credentialAction.manualChecks.join("\n"),
+    /preserve every non-admin identity/u,
+  );
 
   const smokeCommand = status.nextCommands.find((command) =>
     command.includes("run-smoke.sh"),
@@ -808,7 +922,10 @@ test("customer-test status keeps credential closeout admin-only and smoke omits 
   assert.match(smokeCommand, /--deployment-target customer-test-133/u);
   assert.match(smokeCommand, /--admin-username admin/u);
   assert.match(smokeCommand, /--credential-operation-id/u);
-  assert.doesNotMatch(smokeCommand, /UAT|SMS|--uat-password-env|--sms-phone-env/u);
+  assert.doesNotMatch(
+    smokeCommand,
+    /UAT|SMS|--uat-password-env|--sms-phone-env/u,
+  );
 });
 
 test("release evidence status suggests customer config smoke when manifest evidence exists", () => {

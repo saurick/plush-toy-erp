@@ -5,6 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { productionPreflightTest as test } from "./production-preflight-test-lane.mjs";
 import { readRuntimePins } from "../qa/pdf-runtime.mjs";
+import { buildProductionPreflightReceipt } from "./production-preflight-receipt.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const { chromiumVersion } = readRuntimePins(
@@ -682,47 +683,65 @@ test("production preflight resolves a packaged source root without Git metadata"
   fs.mkdirSync(path.dirname(packagedContract), { recursive: true });
   fs.copyFileSync(scriptPath, packagedScript);
   fs.copyFileSync(
+    path.join(repoRoot, "scripts/deploy/release-evidence-contract.json"),
+    path.join(path.dirname(packagedScript), "release-evidence-contract.json"),
+  );
+  fs.copyFileSync(
     path.join(repoRoot, "deployments/yoyoosun/env/runtime.contract.json"),
     packagedContract,
   );
   fs.chmodSync(packagedScript, 0o755);
 
   const fakeBin = createFakeRuntimeBin(fixture.root);
-  const result = runPreflight(fixture, trialOverrideArgs(fixture), {
-    skipComposeConfig: false,
-    preflightScript: packagedScript,
-    cwd: fixture.root,
-    env: {
-      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
-      FAKE_RUNTIME_TARGET_PROJECT: "plush-toy-erp-demo-v1",
-      FAKE_RUNTIME_COMPOSE_PROJECT: "plush-toy-erp-demo-v1",
-      FAKE_RUNTIME_POSTGRES_MOUNT:
-        "/home/simon/plush-toy-erp-demo-v1/data/postgres",
-      FAKE_RUNTIME_POSTGRES_DSN:
-        "postgres://erp_app:test-app-password-12345@postgres:5432/plush_erp_demo_v1?sslmode=disable",
-      FAKE_RUNTIME_POSTGRES_PORT: "55436",
-      FAKE_RUNTIME_APP_HTTP_PORT: "8325",
-      FAKE_RUNTIME_WEB_DESKTOP_PORT: "5195",
-      FAKE_RUNTIME_JAEGER_5775_PORT: "61001",
-      FAKE_RUNTIME_JAEGER_6831_PORT: "61002",
-      FAKE_RUNTIME_JAEGER_6832_PORT: "61003",
-      FAKE_RUNTIME_JAEGER_5778_PORT: "61004",
-      FAKE_RUNTIME_JAEGER_UI_PORT: "61005",
-      FAKE_RUNTIME_JAEGER_14268_PORT: "61006",
-      FAKE_RUNTIME_JAEGER_14250_PORT: "61007",
-      FAKE_RUNTIME_JAEGER_9411_PORT: "61008",
-      FAKE_RUNTIME_JAEGER_OTLP_GRPC_PORT: "61009",
-      FAKE_RUNTIME_JAEGER_OTLP_HTTP_PORT: "61010",
-      FAKE_RUNTIME_TRIAL_ALLOW: "1",
-      FAKE_RUNTIME_TRIAL_TARGET: "customer-trial-133",
-      FAKE_RUNTIME_EXPECTED_RELEASE: fixture.expectedRelease,
-      FAKE_RUNTIME_AUTH_SMS_MODE: "provider",
+  const receiptPath = path.join(fixture.root, "packaged-preflight.json");
+  const result = runPreflight(
+    fixture,
+    [
+      "--profile",
+      "customer-trial-acceptance",
+      ...trialOverrideArgs(fixture),
+      "--out",
+      receiptPath,
+    ],
+    {
+      skipComposeConfig: false,
+      preflightScript: packagedScript,
+      cwd: fixture.root,
+      env: {
+        PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+        FAKE_RUNTIME_TARGET_PROJECT: "plush-toy-erp-demo-v1",
+        FAKE_RUNTIME_COMPOSE_PROJECT: "plush-toy-erp-demo-v1",
+        FAKE_RUNTIME_POSTGRES_MOUNT:
+          "/home/simon/plush-toy-erp-demo-v1/data/postgres",
+        FAKE_RUNTIME_POSTGRES_DSN:
+          "postgres://erp_app:test-app-password-12345@postgres:5432/plush_erp_demo_v1?sslmode=disable",
+        FAKE_RUNTIME_POSTGRES_PORT: "55436",
+        FAKE_RUNTIME_APP_HTTP_PORT: "8325",
+        FAKE_RUNTIME_WEB_DESKTOP_PORT: "5195",
+        FAKE_RUNTIME_JAEGER_5775_PORT: "61001",
+        FAKE_RUNTIME_JAEGER_6831_PORT: "61002",
+        FAKE_RUNTIME_JAEGER_6832_PORT: "61003",
+        FAKE_RUNTIME_JAEGER_5778_PORT: "61004",
+        FAKE_RUNTIME_JAEGER_UI_PORT: "61005",
+        FAKE_RUNTIME_JAEGER_14268_PORT: "61006",
+        FAKE_RUNTIME_JAEGER_14250_PORT: "61007",
+        FAKE_RUNTIME_JAEGER_9411_PORT: "61008",
+        FAKE_RUNTIME_JAEGER_OTLP_GRPC_PORT: "61009",
+        FAKE_RUNTIME_JAEGER_OTLP_HTTP_PORT: "61010",
+        FAKE_RUNTIME_TRIAL_ALLOW: "1",
+        FAKE_RUNTIME_TRIAL_TARGET: "customer-trial-133",
+        FAKE_RUNTIME_EXPECTED_RELEASE: fixture.expectedRelease,
+        FAKE_RUNTIME_AUTH_SMS_MODE: "provider",
+      },
     },
-  });
+  );
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /yoyoosun SMS 运行合同已绑定/u);
   assert.doesNotMatch(result.stderr, /缺少 yoyoosun 运行合同/u);
+  const receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
+  assert.equal(receipt.kind, "production-preflight");
+  assert.equal(receipt.profile, "customer-trial-acceptance");
 });
 
 test("production preflight accepts the supported normal web bind addresses", async (t) => {
@@ -1018,16 +1037,20 @@ test("production preflight writes sanitized report to out file", () => {
   const reportPath = path.join(
     fixture.root,
     "evidence",
-    "production-preflight-report.txt",
+    "production-preflight-report.json",
   );
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   const result = runPreflight(fixture, ["--out", reportPath]);
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  const report = fs.readFileSync(reportPath, "utf8");
-  assert.match(report, /env 必需变量齐全/);
-  assert.match(report, /all checks passed/);
-  assert.doesNotMatch(report, /test-production-password/);
+  const reportText = fs.readFileSync(reportPath, "utf8");
+  const report = JSON.parse(reportText);
+  assert.equal(report.kind, "production-preflight");
+  assert.equal(report.mode, "runtime-env");
+  assert.equal(report.profile, "base-release");
+  assert.equal(report.summary.failed, 0);
+  assert.ok(report.checks.some((check) => check.id === "env-required-keys"));
+  assert.doesNotMatch(reportText, /test-production-password/);
 });
 
 test("production preflight rejects missing out directory before writing report", () => {
@@ -1035,13 +1058,41 @@ test("production preflight rejects missing out directory before writing report",
   const reportPath = path.join(
     fixture.root,
     "missing",
-    "production-preflight-report.txt",
+    "production-preflight-report.json",
   );
   const result = runPreflight(fixture, ["--out", reportPath]);
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /输出目录不存在/);
   assert.equal(fs.existsSync(reportPath), false);
+});
+
+test("production preflight writes a contract receipt without host Node.js", () => {
+  const fixture = writeFixture();
+  const fakeBin = createFakeRuntimeBin(fixture.root);
+  fs.writeFileSync(
+    path.join(fakeBin, "node"),
+    "#!/bin/sh\necho unexpected-node >&2\nexit 127\n",
+    { mode: 0o755 },
+  );
+  const reportPath = path.join(fixture.root, "receipt.json");
+  const result = runPreflight(fixture, ["--out", reportPath], {
+    env: { PATH: `${fakeBin}:${process.env.PATH ?? ""}` },
+  });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.deepEqual(
+    report,
+    buildProductionPreflightReceipt({
+      deploymentTarget: report.deploymentTarget,
+      mode: report.mode,
+      profile: report.profile,
+      productCommit: report.productCommit,
+      generatedAt: report.generatedAt,
+      checks: report.checks.map((check) => check.id),
+    }),
+  );
+  assert.doesNotMatch(result.stderr, /unexpected-node/u);
 });
 
 test("production preflight rejects floating app image tags", () => {
@@ -1077,18 +1128,67 @@ test("production preflight rejects PDF warmup fault-isolation mode", () => {
       .readFileSync(fixture.envFile, "utf8")
       .replace("ERP_PDF_WARMUP=async", "ERP_PDF_WARMUP=off"),
   );
-  const result = runPreflight(fixture);
+  const result = runPreflight(fixture, [
+    "--profile",
+    "customer-trial-acceptance",
+  ]);
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /ERP_PDF_WARMUP 生产发布必须显式为 async/);
+  assert.match(result.stderr, /ERP_PDF_WARMUP 客户试用验收必须显式为 async/);
+});
+
+test("production preflight base profile skips customer acceptance capability checks", () => {
+  const fixture = writeFixture();
+  fs.writeFileSync(
+    fixture.envFile,
+    fs
+      .readFileSync(fixture.envFile, "utf8")
+      .replace("ERP_PDF_WARMUP=async", "ERP_PDF_WARMUP=off"),
+  );
+  const reportPath = path.join(fixture.root, "evidence", "preflight.json");
+  fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+  const fakeBin = createFakeRuntimeBin(fixture.root);
+  const result = runPreflight(
+    fixture,
+    ["--profile", "base-release", "--runtime", "--out", reportPath],
+    {
+      env: {
+        PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+        FAKE_RUNTIME_PDF_WARMUP: "off",
+        FAKE_CHROMIUM_VERSION: "stale-package-not-read-by-base-profile",
+      },
+    },
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.doesNotMatch(
+    result.stdout,
+    /SMS 运行合同|ERP_PDF_WARMUP=async|Chromium \/ chromium-common/u,
+  );
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.equal(report.profile, "base-release");
+  assert.deepEqual(
+    report.checks
+      .map((check) => check.id)
+      .filter((id) =>
+        ["sms-provider-runtime", "pdf-runtime", "chromium-runtime"].includes(
+          id,
+        ),
+      ),
+    [],
+  );
 });
 
 test("production preflight verifies the runtime Chromium package exact pin", () => {
   const fixture = writeFixture();
   const fakeBin = createFakeRuntimeBin(fixture.root);
-  const result = runPreflight(fixture, ["--runtime"], {
-    env: { PATH: `${fakeBin}:${process.env.PATH ?? ""}` },
-  });
+  const result = runPreflight(
+    fixture,
+    ["--profile", "customer-trial-acceptance", "--runtime"],
+    {
+      env: { PATH: `${fakeBin}:${process.env.PATH ?? ""}` },
+    },
+  );
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /Compose 运行服务存在/u);
@@ -1420,12 +1520,16 @@ test("production preflight rejects a named runtime user mapped to uid 0", () => 
 test("production preflight rejects runtime PDF warmup fault-isolation mode", () => {
   const fixture = writeFixture();
   const fakeBin = createFakeRuntimeBin(fixture.root);
-  const result = runPreflight(fixture, ["--runtime"], {
-    env: {
-      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
-      FAKE_RUNTIME_PDF_WARMUP: "off",
+  const result = runPreflight(
+    fixture,
+    ["--profile", "customer-trial-acceptance", "--runtime"],
+    {
+      env: {
+        PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+        FAKE_RUNTIME_PDF_WARMUP: "off",
+      },
     },
-  });
+  );
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /app-server 运行态 ERP_PDF_WARMUP 必须为 async/);
@@ -1435,12 +1539,16 @@ test("production preflight rejects runtime PDF warmup fault-isolation mode", () 
 test("production preflight rejects a stale runtime Chromium package", () => {
   const fixture = writeFixture();
   const fakeBin = createFakeRuntimeBin(fixture.root);
-  const result = runPreflight(fixture, ["--runtime"], {
-    env: {
-      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
-      FAKE_CHROMIUM_VERSION: "150.0.7871.46-1~deb12u1",
+  const result = runPreflight(
+    fixture,
+    ["--profile", "customer-trial-acceptance", "--runtime"],
+    {
+      env: {
+        PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+        FAKE_CHROMIUM_VERSION: "150.0.7871.46-1~deb12u1",
+      },
     },
-  });
+  );
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /app-server Chromium 版本不匹配/);
@@ -1786,16 +1894,66 @@ test("production preflight rejects an unconfined Chromium runtime", () => {
   assert.match(result.stderr, /必须使用固定 Chromium seccomp profile/);
 });
 
-test("production preflight rejects Chromium seccomp profile drift", () => {
+test("production preflight rejects an unsafe Chromium seccomp profile", () => {
   const fixture = writeFixture();
-  fs.appendFileSync(
-    path.join(fixture.composeDir, "chromium-seccomp.json"),
-    "\n",
-  );
+  const profilePath = path.join(fixture.composeDir, "chromium-seccomp.json");
+  const profile = JSON.parse(fs.readFileSync(profilePath, "utf8"));
+  profile.defaultAction = "SCMP_ACT_ALLOW";
+  fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2));
   const result = runPreflight(fixture);
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Chromium seccomp profile 已漂移/);
+  assert.match(result.stderr, /Chromium seccomp profile 缺少默认拒绝/u);
+});
+
+test("production preflight ignores seccomp formatting comments and rule order", () => {
+  const fixture = writeFixture();
+  const file = path.join(fixture.composeDir, "chromium-seccomp.json");
+  const policy = JSON.parse(fs.readFileSync(file, "utf8"));
+  policy.syscalls.reverse().forEach((rule) => {
+    rule.names.reverse();
+    rule.comment = "Reviewed description";
+  });
+  fs.writeFileSync(file, JSON.stringify(policy));
+  const result = runPreflight(fixture);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
+test("production preflight rejects effective seccomp permission changes", async (t) => {
+  for (const [name, mutate] of [
+    [
+      "unconditional privileged syscalls",
+      (policy) =>
+        policy.syscalls.push({
+          names: ["bpf", "ptrace", "mount", "init_module"],
+          action: "SCMP_ACT_ALLOW",
+        }),
+    ],
+    [
+      "restricted sandbox arguments",
+      (policy) => {
+        policy.syscalls[0].args = [{ index: 0, value: 0, op: "SCMP_CMP_EQ" }];
+      },
+    ],
+    [
+      "removed capability condition",
+      (policy) => {
+        delete policy.syscalls.find((rule) => rule.includes?.caps?.length)
+          .includes;
+      },
+    ],
+  ]) {
+    await t.test(name, () => {
+      const fixture = writeFixture();
+      const file = path.join(fixture.composeDir, "chromium-seccomp.json");
+      const policy = JSON.parse(fs.readFileSync(file, "utf8"));
+      mutate(policy);
+      fs.writeFileSync(file, JSON.stringify(policy));
+      const result = runPreflight(fixture);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /已改变受审查的安全规则/u);
+    });
+  }
 });
 
 test("production artifacts pin the verified Chromium build and async warmup", () => {

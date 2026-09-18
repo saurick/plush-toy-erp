@@ -11,12 +11,13 @@ import {
 
 const RELEASE_EVIDENCE_FILE = "release-evidence.md";
 const IMAGE_DIGESTS_FILE = "image-digests.txt";
-const DEFAULT_EVIDENCE_DIR = "deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>";
+const DEFAULT_EVIDENCE_DIR =
+  "deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>";
 const IMMUTABLE_VERSION_INPUTS = [
-  ["RELEASE_VERSION", "release-version", "<release-version>"],
+  ["RELEASE_ID", "release-id", "<release-id>"],
   ["RELEASE_ENVIRONMENT", "environment", "<target-environment>"],
   ["OPERATOR_ROLE", "operator-role", "<operator-role>"],
-  ["GIT_COMMIT", "git-commit", "<git-commit>"],
+  ["PRODUCT_COMMIT", "product-commit", "<product-commit>"],
   ["SERVER_IMAGE", "server-image", "<server-image-ref>"],
   ["SERVER_IMAGE_DIGEST", "server-digest", "sha256:<64-hex>"],
   ["WEB_IMAGE", "web-image", "<web-image-ref>"],
@@ -31,10 +32,10 @@ const USAGE = `Immutable version release evidence writer
 Usage:
   node scripts/deploy/immutable-version-evidence.mjs \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
-    --release-version <release-version> \\
+    --release-id <release-id> \\
     --environment <target-environment> \\
     --operator-role <operator-role> \\
-    --git-commit <git-commit> \\
+    --product-commit <product-commit> \\
     --server-image <server-image-ref> \\
     --server-digest sha256:<64-hex> \\
     --web-image <web-image-ref> \\
@@ -91,8 +92,8 @@ export function parseCliArgs(argv) {
       case "evidence-dir":
         options.evidenceDir = value;
         break;
-      case "release-version":
-        options.releaseVersion = value;
+      case "release-id":
+        options.releaseId = value;
         break;
       case "environment":
         options.environment = value;
@@ -100,8 +101,8 @@ export function parseCliArgs(argv) {
       case "operator-role":
         options.operatorRole = value;
         break;
-      case "git-commit":
-        options.gitCommit = value;
+      case "product-commit":
+        options.productCommit = value;
         break;
       case "server-image":
         options.serverImage = value;
@@ -208,15 +209,21 @@ function assertPlainField(value, label) {
     throw new CliError(`${label} must be a real value`, 2);
   }
   if (/[\r\n|]/.test(text)) {
-    throw new CliError(`${label} must not contain a table separator or newline`, 2);
+    throw new CliError(
+      `${label} must not contain a table separator or newline`,
+      2,
+    );
   }
   return text;
 }
 
-function assertGitCommit(value) {
-  const text = assertPlainField(value, "--git-commit");
-  if (!/^[a-f0-9]{7,40}$/i.test(text)) {
-    throw new CliError("--git-commit must be a 7-40 character git hash", 2);
+function assertProductCommit(value) {
+  const text = assertPlainField(value, "--product-commit");
+  if (!/^[a-f0-9]{40}$/u.test(text)) {
+    throw new CliError(
+      "--product-commit must be a full 40-character lowercase Git commit",
+      2,
+    );
   }
   return text;
 }
@@ -224,7 +231,10 @@ function assertGitCommit(value) {
 function assertAtlasVersion(value, label) {
   const text = assertPlainField(value, label);
   if (!/^\d{14}$/.test(text)) {
-    throw new CliError(`${label} must be a 14-digit Atlas migration version`, 2);
+    throw new CliError(
+      `${label} must be a 14-digit Atlas migration version`,
+      2,
+    );
   }
   return text;
 }
@@ -244,10 +254,10 @@ function updateMarkdownField(content, field, value) {
 export function buildImmutableVersionEvidence(options) {
   for (const key of [
     "evidenceDir",
-    "releaseVersion",
+    "releaseId",
     "environment",
     "operatorRole",
-    "gitCommit",
+    "productCommit",
     "migrationBefore",
     "migrationAfter",
     "backupId",
@@ -262,16 +272,22 @@ export function buildImmutableVersionEvidence(options) {
     out: "image-digests.txt",
   });
   return {
-    releaseVersion: assertPlainField(options.releaseVersion, "--release-version"),
+    releaseId: assertPlainField(options.releaseId, "--release-id"),
     environment: assertPlainField(options.environment, "--environment"),
     operatorRole: assertPlainField(options.operatorRole, "--operator-role"),
-    gitCommit: assertGitCommit(options.gitCommit),
+    productCommit: assertProductCommit(options.productCommit),
     serverImage: imageEvidence.serverImage,
     serverImageDigest: imageEvidence.serverImageDigest,
     webImage: imageEvidence.webImage,
     webImageDigest: imageEvidence.webImageDigest,
-    migrationBefore: assertAtlasVersion(options.migrationBefore, "--migration-before"),
-    migrationAfter: assertAtlasVersion(options.migrationAfter, "--migration-after"),
+    migrationBefore: assertAtlasVersion(
+      options.migrationBefore,
+      "--migration-before",
+    ),
+    migrationAfter: assertAtlasVersion(
+      options.migrationAfter,
+      "--migration-after",
+    ),
     backupId: assertPlainField(options.backupId, "--backup-id"),
   };
 }
@@ -279,10 +295,10 @@ export function buildImmutableVersionEvidence(options) {
 export function applyImmutableVersionEvidenceToMarkdown(content, evidence) {
   let next = content;
   for (const [field, value] of Object.entries({
-    releaseVersion: evidence.releaseVersion,
+    releaseId: evidence.releaseId,
     environment: evidence.environment,
     operatorRole: evidence.operatorRole,
-    gitCommit: evidence.gitCommit,
+    productCommit: evidence.productCommit,
     serverImage: evidence.serverImage,
     serverImageDigest: evidence.serverImageDigest,
     webImage: evidence.webImage,
@@ -300,12 +316,18 @@ export async function writeImmutableVersionEvidence(options, runtime = {}) {
   const repoRoot = runtime.repoRoot || process.cwd();
   const evidenceDir = path.resolve(repoRoot, options.evidenceDir || "");
   if (!fs.existsSync(evidenceDir) || !fs.statSync(evidenceDir).isDirectory()) {
-    throw new CliError(`evidence directory must already exist: ${options.evidenceDir}`, 2);
+    throw new CliError(
+      `evidence directory must already exist: ${options.evidenceDir}`,
+      2,
+    );
   }
   const evidence = buildImmutableVersionEvidence(options);
   const releaseEvidencePath = path.join(evidenceDir, RELEASE_EVIDENCE_FILE);
   if (!fs.existsSync(releaseEvidencePath)) {
-    throw new CliError(`${RELEASE_EVIDENCE_FILE} is required in evidence directory`, 2);
+    throw new CliError(
+      `${RELEASE_EVIDENCE_FILE} is required in evidence directory`,
+      2,
+    );
   }
   const releaseEvidence = await readFile(releaseEvidencePath, "utf8");
   await writeFile(
@@ -332,15 +354,17 @@ async function runCli() {
     return 0;
   }
   if (options.printInputTemplate) {
-    console.log(formatImmutableVersionInputTemplate(
-      buildImmutableVersionInputTemplate(options),
-    ));
+    console.log(
+      formatImmutableVersionInputTemplate(
+        buildImmutableVersionInputTemplate(options),
+      ),
+    );
     return 0;
   }
   const result = await writeImmutableVersionEvidence(options);
   console.log(`immutable version evidence: ${result.releaseEvidencePath}`);
   console.log(`image digests evidence: ${result.imageDigestsPath}`);
-  console.log(`gitCommit: ${result.evidence.gitCommit}`);
+  console.log(`productCommit: ${result.evidence.productCommit}`);
   console.log(`serverImageDigest: ${result.evidence.serverImageDigest}`);
   console.log(`webImageDigest: ${result.evidence.webImageDigest}`);
   return 0;

@@ -768,7 +768,7 @@ stage=runtime_verified
   --deployment-target "$target" --env-file "$runtime_env" \
   --compose-dir "$compose_dir" --compose-override "$compose_override" \
   --runtime --expected-release "$release_sha" \
-  --out "$operation_dir/production-preflight-report.txt" >>"$log_file" 2>&1
+  --out "$operation_dir/production-preflight-report.json" >>"$log_file" 2>&1
 curl -fsS --max-time 10 "$server_endpoint/healthz" >/dev/null
 curl -fsS --max-time 10 "$server_endpoint/readyz" >/dev/null
 curl -fsS --max-time 10 "$web_endpoint/healthz" >/dev/null

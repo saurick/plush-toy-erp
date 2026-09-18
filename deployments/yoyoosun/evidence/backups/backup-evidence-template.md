@@ -9,7 +9,7 @@
 | backupPurpose |  |
 | environment |  |
 | operatorRole |  |
-| releaseVersion |  |
+| releaseId |  |
 | migrationVersion |  |
 
 ## 备份摘要

@@ -7,7 +7,10 @@ import test from "node:test";
 import { buildReport, parseArgs } from "./rollback-rehearsal-report.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
-const scriptPath = path.join(repoRoot, "scripts/deploy/rollback-rehearsal-report.mjs");
+const scriptPath = path.join(
+  repoRoot,
+  "scripts/deploy/rollback-rehearsal-report.mjs",
+);
 
 function writeSmokeReport(root, overrides = {}) {
   const filePath = path.join(root, "smoke-test-report.json");
@@ -17,8 +20,18 @@ function writeSmokeReport(root, overrides = {}) {
     endpointAlias: "https://erp.example.invalid",
     summary: { total: 2, passed: 2, failed: 0 },
     checks: [
-      { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
-      { name: "login-page", status: "pass", target: "https://erp.example.invalid/admin-login", httpCode: "200" },
+      {
+        name: "web-healthz",
+        status: "pass",
+        target: "https://erp.example.invalid/healthz",
+        httpCode: "200",
+      },
+      {
+        name: "login-page",
+        status: "pass",
+        target: "https://erp.example.invalid/admin-login",
+        httpCode: "200",
+      },
     ],
     redaction: { containsSecrets: false, containsRawCustomerRows: false },
     ...overrides,
@@ -31,8 +44,18 @@ function writeCustomerConfigSmokeReport(root, overrides = {}) {
   return writeSmokeReport(root, {
     summary: { total: 3, passed: 3, failed: 0 },
     checks: [
-      { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
-      { name: "login-page", status: "pass", target: "https://erp.example.invalid/admin-login", httpCode: "200" },
+      {
+        name: "web-healthz",
+        status: "pass",
+        target: "https://erp.example.invalid/healthz",
+        httpCode: "200",
+      },
+      {
+        name: "login-page",
+        status: "pass",
+        target: "https://erp.example.invalid/admin-login",
+        httpCode: "200",
+      },
       {
         name: "customer-config-effective-session",
         status: "pass",
@@ -54,7 +77,7 @@ function baseOptions(root, overrides = {}) {
   return {
     customer: "yoyoosun",
     environment: "customer-trial",
-    releaseVersion: "20260629T1200-test",
+    releaseId: "20260629T1200-test",
     rehearsalType: "rollback-forward-fix",
     triggerScenario: "smoke failed after activation",
     rollbackTargetRelease: "previous-stable-release",
@@ -86,7 +109,7 @@ test("parseArgs supports required rollback rehearsal report inputs", () => {
   const options = parseArgs([
     "--environment",
     "customer-trial",
-    "--release-version",
+    "--release-id",
     "20260629T1200-test",
     "--rehearsal-type",
     "rollback-forward-fix",
@@ -103,7 +126,10 @@ test("parseArgs supports required rollback rehearsal report inputs", () => {
   ]);
 
   assert.equal(options.customer, "yoyoosun");
-  assert.equal(options.rollbackRunbook, "deployments/yoyoosun/runbooks/03-rollback.md");
+  assert.equal(
+    options.rollbackRunbook,
+    "deployments/yoyoosun/runbooks/03-rollback.md",
+  );
   assert.deepEqual(options.steps, ["identify rollback target=pass"]);
 });
 
@@ -111,7 +137,7 @@ test("parseArgs derives output path from evidence dir", () => {
   const options = parseArgs([
     "--environment",
     "customer-trial",
-    "--release-version",
+    "--release-id",
     "20260629T1200-test",
     "--rehearsal-type",
     "rollback-forward-fix",
@@ -134,8 +160,13 @@ test("parseArgs derives output path from evidence dir", () => {
 });
 
 test("buildReport accepts passing steps and non-empty passing post-smoke report", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rollback-rehearsal-report-"));
-  const report = buildReport(baseOptions(root), new Date("2026-06-29T12:30:00Z"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "rollback-rehearsal-report-"),
+  );
+  const report = buildReport(
+    baseOptions(root),
+    new Date("2026-06-29T12:30:00Z"),
+  );
 
   assert.equal(report.customerCode, "yoyoosun");
   assert.equal(report.rehearsedAt, "2026-06-29T12:30:00.000Z");
@@ -150,11 +181,14 @@ test("buildReport accepts passing steps and non-empty passing post-smoke report"
 });
 
 test("buildReport accepts customer config post-smoke effective session proof", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rollback-rehearsal-report-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "rollback-rehearsal-report-"),
+  );
   writeCustomerConfigSmokeReport(root);
   const report = buildReport(
     baseOptions(root, {
-      customerConfigRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      customerConfigRevision:
+        "yoyoosun-customer-package-v7.runtime-manifest-v1",
     }),
     new Date("2026-06-29T12:30:00Z"),
   );
@@ -169,7 +203,9 @@ test("buildReport accepts customer config post-smoke effective session proof", (
 });
 
 test("buildReport requires matching customer config post-smoke proof when requested", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rollback-rehearsal-report-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "rollback-rehearsal-report-"),
+  );
 
   assert.throws(
     () =>
@@ -185,7 +221,8 @@ test("buildReport requires matching customer config post-smoke proof when reques
     () =>
       buildReport(
         baseOptions(root, {
-          customerConfigRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+          customerConfigRevision:
+            "yoyoosun-customer-package-v7.runtime-manifest-v1",
         }),
       ),
     /must include customer-config-effective-session/,
@@ -193,8 +230,18 @@ test("buildReport requires matching customer config post-smoke proof when reques
 
   writeCustomerConfigSmokeReport(root, {
     checks: [
-      { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
-      { name: "login-page", status: "pass", target: "https://erp.example.invalid/admin-login", httpCode: "200" },
+      {
+        name: "web-healthz",
+        status: "pass",
+        target: "https://erp.example.invalid/healthz",
+        httpCode: "200",
+      },
+      {
+        name: "login-page",
+        status: "pass",
+        target: "https://erp.example.invalid/admin-login",
+        httpCode: "200",
+      },
       {
         name: "customer-config-effective-session",
         status: "pass",
@@ -210,7 +257,8 @@ test("buildReport requires matching customer config post-smoke proof when reques
     () =>
       buildReport(
         baseOptions(root, {
-          customerConfigRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+          customerConfigRevision:
+            "yoyoosun-customer-package-v7.runtime-manifest-v1",
         }),
       ),
     /expectedRevision must match customerConfigRevision/,
@@ -218,16 +266,23 @@ test("buildReport requires matching customer config post-smoke proof when reques
 });
 
 test("buildReport rejects failed rehearsal steps", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rollback-rehearsal-report-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "rollback-rehearsal-report-"),
+  );
 
   assert.throws(
-    () => buildReport(baseOptions(root, { steps: ["identify rollback target=failed"] })),
+    () =>
+      buildReport(
+        baseOptions(root, { steps: ["identify rollback target=failed"] }),
+      ),
     /steps\[0\]\.status must be pass/,
   );
 });
 
 test("buildReport rejects empty or failed smoke reports", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rollback-rehearsal-report-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "rollback-rehearsal-report-"),
+  );
   writeSmokeReport(root, {
     summary: { total: 0, passed: 0, failed: 0 },
     checks: [],
@@ -241,8 +296,18 @@ test("buildReport rejects empty or failed smoke reports", () => {
   writeSmokeReport(root, {
     summary: { total: 2, passed: 1, failed: 1 },
     checks: [
-      { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
-      { name: "login-page", status: "fail", target: "https://erp.example.invalid/admin-login", httpCode: "500" },
+      {
+        name: "web-healthz",
+        status: "pass",
+        target: "https://erp.example.invalid/healthz",
+        httpCode: "200",
+      },
+      {
+        name: "login-page",
+        status: "fail",
+        target: "https://erp.example.invalid/admin-login",
+        httpCode: "500",
+      },
     ],
   });
 
@@ -253,10 +318,17 @@ test("buildReport rejects empty or failed smoke reports", () => {
 });
 
 test("buildReport rejects smoke reports without traceable target or HTTP status", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rollback-rehearsal-report-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "rollback-rehearsal-report-"),
+  );
   writeSmokeReport(root, {
     checks: [
-      { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
+      {
+        name: "web-healthz",
+        status: "pass",
+        target: "https://erp.example.invalid/healthz",
+        httpCode: "200",
+      },
       { name: "login-page", status: "pass", httpCode: "200" },
     ],
   });
@@ -268,8 +340,17 @@ test("buildReport rejects smoke reports without traceable target or HTTP status"
 
   writeSmokeReport(root, {
     checks: [
-      { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
-      { name: "login-page", status: "pass", target: "https://erp.example.invalid/admin-login" },
+      {
+        name: "web-healthz",
+        status: "pass",
+        target: "https://erp.example.invalid/healthz",
+        httpCode: "200",
+      },
+      {
+        name: "login-page",
+        status: "pass",
+        target: "https://erp.example.invalid/admin-login",
+      },
     ],
   });
 
@@ -280,27 +361,42 @@ test("buildReport rejects smoke reports without traceable target or HTTP status"
 });
 
 test("buildReport rejects post-smoke paths that release gate cannot bind", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rollback-rehearsal-report-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "rollback-rehearsal-report-"),
+  );
   writeSmokeReport(root);
 
   assert.throws(
-    () => buildReport(baseOptions(root, { postSmokeReport: path.join(root, "smoke-test-report.json") })),
+    () =>
+      buildReport(
+        baseOptions(root, {
+          postSmokeReport: path.join(root, "smoke-test-report.json"),
+        }),
+      ),
     /postSmokeReport must be a relative path/,
   );
 
   assert.throws(
-    () => buildReport(baseOptions(root, { postSmokeReport: "output/yoyoosun-smoke.json" })),
+    () =>
+      buildReport(
+        baseOptions(root, { postSmokeReport: "output/yoyoosun-smoke.json" }),
+      ),
     /postSmokeReport must point to smoke-test-report\.json/,
   );
 
   assert.throws(
-    () => buildReport(baseOptions(root, { postSmokeReport: "../smoke-test-report.json" })),
+    () =>
+      buildReport(
+        baseOptions(root, { postSmokeReport: "../smoke-test-report.json" }),
+      ),
     /postSmokeReport must point to smoke-test-report\.json in the same output directory/,
   );
 });
 
 test("CLI writes rollback rehearsal report", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rollback-rehearsal-report-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "rollback-rehearsal-report-"),
+  );
   const outPath = path.join(root, "rollback-rehearsal-report.json");
   writeCustomerConfigSmokeReport(root);
   const result = spawnSync(
@@ -309,7 +405,7 @@ test("CLI writes rollback rehearsal report", () => {
       scriptPath,
       "--environment",
       "customer-trial",
-      "--release-version",
+      "--release-id",
       "20260629T1200-test",
       "--rehearsal-type",
       "rollback-forward-fix",
@@ -342,7 +438,9 @@ test("CLI writes rollback rehearsal report", () => {
 });
 
 test("CLI writes rollback rehearsal report into evidence dir", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rollback-rehearsal-report-evidence-dir-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "rollback-rehearsal-report-evidence-dir-"),
+  );
   writeSmokeReport(root);
   const result = spawnSync(
     "node",
@@ -350,7 +448,7 @@ test("CLI writes rollback rehearsal report into evidence dir", () => {
       scriptPath,
       "--environment",
       "customer-trial",
-      "--release-version",
+      "--release-id",
       "20260629T1200-test",
       "--rehearsal-type",
       "rollback-forward-fix",
@@ -384,7 +482,7 @@ test("CLI rejects missing evidence dir before writing report", () => {
       scriptPath,
       "--environment",
       "customer-trial",
-      "--release-version",
+      "--release-id",
       "20260629T1200-test",
       "--rehearsal-type",
       "rollback-forward-fix",

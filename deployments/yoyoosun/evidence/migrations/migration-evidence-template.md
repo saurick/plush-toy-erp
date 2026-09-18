@@ -4,8 +4,8 @@
 
 | 字段 | 值 |
 | --- | --- |
-| releaseVersion |  |
-| gitCommit |  |
+| releaseId |  |
+| productCommit |  |
 | environment |  |
 | operatorRole |  |
 | startedAt |  |

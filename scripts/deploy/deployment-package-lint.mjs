@@ -170,7 +170,11 @@ function validateRunbookCoverage(packageDir, errors) {
     if (!fs.existsSync(filePath)) continue;
     const lines = readText(filePath).split(/\r?\n/);
     for (const heading of headings) {
-      assert(lines.includes(heading), `${relativePath} missing ${heading}`, errors);
+      assert(
+        lines.includes(heading),
+        `${relativePath} missing ${heading}`,
+        errors,
+      );
     }
   }
 }
@@ -309,9 +313,9 @@ function validateReleaseEvidenceTemplate(packageDir, errors) {
   const basicSection = content.match(/## 基本信息[\s\S]*?(?=\n## )/)?.[0] || "";
   for (const field of [
     "customerCode",
-    "releaseVersion",
+    "releaseId",
     "environment",
-    "gitCommit",
+    "productCommit",
     "serverImageDigest",
     "webImageDigest",
     "migrationBefore",
@@ -325,7 +329,7 @@ function validateReleaseEvidenceTemplate(packageDir, errors) {
     );
   }
   for (const evidenceFile of [
-    "production-preflight-report.txt",
+    "production-preflight-report.json",
     "image-digests.txt",
     "backup-evidence.md",
     "migration-status-before-apply.txt",
@@ -369,7 +373,7 @@ function validateBackupEvidenceTemplate(packageDir, errors) {
     "backupTime",
     "backupPurpose",
     "environment",
-    "releaseVersion",
+    "releaseId",
     "migrationVersion",
     "databaseBackupSize",
     "databaseBackupHash",
@@ -402,8 +406,8 @@ function validateMigrationEvidenceTemplate(packageDir, errors) {
   }
   const content = readText(templatePath);
   for (const field of [
-    "releaseVersion",
-    "gitCommit",
+    "releaseId",
+    "productCommit",
     "environment",
     "startedAt",
     "finishedAt",
@@ -446,7 +450,7 @@ function validateReleaseSignoffTemplate(packageDir, errors) {
   }
   const content = readText(templatePath);
   for (const field of [
-    "releaseVersion",
+    "releaseId",
     "environment",
     "backupId",
     "releaseConclusion",
@@ -576,7 +580,7 @@ function validateSmokeReportExample(packageDir, errors) {
   );
   for (const field of [
     "environment",
-    "releaseVersion",
+    "productCommit",
     "generatedAt",
     "operatorRole",
     "endpointAlias",

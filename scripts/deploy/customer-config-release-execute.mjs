@@ -399,11 +399,9 @@ async function verifyTargetRuntimeIdentity({
     !identity ||
     identity.scope !== "release-v1" ||
     !/^plush_erp_[a-z0-9_]+$/u.test(String(identity.database ?? "")) ||
-    !/^[a-f0-9]{40}$/u.test(String(identity.releaseVersion ?? "")) ||
+    !/^[a-f0-9]{40}$/u.test(String(identity.productCommit ?? "")) ||
     !/^\d{14}$/u.test(String(identity.migrationVersion ?? "")) ||
-    !/^[a-f0-9]{64}$/u.test(
-      String(identity.expectedDigestSha256 ?? ""),
-    )
+    !/^[a-f0-9]{64}$/u.test(String(identity.expectedDigestSha256 ?? ""))
   ) {
     throw new CliError(
       "target runtime identity evidence is incomplete or invalid",
@@ -413,10 +411,7 @@ async function verifyTargetRuntimeIdentity({
   let response;
   try {
     response = await fetchImpl(
-      new URL(
-        "/readyz/runtime-identity",
-        `${backendURL}/`,
-      ).toString(),
+      new URL("/readyz/runtime-identity", `${backendURL}/`).toString(),
       {
         method: "GET",
         headers: {
@@ -445,7 +440,7 @@ async function verifyTargetRuntimeIdentity({
     deploymentTargetBound: true,
     scope: identity.scope,
     database: identity.database,
-    releaseVersion: identity.releaseVersion,
+    productCommit: identity.productCommit,
     migrationVersion: identity.migrationVersion,
     proof,
     responseBodyStored: false,
@@ -900,9 +895,7 @@ async function loadAndValidateInputs(options, repoRoot) {
   }
   if (options.evidenceDir) {
     requireOption(options, "deploymentTarget");
-    if (
-      !["demo-133", "customer-test-133"].includes(options.deploymentTarget)
-    ) {
+    if (!["demo-133", "customer-test-133"].includes(options.deploymentTarget)) {
       throw new CliError(
         "--deployment-target must be demo-133 or customer-test-133",
         2,
@@ -1056,19 +1049,19 @@ export async function runCustomerConfigRelease(options, runtime = {}) {
       )
     : "";
   const results = options.execute
-      ? await executeOperations({
-          backendURL,
-          operations,
-          manifest,
-          activate: Boolean(options.activate),
-          rollback: Boolean(options.rollback),
-          targetRuntimeIdentity: activationGate?.runtimeIdentity ?? null,
-          fetchImpl: runtime.fetchImpl || globalThis.fetch,
-        })
-      : {
-          results: [],
-          runtimeIdentityVerification: null,
-          validatedConfigIdentity: null,
+    ? await executeOperations({
+        backendURL,
+        operations,
+        manifest,
+        activate: Boolean(options.activate),
+        rollback: Boolean(options.rollback),
+        targetRuntimeIdentity: activationGate?.runtimeIdentity ?? null,
+        fetchImpl: runtime.fetchImpl || globalThis.fetch,
+      })
+    : {
+        results: [],
+        runtimeIdentityVerification: null,
+        validatedConfigIdentity: null,
         transitionCheck: null,
         effectiveSessionVerification: null,
       };

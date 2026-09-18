@@ -301,7 +301,7 @@ recover_predecessor_before_migration() {
     --compose-override "$compose_override" \
     --runtime \
     --expected-release "$release_sha" \
-    --out "$operation_dir/recovered-predecessor-preflight-report.txt" \
+    --out "$operation_dir/recovered-predecessor-preflight-report.json" \
     >>"$log_file" 2>&1 || return 1
   predecessor_recovered=1
   return 0
@@ -320,7 +320,7 @@ restore_predecessor_runtime_before_switch() {
     --compose-override "$compose_override" \
     --runtime \
     --expected-release "$release_sha" \
-    --out "$operation_dir/restored-predecessor-runtime-preflight-report.txt" \
+    --out "$operation_dir/restored-predecessor-runtime-preflight-report.json" \
     >>"$log_file" 2>&1 || return 1
   return 0
 }
@@ -487,7 +487,7 @@ compose=(
   --compose-override "$compose_override" \
   --runtime \
   --expected-release "$release_sha" \
-  --out "$operation_dir/predecessor-preflight-report.txt" \
+  --out "$operation_dir/predecessor-preflight-report.json" \
   >>"$log_file" 2>&1
 
 available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
@@ -725,7 +725,7 @@ write_state running
   --compose-override "$compose_override" \
   --runtime \
   --expected-release "$release_sha" \
-  --out "$operation_dir/fresh-runtime-preflight-report.txt" \
+  --out "$operation_dir/fresh-runtime-preflight-report.json" \
   >>"$log_file" 2>&1
 curl --fail --silent --show-error --max-time 10 \
   "$server_endpoint/healthz" >/dev/null

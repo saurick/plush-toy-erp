@@ -10,30 +10,45 @@ import {
   selectYoyoosunCredentialTarget,
 } from "./credential-contract.mjs";
 import { getDeploymentTarget } from "../../../scripts/deploy/deployment-targets.mjs";
+import {
+  RELEASE_EVIDENCE_CONTRACT,
+  RELEASE_EVIDENCE_PROFILES,
+  normalizeReleaseEvidenceProfile,
+} from "../../../scripts/deploy/release-evidence-contract.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "../../..");
 
 function printHelp(stream = process.stdout) {
-  stream.write([
-    "用法:",
-    "  bash deployments/yoyoosun/scripts/collect-evidence.sh --deployment-target <demo-133|customer-test-133> --release-version <version> --output deployments/yoyoosun/evidence/releases/<date>",
-    "",
-    "作用:",
-    "  生成 release evidence 草稿目录。该脚本不采集 secret、不复制 .env、不复制备份文件。",
-    "",
-  ].join("\n"));
+  stream.write(
+    [
+      "用法:",
+      "  bash deployments/yoyoosun/scripts/collect-evidence.sh --deployment-target <demo-133|customer-test-133> --profile <base-release|customer-trial-acceptance> --release-id <id> --output deployments/yoyoosun/evidence/releases/<date>",
+      "",
+      "作用:",
+      "  生成 release evidence 草稿目录。该脚本不采集 secret、不复制 .env、不复制备份文件。",
+      "",
+    ].join("\n"),
+  );
 }
 
 function parseArgs(argv) {
-  const options = { deploymentTarget: "", releaseVersion: "", outputDir: "" };
+  const options = {
+    deploymentTarget: "",
+    profile: RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
+    releaseId: "",
+    outputDir: "",
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--deployment-target") {
       options.deploymentTarget = argv[index + 1] ?? "";
       index += 1;
-    } else if (arg === "--release-version") {
-      options.releaseVersion = argv[index + 1] ?? "";
+    } else if (arg === "--profile") {
+      options.profile = argv[index + 1] ?? "";
+      index += 1;
+    } else if (arg === "--release-id") {
+      options.releaseId = argv[index + 1] ?? "";
       index += 1;
     } else if (arg === "--output") {
       options.outputDir = argv[index + 1] ?? "";
@@ -48,10 +63,14 @@ function parseArgs(argv) {
 }
 
 function writeFile(outputDir, name, content) {
-  fs.writeFileSync(path.join(outputDir, name), content.endsWith("\n") ? content : `${content}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
+  fs.writeFileSync(
+    path.join(outputDir, name),
+    content.endsWith("\n") ? content : `${content}\n`,
+    {
+      encoding: "utf8",
+      mode: 0o600,
+    },
+  );
 }
 
 let options;
@@ -67,9 +86,15 @@ if (options.help) {
   printHelp();
   process.exit(0);
 }
+try {
+  options.profile = normalizeReleaseEvidenceProfile(options.profile);
+} catch (error) {
+  process.stderr.write(`[collect-evidence] ${error.message}\n`);
+  process.exit(1);
+}
 if (
   !["demo-133", "customer-test-133"].includes(options.deploymentTarget) ||
-  !options.releaseVersion ||
+  !options.releaseId ||
   !options.outputDir
 ) {
   printHelp(process.stderr);
@@ -84,53 +109,54 @@ const gitResult = spawnSync("git", ["rev-parse", "HEAD"], {
   encoding: "utf8",
   stdio: ["ignore", "pipe", "ignore"],
 });
-const gitCommit = gitResult.status === 0 ? gitResult.stdout.trim() : "unknown";
+const productCommit =
+  gitResult.status === 0 ? gitResult.stdout.trim() : "unknown";
 const generatedAt = new Date().toISOString().replace(/\.\d{3}Z$/u, "Z");
-const releaseVersion = options.releaseVersion;
-const credentialTarget = selectYoyoosunCredentialTarget(
-  loadYoyoosunCredentialContract(),
-  options.deploymentTarget,
-);
+const releaseId = options.releaseId;
+const acceptance =
+  options.profile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE;
+const credentialTarget = acceptance
+  ? selectYoyoosunCredentialTarget(
+      loadYoyoosunCredentialContract(),
+      options.deploymentTarget,
+    )
+  : null;
 const deploymentTarget = getDeploymentTarget(options.deploymentTarget);
 const demo = options.deploymentTarget === "demo-133";
 
-writeFile(outputDir, "release-evidence.md", `# yoyoosun Release Evidence
+writeFile(
+  outputDir,
+  "release-evidence.md",
+  `# yoyoosun Release Evidence
 
 ## 基本信息
 
 | 字段 | 值 |
 | --- | --- |
+| evidenceContract | ${RELEASE_EVIDENCE_CONTRACT} |
 | customerCode | yoyoosun |
-| releaseVersion | ${releaseVersion} |
+| releaseId | ${releaseId} |
 | releaseDate | ${generatedAt} |
 | environment | ${options.deploymentTarget} |
 | operatorRole | 待填写 |
-| gitCommit | ${gitCommit} |
+| productCommit | ${productCommit} |
 | serverImage | 待填写 |
 | serverImageDigest | 待填写 |
 | webImage | 待填写 |
 | webImageDigest | 待填写 |
 | migrationBefore | 待填写 |
 | migrationAfter | 待填写 |
+| recoveryProcedureChanged | true |
 | backupId | 待填写 |
-
-## 配置指纹
-
-| 项目 | Hash / 摘要 |
-| --- | --- |
-| envFingerprint | 待填写 |
-| customerConfigFingerprint | 待填写 |
-| menuConfigFingerprint | 待填写 |
-| permissionConfigFingerprint | 待填写 |
 
 ## 执行结果
 
 | 项目 | 结果 | Evidence |
 | --- | --- | --- |
-| preflight | 待填写 | production-preflight-report.txt |
+| preflight | 待填写 | production-preflight-report.json |
 | backup | 待填写 | backup-evidence.md |
 | migration | 待填写 | migration-status.txt |
-| credential rotation | 待填写 | credential-rotation-report.json |
+${acceptance ? "| credential rotation / role login | 待填写 | credential-rotation-report.json / smoke-test-report.json |" : ""}
 | seed | 待填写 |  |
 | import dry-run / apply | 待填写 |  |
 | smoke | 待填写 | smoke-test-report.json |
@@ -146,33 +172,52 @@ writeFile(outputDir, "release-evidence.md", `# yoyoosun Release Evidence
 
 | 字段 | 值 |
 | --- | --- |
-| previousReleaseVersion | 待填写 |
+| previousReleaseId | 待填写 |
 | previousServerImage | 待填写 |
 | previousWebImage | 待填写 |
 | backupId | 待填写 |
-| rollbackRunbook | deployments/yoyoosun/runbooks/03-rollback.md |`);
+| rollbackRunbook | deployments/yoyoosun/runbooks/03-rollback.md |`,
+);
 
-writeFile(outputDir, "production-preflight-report.txt", `[production-preflight] 待填写
+writeFile(
+  outputDir,
+  "production-preflight-report.json",
+  JSON.stringify(
+    {
+      evidenceContract: RELEASE_EVIDENCE_CONTRACT,
+      kind: "production-preflight",
+      generatedAt,
+      deploymentTarget: deploymentTarget.key,
+      mode: "runtime-env",
+      profile: options.profile,
+      productCommit,
+      checks: [],
+      summary: { total: 0, passed: 0, failed: 0 },
+      redaction: {
+        containsSecrets: false,
+        containsRawCustomerRows: false,
+        containsFullDsn: false,
+      },
+      nextCommand: `bash scripts/deploy/production-preflight.sh --profile ${options.profile} --deployment-target ${deploymentTarget.key} --env-file ${deploymentTarget.filesystem.runtimeEnv} --compose-dir ${deploymentTarget.compose.directory} --compose-override ${path.join(deploymentTarget.compose.directory, deploymentTarget.compose.overrideFile)} --runtime --expected-release ${productCommit} --out ${outputDir}/production-preflight-report.json`,
+    },
+    null,
+    2,
+  ),
+);
 
-请在真实运行时 .env 准备后执行：
-
-bash scripts/deploy/production-preflight.sh \\
-  --deployment-target ${deploymentTarget.key} \\
-  --env-file ${deploymentTarget.filesystem.runtimeEnv} \\
-  --compose-dir ${deploymentTarget.compose.directory} \\
-  --compose-override ${path.join(deploymentTarget.compose.directory, deploymentTarget.compose.overrideFile)} \\
-  --runtime \\
-  --expected-release ${gitCommit} \\
-  --out "${outputDir}/production-preflight-report.txt"
-
-该文件必须在目标 Compose 服务启动后由 --runtime 模式生成，并记录运行态 PDF warmup、Chromium exact pin 和 health / ready 通过；不要写入真实 .env、secret、token、完整 DSN 或客户 raw data。`);
-
-writeFile(outputDir, "image-digests.txt", `serverImage=待填写
+writeFile(
+  outputDir,
+  "image-digests.txt",
+  `serverImage=待填写
 serverImageDigest=待填写，建议用 scripts/deploy/image-digests-evidence.mjs 生成，必须等于 release-evidence.md serverImageDigest
 webImage=待填写
-webImageDigest=待填写，建议用 scripts/deploy/image-digests-evidence.mjs 生成，必须等于 release-evidence.md webImageDigest`);
+webImageDigest=待填写，建议用 scripts/deploy/image-digests-evidence.mjs 生成，必须等于 release-evidence.md webImageDigest`,
+);
 
-writeFile(outputDir, "backup-evidence.md", `# yoyoosun Backup Evidence
+writeFile(
+  outputDir,
+  "backup-evidence.md",
+  `# yoyoosun Backup Evidence
 
 ## 基本信息
 
@@ -183,7 +228,7 @@ writeFile(outputDir, "backup-evidence.md", `# yoyoosun Backup Evidence
 | backupPurpose | 待填写，必须是 pre-migration 或 pre-deploy |
 | environment | ${options.deploymentTarget} |
 | operatorRole | 待填写 |
-| releaseVersion | ${releaseVersion} |
+| releaseId | ${releaseId} |
 | migrationVersion | 待填写 |
 
 ## 备份摘要
@@ -208,26 +253,39 @@ writeFile(outputDir, "backup-evidence.md", `# yoyoosun Backup Evidence
 | customerConfigCutoverAuditStatus | 待填写，跨越 20260714055825 时必须为 passed |
 | smokeQueryStatus | 待填写 |
 | webSmokeStatus | 待填写 |
-| verifiedAt | 待填写 |`);
+| verifiedAt | 待填写 |`,
+);
 
-writeFile(outputDir, "migration-status.txt", `Migration Status: 待填写
+writeFile(
+  outputDir,
+  "migration-status.txt",
+  `Migration Status: 待填写
 Current Version: 待填写
-Pending Files: 待填写`);
-writeFile(outputDir, "migration-status-before-apply.txt", `Migration Status: 待填写，恢复 dump 后、执行 atlas migrate apply 前记录
+Pending Files: 待填写`,
+);
+writeFile(
+  outputDir,
+  "migration-status-before-apply.txt",
+  `Migration Status: 待填写，恢复 dump 后、执行 atlas migrate apply 前记录
 Current Version: 待填写，必须等于 release-evidence.md migrationBefore
-Pending Files: 待填写，允许大于 0，但必须可解释为待 apply migration`);
-writeFile(outputDir, "command-summary.txt", `backupId=待填写
-releaseVersion=待填写
+Pending Files: 待填写，允许大于 0，但必须可解释为待 apply migration`,
+);
+writeFile(
+  outputDir,
+  "command-summary.txt",
+  `backupId=待填写
+releaseId=待填写
 sourceAlias=待填写，必须脱敏，例如 env:SOURCE_POSTGRES_DSN
 restoreTarget=待填写，必须脱敏，例如 temp-postgres-container:postgres:18:removed-after-run
 populatedUpgradeAuditStatus=待填写，跨越 20260714055504 时必须为 passed
 customerConfigCutoverAuditStatus=待填写，跨越 20260714055825 时必须为 passed
-steps=待填写，记录 pg_dump -> restore -> pre-apply atlas status -> populated upgrade read-only audit -> customer config cutover read-only audit -> atlas migrate apply -> post-apply atlas status -> smoke 的脱敏命令摘要，不保存完整 DSN、secret、dump 内容或客户 raw rows`);
+steps=待填写，记录 pg_dump -> restore -> pre-apply atlas status -> populated upgrade read-only audit -> customer config cutover read-only audit -> atlas migrate apply -> post-apply atlas status -> smoke 的脱敏命令摘要，不保存完整 DSN、secret、dump 内容或客户 raw rows`,
+);
 
 const backupRestoreReport = {
   customerCode: "yoyoosun",
   environment: options.deploymentTarget,
-  releaseVersion,
+  releaseId,
   backupId: "待填写",
   verifiedAt: "待填写",
   sourceAlias: "待填写",
@@ -246,11 +304,13 @@ const backupRestoreReport = {
   },
   restore: {
     restoreTestStatus: "待填写",
-    migrationBeforeApply: "待填写，必须等于 release-evidence.md migrationBefore",
+    migrationBeforeApply:
+      "待填写，必须等于 release-evidence.md migrationBefore",
     restoreMigrationVersion: "待填写",
     pendingFiles: "待填写",
     populatedUpgradeAuditStatus: "待填写，跨越 20260714055504 时必须为 passed",
-    customerConfigCutoverAuditStatus: "待填写，跨越 20260714055825 时必须为 passed",
+    customerConfigCutoverAuditStatus:
+      "待填写，跨越 20260714055825 时必须为 passed",
   },
   smoke: {
     smokeQueryStatus: "待填写",
@@ -271,80 +331,117 @@ const backupRestoreReport = {
     restoreCompleted: false,
     migrationStatus: "待填写",
     populatedUpgradeAuditStatus: "待填写，跨越 20260714055504 时必须为 passed",
-    customerConfigCutoverAuditStatus: "待填写，跨越 20260714055825 时必须为 passed",
+    customerConfigCutoverAuditStatus:
+      "待填写，跨越 20260714055825 时必须为 passed",
     smokeQueryStatus: "待填写",
   },
 };
-writeFile(outputDir, "backup-restore-report.json", JSON.stringify(backupRestoreReport, null, 2));
-
-writeFile(outputDir, "smoke-test-report.json", JSON.stringify({
-  customerCode: "yoyoosun",
-  deploymentTarget: options.deploymentTarget,
-  environment: options.deploymentTarget,
-  releaseVersion,
-  generatedAt,
-  operatorRole: "待填写",
-  summary: { total: 0, passed: 0, failed: 0 },
-  checks: [],
-  redaction: {
-    containsSecrets: false,
-    containsRawCustomerRows: false,
-    notes: "待填写",
-  },
-}, null, 2));
-
-writeFile(outputDir, "credential-rotation-report.json", JSON.stringify({
-  schemaVersion: "plush.manual-acceptance-credential-rotation-receipt/v1",
-  generatedAt,
-  operationId: "待填写",
-  deploymentTarget: credentialTarget.deploymentTarget,
-  target: credentialTarget.commandTarget,
-  targetIdentity: credentialTarget.targetIdentity,
-  database: credentialTarget.database,
-  ...(demo ? { datasetVersion: credentialTarget.datasetVersion } : {}),
-  migrationVersion: "待填写",
-  ...(demo ? { customerRevision: "待填写" } : {}),
-  release: gitCommit,
-  rollbackPoint: {
-    backupAlias: "待填写",
-    backupSha256: "待填写",
-    backupSizeBytes: 0,
-    restoreChecked: false,
-  },
-  adminAccounts: 0,
-  accountKind: demo ? "customer-uat" : "customer-test-admin-only",
-  roleAccounts: 0,
-  nonAdminPolicy: credentialTarget.nonAdmin.policy,
-  nonAdminAccounts: 0,
-  ...(demo ? {} : { nonAdminAccountsPreserved: false }),
-  revokedSessions: 0,
-  authVersionIncremented: false,
-  auditSource: "待填写",
-  phoneBound: false,
-  accounts: [],
-  replayed: false,
-}, null, 2));
-
-writeFile(outputDir, "known-limitations.md", `# yoyoosun Known Limitations
-
-- 当前记录为模板草稿，发布者必须补齐本次 release 的正式能力、模拟能力、不承诺能力、风险和客户验收步骤。`);
-
-fs.copyFileSync(
-  path.join(repoRoot, "deployments/yoyoosun/checklists/smoke-test-checklist.md"),
-  path.join(outputDir, "acceptance-checklist.md"),
+writeFile(
+  outputDir,
+  "backup-restore-report.json",
+  JSON.stringify(backupRestoreReport, null, 2),
 );
+
+writeFile(
+  outputDir,
+  "smoke-test-report.json",
+  JSON.stringify(
+    {
+      customerCode: "yoyoosun",
+      deploymentTarget: options.deploymentTarget,
+      environment: options.deploymentTarget,
+      productCommit,
+      generatedAt,
+      operatorRole: "待填写",
+      summary: { total: 0, passed: 0, failed: 0 },
+      checks: [],
+      redaction: {
+        containsSecrets: false,
+        containsRawCustomerRows: false,
+        notes: "待填写",
+      },
+    },
+    null,
+    2,
+  ),
+);
+
+if (acceptance)
+  writeFile(
+    outputDir,
+    "credential-rotation-report.json",
+    JSON.stringify(
+      {
+        schemaVersion: "plush.manual-acceptance-credential-rotation-receipt/v1",
+        generatedAt,
+        operationId: "待填写",
+        deploymentTarget: credentialTarget.deploymentTarget,
+        target: credentialTarget.commandTarget,
+        targetIdentity: credentialTarget.targetIdentity,
+        database: credentialTarget.database,
+        ...(demo ? { datasetVersion: credentialTarget.datasetVersion } : {}),
+        migrationVersion: "待填写",
+        ...(demo ? { customerRevision: "待填写" } : {}),
+        productCommit,
+        rollbackPoint: {
+          backupAlias: "待填写",
+          backupSha256: "待填写",
+          backupSizeBytes: 0,
+          restoreChecked: false,
+        },
+        adminAccounts: 0,
+        accountKind: demo ? "customer-uat" : "customer-test-admin-only",
+        roleAccounts: 0,
+        nonAdminPolicy: credentialTarget.nonAdmin.policy,
+        nonAdminAccounts: 0,
+        ...(demo ? {} : { nonAdminAccountsPreserved: false }),
+        revokedSessions: 0,
+        authVersionIncremented: false,
+        auditSource: "待填写",
+        phoneBound: false,
+        accounts: [],
+        replayed: false,
+      },
+      null,
+      2,
+    ),
+  );
+
+writeFile(
+  outputDir,
+  "known-limitations.md",
+  `# yoyoosun Known Limitations
+
+- 当前记录为模板草稿，发布者必须补齐本次 release 的正式能力、模拟能力、不承诺能力、风险和客户验收步骤。`,
+);
+
+if (acceptance)
+  fs.copyFileSync(
+    path.join(
+      repoRoot,
+      "deployments/yoyoosun/checklists/smoke-test-checklist.md",
+    ),
+    path.join(outputDir, "acceptance-checklist.md"),
+  );
 fs.copyFileSync(
-  path.join(repoRoot, "deployments/yoyoosun/evidence/releases/rollback-forward-fix-plan-template.md"),
+  path.join(
+    repoRoot,
+    "deployments/yoyoosun/evidence/releases/rollback-forward-fix-plan-template.md",
+  ),
   path.join(outputDir, "rollback-forward-fix-plan.md"),
 );
 
-writeFile(outputDir, "release-signoff-checklist.md", `# yoyoosun Release Sign-off / 发布签收检查模板
+if (acceptance)
+  writeFile(
+    outputDir,
+    "release-signoff-checklist.md",
+    `# yoyoosun Release Sign-off / 发布签收检查模板
 
 ## 结论字段
 
 | 字段 | 值 |
 | --- | --- |
-| releaseVersion | ${releaseVersion} |
+| releaseId | ${releaseId} |
 | environment | ${options.deploymentTarget} |
 | backupId | 待填写，必须与 release-evidence.md 和 backup-evidence.md 一致 |
 | releaseConclusion | 待填写，可选 customer-trial-approved / internal-only / rollback-or-forward-fix |
@@ -365,31 +462,43 @@ writeFile(outputDir, "release-signoff-checklist.md", `# yoyoosun Release Sign-of
 - 本模板只记录发布 evidence 复核结论，不保存真实密码、token、备份文件、完整 DSN、客户 raw rows 或未脱敏截图。
 - customer-trial-approved 只表示本次 release 可继续客户试用，不等于客户最终验收、真实导入完成或完整业务交付。
 - internal-only 表示只能内部验证，不能对客户开放。
-- rollback-or-forward-fix 表示当前 release 不可继续使用，必须回滚或 forward-fix。`);
+- rollback-or-forward-fix 表示当前 release 不可继续使用，必须回滚或 forward-fix。`,
+  );
 
-writeFile(outputDir, "rollback-rehearsal-report.json", JSON.stringify({
-  customerCode: "yoyoosun",
-  environment: options.deploymentTarget,
-  releaseVersion,
-  rehearsedAt: "待填写",
-  rehearsalType: "待填写，可选 rollback / forward-fix / rollback-forward-fix",
-  triggerScenario: "待填写",
-  rollbackTargetRelease: "待填写",
-  rollbackRunbook: "deployments/yoyoosun/runbooks/03-rollback.md",
-  steps: [],
-  postCheck: {
-    smokeStatus: "待填写",
-    evidenceReviewStatus: "待填写",
-  },
-  summary: {
-    rehearsalCompleted: false,
-    rollbackPathStatus: "待填写",
-  },
-  redaction: {
-    containsSecrets: false,
-    containsRawCustomerRows: false,
-    containsFullDsn: false,
-  },
-}, null, 2));
+writeFile(
+  outputDir,
+  "rollback-rehearsal-report.json",
+  JSON.stringify(
+    {
+      customerCode: "yoyoosun",
+      environment: options.deploymentTarget,
+      releaseId,
+      rehearsedAt: "待填写",
+      rehearsalType:
+        "待填写，可选 rollback / forward-fix / rollback-forward-fix",
+      triggerScenario: "待填写",
+      rollbackTargetRelease: "待填写",
+      rollbackRunbook: "deployments/yoyoosun/runbooks/03-rollback.md",
+      steps: [],
+      postCheck: {
+        smokeStatus: "待填写",
+        evidenceReviewStatus: "待填写",
+      },
+      summary: {
+        rehearsalCompleted: false,
+        rollbackPathStatus: "待填写",
+      },
+      redaction: {
+        containsSecrets: false,
+        containsRawCustomerRows: false,
+        containsFullDsn: false,
+      },
+    },
+    null,
+    2,
+  ),
+);
 
-process.stdout.write(`[collect-evidence] draft evidence: ${options.outputDir}\n`);
+process.stdout.write(
+  `[collect-evidence] draft evidence: ${options.outputDir} profile=${options.profile}\n`,
+);

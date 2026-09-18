@@ -72,7 +72,7 @@ node scripts/deploy/customer-config-release-readiness.mjs \
 docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env up -d --remove-orphans
 ```
 
-9. 若本轮创建、恢复或重建过数据库，必须在入口关闭状态下按目标合同恢复凭据并撤销旧会话：两个 target 的 `admin` 都恢复为固定测试凭据 `adminadmin`；只有 `demo-133` 恢复十个 `uat_*` 为 `12345678`；`customer-test-133` 不读取、猜测或改写非管理员密码，只证明其 `id/username` 身份集合保持不变。凭据轮换闭包须在 mutation 前自行生成并 restore-check operation-bound 备份，调用者不能指定备份文件；脱敏回执绑定 exact target、release、migration 与 operation。禁止 Keychain、环境变量或发布输入覆盖公开测试凭据。普通应用升级未触碰数据库账号时也必须运行适用的真实登录矩阵，不能复用旧 token 代替密码验证。SMS 手机号只属于 demo，未人工录入时不阻断。
+9. 客户试用验收且本轮创建、恢复或重建过数据库时，按目标合同恢复凭据并撤销旧会话：`demo-133` 覆盖 admin 与 11 个 `uat_*`；`customer-test-133` 只处理 admin，并证明非管理员身份集合未变化。普通 `base-release` 不把凭据轮换设为发布硬门禁。
 10. 在受控入口运行正式 `run-smoke.sh`：必须同时传入已激活 manifest 的 `--customer-config-revision` 与管理员 token env，生成目标 Web/PDF/登录矩阵及 `customer-config-effective-session` 读回。随后再运行 readiness 的最终激活门禁；此顺序不可提前：
 
 ```bash
@@ -84,7 +84,7 @@ node scripts/deploy/customer-config-release-readiness.mjs \
   --require-executed --require-activated
 ```
 
-再执行日志检查；`demo-133` 必须真实登录 admin 与十个 `uat_*`，`customer-test-133` 只登录 admin 并证明非管理员身份集合未变化。最终 readiness、全部适用门禁和 smoke 均通过后才执行公网 / 客户入口切流。
+再执行日志检查；`demo-133` 必须真实登录 admin 与 11 个 `uat_*`，`customer-test-133` 只登录 admin 并证明非管理员身份集合未变化。最终 readiness、全部适用门禁和 smoke 均通过后才执行公网 / 客户入口切流。
 11. 写入 upgrade evidence。
 12. 客户试用或交付前执行 release evidence gate：
 
@@ -92,6 +92,7 @@ node scripts/deploy/customer-config-release-readiness.mjs \
 node scripts/deploy/release-evidence-gate.mjs \
   --customer yoyoosun \
   --deployment-target <demo-133|customer-test-133> \
+  --profile customer-trial-acceptance \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 

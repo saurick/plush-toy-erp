@@ -95,7 +95,7 @@ test("remote database rebuild restores a stopped predecessor before the switch",
     source,
     /write_receipt not_proven database_rebuild_predecessor_runtime_restore_unknown/u,
   );
-  assert.match(source, /restored-predecessor-runtime-preflight-report\.txt/u);
+  assert.match(source, /restored-predecessor-runtime-preflight-report\.json/u);
 });
 
 test("remote database rebuild records the switch before fresh directory creation", () => {
@@ -111,7 +111,7 @@ test("remote database rebuild records the switch before fresh directory creation
     source,
     /if \[\[ -e "\$data_dir" \]\]; then\n\s+mv "\$data_dir" "\$failed_fresh_dir" \|\| return 1\n\s+fi\n\s+mv "\$rollback_dir" "\$data_dir"/u,
   );
-  assert.match(source, /recovered-predecessor-preflight-report\.txt/u);
+  assert.match(source, /recovered-predecessor-preflight-report\.json/u);
 });
 
 test("remote database rebuild prepares the fresh mount for the image data owner", () => {
@@ -129,7 +129,7 @@ test("remote database rebuild prepares the fresh mount for the image data owner"
   );
   const create = source.indexOf('mkdir -m 700 "$data_dir"');
   const prepare = source.indexOf(
-    'docker run --rm --pull never --network none --user 0:0',
+    "docker run --rm --pull never --network none --user 0:0",
     create,
   );
   const start = source.indexOf("stage=fresh_postgres_start", prepare);
@@ -188,9 +188,15 @@ test("remote database rebuild uses one-use bootstrap secret and exact readbacks"
   assert.match(source, /bootstrap_completed=1/u);
   assert.match(source, /completed: \(\$bootstrapCompleted == 1\)/u);
   assert.match(source, /pg_control_system/u);
-  assert.match(source, /system_identifier_after.*!=.*system_identifier_before/u);
+  assert.match(
+    source,
+    /system_identifier_after.*!=.*system_identifier_before/u,
+  );
   assert.match(source, /SELECT count\(\*\) FROM workflow_tasks/u);
-  assert.doesNotMatch(source, /printf[^\n]*admin_secret|echo[^\n]*admin_secret/u);
+  assert.doesNotMatch(
+    source,
+    /printf[^\n]*admin_secret|echo[^\n]*admin_secret/u,
+  );
 });
 
 test("remote database rebuild help and shell syntax are no-write", () => {

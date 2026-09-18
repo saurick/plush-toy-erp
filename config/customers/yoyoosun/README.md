@@ -54,11 +54,12 @@ node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode 
 node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile
 ```
 
-如需生成本地预览报告：
+预览和正式 payload 分开生成：
 
 ```bash
 node scripts/qa/customer-package-lint.mjs --customer yoyoosun --out output/customers/yoyoosun/customer-package-preview.json
+node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-preview-manifest.json
 node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile --out output/customers/yoyoosun/customer-config-runtime-manifest.json
 ```
 
-这些报告只写入 `output/`，不纳入 git。`customer-package-preview.json` 不是 runtime manifest；只有 `--mode compile` 从 `releasePackage.mjs` 生成的 `customer-config-runtime-manifest.json` 才是可提交给后端 validate / publish 的正式 payload。脚本本身不调用后端、不激活、不导入业务数据。
+这些报告只写入 `output/`，不纳入 git。`customer-package-preview.json` 和 `--mode preview` 产物都只用于评审，不能提交给后端 validate / publish，也不会被自动升级成 runtime；只有 `--mode compile` 从 `releasePackage.mjs` 生成的 `customer-config-runtime-manifest.json` 才是正式 payload。脚本本身不调用后端、不激活、不导入业务数据。

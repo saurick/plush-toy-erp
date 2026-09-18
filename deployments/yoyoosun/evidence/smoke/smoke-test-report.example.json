@@ -1,7 +1,7 @@
 {
   "customerCode": "yoyoosun",
   "environment": "customer-trial",
-  "releaseVersion": "<release-version>",
+  "productCommit": "<40-character-git-commit>",
   "generatedAt": "2026-06-12T00:00:00.000Z",
   "operatorRole": "deployment-operator",
   "endpointAlias": "https://erp.example.invalid",
@@ -46,7 +46,7 @@
       "name": "customer-config-effective-session",
       "status": "pass",
       "target": "jsonrpc:customer_config.get_effective_session",
-      "expectedRevision": "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      "expectedRevision": "<approved-runtime-revision>",
       "tokenSourceEnv": "CUSTOMER_CONFIG_ADMIN_TOKEN",
       "responseBodyStored": false
     }

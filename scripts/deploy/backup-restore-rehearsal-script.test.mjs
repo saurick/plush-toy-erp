@@ -41,7 +41,7 @@ test("backup restore rehearsal script help is runnable", () => {
 });
 
 test("backup restore rehearsal requires source DSN before external tools", () => {
-  const result = runScript(["--release-version", "test-release"]);
+  const result = runScript(["--release-id", "test-release"]);
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /请通过 SOURCE_POSTGRES_DSN 提供源库 DSN/);
@@ -49,7 +49,7 @@ test("backup restore rehearsal requires source DSN before external tools", () =>
 });
 
 test("backup restore rehearsal blocks target DB source unless explicitly allowed", () => {
-  const result = runScript(["--release-version", "test-release"], {
+  const result = runScript(["--release-id", "test-release"], {
     SOURCE_POSTGRES_DSN:
       "postgres://plush:secret@192.168.0.133:5435/plush_erp?sslmode=disable",
     ALLOW_TARGET_DB_BACKUP_REHEARSAL: "",
@@ -67,7 +67,7 @@ test("backup restore rehearsal blocks target DB source unless explicitly allowed
 test("backup restore rehearsal rejects non release backup purpose before external tools", () => {
   const result = runScript(
     [
-      "--release-version",
+      "--release-id",
       "test-release",
       "--backup-purpose",
       "backup-restore-rehearsal",
@@ -85,7 +85,7 @@ test("backup restore rehearsal rejects non release backup purpose before externa
 
 test("backup restore rehearsal requires existing release evidence dir before external tools", () => {
   const result = runScript([
-    "--release-version",
+    "--release-id",
     "test-release",
     "--evidence-dir",
     "deployments/yoyoosun/evidence/releases/not-created",
@@ -107,7 +107,7 @@ test("backup restore rehearsal report shape stays compatible with release eviden
     'backup_purpose="pre-migration"',
     "backup-restore-report.json",
     '"customerCode": "$customer"',
-    '"releaseVersion": "$release_version"',
+    '"releaseId": "$release_id"',
     '"backupId": "$backup_id"',
     '"verifiedAt": "$verified_at"',
     '"sourceAlias": "env:$source_env"',

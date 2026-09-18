@@ -10,6 +10,18 @@ import {
   selectYoyoosunCredentialTarget,
 } from "../../deployments/yoyoosun/scripts/credential-contract.mjs";
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../qa/manual-acceptance-core-contract.mjs";
+import {
+  RELEASE_EVIDENCE_CONTRACT,
+  RELEASE_EVIDENCE_FILES,
+  RELEASE_EVIDENCE_PROFILES,
+  PRODUCTION_PREFLIGHT_CHECKS,
+  normalizeReleaseEvidenceProfile,
+  releaseEvidenceContractFromMarkdown,
+  releaseEvidenceFieldFromMarkdown,
+  releaseEvidenceRequiredFiles,
+  releaseEvidenceProfileSatisfies,
+} from "./release-evidence-contract.mjs";
+import { getDeploymentTarget } from "./deployment-targets.mjs";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 const POPULATED_UPGRADE_AUDIT_VERSION = "20260714055504";
@@ -46,7 +58,7 @@ const CREDENTIAL_ROTATION_DEMO_KEYS = Object.freeze([
   "nonAdminPolicy",
   "operationId",
   "phoneBound",
-  "release",
+  "productCommit",
   "replayed",
   "revokedSessions",
   "roleAccounts",
@@ -70,7 +82,7 @@ const CREDENTIAL_ROTATION_CUSTOMER_TEST_KEYS = Object.freeze([
   "nonAdminPolicy",
   "operationId",
   "phoneBound",
-  "release",
+  "productCommit",
   "replayed",
   "revokedSessions",
   "roleAccounts",
@@ -79,19 +91,7 @@ const CREDENTIAL_ROTATION_CUSTOMER_TEST_KEYS = Object.freeze([
   "target",
   "targetIdentity",
 ]);
-export const REQUIRED_FILES = {
-  release: "release-evidence.md",
-  preflight: "production-preflight-report.txt",
-  imageDigests: "image-digests.txt",
-  backup: "backup-evidence.md",
-  backupRestore: "backup-restore-report.json",
-  migration: "migration-status.txt",
-  smoke: "smoke-test-report.json",
-  credentialRotation: "credential-rotation-report.json",
-  rollbackPlan: "rollback-forward-fix-plan.md",
-  rollbackRehearsal: "rollback-rehearsal-report.json",
-  signoff: "release-signoff-checklist.md",
-};
+export const REQUIRED_FILES = RELEASE_EVIDENCE_FILES;
 
 const SECRET_CONTENT_PATTERNS = [
   /-----BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY-----/,
@@ -120,7 +120,10 @@ const RELEASE_EVIDENCE_GATE_SCOPE = {
 };
 
 function parseArgs(argv) {
-  const options = { customer: DEFAULT_CUSTOMER };
+  const options = {
+    customer: DEFAULT_CUSTOMER,
+    profile: RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--json") {
@@ -142,6 +145,11 @@ function parseArgs(argv) {
       index += 1;
       continue;
     }
+    if (arg === "--profile") {
+      options.profile = argv[index + 1];
+      index += 1;
+      continue;
+    }
     if (arg === "-h" || arg === "--help") {
       options.help = true;
       continue;
@@ -153,11 +161,12 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log(`Usage:
-  node scripts/deploy/release-evidence-gate.mjs --deployment-target <demo-133|customer-test-133> --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> [--customer yoyoosun] [--json]
+  node scripts/deploy/release-evidence-gate.mjs --deployment-target <demo-133|customer-test-133> --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> [--profile <base-release|customer-trial-acceptance>] [--customer yoyoosun] [--json]
 
 Purpose:
-  Validate a filled yoyoosun release evidence directory before customer trial or delivery.
-  This checks metadata, pre-migration backup evidence, migration status, smoke report and sign-off fields.
+  Validate a filled yoyoosun release evidence directory.
+  base-release checks the release safety baseline. customer-trial-acceptance additionally
+  requires credential rotation, role login, SMS, PDF and customer config readback evidence.
   It does not execute release, migration, smoke, restore, rollback or customer config activation.
 `);
 }
@@ -307,22 +316,7 @@ function escapeRegExp(value) {
 }
 
 function findMarkdownField(content, fieldName) {
-  const label = escapeRegExp(fieldName);
-  const tablePattern = new RegExp(
-    `^\\|\\s*${label}\\s*\\|\\s*([^|]+?)\\s*\\|`,
-    "mi",
-  );
-  const tableMatch = content.match(tablePattern);
-  if (tableMatch) {
-    return tableMatch[1].trim();
-  }
-
-  const linePattern = new RegExp(
-    `^(?:[-*]\\s*)?${label}\\s*[:：]\\s*(.+)$`,
-    "mi",
-  );
-  const lineMatch = content.match(linePattern);
-  return lineMatch ? lineMatch[1].trim() : "";
+  return releaseEvidenceFieldFromMarkdown(content, fieldName);
 }
 
 function findKeyValueField(content, fieldName) {
@@ -359,14 +353,22 @@ function validateNoSecrets(fileName, content, errors) {
 }
 
 function validateReleaseEvidence(content, errors) {
+  const evidenceContract = releaseEvidenceContractFromMarkdown(content);
+  assert(
+    evidenceContract === RELEASE_EVIDENCE_CONTRACT,
+    evidenceContract
+      ? `${REQUIRED_FILES.release} evidenceContract ${evidenceContract} is unsupported; expected ${RELEASE_EVIDENCE_CONTRACT}`
+      : `${REQUIRED_FILES.release} must declare evidenceContract ${RELEASE_EVIDENCE_CONTRACT}`,
+    errors,
+  );
   requireMarkdownFields(
     content,
     REQUIRED_FILES.release,
     [
       "customerCode",
-      "releaseVersion",
+      "releaseId",
       "environment",
-      "gitCommit",
+      "productCommit",
       "serverImageDigest",
       "webImageDigest",
       "migrationBefore",
@@ -375,7 +377,7 @@ function validateReleaseEvidence(content, errors) {
     ],
     errors,
   );
-  const gitCommit = findMarkdownField(content, "gitCommit");
+  const productCommit = findMarkdownField(content, "productCommit");
   const serverImageDigest = findMarkdownField(content, "serverImageDigest");
   const webImageDigest = findMarkdownField(content, "webImageDigest");
   const migrationBefore = findMarkdownField(content, "migrationBefore");
@@ -386,8 +388,8 @@ function validateReleaseEvidence(content, errors) {
     errors,
   );
   assert(
-    /^[a-f0-9]{7,40}$/i.test(gitCommit),
-    `${REQUIRED_FILES.release} gitCommit must be a git hash`,
+    /^[a-f0-9]{40}$/u.test(productCommit),
+    `${REQUIRED_FILES.release} productCommit must be a full 40-character lowercase Git commit`,
     errors,
   );
   assert(
@@ -419,84 +421,78 @@ function validateReleaseEvidence(content, errors) {
   }
 }
 
-function validatePreflightReport(content, errors) {
+function validatePreflightReport(
+  content,
+  errors,
+  { deploymentTarget, productCommit, profile },
+) {
+  const report = parseJsonEvidence(REQUIRED_FILES.preflight, content, errors);
+  if (!report) return;
+  const checks = Array.isArray(report.checks) ? report.checks : [];
+  const passedCheckIds = new Set(
+    checks
+      .filter((check) => check?.status === "passed")
+      .map((check) => check?.id),
+  );
+  const requiredChecks = [
+    PRODUCTION_PREFLIGHT_CHECKS.ENV_REQUIRED_KEYS,
+    PRODUCTION_PREFLIGHT_CHECKS.PRODUCTION_BOUNDARIES,
+    PRODUCTION_PREFLIGHT_CHECKS.COMPOSE_AND_MIGRATION,
+    PRODUCTION_PREFLIGHT_CHECKS.COMPOSE_RUNTIME_SERVICES,
+    PRODUCTION_PREFLIGHT_CHECKS.RUNTIME_HEALTH_READY,
+  ];
+  if (profile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE) {
+    requiredChecks.push(
+      PRODUCTION_PREFLIGHT_CHECKS.SMS_PROVIDER_RUNTIME,
+      PRODUCTION_PREFLIGHT_CHECKS.PDF_RUNTIME,
+      PRODUCTION_PREFLIGHT_CHECKS.CHROMIUM_RUNTIME,
+    );
+  }
   assert(
-    /\[production-preflight\]\s+ok:\s+env 必需变量齐全/.test(content),
-    `${REQUIRED_FILES.preflight} must include env required keys check`,
+    report.evidenceContract === RELEASE_EVIDENCE_CONTRACT &&
+      report.kind === "production-preflight",
+    `${REQUIRED_FILES.preflight} must use the current production-preflight evidence contract`,
     errors,
   );
   assert(
-    /\[production-preflight\]\s+ok:\s+生产 secret、镜像 tag、debug、后端端口和 PostgreSQL \/ Jaeger 暴露边界通过/.test(
-      content,
-    ),
-    `${REQUIRED_FILES.preflight} must include production secret/image/debug/exposure boundary check`,
+    report.mode === "runtime-env",
+    `${REQUIRED_FILES.preflight} must come from runtime-env mode`,
     errors,
   );
   assert(
-    /\[production-preflight\]\s+ok:\s+Compose、低配部署边界和 migration 脚本通过/.test(
-      content,
-    ),
-    `${REQUIRED_FILES.preflight} must include compose and low-spec deployment boundary check`,
+    releaseEvidenceProfileSatisfies(report.profile, profile),
+    `${REQUIRED_FILES.preflight} profile must match ${profile}`,
     errors,
   );
   assert(
-    /\[production-preflight\]\s+ok:\s+Compose 运行服务存在/.test(content),
-    `${REQUIRED_FILES.preflight} must include runtime Compose services check`,
+    report.deploymentTarget === deploymentTarget,
+    `${REQUIRED_FILES.preflight} deploymentTarget must match ${deploymentTarget}`,
     errors,
   );
   assert(
-    /\[production-preflight\]\s+ok:\s+yoyoosun SMS 运行合同已绑定:\s+mode=provider\s+contract_sha256=[a-f0-9]{64}/i.test(
-      content,
-    ),
-    `${REQUIRED_FILES.preflight} must bind the yoyoosun provider runtime contract`,
+    report.productCommit === productCommit,
+    `${REQUIRED_FILES.preflight} productCommit must match ${REQUIRED_FILES.release}`,
+    errors,
+  );
+  for (const checkId of requiredChecks) {
+    assert(
+      passedCheckIds.has(checkId),
+      `${REQUIRED_FILES.preflight} missing passed check: ${checkId}`,
+      errors,
+    );
+  }
+  assert(
+    Number(report.summary?.total) === checks.length &&
+      Number(report.summary?.passed) === checks.length &&
+      Number(report.summary?.failed) === 0,
+    `${REQUIRED_FILES.preflight} summary must match an all-passed checks list`,
     errors,
   );
   assert(
-    /\[production-preflight\]\s+ok:\s+运行态 SMS 模式匹配合同:\s+mode=provider/.test(
-      content,
-    ),
-    `${REQUIRED_FILES.preflight} must prove runtime SMS mode=provider`,
-    errors,
-  );
-  assert(
-    /\[production-preflight\]\s+ok:\s+auth\.capabilities 已读回 provider\/enabled\/not-mock/.test(
-      content,
-    ),
-    `${REQUIRED_FILES.preflight} must prove provider auth.capabilities readback`,
-    errors,
-  );
-  assert(
-    /\[production-preflight\]\s+ok:\s+运行态 ERP_PDF_WARMUP=async/.test(
-      content,
-    ),
-    `${REQUIRED_FILES.preflight} must include runtime ERP_PDF_WARMUP=async check`,
-    errors,
-  );
-  assert(
-    /\[production-preflight\]\s+ok:\s+运行态 Chromium \/ chromium-common 版本与 Docker exact pin 一致:\s+\S+/.test(
-      content,
-    ),
-    `${REQUIRED_FILES.preflight} must include runtime Chromium/chromium-common exact pin check`,
-    errors,
-  );
-  assert(
-    /\[production-preflight\]\s+ok:\s+healthz \/ readyz 通过/.test(content),
-    `${REQUIRED_FILES.preflight} must include runtime healthz/readyz check`,
-    errors,
-  );
-  assert(
-    /\[production-preflight\]\s+all checks passed/.test(content),
-    `${REQUIRED_FILES.preflight} must include all checks passed`,
-    errors,
-  );
-  assert(
-    !/example 模式仅检查结构|--example/i.test(content),
-    `${REQUIRED_FILES.preflight} must not be an example-mode preflight`,
-    errors,
-  );
-  assert(
-    !/\[production-preflight\]\s+(ERROR|WARN):/i.test(content),
-    `${REQUIRED_FILES.preflight} must not include ERROR or WARN output`,
+    report.redaction?.containsSecrets === false &&
+      report.redaction?.containsRawCustomerRows === false &&
+      report.redaction?.containsFullDsn === false,
+    `${REQUIRED_FILES.preflight} must declare a redacted receipt`,
     errors,
   );
 }
@@ -517,12 +513,12 @@ function validateImageDigests(content, errors) {
   );
 }
 
-function validateBackupEvidence(content, errors) {
+function validateBackupEvidence(content, errors, requireRestore = true) {
   requireMarkdownFields(
     content,
     REQUIRED_FILES.backup,
     [
-      "releaseVersion",
+      "releaseId",
       "environment",
       "backupId",
       "backupTime",
@@ -531,8 +527,7 @@ function validateBackupEvidence(content, errors) {
       "databaseBackupHash",
       "migrationVersion",
       "storageLocationAlias",
-      "restoreTestStatus",
-      "smokeQueryStatus",
+      ...(requireRestore ? ["restoreTestStatus", "smokeQueryStatus"] : []),
     ],
     errors,
   );
@@ -565,6 +560,7 @@ function validateBackupEvidence(content, errors) {
     `${REQUIRED_FILES.backup} databaseBackupHash must be sha256`,
     errors,
   );
+  if (!requireRestore) return;
   assert(
     /pass|success|verified|ok/i.test(restoreTestStatus),
     `${REQUIRED_FILES.backup} restoreTestStatus must show a passed restore verification`,
@@ -600,7 +596,7 @@ function validateBackupRestoreReport(content, errors, absoluteDir) {
   );
   for (const fieldPath of [
     "environment",
-    "releaseVersion",
+    "releaseId",
     "verifiedAt",
     "sourceAlias",
     "restoreTarget",
@@ -893,10 +889,11 @@ function validateEvidenceConsistency(
     absoluteDir,
     credentialTarget,
     demoCustomerRevision,
+    profile,
   },
   errors,
 ) {
-  const releaseVersion = findMarkdownField(releaseContent, "releaseVersion");
+  const releaseId = findMarkdownField(releaseContent, "releaseId");
   const releaseEnvironment = findMarkdownField(releaseContent, "environment");
   const releaseBackupId = findMarkdownField(releaseContent, "backupId");
   const releaseServerImageDigest = findMarkdownField(
@@ -917,11 +914,8 @@ function validateEvidenceConsistency(
   );
   const migrationBefore = findMarkdownField(releaseContent, "migrationBefore");
   const migrationAfter = findMarkdownField(releaseContent, "migrationAfter");
-  const releaseGitCommit = findMarkdownField(releaseContent, "gitCommit");
-  const backupReleaseVersion = findMarkdownField(
-    backupContent,
-    "releaseVersion",
-  );
+  const productCommit = findMarkdownField(releaseContent, "productCommit");
+  const backupReleaseId = findMarkdownField(backupContent, "releaseId");
   const backupEnvironment = findMarkdownField(backupContent, "environment");
   const backupId = findMarkdownField(backupContent, "backupId");
   const backupMigrationVersion = findMarkdownField(
@@ -932,41 +926,47 @@ function validateEvidenceConsistency(
     findMarkdownField(backupContent, "databaseBackupHash"),
   );
   const migrationStatus = parseMigrationStatus(migrationContent);
-  const backupRestoreReport = parseJsonEvidence(
-    REQUIRED_FILES.backupRestore,
-    backupRestoreContent,
-    errors,
-  );
+  const backupRestoreReport = backupRestoreContent
+    ? parseJsonEvidence(
+        REQUIRED_FILES.backupRestore,
+        backupRestoreContent,
+        errors,
+      )
+    : null;
   const smokeReport = parseJsonEvidence(
     REQUIRED_FILES.smoke,
     smokeContent,
     errors,
   );
-  const rollbackRehearsalReport = parseJsonEvidence(
-    REQUIRED_FILES.rollbackRehearsal,
-    rollbackRehearsalContent,
-    errors,
-  );
-  const credentialRotationReport = parseJsonEvidence(
-    REQUIRED_FILES.credentialRotation,
-    credentialRotationContent,
-    errors,
-  );
+  const rollbackRehearsalReport = rollbackRehearsalContent
+    ? parseJsonEvidence(
+        REQUIRED_FILES.rollbackRehearsal,
+        rollbackRehearsalContent,
+        errors,
+      )
+    : null;
+  const credentialRotationReport = credentialRotationContent
+    ? parseJsonEvidence(
+        REQUIRED_FILES.credentialRotation,
+        credentialRotationContent,
+        errors,
+      )
+    : null;
 
   if (credentialRotationReport) {
     assert(
       credentialRotationReport.deploymentTarget ===
         credentialTarget.deploymentTarget &&
-      credentialRotationReport.target === credentialTarget.commandTarget &&
-      credentialRotationReport.targetIdentity ===
+        credentialRotationReport.target === credentialTarget.commandTarget &&
+        credentialRotationReport.targetIdentity ===
           credentialTarget.targetIdentity &&
         credentialRotationReport.database === credentialTarget.database,
       `${REQUIRED_FILES.credentialRotation} target identity must match selected deployment target`,
       errors,
     );
     assert(
-      credentialRotationReport.release === releaseGitCommit,
-      `${REQUIRED_FILES.credentialRotation} release must match ${REQUIRED_FILES.release} gitCommit`,
+      credentialRotationReport.productCommit === productCommit,
+      `${REQUIRED_FILES.credentialRotation} productCommit must match ${REQUIRED_FILES.release}`,
       errors,
     );
     assert(
@@ -1047,8 +1047,8 @@ function validateEvidenceConsistency(
       "steps",
     );
     assert(
-      backupRestoreReport.releaseVersion === releaseVersion,
-      `${REQUIRED_FILES.backupRestore} releaseVersion must match ${REQUIRED_FILES.release}`,
+      backupRestoreReport.releaseId === releaseId,
+      `${REQUIRED_FILES.backupRestore} releaseId must match ${REQUIRED_FILES.release}`,
       errors,
     );
     assert(
@@ -1103,9 +1103,8 @@ function validateEvidenceConsistency(
       errors,
     );
     assert(
-      findKeyValueField(commandSummaryContent, "releaseVersion") ===
-        releaseVersion,
-      `${REQUIRED_FILES.backupRestore} artifacts.commandSummary releaseVersion must match ${REQUIRED_FILES.release}`,
+      findKeyValueField(commandSummaryContent, "releaseId") === releaseId,
+      `${REQUIRED_FILES.backupRestore} artifacts.commandSummary releaseId must match ${REQUIRED_FILES.release}`,
       errors,
     );
     assert(
@@ -1207,8 +1206,8 @@ function validateEvidenceConsistency(
 
   if (smokeReport) {
     assert(
-      smokeReport.releaseVersion === releaseGitCommit,
-      `${REQUIRED_FILES.smoke} releaseVersion must match ${REQUIRED_FILES.release} gitCommit`,
+      smokeReport.productCommit === productCommit,
+      `${REQUIRED_FILES.smoke} productCommit must match ${REQUIRED_FILES.release}`,
       errors,
     );
     assert(
@@ -1226,17 +1225,17 @@ function validateEvidenceConsistency(
       ? smokeReport.checks.find((check) => check?.name === "runtime-identity")
       : undefined;
     assert(
-      runtimeIdentityCheck?.releaseVersion === releaseGitCommit &&
+      runtimeIdentityCheck?.releaseVersion === productCommit &&
         runtimeIdentityCheck?.migrationVersion === migrationAfter,
-      `${REQUIRED_FILES.smoke} runtime-identity release/migration must match ${REQUIRED_FILES.release} gitCommit/migrationAfter`,
+      `${REQUIRED_FILES.smoke} runtime-identity releaseVersion/migrationVersion must match productCommit/migrationAfter`,
       errors,
     );
   }
 
   if (rollbackRehearsalReport) {
     assert(
-      rollbackRehearsalReport.releaseVersion === releaseVersion,
-      `${REQUIRED_FILES.rollbackRehearsal} releaseVersion must match ${REQUIRED_FILES.release}`,
+      rollbackRehearsalReport.releaseId === releaseId,
+      `${REQUIRED_FILES.rollbackRehearsal} releaseId must match ${REQUIRED_FILES.release}`,
       errors,
     );
     assert(
@@ -1261,7 +1260,10 @@ function validateEvidenceConsistency(
     );
     const customerConfigSmokeCheck =
       findCustomerConfigEffectiveSessionCheck(smokeReport);
-    if (customerConfigSmokeCheck) {
+    if (
+      profile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE &&
+      customerConfigSmokeCheck
+    ) {
       const rollbackEffectiveSession =
         rollbackRehearsalReport.postCheck?.customerConfigEffectiveSession;
       assert(
@@ -1297,8 +1299,8 @@ function validateEvidenceConsistency(
     errors,
   );
   assert(
-    backupReleaseVersion === releaseVersion,
-    `${REQUIRED_FILES.backup} releaseVersion must match ${REQUIRED_FILES.release}`,
+    backupReleaseId === releaseId,
+    `${REQUIRED_FILES.backup} releaseId must match ${REQUIRED_FILES.release}`,
     errors,
   );
   assert(
@@ -1326,21 +1328,23 @@ function validateEvidenceConsistency(
     `${REQUIRED_FILES.migration} Pending Files must be 0`,
     errors,
   );
-  assert(
-    findMarkdownField(signoffContent, "releaseVersion") === releaseVersion,
-    `${REQUIRED_FILES.signoff} releaseVersion must match ${REQUIRED_FILES.release}`,
-    errors,
-  );
-  assert(
-    findMarkdownField(signoffContent, "environment") === releaseEnvironment,
-    `${REQUIRED_FILES.signoff} environment must match ${REQUIRED_FILES.release}`,
-    errors,
-  );
-  assert(
-    findMarkdownField(signoffContent, "backupId") === releaseBackupId,
-    `${REQUIRED_FILES.signoff} backupId must match ${REQUIRED_FILES.release}`,
-    errors,
-  );
+  if (signoffContent) {
+    assert(
+      findMarkdownField(signoffContent, "releaseId") === releaseId,
+      `${REQUIRED_FILES.signoff} releaseId must match ${REQUIRED_FILES.release}`,
+      errors,
+    );
+    assert(
+      findMarkdownField(signoffContent, "environment") === releaseEnvironment,
+      `${REQUIRED_FILES.signoff} environment must match ${REQUIRED_FILES.release}`,
+      errors,
+    );
+    assert(
+      findMarkdownField(signoffContent, "backupId") === releaseBackupId,
+      `${REQUIRED_FILES.signoff} backupId must match ${REQUIRED_FILES.release}`,
+      errors,
+    );
+  }
 }
 
 function validateMigrationStatus(content, errors) {
@@ -1365,9 +1369,8 @@ function validateSmokeReport(
   content,
   errors,
   absoluteDir,
-  credentialTarget,
-  allowMissingCustomerConfigEffectiveSession,
-  allowMissingTemplatePdfRender,
+  targetContext,
+  profile,
 ) {
   let report;
   try {
@@ -1383,14 +1386,14 @@ function validateSmokeReport(
     errors,
   );
   assert(
-    report.deploymentTarget === credentialTarget.deploymentTarget &&
-      report.environment === credentialTarget.deploymentTarget,
-    `${REQUIRED_FILES.smoke} deploymentTarget/environment must match ${credentialTarget.deploymentTarget}`,
+    report.deploymentTarget === targetContext.deploymentTarget &&
+      report.environment === targetContext.deploymentTarget,
+    `${REQUIRED_FILES.smoke} deploymentTarget/environment must match ${targetContext.deploymentTarget}`,
     errors,
   );
   assert(
-    /^[0-9a-f]{40}$/u.test(String(report.releaseVersion ?? "")),
-    `${REQUIRED_FILES.smoke} releaseVersion must be a full 40-character Git commit`,
+    /^[0-9a-f]{40}$/u.test(String(report.productCommit ?? "")),
+    `${REQUIRED_FILES.smoke} productCommit must be a full 40-character Git commit`,
     errors,
   );
   assert(
@@ -1482,19 +1485,17 @@ function validateSmokeReport(
   const runtimeIdentityCheck = runtimeIdentityChecks[0];
   if (runtimeIdentityCheck) {
     const expectedRuntimeIdentityDigest = runtimeIdentityDigest(
-      credentialTarget.database,
-      report.releaseVersion,
+      targetContext.database,
+      report.productCommit,
       runtimeIdentityCheck.migrationVersion,
     );
     assert(
       runtimeIdentityCheck.target === "/readyz/runtime-identity" &&
         String(runtimeIdentityCheck.httpCode ?? "") === "200" &&
         runtimeIdentityCheck.scope === "release-v1" &&
-        runtimeIdentityCheck.database === credentialTarget.database &&
-        runtimeIdentityCheck.releaseVersion === report.releaseVersion &&
-        /^\d{14}$/u.test(
-          String(runtimeIdentityCheck.migrationVersion ?? ""),
-        ) &&
+        runtimeIdentityCheck.database === targetContext.database &&
+        runtimeIdentityCheck.releaseVersion === report.productCommit &&
+        /^\d{14}$/u.test(String(runtimeIdentityCheck.migrationVersion ?? "")) &&
         /^[a-f0-9]{64}$/u.test(
           String(runtimeIdentityCheck.expectedDigestSha256 ?? ""),
         ) &&
@@ -1509,13 +1510,13 @@ function validateSmokeReport(
   const pdfChecks = checks.filter(
     (check) => check?.name === "template-pdf-render",
   );
+  const acceptanceProfile =
+    profile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE;
   assert(
-    allowMissingTemplatePdfRender
-      ? pdfChecks.length <= 1
-      : pdfChecks.length === 1,
-    allowMissingTemplatePdfRender
-      ? `${REQUIRED_FILES.smoke} must not contain duplicate template-pdf-render checks`
-      : `${REQUIRED_FILES.smoke} must include exactly one template-pdf-render check`,
+    acceptanceProfile ? pdfChecks.length === 1 : pdfChecks.length <= 1,
+    acceptanceProfile
+      ? `${REQUIRED_FILES.smoke} must include exactly one template-pdf-render check for customer trial acceptance`
+      : `${REQUIRED_FILES.smoke} must not contain duplicate template-pdf-render checks`,
     errors,
   );
   const pdfCheck = pdfChecks[0];
@@ -1558,8 +1559,10 @@ function validateSmokeReport(
     (check) => check?.name === "auth-sms-capabilities",
   );
   assert(
-    authSMSChecks.length === 1,
-    `${REQUIRED_FILES.smoke} must include exactly one auth-sms-capabilities check`,
+    acceptanceProfile ? authSMSChecks.length === 1 : authSMSChecks.length <= 1,
+    acceptanceProfile
+      ? `${REQUIRED_FILES.smoke} must include exactly one auth-sms-capabilities check for customer trial acceptance`
+      : `${REQUIRED_FILES.smoke} must not contain duplicate auth-sms-capabilities checks`,
     errors,
   );
   const authSMSCheck = authSMSChecks[0];
@@ -1587,24 +1590,28 @@ function validateSmokeReport(
     (check) => check?.name === "credential-login-matrix",
   );
   assert(
-    credentialChecks.length === 1,
-    `${REQUIRED_FILES.smoke} must include exactly one credential-login-matrix check`,
+    acceptanceProfile
+      ? credentialChecks.length === 1
+      : credentialChecks.length <= 1,
+    acceptanceProfile
+      ? `${REQUIRED_FILES.smoke} must include exactly one credential-login-matrix check for customer trial acceptance`
+      : `${REQUIRED_FILES.smoke} must not contain duplicate credential-login-matrix checks`,
     errors,
   );
   const credentialCheck = credentialChecks[0];
-  if (credentialCheck) {
+  if (credentialCheck && acceptanceProfile) {
     const requiredUsernames = [
-      credentialTarget.admin.username,
-      ...credentialTarget.nonAdmin.usernames,
+      targetContext.admin.username,
+      ...targetContext.nonAdmin.usernames,
     ];
-    const demo = credentialTarget.deploymentTarget === "demo-133";
+    const demo = targetContext.deploymentTarget === "demo-133";
     assert(
       credentialCheck.target === "jsonrpc:auth.admin_login",
       `${REQUIRED_FILES.smoke} credential-login-matrix target must be jsonrpc:auth.admin_login`,
       errors,
     );
     assert(
-      credentialCheck.adminUsername === credentialTarget.admin.username &&
+      credentialCheck.adminUsername === targetContext.admin.username &&
         credentialCheck.adminAuthenticated === true &&
         credentialCheck.adminSuperAdmin === true,
       `${REQUIRED_FILES.smoke} credential-login-matrix must prove the selected target admin identity`,
@@ -1612,13 +1619,13 @@ function validateSmokeReport(
     );
     assert(
       Number(credentialCheck.nonAdminExpected) ===
-        credentialTarget.nonAdmin.usernames.length &&
+        targetContext.nonAdmin.usernames.length &&
         Number(credentialCheck.nonAdminAuthenticated) ===
-          credentialTarget.nonAdmin.usernames.length &&
+          targetContext.nonAdmin.usernames.length &&
         Number(credentialCheck.totalExpected) === requiredUsernames.length &&
-        Number(credentialCheck.totalAuthenticated) === requiredUsernames.length &&
-        credentialCheck.loginScope ===
-          (demo ? "admin-plus-uat" : "admin-only"),
+        Number(credentialCheck.totalAuthenticated) ===
+          requiredUsernames.length &&
+        credentialCheck.loginScope === (demo ? "admin-plus-uat" : "admin-only"),
       `${REQUIRED_FILES.smoke} credential-login-matrix counts/scope must match the selected target`,
       errors,
     );
@@ -1639,13 +1646,13 @@ function validateSmokeReport(
     );
     assert(
       credentialCheck.adminPasswordSource ===
-        credentialTarget.admin.credentialSource &&
-        credentialCheck.nonAdminPolicy === credentialTarget.nonAdmin.policy &&
+        targetContext.admin.credentialSource &&
+        credentialCheck.nonAdminPolicy === targetContext.nonAdmin.policy &&
         (demo
           ? credentialCheck.uatPasswordSource ===
-              credentialTarget.nonAdmin.credential.credentialSource &&
+              targetContext.nonAdmin.credential.credentialSource &&
             credentialCheck.smsPhoneSourceEnv ===
-              credentialTarget.sms.identity.environmentVariable &&
+              targetContext.sms.identity.environmentVariable &&
             typeof credentialCheck.phoneConfigured === "boolean" &&
             credentialCheck.phoneBound === credentialCheck.phoneConfigured
           : !Object.keys(credentialCheck).some((key) =>
@@ -1656,16 +1663,14 @@ function validateSmokeReport(
     );
     assert(
       credentialCheck.credentialContractSchema ===
-        credentialTarget.schemaVersion &&
-        credentialCheck.credentialContractSha256 ===
-          credentialTarget.sha256 &&
-        credentialCheck.deploymentTarget ===
-          credentialTarget.deploymentTarget &&
-        credentialCheck.commandTarget === credentialTarget.commandTarget &&
-        credentialCheck.targetIdentity === credentialTarget.targetIdentity &&
-        credentialCheck.database === credentialTarget.database &&
+        targetContext.schemaVersion &&
+        credentialCheck.credentialContractSha256 === targetContext.sha256 &&
+        credentialCheck.deploymentTarget === targetContext.deploymentTarget &&
+        credentialCheck.commandTarget === targetContext.commandTarget &&
+        credentialCheck.targetIdentity === targetContext.targetIdentity &&
+        credentialCheck.database === targetContext.database &&
         (demo
-          ? credentialCheck.datasetVersion === credentialTarget.datasetVersion
+          ? credentialCheck.datasetVersion === targetContext.datasetVersion
           : !("datasetVersion" in credentialCheck)),
       `${REQUIRED_FILES.smoke} credential-login-matrix contract schema/hash/target identity must match credential.contract.json`,
       errors,
@@ -1699,10 +1704,7 @@ function validateSmokeReport(
     `${REQUIRED_FILES.smoke} must not contain duplicate customer-config-effective-session checks`,
     errors,
   );
-  if (
-    credentialTarget.deploymentTarget === "demo-133" &&
-    !allowMissingCustomerConfigEffectiveSession
-  ) {
+  if (acceptanceProfile && targetContext.deploymentTarget === "demo-133") {
     assert(
       customerConfigChecks.length === 1,
       `${REQUIRED_FILES.smoke} must include exactly one customer-config-effective-session check for demo-133`,
@@ -1710,7 +1712,7 @@ function validateSmokeReport(
     );
   }
   const customerConfigCheck = customerConfigChecks[0];
-  if (customerConfigCheck) {
+  if (customerConfigCheck && acceptanceProfile) {
     assert(
       customerConfigCheck.target ===
         "jsonrpc:customer_config.get_effective_session",
@@ -1835,15 +1837,10 @@ function validateCredentialRotationReport(
   );
   assert(
     report.schemaVersion === CREDENTIAL_ROTATION_RECEIPT_SCHEMA &&
-      hasExactKeys(
-        report.rollbackPoint,
-        CREDENTIAL_ROLLBACK_POINT_KEYS,
-      ) &&
+      hasExactKeys(report.rollbackPoint, CREDENTIAL_ROLLBACK_POINT_KEYS) &&
       report.rollbackPoint.backupAlias ===
-        `pre-credential-rotation-${String(report.release ?? "").slice(0, 12)}-${report.operationId}` &&
-      /^[a-f0-9]{64}$/u.test(
-        String(report.rollbackPoint.backupSha256 ?? ""),
-      ) &&
+        `pre-credential-rotation-${String(report.productCommit ?? "").slice(0, 12)}-${report.operationId}` &&
+      /^[a-f0-9]{64}$/u.test(String(report.rollbackPoint.backupSha256 ?? "")) &&
       Number.isSafeInteger(report.rollbackPoint.backupSizeBytes) &&
       report.rollbackPoint.backupSizeBytes > 0 &&
       report.rollbackPoint.restoreChecked === true,
@@ -1856,8 +1853,8 @@ function validateCredentialRotationReport(
     errors,
   );
   assert(
-    /^[0-9a-f]{40}$/u.test(String(report.release ?? "")),
-    `${REQUIRED_FILES.credentialRotation} release must be a full 40-character Git commit`,
+    /^[0-9a-f]{40}$/u.test(String(report.productCommit ?? "")),
+    `${REQUIRED_FILES.credentialRotation} productCommit must be a full 40-character Git commit`,
     errors,
   );
   assert(
@@ -1871,7 +1868,8 @@ function validateCredentialRotationReport(
     Number(report.adminAccounts) === 1 &&
       report.accountKind ===
         (demo ? "customer-uat" : "customer-test-admin-only") &&
-      Number(report.roleAccounts) === credentialTarget.nonAdmin.usernames.length &&
+      Number(report.roleAccounts) ===
+        credentialTarget.nonAdmin.usernames.length &&
       (demo
         ? Number(report.nonAdminAccounts) ===
           credentialTarget.nonAdmin.usernames.length
@@ -1928,8 +1926,7 @@ function validateCredentialRotationReport(
       (account) =>
         account?.phoneBound ===
         (report.phoneBound &&
-          account?.username ===
-            credentialTarget.admin.username),
+          account?.username === credentialTarget.admin.username),
     ),
     `${REQUIRED_FILES.credentialRotation} account phoneBound values must follow the optional contracted admin binding`,
     errors,
@@ -1993,7 +1990,7 @@ function validateRollbackRehearsalReport(content, errors) {
   );
   for (const fieldPath of [
     "environment",
-    "releaseVersion",
+    "releaseId",
     "rehearsedAt",
     "triggerScenario",
     "rollbackTargetRelease",
@@ -2084,7 +2081,7 @@ function validateSignoff(content, errors) {
     content,
     REQUIRED_FILES.signoff,
     [
-      "releaseVersion",
+      "releaseId",
       "environment",
       "backupId",
       "releaseConclusion",
@@ -2119,13 +2116,19 @@ export function validateReleaseEvidenceGate({
   deploymentTarget,
   customer = DEFAULT_CUSTOMER,
   repoRoot = process.cwd(),
-  allowMissingCustomerConfigEffectiveSession = false,
-  allowMissingTemplatePdfRender = false,
+  profile = RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
 } = {}) {
   const errors = [];
-  let credentialTarget;
+  let normalizedProfile = RELEASE_EVIDENCE_PROFILES.BASE_RELEASE;
+  let targetContext;
   let demoCustomerRevision = "";
   let runtimeIdentity = null;
+
+  try {
+    normalizedProfile = normalizeReleaseEvidenceProfile(profile);
+  } catch (error) {
+    errors.push(error.message);
+  }
 
   assert(
     customer === DEFAULT_CUSTOMER,
@@ -2134,21 +2137,30 @@ export function validateReleaseEvidenceGate({
   );
   assert(Boolean(evidenceDir), "--evidence-dir is required", errors);
   assert(
-    deploymentTarget === "demo-133" ||
-      deploymentTarget === "customer-test-133",
+    deploymentTarget === "demo-133" || deploymentTarget === "customer-test-133",
     "--deployment-target must be demo-133 or customer-test-133",
     errors,
   );
   if (errors.length === 0) {
-    credentialTarget = selectYoyoosunCredentialTarget(
-      loadYoyoosunCredentialContract(),
-      deploymentTarget,
-    );
-    if (deploymentTarget === "demo-133") {
-      demoCustomerRevision = loadDemoCustomerRevision(
-        credentialTarget,
-        errors,
+    const target = getDeploymentTarget(deploymentTarget);
+    targetContext = {
+      deploymentTarget: target.key,
+      database: target.database.name,
+    };
+    if (
+      normalizedProfile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE
+    ) {
+      targetContext = selectYoyoosunCredentialTarget(
+        loadYoyoosunCredentialContract(),
+        deploymentTarget,
       );
+    }
+    if (
+      normalizedProfile ===
+        RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE &&
+      deploymentTarget === "demo-133"
+    ) {
+      demoCustomerRevision = loadDemoCustomerRevision(targetContext, errors);
     }
   }
 
@@ -2159,8 +2171,19 @@ export function validateReleaseEvidenceGate({
     errors,
   );
 
+  const releasePath = path.join(absoluteDir, REQUIRED_FILES.release);
+  const releaseContent =
+    absoluteDir && fs.existsSync(releasePath) ? readText(releasePath) : "";
+  const requiredFiles = releaseEvidenceRequiredFiles(
+    normalizedProfile,
+    releaseContent,
+  );
+  const recoveryRehearsalRequired = requiredFiles.includes(
+    REQUIRED_FILES.backupRestore,
+  );
+  const signoffRequired = requiredFiles.includes(REQUIRED_FILES.signoff);
   if (errors.length === 0) {
-    for (const relativePath of Object.values(REQUIRED_FILES)) {
+    for (const relativePath of requiredFiles) {
       assert(
         fs.existsSync(path.join(absoluteDir, relativePath)),
         `Missing ${relativePath}`,
@@ -2170,9 +2193,6 @@ export function validateReleaseEvidenceGate({
   }
 
   if (errors.length === 0) {
-    const releaseContent = readText(
-      path.join(absoluteDir, REQUIRED_FILES.release),
-    );
     const preflightContent = readText(
       path.join(absoluteDir, REQUIRED_FILES.preflight),
     );
@@ -2182,42 +2202,40 @@ export function validateReleaseEvidenceGate({
     const backupContent = readText(
       path.join(absoluteDir, REQUIRED_FILES.backup),
     );
-    const backupRestoreContent = readText(
-      path.join(absoluteDir, REQUIRED_FILES.backupRestore),
-    );
+    const backupRestoreContent = recoveryRehearsalRequired
+      ? readText(path.join(absoluteDir, REQUIRED_FILES.backupRestore))
+      : "";
     const migrationContent = readText(
       path.join(absoluteDir, REQUIRED_FILES.migration),
     );
     const smokeContent = readText(path.join(absoluteDir, REQUIRED_FILES.smoke));
-    const credentialRotationContent = readText(
-      path.join(absoluteDir, REQUIRED_FILES.credentialRotation),
-    );
+    const credentialRotationContent =
+      normalizedProfile === RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE
+        ? readText(path.join(absoluteDir, REQUIRED_FILES.credentialRotation))
+        : "";
     const rollbackPlanContent = readText(
       path.join(absoluteDir, REQUIRED_FILES.rollbackPlan),
     );
-    const rollbackRehearsalContent = readText(
-      path.join(absoluteDir, REQUIRED_FILES.rollbackRehearsal),
-    );
-    const signoffContent = readText(
-      path.join(absoluteDir, REQUIRED_FILES.signoff),
-    );
+    const rollbackRehearsalContent = recoveryRehearsalRequired
+      ? readText(path.join(absoluteDir, REQUIRED_FILES.rollbackRehearsal))
+      : "";
+    const signoffContent = signoffRequired
+      ? readText(path.join(absoluteDir, REQUIRED_FILES.signoff))
+      : "";
 
-    const releaseGitCommit = findMarkdownField(
-      releaseContent,
-      "gitCommit",
-    );
+    const productCommit = findMarkdownField(releaseContent, "productCommit");
     const migrationVersion = findMarkdownField(
       releaseContent,
       "migrationAfter",
     );
     runtimeIdentity = {
       scope: "release-v1",
-      database: credentialTarget.database,
-      releaseVersion: releaseGitCommit,
+      database: targetContext.database,
+      productCommit,
       migrationVersion,
       expectedDigestSha256: runtimeIdentityDigest(
-        credentialTarget.database,
-        releaseGitCommit,
+        targetContext.database,
+        productCommit,
         migrationVersion,
       ),
     };
@@ -2230,7 +2248,9 @@ export function validateReleaseEvidenceGate({
       [REQUIRED_FILES.backupRestore, backupRestoreContent],
       [REQUIRED_FILES.migration, migrationContent],
       [REQUIRED_FILES.smoke, smokeContent],
-      [REQUIRED_FILES.credentialRotation, credentialRotationContent],
+      ...(credentialRotationContent
+        ? [[REQUIRED_FILES.credentialRotation, credentialRotationContent]]
+        : []),
       [REQUIRED_FILES.rollbackPlan, rollbackPlanContent],
       [REQUIRED_FILES.rollbackRehearsal, rollbackRehearsalContent],
       [REQUIRED_FILES.signoff, signoffContent],
@@ -2244,28 +2264,35 @@ export function validateReleaseEvidenceGate({
       `${REQUIRED_FILES.release} environment must match ${deploymentTarget}`,
       errors,
     );
-    validatePreflightReport(preflightContent, errors);
+    validatePreflightReport(preflightContent, errors, {
+      deploymentTarget,
+      productCommit,
+      profile: normalizedProfile,
+    });
     validateImageDigests(imageDigestsContent, errors);
-    validateBackupEvidence(backupContent, errors);
-    validateBackupRestoreReport(backupRestoreContent, errors, absoluteDir);
+    validateBackupEvidence(backupContent, errors, recoveryRehearsalRequired);
+    if (recoveryRehearsalRequired)
+      validateBackupRestoreReport(backupRestoreContent, errors, absoluteDir);
     validateMigrationStatus(migrationContent, errors);
     validateSmokeReport(
       smokeContent,
       errors,
       absoluteDir,
-      credentialTarget,
-      allowMissingCustomerConfigEffectiveSession,
-      allowMissingTemplatePdfRender,
+      targetContext,
+      normalizedProfile,
     );
-    validateCredentialRotationReport(
-      credentialRotationContent,
-      errors,
-      credentialTarget,
-      demoCustomerRevision,
-    );
+    if (credentialRotationContent) {
+      validateCredentialRotationReport(
+        credentialRotationContent,
+        errors,
+        targetContext,
+        demoCustomerRevision,
+      );
+    }
     validateRollbackPlan(rollbackPlanContent, errors);
-    validateRollbackRehearsalReport(rollbackRehearsalContent, errors);
-    validateSignoff(signoffContent, errors);
+    if (recoveryRehearsalRequired)
+      validateRollbackRehearsalReport(rollbackRehearsalContent, errors);
+    if (signoffRequired) validateSignoff(signoffContent, errors);
     validateEvidenceConsistency(
       {
         releaseContent,
@@ -2279,8 +2306,9 @@ export function validateReleaseEvidenceGate({
         signoffContent,
         repoRoot,
         absoluteDir,
-        credentialTarget,
+        credentialTarget: targetContext,
         demoCustomerRevision,
+        profile: normalizedProfile,
       },
       errors,
     );
@@ -2298,7 +2326,10 @@ export function validateReleaseEvidenceGate({
     customer,
     deploymentTarget,
     evidenceDir: absoluteDir,
-    requiredFiles: Object.values(REQUIRED_FILES),
+    evidenceContract: RELEASE_EVIDENCE_CONTRACT,
+    profile: normalizedProfile,
+    requiredFiles,
+    recoveryRehearsalRequired,
     runtimeIdentity,
     scope: RELEASE_EVIDENCE_GATE_SCOPE,
   };
@@ -2307,6 +2338,8 @@ export function validateReleaseEvidenceGate({
 function formatText(result) {
   const lines = [
     `release evidence gate ok: customer=${result.customer}, deploymentTarget=${result.deploymentTarget}, evidenceDir=${result.evidenceDir}`,
+    `evidenceContract: ${result.evidenceContract}`,
+    `profile: ${result.profile}`,
     `ready means: ${result.scope.readyMeaning}`,
     "not proven by this gate:",
   ];
