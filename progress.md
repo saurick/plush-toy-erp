@@ -6,11 +6,12 @@
 
 ### 客户发布门禁收口与固定版本发布（2026-09-19）
 
-- 收口验收版本解耦、发布证据分档、恢复风险条件、结构化预检回执，以及 Chromium 安全语义校验；两组提交 `f27a388f`、`e8d49cb5efec873a6eb31398c659c3bfc22febe4` 已推送 main，未夹带其他任务未提交的页面、打印及委外改动。
-- 本地 release 测试 1269 项通过；最终定向回归、Go manualacceptance 与提交 / 推送门禁通过。同 SHA 的 [GitLab CI 181](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/181) 已通过，28 个作业、耗时 7 分 28 秒，CI Gate 已登记 exact-SHA 证据。
-- [Release 182](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/182) 未发布：五类真实 PDF 通过，Trivy 下载超时经固定版本及摘要校验后恢复；重试扫描发现 Chromium / chromium-common 共 44 条可修复高危记录。按 Debian 官方索引将浏览器锁定为 `153.0.8010.47-2~deb12u1`、快照锁定为 `20260918T180000Z`；须重新取得同一修正 SHA 的 CI、扫描及发布演练终态，不忽略漏洞。
-- 用户明确要求 demo / customer-test 都部署并保留数据。两目标预检通过，仍分别运行 `01fc1476` / `576098bb`；已有 Keychain 专用只读取件凭据已验证，未新建或轮换。尚未部署或迁移；升级包含附件外置，继续走正式停写、备份恢复、导出校验、迁移及公网读回链路。
-- 用户已授权本轮提交、推送及部署；一次性干净推送副本在远端 CI 通过后移入废纸篓，可恢复。此记录随部署结果继续收口，不代表客户 UAT。
+- 验收版本解耦、发布证据分档、恢复风险条件、结构化预检和 Chromium 安全语义校验已由 `f27a388f`、`e8d49cb5` 提交推送；本地 release 1269 项及后续定向回归通过，未夹带其他会话的页面、打印和委外改动。
+- 发布扫描阻断旧 Chromium 的 44 条可修复高危记录，`e61c2e52e67e8e023dc2bf3f899a269775277d8d` 仅更新固定浏览器和 Debian 快照，并补充交接记录；17 项定向测试通过。[CI 183](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/183) 28 项通过；[Release 184](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/184) 完成镜像扫描、五类 PDF、隔离迁移 / 登录 / 备份恢复 / 重启及零残留验证，正式发布 `2026.09.19-1`。
+- demo、customer-test 均已部署上述 SHA，migration 均为 `20260916090000`；health / ready、基础 smoke、前后端和公网 exact-SHA 读回通过。成功 operation 分别为 `cf880ace-c012-4a7c-a117-cd55fc412197`、`2ac00192-516b-444b-b468-e0930c5200b8`，正式回执保存在既有 delivery operation store。
+- 两环境保留原业务数据、账号和 active config；只启用已准备的独立附件配置。demo 的 27 份附件、9,001,107 字节逐份读回核验通过；test 原有附件为零，独立 bucket 校验通过。取件凭据复用 Keychain，未展示、新建或轮换。
+- demo 首次尝试在正式 migration 前因 Docker 默认网段耗尽而失败；已实时证明旧服务及数据库版本恢复，保留原失败回执与 `output/qa/cd-20260919/demo-recovery-readback.json` 后显式重试。仅为两目标创建 `internal` 附件网络，demo / test 分别使用 `10.203.137.0/28`、`10.203.138.0/28`；已验证不冲突，不改 Docker 全局设置、不删除其他网络。重建目标网络时保留或显式恢复该分配。
+- 两目标均保留升级前完整 PG dump、恢复验证和旧版本；附件旧列已移除，回退旧代码须同时恢复配套旧 PG dump，不能只换镜像。一次性推送副本已移入废纸篓。以上不替代目标岗位全量验收和甲方 UAT；本节为发布后记录，不改变已冻结的运行制品。
 
 ### CD 制品发布与目标预检（2026-09-17）
 
