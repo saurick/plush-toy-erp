@@ -6,6 +6,7 @@ import {
   getDeploymentTarget,
   loadDeploymentTargetRegistry,
 } from "../../../scripts/deploy/deployment-targets.mjs";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../../../scripts/qa/manual-acceptance-core-contract.mjs";
 
 export const YOYOOSUN_CREDENTIAL_TARGETS = Object.freeze([
   "demo-133",
@@ -131,7 +132,7 @@ export function loadYoyoosunCredentialContract({
     demo.deploymentTarget === "demo-133" &&
     demo.commandTarget === "customer-trial-133" &&
     demo.database === demoRegistry.database.name &&
-    demo.datasetVersion === "2026.09.16-v7" &&
+    demo.datasetVersion === MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion &&
     demo.targetIdentity === `customer-trial-133:${demo.datasetVersion}` &&
     demo.adminCredential === "admin" &&
     demo.nonAdminPolicy === "rotate" &&
@@ -231,10 +232,7 @@ export function loadYoyoosunCredentialContract({
   });
 }
 
-export function selectYoyoosunCredentialTarget(
-  loaded,
-  deploymentTarget,
-) {
+export function selectYoyoosunCredentialTarget(loaded, deploymentTarget) {
   if (
     !plainObject(loaded) ||
     !plainObject(loaded.contract) ||

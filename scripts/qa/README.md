@@ -147,6 +147,8 @@ V7 使用 `YS7` 来源编号与 `YS-V7` 任务编号，补齐材料厂商料号�
 
 `dataVersion` 表示一轮可重复、可验收的冻结模拟数据基线，不是 Git commit、代码版本或 operation 版本。纯样式、重构、性能优化及不改变数据结果的修复继续使用当前 V7；每次开发反馈仍以新的 operation / batch、隔离库和 exact commit 留证。只有单位含义、记录结构、生命周期 / 状态、业务链映射、稳定编码或数量合同发生不兼容变化，才集中升级 `dataVersion`。已持久落到本地或 demo 的冻结版本不得静默改写；旧基线保留用于说明当时测试内容。
 
+`server/internal/manualacceptance/contract.json` 是这些版本值的唯一真源。`schemaVersion` 只表示合同结构，不随数据批次自动递增；`dataVersion / runId / visiblePrefix` 必须彼此一致。同一天可以冻结不同批次，明确登记的上一批次及客户配置版本只须早于当前版本，不强制相邻编号，也不要求 schema、数据和客户配置的数字相同。Go / JS 共同校验结构、模拟数据限制、单位 / 仓库与固定目标身份。
+
 `demo-133` 使用独立 Compose project `plush-toy-erp-demo-v1`、数据库 `plush_erp_demo_v1`、根目录 `/home/simon/plush-toy-erp-demo-v1`，PostgreSQL / API / Web 端口为 `55436 / 8325 / 5195`。所有精确路径、锁、Jaeger 端口和公网入口以 `scripts/deploy/deployment-targets.json` 为真源；正常整批造数只走后端 API。
 
 demo 造数前必须先在固定 release 上完成登记 target 的 migration、preflight 和 runtime identity 读回。精确命令以 [Compose 迁移脚本](../../server/deploy/compose/prod/README.md#迁移脚本) 为唯一运维入口。运行 env 必须由当前用户持有、精确 `0600` 且无符号链接父路径；启动后必须以 `production-preflight.sh --runtime --expected-release <40sha>` 证明服务 image/content identity 与 app/web `GIT_SHA` 都绑定同一 release，才能进入配置激活与整批造数。

@@ -5,17 +5,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
-
-const SchemaVersion = "plush.manual-acceptance-contract/v7"
 
 var (
 	//go:embed contract.json
-	contractJSON []byte
-	codePattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$`)
-	current      = mustParseContract(contractJSON)
+	contractJSON          []byte
+	codePattern           = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$`)
+	schemaVersionPattern  = regexp.MustCompile(`^plush\.manual-acceptance-contract/v([1-9][0-9]*)$`)
+	datasetVersionPattern = regexp.MustCompile(
+		`^([0-9]{4})\.([0-9]{2})\.([0-9]{2})-v([1-9][0-9]*)$`,
+	)
+	configRevisionPattern = regexp.MustCompile(
+		`^yoyoosun-customer-trial-133-package-v([1-9][0-9]*)\.runtime-manifest-v1$`,
+	)
+	migrationVersionPattern = regexp.MustCompile(`^[0-9]{14}$`)
+	current                 = mustParseContract(contractJSON)
 )
+
+type datasetIdentity struct {
+	compactDate string
+	isoDate     string
+	sequence    int
+}
 
 type SourceNormalization struct {
 	TrimWhitespace bool       `json:"trimWhitespace"`
@@ -86,15 +100,46 @@ func mustParseContract(raw []byte) Contract {
 	return contract
 }
 
+func parseDatasetVersion(value string) (datasetIdentity, bool) {
+	match := datasetVersionPattern.FindStringSubmatch(value)
+	if match == nil {
+		return datasetIdentity{}, false
+	}
+	isoDate := fmt.Sprintf("%s-%s-%s", match[1], match[2], match[3])
+	parsedDate, err := time.Parse("2006-01-02", isoDate)
+	if err != nil || parsedDate.Format("2006-01-02") != isoDate {
+		return datasetIdentity{}, false
+	}
+	sequence, err := strconv.Atoi(match[4])
+	if err != nil {
+		return datasetIdentity{}, false
+	}
+	return datasetIdentity{
+		compactDate: match[1] + match[2] + match[3],
+		isoDate:     isoDate,
+		sequence:    sequence,
+	}, true
+}
+
+func parseConfigPackage(value string) (int, bool) {
+	match := configRevisionPattern.FindStringSubmatch(value)
+	if match == nil {
+		return 0, false
+	}
+	sequence, err := strconv.Atoi(match[1])
+	return sequence, err == nil
+}
+
 func Validate(contract Contract) error {
-	if contract.SchemaVersion != SchemaVersion ||
+	schemaMatch := schemaVersionPattern.FindStringSubmatch(contract.SchemaVersion)
+	dataset, datasetOK := parseDatasetVersion(contract.DataVersion)
+	if schemaMatch == nil || !datasetOK ||
 		contract.DatasetKey != "yoyoosun-manual-acceptance" ||
-		contract.DataVersion != "2026.09.16-v7" ||
-		contract.RunID != "20260916-V7" ||
-		contract.AnchorDateUTC != "2026-09-16T12:00:00.000Z" ||
-		contract.VisiblePrefix != "YS7" ||
+		contract.RunID != fmt.Sprintf("%s-V%d", dataset.compactDate, dataset.sequence) ||
+		contract.AnchorDateUTC != dataset.isoDate+"T12:00:00.000Z" ||
+		contract.VisiblePrefix != fmt.Sprintf("YS%d", dataset.sequence) ||
 		!contract.SimulatedOnly || contract.RealCustomerImport {
-		return fmt.Errorf("dataset identity is not the registered V7 simulation")
+		return fmt.Errorf("dataset identity is not a registered simulation contract")
 	}
 	if !contract.SourceNormalization.TrimWhitespace ||
 		!contract.SourceNormalization.PreserveCase ||
@@ -148,17 +193,20 @@ func Validate(contract Contract) error {
 		warehouseCodes[warehouse.Code] = struct{}{}
 	}
 	target := contract.CustomerTrial133
+	previousDataset, previousDatasetOK := parseDatasetVersion(target.PreviousDatasetVersion)
+	configPackage, configPackageOK := parseConfigPackage(target.ConfigRevision)
+	previousConfigPackage, previousConfigPackageOK := parseConfigPackage(target.PreviousConfigRevision)
 	if target.Target != "customer-trial-133" ||
 		target.DeploymentTarget != "demo-133" ||
 		target.DatabaseName != "plush_erp_demo_v1" ||
 		target.DatabaseLifecycle != "long-lived-registered-target" ||
-		!regexp.MustCompile(`^[0-9]{14}$`).MatchString(target.MinimumMigration) ||
-		!strings.Contains(target.ConfigRevision, "package-v9") ||
-		!strings.HasSuffix(target.ConfigProductVersion, contract.DataVersion) ||
-		!strings.Contains(target.PreviousConfigRevision, "package-v8") ||
-		target.PreviousConfigProductVersion != "customer-trial-133-test-2026.08.15-v6" ||
-		target.PreviousDatasetVersion != "2026.08.15-v6" ||
-		!strings.HasSuffix(target.PreviousConfigProductVersion, target.PreviousDatasetVersion) {
+		!migrationVersionPattern.MatchString(target.MinimumMigration) ||
+		!configPackageOK || !previousConfigPackageOK ||
+		configPackage <= previousConfigPackage ||
+		target.ConfigProductVersion != "customer-trial-133-test-"+contract.DataVersion ||
+		!previousDatasetOK || previousDataset.sequence >= dataset.sequence ||
+		previousDataset.isoDate > dataset.isoDate ||
+		target.PreviousConfigProductVersion != "customer-trial-133-test-"+target.PreviousDatasetVersion {
 		return fmt.Errorf("customer-trial-133 identity is incomplete")
 	}
 	return nil

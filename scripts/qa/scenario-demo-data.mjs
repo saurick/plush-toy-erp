@@ -701,8 +701,8 @@ function usage() {
 只读计划与前置核对：
   node scripts/qa/scenario-demo-data.mjs
 
-执行本地长期 V7 批次：
-  SCENARIO_DEMO_CONFIRM='APPLY_SCENARIO_DEMO:scenario-demo:<database>:2026.09.16-v7:20260916-V7:<plan-digest>' \\
+执行当前登记的长期批次：
+  SCENARIO_DEMO_CONFIRM='APPLY_SCENARIO_DEMO:scenario-demo:<database>:${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}:${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}:<plan-digest>' \\
     node scripts/qa/scenario-demo-data.mjs --apply --expected-plan-digest <plan-digest>
 
 133 使用同一 canonical semantic digest，但必须显式 --target customer-trial-133、

@@ -123,7 +123,9 @@ function sourceRoleUsersForTarget(target) {
     purchase: roleUsernames.purchase,
     engineering: roleUsernames.engineering,
     production: roleUsernames.production,
-    finance: manualAcceptanceAccountSetForTarget(target).contractOperatorProfile.username,
+    finance:
+      manualAcceptanceAccountSetForTarget(target).contractOperatorProfile
+        .username,
     boss: roleUsernames.boss,
     pmc: roleUsernames.pmc,
   });
@@ -460,7 +462,11 @@ function buildSuppliers(prefix, count) {
 }
 
 function buildMaterials(prefix, count, suppliers) {
-  const materialSuppliers = suppliers.filter((supplier) => supplier.isActive && ["material", "mixed"].includes(supplier.supplier_type));
+  const materialSuppliers = suppliers.filter(
+    (supplier) =>
+      supplier.isActive &&
+      ["material", "mixed"].includes(supplier.supplier_type),
+  );
   const templates = [
     ["短毛绒", "面料", "58 英寸 / 280g", "米白", "yard"],
     ["提花布", "面料", "57 英寸", "浅粉", "chineseYard"],
@@ -490,7 +496,12 @@ function buildMaterials(prefix, count, suppliers) {
       supplierRef: materialSuppliers[offset % materialSuppliers.length].code,
       supplier_item_no: `CL-${1000 + index}`,
       category,
-      stock_category: category === "包装" ? "PACKAGING" : ["面料", "填充"].includes(category) ? "MAIN" : "AUXILIARY",
+      stock_category:
+        category === "包装"
+          ? "PACKAGING"
+          : ["面料", "填充"].includes(category)
+            ? "MAIN"
+            : "AUXILIARY",
       spec,
       color: displayColor,
       unitKey,
@@ -749,8 +760,8 @@ function buildPurchaseOrders(
       payment_term_days: supplier.default_payment_term_days,
       invoice_required: supplier.default_invoice_required,
       invoice_category: supplier.default_invoice_category,
-      supplier_confirmed_arrival_date: index % 3 === 0
-        ? isoDate(6 + (index % 15), anchorDate) : undefined,
+      supplier_confirmed_arrival_date:
+        index % 3 === 0 ? isoDate(6 + (index % 15), anchorDate) : undefined,
       delivery_address: "模拟工业区收货路 1 号",
       contract_party_snapshot: {
         buyerCompany: "永绅演示工厂",
@@ -2161,7 +2172,17 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
       label: `material ${record.code}`,
       expected,
       actual: data.material,
-      fields: ["code", "name", "category", "stock_category", "supplier_id", "supplier_item_no", "spec", "color", "default_unit_id"],
+      fields: [
+        "code",
+        "name",
+        "category",
+        "stock_category",
+        "supplier_id",
+        "supplier_item_no",
+        "spec",
+        "color",
+        "default_unit_id",
+      ],
     });
     materials.set(record.code, data.material);
     report.steps.push({
@@ -3633,7 +3654,11 @@ async function createSourceDocuments({
       "expected_arrival_date",
       "note",
     ],
-    headerDateFields: ["purchase_date", "expected_arrival_date", "supplier_confirmed_arrival_date"],
+    headerDateFields: [
+      "purchase_date",
+      "expected_arrival_date",
+      "supplier_confirmed_arrival_date",
+    ],
     itemMethod: "list_purchase_order_items",
     itemListKey: "purchase_order_items",
     itemForeignKey: "purchase_order_id",
@@ -5048,20 +5073,20 @@ function usage() {
 
 写入本地开发环境：
   MANUAL_ACCEPTANCE_SIM_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.09.16-v7:20260916-V7:plush_erp_acceptance_20260728_delivery_dev \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}:${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}:plush_erp_acceptance_20260728_delivery_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
     node scripts/qa/manual-acceptance-source-data.mjs --apply \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.09.16-v7 \\
-      --run-id 20260916-V7 \\
-      --out output/qa/manual-acceptance/datasets/2026.09.16-v7/local/source
+      --data-version ${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION} \\
+      --run-id ${CURRENT_MANUAL_ACCEPTANCE_RUN_ID} \\
+      --out output/qa/manual-acceptance/datasets/${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}/local/source
 
 写入已登记的 133 客户试用环境还必须显式提供：
   --target customer-trial-133 --backend-url https://demo.yoyoosun.net \\
-  --data-version 2026.09.16-v7 --run-id 20260916-V7
+  --data-version ${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION} --run-id ${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}
 并设置绑定 target / dataVersion / runId 的 MANUAL_ACCEPTANCE_TARGET_CONFIRM，
 以及包含精确 origin/customer/release/migration/debug 开关的
 MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
@@ -5073,8 +5098,8 @@ MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.09.16-v7 \\
-      --run-id 20260916-V7
+      --data-version ${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION} \\
+      --run-id ${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}
 
 默认生成：60 客户、60 供应商、80 材料、20 产品/60 规格、30 加工环节、
 45 销售订单、45 采购订单、45 委外订单、45 BOM 版本。

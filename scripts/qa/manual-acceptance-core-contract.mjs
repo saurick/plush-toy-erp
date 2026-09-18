@@ -36,14 +36,47 @@ function dataSemanticValue(contract) {
   return value;
 }
 
-export function validateManualAcceptanceCoreContract(contract) {
+function parseDatasetVersion(value) {
+  const match = /^(\d{4})\.(\d{2})\.(\d{2})-v([1-9]\d*)$/u.exec(
+    String(value || ""),
+  );
+  if (!match) return null;
+  const [, year, month, day, sequence] = match;
+  const isoDate = `${year}-${month}-${day}`;
+  const parsedDate = new Date(`${isoDate}T00:00:00.000Z`);
   if (
-    contract?.schemaVersion !== "plush.manual-acceptance-contract/v7" ||
+    Number.isNaN(parsedDate.getTime()) ||
+    parsedDate.toISOString().slice(0, 10) !== isoDate
+  ) {
+    return null;
+  }
+  return {
+    compactDate: `${year}${month}${day}`,
+    isoDate,
+    sequence: Number(sequence),
+  };
+}
+
+function parseConfigPackage(value) {
+  const match =
+    /^yoyoosun-customer-trial-133-package-v([1-9]\d*)\.runtime-manifest-v1$/u.exec(
+      String(value || ""),
+    );
+  return match ? Number(match[1]) : null;
+}
+
+export function validateManualAcceptanceCoreContract(contract) {
+  const schemaMatch = /^plush\.manual-acceptance-contract\/v([1-9]\d*)$/u.exec(
+    String(contract?.schemaVersion || ""),
+  );
+  const dataset = parseDatasetVersion(contract?.dataVersion);
+  if (
+    !schemaMatch ||
+    !dataset ||
     contract?.datasetKey !== "yoyoosun-manual-acceptance" ||
-    contract?.dataVersion !== "2026.09.16-v7" ||
-    contract?.runId !== "20260916-V7" ||
-    contract?.anchorDateUtc !== "2026-09-16T12:00:00.000Z" ||
-    contract?.visiblePrefix !== "YS7" ||
+    contract?.runId !== `${dataset?.compactDate}-V${dataset?.sequence}` ||
+    contract?.anchorDateUtc !== `${dataset?.isoDate}T12:00:00.000Z` ||
+    contract?.visiblePrefix !== `YS${dataset?.sequence}` ||
     contract?.simulatedOnly !== true ||
     contract?.realCustomerImport !== false ||
     contract?.sourceNormalization?.trimWhitespace !== true ||
@@ -84,23 +117,27 @@ export function validateManualAcceptanceCoreContract(contract) {
     throw new Error("manual acceptance unit or warehouse contract is invalid");
   }
   const target = contract.customerTrial133;
+  const previousDataset = parseDatasetVersion(target?.previousDatasetVersion);
+  const configPackage = parseConfigPackage(target?.configRevision);
+  const previousConfigPackage = parseConfigPackage(
+    target?.previousConfigRevision,
+  );
   if (
     target?.target !== "customer-trial-133" ||
     target?.deploymentTarget !== "demo-133" ||
     target?.databaseName !== "plush_erp_demo_v1" ||
     target?.databaseLifecycle !== "long-lived-registered-target" ||
     !/^[0-9]{14}$/u.test(String(target?.minimumMigration || "")) ||
-    !String(target?.configRevision || "").includes("package-v9") ||
-    !String(target?.configProductVersion || "").endsWith(
-      contract.dataVersion,
-    ) ||
-    !String(target?.previousConfigRevision || "").includes("package-v8") ||
+    configPackage === null ||
+    previousConfigPackage === null ||
+    configPackage <= previousConfigPackage ||
+    target?.configProductVersion !==
+      `customer-trial-133-test-${contract.dataVersion}` ||
+    !previousDataset ||
+    previousDataset.sequence >= dataset.sequence ||
+    previousDataset.isoDate > dataset.isoDate ||
     target?.previousConfigProductVersion !==
-      "customer-trial-133-test-2026.08.15-v6" ||
-    target?.previousDatasetVersion !== "2026.08.15-v6" ||
-    !String(target.previousConfigProductVersion).endsWith(
-      target.previousDatasetVersion,
-    )
+      `customer-trial-133-test-${target.previousDatasetVersion}`
   ) {
     throw new Error("manual acceptance customer-trial target is invalid");
   }

@@ -11,6 +11,8 @@ import {
 } from "./manual-acceptance-source-data.mjs";
 import {
   CUSTOMER_TRIAL_133_TARGET,
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimeIdentityPrecondition,
@@ -305,18 +307,19 @@ async function assertSafeRuntime({
   targetAttestation,
   fetchImpl,
 }) {
-  const capabilities = !targetAttestation || tokens.seedAdmin
-    ? await rpcCall({
-        backendURL: plan.backendURL,
-        domain: "debug",
-        method: "capabilities",
-        token: tokens.seedAdmin || tokens.sales,
-        fetchImpl,
-      })
-    : manualAcceptanceRuntimeCapabilitiesFromAttestation({
-        policy: plan,
-        attestation: targetAttestation,
-      });
+  const capabilities =
+    !targetAttestation || tokens.seedAdmin
+      ? await rpcCall({
+          backendURL: plan.backendURL,
+          domain: "debug",
+          method: "capabilities",
+          token: tokens.seedAdmin || tokens.sales,
+          fetchImpl,
+        })
+      : manualAcceptanceRuntimeCapabilitiesFromAttestation({
+          policy: plan,
+          attestation: targetAttestation,
+        });
   assertManualAcceptanceCapabilitiesPolicy({ policy: plan, capabilities });
   const data = await rpcCall({
     backendURL: plan.backendURL,
@@ -385,7 +388,9 @@ function retirementIdentityAllowlists(plan) {
   };
   return Object.fromEntries(
     Object.entries(values).map(([datasetKey, identities]) => {
-      const normalized = identities.map((value) => requiredText(value, datasetKey));
+      const normalized = identities.map((value) =>
+        requiredText(value, datasetKey),
+      );
       if (
         normalized.length === 0 ||
         new Set(normalized).size !== normalized.length
@@ -743,7 +748,7 @@ function usage() {
 
 133 客户试用环境必须通过已登记的系统信任 TLS 入口，并额外提供：
   --target customer-trial-133 --backend-url https://demo.yoyoosun.net \\
-  --data-version 2026.09.16-v7 --run-id 20260916-V7
+  --data-version ${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION} --run-id ${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}
 以及绑定 target / dataVersion / runId 的 MANUAL_ACCEPTANCE_TARGET_CONFIRM，
 和包含精确 origin/customer/release/migration/debug=false 的
 MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。

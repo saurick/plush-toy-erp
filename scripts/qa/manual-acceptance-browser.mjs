@@ -37,6 +37,7 @@ import { normalizeDatabaseRunID } from "./database-target.mjs";
 import {
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
   assertManualAcceptanceRuntimeIdentityPrecondition,
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
@@ -570,11 +571,11 @@ export function getManualAcceptanceBrowserHelp() {
   MANUAL_ACCEPTANCE_PASSWORD='<本地试用密码>' node scripts/qa/manual-acceptance-browser.mjs \\
     --base-url http://127.0.0.1:15200 \\
     --backend-url http://127.0.0.1:8310 \\
-    --source-report output/qa/manual-acceptance/datasets/2026.09.16-v7/local/source/apply-report.json \\
-    --fact-report output/qa/manual-acceptance/datasets/2026.09.16-v7/local/facts/apply-report.json \\
-    --readiness-report output/qa/manual-acceptance/datasets/2026.09.16-v7/local/readiness/verify-report.json \\
-    --dataset-report output/qa/manual-acceptance/datasets/2026.09.16-v7/local/dataset/apply-report.json \\
-    --report output/qa/manual-acceptance/datasets/2026.09.16-v7/local/browser/report.json
+    --source-report output/qa/manual-acceptance/datasets/${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}/local/source/apply-report.json \\
+    --fact-report output/qa/manual-acceptance/datasets/${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}/local/facts/apply-report.json \\
+    --readiness-report output/qa/manual-acceptance/datasets/${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}/local/readiness/verify-report.json \\
+    --dataset-report output/qa/manual-acceptance/datasets/${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}/local/dataset/apply-report.json \\
+    --report output/qa/manual-acceptance/datasets/${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}/local/browser/report.json
   node scripts/qa/manual-acceptance-browser.mjs --plan \\
     --base-url http://127.0.0.1:15200 \\
     --backend-url http://127.0.0.1:8310

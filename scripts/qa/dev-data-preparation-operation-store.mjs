@@ -18,6 +18,8 @@ import {
 import path from "node:path";
 import process from "node:process";
 
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "./manual-acceptance-core-contract.mjs";
+
 export const DATA_PREPARATION_OPERATION_SCHEMA =
   "plush.dev-data-preparation-operation/v1";
 export const DATA_PREPARATION_PROFILE_KEYS = Object.freeze([
@@ -43,8 +45,8 @@ const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{2,39}$/u;
 const CURRENT_SCENARIO_READBACK_BASELINE = Object.freeze({
-  dataVersion: "2026.09.16-v7",
-  runId: "20260916-V7",
+  dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+  runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
   catalogReadyCount: 41,
   catalogTargetCount: 51,
   browserChecksPending: 10,

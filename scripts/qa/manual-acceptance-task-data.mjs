@@ -8,6 +8,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catalog.mjs";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "./manual-acceptance-core-contract.mjs";
 import { SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES } from "./manual-acceptance-source-data.mjs";
 
 import {
@@ -37,24 +38,28 @@ const SOURCE_TYPE = TASK_SOURCE_TYPE;
 const SIMULATION_PREFIX = TASK_SIMULATION_PREFIX;
 export const TASK_PROFILE_ACCEPTANCE_SNAPSHOT = "acceptance-snapshot";
 export const TASK_PROFILE_LONG_LIVED_WORKBENCH = "long-lived-workbench";
-export const TASK_COPY_REVISION = "PLAIN7";
+const CURRENT_CONTRACT_SEQUENCE =
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.visiblePrefix.slice(2);
+export const TASK_COPY_REVISION = `PLAIN${CURRENT_CONTRACT_SEQUENCE}`;
 export const PREVIOUS_TASK_COPY_REVISION = "PLAIN6";
 export const PREVIOUS_TASK_RUN_ID = "20260815-V6";
 export const PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH2";
 export const PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID = PREVIOUS_TASK_RUN_ID;
 export const LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH3";
-export const LONG_LIVED_WORKBENCH_BATCH_RUN_ID = "20260916-V7";
+export const LONG_LIVED_WORKBENCH_BATCH_RUN_ID =
+  MANUAL_ACCEPTANCE_CORE_CONTRACT.runId;
 export const LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE = 12;
+const CURRENT_TASK_PREFIX = `YS-V${CURRENT_CONTRACT_SEQUENCE}`;
 export const TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
-  boss: "YS-V7-LD",
-  sales: "YS-V7-XS",
-  purchase: "YS-V7-CG",
-  production: "YS-V7-SC",
-  warehouse: "YS-V7-CK",
-  finance: "YS-V7-CW",
-  pmc: "YS-V7-JH",
-  quality: "YS-V7-ZJ",
-  engineering: "YS-V7-GC",
+  boss: `${CURRENT_TASK_PREFIX}-LD`,
+  sales: `${CURRENT_TASK_PREFIX}-XS`,
+  purchase: `${CURRENT_TASK_PREFIX}-CG`,
+  production: `${CURRENT_TASK_PREFIX}-SC`,
+  warehouse: `${CURRENT_TASK_PREFIX}-CK`,
+  finance: `${CURRENT_TASK_PREFIX}-CW`,
+  pmc: `${CURRENT_TASK_PREFIX}-JH`,
+  quality: `${CURRENT_TASK_PREFIX}-ZJ`,
+  engineering: `${CURRENT_TASK_PREFIX}-GC`,
 });
 const PREVIOUS_TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   boss: "YS-V6-LD",
@@ -615,18 +620,18 @@ Usage:
 
 Apply to the dedicated local acceptance runtime:
   MANUAL_ACCEPTANCE_TASK_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.09.16-v7:20260916-V7:plush_erp_acceptance_20260728_delivery_dev \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:${MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion}:${MANUAL_ACCEPTANCE_CORE_CONTRACT.runId}:plush_erp_acceptance_20260728_delivery_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
     node scripts/qa/manual-acceptance-task-data.mjs --apply \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.09.16-v7 \\
-      --run-id 20260916-V7 \\
+      --data-version ${MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion} \\
+      --run-id ${MANUAL_ACCEPTANCE_CORE_CONTRACT.runId} \\
       --schedule-anchor-utc 2026-07-17T09:00:00.000Z \\
-      --source-report output/qa/manual-acceptance/datasets/2026.09.16-v7/local/source/apply-report.json \\
-      --out output/qa/manual-acceptance/datasets/2026.09.16-v7/local/task
+      --source-report output/qa/manual-acceptance/datasets/${MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion}/local/source/apply-report.json \\
+      --out output/qa/manual-acceptance/datasets/${MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion}/local/task
 
 The registered customer trial target additionally requires
 --target customer-trial-133, the exact registered backend origin, an explicit

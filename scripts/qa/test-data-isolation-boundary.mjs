@@ -774,7 +774,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
         path: "scripts/qa/manual-acceptance-source-driven-facts.mjs",
         pattern:
           /SOURCE_DRIVEN_FACT_DATA_VERSION\s*=\s*CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION[\s\S]{0,180}SOURCE_DRIVEN_FACT_RUN_ID\s*=\s*CURRENT_MANUAL_ACCEPTANCE_RUN_ID/u,
-        message: "source-driven Fact helper must derive the current v6 identity",
+        message:
+          "source-driven Fact helper must derive the current v6 identity",
       },
       {
         path: "scripts/qa/manual-acceptance-source-driven-facts.mjs",
@@ -934,9 +935,10 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
       {
         path: "scripts/qa/manual-acceptance-source-retire.mjs",
-        pattern: /--data-version 2026\.09\.16-v7 --run-id 20260916-V7/u,
+        pattern:
+          /--data-version \$\{CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION\} --run-id \$\{CURRENT_MANUAL_ACCEPTANCE_RUN_ID\}/u,
         message:
-          "manual acceptance retirement usage must show the current v6 batch",
+          "manual acceptance retirement usage must derive the current registered batch",
       },
       {
         path: "scripts/qa/manual-acceptance-source-retire.mjs",

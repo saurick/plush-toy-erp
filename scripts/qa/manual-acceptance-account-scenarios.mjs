@@ -1697,7 +1697,7 @@ function usage() {
   node scripts/qa/manual-acceptance-account-scenarios.mjs --json
 
 fresh 库配置激活前只创建或读回固定十个单岗位账号及一个财务兼采购账号：
-  MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS:<target>:2026.09.16-v7:20260916-V7 \
+  MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS:<target>:${ACCOUNT_DATA_VERSION}:${ACCOUNT_RUN_ID} \
   MANUAL_ACCEPTANCE_TARGET_CONFIRM='<exact-target-confirmation>' \
   <target-role-password-env>='<target-role-password>' \
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
@@ -1705,21 +1705,21 @@ fresh 库配置激活前只创建或读回固定十个单岗位账号及一个�
       --target <target> \
       --backend-url <registered-loopback-backend-url> \
       --database-name <registered-database-name> \
-      --data-version 2026.09.16-v7 \
-      --run-id 20260916-V7 \
+      --data-version ${ACCOUNT_DATA_VERSION} \
+      --run-id ${ACCOUNT_RUN_ID} \
       --json
 
 写入本机开发环境：
   MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.09.16-v7:20260916-V7:plush_erp_acceptance_20260728_delivery_dev \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:${ACCOUNT_DATA_VERSION}:${ACCOUNT_RUN_ID}:plush_erp_acceptance_20260728_delivery_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-super-admin-password>' \\
     node scripts/qa/manual-acceptance-account-scenarios.mjs --apply \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
       --database-name plush_erp_acceptance_20260728_delivery_dev \\
-      --data-version 2026.09.16-v7 \\
-      --run-id 20260916-V7 \\
+      --data-version ${ACCOUNT_DATA_VERSION} \\
+      --run-id ${ACCOUNT_RUN_ID} \\
       --audit-minimum 30 \\
       --json
 
@@ -1732,7 +1732,7 @@ fresh 库配置激活前只创建或读回固定十个单岗位账号及一个�
   只创建或读回固定十个单岗位账号及一个财务兼采购账号。
 
   demo 演练造数环境必须通过 https://demo.yoyoosun.net 系统信任 TLS 入口，并显式提供：
-  --target customer-trial-133 --data-version 2026.09.16-v7 --run-id 20260916-V7 --database-name plush_erp_demo_v1
+  --target customer-trial-133 --data-version ${ACCOUNT_DATA_VERSION} --run-id ${ACCOUNT_RUN_ID} --database-name plush_erp_demo_v1
 同时设置绑定目标的 MANUAL_ACCEPTANCE_TARGET_CONFIRM 与
   MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
 远端只核对岗位权限，不修改岗位权限。`;
