@@ -222,6 +222,23 @@ test('更多下拉保留禁用原因、二级确认及弹窗状态，执行后�
       Object.defineProperty(event, 'keyCode', { value: keyCode })
       node.dispatchEvent(event)
     })
+  const focusAndKey = async (node, name, keyCode) =>
+    act(async () => {
+      node.focus()
+      const event = new dom.runtimeWindow.KeyboardEvent('keydown', {
+        key: name,
+        bubbles: true,
+      })
+      Object.defineProperty(event, 'keyCode', { value: keyCode })
+      node.dispatchEvent(event)
+    })
+  const waitFor = async (condition, message) => {
+    const deadline = Date.now() + 1_000
+    while (!condition()) {
+      assert(Date.now() < deadline, message)
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 10)))
+    }
+  }
 
   assert.equal(more().getAttribute('aria-expanded'), 'false')
   await click(more())
@@ -232,15 +249,18 @@ test('更多下拉保留禁用原因、二级确认及弹窗状态，执行后�
   assert.equal(handled, 0)
   assert.equal(more().getAttribute('aria-expanded'), 'true')
 
-  await act(async () => button('查看详情', menu()).focus())
-  await key(button('查看详情', menu()), 'ArrowDown', 40)
-  assert.equal(
-    document.activeElement.getAttribute('aria-label'),
-    '资料尚未补齐'
+  await focusAndKey(button('查看详情', menu()), 'ArrowDown', 40)
+  await waitFor(
+    () => document.activeElement.getAttribute('aria-label') === '资料尚未补齐',
+    '向下移动后应聚焦下一项禁用原因'
   )
   await key(document.activeElement, 'Escape', 27)
-  assert.equal(more().getAttribute('aria-expanded'), 'false')
-  assert.ok(document.activeElement === more(), '关闭更多操作后焦点应回到触发按钮')
+  await waitFor(
+    () =>
+      more().getAttribute('aria-expanded') === 'false' &&
+      document.activeElement === more(),
+    '关闭更多操作后焦点应回到触发按钮'
+  )
 
   await click(more())
   await click(button('危险操作', menu()))

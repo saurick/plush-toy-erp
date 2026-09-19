@@ -126,7 +126,9 @@ export function usePurchaseOrderInboundDraft({
       try {
         items = buildArrivalItems(values.arrival_items)
       } catch (validationError) {
-        message.warning(validationError.message)
+        message.warning(
+          getActionErrorMessage(validationError, '请核对本次到货数量和仓库')
+        )
         return
       }
       const payload = {

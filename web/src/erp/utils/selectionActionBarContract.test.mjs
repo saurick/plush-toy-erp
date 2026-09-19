@@ -36,7 +36,11 @@ test('更多操作使用点击下拉，未选择也可查看，并保留键盘�
   assert.match(layoutSource, /placement="bottomRight"/u)
   assert.match(layoutSource, /open=\{moreActionsOpen\}/u)
   assert.match(layoutSource, /autoFocus/u)
-  assert.match(layoutSource, /onKeyDown=\{focusMoreAction\}/u)
+  assert.match(
+    layoutSource,
+    /onKeyDown=\{\(event\) => \{[\s\S]*?event\.key === 'Escape'[\s\S]*?closeMoreActionsAndRestoreFocus\(\)[\s\S]*?focusMoreAction\(event\)/u
+  )
+  assert.match(layoutSource, /ref=\{moreActionsTriggerRef\}/u)
   assert.match(layoutSource, /aria-expanded=\{moreActionsOpen\}/u)
   assert.doesNotMatch(
     layoutSource,

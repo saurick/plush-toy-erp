@@ -223,6 +223,7 @@ function ResponsiveSelectionActions({ children }) {
   const { token } = theme.useToken()
   const [moreActionsOpen, setMoreActionsOpen] = React.useState(false)
   const moreActionsListRef = React.useRef(null)
+  const moreActionsTriggerRef = React.useRef(null)
   const moreActionsId = React.useId()
   const visibleLimit = screens.lg
     ? DESKTOP_SELECTION_ACTION_LIMIT
@@ -235,6 +236,13 @@ function ResponsiveSelectionActions({ children }) {
   )
   const closeMoreActions = React.useCallback(() => {
     setMoreActionsOpen(false)
+  }, [])
+  const closeMoreActionsAndRestoreFocus = React.useCallback(() => {
+    setMoreActionsOpen(false)
+    const trigger = moreActionsTriggerRef.current
+    window.requestAnimationFrame(() => {
+      trigger?.focus({ preventScroll: true })
+    })
   }, [])
   const focusMoreAction = React.useCallback((event) => {
     const list = moreActionsListRef.current
@@ -288,7 +296,15 @@ function ResponsiveSelectionActions({ children }) {
               ?.focus({ preventScroll: true })
           }
         }}
-        onKeyDown={focusMoreAction}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            event.stopPropagation()
+            closeMoreActionsAndRestoreFocus()
+            return
+          }
+          focusMoreAction(event)
+        }}
       >
         {overflow.map((action, index) => (
           <div
@@ -311,7 +327,14 @@ function ResponsiveSelectionActions({ children }) {
         ))}
       </div>
     ),
-    [closeMoreActions, focusMoreAction, moreActionsId, overflow, token]
+    [
+      closeMoreActions,
+      closeMoreActionsAndRestoreFocus,
+      focusMoreAction,
+      moreActionsId,
+      overflow,
+      token,
+    ]
   )
 
   if (overflow.length === 0) {
@@ -354,6 +377,7 @@ function ResponsiveSelectionActions({ children }) {
         popupRender={renderMoreActions}
       >
         <Button
+          ref={moreActionsTriggerRef}
           className="erp-business-selection-action-bar__compact-more erp-action-button"
           size="small"
           aria-label={`更多操作，共 ${overflow.length} 项`}
