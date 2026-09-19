@@ -54,5 +54,6 @@
 | `docs/archive/progress-2026-09-08-before-test-print-release.md` | 打印修复测试环境发布前的已完成事项过程归档 |
 | `docs/archive/progress-2026-09-16-before-ci-migration-closeout.md` | CI 与共享开发库收口前的报价运费和双目标发布原文归档 |
 | `docs/archive/progress-2026-09-17-before-cd-closeout.md` | CD 收口前已完成的共享开发库迁移记录原文归档 |
+| `docs/archive/progress-2026-09-19-before-iqc-acceptance-closeout.md` | 来料验收收口前业务列表列顺序与全筛选导出原文归档 / Progress Archive Before IQC Acceptance Closeout |
 
 同日进度快照：[备份恢复演练前记录](progress-2026-06-16-before-backup-restore-rehearsal.md)。原名称 progress-2026-06-16-before-audit-log-readable.md 与该文件全文相同，现共用此原文；其他归档中的旧名称保留历史语境。
