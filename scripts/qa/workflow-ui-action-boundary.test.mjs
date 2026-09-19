@@ -1157,7 +1157,7 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
     "outsourcing order page must derive create/update through projected action helper",
   );
   assert(
-    pageSource.includes("primaryAction={\n          canCreate ? (") &&
+    pageSource.includes("primaryAction={\n              canCreate ? (") &&
       pageSource.includes("{canUpdate ? (") &&
       /disabled=\{\s*!selectedRow\s*\|\|\s*!canEditOutsourcingOrder\(selectedRow\)\s*\|\|\s*itemsLoading\s*\}/u.test(
         pageSource,
@@ -1226,6 +1226,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
       tokens: [
         "const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')",
         "const canPost = hasActionPermission(adminProfile, 'warehouse.inbound.confirm')",
+        "const canCancelDraft = hasActionPermission(\n    adminProfile,\n    'purchase.receipt.cancel_draft'\n  )",
         "canUpload={canCreate || canPost}",
         "canWithdraw={canCreate || canPost}",
         "buildPurchaseReturnFromReceiptPayload(values, receipt)",
@@ -1238,7 +1239,9 @@ test("fact pages keep write buttons behind projected actions and status guards",
         'data-business-action-key="post"',
         "!selectedRow || selectedRow.status !== 'DRAFT' || saving",
         'data-business-action-key="cancel"',
-        "!['DRAFT', 'POSTED'].includes(selectedRow.status)",
+        "{canPost || canCancelDraft ? (",
+        "(canPost ? ['DRAFT', 'POSTED'] : ['DRAFT']).includes(",
+        "selectedRow?.status === 'DRAFT' && canCancelDraft",
         "草稿作废不更新库存；已过账入库取消由系统按采购入库规则恢复库存",
       ],
       forbiddenTokens: [

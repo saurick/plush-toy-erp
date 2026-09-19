@@ -32,7 +32,7 @@ func TestRepositoryCatalogAndGeneratedOutputsAreCurrent(t *testing.T) {
 
 	wantMetrics := schemaMetrics{
 		Tables:         76,
-		Columns:        1272,
+		Columns:        1274,
 		ForeignKeys:    154,
 		Indexes:        343,
 		PartialIndexes: 34,

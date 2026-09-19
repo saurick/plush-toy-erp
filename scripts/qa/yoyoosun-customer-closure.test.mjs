@@ -145,6 +145,7 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "products",
     "processes",
     "quality-inspections",
+    "accessories-purchase",
     "production-orders",
     "production-exceptions",
     "inventory",

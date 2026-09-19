@@ -49,7 +49,7 @@ test('yoyoosun purchase preview keeps receipt draft and IQC before posted invent
   assert(purchaseFlow.modules.includes('quality_inspections'))
   assert.match(
     purchaseFlow.guardrail,
-    /采购入库草稿和逐行待检，再由正式 IQC 判定；只有全部行合格或让步接收才允许 POSTED 入库/u
+    /自动形成入库草稿和逐行待检，再由正式 IQC 判定；只有全部行合格或让步接收才允许 POSTED 入库/u
   )
 })
 
