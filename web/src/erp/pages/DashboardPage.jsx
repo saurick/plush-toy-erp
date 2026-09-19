@@ -150,6 +150,9 @@ const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
 
 const WORKBENCH_QUEUE_PAGE_SIZE = TASK_BOARD_FOCUS_PAGE_SIZE
 const TASK_BOARD_PAGE_SCROLL_GAP = 12
+const getLeftAlignedHeaderCellProps = () => ({
+  style: { textAlign: 'left' },
+})
 
 function scrollTaskListToStart(lanesElement) {
   const scrollContainer = lanesElement?.closest?.('.erp-admin-content')
@@ -411,7 +414,7 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
           columns={[
             {
               align: 'left',
-              title: '任务 / 产品与物料',
+              title: '任务与关联内容',
               key: 'identity',
               width: '36%',
               render: (_, task) => (
@@ -1578,8 +1581,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const workbenchTaskColumns = [
     {
       align: 'left',
-      title: '任务 / 产品与物料',
+      title: '任务与关联内容',
       dataIndex: 'task_name',
+      onHeaderCell: getLeftAlignedHeaderCellProps,
       render: (_, record) => (
         <div className="erp-workbench-task-cell">
           <TaskTitleEntry task={record} onOpenTask={openTaskDrawer} />
@@ -1605,6 +1609,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       title: '状态 / 风险',
       key: 'task_priority',
       width: 132,
+      onHeaderCell: getLeftAlignedHeaderCellProps,
       render: (_, record) => {
         return (
           <Space
@@ -1636,6 +1641,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       title: '任务时间',
       key: 'timing',
       width: 210,
+      onHeaderCell: getLeftAlignedHeaderCellProps,
       render: (_, record) => <WorkflowTaskTiming task={record} />,
     },
   ]

@@ -147,7 +147,12 @@ func workflowTaskDisplayContextToMap(context *biz.WorkflowTaskDisplayContext) an
 			"product_id":       item.ProductID, "image_attachment_id": item.ImageAttachmentID,
 		})
 	}
-	return map[string]any{"available": context.Available, "source_no": context.SourceNo, "items": items}
+	return map[string]any{
+		"available":         context.Available,
+		"source_no":         context.SourceNo,
+		"source_line_count": workflowIntValue(context.SourceLineCount),
+		"items":             items,
+	}
 }
 
 func workflowTaskEventsToAny(items []*biz.WorkflowTaskEvent) []any {

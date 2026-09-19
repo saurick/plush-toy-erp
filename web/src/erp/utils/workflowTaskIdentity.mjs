@@ -1,4 +1,9 @@
 const text = (value) => (typeof value === 'string' ? value.trim() : '')
+const PURCHASE_ORDER_SOURCE_TYPES = new Set([
+  'purchase_order',
+  'purchase-order',
+  'accessories-purchase',
+])
 
 export function getWorkflowTaskIdentity(task = {}) {
   const context = task?.display_context
@@ -6,6 +11,11 @@ export function getWorkflowTaskIdentity(task = {}) {
     return {
       available: context.available === true,
       sourceNo: text(context.source_no),
+      sourceLineCount:
+        Number.isSafeInteger(context.source_line_count) &&
+        context.source_line_count >= 0
+          ? context.source_line_count
+          : null,
       items: (Array.isArray(context.items) ? context.items : [])
         .filter((item) => ['product', 'material'].includes(item?.kind))
         .map((item) => ({
@@ -75,7 +85,36 @@ export function getWorkflowTaskIdentity(task = {}) {
       orderNo: '',
     })
   }
-  return { available: true, sourceNo: '', items }
+  return { available: true, sourceNo: '', sourceLineCount: null, items }
+}
+
+export function getWorkflowTaskIdentityPresentation(task = {}) {
+  const identity = getWorkflowTaskIdentity(task)
+  const purchaseOrder = PURCHASE_ORDER_SOURCE_TYPES.has(text(task.source_type))
+  const firstIndex = purchaseOrder
+    ? identity.items.findIndex((item) => item.kind === 'material')
+    : 0
+  const resolvedFirstIndex = firstIndex >= 0 ? firstIndex : 0
+  const first = identity.items[resolvedFirstIndex]
+  const remainingItems = identity.items.filter(
+    (_, index) => index !== resolvedFirstIndex
+  )
+  let compactCountLabel = ''
+  if (
+    purchaseOrder &&
+    Number.isSafeInteger(identity.sourceLineCount) &&
+    identity.sourceLineCount > 0
+  ) {
+    compactCountLabel = `共 ${identity.sourceLineCount} 条采购明细`
+  } else if (!purchaseOrder && identity.items.length > 1) {
+    compactCountLabel = `共 ${identity.items.length} 项关联内容`
+  }
+  return {
+    ...identity,
+    first,
+    remainingItems,
+    compactCountLabel,
+  }
 }
 
 export function getWorkflowTaskIdentityCode(item) {

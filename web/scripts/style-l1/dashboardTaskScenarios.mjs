@@ -1198,7 +1198,7 @@ export function createDashboardTaskScenarios({
           await page
             .locator('.erp-task-board-lane--focused .ant-table-thead th')
             .allTextContents(),
-          ['任务 / 产品与物料', '关联单据 / 时间', '状态与说明 / 负责'],
+          ['任务与关联内容', '关联单据 / 时间', '状态与说明 / 负责'],
           '分类列表应将空间用于三组任务信息，无独立操作列'
         )
         await assertTaskTitleFocusInteractions(page, focusedListRow)

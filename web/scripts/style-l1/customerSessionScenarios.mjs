@@ -939,7 +939,7 @@ export function createCustomerSessionScenarios({
           timeout: 10_000,
         })
         await workbenchTaskDrawer
-          .getByText('长队列待办 01', { exact: true })
+          .getByRole('heading', { name: '长队列待办 01', exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         await page.screenshot({
           path: path.resolve(

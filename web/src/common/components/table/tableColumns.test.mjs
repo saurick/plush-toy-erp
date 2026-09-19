@@ -46,9 +46,9 @@ test('grouped headers preserve callbacks, spans, accessibility and caller styles
   assert.equal(props.colSpan, 2)
   assert.equal(props['aria-label'], '采购')
   assert.deepEqual(props.style, {
-    width: 120,
-    textAlign: 'center',
+    textAlign: 'left',
     verticalAlign: 'middle',
+    width: 120,
   })
   assert.equal(result[0].children[0].align, 'right')
   assert.equal(result[0].children[0].onHeaderCell().style.textAlign, 'center')

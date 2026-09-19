@@ -371,6 +371,16 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       const queue = document
         .querySelector('.erp-workbench-queue-panel')
         ?.getBoundingClientRect()
+      const headers = [
+        ...document.querySelectorAll(
+          '.erp-workbench-queue-panel .ant-table-thead > tr > th'
+        ),
+      ]
+      const firstRowCells = [
+        ...(document.querySelector(
+          '.erp-workbench-queue-panel .ant-table-tbody > tr.ant-table-row'
+        )?.children || []),
+      ].filter((element) => element.tagName === 'TD')
       return {
         gridWidth: grid?.width,
         queueWidth: queue?.width,
@@ -388,6 +398,24 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
         overflow:
           document.documentElement.scrollWidth -
           document.documentElement.clientWidth,
+        columns: headers.map((header, index) => {
+          const cell = firstRowCells[index]
+          const headerRect = header.getBoundingClientRect()
+          const cellRect = cell?.getBoundingClientRect()
+          const content = cell?.firstElementChild || cell
+          return {
+            title: String(header.textContent || '').trim(),
+            headerAlign: getComputedStyle(header).textAlign,
+            contentAlign: content
+              ? getComputedStyle(content).textAlign
+              : null,
+            alignedGeometry: Boolean(
+              cellRect &&
+                Math.abs(headerRect.left - cellRect.left) <= 1 &&
+                Math.abs(headerRect.width - cellRect.width) <= 1
+            ),
+          }
+        }),
       }
     })
     assert(
@@ -399,6 +427,29 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
         metrics.activeFilters === 1 &&
         metrics.overflow <= 1,
       `${scenarioName} 工作台应全宽展示任务并保留队列筛选: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.columns.map(({ headerAlign, contentAlign }) => ({
+        headerAlign,
+        contentAlign,
+      })),
+      [
+        {
+          headerAlign: 'left',
+          contentAlign: 'left',
+        },
+        {
+          headerAlign: 'left',
+          contentAlign: 'left',
+        },
+        { headerAlign: 'center', contentAlign: 'center' },
+        { headerAlign: 'left', contentAlign: 'left' },
+      ],
+      `${scenarioName} 工作台表头应与各列内容使用相同对齐方式`
+    )
+    assert(
+      metrics.columns.every((column) => column.alignedGeometry),
+      `${scenarioName} 工作台表头与正文列边界应一致: ${JSON.stringify(metrics.columns)}`
     )
   }
 

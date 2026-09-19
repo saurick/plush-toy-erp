@@ -1,7 +1,6 @@
 package data
 
 import (
-	"server/internal/attachmentstore"
 	"context"
 	"io"
 	"testing"
@@ -10,6 +9,7 @@ import (
 	"entgo.io/ent/dialect"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
+	"server/internal/attachmentstore"
 	"server/internal/biz"
 	"server/internal/data/model/ent/enttest"
 )
@@ -116,15 +116,17 @@ func TestWorkflowTaskDisplayContextMaterialSource(t *testing.T) {
 	unit := createSalesOrderTestUnit(t, ctx, client, "M-U", true)
 	supplier := createPurchaseOrderTestSupplier(t, ctx, client, "M-S", true)
 	material := client.Material.Create().SetCode("ML-DISPLAY").SetName("短毛绒").SetDefaultUnitID(unit.ID).SaveX(ctx)
+	otherMaterial := client.Material.Create().SetCode("ML-DISPLAY-2").SetName("填充棉").SetDefaultUnitID(unit.ID).SaveX(ctx)
 	order := client.PurchaseOrder.Create().SetPurchaseOrderNo("PO-DISPLAY").SetSupplierID(supplier.ID).SetPurchaseDate(time.Now()).SaveX(ctx)
-	client.PurchaseOrderItem.Create().SetPurchaseOrderID(order.ID).SetLineNo(1).SetMaterialID(material.ID).SetUnitID(unit.ID).SetPurchasedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
+	client.PurchaseOrderItem.Create().SetPurchaseOrderID(order.ID).SetLineNo(1).SetMaterialID(material.ID).SetUnitID(unit.ID).SetProductNameSnapshot("奶咖钥匙圈").SetProductNoSnapshot("P-1").SetPurchasedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
+	client.PurchaseOrderItem.Create().SetPurchaseOrderID(order.ID).SetLineNo(2).SetMaterialID(otherMaterial.ID).SetUnitID(unit.ID).SetProductNameSnapshot("浅咖钥匙圈").SetProductNoSnapshot("P-2").SetPurchasedQuantity(decimal.NewFromInt(5)).SaveX(ctx)
 	instance := client.ProcessInstance.Create().SetProcessKey("material-display").SetProcessVersion("v1").SetConfigRevision("display-test").SetDefinitionHash("display-test-hash").SetBusinessRefType("purchase_order").SetBusinessRefID(order.ID).SetIdempotencyKey("material-source").SaveX(ctx)
 	tasks := []*biz.WorkflowTask{{SourceID: order.ID, SourceType: "purchase_order", ProcessInstanceID: &instance.ID}}
 	if err := hydrateWorkflowTaskDisplayContexts(ctx, client, tasks); err != nil {
 		t.Fatal(err)
 	}
 	got := tasks[0].DisplayContext
-	if got == nil || len(got.Items) != 1 || got.Items[0].Kind != "material" || got.Items[0].Code != material.Code || got.Items[0].StyleNo != "" {
+	if got == nil || got.SourceLineCount == nil || *got.SourceLineCount != 2 || len(got.Items) != 4 || got.Items[0].Kind != "material" || got.Items[0].Code != material.Code || got.Items[0].StyleNo != "" {
 		t.Fatalf("material identity=%#v", got)
 	}
 }

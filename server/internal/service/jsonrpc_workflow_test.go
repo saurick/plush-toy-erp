@@ -2352,8 +2352,9 @@ func TestWorkflowTaskToMapIncludesInternalConcurrencyVersion(t *testing.T) {
 }
 
 func TestWorkflowTaskToMapIncludesReadOnlyDisplayContext(t *testing.T) {
+	lineCount := 2
 	task := &biz.WorkflowTask{ID: 1, DisplayContext: &biz.WorkflowTaskDisplayContext{
-		Available: true, SourceNo: "SO-TEST", Items: []biz.WorkflowTaskDisplayItem{{Kind: "product", Name: "长耳兔", Code: "PRODUCT-1", StyleNo: "RB-018", ProductID: 42, ImageAttachmentID: 8}},
+		Available: true, SourceNo: "SO-TEST", SourceLineCount: &lineCount, Items: []biz.WorkflowTaskDisplayItem{{Kind: "product", Name: "长耳兔", Code: "PRODUCT-1", StyleNo: "RB-018", ProductID: 42, ImageAttachmentID: 8}},
 	}}
 	encoded, err := structpb.NewStruct(workflowTaskToMap(task))
 	if err != nil {
@@ -2365,7 +2366,7 @@ func TestWorkflowTaskToMapIncludesReadOnlyDisplayContext(t *testing.T) {
 		"kind": "product", "name": "长耳兔", "code": "PRODUCT-1", "style_no": "RB-018",
 		"supplier_item_no": "", "order_no": "", "product_id": float64(42), "image_attachment_id": float64(8),
 	}
-	if context["available"] != true || context["source_no"] != "SO-TEST" || len(item) != len(expectedItem) {
+	if context["available"] != true || context["source_no"] != "SO-TEST" || context["source_line_count"] != float64(2) || len(item) != len(expectedItem) {
 		t.Fatalf("display identity contract=%#v", context)
 	}
 	for key, expected := range expectedItem {

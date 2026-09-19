@@ -34,8 +34,9 @@ type workflowDisplayRef struct {
 }
 
 type workflowDisplaySource struct {
-	no    string
-	items []workflowDisplayRef
+	no        string
+	lineCount *int
+	items     []workflowDisplayRef
 }
 
 func workflowDisplaySourceKind(value string) string {
@@ -210,7 +211,7 @@ func hydrateWorkflowTaskDisplayContexts(ctx context.Context, client *ent.Client,
 	for _, kind := range kinds {
 		for id, linkedTasks := range groups[kind] {
 			source, exists := sources[kind][id]
-			projection := &biz.WorkflowTaskDisplayContext{Available: exists, SourceNo: source.no, Items: []biz.WorkflowTaskDisplayItem{}}
+			projection := &biz.WorkflowTaskDisplayContext{Available: exists, SourceNo: source.no, SourceLineCount: source.lineCount, Items: []biz.WorkflowTaskDisplayItem{}}
 			seen := map[biz.WorkflowTaskDisplayItem]bool{}
 			for _, ref := range source.items {
 				item := biz.WorkflowTaskDisplayItem{Kind: ref.kind, Name: ref.name, Code: ref.code, OrderNo: ref.orderNo}
@@ -294,7 +295,8 @@ func loadWorkflowDisplaySources(ctx context.Context, client *ent.Client, kind st
 			return nil, err
 		}
 		for _, row := range rows {
-			source := workflowDisplaySource{no: row.PurchaseOrderNo}
+			lineCount := len(row.Edges.Items)
+			source := workflowDisplaySource{no: row.PurchaseOrderNo, lineCount: &lineCount}
 			for _, item := range row.Edges.Items {
 				source.items = append(source.items, workflowDisplayRef{kind: "material", id: item.MaterialID, name: displayString(item.MaterialNameSnapshot), code: displayString(item.MaterialCodeSnapshot), orderNo: displayString(item.ProductOrderNoSnapshot)})
 				if displayString(item.ProductNameSnapshot) != "" || displayString(item.ProductNoSnapshot) != "" {

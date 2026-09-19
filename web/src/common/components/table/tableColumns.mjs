@@ -10,9 +10,9 @@ export function normalizeTableColumns(columns = []) {
         return {
           ...props,
           style: {
-            ...props.style,
             textAlign: 'center',
             verticalAlign: 'middle',
+            ...props.style,
           },
         }
       },

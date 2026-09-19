@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   getWorkflowTaskIdentity,
   getWorkflowTaskIdentityCode,
+  getWorkflowTaskIdentityPresentation,
   retainWorkflowTaskIdentity,
 } from './workflowTaskIdentity.mjs'
 
@@ -14,6 +15,7 @@ test('source projection owns identity, including clear and missing source', () =
   assert.deepEqual(getWorkflowTaskIdentity(task), {
     available: true,
     sourceNo: 'SO-2',
+    sourceLineCount: null,
     items: [],
   })
   task.display_context.available = false
@@ -46,6 +48,61 @@ test('unlinked task snapshots keep all named products without inventing identifi
     ['泰迪熊', '长耳兔']
   )
   assert.ok(identity.items.every((item) => item.styleNo === ''))
+})
+
+test('purchase task summary counts source lines instead of mixing material and product identities', () => {
+  const display_context = {
+    available: true,
+    source_no: 'PO-2',
+    source_line_count: 2,
+    items: [
+      { kind: 'material', name: '浅黄填充棉', code: 'MAT-1' },
+      { kind: 'product', name: '奶咖钥匙圈', code: 'P-1' },
+      { kind: 'material', name: '米白填充棉', code: 'MAT-2' },
+      { kind: 'product', name: '浅咖钥匙圈', code: 'P-2' },
+    ],
+  }
+  for (const source_type of [
+    'purchase_order',
+    'purchase-order',
+    'accessories-purchase',
+  ]) {
+    const summary = getWorkflowTaskIdentityPresentation({
+      source_type,
+      display_context,
+    })
+    assert.equal(summary.first.name, '浅黄填充棉')
+    assert.equal(summary.compactCountLabel, '共 2 条采购明细')
+    assert.equal(summary.remainingItems.length, 3)
+  }
+})
+
+test('purchase task summary omits an unknown line count instead of reviving the mixed identity count', () => {
+  const summary = getWorkflowTaskIdentityPresentation({
+    source_type: 'purchase_order',
+    display_context: {
+      available: true,
+      items: [
+        { kind: 'material', name: '浅黄丝带' },
+        { kind: 'product', name: '奶咖钥匙圈' },
+      ],
+    },
+  })
+  assert.equal(summary.compactCountLabel, '')
+})
+
+test('non-purchase task summary makes the combined count explicit', () => {
+  const summary = getWorkflowTaskIdentityPresentation({
+    source_type: 'sales_order',
+    display_context: {
+      available: true,
+      items: [
+        { kind: 'product', name: '奶咖钥匙圈' },
+        { kind: 'product', name: '浅咖钥匙圈' },
+      ],
+    },
+  })
+  assert.equal(summary.compactCountLabel, '共 2 项关联内容')
 })
 
 test('supplier references keep merchant names and symbols and never fall back after clearing', () => {

@@ -3,8 +3,8 @@ import WorkflowTaskProductImage from './WorkflowTaskProductImage.jsx'
 import { TaskCopyButton, TaskCopyField } from './WorkflowTaskCopy.jsx'
 import { formatWorkflowProductCopy } from '../../utils/workflowTaskCopy.mjs'
 import {
-  getWorkflowTaskIdentity,
   getWorkflowTaskIdentityCode,
+  getWorkflowTaskIdentityPresentation,
 } from '../../utils/workflowTaskIdentity.mjs'
 import './workflowTaskIdentity.css'
 
@@ -68,7 +68,7 @@ function IdentityItem({ item }) {
 }
 
 export default function WorkflowTaskIdentity({ task, compact = false }) {
-  const identity = getWorkflowTaskIdentity(task)
+  const identity = getWorkflowTaskIdentityPresentation(task)
   if (!identity.available) {
     return (
       <span className="erp-task-identity__unavailable">关联单据已不可用</span>
@@ -76,14 +76,16 @@ export default function WorkflowTaskIdentity({ task, compact = false }) {
   }
   if (!identity.items.length) return null
   if (compact) {
-    const first = identity.items[0]
+    const { first } = identity
     return (
       <span className="erp-task-identity erp-task-identity--compact erp-task-identity__row">
         <WorkflowTaskProductImage item={first} />
         <span className="erp-task-identity__item">
           <strong>
             {first.name || <IdentityCode item={first} />}
-            {identity.items.length > 1 ? ` 等 ${identity.items.length} 项` : ''}
+            {identity.compactCountLabel
+              ? `（${identity.compactCountLabel}）`
+              : ''}
           </strong>
           {first.name ? (
             <span className="erp-task-identity__code">
@@ -102,12 +104,14 @@ export default function WorkflowTaskIdentity({ task, compact = false }) {
     )
   }
   return (
-    <div className="erp-task-identity" aria-label="关联产品与物料">
-      <IdentityItem item={identity.items[0]} />
-      {identity.items.length > 1 ? (
+    <div className="erp-task-identity" aria-label="任务关联内容">
+      <IdentityItem item={identity.first} />
+      {identity.remainingItems.length ? (
         <details className="erp-task-identity__more">
-          <summary>展开其余 {identity.items.length - 1} 项产品 / 物料</summary>
-          {identity.items.slice(1).map((item, index) => (
+          <summary>
+            展开其余 {identity.remainingItems.length} 项关联内容
+          </summary>
+          {identity.remainingItems.map((item, index) => (
             <IdentityItem key={index} item={item} />
           ))}
         </details>

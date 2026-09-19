@@ -57,9 +57,10 @@ type WorkflowTask struct {
 // WorkflowTaskDisplayContext is a read-only identity projection. It is never
 // persisted into the task payload or consumed by a business command.
 type WorkflowTaskDisplayContext struct {
-	Available bool                      `json:"available"`
-	SourceNo  string                    `json:"source_no"`
-	Items     []WorkflowTaskDisplayItem `json:"items"`
+	Available       bool                      `json:"available"`
+	SourceNo        string                    `json:"source_no"`
+	SourceLineCount *int                      `json:"source_line_count"`
+	Items           []WorkflowTaskDisplayItem `json:"items"`
 }
 
 type WorkflowTaskDisplayItem struct {
