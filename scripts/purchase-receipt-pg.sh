@@ -438,6 +438,16 @@ test-populated-upgrade)
     "UPDATE workflow_tasks SET task_status_key = 'pending' WHERE id = 910001" \
     "UPDATE workflow_tasks SET task_status_key = 'ready' WHERE id = 910001"
   expect_populated_blocker \
+    workflow-task-withdrawn-before-migration \
+    'workflow_tasks has 1 incompatible status or anchor rows' \
+    "UPDATE workflow_tasks SET task_status_key = 'withdrawn' WHERE id = 910001" \
+    "UPDATE workflow_tasks SET task_status_key = 'ready' WHERE id = 910001"
+  expect_populated_blocker \
+    node-withdrawn-before-migration \
+    'process_node_instances has 1 incompatible rows' \
+    "UPDATE process_node_instances SET status = 'withdrawn', completed_at = '2026-07-10 16:00:00+00' WHERE id = 910001" \
+    "UPDATE process_node_instances SET status = 'waiting', completed_at = NULL WHERE id = 910001"
+  expect_populated_blocker \
     workflow-task-paired-anchor \
     'workflow_tasks has 1 incompatible status or anchor rows' \
     'UPDATE workflow_tasks SET process_node_instance_id = NULL WHERE id = 910001' \
@@ -559,6 +569,9 @@ test-populated-upgrade)
     --database-url-env PLUSH_DATABASE_PROGRAMMABILITY_URL
   assert_net_weight_gram_upgrade
   assert_populated_preflight_green latest
+  populated_psql -q -v plush_latest_withdrawn=1 -f "$populated_contract_file"
+  POPULATED_EXPECTED_ROW_COUNT=11
+  assert_populated_preflight_green latest-withdrawn
   assert_customer_config_cutover_preflight_green latest
   populated_readback="$(
     populated_psql -Atq -c \

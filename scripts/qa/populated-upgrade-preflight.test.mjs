@@ -148,6 +148,40 @@ test("populated upgrade SQL is read-only and covers every 055504 data boundary",
   assert.doesNotMatch(source, /public\.atlas_schema_revisions/u);
 });
 
+test("latest schema status values remain accepted by the populated upgrade audit", () => {
+  const sql = fs.readFileSync(sqlPath, "utf8");
+  const values = (source) =>
+    [...source.matchAll(/'([^']+)'/gu)].map((match) => match[1]);
+  for (const [table, field, schemaFile] of [
+    ["workflow_tasks", "task_status_key", "workflow_task.go"],
+    ["process_node_instances", "status", "process_node_instance.go"],
+  ]) {
+    const schema = fs.readFileSync(
+      path.join(repoRoot, "server/internal/data/model/schema", schemaFile), "utf8",
+    );
+    const constraint = schema.match(
+      new RegExp(`"${table}_status_allowed":\\s*"([^"]+)"`, "u"),
+    );
+    assert.ok(constraint, `${table}: schema status constraint missing`);
+    const audit = sql.match(
+      new RegExp(`FROM public\\.${table}\\s+WHERE \\([\\s\\S]*?\\$sql\\$ INTO`, "u"),
+    );
+    assert.ok(audit, `${table}: status audit missing`);
+    const base = audit[0].match(
+      new RegExp(`${field}::text NOT IN \\(([^)]+)\\)`, "u"),
+    );
+    assert.ok(base, `${table}: rejected status boundary missing`);
+    const additions = [...audit[0].matchAll(
+      new RegExp(`AND NOT \\(\\$\\d+ AND ${field}::text = '([^']+)'\\)`, "gu"),
+    )].map((match) => match[1]);
+    assert.deepEqual(
+      [...new Set([...values(base[1]), ...additions])].sort(),
+      values(constraint[1]).sort(),
+      `${table}: schema 状态变化必须同步存量升级预检，并通过隔离 PostgreSQL 升级回归`,
+    );
+  }
+});
+
 test("customer config cutover SQL is revision-aware, read-only, and covers both 055825 blockers", () => {
   const source = fs.readFileSync(cutoverSqlPath, "utf8");
   for (const required of [

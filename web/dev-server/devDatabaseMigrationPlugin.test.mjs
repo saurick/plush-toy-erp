@@ -60,6 +60,9 @@ function target({ pendingFiles = 1 } = {}) {
 function dependencies(calls) {
   let pendingFiles = 1
   return {
+    async workspaceCheck() {
+      calls.push('workspace-check')
+    },
     async verifyReadiness() {
       calls.push('verify-readiness')
     },
@@ -345,6 +348,71 @@ test('database migration service reports runtime recovery only after migration a
   assert.equal(readyReports, 1)
 })
 
+test('migration contract failure stops preparation before database access or backend shutdown', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  runtime.workspaceCheck = async () => {
+    calls.push('workspace-check')
+    const error = new Error(
+      'fixture includes docker timeout result=not_proven and private_password'
+    )
+    error.code = 'migration_workspace_check_failed'
+    throw error
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const blocked = await waitForOperation(service, result.operation.id, [
+    'blocked',
+  ])
+  assert.deepEqual(calls, ['source', 'workspace-check'])
+  assert.equal(blocked.issues[0].code, 'migration_workspace_check_failed')
+  assert.match(blocked.issues[0].message, /make migrate_check.*未停止后端/u)
+  assert.match(blocked.message, /迁移链路.*未完成/u)
+  assert.doesNotMatch(
+    JSON.stringify(blocked),
+    /private_password|docker timeout/u
+  )
+  assert.equal(blocked.confirmationPrompt, null)
+})
+
+test('migration edits during the workspace check invalidate preparation before backend shutdown', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  let reads = 0
+  runtime.sourceIdentity = async () => ({
+    commit: 'a'.repeat(40),
+    fingerprint: (++reads === 1 ? 'b' : 'c').repeat(64),
+  })
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const blocked = await waitForOperation(service, result.operation.id, [
+    'blocked',
+  ])
+  assert.equal(blocked.issues[0].code, 'migration_source_changed')
+  assert.equal(blocked.confirmationPrompt, null)
+  assert.equal(calls.includes('workspace-check'), true)
+  assert.equal(
+    calls.some((call) => /^(stop|plan|backup|apply)/u.test(call)),
+    false
+  )
+})
+
 test('database migration service checks tools before stopping the backend', async (t) => {
   const { root, store } = createProject(t)
   const calls = []
@@ -467,6 +535,7 @@ test('database migration service does not require backup tools for an up-to-date
     'passed',
   ])
   assert.equal(operation.readback.migrationVerified, true)
+  assert.deepEqual(calls.slice(0, 2), ['source', 'workspace-check'])
   assert.equal(
     calls.some((call) => /^(?:stop|plan|backup|apply|restart)/u.test(call)),
     false
@@ -655,6 +724,122 @@ test('database migration service blocks active or transactional clients', async 
   assert.match(blocked.issues[0].message, /open_transaction/u)
   assert.equal(calls.filter((call) => call.startsWith('plan:')).length, 1)
   assert.equal(calls.filter((call) => call.startsWith('backup:')).length, 0)
+})
+
+test('database migration service explains preflight blockers without exposing diagnostics', async (t) => {
+  for (const detail of [
+    'workflow_tasks has 29 incompatible status or anchor rows',
+    'other inventory constraint failed',
+  ]) {
+    const { root, store } = createProject(t)
+    const calls = []
+    const runtime = dependencies(calls)
+    runtime.plan = async () => {
+      calls.push('plan')
+      const error = new Error('make migrate_plan 未完成')
+      error.diagnostic = [
+        '[migration-summary] error_code=migration_preflight_failed next_action=resolve_preflight_blockers',
+        `ERROR: populated upgrade preflight failed: ${detail}`,
+        'postgres://private_user:private_password@127.0.0.1/private_database',
+        '/Users/private/workspace/secret.sql',
+      ].join('\n')
+      throw error
+    }
+    const service = createDevDatabaseMigrationService({
+      projectRoot: root,
+      operationStore: store,
+      dependencies: runtime,
+    })
+    const result = await service.act({
+      action: 'prepare',
+      idempotencyKey: PREPARE_KEY,
+    })
+    const blocked = await waitForOperation(service, result.operation.id, [
+      'blocked',
+    ])
+    assert.equal(blocked.issues[0].code, 'migration_preflight_failed')
+    assert.equal(blocked.target.currentVersion, target().currentVersion)
+    assert.equal(blocked.source.fingerprint, 'b'.repeat(64))
+    assert.match(blocked.message, /迁移计划及事务回滚/u)
+    assert.match(blocked.issues[0].message, /本次未执行迁移/u)
+    assert.match(
+      blocked.issues[0].message,
+      detail.startsWith('workflow_tasks')
+        ? /29 条工作流任务.*预检规则与当前数据库版本/u
+        : /本地开发终端的具体阻断原因/u
+    )
+    assert.doesNotMatch(JSON.stringify(blocked), /private_|secret\.sql|ERROR:/u)
+    assert.equal(blocked.confirmationPrompt, null)
+    assert.deepEqual(
+      calls.filter((call) => /^(plan|backup:|apply:)/u.test(call)),
+      ['plan']
+    )
+  }
+})
+
+test('database migration service distinguishes backup script arguments from missing tools', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  runtime.backup = async () => {
+    const error = new Error('bash exited: 1')
+    error.diagnostic = [
+      '用法: 使用 pg_dump、docker 和 atlas 执行备份恢复',
+      '[backup-restore-rehearsal] 不支持的参数: --release-version',
+    ].join('\n')
+    throw error
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const blocked = await waitForOperation(service, result.operation.id, [
+    'blocked',
+  ])
+  assert.equal(blocked.issues[0].code, 'migration_script_contract_failed')
+  assert.match(blocked.issues[0].message, /参数不一致.*本次未执行迁移/u)
+  assert.equal(
+    calls.some((call) => call.startsWith('apply:')),
+    false
+  )
+})
+
+test('backup failures retain their stage instead of treating any tool name as missing tooling', async (t) => {
+  for (const diagnostic of [
+    'pg_dump: error: permission denied for table private_table',
+    'docker restore exited with status 1',
+  ]) {
+    const { root, store } = createProject(t)
+    const calls = []
+    const runtime = dependencies(calls)
+    runtime.backup = async () => {
+      throw new Error(diagnostic)
+    }
+    const service = createDevDatabaseMigrationService({
+      projectRoot: root,
+      operationStore: store,
+      dependencies: runtime,
+    })
+    const result = await service.act({
+      action: 'prepare',
+      idempotencyKey: PREPARE_KEY,
+    })
+    const blocked = await waitForOperation(service, result.operation.id, [
+      'blocked',
+    ])
+    assert.equal(blocked.issues[0].code, 'backup_restore_failed')
+    assert.match(blocked.message, /备份与隔离恢复/u)
+    assert.doesNotMatch(JSON.stringify(blocked), /private_table|pg_dump:/u)
+    assert.equal(
+      calls.some((call) => call.startsWith('apply:')),
+      false
+    )
+  }
 })
 
 test('database migration service never applies a stale source plan', async (t) => {

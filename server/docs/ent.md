@@ -46,11 +46,21 @@ CHECK/UNIQUE/FK 约束。
     ```bash
     make migrate
     ```
-    它会依次完成只读 status、停后端、Atlas validate / dry-run、全部 pending SQL
+    它会只读核对 status，需要准备升级时，先对当前工作区执行迁移链路 QA
+    （包括尚未提交的文件），通过后再停后端、Atlas validate / dry-run、全部 pending SQL
     的同事务真实预演并 `ROLLBACK`、真实备份与隔离恢复验证、migration 与目标
     身份复核，然后要求输入一次可读的完整确认串。确认通过后才整批以
     `tx-mode=all` apply，并在同一目标读回 Atlas status、Ent / PostgreSQL schema、
     可编程对象和 health / ready。
+
+    开发过程中可单独运行 `make migrate_check`，无需先提交代码。它验证当前
+    工作流与流程节点的 schema 合法状态与存量预检规则、实际备份脚本的参数，以及准备 / 执行 / 恢复
+    合同；不连接目标库，不停止后端，不生成或执行 migration。页面与 CLI 的
+    准备升级计划都会自动执行同一检查，失败、零测试、缺少结果或跳过测试均阻断准备。
+    CLI 检查到目标已是最新版本时，只读返回 `up_to_date`；单独检查代码使用 `make migrate_check`。
+    修改 schema 状态时仍须补相应的隔离 PostgreSQL 升级回归；这项快速检查不
+    替代真实数据预演和备份恢复。操作记录保留失败阶段，以及已核对到的目标
+    版本和迁移文件指纹；原始诊断仅留本地终端，公开记录不返回敏感日志。
 
     CI / Codex 等非交互环境必须显式分成两个阶段：
     ```bash
@@ -172,6 +182,11 @@ go run ./cmd/schema-doc --check
 回执不会包含用户名、密码、完整 DSN、原始错误或确认值；原始人类可读错误另行脱敏输出到 stderr。为了让显式 `migrate_prepare → migrate_execute` 仍可操作，prepare 的受控 continuation 会在回执前单独给出本次 operation 的确认变量；低层 `migrate_status / plan` 为现有服务端 parser 保留的旧机器行也可能在回执前给出内部确认。它们都不是通用回执字段，不应复制进日志、工单或聊天。终端回执也不替代备份、隔离恢复、停写、目标 identity、一次 apply 和同目标读回证据。
 
 ## 数据库连接与执行超时
+
+存量升级预检按目标库已完整应用的状态机 migration 判断合法状态。流程节点和
+工作流任务的 `withdrawn` 分别在 `20260811111811`、`20260811122746` 完成后
+才被接受；旧升级检查点仍拒绝提前出现的状态，流程关联、版本和结束时间检查
+继续执行。预检失败时迁移页保留具体阻断分类，正式 apply 不会开始。
 
 高层 `make migrate` 停止本项目后端后，会按数据库会话的实际状态判断风险，不按
 客户端名称判断。没有事务、没有快照或 advisory lock、状态为 `idle / ClientRead`

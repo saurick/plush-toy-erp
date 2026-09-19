@@ -9,9 +9,15 @@ import { fileURLToPath } from "node:url";
 
 import { collectGitChangedFiles } from "./lib/git-range.mjs";
 import { NODE_TEST_GROUPS } from "./node-test-groups.mjs";
+import { MIGRATION_CONTRACT_TESTS } from "./migration-contracts.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "../..");
+const MIGRATION_CONTRACT_PATHS = new Set([
+  ...MIGRATION_CONTRACT_TESTS,
+  ...MIGRATION_CONTRACT_TESTS.map((file) => file.replace(/\.test\.mjs$/u, ".mjs")),
+  "scripts/qa/populated-upgrade-preflight.sh",
+]);
 const AFFECTED_SCOPE_ORDER = [
   "T0",
   "T1",
@@ -121,6 +127,14 @@ const FIXED_COMMANDS = {
   dbGuard: command("db-guard", "T2", "检查 schema 与 migration 同步", "bash", [
     "scripts/qa/db-guard.sh",
   ]),
+  migrationContracts: command(
+    "migration-contracts",
+    "T2",
+    "检查当前工作区的迁移链路合同",
+    "make",
+    ["migrate_check"],
+    "server",
+  ),
   serverData: command(
     "server-data",
     "T2",
@@ -657,6 +671,9 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
+    if (MIGRATION_CONTRACT_PATHS.has(file)) {
+      addFixed(state, "migrationContracts", file);
+    }
     if (isDevPageGovernancePath(file)) {
       directTests.add(DEV_PAGE_GOVERNANCE_TEST);
     }
@@ -771,6 +788,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       file.startsWith("server/internal/data/model/ent/")
     ) {
       addFixed(state, "dbGuard", file);
+      addFixed(state, "migrationContracts", file);
       addFixed(state, "serverData", file);
       directTests.add(SCHEMA_DOCS_TEST);
       addFollowUp(
@@ -994,7 +1012,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       file === "scripts/qa/populated-upgrade-20260714055504.sql" ||
       file === "scripts/qa/customer-config-cutover-20260714055825.sql"
     ) {
-      directTests.add("scripts/qa/populated-upgrade-preflight.test.mjs");
+      addFixed(state, "migrationContracts", file);
       continue;
     }
 
@@ -1072,6 +1090,9 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     );
     fullReasons.forEach((reason) => addReason(state, "full", reason));
   } else {
+    if (state.commands.has("migration-contracts")) {
+      for (const file of MIGRATION_CONTRACT_TESTS) directTests.delete(file);
+    }
     if (state.webNeedsAllTests) {
       for (const testFile of [...directTests]) {
         if (testFile.startsWith("web/src/")) {

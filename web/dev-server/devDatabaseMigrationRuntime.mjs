@@ -27,6 +27,7 @@ export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'scripts/local-migration-workflow.mjs',
   'scripts/local-runtime-preflight-core.mjs',
   'scripts/local-runtime-preflight.mjs',
+  'scripts/qa/migration-contracts.mjs',
   'scripts/qa/database-programmability.mjs',
   'scripts/qa/populated-upgrade-preflight.sh',
   'scripts/qa/populated-upgrade-20260714055504.sql',
@@ -182,7 +183,7 @@ export async function executeCommand(
   let child
   let timer
   let timedOut = false
-  let outputError
+  const outputFailure = { error: null }
   let cleanup
   const signalGroup = async (signal) => {
     if (!child?.pid) return
@@ -198,8 +199,9 @@ export async function executeCommand(
       if (
         error.code !== 'ESRCH' &&
         !(process.platform === 'win32' && error.code === 128)
-      )
+      ) {
         throw error
+      }
     }
   }
   const stop = () => {
@@ -223,19 +225,19 @@ export async function executeCommand(
         let bytes = 0
         child[stream].setEncoding('utf8')
         child[stream].on('data', (chunk) => {
-          if (outputError) return
+          if (outputFailure.error) return
           bytes += Buffer.byteLength(chunk)
           if (bytes > maxBuffer) {
-            outputError = new Error('迁移命令输出超过限制')
-            void stop().catch(reject)
+            outputFailure.error = new Error('迁移命令输出超过限制')
+            stop().catch(reject)
             return
           }
           output[stream] += chunk
           try {
             if (stream === 'stdout') onStdout?.(chunk)
           } catch (error) {
-            outputError = error
-            void stop().catch(reject)
+            outputFailure.error = error
+            stop().catch(reject)
           }
         })
       }
@@ -251,12 +253,12 @@ export async function executeCommand(
       })
       timer = setTimeout(() => {
         timedOut = true
-        void stop().catch(reject)
+        stop().catch(reject)
       }, timeout)
     })
     clearTimeout(timer)
     // A shell can exit while its children survive and still hold output pipes.
-    if (result.error || timedOut || outputError) await stop()
+    if (result.error || timedOut || outputFailure.error) await stop()
     if (timedOut) {
       const error = new Error('迁移命令超时，已停止本次命令及其子进程')
       error.code = 'migration_command_timeout'
@@ -264,7 +266,7 @@ export async function executeCommand(
       error.stderr = result.stderr
       throw error
     }
-    if (outputError) throw outputError
+    if (outputFailure.error) throw outputFailure.error
     if (result.error) {
       throw Object.assign(result.error, {
         stdout: result.stdout,
@@ -366,7 +368,7 @@ export function buildSharedDevBackupRehearsalArgs(operationId) {
     'shared-dev',
     '--source-policy',
     SHARED_DEV_BACKUP_SOURCE_POLICY,
-    '--release-version',
+    '--release-id',
     `migration-${operationId}`,
     '--backup-purpose',
     'pre-migration',
@@ -567,6 +569,17 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
   let cachedToolReadiness = null
   let cachedToolReadinessUntil = 0
   return {
+    async workspaceCheck() {
+      try {
+        await executeCommand('make', ['migrate_check'], {
+          cwd: serverRoot,
+          timeout: 60_000,
+        })
+      } catch (error) {
+        error.code = 'migration_workspace_check_failed'
+        throw error
+      }
+    },
     async toolReadiness() {
       if (cachedToolReadiness && Date.now() < cachedToolReadinessUntil) {
         return cachedToolReadiness

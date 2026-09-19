@@ -12,6 +12,13 @@ function targetBody(source, target, nextTarget) {
   return source.slice(start, end);
 }
 
+test("migration workspace check is an independent read-only entry before Git commit", async () => {
+  const source = await readFile(makefileURL, "utf8");
+  const check = targetBody(source, "migrate_check", "migrate:");
+  assert.match(check, /node \.\.\/scripts\/qa\/migration-contracts\.mjs/u);
+  assert.doesNotMatch(check, /local-migration-workflow|dev_stop|migrate_apply|git status/u);
+});
+
 test("migration make targets keep the guarded low-level plan and apply wrapper", async () => {
   const source = await readFile(makefileURL, "utf8");
   const workflow = targetBody(source, "migrate", "migrate_prepare:");

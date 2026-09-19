@@ -597,6 +597,7 @@ test("affected: schema changes select migration guard and data tests without aut
   );
 
   assert(ids(plan).includes("db-guard"));
+  assert(ids(plan).includes("migration-contracts"));
   assert(ids(plan).includes("server-data"));
   assert(
     plan.commands.some((item) =>
@@ -824,7 +825,7 @@ test("affected: QA shell scripts keep syntax proof and escalate without a siblin
   assert.equal(ids(withSibling).includes("full"), false);
 });
 
-test("affected: migration preflight SQL files run only their static fail-closed contract", () => {
+test("affected: migration preflight SQL files select the current migration chain contract", () => {
   for (const file of [
     "scripts/qa/populated-upgrade-20260714055504.sql",
     "scripts/qa/customer-config-cutover-20260714055825.sql",
@@ -833,9 +834,34 @@ test("affected: migration preflight SQL files run only their static fail-closed 
     assert.equal(plan.localGate, "focused", file);
     assert.deepEqual(ids(plan), [
       "diff-check",
-      "node-tests:scripts/qa/populated-upgrade-preflight.test.mjs",
+      "migration-contracts",
     ]);
   }
+});
+
+test("affected: uncommitted migration callers and tests select the chain once without applying", () => {
+  const plan = buildAffectedPlan(
+    [
+      "web/dev-server/devDatabaseMigrationRuntime.mjs",
+      "scripts/qa/populated-upgrade-preflight.test.mjs",
+      "scripts/qa/migration-contracts.mjs",
+    ],
+    { root: ROOT },
+  );
+  assert.equal(plan.localGate, "focused");
+  const checks = plan.commands.filter((item) => item.id === "migration-contracts");
+  assert.equal(checks.length, 1);
+  assert.deepEqual(checks[0].args, ["migrate_check"]);
+  assert.equal(checks[0].cwd, "server");
+  assert.equal(
+    plan.commands.some((item) => item.id.startsWith("node-tests:") &&
+      item.args.includes("scripts/qa/populated-upgrade-preflight.test.mjs")),
+    false,
+  );
+  assert.equal(
+    plan.commands.some((item) => item.args.includes("migrate_apply")),
+    false,
+  );
 });
 
 test("affected: populated upgrade fixture runs the static PostgreSQL gate contract", () => {

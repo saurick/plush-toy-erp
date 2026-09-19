@@ -116,6 +116,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/database-programmability.test.mjs",
     "scripts/qa/database-target.test.mjs",
     "scripts/qa/disposable-database-runner.test.mjs",
+    "scripts/qa/migration-contracts.test.mjs",
     "scripts/qa/migration-makefile-contract.test.mjs",
     "scripts/qa/populated-upgrade-preflight.test.mjs",
     "scripts/qa/production-order-api-runtime.test.mjs",

@@ -16,6 +16,7 @@
 | --- | --- | --- |
 | `bash scripts/qa/affected.sh --plan` | 读取当前工作树、staged、指定 base 或显式文件，按验证范围（内部键 T0-T8）和受影响领域输出最小必要测试；默认只计划，未知路径保守升级为 `full.sh` | 开发过程中、准备验证前 |
 | `bash scripts/qa/affected.sh --run` | 执行 affected 选出的安全本地命令并记录逐项耗时；页面级浏览器回归（Style L1）、`make data` 和目标环境证据仍作为 required follow-up 单列 | 完成一个可验证切片后 |
+| `make -C server migrate_check` | 检查当前未提交工作区的迁移链路、schema 状态与存量预检、实际备份脚本参数；不连接目标库。页面与 CLI 在准备迁移、停止后端前自动执行；详见 [Ent 迁移说明](../../server/docs/ent.md) | 开发中修改迁移链路或 schema 后；affected 也会选择同一检查 |
 | `node --test scripts/qa/dev-page-governance.test.mjs` | 检查 DEV 菜单 route 唯一且留在 `/__dev`，普通页面由单一模块登记 affected 桌面渲染/溢出 smoke，专属页面保留各自唯一桌面场景；full/strict 默认不运行 DEV 视觉场景，且不登记 DEV 移动端、暗色、成功截图、固定密度或通用键盘合同 | 新增菜单、页面或修改工作台可见内容时 |
 | `node --test scripts/qa/dev-quality-gate-provider-boundary.test.mjs` | 检查质量工作台直接投影服务器 provider 返回的 CI Job，并只用正式流水线与终态门禁判定结果；前端不保存需随 Job 增删改名同步的第二份拓扑 | 修改 GitLab CI 证据 provider、质量工作台或 Job 编排时 |
 | `node --test scripts/qa/ci-job-guide.test.mjs` | 校验每个正式 push-CI Job 都有一份简短用途说明；说明源不保存依赖、状态、耗时、等待或历史，未知 Job 只标记“说明待登记”并继续投影 | 新增、删除、改名或拆分 GitLab CI Job 时 |

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import {
@@ -25,6 +25,29 @@ import {
   redactDatabaseMigrationDiagnostic,
   waitForRuntime,
 } from './devDatabaseMigrationRuntime.mjs'
+
+test('workspace migration check executes the Make target and preserves failure diagnostics', async (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'migration-workspace-check-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  mkdirSync(path.join(root, 'server'))
+  const makefile = path.join(root, 'server/Makefile')
+  const runtime = createDevDatabaseMigrationRuntime(
+    root,
+    'http://127.0.0.1:8300'
+  )
+  writeFileSync(makefile, 'migrate_check:\n\t@echo current-worktree-contract\n')
+  await runtime.workspaceCheck()
+  writeFileSync(
+    makefile,
+    'migrate_check:\n\t@echo broken-current-worktree-contract >&2\n\t@exit 2\n'
+  )
+  await assert.rejects(
+    runtime.workspaceCheck(),
+    (error) =>
+      error.code === 'migration_workspace_check_failed' &&
+      /broken-current-worktree-contract/u.test(error.diagnostic)
+  )
+})
 
 test('migration commands return output and preserve failure diagnostics', async () => {
   assert.deepEqual(
@@ -164,6 +187,23 @@ test('database migration backup binds the narrow shared-dev source policy', () =
     '--out',
     'output/dev-workbench/database-migration-backups',
   ])
+})
+
+test('database migration backup arguments are accepted by the real rehearsal script', () => {
+  const result = spawnSync(
+    'bash',
+    buildSharedDevBackupRehearsalArgs('11111111-1111-4111-8111-111111111111'),
+    {
+      cwd: path.resolve(import.meta.dirname, '../..'),
+      encoding: 'utf8',
+      timeout: 5000,
+      env: { ...process.env, SOURCE_POSTGRES_DSN: '' },
+    }
+  )
+  assert.equal(result.error, undefined)
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /请通过 SOURCE_POSTGRES_DSN 提供源库 DSN/u)
+  assert.doesNotMatch(result.stderr, /不支持的参数|缺少命令/u)
 })
 
 test('database migration source identity follows the centralized dev server paths', () => {

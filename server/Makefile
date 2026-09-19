@@ -158,7 +158,11 @@ ifneq ("$(wildcard $(ENV_FILE))","")
   export
 endif	
 
-.PHONY: migrate migrate_prepare migrate_execute migrate_status migrate_plan migrate_apply
+.PHONY: migrate_check migrate migrate_prepare migrate_execute migrate_status migrate_plan migrate_apply
+# 检查当前工作区的迁移链路合同；不要求提交，不连接目标库。
+migrate_check:
+	@node ../scripts/qa/migration-contracts.mjs
+
 # 共享开发库交互主入口：编排 status、plan、备份恢复、确认、apply、读回和重启。
 migrate:
 	@LOCAL_MIGRATION_WORKFLOW_MODE=run \

@@ -9,6 +9,8 @@ DECLARE
   column_count integer := 0;
   workflow_task_version_migration_pending boolean := false;
   shipment_status_normalization_pending boolean := false;
+  process_node_withdrawal_applied boolean := false;
+  workflow_task_withdrawal_applied boolean := false;
 BEGIN
   IF to_regclass('atlas_schema_revisions.atlas_schema_revisions') IS NOT NULL THEN
     EXECUTE $sql$
@@ -26,6 +28,18 @@ BEGIN
          WHERE version = '20260711204000'
       )
     $sql$ INTO shipment_status_normalization_pending;
+
+    -- Later state-machine migrations extend the legal states. Only completed
+    -- revisions enable them; earlier upgrade checkpoints still reject them.
+    EXECUTE $sql$
+      SELECT EXISTS (
+        SELECT 1 FROM atlas_schema_revisions.atlas_schema_revisions
+         WHERE version = '20260811111811' AND applied = total AND NULLIF(error, '') IS NULL
+      ), EXISTS (
+        SELECT 1 FROM atlas_schema_revisions.atlas_schema_revisions
+         WHERE version = '20260811122746' AND applied = total AND NULLIF(error, '') IS NULL
+      )
+    $sql$ INTO process_node_withdrawal_applied, workflow_task_withdrawal_applied;
   END IF;
 
   IF to_regclass('public.bom_headers') IS NOT NULL THEN
@@ -222,7 +236,10 @@ BEGIN
       EXECUTE $sql$
         SELECT count(*)
           FROM public.process_node_instances
-         WHERE status::text NOT IN ('waiting', 'active', 'completed', 'blocked')
+         WHERE (
+              status::text NOT IN ('waiting', 'active', 'completed', 'blocked')
+              AND NOT ($1 AND status::text = 'withdrawn')
+            )
             OR node_type::text NOT IN (
               'human_task',
               'approval',
@@ -248,7 +265,8 @@ BEGIN
               status::text = 'blocked'
               AND (started_at IS NULL OR completed_at IS NOT NULL)
             )
-      $sql$ INTO invalid_count;
+            OR (status::text = 'withdrawn' AND completed_at IS NULL)
+      $sql$ INTO invalid_count USING process_node_withdrawal_applied;
       IF invalid_count > 0 THEN
         blockers := array_append(
           blockers,
@@ -275,11 +293,14 @@ BEGIN
       EXECUTE $sql$
         SELECT count(*)
           FROM public.workflow_tasks
-         WHERE task_status_key::text NOT IN ('ready', 'blocked', 'done', 'rejected')
+         WHERE (
+              task_status_key::text NOT IN ('ready', 'blocked', 'done', 'rejected')
+              AND NOT ($1 AND task_status_key::text = 'withdrawn')
+            )
             OR (
               (process_instance_id IS NULL) <> (process_node_instance_id IS NULL)
             )
-      $sql$ INTO invalid_count;
+      $sql$ INTO invalid_count USING workflow_task_withdrawal_applied;
       IF invalid_count > 0 THEN
         blockers := array_append(
           blockers,

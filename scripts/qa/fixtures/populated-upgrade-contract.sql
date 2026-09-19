@@ -1,3 +1,27 @@
+\if :{?plush_latest_withdrawn}
+BEGIN;
+INSERT INTO process_instances (
+  id, process_key, process_version, config_revision, definition_hash,
+  business_ref_type, business_ref_id, idempotency_key, status,
+  started_at, created_at, updated_at
+) VALUES (
+  910001, '__qa_populated_withdrawn__', 'v1', 'synthetic-revision',
+  repeat('a', 64), 'sales_order', 910001, '__qa_populated_withdrawn__',
+  'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+);
+INSERT INTO process_node_instances (
+  id, process_instance_id, node_key, node_type, status, completed_at,
+  created_at, updated_at
+) VALUES (
+  910001, 910001, 'withdrawn-task', 'human_task', 'withdrawn',
+  CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+);
+UPDATE workflow_tasks SET task_status_key = 'withdrawn',
+  process_instance_id = 910001, process_node_instance_id = 910001
+WHERE id = 910001;
+COMMIT;
+\endif
+
 \if :{?plush_snapshot}
 WITH synthetic_rows AS (
   SELECT 'unit:' || id::text AS row_key, to_jsonb(row_data) AS payload

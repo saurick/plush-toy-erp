@@ -194,8 +194,35 @@ function databaseClientDiagnosticMessage(diagnostic) {
     : '共享开发库存在活动查询、打开事务、持锁或状态不明的连接；处理后重新准备'
 }
 
+const PREPARE_FAILURE_MESSAGES = Object.freeze({
+  migration_workspace_check_failed:
+    '当前代码的迁移链路检查未通过；请在 server/ 运行 make migrate_check 查看失败项，修复后重新准备。本次未停止后端或执行迁移',
+  database_status_unavailable:
+    '数据库状态核对未完成；请检查本地开发终端的具体原因后重新准备',
+  migration_source_changed:
+    '无法核对当前迁移文件；请检查本地开发终端的具体原因后重新准备',
+  migration_backend_stop_failed:
+    '本地后端停止未完成；请检查进程状态后重新准备。本次未执行迁移',
+  migration_plan_failed:
+    '迁移计划或事务回滚验证未通过；请查看本地开发终端的具体原因，修复后重新准备。本次未执行迁移',
+  backup_restore_failed:
+    '备份或隔离恢复验证未通过；请查看本地开发终端的具体原因，修复后重新准备。本次未执行迁移',
+  migration_recheck_failed:
+    '准备后的迁移文件、目标状态或备份复核未通过；请检查本地开发终端后重新准备。本次未执行迁移',
+  migration_runtime_check_failed:
+    '数据库已是最新版本，但后端运行状态核对未完成；请查看本地开发终端后恢复后端',
+  migration_tool_unavailable: migrationToolIssueMessage(),
+})
+
 function publicIssue(error, fallbackCode = 'operation_blocked') {
   const diagnostic = String(error?.diagnostic || error?.message || '')
+  if (error?.code === 'migration_workspace_check_failed') {
+    return {
+      code: error.code,
+      severity: 'blocked',
+      message: PREPARE_FAILURE_MESSAGES[error.code],
+    }
+  }
   if (error instanceof LocalRuntimePreflightError) {
     return { code: error.code, severity: 'blocked', message: error.message }
   }
@@ -259,7 +286,19 @@ function publicIssue(error, fallbackCode = 'operation_blocked') {
       message: '准备阶段的备份或隔离恢复证据已失效，请重新准备',
     }
   }
-  if (/docker|pg_dump|pg_restore|atlas.*not found|ENOENT/iu.test(diagnostic)) {
+  if (/\[backup-restore-rehearsal\] 不支持的参数:/u.test(diagnostic)) {
+    return {
+      code: 'migration_script_contract_failed',
+      severity: 'blocked',
+      message:
+        '迁移入口与备份脚本的参数不一致；请修复脚本调用后重新准备。本次未执行迁移',
+    }
+  }
+  if (
+    /(?:docker|pg_dump|pg_restore|psql|atlas)[^\n]*(?:(?:command|executable) not found|not installed|ENOENT)|(?:spawn|command not found:)[^\n]*(?:docker|pg_dump|pg_restore|psql|atlas)|cannot connect to the docker daemon|docker daemon is not running/iu.test(
+      diagnostic
+    )
+  ) {
     return {
       code: 'migration_tool_unavailable',
       severity: 'blocked',
@@ -278,13 +317,27 @@ function publicIssue(error, fallbackCode = 'operation_blocked') {
       message: 'migration 或 schema 真源未收口或在操作期间发生变化，请重新准备',
     }
   }
+  if (/\berror_code=migration_preflight_failed\b/u.test(diagnostic)) {
+    const workflowRows = diagnostic.match(
+      /workflow_tasks has (\d+) incompatible status or anchor rows/u
+    )
+    return {
+      code: 'migration_preflight_failed',
+      severity: 'blocked',
+      message: workflowRows
+        ? `存量升级预检发现 ${workflowRows[1]} 条工作流任务的状态或流程关联不符合检查规则；请核对预检规则与当前数据库版本并处理后重新准备。本次未执行迁移`
+        : '迁移预检未通过；请查看本地开发终端的具体阻断原因，处理后重新准备。本次未执行迁移',
+    }
+  }
   return {
-    code: typeof error?.code === 'string' ? error.code : fallbackCode,
+    code:
+      error instanceof DatabaseMigrationActionError ? error.code : fallbackCode,
     severity: 'blocked',
     message:
       error?.message && error instanceof DatabaseMigrationActionError
         ? error.message
-        : '操作未完成；系统没有自动重试，请刷新状态后按提示处理',
+        : PREPARE_FAILURE_MESSAGES[fallbackCode] ||
+          '操作未完成；系统没有自动重试，请刷新状态后按提示处理',
   }
 }
 
@@ -342,10 +395,12 @@ export function createDevDatabaseMigrationService({
   const transitionFailure = (
     operationId,
     error,
-    fallbackStatus = 'blocked'
+    fallbackStatus = 'blocked',
+    fallbackCode = 'operation_blocked'
   ) => {
     logFailure(operationId, error)
-    const issue = publicIssue(error)
+    const issue = publicIssue(error, fallbackCode)
+    const previous = readDatabaseMigrationOperation(store, operationId)
     const status =
       error?.outcome === 'not_proven' ||
       issue.code === 'migration_outcome_unknown'
@@ -356,16 +411,18 @@ export function createDevDatabaseMigrationService({
       message:
         status === 'not_proven'
           ? '操作结果尚未证明，已停止自动处理'
-          : readDatabaseMigrationOperation(store, operationId).readback
-                ?.migrationVerified
+          : previous.readback?.migrationVerified
             ? '数据库升级已完成，后端恢复未完成；修正启动问题后只需重启后端'
-            : '操作被安全停止',
+            : previous.status === 'preparing'
+              ? `${previous.message.replace(/^正在/u, '')}未完成，操作已停止`
+              : '操作被安全停止',
       issues: [issue],
       now: now().toISOString(),
     })
   }
 
   const runPrepare = async (operationId) => {
+    let failureCode = 'migration_workspace_check_failed'
     const progress = (message) =>
       transitionDatabaseMigrationOperation(store, operationId, {
         status: 'preparing',
@@ -373,6 +430,11 @@ export function createDevDatabaseMigrationService({
         now: now().toISOString(),
       })
     try {
+      progress('正在检查当前代码的迁移链路')
+      const checkedSource = await runtime.sourceIdentity()
+      await runtime.workspaceCheck()
+      failureCode = 'database_status_unavailable'
+      progress('正在核对共享开发库状态')
       const initialTarget = await runtime.status()
       if (
         initialTarget.key !== 'shared-dev' ||
@@ -382,8 +444,24 @@ export function createDevDatabaseMigrationService({
           '当前目标不是项目登记的共享开发库'
         )
       }
+      failureCode = 'migration_source_changed'
       const source = await runtime.sourceIdentity()
+      if (source.fingerprint !== checkedSource.fingerprint) {
+        throw new DatabaseMigrationActionError(
+          '迁移文件在代码检查期间发生变化，请重新准备',
+          { code: 'migration_source_changed' }
+        )
+      }
+      transitionDatabaseMigrationOperation(store, operationId, {
+        status: 'preparing',
+        message: '目标与当前迁移文件已核对',
+        target: normalizeTarget(initialTarget),
+        source,
+        now: now().toISOString(),
+      })
       if (initialTarget.pendingFiles === 0) {
+        failureCode = 'migration_runtime_check_failed'
+        progress('正在核对后端运行状态')
         const runtimeReadback = await runtime.runtime()
         await reportRuntimeReady(initialTarget, runtimeReadback)
         transitionDatabaseMigrationOperation(store, operationId, {
@@ -402,6 +480,7 @@ export function createDevDatabaseMigrationService({
         })
         return
       }
+      failureCode = 'migration_tool_unavailable'
       progress('正在检查迁移准备工具')
       const tools = normalizeToolReadiness(await runtime.toolReadiness())
       if (tools.status !== 'ready') {
@@ -409,8 +488,10 @@ export function createDevDatabaseMigrationService({
           code: 'migration_tool_unavailable',
         })
       }
-      progress('正在停止本地后端，准备验证迁移计划')
+      failureCode = 'migration_backend_stop_failed'
+      progress('正在停止本地后端')
       await runtime.stopRuntime()
+      failureCode = 'migration_plan_failed'
       progress('正在验证迁移计划及事务回滚')
       const plan = await runtime.plan(initialTarget.targetConfirmation)
       const reusableBackupOperation = listDatabaseMigrationOperations(store, {
@@ -425,6 +506,7 @@ export function createDevDatabaseMigrationService({
           operation.target?.latestVersion === initialTarget.latestVersion &&
           operation.target?.pendingFiles === initialTarget.pendingFiles
       )
+      failureCode = 'backup_restore_failed'
       const reusableBackup =
         reusableBackupOperation &&
         typeof runtime.verifyBackup === 'function' &&
@@ -435,6 +517,7 @@ export function createDevDatabaseMigrationService({
       const backup =
         reusableBackup ||
         (await runtime.backup(operationId, initialTarget, progress))
+      failureCode = 'migration_recheck_failed'
       progress('正在复核迁移文件、目标状态和备份证据')
       const finalSource = await runtime.sourceIdentity()
       if (finalSource.fingerprint !== source.fingerprint) {
@@ -480,7 +563,7 @@ export function createDevDatabaseMigrationService({
         now: now().toISOString(),
       })
     } catch (error) {
-      transitionFailure(operationId, error, 'blocked')
+      transitionFailure(operationId, error, 'blocked', failureCode)
     } finally {
       releaseDatabaseMigrationExecutionLock(store, operationId)
     }
