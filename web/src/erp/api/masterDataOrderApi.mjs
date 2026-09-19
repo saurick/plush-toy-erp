@@ -675,6 +675,15 @@ export async function listOutsourcingOrders(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listOutsourcingOrderSummary(params = {}, options = {}) {
+  const result = await outsourcingOrderRpc.call('list_outsourcing_order_summary', params, options)
+  return dataOf(result)
+}
+
+export async function listAllOutsourcingOrderSummary(params = {}, options = {}) {
+  return listAllPaginatedRecords(listOutsourcingOrderSummary, params, 'items', options)
+}
+
 export async function listAllOutsourcingOrders(params = {}, options = {}) {
   return listAllPaginatedRecords(
     listOutsourcingOrders,
