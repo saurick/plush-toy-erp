@@ -178,7 +178,8 @@ test('sales selection actions keep one authorized catalog across record states',
     )
   }
   assert.match(page, /actionStates: lifecycleActionStates/u)
-  assert.match(page, /actionStates=\{lifecycleActionStates\}/u)
+  assert.match(page, /<BusinessLifecycleSecondaryAction[\s\S]*?disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u)
+  assert.match(page, /disabledReason=\{lifecycleActionStates\[action.key\]\?\.disabledReason\}/u)
   assert.match(page, /disabled=\{primaryLifecycleState\.disabled\}/u)
   assert.doesNotMatch(page, /canUpdateOrder\s*&&[\s\S]{0,100}!selectedOrder/u)
   assert.doesNotMatch(

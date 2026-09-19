@@ -377,6 +377,7 @@ export const computeMaterialPurchaseTotals = (
 ) => {
   const quantityValues = []
   const amountValues = []
+  const quantityUnits = new Set()
 
   ;(Array.isArray(lines) ? lines : []).forEach((line, rowIndex) => {
     const quantity = isMaterialPurchaseCellHiddenByMerge(
@@ -388,6 +389,7 @@ export const computeMaterialPurchaseTotals = (
       : String(line?.quantity ?? '')
     if (numeric20Scale6Units(quantity) !== null) {
       quantityValues.push(quantity)
+      quantityUnits.add(normalizeMaterialPurchaseUnitText(line?.unit))
     }
     const amount = isMaterialPurchaseCellHiddenByMerge(
       merges,
@@ -403,7 +405,7 @@ export const computeMaterialPurchaseTotals = (
 
   return {
     quantityText:
-      quantityValues.length > 0
+      quantityValues.length > 0 && quantityUnits.size <= 1
         ? formatNumeric20Scale6Summary(sumNumeric20Scale6Values(quantityValues))
         : '',
     amountText:

@@ -16,7 +16,7 @@ import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 
 import {
   BusinessActionTooltip,
-  BusinessLifecycleMoreAction,
+  BusinessLifecycleSecondaryAction,
   BusinessLifecyclePrimaryAction,
   BusinessOperationPanel,
   DateRangeFilter,
@@ -60,7 +60,6 @@ export default function PurchaseOrderOperationPanel({
   lifecycleScope = 'current',
   lifecycleActionStates = {},
   onLifecycleScopeChange,
-  showLifecycleMore = false,
   showLifecyclePrimary = false,
   loadOrders,
   openCreateModal,
@@ -73,11 +72,13 @@ export default function PurchaseOrderOperationPanel({
   orders = [],
   primaryLifecycleAction,
   printPurchaseContract,
+  printPurchaseContracts,
   printingContract = false,
   requestLifecycleAction,
   saving = false,
   secondaryLifecycleActions = [],
   selectedItems = [],
+  selectedOrders = [],
   selectedOrderCanEdit = false,
   selectedOrderCanReorder = false,
   selectedOrderDisplayText = '请先选择采购订单',
@@ -102,6 +103,12 @@ export default function PurchaseOrderOperationPanel({
     setPagination((current) => ({ ...current, current: 1 }))
   const hasSingleSelection =
     selectedRowKeys.length === 1 && Boolean(singleSelectedOrder)
+  const selectedPrintOrders = Array.isArray(selectedOrders)
+    ? selectedOrders
+    : []
+  const printSelectionCount = selectedPrintOrders.length
+  const printSelectionReady =
+    printSelectionCount > 0 && printSelectionCount === selectedRowKeys.length
   const selectedLifecycleStatus = String(
     singleSelectedOrder?.lifecycle_status || ''
   ).toLowerCase()
@@ -420,41 +427,44 @@ export default function PurchaseOrderOperationPanel({
           </BusinessActionTooltip>
         ) : null}
         <BusinessActionTooltip
-          disabled={
-            selectedRowKeys.length !== 1 ||
-            !singleSelectedOrder ||
-            recordActionBusy
-          }
+          selectionActionPriority={printSelectionCount > 1 ? 120 : 40}
+          disabled={!printSelectionReady || recordActionBusy}
           disabledReason={
             recordActionBusy
               ? '当前订单操作完成后可打印'
-              : '请先选择一条采购订单'
+              : selectedRowKeys.length > 0 && !printSelectionReady
+                ? '当前选择已变化，请刷新列表后重新选择'
+                : '请先选择采购订单'
           }
         >
           <Button
             data-business-action-key="print-contract"
             size="small"
             icon={<FileTextOutlined />}
-            disabled={
-              selectedRowKeys.length !== 1 ||
-              !singleSelectedOrder ||
-              recordActionBusy
-            }
+            disabled={!printSelectionReady || recordActionBusy}
             loading={printingContract}
-            onClick={() => printPurchaseContract(singleSelectedOrder)}
+            onClick={() => {
+              if (printSelectionCount === 1) {
+                printPurchaseContract(selectedPrintOrders[0])
+                return
+              }
+              printPurchaseContracts(selectedPrintOrders)
+            }}
           >
-            打印合同
+            {printSelectionCount > 1 ? '批量打印合同' : '打印合同'}
           </Button>
         </BusinessActionTooltip>
-        {showLifecycleMore ? (
-          <BusinessLifecycleMoreAction
-            actions={secondaryLifecycleActions}
-            actionStates={lifecycleActionStates}
-            onAction={(action) =>
-              requestLifecycleAction(action, singleSelectedOrder)
+        {secondaryLifecycleActions.map((action) => (
+          <BusinessLifecycleSecondaryAction
+            key={action.key}
+            action={action}
+            disabled={lifecycleActionStates[action.key]?.disabled}
+            disabledReason={lifecycleActionStates[action.key]?.disabledReason}
+            onAction={(requestedAction) =>
+              requestLifecycleAction(requestedAction, singleSelectedOrder)
             }
           />
-        ) : null}
+        ))}
       </SelectionActionBar>
     </BusinessOperationPanel>
   )

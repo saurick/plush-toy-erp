@@ -126,6 +126,9 @@ export function useOutsourcingOrderEditor({
       products.map((item) => ({
         value: item.id,
         label: productLabel(item),
+        searchText: [item.code, item.style_no, item.name]
+          .filter(Boolean)
+          .join(' '),
         item,
       })),
     [products]
@@ -148,6 +151,9 @@ export function useOutsourcingOrderEditor({
         .map((item) => ({
           value: item.id,
           label: processLabel(item),
+          searchText: [item.code, item.name, item.category]
+            .filter(Boolean)
+            .join(' '),
           item,
         })),
     [processes]
@@ -158,6 +164,8 @@ export function useOutsourcingOrderEditor({
       units.map((item) => ({
         value: item.id,
         label: unitLabel(item),
+        searchText: [item.code, item.name].filter(Boolean).join(' '),
+        suffixLabel: item.name,
         precision:
           Number.isInteger(Number(item.precision)) &&
           Number(item.precision) >= 0
@@ -399,15 +407,17 @@ export function useOutsourcingOrderEditor({
 
   const handleProcessChange = (fieldName, processID) => {
     const process = processes.find((item) => item.id === processID)
-    if (!process) return
-    form.setFieldValue(
-      ['items', fieldName, 'process_name_snapshot'],
-      process.name
-    )
-    form.setFieldValue(
-      ['items', fieldName, 'process_category_snapshot'],
-      process.category || ''
-    )
+    if (!process) {
+      setLineValues(fieldName, {
+        process_name_snapshot: '',
+        process_category_snapshot: '',
+      })
+      return
+    }
+    setLineValues(fieldName, {
+      process_name_snapshot: process.name,
+      process_category_snapshot: process.category || '',
+    })
     const supplierID = Number(form.getFieldValue('supplier_id') || 0)
     const supplier = suppliers.find(
       (item) => Number(item?.id || 0) === supplierID
@@ -477,8 +487,10 @@ export function useOutsourcingOrderEditor({
 
   const handleSupplierChange = (supplierID) => {
     const supplier = suppliers.find((item) => item.id === supplierID)
-    form.setFieldValue('supplier_snapshot', buildSupplierSnapshot(supplier))
-    if (!editingRow?.id) {
+    const initialSnapshot = buildSupplierSnapshot(supplier)
+    const initialSnapshotKey = JSON.stringify(initialSnapshot)
+    form.setFieldValue('supplier_snapshot', initialSnapshot)
+    {
       const termDays = supplier?.default_payment_term_days
       const normalizedTermDays = Number(termDays)
       form.setFieldValue(
@@ -497,7 +509,9 @@ export function useOutsourcingOrderEditor({
     loadSupplierContacts(supplierID).then((contacts) => {
       if (
         String(form.getFieldValue('supplier_id') ?? '') !==
-        String(supplierID ?? '')
+          String(supplierID ?? '') ||
+        JSON.stringify(form.getFieldValue('supplier_snapshot')) !==
+          initialSnapshotKey
       ) {
         return
       }

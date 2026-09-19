@@ -1,7 +1,8 @@
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 export function createWarehouseClassificationScenarios(deps) {
-  let calls, warehouses, materials
+  let calls; let warehouses; let
+materials
   const install = async (page) => {
     calls = []
     warehouses = [
@@ -76,16 +77,16 @@ export function createWarehouseClassificationScenarios(deps) {
         method === 'list_warehouses' ||
         method === 'list_material_warehouses'
       )
-        data = stylePaginatedRpcData(
+        { data = stylePaginatedRpcData(
           warehouses.filter(
             (row) =>
               method === 'list_warehouses' || row.type !== 'FINISHED_GOODS'
           ),
           'warehouses',
           params
-        )
+        ) }
       else if (method === 'list_materials')
-        data = stylePaginatedRpcData(materials, 'materials', params)
+        { data = stylePaginatedRpcData(materials, 'materials', params) }
       else if (method === 'update_warehouse') {
         warehouses = warehouses.map((row) =>
           row.id === params.id ? { ...row, ...params } : row
@@ -114,7 +115,7 @@ export function createWarehouseClassificationScenarios(deps) {
           params
         )
       } else if (method === 'get_purchase_order_receipt_progress')
-        data = {
+        { data = {
           purchase_order_receipt_progress: {
             purchase_order_id: 1,
             purchase_order_no: 'PO-STYLE-L1',
@@ -138,24 +139,24 @@ export function createWarehouseClassificationScenarios(deps) {
               disabled_reason: '',
             })),
           },
-        }
+        } }
       else if (method === 'create_purchase_receipt_from_purchase_order')
-        data = {
+        { data = {
           purchase_receipt: {
             id: 900,
             receipt_no: params.receipt_no,
             status: 'DRAFT',
-            items: params.item_warehouses.map((item, index) => ({
+            items: params.items.map((item, index) => ({
               id: index + 1,
               receipt_id: 900,
               material_id: index + 1,
               warehouse_id: item.warehouse_id,
               unit_id: 1,
               lot_id: index + 901,
-              quantity: '10',
+              quantity: item.quantity,
             })),
           },
-        }
+        } }
       else return route.fallback()
       return route.fulfill({
         status: 200,
@@ -279,7 +280,7 @@ export function createWarehouseClassificationScenarios(deps) {
         await modal
           .locator('.ant-select')
           .filter({
-            has: page.getByRole('combobox', { name: '第2行入库仓库' }),
+            has: page.getByRole('combobox', { name: '第2条入库仓库' }),
           })
           .locator('.ant-select-selector')
           .click()
@@ -304,7 +305,7 @@ export function createWarehouseClassificationScenarios(deps) {
           )
         )
         const sourceTable = modal.locator(
-          '[aria-label="采购订单生成入库来源明细"]'
+          '[aria-label="采购到货清点明细"]'
         )
         const tableWidth = await sourceTable.evaluate(
           (node) => node.getBoundingClientRect().width
@@ -326,6 +327,8 @@ export function createWarehouseClassificationScenarios(deps) {
           path: `${deps.outputDir}/purchase-receipt-material-warehouses${page.viewportSize().width < 1000 ? '-narrow' : ''}.png`,
           fullPage: true,
         })
+        await modal.getByRole('spinbutton', { name: '第1条实点数量', exact: true }).fill('8')
+        await modal.getByRole('spinbutton', { name: '第2条实点数量', exact: true }).fill('6')
         await modal.locator('.ant-modal-footer .ant-btn-primary').click()
         await modal.waitFor({ state: 'hidden' })
         const submitted = calls
@@ -334,9 +337,9 @@ export function createWarehouseClassificationScenarios(deps) {
               call.method === 'create_purchase_receipt_from_purchase_order'
           )
           .at(-1)
-        deps.assert.deepEqual(submitted.params.item_warehouses, [
-          { purchase_order_item_id: 11, warehouse_id: 1 },
-          { purchase_order_item_id: 12, warehouse_id: 2 },
+        deps.assert.deepEqual(submitted.params.items, [
+          { purchase_order_item_id: 11, warehouse_id: 1, quantity: '8' },
+          { purchase_order_item_id: 12, warehouse_id: 2, quantity: '6' },
         ])
         deps.assert.equal(
           calls.some((call) => call.method === 'post_purchase_receipt'),

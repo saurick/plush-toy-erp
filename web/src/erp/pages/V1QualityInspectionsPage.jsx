@@ -27,6 +27,11 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { IncomingCheckItemsDetails } from '../components/quality-inspections/IncomingCheckItems.jsx'
+import {
+  initialIncomingChecks,
+  validateIncomingChecks,
+} from '../utils/incomingAcceptance.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message } from '@/common/utils/antdApp'
@@ -1110,6 +1115,9 @@ export default function V1QualityInspectionsPage() {
         decision_note: '',
       })
     }
+  }, [inspectionForm, inspectionModal, rows])
+
+  useEffect(() => {
     if (['pass', 'reject', 'cancel'].includes(inspectionModal?.mode)) {
       decisionForm.resetFields()
       decisionForm.setFieldsValue({
@@ -1120,10 +1128,15 @@ export default function V1QualityInspectionsPage() {
             : currentBusinessDate(),
         defect_rate_selection: undefined,
         defect_rate_custom_percent: undefined,
+        check_items:
+          inspectionModal?.mode !== 'cancel' &&
+          inspectionModal?.inspection?.purchase_receipt_item_id
+            ? initialIncomingChecks()
+            : undefined,
         decision_note: '',
       })
     }
-  }, [decisionForm, inspectionForm, inspectionModal?.mode, rows])
+  }, [decisionForm, inspectionModal])
 
   const openCreate = useCallback(() => {
     if (referenceDataState !== 'ready') {
@@ -1407,6 +1420,25 @@ export default function V1QualityInspectionsPage() {
     const inspection = inspectionModal?.inspection
     if (!inspection?.id) return
     const values = await decisionForm.validateFields()
+    if (
+      inspection.purchase_receipt_item_id &&
+      inspectionModal.mode !== 'cancel'
+    ) {
+      const result =
+        inspectionModal.mode === 'reject' ? 'REJECT' : values.result
+      const error = validateIncomingChecks(values.check_items, result)
+      if (error) {
+        message.warning(error)
+        return
+      }
+      if (
+        result === 'CONCESSION' &&
+        !String(values.decision_note || '').trim()
+      ) {
+        message.warning('让步接收请填写接收理由')
+        return
+      }
+    }
     setSaving(true)
     try {
       let action = passQualityInspection
@@ -2228,6 +2260,7 @@ export default function V1QualityInspectionsPage() {
         title="质量检验详情"
         onClose={closeQualityInspectionDetails}
       >
+        <IncomingCheckItemsDetails items={detailInspection?.check_items} />
         <BusinessAttachmentPanel
           ownerType="quality_inspection"
           ownerId={detailInspection?.id}
@@ -2376,6 +2409,10 @@ export default function V1QualityInspectionsPage() {
             <QualityInspectionDecisionForm
               form={decisionForm}
               mode={inspectionModal?.mode}
+              disabled={saving}
+              incoming={Boolean(
+                inspectionModal?.inspection?.purchase_receipt_item_id
+              )}
               allowConcession={!decisionIsProductionStage}
             />
           </>

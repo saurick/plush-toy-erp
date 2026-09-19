@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from 'react'
-import { Alert, Button, Form, Input, Modal, Select, Space } from 'antd'
+import { Alert, Button, Form, Input, Select, Space } from 'antd'
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
@@ -76,10 +77,10 @@ export default function PurchaseReceiptExceptionModal({
   }
 
   return (
-    <Modal
+    <BusinessModal
       title={isReturn ? '从入库单生成采购退货' : '登记采购入库调整'}
       open={open}
-      width={820}
+      size="lineItems"
       okText={isReturn ? '生成退货草稿' : '生成调整草稿'}
       cancelText="取消"
       confirmLoading={loading}
@@ -266,6 +267,6 @@ export default function PurchaseReceiptExceptionModal({
           <BusinessTextArea minRows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>
-    </Modal>
+    </BusinessModal>
   )
 }

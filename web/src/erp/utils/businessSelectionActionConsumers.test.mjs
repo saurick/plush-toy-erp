@@ -39,12 +39,14 @@ const FORMAL_SELECTION_STABLE_ACTION_EVIDENCE = Object.freeze({
   'ShipmentsPage.jsx': /data-business-action-key="shipment-ship"/u,
   'V1InventoryLedgerPage.jsx': /data-business-action-key="related-records"/u,
   'V1MasterDataPage.jsx': /\{canUpdate \? \([\s\S]*?\{canDisable \? \(/u,
-  'V1OutsourcingOrdersPage.jsx': /actionStates=\{lifecycleActionStates\}/u,
+  'V1OutsourcingOrdersPage.jsx':
+    /disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u,
   'V1ProductionOrdersPage.jsx': /data-business-action-key="release"/u,
   'V1PurchaseOrdersPage.jsx': /data-business-action-key="generate-inbound"/u,
   'V1PurchaseReceiptsPage.jsx': /data-business-action-key="post"/u,
   'V1QualityInspectionsPage.jsx': /data-business-action-key="submit"/u,
-  'V1SalesOrdersPage.jsx': /actionStates=\{lifecycleActionStates\}/u,
+  'V1SalesOrdersPage.jsx':
+    /disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u,
   'WorkflowBusinessModulePage.jsx':
     /data-business-action-key="workflow-task-complete"/u,
 })
@@ -175,10 +177,11 @@ test('采购订单页通过唯一操作面板消费共享动作合同', () => {
     '采购订单页只应有一个当前操作面板真源'
   )
   assert.match(purchasePanel, /<BusinessLifecyclePrimaryAction/u)
-  assert.match(purchasePanel, /<BusinessLifecycleMoreAction/u)
+  assert.match(purchasePanel, /secondaryLifecycleActions\.map/u)
+  assert.match(purchasePanel, /<BusinessLifecycleSecondaryAction/u)
 })
 
-test('共享操作区未选择时只提示选择，桌面和窄屏均限制常驻动作数量', () => {
+test('共享操作区保留岗位动作入口，桌面和窄屏均限制常驻动作数量', () => {
   const layout = readFileSync(
     resolve(
       currentDirectory,
@@ -192,11 +195,10 @@ test('共享操作区未选择时只提示选择，桌面和窄屏均限制常�
   assert.match(layout, /child\.props\?\.visible !== false/u)
   assert.match(
     layout,
-    /hasSelection \? \(\s*<div\s*className="erp-business-selection-action-bar__record-actions"/u
+    /recordActions\.length > 0 \? \(\s*<div\s*className="erp-business-selection-action-bar__record-actions"/u
   )
   assert.match(layout, /aria-label="当前记录操作"/u)
   assert.match(layout, /if \(!action\) return null/u)
-  assert.match(layout, /if \(actions\.length === 0\) return null/u)
 })
 
 test('采购和加工合同补齐详情入口，任务页不展示未实现的导出', () => {

@@ -9,8 +9,9 @@ import {
   PrinterOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Input, Modal, Popconfirm, Tabs, Tag } from 'antd'
+import { Button, Dropdown, Input, Popconfirm, Tabs, Tag } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { useOperationalFactQuery } from '../components/operational-facts/useOperationalFactQuery.mjs'
 import { useOperationalFactMutations } from '../components/operational-facts/useOperationalFactMutations.mjs'
@@ -1569,7 +1570,8 @@ export function OperationalFactWorkspace({
             : undefined
         }
       />
-      <Modal
+      <BusinessModal
+        size="confirm"
         title={
           currentActiveKey === 'finance'
             ? activeSelectedRow?.status === 'DRAFT'
@@ -1620,7 +1622,7 @@ export function OperationalFactWorkspace({
           }
           onChange={(event) => setFinanceCancelReason(event.target.value)}
         />
-      </Modal>
+      </BusinessModal>
     </BusinessPageLayout>
   )
 }

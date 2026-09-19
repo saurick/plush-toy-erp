@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
-import { Alert, Descriptions, Form, Input, Modal } from 'antd'
+import { Alert, Descriptions, Form, Input } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
@@ -26,7 +27,7 @@ export default function ProductionReworkModal({
 }) {
   const [form] = Form.useForm()
   const editing = mode === 'edit'
-  const Editor = editing ? BusinessFormPage : Modal
+  const Editor = editing ? BusinessFormPage : BusinessModal
   const summary = productionReworkQuantitySummary(source, facts)
 
   useEffect(() => {
@@ -62,7 +63,14 @@ export default function ProductionReworkModal({
 
   return (
     <Editor
-      {...(editing ? { form } : { width: 680, cancelText: '取消', destroyOnHidden: true, forceRender: true })}
+      {...(editing
+        ? { form }
+        : {
+            size: 'localAction',
+            cancelText: '取消',
+            destroyOnHidden: true,
+            forceRender: true,
+          })}
       title={editing ? '编辑返工草稿' : '发起返工'}
       open={open}
       okText={editing ? '保存草稿' : '生成返工草稿'}

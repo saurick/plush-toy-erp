@@ -4,14 +4,22 @@ body {
   --erp-form-control-height: 36px;
   --erp-control-focus-border: #2b8a3e;
   --erp-control-focus-ring: rgb(43 138 62 / 14%);
-  --erp-select-option-divider: rgb(15 23 42 / 8%);
+  --erp-popup-option-divider: rgb(15 23 42 / 8%);
+  --erp-popup-option-hover: #edf3ee;
+  --erp-popup-option-selected: #dbe9de;
+  --erp-popup-danger-hover: #fff1f0;
+  --erp-popup-danger-text: #ff4d4f;
 }
 
 [data-erp-theme='dark'] #root,
 [data-erp-theme='dark'] body {
   --erp-control-focus-border: var(--erp-interactive-border-focus);
   --erp-control-focus-ring: var(--erp-focus-ring);
-  --erp-select-option-divider: rgb(255 255 255 / 10%);
+  --erp-popup-option-divider: rgb(255 255 255 / 10%);
+  --erp-popup-option-hover: var(--erp-interactive-bg-hover);
+  --erp-popup-option-selected: var(--erp-interactive-bg-active);
+  --erp-popup-danger-hover: #3b2028;
+  --erp-popup-danger-text: #ff7875;
 }
 
 #root
@@ -181,22 +189,153 @@ body
   white-space: nowrap;
 }
 
-body .ant-select-dropdown .ant-select-item-option {
+/* 选择项、标准命令菜单和更多操作共用行节奏；选中态仅用于选择项。 */
+body .ant-select-dropdown,
+body .ant-dropdown .ant-dropdown-menu,
+body .erp-business-selection-action-menu {
+  padding: 6px;
+  border-radius: var(--erp-control-radius);
+}
+
+body .ant-select-dropdown,
+body .ant-dropdown {
+  max-width: calc(100vw - 24px);
+}
+
+body .ant-dropdown .ant-dropdown-menu {
+  max-width: min(320px, calc(100vw - 24px));
+}
+
+body .ant-select-dropdown .ant-select-item-option,
+body :where(.ant-dropdown) .ant-dropdown-menu-item,
+body :where(.ant-dropdown) .ant-dropdown-menu-submenu-title,
+body .erp-business-selection-action-menu__item .ant-btn {
   height: auto;
   min-height: 36px;
-  align-items: flex-start;
+  align-items: center;
   border-radius: 8px;
   padding: 8px 10px;
+  line-height: 1.45;
+  white-space: normal;
 }
 
-body .ant-select-dropdown .ant-select-item-option:not(:last-child) {
-  box-shadow: inset 0 -1px 0 var(--erp-select-option-divider);
+body .ant-select-dropdown .ant-select-item-option:not(:last-child),
+body .ant-dropdown .ant-dropdown-menu-item:not(:last-child),
+body .ant-dropdown .ant-dropdown-menu-submenu:not(:last-child),
+body .erp-business-selection-action-menu__item:not(:last-child) {
+  box-shadow: inset 0 -1px 0 var(--erp-popup-option-divider);
 }
 
-body .ant-select-dropdown .ant-select-item-option-content {
+body
+  .ant-dropdown
+  .ant-dropdown-menu-item:has(+ .ant-dropdown-menu-item-divider),
+body
+  .ant-dropdown
+  .ant-dropdown-menu-submenu:has(+ .ant-dropdown-menu-item-divider) {
+  box-shadow: none;
+}
+
+body .ant-select-dropdown .ant-select-item-option-content,
+body .ant-dropdown .ant-dropdown-menu-title-content,
+body
+  .erp-business-selection-action-menu__item
+  .ant-btn
+  > span:not(.ant-btn-icon, .anticon) {
+  min-width: 0;
   overflow: visible;
   line-height: 1.45;
   overflow-wrap: anywhere;
   text-overflow: clip;
   white-space: normal;
+}
+
+body .erp-business-selection-action-menu__item .ant-btn {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body
+  .erp-business-selection-action-menu__item
+  .ant-btn:not(:disabled):not(.ant-btn-dangerous) {
+  color: var(--erp-text, rgb(0 0 0 / 88%));
+}
+
+body
+  .ant-select-dropdown
+  .ant-select-item-option-active:not(.ant-select-item-option-disabled),
+body
+  .ant-dropdown
+  .ant-dropdown-menu-item:not(.ant-dropdown-menu-item-disabled):is(
+    :hover,
+    :focus-visible,
+    .ant-dropdown-menu-item-active
+  ),
+body
+  .ant-dropdown
+  .ant-dropdown-menu-submenu:not(.ant-dropdown-menu-submenu-disabled)
+  > .ant-dropdown-menu-submenu-title:is(:hover, :focus-visible),
+body
+  .erp-business-selection-action-menu__item
+  .ant-btn:not(:disabled):not(.ant-btn-loading):is(
+    :hover,
+    :focus-visible,
+    .ant-dropdown-open
+  ) {
+  background: var(--erp-popup-option-hover);
+}
+
+body
+  .ant-select-dropdown
+  .ant-select-item-option-selected:not(.ant-select-item-option-disabled),
+body
+  .ant-dropdown
+  .ant-dropdown-menu-item-selected:not(.ant-dropdown-menu-item-disabled) {
+  background: var(--erp-popup-option-selected);
+  font-weight: 600;
+}
+
+body
+  .ant-dropdown
+  .ant-dropdown-menu-item-danger:not(.ant-dropdown-menu-item-disabled),
+body
+  .erp-business-selection-action-menu__item
+  .ant-btn-dangerous:not(:disabled) {
+  color: var(--erp-popup-danger-text);
+}
+
+body
+  .ant-dropdown
+  .ant-dropdown-menu-item-danger:not(.ant-dropdown-menu-item-disabled):is(
+    :hover,
+    :focus-visible,
+    .ant-dropdown-menu-item-active
+  ),
+body
+  .erp-business-selection-action-menu__item
+  .ant-btn-dangerous:not(:disabled):not(.ant-btn-loading):is(
+    :hover,
+    :focus-visible
+  ) {
+  background: var(--erp-popup-danger-hover);
+}
+
+body
+  .ant-dropdown
+  .ant-dropdown-menu
+  :is(.ant-dropdown-menu-item, .ant-dropdown-menu-submenu-title):focus-visible,
+body
+  .erp-business-selection-action-menu__item
+  :is(.ant-btn, .erp-business-action-tooltip-anchor):focus-visible {
+  outline: 2px solid var(--erp-control-focus-border);
+  outline-offset: -2px;
+}
+
+@media screen and (max-width: 991px) {
+  body .ant-select-dropdown .ant-select-item-option,
+  body :where(.ant-dropdown) .ant-dropdown-menu-item,
+  body :where(.ant-dropdown) .ant-dropdown-menu-submenu-title,
+  body .erp-business-selection-action-menu__item .ant-btn {
+    min-height: 44px;
+  }
 }

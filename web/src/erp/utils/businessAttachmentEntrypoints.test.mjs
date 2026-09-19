@@ -45,7 +45,7 @@ test('BusinessAttachmentModalButton is the only page-level wrapper around Busine
   )
 
   assert(source.includes('BusinessAttachmentPanel'))
-  assert(source.includes('<Modal'))
+  assert(source.includes('<BusinessModal'))
   assert(source.includes('allowPendingAttachmentsWithoutOwner={false}'))
   assert(source.includes('<PaperClipOutlined aria-hidden="true" />'))
 })

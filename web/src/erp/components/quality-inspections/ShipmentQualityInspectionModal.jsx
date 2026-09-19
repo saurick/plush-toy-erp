@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
-import { Alert, Descriptions, Form, Input, Modal, Select } from 'antd'
+import { Alert, Descriptions, Form, Input, Select } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 
 import {
   sourceBusinessActionNo,
@@ -163,11 +164,11 @@ export default function ShipmentQualityInspectionModal({
         : ''
 
   return (
-    <Modal
+    <BusinessModal
       className="erp-shipment-quality-inspection-modal"
       title="发起出货前成品检验"
       open={open}
-      width={720}
+      size="localAction"
       okText="生成检验草稿"
       cancelText="取消"
       confirmLoading={loading}
@@ -282,6 +283,6 @@ export default function ShipmentQualityInspectionModal({
           />
         </Form.Item>
       </Form>
-    </Modal>
+    </BusinessModal>
   )
 }

@@ -16,6 +16,22 @@ import {
   updateMaterialPurchaseLineCell,
 } from './materialPurchaseContractEditor.mjs'
 
+test('采购合同不同单位不混加数量，同币种金额仍准确合计', () => {
+  const lines = [
+    { unit: '件', quantity: '2', amount: '0.10' },
+    { unit: '米', quantity: '3', amount: '0.20' },
+  ]
+  assert.deepEqual(computeMaterialPurchaseTotals(lines), {
+    quantityText: '',
+    amountText: '0.30',
+  })
+  assert.equal(
+    computeMaterialPurchaseTotals([{ ...lines[0], unit: 'M' }, lines[1]])
+      .quantityText,
+    '5'
+  )
+})
+
 const sampleDraft = buildMaterialPurchaseContractDraft({
   contractNo: 'C25030508',
   lines: [

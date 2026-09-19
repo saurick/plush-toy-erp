@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { buildArrivalItems } from '../../utils/incomingAcceptance.mjs'
 import {
   materialWarehouseOptions,
   recommendedMaterialWarehouse,
@@ -31,13 +32,19 @@ export function usePurchaseOrderInboundDraft({
   const [inboundDraftPreviewLoading, setInboundDraftPreviewLoading] =
     useState(false)
   const [inboundDraftPreviewRows, setInboundDraftPreviewRows] = useState([])
+  const [inboundDraftPreviewError, setInboundDraftPreviewError] = useState('')
+  const previewRequestRef = useRef(0)
+  const submittingRef = useRef(false)
   const mutationAttemptsRef = useRef(
     createPurchaseReceiptMutationAttemptStore()
   )
 
   const closeInboundDraftModal = useCallback(() => {
+    previewRequestRef.current += 1
     setInboundDraftModalOpen(false)
     setInboundDraftPreviewRows([])
+    setInboundDraftPreviewError('')
+    setInboundDraftPreviewLoading(false)
   }, [])
 
   const openInboundDraftModal = useCallback(
@@ -46,14 +53,16 @@ export function usePurchaseOrderInboundDraft({
         return
       }
       setInboundDraftPreviewRows([])
-      const sourceOrderNo = record.purchase_order_no || '采购订单未编号'
+      setInboundDraftPreviewError('')
+      const request = ++previewRequestRef.current
+      form.resetFields()
       form.setFieldsValue({
         receipt_no: record.purchase_order_no
-          ? `IN-${record.purchase_order_no}`
+          ? `IN-${record.purchase_order_no.slice(0, 36)}-${Date.now().toString(36)}`
           : undefined,
-        item_warehouses: {},
+        arrival_items: [],
         received_at: todayInputValue(),
-        note: `来源采购订单 ${sourceOrderNo}`,
+        note: '',
       })
       setInboundDraftModalOpen(true)
       setInboundDraftPreviewLoading(true)
@@ -61,6 +70,7 @@ export function usePurchaseOrderInboundDraft({
         const progress = await getPurchaseOrderReceiptProgress({
           id: record.id,
         })
+        if (request !== previewRequestRef.current) return
         const rows = buildInboundDraftPreviewRows(progress).map((row) => {
           const material = materials.find(
             (item) => Number(item.id) === row.materialID
@@ -80,42 +90,49 @@ export function usePurchaseOrderInboundDraft({
         })
         setInboundDraftPreviewRows(rows)
         form.setFieldValue(
-          'item_warehouses',
-          Object.fromEntries(
-            rows
-              .filter((row) => row.canGenerate)
-              .map((row) => [String(row.key), row.defaultWarehouseID])
-          )
+          'arrival_items',
+          rows
+            .filter((row) => row.canGenerate)
+            .map((row) => ({
+              purchase_order_item_id: row.key,
+              warehouse_id: row.defaultWarehouseID,
+            }))
         )
       } catch (error) {
+        if (request !== previewRequestRef.current) return
         setInboundDraftPreviewRows([])
-        message.warning(getActionErrorMessage(error, '加载采购入库进度失败'))
+        setInboundDraftPreviewError(
+          getActionErrorMessage(error, '到货材料加载失败，请重试')
+        )
       } finally {
-        setInboundDraftPreviewLoading(false)
+        if (request === previewRequestRef.current) {
+          setInboundDraftPreviewLoading(false)
+        }
       }
     },
     [form, materials, warehouseOptions]
   )
 
   const createInboundDraftFromOrder = useCallback(async () => {
-    if (!selectedOrder) {
+    if (!selectedOrder || submittingRef.current) {
       return
     }
+    submittingRef.current = true
     const scope = `create-from-purchase-order:${selectedOrder.id}`
     let attempt
     try {
       const values = await form.validateFields()
+      let items
+      try {
+        items = buildArrivalItems(values.arrival_items)
+      } catch (validationError) {
+        message.warning(validationError.message)
+        return
+      }
       const payload = {
         purchase_order_id: selectedOrder.id,
         receipt_no: values.receipt_no,
-        item_warehouses: inboundDraftPreviewRows
-          .filter((row) => row.canGenerate)
-          .map((row) => ({
-            purchase_order_item_id: row.key,
-            warehouse_id: Number(
-              values.item_warehouses?.[String(row.key)] || 0
-            ),
-          })),
+        items,
         received_at: values.received_at,
         note: values.note || undefined,
       }
@@ -134,7 +151,15 @@ export function usePurchaseOrderInboundDraft({
         })
       )
     } catch (error) {
-      if (error?.errorFields) return
+      if (error?.errorFields) {
+        if (error.errorFields[0]) {
+          form.scrollToField(error.errorFields[0].name, {
+            block: 'center',
+            focus: true,
+          })
+        }
+        return
+      }
       const retained = attempt
         ? mutationAttemptsRef.current.settle(scope, attempt, error)
         : isPurchaseReceiptMutationResultUnknown(error)
@@ -146,15 +171,10 @@ export function usePurchaseOrderInboundDraft({
         message.error(getActionErrorMessage(error, '登记采购到货失败'))
       }
     } finally {
+      submittingRef.current = false
       setGeneratingInboundDraft(false)
     }
-  }, [
-    inboundDraftPreviewRows,
-    closeInboundDraftModal,
-    form,
-    navigate,
-    selectedOrder,
-  ])
+  }, [closeInboundDraftModal, form, navigate, selectedOrder])
 
   const hasInboundDraftRemaining = useMemo(
     () => inboundDraftPreviewRows.some((row) => row.canGenerate),
@@ -168,6 +188,7 @@ export function usePurchaseOrderInboundDraft({
     hasInboundDraftRemaining,
     inboundDraftModalOpen,
     inboundDraftPreviewLoading,
+    inboundDraftPreviewError,
     inboundDraftPreviewRows,
     openInboundDraftModal,
   }

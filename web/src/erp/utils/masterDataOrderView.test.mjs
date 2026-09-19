@@ -2504,10 +2504,10 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
 
   for (const visibleText of [
     '加工品类',
-    '产品 / 半成品（车缝、手工等）',
-    '材料（布料加工等）',
+    '产品 / 半成品',
+    '材料',
     '加工金额',
-    '保存时由系统按数量和单价核算',
+    '已计价金额',
   ]) {
     assert.match(formSource, new RegExp(visibleText, 'u'))
   }
@@ -3089,7 +3089,7 @@ test('source document line summaries preserve numeric(20,6) boundary values exac
     amount: '100000000000000',
   }
   assert.deepEqual(summarizePurchaseOrderLines(lines), expected)
-  assert.deepEqual(summarizeOutsourcingOrderLines(lines), expected)
+  assert.deepEqual(summarizeOutsourcingOrderLines(lines), { ...expected, amount: '0' })
 })
 
 test('masterDataOrderView: outsourcing order item amount derives from quantity and unit price', () => {

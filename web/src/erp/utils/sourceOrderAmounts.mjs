@@ -172,7 +172,35 @@ function derivePurchaseOrderItemAmount(values = {}) {
 }
 
 function deriveOutsourcingOrderItemAmount(values = {}) {
-  return deriveOrderItemAmount(values, 'outsourcing_quantity')
+  return multiplyUnsignedDecimalToFixed(
+    values.outsourcing_quantity,
+    values.unit_price
+  )
+}
+
+export function summarizeOutsourcingOrderFormLines(lines = []) {
+  const quantities = new Map()
+  for (const line of lines) {
+    const key = line.unit_id || ''
+    const group = quantities.get(key) || {
+      unit: line.unit_name_snapshot || '未选单位',
+      values: [],
+    }
+    group.values.push(line.outsourcing_quantity)
+    quantities.set(key, group)
+  }
+  return {
+    quantityGroups: [...quantities.values()].map(({ unit, values }) => ({
+      unit,
+      quantity: sumNumeric20Scale6Values(values),
+    })),
+    amount: sumNumeric20Scale6Values(
+      lines.map(deriveOutsourcingOrderItemAmount)
+    ),
+    unpricedCount: lines.filter(
+      (line) => deriveOutsourcingOrderItemAmount(line) === undefined
+    ).length,
+  }
 }
 
 function snapshotValue(snapshot, keys) {

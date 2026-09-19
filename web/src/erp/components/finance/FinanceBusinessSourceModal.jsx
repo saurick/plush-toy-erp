@@ -1,5 +1,6 @@
 import React from 'react'
-import { Alert, Descriptions, Form, Input, Modal } from 'antd'
+import { Alert, Descriptions, Form, Input } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
@@ -127,10 +128,10 @@ export default function FinanceBusinessSourceModal({
     FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION
 
   return (
-    <Modal
+    <BusinessModal
       title={config.title}
       open={open}
-      width={620}
+      size="localAction"
       okText={config.okText}
       cancelText="取消"
       confirmLoading={loading}
@@ -187,6 +188,6 @@ export default function FinanceBusinessSourceModal({
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>
-    </Modal>
+    </BusinessModal>
   )
 }

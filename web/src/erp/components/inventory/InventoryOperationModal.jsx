@@ -117,7 +117,7 @@ export default function InventoryOperationModal({
           : '从当前选中的库存余额生成可核对、可恢复的作业草稿。'
       }
       open={open}
-      width={880}
+      size="localAction"
       okText={isEdit ? '保存草稿' : meta.createSubmit}
       cancelText="取消"
       confirmLoading={loading}

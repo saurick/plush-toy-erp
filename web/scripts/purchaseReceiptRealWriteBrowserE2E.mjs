@@ -602,6 +602,7 @@ async function createReceiptWithItemForUI(page, refs, baseURL) {
     'create_purchase_receipt_from_purchase_order',
     {
       purchase_order_id: sourceOrder.id,
+      all_remaining: true,
       receipt_no: receiptNo,
       warehouse_id: refs.warehouse.id,
       received_at: new Date().toISOString().slice(0, 10),

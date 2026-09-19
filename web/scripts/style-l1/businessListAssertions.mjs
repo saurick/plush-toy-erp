@@ -81,26 +81,18 @@ export function createBusinessListAssertions({ outputDir }) {
       )
     }
 
-    const menuButton = page.locator(
-      '[data-business-action-key="lifecycle-more"]:visible'
-    )
-    if ((await menuButton.count()) === 0) {
-      await actionBar.getByRole('button', { name: /更多操作/ }).click()
-    }
-    await menuButton.waitFor({ state: 'visible', timeout: 10_000 })
-    await menuButton.click()
-    const menuDropdown = page
-      .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
-      .filter({ hasText: '状态变更' })
-      .last()
+    const moreButton = actionBar.getByRole('button', { name: /更多操作/ })
+    await moreButton.click()
+    const menuDropdown = page.locator('.erp-business-selection-action-menu')
     await menuDropdown.waitFor({ state: 'visible', timeout: 10_000 })
-    await menuDropdown.getByText('状态变更', { exact: true }).waitFor({
-      state: 'visible',
-      timeout: 10_000,
-    })
+    assert.equal(
+      await menuDropdown.getByRole('button', { name: /其他状态操作/u }).count(),
+      0,
+      `${scenarioName} 状态动作应直接显示，不再套二次下拉`
+    )
     for (const label of menuActionLabels) {
       await menuDropdown
-        .getByRole('menuitem', { name: looseTextPattern(label) })
+        .getByRole('button', { name: looseTextPattern(label) })
         .waitFor({ state: 'visible', timeout: 10_000 })
     }
 
@@ -138,17 +130,8 @@ export function createBusinessListAssertions({ outputDir }) {
       metrics.buttons.every((item) => item.width > 0 && item.height > 0),
       `${scenarioName} 状态动作按钮应保持可见尺寸: ${JSON.stringify(metrics)}`
     )
-    await page.keyboard.press('Escape')
-    if (
-      await page
-        .locator('.erp-business-selection-action-drawer.ant-drawer-open')
-        .count()
-    ) {
-      await page.keyboard.press('Escape')
-      await page
-        .locator('.erp-business-selection-action-drawer')
-        .waitFor({ state: 'hidden' })
-    }
+    await moreButton.press('Escape')
+    await menuDropdown.waitFor({ state: 'hidden' })
   }
 
   async function _assertBusinessSelectionActionBarBoxModel(
@@ -239,9 +222,9 @@ export function createBusinessListAssertions({ outputDir }) {
     }
     if (expectedMode === 'empty')
       assert.equal(
-        metrics.actions,
-        null,
-        `${scenarioName} 未选中只显示选择提示`
+        metrics.tag?.text,
+        '请选择一条记录',
+        `${scenarioName} 未选中时应提示先选择记录`
       )
     assert(
       metrics.actionBar.scrollWidth <= metrics.actionBar.clientWidth + 2,

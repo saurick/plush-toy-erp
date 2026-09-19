@@ -63,7 +63,6 @@ import {
   productionWipUUID,
 } from '../../utils/productionWipModel.mjs'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
-import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const { Text, Title } = Typography
 
@@ -1329,11 +1328,7 @@ export default function ProductionRouteExecutionModal({
   return (
     <BusinessFormModal
       open={open}
-      width={
-        assignmentOnly
-          ? 'min(760px, calc(100vw - 32px))'
-          : ERP_MODAL_WIDTHS.lineItems
-      }
+      size={assignmentOnly ? 'localAction' : 'lineItems'}
       title={
         assignmentOnly
           ? '安排本厂或外发加工'

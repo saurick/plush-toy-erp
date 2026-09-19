@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Alert, Descriptions, Form, Input, Modal } from 'antd'
+import { Alert, Descriptions, Form, Input } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
@@ -21,10 +22,7 @@ import {
 
 function requirementLabel(requirement) {
   return (
-    [
-      requirement?.material_code_snapshot,
-      requirement?.material_name_snapshot,
-    ]
+    [requirement?.material_code_snapshot, requirement?.material_name_snapshot]
       .map((value) => String(value || '').trim())
       .filter(Boolean)
       .join(' / ') || '物料需求已关联'
@@ -118,10 +116,10 @@ export default function ProductionOverIssueRequestModal({
   }
 
   return (
-    <Modal
+    <BusinessModal
       title="申请生产超领"
       open={open}
-      width={680}
+      size="localAction"
       okText="提交申请"
       cancelText="返回"
       confirmLoading={loading}
@@ -213,6 +211,6 @@ export default function ProductionOverIssueRequestModal({
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>
-    </Modal>
+    </BusinessModal>
   )
 }

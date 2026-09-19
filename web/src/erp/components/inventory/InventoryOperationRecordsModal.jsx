@@ -1,6 +1,7 @@
 import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Checkbox, Modal, Select, Space, Tag } from 'antd'
+import { Alert, Button, Checkbox, Select, Space, Tag } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 
 import { message } from '@/common/utils/antdApp'
@@ -8,7 +9,6 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { listInventoryOperations } from '../../api/inventoryApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
-import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const TYPE_LABELS = Object.freeze({
   CYCLE_COUNT: '库存盘点',
@@ -240,11 +240,11 @@ export default function InventoryOperationRecordsModal({
   )
 
   return (
-    <Modal
+    <BusinessModal
       className="erp-inventory-operation-records-modal"
       title="库存作业记录"
       open={open}
-      width={ERP_MODAL_WIDTHS.lineItems}
+      size="lineItems"
       footer={null}
       destroyOnHidden
       onCancel={onCancel}
@@ -313,6 +313,6 @@ export default function InventoryOperationRecordsModal({
           })
         }
       />
-    </Modal>
+    </BusinessModal>
   )
 }

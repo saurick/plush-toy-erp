@@ -203,6 +203,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'purchase_approval:creates_source:purchase_receipt': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['quality'],
         capabilityKeys: ['purchase.receipt.create'],
         stateRefs: [
           state('source.purchase_order', 'approved', 'precondition'),
@@ -210,15 +211,19 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         ],
       }),
       'purchase_receipt:creates_source:purchase_quality': step({
-        responsibilityMode: 'human',
-        capabilityKeys: ['quality.inspection.create'],
+        responsibilityMode: 'system',
         stateRefs: [
           state('fact.purchase_receipt', 'DRAFT', 'precondition'),
-          state('fact.quality_inspection', 'DRAFT', 'result'),
+          state('fact.quality_inspection', 'SUBMITTED', 'result'),
         ],
       }),
       'purchase_quality:posts_fact:purchase_lot': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['quality', 'warehouse'],
+        capabilityKeys: [
+          'quality.inspection.update',
+          'warehouse.inbound.confirm',
+        ],
         stateTransitionRefs: [
           transition('fact.quality_inspection', 'SUBMITTED->PASSED'),
           transition('fact.purchase_receipt', 'DRAFT->POSTED'),
@@ -260,6 +265,9 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         FACT_DATA_REF,
         'server/internal/biz/purchase_order_test.go',
         'server/internal/biz/workflow_purchase_iqc_test.go',
+        'server/internal/biz/incoming_acceptance_test.go',
+        'server/internal/data/incoming_acceptance_test.go',
+        'web/src/erp/utils/incomingAcceptance.test.mjs',
       ],
     }),
   }),

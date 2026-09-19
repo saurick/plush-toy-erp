@@ -250,7 +250,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'purchase_to_inventory',
     '采购下单到合格入库',
     'primary',
-    '采购订单经审批后生成采购收货，质量判定通过后才形成可用库存批次。',
+    '采购订单经审批后，由仓库所属 IQC 登记本次实点数量和通用验收项目；质量允许接收后，再由仓库确认入库。',
     [
       chainNode('purchase_order', '采购订单与订单行', 'source_document', {
         machineKeys: ['source.purchase_order', 'source.order_item'],
@@ -263,11 +263,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainNode('purchase_task', '采购审批任务', 'workflow_task', {
         sourceRefs: ['server/internal/biz/workflow_source_tasks.go'],
       }),
-      chainNode('purchase_receipt', '采购收货单', 'fact_ledger', {
+      chainNode('purchase_receipt', '分批到货与实点记录', 'fact_ledger', {
         machineKeys: ['fact.purchase_receipt'],
         sourceRefs: ['server/internal/biz/purchase_receipt.go'],
       }),
-      chainNode('purchase_quality', '采购质量检验', 'fact_ledger', {
+      chainNode('purchase_quality', 'IQC 逐项验收', 'fact_ledger', {
         machineKeys: ['fact.quality_inspection'],
         sourceRefs: ['server/internal/biz/quality_inspection.go'],
       }),
@@ -316,7 +316,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'purchase_approval',
         'purchase_receipt',
-        '从采购来源生成收货',
+        'IQC 登记本次到货',
         'creates_source',
         {
           action: 'InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder',
@@ -327,10 +327,10 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'purchase_receipt',
         'purchase_quality',
-        '建立采购质检',
+        '自动建立逐行待检 IQC',
         'creates_source',
         {
-          action: 'InventoryUsecase.CreateQualityInspectionFromPurchaseReceipt',
+          action: 'InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder',
           factBoundary: 'quality_inspection_fact',
           sourceRefs: ['server/internal/biz/quality_inspection.go'],
         }

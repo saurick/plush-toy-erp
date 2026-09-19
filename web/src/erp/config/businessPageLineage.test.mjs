@@ -88,6 +88,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_outsourcing_return_dispositions',
   'list_outsourcing_order_items',
   'list_outsourcing_orders',
+  'list_outsourcing_order_summary',
   'list_processes',
   'list_product_skus',
   'list_production_facts',

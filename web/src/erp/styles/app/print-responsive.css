@@ -73,6 +73,29 @@
     overflow: visible;
   }
 
+  .erp-material-contract-batch {
+    display: block;
+    width: 210mm;
+  }
+
+  .erp-material-contract-batch__document {
+    width: 210mm;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  /* 合同间已独立分页，页边距承担底部留白，避免纸面空盒延伸到尾页。 */
+  .erp-material-contract-batch__document .erp-material-contract-paper {
+    min-height: 0;
+    padding-bottom: 0;
+  }
+
+  .erp-material-contract-batch__document
+    + .erp-material-contract-batch__document {
+    break-before: page;
+    page-break-before: always;
+  }
+
   .erp-processing-contract-paper {
     width: 210mm;
     min-height: 297mm;

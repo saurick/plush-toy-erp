@@ -6,7 +6,8 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Modal, Space, Tag } from 'antd'
+import { Alert, Button, Space, Tag } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 
 import {
@@ -14,7 +15,6 @@ import {
   resolveOutsourcingReturnQualityGate,
 } from '../../utils/qualityInspectionSourceAction.mjs'
 import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
-import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
@@ -216,10 +216,10 @@ export default function OutsourcingReturnRecordsModal({
   ]
 
   return (
-    <Modal
+    <BusinessModal
       title={`委外记录 · ${order?.outsourcing_order_no || '当前委外订单'}`}
       open={open}
-      width={ERP_MODAL_WIDTHS.lineItems}
+      size="lineItems"
       footer={
         <Space wrap>
           {selectedDraft && canPostFact ? (
@@ -350,6 +350,6 @@ export default function OutsourcingReturnRecordsModal({
         onRow={(record) => ({ onClick: () => setSelected(record) })}
         locale={{ emptyText: '暂无委外记录' }}
       />
-    </Modal>
+    </BusinessModal>
   )
 }

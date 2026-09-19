@@ -5,12 +5,12 @@ import {
   Descriptions,
   Form,
   Input,
-  Modal,
   Popconfirm,
   Select,
   Space,
   Tag,
 } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -233,11 +233,11 @@ export default function PurchaseRejectionDispositionModal({
 
   const status = STATUS_META[record?.status] || null
   return (
-    <Modal
+    <BusinessModal
       className="erp-purchase-rejection-disposition-modal"
       title="首次来料不合格退厂处置"
       open={open}
-      width={760}
+      size="recordDetails"
       destroyOnHidden
       maskClosable={!loading}
       keyboard={!loading}
@@ -412,6 +412,6 @@ export default function PurchaseRejectionDispositionModal({
           </Form.Item>
         ) : null}
       </Form>
-    </Modal>
+    </BusinessModal>
   )
 }

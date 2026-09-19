@@ -41,9 +41,9 @@ export function createQualitySourceActionScenarios(deps) {
     assert(more, `未找到可见的更多操作按钮: ${actionName}`)
     await more.waitFor({ state: 'visible', timeout: 10_000 })
     await more.click()
-    const drawer = page.locator('.erp-business-selection-action-drawer:visible')
-    await drawer.waitFor({ state: 'visible', timeout: 10_000 })
-    const overflowButtons = drawer
+    const actionMenu = page.locator('.erp-business-selection-action-menu:visible')
+    await actionMenu.waitFor({ state: 'visible', timeout: 10_000 })
+    const overflowButtons = actionMenu
       .locator('button')
       .filter({ hasText: actionName })
     for (let index = 0; index < (await overflowButtons.count()); index += 1) {
@@ -54,7 +54,7 @@ export function createQualitySourceActionScenarios(deps) {
     }
     throw new Error(
       `更多操作中缺少“${actionName}”: ${String(
-        (await drawer.innerText()) || ''
+        (await actionMenu.innerText()) || ''
       ).replace(/\s+/gu, ' ')}`
     )
   }

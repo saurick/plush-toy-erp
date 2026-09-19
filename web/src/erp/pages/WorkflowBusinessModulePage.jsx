@@ -6,9 +6,10 @@ import {
   RedoOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Input, Modal, Space, Tabs, Tag } from 'antd'
+import { Alert, Button, Input, Space, Tabs, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -1510,9 +1511,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         onClose={() => setDetailTask(null)}
       />
 
-      <Modal
+      <BusinessModal
         className="erp-business-action-modal"
-        width={520}
+        size="confirm"
         title={businessActionModalTitle(
           taskReasonModal?.mode === 'block'
             ? '标记阻塞'
@@ -1617,7 +1618,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             ) : null}
           </>
         ) : null}
-      </Modal>
+      </BusinessModal>
     </>
   )
 

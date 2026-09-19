@@ -1487,8 +1487,10 @@ const FLOW_DEFINITIONS = [
       schemaPath: 'server/internal/data/model/schema/purchase_receipt.go',
       postAction: 'post_purchase_receipt',
       cancelAction: 'cancel_purchase_receipt',
-      postPermission: ['purchase.receipt.create'],
-      cancelPermission: ['purchase.receipt.create'],
+      postPermission: ['warehouse.inbound.confirm'],
+      cancelPermission: ['warehouse.inbound.confirm'],
+      draftCancelAction: 'cancel_purchase_receipt_draft',
+      draftCancelPermission: ['purchase.receipt.cancel_draft'],
     },
     {
       key: 'fact.purchase_return',
@@ -1530,9 +1532,10 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'fact_ledger',
       }),
       transition('DRAFT', 'CANCELLED', {
-        guard: '草稿取消必须走对应领域 usecase。',
-        action: item.cancelAction,
-        permission: item.cancelPermission,
+        guard:
+          '草稿取消结清待检与零余额预备批次；已入库只能走原有库存冲正动作。',
+        action: item.draftCancelAction || item.cancelAction,
+        permission: item.draftCancelPermission || item.cancelPermission,
         factBoundary: 'fact_ledger',
       }),
       transition('POSTED', 'CANCELLED', {
@@ -1568,7 +1571,8 @@ const FLOW_DEFINITIONS = [
     scopeKey: 'fact_ledger',
     kind: 'state_machine',
     label: '质量检验',
-    summary: '正式质检从草稿提交，再判定通过、不通过或取消。',
+    summary:
+      '来料登记自动建立待检记录；IQC 逐项记录要求、实测、全检或抽检与结果，再办理判定。',
     states: [
       state('DRAFT', '草稿'),
       state('SUBMITTED', '已提交'),
@@ -1576,7 +1580,7 @@ const FLOW_DEFINITIONS = [
       state('REJECTED', '不通过'),
       state('CANCELLED', '已取消'),
     ],
-    initialStates: ['DRAFT'],
+    initialStates: ['DRAFT', 'SUBMITTED'],
     terminalStates: ['PASSED', 'REJECTED', 'CANCELLED'],
     transitions: [
       transition('DRAFT', 'SUBMITTED', {
@@ -1592,7 +1596,8 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'fact_ledger',
       }),
       transition('SUBMITTED', 'PASSED', {
-        guard: '判定结果由正式质检 usecase 写入。',
+        guard:
+          '来料必须保留实际检查项目；未检不能通过，异常项只允许拒收或有理由的让步接收。',
         action: 'pass_quality_inspection',
         permission: ['quality.inspection.update'],
         factBoundary: 'fact_ledger',

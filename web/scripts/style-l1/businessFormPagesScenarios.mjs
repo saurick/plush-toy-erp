@@ -81,14 +81,12 @@ export function createBusinessFormPagesScenarios(deps) {
             '加工品类',
             '产品/材料',
             '加工项目',
-            '工序名称',
-            '工序类别',
+            '工序',
             '单位',
             '单价',
             '加工数量',
             '加工金额',
-            '备注',
-            '回货日期',
+            '预计回货日期',
             '操作',
           ]
         )
@@ -157,7 +155,7 @@ export function createBusinessFormPagesScenarios(deps) {
         const row = editor.locator('.erp-line-item-table__main-row').first()
         const price = row.locator('input[id$="_unit_price"]')
         const quantity = row.locator('input[id$="_outsourcing_quantity"]')
-        const amount = row.locator('td').nth(10).locator('input')
+        const amount = row.getByRole('textbox', { name: '第 1 行加工金额' })
         const originalPrice = await price.inputValue()
         const originalQuantity = await quantity.inputValue()
         await price.fill('2.5')

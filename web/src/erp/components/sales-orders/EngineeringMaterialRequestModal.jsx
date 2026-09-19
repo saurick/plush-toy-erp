@@ -25,7 +25,8 @@ export default function EngineeringMaterialRequestModal(props) {
               ? undefined
               : '工程提交用料，老板审核，财务审核通过后按厂商生成采购订单。展开材料可核对产品与部位用量。'
           }
-          width={mobile ? '100%' : 'min(1800px, 96vw)'}
+          size="lineItems"
+          width={mobile ? '100%' : undefined}
           centered={!mobile}
           closable={!saving}
           open={Boolean(orderID)}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PaperClipOutlined } from '@ant-design/icons'
-import { Button, Modal, Tooltip } from 'antd'
+import { Button, Tooltip } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 
 import { listBusinessAttachments } from '../../api/attachmentApi.mjs'
 import { resolveBusinessAttachmentActionLabel } from '../../utils/businessAttachmentPanelState.mjs'
@@ -95,13 +96,13 @@ export default function BusinessAttachmentModalButton({
       ) : (
         triggerButton
       )}
-      <Modal
+      <BusinessModal
         centered
         destroyOnHidden
         footer={null}
         open={open}
         title={modalTitle}
-        width="min(880px, calc(100vw - 48px))"
+        size="localAction"
         onCancel={() => {
           setOpen(false)
           loadAttachmentCount()
@@ -120,7 +121,7 @@ export default function BusinessAttachmentModalButton({
           missingOwnerEmptyText={disabledReason}
           variant="inline"
         />
-      </Modal>
+      </BusinessModal>
     </>
   )
 }

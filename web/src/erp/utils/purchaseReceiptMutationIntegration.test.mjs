@@ -64,7 +64,7 @@ test('purchase order inbound draft reads the authoritative receipt progress once
   )
   assert.match(load, /getPurchaseOrderReceiptProgress\(\{\s*id: record\.id/u)
   assert.match(load, /buildInboundDraftPreviewRows\(progress\)/u)
-  assert.match(load, /加载采购入库进度失败/u)
+  assert.match(load, /到货材料加载失败，请重试/u)
   assert.doesNotMatch(
     inboundDraftHook,
     /listAllPurchaseReceipts|loadOrderItems\(record\)|remainingQuantity > 0/u

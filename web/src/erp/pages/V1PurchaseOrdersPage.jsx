@@ -1194,7 +1194,7 @@ export default function V1PurchaseOrdersPage() {
       ),
     [adminProfile]
   )
-  const { printPurchaseContract, printingContract } =
+  const { printPurchaseContract, printPurchaseContracts, printingContract } =
     usePurchaseOrderContractPrint({
       loadOrderItems,
       loadPrintReferenceData,
@@ -1214,6 +1214,7 @@ export default function V1PurchaseOrdersPage() {
     hasInboundDraftRemaining,
     inboundDraftModalOpen,
     inboundDraftPreviewLoading,
+    inboundDraftPreviewError,
     inboundDraftPreviewRows,
     openInboundDraftModal: openInboundDraftModalWithReadySource,
   } = usePurchaseOrderInboundDraft({
@@ -1457,7 +1458,6 @@ export default function V1PurchaseOrdersPage() {
   )
   const {
     showPrimarySlot: showLifecyclePrimary,
-    showMoreSlot: showLifecycleMore,
     primaryAction: primaryLifecycleAction,
     secondaryActions: secondaryLifecycleActions,
     actionStates: lifecycleActionStates,
@@ -1513,7 +1513,6 @@ export default function V1PurchaseOrdersPage() {
           setPagination((current) => ({ ...current, current: 1 }))
         }}
         showLifecyclePrimary={showLifecyclePrimary}
-        showLifecycleMore={showLifecycleMore}
         loadOrders={loadOrders}
         openCreateModal={openCreateModal}
         openEditModal={openEditModal}
@@ -1526,11 +1525,13 @@ export default function V1PurchaseOrdersPage() {
         primaryLifecycleAction={primaryLifecycleAction}
         lifecycleActionStates={lifecycleActionStates}
         printPurchaseContract={printPurchaseContract}
+        printPurchaseContracts={printPurchaseContracts}
         printingContract={printingContract}
         requestLifecycleAction={requestLifecycleAction}
         saving={saving}
         secondaryLifecycleActions={secondaryLifecycleActions}
         selectedItems={selectedItems}
+        selectedOrders={selectedOrders}
         selectedOrderCanEdit={selectedOrderCanEdit}
         selectedOrderCanReorder={selectedOrderCanReorder}
         selectedOrderDisplayText={selectedOrderDisplayText}
@@ -1564,7 +1565,7 @@ export default function V1PurchaseOrdersPage() {
         dataSource={orders}
         expandable={purchaseOrderItemsPreview.expandable}
         rowSelection={{
-          type: 'radio',
+          type: 'checkbox',
           selectedRowKeys,
           getCheckboxProps: () => ({ disabled: recordActionBusy }),
           onChange: (nextKeys, nextRows) => {
@@ -1699,12 +1700,14 @@ export default function V1PurchaseOrdersPage() {
         order={singleSelectedOrder}
         rows={inboundDraftPreviewRows}
         loading={inboundDraftPreviewLoading}
+        loadError={inboundDraftPreviewError}
         submitting={generatingInboundDraft}
         referenceDataReady={inboundReferenceDataReady}
         hasRemaining={hasInboundDraftRemaining}
         resolveSupplierName={resolveSupplierName}
         onOk={createInboundDraftWithReadySource}
         onCancel={closeInboundDraftModal}
+        onRetry={() => openInboundDraftModalWithReadySource(singleSelectedOrder)}
       />
     </BusinessPageLayout>
   )

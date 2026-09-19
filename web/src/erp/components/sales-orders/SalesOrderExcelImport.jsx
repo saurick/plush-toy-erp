@@ -282,7 +282,6 @@ export default function SalesOrderExcelImport({
         rowKey="order_no"
         multiple
         allowSelectAll
-        width={1100}
         expandable={{
           expandedRowRender: renderOrderLines,
           columnTitle: '明细',

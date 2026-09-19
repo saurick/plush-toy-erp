@@ -1,10 +1,14 @@
 export const ERP_MODAL_WIDTHS = Object.freeze({
   confirm: 480,
-  masterDataForm: 'min(880px, calc(100vw - 48px))',
-  masterDataItemsForm: 'min(1280px, calc(100vw - 48px))',
-  businessForm: 'min(1720px, calc(100vw - 96px))',
-  recordDetails: 'min(1120px, calc(100vw - 48px))',
+  localAction: 'min(860px, calc(100vw - 32px))',
+  recordDetails: 'min(1120px, calc(100vw - 32px))',
   lineItems: 'min(1800px, 94vw, calc(100vw - 32px))',
-  localAction: 'min(860px, calc(100vw - 96px))',
-  columnOrder: 'min(960px, calc(100vw - 48px))',
+  columnOrder: 'min(960px, calc(100vw - 32px))',
 })
+
+export function resolveBusinessModalWidth(size = 'localAction', width = null) {
+  if (!Object.hasOwn(ERP_MODAL_WIDTHS, size)) {
+    throw new RangeError(`Unknown business modal size: ${size}`)
+  }
+  return width ?? ERP_MODAL_WIDTHS[size]
+}

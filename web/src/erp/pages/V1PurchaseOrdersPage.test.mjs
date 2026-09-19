@@ -116,9 +116,10 @@ test('purchase inbound uses active warehouse master data without coupling form r
   assert.match(operationPanel, /!hasInboundWarehouse/u)
   assert.match(
     inboundModal,
-    /disabled: loading \|\| !referenceDataReady \|\| !hasRemaining/u
+    /const disabled = loading \|\| !!loadError \|\| !referenceDataReady \|\| submitting/u
   )
-  assert.match(inboundModal, /disabled=\{!referenceDataReady\}/u)
+  assert.match(inboundModal, /okButtonProps=\{\{ disabled: disabled \|\| !hasRemaining \}\}/u)
+  assert.match(inboundModal, /<Form[\s\S]*?disabled=\{disabled\}/u)
 })
 
 test('purchase refresh reports failure and open forms remain disabled until their references are ready', () => {
@@ -199,7 +200,8 @@ test('purchase selection actions keep one authorized catalog across record state
     )
   }
   assert.match(page, /actionStates: lifecycleActionStates/u)
-  assert.match(operationPanel, /actionStates=\{lifecycleActionStates\}/u)
+  assert.match(operationPanel, /<BusinessLifecycleSecondaryAction[\s\S]*?disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u)
+  assert.match(operationPanel, /disabledReason=\{lifecycleActionStates\[action.key\]\?\.disabledReason\}/u)
   assert.match(operationPanel, /disabled=\{primaryLifecycleState\.disabled\}/u)
   assert.doesNotMatch(
     operationPanel,

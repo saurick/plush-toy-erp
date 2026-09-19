@@ -23,11 +23,11 @@ async function clickVisibleAction(page, text) {
     )
     await more.waitFor({ state: 'visible', timeout: 10_000 })
     await more.click()
-    const drawer = page
-      .locator('.erp-business-selection-action-drawer:visible')
+    const actionMenu = page
+      .locator('.erp-business-selection-action-menu:visible')
       .last()
-    await drawer.waitFor({ state: 'visible', timeout: 10_000 })
-    action = drawer.locator('button:visible', { hasText: pattern }).first()
+    await actionMenu.waitFor({ state: 'visible', timeout: 10_000 })
+    action = actionMenu.locator('button:visible', { hasText: pattern }).first()
   } else {
     action = page.locator('button:visible', { hasText: pattern }).first()
   }

@@ -1,6 +1,7 @@
 import { RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Button, Form, Input, Modal, Select, Space, Tag } from 'antd'
+import { Alert, Button, Form, Input, Select, Space, Tag } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -185,10 +186,10 @@ export default function OutsourcingReturnDispositionModal({
     }
   }
   return (
-    <Modal
+    <BusinessModal
       title={readOnly ? '查看委外不合格处置' : '委外不合格返厂 / 返工'}
       open={open}
-      width={900}
+      size="recordDetails"
       footer={
         <Space wrap>
           <Button onClick={onClose} disabled={loading}>
@@ -320,6 +321,6 @@ export default function OutsourcingReturnDispositionModal({
           },
         ]}
       />
-    </Modal>
+    </BusinessModal>
   )
 }

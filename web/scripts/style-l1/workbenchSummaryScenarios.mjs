@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { assertBusinessModalViewport } from './modalAssertions.mjs'
 
 const baseActions = ['erp.workbench.read', 'workflow.task.read']
 const salesActions = ['sales_order.read', 'sales_order_item.read']
@@ -281,6 +282,11 @@ export function createWorkbenchSummaryScenarios({
             .getByRole('button', { name: '查看材料汇总', exact: true })
             .click()
           await page.getByRole('dialog').waitFor()
+          await assertBusinessModalViewport(page, page.getByRole('dialog'), {
+            label: 'engineering-material-summary',
+            minWidthRatio: 0.9,
+            maxWidth: 1800,
+          })
           assert.equal(calls.at(-1).method, 'get_engineering_material_request')
           assert.equal(calls.at(-1).params.request_id, 51)
           assert.equal(calls.at(-1).params.sales_order_id, 101)

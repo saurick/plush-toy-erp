@@ -191,6 +191,8 @@ export default function PrintWorkspaceShell({
   appendixCount = 0,
   editorActions = null,
   draftActions = null,
+  draftTitle = '模板内容',
+  draftDefaultOpen = false,
   formatActions = null,
   selectionMode = '',
   selectionCount = 0,
@@ -487,8 +489,9 @@ export default function PrintWorkspaceShell({
               ) : null}
               {draftActions ? (
                 <PrintWorkspaceToolSection
-                  title="模板内容"
+                  title={draftTitle}
                   collapsible
+                  defaultOpen={draftDefaultOpen}
                   feedback={feedback?.area === 'draft' ? feedback : null}
                 >
                   {draftActions}

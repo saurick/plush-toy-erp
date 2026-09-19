@@ -44,22 +44,24 @@ import {
 import { OUTSOURCING_ORDER_SUBJECT_TYPES } from '../../utils/sourceOrderLineValues.mjs'
 import {
   deriveOutsourcingOrderItemAmount,
-  summarizeOutsourcingOrderLines,
+  summarizeOutsourcingOrderFormLines,
 } from '../../utils/sourceOrderAmounts.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
-import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
+import {
+  formatNumeric20Scale6Summary,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
 import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx'
 
 const OUTSOURCING_ORDER_COLUMNS = [
-  { label: '产品订单编号', width: 168 },
-  { label: '加工品类', width: 150, required: true },
-  { label: '产品 / 材料', width: 200, required: true },
-  { label: '加工项目', width: 140 },
-  { label: '工序名称', width: 150, required: true },
-  { label: '工序类别', width: 120 },
-  { label: '单位', width: 120, required: true },
-  { label: '单价', width: 125 },
-  { label: '加工数量', width: 284, required: true },
+  { label: '产品订单编号', width: 155 },
+  { label: '加工品类', width: 115, required: true },
+  { label: '产品 / 材料', width: 230, required: true },
+  { label: '加工项目', width: 160 },
+  { label: '工序', width: 140, required: true },
+  { label: '单位', width: 90, required: true },
+  { label: '单价', width: 110 },
+  { label: '加工数量', width: 160, required: true },
   {
     label: (
       <BusinessHelpLabel
@@ -70,9 +72,34 @@ const OUTSOURCING_ORDER_COLUMNS = [
     ),
     width: 112,
   },
-  { label: '备注', width: 180 },
-  { label: '回货日期', width: 176 },
+  { label: '预计回货日期', width: 155 },
 ]
+
+function decimalRule({ positive = false } = {}) {
+  return {
+    validator: async (_, value) => {
+      if (
+        value === undefined ||
+        value === null ||
+        String(value).trim() === ''
+      ) {
+        return
+      }
+      const units = numeric20Scale6Units(value)
+      if (
+        units === null ||
+        String(value).includes(',') ||
+        (positive && BigInt(units) <= BigInt(0))
+      ) {
+        throw new Error(
+          positive
+            ? '请输入大于 0 的数量，最多 6 位小数'
+            : '请输入不小于 0 的单价，最多 6 位小数'
+        )
+      }
+    },
+  }
+}
 
 function quantityPrecisionRule({ form, fieldName, unitOptions }) {
   return {
@@ -105,7 +132,9 @@ export function supplierLabel(supplier = {}) {
 
 export function productLabel(product = {}) {
   return (
-    [product.code, product.name].filter(Boolean).join(' / ') || '产品已关联'
+    [product.style_no?.trim() || product.code, product.name]
+      .filter(Boolean)
+      .join(' / ') || '产品已关联'
   )
 }
 
@@ -130,14 +159,14 @@ export function materialLabel(material = {}) {
 
 export function processLabel(process = {}) {
   return (
-    [process.code, process.name, process.category]
+    [process.name, process.category !== process.name ? process.category : '']
       .filter(Boolean)
       .join(' / ') || '工序已关联'
   )
 }
 
 export function unitLabel(unit = {}) {
-  return [unit.code, unit.name].filter(Boolean).join(' / ') || '单位已关联'
+  return unit.name || unit.code || '单位已关联'
 }
 
 export function outsourcingOrderLineOrderLabel(item = {}, index = 0) {
@@ -228,9 +257,10 @@ export default function OutsourcingOrderForm({
       <Form.Item
         className="erp-business-action-form__field"
         name="source_order_no"
-        label="来源订单号"
+        label="整单来源订单号"
+        extra="整份合同共用的来源，可不填；各行产品订单编号在明细中填写。"
       >
-        <Input maxLength={128} placeholder="如产品订单编号 / 销售订单号" />
+        <Input maxLength={128} placeholder="整份合同共用时填写" />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -279,6 +309,7 @@ export default function OutsourcingOrderForm({
         dependencies={['order_date']}
         name="expected_return_date"
         label="预计回货日期"
+        extra="作为各行默认日期；个别行可单独调整。"
         rules={[
           dateInputNotBeforeRule({
             getStartValue: () => form.getFieldValue('order_date'),
@@ -411,17 +442,12 @@ export default function OutsourcingOrderForm({
       <BusinessLineItemsSection
         columns={OUTSOURCING_ORDER_COLUMNS}
         title="加工明细"
-        description="按行填写加工项目、单位、单价和数量，金额自动计算。"
+        description="加工项目填写部位或内容（如脸*1、耳*2），工序选择电绣、激光等加工方式。"
         emptyDescription="暂无加工明细"
         renderBeforeHeader={({ fields }) => (
           <>
-            <div className="erp-line-items-form__import-row">
-              <div className="erp-line-items-form__import-copy">
-                <strong>调整加工明细顺序</strong>
-                <span>按合同展示和后续选单需要调整，不改变原明细身份。</span>
-              </div>
+            <div className="erp-outsourcing-contract-form__line-tools">
               <Button
-                className="erp-line-items-form__import-button"
                 disabled={fields.length < 2}
                 icon={<OrderedListOutlined />}
                 onClick={() => {
@@ -450,6 +476,16 @@ export default function OutsourcingOrderForm({
           <BusinessLineItemRow
             key={field.key}
             index={index}
+            detailsLabel="规格与备注"
+            status={
+              <Form.Item noStyle shouldUpdate>
+                {({ getFieldValue }) =>
+                  getFieldValue(['items', field.name, 'note'])
+                    ? '已填备注'
+                    : null
+                }
+              </Form.Item>
+            }
             rowRef={(node) => registerLineItemRow(index, node)}
             actions={
               <Space
@@ -528,7 +564,7 @@ export default function OutsourcingOrderForm({
                 <Input
                   allowClear
                   maxLength={128}
-                  placeholder="如 SO-YOYO-TRIAL-001"
+                  placeholder="原产品订单编号"
                 />
               </Form.Item>,
               <Form.Item
@@ -541,11 +577,11 @@ export default function OutsourcingOrderForm({
                   options={[
                     {
                       value: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
-                      label: '产品 / 半成品（车缝、手工等）',
+                      label: '产品 / 半成品',
                     },
                     {
                       value: OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL,
-                      label: '材料（布料加工等）',
+                      label: '材料',
                     },
                   ]}
                   onChange={(value) => onSubjectTypeChange(field.name, value)}
@@ -576,6 +612,7 @@ export default function OutsourcingOrderForm({
                         rules={[{ required: true, message: '请选择材料' }]}
                       >
                         <Select
+                          allowClear
                           showSearch
                           options={materialOptions}
                           optionFilterProp="label"
@@ -597,11 +634,12 @@ export default function OutsourcingOrderForm({
                       ]}
                     >
                       <Select
+                        allowClear
                         showSearch
                         options={productOptions}
                         listItemHeight={48}
                         optionRender={renderProductOption}
-                        optionFilterProp="label"
+                        optionFilterProp="searchText"
                         onChange={(value) => onProductChange(field.name, value)}
                       />
                     </Form.Item>
@@ -622,64 +660,57 @@ export default function OutsourcingOrderForm({
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--source"
                 name={[field.name, 'process_id']}
-                label="工序名称"
+                label="工序"
                 rules={[{ required: true, message: '请选择工序' }]}
               >
                 <Select
+                  allowClear
                   showSearch
                   options={processOptions}
-                  optionFilterProp="label"
+                  optionFilterProp="searchText"
                   onChange={(value) => onProcessChange(field.name, value)}
                 />
               </Form.Item>,
               <Form.Item
                 noStyle
                 shouldUpdate={(previous, current) =>
-                  previous?.items?.[field.name]?.process_category_snapshot !==
-                  current?.items?.[field.name]?.process_category_snapshot
+                  previous?.items?.[field.name]?.product_sku_id !==
+                  current?.items?.[field.name]?.product_sku_id
                 }
               >
                 {({ getFieldValue }) => (
-                  <Form.Item label="工序类别">
-                    <Input
-                      readOnly
-                      value={
-                        getFieldValue([
-                          'items',
-                          field.name,
-                          'process_category_snapshot',
-                        ]) || ''
-                      }
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--unit"
+                    name={[field.name, 'unit_id']}
+                    label="单位"
+                    rules={[{ required: true, message: '请选择单位' }]}
+                  >
+                    <Select
+                      disabled={Boolean(
+                        getFieldValue(['items', field.name, 'product_sku_id'])
+                      )}
+                      showSearch
+                      options={unitOptions}
+                      optionFilterProp="searchText"
+                      onChange={(value) => {
+                        onUnitChange(field.name, value)
+                        form
+                          .validateFields([
+                            ['items', field.name, 'outsourcing_quantity'],
+                          ])
+                          .catch(() => {})
+                      }}
                     />
                   </Form.Item>
                 )}
               </Form.Item>,
               <Form.Item
-                className="erp-line-item-field erp-line-item-field--unit"
-                name={[field.name, 'unit_id']}
-                label="单位"
-                rules={[{ required: true, message: '请选择单位' }]}
-              >
-                <Select
-                  showSearch
-                  options={unitOptions}
-                  optionFilterProp="searchText"
-                  onChange={(value) => {
-                    onUnitChange(field.name, value)
-                    form
-                      .validateFields([
-                        ['items', field.name, 'outsourcing_quantity'],
-                      ])
-                      .catch(() => {})
-                  }}
-                />
-              </Form.Item>,
-              <Form.Item
                 className="erp-line-item-field erp-line-item-field--money"
                 name={[field.name, 'unit_price']}
                 label="单价"
+                rules={[decimalRule()]}
               >
-                <Input />
+                <Input inputMode="decimal" placeholder="可暂不定价" />
               </Form.Item>,
               <Form.Item
                 noStyle
@@ -697,6 +728,7 @@ export default function OutsourcingOrderForm({
                     label="加工数量"
                     rules={[
                       { required: true, message: '请输入加工数量' },
+                      decimalRule({ positive: true }),
                       quantityPrecisionRule({
                         form,
                         fieldName: field.name,
@@ -705,7 +737,7 @@ export default function OutsourcingOrderForm({
                     ]}
                   >
                     <FieldWithUnitSuffix
-                      control={<Input />}
+                      control={<Input inputMode="decimal" />}
                       unitText={unitSuffixTextFromOptions(
                         unitOptions,
                         getFieldValue(['items', field.name, 'unit_id']),
@@ -734,6 +766,7 @@ export default function OutsourcingOrderForm({
                     label="加工金额"
                   >
                     <Input
+                      aria-label={`第 ${index + 1} 行加工金额`}
                       readOnly
                       value={
                         deriveOutsourcingOrderItemAmount(
@@ -745,16 +778,9 @@ export default function OutsourcingOrderForm({
                 )}
               </Form.Item>,
               <Form.Item
-                className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
-                name={[field.name, 'note']}
-                label="备注"
-              >
-                <BusinessTextArea allowClear showCount maxLength={255} />
-              </Form.Item>,
-              <Form.Item
                 className="erp-line-item-field erp-line-item-field--date"
                 name={[field.name, 'expected_return_date']}
-                label="回货日期"
+                label="预计回货日期"
                 dependencies={['order_date']}
                 rules={[
                   dateInputNotBeforeRule({
@@ -764,6 +790,7 @@ export default function OutsourcingOrderForm({
                 ]}
               >
                 <DateInput
+                  placeholder={expectedReturnDate || '沿用合同日期'}
                   disabledDate={
                     orderDate ? disableExpectedReturnBeforeOrderDate : undefined
                   }
@@ -817,7 +844,7 @@ export default function OutsourcingOrderForm({
                     className="erp-line-item-field erp-line-item-field--source"
                     name={[field.name, 'product_sku_id']}
                     label="产品规格"
-                    extra="可选；选择后单位按产品规格默认单位带出，回货批次和库存按该规格独立记录。"
+                    extra="可选；选择规格后固定使用该规格的单位。需要调整单位时先清除规格。"
                   >
                     <Select
                       allowClear
@@ -836,28 +863,30 @@ export default function OutsourcingOrderForm({
             <Form.Item noStyle shouldUpdate>
               {({ getFieldValue }) => {
                 const line = getFieldValue(['items', field.name]) || {}
-                return line.subject_type !== 'MATERIAL' && line.product_id ? (
+                if (
+                  line.subject_type !==
+                    OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT ||
+                  !line.product_id
+                )
+                  { return null }
+                return (
                   <ProductIdentity
                     productId={line.product_id}
-                    name={
-                      productOptions.find(
-                        (option) =>
-                          Number(option.value) === Number(line.product_id)
-                      )?.label || '当前产品'
-                    }
-                  />
-                ) : null
+                    name={line.product_name_snapshot}
+                    compact
+                  >
+                    产品图片
+                  </ProductIdentity>
+                )
               }}
             </Form.Item>
-            <p className="erp-line-item-details__help">
-              查货只表示加工环节；合格、不合格、让步、返工等结果不在加工合同里维护。
-            </p>
-            <p className="erp-line-item-details__help">
-              填写本行具体加工部位或内容，如“脸*1”“耳*2”；不要与工序混填。
-            </p>
-            <p className="erp-line-item-details__help">
-              仅供录入核对，保存时由系统按数量和单价核算。
-            </p>
+            <Form.Item
+              className="erp-line-item-field erp-line-item-field--note"
+              name={[field.name, 'note']}
+              label="行备注"
+            >
+              <BusinessTextArea allowClear showCount maxLength={255} />
+            </Form.Item>
           </BusinessLineItemRow>
         )}
         footerProps={({ add, fields }) => ({
@@ -879,21 +908,26 @@ export default function OutsourcingOrderForm({
               label: '数量合计',
               value: (
                 <BusinessLineItemsSummaryValue
-                  summarize={summarizeOutsourcingOrderLines}
+                  summarize={summarizeOutsourcingOrderFormLines}
                   select={(summary) =>
-                    formatNumeric20Scale6Summary(summary.quantity, 3)
+                    summary.quantityGroups
+                      .map(
+                        ({ unit, quantity }) =>
+                          `${formatNumeric20Scale6Summary(quantity, 3)} ${unit}`
+                      )
+                      .join('、') || '—'
                   }
                 />
               ),
             },
             {
               key: 'amount',
-              label: '金额合计',
+              label: '已计价金额',
               value: (
                 <BusinessLineItemsSummaryValue
-                  summarize={summarizeOutsourcingOrderLines}
+                  summarize={summarizeOutsourcingOrderFormLines}
                   select={(summary) =>
-                    formatNumeric20Scale6Summary(summary.amount, 2)
+                    `${formatNumeric20Scale6Summary(summary.amount, 2)}${summary.unpricedCount ? `（${summary.unpricedCount} 行待完善）` : ''}`
                   }
                 />
               ),

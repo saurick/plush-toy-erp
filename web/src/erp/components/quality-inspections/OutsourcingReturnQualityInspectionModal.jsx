@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
-import { Alert, Descriptions, Form, Input, Modal } from 'antd'
+import { Alert, Descriptions, Form, Input } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 
 import {
   sourceBusinessActionNo,
@@ -53,11 +54,11 @@ export default function OutsourcingReturnQualityInspectionModal({
   }
 
   return (
-    <Modal
+    <BusinessModal
       className="erp-outsourcing-return-quality-modal"
       title="发起委外回货质检"
       open={open}
-      width={680}
+      size="localAction"
       okText="生成质检草稿"
       cancelText="取消"
       confirmLoading={loading}
@@ -123,6 +124,6 @@ export default function OutsourcingReturnQualityInspectionModal({
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>
-    </Modal>
+    </BusinessModal>
   )
 }

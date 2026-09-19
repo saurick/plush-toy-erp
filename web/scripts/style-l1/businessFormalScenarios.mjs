@@ -156,9 +156,9 @@ export function createBusinessFormalScenarios(deps) {
       )
     }
     await moreButton.click()
-    const drawer = page.locator('.erp-business-selection-action-drawer:visible')
-    await drawer.waitFor({ state: 'visible' })
-    const overflowButtons = drawer
+    const actionMenu = page.locator('.erp-business-selection-action-menu:visible')
+    await actionMenu.waitFor({ state: 'visible' })
+    const overflowButtons = actionMenu
       .locator('button')
       .filter({ hasText: actionName })
     for (let index = 0; index < (await overflowButtons.count()); index += 1) {
@@ -3548,14 +3548,19 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '列顺序')
         await assertNoListDeleteTrashToolbar(page)
         await assertTextAbsent(page, 'quality_inspections')
-        const qualityDispositionAction = page.locator(
-          '[data-business-action-key="quality-disposition"]'
+        const qualityDispositionAction = await findSelectionActionButton(
+          page,
+          '不合格处置'
         )
         assert.equal(
-          await qualityDispositionAction.count(),
-          0,
-          '未选择记录时不展示本单处置入口'
+          await qualityDispositionAction.isDisabled(),
+          true,
+          '未选择记录时保留岗位入口并提示先选择'
         )
+        await page.keyboard.press('Escape')
+        await page
+          .locator('.erp-business-selection-action-menu')
+          .waitFor({ state: 'hidden' })
         await expectText(page, 'QI-STYLE-L1')
         await expectText(page, 'PR-STYLE-L1')
         await expectText(page, 'INV-LOT-001')
@@ -3686,12 +3691,12 @@ export function createBusinessFormalScenarios(deps) {
         await findSelectionActionButton(page, '判定不合格')
         if (
           await page
-            .locator('.erp-business-selection-action-drawer.ant-drawer-open')
+            .locator('.erp-business-selection-action-menu:visible')
             .count()
         ) {
           await page.keyboard.press('Escape')
           await page
-            .locator('.erp-business-selection-action-drawer')
+            .locator('.erp-business-selection-action-menu')
             .waitFor({ state: 'hidden' })
         }
         await verifyBusinessActionFormModal(page, {
@@ -4374,12 +4379,12 @@ export function createBusinessFormalScenarios(deps) {
               false,
               '选中主任务表记录后应允许查看当前任务'
             )
-            const actionDrawer = page.locator(
-              '.erp-business-selection-action-drawer:visible'
+            const actionMenu = page.locator(
+              '.erp-business-selection-action-menu:visible'
             )
-            if (await actionDrawer.count()) {
+            if (await actionMenu.count()) {
               await page.keyboard.press('Escape')
-              await actionDrawer.waitFor({ state: 'hidden' })
+              await actionMenu.waitFor({ state: 'hidden' })
             }
             await expectNoButton(page, '处理')
 
@@ -5898,7 +5903,7 @@ export function createBusinessFormalScenarios(deps) {
           await expectHeading(page, '销售订单')
           await expectText(page, 'SO-STYLE-L1')
           await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
-          await page.getByRole('button', { name: '编辑订单' }).click()
+          await (await findSelectionActionButton(page, '编辑订单')).click()
           const orderModal = page
             .locator('.erp-business-form-page:not([hidden])')
             .filter({ hasText: '编辑销售订单' })

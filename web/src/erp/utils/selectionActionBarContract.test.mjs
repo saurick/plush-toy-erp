@@ -30,11 +30,14 @@ test('当前操作条按手机和平板宽度收口动作，不为页面各写�
   )
 })
 
-test('当前操作条的更多面板在未选择时也可查看，并显式恢复触发点焦点', () => {
-  assert.match(layoutSource, /<Drawer/u)
+test('更多操作使用点击下拉，未选择也可查看，并保留键盘交互', () => {
+  assert.doesNotMatch(layoutSource, /<Drawer/u)
+  assert.match(layoutSource, /popupRender=\{renderMoreActions\}/u)
+  assert.match(layoutSource, /placement="bottomRight"/u)
   assert.match(layoutSource, /open=\{moreActionsOpen\}/u)
-  assert.match(layoutSource, /keyboard/u)
-  assert.match(layoutSource, /maskClosable/u)
+  assert.match(layoutSource, /autoFocus/u)
+  assert.match(layoutSource, /onKeyDown=\{focusMoreAction\}/u)
+  assert.match(layoutSource, /aria-expanded=\{moreActionsOpen\}/u)
   assert.doesNotMatch(
     layoutSource,
     /erp-business-selection-action-bar__compact-more[\s\S]*?disabled=\{!hasSelection\}/u
@@ -47,7 +50,6 @@ test('当前操作条的更多面板在未选择时也可查看，并显式恢�
     layoutSource,
     /moreActionsListRef\.current[\s\S]*?button:not\(:disabled\), \.erp-business-action-tooltip-anchor\[tabindex="0"\][\s\S]*?preventScroll: true/u
   )
-  assert.match(layoutSource, /moreActionsButtonRef\.current\?\.focus/u)
   assert.doesNotMatch(layoutSource, /useState\(true\)/u)
   assert.match(layoutSource, /React\.Children\.map\(action\.props\.children/u)
   assert.match(layoutSource, /containsDeferredSelectionAction\(action\)/u)
@@ -67,22 +69,26 @@ test('临时不可用动作使用共享提示，禁用按钮仍可触发原因�
   )
 })
 
-test('生命周期更多操作始终可打开，各动作在菜单内独立置灰并说明原因', () => {
-  const lifecycleMoreSource = layoutSource.slice(
-    layoutSource.indexOf('export function BusinessLifecycleMoreAction'),
-    layoutSource.indexOf('BusinessLifecycleMoreAction.selectionActionPriority')
+test('次级状态动作直接使用共享按钮，保留禁用原因与危险样式', () => {
+  const secondarySource = layoutSource.slice(
+    layoutSource.indexOf('export function BusinessLifecycleSecondaryAction'),
+    layoutSource.indexOf(
+      'BusinessLifecycleSecondaryAction.selectionActionPriority'
+    )
   )
 
-  assert.match(lifecycleMoreSource, /actionStates = \{\}/u)
-  assert.match(lifecycleMoreSource, /disabled: actionDisabled/u)
-  assert.match(lifecycleMoreSource, /actionDisabledReason/u)
-  assert.match(lifecycleMoreSource, /<Text type="secondary">/u)
-  assert.doesNotMatch(lifecycleMoreSource, /<Dropdown[\s\S]*?disabled=\{disabled\}/u)
-  assert.doesNotMatch(lifecycleMoreSource, /<Button[\s\S]*?disabled=\{disabled\}/u)
+  assert.doesNotMatch(secondarySource, /<Dropdown/u)
   assert.match(
-    lifecycleMoreSource,
-    /if \(action && !\(actionState\.disabled \?\? disabled\)\) onAction\(action\)/u
+    secondarySource,
+    /<BusinessActionTooltip disabled=\{disabled\} disabledReason=\{disabledReason\}/u
   )
+  assert.match(
+    secondarySource,
+    /data-business-action-key=\{`lifecycle-\$\{action.key\}`\}/u
+  )
+  assert.match(secondarySource, /danger=\{action.danger === true\}/u)
+  assert.match(secondarySource, /disabled=\{disabled\}/u)
+  assert.match(secondarySource, /onClick=\{\(\) => onAction\(action\)\}/u)
 })
 
 test('窄屏动作保持可读触控尺寸，不再把全部按钮逐行撑满', () => {
@@ -100,6 +106,6 @@ test('窄屏动作保持可读触控尺寸，不再把全部按钮逐行撑满',
   )
   assert.match(
     responsiveCss,
-    /erp-business-selection-action-drawer__item[\s\S]*min-height:\s*44px/u
+    /erp-business-selection-action-menu__item[\s\S]*min-height:\s*44px/u
   )
 })

@@ -5,6 +5,102 @@ import {
   isAcceptedFocusBorder,
 } from './colorAssertions.mjs'
 
+export async function assertBusinessModalViewport(
+  page,
+  modal,
+  { label, minWidthRatio = 0, maxWidth = Infinity, scrollable = false }
+) {
+  await modal.waitFor({ state: 'visible' })
+  await modal.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      })
+  )
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.ant-modal:has(.ant-modal-body)')]
+      .filter(
+        (node) =>
+          getComputedStyle(node.closest('.ant-modal-wrap')).display !== 'none'
+      )
+      .every((node) =>
+        [node, node.querySelector('.ant-modal-content')].every((element) => {
+          const style = getComputedStyle(element)
+          return (
+            style.opacity === '1' &&
+            style.transform === 'none' &&
+            element
+              .getAnimations()
+              .every((animation) => animation.playState !== 'running')
+          )
+        })
+      )
+  )
+  const metrics = await modal.evaluate((node) => {
+    const box = (element) => {
+      if (!element) return null
+      const rect = element.getBoundingClientRect()
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      }
+    }
+    const body = node.querySelector('.ant-modal-body')
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      dialog: box(node),
+      body: {
+        ...box(body),
+        clientWidth: body.clientWidth,
+        scrollWidth: body.scrollWidth,
+        clientHeight: body.clientHeight,
+        scrollHeight: body.scrollHeight,
+      },
+      header: box(node.querySelector('.ant-modal-header')),
+      footer: box(node.querySelector('.ant-modal-footer')),
+    }
+  })
+  const { viewport, dialog, body, header, footer } = metrics
+  assert.ok(
+    dialog.left >= -1 && dialog.right <= viewport.width + 1,
+    `${label}: dialog fits horizontally`
+  )
+  assert.ok(
+    dialog.top >= -1 && dialog.bottom <= viewport.height + 1,
+    `${label}: dialog fits vertically ${JSON.stringify(metrics)}`
+  )
+  assert.ok(
+    dialog.width >= viewport.width * minWidthRatio &&
+      dialog.width <= maxWidth + 1,
+    `${label}: task-appropriate width ${dialog.width}`
+  )
+  assert.ok(
+    body.scrollWidth <= body.clientWidth + 1,
+    `${label}: horizontal scroll stays inside the table ${JSON.stringify(body)}`
+  )
+  if (header)
+    assert.ok(
+      header.top >= 0 && header.bottom <= body.top + 1,
+      `${label}: header remains visible`
+    )
+  if (footer)
+    assert.ok(
+      footer.top >= body.bottom - 1 && footer.bottom <= viewport.height,
+      `${label}: footer remains visible`
+    )
+  if (scrollable)
+    assert.ok(
+      body.scrollHeight > body.clientHeight + 10,
+      `${label}: long content scrolls inside the body`
+    )
+  console.log(`[modal-layout] ${label}: ${JSON.stringify(metrics)}`)
+  return metrics
+}
+
 const assertAntdModalCentered = (...args) =>
   assertAntdModalCenteredImpl(...args)
 
@@ -277,7 +373,10 @@ async function assertAppAlertDialogLayout(
 }
 
 async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
-  const modal = page.locator('.erp-business-form-page:not([hidden])').filter({ hasText: title }).last()
+  const modal = page
+    .locator('.erp-business-form-page:not([hidden])')
+    .filter({ hasText: title })
+    .last()
   await modal.waitFor({ state: 'visible', timeout: 10_000 })
   await assertBusinessFormPage(page, modal)
 

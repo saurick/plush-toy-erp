@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Alert, Form, Input, Modal } from 'antd'
+import { Alert, Form, Input } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { AUTH_SCOPE, getLoginPath, getToken, logout } from '@/common/auth/auth'
 import { RpcErrorCode } from '@/common/consts/errorCodes'
 import { message } from '@/common/utils/antdApp'
@@ -61,12 +62,12 @@ export default function AccountPasswordModal({ onClose }) {
   }
 
   return (
-    <Modal
+    <BusinessModal
       className="erp-account-password-modal"
       title="修改密码"
       open
       centered
-      width={440}
+      size="confirm"
       onCancel={() => {
         if (!savingRef.current) onClose()
       }}
@@ -132,6 +133,6 @@ export default function AccountPasswordModal({ onClose }) {
           <Input.Password autoComplete="new-password" />
         </Form.Item>
       </Form>
-    </Modal>
+    </BusinessModal>
   )
 }

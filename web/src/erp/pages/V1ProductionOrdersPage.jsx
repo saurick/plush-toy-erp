@@ -1,20 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Alert,
-  Button,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, Button, Form, Input, Select, Tag, Typography } from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message, modal } from '@/common/utils/antdApp'
@@ -2182,7 +2174,8 @@ export default function V1ProductionOrdersPage() {
         }}
       />
 
-      <Modal
+      <BusinessModal
+        size="confirm"
         open={Boolean(reasonAction)}
         title={reasonAction === 'close' ? '关闭生产订单' : '取消生产订单'}
         okText={reasonAction === 'close' ? '确认关闭' : '确认取消'}
@@ -2225,7 +2218,7 @@ export default function V1ProductionOrdersPage() {
             <Input.TextArea autoFocus rows={4} maxLength={255} showCount />
           </Form.Item>
         </Form>
-      </Modal>
+      </BusinessModal>
     </BusinessPageLayout>
   )
 }

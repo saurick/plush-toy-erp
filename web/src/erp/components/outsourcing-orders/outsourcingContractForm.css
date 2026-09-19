@@ -7,6 +7,18 @@
   overflow: hidden;
 }
 
+.erp-outsourcing-contract-form__line-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.erp-outsourcing-summary__note {
+  margin: 8px 0;
+  color: var(--ant-color-text-secondary, #64748b);
+  font-size: 13px;
+}
+
 .erp-outsourcing-contract-form__parties section {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

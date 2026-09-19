@@ -1,14 +1,7 @@
 import { RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Button,
-  Empty,
-  Modal,
-  Pagination,
-  Popover,
-  Tag,
-  Typography,
-} from 'antd'
+import { Button, Empty, Pagination, Popover, Tag, Typography } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
@@ -106,7 +99,7 @@ export default function SourceImportPickerModal({
   onCancel,
   onImport,
   onReload,
-  width = ERP_MODAL_WIDTHS.localAction,
+  width = ERP_MODAL_WIDTHS.lineItems,
   pageSize = 5,
   serverPagination = false,
   total: serverTotal = 0,
@@ -319,7 +312,7 @@ export default function SourceImportPickerModal({
   }
 
   return (
-    <Modal
+    <BusinessModal
       className="erp-source-import-picker-modal"
       width={width}
       open={open}
@@ -517,6 +510,6 @@ export default function SourceImportPickerModal({
           />
         </div>
       </div>
-    </Modal>
+    </BusinessModal>
   )
 }

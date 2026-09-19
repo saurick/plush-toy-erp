@@ -4,7 +4,8 @@ import {
   CheckCircleOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons'
-import { Button, Modal, Popover, Tag, Typography } from 'antd'
+import { Button, Popover, Tag, Typography } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import {
   BUSINESS_HELP_TYPE_PRESENTATION,
   getBusinessHelpItem,
@@ -125,22 +126,14 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
       >
         这页怎么用
       </Button>
-      <Modal
+      <BusinessModal
         centered
         destroyOnHidden
         focusTriggerAfterClose
         keyboard
         maskClosable
         className="erp-business-page-help-modal"
-        width={760}
-        style={{ maxWidth: 'calc(100vw - 24px)' }}
-        styles={{
-          body: {
-            maxHeight: 'min(70vh, 680px)',
-            overflowY: 'auto',
-            overscrollBehavior: 'contain',
-          },
-        }}
+        size="localAction"
         open={open}
         title={`${entry.title}怎么用`}
         onCancel={() => setOpen(false)}
@@ -160,7 +153,7 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
         ]}
       >
         <PageGuideContent entry={entry} />
-      </Modal>
+      </BusinessModal>
     </>
   )
 }

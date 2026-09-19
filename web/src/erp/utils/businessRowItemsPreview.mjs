@@ -1,5 +1,5 @@
 export const BUSINESS_ROW_ITEMS_PREVIEW_LIMIT = 5
-export const BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE = 20
+export const BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE = 10
 
 export function normalizeBusinessRowItemsTotal(value) {
   return Number.isSafeInteger(value) && value >= 0 ? value : undefined

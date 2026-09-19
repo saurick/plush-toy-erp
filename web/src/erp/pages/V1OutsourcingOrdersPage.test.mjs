@@ -384,7 +384,8 @@ test('outsourcing selection actions keep one authorized catalog across record st
     )
   }
   assert.match(source, /actionStates: lifecycleActionStates/u)
-  assert.match(source, /actionStates=\{lifecycleActionStates\}/u)
+  assert.match(source, /<BusinessLifecycleSecondaryAction[\s\S]*?disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u)
+  assert.match(source, /disabledReason=\{\s*lifecycleActionStates\[action.key\]\?\.disabledReason\s*\}/u)
   assert.match(source, /disabled=\{primaryLifecycleState\.disabled\}/u)
   assert.doesNotMatch(
     actionBarSource,

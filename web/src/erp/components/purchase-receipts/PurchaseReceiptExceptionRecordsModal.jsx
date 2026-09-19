@@ -4,7 +4,8 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Modal, Popconfirm, Space, Tabs, Tag } from 'antd'
+import { Alert, Button, Popconfirm, Space, Tabs, Tag } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 
 import { message } from '@/common/utils/antdApp'
@@ -21,7 +22,6 @@ import {
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
 import { formatPurchaseReceiptQuantityTotal } from '../../utils/purchaseReceiptDecimal.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
-import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
@@ -407,10 +407,10 @@ export default function PurchaseReceiptExceptionRecordsModal({
   }
 
   return (
-    <Modal
+    <BusinessModal
       title={`退货与调整记录 · ${receipt?.receipt_no || '采购入库单'}`}
       open={open}
-      width={ERP_MODAL_WIDTHS.lineItems}
+      size="lineItems"
       footer={
         <Space>
           <Button
@@ -454,6 +454,6 @@ export default function PurchaseReceiptExceptionRecordsModal({
           message="当前岗位无权查看退货或调整记录。"
         />
       )}
-    </Modal>
+    </BusinessModal>
   )
 }

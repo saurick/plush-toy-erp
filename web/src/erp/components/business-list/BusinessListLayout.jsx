@@ -6,7 +6,6 @@ import {
   CheckSquareOutlined,
   CopyOutlined,
   DownOutlined,
-  MoreOutlined,
   RollbackOutlined,
   SendOutlined,
   StopOutlined,
@@ -15,7 +14,6 @@ import {
   Button,
   Card,
   DatePicker,
-  Drawer,
   Dropdown,
   Empty,
   Grid,
@@ -26,6 +24,7 @@ import {
   Tag,
   Tooltip,
   Typography,
+  theme,
 } from 'antd'
 import Table from '@/common/components/table/AppTable'
 import SharedSearchInput from '@/common/components/SearchInput'
@@ -213,7 +212,6 @@ function wrapOverflowSelectionAction(action, close) {
 
 function containsDeferredSelectionAction(action) {
   if (!React.isValidElement(action)) return false
-  if (action.type?.selectionActionDeferred === true) return true
   if (action.type === Popconfirm || action.type === Dropdown) return true
   return React.Children.toArray(action.props.children).some(
     containsDeferredSelectionAction
@@ -222,9 +220,10 @@ function containsDeferredSelectionAction(action) {
 
 function ResponsiveSelectionActions({ children }) {
   const screens = Grid.useBreakpoint()
+  const { token } = theme.useToken()
   const [moreActionsOpen, setMoreActionsOpen] = React.useState(false)
-  const moreActionsButtonRef = React.useRef(null)
   const moreActionsListRef = React.useRef(null)
+  const moreActionsId = React.useId()
   const visibleLimit = screens.lg
     ? DESKTOP_SELECTION_ACTION_LIMIT
     : screens.md
@@ -237,10 +236,83 @@ function ResponsiveSelectionActions({ children }) {
   const closeMoreActions = React.useCallback(() => {
     setMoreActionsOpen(false)
   }, [])
+  const focusMoreAction = React.useCallback((event) => {
+    const list = moreActionsListRef.current
+    if (!list?.contains(event.target)) return
+    const actions = Array.from(
+      list.querySelectorAll(
+        'button:not(:disabled), .erp-business-action-tooltip-anchor[tabindex="0"]'
+      )
+    )
+    if (actions.length === 0) return
+    const current = actions.indexOf(document.activeElement)
+    const last = actions.length - 1
+    const index = {
+      ArrowDown: current < last ? current + 1 : 0,
+      ArrowUp: current > 0 ? current - 1 : last,
+      Home: 0,
+      End: last,
+    }[event.key]
+    if (index !== undefined) {
+      event.preventDefault()
+      event.stopPropagation()
+      actions[index].focus({ preventScroll: true })
+    }
+  }, [])
 
   React.useEffect(() => {
     if (overflow.length === 0) setMoreActionsOpen(false)
   }, [overflow.length])
+
+  const renderMoreActions = React.useCallback(
+    () => (
+      <div
+        ref={moreActionsListRef}
+        id={moreActionsId}
+        className="erp-business-selection-action-menu"
+        style={{
+          background: token.colorBgElevated,
+          color: token.colorText,
+          borderColor: token.colorBorderSecondary,
+          boxShadow: token.boxShadowSecondary,
+        }}
+        role="toolbar"
+        aria-label="更多操作"
+        tabIndex={-1}
+        onFocus={(event) => {
+          if (event.target === event.currentTarget) {
+            moreActionsListRef.current
+              ?.querySelector(
+                'button:not(:disabled), .erp-business-action-tooltip-anchor[tabindex="0"]'
+              )
+              ?.focus({ preventScroll: true })
+          }
+        }}
+        onKeyDown={focusMoreAction}
+      >
+        {overflow.map((action, index) => (
+          <div
+            key={action?.key || `selection-overflow-action-${index}`}
+            className="erp-business-selection-action-menu__item"
+            onClick={(event) => {
+              const button = event.target.closest('button')
+              if (
+                !containsDeferredSelectionAction(action) &&
+                button &&
+                !button.disabled &&
+                !button.classList.contains('ant-btn-loading')
+              ) {
+                closeMoreActions()
+              }
+            }}
+          >
+            {wrapOverflowSelectionAction(action, closeMoreActions)}
+          </div>
+        ))}
+      </div>
+    ),
+    [closeMoreActions, focusMoreAction, moreActionsId, overflow, token]
+  )
 
   if (overflow.length === 0) {
     return (
@@ -254,81 +326,44 @@ function ResponsiveSelectionActions({ children }) {
   }
 
   return (
-    <>
-      <div
-        className={joinClassNames(
-          'erp-business-selection-action-bar__actions erp-business-module-selection-actions',
-          screens.lg
-            ? 'erp-business-selection-action-bar__actions--overflow'
-            : 'erp-business-selection-action-bar__actions--compact'
-        )}
-      >
-        {context.length > 0 ? (
-          <div className="erp-business-selection-action-bar__compact-context">
-            {context}
-          </div>
-        ) : null}
-        <div className="erp-business-selection-action-bar__compact-visible">
-          {visible}
+    <div
+      className={joinClassNames(
+        'erp-business-selection-action-bar__actions erp-business-module-selection-actions',
+        screens.lg
+          ? 'erp-business-selection-action-bar__actions--overflow'
+          : 'erp-business-selection-action-bar__actions--compact'
+      )}
+    >
+      {context.length > 0 ? (
+        <div className="erp-business-selection-action-bar__compact-context">
+          {context}
         </div>
-        <Button
-          ref={moreActionsButtonRef}
-          className="erp-business-selection-action-bar__compact-more"
-          icon={<MoreOutlined />}
-          aria-label={`更多操作，共 ${overflow.length} 项`}
-          onClick={() => setMoreActionsOpen(true)}
-        >
-          更多操作
-        </Button>
+      ) : null}
+      <div className="erp-business-selection-action-bar__compact-visible">
+        {visible}
       </div>
-      <Drawer
-        rootClassName="erp-business-selection-action-drawer"
-        title="更多操作"
-        placement={screens.md ? 'right' : 'bottom'}
-        width={screens.md ? 420 : undefined}
-        height={screens.md ? undefined : 'min(70vh, 560px)'}
+      <Dropdown
+        trigger={['click']}
+        placement="bottomRight"
         open={moreActionsOpen}
-        keyboard
-        maskClosable
+        onOpenChange={setMoreActionsOpen}
+        autoFocus
+        autoAdjustOverflow
         destroyOnHidden={false}
-        onClose={closeMoreActions}
-        afterOpenChange={(open) => {
-          window.requestAnimationFrame(() => {
-            if (open) {
-              moreActionsListRef.current
-                ?.querySelector(
-                  'button:not(:disabled), .erp-business-action-tooltip-anchor[tabindex="0"]'
-                )
-                ?.focus({ preventScroll: true })
-              return
-            }
-            moreActionsButtonRef.current?.focus({ preventScroll: true })
-          })
-        }}
+        overlayClassName="erp-business-selection-action-dropdown"
+        popupRender={renderMoreActions}
       >
-        <div
-          ref={moreActionsListRef}
-          className="erp-business-selection-action-drawer__list"
+        <Button
+          className="erp-business-selection-action-bar__compact-more erp-action-button"
+          size="small"
+          aria-label={`更多操作，共 ${overflow.length} 项`}
+          aria-expanded={moreActionsOpen}
+          aria-controls={moreActionsId}
         >
-          {overflow.map((action, index) => (
-            <div
-              key={action?.key || `selection-overflow-action-${index}`}
-              className="erp-business-selection-action-drawer__item"
-              onClick={(event) => {
-                if (
-                  !containsDeferredSelectionAction(action) &&
-                  event.target.closest('button')
-                ) {
-                  closeMoreActions()
-                }
-              }}
-            >
-              {wrapOverflowSelectionAction(action, closeMoreActions)}
-            </div>
-          ))}
-        </div>
-      </Drawer>
-    </>
+          更多操作 <DownOutlined />
+        </Button>
+      </Dropdown>
+    </div>
   )
 }
 
@@ -956,7 +991,7 @@ export function SelectionActionBar({
           </div>
         ) : null}
       </div>
-      {hasSelection ? (
+      {recordActions.length > 0 ? (
         <div
           className="erp-business-selection-action-bar__record-actions"
           role="group"
@@ -1065,7 +1100,7 @@ export function BusinessLifecyclePrimaryAction({
       <Button
         icon={getLifecycleActionIcon(action)}
         data-business-action-key="lifecycle-primary"
-        className="erp-business-module-status-action erp-business-lifecycle-slot erp-action-button"
+        className="erp-business-module-status-action erp-action-button"
         size="small"
         type="primary"
         danger={action?.danger === true}
@@ -1083,81 +1118,31 @@ export function BusinessLifecyclePrimaryAction({
 
 BusinessLifecyclePrimaryAction.selectionActionPriority = 100
 
-export function BusinessLifecycleMoreAction({
-  actions = [],
-  actionStates = {},
+export function BusinessLifecycleSecondaryAction({
+  action = null,
   disabled = false,
   disabledReason = '',
-  getPopupContainer,
-  label = '其他状态操作',
   onAction = () => {},
 }) {
-  if (actions.length === 0) return null
-
-  const menuItems = [
-    {
-      key: 'status-transitions',
-      label: '状态变更',
-      type: 'group',
-      children: actions.map((action) => {
-        const actionState = actionStates[action.key] || {}
-        const actionDisabled = actionState.disabled ?? disabled
-        const actionDisabledReason = actionDisabled
-          ? actionState.disabledReason || disabledReason
-          : ''
-        return {
-          key: action.key,
-          icon: getLifecycleActionIcon(action),
-          label: (
-            <span
-              title={actionDisabledReason || undefined}
-              aria-label={
-                actionDisabledReason
-                  ? `${action.label}，${actionDisabledReason}`
-                  : action.label
-              }
-            >
-              {action.label}
-              {actionDisabledReason ? (
-                <Text type="secondary">（{actionDisabledReason}）</Text>
-              ) : null}
-            </span>
-          ),
-          danger: action.danger,
-          disabled: actionDisabled,
-        }
-      }),
-    },
-  ]
-
+  if (!action) return null
   return (
-    <Dropdown
-      trigger={['click']}
-      destroyOnHidden
-      getPopupContainer={getPopupContainer}
-      menu={{
-        items: menuItems,
-        onClick: ({ key }) => {
-          const action = actions.find((item) => item.key === key)
-          const actionState = action ? actionStates[action.key] || {} : {}
-          if (action && !(actionState.disabled ?? disabled)) onAction(action)
-        },
-      }}
-    >
+    <BusinessActionTooltip disabled={disabled} disabledReason={disabledReason}>
       <Button
-        data-business-action-key="lifecycle-more"
-        className="erp-business-module-status-action erp-business-lifecycle-slot erp-action-button"
+        icon={getLifecycleActionIcon(action)}
+        data-business-action-key={`lifecycle-${action.key}`}
+        className="erp-business-module-status-action erp-action-button"
         size="small"
-        aria-label={label}
+        danger={action.danger === true}
+        disabled={disabled}
+        onClick={() => onAction(action)}
       >
-        {label} <DownOutlined />
+        {action.label}
       </Button>
-    </Dropdown>
+    </BusinessActionTooltip>
   )
 }
 
-BusinessLifecycleMoreAction.selectionActionPriority = 20
-BusinessLifecycleMoreAction.selectionActionDeferred = true
+BusinessLifecycleSecondaryAction.selectionActionPriority = 20
 
 export function SelectedItemsSummaryTag({
   selectedCount,

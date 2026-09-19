@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Button, Modal, Space, Spin, Tag, Typography } from 'antd'
+import { Button, Space, Spin, Tag, Typography } from 'antd'
 import {
   CloseCircleOutlined,
   EyeOutlined,
@@ -15,6 +15,7 @@ import {
   UndoOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -831,18 +832,18 @@ const ProductImageSlots = forwardRef(
           })}
         </div>
 
-        <Modal
+        <BusinessModal
           open={Boolean(preview)}
           title={preview?.fileName || '产品图片预览'}
           footer={null}
-          width="min(960px, calc(100vw - 48px))"
+          size="columnOrder"
           destroyOnHidden
           onCancel={closePreview}
         >
           <div className="product-image-slots__modal-preview">
             <img src={preview?.url} alt={preview?.fileName || '产品图片预览'} />
           </div>
-        </Modal>
+        </BusinessModal>
       </section>
     )
   }

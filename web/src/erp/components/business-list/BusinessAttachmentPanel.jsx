@@ -8,16 +8,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import {
-  Button,
-  Input,
-  List,
-  Modal,
-  Space,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd'
+import { Button, Input, List, Space, Tag, Tooltip, Typography } from 'antd'
 import {
   DeleteOutlined,
   DownloadOutlined,
@@ -27,6 +18,7 @@ import {
   StopOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
@@ -1158,7 +1150,8 @@ const BusinessAttachmentPanel = forwardRef(
             </List.Item>
           )}
         />
-        <Modal
+        <BusinessModal
+          size="confirm"
           centered
           destroyOnHidden
           open={Boolean(batchRetryState)}
@@ -1225,8 +1218,9 @@ const BusinessAttachmentPanel = forwardRef(
               )}
             />
           </Space>
-        </Modal>
-        <Modal
+        </BusinessModal>
+        <BusinessModal
+          size="confirm"
           centered
           destroyOnHidden
           open={Boolean(withdrawalTarget)}
@@ -1261,12 +1255,12 @@ const BusinessAttachmentPanel = forwardRef(
               onChange={(event) => setWithdrawalReason(event.target.value)}
             />
           </Space>
-        </Modal>
-        <Modal
+        </BusinessModal>
+        <BusinessModal
           open={Boolean(previewAttachment)}
           title={previewAttachment?.file_name || '附件预览'}
           footer={null}
-          width="min(960px, calc(100vw - 48px))"
+          size="columnOrder"
           destroyOnHidden
           onCancel={handleClosePreview}
         >
@@ -1285,7 +1279,7 @@ const BusinessAttachmentPanel = forwardRef(
               />
             </div>
           )}
-        </Modal>
+        </BusinessModal>
       </section>
     )
   }

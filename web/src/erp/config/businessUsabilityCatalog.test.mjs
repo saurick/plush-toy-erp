@@ -113,10 +113,7 @@ test('businessUsabilityCatalog: 关键字段问号可悬停、聚焦和点击且
   assert.match(componentSource, /aria-label=\{`查看\$\{label\}说明`\}/u)
   assert.match(componentSource, /focusTriggerAfterClose/u)
   assert.match(componentSource, /keyboard/u)
-  assert.match(componentSource, /maxWidth: 'calc\(100vw - 24px\)'/u)
-  assert.match(componentSource, /maxHeight: 'min\(70vh, 680px\)'/u)
-  assert.match(componentSource, /overflowY: 'auto'/u)
-  assert.match(componentSource, /overscrollBehavior: 'contain'/u)
+  assert.match(componentSource, /<BusinessModal/u)
   assert.match(
     componentSource,
     /<details className="erp-business-page-help__boundary">/u

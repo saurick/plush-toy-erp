@@ -232,6 +232,9 @@ export function useBusinessRowItemsPreview({
   const [expandedRowKey, setExpandedRowKey] = useState(null)
   const [modalRecord, setModalRecord] = useState(null)
   const [modalPage, setModalPage] = useState(1)
+  const [modalPageSize, setModalPageSize] = useState(
+    BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE
+  )
   const modalContentRef = useRef(null)
   const entriesRef = useRef(entries)
   const mountedRef = useRef(true)
@@ -513,6 +516,7 @@ export function useBusinessRowItemsPreview({
       }
       setModalRecord(record)
       setModalPage(1)
+      setModalPageSize(BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE)
       ensureLoaded(record, 'all')
     },
     [ensureLoaded]
@@ -531,13 +535,8 @@ export function useBusinessRowItemsPreview({
     : IDLE_LOAD_STATE
   const modalItems = modalLoad.data?.items || EMPTY_ITEMS
   const modalPageData = useMemo(
-    () =>
-      businessRowItemsModalPage(
-        modalItems,
-        modalPage,
-        BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE
-      ),
-    [modalItems, modalPage]
+    () => businessRowItemsModalPage(modalItems, modalPage, modalPageSize),
+    [modalItems, modalPage, modalPageSize]
   )
   const modalRecordLabel = modalRecord
     ? getRecordLabel?.(modalRecord) || ''
@@ -632,7 +631,10 @@ export function useBusinessRowItemsPreview({
               current={modalPageData.page}
               pageSize={modalPageData.pageSize}
               total={modalItems.length}
-              onChange={setModalPage}
+              onChange={(page, pageSize) => {
+                setModalPage(page)
+                setModalPageSize(pageSize)
+              }}
               contentRef={modalContentRef}
             />
           ) : null}

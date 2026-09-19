@@ -1,4 +1,5 @@
 import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
+import { assertBusinessModalViewport } from './modalAssertions.mjs'
 
 export function createPurchaseReceiptScenarios(deps) {
   const {
@@ -560,6 +561,17 @@ export function createPurchaseReceiptScenarios(deps) {
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '确认草稿后库存会同步更新')
         await expectText(page, 'PRT-STYLE-L1')
+        await assertBusinessModalViewport(page, modal, {
+          label: 'purchase-return-adjustment-records',
+          minWidthRatio: 0.9,
+          maxWidth: 1800,
+        })
+        await page.setViewportSize({ width: 720, height: 568 })
+        await assertBusinessModalViewport(page, modal, {
+          label: 'purchase-return-adjustment-records-narrow',
+          minWidthRatio: 0.9,
+        })
+        await page.setViewportSize({ width: 1440, height: 900 })
 
         const returnPostButton = modal.getByRole('button', {
           name: /确\s*认/u,

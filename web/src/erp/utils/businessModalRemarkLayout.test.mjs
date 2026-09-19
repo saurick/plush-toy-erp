@@ -19,11 +19,6 @@ const fullRowRemarkContracts = [
     field: 'note',
   },
   {
-    file: '../components/purchase-orders/PurchaseOrderInboundDraftModal.jsx',
-    label: '备注',
-    field: 'note',
-  },
-  {
     file: '../components/outsourcing-orders/OutsourcingOrderForm.jsx',
     label: '备注',
     field: 'note',
@@ -76,11 +71,21 @@ test('business modal non-item remarks stay on their own form row', () => {
 test('line item remarks keep the item-row layout contract', () => {
   for (const file of lineItemRemarkContracts) {
     const source = sourceFor(file)
+    const blocks = source.match(/<Form\.Item[\s\S]*?<\/Form\.Item>/gu) || []
     assert(
-      source.includes(
-        'erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note'
+      blocks.some((block) =>
+        block.includes('erp-line-item-field--note') &&
+        block.includes("name={[field.name, 'note']}") &&
+        !block.includes('erp-business-action-form__field--full')
       ),
       `${file} 的 item 备注应继续使用明细行 note 类，不应被升级为单据级整行备注`
     )
   }
+})
+
+test('purchase arrival keeps its optional note with receipt information', () => {
+  const source = sourceFor('../components/purchase-orders/PurchaseOrderInboundDraftModal.jsx')
+  const receipt = source.match(/<section[^>]*aria-label="收货信息"[\s\S]*?<\/section>/u)?.[0] || ''
+  assert.match(receipt, /<Form\.Item name="note" label="到货备注">\s*<BusinessTextArea[\s\S]*?maxLength=\{255\}/u)
+  assert.doesNotMatch(receipt, /<TextArea|rows=|maxRows/u)
 })

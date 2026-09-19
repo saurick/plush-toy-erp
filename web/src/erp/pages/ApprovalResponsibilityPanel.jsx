@@ -11,7 +11,6 @@ import {
   Card,
   Empty,
   Form,
-  Modal,
   Popover,
   Select,
   Space,
@@ -19,6 +18,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -989,14 +989,14 @@ export default function ApprovalResponsibilityPanel({
         </>
       ) : null}
 
-      <Modal
+      <BusinessModal
         title={`调整${displayItems.find((item) => item.approval_key === editingKey)?.label || '审批责任'}`}
         open={Boolean(activeEditable)}
         onCancel={() => closeEditor()}
         onOk={saveEditor}
         okText="保存调整"
         cancelText="取消"
-        width={760}
+        size="localAction"
         centered
         destroyOnHidden
       >
@@ -1210,7 +1210,7 @@ export default function ApprovalResponsibilityPanel({
             </div>
           ))}
         </Form>
-      </Modal>
+      </BusinessModal>
     </Card>
   )
 }

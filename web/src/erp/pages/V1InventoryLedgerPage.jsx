@@ -16,7 +16,6 @@ import {
   Dropdown,
   Empty,
   Input,
-  Modal,
   Popconfirm,
   Space,
   Tabs,
@@ -27,6 +26,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import Table from '@/common/components/table/AppTable'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
@@ -2539,7 +2539,8 @@ export default function V1InventoryLedgerPage() {
           editingOperation ? saveInventoryOperation : submitInventoryOperation
         }
       />
-      <Modal
+      <BusinessModal
+        size="confirm"
         title="取消库存作业"
         open={operationCancelOpen}
         okText="确认取消"
@@ -2564,7 +2565,7 @@ export default function V1InventoryLedgerPage() {
           placeholder="请填写取消原因"
           onChange={(event) => setOperationCancelReason(event.target.value)}
         />
-      </Modal>
+      </BusinessModal>
       <WarehouseSettingsModal
         open={warehouseSettingsOpen}
         onCancel={() => setWarehouseSettingsOpen(false)}

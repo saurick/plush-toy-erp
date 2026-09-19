@@ -1082,8 +1082,48 @@
   font-size: 13px;
 }
 
+.erp-business-details-page-size {
+  --erp-control-radius: 6px;
+  width: 112px;
+  flex-shrink: 0;
+}
+
 .erp-business-details-modal .ant-modal-footer .ant-pagination {
   margin: 0;
+}
+
+.erp-business-details-pagination .ant-pagination-item,
+.erp-business-details-pagination .ant-pagination-prev .ant-pagination-item-link,
+.erp-business-details-pagination .ant-pagination-next .ant-pagination-item-link {
+  border: 1px solid var(--erp-business-action-modal-divider, #dde6e0);
+  border-radius: 6px;
+}
+
+.erp-business-details-pagination .ant-pagination-item-active {
+  border-color: var(--erp-primary, #2f7d49);
+}
+
+@media screen and (max-width: 575px) {
+  .erp-business-details-modal .ant-modal-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 12px;
+  }
+
+  .erp-business-details-page-size,
+  .erp-business-details-modal .ant-modal-footer > .ant-btn {
+    grid-column: 2;
+  }
+
+  .erp-business-details-modal .ant-modal-footer > .ant-btn {
+    min-width: 64px;
+    width: auto;
+  }
+
+  .erp-business-details-pagination {
+    grid-column: 1;
+    justify-self: start;
+  }
 }
 
 .erp-business-details-modal .ant-divider {
@@ -1567,27 +1607,17 @@
 .erp-business-selection-action-bar--embedded
   .erp-business-selection-action-bar__actions
   .ant-btn {
+  height: 30px;
   min-height: 30px;
   border-radius: 8px;
   font-size: 13px;
   line-height: 1.2;
 }
 
-.erp-business-selection-action-bar--embedded
-  .erp-business-selection-action-bar__actions
-  .ant-btn-sm {
-  height: 30px;
-}
-
 .erp-business-selection-action-bar__hint {
   max-width: 720px;
   font-size: 12px;
   line-height: 20px;
-}
-
-/* 状态主动作保留稳定槽位，较长文案仍可按内容扩展。 */
-.erp-business-lifecycle-slot.ant-btn {
-  min-width: 96px;
 }
 
 .erp-business-batch-delete-modal__content {
@@ -1626,18 +1656,6 @@
   font-size: 14px;
   font-weight: 500;
   line-height: 1.45;
-}
-
-.erp-business-module-select-popup .ant-select-item-option-content {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.erp-business-module-select-popup .ant-select-item-option-active,
-.erp-business-module-select-popup .ant-select-item-option-selected {
-  background: #f2f6f2;
 }
 
 .erp-business-module-select-popup .rc-virtual-list-holder {

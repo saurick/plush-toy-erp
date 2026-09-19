@@ -28,7 +28,7 @@ export function createBusinessAttachmentAssertions({
 
     const button = page
       .locator(
-        '.erp-business-selection-action-bar__actions button, .erp-business-selection-action-drawer.ant-drawer-open button'
+        '.erp-business-selection-action-bar__actions button, .erp-business-selection-action-menu:visible button'
       )
       .filter({ hasText: buttonName })
       .first()

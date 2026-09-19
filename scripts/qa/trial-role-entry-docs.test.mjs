@@ -246,7 +246,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     qaReadme,
-    "高频快速检查，只运行显式 `fast` Node 测试组",
+    "跨模块基础检查集合，运行显式 `fast` Node 测试组",
     "scripts README fast QA summary",
   );
   assertIncludes(

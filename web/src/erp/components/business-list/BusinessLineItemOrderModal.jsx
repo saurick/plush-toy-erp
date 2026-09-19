@@ -5,9 +5,9 @@ import {
   VerticalAlignBottomOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Modal, Space } from 'antd'
+import { Button, Empty, Space } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 
-import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 import {
   buildBusinessLineItemOrderEntries,
   businessLineItemOrderChanged,
@@ -61,7 +61,7 @@ export default function BusinessLineItemOrderModal({
   }
 
   return (
-    <Modal
+    <BusinessModal
       className="erp-business-action-modal erp-business-action-modal--columns"
       destroyOnHidden={false}
       closable={!applying}
@@ -90,7 +90,7 @@ export default function BusinessLineItemOrderModal({
           <small>{description}</small>
         </div>
       }
-      width={ERP_MODAL_WIDTHS.columnOrder}
+      size="columnOrder"
     >
       {draftEntries.length === 0 ? (
         <Empty description={`暂无可调整的${itemNoun}`} />
@@ -185,6 +185,6 @@ export default function BusinessLineItemOrderModal({
           })}
         </div>
       )}
-    </Modal>
+    </BusinessModal>
   )
 }

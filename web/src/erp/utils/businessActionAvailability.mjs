@@ -87,7 +87,7 @@ export function resolveBusinessLifecycleActions({
     ? authorizedActions.filter((action) => canRun(action))
     : []
   // Lifecycle predicates describe legal transitions, independently of transient loading.
-  const visibleActions = selected ? availableActions : []
+  const visibleActions = selected ? availableActions : authorizedActions
   const primaryAction =
     visibleActions.find((action) => isPrimary(action)) || null
   const secondaryActions = visibleActions.filter(
@@ -120,7 +120,6 @@ export function resolveBusinessLifecycleActions({
   return {
     hasCapability: authorizedActions.length > 0,
     showPrimarySlot: Boolean(primaryAction),
-    showMoreSlot: secondaryActions.length > 0,
     authorizedActions,
     availableActions,
     primaryAction,

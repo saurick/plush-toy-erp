@@ -313,7 +313,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'business-detail-page-standard-v1/index.html',
     readmePath: 'business-detail-page-standard-v1/README.md',
     description:
-      '对齐共享只读详情 Modal：覆盖字段描述表、左侧编号与分组明细卡片，以及加载、空结果和失败重试；底部固定总条数、10 条分页和关闭。',
+      '对齐共享只读详情 Modal：覆盖字段描述表、左侧编号与分组明细卡片，以及加载、空结果和失败重试；底部固定总条数、每页条数选择、方框页码和关闭。',
     appliesTo:
       '销售订单、客户 / 供应商、产品、采购入库、库存批次、质检、出货和财务等需要详情承载的页面可参照；字段和动作仍由各自 API / usecase / RBAC 决定。',
   },

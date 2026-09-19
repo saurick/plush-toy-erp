@@ -23,7 +23,7 @@ import { currentBusinessDate } from '../utils/businessDate.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessActionTooltip,
-  BusinessLifecycleMoreAction,
+  BusinessLifecycleSecondaryAction,
   BusinessLifecyclePrimaryAction,
   BusinessDataTable,
   BusinessOperationPanel,
@@ -1486,7 +1486,6 @@ export default function V1SalesOrdersPage() {
   }, [adminProfile, saving, selectedOrder])
   const {
     showPrimarySlot: showLifecyclePrimary,
-    showMoreSlot: showLifecycleMore,
     primaryAction: primaryLifecycleAction,
     secondaryActions: secondaryLifecycleActions,
     actionStates: lifecycleActionStates,
@@ -1910,15 +1909,17 @@ export default function V1SalesOrdersPage() {
               }
             />
           ) : null}
-          {showLifecycleMore ? (
-            <BusinessLifecycleMoreAction
-              actions={secondaryLifecycleActions}
-              actionStates={lifecycleActionStates}
-              onAction={(action) =>
-                requestLifecycleAction(action, selectedOrder)
+          {secondaryLifecycleActions.map((action) => (
+            <BusinessLifecycleSecondaryAction
+              key={action.key}
+              action={action}
+              disabled={lifecycleActionStates[action.key]?.disabled}
+              disabledReason={lifecycleActionStates[action.key]?.disabledReason}
+              onAction={(requestedAction) =>
+                requestLifecycleAction(requestedAction, selectedOrder)
               }
             />
-          ) : null}
+          ))}
         </SelectionActionBar>
       </BusinessOperationPanel>
 

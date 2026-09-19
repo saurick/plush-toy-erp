@@ -536,6 +536,7 @@ export const businessPageFlowDefinitions = Object.freeze(
           'cancel_production_order',
         ],
         ['inbound', 'inbound', 'cancel_purchase_receipt'],
+        ['inbound', 'inbound', 'cancel_purchase_receipt_draft'],
         ['inbound', 'inbound', 'cancel_purchase_return'],
         ['inbound', 'inbound', 'cancel_purchase_receipt_adjustment'],
         [

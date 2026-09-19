@@ -12,6 +12,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { arrivalDifference } from '../utils/incomingAcceptance.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -19,6 +20,7 @@ import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   cancelPurchaseReceipt,
+  cancelPurchaseReceiptDraft,
   createPurchaseReceiptAdjustmentFromReceipt,
   createPurchaseReturnFromReceipt,
   getPurchaseReceipt,
@@ -236,6 +238,10 @@ export default function V1PurchaseReceiptsPage() {
   const canRead = hasActionPermission(adminProfile, 'purchase.receipt.read')
   const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')
   const canPost = hasActionPermission(adminProfile, 'warehouse.inbound.confirm')
+  const canCancelDraft = hasActionPermission(
+    adminProfile,
+    'purchase.receipt.cancel_draft'
+  )
   const canCreateReturn = hasActionPermission(
     adminProfile,
     'purchase.return.create'
@@ -368,9 +374,22 @@ export default function V1PurchaseReceiptsPage() {
       { key: 'lot_no', label: '批次号', value: optionalText(item?.lot_no) },
       {
         key: 'quantity',
-        label: '数量',
+        label: '本次实点数量',
         value: formatQuantity(item?.quantity),
         rowStart: true,
+      },
+      {
+        key: 'declared_quantity',
+        label: '送货标示数量',
+        value:
+          item?.declared_quantity == null
+            ? '未提供'
+            : formatQuantity(item.declared_quantity),
+      },
+      {
+        key: 'arrival_difference',
+        label: '实点与标示差异',
+        value: arrivalDifference(item?.quantity, item?.declared_quantity),
       },
       {
         key: 'unit',
@@ -1410,20 +1429,27 @@ export default function V1PurchaseReceiptsPage() {
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {canPost ? (
+          {canPost || canCancelDraft ? (
             <BusinessActionTooltip
               visible={
-                !selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)
+                !selectedRow ||
+                (canPost ? ['DRAFT', 'POSTED'] : ['DRAFT']).includes(
+                  selectedRow.status
+                )
               }
               disabled={
                 !selectedRow ||
-                !['DRAFT', 'POSTED'].includes(selectedRow.status) ||
+                !(canPost ? ['DRAFT', 'POSTED'] : ['DRAFT']).includes(
+                  selectedRow.status
+                ) ||
                 saving
               }
               disabledReason={
                 !selectedRow
                   ? '请先选择一条入库记录'
-                  : !['DRAFT', 'POSTED'].includes(selectedRow.status)
+                  : !(canPost ? ['DRAFT', 'POSTED'] : ['DRAFT']).includes(
+                        selectedRow.status
+                      )
                     ? '已取消入库记录不能再次取消'
                     : saving
                       ? '当前操作完成后可继续'
@@ -1439,7 +1465,9 @@ export default function V1PurchaseReceiptsPage() {
                 onConfirm={() =>
                   runReceiptAction(
                     selectedRow,
-                    cancelPurchaseReceipt,
+                    selectedRow?.status === 'DRAFT' && canCancelDraft
+                      ? cancelPurchaseReceiptDraft
+                      : cancelPurchaseReceipt,
                     selectedRow?.status === 'DRAFT'
                       ? '采购入库草稿已作废，未更新库存'
                       : '采购入库已取消，库存已恢复'
@@ -1456,7 +1484,9 @@ export default function V1PurchaseReceiptsPage() {
                   icon={<CloseCircleOutlined />}
                   disabled={
                     !selectedRow ||
-                    !['DRAFT', 'POSTED'].includes(selectedRow.status) ||
+                    !(canPost ? ['DRAFT', 'POSTED'] : ['DRAFT']).includes(
+                      selectedRow.status
+                    ) ||
                     saving
                   }
                 >

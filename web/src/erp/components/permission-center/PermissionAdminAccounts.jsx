@@ -7,7 +7,6 @@ import {
   Empty,
   Form,
   Input,
-  Modal,
   Select,
   Space,
   Switch,
@@ -22,6 +21,7 @@ import React, {
   useState,
 } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import {
@@ -1097,7 +1097,7 @@ export default function PermissionAdminAccounts({
           ) : null}
         </Form>
       </BusinessFormPage>
-      <Modal
+      <BusinessModal
         className="erp-permission-modal"
         title={
           editingAdmin?.username
@@ -1111,7 +1111,7 @@ export default function PermissionAdminAccounts({
         okText="保存"
         cancelText="取消"
         centered
-        width={720}
+        size="localAction"
         forceRender
       >
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
@@ -1131,7 +1131,7 @@ export default function PermissionAdminAccounts({
             />
           </label>
         </Space>
-      </Modal>
+      </BusinessModal>
       <BusinessFormPage
         container={editorContainer}
         className="erp-permission-editor"
@@ -1177,7 +1177,8 @@ export default function PermissionAdminAccounts({
           </label>
         </Space>
       </BusinessFormPage>
-      <Modal
+      <BusinessModal
+        size="confirm"
         className="erp-permission-modal"
         title={
           resettingAdmin?.username
@@ -1239,8 +1240,9 @@ export default function PermissionAdminAccounts({
             <Input.Password autoComplete="new-password" />
           </Form.Item>
         </Form>
-      </Modal>
-      <Modal
+      </BusinessModal>
+      <BusinessModal
+        size="confirm"
         className="erp-permission-modal"
         title={statusActionDisabled ? '临时停用账号' : '恢复账号使用'}
         open={statusModalOpen}
@@ -1283,8 +1285,9 @@ export default function PermissionAdminAccounts({
             />
           </Form.Item>
         </Form>
-      </Modal>
-      <Modal
+      </BusinessModal>
+      <BusinessModal
+        size="confirm"
         className="erp-permission-modal"
         title="离职注销账号"
         open={revokeModalOpen}
@@ -1321,7 +1324,7 @@ export default function PermissionAdminAccounts({
             />
           </Form.Item>
         </Form>
-      </Modal>
+      </BusinessModal>
     </>
   )
 }

@@ -4,11 +4,11 @@ import {
   Descriptions,
   Form,
   Input,
-  Modal,
   Radio,
   Select,
   Typography,
 } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
@@ -54,7 +54,7 @@ export default function ProductionCompletionModal({
 }) {
   const [form] = Form.useForm()
   const editing = mode === 'edit'
-  const Editor = editing ? BusinessFormPage : Modal
+  const Editor = editing ? BusinessFormPage : BusinessModal
   const selectedItemID = Form.useWatch('production_order_item_id', form)
   const selectedBatchID = Form.useWatch('production_wip_batch_id', form)
   const lotSelection = Form.useWatch('lot_selection', form)
@@ -141,7 +141,9 @@ export default function ProductionCompletionModal({
 
   return (
     <Editor
-      {...(editing ? { form } : { width: 720, cancelText: '取消', destroyOnHidden: true })}
+      {...(editing
+        ? { form }
+        : { size: 'localAction', cancelText: '取消', destroyOnHidden: true })}
       title={
         editing
           ? '核对待入库完工报告'

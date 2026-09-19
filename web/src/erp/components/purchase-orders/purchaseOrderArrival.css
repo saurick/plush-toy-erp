@@ -1,0 +1,221 @@
+.erp-purchase-arrival__source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 16px;
+  margin-bottom: 20px;
+  overflow-wrap: anywhere;
+}
+
+.erp-purchase-arrival__source strong {
+  font-size: 16px;
+}
+
+.erp-purchase-arrival__source span,
+.erp-purchase-arrival__section-head span,
+.erp-purchase-arrival__material-name > span,
+.erp-purchase-arrival__material-quantity > span,
+.erp-purchase-arrival__comparison,
+.erp-purchase-arrival__record-label,
+.erp-purchase-arrival__help,
+.erp-purchase-arrival__footer-summary {
+  color: var(--erp-text-muted, #64748b);
+  font-size: 13px;
+}
+
+.erp-business-action-form.erp-purchase-arrival__form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.erp-purchase-arrival__receipt {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(240px, 1.35fr) minmax(
+      240px,
+      1.5fr
+    );
+  gap: 16px;
+}
+
+.erp-purchase-arrival__section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-bottom: 12px;
+}
+
+.erp-purchase-arrival__section-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.erp-purchase-arrival__materials {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 80px;
+}
+
+.erp-purchase-arrival__material {
+  min-width: 0;
+  border: 1px solid var(--erp-border, #e2e8f0);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.erp-purchase-arrival__material-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--erp-border, #e2e8f0);
+  background: var(--erp-surface-bg-soft, #f8fafc);
+}
+
+.erp-purchase-arrival__material-name,
+.erp-purchase-arrival__material-quantity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-purchase-arrival__material-name {
+  flex: 1 1 240px;
+}
+
+.erp-purchase-arrival__material-quantity {
+  align-items: flex-end;
+}
+
+.erp-purchase-arrival__material-quantity strong {
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-purchase-arrival__record {
+  padding: 12px 16px;
+}
+
+.erp-purchase-arrival__record + .erp-purchase-arrival__record {
+  border-top: 1px solid var(--erp-border, #e2e8f0);
+}
+
+.erp-purchase-arrival__record-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 10px;
+}
+
+.erp-purchase-arrival__comparison {
+  flex: 1;
+  min-width: 0;
+}
+
+.erp-purchase-arrival__comparison .ant-tag {
+  margin: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.erp-purchase-arrival__fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.erp-purchase-arrival__fields .ant-input-number {
+  width: 100%;
+}
+
+.erp-purchase-arrival__record-note {
+  margin-top: 10px;
+  color: var(--erp-text-muted, #64748b);
+  font-size: 13px;
+}
+
+.erp-purchase-arrival__record-note summary {
+  width: fit-content;
+  max-width: 100%;
+  cursor: pointer;
+}
+
+.erp-purchase-arrival__record-note[open] summary {
+  margin-bottom: 8px;
+}
+
+.erp-purchase-arrival__add-record {
+  padding: 0 16px 14px;
+}
+
+.erp-purchase-arrival__help {
+  margin: 16px 0 0;
+  line-height: 1.6;
+}
+
+.erp-purchase-arrival__error {
+  margin: 12px 0 0;
+  color: var(--ant-color-error, #d4380d);
+}
+
+.erp-purchase-arrival__footer {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.erp-purchase-arrival__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.erp-purchase-arrival .erp-purchase-arrival__footer-actions .ant-btn {
+  flex: 0 0 auto;
+  margin-inline-start: 0;
+}
+
+@media (max-width: 900px) {
+  .erp-purchase-arrival__receipt,
+  .erp-purchase-arrival__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-purchase-arrival__receipt > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 540px) {
+  .erp-purchase-arrival__receipt,
+  .erp-purchase-arrival__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .erp-purchase-arrival__material-head,
+  .erp-purchase-arrival__record {
+    padding: 12px;
+  }
+
+  .erp-purchase-arrival__material-quantity {
+    align-items: flex-start;
+  }
+
+  .erp-purchase-arrival__footer-summary {
+    width: 100%;
+    text-align: left;
+  }
+}

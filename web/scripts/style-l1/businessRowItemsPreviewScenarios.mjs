@@ -13,16 +13,73 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
     path,
   } = deps
 
+  async function waitForDetailsMotion(modal) {
+    await modal.evaluate(async (node) => {
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      )
+      await Promise.all(
+        node
+          .getAnimations({ subtree: true })
+          .map((animation) => animation.finished.catch(() => {}))
+      )
+    })
+  }
+
   async function assertFixedDetailPagination(page, modal) {
+    await waitForDetailsMotion(modal)
     const footer = modal.locator('.ant-modal-footer')
     const pagination = footer.locator('.ant-pagination')
     await pagination.waitFor()
+    await footer.getByRole('combobox', { name: '每页明细条数' }).waitFor()
+    const controls = await footer.evaluate((node) => {
+      const select = node
+        .querySelector('.erp-business-details-page-size')
+        .getBoundingClientRect()
+      const pages = node
+        .querySelector('.ant-pagination')
+        .getBoundingClientRect()
+      const close = node
+        .querySelector(':scope > .ant-btn')
+        .getBoundingClientRect()
+      const buttons = [
+        ...node.querySelectorAll(
+          '.ant-pagination-item, .ant-pagination-item-link'
+        ),
+      ]
+      return {
+        overflow: node.scrollWidth - node.clientWidth,
+        selectorBeforePages: select.right <= pages.left,
+        sameRow:
+          Math.abs(select.top - pages.top) <= 2 &&
+          Math.abs(close.top - pages.top) <= 2,
+        buttonsBoxed: buttons.every(
+          (button) =>
+            Number.parseFloat(getComputedStyle(button).borderTopWidth) >= 1
+        ),
+      }
+    })
+    assert(
+      controls.overflow <= 1,
+      `分页控件不得横向溢出: ${JSON.stringify(controls)}`
+    )
+    if (page.viewportSize().width >= 768) {
+      assert(
+        controls.selectorBeforePages &&
+          controls.sameRow &&
+          controls.buttonsBoxed,
+        `桌面应依次显示条数选择、方框页码和关闭: ${JSON.stringify(controls)}`
+      )
+    }
     const before = await footer.boundingBox()
     await modal.locator('.ant-modal-body').evaluate((node) => {
       node.scrollTop = node.scrollHeight
     })
     const after = await footer.boundingBox()
-    assert(Math.abs(before.y - after.y) <= 1, '滚动明细时底部分页应保持固定')
+    assert(
+      Math.abs(before.y - after.y) <= 1,
+      `滚动明细时底部分页应保持固定: ${JSON.stringify({ before, after })}`
+    )
     assert(
       after.y >= 0 && after.y + after.height <= page.viewportSize().height,
       '底部分页必须完整留在可视区域'
@@ -32,12 +89,33 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
     })
   }
 
+  async function changeDetailsPageSize(page, modal, size) {
+    await modal
+      .getByRole('combobox', { name: '每页明细条数' })
+      .press('ArrowDown')
+    await page
+      .getByRole('option', { name: `${size} 条/页`, exact: true })
+      .click()
+    await page.waitForFunction(() => {
+      const body = document.querySelector(
+        '.erp-business-details-modal .ant-modal-body'
+      )
+      const firstCard = body?.querySelector('.erp-business-row-item-card')
+      if (!firstCard) return false
+      const card = firstCard.getBoundingClientRect()
+      const viewport = body.getBoundingClientRect()
+      return card.top >= viewport.top - 1 && card.top < viewport.bottom
+    })
+  }
+
   async function assertWideDetailsModal(page, modal) {
+    await waitForDetailsMotion(modal)
     await page.waitForFunction(() =>
       [...document.querySelectorAll('.ant-modal')]
         .filter((node) => node.getBoundingClientRect().width > 0)
         .every(
           (node) =>
+            !/\bant-zoom-(appear|enter)\b/u.test(node.className) &&
             Math.abs(node.getBoundingClientRect().width - node.offsetWidth) < 1
         )
     )
@@ -458,15 +536,43 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
               ? `${'按产品订单分别分包，标签与送货单对应。'.repeat(8)}\n末行交货说明。`
               : '外箱按订单分开',
         }))
+        const orders = [
+          order,
+          {
+            ...order,
+            id: 2,
+            purchase_order_no: 'PO-STYLE-EMPTY',
+            item_count: 0,
+          },
+          {
+            ...order,
+            id: 3,
+            purchase_order_no: 'PO-STYLE-SINGLE',
+            item_count: 1,
+          },
+        ]
         await page.route('**/rpc/purchase_order', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
           let data
           if (method === 'list_purchase_orders') {
-            data = stylePaginatedRpcData([order], 'purchase_orders', params)
+            data = stylePaginatedRpcData(orders, 'purchase_orders', params)
           } else if (method === 'list_purchase_order_items') {
-            data = stylePaginatedRpcData(items, 'purchase_order_items', params)
+            const orderItems =
+              params.purchase_order_id === 2
+                ? []
+                : params.purchase_order_id === 3
+                  ? [{ ...items[0], purchase_order_id: 3 }]
+                  : items
+            data = stylePaginatedRpcData(
+              orderItems,
+              'purchase_order_items',
+              params
+            )
           } else if (method === 'get_purchase_order') {
-            data = { purchase_order: order }
+            data = {
+              purchase_order:
+                orders.find((item) => item.id === params.id) || order,
+            }
           } else {
             return route.fallback()
           }
@@ -610,6 +716,33 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           await modal.locator('.erp-business-row-item-card').count(),
           5
         )
+        await changeDetailsPageSize(page, modal, 20)
+        await modal.getByText('明细 1', { exact: true }).waitFor()
+        assert.equal(
+          await modal.locator('.erp-business-row-item-card').count(),
+          20
+        )
+        await modal.locator('.ant-pagination-next button').click()
+        await modal.getByText('明细 21', { exact: true }).waitFor()
+        assert.equal(
+          await modal.locator('.erp-business-row-item-card').count(),
+          5
+        )
+        await changeDetailsPageSize(page, modal, 50)
+        await modal.getByText('明细 1', { exact: true }).waitFor()
+        assert.equal(
+          await modal.locator('.erp-business-row-item-card').count(),
+          25
+        )
+        assert.equal(
+          await modal.locator('.ant-pagination-next button').isDisabled(),
+          true
+        )
+        assert.equal(
+          await modal.locator('.ant-pagination-prev button').isDisabled(),
+          true
+        )
+        await assertFixedDetailPagination(page, modal)
         await modal.getByRole('button', { name: /关\s*闭/u }).click()
         await modal.waitFor({ state: 'hidden' })
         await page.setViewportSize({ width: 1920, height: 1000 })
@@ -627,12 +760,60 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           await modal.locator('.erp-business-row-item-card').count(),
           10
         )
+        assert.equal(
+          await modal
+            .locator(
+              '.erp-business-details-page-size .ant-select-selection-item'
+            )
+            .innerText(),
+          '10 条/页'
+        )
         await modal.getByRole('button', { name: /关\s*闭/u }).click()
         await modal.waitFor({ state: 'hidden' })
         await assertNoHorizontalOverflow(
           page,
           `business-details-wide-${theme}-closed`
         )
+        for (const [number, count] of [
+          ['PO-STYLE-EMPTY', 0],
+          ['PO-STYLE-SINGLE', 1],
+        ]) {
+          await page
+            .locator('.erp-business-data-table-card')
+            .getByText(number, { exact: true })
+            .dblclick()
+          await modal
+            .locator('.erp-business-details-total')
+            .getByText(`共 ${count} 条`, { exact: true })
+            .waitFor()
+          assert.equal(
+            await modal.locator('.erp-business-row-item-card').count(),
+            count
+          )
+          assert.equal(
+            await modal
+              .getByRole('combobox', { name: '每页明细条数' })
+              .isDisabled(),
+            count === 0
+          )
+          assert.equal(
+            await modal.locator('.ant-pagination-prev button').isDisabled(),
+            true
+          )
+          assert.equal(
+            await modal.locator('.ant-pagination-next button').isDisabled(),
+            true
+          )
+          if (count === 1) {
+            await changeDetailsPageSize(page, modal, 20)
+            assert.equal(
+              await modal.locator('.erp-business-row-item-card').count(),
+              1
+            )
+          }
+          await modal.getByRole('button', { name: /关\s*闭/u }).click()
+          await modal.waitFor({ state: 'hidden' })
+        }
       },
     })),
     (() => {
@@ -983,16 +1164,16 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           await assertFixedDetailPagination(page, modal)
           assert.equal(
             await fullItems.locator('.erp-business-row-item-card').count(),
-            20
+            10
           )
           assert.equal(
-            await modal
+            await fullItems
               .locator(
                 'input:visible:not([disabled]), textarea:visible:not([disabled]), .ant-select:visible:not(.ant-select-disabled)'
               )
               .count(),
             0,
-            '完整明细 Modal 必须保持只读'
+            '完整明细内容必须保持只读，分页设置位于底部'
           )
           assert.equal(
             await modal
@@ -1012,11 +1193,29 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           await modal.locator('.ant-pagination-next button').click()
           assert.equal(
             await fullItems.locator('.erp-business-row-item-card').count(),
+            10
+          )
+          await expectText(modal, '第 11 行')
+          await changeDetailsPageSize(page, modal, 20)
+          await expectText(modal, '第 1 行')
+          assert.equal(
+            await fullItems.locator('.erp-business-row-item-card').count(),
+            20
+          )
+          await modal.locator('.ant-pagination-next button').click()
+          assert.equal(
+            await fullItems.locator('.erp-business-row-item-card').count(),
             2
           )
           await expectText(page, '第 21 行')
           await page.setViewportSize({ width: 390, height: 900 })
           await assertWideDetailsModal(page, modal)
+          await assertFixedDetailPagination(page, modal)
+          await changeDetailsPageSize(page, modal, 50)
+          assert.equal(
+            await fullItems.locator('.erp-business-row-item-card').count(),
+            22
+          )
           await modal.screenshot({
             path: path.join(
               outputDir,
@@ -1026,6 +1225,22 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           await modal.locator('.ant-modal-close').click({ force: true })
           await modal.waitFor({ state: 'hidden', timeout: 10_000 })
           await page.setViewportSize({ width: 1440, height: 900 })
+          await preview.getByRole('button', { name: '查看全部' }).click()
+          await modal.waitFor()
+          assert.equal(
+            await fullItems.locator('.erp-business-row-item-card').count(),
+            10
+          )
+          assert.equal(
+            await modal
+              .locator(
+                '.erp-business-details-page-size .ant-select-selection-item'
+              )
+              .innerText(),
+            '10 条/页'
+          )
+          await modal.getByRole('button', { name: /关\s*闭/u }).click()
+          await modal.waitFor({ state: 'hidden' })
           assert.equal(detailReads, 1, '查看全部应复用完整聚合缓存')
           assert.equal(await selection.isChecked(), false)
           await assertNoHorizontalOverflow(

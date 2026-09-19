@@ -1,13 +1,17 @@
 import React, { useEffect, useMemo } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
+import MaterialPurchaseContractBatchWorkbench from '../components/print/MaterialPurchaseContractBatchWorkbench.jsx'
 import MaterialPurchaseContractWorkbench from '../components/print/MaterialPurchaseContractWorkbench.jsx'
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
+import { isMaterialPurchaseContractBatchDraft } from '../utils/materialPurchaseContractBatch.mjs'
 import {
   buildRestorablePrintWorkspaceURL,
   buildPrintWorkspaceDraftStorageKey,
   PRINT_WORKSPACE_DRAFT_MODE,
   PRINT_WORKSPACE_ENTRY_SOURCE,
+  readInitialPrintWorkspaceDraftFromWindowName,
+  readPrintWorkspaceDraftSnapshot,
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceDraftMode,
@@ -46,13 +50,40 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
       stateID: workspaceStateID,
     })
   }, [configRevision, customerKey, entrySource, workspaceStateID])
+  const initialWorkspaceDraft = useMemo(() => {
+    if (resetDraftOnOpen) {
+      return null
+    }
+    return (
+      readInitialPrintWorkspaceDraftFromWindowName(
+        'material-purchase-contract',
+        workspaceStateID
+      ) || readPrintWorkspaceDraftSnapshot(draftStorageKey)
+    )
+  }, [draftStorageKey, resetDraftOnOpen, workspaceStateID])
+  const batchDraft = isMaterialPurchaseContractBatchDraft(initialWorkspaceDraft)
+    ? initialWorkspaceDraft
+    : null
 
   useEffect(() => {
-    document.title = '采购合同打印窗口'
-  }, [])
+    document.title = batchDraft ? '采购合同批量打印窗口' : '采购合同打印窗口'
+  }, [batchDraft])
 
   if (!template) {
     return <Navigate to="/erp/print-center" replace />
+  }
+
+  if (batchDraft) {
+    return (
+      <MaterialPurchaseContractBatchWorkbench
+        template={template}
+        initialBatchDraft={batchDraft}
+        draftStorageKey={draftStorageKey}
+        workspaceStateID={workspaceStateID}
+        workspaceURL={workspaceURL}
+        customerKey={customerKey}
+      />
+    )
   }
 
   return (

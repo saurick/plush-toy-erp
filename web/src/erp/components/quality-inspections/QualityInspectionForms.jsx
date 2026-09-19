@@ -1,5 +1,6 @@
 import React from 'react'
 import { Form, Input, InputNumber, Radio, Select } from 'antd'
+import { IncomingCheckItemsForm } from './IncomingCheckItems.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
@@ -45,6 +46,9 @@ export function buildDecisionParams(inspectionID, values = {}, result = '') {
     inspected_at: trimOptional(values.inspected_at),
     inspector_id: positiveInt(values.inspector_id),
     decision_note: trimOptional(values.decision_note),
+    ...(decisionResult && values.check_items
+      ? { check_items: values.check_items }
+      : {}),
     ...(decisionResult
       ? buildQualityDefectRateParams(
           values.defect_rate_selection,
@@ -124,6 +128,8 @@ export function QualityInspectionDecisionForm({
   form,
   mode,
   allowConcession = true,
+  incoming = false,
+  disabled = false,
 }) {
   const defectRateSelection = Form.useWatch('defect_rate_selection', form)
 
@@ -137,8 +143,10 @@ export function QualityInspectionDecisionForm({
     <Form
       form={form}
       layout="vertical"
+      disabled={disabled}
       className="erp-business-action-form erp-business-action-form--grid"
     >
+      {incoming && mode !== 'cancel' ? <IncomingCheckItemsForm /> : null}
       {mode === 'pass' ? (
         <Form.Item
           className="erp-business-action-form__field"

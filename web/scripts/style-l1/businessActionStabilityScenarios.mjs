@@ -1,6 +1,7 @@
 import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
+import { assertBusinessModalViewport } from './modalAssertions.mjs'
 
 const SALES_ORDER_PATH = '/erp/sales/project-orders/sales-orders'
 const PURCHASE_ORDER_PATH = '/erp/purchase/accessories'
@@ -506,7 +507,18 @@ async function selectBusinessRow(page, recordNo) {
     .filter({ hasText: recordNo })
     .first()
   await row.waitFor({ state: 'visible', timeout: 10_000 })
-  await row.click()
+  const radio = row.getByRole('radio')
+  if (await radio.count()) {
+    await radio.check()
+  } else {
+    const checkedRows = page.locator(
+      '.ant-table-tbody .ant-table-row.ant-table-row-selected'
+    )
+    for (let index = (await checkedRows.count()) - 1; index >= 0; index -= 1) {
+      await checkedRows.nth(index).getByRole('checkbox').uncheck()
+    }
+    await row.getByRole('checkbox').check()
+  }
   await page.waitForFunction(
     (recordLabel) =>
       Array.from(
@@ -519,10 +531,14 @@ async function selectBusinessRow(page, recordNo) {
   await page.waitForTimeout(180)
 }
 
-async function captureDesktopActionLayout(page) {
+async function captureActionLayout(page) {
   const actionBar = page.locator('.erp-business-module-current-action').first()
   if (await actionBar.locator('button').count()) {
-    await assertButtonSpacing(actionBar, '桌面当前操作', { contentSized: true })
+    await assertButtonSpacing(actionBar, '当前操作区', {
+      contentSized: await page.evaluate(() =>
+        window.matchMedia('(min-width: 992px)').matches
+      ),
+    })
   }
   return actionBar.evaluate((bar) => {
     const actions = bar.querySelector(
@@ -588,14 +604,14 @@ async function assertDesktopActionState(
   { visible, disabled }
 ) {
   const scope =
-    '.erp-business-module-current-action, .erp-business-selection-action-drawer.ant-drawer-open'
+    '.erp-business-module-current-action, .erp-business-selection-action-menu:visible'
   const selector = `[data-business-action-key="${key}"]:visible`
   let action = page.locator(scope).locator(selector)
   const more = page.locator(
     '.erp-business-module-current-action .erp-business-selection-action-bar__compact-more:visible'
   )
   const opened = (await action.count()) === 0 && (await more.count()) > 0
-  if (opened) await openMobileActionDrawer(page)
+  if (opened) await openActionMenu(page)
   action = page.locator(scope).locator(selector)
   assert.equal(
     (await action.count()) > 0,
@@ -608,7 +624,25 @@ async function assertDesktopActionState(
       disabled,
       `${key} 禁用态应为 ${disabled}`
     )
-  if (opened) await closeMobileActionDrawer(page)
+  if (opened) await closeActionMenu(page)
+}
+
+async function assertUnselectedActions(page, assert) {
+  const layout = await captureActionLayout(page)
+  const recordButtons = layout.buttons.filter(
+    (button) => button.key !== '更多操作'
+  )
+  assert(recordButtons.length > 0, '未选择时应保留岗位操作入口')
+  assert(
+    recordButtons.every((button) => button.disabled),
+    '未选择时不能办理本单操作'
+  )
+  assert.equal(
+    await page.locator('[data-business-action-key="clear-selection"]').count(),
+    0,
+    '未选择时无需清空已选'
+  )
+  return layout
 }
 
 function assertStableDesktopLayout(
@@ -696,13 +730,13 @@ async function captureMobileActionLayout(page) {
   })
 }
 
-async function captureMobileDrawerKeys(page) {
+async function captureActionMenuKeys(page) {
   return page
-    .locator('.erp-business-selection-action-drawer__list')
+    .locator('.erp-business-selection-action-menu')
     .evaluate((list) => {
       let statusIndex = 0
       return Array.from(
-        list.querySelectorAll('.erp-business-selection-action-drawer__item')
+        list.querySelectorAll('.erp-business-selection-action-menu__item')
       ).map((item) => {
         const button = item.querySelector('button')
         const explicitKey = button?.getAttribute('data-business-action-key')
@@ -719,27 +753,22 @@ async function captureMobileDrawerKeys(page) {
     })
 }
 
-async function openMobileActionDrawer(page) {
+async function openActionMenu(page) {
   const button = page
     .locator('.erp-business-module-current-action')
     .first()
     .locator('.erp-business-selection-action-bar__compact-more')
   await button.click()
   await page
-    .locator('.erp-business-selection-action-drawer')
+    .locator('.erp-business-selection-action-menu')
     .waitFor({ state: 'visible', timeout: 10_000 })
 }
 
-async function closeMobileActionDrawer(page) {
+async function closeActionMenu(page) {
   await page.keyboard.press('Escape')
-  await page.waitForFunction(
-    () =>
-      !document
-        .querySelector('.erp-business-selection-action-drawer')
-        ?.classList.contains('ant-drawer-open'),
-    undefined,
-    { timeout: 10_000 }
-  )
+  await page
+    .locator('.erp-business-selection-action-menu')
+    .waitFor({ state: 'hidden', timeout: 10_000 })
 }
 
 async function screenshot(page, path, outputDir, fileName) {
@@ -785,6 +814,205 @@ export function createBusinessActionStabilityScenarios(deps) {
   const productionIdentity = roleIdentity('production')
 
   return [
+    {
+      name: 'purchase-order-batch-print-selection-desktop',
+      path: PURCHASE_ORDER_PATH,
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, {
+          includeSales: false,
+          includePurchase: true,
+        })
+      },
+      verify: async (page) => {
+        await waitForBusinessPage(page, '采购订单')
+        const selectableRows = page.locator(
+          '.ant-table-tbody .ant-table-row input[type="checkbox"]:not(:disabled)'
+        )
+        const selectedCount = await selectableRows.count()
+        assert.ok(selectedCount > 1)
+        assert.equal(
+          await page
+            .locator('[data-business-action-key="select-page-for-print"]')
+            .count(),
+          0
+        )
+        for (let index = 0; index < selectedCount; index += 1) {
+          await selectableRows.nth(index).check()
+        }
+        await page
+          .getByText(`已选择 ${selectedCount} 张采购订单`, { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await page
+            .locator(
+              '.ant-table-tbody .ant-table-row input[type="checkbox"]:checked'
+            )
+            .count(),
+          selectedCount
+        )
+        let printButton = page.locator(
+          '.erp-business-module-current-action [data-business-action-key="print-contract"]:visible'
+        )
+        const printActionInMenu = (await printButton.count()) === 0
+        if (printActionInMenu) await openActionMenu(page)
+        printButton = page.locator(
+          '.erp-business-module-current-action [data-business-action-key="print-contract"]:visible, .erp-business-selection-action-menu [data-business-action-key="print-contract"]:visible'
+        )
+        assert.equal(await printButton.count(), 1)
+        assert.equal(await printButton.isEnabled(), true)
+        assert.match(
+          await printButton.textContent(),
+          /批量打印合同/u
+        )
+        if (printActionInMenu) await closeActionMenu(page)
+        await assertDesktopActionState(page, assert, 'purchase-details', {
+          visible: true,
+          disabled: true,
+        })
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'purchase-order-batch-print-selection-desktop.png'
+          ),
+          fullPage: true,
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'purchase-order-batch-print-selection-desktop'
+        )
+      },
+    },
+    {
+      name: 'engineering-summary-purchase-batch-print',
+      path: `${SALES_ORDER_PATH}?sales_order_id=1103&material_request_id=5`,
+      auth: 'admin',
+      ...financeIdentity,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, { includePurchase: true })
+        const orders = Array.from({ length: 21 }, (_, index) => ({
+          ...createPurchaseOrderRows().find((order) => order.id === 1202),
+          id: 1400 + index,
+          supplier_id: 1400 + index,
+          purchase_order_no: `PO-SUMMARY-${index + 1}`,
+          currency: 'CNY',
+          item_count: 1,
+        }))
+        await page.route('**/rpc/sales_order', async (route) => {
+          const { id, method } = route.request().postDataJSON()
+          if (method !== 'get_engineering_material_request')
+            return route.fallback()
+          return fulfillRpc(route, id, {
+            id: 5,
+            sales_order_id: 1103,
+            order_no: 'SO-ACTION-ACTIVE',
+            order_status: 'active',
+            status: 'APPROVED',
+            version: 3,
+            issues: [],
+            sources: [],
+            items: [],
+            purchase_orders: orders.map((order) => ({
+              id: order.id,
+              purchase_order_no: order.purchase_order_no,
+              supplier_id: order.supplier_id,
+            })),
+          })
+        })
+        await page.route('**/rpc/purchase_order', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method === 'get_purchase_order') {
+            return fulfillRpc(route, id, {
+              purchase_order: orders.find(
+                (order) => order.id === Number(params.id)
+              ),
+            })
+          }
+          if (method === 'list_purchase_order_items') {
+            return fulfillRpc(
+              route,
+              id,
+              rpcPage(
+                [
+                  {
+                    id: Number(params.purchase_order_id),
+                    purchase_order_id: Number(params.purchase_order_id),
+                    line_no: 1,
+                    display_order: 1,
+                    material_id: 1,
+                    unit_id: 1,
+                    material_name_snapshot: '模拟缺价材料',
+                    purchased_quantity: '20',
+                    unit_price: null,
+                    amount: null,
+                    line_status: 'open',
+                  },
+                ],
+                'purchase_order_items',
+                params
+              )
+            )
+          }
+          return route.fallback()
+        })
+      },
+      verify: async (page) => {
+        const button = page.getByRole('button', {
+          name: '打印本次采购合同',
+          exact: true,
+        })
+        await button.waitFor({ state: 'visible' })
+        await installAdminRpcMocks(page.context(), {
+          baseURL: new URL(page.url()).origin,
+          adminProfileOverride: financeIdentity.adminProfile,
+          effectiveSessionOverride: financeIdentity.effectiveSession,
+        })
+        const popupPromise = page.waitForEvent('popup')
+        await button.click()
+        const popup = await popupPromise
+        try {
+          await popup
+            .getByText('共 21 份，已选 21 份', { exact: true })
+            .waitFor({ state: 'visible', timeout: 15_000 })
+          assert.equal(
+            await popup
+              .getByRole('checkbox', { name: /^选择合同 PO-SUMMARY-/u })
+              .count(),
+            21
+          )
+          assert.equal(
+            await popup
+              .locator('.erp-material-contract-batch__document')
+              .count(),
+            20
+          )
+          assert.ok((await popup.getByText(/待补：.*单价/u).count()) >= 21)
+          await popup
+            .getByRole('combobox', { name: '输出批次', exact: true })
+            .selectOption('1')
+          await popup
+            .locator('[data-purchase-order-no="PO-SUMMARY-21"]')
+            .waitFor({ state: 'visible' })
+          await assertNoHorizontalOverflow(
+            popup,
+            'engineering-summary-purchase-batch-print'
+          )
+          await popup.screenshot({
+            path: path.join(
+              outputDir,
+              'engineering-summary-purchase-batch-print.png'
+            ),
+            fullPage: true,
+          })
+          assert.match(page.url(), /material_request_id=5/u)
+        } finally {
+          await popup.close()
+        }
+      },
+    },
     {
       name: 'finance-purchase-order-read-and-print-desktop',
       path: `${SALES_ORDER_PATH}?sales_order_id=1103&material_request_id=5`,
@@ -864,7 +1092,7 @@ export function createBusinessActionStabilityScenarios(deps) {
       verify: async (page) => {
         const requestDialog = page.getByRole('dialog')
         await requestDialog
-          .getByRole('button', { name: 'PO-ACTION-APPROVED', exact: true })
+          .getByRole('link', { name: 'PO-ACTION-APPROVED', exact: true })
           .click()
         await waitForBusinessPage(page, '采购订单')
         assert.equal(
@@ -890,7 +1118,9 @@ export function createBusinessActionStabilityScenarios(deps) {
         for (const key of [
           'purchase-edit',
           'lifecycle-primary',
-          'lifecycle-more',
+          'lifecycle-normal_close',
+          'lifecycle-short_close',
+          'lifecycle-cancel',
           'generate-inbound',
         ]) {
           await assertDesktopActionState(page, assert, key, { visible: false })
@@ -983,14 +1213,29 @@ export function createBusinessActionStabilityScenarios(deps) {
               .waitFor({ state: 'visible' })
             await primaryButtons.nth(visibleCount).waitFor({ state: 'hidden' })
           }
+          await actions.evaluate(async (element) => {
+            await Promise.allSettled(
+              element
+                .getAnimations({ subtree: true })
+                .map((animation) => animation.finished)
+            )
+          })
           const name = `button-spacing-${themeMode}-${width}`
           const metrics = await assertButtonSpacing(actions, name, {
             contentSized: !compact,
           })
+          if (!compact) {
+            assert(
+              Math.max(...metrics.map((button) => button.height)) -
+                Math.min(...metrics.map((button) => button.height)) <=
+                1,
+              `${name} 同一操作区的按钮高度应一致: ${JSON.stringify(metrics)}`
+            )
+          }
           if (compact) {
             assert(
               metrics.every((button) => button.height >= 44),
-              `${name} 窄屏按钮应保留 44px 触控高度`
+              `${name} 窄屏按钮应保留 44px 触控高度: ${JSON.stringify(metrics)}`
             )
             assert(
               Math.max(...metrics.map((button) => button.top)) -
@@ -1002,13 +1247,11 @@ export function createBusinessActionStabilityScenarios(deps) {
               '.erp-business-selection-action-bar__compact-more'
             )
             await more.click()
-            const drawer = page.locator('.erp-business-selection-action-drawer')
-            await drawer.waitFor({ state: 'visible' })
-            await assertButtonSpacing(drawer, `${name}-more`)
-            await closeMobileActionDrawer(page)
-            await drawer
-              .locator('.ant-drawer-content')
-              .waitFor({ state: 'hidden' })
+            const actionMenu = page.locator('.erp-business-selection-action-menu')
+            await actionMenu.waitFor({ state: 'visible' })
+            await assertButtonSpacing(actionMenu, `${name}-more`)
+            await closeActionMenu(page)
+            await actionMenu.waitFor({ state: 'hidden' })
             const restored = await assertButtonSpacing(
               actions,
               `${name}-restored`
@@ -1027,10 +1270,10 @@ export function createBusinessActionStabilityScenarios(deps) {
 
         await page.setViewportSize({ width: 1440, height: 900 })
         await page
-          .getByRole('button', { name: '登记收付款', exact: true })
+          .getByRole('button', { name: /列顺序/u })
           .click()
         const modal = page.getByRole('dialog', {
-          name: /^登记收付款/u,
+          name: /^调整列表列顺序/u,
         })
         await modal.waitFor({ state: 'visible' })
         await modal.evaluate(async (element) => {
@@ -1043,19 +1286,13 @@ export function createBusinessActionStabilityScenarios(deps) {
           `button-spacing-${themeMode}-modal`,
           { contentSized: true }
         )
-        await modal.getByRole('button', { name: /^取\s*消$/u }).click()
+        await modal.locator('.ant-modal-close').click()
         await modal.waitFor({ state: 'hidden' })
 
         await gotoScenarioPath(page, '/erp/finance/receivables', {
           waitUntil: 'domcontentloaded',
         })
         await waitForBusinessPage(page, '应收管理')
-        await page
-          .locator(
-            '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
-          )
-          .first()
-          .click()
         const shortActions = page
           .locator('.erp-business-module-current-action')
           .first()
@@ -1063,6 +1300,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           '[data-business-action-key="finance-fact-confirm"]'
         )
         await confirm.waitFor({ state: 'visible' })
+        assert.equal(await confirm.isDisabled(), true, '未选择时确认应禁用')
         await assertButtonSpacing(
           shortActions,
           `button-spacing-${themeMode}-short`,
@@ -1096,8 +1334,7 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
       verify: async (page) => {
         await waitForBusinessPage(page, '销售订单')
-        const emptyLayout = await captureDesktopActionLayout(page)
-        assert.deepEqual(emptyLayout.keys, [])
+        const emptyLayout = await assertUnselectedActions(page, assert)
         let draftLayout = null
         for (const [status] of SALES_ORDER_STATUSES) {
           await selectBusinessRow(page, `SO-ACTION-${status.toUpperCase()}`)
@@ -1113,12 +1350,16 @@ export function createBusinessActionStabilityScenarios(deps) {
             visible: ['draft', 'active'].includes(status),
             disabled: false,
           })
-          await assertDesktopActionState(page, assert, 'lifecycle-more', {
+          await assertDesktopActionState(page, assert, 'lifecycle-cancel', {
             visible: ['draft', 'submitted', 'active'].includes(status),
             disabled: false,
           })
+          await assertDesktopActionState(page, assert, 'lifecycle-short_close', {
+            visible: status === 'active',
+            disabled: false,
+          })
           if (status === 'draft')
-            draftLayout = await captureDesktopActionLayout(page)
+            draftLayout = await captureActionLayout(page)
           await assertNoHorizontalOverflow(page, `销售订单 ${status}`)
           await screenshot(
             page,
@@ -1129,16 +1370,14 @@ export function createBusinessActionStabilityScenarios(deps) {
         }
 
         await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
-        await openMobileActionDrawer(page)
-        const lifecycleMoreButton = page.locator(
-          '.erp-business-selection-action-drawer [data-business-action-key="lifecycle-more"]'
-        )
-        await lifecycleMoreButton.click()
-        const lifecycleMenu = page
-          .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
-          .filter({ hasText: '状态变更' })
-          .last()
-        await lifecycleMenu.getByRole('menuitem', { name: /提前关闭/u }).click()
+        await openActionMenu(page)
+        await page
+          .locator('.erp-business-selection-action-menu')
+          .getByRole('button', { name: '提前关闭', exact: true })
+          .click()
+        await page.locator('.erp-business-selection-action-menu').waitFor({
+          state: 'hidden',
+        })
         const closeDialog = page.getByRole('dialog', {
           name: '确认提前关闭销售订单',
         })
@@ -1229,10 +1468,10 @@ export function createBusinessActionStabilityScenarios(deps) {
         await closeDialog.waitFor({ state: 'hidden', timeout: 5_000 })
         if (
           await page
-            .locator('.erp-business-selection-action-drawer.ant-drawer-open')
+            .locator('.erp-business-selection-action-menu:visible')
             .count()
         )
-          await closeMobileActionDrawer(page)
+          await closeActionMenu(page)
         await page.setViewportSize({ width: 1440, height: 900 })
 
         await page
@@ -1243,7 +1482,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         assertStableDesktopLayout(
           assert,
           emptyLayout,
-          await captureDesktopActionLayout(page),
+          await captureActionLayout(page),
           '销售订单清空选择恢复'
         )
         await selectBusinessRow(page, 'SO-ACTION-DRAFT')
@@ -1255,19 +1494,18 @@ export function createBusinessActionStabilityScenarios(deps) {
         await submitButton
           .locator('.ant-btn-loading-icon')
           .waitFor({ state: 'visible', timeout: 5_000 })
-        const savingLayout = await captureDesktopActionLayout(page)
+        const savingLayout = await captureActionLayout(page)
         assertStableDesktopLayout(
           assert,
           draftLayout,
           savingLayout,
           '销售订单保存中'
         )
-        for (const key of ['edit', 'lifecycle-primary']) {
-          assert.equal(
-            savingLayout.buttons.find((button) => button.key === key)?.disabled,
-            true,
-            `销售订单保存中应保留并禁用 ${key}: ${JSON.stringify(savingLayout)}`
-          )
+        for (const key of ['lifecycle-primary', 'edit']) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: true,
+            disabled: true,
+          })
         }
         assert(
           savingLayout.keys.includes('更多操作'),
@@ -1316,7 +1554,9 @@ export function createBusinessActionStabilityScenarios(deps) {
           'edit',
           'reserve-stock',
           'lifecycle-primary',
-          'lifecycle-more',
+          'lifecycle-normal_close',
+          'lifecycle-short_close',
+          'lifecycle-cancel',
         ]) {
           assert.equal(
             await actionBar
@@ -1425,7 +1665,7 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
       verify: async (page) => {
         await waitForBusinessPage(page, '采购订单')
-        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        await assertUnselectedActions(page, assert)
         for (const status of ['DRAFT', 'APPROVED', 'CLOSED']) {
           await selectBusinessRow(page, 'PO-ACTION-' + status)
           await assertDesktopActionState(page, assert, 'purchase-details', {
@@ -1444,15 +1684,19 @@ export function createBusinessActionStabilityScenarios(deps) {
             visible: status !== 'CLOSED',
             disabled: false,
           })
-          await assertDesktopActionState(page, assert, 'lifecycle-more', {
+          await assertDesktopActionState(page, assert, 'lifecycle-cancel', {
             visible: status !== 'CLOSED',
+            disabled: false,
+          })
+          await assertDesktopActionState(page, assert, 'lifecycle-short_close', {
+            visible: status === 'APPROVED',
             disabled: false,
           })
           await assertNoHorizontalOverflow(page, '采购订单 ' + status)
         }
         await gotoScenarioPath(page, PURCHASE_RECEIPT_PATH)
         await waitForBusinessPage(page, '入库管理')
-        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        await assertUnselectedActions(page, assert)
         await selectBusinessRow(page, 'PR-STYLE-L1-DRAFT')
         await assertDesktopActionState(page, assert, 'post', {
           visible: true,
@@ -1471,7 +1715,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           await assertDesktopActionState(page, assert, key, { visible: false })
         await gotoScenarioPath(page, QUALITY_INSPECTION_PATH)
         await waitForBusinessPage(page, '质量检验')
-        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        await assertUnselectedActions(page, assert)
         for (const status of ['DRAFT', 'SUBMITTED', 'CANCELLED']) {
           await selectBusinessRow(page, 'QI-ACTION-' + status)
           await assertDesktopActionState(page, assert, 'submit', {
@@ -1499,7 +1743,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         })
         await gotoScenarioPath(page, SHIPMENT_PATH)
         await waitForBusinessPage(page, '出货单')
-        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        await assertUnselectedActions(page, assert)
         await selectBusinessRow(page, 'SHIP-ACTION-CANCELLED')
         for (const key of [
           'shipment-edit',
@@ -1531,10 +1775,23 @@ export function createBusinessActionStabilityScenarios(deps) {
           includeSales: false,
           includeFinance: true,
         })
+        await page.route('**/rpc/customer_config', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON() || {}
+          if (method !== 'get_finance_payment_approval_process') {
+            await route.fallback()
+            return
+          }
+          await fulfillRpc(route, id, {
+            source_readback: createFinancePaymentRows().find(
+              (row) => row.id === Number(params.finance_payment_id)
+            ),
+            process_context: null,
+          })
+        })
       },
       verify: async (page) => {
         await waitForBusinessPage(page, '收付款与核销')
-        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        await assertUnselectedActions(page, assert)
         const states = {
           DRAFT: {
             allocation: true,
@@ -1566,16 +1823,26 @@ export function createBusinessActionStabilityScenarios(deps) {
           })
           await assertNoHorizontalOverflow(page, '收付款 ' + status)
         }
-        await page
-          .locator('[data-business-action-key="clear-selection"]')
-          .click()
-        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-finance-none-desktop.png'
-        )
+        await selectBusinessRow(page, 'PAY-ACTION-DRAFT')
+        if ((await page.locator('[data-business-action-key="payment-cancel"]').count()) === 0) {
+          await openActionMenu(page)
+        }
+        await page.locator('[data-business-action-key="payment-cancel"]').click()
+        const cancelDialog = page.getByRole('dialog').filter({ hasText: '取消收付款' }).last()
+        await assertBusinessModalViewport(page, cancelDialog, { label: 'finance-cancel-compact', maxWidth: 480 })
+        await page.screenshot({ path: path.join(outputDir, 'finance-cancel-compact.png'), fullPage: true })
+        const reason = cancelDialog.getByRole('textbox')
+        await reason.fill('模拟取消原因'.repeat(30))
+        assert.ok((await reason.boundingBox()).width > 350, '简短确认中的原因应占满可用正文宽度')
+        await page.setViewportSize({ width: 390, height: 600 })
+        await assertBusinessModalViewport(page, cancelDialog, { label: 'finance-cancel-narrow', maxWidth: 480 })
+        await page.screenshot({ path: path.join(outputDir, 'finance-cancel-narrow.png'), fullPage: true })
+        await cancelDialog.getByRole('button', { name: /^返\s*回$/u }).click()
+        await cancelDialog.waitFor({ state: 'hidden' })
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await page.locator('[data-business-action-key="clear-selection"]').click()
+        await assertUnselectedActions(page, assert)
+        await screenshot(page, path, outputDir, 'business-action-stability-finance-none-desktop.png')
       },
     },
     {
@@ -1643,7 +1910,7 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
       verify: async (page) => {
         await waitForBusinessPage(page, '出货单')
-        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        await assertUnselectedActions(page, assert)
         for (const [suffix, visible, disabled] of [
           ['DRAFT', true, true],
           ['DRAFT-APPROVED', true, false],
@@ -1694,7 +1961,7 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
       verify: async (page) => {
         await waitForBusinessPage(page, '生产异常处置')
-        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        await assertUnselectedActions(page, assert)
         const cases = {
           'SUBMITTED-SCRAP': {
             approval: false,
@@ -1754,18 +2021,22 @@ export function createBusinessActionStabilityScenarios(deps) {
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
-        assert.deepEqual((await captureDesktopActionLayout(page)).keys, [])
+        await assertUnselectedActions(page, assert)
         await selectBusinessRow(page, 'SO-ACTION-DRAFT')
         assert.deepEqual((await captureMobileActionLayout(page)).visible, [
           'lifecycle-primary',
         ])
-        await openMobileActionDrawer(page)
-        const draftKeys = await captureMobileDrawerKeys(page)
+        await openActionMenu(page)
+        const draftKeys = await captureActionMenuKeys(page)
         assert(draftKeys.includes('edit'))
         assert(draftKeys.includes('reserve-stock'))
-        assert(draftKeys.includes('lifecycle-more'))
+        assert(draftKeys.includes('lifecycle-cancel'))
+        assert.equal(
+          await page.getByRole('button', { name: /其他状态操作/u }).count(),
+          0
+        )
         const reserve = page.locator(
-          '.erp-business-selection-action-drawer [data-business-action-key="reserve-stock"]'
+          '.erp-business-selection-action-menu [data-business-action-key="reserve-stock"]'
         )
         assert.equal(await reserve.isDisabled(), true)
         await reserve.evaluate((button) => button.parentElement.focus())
@@ -1773,7 +2044,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           .getByRole('tooltip')
           .filter({ hasText: '销售订单生效后可预留库存' })
           .waitFor({ state: 'visible' })
-        await closeMobileActionDrawer(page)
+        await closeActionMenu(page)
         await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
         assert.deepEqual((await captureMobileActionLayout(page)).visible, [
           'lifecycle-primary',
@@ -1788,7 +2059,9 @@ export function createBusinessActionStabilityScenarios(deps) {
           'edit',
           'reserve-stock',
           'lifecycle-primary',
-          'lifecycle-more',
+          'lifecycle-normal_close',
+          'lifecycle-short_close',
+          'lifecycle-cancel',
         ])
           await assertDesktopActionState(page, assert, key, { visible: false })
         await assertDesktopActionState(page, assert, 'view-details', {

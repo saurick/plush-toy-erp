@@ -1917,7 +1917,7 @@ export default function FinancePaymentsPage() {
         title="选择核销记录"
         description="本次核销合计必须精确等于收付款金额，且每笔不得超过来源记录的当前未核销金额。"
         open={allocationOpen}
-        width={860}
+        size="localAction"
         okText="过账并核销"
         cancelText="取消"
         confirmLoading={loading}
@@ -1989,6 +1989,7 @@ export default function FinancePaymentsPage() {
 
       <BusinessFormModal
         title="取消收付款"
+        size="confirm"
         description="取消不会删除收付款记录；已发生的流程效果仍保留恢复审计。"
         open={cancelOpen}
         okText="确认取消"
@@ -2024,6 +2025,7 @@ export default function FinancePaymentsPage() {
 
       <BusinessFormModal
         title="冲销收付款"
+        size="confirm"
         description="冲销会恢复原核销金额并保留原收付款及核销记录。"
         open={reverseOpen}
         okText="确认冲销"
@@ -2054,7 +2056,7 @@ export default function FinancePaymentsPage() {
       <CreditEditor
         {...(isCreatingCredit
           ? { form: creditForm }
-          : { width: 720, cancelText: '取消' })}
+          : { size: 'localAction', cancelText: '取消' })}
         title={creditOpen === 'reverse' ? '冲销红冲记录' : '登记红冲'}
         description={
           creditOpen === 'reverse'

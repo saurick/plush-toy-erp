@@ -74,7 +74,7 @@ export default function WarehouseSettingsModal({ open, onCancel, onSaved }) {
       onOk={save}
       okText={editingID ? '保存修改' : '新增仓库'}
       confirmLoading={busy}
-      width={880}
+      size="recordDetails"
     >
       {error ? (
         <Alert

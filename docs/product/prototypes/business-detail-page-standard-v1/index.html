@@ -394,6 +394,17 @@
         margin: 0;
       }
 
+      #itemsPageSize {
+        width: 112px;
+        height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 8px;
+        font: inherit;
+      }
+
       .pagination button {
         min-width: 34px;
         padding: 0 8px;
@@ -419,6 +430,24 @@
         margin-right: auto;
         color: var(--muted);
         font-size: 13px;
+      }
+
+      @media (max-width: 575px) {
+        .modal-foot {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 10px 12px;
+        }
+
+        #itemsPageSize,
+        #closeDetails {
+          grid-column: 2;
+        }
+
+        #itemsPagination {
+          grid-column: 1;
+          justify-self: start;
+        }
       }
 
       @media (prefers-color-scheme: dark) {
@@ -577,6 +606,11 @@
 
       <footer class="modal-foot">
         <span id="itemsTotal"></span>
+        <select id="itemsPageSize" aria-label="每页明细条数">
+          <option value="10">10 条/页</option>
+          <option value="20">20 条/页</option>
+          <option value="50">50 条/页</option>
+        </select>
         <nav id="itemsPagination" class="pagination" aria-label="明细分页"></nav>
         <button id="closeDetails" type="button">关闭</button>
       </footer>
@@ -591,8 +625,10 @@
       const itemsTitle = document.querySelector("#itemsTitle");
       const itemsTotal = document.querySelector("#itemsTotal");
       const itemsPagination = document.querySelector("#itemsPagination");
+      const itemsPageSize = document.querySelector("#itemsPageSize");
       let currentState = "items";
       let currentPage = 1;
+      let pageSize = 10;
 
       const items = Array.from({ length: 12 }, (_, index) => ({
         name: index % 2 ? "云朵小熊" : "星星挂件",
@@ -621,6 +657,8 @@
         itemsTitle.textContent = `完整明细（共 ${currentState === "empty" ? 0 : items.length} 条）`;
         itemsTotal.textContent = currentState === "items" ? `共 ${items.length} 条` : currentState === "empty" ? "共 0 条" : "";
         itemsPagination.innerHTML = "";
+        itemsPageSize.hidden = currentState !== "items" && currentState !== "empty";
+        itemsPageSize.disabled = currentState === "empty";
         if (currentState === "loading") {
           itemsRegion.innerHTML = '<div class="state-box"><div><div class="spinner" aria-hidden="true"></div><strong>正在加载明细…</strong></div></div>';
           return;
@@ -639,16 +677,17 @@
           });
           return;
         }
-        if (currentState === "empty") {
-          itemsRegion.innerHTML = '<div class="state-box"><div><strong>当前记录暂无明细</strong><p>详情仍保持只读，不在这里新增明细。</p></div></div>';
-          return;
-        }
-        const start = (currentPage - 1) * 10;
-        const pageItems = items.slice(start, start + 10);
-        itemsRegion.innerHTML = `<div class="items">${pageItems.map((item, index) => itemCard(item, start + index)).join("")}</div>`;
+        const total = currentState === "empty" ? 0 : items.length;
+        const pageCount = Math.max(1, Math.ceil(total / pageSize));
+        const start = (currentPage - 1) * pageSize;
+        const pageItems = items.slice(start, start + pageSize);
+        itemsRegion.innerHTML = total === 0
+          ? '<div class="state-box"><div><strong>当前记录暂无明细</strong><p>详情仍保持只读，不在这里新增明细。</p></div></div>'
+          : `<div class="items">${pageItems.map((item, index) => itemCard(item, start + index)).join("")}</div>`;
         itemsPagination.innerHTML = `
-            <button type="button" data-page="1" aria-current="${currentPage === 1 ? "page" : "false"}">1</button>
-            <button type="button" data-page="2" aria-current="${currentPage === 2 ? "page" : "false"}">2</button>
+            <button type="button" data-page="${currentPage - 1}" aria-label="上一页" ${currentPage === 1 ? "disabled" : ""}>‹</button>
+            ${Array.from({ length: pageCount }, (_, index) => `<button type="button" data-page="${index + 1}" ${total === 0 ? "disabled" : ""} aria-current="${currentPage === index + 1 ? "page" : "false"}">${index + 1}</button>`).join("")}
+            <button type="button" data-page="${currentPage + 1}" aria-label="下一页" ${currentPage === pageCount ? "disabled" : ""}>›</button>
           `;
         itemsPagination.querySelectorAll("[data-page]").forEach((button) => {
           button.addEventListener("click", () => {
@@ -665,6 +704,10 @@
 
       function openDialog() {
         if (dialog.open) return;
+        currentPage = 1;
+        pageSize = 10;
+        itemsPageSize.value = "10";
+        renderItems();
         dialog.showModal();
         requestAnimationFrame(() => document.querySelector("#closeIcon").focus({ preventScroll: true }));
       }
@@ -674,6 +717,12 @@
       }
 
       openButton.addEventListener("click", openDialog);
+      itemsPageSize.addEventListener("change", () => {
+        pageSize = Number(itemsPageSize.value);
+        currentPage = 1;
+        renderItems();
+        itemsTitle.scrollIntoView({ block: "start" });
+      });
       closeButtons.forEach((button) => button.addEventListener("click", closeDialog));
       dialog.addEventListener("close", () => requestAnimationFrame(() => openButton.focus({ preventScroll: true })));
       stateButtons.forEach((button) => button.addEventListener("click", () => {

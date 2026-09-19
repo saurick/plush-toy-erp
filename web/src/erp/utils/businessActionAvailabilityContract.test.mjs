@@ -137,7 +137,7 @@ test('业务动作可用性：状态不适用原因优先于保存中，避免�
   )
 })
 
-test('生命周期动作槽：主动作随合法阶段变化，未选中和终态没有空动作', () => {
+test('生命周期动作槽：未选择展示有权限的禁用入口，选中后随合法阶段变化', () => {
   const actions = [
     { key: 'submit', label: '提交', permission: 'order.submit' },
     { key: 'close', label: '关闭', permission: 'order.close' },
@@ -172,17 +172,13 @@ test('生命周期动作槽：主动作随合法阶段变化，未选中和终�
   assert.equal(closed.hasCapability, true)
   assert.equal(empty.hasCapability, true)
   assert.equal(draft.showPrimarySlot, true)
-  assert.equal(draft.showMoreSlot, true)
   assert.equal(active.showPrimarySlot, true)
-  assert.equal(active.showMoreSlot, true)
   assert.equal(closed.showPrimarySlot, false)
-  assert.equal(closed.showMoreSlot, false)
-  assert.equal(empty.showPrimarySlot, false)
-  assert.equal(empty.showMoreSlot, false)
+  assert.equal(empty.showPrimarySlot, true)
   assert.equal(draft.primaryAction.key, 'submit')
   assert.equal(active.primaryAction.key, 'close')
   assert.equal(closed.primaryAction, null)
-  assert.equal(empty.primaryAction, null)
+  assert.equal(empty.primaryAction.key, 'submit')
   assert.deepEqual(empty.availableActions, [])
   assert.deepEqual(
     draft.secondaryActions.map((action) => action.key),
@@ -198,7 +194,7 @@ test('生命周期动作槽：主动作随合法阶段变化，未选中和终�
   )
   assert.deepEqual(
     empty.secondaryActions.map((action) => action.key),
-    []
+    ['close', 'cancel']
   )
   for (const state of [draft, active, closed, empty]) {
     assert.deepEqual(
@@ -269,7 +265,6 @@ test('生命周期动作槽：所有角色按能力裁剪，未选择也不泄�
   })
   assert.equal(hidden.hasCapability, false)
   assert.equal(hidden.showPrimarySlot, false)
-  assert.equal(hidden.showMoreSlot, false)
   assert.equal(hidden.primaryAction, null)
   assert.deepEqual(hidden.secondaryActions, [])
 
@@ -281,7 +276,6 @@ test('生命周期动作槽：所有角色按能力裁剪，未选择也不泄�
   })
   assert.equal(cancelOnly.hasCapability, true)
   assert.equal(cancelOnly.showPrimarySlot, false)
-  assert.equal(cancelOnly.showMoreSlot, true)
   assert.equal(cancelOnly.primaryAction, null)
   assert.deepEqual(
     cancelOnly.secondaryActions.map((action) => action.key),
@@ -296,12 +290,11 @@ test('生命周期动作槽：所有角色按能力裁剪，未选择也不泄�
   })
   assert.equal(unselectedCancelOnly.hasCapability, true)
   assert.equal(unselectedCancelOnly.showPrimarySlot, false)
-  assert.equal(unselectedCancelOnly.showMoreSlot, false)
   assert.equal(unselectedCancelOnly.primaryAction, null)
   assert.deepEqual(unselectedCancelOnly.availableActions, [])
   assert.deepEqual(
     unselectedCancelOnly.secondaryActions.map((action) => action.key),
-    []
+    ['cancel']
   )
 
   const unselectedSubmitOnly = resolveBusinessLifecycleActions({
@@ -310,13 +303,12 @@ test('生命周期动作槽：所有角色按能力裁剪，未选择也不泄�
     hasPermission: (action) => action.key === 'submit',
     canRun: () => false,
   })
-  assert.equal(unselectedSubmitOnly.showPrimarySlot, false)
-  assert.equal(unselectedSubmitOnly.showMoreSlot, false)
-  assert.equal(unselectedSubmitOnly.primaryAction, null)
+  assert.equal(unselectedSubmitOnly.showPrimarySlot, true)
+  assert.equal(unselectedSubmitOnly.primaryAction.key, 'submit')
   assert.deepEqual(unselectedSubmitOnly.secondaryActions, [])
 })
 
-test('九个岗位仅展示已授权且可办理的生命周期动作，终态与未选择均不占位', () => {
+test('九个岗位未选择时展示已授权的禁用动作，选中后仅展示合法生命周期动作', () => {
   const actions = [
     ...new Set(
       yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.capabilityKeys)
@@ -354,13 +346,23 @@ test('九个岗位仅展示已授权且可办理的生命周期动作，终态�
       `${role.roleKey} 终态记录不得改变动作目录`
     )
     assert.equal(available.primaryAction?.key, authorizedKeys[0])
-    assert.equal(empty.primaryAction, null)
+    assert.equal(empty.primaryAction?.key, authorizedKeys[0])
     assert.equal(terminal.primaryAction, null)
     assert.deepEqual(terminal.secondaryActions, [])
-    assert.deepEqual(empty.secondaryActions, [])
     assert.deepEqual(
-      terminal.secondaryActions.map((action) => action.key),
-      empty.secondaryActions.map((action) => action.key)
+      empty.secondaryActions.map((action) => action.key),
+      authorizedKeys.slice(1)
+    )
+    assert.deepEqual(empty.availableActions, [])
+    assert.deepEqual(Object.keys(empty.actionStates), authorizedKeys)
+    assert(
+      Object.values(empty.actionStates).every(
+        (state) =>
+          !state.available &&
+          state.disabled &&
+          state.disabledReason === `请先选择 ${role.displayName} 待办理记录`
+      ),
+      `${role.roleKey} 未选择记录时入口应可发现，但不能办理`
     )
     assert(
       Object.values(terminal.actionStates).every(

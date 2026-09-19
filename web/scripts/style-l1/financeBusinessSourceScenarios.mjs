@@ -1,6 +1,7 @@
 import path from 'node:path'
 
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { assertBusinessModalViewport } from './modalAssertions.mjs'
 
 export function createFinanceBusinessSourceScenarios(deps) {
   const {
@@ -33,9 +34,9 @@ export function createFinanceBusinessSourceScenarios(deps) {
     const more = page.getByRole('button', { name: /更多操作/u }).last()
     await more.waitFor({ state: 'visible', timeout: 10_000 })
     await more.click()
-    const drawer = page.locator('.erp-business-selection-action-drawer')
-    await drawer.waitFor({ state: 'visible', timeout: 10_000 })
-    await drawer.getByRole('button', { name: actionName, exact: true }).click()
+    const actionMenu = page.locator('.erp-business-selection-action-menu')
+    await actionMenu.waitFor({ state: 'visible', timeout: 10_000 })
+    await actionMenu.getByRole('button', { name: actionName, exact: true }).click()
   }
 
   const assertFinanceSourceModal = async (
@@ -919,6 +920,10 @@ export function createFinanceBusinessSourceScenarios(deps) {
           reconciliation: true,
         })
         await modal.getByLabel('备注').fill('客户应收单笔核对')
+        await assertBusinessModalViewport(page, modal, {
+          label: 'finance-source-local-form-narrow',
+          maxWidth: 860,
+        })
         await modal.getByRole('button', { name: '生成核对草稿' }).click()
         await expectText(page, '单笔核对草稿已生成，请到对账管理核对并确认')
         await modal.waitFor({ state: 'hidden', timeout: 10_000 })

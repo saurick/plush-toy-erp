@@ -6,8 +6,9 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Checkbox, Input, Modal } from 'antd'
+import { Checkbox, Input } from 'antd'
 import { DeleteOutlined, DragOutlined } from '@ant-design/icons'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { PrintToolButton } from './PrintWorkspaceTools.jsx'
 import {
@@ -841,10 +842,10 @@ export default function WorkInstructionImageAnnotationEditor({
   }
 
   return (
-    <Modal
+    <BusinessModal
       open={open}
       title="图片标注"
-      width="min(1120px, calc(100vw - 32px))"
+      size="recordDetails"
       className="erp-work-instruction-annotation-modal"
       rootClassName="erp-work-instruction-annotation-modal-root"
       data-work-instruction-annotation-editor="true"
@@ -1249,6 +1250,6 @@ export default function WorkInstructionImageAnnotationEditor({
           ) : null}
         </aside>
       </div>
-    </Modal>
+    </BusinessModal>
   )
 }

@@ -1,16 +1,8 @@
 import React from 'react'
-import { Modal } from 'antd'
-import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
+import BusinessModal from './BusinessModal.jsx'
 
 function joinClassNames(...parts) {
   return parts.filter(Boolean).join(' ')
-}
-
-function resolveWidth(size, width) {
-  if (width) return width
-  if (size === 'masterData') return ERP_MODAL_WIDTHS.masterDataForm
-  if (size === 'masterDataItems') return ERP_MODAL_WIDTHS.masterDataItemsForm
-  return ERP_MODAL_WIDTHS.businessForm
 }
 
 function findLatestVisibleBusinessFormModal() {
@@ -108,7 +100,7 @@ export default function BusinessFormModal({
   description,
   icon,
   title,
-  size = 'business',
+  size = 'localAction',
   width,
   centered = true,
   maskClosable = false,
@@ -163,7 +155,7 @@ export default function BusinessFormModal({
   }, [open])
 
   return (
-    <Modal
+    <BusinessModal
       {...modalProps}
       open={open}
       afterOpenChange={handleAfterOpenChange}
@@ -172,12 +164,13 @@ export default function BusinessFormModal({
         'erp-business-action-modal--form',
         className
       )}
-      width={resolveWidth(size, width)}
+      size={size}
+      width={width}
       title={modalTitle}
       centered={centered}
       maskClosable={maskClosable}
     >
       {children}
-    </Modal>
+    </BusinessModal>
   )
 }

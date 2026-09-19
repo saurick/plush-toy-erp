@@ -125,6 +125,7 @@ export default function SalesOrderEngineeringModal({
   }
   return (
     <BusinessFormModal
+      size="recordDetails"
       title={`工程与打样${context?.order?.order_no ? ` · ${context.order.order_no}` : ''}`}
       description="先关联工程产品和 BOM，产品主图及物料齐备后开始打样，确认样品时填写结果。"
       open={Boolean(orderID)}

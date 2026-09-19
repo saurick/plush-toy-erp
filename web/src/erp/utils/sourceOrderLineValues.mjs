@@ -87,7 +87,8 @@ function buildOutsourcingOrderItemSourceValuesFromProduct(
   return {
     ...resetValues,
     product_id: Number(product.id || 0) || undefined,
-    product_no_snapshot: trimOptional(product.code) || '',
+    product_no_snapshot:
+      trimOptional(product.style_no) || trimOptional(product.code) || '',
     product_name_snapshot: trimOptional(product.name) || '',
     unit_id: Number(product.default_unit_id || 0) || undefined,
     unit_name_snapshot: trimOptional(unit.name) || '',

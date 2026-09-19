@@ -638,11 +638,11 @@ test('devPrototypes: 业务详情样板只承接共享只读 Modal', () => {
   assert.match(html, /data-state="empty"/u)
   assert.match(html, /data-state="loading"/u)
   assert.match(html, /data-state="error"/u)
-  assert.match(html, /items\.slice\(start, start \+ 10\)/u)
+  assert.match(html, /items\.slice\(start, start \+ pageSize\)/u)
   assert.match(html, /data-retry/u)
   assert.match(
     html,
-    /<footer class="modal-foot">\s*<span id="itemsTotal"><\/span>\s*<nav id="itemsPagination"[^>]*><\/nav>\s*<button id="closeDetails"/u
+    /<footer class="modal-foot">\s*<span id="itemsTotal"><\/span>\s*<select id="itemsPageSize"[\s\S]*?<\/select>\s*<nav id="itemsPagination"[^>]*><\/nav>\s*<button id="closeDetails"/u
   )
   assert.doesNotMatch(html, /Workflow|Fact|协同动作|事实动作/u)
 })

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Alert, Form, Input, Modal, Select } from 'antd'
+import { Alert, Form, Input, Select } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
@@ -101,7 +102,8 @@ export default function ProductionExceptionRequestModal({
     }
   }
   return (
-    <Modal
+    <BusinessModal
+      size="localAction"
       title="提交生产异常申请"
       open={open}
       confirmLoading={loading}
@@ -155,6 +157,6 @@ export default function ProductionExceptionRequestModal({
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
       </Form>
-    </Modal>
+    </BusinessModal>
   )
 }

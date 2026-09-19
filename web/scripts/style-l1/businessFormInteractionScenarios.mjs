@@ -1,7 +1,9 @@
+import { verifyPurchaseArrivalRedesign } from './purchaseArrivalRedesignScenarios.mjs'
 import { Buffer } from 'node:buffer'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
+import { assertBusinessModalViewport } from './modalAssertions.mjs'
 
 export function createBusinessFormInteractionScenarios({
   customerRuntimeEffectiveSession,
@@ -129,7 +131,7 @@ export function createBusinessFormInteractionScenarios({
       `${scenarioName} 当前操作区不应横向溢出: ${JSON.stringify(metrics)}`
     )
     assert.equal(
-      await page.locator('.erp-business-selection-action-drawer').count(),
+      await page.locator('.erp-business-selection-action-menu').count(),
       0,
       `${scenarioName} 更多操作面板默认必须关闭`
     )
@@ -138,30 +140,25 @@ export function createBusinessFormInteractionScenarios({
       name: /更多操作/u,
     })
     await moreButton.click()
-    const drawer = page.locator('.erp-business-selection-action-drawer')
-    await drawer.waitFor({ state: 'visible', timeout: 10_000 })
+    const actionMenu = page.locator('.erp-business-selection-action-menu')
+    await actionMenu.waitFor({ state: 'visible', timeout: 10_000 })
     await page.waitForFunction(
       () => {
-        const drawerNode = document.querySelector(
-          '.erp-business-selection-action-drawer'
+        const menuNode = document.querySelector(
+          '.erp-business-selection-action-menu'
         )
         return (
-          drawerNode?.contains(document.activeElement) &&
-          document.activeElement?.matches('button:not(:disabled)')
+          menuNode?.contains(document.activeElement) &&
+          document.activeElement?.matches(
+            'button:not(:disabled), .erp-business-action-tooltip-anchor[tabindex="0"]'
+          )
         )
       },
       undefined,
       { timeout: 10_000 }
     )
     await page.keyboard.press('Escape')
-    await page.waitForFunction(
-      () =>
-        !document
-          .querySelector('.erp-business-selection-action-drawer')
-          ?.classList.contains('ant-drawer-open'),
-      undefined,
-      { timeout: 10_000 }
-    )
+    await actionMenu.waitFor({ state: 'hidden', timeout: 10_000 })
     await page.waitForFunction(
       (selector) => document.activeElement?.matches(selector),
       '.erp-business-selection-action-bar__compact-more',
@@ -751,44 +748,7 @@ export function createBusinessFormInteractionScenarios({
           })
         })
       },
-      verify: async (page) => {
-        await expectHeading(page, '采购订单')
-        const purchaseOrderRow = page
-          .locator('.erp-business-data-table-card .ant-table-tbody tr')
-          .filter({ hasText: 'PO-STYLE-L1' })
-          .first()
-        await purchaseOrderRow.click()
-        await expectButton(page, '登记到货')
-        await page.getByRole('button', { name: '登记到货' }).click()
-        const modal = page
-          .locator('.ant-modal')
-          .filter({ hasText: '登记采购到货' })
-          .last()
-        await modal.waitFor({ state: 'visible', timeout: 10_000 })
-        await expectText(page, '来源采购订单：PO-STYLE-L1')
-        await assertTextAbsent(page, '来源采购订单：1')
-        await expectText(page, '入库单号')
-        await expectText(page, '入库仓库')
-        await expectText(page, '入库日期')
-        await expectText(page, '备注')
-        for (const columnTitle of [
-          '已过账入库',
-          '草稿占用',
-          '剩余可收',
-          '剩余可生成',
-          '本次生成',
-          '不可生成原因',
-        ]) {
-          await expectText(page, columnTitle)
-        }
-        await expectText(page, '12.999997 件')
-        await expectText(page, '现有入库草稿占用超过剩余可收数量，请先处理草稿')
-        await assertTextAbsent(page, 'purchase_order_item_id')
-        await assertNoHorizontalOverflow(
-          page,
-          'purchase-order-inbound-draft-modal-controls-desktop'
-        )
-      },
+      verify: async (page) => verifyPurchaseArrivalRedesign(page, { outputDir }),
     },
     {
       name: 'processing-contract-form-modal-title-desktop',
@@ -1399,6 +1359,10 @@ export function createBusinessFormInteractionScenarios({
           .waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '保存和过账时都会重新核对账面数量')
         await expectText(page, '盘点期间库存变化时')
+        await assertBusinessModalViewport(page, page.getByRole('dialog'), {
+          label: 'inventory-local-form-dark',
+          maxWidth: 860,
+        })
         await page.screenshot({
           path: path.join(
             outputDir,

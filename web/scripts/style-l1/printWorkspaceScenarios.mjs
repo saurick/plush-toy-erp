@@ -1,4 +1,9 @@
 import { Buffer } from 'node:buffer'
+import {
+  buildMaterialPurchaseContractBatchDraft,
+  groupMaterialPurchaseContracts,
+} from '../../src/erp/utils/materialPurchaseContractBatch.mjs'
+import { buildMaterialPurchaseContractBusinessDraft } from '../../src/erp/utils/materialPurchaseContractEditor.mjs'
 import { assertPrintTemplateGuide } from './printTemplateGuideAssertions.mjs'
 import { createMaterialDetailInteractionScenario } from './materialDetailInteractionScenario.mjs'
 import { createColorCardInteractionScenario } from './colorCardInteractionScenario.mjs'
@@ -2024,6 +2029,444 @@ export function createPrintWorkspaceScenarios({
             '.erp-processing-contract-table tbody tr:not(.erp-processing-contract-table__total)',
           selectedRowSelector: '.erp-processing-contract-table__row--selected',
           counterLabel: '加工明细行',
+        })
+      },
+    },
+    {
+      name: 'print-workspace-material-supplier-group',
+      path: '/erp/print-workspace/material-purchase-contract?source=business&state=material-supplier-group-l1',
+      auth: 'admin',
+      viewport: { width: 1600, height: 1100 },
+      beforeNavigate: async (page) => {
+        const draft = buildMaterialPurchaseContractBatchDraft(
+          groupMaterialPurchaseContracts(
+            Array.from({ length: 4 }, (_, index) => ({
+              record: {
+                id: index + 1,
+                supplier_id: 8,
+                purchase_order_no: `PO-GROUP-${index + 1}`,
+                currency: 'CNY',
+                payment_term_days: index === 3 ? 30 : 45,
+              },
+              draft: buildMaterialPurchaseContractBusinessDraft({
+                contractNo: `PO-GROUP-${index + 1}`,
+                supplierName: '示例布行',
+                buyerCompany: '示例采购方',
+                lines: [
+                  {
+                    contractNo: `PO-GROUP-${index + 1}`,
+                    productOrderNo: `SO-GROUP-${index + 1}`,
+                    materialName: '来源材料',
+                    unit: index === 2 ? '米' : '件',
+                    quantity: '10',
+                    unitPrice: index === 0 ? '' : '1',
+                  },
+                ],
+              }),
+            }))
+          )
+        )
+        await page.addInitScript((initial) => {
+          if (sessionStorage.getItem('material-supplier-group-loaded')) return
+          sessionStorage.setItem('material-supplier-group-loaded', 'true')
+          window.name = `__plush_erp_print_initial_draft__:${JSON.stringify({ version: 1, templateKey: 'material-purchase-contract', stateID: 'material-supplier-group-l1', draft: initial })}`
+        }, draft)
+      },
+      verify: async (page) => {
+        await page
+          .getByText('共 2 份，已选 2 份', { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await page.getByText('付款条件不同，已分开', { exact: true }).count(),
+          2
+        )
+        await page
+          .getByText('3 张采购单', { exact: true })
+          .waitFor({ state: 'visible' })
+        const group = page.locator('[data-purchase-order-ids="1,2,3"]')
+        const rows = group.locator(
+          '.erp-material-contract-table tbody tr:not(.erp-material-contract-table__total)'
+        )
+        assert.equal(await rows.count(), 3)
+        for (let index = 0; index < 3; index += 1) {
+          assert.match(
+            await rows.nth(index).innerText(),
+            new RegExp(`PO-GROUP-${index + 1}`, 'u')
+          )
+          assert.match(
+            await rows.nth(index).innerText(),
+            new RegExp(`SO-GROUP-${index + 1}`, 'u')
+          )
+        }
+        const price = rows
+          .first()
+          .locator('td')
+          .nth(8)
+          .locator('[contenteditable="true"]')
+        await price.fill('2.50')
+        await price.press('Tab')
+        await page
+          .getByRole('checkbox', { name: '选择合同 PO-GROUP-4', exact: true })
+          .uncheck()
+        await page
+          .getByText('本窗口内容已保存', { exact: true })
+          .waitFor({ state: 'visible' })
+        await page.reload()
+        await page
+          .getByText('共 2 份，已选 1 份', { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await page.locator('.erp-material-contract-batch__document').count(),
+          1
+        )
+        assert.equal(Number(await price.innerText()), 2.5)
+        const totals = group.locator(
+          '.erp-material-contract-table__total .erp-contract-table__total-value'
+        )
+        assert.equal((await totals.nth(0).innerText()).trim(), '')
+        assert.equal((await totals.nth(1).innerText()).trim(), '45.00')
+        await assertNoHorizontalOverflow(
+          page,
+          'print-workspace-material-supplier-group'
+        )
+        await page.emulateMedia({ media: 'print' })
+        const printGeometry = await group.locator('.erp-material-contract-paper').evaluate((element) => ({
+          minHeight: getComputedStyle(element).minHeight,
+          paddingBottom: getComputedStyle(element).paddingBottom,
+        }))
+        assert.deepEqual(printGeometry, { minHeight: '0px', paddingBottom: '0px' })
+        await page.emulateMedia({ media: 'screen' })
+        const payloads = []
+        const capture = (request) => {
+          if (request.url().includes('/templates/render-pdf'))
+            payloads.push(request.postDataJSON())
+        }
+        page.on('request', capture)
+        try {
+          await assertPrintPreviewPopup(page, {
+            buttonName: '在线预览 PDF',
+            title: '采购合同批量 PDF 预览',
+            screenshotName: 'print-workspace-material-supplier-group-preview',
+          })
+        } finally {
+          page.off('request', capture)
+        }
+        assert.equal(payloads.length, 1)
+        for (let index = 1; index <= 3; index += 1)
+          assert.match(payloads[0].html, new RegExp(`PO-GROUP-${index}`, 'u'))
+        assert.doesNotMatch(payloads[0].html, /PO-GROUP-4/u)
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'print-workspace-material-supplier-group.png'
+          ),
+          fullPage: true,
+        })
+      },
+    },
+    {
+      name: 'print-workspace-material-purchase-batch',
+      path: '/erp/print-workspace/material-purchase-contract?source=business&state=material-purchase-batch-l1',
+      auth: 'admin',
+      viewport: { width: 1600, height: 1100 },
+      beforeNavigate: async (page) => {
+        const initialDraft = {
+          kind: 'material-purchase-contract-batch',
+          version: 1,
+          contracts: [
+            {
+              purchaseOrderID: 1201,
+              orderNo: 'PO-BATCH-001',
+              supplierName: '同一批量供应商',
+              draft: {
+                contractNo: 'PO-BATCH-001',
+                supplierName: '同一批量供应商',
+                buyerCompany: '批量采购方',
+                lines: [
+                  {
+                    materialName: '批量材料一',
+                    quantity: '20',
+                    unitPrice: '1.25',
+                  },
+                ],
+              },
+            },
+            {
+              purchaseOrderID: 1202,
+              orderNo: 'PO-BATCH-002',
+              supplierName: '同一批量供应商',
+              draft: {
+                contractNo: 'PO-BATCH-002',
+                supplierName: '同一批量供应商',
+                buyerCompany: '批量采购方',
+                lines: [
+                  {
+                    materialName: '批量材料二',
+                    quantity: '30',
+                    unitPrice: '',
+                  },
+                ],
+              },
+            },
+          ],
+        }
+        await page.addInitScript((draft) => {
+          if (sessionStorage.getItem('material-purchase-batch-l1-loaded'))
+            return
+          sessionStorage.setItem('material-purchase-batch-l1-loaded', 'true')
+          window.name = `__plush_erp_print_initial_draft__:${JSON.stringify({
+            version: 1,
+            templateKey: 'material-purchase-contract',
+            stateID: 'material-purchase-batch-l1',
+            draft,
+          })}`
+        }, initialDraft)
+      },
+      verify: async (page) => {
+        await page.locator('.erp-material-contract-batch').waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await expectText(page, '采购合同批量打印（2 份）')
+        assert.equal(
+          await page.locator('.erp-material-contract-batch__document').count(),
+          2
+        )
+        assert.equal(
+          await page.locator('.erp-material-contract-paper').count(),
+          2
+        )
+        assert.ok((await page.locator('[contenteditable="true"]').count()) > 0)
+        await page
+          .getByText('待补：第 1 行单价', { exact: true })
+          .waitFor({ state: 'visible' })
+        let rejectedPdfRequests = 0
+        const countRejectedPdf = (request) => {
+          if (request.url().includes('/templates/render-pdf'))
+            rejectedPdfRequests += 1
+        }
+        page.on('request', countRejectedPdf)
+        await page
+          .getByRole('button', { name: '在线预览 PDF', exact: true })
+          .click()
+        await page
+          .getByRole('alert')
+          .filter({ hasText: '第 1 行单价' })
+          .waitFor({ state: 'visible' })
+        page.off('request', countRejectedPdf)
+        assert.equal(rejectedPdfRequests, 0, '缺资料时不能发起 PDF 输出')
+        const price = page
+          .locator(
+            '[data-purchase-order-no="PO-BATCH-002"] .erp-material-contract-table tbody tr'
+          )
+          .first()
+          .locator('td')
+          .nth(8)
+          .locator('[contenteditable="true"]')
+        await price.fill('2.50')
+        await price.press('Tab')
+        await page
+          .getByRole('checkbox', { name: '选择合同 PO-BATCH-001', exact: true })
+          .uncheck()
+        await page
+          .getByText('共 2 份，已选 1 份', { exact: true })
+          .waitFor({ state: 'visible' })
+        await page
+          .getByText('本窗口内容已保存', { exact: true })
+          .waitFor({ state: 'visible' })
+        await page.reload()
+        await page
+          .getByText('共 2 份，已选 1 份', { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await page.locator('.erp-material-contract-batch__document').count(),
+          1
+        )
+        assert.equal(Number((await price.innerText()).trim()), 2.5)
+        await page
+          .getByRole('checkbox', { name: '选择合同 PO-BATCH-001', exact: true })
+          .check()
+        await page
+          .getByText('共 2 份，已选 2 份', { exact: true })
+          .waitFor({ state: 'visible' })
+        for (const [index, orderNo] of [
+          'PO-BATCH-001',
+          'PO-BATCH-002',
+        ].entries()) {
+          assert.match(
+            await page
+              .locator('.erp-material-contract-batch__document')
+              .nth(index)
+              .innerText(),
+            new RegExp(orderNo, 'u')
+          )
+        }
+
+        await page.emulateMedia({ media: 'print' })
+        const secondDocumentBreak = await page
+          .locator('.erp-material-contract-batch__document')
+          .nth(1)
+          .evaluate((element) => ({
+            breakBefore: getComputedStyle(element).breakBefore,
+            pageBreakBefore: getComputedStyle(element).pageBreakBefore,
+          }))
+        assert(
+          secondDocumentBreak.breakBefore === 'page' ||
+            secondDocumentBreak.pageBreakBefore === 'always',
+          `第二份采购合同应从新页开始: ${JSON.stringify(secondDocumentBreak)}`
+        )
+        await page.emulateMedia({ media: 'screen' })
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'print-workspace-material-purchase-batch.png'
+          ),
+          fullPage: true,
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'print-workspace-material-purchase-batch'
+        )
+        const renderPayloads = []
+        const captureRenderPayload = (request) => {
+          if (request.url().includes('/templates/render-pdf')) {
+            renderPayloads.push(request.postDataJSON())
+          }
+        }
+        page.on('request', captureRenderPayload)
+        try {
+          await assertPrintPreviewPopup(page, {
+            buttonName: '在线预览 PDF',
+            title: '采购合同批量 PDF 预览',
+            screenshotName:
+              'print-workspace-material-purchase-batch-preview-popup-window',
+          })
+        } finally {
+          page.off('request', captureRenderPayload)
+        }
+        assert.equal(renderPayloads.length, 1)
+        assert.equal(
+          renderPayloads[0]?.template_key,
+          'material-purchase-contract'
+        )
+        assert.match(
+          renderPayloads[0]?.html || '',
+          /data-purchase-order-no="PO-BATCH-001"/u
+        )
+        assert.match(
+          renderPayloads[0]?.html || '',
+          /data-purchase-order-no="PO-BATCH-002"/u
+        )
+      },
+    },
+    {
+      name: 'print-workspace-material-purchase-multiple-batches',
+      path: '/erp/print-workspace/material-purchase-contract?source=business&state=material-purchase-many-l1',
+      auth: 'admin',
+      viewport: { width: 1600, height: 1100 },
+      beforeNavigate: async (page) => {
+        await page.addInitScript(() => {
+          if (sessionStorage.getItem('material-purchase-many-l1-loaded')) return
+          sessionStorage.setItem('material-purchase-many-l1-loaded', 'true')
+          window.name = `__plush_erp_print_initial_draft__:${JSON.stringify({
+            version: 1,
+            templateKey: 'material-purchase-contract',
+            stateID: 'material-purchase-many-l1',
+            draft: {
+              kind: 'material-purchase-contract-batch',
+              version: 1,
+              sourceLabel: '模拟汇总表',
+              contracts: Array.from({ length: 21 }, (_, index) => ({
+                purchaseOrderID: index + 1,
+                orderNo: `PO-MANY-${index + 1}`,
+                draft: {
+                  contractNo: `PO-MANY-${index + 1}`,
+                  supplierName: '模拟供应商',
+                  buyerCompany: '模拟采购方',
+                  lines: [
+                    {
+                      materialName: '模拟材料',
+                      quantity: '10',
+                      unitPrice: index === 20 ? '' : '1',
+                    },
+                  ],
+                },
+              })),
+            },
+          })}`
+        })
+      },
+      verify: async (page) => {
+        await page
+          .getByText('共 21 份，已选 21 份', { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await page.locator('.erp-material-contract-batch__document').count(),
+          20
+        )
+        await page
+          .getByRole('button', { name: '核对合同 PO-MANY-21', exact: true })
+          .click()
+        const price = page
+          .locator(
+            '[data-purchase-order-no="PO-MANY-21"] .erp-material-contract-table tbody tr'
+          )
+          .first()
+          .locator('td')
+          .nth(8)
+          .locator('[contenteditable="true"]')
+        await price.fill('3.50')
+        await price.press('Tab')
+        await page
+          .getByText('本窗口内容已保存', { exact: true })
+          .waitFor({ state: 'visible' })
+        await page.reload()
+        await page
+          .getByText('第 2/2 批 · 本次输出 1 份', { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.equal(Number((await price.innerText()).trim()), 3.5)
+        const renderPayloads = []
+        const capture = (request) => {
+          if (request.url().includes('/templates/render-pdf'))
+            renderPayloads.push(request.postDataJSON())
+        }
+        page.on('request', capture)
+        try {
+          await assertPrintPreviewPopup(page, {
+            buttonName: '在线预览 PDF',
+            title: '采购合同批量 PDF 预览',
+            screenshotName:
+              'print-workspace-material-purchase-last-batch-preview',
+          })
+        } finally {
+          page.off('request', capture)
+        }
+        assert.equal(renderPayloads.length, 1)
+        assert.match(
+          renderPayloads[0].html,
+          /data-purchase-order-no="PO-MANY-21"/u
+        )
+        assert.doesNotMatch(
+          renderPayloads[0].html,
+          /data-purchase-order-no="PO-MANY-1"/u
+        )
+        await page
+          .getByRole('combobox', { name: '输出批次', exact: true })
+          .selectOption('0')
+        assert.equal(
+          await page.locator('.erp-material-contract-batch__document').count(),
+          20
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          'print-workspace-material-purchase-multiple-batches'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'print-workspace-material-purchase-multiple-batches.png'
+          ),
+          fullPage: true,
         })
       },
     },

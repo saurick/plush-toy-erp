@@ -63,7 +63,6 @@ export async function assertButtonSpacing(
             0,
             ...content.map((child) => child.overflow)
           ),
-          stableSlot: button.classList.contains('erp-business-lifecycle-slot'),
         }
       })
   )
@@ -79,11 +78,11 @@ export async function assertButtonSpacing(
         metric.contentOverflow <= 1,
       `${evidence} 图标和文案不得挤占留白或裁切`
     )
-    if (contentSized && !metric.stableSlot) {
+    if (contentSized) {
       assert(
         metric.insetLeft <= paddingInline + 1 &&
           metric.insetRight <= paddingInline + 1,
-        `${evidence} 普通动作应按内容定宽，不能用固定宽度填充留白`
+        `${evidence} 操作按钮应按内容定宽，不能用固定宽度填充留白`
       )
     }
   }

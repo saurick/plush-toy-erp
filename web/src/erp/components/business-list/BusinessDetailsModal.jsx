@@ -5,6 +5,7 @@ import { Alert, Button, Descriptions, Divider, Empty, Spin } from 'antd'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
+import { BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE } from '../../utils/businessRowItemsPreview.mjs'
 
 import { getColumnLabel } from './ColumnOrderModal.jsx'
 import BusinessFormModal from './BusinessFormModal.jsx'
@@ -13,7 +14,6 @@ import BusinessRowItemCards, {
   visibleDetailValue,
 } from './BusinessRowItemCards.jsx'
 
-const LINE_ITEM_PAGE_SIZE = 10
 const EMPTY_LINE_ITEMS = Object.freeze([])
 
 function readDataIndex(record, dataIndex) {
@@ -53,10 +53,12 @@ function useBusinessLineItems(config, open, record) {
     items: EMPTY_LINE_ITEMS,
   })
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE)
   const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     setPage(1)
+    setPageSize(BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE)
     if (!open || !record) {
       setLoadState({ status: 'idle', items: EMPTY_LINE_ITEMS })
       return undefined
@@ -88,16 +90,17 @@ function useBusinessLineItems(config, open, record) {
     return () => controller.abort()
   }, [embeddedItems, loadItems, open, record, retryKey])
 
-  const pageStart = (page - 1) * LINE_ITEM_PAGE_SIZE
-  const pageItems = loadState.items.slice(
-    pageStart,
-    pageStart + LINE_ITEM_PAGE_SIZE
-  )
+  const pageStart = (page - 1) * pageSize
+  const pageItems = loadState.items.slice(pageStart, pageStart + pageSize)
 
   return {
     loadState,
     page,
-    setPage,
+    pageSize,
+    changePage: (nextPage, nextPageSize) => {
+      setPage(nextPage)
+      setPageSize(nextPageSize)
+    },
     pageStart,
     pageItems,
     retry: () => setRetryKey((value) => value + 1),
@@ -202,9 +205,9 @@ export default function BusinessDetailsModal({
           {lineItems && lineItemsState.loadState.status === 'success' ? (
             <BusinessDetailsPagination
               current={lineItemsState.page}
-              pageSize={LINE_ITEM_PAGE_SIZE}
+              pageSize={lineItemsState.pageSize}
               total={lineItemsState.loadState.items.length}
-              onChange={lineItemsState.setPage}
+              onChange={lineItemsState.changePage}
               contentRef={lineItemsRef}
             />
           ) : null}

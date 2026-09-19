@@ -364,6 +364,7 @@ test('style-l1 purchase mock enforces retry-safe receipt mutations', async () =>
     purchase_order_id: 7,
     receipt_no: 'IN-PO-7',
     warehouse_id: 1,
+    all_remaining: true,
     received_at: '2026-07-14',
     idempotency_key: 'style-l1-create-receipt',
   }

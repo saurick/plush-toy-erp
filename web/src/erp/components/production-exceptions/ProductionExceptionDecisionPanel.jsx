@@ -1,7 +1,8 @@
 import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Input, Modal, Tag } from 'antd'
+import { Alert, Button, Card, Input, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -752,7 +753,8 @@ export default function ProductionExceptionDecisionPanel({
         />
       </Card>
       {columnOrderModal}
-      <Modal
+      <BusinessModal
+        size="confirm"
         title="确认生产异常处置"
         open={Boolean(action)}
         confirmLoading={loading}
@@ -774,7 +776,7 @@ export default function ProductionExceptionDecisionPanel({
           showCount
           placeholder="填写审批、执行或冲正原因"
         />
-      </Modal>
+      </BusinessModal>
     </>
   )
 }

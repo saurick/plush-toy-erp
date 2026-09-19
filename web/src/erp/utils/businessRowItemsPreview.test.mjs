@@ -141,7 +141,7 @@ test('business row item modal pagination clamps pages without losing items', () 
   )
   assert.deepEqual(
     businessRowItemsModalPage(items, 2).items.map((item) => item.id),
-    [21, 22, 23]
+    [11, 12, 13]
   )
   assert.equal(businessRowItemsModalPage(items, 99).page, 2)
   assert.equal(businessRowItemsModalPage(items, -1).page, 1)

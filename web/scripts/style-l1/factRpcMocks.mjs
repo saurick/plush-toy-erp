@@ -1584,21 +1584,21 @@ export async function installFactRpcMocks(page, context) {
             () => {
               const receiptId = nextPurchaseReceiptId
               nextPurchaseReceiptId += 1
-              const itemId = nextPurchaseReceiptItemId
-              nextPurchaseReceiptItemId += 1
-              const item = {
+              const arrivalLines = params.items || (params.all_remaining ? [purchaseReceiptItem] : [])
+              const items = arrivalLines.map((line) => ({
                 ...purchaseReceiptItem,
-                id: itemId,
+                ...line,
+                id: nextPurchaseReceiptItemId++,
                 receipt_id: receiptId,
-                warehouse_id: Number(params.warehouse_id || 1),
-              }
+                warehouse_id: Number(line.warehouse_id || params.warehouse_id || 1),
+              }))
               const receipt = {
                 ...purchaseReceipts[1],
                 ...params,
                 id: receiptId,
                 receipt_no: String(params.receipt_no || '').trim(),
                 status: 'DRAFT',
-                items: [item],
+                items,
                 created_at: nowUnix(),
                 updated_at: nowUnix(),
               }

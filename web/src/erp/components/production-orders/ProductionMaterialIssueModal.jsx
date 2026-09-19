@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react'
-import { Alert, Descriptions, Form, Input, Modal, Select } from 'antd'
+import { Alert, Descriptions, Form, Input, Select } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 
 import { inventoryLotOption } from '../../utils/referenceSelectOptions.mjs'
@@ -40,7 +41,7 @@ export default function ProductionMaterialIssueModal({
 }) {
   const [form] = Form.useForm()
   const editing = mode === 'edit'
-  const Editor = editing ? BusinessFormPage : Modal
+  const Editor = editing ? BusinessFormPage : BusinessModal
   const formConnectedRef = useRef(false)
   const lotOptions = useMemo(
     () =>
@@ -81,7 +82,9 @@ export default function ProductionMaterialIssueModal({
 
   return (
     <Editor
-      {...(editing ? { form } : { width: 720, cancelText: '取消', destroyOnHidden: true })}
+      {...(editing
+        ? { form }
+        : { size: 'localAction', cancelText: '取消', destroyOnHidden: true })}
       className="erp-production-material-issue-modal"
       title={editing ? '编辑生产领料草稿' : '生产领料'}
       open={open}

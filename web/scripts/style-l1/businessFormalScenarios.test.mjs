@@ -235,7 +235,7 @@ test('business-core detail and lineage checks are scoped to their surfaces', () 
   )
   assert.match(
     source,
-    /erp-business-selection-action-drawer:visible[\s\S]{0,180}keyboard\.press\('Escape'\)/u
+    /erp-business-selection-action-menu:visible[\s\S]{0,180}keyboard\.press\('Escape'\)/u
   )
   assert.doesNotMatch(source, /协同任务附件/u)
 })
@@ -277,7 +277,7 @@ test('business-core selection actions remain reachable through responsive overfl
   )
   assert.match(source, /candidate\.innerText\(\)/u)
   assert.match(source, /getByRole\('button', \{ name: \/更多操作\/u \}\)/u)
-  assert.match(source, /erp-business-selection-action-drawer:visible/u)
+  assert.match(source, /erp-business-selection-action-menu:visible/u)
 })
 
 test('business-core destructive draft actions confirm through visible popconfirm content', () => {
