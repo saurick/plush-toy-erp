@@ -26,6 +26,7 @@ var purchaseReceiptItemLockedFields = map[string]struct{}{
 	"purchase_order_item_id":   {},
 	"lot_no":                   {},
 	"quantity":                 {},
+	"declared_quantity":        {},
 	"unit_price":               {},
 	"amount":                   {},
 	"source_line_no":           {},
@@ -99,6 +100,7 @@ func (PurchaseReceiptItem) Fields() []ent.Field {
 			Nillable().
 			MaxLen(64),
 		decimalQuantityField("quantity"),
+		optionalDecimalField("declared_quantity"),
 		optionalDecimalField("unit_price"),
 		optionalDecimalField("amount"),
 		field.String("source_line_no").
@@ -180,7 +182,6 @@ func (PurchaseReceiptItem) Indexes() []ent.Index {
 				entsql.IndexWhere("idempotency_key IS NOT NULL AND idempotency_key <> ''"),
 			),
 		index.Fields("receipt_id", "source_line_no").
-			Unique().
 			Annotations(
 				entsql.IndexWhere("source_line_no IS NOT NULL AND source_line_no <> ''"),
 			),

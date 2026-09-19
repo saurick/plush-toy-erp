@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/core/qualitycheck"
 	"server/internal/data/model/ent/accessentitlement"
 	"server/internal/data/model/ent/adminsession"
 	"server/internal/data/model/ent/adminuser"
@@ -81439,6 +81440,7 @@ type PurchaseReceiptItemMutation struct {
 	id                                       *int
 	lot_no                                   *string
 	quantity                                 *decimal.Decimal
+	declared_quantity                        *decimal.Decimal
 	unit_price                               *decimal.Decimal
 	amount                                   *decimal.Decimal
 	source_line_no                           *string
@@ -81897,6 +81899,55 @@ func (m *PurchaseReceiptItemMutation) OldQuantity(ctx context.Context) (v decima
 // ResetQuantity resets all changes to the "quantity" field.
 func (m *PurchaseReceiptItemMutation) ResetQuantity() {
 	m.quantity = nil
+}
+
+// SetDeclaredQuantity sets the "declared_quantity" field.
+func (m *PurchaseReceiptItemMutation) SetDeclaredQuantity(d decimal.Decimal) {
+	m.declared_quantity = &d
+}
+
+// DeclaredQuantity returns the value of the "declared_quantity" field in the mutation.
+func (m *PurchaseReceiptItemMutation) DeclaredQuantity() (r decimal.Decimal, exists bool) {
+	v := m.declared_quantity
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeclaredQuantity returns the old "declared_quantity" field's value of the PurchaseReceiptItem entity.
+// If the PurchaseReceiptItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptItemMutation) OldDeclaredQuantity(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeclaredQuantity is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeclaredQuantity requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeclaredQuantity: %w", err)
+	}
+	return oldValue.DeclaredQuantity, nil
+}
+
+// ClearDeclaredQuantity clears the value of the "declared_quantity" field.
+func (m *PurchaseReceiptItemMutation) ClearDeclaredQuantity() {
+	m.declared_quantity = nil
+	m.clearedFields[purchasereceiptitem.FieldDeclaredQuantity] = struct{}{}
+}
+
+// DeclaredQuantityCleared returns if the "declared_quantity" field was cleared in this mutation.
+func (m *PurchaseReceiptItemMutation) DeclaredQuantityCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptitem.FieldDeclaredQuantity]
+	return ok
+}
+
+// ResetDeclaredQuantity resets all changes to the "declared_quantity" field.
+func (m *PurchaseReceiptItemMutation) ResetDeclaredQuantity() {
+	m.declared_quantity = nil
+	delete(m.clearedFields, purchasereceiptitem.FieldDeclaredQuantity)
 }
 
 // SetUnitPrice sets the "unit_price" field.
@@ -82636,7 +82687,7 @@ func (m *PurchaseReceiptItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PurchaseReceiptItemMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 17)
 	if m.receipt != nil {
 		fields = append(fields, purchasereceiptitem.FieldReceiptID)
 	}
@@ -82660,6 +82711,9 @@ func (m *PurchaseReceiptItemMutation) Fields() []string {
 	}
 	if m.quantity != nil {
 		fields = append(fields, purchasereceiptitem.FieldQuantity)
+	}
+	if m.declared_quantity != nil {
+		fields = append(fields, purchasereceiptitem.FieldDeclaredQuantity)
 	}
 	if m.unit_price != nil {
 		fields = append(fields, purchasereceiptitem.FieldUnitPrice)
@@ -82709,6 +82763,8 @@ func (m *PurchaseReceiptItemMutation) Field(name string) (ent.Value, bool) {
 		return m.LotNo()
 	case purchasereceiptitem.FieldQuantity:
 		return m.Quantity()
+	case purchasereceiptitem.FieldDeclaredQuantity:
+		return m.DeclaredQuantity()
 	case purchasereceiptitem.FieldUnitPrice:
 		return m.UnitPrice()
 	case purchasereceiptitem.FieldAmount:
@@ -82750,6 +82806,8 @@ func (m *PurchaseReceiptItemMutation) OldField(ctx context.Context, name string)
 		return m.OldLotNo(ctx)
 	case purchasereceiptitem.FieldQuantity:
 		return m.OldQuantity(ctx)
+	case purchasereceiptitem.FieldDeclaredQuantity:
+		return m.OldDeclaredQuantity(ctx)
 	case purchasereceiptitem.FieldUnitPrice:
 		return m.OldUnitPrice(ctx)
 	case purchasereceiptitem.FieldAmount:
@@ -82830,6 +82888,13 @@ func (m *PurchaseReceiptItemMutation) SetField(name string, value ent.Value) err
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetQuantity(v)
+		return nil
+	case purchasereceiptitem.FieldDeclaredQuantity:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeclaredQuantity(v)
 		return nil
 	case purchasereceiptitem.FieldUnitPrice:
 		v, ok := value.(decimal.Decimal)
@@ -82929,6 +82994,9 @@ func (m *PurchaseReceiptItemMutation) ClearedFields() []string {
 	if m.FieldCleared(purchasereceiptitem.FieldLotNo) {
 		fields = append(fields, purchasereceiptitem.FieldLotNo)
 	}
+	if m.FieldCleared(purchasereceiptitem.FieldDeclaredQuantity) {
+		fields = append(fields, purchasereceiptitem.FieldDeclaredQuantity)
+	}
 	if m.FieldCleared(purchasereceiptitem.FieldUnitPrice) {
 		fields = append(fields, purchasereceiptitem.FieldUnitPrice)
 	}
@@ -82969,6 +83037,9 @@ func (m *PurchaseReceiptItemMutation) ClearField(name string) error {
 		return nil
 	case purchasereceiptitem.FieldLotNo:
 		m.ClearLotNo()
+		return nil
+	case purchasereceiptitem.FieldDeclaredQuantity:
+		m.ClearDeclaredQuantity()
 		return nil
 	case purchasereceiptitem.FieldUnitPrice:
 		m.ClearUnitPrice()
@@ -83019,6 +83090,9 @@ func (m *PurchaseReceiptItemMutation) ResetField(name string) error {
 		return nil
 	case purchasereceiptitem.FieldQuantity:
 		m.ResetQuantity()
+		return nil
+	case purchasereceiptitem.FieldDeclaredQuantity:
+		m.ResetDeclaredQuantity()
 		return nil
 	case purchasereceiptitem.FieldUnitPrice:
 		m.ResetUnitPrice()
@@ -87996,6 +88070,8 @@ type QualityInspectionMutation struct {
 	superseded_reason                  *string
 	defect_rate_operator               *string
 	defect_rate_percent                *decimal.Decimal
+	check_items                        *[]qualitycheck.Item
+	appendcheck_items                  []qualitycheck.Item
 	decision_note                      *string
 	created_at                         *time.Time
 	updated_at                         *time.Time
@@ -89363,6 +89439,71 @@ func (m *QualityInspectionMutation) ResetDefectRatePercent() {
 	delete(m.clearedFields, qualityinspection.FieldDefectRatePercent)
 }
 
+// SetCheckItems sets the "check_items" field.
+func (m *QualityInspectionMutation) SetCheckItems(q []qualitycheck.Item) {
+	m.check_items = &q
+	m.appendcheck_items = nil
+}
+
+// CheckItems returns the value of the "check_items" field in the mutation.
+func (m *QualityInspectionMutation) CheckItems() (r []qualitycheck.Item, exists bool) {
+	v := m.check_items
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCheckItems returns the old "check_items" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldCheckItems(ctx context.Context) (v []qualitycheck.Item, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCheckItems is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCheckItems requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCheckItems: %w", err)
+	}
+	return oldValue.CheckItems, nil
+}
+
+// AppendCheckItems adds q to the "check_items" field.
+func (m *QualityInspectionMutation) AppendCheckItems(q []qualitycheck.Item) {
+	m.appendcheck_items = append(m.appendcheck_items, q...)
+}
+
+// AppendedCheckItems returns the list of values that were appended to the "check_items" field in this mutation.
+func (m *QualityInspectionMutation) AppendedCheckItems() ([]qualitycheck.Item, bool) {
+	if len(m.appendcheck_items) == 0 {
+		return nil, false
+	}
+	return m.appendcheck_items, true
+}
+
+// ClearCheckItems clears the value of the "check_items" field.
+func (m *QualityInspectionMutation) ClearCheckItems() {
+	m.check_items = nil
+	m.appendcheck_items = nil
+	m.clearedFields[qualityinspection.FieldCheckItems] = struct{}{}
+}
+
+// CheckItemsCleared returns if the "check_items" field was cleared in this mutation.
+func (m *QualityInspectionMutation) CheckItemsCleared() bool {
+	_, ok := m.clearedFields[qualityinspection.FieldCheckItems]
+	return ok
+}
+
+// ResetCheckItems resets all changes to the "check_items" field.
+func (m *QualityInspectionMutation) ResetCheckItems() {
+	m.check_items = nil
+	m.appendcheck_items = nil
+	delete(m.clearedFields, qualityinspection.FieldCheckItems)
+}
+
 // SetDecisionNote sets the "decision_note" field.
 func (m *QualityInspectionMutation) SetDecisionNote(s string) {
 	m.decision_note = &s
@@ -89788,7 +89929,7 @@ func (m *QualityInspectionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *QualityInspectionMutation) Fields() []string {
-	fields := make([]string, 0, 27)
+	fields := make([]string, 0, 28)
 	if m.inspection_no != nil {
 		fields = append(fields, qualityinspection.FieldInspectionNo)
 	}
@@ -89861,6 +90002,9 @@ func (m *QualityInspectionMutation) Fields() []string {
 	if m.defect_rate_percent != nil {
 		fields = append(fields, qualityinspection.FieldDefectRatePercent)
 	}
+	if m.check_items != nil {
+		fields = append(fields, qualityinspection.FieldCheckItems)
+	}
 	if m.decision_note != nil {
 		fields = append(fields, qualityinspection.FieldDecisionNote)
 	}
@@ -89926,6 +90070,8 @@ func (m *QualityInspectionMutation) Field(name string) (ent.Value, bool) {
 		return m.DefectRateOperator()
 	case qualityinspection.FieldDefectRatePercent:
 		return m.DefectRatePercent()
+	case qualityinspection.FieldCheckItems:
+		return m.CheckItems()
 	case qualityinspection.FieldDecisionNote:
 		return m.DecisionNote()
 	case qualityinspection.FieldCreatedAt:
@@ -89989,6 +90135,8 @@ func (m *QualityInspectionMutation) OldField(ctx context.Context, name string) (
 		return m.OldDefectRateOperator(ctx)
 	case qualityinspection.FieldDefectRatePercent:
 		return m.OldDefectRatePercent(ctx)
+	case qualityinspection.FieldCheckItems:
+		return m.OldCheckItems(ctx)
 	case qualityinspection.FieldDecisionNote:
 		return m.OldDecisionNote(ctx)
 	case qualityinspection.FieldCreatedAt:
@@ -90172,6 +90320,13 @@ func (m *QualityInspectionMutation) SetField(name string, value ent.Value) error
 		}
 		m.SetDefectRatePercent(v)
 		return nil
+	case qualityinspection.FieldCheckItems:
+		v, ok := value.([]qualitycheck.Item)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCheckItems(v)
+		return nil
 	case qualityinspection.FieldDecisionNote:
 		v, ok := value.(string)
 		if !ok {
@@ -90349,6 +90504,9 @@ func (m *QualityInspectionMutation) ClearedFields() []string {
 	if m.FieldCleared(qualityinspection.FieldDefectRatePercent) {
 		fields = append(fields, qualityinspection.FieldDefectRatePercent)
 	}
+	if m.FieldCleared(qualityinspection.FieldCheckItems) {
+		fields = append(fields, qualityinspection.FieldCheckItems)
+	}
 	if m.FieldCleared(qualityinspection.FieldDecisionNote) {
 		fields = append(fields, qualityinspection.FieldDecisionNote)
 	}
@@ -90428,6 +90586,9 @@ func (m *QualityInspectionMutation) ClearField(name string) error {
 		return nil
 	case qualityinspection.FieldDefectRatePercent:
 		m.ClearDefectRatePercent()
+		return nil
+	case qualityinspection.FieldCheckItems:
+		m.ClearCheckItems()
 		return nil
 	case qualityinspection.FieldDecisionNote:
 		m.ClearDecisionNote()
@@ -90511,6 +90672,9 @@ func (m *QualityInspectionMutation) ResetField(name string) error {
 		return nil
 	case qualityinspection.FieldDefectRatePercent:
 		m.ResetDefectRatePercent()
+		return nil
+	case qualityinspection.FieldCheckItems:
+		m.ResetCheckItems()
 		return nil
 	case qualityinspection.FieldDecisionNote:
 		m.ResetDecisionNote()

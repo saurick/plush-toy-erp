@@ -407,6 +407,7 @@ func TestPurchaseReceiptRetrySafeParamsRejectClientPayloadHash(t *testing.T) {
 	fromOrder := map[string]any{
 		"customer_key":      biz.DefaultCustomerKey,
 		"purchase_order_id": float64(1),
+		"all_remaining":     true,
 		"receipt_no":        "PR-CLIENT-HASH",
 		"warehouse_id":      float64(2),
 		"idempotency_key":   "receipt-attempt-1",
@@ -498,6 +499,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	))
 	_, missingReceiptKeyRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "missing-key", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
+		"all_remaining":     true,
 		"receipt_no":        "PR-FROM-PO-MISSING-KEY",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"received_at":       "2026-06-17",
@@ -507,6 +509,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	}
 	_, forgedSupplierRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "forged-supplier", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
+		"all_remaining":     true,
 		"receipt_no":        "PR-FROM-PO-FORGED-SUPPLIER",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"received_at":       "2026-06-17",
@@ -519,6 +522,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 
 	_, receiptRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "1", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
+		"all_remaining":     true,
 		"receipt_no":        "PR-FROM-PO-001",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"received_at":       "2026-06-17",
@@ -557,6 +561,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	receiptID := jsonRPCInt(t, receipt, "id")
 	_, replayReceiptRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "1-replay", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
+		"all_remaining":     true,
 		"receipt_no":        "PR-FROM-PO-001",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"received_at":       "2026-06-17",
@@ -578,6 +583,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 
 	_, duplicateRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "2", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
+		"all_remaining":     true,
 		"receipt_no":        "PR-FROM-PO-002",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"idempotency_key":   "jsonrpc-create-receipt-from-po-attempt-1",
@@ -610,6 +616,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	}
 	_, identityConflictRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "supplier-identity-conflict", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
+		"all_remaining":     true,
 		"receipt_no":        "PR-FROM-PO-001",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"received_at":       "2026-06-17",
@@ -626,6 +633,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresDomainPermissions(t *testin
 
 	_, createRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "1", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(1),
+		"all_remaining":     true,
 		"receipt_no":        "PR-DENIED",
 		"warehouse_id":      float64(1),
 		"idempotency_key":   "jsonrpc-permission-denied-receipt",
@@ -661,6 +669,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptSourceMethodsRequirePurchaseOrderRead(
 	createParams := mustJSONRPCStruct(t, map[string]any{
 		"customer_key":      biz.DefaultCustomerKey,
 		"purchase_order_id": float64(createSourceItem.PurchaseOrderID),
+		"all_remaining":     true,
 		"receipt_no":        "PR-SOURCE-PERMISSION",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"idempotency_key":   "jsonrpc-source-permission-create",
@@ -817,6 +826,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 
 	_, createRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_from_purchase_order", "read-only-create", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(gateSourceItem.PurchaseOrderID),
+		"all_remaining":     true,
 		"receipt_no":        "PR-MODULE-READONLY",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"idempotency_key":   "jsonrpc-module-read-only-create",
@@ -835,6 +845,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 	activatePurchaseTestCustomerConfig(t, j, enabledConfig)
 	_, receiptRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_from_purchase_order", "enabled-create", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(gateSourceItem.PurchaseOrderID),
+		"all_remaining":     true,
 		"receipt_no":        "PR-MODULE-ENABLED",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"idempotency_key":   "jsonrpc-module-enabled-create",

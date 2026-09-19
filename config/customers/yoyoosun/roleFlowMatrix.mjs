@@ -426,7 +426,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
     }),
     Object.freeze({
       roleKey: "quality",
-      displayName: "品质",
+      displayName: "仓库 IQC / 品质",
       productCoreRole: "quality",
       ownerPools: Object.freeze(["quality"]),
       menuSurfaces: Object.freeze([
@@ -435,6 +435,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "products",
         "processes",
         "quality-inspections",
+        "accessories-purchase",
         "production-orders",
         "production-exceptions",
         "inventory",
@@ -456,6 +457,9 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "sales_order_item.read",
         "outsourcing.order.read",
         "outsourcing.fact.read",
+        "purchase.order.read",
+        "purchase.receipt.create",
+        "purchase.receipt.cancel_draft",
         "purchase.receipt.read",
         "purchase.return.read",
         "purchase.return.create",
@@ -481,7 +485,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "production_to_inventory.stage_quality_gate",
       ]),
       guardrail:
-        "品质可查看 WIP 来源并分别办理生产分段质检；不能安排或执行 WIP，也不能把质检任务完成自动写成库存、出货或财务事实。",
+        "来料由仓库所属 IQC 清点并检验，可登记到货和取消未入库登记，库存过账仍由仓库办理。品质可查看 WIP 来源并分别办理生产分段质检；不能安排或执行 WIP，也不能把质检任务完成自动写成库存、出货或财务事实。",
     }),
     Object.freeze({
       roleKey: "finance",

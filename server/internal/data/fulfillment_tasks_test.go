@@ -33,12 +33,12 @@ func TestFulfillmentReceiptQualityInboundAndReplay(t *testing.T) {
 	if _, err := NewPurchaseOrderRepo(data, log.NewStdLogger(io.Discard)).UpdatePurchaseOrderLifecycle(ctx, item.PurchaseOrderID, biz.PurchaseOrderStatusApproved); err != nil {
 		t.Fatal(err)
 	}
-	in := &biz.PurchaseReceiptFromPurchaseOrderCreate{PurchaseOrderID: item.PurchaseOrderID, ReceiptNo: "PR-HANDOFF", WarehouseID: f.warehouseID, IdempotencyKey: "handoff-receipt"}
+	in := &biz.PurchaseReceiptFromPurchaseOrderCreate{AllRemaining: true, PurchaseOrderID: item.PurchaseOrderID, ReceiptNo: "PR-HANDOFF", WarehouseID: f.warehouseID, IdempotencyKey: "handoff-receipt"}
 	receipt, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertFulfillmentTask(t, ctx, client, "purchase_arrival", item.PurchaseOrderID, "done", biz.WarehouseRoleKey)
+	assertFulfillmentTask(t, ctx, client, "purchase_arrival", item.PurchaseOrderID, "done", biz.QualityRoleKey)
 	assertFulfillmentTask(t, ctx, client, "receipt_quality", receipt.QualityInspections[0].ID, "ready", biz.QualityRoleKey)
 	assertFulfillmentTask(t, ctx, client, "receipt_inbound", receipt.ID, "blocked", biz.WarehouseRoleKey)
 	assertInventoryTxnCount(t, ctx, client, 0)
@@ -72,7 +72,7 @@ func TestFulfillmentReceiptRejectCorrectionAndCancellation(t *testing.T) {
 	f := createInventoryTestFixtures(t, ctx, client)
 	item := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, client, f, "REJECT", mustDecimal(t, "10"))
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
-	receipt, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{PurchaseOrderID: item.PurchaseOrderID, ReceiptNo: "PR-REJECT", WarehouseID: f.warehouseID})
+	receipt, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{AllRemaining: true, PurchaseOrderID: item.PurchaseOrderID, ReceiptNo: "PR-REJECT", WarehouseID: f.warehouseID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestFulfillmentReceiptRejectCorrectionAndCancellation(t *testing.T) {
 	}
 	assertFulfillmentTask(t, ctx, client, "receipt_inbound", receipt.ID, "withdrawn", biz.WarehouseRoleKey)
 	assertFulfillmentTask(t, ctx, client, "receipt_exception", receipt.ID, "withdrawn", biz.PurchaseRoleKey)
-	assertFulfillmentTask(t, ctx, client, "purchase_arrival", item.PurchaseOrderID, "ready", biz.WarehouseRoleKey)
+	assertFulfillmentTask(t, ctx, client, "purchase_arrival", item.PurchaseOrderID, "ready", biz.QualityRoleKey)
 	assertInventoryTxnCount(t, ctx, client, 0)
 }
 
@@ -101,7 +101,7 @@ func TestFulfillmentTaskConflictRollsBackReceiving(t *testing.T) {
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	client.WorkflowTask.Create().SetTaskCode(biz.WorkflowSourceTaskCode("handoff_receipt_quality", 1)).SetTaskName("冲突任务").SetTaskStatusKey("ready").SetTaskGroup("manual").SetSourceType("manual").SetSourceID(1).SetOwnerRoleKey(biz.QualityRoleKey).SaveX(ctx)
 
-	_, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{PurchaseOrderID: item.PurchaseOrderID, ReceiptNo: "PR-ATOMIC", WarehouseID: f.warehouseID})
+	_, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{AllRemaining: true, PurchaseOrderID: item.PurchaseOrderID, ReceiptNo: "PR-ATOMIC", WarehouseID: f.warehouseID})
 	if err == nil {
 		t.Fatal("expected source task conflict")
 	}

@@ -247,6 +247,7 @@ func TestInventoryRepo_DraftPurchaseReceiptCancellationReleasesPurchaseOrderSett
 			inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 			purchaseOrderUC := biz.NewPurchaseOrderUsecase(NewPurchaseOrderRepo(data, log.NewStdLogger(io.Discard)))
 			receipt, err := inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+				AllRemaining:    true,
 				PurchaseOrderID: orderItem.PurchaseOrderID,
 				ReceiptNo:       "PR-PO-DRAFT-CANCEL-" + targetStatus,
 				WarehouseID:     fixtures.warehouseID,

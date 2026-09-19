@@ -5559,27 +5559,27 @@ func init() {
 	// purchasereceiptitem.LotNoValidator is a validator for the "lot_no" field. It is called by the builders before save.
 	purchasereceiptitem.LotNoValidator = purchasereceiptitemDescLotNo.Validators[0].(func(string) error)
 	// purchasereceiptitemDescSourceLineNo is the schema descriptor for source_line_no field.
-	purchasereceiptitemDescSourceLineNo := purchasereceiptitemFields[10].Descriptor()
+	purchasereceiptitemDescSourceLineNo := purchasereceiptitemFields[11].Descriptor()
 	// purchasereceiptitem.SourceLineNoValidator is a validator for the "source_line_no" field. It is called by the builders before save.
 	purchasereceiptitem.SourceLineNoValidator = purchasereceiptitemDescSourceLineNo.Validators[0].(func(string) error)
 	// purchasereceiptitemDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	purchasereceiptitemDescIdempotencyKey := purchasereceiptitemFields[11].Descriptor()
+	purchasereceiptitemDescIdempotencyKey := purchasereceiptitemFields[12].Descriptor()
 	// purchasereceiptitem.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	purchasereceiptitem.IdempotencyKeyValidator = purchasereceiptitemDescIdempotencyKey.Validators[0].(func(string) error)
 	// purchasereceiptitemDescIdempotencyPayloadHash is the schema descriptor for idempotency_payload_hash field.
-	purchasereceiptitemDescIdempotencyPayloadHash := purchasereceiptitemFields[12].Descriptor()
+	purchasereceiptitemDescIdempotencyPayloadHash := purchasereceiptitemFields[13].Descriptor()
 	// purchasereceiptitem.IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
 	purchasereceiptitem.IdempotencyPayloadHashValidator = purchasereceiptitemDescIdempotencyPayloadHash.Validators[0].(func(string) error)
 	// purchasereceiptitemDescNote is the schema descriptor for note field.
-	purchasereceiptitemDescNote := purchasereceiptitemFields[13].Descriptor()
+	purchasereceiptitemDescNote := purchasereceiptitemFields[14].Descriptor()
 	// purchasereceiptitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	purchasereceiptitem.NoteValidator = purchasereceiptitemDescNote.Validators[0].(func(string) error)
 	// purchasereceiptitemDescCreatedAt is the schema descriptor for created_at field.
-	purchasereceiptitemDescCreatedAt := purchasereceiptitemFields[14].Descriptor()
+	purchasereceiptitemDescCreatedAt := purchasereceiptitemFields[15].Descriptor()
 	// purchasereceiptitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	purchasereceiptitem.DefaultCreatedAt = purchasereceiptitemDescCreatedAt.Default.(func() time.Time)
 	// purchasereceiptitemDescUpdatedAt is the schema descriptor for updated_at field.
-	purchasereceiptitemDescUpdatedAt := purchasereceiptitemFields[15].Descriptor()
+	purchasereceiptitemDescUpdatedAt := purchasereceiptitemFields[16].Descriptor()
 	// purchasereceiptitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	purchasereceiptitem.DefaultUpdatedAt = purchasereceiptitemDescUpdatedAt.Default.(func() time.Time)
 	// purchasereceiptitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -6028,15 +6028,15 @@ func init() {
 	// qualityinspection.DefectRateOperatorValidator is a validator for the "defect_rate_operator" field. It is called by the builders before save.
 	qualityinspection.DefectRateOperatorValidator = qualityinspectionDescDefectRateOperator.Validators[0].(func(string) error)
 	// qualityinspectionDescDecisionNote is the schema descriptor for decision_note field.
-	qualityinspectionDescDecisionNote := qualityinspectionFields[24].Descriptor()
+	qualityinspectionDescDecisionNote := qualityinspectionFields[25].Descriptor()
 	// qualityinspection.DecisionNoteValidator is a validator for the "decision_note" field. It is called by the builders before save.
 	qualityinspection.DecisionNoteValidator = qualityinspectionDescDecisionNote.Validators[0].(func(string) error)
 	// qualityinspectionDescCreatedAt is the schema descriptor for created_at field.
-	qualityinspectionDescCreatedAt := qualityinspectionFields[25].Descriptor()
+	qualityinspectionDescCreatedAt := qualityinspectionFields[26].Descriptor()
 	// qualityinspection.DefaultCreatedAt holds the default value on creation for the created_at field.
 	qualityinspection.DefaultCreatedAt = qualityinspectionDescCreatedAt.Default.(func() time.Time)
 	// qualityinspectionDescUpdatedAt is the schema descriptor for updated_at field.
-	qualityinspectionDescUpdatedAt := qualityinspectionFields[26].Descriptor()
+	qualityinspectionDescUpdatedAt := qualityinspectionFields[27].Descriptor()
 	// qualityinspection.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	qualityinspection.DefaultUpdatedAt = qualityinspectionDescUpdatedAt.Default.(func() time.Time)
 	// qualityinspection.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

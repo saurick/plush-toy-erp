@@ -40,6 +40,8 @@ type PurchaseReceiptItem struct {
 	LotNo *string `json:"lot_no,omitempty"`
 	// Quantity holds the value of the "quantity" field.
 	Quantity decimal.Decimal `json:"quantity,omitempty"`
+	// DeclaredQuantity holds the value of the "declared_quantity" field.
+	DeclaredQuantity *decimal.Decimal `json:"declared_quantity,omitempty"`
 	// UnitPrice holds the value of the "unit_price" field.
 	UnitPrice *decimal.Decimal `json:"unit_price,omitempty"`
 	// Amount holds the value of the "amount" field.
@@ -185,7 +187,7 @@ func (*PurchaseReceiptItem) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case purchasereceiptitem.FieldUnitPrice, purchasereceiptitem.FieldAmount:
+		case purchasereceiptitem.FieldDeclaredQuantity, purchasereceiptitem.FieldUnitPrice, purchasereceiptitem.FieldAmount:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case purchasereceiptitem.FieldQuantity:
 			values[i] = new(decimal.Decimal)
@@ -266,6 +268,13 @@ func (_m *PurchaseReceiptItem) assignValues(columns []string, values []any) erro
 				return fmt.Errorf("unexpected type %T for field quantity", values[i])
 			} else if value != nil {
 				_m.Quantity = *value
+			}
+		case purchasereceiptitem.FieldDeclaredQuantity:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field declared_quantity", values[i])
+			} else if value.Valid {
+				_m.DeclaredQuantity = new(decimal.Decimal)
+				*_m.DeclaredQuantity = *value.S.(*decimal.Decimal)
 			}
 		case purchasereceiptitem.FieldUnitPrice:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -431,6 +440,11 @@ func (_m *PurchaseReceiptItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("quantity=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Quantity))
+	builder.WriteString(", ")
+	if v := _m.DeclaredQuantity; v != nil {
+		builder.WriteString("declared_quantity=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.UnitPrice; v != nil {
 		builder.WriteString("unit_price=")

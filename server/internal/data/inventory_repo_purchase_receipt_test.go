@@ -288,9 +288,10 @@ func TestInventoryRepo_PurchaseReceiptItemIdempotencyReplaysOneFactSet(t *testin
 
 	lotCountBeforeFailedAppend := client.InventoryLot.Query().CountX(ctx)
 	failedAppend := *input
-	failedAppend.IdempotencyKey = "test:purchase-receipt-item:source-line-conflict"
+	failedAppend.IdempotencyKey = "test:purchase-receipt-item:invalid-warehouse"
+	failedAppend.WarehouseID = fixtures.productWarehouseID
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &failedAppend); err == nil {
-		t.Fatal("duplicate source line must fail")
+		t.Fatal("warehouse category mismatch must fail without leaking a lot")
 	}
 	if got := client.InventoryLot.Query().CountX(ctx); got != lotCountBeforeFailedAppend {
 		t.Fatalf("failed item append leaked lot: %d -> %d", lotCountBeforeFailedAppend, got)

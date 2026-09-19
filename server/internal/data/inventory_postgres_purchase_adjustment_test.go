@@ -36,7 +36,6 @@ func TestPurchaseReceiptAdjustmentPostgresShapeAndFlow(t *testing.T) {
 	assertPostgresUniqueIndex(t, data.sqldb, "purchase_receipt_adjustments", "purchasereceiptadjustment_adjustment_no")
 	assertPostgresUniqueIndex(t, data.sqldb, "purchase_receipt_adjustments", "purchasereceiptadjustment_idempotency_key")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_adjustments", "purchase_receipt_adjustments_idempotency_bundle_complete", "idempotency_item_count > 0")
-	assertPostgresPartialUniqueIndex(t, data.sqldb, "purchase_receipt_adjustment_items", "purchasereceiptadjustmentitem_adjustment_id_source_line_no", "source_line_no IS NOT NULL AND source_line_no <> ''")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_adjustment_items", "purchase_receipt_adjustment_items_quantity_positive", "quantity > 0")
 	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "purchase_receipt_adjustments", "purchase_receipt_adjustments_purchase_receipts_purchase_receipt", "NO ACTION")
 	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "purchase_receipt_adjustment_items", "purchase_receipt_adjustment_items_purchase_receipt_items_purcha", "NO ACTION")
@@ -116,8 +115,8 @@ func TestPurchaseReceiptAdjustmentPostgresShapeAndFlow(t *testing.T) {
 		LotID:                 receiptItem.LotID,
 		Quantity:              mustDecimal(t, "1"),
 		SourceLineNo:          stringPtr("same-line"),
-	}); !ent.IsConstraintError(err) {
-		t.Fatalf("expected adjustment source_line_no partial unique constraint, got %v", err)
+	}); err != nil {
+		t.Fatalf("split source receipt rows must retain the same source line display number, got %v", err)
 	}
 	if _, err := client.PurchaseReceiptAdjustmentItem.Create().
 		SetAdjustmentID(adjustment.ID).
@@ -184,7 +183,7 @@ func TestPurchaseReceiptAdjustmentPostgresShapeAndFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get postgres balance after adjustment failed: %v", err)
 	}
-	assertDecimalEqual(t, balance.Quantity, "6")
+	assertDecimalEqual(t, balance.Quantity, "5")
 
 	if _, err := client.PurchaseReceiptAdjustment.UpdateOneID(adjustment.ID).SetStatus(biz.PurchaseReceiptAdjustmentStatusDraft).Save(ctx); err == nil {
 		t.Fatalf("expected postgres posted adjustment status update to be rejected")

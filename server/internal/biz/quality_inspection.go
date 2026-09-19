@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"server/internal/core/qualitycheck"
 	"strings"
 	"time"
 
@@ -49,6 +50,7 @@ var (
 )
 
 type QualityInspection struct {
+	CheckItems               []qualitycheck.Item
 	ID                       int
 	InspectionNo             string
 	PurchaseReceiptID        int
@@ -129,6 +131,7 @@ type QualityInspectionFromOutsourcingReturnCreate struct {
 }
 
 type QualityInspectionDecision struct {
+	CheckItems   []qualitycheck.Item
 	InspectionID int
 	Result       string
 	InspectedAt  time.Time
@@ -472,6 +475,13 @@ func normalizeQualityInspectionDecision(in QualityInspectionDecision, defaultRes
 	}
 	in.DefectRateOperator = defectRateOperator
 	in.DefectRatePercent = defectRatePercent
+	in.CheckItems, err = NormalizeQualityCheckItems(in.CheckItems, in.Result)
+	if err != nil {
+		return QualityInspectionDecision{}, err
+	}
+	if in.Result == QualityInspectionResultConcession && len(in.CheckItems) > 0 && in.DecisionNote == nil {
+		return QualityInspectionDecision{}, ErrBadParam
+	}
 	if in.InspectionID <= 0 || !IsValidQualityInspectionResult(in.Result) {
 		return QualityInspectionDecision{}, ErrBadParam
 	}

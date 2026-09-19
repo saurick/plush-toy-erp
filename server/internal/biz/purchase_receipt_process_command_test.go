@@ -48,6 +48,7 @@ func TestPurchaseReceiptProcessDomainCommandCreateBindsUsecase(t *testing.T) {
 		IdempotencyKey:        "process:10:node:20:purchase-receipt-create",
 		Payload: map[string]any{
 			"purchase_order_id": float64(3001),
+			"all_remaining":     true,
 			"receipt_no":        "PR-PROCESS-001",
 			"warehouse_id":      float64(7001),
 			"received_at":       "2026-06-30",
@@ -124,6 +125,7 @@ func TestPurchaseReceiptProcessDomainCommandCreateRejectsMismatchedBusinessRef(t
 		IdempotencyKey:  "process:10:node:20:purchase-receipt-create",
 		Payload: map[string]any{
 			"purchase_order_id": float64(3002),
+			"all_remaining":     true,
 			"receipt_no":        "PR-PROCESS-001",
 			"warehouse_id":      float64(7001),
 		},
@@ -169,6 +171,7 @@ func TestPurchaseReceiptProcessDomainCommandCreateRequiresWarehouse(t *testing.T
 func TestNormalizePurchaseReceiptFromPurchaseOrderCreateIdempotencyPayload(t *testing.T) {
 	note := "首批到货"
 	base := PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: 3001,
 		ReceiptNo:       " PR-IDEMPOTENCY-001 ",
 		WarehouseID:     7001,

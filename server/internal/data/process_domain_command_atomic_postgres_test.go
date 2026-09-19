@@ -649,6 +649,7 @@ func TestPurchaseReceiptPostgresProcessCommandCreateRollsBackReceiptLotsAndInspe
 		"receipt_no":        receiptNo,
 		"warehouse_id":      fixtures.warehouseID,
 		"received_at":       "2026-07-11",
+		"all_remaining":     true,
 	}
 	command := claimedPostgresProcessCommandForBusinessRef(
 		t,
@@ -670,12 +671,14 @@ func TestPurchaseReceiptPostgresProcessCommandCreateRollsBackReceiptLotsAndInspe
 	conflictHash := *conflictBefore.DomainCommandResultHash
 	conflictRecordedAt := *conflictBefore.DomainCommandResultRecordedAt
 	payloadBytes, err := json.Marshal(struct {
+		AllRemaining    bool    `json:"all_remaining"`
 		PurchaseOrderID int     `json:"purchase_order_id"`
 		ReceiptNo       string  `json:"receipt_no"`
 		WarehouseID     int     `json:"warehouse_id"`
 		ReceivedAt      string  `json:"received_at"`
 		Note            *string `json:"note"`
 	}{
+		AllRemaining:    true,
 		PurchaseOrderID: orderItem.PurchaseOrderID,
 		ReceiptNo:       receiptNo,
 		WarehouseID:     fixtures.warehouseID,
@@ -719,6 +722,7 @@ func TestPurchaseReceiptPostgresProcessCommandCreateRollsBackReceiptLotsAndInspe
 	beforeReceiptCount, beforeItemCount, beforeLotCount, beforeInspectionCount := countReceiptFacts()
 
 	if _, err := inventoryRepo.CreatePurchaseReceiptFromPurchaseOrderForProcessCommand(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:           true,
 		PurchaseOrderID:        orderItem.PurchaseOrderID,
 		ReceiptNo:              receiptNo,
 		WarehouseID:            fixtures.warehouseID,

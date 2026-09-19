@@ -1491,6 +1491,16 @@ func DefectRatePercentNotNil() predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldNotNull(FieldDefectRatePercent))
 }
 
+// CheckItemsIsNil applies the IsNil predicate on the "check_items" field.
+func CheckItemsIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldCheckItems))
+}
+
+// CheckItemsNotNil applies the NotNil predicate on the "check_items" field.
+func CheckItemsNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldCheckItems))
+}
+
 // DecisionNoteEQ applies the EQ predicate on the "decision_note" field.
 func DecisionNoteEQ(v string) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldDecisionNote, v))

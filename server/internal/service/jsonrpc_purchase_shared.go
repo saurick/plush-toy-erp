@@ -23,6 +23,8 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 		"receipt_no",
 		"warehouse_id",
 		"item_warehouses",
+		"items",
+		"all_remaining",
 		"received_at",
 		"note",
 		"idempotency_key",
@@ -41,7 +43,21 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 	if !valid {
 		return nil, false
 	}
+	lines, linesOK := purchaseReceiptLinesFromParams(pm)
+	allRemaining := false
+	if raw, exists := pm["all_remaining"]; exists {
+		var ok bool
+		allRemaining, ok = raw.(bool)
+		if !ok {
+			return nil, false
+		}
+	}
+	if !linesOK || ((len(lines) == 0) == !allRemaining) {
+		return nil, false
+	}
 	return &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		Lines:           lines,
+		AllRemaining:    allRemaining,
 		ItemWarehouses:  itemWarehouses,
 		PurchaseOrderID: getInt(pm, "purchase_order_id", 0),
 		ReceiptNo:       getString(pm, "receipt_no"),
@@ -64,6 +80,7 @@ func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceip
 		"purchase_order_item_id",
 		"lot_no",
 		"quantity",
+		"declared_quantity",
 		"unit_price",
 		"amount",
 		"source_line_no",
@@ -73,6 +90,10 @@ func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceip
 		return nil, false
 	}
 	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
+	if !ok {
+		return nil, false
+	}
+	declared, ok := getOptionalJSONRPCDecimalString(pm, "declared_quantity")
 	if !ok {
 		return nil, false
 	}
@@ -93,6 +114,7 @@ func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceip
 		PurchaseOrderItemID: getOptionalInt(pm, "purchase_order_item_id"),
 		LotNo:               getWorkflowStringPtr(pm, "lot_no"),
 		Quantity:            quantity,
+		DeclaredQuantity:    declared,
 		UnitPrice:           unitPrice,
 		Amount:              amount,
 		SourceLineNo:        getWorkflowStringPtr(pm, "source_line_no"),
@@ -147,6 +169,8 @@ func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1
 	}
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrDataScopeForbidden):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrBadParam):
@@ -262,6 +286,7 @@ func purchaseReceiptItemToAny(item *biz.PurchaseReceiptItem) map[string]any {
 		"purchase_order_item_id": optionalIntToAny(item.PurchaseOrderItemID),
 		"lot_no":                 optionalStringToAny(item.LotNo),
 		"quantity":               item.Quantity.String(),
+		"declared_quantity":      optionalDecimalString(item.DeclaredQuantity),
 		"unit_price":             optionalDecimalString(item.UnitPrice),
 		"amount":                 optionalDecimalString(item.Amount),
 		"source_line_no":         optionalStringToAny(item.SourceLineNo),

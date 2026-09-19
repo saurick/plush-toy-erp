@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/core/qualitycheck"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/material"
@@ -354,6 +355,12 @@ func (_c *QualityInspectionCreate) SetNillableDefectRatePercent(v *decimal.Decim
 	if v != nil {
 		_c.SetDefectRatePercent(*v)
 	}
+	return _c
+}
+
+// SetCheckItems sets the "check_items" field.
+func (_c *QualityInspectionCreate) SetCheckItems(v []qualitycheck.Item) *QualityInspectionCreate {
+	_c.mutation.SetCheckItems(v)
 	return _c
 }
 
@@ -745,6 +752,10 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 	if value, ok := _c.mutation.DefectRatePercent(); ok {
 		_spec.SetField(qualityinspection.FieldDefectRatePercent, field.TypeOther, value)
 		_node.DefectRatePercent = &value
+	}
+	if value, ok := _c.mutation.CheckItems(); ok {
+		_spec.SetField(qualityinspection.FieldCheckItems, field.TypeJSON, value)
+		_node.CheckItems = value
 	}
 	if value, ok := _c.mutation.DecisionNote(); ok {
 		_spec.SetField(qualityinspection.FieldDecisionNote, field.TypeString, value)

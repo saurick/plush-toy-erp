@@ -1132,6 +1132,7 @@ async function advanceQuality(rpc, inspection, target, plan) {
       method: "pass_quality_inspection",
       params: {
         result: "PASS",
+        check_items: [{ name: "外观", requirement: "符合模拟确认样", observation: "已核对模拟确认样", result: "PASS", scope: "FULL", note: "模拟验收记录" }],
         defect_rate_operator: "APPROX",
         defect_rate_percent: "5",
         inspected_at: plan.anchorDate,
@@ -1142,6 +1143,7 @@ async function advanceQuality(rpc, inspection, target, plan) {
       method: "reject_quality_inspection",
       params: {
         result: "REJECT",
+        check_items: [{ name: "颜色", requirement: "符合模拟确认样", observation: "模拟颜色偏差", result: "FAIL", scope: "FULL", note: "模拟验收记录" }],
         defect_rate_operator: "GT",
         defect_rate_percent: "50",
         inspected_at: plan.anchorDate,
@@ -1394,6 +1396,7 @@ async function createOrReadReceipt(rpc, receiptPlan, plan) {
     const method = "create_purchase_receipt_from_purchase_order";
     const params = {
       purchase_order_id: positiveID(sourceOrder.id, "purchaseOrder.id"),
+      all_remaining: true,
       receipt_no: receiptPlan.receiptNo,
       warehouse_id: receiptPlan.warehouseId,
       received_at: plan.anchorDate,

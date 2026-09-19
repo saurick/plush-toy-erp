@@ -150,6 +150,7 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 		t.Fatalf("disable unit after purchase order approval failed: %v", err)
 	}
 	receipt, err := inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: result.Order.ID,
 		ReceiptNo:       "PR-PO-001",
 		WarehouseID:     warehouse.ID,

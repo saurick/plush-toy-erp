@@ -1039,12 +1039,23 @@ func materialSupplyPurchaseReceiptCreateExecutionFromParams(pm map[string]any) (
 	receiptNo := strings.TrimSpace(getString(pm, "receipt_no"))
 	warehouseID := getInt(pm, "warehouse_id", 0)
 	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
-	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || receiptNo == "" || warehouseID <= 0 || idempotencyKey == "" {
+	lines, linesOK := purchaseReceiptLinesFromParams(pm)
+	allRemaining, _ := pm["all_remaining"].(bool)
+	if !linesOK || ((len(lines) == 0) == !allRemaining) {
+		return nil, false
+	}
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || receiptNo == "" || (warehouseID <= 0 && len(lines) == 0) || idempotencyKey == "" {
 		return nil, false
 	}
 	payload := map[string]any{
 		"receipt_no":   receiptNo,
 		"warehouse_id": warehouseID,
+	}
+	if len(lines) > 0 {
+		payload["items"] = lines
+		delete(payload, "warehouse_id")
+	} else {
+		payload["all_remaining"] = true
 	}
 	putPositiveIntPayload(payload, "purchase_order_id", purchaseOrderID)
 	putStringPayload(payload, "received_at", getString(pm, "received_at"))

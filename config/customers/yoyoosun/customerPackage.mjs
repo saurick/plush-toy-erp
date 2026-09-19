@@ -267,7 +267,7 @@ export const yoyoosunCustomerPackage = Object.freeze({
         "inventory",
       ]),
       guardrail:
-        "采购订单批准只形成采购承诺；到货后先形成采购入库草稿和逐行待检，再由正式 IQC 判定；只有全部行合格或让步接收才允许 POSTED 入库。当前流程预览不替代采购、质检或库存 usecase。",
+        "采购订单批准只形成采购承诺；到货后由归属仓库的 IQC 录入本次实点数量、可选送货标示数量和逐项检查；分批与分卷均追溯原采购行，自动形成入库草稿和逐行待检，再由正式 IQC 判定；只有全部行合格或让步接收才允许 POSTED 入库。当前流程预览不替代采购、质检或库存 usecase。",
     },
     {
       key: "production_to_inventory",

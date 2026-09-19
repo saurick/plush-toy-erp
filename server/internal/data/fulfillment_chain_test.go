@@ -32,7 +32,7 @@ func TestFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T) {
 	vendor := f.client.Supplier.Create().SetCode("HANDOFF-VENDOR").SetName("测试加工厂").SetSupplierType("outsourcing").SaveX(ctx)
 
 	sourceItem := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, f.client, inventoryTestFixtures{materialID: f.materialID, unitID: f.unitID, warehouseID: warehouse.ID}, "CHAIN", wip.MaterialRequirements[0].PlannedQuantity)
-	receipt, err := inv.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{PurchaseOrderID: sourceItem.PurchaseOrderID, ReceiptNo: "PR-HANDOFF-CHAIN", WarehouseID: warehouse.ID, IdempotencyKey: "chain-arrival"})
+	receipt, err := inv.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{AllRemaining: true, PurchaseOrderID: sourceItem.PurchaseOrderID, ReceiptNo: "PR-HANDOFF-CHAIN", WarehouseID: warehouse.ID, IdempotencyKey: "chain-arrival"})
 	if err != nil {
 		t.Fatal(err)
 	}

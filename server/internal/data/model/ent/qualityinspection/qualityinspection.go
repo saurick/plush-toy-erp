@@ -63,6 +63,8 @@ const (
 	FieldDefectRateOperator = "defect_rate_operator"
 	// FieldDefectRatePercent holds the string denoting the defect_rate_percent field in the database.
 	FieldDefectRatePercent = "defect_rate_percent"
+	// FieldCheckItems holds the string denoting the check_items field in the database.
+	FieldCheckItems = "check_items"
 	// FieldDecisionNote holds the string denoting the decision_note field in the database.
 	FieldDecisionNote = "decision_note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -172,6 +174,7 @@ var Columns = []string{
 	FieldSupersededReason,
 	FieldDefectRateOperator,
 	FieldDefectRatePercent,
+	FieldCheckItems,
 	FieldDecisionNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,

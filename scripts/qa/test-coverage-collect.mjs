@@ -133,6 +133,16 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
   ]),
   "fact-purchase": Object.freeze([
     goScenario(
+      "iqc-partial-arrival-evidence",
+      "server/internal/data",
+      "TestIncomingAcceptancePartialEvidenceAndCorrection",
+    ),
+    goScenario(
+      "iqc-receiving-permissions",
+      "server/internal/service",
+      "TestJsonrpcIncomingAcceptanceRoleBoundary",
+    ),
+    goScenario(
       "purchase-receipt-process-command",
       "server/internal/biz",
       "TestPurchaseReceiptProcessDomainCommandCreateRequiresWarehouse",

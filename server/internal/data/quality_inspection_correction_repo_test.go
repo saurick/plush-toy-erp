@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 	"testing"
 
 	"server/internal/biz"
@@ -49,6 +50,9 @@ func TestQualityInspectionCorrectionSupersedesResultAndReopensHold(t *testing.T)
 	gotOriginal, err := uc.GetQualityInspection(ctx, original.ID)
 	if err != nil || gotOriginal.SupersededAt == nil || gotOriginal.SupersededBy == nil || *gotOriginal.SupersededBy != 17 || gotOriginal.SupersededReason == nil {
 		t.Fatalf("original=%+v err=%v", gotOriginal, err)
+	}
+	if len(original.CheckItems) == 0 || !slices.Equal(gotOriginal.CheckItems, original.CheckItems) || len(corrected.CheckItems) != 0 {
+		t.Fatal("correction must preserve original evidence and require a fresh inspection")
 	}
 	assertLotStatus(t, ctx, uc, *item.LotID, biz.InventoryLotHold)
 

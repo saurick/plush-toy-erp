@@ -31,6 +31,7 @@ func (d *jsonrpcDispatcher) handlePurchase(
 		"add_purchase_receipt_item",
 		"post_purchase_receipt",
 		"cancel_purchase_receipt",
+		"cancel_purchase_receipt_draft",
 		"get_purchase_receipt",
 		"list_purchase_receipts":
 		return d.handlePurchaseReceipt(ctx, method, id, pm, claims.UserID)

@@ -132,7 +132,7 @@ func TestPurchaseReceiptWarehousePerLineAndAtomicValidation(t *testing.T) {
 	m := client.Material.Create().SetCode("AUX-M").SetName("线").SetStockCategory(biz.MaterialStockAuxiliary).SetDefaultUnitID(f.unitID).SetDefaultWarehouseID(auxiliary.ID).SaveX(ctx)
 	second := client.PurchaseOrderItem.Create().SetPurchaseOrderID(first.PurchaseOrderID).SetLineNo(2).SetMaterialID(m.ID).SetUnitID(f.unitID).SetPurchasedQuantity(decimal.NewFromInt(20)).SetLineStatus(biz.PurchaseOrderItemStatusOpen).SaveX(ctx)
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(d, log.NewStdLogger(io.Discard)))
-	input := &biz.PurchaseReceiptFromPurchaseOrderCreate{PurchaseOrderID: first.PurchaseOrderID, ReceiptNo: "MIXED-WH", ItemWarehouses: map[int]int{first.ID: main.ID, second.ID: main.ID}, IdempotencyKey: "mixed-wh"}
+	input := &biz.PurchaseReceiptFromPurchaseOrderCreate{AllRemaining: true, PurchaseOrderID: first.PurchaseOrderID, ReceiptNo: "MIXED-WH", ItemWarehouses: map[int]int{first.ID: main.ID, second.ID: main.ID}, IdempotencyKey: "mixed-wh"}
 	before := client.PurchaseReceipt.Query().CountX(ctx)
 	if _, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, input); !errors.Is(err, biz.ErrWarehouseCategoryMismatch) {
 		t.Fatalf("mixed material order accepted one wrong warehouse: %v", err)

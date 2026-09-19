@@ -3,14 +3,17 @@ package data
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"server/internal/biz"
+	"server/internal/core/qualitycheck"
 	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/predicate"
@@ -818,6 +821,11 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(
 	if in == nil || in.InspectionID <= 0 {
 		return nil, biz.ErrBadParam
 	}
+	checks, checkErr := biz.NormalizeQualityCheckItems(in.CheckItems, in.Result)
+	if checkErr != nil {
+		return nil, checkErr
+	}
+	in.CheckItems = checks
 	preview, err := r.data.postgres.QualityInspection.Get(ctx, in.InspectionID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -842,12 +850,15 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(
 	if err != nil {
 		return nil, err
 	}
+	if row.PurchaseReceiptItemID != nil && len(in.CheckItems) == 0 {
+		return nil, biz.ErrBadParam
+	}
 	transition, ok := corestatus.DecideQualityInspection(row.Status, targetInspectionStatus)
 	if !ok {
 		return nil, biz.ErrBadParam
 	}
 	if !transition.Changed {
-		if !qualityInspectionDefectRateMatches(row, in) {
+		if !qualityInspectionDecisionMatches(row, in, targetInspectionStatus) {
 			return nil, biz.ErrIdempotencyConflict
 		}
 		if command != nil {
@@ -893,7 +904,7 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(
 	if decisionNote == nil {
 		decisionNote = row.DecisionNote
 	}
-	if err := updateQualityInspectionDecision(ctx, tx, row.ID, targetInspectionStatus, in.Result, in.InspectedAt, inspectorID, defectRateOperator, defectRatePercent, decisionNote); err != nil {
+	if err := updateQualityInspectionDecision(ctx, tx, row.ID, targetInspectionStatus, in.Result, in.InspectedAt, inspectorID, defectRateOperator, defectRatePercent, decisionNote, in.CheckItems); err != nil {
 		return nil, err
 	}
 	if targetLotStatus != lot.Status {
@@ -950,7 +961,7 @@ func qualityInspectionLotStatusReason(note *string, fallback string) string {
 func qualityInspectionDecisionMatches(row *ent.QualityInspection, in *biz.QualityInspectionDecision, targetStatus string) bool {
 	if row == nil || in == nil || row.Status != targetStatus || row.Result == nil || *row.Result != in.Result ||
 		row.InspectedAt == nil || (!in.InspectedAtDefaulted && !row.InspectedAt.Equal(in.InspectedAt)) ||
-		!qualityInspectionDefectRateMatches(row, in) {
+		!qualityInspectionDefectRateMatches(row, in) || !slices.Equal(row.CheckItems, in.CheckItems) {
 		return false
 	}
 	inspectorID := in.InspectorID
@@ -1098,6 +1109,7 @@ func (r *inventoryRepo) decideProductionWIPQualityInspection(
 		defectRateOperator,
 		defectRatePercent,
 		decisionNote,
+		in.CheckItems,
 	); err != nil {
 		return nil, err
 	}
@@ -1684,11 +1696,15 @@ func updateQualityInspectionSubmitted(ctx context.Context, tx *inventoryDBTx, in
 	return requireQualityInspectionRowsAffected(result)
 }
 
-func updateQualityInspectionDecision(ctx context.Context, tx *inventoryDBTx, inspectionID int, status string, result string, inspectedAt time.Time, inspectorID *int, defectRateOperator *string, defectRatePercent *decimal.Decimal, decisionNote *string) error {
-	p := inventorySQLPlaceholders(tx.dialect, 10)
+func updateQualityInspectionDecision(ctx context.Context, tx *inventoryDBTx, inspectionID int, status string, result string, inspectedAt time.Time, inspectorID *int, defectRateOperator *string, defectRatePercent *decimal.Decimal, decisionNote *string, checkItems []qualitycheck.Item) error {
+	evidence, err := json.Marshal(checkItems)
+	if err != nil {
+		return err
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 11)
 	query := fmt.Sprintf(
-		`UPDATE quality_inspections SET status = %s, result = %s, inspected_at = %s, inspector_id = %s, defect_rate_operator = %s, defect_rate_percent = %s, decision_note = %s, updated_at = %s WHERE id = %s AND status = %s`,
-		p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9],
+		`UPDATE quality_inspections SET status = %s, result = %s, inspected_at = %s, inspector_id = %s, defect_rate_operator = %s, defect_rate_percent = %s, decision_note = %s, updated_at = %s, check_items = %s WHERE id = %s AND status = %s`,
+		p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10],
 	)
 	resultRow, err := tx.sqlTx.ExecContext(ctx, query,
 		status,
@@ -1699,6 +1715,7 @@ func updateQualityInspectionDecision(ctx context.Context, tx *inventoryDBTx, ins
 		optionalDecimalSQLValue(defectRatePercent),
 		optionalStringSQLValue(decisionNote),
 		time.Now(),
+		string(evidence),
 		inspectionID,
 		biz.QualityInspectionStatusSubmitted,
 	)
@@ -1899,6 +1916,7 @@ func entQualityInspectionToBiz(row *ent.QualityInspection) *biz.QualityInspectio
 		InspectorID:              row.InspectorID,
 		DefectRateOperator:       row.DefectRateOperator,
 		DefectRatePercent:        row.DefectRatePercent,
+		CheckItems:               row.CheckItems,
 		DecisionNote:             row.DecisionNote,
 		CorrectionOfInspectionID: row.CorrectionOfInspectionID,
 		SupersededAt:             row.SupersededAt,

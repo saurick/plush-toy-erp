@@ -168,6 +168,26 @@ func (_u *PurchaseReceiptItemUpdate) SetNillableQuantity(v *decimal.Decimal) *Pu
 	return _u
 }
 
+// SetDeclaredQuantity sets the "declared_quantity" field.
+func (_u *PurchaseReceiptItemUpdate) SetDeclaredQuantity(v decimal.Decimal) *PurchaseReceiptItemUpdate {
+	_u.mutation.SetDeclaredQuantity(v)
+	return _u
+}
+
+// SetNillableDeclaredQuantity sets the "declared_quantity" field if the given value is not nil.
+func (_u *PurchaseReceiptItemUpdate) SetNillableDeclaredQuantity(v *decimal.Decimal) *PurchaseReceiptItemUpdate {
+	if v != nil {
+		_u.SetDeclaredQuantity(*v)
+	}
+	return _u
+}
+
+// ClearDeclaredQuantity clears the value of the "declared_quantity" field.
+func (_u *PurchaseReceiptItemUpdate) ClearDeclaredQuantity() *PurchaseReceiptItemUpdate {
+	_u.mutation.ClearDeclaredQuantity()
+	return _u
+}
+
 // SetUnitPrice sets the "unit_price" field.
 func (_u *PurchaseReceiptItemUpdate) SetUnitPrice(v decimal.Decimal) *PurchaseReceiptItemUpdate {
 	_u.mutation.SetUnitPrice(v)
@@ -621,6 +641,12 @@ func (_u *PurchaseReceiptItemUpdate) sqlSave(ctx context.Context) (_node int, er
 	}
 	if value, ok := _u.mutation.Quantity(); ok {
 		_spec.SetField(purchasereceiptitem.FieldQuantity, field.TypeOther, value)
+	}
+	if value, ok := _u.mutation.DeclaredQuantity(); ok {
+		_spec.SetField(purchasereceiptitem.FieldDeclaredQuantity, field.TypeOther, value)
+	}
+	if _u.mutation.DeclaredQuantityCleared() {
+		_spec.ClearField(purchasereceiptitem.FieldDeclaredQuantity, field.TypeOther)
 	}
 	if value, ok := _u.mutation.UnitPrice(); ok {
 		_spec.SetField(purchasereceiptitem.FieldUnitPrice, field.TypeOther, value)
@@ -1120,6 +1146,26 @@ func (_u *PurchaseReceiptItemUpdateOne) SetNillableQuantity(v *decimal.Decimal) 
 	return _u
 }
 
+// SetDeclaredQuantity sets the "declared_quantity" field.
+func (_u *PurchaseReceiptItemUpdateOne) SetDeclaredQuantity(v decimal.Decimal) *PurchaseReceiptItemUpdateOne {
+	_u.mutation.SetDeclaredQuantity(v)
+	return _u
+}
+
+// SetNillableDeclaredQuantity sets the "declared_quantity" field if the given value is not nil.
+func (_u *PurchaseReceiptItemUpdateOne) SetNillableDeclaredQuantity(v *decimal.Decimal) *PurchaseReceiptItemUpdateOne {
+	if v != nil {
+		_u.SetDeclaredQuantity(*v)
+	}
+	return _u
+}
+
+// ClearDeclaredQuantity clears the value of the "declared_quantity" field.
+func (_u *PurchaseReceiptItemUpdateOne) ClearDeclaredQuantity() *PurchaseReceiptItemUpdateOne {
+	_u.mutation.ClearDeclaredQuantity()
+	return _u
+}
+
 // SetUnitPrice sets the "unit_price" field.
 func (_u *PurchaseReceiptItemUpdateOne) SetUnitPrice(v decimal.Decimal) *PurchaseReceiptItemUpdateOne {
 	_u.mutation.SetUnitPrice(v)
@@ -1603,6 +1649,12 @@ func (_u *PurchaseReceiptItemUpdateOne) sqlSave(ctx context.Context) (_node *Pur
 	}
 	if value, ok := _u.mutation.Quantity(); ok {
 		_spec.SetField(purchasereceiptitem.FieldQuantity, field.TypeOther, value)
+	}
+	if value, ok := _u.mutation.DeclaredQuantity(); ok {
+		_spec.SetField(purchasereceiptitem.FieldDeclaredQuantity, field.TypeOther, value)
+	}
+	if _u.mutation.DeclaredQuantityCleared() {
+		_spec.ClearField(purchasereceiptitem.FieldDeclaredQuantity, field.TypeOther)
 	}
 	if value, ok := _u.mutation.UnitPrice(); ok {
 		_spec.SetField(purchasereceiptitem.FieldUnitPrice, field.TypeOther, value)

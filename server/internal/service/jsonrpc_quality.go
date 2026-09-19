@@ -300,6 +300,7 @@ func qualityInspectionDecisionFromParams(pm map[string]any) (*biz.QualityInspect
 		"defect_rate_operator",
 		"defect_rate_percent",
 		"decision_note",
+		"check_items",
 	) {
 		return nil, false
 	}
@@ -311,7 +312,12 @@ func qualityInspectionDecisionFromParams(pm map[string]any) (*biz.QualityInspect
 	if !ok {
 		return nil, false
 	}
+	checkItems, ok := qualityCheckItemsFromParams(pm)
+	if !ok {
+		return nil, false
+	}
 	return &biz.QualityInspectionDecision{
+		CheckItems:         checkItems,
 		InspectionID:       getInt(pm, "id", 0),
 		Result:             getString(pm, "result"),
 		InspectedAt:        optionalTimeValue(inspectedAt),
@@ -552,6 +558,7 @@ func qualityInspectionToAny(item *biz.QualityInspection) map[string]any {
 		"inspector_id":                optionalIntToAny(item.InspectorID),
 		"defect_rate_operator":        optionalStringToAny(item.DefectRateOperator),
 		"defect_rate_percent":         optionalDecimalString(item.DefectRatePercent),
+		"check_items":                 qualityCheckItemsToAny(item.CheckItems),
 		"decision_note":               optionalStringToAny(item.DecisionNote),
 		"correction_of_inspection_id": optionalIntToAny(item.CorrectionOfInspectionID),
 		"superseded_at":               optionalUnix(item.SupersededAt),

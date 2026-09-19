@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/core/qualitycheck"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/material"
@@ -20,6 +21,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/shopspring/decimal"
 )
@@ -507,6 +509,24 @@ func (_u *QualityInspectionUpdate) ClearDefectRatePercent() *QualityInspectionUp
 	return _u
 }
 
+// SetCheckItems sets the "check_items" field.
+func (_u *QualityInspectionUpdate) SetCheckItems(v []qualitycheck.Item) *QualityInspectionUpdate {
+	_u.mutation.SetCheckItems(v)
+	return _u
+}
+
+// AppendCheckItems appends value to the "check_items" field.
+func (_u *QualityInspectionUpdate) AppendCheckItems(v []qualitycheck.Item) *QualityInspectionUpdate {
+	_u.mutation.AppendCheckItems(v)
+	return _u
+}
+
+// ClearCheckItems clears the value of the "check_items" field.
+func (_u *QualityInspectionUpdate) ClearCheckItems() *QualityInspectionUpdate {
+	_u.mutation.ClearCheckItems()
+	return _u
+}
+
 // SetDecisionNote sets the "decision_note" field.
 func (_u *QualityInspectionUpdate) SetDecisionNote(v string) *QualityInspectionUpdate {
 	_u.mutation.SetDecisionNote(v)
@@ -947,6 +967,17 @@ func (_u *QualityInspectionUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if _u.mutation.DefectRatePercentCleared() {
 		_spec.ClearField(qualityinspection.FieldDefectRatePercent, field.TypeOther)
+	}
+	if value, ok := _u.mutation.CheckItems(); ok {
+		_spec.SetField(qualityinspection.FieldCheckItems, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedCheckItems(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, qualityinspection.FieldCheckItems, value)
+		})
+	}
+	if _u.mutation.CheckItemsCleared() {
+		_spec.ClearField(qualityinspection.FieldCheckItems, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.DecisionNote(); ok {
 		_spec.SetField(qualityinspection.FieldDecisionNote, field.TypeString, value)
@@ -1711,6 +1742,24 @@ func (_u *QualityInspectionUpdateOne) ClearDefectRatePercent() *QualityInspectio
 	return _u
 }
 
+// SetCheckItems sets the "check_items" field.
+func (_u *QualityInspectionUpdateOne) SetCheckItems(v []qualitycheck.Item) *QualityInspectionUpdateOne {
+	_u.mutation.SetCheckItems(v)
+	return _u
+}
+
+// AppendCheckItems appends value to the "check_items" field.
+func (_u *QualityInspectionUpdateOne) AppendCheckItems(v []qualitycheck.Item) *QualityInspectionUpdateOne {
+	_u.mutation.AppendCheckItems(v)
+	return _u
+}
+
+// ClearCheckItems clears the value of the "check_items" field.
+func (_u *QualityInspectionUpdateOne) ClearCheckItems() *QualityInspectionUpdateOne {
+	_u.mutation.ClearCheckItems()
+	return _u
+}
+
 // SetDecisionNote sets the "decision_note" field.
 func (_u *QualityInspectionUpdateOne) SetDecisionNote(v string) *QualityInspectionUpdateOne {
 	_u.mutation.SetDecisionNote(v)
@@ -2181,6 +2230,17 @@ func (_u *QualityInspectionUpdateOne) sqlSave(ctx context.Context) (_node *Quali
 	}
 	if _u.mutation.DefectRatePercentCleared() {
 		_spec.ClearField(qualityinspection.FieldDefectRatePercent, field.TypeOther)
+	}
+	if value, ok := _u.mutation.CheckItems(); ok {
+		_spec.SetField(qualityinspection.FieldCheckItems, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedCheckItems(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, qualityinspection.FieldCheckItems, value)
+		})
+	}
+	if _u.mutation.CheckItemsCleared() {
+		_spec.ClearField(qualityinspection.FieldCheckItems, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.DecisionNote(); ok {
 		_spec.SetField(qualityinspection.FieldDecisionNote, field.TypeString, value)

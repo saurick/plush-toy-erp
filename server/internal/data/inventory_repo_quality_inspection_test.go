@@ -8,16 +8,27 @@ import (
 	"time"
 
 	"server/internal/biz"
+	"server/internal/core/qualitycheck"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
 )
+
+func incomingEvidenceForTest(result string) []qualitycheck.Item {
+	outcome := "PASS"
+	if result == biz.QualityInspectionResultReject || result == biz.QualityInspectionResultConcession {
+		outcome = "FAIL"
+	}
+	return []qualitycheck.Item{{Name: "外观", Requirement: "符合确认样", Observation: "按模拟样本检查", Result: outcome, Scope: "FULL"}}
+}
 
 func approximateQualityInspectionDecision(inspectionID int, result string) *biz.QualityInspectionDecision {
 	operator := biz.QualityInspectionDefectRateOperatorApprox
 	percent := decimal.NewFromInt(5)
 	return &biz.QualityInspectionDecision{
 		InspectionID:       inspectionID,
+		CheckItems:         incomingEvidenceForTest(result),
+		DecisionNote:       stringPtr("模拟检验记录"),
 		Result:             result,
 		DefectRateOperator: &operator,
 		DefectRatePercent:  &percent,
@@ -98,6 +109,7 @@ func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
 	passRatePercent := mustDecimal(t, "5")
 	passed, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
 		InspectionID:       draft.ID,
+		CheckItems:         incomingEvidenceForTest(biz.QualityInspectionResultPass),
 		Result:             biz.QualityInspectionResultPass,
 		InspectedAt:        inspectedAt,
 		InspectorID:        &inspectorID,
@@ -118,7 +130,7 @@ func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
 	}
 	assertLotStatus(t, ctx, uc, *passItem.LotID, biz.InventoryLotActive)
 	assertInventoryTxnCount(t, ctx, client, beforeQualityTxnCount)
-	if replay, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: draft.ID, DefectRateOperator: &passRateOperator, DefectRatePercent: &passRatePercent}); err != nil || replay.Status != biz.QualityInspectionStatusPassed {
+	if replay, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: draft.ID, CheckItems: incomingEvidenceForTest(biz.QualityInspectionResultPass), DefectRateOperator: &passRateOperator, DefectRatePercent: &passRatePercent}); err != nil || replay.Status != biz.QualityInspectionStatusPassed {
 		t.Fatalf("repeat pass should be idempotent passed, row=%v err=%v", replay, err)
 	}
 	if _, err := uc.CancelQualityInspection(ctx, draft.ID, nil); !errors.Is(err, biz.ErrBadParam) {
@@ -146,7 +158,7 @@ func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
 	}
 	rejectRateOperator := biz.QualityInspectionDefectRateOperatorGT
 	rejectRatePercent := mustDecimal(t, "50")
-	if _, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID, DefectRateOperator: &rejectRateOperator, DefectRatePercent: &rejectRatePercent, DecisionNote: stringPtr("拒收")}); err != nil {
+	if _, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID, CheckItems: incomingEvidenceForTest(biz.QualityInspectionResultReject), DefectRateOperator: &rejectRateOperator, DefectRatePercent: &rejectRatePercent, DecisionNote: stringPtr("拒收")}); err != nil {
 		t.Fatalf("reject quality inspection failed: %v", err)
 	}
 	rejected, err := uc.GetQualityInspection(ctx, rejectDraft.ID)
@@ -161,7 +173,7 @@ func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
 	}
 	rejectItem := rejectReceipt.Items[0]
 	assertLotStatus(t, ctx, uc, *rejectItem.LotID, biz.InventoryLotRejected)
-	if replay, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID, DefectRateOperator: &rejectRateOperator, DefectRatePercent: &rejectRatePercent}); err != nil || replay.Status != biz.QualityInspectionStatusRejected {
+	if replay, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID, CheckItems: incomingEvidenceForTest(biz.QualityInspectionResultReject), DefectRateOperator: &rejectRateOperator, DefectRatePercent: &rejectRatePercent}); err != nil || replay.Status != biz.QualityInspectionStatusRejected {
 		t.Fatalf("repeat reject should be idempotent rejected, row=%v err=%v", replay, err)
 	}
 	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{

@@ -83,7 +83,7 @@ func TestSourceDocumentPostgresReceiptCreateVsPurchaseCancelUsesOneSourceLock(t 
 			order := client.PurchaseOrder.Create().SetPurchaseOrderNo("PO-SETTLE-PG-" + name + "-" + fixtures.suffix).SetSupplierID(supplier.ID).SetSupplierSnapshot(map[string]any{"name": "supplier"}).SetPurchaseDate(time.Now().UTC()).SetLifecycleStatus(biz.PurchaseOrderStatusApproved).SaveX(ctx)
 			client.PurchaseOrderItem.Create().SetPurchaseOrderID(order.ID).SetLineNo(1).SetMaterialID(fixtures.materialID).SetUnitID(fixtures.unitID).SetPurchasedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
 			create := func() error {
-				_, err := inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{ReceiptNo: receiptNo, PurchaseOrderID: order.ID, WarehouseID: fixtures.warehouseID, ReceivedAt: time.Now().UTC(), IdempotencyKey: "receipt-settle-pg-" + name + "-" + fixtures.suffix})
+				_, err := inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{AllRemaining: true, ReceiptNo: receiptNo, PurchaseOrderID: order.ID, WarehouseID: fixtures.warehouseID, ReceivedAt: time.Now().UTC(), IdempotencyKey: "receipt-settle-pg-" + name + "-" + fixtures.suffix})
 				return err
 			}
 			cancel := func() error {

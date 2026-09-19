@@ -36,6 +36,11 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if in.WarehouseID > 0 && !scope.Allows(in.WarehouseID) {
 			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 		}
+		for _, line := range in.Lines {
+			if !scope.Allows(line.WarehouseID) {
+				return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+			}
+		}
 		for _, warehouseID := range in.ItemWarehouses {
 			if !scope.Allows(warehouseID) {
 				return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
@@ -67,6 +72,19 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.PostPurchaseReceipt(ctx, getInt(pm, "id", 0))
+		return id, purchaseReceiptResult(ctx, d, item, err), nil
+	case "cancel_purchase_receipt_draft":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCancelDraft); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {
+			return id, res, nil
+		}
+		scope, res := d.currentWarehouseDataScope(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		item, err := d.inventoryUC.CancelPurchaseReceiptDraft(ctx, getInt(pm, "id", 0), actorID, scope)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "cancel_purchase_receipt":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInboundConfirm); res != nil {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"server/internal/biz"
+	"server/internal/core/qualitycheck"
 	datarepo "server/internal/data"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/qualityinspection"
@@ -78,6 +79,7 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 		"id":                   float64(inspectionID),
 		"result":               biz.QualityInspectionResultConcession,
 		"inspected_at":         "2026-06-17",
+		"check_items":          qualityCheckItemsToAny(rpcIncomingEvidence("FAIL")),
 		"defect_rate_operator": "approx",
 		"defect_rate_percent":  "5.0",
 		"decision_note":        "让步接收",
@@ -142,6 +144,7 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 	}
 	_, rejectRes, err := j.handleQuality(adminCtx, "reject_quality_inspection", "6", mustJSONRPCStruct(t, map[string]any{
 		"id":                   float64(rejectDraft),
+		"check_items":          qualityCheckItemsToAny(rpcIncomingEvidence("FAIL")),
 		"defect_rate_operator": biz.QualityInspectionDefectRateOperatorGT,
 		"defect_rate_percent":  "50",
 		"decision_note":        "尺寸不符",
@@ -198,6 +201,7 @@ func TestJsonrpcDispatcher_CorrectQualityInspectionResultContract(t *testing.T) 
 	defectRate := decimal.NewFromInt(40)
 	rejected, err := j.inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{
 		InspectionID: inspections[0].ID, Result: biz.QualityInspectionResultReject,
+		CheckItems:         rpcIncomingEvidence("FAIL"),
 		DefectRateOperator: stringPtr(biz.QualityInspectionDefectRateOperatorGT), DefectRatePercent: &defectRate,
 	})
 	if err != nil {
@@ -788,6 +792,7 @@ func passPurchaseReceiptQualityForServiceTest(t *testing.T, ctx context.Context,
 		percent := decimal.NewFromInt(5)
 		if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
 			InspectionID:       inspection.ID,
+			CheckItems:         rpcIncomingEvidence("PASS"),
 			Result:             biz.QualityInspectionResultPass,
 			DefectRateOperator: &operator,
 			DefectRatePercent:  &percent,
@@ -850,4 +855,8 @@ func mustDecimal(t *testing.T, value string) decimal.Decimal {
 		t.Fatalf("parse decimal %s failed: %v", value, err)
 	}
 	return parsed
+}
+
+func rpcIncomingEvidence(result string) []qualitycheck.Item {
+	return []qualitycheck.Item{{Name: "外观", Requirement: "符合样品", Observation: "已核对模拟样品", Result: result, Scope: "FULL"}}
 }

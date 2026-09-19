@@ -140,7 +140,6 @@ func (PurchaseReturnItem) Indexes() []ent.Index {
 		index.Fields("warehouse_id"),
 		index.Fields("lot_id"),
 		index.Fields("return_id", "source_line_no").
-			Unique().
 			Annotations(
 				entsql.IndexWhere("source_line_no IS NOT NULL AND source_line_no <> ''"),
 			),

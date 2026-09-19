@@ -3,7 +3,9 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
+	"server/internal/core/qualitycheck"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/productionwipbatch"
@@ -72,6 +74,8 @@ type QualityInspection struct {
 	DefectRateOperator *string `json:"defect_rate_operator,omitempty"`
 	// DefectRatePercent holds the value of the "defect_rate_percent" field.
 	DefectRatePercent *decimal.Decimal `json:"defect_rate_percent,omitempty"`
+	// CheckItems holds the value of the "check_items" field.
+	CheckItems []qualitycheck.Item `json:"check_items,omitempty"`
 	// DecisionNote holds the value of the "decision_note" field.
 	DecisionNote *string `json:"decision_note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -198,6 +202,8 @@ func (*QualityInspection) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case qualityinspection.FieldDefectRatePercent:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
+		case qualityinspection.FieldCheckItems:
+			values[i] = new([]byte)
 		case qualityinspection.FieldID, qualityinspection.FieldPurchaseReceiptID, qualityinspection.FieldPurchaseReceiptItemID, qualityinspection.FieldInventoryLotID, qualityinspection.FieldProductionWipBatchID, qualityinspection.FieldMaterialID, qualityinspection.FieldWarehouseID, qualityinspection.FieldSourceID, qualityinspection.FieldSubjectID, qualityinspection.FieldInspectorID, qualityinspection.FieldCorrectionOfInspectionID, qualityinspection.FieldSupersededBy:
 			values[i] = new(sql.NullInt64)
 		case qualityinspection.FieldInspectionNo, qualityinspection.FieldGateCode, qualityinspection.FieldSourceType, qualityinspection.FieldInspectionType, qualityinspection.FieldSubjectType, qualityinspection.FieldStatus, qualityinspection.FieldResult, qualityinspection.FieldOriginalLotStatus, qualityinspection.FieldSupersededReason, qualityinspection.FieldDefectRateOperator, qualityinspection.FieldDecisionNote:
@@ -389,6 +395,14 @@ func (_m *QualityInspection) assignValues(columns []string, values []any) error 
 			} else if value.Valid {
 				_m.DefectRatePercent = new(decimal.Decimal)
 				*_m.DefectRatePercent = *value.S.(*decimal.Decimal)
+			}
+		case qualityinspection.FieldCheckItems:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field check_items", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.CheckItems); err != nil {
+					return fmt.Errorf("unmarshal field check_items: %w", err)
+				}
 			}
 		case qualityinspection.FieldDecisionNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -598,6 +612,9 @@ func (_m *QualityInspection) String() string {
 		builder.WriteString("defect_rate_percent=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("check_items=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CheckItems))
 	builder.WriteString(", ")
 	if v := _m.DecisionNote; v != nil {
 		builder.WriteString("decision_note=")

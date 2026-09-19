@@ -31,6 +31,8 @@ const (
 	FieldLotNo = "lot_no"
 	// FieldQuantity holds the string denoting the quantity field in the database.
 	FieldQuantity = "quantity"
+	// FieldDeclaredQuantity holds the string denoting the declared_quantity field in the database.
+	FieldDeclaredQuantity = "declared_quantity"
 	// FieldUnitPrice holds the string denoting the unit_price field in the database.
 	FieldUnitPrice = "unit_price"
 	// FieldAmount holds the string denoting the amount field in the database.
@@ -143,6 +145,7 @@ var Columns = []string{
 	FieldPurchaseOrderItemID,
 	FieldLotNo,
 	FieldQuantity,
+	FieldDeclaredQuantity,
 	FieldUnitPrice,
 	FieldAmount,
 	FieldSourceLineNo,
@@ -246,6 +249,11 @@ func ByLotNo(opts ...sql.OrderTermOption) OrderOption {
 // ByQuantity orders the results by the quantity field.
 func ByQuantity(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldQuantity, opts...).ToFunc()
+}
+
+// ByDeclaredQuantity orders the results by the declared_quantity field.
+func ByDeclaredQuantity(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDeclaredQuantity, opts...).ToFunc()
 }
 
 // ByUnitPrice orders the results by the unit_price field.

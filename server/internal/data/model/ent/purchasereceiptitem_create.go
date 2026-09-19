@@ -102,6 +102,20 @@ func (_c *PurchaseReceiptItemCreate) SetQuantity(v decimal.Decimal) *PurchaseRec
 	return _c
 }
 
+// SetDeclaredQuantity sets the "declared_quantity" field.
+func (_c *PurchaseReceiptItemCreate) SetDeclaredQuantity(v decimal.Decimal) *PurchaseReceiptItemCreate {
+	_c.mutation.SetDeclaredQuantity(v)
+	return _c
+}
+
+// SetNillableDeclaredQuantity sets the "declared_quantity" field if the given value is not nil.
+func (_c *PurchaseReceiptItemCreate) SetNillableDeclaredQuantity(v *decimal.Decimal) *PurchaseReceiptItemCreate {
+	if v != nil {
+		_c.SetDeclaredQuantity(*v)
+	}
+	return _c
+}
+
 // SetUnitPrice sets the "unit_price" field.
 func (_c *PurchaseReceiptItemCreate) SetUnitPrice(v decimal.Decimal) *PurchaseReceiptItemCreate {
 	_c.mutation.SetUnitPrice(v)
@@ -480,6 +494,10 @@ func (_c *PurchaseReceiptItemCreate) createSpec() (*PurchaseReceiptItem, *sqlgra
 	if value, ok := _c.mutation.Quantity(); ok {
 		_spec.SetField(purchasereceiptitem.FieldQuantity, field.TypeOther, value)
 		_node.Quantity = value
+	}
+	if value, ok := _c.mutation.DeclaredQuantity(); ok {
+		_spec.SetField(purchasereceiptitem.FieldDeclaredQuantity, field.TypeOther, value)
+		_node.DeclaredQuantity = &value
 	}
 	if value, ok := _c.mutation.UnitPrice(); ok {
 		_spec.SetField(purchasereceiptitem.FieldUnitPrice, field.TypeOther, value)

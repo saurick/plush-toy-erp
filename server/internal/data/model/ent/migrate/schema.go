@@ -3320,7 +3320,7 @@ var (
 			},
 			{
 				Name:    "purchasereceiptadjustmentitem_adjustment_id_source_line_no",
-				Unique:  true,
+				Unique:  false,
 				Columns: []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[10], PurchaseReceiptAdjustmentItemsColumns[3]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "source_line_no IS NOT NULL AND source_line_no <> ''",
@@ -3333,6 +3333,7 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "lot_no", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "declared_quantity", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "unit_price", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "source_line_no", Type: field.TypeString, Nullable: true, Size: 64},
@@ -3356,37 +3357,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_receipt_items_inventory_lots_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[11]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[12]},
 				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_materials_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[12]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[13]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_purchase_order_items_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[13]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[14]},
 				RefColumns: []*schema.Column{PurchaseOrderItemsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_purchase_receipts_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[14]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[15]},
 				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_units_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[15]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[16]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_warehouses_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[16]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[17]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3395,40 +3396,40 @@ var (
 			{
 				Name:    "purchasereceiptitem_receipt_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[14]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[15]},
 			},
 			{
 				Name:    "purchasereceiptitem_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[12]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[13]},
 			},
 			{
 				Name:    "purchasereceiptitem_warehouse_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[16]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[17]},
 			},
 			{
 				Name:    "purchasereceiptitem_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[11]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[12]},
 			},
 			{
 				Name:    "purchasereceiptitem_purchase_order_item_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[13]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[14]},
 			},
 			{
 				Name:    "purchasereceiptitem_receipt_id_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[14], PurchaseReceiptItemsColumns[6]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[15], PurchaseReceiptItemsColumns[7]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "idempotency_key IS NOT NULL AND idempotency_key <> ''",
 				},
 			},
 			{
 				Name:    "purchasereceiptitem_receipt_id_source_line_no",
-				Unique:  true,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[14], PurchaseReceiptItemsColumns[5]},
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[15], PurchaseReceiptItemsColumns[6]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "source_line_no IS NOT NULL AND source_line_no <> ''",
 				},
@@ -3665,7 +3666,7 @@ var (
 			},
 			{
 				Name:    "purchasereturnitem_return_id_source_line_no",
-				Unique:  true,
+				Unique:  false,
 				Columns: []*schema.Column{PurchaseReturnItemsColumns[11], PurchaseReturnItemsColumns[4]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "source_line_no IS NOT NULL AND source_line_no <> ''",
@@ -3694,6 +3695,7 @@ var (
 		{Name: "superseded_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "defect_rate_operator", Type: field.TypeString, Nullable: true, Size: 16},
 		{Name: "defect_rate_percent", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "check_items", Type: field.TypeJSON, Nullable: true},
 		{Name: "decision_note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -3712,37 +3714,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "quality_inspections_inventory_lots_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[22]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[23]},
 				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "quality_inspections_materials_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[23]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[24]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "quality_inspections_production_wip_batches_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[24]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[25]},
 				RefColumns: []*schema.Column{ProductionWipBatchesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "quality_inspections_purchase_receipts_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[25]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[26]},
 				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "quality_inspections_purchase_receipt_items_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[26]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[27]},
 				RefColumns: []*schema.Column{PurchaseReceiptItemsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "quality_inspections_warehouses_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[27]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[28]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3756,32 +3758,32 @@ var (
 			{
 				Name:    "qualityinspection_purchase_receipt_id",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[25]},
+				Columns: []*schema.Column{QualityInspectionsColumns[26]},
 			},
 			{
 				Name:    "qualityinspection_purchase_receipt_item_id",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[26]},
+				Columns: []*schema.Column{QualityInspectionsColumns[27]},
 			},
 			{
 				Name:    "qualityinspection_inventory_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[22]},
+				Columns: []*schema.Column{QualityInspectionsColumns[23]},
 			},
 			{
 				Name:    "qualityinspection_production_wip_batch_id_gate_code",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[24], QualityInspectionsColumns[2]},
+				Columns: []*schema.Column{QualityInspectionsColumns[25], QualityInspectionsColumns[2]},
 			},
 			{
 				Name:    "qualityinspection_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[23]},
+				Columns: []*schema.Column{QualityInspectionsColumns[24]},
 			},
 			{
 				Name:    "qualityinspection_warehouse_id",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[27]},
+				Columns: []*schema.Column{QualityInspectionsColumns[28]},
 			},
 			{
 				Name:    "qualityinspection_source_type_source_id",
@@ -3819,7 +3821,7 @@ var (
 			{
 				Name:    "qualityinspection_inventory_lot_id_submitted",
 				Unique:  true,
-				Columns: []*schema.Column{QualityInspectionsColumns[22]},
+				Columns: []*schema.Column{QualityInspectionsColumns[23]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "status = 'SUBMITTED'",
 				},
@@ -3827,7 +3829,7 @@ var (
 			{
 				Name:    "qualityinspection_wip_batch_gate_active",
 				Unique:  true,
-				Columns: []*schema.Column{QualityInspectionsColumns[24], QualityInspectionsColumns[2]},
+				Columns: []*schema.Column{QualityInspectionsColumns[25], QualityInspectionsColumns[2]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "production_wip_batch_id IS NOT NULL AND gate_code IS NOT NULL AND status <> 'CANCELLED'",
 				},

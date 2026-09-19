@@ -3,6 +3,7 @@ package schema
 import (
 	"context"
 	"errors"
+	"server/internal/core/qualitycheck"
 	"time"
 
 	"entgo.io/ent"
@@ -38,6 +39,7 @@ var qualityInspectionLockedFields = map[string]struct{}{
 	"inspector_id":                {},
 	"defect_rate_operator":        {},
 	"defect_rate_percent":         {},
+	"check_items":                 {},
 	"correction_of_inspection_id": {},
 }
 
@@ -228,6 +230,7 @@ func (QualityInspection) Fields() []ent.Field {
 			Nillable().
 			MaxLen(16),
 		optionalDecimalField("defect_rate_percent"),
+		field.JSON("check_items", []qualitycheck.Item{}).Optional(),
 		field.String("decision_note").
 			Optional().
 			Nillable().

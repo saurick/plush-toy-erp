@@ -124,7 +124,7 @@ func TestCustomerConfigExecuteMethodsAuthorizeInstanceRevision(t *testing.T) {
 	}{
 		{"execute_sales_order_acceptance_submit", biz.ProcessDomainCommandSalesOrderSubmit, biz.ProcessKeySalesOrderAcceptance, "sales_order", map[string]any{"sales_order_id": 1001}},
 		{"execute_material_supply_purchase_order_submit", biz.ProcessDomainCommandPurchaseOrderSubmit, biz.ProcessKeyMaterialSupply, "purchase_order", map[string]any{"purchase_order_id": 1001}},
-		{"execute_material_supply_purchase_receipt_create", biz.ProcessDomainCommandPurchaseReceiptCreate, biz.ProcessKeyMaterialSupply, "purchase_order", map[string]any{"purchase_order_id": 1001, "receipt_no": "RCPT-test", "warehouse_id": 1}},
+		{"execute_material_supply_purchase_receipt_create", biz.ProcessDomainCommandPurchaseReceiptCreate, biz.ProcessKeyMaterialSupply, "purchase_order", map[string]any{"all_remaining": true, "purchase_order_id": 1001, "receipt_no": "RCPT-test", "warehouse_id": 1}},
 		{"execute_material_supply_quality_gate", biz.ProcessDomainCommandIncomingQualityGate, biz.ProcessKeyMaterialSupply, "purchase_order", map[string]any{"purchase_receipt_id": 1001}},
 		{"execute_material_supply_post_inbound", biz.ProcessDomainCommandInventoryPostInbound, biz.ProcessKeyMaterialSupply, "purchase_order", map[string]any{"purchase_receipt_id": 1001}},
 		{"execute_finished_goods_delivery_quality_decide", biz.ProcessDomainCommandFinishedGoodsQualityDecide, biz.ProcessKeyFinishedGoodsDelivery, "shipment", map[string]any{"shipment_id": 1001, "quality_inspection_id": 1, "result": "PASS"}},

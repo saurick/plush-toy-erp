@@ -71,6 +71,11 @@ export async function postPurchaseReceipt(params = {}) {
   return dataOf(result)?.purchase_receipt || null
 }
 
+export async function cancelPurchaseReceiptDraft(params = {}) {
+  const result = await purchaseRpc.call('cancel_purchase_receipt_draft', params)
+  return dataOf(result)?.purchase_receipt || null
+}
+
 export async function cancelPurchaseReceipt(params = {}) {
   const result = await purchaseRpc.call('cancel_purchase_receipt', params)
   return dataOf(result)?.purchase_receipt || null
@@ -228,7 +233,10 @@ export async function getPurchaseRejectionDisposition(
   return dataOf(result)?.purchase_rejection_disposition || null
 }
 
-export async function listPurchaseRejectionDispositions(params = {}, options = {}) {
+export async function listPurchaseRejectionDispositions(
+  params = {},
+  options = {}
+) {
   const result = await purchaseRpc.call(
     'list_purchase_rejection_dispositions',
     params,

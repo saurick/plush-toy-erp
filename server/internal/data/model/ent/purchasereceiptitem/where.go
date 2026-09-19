@@ -96,6 +96,11 @@ func Quantity(v decimal.Decimal) predicate.PurchaseReceiptItem {
 	return predicate.PurchaseReceiptItem(sql.FieldEQ(FieldQuantity, v))
 }
 
+// DeclaredQuantity applies equality check predicate on the "declared_quantity" field. It's identical to DeclaredQuantityEQ.
+func DeclaredQuantity(v decimal.Decimal) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldEQ(FieldDeclaredQuantity, v))
+}
+
 // UnitPrice applies equality check predicate on the "unit_price" field. It's identical to UnitPriceEQ.
 func UnitPrice(v decimal.Decimal) predicate.PurchaseReceiptItem {
 	return predicate.PurchaseReceiptItem(sql.FieldEQ(FieldUnitPrice, v))
@@ -389,6 +394,56 @@ func QuantityLT(v decimal.Decimal) predicate.PurchaseReceiptItem {
 // QuantityLTE applies the LTE predicate on the "quantity" field.
 func QuantityLTE(v decimal.Decimal) predicate.PurchaseReceiptItem {
 	return predicate.PurchaseReceiptItem(sql.FieldLTE(FieldQuantity, v))
+}
+
+// DeclaredQuantityEQ applies the EQ predicate on the "declared_quantity" field.
+func DeclaredQuantityEQ(v decimal.Decimal) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldEQ(FieldDeclaredQuantity, v))
+}
+
+// DeclaredQuantityNEQ applies the NEQ predicate on the "declared_quantity" field.
+func DeclaredQuantityNEQ(v decimal.Decimal) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldNEQ(FieldDeclaredQuantity, v))
+}
+
+// DeclaredQuantityIn applies the In predicate on the "declared_quantity" field.
+func DeclaredQuantityIn(vs ...decimal.Decimal) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldIn(FieldDeclaredQuantity, vs...))
+}
+
+// DeclaredQuantityNotIn applies the NotIn predicate on the "declared_quantity" field.
+func DeclaredQuantityNotIn(vs ...decimal.Decimal) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldNotIn(FieldDeclaredQuantity, vs...))
+}
+
+// DeclaredQuantityGT applies the GT predicate on the "declared_quantity" field.
+func DeclaredQuantityGT(v decimal.Decimal) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldGT(FieldDeclaredQuantity, v))
+}
+
+// DeclaredQuantityGTE applies the GTE predicate on the "declared_quantity" field.
+func DeclaredQuantityGTE(v decimal.Decimal) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldGTE(FieldDeclaredQuantity, v))
+}
+
+// DeclaredQuantityLT applies the LT predicate on the "declared_quantity" field.
+func DeclaredQuantityLT(v decimal.Decimal) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldLT(FieldDeclaredQuantity, v))
+}
+
+// DeclaredQuantityLTE applies the LTE predicate on the "declared_quantity" field.
+func DeclaredQuantityLTE(v decimal.Decimal) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldLTE(FieldDeclaredQuantity, v))
+}
+
+// DeclaredQuantityIsNil applies the IsNil predicate on the "declared_quantity" field.
+func DeclaredQuantityIsNil() predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldIsNull(FieldDeclaredQuantity))
+}
+
+// DeclaredQuantityNotNil applies the NotNil predicate on the "declared_quantity" field.
+func DeclaredQuantityNotNil() predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldNotNull(FieldDeclaredQuantity))
 }
 
 // UnitPriceEQ applies the EQ predicate on the "unit_price" field.

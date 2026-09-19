@@ -110,6 +110,7 @@ func TestPurchaseReceiptPostgresConcurrentAutomaticDraftGeneration(t *testing.T)
 			defer wg.Done()
 			<-start
 			results[index].receipt, results[index].err = uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+				AllRemaining:    true,
 				PurchaseOrderID: orderItem.PurchaseOrderID,
 				ReceiptNo:       receiptNos[index],
 				WarehouseID:     fixtures.warehouseID,
@@ -181,6 +182,7 @@ func TestPurchaseReceiptPostgresConcurrentCommandReplayReturnsOneFactSet(t *test
 		mustDecimal(t, "10"),
 	)
 	input := biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: orderItem.PurchaseOrderID,
 		ReceiptNo:       "PR-PG-COMMAND-IDEMPOTENCY-" + postgresFixtures.suffix,
 		WarehouseID:     fixtures.warehouseID,
@@ -246,12 +248,14 @@ func TestPurchaseReceiptPostgresConcurrentCommandPayloadConflictPersistsOneFactS
 	key := "process:pg:" + postgresFixtures.suffix + ":purchase-receipt-conflict"
 	inputs := []biz.PurchaseReceiptFromPurchaseOrderCreate{
 		{
+			AllRemaining:    true,
 			PurchaseOrderID: firstOrderItem.PurchaseOrderID,
 			ReceiptNo:       "PR-PG-COMMAND-CONFLICT-A-" + postgresFixtures.suffix,
 			WarehouseID:     fixtures.warehouseID,
 			IdempotencyKey:  key,
 		},
 		{
+			AllRemaining:    true,
 			PurchaseOrderID: secondOrderItem.PurchaseOrderID,
 			ReceiptNo:       "PR-PG-COMMAND-CONFLICT-B-" + postgresFixtures.suffix,
 			WarehouseID:     fixtures.warehouseID,

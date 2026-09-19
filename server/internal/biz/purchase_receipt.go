@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	corestatus "server/internal/core/status"
 	"server/internal/core/value"
@@ -44,6 +45,7 @@ type PurchaseReceiptItem struct {
 	PurchaseOrderItemID *int
 	LotNo               *string
 	Quantity            decimal.Decimal
+	DeclaredQuantity    *decimal.Decimal
 	UnitPrice           *decimal.Decimal
 	Amount              *decimal.Decimal
 	SourceLineNo        *string
@@ -60,7 +62,18 @@ type PurchaseReceiptCreate struct {
 	Note         *string
 }
 
+type PurchaseReceiptOrderLine struct {
+	PurchaseOrderItemID int              `json:"purchase_order_item_id"`
+	WarehouseID         int              `json:"warehouse_id"`
+	Quantity            decimal.Decimal  `json:"quantity"`
+	DeclaredQuantity    *decimal.Decimal `json:"declared_quantity,omitempty"`
+	LotNo               *string          `json:"lot_no,omitempty"`
+	Note                *string          `json:"note,omitempty"`
+}
+
 type PurchaseReceiptFromPurchaseOrderCreate struct {
+	Lines                  []PurchaseReceiptOrderLine
+	AllRemaining           bool
 	ItemWarehouses         map[int]int
 	PurchaseOrderID        int
 	ReceiptNo              string
@@ -80,6 +93,7 @@ type PurchaseReceiptItemCreate struct {
 	PurchaseOrderItemID    *int
 	LotNo                  *string
 	Quantity               decimal.Decimal
+	DeclaredQuantity       *decimal.Decimal
 	UnitPrice              *decimal.Decimal
 	Amount                 *decimal.Decimal
 	SourceLineNo           *string
@@ -215,6 +229,20 @@ func (uc *InventoryUsecase) CancelPostedPurchaseReceiptWithActor(ctx context.Con
 	return repo.CancelPostedPurchaseReceiptWithActor(ctx, receiptID, actorID)
 }
 
+// CancelPurchaseReceiptDraft cannot reverse inventory, even if posting races it.
+func (uc *InventoryUsecase) CancelPurchaseReceiptDraft(ctx context.Context, receiptID, actorID int, scope WarehouseDataScope) (*PurchaseReceipt, error) {
+	if uc == nil || uc.repo == nil || receiptID <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(interface {
+		CancelPurchaseReceiptDraft(context.Context, int, int, WarehouseDataScope) (*PurchaseReceipt, error)
+	})
+	if !ok {
+		return nil, ErrActorAwareCancellationUnavailable
+	}
+	return repo.CancelPurchaseReceiptDraft(ctx, receiptID, actorID, NormalizeWarehouseDataScope(scope))
+}
+
 func (uc *InventoryUsecase) GetPurchaseReceipt(ctx context.Context, id int) (*PurchaseReceipt, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
@@ -266,6 +294,26 @@ func normalizePurchaseReceiptFromPurchaseOrderCreate(in PurchaseReceiptFromPurch
 	in.Note = normalizeOptionalString(in.Note)
 	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
 	in.IdempotencyPayloadHash = ""
+	if (len(in.Lines) == 0) == !in.AllRemaining || len(in.Lines) > 200 || (len(in.Lines) > 0 && (len(in.ItemWarehouses) > 0 || in.WarehouseID != 0)) {
+		return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
+	}
+	for i := range in.Lines {
+		line := &in.Lines[i]
+		if line.PurchaseOrderItemID <= 0 || line.WarehouseID <= 0 {
+			return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
+		}
+		if _, err := value.NewPositiveQuantity(line.Quantity); err != nil {
+			return PurchaseReceiptFromPurchaseOrderCreate{}, err
+		}
+		if !validArrivalQuantity(line.Quantity, false) || (line.DeclaredQuantity != nil && !validArrivalQuantity(*line.DeclaredQuantity, true)) {
+			return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
+		}
+		line.LotNo = normalizeOptionalString(line.LotNo)
+		line.Note = normalizeOptionalString(line.Note)
+		if (line.LotNo != nil && utf8.RuneCountInString(*line.LotNo) > 64) || (line.Note != nil && utf8.RuneCountInString(*line.Note) > 255) {
+			return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
+		}
+	}
 	for itemID, warehouseID := range in.ItemWarehouses {
 		if itemID <= 0 || warehouseID <= 0 {
 			return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
@@ -280,7 +328,7 @@ func normalizePurchaseReceiptFromPurchaseOrderCreate(in PurchaseReceiptFromPurch
 	if in.ReceivedAt.IsZero() {
 		in.ReceivedAt = time.Now()
 	}
-	if in.PurchaseOrderID <= 0 || in.WarehouseID < 0 || (in.WarehouseID == 0 && len(in.ItemWarehouses) == 0) || in.ReceiptNo == "" {
+	if in.PurchaseOrderID <= 0 || in.WarehouseID < 0 || (in.WarehouseID == 0 && len(in.ItemWarehouses) == 0 && len(in.Lines) == 0) || in.ReceiptNo == "" {
 		return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
 	}
 	return in, nil
@@ -292,13 +340,17 @@ func purchaseReceiptFromPurchaseOrderPayloadHash(in PurchaseReceiptFromPurchaseO
 		receivedAt = in.ReceivedAt.UTC().Format(time.RFC3339Nano)
 	}
 	payload := struct {
-		ItemWarehouses  map[int]int `json:"item_warehouses,omitempty"`
-		PurchaseOrderID int         `json:"purchase_order_id"`
-		ReceiptNo       string      `json:"receipt_no"`
-		WarehouseID     int         `json:"warehouse_id"`
-		ReceivedAt      string      `json:"received_at"`
-		Note            *string     `json:"note"`
+		Lines           []PurchaseReceiptOrderLine `json:"items,omitempty"`
+		AllRemaining    bool                       `json:"all_remaining"`
+		ItemWarehouses  map[int]int                `json:"item_warehouses,omitempty"`
+		PurchaseOrderID int                        `json:"purchase_order_id"`
+		ReceiptNo       string                     `json:"receipt_no"`
+		WarehouseID     int                        `json:"warehouse_id"`
+		ReceivedAt      string                     `json:"received_at"`
+		Note            *string                    `json:"note"`
 	}{
+		Lines:           in.Lines,
+		AllRemaining:    in.AllRemaining,
 		ItemWarehouses:  in.ItemWarehouses,
 		PurchaseOrderID: in.PurchaseOrderID,
 		ReceiptNo:       in.ReceiptNo,
@@ -340,6 +392,7 @@ func purchaseReceiptItemPayloadHash(in PurchaseReceiptItemCreate) string {
 		PurchaseOrderItemID *int    `json:"purchase_order_item_id"`
 		LotNo               *string `json:"lot_no"`
 		Quantity            string  `json:"quantity"`
+		DeclaredQuantity    *string `json:"declared_quantity,omitempty"`
 		UnitPrice           *string `json:"unit_price"`
 		Amount              *string `json:"amount"`
 		SourceLineNo        *string `json:"source_line_no"`
@@ -353,6 +406,7 @@ func purchaseReceiptItemPayloadHash(in PurchaseReceiptItemCreate) string {
 		PurchaseOrderItemID: in.PurchaseOrderItemID,
 		LotNo:               in.LotNo,
 		Quantity:            in.Quantity.String(),
+		DeclaredQuantity:    canonicalOptionalDecimal(in.DeclaredQuantity),
 		UnitPrice:           canonicalOptionalDecimal(in.UnitPrice),
 		Amount:              canonicalOptionalDecimal(in.Amount),
 		SourceLineNo:        in.SourceLineNo,
@@ -394,6 +448,9 @@ func normalizePurchaseReceiptItemCreateForReceipt(in PurchaseReceiptItemCreate, 
 		return PurchaseReceiptItemCreate{}, ErrBadParam
 	}
 	if _, err := value.NewPositiveQuantity(in.Quantity); err != nil {
+		return PurchaseReceiptItemCreate{}, ErrBadParam
+	}
+	if !validArrivalQuantity(in.Quantity, false) || (in.DeclaredQuantity != nil && !validArrivalQuantity(*in.DeclaredQuantity, true)) {
 		return PurchaseReceiptItemCreate{}, ErrBadParam
 	}
 	return in, nil
@@ -461,6 +518,9 @@ func (uc *InventoryUsecase) validatePurchaseReceiptWarehouseReferences(ctx conte
 	if in.WarehouseID > 0 {
 		ids[in.WarehouseID] = true
 	}
+	for _, line := range in.Lines {
+		ids[line.WarehouseID] = true
+	}
 	for _, id := range in.ItemWarehouses {
 		ids[id] = true
 	}
@@ -470,4 +530,8 @@ func (uc *InventoryUsecase) validatePurchaseReceiptWarehouseReferences(ctx conte
 		}
 	}
 	return nil
+}
+
+func validArrivalQuantity(q decimal.Decimal, allowZero bool) bool {
+	return (q.IsPositive() || (allowZero && q.IsZero())) && q.Equal(q.Truncate(6)) && q.LessThan(decimal.New(1, 14))
 }

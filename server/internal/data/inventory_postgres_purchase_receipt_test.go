@@ -42,7 +42,6 @@ func TestPurchaseReceiptPostgresMigrationShape(t *testing.T) {
 	assertPostgresUniqueIndex(t, data.sqldb, "purchase_receipts", "purchasereceipt_receipt_no")
 	assertPostgresUniqueIndex(t, data.sqldb, "purchase_receipts", "purchasereceipt_idempotency_key")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "purchase_receipt_items", "purchasereceiptitem_receipt_id_idempotency_key", "idempotency_key IS NOT NULL AND idempotency_key <> ''")
-	assertPostgresPartialUniqueIndex(t, data.sqldb, "purchase_receipt_items", "purchasereceiptitem_receipt_id_source_line_no", "source_line_no IS NOT NULL AND source_line_no <> ''")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipts", "purchase_receipts_idempotency_bundle_complete", "idempotency_item_count > 0")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_quantity_positive", "quantity > 0")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_unit_price_non_negative", "unit_price IS NULL OR unit_price >= 0")
@@ -102,8 +101,8 @@ func TestPurchaseReceiptPostgresMigrationShape(t *testing.T) {
 		Quantity:       mustDecimal(t, "1"),
 		SourceLineNo:   stringPtr("same-line"),
 		IdempotencyKey: "test:postgres:source-line:second:" + fixtures.suffix,
-	}); !ent.IsConstraintError(err) {
-		t.Fatalf("expected postgres receipt source_line_no unique constraint, got %v", err)
+	}); err != nil {
+		t.Fatalf("split rolls from one source line must be allowed, got %v", err)
 	}
 	if _, err := client.PurchaseReceiptItem.Create().
 		SetReceiptID(receipt.ID).
@@ -540,6 +539,7 @@ func TestPurchaseReceiptPostgresConcurrentCreateFromOrderReturnsOneFactSet(t *te
 	orderItem := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, client, fixtures, "PG-CREATE-IDEMPOTENCY-"+postgresFixtures.suffix, mustDecimal(t, "7"))
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	input := biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: orderItem.PurchaseOrderID,
 		ReceiptNo:       "PG-PR-CREATE-IDEMPOTENCY-" + postgresFixtures.suffix,
 		WarehouseID:     fixtures.warehouseID,
@@ -613,6 +613,7 @@ func TestPurchaseReceiptPostgresMaterialSupplyMultiLineQualityGate(t *testing.T)
 	}
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	receipt, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: orderItem.PurchaseOrderID,
 		ReceiptNo:       "PG-PR-QUALITY-" + postgresFixtures.suffix,
 		WarehouseID:     fixtures.warehouseID,

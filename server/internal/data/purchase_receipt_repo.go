@@ -287,12 +287,8 @@ func (r *inventoryRepo) createPurchaseReceiptFromPurchaseOrder(
 	if err := validatePurchaseReceiptLineWarehouses(ctx, tx.client, in, orderItems, remainingByItemID); err != nil {
 		return nil, err
 	}
-	plannedLineCount := 0
-	for _, item := range orderItems {
-		if remainingByItemID[item.ID].IsPositive() {
-			plannedLineCount++
-		}
-	}
+	lines := purchaseReceiptOrderLines(in, orderItems, remainingByItemID)
+	plannedLineCount := len(lines)
 	if plannedLineCount == 0 {
 		return nil, biz.ErrBadParam
 	}
@@ -335,26 +331,29 @@ func (r *inventoryRepo) createPurchaseReceiptFromPurchaseOrder(
 		return nil, err
 	}
 
-	createdLineCount := 0
+	orderItemsByID := make(map[int]*ent.PurchaseOrderItem, len(orderItems))
 	for _, item := range orderItems {
-		remaining := remainingByItemID[item.ID]
-		if !remaining.IsPositive() {
-			continue
-		}
-		unitPrice, amount := purchaseReceiptPriceAndAmount(item, remaining)
+		orderItemsByID[item.ID] = item
+	}
+	createdLineCount := 0
+	for _, line := range lines {
+		item := orderItemsByID[line.PurchaseOrderItemID]
+		unitPrice, amount := purchaseReceiptPriceAndAmount(item, line.Quantity)
 		orderItemID := item.ID
 		sourceLineNo := fmt.Sprintf("%d", item.LineNo)
 		if _, _, err := createPreparedPurchaseReceiptItem(ctx, tx, receipt, &biz.PurchaseReceiptItemCreate{
 			ReceiptID:           receipt.ID,
 			MaterialID:          item.MaterialID,
-			WarehouseID:         purchaseReceiptLineWarehouse(in, item.ID),
+			WarehouseID:         line.WarehouseID,
 			UnitID:              item.UnitID,
 			PurchaseOrderItemID: &orderItemID,
-			Quantity:            remaining,
+			Quantity:            line.Quantity,
+			DeclaredQuantity:    line.DeclaredQuantity,
+			LotNo:               line.LotNo,
 			UnitPrice:           unitPrice,
 			Amount:              amount,
 			SourceLineNo:        &sourceLineNo,
-			Note:                item.Note,
+			Note:                line.Note,
 		}, createdLineCount+1); err != nil {
 			return nil, err
 		}
@@ -718,7 +717,7 @@ func verifyPurchaseReceiptInboundEvidence(ctx context.Context, tx *inventoryDBTx
 
 func (r *inventoryRepo) CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (_ *biz.PurchaseReceipt, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
-	return r.cancelPostedPurchaseReceipt(ctx, receiptID, 0)
+	return r.cancelPostedPurchaseReceipt(ctx, receiptID, 0, nil)
 }
 
 func (r *inventoryRepo) CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (_ *biz.PurchaseReceipt, resultErr error) {
@@ -726,10 +725,18 @@ func (r *inventoryRepo) CancelPostedPurchaseReceiptWithActor(ctx context.Context
 	if actorID <= 0 {
 		return nil, biz.ErrBadParam
 	}
-	return r.cancelPostedPurchaseReceipt(ctx, receiptID, actorID)
+	return r.cancelPostedPurchaseReceipt(ctx, receiptID, actorID, nil)
 }
 
-func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receiptID int, actorID int) (*biz.PurchaseReceipt, error) {
+func (r *inventoryRepo) CancelPurchaseReceiptDraft(ctx context.Context, receiptID, actorID int, scope biz.WarehouseDataScope) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
+	if receiptID <= 0 || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	return r.cancelPostedPurchaseReceipt(ctx, receiptID, actorID, &scope)
+}
+
+func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receiptID int, actorID int, draftScope *biz.WarehouseDataScope) (*biz.PurchaseReceipt, error) {
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -745,6 +752,21 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 			return nil, biz.ErrPurchaseReceiptNotFound
 		}
 		return nil, err
+	}
+	// Check under the same receipt lock used by posting, including cancelled replays.
+	if draftScope != nil && (receipt.PostedAt != nil || (receipt.Status != biz.PurchaseReceiptStatusDraft && receipt.Status != biz.PurchaseReceiptStatusCancelled)) {
+		return nil, biz.ErrBadParam
+	}
+	if draftScope != nil {
+		items, err := tx.client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receipt.ID)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range items {
+			if err := biz.ValidateWarehouseDataScopeAccess(*draftScope, item.WarehouseID); err != nil {
+				return nil, err
+			}
+		}
 	}
 	hasActiveRejectionDisposition, err := tx.client.PurchaseRejectionDisposition.Query().
 		Where(
@@ -1846,6 +1868,7 @@ func createPreparedPurchaseReceiptItem(
 		SetNillablePurchaseOrderItemID(in.PurchaseOrderItemID).
 		SetNillableLotNo(in.LotNo).
 		SetQuantity(in.Quantity).
+		SetNillableDeclaredQuantity(in.DeclaredQuantity).
 		SetNillableUnitPrice(in.UnitPrice).
 		SetNillableAmount(in.Amount).
 		SetNillableSourceLineNo(in.SourceLineNo).
@@ -2111,6 +2134,7 @@ func entPurchaseReceiptItemToBiz(row *ent.PurchaseReceiptItem) *biz.PurchaseRece
 		PurchaseOrderItemID: row.PurchaseOrderItemID,
 		LotNo:               row.LotNo,
 		Quantity:            row.Quantity,
+		DeclaredQuantity:    row.DeclaredQuantity,
 		UnitPrice:           row.UnitPrice,
 		Amount:              row.Amount,
 		SourceLineNo:        row.SourceLineNo,
@@ -2127,26 +2151,41 @@ func purchaseReceiptLineWarehouse(in *biz.PurchaseReceiptFromPurchaseOrderCreate
 	return in.WarehouseID
 }
 
-func validatePurchaseReceiptLineWarehouses(ctx context.Context, client *ent.Client, in *biz.PurchaseReceiptFromPurchaseOrderCreate, items []*ent.PurchaseOrderItem, remaining map[int]decimal.Decimal) error {
-	validIDs := map[int]bool{}
-	hasRemaining := false
+func purchaseReceiptOrderLines(in *biz.PurchaseReceiptFromPurchaseOrderCreate, items []*ent.PurchaseOrderItem, remaining map[int]decimal.Decimal) []biz.PurchaseReceiptOrderLine {
+	if !in.AllRemaining {
+		return in.Lines
+	}
+	lines := make([]biz.PurchaseReceiptOrderLine, 0, len(items))
 	for _, item := range items {
-		validIDs[item.ID] = true
-		if !remaining[item.ID].IsPositive() {
-			continue
+		if remaining[item.ID].IsPositive() {
+			lines = append(lines, biz.PurchaseReceiptOrderLine{PurchaseOrderItemID: item.ID, WarehouseID: purchaseReceiptLineWarehouse(in, item.ID), Quantity: remaining[item.ID], Note: item.Note})
 		}
-		hasRemaining = true
-		if err := validateIncomingWarehouse(ctx, client, purchaseReceiptLineWarehouse(in, item.ID), biz.InventorySubjectMaterial, item.MaterialID); err != nil {
+	}
+	return lines
+}
+
+func validatePurchaseReceiptLineWarehouses(ctx context.Context, client *ent.Client, in *biz.PurchaseReceiptFromPurchaseOrderCreate, items []*ent.PurchaseOrderItem, remaining map[int]decimal.Decimal) error {
+	valid := make(map[int]*ent.PurchaseOrderItem, len(items))
+	for _, item := range items {
+		valid[item.ID] = item
+	}
+	lines := purchaseReceiptOrderLines(in, items, remaining)
+	if len(lines) == 0 {
+		return biz.ErrBadParam
+	}
+	for _, line := range lines {
+		item := valid[line.PurchaseOrderItemID]
+		if item == nil || !remaining[item.ID].IsPositive() || !line.Quantity.IsPositive() {
+			return biz.ErrBadParam
+		}
+		if err := validateIncomingWarehouse(ctx, client, line.WarehouseID, biz.InventorySubjectMaterial, item.MaterialID); err != nil {
 			return err
 		}
 	}
 	for id := range in.ItemWarehouses {
-		if !validIDs[id] || !remaining[id].IsPositive() {
+		if valid[id] == nil || !remaining[id].IsPositive() {
 			return biz.ErrBadParam
 		}
-	}
-	if !hasRemaining {
-		return biz.ErrBadParam
 	}
 	return nil
 }

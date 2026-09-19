@@ -591,6 +591,7 @@ function receiptSourceOrderParams(plan, scenario, index) {
 function linkedReceiptParams(plan, scenario, index, approvedOrder) {
   return {
     purchase_order_id: approvedOrder.order.id,
+    all_remaining: true,
     receipt_no: `${plan.prefix}-PR-${String(index + 1).padStart(2, "0")}-${RECEIPT_SCENARIO_CODES[scenario.key]}`,
     warehouse_id: plan.ids.warehouseId,
     received_at: scenarioDate(index),
@@ -676,7 +677,7 @@ async function createReceiptMatrix(
       domain: "purchase",
       method: "create_purchase_receipt_from_purchase_order",
       params: linkedReceiptParams(plan, scenario, index, approvedOrder),
-      token: tokens.purchase,
+      token: tokens.quality,
       fetchImpl,
     });
     const createdReceipt = requireMutationRecord(
@@ -749,6 +750,7 @@ async function createReceiptMatrix(
         params: {
           id: inspection.id,
           result: index % 2 === 0 ? "PASS" : "CONCESSION",
+          check_items: [{ name: "外观", requirement: "符合模拟确认样", observation: "按场景记录模拟结果", result: index % 2 === 0 ? "PASS" : "FAIL", scope: "FULL", note: "模拟验收" }],
           inspected_at: scenarioDate(index),
           defect_rate_operator: "APPROX",
           defect_rate_percent: index % 2 === 0 ? "5" : "10",
@@ -772,6 +774,7 @@ async function createReceiptMatrix(
         params: {
           id: inspection.id,
           result: "REJECT",
+          check_items: [{ name: "尺寸", requirement: "符合模拟尺寸", observation: "模拟尺寸偏差", result: "FAIL", scope: "FULL", note: "模拟验收" }],
           inspected_at: scenarioDate(index),
           defect_rate_operator: "GT",
           defect_rate_percent: "50",

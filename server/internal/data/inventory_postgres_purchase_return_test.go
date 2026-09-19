@@ -38,7 +38,6 @@ func TestPurchaseReturnPostgresMigrationShape(t *testing.T) {
 	assertPostgresUniqueIndex(t, data.sqldb, "purchase_returns", "purchasereturn_return_no")
 	assertPostgresUniqueIndex(t, data.sqldb, "purchase_returns", "purchasereturn_idempotency_key")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_returns", "purchase_returns_idempotency_bundle_complete", "idempotency_item_count > 0")
-	assertPostgresPartialUniqueIndex(t, data.sqldb, "purchase_return_items", "purchasereturnitem_return_id_source_line_no", "source_line_no IS NOT NULL AND source_line_no <> ''")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_return_items", "purchase_return_items_quantity_positive", "quantity > 0")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_return_items", "purchase_return_items_unit_price_non_negative", "unit_price IS NULL OR unit_price >= 0")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_return_items", "purchase_return_items_amount_non_negative", "amount IS NULL OR amount >= 0")
@@ -96,8 +95,8 @@ func TestPurchaseReturnPostgresMigrationShape(t *testing.T) {
 		UnitID:       fixtures.unitID,
 		Quantity:     mustDecimal(t, "1"),
 		SourceLineNo: stringPtr("same-line"),
-	}); !ent.IsConstraintError(err) {
-		t.Fatalf("expected postgres return source_line_no unique constraint, got %v", err)
+	}); err != nil {
+		t.Fatalf("split source receipt rows must retain the same source line display number, got %v", err)
 	}
 	if _, err := client.PurchaseReturnItem.Create().
 		SetReturnID(returnDraft.ID).

@@ -98,6 +98,7 @@ func TestJsonrpcDispatcher_RejectedQualityInspectionCreatesTraceablePurchaseRetu
 	percent := decimal.NewFromInt(20)
 	rejected, err := j.inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{
 		InspectionID:       draft.ID,
+		CheckItems:         rpcIncomingEvidence("FAIL"),
 		DefectRateOperator: &operator,
 		DefectRatePercent:  &percent,
 		DecisionNote:       stringPtr("尺寸不合格"),

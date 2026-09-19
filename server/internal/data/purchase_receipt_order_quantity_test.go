@@ -253,6 +253,7 @@ func TestCreatePurchaseReceiptFromPurchaseOrderIdempotencyReturnsOriginalFacts(t
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	note := "流程自动生成"
 	input := &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: orderItem.PurchaseOrderID,
 		ReceiptNo:       "PR-PO-IDEMPOTENCY",
 		WarehouseID:     fixtures.warehouseID,
@@ -354,6 +355,7 @@ func TestCreatePurchaseReceiptFromPurchaseOrderReservesDraftWithoutCountingItAsP
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 
 	firstDraft, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: orderItem.PurchaseOrderID,
 		ReceiptNo:       "PR-PO-AUTO-DRAFT-1",
 		WarehouseID:     fixtures.warehouseID,
@@ -366,6 +368,7 @@ func TestCreatePurchaseReceiptFromPurchaseOrderReservesDraftWithoutCountingItAsP
 	passAllPurchaseReceiptQualityInspections(t, ctx, uc, firstDraft.ID)
 
 	if _, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: orderItem.PurchaseOrderID,
 		ReceiptNo:       "PR-PO-AUTO-DRAFT-2",
 		WarehouseID:     fixtures.warehouseID,
@@ -408,6 +411,7 @@ func TestMaterialSupplyReceiptCreatesLineQualityGateBeforeInventoryPost(t *testi
 	}
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	receipt, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: firstOrderItem.PurchaseOrderID,
 		ReceiptNo:       "PR-QUALITY-GATE",
 		WarehouseID:     fixtures.warehouseID,
@@ -473,6 +477,7 @@ func TestMaterialSupplyRejectedLineBlocksReceiptPost(t *testing.T) {
 	orderItem := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, client, fixtures, "QUALITY-REJECT", mustDecimal(t, "5"))
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	receipt, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: orderItem.PurchaseOrderID,
 		ReceiptNo:       "PR-QUALITY-REJECT",
 		WarehouseID:     fixtures.warehouseID,
@@ -539,6 +544,7 @@ func TestPurchaseReceiptOrderQuantityGuardIncludesPostedQuantityAdjustments(t *t
 		t.Fatalf("quantity increase to exact purchase quantity failed: %v", err)
 	}
 	if _, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		AllRemaining:    true,
 		PurchaseOrderID: orderItem.PurchaseOrderID,
 		ReceiptNo:       "PR-PO-ADJUST-FULL",
 		WarehouseID:     fixtures.warehouseID,

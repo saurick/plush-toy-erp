@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"strings"
 	"time"
@@ -61,8 +62,15 @@ func (h *purchaseReceiptCreateProcessCommandHandler) ValidateProcessDomainComman
 			return err
 		}
 	}
-	if err := requireActiveReference(ctx, normalized.WarehouseID, h.uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
-		return err
+	if normalized.WarehouseID > 0 {
+		if err := requireActiveReference(ctx, normalized.WarehouseID, h.uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
+			return err
+		}
+	}
+	for _, line := range normalized.Lines {
+		if err := requireActiveReference(ctx, line.WarehouseID, h.uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
+			return err
+		}
 	}
 	if preflight, ok := h.uc.repo.(purchaseReceiptFromPurchaseOrderProcessPreflight); ok {
 		return preflight.ValidatePurchaseReceiptFromPurchaseOrder(ctx, &normalized)
@@ -142,6 +150,7 @@ func purchaseReceiptCreateFromProcessCommandInput(in *ProcessDomainCommandInput)
 		purchaseReceiptProcessCommandPayloadWarehouseID,
 		purchaseReceiptProcessCommandPayloadReceivedAt,
 		purchaseReceiptProcessCommandPayloadNote,
+		"items", "all_remaining",
 	); err != nil {
 		return nil, err
 	}
@@ -156,17 +165,31 @@ func purchaseReceiptCreateFromProcessCommandInput(in *ProcessDomainCommandInput)
 		return nil, ErrBadParam
 	}
 	warehouseID, hasWarehouseID, err := processCommandPositiveIntFromPayload(in.Payload, purchaseReceiptProcessCommandPayloadWarehouseID)
-	if err != nil || !hasWarehouseID {
+	if err != nil || (!hasWarehouseID && in.Payload["items"] == nil) {
 		if err != nil {
 			return nil, err
 		}
 		return nil, ErrBadParam
 	}
+	var lines []PurchaseReceiptOrderLine
+	if raw, exists := in.Payload["items"]; exists {
+		encoded, err := json.Marshal(raw)
+		if err != nil || len(encoded) > 100000 || raw == nil {
+			return nil, ErrBadParam
+		}
+		decoder := json.NewDecoder(strings.NewReader(string(encoded)))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&lines); err != nil || len(lines) == 0 {
+			return nil, ErrBadParam
+		}
+	}
+	allRemaining, _ := in.Payload["all_remaining"].(bool)
 	receivedAt, err := processCommandOptionalTimeFromPayload(in.Payload, purchaseReceiptProcessCommandPayloadReceivedAt)
 	if err != nil {
 		return nil, err
 	}
 	return &PurchaseReceiptFromPurchaseOrderCreate{
+		Lines: lines, AllRemaining: allRemaining,
 		PurchaseOrderID: in.ProcessInstance.BusinessRefID,
 		ReceiptNo:       processCommandStringFromPayload(in.Payload, purchaseReceiptProcessCommandPayloadReceiptNo),
 		WarehouseID:     warehouseID,
