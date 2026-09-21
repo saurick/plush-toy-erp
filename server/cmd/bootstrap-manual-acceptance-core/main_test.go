@@ -18,19 +18,41 @@ import (
 )
 
 const (
-	testMigration = "20260716123456"
-	testRelease   = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	testDSN       = "postgres://postgres:runtime-password@postgres:5432/plush_erp_demo_v1?sslmode=disable"
+	testMigration   = "20260716123456"
+	testRelease     = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	trialDSN        = "postgres://postgres:runtime-password@postgres:5432/plush_erp_demo_v1?sslmode=disable"
+	customerTestDSN = "postgres://postgres:runtime-password@postgres:5432/plush_erp_customer_test_v1?sslmode=disable"
 )
 
 func validOptions() options {
 	opts := options{
-		expectedDatabase:         expectedDatabase,
+		target:                   customertrialconfig.ExpectedTarget,
+		expectedDatabase:         manualAcceptanceContract.CustomerTrial133.DatabaseName,
 		expectedMigrationVersion: testMigration,
 		expectedRelease:          testRelease,
 		timeout:                  30 * time.Second,
 	}
-	opts.confirm = expectedConfirmation(opts)
+	confirmation, err := expectedConfirmation(opts)
+	if err != nil {
+		panic(err)
+	}
+	opts.confirm = confirmation
+	return opts
+}
+
+func validCustomerTestOptions() options {
+	opts := options{
+		target:                   customerTestTarget,
+		expectedDatabase:         customerTestDatabase,
+		expectedMigrationVersion: testMigration,
+		expectedRelease:          testRelease,
+		timeout:                  30 * time.Second,
+	}
+	confirmation, err := expectedConfirmation(opts)
+	if err != nil {
+		panic(err)
+	}
+	opts.confirm = confirmation
 	return opts
 }
 
@@ -47,6 +69,13 @@ func enabledTrialEnv(key string) string {
 	}
 }
 
+func customerTestEnv(key string) string {
+	if key == customertrialconfig.DebugEnv {
+		return "prod"
+	}
+	return ""
+}
+
 func exactTrialSnapshot(t *testing.T) []byte {
 	t.Helper()
 	raw, err := json.Marshal(map[string]any{
@@ -60,8 +89,20 @@ func exactTrialSnapshot(t *testing.T) []byte {
 	return raw
 }
 
+func exactCustomerTestSnapshot(t *testing.T) []byte {
+	t.Helper()
+	raw, err := json.Marshal(map[string]any{
+		"customerKey": customertrialconfig.ExpectedCustomerKey,
+		"pages":       []any{"sales-orders"},
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	return raw
+}
+
 func TestValidateInvocationRequiresEveryExactBoundaryBeforeDatabaseAccess(t *testing.T) {
-	if err := validateInvocation(validOptions(), testDSN, enabledTrialEnv, testRelease); err != nil {
+	if err := validateInvocation(validOptions(), trialDSN, enabledTrialEnv, testRelease); err != nil {
 		t.Fatalf("validateInvocation() exact input error = %v", err)
 	}
 
@@ -72,16 +113,16 @@ func TestValidateInvocationRequiresEveryExactBoundaryBeforeDatabaseAccess(t *tes
 		getenv          func(string) string
 		compiledVersion string
 	}{
-		{name: "wrong database", mutate: func(opts *options) { opts.expectedDatabase = "plush_erp" }, dsn: testDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
-		{name: "wrong migration", mutate: func(opts *options) { opts.expectedMigrationVersion = "latest" }, dsn: testDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
-		{name: "wrong release", mutate: func(opts *options) { opts.expectedRelease = strings.Repeat("A", 40) }, dsn: testDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
-		{name: "wrong confirmation", mutate: func(opts *options) { opts.confirm = "yes" }, dsn: testDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
-		{name: "timeout too long", mutate: func(opts *options) { opts.timeout = 2 * time.Minute }, dsn: testDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "wrong database", mutate: func(opts *options) { opts.expectedDatabase = "plush_erp" }, dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "wrong migration", mutate: func(opts *options) { opts.expectedMigrationVersion = "latest" }, dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "wrong release", mutate: func(opts *options) { opts.expectedRelease = strings.Repeat("A", 40) }, dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "wrong confirmation", mutate: func(opts *options) { opts.confirm = "yes" }, dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "timeout too long", mutate: func(opts *options) { opts.timeout = 2 * time.Minute }, dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
 		{name: "missing dsn", dsn: "", getenv: enabledTrialEnv, compiledVersion: testRelease},
-		{name: "dsn whitespace", dsn: " " + testDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
-		{name: "gate disabled", dsn: testDSN, getenv: func(string) string { return "" }, compiledVersion: testRelease},
+		{name: "dsn whitespace", dsn: " " + trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "gate disabled", dsn: trialDSN, getenv: func(string) string { return "" }, compiledVersion: testRelease},
 		{name: "wrong gate database", dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable", getenv: enabledTrialEnv, compiledVersion: testRelease},
-		{name: "compiled release mismatch", dsn: testDSN, getenv: enabledTrialEnv, compiledVersion: strings.Repeat("b", 40)},
+		{name: "compiled release mismatch", dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: strings.Repeat("b", 40)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -98,20 +139,65 @@ func TestValidateInvocationRequiresEveryExactBoundaryBeforeDatabaseAccess(t *tes
 	}
 }
 
+func TestValidateInvocationAcceptsOnlyTheRegisteredCustomerTestRuntime(t *testing.T) {
+	opts := validCustomerTestOptions()
+	if err := validateInvocation(opts, customerTestDSN, customerTestEnv, testRelease); err != nil {
+		t.Fatalf("validateInvocation() customer test input error = %v", err)
+	}
+	for name, candidate := range map[string]struct {
+		dsn    string
+		getenv func(string) string
+	}{
+		"trial database": {dsn: trialDSN, getenv: customerTestEnv},
+		"extra query":    {dsn: customerTestDSN + "&application_name=seed", getenv: customerTestEnv},
+		"trial gate":     {dsn: customerTestDSN, getenv: enabledTrialEnv},
+		"non prod":       {dsn: customerTestDSN, getenv: func(string) string { return "" }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := validateInvocation(opts, candidate.dsn, candidate.getenv, testRelease); err == nil {
+				t.Fatal("validateInvocation() unexpectedly accepted a mismatched customer test runtime")
+			} else if strings.Contains(err.Error(), "runtime-password") {
+				t.Fatalf("validation error leaked DSN credentials: %v", err)
+			}
+		})
+	}
+}
+
 func TestExpectedConfirmationBindsFixedDatasetAndRun(t *testing.T) {
-	confirmation := expectedConfirmation(validOptions())
+	confirmation, err := expectedConfirmation(validOptions())
+	if err != nil {
+		t.Fatalf("expectedConfirmation() error = %v", err)
+	}
 	for _, required := range []string{
 		customertrialconfig.ExpectedTarget,
 		customertrialconfig.ExpectedCustomerKey,
-		expectedDatabase,
-		expectedDatasetKey,
+		manualAcceptanceContract.CustomerTrial133.DatabaseName,
+		manualAcceptanceContract.DatasetKey,
 		customertrialconfig.DatasetVersion,
-		expectedRunID,
+		manualAcceptanceContract.RunID,
 		testMigration,
 		testRelease,
 	} {
 		if !strings.Contains(confirmation, required) {
 			t.Fatalf("confirmation %q does not bind %q", confirmation, required)
+		}
+	}
+	customerTestConfirmation, err := expectedConfirmation(validCustomerTestOptions())
+	if err != nil {
+		t.Fatalf("expectedConfirmation(customer-test) error = %v", err)
+	}
+	for _, required := range []string{
+		"BOOTSTRAP_CUSTOMER_TEST_CORE",
+		customerTestTarget,
+		customerTestDatabase,
+		customerTestFoundationKey,
+		manualAcceptanceContract.DataVersion,
+		manualAcceptanceContract.RunID,
+		testMigration,
+		testRelease,
+	} {
+		if !strings.Contains(customerTestConfirmation, required) {
+			t.Fatalf("customer test confirmation %q does not bind %q", customerTestConfirmation, required)
 		}
 	}
 }
@@ -171,8 +257,18 @@ func expectDatabasePreflight(
 	activeCount int64,
 ) {
 	t.Helper()
+	policy, err := resolveTargetPolicy(opts.target)
+	if err != nil {
+		t.Fatalf("resolveTargetPolicy() error = %v", err)
+	}
+	revision := customertrialconfig.Revision
+	productVersion := customertrialconfig.ProductVersion
+	if policy.target == customerTestTarget {
+		revision = "yoyoosun-customer-package-v7.runtime-manifest-v1"
+		productVersion = "local-customer-package"
+	}
 	mock.ExpectQuery(`SELECT current_database\(\)`).
-		WillReturnRows(sqlmock.NewRows([]string{"current_database"}).AddRow(expectedDatabase))
+		WillReturnRows(sqlmock.NewRows([]string{"current_database"}).AddRow(policy.database))
 	mock.ExpectQuery(`SELECT CASE WHEN`).
 		WillReturnRows(sqlmock.NewRows([]string{"schema_status"}).AddRow("ready"))
 	mock.ExpectQuery(`SELECT version[\s\S]+FROM atlas_schema_revisions\.atlas_schema_revisions`).
@@ -181,10 +277,10 @@ func expectDatabasePreflight(
 		return
 	}
 	mock.ExpectQuery(`SELECT revision, product_version, compiled_snapshot, COUNT\(\*\) OVER \(\)`).
-		WithArgs(customertrialconfig.ExpectedCustomerKey).
+		WithArgs(policy.customerKey).
 		WillReturnRows(sqlmock.NewRows([]string{"revision", "product_version", "compiled_snapshot", "active_count"}).AddRow(
-			customertrialconfig.Revision,
-			customertrialconfig.ProductVersion,
+			revision,
+			productVersion,
 			snapshot,
 			activeCount,
 		))
@@ -230,7 +326,7 @@ func expectBoundary(mock sqlmock.Sqlmock, dataset data.CoreDemoReferenceSeedData
 		))
 }
 
-func expectReferenceUpserts(mock sqlmock.Sqlmock, dataset data.CoreDemoReferenceSeedDataset) {
+func expectReferenceUpserts(mock sqlmock.Sqlmock, dataset data.CoreDemoReferenceSeedDataset, retireLegacy bool) {
 	for index, unit := range dataset.Units {
 		mock.ExpectQuery(`INSERT INTO units`).
 			WithArgs(unit.Code, unit.Name, unit.Precision).
@@ -240,6 +336,9 @@ func expectReferenceUpserts(mock sqlmock.Sqlmock, dataset data.CoreDemoReference
 		mock.ExpectQuery(`INSERT INTO warehouses`).
 			WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21 + index))
+	}
+	if !retireLegacy {
+		return
 	}
 	for _, legacy := range data.LegacyCoreDemoReferenceSeedDatasets() {
 		for _, unit := range legacy.Units {
@@ -339,7 +438,7 @@ func TestBootstrapManualAcceptanceCoreRollsBackFailedExactReadback(t *testing.T)
 	expectDatabasePreflight(t, mock, opts, opts.expectedMigrationVersion, exactTrialSnapshot(t), 1)
 	mock.ExpectBegin()
 	expectBoundary(mock, dataset, coreBoundary{})
-	expectReferenceUpserts(mock, dataset)
+	expectReferenceUpserts(mock, dataset, true)
 	expectBoundary(mock, dataset, coreBoundary{unitTotal: int64(len(dataset.Units)), unitExact: int64(len(dataset.Units)), warehouseTotal: 3, warehouseExact: 3})
 	mock.ExpectRollback()
 	mock.ExpectClose()
@@ -371,7 +470,7 @@ func TestBootstrapManualAcceptanceCoreIsIdempotentWithExactReadback(t *testing.T
 		} else {
 			expectBoundary(mock, dataset, exact)
 		}
-		expectReferenceUpserts(mock, dataset)
+		expectReferenceUpserts(mock, dataset, true)
 		expectBoundary(mock, dataset, exact)
 		mock.ExpectCommit()
 	}
@@ -393,6 +492,45 @@ func TestBootstrapManualAcceptanceCoreIsIdempotentWithExactReadback(t *testing.T
 				t.Fatalf("run %d did not return exact warehouse ids: %#v", run+1, result.warehouseIDs)
 			}
 		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestBootstrapCustomerTestCorePreservesExistingReferences(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	opts := validCustomerTestOptions()
+	dataset := data.DefaultCoreDemoReferenceSeedDataset()
+	exact := coreBoundary{
+		unitTotal:      int64(len(dataset.Units)),
+		unitExact:      int64(len(dataset.Units)),
+		warehouseTotal: int64(len(dataset.Warehouses)),
+		warehouseExact: int64(len(dataset.Warehouses)),
+	}
+	expectDatabasePreflight(t, mock, opts, opts.expectedMigrationVersion, exactCustomerTestSnapshot(t), 1)
+	mock.ExpectBegin()
+	expectBoundary(mock, dataset, coreBoundary{})
+	expectReferenceUpserts(mock, dataset, false)
+	expectBoundary(mock, dataset, exact)
+	mock.ExpectCommit()
+	mock.ExpectClose()
+
+	result, err := bootstrapManualAcceptanceCore(context.Background(), db, opts)
+	if err != nil {
+		t.Fatalf("bootstrapManualAcceptanceCore(customer-test) error = %v", err)
+	}
+	if len(result.unitIDs) != len(dataset.Units) || len(result.warehouseIDs) != len(dataset.Warehouses) {
+		t.Fatalf("unexpected customer test result: %#v", result)
+	}
+	if len(result.retiredUnitIDs) != 0 || len(result.retiredWarehouseIDs) != 0 {
+		t.Fatalf("customer test bootstrap retired existing references: %#v", result)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatalf("db.Close() error = %v", err)

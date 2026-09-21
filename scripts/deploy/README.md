@@ -13,7 +13,7 @@
 | target | 用途 | 公网入口 | 数据规则 |
 | --- | --- | --- | --- |
 | `demo-133` | 项目方造数、演练、培训与回归 | `demo.yoyoosun.net` | 可经受控 rebuild 恢复 seed / fixture / 模拟数据 |
-| `customer-test-133` | 甲方测试与验收 | `test.yoyoosun.net` | 普通部署默认保留现有数据；新一轮测试前可显式清空并重建干净基线 |
+| `customer-test-133` | 甲方测试与验收 | `test.yoyoosun.net` | 普通部署不 rebuild、不 seed，默认保留现有数据；可显式准备最小基础资料，新一轮测试前可独立重建 |
 
 `erp` 是未来生产环境，尚未登记为可执行 target；`yoyoosun.net` 临时 `302` 跳转到 `https://erp.yoyoosun.net` 也不改变这一点。`admin.yoyoosun.net` 退役后仍不能进入 target registry、环境变量映射、数据清理、preflight、健康检查、release、promotion、smoke 或 rollback。`customer-trial-133` 只是 `demo-133` 内部模拟数据合同，不是第三个部署 target。
 
@@ -34,6 +34,7 @@
 | `database-rebuild-controller.mjs` | 为指定 target 生成备份、物理数据代和空基线资格计划 | 不停服务、不备份、不迁移 |
 | `database-rebuild-executor.mjs` | 执行 ready rebuild operation | 会停单一 target、备份并切换其 PostgreSQL 数据目录 |
 | `bootstrap-production-admin.sh` | 在已迁移 fresh 数据库创建首个管理员并读回 marker/audit/RBAC | 只允许 fresh target 的一次性确认窗口 |
+| 镜像内 `bootstrap-manual-acceptance-core` | 为 demo 或 customer-test 准备精确 allowlist 的单位 / 仓库 | test 必须显式指定 target、release、migration 与确认串；不写业务对象、不退休既有 test 资料 |
 | `release-evidence-status.mjs` / `release-evidence-gate.mjs` | 汇总并校验 release evidence | 只读 |
 
 所有浏览器动作只传 operation intent、固定 target、版本和确认串；浏览器不能传 repo、路径、SSH、env、shell、SQL、Docker 命令或凭据。
@@ -75,7 +76,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 ## 数据库重建
 
-数据库重建不是通用清库工具，也不是 promotion 的隐藏阶段。普通 promotion 默认保留数据库、附件、账号/RBAC、客户配置与审计；需要清空时必须另建 `rebuild-database` operation。没有新版本时可绑定目标当前 exact release 独立执行；同次既要新版本又要清空时，先完成保留数据的 promotion，再对同一已读回 release 独立重建。
+数据库重建不是通用清库工具，也不是 promotion 的隐藏阶段。普通 promotion 默认保留数据库、附件、账号/RBAC、客户配置、基础资料与审计，也不得调用 core bootstrap；需要清空时必须由当前任务明确授权并另建 `rebuild-database` operation。没有新版本时可绑定目标当前 exact release 独立执行；同次既要新版本又要清空时，先完成保留数据的 promotion，再对同一已读回 release 独立重建。
 
 执行前必须：
 
@@ -85,7 +86,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 4. 旧物理数据目录、dump 与 rollback identity 可读回。
 5. 只停止目标自身的 app/web/PostgreSQL，不影响另一个环境。
 
-`demo-133` 的受控重建可以随后重放 `customer-trial-133` 模拟数据。`customer-test-133` 的受控重建只建立甲方最小可登录的干净业务基线，不重放 demo seed/fixture。没有数据分类和恢复证明时不得执行重建；target 登记、普通 Goal 或一次 promotion 都不代表已授权或已完成清理。
+`demo-133` 的受控重建可以随后重放 `customer-trial-133` 模拟数据。`customer-test-133` 的受控重建只建立甲方最小可登录的干净业务基线，不重放 demo seed/fixture；客户配置激活后，可在独立明确授权下运行一次性 core bootstrap 恢复 11 个单位和 4 个仓库。没有数据分类和恢复证明时不得执行重建；target 登记、普通 Goal 或一次 promotion 都不代表已授权或已完成清理。
 
 fresh generation 的客户配置在 migration 和一次性管理员 bootstrap 之后才激活。因此 rebuild controller 只允许将 preflight 明确读回的 `customerConfigState=absent` 延后到重建后闭环；`invalid`、`unknown`、读取失败但未证明为空，以及磁盘、锁、运行版本、数据库身份等其他 blocker 仍全部失败关闭。普通 promotion 不使用这一例外。
 

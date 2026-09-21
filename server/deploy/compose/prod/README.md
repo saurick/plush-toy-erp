@@ -20,7 +20,7 @@
 | `demo-133`          | 项目方造数、演练、培训与回归；允许受控重建       | `demo.yoyoosun.net` | `plush-toy-erp-demo-v1` | `plush_erp_demo_v1`          | `55436 / 8325 / 5195`  |
 | `customer-test-133` | 甲方测试与验收；普通部署保留数据，需要时独立重建 | `test.yoyoosun.net` | `plush-toy-erp-test-v1` | `plush_erp_customer_test_v1` | `55437 / 8335 / 5205`  |
 
-两个环境部署同一不可变 release digest，但数据库、上传、Compose project、端口、runtime env、数据目录、migration 锁、备份、回滚点、operation 与 smoke 必须完全独立。demo 造数不能进入 test；test 的普通 promotion 保留数据，显式重建或清理不能影响 demo。
+两个环境部署同一不可变 release digest，但数据库、上传、Compose project、端口、runtime env、数据目录、migration 锁、备份、回滚点、operation 与 smoke 必须完全独立。demo 造数不能进入 test；test 的普通 promotion 不执行 rebuild 或 seed，保留全部既有数据；显式重建或清理不能影响 demo。
 
 `customer-trial-133` 仍是 demo 内部模拟数据合同的 target key，不是第三个部署环境。它只能在 `demo-133` 的受控数据准备链中使用。
 
@@ -90,7 +90,28 @@ APP_ADMIN_PASSWORD='<ephemeral-secret>' \
 
 ## customer-test 干净基线
 
-`customer-test-133` 用于甲方自行录入真实测试数据。它不执行 demo 的 seed / fixture / 模拟业务造数。需要恢复干净基线时，只能走正式 database rebuild 主路径：
+`customer-test-133` 用于甲方自行录入测试数据。它不执行 demo 的 fixture、整批模拟业务造数或 Fact 写入。普通 promotion 不清空、不重建、也不重放基础资料；只有当前 Codex 任务明确授权目标写入时，才允许在 fresh backup 与实时 preflight 后运行一次性 core bootstrap。该入口只幂等创建当前 allowlist 中的 11 个单位和 4 个仓库，不创建材料、产品、工艺、BOM、客户、订单、Workflow 或 Fact，也不停用旧批次或人工维护的资料。
+
+```bash
+cd /home/simon/plush-toy-erp-test-v1/current/server/deploy/compose/prod
+docker compose \
+  -p plush-toy-erp-test-v1 \
+  --env-file /home/simon/plush-toy-erp-test-v1/runtime/.env.customer-test-133 \
+  -f compose.yml \
+  -f compose.customer-test-133.yml \
+  run --rm --no-deps --pull never \
+  --entrypoint /app/bootstrap-manual-acceptance-core \
+  app-server \
+  --target customer-test-133 \
+  --expected-database plush_erp_customer_test_v1 \
+  --expected-migration '<14-digit-migration>' \
+  --expected-release '<40-character-release>' \
+  --confirm 'BOOTSTRAP_CUSTOMER_TEST_CORE:customer-test-133:yoyoosun:plush_erp_customer_test_v1:yoyoosun-customer-test-core:<data-version>:<run-id>:<migration>:<release>'
+```
+
+命令会再次核对精确数据库、镜像内 release、Atlas migration、`ERP_DEBUG_ENV=prod`、trial gate 关闭、唯一 active yoyoosun 配置和写后精确读回；任一身份漂移都会在写入前失败。这里的基础资料仍是受控测试基线，不代表真实客户资料导入。
+
+需要恢复干净基线时，只能走正式 database rebuild 主路径：
 
 1. 绑定当前不可变 release、目标身份与未结束 operation。
 2. 创建并恢复校验备份，记录精确 rollback point。

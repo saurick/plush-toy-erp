@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -16,23 +17,40 @@ import (
 	"server/internal/data"
 	"server/internal/manualacceptance"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-const dsnEnv = "POSTGRES_DSN"
+const (
+	dsnEnv                    = "POSTGRES_DSN"
+	customerTestTarget        = "customer-test-133"
+	customerTestDatabase      = "plush_erp_customer_test_v1"
+	customerTestFoundationKey = "yoyoosun-customer-test-core"
+	productionPostgresHost    = "postgres"
+	productionPostgresPort    = "5432"
+)
 
 var (
 	manualAcceptanceContract = manualacceptance.Current()
-	expectedDatabase         = manualAcceptanceContract.CustomerTrial133.DatabaseName
-	expectedDatasetKey       = manualAcceptanceContract.DatasetKey
-	expectedRunID            = manualAcceptanceContract.RunID
 	Version                  = "dev"
 	migrationVersionPattern  = regexp.MustCompile(`^[0-9]{14}$`)
 	releaseVersionPattern    = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	errCoreBoundaryViolation = errors.New("manual acceptance core boundary is invalid")
 )
 
+type targetPolicy struct {
+	target             string
+	customerKey        string
+	database           string
+	datasetKey         string
+	datasetVersion     string
+	runID              string
+	requireTrialConfig bool
+	retireLegacy       bool
+}
+
 type options struct {
+	target                   string
 	expectedDatabase         string
 	expectedMigrationVersion string
 	expectedRelease          string
@@ -70,6 +88,10 @@ func main() {
 	if err != nil {
 		fail("%v", err)
 	}
+	policy, err := resolveTargetPolicy(opts.target)
+	if err != nil {
+		fail("%v", err)
+	}
 	dsn := os.Getenv(dsnEnv)
 	if err := validateInvocation(opts, dsn, os.Getenv, Version); err != nil {
 		fail("%v", err)
@@ -92,26 +114,28 @@ func main() {
 	}
 
 	fmt.Printf(
-		"manual acceptance core bootstrap completed target=%s customer=%s database=%s dataset_key=%s dataset_version=%s run_id=%s migration=%s release=%s units=%d warehouses=%d retired_legacy_units=%d retired_legacy_warehouses=%d idempotent=true\n",
-		customertrialconfig.ExpectedTarget,
-		customertrialconfig.ExpectedCustomerKey,
-		expectedDatabase,
-		expectedDatasetKey,
-		customertrialconfig.DatasetVersion,
-		expectedRunID,
+		"core reference bootstrap completed target=%s customer=%s database=%s dataset_key=%s dataset_version=%s run_id=%s migration=%s release=%s units=%d warehouses=%d retired_legacy_units=%d retired_legacy_warehouses=%d retire_legacy_references=%t idempotent=true\n",
+		policy.target,
+		policy.customerKey,
+		policy.database,
+		policy.datasetKey,
+		policy.datasetVersion,
+		policy.runID,
 		opts.expectedMigrationVersion,
 		opts.expectedRelease,
 		len(result.unitIDs),
 		len(result.warehouseIDs),
 		len(result.retiredUnitIDs),
 		len(result.retiredWarehouseIDs),
+		policy.retireLegacy,
 	)
 }
 
 func parseOptions(args []string) (options, error) {
 	var opts options
 	flags := flag.NewFlagSet("bootstrap-manual-acceptance-core", flag.ContinueOnError)
-	flags.StringVar(&opts.expectedDatabase, "expected-database", "", "exact registered customer-trial-133 database")
+	flags.StringVar(&opts.target, "target", customertrialconfig.ExpectedTarget, "exact target: customer-trial-133 or customer-test-133")
+	flags.StringVar(&opts.expectedDatabase, "expected-database", "", "exact registered target database")
 	flags.StringVar(&opts.expectedMigrationVersion, "expected-migration", "", "exact current Atlas migration version")
 	flags.StringVar(&opts.expectedRelease, "expected-release", "", "exact 40-character lowercase Git SHA compiled into this binary")
 	flags.StringVar(&opts.confirm, "confirm", "", "exact target-bound confirmation")
@@ -125,23 +149,65 @@ func parseOptions(args []string) (options, error) {
 	return opts, nil
 }
 
-func expectedConfirmation(opts options) string {
+func resolveTargetPolicy(target string) (targetPolicy, error) {
+	target = strings.TrimSpace(target)
+	switch target {
+	case customertrialconfig.ExpectedTarget:
+		return targetPolicy{
+			target:             customertrialconfig.ExpectedTarget,
+			customerKey:        customertrialconfig.ExpectedCustomerKey,
+			database:           manualAcceptanceContract.CustomerTrial133.DatabaseName,
+			datasetKey:         manualAcceptanceContract.DatasetKey,
+			datasetVersion:     customertrialconfig.DatasetVersion,
+			runID:              manualAcceptanceContract.RunID,
+			requireTrialConfig: true,
+			retireLegacy:       true,
+		}, nil
+	case customerTestTarget:
+		return targetPolicy{
+			target:             customerTestTarget,
+			customerKey:        customertrialconfig.ExpectedCustomerKey,
+			database:           customerTestDatabase,
+			datasetKey:         customerTestFoundationKey,
+			datasetVersion:     manualAcceptanceContract.DataVersion,
+			runID:              manualAcceptanceContract.RunID,
+			requireTrialConfig: false,
+			retireLegacy:       false,
+		}, nil
+	default:
+		return targetPolicy{}, fmt.Errorf("--target must equal %s or %s", customertrialconfig.ExpectedTarget, customerTestTarget)
+	}
+}
+
+func expectedConfirmation(opts options) (string, error) {
+	policy, err := resolveTargetPolicy(opts.target)
+	if err != nil {
+		return "", err
+	}
+	action := "BOOTSTRAP_MANUAL_ACCEPTANCE_CORE"
+	if policy.target == customerTestTarget {
+		action = "BOOTSTRAP_CUSTOMER_TEST_CORE"
+	}
 	return strings.Join([]string{
-		"BOOTSTRAP_MANUAL_ACCEPTANCE_CORE",
-		customertrialconfig.ExpectedTarget,
-		customertrialconfig.ExpectedCustomerKey,
-		expectedDatabase,
-		expectedDatasetKey,
-		customertrialconfig.DatasetVersion,
-		expectedRunID,
+		action,
+		policy.target,
+		policy.customerKey,
+		policy.database,
+		policy.datasetKey,
+		policy.datasetVersion,
+		policy.runID,
 		opts.expectedMigrationVersion,
 		opts.expectedRelease,
-	}, ":")
+	}, ":"), nil
 }
 
 func validateOptions(opts options) error {
-	if opts.expectedDatabase != expectedDatabase {
-		return fmt.Errorf("--expected-database must equal the registered customer-trial-133 database")
+	policy, err := resolveTargetPolicy(opts.target)
+	if err != nil {
+		return err
+	}
+	if opts.expectedDatabase != policy.database {
+		return fmt.Errorf("--expected-database must equal the registered %s database", policy.target)
 	}
 	if !migrationVersionPattern.MatchString(opts.expectedMigrationVersion) {
 		return fmt.Errorf("--expected-migration must be a 14-digit Atlas version")
@@ -149,7 +215,11 @@ func validateOptions(opts options) error {
 	if !releaseVersionPattern.MatchString(opts.expectedRelease) {
 		return fmt.Errorf("--expected-release must be a 40-character lowercase Git SHA")
 	}
-	if opts.confirm != expectedConfirmation(opts) {
+	expected, err := expectedConfirmation(opts)
+	if err != nil {
+		return err
+	}
+	if opts.confirm != expected {
 		return fmt.Errorf("--confirm does not match the exact target, database, dataset, run, migration and release")
 	}
 	if opts.timeout <= 0 || opts.timeout > time.Minute {
@@ -162,15 +232,31 @@ func validateInvocation(opts options, dsn string, getenv func(string) string, co
 	if err := validateOptions(opts); err != nil {
 		return err
 	}
-	if dsn == "" || dsn != strings.TrimSpace(dsn) {
-		return fmt.Errorf("%s must be present without surrounding whitespace", dsnEnv)
-	}
-	enabled, err := customertrialconfig.ResolveGate(dsn, getenv)
+	policy, err := resolveTargetPolicy(opts.target)
 	if err != nil {
 		return err
 	}
-	if !enabled {
-		return fmt.Errorf("customer-trial-133 runtime gate is not enabled")
+	if dsn == "" || dsn != strings.TrimSpace(dsn) {
+		return fmt.Errorf("%s must be present without surrounding whitespace", dsnEnv)
+	}
+	enabled, gateErr := customertrialconfig.ResolveGate(dsn, getenv)
+	if policy.requireTrialConfig {
+		if gateErr != nil {
+			return gateErr
+		}
+		if !enabled {
+			return fmt.Errorf("customer-trial-133 runtime gate is not enabled")
+		}
+	} else {
+		if gateErr != nil || enabled {
+			return fmt.Errorf("customer-test-133 requires the customer trial runtime gate to be disabled")
+		}
+		if strings.TrimSpace(getenv(customertrialconfig.DebugEnv)) != "prod" {
+			return fmt.Errorf("customer-test-133 requires %s=prod", customertrialconfig.DebugEnv)
+		}
+		if err := validateCustomerTestDSN(dsn, policy.database); err != nil {
+			return err
+		}
 	}
 	if compiledVersion != opts.expectedRelease {
 		return fmt.Errorf("compiled release does not match --expected-release")
@@ -178,9 +264,39 @@ func validateInvocation(opts options, dsn string, getenv func(string) string, co
 	return nil
 }
 
+func validateCustomerTestDSN(raw, expectedDatabase string) error {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed == nil ||
+		(parsed.Scheme != "postgres" && parsed.Scheme != "postgresql") ||
+		parsed.Opaque != "" || parsed.Fragment != "" ||
+		parsed.Hostname() != productionPostgresHost ||
+		parsed.Port() != productionPostgresPort ||
+		parsed.Path != "/"+expectedDatabase {
+		return fmt.Errorf("customer-test-133 PostgreSQL target does not match the registered database")
+	}
+	query := parsed.Query()
+	sslModes, ok := query["sslmode"]
+	if len(query) != 1 || !ok || len(sslModes) != 1 || sslModes[0] != "disable" {
+		return fmt.Errorf("customer-test-133 PostgreSQL query must contain only sslmode=disable")
+	}
+	config, err := pgconn.ParseConfig(raw)
+	if err != nil || config == nil ||
+		strings.TrimSpace(config.Host) != productionPostgresHost ||
+		fmt.Sprintf("%d", config.Port) != productionPostgresPort ||
+		strings.TrimSpace(config.Database) != expectedDatabase ||
+		len(config.Fallbacks) != 0 || config.TLSConfig != nil {
+		return fmt.Errorf("customer-test-133 PostgreSQL target cannot be resolved to the single registered database")
+	}
+	return nil
+}
+
 func bootstrapManualAcceptanceCore(ctx context.Context, db *sql.DB, opts options) (*bootstrapResult, error) {
 	if db == nil {
 		return nil, fmt.Errorf("PostgreSQL connection is required")
+	}
+	policy, err := resolveTargetPolicy(opts.target)
+	if err != nil {
+		return nil, err
 	}
 	dataset := data.DefaultCoreDemoReferenceSeedDataset()
 	if err := validateReferenceDataset(dataset); err != nil {
@@ -190,8 +306,8 @@ func bootstrapManualAcceptanceCore(ctx context.Context, db *sql.DB, opts options
 	if err := db.QueryRowContext(ctx, `SELECT current_database()`).Scan(&databaseName); err != nil {
 		return nil, fmt.Errorf("database identity readback failed: %w", err)
 	}
-	if databaseName != expectedDatabase || databaseName != opts.expectedDatabase {
-		return nil, fmt.Errorf("database identity does not match the registered customer-trial-133 database")
+	if databaseName != policy.database || databaseName != opts.expectedDatabase {
+		return nil, fmt.Errorf("database identity does not match the registered %s database", policy.target)
 	}
 
 	var schemaStatus string
@@ -225,24 +341,24 @@ LIMIT 1`).Scan(&migrationVersion); err != nil {
 		return nil, fmt.Errorf("atlas migration does not match --expected-migration")
 	}
 
-	identity, err := activeCustomerTrialConfig(ctx, db)
+	identity, err := activeCustomerConfig(ctx, db, policy.customerKey)
 	if err != nil {
 		return nil, err
 	}
 	if identity.activeCount != 1 {
-		return nil, fmt.Errorf("active customer-trial-133 configuration count must equal one")
+		return nil, fmt.Errorf("active %s configuration count must equal one", policy.target)
 	}
 	trial, err := customertrialconfig.ClassifyManifest(
-		customertrialconfig.ExpectedCustomerKey,
+		policy.customerKey,
 		identity.revision,
 		identity.productVersion,
 		identity.compiledSnapshot,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("active customer-trial-133 configuration is invalid: %w", err)
+		return nil, fmt.Errorf("active %s configuration is invalid: %w", policy.target, err)
 	}
-	if !trial {
-		return nil, fmt.Errorf("active configuration is not the registered customer-trial-133 revision")
+	if policy.requireTrialConfig != trial {
+		return nil, fmt.Errorf("active configuration does not match the registered %s policy", policy.target)
 	}
 
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
@@ -258,7 +374,7 @@ LIMIT 1`).Scan(&migrationVersion); err != nil {
 	if err := validatePreWriteBoundary(before, dataset); err != nil {
 		return nil, err
 	}
-	result, err := upsertCoreReferences(ctx, tx, dataset)
+	result, err := upsertCoreReferences(ctx, tx, dataset, policy.retireLegacy)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +391,7 @@ LIMIT 1`).Scan(&migrationVersion); err != nil {
 	return result, nil
 }
 
-func activeCustomerTrialConfig(ctx context.Context, db *sql.DB) (activeConfigIdentity, error) {
+func activeCustomerConfig(ctx context.Context, db *sql.DB, customerKey string) (activeConfigIdentity, error) {
 	var identity activeConfigIdentity
 	var snapshotRaw []byte
 	err := db.QueryRowContext(ctx, `
@@ -283,20 +399,20 @@ SELECT revision, product_version, compiled_snapshot, COUNT(*) OVER ()
 FROM customer_config_revisions
 WHERE customer_key = $1 AND status = 'active'
 ORDER BY activated_at DESC NULLS LAST, id DESC
-LIMIT 1`, customertrialconfig.ExpectedCustomerKey).Scan(
+LIMIT 1`, customerKey).Scan(
 		&identity.revision,
 		&identity.productVersion,
 		&snapshotRaw,
 		&identity.activeCount,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return activeConfigIdentity{}, fmt.Errorf("active customer-trial-133 configuration is missing")
+		return activeConfigIdentity{}, fmt.Errorf("active customer configuration is missing")
 	}
 	if err != nil {
-		return activeConfigIdentity{}, fmt.Errorf("active customer-trial-133 configuration readback failed: %w", err)
+		return activeConfigIdentity{}, fmt.Errorf("active customer configuration readback failed: %w", err)
 	}
 	if len(snapshotRaw) == 0 || json.Unmarshal(snapshotRaw, &identity.compiledSnapshot) != nil || len(identity.compiledSnapshot) == 0 {
-		return activeConfigIdentity{}, fmt.Errorf("active customer-trial-133 compiled snapshot is invalid")
+		return activeConfigIdentity{}, fmt.Errorf("active customer compiled snapshot is invalid")
 	}
 	return identity, nil
 }
@@ -433,8 +549,16 @@ func validatePostWriteBoundary(boundary coreBoundary, dataset data.CoreDemoRefer
 	return nil
 }
 
-func upsertCoreReferences(ctx context.Context, tx *sql.Tx, dataset data.CoreDemoReferenceSeedDataset) (*bootstrapResult, error) {
-	reconciled, err := data.ReconcileCoreDemoReferencesInTx(ctx, tx, dataset)
+func upsertCoreReferences(ctx context.Context, tx *sql.Tx, dataset data.CoreDemoReferenceSeedDataset, retireLegacy bool) (*bootstrapResult, error) {
+	var (
+		reconciled *data.CoreDemoSeedResult
+		err        error
+	)
+	if retireLegacy {
+		reconciled, err = data.ReconcileCoreDemoReferencesInTx(ctx, tx, dataset)
+	} else {
+		reconciled, err = data.ReconcilePreservedCoreReferencesInTx(ctx, tx, dataset)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("reconcile exact core references failed: %w", err)
 	}

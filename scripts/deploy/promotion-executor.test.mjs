@@ -861,7 +861,7 @@ test("promotion executor contains no target build or automatic retry path", () =
   );
 });
 
-test("ordinary promotion cannot invoke the independent database rebuild path", () => {
+test("ordinary promotion cannot rebuild or reseed target data", () => {
   for (const file of [
     "promotion-controller.mjs",
     "promotion-executor.mjs",
@@ -870,8 +870,8 @@ test("ordinary promotion cannot invoke the independent database rebuild path", (
     const source = readFileSync(path.join(import.meta.dirname, file), "utf8");
     assert.doesNotMatch(
       source,
-      /database-rebuild|rebuild-database|REBUILD_DATABASE/u,
-      `${file} must preserve target data and remain separate from rebuild`,
+      /database-rebuild|rebuild-database|REBUILD_DATABASE|bootstrap-manual-acceptance-core|BOOTSTRAP_CUSTOMER_TEST_CORE/u,
+      `${file} must preserve target data and remain separate from rebuild or seed`,
     );
   }
 });

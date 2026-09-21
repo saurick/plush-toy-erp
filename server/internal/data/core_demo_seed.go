@@ -428,6 +428,14 @@ func ReconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset Co
 	return reconcileCoreDemoReferencesInTx(ctx, tx, dataset, true)
 }
 
+// ReconcilePreservedCoreReferencesInTx writes only the exact current
+// reference allowlist. It is used by long-lived customer-test data where
+// ordinary deployments and one-shot foundation preparation must not retire
+// older or manually maintained references.
+func ReconcilePreservedCoreReferencesInTx(ctx context.Context, tx *sql.Tx, dataset CoreDemoReferenceSeedDataset) (*CoreDemoSeedResult, error) {
+	return reconcileCoreDemoReferencesInTx(ctx, tx, dataset, false)
+}
+
 func reconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset CoreDemoReferenceSeedDataset, retireLegacy bool) (*CoreDemoSeedResult, error) {
 	if tx == nil {
 		return nil, ErrCoreDemoSeedMissingDB

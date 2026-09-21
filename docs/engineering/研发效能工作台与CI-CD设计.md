@@ -137,10 +137,10 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 | 环境 | 公网入口 | 数据与用途 | 重建边界 |
 | --- | --- | --- | --- |
 | demo / `demo-133` | `demo.yoyoosun.net` | 项目方造数、演练、培训和回归；允许 seed/fixture/模拟业务事实 | 只走受控重建，必须保留自己的备份与回滚点 |
-| test / `customer-test-133` | `test.yoyoosun.net` | 甲方测试/验收；普通部署保留数据，新一轮测试前可显式重建 | 清理与 promotion 分开；重建前必须有可恢复备份、恢复验证和精确回滚点 |
+| test / `customer-test-133` | `test.yoyoosun.net` | 甲方测试/验收；普通部署不 rebuild、不 seed 并保留数据；基础单位 / 仓库只走显式一次性 bootstrap | 清理与 promotion 分开；重建前必须有可恢复备份、恢复验证和精确回滚点 |
 | erp | `erp.yoyoosun.net` | 未来正式生产 | 当前未登记、未启用，不能从工作台执行 |
 
-demo 与 test 必须使用同一 release digest，但数据库、上传目录、Compose project、宿主端口、运行 env、备份、回滚点、target registry、preflight、operation 和 smoke 全部独立。demo 造数不得进入 test；test 普通 promotion 保留现有数据，显式重建不得影响 demo。根域 `yoyoosun.net` 临时 `302` 跳转到 `erp.yoyoosun.net` 只是导航行为，不把未来生产域名加入 target registry。`admin.yoyoosun.net` 退役后绝不进入 CI/CD 环境矩阵、数据清理、健康检查、发布验证或回滚流程。真实资料进入客户 Private 仓或经确认的受控存储，不进入 Product Core、CI artifacts 或公开 GitHub 镜像。
+demo 与 test 必须使用同一 release digest，但数据库、上传目录、Compose project、宿主端口、运行 env、备份、回滚点、target registry、preflight、operation 和 smoke 全部独立。demo 造数不得进入 test；test 普通 promotion 保留现有数据且不调用任何 seed，显式重建不得影响 demo。test 的一次性 core bootstrap 只写精确 allowlist 的 11 个单位和 4 个仓库，要求当前任务明确授权、fresh backup、实时 target 身份、exact release / migration 和写后读回，不构成真实客户导入。根域 `yoyoosun.net` 临时 `302` 跳转到 `erp.yoyoosun.net` 只是导航行为，不把未来生产域名加入 target registry。`admin.yoyoosun.net` 退役后绝不进入 CI/CD 环境矩阵、数据清理、健康检查、发布验证或回滚流程。真实资料进入客户 Private 仓或经确认的受控存储，不进入 Product Core、CI artifacts 或公开 GitHub 镜像。
 
 ## Secrets、权限与审计
 
@@ -358,7 +358,7 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 - “流水线耗时”直接读取固定 GitLab 项目最近 pipeline、job 与时间；GitLab Jobs API 不提供 GitHub 式 step 时间时，界面保持 job 级证据，不伪造步骤。页面分别显示统计读取时间及最近一次流水线、最近一次制品发布和构建制品的事件时间，并默认展示可见关键路径、最长可见环节和建议复核点；全部任务与步骤按需展开，不自动并发、重跑或复制 GitLab 状态。目标部署仍以工作台 operation 独立计时和读回。
 - 发布只允许当前 clean exact SHA；GitLab adapter 固定 `gitlab.saurick.me/saurick/plush-toy-erp`、受保护 main、Generic Package 和 `yoyoosun`。版本目录、流水线耗时、发布状态与控制制品下载使用只读 Provider；只有创建新发布调用写 Provider，未加载短期 `PLUSH_GITLAB_TOKEN` 时页面保持可读并停用该动作。显式 `PLUSH_DELIVERY_PROVIDER=github` 才启用 GitHub 应急 adapter；两条发布链不得同时运行。
 - 版本列表不改写不可变版本号；GitLab adapter 提供带时区的 `publishedAt`，每行在版本号和 short SHA 下显示本地完整日期时间，并用 HTML `time/dateTime` 保留原始值。Provider 拒绝缺失或非法发布时间，前端摘要合同进一步拒绝无时区值；比 133 当前 manifest 新的版本只允许准备部署，旧版本只允许检查回滚，当前 manifest、migration 序列或客户配置源指纹不能证明时按钮禁用并说明原因。顶部严格门禁与最新不可变版本、当前 operation、历史记录、详情头部和事件流统一显示各自真源提供的完成、发布、开始或更新时间；没有对应真源时显示“时间未证明”，不拿制品发布时间推算目标部署或公网核验时间。
-- 发布、部署与回滚先按动作、固定目标、Exact-SHA、版本和发布输入创建或复用 operation；不同窗口的相同意图会合并为一个 operation。同一目标只允许一个执行器；页面刷新从原子 operation store 恢复。test 普通部署保留现有数据，清空并重建测试数据使用独立的两阶段 operation，并固定到 test 当前运行的 exact SHA。`failed / blocked` 可由用户显式创建带父 operation 和尝试次数的新 operation，旧终态不变；`not_proven` 必须先读回目标且不提供重试。幂等证据仍以现有“操作记录”和详情为唯一运行真源，不新增幂等写动作或第二套 operation 状态，也不显示原始幂等键或指纹；演练页只读引用其完成状态。
+- 发布、部署与回滚先按动作、固定目标、Exact-SHA、版本和发布输入创建或复用 operation；不同窗口的相同意图会合并为一个 operation。同一目标只允许一个执行器；页面刷新从原子 operation store 恢复。test 普通部署保留现有数据且不调用 rebuild / seed；清空并重建测试数据使用独立的两阶段 operation，并固定到 test 当前运行的 exact SHA。只有当前 Codex 任务明确授权时才可另行执行一次性 test core bootstrap，且它不是 promotion 阶段。`failed / blocked` 可由用户显式创建带父 operation 和尝试次数的新 operation，旧终态不变；`not_proven` 必须先读回目标且不提供重试。幂等证据仍以现有“操作记录”和详情为唯一运行真源，不新增幂等写动作或第二套 operation 状态，也不显示原始幂等键或指纹；演练页只读引用其完成状态。
 - Operation 列表同时展示开始时间、终态完成时间和工作台操作历时；未结束 operation 显示开始与最近更新时间。已结束记录只提供结果、动作、目标和版本 / SHA / 操作 ID 四类高价值筛选，筛选写入 URL 并在刷新、前进和后退后恢复；不增加低价值日期区间或技术字段筛选。详情按动作分型：制品发布只显示构建、制品和工作台发布操作历时，不把未执行的目标传输、备份或镜像加载写成“未证明”；部署、回滚和重建只显示真实读回的目标指标。技术 ID、重复请求识别依据、digest 和最近 100 条脱敏事件默认折叠；事件仍使用完整本地时间并在 `time/dateTime` 中保留原始带时区值。浏览器不接收本机路径、repo/workflow/target/SSH/shell/SQL/Docker 输入，也不持有 GitLab、GitHub 或 SSH 凭据。
 - 效能工作台的质量门禁、测试、数据准备、数据库迁移和客户配置执行证据统一展示真源提供的统计读取、开始、完成、阶段、事件、计划、备份验证、发布或激活时间；ISO 值必须自带时区，后端 Unix 时间只在字段合同明确为秒时转换。缺失或非法值显示“时间未证明”，静态目录和没有权威快照时间的页面不使用页面加载时间冒充更新时间。
 - 远端基础回执当前只证明制品、备份恢复检查、migration、Compose、health、ready、Web health 与运行 SHA；带凭据岗位矩阵、PDF、客户 UAT 和签收仍需独立完成。
