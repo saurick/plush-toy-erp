@@ -704,7 +704,7 @@ Server 镜像切换到固定 Debian snapshot 后，先升级基础镜像已有�
 
 发布作业始终保留脱敏的 `release-rehearsal.json` 与 PDF 扫描产物；演练结束时必须清理当前临时工作区内由容器持有的 PostgreSQL 和附件目录，确认容器与工作区均无残留后才允许登记版本。
 
-Trivy 漏洞库固定从官方 `ghcr.io/aquasecurity/trivy-db:2` 获取，避免默认优先连接 Runner 不可达的 Google 镜像站。下载与扫描继续使用既有超时和完整性校验，失败仍阻断发布。
+Trivy 漏洞库固定从官方 `ghcr.io/aquasecurity/trivy-db:2` 获取，避免默认优先连接 Runner 不可达的 Google 镜像站。下载与完整扫描共享 30 分钟超时预算，以容纳按需代理链路的带宽波动；超时、下载不完整或扫描失败仍阻断发布。
 
 此门禁的漏洞阻断范围为 Chromium 所在的 Debian 系统包（Trivy `Class=os-pkgs`、`Type=debian`）。Trivy 同时发现的 Go 二进制依赖问题按原分类完整保留，并单独计数；它们由既有 Go 安全检查继续判定调用路径和升级范围。打印运行时通过不代表全镜像无漏洞，也不把暂无修复版本的系统包发现当作已修复。
 

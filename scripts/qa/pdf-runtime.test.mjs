@@ -13,6 +13,10 @@ const source = await readFile(
   new URL("../../server/Dockerfile", import.meta.url),
   "utf8",
 );
+const runtimeScript = await readFile(
+  new URL("./pdf-runtime.sh", import.meta.url),
+  "utf8",
+);
 const pins = readRuntimePins(source);
 const image = [
   {
@@ -63,6 +67,13 @@ test("PDF runtime keeps repeatable source pins while comparing numeric upstream 
   assert.equal(compareBrowserVersions("152.0.7977.100", "152.0.7977.82"), 1);
   assert.equal(compareBrowserVersions("152.0.7977.9", "152.0.7977.82"), -1);
   assert.equal(compareBrowserVersions("152.0.7977.82", "152.0.7977.82"), 0);
+});
+
+test("Trivy keeps the official database and a proxy-tolerant full-scan timeout", () => {
+  assert.match(
+    runtimeScript,
+    /--db-repository ghcr[.]io\/aquasecurity\/trivy-db:2[\s\S]+--timeout 30m --parallel 2/u,
+  );
 });
 
 test("actual image packages, executable, user and bytes determine acceptance", () => {
