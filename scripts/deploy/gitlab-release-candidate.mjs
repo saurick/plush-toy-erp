@@ -3,6 +3,9 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  chmodSync,
+  constants,
+  copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -185,6 +188,36 @@ function atomicBuffer(file, buffer) {
     renameSync(temporary, file);
   } finally {
     rmSync(temporary, { force: true });
+  }
+}
+
+export function atomicCopyPlainFile(sourceFile, destinationFile) {
+  const source = path.resolve(sourceFile);
+  const destination = path.resolve(destinationFile);
+  const sourceStat = plainFile(source, "release candidate recovery source");
+  const sourceDigest = sha256File(source);
+  if (existsSync(destination)) {
+    throw new Error("release candidate recovery destination already exists");
+  }
+  mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 });
+  const temporary = `${destination}.${process.pid}.tmp`;
+  let committed = false;
+  try {
+    copyFileSync(source, temporary, constants.COPYFILE_EXCL);
+    chmodSync(temporary, 0o600);
+    const temporaryStat = plainFile(temporary, "release candidate recovery temporary file");
+    if (temporaryStat.size !== sourceStat.size || sha256File(temporary) !== sourceDigest) {
+      throw new Error("release candidate recovery copy digest mismatch");
+    }
+    renameSync(temporary, destination);
+    const destinationStat = plainFile(destination, "release candidate recovery destination");
+    if (destinationStat.size !== sourceStat.size || sha256File(destination) !== sourceDigest) {
+      throw new Error("release candidate recovery destination digest mismatch");
+    }
+    committed = true;
+  } finally {
+    rmSync(temporary, { force: true });
+    if (!committed) rmSync(destination, { force: true });
   }
 }
 
@@ -475,14 +508,23 @@ export async function recoverCandidate(options, runtime = {}) {
     extractCandidateArchive(archive, extracted);
     const manifest = assertExtractedCandidate(extracted, releaseIdentity);
     const artifactDir = path.resolve(options.artifactDir);
-    if (existsSync(artifactDir)) throw new Error("release candidate output already exists");
-    mkdirSync(artifactDir, { recursive: true, mode: 0o700 });
-    for (const name of CANDIDATE_PAYLOADS) {
-      renameSync(path.join(extracted, name), path.join(artifactDir, name));
-    }
     const manifestOut = path.resolve(options.manifestOut);
-    mkdirSync(path.dirname(manifestOut), { recursive: true, mode: 0o700 });
-    renameSync(path.join(extracted, "release-candidate.json"), manifestOut);
+    if (existsSync(artifactDir)) throw new Error("release candidate output already exists");
+    if (existsSync(manifestOut)) throw new Error("release candidate manifest output already exists");
+    let completed = false;
+    try {
+      mkdirSync(artifactDir, { recursive: true, mode: 0o700 });
+      for (const name of CANDIDATE_PAYLOADS) {
+        atomicCopyPlainFile(path.join(extracted, name), path.join(artifactDir, name));
+      }
+      atomicCopyPlainFile(path.join(extracted, "release-candidate.json"), manifestOut);
+      completed = true;
+    } finally {
+      if (!completed) {
+        rmSync(artifactDir, { recursive: true, force: true });
+        rmSync(manifestOut, { force: true });
+      }
+    }
     return { status: "recovered", packageId: packageValue.id, manifest };
   } finally {
     rmSync(workspace, { recursive: true, force: true });

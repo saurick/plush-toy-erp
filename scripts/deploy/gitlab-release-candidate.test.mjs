@@ -1,14 +1,56 @@
 import assert from "node:assert/strict";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
 import test from "node:test";
 
 import {
   GITLAB_RELEASE_CANDIDATE_SCHEMA,
+  atomicCopyPlainFile,
   validateGitlabReleaseCandidateManifest,
   validateReleaseRehearsalReceipt,
 } from "./gitlab-release-candidate.mjs";
 
 const sha = "a".repeat(40);
 const digest = "b".repeat(64);
+
+test("candidate recovery copies a verified file across workspace boundaries without moving the source", () => {
+  const sourceRoot = mkdtempSync(path.join(os.tmpdir(), "plush-release-candidate-source-"));
+  const destinationRoot = mkdtempSync(
+    path.join(process.cwd(), ".plush-release-candidate-destination-"),
+  );
+  try {
+    const source = path.join(sourceRoot, "server-image.tar");
+    const destination = path.join(destinationRoot, "nested", "server-image.tar");
+    writeFileSync(source, "verified candidate payload", { mode: 0o600, flag: "wx" });
+
+    atomicCopyPlainFile(source, destination);
+
+    assert.equal(readFileSync(source, "utf8"), "verified candidate payload");
+    assert.equal(readFileSync(destination, "utf8"), "verified candidate payload");
+    assert.equal(statSync(destination).mode & 0o777, 0o600);
+    assert.deepEqual(readdirSync(path.dirname(destination)), ["server-image.tar"]);
+
+    assert.throws(
+      () => atomicCopyPlainFile(source, destination),
+      /destination already exists/u,
+    );
+    assert.equal(readFileSync(destination, "utf8"), "verified candidate payload");
+    assert.equal(existsSync(`${destination}.${process.pid}.tmp`), false);
+  } finally {
+    rmSync(sourceRoot, { recursive: true, force: true });
+    rmSync(destinationRoot, { recursive: true, force: true });
+  }
+});
 
 test("candidate manifest requires one build and exact five-file digest set", () => {
   const manifest = {
