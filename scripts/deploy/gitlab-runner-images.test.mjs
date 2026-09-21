@@ -45,6 +45,15 @@ test("cleanup requires exact project, dedicated host, CI context and SHA", () =>
   }
   const f = fixture();
   assert.throws(() => cleanupRunnerImages("main", f.options), /exact SHA/u);
+
+  const esxi = fixture();
+  assert.equal(
+    cleanupRunnerImages(sha, {
+      ...esxi.options,
+      hostname: "plush-gitlab-runner-esxi",
+    }).status,
+    "cleaned",
+  );
 });
 
 test("cleanup only removes the six verified aliases for the published build", () => {

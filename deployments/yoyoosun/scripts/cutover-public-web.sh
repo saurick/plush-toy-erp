@@ -129,18 +129,29 @@ wait_http_health() {
 
 assert_provider_capabilities() {
   local base_url="$1"
-  curl -fsS \
+  local payload
+  payload="$(curl -fsS \
     --max-time 10 \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":"public-cutover","method":"capabilities","params":{}}' \
-    "${base_url%/}/rpc/auth" | python3 -c '
+    "${base_url%/}/rpc/auth")" || return 1
+  python3 -c '
 import json
 import sys
 payload = json.load(sys.stdin)
 sms = payload.get("result", {}).get("data", {}).get("sms_login", {})
 ok = payload.get("result", {}).get("code") == 0 and sms.get("enabled") is True and sms.get("mode") == "provider" and sms.get("mock_delivery") is False
 raise SystemExit(0 if ok else 1)
-'
+' <<<"$payload"
+}
+
+wait_provider_capabilities() {
+  local base_url="$1"
+  for _ in $(seq 1 12); do
+    assert_provider_capabilities "$base_url" && return 0
+    sleep 2
+  done
+  return 1
 }
 
 container_release() {
@@ -160,7 +171,7 @@ if [[ "$current_container" != none ]]; then
   [[ "$current_release" =~ ^[0-9a-f]{40}$ ]] || fail "当前公网容器没有可信 GIT_SHA"
   if [[ "$current_release" == "$release" ]]; then
     wait_http_health "http://127.0.0.1:$host_port/healthz" || fail "当前公网入口未健康"
-    assert_provider_capabilities "$endpoint" || fail "当前公网入口未满足 provider 合同"
+    wait_provider_capabilities "$endpoint" || fail "当前公网入口未满足 provider 合同"
     echo "[cutover-public-web] passed current=$current_container rollback=$current_container release=$release provider=true reused=true"
     exit 0
   fi
@@ -195,7 +206,7 @@ docker run -d \
 
 wait_http_health "http://127.0.0.1:$candidate_port/healthz" || fail "候选前端未健康"
 
-assert_provider_capabilities "http://127.0.0.1:$candidate_port" || fail "候选前端 SMS 能力未匹配 provider 合同"
+wait_provider_capabilities "http://127.0.0.1:$candidate_port" || fail "候选前端 SMS 能力未匹配 provider 合同"
 if [[ "$current_container" != none ]]; then
   docker update --restart=no "$current_container" >/dev/null
   docker stop "$current_container" >/dev/null
@@ -224,7 +235,7 @@ if ! docker run -d \
 fi
 
 if ! wait_http_health "http://127.0.0.1:$host_port/healthz" ||
-  ! assert_provider_capabilities "$endpoint"; then
+  ! wait_provider_capabilities "$endpoint"; then
   rollback_old
   fail "公网切流后验证失败，已尝试恢复旧入口"
 fi

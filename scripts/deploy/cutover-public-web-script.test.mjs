@@ -17,6 +17,7 @@ test("public web cutover uses HTTP health when the image has no Docker healthche
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "public-web-cutover-"));
   const binDir = path.join(root, "bin");
   const dockerLog = path.join(root, "docker.log");
+  const providerCounter = path.join(root, "provider-attempts");
   fs.mkdirSync(binDir);
 
   fs.writeFileSync(
@@ -50,6 +51,13 @@ url="\${@: -1}"
 if [[ "$url" == */healthz ]]; then
   printf '200'
 else
+  if [[ "$url" == https://demo.yoyoosun.net/rpc/auth ]]; then
+    attempts=0
+    [[ ! -f "$FAKE_PROVIDER_COUNTER" ]] || read -r attempts <"$FAKE_PROVIDER_COUNTER"
+    attempts=$((attempts + 1))
+    printf '%s\\n' "$attempts" >"$FAKE_PROVIDER_COUNTER"
+    ((attempts >= 3)) || exit 28
+  fi
   printf '%s\\n' '{"result":{"code":0,"data":{"sms_login":{"enabled":true,"mode":"provider","mock_delivery":false}}}}'
 fi
 `,
@@ -90,6 +98,7 @@ fi
       PATH: `${binDir}:${process.env.PATH}`,
       FAKE_DOCKER_LOG: dockerLog,
       FAKE_CURRENT_RELEASE: currentRelease,
+      FAKE_PROVIDER_COUNTER: providerCounter,
     },
   });
 
@@ -107,6 +116,7 @@ fi
     dockerCalls.match(/API_ORIGIN=http:\/\/app-server:8300/g)?.length,
     2,
   );
+  assert.equal(fs.readFileSync(providerCounter, "utf8").trim(), "3");
   const source = fs.readFileSync(scriptPath, "utf8");
   assert.doesNotMatch(source, /curl\s+-k/u);
   assert.match(
@@ -123,6 +133,7 @@ fi
       PATH: `${binDir}:${process.env.PATH}`,
       FAKE_DOCKER_LOG: dockerLog,
       FAKE_CURRENT_RELEASE: release,
+      FAKE_PROVIDER_COUNTER: providerCounter,
     },
   });
   assert.equal(reused.status, 0, `${reused.stdout}\n${reused.stderr}`);

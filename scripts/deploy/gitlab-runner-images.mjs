@@ -5,13 +5,18 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+const DEDICATED_RUNNER_HOSTNAMES = new Set([
+  "plush-gitlab-runner",
+  "plush-gitlab-runner-esxi",
+]);
+
 export function cleanupRunnerImages(sha, options = {}) {
   const env = options.env || process.env;
   const run = options.run || spawnSync;
   const hostname = options.hostname || os.hostname();
   if (
     !/^[0-9a-f]{40}$/u.test(sha) ||
-    hostname !== "plush-gitlab-runner" ||
+    !DEDICATED_RUNNER_HOSTNAMES.has(hostname) ||
     env.CI !== "true" ||
     env.GITLAB_CI !== "true" ||
     env.CI_PROJECT_PATH !== "saurick/plush-toy-erp"
