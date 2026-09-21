@@ -363,9 +363,21 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
     );
   }
   assert.deepEqual(yoyoosunMenuConfig.desktopMenu.hiddenItemKeys, []);
+  assert.deepEqual(yoyoosunMenuConfig.desktopMenu.routeOnlyItemKeys, [
+    "production-scheduling",
+    "production-exceptions",
+  ]);
+  const productionMenu = yoyoosunMenuConfig.desktopMenu.sections.find(
+    (section) => section.title === "生产管理",
+  );
+  assert.deepEqual(productionMenu?.items, [
+    "production-orders",
+    "production-progress",
+  ]);
   for (const key of [
     "business-dashboard",
     "shipping-release",
+    ...yoyoosunMenuConfig.desktopMenu.routeOnlyItemKeys,
   ]) {
     assert(manifest.compiled_snapshot.pages.includes(key));
   }

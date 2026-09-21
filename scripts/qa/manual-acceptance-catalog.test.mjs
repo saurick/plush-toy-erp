@@ -93,23 +93,39 @@ test("manual acceptance catalog covers all 51 formal read-only targets", () => {
   );
 });
 
-test("manual acceptance catalog keeps every formal route visible and excludes development-only pages", () => {
+test("manual acceptance catalog keeps route-only pages formal and out of the sidebar", () => {
   const catalog = buildManualAcceptanceCatalog();
   const allTechnical = flattenTechnicalManifest(catalog);
   const serialized = JSON.stringify(allTechnical);
 
   assert.deepEqual(yoyoosunMenuConfig.desktopMenu.hiddenItemKeys, []);
-  for (const pageKey of [
-    "business-dashboard",
-    "shipping-release",
+  assert.deepEqual(yoyoosunMenuConfig.desktopMenu.routeOnlyItemKeys, [
+    "production-scheduling",
     "production-exceptions",
-  ]) {
+  ]);
+  for (const pageKey of ["business-dashboard", "shipping-release"]) {
     const item = catalog.technicalManifest.desktopPages.find(
       (candidate) => candidate.key === pageKey,
     );
     assert(item, `${pageKey} must stay in the formal route inventory`);
     assert.equal(item.menuHidden, false);
   }
+  for (const pageKey of yoyoosunMenuConfig.desktopMenu.routeOnlyItemKeys) {
+    const item = catalog.technicalManifest.desktopPages.find(
+      (candidate) => candidate.key === pageKey,
+    );
+    assert(item, `${pageKey} must stay in the formal route inventory`);
+    assert.equal(item.menuHidden, true);
+  }
+  assert.equal(catalog.summary.hiddenDesktopPagesCovered, 2);
+  assert.deepEqual(catalog.technicalManifest.hiddenDesktopKeys, [
+    "production-scheduling",
+    "production-exceptions",
+  ]);
+  assert.deepEqual(catalog.technicalManifest.routeOnlyDesktopKeys, [
+    "production-scheduling",
+    "production-exceptions",
+  ]);
   assert.deepEqual(catalog.technicalManifest.excludedDesktopKeys, []);
   assert(!serialized.includes("__dev"));
   assert(!serialized.includes("/erp/__dev"));
@@ -265,7 +281,7 @@ test("manual acceptance catalog treats production and outbound pages as source-g
   const byTitle = new Map(
     catalog.acceptanceGuide.desktopPages.map((item) => [item.title, item]),
   );
-  const production = byTitle.get("生产进度");
+  const production = byTitle.get("生产记录");
   const outbound = byTitle.get("出库管理");
 
   assert(production);
@@ -288,8 +304,8 @@ test("production collaboration pages match the roles' executable task states", (
   const byTitle = new Map(
     catalog.acceptanceGuide.desktopPages.map((item) => [item.title, item]),
   );
-  const scheduling = byTitle.get("生产排程");
-  const exceptions = byTitle.get("生产异常处置");
+  const scheduling = byTitle.get("排产确认");
+  const exceptions = byTitle.get("异常处理");
 
   assert(scheduling);
   assert(exceptions);

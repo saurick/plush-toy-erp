@@ -891,6 +891,8 @@ export function buildCustomerMenuRuntimeSummary(
   sourcePath = DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH
 ) {
   const sections = menuConfig.desktopMenu?.sections || []
+  const routeOnlyItemKeys = menuConfig.desktopMenu?.routeOnlyItemKeys || []
+  const itemCount = countMenuItems(sections)
   const brand = menuConfig.brand || {}
   return {
     customerKey: menuConfig.customerKey,
@@ -900,7 +902,10 @@ export function buildCustomerMenuRuntimeSummary(
       brandMark: resolveBrandMark(brand, menuConfig.label),
     },
     sectionCount: sections.length,
-    itemCount: countMenuItems(sections),
+    itemCount,
+    routeOnlyItemCount: routeOnlyItemKeys.length,
+    formalPageCount: itemCount + routeOnlyItemKeys.length,
+    routeOnlyItemKeys,
     sections,
     sourcePath,
     sourceLabel: mapSourcePathLabel(sourcePath),
@@ -1730,7 +1735,7 @@ export function buildCustomerPackageConsoleSummary({
         value: menuItemCount,
         unit: '项',
         status: 'runtime_frontend_only',
-        note: `${menuSummary?.sectionCount || 0} 个分组，只影响前端展示。`,
+        note: `${menuSummary?.sectionCount || 0} 个分组，另有 ${menuSummary?.routeOnlyItemCount || 0} 个页内路由，只影响前端展示。`,
       },
       {
         key: 'fields',

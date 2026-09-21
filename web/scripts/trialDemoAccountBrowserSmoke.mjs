@@ -96,6 +96,15 @@ const pageDefinitionByKey = new Map([
   ...Object.values(navigationItemRegistry).map((item) => [item.key, item]),
   ...businessModuleDefinitions.map((item) => [item.key, item]),
 ])
+const menuLabelByPath = new Map(
+  [...pageDefinitionByKey.values()].map((item) => [item.path, item.label])
+)
+const routeOnlyCustomerMenuKeys = new Set(
+  yoyoosunMenuConfig.desktopMenu?.routeOnlyItemKeys || []
+)
+const hiddenCustomerPageKeys = new Set(
+  yoyoosunMenuConfig.desktopMenu?.hiddenItemKeys || []
+)
 const authenticatedMenuLabels = Object.values(navigationItemRegistry)
   .filter((item) => item.access === 'authenticated')
   .map((item) => item.label)
@@ -106,6 +115,7 @@ function expectedMenusForRole(roleKey) {
   )
   assert(profile, `missing yoyoosun role projection: ${roleKey}`)
   return profile.menuSurfaces
+    .filter((pageKey) => !routeOnlyCustomerMenuKeys.has(pageKey))
     .map((pageKey) => menuLabelByKey.get(pageKey))
     .filter(Boolean)
 }
@@ -169,7 +179,7 @@ const desktopAccounts = [
       '采购订单',
       '模板打印中心',
       '出货放行',
-      '生产异常处置',
+      '异常处理',
     ],
   },
 ]
@@ -187,7 +197,10 @@ const mobileAccounts = [
 ]
 
 const hiddenCustomerMenuLabels = (
-  yoyoosunMenuConfig.desktopMenu?.hiddenItemKeys || []
+  [
+    ...(yoyoosunMenuConfig.desktopMenu?.hiddenItemKeys || []),
+    ...routeOnlyCustomerMenuKeys,
+  ]
 )
   .map((key) => menuLabelByKey.get(key))
   .filter(Boolean)
@@ -200,10 +213,13 @@ const visibleCustomerMenuLabelSet = new Set(
     .filter(Boolean)
 )
 const formalCustomerPageKeys = uniqueStrings(
-  (yoyoosunMenuConfig.desktopMenu?.sections || []).flatMap(
-    (section) => section.items || []
-  )
-).filter((key) => !hiddenCustomerMenuLabelSet.has(menuLabelByKey.get(key)))
+  [
+    ...(yoyoosunMenuConfig.desktopMenu?.sections || []).flatMap(
+      (section) => section.items || []
+    ),
+    ...routeOnlyCustomerMenuKeys,
+  ]
+).filter((key) => !hiddenCustomerPageKeys.has(key))
 
 function pageRouteTarget(pageKey) {
   const definition = pageDefinitionByKey.get(pageKey)
@@ -213,6 +229,9 @@ function pageRouteTarget(pageKey) {
     label: definition.label,
     title: definition.title || definition.label,
     path: definition.path,
+    sidebarVisible: !routeOnlyCustomerMenuKeys.has(pageKey),
+    sidebarLabel:
+      menuLabelByPath.get(definition.sidebarParentPath) || definition.label,
   }
 }
 
@@ -408,7 +427,7 @@ function buildRouteAccessPlanSummary() {
       forbiddenPages: entry.forbiddenPages.map((page) => ({ ...page })),
     })),
     boundary:
-      'Every allowed role menu surface is opened through its visible menu item. Every other formal yoyoosun customer page is requested directly and must redirect to an allowed role page or the authenticated help page before it can be used.',
+      'Every allowed sidebar page is opened through its visible menu item. Allowed route-only pages are opened directly and must keep their visible parent selected. Every other formal yoyoosun customer page is requested directly and must redirect to an allowed role page or the authenticated help page before it can be used.',
   }
 }
 
@@ -460,12 +479,16 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
         account.expectedMessage === '当前账号未分配业务岗位'
     ),
     coversFormalCustomerPageProjection:
-      plan.customerHiddenMenuLabels.length === 0 &&
+      plan.customerHiddenMenuLabels.length === 2 &&
+      ['排产确认', '异常处理'].every((label) =>
+        plan.customerHiddenMenuLabels.includes(label)
+      ) &&
       bossDesktop?.visibleExpectedMenus.includes('业务看板') &&
       !warehouseDesktop?.visibleExpectedMenus.includes('出货放行') &&
       financeDesktop?.visibleExpectedMenus.includes('出货放行') &&
-      productionDesktop?.visibleExpectedMenus.includes('生产异常处置') &&
-      ['业务看板', '出货放行', '生产异常处置', '异常处理'].every((label) =>
+      productionDesktop?.visibleExpectedMenus.includes('生产记录') &&
+      !productionDesktop?.visibleExpectedMenus.includes('异常处理') &&
+      ['业务看板', '出货放行', '排产确认', '异常处理'].every((label) =>
         adminDesktop?.forbiddenMenus.includes(label)
       ),
     coversLegacyMenuCleanup:
@@ -1575,13 +1598,19 @@ async function verifyRoleGuidedMenuStructure(page, username) {
 async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
   const measurements = []
   for (const target of routeAccess.allowedPages) {
-    const menuItem = await findVisibleMenuItem(page, target.label)
     requestTracker.begin({
       username: routeAccess.username,
       label: target.label,
       path: target.path,
     })
-    await menuItem.click()
+    if (target.sidebarVisible) {
+      const menuItem = await findVisibleMenuItem(page, target.label)
+      await menuItem.click()
+    } else {
+      await page.goto(new URL(target.path, `${baseURL}/`).toString(), {
+        waitUntil: 'domcontentloaded',
+      })
+    }
     await page.waitForURL((url) => url.pathname === target.path, {
       timeout: 15_000,
     })
@@ -1597,7 +1626,7 @@ async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
             node.classList.contains('ant-menu-item-selected') &&
             (node.textContent || '').trim().includes(label)
         ),
-      target.label,
+      target.sidebarLabel,
       { timeout: 15_000 }
     )
     const selectedLabels = (
@@ -1606,8 +1635,8 @@ async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
         .allTextContents()
     ).map((label) => label.trim())
     assert(
-      selectedLabels.includes(target.label),
-      `${routeAccess.username} 打开 ${target.label} 后菜单未保持选中`
+      selectedLabels.includes(target.sidebarLabel),
+      `${routeAccess.username} 打开 ${target.label} 后侧栏未保持 ${target.sidebarLabel} 选中`
     )
     const mainText = await page.getByRole('main').innerText()
     assert.doesNotMatch(

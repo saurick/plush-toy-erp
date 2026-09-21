@@ -27,6 +27,14 @@ test('dashboardTaskDisplay: 任务来源类型使用业务可读标签', () => {
   assert.equal(getWorkflowTaskSourceTypeLabel('project-orders'), '销售订单')
   assert.equal(getWorkflowTaskSourceTypeLabel('production-orders'), '生产订单')
   assert.equal(
+    getWorkflowTaskSourceTypeLabel('production-scheduling'),
+    '排产确认'
+  )
+  assert.equal(
+    getWorkflowTaskSourceTypeLabel('production-exceptions'),
+    '异常处理'
+  )
+  assert.equal(
     getWorkflowTaskSourceTypeLabel('production-progress'),
     '生产记录'
   )

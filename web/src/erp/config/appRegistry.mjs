@@ -38,7 +38,7 @@ export const mobileRoleDefinitions = Object.freeze([
     title: '生产手机待办',
     shortTitle: '生产手机待办',
     label: '生产',
-    description: '跟进今日排产、生产进度、延期原因、返工和异常事项。',
+    description: '跟进今日排产、生产记录、延期原因、返工和异常事项。',
   },
   {
     roleKey: 'warehouse',

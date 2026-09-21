@@ -19,6 +19,8 @@ export function buildWorkflowBusinessTaskQuery({
   ownerRoleKey = '',
   dueFrom,
   dueTo,
+  sourceType = '',
+  sourceID = 0,
   pagination = {},
 } = {}) {
   const normalizedTaskGroup = String(taskGroup || '').trim()
@@ -34,11 +36,21 @@ export function buildWorkflowBusinessTaskQuery({
   const normalizedKeyword = String(keyword || '').trim()
   const normalizedStatus = String(status || '').trim()
   const normalizedOwnerRoleKey = String(ownerRoleKey || '').trim()
+  const normalizedSourceType = String(sourceType || '').trim()
+  const normalizedSourceID = Number(sourceID)
   if (normalizedKeyword) query.keyword = normalizedKeyword
   if (normalizedStatus) query.task_status_key = normalizedStatus
   if (normalizedOwnerRoleKey) query.owner_role_key = normalizedOwnerRoleKey
   if (Number.isSafeInteger(dueFrom) && dueFrom > 0) query.due_from = dueFrom
   if (Number.isSafeInteger(dueTo) && dueTo > 0) query.due_to = dueTo
+  if (
+    normalizedSourceType &&
+    Number.isSafeInteger(normalizedSourceID) &&
+    normalizedSourceID > 0
+  ) {
+    query.source_type = normalizedSourceType
+    query.source_id = normalizedSourceID
+  }
   return query
 }
 

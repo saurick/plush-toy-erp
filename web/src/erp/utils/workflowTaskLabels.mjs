@@ -21,7 +21,7 @@ const WORKFLOW_TASK_GROUP_LABELS = Object.freeze({
   purchase_reconciliation: '采购对账',
   receivable_registration: '应收登记',
   production_exception: '生产异常',
-  production_scheduling: '生产排程',
+  production_scheduling: '排产确认',
   shipment_finance_approval: '出货财务审批',
   trial_boss_work: '老板协同',
   trial_engineering_work: '工程跟进',

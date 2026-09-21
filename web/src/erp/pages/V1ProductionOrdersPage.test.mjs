@@ -104,6 +104,7 @@ test('production order core actions stay stable while record-specific readers us
     'route-execution',
     'rework-progress',
     'production-records',
+    'production-scheduling',
     'release',
     'close',
     'cancel',
@@ -127,7 +128,10 @@ test('production order core actions stay stable while record-specific readers us
 })
 
 test('production order release explains the atomic scheduling handoff', () => {
-  assert.match(page, /生产订单已发布，排程任务已进入 PMC 待办/u)
+  assert.match(page, /生产订单已发布，排产确认已进入 PMC 待办/u)
+  assert.match(page, /V1_ROUTE_PATHS\.productionScheduling/u)
+  assert.match(page, /source_type: 'production-orders'/u)
+  assert.match(page, /source_id: order\.id/u)
 })
 
 test('production order forms remain connected before initialization', () => {

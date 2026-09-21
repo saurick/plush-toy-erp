@@ -646,7 +646,7 @@ test('workflowDashboardStats: 委外延期和回货预警进入对应桶', () =>
   assert.equal(stats.buckets.outsourceReturnQcPending.length, 1)
 })
 
-test('workflowDashboardStats: 生产排程和返工异常进入来源任务预警桶', () => {
+test('workflowDashboardStats: 排产确认和返工异常进入来源任务预警桶', () => {
   const productionScheduling = task({
     id: 24,
     source_type: 'production-orders',
@@ -679,7 +679,7 @@ test('workflowDashboardStats: 生产排程和返工异常进入来源任务预�
       buildWorkflowTaskAlert(productionScheduling, { nowMs: NOW_MS })
         ?.alert_level,
     ],
-    ['production_scheduling_pending', '生产排程待处理', 'warning']
+    ['production_scheduling_pending', '排产确认待处理', 'warning']
   )
   assert.deepEqual(
     [

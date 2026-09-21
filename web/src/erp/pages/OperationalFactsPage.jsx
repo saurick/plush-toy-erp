@@ -112,6 +112,7 @@ export function OperationalFactWorkspace({
   enabledViews,
   viewOverrides = EMPTY_VIEW_OVERRIDES,
   showTabs = true,
+  workspaceNavigation = null,
 }) {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
@@ -1435,14 +1436,14 @@ export function OperationalFactWorkspace({
 
       <BusinessDataTable
         tableHeader={
-          showTabs && tabItems.length > 1 ? (
+          workspaceNavigation || (showTabs && tabItems.length > 1 ? (
             <Tabs
               className="erp-business-view-tabs"
               activeKey={currentActiveKey}
               onChange={setActiveKey}
               items={tabItems}
             />
-          ) : null
+          ) : null)
         }
         rowKey="id"
         columns={tableColumns}

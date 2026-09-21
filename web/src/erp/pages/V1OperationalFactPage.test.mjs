@@ -38,8 +38,13 @@ test('invoice and reconciliation copy matches the available actions', () => {
   assert.doesNotMatch(source, /结清对账/u)
 })
 
-test('production progress keeps its view and shared role help explains warehouse handoff', () => {
+test('production records keep fact truth and expose permission-aware internal views', () => {
   assert.match(source, /initialActiveKey: 'production'/u)
+  assert.match(source, /ProductionRecordsNavigation/u)
+  assert.match(source, /PRODUCTION_RECORD_VIEW_KEYS\.DECISIONS/u)
+  assert.match(source, /PRODUCTION_RECORD_VIEW_KEYS\.TASKS/u)
+  assert.match(source, /V1_ROUTE_PATHS\.productionExceptions/u)
+  assert.match(source, /production_order_id:/u)
   const help = readFileSync(
     new URL('../config/roleHelpContent.mjs', import.meta.url),
     'utf8'

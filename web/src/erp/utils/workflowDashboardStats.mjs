@@ -483,7 +483,7 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
       alert_type: 'production_scheduling_pending',
       alert_level: dueStatus === 'overdue' ? 'critical' : 'warning',
       alert_label:
-        dueStatus === 'overdue' ? '生产排程已超时' : '生产排程待处理',
+        dueStatus === 'overdue' ? '排产确认已超时' : '排产确认待处理',
     }
   }
 

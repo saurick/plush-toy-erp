@@ -951,6 +951,12 @@ export function buildManualAcceptanceCatalog() {
   const hiddenItemKeys = [
     ...(yoyoosunMenuConfig.desktopMenu?.hiddenItemKeys || []),
   ];
+  const routeOnlyItemKeys = [
+    ...(yoyoosunMenuConfig.desktopMenu?.routeOnlyItemKeys || []),
+  ];
+  const nonSidebarItemKeys = [
+    ...new Set([...hiddenItemKeys, ...routeOnlyItemKeys]),
+  ];
   const formalSections = getNavigationSections(yoyoosunMenuConfig);
   const formalDesktopItems = formalSections.flatMap((section) =>
     section.items.map((item) => ({ ...item, sectionTitle: section.title })),
@@ -1024,7 +1030,7 @@ export function buildManualAcceptanceCatalog() {
       source: businessModuleKeys.has(item.key)
         ? "businessModules+seedData+yoyoosunMenu"
         : "seedData+yoyoosunMenu",
-      menuHidden: hiddenItemKeys.includes(item.key),
+      menuHidden: nonSidebarItemKeys.includes(item.key),
     });
   });
   const desktopAcceptance = desktopTechnical.map((item) =>
@@ -1127,10 +1133,10 @@ export function buildManualAcceptanceCatalog() {
     ...workspaceTechnical,
   ];
   const formalDesktopKeys = new Set(desktopTechnical.map((item) => item.key));
-  hiddenItemKeys.forEach((hiddenKey) =>
+  nonSidebarItemKeys.forEach((hiddenKey) =>
     assertSource(
       formalDesktopKeys.has(hiddenKey),
-      `菜单隐藏页 ${hiddenKey} 仍应进入正式路由验收目录`,
+      `侧栏不展示页 ${hiddenKey} 仍应进入正式路由验收目录`,
     ),
   );
   assertSource(
@@ -1162,11 +1168,12 @@ export function buildManualAcceptanceCatalog() {
       printPreviewPages: previewTechnical.length,
       printWorkspacePages: workspaceTechnical.length,
       totalScenarios: allTechnical.length,
-      hiddenDesktopPagesCovered: hiddenItemKeys.length,
+      hiddenDesktopPagesCovered: nonSidebarItemKeys.length,
     },
     technicalManifest: {
       sourceFiles: [...SOURCE_FILES],
-      hiddenDesktopKeys: hiddenItemKeys,
+      hiddenDesktopKeys: nonSidebarItemKeys,
+      routeOnlyDesktopKeys: routeOnlyItemKeys,
       excludedDesktopKeys: [],
       entries: entryTechnical,
       desktopPages: desktopTechnical,

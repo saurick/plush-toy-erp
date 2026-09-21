@@ -102,6 +102,7 @@ import {
   sourceBusinessActionNo,
 } from '../utils/sourceBusinessAction.mjs'
 import {
+  canOpenRelatedDocumentPath,
   linkedDocumentContext,
   linkedDocumentRequestKeyword,
 } from '../utils/relatedDocumentNavigation.mjs'
@@ -267,6 +268,7 @@ function draftParams(values) {
 export default function V1ProductionOrdersPage() {
   const outletContext = useOutletContext()
   const adminProfile = outletContext?.adminProfile || {}
+  const allowedMenuPaths = outletContext?.allowedMenuPaths || []
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const routeProductionOrderID = searchParamPositiveInt(
@@ -453,6 +455,24 @@ export default function V1ProductionOrdersPage() {
       relevant: selectedProductionRouteRelevant,
       busy: detailLoading || reworkProgressLoading,
       busyReason: '当前资料加载完成后可查看返工进度',
+    })
+  const canOpenProductionScheduling = canOpenRelatedDocumentPath({
+    path: V1_ROUTE_PATHS.productionScheduling,
+    adminProfile,
+    allowedMenuPaths,
+  })
+  const productionSchedulingRelevant = [
+    PRODUCTION_ORDER_STATUS.RELEASED,
+    PRODUCTION_ORDER_STATUS.CLOSED,
+    PRODUCTION_ORDER_STATUS.CANCELLED,
+  ].includes(selected?.status)
+  const productionSchedulingActionAvailability =
+    resolveContextualBusinessActionAvailability({
+      authorized: canOpenProductionScheduling,
+      selected: Boolean(selected),
+      relevant: productionSchedulingRelevant,
+      busy: detailLoading || mutationLoading,
+      busyReason: '当前资料处理完成后可查看排产确认',
     })
 
   useEffect(() => {
@@ -771,6 +791,16 @@ export default function V1ProductionOrdersPage() {
     navigate(
       routeWithQuery(V1_ROUTE_PATHS.productionProgress, {
         source_type: 'PRODUCTION_ORDER',
+        source_id: order.id,
+      })
+    )
+  }
+
+  const openProductionScheduling = (order = selected) => {
+    if (!order?.id || !canOpenProductionScheduling) return
+    navigate(
+      routeWithQuery(V1_ROUTE_PATHS.productionScheduling, {
+        source_type: 'production-orders',
         source_id: order.id,
       })
     )
@@ -1527,7 +1557,7 @@ export default function V1ProductionOrdersPage() {
     const operations = {
       release: [
         releaseProductionOrder,
-        '生产订单已发布，排程任务已进入 PMC 待办',
+        '生产订单已发布，排产确认已进入 PMC 待办',
       ],
       close: [closeProductionOrder, '生产订单关闭成功'],
       cancel: [cancelProductionOrder, '生产订单取消成功'],
@@ -1891,6 +1921,22 @@ export default function V1ProductionOrdersPage() {
                 onClick={() => viewProductionFacts(selected)}
               >
                 查看生产记录
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {productionSchedulingActionAvailability.visible ? (
+            <BusinessActionTooltip
+              disabled={productionSchedulingActionAvailability.disabled}
+              disabledReason={
+                productionSchedulingActionAvailability.disabledReason
+              }
+            >
+              <Button
+                data-business-action-key="production-scheduling"
+                disabled={productionSchedulingActionAvailability.disabled}
+                onClick={() => openProductionScheduling(selected)}
+              >
+                排产确认
               </Button>
             </BusinessActionTooltip>
           ) : null}

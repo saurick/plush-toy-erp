@@ -162,16 +162,16 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         actionLabel: '打开生产订单',
       },
       {
-        title: '跟进生产进度',
+        title: '查看生产记录',
         description: '办理领料、提交完工报告和返工来源记录。',
         path: '/erp/production/progress',
-        actionLabel: '打开生产进度',
+        actionLabel: '打开生产记录',
       },
       {
-        title: '办理生产异常处置',
+        title: '办理异常处理',
         description: '查看报废、在制让步和超领申请，按审批结果执行或冲正。',
         path: '/erp/production/exceptions',
-        actionLabel: '打开生产异常处置',
+        actionLabel: '打开异常处理',
       },
       {
         title: '跟进委外订单',
@@ -338,20 +338,20 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         actionLabel: '打开生产订单',
       },
       {
-        title: '推进生产排程',
-        description: '处理生产订单发布后生成的排程待办。',
+        title: '完成排产确认',
+        description: '处理生产订单发布后生成的排产确认待办。',
         path: '/erp/production/scheduling',
-        actionLabel: '打开生产排程',
+        actionLabel: '打开排产确认',
       },
     ],
     workflow: [
       '从销售订单和交期判断当前优先级。',
       '核对物料清单、库存可用量和采购到料进度。',
-      '维护计划并完成生产订单发布后生成的排程待办。',
+      '维护计划并完成生产订单发布后生成的排产确认待办。',
       '持续跟进生产、委外、质检、仓库和出货异常。',
     ],
     completion:
-      '计划、优先级、责任人和预计日期可查，排程事项已经交给生产；这不等于领料、完工或库存已更新。',
+      '计划、优先级、责任人和预计日期可查，排产事项已经交给生产；这不等于领料、完工或库存已更新。',
     handoff:
       '缺料交给采购，工序与完工交给生产，检验交给品质，备货与出货交给仓库，并向业务反馈交期变化。',
     exception: {
@@ -365,7 +365,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       returnTo: '缺料交采购，资料交工程，产能交生产，客户交期变更交销售。',
       doneWhen: '风险、责任人、处理日期和下一步可查，相关岗位已经收到事项。',
     },
-    caution: '排程任务完成不等于领料、完工或库存已经更新。',
+    caution: '排产确认完成不等于领料、完工或库存已经更新。',
   },
   {
     key: 'quality',
@@ -385,10 +385,10 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         actionLabel: '打开入库管理',
       },
       {
-        title: '跟进生产异常处置',
+        title: '跟进异常处理',
         description: '核对报废、在制让步和超领申请的审批与执行状态。',
         path: '/erp/production/exceptions',
-        actionLabel: '打开生产异常处置',
+        actionLabel: '打开异常处理',
       },
     ],
     workflow: [

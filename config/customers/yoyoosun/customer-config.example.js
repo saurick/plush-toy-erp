@@ -27,6 +27,10 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
   desktopMenu: Object.freeze({
     presentation: "role_guided",
     hiddenItemKeys: Object.freeze([]),
+    routeOnlyItemKeys: Object.freeze([
+      "production-scheduling",
+      "production-exceptions",
+    ]),
     sections: Object.freeze([
       Object.freeze({
         title: "看板中心",
@@ -71,12 +75,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
       }),
       Object.freeze({
         title: "生产管理",
-        items: Object.freeze([
-          "production-orders",
-          "production-scheduling",
-          "production-progress",
-          "production-exceptions",
-        ]),
+        items: Object.freeze(["production-orders", "production-progress"]),
       }),
       Object.freeze({
         title: "出货管理",

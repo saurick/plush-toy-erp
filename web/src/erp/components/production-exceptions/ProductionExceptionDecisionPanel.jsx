@@ -36,6 +36,16 @@ import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { resolveProductionExceptionActionAvailability } from '../../utils/operationalActionAvailability.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
+import {
+  createBusinessTablePagination,
+  resetBusinessPaginationCurrent,
+} from '../../utils/businessPagination.mjs'
+import {
+  buildProductionExceptionListQuery,
+  reconcileProductionExceptionPage,
+  requireProductionExceptionPage,
+  requireProductionExceptionRecord,
+} from '../../utils/productionExceptionListModel.mjs'
 
 const TYPE_LABELS = {
   SCRAP: '生产报废',
@@ -122,9 +132,11 @@ export default function ProductionExceptionDecisionPanel({
   onSummaryChange,
   tableHeader,
 }) {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
   const [rows, setRows] = useState([])
+  const [total, setTotal] = useState(0)
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [action, setAction] = useState(null)
   const [selectedID, setSelectedID] = useState(null)
@@ -152,8 +164,22 @@ export default function ProductionExceptionDecisionPanel({
   const linkedProductionExceptionID = Number(
     searchParams.get('production_exception_id') || 0
   )
-  const hasActiveFilters = Boolean(
+  const routeProductionOrderID = Number(
+    searchParams.get('production_order_id') || 0
+  )
+  const hasRouteProductionOrder = Boolean(
+    Number.isSafeInteger(routeProductionOrderID) && routeProductionOrderID > 0
+  )
+  const hasListFilters = Boolean(
     decisionTypeFilter || statusFilter || executionStatusFilter
+  )
+  const hasExactContext = Boolean(
+    !hasListFilters &&
+      Number.isSafeInteger(linkedProductionExceptionID) &&
+      linkedProductionExceptionID > 0
+  )
+  const hasActiveFilters = Boolean(
+    hasListFilters || hasRouteProductionOrder || hasExactContext
   )
 
   const load = useCallback(async () => {
@@ -161,6 +187,7 @@ export default function ProductionExceptionDecisionPanel({
     if (!canRead) {
       if (request.isCurrent()) {
         setRows([])
+        setTotal(0)
         setSelectedID(null)
         setLoading(false)
         onSummaryChange?.({ total: 0, pageCount: 0 })
@@ -170,68 +197,76 @@ export default function ProductionExceptionDecisionPanel({
     }
     setLoading(true)
     try {
-      const data = await listProductionExceptions(
-        {
-          ...(decisionTypeFilter ? { decision_type: decisionTypeFilter } : {}),
-          ...(statusFilter ? { status: statusFilter } : {}),
-          ...(executionStatusFilter
-            ? { execution_status: executionStatusFilter }
-            : {}),
-          limit: 100,
-          offset: 0,
-        },
-        { signal: request.signal }
-      )
-      if (!request.isCurrent()) return null
-      if (!Array.isArray(data?.production_exceptions)) {
-        throw Object.assign(new Error('生产异常记录返回不完整'), {
-          isInvalidResponse: true,
+      if (hasExactContext) {
+        const linked = await getProductionException(
+          { id: linkedProductionExceptionID },
+          { signal: request.signal }
+        )
+        if (!request.isCurrent()) return null
+        const exactRecord = requireProductionExceptionRecord(linked, {
+          id: linkedProductionExceptionID,
+          productionOrderID: hasRouteProductionOrder
+            ? routeProductionOrderID
+            : 0,
         })
+        setRows([exactRecord])
+        setTotal(1)
+        setSelectedID(exactRecord.id)
+        onSummaryChange?.({ total: 1, pageCount: 1 })
+        return [exactRecord]
       }
-      let nextRows = data.production_exceptions
-      if (
-        !hasActiveFilters &&
-        Number.isSafeInteger(linkedProductionExceptionID) &&
-        linkedProductionExceptionID > 0
-      ) {
-        if (!nextRows.some((item) => item.id === linkedProductionExceptionID)) {
-          const linked = await getProductionException(
-            {
-              id: linkedProductionExceptionID,
-            },
-            { signal: request.signal }
-          )
-          if (!request.isCurrent()) return null
-          if (linked?.id !== linkedProductionExceptionID) {
-            throw Object.assign(new Error('关联生产异常返回不完整'), {
-              isInvalidResponse: true,
-            })
-          }
-          nextRows = [linked, ...nextRows]
-        }
-      }
-      setRows(nextRows)
-      setSelectedID((current) => {
-        if (
-          !hasActiveFilters &&
-          Number.isSafeInteger(linkedProductionExceptionID) &&
-          linkedProductionExceptionID > 0
-        ) {
-          return linkedProductionExceptionID
-        }
-        return nextRows.some((item) => item.id === current) ? current : null
+
+      const query = buildProductionExceptionListQuery({
+        decisionType: decisionTypeFilter,
+        status: statusFilter,
+        executionStatus: executionStatusFilter,
+        productionOrderID: hasRouteProductionOrder
+          ? routeProductionOrderID
+          : 0,
+        pagination,
       })
-      const total = Number(data?.total)
+      const data = await listProductionExceptions(query, {
+        signal: request.signal,
+      })
+      if (!request.isCurrent()) return null
+      const page = requireProductionExceptionPage(data, {
+        limit: query.limit,
+        productionOrderID: hasRouteProductionOrder
+          ? routeProductionOrderID
+          : 0,
+      })
+      const pageState = reconcileProductionExceptionPage({
+        records: page.records,
+        total: page.total,
+        pagination,
+      })
+      setRows(pageState.records)
+      setTotal(page.total)
+      setSelectedID((current) =>
+        reconcileProductionExceptionPage({
+          records: page.records,
+          total: page.total,
+          pagination,
+          selectedID: current,
+        }).selectedID
+      )
+      if (pageState.shouldRetreat) {
+        setPagination((current) => ({
+          ...current,
+          current: pageState.current,
+        }))
+      }
       onSummaryChange?.({
-        total:
-          Number.isSafeInteger(total) && total >= 0
-            ? Math.max(total, nextRows.length)
-            : nextRows.length,
-        pageCount: nextRows.length,
+        total: page.total,
+        pageCount: pageState.records.length,
       })
-      return nextRows
+      return pageState.records
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) return null
+      setRows([])
+      setTotal(0)
+      setSelectedID(null)
+      onSummaryChange?.({ total: 0, pageCount: 0 })
       message.error(getActionErrorMessage(error, '读取生产异常处置申请'))
       return null
     } finally {
@@ -245,9 +280,12 @@ export default function ProductionExceptionDecisionPanel({
     canRead,
     decisionTypeFilter,
     executionStatusFilter,
-    hasActiveFilters,
+    hasExactContext,
+    hasRouteProductionOrder,
     linkedProductionExceptionID,
     onSummaryChange,
+    pagination,
+    routeProductionOrderID,
     statusFilter,
   ])
   useEffect(() => {
@@ -519,6 +557,11 @@ export default function ProductionExceptionDecisionPanel({
     setStatusFilter('')
     setExecutionStatusFilter('')
     setSelectedID(null)
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('production_exception_id')
+    nextParams.delete('production_order_id')
+    setSearchParams(nextParams, { replace: true })
+    resetBusinessPaginationCurrent(setPagination)
   }
 
   return (
@@ -534,6 +577,7 @@ export default function ProductionExceptionDecisionPanel({
               onChange={(value) => {
                 setDecisionTypeFilter(value || '')
                 setSelectedID(null)
+                resetBusinessPaginationCurrent(setPagination)
               }}
             />
             <SelectFilter
@@ -543,6 +587,7 @@ export default function ProductionExceptionDecisionPanel({
               onChange={(value) => {
                 setStatusFilter(value || '')
                 setSelectedID(null)
+                resetBusinessPaginationCurrent(setPagination)
               }}
             />
             <SelectFilter
@@ -552,8 +597,27 @@ export default function ProductionExceptionDecisionPanel({
               onChange={(value) => {
                 setExecutionStatusFilter(value || '')
                 setSelectedID(null)
+                resetBusinessPaginationCurrent(setPagination)
               }}
             />
+            {hasRouteProductionOrder ? (
+              <Tag
+                closable
+                onClose={(event) => {
+                  event.preventDefault()
+                  const nextParams = new URLSearchParams(searchParams)
+                  nextParams.delete('production_order_id')
+                  setSearchParams(nextParams, { replace: true })
+                  setSelectedID(null)
+                  resetBusinessPaginationCurrent(setPagination)
+                }}
+              >
+                生产订单 #{routeProductionOrderID}
+              </Tag>
+            ) : null}
+            {hasExactContext ? (
+              <Tag color="blue">已定位异常 #{linkedProductionExceptionID}</Tag>
+            ) : null}
           </>
         }
         onClearFilters={clearFilters}
@@ -747,7 +811,18 @@ export default function ProductionExceptionDecisionPanel({
           rowClassName={(record) =>
             record.id === selectedID ? 'ant-table-row-selected' : ''
           }
-          pagination={false}
+          pagination={
+            hasExactContext
+              ? false
+              : createBusinessTablePagination({
+                  pagination,
+                  total,
+                  onChange: (current, pageSize) => {
+                    setSelectedID(null)
+                    setPagination({ current, pageSize })
+                  },
+                })
+          }
           scroll={{ x: 960 }}
           locale={{ emptyText: '暂无生产异常处置申请' }}
         />

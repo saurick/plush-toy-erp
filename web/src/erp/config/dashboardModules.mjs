@@ -143,7 +143,7 @@ export const dashboardHealthModules = Object.freeze([
       ),
       dashboardSource(
         'production-scheduling',
-        '生产排程',
+        '排产确认',
         '/erp/production/scheduling',
         DASHBOARD_TRUTH_KINDS.COLLABORATION
       ),
@@ -155,7 +155,7 @@ export const dashboardHealthModules = Object.freeze([
       ),
       dashboardSource(
         'production-exceptions',
-        '生产异常处置',
+        '异常处理',
         '/erp/production/exceptions',
         DASHBOARD_TRUTH_KINDS.COLLABORATION
       ),

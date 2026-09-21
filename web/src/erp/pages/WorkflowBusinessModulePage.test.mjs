@@ -16,6 +16,15 @@ const productionExceptionPanel = readFileSync(
   ),
   'utf8'
 )
+const productionRecordsNavigation = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/production-records/ProductionRecordsNavigation.jsx',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
 const businessListToolbarActions = readFileSync(
   fileURLToPath(
     new URL(
@@ -44,10 +53,11 @@ test('workflow business page consumes the dashboard source keyword without mutat
 })
 
 test('production exception disposition page separates applications and pending approvals into accessible tabs', () => {
-  assert.match(source, /import \{[^}]*Tabs[^}]*\} from 'antd'/u)
-  assert.match(source, /label: '处置申请'/u)
-  assert.match(source, /label: '待审批'/u)
-  assert.match(source, /aria-label="生产异常处置工作区"/u)
+  assert.match(source, /ProductionRecordsNavigation/u)
+  assert.match(productionRecordsNavigation, /'生产记录'/u)
+  assert.match(productionRecordsNavigation, /'异常处理'/u)
+  assert.match(productionRecordsNavigation, /'待审批'/u)
+  assert.match(productionRecordsNavigation, /aria-label="生产记录工作区"/u)
   assert.match(
     source,
     /'production-exceptions': \{[\s\S]*ownerRoleOptions: \[workflowRoleOption\('boss'\)\]/u
@@ -72,11 +82,11 @@ test('production exception disposition page separates applications and pending a
   )
   assert.match(
     source,
-    /linkedProductionExceptionID > 0[\s\S]*PRODUCTION_EXCEPTION_TAB_KEYS\.DECISIONS/u
+    /linkedProductionExceptionID > 0 && canReadRecords[\s\S]*PRODUCTION_EXCEPTION_TAB_KEYS\.DECISIONS/u
   )
   assert.match(
     source,
-    /linkedKeyword && canReadWorkflowTasks[\s\S]*PRODUCTION_EXCEPTION_TAB_KEYS\.TASKS/u
+    /linkedKeyword && canReadTasks[\s\S]*PRODUCTION_EXCEPTION_TAB_KEYS\.TASKS/u
   )
 })
 
@@ -88,7 +98,7 @@ test('ordinary workflow pages keep task language separate from exception approva
 })
 
 test('production exception disposition tabs refresh and summarize only the active workspace', () => {
-  assert.match(source, /生产异常处置申请已刷新/u)
+  assert.match(source, /异常处理申请已刷新/u)
   assert.match(source, /productionExceptionRefreshRef\.current/u)
   assert.match(source, /label: '异常记录'/u)
   assert.match(source, /label: '当前显示'/u)
@@ -226,12 +236,13 @@ test('production exception applications use server-backed filters and a selected
   assert.match(productionExceptionPanel, /aria-label="异常类型"/u)
   assert.match(productionExceptionPanel, /aria-label="审批状态"/u)
   assert.match(productionExceptionPanel, /aria-label="业务状态"/u)
-  assert.match(productionExceptionPanel, /decision_type:\s*decisionTypeFilter/u)
+  assert.match(productionExceptionPanel, /buildProductionExceptionListQuery/u)
+  assert.match(productionExceptionPanel, /decisionType:\s*decisionTypeFilter/u)
   assert.match(productionExceptionPanel, /status:\s*statusFilter/u)
-  assert.match(
-    productionExceptionPanel,
-    /execution_status:\s*executionStatusFilter/u
-  )
+  assert.match(productionExceptionPanel, /executionStatus:\s*executionStatusFilter/u)
+  assert.match(productionExceptionPanel, /productionOrderID:/u)
+  assert.match(productionExceptionPanel, /createBusinessTablePagination/u)
+  assert.match(productionExceptionPanel, /requireProductionExceptionRecord/u)
   for (const actionLabel of [
     '核对审批流',
     '去任务中心审批',

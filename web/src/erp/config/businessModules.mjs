@@ -335,7 +335,7 @@ export const businessModuleDefinitions = Object.freeze([
     currentScope: [
       '生产计划草稿与明细',
       '发布、关闭和取消等状态操作',
-      '发布时原子生成 PMC 生产排程待办',
+      '发布时原子生成 PMC 排产确认待办',
       '销售来源与当前生效 BOM 可读选择',
       '固定路线：布料加工 → 车缝 → 手工 → 包装',
       '按在制批次办理拆分、内外发安排与车间移交',
@@ -348,17 +348,19 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'production-scheduling',
     sectionKey: 'production',
-    label: '生产排程',
-    title: '生产排程',
+    label: '排产确认',
+    title: '排产确认',
     path: '/erp/production/scheduling',
     shortLabel: '排程',
+    sidebarVisible: false,
+    sidebarParentPath: '/erp/production/orders',
     pageKind: 'formal-v1',
     description:
-      '生产排程处理生产订单发布时生成的 PMC 待办；完成排程任务不会代写领料、完工或库存记录。',
+      '排产确认处理生产订单发布时生成的 PMC 待办；完成排产任务不会代写领料、完工或库存记录。',
     primaryEntity: 'workflow_tasks',
     factSource: 'production_orders -> workflow_tasks',
     boundary:
-      '生产排程只管理已有计划待办；当前不提供通用新建任务，完工、领料和成品入库需到对应页面登记。',
+      '排产确认只管理已有计划待办；当前不提供通用新建任务，完工、领料和成品入库需到对应页面登记。',
     sourceRefs: ['production_orders', 'workflow_tasks'],
     currentScope: [
       '生产订单发布生成的排程任务',
@@ -371,13 +373,13 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'production-progress',
     sectionKey: 'production',
-    label: '生产进度',
-    title: '生产进度',
+    label: '生产记录',
+    title: '生产记录',
     path: '/erp/production/progress',
-    shortLabel: '进度',
+    shortLabel: '记录',
     pageKind: 'formal-v1',
     description:
-      '生产进度用于处理生产发料、返工和待入库完工报告；生产提交完工报告，仓库核对实收后确认成品入库。',
+      '生产记录用于处理生产发料、返工和待入库完工报告；生产提交完工报告，仓库核对实收后确认成品入库。',
     primaryEntity: 'production_facts',
     factSource: 'production_facts, inventory_txns',
     boundary:
@@ -401,13 +403,15 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'production-exceptions',
     sectionKey: 'production',
-    label: '生产异常处置',
-    title: '生产异常处置',
+    label: '异常处理',
+    title: '异常处理',
     path: '/erp/production/exceptions',
-    shortLabel: '异常处置',
+    shortLabel: '异常',
+    sidebarVisible: false,
+    sidebarParentPath: '/erp/production/progress',
     pageKind: 'formal-v1',
     description:
-      '生产异常处置用于办理报废、在制让步和超领申请；审批只记录决定，报废和让步由生产岗位显式执行或冲正，超领额度由正式领料消费。',
+      '异常处理用于办理报废、在制让步和超领申请；审批只记录决定，报废和让步由生产岗位显式执行或冲正，超领额度由正式领料消费。',
     primaryEntity:
       'production_exception_decisions / production_wip_events / workflow_tasks',
     factSource:

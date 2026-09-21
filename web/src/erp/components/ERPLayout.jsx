@@ -76,6 +76,7 @@ import {
 import {
   getActiveCustomerMenuConfig,
   getCustomerNavigationPresentation,
+  getSidebarNavigationSections,
 } from '../config/customerMenuConfig.mjs'
 import {
   getEnabledMobileRoleKeys,
@@ -816,13 +817,17 @@ export default function ERPLayout({ legalNotice }) {
     customerNavigationPresentation === 'role_guided' &&
     !isSuperAdmin &&
     !shouldUseProductCoreNavigation
+  const sidebarVisibleSections = useMemo(
+    () => getSidebarNavigationSections(visibleSections),
+    [visibleSections]
+  )
   const roleGuidedNavigation = useMemo(
     () =>
       buildRoleGuidedNavigation({
-        visibleSections,
+        visibleSections: sidebarVisibleSections,
         adminProfile,
       }),
-    [adminProfile, visibleSections]
+    [adminProfile, sidebarVisibleSections]
   )
 
   const permissionGovernedVisibleSections = useMemo(
@@ -840,9 +845,9 @@ export default function ERPLayout({ legalNotice }) {
   const desktopHomeEntry = useMemo(
     () =>
       resolveDesktopHomeEntry({
-        navigationSections: visibleSections,
+        navigationSections: sidebarVisibleSections,
       }),
-    [visibleSections]
+    [sidebarVisibleSections]
   )
   const visibleMenuPaths = useMemo(
     () =>
@@ -947,7 +952,7 @@ export default function ERPLayout({ legalNotice }) {
     })
 
     if (!useRoleGuidedNavigation) {
-      return visibleSections.map((section) => buildMenuGroup(section))
+      return sidebarVisibleSections.map((section) => buildMenuGroup(section))
     }
 
     const guidedItems = []
@@ -978,14 +983,17 @@ export default function ERPLayout({ legalNotice }) {
       })
     }
     return guidedItems
-  }, [roleGuidedNavigation, useRoleGuidedNavigation, visibleSections])
+  }, [roleGuidedNavigation, sidebarVisibleSections, useRoleGuidedNavigation])
+
+  const currentSidebarPath =
+    currentEntry?.sidebarParentPath || currentNavigationEntry.menuPath
 
   const roleGuidedSecondaryContainsCurrent = useMemo(
     () =>
       roleGuidedNavigation.secondaryItems.some(
-        (item) => item.path === currentNavigationEntry.menuPath
+        (item) => item.path === currentSidebarPath
       ),
-    [currentNavigationEntry.menuPath, roleGuidedNavigation.secondaryItems]
+    [currentSidebarPath, roleGuidedNavigation.secondaryItems]
   )
 
   const roleGuidedSecondaryPaths = useMemo(
@@ -1008,8 +1016,8 @@ export default function ERPLayout({ legalNotice }) {
   ])
 
   const selectedKeys =
-    currentNavigationEntry.matched && currentEntry?.path
-      ? [currentEntry.path]
+    currentNavigationEntry.matched && currentSidebarPath
+      ? [currentSidebarPath]
       : []
   const hideCurrentEntryPageHead = [
     '/erp/master/',
@@ -1306,7 +1314,8 @@ export default function ERPLayout({ legalNotice }) {
       disabled: loggingOut,
     },
   ].filter(Boolean)
-  const noVisibleMenus = permissionGovernedVisibleSections.length === 0
+  const noVisibleMenus =
+    getSidebarNavigationSections(permissionGovernedVisibleSections).length === 0
   const shouldBlockOutlet = currentPageShouldRedirect
   const shouldGuardProductCoreBusinessData =
     shouldGuardCustomerBusinessPageRuntime({

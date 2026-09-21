@@ -17,6 +17,8 @@ test('workflow business query sends every filter and the second-page offset to t
       ownerRoleKey: 'pmc',
       dueFrom: 1_752_787_200,
       dueTo: 1_752_873_599,
+      sourceType: ' production-orders ',
+      sourceID: 42,
       pagination: { current: 2, pageSize: 10 },
     }),
     {
@@ -26,6 +28,8 @@ test('workflow business query sends every filter and the second-page offset to t
       owner_role_key: 'pmc',
       due_from: 1_752_787_200,
       due_to: 1_752_873_599,
+      source_type: 'production-orders',
+      source_id: 42,
       limit: 10,
       offset: 10,
     }

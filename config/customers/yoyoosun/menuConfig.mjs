@@ -10,6 +10,7 @@ export const yoyoosunMenuConfig = Object.freeze({
   desktopMenu: {
     presentation: "role_guided",
     hiddenItemKeys: [],
+    routeOnlyItemKeys: ["production-scheduling", "production-exceptions"],
     sections: [
       {
         title: "看板中心",
@@ -45,12 +46,7 @@ export const yoyoosunMenuConfig = Object.freeze({
       },
       {
         title: "生产管理",
-        items: [
-          "production-orders",
-          "production-scheduling",
-          "production-progress",
-          "production-exceptions",
-        ],
+        items: ["production-orders", "production-progress"],
       },
       {
         title: "出货管理",

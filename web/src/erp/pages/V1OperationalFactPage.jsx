@@ -1,5 +1,13 @@
 import React from 'react'
+import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
+import ProductionRecordsNavigation, {
+  PRODUCTION_RECORD_VIEW_KEYS,
+} from '../components/production-records/ProductionRecordsNavigation.jsx'
+import { canReadProductionExceptionDecisions } from '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
 import { getBusinessModule } from '../config/businessModules.mjs'
+import { hasActionPermission, V1_ROUTE_PATHS } from '../utils/masterDataOrderView.mjs'
+import { canOpenRelatedDocumentPath } from '../utils/relatedDocumentNavigation.mjs'
+import { routeWithQuery } from '../utils/routeQuery.mjs'
 import { OperationalFactWorkspace } from './OperationalFactsPage.jsx'
 
 const PAGE_CONFIGS = Object.freeze({
@@ -78,6 +86,55 @@ const PAGE_CONFIGS = Object.freeze({
 export default function V1OperationalFactPage({ moduleKey }) {
   const moduleItem = getBusinessModule(moduleKey)
   const config = PAGE_CONFIGS[moduleKey] || PAGE_CONFIGS['production-progress']
+  const outletContext = useOutletContext()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const adminProfile = outletContext?.adminProfile || {}
+  const isProductionRecordsPage = moduleKey === 'production-progress'
+  const canOpenProductionExceptions =
+    isProductionRecordsPage &&
+    canOpenRelatedDocumentPath({
+      path: V1_ROUTE_PATHS.productionExceptions,
+      adminProfile,
+      allowedMenuPaths: outletContext?.allowedMenuPaths || [],
+    })
+  const productionRecordViewKeys = [
+    PRODUCTION_RECORD_VIEW_KEYS.RECORDS,
+    ...(canOpenProductionExceptions &&
+    canReadProductionExceptionDecisions(adminProfile)
+      ? [PRODUCTION_RECORD_VIEW_KEYS.DECISIONS]
+      : []),
+    ...(canOpenProductionExceptions &&
+    hasActionPermission(adminProfile, 'workflow.task.read')
+      ? [PRODUCTION_RECORD_VIEW_KEYS.TASKS]
+      : []),
+  ]
+  const routeProductionOrderID =
+    String(searchParams.get('source_type') || '').toUpperCase() ===
+    'PRODUCTION_ORDER'
+      ? Number(searchParams.get('source_id') || 0)
+      : 0
+  const workspaceNavigation =
+    isProductionRecordsPage && productionRecordViewKeys.length > 1 ? (
+      <ProductionRecordsNavigation
+        activeKey={PRODUCTION_RECORD_VIEW_KEYS.RECORDS}
+        availableKeys={productionRecordViewKeys}
+        onChange={(nextView) => {
+          if (nextView === PRODUCTION_RECORD_VIEW_KEYS.RECORDS) return
+          navigate(
+            routeWithQuery(V1_ROUTE_PATHS.productionExceptions, {
+              view: nextView,
+              production_order_id:
+                nextView === PRODUCTION_RECORD_VIEW_KEYS.DECISIONS &&
+                Number.isSafeInteger(routeProductionOrderID) &&
+                routeProductionOrderID > 0
+                  ? routeProductionOrderID
+                  : undefined,
+            })
+          )
+        }}
+      />
+    ) : null
 
   return (
     <OperationalFactWorkspace
@@ -87,6 +144,7 @@ export default function V1OperationalFactPage({ moduleKey }) {
       enabledViews={config.enabledViews}
       viewOverrides={config.viewOverrides}
       showTabs={config.showTabs}
+      workspaceNavigation={workspaceNavigation}
     />
   )
 }

@@ -33,6 +33,20 @@ export function getCustomerNavigationPresentation(
     : 'sectioned'
 }
 
+export function getSidebarNavigationSections(sections = []) {
+  if (!Array.isArray(sections)) {
+    return []
+  }
+  return sections
+    .map((section) => ({
+      ...section,
+      items: (section.items || []).filter(
+        (item) => item?.sidebarVisible !== false
+      ),
+    }))
+    .filter((section) => section.items.length > 0)
+}
+
 function buildItemRegistry(sections = []) {
   const registry = new Map()
   sections.forEach((section) => {
@@ -94,6 +108,9 @@ export function applyCustomerMenuConfig(
   }
 
   const hiddenItemKeys = normalizeStringList(desktopMenu.hiddenItemKeys)
+  const routeOnlyItemKeys = new Set(
+    normalizeStringList(desktopMenu.routeOnlyItemKeys)
+  )
   const itemOverrides =
     desktopMenu.itemOverrides && typeof desktopMenu.itemOverrides === 'object'
       ? desktopMenu.itemOverrides
@@ -136,7 +153,36 @@ export function applyCustomerMenuConfig(
     })
     .filter(Boolean)
 
-  return configuredSections.length > 0
-    ? configuredSections
-    : applyHiddenItems(baseSections, hiddenItemKeys, itemOverrides)
+  if (configuredSections.length === 0) {
+    return applyHiddenItems(baseSections, hiddenItemKeys, itemOverrides)
+  }
+
+  const routeOnlyItems = [...registry.values()]
+    .filter(
+      ({ item }) =>
+        routeOnlyItemKeys.has(item.key) &&
+        item?.sidebarVisible === false &&
+        !hidden.has(item.key) &&
+        !used.has(item.key)
+    )
+    .map(({ item, sectionTitle }) => ({
+      item: applyItemOverride(item, itemOverrides),
+      sectionTitle,
+    }))
+
+  routeOnlyItems.forEach(({ item, sectionTitle }) => {
+    const targetSection = configuredSections.find(
+      (section) => section.title === sectionTitle
+    )
+    if (targetSection) {
+      targetSection.items.push(item)
+      return
+    }
+    configuredSections.push({
+      title: sectionTitle || '内部入口',
+      items: [item],
+    })
+  })
+
+  return configuredSections
 }
