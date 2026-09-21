@@ -94,7 +94,7 @@ TRIVY_DIR="$ROOT_DIR/output/cache/pdf-runtime/trivy-$TRIVY_VERSION"
 mkdir -p "$TRIVY_DIR"
 TRIVY_ARCHIVE="$TRIVY_DIR/trivy.tar.gz"
 if [[ ! -f "$TRIVY_ARCHIVE" ]] || [[ "$(sha256sum "$TRIVY_ARCHIVE" | cut -d ' ' -f 1)" != "$TRIVY_SHA" ]]; then
-  curl --fail --location --retry 2 --connect-timeout 15 --max-time 300 \
+  curl --fail --location --retry 2 --connect-timeout 15 --max-time 900 \
     "https://github.com/aquasecurity/trivy/releases/download/v$TRIVY_VERSION/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
     --output "$TRIVY_ARCHIVE"
 fi

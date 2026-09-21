@@ -72,7 +72,7 @@ test("PDF runtime keeps repeatable source pins while comparing numeric upstream 
 test("Trivy keeps the official database and a proxy-tolerant full-scan timeout", () => {
   assert.match(
     runtimeScript,
-    /--db-repository ghcr[.]io\/aquasecurity\/trivy-db:2[\s\S]+--timeout 30m --parallel 2/u,
+    /curl --fail --location --retry 2 --connect-timeout 15 --max-time 900[\s\S]+--db-repository ghcr[.]io\/aquasecurity\/trivy-db:2[\s\S]+--timeout 30m --parallel 2/u,
   );
 });
 
