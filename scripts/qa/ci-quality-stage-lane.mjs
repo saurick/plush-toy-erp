@@ -29,7 +29,12 @@ import {
   summarizeGateCategories,
 } from "./run-gate-with-receipt.mjs";
 
-export const CI_QUALITY_STAGE_LANE_SCHEMA = "plush.ci-quality-stage-lane/v1";
+export const CI_QUALITY_STAGE_LANE_SCHEMA = "plush.ci-quality-stage-lane/v2";
+export const CI_POSTGRES_IMAGE = "postgres:18.1";
+export const CI_POSTGRES_TMPFS = Object.freeze({
+  destination: "/var/lib/postgresql",
+  options: "rw,noexec,nosuid,nodev,size=1073741824",
+});
 
 export const CI_WEB_QUALITY_LANES = Object.freeze({
   checks: Object.freeze({
@@ -760,6 +765,57 @@ async function waitForPostgres(root, name) {
   throw new Error("quality lane PostgreSQL did not become healthy");
 }
 
+export function validateCiPostgresStorageIsolation(container) {
+  const tmpfs = container?.HostConfig?.Tmpfs;
+  const entries =
+    tmpfs && typeof tmpfs === "object" ? Object.entries(tmpfs) : [];
+  const pgdata = Array.isArray(container?.Config?.Env)
+    ? container.Config.Env.find((value) => value.startsWith("PGDATA="))?.slice(
+        "PGDATA=".length,
+      )
+    : "";
+  const relativePgdata = pgdata
+    ? path.posix.relative(CI_POSTGRES_TMPFS.destination, pgdata)
+    : "";
+  if (
+    container?.Config?.Image !== CI_POSTGRES_IMAGE ||
+    entries.length !== 1 ||
+    tmpfs[CI_POSTGRES_TMPFS.destination] !== CI_POSTGRES_TMPFS.options ||
+    !pgdata ||
+    relativePgdata === "" ||
+    relativePgdata === ".." ||
+    relativePgdata.startsWith("../") ||
+    path.posix.isAbsolute(relativePgdata)
+  ) {
+    throw new Error("quality lane PostgreSQL storage isolation is invalid");
+  }
+  return true;
+}
+
+function assertCiPostgresStorageIsolation(root, name) {
+  const result = spawnSync("docker", ["inspect", name], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 4 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let containers;
+  try {
+    containers = JSON.parse(String(result.stdout || ""));
+  } catch {
+    throw new Error("quality lane PostgreSQL storage readback is invalid");
+  }
+  if (
+    result.error ||
+    result.status !== 0 ||
+    !Array.isArray(containers) ||
+    containers.length !== 1
+  ) {
+    throw new Error("quality lane PostgreSQL storage readback failed");
+  }
+  return validateCiPostgresStorageIsolation(containers[0]);
+}
+
 function addCounts(left = {}, right = {}) {
   return Object.freeze({
     executed: Number(left.executed || 0) + Number(right.executed || 0),
@@ -853,6 +909,8 @@ export function validateCiQualityStageLaneReceipt(
     receipt.invariants?.makeData !==
       (definition.makeData ? "passed" : "not-applicable") ||
     receipt.invariants?.databaseCleanup !==
+      (definition.postgres ? "passed" : "not-applicable") ||
+    receipt.invariants?.databaseStorageIsolation !==
       (definition.postgres ? "passed" : "not-applicable") ||
     receipt.invariants?.chromiumSandboxCleanup !==
       (definition.chromium ? "passed" : "not-applicable") ||
@@ -1200,6 +1258,9 @@ export async function runCiQualityStageLane({
   const invariants = {
     makeData: definition.makeData ? "pending" : "not-applicable",
     databaseCleanup: definition.postgres ? "pending" : "not-applicable",
+    databaseStorageIsolation: definition.postgres
+      ? "pending"
+      : "not-applicable",
     chromiumSandboxCleanup: definition.chromium ? "pending" : "not-applicable",
     playwrightRuntimeCleanup: definition.chromium
       ? "pending"
@@ -1266,6 +1327,8 @@ export async function runCiQualityStageLane({
           `com.plush.ci.job=${env.CI_JOB_ID}`,
           "--env",
           "POSTGRES_PASSWORD=ci-local-password",
+          "--tmpfs",
+          `${CI_POSTGRES_TMPFS.destination}:${CI_POSTGRES_TMPFS.options}`,
           "--publish",
           "127.0.0.1::5432",
           "--health-cmd",
@@ -1276,10 +1339,12 @@ export async function runCiQualityStageLane({
           "5s",
           "--health-retries",
           "45",
-          "postgres:18.1",
+          CI_POSTGRES_IMAGE,
         ],
         { cwd: root, env: childEnv, termination },
       );
+      assertCiPostgresStorageIsolation(root, postgresName);
+      invariants.databaseStorageIsolation = "passed";
       await waitForPostgres(root, postgresName);
       const port = mappedPostgresPort(root, postgresName);
       childEnv.DISPOSABLE_DATABASE_BASE_URL = `postgres://postgres:ci-local-password@127.0.0.1:${port}/postgres?sslmode=disable`;

@@ -34,6 +34,8 @@ Runner VM 的 vCPU、内存和系统盘不是仓库常量，而是 `runner-vm.sh
 
 当前 canonical 质量 Pipeline 的全局稳定安全并发上限只在 `runner-capacity.env` 保存，DAG 只调度已经就绪的 Job，空槽不预留 CPU 或内存。`concurrent=limit` 把多 Pipeline 即使短暂重叠时的总资源使用也限制在同一个全局上限内；普通完整质量只接受 protected main 的自然 push，新的 commit 自动取消可中断的旧 Pipeline。Job 内 Node 并发仍为 1，PostgreSQL、Docker、Chromium、浏览器锁和 resource-sensitive lane 继续按既有资源边界串行或隔离。只有 VM 资源规格变化，或出现 OOM、swap、持续 iowait、资源残留或清理污染证据时，才重新评估安全上限；不得通过跳过测试保速。
 
+GitLab quality 中的 `server-upgrade` 与 `server-postgres` 各自把 PostgreSQL 官方 volume 根目录挂载为独立、上限 1 GiB 的 tmpfs，使临时表数据和 WAL 不再与 Git checkout、编译缓存及 Docker 写层争用 Runner 系统盘。容器启动后必须从 Docker inspect 读回精确 tmpfs 参数，并确认镜像 `PGDATA` 位于该挂载内；缺失、漂移或越界一律在测试前失败。tmpfs 上限不是预留内存，两座数据库仍保持独立容器和完整清理读回，不能以此放宽 Runner 的内存、swap、OOM 或 PSI 观察。
+
 性能调优必须分别观测 GitLab 宿主机和 Runner guest：在候选内存下运行 protected main 的完整自然 push Pipeline，记录冷/热缓存的 job 时长、DAG 关键路径、峰值工作集、最低 MemAvailable、swap、memory PSI、OOM、IO 峰值、p50、波动和近似 p95，再决定 Runner 内存、slot、分片和语言测试并行度。内存候选以完整 Pipeline 的实测峰值加明确余量为依据；一次绿色只证明该次候选可运行，不直接证明长期稳定，缩容后至少保留可立即恢复的上一档规格。普通 CI 7–9 分钟、热缓存提交到部署 10–15 分钟只是稳健阶段目标；资源仍有余量且未出现排队、IO 争用、OOM、flaky 或波动扩大时，继续冲刺 6–8 分钟和 8–12 分钟，稳定更快也接受。只有资源饱和或进一步提速需要明显不成比例的复杂度时才停止；不得减少测试、放宽 fail-closed / exact-SHA、隔离或清理门禁，也不得用伪缓存命中换取数字。
 
 ## Playwright 冷启动与本地运行包
