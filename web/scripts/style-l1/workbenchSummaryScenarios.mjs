@@ -281,24 +281,42 @@ export function createWorkbenchSummaryScenarios({
           await region
             .getByRole('button', { name: '查看材料汇总', exact: true })
             .click()
-          await page.getByRole('dialog').waitFor()
-          await assertBusinessModalViewport(page, page.getByRole('dialog'), {
+          const materialDialog = page.getByRole('dialog')
+          await materialDialog.waitFor()
+          await assertBusinessModalViewport(page, materialDialog, {
             label: 'engineering-material-summary',
             minWidthRatio: 0.9,
             maxWidth: 1800,
           })
+          assert.match(
+            await materialDialog
+              .locator('.erp-material-sheet__purchase-basis')
+              .textContent(),
+            /采购订单按本表总用数量生成.*库存仅供参考.*未自动抵扣/u
+          )
+          const calculationBasis = materialDialog.locator(
+            '.erp-material-sheet__help'
+          )
+          assert.equal(await calculationBasis.getAttribute('open'), null)
+          await calculationBasis.locator('summary').click()
+          assert.match(
+            await calculationBasis.textContent(),
+            /生产数量：.*订单数量加船头样数量/u
+          )
+          assert.match(
+            await calculationBasis.textContent(),
+            /提交审批时会冻结本次订单、BOM.*后续资料变更不会自动改写/u
+          )
           assert.equal(calls.at(-1).method, 'get_engineering_material_request')
           assert.equal(calls.at(-1).params.request_id, 51)
           assert.equal(calls.at(-1).params.sales_order_id, 101)
           assert.equal(
-            await page
-              .getByRole('dialog')
+            await materialDialog
               .getByRole('button', { name: /提交|批准采购|审核通过|重新整理/u })
               .count(),
             0
           )
-          await page
-            .getByRole('dialog')
+          await materialDialog
             .getByRole('button', { name: 'Close', exact: true })
             .click()
           await assertNoHorizontalOverflow(page)

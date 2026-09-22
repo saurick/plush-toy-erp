@@ -133,6 +133,17 @@
   margin-left: auto;
 }
 
+.erp-material-sheet__purchase-basis {
+  margin: 0 0 12px;
+  color: var(--erp-text-muted, #64748b);
+  line-height: 1.6;
+}
+
+.erp-material-sheet__purchase-basis strong,
+.erp-material-sheet__help strong {
+  color: var(--erp-text, #1f2937);
+}
+
 .erp-material-sheet__table .ant-table-cell,
 .erp-material-parts .ant-table-cell {
   overflow-wrap: anywhere;
@@ -216,6 +227,15 @@
 
 .erp-material-sheet__help p {
   margin: 8px 0;
+}
+
+.erp-material-sheet__help ol {
+  margin: 8px 0;
+  padding-inline-start: 22px;
+}
+
+.erp-material-sheet__help li + li {
+  margin-top: 6px;
 }
 
 .erp-material-cards {

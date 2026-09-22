@@ -334,6 +334,10 @@ export default function EngineeringMaterialSummarySheet({
           </Space>
         )}
       </div>
+      <p className="erp-material-sheet__purchase-basis">
+        <strong>采购口径：</strong>
+        财务批准后，采购订单按本表总用数量生成；当前库存仅供参考，未自动抵扣。
+      </p>
       {mobile && mobileView === 'cards' ? (
         <div className="erp-material-cards">
           {!rows.length ? (
@@ -421,14 +425,31 @@ export default function EngineeringMaterialSummarySheet({
       </div>
       <details className="erp-material-sheet__help">
         <summary>
-          数量与采购口径
+          查看用料计算与采购生成依据
           {inventory?.status === 'UNAVAILABLE'
             ? ' · 库存读取失败，可重新读取'
             : ''}
         </summary>
+        <ol>
+          <li>
+            <strong>生产数量：</strong>订单数量加船头样数量。
+          </li>
+          <li>
+            <strong>部位用量：</strong>生产数量乘 BOM
+            单位用量，再计入损耗率。片数已包含在单位用量中，不重复相乘。
+          </li>
+          <li>
+            <strong>材料汇总：</strong>
+            相同材料和单位的部位用量合并，不同单位分开合计；汇总表默认显示两位小数，展开明细保留原有精度。
+          </li>
+          <li>
+            <strong>采购生成：</strong>
+            财务批准后按厂商分单，并以本表总用数量作为采购数量；单价、金额和预计到货日期生成时留空，后续在采购订单中补充。
+          </li>
+        </ol>
         <p>
-          总用数量按生产数量和 BOM
-          部位损耗计算，包含船头样。片数已包含在单位用量中，不再重复相乘。不同单位分开合计；汇总数量保留两位小数，计算与部位单位用量保留原有精度。
+          提交审批时会冻结本次订单、BOM
+          和用量依据；已提交申请继续显示冻结内容，后续资料变更不会自动改写。需要调整时，先退回工程，再按当前资料重新整理。
         </p>
         <p>
           {inventory?.status === 'AVAILABLE'
@@ -437,9 +458,6 @@ export default function EngineeringMaterialSummarySheet({
               ? '当前岗位未开放库存查看。'
               : '当前库存暂不可用，可重新读取。'}
           库存仅作参考，不代表已为此订单预留，不自动抵扣采购数量。
-        </p>
-        <p>
-          财务审核通过后，按厂商和本表总用数量生成采购订单。采购单的单价、金额和预计到货日期留空。
         </p>
       </details>
     </section>

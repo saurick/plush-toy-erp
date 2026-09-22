@@ -5,7 +5,7 @@ function scope(placeholder, fields) {
 // Keep these descriptions aligned with the server's business document search.
 export const BUSINESS_SEARCH_SCOPES = Object.freeze({
   sales: scope('搜单号、客户、产品、款号', '销售单号、客户订单号、客户名称或编号、产品名称或编号、内部款号、客户款号、业务员、付款方式'),
-  engineering: scope('搜订单、产品、材料、供应商', '来源订单号、客户、产品名称或编号、内部款号、客户款号、材料名称或编号、供应商名称或编号'),
+  engineering: scope('搜订单、产品或材料', '来源订单号、客户、产品名称或编号、内部款号、客户款号、材料名称或编号、供应商名称或编号'),
   purchase: scope('搜单号、供应商、材料、产品', '采购单号、供应商单号、供应商名称或编号、材料名称或编号、供应商料号、产品名称或编号、内部款号、客户款号、来源订单号、客户'),
   production: scope('搜单号、产品、款号、客户', '生产单号、产品名称或编号、内部款号、客户款号、来源销售单号、客户订单号、客户、备注'),
   outsourcing: scope('合同、厂家、产品、材料', '合同号、加工商名称或编号、产品名称或编号、内部款号、客户款号、材料名称或编号、供应商料号、加工工序、来源订单号、生产批次'),

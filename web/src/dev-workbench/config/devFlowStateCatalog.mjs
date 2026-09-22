@@ -816,7 +816,8 @@ const FLOW_DEFINITIONS = [
     scopeKey: 'source_document',
     kind: 'state_machine',
     label: '工程用料审批',
-    summary: '按订单汇总已确认材料，老板审核后由财务审核生成采购订单。',
+    summary:
+      '按订单和已确认 BOM 冻结应需数量，老板、财务两级审核后按厂商生成采购订单；库存与在途不自动抵扣。',
     states: [
       state('SUBMITTED', '待老板审核'),
       state('BOSS_APPROVED', '待财务审核'),
@@ -839,7 +840,8 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'source_document_only',
       }),
       transition('BOSS_APPROVED', 'APPROVED', {
-        guard: '另一位财务审批人核对数量、单价、交期，数量变更附原因。',
+        guard:
+          '另一位财务审批人核对冻结的订单、BOM、材料、厂商与应需数量；不可改量，批准后按厂商生成采购单。',
         action: 'finance_review_engineering_material_request',
         permission: ['engineering.material.finance_approve'],
         factBoundary: 'source_document_only',
@@ -860,7 +862,7 @@ const FLOW_DEFINITIONS = [
       evidence(
         'code',
         'server/internal/data/engineering_material_request_repo.go',
-        '审批记录与按厂商生成的采购源单在同一事务保存，不生成收货事实。'
+        '审批记录与按厂商生成的采购源单在同一事务保存；采购数量取冻结应需数量，库存与在途不抵扣，也不生成收货事实。'
       ),
     ],
   },

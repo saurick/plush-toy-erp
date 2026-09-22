@@ -115,6 +115,29 @@ export function createTableAlignmentScenarios({
         await page.locator('#toggle-mobile').click()
         await page.getByText('整表对照', { exact: true }).click()
       }
+      const materialSheet = page.locator('#material-table')
+      const purchaseBasis = materialSheet.locator(
+        '.erp-material-sheet__purchase-basis'
+      )
+      await purchaseBasis.waitFor()
+      assert.match(
+        await purchaseBasis.textContent(),
+        /当前库存仅供参考，未自动抵扣/u
+      )
+      const calculationBasis = materialSheet.locator(
+        '.erp-material-sheet__help'
+      )
+      assert.equal(await calculationBasis.getAttribute('open'), null)
+      await calculationBasis.locator('summary').click()
+      assert.notEqual(await calculationBasis.getAttribute('open'), null)
+      assert.match(
+        await calculationBasis.textContent(),
+        /生产数量：订单数量加船头样数量/u
+      )
+      assert.match(
+        await calculationBasis.textContent(),
+        /提交审批时会冻结本次订单、BOM.*后续资料变更不会自动改写/u
+      )
       const evidence = []
       evidence.push(await measureTables(page))
       assertAligned(evidence.at(-1))

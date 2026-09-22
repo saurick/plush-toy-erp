@@ -486,7 +486,25 @@ for (const purchaseRead of [false, true]) {
     }
     await ui.render()
     await ui.click(ui.button('查看材料汇总'))
-    assert.ok(document.querySelector('.erp-material-sheet'))
+    const sheet = document.querySelector('.erp-material-sheet')
+    assert.ok(sheet)
+    assert.match(
+      sheet.querySelector('.erp-material-sheet__purchase-basis').textContent,
+      /采购订单按本表总用数量生成.*当前库存仅供参考.*未自动抵扣/u
+    )
+    const calculationBasis = sheet.querySelector('.erp-material-sheet__help')
+    assert.match(
+      calculationBasis.querySelector('summary').textContent,
+      /查看用料计算与采购生成依据/u
+    )
+    assert.match(
+      calculationBasis.textContent,
+      /生产数量：.*订单数量加船头样数量/u
+    )
+    assert.match(
+      calculationBasis.textContent,
+      /提交审批时会冻结本次订单、BOM.*后续资料变更不会自动改写/u
+    )
     assert.equal(Boolean(document.querySelector('a[href="/erp/purchase/accessories?purchase_order_id=91"]')), purchaseRead)
     assert.equal(ui.button('填写核价'), undefined)
   })

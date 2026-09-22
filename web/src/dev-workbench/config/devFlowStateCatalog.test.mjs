@@ -543,6 +543,20 @@ test('devFlowStateCatalog: 覆盖清单固定为 35 个当前对象', () => {
   }
 })
 
+test('devFlowStateCatalog: 工程用料审批保持冻结总需求与采购边界', () => {
+  const flow = getDevFlowStateMachine('source.engineering_material_request')
+  const financeApproval = flow.transitions.find(
+    (item) => item.key === 'BOSS_APPROVED->APPROVED'
+  )
+
+  assert.match(flow.summary, /按订单和已确认 BOM 冻结应需数量/u)
+  assert.match(flow.summary, /库存与在途不自动抵扣/u)
+  assert.match(financeApproval.guard, /不可改量/u)
+  assert.match(financeApproval.guard, /批准后按厂商生成采购单/u)
+  assert.doesNotMatch(financeApproval.guard, /核对.*单价|核对.*交期|数量变更/u)
+  assert.equal(financeApproval.factBoundary, 'source_document_only')
+})
+
 test('devFlowStateCatalog: 33 个状态集合与后端 canonical contract 全等', () => {
   for (const flow of DEV_FLOW_STATE_CATALOG.flows) {
     assert.deepEqual(
