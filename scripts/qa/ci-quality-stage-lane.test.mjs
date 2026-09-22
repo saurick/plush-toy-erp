@@ -9,6 +9,8 @@ import test from "node:test";
 import {
   CI_BROWSER_QUALITY_LANES,
   CI_BROWSER_QUALITY_SCENARIOS,
+  CI_POSTGRES_IMAGE,
+  CI_POSTGRES_TMPFS,
   CI_QUALITY_STAGE_LANE_SCHEMA,
   CI_SERVER_QUALITY_LANES,
   CI_WEB_QUALITY_LANES,
@@ -17,6 +19,7 @@ import {
   loadCiQualityStageLaneSet,
   parseCiBrowserScenarioTimings,
   validateCiBrowserQualityLaneRegistry,
+  validateCiPostgresStorageIsolation,
   validateCiQualityStageLaneReceipt,
 } from "./ci-quality-stage-lane.mjs";
 import { isRetryableScenarioFailure } from "../../web/scripts/styleL1.mjs";
@@ -124,6 +127,9 @@ function receipt(shard, lane, index) {
     invariants: {
       makeData: definition.makeData ? "passed" : "not-applicable",
       databaseCleanup: definition.postgres ? "passed" : "not-applicable",
+      databaseStorageIsolation: definition.postgres
+        ? "passed"
+        : "not-applicable",
       chromiumSandboxCleanup: definition.chromium ? "passed" : "not-applicable",
       playwrightRuntimeCleanup: definition.chromium
         ? "passed"
@@ -249,6 +255,39 @@ test("Web, Server and Browser internal lane catalogs partition canonical work on
         },
       }),
     /incomplete or ambiguous/u,
+  );
+});
+
+test("CI PostgreSQL lanes require bounded tmpfs storage around the image PGDATA", () => {
+  const container = {
+    Config: {
+      Env: ["PGDATA=/var/lib/postgresql/18/docker"],
+      Image: CI_POSTGRES_IMAGE,
+    },
+    HostConfig: {
+      Tmpfs: {
+        [CI_POSTGRES_TMPFS.destination]: CI_POSTGRES_TMPFS.options,
+      },
+    },
+  };
+  assert.equal(validateCiPostgresStorageIsolation(container), true);
+  assert.match(
+    laneSource,
+    /"--tmpfs",\n {10}`\$\{CI_POSTGRES_TMPFS[.]destination\}:\$\{CI_POSTGRES_TMPFS[.]options\}`/u,
+  );
+
+  const diskBacked = structuredClone(container);
+  diskBacked.HostConfig.Tmpfs = {};
+  assert.throws(
+    () => validateCiPostgresStorageIsolation(diskBacked),
+    /storage isolation/u,
+  );
+
+  const escapedPgdata = structuredClone(container);
+  escapedPgdata.Config.Env = ["PGDATA=/var/lib/postgresql-data"];
+  assert.throws(
+    () => validateCiPostgresStorageIsolation(escapedPgdata),
+    /storage isolation/u,
   );
 });
 
@@ -401,6 +440,17 @@ test("lane receipts reject skipped, drifted and incomplete cleanup evidence", ()
   assert.throws(
     () =>
       validateCiQualityStageLaneReceipt(dirty, {
+        shard: "server",
+        lane: "upgrade",
+        expected,
+      }),
+    /invalid/u,
+  );
+  const diskBacked = structuredClone(value);
+  diskBacked.invariants.databaseStorageIsolation = "failed";
+  assert.throws(
+    () =>
+      validateCiQualityStageLaneReceipt(diskBacked, {
         shard: "server",
         lane: "upgrade",
         expected,
