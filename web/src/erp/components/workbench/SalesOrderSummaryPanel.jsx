@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Select, Space, Tag } from 'antd'
+import { Alert, Button, Space, Tag } from 'antd'
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
 import {
   useNavigate,
@@ -7,7 +7,6 @@ import {
   useSearchParams,
 } from 'react-router-dom'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import SearchInput from '@/common/components/SearchInput'
 import {
   listSalesOrderSummary,
   listAllSalesOrderSummary,
@@ -16,6 +15,8 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   DateRangeFilter,
+  SearchInput,
+  SelectFilter,
 } from '../business-list/BusinessListLayout.jsx'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
 import useBusinessListExport from '../../hooks/useBusinessListExport.js'
@@ -104,7 +105,7 @@ export default function SalesOrderSummaryPanel() {
       render: dateLabel,
       exportValue: (row) => dateLabel(row.order_date),
     },
-    { title: '客户', dataIndex: 'customer_name', width: 150 },
+    { align: 'left', title: '客户', dataIndex: 'customer_name', width: 150 },
     {
       title: '订单编号',
       dataIndex: 'order_no',
@@ -135,6 +136,7 @@ export default function SalesOrderSummaryPanel() {
       render: valueOrDash,
     },
     {
+      align: 'left',
       title: '产品名称',
       key: 'product',
       width: 220,
@@ -215,8 +217,15 @@ export default function SalesOrderSummaryPanel() {
         ]
       : []),
     { title: '设计师', dataIndex: 'designer', width: 120, render: valueOrDash },
-    { title: '备注', dataIndex: 'note', width: 220, render: valueOrDash },
     {
+      align: 'left',
+      title: '备注',
+      dataIndex: 'note',
+      width: 220,
+      render: valueOrDash,
+    },
+    {
+      align: 'left',
       title: '工艺',
       dataIndex: 'process_requirement',
       width: 220,
@@ -260,7 +269,7 @@ export default function SalesOrderSummaryPanel() {
               value={filters.sales_owner}
               onSearch={(owner) => update({ owner })}
             />
-            <Select
+            <SelectFilter
               aria-label="订单状态"
               value={filters.lifecycle_status}
               options={SALES_SUMMARY_STATUSES}

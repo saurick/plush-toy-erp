@@ -52,6 +52,7 @@ import {
   listAllContactsByOwner,
   listAllProductSKUs,
   listAllSalesOrderItems,
+  listAllSalesOrderSummary,
   listAllSalesOrders,
   listSalesOrderItemsPreview,
   listSalesOrders,
@@ -177,6 +178,12 @@ import {
   prepareSourceOrderLifecycleAttempt,
 } from '../utils/sourceOrderLifecycleAction.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
+import SalesDeliveryProgress from '../components/business-visualizations/SalesDeliveryProgress.jsx'
+import {
+  BusinessViewSurface,
+  BusinessViewSwitch,
+} from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 
 const CUSTOMER_CONTACT_OWNER_TYPE = 'CUSTOMER'
 
@@ -256,6 +263,7 @@ export default function V1SalesOrdersPage() {
   const [dateFilterStart, setDateFilterStart] = useState('')
   const [dateFilterEnd, setDateFilterEnd] = useState('')
   const [sortFilter, setSortFilter] = useState('updated_at:desc')
+  const [contentView, setContentView] = useState('list')
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
   const [units, setUnits] = useState([])
@@ -659,6 +667,54 @@ export default function V1SalesOrdersPage() {
     statusFilter,
   ])
 
+  const deliverySummaryParams = useMemo(() => {
+    const customerName = customerFilter
+      ? customers.find(
+          (customer) => String(customer?.id) === String(customerFilter)
+        )?.name
+      : ''
+    return {
+      keyword: resolvedRouteKeyword || orderListParams.keyword || undefined,
+      customer: customerName || undefined,
+      lifecycle_status: statusFilter || undefined,
+      date_field: dateFilterField,
+      date_from: dateFilterStart || undefined,
+      date_to: dateFilterEnd || undefined,
+    }
+  }, [
+    customerFilter,
+    customers,
+    dateFilterEnd,
+    dateFilterField,
+    dateFilterStart,
+    orderListParams.keyword,
+    resolvedRouteKeyword,
+    statusFilter,
+  ])
+
+  const loadDeliveryItems = useCallback(
+    async ({ signal }) => {
+      const result = await listAllSalesOrderSummary(deliverySummaryParams, {
+        signal,
+      })
+      const items = Array.isArray(result?.items) ? result.items : []
+      if (statusFilter || lifecycleScope === LIFECYCLE_SCOPE.ALL) return items
+      const historical = new Set(['closed', 'canceled'])
+      return items.filter((item) =>
+        lifecycleScope === LIFECYCLE_SCOPE.HISTORY
+          ? historical.has(String(item?.lifecycle_status || '').toLowerCase())
+          : !historical.has(String(item?.lifecycle_status || '').toLowerCase())
+      )
+    },
+    [deliverySummaryParams, lifecycleScope, statusFilter]
+  )
+
+  const deliveryData = useBusinessVisualizationData({
+    enabled: contentView === 'delivery',
+    load: loadDeliveryItems,
+    actionLabel: '加载销售交付进度',
+  })
+
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
     setLoading(true)
@@ -1033,6 +1089,34 @@ export default function V1SalesOrdersPage() {
     }
     openSalesOrderDetails(order)
   }
+
+  const openDeliveryOrder = useCallback(
+    async (row) => {
+      const orderID = Number(row?.salesOrderID || 0)
+      if (orderID <= 0) return
+      const request = beginLatestRequest('delivery-order-details')
+      setItemLoading(true)
+      try {
+        const order = await getSalesOrder(
+          { id: orderID },
+          { signal: request.signal }
+        )
+        if (!request.isCurrent() || !order?.id) return
+        setSelectedOrder(order)
+        setDetailOrder(order)
+      } catch (error) {
+        if (!isRpcAbortError(error) && request.isCurrent()) {
+          message.error(getActionErrorMessage(error, '打开销售订单详情'))
+        }
+      } finally {
+        if (request.isCurrent()) {
+          setItemLoading(false)
+          request.finish()
+        }
+      }
+    },
+    [beginLatestRequest]
+  )
 
   const openSalesOrderLineOrder = async () => {
     const order = selectedOrder
@@ -1543,6 +1627,19 @@ export default function V1SalesOrdersPage() {
       navigate(targetPath)
     }
   }
+  const salesViewSwitch = (
+    <BusinessViewSwitch
+      value={contentView}
+      options={[
+        { value: 'list', label: '订单列表' },
+        { value: 'delivery', label: '交付进度' },
+      ]}
+      loading={deliveryData.loading}
+      onChange={setContentView}
+      onReload={deliveryData.reload}
+    />
+  )
+
   return (
     <BusinessPageLayout className="erp-v1-sales-orders-page">
       <PageHeaderCard
@@ -1923,38 +2020,51 @@ export default function V1SalesOrdersPage() {
         </SelectionActionBar>
       </BusinessOperationPanel>
 
-      <BusinessDataTable
-        rowKey="id"
-        loading={loading}
-        columns={orderColumns}
-        dataSource={orders}
-        expandable={salesOrderItemsPreview.expandable}
-        pagination={createBusinessTablePagination({
-          pagination,
-          total,
-          onChange: (current, pageSize) => setPagination({ current, pageSize }),
-        })}
-        emptyDescription="暂无销售订单"
-        rowSelection={{
-          type: 'radio',
-          selectedRowKeys: selectedOrder?.id ? [selectedOrder.id] : [],
-          getCheckboxProps: () => ({ disabled: saving }),
-          onChange: (_keys, selectedRows) => {
-            if (saving) return
-            setSelectedOrder(selectedRows[0] || null)
-          },
-        }}
-        rowClassName={(record) =>
-          record.id === selectedOrder?.id ? 'ant-table-row-selected' : ''
-        }
-        onRow={(record) => ({
-          onClick: () => {
-            if (saving) return
-            setSelectedOrder(record)
-          },
-        })}
-        onOpenRecord={saving ? undefined : openSalesOrderRecord}
-      />
+      <BusinessViewSurface switcher={salesViewSwitch}>
+        {contentView === 'delivery' ? (
+          <SalesDeliveryProgress
+            items={deliveryData.rows}
+            loading={deliveryData.loading}
+            error={deliveryData.error}
+            onRetry={deliveryData.reload}
+            onOpen={openDeliveryOrder}
+          />
+        ) : (
+          <BusinessDataTable
+            rowKey="id"
+            loading={loading}
+            columns={orderColumns}
+            dataSource={orders}
+            expandable={salesOrderItemsPreview.expandable}
+            pagination={createBusinessTablePagination({
+              pagination,
+              total,
+              onChange: (current, pageSize) =>
+                setPagination({ current, pageSize }),
+            })}
+            emptyDescription="暂无销售订单"
+            rowSelection={{
+              type: 'radio',
+              selectedRowKeys: selectedOrder?.id ? [selectedOrder.id] : [],
+              getCheckboxProps: () => ({ disabled: saving }),
+              onChange: (_keys, selectedRows) => {
+                if (saving) return
+                setSelectedOrder(selectedRows[0] || null)
+              },
+            }}
+            rowClassName={(record) =>
+              record.id === selectedOrder?.id ? 'ant-table-row-selected' : ''
+            }
+            onRow={(record) => ({
+              onClick: () => {
+                if (saving) return
+                setSelectedOrder(record)
+              },
+            })}
+            onOpenRecord={saving ? undefined : openSalesOrderRecord}
+          />
+        )}
+      </BusinessViewSurface>
 
       <BusinessDetailsModal
         columns={orderDataColumns}

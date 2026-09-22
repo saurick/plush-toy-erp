@@ -21,13 +21,13 @@ import {
   Select,
   Space,
   Tag,
-  Tabs,
   Tooltip,
   Typography,
 } from 'antd'
 import { Link as RouterLink, useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevDeliveryTimestamp from '../components/DevDeliveryTimestamp.jsx'

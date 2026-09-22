@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { assertTableSemanticAlignment } from './businessTableAssertions.mjs'
 
 export function createOutsourcingSummaryScenarios({
   assert,
@@ -81,8 +82,9 @@ export function createOutsourcingSummaryScenarios({
         failNext = false
         await page.route('**/rpc/outsourcing_order', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
-          if (method !== 'list_outsourcing_order_summary')
+          if (method !== 'list_outsourcing_order_summary') {
             return route.fallback()
+          }
           calls.push(params)
           if (failNext) {
             failNext = false
@@ -143,9 +145,7 @@ export function createOutsourcingSummaryScenarios({
             response.request().postDataJSON()?.method ===
               'list_outsourcing_order_summary'
         )
-        await page
-          .getByRole('button', { name: /刷新当前页/u })
-          .click()
+        await page.getByRole('button', { name: /刷新当前页/u }).click()
         await refreshed
         await region.getByText('模拟产品 1', { exact: true }).waitFor()
         assert.equal(calls.length, countBeforeRefresh + 1)
@@ -161,6 +161,20 @@ export function createOutsourcingSummaryScenarios({
             .count(),
           readOnly ? 0 : 1
         )
+        await assertTableSemanticAlignment(region, {
+          scenarioName: name,
+          expected: {
+            '产品 / 材料编号': 'center',
+            '产品 / 材料名称': 'left',
+            加工项目: 'left',
+            厂家名称: 'left',
+            单位: 'center',
+            加工数量: 'right',
+            行备注: 'left',
+            委托人: 'center',
+            合同状态: 'center',
+          },
+        })
         await region.locator('.ant-pagination-item-2').click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
         assert.equal(calls.at(-1).offset, 20)

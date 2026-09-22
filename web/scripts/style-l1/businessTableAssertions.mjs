@@ -1,5 +1,93 @@
 import assert from 'node:assert/strict'
 
+export async function assertTableSemanticAlignment(
+  scope,
+  { scenarioName, expected, tableSelector = '.app-table' }
+) {
+  const evidence = await scope.evaluate(
+    (root, { expectedTitles, tableSelector }) => {
+      const visible = (node) => node.getBoundingClientRect().height > 1
+      const normalize = (value) =>
+        String(value || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+      const table = [...root.querySelectorAll(tableSelector)].find(
+        (candidate) =>
+          visible(candidate) &&
+          [
+            ...candidate.querySelectorAll(
+              '.ant-table-tbody > tr.ant-table-row'
+            ),
+          ].some(visible)
+      )
+      if (!table) return { tableFound: false, columns: [] }
+
+      const headers = [
+        ...table.querySelectorAll('.ant-table-thead > tr > th'),
+      ].filter(visible)
+      const row = [
+        ...table.querySelectorAll('.ant-table-tbody > tr.ant-table-row'),
+      ].find(visible)
+      const cells = [...(row?.children || [])].filter(
+        (cell) => cell.tagName === 'TD'
+      )
+
+      return {
+        tableFound: true,
+        columns: expectedTitles.map((title) => {
+          const index = headers.findIndex(
+            (header) => normalize(header.textContent) === title
+          )
+          const header = headers[index]
+          const cell = cells[index]
+          return {
+            title,
+            found: Boolean(header && cell),
+            headerAlign: header ? getComputedStyle(header).textAlign : null,
+            headerVertical: header
+              ? getComputedStyle(header).verticalAlign
+              : null,
+            bodyAlign: cell ? getComputedStyle(cell).textAlign : null,
+            bodyVertical: cell ? getComputedStyle(cell).verticalAlign : null,
+          }
+        }),
+      }
+    },
+    { expectedTitles: Object.keys(expected), tableSelector }
+  )
+
+  assert(
+    evidence.tableFound,
+    `${scenarioName} 未找到可检查的业务表格: ${JSON.stringify(evidence)}`
+  )
+  for (const column of evidence.columns) {
+    assert(
+      column.found,
+      `${scenarioName} 未找到表格列 ${column.title}: ${JSON.stringify(evidence)}`
+    )
+    assert.equal(
+      column.headerAlign,
+      'center',
+      `${scenarioName} ${column.title} 表头应水平居中`
+    )
+    assert.equal(
+      column.headerVertical,
+      'middle',
+      `${scenarioName} ${column.title} 表头应垂直居中`
+    )
+    assert.equal(
+      column.bodyAlign,
+      expected[column.title],
+      `${scenarioName} ${column.title} 正文对齐不符合字段语义`
+    )
+    assert.equal(
+      column.bodyVertical,
+      'middle',
+      `${scenarioName} ${column.title} 正文应垂直居中`
+    )
+  }
+}
+
 export async function assertTableHeaderControlsFit(
   page,
   { scenarioName, tableSelector = '.app-table' }

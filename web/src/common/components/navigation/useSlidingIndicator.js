@@ -58,27 +58,37 @@ export default function useSlidingIndicator({
       container.dataset.slidingReady = 'true'
     }
 
-    const observer = new ResizeObserver(measure)
-    observer.observe(container)
-    measureRef.current = () => {
+    const resizeObserver = new ResizeObserver(measure)
+    resizeObserver.observe(container)
+    const refresh = () => {
       const items = new Set(container.querySelectorAll(itemSelector))
       observedItems.forEach((item) => {
         if (!items.has(item)) {
-          observer.unobserve(item)
+          resizeObserver.unobserve(item)
           observedItems.delete(item)
         }
       })
       items.forEach((item) => {
         if (!observedItems.has(item)) {
-          observer.observe(item)
+          resizeObserver.observe(item)
           observedItems.add(item)
         }
       })
       measure()
     }
+    const mutationObserver = new MutationObserver(refresh)
+    mutationObserver.observe(container, {
+      attributes: true,
+      attributeFilter: ['aria-selected', 'class'],
+      childList: true,
+      subtree: true,
+    })
+    measureRef.current = refresh
+    refresh()
 
     return () => {
-      observer.disconnect()
+      mutationObserver.disconnect()
+      resizeObserver.disconnect()
       measureRef.current = null
     }
   }, [containerSelector, itemSelector, selectedSelector])

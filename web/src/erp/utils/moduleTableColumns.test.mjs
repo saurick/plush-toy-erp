@@ -36,12 +36,79 @@ function listFilesRecursively(rootDir) {
   })
 }
 
+function assertSourceColumnAlignment(relativePath, title, alignment) {
+  const source = readFileSync(resolve(erpSourceRoot, relativePath), 'utf8')
+  const titleMarker = `title: '${title}'`
+  const titleIndex = source.indexOf(titleMarker)
+  assert.notEqual(titleIndex, -1, `${relativePath} missing ${title}`)
+  const objectStart = source.lastIndexOf('{', titleIndex)
+  assert.notEqual(objectStart, -1, `${relativePath} missing ${title} column`)
+  assert.match(
+    source.slice(objectStart, titleIndex),
+    new RegExp(`\\balign:\\s*'${alignment}'`, 'u'),
+    `${relativePath} ${title} should align ${alignment}`
+  )
+}
+
 test('moduleTableColumns: 会生成稳定列顺序 key', () => {
   assert.deepEqual(buildModuleColumnOrder(columns), [
     'code',
     'customerName',
     'amount',
   ])
+})
+
+test('moduleTableColumns: 业务字段显式保留正文语义对齐', () => {
+  const contracts = [
+    ['pages/DashboardPage.jsx', '关联单据 / 时间', 'left'],
+    ['pages/DashboardPage.jsx', '任务时间', 'left'],
+    ['components/workbench/SalesOrderSummaryPanel.jsx', '客户', 'left'],
+    ['components/workbench/SalesOrderSummaryPanel.jsx', '产品名称', 'left'],
+    ['components/workbench/SalesOrderSummaryPanel.jsx', '备注', 'left'],
+    ['components/workbench/SalesOrderSummaryPanel.jsx', '工艺', 'left'],
+    [
+      'components/outsourcing-orders/OutsourcingOrderSummaryPanel.jsx',
+      '产品 / 材料名称',
+      'left',
+    ],
+    [
+      'components/outsourcing-orders/OutsourcingOrderSummaryPanel.jsx',
+      '加工项目',
+      'left',
+    ],
+    [
+      'components/outsourcing-orders/OutsourcingOrderSummaryPanel.jsx',
+      '厂家名称',
+      'left',
+    ],
+    [
+      'components/outsourcing-orders/OutsourcingOrderSummaryPanel.jsx',
+      '行备注',
+      'left',
+    ],
+    ['pages/V1OutsourcingOrdersPage.jsx', '委托单位（甲方）', 'left'],
+    ['pages/V1OutsourcingOrdersPage.jsx', '委托方地址', 'left'],
+    ['pages/V1OutsourcingOrdersPage.jsx', '乙方单位', 'left'],
+    ['pages/V1OutsourcingOrdersPage.jsx', '乙方地址', 'left'],
+    ['components/master-data/masterDataColumns.jsx', '简称', 'left'],
+    ['pages/V1PurchaseReceiptsPage.jsx', '明细行数', 'right'],
+    [
+      'components/operational-facts/operationalFactPageConfig.mjs',
+      '行数',
+      'right',
+    ],
+    ['components/shipments/shipmentColumns.jsx', '明细行', 'right'],
+    ['components/sales-orders/SalesOrderExcelImport.jsx', '明细', 'right'],
+    [
+      'components/sales-orders/EngineeringMaterialSummarySheet.jsx',
+      '片数',
+      'right',
+    ],
+  ]
+
+  for (const [relativePath, title, alignment] of contracts) {
+    assertSourceColumnAlignment(relativePath, title, alignment)
+  }
 })
 
 test('moduleTableColumns: 会过滤非法和重复列 key', () => {

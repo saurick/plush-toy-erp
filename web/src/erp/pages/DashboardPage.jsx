@@ -9,7 +9,6 @@ import React, {
   useState,
 } from 'react'
 import {
-  ArrowLeftOutlined,
   ArrowRightOutlined,
   CheckOutlined,
   ClockCircleOutlined,
@@ -18,17 +17,7 @@ import {
   FileTextOutlined,
   FilterOutlined,
 } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Space,
-  Tabs,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd'
+import { Alert, Button, Card, Empty, Space, Tag, Typography } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -38,6 +27,7 @@ import { getWorkflowTaskDisplayName } from '../utils/processRuntimePresentation.
 import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -150,9 +140,38 @@ const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
 
 const WORKBENCH_QUEUE_PAGE_SIZE = TASK_BOARD_FOCUS_PAGE_SIZE
 const TASK_BOARD_PAGE_SCROLL_GAP = 12
-const getLeftAlignedHeaderCellProps = () => ({
-  style: { textAlign: 'left' },
-})
+
+function TaskBoardProgressRail({ activeLane, counts, ready, onSelectLane }) {
+  return (
+    <nav className="erp-task-progress-rail" aria-label="任务分类">
+      <button
+        type="button"
+        className={`erp-task-progress-rail__item erp-task-progress-rail__item--overview${activeLane === 'all' ? ' is-active' : ''}`}
+        aria-pressed={activeLane === 'all'}
+        aria-label="任务概览"
+        onClick={() => onSelectLane('all')}
+      >
+        <span className="erp-task-progress-rail__label">概览</span>
+      </button>
+      {TASK_BOARD_LANE_DEFINITIONS.map((lane) => (
+        <button
+          key={lane.key}
+          type="button"
+          data-lane={lane.key}
+          className={`erp-task-progress-rail__item${activeLane === lane.key ? ' is-active' : ''}`}
+          aria-pressed={activeLane === lane.key}
+          aria-label={`${lane.title}，${ready ? `${counts[lane.key]} 项` : '数量读取中'}`}
+          onClick={() => onSelectLane(lane.key)}
+        >
+          <span className="erp-task-progress-rail__label">{lane.title}</span>
+          <strong className="erp-task-progress-rail__value">
+            {ready ? counts[lane.key] : '—'}
+          </strong>
+        </button>
+      ))}
+    </nav>
+  )
+}
 
 function scrollTaskListToStart(lanesElement) {
   const scrollContainer = lanesElement?.closest?.('.erp-admin-content')
@@ -425,6 +444,7 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
               ),
             },
             {
+              align: 'left',
               title: '关联单据 / 时间',
               key: 'source',
               width: '27%',
@@ -605,8 +625,8 @@ function WorkbenchQueueEmpty({ activeOption, fallbackOption, onSwitchQueue }) {
   )
 }
 
-const WorkbenchSummaries = lazy(() =>
-  import('../components/workbench/WorkbenchSummaries.jsx')
+const WorkbenchSummaries = lazy(
+  () => import('../components/workbench/WorkbenchSummaries.jsx')
 )
 
 export default function DashboardPage({ initialView = 'workbench' }) {
@@ -1583,7 +1603,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       align: 'left',
       title: '任务与关联内容',
       dataIndex: 'task_name',
-      onHeaderCell: getLeftAlignedHeaderCellProps,
       render: (_, record) => (
         <div className="erp-workbench-task-cell">
           <TaskTitleEntry task={record} onOpenTask={openTaskDrawer} />
@@ -1609,7 +1628,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       title: '状态 / 风险',
       key: 'task_priority',
       width: 132,
-      onHeaderCell: getLeftAlignedHeaderCellProps,
       render: (_, record) => {
         return (
           <Space
@@ -1638,10 +1656,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
     },
     {
+      align: 'left',
       title: '任务时间',
       key: 'timing',
       width: 210,
-      onHeaderCell: getLeftAlignedHeaderCellProps,
       render: (_, record) => <WorkflowTaskTiming task={record} />,
     },
   ]
@@ -1809,38 +1827,12 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           }
         >
           <div className="erp-dashboard-block">
-            {taskBoardModel.focused ? (
-              <section className="erp-task-center-summary">
-                <Tooltip title="返回任务概览">
-                  <Button
-                    type="text"
-                    aria-label="返回任务概览"
-                    icon={<ArrowLeftOutlined aria-hidden="true" />}
-                    onClick={() => selectTaskBoardLane('all')}
-                  />
-                </Tooltip>
-                <Tabs
-                  className="erp-task-board-categories"
-                  aria-label="任务分类"
-                  activeKey={filters.lane}
-                  onChange={selectTaskBoardLane}
-                  tabBarGutter={24}
-                  items={TASK_BOARD_LANE_DEFINITIONS.map((lane) => ({
-                    key: lane.key,
-                    label: (
-                      <span className="erp-task-board-category">
-                        <span>{lane.title}</span>
-                        <span className="erp-task-board-category-count">
-                          {taskBoardMetricsReady
-                            ? taskBoardCounts[lane.key]
-                            : '—'}
-                        </span>
-                      </span>
-                    ),
-                  }))}
-                />
-              </section>
-            ) : null}
+            <TaskBoardProgressRail
+              activeLane={filters.lane}
+              counts={taskBoardCounts}
+              ready={taskBoardMetricsReady}
+              onSelectLane={selectTaskBoardLane}
+            />
 
             <div className="erp-task-board-controls">
               <div className="erp-task-board-filters">

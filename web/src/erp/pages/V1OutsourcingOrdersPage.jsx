@@ -8,8 +8,9 @@ import {
   PrinterOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Space, Tag, Tabs } from 'antd'
+import { Button, Space, Tag } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { useOutsourcingOrderLifecycle } from '../components/outsourcing-orders/useOutsourcingOrderLifecycle.jsx'
 import { useOutsourcingOrderLineOrder } from '../components/outsourcing-orders/useOutsourcingOrderLineOrder.mjs'
@@ -596,6 +597,7 @@ export default function V1OutsourcingOrdersPage() {
     () => [
       ...dataColumns,
       {
+        align: 'left',
         key: 'buyer-company',
         title: '委托单位（甲方）',
         dataIndex: ['contract_party_snapshot', 'buyerCompany'],
@@ -611,11 +613,13 @@ export default function V1OutsourcingOrdersPage() {
         dataIndex: ['contract_party_snapshot', 'buyerPhone'],
       },
       {
+        align: 'left',
         key: 'buyer-address',
         title: '委托方地址',
         dataIndex: ['contract_party_snapshot', 'buyerAddress'],
       },
       {
+        align: 'left',
         key: 'supplier-company',
         title: '乙方单位',
         dataIndex: ['supplier_snapshot', 'name'],
@@ -635,6 +639,7 @@ export default function V1OutsourcingOrdersPage() {
           value || record?.supplier_snapshot?.contact_mobile || '-',
       },
       {
+        align: 'left',
         key: 'supplier-address',
         title: '乙方地址',
         dataIndex: ['supplier_snapshot', 'address'],

@@ -57,6 +57,7 @@
 | `node scripts/qa/manual-acceptance-catalog.mjs` | 生成只读页面验收目录，默认只输出；范围与步骤见下文全页面试用验收数据。 | 准备全页面试用验收范围时 |
 | `node scripts/qa/local-acceptance-lifecycle.mjs --commit <sha> --run-id <run>` | 默认只输出计划；显式执行在按批隔离库完成技术验收并清理，详见下文。 | 对 clean exact SHA 做本地完整技术验收时 |
 | `node scripts/qa/scenario-demo-data.mjs` | 默认只读输出固定 V7 长期数据计划；本地开发与 `customer-trial-133` 复用同一 canonical 业务语义和九阶段 runner，但数据库、release、migration、客户配置、账号命名、attestation 与回执独立。133 的密码值由固定公开测试凭据合同约束，不构成数据共库。精确 plan digest 和确认串匹配后才通过正式 API exact-create-or-readback；不清理、不重置，不把查询读回写成人工验收或真实客户导入 | 需要为本地或 133 长期保留固定业务场景数据时 |
+| `node scripts/qa/visualization-demo-data.mjs --anchor-date <YYYY-MM-DD>` | 默认只读生成本地可视化增量计划；只接受已登记 `scenario-demo` 与当前 V7 来源报告，通过正式 JSON-RPC 补齐销售交期、采购到货、生产计划和五产品工序样本，并读回既有财务、库存、PMC 任务覆盖。显式 apply 需要 plan digest 与确认串；报告写入 ignored `output/qa/visualization-demo/<run-id>/` | 开发五类业务可视化并需要紧凑、可重复的风险状态数据时 |
 | `node --test scripts/qa/customer-trial-133-data.test.mjs` | 锁住 133 数据写入前的新回滚点：固定目标 SSH 脚本使用 `erp_backup` 只读角色，复核 exact release / database / migration，完成 custom dump、`pg_restore --list`、SHA-256、原子落盘和脱敏回执；不接受浏览器主机、路径、DSN 或命令输入 | 调整 133 数据准备或备份回执合同后 |
 | `node scripts/qa/manual-acceptance-dataset.mjs` | 默认生成双环境计划；显式 apply 才由串行 runner 写入模拟数据并校验回执。 | 准备或重放双环境全页面模拟数据时 |
 | `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version 2026.09.16-v7 --run-id 20260916-V7 --json` | 生成模拟主数据和源单计划，默认只读；身份、批次与允许写入见下文。 | 写入模拟源数据前确认数量、状态和边界时 |
@@ -143,6 +144,8 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 ## 全页面试用验收数据
 
 当前唯一整批合同是 `2026.09.16-v7 / 20260916-V7`。本地隔离库和 `demo-133` 使用同一套业务含义、数量与状态矩阵，但数据库 ID 各自独立，不能复制表行或用“编号相同”代替读回证明。正式部署默认不执行这套数据；`customer-test-133` 是甲方测试/验收环境，禁止重放整批合同，只允许在明确授权、exact release / migration 和写后读回下复用 core allowlist 准备 11 个单位与 4 个仓库。
+
+`visualization-demo-data.mjs` 是 `scenario-demo` 上的本地开发增量，不是新的整批合同、UAT 或客户真实数据。它使用按日期固定的 `VIS-*` 编号，通过销售、采购、生产、工序、财务、库存和 Workflow 正式读写接口 exact-create-or-readback；不直写数据库，也不在前端保存 fixture。脚本补齐 5 种交期 / 到货风险、6 种生产排期样本及一个五产品完整路线样本，并要求现有财务应收应付、跨仓库存和 PMC 排产任务达到实时读回门槛。已下达的生产与工序事实按业务生命周期保留，退出时按批次编号查找和停用 / 取消可编辑源单，不做物理删除或数据库重置。
 
 V7 使用 `YS7` 来源编号与 `YS-V7` 任务编号，补齐材料厂商料号、采购双方信息、付款 / 发票条件、确认到货日期和收货地址。加工合同由独立的 `demo_finance_purchase / uat_finance_purchase` 双岗位模拟账号办理，纯财务账号保持原有权限；收货与工序回货由仓库、工序执行由生产、包装版本确认由业务账号办理。整批事实报告额外读回材料和成品入库的来源待办，核对关联、仓库责任、状态与跳转入口。旧 V6 来源单、已过账事实及审计保留；标准路线绑定只通过既有受控替换流程从精确登记的上一批次转移。
 

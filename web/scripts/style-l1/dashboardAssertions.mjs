@@ -406,6 +406,9 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           return {
             title: String(header.textContent || '').trim(),
             headerAlign: getComputedStyle(header).textAlign,
+            headerVertical: getComputedStyle(header).verticalAlign,
+            cellAlign: cell ? getComputedStyle(cell).textAlign : null,
+            bodyVertical: cell ? getComputedStyle(cell).verticalAlign : null,
             contentAlign: content
               ? getComputedStyle(content).textAlign
               : null,
@@ -429,23 +432,52 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       `${scenarioName} 工作台应全宽展示任务并保留队列筛选: ${JSON.stringify(metrics)}`
     )
     assert.deepEqual(
-      metrics.columns.map(({ headerAlign, contentAlign }) => ({
-        headerAlign,
-        contentAlign,
-      })),
+      metrics.columns.map(
+        ({
+          headerAlign,
+          headerVertical,
+          cellAlign,
+          bodyVertical,
+          contentAlign,
+        }) => ({
+          headerAlign,
+          headerVertical,
+          cellAlign,
+          bodyVertical,
+          contentAlign,
+        })
+      ),
       [
         {
-          headerAlign: 'left',
+          headerAlign: 'center',
+          headerVertical: 'middle',
+          cellAlign: 'left',
+          bodyVertical: 'middle',
           contentAlign: 'left',
         },
         {
-          headerAlign: 'left',
+          headerAlign: 'center',
+          headerVertical: 'middle',
+          cellAlign: 'left',
+          bodyVertical: 'middle',
           contentAlign: 'left',
         },
-        { headerAlign: 'center', contentAlign: 'center' },
-        { headerAlign: 'left', contentAlign: 'left' },
+        {
+          headerAlign: 'center',
+          headerVertical: 'middle',
+          cellAlign: 'center',
+          bodyVertical: 'middle',
+          contentAlign: 'center',
+        },
+        {
+          headerAlign: 'center',
+          headerVertical: 'middle',
+          cellAlign: 'left',
+          bodyVertical: 'middle',
+          contentAlign: 'left',
+        },
       ],
-      `${scenarioName} 工作台表头应与各列内容使用相同对齐方式`
+      `${scenarioName} 工作台表头应统一居中，正文保持字段语义对齐`
     )
     assert(
       metrics.columns.every((column) => column.alignedGeometry),

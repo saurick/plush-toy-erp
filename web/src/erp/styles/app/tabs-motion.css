@@ -4,7 +4,8 @@
 }
 
 .erp-sliding-segmented.ant-segmented .ant-segmented-group,
-.erp-sliding-tab-list {
+.erp-sliding-tab-list,
+.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-nav-list {
   position: relative;
   isolation: isolate;
 }
@@ -34,6 +35,62 @@
     transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
     width var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
     height var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+
+.erp-sliding-tabs.ant-tabs
+  > .ant-tabs-nav
+  .ant-tabs-nav-list[data-sliding-ready='true']::before {
+  opacity: 1;
+  transition:
+    transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    width var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    height var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+
+.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-nav-list::before {
+  position: absolute;
+  z-index: 1;
+  border-radius: 999px;
+  background: var(--erp-tabs-indicator-color, #397655);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+}
+
+.erp-sliding-tabs.ant-tabs-top > .ant-tabs-nav .ant-tabs-nav-list::before,
+.erp-sliding-tabs.ant-tabs-bottom > .ant-tabs-nav .ant-tabs-nav-list::before {
+  left: 0;
+  width: var(--erp-slider-width, 0px);
+  height: 2px;
+  transform: translateX(var(--erp-slider-x, 0px));
+}
+
+.erp-sliding-tabs.ant-tabs-top > .ant-tabs-nav .ant-tabs-nav-list::before {
+  bottom: 0;
+}
+
+.erp-sliding-tabs.ant-tabs-bottom > .ant-tabs-nav .ant-tabs-nav-list::before {
+  top: 0;
+}
+
+.erp-sliding-tabs.ant-tabs-left > .ant-tabs-nav .ant-tabs-nav-list::before,
+.erp-sliding-tabs.ant-tabs-right > .ant-tabs-nav .ant-tabs-nav-list::before {
+  top: 0;
+  width: 2px;
+  height: var(--erp-slider-height, 0px);
+  transform: translateY(var(--erp-slider-y, 0px));
+}
+
+.erp-sliding-tabs.ant-tabs-left > .ant-tabs-nav .ant-tabs-nav-list::before {
+  right: 0;
+}
+
+.erp-sliding-tabs.ant-tabs-right > .ant-tabs-nav .ant-tabs-nav-list::before {
+  left: 0;
+}
+
+.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
+  display: none;
 }
 
 .erp-sliding-segmented.ant-segmented {
@@ -82,18 +139,6 @@
   transition:
     color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
     border-color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
-}
-
-/* Ant Tabs already owns a persistent ink bar. Keep its geometry and give it
-   the same continuous motion as the segmented and mobile indicators. */
-.ant-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
-  transition:
-    left var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
-    right var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
-    top var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
-    width var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
-    height var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
-    transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
 }
 
 .ant-tabs .ant-tabs-tab,

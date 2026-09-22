@@ -1,4 +1,4 @@
-.erp-workbench-summaries {
+.erp-workbench-summaries.erp-business-page-layout {
   display: grid;
   gap: 16px;
   min-width: 0;
@@ -16,17 +16,6 @@
 .erp-workbench-summaries__note {
   color: var(--erp-text-muted);
   font-size: 13px;
-}
-
-.erp-workbench-summaries
-  .erp-business-operation-panel__filters
-  > .ant-input-group-wrapper {
-  width: 240px;
-  max-width: 100%;
-}
-
-.erp-workbench-summaries .erp-business-operation-panel__filters > .ant-select {
-  min-width: 160px;
 }
 
 .erp-workbench-summaries__product {

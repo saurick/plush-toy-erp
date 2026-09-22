@@ -1,6 +1,7 @@
-import { Typography, Alert, Space, Tabs, Tag } from 'antd'
+import { Typography, Alert, Space, Tag } from 'antd'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 import { usePermissionRoleSettings } from '../components/permission-center/usePermissionRoleSettings.jsx'
 import PermissionAdminAccounts from '../components/permission-center/PermissionAdminAccounts.jsx'
 import { usePermissionCenterData } from '../components/permission-center/usePermissionCenterData.mjs'
@@ -315,60 +316,62 @@ export default function PermissionCenterPage() {
             message="当前账号部分操作受限"
             description={`${permissionWarningMessages.join('；')}。超级管理员账号只能由超级管理员维护。`}
           />
-      ) : null}
+        ) : null}
 
         <Tabs
           activeKey={activeTabKey}
           className="erp-permission-tabs"
           items={[
-          {
-            key: PERMISSION_CENTER_TAB_KEYS.ROLES,
-            label: (
-              <span className="erp-permission-tabs__label">
-                岗位设置
-                <Tag color="blue">{roles.length}</Tag>
-              </span>
-            ),
-            children: roleTemplateTab,
-          },
-          {
-            key: PERMISSION_CENTER_TAB_KEYS.ADMINS,
-            label: (
-              <span className="erp-permission-tabs__label">
-                员工账号
-                {canReadUsers ? <Tag color="green">{admins.length}</Tag> : null}
-              </span>
-            ),
-            children: adminAccountTab,
-          },
-          canReadApprovalResponsibilities
-            ? {
-                key: PERMISSION_CENTER_TAB_KEYS.APPROVALS,
-                label: (
-                  <span className="erp-permission-tabs__label">
-                    审批责任
-                    <Tag color="purple">3</Tag>
-                  </span>
-                ),
-                children: (
-                  <ApprovalResponsibilityPanel
-                    active={
-                      activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS
-                    }
-                    admins={admins}
-                    roles={roles}
-                    currentAdmin={currentAdmin}
-                    canRead={canReadApprovalResponsibilities}
-                    canManage={canManageApprovalResponsibilities}
-                    readOnlyReason={approvalReadOnlyReason}
-                    discardVersion={approvalDiscardVersion}
-                    refreshVersion={approvalRefreshVersion}
-                    onDirtyChange={setApprovalResponsibilityDirty}
-                  />
-                ),
-              }
-            : null,
-        ].filter(Boolean)}
+            {
+              key: PERMISSION_CENTER_TAB_KEYS.ROLES,
+              label: (
+                <span className="erp-permission-tabs__label">
+                  岗位设置
+                  <Tag color="blue">{roles.length}</Tag>
+                </span>
+              ),
+              children: roleTemplateTab,
+            },
+            {
+              key: PERMISSION_CENTER_TAB_KEYS.ADMINS,
+              label: (
+                <span className="erp-permission-tabs__label">
+                  员工账号
+                  {canReadUsers ? (
+                    <Tag color="green">{admins.length}</Tag>
+                  ) : null}
+                </span>
+              ),
+              children: adminAccountTab,
+            },
+            canReadApprovalResponsibilities
+              ? {
+                  key: PERMISSION_CENTER_TAB_KEYS.APPROVALS,
+                  label: (
+                    <span className="erp-permission-tabs__label">
+                      审批责任
+                      <Tag color="purple">3</Tag>
+                    </span>
+                  ),
+                  children: (
+                    <ApprovalResponsibilityPanel
+                      active={
+                        activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS
+                      }
+                      admins={admins}
+                      roles={roles}
+                      currentAdmin={currentAdmin}
+                      canRead={canReadApprovalResponsibilities}
+                      canManage={canManageApprovalResponsibilities}
+                      readOnlyReason={approvalReadOnlyReason}
+                      discardVersion={approvalDiscardVersion}
+                      refreshVersion={approvalRefreshVersion}
+                      onDirtyChange={setApprovalResponsibilityDirty}
+                    />
+                  ),
+                }
+              : null,
+          ].filter(Boolean)}
           onChange={changePermissionCenterTab}
         />
       </Space>

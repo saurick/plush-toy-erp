@@ -335,6 +335,20 @@ export default function BusinessDashboardPage() {
       ),
     [adminProfile, allowedMenuPaths, isSuperAdmin, moduleRows]
   )
+  const managementSourceKeys = [
+    'sales-orders',
+    'accessories-purchase',
+    'production-orders',
+  ]
+  const managementSources = managementSourceKeys
+    .map((key) => businessSourceRows.find((source) => source.key === key))
+    .filter(Boolean)
+  const canOpenTaskBoard =
+    (isSuperAdmin || allowedMenuPaths.has('/erp/task-board')) &&
+    effectiveSessionAllowsPage(adminProfile, 'task-board', {
+      isLocalDev: false,
+      isSuperAdmin,
+    })
   const openTaskEntry = (task, access) => {
     const entryPath = resolveWorkflowTaskEntryPath(task)
     if (
@@ -355,6 +369,53 @@ export default function BusinessDashboardPage() {
       className="erp-dashboard-page erp-business-dashboard-page"
     >
       <div className="erp-business-board-workspace">
+        <section className="erp-management-glance" aria-label="管理概览">
+          <div className="erp-management-glance__title">
+            <strong>管理概览</strong>
+            <span className="erp-management-glance__hint">
+              独立口径，点击进入明细
+            </span>
+          </div>
+          {managementSources.map((source) => (
+            <button
+              key={source.key}
+              type="button"
+              className="erp-management-glance__item"
+              disabled={!source.canOpen}
+              onClick={() => source.canOpen && navigate(source.path)}
+            >
+              <span className="erp-management-glance__label">
+                {source.label}
+              </span>
+              <strong className="erp-management-glance__value">
+                {source.available ? formatCount(source.total) : '—'}
+              </strong>
+            </button>
+          ))}
+          {BUSINESS_ATTENTION_LANES.map((definition) => (
+            <button
+              key={definition.key}
+              type="button"
+              className="erp-management-glance__item"
+              data-lane={definition.key}
+              disabled={!canOpenTaskBoard}
+              onClick={() =>
+                canOpenTaskBoard &&
+                navigate(`/erp/task-board?lane=${definition.key}`)
+              }
+            >
+              <span className="erp-management-glance__label">
+                {definition.title}任务
+              </span>
+              <strong className="erp-management-glance__value">
+                {taskBoardReady
+                  ? formatCount(taskBoard?.counts?.[definition.key])
+                  : '—'}
+              </strong>
+            </button>
+          ))}
+        </section>
+
         <Card
           className="erp-dashboard-card erp-business-board-attention-card"
           variant="borderless"
@@ -382,11 +443,7 @@ export default function BusinessDashboardPage() {
                   taskBoard={taskBoard}
                   taskBoardReady={taskBoardReady}
                   onViewAll={
-                    (isSuperAdmin || allowedMenuPaths.has('/erp/task-board')) &&
-                    effectiveSessionAllowsPage(adminProfile, 'task-board', {
-                      isLocalDev: false,
-                      isSuperAdmin,
-                    })
+                    canOpenTaskBoard
                       ? (lane) => navigate(`/erp/task-board?lane=${lane}`)
                       : null
                   }

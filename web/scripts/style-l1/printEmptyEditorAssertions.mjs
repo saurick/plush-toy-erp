@@ -1,43 +1,81 @@
 import assert from 'node:assert/strict'
 
 export async function measureEmptyEditorHints(editors) {
-  return editors.evaluateAll((nodes) =>
-    nodes.map((node) => {
+  return editors.evaluateAll((nodes) => {
+    const cacheName = '__plushStyleL1EmptyHintMetricCache'
+    const metricCache =
+      globalThis[cacheName] instanceof Map ? globalThis[cacheName] : new Map()
+    globalThis[cacheName] = metricCache
+
+    return nodes.map((node) => {
       const style = getComputedStyle(node)
       const hint = getComputedStyle(node, '::before')
-      const probe = document.createElement('span')
-      Object.assign(probe.style, {
-        position: 'fixed',
-        left: '-10000px',
-        top: '0',
-        visibility: 'hidden',
-        display: 'block',
-        boxSizing: 'content-box',
-        width: hint.width,
-        fontFamily: hint.fontFamily,
-        fontSize: hint.fontSize,
-        fontWeight: hint.fontWeight,
-        letterSpacing: hint.letterSpacing,
-        lineHeight: hint.lineHeight,
-        lineBreak: hint.lineBreak,
-        whiteSpace: hint.whiteSpace,
-        overflowWrap: hint.overflowWrap,
-        wordBreak: hint.wordBreak,
-        zoom: style.zoom,
-      })
-      probe.textContent = '点击填写'
-      // 字体在缩放时会按实际像素取整，探针必须与提示处于相同的缩放上下文。
-      node.parentElement.append(probe)
-      const probeBox = probe.getBoundingClientRect()
-      const zoom =
-        probeBox.width / Number.parseFloat(getComputedStyle(probe).width) || 1
-      const requiredHeight = probeBox.height / zoom
-      const range = document.createRange()
-      range.selectNodeContents(probe)
-      const textWidth = Math.max(
-        ...[...range.getClientRects()].map((r) => r.width / zoom)
-      )
-      probe.remove()
+      const fieldBox = node.getBoundingClientRect()
+      const effectiveScaleX = node.clientWidth
+        ? fieldBox.width / node.clientWidth
+        : 1
+      const effectiveScaleY = node.clientHeight
+        ? fieldBox.height / node.clientHeight
+        : 1
+      const metricKey = JSON.stringify([
+        node.tagName,
+        node.className,
+        hint.content,
+        hint.width,
+        hint.fontFamily,
+        hint.fontSize,
+        hint.fontWeight,
+        hint.letterSpacing,
+        hint.lineHeight,
+        hint.lineBreak,
+        hint.whiteSpace,
+        hint.overflowWrap,
+        hint.wordBreak,
+        style.zoom,
+        effectiveScaleX,
+        effectiveScaleY,
+        globalThis.devicePixelRatio,
+      ])
+      let metrics = metricCache.get(metricKey)
+      if (!metrics) {
+        const probe = document.createElement('span')
+        Object.assign(probe.style, {
+          position: 'fixed',
+          left: '-10000px',
+          top: '0',
+          visibility: 'hidden',
+          display: 'block',
+          boxSizing: 'content-box',
+          width: hint.width,
+          fontFamily: hint.fontFamily,
+          fontSize: hint.fontSize,
+          fontWeight: hint.fontWeight,
+          letterSpacing: hint.letterSpacing,
+          lineHeight: hint.lineHeight,
+          lineBreak: hint.lineBreak,
+          whiteSpace: hint.whiteSpace,
+          overflowWrap: hint.overflowWrap,
+          wordBreak: hint.wordBreak,
+          zoom: style.zoom,
+        })
+        probe.textContent = '点击填写'
+        // 字体在缩放时会按实际像素取整，探针必须与提示处于相同的缩放上下文。
+        node.parentElement.append(probe)
+        const probeBox = probe.getBoundingClientRect()
+        const zoom =
+          probeBox.width / Number.parseFloat(getComputedStyle(probe).width) || 1
+        const range = document.createRange()
+        range.selectNodeContents(probe)
+        metrics = {
+          requiredHeight: probeBox.height / zoom,
+          textWidth: Math.max(
+            ...[...range.getClientRects()].map((r) => r.width / zoom)
+          ),
+        }
+        probe.remove()
+        if (metricCache.size >= 512) metricCache.clear()
+        metricCache.set(metricKey, metrics)
+      }
       const width = Number.parseFloat(hint.width)
       const height = Number.parseFloat(hint.height)
       const empty = !node.textContent.replace(/\u200b/g, '').trim()
@@ -53,18 +91,18 @@ export async function measureEmptyEditorHints(editors) {
         content: hint.content,
         width,
         height,
-        requiredHeight,
-        textWidth,
+        requiredHeight: metrics.requiredHeight,
+        textWidth: metrics.textWidth,
         textFits:
           !empty ||
           (hint.content === '"点击填写"' &&
             width > 0 &&
-            requiredHeight <= height + 0.1 &&
-            textWidth <= width + 0.1 &&
+            metrics.requiredHeight <= height + 0.1 &&
+            metrics.textWidth <= width + 0.1 &&
             height <= node.clientHeight + 1),
       }
     })
-  )
+  })
 }
 
 export async function assertEmptyEditorCaret(page, editor, label) {

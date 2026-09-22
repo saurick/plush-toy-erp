@@ -17,7 +17,7 @@ window.__vite_plugin_react_preamble_installed__ = true;
 async function sampleMotion(
   page,
   id,
-  { reverse = false, inkBar = false, targetIndex = 1 } = {}
+  { reverse = false, targetIndex = 1 } = {}
 ) {
   return page.locator(`#${id}`).evaluate(
     async (root, config) => {
@@ -29,19 +29,13 @@ async function sampleMotion(
           '.ant-segmented-item, [role="tab"], .erp-dev-governance-task-nav__item'
         ),
       ]
-      const indicator = config.inkBar
-        ? group.querySelector('.ant-tabs-ink-bar')
-        : group
       const read = () => {
-        const style = getComputedStyle(
-          indicator,
-          config.inkBar ? null : '::before'
-        )
+        const style = getComputedStyle(group, '::before')
         const matrix = new DOMMatrixReadOnly(
           style.transform === 'none' ? undefined : style.transform
         )
         return {
-          x: matrix.m41 + (config.inkBar ? parseFloat(style.left) : 0),
+          x: matrix.m41,
           y: matrix.m42,
           width: parseFloat(style.width),
           opacity: style.opacity,
@@ -49,12 +43,13 @@ async function sampleMotion(
         }
       }
       const first = read()
-      const targetItem = config.inkBar
+      const isAntTabs = group.classList.contains('ant-tabs-nav-list')
+      const targetItem = isAntTabs
         ? items[config.targetIndex].closest('.ant-tabs-tab')
         : items[config.targetIndex]
       const target = {
         x: targetItem.offsetLeft,
-        y: config.inkBar ? first.y : targetItem.offsetTop,
+        y: isAntTabs ? first.y : targetItem.offsetTop,
         width: targetItem.offsetWidth,
       }
       const samples = []
@@ -76,7 +71,7 @@ async function sampleMotion(
       })
       return { first, target, samples }
     },
-    { reverse, inkBar, targetIndex }
+    { reverse, targetIndex }
   )
 }
 
@@ -103,6 +98,10 @@ function assertMotion(result, label, reverse = false) {
   assert(
     samples.every((frame) => frame.opacity === '1'),
     `${label}: highlight disappeared during motion`
+  )
+  assert(
+    samples.every((frame) => frame.width > 1),
+    `${label}: highlight collapsed during motion`
   )
   for (let index = 1; index < samples.length; index += 1) {
     const previous = samples[index - 1]
@@ -145,6 +144,58 @@ async function assertAligned(page, id) {
   )
 }
 
+async function sampleActionBarRemount(page) {
+  return page.locator('#action-remount').evaluate(async (root) => {
+    const trigger = root.querySelector('#remount-action-bar')
+    const samples = []
+    trigger.click()
+    const start = performance.now()
+    await new Promise((resolve) => {
+      const frame = () => {
+        const more = root.querySelector(
+          '.erp-business-selection-action-bar__compact-more'
+        )
+        const row = root.querySelector(
+          '.erp-business-selection-action-bar__row'
+        )
+        if (more && row) {
+          samples.push({
+            elapsed: performance.now() - start,
+            buttonHeight: more.getBoundingClientRect().height,
+            rowHeight: row.getBoundingClientRect().height,
+            actionClass:
+              more.closest('.erp-business-module-selection-actions')
+                ?.className || '',
+          })
+        }
+        if (performance.now() - start < 360) requestAnimationFrame(frame)
+        else resolve()
+      }
+      requestAnimationFrame(frame)
+    })
+    return samples
+  })
+}
+
+function assertActionBarRemountStable(samples, label) {
+  assert(samples.length >= 5, `${label}: missing remount frames`)
+  const buttonHeights = samples.map((sample) => sample.buttonHeight)
+  const rowHeights = samples.map((sample) => sample.rowHeight)
+  assert(
+    Math.max(...buttonHeights) - Math.min(...buttonHeights) <= 0.5 &&
+      buttonHeights.every((height) => Math.abs(height - 30) <= 0.5),
+    `${label}: more action button changed height ${JSON.stringify(samples)}`
+  )
+  assert(
+    Math.max(...rowHeights) - Math.min(...rowHeights) <= 0.5,
+    `${label}: action row changed height ${JSON.stringify(samples)}`
+  )
+  assert(
+    samples.every((sample) => sample.actionClass.includes('actions--overflow')),
+    `${label}: desktop remount flashed compact actions ${JSON.stringify(samples)}`
+  )
+}
+
 export function createTabMotionScenarios({ outputDir }) {
   return ['light', 'dark'].map((mode) => ({
     name: `global-tab-sliding-${mode}`,
@@ -159,6 +210,12 @@ export function createTabMotionScenarios({ outputDir }) {
       const motionEvidence = []
       await page.locator('#unequal [data-sliding-ready="true"]').waitFor()
       if (mode === 'dark') await page.locator('#toggle-theme').click()
+      for (let index = 0; index < 3; index += 1) {
+        assertActionBarRemountStable(
+          await sampleActionBarRemount(page),
+          `${mode}/action-remount-${index + 1}`
+        )
+      }
       await assertAligned(page, 'equal')
       for (const id of [
         'unequal',
@@ -199,15 +256,12 @@ export function createTabMotionScenarios({ outputDir }) {
         motionEvidence.push({ id, direction: 'reverse', ...reverse })
         assertMotion(reverse, `${mode}/${id}/reverse`, true)
       }
-      assertMotion(
-        await sampleMotion(page, 'ant-tabs', { inkBar: true }),
-        `${mode}/Ant Tabs`
-      )
+      assertMotion(await sampleMotion(page, 'ant-tabs'), `${mode}/Sliding Tabs`)
       await page.locator('#ant-tabs [role="tab"]').first().click()
       await page.waitForTimeout(460)
       assertMotion(
-        await sampleMotion(page, 'ant-tabs', { inkBar: true, reverse: true }),
-        `${mode}/Ant Tabs/reverse`,
+        await sampleMotion(page, 'ant-tabs', { reverse: true }),
+        `${mode}/Sliding Tabs/reverse`,
         true
       )
 
@@ -279,6 +333,15 @@ export function createTabMotionScenarios({ outputDir }) {
       assert(
         duration.split(',').every((part) => parseFloat(part) === 0),
         'reduced motion must disable sliding'
+      )
+      const tabsDuration = await page
+        .locator('#ant-tabs .ant-tabs-nav-list')
+        .evaluate(
+          (list) => getComputedStyle(list, '::before').transitionDuration
+        )
+      assert(
+        tabsDuration.split(',').every((part) => parseFloat(part) === 0),
+        'reduced motion must disable shared Tabs sliding'
       )
       await writeFile(
         path.join(outputDir, `global-tab-sliding-${mode}-frames.json`),

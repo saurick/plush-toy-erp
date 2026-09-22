@@ -36,6 +36,11 @@ import ProductionOverIssueRequestModal from '../components/production-orders/Pro
 import ProductionOrderEditor from '../components/production-orders/ProductionOrderEditor.jsx'
 import ProductionReworkProgressModal from '../components/production-orders/ProductionReworkProgressModal.jsx'
 import ProductionRouteExecutionModal from '../components/production-orders/ProductionRouteExecutionModal.jsx'
+import ProductionOrderOverview from '../components/business-visualizations/ProductionOrderOverview.jsx'
+import {
+  BusinessViewSurface,
+  BusinessViewSwitch,
+} from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 import { listAllInventoryLots } from '../api/inventoryApi.mjs'
 import { listAllWarehouses } from '../api/masterDataOrderApi.mjs'
 import {
@@ -108,6 +113,7 @@ import {
 } from '../utils/relatedDocumentNavigation.mjs'
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
 import {
   resolveBusinessActionAvailability,
   resolveContextualBusinessActionAvailability,
@@ -281,6 +287,7 @@ export default function V1ProductionOrdersPage() {
   const [query, setQuery] = useState(() => queryFromSearchParams(searchParams))
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
+  const [contentView, setContentView] = useState('list')
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [mutationLoading, setMutationLoading] = useState(false)
@@ -792,6 +799,17 @@ export default function V1ProductionOrdersPage() {
       routeWithQuery(V1_ROUTE_PATHS.productionProgress, {
         source_type: 'PRODUCTION_ORDER',
         source_id: order.id,
+      })
+    )
+  }
+
+  const viewProductionProcess = (order = selected) => {
+    if (!order?.id) return
+    navigate(
+      routeWithQuery(V1_ROUTE_PATHS.productionProgress, {
+        source_type: 'PRODUCTION_ORDER',
+        source_id: order.id,
+        display: 'process',
       })
     )
   }
@@ -1644,6 +1662,11 @@ export default function V1ProductionOrdersPage() {
     },
     [canRead, productionOrderListParams, routeProductionOrderID]
   )
+  const overviewData = useBusinessVisualizationData({
+    enabled: contentView === 'overview',
+    load: loadExportOrders,
+    actionLabel: '加载生产总览',
+  })
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: 'production-orders-export',
     loadRows: loadExportOrders,
@@ -1651,6 +1674,18 @@ export default function V1ProductionOrdersPage() {
     columns: exportColumns,
     recordLabel: '生产订单',
   })
+  const productionViewSwitch = (
+    <BusinessViewSwitch
+      value={contentView}
+      options={[
+        { value: 'list', label: '订单列表' },
+        { value: 'overview', label: '生产总览' },
+      ]}
+      loading={overviewData.loading}
+      onChange={setContentView}
+      onReload={overviewData.reload}
+    />
+  )
 
   if (!canRead) {
     return (
@@ -2082,46 +2117,82 @@ export default function V1ProductionOrdersPage() {
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
-      <BusinessDataTable
-        loading={loading}
-        rowKey="id"
-        columns={tableColumns}
-        dataSource={orders}
-        rowSelection={{
-          type: 'radio',
-          selectedRowKeys: selected ? [selected.id] : [],
-          onChange: (_, rows) => {
-            if (rows[0]) selectRecord(rows[0])
-            else {
-              setSelected(null)
-              setAggregate(null)
+      <BusinessViewSurface switcher={productionViewSwitch}>
+        {contentView === 'overview' ? (
+          <ProductionOrderOverview
+            orders={overviewData.rows}
+            loading={overviewData.loading}
+            error={overviewData.error}
+            onRetry={overviewData.reload}
+            onOpen={(record) =>
+              loadDetail(
+                record,
+                canUpdate &&
+                  record.orderStatus === PRODUCTION_ORDER_STATUS.DRAFT
+                  ? 'edit'
+                  : 'view'
+              )
             }
-          },
-        }}
-        onRow={(record) => ({
-          onClick: () => selectRecord(record),
-        })}
-        onOpenRecord={(record) =>
-          loadDetail(
-            record,
-            canUpdate && record.status === PRODUCTION_ORDER_STATUS.DRAFT
-              ? 'edit'
-              : 'view'
-          )
-        }
-        pagination={{
-          current: query.page,
-          pageSize: query.page_size,
-          total,
-          showSizeChanger: true,
-          onChange: (page, pageSize) =>
-            writeQuery({ page, page_size: pageSize }),
-        }}
-        expandable={productionItemsPreview.expandable}
-        emptyDescription={
-          canCreate ? '暂无生产订单，可新建生产计划单' : '暂无可查看的生产订单'
-        }
-      />
+            onShowProcess={viewProductionProcess}
+            onFilterStatus={(status) => {
+              writeQuery({
+                status,
+                scope: [
+                  PRODUCTION_ORDER_STATUS.CLOSED,
+                  PRODUCTION_ORDER_STATUS.CANCELLED,
+                ].includes(status)
+                  ? LIFECYCLE_SCOPE.HISTORY
+                  : LIFECYCLE_SCOPE.CURRENT,
+                page: 1,
+              })
+              setContentView('list')
+            }}
+          />
+        ) : (
+          <BusinessDataTable
+            loading={loading}
+            rowKey="id"
+            columns={tableColumns}
+            dataSource={orders}
+            rowSelection={{
+              type: 'radio',
+              selectedRowKeys: selected ? [selected.id] : [],
+              onChange: (_, rows) => {
+                if (rows[0]) selectRecord(rows[0])
+                else {
+                  setSelected(null)
+                  setAggregate(null)
+                }
+              },
+            }}
+            onRow={(record) => ({
+              onClick: () => selectRecord(record),
+            })}
+            onOpenRecord={(record) =>
+              loadDetail(
+                record,
+                canUpdate && record.status === PRODUCTION_ORDER_STATUS.DRAFT
+                  ? 'edit'
+                  : 'view'
+              )
+            }
+            pagination={{
+              current: query.page,
+              pageSize: query.page_size,
+              total,
+              showSizeChanger: true,
+              onChange: (page, pageSize) =>
+                writeQuery({ page, page_size: pageSize }),
+            }}
+            expandable={productionItemsPreview.expandable}
+            emptyDescription={
+              canCreate
+                ? '暂无生产订单，可新建生产计划单'
+                : '暂无可查看的生产订单'
+            }
+          />
+        )}
+      </BusinessViewSurface>
       {productionItemsPreview.modal}
       {columnOrderModal}
 

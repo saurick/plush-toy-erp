@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -9,8 +9,13 @@ import {
   PrinterOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Input, Popconfirm, Tabs, Tag } from 'antd'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { Button, Dropdown, Input, Popconfirm, Tag } from 'antd'
+import {
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { useOperationalFactQuery } from '../components/operational-facts/useOperationalFactQuery.mjs'
@@ -54,6 +59,14 @@ import ProductionReworkModal from '../components/production-facts/ProductionRewo
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
 import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
 import ProductionReworkProgressModal from '../components/production-orders/ProductionReworkProgressModal.jsx'
+import FinanceDueOverview from '../components/business-visualizations/FinanceDueOverview.jsx'
+import ProductionProcessProgress from '../components/business-visualizations/ProductionProcessProgress.jsx'
+import {
+  BusinessViewSurface,
+  BusinessViewSwitch,
+} from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
+import { listAllProductionOrders } from '../api/productionOrderApi.mjs'
+import { getProductionWip } from '../api/productionWipApi.mjs'
 import { routeWithQuery } from '../utils/routeQuery.mjs'
 import {
   canOpenRelatedDocumentPath,
@@ -75,6 +88,7 @@ import {
 } from '../utils/financeBusinessSourceAction.mjs'
 
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
 import { resolveContextualBusinessActionAvailability } from '../utils/businessActionAvailability.mjs'
 import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import { isProductionReworkEligible } from '../utils/productionReworkAction.mjs'
@@ -116,6 +130,10 @@ export function OperationalFactWorkspace({
 }) {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const [contentView, setContentView] = useState(() =>
+    searchParams.get('display') === 'process' ? 'process' : 'list'
+  )
 
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -240,6 +258,87 @@ export function OperationalFactWorkspace({
   const canViewProductionReworkProgress =
     hasActionPermission(adminProfile, 'production.fact.read') &&
     hasActionPermission(adminProfile, 'production.wip.read')
+  const isProductionRecordsPage =
+    toolbarModuleKey === 'production-progress' &&
+    currentActiveKey === 'production'
+  const canUseProductionProcessView =
+    isProductionRecordsPage && canViewProductionReworkProgress
+  const isFinanceDuePage =
+    currentActiveKey === 'finance' &&
+    ['RECEIVABLE', 'PAYABLE'].includes(activeFinanceFactType)
+  useEffect(() => {
+    if (
+      (contentView === 'process' && !canUseProductionProcessView) ||
+      (contentView === 'due' && !isFinanceDuePage)
+    ) {
+      setContentView('list')
+    }
+  }, [canUseProductionProcessView, contentView, isFinanceDuePage])
+
+  const loadFinanceDueRows = useCallback(
+    ({ signal }) => loadExportRows({ signal }),
+    [loadExportRows]
+  )
+  const financeDueData = useBusinessVisualizationData({
+    enabled: contentView === 'due' && isFinanceDuePage,
+    load: loadFinanceDueRows,
+    actionLabel: '加载财务到期顺序',
+  })
+
+  const loadProcessOrders = useCallback(async ({ signal }) => {
+    const data = await listAllProductionOrders(
+      {
+        lifecycle_scope: 'all',
+        sort_by: 'updated_at',
+        sort_direction: 'desc',
+      },
+      { signal }
+    )
+    return (
+      Array.isArray(data?.production_orders) ? data.production_orders : []
+    ).filter((order) => ['RELEASED', 'CLOSED'].includes(order?.status))
+  }, [])
+  const processOrdersData = useBusinessVisualizationData({
+    enabled: contentView === 'process' && canUseProductionProcessView,
+    load: loadProcessOrders,
+    actionLabel: '加载生产工序订单',
+  })
+  const preferredProcessOrderID =
+    String(routeSourceType || '').toUpperCase() === 'PRODUCTION_ORDER'
+      ? Number(routeSourceID || 0)
+      : Number(activeSelectedRow?.production_order_id || 0)
+  const [selectedProcessOrderID, setSelectedProcessOrderID] = useState(0)
+  useEffect(() => {
+    if (contentView !== 'process') return
+    const availableIDs = new Set(
+      processOrdersData.rows.map((order) => Number(order?.id || 0))
+    )
+    setSelectedProcessOrderID((current) => {
+      if (
+        preferredProcessOrderID &&
+        availableIDs.has(preferredProcessOrderID)
+      ) {
+        return preferredProcessOrderID
+      }
+      if (current && availableIDs.has(current)) return current
+      return Number(processOrdersData.rows[0]?.id || 0)
+    })
+  }, [contentView, preferredProcessOrderID, processOrdersData.rows])
+  const loadProcessAggregate = useCallback(
+    async ({ signal }) => {
+      if (!selectedProcessOrderID) return []
+      return [await getProductionWip(selectedProcessOrderID, { signal })]
+    },
+    [selectedProcessOrderID]
+  )
+  const processAggregateData = useBusinessVisualizationData({
+    enabled:
+      contentView === 'process' &&
+      canUseProductionProcessView &&
+      selectedProcessOrderID > 0,
+    load: loadProcessAggregate,
+    actionLabel: '加载生产工序进度',
+  })
   const selectedProductionDraftSaveAction =
     currentActiveKey === 'production' && activeSelectedRow?.status === 'DRAFT'
       ? productionDraftSaveActionFor(activeSelectedRow)
@@ -648,6 +747,68 @@ export function OperationalFactWorkspace({
     key,
     label: config.title,
   }))
+  const workspaceTabs =
+    workspaceNavigation ||
+    (showTabs && tabItems.length > 1 ? (
+      <Tabs
+        className="erp-business-view-tabs"
+        activeKey={currentActiveKey}
+        onChange={setActiveKey}
+        items={tabItems}
+      />
+    ) : null)
+  const contentViewSwitch = isFinanceDuePage ? (
+    <BusinessViewSwitch
+      value={contentView}
+      options={[
+        { value: 'list', label: '账款列表' },
+        { value: 'due', label: '到期顺序' },
+      ]}
+      loading={financeDueData.loading}
+      onChange={setContentView}
+      onReload={financeDueData.reload}
+    />
+  ) : canUseProductionProcessView ? (
+    <BusinessViewSwitch
+      value={contentView}
+      options={[
+        { value: 'list', label: '记录明细' },
+        { value: 'process', label: '生产工序' },
+      ]}
+      loading={processOrdersData.loading || processAggregateData.loading}
+      onChange={setContentView}
+      onReload={() => {
+        processOrdersData.reload()
+        processAggregateData.reload()
+      }}
+    />
+  ) : null
+  const visualizationHeader =
+    workspaceTabs || contentViewSwitch ? (
+      <div
+        className={`erp-operational-visual-toolbar${
+          workspaceTabs && contentViewSwitch
+            ? ' erp-operational-visual-toolbar--split'
+            : ''
+        }`}
+      >
+        {workspaceTabs ? (
+          <div className="erp-operational-visual-toolbar__primary">
+            {workspaceTabs}
+          </div>
+        ) : null}
+        {contentViewSwitch ? (
+          <div className="erp-operational-visual-toolbar__secondary">
+            {contentViewSwitch}
+          </div>
+        ) : null}
+      </div>
+    ) : null
+  const processAggregate = processAggregateData.rows[0] || null
+  const processLoading =
+    processOrdersData.loading ||
+    Boolean(selectedProcessOrderID && processAggregateData.loading)
+  const processError = processOrdersData.error || processAggregateData.error
 
   return (
     <BusinessPageLayout className="erp-v1-operational-fact-page">
@@ -1434,53 +1595,82 @@ export function OperationalFactWorkspace({
         </SelectionActionBar>
       </BusinessOperationPanel>
 
-      <BusinessDataTable
-        tableHeader={
-          workspaceNavigation || (showTabs && tabItems.length > 1 ? (
-            <Tabs
-              className="erp-business-view-tabs"
-              activeKey={currentActiveKey}
-              onChange={setActiveKey}
-              items={tabItems}
-            />
-          ) : null)
-        }
-        rowKey="id"
-        columns={tableColumns}
-        dataSource={activeRows}
-        loading={loading}
-        rowSelection={{
-          type: 'radio',
-          selectedRowKeys: activeSelectedRow ? [activeSelectedRow.id] : [],
-          onChange: (_keys, selectedRows) =>
-            setSelectedByKey((prev) => ({
-              ...prev,
-              [currentActiveKey]: selectedRows[0] || null,
-            })),
-        }}
-        rowClassName={(record) =>
-          record.id === activeSelectedRow?.id ? 'ant-table-row-selected' : ''
-        }
-        onRow={(record) => ({
-          onClick: () =>
-            setSelectedByKey((prev) => ({
-              ...prev,
-              [currentActiveKey]: record,
-            })),
-        })}
-        onOpenRecord={openOperationalFactDetails}
-        emptyDescription="暂无业务记录"
-        pagination={createBusinessTablePagination({
-          pagination: activePagination,
-          total: activeTotal,
-          onChange: (current, pageSize) =>
-            setPaginationByKey((prev) => ({
-              ...prev,
-              [currentActiveKey]: { current, pageSize },
-            })),
-        })}
-        scroll={{ x: 1320 }}
-      />
+      <BusinessViewSurface switcher={visualizationHeader}>
+        {contentView === 'due' && isFinanceDuePage ? (
+          <FinanceDueOverview
+            facts={financeDueData.rows}
+            loading={financeDueData.loading}
+            error={financeDueData.error}
+            onRetry={financeDueData.reload}
+            onOpen={(row) => {
+              const source = financeDueData.rows.find(
+                (fact) => Number(fact?.id || 0) === Number(row?.id || 0)
+              )
+              if (source) openOperationalFactDetails(source)
+            }}
+          />
+        ) : contentView === 'process' && canUseProductionProcessView ? (
+          <ProductionProcessProgress
+            orders={processOrdersData.rows}
+            selectedOrderID={selectedProcessOrderID}
+            aggregate={processAggregate}
+            loading={processLoading}
+            error={processError}
+            onRetry={() => {
+              processOrdersData.reload()
+              processAggregateData.reload()
+            }}
+            onSelectOrder={setSelectedProcessOrderID}
+            onOpenOrder={(productionOrderID) =>
+              navigate(
+                routeWithQuery(V1_ROUTE_PATHS.productionOrders, {
+                  production_order_id: productionOrderID,
+                })
+              )
+            }
+          />
+        ) : (
+          <BusinessDataTable
+            rowKey="id"
+            columns={tableColumns}
+            dataSource={activeRows}
+            loading={loading}
+            rowSelection={{
+              type: 'radio',
+              selectedRowKeys: activeSelectedRow ? [activeSelectedRow.id] : [],
+              onChange: (_keys, selectedRows) =>
+                setSelectedByKey((prev) => ({
+                  ...prev,
+                  [currentActiveKey]: selectedRows[0] || null,
+                })),
+            }}
+            rowClassName={(record) =>
+              record.id === activeSelectedRow?.id
+                ? 'ant-table-row-selected'
+                : ''
+            }
+            onRow={(record) => ({
+              onClick: () =>
+                setSelectedByKey((prev) => ({
+                  ...prev,
+                  [currentActiveKey]: record,
+                })),
+            })}
+            onOpenRecord={openOperationalFactDetails}
+            emptyDescription="暂无业务记录"
+            pagination={createBusinessTablePagination({
+              pagination: activePagination,
+              total: activeTotal,
+              onChange: (current, pageSize) =>
+                setPaginationByKey((prev) => ({
+                  ...prev,
+                  [currentActiveKey]: { current, pageSize },
+                })),
+            })}
+            scroll={{ x: 1320 }}
+          />
+        )}
+      </BusinessViewSurface>
 
       {columnOrderModal}
       <BusinessDetailsModal

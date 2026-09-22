@@ -8,11 +8,11 @@ import {
   Popover,
   Select,
   Space,
-  Tabs,
   Tag,
   Typography,
 } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'

@@ -13,11 +13,18 @@ const responsiveCss = readFileSync(
   resolve(__dirname, '../styles/app/business-responsive.css'),
   'utf8'
 )
+const businessTableCss = readFileSync(
+  resolve(__dirname, '../styles/app/business-tables.css'),
+  'utf8'
+)
 
 test('当前操作条按手机和平板宽度收口动作，不为页面各写一套分支', () => {
   assert.match(layoutSource, /PHONE_SELECTION_ACTION_LIMIT\s*=\s*1/u)
   assert.match(layoutSource, /TABLET_SELECTION_ACTION_LIMIT\s*=\s*2/u)
-  assert.match(layoutSource, /Grid\.useBreakpoint\(\)/u)
+  assert.match(
+    layoutSource,
+    /resolveInitialSelectionActionScreens\(\{ screenLG, screenMD \}\)[\s\S]*Grid\.useBreakpoint\(true, initialScreens\)/u
+  )
   assert.match(
     layoutSource,
     /erp-business-selection-action-bar__actions--compact/u
@@ -27,6 +34,21 @@ test('当前操作条按手机和平板宽度收口动作，不为页面各写�
   assert.doesNotMatch(
     layoutSource,
     /Number\(right\.enabled\) - Number\(left\.enabled\)/u
+  )
+})
+
+test('当前操作条首帧读取真实断点，且按钮尺寸不参与过渡', () => {
+  assert.match(
+    layoutSource,
+    /matchMedia\(`\(min-width: \$\{token\.screenLG\}px\)`\)/u
+  )
+  assert.match(
+    layoutSource,
+    /matchMedia\(`\(min-width: \$\{token\.screenMD\}px\)`\)/u
+  )
+  assert.match(
+    businessTableCss,
+    /erp-business-selection-action-bar__actions \.ant-btn[\s\S]*?transition-property:\s*color, background-color, border-color, box-shadow;/u
   )
 })
 

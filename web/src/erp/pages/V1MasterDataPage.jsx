@@ -15,8 +15,9 @@ import {
   SettingOutlined,
   StopOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Popconfirm, Space, Tabs } from 'antd'
+import { Button, Form, Popconfirm, Space } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../utils/warehouseClassification.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'

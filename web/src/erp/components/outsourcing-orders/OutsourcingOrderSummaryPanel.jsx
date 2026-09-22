@@ -112,6 +112,7 @@ export default forwardRef((
       exportValue: outsourcingSummarySubjectCode,
     },
     {
+      align: 'left',
       title: '产品 / 材料名称',
       key: 'subject_name',
       width: 210,
@@ -119,12 +120,14 @@ export default forwardRef((
       exportValue: outsourcingSummarySubjectName,
     },
     {
+      align: 'left',
       title: '加工项目',
       dataIndex: 'processing_item',
       width: 190,
       render: valueOrDash,
     },
     {
+      align: 'left',
       title: '厂家名称',
       dataIndex: 'supplier_name',
       width: 170,
@@ -174,7 +177,13 @@ export default forwardRef((
     ...(hasActionPermission(adminProfile, 'field.finance_settlement.read')
       ? [{ title: '币种', dataIndex: 'currency', width: 80 }]
       : []),
-    { title: '行备注', dataIndex: 'note', width: 200, render: valueOrDash },
+    {
+      align: 'left',
+      title: '行备注',
+      dataIndex: 'note',
+      width: 200,
+      render: valueOrDash,
+    },
     {
       title: '委托人',
       dataIndex: 'buyer_contact',

@@ -1,14 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import {
-  Alert,
-  Button,
-  Card,
-  Form,
-  Input,
-  Segmented,
-  Space,
-} from 'antd'
+import { Alert, Button, Card, Form, Input, Space } from 'antd'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import {
   AUTH_SCOPE,
   getStoredAdminProfile,

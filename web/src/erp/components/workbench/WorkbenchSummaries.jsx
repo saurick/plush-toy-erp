@@ -15,7 +15,10 @@ export default function WorkbenchSummaries({ options }) {
   if (!selected) return null
   const accessKey = workflowTaskAdminAccessRequestIdentity(adminProfile)
   return (
-    <section className="erp-workbench-summaries" aria-label="工作台汇总">
+    <section
+      className="erp-business-page-layout erp-workbench-summaries"
+      aria-label="工作台汇总"
+    >
       <div className="erp-workbench-summaries__heading">
         {options.length > 1 ? (
           <Select

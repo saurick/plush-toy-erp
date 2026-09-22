@@ -152,6 +152,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
         record.customer_snapshot || (record.customer_id ? '客户已关联' : ''),
     },
     {
+      align: 'right',
       title: '明细行',
       exportTitle: '明细行',
       hidden: true,

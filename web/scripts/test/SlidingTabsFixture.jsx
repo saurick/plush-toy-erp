@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { ConfigProvider, Tabs, theme } from 'antd'
+import { Button, ConfigProvider, theme } from 'antd'
 import SlidingSegmented from '../../src/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '../../src/common/components/navigation/SlidingTabList'
+import Tabs from '../../src/common/components/navigation/SlidingTabs'
 import DevTaskNav from '../../src/dev-workbench/components/DevTaskNav'
 import { TaskNav as GovernanceTaskNav } from '../../src/dev-workbench/pages/DevGovernancePage'
+import { SelectionActionBar } from '../../src/erp/components/business-list/BusinessListLayout'
 import 'antd/dist/reset.css'
 import '../../src/erp/styles/app.css'
 import '../../src/dev-workbench/styles/index.css'
@@ -48,6 +50,28 @@ function CustomTabs({ id, className, itemClass = '', disabledLast = false }) {
           </button>
         ))}
       </SlidingTabList>
+    </section>
+  )
+}
+
+function ActionBarMountFixture() {
+  const [generation, setGeneration] = useState(0)
+  return (
+    <section id="action-remount">
+      <button
+        id="remount-action-bar"
+        type="button"
+        onClick={() => setGeneration((value) => value + 1)}
+      >
+        重新挂载操作条
+      </button>
+      <SelectionActionBar key={generation} embedded selectedCount={0}>
+        {Array.from({ length: 6 }, (_, index) => (
+          <Button key={index} size="small">
+            操作 {index + 1}
+          </Button>
+        ))}
+      </SelectionActionBar>
     </section>
   )
 }
@@ -187,6 +211,7 @@ function Fixture() {
             }))}
           />
         </section>
+        <ActionBarMountFixture />
       </main>
     </ConfigProvider>
   )

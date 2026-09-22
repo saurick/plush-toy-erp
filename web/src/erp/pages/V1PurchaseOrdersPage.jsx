@@ -61,6 +61,12 @@ import {
 import { usePurchaseOrderContractPrint } from '../components/purchase-orders/usePurchaseOrderContractPrint.mjs'
 import { usePurchaseOrderInboundDraft } from '../components/purchase-orders/usePurchaseOrderInboundDraft.mjs'
 import { useSourceOrderWorkflowActions } from '../components/workflow/useSourceOrderWorkflowActions.mjs'
+import PurchaseArrivalCalendar from '../components/business-visualizations/PurchaseArrivalCalendar.jsx'
+import {
+  BusinessViewSurface,
+  BusinessViewSwitch,
+} from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
+import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
@@ -215,6 +221,7 @@ export default function V1PurchaseOrdersPage() {
   const [dateFilterStart, setDateFilterStart] = useState('')
   const [dateFilterEnd, setDateFilterEnd] = useState('')
   const [sortValue, setSortValue] = useState('updated_at:desc')
+  const [contentView, setContentView] = useState('list')
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [editingOrder, setEditingOrder] = useState(null)
   const [detailOrder, setDetailOrder] = useState(null)
@@ -432,6 +439,22 @@ export default function V1PurchaseOrdersPage() {
     status,
     supplierFilter,
   ])
+
+  const loadArrivalOrders = useCallback(
+    async ({ signal }) => {
+      const result = await listAllPurchaseOrders(orderListParams, { signal })
+      return Array.isArray(result?.purchase_orders)
+        ? result.purchase_orders
+        : []
+    },
+    [orderListParams]
+  )
+
+  const arrivalData = useBusinessVisualizationData({
+    enabled: contentView === 'arrival',
+    load: loadArrivalOrders,
+    actionLabel: '加载采购到货日历',
+  })
 
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
@@ -1463,6 +1486,19 @@ export default function V1PurchaseOrdersPage() {
     actionStates: lifecycleActionStates,
   } = lifecycleActions
 
+  const purchaseViewSwitch = (
+    <BusinessViewSwitch
+      value={contentView}
+      options={[
+        { value: 'list', label: '订单列表' },
+        { value: 'arrival', label: '到货日历' },
+      ]}
+      loading={arrivalData.loading}
+      onChange={setContentView}
+      onReload={arrivalData.reload}
+    />
+  )
+
   return (
     <BusinessPageLayout className="erp-v1-purchase-orders-page">
       <PageHeaderCard
@@ -1558,54 +1594,77 @@ export default function V1PurchaseOrdersPage() {
         supplierOptions={supplierOptions}
       />
 
-      <BusinessDataTable
-        loading={loading}
-        rowKey="id"
-        columns={columns}
-        dataSource={orders}
-        expandable={purchaseOrderItemsPreview.expandable}
-        rowSelection={{
-          type: 'checkbox',
-          selectedRowKeys,
-          getCheckboxProps: () => ({ disabled: recordActionBusy }),
-          onChange: (nextKeys, nextRows) => {
-            if (recordActionBusy) return
-            applySelectedRowKeys(nextKeys)
-            const nextSingle = nextKeys.length === 1 ? nextRows[0] : null
-            if (nextSingle?.id) {
-              setSelectedOrder(nextSingle)
-            } else {
-              setSelectedOrder(null)
-            }
-          },
-        }}
-        rowClassName={(record) =>
-          selectedRowKeys.includes(record?.id) ? 'ant-table-row-selected' : ''
-        }
-        onRow={(record) => ({
-          onClick: (event) => {
-            if (recordActionBusy) return
-            if (
-              event.target?.closest?.(
-                '.ant-checkbox-wrapper, .ant-checkbox, .ant-radio-wrapper, .ant-radio, .ant-table-selection-column'
+      <BusinessViewSurface switcher={purchaseViewSwitch}>
+        {contentView === 'arrival' ? (
+          <PurchaseArrivalCalendar
+            orders={arrivalData.rows}
+            loading={arrivalData.loading}
+            error={arrivalData.error}
+            onRetry={arrivalData.reload}
+            onOpen={(row) =>
+              openPurchaseOrderDetails(
+                arrivalData.rows.find(
+                  (order) => Number(order?.id || 0) === Number(row?.id || 0)
+                )
               )
-            ) {
-              return
             }
-            applySelectedRowKeys([record.id])
-            setSelectedOrder(record)
-          },
-        })}
-        onOpenRecord={recordActionBusy ? undefined : openPurchaseOrderRecord}
-        pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total,
-          showSizeChanger: true,
-          onChange: (current, pageSize) => setPagination({ current, pageSize }),
-        }}
-        emptyDescription="暂无采购订单"
-      />
+          />
+        ) : (
+          <BusinessDataTable
+            loading={loading}
+            rowKey="id"
+            columns={columns}
+            dataSource={orders}
+            expandable={purchaseOrderItemsPreview.expandable}
+            rowSelection={{
+              type: 'checkbox',
+              selectedRowKeys,
+              getCheckboxProps: () => ({ disabled: recordActionBusy }),
+              onChange: (nextKeys, nextRows) => {
+                if (recordActionBusy) return
+                applySelectedRowKeys(nextKeys)
+                const nextSingle = nextKeys.length === 1 ? nextRows[0] : null
+                if (nextSingle?.id) {
+                  setSelectedOrder(nextSingle)
+                } else {
+                  setSelectedOrder(null)
+                }
+              },
+            }}
+            rowClassName={(record) =>
+              selectedRowKeys.includes(record?.id)
+                ? 'ant-table-row-selected'
+                : ''
+            }
+            onRow={(record) => ({
+              onClick: (event) => {
+                if (recordActionBusy) return
+                if (
+                  event.target?.closest?.(
+                    '.ant-checkbox-wrapper, .ant-checkbox, .ant-radio-wrapper, .ant-radio, .ant-table-selection-column'
+                  )
+                ) {
+                  return
+                }
+                applySelectedRowKeys([record.id])
+                setSelectedOrder(record)
+              },
+            })}
+            onOpenRecord={
+              recordActionBusy ? undefined : openPurchaseOrderRecord
+            }
+            pagination={{
+              current: pagination.current,
+              pageSize: pagination.pageSize,
+              total,
+              showSizeChanger: true,
+              onChange: (current, pageSize) =>
+                setPagination({ current, pageSize }),
+            }}
+            emptyDescription="暂无采购订单"
+          />
+        )}
+      </BusinessViewSurface>
 
       <BusinessDetailsModal
         columns={dataColumns}
@@ -1707,7 +1766,9 @@ export default function V1PurchaseOrdersPage() {
         resolveSupplierName={resolveSupplierName}
         onOk={createInboundDraftWithReadySource}
         onCancel={closeInboundDraftModal}
-        onRetry={() => openInboundDraftModalWithReadySource(singleSelectedOrder)}
+        onRetry={() =>
+          openInboundDraftModalWithReadySource(singleSelectedOrder)
+        }
       />
     </BusinessPageLayout>
   )

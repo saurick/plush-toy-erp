@@ -647,6 +647,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         exportValue: customerColumnText,
       },
       {
+        align: 'right',
         title: '行数',
         width: 90,
         sortValue: (record) => record.items?.length || 0,

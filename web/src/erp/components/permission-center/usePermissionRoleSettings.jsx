@@ -6,7 +6,6 @@ import {
   Empty,
   Popover,
   Space,
-  Tabs,
   Tag,
 } from 'antd'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -16,6 +15,7 @@ import {
   RightOutlined,
   SaveOutlined,
 } from '@ant-design/icons'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 import {
   IS_PRODUCTION_BUILD,
   READ_USER_PERMISSION,

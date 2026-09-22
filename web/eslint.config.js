@@ -109,4 +109,26 @@ export default [
       },
     },
   }),
+  {
+    files: ['src/**/*.{js,jsx,mjs,ts,tsx}'],
+    ignores: [
+      'src/common/components/navigation/SlidingSegmented.jsx',
+      'src/common/components/navigation/SlidingTabs.jsx',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'antd',
+              importNames: ['Segmented', 'Tabs'],
+              message:
+                'Use the shared SlidingSegmented or SlidingTabs component so tab motion and reduced-motion behavior stay consistent.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]

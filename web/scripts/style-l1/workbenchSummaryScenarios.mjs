@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { assertTableSemanticAlignment } from './businessTableAssertions.mjs'
 
 const baseActions = ['erp.workbench.read', 'workflow.task.read']
 const salesActions = ['sales_order.read', 'sales_order_item.read']
@@ -205,6 +206,57 @@ export function createWorkbenchSummaryScenarios({
             .getByRole('columnheader', { name: '单价', exact: true })
             .waitFor()
         }
+        await assertTableSemanticAlignment(region, {
+          scenarioName: name,
+          expected: {
+            客户: 'left',
+            产品名称: 'left',
+            订单数量: 'right',
+            单位: 'center',
+            备注: 'left',
+            工艺: 'left',
+            订单状态: 'center',
+          },
+        })
+        const summaryLayout = await region.evaluate((element) => {
+          const panel = element.querySelector('.erp-business-operation-panel')
+          const filters = element.querySelector(
+            '.erp-business-operation-panel__filters'
+          )
+          const toolbar = element.querySelector(
+            '.erp-business-operation-panel__toolbar'
+          )
+          const dateRange = element.querySelector(
+            '.erp-business-date-range-filter'
+          )
+          const elementStyle = getComputedStyle(element)
+          const panelStyle = getComputedStyle(panel)
+          const dateRangeStyle = getComputedStyle(dateRange)
+          const filterRect = filters.getBoundingClientRect()
+          const toolbarRect = toolbar.getBoundingClientRect()
+          return {
+            controlHeight: elementStyle
+              .getPropertyValue('--erp-business-control-height')
+              .trim(),
+            panelBorderRadius: panelStyle.borderRadius,
+            dateBorderStyle: dateRangeStyle.borderTopStyle,
+            dateBorderWidth: dateRangeStyle.borderTopWidth,
+            filterBottom: filterRect.bottom,
+            toolbarTop: toolbarRect.top,
+            searchControlCount: element.querySelectorAll(
+              '.erp-business-filter-control--search.ant-input-affix-wrapper'
+            ).length,
+          }
+        })
+        assert.equal(summaryLayout.controlHeight, '36px')
+        assert.equal(summaryLayout.panelBorderRadius, '8px')
+        assert.equal(summaryLayout.dateBorderStyle, 'solid')
+        assert.equal(summaryLayout.dateBorderWidth, '1px')
+        assert.equal(summaryLayout.searchControlCount, 3)
+        assert(
+          summaryLayout.toolbarTop >= summaryLayout.filterBottom + 7,
+          `${name} 工作台汇总操作不能覆盖筛选区: ${JSON.stringify(summaryLayout)}`
+        )
         await region.locator('.ant-pagination-item-2').click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
         assert.equal(calls.at(-1).params.offset, 20)

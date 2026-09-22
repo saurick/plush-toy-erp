@@ -2,7 +2,10 @@ import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { businessModuleDefinitions } from '../../src/erp/config/businessModules.mjs'
-import { assertTableHeaderControlsFit } from './businessTableAssertions.mjs'
+import {
+  assertTableHeaderControlsFit,
+  assertTableSemanticAlignment,
+} from './businessTableAssertions.mjs'
 
 async function measureTables(page) {
   return page.evaluate(() => {
@@ -141,6 +144,17 @@ export function createTableAlignmentScenarios({
       const evidence = []
       evidence.push(await measureTables(page))
       assertAligned(evidence.at(-1))
+      await assertTableSemanticAlignment(page.locator('#business-table'), {
+        scenarioName: `global-table-alignment-${mode}`,
+        expected: {
+          材料编号: 'center',
+          品名: 'left',
+          单位: 'center',
+          数量: 'right',
+          状态: 'center',
+          备注: 'left',
+        },
+      })
       await assertTableHeaderControlsFit(page, {
         scenarioName: `global-table-alignment-${mode}`,
       })
@@ -188,6 +202,18 @@ export function createTableAlignmentScenarios({
       await page.locator('#material-table .erp-material-parts').waitFor()
       const expanded = await measureTables(page)
       assert(expanded.bodyAlignment.every((cell) => cell.vertical === 'middle'))
+      await assertTableSemanticAlignment(page.locator('#material-table'), {
+        scenarioName: `global-table-alignment-${mode}-parts`,
+        tableSelector: '.erp-material-parts',
+        expected: {
+          '产品 / 订单行': 'left',
+          BOM: 'center',
+          部位: 'left',
+          片数: 'right',
+          单位用量: 'right',
+          '加工 / 备注': 'left',
+        },
+      })
       await page
         .locator('#material-table .ant-table-row-expand-icon')
         .first()

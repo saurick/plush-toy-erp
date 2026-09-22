@@ -442,6 +442,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
         ]
       : [
           {
+            align: 'left',
             defaultPriority: 40,
             title: '简称',
             exportTitle: '简称',

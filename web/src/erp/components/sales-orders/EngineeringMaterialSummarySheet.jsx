@@ -39,7 +39,12 @@ function MaterialParts({ parts }) {
         },
         { title: 'BOM', dataIndex: 'bom_version', width: 75 },
         { align: 'left', title: '部位', dataIndex: 'position', width: 110 },
-        { title: '片数', dataIndex: 'piece_count', width: 65 },
+        {
+          align: 'right',
+          title: '片数',
+          dataIndex: 'piece_count',
+          width: 65,
+        },
         {
           title: '单位用量',
           dataIndex: 'unit_usage',

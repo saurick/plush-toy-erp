@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Select, Tag } from 'antd'
+import { Alert, Button, Tag } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import SearchInput from '@/common/components/SearchInput'
 import { listEngineeringMaterialRequests } from '../../api/masterDataOrderApi.mjs'
 import {
   BusinessDataTable,
   BusinessOperationPanel,
+  SearchInput,
+  SelectFilter,
 } from '../business-list/BusinessListLayout.jsx'
 import EngineeringMaterialRequestModal from '../sales-orders/EngineeringMaterialRequestModal.jsx'
 import {
@@ -111,12 +112,11 @@ export default function EngineeringMaterialSummaryPanel() {
         }}
         onPressEnter={() => updateFilter('q', draft.trim())}
       />
-      <Select
+      <SelectFilter
         aria-label="审批状态"
         value={status}
         options={STATUS_OPTIONS}
         onChange={(value) => updateFilter('status', value)}
-        style={{ minWidth: 160 }}
       />
     </>
   )

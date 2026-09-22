@@ -1,5 +1,5 @@
 import React from 'react'
-import { Tabs } from 'antd'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 
 export const PRODUCTION_RECORD_VIEW_KEYS = Object.freeze({
   RECORDS: 'records',
@@ -31,7 +31,7 @@ export default function ProductionRecordsNavigation({
   return (
     <Tabs
       aria-label="生产记录工作区"
-      className="erp-business-view-tabs"
+      className="erp-business-view-tabs erp-production-record-tabs"
       activeKey={activeKey}
       items={items}
       onChange={onChange}

@@ -1416,6 +1416,7 @@
 .erp-business-selection-action-bar__actions .ant-btn {
   min-height: 36px;
   border-radius: 10px;
+  transition-property: color, background-color, border-color, box-shadow;
 }
 
 .erp-business-selection-action-bar__actions

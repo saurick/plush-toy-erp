@@ -14,12 +14,12 @@ import {
   Select,
   Space,
   Statistic,
-  Tabs,
   Tag,
   Typography,
 } from 'antd'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
 import { MermaidDiagram } from '@/common/components/markdown'

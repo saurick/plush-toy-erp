@@ -24,6 +24,7 @@ const columns = [
   { align: 'left', title: '原表客户', dataIndex: 'customer', width: 140 },
   { title: '下单日期', dataIndex: 'order_date', width: 120 },
   {
+    align: 'right',
     title: '明细',
     key: 'line_count',
     width: 70,

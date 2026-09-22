@@ -4,9 +4,10 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Popconfirm, Space, Tabs, Tag } from 'antd'
+import { Alert, Button, Popconfirm, Space, Tag } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'

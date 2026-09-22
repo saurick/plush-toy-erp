@@ -27,7 +27,7 @@ test('table alignment centers short cells and headers while preserving text and 
   assert.equal(columns[1].onHeaderCell, undefined)
 })
 
-test('grouped headers preserve callbacks, spans, accessibility and caller styles', () => {
+test('grouped headers preserve callbacks and non-alignment styles while enforcing shared alignment', () => {
   const click = () => {}
   const result = normalizeTableColumns([
     {
@@ -46,9 +46,9 @@ test('grouped headers preserve callbacks, spans, accessibility and caller styles
   assert.equal(props.colSpan, 2)
   assert.equal(props['aria-label'], '采购')
   assert.deepEqual(props.style, {
-    textAlign: 'left',
-    verticalAlign: 'middle',
     width: 120,
+    textAlign: 'center',
+    verticalAlign: 'middle',
   })
   assert.equal(result[0].children[0].align, 'right')
   assert.equal(result[0].children[0].onHeaderCell().style.textAlign, 'center')

@@ -18,7 +18,6 @@ import {
   Input,
   Popconfirm,
   Space,
-  Tabs,
   Tag,
 } from 'antd'
 import {
@@ -29,6 +28,7 @@ import {
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import Table from '@/common/components/table/AppTable'
+import Tabs from '@/common/components/navigation/SlidingTabs'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import {
   MATERIAL_STOCK_CATEGORY_OPTIONS,
@@ -81,6 +81,8 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import InventoryDistributionOverview from '../components/business-visualizations/InventoryDistributionOverview.jsx'
+import { BusinessViewSwitch } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
 import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
 import InventoryOperationRecordsModal from '../components/inventory/InventoryOperationRecordsModal.jsx'
@@ -128,6 +130,7 @@ import {
   isSourceBusinessActionResultUnknown,
 } from '../utils/sourceBusinessAction.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
 
 const VIEW_BALANCES = 'balances'
 const VIEW_LOTS = 'lots'
@@ -413,6 +416,7 @@ export default function V1InventoryLedgerPage() {
   const requestSequenceRef = useRef({})
   const operationAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const [activeView, setActiveView] = useState(VIEW_BALANCES)
+  const [balanceDisplay, setBalanceDisplay] = useState('list')
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
@@ -672,6 +676,20 @@ export default function V1InventoryLedgerPage() {
     ]
   )
 
+  const loadDistributionBalances = useCallback(
+    async ({ signal }) => {
+      const data = await loadInventoryList({ signal, all: true })
+      return getRowsFromData(VIEW_BALANCES, data)
+    },
+    [loadInventoryList]
+  )
+
+  const distributionData = useBusinessVisualizationData({
+    enabled: activeView === VIEW_BALANCES && balanceDisplay === 'distribution',
+    load: loadDistributionBalances,
+    actionLabel: '加载仓库库存分布',
+  })
+
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
     if (!canReadInventory) {
@@ -733,6 +751,7 @@ export default function V1InventoryLedgerPage() {
   const handleViewChange = useCallback(
     (nextView) => {
       setActiveView(nextView)
+      if (nextView !== VIEW_BALANCES) setBalanceDisplay('list')
       setSelectedRow(null)
       setDetailRecord(null)
       setDateFilterStart('')
@@ -743,6 +762,18 @@ export default function V1InventoryLedgerPage() {
   )
 
   const activeLabel = VIEW_LABELS[activeView]
+  const inventoryBalanceSwitch = (
+    <BusinessViewSwitch
+      value={balanceDisplay}
+      options={[
+        { value: 'list', label: '余额明细' },
+        { value: 'distribution', label: '仓库分布' },
+      ]}
+      loading={distributionData.loading}
+      onChange={setBalanceDisplay}
+      onReload={distributionData.reload}
+    />
+  )
   const openInventoryDetails = useCallback((record) => {
     if (!record?.id) return
     setSelectedRow(record)
@@ -951,6 +982,21 @@ export default function V1InventoryLedgerPage() {
     () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
     [warehouses]
   )
+  const warehouseFilterOptions = useMemo(() => {
+    const selectedID = Number(warehouseID || 0)
+    if (
+      selectedID <= 0 ||
+      warehouseOptions.some(
+        (option) => Number(option.value || 0) === selectedID
+      )
+    ) {
+      return warehouseOptions
+    }
+    return [
+      ...warehouseOptions,
+      { value: selectedID, label: `仓库 #${selectedID}（未启用）` },
+    ]
+  }, [warehouseID, warehouseOptions])
   const inventoryLotOptions = useMemo(
     () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
     [inventoryLots]
@@ -1368,8 +1414,8 @@ export default function V1InventoryLedgerPage() {
     [renderSubjectReference]
   )
   const renderWarehouseReference = useCallback(
-    (value) => referenceLabel(warehouseOptions, value, '仓库'),
-    [warehouseOptions]
+    (value) => referenceLabel(warehouseFilterOptions, value, '仓库'),
+    [warehouseFilterOptions]
   )
   const renderProductSKUReference = useCallback(
     (value, record) => {
@@ -2229,7 +2275,10 @@ export default function V1InventoryLedgerPage() {
               className="erp-business-filter-control--status"
               aria-label="仓库"
               value={warehouseID}
-              options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
+              options={[
+                { label: '全部仓库', value: '' },
+                ...warehouseFilterOptions,
+              ]}
               placeholder={
                 activeView === VIEW_LOTS ? '当前有余额仓库' : '全部仓库'
               }
@@ -2454,52 +2503,71 @@ export default function V1InventoryLedgerPage() {
       </BusinessOperationPanel>
 
       <Card className="erp-business-data-table-card erp-business-module-table-card">
-        <Tabs
-          activeKey={activeView}
-          items={VIEW_ITEMS}
-          onChange={handleViewChange}
-        />
-        <Table
-          rowKey={(record) => `${activeView}-${record.id}`}
-          loading={loading}
-          dataSource={rows}
-          columns={copyableTableColumns}
-          pagination={createBusinessTablePagination({
-            pagination,
-            total,
-            onChange: (current, pageSize) =>
-              setPagination({ current, pageSize }),
-          })}
-          scroll={{ x: activeView === VIEW_TXNS ? 1900 : 1500 }}
-          rowSelection={{
-            type: 'radio',
-            columnWidth: 48,
-            selectedRowKeys: selectedRowKey ? [selectedRowKey] : [],
-            onChange: (_keys, selectedRows) =>
-              setSelectedRow(selectedRows[0] || null),
-          }}
-          rowClassName={(record) =>
-            record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
-          }
-          onRow={(record) => ({
-            onClick: () => setSelectedRow(record),
-            onDoubleClick: (event) => {
-              if (
-                event.target?.closest?.(
-                  'a, button, input, textarea, select, label, [role="button"], [role="link"], .ant-table-selection-column, .ant-radio-wrapper, .ant-checkbox-wrapper, .erp-business-row-expand-button'
-                )
-              ) {
-                return
-              }
-              openInventoryDetails(record)
-            },
-            style: { cursor: 'pointer' },
-            title: '单击选中，双击打开',
-          })}
-          locale={{
-            emptyText: <Empty description={`暂无${activeLabel}`} />,
-          }}
-        />
+        <div className="erp-inventory-ledger-view-bar">
+          <Tabs
+            activeKey={activeView}
+            items={VIEW_ITEMS}
+            onChange={handleViewChange}
+          />
+          {activeView === VIEW_BALANCES ? inventoryBalanceSwitch : null}
+        </div>
+        {activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? (
+          <InventoryDistributionOverview
+            balances={distributionData.rows}
+            warehouses={warehouses}
+            loading={distributionData.loading}
+            error={distributionData.error}
+            onRetry={distributionData.reload}
+            onSelectWarehouse={(warehouse) => {
+              if (warehouse.warehouseID <= 0) return
+              setWarehouseID(warehouse.warehouseID)
+              setBalanceDisplay('list')
+              resetCurrentPage()
+            }}
+          />
+        ) : (
+          <Table
+            rowKey={(record) => `${activeView}-${record.id}`}
+            loading={loading}
+            dataSource={rows}
+            columns={copyableTableColumns}
+            pagination={createBusinessTablePagination({
+              pagination,
+              total,
+              onChange: (current, pageSize) =>
+                setPagination({ current, pageSize }),
+            })}
+            scroll={{ x: activeView === VIEW_TXNS ? 1900 : 1500 }}
+            rowSelection={{
+              type: 'radio',
+              columnWidth: 48,
+              selectedRowKeys: selectedRowKey ? [selectedRowKey] : [],
+              onChange: (_keys, selectedRows) =>
+                setSelectedRow(selectedRows[0] || null),
+            }}
+            rowClassName={(record) =>
+              record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
+            }
+            onRow={(record) => ({
+              onClick: () => setSelectedRow(record),
+              onDoubleClick: (event) => {
+                if (
+                  event.target?.closest?.(
+                    'a, button, input, textarea, select, label, [role="button"], [role="link"], .ant-table-selection-column, .ant-radio-wrapper, .ant-checkbox-wrapper, .erp-business-row-expand-button'
+                  )
+                ) {
+                  return
+                }
+                openInventoryDetails(record)
+              },
+              style: { cursor: 'pointer' },
+              title: '单击选中，双击打开',
+            })}
+            locale={{
+              emptyText: <Empty description={`暂无${activeLabel}`} />,
+            }}
+          />
+        )}
       </Card>
       {columnOrderModal}
       <BusinessDetailsModal

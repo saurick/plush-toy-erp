@@ -61,6 +61,17 @@ const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
 const PHONE_SELECTION_ACTION_LIMIT = 1
 const TABLET_SELECTION_ACTION_LIMIT = 2
 const DESKTOP_SELECTION_ACTION_LIMIT = 4
+
+function resolveInitialSelectionActionScreens(token) {
+  const matchMedia = globalThis.window?.matchMedia?.bind(globalThis.window)
+  if (!matchMedia) return {}
+
+  return {
+    lg: matchMedia(`(min-width: ${token.screenLG}px)`).matches,
+    md: matchMedia(`(min-width: ${token.screenMD}px)`).matches,
+  }
+}
+
 function joinClassNames(...items) {
   return items.filter(Boolean).join(' ')
 }
@@ -219,8 +230,13 @@ function containsDeferredSelectionAction(action) {
 }
 
 function ResponsiveSelectionActions({ children }) {
-  const screens = Grid.useBreakpoint()
   const { token } = theme.useToken()
+  const { screenLG, screenMD } = token
+  const initialScreens = React.useMemo(
+    () => resolveInitialSelectionActionScreens({ screenLG, screenMD }),
+    [screenLG, screenMD]
+  )
+  const screens = Grid.useBreakpoint(true, initialScreens)
   const [moreActionsOpen, setMoreActionsOpen] = React.useState(false)
   const moreActionsListRef = React.useRef(null)
   const moreActionsTriggerRef = React.useRef(null)

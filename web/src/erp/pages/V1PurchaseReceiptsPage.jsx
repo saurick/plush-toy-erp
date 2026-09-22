@@ -928,6 +928,7 @@ export default function V1PurchaseReceiptsPage() {
           exportValue: (record) => formatUnixDateTime(record?.posted_at),
         },
         {
+          align: 'right',
           defaultPriority: 60,
           title: '明细行数',
           exportTitle: '明细行数',

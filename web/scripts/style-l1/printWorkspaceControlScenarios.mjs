@@ -30,6 +30,30 @@ export function createPrintWorkspaceControlScenarios({
           )
           const count = await editors.count()
           assert(count > 0, `${template.key} 必须遍历实际编辑字段`)
+          const assertEditorInventory = async (phase) => {
+            const inventory = await editors.evaluateAll((nodes) => ({
+              count: nodes.length,
+              hiddenIndexes: nodes.flatMap((node, index) => {
+                const visible = node.checkVisibility
+                  ? node.checkVisibility({
+                      checkOpacity: false,
+                      checkVisibilityCSS: true,
+                    })
+                  : Boolean(node.getClientRects().length)
+                return visible ? [] : [index]
+              }),
+            }))
+            assert.equal(
+              inventory.count,
+              count,
+              `${template.key} ${phase}不能删除字段或移动后续索引`
+            )
+            assert.deepEqual(
+              inventory.hiddenIndexes,
+              [],
+              `${template.key} ${phase}全部空字段仍须可见`
+            )
+          }
           const stepNumbers = await editors.evaluateAll((nodes) =>
             nodes.map((node) =>
               node.closest('.erp-work-instruction-paper__step-no')
@@ -42,17 +66,12 @@ export function createPrintWorkspaceControlScenarios({
             await page
               .locator('.erp-print-shell__zoom-control select')
               .selectOption(scale)
+            await assertEditorInventory(`${scale} 缩放清空前`)
+            const blurTarget = page.locator(
+              '.erp-print-shell__toolbar-copy > strong'
+            )
             for (let index = 0; index < count; index += 1) {
               const editor = editors.nth(index)
-              assert.equal(
-                await editors.count(),
-                count,
-                `${template.key} 清空不能删除字段或移动后续索引`
-              )
-              assert(
-                await editor.isVisible(),
-                `${template.key} 字段 ${index} 空值后仍须可见`
-              )
               // 每个字段都实际清空，不能按 display / align 抽样漏掉收缩的日期等字段。
               await editor.fill('')
               await editor.press('Backspace')
@@ -62,9 +81,7 @@ export function createPrintWorkspaceControlScenarios({
                 state: 'focused',
                 ...(await measureEmptyEditorHints(editor))[0],
               })
-              await page
-                .locator('.erp-print-shell__toolbar-copy > strong')
-                .click()
+              await blurTarget.click()
               report.states.push({
                 scale,
                 index,
@@ -80,11 +97,10 @@ export function createPrintWorkspaceControlScenarios({
                   `${template.key} 字段 ${index} 清空失焦后应能点击并重新填写`
                 )
                 await editor.fill('')
-                await page
-                  .locator('.erp-print-shell__toolbar-copy > strong')
-                  .click()
+                await blurTarget.click()
               }
             }
+            await assertEditorInventory(`${scale} 缩放清空后`)
             if (scale === '1') {
               await page.locator('.erp-print-shell__stage-wrap').screenshot({
                 path: path.join(
