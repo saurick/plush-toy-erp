@@ -7,7 +7,7 @@ x-default-logging: &default-logging
     max-file: "3"
 
 x-web-app-common: &web-app-common
-  image: "${WEB_IMAGE:-plush-toy-erp-web:dev}"
+  image: "${WEB_IMAGE:?WEB_IMAGE is required}"
   restart: always
   init: true
   stop_grace_period: 15s
@@ -76,7 +76,7 @@ services:
     ports:
       - "${POSTGRES_BIND_ADDR:-127.0.0.1}:${POSTGRES_PORT:-5435}:5432"
     environment:
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-this-prod-postgres-password}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
       POSTGRES_DB: "${POSTGRES_DB:-plush_erp}"
       POSTGRES_USER: "${POSTGRES_USER:-postgres}"
       POSTGRES_APP_PASSWORD: "${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD is required}"
@@ -125,7 +125,7 @@ services:
     networks: {}
 
   app-server:
-    image: "${APP_IMAGE:-plush-toy-erp-server:dev}"
+    image: "${APP_IMAGE:?APP_IMAGE is required}"
     container_name: "${PROJECT_SLUG:-plush-toy-erp}-server"
     restart: always
     init: true
@@ -166,7 +166,7 @@ services:
       POSTGRES_STARTUP_TIMEOUT: "${POSTGRES_STARTUP_TIMEOUT:-60s}"
       TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
       TRACE_RATIO: "${TRACE_RATIO:-0.1}"
-      APP_JWT_SECRET: "${APP_JWT_SECRET:-change-this-prod-jwt-secret}"
+      APP_JWT_SECRET: "${APP_JWT_SECRET:?APP_JWT_SECRET is required}"
       APP_AUTH_SMS_MODE: "${APP_AUTH_SMS_MODE:-disabled}"
       APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID: "${APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID:-}"
       APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET: "${APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET:-}"

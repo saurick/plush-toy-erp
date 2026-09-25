@@ -654,7 +654,7 @@ export function createGithubDeliveryProvider({
     async dispatchRelease(request) {
       validateReleaseDispatchRequest(request);
       throw new Error(
-        "GitHub emergency publication is disabled before workflow dispatch",
+        "GitHub publication is disabled by the read-only provider boundary",
       );
     },
 

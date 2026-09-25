@@ -3,14 +3,31 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ENV_FILE="$SCRIPT_DIR/.env"
-CHECKSUM_FILE="${1:-}"
+CHECKSUM_FILE=""
 
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "[gitlab-backup-verify] missing $ENV_FILE"
-  exit 2
-fi
-if [[ -L "$ENV_FILE" ]]; then
-  echo "[gitlab-backup-verify] env file must be a regular non-symlink file"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --env-file)
+    ENV_FILE="${2:-}"
+    shift 2
+    ;;
+  --checksum)
+    CHECKSUM_FILE="${2:-}"
+    shift 2
+    ;;
+  -h | --help)
+    echo "usage: bash server/deploy/gitlab/gitlab-backup-verify.sh [--env-file <file>] [--checksum <file>]"
+    exit 0
+    ;;
+  *)
+    echo "[gitlab-backup-verify] unsupported argument: $1" >&2
+    exit 2
+    ;;
+  esac
+done
+
+if [[ "$ENV_FILE" != /* || ! -f "$ENV_FILE" || -L "$ENV_FILE" ]]; then
+  echo "[gitlab-backup-verify] env file must be an absolute regular non-symlink file: $ENV_FILE" >&2
   exit 2
 fi
 read_env_value() {

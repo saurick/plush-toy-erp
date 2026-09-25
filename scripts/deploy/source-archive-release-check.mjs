@@ -414,6 +414,13 @@ function isAllowedEnvFile(relativePath) {
   );
 }
 
+function isCurrentMarkdownNavigationFile(relativePath) {
+  return (
+    !relativePath.startsWith("docs/archive/") ||
+    path.posix.basename(relativePath) === "README.md"
+  );
+}
+
 function scanArchiveInventory({ archiveRoot, customer }) {
   const inventory = walkArchive(archiveRoot);
   const missingPaths = [
@@ -457,8 +464,7 @@ function scanArchiveInventory({ archiveRoot, customer }) {
   );
   const brokenMarkdownLinks = findBrokenLocalMarkdownLinks({
     rootDir: archiveRoot,
-    sourceFiles: markdownFiles,
-    ignoredPrefixes: ["docs/archive/", "progress.md"],
+    sourceFiles: markdownFiles.filter(isCurrentMarkdownNavigationFile),
   });
   if (
     missingPaths.length > 0 ||

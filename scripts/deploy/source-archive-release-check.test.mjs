@@ -367,6 +367,59 @@ test("light check rejects archive Markdown links to export-ignored customer docs
   }
 });
 
+test("light check scans progress and archive README links", async () => {
+  const root = createFixtureRepo();
+  try {
+    writeFixtureFile(
+      root,
+      "progress.md",
+      "[Missing](docs/missing-progress.md)\n",
+    );
+    writeFixtureFile(
+      root,
+      "docs/archive/README.md",
+      "[Missing](missing-index-target.md)\n",
+    );
+    runGit(root, ["add", "progress.md", "docs/archive/README.md"]);
+    runGit(root, ["commit", "-qm", "add broken current navigation links"]);
+
+    await assert.rejects(
+      () => runSourceArchiveReleaseCheck({ mode: "light" }, { repoRoot: root }),
+      (error) => {
+        assert.match(error.message, /inventory check failed/u);
+        assert.deepEqual(error.details.brokenMarkdownLinks, [
+          "docs/archive/README.md -> missing-index-target.md",
+          "progress.md -> docs/missing-progress.md",
+        ]);
+        return true;
+      },
+    );
+  } finally {
+    removeFixtureRepo(root);
+  }
+});
+
+test("light check keeps frozen archive bodies outside current-link enforcement", async () => {
+  const root = createFixtureRepo();
+  try {
+    writeFixtureFile(
+      root,
+      "docs/archive/frozen-history.md",
+      "[Retired target](retired-path.md)\n",
+    );
+    runGit(root, ["add", "docs/archive/frozen-history.md"]);
+    runGit(root, ["commit", "-qm", "add frozen history fixture"]);
+
+    const report = await runSourceArchiveReleaseCheck(
+      { mode: "light" },
+      { repoRoot: root },
+    );
+    assert.equal(report.inventory.brokenMarkdownLinks.length, 0);
+  } finally {
+    removeFixtureRepo(root);
+  }
+});
+
 test("export-ignore cannot hide a committed Product Core customer-source boundary violation", async () => {
   const root = createFixtureRepo({ includePrivateSources: true });
   try {

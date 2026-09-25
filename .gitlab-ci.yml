@@ -998,7 +998,7 @@ publish_release:
       docker_config="$(mktemp -d)"
       export DOCKER_CONFIG="$docker_config"
       printf '%s' "$GITHUB_PACKAGES_TOKEN" | docker login ghcr.io --username "$GITHUB_PACKAGES_USER" --password-stdin
-      node scripts/deploy/github-release-publisher.mjs \
+      node scripts/deploy/ghcr-image-publisher.mjs \
         --artifact-dir "$artifact_dir" \
         --strict-terminal "$terminal" \
         --rehearsal-receipt "$artifact_dir/release-rehearsal.json" \

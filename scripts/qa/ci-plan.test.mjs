@@ -58,13 +58,13 @@ test("CI plan treats main full as the complete environment", () => {
   assert(Object.values(plan.flags).every(Boolean));
 });
 
-test("emergency release workflow contract parsing selects Go without forcing full", () => {
+test("GitHub workflow boundary stays focused and does not require Go", () => {
   const plan = buildCIPlan({
     files: [".github/workflows/release.yml"],
     mode: "affected",
     root: ROOT,
   });
-  assert.equal(plan.flags.needsGo, true);
+  assert.equal(plan.flags.needsGo, false);
   assert.equal(plan.flags.full, false);
 });
 

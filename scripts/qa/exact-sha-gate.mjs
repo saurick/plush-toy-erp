@@ -56,10 +56,7 @@ const EXTRA_FINGERPRINT_FILES = Object.freeze([
   "scripts/deploy/gitlab-release-candidate.mjs",
   "scripts/deploy/gitlab-release-candidate.test.mjs",
 ]);
-const WORKFLOW_FINGERPRINT_FILES = Object.freeze([
-  ".gitlab-ci.yml",
-  ".github/workflows/release.yml",
-]);
+const WORKFLOW_FINGERPRINT_FILES = Object.freeze([".gitlab-ci.yml"]);
 const TOOLCHAIN_FINGERPRINT_FILES = Object.freeze([
   ".n-node-version",
   "server/go.mod",

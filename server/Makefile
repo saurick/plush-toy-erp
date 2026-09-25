@@ -455,8 +455,7 @@ image_gc:
 
 .PHONY: build_server push_server
 
-# 本地/开发环境额外打一个固定tag，可以是dev或者latest
-# 部署时就可以一直写 plush-toy-erp-server:dev（或 :latest）
+# 仅供本地/开发环境额外打固定 tag；正式部署必须使用 manifest 固定的不可变镜像，禁止 dev/latest。
 FIXED_TAG ?= dev
 NODE_BUILDER_IMAGE ?= node:24.21.0
 GO_BUILDER_IMAGE ?= golang:1.26.8

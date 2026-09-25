@@ -685,7 +685,7 @@ test("GitLab definitions pin identity, separate SSD data and require exact execu
   );
   assert.match(runnerCloudInit, /\[systemctl, enable, --now, fstrim.timer\]/u);
   assert.match(installer, /preview_only=true/u);
-  assert.match(installer, /EXPECTED_CONTROL_HOSTNAME=r640/u);
+  assert.match(installer, /EXPECTED_CONTROL_HOSTNAME=r740xd/u);
   assert.match(installer, /EXPECTED_GITLAB_HOSTNAME=gitlab[.]saurick[.]me/u);
   assert.match(
     installer,
@@ -696,7 +696,7 @@ test("GitLab definitions pin identity, separate SSD data and require exact execu
   assert.doesNotMatch(installer, /source "\$ENV_FILE"/u);
   assert.doesNotMatch(installer, /docker\s+(?:rm|stop|system prune)|rm\s+-rf/u);
   assert.match(backup, /\/srv\/raid5\/gitlab\/backups/u);
-  assert.match(backup, /EXPECTED_CONTROL_HOSTNAME=r640/u);
+  assert.match(backup, /EXPECTED_CONTROL_HOSTNAME=r740xd/u);
   assert.match(backup, /EXPECTED_GITLAB_HOSTNAME=gitlab[.]saurick[.]me/u);
   assert.match(
     backup,
@@ -831,7 +831,7 @@ test("Runner provisioning and capacity stay explicit and fail closed", () => {
   assert.doesNotMatch(runnerVm, /--slot-safety-max/u);
   assert.match(runnerVm, /SOURCE_CAPACITY_FILE/u);
   assert.equal(runnerCapacityPolicy, "RUNNER_CONCURRENT_SLOTS=19\n");
-  assert.match(runnerVm, /EXPECTED_CONTROL_HOSTNAME=r640/u);
+  assert.match(runnerVm, /EXPECTED_CONTROL_HOSTNAME=r740xd/u);
   assert.match(runnerVm, /PROVISION_PLUSH_RUNNER:\$EXPECTED_CONTROL_HOSTNAME:/u);
   assert.match(runnerVm, /BASE_VOLUME_SHA256/u);
   assert.match(runnerVm, /timeout 600 sha256sum/u);

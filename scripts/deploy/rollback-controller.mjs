@@ -39,10 +39,9 @@ function readReleaseManifest(file) {
       maximumBytes: MAX_MANIFEST_BYTES,
     });
   } catch (error) {
-    throw new Error(
-      "rollback release manifest is not a bounded plain file",
-      { cause: error },
-    );
+    throw new Error("rollback release manifest is not a bounded plain file", {
+      cause: error,
+    });
   }
   return {
     absolute,
@@ -118,6 +117,10 @@ export async function prepareRollback(
   const target = readReleaseManifest(targetReleaseManifestPath);
   const currentManifestSha256 = current.sha256;
   const targetManifestSha256 = target.sha256;
+  const recoveryDrillIdMatch = String(idempotencyKey || "").match(
+    /(?:^|:)([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u,
+  );
+  const recoveryDrillId = recoveryDrillIdMatch?.[1] || null;
   const created = createOrReuseDeliveryOperation(store, {
     action: "rollback",
     target: targetKey,
@@ -127,6 +130,7 @@ export async function prepareRollback(
     retryOfOperationId,
     metadata: {
       source: "version-center",
+      ...(recoveryDrillId ? { recoveryDrillId } : {}),
       currentGitSha: current.manifest.gitSha,
       currentVersion: current.manifest.version,
       currentManifestSha256,
@@ -167,12 +171,11 @@ export async function prepareRollback(
         ) {
           throw new Error("legacy rollback target cache is unavailable");
         }
-        rollbackTargetCacheFingerprint =
-          targetReleaseCacheEvidenceFingerprint({
-            targetKey,
-            identity,
-            probe,
-          });
+        rollbackTargetCacheFingerprint = targetReleaseCacheEvidenceFingerprint({
+          targetKey,
+          identity,
+          probe,
+        });
       } catch {
         targetPreflight = {
           ...targetPreflight,

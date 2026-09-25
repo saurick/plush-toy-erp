@@ -24,6 +24,7 @@ import { prepareRollback, readRollbackPlan } from "./rollback-controller.mjs";
 const FROM_SHA = "a".repeat(40);
 const TO_SHA = "b".repeat(40);
 const HASH = "c".repeat(64);
+const RECOVERY_DRILL_ID = "123e4567-e89b-42d3-a456-426614174009";
 
 function classifyRelation({ currentGitSha, candidateGitSha }) {
   return {
@@ -168,7 +169,7 @@ test("rollback controller awaits preflight and produces one idempotent ready ope
     currentReleaseManifestPath: fixture.currentManifest,
     targetReleaseManifestPath: fixture.targetManifest,
     targetKey: "demo-133",
-    idempotencyKey: "rollback-controller:fixed:0001",
+    idempotencyKey: `rollback-controller:fixed:${RECOVERY_DRILL_ID}`,
     operationStore: fixture.store,
   };
   const first = await prepareRollback(input, {
@@ -183,6 +184,7 @@ test("rollback controller awaits preflight and produces one idempotent ready ope
     },
   });
   assert.equal(first.operation.status, "ready");
+  assert.equal(first.operation.metadata.recoveryDrillId, RECOVERY_DRILL_ID);
   assert.match(
     first.operation.metadata.rollbackTargetCacheFingerprint,
     /^[0-9a-f]{64}$/u,

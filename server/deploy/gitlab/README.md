@@ -2,7 +2,7 @@
 
 本目录定义 GitLab 宿主上的代码与 CI 控制面，但不会被仓库脚本自动执行。当前正式拓扑是：GitLab 为代码真源和 CI/CD 主链，GitHub 为单向只读审查镜像，GHCR 暂时继续保存按 digest 固定的运行镜像。
 
-当前物理宿主型号为 Dell PowerEdge R740xd；操作系统短主机名仍为 `r640`，现有 Runner 注册名仍为 `r640-kvm-isolated-shell`。后两者是需要精确匹配的逻辑外部身份，不再作为硬件型号或用户界面名称使用。
+当前物理宿主型号和操作系统短主机名均为 `r740xd`；安装、Runner provisioning 与备份脚本都以该短主机名作为 fail-closed 身份。历史 Runner 显示名不参与宿主身份判断，也不能拿来恢复旧主机名门禁。
 
 ## 存储与隔离结论
 
@@ -10,7 +10,8 @@
 | --- | --- | --- | --- |
 | GitLab config、PostgreSQL、repositories | GitLab 宿主 SSD：`/srv/gitlab` | 随机 I/O 和数据库延迟敏感 | 由 GitLab backup + config archive 恢复 |
 | CI artifacts、Package Registry | GitLab 宿主 RAID5：`/srv/raid5/gitlab/artifacts`、`/srv/raid5/gitlab/packages` | 大文件容量优先；正式制品通过原 GitLab URL 读取 | 保留正式 Release、源码、演练与门禁证据，纳入 GitLab backup |
-| GitLab 备份生成、临时文件与归档 | GitLab 宿主 RAID5：`/srv/raid5/gitlab/backups/repository` | 直接在 RAID5 生成，避免 SSD 再保留一套全量备份 | config archive 与 checksum 同属 `backups`；仍需异机/离线副本，RAID 不是备份 |
+| GitLab 本地备份生成、临时文件与归档 | GitLab 宿主 RAID5：`/srv/raid5/gitlab/backups/repository` | 直接在 RAID5 生成，避免 SSD 再保留一套全量备份 | config archive、checksum 与状态回执同属 `backups`；只承担快速恢复输入，RAID 不是异机备份 |
+| GitLab 加密异机副本 | 独立设备的精确挂载点：`/mnt/plush-gitlab-offsite/gitlab` | 本地 backup、config 与 checksum 全部经 `age` 加密后再原子登记 | 私钥不放 GitLab 宿主；异机包校验通过仍不替代同版本完整恢复演练 |
 | Runner VM 系统盘与 job cache | GitLab 宿主 SSD 上的独立 KVM qcow2 | 构建 I/O 与 GitLab 数据隔离 | Runner 可重建，不保存业务真源 |
 | 发布镜像 | GHCR digest | 复用现有目标机加载和 release manifest 合同 | 新 GitLab Release 保存 v2 七资产（含同一演练回执）；legacy v1 六资产只读/回滚 |
 
@@ -18,7 +19,7 @@ GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数
 
 ### Storage retention
 
-备份保留 14 天，生成入口用非等待锁串行，先验证真实 RAID5 挂载及容器 backup bind；缺挂载时阻断，不退回 SSD。Compose 不自动创建缺失的冷数据目录。已有安装必须在无活动 CI/backup 的维护窗口先复制并逐文件校验 Package，再切换挂载；读回 GitLab 健康、项目 clone、Package 下载和备份恢复后才能移除旧副本。直接覆盖旧 Compose 前还须保留 live config 与回滚文件。
+备份保留 14 天，生成入口用非等待锁串行，先验证真实 RAID5、容器 backup bind、异机精确挂载、独立文件系统、固定 marker 与唯一 `age` recipient；任一缺失即阻断，不回退到 SSD 或同机 RAID。只有本地归档和四个加密文件全部完成后才原子登记异机目录并写成功状态。Compose 不自动创建缺失的冷数据目录。已有安装必须在无活动 CI/backup 的维护窗口先复制并逐文件校验 Package，再切换挂载；读回 GitLab 健康、项目 clone、Package 下载和备份恢复后才能移除旧副本。直接覆盖旧 Compose 前还须保留 live config 与回滚文件。
 
 正式发布和重复发布的入口都先校验七资产、Release、源码包与演练身份，再通过 GitLab API 退役对应 `candidate.tar` 并读回，最后通过 `gitlab-runner-images.mjs` 移除本次构建在专属 Runner 中的六个镜像别名。清理入口只接受可重建默认主机名 `plush-gitlab-runner` 与当前 ESXi 实例主机名 `plush-gitlab-runner-esxi`，并继续同时校验 CI、项目和 exact SHA。每个别名都核对完整 commit，任何现存容器引用或 tag 身份变化都阻止删除；不使用 force，构建层仍受 Docker GC 管理。缺少任何正式恢复输入、尚未发布或身份不唯一时保留候选；不按文件年龄直接删除 Package 底层目录。
 
@@ -67,8 +68,12 @@ CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1
 - `runner-vm.sh`：唯一 VM provisioning 入口；显式验证 vCPU、内存、磁盘参数形状，不替工作负载猜测固定内存下限，并从唯一容量参数读取初始槽位和安全上限；默认只读预览，失败只回滚本操作创建的 domain/volume。
 - `runner-capacity.env`：唯一受版本控制的当前槽位参数；VM 创建、live helper 和 CI evidence 只从该参数建立一致性证明。
 - `runner-capacity.sh`：VM 内唯一槽位更新 helper；锁定旧值和 idle 状态，原子更新、服务读回并生成脱敏容量回执。
-- `gitlab-backup.sh`：生成 GitLab 应用备份、config archive 和 RAID5 checksum；默认只预览。
-- `gitlab-backup-verify.sh`：只校验归档、checksum 与当前 GitLab 自检，不会覆盖在线实例。
+- `gitlab-backup.sh`：生成 GitLab 应用备份、config archive、本地 checksum、状态回执和加密异机副本；默认只预览，必须显式给出 execute 与精确确认串。
+- `gitlab-backup-verify.sh`：校验本地归档、checksum 与当前 GitLab 自检，不会覆盖在线实例。
+- `gitlab-backup-health.sh`：检查最近成功状态、36 小时新鲜度和对应加密异机包。
+- `gitlab-offsite-backup-verify.sh`：在持有私钥的独立恢复主机解密并校验异机包、归档和身份；不连接或覆盖在线 GitLab。
+- `gitlab-backup-failure-notify.sh`：通过 root-only curl 配置向唯一 HTTPS receiver 发送脱敏失败事件；`--check` 只验证配置，不发送。
+- `systemd/`：版本化每日 timer、备份 service、失败通知 unit 与兼容 drop-in；安装不会由仓库或普通 CI 自动执行。
 
 ## Runner Go 模块网络与完整性
 
@@ -124,7 +129,7 @@ gitlab.saurick.me
    ```bash
    sudo bash server/deploy/gitlab/install-gitlab.sh \
      --execute \
-     --confirm INSTALL_GITLAB:r640:gitlab.saurick.me
+     --confirm INSTALL_GITLAB:r740xd:gitlab.saurick.me
    ```
 
 3. 不把初始 root 密码打印到流水线或聊天；在 GitLab 宿主本机读取容器内固定文件，首次登录后立即修改并启用 MFA。
@@ -150,7 +155,7 @@ gitlab.saurick.me
 - GitHub 禁止直接写 `main`，主分支变化只来自 GitLab push mirror；
 - 本地 remote 固定为 `origin=GitLab`、`github=GitHub`；正式代码只推 GitLab `origin/main`，不从本地直接写 GitHub main，也不创建专用审查分支；
 - GitHub 不配置仓库 CI workflow，main 镜像不重复执行 GitLab 门禁；
-- GitHub `Emergency Immutable Release (GitHub)` 当前在 checkout、登录、构建或上传前固定失败关闭；只有未来完整支持 canonical v2 七资产与同一演练回执后才可另行恢复，且不得与 GitLab release pipeline 同时执行。
+- GitHub 只保留历史 Release 读取；仓库没有 Actions workflow、publisher 或 strict 复用 writer。恢复任何发布写路径都必须重新专项评审 canonical v2 七资产、演练回执、并发 Provider 和凭据边界。
 
 GPT Review 按本次 GitLab push 前后的 base/head SHA 读取 GitHub main 提交差异；审查意见回到当前任务处理，GitHub 不成为字段、发布或部署真源。
 
@@ -158,16 +163,60 @@ GPT Review 按本次 GitLab push 前后的 base/head SHA 读取 GitHub main 提�
 
 Compose 固定 GitLab CE `19.3.2` 的镜像 digest；该版本包含 [GitLab 官方 2026-09-10 安全补丁](https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-3-2-released/)。配置版本不替代目标机运行版本与升级后检查。
 
-每日备份由 root 定时器调用：
+备份启用前必须先准备独立存储和外部通知接收端；没有真实前置时保持现有服务不变，不能填占位值冒充完成：
+
+1. 把异机或独立设备直接挂载到 `.env` 登记的精确目录，确认它与 `/srv/raid5` 的 filesystem device 不同，并在挂载根写入内容严格为 `plush-gitlab-offsite-v1` 的 `.plush-gitlab-offsite-target`。
+2. 在独立恢复主机生成并保管 `age` 私钥；GitLab 宿主只安装 `age` 和单个公钥 recipient 文件 `/etc/plush-gitlab/backup-age-recipient.txt`，文件必须 root 所有且不可被 group/world 写入。
+3. 把 `backup-alert.curl.example` 复制为 `/etc/plush-gitlab/backup-alert.curl`，替换为真实 HTTPS receiver，并保持 `root:root 0600`。认证 header 只放该文件，不进入 unit 参数、仓库或日志。
+4. 先运行只读预检和通知配置检查；两者都通过后，才在独立备份窗口安装脚本和 unit：
+
+   ```bash
+   sudo bash server/deploy/gitlab/gitlab-backup.sh
+   sudo bash server/deploy/gitlab/gitlab-backup-failure-notify.sh \
+     --unit plush-gitlab-backup.service \
+     --config /etc/plush-gitlab/backup-alert.curl \
+     --check
+
+   sudo install -d -o root -g root -m 0700 /etc/plush-gitlab
+   sudo install -d -o root -g root -m 0755 /usr/local/libexec
+   sudo install -o root -g root -m 0600 server/deploy/gitlab/.env /etc/plush-gitlab/gitlab.env
+   sudo install -o root -g root -m 0755 \
+     server/deploy/gitlab/gitlab-backup.sh \
+     server/deploy/gitlab/gitlab-backup-verify.sh \
+     server/deploy/gitlab/gitlab-backup-health.sh \
+     server/deploy/gitlab/gitlab-backup-failure-notify.sh \
+     /usr/local/libexec/
+   sudo install -d -o root -g root -m 0755 \
+     /etc/systemd/system/plush-gitlab-backup.service.d
+   sudo install -o root -g root -m 0644 \
+     server/deploy/gitlab/systemd/plush-gitlab-backup.service \
+     server/deploy/gitlab/systemd/plush-gitlab-backup.timer \
+     server/deploy/gitlab/systemd/plush-gitlab-backup-failure@.service \
+     /etc/systemd/system/
+   sudo install -o root -g root -m 0644 \
+     server/deploy/gitlab/systemd/plush-gitlab-backup.service.d/20-alert.conf \
+     /etc/systemd/system/plush-gitlab-backup.service.d/20-alert.conf
+   sudo systemd-analyze verify \
+     /etc/systemd/system/plush-gitlab-backup.service \
+     /etc/systemd/system/plush-gitlab-backup.timer \
+     /etc/systemd/system/plush-gitlab-backup-failure@.service
+   sudo systemctl daemon-reload
+   ```
+
+首次受控执行会生成本地归档和加密异机包，属于高 I/O 运维动作，必须放在无活动 CI、升级或其他备份的窗口：
 
 ```bash
-sudo bash server/deploy/gitlab/gitlab-backup.sh \
+sudo /usr/local/libexec/plush-gitlab-backup.sh \
+  --env-file /etc/plush-gitlab/gitlab.env \
   --execute \
-  --confirm BACKUP_GITLAB:r640:gitlab.saurick.me
-sudo bash server/deploy/gitlab/gitlab-backup-verify.sh
+  --confirm BACKUP_GITLAB:r740xd:gitlab.saurick.me
+sudo /usr/local/libexec/plush-gitlab-backup-verify.sh \
+  --env-file /etc/plush-gitlab/gitlab.env
+sudo /usr/local/libexec/plush-gitlab-backup-health.sh \
+  --env-file /etc/plush-gitlab/gitlab.env
 ```
 
-每季度把同一 GitLab backup、config archive 和 checksum 放入一次性 VM，按 GitLab 官方同版本恢复流程演练。只有登录、项目 clone、pipeline artifact 和 Release package 都读回后，恢复证据才算完整。在线 `gitlab-backup-verify.sh` 不能替代恢复演练。
+把对应异机目录提供给独立恢复主机后，使用私钥运行 `gitlab-offsite-backup-verify.sh --backup-dir <精确挂载点> --age-identity-file <私钥文件> --report <回执路径>`；报告的边界只是“加密副本和归档完整”。随后仍需每季度把同一 GitLab backup、config archive 和 checksum 放入一次性同版本 VM，按 GitLab 官方恢复流程演练。只有登录、项目 clone、pipeline artifact 和 Release package 都读回后，恢复证据才算完整。在线 health、归档校验或异机解密都不能替代恢复演练。首次手工闭环通过后再执行 `systemctl enable plush-gitlab-backup.timer` 和 `systemctl start plush-gitlab-backup.timer`；`Persistent=true` 可能立即补跑错过的日程，因此启动 timer 也必须位于同一备份窗口。
 
 升级前先固定当前 compose digest、GitLab 版本、最新已验证备份和回滚窗口；按 GitLab 支持的逐版本升级路径修改 digest。不得使用浮动 `latest`，不得在失败时删除 `/srv/gitlab` 或 RAID5 备份。
 
@@ -208,4 +257,4 @@ GitLab、独立 KVM Runner、公网入口、protected main、GitHub 单向 mirro
 | release 身份不一致 | 终止 job，保留 package/release 证据，使用新版本修复 | 覆盖同名 asset/tag 或猜 digest |
 | backup/restore 未通过 | 阻断 GitLab 升级和正式依赖切换 | 把 RAID 健康当恢复证据 |
 
-遇到以下任一条件立即停止：目标身份/挂载漂移、活动 writer/部署、端口重叠、备份不可验证、secret 可能落盘/输出、Runner 需要越过 VM、GitLab/GitHub 同时发布、release SHA 与 main 不一致、目标结果 `not_proven`、或需要数据库/域名破坏性动作但没有独立授权。
+遇到以下任一条件立即停止：目标身份/挂载漂移、活动 writer/部署、端口重叠、备份不可验证、异机副本或告警 receiver 未就绪、secret 可能落盘/输出、Runner 需要越过 VM、出现未评审的 GitHub 发布写路径、release SHA 与 main 不一致、目标结果 `not_proven`、或需要数据库/域名破坏性动作但没有独立授权。

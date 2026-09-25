@@ -1991,6 +1991,22 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
     ),
   );
 
+  for (const key of [
+    "APP_IMAGE",
+    "WEB_IMAGE",
+    "POSTGRES_PASSWORD",
+    "APP_JWT_SECRET",
+  ]) {
+    assert.match(
+      productionCompose,
+      new RegExp(`\\$\\{${key}:\\?${key} is required\\}`, "u"),
+    );
+  }
+  assert.doesNotMatch(
+    productionCompose,
+    /plush-toy-erp-(?:server|web):dev|change-this-prod-(?:postgres-password|jwt-secret)/u,
+  );
+
   assert.match(
     dockerfile,
     /^ARG CHROMIUM_VERSION=\d+\.\d+\.\d+\.\d+-\d+~deb12u\d+$/m,

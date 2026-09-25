@@ -79,6 +79,21 @@ test("customer-config-runtime-manifest: runtime page allowlist follows desktop n
   assert(!RUNTIME_PAGE_KEYS.includes("operations-facts"));
 });
 
+test("customer-config-runtime-manifest: boss and PMC progress visibility includes WIP reading without execution grants", () => {
+  const manifest = buildRuntimeManifest();
+  for (const roleKey of ["boss", "pmc"]) {
+    const actions = manifest.access_entitlements
+      .filter((entry) => entry.role_key === roleKey && entry.enabled)
+      .map((entry) => entry.capability_key);
+    for (const action of ["erp.business_dashboard.read", "sales_order.read", "sales_order_item.read", "pmc.plan.read", "production.wip.read", "workflow.task.read"]) {
+      assert(actions.includes(action), `${roleKey} lacks ${action}`);
+    }
+    for (const action of ["production.wip.execute", "production.wip.rework", "production.fact.post"]) {
+      assert(!actions.includes(action), `${roleKey} must not gain ${action}`);
+    }
+  }
+});
+
 test("customer-config-runtime-manifest: warehouse maintenance stays with the warehouse role", () => {
   const manifest = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
   const maintenanceRoles = manifest.access_entitlements

@@ -39,6 +39,8 @@ import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
 function readPlainJson(file, maximumBytes = MAX_MANIFEST_BYTES) {
   const absolute = realpathSync(file);
@@ -89,6 +91,7 @@ export async function preparePromotion(
     idempotencyKey,
     operationStore,
     retryOfOperationId = null,
+    recoveryLineage = null,
   },
   {
     runPreflight = runTargetPreflight,
@@ -117,6 +120,17 @@ export async function preparePromotion(
     customer: "yoyoosun",
   });
   const rehearsalReceiptSha256 = sha256File(rehearsalInput.absolute);
+  if (
+    recoveryLineage !== null &&
+    (!recoveryLineage ||
+      !UUID_V4_PATTERN.test(String(recoveryLineage.drillId || "")) ||
+      !UUID_V4_PATTERN.test(
+        String(recoveryLineage.rollbackOperationId || ""),
+      ) ||
+      !SHA_PATTERN.test(String(recoveryLineage.rollbackGitSha || "")))
+  ) {
+    throw new Error("promotion recovery lineage is invalid");
+  }
   validateReleaseArtifactBinding(
     releaseManifest,
     artifact,
@@ -139,6 +153,13 @@ export async function preparePromotion(
       releaseManifestSha256,
       rehearsalReceiptSha256,
       source: "version-center",
+      ...(recoveryLineage
+        ? {
+            recoveryDrillId: recoveryLineage.drillId,
+            recoveryRollbackOperationId: recoveryLineage.rollbackOperationId,
+            recoveryRollbackGitSha: recoveryLineage.rollbackGitSha,
+          }
+        : {}),
     },
     now: now(),
   });

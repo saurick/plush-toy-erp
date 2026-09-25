@@ -6,9 +6,9 @@ import test from "node:test";
 import {
   assertLoadedImage,
   parseDockerPushDigest,
-} from "./github-release-publisher.mjs";
+} from "./ghcr-image-publisher.mjs";
 
-test("GitHub publisher extracts one immutable digest from docker push", () => {
+test("GHCR publisher extracts one immutable digest from docker push", () => {
   assert.equal(
     parseDockerPushDigest(
       `layer: pushed
@@ -27,7 +27,7 @@ digest: sha256:${"b".repeat(64)}
   );
 });
 
-test("GitHub publisher rejects missing or conflicting push digests", () => {
+test("GHCR publisher rejects missing or conflicting push digests", () => {
   assert.throws(() => parseDockerPushDigest("pushed"), /one immutable digest/u);
   assert.throws(
     () =>
@@ -40,7 +40,7 @@ digest: sha256:${"b".repeat(64)}
   );
 });
 
-test("GitHub publisher accepts the same archive manifest identity on a containerd image store", () => {
+test("GHCR publisher accepts the same archive manifest identity on a containerd image store", () => {
   const gitSha = "a".repeat(40);
   const releaseVersion = "2026.08.31-2";
   const manifestDigest = `sha256:${"b".repeat(64)}`;
@@ -68,7 +68,7 @@ test("GitHub publisher accepts the same archive manifest identity on a container
 
 test("publisher validates the fixed rehearsal receipt before image publication", () => {
   const source = readFileSync(
-    path.join(import.meta.dirname, "github-release-publisher.mjs"),
+    path.join(import.meta.dirname, "ghcr-image-publisher.mjs"),
     "utf8",
   );
   const receiptValidation = source.indexOf("validateReleaseRehearsalReceipt(");

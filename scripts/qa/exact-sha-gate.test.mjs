@@ -81,7 +81,6 @@ function createFixture() {
   const files = new Set([
     ...PROFILE_REQUIRED_FILES.strict,
     ".gitlab-ci.yml",
-    ".github/workflows/release.yml",
     ".n-node-version",
     "server/go.mod",
     "server/go.sum",

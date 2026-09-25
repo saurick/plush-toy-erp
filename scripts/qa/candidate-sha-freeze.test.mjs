@@ -83,7 +83,7 @@ test("candidate freeze runs one fixed contract matrix and one desktop workbench 
   ]);
   assert.equal(
     CANDIDATE_SHA_FREEZE_TESTS.includes(
-      "scripts/deploy/github-strict-terminal-reuse.test.mjs",
+      "scripts/qa/github-write-boundary.test.mjs",
     ),
     true,
   );

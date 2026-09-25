@@ -15,7 +15,7 @@ DISK_VOLUME=plush-gitlab-runner.qcow2
 SEED_VOLUME=plush-gitlab-runner-seed.iso
 LOCK_DIR=/run/plush-runner-vm
 LOCK_FILE=/run/plush-runner-vm/provision.lock
-EXPECTED_CONTROL_HOSTNAME=r640
+EXPECTED_CONTROL_HOSTNAME=r740xd
 
 MODE=preview
 VCPUS=

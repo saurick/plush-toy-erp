@@ -161,7 +161,7 @@ function publishImage({
   return { kind: source.kind, repository, digest, reused: false };
 }
 
-export function publishGitHubReleaseArtifact(
+export function publishGhcrReleaseImages(
   {
     artifactDir,
     strictTerminalPath,
@@ -173,7 +173,7 @@ export function publishGitHubReleaseArtifact(
   { root = process.cwd(), run = runCommand } = {},
 ) {
   if (!REPOSITORY_PATTERN.test(String(repository || ""))) {
-    throw new Error("GitHub repository must be owner/name");
+    throw new Error("GHCR repository must be owner/name");
   }
   const normalizedRepository = repository.toLowerCase();
   const resolvedArtifactDir = path.resolve(root, artifactDir);
@@ -293,7 +293,7 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log(`Usage:
-  node scripts/deploy/github-release-publisher.mjs \\
+  node scripts/deploy/ghcr-image-publisher.mjs \\
     --artifact-dir output/releases/<sha> \\
     --strict-terminal output/qa/exact-sha/<sha>/<fingerprint>.json \\
     --rehearsal-receipt output/releases/<sha>/release-rehearsal.json \\
@@ -319,7 +319,7 @@ function main() {
   ]) {
     if (!options[field]) throw new Error(`${field} is required`);
   }
-  const result = publishGitHubReleaseArtifact(options);
+  const result = publishGhcrReleaseImages(options);
   console.log(
     options.json
       ? JSON.stringify(
@@ -333,7 +333,7 @@ function main() {
           null,
           2,
         )
-      : `[github-release-publisher] status=passed version=${result.manifest.version} sha=${result.manifest.gitSha} manifest=${path.relative(process.cwd(), result.outputPath)}`,
+      : `[ghcr-image-publisher] status=passed version=${result.manifest.version} sha=${result.manifest.gitSha} manifest=${path.relative(process.cwd(), result.outputPath)}`,
   );
 }
 
@@ -346,7 +346,7 @@ if (isDirectRun) {
     main();
   } catch (error) {
     console.error(
-      `[github-release-publisher] status=blocked reason=${error.message}`,
+      `[ghcr-image-publisher] status=blocked reason=${error.message}`,
     );
     process.exitCode = 2;
   }

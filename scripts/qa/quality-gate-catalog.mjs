@@ -31,7 +31,6 @@ export const QUALITY_GATE_CATALOG = Object.freeze([
     sources: Object.freeze([
       "scripts/qa/strict.sh",
       ".gitlab-ci.yml",
-      ".github/workflows/release.yml",
       "scripts/qa/run-gate-with-receipt.mjs",
     ]),
     evidence: "dev-workbench-receipt/v1",
@@ -121,7 +120,6 @@ export const QUALITY_GATE_CATALOG = Object.freeze([
     profiles: Object.freeze(["strict"]),
     sources: Object.freeze([
       ".gitlab-ci.yml",
-      ".github/workflows/release.yml",
       "scripts/deploy/source-archive-release-check.mjs",
     ]),
     evidence: "Exact-SHA strict terminal and immutable release evidence",

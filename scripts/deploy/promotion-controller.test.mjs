@@ -300,6 +300,42 @@ test("promotion preparation awaits one read-only preflight and becomes ready", a
   );
 });
 
+test("promotion preparation persists an explicit rollback-forward recovery lineage", async (t) => {
+  const data = fixture(t);
+  const recoveryLineage = {
+    drillId: "123e4567-e89b-42d3-a456-426614174009",
+    rollbackOperationId: "223e4567-e89b-42d3-a456-426614174009",
+    rollbackGitSha: CURRENT_SHA,
+  };
+  const report = await preparePromotion(
+    {
+      repoRoot: data.root,
+      releaseManifestPath: data.releaseManifestPath,
+      targetKey: "demo-133",
+      idempotencyKey: `${IDEMPOTENCY_KEY}:recovery-lineage`,
+      operationStore: data.store,
+      recoveryLineage,
+    },
+    {
+      classifyRelation,
+      runPreflight: () => targetPreflight(false),
+    },
+  );
+
+  assert.equal(
+    report.operation.metadata.recoveryDrillId,
+    recoveryLineage.drillId,
+  );
+  assert.equal(
+    report.operation.metadata.recoveryRollbackOperationId,
+    recoveryLineage.rollbackOperationId,
+  );
+  assert.equal(
+    report.operation.metadata.recoveryRollbackGitSha,
+    recoveryLineage.rollbackGitSha,
+  );
+});
+
 test("final eligibility qualification completes before ready is persisted", async (t) => {
   const data = fixture(t);
   let observedStatus = "";

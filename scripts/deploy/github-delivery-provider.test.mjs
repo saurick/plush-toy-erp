@@ -311,7 +311,7 @@ test("GitHub provider returns bounded run, job and step timings", async () => {
   assert.match(String(calls[1].at(-1)), /runs\/321\/attempts\/2\/jobs/u);
 });
 
-test("GitHub provider fails closed before emergency workflow dispatch", async () => {
+test("GitHub provider rejects publication at the read-only provider boundary", async () => {
   let invocation;
   const provider = createGithubDeliveryProvider({
     projectRoot: process.cwd(),
@@ -327,7 +327,7 @@ test("GitHub provider fails closed before emergency workflow dispatch", async ()
       customer: "yoyoosun",
       versionReference: "2026-07-29T01:00:00.000Z",
     }),
-    /disabled before workflow dispatch/u,
+    /read-only provider boundary/u,
   );
   assert.equal(invocation, undefined);
   await assert.rejects(

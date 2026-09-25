@@ -22,13 +22,9 @@ export function buildCIPlan({ files, mode, root = process.cwd() }) {
   const full = mode === "full" || affected.localGate === "full";
   const changedWeb = affected.changedFiles.some((file) => file.startsWith("web/"));
   const changedServer = affected.changedFiles.some((file) => file.startsWith("server/"));
-  const workflowContractNeedsGo = commandTexts.some((value) =>
-    /(?:ci|release)-workflow\.test\.mjs/u.test(value),
-  );
   const needsGo =
     full ||
     changedServer ||
-    workflowContractNeedsGo ||
     affected.commands.some((command) => ["go", "make"].includes(command.bin));
   const needsWeb =
     full ||
