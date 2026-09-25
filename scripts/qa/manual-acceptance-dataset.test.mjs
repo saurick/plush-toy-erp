@@ -976,7 +976,7 @@ test("semantic digest is stable across targets and clocks and legacy versions fa
 test("semantic plan locks the nine narrow stage contracts", () => {
   const plan = buildManualAcceptanceSemanticPlan();
   assert.equal(plan.businessChain.chainCount, 11);
-  assert.equal(plan.businessChain.stepCount, 67);
+  assert.equal(plan.businessChain.stepCount, 62);
   assert.equal(plan.businessChain.scenarioCount, 66);
   assert.match(plan.businessChain.chainDataDigest, /^[0-9a-f]{64}$/u);
   assert.deepEqual(plan.stageOrder, [...MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS]);
