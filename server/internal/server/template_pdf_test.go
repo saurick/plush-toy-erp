@@ -490,7 +490,7 @@ func TestResolveTemplatePDFChromeExecPathUsesNativeCandidates(t *testing.T) {
 
 func TestResolveTemplatePDFPlaywrightChromeExecPath(t *testing.T) {
 	tempHome := t.TempDir()
-	chromePath := filepath.Join(tempHome, ".cache", "ms-playwright", "chromium-1208", "chrome-linux64", "chrome")
+	chromePath := filepath.Join(tempHome, ".cache", "ms-playwright", "chromium-1243", "chrome-linux64", "chrome")
 	if err := os.MkdirAll(filepath.Dir(chromePath), 0755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}

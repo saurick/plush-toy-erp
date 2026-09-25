@@ -26,14 +26,14 @@ import { pathToFileURL } from "node:url";
 export const CI_PLAYWRIGHT_RUNTIME_SCHEMA = "plush.ci-playwright-runtime/v1";
 const EXPECTED_PROJECT = "saurick/plush-toy-erp";
 const EXPECTED_API_URL = "https://gitlab.saurick.me/api/v4";
-const PLAYWRIGHT_VERSION = "1.58.2";
-const CHROMIUM_VERSION = "145.0.7632.6";
-const CHROMIUM_REVISION = "1208";
+const PLAYWRIGHT_VERSION = "1.63.0";
+const CHROMIUM_VERSION = "153.0.8010.12";
+const CHROMIUM_REVISION = "1243";
 const FFMPEG_REVISION = "1011";
 export const CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256 =
-  "206aa30eeb399b1d10fdf345106b315be01deded548243eb7263c8af2773ab88";
+  "c100b678a8c171ad0733e51b6f18d98d936d38ab945681c41da00f2ee22e7571";
 const PACKAGE_NAME = "plush-ci-playwright-runtime";
-const PACKAGE_VERSION = "playwright-1.58.2-linux-x64-r1208-v1";
+const PACKAGE_VERSION = "playwright-1.63.0-linux-x64-r1243-v1";
 const PACKAGE_FILE = "runtime.tar";
 const PACKAGE_TIMEOUT_MS = 10 * 60 * 1_000;
 export const CI_PLAYWRIGHT_RUNTIME_LOCAL_SEED_DIRECTORY =
@@ -44,20 +44,20 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 export const CI_PLAYWRIGHT_RUNTIME_ASSETS = Object.freeze([
   Object.freeze({
     name: "chrome-linux64.zip",
-    size: 175_440_843,
-    sha256: "b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38",
-    url: "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/145.0.7632.6/linux64/chrome-linux64.zip",
-    directory: "chromium-1208",
+    size: 195_836_009,
+    sha256: "8aac35011c18f6e2d10696154af89a5728ac2ddd6dc6fad24ffdf243c3fcfd5a",
+    url: "https://cdn.playwright.dev/builds/cft/153.0.8010.12/linux64/chrome-linux64.zip",
+    directory: "chromium-1243",
     executable: path.join("chrome-linux64", "chrome"),
     sandbox: path.join("chrome-linux64", "chrome_sandbox"),
     sandboxSha256: CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256,
   }),
   Object.freeze({
     name: "chrome-headless-shell-linux64.zip",
-    size: 116_288_461,
-    sha256: "2536e97d8f410df0394b3e7c4252e88ce9f239f04f3af4e247a26caf45baf49e",
-    url: "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/145.0.7632.6/linux64/chrome-headless-shell-linux64.zip",
-    directory: "chromium_headless_shell-1208",
+    size: 119_809_080,
+    sha256: "a9da028861a0cf789ff25c2fed45f5f1aaf969ed9247835b6a7821a4f7af9d1d",
+    url: "https://cdn.playwright.dev/builds/cft/153.0.8010.12/linux64/chrome-headless-shell-linux64.zip",
+    directory: "chromium_headless_shell-1243",
     executable: path.join(
       "chrome-headless-shell-linux64",
       "chrome-headless-shell",

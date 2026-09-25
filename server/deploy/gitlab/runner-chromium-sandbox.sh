@@ -3,7 +3,7 @@ set -Eeuo pipefail
 umask 077
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-EXPECTED_SANDBOX_SHA256=206aa30eeb399b1d10fdf345106b315be01deded548243eb7263c8af2773ab88
+EXPECTED_SANDBOX_SHA256=c100b678a8c171ad0733e51b6f18d98d936d38ab945681c41da00f2ee22e7571
 LOCK_DIR=/run/plush-runner-chromium-sandbox
 LOCK_FILE="$LOCK_DIR/operation.lock"
 
@@ -45,7 +45,7 @@ install)
   [[ -f "$SOURCE" && ! -L "$SOURCE" ]]
   [[ "$(realpath -e -- "$SOURCE")" == "$SOURCE" ]]
   case "$SOURCE" in
-  /home/gitlab-runner/builds/*/saurick/plush-toy-erp/output/runtime/gitlab/playwright-"$JOB_ID"/chromium-1208/chrome-linux64/chrome_sandbox) ;;
+  /home/gitlab-runner/builds/*/saurick/plush-toy-erp/output/runtime/gitlab/playwright-"$JOB_ID"/chromium-1243/chrome-linux64/chrome_sandbox) ;;
   *) exit 42 ;;
   esac
   [[ "$(stat -c '%U:%G:%h' "$SOURCE")" == gitlab-runner:gitlab-runner:1 ]]

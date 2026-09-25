@@ -20,6 +20,9 @@ const source = readFileSync(
   new URL("./ci-playwright-runtime.mjs", import.meta.url),
   "utf8",
 );
+const webPackage = JSON.parse(
+  readFileSync(new URL("../../web/package.json", import.meta.url), "utf8"),
+);
 
 const protectedPrepareEnv = Object.freeze({
   GITLAB_CI: "true",
@@ -50,20 +53,20 @@ test("Playwright runtime pins one exact Linux archive set", () => {
       packageFile: CI_PLAYWRIGHT_RUNTIME.packageFile,
     },
     {
-      playwrightVersion: "1.58.2",
-      chromiumVersion: "145.0.7632.6",
-      chromiumRevision: "1208",
+      playwrightVersion: "1.63.0",
+      chromiumVersion: "153.0.8010.12",
+      chromiumRevision: "1243",
       ffmpegRevision: "1011",
       platform: "ubuntu24.04-x64",
       packageName: "plush-ci-playwright-runtime",
-      packageVersion: "playwright-1.58.2-linux-x64-r1208-v1",
+      packageVersion: "playwright-1.63.0-linux-x64-r1243-v1",
       packageFile: "runtime.tar",
     },
   );
   assert.match(CI_PLAYWRIGHT_RUNTIME.archiveSetSha256, /^[0-9a-f]{64}$/u);
   assert.equal(
     CI_PLAYWRIGHT_CHROMIUM_SANDBOX_SHA256,
-    "206aa30eeb399b1d10fdf345106b315be01deded548243eb7263c8af2773ab88",
+    "c100b678a8c171ad0733e51b6f18d98d936d38ab945681c41da00f2ee22e7571",
   );
   assert.equal(
     CI_PLAYWRIGHT_RUNTIME_ASSETS[0].sandboxSha256,
@@ -79,17 +82,17 @@ test("Playwright runtime pins one exact Linux archive set", () => {
     [
       {
         name: "chrome-linux64.zip",
-        size: 175_440_843,
+        size: 195_836_009,
         sha256:
-          "b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38",
-        url: "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/145.0.7632.6/linux64/chrome-linux64.zip",
+          "8aac35011c18f6e2d10696154af89a5728ac2ddd6dc6fad24ffdf243c3fcfd5a",
+        url: "https://cdn.playwright.dev/builds/cft/153.0.8010.12/linux64/chrome-linux64.zip",
       },
       {
         name: "chrome-headless-shell-linux64.zip",
-        size: 116_288_461,
+        size: 119_809_080,
         sha256:
-          "2536e97d8f410df0394b3e7c4252e88ce9f239f04f3af4e247a26caf45baf49e",
-        url: "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/145.0.7632.6/linux64/chrome-headless-shell-linux64.zip",
+          "a9da028861a0cf789ff25c2fed45f5f1aaf969ed9247835b6a7821a4f7af9d1d",
+        url: "https://cdn.playwright.dev/builds/cft/153.0.8010.12/linux64/chrome-headless-shell-linux64.zip",
       },
       {
         name: "ffmpeg-linux.zip",
@@ -119,37 +122,44 @@ test("Playwright runtime pins one exact Linux archive set", () => {
   }
 });
 
+test("tracked Playwright dependency matches the controlled runtime", () => {
+  assert.equal(
+    webPackage.devDependencies?.playwright,
+    `^${CI_PLAYWRIGHT_RUNTIME.playwrightVersion}`,
+  );
+});
+
 test("installed Playwright metadata must match the pinned runtime", () => {
   const browsers = [
     {
       name: "chromium",
-      revision: "1208",
-      browserVersion: "145.0.7632.6",
+      revision: "1243",
+      browserVersion: "153.0.8010.12",
       installByDefault: true,
     },
     {
       name: "chromium-headless-shell",
-      revision: "1208",
-      browserVersion: "145.0.7632.6",
+      revision: "1243",
+      browserVersion: "153.0.8010.12",
       installByDefault: true,
     },
     { name: "ffmpeg", revision: "1011", installByDefault: true },
   ];
   assert.equal(
-    assertPinnedPlaywrightMetadata({ version: "1.58.2", browsers }),
+    assertPinnedPlaywrightMetadata({ version: "1.63.0", browsers }),
     true,
   );
   assert.throws(
-    () => assertPinnedPlaywrightMetadata({ version: "1.58.1", browsers }),
+    () => assertPinnedPlaywrightMetadata({ version: "1.62.0", browsers }),
     /pinned runtime/u,
   );
   assert.throws(
     () =>
       assertPinnedPlaywrightMetadata({
-        version: "1.58.2",
+        version: "1.63.0",
         browsers: browsers.map((browser) =>
           browser.name === "chromium-headless-shell"
-            ? { ...browser, revision: "1207" }
+            ? { ...browser, revision: "1242" }
             : browser,
         ),
       }),
@@ -174,7 +184,7 @@ test("only the protected main push prepare job may seed an absent package", () =
   }
   assert.equal(
     runtimePackageUrl(protectedPrepareEnv),
-    "https://gitlab.saurick.me/api/v4/projects/2/packages/generic/plush-ci-playwright-runtime/playwright-1.58.2-linux-x64-r1208-v1/runtime.tar",
+    "https://gitlab.saurick.me/api/v4/projects/2/packages/generic/plush-ci-playwright-runtime/playwright-1.63.0-linux-x64-r1243-v1/runtime.tar",
   );
   assert.throws(
     () =>
@@ -226,7 +236,7 @@ test("package absence only consumes one exact Runner-local cold seed", () => {
   );
   assert.equal(
     CI_PLAYWRIGHT_RUNTIME_LOCAL_SEED_DIRECTORY,
-    "/home/gitlab-runner/.plush-ci-playwright-runtime-seed-playwright-1.58.2-linux-x64-r1208-v1",
+    "/home/gitlab-runner/.plush-ci-playwright-runtime-seed-playwright-1.63.0-linux-x64-r1243-v1",
   );
   assert.match(
     source,
