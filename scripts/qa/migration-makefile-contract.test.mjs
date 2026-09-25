@@ -107,13 +107,13 @@ test("migration makefile separates interactive run from explicit non-interactive
 
 test("migration generation pins Atlas and closes checksum/revision escape hatches", async () => {
   const source = await readFile(makefileURL, "utf8");
-  assert.match(source, /ATLAS_VERSION \?= v1\.2\.0/u);
+  assert.match(source, /ATLAS_VERSION \?= v1\.3\.0/u);
   assert.match(source, /atlas_check:/u);
   assert.match(source, /Atlas 版本必须是 \$\(ATLAS_VERSION\)/u);
   assert.match(source, /ent_migrate: atlas_check/u);
   assert.match(
     source,
-    /--dev-url "docker:\/\/postgres\/18\.1\/dev\?search_path=public"/u,
+    /--dev-url "docker:\/\/postgres\/18\.6\/dev\?search_path=public"/u,
   );
   assert.doesNotMatch(
     source,
