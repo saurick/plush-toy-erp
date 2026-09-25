@@ -644,8 +644,8 @@ function validateCustomerConfigReleaseOverlay() {
     "web/vite.shared.mjs must not statically load DEV-only plugin modules during production builds",
   );
   assert(
-    viteSharedSource.includes(
-      "const DEV_WORKBENCH_PLUGIN_MODULE = './dev-server/devWorkbenchPlugins.mjs'",
+    /const DEV_WORKBENCH_PLUGIN_MODULE = new URL\(\s*'\.\/dev-server\/devWorkbenchPlugins\.mjs',\s*import\.meta\.url\s*\)\.href/u.test(
+      viteSharedSource,
     ),
     "web/vite.shared.mjs must bind the DEV-only plugin module to a fixed local path",
   );
