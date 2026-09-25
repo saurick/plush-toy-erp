@@ -103,10 +103,8 @@ services:
     stop_grace_period: 30s
     logging: *default-logging
     ports:
-      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_5775_PORT:-15775}:5775/udp"
       - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_6831_PORT:-16831}:6831/udp"
       - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_6832_PORT:-16832}:6832/udp"
-      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_5778_PORT:-15778}:5778"
       - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_UI_PORT:-16687}:16686"
       - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_14268_PORT:-24268}:14268"
       - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_14250_PORT:-24250}:14250"

@@ -23,6 +23,8 @@
 
 两个环境部署同一不可变 release digest，但数据库、上传、Compose project、端口、runtime env、数据目录、migration 锁、备份、回滚点、operation 与 smoke 必须完全独立。demo 造数不能进入 test；test 的普通 promotion 不执行 rebuild 或 seed，保留全部既有数据；显式重建或清理不能影响 demo。
 
+Jaeger 只发布 `jaeger-v2.yml` 实际启用的 OTLP、Jaeger、Zipkin 与查询 UI 端口，不保留 v1 的 `5775` agent 端口，也不发布当前未配置 remote-sampling extension 的 `5778`。发布、回滚和首次初始化在私有 `umask` 解包后仅把该配置文件归一化为容器只读的 `0444`；其余 release 文件继续保持私有权限。
+
 `customer-trial-133` 仍是 demo 内部模拟数据合同的 target key，不是第三个部署环境。它只能在 `demo-133` 的受控数据准备链中使用。
 
 ## 快速开始（仅本地或新建隔离环境）

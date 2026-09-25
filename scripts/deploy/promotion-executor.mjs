@@ -90,6 +90,7 @@ const PROMOTION_STAGE_IDS = Object.freeze([
   "capacity_recheck",
   "release_materialization",
   "image_load_and_readback",
+  "runtime_dependency_preflight",
   "fresh_backup_and_restore_check",
   "env_and_static_preflight",
   "maintenance_window",

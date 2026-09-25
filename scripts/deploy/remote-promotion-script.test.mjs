@@ -195,20 +195,27 @@ test("remote promotion removes the complete incoming control and payload invento
   assert.match(cleanup, /rmdir "\$incoming"/u);
 });
 
-test("remote promotion restores only the trusted database role script mode after safe extraction", () => {
+test("remote promotion restores only trusted runtime file modes after safe extraction", () => {
   const extractIndex = source.indexOf("tar --extract");
   const ownershipGateIndex = source.indexOf('"$owner_uid" == "$(id -u)"');
-  const chmodIndex = source.indexOf('chmod 755 "$database_roles_script"');
+  const rolesChmodIndex = source.indexOf('chmod 755 "$database_roles_script"');
+  const jaegerChmodIndex = source.indexOf('chmod 444 "$jaeger_config"');
   const retainIndex = source.indexOf(
     'mv "$release_materializing" "$release_dir"',
   );
   assert.ok(extractIndex >= 0 && extractIndex < ownershipGateIndex);
-  assert.ok(ownershipGateIndex < chmodIndex && chmodIndex < retainIndex);
+  assert.ok(
+    ownershipGateIndex < rolesChmodIndex &&
+      rolesChmodIndex < jaegerChmodIndex &&
+      jaegerChmodIndex < retainIndex,
+  );
   assert.match(source, /--no-same-owner --no-same-permissions/u);
   assert.match(
     source,
     /-f "\$database_roles_script" && ! -L "\$database_roles_script"/u,
   );
+  assert.match(source, /-f "\$jaeger_config" && ! -L "\$jaeger_config"/u);
+  assert.match(source, /Jaeger v2 configuration is invalid/u);
   assert.match(source, /"\$owner_uid" == "\$\(id -u\)"/u);
   assert.doesNotMatch(source, /chmod -R|chmod 755 "\$release_materializing"/u);
 });

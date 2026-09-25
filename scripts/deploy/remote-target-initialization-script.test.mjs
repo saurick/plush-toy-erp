@@ -107,15 +107,21 @@ test("target initializer keeps bootstrap secrets transient and rollback owner-bo
   assert.doesNotMatch(passed, /cleanup_exact_target|write_receipt_json (?:failed|not_proven)/u);
 });
 
-test("target initializer restores the container-readable database role script mode", () => {
+test("target initializer restores container-readable runtime file modes", () => {
   const extractIndex = source.indexOf("tar --extract");
-  const chmodIndex = source.indexOf('chmod 755 "$database_roles_script"');
+  const rolesChmodIndex = source.indexOf('chmod 755 "$database_roles_script"');
+  const jaegerChmodIndex = source.indexOf('chmod 444 "$jaeger_config"');
   const composeStartIndex = source.indexOf("stage=database_start");
-  assert.ok(extractIndex >= 0 && extractIndex < chmodIndex);
-  assert.ok(chmodIndex < composeStartIndex);
+  assert.ok(extractIndex >= 0 && extractIndex < rolesChmodIndex);
+  assert.ok(rolesChmodIndex < jaegerChmodIndex);
+  assert.ok(jaegerChmodIndex < composeStartIndex);
   assert.match(
     source,
     /plain_owned_file "\$database_roles_script" \|\| fail "database role initializer is invalid"/u,
+  );
+  assert.match(
+    source,
+    /plain_owned_file "\$jaeger_config" \|\| fail "Jaeger v2 configuration is invalid"/u,
   );
 });
 

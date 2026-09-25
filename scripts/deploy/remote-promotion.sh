@@ -931,11 +931,17 @@ else
   tar --extract --file "$incoming/source.tar" \
     --directory "$release_materializing" --no-same-owner --no-same-permissions
   database_roles_script=$release_materializing/server/deploy/compose/prod/database_roles.sh
+  jaeger_config=$release_materializing/server/deploy/compose/prod/jaeger-v2.yml
   owner_uid="$(stat -c '%u' "$database_roles_script" 2>/dev/null || true)"
   [[ -f "$database_roles_script" && ! -L "$database_roles_script" &&
     "$owner_uid" == "$(id -u)" ]] ||
     fail "database role initializer is invalid"
+  owner_uid="$(stat -c '%u' "$jaeger_config" 2>/dev/null || true)"
+  [[ -f "$jaeger_config" && ! -L "$jaeger_config" &&
+    "$owner_uid" == "$(id -u)" ]] ||
+    fail "Jaeger v2 configuration is invalid"
   chmod 755 "$database_roles_script"
+  chmod 444 "$jaeger_config"
   jq -n \
     --arg schemaVersion "plush.target-release-identity/v1" \
     --arg gitSha "$release_sha" \

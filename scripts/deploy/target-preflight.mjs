@@ -102,10 +102,8 @@ app_port=__APP_PORT__
 web_bind=__WEB_BIND__
 web_port=__WEB_PORT__
 jaeger_bind=__JAEGER_BIND__
-jaeger_5775_port=__JAEGER_5775_PORT__
 jaeger_6831_port=__JAEGER_6831_PORT__
 jaeger_6832_port=__JAEGER_6832_PORT__
-jaeger_5778_port=__JAEGER_5778_PORT__
 jaeger_ui_port=__JAEGER_UI_PORT__
 jaeger_14268_port=__JAEGER_14268_PORT__
 jaeger_14250_port=__JAEGER_14250_PORT__
@@ -290,10 +288,8 @@ if plain_file "$runtime_env"; then
   [[ "$(env_value WEB_DESKTOP_BIND_ADDR)" == "$web_bind" ]] || resource_identity_mismatch=1
   [[ "$(env_value WEB_DESKTOP_PORT)" == "$web_port" ]] || resource_identity_mismatch=1
   [[ "$(env_value JAEGER_BIND_ADDR)" == "$jaeger_bind" ]] || resource_identity_mismatch=1
-  [[ "$(env_value JAEGER_5775_PORT)" == "$jaeger_5775_port" ]] || resource_identity_mismatch=1
   [[ "$(env_value JAEGER_6831_PORT)" == "$jaeger_6831_port" ]] || resource_identity_mismatch=1
   [[ "$(env_value JAEGER_6832_PORT)" == "$jaeger_6832_port" ]] || resource_identity_mismatch=1
-  [[ "$(env_value JAEGER_5778_PORT)" == "$jaeger_5778_port" ]] || resource_identity_mismatch=1
   [[ "$(env_value JAEGER_UI_PORT)" == "$jaeger_ui_port" ]] || resource_identity_mismatch=1
   [[ "$(env_value JAEGER_14268_PORT)" == "$jaeger_14268_port" ]] || resource_identity_mismatch=1
   [[ "$(env_value JAEGER_14250_PORT)" == "$jaeger_14250_port" ]] || resource_identity_mismatch=1
@@ -699,10 +695,8 @@ export function buildRemoteTargetPreflightScript(target) {
     __WEB_BIND__: target.runtime.web.bindAddress,
     __WEB_PORT__: target.runtime.web.hostPort,
     __JAEGER_BIND__: target.runtime.jaeger.bindAddress,
-    __JAEGER_5775_PORT__: target.runtime.jaeger.ports.agentCompact,
     __JAEGER_6831_PORT__: target.runtime.jaeger.ports.agentThriftCompact,
     __JAEGER_6832_PORT__: target.runtime.jaeger.ports.agentThriftBinary,
-    __JAEGER_5778_PORT__: target.runtime.jaeger.ports.config,
     __JAEGER_UI_PORT__: target.runtime.jaeger.ports.ui,
     __JAEGER_14268_PORT__: target.runtime.jaeger.ports.collectorHttp,
     __JAEGER_14250_PORT__: target.runtime.jaeger.ports.collectorGrpc,

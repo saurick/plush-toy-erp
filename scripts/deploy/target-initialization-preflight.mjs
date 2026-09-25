@@ -180,14 +180,13 @@ function targetPorts(target) {
     ...Object.entries(target.runtime.jaeger.ports)
       .filter(
         ([key]) =>
-          !["agentCompact", "agentThriftCompact", "agentThriftBinary"].includes(
+          !["agentThriftCompact", "agentThriftBinary"].includes(
             key,
           ),
       )
       .map(([, port]) => port),
   ];
   const udp = [
-    target.runtime.jaeger.ports.agentCompact,
     target.runtime.jaeger.ports.agentThriftCompact,
     target.runtime.jaeger.ports.agentThriftBinary,
   ];

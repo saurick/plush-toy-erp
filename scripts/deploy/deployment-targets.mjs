@@ -23,12 +23,10 @@ const SAFE_RELATIVE_PATH_PATTERN =
 const DATABASE_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/u;
 const LOOPBACK_ADDRESS = "127.0.0.1";
 const JAEGER_PORT_KEYS = Object.freeze([
-  "agentCompact",
   "agentThriftBinary",
   "agentThriftCompact",
   "collectorGrpc",
   "collectorHttp",
-  "config",
   "otlpGrpc",
   "otlpHttp",
   "ui",
@@ -51,10 +49,8 @@ const FIXED_TARGET_IDENTITIES = Object.freeze({
     serverPort: 8325,
     webPort: 5195,
     jaegerPorts: Object.freeze({
-      agentCompact: 61001,
       agentThriftCompact: 61002,
       agentThriftBinary: 61003,
-      config: 61004,
       ui: 61005,
       collectorHttp: 61006,
       collectorGrpc: 61007,
@@ -81,10 +77,8 @@ const FIXED_TARGET_IDENTITIES = Object.freeze({
     serverPort: 8335,
     webPort: 5205,
     jaegerPorts: Object.freeze({
-      agentCompact: 62001,
       agentThriftCompact: 62002,
       agentThriftBinary: 62003,
-      config: 62004,
       ui: 62005,
       collectorHttp: 62006,
       collectorGrpc: 62007,

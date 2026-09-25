@@ -208,16 +208,23 @@ validate_source_archive() {
 materialize_release_source() {
   local archive="$1"
   local destination="$2"
+  local jaeger_config
   local roles_script
   local owner_uid
   tar --extract --file "$archive" \
     --directory "$destination" --no-same-owner --no-same-permissions
   roles_script=$destination/server/deploy/compose/prod/database_roles.sh
+  jaeger_config=$destination/server/deploy/compose/prod/jaeger-v2.yml
   owner_uid="$(stat -c '%u' "$roles_script" 2>/dev/null || true)"
   [[ -f "$roles_script" && ! -L "$roles_script" &&
     "$owner_uid" == "$(id -u)" ]] ||
     fail "database role initializer is invalid"
+  owner_uid="$(stat -c '%u' "$jaeger_config" 2>/dev/null || true)"
+  [[ -f "$jaeger_config" && ! -L "$jaeger_config" &&
+    "$owner_uid" == "$(id -u)" ]] ||
+    fail "Jaeger v2 configuration is invalid"
   chmod 755 "$roles_script"
+  chmod 444 "$jaeger_config"
 }
 
 release_tree_digest() {
@@ -1121,6 +1128,11 @@ if [[ -e "$release_dir" ]]; then
     fail "source archive contains a reserved release identity"
   cp "$release_identity" "$release_verifying/.plush-release-identity.json"
   chmod 600 "$release_verifying/.plush-release-identity.json"
+  existing_jaeger_config=$release_dir/server/deploy/compose/prod/jaeger-v2.yml
+  [[ -f "$existing_jaeger_config" && ! -L "$existing_jaeger_config" &&
+    "$(stat -c '%u' "$existing_jaeger_config" 2>/dev/null || true)" == "$(id -u)" ]] ||
+    fail "existing Jaeger v2 configuration is invalid"
+  chmod 444 "$existing_jaeger_config"
   existing_tree_digest="$(release_tree_digest "$release_dir")" ||
     fail "existing target release tree is invalid"
   verified_tree_digest="$(release_tree_digest "$release_verifying")" ||
