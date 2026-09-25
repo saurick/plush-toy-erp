@@ -2048,21 +2048,21 @@ test("dashboard data evidence fails closed for empty or unavailable sources", ()
   ];
   assert.equal(
     evaluateBusinessDashboardEvidence(
-      ["客户数量60", "出货放行数量45"],
+      {total:60,ids:[1]},
       requirements,
     ).minimumSatisfied,
     true,
   );
   assert.equal(
     evaluateBusinessDashboardEvidence(
-      ["客户数量60", "出货放行数量暂不可用"],
+      {total:null,ids:[]},
       requirements,
     ).minimumSatisfied,
     false,
   );
   assert.equal(
     evaluateBusinessDashboardEvidence(
-      ["客户数量60", "出货放行数量3"],
+      {total:3,ids:[1]},
       requirements,
     ).minimumSatisfied,
     false,
@@ -2203,237 +2203,20 @@ test("dashboard task evidence binds the visible page to the exact current batch"
   }
 });
 
-test("business dashboard binds every card to the fresh projection and same-batch source", () => {
-  const requirements = [
-    {
-      key: "customers",
-      label: "客户",
-      minimumRecords: 60,
-      probeId: "customers",
-      exactCurrentBatchCount: true,
-    },
-    {
-      key: "products",
-      label: "产品",
-      minimumRecords: 20,
-      probeId: "products",
-      exactCurrentBatchCount: true,
-    },
-    {
-      key: "inventory",
-      label: "库存台账",
-      minimumRecords: 45,
-      probeId: "inventory-balances",
-      exactCurrentBatchCount: true,
-    },
-  ];
-  const evidence = evaluateBusinessDashboardEvidence(
-    ["客户数量60", "产品数量20", "库存台账数量193"],
-    requirements,
-  );
-  const currentBatch = {
-    dataStatus: "pass",
-    actual: 20,
-    probes: [
-      {
-        id: "customers",
-        status: "pass",
-        actual: 60,
-        batchEvidence: "prefix_filtered",
-      },
-      {
-        id: "products",
-        status: "pass",
-        actual: 20,
-        batchEvidence: "prefix_filtered",
-      },
-      {
-        id: "inventory-balances",
-        status: "pass",
-        actual: 193,
-        batchEvidence: "exact_references",
-      },
-      {
-        id: "business-dashboard-stats",
-        status: "pass",
-        actual: 20,
-        batchEvidence: "fresh_dataset_projection",
-        moduleTotals: { customers: 60, products: 20, inventory: 193 },
-      },
-    ],
-  };
-  assert.equal(
-    evaluateBusinessDashboardCurrentBatchEvidence({
-      evidence,
-      currentBatch,
-      baselineProven: true,
-    }).minimumSatisfied,
-    true,
-  );
-  assert.equal(
-    evaluateBusinessDashboardCurrentBatchEvidence({
-      evidence,
-      currentBatch: {
-        ...currentBatch,
-        probes: [
-          { ...currentBatch.probes[0], actual: 59 },
-          currentBatch.probes[1],
-          currentBatch.probes[2],
-          currentBatch.probes[3],
-        ],
-      },
-      baselineProven: true,
-    }).minimumSatisfied,
-    false,
-  );
-  assert.equal(
-    evaluateBusinessDashboardCurrentBatchEvidence({
-      evidence,
-      currentBatch: {
-        ...currentBatch,
-        probes: [
-          ...currentBatch.probes.slice(0, 3),
-          {
-            ...currentBatch.probes[3],
-            moduleTotals: { customers: 60, products: 20, inventory: 192 },
-          },
-        ],
-      },
-      baselineProven: true,
-    }).minimumSatisfied,
-    false,
-  );
-  assert.equal(
-    evaluateBusinessDashboardCurrentBatchEvidence({
-      evidence,
-      currentBatch,
-      baselineProven: false,
-    }).minimumSatisfied,
-    false,
-  );
-  assert.equal(
-    evaluateBusinessDashboardCurrentBatchEvidence({
-      evidence,
-      currentBatch: {
-        ...currentBatch,
-        probes: [
-          ...currentBatch.probes.slice(0, 3),
-          {
-            ...currentBatch.probes[3],
-            batchEvidence: "unregistered_projection",
-          },
-        ],
-      },
-      baselineProven: true,
-    }).minimumSatisfied,
-    false,
-  );
-});
-
-test("business dashboard binds persistent totals without confusing them with the current batch", () => {
-  const requirements = [
-    {
-      key: "customers",
-      label: "客户",
-      minimumRecords: 60,
-      probeId: "customers",
-      exactCurrentBatchCount: true,
-    },
-    {
-      key: "products",
-      label: "产品",
-      minimumRecords: 20,
-      probeId: "products",
-      exactCurrentBatchCount: true,
-    },
-    {
-      key: "inventory",
-      label: "库存台账",
-      minimumRecords: 45,
-      probeId: "inventory-balances",
-      exactCurrentBatchCount: true,
-    },
-  ];
-  const evidence = evaluateBusinessDashboardEvidence(
-    ["客户数量75", "产品数量40", "库存台账数量220"],
-    requirements,
-  );
-  const currentBatch = {
-    dataStatus: "pass",
-    actual: 20,
-    probes: [
-      {
-        id: "customers",
-        status: "pass",
-        actual: 60,
-        batchEvidence: "prefix_filtered",
-      },
-      {
-        id: "products",
-        status: "pass",
-        actual: 20,
-        batchEvidence: "prefix_filtered",
-      },
-      {
-        id: "inventory-balances",
-        status: "pass",
-        actual: 193,
-        batchEvidence: "exact_references",
-      },
-      {
-        id: "business-dashboard-stats",
-        status: "pass",
-        actual: 20,
-        batchEvidence: "persistent_dataset_projection",
-        moduleTotals: { customers: 75, products: 40, inventory: 220 },
-      },
-    ],
-  };
-  const passing = evaluateBusinessDashboardCurrentBatchEvidence({
-    evidence,
-    currentBatch,
-    baselineProven: true,
-  });
-  assert.equal(passing.minimumSatisfied, true);
-  assert.equal(
-    passing.projectionBatchEvidence,
-    "persistent_dataset_projection",
-  );
-  assert.equal(
-    passing.sources[0].currentBatchCountComparison,
-    "projection_total_with_batch_minimum",
-  );
-  assert.equal(
-    evaluateBusinessDashboardCurrentBatchEvidence({
-      evidence,
-      currentBatch: {
-        ...currentBatch,
-        probes: [
-          { ...currentBatch.probes[0], status: "fail" },
-          ...currentBatch.probes.slice(1),
-        ],
-      },
-      baselineProven: true,
-    }).minimumSatisfied,
-    false,
-  );
-  assert.equal(
-    evaluateBusinessDashboardCurrentBatchEvidence({
-      evidence,
-      currentBatch: {
-        ...currentBatch,
-        probes: [
-          ...currentBatch.probes.slice(0, 3),
-          {
-            ...currentBatch.probes[3],
-            moduleTotals: { customers: 74, products: 40, inventory: 220 },
-          },
-        ],
-      },
-      baselineProven: true,
-    }).minimumSatisfied,
-    false,
-  );
+test("progress evidence binds counts and exact visible orders to current-batch sources", () => {
+ const evidence=evaluateBusinessDashboardEvidence({total:45,ids:[1,2]},[{key:"orders",label:"订单",minimumRecords:20,probeId:"sales-orders"}]);
+ const currentBatch={dataStatus:"pass",probes:[
+ {id:"sales-orders",status:"pass",actual:45,batchEvidence:"prefix_filtered"},
+ {id:"business-progress",status:"pass",batchEvidence:"fresh_dataset_projection",progressCounts:{total:45},sampleOrderIDs:[1,2,3]},
+ ]};
+ assert.equal(evaluateBusinessDashboardCurrentBatchEvidence({evidence,currentBatch,baselineProven:true}).minimumSatisfied,true);
+ assert.equal(evaluateBusinessDashboardCurrentBatchEvidence({evidence,currentBatch,baselineProven:false}).minimumSatisfied,false);
+ const wrongID={...evidence,sampleOrderIDs:[99]};
+ assert.equal(evaluateBusinessDashboardCurrentBatchEvidence({evidence:wrongID,currentBatch,baselineProven:true}).minimumSatisfied,false);
+ const wrongCount={...evidence,observedTotal:46};
+ assert.equal(evaluateBusinessDashboardCurrentBatchEvidence({evidence:wrongCount,currentBatch,baselineProven:true}).minimumSatisfied,false);
+ currentBatch.probes[0].batchEvidence="not_proven";
+ assert.equal(evaluateBusinessDashboardCurrentBatchEvidence({evidence,currentBatch,baselineProven:true}).minimumSatisfied,false);
 });
 
 test("print preview and current-batch source minimum evidence fail closed", () => {

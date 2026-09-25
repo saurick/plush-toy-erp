@@ -1,6 +1,6 @@
-import { AUTH_SCOPE } from '@/common/auth/auth'
-import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
-import { JsonRpc } from '@/common/utils/jsonRpc'
+import { AUTH_SCOPE } from '../../common/auth/auth.js'
+import { ADMIN_BASE_PATH } from '../../common/utils/adminRpc.js'
+import { JsonRpc } from '../../common/utils/jsonRpc.js'
 import { buildCustomerConfigMutationPayload } from './customerConfigTransition.mjs'
 
 const customerConfigRpc = new JsonRpc({

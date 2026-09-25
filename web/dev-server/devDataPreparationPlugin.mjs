@@ -11,6 +11,7 @@ import {
   acquireDataPreparationIdempotencyLock,
   acquireDataPreparationExecutionLock,
   createOrReuseDataPreparationOperation,
+  DATA_PREPARATION_HISTORICAL_SCENARIO_READBACK_BASELINES,
   DATA_PREPARATION_PROFILE_KEYS,
   DATA_PREPARATION_TARGET_KEYS,
   DATA_PREPARATION_TERMINAL_STATUSES,
@@ -75,6 +76,8 @@ const SCENARIO_DEMO_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID
 const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 51
 const SCENARIO_DEMO_CATALOG_READY_COUNT = 41
 const SCENARIO_DEMO_BROWSER_CHECKS_PENDING = 10
+const DATA_PREPARATION_OPERATION_CONTRACT =
+  'plush.dev-data-preparation-operation-contract/v1'
 const INTERRUPTED_OPERATION_RECOVERY_GRACE_MS = 30_000
 const LOCAL_DEVELOPMENT_TARGET = 'local-development'
 const ISOLATED_LOCAL_TARGET = 'isolated-local'
@@ -141,7 +144,7 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
   Object.freeze({
     key: 'full-acceptance',
     title: '按最新业务链完整回归',
-    purpose: '在新隔离库运行全部已登记业务链、合法场景与现有完整验收生命周期',
+    purpose: '在新隔离库运行全部已登记业务链、场景合同与现有完整验收生命周期',
     writesDatabase: true,
     dataRetention: 'ephemeral',
     cleanupMode: 'automatic',
@@ -153,7 +156,7 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
   Object.freeze({
     key: 'core-demo',
     title: '本地长期基础数据',
-    purpose: '稳定准备十个演示账号与当前 V6 的单位、仓库引用',
+    purpose: '稳定准备十个演示账号与当前 V7 的单位、仓库引用',
     writesDatabase: true,
     dataRetention: 'long-lived',
     cleanupMode: 'not-supported',
@@ -164,7 +167,7 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
     key: 'scenario-demo',
     title: '长期业务场景数据',
     purpose:
-      '本地开发与 demo-133 分别按固定目标身份，共用同一 V6 语义精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
+      '本地开发与 demo-133 分别按固定目标身份，共用同一 V7 语义精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
     writesDatabase: true,
     dataRetention: 'long-lived',
     cleanupMode: 'forward-only',
@@ -416,7 +419,7 @@ function scenarioTargetArgs(targetKey, attestation) {
 export function scenarioDemoPlanCommand(
   projectRoot,
   targetKey = LOCAL_DEVELOPMENT_TARGET,
-  attestation
+  attestation = null
 ) {
   const root = path.resolve(projectRoot)
   return Object.freeze({
@@ -833,8 +836,85 @@ function validateScenarioDemoPublicReadback(readback, operation) {
   return parsed
 }
 
+function operationContract(operation) {
+  const dataVersion =
+    operation.readback?.dataVersion ||
+    operation.targetSummary?.datasetVersion ||
+    null
+  const datasetRunId =
+    operation.readback?.runId || operation.targetSummary?.datasetRunId || null
+  const semanticDigest =
+    operation.readback?.semanticDigest ||
+    operation.targetSummary?.semanticDigest ||
+    null
+  const currentIdentity =
+    dataVersion === SCENARIO_DEMO_DATA_VERSION &&
+    datasetRunId === SCENARIO_DEMO_RUN_ID &&
+    semanticDigest === MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT.semanticDigest
+  const historicalIdentity =
+    DATA_PREPARATION_HISTORICAL_SCENARIO_READBACK_BASELINES.some(
+      (baseline) =>
+        dataVersion === baseline.dataVersion && datasetRunId === baseline.runId
+    )
+  let classification = currentIdentity
+    ? 'current'
+    : historicalIdentity
+      ? 'historical'
+      : 'unresolved'
+  if (
+    classification === 'current' &&
+    operation.profileKey === 'full-acceptance' &&
+    operation.status === 'passed'
+  ) {
+    const chainDataDigest = operation.readback?.chainDataDigest
+    const chainVerificationDigest = operation.readback?.chainVerificationDigest
+    const hasChainIdentity =
+      /^[0-9a-f]{64}$/u.test(String(chainDataDigest || '')) &&
+      /^[0-9a-f]{64}$/u.test(String(chainVerificationDigest || ''))
+    if (
+      chainDataDigest !== MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest ||
+      chainVerificationDigest !==
+        MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest
+    ) {
+      classification = hasChainIdentity ? 'historical' : 'unresolved'
+    }
+  }
+  if (
+    classification === 'current' &&
+    operation.profileKey === 'scenario-demo' &&
+    operation.status === 'passed'
+  ) {
+    try {
+      validateScenarioDemoPublicReadback(operation.readback, operation)
+    } catch {
+      classification = 'unresolved'
+    }
+  }
+  return Object.freeze({
+    schemaVersion: DATA_PREPARATION_OPERATION_CONTRACT,
+    classification,
+    dataVersion,
+    datasetRunId,
+    semanticDigest,
+  })
+}
+
 function isCurrentPublicOperation(operation) {
-  if (operation.profileKey !== 'scenario-demo') return true
+  if (operationContract(operation).classification !== 'current') return false
+  if (operation.profileKey !== 'scenario-demo') {
+    if (
+      operation.profileKey === 'full-acceptance' &&
+      operation.status === 'passed'
+    ) {
+      return (
+        operation.readback?.chainDataDigest ===
+          MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest &&
+        operation.readback?.chainVerificationDigest ===
+          MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest
+      )
+    }
+    return true
+  }
   if (operation.readback == null) return operation.status !== 'passed'
   try {
     validateScenarioDemoPublicReadback(operation.readback, operation)
@@ -1010,6 +1090,7 @@ function publicOperation(operation) {
     status: operation.status,
     planHash: operation.planHash,
     runId: operation.runId,
+    contract: operationContract(operation),
     repository: operation.repository,
     targetSummary: { ...operation.targetSummary, targetKey },
     createdAt: operation.createdAt,
@@ -1020,6 +1101,17 @@ function publicOperation(operation) {
     readback: operation.readback,
     confirmationRequired: confirmation,
     terminal: DATA_PREPARATION_TERMINAL_STATUSES.includes(operation.status),
+  }
+}
+
+function publicOperationReference(operation) {
+  return {
+    id: operation.id,
+    profileKey: operation.profileKey,
+    status: operation.status,
+    updatedAt: operation.updatedAt,
+    terminal: DATA_PREPARATION_TERMINAL_STATUSES.includes(operation.status),
+    contract: operationContract(operation),
   }
 }
 
@@ -1040,6 +1132,7 @@ function laterScenarioReadbackResolves(operation, operations) {
         (operation.targetSummary.targetKey || LOCAL_DEVELOPMENT_TARGET) &&
       candidate.readback?.dataVersion === SCENARIO_DEMO_DATA_VERSION &&
       candidate.readback?.runId === SCENARIO_DEMO_RUN_ID &&
+      isCurrentPublicOperation(candidate) &&
       Date.parse(candidate.updatedAt) > Date.parse(operation.updatedAt)
   )
 }
@@ -1049,6 +1142,9 @@ export function unresolvedDataPreparationOutcomeBlocksExecution(
   operations
 ) {
   return operations.some((candidate) => {
+    if (operationContract(candidate).classification === 'historical') {
+      return false
+    }
     if (
       !['not_proven', 'launching', 'running'].includes(candidate.status) ||
       candidate.id === operation.id
@@ -1267,7 +1363,7 @@ export function createDevDataPreparationService({
   }
 
   function customerTrialAttestation(report) {
-    const runtime = report.remote.runtime
+    const { runtime } = report.remote
     return Object.freeze({
       target: CUSTOMER_TRIAL_133_TARGET,
       origin: CUSTOMER_TRIAL_133_ORIGIN,
@@ -1292,7 +1388,7 @@ export function createDevDataPreparationService({
       repository
     )
     const attestation = customerTrialAttestation(report)
-    const runtime = report.remote.runtime
+    const { runtime } = report.remote
     const fingerprint = hashDataPreparationPlan({
       targetAlias: CUSTOMER_TRIAL_133_TARGET,
       databaseName: runtime.databaseName,
@@ -1508,21 +1604,45 @@ export function createDevDataPreparationService({
     }
     const operations = listDataPreparationOperations(store, { limit: 100 })
     const currentOperations = operations.filter(isCurrentPublicOperation)
-    const omittedOperationCount = operations.length - currentOperations.length
-    if (omittedOperationCount > 0) {
+    const historicalOperations = operations.filter(
+      (operation) =>
+        operationContract(operation).classification === 'historical'
+    )
+    const unresolvedContractOperations = operations.filter(
+      (operation) =>
+        operationContract(operation).classification === 'unresolved'
+    )
+    const blockingUnresolvedContractOperations =
+      unresolvedContractOperations.filter((operation) =>
+        ['launching', 'running', 'not_proven'].includes(operation.status)
+      )
+    if (historicalOperations.length > 0) {
       issues.push({
-        code: 'historical_operation_contract_omitted',
+        code: 'historical_operation_contract_preserved',
         severity: 'warning',
-        message: `已保留 ${omittedOperationCount} 条旧合同历史回执，但不会混入当前数据摘要`,
+        message: `已保留 ${historicalOperations.length} 条旧合同历史回执，但不会参与当前 V7 执行或环境判断`,
       })
     }
-    const unresolvedOperations = operations.filter(
+    if (unresolvedContractOperations.length > 0) {
+      issues.push({
+        code: 'unresolved_operation_contract_preserved',
+        severity:
+          blockingUnresolvedContractOperations.length > 0
+            ? 'blocked'
+            : 'warning',
+        message:
+          blockingUnresolvedContractOperations.length > 0
+            ? `存在 ${blockingUnresolvedContractOperations.length} 条合同版本无法判定且结果未收口的操作，核对前禁止再次执行`
+            : `另有 ${unresolvedContractOperations.length} 条无法判定版本合同的旧回执，仅供历史核对`,
+      })
+    }
+    const unresolvedOutcomes = currentOperations.filter(
       (operation) =>
         operation.status === 'not_proven' &&
         !laterScenarioReadbackResolves(operation, operations)
     )
-    if (unresolvedOperations.length > 0) {
-      const scenarioReplayAvailable = unresolvedOperations.every(
+    if (unresolvedOutcomes.length > 0) {
+      const scenarioReplayAvailable = unresolvedOutcomes.every(
         (operation) => operation.profileKey === 'scenario-demo'
       )
       issues.push({
@@ -1536,7 +1656,7 @@ export function createDevDataPreparationService({
       })
     }
     return {
-      schemaVersion: 'plush.dev-data-preparation-summary/v1',
+      schemaVersion: 'plush.dev-data-preparation-summary/v2',
       status: issues.some((issue) => issue.severity === 'blocked')
         ? 'blocked'
         : issues.length
@@ -1548,7 +1668,13 @@ export function createDevDataPreparationService({
       target,
       acceptancePlan: MANUAL_ACCEPTANCE_REVIEW_PLAN,
       profiles: DEV_DATA_PREPARATION_PROFILES,
-      operations: currentOperations.slice(0, 50).map(publicOperation),
+      currentOperations: currentOperations.slice(0, 50).map(publicOperation),
+      historicalOperations: historicalOperations
+        .slice(0, 50)
+        .map(publicOperationReference),
+      unresolvedOperations: unresolvedContractOperations
+        .slice(0, 50)
+        .map(publicOperationReference),
       issues,
       boundaries: {
         developmentOnly: true,
@@ -1594,6 +1720,11 @@ export function createDevDataPreparationService({
       payload.profileKey
     )
     if (existing) {
+      if (!isCurrentPublicOperation(existing)) {
+        throw new Error(
+          'data preparation idempotency key belongs to a previous contract'
+        )
+      }
       return {
         schemaVersion: 'plush.dev-data-preparation-action-result/v1',
         action: 'prepare',
@@ -1621,6 +1752,11 @@ export function createDevDataPreparationService({
           payload.profileKey
         )
         if (completed) {
+          if (!isCurrentPublicOperation(completed)) {
+            throw new Error(
+              'data preparation idempotency key belongs to a previous contract'
+            )
+          }
           return {
             schemaVersion: 'plush.dev-data-preparation-action-result/v1',
             action: 'prepare',
@@ -1653,6 +1789,11 @@ export function createDevDataPreparationService({
         payload.profileKey
       )
       if (completed) {
+        if (!isCurrentPublicOperation(completed)) {
+          throw new Error(
+            'data preparation idempotency key belongs to a previous contract'
+          )
+        }
         return {
           schemaVersion: 'plush.dev-data-preparation-action-result/v1',
           action: 'prepare',
@@ -1767,7 +1908,7 @@ export function createDevDataPreparationService({
         outputs.set(command.key, String(result.stdout || ''))
         completed.push(command.key)
       } catch (error) {
-        const stage = command.key === 'role-seed' ? '角色账号' : 'V6 单位与仓库'
+        const stage = command.key === 'role-seed' ? '角色账号' : 'V7 单位与仓库'
         const partial =
           completed.length > 0
             ? `；已完成 ${completed.join('、')}，目标可能已部分更新，禁止按全量成功使用`
@@ -1909,6 +2050,9 @@ export function createDevDataPreparationService({
       throw new Error('another data preparation operation is running')
     }
     let operation = readDataPreparationOperation(store, payload.operationId)
+    if (!isCurrentPublicOperation(operation)) {
+      throw new Error('data preparation operation contract is not current')
+    }
     const persistedOperations = listDataPreparationOperations(store, {
       limit: 200,
     })

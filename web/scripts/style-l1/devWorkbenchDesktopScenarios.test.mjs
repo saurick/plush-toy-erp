@@ -8,6 +8,7 @@ import {
   DEV_DRILL_RECOVERY_ROUTE,
   DEV_GOVERNANCE_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
+  DEV_PRODUCT_ENGINEERING_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
   DEV_QUALITY_ROUTE,
   DEV_SECONDARY_NAV_ITEMS,
@@ -78,8 +79,8 @@ test('ordinary DEV desktop smokes honor route-specific landing contracts', async
   const contracts = [
     {
       route: DEV_QUALITY_ROUTE,
-      finalRoute: DEV_QUALITY_GATES_ROUTE,
-      heading: DEV_PAGE_TITLE_BY_ROUTE[DEV_QUALITY_GATES_ROUTE],
+      finalRoute: DEV_QUALITY_ROUTE,
+      heading: DEV_PAGE_TITLE_BY_ROUTE[DEV_QUALITY_ROUTE],
     },
     {
       route: DEV_GOVERNANCE_ROUTE,
@@ -112,8 +113,18 @@ test('ordinary DEV desktop smokes honor route-specific landing contracts', async
   for (const contract of contracts) {
     const scenario = scenarios.find(({ path }) => path === contract.route)
     const page = {
-      locator: () => ({
-        count: async () => 1,
+      locator: (selector) => ({
+        count: async () => {
+          if (selector === '.erp-dev-quality-task') return 3
+          if (
+            selector === '.erp-dev-quality-task a[href="/__dev/quality-gates"]'
+          ) {
+            return 1
+          }
+          if (selector === '.erp-dev-product-task') return 7
+          if (selector === '.erp-dev-product-task__index') return 0
+          return 1
+        },
         waitFor: async () => {},
       }),
       url: () => `http://127.0.0.1${contract.finalRoute}?view=server`,
@@ -123,5 +134,32 @@ test('ordinary DEV desktop smokes honor route-specific landing contracts', async
     await scenario.verify(page)
     assert.equal(observedHeadings.get(contract.finalRoute), contract.heading)
     assert(overflowRoutes.has(contract.route))
+  }
+})
+
+test('product and quality area smokes enforce their complete landing contracts', async () => {
+  const counts = new Map([
+    ['.erp-dev-workspace-page', 1],
+    ['.erp-dev-product-task', 7],
+    ['.erp-dev-product-task__index', 0],
+    ['.erp-dev-quality-task', 3],
+    ['.erp-dev-quality-task a[href="/__dev/quality-gates"]', 1],
+  ])
+  const scenarios = createDevWorkbenchDesktopScenarios({
+    assert,
+    assertNoHorizontalOverflow: async () => {},
+    expectHeading: async () => {},
+  })
+
+  for (const route of [DEV_PRODUCT_ENGINEERING_ROUTE, DEV_QUALITY_ROUTE]) {
+    const scenario = scenarios.find(({ path }) => path === route)
+    assert(scenario)
+    await scenario.verify({
+      locator: (selector) => ({
+        count: async () => counts.get(selector) ?? 0,
+        waitFor: async () => {},
+      }),
+      url: () => `http://127.0.0.1${route}`,
+    })
   }
 })

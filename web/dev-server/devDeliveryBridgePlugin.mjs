@@ -642,7 +642,7 @@ export function captureDevDeliveryProviderEnvironments(env = process.env) {
   return Object.freeze({
     readEnvironment: Object.freeze(readEnvironment),
     writeEnvironment: Object.freeze(writeEnvironment),
-    releaseDispatchAllowed: selected !== 'gitlab' || Boolean(writeToken),
+    releaseDispatchAllowed: selected === 'gitlab' && Boolean(writeToken),
   })
 }
 
@@ -1185,6 +1185,28 @@ export function createDevDeliveryService({
     payload,
     { retryOfOperationId = null } = {}
   ) {
+    const recoveryRollback = listDeliveryOperations(store, { limit: 200 })
+      .filter(
+        (operation) =>
+          operation.action === 'rollback' &&
+          operation.target === payload.target &&
+          operation.status === 'passed' &&
+          operation.metadata?.currentGitSha === payload.gitSha &&
+          UUID_V4_PATTERN.test(
+            String(operation.metadata?.recoveryDrillId || '')
+          )
+      )
+      .sort(
+        (left, right) =>
+          Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
+      )[0]
+    const recoveryLineage = recoveryRollback
+      ? {
+          drillId: recoveryRollback.metadata.recoveryDrillId,
+          rollbackOperationId: recoveryRollback.id,
+          rollbackGitSha: recoveryRollback.gitSha,
+        }
+      : null
     const versions = await Promise.resolve(
       readDeliveryProvider.listVersions({ limit: 50 })
     )
@@ -1292,6 +1314,7 @@ export function createDevDeliveryService({
           idempotencyKey: payload.idempotencyKey,
           operationStore: store,
           retryOfOperationId,
+          recoveryLineage,
         },
         {
           runPreflight,

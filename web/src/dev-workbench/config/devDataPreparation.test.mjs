@@ -90,6 +90,13 @@ function operationFixture(overrides = {}) {
     status: 'ready',
     planHash: PLAN_HASH,
     runId: RUN_ID,
+    contract: {
+      schemaVersion: 'plush.dev-data-preparation-operation-contract/v1',
+      classification: 'current',
+      dataVersion: '2026.09.16-v7',
+      datasetRunId: '20260916-V7',
+      semanticDigest: '6'.repeat(64),
+    },
     repository: {
       commit: 'd'.repeat(40),
       dirty: false,
@@ -228,7 +235,7 @@ function fullOperationFixture(overrides = {}) {
 
 function summaryFixture() {
   return {
-    schemaVersion: 'plush.dev-data-preparation-summary/v1',
+    schemaVersion: 'plush.dev-data-preparation-summary/v2',
     status: 'success',
     generatedAt: CREATED_AT,
     repository: {
@@ -330,7 +337,9 @@ function summaryFixture() {
         requiredEnvironment: ['clean exact commit', '专用隔离库'],
       },
     ],
-    operations: [operationFixture()],
+    currentOperations: [operationFixture()],
+    historicalOperations: [],
+    unresolvedOperations: [],
     issues: [],
     boundaries: {
       developmentOnly: true,

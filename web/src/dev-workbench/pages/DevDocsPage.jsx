@@ -11,15 +11,7 @@ import {
   RightOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import {
-  Button,
-  Empty,
-  Space,
-  Spin,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd'
+import { Button, Empty, Space, Spin, Tag, Tooltip, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
@@ -52,6 +44,7 @@ import {
 } from '../config/devDocs.mjs'
 import {
   buildDevDocsLocation,
+  findDevDocsMarkdownAnchor,
   resolveDevDocsMarkdownHref,
 } from './devDocsNavigation.mjs'
 
@@ -107,6 +100,7 @@ const currentMarkdownModules = import.meta.glob(
 const archiveMarkdownModules = import.meta.glob(
   '../../../../docs/archive/**/*.md',
   {
+    eager: true,
     import: 'default',
     query: '?raw',
   }
@@ -167,9 +161,7 @@ function scrollMarkdownContainerToHeading(container, headingId) {
     return false
   }
 
-  const target = [...container.querySelectorAll('h1, h2, h3')].find(
-    (element) => element.id === headingId
-  )
+  const target = findDevDocsMarkdownAnchor(container, headingId)
   if (!target) {
     return false
   }
@@ -424,10 +416,7 @@ export default function DevDocsPage() {
   const [searchScope, setSearchScope] = useState(DEV_DOCS_SEARCH_SCOPE_ALL)
   const [selectedKey, setSelectedKey] = useState(() =>
     readSelectedKey(
-      filterDevDocsByLifecycle(
-        docs,
-        readLifecycle(docs, location.search)
-      ),
+      filterDevDocsByLifecycle(docs, readLifecycle(docs, location.search)),
       location.search
     )
   )
@@ -454,10 +443,7 @@ export default function DevDocsPage() {
     [docsWithSearchText, keyword, searchScope]
   )
   const pinnedDocs = useMemo(
-    () =>
-      sortDevDocsItemsByPinned(
-        lifecycleDocs.filter((item) => item.pinned)
-      ),
+    () => sortDevDocsItemsByPinned(lifecycleDocs.filter((item) => item.pinned)),
     [lifecycleDocs]
   )
   const trimmedKeyword = keyword.trim()
@@ -886,8 +872,11 @@ export default function DevDocsPage() {
           <details className="erp-dev-docs-boundary-details">
             <summary>查看收录范围与维护边界</summary>
             <Paragraph>
-              查看器只读加载当前工作区内已匹配的 Markdown；历史正文仅在打开时加载。
-              文件可见不代表已经纳入 Git，也不代表内容是 runtime、schema、权限、发布或客户验收真源。
+              {
+                '查看器只读加载当前工作区内已匹配的 Markdown；历史正文仅在打开时加载。 '
+              }
+              文件可见不代表已经纳入 Git，也不代表内容是
+              runtime、schema、权限、发布或客户验收真源。
             </Paragraph>
           </details>
         </div>

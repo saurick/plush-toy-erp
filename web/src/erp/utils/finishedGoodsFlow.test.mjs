@@ -1,7 +1,4 @@
 import assert from 'node:assert/strict'
-
-import { readFileSync } from 'node:fs'
-
 import test from 'node:test'
 
 import {
@@ -12,16 +9,16 @@ import {
 } from './finishedGoodsFlow.mjs'
 
 import * as flow from './finishedGoodsFlow.mjs'
+import {
+  assertServerOwnedTaskMatchers,
+  assertSourceOmitsSymbols,
+  mobileWorkflowSources,
+} from '../../../scripts/test/workflowFlowContract.mjs'
 
-const mobileRoleTasksPageSource = readFileSync(
-  new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
-  'utf8'
-)
-
-const mobileRoleTaskActionsSource = readFileSync(
-  new URL('../mobile/hooks/useMobileRoleTaskActions.js', import.meta.url),
-  'utf8'
-)
+const {
+  actions: mobileRoleTaskActionsSource,
+  page: mobileRoleTasksPageSource,
+} = mobileWorkflowSources
 
 function shipmentReleaseSourceTask(sourceID = 42, overrides = {}) {
   return {
@@ -42,71 +39,29 @@ function shipmentReleaseSourceTask(sourceID = 42, overrides = {}) {
 }
 
 test('finishedGoodsFlow: 移动端成品抽检状态动作不再本地创建下游任务', () => {
-  assert.equal(
-    mobileRoleTasksPageSource.includes('buildFinishedGoodsInboundTask'),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('buildFinishedGoodsReworkTask'),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('passFinishedGoodsQcTask'),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('failFinishedGoodsQcTask'),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('FINISHED_GOODS_INBOUND_TASK_GROUP'),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('FINISHED_GOODS_REWORK_TASK_GROUP'),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('completeFinishedGoodsInboundTask'),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('completeShipmentReleaseTask'),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('buildShipmentReleaseTask'),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('SHIPMENT_RELEASE_TASK_GROUP'),
-    false
-  )
-  assert.equal(
-    mobileRoleTaskActionsSource.includes('runFinishedGoodsFollowUp'),
-    false
-  )
-  assert.equal(
-    mobileRoleTaskActionsSource.includes('completeFinishedGoodsReworkTask'),
-    false
-  )
-  assert.equal(
-    mobileRoleTaskActionsSource.includes(
-      'FINISHED_GOODS_PRODUCTION_PROCESSING_STATUS_KEY'
-    ),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes("shipment_result: 'shipped'"),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('RECEIVABLE_REGISTRATION_TASK_GROUP'),
-    false
-  )
-  assert.equal(
-    mobileRoleTasksPageSource.includes('buildReceivableRegistrationTask'),
-    false
+  assertSourceOmitsSymbols(mobileRoleTasksPageSource, 'MobileRoleTasksPage', [
+    'buildFinishedGoodsInboundTask',
+    'buildFinishedGoodsReworkTask',
+    'passFinishedGoodsQcTask',
+    'failFinishedGoodsQcTask',
+    'FINISHED_GOODS_INBOUND_TASK_GROUP',
+    'FINISHED_GOODS_REWORK_TASK_GROUP',
+    'completeFinishedGoodsInboundTask',
+    'completeShipmentReleaseTask',
+    'buildShipmentReleaseTask',
+    'SHIPMENT_RELEASE_TASK_GROUP',
+    "shipment_result: 'shipped'",
+    'RECEIVABLE_REGISTRATION_TASK_GROUP',
+    'buildReceivableRegistrationTask',
+  ])
+  assertSourceOmitsSymbols(
+    mobileRoleTaskActionsSource,
+    'useMobileRoleTaskActions',
+    [
+      'runFinishedGoodsFollowUp',
+      'completeFinishedGoodsReworkTask',
+      'FINISHED_GOODS_PRODUCTION_PROCESSING_STATUS_KEY',
+    ]
   )
 })
 
@@ -139,29 +94,23 @@ test('finishedGoodsFlow: canonical 出货放行来源任务保持只读识别', 
 })
 
 test('finishedGoodsFlow: recognizes server tasks without exposing client task builders', () => {
-  assert.equal(
-    Object.keys(flow).some((name) => name.startsWith('build')),
-    false
-  )
-  for (const [matcher, sourceType, taskGroup] of [
-    ['isFinishedGoodsQcTask', 'production-progress', 'finished_goods_qc'],
-    ['isFinishedGoodsInboundTask', 'inbound', 'finished_goods_inbound'],
-    ['isShipmentReleaseTask', 'shipment', 'shipment_finance_approval'],
-  ]) {
-    assert.equal(
-      flow[matcher]({ source_type: sourceType, task_group: taskGroup }),
-      true
-    )
-    assert.equal(
-      flow[matcher]({ source_type: 'unrelated', task_group: taskGroup }),
-      false
-    )
-    assert.equal(
-      flow[matcher]({ source_type: sourceType, task_group: 'unrelated' }),
-      false
-    )
-    assert.equal(flow[matcher]({}), false)
-  }
+  assertServerOwnedTaskMatchers(flow, [
+    {
+      matcher: 'isFinishedGoodsQcTask',
+      sourceType: 'production-progress',
+      taskGroup: 'finished_goods_qc',
+    },
+    {
+      matcher: 'isFinishedGoodsInboundTask',
+      sourceType: 'inbound',
+      taskGroup: 'finished_goods_inbound',
+    },
+    {
+      matcher: 'isShipmentReleaseTask',
+      sourceType: 'shipment',
+      taskGroup: 'shipment_finance_approval',
+    },
+  ])
 })
 
 test('finished goods projection keeps finance approval distinct from shipped', () => {

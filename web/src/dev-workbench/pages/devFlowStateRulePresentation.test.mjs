@@ -245,7 +245,14 @@ test('related-view projection only creates exact catalog-backed destinations', (
     shipmentTargets.facts.map((item) => item.factKey),
     ['fact.shipment']
   )
-  assert.equal(shipmentTargets.chains.length, 2)
+  assert.deepEqual(
+    shipmentTargets.chains.map((item) => [item.chainKey, item.nodeKey]),
+    [
+      ['delivery_to_settlement', 'shipment_draft'],
+      ['delivery_to_settlement', 'shipped'],
+      ['delivery_to_settlement', 'shipment_cancelled'],
+    ]
+  )
 
   assert.deepEqual(
     buildDevFlowStateRelatedViews(

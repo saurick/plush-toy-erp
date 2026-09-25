@@ -32,6 +32,10 @@ import {
 } from '../../../../scripts/qa/dev-flow-state-canonical-contract.mjs'
 
 const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url))
+const observatoryPageSource = readFileSync(
+  new URL('../pages/DevFlowStateObservatoryPage.jsx', import.meta.url),
+  'utf8'
+)
 
 const EXPECTED_FLOW_KEYS = [
   'source.sales_order_engineering',
@@ -82,6 +86,19 @@ const EXPECTED_LAYER_KEYS = [
   'automation',
   'fact',
 ]
+
+test('devFlowStateCatalog: 目录重载只允许最新请求更新页面状态', () => {
+  assert.match(observatoryPageSource, /const requestSequenceRef = useRef\(0\)/u)
+  assert.match(
+    observatoryPageSource,
+    /requestSequenceRef[.]current !== requestSequence/u
+  )
+  assert.match(
+    observatoryPageSource,
+    /return \(\) => \{\s*requestSequenceRef[.]current \+= 1\s*\}/u
+  )
+  assert.doesNotMatch(observatoryPageSource, /let active = true/u)
+})
 
 const expectedProcessNodes = {
   'sales_order_acceptance/approval_pmc': [

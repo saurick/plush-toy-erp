@@ -492,7 +492,7 @@ export function createDevVersionCenterScenarios({
   return [
     {
       name: 'dev-version-center-tabs-pagination-desktop',
-      path: '/__dev/version-center',
+      path: '/__dev/version-center?view=history&view=pipeline&history_action=promote&history_action=release',
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
         summaryRequests = 0
@@ -503,6 +503,12 @@ export function createDevVersionCenterScenarios({
       verify: async (page) => {
         await expectHeading(page, '版本发布与部署中心')
         await waitForView(page, 'versions')
+        await page.waitForURL(
+          (url) =>
+            url.searchParams.getAll('view').length === 1 &&
+            !url.searchParams.has('history_action'),
+          { timeout: 10_000 }
+        )
         await page
           .locator('.erp-dev-version-workspace')
           .waitFor({ state: 'visible' })

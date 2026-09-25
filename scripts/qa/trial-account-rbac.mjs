@@ -164,7 +164,7 @@ const usage = `用法:
   验证 10 个 demo_* 账号能通过真实 /rpc/auth admin_login + me，并核对:
   - 单一预期角色
   - 对应 mobile.<role>.access
-  - 至少一个真实电脑端菜单；老板额外包含工作台和业务看板
+  - 至少一个真实电脑端菜单；老板额外包含工作台和进度看板
   - 无 debug.* 权限
   - 非 super admin
   - 未禁用

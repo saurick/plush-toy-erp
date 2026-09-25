@@ -527,8 +527,13 @@ test("mobile task actions explain backend access before submitting actions", () 
     erpSourceRoot,
     "utils/workflowTaskActionSubmitGuard.mjs",
   );
+  const submitGuardCorePath = path.join(
+    erpSourceRoot,
+    "utils/workflowTaskActionSubmitGuardCore.mjs",
+  );
   const source = readFileSync(actionHookPath, "utf8");
-  const submitGuardSource = readFileSync(submitGuardPath, "utf8");
+  const submitGuardEntrySource = readFileSync(submitGuardPath, "utf8");
+  const submitGuardSource = readFileSync(submitGuardCorePath, "utf8");
 
   const reasonGuardIndex = source.indexOf(
     "if (reasonRequired && !actionReason)",
@@ -601,7 +606,7 @@ test("mobile task actions explain backend access before submitting actions", () 
   );
   assert.match(
     submitGuardSource,
-    /explainWorkflowActionAccess\(\{[\s\S]*task_id: taskID,[\s\S]*action_key: normalizedActionKey,[\s\S]*\}\)/u,
+    /const data = await explain\(\{[\s\S]*task_id: taskID,[\s\S]*action_key: normalizedActionKey,[\s\S]*\}\)/u,
     "shared submit guard must use the formal backend explain task_id/action_key contract",
   );
   assert.match(
@@ -630,6 +635,11 @@ test("mobile task actions explain backend access before submitting actions", () 
   assert(
     !source.includes("explainWorkflowActionAccess"),
     "mobile action hook must not keep a private backend explain branch",
+  );
+  assert.match(
+    submitGuardEntrySource,
+    /bindWorkflowActionSubmitGuard\(\{[\s\S]*explain: explainWorkflowActionAccess,[\s\S]*\}\)/u,
+    "shared submit guard entry must bind the formal workflow explain API",
   );
   assert.match(
     source,

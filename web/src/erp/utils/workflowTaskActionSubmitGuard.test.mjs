@@ -1,81 +1,15 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import vm from 'node:vm'
 
-import {
-  normalizeWorkflowActionExplainData,
-  normalizeWorkflowActionMode,
-  normalizeWorkflowTaskSourceAccess,
-} from './workflowTaskActionAccess.mjs'
-
-function getUserFacingErrorMessage(err, fallback = '请求失败，请稍后重试') {
-  const message = typeof err === 'string' ? err : (err?.message ?? '')
-  return /[\u3400-\u9fff]/u.test(String(message || '')) ? message : fallback
-}
-
-function getActionErrorMessage(err, action) {
-  return getUserFacingErrorMessage(err, action)
-}
+import { bindWorkflowActionSubmitGuard } from './workflowTaskActionSubmitGuardCore.mjs'
 
 function loadSubmitGuard({ explainWorkflowActionAccess }) {
-  const source = readFileSync(
-    new URL('./workflowTaskActionSubmitGuard.mjs', import.meta.url),
-    'utf8'
-  )
-  const transformed = source
-    .replace(
-      `import {
-  getActionErrorMessage,
-  getUserFacingErrorMessage,
-} from '@/common/utils/errorMessage'
-`,
-      `const { getActionErrorMessage, getUserFacingErrorMessage } = __errorMessage__
-`
-    )
-    .replace(
-      `import { explainWorkflowActionAccess } from '../api/workflowApi.mjs'
-`,
-      `const { explainWorkflowActionAccess } = __workflowApi__
-`
-    )
-    .replace(
-      `import {
-  normalizeWorkflowActionExplainData,
-  normalizeWorkflowActionMode,
-  normalizeWorkflowTaskSourceAccess,
-} from './workflowTaskActionAccess.mjs'
-`,
-      `const { normalizeWorkflowActionExplainData, normalizeWorkflowActionMode, normalizeWorkflowTaskSourceAccess } = __access__
-`
-    )
-    .replace(
-      'export async function verifyWorkflowTaskActionAccessBeforeSubmit',
-      'async function verifyWorkflowTaskActionAccessBeforeSubmit'
-    )
-
-  assert(!/\bimport\s/u.test(transformed))
-  assert(!/\bexport\s/u.test(transformed))
-
-  const module = { exports: {} }
-  vm.runInNewContext(
-    `${transformed}
-module.exports = { verifyWorkflowTaskActionAccessBeforeSubmit }`,
-    {
-      __errorMessage__: {
-        getActionErrorMessage,
-        getUserFacingErrorMessage,
-      },
-      __workflowApi__: { explainWorkflowActionAccess },
-      __access__: {
-        normalizeWorkflowActionExplainData,
-        normalizeWorkflowActionMode,
-        normalizeWorkflowTaskSourceAccess,
-      },
-      module,
-    }
-  )
-  return module.exports
+  return {
+    verifyWorkflowTaskActionAccessBeforeSubmit:
+      bindWorkflowActionSubmitGuard({
+        explain: explainWorkflowActionAccess,
+      }),
+  }
 }
 
 test('workflowTaskActionSubmitGuard: missing task or action stops before backend explain', async () => {

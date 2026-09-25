@@ -83,6 +83,27 @@ function EnvironmentCard({ card, loading }) {
               missing="权威读回时间未证明"
             />
           </div>
+          <ul
+            className="erp-dev-environment-card__dimensions"
+            aria-label={`${card.label}证据维度`}
+          >
+            {card.evidenceDimensions.map((dimension) => {
+              const dimensionStatus = devEnvironmentEvidenceStatusPresentation(
+                dimension.status
+              )
+              return (
+                <li key={dimension.key}>
+                  <span className="erp-dev-environment-card__dimension-copy">
+                    <strong>{dimension.label}</strong>
+                    <small>{dimension.detail}</small>
+                  </span>
+                  <Tag color={dimensionStatus.color}>
+                    {dimensionStatus.label}
+                  </Tag>
+                </li>
+              )
+            })}
+          </ul>
           <details>
             <summary>身份与边界</summary>
             <div className="erp-dev-environment-card__details-body">
@@ -334,7 +355,7 @@ export default function DevEnvironmentEvidencePanel() {
       <div
         className="erp-dev-environment-evidence__grid"
         role="region"
-        aria-label="本地开发、demo 项目演练造数、test 甲方测试验收与隔离完整验收的环境与验收事实"
+        aria-label="本地开发、demo 项目演练造数、test 甲方测试环境与隔离完整验收的环境与验收事实"
         // 横向事实对比区需要键盘焦点，才能在窄屏使用方向键滚动。
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}

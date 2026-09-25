@@ -242,11 +242,26 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
   )
 })
 
-test('devHub: quality area entry resolves to the canonical server gate view', () => {
+test('devHub: quality area remains a task landing instead of skipping to one gate', () => {
+  assert.doesNotMatch(devWorkbenchAreaPageSource, /<Navigate/u)
+  assert.match(devWorkbenchAreaPageSource, /先选要完成的事情/u)
+  assert.match(devWorkbenchAreaPageSource, /<QualityTaskEntry/u)
+  assert.match(devWorkbenchAreaPageSource, /'quality-gates': Object[.]freeze/u)
+  assert.match(devWorkbenchAreaPageSource, /运行完整或严格门禁/u)
+  assert.match(devWorkbenchAreaPageSource, /entryPresentation/u)
+})
+
+test('devHub: product questions stay parallel and relationship view names cross-area evidence', () => {
   assert.match(
     devWorkbenchAreaPageSource,
-    /if \(isQualityArea\) \{[\s\S]*<Navigate to=\{`\$\{DEV_QUALITY_GATES_ROUTE\}\?view=server`\} replace \/>/u
+    /<ul className="erp-dev-product-task-list">/u
   )
+  assert.doesNotMatch(
+    devWorkbenchAreaPageSource,
+    /erp-dev-product-task__index/u
+  )
+  assert.match(devWorkbenchAreaPageSource, /项目图视角还会关联质量与交付证据/u)
+  assert.doesNotMatch(devWorkbenchAreaPageSource, /同一组已有工具/u)
 })
 
 test('devHub: every tool has one registered area and the overview derives stages from it', () => {

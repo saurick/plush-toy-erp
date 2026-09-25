@@ -80,6 +80,10 @@ test('devDocs: 只通过开发态独立路径暴露', () => {
   )
   assert.match(
     devDocsPageSource,
+    /const archiveMarkdownModules = import\.meta\.glob\([\s\S]*?eager: true/u
+  )
+  assert.match(
+    devDocsPageSource,
     /aria-current=\{active \? 'true' : undefined\}/u
   )
 })
@@ -119,7 +123,10 @@ test('devDocs: 合并后的专题和操作说明仍能在查看器内查阅', ()
     '../../../../deployments/*/runbooks/*.md',
     '../../../../deployments/*/checklists/*.md',
   ]) {
-    assert(devDocsPageSource.includes(source), `missing documentation source: ${source}`)
+    assert(
+      devDocsPageSource.includes(source),
+      `missing documentation source: ${source}`
+    )
   }
   const items = buildDevDocsItems({
     '../../../../server/docs/api.md': '# JSON-RPC API 说明',
@@ -131,7 +138,11 @@ test('devDocs: 合并后的专题和操作说明仍能在查看器内查阅', ()
   assert.equal(items.length, 5)
   assert(items.every((item) => item.lifecycle === DEV_DOCS_LIFECYCLE_CURRENT))
   assert(items.some((item) => item.path === 'server/docs/api.md'))
-  assert(items.some((item) => item.path === 'deployments/yoyoosun/runbooks/08-daily-ops.md'))
+  assert(
+    items.some(
+      (item) => item.path === 'deployments/yoyoosun/runbooks/08-daily-ops.md'
+    )
+  )
 })
 
 test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registry', () => {
@@ -215,8 +226,7 @@ test('devDocs: 默认按当前、评审参考和历史三层分流', async () =>
   const docs = buildDevDocsItems({
     '../../../../docs/当前真源与交接顺序.md': '# 当前真源',
     '../../../../docs/product/prototypes/README.md': '# 原型总入口',
-    '../../../../docs/product/prototypes/menu-v1/README.md':
-      '# 菜单候选原型',
+    '../../../../docs/product/prototypes/menu-v1/README.md': '# 菜单候选原型',
     '../../../../docs/reference/外部输入.md': '# 外部输入参考',
     '../../../../docs/archive/progress-2026-06.md': loadArchive,
   })
@@ -238,27 +248,18 @@ test('devDocs: 默认按当前、评审参考和历史三层分流', async () =>
   )
   assert.equal(normalizeDevDocsLifecycle('unknown'), DEV_DOCS_LIFECYCLE_CURRENT)
   assert.deepEqual(
-    filterDevDocsByLifecycle(docs, DEV_DOCS_LIFECYCLE_CURRENT).map(
-      (item) => item.path
-    ).sort(),
-    [
-      'docs/product/prototypes/README.md',
-      'docs/当前真源与交接顺序.md',
-    ]
+    filterDevDocsByLifecycle(docs, DEV_DOCS_LIFECYCLE_CURRENT)
+      .map((item) => item.path)
+      .sort(),
+    ['docs/product/prototypes/README.md', 'docs/当前真源与交接顺序.md']
   )
   assert.deepEqual(
-    filterDevDocsByLifecycle(docs, DEV_DOCS_LIFECYCLE_REVIEW).map(
-      (item) => item.path
-    ).sort(),
-    [
-      'docs/product/prototypes/menu-v1/README.md',
-      'docs/reference/外部输入.md',
-    ]
+    filterDevDocsByLifecycle(docs, DEV_DOCS_LIFECYCLE_REVIEW)
+      .map((item) => item.path)
+      .sort(),
+    ['docs/product/prototypes/menu-v1/README.md', 'docs/reference/外部输入.md']
   )
-  const archive = filterDevDocsByLifecycle(
-    docs,
-    DEV_DOCS_LIFECYCLE_ARCHIVE
-  )
+  const archive = filterDevDocsByLifecycle(docs, DEV_DOCS_LIFECYCLE_ARCHIVE)
   assert.equal(archive.length, 1)
   assert.equal(archive[0].source, '')
   assert.equal(archive[0].loadSource, loadArchive)
@@ -276,7 +277,8 @@ test('devDocs: 按仓库路径生成目录树', () => {
     '../../../../README.md': '# 仓库 README',
     '../../../../docs/product/产品完成路线图.md': '# 产品完成路线图',
     '../../../../docs/customers/yoyoosun/导入策略.md': '# yoyoosun 导入策略',
-    '../../../../docs/customers/yoyoosun/客户配置草案.md': '# yoyoosun 客户配置',
+    '../../../../docs/customers/yoyoosun/客户配置草案.md':
+      '# yoyoosun 客户配置',
     '../../../../docs/archive/progress-2026-06.md': '# 过程归档',
   })
 

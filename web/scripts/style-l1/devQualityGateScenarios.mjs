@@ -672,7 +672,7 @@ function governance() {
         trigger: '准备发版或需要严格发布候选证据时',
         riskLevel: 'high',
         profiles: ['strict'],
-        sources: ['scripts/qa/strict.sh', '.github/workflows/release.yml'],
+        sources: ['scripts/qa/strict.sh', '.gitlab-ci.yml'],
         evidence: 'dev-workbench-receipt/v1',
         blocks: '当前版本进入版本发布',
         relationship: '在 full 主路径前增加严格静态检查',

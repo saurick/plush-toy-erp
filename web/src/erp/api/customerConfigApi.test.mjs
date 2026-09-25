@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import test from 'node:test'
+import test, { after } from 'node:test'
+
+import * as customerConfigApi from './customerConfigApi.mjs'
+import { installRpcCallHarness } from '../../../scripts/test/rpcApiTestHarness.mjs'
 
 const customerConfigApiSource = readFileSync(
   fileURLToPath(new URL('./customerConfigApi.mjs', import.meta.url)),
@@ -21,28 +24,11 @@ const salesOrderPageSource = readFileSync(
   'utf8'
 )
 
+const setCustomerConfigApiCall = installRpcCallHarness(after)
+
 async function loadCustomerConfigApiForTest(call) {
-  globalThis.__customerConfigApiCall = call
-  const source = customerConfigApiSource
-    .replace(
-      /import \{ AUTH_SCOPE \} from '[^']+'\n/,
-      "const AUTH_SCOPE = { ADMIN: 'admin' }\n"
-    )
-    .replace(
-      /import \{ ADMIN_BASE_PATH \} from '[^']+'\n/,
-      "const ADMIN_BASE_PATH = '/admin'\n"
-    )
-    .replace(
-      /import \{ JsonRpc \} from '[^']+'\n/,
-      'class JsonRpc { call(method, params) { return globalThis.__customerConfigApiCall(method, params) } }\n'
-    )
-    .replace(
-      /import \{ buildCustomerConfigMutationPayload \} from '[^']+'\n/,
-      'const buildCustomerConfigMutationPayload = (_action, params) => params\n'
-    )
-  return import(
-    `data:text/javascript;base64,${Buffer.from(source).toString('base64')}#${Date.now()}-${Math.random()}`
-  )
+  setCustomerConfigApiCall(call)
+  return customerConfigApi
 }
 
 function processStartData({

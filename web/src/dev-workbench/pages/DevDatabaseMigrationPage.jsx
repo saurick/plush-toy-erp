@@ -214,7 +214,8 @@ export default function DevDatabaseMigrationPage() {
   useEffect(() => {
     if (!pollingOperation) return undefined
     let cancelled = false
-    const timer = window.setInterval(async () => {
+    let timer = 0
+    const poll = async () => {
       try {
         const operation = await client.operation(pollingOperation.id)
         if (cancelled) return
@@ -230,18 +231,23 @@ export default function DevDatabaseMigrationPage() {
             : current
         )
         if (!isDatabaseMigrationOperationPolling(operation.status)) {
-          window.clearInterval(timer)
-          refresh()
+          await refresh()
+          return
         }
       } catch (error) {
         if (!cancelled) {
           message.error(error?.message || '迁移操作状态读取失败')
         }
       }
-    }, OPERATION_POLL_INTERVAL_MS)
+      if (!cancelled) {
+        timer = window.setTimeout(poll, OPERATION_POLL_INTERVAL_MS)
+      }
+    }
+
+    timer = window.setTimeout(poll, OPERATION_POLL_INTERVAL_MS)
     return () => {
       cancelled = true
-      window.clearInterval(timer)
+      window.clearTimeout(timer)
     }
   }, [client, pollingOperation, refresh, updateSummary])
 

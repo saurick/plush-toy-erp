@@ -38,8 +38,8 @@ function dataSummaryFixture() {
       fingerprint: 'd'.repeat(64),
     },
     datasetContract: {
-      dataVersion: '2026.08.15-v6',
-      runId: '20260815-V6',
+      dataVersion: '2026.09.16-v7',
+      runId: '20260916-V7',
       semanticDigest: DIGEST,
       unitCount: 11,
       warehouseCount: 4,
@@ -48,7 +48,7 @@ function dataSummaryFixture() {
         minimumMigration: '20260728100514',
         configRevision:
           'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-        configProductVersion: 'customer-trial-133-test-2026.08.15-v6',
+        configProductVersion: 'customer-trial-133-test-2026.09.16-v7',
       },
     },
     target: {
@@ -57,7 +57,7 @@ function dataSummaryFixture() {
         databaseName: 'plush_erp',
         migrationVersion: '20260728100514',
         customerConfigRevision: 'local-v8',
-        customerConfigProductVersion: 'local-2026.08.15-v6',
+        customerConfigProductVersion: 'local-2026.09.16-v7',
         targetFingerprint: TARGET_FINGERPRINT,
       },
       fullAcceptance: { migrationVersion: '20260728100514' },
@@ -66,17 +66,17 @@ function dataSummaryFixture() {
       chainDataDigest: 'e'.repeat(64),
       chainVerificationDigest: 'f'.repeat(64),
     },
-    operations: [
+    currentOperations: [
       operation('core-demo', {
         core: { units: 11, warehouses: 4 },
       }),
       operation('scenario-demo', {
-        dataVersion: '2026.08.15-v6',
-        runId: '20260815-V6',
+        dataVersion: '2026.09.16-v7',
+        runId: '20260916-V7',
         targetFingerprint: TARGET_FINGERPRINT,
       }),
       operation('full-acceptance', {
-        dataVersion: '2026.08.15-v6',
+        dataVersion: '2026.09.16-v7',
         reportStatus: 'passed',
         cleanupComplete: true,
         residualDatabaseCount: 0,
@@ -88,7 +88,7 @@ function dataSummaryFixture() {
 }
 
 function addTrialReadback(summary) {
-  summary.operations.push(
+  summary.currentOperations.push(
     operation(
       'scenario-demo',
       {
@@ -98,8 +98,8 @@ function addTrialReadback(summary) {
         migrationVersion: '20260728100514',
         customerConfigRevision:
           'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-        dataVersion: '2026.08.15-v6',
-        runId: '20260815-V6',
+        dataVersion: '2026.09.16-v7',
+        runId: '20260916-V7',
         semanticDigest: DIGEST,
         backupReceipt: {
           status: 'passed',
@@ -129,8 +129,8 @@ function deliverySummaryFixture() {
         activeCustomerConfig: {
           revision:
             'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-          productVersion: 'customer-trial-133-test-2026.08.15-v6',
-          datasetVersion: '2026.08.15-v6',
+          productVersion: 'customer-trial-133-test-2026.09.16-v7',
+          datasetVersion: '2026.09.16-v7',
         },
         serverHealth: 'passed',
         serverReady: 'passed',
@@ -196,10 +196,29 @@ test('environment evidence keeps one controller and four evidence cards', () => 
   assert.equal(evidence.cards[0].status, 'success')
   assert.equal(evidence.cards[1].status, 'not_proven')
   assert.match(evidence.cards[1].nextAction, /demo 目标卡/u)
-  assert.equal(evidence.cards[2].status, 'success')
+  assert.equal(evidence.cards[2].status, 'not_proven')
+  assert.equal(evidence.cards[2].label, 'test 甲方测试环境')
+  assert.equal(
+    evidence.cards[2].evidenceDimensions.find(
+      (dimension) => dimension.key === 'acceptance'
+    ).status,
+    'not_proven'
+  )
   assert.equal(evidence.cards[2].datasetVersion, '保留现有数据')
   assert.match(evidence.cards[2].nextAction, /独立清空并重建/u)
   assert.equal(evidence.cards[3].status, 'success')
+})
+
+test('local evidence does not treat summary generation time as a current readback', () => {
+  const dataSummary = dataSummaryFixture()
+  dataSummary.currentOperations = []
+
+  const evidence = buildDevEnvironmentEvidence({
+    dataSummary,
+    deliverySummary: deliverySummaryFixture(),
+  })
+
+  assert.equal(evidence.cards[0].readbackAt, '')
 })
 
 test('customer test data rebuild is independent from normal deployment readiness', () => {
@@ -210,6 +229,17 @@ test('customer test data rebuild is independent from normal deployment readiness
     target: 'customer-test-133',
     status: 'passed',
     updatedAt: '2026-08-15T03:00:00.000Z',
+    gitSha: COMMIT,
+    metadata: {
+      logicalDatabase: 'plush_erp_customer_test_v1',
+      physicalGeneration: 'fresh',
+      databaseRebuildFingerprint: '4'.repeat(64),
+      databaseRebuildReceiptSha256: '5'.repeat(64),
+      migrationReadback: '20260728100514',
+      predecessorPreserved: true,
+      backupSha256: '6'.repeat(64),
+      backupSizeBytes: 4096,
+    },
   })
   const evidence = buildDevEnvironmentEvidence({
     dataSummary: dataSummaryFixture(),
@@ -217,7 +247,7 @@ test('customer test data rebuild is independent from normal deployment readiness
   })
   const customerTest = evidence.cards[2]
 
-  assert.equal(customerTest.status, 'success')
+  assert.equal(customerTest.status, 'not_proven')
   assert.equal(customerTest.datasetVersion, 'clean-baseline')
   assert.equal(customerTest.datasetRunId, '11111111')
   assert.match(customerTest.datasetEvidence, /受控重建/u)
@@ -271,7 +301,7 @@ test('stale release, config or dataset evidence never becomes green', () => {
   assert.match(evidence.cards[1].nextAction, /Exact-SHA/u)
 
   const staleData = dataSummaryFixture()
-  staleData.operations[1].readback.dataVersion = '2026.07.16-v5'
+  staleData.currentOperations[1].readback.dataVersion = '2026.07.16-v5'
   assert.equal(
     buildDevEnvironmentEvidence({ dataSummary: staleData }).cards[0].status,
     'not_proven'

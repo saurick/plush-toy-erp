@@ -868,7 +868,9 @@ test('summary fails core demo closed when the migration preflight is not ready',
     ),
     true
   )
-  assert.deepEqual(summary.operations, [])
+  assert.deepEqual(summary.currentOperations, [])
+  assert.deepEqual(summary.historicalOperations, [])
+  assert.deepEqual(summary.unresolvedOperations, [])
 })
 
 test('summary coalesces concurrent reads, caches route remounts, and supports an authoritative refresh', async (t) => {
@@ -999,20 +1001,94 @@ test('summary keeps legacy scenario receipts on disk but omits them from the cur
   })
   const summary = await service.summary()
   assert.equal(
-    summary.operations.some(
+    summary.currentOperations.some(
       (operation) => operation.id === created.operation.id
     ),
     false
   )
   assert.equal(
+    summary.historicalOperations.some(
+      (operation) => operation.id === created.operation.id
+    ),
+    true
+  )
+  assert.equal(
     summary.issues.some(
-      (issue) => issue.code === 'historical_operation_contract_omitted'
+      (issue) => issue.code === 'historical_operation_contract_preserved'
     ),
     true
   )
   assert.equal(
     readDataPreparationOperation(fixture.store, created.operation.id).status,
     'passed'
+  )
+})
+
+test('summary isolates an unregistered operation contract and rejects its execution', async (t) => {
+  const fixture = createFixture(t)
+  const targetSummary = {
+    safeTarget: 'local-development:plush_erp',
+    targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
+    preflightFingerprint: 'd'.repeat(64),
+    disposable: false,
+    automaticCleanup: false,
+    targetKey: 'local-development',
+  }
+  const runId = 'scenario_demo_unregistered'
+  const planHash = hashDataPreparationPlan({
+    profileKey: 'scenario-demo',
+    repository: REPOSITORY,
+    runId,
+    targetSummary,
+  })
+  const created = createOrReuseDataPreparationOperation(fixture.store, {
+    idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
+    profileKey: 'scenario-demo',
+    repository: REPOSITORY,
+    runId,
+    targetSummary,
+    planHash,
+    operationId: '623e4567-e89b-42d3-a456-426614174000',
+    now: '2026-07-29T02:03:04.000Z',
+  })
+  const service = createDevDataPreparationService({
+    projectRoot: fixture.root,
+    operationStore: fixture.store,
+    commandRunner: successfulRunner([]),
+    readRepositoryState: async () => REPOSITORY,
+    environment: { LOCAL_ACCEPTANCE_DATABASE_BASE_URL: FULL_DSN },
+    now: () => new Date('2026-07-29T02:07:04.000Z'),
+  })
+
+  const summary = await service.summary()
+  assert.equal(
+    summary.unresolvedOperations.some(
+      (operation) => operation.id === created.operation.id
+    ),
+    true
+  )
+  assert.equal(
+    summary.currentOperations.some(
+      (operation) => operation.id === created.operation.id
+    ),
+    false
+  )
+  await assert.rejects(
+    service.act({
+      action: 'execute',
+      payload: {
+        operationId: created.operation.id,
+        confirmation: [
+          'DATA_PREPARATION',
+          'scenario-demo',
+          'local-development',
+          runId,
+          planHash,
+          created.operation.id,
+        ].join(':'),
+      },
+    }),
+    /contract is not current/u
   )
 })
 
@@ -1134,7 +1210,7 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
       stages: summary.acceptancePlan.dataStageCount,
       targets: summary.acceptancePlan.catalogTargetCount,
     },
-    { chains: 11, steps: 67, scenarios: 66, stages: 9, targets: 51 }
+    { chains: 11, steps: 62, scenarios: 66, stages: 9, targets: 51 }
   )
   assert.equal(summary.acceptancePlan.selectorAffectsExecution, false)
   assert.equal(summary.acceptancePlan.freshBatchPerRun, true)
@@ -1308,6 +1384,16 @@ test('operation persistence recovers interrupted execution as not_proven and blo
     readDataPreparationOperation(fixture.store, created.operation.id).status,
     'not_proven'
   )
+  const summary = await service.summary()
+  assert.equal(summary.status, 'blocked')
+  assert.equal(
+    summary.issues.some(
+      (issue) =>
+        issue.code === 'unresolved_operation_contract_preserved' &&
+        issue.severity === 'blocked'
+    ),
+    true
+  )
   await assert.rejects(
     service.act({
       action: 'execute',
@@ -1317,7 +1403,7 @@ test('operation persistence recovers interrupted execution as not_proven and blo
           'DATA_PREPARATION:core-demo:placeholder:placeholder:placeholder',
       },
     }),
-    /blocks execution/u
+    /contract is not current/u
   )
 })
 
@@ -1437,11 +1523,19 @@ test('scenario-demo allows only a newer explicit same-target replay after an unk
 test('a later authoritative scenario readback releases the resolved unknown outcome for core demo', () => {
   const targetSummary = {
     targetKey: 'local-development',
-    safeTarget: 'host=192.168.0.133 port=5432 database=plush_erp',
+    safeTarget: 'local-development:plush_erp',
     targetFingerprint: 'c'.repeat(64),
     preflightFingerprint: 'd'.repeat(64),
     disposable: false,
     automaticCleanup: false,
+    releaseSha: REPOSITORY.commit,
+    databaseName: 'plush_erp',
+    migrationVersion: '20260916090000',
+    customerConfigRevision: 'yoyoosun-local-test.runtime-v1',
+    datasetVersion: '2026.09.16-v7',
+    datasetRunId: '20260916-V7',
+    semanticDigest: SCENARIO_SEMANTIC_DIGEST,
+    rollbackPoint: 'forward-only:plush_erp:20260916-V7',
   }
   const coreCandidate = {
     id: '323e4567-e89b-42d3-a456-426614174000',
@@ -1465,9 +1559,31 @@ test('a later authoritative scenario readback releases the resolved unknown outc
     createdAt: '2026-07-29T02:05:30.000Z',
     updatedAt: '2026-07-29T02:06:04.000Z',
     targetSummary,
+    repository: REPOSITORY,
     readback: {
+      schemaVersion: 'plush.dev-data-preparation-readback/v1',
+      profileKey: 'scenario-demo',
+      targetKey: 'local-development',
+      targetEnvironment: 'local-development',
+      targetFingerprint: targetSummary.targetFingerprint,
+      databaseName: 'plush_erp',
+      release: REPOSITORY.commit,
+      migrationVersion: '20260916090000',
+      customerConfigRevision: 'yoyoosun-local-test.runtime-v1',
+      datasetKey: 'yoyoosun-manual-acceptance',
       dataVersion: '2026.09.16-v7',
       runId: '20260916-V7',
+      semanticDigest: SCENARIO_SEMANTIC_DIGEST,
+      stageCount: 9,
+      sourceDocumentCount: 135,
+      processRuntimeCount: 5,
+      factCount: 500,
+      catalogReadyCount: 41,
+      catalogTargetCount: 51,
+      browserChecksPending: 10,
+      manualAcceptanceCompleted: false,
+      cleanupSupported: false,
+      replayMode: 'exact-create-or-readback',
     },
   }
 

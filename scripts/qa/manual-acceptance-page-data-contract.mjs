@@ -121,7 +121,7 @@ const PROBE_GENERATOR_STAGE = Object.freeze({
   "boss-dashboard-active-tasks": "task",
   "mobile-task-total": "task",
   "catalog-print-templates": "catalog",
-  "business-dashboard-stats": "facts",
+  "business-progress": "facts",
 });
 
 const WORKFLOW_TASK_GROUP_PROBES = Object.freeze({
@@ -253,6 +253,9 @@ function targetEvidence(item) {
       probeIds: [
         MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.mobileTaskTotal,
         "boss-dashboard-tasks",
+        "workflow-tasks:production_scheduling",
+        "workflow-tasks:production_exception",
+        "workflow-tasks:shipment_finance_approval",
       ],
       actualProbeId: "boss-dashboard-tasks",
       browserRequired: true,
@@ -262,33 +265,11 @@ function targetEvidence(item) {
   }
   if (item.key === "business-dashboard") {
     return {
-      probeIds: [
-        "customers",
-        "suppliers",
-        "products",
-        "bom-versions",
-        "sales-orders",
-        "purchase-orders",
-        "purchase-receipts",
-        "quality-inspections",
-        "inventory-balances",
-        "workflow-tasks:shipment_finance_approval",
-        "shipments",
-        "production-orders",
-        "workflow-tasks:production_scheduling",
-        "production-facts",
-        "workflow-tasks:production_exception",
-        "outsourcing-orders",
-        "finance-reconciliation",
-        "finance-payables",
-        "finance-receivables",
-        "finance-invoices",
-        "business-dashboard-stats",
-      ],
-      combine: "minimum",
+      probeIds: ["sales-orders", "production-orders", "business-progress", "boss-dashboard-tasks"],
+      actualProbeId: "business-progress",
       browserRequired: true,
       reason:
-        "基础资料、业务单据、办理结果和当前待办分别按共享批次核对；页面四类数字与跳转仍需页面确认。",
+        "进度看板按源单与当前批次核对；页面全范围数量、可见订单标识与原单跳转须与进度查询一致。",
     };
   }
   if (item.key === "production-exceptions") {
@@ -357,6 +338,10 @@ function targetEvidence(item) {
       browserRequired: true,
       reason: "账号和岗位模板数量可核对，筛选及权限调整仍需页面确认。",
     };
+  }
+  if (item.key === "products") {
+    return { probeIds: ["products", "product-skus"], actualProbeId: "product-skus", browserRequired: true,
+      reason: "产品与规格分别核对，页面数量采用规格；主档作为其来源证据。" };
   }
   const probeId = MANUAL_ACCEPTANCE_DESKTOP_DATASET_BY_PAGE[item.key];
   assertContract(probeId, `页面 ${item.key} 没有共享数据核验口径`);

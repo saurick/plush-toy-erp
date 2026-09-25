@@ -5,7 +5,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
+import { requireProgressBoard } from "../../web/src/erp/utils/businessProgress.mjs";
 import {
   LOCAL_DEMO_ACCOUNT_SET,
   MANUAL_ACCEPTANCE_BUSINESS_ROLE_KEYS,
@@ -62,12 +62,7 @@ const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/readiness";
 const MOBILE_TASK_TOTAL = 180;
 const MOBILE_TASKS_PER_ROLE = 20;
 const QUERY_LIMIT = 200;
-const BUSINESS_DASHBOARD_PROJECTION_PROBE_ID = "business-dashboard-stats";
-const BUSINESS_DASHBOARD_MODULE_KEYS = Object.freeze(
-  dashboardHealthModules.flatMap((module) =>
-    module.sources.map((source) => source.key),
-  ),
-);
+const BUSINESS_DASHBOARD_PROJECTION_PROBE_ID = "business-progress";
 const RUNTIME_PREFLIGHT_USERNAME = "admin";
 const SOURCE_DRIVEN_FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const TASK_REQUIRED_STATUSES = Object.freeze(
@@ -1003,7 +998,7 @@ function validateFactReport(report) {
   }
   if (!manualAcceptanceOutsourcingInventoryCoverageIsComplete(report)) {
     throw new CliError(
-      "业务记录报告缺少完整的委外回货库存覆盖与业务看板同批精确总数",
+      "业务记录报告缺少完整的委外回货库存覆盖与业务事实同批精确总数",
       2,
     );
   }
@@ -1633,36 +1628,15 @@ function buildDatasetProbes(
     id: BUSINESS_DASHBOARD_PROJECTION_PROBE_ID,
     roleKey: "boss",
     domain: "business",
-    method: "dashboard_stats",
-    listKey: "modules",
-    params: {},
-    includeCustomerKey: true,
-    batchEvidence:
-      sourceReport && factReport && taskReport
-        ? persistentProjection
-          ? "persistent_dataset_projection"
-          : "fresh_dataset_projection"
-        : "not_proven",
-    batchNotProvenReason:
-      sourceReport && factReport && taskReport
-        ? null
-        : "缺少同批源数据、业务记录或岗位任务报告，不能把历史业务看板总数当成本批数据。",
-    expectedMinimum: BUSINESS_DASHBOARD_MODULE_KEYS.length,
-    expectedExact: BUSINESS_DASHBOARD_MODULE_KEYS.length,
-    expectedModuleKeys: [...BUSINESS_DASHBOARD_MODULE_KEYS],
-    expectedModuleTotals: {
-      ...(sourceReport
-        ? { products: Number(sourceReport.scale.products) }
-        : {}),
-      ...(factReport
-        ? {
-            inventory: Number(
-              factReport.summary.businessDashboardInventoryTotal,
-            ),
-          }
-        : {}),
-    },
-    expectedModuleTotalComparison: persistentProjection ? "minimum" : "exact",
+    method: "list_progress",
+    listKey: "rows",
+    params: { view: "orders", scope: "all", limit: 100, offset: 0 },
+    includeCustomerKey: false,
+    batchEvidence: sourceReport && factReport && taskReport
+      ? persistentProjection ? "persistent_dataset_projection" : "fresh_dataset_projection"
+      : "not_proven",
+    batchNotProvenReason: "缺少同批源单、事实或任务报告，不能证明进度来自当前验收批次。",
+    expectedMinimum: Math.max(canonical["sales-orders"] ?? 0, declared["sales-orders"] ?? 0),
     declaredMinimum: null,
     readOnly: true,
   });
@@ -2368,126 +2342,20 @@ export function evaluateManualAcceptanceDataset(probe, data) {
 }
 
 export function evaluateBusinessDashboardProjection(probe, data) {
-  const moduleTotalComparison =
-    probe.expectedModuleTotalComparison === "minimum" ? "minimum" : "exact";
-  if (probe.batchEvidence === "not_proven") {
-    return {
-      id: probe.id,
-      status: "not_proven",
-      expectedMinimum: probe.expectedMinimum,
-      expectedExact: probe.expectedExact,
-      actual: null,
-      returned: 0,
-      statusCounts: {},
-      requiredStatuses: [],
-      missingStatuses: [],
-      enoughRecords: false,
-      enoughStatuses: true,
-      enoughSecondaryKinds: true,
-      batchEvidence: "not_proven",
-      moduleTotals: {},
-      missingModuleKeys: [...probe.expectedModuleKeys],
-      unexpectedModuleKeys: [],
-      unavailableModuleKeys: [],
-      moduleTotalMismatches: {},
-      moduleTotalComparison,
-      notProvenReason: probe.batchNotProvenReason,
-      error: null,
-    };
-  }
-  const modules = Array.isArray(data?.modules) ? data.modules : null;
-  if (!modules) {
-    return {
-      id: probe.id,
-      status: "error",
-      expectedMinimum: probe.expectedMinimum,
-      expectedExact: probe.expectedExact,
-      actual: null,
-      returned: 0,
-      statusCounts: {},
-      requiredStatuses: [],
-      missingStatuses: [],
-      enoughRecords: false,
-      enoughStatuses: false,
-      enoughSecondaryKinds: true,
-      batchEvidence: probe.batchEvidence,
-      moduleTotals: {},
-      missingModuleKeys: [...probe.expectedModuleKeys],
-      unexpectedModuleKeys: [],
-      unavailableModuleKeys: [],
-      moduleTotalMismatches: {},
-      moduleTotalComparison,
-      notProvenReason: null,
-      error: "查询结果缺少 modules",
-    };
-  }
-  const moduleTotals = Object.fromEntries(
-    modules.map((module) => [
-      String(module?.module_key || ""),
-      Number(module?.total),
-    ]),
-  );
-  const actualModuleKeys = modules.map((module) =>
-    String(module?.module_key || ""),
-  );
-  const missingModuleKeys = probe.expectedModuleKeys.filter(
-    (key) => !actualModuleKeys.includes(key),
-  );
-  const unexpectedModuleKeys = actualModuleKeys.filter(
-    (key) => !probe.expectedModuleKeys.includes(key),
-  );
-  const unavailableModuleKeys = modules
-    .filter(
-      (module) =>
-        module?.available !== true ||
-        !Number.isSafeInteger(Number(module?.total)) ||
-        Number(module.total) < 0,
-    )
-    .map((module) => String(module?.module_key || ""));
-  const moduleTotalMismatches = Object.fromEntries(
-    Object.entries(probe.expectedModuleTotals || {})
-      .filter(([key, expected]) => {
-        const actual = moduleTotals[key];
-        return moduleTotalComparison === "minimum"
-          ? !Number.isFinite(actual) || actual < Number(expected)
-          : actual !== Number(expected);
-      })
-      .map(([key, expected]) => [
-        key,
-        { expected: Number(expected), actual: moduleTotals[key] ?? null },
-      ]),
-  );
-  const exactModuleSet =
-    modules.length === probe.expectedExact &&
-    new Set(actualModuleKeys).size === modules.length &&
-    missingModuleKeys.length === 0 &&
-    unexpectedModuleKeys.length === 0;
-  const enoughRecords =
-    exactModuleSet &&
-    unavailableModuleKeys.length === 0 &&
-    Object.keys(moduleTotalMismatches).length === 0;
+  let error = null;
+  try { requireProgressBoard(data); } catch { error = "进度响应缺少有效数量、来源明细或权限范围"; }
+  const batchProven = probe.batchEvidence !== "not_proven";
+  const enoughRecords = !error && data.access.sales && data.total === data.counts.total && data.total >= probe.expectedMinimum && data.rows.length > 0;
   return {
     id: probe.id,
-    status: enoughRecords ? "pass" : "fail",
-    expectedMinimum: probe.expectedMinimum,
-    expectedExact: probe.expectedExact,
-    actual: modules.length,
-    returned: modules.length,
-    statusCounts: {},
-    requiredStatuses: [],
-    missingStatuses: [],
-    enoughRecords,
-    enoughStatuses: true,
-    enoughSecondaryKinds: true,
+    status: !batchProven ? "not_proven" : error ? "error" : enoughRecords ? "pass" : "fail",
+    expectedMinimum: probe.expectedMinimum, actual: error ? null : data.total,
+    returned: error ? 0 : data.rows.length, statusCounts: {}, requiredStatuses: [], missingStatuses: [],
+    enoughRecords: batchProven && enoughRecords, enoughStatuses: true, enoughSecondaryKinds: true,
     batchEvidence: probe.batchEvidence,
-    moduleTotals,
-    missingModuleKeys,
-    unexpectedModuleKeys,
-    unavailableModuleKeys,
-    moduleTotalMismatches,
-    moduleTotalComparison,
-    notProvenReason: null,
-    error: null,
+    progressCounts: error ? null : data.counts,
+    sampleOrderIDs: error ? [] : data.rows.map(row => row.id),
+    notProvenReason: batchProven ? null : probe.batchNotProvenReason, error,
   };
 }
 

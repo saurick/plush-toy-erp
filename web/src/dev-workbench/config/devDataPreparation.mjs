@@ -123,7 +123,7 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance]: Object.freeze({
     title: '按最新业务链完整回归',
     shortTitle: 'Full Acceptance',
-    purpose: '按全部已登记业务链和合法场景，在新隔离库完成完整回归',
+    purpose: '按全部已登记业务链和场景合同，在新隔离库完成完整回归',
     retention: '每次执行都建立新批次，只接受 clean exact commit',
     cleanup: '无论验收成功或失败都自动清理隔离库，不提供手工清理按钮。',
     scope:
@@ -136,12 +136,12 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     prepareDescription:
       '预检通过后生成绑定当前业务链合同与 clean exact commit 的新批次计划，不会立即写入。',
     confirmationDescription:
-      '完整回归始终执行全部已登记合法场景；业务链选择只帮助核对计划。成功或失败后都必须完成自动清理读回。',
+      '完整回归始终执行全部已登记场景合同；业务链选择只帮助核对计划。成功或失败后都必须完成自动清理读回。',
     successDescription: '最新业务链回归、各阶段耗时与自动清理读回已记录。',
     cleanupBoundary: '成功或失败后自动清理',
     steps: Object.freeze([
       '确认 clean exact commit 与专用隔离库',
-      '按当前业务链合同执行 9 个现有造数阶段和全部合法场景',
+      '按当前业务链合同执行 9 个现有造数阶段和全部场景合同',
       '运行现有完整 QA / 浏览器回归并记录总耗时与阶段耗时',
       '成功或失败后自动清理隔离库并读回零残留',
     ]),
@@ -194,6 +194,11 @@ const TERMINAL_OPERATION_STATUSES = new Set([
   'failed',
   'blocked',
   'not_proven',
+])
+const OPERATION_CONTRACT_CLASSIFICATIONS = new Set([
+  'current',
+  'historical',
+  'unresolved',
 ])
 const ISSUE_SEVERITIES = new Set(['warning', 'blocked'])
 const OPERATION_ID_PATTERN =
@@ -267,6 +272,44 @@ function assertIsoTimestamp(value, field) {
     throw new Error(`${field} is invalid`)
   }
   return value
+}
+
+function validateOperationContract(contract, expectedClassification = '') {
+  assertExactKeys(
+    contract,
+    [
+      'classification',
+      'dataVersion',
+      'datasetRunId',
+      'schemaVersion',
+      'semanticDigest',
+    ],
+    'data preparation operation contract'
+  )
+  if (
+    contract.schemaVersion !==
+      'plush.dev-data-preparation-operation-contract/v1' ||
+    !OPERATION_CONTRACT_CLASSIFICATIONS.has(contract.classification) ||
+    (expectedClassification &&
+      contract.classification !== expectedClassification) ||
+    (contract.dataVersion !== null &&
+      !/^20\d{2}\.\d{2}\.\d{2}-v\d+$/u.test(contract.dataVersion)) ||
+    (contract.datasetRunId !== null &&
+      !/^20\d{6}-V\d+$/u.test(contract.datasetRunId)) ||
+    (contract.semanticDigest !== null &&
+      !HASH_PATTERN.test(contract.semanticDigest))
+  ) {
+    throw new Error('data preparation operation contract is invalid')
+  }
+  if (
+    contract.classification === 'current' &&
+    (contract.dataVersion !== SCENARIO_DEMO_DATA_VERSION ||
+      contract.datasetRunId !== SCENARIO_DEMO_RUN_ID ||
+      !HASH_PATTERN.test(String(contract.semanticDigest || '')))
+  ) {
+    throw new Error('current data preparation operation contract is invalid')
+  }
+  return contract
 }
 
 function validateIssue(issue) {
@@ -877,6 +920,7 @@ export function validateDevDataPreparationOperation(operation) {
     operation,
     [
       'confirmationRequired',
+      'contract',
       'createdAt',
       'events',
       'id',
@@ -894,6 +938,7 @@ export function validateDevDataPreparationOperation(operation) {
     ],
     'data preparation operation'
   )
+  validateOperationContract(operation.contract, 'current')
   const targetSummaryKeys = [
     'automaticCleanup',
     'disposable',
@@ -1024,6 +1069,28 @@ export function validateDevDataPreparationOperation(operation) {
   return operation
 }
 
+function validateOperationReference(operation) {
+  assertExactKeys(
+    operation,
+    ['contract', 'id', 'profileKey', 'status', 'terminal', 'updatedAt'],
+    'data preparation operation reference'
+  )
+  if (
+    !OPERATION_ID_PATTERN.test(String(operation.id || '')) ||
+    !PROFILE_KEYS.has(operation.profileKey) ||
+    !OPERATION_STATUSES.has(operation.status) ||
+    operation.terminal !== TERMINAL_OPERATION_STATUSES.has(operation.status)
+  ) {
+    throw new Error('data preparation operation reference is invalid')
+  }
+  assertIsoTimestamp(
+    operation.updatedAt,
+    'data preparation operation reference timestamp'
+  )
+  validateOperationContract(operation.contract)
+  return operation
+}
+
 export function validateDevDataPreparationSummary(summary) {
   assertExactKeys(
     summary,
@@ -1032,13 +1099,15 @@ export function validateDevDataPreparationSummary(summary) {
       'acceptancePlan',
       'datasetContract',
       'generatedAt',
+      'historicalOperations',
       'issues',
-      'operations',
+      'currentOperations',
       'profiles',
       'repository',
       'schemaVersion',
       'status',
       'target',
+      'unresolvedOperations',
     ],
     'data preparation summary'
   )
@@ -1062,10 +1131,12 @@ export function validateDevDataPreparationSummary(summary) {
     'data preparation boundaries'
   )
   if (
-    summary.schemaVersion !== 'plush.dev-data-preparation-summary/v1' ||
+    summary.schemaVersion !== 'plush.dev-data-preparation-summary/v2' ||
     !SUMMARY_STATUSES.has(summary.status) ||
     !Array.isArray(summary.profiles) ||
-    !Array.isArray(summary.operations) ||
+    !Array.isArray(summary.currentOperations) ||
+    !Array.isArray(summary.historicalOperations) ||
+    !Array.isArray(summary.unresolvedOperations) ||
     !Array.isArray(summary.issues)
   ) {
     throw new Error('data preparation summary contract is invalid')
@@ -1101,8 +1172,25 @@ export function validateDevDataPreparationSummary(summary) {
   ) {
     throw new Error('data preparation profile set is invalid')
   }
-  summary.operations.forEach(validateDevDataPreparationOperation)
-  summary.operations.forEach((operation) => {
+  summary.currentOperations.forEach(validateDevDataPreparationOperation)
+  summary.historicalOperations.forEach(validateOperationReference)
+  summary.unresolvedOperations.forEach(validateOperationReference)
+  if (
+    summary.historicalOperations.some(
+      (operation) => operation.contract.classification !== 'historical'
+    ) ||
+    summary.unresolvedOperations.some(
+      (operation) => operation.contract.classification !== 'unresolved'
+    ) ||
+    summary.currentOperations.some(
+      (operation) =>
+        operation.contract.semanticDigest !==
+        summary.datasetContract.semanticDigest
+    )
+  ) {
+    throw new Error('data preparation operation buckets are invalid')
+  }
+  summary.currentOperations.forEach((operation) => {
     if (
       operation.profileKey !== DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
     ) {

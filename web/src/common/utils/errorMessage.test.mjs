@@ -1,79 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import fs from 'node:fs'
-import path from 'node:path'
-import vm from 'node:vm'
 
-function loadErrorCodesModule() {
-  const generatedPath = path.resolve(
-    import.meta.dirname,
-    '../consts/errorCodes.generated.js'
-  )
-  const generatedSource = fs.readFileSync(generatedPath, 'utf8')
-  const generatedTransformed = generatedSource
-    .replace(/export const /g, 'const ')
-    .concat('\nmodule.exports = { RpcErrorCode };\n')
-
-  const generatedSandbox = { module: { exports: {} }, exports: {} }
-  vm.runInNewContext(generatedTransformed, generatedSandbox, {
-    filename: generatedPath,
-  })
-
-  const filePath = path.resolve(import.meta.dirname, '../consts/errorCodes.js')
-  const source = fs.readFileSync(filePath, 'utf8')
-  const transformed = source
-    .replace(
-      /import\s+\{\s*RpcErrorCode\s*\}\s+from\s+["']\.\/errorCodes\.generated\.js["']\s*/u,
-      'const { RpcErrorCode } = __generated__\n'
-    )
-    .replace(/export\s+\{\s*RpcErrorCode\s*\}\s*/u, '')
-    .replace(/export const /g, 'const ')
-    .replace(/export function /g, 'function ')
-    .concat(
-      '\nmodule.exports = { RpcErrorCode, AUTH_FAILURE_ERROR_CODES, isAuthFailureCode, DEFAULT_RPC_ERROR_MESSAGES };\n'
-    )
-
-  const sandbox = {
-    module: { exports: {} },
-    exports: {},
-    __generated__: generatedSandbox.module.exports,
-  }
-  vm.runInNewContext(transformed, sandbox, { filename: filePath })
-  return sandbox.module.exports
-}
-
-function loadErrorMessageModule() {
-  const filePath = path.resolve(import.meta.dirname, './errorMessage.js')
-  const source = fs.readFileSync(filePath, 'utf8')
-  const transformed = source
-    .replace(
-      /import\s+\{\s*logout\s*\}\s+from\s+["'](?:@\/common\/auth\/auth|\.\.\/auth\/auth\.js)["']\s*/u,
-      'const { logout } = __auth__\n'
-    )
-    .replace(
-      /import\s+\{[\s\S]*?\}\s+from\s+["'](?:@\/common\/consts\/errorCodes|\.\.\/consts\/errorCodes\.js)["']\s*/u,
-      'const { DEFAULT_RPC_ERROR_MESSAGES, RpcErrorCode, isAuthFailureCode } = __errorCodes__\n'
-    )
-    .replace(/export function /g, 'function ')
-    .replace(/export const /g, 'const ')
-    .concat(
-      '\nmodule.exports = { getUserFacingErrorMessage, getActionErrorMessage, handleRpcError, ERROR_MESSAGES };\n'
-    )
-
-  const sandbox = {
-    module: { exports: {} },
-    exports: {},
-    __auth__: { logout() {} },
-    __errorCodes__: errorCodesModule,
-  }
-  vm.runInNewContext(transformed, sandbox, { filename: filePath })
-  return sandbox.module.exports
-}
-
-const errorCodesModule = loadErrorCodesModule()
-const { RpcErrorCode, DEFAULT_RPC_ERROR_MESSAGES } = errorCodesModule
-const { getUserFacingErrorMessage, getActionErrorMessage } =
-  loadErrorMessageModule()
+import {
+  DEFAULT_RPC_ERROR_MESSAGES,
+  RpcErrorCode,
+} from '../consts/errorCodes.js'
+import {
+  getActionErrorMessage,
+  getUserFacingErrorMessage,
+} from './errorMessage.js'
 
 test('errorMessage: 网络错误统一翻译为中文', () => {
   assert.equal(

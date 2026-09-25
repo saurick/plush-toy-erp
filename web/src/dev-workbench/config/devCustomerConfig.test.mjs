@@ -18,6 +18,7 @@ import {
   buildFieldNumberingDraftSummary,
   buildPrintTemplateFieldSummary,
   buildImportToolingSummary,
+  createDevCustomerConfigIdempotencyKey,
   isDevCustomerConfigEnabled,
   listRegisteredDevCustomerPackages,
   readDevCustomerKeyFromSearch,
@@ -219,6 +220,18 @@ test('devCustomerConfig: 未登记客户返回 missing 且不 fallback 到 yoyoo
   assert.equal(overview.blockedPieces[0].title, '未登记客户配置包')
   assert.equal(overview.blockedPieces[0].status, '未登记')
   assert.match(overview.blockedPieces[0].boundary, /不会自动改用其他客户包/)
+
+  const duplicateOverview = buildCustomerConfigDevOverviewFromSearch(
+    '?customer=yoyoosun&customer=unknown-customer'
+  )
+  assert.equal(duplicateOverview.status, 'invalid')
+  assert.equal(duplicateOverview.customerKey, '')
+  assert.equal(duplicateOverview.requestedCustomerKey, '重复参数')
+  assert.equal(
+    duplicateOverview.blockedPieces[0].key,
+    'duplicate-customer-query'
+  )
+  assert.match(duplicateOverview.blockedPieces[0].boundary, /不会猜测/u)
 })
 
 test('devCustomerConfig: registry 暴露已登记客户列表', () => {
@@ -296,6 +309,11 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
   assert.equal(summary.canApplyTestConfig, true)
   assert.equal(summary.canCheckReleaseReadiness, true)
   assert.equal(summary.uiDryRunApiPath, '/__dev/api/customer-import/dry-run')
+  assert.equal(summary.uiSessionApiPath, '/__dev/api/customer-config/session')
+  assert.equal(
+    summary.uiOperationsApiPath,
+    '/__dev/api/customer-config/operations'
+  )
   assert.equal(
     summary.uiRuntimeManifestApiPath,
     '/__dev/api/customer-config/runtime-manifest'
@@ -536,6 +554,19 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
         !item.command.includes('CUSTOMER_CONFIG_ADMIN_TOKEN') &&
         !item.command.includes('--execute')
     )
+  )
+})
+
+test('customer config bridge idempotency keys bind action and customer', () => {
+  const uuid = '11111111-1111-4111-8111-111111111111'
+  assert.equal(
+    createDevCustomerConfigIdempotencyKey('dry-run', 'yoyoosun', () => uuid),
+    `customer-config:dry-run:yoyoosun:${uuid}`
+  )
+  assert.throws(
+    () =>
+      createDevCustomerConfigIdempotencyKey('unknown', 'yoyoosun', () => uuid),
+    /action/u
   )
 })
 
@@ -977,6 +1008,40 @@ test('devCustomerConfig: 主工作任务与执行动作保持单一层级', asyn
   assert.match(
     source,
     /releaseState\.status === 'success' \? 'primary' : 'default'/u
+  )
+})
+
+test('devCustomerConfig: 视图、子任务和证据批次 query 会恢复为唯一规范值', async () => {
+  const source = await readFile(
+    new URL('../pages/DevCustomerConfigPage.jsx', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(
+    source,
+    /searchParams[.]getAll\(\s*DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY/u
+  )
+  assert.match(
+    source,
+    /searchParams[.]getAll\(\s*DEV_CUSTOMER_CONFIG_QUERY_KEY/u
+  )
+  assert.match(source, /overview[.]status !== 'ready'/u)
+  assert.match(source, /requestedViewCount !== 1/u)
+  assert.match(
+    source,
+    /activeView === VIEW_OVERVIEW[\s\S]*?delete\(DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY\)/u
+  )
+  assert.match(
+    source,
+    /activePreflightSection === PREFLIGHT_SECTION_PACKAGE[\s\S]*?delete\(PREFLIGHT_SECTION_QUERY_KEY\)/u
+  )
+  assert.match(
+    source,
+    /activeImportAction === IMPORT_ACTION_DRY_RUN[\s\S]*?delete\(IMPORT_ACTION_QUERY_KEY\)/u
+  )
+  assert.match(
+    source,
+    /releaseBatchesState[.]status !== 'success'[\s\S]*?requestedReleaseBatchCount === 1/u
   )
 })
 

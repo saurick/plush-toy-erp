@@ -391,7 +391,7 @@ function createWebTestSelector(root) {
   }
 
   const readerTests = relatedTests(opaqueReaders);
-  return (file) => {
+  return (file, { includeOpaqueReaders = true } = {}) => {
     const related = relatedTests([
       file,
       ...siblingTestCandidates(file).filter((candidate) =>
@@ -399,7 +399,9 @@ function createWebTestSelector(root) {
       ),
     ]);
     // A global source scanner alone cannot establish coverage of a new page.
-    return related.length > 0 ? uniqueSorted([...related, ...readerTests]) : [];
+    return related.length > 0
+      ? uniqueSorted([...related, ...(includeOpaqueReaders ? readerTests : [])])
+      : [];
   };
 }
 
@@ -737,12 +739,12 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
 
     if (file.startsWith(".github/workflows/")) {
-      directTests.add("scripts/qa/release-workflow.test.mjs");
+      directTests.add("scripts/qa/github-write-boundary.test.mjs");
       addFollowUp(
         state,
         "remote-ci-enforcement",
         "T8",
-        "确认 GitHub 只保留显式应急发布 workflow，main 镜像不会重复运行 CI，且未与 GitLab 主链并行发布。仓库 workflow 不能替代远端镜像规则证据。",
+        "确认 GitHub main 仍只接收 GitLab protected-main 的单向镜像，仓库不含 GitHub Actions workflow，也不存在 GitHub 发布写路径。仓库边界不能替代远端镜像规则读回。",
         file,
       );
       continue;
@@ -969,10 +971,17 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
           addReason(state, "full", file);
         }
       } else {
-        const siblingTests = siblingTestCandidates(file).filter((candidate) =>
+        let relatedTests = siblingTestCandidates(file).filter((candidate) =>
           fs.existsSync(path.join(root, candidate)),
         );
-        siblingTests.forEach((candidate) => directTests.add(candidate));
+        if (file.endsWith(".mjs") && fs.existsSync(path.join(root, file))) {
+          selectWebTests ||= createWebTestSelector(root);
+          relatedTests = uniqueSorted([
+            ...relatedTests,
+            ...selectWebTests(file, { includeOpaqueReaders: false }),
+          ]);
+        }
+        relatedTests.forEach((candidate) => directTests.add(candidate));
         if (file.endsWith(".mjs")) {
           addSyntaxCheck(state, file);
         }
@@ -1000,11 +1009,6 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         "可显式运行 canonical runtime experimental audit；其 broad keyword 命中只作只读审查线索，不阻断 affected/fast，也不代表产品缺陷。",
         file,
       );
-      continue;
-    }
-
-    if (file === "scripts/qa/ci-workflow-yaml-check.go") {
-      directTests.add("scripts/qa/release-workflow.test.mjs");
       continue;
     }
 

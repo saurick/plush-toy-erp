@@ -109,10 +109,24 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
   }, [currentPathname])
 
   useEffect(() => {
+    const areaSecondaryItems = getDevSecondaryNavItems(currentAreaKey)
+    const currentSecondaryIndex = areaSecondaryItems.findIndex(
+      (item) => item.route === routedPathname
+    )
+    const nextSecondaryItem =
+      areaSecondaryItems[
+        currentSecondaryIndex >= 0
+          ? (currentSecondaryIndex + 1) % areaSecondaryItems.length
+          : 0
+      ]
+    const areaLandingRoute = DEV_WORKSPACE_NAV_ITEMS.find(
+      (item) => item.key === currentAreaKey
+    )?.route
     const routePathnames = [
-      ...getDevSecondaryNavItems(currentAreaKey).map((item) => item.route),
-      ...DEV_WORKSPACE_NAV_ITEMS.map((item) => item.route),
-    ].filter((routePathname) => routePathname !== routedPathname)
+      ...new Set([areaLandingRoute, nextSecondaryItem?.route]),
+    ].filter(
+      (routePathname) => routePathname && routePathname !== routedPathname
+    )
     const preloadVisibleRoutes = () => {
       routePathnames.forEach((routePathname) => {
         preloadDevRoute(routePathname)

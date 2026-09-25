@@ -198,9 +198,11 @@ function useFlowStateCatalog() {
     catalog: null,
     error: '',
   })
+  const requestSequenceRef = useRef(0)
 
   const reload = useCallback(() => {
-    let active = true
+    const requestSequence = requestSequenceRef.current + 1
+    requestSequenceRef.current = requestSequence
     const loader =
       CATALOG_MODULES[CATALOG_MODULE_PATH] || Object.values(CATALOG_MODULES)[0]
     setState({ status: 'loading', catalog: null, error: '' })
@@ -210,13 +212,11 @@ function useFlowStateCatalog() {
         catalog: null,
         error: `未找到 ${CATALOG_MODULE_PATH}`,
       })
-      return () => {
-        active = false
-      }
+      return
     }
     loader()
       .then((moduleValue) => {
-        if (!active) return
+        if (requestSequenceRef.current !== requestSequence) return
         setState({
           status: 'ready',
           catalog: validateCatalog(moduleValue),
@@ -224,19 +224,21 @@ function useFlowStateCatalog() {
         })
       })
       .catch((error) => {
-        if (!active) return
+        if (requestSequenceRef.current !== requestSequence) return
         setState({
           status: 'error',
           catalog: null,
           error: cleanText(error?.message) || '目录加载失败',
         })
       })
-    return () => {
-      active = false
-    }
   }, [])
 
-  useEffect(() => reload(), [reload])
+  useEffect(() => {
+    reload()
+    return () => {
+      requestSequenceRef.current += 1
+    }
+  }, [reload])
   return { ...state, reload }
 }
 

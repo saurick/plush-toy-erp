@@ -201,7 +201,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           processNode(PURCHASE_APPROVAL, 'approve_purchase_order'),
         ],
       }),
-      'purchase_approval:creates_source:purchase_receipt': step({
+      'purchase_approval:creates_fact_draft:purchase_receipt': step({
         responsibilityMode: 'human',
         ownerPoolKeys: ['quality'],
         capabilityKeys: ['purchase.receipt.create'],
@@ -210,7 +210,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           state('fact.purchase_receipt', 'DRAFT', 'result'),
         ],
       }),
-      'purchase_receipt:creates_source:purchase_quality': step({
+      'purchase_receipt:creates_fact_draft:purchase_quality': step({
         responsibilityMode: 'system',
         stateRefs: [
           state('fact.purchase_receipt', 'DRAFT', 'precondition'),
@@ -236,8 +236,8 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'purchase_order:starts_process:purchase_approval',
         'purchase_approval:creates_task:purchase_task',
         'purchase_task:calls_domain_command:purchase_approval',
-        'purchase_approval:creates_source:purchase_receipt',
-        'purchase_receipt:creates_source:purchase_quality',
+        'purchase_approval:creates_fact_draft:purchase_receipt',
+        'purchase_receipt:creates_fact_draft:purchase_quality',
         'purchase_quality:posts_fact:purchase_lot',
       ],
       interruptionStepKeys: [
@@ -245,7 +245,9 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'purchase_quality:posts_fact:purchase_lot',
       ],
       interruptionKinds: ['blocked', 'rejected', 'resume'],
-      correctionStepKeys: ['purchase_receipt:creates_source:purchase_quality'],
+      correctionStepKeys: [
+        'purchase_receipt:creates_fact_draft:purchase_quality',
+      ],
       protectedStepKey: 'purchase_quality:posts_fact:purchase_lot',
       wrongStateStepKey: 'purchase_quality:posts_fact:purchase_lot',
       idempotentStepKey: 'purchase_quality:posts_fact:purchase_lot',
@@ -365,7 +367,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           state('fact.outsourcing', 'DRAFT', 'result'),
         ],
       }),
-      'outsourcing_return:creates_source:outsourcing_quality': step({
+      'outsourcing_return:creates_fact_draft:outsourcing_quality': step({
         responsibilityMode: 'human',
         capabilityKeys: ['quality.inspection.create'],
         stateRefs: [state('fact.quality_inspection', 'DRAFT', 'result')],
@@ -383,11 +385,11 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       happyStepKeys: [
         'outsourcing_order:posts_fact:outsourcing_issue',
         'outsourcing_issue:returns:outsourcing_return',
-        'outsourcing_return:creates_source:outsourcing_quality',
+        'outsourcing_return:creates_fact_draft:outsourcing_quality',
         'outsourcing_quality:posts_fact:outsourcing_lot',
       ],
       interruptionStepKeys: [
-        'outsourcing_return:creates_source:outsourcing_quality',
+        'outsourcing_return:creates_fact_draft:outsourcing_quality',
         'outsourcing_quality:posts_fact:outsourcing_lot',
       ],
       interruptionKinds: ['rejected', 'returned', 'recovery'],
@@ -447,46 +449,11 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         stateTransitionRefs: [transition('fact.finance', 'DRAFT->POSTED')],
         stateRefs: [state('fact.shipment', 'SHIPPED', 'precondition')],
       }),
-      'receivable:starts_process:payment_process': step({
-        responsibilityMode: 'human',
-        stateRefs: [
-          state('fact.finance', 'POSTED', 'precondition'),
-          state('fact.finance_payment', 'DRAFT', 'result'),
-        ],
-        processNodeRefs: [
-          processNode(FINANCE_PAYMENT_APPROVAL, 'finance_payment_approval'),
-        ],
-      }),
-      'payment_process:creates_task:payment_task': step({
-        responsibilityMode: 'human',
-        stateRefs: [state('workflow.task', 'ready', 'result')],
-        processNodeRefs: [
-          processNode(FINANCE_PAYMENT_APPROVAL, 'finance_payment_approval'),
-          processNode(FINANCE_PAYMENT_APPROVAL, 'finance_payment_execution'),
-        ],
-      }),
-      'payment_task:calls_domain_command:payment': step({
+      'shipped:reverses:shipment_cancelled': step({
         responsibilityMode: 'human',
         stateTransitionRefs: [
-          transition('workflow.task', 'ready->done'),
-          transition('fact.finance_payment', 'APPROVED->POSTED'),
+          transition('fact.shipment', 'SHIPPED->CANCELLED'),
         ],
-        processNodeRefs: [
-          processNode(FINANCE_PAYMENT_APPROVAL, 'post_finance_payment'),
-        ],
-      }),
-      'payment:posts_fact:allocation': step({
-        responsibilityMode: 'human',
-        stateTransitionRefs: [transition('fact.finance', 'POSTED->SETTLED')],
-        stateRefs: [state('fact.finance_payment', 'POSTED', 'precondition')],
-      }),
-      'allocation:derives:receivable': step({
-        responsibilityMode: 'derived',
-        stateTransitionRefs: [transition('fact.finance', 'POSTED->SETTLED')],
-      }),
-      'credit_note:reverses:receivable': step({
-        responsibilityMode: 'human',
-        stateTransitionRefs: [transition('fact.finance', 'SETTLED->POSTED')],
       }),
     }),
     profile: profile({
@@ -496,18 +463,12 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'shipment_release_task:calls_domain_command:shipment_release',
         'shipment_release:posts_fact:shipped',
         'shipped:posts_fact:receivable',
-        'receivable:starts_process:payment_process',
-        'payment_process:creates_task:payment_task',
-        'payment_task:calls_domain_command:payment',
-        'payment:posts_fact:allocation',
-        'allocation:derives:receivable',
       ],
       interruptionStepKeys: [
         'shipment_release_task:calls_domain_command:shipment_release',
-        'payment_task:calls_domain_command:payment',
       ],
       interruptionKinds: ['blocked', 'rejected', 'resume'],
-      correctionStepKeys: ['credit_note:reverses:receivable'],
+      correctionStepKeys: ['shipped:reverses:shipment_cancelled'],
       protectedStepKey: 'shipment_release:posts_fact:shipped',
       wrongStateStepKey: 'shipment_release:posts_fact:shipped',
       idempotentStepKey: 'shipment_release:posts_fact:shipped',
@@ -516,12 +477,9 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       interruptionTransitionRefs: [
         transition('workflow.task', 'ready->blocked'),
         transition('workflow.task', 'blocked->ready'),
-        transition('fact.finance_payment', 'DRAFT->REJECTED'),
       ],
       correctionTransitionRefs: [
         transition('fact.shipment', 'SHIPPED->CANCELLED'),
-        transition('fact.finance_payment', 'POSTED->REVERSED'),
-        transition('fact.finance', 'SETTLED->POSTED'),
       ],
       sourceRefs: [
         SOURCE_DATA_REF,
@@ -572,7 +530,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           transition('fact.finance', 'SETTLED->POSTED'),
         ],
       }),
-      'open_finance_fact:creates_source:finance_credit_note': step({
+      'open_finance_fact:creates_fact_draft:finance_credit_note': step({
         responsibilityMode: 'human',
         capabilityKeys: ['finance.credit_note.create'],
         stateRefs: [state('fact.finance', 'POSTED', 'precondition')],
@@ -592,7 +550,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'finance_payment_process:calls_domain_command:finance_payment',
         'finance_payment:posts_fact:finance_allocation',
         'finance_allocation:derives:settled_finance_fact',
-        'open_finance_fact:creates_source:finance_credit_note',
+        'open_finance_fact:creates_fact_draft:finance_credit_note',
         'finance_credit_note:posts_fact:settled_finance_fact',
       ],
       interruptionStepKeys: [
@@ -910,22 +868,24 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
 
   purchase_quality_disposition: Object.freeze({
     steps: Object.freeze({
-      'rejected_purchase_quality:creates_source:purchase_disposition': step({
-        responsibilityMode: 'human',
-        stateTransitionRefs: [
-          transition('fact.quality_inspection', 'SUBMITTED->REJECTED'),
-        ],
-        stateRefs: [
-          state('fact.purchase_rejection_disposition', 'DRAFT', 'result'),
-        ],
-      }),
+      'rejected_purchase_quality:creates_fact_draft:purchase_disposition': step(
+        {
+          responsibilityMode: 'human',
+          stateTransitionRefs: [
+            transition('fact.quality_inspection', 'SUBMITTED->REJECTED'),
+          ],
+          stateRefs: [
+            state('fact.purchase_rejection_disposition', 'DRAFT', 'result'),
+          ],
+        }
+      ),
       'purchase_disposition:returns:purchase_return': step({
         responsibilityMode: 'human',
         stateTransitionRefs: [
           transition('fact.purchase_return', 'DRAFT->POSTED'),
         ],
       }),
-      'purchase_disposition:creates_source:purchase_adjustment': step({
+      'purchase_disposition:creates_fact_draft:purchase_adjustment': step({
         responsibilityMode: 'human',
         stateTransitionRefs: [
           transition('fact.purchase_receipt_adjustment', 'DRAFT->POSTED'),
@@ -948,14 +908,14 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     }),
     profile: profile({
       happyStepKeys: [
-        'rejected_purchase_quality:creates_source:purchase_disposition',
+        'rejected_purchase_quality:creates_fact_draft:purchase_disposition',
         'purchase_disposition:returns:purchase_return',
-        'purchase_disposition:creates_source:purchase_adjustment',
+        'purchase_disposition:creates_fact_draft:purchase_adjustment',
         'purchase_return:posts_fact:disposed_purchase_lot',
         'purchase_adjustment:posts_fact:disposed_purchase_lot',
       ],
       interruptionStepKeys: [
-        'rejected_purchase_quality:creates_source:purchase_disposition',
+        'rejected_purchase_quality:creates_fact_draft:purchase_disposition',
       ],
       interruptionKinds: ['rejected', 'returned', 'recovery'],
       correctionStepKeys: [
@@ -963,7 +923,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'purchase_adjustment:posts_fact:disposed_purchase_lot',
       ],
       protectedStepKey:
-        'rejected_purchase_quality:creates_source:purchase_disposition',
+        'rejected_purchase_quality:creates_fact_draft:purchase_disposition',
       wrongStateStepKey: 'purchase_return:posts_fact:disposed_purchase_lot',
       idempotentStepKey: 'purchase_return:posts_fact:disposed_purchase_lot',
       dataStageKeys: ['facts', 'readiness'],
@@ -984,7 +944,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
 
   outsourcing_quality_disposition: Object.freeze({
     steps: Object.freeze({
-      'rejected_outsourcing_quality:creates_source:outsourcing_disposition':
+      'rejected_outsourcing_quality:creates_fact_draft:outsourcing_disposition':
         step({
           responsibilityMode: 'human',
           stateTransitionRefs: [
@@ -1014,12 +974,12 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     }),
     profile: profile({
       happyStepKeys: [
-        'rejected_outsourcing_quality:creates_source:outsourcing_disposition',
+        'rejected_outsourcing_quality:creates_fact_draft:outsourcing_disposition',
         'outsourcing_disposition:returns:outsourcing_correction',
         'outsourcing_correction:posts_fact:outsourcing_quarantine_lot',
       ],
       interruptionStepKeys: [
-        'rejected_outsourcing_quality:creates_source:outsourcing_disposition',
+        'rejected_outsourcing_quality:creates_fact_draft:outsourcing_disposition',
       ],
       interruptionKinds: ['rejected', 'returned', 'recovery'],
       correctionStepKeys: [
@@ -1055,7 +1015,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           transition('fact.purchase_return', 'DRAFT->POSTED'),
         ],
       }),
-      'posted_purchase_receipt:creates_source:purchase_adjustment_correction':
+      'posted_purchase_receipt:creates_fact_draft:purchase_adjustment_correction':
         step({
           responsibilityMode: 'human',
           stateRefs: [state('fact.purchase_receipt', 'POSTED', 'precondition')],
@@ -1099,14 +1059,14 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     profile: profile({
       happyStepKeys: [
         'posted_purchase_receipt:returns:purchase_return_correction',
-        'posted_purchase_receipt:creates_source:purchase_adjustment_correction',
+        'posted_purchase_receipt:creates_fact_draft:purchase_adjustment_correction',
         'purchase_return_correction:posts_fact:corrected_purchase_inventory',
         'purchase_adjustment_correction:posts_fact:corrected_purchase_inventory',
         'corrected_purchase_inventory:derives:corrected_purchase_finance',
       ],
       interruptionStepKeys: [
         'posted_purchase_receipt:returns:purchase_return_correction',
-        'posted_purchase_receipt:creates_source:purchase_adjustment_correction',
+        'posted_purchase_receipt:creates_fact_draft:purchase_adjustment_correction',
       ],
       interruptionKinds: ['retry', 'recovery'],
       correctionStepKeys: [

@@ -259,6 +259,34 @@
   overflow-wrap: anywhere;
 }
 
+.erp-dev-environment-card__dimensions {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-dev-environment-card__dimensions li {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-dev-environment-card__dimension-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.erp-dev-environment-card__dimensions small {
+  color: var(--dev-env-muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .erp-dev-environment-card details {
   font-size: 12px;
 }
@@ -454,7 +482,8 @@
 }
 
 .erp-dev-task-nav--primary {
-  --erp-slider-shadow: inset 3px 0 0 var(--dev-task-active-border, #1677ff),
+  --erp-slider-shadow:
+    inset 3px 0 0 var(--dev-task-active-border, #1677ff),
     inset 0 0 0 1px var(--dev-task-active-border, #1677ff);
 }
 

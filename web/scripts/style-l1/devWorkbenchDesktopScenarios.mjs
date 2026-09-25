@@ -5,6 +5,7 @@ import {
   DEV_GOVERNANCE_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
+  DEV_PRODUCT_ENGINEERING_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
   DEV_QUALITY_ROUTE,
   DEV_SECONDARY_NAV_ITEMS,
@@ -32,16 +33,13 @@ const ORDINARY_DEV_ROUTES = Object.freeze(
   [...DEV_WORKSPACE_NAV_ITEMS, ...DEV_SECONDARY_NAV_ITEMS]
     .filter((item) => !SPECIALIZED_ROUTES.has(item.route))
     .map((item) => {
-      const expectedRoute =
-        item.route === DEV_QUALITY_ROUTE ? DEV_QUALITY_GATES_ROUTE : item.route
-
       return Object.freeze({
         key: item.key,
         route: item.route,
-        expectedRoute,
+        expectedRoute: item.route,
         title:
           DESKTOP_HEADING_BY_ROUTE[item.route] ||
-          DEV_PAGE_TITLE_BY_ROUTE[expectedRoute] ||
+          DEV_PAGE_TITLE_BY_ROUTE[item.route] ||
           item.label,
       })
     })
@@ -71,6 +69,32 @@ export function createDevWorkbenchDesktopScenarios({
         item.expectedRoute.replace(/\/+$/u, '') || '/',
         `${item.route} 桌面 smoke 必须落到登记页面`
       )
+      if (item.route === DEV_PRODUCT_ENGINEERING_ROUTE) {
+        assert.equal(
+          await page.locator('.erp-dev-product-task').count(),
+          7,
+          '产品工程问题视角应完整显示七个并列入口'
+        )
+        assert.equal(
+          await page.locator('.erp-dev-product-task__index').count(),
+          0,
+          '并列产品问题不能显示为虚假的执行序号'
+        )
+      }
+      if (item.route === DEV_QUALITY_ROUTE) {
+        assert.equal(
+          await page.locator('.erp-dev-quality-task').count(),
+          3,
+          '质量验证首页应完整显示改动验证、质量门禁和测试数据'
+        )
+        assert.equal(
+          await page
+            .locator('.erp-dev-quality-task a[href="/__dev/quality-gates"]')
+            .count(),
+          1,
+          '质量验证首页应提供质量门禁入口'
+        )
+      }
       await assertNoHorizontalOverflow(page, item.route)
     },
   }))

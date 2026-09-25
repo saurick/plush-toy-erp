@@ -31,7 +31,7 @@ function currentOperation(summary, profileKey, predicate = () => true) {
   const repositoryCommit = summary?.repository?.commit
   if (!SHA_PATTERN.test(String(repositoryCommit || ''))) return null
   return (
-    summary.operations?.find(
+    summary.currentOperations?.find(
       (operation) =>
         operation.profileKey === profileKey &&
         operation.status === 'passed' &&
@@ -40,6 +40,10 @@ function currentOperation(summary, profileKey, predicate = () => true) {
         predicate(operation)
     ) || null
   )
+}
+
+function evidenceDimension(key, label, status, detail) {
+  return Object.freeze({ key, label, status, detail })
 }
 
 function localEnvironmentCard(dataSummary, error) {
@@ -94,11 +98,38 @@ function localEnvironmentCard(dataSummary, error) {
       ? 'Core 与 Scenario 已按当前提交读回'
       : '当前提交的 Core / Scenario 持久读回未齐',
     health: targetAvailable ? '本地固定目标预检已读取' : '本地固定目标未通过',
+    evidenceDimensions: Object.freeze([
+      evidenceDimension(
+        'runtime',
+        '运行目标',
+        targetAvailable ? 'success' : 'blocked',
+        targetAvailable ? '固定开发目标预检通过' : '固定开发目标预检未通过'
+      ),
+      evidenceDimension(
+        'candidate',
+        '代码候选',
+        SHA_PATTERN.test(String(dataSummary?.repository?.commit || ''))
+          ? 'success'
+          : 'not_proven',
+        '绑定当前本地仓库提交身份'
+      ),
+      evidenceDimension(
+        'dataset',
+        '数据合同',
+        datasetReadBack ? 'success' : 'not_proven',
+        datasetReadBack ? 'Core 与 Scenario 当前合同已读回' : '当前合同读回未齐'
+      ),
+      evidenceDimension(
+        'acceptance',
+        '人工验收',
+        'not_proven',
+        '本地开发数据不代表甲方验收'
+      ),
+    ]),
     rollbackBoundary: '长期数据只向前补齐；通过正式生命周期退出',
     readbackAt: latestTimestamp([
       coreOperation?.updatedAt,
       scenarioOperation?.updatedAt,
-      dataSummary?.generatedAt,
     ]),
     nextAction: error
       ? '重新读取本地数据证据'
@@ -128,6 +159,28 @@ function latestOperation(summary, predicate) {
   )
 }
 
+function validCleanBaseline(rebuild, runtime) {
+  const metadata = rebuild?.metadata
+  const backupValid =
+    HASH_PATTERN.test(String(metadata?.backupSha256 || '')) &&
+    Number.isSafeInteger(metadata?.backupSizeBytes) &&
+    metadata.backupSizeBytes > 0
+  return Boolean(
+    rebuild?.status === 'passed' &&
+    rebuild?.target === 'customer-test-133' &&
+    SHA_PATTERN.test(String(rebuild?.gitSha || '')) &&
+    rebuild.gitSha === runtime?.serverSha &&
+    rebuild.gitSha === runtime?.webSha &&
+    metadata?.logicalDatabase === runtime?.databaseName &&
+    metadata?.physicalGeneration === 'fresh' &&
+    HASH_PATTERN.test(String(metadata?.databaseRebuildFingerprint || '')) &&
+    HASH_PATTERN.test(String(metadata?.databaseRebuildReceiptSha256 || '')) &&
+    metadata?.migrationReadback === runtime?.migrationVersion &&
+    metadata?.predecessorPreserved === true &&
+    backupValid
+  )
+}
+
 function customerTestCard(dataSummary, deliverySummary, error) {
   const target = deliveryTarget(deliverySummary, 'customer-test-133')
   const runtime = target?.remote?.runtime
@@ -139,36 +192,42 @@ function customerTestCard(dataSummary, deliverySummary, error) {
       operation.status === 'passed'
   )
   const latestGeneratedDataWrite = latestOperation(
-    dataSummary,
+    { operations: dataSummary?.currentOperations || [] },
     (operation) =>
       operation.profileKey === 'scenario-demo' &&
       operation.status === 'passed' &&
       operation.readback?.databaseName === runtime?.databaseName
   )
+  const rebuildEvidenceValid = validCleanBaseline(rebuild, runtime)
   const cleanBaseline = Boolean(
-    rebuild &&
-      (!latestGeneratedDataWrite ||
-        Date.parse(rebuild.updatedAt) >
-          Date.parse(latestGeneratedDataWrite.updatedAt))
+    rebuildEvidenceValid &&
+    (!latestGeneratedDataWrite ||
+      Date.parse(rebuild.updatedAt) >
+        Date.parse(latestGeneratedDataWrite.updatedAt))
   )
   const runtimeReady = Boolean(
     target?.status === 'passed' &&
-      runtime?.serverHealth === 'passed' &&
-      runtime?.serverReady === 'passed' &&
-      runtime?.webHealth === 'passed' &&
-      target?.remote?.publicEntry?.status === 'passed'
+    runtime?.serverHealth === 'passed' &&
+    runtime?.serverReady === 'passed' &&
+    runtime?.webHealth === 'passed' &&
+    target?.remote?.publicEntry?.status === 'passed'
+  )
+  const candidateAligned = Boolean(
+    SHA_PATTERN.test(String(dataSummary?.repository?.commit || '')) &&
+    runtime?.serverSha === dataSummary.repository.commit &&
+    runtime?.webSha === dataSummary.repository.commit
   )
   const status = error
     ? 'failed'
     : !target || target.status === 'blocked'
       ? 'blocked'
-      : runtimeReady
-        ? 'success'
-        : 'warning'
+      : !runtimeReady || !candidateAligned
+        ? 'warning'
+        : 'not_proven'
 
   return {
     key: 'customer-test-133',
-    label: 'test 甲方测试验收',
+    label: 'test 甲方测试环境',
     scope: '普通部署保留现有数据；需要时独立清空并重建测试数据',
     accent: 'test',
     status,
@@ -183,28 +242,56 @@ function customerTestCard(dataSummary, deliverySummary, error) {
     datasetRunId: rebuild?.id ? rebuild.id.slice(0, 8) : '不适用',
     semanticDigest: '不适用',
     datasetEvidence: cleanBaseline
-      ? '受控重建晚于该库最近一次模拟数据写入'
+      ? '受控重建身份、回滚点、migration 与 fresh generation 已完整读回'
       : rebuild
-        ? '受控重建后已有数据写入；普通部署继续保留现状'
+        ? rebuildEvidenceValid
+          ? '受控重建后已有数据写入；普通部署继续保留现状'
+          : '存在重建记录，但完整回执身份不足，不能证明干净基线'
         : '尚未执行独立清空重建；普通部署继续保留现状',
     health: runtimeReady
       ? 'health / ready / 公网入口已读回'
       : 'health / ready / 公网入口未齐',
+    evidenceDimensions: Object.freeze([
+      evidenceDimension(
+        'runtime',
+        '运行状态',
+        runtimeReady ? 'success' : 'warning',
+        runtimeReady ? 'health / ready / 公网入口已读回' : '运行读回未齐'
+      ),
+      evidenceDimension(
+        'candidate',
+        '候选版本',
+        candidateAligned ? 'success' : 'warning',
+        candidateAligned
+          ? '运行版本与当前本地提交一致'
+          : '运行正常与当前本地提交一致是两件事'
+      ),
+      evidenceDimension(
+        'dataset',
+        '数据基线',
+        cleanBaseline ? 'success' : 'not_proven',
+        cleanBaseline ? '干净基线回执完整' : '当前数据基线未证明为干净'
+      ),
+      evidenceDimension(
+        'acceptance',
+        '甲方验收',
+        'not_proven',
+        '尚无绑定当前版本、数据与目标的甲方签收回执'
+      ),
+    ]),
     rollbackBoundary: rebuild
       ? '数据清空重建 operation 已通过；恢复只使用其绑定回滚点'
       : '普通部署保留数据；清空重建时另行取得可恢复备份与精确回滚点',
-    readbackAt: latestTimestamp([
-      rebuild?.updatedAt,
-      target?.generatedAt,
-      deliverySummary?.generatedAt,
-    ]),
+    readbackAt: latestTimestamp([rebuild?.updatedAt, target?.generatedAt]),
     nextAction: error
       ? '重新读取 test 目标证据'
       : !runtimeReady
         ? '先完成 test 运行态与公网读回'
-        : cleanBaseline
-          ? '可在当前干净基线上继续录入测试数据'
-          : '保留现有数据继续测试；需要时独立清空并重建',
+        : !candidateAligned
+          ? '先决定发布当前候选，或按目标现有版本继续测试'
+          : cleanBaseline
+            ? '可录入测试数据；甲方完成实际使用后再登记签收回执'
+            : '保留现有数据继续测试；需要时独立清空并重建',
     error: safeText(error, ''),
   }
 }
@@ -251,17 +338,16 @@ function demoProjectCard(dataSummary, deliverySummary, error) {
   )
   const datasetReadBack = Boolean(trialOperation)
   const dataBackup = trialOperation?.readback?.backupReceipt
-  const runtimeAligned =
-    releaseAligned && migrationAligned && configAligned && healthReady
+  const runtimeAligned = migrationAligned && configAligned && healthReady
   const status = error
     ? 'failed'
     : !target || target.status === 'blocked'
       ? 'blocked'
-      : runtimeAligned && datasetReadBack
-        ? 'success'
-        : runtimeAligned
-          ? 'not_proven'
-          : 'warning'
+      : !runtimeAligned || !releaseAligned
+        ? 'warning'
+        : datasetReadBack
+          ? 'success'
+          : 'not_proven'
 
   let nextAction = '先权威读回 demo 固定目标'
   if (error) {
@@ -302,6 +388,34 @@ function demoProjectCard(dataSummary, deliverySummary, error) {
     health: healthReady
       ? 'health / ready / 公网入口已读回'
       : 'health / ready / 公网入口未齐',
+    evidenceDimensions: Object.freeze([
+      evidenceDimension(
+        'runtime',
+        '运行状态',
+        healthReady ? 'success' : 'warning',
+        healthReady ? 'health / ready / 公网入口已读回' : '运行读回未齐'
+      ),
+      evidenceDimension(
+        'candidate',
+        '候选版本',
+        releaseAligned ? 'success' : 'warning',
+        releaseAligned
+          ? '运行版本与当前本地提交一致'
+          : '目标仍可健康运行，但未对齐当前本地提交'
+      ),
+      evidenceDimension(
+        'dataset',
+        '演练数据',
+        datasetReadBack ? 'success' : 'not_proven',
+        datasetReadBack ? '当前数据合同已持久读回' : '当前数据合同未读回'
+      ),
+      evidenceDimension(
+        'acceptance',
+        '人工验收',
+        'not_proven',
+        '演练数据与健康检查不等于甲方验收'
+      ),
+    ]),
     rollbackBoundary:
       dataBackup?.status === 'passed' &&
       HASH_PATTERN.test(String(dataBackup?.sha256 || '')) &&
@@ -314,7 +428,6 @@ function demoProjectCard(dataSummary, deliverySummary, error) {
     readbackAt: latestTimestamp([
       trialOperation?.updatedAt,
       target?.generatedAt,
-      deliverySummary?.generatedAt,
     ]),
     nextAction,
     error: safeText(error, ''),
@@ -368,6 +481,32 @@ function isolatedAcceptanceCard(dataSummary, error) {
       ? '当前提交完整验收通过，已自动清理零残留'
       : '当前提交尚无完整验收与零残留回执',
     health: clean ? '当前仓库已干净' : '必须绑定 clean exact commit',
+    evidenceDimensions: Object.freeze([
+      evidenceDimension(
+        'runtime',
+        '隔离运行',
+        operation ? 'success' : 'not_proven',
+        operation ? '隔离生命周期已完成' : '尚无当前提交的隔离执行'
+      ),
+      evidenceDimension(
+        'candidate',
+        '候选版本',
+        clean ? 'success' : 'blocked',
+        clean ? '绑定 clean exact commit' : '当前工作区不是干净候选'
+      ),
+      evidenceDimension(
+        'dataset',
+        '回归数据',
+        operation ? 'success' : 'not_proven',
+        operation ? '新批次完成且零残留' : '新批次数据回执未取得'
+      ),
+      evidenceDimension(
+        'acceptance',
+        '自动回归',
+        operation ? 'success' : 'not_proven',
+        operation ? '当前合同自动回归已通过' : '自动回归未证明'
+      ),
+    ]),
     rollbackBoundary: '成功或失败都自动清理，不作长期数据',
     readbackAt: operation?.updatedAt || '',
     nextAction:

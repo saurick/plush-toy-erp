@@ -5,7 +5,7 @@ import {
   DeploymentUnitOutlined,
   RightOutlined,
 } from '@ant-design/icons'
-import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Tag, Typography } from 'antd'
 import DevEntrySourceDetails from '../components/DevEntrySourceDetails.jsx'
 import DevEnvironmentEvidencePanel from '../components/DevEnvironmentEvidencePanel.jsx'
@@ -20,10 +20,7 @@ import {
   buildDevProductEngineeringSearch,
   parseDevProductEngineeringSearch,
 } from '../config/devRelationshipPerspectives.mjs'
-import {
-  DEV_QUALITY_GATES_ROUTE,
-  DEV_WORKBENCH_AREA_KEYS,
-} from '../config/devRoutes.mjs'
+import { DEV_WORKBENCH_AREA_KEYS } from '../config/devRoutes.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -56,6 +53,14 @@ const QUALITY_ENTRY_PRESENTATION = Object.freeze({
       '先让系统只读判断影响范围，再运行与本轮改动匹配的固定检查；每项结果独立保留。',
     action: '开始验证',
     boundary: '只读计划 · 固定检查 · 独立证据',
+  }),
+  'quality-gates': Object.freeze({
+    eyebrow: '需要正式门禁时',
+    title: '运行完整或严格门禁',
+    description:
+      '通过固定 full / strict 动作运行正式门禁，分别核对阶段、耗时和回执，不把局部绿色当成完整结论。',
+    action: '进入质量门禁',
+    boundary: '固定动作 · 回执真源 · 不接受任意命令',
   }),
   'data-preparation': Object.freeze({
     eyebrow: '用例缺少前置数据时',
@@ -126,16 +131,27 @@ const PRODUCT_ENGINEERING_ENTRY_PRESENTATION = Object.freeze({
   }),
 })
 
-function ProductEngineeringTaskEntry({ item, index }) {
-  const copy = PRODUCT_ENGINEERING_ENTRY_PRESENTATION[item.key]
+function entryPresentation(item, presentation, fallbackEyebrow) {
+  return (
+    presentation[item.key] || {
+      eyebrow: fallbackEyebrow,
+      title: item.title,
+      description: item.description,
+      action: '打开工具',
+      boundary: item.status,
+    }
+  )
+}
 
-  if (!copy) return null
+function ProductEngineeringTaskEntry({ item }) {
+  const copy = entryPresentation(
+    item,
+    PRODUCT_ENGINEERING_ENTRY_PRESENTATION,
+    '产品工程入口'
+  )
 
   return (
     <li className="erp-dev-product-task">
-      <span className="erp-dev-product-task__index" aria-hidden="true">
-        {String(index + 1).padStart(2, '0')}
-      </span>
       <div className="erp-dev-product-task__copy">
         <Text className="erp-dev-product-task__eyebrow">{copy.eyebrow}</Text>
         <Title level={3}>{copy.title}</Title>
@@ -265,7 +281,7 @@ function ProductEngineeringWorkspace({ items }) {
             选择查看方式
           </Text>
           <Text type="secondary">
-            两种方式指向同一组已有工具，只改变入口的组织方式。
+            按问题找入口聚焦七个产品工程工具；项目图视角还会关联质量与交付证据，但不复制这些页面的真源。
           </Text>
         </div>
       </div>
@@ -289,15 +305,11 @@ function ProductEngineeringWorkspace({ items }) {
               每个入口先给答案或可读内容；工具名称、路径和维护来源需要时再展开。
             </Text>
           </div>
-          <ol className="erp-dev-product-task-list">
-            {items.map((item, index) => (
-              <ProductEngineeringTaskEntry
-                key={item.key}
-                item={item}
-                index={index}
-              />
+          <ul className="erp-dev-product-task-list">
+            {items.map((item) => (
+              <ProductEngineeringTaskEntry key={item.key} item={item} />
             ))}
-          </ol>
+          </ul>
         </section>
       ) : (
         <section
@@ -341,9 +353,11 @@ function ProductEngineeringWorkspace({ items }) {
 }
 
 function QualityTaskEntry({ item }) {
-  const copy = QUALITY_ENTRY_PRESENTATION[item.key]
-
-  if (!copy) return null
+  const copy = entryPresentation(
+    item,
+    QUALITY_ENTRY_PRESENTATION,
+    '质量验证入口'
+  )
 
   return (
     <article className="erp-dev-quality-task">
@@ -431,10 +445,6 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
 
   if (!presentation) {
     throw new Error(`unknown dev workbench area: ${String(areaKey || '')}`)
-  }
-
-  if (isQualityArea) {
-    return <Navigate to={`${DEV_QUALITY_GATES_ROUTE}?view=server`} replace />
   }
 
   return (

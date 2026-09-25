@@ -1,31 +1,14 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import test from 'node:test'
+import test, { after } from 'node:test'
 
-const source = readFileSync(
-  fileURLToPath(new URL('./approvalSettingsApi.mjs', import.meta.url)),
-  'utf8'
-)
+import * as approvalSettingsApi from './approvalSettingsApi.mjs'
+import { installRpcCallHarness } from '../../../scripts/test/rpcApiTestHarness.mjs'
+
+const setApprovalSettingsCall = installRpcCallHarness(after)
 
 async function loadApi(call) {
-  globalThis.__approvalSettingsCall = call
-  const transformed = source
-    .replace(
-      /import \{ AUTH_SCOPE \} from '[^']+'\n/,
-      "const AUTH_SCOPE = { ADMIN: 'admin' }\n"
-    )
-    .replace(
-      /import \{ ADMIN_BASE_PATH \} from '[^']+'\n/,
-      "const ADMIN_BASE_PATH = '/admin'\n"
-    )
-    .replace(
-      /import \{ JsonRpc \} from '[^']+'\n/,
-      'class JsonRpc { call(method, params) { return globalThis.__approvalSettingsCall(method, params) } }\n'
-    )
-  return import(
-    `data:text/javascript;base64,${Buffer.from(transformed).toString('base64')}#${Date.now()}-${Math.random()}`
-  )
+  setApprovalSettingsCall(call)
+  return approvalSettingsApi
 }
 
 test('approval settings API uses fixed strict revision contract', async () => {

@@ -65,13 +65,6 @@ const databaseMigrationPageSource = readFileSync(
   new URL('../pages/DevDatabaseMigrationPage.jsx', import.meta.url),
   'utf8'
 )
-const workflowSources = ['release.yml'].map((name) =>
-  readFileSync(
-    new URL(`../../../../.github/workflows/${name}`, import.meta.url),
-    'utf8'
-  )
-)
-
 function response(payload, ok = true) {
   return {
     ok,
@@ -940,22 +933,6 @@ test('pipeline jobs and timing stages use Chinese-first presentation labels', ()
     deliveryPipelinePresentation('publish_release').label,
     '发布不可变制品集'
   )
-  for (const source of workflowSources) {
-    const names = [...source.matchAll(/^(?: {4}name:| {6}- name:) (.+)$/gmu)]
-      .map((match) => match[1].trim())
-      .filter(Boolean)
-    assert.ok(names.length > 0)
-    for (const name of names) {
-      const presentation = deliveryPipelinePresentation(name)
-      assert.notEqual(
-        presentation.label,
-        '其他流水线环节',
-        `${name} must have a Chinese presentation label`
-      )
-      assert.match(presentation.label, /\p{Script=Han}/u)
-      assert.ok(presentation.title.includes(name))
-    }
-  }
   assert.equal(
     deliveryPipelinePresentation('Initialize containers').label,
     '初始化测试容器'
@@ -1306,6 +1283,12 @@ test('version center keeps critical state visible and uses stable tab pagination
     resolveDevVersionCenterView(DEV_VERSION_CENTER_VIEW_HISTORY),
     DEV_VERSION_CENTER_VIEW_HISTORY
   )
+  assert.match(
+    versionCenterPageSource,
+    /searchParams[.]getAll\(\s*DEV_VERSION_CENTER_VIEW_QUERY_KEY/u
+  )
+  assert.match(versionCenterPageSource, /requestedViewCount !== 1/u)
+  assert.match(versionCenterPageSource, /requestedCount !== 1/u)
   assert.equal(DEV_VERSION_CENTER_VERSION_PAGE_SIZE, 6)
   assert.equal(DEV_VERSION_CENTER_HISTORY_PAGE_SIZE, 10)
   assert.equal(
@@ -1420,6 +1403,11 @@ test('delivery pages expose one canonical dangerous action and lock concurrent m
     /cancelButtonProps=\{\{[\s\S]*?disabled:[\s\S]*?execute:/u
   )
   assert.match(databaseMigrationPageSource, /danger: true/u)
+  assert.match(
+    databaseMigrationPageSource,
+    /window[.]setTimeout\(poll, OPERATION_POLL_INTERVAL_MS\)/u
+  )
+  assert.doesNotMatch(databaseMigrationPageSource, /setInterval\(async/u)
 
   assert.match(versionCenterPageSource, /mutationInFlightRef/u)
   assert.match(versionCenterPageSource, /hasOpenOperation/u)

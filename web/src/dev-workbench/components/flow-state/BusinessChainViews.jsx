@@ -685,7 +685,7 @@ function BusinessChainView({
           <Paragraph>{chain.summary}</Paragraph>
           <Text type="secondary">
             {chain.steps.length} 个链路步骤 · {chain.acceptanceScenarios.length}{' '}
-            个已登记合法场景
+            个已登记场景合同
           </Text>
         </div>
         <div className="erp-dev-flow-chain-heading__actions">

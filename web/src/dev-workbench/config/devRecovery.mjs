@@ -141,6 +141,10 @@ const TIMESTAMP_WITH_TIME_ZONE_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u
 const BACKUP_RESTORE_CURRENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000
 const BACKUP_RESTORE_CLOCK_SKEW_MS = 5 * 60 * 1000
+const SAME_SHA_CURRENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000
+const ROLLBACK_FORWARD_CURRENT_WINDOW_MS = 100 * 24 * 60 * 60 * 1000
+const RECOVERY_DRILL_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 
 function isExactSha(value) {
   return SHA_PATTERN.test(String(value || ''))
@@ -179,6 +183,60 @@ function newestOperation(operations = [], predicate = () => true) {
     .sort(
       (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
     )[0]
+}
+
+function operationIsFresh(operation, nowMs, windowMs) {
+  const updatedAtMs = Date.parse(String(operation?.updatedAt || ''))
+  return (
+    Number.isFinite(updatedAtMs) &&
+    updatedAtMs <= nowMs + BACKUP_RESTORE_CLOCK_SKEW_MS &&
+    nowMs - updatedAtMs <= windowMs
+  )
+}
+
+function rollbackForwardEvidence(summary, nowMs) {
+  const currentSha = targetRuntimeSha(summary)
+  const operations = targetOperations(summary)
+  const forwards = operations
+    .filter(
+      (operation) =>
+        passedOperation(operation) &&
+        operation.action === 'promote' &&
+        operation.gitSha === currentSha &&
+        operationIsFresh(
+          operation,
+          nowMs,
+          ROLLBACK_FORWARD_CURRENT_WINDOW_MS
+        ) &&
+        RECOVERY_DRILL_ID_PATTERN.test(
+          String(operation.metadata?.recoveryDrillId || '')
+        )
+    )
+    .sort(
+      (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
+    )
+  for (const forward of forwards) {
+    const rollback = newestOperation(
+      operations,
+      (operation) =>
+        passedOperation(operation) &&
+        operation.action === 'rollback' &&
+        operation.id === forward.metadata?.recoveryRollbackOperationId &&
+        operation.metadata?.recoveryDrillId ===
+          forward.metadata?.recoveryDrillId &&
+        operation.metadata?.currentGitSha === forward.gitSha &&
+        operation.gitSha === forward.metadata?.recoveryRollbackGitSha &&
+        operation.gitSha !== forward.gitSha &&
+        operationIsFresh(
+          operation,
+          nowMs,
+          ROLLBACK_FORWARD_CURRENT_WINDOW_MS
+        ) &&
+        Date.parse(operation.updatedAt) < Date.parse(forward.updatedAt)
+    )
+    if (rollback) return { rollback, forward }
+  }
+  return null
 }
 
 function backupRestoreEvidenceState(summary, nowMs) {
@@ -288,10 +346,10 @@ export function resolveDevRecoveryTarget(summary = {}) {
     purpose === 'project-demo-simulated'
       ? '项目方演练造数环境'
       : purpose === 'customer-clean-acceptance'
-        ? '甲方测试验收环境'
-      : purpose === 'production'
-        ? '正式生产环境'
-        : '受控交付环境'
+        ? '甲方测试环境'
+        : purpose === 'production'
+          ? '正式生产环境'
+          : '受控交付环境'
   return Object.freeze({
     key,
     label,
@@ -324,6 +382,7 @@ function drillStatus(drill, summary, nowMs) {
         passedOperation(item) &&
         item.action === 'promote' &&
         item.gitSha === currentSha &&
+        operationIsFresh(item, nowMs, SAME_SHA_CURRENT_WINDOW_MS) &&
         operationHasMessage(
           item,
           'requested exact SHA is already current and healthy'
@@ -333,22 +392,7 @@ function drillStatus(drill, summary, nowMs) {
     return targetPassed && currentVersion ? 'available' : 'blocked'
   }
   if (drill.key === 'rollback-forward') {
-    const rollback = newestOperation(
-      operations,
-      (item) => passedOperation(item) && item.action === 'rollback'
-    )
-    const rollbackCompletedAt = rollback
-      ? Date.parse(rollback.updatedAt)
-      : Number.POSITIVE_INFINITY
-    const forward = newestOperation(
-      operations,
-      (item) =>
-        passedOperation(item) &&
-        item.action === 'promote' &&
-        item.gitSha === currentSha &&
-        Date.parse(item.updatedAt) > rollbackCompletedAt
-    )
-    if (rollback && forward) return 'current'
+    if (rollbackForwardEvidence(summary, nowMs)) return 'current'
     return targetPassed &&
       versions.filter((version) => version.completeAssets).length > 1
       ? 'guarded'
@@ -380,6 +424,7 @@ function drillEvidence(drill, summary, status, nowMs) {
         passedOperation(item) &&
         item.action === 'promote' &&
         item.gitSha === currentSha &&
+        operationIsFresh(item, nowMs, SAME_SHA_CURRENT_WINDOW_MS) &&
         operationHasMessage(
           item,
           'requested exact SHA is already current and healthy'
@@ -394,18 +439,21 @@ function drillEvidence(drill, summary, status, nowMs) {
     }
   }
   if (drill.key === 'rollback-forward') {
-    const operation = newestOperation(
-      operations,
-      (item) => passedOperation(item) && item.action === 'rollback'
-    )
+    const evidence = rollbackForwardEvidence(summary, nowMs)
+    const operation =
+      evidence?.rollback ||
+      newestOperation(
+        operations,
+        (item) => passedOperation(item) && item.action === 'rollback'
+      )
     return {
-      at: operation?.updatedAt || '',
-      operationId: operation?.id || '',
+      at: evidence?.forward?.updatedAt || operation?.updatedAt || '',
+      operationId: evidence?.forward?.id || operation?.id || '',
       note:
         status === 'current'
-          ? '回滚后已再前滚到当前 exact SHA'
+          ? '同一演练链已完成回滚，并再前滚到当前 exact SHA'
           : operation
-            ? '已有回滚证据，但尚未证明已再前滚到当前版本'
+            ? '已有回滚证据，但缺少同一演练链、当前版本或季度窗口内的再前滚证明'
             : '尚无完整回滚与再前滚证据',
     }
   }

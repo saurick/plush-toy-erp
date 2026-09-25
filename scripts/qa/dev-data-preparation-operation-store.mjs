@@ -51,22 +51,23 @@ const CURRENT_SCENARIO_READBACK_BASELINE = Object.freeze({
   catalogTargetCount: 51,
   browserChecksPending: 10,
 });
-const HISTORICAL_SCENARIO_READBACK_BASELINES = Object.freeze([
-  Object.freeze({
-    dataVersion: "2026.08.15-v6",
-    runId: "20260815-V6",
-    catalogReadyCount: 41,
-    catalogTargetCount: 51,
-    browserChecksPending: 10,
-  }),
-  Object.freeze({
-    dataVersion: "2026.07.16-v5",
-    runId: "20260716-V5",
-    catalogReadyCount: 40,
-    catalogTargetCount: 50,
-    browserChecksPending: 10,
-  }),
-]);
+export const DATA_PREPARATION_HISTORICAL_SCENARIO_READBACK_BASELINES =
+  Object.freeze([
+    Object.freeze({
+      dataVersion: "2026.08.15-v6",
+      runId: "20260815-V6",
+      catalogReadyCount: 41,
+      catalogTargetCount: 51,
+      browserChecksPending: 10,
+    }),
+    Object.freeze({
+      dataVersion: "2026.07.16-v5",
+      runId: "20260716-V5",
+      catalogReadyCount: 40,
+      catalogTargetCount: 50,
+      browserChecksPending: 10,
+    }),
+  ]);
 const STATUS_TRANSITIONS = Object.freeze({
   ready: new Set(["launching", "blocked", "failed"]),
   launching: new Set(["running", "failed", "blocked", "not_proven"]),
@@ -349,7 +350,7 @@ function validateReadback(
     const matchesHistoricalBaseline =
       allowHistoricalScenarioBaseline &&
       (legacy || current || remoteCurrent) &&
-      HISTORICAL_SCENARIO_READBACK_BASELINES.some((baseline) =>
+      DATA_PREPARATION_HISTORICAL_SCENARIO_READBACK_BASELINES.some((baseline) =>
         matchesScenarioReadbackBaseline(value, baseline),
       );
     if (

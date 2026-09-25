@@ -6,7 +6,7 @@ import {
 } from './devBusinessChainStepContracts.mjs'
 
 export const DEV_BUSINESS_CHAIN_CATALOG_VERSION =
-  'dev-business-chain-catalog/v2'
+  'dev-business-chain-catalog/v3'
 
 export const DEV_BUSINESS_CHAIN_OVERVIEW_KEY = 'all'
 
@@ -33,6 +33,7 @@ export const DEV_BUSINESS_CHAIN_EDGE_KINDS = Object.freeze([
   'calls_domain_command',
   'requires',
   'creates_source',
+  'creates_fact_draft',
   'posts_fact',
   'derives',
   'reverses',
@@ -317,7 +318,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'purchase_approval',
         'purchase_receipt',
         'IQC 登记本次到货',
-        'creates_source',
+        'creates_fact_draft',
         {
           action: 'InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder',
           factBoundary: 'purchase_receipt_draft',
@@ -328,7 +329,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'purchase_receipt',
         'purchase_quality',
         '自动建立逐行待检 IQC',
-        'creates_source',
+        'creates_fact_draft',
         {
           action: 'InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder',
           factBoundary: 'quality_inspection_fact',
@@ -498,7 +499,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'outsourcing_return',
         'outsourcing_quality',
         '回货创建质检',
-        'creates_source',
+        'creates_fact_draft',
         {
           action:
             'InventoryUsecase.CreateQualityInspectionFromOutsourcingReturn',
@@ -524,9 +525,9 @@ const BUSINESS_CHAIN_DEFINITIONS = [
   ),
   chain(
     'delivery_to_settlement',
-    '成品出货到应收结清',
+    '成品出货到应收建立',
     'primary',
-    '出货单经财务放行后才能执行真实出货；真实出货完成后再产生应收或发票，收款过账后形成核销与结清。',
+    '出货单经财务放行后才能执行真实出货；真实出货完成后产生应收或发票，取消已出货单时同步冲销出货与库存影响。',
     [
       chainNode('shipment_draft', '出货单', 'fact_ledger', {
         machineKeys: ['fact.shipment'],
@@ -559,24 +560,9 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         machineKeys: ['fact.finance'],
         sourceRefs: ['server/internal/biz/operational_fact.go'],
       }),
-      chainNode('payment_process', '收付款审批流程', 'process_runtime', {
-        processDefinitionKeys: ['finance_payment_approval/approval_post'],
-        sourceRefs: [PROCESS_CONTRACT_REF, PROCESS_RUNTIME_REF],
-      }),
-      chainNode('payment_task', '收付款审批与执行任务', 'workflow_task', {
-        sourceRefs: ['server/internal/biz/workflow_source_tasks.go'],
-      }),
-      chainNode('payment', '收款事实', 'fact_ledger', {
-        machineKeys: ['fact.finance_payment'],
-        sourceRefs: ['server/internal/biz/finance_payment.go'],
-      }),
-      chainNode('allocation', '核销记录', 'fact_ledger', {
-        machineKeys: ['fact.finance_allocation'],
-        sourceRefs: ['server/internal/biz/finance_payment.go'],
-      }),
-      chainNode('credit_note', '红冲单', 'fact_ledger', {
-        machineKeys: ['fact.finance_credit_note'],
-        sourceRefs: ['server/internal/biz/finance_payment.go'],
+      chainNode('shipment_cancelled', '已取消出货事实', 'fact_ledger', {
+        machineKeys: ['fact.shipment'],
+        sourceRefs: ['server/internal/biz/operational_fact.go'],
       }),
     ],
     [
@@ -629,67 +615,18 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         sourceRefs: ['server/internal/biz/operational_fact.go'],
       }),
       chainEdge(
-        'receivable',
-        'payment_process',
-        '收款单启动审批',
-        'starts_process',
+        'shipped',
+        'shipment_cancelled',
+        '取消出货并冲销库存影响',
+        'reverses',
         {
-          action: 'OperationalFactUsecase.CreateFinancePayment',
-          factBoundary: 'finance_payment_source_document',
-          sourceRefs: [
-            'server/internal/biz/finance_payment.go',
-            'server/internal/biz/finance_process_command.go',
-          ],
+          action: 'OperationalFactUsecase.CancelShippedShipmentWithActor',
+          factBoundary: 'shipment_and_inventory_correction',
+          sourceRefs: ['server/internal/biz/operational_fact.go'],
         }
       ),
-      chainEdge(
-        'payment_process',
-        'payment_task',
-        '创建审批与执行任务',
-        'creates_task',
-        {
-          action: 'ProcessRuntime materialize approval / human_task',
-          factBoundary: 'orchestration_only',
-          sourceRefs: [
-            PROCESS_RUNTIME_REF,
-            'server/internal/biz/process_runtime_workflow.go',
-          ],
-        }
-      ),
-      chainEdge(
-        'payment_task',
-        'payment',
-        '领域命令过账收款',
-        'calls_domain_command',
-        {
-          action: 'OperationalFactUsecase.PostFinancePaymentForProcessCommand',
-          factBoundary: 'finance_payment_post_via_domain_usecase',
-          sourceRefs: [
-            'server/internal/biz/finance_payment_process_command.go',
-          ],
-        }
-      ),
-      chainEdge('payment', 'allocation', '按明细生成核销', 'posts_fact', {
-        action: 'OperationalFactUsecase.PostFinancePayment',
-        factBoundary: 'finance_payment_and_allocations',
-        sourceRefs: ['server/internal/biz/finance_payment.go'],
-      }),
-      chainEdge('allocation', 'receivable', '派生结清或重开余额', 'derives', {
-        action: 'recalculate finance fact outstanding amount',
-        factBoundary: 'finance_fact_projection',
-        sourceRefs: [
-          'server/internal/biz/finance_payment.go',
-          'server/internal/biz/operational_fact.go',
-        ],
-      }),
-      chainEdge('credit_note', 'receivable', '红冲减少或恢复应收', 'reverses', {
-        action:
-          'OperationalFactUsecase.CreateFinanceCreditNote / ReverseFinanceCreditNote',
-        factBoundary: 'finance_credit_note_and_fact_balance',
-        sourceRefs: ['server/internal/biz/finance_payment.go'],
-      }),
     ],
-    { entryNodeKeys: ['shipment_draft', 'credit_note'] }
+    { entryNodeKeys: ['shipment_draft'] }
   ),
   chain(
     'finance_payment_and_reversal',
@@ -789,7 +726,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'open_finance_fact',
         'finance_credit_note',
         '创建红冲单',
-        'creates_source',
+        'creates_fact_draft',
         {
           action: 'OperationalFactUsecase.CreateFinanceCreditNote',
           factBoundary: 'finance_credit_note',
@@ -826,11 +763,16 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'supporting',
     '人工库存操作单经审批和领域命令过账后，才产生库存交易与批次余额变化。',
     [
-      chainNode('inventory_operation', '库存操作单', 'source_document', {
-        machineKeys: ['fact.inventory_operation'],
-        factKeys: ['fact.inventory_operation'],
-        sourceRefs: ['server/internal/biz/inventory_operation.go'],
-      }),
+      chainNode(
+        'inventory_operation',
+        '库存操作事实单（草稿）',
+        'fact_ledger',
+        {
+          machineKeys: ['fact.inventory_operation'],
+          factKeys: ['fact.inventory_operation'],
+          sourceRefs: ['server/internal/biz/inventory_operation.go'],
+        }
+      ),
       chainNode(
         'inventory_adjustment_process',
         '库存调整审批流程',
@@ -1166,7 +1108,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'rejected_purchase_quality',
         'purchase_disposition',
         '创建拒收处置',
-        'creates_source',
+        'creates_fact_draft',
         {
           action: 'InventoryUsecase.CreatePurchaseRejectionDisposition',
           factBoundary: 'purchase_rejection_disposition',
@@ -1188,7 +1130,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'purchase_disposition',
         'purchase_adjustment',
         '让步或报废形成调整',
-        'creates_source',
+        'creates_fact_draft',
         {
           action: 'InventoryUsecase.CreatePurchaseReceiptAdjustmentFromReceipt',
           factBoundary: 'purchase_receipt_adjustment_fact',
@@ -1258,7 +1200,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'rejected_outsourcing_quality',
         'outsourcing_disposition',
         '创建委外处置',
-        'creates_source',
+        'creates_fact_draft',
         {
           action: 'OperationalFactUsecase.CreateOutsourcingReturnDisposition',
           factBoundary: 'outsourcing_return_disposition',
@@ -1353,7 +1295,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'posted_purchase_receipt',
         'purchase_adjustment_correction',
         '按原入库生成调整',
-        'creates_source',
+        'creates_fact_draft',
         {
           action:
             'InventoryUsecase.CreatePurchaseReceiptAdjustmentFromReceipt / PostPurchaseReceiptAdjustment',
@@ -1551,8 +1493,8 @@ const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
     {
       fromChainKey: 'delivery_to_settlement',
       toChainKey: 'finance_payment_and_reversal',
-      label: '结算后进入核销与冲正',
-      kind: 'corrects',
+      label: '应收 / 应付进入收付款、核销与冲正',
+      kind: 'continues',
     },
   ],
   sourceRefs: [ARCHITECTURE_REF, WORKFLOW_MAP_REF, PRODUCT_FLOW_REF],

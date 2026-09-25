@@ -31,6 +31,17 @@ export function buildDevDocsLocation({
   }
 }
 
+export function findDevDocsMarkdownAnchor(container, headingId = '') {
+  const normalizedHeadingId = String(headingId || '').trim()
+  if (!container || !normalizedHeadingId) return null
+
+  return (
+    [...container.querySelectorAll('[data-markdown-anchor]')].find(
+      (element) => element.id === normalizedHeadingId
+    ) || null
+  )
+}
+
 export function resolveDevDocsMarkdownHref(href = '', currentPath = '') {
   const normalizedHref = normalizeHref(href)
   const normalizedCurrentPath = String(currentPath || '').trim()

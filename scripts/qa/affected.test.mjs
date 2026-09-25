@@ -195,7 +195,7 @@ test("affected: removed GitHub CI workflow runs the remaining workflow contract"
 
   assert(
     plan.commands.some((item) =>
-      item.args.includes("scripts/qa/release-workflow.test.mjs"),
+      item.args.includes("scripts/qa/github-write-boundary.test.mjs"),
     ),
   );
   assert(plan.followUps.some((item) => item.id === "remote-ci-enforcement"));
@@ -216,14 +216,14 @@ test("affected: canonical GitLab pipeline changes run the GitLab contract", () =
   );
 });
 
-test("affected: release workflow changes run the immutable release contract", () => {
+test("affected: any GitHub workflow change runs the read-only mirror boundary", () => {
   const plan = buildAffectedPlan([".github/workflows/release.yml"], {
     root: ROOT,
   });
 
   assert(
     plan.commands.some((item) =>
-      item.args.includes("scripts/qa/release-workflow.test.mjs"),
+      item.args.includes("scripts/qa/github-write-boundary.test.mjs"),
     ),
   );
   assert(plan.followUps.some((item) => item.id === "remote-ci-enforcement"));
@@ -318,6 +318,33 @@ test("affected: shared helpers include transitive consumers, aliases, cycles and
         "web/src/scanner.test.mjs",
       ]);
       assert(!ids(plan).includes("web-test"));
+    },
+  );
+});
+
+test("affected: shared Web test helpers select their importing tests only", async () => {
+  await withSourceFixture(
+    {
+      "web/scripts/test/harness.mjs": "export const install = () => true;",
+      "web/src/erp/api/first.test.mjs":
+        "import { install } from '../../../scripts/test/harness.mjs'; install();",
+      "web/src/erp/utils/second.test.mjs":
+        "import { install } from '../../../scripts/test/harness.mjs'; install();",
+      "web/src/scanner.test.mjs": "import fs from 'node:fs';",
+      "web/src/unrelated.test.mjs": "export const unrelated = true;",
+    },
+    (root) => {
+      const plan = buildAffectedPlan(["web/scripts/test/harness.mjs"], {
+        root,
+      });
+
+      assert.deepEqual(selectedTests(plan), [
+        "web/src/erp/api/first.test.mjs",
+        "web/src/erp/utils/second.test.mjs",
+      ]);
+      assert(ids(plan).includes("node-check:web/scripts/test/harness.mjs"));
+      assert.equal(ids(plan).includes("web-test"), false);
+      assert.equal(plan.localGate, "focused");
     },
   );
 });
@@ -884,19 +911,6 @@ test("affected: populated upgrade fixture runs the static PostgreSQL gate contra
       fixture,
     );
   }
-});
-
-test("affected: workflow YAML parser changes rerun the emergency release contract", () => {
-  const plan = buildAffectedPlan(["scripts/qa/ci-workflow-yaml-check.go"], {
-    root: ROOT,
-  });
-
-  assert(
-    plan.commands.some((item) =>
-      item.args.includes("scripts/qa/release-workflow.test.mjs"),
-    ),
-  );
-  assert.equal(ids(plan).includes("full"), false);
 });
 
 test("affected: default collection includes unstaged, staged, and untracked files", async () => {

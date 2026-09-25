@@ -115,6 +115,15 @@ test('delivery bridge keeps read and write provider credentials isolated', () =>
   assert.equal(readOnly.releaseDispatchAllowed, false)
 })
 
+test('GitHub provider remains read-only even when a GitLab write token exists', () => {
+  const environments = captureDevDeliveryProviderEnvironments({
+    PLUSH_DELIVERY_PROVIDER: 'github',
+    PLUSH_GITLAB_TOKEN: 'unrelated-write-token',
+  })
+
+  assert.equal(environments.releaseDispatchAllowed, false)
+})
+
 test('read-only GitLab evidence does not authorize release dispatch', async (t) => {
   const { root, store } = createProject(t)
   const environment = { PLUSH_GITLAB_READ_TOKEN: 'read-only-token' }
@@ -1442,6 +1451,90 @@ test('upgrade promotion proves the current direct-fetch rollback transport befor
   assert.deepEqual(downloads, [SHA, currentSha, currentSha])
   assert.equal(spawnCount, 1)
   child.emit('close', 1)
+})
+
+test('promotion preparation binds the newest passed rollback from the same recovery drill', async (t) => {
+  const { root, store } = createProject(t)
+  const recoveryDrillId = '123e4567-e89b-42d3-a456-426614174009'
+  const rollbackGitSha = 'b'.repeat(40)
+  createOrReuseDeliveryOperation(store, {
+    action: 'rollback',
+    target: 'demo-133',
+    gitSha: rollbackGitSha,
+    version: '2026.07.28-1',
+    idempotencyKey: `version-center:rollback:${recoveryDrillId}`,
+    operationId: ROLLBACK_OPERATION_ID,
+    metadata: {
+      source: 'version-center',
+      currentGitSha: SHA,
+      currentVersion: '2026.07.29-1',
+      recoveryDrillId,
+    },
+  })
+  transitionDeliveryOperation(store, ROLLBACK_OPERATION_ID, {
+    status: 'running',
+    message: 'rollback qualification started',
+  })
+  transitionDeliveryOperation(store, ROLLBACK_OPERATION_ID, {
+    status: 'passed',
+    message: 'rollback completed',
+  })
+
+  let capturedLineage = null
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      provider: 'gitlab',
+      listVersions: () => [
+        {
+          gitSha: SHA,
+          version: '2026.07.29-1',
+          status: 'published',
+          completeAssets: true,
+          promotionEligible: true,
+        },
+      ],
+      downloadReleaseControl: (_gitSha, destination) =>
+        directControlDownload(destination),
+    },
+    async preparePromotionAction(input) {
+      capturedLineage = input.recoveryLineage
+      let { operation } = createOrReuseDeliveryOperation(store, {
+        action: 'promote',
+        target: input.targetKey,
+        gitSha: SHA,
+        version: '2026.07.29-1',
+        idempotencyKey: input.idempotencyKey,
+        operationId: OPERATION_ID,
+      })
+      operation = transitionDeliveryOperation(store, operation.id, {
+        status: 'running',
+        message: 'promotion qualification started',
+      })
+      operation = transitionDeliveryOperation(store, operation.id, {
+        status: 'ready',
+        message: 'promotion ready',
+      })
+      return { operation, plan: { status: 'eligible' }, reused: false }
+    },
+  })
+
+  await service.act({
+    action: 'prepare-promotion',
+    payload: {
+      gitSha: SHA,
+      version: '2026.07.29-1',
+      target: 'demo-133',
+      idempotencyKey: IDEMPOTENCY_KEY,
+    },
+  })
+
+  assert.deepEqual(capturedLineage, {
+    drillId: recoveryDrillId,
+    rollbackOperationId: ROLLBACK_OPERATION_ID,
+    rollbackGitSha,
+  })
 })
 
 test('upgrade promotion is blocked before target write when current rollback transport is missing', async (t) => {

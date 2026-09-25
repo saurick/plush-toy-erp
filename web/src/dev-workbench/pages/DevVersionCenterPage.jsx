@@ -114,7 +114,7 @@ const OPERATION_HISTORY_ACTION_OPTIONS = [
 const OPERATION_HISTORY_TARGET_OPTIONS = [
   { label: '全部目标', value: DEV_VERSION_CENTER_HISTORY_FILTER_ALL },
   { label: 'GitLab Release', value: 'gitlab-release' },
-  { label: 'GitHub 应急 Release', value: 'github-release' },
+  { label: 'GitHub 历史 Release', value: 'github-release' },
   ...DEV_DELIVERY_TARGETS.map((target) => ({
     label: target.shortLabel,
     value: target.key,
@@ -170,7 +170,7 @@ function operationActionLabel(action, promotionMode = null, target = '') {
 
 function deliveryTargetLabel(targetKey) {
   if (targetKey === 'gitlab-release') return 'GitLab Release'
-  if (targetKey === 'github-release') return 'GitHub 应急 Release'
+  if (targetKey === 'github-release') return 'GitHub 历史 Release'
   return (
     DEV_DELIVERY_TARGETS.find((target) => target.key === targetKey)?.label ||
     targetKey ||
@@ -210,7 +210,7 @@ const MANUAL_TAKEOVER_STEPS = [
   {
     title: '生成不可变 Release',
     description:
-      '优先回到本页使用“发布当前版本制品”；页面不可用时，才在 GitLab 手动运行受保护的 release pipeline，并填写同一 exact SHA 和新版本号。GitHub workflow 仅作显式应急回退。',
+      '优先回到本页使用“发布当前版本制品”；页面不可用时，才在 GitLab 手动运行受保护的 release pipeline，并填写同一 exact SHA 和新版本号。GitHub 只保留历史 Release 读取，不提供发布入口。',
     boundary: '不要手工创建、移动或覆盖 tag，也不要上传自行拼装的制品。',
   },
   {
@@ -341,17 +341,36 @@ export default function DevVersionCenterPage() {
         customerScope.customerKey
       )
     : ''
-  const requestedView =
-    searchParams.get(DEV_VERSION_CENTER_VIEW_QUERY_KEY) || ''
+  const requestedViewValues = searchParams.getAll(
+    DEV_VERSION_CENTER_VIEW_QUERY_KEY
+  )
+  const requestedViewCount = requestedViewValues.length
+  const requestedView = requestedViewCount === 1 ? requestedViewValues[0] : ''
   const activeView = resolveDevVersionCenterView(requestedView)
+  const requestedHistoryActionValues = searchParams.getAll(
+    DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action
+  )
+  const requestedHistoryResultValues = searchParams.getAll(
+    DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.result
+  )
+  const requestedHistoryTargetValues = searchParams.getAll(
+    DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target
+  )
+  const requestedHistoryKeywordValues = searchParams.getAll(
+    DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.keyword
+  )
+  const requestedHistoryActionCount = requestedHistoryActionValues.length
+  const requestedHistoryResultCount = requestedHistoryResultValues.length
+  const requestedHistoryTargetCount = requestedHistoryTargetValues.length
+  const requestedHistoryKeywordCount = requestedHistoryKeywordValues.length
   const requestedHistoryAction =
-    searchParams.get(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action) || ''
+    requestedHistoryActionCount === 1 ? requestedHistoryActionValues[0] : ''
   const requestedHistoryResult =
-    searchParams.get(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.result) || ''
+    requestedHistoryResultCount === 1 ? requestedHistoryResultValues[0] : ''
   const requestedHistoryTarget =
-    searchParams.get(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target) || ''
+    requestedHistoryTargetCount === 1 ? requestedHistoryTargetValues[0] : ''
   const requestedHistoryKeyword =
-    searchParams.get(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.keyword) || ''
+    requestedHistoryKeywordCount === 1 ? requestedHistoryKeywordValues[0] : ''
   const operationHistoryFilters = resolveDevOperationHistoryFilters({
     action: requestedHistoryAction,
     result: requestedHistoryResult,
@@ -409,7 +428,7 @@ export default function DevVersionCenterPage() {
   const summary = summaryInCurrentScope ? storedSummary : null
   const summaryFresh = summaryInCurrentScope && storedSummaryFresh
   const deliveryProviderName =
-    summary?.boundaries?.provider === 'github' ? 'GitHub 应急链' : 'GitLab'
+    summary?.boundaries?.provider === 'github' ? 'GitHub 历史只读' : 'GitLab'
 
   const restoreOperationDetailTriggerFocus = useCallback(() => {
     const trigger = operationDetailTriggerRef.current
@@ -461,30 +480,34 @@ export default function DevVersionCenterPage() {
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams)
     let changed = false
-    if (requestedView !== activeView) {
+    if (requestedViewCount !== 1 || requestedView !== activeView) {
       nextParams.set(DEV_VERSION_CENTER_VIEW_QUERY_KEY, activeView)
       changed = true
     }
-    for (const [key, value, defaultValue] of [
+    for (const [key, value, defaultValue, requestedCount] of [
       [
         DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action,
         operationHistoryFilters.action,
         DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+        requestedHistoryActionCount,
       ],
       [
         DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.result,
         operationHistoryFilters.result,
         DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+        requestedHistoryResultCount,
       ],
       [
         DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target,
         operationHistoryFilters.target,
         DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+        requestedHistoryTargetCount,
       ],
       [
         DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.keyword,
         operationHistoryFilters.keyword,
         '',
+        requestedHistoryKeywordCount,
       ],
     ]) {
       if (value === defaultValue) {
@@ -492,7 +515,7 @@ export default function DevVersionCenterPage() {
           nextParams.delete(key)
           changed = true
         }
-      } else if (nextParams.get(key) !== value) {
+      } else if (requestedCount !== 1 || nextParams.get(key) !== value) {
         nextParams.set(key, value)
         changed = true
       }
@@ -505,6 +528,11 @@ export default function DevVersionCenterPage() {
     operationHistoryFilters.result,
     operationHistoryFilters.target,
     requestedView,
+    requestedHistoryActionCount,
+    requestedHistoryKeywordCount,
+    requestedHistoryResultCount,
+    requestedHistoryTargetCount,
+    requestedViewCount,
     searchParams,
     setSearchParams,
   ])
@@ -631,7 +659,7 @@ export default function DevVersionCenterPage() {
     refreshRequestRef.current = requestId
     const hasVisibleSummary = Boolean(
       summarySnapshotKeyRef.current === requestedSnapshotKey &&
-        summaryRef.current
+      summaryRef.current
     )
     setInitialLoading(!hasVisibleSummary)
     setRefreshing(hasVisibleSummary)
@@ -795,11 +823,9 @@ export default function DevVersionCenterPage() {
   )
   const hasOperationHistoryFilters = Boolean(
     operationHistoryFilters.action !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
-      operationHistoryFilters.result !==
-        DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
-      operationHistoryFilters.target !==
-        DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
-      operationHistoryFilters.keyword
+    operationHistoryFilters.result !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
+    operationHistoryFilters.target !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
+    operationHistoryFilters.keyword
   )
   const operationHistoryState = resolveDevOperationHistoryState({
     initialLoading,
@@ -830,12 +856,12 @@ export default function DevVersionCenterPage() {
   const targetPassed = target?.status === 'passed'
   const customerTestRebuildEligible = Boolean(
     summaryFresh &&
-      selectedTargetKey === 'customer-test-133' &&
-      targetPassed &&
-      currentTargetRelease?.status === 'published' &&
-      currentTargetRelease.completeAssets === true &&
-      !hasOpenOperation &&
-      !isMutationRunning
+    selectedTargetKey === 'customer-test-133' &&
+    targetPassed &&
+    currentTargetRelease?.status === 'published' &&
+    currentTargetRelease.completeAssets === true &&
+    !hasOpenOperation &&
+    !isMutationRunning
   )
   const customerTestRebuildExplanation = isMutationRunning
     ? '已有写操作正在提交'
@@ -852,24 +878,24 @@ export default function DevVersionCenterPage() {
               : ''
   const initializationReady = Boolean(
     initializationPreflight?.status === 'eligible' &&
-      initializationPreflight?.remote?.rootState === 'absent' &&
-      initializationPreflight?.blockers?.length === 0
+    initializationPreflight?.remote?.rootState === 'absent' &&
+    initializationPreflight?.blockers?.length === 0
   )
   const headAlreadyPublished = Boolean(
     currentHeadRelease?.status === 'published' &&
-      currentHeadRelease?.completeAssets === true
+    currentHeadRelease?.completeAssets === true
   )
   const releaseDispatchAllowed =
     summary?.boundaries?.releaseDispatchAllowed === true
   const canDispatch = Boolean(
     summaryFresh &&
-      releaseDispatchAllowed &&
-      repository &&
-      !repository.dirty &&
-      Boolean(releaseVersion) &&
-      !headAlreadyPublished &&
-      !hasOpenOperation &&
-      !isMutationRunning
+    releaseDispatchAllowed &&
+    repository &&
+    !repository.dirty &&
+    Boolean(releaseVersion) &&
+    !headAlreadyPublished &&
+    !hasOpenOperation &&
+    !isMutationRunning
   )
   const dispatchExplanation = isMutationRunning
     ? '已有写操作正在提交'
@@ -878,7 +904,9 @@ export default function DevVersionCenterPage() {
       : hasOpenOperation
         ? '已有未结束的操作'
         : !releaseDispatchAllowed
-          ? '当前只加载 GitLab 只读凭据；查看不受影响，创建新发布需要短期发布凭据'
+          ? summary?.boundaries?.provider === 'github'
+            ? 'GitHub Provider 只读取历史 Release，不能创建新发布'
+            : '当前只加载 GitLab 只读凭据；查看不受影响，创建新发布需要短期发布凭据'
           : repository?.dirty
             ? '当前工作树有改动，不能创建 exact-SHA 发布'
             : !releaseVersion
@@ -891,8 +919,8 @@ export default function DevVersionCenterPage() {
   const strictProof = qualityGateSummary?.proofs?.strict
   const qualityGateIdentityCurrent = Boolean(
     repository &&
-      qualityGateSummary?.repository?.commit === repository.commit &&
-      qualityGateSummary.repository.dirty === repository.dirty
+    qualityGateSummary?.repository?.commit === repository.commit &&
+    qualityGateSummary.repository.dirty === repository.dirty
   )
   const strictSummaryLabel = qualityGateError
     ? '摘要读取失败'
@@ -1160,10 +1188,10 @@ export default function DevVersionCenterPage() {
       : []
   const operationDetailNeedsRetryCard = Boolean(
     operationDetail &&
-      (operationDetail.status !== 'passed' ||
-        operationDetail.idempotency.attempt > 1 ||
-        operationDetail.idempotency.reuseCount > 0 ||
-        operationDetail.retry.allowed)
+    (operationDetail.status !== 'passed' ||
+      operationDetail.idempotency.attempt > 1 ||
+      operationDetail.idempotency.reuseCount > 0 ||
+      operationDetail.retry.allowed)
   )
   const operationServerDigest =
     operationDetail?.metrics?.serverDigest ??

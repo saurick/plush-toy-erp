@@ -1100,53 +1100,6 @@
   color: #bbf7d0;
 }
 
-[data-erp-theme='dark'] .erp-dev-customer-view-switch.ant-segmented,
-[data-erp-theme='dark'] .erp-dev-testing-reader__toolbar .ant-segmented {
-  --erp-segmented-bg: #1e3a8a;
-  --erp-segmented-shadow: inset 3px 0 0 #60a5fa;
-  --erp-segmented-text: var(--erp-text-muted);
-  --erp-segmented-selected-text: #f8fafc;
-  border-color: #334155;
-  background: #0b1220;
-}
-
-[data-erp-theme='dark'] .erp-dev-customer-view-switch .ant-segmented-item,
-[data-erp-theme='dark'] .erp-dev-testing-reader__toolbar .ant-segmented-item {
-  border-color: #334155;
-  background: transparent;
-  color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .erp-dev-customer-view-switch .ant-segmented-item:hover,
-[data-erp-theme='dark']
-  .erp-dev-customer-view-switch
-  .ant-segmented-item:focus-visible,
-[data-erp-theme='dark']
-  .erp-dev-testing-reader__toolbar
-  .ant-segmented-item:hover,
-[data-erp-theme='dark']
-  .erp-dev-testing-reader__toolbar
-  .ant-segmented-item:focus-visible {
-  border-color: #60a5fa;
-  color: #dbeafe;
-}
-
-[data-erp-theme='dark']
-  .erp-dev-customer-view-switch
-  .erp-segmented-item-selected,
-[data-erp-theme='dark']
-  .erp-dev-testing-reader__toolbar
-  .erp-segmented-item-selected {
-  border-color: #60a5fa;
-}
-
-[data-erp-theme='dark'] .erp-dev-customer-view-switch .ant-segmented-item-label,
-[data-erp-theme='dark']
-  .erp-dev-testing-reader__toolbar
-  .ant-segmented-item-label {
-  color: inherit;
-}
-
 [data-erp-theme='dark'] .erp-dev-customer-decision-card,
 [data-erp-theme='dark'] .erp-dev-customer-field,
 [data-erp-theme='dark'] .erp-dev-customer-numbering,
@@ -1216,21 +1169,6 @@
 
 [data-erp-theme='dark'] .erp-dev-hub-pinned {
   border-bottom-color: var(--erp-border);
-}
-
-[data-erp-theme='dark'] .erp-dev-hub-group-filter.ant-segmented {
-  background: var(--erp-surface-bg-soft);
-}
-
-[data-erp-theme='dark'] .erp-dev-hub-group-filter .ant-segmented-item-label {
-  color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark']
-  .erp-dev-hub-group-filter
-  .erp-segmented-item-selected
-  .ant-segmented-item-label {
-  color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-dev-hub-card__icon {

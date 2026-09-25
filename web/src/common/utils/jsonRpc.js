@@ -1,9 +1,9 @@
 // web/src/common/utils/jsonRpc.js
-import { RpcError } from '@/common/utils/rpcError'
-import { getToken, logout, getLoginPath } from '@/common/auth/auth'
-import { authBus } from '@/common/auth/authBus'
-import { isAuthFailureCode } from '@/common/consts/errorCodes'
-import { getUserFacingErrorMessage } from '@/common/utils/errorMessage'
+import { getToken, logout, getLoginPath } from '../auth/auth.js'
+import { authBus } from '../auth/authBus.js'
+import { isAuthFailureCode } from '../consts/errorCodes.js'
+import { getUserFacingErrorMessage } from './errorMessage.js'
+import { RpcError } from './rpcError.js'
 
 let globalRpcId = 0
 const pausedScopes = new Map()

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
+import { progressFixtureData } from "../../web/scripts/style-l1/businessProgressFixtures.mjs";
 import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catalog.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
@@ -1103,21 +1103,8 @@ function createReadinessFetch(runtimeOptions = {}) {
         total: 30,
       });
     }
-    if (body.method === "dashboard_stats") {
-      return okResponse({
-        modules: dashboardHealthModules.flatMap((module) =>
-          module.sources.map((source) => ({
-            module_key: source.key,
-            available: true,
-            total:
-              source.key === "products"
-                ? 20
-                : source.key === "production-scheduling"
-                  ? 25
-                  : 45,
-          })),
-        ),
-      });
+    if (body.method === "list_progress") {
+      return okResponse({...progressFixtureData({scope:"all",limit:100}), total:45, counts:{total:45,overdue:1,due_soon:1,blocked:1,undated:1}});
     }
     if (body.method === "list_tasks") {
       if (
@@ -1496,8 +1483,8 @@ test("default plan covers all 51 targets and never connects to a backend", async
   const businessDashboard = result.plan.targets.find(
     (item) => item.id === "desktopPages:business-dashboard",
   );
-  assert.ok(businessDashboard.probeIds.includes("products"));
-  assert.ok(businessDashboard.probeIds.includes("business-dashboard-stats"));
+  assert.ok(businessDashboard.probeIds.includes("sales-orders"));
+  assert.ok(businessDashboard.probeIds.includes("business-progress"));
   assert.equal(businessDashboard.probeIds.includes("product-skus"), false);
   assert.equal(result.plan.expected.targets, 51);
   assert.equal(result.plan.expected.mobileTaskTotal, 180);
@@ -1546,93 +1533,18 @@ test("readiness binds the explicit long-lived workbench batch identity and prefi
   );
 });
 
-test("business dashboard projection proves the exact runtime module set", () => {
-  const plan = buildManualAcceptanceReadinessPlan({
-    sourceReport: sourceReport(),
-    factReport: factReport(),
-    taskReport: taskReport(),
-  });
-  const probe = plan.probes.find(
-    (item) => item.id === "business-dashboard-stats",
-  );
-  assert.equal(probe.batchEvidence, "fresh_dataset_projection");
-  assert.equal(probe.expectedModuleTotalComparison, "exact");
-  assert.deepEqual(probe.expectedModuleTotals, {
-    products: 20,
-    inventory: 45,
-  });
-  const modules = probe.expectedModuleKeys.map((moduleKey) => ({
-    module_key: moduleKey,
-    available: true,
-    total:
-      moduleKey === "products"
-        ? 20
-        : moduleKey === "production-scheduling"
-          ? 25
-          : 45,
-  }));
-  const passing = evaluateBusinessDashboardProjection(probe, { modules });
-  assert.equal(passing.status, "pass");
-  assert.equal(passing.moduleTotals.products, 20);
-  assert.equal(passing.moduleTotals.inventory, 45);
-  assert.equal(passing.moduleTotals["production-scheduling"], 25);
-
-  const stale = structuredClone(modules);
-  stale.find((item) => item.module_key === "production-scheduling").total = 20;
-  assert.equal(
-    evaluateBusinessDashboardProjection(probe, { modules: stale }).status,
-    "pass",
-  );
-  const pollutedInventory = structuredClone(modules);
-  pollutedInventory.find((item) => item.module_key === "inventory").total = 999;
-  assert.equal(
-    evaluateBusinessDashboardProjection(probe, {
-      modules: pollutedInventory,
-    }).status,
-    "fail",
-  );
-  assert.equal(
-    evaluateBusinessDashboardProjection(probe, {
-      modules: modules.slice(1),
-    }).status,
-    "fail",
-  );
-});
-
-test("business dashboard projection preserves legacy totals on persistent targets", () => {
-  const target = {
-    target: SCENARIO_DEMO_TARGET,
-    backendURL: "http://127.0.0.1:8300",
-    databaseName: "plush_erp",
-  };
-  const plan = buildManualAcceptanceReadinessPlan({
-    sourceReport: sourceReport(target),
-    factReport: factReport(target),
-    taskReport: taskReport(target),
-  });
-  const probe = plan.probes.find(
-    (item) => item.id === "business-dashboard-stats",
-  );
-  assert.equal(probe.batchEvidence, "persistent_dataset_projection");
-  assert.equal(probe.expectedModuleTotalComparison, "minimum");
-
-  const modules = probe.expectedModuleKeys.map((moduleKey) => ({
-    module_key: moduleKey,
-    available: true,
-    total: moduleKey === "products" ? 40 : moduleKey === "inventory" ? 90 : 45,
-  }));
-  const passing = evaluateBusinessDashboardProjection(probe, { modules });
-  assert.equal(passing.status, "pass");
-  assert.equal(passing.moduleTotalComparison, "minimum");
-
-  const missingCurrentBatch = structuredClone(modules);
-  missingCurrentBatch.find((item) => item.module_key === "products").total = 19;
-  assert.equal(
-    evaluateBusinessDashboardProjection(probe, {
-      modules: missingCurrentBatch,
-    }).status,
-    "fail",
-  );
+test("progress projection requires complete records, source access and current-batch evidence", () => {
+  const plan = buildManualAcceptanceReadinessPlan({sourceReport:sourceReport(),factReport:factReport(),taskReport:taskReport()});
+  const probe = plan.probes.find(item=>item.id === "business-progress");
+  assert.equal(probe.method,"list_progress");
+  assert.equal(probe.params.scope,"all");
+  assert.equal(probe.includeCustomerKey,false);
+  const data={...progressFixtureData({scope:"all",limit:100}),total:45,counts:{total:45,overdue:1,due_soon:1,blocked:1,undated:1}};
+  assert.equal(evaluateBusinessDashboardProjection(probe,data).status,"pass");
+  assert.equal(evaluateBusinessDashboardProjection(probe,{...data,access:{...data.access,sales:false}}).status,"fail");
+  assert.equal(evaluateBusinessDashboardProjection(probe,{...data,rows:[{}]}).status,"error");
+  assert.equal(evaluateBusinessDashboardProjection({...probe,batchEvidence:"not_proven"},data).status,"not_proven");
+  assert.equal(evaluateBusinessDashboardProjection(probe,{...data,total:0,rows:[],counts:{...data.counts,total:0}}).status,"fail");
 });
 
 test("apply reports may raise minimums while the shipment dataset stays exact", () => {
@@ -2409,7 +2321,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   );
   assert(
     calls.every(({ method }) =>
-      /^(?:runtime_identity|admin_login|capabilities|get_effective_session|dashboard_stats|list|list_|rbac_options|audit_logs)/u.test(
+      /^(?:runtime_identity|admin_login|capabilities|get_effective_session|list_progress|list|list_|rbac_options|audit_logs)/u.test(
         method,
       ),
     ),

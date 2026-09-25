@@ -210,7 +210,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '把业务管理菜单收敛为业务对象总控：按链路选择对象、查看风险、进入标准业务页或详情页。',
     appliesTo:
-      '业务看板按正式投影展示全宽关注事项和独立业务记录；原型的汇总卡与常驻侧栏未被采纳，仍保持待实现状态。',
+      '运行时进度看板已采用订单交付、生产执行与按需侧栏；本原型的模块汇总卡不代表当前实现，仍保持待实现状态。',
   },
   {
     key: 'business-management-center-redesign-reference',

@@ -166,7 +166,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
             },
             {
               key: 'scenarios',
-              label: '本步骤合法场景',
+              label: '本步骤场景合同',
               children: (
                 <Space wrap size={[4, 4]}>
                   {step.scenarioKinds.map((kind) => (
@@ -190,7 +190,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
         {[
           ['业务链', plan.chainCount],
           ['链路步骤', plan.stepCount],
-          ['合法场景', plan.scenarioCount],
+          ['场景合同', plan.scenarioCount],
           ['造数阶段', plan.dataStageCount],
           ['页面目标', plan.catalogTargetCount],
         ].map(([label, value]) => (
@@ -204,7 +204,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
         <div>
           <Text strong>选择业务链查看</Text>
           <Text type="secondary">
-            选择只影响计划下钻；完整回归始终执行全部已登记合法场景。
+            选择只影响计划下钻；完整回归始终执行全部已登记场景合同。
           </Text>
         </div>
         <Select
@@ -311,7 +311,7 @@ function WorkflowStep({ number, title, description, extra, children }) {
 }
 
 function currentPassedOperation(summary, profileKey, predicate) {
-  return summary.operations.find(
+  return summary.currentOperations.find(
     (operation) =>
       operation.profileKey === profileKey &&
       operation.status === 'passed' &&
@@ -964,7 +964,10 @@ export default function DevDataPreparationPage() {
       current
         ? {
             ...current,
-            operations: upsertOperation(operation, current.operations),
+            currentOperations: upsertOperation(
+              operation,
+              current.currentOperations
+            ),
           }
         : current
     )
@@ -987,7 +990,7 @@ export default function DevDataPreparationPage() {
       if (requestVersion !== requestVersionRef.current) return
       setSummary(nextSummary)
       const recoveredOperation = selectRecoverableDataPreparationOperation(
-        nextSummary.operations,
+        nextSummary.currentOperations,
         currentOperationIdRef.current,
         selectedProfileKey,
         profileTargetKey(selectedProfileKey, selectedScenarioTargetKey)
@@ -1090,7 +1093,7 @@ export default function DevDataPreparationPage() {
   const repositoryBlocked =
     selectedProfile?.exactCleanCommitRequired === true &&
     (!summary?.repository || summary.repository.dirty)
-  const hasActiveOperation = (summary?.operations || []).some(
+  const hasActiveOperation = (summary?.currentOperations || []).some(
     (operation) =>
       operation.profileKey === selectedProfileKey &&
       operation.targetSummary.targetKey === selectedOperationTargetKey &&
@@ -1233,7 +1236,7 @@ export default function DevDataPreparationPage() {
     }
   }
 
-  const historyItems = (summary?.operations || []).map((operation) => ({
+  const historyItems = (summary?.currentOperations || []).map((operation) => ({
     key: operation.id,
     label: (
       <div className="erp-dev-data-history-label">
@@ -1259,6 +1262,10 @@ export default function DevDataPreparationPage() {
       />
     ),
   }))
+  const historicalOperationReferences = [
+    ...(summary?.historicalOperations || []),
+    ...(summary?.unresolvedOperations || []),
+  ]
 
   return (
     <div
@@ -1285,7 +1292,7 @@ export default function DevDataPreparationPage() {
               准备回归数据
             </Title>
             <Paragraph className="erp-dev-hub-summary">
-              默认按最新业务链合同建立完整回归新批次；先看合法步骤和场景，再确认执行并查看真实耗时。页面不接收自定义目标、命令或凭据。
+              默认按最新业务链合同建立完整回归新批次；先看已登记步骤和场景合同，再确认执行并查看真实耗时。页面不接收自定义目标、命令或凭据。
             </Paragraph>
           </div>
         </div>
@@ -1460,7 +1467,7 @@ export default function DevDataPreparationPage() {
             <WorkflowStep
               number="2"
               title="核对最新业务链与数据范围"
-              description="选择业务链，展开步骤绑定的责任、状态、动作、结果和 Fact；只查看已登记合法场景。"
+              description="选择业务链，展开步骤绑定的责任、状态、动作、结果和 Fact；只查看已登记场景合同及其证据绑定。"
               extra={<Text type="secondary">不支持自定义参数</Text>}
             >
               <AcceptancePlanReview
@@ -1530,7 +1537,7 @@ export default function DevDataPreparationPage() {
                     onChange={customerScope.selectCustomer}
                     disabled={preparing || executing}
                     label="业务场景甲方"
-                    note="仅业务场景模拟数据按甲方选择；当前永绅对应固定 yoyoosun V6 场景批次。"
+                    note="仅业务场景模拟数据按甲方选择；当前永绅对应固定 yoyoosun V7 场景批次。"
                     invalidDescription="当前甲方没有登记固定场景数据；业务场景的准备与执行已停止，其他数据准备方式不受影响。"
                   />
                 </Space>
@@ -1640,7 +1647,14 @@ export default function DevDataPreparationPage() {
               number="4"
               title="查看回执与耗时"
               description="查看实际执行总耗时、完整回归的 9 个造数阶段耗时和自动清理读回；旧回执只证明对应旧计划。"
-              extra={<Tag>{historyItems.length} 条回执</Tag>}
+              extra={
+                <Tag>
+                  {historyItems.length} 条当前回执
+                  {historicalOperationReferences.length > 0
+                    ? ` · ${historicalOperationReferences.length} 条旧合同记录`
+                    : ''}
+                </Tag>
+              }
             >
               {currentOperation?.terminal ? (
                 <section
@@ -1665,6 +1679,52 @@ export default function DevDataPreparationPage() {
                   description="尚无数据准备回执"
                 />
               )}
+              {historicalOperationReferences.length > 0 ? (
+                <details className="erp-dev-data-history">
+                  <summary>
+                    展开旧合同与未识别合同记录（
+                    {historicalOperationReferences.length}）
+                  </summary>
+                  <Alert
+                    type="info"
+                    showIcon
+                    message="这些记录只用于追溯"
+                    description="旧数据合同和无法识别版本的历史记录不会参与当前 V7 执行、恢复选择或环境就绪判断。"
+                  />
+                  <List
+                    size="small"
+                    dataSource={historicalOperationReferences}
+                    renderItem={(operation) => (
+                      <List.Item>
+                        <Space wrap>
+                          <Text>
+                            {
+                              DEV_DATA_PREPARATION_PROFILE_COPY[
+                                operation.profileKey
+                              ].title
+                            }
+                          </Text>
+                          <StatusTag status={operation.status} />
+                          <Tag>
+                            {operation.contract.classification === 'historical'
+                              ? '旧合同'
+                              : '合同未识别'}
+                          </Tag>
+                          <Text type="secondary">
+                            {operation.contract.dataVersion || '版本未记录'} ·{' '}
+                            {operation.contract.datasetRunId || '批次未记录'}
+                          </Text>
+                          <DevTimestamp
+                            value={operation.updatedAt}
+                            action="最后记录于"
+                            missing="时间未证明"
+                          />
+                        </Space>
+                      </List.Item>
+                    )}
+                  />
+                </details>
+              ) : null}
             </WorkflowStep>
           </div>
         ) : null}
@@ -1706,7 +1766,7 @@ export default function DevDataPreparationPage() {
             showIcon
             message={
               currentIsScenarioDemo
-                ? '确认后生成固定 V6 业务场景数据'
+                ? '确认后生成固定 V7 业务场景数据'
                 : '确认后才会写入固定目标'
             }
             description={

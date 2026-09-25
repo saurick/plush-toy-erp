@@ -40,6 +40,7 @@ import {
   DEV_CUSTOMER_CONFIG_SOURCE_PATH,
   DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY,
   buildCustomerConfigDevOverviewFromSearch,
+  createDevCustomerConfigIdempotencyKey,
 } from '../config/devCustomerConfig.mjs'
 import { getBusinessModule } from '@/erp/config/businessModules.mjs'
 import { navigationItemRegistry } from '@/erp/config/seedData.mjs'
@@ -1013,8 +1014,7 @@ function MissingCustomerPanel({ overview }) {
   const requestedCustomerKey = overview.requestedCustomerKey || '未选择'
   const missingTitle = overview.sourceLabel || '未登记客户配置包'
   const missingDescription =
-    overview.blockedPieces?.[0]?.boundary ||
-    '请选择已登记的客户配置包后重试。'
+    overview.blockedPieces?.[0]?.boundary || '请选择已登记的客户配置包后重试。'
 
   return (
     <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-missing">
@@ -2010,7 +2010,8 @@ export default function DevCustomerConfigPage() {
     customerKey: overviewCustomerKey,
     importSummary: overviewImportSummary,
   } = overview
-  const { uiReleaseBatchesApiPath } = overviewImportSummary || {}
+  const { uiOperationsApiPath, uiReleaseBatchesApiPath, uiSessionApiPath } =
+    overviewImportSummary || {}
   const [dryRunState, setDryRunState] = useState({ status: 'idle' })
   const [applyState, setApplyState] = useState({ status: 'idle' })
   const [releaseState, setReleaseState] = useState({ status: 'idle' })
@@ -2024,43 +2025,105 @@ export default function DevCustomerConfigPage() {
   const applyAbortRef = useRef(null)
   const releaseRequestRef = useRef(0)
   const releaseAbortRef = useRef(null)
-  const isMissingCustomer = overview.status === 'missing'
+  const bridgeSessionRef = useRef({ token: '', promise: null })
+  const isMissingCustomer = overview.status !== 'ready'
+  const requestedCustomerValues = searchParams.getAll(
+    DEV_CUSTOMER_CONFIG_QUERY_KEY
+  )
+  const requestedCustomerCount = requestedCustomerValues.length
+  const requestedCustomerValue =
+    requestedCustomerCount === 1 ? requestedCustomerValues[0] : ''
+  const requestedViewValues = searchParams.getAll(
+    DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY
+  )
+  const requestedViewCount = requestedViewValues.length
   const requestedView = String(
-    searchParams.get(DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY) || ''
+    requestedViewCount === 1 ? requestedViewValues[0] : ''
   ).trim()
   const activeView = VIEW_OPTIONS.some((item) => item.value === requestedView)
     ? requestedView
     : VIEW_OVERVIEW
+  const requestedPreflightSectionValues = searchParams.getAll(
+    PREFLIGHT_SECTION_QUERY_KEY
+  )
+  const requestedPreflightSectionCount = requestedPreflightSectionValues.length
   const requestedPreflightSection = String(
-    searchParams.get(PREFLIGHT_SECTION_QUERY_KEY) || ''
+    requestedPreflightSectionCount === 1
+      ? requestedPreflightSectionValues[0]
+      : ''
   ).trim()
   const activePreflightSection = PREFLIGHT_SECTION_VALUES.has(
     requestedPreflightSection
   )
     ? requestedPreflightSection
     : PREFLIGHT_SECTION_PACKAGE
+  const requestedImportActionValues = searchParams.getAll(
+    IMPORT_ACTION_QUERY_KEY
+  )
+  const requestedImportActionCount = requestedImportActionValues.length
   const requestedImportAction = String(
-    searchParams.get(IMPORT_ACTION_QUERY_KEY) || ''
+    requestedImportActionCount === 1 ? requestedImportActionValues[0] : ''
   ).trim()
   const activeImportAction = IMPORT_ACTION_VALUES.has(requestedImportAction)
     ? requestedImportAction
     : IMPORT_ACTION_DRY_RUN
   const searchParamsKey = searchParams.toString()
+  const requestedReleaseBatchValues = searchParams.getAll(
+    DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY
+  )
+  const requestedReleaseBatchCount = requestedReleaseBatchValues.length
   const requestedReleaseBatch = String(
-    searchParams.get(DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY) || ''
+    requestedReleaseBatchCount === 1 ? requestedReleaseBatchValues[0] : ''
   ).trim()
   const releaseBatch =
     releaseBatchesState.status === 'success' &&
     releaseBatchesState.batches.includes(requestedReleaseBatch)
       ? requestedReleaseBatch
       : ''
-  const isMutationRunning = applyState.status === 'running'
+  const isMutationRunning =
+    dryRunState.status === 'running' ||
+    applyState.status === 'running' ||
+    releaseState.status === 'checking'
+
+  const getBridgeCsrfToken = async () => {
+    if (bridgeSessionRef.current.token) {
+      return bridgeSessionRef.current.token
+    }
+    if (!bridgeSessionRef.current.promise) {
+      bridgeSessionRef.current.promise = fetch(uiSessionApiPath, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { accept: 'application/json' },
+      })
+        .then(async (response) => {
+          const payload = await response.json()
+          if (
+            !response.ok ||
+            payload.schemaVersion !== 'plush.dev-customer-config-session/v1' ||
+            typeof payload.csrfToken !== 'string' ||
+            payload.csrfToken.length < 32
+          ) {
+            throw new Error('客户配置工具会话初始化失败')
+          }
+          bridgeSessionRef.current.token = payload.csrfToken
+          return payload.csrfToken
+        })
+        .finally(() => {
+          bridgeSessionRef.current.promise = null
+        })
+    }
+    return bridgeSessionRef.current.promise
+  }
 
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParamsKey)
     let changed = false
 
-    if (!String(nextParams.get(DEV_CUSTOMER_CONFIG_QUERY_KEY) || '').trim()) {
+    if (
+      requestedCustomerCount === 0 ||
+      (requestedCustomerCount === 1 &&
+        !String(requestedCustomerValue || '').trim())
+    ) {
       nextParams.set(
         DEV_CUSTOMER_CONFIG_QUERY_KEY,
         DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY
@@ -2068,31 +2131,91 @@ export default function DevCustomerConfigPage() {
       changed = true
     }
 
-    if (
-      (activeView !== VIEW_PREFLIGHT ||
-        (requestedPreflightSection &&
-          !PREFLIGHT_SECTION_VALUES.has(requestedPreflightSection))) &&
-      nextParams.has(PREFLIGHT_SECTION_QUERY_KEY)
+    if (activeView === VIEW_OVERVIEW) {
+      if (nextParams.has(DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY)) {
+        nextParams.delete(DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY)
+        changed = true
+      }
+    } else if (
+      requestedViewCount !== 1 ||
+      nextParams.get(DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY) !== activeView
     ) {
-      nextParams.delete(PREFLIGHT_SECTION_QUERY_KEY)
+      nextParams.set(DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY, activeView)
       changed = true
     }
-    if (
-      (activeView !== VIEW_IMPORT ||
-        (requestedImportAction &&
-          !IMPORT_ACTION_VALUES.has(requestedImportAction))) &&
-      nextParams.has(IMPORT_ACTION_QUERY_KEY)
+
+    if (activeView !== VIEW_PREFLIGHT) {
+      if (nextParams.has(PREFLIGHT_SECTION_QUERY_KEY)) {
+        nextParams.delete(PREFLIGHT_SECTION_QUERY_KEY)
+        changed = true
+      }
+    } else if (activePreflightSection === PREFLIGHT_SECTION_PACKAGE) {
+      if (nextParams.has(PREFLIGHT_SECTION_QUERY_KEY)) {
+        nextParams.delete(PREFLIGHT_SECTION_QUERY_KEY)
+        changed = true
+      }
+    } else if (
+      requestedPreflightSectionCount !== 1 ||
+      nextParams.get(PREFLIGHT_SECTION_QUERY_KEY) !== activePreflightSection
     ) {
-      nextParams.delete(IMPORT_ACTION_QUERY_KEY)
+      nextParams.set(PREFLIGHT_SECTION_QUERY_KEY, activePreflightSection)
       changed = true
     }
+
+    if (activeView !== VIEW_IMPORT) {
+      if (nextParams.has(IMPORT_ACTION_QUERY_KEY)) {
+        nextParams.delete(IMPORT_ACTION_QUERY_KEY)
+        changed = true
+      }
+    } else if (activeImportAction === IMPORT_ACTION_DRY_RUN) {
+      if (nextParams.has(IMPORT_ACTION_QUERY_KEY)) {
+        nextParams.delete(IMPORT_ACTION_QUERY_KEY)
+        changed = true
+      }
+    } else if (
+      requestedImportActionCount !== 1 ||
+      nextParams.get(IMPORT_ACTION_QUERY_KEY) !== activeImportAction
+    ) {
+      nextParams.set(IMPORT_ACTION_QUERY_KEY, activeImportAction)
+      changed = true
+    }
+
     if (changed) {
       setSearchParams(nextParams, { replace: true })
     }
   }, [
+    activeImportAction,
+    activePreflightSection,
     activeView,
-    requestedImportAction,
-    requestedPreflightSection,
+    requestedCustomerCount,
+    requestedCustomerValue,
+    requestedImportActionCount,
+    requestedPreflightSectionCount,
+    requestedViewCount,
+    searchParamsKey,
+    setSearchParams,
+  ])
+
+  useEffect(() => {
+    if (releaseBatchesState.status !== 'success') return
+    const nextParams = new URLSearchParams(searchParamsKey)
+    if (!releaseBatch) {
+      if (!nextParams.has(DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY)) return
+      nextParams.delete(DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY)
+    } else if (
+      requestedReleaseBatchCount === 1 &&
+      nextParams.get(DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY) ===
+        releaseBatch
+    ) {
+      return
+    } else {
+      nextParams.set(DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY, releaseBatch)
+    }
+    setSearchParams(nextParams, { replace: true })
+  }, [
+    releaseBatch,
+    releaseBatchesState.status,
+    requestedReleaseBatchCount,
     searchParamsKey,
     setSearchParams,
   ])
@@ -2144,6 +2267,62 @@ export default function DevCustomerConfigPage() {
 
     return () => controller.abort()
   }, [isMissingCustomer, overviewCustomerKey, uiReleaseBatchesApiPath])
+
+  useEffect(() => {
+    if (isMissingCustomer || !uiOperationsApiPath) return undefined
+    const controller = new AbortController()
+    const url = new URL(uiOperationsApiPath, window.location.origin)
+    url.searchParams.set('customerKey', overviewCustomerKey)
+    fetch(`${url.pathname}${url.search}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { accept: 'application/json' },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('客户配置操作回执读取失败')
+        return response.json()
+      })
+      .then((payload) => {
+        const operations = Array.isArray(payload.operations)
+          ? payload.operations
+          : []
+        const latest = (action) =>
+          operations.find((operation) => operation.action === action)
+        const dryRun = latest('dry-run')
+        if (dryRun?.status === 'passed' && dryRun.result) {
+          setDryRunState({ status: 'success', result: dryRun.result })
+        } else if (['failed', 'not_proven'].includes(dryRun?.status)) {
+          setDryRunState({
+            status: 'error',
+            error:
+              dryRun.status === 'not_proven'
+                ? '上次试跑因开发服务中断，结果未证明；请重新发起。'
+                : '上次试跑失败；请重新发起并查看本机开发终端。',
+          })
+        }
+        const readiness = latest('release-readiness')
+        if (readiness?.status === 'passed' && readiness.result) {
+          setReleaseState({ status: 'success', result: readiness.result })
+        } else if (readiness?.status === 'blocked' && readiness.result) {
+          setReleaseState({ status: 'blocked', result: readiness.result })
+        } else if (['failed', 'not_proven'].includes(readiness?.status)) {
+          setReleaseState({
+            status: 'error',
+            error:
+              readiness.status === 'not_proven'
+                ? '上次门禁检查因开发服务中断，结果未证明；请重新检查。'
+                : '上次门禁检查失败；请重新检查。',
+          })
+        }
+      })
+      .catch((error) => {
+        if (error?.name !== 'AbortError') {
+          message.warning('客户配置操作历史暂不可读')
+        }
+      })
+    return () => controller.abort()
+  }, [isMissingCustomer, overviewCustomerKey, uiOperationsApiPath])
 
   useEffect(
     () => () => {
@@ -2255,12 +2434,23 @@ export default function DevCustomerConfigPage() {
     setDryRunState({ status: 'running' })
 
     try {
+      const csrfToken = await getBridgeCsrfToken()
       const response = await fetch(overview.importSummary.uiDryRunApiPath, {
         method: 'POST',
+        cache: 'no-store',
+        credentials: 'same-origin',
         headers: {
+          accept: 'application/json',
           'content-type': 'application/json',
+          'x-csrf-token': csrfToken,
         },
-        body: JSON.stringify({ customerKey: overview.customerKey }),
+        body: JSON.stringify({
+          customerKey: overview.customerKey,
+          idempotencyKey: createDevCustomerConfigIdempotencyKey(
+            'dry-run',
+            overview.customerKey
+          ),
+        }),
         signal: controller.signal,
       })
       const payload = await response.json()
@@ -2308,14 +2498,25 @@ export default function DevCustomerConfigPage() {
     const ensureCurrent = () => applyRequestRef.current === requestId
 
     try {
+      const csrfToken = await getBridgeCsrfToken()
       const response = await fetch(
         overview.importSummary.uiRuntimeManifestApiPath,
         {
           method: 'POST',
+          cache: 'no-store',
+          credentials: 'same-origin',
           headers: {
+            accept: 'application/json',
             'content-type': 'application/json',
+            'x-csrf-token': csrfToken,
           },
-          body: JSON.stringify({ customerKey: overview.customerKey }),
+          body: JSON.stringify({
+            customerKey: overview.customerKey,
+            idempotencyKey: createDevCustomerConfigIdempotencyKey(
+              'runtime-manifest',
+              overview.customerKey
+            ),
+          }),
           signal: controller.signal,
         }
       )
@@ -2513,16 +2714,25 @@ export default function DevCustomerConfigPage() {
     const ensureCurrent = () => releaseRequestRef.current === requestId
 
     try {
+      const csrfToken = await getBridgeCsrfToken()
       const response = await fetch(
         overview.importSummary.uiReleaseReadinessApiPath,
         {
           method: 'POST',
+          cache: 'no-store',
+          credentials: 'same-origin',
           headers: {
+            accept: 'application/json',
             'content-type': 'application/json',
+            'x-csrf-token': csrfToken,
           },
           body: JSON.stringify({
             customerKey: overview.customerKey,
             releaseBatch,
+            idempotencyKey: createDevCustomerConfigIdempotencyKey(
+              'release-readiness',
+              overview.customerKey
+            ),
           }),
           signal: controller.signal,
         }
@@ -2537,7 +2747,7 @@ export default function DevCustomerConfigPage() {
       }
       const payload = await response.json()
       if (payload.status === 'ready') {
-        setReleaseState({ status: 'ready', result: payload })
+        setReleaseState({ status: 'success', result: payload })
         message.success('发布门禁已通过')
         return
       }

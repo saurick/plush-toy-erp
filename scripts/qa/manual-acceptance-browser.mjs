@@ -20,7 +20,6 @@ import {
 } from "./manual-acceptance-page-data-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import { formatUnixDate } from "../../web/src/erp/utils/masterDataOrderView.mjs";
-import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
@@ -242,76 +241,16 @@ function accountForTarget(target, formalAccounts) {
 const BUSINESS_DASHBOARD_PAGE_KEY_BY_SOURCE = Object.freeze({
   outbound: "shipments",
 });
-const BUSINESS_DASHBOARD_PROJECTION_PROBE_ID = "business-dashboard-stats";
+const BUSINESS_DASHBOARD_PROJECTION_PROBE_ID = "business-progress";
 const BUSINESS_DASHBOARD_PROJECTION_BATCH_EVIDENCE = new Set([
   "fresh_dataset_projection",
   "persistent_dataset_projection",
 ]);
 
-const BUSINESS_DASHBOARD_PROBE_ID_BY_SOURCE = Object.freeze({
-  customers: "customers",
-  suppliers: "suppliers",
-  products: "products",
-  "material-bom": "bom-versions",
-  "sales-orders": "sales-orders",
-  "accessories-purchase": "purchase-orders",
-  inbound: "purchase-receipts",
-  "quality-inspections": "quality-inspections",
-  inventory: "inventory-balances",
-  "shipping-release": "workflow-tasks:shipment_finance_approval",
-  outbound: "shipments",
-  "production-orders": "production-orders",
-  "production-scheduling": "workflow-tasks:production_scheduling",
-  "production-progress": "production-facts",
-  "production-exceptions": "workflow-tasks:production_exception",
-  "processing-contracts": "outsourcing-orders",
-  reconciliation: "finance-reconciliation",
-  payables: "finance-payables",
-  receivables: "finance-receivables",
-  invoices: "finance-invoices",
-});
-
-// These cards deliberately project a broader or narrower current view than a
-// single generator probe: purchase orders also include source-driven orders,
-// quality excludes records outside the page's effective view, and scheduling
-// is a workflow aggregation. The fresh-baseline projection probe remains the
-// exact DOM-to-runtime binding for them.
-const BUSINESS_DASHBOARD_PROJECTION_ONLY_BATCH_KEYS = new Set([
-  "accessories-purchase",
-  "quality-inspections",
-  "production-scheduling",
-]);
-
 function businessDashboardRequirements(catalog) {
-  const desktopByKey = new Map(
-    catalog.technicalManifest.desktopPages.map((item) => [item.key, item]),
-  );
-  return dashboardHealthModules.flatMap((module) =>
-    module.sources.map((source) => {
-      const pageKey =
-        BUSINESS_DASHBOARD_PAGE_KEY_BY_SOURCE[source.key] || source.key;
-      const page = desktopByKey.get(pageKey);
-      if (!page) {
-        throw new BrowserAcceptanceError(
-          `业务看板来源 ${source.key} 没有正式页面数据合同`,
-        );
-      }
-      const probeId = BUSINESS_DASHBOARD_PROBE_ID_BY_SOURCE[source.key];
-      if (!probeId) {
-        throw new BrowserAcceptanceError(
-          `业务看板来源 ${source.key} 没有当前批次 readiness 映射`,
-        );
-      }
-      return {
-        key: source.key,
-        label: source.label,
-        minimumRecords: page.minimumRecords,
-        probeId,
-        exactCurrentBatchCount:
-          !BUSINESS_DASHBOARD_PROJECTION_ONLY_BATCH_KEYS.has(source.key),
-      };
-    }),
-  );
+  const sales = catalog.technicalManifest.desktopPages.find(item => item.key === "sales-orders");
+  if (!sales) throw new BrowserAcceptanceError("进度看板缺少销售订单数据合同");
+  return [{ key: "orders", label: "订单", minimumRecords: sales.minimumRecords, probeId: "sales-orders" }];
 }
 
 export function buildManualAcceptanceBrowserPlan({
@@ -1143,123 +1082,27 @@ export function evaluateGlobalDashboardEvidence(
   };
 }
 
-export function evaluateBusinessDashboardEvidence(ariaLabels, requirements) {
-  const parsedByLabel = new Map(
-    (ariaLabels || []).flatMap((ariaLabel) => {
-      const match = String(ariaLabel || "").match(/^(.+?)数量(\d+|暂不可用)$/u);
-      return match ? [[match[1].trim(), match[2]]] : [];
-    }),
-  );
-  const sources = (requirements || []).map((requirement) => {
-    const raw = parsedByLabel.get(requirement.label);
-    const actual = /^\d+$/u.test(String(raw || "")) ? Number(raw) : null;
-    return {
-      ...requirement,
-      actual,
-      available: actual !== null,
-      minimumSatisfied:
-        actual !== null && actual >= Number(requirement.minimumRecords),
-    };
-  });
-  const minimumSatisfied =
-    sources.length > 0 && sources.every((source) => source.minimumSatisfied);
-  const observedTotal = sources.length
-    ? Math.min(...sources.map((source) => source.actual ?? 0))
-    : 0;
-  return {
-    status: minimumSatisfied
-      ? "minimum_proven"
-      : sources.some((source) => Number(source.actual) > 0)
-        ? "page_has_data_minimum_not_proven"
-        : "not_proven",
-    evidenceSource: "business dashboard source aria labels",
-    sources,
-    observedTotal,
-    minimumRecords: sources.length
-      ? Math.min(...sources.map((source) => Number(source.minimumRecords)))
-      : 0,
-    minimumSatisfied,
-  };
+export function evaluateBusinessDashboardEvidence(metrics, requirements) {
+  const actual = Number.isSafeInteger(metrics?.total) && metrics.total >= 0 ? metrics.total : null;
+  const ids = Array.isArray(metrics?.ids) ? metrics.ids : [];
+  const sources = requirements.map(item => ({...item, actual,
+    minimumSatisfied: actual !== null && actual >= item.minimumRecords && ids.length > 0,
+  }));
+  const minimumSatisfied = sources.length > 0 && sources.every(item => item.minimumSatisfied);
+  return { status: minimumSatisfied ? "minimum_proven" : "not_proven", evidenceSource: "progress table and filtered total",
+    sources, observedTotal: actual ?? 0, sampleOrderIDs: ids, minimumRecords: requirements[0]?.minimumRecords ?? 0, minimumSatisfied };
 }
 
-export function evaluateBusinessDashboardCurrentBatchEvidence({
-  evidence,
-  currentBatch,
-  baselineProven = false,
-}) {
-  const probeById = new Map(
-    (currentBatch?.probes || []).map((probe) => [probe.id, probe]),
-  );
-  const projectionProbe = probeById.get(BUSINESS_DASHBOARD_PROJECTION_PROBE_ID);
-  const projectionBatchEvidence = String(
-    projectionProbe?.batchEvidence || "not_proven",
-  );
-  const persistentProjection =
-    projectionBatchEvidence === "persistent_dataset_projection";
-  const projectionProven =
-    baselineProven === true &&
-    projectionProbe?.status === "pass" &&
-    BUSINESS_DASHBOARD_PROJECTION_BATCH_EVIDENCE.has(projectionBatchEvidence) &&
-    projectionProbe?.moduleTotals &&
-    typeof projectionProbe.moduleTotals === "object";
-  const sources = (evidence?.sources || []).map((source) => {
-    const probe = probeById.get(source.probeId);
-    const batchProven =
-      probe?.status === "pass" &&
-      probe?.batchEvidence !== "not_proven" &&
-      Number.isSafeInteger(probe?.actual);
-    const projectionActual = Number(
-      projectionProbe?.moduleTotals?.[source.key],
-    );
-    const projectionCountSatisfied =
-      projectionProven &&
-      Number.isSafeInteger(projectionActual) &&
-      source.actual === projectionActual;
-    const exactCurrentBatchCountSatisfied =
-      source.exactCurrentBatchCount === false ||
-      (batchProven && (persistentProjection || source.actual === probe.actual));
-    return {
-      ...source,
-      currentBatchActual: probe?.actual ?? null,
-      currentBatchEvidence: probe?.batchEvidence || "not_proven",
-      batchProven,
-      projectionActual: Number.isSafeInteger(projectionActual)
-        ? projectionActual
-        : null,
-      projectionCountSatisfied,
-      exactCurrentBatchCountSatisfied,
-      currentBatchCountComparison: persistentProjection
-        ? "projection_total_with_batch_minimum"
-        : "exact_current_batch",
-    };
-  });
-  const currentBatchBound =
-    currentBatch?.dataStatus === "pass" &&
-    projectionProven &&
-    sources.length > 0 &&
-    sources.every(
-      (source) =>
-        source.batchProven &&
-        source.projectionCountSatisfied &&
-        source.exactCurrentBatchCountSatisfied,
-    );
-  const minimumSatisfied =
-    evidence?.minimumSatisfied === true && currentBatchBound;
-  return {
-    ...evidence,
-    status: minimumSatisfied
-      ? "minimum_proven"
-      : sources.some((source) => Number(source.actual) > 0)
-        ? "page_has_data_minimum_not_proven"
-        : "not_proven",
-    evidenceSource:
-      "business dashboard source aria labels bound to current-batch readiness probes",
-    sources,
-    projectionBatchEvidence,
-    projectionProven,
-    currentBatchBound,
-    minimumSatisfied,
-  };
+export function evaluateBusinessDashboardCurrentBatchEvidence({evidence, currentBatch, baselineProven = false}) {
+  const probes = new Map((currentBatch?.probes || []).map(probe => [probe.id,probe]));
+  const projection = probes.get(BUSINESS_DASHBOARD_PROJECTION_PROBE_ID);
+  const projectionProven = baselineProven && projection?.status === "pass" && BUSINESS_DASHBOARD_PROJECTION_BATCH_EVIDENCE.has(projection?.batchEvidence);
+  const projectionCountSatisfied = projectionProven && projection.progressCounts?.total === evidence.observedTotal;
+  const idsBound = evidence.sampleOrderIDs.length > 0 && evidence.sampleOrderIDs.every(id => projection?.sampleOrderIDs?.includes(id));
+  const sources = evidence.sources.map(source => ({...source, batchProven: probes.get(source.probeId)?.status === "pass" && probes.get(source.probeId)?.batchEvidence !== "not_proven", projectionCountSatisfied }));
+  const currentBatchBound = currentBatch?.dataStatus === "pass" && projectionCountSatisfied && idsBound && sources.every(source => source.batchProven);
+  const minimumSatisfied = evidence.minimumSatisfied && currentBatchBound;
+  return {...evidence, sources, projectionProven, currentBatchBound, minimumSatisfied, status: minimumSatisfied ? "minimum_proven" : "not_proven"};
 }
 
 export function evaluateDashboardTaskCurrentBatchEvidence({
@@ -1451,61 +1294,25 @@ async function readDashboardEvidence(page, target, datasetBinding) {
     });
   }
   if (target.key === "business-dashboard") {
-    await page.locator(".erp-business-dashboard-page").waitFor({
-      state: "visible",
-      timeout: PAGE_TIMEOUT_MS,
-    });
-    await page.waitForFunction(
-      (expected) => {
-        const labels = [
-          ...document.querySelectorAll(
-            ".erp-business-board-source-count[aria-label]",
-          ),
-        ].map((node) => node.getAttribute("aria-label") || "");
-        return (
-          labels.length === expected &&
-          labels.every((label) => !label.includes("暂不可用"))
-        );
-      },
-      target.dataEvidenceRequirements.length,
-      { timeout: PAGE_TIMEOUT_MS },
-    );
-    const labels = await page
-      .locator(".erp-business-board-source-count[aria-label]")
-      .evaluateAll((nodes) =>
-        nodes.map((node) => node.getAttribute("aria-label") || ""),
-      );
+    const url = new URL(page.url());
+    url.search = "view=orders&scope=all";
+    await page.goto(url.toString());
+    await page.locator(".erp-progress-order").first().waitFor({state:"visible",timeout:PAGE_TIMEOUT_MS});
+    const metrics = await page.locator(".erp-progress-board").evaluate(root => ({
+      total: Number(root.querySelector(".erp-progress-metric strong")?.textContent.replaceAll(",","")),
+      ids: [...root.querySelectorAll("[data-progress-order-id]")].map(node => Number(node.dataset.progressOrderId)),
+    }));
     const evidence = evaluateBusinessDashboardCurrentBatchEvidence({
-      evidence: evaluateBusinessDashboardEvidence(
-        labels,
-        target.dataEvidenceRequirements,
-      ),
-      currentBatch,
-      baselineProven:
-        datasetBinding?.dataset?.baseline?.exactEmptyBusinessBaseline === true,
+      evidence: evaluateBusinessDashboardEvidence(metrics,target.dataEvidenceRequirements),currentBatch,
+      baselineProven: datasetBinding?.dataset?.baseline?.exactEmptyBusinessBaseline === true,
     });
-    const openable = page
-      .locator(".erp-business-board-source-item--openable[data-target-path]")
-      .first();
-    const expectedPath = requiredText(
-      await openable.getAttribute("data-target-path"),
-      "业务看板可进入来源路径",
-    );
-    await Promise.all([
-      page.waitForURL((url) => url.pathname === expectedPath, {
-        timeout: PAGE_TIMEOUT_MS,
-      }),
-      openable.getByRole("button").click(),
-    ]);
+    await page.locator(".erp-progress-order").first().click();
+    const drawer = page.getByRole("dialog");
+    await drawer.getByRole("tab",{name:"产品明细",exact:true}).waitFor();
+    const expectedPath = "/erp/sales/project-orders/sales-orders";
+    await Promise.all([page.waitForURL(url => url.pathname === expectedPath,{timeout:PAGE_TIMEOUT_MS}),drawer.getByRole("button",{name:"打开原单",exact:true}).click()]);
     await waitForReadablePage(page);
-    return {
-      ...evidence,
-      navigationProof: {
-        expectedPath,
-        actualPath: new URL(page.url()).pathname,
-        passed: new URL(page.url()).pathname === expectedPath,
-      },
-    };
+    return {...evidence,navigationProof:{expectedPath,actualPath:new URL(page.url()).pathname,passed:new URL(page.url()).pathname === expectedPath}};
   }
   throw new BrowserAcceptanceError(`${target.title} 缺少页面数据证据读取器`);
 }

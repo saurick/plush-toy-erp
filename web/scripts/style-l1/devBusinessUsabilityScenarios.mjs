@@ -6,10 +6,11 @@ export function createDevBusinessUsabilityScenarios({
   return [
     {
       name: 'dev-business-usability-desktop-light',
-      path: '/__dev/business-usability',
+      path: '/__dev/business-usability?status=unknown&role=unknown&legacy=1',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '员工能不能看懂、能不能自己完成？')
+        await page.waitForURL((url) => url.search === '')
         assert.equal(
           await page
             .getByRole('link', { name: '业务易用性', exact: true })

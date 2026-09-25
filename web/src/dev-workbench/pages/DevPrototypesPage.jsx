@@ -13,11 +13,12 @@ import {
   PushpinOutlined,
   RightOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Space, Tag, Typography } from 'antd'
+import { Button, Drawer, Empty, Space, Tag, Typography } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevControlStandards from '../components/DevControlStandards.jsx'
 import {
   DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY,
   DEV_PROTOTYPE_FILTER_OPTIONS,
@@ -648,6 +649,15 @@ export default function DevPrototypesPage() {
               产品原型与样板查看器 / Prototype Viewer
             </Title>
             <Tag color="green">仅开发环境 / DEV ONLY</Tag>
+            <Button
+              onClick={() => {
+                const params = new URLSearchParams(searchParams)
+                params.set('controls', '1')
+                setSearchParams(params)
+              }}
+            >
+              交互控件规范
+            </Button>
           </Space>
           <Paragraph className="erp-dev-prototypes-summary">
             先按状态找到要评审的方案，再查看用途、适用范围和实际画面；默认只展开当前方案所在目录。
@@ -678,6 +688,32 @@ export default function DevPrototypesPage() {
           </details>
         </div>
       </header>
+
+      <Drawer
+        title="交互控件规范 · 当前共享组件"
+        width={880}
+        open={searchParams.get('controls') === '1'}
+        destroyOnHidden
+        onClose={() => {
+          const params = new URLSearchParams(searchParams)
+          params.delete('controls')
+          setSearchParams(params)
+        }}
+        extra={
+          <Button
+            onClick={() =>
+              navigate({
+                pathname: '/__dev/docs',
+                search: `?path=${encodeURIComponent('docs/engineering/研发效能工作台与CI-CD设计.md')}`,
+              })
+            }
+          >
+            查看规范文档
+          </Button>
+        }
+      >
+        <DevControlStandards />
+      </Drawer>
 
       <main ref={pageMainRef} className="erp-dev-prototypes-shell">
         <aside className="erp-dev-prototypes-sidebar">

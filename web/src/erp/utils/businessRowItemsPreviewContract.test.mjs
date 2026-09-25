@@ -38,7 +38,7 @@ test('seven document aggregate pages use the shared row item preview contract', 
     )
     assert.match(
       pageSource,
-      /expandable=\{\w+ItemsPreview\.expandable\}/,
+      /expandable=\{(?:\w+ItemsPreview\.expandable|\{\s*\.\.\.\w+ItemsPreview\.expandable,\s*columnWidth:\s*\d+,?\s*\})\}/u,
       `${relativePath} should pass the shared controlled expandable config`
     )
   }

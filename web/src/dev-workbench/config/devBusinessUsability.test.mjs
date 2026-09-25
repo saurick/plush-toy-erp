@@ -10,10 +10,13 @@ import {
   DEV_BUSINESS_USABILITY_ALL_ROLES,
   DEV_BUSINESS_USABILITY_ALL_STATUS,
   DEV_BUSINESS_USABILITY_PAGE_SIZE,
+  DEV_BUSINESS_USABILITY_QUERY_KEYS,
   DEV_BUSINESS_USABILITY_ROUTE,
+  buildDevBusinessUsabilitySearch,
   buildBusinessUsabilitySummary,
   filterBusinessUsabilityEntries,
   getBusinessUsabilityRoleLabels,
+  parseDevBusinessUsabilitySearch,
 } from './devBusinessUsability.mjs'
 
 test('devBusinessUsability: 只读摘要来自共享业务易用性目录', () => {
@@ -60,6 +63,68 @@ test('devBusinessUsability: 可按覆盖状态、岗位帮助和通俗文字筛�
   )
 })
 
+test('devBusinessUsability: URL 筛选只接受单值已登记条件并恢复规范状态', () => {
+  assert.deepEqual(DEV_BUSINESS_USABILITY_QUERY_KEYS, {
+    keyword: 'q',
+    status: 'status',
+    role: 'role',
+  })
+  assert.deepEqual(parseDevBusinessUsabilitySearch(''), {
+    keyword: '',
+    status: DEV_BUSINESS_USABILITY_ALL_STATUS,
+    role: DEV_BUSINESS_USABILITY_ALL_ROLES,
+    canonical: true,
+  })
+  assert.deepEqual(
+    parseDevBusinessUsabilitySearch(
+      '?q=%E5%8F%AF%E7%94%A8%E9%87%8F&status=covered&role=warehouse'
+    ),
+    {
+      keyword: '可用量',
+      status: BUSINESS_USABILITY_STATUS.COVERED,
+      role: 'warehouse',
+      canonical: true,
+    }
+  )
+  for (const search of [
+    '?status=unknown',
+    '?role=unknown',
+    '?status=covered&status=missing',
+    '?role=warehouse&role=sales',
+    '?q=one&q=two',
+    '?legacy=1',
+    '?q=%20',
+  ]) {
+    assert.equal(parseDevBusinessUsabilitySearch(search).canonical, false)
+  }
+  assert.deepEqual(
+    parseDevBusinessUsabilitySearch(
+      '?status=covered&status=missing&role=warehouse&legacy=1'
+    ),
+    {
+      keyword: '',
+      status: DEV_BUSINESS_USABILITY_ALL_STATUS,
+      role: 'warehouse',
+      canonical: false,
+    }
+  )
+  assert.equal(
+    buildDevBusinessUsabilitySearch({
+      keyword: '可用量',
+      status: BUSINESS_USABILITY_STATUS.COVERED,
+      role: 'warehouse',
+    }),
+    '?q=%E5%8F%AF%E7%94%A8%E9%87%8F&status=covered&role=warehouse'
+  )
+  assert.equal(
+    buildDevBusinessUsabilitySearch({
+      status: DEV_BUSINESS_USABILITY_ALL_STATUS,
+      role: DEV_BUSINESS_USABILITY_ALL_ROLES,
+    }),
+    ''
+  )
+})
+
 test('devBusinessUsability: 页面明确只读且不复制权限与岗位责任真源', () => {
   const pageSource = readFileSync(
     new URL('../pages/DevBusinessUsabilityPage.jsx', import.meta.url),
@@ -74,6 +139,8 @@ test('devBusinessUsability: 页面明确只读且不复制权限与岗位责任�
   )
   assert.match(pageSource, /\/erp\/help-center/u)
   assert.match(pageSource, /\/__dev\/status-flows/u)
+  assert.match(pageSource, /parseDevBusinessUsabilitySearch/u)
+  assert.match(pageSource, /buildDevBusinessUsabilitySearch/u)
   assert.doesNotMatch(
     pageSource,
     /JsonRpc|fetch\(|axios|effective_role_access/u

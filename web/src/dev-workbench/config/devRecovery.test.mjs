@@ -19,6 +19,7 @@ function operation({
   updatedAt,
   target = 'demo-133',
   message = 'target promotion and basic runtime verification passed',
+  metadata = {},
 }) {
   return {
     id,
@@ -29,6 +30,7 @@ function operation({
     terminal: true,
     updatedAt,
     events: [{ message }],
+    metadata,
   }
 }
 
@@ -159,7 +161,7 @@ test('devRecovery: 目标展示使用业务环境语义并保留技术 key', () 
     }),
     {
       key: 'customer-test-133',
-      label: '甲方测试验收环境',
+      label: '甲方测试环境',
       purpose: 'customer-clean-acceptance',
       customer: 'yoyoosun',
       trialTarget: '',
@@ -185,7 +187,8 @@ test('devRecovery: 目标展示使用业务环境语义并保留技术 key', () 
   )
 })
 
-test('devRecovery: 只把精确幂等和完整回滚再前滚 operation 认作最近证据', () => {
+test('devRecovery: 只把近期精确幂等和同一演练链的回滚再前滚认作最近证据', () => {
+  const recoveryDrillId = '90000000-0000-4000-8000-000000000009'
   const overview = buildDevRecoveryOverview(
     summary({
       operations: [
@@ -201,6 +204,11 @@ test('devRecovery: 只把精确幂等和完整回滚再前滚 operation 认作�
           action: 'promote',
           gitSha: CURRENT_SHA,
           updatedAt: '2026-08-10T00:40:00.000Z',
+          metadata: {
+            recoveryDrillId,
+            recoveryRollbackOperationId: '10000000-0000-4000-8000-000000000001',
+            recoveryRollbackGitSha: PREVIOUS_SHA,
+          },
         }),
         operation({
           id: '10000000-0000-4000-8000-000000000001',
@@ -208,9 +216,14 @@ test('devRecovery: 只把精确幂等和完整回滚再前滚 operation 认作�
           gitSha: PREVIOUS_SHA,
           updatedAt: '2026-08-10T00:30:00.000Z',
           message: 'code-only rollback and basic runtime verification passed',
+          metadata: {
+            recoveryDrillId,
+            currentGitSha: CURRENT_SHA,
+          },
         }),
       ],
-    })
+    }),
+    { nowMs: Date.parse('2026-08-11T00:00:00.000Z') }
   )
   assert.equal(overview.target.label, '项目方演练造数环境')
   assert.equal(overview.currentSha, CURRENT_SHA)
@@ -224,6 +237,44 @@ test('devRecovery: 只把精确幂等和完整回滚再前滚 operation 认作�
     overview.drills.find((drill) => drill.key === 'same-sha-idempotency')
       .evidenceState.operationId,
     '30000000-0000-4000-8000-000000000003'
+  )
+})
+
+test('devRecovery: 过期幂等回执和未绑定 lineage 的回滚前滚不会显示为 current', () => {
+  const overview = buildDevRecoveryOverview(
+    summary({
+      operations: [
+        operation({
+          id: '30000000-0000-4000-8000-000000000003',
+          action: 'promote',
+          gitSha: CURRENT_SHA,
+          updatedAt: '2026-01-01T00:50:00.000Z',
+          message: 'requested exact SHA is already current and healthy',
+        }),
+        operation({
+          id: '20000000-0000-4000-8000-000000000002',
+          action: 'promote',
+          gitSha: CURRENT_SHA,
+          updatedAt: '2026-08-10T00:40:00.000Z',
+        }),
+        operation({
+          id: '10000000-0000-4000-8000-000000000001',
+          action: 'rollback',
+          gitSha: PREVIOUS_SHA,
+          updatedAt: '2026-08-10T00:30:00.000Z',
+        }),
+      ],
+    }),
+    { nowMs: Date.parse('2026-08-11T00:00:00.000Z') }
+  )
+  assert.equal(
+    overview.drills.find((drill) => drill.key === 'same-sha-idempotency')
+      .status,
+    'available'
+  )
+  assert.equal(
+    overview.drills.find((drill) => drill.key === 'rollback-forward').status,
+    'guarded'
   )
 })
 

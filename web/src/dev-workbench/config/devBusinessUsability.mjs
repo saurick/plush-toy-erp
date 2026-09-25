@@ -11,6 +11,12 @@ export { DEV_BUSINESS_USABILITY_ROUTE }
 export const DEV_BUSINESS_USABILITY_ALL_STATUS = 'all'
 export const DEV_BUSINESS_USABILITY_ALL_ROLES = 'all'
 export const DEV_BUSINESS_USABILITY_PAGE_SIZE = 10
+export const DEV_BUSINESS_USABILITY_QUERY_KEYS = Object.freeze({
+  keyword: 'q',
+  status: 'status',
+  role: 'role',
+})
+const DEV_BUSINESS_USABILITY_MAX_KEYWORD_LENGTH = 128
 
 const ROLE_LABEL_BY_KEY = new Map(
   ROLE_HELP_GUIDES.map((guide) => [guide.key, guide.label])
@@ -36,6 +42,89 @@ export const DEV_BUSINESS_USABILITY_ROLE_OPTIONS = Object.freeze([
     Object.freeze({ value: guide.key, label: guide.label })
   ),
 ])
+
+const STATUS_VALUES = new Set(
+  DEV_BUSINESS_USABILITY_STATUS_OPTIONS.map((option) => option.value)
+)
+const ROLE_VALUES = new Set(
+  DEV_BUSINESS_USABILITY_ROLE_OPTIONS.map((option) => option.value)
+)
+
+function asSearchParams(value = '') {
+  return value instanceof URLSearchParams
+    ? new URLSearchParams(value)
+    : new URLSearchParams(String(value || '').replace(/^\?/u, ''))
+}
+
+function readSingleQueryValue(searchParams, key) {
+  const values = searchParams.getAll(key)
+  return values.length === 1 ? values[0] : ''
+}
+
+function normalizeQueryKeyword(value = '') {
+  const keyword = String(value || '').slice(
+    0,
+    DEV_BUSINESS_USABILITY_MAX_KEYWORD_LENGTH
+  )
+  return keyword.trim() ? keyword : ''
+}
+
+export function buildDevBusinessUsabilitySearch(filters = {}) {
+  const params = new URLSearchParams()
+  const keyword = normalizeQueryKeyword(filters.keyword)
+  const requestedStatus = String(filters.status || '').trim()
+  const requestedRole = String(filters.role || '').trim()
+  const status = STATUS_VALUES.has(requestedStatus)
+    ? requestedStatus
+    : DEV_BUSINESS_USABILITY_ALL_STATUS
+  const role = ROLE_VALUES.has(requestedRole)
+    ? requestedRole
+    : DEV_BUSINESS_USABILITY_ALL_ROLES
+
+  if (keyword) {
+    params.set(DEV_BUSINESS_USABILITY_QUERY_KEYS.keyword, keyword)
+  }
+  if (status !== DEV_BUSINESS_USABILITY_ALL_STATUS) {
+    params.set(DEV_BUSINESS_USABILITY_QUERY_KEYS.status, status)
+  }
+  if (role !== DEV_BUSINESS_USABILITY_ALL_ROLES) {
+    params.set(DEV_BUSINESS_USABILITY_QUERY_KEYS.role, role)
+  }
+
+  const search = params.toString()
+  return search ? `?${search}` : ''
+}
+
+export function parseDevBusinessUsabilitySearch(search = '') {
+  const params = asSearchParams(search)
+  const keyword = normalizeQueryKeyword(
+    readSingleQueryValue(params, DEV_BUSINESS_USABILITY_QUERY_KEYS.keyword)
+  )
+  const requestedStatus = String(
+    readSingleQueryValue(params, DEV_BUSINESS_USABILITY_QUERY_KEYS.status)
+  ).trim()
+  const requestedRole = String(
+    readSingleQueryValue(params, DEV_BUSINESS_USABILITY_QUERY_KEYS.role)
+  ).trim()
+  const status = STATUS_VALUES.has(requestedStatus)
+    ? requestedStatus
+    : DEV_BUSINESS_USABILITY_ALL_STATUS
+  const role = ROLE_VALUES.has(requestedRole)
+    ? requestedRole
+    : DEV_BUSINESS_USABILITY_ALL_ROLES
+  const canonicalSearch = buildDevBusinessUsabilitySearch({
+    keyword,
+    status,
+    role,
+  })
+
+  return Object.freeze({
+    keyword,
+    status,
+    role,
+    canonical: params.toString() === canonicalSearch.slice(1),
+  })
+}
 
 function normalizeKeyword(value = '') {
   return String(value || '')

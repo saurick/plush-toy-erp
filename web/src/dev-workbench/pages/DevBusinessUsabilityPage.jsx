@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import {
   ArrowRightOutlined,
   CheckCircleOutlined,
@@ -25,14 +25,14 @@ import {
 } from '../../erp/config/businessUsabilityCatalog.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
-  DEV_BUSINESS_USABILITY_ALL_ROLES,
-  DEV_BUSINESS_USABILITY_ALL_STATUS,
   DEV_BUSINESS_USABILITY_PAGE_SIZE,
   DEV_BUSINESS_USABILITY_ROLE_OPTIONS,
   DEV_BUSINESS_USABILITY_STATUS_OPTIONS,
+  buildDevBusinessUsabilitySearch,
   buildBusinessUsabilitySummary,
   filterBusinessUsabilityEntries,
   getBusinessUsabilityRoleLabels,
+  parseDevBusinessUsabilitySearch,
 } from '../config/devBusinessUsability.mjs'
 import '../styles/dev-business-usability.css'
 
@@ -44,18 +44,13 @@ const STATUS_COLOR = Object.freeze({
   [BUSINESS_USABILITY_STATUS.MISSING]: 'red',
 })
 
-function replaceQueryValue(searchParams, key, value, emptyValue = '') {
-  const next = new URLSearchParams(searchParams)
-  if (!value || value === emptyValue) next.delete(key)
-  else next.set(key, value)
-  return next
-}
-
 export default function DevBusinessUsabilityPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const keyword = searchParams.get('q') || ''
-  const status = searchParams.get('status') || DEV_BUSINESS_USABILITY_ALL_STATUS
-  const role = searchParams.get('role') || DEV_BUSINESS_USABILITY_ALL_ROLES
+  const parsedSearch = useMemo(
+    () => parseDevBusinessUsabilitySearch(searchParams),
+    [searchParams]
+  )
+  const { keyword, status, role } = parsedSearch
   const summary = useMemo(() => buildBusinessUsabilitySummary(), [])
   const filteredEntries = useMemo(
     () =>
@@ -67,8 +62,22 @@ export default function DevBusinessUsabilityPage() {
     [keyword, role, status]
   )
 
-  const updateQuery = (key, value, emptyValue = '') => {
-    setSearchParams(replaceQueryValue(searchParams, key, value, emptyValue), {
+  useEffect(() => {
+    if (parsedSearch.canonical) return
+    const nextSearch = buildDevBusinessUsabilitySearch(parsedSearch)
+    setSearchParams(new URLSearchParams(nextSearch.slice(1)), {
+      replace: true,
+    })
+  }, [parsedSearch, setSearchParams])
+
+  const updateQuery = (patch) => {
+    const nextSearch = buildDevBusinessUsabilitySearch({
+      keyword,
+      status,
+      role,
+      ...patch,
+    })
+    setSearchParams(new URLSearchParams(nextSearch.slice(1)), {
       replace: true,
     })
   }
@@ -225,15 +234,13 @@ export default function DevBusinessUsabilityPage() {
             value={keyword}
             placeholder="搜索页面、任务、公式、来源或岗位"
             aria-label="搜索业务易用性说明"
-            onChange={(event) => updateQuery('q', event.target.value)}
+            onChange={(event) => updateQuery({ keyword: event.target.value })}
           />
           <Select
             value={status}
             options={DEV_BUSINESS_USABILITY_STATUS_OPTIONS}
             aria-label="按说明覆盖状态筛选"
-            onChange={(value) =>
-              updateQuery('status', value, DEV_BUSINESS_USABILITY_ALL_STATUS)
-            }
+            onChange={(value) => updateQuery({ status: value })}
           />
           <Select
             showSearch
@@ -241,9 +248,7 @@ export default function DevBusinessUsabilityPage() {
             value={role}
             options={DEV_BUSINESS_USABILITY_ROLE_OPTIONS}
             aria-label="按岗位帮助推荐筛选"
-            onChange={(value) =>
-              updateQuery('role', value, DEV_BUSINESS_USABILITY_ALL_ROLES)
-            }
+            onChange={(value) => updateQuery({ role: value })}
           />
           <Text type="secondary">当前显示 {filteredEntries.length} 个页面</Text>
         </Card>

@@ -10,4 +10,4 @@
 | 安装 GitLab / Runner、备份和恢复 | [GitLab 运维](../../server/deploy/gitlab/README.md) |
 | 发布与目标运行 | [部署约定](../部署约定.md)、[部署脚本](../../scripts/deploy/README.md) |
 
-`.gitlab-ci.yml` 是 canonical CI/CD 编排，GitHub 只接收只读镜像并保留显式应急保护壳；DEV 工作台只投影正式脚本与 Provider 证据，不进入生产构建。当前 SHA、pipeline、Runner、备份和目标状态使用实时读回，不再维护独立的实施勾选表。
+`.gitlab-ci.yml` 是 canonical CI/CD 编排，GitHub 只接收只读镜像并读取历史 Release，仓库不保留 workflow 或发布写入 helper；DEV 工作台只投影正式脚本与 Provider 证据，不进入生产构建。当前 SHA、pipeline、Runner、备份和目标状态使用实时读回，不再维护独立的实施勾选表。

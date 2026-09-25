@@ -39,6 +39,10 @@ export const DEV_CUSTOMER_PACKAGE_QA_COMMAND =
   'node scripts/qa/customer-package-lint.mjs --customer yoyoosun'
 export const DEV_CUSTOMER_IMPORT_DRY_RUN_API =
   '/__dev/api/customer-import/dry-run'
+export const DEV_CUSTOMER_CONFIG_SESSION_API =
+  '/__dev/api/customer-config/session'
+export const DEV_CUSTOMER_CONFIG_OPERATIONS_API =
+  '/__dev/api/customer-config/operations'
 export const DEV_CUSTOMER_CONFIG_RUNTIME_MANIFEST_API =
   '/__dev/api/customer-config/runtime-manifest'
 export const DEV_CUSTOMER_CONFIG_RELEASE_BATCHES_API =
@@ -49,6 +53,27 @@ export const DEV_CUSTOMER_CONFIG_RELEASE_EXECUTE_TEMPLATE_COMMAND =
   'node scripts/deploy/customer-config-release-execute.mjs --print-input-template'
 export const DEV_CUSTOMER_CONFIG_RELEASE_READINESS_TEMPLATE_COMMAND =
   'node scripts/deploy/customer-config-release-readiness.mjs --print-input-template'
+
+export function createDevCustomerConfigIdempotencyKey(
+  action,
+  customerKey,
+  randomUuid = () => globalThis.crypto.randomUUID()
+) {
+  if (!['dry-run', 'runtime-manifest', 'release-readiness'].includes(action)) {
+    throw new Error('customer config operation action is invalid')
+  }
+  const normalizedCustomerKey = normalizeCustomerKey(customerKey)
+  const uuid = String(randomUuid())
+  if (
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(normalizedCustomerKey) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+      uuid
+    )
+  ) {
+    throw new Error('customer config operation identity is invalid')
+  }
+  return `customer-config:${action}:${normalizedCustomerKey}:${uuid}`
+}
 
 export const DEV_CUSTOMER_CONFIG_REGISTRY = Object.freeze({
   yoyoosun: Object.freeze({
@@ -1067,6 +1092,8 @@ export function buildImportToolingSummary(
     sourceLabel: mapSourcePathLabel(DEV_CUSTOMER_IMPORT_TOOLING_SOURCE_PATH),
     qaCommand: DEV_CUSTOMER_CONFIG_QA_COMMAND,
     uiDryRunApiPath: DEV_CUSTOMER_IMPORT_DRY_RUN_API,
+    uiSessionApiPath: DEV_CUSTOMER_CONFIG_SESSION_API,
+    uiOperationsApiPath: DEV_CUSTOMER_CONFIG_OPERATIONS_API,
     uiRuntimeManifestApiPath: DEV_CUSTOMER_CONFIG_RUNTIME_MANIFEST_API,
     uiReleaseBatchesApiPath: DEV_CUSTOMER_CONFIG_RELEASE_BATCHES_API,
     uiReleaseReadinessApiPath: DEV_CUSTOMER_CONFIG_RELEASE_READINESS_API,
@@ -2207,9 +2234,33 @@ export function buildCustomerConfigDevOverview({
 }
 
 export function buildCustomerConfigDevOverviewFromSearch(searchParams = '') {
+  const params =
+    typeof searchParams.getAll === 'function'
+      ? new URLSearchParams(searchParams)
+      : new URLSearchParams(String(searchParams || '').replace(/^\?/u, ''))
+  if (params.getAll(DEV_CUSTOMER_CONFIG_QUERY_KEY).length > 1) {
+    const overview = buildCustomerConfigDevOverview({ customerKey: '' })
+    return {
+      ...overview,
+      status: 'invalid',
+      requestedCustomerKey: '重复参数',
+      sourceLabel: '客户范围参数重复',
+      blockedPieces: [
+        {
+          key: 'duplicate-customer-query',
+          title: '客户范围参数重复',
+          sourcePath: 'config/customers/<customer-key>/',
+          sourceLabel: mapSourcePathLabel('config/customers/<customer-key>/'),
+          status: '无效',
+          boundary:
+            '当前 URL 包含多个 customer 参数，系统不会猜测要使用哪一个客户包；请从已登记列表中重新选择。',
+        },
+      ],
+    }
+  }
   return buildCustomerConfigDevOverview({
     customerKey: readDevCustomerKeyFromSearch(
-      searchParams,
+      params,
       DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY
     ),
   })

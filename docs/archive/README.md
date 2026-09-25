@@ -19,6 +19,24 @@
 | `docs/archive/progress-2026-06-13-before-workbench-prototype-redesign.md`               | 工作台原型重做前的 `progress.md` 过程记录归档                                                   |
 | `docs/archive/progress-2026-06-14-before-business-modal-alignment.md`                   | 业务新建 / 编辑弹窗统一前的 `progress.md` 过程记录归档                                          |
 | `docs/archive/progress-2026-06-15-before-final-bom-closeout.md`                         | BOM 收口和文档治理前的 `progress.md` 过程记录归档                                               |
+| `docs/archive/progress-2026-06-16-before-backup-restore-rehearsal.md`                   | 备份恢复演练前的 `progress.md` 过程记录归档                                                     |
+| `docs/archive/progress-2026-06-17-before-related-actions.md`                            | 业务关联动作治理前的 `progress.md` 过程记录归档                                                 |
+| `docs/archive/progress-2026-06-18-before-formal-preview-action-cleanup.md`              | 正式预览动作清理前的 `progress.md` 过程记录归档                                                 |
+| `docs/archive/progress-2026-06-19-before-shipping-release-task-filter.md`               | 出货放行任务过滤收口前的 `progress.md` 过程记录归档                                             |
+| `docs/archive/progress-2026-06-20-before-lifecycle-ui-policy.md`                        | 业务数据生命周期页面治理前的 `progress.md` 过程记录归档                                        |
+| `docs/archive/progress-2026-06-22-before-project-skill-agents-rules.md`                 | 项目 Skill 与 AGENTS 规则治理前的 `progress.md` 过程记录归档                                    |
+| `docs/archive/progress-2026-06-24-before-menu-request-lifecycle.md`                     | 菜单请求生命周期治理前的 `progress.md` 过程记录归档                                             |
+| `docs/archive/progress-2026-06-26-before-input-caret-line-height.md`                    | 输入光标行高治理前的 `progress.md` 过程记录归档                                                 |
+| `docs/archive/progress-2026-06-28-before-runtime-manifest.md`                           | 客户配置 runtime manifest 前的 `progress.md` 过程记录归档                                       |
+| `docs/archive/progress-2026-06-29-before-release-evidence-hardening.md`                 | 发布证据强化前的 `progress.md` 过程记录归档                                                     |
+| `docs/archive/progress-2026-06-29-before-target-evidence-binding.md`                    | 目标环境证据绑定前的 `progress.md` 过程记录归档                                                 |
+| `docs/archive/progress-2026-06-29-before-priority-audit-closeout.md`                    | 优先级审计收口前的 `progress.md` 过程记录归档                                                   |
+| `docs/archive/progress-2026-06-29-before-process-runtime-minimum.md`                    | ProcessRuntime 最小运行时前的 `progress.md` 过程记录归档                                        |
+| `docs/archive/progress-2026-06-29-before-linked-task-idempotency.md`                    | linked task 幂等守卫前的 `progress.md` 过程记录归档                                              |
+| `docs/archive/progress-2026-06-30-before-inventory-post-inbound.md`                     | 库存入账 handler 前的 `progress.md` 过程记录归档                                                 |
+| `docs/archive/progress-2026-06-30-before-p5-release-input-checklist.md`                 | P5 release 输入清单前的 `progress.md` 过程记录归档                                               |
+| `docs/archive/progress-2026-06-30-before-p5-input-checklist-followup.md`                | P5 input checklist 后续收口前的 `progress.md` 过程记录归档                                      |
+| `docs/archive/progress-2026-06-30-before-outsourcing-order-api-gate.md`                 | 委外订单 API moduleStates 门禁前的 `progress.md` 过程记录归档                                   |
 | `docs/archive/progress-2026-07-01-before-action-projection-l1.md`                       | action projection L1 收口前的 `progress.md` 过程记录归档                                        |
 | `docs/archive/progress-2026-07-01-before-progress-archive-and-next-no-write.md`         | 下一轮 no-write 闭环前的 `progress.md` 过程记录归档                                             |
 | `docs/archive/progress-2026-07-01-before-readme-preflight-sync-closeout.md`             | Web README mobile preflight 口径同步后的 `progress.md` 过程记录归档                             |
@@ -38,6 +56,9 @@
 | `docs/archive/progress-2026-07-03-before-order-selection-status-fallback.md`            | 订单选中摘要状态 fallback 收口前的 `progress.md` 过程记录归档                                   |
 | `docs/archive/progress-2026-07-03-before-print-preview-missing-field.md`                | 打印静态预览缺值防护前的 `progress.md` 过程记录归档                                             |
 | `docs/archive/progress-2026-07-03-before-p5-candidate-recovery.md`                      | P5 goal 恢复候选边界收口前的 `progress.md` 过程记录归档                                         |
+| `docs/archive/progress-2026-07-05-before-work-instruction-font-size.md`                 | 作业指导书字号收口前的 `progress.md` 过程记录归档                                               |
+| `docs/archive/progress-2026-07-06-before-color-card-padding.md`                         | 色卡留白收口前的 `progress.md` 过程记录归档                                                     |
+| `docs/archive/progress-2026-07-06-before-print-restore-sample.md`                       | 打印恢复样例收口前的 `progress.md` 过程记录归档                                                 |
 | `docs/archive/progress-2026-07-08-before-runtime-lazy-import-retry.md`                  | 路由动态模块加载恢复修复前的 `progress.md` 过程记录归档                                         |
 | `docs/archive/progress-2026-07-11-before-manual-regression-deploy.md`                   | 全场景手工回归数据、提交推送和 133 部署收口前的 `progress.md` 过程记录归档                      |
 | `docs/archive/progress-2026-07-12-before-agents-size-gate.md`                           | AGENTS 体积自动门禁前的 Skills 与项目规则治理过程归档                                           |
@@ -55,5 +76,6 @@
 | `docs/archive/progress-2026-09-16-before-ci-migration-closeout.md` | CI 与共享开发库收口前的报价运费和双目标发布原文归档 |
 | `docs/archive/progress-2026-09-17-before-cd-closeout.md` | CD 收口前已完成的共享开发库迁移记录原文归档 |
 | `docs/archive/progress-2026-09-19-before-iqc-acceptance-closeout.md` | 来料验收收口前业务列表列顺序与全筛选导出原文归档 / Progress Archive Before IQC Acceptance Closeout |
+| `docs/archive/progress-2026-09-25-before-document-governance.md` | 文档治理前 `progress.md` 的 337 行完整快照，保留当时活跃事项、验证、Git 交接与未决风险 |
 
 同日进度快照：[备份恢复演练前记录](progress-2026-06-16-before-backup-restore-rehearsal.md)。原名称 progress-2026-06-16-before-audit-log-readable.md 与该文件全文相同，现共用此原文；其他归档中的旧名称保留历史语境。

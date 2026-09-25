@@ -151,6 +151,7 @@ test('business chain nodes and edges remain connected, read-only, and source-bac
     assert.ok(allowedKinds.has(chain.kind), chain.key)
 
     const nodeKeys = new Set(chain.nodes.map((node) => node.key))
+    const nodesByKey = new Map(chain.nodes.map((node) => [node.key, node]))
     assert.equal(nodeKeys.size, chain.nodes.length, chain.key)
     const reachable = new Set(chain.entryNodeKeys)
     const pending = [...chain.entryNodeKeys]
@@ -193,8 +194,57 @@ test('business chain nodes and edges remain connected, read-only, and source-bac
       assert.ok(edge.action, `${chain.key}/${edge.key} action`)
       assert.ok(edge.factBoundary, `${chain.key}/${edge.key} boundary`)
       assert.ok(edge.sourceRefs.length > 0, `${chain.key}/${edge.key}`)
+      if (edge.kind === 'creates_source') {
+        assert.equal(
+          nodesByKey.get(edge.to)?.layer,
+          'source_document',
+          `${chain.key}/${edge.key} source boundary`
+        )
+      }
+      if (edge.kind === 'creates_fact_draft') {
+        assert.equal(
+          nodesByKey.get(edge.to)?.layer,
+          'fact_ledger',
+          `${chain.key}/${edge.key} fact draft boundary`
+        )
+      }
     }
   }
+})
+
+test('delivery creates receivable facts but leaves payment and reversal to the finance chain', () => {
+  const delivery = DEV_FLOW_STATE_CATALOG.businessChains.find(
+    (chain) => chain.key === 'delivery_to_settlement'
+  )
+  assert.ok(delivery)
+  assert.deepEqual(
+    delivery.nodes.map((node) => node.key),
+    [
+      'shipment_draft',
+      'shipment_release_process',
+      'shipment_release_task',
+      'shipment_release',
+      'shipped',
+      'receivable',
+      'shipment_cancelled',
+    ]
+  )
+  assert.equal(
+    delivery.nodes.some((node) =>
+      ['payment', 'allocation', 'credit_note'].some((key) =>
+        node.key.includes(key)
+      )
+    ),
+    false
+  )
+  assert.ok(
+    DEV_FLOW_STATE_CATALOG.businessChainOverview.relations.some(
+      (relation) =>
+        relation.fromChainKey === 'delivery_to_settlement' &&
+        relation.toChainKey === 'finance_payment_and_reversal' &&
+        relation.kind === 'continues'
+    )
+  )
 })
 
 test('business chain steps bind formal responsibility, state, action, process, Fact, and registered scenarios', () => {
@@ -211,7 +261,7 @@ test('business chain steps bind formal responsibility, state, action, process, F
   )
   const roleProfiles = yoyoosunRoleFlowMatrix.roles
 
-  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 67)
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 62)
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.scenarioCount, 66)
   assert.equal(
     DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepContractComplete,

@@ -7,7 +7,7 @@
 | 路径 | 职责 |
 | --- | --- |
 | `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择和生产单端口 `/m/<role>/tasks` 岗位任务端路径，内部目录职责见 [`web/README.md`](web/README.md) |
-| `server/` | Kratos + Ent + Atlas 后端，当前承载管理员账号、鉴权、错误码、工作流协同、领域 usecase、业务看板 `dashboard_stats`、客户配置版本 `customer_config` JSON-RPC 域、采购订单 `purchase_order` JSON-RPC 域、采购入库与采购更正 `purchase` JSON-RPC 域、库存台账只读 `inventory` JSON-RPC 域、质量检验 `quality` JSON-RPC 域、业务事实 `operational_fact` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
+| `server/` | Kratos + Ent + Atlas 后端，当前承载管理员账号、鉴权、错误码、工作流协同、领域 usecase、进度看板 `list_progress / get_progress`、客户配置版本 `customer_config` JSON-RPC 域、采购订单 `purchase_order` JSON-RPC 域、采购入库与采购更正 `purchase` JSON-RPC 域、库存台账只读 `inventory` JSON-RPC 域、质量检验 `quality` JSON-RPC 域、业务事实 `operational_fact` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
 | [`.agents/skills/`](.agents/skills/README.md) | Codex 项目专项 SOP：代码审查、文档、领域边界、页面、打印模板、seed/import、测试与 operations；Git 改动按项目约定留下被动 handoff record，复杂 commit/push 仅在明确授权后使用全局 skill |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
@@ -16,18 +16,13 @@
 
 ## 当前边界
 
-- 文档入口：[docs/README.md](docs/README.md)；当前真源：[docs/当前真源与交接顺序.md](docs/当前真源与交接顺序.md)；链与运行轨迹边界：[docs/architecture/业务链与运行轨迹边界.md](docs/architecture/业务链与运行轨迹边界.md)；项目治理地图：[docs/项目治理地图.md](docs/项目治理地图.md)。
-- 当前唯一部署真源仍是 `server/deploy/compose/prod`
-- 当前后端统一走 `8300`
-- 本地开发数据库默认命中 `192.168.0.133:5432/plush_erp`；133 上演示、验收和运行实例与开发库独立；`5435/55435` 旧实例已退役
-- 当前管理员账号 / RBAC 表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧普通 `users` 表和 `user` JSON-RPC 普通账号管理链路已退出，账号登录与岗位任务端统一使用 `admin_users`、角色和权限码；业务看板统计使用只读 `dashboard_stats`；采购订单、BOM、产品 / SKU、工序、采购入库、质量检验、库存、委外订单、生产记录、出货、应收、应付、发票、单笔核对、真实收付款、多来源核销和红冲均已有对应 JSON-RPC / RBAC / V1 页面或正式来源入口；余额视图按 ACTIVE `stock_reservations` 返回已预留和可用量，显式 SKU 贯通销售订单行、批次、库存、生产 / 委外、出货与预留，并以产品 + SKU + 仓库 + 单位 + 批次作为精确库存 grain。历史 `product_sku_id=NULL` 不自动回填或与任一 SKU 共池；BOM SKU 粒度、受控导入创建 SKU 和旧库存人工重分类仍待评审；具体目标库是否已 apply 以 `make migrate_status` 为准
-- `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；品质岗位可在启动财务放行前，从 `DRAFT` 出货单按产品 / SKU、仓库、批次送检粒度生成出货前成品检验，一旦发起就必须合格或让步接收后才能启动。`finished_goods_delivery` 启动事务锁定出货单并重验检验集合，随后直接创建 Shipment 财务 approval；审批同意由绑定领域命令写版本化 `APPROVED` 门禁，审批拒绝由命名领域命令写 `REJECTED` 门禁，两条分支分别结束流程且都不生成仓库放行任务。确认出货仍在独立事务重新核对 `APPROVED` 门禁、质检、来源数量、预留和可用库存，之后才写 `SHIPPED` 与库存 `OUT`。该可选质检侧链不启动 Workflow，也不替代生产完工质检主链；`出库管理` 已作为收窄的出货出库 / 库存预留 V1 入口复用 `shipments / stock_reservations`
-- 采购订单当前只表达采购承诺，不写库存、批次、应付、发票或付款事实；采购需求、采购订单余额、在途统计、采购合同审批、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM Version 当前只维护工程版本、明细、复制、激活和归档，不生成采购需求、生产任务、库存事实或成本；加工环节 / processes 工序主数据只维护工序编号、名称、类别和可委外 / 可内制 / 需质检标记，不生成委外源单、生产任务、质检事实、库存流水或财务事实
-- Product Core 的来源动作已收口到正式源单或事实页：生产订单办理领料 / 完工 / 返工，委外合同办理发料 / 回货 / 质检 / 异常处置，采购入库办理退货 / 调整 / 应付；首次 IQC 拒绝可登记退回供应商 / 供应商补换处置并取消未入库收货，不写库存退货，补换新到货仍需独立来源。已出货来源生成应收 / 发票，真实收付款独立登记并按同往来方同币种分配到多条应收或应付，支持部分核销、冲正和红冲。来源、往来方、物料 / 产品、单位、批次和金额由后端派生，通用事实页不恢复无来源万能新增。yoyoosun 的本地跟踪配置与 133 较早 V5 技术试用必须和当前 HEAD 分开取证；当前财务岗位未获得收付款页面 / 权限，当前后续切片未整体重发，客户 UAT / 签收未完成
-- 生产管理侧栏固定为“生产订单、生产记录”；排产确认从生产订单动作或任务链接进入，异常处理从生产记录或任务链接进入。排产确认、返工异常提醒和历史出货放行三类来源协同均收口到真实 producer：生产订单从草稿下达时生成 `production_scheduling` 任务，返工事实过账时生成 `production_exception` 提醒任务；新出货不再生成历史仓库放行任务，而由正式 Shipment 财务 approval 写版本化门禁。正式生产异常申请另走 `ProductionExceptionDecision → production_exception_approval → production_exception_decision_approval`，老板审批只记录决定或超领额度，报废 / WIP 让步仍须生产显式执行，超领仍由正常领料消费。来源提醒与正式申请 / 审批不能互相冒充；任何 Workflow task done 都不代写生产、库存、质检、出货或财务事实
-- 业务链路调试 seed、按 `debugRunId` 清理和全量业务数据清空仅作为开发验收能力接入后端 `debug` JSON-RPC 域，应用默认全部关闭并由独立 `ERP_DEBUG_*` 开关显式启用；全量清空只允许 local / dev，默认 `dry_run=true`，真实删除还要求固定确认词，远程、共享和生产环境始终拒绝。业务数据清空按 allowlist 执行，覆盖工序档案和委外源单，不删除账号、权限、管理员偏好、配置和数据库结构；按 `debugRunId` 清理还会校验 debug 数据标记
-- 扩展硬件链路、PDA、条码枪、图片识别本轮统一标记为 deferred
-- 模板打印当前保留采购合同、加工合同、物料分析明细表、色卡和作业指导书五套正式模板；采购订单带值打开采购合同，委外订单带值打开加工合同和外发作业指导书，BOM 管理带值打开物料分析明细表、色卡和内部 / 工程资料作业指导书，打印中心保留默认样例、纸面预览和打印窗口入口
+- 文档从 [docs/README.md](docs/README.md) 进入；能力判断先看[当前真源与交接顺序](docs/当前真源与交接顺序.md)，跨层改动看[项目治理地图](docs/项目治理地图.md)，具体产品状态回到[产品能力进度台账](docs/product/产品能力进度台账.md)、代码、migration 和测试核对。
+- 当前形态是单仓库、单客户私有化部署。Product Core 通过客户配置、菜单开关、RBAC、角色模板和 Workflow 责任投影岗位界面；稳定客户 key 为 `yoyoosun`，customer key 不承担 runtime tenant 语义。
+- 生产前端保持一个 Vite 入口，桌面后台与 `/m/<role>/tasks` 岗位任务端共用服务；本地固定端口、启动和故障恢复以本页后文、[Web README](web/README.md) 与 `config/dev-ports.env` 为准。
+- Source Document、Workflow / ProcessRuntime 与 Fact 分层：任务完成不代写库存、质检、生产、出货或财务事实；业务写入只经过受控后端 repository / usecase，前端不补造或双写事实。
+- 部署唯一真源是 [server/deploy/compose/prod](server/deploy/compose/prod/README.md)。目标机只加载不可变制品、执行正式 migration 并读回运行身份；本地绿色、过程记录或历史 release 都不等于当前目标交付。
+- 当前对象、页面、权限与状态较多，不在根 README 复制明细表。字段来源、生命周期、角色责任、打印、导入和部署分别由对应专题文档维护，目标是否已 apply / 激活 / 验收必须读取目标证据。
+- Debug seed、按 `debugRunId` 清理和全量业务数据清空只服务受控开发验收，默认关闭；远程、共享与生产环境不得借此绕过业务 usecase、权限、审计或恢复边界。
 
 ## 本地工具版本
 

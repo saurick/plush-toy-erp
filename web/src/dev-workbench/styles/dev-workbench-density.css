@@ -182,14 +182,9 @@
 }
 
 .erp-dev-product-task {
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   padding-block: 13px;
-}
-
-.erp-dev-product-task__index {
-  width: 32px;
-  height: 32px;
 }
 
 .erp-dev-product-task__copy {
@@ -625,7 +620,7 @@
 
   .erp-dev-product-task,
   .erp-dev-quality-task {
-    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 9px;
     padding-block: 12px;
   }
@@ -637,13 +632,9 @@
 
   .erp-dev-product-task__action,
   .erp-dev-quality-task__action {
-    grid-column: 2;
+    grid-column: 1;
     width: fit-content;
     justify-self: start;
-  }
-
-  .erp-dev-quality-task__action {
-    grid-column: 1;
   }
 
   .erp-dev-static-guidance > summary {

@@ -433,7 +433,6 @@ function createReport(options, runs) {
       "post_purchase_receipt",
       "get_purchase_receipt",
       "list_purchase_receipts",
-      "dashboard_stats inbound projection",
       "cancel_purchase_receipt reversal",
       "permission denied paths",
       "invalid line failure path",
