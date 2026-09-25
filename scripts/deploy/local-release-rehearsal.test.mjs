@@ -74,10 +74,8 @@ const ports = {
   postgres: 51001,
   appHttp: 51002,
   web: 51004,
-  jaeger5775: 51005,
   jaeger6831: 51006,
   jaeger6832: 51007,
-  jaeger5778: 51008,
   jaegerUi: 51009,
   jaeger14268: 51010,
   jaeger14250: 51011,
@@ -90,17 +88,17 @@ test("release rehearsal retries bounded TCP and UDP port collisions", async () =
   const tcpValues = [
     51001, 51001, 51002, 51003, 51004, 51005, 51006, 51007, 51008, 51009, 51010,
   ];
-  const udpValues = [51010, 51011, 51011, 51012, 51013];
+  const udpValues = [51009, 51010, 51010, 51011];
   const allocated = await allocateRehearsalPorts({
     allocateTcp: async () => tcpValues.shift(),
     allocateUdp: async () => udpValues.shift(),
     maximumAttempts: 4,
   });
-  assert.equal(Object.keys(allocated).length, 13);
-  assert.equal(new Set(Object.values(allocated)).size, 13);
+  assert.equal(Object.keys(allocated).length, 11);
+  assert.equal(new Set(Object.values(allocated)).size, 11);
   assert.deepEqual(
-    [allocated.jaeger5775, allocated.jaeger6831, allocated.jaeger6832],
-    [51011, 51012, 51013],
+    [allocated.jaeger6831, allocated.jaeger6832],
+    [51010, 51011],
   );
   await assert.rejects(
     allocateDistinctRehearsalPort(async () => 51001, new Set([51001]), 2),

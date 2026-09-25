@@ -84,10 +84,8 @@ function writeFixture({
       "ERP_CUSTOMER_TRIAL_TARGET=",
       "ERP_PDF_WARMUP=async",
       "JAEGER_BIND_ADDR=127.0.0.1",
-      "JAEGER_5775_PORT=15775",
       "JAEGER_6831_PORT=16831",
       "JAEGER_6832_PORT=16832",
-      "JAEGER_5778_PORT=15778",
       "JAEGER_UI_PORT=16687",
       "JAEGER_14268_PORT=24268",
       "JAEGER_14250_PORT=24250",
@@ -269,10 +267,8 @@ const deploymentTargetFixtures = Object.freeze({
       POSTGRES_PORT: "55436",
       APP_HTTP_PORT: "8325",
       WEB_DESKTOP_PORT: "5195",
-      JAEGER_5775_PORT: "61001",
       JAEGER_6831_PORT: "61002",
       JAEGER_6832_PORT: "61003",
-      JAEGER_5778_PORT: "61004",
       JAEGER_UI_PORT: "61005",
       JAEGER_14268_PORT: "61006",
       JAEGER_14250_PORT: "61007",
@@ -293,10 +289,8 @@ const deploymentTargetFixtures = Object.freeze({
       POSTGRES_PORT: "55437",
       APP_HTTP_PORT: "8335",
       WEB_DESKTOP_PORT: "5205",
-      JAEGER_5775_PORT: "62001",
       JAEGER_6831_PORT: "62002",
       JAEGER_6832_PORT: "62003",
-      JAEGER_5778_PORT: "62004",
       JAEGER_UI_PORT: "62005",
       JAEGER_14268_PORT: "62006",
       JAEGER_14250_PORT: "62007",
@@ -482,10 +476,8 @@ if [[ "\${1:-}" == "port" ]]; then
   postgres-cid:5432/tcp) host_port="\${FAKE_RUNTIME_POSTGRES_PORT:-5435}" ;;
   app-server-cid:8300/tcp) host_port="\${FAKE_RUNTIME_APP_HTTP_PORT:-8300}" ;;
   web-desktop-cid:5175/tcp) host_port="\${FAKE_RUNTIME_WEB_DESKTOP_PORT:-5175}" ;;
-  jaeger-cid:5775/udp) host_port="\${FAKE_RUNTIME_JAEGER_5775_PORT:-15775}" ;;
   jaeger-cid:6831/udp) host_port="\${FAKE_RUNTIME_JAEGER_6831_PORT:-16831}" ;;
   jaeger-cid:6832/udp) host_port="\${FAKE_RUNTIME_JAEGER_6832_PORT:-16832}" ;;
-  jaeger-cid:5778/tcp) host_port="\${FAKE_RUNTIME_JAEGER_5778_PORT:-15778}" ;;
   jaeger-cid:16686/tcp) host_port="\${FAKE_RUNTIME_JAEGER_UI_PORT:-16687}" ;;
   jaeger-cid:14268/tcp) host_port="\${FAKE_RUNTIME_JAEGER_14268_PORT:-24268}" ;;
   jaeger-cid:14250/tcp) host_port="\${FAKE_RUNTIME_JAEGER_14250_PORT:-24250}" ;;
@@ -718,10 +710,8 @@ test("production preflight resolves a packaged source root without Git metadata"
         FAKE_RUNTIME_POSTGRES_PORT: "55436",
         FAKE_RUNTIME_APP_HTTP_PORT: "8325",
         FAKE_RUNTIME_WEB_DESKTOP_PORT: "5195",
-        FAKE_RUNTIME_JAEGER_5775_PORT: "61001",
         FAKE_RUNTIME_JAEGER_6831_PORT: "61002",
         FAKE_RUNTIME_JAEGER_6832_PORT: "61003",
-        FAKE_RUNTIME_JAEGER_5778_PORT: "61004",
         FAKE_RUNTIME_JAEGER_UI_PORT: "61005",
         FAKE_RUNTIME_JAEGER_14268_PORT: "61006",
         FAKE_RUNTIME_JAEGER_14250_PORT: "61007",

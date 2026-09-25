@@ -74,6 +74,8 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。promotion 在已创建权限为 `0600` 的 env 备份后，同时推进 release 固定的 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 版本；外部附件存储不在该动作中变更。固定的基础服务镜像须在执行前预置到目标，执行器使用 `--pull never`，并在创建新备份和进入维护窗口前核对所需镜像与 `linux/amd64` 平台，缺失时失败关闭。operation 分别记录 Mac 控制包字节/耗时、目标宿主内部取件期望与实际字节/耗时、校验与缓存命中，不把控制面等待伪装成制品传输。传输不使用 `--delete`，不全局 prune，不删除数据库、volume、env、证书、当前版本或规定回滚版本。
 
+目标 source 在 `umask 077` 下解包，默认保持 owner 私有；只有容器必须读取的 `server/deploy/compose/prod/jaeger-v2.yml` 在校验为当前用户拥有的普通文件后改为 `0444`，`database_roles.sh` 则恢复为 `0755`。promotion、rollback 与首次初始化必须执行同一归一化合同，禁止通过 root 容器绕过文件权限。
+
 ## 数据库重建
 
 数据库重建不是通用清库工具，也不是 promotion 的隐藏阶段。普通 promotion 默认保留数据库、附件、账号/RBAC、客户配置、基础资料与审计，也不得调用 core bootstrap；需要清空时必须由当前任务明确授权并另建 `rebuild-database` operation。没有新版本时可绑定目标当前 exact release 独立执行；同次既要新版本又要清空时，先完成保留数据的 promotion，再对同一已读回 release 独立重建。

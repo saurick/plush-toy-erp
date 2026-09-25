@@ -53,10 +53,8 @@ test("deployment registry exposes only the isolated demo and customer-test targe
     jaeger: {
       bindAddress: "127.0.0.1",
       ports: {
-        agentCompact: 61001,
         agentThriftCompact: 61002,
         agentThriftBinary: 61003,
-        config: 61004,
         ui: 61005,
         collectorHttp: 61006,
         collectorGrpc: 61007,

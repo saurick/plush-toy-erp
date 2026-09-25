@@ -190,7 +190,6 @@ export async function allocateRehearsalPorts({
     "postgres",
     "appHttp",
     "web",
-    "jaeger5778",
     "jaegerUi",
     "jaeger14268",
     "jaeger14250",
@@ -204,7 +203,7 @@ export async function allocateRehearsalPorts({
       maximumAttempts,
     );
   }
-  for (const key of ["jaeger5775", "jaeger6831", "jaeger6832"]) {
+  for (const key of ["jaeger6831", "jaeger6832"]) {
     ports[key] = await allocateDistinctRehearsalPort(
       allocateUdp,
       reserved,
@@ -284,10 +283,8 @@ export function buildRehearsalEnvironment({
     WEB_DESKTOP_BIND_ADDR: "127.0.0.1",
     WEB_DESKTOP_PORT: ports.web,
     JAEGER_BIND_ADDR: "127.0.0.1",
-    JAEGER_5775_PORT: ports.jaeger5775,
     JAEGER_6831_PORT: ports.jaeger6831,
     JAEGER_6832_PORT: ports.jaeger6832,
-    JAEGER_5778_PORT: ports.jaeger5778,
     JAEGER_UI_PORT: ports.jaegerUi,
     JAEGER_14268_PORT: ports.jaeger14268,
     JAEGER_14250_PORT: ports.jaeger14250,

@@ -50,10 +50,8 @@
         "jaeger": {
           "bindAddress": "127.0.0.1",
           "ports": {
-            "agentCompact": 61001,
             "agentThriftCompact": 61002,
             "agentThriftBinary": 61003,
-            "config": 61004,
             "ui": 61005,
             "collectorHttp": 61006,
             "collectorGrpc": 61007,
@@ -127,10 +125,8 @@
         "jaeger": {
           "bindAddress": "127.0.0.1",
           "ports": {
-            "agentCompact": 62001,
             "agentThriftCompact": 62002,
             "agentThriftBinary": 62003,
-            "config": 62004,
             "ui": 62005,
             "collectorHttp": 62006,
             "collectorGrpc": 62007,

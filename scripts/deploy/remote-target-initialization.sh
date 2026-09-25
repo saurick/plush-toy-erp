@@ -48,7 +48,7 @@ demo-133)
   postgres_port=55436
   app_port=8325
   web_port=5195
-  jaeger_ports=(61001 61002 61003 61004 61005 61006 61007 61008 61009 61010)
+  jaeger_ports=(61002 61003 61005 61006 61007 61008 61009 61010)
   ;;
 customer-test-133)
   root=/home/simon/plush-toy-erp-test-v1
@@ -68,7 +68,7 @@ customer-test-133)
   postgres_port=55437
   app_port=8335
   web_port=5205
-  jaeger_ports=(62001 62002 62003 62004 62005 62006 62007 62008 62009 62010)
+  jaeger_ports=(62002 62003 62005 62006 62007 62008 62009 62010)
   ;;
 *) fail "unsupported target" ;;
 esac
@@ -558,8 +558,11 @@ if ! tar -tf "$incoming/source.tar" | awk '/^\// {exit 1} /(^|\/)\.\.?(\/|$)/ {e
 fi
 tar --extract --file "$incoming/source.tar" --directory "$release_dir" --no-same-owner --no-same-permissions
 database_roles_script=$release_dir/server/deploy/compose/prod/database_roles.sh
+jaeger_config=$release_dir/server/deploy/compose/prod/jaeger-v2.yml
 plain_owned_file "$database_roles_script" || fail "database role initializer is invalid"
+plain_owned_file "$jaeger_config" || fail "Jaeger v2 configuration is invalid"
 chmod 755 "$database_roles_script"
+chmod 444 "$jaeger_config"
 jq -n \
   --arg schemaVersion "plush.target-release-identity/v1" \
   --arg gitSha "$release_sha" \
@@ -689,9 +692,9 @@ postgres_dsn="postgres://erp_app:${secret_values[POSTGRES_APP_PASSWORD]}@postgre
   printf 'APP_HTTP_BIND_ADDR=127.0.0.1\nAPP_HTTP_PORT=%s\n' "$app_port"
   printf 'WEB_DESKTOP_BIND_ADDR=127.0.0.1\nWEB_DESKTOP_PORT=%s\n' "$web_port"
   printf 'JAEGER_BIND_ADDR=127.0.0.1\n'
-  printf 'JAEGER_5775_PORT=%s\nJAEGER_6831_PORT=%s\nJAEGER_6832_PORT=%s\nJAEGER_5778_PORT=%s\n' "${jaeger_ports[0]}" "${jaeger_ports[1]}" "${jaeger_ports[2]}" "${jaeger_ports[3]}"
-  printf 'JAEGER_UI_PORT=%s\nJAEGER_14268_PORT=%s\nJAEGER_14250_PORT=%s\nJAEGER_9411_PORT=%s\n' "${jaeger_ports[4]}" "${jaeger_ports[5]}" "${jaeger_ports[6]}" "${jaeger_ports[7]}"
-  printf 'JAEGER_OTLP_GRPC_PORT=%s\nJAEGER_OTLP_HTTP_PORT=%s\n' "${jaeger_ports[8]}" "${jaeger_ports[9]}"
+  printf 'JAEGER_6831_PORT=%s\nJAEGER_6832_PORT=%s\n' "${jaeger_ports[0]}" "${jaeger_ports[1]}"
+  printf 'JAEGER_UI_PORT=%s\nJAEGER_14268_PORT=%s\nJAEGER_14250_PORT=%s\nJAEGER_9411_PORT=%s\n' "${jaeger_ports[2]}" "${jaeger_ports[3]}" "${jaeger_ports[4]}" "${jaeger_ports[5]}"
+  printf 'JAEGER_OTLP_GRPC_PORT=%s\nJAEGER_OTLP_HTTP_PORT=%s\n' "${jaeger_ports[6]}" "${jaeger_ports[7]}"
   printf 'PROMETHEUS_SERVER_URL=http://host.docker.internal:3004\n'
 } >"$runtime_env.next"
 chmod 600 "$runtime_env.next"
