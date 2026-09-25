@@ -172,7 +172,7 @@ const desktopAccounts = [
     forbiddenMenus: [
       '工作台',
       '任务看板',
-      '业务看板',
+      '进度看板',
       '客户档案',
       '供应商与加工厂',
       '销售订单',
@@ -464,7 +464,7 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
     coversAdminBusinessMenuDenial: [
       '工作台',
       '任务看板',
-      '业务看板',
+      '进度看板',
       '销售订单',
       '采购订单',
       '模板打印中心',
@@ -483,12 +483,12 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
       ['排产确认', '异常处理'].every((label) =>
         plan.customerHiddenMenuLabels.includes(label)
       ) &&
-      bossDesktop?.visibleExpectedMenus.includes('业务看板') &&
+      bossDesktop?.visibleExpectedMenus.includes('进度看板') &&
       !warehouseDesktop?.visibleExpectedMenus.includes('出货放行') &&
       financeDesktop?.visibleExpectedMenus.includes('出货放行') &&
       productionDesktop?.visibleExpectedMenus.includes('生产记录') &&
       !productionDesktop?.visibleExpectedMenus.includes('异常处理') &&
-      ['业务看板', '出货放行', '排产确认', '异常处理'].every((label) =>
+      ['进度看板', '出货放行', '排产确认', '异常处理'].every((label) =>
         adminDesktop?.forbiddenMenus.includes(label)
       ),
     coversLegacyMenuCleanup:

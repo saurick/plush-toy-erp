@@ -60,11 +60,8 @@ export const customerPackageCatalog = Object.freeze({
     },
     {
       key: "business-dashboard",
-      label: "业务看板",
-      requiredCapabilityKeys: [
-        "erp.business_dashboard.read",
-        "workflow.task.read",
-      ],
+      label: "进度看板",
+      requiredCapabilityKeys: ["erp.business_dashboard.read"],
     },
     {
       key: "customers",

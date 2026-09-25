@@ -134,27 +134,6 @@ function mockProductionMaterialRequirementProjection() {
       : 'NEEDS_REVIEW',
   }
 }
-const mockBusinessDashboardProjectionModuleKeys = [
-  'customers',
-  'suppliers',
-  'products',
-  'sales-orders',
-  'material-bom',
-  'accessories-purchase',
-  'processing-contracts',
-  'inbound',
-  'inventory',
-  'shipping-release',
-  'outbound',
-  'production-scheduling',
-  'production-progress',
-  'production-exceptions',
-  'quality-inspections',
-  'reconciliation',
-  'payables',
-  'receivables',
-  'invoices',
-]
 
 const mockPermissions = [
   { permission_key: 'system.user.read', name: '查看管理员', module: 'system' },
@@ -186,7 +165,7 @@ const mockPermissions = [
   },
   {
     permission_key: 'erp.business_dashboard.read',
-    name: '查看业务看板',
+    name: '查看进度看板',
     module: 'erp',
   },
   {
@@ -680,14 +659,6 @@ function upsertMockWorkflowBusinessProjection(
     mockWorkflowBusinessStates.push(projection)
   }
   return projection
-}
-
-function buildBusinessDashboardProjectionStats() {
-  return mockBusinessDashboardProjectionModuleKeys.map((moduleKey) => ({
-    module_key: moduleKey,
-    total: 0,
-    status_counts: {},
-  }))
 }
 
 function isMockTerminalWorkflowTask(task = {}) {
@@ -1315,12 +1286,22 @@ export function setupJsonRpcMockServer() {
         `unknown jsonrpc url=${domain}`
       )
     } else if (domain === 'business') {
-      if (method === 'dashboard_stats') {
+      if (method === 'list_progress') {
         responseBody = {
           jsonrpc: '2.0',
           id,
           result: makeBizResult({
-            modules: buildBusinessDashboardProjectionStats(),
+            rows: [],
+            total: 0,
+            counts: {
+              total: 0,
+              overdue: 0,
+              due_soon: 0,
+              blocked: 0,
+              undated: 0,
+            },
+            snapshot_at: new Date().toISOString(),
+            access: { sales: true, production: true, tasks: true, wip: true },
           }),
           error: '',
         }

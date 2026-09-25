@@ -107,22 +107,42 @@ export function createProductPaginationScenarios({
 
         await page.getByRole('button', { name: '新建产品' }).click()
         const modal = page
-          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .locator('.erp-business-form-page:not([hidden])')
           .last()
         await modal.waitFor({ state: 'visible' })
         await modal.getByLabel('产品名称').fill('分页最新产品')
 
-        const firstPageRequest = page.waitForRequest((request) => {
-          if (!request.url().endsWith('/rpc/masterdata')) return false
-          const body = request.postDataJSON() || {}
-          return (
-            body.method === 'list_products' && Number(body.params?.offset) === 0
+        await page.waitForFunction(
+          () => {
+            const button = document.querySelector(
+              '.erp-business-form-page:not([hidden]) .erp-business-form-page__actions .ant-btn-primary'
+            )
+            return button && !button.disabled
+          },
+          undefined,
+          { timeout: 10_000 }
+        )
+        const saveDispatched = await page.evaluate(() => {
+          const button = document.querySelector(
+            '.erp-business-form-page:not([hidden]) .erp-business-form-page__actions .ant-btn-primary'
           )
+          if (!button || button.disabled) return false
+          button.dispatchEvent(
+            new MouseEvent('click', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+            })
+          )
+          return true
         })
-        await modal.locator('.ant-modal-footer .ant-btn-primary').click()
-        await firstPageRequest
+        assert(saveDispatched, '新建产品保存按钮应可提交')
         await modal.waitFor({ state: 'hidden' })
         await expectText(page, '分页最新产品')
+        assert(
+          listRequests.some((request) => request.offset === 0),
+          `新建产品后应回到第一页重新读取: ${JSON.stringify(listRequests)}`
+        )
 
         const metrics = await page.evaluate(() => {
           const table = document.querySelector(

@@ -297,10 +297,9 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       activeTaskTab instanceof HTMLElement
         ? getComputedStyle(activeTaskTab)
         : null
-    const activeTaskTabBeforeStyle =
-      activeTaskTab instanceof HTMLElement
-        ? getComputedStyle(activeTaskTab, '::before')
-        : null
+    const taskTabIndicatorStyle = tabList
+      ? getComputedStyle(tabList, '::before')
+      : null
     const pageLayout = node.closest('.erp-business-page-layout')
     const rectFor = (selector) => {
       const target = pageLayout?.querySelector(selector)
@@ -384,9 +383,11 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
         ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
       ].map((item) => String(item.textContent || '').trim()),
       activeTabTransitionDuration: activeTaskTabStyle?.transitionDuration || '',
-      activeTabFillContent: activeTaskTabBeforeStyle?.content || '',
-      activeTabFillTransitionDuration:
-        activeTaskTabBeforeStyle?.transitionDuration || '',
+      tabIndicatorReady:
+        tabList?.getAttribute('data-sliding-ready') === 'true',
+      tabIndicatorContent: taskTabIndicatorStyle?.content || '',
+      tabIndicatorTransitionDuration:
+        taskTabIndicatorStyle?.transitionDuration || '',
       taskItemCount: node.querySelectorAll(
         '.erp-business-collaboration-task-panel__item'
       ).length,
@@ -498,12 +499,13 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     )}`
   )
   assert(
-    expandedMetrics.activeTabFillContent !== 'none' &&
-      expandedMetrics.activeTabFillContent !== 'normal' &&
+    expandedMetrics.tabIndicatorReady &&
+      expandedMetrics.tabIndicatorContent !== 'none' &&
+      expandedMetrics.tabIndicatorContent !== 'normal' &&
       String(expandedMetrics.activeTabTransitionDuration)
         .split(',')
         .some((part) => Number.parseFloat(part) > 0) &&
-      String(expandedMetrics.activeTabFillTransitionDuration)
+      String(expandedMetrics.tabIndicatorTransitionDuration)
         .split(',')
         .some((part) => Number.parseFloat(part) > 0),
     `${scenarioName} 协同任务分类缺少平滑选中态过渡: ${JSON.stringify(

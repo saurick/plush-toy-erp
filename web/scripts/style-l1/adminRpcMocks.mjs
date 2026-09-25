@@ -215,7 +215,7 @@ export async function installAdminRpcMocks(
     },
     {
       permission_key: 'erp.business_dashboard.read',
-      name: '查看业务看板',
+      name: '查看进度看板',
       module: 'erp',
     },
     {

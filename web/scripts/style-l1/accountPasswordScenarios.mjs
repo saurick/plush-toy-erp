@@ -100,9 +100,7 @@ export function createAccountPasswordScenarios({
         })
         const openPassword = async () => {
           if (mobile) {
-            await page
-              .getByRole('button', { name: '我的', exact: true })
-              .click()
+            await page.getByTestId('mobile-role-nav-mine').click()
             await page
               .getByRole('button', { name: '修改密码', exact: true })
               .click()

@@ -761,7 +761,7 @@ export function createPrintWorkspaceScenarios({
               item.tagName === 'BUTTON' &&
               item.cursor === 'pointer' &&
               ['true', 'false'].includes(item.ariaPressed) &&
-              item.iconCount === (item.ariaPressed === 'true' ? 1 : 0) &&
+              item.iconCount === (item.ariaPressed === 'true' ? 2 : 1) &&
               item.scrollWidth <= item.clientWidth + 1
           ),
           `打印模板目录按钮应明确暴露选择动作和当前态: ${JSON.stringify(templateButtonSemantics)}`
@@ -1524,6 +1524,7 @@ export function createPrintWorkspaceScenarios({
             timeout: 10_000,
           })
           await expectText(page, template.title)
+          await expandPrintToolSection(page, '末尾附图')
           await page
             .locator('[data-print-appendix-manager]')
             .waitFor({ state: 'visible', timeout: 10_000 })
@@ -1643,11 +1644,13 @@ export function createPrintWorkspaceScenarios({
             expectedSegmentCounts: [1, 1, 1, 1, 1, 4],
           })
 
+          await page.locator('[data-print-draft-save-status="saved"]').waitFor()
           await page.reload({ waitUntil: 'domcontentloaded' })
           await page.locator(template.paperSelector).first().waitFor({
             state: 'visible',
             timeout: 10_000,
           })
+          await expandPrintToolSection(page, '末尾附图')
           await waitForPrintAppendixImageCount(page, {
             paperSelector: template.paperSelector,
             expectedCount: 6,

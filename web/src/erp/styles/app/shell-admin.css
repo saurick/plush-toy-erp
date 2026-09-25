@@ -1,11 +1,3 @@
-.erp-theme-toggle.ant-segmented {
-  --erp-segmented-bg: var(--erp-theme-toggle-selected-bg, #e8f5ea);
-  --erp-segmented-selected-text: var(--erp-theme-toggle-selected-text, #155c2f);
-  border: 1px solid var(--erp-theme-toggle-border, #d8e2dc);
-  background: var(--erp-theme-toggle-bg, rgb(255 255 255 / 0.72));
-  color: var(--erp-text-muted, #647067);
-}
-
 .erp-theme-toggle .ant-segmented-item {
   min-width: 82px;
   font-weight: 700;

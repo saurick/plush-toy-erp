@@ -38,8 +38,9 @@ func NewJsonrpcService(
 	attachmentUC *biz.BusinessAttachmentUsecase,
 	customerConfigUC *biz.CustomerConfigUsecase,
 	adminReader biz.AdminAccountReader,
+	businessProgressUC *biz.BusinessProgressUsecase,
 ) *JsonrpcService {
-	return &JsonrpcService{
+	service := &JsonrpcService{
 		dispatcher: newJSONRPCDispatcher(
 			c,
 			logger,
@@ -61,6 +62,8 @@ func NewJsonrpcService(
 		),
 		log: log.NewHelper(log.With(logger, "module", "service.jsonrpc.transport")),
 	}
+	service.dispatcher.businessProgressUC = businessProgressUC
+	return service
 }
 
 // PostJsonrpc 对应 POST /rpc/{url}

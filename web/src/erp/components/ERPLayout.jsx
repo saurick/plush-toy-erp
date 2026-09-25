@@ -156,9 +156,9 @@ const navIconRegistry = {
 
 const productCoreReviewFallbackByPageKey = {
   'business-dashboard': {
-    title: '业务看板',
-    description: '业务看板汇总订单、库存、待办、出货和财务等业务数量。',
-    currentScope: ['看板入口', '页面权限', '数字分类', '客户数据连接状态'],
+    title: '进度看板',
+    description: '进度看板按订单和生产单查看进展、交期与关联任务。',
+    currentScope: ['订单交付', '生产执行', '进度追溯', '来源权限'],
     boundary: '当前只显示看板功能说明；连接客户业务数据后才会显示实际数字。',
   },
 }

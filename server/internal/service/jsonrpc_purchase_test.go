@@ -298,19 +298,6 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 		t.Fatalf("expected one source-bound purchase receipt fixture, got %d", total)
 	}
 	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(
-		[]string{biz.BossRoleKey},
-		biz.PermissionERPBusinessDashboardRead,
-	)}
-
-	_, dashboardRes, err := j.handleBusiness(adminCtx, "dashboard_stats", "6", nil)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if dashboardRes == nil || dashboardRes.Code != errcode.OK.Code {
-		t.Fatalf("expected dashboard OK, got %#v", dashboardRes)
-	}
-	assertDashboardInboundPurchaseReceiptProjection(t, dashboardRes, wantReceiptTotal)
-	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(
 		[]string{biz.WarehouseRoleKey},
 		biz.PermissionWarehouseInboundConfirm,
 		biz.PermissionWarehouseInboundRead,
@@ -1037,32 +1024,4 @@ func jsonRPCInt(t *testing.T, data map[string]any, key string) int {
 		t.Fatalf("expected numeric %s, got %#v", key, data[key])
 		return 0
 	}
-}
-
-func assertDashboardInboundPurchaseReceiptProjection(t *testing.T, res *v1.JsonrpcResult, wantTotal int) {
-	t.Helper()
-	if res == nil || res.Data == nil {
-		t.Fatalf("expected dashboard data, got %#v", res)
-	}
-	modules, ok := res.Data.AsMap()["modules"].([]any)
-	if !ok {
-		t.Fatalf("expected dashboard modules, got %#v", res.Data.AsMap()["modules"])
-	}
-	for _, raw := range modules {
-		module, ok := raw.(map[string]any)
-		if !ok || module["module_key"] != "inbound" {
-			continue
-		}
-		if total := jsonRPCInt(t, module, "total"); total != wantTotal {
-			t.Fatalf("expected inbound total=%d, got %d", wantTotal, total)
-		}
-		if available, ok := module["available"].(bool); !ok || !available {
-			t.Fatalf("expected inbound projection available, got %#v", module["available"])
-		}
-		if _, exists := module["status_counts"]; exists {
-			t.Fatalf("dashboard module must not expose status_counts: %#v", module)
-		}
-		return
-	}
-	t.Fatalf("inbound module not found in dashboard modules")
 }

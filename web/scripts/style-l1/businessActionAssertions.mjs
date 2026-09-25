@@ -169,6 +169,12 @@ export function createBusinessActionAssertions({ outputDir }) {
             return false
           }
           if (
+            control.matches('.ant-select-selector') &&
+            control.closest('.erp-line-item-table__cell')
+          ) {
+            return false
+          }
+          if (
             control.matches('input.ant-input') &&
             control.closest(
               '.ant-input-affix-wrapper, .ant-input-number, .ant-picker, .ant-select'

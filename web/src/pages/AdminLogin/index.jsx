@@ -362,11 +362,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
                 <Segmented
                   aria-label="工作方式"
                   block
-                  className={`erp-login-segmented ${
-                    entryTarget === ENTRY_TARGET.MOBILE_TASKS
-                      ? 'erp-login-segmented--right'
-                      : 'erp-login-segmented--left'
-                  }`}
+                  className="erp-login-segmented"
                   value={entryTarget}
                   onChange={(value) => {
                     setEntryTarget(value)
@@ -382,11 +378,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
               <Form.Item>
                 <Segmented
                   block
-                  className={`erp-login-segmented ${
-                    activeLoginMode === LOGIN_MODE.SMS
-                      ? 'erp-login-segmented--right'
-                      : 'erp-login-segmented--left'
-                  }`}
+                  className="erp-login-segmented"
                   value={loginMode}
                   onChange={(value) => {
                     setLoginMode(value)

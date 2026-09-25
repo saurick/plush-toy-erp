@@ -26,7 +26,7 @@ export function createProductionReworkScenarios(deps) {
         menus: [
           {
             key: 'production-progress',
-            label: '生产进度',
+            label: '生产记录',
             path: '/erp/production/progress',
             required_any: ['production.fact.read'],
             required_all: [],
@@ -58,7 +58,7 @@ export function createProductionReworkScenarios(deps) {
         })
       },
       verify: async (page) => {
-        await expectHeading(page, '生产进度')
+        await expectHeading(page, '生产记录')
         await page
           .getByText('PROD-FG-POSTED-L1', { exact: true })
           .first()
@@ -205,7 +205,7 @@ export function createProductionReworkScenarios(deps) {
         menus: [
           {
             key: 'production-progress',
-            label: '生产进度',
+            label: '生产记录',
             path: '/erp/production/progress',
             required_any: ['production.fact.read'],
             required_all: [],
@@ -225,7 +225,7 @@ export function createProductionReworkScenarios(deps) {
         ],
       },
       verify: async (page) => {
-        await expectHeading(page, '生产进度')
+        await expectHeading(page, '生产记录')
 
         const draftCompletionRow = page
           .locator(
@@ -256,12 +256,11 @@ export function createProductionReworkScenarios(deps) {
           state: 'visible',
           timeout: 10_000,
         })
-        await withdrawDraftButton.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(await confirmInboundButton.isEnabled(), true)
         assert.equal(
-          await withdrawDraftButton.isDisabled(),
-          true,
-          '仓库可以确认待入库完工报告，但不能代替生产撤回报告'
+          await withdrawDraftButton.count(),
+          0,
+          '仓库可以确认待入库完工报告，但不应看到生产撤回入口'
         )
 
         const postedCompletionRow = page
@@ -284,9 +283,9 @@ export function createProductionReworkScenarios(deps) {
         })
         assert.equal(await reverseInboundButton.isEnabled(), true)
         assert.equal(
-          await confirmInboundButton.isDisabled(),
-          true,
-          '已入库记录不能重复确认'
+          await confirmInboundButton.count(),
+          0,
+          '已入库记录不应继续显示确认入口'
         )
 
         await page.screenshot({
@@ -321,7 +320,7 @@ export function createProductionReworkScenarios(deps) {
         menus: [
           {
             key: 'production-progress',
-            label: '生产进度',
+            label: '生产记录',
             path: '/erp/production/progress',
             required_any: ['production.fact.read'],
             required_all: [],
@@ -343,7 +342,7 @@ export function createProductionReworkScenarios(deps) {
         ],
       },
       verify: async (page) => {
-        await expectHeading(page, '生产进度')
+        await expectHeading(page, '生产记录')
         const draftCompletionRow = page
           .locator(
             '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
@@ -363,15 +362,11 @@ export function createProductionReworkScenarios(deps) {
           .locator('button:visible')
           .filter({ hasText: '作废完工报告' })
           .last()
-        await confirmInboundButton.waitFor({
-          state: 'visible',
-          timeout: 10_000,
-        })
         await withdrawDraftButton.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
-          await confirmInboundButton.isDisabled(),
-          true,
-          '生产提交完工报告后不能自行确认成品入库'
+          await confirmInboundButton.count(),
+          0,
+          '生产提交完工报告后不应看到确认成品入库入口'
         )
         assert.equal(await withdrawDraftButton.isEnabled(), true)
 
@@ -405,14 +400,10 @@ export function createProductionReworkScenarios(deps) {
           .locator('button:visible')
           .filter({ hasText: '撤销成品入库' })
           .last()
-        await reverseInboundButton.waitFor({
-          state: 'visible',
-          timeout: 10_000,
-        })
         assert.equal(
-          await reverseInboundButton.isDisabled(),
-          true,
-          '生产不能撤销仓库已经确认的成品入库'
+          await reverseInboundButton.count(),
+          0,
+          '生产不应看到撤销仓库已确认成品入库的入口'
         )
         await assertNoHorizontalOverflow(
           page,

@@ -1,0 +1,63 @@
+.mobile-navigation-icon {
+  position: relative;
+  display: inline-flex;
+  width: 34px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-navigation-badge {
+  position: absolute;
+  top: 0;
+  right: -13px;
+  display: inline-flex;
+  min-width: 21px;
+  height: 21px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  padding: 0 4px;
+  background: #047857;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.mobile-navigation-badge--risk {
+  background: #dc2626;
+}
+
+.mobile-navigation-count-error {
+  display: flex;
+  min-height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+[data-erp-theme='dark'] .mobile-navigation-badge {
+  border-color: #172334;
+  background: #6ee7b7;
+  color: #062d23;
+}
+
+[data-erp-theme='dark'] .mobile-navigation-badge--risk {
+  background: #fda4af;
+  color: #450a0a;
+}
+
+[data-erp-theme='dark'] .mobile-navigation-count-error {
+  background: #332317;
+  color: #fed7aa;
+}

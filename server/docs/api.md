@@ -72,6 +72,7 @@ HTTP 路由：
 - `list_role_tasks`
 - `list_workbench_role_tasks`
 - `get_task_board`
+- `get_task`
 - `get_task_process_context`
 - `list_task_events`
 - `list_business_states`
@@ -93,6 +94,8 @@ HTTP 路由：
 `list_workbench_role_tasks` 只用于桌面岗位工作台，参数、游标和响应结构与 `list_role_tasks` 相同。服务端同时要求当前 effective `erp.workbench.read` 与 `workflow.task.read`，并要求 `role_key` 存在于当前 effective session 的桌面岗位投影；查询使用账号的任务只读可见范围，因此 `workflow.task.supervise` 和 super admin 可以保留跨岗位只读监督，但不会获得完成、阻塞、驳回或改派权限。该方法不替代也不放宽岗位任务端的 `mobile.<role>.access` 与真实业务岗位门禁。
 
 两个岗位任务读取方法的 `view_key` 都只接受 `todo / approval / risk / history`。`approval` 只返回 `ready / blocked` 且 `required_capability_key` 命中服务端审批能力注册表的任务；账号必须至少持有一个已登记审批能力。查询会把每个审批能力与它在任务冻结 revision 中的责任岗位 / 责任池范围成对应用，不能把某一审批能力的岗位范围借给另一能力。`get_task_board(approval_only=true)` 复用同一注册表与成对可见性合同，不只识别通用 `workflow.task.approve`。
+
+`get_task` 只接受正整数 `task_id`，返回 `{ task }` 中的正式任务及版本，用于从进度明细精确进入任务，不能依赖已加载列表查找。读取要求有效登录、active 账号、`workflow.task.read` 和该任务冻结配置下的责任 / 监督可见范围；不接受角色、来源等范围覆盖参数，不写任务或业务事实。可见性不代表可办理，后续动作继续执行既有 explain、权限、版本和幂等校验。
 
 `get_task_process_context` 是 `workflow.task.read` 下的 ProcessRuntime 业务轨迹只读接口，只接受任务 ID。服务端先按当前账号可见性读取任务，再使用任务已持久化的 ProcessRuntime 锚点核对来源、流程实例和关联节点；无锚点、来源不一致、节点不属于该实例或关联节点不存在都会拒绝，不从 task group、名称或 payload 猜测。响应只返回业务来源、流程实例摘要、全部节点、当前节点和已完成节点，不返回流程定义 hash、edge、分支选择或策略快照。桌面任务抽屉和手机任务详情据此显示业务流程、来源单据、发起时间、流程状态，以及已执行 / 当前 / 受阻业务轨迹、本任务锚点和重试次数；`waiting` 可能属于未选分支，前端不得把它排成确定的未来步骤。`list_task_events` 另行提供单条任务的“本任务处理记录”，不能把两条读链合并成完整审批链。明确带 `simulated_only` 或验收批次来源的无流程任务显示“模拟展示数据”边界，不冒充流程闭环。
 
@@ -250,18 +253,22 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 `inventory` JSON-RPC 域只读返回库存余额、批次和流水，并支持按显式 `product_sku_id` 筛选。产品库存 grain 当前为产品 + 可选 SKU + 仓库 + 单位 + 可选批次；`inventory_lots / inventory_txns / inventory_balances`、生产 / 委外事实、出货和预留共用这一粒度，扣减、冲正、可用量和幂等匹配都不能跨 SKU。历史 `product_sku_id=NULL` 保留为未分规格产品库存，不自动回填、不作为任一 SKU 的兜底池。采购入库仍是 MATERIAL 主路径；成品 SKU 入库由生产 / 委外事实承接，不代表采购收货已支持产品 SKU。
 
-### 业务看板 `business`
+### 进度看板 `business`
 
-普通 `business` JSON-RPC 域当前只保留业务看板 `dashboard_stats`，入口要求 `erp.business_dashboard.read`。岗位工作台单独使用 `erp.workbench.read`，不能借工作台权限读取跨部门统计。响应固定返回 20 个模块，每项只包含 `module_key / available / total`；客户端必须先判断 `available`，成功查询得到 0 条时是 `available=true, total=0`，运行时 usecase 未接入或当前管理员没有对应 Workflow 读取能力时是 `available=false`，不能把后者显示成真实 0。任一已接入查询报错会让整次 `dashboard_stats` fail closed，不返回部分成功的混合快照。旧 `list_records / create_record / update_record / delete_records / restore_record` 已退出运行时，不能恢复为事实或历史快照查询入口。
+只读入口 `list_progress / get_progress` 要求 `erp.business_dashboard.read`，复用现有销售订单、生产明细、WIP、生产事实、正式出货及 Workflow；没有看板事实表。工作台仍使用 `erp.workbench.read`。旧模块数量接口 `dashboard_stats` 已退出。
 
-20 个模块按真实数据层读取，不建立新的看板事实表，也不从 Workflow payload 或前端列表反推业务数量：
+| 方法 | 参数与返回 |
+| --- | --- |
+| `list_progress` | `view=orders/production`，`scope=active/all/ended`，`risk=all/overdue/due_soon/blocked/undated/unlinked`；支持 `keyword/owner/date_from/date_to`，`limit` 默认 20、最大 100，`offset` 最大 1,000,000。返回 `rows/total/counts/snapshot_at/access`。日期为 `YYYY-MM-DD`，非法枚举、额外参数与反向日期范围拒绝。 |
+| `get_progress` | 必填正整数 `id` 和对应 `view`；返回 `row/sections/has_more/snapshot_at/access`。产品明细、生产单、工序批次、领料、关联任务各最多 100 条；`has_more` 提示到来源页继续查看，不能把截断数据当作全量。 |
 
-| 真源层 | `module_key` | 当前读取口径 |
-| --- | --- | --- |
-| MasterData | `customers`、`suppliers`、`products`、`material-bom` | 客户、供应商、产品读取 MasterData；BOM 读取现有 BOM header 清单。 |
-| Source Document | `sales-orders`、`accessories-purchase`、`processing-contracts`、`production-orders` | 分别读取销售订单、采购订单、委外订单和生产订单源单，不用后续 Fact 数量替代。 |
-| Fact | `inbound`、`inventory`、`outbound`、`production-progress`、`quality-inspections`、`reconciliation`、`payables`、`receivables`、`invoices` | 分别读取采购入库、库存余额、出货单、生产事实、质量检验及财务事实；财务四项严格按 `RECONCILIATION / PAYABLE / RECEIVABLE / INVOICE` 过滤，不混算其它财务类型。 |
-| Workflow | `shipping-release`、`production-scheduling`、`production-exceptions` | 分别读取历史 `shipment_release` 协同任务、`production_scheduling` 与 `production_exception`；新的出货财务审批统一进入 ProcessRuntime 审批箱，不再生成 `shipment_release`。只有具备 `workflow.task.read` 时才查询，并复用 active / stored revision、owner role 与 assignee 可见性范围。 |
+进度行的 `product/product_id` 指向按显示名称稳定排序后的首款代表产品，`product_count` 保留整单款数；首款缺少正式产品关联时 `product_id=0`。列表图片继续通过 `attachment.list_product_image_references` 与缩略图下载按需读取，进度响应不携带图片二进制；读取图片仍要求 `product.read`。
+
+订单视图要求有效的 `sales_order.read + sales_order_item.read`；生产视图要求 `pmc.plan.read` 或 `production.wip.read`，并检查对应模块可读状态。WIP、工序质检与有效完工数另需 `production.wip.read` 及质检模块可读。老板与 PMC 的客户配置模板均包含这项只读能力，不授予生产执行、返工或事实过账；已启用环境需通过正常客户配置更新采用当前模板。没有销售读取能力时，生产视图不投影客户与业务负责人。关联任务复用任务看板的 RBAC、stored revision、岗位、assignee 与监督范围，不能通过查询参数扩大权限。`access=false` 展示无权限，不展示为真实零；异常整次失败，不拼接部分成功。
+
+`counts` 按搜索、记录范围、处理人和交期条件在数据库分页前汇总，风险可重叠；`total` 另应用所选风险。列表、数量和明细分别在各自的只读一致性事务中返回。交期统一按北京时间自然日计算；销售使用最早未交明细交期，明细缺失时采用单头交期，已结束单据不进入逾期或任务阻塞计数。
+
+出货数量仅累计 `SHIPPED`，取消出货不计入；错联或缺失销售行时返回待核对，不给百分比。不同单位不相加。有效完工累计已登记的 `FINISHED_GOODS_RECEIPT` 并扣除已登记 `REWORK`，不由关闭生产单或任务完成推导；领料对比生产计划用量和已登记领料，不等同仓库可用量或采购齐套。未关联销售的生产单在生产视图单独筛选；无法可靠关联订单的其他协同任务仍从任务看板查询。
 
 ### 业务附件 `attachment`
 

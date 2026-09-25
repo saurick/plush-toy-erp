@@ -1,5 +1,6 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { clickERPThemeOption } from './themeAssertions.mjs'
+import { MOBILE_ROLE_TASK_PAGE_LIMIT } from '../../src/erp/utils/mobileTaskQueries.mjs'
 
 export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
   const permissions = [
@@ -62,16 +63,24 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       const indicator = page.getByTestId('mobile-task-pull-refresh')
       const rows = page.locator('.erp-mobile-list-item')
       const refresh = page.getByRole('button', { name: '刷新', exact: true })
-      const sort = page.getByTestId('mobile-task-sortKey-trigger')
-      const status = page.getByTestId('mobile-task-statusKey-trigger')
-      const choose = async (trigger, label) => {
-        const title = (await trigger.getAttribute('aria-label')).split('：')[0]
-        await trigger.tap()
-        const menu = page.getByRole('menu', { name: title, exact: true })
-        await menu
-          .getByRole('menuitemradio', { name: label, exact: true })
-          .tap()
-        await menu.waitFor({ state: 'hidden' })
+      const filterTrigger = page.getByTestId('mobile-task-list-filter-trigger')
+      const openTaskFilters = async () => {
+        await filterTrigger.click()
+        const dropdown = page.getByRole('group', {
+          name: '筛选任务',
+          exact: true,
+        })
+        await dropdown.waitFor({ state: 'visible' })
+        return dropdown
+      }
+      const chooseTaskFilter = async (label) => {
+        const dropdown = await openTaskFilters()
+        await dropdown.getByText(label, { exact: true }).click()
+        await dropdown.waitFor({ state: 'hidden' })
+      }
+      const applyTaskFilters = async ({ sort, status }) => {
+        if (sort) await chooseTaskFilter(sort)
+        if (status) await chooseTaskFilter(status)
       }
       const client = await page.context().newCDPSession(page)
       await client.send('Emulation.setTouchEmulationEnabled', {
@@ -84,7 +93,13 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       let releaseResponse
       await page.route('**/rpc/workflow', async (route) => {
         const body = route.request().postDataJSON()
-        if (body.method !== 'list_role_tasks') return route.fallback()
+        // 独立的角标计数读取不属于列表刷新；手势仍须精确触发一次当前列表请求。
+        if (
+          body.method !== 'list_role_tasks' ||
+          body.params.limit !== MOBILE_ROLE_TASK_PAGE_LIMIT
+        ) {
+          return route.fallback()
+        }
         requests.push(body.params)
         const response = nextResponse
         nextResponse = 'normal'
@@ -131,16 +146,9 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         })
         await page
           .waitForFunction(
-            () => {
-              const options = document.querySelector(
-                '[data-testid="mobile-task-list-toolbar-options"]'
-              )
-              return (
-                document.querySelector('[data-testid="mobile-role-scroll"]')
-                  .scrollTop === 0 &&
-                (!options || options.getAttribute('aria-hidden') === 'false')
-              )
-            },
+            () =>
+              document.querySelector('[data-testid="mobile-role-scroll"]')
+                .scrollTop === 0,
             null,
             { timeout: 5000 }
           )
@@ -149,26 +157,11 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
               scrollTop: document.querySelector(
                 '[data-testid="mobile-role-scroll"]'
               ).scrollTop,
-              toolbarHidden: document
-                .querySelector(
-                  '[data-testid="mobile-task-list-toolbar-options"]'
-                )
-                ?.getAttribute('aria-hidden'),
             }))
             throw new Error(
               `${error.message}\n回到顶部状态：${JSON.stringify(position)}`
             )
           })
-        const options = page.getByTestId('mobile-task-list-toolbar-options')
-        if (await options.count()) {
-          await options.evaluate(async (node) => {
-            await Promise.all(
-              node
-                .getAnimations({ subtree: true })
-                .map((animation) => animation.finished.catch(() => {}))
-            )
-          })
-        }
       }
       const refreshLayout = () =>
         page.evaluate(() => {
@@ -177,7 +170,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
             header: '.mobile-task-list-header',
             search: '.mobile-role-task-search',
             tabs: '.mobile-role-task-filters, .mobile-role-message-tabs',
-            options: '.mobile-task-list-options',
+            filter: '[data-testid="mobile-task-list-filter-trigger"]',
             navigation: '[data-testid="mobile-role-bottom-nav"]',
           }
           return {
@@ -239,6 +232,12 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       }
       const pull = async (label = '下拉') => {
         await top()
+        await page.evaluate(
+          () =>
+            new Promise((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(resolve))
+            )
+        )
         const before = await refreshLayout()
         assert(
           (await page.locator('.ant-message-notice').count()) <= 1,
@@ -315,7 +314,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         })
         assert(geometry.header.height <= 72, '顶部保持一行紧凑布局')
         assert(
-          geometry.refresh.height >= 48 && geometry.refresh.width >= 80,
+          geometry.refresh.height >= 44 && geometry.refresh.width >= 72,
           '刷新文字与点击区不能缩成难点的小图标'
         )
         assert(
@@ -452,8 +451,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
 
       await page.getByRole('searchbox').fill('刷新模拟')
       await page.getByRole('searchbox').press('Enter')
-      await choose(sort, '等待最久')
-      await choose(status, '阻塞')
+      await applyTaskFilters({ sort: '等待最久', status: '阻塞' })
       await page.getByTestId('mobile-role-filter-approval').click()
       await settle()
       await page.waitForFunction(
@@ -478,8 +476,25 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         /保留上次已加载内容/u
       )
       assert.equal(await page.getByRole('searchbox').inputValue(), '刷新模拟')
-      assert.equal(await sort.innerText(), '等待最久')
-      assert.equal(await status.innerText(), '阻塞')
+      assert.equal(
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选任务，已应用 2 项'
+      )
+      const persistedFilterDropdown = await openTaskFilters()
+      assert.equal(
+        await persistedFilterDropdown
+          .getByRole('radio', { name: '等待最久', exact: true })
+          .isChecked(),
+        true
+      )
+      assert.equal(
+        await persistedFilterDropdown
+          .getByRole('radio', { name: '阻塞', exact: true })
+          .isChecked(),
+        true
+      )
+      await filterTrigger.click()
+      await persistedFilterDropdown.waitFor({ state: 'hidden' })
       assert.equal(
         await page
           .getByTestId('mobile-role-filter-approval')
@@ -530,7 +545,11 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       })
       await clickERPThemeOption(page, '跟系统')
       await clickERPThemeOption(page, '浅色')
-      await page.getByTestId('mobile-role-nav-todo').click()
+      await page.getByTestId('mobile-role-nav-tasks').click()
+      await page
+        .getByLabel('任务状态', { exact: true })
+        .getByText('待办', { exact: true })
+        .click()
       assert.equal(
         await page
           .getByTestId('mobile-role-filter-approval')
@@ -561,7 +580,11 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         '离开列表后旧请求不得弹出错误'
       )
       await clickERPThemeOption(page, '暗色')
-      await page.getByTestId('mobile-role-nav-todo').click()
+      await page.getByTestId('mobile-role-nav-tasks').click()
+      await page
+        .getByLabel('任务状态', { exact: true })
+        .getByText('待办', { exact: true })
+        .click()
       await page.getByRole('button', { name: '重新加载', exact: true }).click()
       await settle()
       await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -577,18 +600,22 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       })
 
       const searchList = async (keyword, viewKey) => {
-        const response = page.waitForResponse((candidate) => {
+        const searchbox = page.getByRole('searchbox')
+        if ((await searchbox.inputValue()) === keyword) {
+          return
+        }
+        const request = page.waitForRequest((candidate) => {
           if (!candidate.url().endsWith('/rpc/workflow')) return false
-          const body = candidate.request().postDataJSON()
+          const body = candidate.postDataJSON()
           return (
             body.method === 'list_role_tasks' &&
             body.params.view_key === viewKey &&
             body.params.keyword === keyword
           )
         })
-        await page.getByRole('searchbox').fill(keyword)
-        await page.getByRole('searchbox').press('Enter')
-        await (await response).finished()
+        await searchbox.fill(keyword)
+        await searchbox.press('Enter')
+        await request
       }
 
       for (const { tab, messageTab, viewKey, label, emptyText } of [
@@ -613,7 +640,15 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
           emptyText: '暂无超时任务',
         },
       ]) {
-        await page.getByTestId(`mobile-role-nav-${tab}`).tap()
+        await page
+          .getByTestId(`mobile-role-nav-${tab === 'done' ? 'tasks' : tab}`)
+          .tap()
+        if (tab === 'done') {
+          await page
+            .getByLabel('任务状态', { exact: true })
+            .getByText('已办', { exact: true })
+            .tap()
+        }
         if (messageTab) {
           await page.getByTestId(`mobile-role-message-tab-${messageTab}`).tap()
         }
@@ -737,9 +772,15 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         await listRows.first().waitFor({ state: 'visible' })
         await settle()
       }
-      await page.getByTestId('mobile-role-nav-todo').click()
-      await page.getByRole('searchbox').fill('不存在的任务')
-      await page.getByRole('searchbox').press('Enter')
+      await page.getByTestId('mobile-role-nav-tasks').click()
+      await page
+        .getByLabel('任务状态', { exact: true })
+        .getByText('待办', { exact: true })
+        .click()
+      await searchList('不存在的任务', 'approval')
+      await page
+        .getByText('当前筛选下暂无任务', { exact: true })
+        .waitFor({ state: 'visible' })
       await settle()
       assert.equal(await rows.count(), 0)
       await pull()

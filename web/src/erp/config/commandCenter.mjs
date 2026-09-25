@@ -18,7 +18,7 @@ export const commandCenterGroups = Object.freeze([
       },
       {
         key: 'business-board',
-        label: '业务看板',
+        label: '进度看板',
         shortLabel: '业务',
         path: '/erp/business-dashboard',
         description: '查看各类业务数量、办理情况和需要关注的事项。',

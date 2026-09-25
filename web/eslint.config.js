@@ -114,6 +114,7 @@ export default [
     ignores: [
       'src/common/components/navigation/SlidingSegmented.jsx',
       'src/common/components/navigation/SlidingTabs.jsx',
+      'src/common/components/navigation/SlidingTabList.jsx',
     ],
     rules: {
       'no-restricted-imports': [
@@ -124,9 +125,18 @@ export default [
               name: 'antd',
               importNames: ['Segmented', 'Tabs'],
               message:
-                'Use the shared SlidingSegmented or SlidingTabs component so tab motion and reduced-motion behavior stay consistent.',
+                'Use SlidingSegmented or SlidingTabs for visible boundaries, selected states, keyboard and motion. See DEV prototypes → 交互控件规范.',
             },
           ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'JSXOpeningElement[name.name=/^[a-z]/]:has(JSXAttribute[name.name="role"][value.value="tablist"])',
+          message:
+            'Use SlidingTabList for custom tabs. The shared component owns selection motion and keyboard navigation.',
         },
       ],
     },

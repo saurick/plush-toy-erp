@@ -31,6 +31,7 @@ type jsonrpcDispatcher struct {
 	debugUC                *biz.DebugUsecase
 	masterDataUC           *biz.MasterDataUsecase
 	salesOrderUC           *biz.SalesOrderUsecase
+	businessProgressUC     *biz.BusinessProgressUsecase
 	purchaseOrderUC        *biz.PurchaseOrderUsecase
 	productionOrderUC      *biz.ProductionOrderUsecase
 	outsourcingOrderUC     *biz.OutsourcingOrderUsecase

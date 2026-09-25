@@ -362,7 +362,7 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 		},
 		{
 			key:         "business-dashboard",
-			label:       "业务看板",
+			label:       "进度看板",
 			path:        "/erp/business-dashboard",
 			permissions: []string{PermissionERPBusinessDashboardRead},
 		},

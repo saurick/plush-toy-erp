@@ -1,3 +1,4 @@
+import { createBusinessProgressScenarios } from './businessProgressScenarios.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
@@ -27,66 +28,6 @@ export function createDashboardTaskScenarios({
   assertDarkThemeContrast,
   assertDarkThemeNeutralInteractions,
 }) {
-  const assertBusinessDashboardCountStates = async (page, scenarioName) => {
-    await page
-      .getByRole('button', { name: '查看客户', exact: true })
-      .waitFor({ state: 'visible', timeout: 10_000 })
-    const metrics = await page.evaluate(() => {
-      const sourceItems = Array.from(
-        document.querySelectorAll('.erp-business-board-source-item--openable')
-      )
-      const sourceCount = (label) => {
-        const entry = document.querySelector(`[aria-label="查看${label}"]`)
-        return String(
-          entry
-            ?.closest('.erp-business-board-source-item--openable')
-            ?.querySelector('.erp-business-board-source-count')?.textContent ||
-            ''
-        ).trim()
-      }
-      const laneCounts = Object.fromEntries(
-        Array.from(
-          document.querySelectorAll('.erp-business-board-alert-item')
-        ).map((node) => [
-          String(
-            node.querySelector('.ant-typography')?.textContent || ''
-          ).trim(),
-          String(
-            node.querySelector('.erp-business-board-alert-count')
-              ?.textContent || ''
-          ).trim(),
-        ])
-      )
-      return {
-        sourceItemCount: sourceItems.length,
-        sourceItemsWithEntry: sourceItems.filter((node) =>
-          node.querySelector('.erp-business-board-source-entry')
-        ).length,
-        customer: sourceCount('客户'),
-        productionException: sourceCount('生产异常处置'),
-        invoice: sourceCount('发票记录'),
-        laneCounts,
-      }
-    })
-
-    assert.equal(
-      metrics.sourceItemCount,
-      20,
-      `${scenarioName} 应展示 20 个独立对象统计: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(
-      metrics.sourceItemsWithEntry,
-      metrics.sourceItemCount,
-      `${scenarioName} 每个对象统计都应有独立入口: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(metrics.customer, '60')
-    assert.equal(metrics.productionException, '20')
-    assert.equal(metrics.invoice, '0')
-    assert.deepEqual(metrics.laneCounts, {
-      阻塞: '27',
-      到期提醒: '66',
-    })
-  }
   return [
     {
       name: 'erp-task-board-desktop',
@@ -261,9 +202,9 @@ export function createDashboardTaskScenarios({
         }
         await page.setViewportSize({ width: 1440, height: 900 })
         await page.locator('.erp-task-board-lane-footer button').first().click()
-        await page.getByRole('tab', { name: /已结束/ }).click()
+        await page.getByRole('button', { name: /已结束/ }).click()
         await page
-          .getByRole('tab', { name: /已结束/, selected: true })
+          .getByRole('button', { name: /已结束/, pressed: true })
           .waitFor()
         await assertTextAbsent(
           page,
@@ -308,7 +249,7 @@ export function createDashboardTaskScenarios({
         await page
           .getByRole('button', { name: '清除状态：已完成', exact: true })
           .waitFor()
-        await page.getByRole('tab', { name: /阻塞/ }).click()
+        await page.getByRole('button', { name: /阻塞/ }).click()
         await page.waitForFunction(() => {
           const params = new URLSearchParams(location.search)
           return params.get('lane') === 'exception' && !params.has('status')
@@ -334,7 +275,7 @@ export function createDashboardTaskScenarios({
           return params.get('lane') === 'exception' && !params.has('q')
         })
         await page
-          .getByRole('button', { name: '返回任务概览', exact: true })
+          .getByRole('button', { name: '任务概览', exact: true })
           .click()
         await page
           .locator(
@@ -1043,7 +984,7 @@ export function createDashboardTaskScenarios({
             const boardCard = document.querySelector(
               '.erp-dashboard-task-board-card'
             )
-            const summary = document.querySelector('.erp-task-center-summary')
+            const summary = document.querySelector('.erp-task-progress-rail')
             const contentRect = document
               .querySelector(
                 '.erp-dashboard-task-board-card .erp-dashboard-block'
@@ -1052,7 +993,7 @@ export function createDashboardTaskScenarios({
             const lanes = document.querySelector('.erp-task-board-lanes')
             const metricButtons = [
               ...document.querySelectorAll(
-                '.erp-task-board-category-count, .erp-task-board-lane-count'
+                '.erp-task-progress-rail__value'
               ),
             ]
             const content = document.querySelector('.erp-admin-content')
@@ -1075,7 +1016,7 @@ export function createDashboardTaskScenarios({
               ),
               activeLabels: [
                 ...document.querySelectorAll(
-                  '.erp-task-board-categories .ant-tabs-tab-active .erp-task-board-category > span:first-child'
+                  '.erp-task-progress-rail__item[aria-pressed="true"] .erp-task-progress-rail__label'
                 ),
               ].map((node) => node.textContent.trim()),
               summaryTop: summaryRect?.top ?? contentRect?.top ?? 0,
@@ -1507,7 +1448,7 @@ export function createDashboardTaskScenarios({
         }
         await page.setViewportSize({ width: 1440, height: 900 })
         await page
-          .getByRole('button', { name: '返回任务概览', exact: true })
+          .getByRole('button', { name: '任务概览', exact: true })
           .click()
         await page.waitForFunction(() => {
           const params = new URLSearchParams(window.location.search)
@@ -2234,353 +2175,12 @@ export function createDashboardTaskScenarios({
         })
       },
     },
-    {
-      name: 'erp-business-dashboard-desktop',
-      path: '/erp/business-dashboard',
-      auth: 'admin',
-      effectiveSession: {
-        ...customerRuntimeEffectiveSession,
-        actions: ['workflow.task.read'],
-      },
-      viewport: { width: 1440, height: 900 },
-      verify: async (page) => {
-        await expectText(page, '毛绒玩具管理系统')
-        await expectText(page, '超级管理员')
-        await expectText(page, '看板中心')
-        await expectHeading(page, '需要关注')
-        await expectText(page, '基础资料')
-        await expectText(page, '业务单据')
-        await expectText(page, '办理结果')
-        await expectText(page, '需要关注')
-        await expectText(page, '业务数据')
-        await assertTextAbsent(page, '内部来源')
-        await expectText(page, '业务环节')
-        await expectText(page, '采购/入库')
-        await expectText(page, '当前数量')
-        await assertTextAbsent(page, '数字说明')
-        await expectNoButton(page, '任务看板')
-        await assertNoDuplicatedAdminPageTitle(page, {
-          scenarioName: 'erp-business-dashboard-desktop',
-        })
-        await assertDashboardMetricInteractionSemantics(page, {
-          scenarioName: 'erp-business-dashboard-desktop',
-          expectBusinessAttention: true,
-        })
-        await assertShellRefreshButton(page, {
-          scenarioName: 'erp-business-dashboard-desktop',
-          expectVisible: true,
-        })
-        await assertNoDashboardCenterLocalRefreshButton(page, {
-          scenarioName: 'erp-business-dashboard-desktop',
-        })
-        await assertNoHorizontalOverflow(page, 'erp-business-dashboard-desktop')
-        await assertBusinessDashboardCountStates(
-          page,
-          'erp-business-dashboard-desktop'
-        )
-        const blockedAttention = page.getByRole('group', {
-          name: '阻塞，27 项',
-          exact: true,
-        })
-        assert(
-          (await blockedAttention.textContent()).includes(
-            '客户尚未确认耳长尺寸'
-          ),
-          '阻塞预览应直接展示实际原因'
-        )
-        assert(
-          (await blockedAttention.textContent()).includes('工程'),
-          '阻塞预览应展示负责岗位'
-        )
-        await page
-          .locator('.erp-business-board-boundary-summary summary')
-          .click()
-        await expectText(page, '完成任务不会自动产生库存、出货或财务记录')
-        await page
-          .locator('.erp-business-board-boundary-summary summary')
-          .click()
-        const customerSourceRow = page
-          .getByRole('button', { name: '查看客户', exact: true })
-          .locator('xpath=ancestor::tr[1]')
-        const customerSourceBeforeHover = await customerSourceRow.evaluate(
-          (element) => {
-            const rect = element.getBoundingClientRect()
-            const style = getComputedStyle(element.querySelector('td'))
-            return {
-              width: rect.width,
-              height: rect.height,
-              backgroundColor: style.backgroundColor,
-              borderColor: style.borderColor,
-            }
-          }
-        )
-        await customerSourceRow.hover()
-        await page.waitForFunction(
-          ({ backgroundColor, borderColor }) => {
-            const sourceItem = document
-              .querySelector('[aria-label="查看客户"]')
-              ?.closest('tr.erp-business-board-source-item--openable')
-            const sourceCell = sourceItem?.querySelector('td')
-            if (!sourceCell) return false
-            const style = getComputedStyle(sourceCell)
-            return (
-              style.backgroundColor !== backgroundColor ||
-              style.borderColor !== borderColor
-            )
-          },
-          customerSourceBeforeHover,
-          { timeout: 2_000 }
-        )
-        const customerSourceAfterHover = await customerSourceRow.evaluate(
-          (element) => {
-            const rect = element.getBoundingClientRect()
-            const sourceCell = element.querySelector('td')
-            const style = getComputedStyle(sourceCell)
-            const cells = Array.from(element.querySelectorAll(':scope > td'))
-            const recordCell = cells[1]
-            const countCell = cells[2]
-            const tableCard = element.closest('.erp-dashboard-table-card')
-            const tableCardRect = tableCard?.getBoundingClientRect()
-            const tableScrollContainer = tableCard?.querySelector(
-              '.ant-table-content, .ant-table-body'
-            )
-            const tableScrollStyle = tableScrollContainer
-              ? getComputedStyle(tableScrollContainer)
-              : null
-            const entryButton = element.querySelector(
-              '.erp-business-board-source-entry'
-            )
-            const entryButtonRect = entryButton?.getBoundingClientRect()
-            return {
-              width: rect.width,
-              height: rect.height,
-              backgroundColor: style.backgroundColor,
-              borderColor: style.borderColor,
-              recordCellFits:
-                Boolean(recordCell) &&
-                recordCell.scrollWidth <= recordCell.clientWidth + 1,
-              countCellFits:
-                Boolean(countCell) &&
-                countCell.scrollWidth <= countCell.clientWidth + 1,
-              tableScroll: {
-                clientWidth: tableScrollContainer?.clientWidth || 0,
-                scrollWidth: tableScrollContainer?.scrollWidth || 0,
-                overflowX: tableScrollStyle?.overflowX || '',
-              },
-              entryButtonWithinCard: Boolean(
-                tableCardRect &&
-                  entryButtonRect &&
-                  entryButtonRect.left >= tableCardRect.left - 1 &&
-                  entryButtonRect.right <= tableCardRect.right + 1
-              ),
-            }
-          }
-        )
-        const tableScrollIsControlled =
-          customerSourceAfterHover.tableScroll.clientWidth > 0 &&
-          customerSourceAfterHover.tableScroll.scrollWidth >=
-            customerSourceAfterHover.tableScroll.clientWidth &&
-          (customerSourceAfterHover.tableScroll.scrollWidth <=
-            customerSourceAfterHover.tableScroll.clientWidth + 1 ||
-            ['auto', 'scroll'].includes(
-              customerSourceAfterHover.tableScroll.overflowX
-            ))
-        assert(
-          customerSourceAfterHover.width === customerSourceBeforeHover.width &&
-            customerSourceAfterHover.height ===
-              customerSourceBeforeHover.height &&
-            customerSourceAfterHover.recordCellFits &&
-            customerSourceAfterHover.countCellFits &&
-            customerSourceAfterHover.entryButtonWithinCard &&
-            tableScrollIsControlled &&
-            (customerSourceAfterHover.backgroundColor !==
-              customerSourceBeforeHover.backgroundColor ||
-              customerSourceAfterHover.borderColor !==
-                customerSourceBeforeHover.borderColor),
-          `业务来源项 hover 应有反馈且不改变尺寸或产生溢出: ${JSON.stringify({
-            before: customerSourceBeforeHover,
-            after: customerSourceAfterHover,
-          })}`
-        )
-        await customerSourceRow.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-business-dashboard-source-double-click-hover.png'
-          ),
-        })
-        await customerSourceRow.dblclick()
-        await waitForPath(page, '/erp/master/partners/customers')
-        await page.goBack()
-        await waitForPath(page, '/erp/business-dashboard')
-        await expectHeading(page, '需要关注')
-        await page
-          .getByRole('button', { name: '查看客户', exact: true })
-          .click()
-        await waitForPath(page, '/erp/master/partners/customers')
-        await page.goBack()
-        await waitForPath(page, '/erp/business-dashboard')
-        await expectHeading(page, '需要关注')
-        await page.locator('.erp-admin-content').evaluate((node) => {
-          node.scrollTop = 0
-        })
-      },
-    },
-    {
-      name: 'erp-business-dashboard-dark-desktop',
-      path: '/erp/business-dashboard',
-      auth: 'admin',
-      effectiveSession: {
-        ...customerRuntimeEffectiveSession,
-        actions: ['workflow.task.read'],
-      },
-      themeMode: 'dark',
-      viewport: { width: 1440, height: 900 },
-      verify: async (page) => {
-        await expectText(page, '业务管理')
-        await expectHeading(page, '需要关注')
-        await expectText(page, '基础资料')
-        await expectText(page, '业务数据')
-        await expectText(page, '需要关注')
-        await assertTextAbsent(page, '数字说明')
-        await assertERPThemeMode(page, {
-          scenarioName: 'erp-business-dashboard-dark-desktop',
-          expectedMode: 'dark',
-          expectedEffectiveTheme: 'dark',
-        })
-        await assertNoDuplicatedAdminPageTitle(page, {
-          scenarioName: 'erp-business-dashboard-dark-desktop',
-        })
-        await assertDashboardMetricInteractionSemantics(page, {
-          scenarioName: 'erp-business-dashboard-dark-desktop',
-          expectBusinessAttention: true,
-        })
-        await assertNoDashboardCenterLocalRefreshButton(page, {
-          scenarioName: 'erp-business-dashboard-dark-desktop',
-        })
-        await assertDarkDashboardLinkButtonsUnboxed(page, {
-          scenarioName: 'erp-business-dashboard-dark-desktop',
-        })
-        await assertThemeReadable(page, {
-          scenarioName: 'erp-business-dashboard-dark-desktop',
-          selector: '.erp-business-board-attention-card',
-        })
-        await assertThemeReadable(page, {
-          scenarioName: 'erp-business-dashboard-dark-desktop',
-          selector: '.erp-dashboard-table-card',
-        })
-        await assertThemeReadable(page, {
-          scenarioName: 'erp-business-dashboard-dark-desktop',
-          selector: '.erp-business-board-alert-item',
-        })
-        await assertDarkThemeContrast(page, {
-          scenarioName: 'erp-business-dashboard-dark-desktop',
-          selector: '.erp-business-dashboard-page',
-        })
-      },
-    },
-    {
-      name: 'erp-business-dashboard-stats-unavailable-desktop',
-      path: '/erp/business-dashboard?__style_l1_business_dashboard_stats_unavailable=1',
-      auth: 'admin',
-      effectiveSession: {
-        ...customerRuntimeEffectiveSession,
-        actions: ['workflow.task.read'],
-      },
-      viewport: { width: 1440, height: 900 },
-      verify: async (page) => {
-        await expectHeading(page, '需要关注')
-        await expectText(page, '业务统计暂不可用')
-        await page
-          .getByRole('group', { name: '阻塞，27 项', exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        const customerCount = await page
-          .getByRole('button', { name: '查看客户', exact: true })
-          .locator('xpath=ancestor::tr[1]')
-          .locator('.erp-business-board-source-count')
-          .textContent()
-        assert.equal(String(customerCount || '').trim(), '—')
-        await assertTextAbsent(page, '待办概览暂不可用')
-        await assertTextAbsent(page, '当前页面数据已刷新')
-        await page
-          .locator('.erp-admin-header button')
-          .filter({ hasText: '刷新当前页' })
-          .click()
-        await expectText(page, '当前页面数据已刷新')
-        await page.waitForFunction(
-          () =>
-            String(
-              document
-                .querySelector('[aria-label="查看客户"]')
-                ?.closest('.erp-business-board-source-item--openable')
-                ?.querySelector('.erp-business-board-source-count')
-                ?.textContent || ''
-            ).trim() === '60',
-          undefined,
-          { timeout: 10_000 }
-        )
-        await page
-          .locator('.erp-business-board-inline-alert')
-          .filter({ hasText: '业务统计暂不可用' })
-          .waitFor({ state: 'detached', timeout: 10_000 })
-        await page
-          .locator('.ant-message-notice')
-          .last()
-          .waitFor({ state: 'detached', timeout: 10_000 })
-      },
-    },
-    {
-      name: 'erp-business-dashboard-workflow-unavailable-desktop',
-      path: '/erp/business-dashboard?__style_l1_business_dashboard_workflow_unavailable=1',
-      auth: 'admin',
-      effectiveSession: {
-        ...customerRuntimeEffectiveSession,
-        actions: ['workflow.task.read'],
-      },
-      viewport: { width: 1440, height: 900 },
-      verify: async (page) => {
-        await expectHeading(page, '需要关注')
-        await expectText(page, '待办概览暂不可用')
-        await expectText(page, '60')
-        await page
-          .getByRole('group', { name: '阻塞，暂不可用', exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await assertTextAbsent(page, '业务统计暂不可用')
-        await assertTextAbsent(page, '当前页面数据已刷新')
-        await page
-          .locator('.erp-admin-header button')
-          .filter({ hasText: '刷新当前页' })
-          .click()
-        await expectText(page, '当前页面数据已刷新')
-        await page
-          .getByRole('group', { name: '阻塞，27 项', exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await page
-          .locator('.erp-business-board-inline-alert')
-          .filter({ hasText: '待办概览暂不可用' })
-          .waitFor({ state: 'detached', timeout: 10_000 })
-        await page
-          .locator('.ant-message-notice')
-          .last()
-          .waitFor({ state: 'detached', timeout: 10_000 })
-      },
-    },
-    {
-      name: 'erp-business-dashboard-large-count-desktop',
-      path: '/erp/business-dashboard?__style_l1_business_dashboard_large=1',
-      auth: 'admin',
-      effectiveSession: {
-        ...customerRuntimeEffectiveSession,
-        actions: ['workflow.task.read'],
-      },
-      viewport: { width: 1440, height: 900 },
-      verify: async (page) => {
-        await expectHeading(page, '需要关注')
-        await expectText(page, '1,234,567')
-        await page
-          .getByRole('button', { name: '查看客户', exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-      },
-    },
+    ...createBusinessProgressScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      customerRuntimeEffectiveSession,
+      outputDir,
+    }),
     {
       name: 'erp-layout-scroll-isolated',
       path: '/erp/dashboard',
@@ -2927,20 +2527,6 @@ export function createDashboardTaskScenarios({
           expectedTaskText: '宽屏重叠回归任务',
           expectReasonInput: false,
         })
-        await page
-          .locator('.erp-task-action-drawer')
-          .getByRole('tab', { name: /选择处理/ })
-          .click()
-        await page
-          .locator('.erp-task-action-drawer')
-          .getByRole('radio', { name: /处理完成/ })
-          .click()
-        await assertTaskActionDrawerLayout(page, {
-          scenarioName: 'erp-task-board-dark-wide-complete-action',
-          expectedTaskText: '宽屏重叠回归任务',
-          expectedActionText: '提交后任务会进入已完成',
-          expectReasonInput: false,
-        })
         const wideTaskDrawer = page.locator('.erp-task-action-drawer')
         const responsibilityEmphasis = await wideTaskDrawer
           .locator('.erp-task-action-drawer__responsibility')
@@ -2973,6 +2559,20 @@ export function createDashboardTaskScenarios({
             responsibilityEmphasis
           )}`
         )
+        await page
+          .locator('.erp-task-action-drawer')
+          .getByRole('tab', { name: /选择处理/ })
+          .click()
+        await page
+          .locator('.erp-task-action-drawer')
+          .getByRole('radio', { name: /处理完成/ })
+          .click()
+        await assertTaskActionDrawerLayout(page, {
+          scenarioName: 'erp-task-board-dark-wide-complete-action',
+          expectedTaskText: '宽屏重叠回归任务',
+          expectedActionText: '提交后任务会进入已完成',
+          expectReasonInput: false,
+        })
         await wideTaskDrawer.getByRole('tab', { name: /确认与结果/ }).click()
         await expectText(wideTaskDrawer, '提交后会发生什么')
         await expectText(

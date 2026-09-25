@@ -701,6 +701,7 @@
 
 .erp-business-filter-control--search.ant-input-affix-wrapper {
   flex: 1 1 220px;
+  min-width: 264px;
   max-width: 340px;
 }
 
@@ -1800,6 +1801,66 @@
   background: rgb(15 23 42 / 8%);
   opacity: 1;
   pointer-events: auto;
+}
+
+/* The sales list keeps six primary fields in the first scan pane. Compact
+   only spacing; labels stay centered and both 24px header controls remain. */
+.erp-v1-sales-orders-page
+  .erp-business-module-table-card
+  .ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th:has(.erp-module-column-header) {
+  padding-inline: 0;
+}
+
+.erp-v1-sales-orders-page .erp-module-column-header {
+  gap: 0;
+}
+
+.erp-v1-sales-orders-page .erp-module-column-header-text {
+  transform: translateX(-2px);
+}
+
+.erp-v1-sales-orders-page
+  .erp-business-module-table-card
+  .ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th
+  .ant-table-column-sorters:has(.erp-module-column-header) {
+  gap: 7px;
+}
+
+.erp-v1-sales-orders-page
+  .erp-business-module-table-card
+  .ant-table-column-sorter {
+  flex: 0 0 8px;
+  width: 8px;
+  min-width: 8px;
+}
+
+.erp-v1-sales-orders-page
+  .erp-business-module-table-card
+  .ant-table-column-sorter-inner {
+  width: 8px;
+  font-size: 8px;
+}
+
+.erp-v1-sales-orders-page
+  .erp-business-module-table-card
+  :where(th, td).ant-table-row-expand-icon-cell {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+}
+
+.erp-v1-sales-orders-page
+  .erp-business-module-table-card
+  :where(th, td).ant-table-selection-column {
+  width: 38px;
+  min-width: 38px;
+  max-width: 38px;
 }
 
 .erp-business-column-order-modal {

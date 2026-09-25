@@ -43,6 +43,7 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(biz.AdminDirectoryReader), new(*adminManageRepo)),
 
 	// domain repos
+	NewBusinessProgressRepo,
 	NewWorkflowRepo,
 	wire.Bind(new(biz.WorkflowRepo), new(*workflowRepo)),
 	NewProcessRuntimeRepo,

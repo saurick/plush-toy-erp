@@ -449,6 +449,24 @@
   background: rgb(15 23 42 / 0.36);
 }
 
+[data-erp-theme='dark']
+  .erp-task-progress-rail__item[data-lane='exception']
+  .erp-task-progress-rail__value {
+  color: #ff9aa3;
+}
+
+[data-erp-theme='dark']
+  .erp-task-progress-rail__item[data-lane='due']
+  .erp-task-progress-rail__value {
+  color: #f4b55e;
+}
+
+[data-erp-theme='dark']
+  .erp-task-progress-rail__item[data-lane='finished']
+  .erp-task-progress-rail__value {
+  color: #86efac;
+}
+
 [data-erp-theme='dark'] .erp-task-board-lane--actionable.ant-card {
   --erp-task-board-lane-accent: #71a7e0;
   --erp-task-board-lane-border: rgb(113 167 224 / 0.28);
@@ -558,52 +576,6 @@
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-login-card .ant-segmented {
-  --erp-login-segmented-indicator-bg: #166534;
-  --erp-login-segmented-indicator-shadow: 0 10px 24px rgb(0 0 0 / 0.28);
-  border: 1px solid var(--erp-border-strong);
-  background: rgb(15 23 42 / 0.86);
-}
-
-[data-erp-theme='dark']
-  .erp-login-card
-  .ant-segmented
-  .ant-segmented-item-label {
-  color: var(--erp-text);
-}
-
-[data-erp-theme='dark']
-  .erp-login-card
-  .ant-segmented
-  .ant-segmented-item:hover
-  .ant-segmented-item-label,
-[data-erp-theme='dark']
-  .erp-login-card
-  .ant-segmented
-  .ant-segmented-item-focused
-  .ant-segmented-item-label {
-  color: #ffffff;
-}
-
-[data-erp-theme='dark']
-  .erp-login-card
-  .ant-segmented
-  .ant-segmented-item-selected {
-  background: transparent;
-}
-
-[data-erp-theme='dark']
-  .erp-login-card
-  .erp-login-segmented--left.ant-segmented
-  label.ant-segmented-item:nth-of-type(1)
-  .ant-segmented-item-label,
-[data-erp-theme='dark']
-  .erp-login-card
-  .erp-login-segmented--right.ant-segmented
-  label.ant-segmented-item:nth-of-type(2)
-  .ant-segmented-item-label {
-  color: #ffffff;
-}
 
 [data-erp-theme='dark'] .erp-login-card .erp-login-sms-hint.ant-alert {
   border-color: rgb(74 222 128 / 0.32);
@@ -1087,29 +1059,6 @@
 [data-erp-theme='dark'] .erp-role-navigation-workspace-tabs > .ant-tabs-nav {
   border-color: var(--erp-border);
   background: var(--erp-surface);
-}
-
-[data-erp-theme='dark'] .erp-permission-tabs .ant-tabs-tab,
-[data-erp-theme='dark'] .erp-role-navigation-workspace-tabs .ant-tabs-tab {
-  color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .erp-permission-tabs .ant-tabs-tab-active,
-[data-erp-theme='dark']
-  .erp-role-navigation-workspace-tabs
-  .ant-tabs-tab-active {
-  background: transparent;
-}
-
-[data-erp-theme='dark']
-  .erp-permission-tabs
-  .ant-tabs-tab-active
-  .ant-tabs-tab-btn,
-[data-erp-theme='dark']
-  .erp-role-navigation-workspace-tabs
-  .ant-tabs-tab-active
-  .ant-tabs-tab-btn {
-  color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-permission-section.ant-card {

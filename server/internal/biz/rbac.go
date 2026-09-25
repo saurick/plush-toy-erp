@@ -305,7 +305,7 @@ var builtinPermissions = withBuiltinPermissionMetadata([]PermissionDefinition{
 	{Key: PermissionCustomerConfigRollback, Name: "回滚客户配置版本", Module: "customer_config", Action: "rollback", Resource: "revision", Builtin: true},
 	{Key: PermissionProcessRuntimeRecover, Name: "恢复异常流程运行实例", Module: "process_runtime", Action: "recover", Resource: "domain_command", Builtin: true},
 	{Key: PermissionERPWorkbenchRead, Name: "查看岗位工作台", Description: "查看本岗位待办、风险、阻塞和来源单据入口；任务读写仍由 workflow.task.* 单独控制。", Module: "erp", Action: "read", Resource: "workbench", Builtin: true},
-	{Key: PermissionERPBusinessDashboardRead, Name: "查看业务看板", Description: "查看跨部门业务统计；不授予来源单据编辑权。", Module: "erp", Action: "read", Resource: "business_dashboard", Builtin: true},
+	{Key: PermissionERPBusinessDashboardRead, Name: "查看进度看板", Description: "查看业务进度；明细仍受来源读取权限控制，不授予编辑权。", Module: "erp", Action: "read", Resource: "business_dashboard", Builtin: true},
 	{Key: PermissionERPPrintTemplateRead, Name: "查看打印模板", Module: "erp", Action: "read", Resource: "print_template", Builtin: true},
 	{Key: PermissionERPBusinessChainDebugRead, Name: "查看业务链路调试能力", Module: "erp", Action: "read", Resource: "business_chain_debug", Builtin: true},
 	{Key: PermissionFieldPartyPrivateRead, Name: "查看往来单位隐私字段", Description: "查看客户、供应商和联系人中的电话、地址、税号及账户等隐私字段。", Module: "field", Action: "read", Resource: "party_private", Builtin: true},
@@ -852,7 +852,7 @@ func AdminCanAccessMobileRole(admin *AdminUser, roleKey string) bool {
 var builtinAdminMenus = []AdminMenu{
 	{Key: "global-dashboard", Label: "工作台", Path: "/erp/dashboard", RequiredAny: []string{PermissionERPWorkbenchRead}},
 	{Key: "task-board", Label: "任务看板", Path: "/erp/task-board", RequiredAny: []string{PermissionWorkflowTaskRead}},
-	{Key: "business-dashboard", Label: "业务看板", Path: "/erp/business-dashboard", RequiredAny: []string{PermissionERPBusinessDashboardRead}},
+	{Key: "business-dashboard", Label: "进度看板", Path: "/erp/business-dashboard", RequiredAny: []string{PermissionERPBusinessDashboardRead}},
 	{Key: "customers", Label: "客户档案", Path: "/erp/master/partners/customers", RequiredAny: []string{PermissionCustomerRead}},
 	{Key: "suppliers", Label: "供应商与加工厂", Path: "/erp/master/partners/suppliers", RequiredAny: []string{PermissionSupplierRead}},
 	{Key: "products", Label: "产品档案", Path: "/erp/master/products", RequiredAny: []string{PermissionProductRead, PermissionProductSKURead}},

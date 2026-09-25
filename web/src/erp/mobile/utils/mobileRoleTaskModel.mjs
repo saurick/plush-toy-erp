@@ -96,6 +96,7 @@ export const QUICK_REASONS = [
 ]
 
 export const MOBILE_MAIN_TAB_KEYS = Object.freeze({
+  PROGRESS: 'progress',
   TODO: 'todo',
   DONE: 'done',
   MESSAGES: 'messages',

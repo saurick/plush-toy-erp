@@ -1,5 +1,6 @@
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
+import { assertMobileSearchAffordance } from './controlAffordanceAssertions.mjs'
 
 export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
   const baseTime = 1_788_840_000
@@ -68,81 +69,16 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       },
     ],
     verify: async (page) => {
+      const searchRoot = page.locator(
+        '.mobile-role-task-search .erp-mobile-search'
+      )
+      await searchRoot.waitFor()
+      await assertMobileSearchAffordance(searchRoot)
+
       const rows = page.locator('.erp-mobile-list-item')
-      const sort = page.getByTestId('mobile-task-sortKey-trigger')
-      const status = page.getByTestId('mobile-task-statusKey-trigger')
       const range = page.getByTestId('mobile-task-list-range')
       const scroller = page.getByTestId('mobile-role-scroll')
-      const toolbarOptions = page.getByTestId(
-        'mobile-task-list-toolbar-options'
-      )
-      const scrollTo = async (top) => {
-        await scroller.evaluate(async (node, nextTop) => {
-          node.scrollTop = nextTop
-          await new Promise((resolve) =>
-            requestAnimationFrame(() => requestAnimationFrame(resolve))
-          )
-        }, top)
-      }
-      const waitToolbar = async (visible) => {
-        await page.waitForFunction(
-          (expected) =>
-            document
-              .querySelector('[data-testid="mobile-task-list-toolbar-options"]')
-              ?.getAttribute('aria-hidden') === String(!expected),
-          visible
-        )
-        await toolbarOptions.evaluate(async (node) => {
-          await Promise.all(
-            node
-              .getAnimations({ subtree: true })
-              .map((animation) => animation.finished.catch(() => {}))
-          )
-        })
-      }
-      const menu = page
-        .locator('.mobile-task-options-dropdown:visible')
-        .getByRole('menu')
-      const openMenu = async (trigger) => {
-        if ((await toolbarOptions.getAttribute('aria-hidden')) === 'true') {
-          await scrollTo(
-            await scroller.evaluate((node) => Math.max(0, node.scrollTop - 32))
-          )
-        }
-        await waitToolbar(true)
-        const title = (await trigger.getAttribute('aria-label')).split('：')[0]
-        await trigger.tap()
-        await page
-          .getByRole('menu', { name: title, exact: true })
-          .waitFor({ state: 'visible' })
-        await page.waitForFunction(
-          (expectedTitle) =>
-            document.activeElement
-              ?.closest('[role="menu"]')
-              ?.getAttribute('aria-label') === expectedTitle &&
-            Array.from(
-              document.querySelectorAll(
-                '.mobile-task-options-dropdown [role="menu"]'
-              )
-            ).filter((node) => node.getClientRects().length > 0).length === 1,
-          title
-        )
-        await menu.evaluate(async (node) => {
-          await Promise.all(
-            node.parentElement
-              .getAnimations({ subtree: true })
-              .map((animation) => animation.finished.catch(() => {}))
-          )
-        })
-      }
-      const choose = async (trigger, label) => {
-        await openMenu(trigger)
-        await menu
-          .getByRole('menuitemradio', { name: label, exact: true })
-          .tap()
-        await menu.waitFor({ state: 'hidden' })
-        assert.equal(await trigger.innerText(), label)
-      }
+      const filterTrigger = page.getByTestId('mobile-task-list-filter-trigger')
       const ids = () =>
         rows.evaluateAll((elements) =>
           elements.map((element) => Number(element.dataset.mobileTaskId))
@@ -163,132 +99,151 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
             ) === expected,
           id
         )
+      const waitSearchValue = async (value) =>
+        page.waitForFunction(
+          (expected) =>
+            document.querySelector('.mobile-role-task-search input')?.value ===
+            expected,
+          value
+        )
+      const openFilters = async (contextLabel = '任务') => {
+        await filterTrigger.click()
+        const dropdown = page.getByRole('group', {
+          name: `筛选${contextLabel}`,
+          exact: true,
+        })
+        await dropdown.waitFor({ state: 'visible' })
+        return dropdown
+      }
+      const chooseFilter = async (dropdown, label) => {
+        await dropdown.getByText(label, { exact: true }).click()
+        await dropdown.waitFor({ state: 'hidden' })
+      }
+      const applyFilters = async ({ sort, status, contextLabel = '任务' }) => {
+        if (sort) await chooseFilter(await openFilters(contextLabel), sort)
+        if (status) await chooseFilter(await openFilters(contextLabel), status)
+      }
+
       await waitFirst(97063)
       assert.match(await range.innerText(), /已显示 12 项.*共 64 项/u)
-      assert.equal(await sort.innerText(), '最近进入')
-      const contentHeight = await scroller.evaluate((node) => node.scrollHeight)
-      await scrollTo(600)
-      await waitToolbar(false)
-      const pinnedTabs = await page
-        .getByTestId('mobile-role-task-filters')
-        .boundingBox()
-      const scrollBox = await scroller.boundingBox()
-      assert(
-        Math.abs(pinnedTabs.y - scrollBox.y) <= 1,
-        '向下滚动仍保留分类 tab 吸顶'
-      )
-      assert(
-        await toolbarOptions.evaluate((node) => {
-          const rect = node.getBoundingClientRect()
-          const target = document.elementFromPoint(
-            rect.x + rect.width / 2,
-            rect.y + rect.height / 2
+      assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选任务')
+
+      for (const width of [320, 390, 430]) {
+        await page.setViewportSize({ width, height: 844 })
+        const geometry = await page.evaluate(() => {
+          const rect = (selector) =>
+            document.querySelector(selector)?.getBoundingClientRect().toJSON()
+          const selected = document.querySelector(
+            '.mobile-role-task-filters .erp-filter-chip[aria-pressed="true"]'
           )
-          return !target?.closest('.mobile-task-list-toolbar')
-        }),
-        '隐藏的筛选区域不遮挡下方任务点击'
-      )
-      await page.screenshot({
-        path: path.join(outputDir, 'mobile-task-filters-scroll-down.png'),
-        fullPage: true,
-      })
-      await scrollTo(592)
-      assert.equal(
-        await toolbarOptions.getAttribute('aria-hidden'),
-        'true',
-        '轻微向上移动不闪动'
-      )
-      await scrollTo(584)
-      await waitToolbar(true)
-      await page.screenshot({
-        path: path.join(outputDir, 'mobile-task-filters-scroll-up.png'),
-        fullPage: true,
-      })
-      await scrollTo(596)
-      assert.equal(await toolbarOptions.getAttribute('aria-hidden'), 'false')
-      await scrollTo(610)
-      await waitToolbar(false)
-      await scrollTo(590)
-      await waitToolbar(true)
-      assert.equal(
-        await scroller.evaluate((node) => node.scrollHeight),
-        contentHeight,
-        '筛选展开收起不改变列表高度'
-      )
-      await openMenu(sort)
-      await scrollTo(650)
-      await waitToolbar(true)
-      await sort.tap()
-      await menu.waitFor({ state: 'hidden' })
-      await scrollTo(680)
-      await waitToolbar(false)
-      await scrollTo(660)
-      await waitToolbar(true)
-      await sort.focus()
-      await page.keyboard.press('Tab')
-      assert(
-        await status.evaluate(
-          (node) =>
-            node === document.activeElement && node.matches(':focus-visible')
+          return {
+            clientWidth: document.documentElement.clientWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+            query: rect('.mobile-role-task-query'),
+            search: rect('.mobile-role-task-search'),
+            filter: rect('[data-testid="mobile-task-list-filter-trigger"]'),
+            tabs: rect('.mobile-task-view-switch'),
+            chips: rect('.mobile-role-task-filters'),
+            selectedShadow: selected
+              ? getComputedStyle(selected).boxShadow
+              : null,
+            checkCount: document.querySelectorAll('.erp-filter-chip__check')
+              .length,
+          }
+        })
+        assert(
+          geometry.scrollWidth <= geometry.clientWidth + 1,
+          JSON.stringify(geometry)
         )
-      )
-      await scrollTo(720)
-      await waitToolbar(true)
-      await scroller.tap({ position: { x: 3, y: 180 } })
-      await scrollTo(750)
-      await waitToolbar(false)
-      await scrollTo(0)
-      await waitToolbar(true)
-      await openMenu(sort)
-      assert.equal(
-        await page.getByRole('dialog').count(),
-        0,
-        '就地下拉不遮罩整页'
-      )
-      assert.equal(
-        await menu
-          .getByRole('menuitemradio', { name: '最近进入', exact: true })
-          .getAttribute('aria-checked'),
-        'true'
-      )
-      await sort.tap()
-      await menu.waitFor({ state: 'hidden' })
-      assert.equal(await sort.innerText(), '最近进入', '再次点击入口只收起菜单')
-      await openMenu(sort)
-      await page.getByTestId('mobile-role-list-heading').tap()
-      await menu.waitFor({ state: 'hidden' })
-      await openMenu(sort)
-      await openMenu(status)
-      assert.equal(await menu.getAttribute('aria-label'), '任务状态')
-      assert.equal(await menu.count(), 1, '同时只展开一个菜单')
-      await status.tap()
-      await menu.waitFor({ state: 'hidden' })
-      await sort.focus()
-      await sort.press('Enter')
-      await menu.waitFor({ state: 'visible' })
-      await page.waitForFunction(() =>
-        document.activeElement?.closest('.mobile-task-options-dropdown')
-      )
-      await page.keyboard.press('Home')
-      await page.keyboard.press('ArrowDown')
+        assert(
+          geometry.query.height <= 48 && geometry.filter.height >= 44,
+          `搜索和统一筛选保持同一行：${JSON.stringify(geometry)}`
+        )
+        assert(
+          geometry.search.right <= geometry.filter.x - 8,
+          `搜索与筛选保留清晰间距：${JSON.stringify(geometry)}`
+        )
+        assert(
+          geometry.chips.bottom - geometry.query.top <= 172,
+          `列表顶部控制区保持紧凑：${JSON.stringify(geometry)}`
+        )
+        assert.equal(geometry.checkCount, 0, '选中控件不使用勾选图标')
+        assert.equal(
+          geometry.selectedShadow,
+          'none',
+          '快捷筛选不使用粗底边或阴影'
+        )
+      }
+      await page.setViewportSize({ width: 390, height: 844 })
+
+      const immediateDropdown = await openFilters()
+      const alignedControls = await immediateDropdown.evaluate((node) => {
+        const centerX = (element) => {
+          const rect = element.getBoundingClientRect()
+          return rect.left + rect.width / 2
+        }
+        const fieldsets = Array.from(node.querySelectorAll('fieldset'))
+        const itemDeltas = Array.from(
+          node.querySelectorAll('.ant-segmented-item')
+        ).map((item) => {
+          const label = item.querySelector('.ant-segmented-item-label')
+          return label ? Math.abs(centerX(item) - centerX(label)) : Infinity
+        })
+        const legendDeltas = fieldsets.map((fieldset) => {
+          const legend = fieldset.querySelector('legend')
+          return legend
+            ? Math.abs(centerX(fieldset) - centerX(legend))
+            : Infinity
+        })
+        const reset = node.querySelector('.mobile-task-filter-dropdown__reset')
+        return {
+          itemDeltas,
+          legendDeltas,
+          resetDelta: reset
+            ? Math.abs(centerX(node) - centerX(reset))
+            : Infinity,
+        }
+      })
       assert(
-        await menu
-          .getByRole('menuitemradio', { name: '截止最早', exact: true })
-          .evaluate((node) => node === document.activeElement),
-        '方向键切换菜单选项'
+        alignedControls.legendDeltas.every((delta) => delta <= 1) &&
+          alignedControls.itemDeltas.every((delta) => delta <= 1) &&
+          alignedControls.resetDelta <= 1,
+        `筛选标题、选项和重置动作必须共用居中基线：${JSON.stringify(alignedControls)}`
       )
-      await page.keyboard.press('Escape')
-      await menu.waitFor({ state: 'hidden' })
-      assert(
-        await sort.evaluate((node) => node === document.activeElement),
-        '收起后焦点回到入口'
-      )
-      await choose(sort, '等待最久')
+      await chooseFilter(immediateDropdown, '等待最久')
       await waitFirst(97001)
-      assert.deepEqual((await ids()).slice(0, 4), [97001, 97000, 97003, 97002])
-      await choose(sort, '截止最早')
+      assert.equal(
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选任务，已应用 1 项',
+        '下拉层内选择应立即生效'
+      )
+      assert(
+        await filterTrigger.evaluate((node) => node === document.activeElement),
+        '收起后焦点返回筛选入口'
+      )
+
+      const resetDropdown = await openFilters()
+      await resetDropdown
+        .getByRole('button', { name: '重置筛选', exact: true })
+        .click()
+      await resetDropdown.waitFor({ state: 'hidden' })
       await waitFirst(97063)
-      while ((await rows.count()) < 64) {
+      assert.equal(
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选任务',
+        '重置应立即恢复默认条件'
+      )
+      await applyFilters({ sort: '截止最早', status: '阻塞' })
+      await waitFirst(97063)
+      await waitCount(12)
+      assert.match(await range.innerText(), /共 22 项/u)
+      assert((await ids()).every((id) => (id - 97000) % 3 === 0))
+      assert.equal(
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选任务，已应用 2 项'
+      )
+
+      while ((await rows.count()) < 22) {
         const previous = await rows.count()
         await page.getByTestId('mobile-role-list-toggle-todo').click()
         await page.waitForFunction(
@@ -298,24 +253,19 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         )
       }
       const deadlineOrder = await ids()
-      assert.equal(new Set(deadlineOrder).size, 64)
       const orderedTasks = deadlineOrder.map((id) =>
         tasks.find((task) => task.id === id)
       )
-      for (let i = 1; i < orderedTasks.length; i++) {
+      for (let index = 1; index < orderedTasks.length; index += 1) {
         assert(
-          (orderedTasks[i - 1].due_at || Infinity) <=
-            (orderedTasks[i].due_at || Infinity),
-          '截止排序必须覆盖下一页且缺值置后'
+          (orderedTasks[index - 1].due_at || Infinity) <=
+            (orderedTasks[index].due_at || Infinity),
+          '截止排序覆盖已加载的全部阻塞任务且缺值置后'
         )
       }
-      await choose(status, '阻塞')
-      await waitCount(12)
-      assert.match(await range.innerText(), /共 22 项/u)
-      assert((await ids()).every((id) => (id - 97000) % 3 === 0))
+
       await page.getByTestId('mobile-role-filter-approval').click()
       await waitCount(12)
-      assert.match(await range.innerText(), /共 22 项/u)
       const selectedID = (await ids())[0]
       await clickTaskCardContent(
         rows.first(),
@@ -332,160 +282,226 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         .getByRole('button', { name: '返回任务列表', exact: true })
         .click()
       await waitFirst(selectedID)
-      assert.equal(await sort.innerText(), '截止最早')
-      assert.equal(await status.innerText(), '阻塞')
-      await scrollTo(600)
-      await waitToolbar(false)
-      await scrollTo(580)
-      await waitToolbar(true)
-      await scrollTo(0)
-      await waitToolbar(true)
+      assert.equal(
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选任务，已应用 2 项',
+        '进入详情并返回后保留筛选条件'
+      )
+
       const search = page.getByRole('searchbox')
       await search.fill('不存在的模拟订单')
+      await search.press('Enter')
       await page
         .getByText('当前筛选下暂无任务', { exact: true })
         .waitFor({ state: 'visible' })
-      assert.match(await range.innerText(), /共 0 项/u)
-      await page.getByRole('button', { name: '重置', exact: true }).tap()
+      assert.match(await range.innerText(), /已显示 0 项/u)
+      await page.getByRole('button', { name: '清除搜索', exact: true }).click()
       await waitFirst(97063)
-      assert.equal(await sort.innerText(), '最近进入')
-      assert.equal(await status.innerText(), '全部状态')
-      assert.equal(await search.inputValue(), '')
-      await choose(sort, '等待最久')
-      await choose(status, '待处理')
-      await choose(status, '全部状态')
-      await waitFirst(97001)
-      await choose(status, '阻塞')
-      await waitFirst(97000)
-      assert((await ids()).every((id) => (id - 97000) % 3 === 0))
-      await page.getByTestId('mobile-role-nav-done').click()
-      await waitFirst(98000)
-      assert.equal(await rows.count(), 1, '已办不受待办阻塞状态筛选影响')
       assert.equal(
-        await page.getByTestId('mobile-task-list-options').count(),
-        0
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选任务，已应用 2 项',
+        '清除搜索不连带清除任务筛选'
       )
-      await page.getByTestId('mobile-role-nav-todo').click()
+
+      const appliedResetDropdown = await openFilters()
+      await appliedResetDropdown
+        .getByRole('button', { name: '重置筛选', exact: true })
+        .click()
+      await appliedResetDropdown.waitFor({ state: 'hidden' })
+      await waitFirst(97063)
+      assert.match(await range.innerText(), /共 64 项/u)
+      assert.equal(
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选任务',
+        '重置应立即清除任务筛选'
+      )
+      await applyFilters({ sort: '等待最久', status: '阻塞' })
       await waitFirst(97000)
-      assert.equal(await status.innerText(), '阻塞')
-      await page.getByTestId('mobile-role-nav-messages').tap()
+      await page.getByTestId('mobile-role-nav-tasks').click()
       await page
-        .locator('.mobile-role-message-card')
-        .first()
-        .waitFor({ state: 'visible' })
-      await scrollTo(600)
-      await waitToolbar(false)
-      await scrollTo(580)
-      await waitToolbar(true)
-      await openMenu(status)
-      await status.tap()
-      await menu.waitFor({ state: 'hidden' })
-      await page.getByTestId('mobile-role-nav-todo').tap()
+        .getByLabel('任务状态', { exact: true })
+        .getByText('已办', { exact: true })
+        .click()
+      await waitFirst(98000)
+      assert.equal(await rows.count(), 1, '已办不受待办状态筛选影响')
+      assert.equal(
+        await page.getByTestId('mobile-task-list-filter-trigger').count(),
+        0,
+        '已办不展示无效筛选入口'
+      )
+      await page
+        .getByLabel('任务状态', { exact: true })
+        .getByText('待办', { exact: true })
+        .click()
       await waitFirst(97000)
-      for (const width of [320, 390, 430, 1440]) {
-        await page.setViewportSize({ width, height: 844 })
-        const metrics = await page
-          .getByTestId('mobile-task-list-options')
-          .evaluate((node) => {
-            const controls = Array.from(node.children).map((child) =>
-              child.getBoundingClientRect()
-            )
-            return {
-              width: node.clientWidth,
-              scrollWidth: node.scrollWidth,
-              controls: controls.map((rect) => ({
-                x: rect.x,
-                right: rect.right,
-                height: rect.height,
-              })),
-            }
-          })
-        assert(metrics.scrollWidth <= metrics.width + 1)
-        assert(
-          metrics.controls.every(
-            (control) => control.height >= 48 && control.right <= width
-          )
-        )
-        await openMenu(status)
-        const triggerBox = await status.boundingBox()
-        const menuMetrics = await menu.evaluate((node) => {
-          const rect = node.getBoundingClientRect()
-          return {
-            x: rect.x,
-            right: rect.right,
-            y: rect.y,
-            width: rect.width,
-            controls: Array.from(
-              node.querySelectorAll('[role="menuitemradio"]')
-            ).map((item) => {
-              const box = item.getBoundingClientRect()
-              return { width: box.width, height: box.height, right: box.right }
-            }),
-          }
-        })
-        assert(menuMetrics.x >= 0 && menuMetrics.right <= width)
-        assert(
-          menuMetrics.y >= triggerBox.y + triggerBox.height - 1 &&
-            menuMetrics.y <= triggerBox.y + triggerBox.height + 16,
-          '菜单直接位于入口下方'
-        )
-        assert(
-          menuMetrics.controls.every(
-            (control) =>
-              control.height >= 48 &&
-              control.width >= menuMetrics.width - 16 &&
-              control.right <= width
-          )
-        )
-        await status.tap()
-        await menu.waitFor({ state: 'hidden' })
-      }
-      await page.setViewportSize({ width: 568, height: 320 })
-      await openMenu(sort)
-      await menu
-        .getByRole('menuitemradio', { name: '等待最久', exact: true })
-        .tap()
-      await menu.waitFor({ state: 'hidden' })
+      assert.equal(
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选任务，已应用 2 项',
+        '返回待办后恢复原筛选'
+      )
+      await search.fill('SORT-0')
+      await search.press('Enter')
+      await waitFirst(97000)
+
+      await page.getByTestId('mobile-role-nav-messages').click()
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="mobile-task-list-filter-trigger"]')
+            ?.getAttribute('aria-label') === '筛选风险'
+      )
+      assert.equal(
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选风险',
+        '首次进入风险页使用该页默认筛选'
+      )
+      await waitSearchValue('')
+      assert.equal(await search.inputValue(), '', '风险页使用自己的搜索词')
+      await applyFilters({ sort: '截止最早', contextLabel: '风险' })
+      await search.fill('SORT-6')
+      await search.press('Enter')
+      await page.waitForFunction(
+        (expected) =>
+          window.history.state?.mobileRoleTasksQueryPages?.risks?.keyword ===
+          expected,
+        'SORT-6'
+      )
+      assert.equal(
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选风险，已应用 1 项'
+      )
+      await page.reload()
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="mobile-task-list-filter-trigger"]')
+            ?.getAttribute('aria-label') === '筛选风险，已应用 1 项'
+      )
+      await waitSearchValue('SORT-6')
+      assert.equal(await search.inputValue(), 'SORT-6')
+      await page.getByTestId('mobile-role-nav-tasks').click()
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="mobile-task-list-filter-trigger"]')
+            ?.getAttribute('aria-label') === '筛选任务，已应用 2 项'
+      )
+      await waitSearchValue('SORT-0')
+      assert.equal(
+        await search.inputValue(),
+        'SORT-0',
+        '返回任务页恢复任务页自己的搜索词'
+      )
+      await page.getByTestId('mobile-role-nav-messages').click()
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="mobile-task-list-filter-trigger"]')
+            ?.getAttribute('aria-label') === '筛选风险，已应用 1 项'
+      )
+      await waitSearchValue('SORT-6')
+      assert.equal(await search.inputValue(), 'SORT-6')
+      const riskDropdown = await openFilters('风险')
+      await page.waitForTimeout(250)
+      await riskDropdown.waitFor({ state: 'visible' })
+      await page.screenshot({
+        path: path.join(
+          outputDir,
+          'mobile-risk-list-filter-dropdown-light.png'
+        ),
+      })
+      await riskDropdown
+        .getByRole('button', { name: '重置筛选', exact: true })
+        .click()
+      await riskDropdown.waitFor({ state: 'hidden' })
+      assert.equal(
+        await filterTrigger.getAttribute('aria-label'),
+        '筛选风险',
+        '风险页重置只恢复风险页默认条件'
+      )
+      assert.equal(
+        await search.inputValue(),
+        'SORT-6',
+        '重置筛选不重复承担清除搜索职责'
+      )
+      await page.getByTestId('mobile-role-nav-tasks').click()
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="mobile-task-list-filter-trigger"]')
+            ?.getAttribute('aria-label') === '筛选任务，已应用 2 项'
+      )
+      await page.getByRole('button', { name: '清除搜索', exact: true }).click()
+      await waitFirst(97000)
+
+      await page.setViewportSize({ width: 320, height: 568 })
+      const narrowDropdown = await openFilters()
+      await page.waitForTimeout(200)
+      const narrowGeometry = await page.evaluate(() => {
+        const root = document.querySelector('.mobile-task-filter-popover')
+        const panel = root?.querySelector('.mobile-task-filter-dropdown')
+        return {
+          viewport: {
+            width: document.documentElement.clientWidth,
+            height: document.documentElement.clientHeight,
+          },
+          scrollWidth: document.documentElement.scrollWidth,
+          root: root?.getBoundingClientRect().toJSON(),
+          panel: panel?.getBoundingClientRect().toJSON(),
+        }
+      })
+      assert(
+        narrowGeometry.scrollWidth <= narrowGeometry.viewport.width + 1,
+        JSON.stringify(narrowGeometry)
+      )
+      assert(
+        narrowGeometry.root.x >= 0 &&
+          narrowGeometry.root.y >= 0 &&
+          narrowGeometry.root.right <= narrowGeometry.viewport.width + 1 &&
+          narrowGeometry.root.bottom <= narrowGeometry.viewport.height + 1 &&
+          narrowGeometry.panel.height <=
+            narrowGeometry.viewport.height * 0.52 + 2,
+        `窄屏任务筛选下拉层保持在视口内：${JSON.stringify(narrowGeometry)}`
+      )
+      await filterTrigger.click()
+      await narrowDropdown.waitFor({ state: 'hidden' })
+
       await page.setViewportSize({ width: 390, height: 844 })
-      await page.getByTestId('mobile-role-scroll').evaluate((node) => {
+      await scroller.evaluate((node) => {
         node.scrollTop = 0
       })
       await page.screenshot({
         path: path.join(outputDir, 'mobile-task-list-options-light.png'),
         fullPage: true,
       })
-      await openMenu(sort)
+      const lightDropdown = await openFilters()
+      await page.waitForTimeout(350)
       await page.screenshot({
         path: path.join(
           outputDir,
-          'mobile-task-list-options-dropdown-light.png'
+          'mobile-task-list-filter-dropdown-light.png'
         ),
-        fullPage: true,
       })
-      await sort.tap()
-      await menu.waitFor({ state: 'hidden' })
+      await filterTrigger.click()
+      await lightDropdown.waitFor({ state: 'hidden' })
+
       await clickMobileThemeOption(page, '暗色')
-      const colors = await sort.evaluate((node) => ({
-        background: getComputedStyle(node).backgroundColor,
-        color: getComputedStyle(node).color,
-      }))
-      assert.notEqual(colors.background, 'rgb(255, 255, 255)')
-      assert.notEqual(colors.background, colors.color)
-      await openMenu(status)
-      const selectedColors = await menu
-        .getByRole('menuitemradio', { name: '阻塞', exact: true })
-        .evaluate((node) => ({
-          background: getComputedStyle(node).backgroundColor,
+      const darkDropdown = await openFilters()
+      await page.waitForTimeout(350)
+      const darkColors = await darkDropdown.evaluate((node) => {
+        const surface = node.closest('.ant-popover-inner') || node
+        return {
+          background: getComputedStyle(surface).backgroundColor,
           color: getComputedStyle(node).color,
-        }))
-      assert.notEqual(selectedColors.background, 'rgb(232, 245, 234)')
-      assert.notEqual(selectedColors.background, selectedColors.color)
-      await page.screenshot({
-        path: path.join(outputDir, 'mobile-task-list-options-dark.png'),
-        fullPage: true,
+        }
       })
-      await status.tap()
-      await menu.waitFor({ state: 'hidden' })
+      assert.notEqual(darkColors.background, 'rgb(255, 255, 255)')
+      assert.notEqual(darkColors.background, darkColors.color)
+      await page.screenshot({
+        path: path.join(outputDir, 'mobile-task-list-filter-dropdown-dark.png'),
+      })
+      await filterTrigger.click()
+      await darkDropdown.waitFor({ state: 'hidden' })
     },
   }
 }

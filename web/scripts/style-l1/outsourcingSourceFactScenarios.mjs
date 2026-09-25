@@ -248,10 +248,23 @@ export function createOutsourcingSourceFactScenarios(deps) {
           '行内明细快速预览应保持只读，不承载委外回货'
         )
 
-        await page
-          .getByText('OUT-SOURCE-L1', { exact: true })
+        const orderRow = page
+          .locator(
+            '.erp-business-data-table-card .ant-table-tbody tr[data-row-key="1"]'
+          )
           .first()
-          .dblclick()
+        await orderRow.getByText('OUT-SOURCE-L1', { exact: true }).first().click()
+        let detailsAction = page
+          .locator('button[data-business-action-key="outsourcing-details"]:visible')
+          .first()
+        if ((await detailsAction.count()) === 0) {
+          await page.getByRole('button', { name: /^更多操作，共/u }).click()
+          detailsAction = page
+            .locator('.erp-business-selection-action-menu:visible')
+            .locator('button[data-business-action-key="outsourcing-details"]')
+            .first()
+        }
+        await detailsAction.click()
         const detailModal = page
           .locator('.erp-business-action-modal--form.ant-modal:visible')
           .filter({ hasText: '加工合同详情' })

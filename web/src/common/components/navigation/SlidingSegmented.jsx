@@ -1,5 +1,5 @@
 import React, { forwardRef, useCallback, useState } from 'react'
-import { Segmented, theme } from 'antd'
+import { Segmented } from 'antd'
 import useSlidingIndicator from './useSlidingIndicator'
 
 const optionValue = (option) =>
@@ -18,7 +18,6 @@ const SlidingSegmented = forwardRef(
     },
     forwardedRef
   ) => {
-    const { token } = theme.useToken()
     const [localValue, setLocalValue] = useState(() =>
       defaultValue !== undefined ? defaultValue : optionValue(options[0])
     )
@@ -42,14 +41,7 @@ const SlidingSegmented = forwardRef(
         {...props}
         ref={setRef}
         className={`erp-sliding-segmented ${className}`}
-        style={{
-          '--erp-segmented-default-bg': token.colorBgElevated,
-          '--erp-segmented-default-text': token.colorTextLabel,
-          '--erp-segmented-default-selected-text': token.colorText,
-          '--erp-segmented-default-radius': `${token.borderRadiusSM}px`,
-          '--erp-segmented-default-shadow': token.boxShadowTertiary,
-          ...style,
-        }}
+        style={style}
         options={options.map((option) => {
           const normalized =
             typeof option === 'object' && option !== null

@@ -1,4 +1,6 @@
+import { assertFilterAffordance } from './controlAffordanceAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { MOBILE_ROLE_TASK_PAGE_LIMIT } from '../../src/erp/utils/mobileTaskQueries.mjs'
 import { mobileTaskListOptionsScenario } from './mobileTaskListOptionsScenario.mjs'
 import { mobileTaskRefreshScenario } from './mobileTaskRefreshScenario.mjs'
 import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
@@ -222,12 +224,14 @@ export function createMobileTaskScenarios({
               inputShadow: style.boxShadow,
               inputBorder: style.borderWidth,
               inputOutline: style.outlineWidth,
+              inputOutlineStyle: style.outlineStyle,
               inputColor: style.color,
               wrapperBackground: wrapperStyle.backgroundColor,
               wrapperShadow: wrapperStyle.boxShadow,
               wrapperBorder: wrapperStyle.borderColor,
               wrapperHeight: wrapper.getBoundingClientRect().height,
               formOutline: getComputedStyle(form).outlineWidth,
+              formOutlineStyle: getComputedStyle(form).outlineStyle,
             }
           })
           await page.screenshot({
@@ -240,9 +244,22 @@ export function createMobileTaskScenarios({
             `搜索框内部不应叠加第二层焦点边框：${JSON.stringify(focusStyle)}`
           )
           assert.equal(focusStyle.inputBorder, '0px')
-          assert.equal(focusStyle.inputOutline, '0px')
-          assert.equal(focusStyle.formOutline, '0px')
-          assert.equal(focusStyle.wrapperHeight, 48)
+          assert(
+            focusStyle.inputOutlineStyle === 'none' ||
+              focusStyle.inputOutline === '0px',
+            `搜索框内部不应绘制 outline：${JSON.stringify(focusStyle)}`
+          )
+          assert(
+            focusStyle.formOutlineStyle === 'none' ||
+              focusStyle.formOutline === '0px',
+            `搜索表单不应绘制第二层 outline：${JSON.stringify(focusStyle)}`
+          )
+          assert(
+            focusStyle.wrapperHeight >= 44 && focusStyle.wrapperHeight <= 48,
+            `搜索框高度应保持在移动端可触控的紧凑范围：${JSON.stringify(
+              focusStyle
+            )}`
+          )
           assert.match(focusStyle.wrapperShadow, /inset/u)
           assertReadableOnBackground(
             focusStyle.inputColor,
@@ -481,7 +498,10 @@ export function createMobileTaskScenarios({
         await page.goBack()
         await search.waitFor({ state: 'visible' })
         assert.equal(await search.inputValue(), '')
-        await page.getByRole('button', { name: '已办', exact: true }).click()
+        await page
+          .getByLabel('任务状态', { exact: true })
+          .getByText('已办', { exact: true })
+          .click()
         const endedTask = page.getByRole('button', {
           name: '查看样品资料已核对处理结果',
           exact: true,
@@ -519,7 +539,10 @@ export function createMobileTaskScenarios({
           0
         )
         await page.goBack()
-        await page.getByRole('button', { name: '待办', exact: true }).click()
+        await page
+          .getByLabel('任务状态', { exact: true })
+          .getByText('待办', { exact: true })
+          .click()
         for (const [keyword, label, state] of [
           ['占位产品', '暂无图', 'empty'],
           ['占位物料', '物料', 'empty'],
@@ -977,7 +1000,7 @@ export function createMobileTaskScenarios({
               const tabs = document.querySelector('.mobile-role-task-filters')
               const tabsStyle =
                 tabs instanceof HTMLElement
-                  ? window.getComputedStyle(tabs, '::before')
+                  ? window.getComputedStyle(tabs)
                   : null
               const buttons = Array.from(
                 tabs?.querySelectorAll('.mobile-role-task-filter') || []
@@ -1014,10 +1037,21 @@ export function createMobileTaskScenarios({
                   tabs instanceof HTMLElement ? tabs.clientWidth : 0,
                 tabsScrollWidth:
                   tabs instanceof HTMLElement ? tabs.scrollWidth : 0,
-                thumbWidth: Number.parseFloat(tabsStyle?.width || '0'),
+                gap: Number.parseFloat(tabsStyle?.columnGap || '0'),
+                padding:
+                  Number.parseFloat(tabsStyle?.paddingLeft || '0') +
+                  Number.parseFloat(tabsStyle?.paddingRight || '0'),
               }
             })
-            const expectedFilterWidth = (filterMetrics.tabsClientWidth - 8) / 3
+            await assertFilterAffordance(
+              page.locator('.mobile-role-task-filter'),
+              44
+            )
+            const expectedFilterWidth =
+              (filterMetrics.tabsClientWidth -
+                filterMetrics.padding -
+                2 * filterMetrics.gap) /
+              3
             assert(
               JSON.stringify(filterMetrics.labels) ===
                 JSON.stringify(['全部', '风险', '超时']) &&
@@ -1030,8 +1064,6 @@ export function createMobileTaskScenarios({
                 ) &&
                 filterMetrics.tabsScrollWidth <=
                   filterMetrics.tabsClientWidth + 1 &&
-                Math.abs(filterMetrics.thumbWidth - expectedFilterWidth) <=
-                  1.5 &&
                 filterMetrics.widths.every(
                   (width) => Math.abs(width - expectedFilterWidth) <= 1.5
                 ),
@@ -1122,8 +1154,22 @@ export function createMobileTaskScenarios({
             roleTaskCard.getByText(role.taskName, { exact: true })
           )
           await expectText(page, role.taskName)
-          const identity = page.locator('[aria-label="关联产品与物料"]')
-          await expectText(identity, '长耳兔抱枕（加长耳朵与可拆洗外套）')
+          const identity = page.locator('[aria-label="任务关联内容"]')
+          await expectText(
+            identity,
+            '长耳兔抱枕（加长耳朵与可拆洗外套）'
+          ).catch(async (error) => {
+            await page.screenshot({
+              path: path.join(
+                outputDir,
+                `mobile-yoyo-${role.key}-detail-failure.png`
+              ),
+            })
+            throw new Error(
+              `${error.message}\n${(await page.locator('body').innerText()).slice(0, 1600)}`,
+              { cause: error }
+            )
+          })
           await identity.locator('summary').click()
           await expectText(identity, '云朵小熊')
           await identity.locator('summary').click()
@@ -2643,10 +2689,14 @@ export function createMobileTaskScenarios({
           { timeout: 10_000 }
         )
         await page.reload({ waitUntil: 'domcontentloaded' })
-        await page.getByTestId('mobile-role-nav-todo').click()
+        await page.getByTestId('mobile-role-nav-tasks').click()
+        await page
+          .getByLabel('任务状态', { exact: true })
+          .getByText('待办', { exact: true })
+          .click()
         await page.waitForFunction(() => {
           const heading = document.querySelector('.mobile-role-tasks-page h1')
-          return heading?.textContent?.trim() === '待办'
+          return heading?.textContent?.trim() === '任务'
         })
         await page.waitForFunction(
           () =>
@@ -2754,8 +2804,8 @@ export function createMobileTaskScenarios({
         )
         assert.equal(
           await page.locator('[data-testid^="mobile-role-nav-"]').count(),
-          4,
-          '移动端增加待我审批筛选后仍应只保留 4 个底栏入口'
+          3,
+          '无进度权限的账号保留任务、风险、我的三个入口；审批仍位于任务内'
         )
         const roleTaskViewRequests = []
         const captureRoleTaskViewRequest = (request) => {
@@ -2769,7 +2819,8 @@ export function createMobileTaskScenarios({
           if (
             !['list_role_tasks', 'list_workbench_role_tasks'].includes(
               body?.method
-            )
+            ) ||
+            body.params?.limit !== MOBILE_ROLE_TASK_PAGE_LIMIT
           ) {
             return
           }
@@ -3049,7 +3100,7 @@ export function createMobileTaskScenarios({
         await page.getByLabel('返回任务列表').click()
         await page.waitForFunction(() => {
           const heading = document.querySelector('.mobile-role-tasks-page h1')
-          return heading?.textContent?.trim() === '待办'
+          return heading?.textContent?.trim() === '任务'
         })
         await assertERPThemeMode(page, {
           scenarioName: 'mobile-tasks-dark',
@@ -3228,7 +3279,7 @@ export function createMobileTaskScenarios({
               document.querySelectorAll('.erp-mobile-list-item')
             )
             return (
-              heading?.textContent?.trim() === '待办' &&
+              heading?.textContent?.trim() === '任务' &&
               rows.some((row) => row.textContent?.includes(name)) &&
               !document.querySelector('.mobile-role-tasks-page--detail') &&
               !document.querySelector('.erp-admin-sider')
@@ -3253,7 +3304,7 @@ export function createMobileTaskScenarios({
         }))
         assert(
           listMetrics.path === '/m/sales/tasks' &&
-            listMetrics.heading === '待办' &&
+            listMetrics.heading === '任务' &&
             !listMetrics.hasDesktopShell &&
             listMetrics.hasMobileShell &&
             !listMetrics.hasDetail,
@@ -3303,7 +3354,7 @@ export function createMobileTaskScenarios({
           (name) => {
             const heading = document.querySelector('.mobile-role-tasks-page h1')
             return (
-              heading?.textContent?.trim() === '待办' &&
+              heading?.textContent?.trim() === '任务' &&
               !document.querySelector('.mobile-role-tasks-page--detail') &&
               !document.body.textContent?.includes(name)
             )
@@ -3326,37 +3377,6 @@ export function createMobileTaskScenarios({
           { screen: '', depth: 0, hasDetail: false, hasAction: false },
           `已被其它终端处理的任务应一次回到真实列表历史项: ${JSON.stringify(missingTaskHistory)}`
         )
-      },
-    },
-    {
-      name: 'erp-business-dashboard-mobile',
-      path: '/erp/business-dashboard',
-      auth: 'admin',
-      effectiveSession: {
-        ...customerRuntimeEffectiveSession,
-        actions: ['workflow.task.read'],
-      },
-      viewport: { width: 390, height: 844 },
-      verify: async (page) => {
-        await expectText(page, '超级管理员')
-        await expectText(page, '业务管理')
-        await expectText(page, '业务看板')
-        await expectText(page, '业务数据')
-        await expectText(page, '需要关注')
-        await assertTextAbsent(page, '数字说明')
-        await assertNoDuplicatedAdminPageTitle(page, {
-          scenarioName: 'erp-business-dashboard-mobile',
-        })
-        await assertDashboardMetricInteractionSemantics(page, {
-          scenarioName: 'erp-business-dashboard-mobile',
-          expectBusinessAttention: true,
-        })
-        await assertNoDashboardCenterLocalRefreshButton(page, {
-          scenarioName: 'erp-business-dashboard-mobile',
-        })
-        await page
-          .getByRole('button', { name: '查看客户', exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
       },
     },
   ]

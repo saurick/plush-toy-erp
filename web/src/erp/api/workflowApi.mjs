@@ -501,6 +501,29 @@ export async function listWorkflowTasks(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function getWorkflowTask(taskID, options = {}) {
+  if (!Number.isSafeInteger(taskID) || taskID <= 0) {
+    throw new TypeError('任务参数无效')
+  }
+  const result = await workflowRpc.call(
+    'get_task',
+    { task_id: taskID },
+    options
+  )
+  const { task } = dataOf(result)
+  if (
+    task?.id !== taskID ||
+    !Number.isSafeInteger(task.version) ||
+    task.version <= 0 ||
+    !WORKFLOW_TASK_STATUS_KEYS.has(task.task_status_key)
+  ) {
+    throw Object.assign(new Error('任务详情暂不可用，请重试'), {
+      isInvalidResponse: true,
+    })
+  }
+  return task
+}
+
 export async function listWorkflowTaskEvents(taskId, options = {}) {
   const normalizedTaskId = Number(taskId)
   if (!Number.isSafeInteger(normalizedTaskId) || normalizedTaskId <= 0) {

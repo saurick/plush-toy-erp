@@ -59,7 +59,7 @@ const OUTSOURCING_ORDER_COLUMNS = [
   { label: '产品 / 材料', width: 230, required: true },
   { label: '加工项目', width: 160 },
   { label: '工序', width: 140, required: true },
-  { label: '单位', width: 90, required: true },
+  { label: '单位', width: 100, required: true },
   { label: '单价', width: 110 },
   { label: '加工数量', width: 160, required: true },
   {

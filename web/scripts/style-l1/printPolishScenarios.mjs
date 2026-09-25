@@ -120,7 +120,7 @@ export function createPrintPolishScenarios({
         const expected = [
           ['材料', '类别'],
           ['物料名称'],
-          ['厂商', '料号'],
+          ['款号'],
           ['规格'],
           ['颜色'],
           ['单位'],

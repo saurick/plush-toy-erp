@@ -128,11 +128,11 @@ test('workflow list failure assertion follows the current module title', () => {
 test('production exception workflow scenario follows the current approval empty state', () => {
   assert.match(source, /expectText\(page, '暂无待审批的生产异常处置申请。'\)/u)
   assert.doesNotMatch(source, /expectText\(page, '暂无生产异常任务。'\)/u)
-  assert.match(source, /getByRole\('tab', \{\s*name: '处置申请'/u)
+  assert.match(source, /getByRole\('tab', \{\s*name: '异常处理'/u)
   assert.match(source, /getByRole\('tab', \{\s*name: '待审批'/u)
   assert.match(source, /暂无生产异常处置申请/u)
-  assert.match(source, /生产异常处置申请已刷新/u)
-  assert.match(source, /生产异常处置任务已刷新/u)
+  assert.match(source, /异常处理申请已刷新/u)
+  assert.match(source, /异常处理任务已刷新/u)
   assert.match(source, /business-production-exceptions-decisions-tab\.png/u)
   assert.match(source, /business-production-exceptions-tasks-tab\.png/u)
   assert.match(source, /business-production-exception-tabs-desktop/u)
@@ -325,7 +325,7 @@ test('production material issue scenario follows release and reference paging co
       "name: 'business-formal-shipping-release-readonly-actions-desktop'"
     )
   )
-  assert.match(scenario, /生产订单已发布，排程任务已进入 PMC 待办/u)
+  assert.match(scenario, /生产订单已发布，排产确认已进入 PMC 待办/u)
   assert.doesNotMatch(scenario, /生产订单发布成功/u)
   assert.match(
     scenario,

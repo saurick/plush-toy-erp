@@ -42,7 +42,7 @@ const fixture = {
 async function installPreviewImage(page) {
   await page.route('**/rpc/workflow', async (route) => {
     const body = route.request().postDataJSON()
-    if (body.method !== 'get_task_board' || body.params.limit !== 1) {
+    if (body.method !== 'get_task_board') {
       return route.fallback()
     }
     await route.fulfill({
@@ -418,7 +418,6 @@ export function createTaskImagePreviewScenarios({
             'task-image-preview-table',
           ],
           ['/erp/dashboard', 'task-image-preview-workbench'],
-          ['/erp/business-dashboard', 'task-image-preview-business'],
         ]) {
           await page.goto(new URL(url, page.url()).href)
           if (url === '/erp/dashboard') {

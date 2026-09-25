@@ -249,9 +249,14 @@ export function createOrderEngineeringScenarios(deps) {
           engineeringSave.params.items[0].engineering_status,
           'PREPARING'
         )
-        await page
-          .getByRole('button', { name: '材料汇总与审批', exact: true })
-          .click()
+        const materialRequestAction = page.locator(
+          'button[data-business-action-key="engineering-material"]'
+        )
+        deps.assert.equal(
+          (await materialRequestAction.innerText()).trim(),
+          '提交用料汇总'
+        )
+        await materialRequestAction.click()
         const modal = page
           .getByRole('dialog')
           .filter({ hasText: '审核工程用料' })
@@ -292,7 +297,7 @@ export function createOrderEngineeringScenarios(deps) {
           .getByRole('button', { name: '批准并生成采购订单', exact: true })
           .click()
         await modal
-          .getByRole('button', { name: 'PO-MR-5-1', exact: true })
+          .getByRole('link', { name: 'PO-MR-5-1', exact: true })
           .waitFor({ state: 'visible' })
         const approvals = calls.filter(
           (call) =>

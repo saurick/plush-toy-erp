@@ -217,7 +217,7 @@ export function createBusinessColumnPriorityScenarios({
             '/erp/production/exceptions',
             ['异常单号', '异常类型', '审批状态', '业务状态'],
             [],
-            '处置申请',
+            '异常处理',
           ],
         ]
         for (const [url, leading, extra = [], tab] of cases) {

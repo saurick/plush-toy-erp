@@ -49,10 +49,10 @@ const PURCHASE_ORDER_COLUMNS = [
   { label: '产品订单编号', width: 144 },
   { label: '产品编号', width: 136 },
   { label: '产品名称', width: 176 },
-  { label: '材料名称', width: 200, required: true },
-  { label: '单位', width: 100, required: true },
+  { label: '材料名称', width: 240, required: true },
+  { label: '单位', width: 130, required: true },
   { label: '单价', width: 112 },
-  { label: '采购数量', width: 160, required: true },
+  { label: '采购数量', width: 220, required: true },
   {
     label: (
       <BusinessHelpLabel

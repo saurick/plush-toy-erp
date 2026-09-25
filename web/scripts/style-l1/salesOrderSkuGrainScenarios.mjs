@@ -14,6 +14,24 @@ async function fulfillRpc(route, id, data) {
   })
 }
 
+async function clickSelectionAction(page, actionKey) {
+  const scope =
+    '.erp-business-module-current-action, .erp-business-selection-action-menu:visible'
+  let action = page
+    .locator(scope)
+    .locator(`[data-business-action-key="${actionKey}"]:visible`)
+    .first()
+  if ((await action.count()) === 0) {
+    await page.getByRole('button', { name: /^更多操作，共/u }).click()
+    action = page
+      .locator('.erp-business-selection-action-menu:visible')
+      .locator(`[data-business-action-key="${actionKey}"]`)
+      .first()
+    await action.waitFor({ state: 'visible' })
+  }
+  await action.click()
+}
+
 function historicalUnallocatedLine(
   id,
   lineNo,
@@ -132,7 +150,7 @@ export function createSalesOrderSkuGrainScenarios(deps) {
         await expectHeading(page, '销售订单')
         await expectText(page, 'SO-STYLE-L1')
         await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
-        await page.getByRole('button', { name: '编辑订单' }).click()
+        await clickSelectionAction(page, 'edit')
         const modal = page
           .locator('.erp-business-form-page:not([hidden])')
           .filter({ hasText: '编辑销售订单' })

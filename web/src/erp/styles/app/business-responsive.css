@@ -64,9 +64,12 @@
   border-radius: 8px;
 }
 
-.erp-business-selection-action-menu__item .ant-btn {
+.erp-business-selection-action-menu
+  .erp-business-selection-action-menu__item
+  .ant-btn {
   width: 100%;
   justify-content: flex-start;
+  padding-inline: 12px;
   text-align: left;
 }
 

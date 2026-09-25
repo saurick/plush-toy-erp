@@ -1,3 +1,5 @@
+import { createMobileProgressScenarios } from './mobileProgressScenarios.mjs'
+import { createMobileNavigationBadgeScenarios } from './mobileNavigationBadgeScenarios.mjs'
 import { createBusinessFormInteractionScenarios } from './businessFormInteractionScenarios.mjs'
 import { createBusinessPageContractScenarios } from './businessPageContractScenarios.mjs'
 import { createAuditLogScenarios } from './auditLogScenarios.mjs'
@@ -469,6 +471,11 @@ export function createStyleL1Scenarios(deps) {
       assertThemeReadable,
       assertDarkThemeContrast,
       assertDarkThemeNeutralInteractions,
+    }),
+    ...createMobileProgressScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createMobileNavigationBadgeScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
     }),
     ...createMobileTaskScenarios({
       expectText,

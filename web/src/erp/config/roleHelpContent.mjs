@@ -25,10 +25,10 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         actionLabel: '打开工作台',
       },
       {
-        title: '核对业务变化',
-        description: '查看订单、库存、出货和财务数量变化。',
+        title: '跟踪交付进度',
+        description: '查订单和生产进度，定位交期、阻塞与当前处理人。',
         path: '/erp/business-dashboard',
-        actionLabel: '打开业务看板',
+        actionLabel: '打开进度看板',
       },
     ],
     workflow: [

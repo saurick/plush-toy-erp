@@ -14,6 +14,49 @@ export function createSalesOrderImportScenarios(deps) {
     outputDir,
   } = deps
   const importPath = '/erp/sales/project-orders/sales-orders'
+  const clickSelectionAction = async (page, name, actionKey) => {
+    const button = page
+      .locator('.erp-business-module-current-action')
+      .locator(`button[data-business-action-key="${actionKey}"]:visible`)
+      .first()
+    if ((await button.count()) > 0) {
+      await button.click()
+      return
+    }
+    await page.getByRole('button', { name: /^更多操作，共/u }).click()
+    const menu = page.locator('.erp-business-selection-action-menu:visible')
+    await menu.waitFor({ state: 'visible' })
+    const menuButton = menu
+      .locator(`button[data-business-action-key="${actionKey}"]`)
+      .first()
+    if ((await menuButton.count()) > 0 && (await menuButton.isVisible())) {
+      await menuButton.click()
+      return
+    }
+    const metrics = await page.evaluate(() => ({
+      selectedRows: Array.from(
+        document.querySelectorAll('.ant-table-row-selected')
+      ).map((row) =>
+        String(row.textContent || '')
+          .replace(/\s+/gu, ' ')
+          .trim()
+      ),
+      actionBar: String(
+        document.querySelector('.erp-business-module-current-action')
+          ?.textContent || ''
+      )
+        .replace(/\s+/gu, ' ')
+        .trim(),
+      menuButtons: Array.from(
+        document.querySelectorAll('.erp-business-selection-action-menu button')
+      )
+        .filter((node) => node.offsetWidth || node.offsetHeight)
+        .map((node) =>
+          String(node.textContent || '').replace(/\s+/gu, ' ').trim()
+        ),
+    }))
+    throw new Error(`更多操作中缺少“${name}”: ${JSON.stringify(metrics)}`)
+  }
   function scenario(name, failSecond = false) {
     let parsed
       let file
@@ -437,7 +480,7 @@ export function createSalesOrderImportScenarios(deps) {
           .click()
         await editor.waitFor({ state: 'hidden' })
         await page.locator('.ant-table-tbody > tr[data-row-key]').filter({ hasText: parsed.orders[0].order_no }).first().click()
-        await page.getByRole('button', { name: /编辑订单$/u }).click()
+        await clickSelectionAction(page, '编辑订单', 'edit')
         await editor.getByRole('heading', { name: '编辑销售订单', exact: true }).waitFor()
         await checkPaymentRecords(parsed.orders[0])
         assert.equal(await editor.locator('.erp-sales-order-lines-form__row').count(), parsed.orders[0].lines.length)

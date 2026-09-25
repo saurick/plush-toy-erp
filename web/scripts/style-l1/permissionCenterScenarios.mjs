@@ -144,16 +144,16 @@ export function createPermissionCenterScenarios({
         await primaryTier.locator('.ant-select').nth(2).click()
         const employeeOptions = page.locator('.ant-select-dropdown:visible')
         await employeeOptions
-          .getByText('multi-role-employee', { exact: true })
+          .getByText('综合跟单（multi-role-employee）', { exact: true })
           .waitFor({ state: 'visible' })
         await employeeOptions
-          .getByText('assistant-admin', { exact: true })
+          .getByText('业务助理（assistant-admin）', { exact: true })
           .waitFor({ state: 'visible' })
         await employeeOptions
           .getByText('suspended-finance', { exact: true })
           .waitFor({ state: 'detached' })
         await employeeOptions
-          .getByText('multi-role-employee', { exact: true })
+          .getByText('综合跟单（multi-role-employee）', { exact: true })
           .click()
         const backupTier = dialog
           .locator('.erp-approval-responsibility-form__tier')
@@ -900,16 +900,16 @@ export function createPermissionCenterScenarios({
           const activeTab = document.querySelector(
             '.erp-permission-tabs .ant-tabs-tab-active'
           )
-          const tabInkBar = document.querySelector(
-            '.erp-permission-tabs .ant-tabs-ink-bar'
+          const tabIndicator = document.querySelector(
+            '.erp-permission-tabs .ant-tabs-nav-list'
           )
           const activeTabStyle =
             activeTab instanceof HTMLElement
               ? window.getComputedStyle(activeTab)
               : null
-          const tabInkBarStyle =
-            tabInkBar instanceof HTMLElement
-              ? window.getComputedStyle(tabInkBar)
+          const tabIndicatorStyle =
+            tabIndicator instanceof HTMLElement
+              ? window.getComputedStyle(tabIndicator, '::before')
               : null
           const adminSection = document.querySelector(
             '.erp-permission-section--admins'
@@ -935,8 +935,10 @@ export function createPermissionCenterScenarios({
             activeTabText: String(activeTab?.textContent || '').trim(),
             activeTabTransitionDuration:
               activeTabStyle?.transitionDuration || '',
-            tabInkBarTransitionDuration:
-              tabInkBarStyle?.transitionDuration || '',
+            tabIndicatorReady:
+              tabIndicator?.getAttribute('data-sliding-ready') === 'true',
+            tabIndicatorTransitionDuration:
+              tabIndicatorStyle?.transitionDuration || '',
             adminTop: adminRect?.top || 0,
             adminHeight: adminRect?.height || 0,
             roleTop: roleRect?.top || 0,
@@ -966,7 +968,8 @@ export function createPermissionCenterScenarios({
           String(roleCenterMetrics.activeTabTransitionDuration)
             .split(',')
             .some((part) => Number.parseFloat(part) > 0) &&
-            String(roleCenterMetrics.tabInkBarTransitionDuration)
+            roleCenterMetrics.tabIndicatorReady &&
+            String(roleCenterMetrics.tabIndicatorTransitionDuration)
               .split(',')
               .some((part) => Number.parseFloat(part) > 0),
           `权限管理 tab 缺少全局平滑过渡: ${JSON.stringify(roleCenterMetrics)}`
@@ -1564,11 +1567,16 @@ export function createPermissionCenterScenarios({
           '跳到功能分类',
           '移动端功能分类下拉应保留可访问名称'
         )
-        await mobileCategoryNav.locator('.ant-select-selector').click()
-        await page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: /^生产执行/u })
-          .dispatchEvent('click')
+        const productionCategoryDropdown =
+          await openControlledAntSelectDropdown(
+            page,
+            mobileCategoryNav,
+            '移动端功能分类导航'
+          )
+        await selectVirtualizedAntOption(page, productionCategoryDropdown, {
+          label: '移动端功能分类导航',
+          optionLabel: '生产执行 0/1',
+        })
         await page.waitForTimeout(1800)
         const mobileSelectedCategory = String(
           await mobileCategoryNav
@@ -1633,11 +1641,15 @@ export function createPermissionCenterScenarios({
           path: 'output/playwright/style-l1/permission-center-category-navigation-mobile-dark.png',
           fullPage: false,
         })
-        await mobileCategoryNav.locator('.ant-select-selector').click()
-        await page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: /^财务/u })
-          .dispatchEvent('click')
+        const financeCategoryDropdown = await openControlledAntSelectDropdown(
+          page,
+          mobileCategoryNav,
+          '移动端功能分类导航'
+        )
+        await selectVirtualizedAntOption(page, financeCategoryDropdown, {
+          label: '移动端功能分类导航',
+          optionLabel: '财务 3/15',
+        })
         await page.waitForTimeout(800)
         const financePermissionSection = page.locator(
           '.erp-permission-checklist__section[data-permission-module="finance"]'

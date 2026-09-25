@@ -232,7 +232,7 @@ export function createProductIdentityScenarios({
         await closeImage(page)
         await page.getByRole('button', { name: '新建草稿' }).click()
         const modal = page
-          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .locator('.erp-business-form-page:not([hidden])')
           .last()
         await modal.waitFor()
         await modal.getByRole('combobox', { name: /产品$/ }).click()
@@ -268,7 +268,9 @@ export function createProductIdentityScenarios({
           0,
           'clearing association removes the old image'
         )
-        await modal.getByRole('button', { name: /取\s*消/ }).click()
+        await modal
+          .getByRole('button', { name: '返回列表', exact: true })
+          .click()
       },
     },
     {
@@ -346,20 +348,23 @@ export function createProductIdentityScenarios({
       viewport: { width: 1440, height: 1000 },
       beforeNavigate: installImages,
       verify: async (page) => {
-        await page
+        const shipmentRow = page
           .locator('.ant-table-tbody tr')
           .filter({ hasText: 'SHIP-STYLE-L1' })
           .first()
-          .click()
+        await shipmentRow.getByRole('radio').check()
         await page.getByRole('button', { name: '查看明细' }).click()
-        const modal = page.locator('.ant-modal:visible').last()
+        const modal = page
+          .locator('.erp-business-form-page:not([hidden])')
+          .last()
         await modal
           .locator('.erp-product-identity')
           .first()
           .scrollIntoViewIfNeeded()
         await modal.locator('.erp-product-identity button').first().click()
         await closeImage(page)
-        assert.equal(await page.locator('.ant-modal:visible').count(), 1)
+        assert.equal(await page.locator('.ant-modal:visible').count(), 0)
+        assert.equal(await modal.isVisible(), true)
         await modal.screenshot({
           path: path.join(
             outputDir,

@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useId, useRef, useState } from 'react'
 import {
   ArrowUpOutlined,
-  CloseOutlined,
+  BarChartOutlined,
   BellOutlined,
-  CheckSquareOutlined,
   FileTextOutlined,
   InfoCircleOutlined,
   KeyOutlined,
@@ -17,7 +16,11 @@ import {
 } from '@ant-design/icons'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
-import SearchInput from '@/common/components/SearchInput'
+import FilterChip from '@/common/components/navigation/FilterChip'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
+import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
+import MobileProgressPanel from './MobileProgressPanel'
+import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
 import AccountPasswordModal from '../../components/AccountPasswordModal.jsx'
 import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
@@ -25,8 +28,11 @@ import { WorkflowTaskSource } from '../../components/workflow/WorkflowTaskCopy.j
 import WorkflowTaskTiming from '../../components/workflow/WorkflowTaskTiming.jsx'
 import { getWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
 import MobileTaskListSkeleton from './MobileTaskListSkeleton.jsx'
+import MobileTaskListOptions from './MobileTaskListOptions.jsx'
 import MobileTaskListToolbar from './MobileTaskListToolbar.jsx'
 import MobileTaskPullRefresh from './MobileTaskPullRefresh.jsx'
+import MobileNavigationIcon from './MobileNavigationIcon.jsx'
+import useMobileNavigationCounts from '../hooks/useMobileNavigationCounts'
 import {
   MOBILE_LIST_COLLAPSED_LIMITS,
   MOBILE_LIST_KEYS,
@@ -44,15 +50,18 @@ import {
 } from '../utils/mobileRoleTaskModel.mjs'
 import { mobileTheme } from '../theme'
 
-const MOBILE_MAIN_TAB_ITEMS = Object.freeze([
-  { key: MOBILE_MAIN_TAB_KEYS.TODO, label: '待办', Icon: InboxOutlined },
-  { key: MOBILE_MAIN_TAB_KEYS.DONE, label: '已办', Icon: CheckSquareOutlined },
+const MOBILE_MAIN_TAB_ITEMS = [
+  { key: 'tasks', label: '任务', Icon: InboxOutlined },
   { key: MOBILE_MAIN_TAB_KEYS.MESSAGES, label: '风险', Icon: BellOutlined },
   { key: MOBILE_MAIN_TAB_KEYS.MINE, label: '我的', Icon: UserOutlined },
-])
+]
 
 export default function MobileTaskListScreen({
   activeFilterKey,
+  progressAccess,
+  accessScopeKey,
+  activeRoleKey,
+  onOpenProgressTask,
   activeMainTabKey,
   activeMessageTabKey,
   activeViewHasData,
@@ -99,9 +108,36 @@ export default function MobileTaskListScreen({
   visibleListLimitsByKey,
   setVisibleListLimitsByKey,
 }) {
+  const navigationId = useId()
+  const navigationCounts = useMobileNavigationCounts({
+    adminProfile,
+    roleKey: activeRoleKey,
+    refreshRevision: authoritativeTaskCounts,
+  })
+  const isProgress = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
+  const isTasks = [
+    MOBILE_MAIN_TAB_KEYS.TODO,
+    MOBILE_MAIN_TAB_KEYS.DONE,
+  ].includes(activeMainTabKey)
+  const canFilterTaskList = [
+    MOBILE_MAIN_TAB_KEYS.TODO,
+    MOBILE_MAIN_TAB_KEYS.MESSAGES,
+  ].includes(activeMainTabKey)
+  const lastTaskTab = useRef(MOBILE_MAIN_TAB_KEYS.TODO)
+  if (isTasks) lastTaskTab.current = activeMainTabKey
+  const navigationItems = progressAccess?.enabled
+    ? [
+        {
+          key: MOBILE_MAIN_TAB_KEYS.PROGRESS,
+          label: '进度',
+          Icon: BarChartOutlined,
+        },
+        ...MOBILE_MAIN_TAB_ITEMS,
+      ]
+    : MOBILE_MAIN_TAB_ITEMS
+  const activeNavigationKey = isTasks ? 'tasks' : activeMainTabKey
   const [keywordDraft, setKeywordDraft] = useState(taskKeyword || '')
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
-  const searchFormRef = useRef(null)
   const searchTimerRef = useRef(null)
   const composingSearchRef = useRef(false)
   const submittedKeywordRef = useRef(taskKeyword || '')
@@ -316,38 +352,26 @@ export default function MobileTaskListScreen({
   }
 
   const renderTaskFilters = () => {
-    const filterCount = Math.max(1, filterItems.length)
-    const activeFilterIndex = Math.max(
-      0,
-      filterItems.findIndex((item) => item.key === activeFilterKey)
-    )
-
     return (
       <div
         data-testid="mobile-role-task-filters"
-        className={`mobile-role-task-filters mobile-role-task-filters--${activeFilterKey} mx-4 mt-4 grid rounded-2xl bg-slate-100 p-1 shadow-inner`}
-        style={{
-          '--mobile-role-task-filter-offset': `${activeFilterIndex * 100}%`,
-          '--mobile-role-task-filter-width': `calc((100% - 8px) / ${filterCount})`,
-          gridTemplateColumns: `repeat(${filterCount}, minmax(0, 1fr))`,
-        }}
+        className={`mobile-role-task-filters mobile-role-task-filters--${activeFilterKey} mx-4 mt-4`}
+        role="group"
+        aria-label="任务快捷筛选"
       >
         {filterItems.map((item) => {
           const active = item.key === activeFilterKey
           const countAvailable =
             Number.isSafeInteger(item.count) && item.count >= 0
           return (
-            <button
+            <FilterChip
               key={item.key}
-              type="button"
               data-testid={`mobile-role-filter-${item.key}`}
-              aria-pressed={active}
+              selected={active}
               aria-label={`${item.ariaLabel || item.label}，${
                 countAvailable ? `共 ${item.count} 条` : '数量暂不可用'
               }`}
-              className={`mobile-role-task-filter min-w-0 rounded-xl px-1 py-3 text-base font-semibold transition ${
-                active ? 'mobile-role-task-filter--active' : 'text-slate-500'
-              }`}
+              className="mobile-role-task-filter"
               onClick={() => {
                 setActiveFilterKey(item.key)
                 setSelectedTaskID(null)
@@ -367,43 +391,14 @@ export default function MobileTaskListScreen({
                   {countAvailable ? item.count : '—'}
                 </span>
               </span>
-            </button>
+            </FilterChip>
           )
         })}
       </div>
     )
   }
 
-  const renderListOptions = (tabs) => (
-    <MobileTaskListToolbar
-      tabs={tabs}
-      scrollContainerRef={scrollContainerRef}
-      resetKey={`${activeMainTabKey}|${activeFilterKey}|${activeMessageTabKey}|${taskKeyword}|${taskSortKey}|${taskStatusKey}`}
-      sortKey={taskSortKey}
-      statusKey={taskStatusKey}
-      onChange={onTaskListOptionsChange}
-      resetDisabled={
-        taskSortKey === 'newest' &&
-        !taskStatusKey &&
-        !keywordDraft &&
-        activeFilterKey === MOBILE_TASK_FILTER_KEYS.ALL
-      }
-      onReset={() => {
-        clearTimeout(searchTimerRef.current)
-        composingSearchRef.current = false
-        submittedKeywordRef.current = ''
-        setKeywordDraft('')
-        setActiveFilterKey(MOBILE_TASK_FILTER_KEYS.ALL)
-        setVisibleListLimitsByKey({})
-        scrollMainToTop()
-        onTaskListOptionsChange({
-          keyword: '',
-          sortKey: 'newest',
-          statusKey: '',
-        })
-      }}
-    />
-  )
+  const renderListToolbar = (tabs) => <MobileTaskListToolbar tabs={tabs} />
 
   const renderListFeedback = () => (
     <>
@@ -445,7 +440,7 @@ export default function MobileTaskListScreen({
       <MobileTaskListSkeleton filterCount={canViewApprovalInbox ? 4 : 3} />
     ) : (
       <>
-        {renderListOptions(renderTaskFilters())}
+        {renderListToolbar(renderTaskFilters())}
         {renderListFeedback()}
         <section className="mx-4 mt-4 pb-4">
           <div
@@ -611,9 +606,9 @@ export default function MobileTaskListScreen({
     ]
 
     return (
-      <div
+      <SlidingTabList
         className={`mobile-role-message-tabs mobile-role-message-tabs--${activeMessageTabKey}`}
-        role="tablist"
+        aria-label="风险类别"
       >
         {items.map((item) => {
           const active = item.key === activeMessageTabKey
@@ -636,7 +631,7 @@ export default function MobileTaskListScreen({
             </button>
           )
         })}
-      </div>
+      </SlidingTabList>
     )
   }
 
@@ -754,7 +749,7 @@ export default function MobileTaskListScreen({
 
   const renderMessagesPanel = () => (
     <>
-      {renderListOptions(renderMessageTabs())}
+      {renderListToolbar(renderMessageTabs())}
       {renderListFeedback()}
       <section className="mobile-role-messages mx-4 mt-5 space-y-4 pb-5">
         {activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.WARNING
@@ -923,48 +918,71 @@ export default function MobileTaskListScreen({
   }
 
   const renderBottomNavigation = () => (
-    <nav
-      className={`mobile-role-bottom-nav mobile-role-bottom-nav--${activeMainTabKey}`}
+    <SlidingTabList
+      className="mobile-role-bottom-nav"
+      style={{
+        gridTemplateColumns: `repeat(${navigationItems.length}, minmax(0, 1fr))`,
+      }}
       aria-label="移动端主导航"
       data-testid="mobile-role-bottom-nav"
     >
-      {MOBILE_MAIN_TAB_ITEMS.map(({ key, label, Icon }) => {
-        const active = key === activeMainTabKey
+      {navigationItems.map(({ key, label, Icon }) => {
+        const active = key === activeNavigationKey
+        const badgeCount =
+          key === 'tasks'
+            ? navigationCounts.counts?.todo
+            : key === MOBILE_MAIN_TAB_KEYS.MESSAGES
+              ? navigationCounts.counts?.risk
+              : undefined
+        const countDescription = Number.isSafeInteger(badgeCount)
+          ? `${badgeCount} 项${key === 'tasks' ? '待办' : '风险任务'}${navigationCounts.error ? '，数量待更新' : ''}`
+          : undefined
         return (
           <button
             key={key}
             type="button"
+            role="tab"
+            aria-selected={active}
+            aria-label={label}
+            aria-describedby={
+              countDescription ? `${navigationId}-${key}-count` : undefined
+            }
             data-testid={`mobile-role-nav-${key}`}
             aria-current={active ? 'page' : undefined}
-            className={`mobile-role-bottom-nav__item ${
-              active ? 'mobile-role-bottom-nav__item--active' : ''
-            }`}
-            onClick={() =>
+            className={`mobile-role-bottom-nav__item ${active ? 'mobile-role-bottom-nav__item--active' : ''}`}
+            onClick={() => {
+              if (active) return
               openTaskBucket({
-                mainTabKey: key,
-                filterKey:
-                  activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MINE
-                    ? activeFilterKey
-                    : MOBILE_TASK_FILTER_KEYS.ALL,
+                mainTabKey: key === 'tasks' ? lastTaskTab.current : key,
+                filterKey: activeFilterKey,
               })
-            }
+            }}
           >
-            <Icon aria-hidden="true" />
-            <span>{label}</span>
+            <MobileNavigationIcon
+              Icon={Icon}
+              count={badgeCount}
+              risk={key === MOBILE_MAIN_TAB_KEYS.MESSAGES}
+            />
+            <span className="mobile-role-bottom-nav__label">{label}</span>
+            {countDescription && (
+              <span id={`${navigationId}-${key}-count`} className="sr-only">
+                {countDescription}
+              </span>
+            )}
           </button>
         )
       })}
-    </nav>
+    </SlidingTabList>
   )
-
   const activeTabLabel =
-    MOBILE_MAIN_TAB_ITEMS.find((item) => item.key === activeMainTabKey)
-      ?.label || '待办'
+    navigationItems.find((item) => item.key === activeNavigationKey)?.label ||
+    '任务'
 
   return (
-    <div className="mobile-role-tasks-page mobile-role-tasks-page--tabs surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
+    <div className="mobile-role-tasks-page mobile-role-tasks-page--tabs erp-mobile-controls surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
       <div
         ref={scrollContainerRef}
+        style={{ display: isProgress ? 'none' : undefined }}
         className={`mobile-role-tasks-page__scroll${
           activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE
             ? ' mobile-role-tasks-page__scroll--pull-refresh'
@@ -996,7 +1014,7 @@ export default function MobileTaskListScreen({
           {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE ? (
             <button
               type="button"
-              className="mobile-task-list-header__refresh"
+              className="mobile-task-list-header__refresh erp-control-button"
               onClick={() => loadTasks({ showRefreshFeedback: true })}
               disabled={loading || loadingMore}
             >
@@ -1010,76 +1028,106 @@ export default function MobileTaskListScreen({
         </header>
 
         {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE ? (
-          <form
-            ref={searchFormRef}
-            className="mobile-role-task-search mx-4 mt-1"
-            role="search"
-            onSubmit={(event) => event.preventDefault()}
-          >
-            <SearchInput
-              type="search"
-              size="large"
-              enterKeyHint="search"
-              autoComplete="off"
-              aria-label="搜索订单、产品、物料或款号"
-              placeholder="订单 / 产品 / 物料 / 款号"
-              maxLength={100}
-              value={keywordDraft}
-              onCompositionStart={() => {
-                composingSearchRef.current = true
-                clearTimeout(searchTimerRef.current)
-              }}
-              onCompositionEnd={(event) => {
-                composingSearchRef.current = false
-                setKeywordDraft(event.currentTarget.value)
-                searchTasks(event.currentTarget.value)
-              }}
-              onChange={(event) => {
-                const { value } = event.target
-                setKeywordDraft(value)
-                if (
-                  !composingSearchRef.current &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  searchTasks(value)
+          <div className="mobile-role-task-query">
+            <form
+              className="mobile-role-task-search"
+              role="search"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <MobileSearchInput
+                type="search"
+                size="large"
+                enterKeyHint="search"
+                autoComplete="off"
+                aria-label="搜索订单、产品、物料或款号"
+                placeholder="订单/产品/物料/款号"
+                maxLength={100}
+                value={keywordDraft}
+                onCompositionStart={() => {
+                  composingSearchRef.current = true
+                  clearTimeout(searchTimerRef.current)
+                }}
+                onCompositionEnd={(event) => {
+                  composingSearchRef.current = false
+                  setKeywordDraft(event.currentTarget.value)
+                  searchTasks(event.currentTarget.value)
+                }}
+                onChange={(event) => {
+                  const { value } = event.target
+                  setKeywordDraft(value)
+                  if (
+                    !composingSearchRef.current &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    searchTasks(value)
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    event.key !== 'Enter' ||
+                    composingSearchRef.current ||
+                    event.nativeEvent.isComposing ||
+                    event.nativeEvent.keyCode === 229
+                  ) {
+                    return
+                  }
+                  event.preventDefault()
+                  searchTasks(event.currentTarget.value, true)
+                }}
+                clearVisible={Boolean(keywordDraft || taskKeyword)}
+                onClear={() => {
+                  composingSearchRef.current = false
+                  setKeywordDraft('')
+                  searchTasks('', true)
+                }}
+              />
+            </form>
+            {canFilterTaskList ? (
+              <MobileTaskListOptions
+                contextLabel={
+                  activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MESSAGES
+                    ? '风险'
+                    : '任务'
                 }
-              }}
-              onKeyDown={(event) => {
-                if (
-                  event.key !== 'Enter' ||
-                  composingSearchRef.current ||
-                  event.nativeEvent.isComposing ||
-                  event.nativeEvent.keyCode === 229
-                ) {
-                  return
-                }
-                event.preventDefault()
-                searchTasks(event.currentTarget.value, true)
-              }}
-              suffix={
-                keywordDraft || taskKeyword ? (
-                  <button
-                    type="button"
-                    aria-label="清除搜索"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      composingSearchRef.current = false
-                      setKeywordDraft('')
-                      searchTasks('', true)
-                      searchFormRef.current?.querySelector('input')?.focus()
-                    }}
-                  >
-                    <CloseOutlined aria-hidden="true" />
-                  </button>
-                ) : null
-              }
-            />
-          </form>
+                sortKey={taskSortKey}
+                statusKey={taskStatusKey}
+                onChange={onTaskListOptionsChange}
+              />
+            ) : null}
+          </div>
         ) : null}
+        <div hidden={!isTasks} className="mobile-workspace-task-views">
+          <SlidingSegmented
+            block
+            aria-label="任务状态"
+            value={isTasks ? activeMainTabKey : lastTaskTab.current}
+            options={[
+              { value: MOBILE_MAIN_TAB_KEYS.TODO, label: '待办' },
+              { value: MOBILE_MAIN_TAB_KEYS.DONE, label: '已办' },
+            ]}
+            onChange={(key) =>
+              openTaskBucket({
+                mainTabKey: key,
+                filterKey: activeFilterKey,
+              })
+            }
+          />
+        </div>
         {renderActiveTabPanel()}
       </div>
 
-      {showScrollTopButton ? (
+      {progressAccess?.enabled && (
+        <MobileProgressPanel
+          active={isProgress}
+          access={progressAccess}
+          scopeKey={accessScopeKey}
+          roleKey={activeRoleKey}
+          adminProfile={adminProfile}
+          onOpenTask={onOpenProgressTask}
+          canEnterDesktop={canEnterDesktop}
+        />
+      )}
+      {!isProgress && showScrollTopButton ? (
         <button
           type="button"
           className="mobile-role-scroll-top"
@@ -1091,6 +1139,19 @@ export default function MobileTaskListScreen({
         </button>
       ) : null}
 
+      {navigationCounts.error && (
+        <button
+          type="button"
+          className="mobile-navigation-count-error"
+          onClick={navigationCounts.refresh}
+          disabled={navigationCounts.loading}
+          aria-live="polite"
+        >
+          {navigationCounts.loading
+            ? '正在更新角标…'
+            : '角标更新失败 · 点此重试'}
+        </button>
+      )}
       {renderBottomNavigation()}
     </div>
   )

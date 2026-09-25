@@ -638,7 +638,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前不生成库存流水和库存余额，只生成采购、IQC 与入库调试记录。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "业务看板", Path: "/erp/business-dashboard", Reason: "核对采购到货调试状态投影"},
+			{Label: "采购订单", Path: "/erp/purchase/accessories", Reason: "核对采购到货进度"},
 			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对 IQC 与仓库入库任务"},
 		},
 		records: []debugRecordTemplate{
@@ -664,7 +664,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前不生成委外专表和委外成本结算，只生成加工合同、回货检验和入库调试记录。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "业务看板", Path: "/erp/business-dashboard", Reason: "核对委外回货状态投影"},
+			{Label: "进度看板", Path: "/erp/business-dashboard?view=production", Reason: "核对关联生产单与委外工序进度"},
 			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对委外回货检验和入库任务"},
 		},
 		records: []debugRecordTemplate{
@@ -690,7 +690,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前不生成 production_order、shipment_order 或 inventory_txn 专表数据。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "业务看板", Path: "/erp/business-dashboard", Reason: "核对生产到出货状态投影"},
+			{Label: "进度看板", Path: "/erp/business-dashboard", Reason: "核对生产与实际交付进度"},
 			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对成品抽检和出货放行任务"},
 		},
 		records: []debugRecordTemplate{
@@ -719,7 +719,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前不生成 ar_receivable、ar_invoice、总账或凭证专表。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "业务看板", Path: "/erp/business-dashboard", Reason: "核对出货到财务状态投影"},
+			{Label: "进度看板", Path: "/erp/business-dashboard", Reason: "核对实际出货数量与交期"},
 			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对应收和开票协同任务"},
 		},
 		records: []debugRecordTemplate{
@@ -747,7 +747,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前不生成 ap_payable、ap_reconciliation 或付款流水专表。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "业务看板", Path: "/erp/business-dashboard", Reason: "核对应付和对账状态投影"},
+			{Label: "应付账款", Path: "/erp/finance/payables", Reason: "核对应付记录"},
 			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对应付登记和对账协同任务"},
 		},
 		records: []debugRecordTemplate{

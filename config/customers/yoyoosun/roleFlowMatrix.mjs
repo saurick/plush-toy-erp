@@ -130,6 +130,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "pmc.plan.read",
         "pmc.risk.read",
         "production.fact.read",
+        "production.wip.read",
         "production.exception.approve",
         "warehouse.adjustment.approve",
         "shipment.read",

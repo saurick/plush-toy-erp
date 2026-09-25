@@ -75,6 +75,8 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
       '.ant-tooltip',
       '.ant-popover',
       '.ant-table-filter-dropdown',
+      '.ant-pagination-size-changer',
+      '.erp-business-details-page-size',
       '.erp-print-shell',
       '.erp-print-paper',
       '.erp-material-contract-paper',
@@ -679,8 +681,11 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
 
   const focusIssues = metrics.filter((item) => {
     const boxShadow = String(item.boxShadow || '').toLowerCase()
+    const outlineStyle = String(item.outlineStyle || '').toLowerCase()
     const outlineWidth = Number.parseFloat(item.outlineWidth || '0')
-    return !boxShadow.includes('inset') && !(outlineWidth > 0)
+    const hasVisibleOutline =
+      outlineStyle !== '' && outlineStyle !== 'none' && outlineWidth > 0
+    return !boxShadow.includes('inset') && !hasVisibleOutline
   })
 
   if (metrics.length === 0) return
@@ -853,10 +858,19 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
             )
           : []
         const directInput = owner.matches('input.ant-input') ? owner : null
+        const selectedItem = owner.matches('.ant-select-selector')
+          ? owner.querySelector('.ant-select-selection-item')
+          : null
+        const hasClosedSelection = Boolean(
+          selectedItem?.textContent?.trim() &&
+            !owner.closest('.ant-select')?.classList.contains('ant-select-open')
+        )
         const selectTextNodes = owner.matches('.ant-select-selector')
           ? Array.from(
               owner.querySelectorAll(
-                '.ant-select-selection-item, .ant-select-selection-placeholder, .ant-select-selection-search, .ant-select-selection-search-input'
+                hasClosedSelection
+                  ? '.ant-select-selection-item'
+                  : '.ant-select-selection-item, .ant-select-selection-placeholder, .ant-select-selection-search, .ant-select-selection-search-input'
               )
             ).filter((node) => node instanceof HTMLElement && isVisible(node))
           : []
@@ -1004,8 +1018,21 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
       return {
         tagName: node.tagName,
         className: classes.join(' '),
+        ariaLabel:
+          node.getAttribute('aria-label') ||
+          node.querySelector('[aria-label]')?.getAttribute('aria-label') ||
+          '',
         placeholder: node.getAttribute('placeholder') || '',
         type: node.getAttribute('type') || '',
+        parentClassName:
+          typeof node.parentElement?.className === 'string'
+            ? node.parentElement.className
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 5)
+                .join(' ')
+            : '',
         formClassName:
           typeof form.className === 'string'
             ? form.className
@@ -1017,6 +1044,7 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
             : '',
         expectedHeight,
         height: Number(getLayoutHeight(node).toFixed(1)),
+        computedHeight: window.getComputedStyle(node).height,
       }
     }
 
@@ -1045,6 +1073,10 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
         if (
           node.matches('textarea, input[type="checkbox"], input[type="radio"]')
         ) {
+          continue
+        }
+        // 明细表下拉允许长选项换行，文字与内容盒由垂直节奏断言单独覆盖。
+        if (node.matches('.ant-select-single') && node.closest('td')) {
           continue
         }
 

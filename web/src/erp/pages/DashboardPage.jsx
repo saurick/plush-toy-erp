@@ -10,7 +10,6 @@ import React, {
 } from 'react'
 import {
   ArrowRightOutlined,
-  CheckOutlined,
   ClockCircleOutlined,
   CloseOutlined,
   ExclamationCircleOutlined,
@@ -28,6 +27,7 @@ import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import Tabs from '@/common/components/navigation/SlidingTabs'
+import FilterChip from '@/common/components/navigation/FilterChip'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -129,12 +129,10 @@ const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
   {
     label: '全部任务',
     value: 'all',
-    icon: <CheckOutlined aria-hidden="true" />,
   },
   {
     label: '待我审批',
     value: 'approval',
-    icon: <CheckOutlined aria-hidden="true" />,
   },
 ])
 
@@ -144,22 +142,20 @@ const TASK_BOARD_PAGE_SCROLL_GAP = 12
 function TaskBoardProgressRail({ activeLane, counts, ready, onSelectLane }) {
   return (
     <nav className="erp-task-progress-rail" aria-label="任务分类">
-      <button
-        type="button"
+      <FilterChip
         className={`erp-task-progress-rail__item erp-task-progress-rail__item--overview${activeLane === 'all' ? ' is-active' : ''}`}
-        aria-pressed={activeLane === 'all'}
+        selected={activeLane === 'all'}
         aria-label="任务概览"
         onClick={() => onSelectLane('all')}
       >
         <span className="erp-task-progress-rail__label">概览</span>
-      </button>
+      </FilterChip>
       {TASK_BOARD_LANE_DEFINITIONS.map((lane) => (
-        <button
+        <FilterChip
           key={lane.key}
-          type="button"
           data-lane={lane.key}
           className={`erp-task-progress-rail__item${activeLane === lane.key ? ' is-active' : ''}`}
-          aria-pressed={activeLane === lane.key}
+          selected={activeLane === lane.key}
           aria-label={`${lane.title}，${ready ? `${counts[lane.key]} 项` : '数量读取中'}`}
           onClick={() => onSelectLane(lane.key)}
         >
@@ -167,7 +163,7 @@ function TaskBoardProgressRail({ activeLane, counts, ready, onSelectLane }) {
           <strong className="erp-task-progress-rail__value">
             {ready ? counts[lane.key] : '—'}
           </strong>
-        </button>
+        </FilterChip>
       ))}
     </nav>
   )
@@ -206,7 +202,7 @@ const PRODUCT_CORE_METRICS = Object.freeze([
 const PRODUCT_CORE_REVIEW_ENTRIES = Object.freeze([
   {
     key: 'business-dashboard',
-    title: '业务看板',
+    title: '进度看板',
     path: '/erp/business-dashboard',
     description: '查看业务数量、办理情况和需要关注的事项。',
   },
@@ -1670,6 +1666,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       aria-label={activeView === 'task-board' ? '任务看板' : '工作台'}
       className="erp-dashboard-page erp-command-center-page"
     >
+      <Title level={1} className="erp-sr-only">
+        {activeView === 'task-board' ? '任务看板' : '工作台'}
+      </Title>
       <div
         hidden
         aria-hidden="true"

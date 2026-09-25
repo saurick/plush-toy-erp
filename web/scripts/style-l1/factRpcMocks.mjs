@@ -2179,7 +2179,6 @@ export async function installFactRpcMocks(page, context) {
       task,
     }
   }
-  let businessDashboardStatsFailureServed = false
   let businessDashboardWorkflowFailureServed = false
   await page.route('**/rpc/business', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -2187,80 +2186,8 @@ export async function installFactRpcMocks(page, context) {
 
     let data = {}
     switch (method) {
-      case 'dashboard_stats':
-        if (
-          page
-            .url()
-            .includes('__style_l1_business_dashboard_stats_unavailable=1') &&
-          !businessDashboardStatsFailureServed
-        ) {
-          businessDashboardStatsFailureServed = true
-          data = unsupportedRpcMethod(
-            'business',
-            'dashboard_stats temporarily unavailable'
-          )
-          break
-        }
-        data = {
-          modules: [
-            {
-              module_key: 'customers',
-              available: true,
-              total: page
-                .url()
-                .includes('__style_l1_business_dashboard_large=1')
-                ? 1_234_567
-                : 60,
-            },
-            { module_key: 'suppliers', available: true, total: 60 },
-            { module_key: 'products', available: true, total: 24 },
-            { module_key: 'material-bom', available: true, total: 47 },
-            { module_key: 'sales-orders', available: true, total: 45 },
-            {
-              module_key: 'accessories-purchase',
-              available: true,
-              total: 45,
-            },
-            { module_key: 'inbound', available: true, total: 0 },
-            {
-              module_key: 'quality-inspections',
-              available: true,
-              total: 0,
-            },
-            { module_key: 'inventory', available: true, total: 0 },
-            { module_key: 'shipping-release', available: true, total: 0 },
-            { module_key: 'outbound', available: true, total: 0 },
-            {
-              module_key: 'production-orders',
-              available: true,
-              total: 0,
-            },
-            {
-              module_key: 'production-scheduling',
-              available: true,
-              total: 20,
-            },
-            {
-              module_key: 'production-progress',
-              available: true,
-              total: 0,
-            },
-            {
-              module_key: 'production-exceptions',
-              available: true,
-              total: 20,
-            },
-            {
-              module_key: 'processing-contracts',
-              available: true,
-              total: 45,
-            },
-            { module_key: 'reconciliation', available: true, total: 0 },
-            { module_key: 'payables', available: true, total: 0 },
-            { module_key: 'receivables', available: true, total: 0 },
-            { module_key: 'invoices', available: true, total: 0 },
-          ],
-        }
+      case 'list_progress':
+        data = { rows: [], total: 0, counts: { total: 0, overdue: 0, due_soon: 0, blocked: 0, undated: 0 }, snapshot_at: new Date().toISOString(), access: { sales: true, production: true, tasks: true, wip: true } }
         break
       default:
         data = unsupportedRpcMethod('business', method)
@@ -2316,6 +2243,13 @@ export async function installFactRpcMocks(page, context) {
           }
         }
         break
+      case 'get_task': {
+        const task = workflowTasks.find((item) => item.id === params.task_id)
+        if (!workflowMockPermissionAllowed(adminProfile, effectiveSession, 'workflow.task.read') || !task || !workflowMockCanViewTask(adminProfile, effectiveSession, task)) {
+          fail('当前账号不能查看此任务')
+        } else data = { task }
+        break
+      }
       case 'list_tasks': {
         if (
           !workflowMockPermissionAllowed(

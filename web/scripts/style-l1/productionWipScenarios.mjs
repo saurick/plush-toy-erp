@@ -16,8 +16,8 @@ function productionWipPermissions() {
 async function clickVisibleAction(page, text) {
   const pattern = text instanceof RegExp ? text : new RegExp(`^${text}$`, 'u')
   const compact = Number(page.viewportSize()?.width || 0) < 992
-  let action
-  if (compact) {
+  let action = page.locator('button:visible', { hasText: pattern }).first()
+  if (compact && (await action.count()) === 0) {
     const more = page.locator(
       '.erp-business-selection-action-bar__compact-more:visible'
     )
@@ -28,8 +28,6 @@ async function clickVisibleAction(page, text) {
       .last()
     await actionMenu.waitFor({ state: 'visible', timeout: 10_000 })
     action = actionMenu.locator('button:visible', { hasText: pattern }).first()
-  } else {
-    action = page.locator('button:visible', { hasText: pattern }).first()
   }
   await action.waitFor({ state: 'visible', timeout: 10_000 })
   await action.click()
@@ -39,7 +37,7 @@ async function releaseProductionOrder(page, expectText) {
   await page.getByText('MO-STYLE-L1-20260713', { exact: true }).first().click()
   await clickVisibleAction(page, /发\s*布/u)
   await page.getByRole('button', { name: '确认发布' }).click()
-  await expectText(page, '生产订单已发布，排程任务已进入 PMC 待办')
+  await expectText(page, '生产订单已发布，排产确认已进入 PMC 待办')
 }
 
 export function createProductionWipScenarios(deps) {
@@ -112,8 +110,9 @@ export function createProductionWipScenarios(deps) {
           assert.equal(
             await modal
               .getByRole('button', { name: '开始工序', exact: true })
-              .isEnabled(),
-            false
+              .count(),
+            0,
+            '仓库来源查看只展示工序信息，不应暴露生产执行入口'
           )
         } else {
           assert.equal(

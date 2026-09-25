@@ -30,6 +30,20 @@ export function createBusinessPageContractScenarios({
       `后台菜单应展示“${text}”，当前菜单文本：${menuText}`
     )
   }
+  const exposeSelectionActionOverflow = async (page) => {
+    const moreButtons = page.getByRole('button', { name: /^更多操作，共/u })
+    for (let index = 0; index < (await moreButtons.count()); index += 1) {
+      const button = moreButtons.nth(index)
+      if (await button.isVisible()) {
+        await button.click()
+        await page
+          .locator('.erp-business-selection-action-menu:visible')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        return true
+      }
+    }
+    return false
+  }
   const assertClassifiedBusinessFormPage = async (
     page,
     {
@@ -480,10 +494,10 @@ export function createBusinessPageContractScenarios({
       verify: async (page) => {
         await expectButton(page, '新建订单')
         await expectText(page, '当前操作')
-        await expectText(page, '订单明细')
+        await expectText(page, '订单列表')
         await expectText(page, '工作台')
         await expectText(page, '任务看板')
-        await expectText(page, '业务看板')
+        await expectText(page, '进度看板')
         await expectText(page, '基础资料')
         await expectText(page, '客户档案')
         await expectText(page, '供应商与加工厂')
@@ -502,8 +516,8 @@ export function createBusinessPageContractScenarios({
         await expectText(page, '委外管理')
         await expectText(page, '委外订单')
         await expectText(page, '生产管理')
-        await expectText(page, '生产排程')
-        await expectText(page, '生产异常处置')
+        await expectText(page, '生产订单')
+        await expectText(page, '生产记录')
         await expectText(page, '出货管理')
         await expectText(page, '出货放行')
         await expectText(page, '财务管理')
@@ -572,6 +586,7 @@ export function createBusinessPageContractScenarios({
       verify: async (page) => {
         await expectHeading(page, '物料清单（BOM）')
         await expectText(page, '当前操作')
+        const bomOverflowOpen = await exposeSelectionActionOverflow(page)
         for (const label of ['打印物料明细', '打印色卡', '打印作业指导书']) {
           await expectButton(page, label)
         }
@@ -601,20 +616,26 @@ export function createBusinessPageContractScenarios({
             bomActionMetrics
           )}`
         )
+        if (bomOverflowOpen) await page.keyboard.press('Escape')
 
         await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '委外订单')
+        const outsourcingOverflowOpen =
+          await exposeSelectionActionOverflow(page)
         await expectButton(page, '加工合同打印')
         await expectButton(page, '作业指导书打印')
         const outsourcingActionMetrics = await page.evaluate(() => {
           const bar = document.querySelector(
             '.erp-business-selection-action-bar__actions'
           )
+          const actionMenu = Array.from(
+            document.querySelectorAll('.erp-business-selection-action-menu')
+          ).find((node) => node.offsetWidth || node.offsetHeight)
           return {
             found: Boolean(bar),
-            text: String(bar?.textContent || '')
+            text: `${String(bar?.textContent || '')} ${String(actionMenu?.textContent || '')}`
               .replace(/\s+/g, ' ')
               .trim(),
             clientWidth: bar?.clientWidth || 0,
@@ -631,6 +652,7 @@ export function createBusinessPageContractScenarios({
             outsourcingActionMetrics
           )}`
         )
+        if (outsourcingOverflowOpen) await page.keyboard.press('Escape')
         await assertNoHorizontalOverflow(
           page,
           'print-template-business-entry-ownership'

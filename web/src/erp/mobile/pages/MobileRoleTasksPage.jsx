@@ -12,11 +12,16 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import useRuntimeBuildIdentity from '@/common/runtime/useRuntimeBuildIdentity'
 import { useERPWorkspace } from '../../context/ERPWorkspaceProvider'
-import { listWorkflowRoleTasks } from '../../api/workflowApi.mjs'
+import {
+  getWorkflowTask,
+  listWorkflowRoleTasks,
+} from '../../api/workflowApi.mjs'
 import { buildMobileTaskListForRole } from '../../utils/mobileTaskView.mjs'
 import {
   MOBILE_ROLE_TASK_PAGE_LIMIT,
   MOBILE_ROLE_TASK_VIEW_KEYS,
+  MOBILE_TASK_SORT_OPTIONS,
+  MOBILE_TASK_STATUS_OPTIONS,
   buildMobileRoleTaskQuery,
   mobileTaskQueryScope,
   readMobileTaskQueryHistory,
@@ -43,6 +48,8 @@ import {
   ENGINEERING_MATERIAL_STATUS,
 } from '../../utils/engineeringMaterialTask.mjs'
 import MobileTaskActionScreen from '../components/MobileTaskActionScreen.jsx'
+import { mobileProgressAccess } from '../utils/mobileProgress.mjs'
+import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
 import MobileTaskListScreen from '../components/MobileTaskListScreen.jsx'
 import MobileTaskReceiptScreen from '../components/MobileTaskReceiptScreen.jsx'
 import useMobileRoleTaskActions from '../hooks/useMobileRoleTaskActions'
@@ -85,6 +92,7 @@ const MOBILE_TASK_HISTORY_SCOPE_KEY = 'mobileRoleTasksScope'
 const MOBILE_TASK_HISTORY_KEYWORD_KEY = 'mobileRoleTasksKeyword'
 const MOBILE_TASK_HISTORY_SORT_KEY = 'mobileRoleTasksSort'
 const MOBILE_TASK_HISTORY_STATUS_KEY = 'mobileRoleTasksStatus'
+const MOBILE_TASK_HISTORY_QUERY_PAGES_KEY = 'mobileRoleTasksQueryPages'
 const MOBILE_TASK_HISTORY_REASON_KEY = 'mobileRoleTasksReason'
 const MOBILE_TASK_HISTORY_MATERIAL_DRAFT_KEY = 'mobileRoleTasksMaterialDraft'
 const MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY =
@@ -95,6 +103,22 @@ const MOBILE_TASK_HISTORY_SCREENS = new Set(['detail', 'action', 'receipt'])
 const MOBILE_TASK_RESTORE_PAGE_LIMIT = 20
 const MOBILE_TASK_RESTORE_ITEM_LIMIT =
   MOBILE_ROLE_TASK_PAGE_LIMIT * MOBILE_TASK_RESTORE_PAGE_LIMIT
+
+const MOBILE_TASK_QUERY_PAGE_KEYS = Object.freeze({
+  TASKS: 'tasks',
+  RISKS: 'risks',
+})
+const DEFAULT_MOBILE_TASK_QUERY_OPTIONS = Object.freeze({
+  keyword: '',
+  sortKey: 'newest',
+  statusKey: '',
+})
+const MOBILE_TASK_SORT_KEY_SET = new Set(
+  MOBILE_TASK_SORT_OPTIONS.map((option) => option.value)
+)
+const MOBILE_TASK_STATUS_KEY_SET = new Set(
+  MOBILE_TASK_STATUS_OPTIONS.map((option) => option.value)
+)
 
 function readMobileTaskHistoryState() {
   if (typeof window === 'undefined') return {}
@@ -176,6 +200,49 @@ function mobileTaskHistoryChoice(value, choices, fallback) {
   return choices.includes(value) ? value : fallback
 }
 
+function mobileTaskQueryPageKey(mainTabKey) {
+  return mainTabKey === MOBILE_MAIN_TAB_KEYS.MESSAGES
+    ? MOBILE_TASK_QUERY_PAGE_KEYS.RISKS
+    : MOBILE_TASK_QUERY_PAGE_KEYS.TASKS
+}
+
+function normalizeMobileTaskQueryOptions(value) {
+  const options = value && typeof value === 'object' ? value : {}
+  return {
+    keyword: String(options.keyword || '')
+      .trim()
+      .slice(0, 100),
+    sortKey: MOBILE_TASK_SORT_KEY_SET.has(options.sortKey)
+      ? options.sortKey
+      : DEFAULT_MOBILE_TASK_QUERY_OPTIONS.sortKey,
+    statusKey: MOBILE_TASK_STATUS_KEY_SET.has(options.statusKey)
+      ? options.statusKey
+      : DEFAULT_MOBILE_TASK_QUERY_OPTIONS.statusKey,
+  }
+}
+
+function readMobileTaskQueryPages(
+  history,
+  accessScope,
+  activePageKey,
+  activeOptions
+) {
+  const trusted =
+    String(history?.[MOBILE_TASK_HISTORY_SCOPE_KEY] || '').trim() ===
+    mobileTaskQueryScope(accessScope, activeOptions)
+  const stored = trusted ? history?.[MOBILE_TASK_HISTORY_QUERY_PAGES_KEY] : null
+  const pages = {
+    [MOBILE_TASK_QUERY_PAGE_KEYS.TASKS]: normalizeMobileTaskQueryOptions(
+      stored?.[MOBILE_TASK_QUERY_PAGE_KEYS.TASKS]
+    ),
+    [MOBILE_TASK_QUERY_PAGE_KEYS.RISKS]: normalizeMobileTaskQueryOptions(
+      stored?.[MOBILE_TASK_QUERY_PAGE_KEYS.RISKS]
+    ),
+  }
+  pages[activePageKey] = normalizeMobileTaskQueryOptions(activeOptions)
+  return pages
+}
+
 function readMobileTaskListLimits(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   return Object.fromEntries(
@@ -200,6 +267,12 @@ export default function MobileRoleTasksPage() {
   const { activeRoleKey } = useERPWorkspace()
   const { adminProfile, canEnterDesktop, handleLogout, loggingOut } =
     useOutletContext() || {}
+  const progressAccess = useMemo(
+    () => mobileProgressAccess(adminProfile),
+    [adminProfile]
+  )
+  const beginLinkedTask = useLatestRequestCoordinator()
+  const [linkedTaskState, setLinkedTaskState] = useState(null)
   const runtimeBuildIdentity = useRuntimeBuildIdentity()
   const canMountCustomerTasks = canMountCustomerRuntime(adminProfile)
   const canViewApprovalInbox = canViewWorkflowApprovalInbox(adminProfile)
@@ -208,17 +281,72 @@ export default function MobileRoleTasksPage() {
   const taskAccessScopeKey = `${activeRoleKey}|access:${taskAccessIdentity}|${canMountCustomerTasks ? 'ready' : 'blocked'}`
   const initialHistoryStateRef = useRef(readMobileTaskHistoryState())
   const initialHistoryCandidate = initialHistoryStateRef.current
-  const [taskQueryOptions, setTaskQueryOptions] = useState(() =>
-    readMobileTaskQueryHistory(initialHistoryCandidate, taskAccessScopeKey)
+  const defaultMainTabKey = progressAccess.enabled
+    ? MOBILE_MAIN_TAB_KEYS.PROGRESS
+    : MOBILE_MAIN_TAB_KEYS.TODO
+  const initialTaskQueryOptions = readMobileTaskQueryHistory(
+    initialHistoryCandidate,
+    taskAccessScopeKey
   )
+  const initialHistoryMatchesQuery =
+    String(
+      initialHistoryCandidate[MOBILE_TASK_HISTORY_SCOPE_KEY] || ''
+    ).trim() ===
+    mobileTaskQueryScope(taskAccessScopeKey, initialTaskQueryOptions)
+  const initialMainTabKey = initialHistoryMatchesQuery
+    ? mobileTaskHistoryChoice(
+        initialHistoryCandidate[MOBILE_TASK_HISTORY_MAIN_TAB_KEY],
+        Object.values(MOBILE_MAIN_TAB_KEYS),
+        defaultMainTabKey
+      )
+    : defaultMainTabKey
+  const [requestedMainTabKey, setActiveMainTabKey] = useState(initialMainTabKey)
+  const activeMainTabKey =
+    requestedMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
+    !progressAccess.enabled
+      ? MOBILE_MAIN_TAB_KEYS.TODO
+      : requestedMainTabKey
+  const activeTaskQueryPageKey = mobileTaskQueryPageKey(activeMainTabKey)
+  const [taskQueryOptionsByPage, setTaskQueryOptionsByPage] = useState(() =>
+    readMobileTaskQueryPages(
+      initialHistoryCandidate,
+      taskAccessScopeKey,
+      mobileTaskQueryPageKey(initialMainTabKey),
+      initialTaskQueryOptions
+    )
+  )
+  const taskQueryOptions =
+    taskQueryOptionsByPage[activeTaskQueryPageKey] ||
+    DEFAULT_MOBILE_TASK_QUERY_OPTIONS
   const {
     keyword: taskKeyword,
     sortKey: taskSortKey,
     statusKey: taskStatusKey,
   } = taskQueryOptions
-  const setTaskKeyword = useCallback((keyword) => {
-    setTaskQueryOptions((current) => ({ ...current, keyword }))
-  }, [])
+  const updateActiveTaskQueryOptions = useCallback(
+    (update) => {
+      setTaskQueryOptionsByPage((current) => {
+        const currentOptions =
+          current[activeTaskQueryPageKey] || DEFAULT_MOBILE_TASK_QUERY_OPTIONS
+        const nextOptions =
+          typeof update === 'function'
+            ? update(currentOptions)
+            : { ...currentOptions, ...update }
+        return {
+          ...current,
+          [activeTaskQueryPageKey]:
+            normalizeMobileTaskQueryOptions(nextOptions),
+        }
+      })
+    },
+    [activeTaskQueryPageKey]
+  )
+  const setTaskKeyword = useCallback(
+    (keyword) => {
+      updateActiveTaskQueryOptions((current) => ({ ...current, keyword }))
+    },
+    [updateActiveTaskQueryOptions]
+  )
   const taskScopeKey = mobileTaskQueryScope(
     taskAccessScopeKey,
     taskQueryOptions
@@ -266,13 +394,6 @@ export default function MobileRoleTasksPage() {
   )
   const [showScrollTopButton, setShowScrollTopButton] = useState(
     () => listScrollTopRef.current >= MOBILE_SCROLL_TOP_VISIBLE_OFFSET
-  )
-  const [activeMainTabKey, setActiveMainTabKey] = useState(() =>
-    mobileTaskHistoryChoice(
-      initialHistoryState[MOBILE_TASK_HISTORY_MAIN_TAB_KEY],
-      Object.values(MOBILE_MAIN_TAB_KEYS),
-      MOBILE_MAIN_TAB_KEYS.TODO
-    )
   )
   const [activeMessageTabKey, setActiveMessageTabKey] = useState(() =>
     mobileTaskHistoryChoice(
@@ -511,7 +632,64 @@ export default function MobileRoleTasksPage() {
       riskScope,
     ]
   )
-  const { selectedTask } = activeTaskViewState
+  const loadLinkedTask = useCallback(
+    async (taskID) => {
+      const request = beginLinkedTask('linked-task')
+      setLinkedTaskState({
+        scope: taskAccessScopeKey,
+        id: taskID,
+        loading: true,
+      })
+      try {
+        const task = await getWorkflowTask(taskID, { signal: request.signal })
+        if (!request.isCurrent()) return false
+        setLinkedTaskState({ scope: taskAccessScopeKey, id: taskID, task })
+        return true
+      } catch (error) {
+        if (request.isCurrent()) {
+          setLinkedTaskState({
+            scope: taskAccessScopeKey,
+            id: taskID,
+            error: getActionErrorMessage(error, '查看关联任务失败，请重试'),
+          })
+        }
+        return false
+      } finally {
+        if (request.isCurrent()) request.finish()
+      }
+    },
+    [beginLinkedTask, taskAccessScopeKey]
+  )
+  const linkedTask =
+    linkedTaskState?.scope === taskAccessScopeKey &&
+    linkedTaskState?.id === selectedTaskID
+      ? linkedTaskState
+      : null
+  useEffect(() => {
+    if (!selectedTaskID || activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.PROGRESS) {
+      setLinkedTaskState(null)
+    }
+  }, [activeMainTabKey, selectedTaskID])
+  useEffect(() => {
+    if (
+      activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
+      selectedTaskID &&
+      !linkedTask
+    ) {
+      loadLinkedTask(selectedTaskID)
+    }
+  }, [activeMainTabKey, selectedTaskID, linkedTask, loadLinkedTask])
+  useEffect(
+    () => () => {
+      const request = beginLinkedTask('linked-task')
+      request.finish()
+    },
+    [beginLinkedTask, taskAccessScopeKey, selectedTaskID]
+  )
+  const selectedTask =
+    activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
+      ? linkedTask?.task || null
+      : activeTaskViewState.selectedTask
   const receiptDetailTask = useMemo(
     () =>
       resolveMobileRoleTaskReceiptDetailTask({
@@ -523,7 +701,11 @@ export default function MobileRoleTasksPage() {
   )
   const detailTask = selectedTask || receiptDetailTask
   const selectedTaskActionsEnabled =
-    canMountCustomerTasks && activeTaskViewState.actionsEnabled
+    canMountCustomerTasks &&
+    (activeTaskViewState.actionsEnabled ||
+      (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
+        Boolean(selectedTask) &&
+        !TERMINAL_TASK_STATUS_KEYS.has(selectedTask.task_status_key)))
   const selectedTaskActionAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: selectedTaskActionsEnabled ? selectedTask : null,
@@ -549,7 +731,6 @@ export default function MobileRoleTasksPage() {
     ) {
       return
     }
-    setActiveFilterKey('all')
     setSelectedTaskID(null)
     setDetailAction(null)
   }, [activeMainTabKey])
@@ -776,6 +957,7 @@ export default function MobileRoleTasksPage() {
   useEffect(() => {
     if (
       canMountCustomerTasks &&
+      activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.PROGRESS &&
       !activeTaskSlot.loaded &&
       !activeTaskSlot.loading &&
       !activeTaskSlot.error
@@ -783,6 +965,7 @@ export default function MobileRoleTasksPage() {
       loadTaskView(activeTaskViewKey)
     }
   }, [
+    activeMainTabKey,
     activeTaskSlot.loaded,
     activeTaskSlot.loading,
     activeTaskSlot.error,
@@ -809,6 +992,12 @@ export default function MobileRoleTasksPage() {
 
   const refreshTasksAfterMutation = useCallback(
     async (options = {}) => {
+      if (
+        activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
+        selectedTaskID
+      ) {
+        return loadLinkedTask(selectedTaskID)
+      }
       let currentState = readMobileRoleTaskScopeState(
         taskScopeStateRef.current,
         taskScopeKey
@@ -916,6 +1105,9 @@ export default function MobileRoleTasksPage() {
       return true
     },
     [
+      activeMainTabKey,
+      selectedTaskID,
+      loadLinkedTask,
       activeTaskViewKey,
       historyRestoreItemLimit,
       loadTaskView,
@@ -1172,7 +1364,13 @@ export default function MobileRoleTasksPage() {
   }, [flushMobileTaskDraftHistory])
 
   useEffect(() => {
-    if (selectedTaskID === null || !activeTaskSlot.loaded) return
+    if (
+      activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS ||
+      selectedTaskID === null ||
+      !activeTaskSlot.loaded
+    ) {
+      return
+    }
     if (receiptDetailTask) {
       restoringHistoryTaskRef.current = false
       taskViewRestoreTargetRef.current[activeTaskViewKey] = 0
@@ -1241,6 +1439,7 @@ export default function MobileRoleTasksPage() {
     )
     currentTaskScreenRef.current = ''
   }, [
+    activeMainTabKey,
     actionReceipt,
     actionReceiptRetryable,
     activeTaskSlot.error,
@@ -1291,6 +1490,7 @@ export default function MobileRoleTasksPage() {
         [MOBILE_TASK_HISTORY_KEYWORD_KEY]: taskKeyword,
         [MOBILE_TASK_HISTORY_SORT_KEY]: taskSortKey,
         [MOBILE_TASK_HISTORY_STATUS_KEY]: taskStatusKey,
+        [MOBILE_TASK_HISTORY_QUERY_PAGES_KEY]: taskQueryOptionsByPage,
         [MOBILE_TASK_HISTORY_SCROLL_TOP_KEY]: listScrollTopRef.current,
         [MOBILE_TASK_HISTORY_LIST_LIMITS_KEY]: visibleListLimitsByKey,
         [MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY]: loadedCounts,
@@ -1311,6 +1511,7 @@ export default function MobileRoleTasksPage() {
       taskKeyword,
       taskSortKey,
       taskStatusKey,
+      taskQueryOptionsByPage,
       taskScopeKey,
       visibleListLimitsByKey,
     ]
@@ -1812,6 +2013,57 @@ export default function MobileRoleTasksPage() {
     visibleListLimitsByKey,
   ])
 
+  useEffect(() => {
+    if (selectedTaskID || actionReceipt) return
+    window.history.replaceState(
+      {
+        ...window.history.state,
+        [MOBILE_TASK_HISTORY_MAIN_TAB_KEY]: activeMainTabKey,
+        [MOBILE_TASK_HISTORY_SCOPE_KEY]: taskScopeKey,
+        [MOBILE_TASK_HISTORY_KEYWORD_KEY]: taskKeyword,
+        [MOBILE_TASK_HISTORY_SORT_KEY]: taskSortKey,
+        [MOBILE_TASK_HISTORY_STATUS_KEY]: taskStatusKey,
+        [MOBILE_TASK_HISTORY_QUERY_PAGES_KEY]: taskQueryOptionsByPage,
+      },
+      ''
+    )
+  }, [
+    activeMainTabKey,
+    taskScopeKey,
+    taskKeyword,
+    taskSortKey,
+    taskStatusKey,
+    taskQueryOptionsByPage,
+    selectedTaskID,
+    actionReceipt,
+  ])
+
+  if (
+    activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
+    selectedTaskID &&
+    !selectedTask &&
+    !actionReceipt
+  ) {
+    return (
+      <section
+        className="mobile-role-tasks-page mobile-linked-task-feedback"
+        aria-label="关联任务"
+      >
+        <button type="button" onClick={handleDetailBack}>
+          返回进度详情
+        </button>
+        <p role={linkedTask?.error ? 'alert' : 'status'}>
+          {linkedTask?.error || '正在读取关联任务…'}
+        </p>
+        {linkedTask?.error && (
+          <button type="button" onClick={() => loadLinkedTask(selectedTaskID)}>
+            重试
+          </button>
+        )}
+      </section>
+    )
+  }
+
   if (actionReceipt) {
     const receiptTaskRecoveryPending = Boolean(
       actionReceiptRetryable && selectedTaskID && !selectedTask
@@ -1959,6 +2211,10 @@ export default function MobileRoleTasksPage() {
   return (
     <MobileTaskListScreen
       key={taskAccessScopeKey}
+      progressAccess={progressAccess}
+      accessScopeKey={taskAccessScopeKey}
+      activeRoleKey={activeRoleKey}
+      onOpenProgressTask={handleSelectTaskID}
       activeFilterKey={visibleActiveFilterKey}
       activeMainTabKey={activeMainTabKey}
       activeMessageTabKey={activeMessageTabKey}
@@ -2011,7 +2267,7 @@ export default function MobileRoleTasksPage() {
       taskSortKey={taskSortKey}
       taskStatusKey={taskStatusKey}
       onTaskListOptionsChange={(options) =>
-        setTaskQueryOptions((current) => ({ ...current, ...options }))
+        updateActiveTaskQueryOptions((current) => ({ ...current, ...options }))
       }
       onSearchTasks={setTaskKeyword}
       visibleListLimitsByKey={visibleListLimitsByKey}

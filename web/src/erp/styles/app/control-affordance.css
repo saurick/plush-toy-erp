@@ -1,0 +1,396 @@
+/* Shared control appearance. Page styles own placement, not selected colours. */
+:root,
+[data-erp-theme='light'] {
+  --erp-control-surface: #fff;
+  --erp-control-track: #edf2ef;
+  --erp-control-border: #788d80;
+  --erp-control-tab-border: #687c70;
+  --erp-control-text: #354e40;
+  --erp-control-muted: #536c5d;
+  --erp-control-on-accent: #fff;
+  --erp-control-accent: #237443;
+  --erp-control-selected: #deeee3;
+  --erp-control-selected-text: #185a32;
+  --erp-control-hover: #e7f1eb;
+  --erp-control-disabled-bg: #eef1ef;
+  --erp-control-disabled-text: #77847b;
+}
+
+[data-erp-theme='dark'] {
+  --erp-control-surface: #182638;
+  --erp-control-track: #111d2b;
+  --erp-control-border: #607785;
+  --erp-control-tab-border: #81978a;
+  --erp-control-text: #d5e2e7;
+  --erp-control-muted: #a8bec3;
+  --erp-control-on-accent: #10291b;
+  --erp-control-accent: #88cfa6;
+  --erp-control-selected: #254638;
+  --erp-control-selected-text: #c5f1d5;
+  --erp-control-hover: #293e43;
+  --erp-control-disabled-bg: #202d39;
+  --erp-control-disabled-text: #8a99a5;
+}
+
+.erp-sliding-segmented.ant-segmented {
+  --erp-slider-bg: var(--erp-control-selected);
+  --erp-slider-radius: 6px;
+  --erp-slider-shadow: inset 0 0 0 1px var(--erp-control-tab-border);
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid var(--erp-control-tab-border);
+  border-radius: 9px;
+  background: var(--erp-control-track);
+}
+
+.erp-sliding-segmented.ant-segmented .ant-segmented-item {
+  border-color: transparent;
+  border-radius: 6px;
+  color: var(--erp-control-text);
+}
+
+.erp-sliding-segmented.ant-segmented .ant-segmented-item-label {
+  min-height: 30px;
+  padding-inline: 14px;
+  color: inherit;
+  font-weight: 600;
+}
+
+.erp-sliding-segmented.ant-segmented
+  .ant-segmented-item.erp-segmented-item-selected {
+  color: var(--erp-control-selected-text);
+}
+
+.erp-sliding-segmented.ant-segmented
+  .ant-segmented-item:not(.ant-segmented-item-disabled):hover::after {
+  background: color-mix(in srgb, var(--erp-control-accent) 9%, transparent);
+}
+
+.erp-sliding-segmented.ant-segmented
+  .ant-segmented-item.ant-segmented-item-disabled {
+  color: var(--erp-control-disabled-text);
+  cursor: not-allowed;
+}
+
+.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab {
+  min-height: 36px;
+  margin: 0 4px 0 0;
+  padding: 7px 14px;
+  border: 1px solid var(--erp-control-tab-border);
+  border-radius: 8px 8px 0 0;
+  background: var(--erp-control-surface);
+  color: var(--erp-control-text);
+}
+
+.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+  border-color: var(--erp-control-tab-border);
+  background: var(--erp-control-selected);
+}
+
+.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab-btn {
+  color: inherit;
+  font-weight: 600;
+  text-shadow: none;
+}
+
+.erp-sliding-tabs.ant-tabs
+  > .ant-tabs-nav
+  .ant-tabs-tab-active
+  .ant-tabs-tab-btn {
+  color: var(--erp-control-selected-text);
+}
+
+.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-nav-list::before {
+  background: var(--erp-control-tab-border);
+}
+
+.erp-sliding-tabs.ant-tabs:is(.ant-tabs-top, .ant-tabs-bottom)
+  > .ant-tabs-nav
+  .ant-tabs-nav-list::before {
+  height: 1px;
+}
+
+.erp-sliding-tabs.ant-tabs
+  > .ant-tabs-nav
+  .ant-tabs-tab:not(.ant-tabs-tab-disabled):hover {
+  border-color: var(--erp-control-tab-border);
+  background: var(--erp-control-hover);
+}
+
+.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab-disabled {
+  border-color: var(--erp-control-tab-border);
+  background: var(--erp-control-disabled-bg);
+  color: var(--erp-control-disabled-text);
+}
+
+/* Custom strips share a visible selection; their layouts can remain horizontal,
+   vertical, or a bottom navigation without becoming oversized desktop buttons. */
+.erp-sliding-tab-list {
+  --erp-slider-bg: var(--erp-control-selected);
+  --erp-slider-shadow: inset 0 0 0 1px var(--erp-control-tab-border);
+}
+
+.erp-sliding-tab-list > [role='tab'][aria-selected='true'] {
+  color: var(--erp-control-selected-text);
+}
+
+.erp-filter-chip {
+  position: relative;
+  display: inline-flex;
+  min-height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--erp-control-tab-border);
+  border-radius: 8px;
+  background: var(--erp-control-surface);
+  color: var(--erp-control-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.erp-filter-chip__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.erp-filter-chip__count {
+  min-width: 18px;
+  border-radius: 4px;
+  padding-inline: 4px;
+  background: var(--erp-control-track);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-filter-chip[aria-pressed='true'] {
+  border-color: var(--erp-control-tab-border);
+  background: var(--erp-control-selected);
+  color: var(--erp-control-selected-text);
+  box-shadow: none;
+}
+
+.erp-control-button {
+  border: 1px solid var(--erp-control-border);
+  background: var(--erp-control-surface);
+  color: var(--erp-control-text);
+}
+
+/* Mobile search, filter fields and actions share the navigation palette. */
+.erp-mobile-controls {
+  --erp-form-control-height: 46px;
+  --erp-control-radius: 10px;
+  --erp-popup-option-hover: var(--erp-control-hover);
+  --erp-popup-option-selected: var(--erp-control-selected);
+}
+
+.erp-mobile-controls .erp-control-button,
+.erp-mobile-controls .ant-btn {
+  min-height: 46px;
+  border-radius: var(--erp-control-radius);
+  font-size: 14px;
+  font-weight: 600;
+  touch-action: manipulation;
+}
+
+.erp-mobile-controls .erp-control-button,
+.erp-mobile-controls .ant-btn-default:not(:disabled, .ant-btn-dangerous) {
+  border-color: var(--erp-control-border);
+  background: var(--erp-control-surface);
+  color: var(--erp-control-text);
+}
+
+.erp-mobile-controls .ant-btn-primary:not(:disabled, .ant-btn-dangerous) {
+  border-color: var(--erp-control-accent);
+  background: var(--erp-control-accent);
+  color: var(--erp-control-on-accent);
+}
+
+.erp-mobile-controls .erp-control-button[data-active='true'],
+.erp-mobile-controls .erp-control-button[aria-expanded='true'] {
+  border-color: var(--erp-control-accent);
+  background: var(--erp-control-selected);
+  color: var(--erp-control-selected-text);
+  box-shadow: none;
+}
+
+.erp-control-count {
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--erp-control-track);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.erp-mobile-controls .erp-control-button--text {
+  border-color: transparent;
+  background: transparent;
+  color: var(--erp-control-accent);
+}
+
+.erp-mobile-controls .ant-dropdown-menu {
+  border: 1px solid var(--erp-control-border);
+  background: var(--erp-control-surface);
+}
+
+.erp-mobile-controls .ant-dropdown-menu .ant-dropdown-menu-item {
+  color: var(--erp-control-text);
+}
+
+.erp-mobile-controls .ant-dropdown-menu .ant-dropdown-menu-item-selected {
+  color: var(--erp-control-selected-text);
+}
+
+.erp-mobile-search {
+  min-width: 0;
+}
+
+.erp-mobile-controls .erp-search-input:where(.ant-input-affix-wrapper),
+.erp-mobile-controls .erp-control-field {
+  border: 1px solid var(--erp-control-border);
+  background: var(--erp-control-surface);
+  color: var(--erp-control-text);
+  font-size: 16px;
+}
+
+.erp-mobile-controls .erp-control-field {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  border-radius: var(--erp-control-radius);
+  padding: 8px 10px;
+  line-height: 1.5;
+  color-scheme: light;
+}
+
+[data-erp-theme='dark'] .erp-mobile-controls .erp-control-field {
+  color-scheme: dark;
+}
+
+.erp-mobile-controls .erp-search-input > input.ant-input {
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+}
+
+.erp-mobile-controls .erp-search-input > input.ant-input::placeholder,
+.erp-mobile-controls .erp-control-field::placeholder {
+  color: var(--erp-control-muted);
+  opacity: 1;
+}
+
+.erp-mobile-search .ant-input-prefix {
+  margin-inline-end: 8px;
+  color: var(--erp-control-muted);
+}
+
+.erp-mobile-search .ant-input-suffix {
+  margin-inline-end: -8px;
+}
+
+.erp-mobile-search input[type='search']::-webkit-search-cancel-button {
+  display: none;
+}
+
+.erp-mobile-search__clear {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--erp-control-muted);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.erp-mobile-search__clear:focus-visible {
+  outline: 2px solid var(--erp-control-accent);
+  outline-offset: -4px;
+}
+
+.ant-btn.ant-btn-default:not(
+    :disabled,
+    .ant-btn-dangerous,
+    .ant-btn-background-ghost
+  ) {
+  border-color: var(--erp-control-border);
+}
+
+.ant-btn.ant-btn-default:not(
+    :disabled,
+    .ant-btn-dangerous,
+    .ant-btn-background-ghost
+  ):hover {
+  border-color: var(--erp-control-accent);
+}
+
+.erp-filter-chip:disabled {
+  border-color: var(--erp-control-tab-border);
+  background: var(--erp-control-disabled-bg);
+  color: var(--erp-control-disabled-text);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.erp-control-button:disabled {
+  border-color: var(--erp-control-border);
+  background: var(--erp-control-disabled-bg);
+  color: var(--erp-control-disabled-text);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.erp-mobile-controls .erp-control-button:disabled {
+  color: var(--erp-control-disabled-text);
+  box-shadow: none;
+}
+
+.erp-filter-chip:not(:disabled):hover {
+  border-color: var(--erp-control-tab-border);
+  background: var(--erp-control-hover);
+}
+
+.erp-control-button:not(:disabled):hover {
+  border-color: var(--erp-control-accent);
+  background: var(--erp-control-hover);
+}
+
+:is(.erp-filter-chip, .erp-control-button, .ant-btn):focus-visible,
+.erp-sliding-tab-list > [role='tab']:focus-visible,
+.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab-btn:focus-visible,
+.erp-sliding-segmented.ant-segmented
+  .ant-segmented-item:has(input:focus-visible) {
+  outline: 2px solid var(--erp-control-accent);
+  outline-offset: -3px;
+}
+
+.ant-btn.ant-btn-primary:focus-visible {
+  outline-color: var(--erp-control-surface);
+}
+
+@media (max-width: 767px) {
+  .erp-filter-chip__count {
+    min-width: 12px;
+    padding-inline: 2px;
+  }
+
+  .erp-filter-chip,
+  .erp-control-button,
+  .erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-tab,
+  .erp-sliding-segmented.ant-segmented .ant-segmented-item-label {
+    min-height: 44px;
+  }
+}

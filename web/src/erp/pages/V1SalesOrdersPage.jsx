@@ -2035,7 +2035,10 @@ export default function V1SalesOrdersPage() {
             loading={loading}
             columns={orderColumns}
             dataSource={orders}
-            expandable={salesOrderItemsPreview.expandable}
+            expandable={{
+              ...salesOrderItemsPreview.expandable,
+              columnWidth: 48,
+            }}
             pagination={createBusinessTablePagination({
               pagination,
               total,
@@ -2045,6 +2048,7 @@ export default function V1SalesOrdersPage() {
             emptyDescription="暂无销售订单"
             rowSelection={{
               type: 'radio',
+              columnWidth: 38,
               selectedRowKeys: selectedOrder?.id ? [selectedOrder.id] : [],
               getCheckboxProps: () => ({ disabled: saving }),
               onChange: (_keys, selectedRows) => {

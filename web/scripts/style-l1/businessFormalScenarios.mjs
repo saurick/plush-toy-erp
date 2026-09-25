@@ -155,8 +155,13 @@ export function createBusinessFormalScenarios(deps) {
         `未找到可触达的操作“${actionName}”: ${JSON.stringify(metrics)}`
       )
     }
-    await moreButton.click()
-    const actionMenu = page.locator('.erp-business-selection-action-menu:visible')
+    const actionMenuID = await moreButton.getAttribute('aria-controls')
+    if ((await moreButton.getAttribute('aria-expanded')) !== 'true') {
+      await moreButton.click()
+    }
+    const actionMenu = actionMenuID
+      ? page.locator(`[id=${JSON.stringify(actionMenuID)}]`)
+      : page.locator('.erp-business-selection-action-menu:visible').last()
     await actionMenu.waitFor({ state: 'visible' })
     const overflowButtons = actionMenu
       .locator('button')
@@ -171,7 +176,23 @@ export function createBusinessFormalScenarios(deps) {
         return candidate
       }
     }
-    throw new Error(`更多操作中缺少“${actionName}”`)
+    const menuMetrics = await actionMenu.evaluateAll((menus) =>
+      menus.map((menu) => ({
+        text: String(menu.textContent || '')
+          .replace(/\s+/gu, ' ')
+          .trim(),
+        buttons: Array.from(menu.querySelectorAll('button')).map((button) => ({
+          key: button.getAttribute('data-business-action-key') || '',
+          text: String(button.textContent || '')
+            .replace(/\s+/gu, ' ')
+            .trim(),
+          disabled: button.disabled,
+        })),
+      }))
+    )
+    throw new Error(
+      `更多操作中缺少“${actionName}”: ${JSON.stringify(menuMetrics)}`
+    )
   }
 
   const confirmVisiblePopconfirm = async (page) => {
@@ -184,7 +205,7 @@ export function createBusinessFormalScenarios(deps) {
     await confirmButton.click()
   }
 
-  const assertBusinessViewTabNeutralStyle = async (
+  const assertBusinessViewTabSelectedStyle = async (
     page,
     { scenarioName, tabName }
   ) => {
@@ -202,8 +223,8 @@ export function createBusinessFormalScenarios(deps) {
       .replace(/\s/g, '')
       .toLowerCase()
     assert(
-      background === 'rgba(0,0,0,0)' || background === 'transparent',
-      `${scenarioName} 主视图 Tab 不应出现激活背景色: ${JSON.stringify(
+      background !== 'rgba(0,0,0,0)' && background !== 'transparent',
+      `${scenarioName} 主视图 Tab 应显示明确选中背景色: ${JSON.stringify(
         metrics
       )}`
     )
@@ -1299,7 +1320,7 @@ export function createBusinessFormalScenarios(deps) {
           await expectHeading(page, '销售订单')
           await expectText(page, 'SO-STYLE-L1')
           await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
-          await page.getByRole('button', { name: '编辑订单' }).click()
+          await (await findSelectionActionButton(page, '编辑订单')).click()
           await expectText(page, '未进入编辑')
           const failureNotice = page
             .getByText('未进入编辑', { exact: false })
@@ -1457,7 +1478,7 @@ export function createBusinessFormalScenarios(deps) {
           await expectHeading(page, '销售订单')
           await expectText(page, 'SO-STYLE-L1')
           await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
-          await page.getByRole('button', { name: '编辑订单' }).click()
+          await (await findSelectionActionButton(page, '编辑订单')).click()
           await itemRequestStarted
 
           await page.getByRole('button', { name: '新建订单' }).click()
@@ -2326,7 +2347,7 @@ export function createBusinessFormalScenarios(deps) {
               )
             })
             const tabs = document.querySelector(
-              '[aria-label="生产异常处置工作区"]'
+              '[aria-label="生产记录工作区"]'
             )
             const tabList = tabs?.querySelector('[role="tablist"]')
             const activeTab = tabs?.querySelector(
@@ -2477,7 +2498,7 @@ export function createBusinessFormalScenarios(deps) {
               metrics
             )}`
           )
-          if (expectedTab === '处置申请') {
+          if (expectedTab === '异常处理') {
             assert.deepEqual(
               metrics.decisionFilterLabels,
               ['异常类型', '审批状态', '业务状态'],
@@ -2516,7 +2537,7 @@ export function createBusinessFormalScenarios(deps) {
           await assertNoHorizontalOverflow(page, scenarioName)
         }
 
-        await expectHeading(page, '生产异常处置')
+        await expectHeading(page, '生产记录')
         await expectText(page, '暂无生产异常处置申请')
         await expectText(page, '全部异常类型')
         await expectText(page, '全部审批状态')
@@ -2525,7 +2546,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '请选择一条记录')
         await assertProductionExceptionTabGeometry(
           'business-production-exceptions-decisions-tab',
-          '处置申请'
+          '异常处理'
         )
         await page.getByRole('button', { name: /列顺序/u }).click()
         const decisionColumnOrderDialog = page.getByRole('dialog', {
@@ -2536,7 +2557,7 @@ export function createBusinessFormalScenarios(deps) {
         await decisionColumnOrderDialog.locator('.ant-modal-close').click()
         await decisionColumnOrderDialog.waitFor({ state: 'hidden' })
         await page.getByRole('button', { name: '刷新当前页' }).click()
-        await expectText(page, '生产异常处置申请已刷新')
+        await expectText(page, '异常处理申请已刷新')
         await page.screenshot({
           path: path.join(
             outputDir,
@@ -2545,7 +2566,7 @@ export function createBusinessFormalScenarios(deps) {
           fullPage: true,
         })
         await page
-          .getByText('生产异常处置申请已刷新', { exact: true })
+          .getByText('异常处理申请已刷新', { exact: true })
           .waitFor({ state: 'hidden', timeout: 6_000 })
 
         await page.getByRole('tab', { name: '待审批' }).click()
@@ -2564,7 +2585,7 @@ export function createBusinessFormalScenarios(deps) {
         await taskColumnOrderDialog.locator('.ant-modal-close').click()
         await taskColumnOrderDialog.waitFor({ state: 'hidden' })
         await page.getByRole('button', { name: '刷新当前页' }).click()
-        await expectText(page, '生产异常处置任务已刷新')
+        await expectText(page, '异常处理任务已刷新')
         await page.screenshot({
           path: path.join(
             outputDir,
@@ -2573,6 +2594,8 @@ export function createBusinessFormalScenarios(deps) {
           fullPage: true,
         })
 
+        await page.getByRole('tab', { name: '异常处理' }).click()
+        await expectText(page, '暂无生产异常处置申请')
         await page.evaluate(() => {
           window.localStorage.setItem('plush_erp_theme_mode', 'dark')
         })
@@ -2585,7 +2608,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertProductionExceptionTabGeometry(
           'business-production-exceptions-decisions-tab-dark',
-          '处置申请'
+          '异常处理'
         )
         await page.screenshot({
           path: path.join(
@@ -2603,7 +2626,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '暂无生产异常处置申请')
         await assertProductionExceptionTabGeometry(
           'business-production-exceptions-decisions-tab-mobile',
-          '处置申请'
+          '异常处理'
         )
         await page.screenshot({
           path: path.join(
@@ -2645,7 +2668,6 @@ export function createBusinessFormalScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '生产订单')
         await expectText(page, 'MO-STYLE-L1-20260713')
-        await expectText(page, '维护生产计划单')
         await expectButton(page, '新建生产订单')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-production-orders',
@@ -3135,7 +3157,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '产品规格')
         await page.getByRole('tab', { name: '产品基础信息' }).waitFor()
         await page.getByRole('tab', { name: '产品规格' }).waitFor()
-        await assertBusinessViewTabNeutralStyle(page, {
+        await assertBusinessViewTabSelectedStyle(page, {
           scenarioName: 'business-standard-products',
           tabName: '产品基础信息',
         })
@@ -3199,7 +3221,7 @@ export function createBusinessFormalScenarios(deps) {
           fromIndex: beforeProductSKUTabRequests,
           scenarioName: 'business-standard-product-skus-reference-refresh',
         })
-        await assertBusinessViewTabNeutralStyle(page, {
+        await assertBusinessViewTabSelectedStyle(page, {
           scenarioName: 'business-standard-product-skus',
           tabName: '产品规格',
         })
@@ -3648,7 +3670,7 @@ export function createBusinessFormalScenarios(deps) {
         await page.getByText('QI-STYLE-L1', { exact: false }).first().click()
         forceEmptyQualityInspections = true
         await page
-          .getByPlaceholder('搜索质检单')
+          .getByPlaceholder('搜单号、产品、材料、批次')
           .first()
           .fill(qualityEmptySearchKeyword)
         await page.keyboard.press('Enter')
@@ -3658,7 +3680,10 @@ export function createBusinessFormalScenarios(deps) {
           staleText: 'QI-STYLE-L1',
         })
         forceEmptyQualityInspections = false
-        await page.getByPlaceholder('搜索质检单').first().fill('')
+        await page
+          .getByPlaceholder('搜单号、产品、材料、批次')
+          .first()
+          .fill('')
         await page.keyboard.press('Enter')
         await expectText(page, 'QI-STYLE-L1')
         await verifyBusinessRowDoubleClickModal(page, {
@@ -4023,13 +4048,15 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '加工合同打印')
         await expectNoButton(page, '作业指导书打印')
         await expectNoButton(page, '打印作业指导书')
-        const processingContractPrintButton = page.getByRole('button', {
-          name: '加工合同打印',
-        })
+        let processingContractPrintButton = await findSelectionActionButton(
+          page,
+          '加工合同打印'
+        )
         assert(
           await processingContractPrintButton.isDisabled(),
           '未选中加工合同前，加工合同打印按钮应保持禁用'
         )
+        await page.keyboard.press('Escape')
         await page
           .getByRole('row')
           .filter({ hasText: 'SIM-OUTSOURCE-CONTRACT-L1' })
@@ -4045,11 +4072,16 @@ export function createBusinessFormalScenarios(deps) {
           0,
           '加工合同页当前操作区不应保留跨模块相关单据下拉，避免加工页承接质检、库存或应付事实'
         )
+        processingContractPrintButton = await findSelectionActionButton(
+          page,
+          '加工合同打印'
+        )
         assert.equal(
           await processingContractPrintButton.isDisabled(),
           false,
           '选中加工合同后，加工合同打印按钮应启用'
         )
+        await page.keyboard.press('Escape')
         await assertOrderLifecycleActionsConsolidated(page, {
           scenarioName: 'business-v1-processing-contracts',
           primaryActionLabel: '提交',
@@ -4072,11 +4104,11 @@ export function createBusinessFormalScenarios(deps) {
             '加工合同号',
             '加工厂',
             '加工明细',
-            '来源产品订单编号',
+            '产品订单编号',
             '加工项目',
             '工序',
             '单位',
-            '查货只表示加工环节',
+            '工序选择电绣、激光等加工方式',
           ],
           afterOpen: async (modal) => {
             await assertNonItemTextareaFullRow(modal, {
@@ -4138,8 +4170,7 @@ export function createBusinessFormalScenarios(deps) {
           }
           await assertUnifiedListToolbarShell(page, {
             scenarioName,
-            exportDisabled: true,
-            exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
+            exportVisible: false,
           })
           await page.getByRole('button', { name: '刷新当前页' }).click()
           const expectedRefreshMessage =
@@ -4171,20 +4202,20 @@ export function createBusinessFormalScenarios(deps) {
 
         await verifyWorkflowV1Page({
           path: '/erp/production/scheduling',
-          heading: '生产排程',
+          heading: '排产确认',
           absentTexts: ['发起排程协同', '新建排程单', '生成生产任务'],
           scenarioName: 'business-workflow-production-scheduling',
           afterPageReady: async () => {
-            await expectText(page, '暂无生产排程任务。')
+            await expectText(page, '暂无排产确认任务。')
           },
         })
 
         await gotoScenarioPath(page, '/erp/production/exceptions', {
           waitUntil: 'domcontentloaded',
         })
-        await expectHeading(page, '生产异常处置')
+        await expectHeading(page, '生产记录')
         const productionExceptionDecisionTab = page.getByRole('tab', {
-          name: '处置申请',
+          name: '异常处理',
         })
         const productionExceptionTaskTab = page.getByRole('tab', {
           name: '待审批',
@@ -4224,7 +4255,7 @@ export function createBusinessFormalScenarios(deps) {
           await assertTextAbsent(page, text)
         }
         await page.getByRole('button', { name: '刷新当前页' }).click()
-        await expectText(page, '生产异常处置申请已刷新')
+        await expectText(page, '异常处理申请已刷新')
         await assertNoHorizontalOverflow(
           page,
           'business-production-exceptions-decisions-tab'
@@ -4237,7 +4268,7 @@ export function createBusinessFormalScenarios(deps) {
           fullPage: true,
         })
         await page
-          .getByText('生产异常处置申请已刷新', { exact: true })
+          .getByText('异常处理申请已刷新', { exact: true })
           .waitFor({ state: 'hidden', timeout: 6_000 })
 
         await productionExceptionTaskTab.click()
@@ -4251,7 +4282,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '列顺序')
         await expectNoButton(page, '导出筛选结果')
         await page.getByRole('button', { name: '刷新当前页' }).click()
-        await expectText(page, '生产异常处置任务已刷新')
+        await expectText(page, '异常处理任务已刷新')
         await expectNoButton(page, '删除')
         await assertNoHorizontalOverflow(
           page,
@@ -4491,7 +4522,7 @@ export function createBusinessFormalScenarios(deps) {
         await gotoScenarioPath(page, '/erp/production/progress', {
           waitUntil: 'domcontentloaded',
         })
-        await expectHeading(page, '生产进度')
+        await expectHeading(page, '生产记录')
         await expectText(page, 'PROD-FACT-L1')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-production-progress',
@@ -4649,8 +4680,8 @@ export function createBusinessFormalScenarios(deps) {
         await gotoScenarioPath(page, '/erp/production/exceptions', {
           waitUntil: 'domcontentloaded',
         })
-        await expectHeading(page, '生产异常处置')
-        await expectText(page, '处置申请')
+        await expectHeading(page, '生产记录')
+        await expectText(page, '异常处理')
         await expectText(page, '业务处理分开完成')
         await assertBusinessCollaborationPanelAbsent(
           page,
@@ -4711,8 +4742,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertTextAbsent(page, '发起放行协同')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-workflow-shipping-release-mobile',
-          exportDisabled: true,
-          exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
+          exportVisible: false,
         })
         await assertTextAbsent(page, '新建放行单')
         await assertTextAbsent(page, '生成出货放行')
@@ -4747,7 +4777,7 @@ export function createBusinessFormalScenarios(deps) {
             '加工明细',
             '工序',
             '单位',
-            '查货只表示加工环节',
+            '工序选择电绣、激光等加工方式',
           ],
           requireMultiColumn: false,
         })
@@ -4827,8 +4857,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertUnifiedListToolbarShell(page, {
           scenarioName:
             'business-formal-shipping-release-no-permission-desktop',
-          exportDisabled: true,
-          exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
+          exportVisible: false,
         })
         await expectText(page, '当前账号不能查看此类任务。')
         await page.getByRole('button', { name: '刷新当前页' }).click()
@@ -5008,7 +5037,7 @@ export function createBusinessFormalScenarios(deps) {
         await page
           .locator('.erp-business-module-current-action')
           .first()
-          .getByRole('button', { name: /提\s*交/u })
+          .getByRole('button', { name: /^提\s*交$/u })
           .click()
         await waitForCapturedMethods(
           customerConfigMethods,
@@ -5377,7 +5406,7 @@ export function createBusinessFormalScenarios(deps) {
           )
           await releaseButton.click()
           await page.getByRole('button', { name: '确认发布' }).click()
-          await expectText(page, '生产订单已发布，排程任务已进入 PMC 待办')
+          await expectText(page, '生产订单已发布，排产确认已进入 PMC 待办')
 
           await page
             .getByText('MO-STYLE-L1-20260713', { exact: true })
@@ -5755,8 +5784,7 @@ export function createBusinessFormalScenarios(deps) {
           await assertUnifiedListToolbarShell(page, {
             scenarioName:
               'business-formal-shipping-release-readonly-actions-desktop',
-            exportDisabled: true,
-            exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
+            exportVisible: false,
           })
           await expectText(page, '出货财务审批只读确认')
           await expectText(page, 'SHIP-REL-READONLY')
@@ -5787,7 +5815,14 @@ export function createBusinessFormalScenarios(deps) {
             .first()
             .evaluate((node) => {
               const buttons = Array.from(node.querySelectorAll('button')).map(
-                (button) => String(button.textContent || '').trim()
+                (button) => ({
+                  text: String(button.textContent || '').trim(),
+                  ariaLabel: button.getAttribute('aria-label') || '',
+                  title: button.getAttribute('title') || '',
+                  className: button.className,
+                  actionKey:
+                    button.getAttribute('data-business-action-key') || '',
+                })
               )
               return {
                 text: String(node.textContent || '')
@@ -5798,8 +5833,14 @@ export function createBusinessFormalScenarios(deps) {
                 clientWidth: node.clientWidth,
               }
             })
+          const unexpectedRowButtons = readonlyMetrics.buttons.filter(
+            (button) =>
+              !String(button.className || '').includes(
+                'erp-business-table-copyable-cell__button'
+              )
+          )
           assert(
-            readonlyMetrics.buttons.length === 0,
+            unexpectedRowButtons.length === 0,
             `出货放行只读表格行不应直接暴露动作按钮: ${JSON.stringify(
               readonlyMetrics
             )}`

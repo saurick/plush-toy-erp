@@ -7,7 +7,7 @@ const ERP_APP_DEFINITIONS = {
     roleKey: null,
     command: 'pnpm start',
     description:
-      '电脑端用于查看业务看板、办理日常业务、打印单据和管理账号权限；手机待办可用于随时查看和处理岗位任务。',
+      '电脑端用于查看进度看板、办理日常业务、打印单据和管理账号权限；手机待办可用于随时查看和处理岗位任务。',
   },
 }
 

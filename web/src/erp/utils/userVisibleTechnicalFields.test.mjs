@@ -3,10 +3,7 @@ import test from 'node:test'
 
 import { DEFAULT_RPC_ERROR_MESSAGES } from '../../common/consts/errorCodes.js'
 import { businessModuleDefinitions } from '../config/businessModules.mjs'
-import {
-  dashboardHealthModules,
-  dashboardModules,
-} from '../config/dashboardModules.mjs'
+import { dashboardModules } from '../config/dashboardModules.mjs'
 import {
   ERP_MENU_PERMISSION_GROUPS,
   getMobileRolePermissionLabel,
@@ -225,7 +222,6 @@ test('formal visible catalogs and mapped errors contain business copy only', () 
   const visibleCopy = [
     ...visibleCatalogCopy(businessModuleDefinitions),
     ...visibleCatalogCopy(dashboardModules),
-    ...visibleCatalogCopy(dashboardHealthModules),
     ...visibleCatalogCopy(ERP_MENU_PERMISSION_GROUPS),
     ...Object.values(DEFAULT_RPC_ERROR_MESSAGES),
   ]

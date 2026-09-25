@@ -1,5 +1,5 @@
 import React, { forwardRef, useCallback } from 'react'
-import { Tabs, theme } from 'antd'
+import { Tabs } from 'antd'
 import useSlidingIndicator from './useSlidingIndicator'
 
 const ANT_TABS_MOTION_DISABLED = Object.freeze({
@@ -9,7 +9,6 @@ const ANT_TABS_MOTION_DISABLED = Object.freeze({
 
 const SlidingTabs = forwardRef(
   ({ className = '', style, ...props }, forwardedRef) => {
-    const { token } = theme.useToken()
     const rootRef = useSlidingIndicator({
       containerSelector: '.ant-tabs-nav-list',
       itemSelector: '.ant-tabs-tab',
@@ -30,10 +29,7 @@ const SlidingTabs = forwardRef(
         ref={setRef}
         animated={ANT_TABS_MOTION_DISABLED}
         className={`erp-sliding-tabs ${className}`.trim()}
-        style={{
-          '--erp-tabs-indicator-color': token.colorPrimary,
-          ...style,
-        }}
+        style={style}
       />
     )
   }

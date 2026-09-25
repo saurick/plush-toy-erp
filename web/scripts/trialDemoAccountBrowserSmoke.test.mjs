@@ -381,7 +381,7 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
   assert(
     template.desktopAccounts
       .find((account) => account.username === 'demo_boss')
-      ?.expectedMenus.includes('业务看板')
+      ?.expectedMenus.includes('进度看板')
   )
   assert(
     template.desktopAccounts
@@ -401,7 +401,7 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
   )
   assert.match(
     adminPlan.forbiddenMenus.join('\n'),
-    /业务看板.*出货放行.*异常处理.*排产确认/su
+    /进度看板.*出货放行.*异常处理.*排产确认/su
   )
   const engineeringPlan = template.menuProjectionPlan.desktopAccounts.find(
     (account) => account.username === 'demo_engineering'
@@ -515,7 +515,7 @@ test('trial demo account browser smoke CLI preflight writes sanitized report', (
   assert(
     report.menuProjectionPlan.desktopAccounts
       .find((account) => account.username === 'demo_boss')
-      ?.configuredExpectedMenus.includes('业务看板')
+      ?.configuredExpectedMenus.includes('进度看板')
   )
   assert(
     report.menuProjectionPlan.desktopAccounts

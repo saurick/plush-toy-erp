@@ -1927,8 +1927,11 @@ export function createBusinessActionStabilityScenarios(deps) {
             visible: suffix !== 'CANCELLED',
             disabled: false,
           })
+          await assertDesktopActionState(page, assert, 'shipment-release', {
+            visible: suffix === 'DRAFT',
+            disabled: false,
+          })
           for (const key of [
-            'shipment-release',
             'shipment-receivable',
             'shipment-invoice',
             'shipment-quality',
@@ -1960,7 +1963,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         })
       },
       verify: async (page) => {
-        await waitForBusinessPage(page, '生产异常处置')
+        await waitForBusinessPage(page, '生产记录')
         await assertUnselectedActions(page, assert)
         const cases = {
           'SUBMITTED-SCRAP': {

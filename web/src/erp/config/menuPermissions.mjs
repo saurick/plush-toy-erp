@@ -91,7 +91,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'boss',
     label: '老板 / 管理层',
     description:
-      '看工作台、任务看板、业务看板、正式业务入口和打印中心，不含权限管理。',
+      '看工作台、任务看板、进度看板、正式业务入口和打印中心，不含权限管理。',
     mobileRolePermissions: buildMobileRolePreset(['boss']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -105,7 +105,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'sales',
     label: '业务',
     description:
-      '可使用基础资料、销售订单、出货放行、应收跟进、任务看板、业务看板和打印中心。',
+      '可使用基础资料、销售订单、出货放行、应收跟进、任务看板、进度看板和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['sales']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -124,7 +124,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'pmc',
     label: 'PMC',
     description:
-      '可使用工作台、任务看板、业务看板、基础资料、产品工程、采购、库存、生产、委外和出货。',
+      '可使用工作台、任务看板、进度看板、基础资料、产品工程、采购、库存、生产、委外和出货。',
     mobileRolePermissions: buildMobileRolePreset(['pmc']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -143,7 +143,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'production',
     label: '生产经理',
     description:
-      '可使用工作台、任务看板、业务看板、基础资料、产品工程、委外、生产和质检。',
+      '可使用工作台、任务看板、进度看板、基础资料、产品工程、委外、生产和质检。',
     mobileRolePermissions: buildMobileRolePreset(['production']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -160,7 +160,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'purchase',
     label: '采购',
     description:
-      '可使用任务看板、业务看板、基础资料、产品工程、采购、入库、来料质检、委外和打印中心。',
+      '可使用任务看板、进度看板、基础资料、产品工程、采购、入库、来料质检、委外和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['purchase']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -179,7 +179,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'engineering',
     label: '工程',
     description:
-      '可使用任务看板、业务看板、基础资料、产品工程和工程手机待办，不含采购、库存、生产、财务和权限管理。',
+      '可使用任务看板、进度看板、基础资料、产品工程和工程手机待办，不含采购、库存、生产、财务和权限管理。',
     mobileRolePermissions: buildMobileRolePreset(['engineering']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -193,7 +193,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'warehouse',
     label: '仓库',
     description:
-      '可使用工作台、任务看板、业务看板、基础资料、入库、库存、出货、出库和来料质检。',
+      '可使用工作台、任务看板、进度看板、基础资料、入库、库存、出货、出库和来料质检。',
     mobileRolePermissions: buildMobileRolePreset(['warehouse']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -209,7 +209,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'quality',
     label: '品质',
     description:
-      '可使用工作台、任务看板、业务看板、基础资料、入库、来料质检、生产记录内的异常处理和出货放行。',
+      '可使用工作台、任务看板、进度看板、基础资料、入库、来料质检、生产记录内的异常处理和出货放行。',
     mobileRolePermissions: buildMobileRolePreset(['quality']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -226,7 +226,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'finance',
     label: '财务',
     description:
-      '可使用工作台、任务看板、业务看板、基础资料、采购订单核对、委外、出货、财务管理和打印中心。',
+      '可使用工作台、任务看板、进度看板、基础资料、采购订单核对、委外、出货、财务管理和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['finance']),
     permissions: buildPreset([
       '/erp/dashboard',

@@ -22,10 +22,10 @@ export function createBusinessListAssertions({ outputDir }) {
     const compactText = (value) => String(value || '').replace(/\s+/gu, '')
     const looseTextPattern = (value) =>
       new RegExp(
-        String(value || '')
+        `^\\s*${String(value || '')
           .split('')
           .map((char) => char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-          .join('\\s*'),
+          .join('\\s*')}\\s*$`,
         'u'
       )
     const actionBar = page

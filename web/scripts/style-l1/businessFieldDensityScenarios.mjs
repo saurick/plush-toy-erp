@@ -94,9 +94,35 @@ export function createBusinessFieldDensityScenarios(deps) {
           return Array.from(document.querySelectorAll(selector))
             .filter((node) => scanLabels.includes(node.textContent.trim()))
             .map((node) => {
-              const box = node.closest('th').getBoundingClientRect()
+              const cell = node.closest('th')
+              const box = cell.getBoundingClientRect()
+              const cellStyle = window.getComputedStyle(cell)
+              const title = node.closest('.ant-table-column-title')
+              const trigger = title?.querySelector(
+                '.erp-module-column-header-trigger'
+              )
+              const sorter = node
+                .closest('.ant-table-column-sorters')
+                ?.querySelector('.ant-table-column-sorter')
               return {
                 label: node.textContent.trim(),
+                left: Math.round(box.left),
+                right: Math.round(box.right),
+                width: Math.round(box.width),
+                paddingInline:
+                  Number.parseFloat(cellStyle.paddingLeft || '0') +
+                  Number.parseFloat(cellStyle.paddingRight || '0'),
+                titleWidth: Math.round(
+                  title?.getBoundingClientRect().width || 0
+                ),
+                triggerWidth: Math.round(
+                  trigger?.getBoundingClientRect().width || 0
+                ),
+                sorterWidth: Math.round(
+                  sorter?.getBoundingClientRect().width || 0
+                ),
+                frameLeft: Math.round(frame.left),
+                frameRight: Math.round(frame.right),
                 visible:
                   box.left >= frame.left - 1 && box.right <= frame.right + 1,
               }

@@ -1,3 +1,5 @@
+import { assertFilterAffordance } from './controlAffordanceAssertions.mjs'
+
 export function createMobileTaskAssertions(deps) {
   const {
     assert,
@@ -59,7 +61,7 @@ export function createMobileTaskAssertions(deps) {
     })
     assert.equal(
       todoMetrics.heading,
-      '待办',
+      '任务',
       `${scenarioName} 默认分区应为待办: ${JSON.stringify(todoMetrics)}`
     )
     assert.equal(
@@ -112,14 +114,19 @@ export function createMobileTaskAssertions(deps) {
     await assertMobileTaskMessageTabsSwitch(page, { scenarioName })
     await assertMobileTaskDarkMessagesReadable(page, { scenarioName })
 
-    await page.getByTestId('mobile-role-nav-done').click()
+    await page.getByTestId('mobile-role-nav-tasks').click()
+
+    await page
+      .getByLabel('任务状态', { exact: true })
+      .getByText('已办', { exact: true })
+      .click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
       const count = document
         .querySelector('[data-testid="mobile-role-done-count"]')
         ?.textContent?.trim()
       return (
-        heading?.textContent?.trim() === '已办' && /^\d+$/u.test(count || '')
+        heading?.textContent?.trim() === '任务' && /^\d+$/u.test(count || '')
       )
     })
     const doneMetrics = await readMobileTaskLayoutMetrics(page)
@@ -171,10 +178,15 @@ export function createMobileTaskAssertions(deps) {
       animations: 'disabled',
     })
 
-    await page.getByTestId('mobile-role-nav-todo').click()
+    await page.getByTestId('mobile-role-nav-tasks').click()
+
+    await page
+      .getByLabel('任务状态', { exact: true })
+      .getByText('待办', { exact: true })
+      .click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
-      return heading?.textContent?.trim() === '待办'
+      return heading?.textContent?.trim() === '任务'
     })
     const restoredMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(restoredMetrics, scenarioName)
@@ -295,10 +307,14 @@ export function createMobileTaskAssertions(deps) {
       undefined,
       { timeout: 10_000 }
     )
-    await page.getByTestId('mobile-role-nav-done').click()
+    await page.getByTestId('mobile-role-nav-tasks').click()
+    await page
+      .getByLabel('任务状态', { exact: true })
+      .getByText('已办', { exact: true })
+      .click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
-      return heading?.textContent?.trim() === '已办'
+      return heading?.textContent?.trim() === '任务'
     })
     await page
       .locator('.erp-mobile-list-item')
@@ -453,21 +469,12 @@ export function createMobileTaskAssertions(deps) {
     const metrics = await page.getByTestId(testID).evaluate((node) => {
       const style = window.getComputedStyle(node)
       const rect = node.getBoundingClientRect()
-      const filters = node.closest('.mobile-role-task-filters')
-      const filterThumbStyle =
-        filters instanceof HTMLElement
-          ? window.getComputedStyle(filters, '::before')
-          : null
       return {
         testID: node.getAttribute('data-testid'),
         ariaPressed: node.getAttribute('aria-pressed'),
         className: node.className,
-        filtersClassName: filters?.className || '',
-        filterThumbContent: filterThumbStyle?.content || '',
-        filterThumbTransform: filterThumbStyle?.transform || '',
-        filterThumbTransitionDuration:
-          filterThumbStyle?.transitionDuration || '',
-        filterTransitionDuration: style.transitionDuration || '',
+        hasCheck: Boolean(node.querySelector('.erp-filter-chip__check')),
+        borderWidth: Number.parseFloat(style.borderWidth),
         backgroundColor: style.backgroundColor,
         color: style.color,
         boxShadow: style.boxShadow,
@@ -483,23 +490,11 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} ${label} 缺少 aria-pressed 选中态: ${JSON.stringify(metrics)}`
     )
     assert(
-      String(metrics.className).includes('mobile-role-task-filter--active'),
-      `${scenarioName} ${label} 筛选选中态缺少 active class: ${JSON.stringify(metrics)}`
-    )
-    const expectedFilterKey = String(testID).replace('mobile-role-filter-', '')
-    assert(
-      String(metrics.filtersClassName).includes(
-        `mobile-role-task-filters--${expectedFilterKey}`
-      ) &&
-        metrics.filterThumbContent !== 'none' &&
-        metrics.filterThumbContent !== 'normal' &&
-        String(metrics.filterThumbTransitionDuration)
-          .split(',')
-          .some((part) => Number.parseFloat(part) > 0) &&
-        String(metrics.filterTransitionDuration)
-          .split(',')
-          .some((part) => Number.parseFloat(part) > 0),
-      `${scenarioName} ${label} 筛选缺少滑动选中态过渡: ${JSON.stringify(metrics)}`
+      !metrics.hasCheck &&
+        metrics.borderWidth >= 1 &&
+        metrics.boxShadow === 'none' &&
+        metrics.height >= 44,
+      `${scenarioName} ${label} 筛选应以单线强调边框、底色及足够点击区域表达选中，不应添加勾号或粗边框: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.scrollWidth <= metrics.clientWidth + 1,
@@ -1153,10 +1148,14 @@ export function createMobileTaskAssertions(deps) {
         timingText:
           document.querySelector('.mobile-task-detail-hero .erp-task-timing')
             ?.textContent || '',
-        redundantCopy: Array.from(shell.querySelectorAll('h1, h2, h3, h4, [role="heading"]'))
+        redundantCopy: Array.from(
+          shell.querySelectorAll('h1, h2, h3, h4, [role="heading"]')
+        )
           .filter((heading) => heading.getClientRects().length > 0)
           .map((heading) => heading.textContent.trim())
-          .filter((heading) => ['当前任务', '当前办理状态', '关联来源'].includes(heading)),
+          .filter((heading) =>
+            ['当前任务', '当前办理状态', '关联来源'].includes(heading)
+          ),
         buttons,
         flowSteps,
         scrollTopButtonCount: document.querySelectorAll(
@@ -1588,7 +1587,7 @@ export function createMobileTaskAssertions(deps) {
     await page.getByLabel('返回任务列表').click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
-      return heading?.textContent?.trim() === '待办'
+      return heading?.textContent?.trim() === '任务'
     })
 
     await gotoScenarioPath(page, '/m/boss/tasks', {
@@ -1737,7 +1736,11 @@ export function createMobileTaskAssertions(deps) {
     await gotoScenarioPath(page, '/m/sales/tasks', {
       waitUntil: 'domcontentloaded',
     })
-    await page.getByTestId('mobile-role-nav-todo').click()
+    await page.getByTestId('mobile-role-nav-tasks').click()
+    await page
+      .getByLabel('任务状态', { exact: true })
+      .getByText('待办', { exact: true })
+      .click()
     await page.getByTestId('mobile-role-filter-overdue').click()
     await page.waitForFunction(
       () =>
@@ -2356,14 +2359,6 @@ export function createMobileTaskAssertions(deps) {
       const tabsRect = tabs?.getBoundingClientRect()
       const tabsStyle =
         tabs instanceof HTMLElement ? window.getComputedStyle(tabs) : null
-      const tabsBeforeStyle =
-        tabs instanceof HTMLElement
-          ? window.getComputedStyle(tabs, '::before')
-          : null
-      const activeTabStyle =
-        activeTab instanceof HTMLElement
-          ? window.getComputedStyle(activeTab)
-          : null
       const filterItems = Array.from(
         tabs?.querySelectorAll('.mobile-role-task-filter') || []
       ).map((button) => {
@@ -2386,8 +2381,10 @@ export function createMobileTaskAssertions(deps) {
           textOverflow: contentStyle?.textOverflow || '',
           whiteSpace: contentStyle?.whiteSpace || '',
           height: contentRect?.height || 0,
+          countHeight: count?.getBoundingClientRect().height || 0,
           lineHeight: Number.parseFloat(contentStyle?.lineHeight || '0'),
           width: buttonRect.width,
+          buttonHeight: buttonRect.height,
           scrollWidth: content?.scrollWidth || 0,
           clientWidth: content?.clientWidth || 0,
         }
@@ -2398,11 +2395,7 @@ export function createMobileTaskAssertions(deps) {
         filterItems,
         tabsClassName: tabs?.className || '',
         tabsSticky: tabsStyle?.position === 'sticky',
-        tabsThumbContent: tabsBeforeStyle?.content || '',
-        tabsThumbTransform: tabsBeforeStyle?.transform || '',
-        tabsThumbWidth: Number.parseFloat(tabsBeforeStyle?.width || '0'),
-        tabsThumbTransitionDuration: tabsBeforeStyle?.transitionDuration || '',
-        activeTabTransitionDuration: activeTabStyle?.transitionDuration || '',
+        gap: Number.parseFloat(tabsStyle?.columnGap || '0'),
         scroll: scrollRect
           ? {
               top: scrollRect.top,
@@ -2450,7 +2443,7 @@ export function createMobileTaskAssertions(deps) {
         item.ariaLabel.includes(item.label) &&
           item.whiteSpace === 'nowrap' &&
           item.textOverflow !== 'ellipsis' &&
-          item.height <= item.lineHeight + 1.5 &&
+          item.height <= Math.max(item.lineHeight, item.countHeight) + 1.5 &&
           item.scrollWidth <= item.clientWidth + 1,
         `${scenarioName} ${item.label} 筛选不应换行、裁切或显示省略号: ${JSON.stringify(metrics)}`
       )
@@ -2494,30 +2487,19 @@ export function createMobileTaskAssertions(deps) {
           largeCountMetrics.documentClientWidth + 1,
       `${scenarioName} 三位数筛选数量标签不应被裁切或导致横向溢出: ${JSON.stringify(largeCountMetrics)}`
     )
-    const expectedFilterWidth =
-      (metrics.tabs.clientWidth - 8) / metrics.buttonCount
+    await assertFilterAffordance(page.locator('.mobile-role-task-filter'), 44)
     assert(
-      Math.abs(metrics.tabsThumbWidth - expectedFilterWidth) <= 1.5 &&
-        metrics.filterItems.every(
-          (item) => Math.abs(item.width - expectedFilterWidth) <= 1.5
-        ),
-      `${scenarioName} 审批并入筛选行后按钮与滑块应保持等宽: ${JSON.stringify(metrics)}`
+      metrics.filterItems.every(
+        (item) => item.width >= 44 && item.buttonHeight >= 44
+      ) &&
+        metrics.filterItems.reduce((sum, item) => sum + item.width, 0) +
+          metrics.gap * (metrics.buttonCount - 1) <=
+          metrics.tabs.clientWidth + 1.5,
+      `${scenarioName} 四项筛选应完整显示并保留足够点击区域: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.activeLabel.includes('全部'),
-      `${scenarioName} 待办筛选 sticky tab 选中态错误: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      String(metrics.tabsClassName).includes('mobile-role-task-filters--all') &&
-        metrics.tabsThumbContent !== 'none' &&
-        metrics.tabsThumbContent !== 'normal' &&
-        String(metrics.tabsThumbTransitionDuration)
-          .split(',')
-          .some((part) => Number.parseFloat(part) > 0) &&
-        String(metrics.activeTabTransitionDuration)
-          .split(',')
-          .some((part) => Number.parseFloat(part) > 0),
-      `${scenarioName} 待办筛选默认态缺少滑动选中态过渡: ${JSON.stringify(metrics)}`
+      `${scenarioName} 待办筛选选中态错误: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.tabsSticky,
@@ -2581,11 +2563,11 @@ export function createMobileTaskAssertions(deps) {
     assert(metrics.nav, `${scenarioName} 未找到移动端底部导航`)
     assert.equal(
       metrics.navButtonCount,
-      4,
-      `${scenarioName} 底部导航应固定为四项: ${JSON.stringify(metrics)}`
+      3,
+      `${scenarioName} 无进度权限时底部导航应为任务、风险、我的三项: ${JSON.stringify(metrics)}`
     )
     assert(
-      String(metrics.navClassName).includes('mobile-role-bottom-nav--') &&
+      String(metrics.navClassName).includes('erp-sliding-tab-list') &&
         metrics.navThumbContent !== 'none' &&
         metrics.navThumbContent !== 'normal' &&
         String(metrics.navThumbTransitionDuration)

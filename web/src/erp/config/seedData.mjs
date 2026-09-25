@@ -52,7 +52,7 @@ const navItemRegistry = {
   },
   'business-dashboard': {
     key: 'business-dashboard',
-    label: '业务看板',
+    label: '进度看板',
     path: '/erp/business-dashboard',
     shortLabel: '业务',
     description: '按业务记录、部门待处理和风险预警看整体运行状态。',

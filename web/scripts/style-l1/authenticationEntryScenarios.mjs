@@ -342,7 +342,7 @@ export function createAuthenticationEntryScenarios({
           }, initialStyle)
           brokenFocusStyle = await page.addStyleTag({
             content:
-              '.erp-login-sms-code-compact:focus-within::after { box-shadow: none !important; outline: none !important; }',
+              '.erp-login-card .erp-login-sms-code-compact.ant-space-compact:focus-within::after { content: none !important; box-shadow: none !important; outline: none !important; }',
           })
           await assert.rejects(
             () =>

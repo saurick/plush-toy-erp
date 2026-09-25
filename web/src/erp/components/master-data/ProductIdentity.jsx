@@ -91,14 +91,7 @@ function ProductPicture({ productID, name, code, read, preview }) {
   )
 }
 
-export default function ProductIdentity({
-  productId,
-  name,
-  code,
-  children,
-  compact = false,
-  preview = true,
-}) {
+export function ProductThumbnail({ productId, name, code, preview = true }) {
   const { adminProfile } = useOutletContext() || {}
   const productID = Number(productId || 0)
   const allowed =
@@ -108,22 +101,40 @@ export default function ProductIdentity({
   const accessKey = allowed
     ? workflowTaskAdminAccessRequestIdentity(adminProfile)
     : ''
+  return allowed ? (
+    <ProductPicture
+      key={`${accessKey}:${productID}`}
+      productID={productID}
+      name={name}
+      code={code}
+      read={referenceLoader(adminProfile, accessKey)}
+      preview={preview}
+    />
+  ) : (
+    <span className="erp-product-identity__picture">
+      <WorkflowTaskProductImage item={{ name }} preview={preview} />
+    </span>
+  )
+}
+
+export default function ProductIdentity({
+  productId,
+  name,
+  code,
+  children,
+  compact = false,
+  preview = true,
+}) {
   return (
     <span
       className={`erp-product-identity${compact ? ' erp-product-identity--compact' : ''}`}
     >
-      {allowed ? (
-        <ProductPicture
-          key={`${accessKey}:${productID}`}
-          productID={productID}
-          name={name}
-          code={code}
-          read={referenceLoader(adminProfile, accessKey)}
-          preview={preview}
-        />
-      ) : (
-        <WorkflowTaskProductImage item={{ name }} />
-      )}
+      <ProductThumbnail
+        productId={productId}
+        name={name}
+        code={code}
+        preview={preview}
+      />
       <span className="erp-product-identity__text">
         {children || name || '产品'}
         {code ? <small>{code}</small> : null}

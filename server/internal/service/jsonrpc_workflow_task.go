@@ -90,6 +90,30 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
+	case "get_task":
+		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownWorkflowTaskParams(pm, method, "task_id"); res != nil {
+			return id, res, nil
+		}
+		taskID, res := getRequiredWorkflowTaskID(pm)
+		if res != nil {
+			return id, res, nil
+		}
+		task, err := d.workflowUC.GetTask(ctx, taskID)
+		if err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
+		}
+		admin, res := d.CurrentAdmin(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		visibility := d.workflowTaskRoleVisibilityForTask(ctx, admin, task, biz.PermissionWorkflowTaskRead)
+		if !visibility.Valid || !workflowAdminCanViewTask(admin, task, visibility.RoleKeys) {
+			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"task": workflowTaskToMap(task)})}, nil
 	case "list_tasks":
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil

@@ -52,6 +52,63 @@ test('module scope must cover every selector and positive alternative', async ()
   }
 })
 
+test('shared tabs and filter chips keep one appearance owner while allowing page geometry', async () => {
+  for (const css of [
+    '.erp-page .erp-sliding-segmented { background: white; }',
+    '.erp-page .erp-filter-chip[aria-pressed="true"] { border: 0; }',
+    '.erp-page .ant-tabs-tab-active { color: #ddd; }',
+    '.erp-page .ant-segmented-item-selected { background: white; }',
+    '.erp-page { --erp-segmented-bg: white; }',
+    '.erp-page { --erp-control-accent: #eee; }',
+    '.erp-page { --erp-control-tab-border: #eee; }',
+    '.erp-page .erp-mobile-search .ant-input { background: white; }',
+    '.erp-page .erp-control-field { border-color: #eee; }',
+    '.erp-page { --erp-control-muted: #eee; }',
+  ]) {
+    assert.match((await warnings(css))[0], /control-affordance/u)
+    assert.deepEqual(
+      await warnings(css, 'src/erp/styles/app/control-affordance.css'),
+      []
+    )
+  }
+  assert.deepEqual(
+    await warnings(
+      '.erp-page .erp-filter-chip { min-height: 44px; padding: 8px; }'
+    ),
+    []
+  )
+  assert.match(
+    (
+      await warnings('.erp-page { --erp-slider-shadow: inset 0 -3px 0 green; }')
+    )[0],
+    /不得使用 2px 以上的底边/u
+  )
+  assert.deepEqual(
+    await warnings('.erp-page { --erp-slider-shadow: inset 0 0 0 1px green; }'),
+    []
+  )
+})
+
+test('mobile search layout and excluded fields do not claim shared appearance', async () => {
+  assert.deepEqual(
+    await warnings('.erp-page .erp-mobile-search { max-width: 440px; }'),
+    []
+  )
+  assert.deepEqual(
+    await warnings(
+      '.erp-page input:not(.erp-control-field) { color: inherit; }'
+    ),
+    []
+  )
+  assert.deepEqual(
+    await warnings(
+      '.erp-mobile-controls .erp-control-field:focus { outline: 0; }',
+      'src/erp/styles/app/control-focus.css'
+    ),
+    []
+  )
+})
+
 test('duplicate classes are rejected only within the same compound selector', async () => {
   assert.match(
     (await warnings('.erp-page.erp-page input { color: red; }'))[0],

@@ -224,15 +224,11 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
         : null
       const items = Array.from(
         control.querySelectorAll('.ant-segmented-item')
-      ).map((item, index) => {
+      ).map((item) => {
         const label = item.querySelector('.ant-segmented-item-label') || item
         const itemStyle = window.getComputedStyle(item)
         const labelStyle = window.getComputedStyle(label)
-        const isActiveByState =
-          (control.classList.contains('erp-login-segmented--left') &&
-            index === 0) ||
-          (control.classList.contains('erp-login-segmented--right') &&
-            index === 1)
+        const isActiveByState = item.querySelector('input')?.checked === true
         return {
           text: label.textContent?.replace(/\s+/g, ' ').trim() || '',
           isActiveByState,
@@ -246,11 +242,9 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
       return {
         className: control.className,
         motionDuration: style
-          .getPropertyValue('--erp-login-segmented-motion-duration')
+          .getPropertyValue('--erp-tab-motion-duration')
           .trim(),
-        motionEasing: style
-          .getPropertyValue('--erp-login-segmented-motion-easing')
-          .trim(),
+        motionEasing: style.getPropertyValue('--erp-tab-motion-easing').trim(),
         transitionDuration: style.transitionDuration,
         transitionTimingFunction: style.transitionTimingFunction,
         groupPosition: groupStyle?.position || '',
@@ -317,7 +311,7 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
       maxDuration >= 400 &&
         control.motionEasing.includes('0.215') &&
         !control.motionEasing.includes('0.2, 0, 0, 1'),
-      `${scenarioName} 登录页 Segmented 专属动效变量被全局短动效覆盖: ${JSON.stringify(
+      `${scenarioName} 登录页 Segmented 共享动效变量缺失或被短动效覆盖: ${JSON.stringify(
         {
           ...control,
           maxDuration,
@@ -379,15 +373,10 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
     })
   })
   assert(
-    metrics.segmentedControls.some((control) =>
-      control.className.includes('erp-login-segmented--right')
-    ) ||
-      metrics.segmentedControls.some((control) =>
-        control.className.includes('erp-login-segmented--left')
-      ),
-    `${scenarioName} 登录页 Segmented 缺少左右状态类: ${JSON.stringify(
-      metrics
-    )}`
+    metrics.segmentedControls.every((control) =>
+      control.className.includes('erp-sliding-segmented')
+    ),
+    `${scenarioName} 登录页必须复用共享视图切换组件`
   )
   assert.equal(
     metrics.entrySegmentedAriaLabel,

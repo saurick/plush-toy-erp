@@ -530,8 +530,31 @@ export function createQualitySourceActionScenarios(deps) {
             0,
             '切回固定档位后应清除并收起自定义比例输入框'
           )
+          const checkResultItem = modal
+            .locator('.ant-form-item')
+            .filter({ hasText: /^检查结果/ })
+            .first()
+          await checkResultItem.locator('.ant-select-selector').click()
+          await page
+            .locator('.ant-select-dropdown:visible')
+            .getByText('异常', { exact: true })
+            .click()
+          await modal
+            .getByLabel('实际情况')
+            .first()
+            .fill('发现明显色差')
+          const checkScopeItem = modal
+            .locator('.ant-form-item')
+            .filter({ hasText: /^检查范围/ })
+            .first()
+          await checkScopeItem.locator('.ant-select-selector').click()
+          await page
+            .locator('.ant-select-dropdown:visible')
+            .getByText('全检', { exact: true })
+            .click()
           await modal.getByRole('button', { name: '确认不合格' }).click()
           await expectText(page, '质量检验已判定不合格')
+          await modal.waitFor({ state: 'hidden', timeout: 10_000 })
 
           assert.equal(
             rejectParams.length,
@@ -540,6 +563,7 @@ export function createQualitySourceActionScenarios(deps) {
           )
           const params = rejectParams[0]
           assert.deepEqual(Object.keys(params).sort(), [
+            'check_items',
             'defect_rate_operator',
             'defect_rate_percent',
             'id',
@@ -550,6 +574,9 @@ export function createQualitySourceActionScenarios(deps) {
           assert.equal(params.result, 'REJECT')
           assert.equal(params.defect_rate_operator, 'GT')
           assert.equal(params.defect_rate_percent, '50')
+          assert.equal(params.check_items[0].result, 'FAIL')
+          assert.equal(params.check_items[0].observation, '发现明显色差')
+          assert.equal(params.check_items[0].scope, 'FULL')
           assert.match(params.inspected_at, /^\d{4}-\d{2}-\d{2}$/u)
 
           const updatedRow = page
@@ -950,11 +977,40 @@ export function createQualitySourceActionScenarios(deps) {
           const completedDispositionAction = page.locator(
             '[data-business-action-key="quality-disposition"]'
           )
+          await completedDispositionAction.waitFor({
+            state: 'hidden',
+            timeout: 10_000,
+          })
+          const postSubmitMoreButtons = page.getByRole('button', {
+            name: /更多操作/u,
+          })
+          let postSubmitMore = null
+          for (
+            let index = 0;
+            index < (await postSubmitMoreButtons.count());
+            index += 1
+          ) {
+            const candidate = postSubmitMoreButtons.nth(index)
+            if (await candidate.isVisible()) postSubmitMore = candidate
+          }
+          assert(postSubmitMore, '退货生成后应仍可查看其他选中行操作')
+          await postSubmitMore.click()
+          const postSubmitActionMenu = page.locator(
+            '.erp-business-selection-action-menu:visible'
+          )
+          await postSubmitActionMenu.waitFor({
+            state: 'visible',
+            timeout: 10_000,
+          })
           assert.equal(
-            await completedDispositionAction.count(),
+            await postSubmitActionMenu
+              .locator('button')
+              .filter({ hasText: '不合格处置' })
+              .count(),
             0,
             '退货已生成后隐藏重复处置入口，结果从关联退货追溯'
           )
+          await postSubmitMore.click()
           await selectRow(page, 'QI-INITIAL-REJECT-STYLE-L1')
           const initialRejectDispositionButton =
             await findSelectionActionButton(page, '不合格处置')
@@ -1223,7 +1279,11 @@ export function createQualitySourceActionScenarios(deps) {
               `委外回货质检弹窗不应显示技术字段 ${technicalCopy}`
             )
           }
-          await qualityModal.getByLabel('送检备注').fill('委外回货抽检')
+          await qualityModal
+            .locator('.ant-form-item')
+            .filter({ hasText: /^送检备注/ })
+            .locator('textarea')
+            .fill('委外回货抽检')
           await page.waitForTimeout(700)
           await qualityModal.screenshot({
             path: path.resolve(

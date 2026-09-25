@@ -12,6 +12,7 @@ var ProviderSet = wire.NewSet(
 	NewDebugUsecase,
 	NewMasterDataUsecase,
 	NewSalesOrderUsecase,
+	NewBusinessProgressUsecase,
 	NewPurchaseOrderUsecase,
 	NewProductionOrderUsecase,
 	NewOutsourcingOrderUsecase,

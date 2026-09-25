@@ -172,6 +172,23 @@ export function createBusinessFormInteractionScenarios({
     })
     return { promise, resolve }
   }
+  const submitVisibleBusinessFormPage = async (page, label = '保存') => {
+    const submitted = await page.evaluate((expectedLabel) => {
+      const button = Array.from(
+        document.querySelectorAll(
+          '.erp-business-form-page:not([hidden]) .erp-business-form-page__actions button'
+        )
+      ).find(
+        (candidate) =>
+          !candidate.disabled &&
+          String(candidate.textContent || '').replace(/\s+/gu, '') ===
+            String(expectedLabel).replace(/\s+/gu, '')
+      )
+      button?.click()
+      return Boolean(button)
+    }, label)
+    assert(submitted, `页内业务表单缺少可用的“${label}”按钮`)
+  }
   let purchaseOrderMaterialReferenceAttempts = 0
   let purchaseOrderMaterialReferenceMode = 'pending'
   let purchaseOrderMaterialReferenceCounts = {}
@@ -293,9 +310,15 @@ export function createBusinessFormInteractionScenarios({
           '示例织造AB-001#-02#米白'
         )
         await supplierItemInput.fill('另一示例CD-002#蓝')
-        await assertAntdModalCentered(
+        assert.equal(
+          await materialModal.evaluate((node) =>
+            node.matches('.erp-business-form-page')
+          ),
+          true,
+          '材料编辑应使用页内业务表单'
+        )
+        await assertNoHorizontalOverflow(
           page,
-          materialModal,
           'material-master-supplier-item-no-edit'
         )
         await materialModal.screenshot({
@@ -308,7 +331,7 @@ export function createBusinessFormInteractionScenarios({
               request.url().endsWith('/rpc/masterdata') &&
               request.postDataJSON()?.method === 'update_material'
           ),
-          materialModal.getByRole('button', { name: /^确\s*定$/u }).click(),
+          submitVisibleBusinessFormPage(page),
         ])
         assert.equal(
           updateRequest.postDataJSON().params.supplier_item_no,
@@ -330,7 +353,7 @@ export function createBusinessFormInteractionScenarios({
               request.url().endsWith('/rpc/masterdata') &&
               request.postDataJSON()?.method === 'update_material'
           ),
-          materialModal.getByRole('button', { name: /^确\s*定$/u }).click(),
+          submitVisibleBusinessFormPage(page),
         ])
         assert.equal(
           clearRequest.postDataJSON().params.supplier_item_no,
@@ -801,7 +824,7 @@ export function createBusinessFormInteractionScenarios({
           minFieldCount: 6,
           screenshotName: 'business-v1-outsourcing-order-title-form-modal',
           expectedTexts: [
-            '合同委托方信息',
+            '委托方',
             '委托单位',
             '委托人',
             '委托方电话',
@@ -810,8 +833,8 @@ export function createBusinessFormInteractionScenarios({
             '加工合同号',
             '加工厂',
             '加工明细',
-            '同一份加工合同内维护产品、工序、数量、单价和预计回货。',
-            '来源产品订单编号',
+            '加工项目填写部位或内容（如脸*1、耳*2），工序选择电绣、激光等加工方式。',
+            '产品订单编号',
             '加工项目',
             '工序',
             '单位',
@@ -828,7 +851,7 @@ export function createBusinessFormInteractionScenarios({
               .locator(
                 '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
               )
-              .filter({ has: page.getByText('PROD-STYLE-L1 / 样式产品', { exact: true }) })
+              .filter({ hasText: 'BEAR-STYLE / 样式产品' })
               .first()
               .click()
             const productSKUInput = modal
@@ -863,7 +886,7 @@ export function createBusinessFormInteractionScenarios({
               .locator(
                 '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
               )
-              .filter({ hasText: '材料（布料加工等）' })
+              .filter({ hasText: '材料' })
               .first()
               .click()
             const materialInput = modal
@@ -901,7 +924,7 @@ export function createBusinessFormInteractionScenarios({
               materialRowMetrics.found &&
                 materialRowMetrics.scrollWidth <=
                   materialRowMetrics.clientWidth + 1 &&
-                materialRowMetrics.text.includes('材料（布料加工等）') &&
+                materialRowMetrics.text.includes('加工品类材料') &&
                 materialRowMetrics.text.includes('MAT-STYLE-L') &&
                 materialRowMetrics.text.includes('样式材料'),
               `材料加工行应完整显示并不溢出: ${JSON.stringify(
@@ -960,7 +983,8 @@ export function createBusinessFormInteractionScenarios({
           .locator('.ant-table-row')
           .filter({ hasText: '样式供应商' })
           .first()
-          .click()
+          .getByRole('radio')
+          .check()
         assert.equal(
           await page.locator('.erp-business-collaboration-task-panel').count(),
           0,
@@ -1085,7 +1109,12 @@ export function createBusinessFormInteractionScenarios({
         })
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'shipment-date-filter-desktop',
-          unsortableHeaders: ['实际 / 最终总净重（克）', '备注'],
+          unsortableHeaders: [
+            '实际 / 最终总净重（克）',
+            '实际运费',
+            '包装 / 毛重 / 体积',
+            '备注',
+          ],
         })
         await assertBusinessModuleToolbarControlStyle(page, {
           scenarioName: 'shipment-date-filter-desktop',
@@ -1183,7 +1212,7 @@ export function createBusinessFormInteractionScenarios({
           .locator('.erp-business-data-table-card .ant-table-tbody tr')
           .filter({ hasText: 'PO-STYLE-L1' })
           .first()
-        await purchaseOrderRow.getByRole('radio').check()
+        await purchaseOrderRow.getByRole('checkbox').check()
         await purchaseOrderRow.waitFor({ state: 'visible', timeout: 10_000 })
         assert(
           String((await purchaseOrderRow.getAttribute('class')) || '').includes(
@@ -1209,7 +1238,13 @@ export function createBusinessFormInteractionScenarios({
       name: 'business-selection-actions-phone-320',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
-      effectiveSession: customerRuntimeEffectiveSession,
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        actions: [
+          ...customerRuntimeEffectiveSession.actions,
+          'supplier.disable',
+        ],
+      },
       viewport: { width: 320, height: 760 },
       verify: async (page) => {
         await expectHeading(page, '供应商与加工厂')
@@ -1240,7 +1275,8 @@ export function createBusinessFormInteractionScenarios({
           .locator('.erp-business-data-table-card .ant-table-tbody tr')
           .filter({ hasText: 'PO-STYLE-L1' })
           .first()
-          .click()
+          .getByRole('checkbox')
+          .check()
         await assertResponsiveSelectionActionBar(page, {
           scenarioName: 'business-selection-actions-tablet-820',
           maxVisibleActions: 2,
@@ -1259,7 +1295,12 @@ export function createBusinessFormInteractionScenarios({
       viewport: { width: 1024, height: 768 },
       verify: async (page) => {
         await expectHeading(page, '出货单')
-        await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
+        await page
+          .locator('.erp-business-data-table-card .ant-table-tbody tr')
+          .filter({ hasText: 'SHIP-STYLE-L1' })
+          .first()
+          .getByRole('radio')
+          .check()
         const metrics = await page
           .locator('.erp-business-selection-action-bar__actions')
           .first()

@@ -11,6 +11,10 @@ const messages = stylelint.utils.ruleMessages(ruleName, {
   radius:
     'AntD 输入控件圆角由 control-foundation.css 维护；组合接缝通过 --erp-control-radius 表达',
   page: '模块打印必须使用命名 @page，避免修改其他页面的纸张设置',
+  controls:
+    'Tab、筛选与移动搜索的外观由 control-affordance.css 维护；页面只定义布局和尺寸',
+  thickSelection:
+    'Tab 与筛选选中态不得使用 2px 以上的底边；使用共享底色、单线描边和字重',
 })
 
 // 这些文件维护应用级基线；业务页面和按需加载的组件不进入此列表。
@@ -18,6 +22,7 @@ const sharedFiles = new Set([
   'src/erp/styles/app/control-foundation.css',
   'src/erp/styles/app/business-control-rhythm.css',
   'src/erp/styles/app/control-focus.css',
+  'src/erp/styles/app/control-affordance.css',
   'src/erp/styles/app/theme-overrides.css',
   'src/erp/styles/app/tabs-motion.css',
   'src/erp/styles/app/print-responsive.css',
@@ -77,6 +82,20 @@ const rule = (enabled) => (root, result) => {
   const report = (node, message) =>
     stylelint.utils.report({ ruleName, result, node, message })
 
+  const appearanceOwner =
+    relative === 'src/erp/styles/app/control-affordance.css'
+  root.walkDecls('--erp-slider-shadow', (decl) => {
+    if (/inset\s+0\s+-[2-9]\d*px\s+0/u.test(decl.value)) {
+      report(decl, messages.thickSelection)
+    }
+  })
+  if (!appearanceOwner) {
+    root.walkDecls(
+      /^--erp-(segmented-|control-(surface|track|border|tab-border|text|muted|on-accent|accent|selected|hover|disabled))/u,
+      (decl) => report(decl, messages.controls)
+    )
+  }
+
   root.walkAtRules('page', (node) => {
     if (!shared && (!node.params || node.params.startsWith(':'))) {
       report(node, messages.page)
@@ -90,6 +109,33 @@ const rule = (enabled) => (root, result) => {
       return
     }
     const selectors = selectorParser().astSync(node.selector)
+    let mobileControl = false
+    selectors.walkClasses((part) => {
+      if (
+        !/^erp-(?:mobile-search(?:__clear)?|control-field)$/u.test(part.value)
+      ) {
+        return
+      }
+      let { parent } = part
+      while (parent) {
+        if (parent.type === 'pseudo' && parent.value === ':not') return
+        parent = parent.parent
+      }
+      mobileControl = true
+    })
+    if (
+      !appearanceOwner &&
+      relative !== 'src/erp/styles/app/tabs-motion.css' &&
+      ((mobileControl && relative !== focusFile) ||
+        /erp-sliding-(?:tabs|segmented)|erp-filter-chip|ant-(?:segmented(?:-item(?:-label|-selected)?)?|tabs-tab(?:-btn|-active)?|tabs-ink-bar)(?![\w-])|erp-segmented-item-selected/u.test(
+          node.selector
+        ))
+    ) {
+      node.walkDecls(
+        /^(?:background(?:-color)?|color|box-shadow|border(?:-.+)?|outline)$/u,
+        (decl) => report(decl, messages.controls)
+      )
+    }
     if (
       relative !== 'src/erp/styles/app/control-foundation.css' &&
       selectors.nodes.some(targetsOuterControl)

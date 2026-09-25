@@ -79,6 +79,25 @@ function validTask(overrides = {}) {
   }
 }
 
+test('workflowApi: 单任务读取按准确身份校验，并保留取消信号', async () => {
+  const controller = new AbortController()
+  const api = await loadWorkflowApi(async (method, params, options) => {
+    assert.equal(method, 'get_task')
+    assert.deepEqual(params, { task_id: 42 })
+    assert.equal(options.signal, controller.signal)
+    return { data: { task: validTask() } }
+  })
+  assert.equal(
+    (await api.getWorkflowTask(42, { signal: controller.signal })).version,
+    8
+  )
+  await assert.rejects(api.getWorkflowTask(0), /任务参数无效/u)
+  const wrong = await loadWorkflowApi(async () => ({
+    data: { task: validTask({ id: 43 }) },
+  }))
+  await assert.rejects(wrong.getWorkflowTask(42), /任务详情暂不可用/u)
+})
+
 function roleTaskCounts({
   ready = 0,
   blocked = 0,

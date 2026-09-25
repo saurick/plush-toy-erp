@@ -78,6 +78,7 @@ export function createCustomerSessionScenarios({
     {
       name: 'erp-dashboard-redirect',
       path: '/erp/dashboard',
+      mockAdminRpc: true,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
         await expectHeading(page, '毛绒玩具管理系统')
@@ -1101,9 +1102,8 @@ export function createCustomerSessionScenarios({
       expectPath: '/erp/business-dashboard',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '业务管理')
         await expectText(page, '超级管理员')
-        await expectText(page, '业务看板 功能预览')
+        await expectText(page, '进度看板 功能预览')
         await expectText(page, '功能说明')
         await expectText(page, '尚未连接客户环境')
         await assertTextAbsent(page, '产品核心评审不读取客户业务数据')
@@ -1117,9 +1117,7 @@ export function createCustomerSessionScenarios({
           const review = document.querySelector(
             '[data-product-core-capability-review="true"]'
           )
-          const dashboard = document.querySelector(
-            '.erp-business-dashboard-page'
-          )
+          const dashboard = document.querySelector('.erp-progress-board')
           const table = document.querySelector('.ant-table')
           const menu = document.querySelector('.erp-admin-menu')
           const reviewRect = review?.getBoundingClientRect()
@@ -1149,7 +1147,7 @@ export function createCustomerSessionScenarios({
           )}`
         )
         assert(
-          !pageMetrics.menuText.includes('业务看板') &&
+          !pageMetrics.menuText.includes('进度看板') &&
             !pageMetrics.menuText.includes('BOM 管理') &&
             !pageMetrics.menuText.includes('委外订单'),
           `无客户 Product Core 侧栏不应显示客户业务导航: ${JSON.stringify(
@@ -1776,14 +1774,14 @@ export function createCustomerSessionScenarios({
         })
       },
       verify: async (page) => {
-        await expectHeading(page, '生产异常处置')
+        await expectHeading(page, '生产记录')
         const taskTab = page.getByRole('tab', { name: '待审批' })
         await taskTab.waitFor({ state: 'visible' })
         assert.equal(await taskTab.getAttribute('aria-selected'), 'true')
         assert.equal(
-          await page.getByRole('tab', { name: '处置申请' }).count(),
+          await page.getByRole('tab', { name: '异常处理' }).count(),
           0,
-          '仅有任务读取权限时不得挂载不可读的处置申请页签'
+          '仅有任务读取权限时不得挂载不可读的异常处理页签'
         )
         await expectText(page, '暂无待审批的生产异常处置申请。')
         assert.equal(
@@ -2064,7 +2062,7 @@ export function createCustomerSessionScenarios({
           .filter({ hasText: '岗位使用帮助' })
         await helpMenuItem.click()
         await page.waitForURL((url) => url.pathname === '/erp/help-center')
-        await expectText(page, '正常办理案例')
+        await expectText(page, '正常怎么做')
         await expectText(page, '完成标准')
         await expectText(page, '遇到异常怎么办')
         await expectText(page, '退回对象')
@@ -2089,7 +2087,7 @@ export function createCustomerSessionScenarios({
         await page
           .reload({ waitUntil: 'domcontentloaded' })
           .then(() => page.waitForLoadState('networkidle').catch(() => {}))
-        await expectText(page, '正常办理案例')
+        await expectText(page, '正常怎么做')
         await helpMenuItem.waitFor({ state: 'visible', timeout: 10_000 })
         const reloadedHelpState = await readMoreFunctionsState()
         assert.equal(
@@ -2337,7 +2335,7 @@ export function createCustomerSessionScenarios({
         const menu = page.locator('.erp-admin-menu')
         await expectText(page, '看板中心')
         await expectText(page, '常用工作')
-        await expectText(page, '更多功能（16）')
+        await expectText(page, '更多功能（14）')
         const visibleLeafTexts = await menu.evaluate((node) =>
           Array.from(node.querySelectorAll('.ant-menu-item'))
             .filter((item) => item.getClientRects().length > 0)
@@ -2348,7 +2346,7 @@ export function createCustomerSessionScenarios({
           [
             '工作台',
             '任务看板',
-            '业务看板',
+            '进度看板',
             '销售订单',
             '采购订单',
             '质量检验',
@@ -2361,7 +2359,7 @@ export function createCustomerSessionScenarios({
           .first()
           .locator('..')
         await moreFunctionsRoot.locator('.ant-menu-submenu-title').click()
-        await expectText(page, '生产异常处置')
+        await expectText(page, '生产订单')
         await expectText(page, '岗位使用帮助')
         assert.deepEqual(
           await moreFunctionsRoot
@@ -2381,7 +2379,7 @@ export function createCustomerSessionScenarios({
         const bossMoreItems = await moreFunctionsRoot
           .locator('.ant-menu-item')
           .allTextContents()
-        assert.equal(bossMoreItems.length, 16)
+        assert.equal(bossMoreItems.length, 14)
         assert.equal(String(bossMoreItems.at(-1) || '').trim(), '岗位使用帮助')
         await page.screenshot({
           path: path.resolve(

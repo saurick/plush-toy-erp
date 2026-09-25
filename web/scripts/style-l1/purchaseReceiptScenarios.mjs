@@ -23,12 +23,33 @@ export function createPurchaseReceiptScenarios(deps) {
       assertAntdModalCentered,
     })
 
-  const clickSelectionAction = async (page, name) => {
-    const button = page.getByRole('button', { name, exact: true })
-    if (!(await button.isVisible())) {
-      await page.getByRole('button', { name: /^更多操作，共/u }).click()
+  const getSelectionActionButton = async (page, name) => {
+    const buttons = page.getByRole('button', { name, exact: true })
+    for (let index = 0; index < (await buttons.count()); index += 1) {
+      const button = buttons.nth(index)
+      if (await button.isVisible()) return button
     }
-    await button.click()
+    const moreButtons = page.getByRole('button', { name: /^更多操作，共/u })
+    for (let index = 0; index < (await moreButtons.count()); index += 1) {
+      const moreButton = moreButtons.nth(index)
+      if (await moreButton.isVisible()) {
+        await moreButton.click()
+        break
+      }
+    }
+    const menu = page.locator('.erp-business-selection-action-menu:visible')
+    await menu.waitFor({ state: 'visible', timeout: 10_000 })
+    const menuButtons = menu.getByRole('button', { name, exact: true })
+    for (let index = 0; index < (await menuButtons.count()); index += 1) {
+      const button = menuButtons.nth(index)
+      if (await button.isVisible()) return button
+    }
+    throw new Error(`更多操作中缺少“${String(name)}”`)
+  }
+
+  const clickSelectionAction = async (page, name) => {
+    const button = await getSelectionActionButton(page, name)
+    await button.dispatchEvent('click')
   }
 
   const assertPurchaseReceiptToolbarShell = async (page, scenarioName) => {
@@ -206,7 +227,9 @@ export function createPurchaseReceiptScenarios(deps) {
       '仓库',
       '批次',
       '批次号',
-      '数量',
+      '本次实点数量',
+      '送货标示数量',
+      '实点与标示差异',
       '单位',
       '单价',
       '金额',
@@ -464,7 +487,8 @@ export function createPurchaseReceiptScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '入库管理')
         await expectText(page, 'PR-STYLE-L1-DRAFT')
-        await expectText(page, '不提供脱离采购来源的手工入库明细')
+        await expectText(page, '入库单：正式入库记录')
+        await expectText(page, '过账后更新库存记录')
         await assertTextAbsent(page, '维护明细')
         await assertTextAbsent(page, '添加明细')
         await assertTextAbsent(page, '添加入库明细')
@@ -506,19 +530,16 @@ export function createPurchaseReceiptScenarios(deps) {
         const actionBarText = await page
           .locator('.erp-business-module-current-action')
           .innerText()
-        const discardDraftButton = page.getByRole('button', {
-          name: /作废草稿/u,
-        })
-        if (!(await discardDraftButton.isVisible())) {
-          await page.getByRole('button', { name: /^更多操作，共/u }).click()
-        }
-        await discardDraftButton.waitFor({ state: 'visible', timeout: 10_000 })
+        const discardDraftButton = await getSelectionActionButton(
+          page,
+          /作废草稿/u
+        )
         assert.equal(
           await discardDraftButton.isDisabled(),
           false,
           `采购入库草稿作废入口不应被禁用: ${actionBarText}`
         )
-        await discardDraftButton.click()
+        await discardDraftButton.dispatchEvent('click')
         const visiblePopover = page
           .locator('.ant-popover:visible')
           .filter({ hasText: '确认作废采购入库草稿' })
@@ -647,7 +668,7 @@ export function createPurchaseReceiptScenarios(deps) {
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
-        await expectText(page, '不提供脱离采购来源的手工入库明细')
+        await expectText(page, '入库单：正式入库记录')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
         await assertTextAbsent(page, '添加明细')
@@ -666,7 +687,7 @@ export function createPurchaseReceiptScenarios(deps) {
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '入库管理')
-        await expectText(page, '不提供脱离采购来源的手工入库明细')
+        await expectText(page, '入库单：正式入库记录')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
         await assertTextAbsent(page, '添加明细')

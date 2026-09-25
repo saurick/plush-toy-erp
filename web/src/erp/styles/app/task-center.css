@@ -45,16 +45,8 @@
 }
 
 .erp-task-board-scope-filter .ant-segmented {
-  --erp-segmented-bg: var(--erp-primary-strong, #237234);
-  --erp-segmented-radius: 7px;
-  --erp-segmented-shadow: none;
-  --erp-segmented-text: var(--erp-text, #344054);
-  --erp-segmented-selected-text: var(--erp-task-scope-selected-text);
   max-width: 100%;
   padding: 3px;
-  border: 1px solid var(--erp-border-strong, #bccdc1);
-  border-radius: 10px;
-  background: var(--erp-surface-bg-soft, #f4f7f5);
 }
 
 .erp-task-board-scope-filter .ant-segmented-group {
@@ -63,10 +55,6 @@
 
 .erp-task-board-scope-filter .ant-segmented-item {
   min-width: 112px;
-  border: 1px solid var(--erp-border-strong, #bccdc1);
-  border-radius: 7px;
-  color: var(--erp-text, #344054);
-  background: transparent;
 }
 
 .erp-task-board-scope-filter .ant-segmented-item-label {
@@ -84,16 +72,6 @@
 }
 
 .erp-task-board-scope-filter
-  .ant-segmented-item:not(.erp-segmented-item-selected):hover {
-  border-color: var(--erp-primary, #2b8a3e);
-  color: var(--erp-text, #344054);
-}
-
-.erp-task-board-scope-filter .erp-segmented-item-selected {
-  border-color: var(--erp-primary-strong, #237234);
-}
-
-.erp-task-board-scope-filter
   .erp-segmented-item-selected
   .ant-segmented-item-icon {
   opacity: 1;
@@ -101,7 +79,6 @@
 
 .erp-task-board-scope-filter .ant-segmented:focus-visible,
 .erp-task-board-scope-filter .ant-segmented-item-focused {
-  outline: 2px solid var(--erp-control-focus-border);
   outline-offset: 2px;
 }
 

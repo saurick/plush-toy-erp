@@ -30,6 +30,31 @@ body
   outline: 0;
 }
 
+/* Ant status styles are injected after the app stylesheet. The focused
+   control keeps the shared focus border and inset ring as the active state. */
+body
+  .ant-select.ant-select-outlined:not(.ant-select-disabled):not(
+    .ant-select-customize-input
+  ):not(.ant-pagination-size-changer):is(
+    :focus-within,
+    .ant-select-focused,
+    .ant-select-open
+  )
+  > .ant-select-selector {
+  border-color: var(--erp-control-focus-border);
+  box-shadow: var(
+    --erp-control-focus-shadow,
+    inset 0 0 0 2px var(--erp-control-focus-ring)
+  );
+  outline: 0;
+}
+
+.erp-mobile-controls .erp-control-field:focus {
+  border-color: var(--erp-control-focus-border);
+  box-shadow: inset 0 0 0 2px var(--erp-control-focus-ring);
+  outline: 0;
+}
+
 /* 内层输入负责文字与键盘交互，原生/Tailwind focus 不再绘制第二层边框。 */
 body
   :is(
@@ -45,6 +70,12 @@ body
   --tw-ring-shadow: 0 0 #0000;
   border-color: transparent;
   box-shadow: none;
+  outline: 0;
+}
+
+body
+  .ant-select.ant-select-outlined.ant-select-focused
+  .ant-select-selection-search-input:focus {
   outline: 0;
 }
 

@@ -253,7 +253,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "workbench-summary-list", "按来源权限查看汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary", "list_engineering_material_requests"), businessUsageConditions),
 	)
 	add(PermissionERPBusinessDashboardRead,
-		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "业务看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "dashboard_stats"), businessUsageConditions),
+		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "进度看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "list_progress", "get_progress"), businessUsageConditions),
 	)
 	addMenu(PermissionERPPrintTemplateRead, "print-center", "print-templates", "打印模板", "print-template-list", "模板打印中心", permissionControlPage, "允许进入并查看", nil, businessUsageConditions)
 	addBackend(PermissionERPBusinessChainDebugRead, permissionMethods("debug", "capabilities", "config"), debugUsageConditions)
@@ -335,7 +335,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 			menuPermissionSurface("task-board", "task-actions", "协同任务", controlKey, controlLabel, controlType, effect, methods, workflowUsageConditions),
 		}
 	}
-	workflowTaskReadSurfaces := workflowSurfaces("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment", "get_task_process_context", "list_task_events"))
+	workflowTaskReadSurfaces := workflowSurfaces("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "get_task", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment", "get_task_process_context", "list_task_events"))
 	for index := range workflowTaskReadSurfaces {
 		if workflowTaskReadSurfaces[index].PageKey == "global-dashboard" {
 			workflowTaskReadSurfaces[index].BackendMethods = append(
@@ -545,6 +545,11 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addBackend(PermissionDebugBusinessChainRun, permissionMethods("debug", "rebuild_business_chain_scenario", "seed_business_chain_scenario", "clear_business_chain_scenario", "cleanup_business_chain_scenario"), debugUsageConditions)
 	addBackend(PermissionDebugBusinessChainRead, permissionMethods("debug", "capabilities", "config"), debugUsageConditions)
 
+	for _, permission := range []string{PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionPMCPlanRead, PermissionProductionWIPRead, PermissionWorkflowTaskRead} {
+		usage := out[permission]
+		usage.Surfaces = append(usage.Surfaces, menuPermissionSurface("business-dashboard", "progress-sources", "来源进度", "progress-source-read", "按来源权限查看进度", permissionControlSection, "允许查看对应来源环节", permissionMethods("business", "list_progress", "get_progress"), []string{"页面入口仍需进度看板权限；订单同时要求销售单与明细读取，工序及质检另需生产读取；任务沿用 revision 与责任可见范围"}))
+		out[permission] = usage
+	}
 	applySourceActionReadPermissionUsages(out)
 	return out
 }

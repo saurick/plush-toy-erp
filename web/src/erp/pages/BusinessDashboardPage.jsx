@@ -1,584 +1,655 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Alert, Button, Empty, Popover, Select, Tag } from 'antd'
+import { FilterOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import {
-  ArrowRightOutlined,
-  FileTextOutlined,
-  InfoCircleOutlined,
-  UserOutlined,
-} from '@ant-design/icons'
-import { Alert, Button, Card, Space, Spin, Typography } from 'antd'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
+import FilterChip from '@/common/components/navigation/FilterChip'
 import Table from '@/common/components/table/AppTable'
-import WorkflowTaskIdentity from '../components/workflow/WorkflowTaskIdentity.jsx'
-import WorkflowTaskTiming from '../components/workflow/WorkflowTaskTiming.jsx'
-import { message } from '@/common/utils/antdApp'
+import SearchInput from '@/common/components/SearchInput'
+import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { getBusinessDashboardStats } from '../api/businessDashboardApi.mjs'
-import { getWorkflowTaskBoard } from '../api/workflowApi.mjs'
+import { listBusinessProgress } from '../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
-import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
-import {
-  DASHBOARD_TRUTH_KINDS,
-  dashboardHealthModules,
-} from '../config/dashboardModules.mjs'
-import {
-  formatWorkflowTaskSource,
-  resolveWorkflowTaskEntryPath,
-} from '../utils/dashboardTaskDisplay.mjs'
-import {
-  buildDashboardModuleRows,
-  normalizeDashboardModuleStats,
-} from '../utils/dashboardStats.mjs'
-import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mjs'
+import { canOpenRelatedDocumentPath } from '../utils/relatedDocumentNavigation.mjs'
 import { effectiveSessionAllowsPage } from '../utils/adminProfileSync.mjs'
+import { getWorkflowTaskOwnerRoleLabel } from '../utils/workflowTaskBoard.mjs'
 import {
-  TASK_BOARD_LANE_DEFINITIONS,
-  getWorkflowTaskOwnerRoleLabel,
-  getWorkflowTaskReasonMeta,
-} from '../utils/workflowTaskBoard.mjs'
-import { canOpenWorkflowTaskEntry } from '../utils/workflowTaskEntryAccess.mjs'
+  progressQueryFromURL,
+  progressDelivery,
+  progressStatusLabel,
+} from '../utils/businessProgress.mjs'
+import BusinessProgressDrawer from '../components/business-visualizations/BusinessProgressDrawer.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessListLayout.jsx'
+import '../styles/app/progress-board.css'
 
-const { Paragraph, Text, Title } = Typography
-
-const NUMBER_FORMATTER = new Intl.NumberFormat('zh-CN')
-const PAGE_KEY_BY_DASHBOARD_SOURCE = Object.freeze({
-  outbound: 'shipments',
-})
-
-const DATA_BOUNDARIES = Object.freeze([
-  {
-    key: 'master-data',
-    title: '基础资料',
-    description: '客户、供应商、产品与物料清单等基础资料。',
-  },
-  {
-    key: 'source-document',
-    title: '业务单据',
-    description:
-      '销售、采购、生产与委外等订单或合同，用于记录业务发起或约定，后续仍需按流程办理。',
-  },
-  {
-    key: 'business-overview',
-    title: '办理结果',
-    description: '入库、质检、库存、出货和财务等已经完成的业务记录。',
-  },
-  {
-    key: 'collaboration',
-    title: '待办事项',
-    description:
-      '排程、异常、放行等需要跟进的工作；完成任务不会自动产生库存、出货或财务记录。',
-  },
-])
-
-const DATA_BOUNDARY_LABELS = Object.freeze({
-  [DASHBOARD_TRUTH_KINDS.MASTER_DATA]: '基础资料',
-  [DASHBOARD_TRUTH_KINDS.SOURCE_DOCUMENT]: '业务单据',
-  [DASHBOARD_TRUTH_KINDS.BUSINESS_FACT]: '办理结果',
-  [DASHBOARD_TRUTH_KINDS.COLLABORATION]: '待办事项',
-})
-const BUSINESS_ATTENTION_LANES = Object.freeze(
-  TASK_BOARD_LANE_DEFINITIONS.filter(
-    (definition) => definition.key === 'exception' || definition.key === 'due'
-  )
-)
-
-function formatCount(value) {
-  return Number.isSafeInteger(value) && value >= 0
-    ? NUMBER_FORMATTER.format(value)
+const SCOPES = [
+  { value: 'active', label: '在执行' },
+  { value: 'ended', label: '已结束' },
+  { value: 'all', label: '全部记录' },
+]
+const roleLabel = (key) =>
+  key ? getWorkflowTaskOwnerRoleLabel({ owner_role_key: key }) : '未分配岗位'
+const count = (value) =>
+  Number.isSafeInteger(value)
+    ? new Intl.NumberFormat('zh-CN').format(value)
     : '—'
-}
 
-function getLane(taskBoard, key) {
-  return Array.isArray(taskBoard?.lanes)
-    ? taskBoard.lanes.find((lane) => lane?.key === key) || null
-    : null
-}
-
-function BusinessAttentionItem({
-  adminProfile,
-  definition,
-  onOpenEntry,
-  taskBoard,
-  taskBoardReady,
-  onViewAll,
-}) {
-  const lane = getLane(taskBoard, definition.key)
-  const total = taskBoardReady ? taskBoard.counts[definition.key] : null
-  const task = taskBoardReady ? lane?.tasks?.[0] : null
-  const reason = task ? getWorkflowTaskReasonMeta(task) : null
-  const access = useWorkflowTaskActionAccess({
-    adminProfile,
-    task,
-    enabled: Boolean(task),
-  })
-  const entryPath = task ? resolveWorkflowTaskEntryPath(task) : ''
-  const canOpenEntry = canOpenWorkflowTaskEntry(
-    adminProfile,
-    entryPath,
-    access.sourceAccess
-  )
-
+function Stage({ label, text, tone = '', onClick, disabled }) {
   return (
-    <div
-      role="group"
-      aria-label={`${definition.title}，${taskBoardReady ? `${formatCount(total)} 项` : '暂不可用'}`}
-      className={`erp-business-board-alert-item${
-        canOpenEntry ? ' erp-business-board-alert-item--openable' : ''
-      }`}
-      data-open-on-double-click={canOpenEntry ? 'true' : undefined}
-      title={canOpenEntry ? '双击查看相关业务' : undefined}
-      onDoubleClick={
-        canOpenEntry
-          ? (event) =>
-              openDashboardItemOnDoubleClick(event, () =>
-                onOpenEntry(task, access)
-              )
-          : undefined
-      }
+    <button
+      type="button"
+      className={`erp-progress-stage ${tone}`}
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={`${label}：${text}`}
     >
-      <div className="erp-business-board-alert-head">
-        <Text strong>{definition.title}</Text>
-        <strong className="erp-business-board-alert-count">
-          {taskBoardReady ? formatCount(total) : '—'}
-        </strong>
-      </div>
-      {!taskBoardReady ? (
-        <Text type="secondary">暂不可用</Text>
-      ) : task ? (
-        <>
-          <Text strong className="erp-business-board-task-text">
-            {task.task_name || definition.title}
-          </Text>
-          <WorkflowTaskIdentity task={task} compact />
-          <Text type="secondary" className="erp-business-board-task-source">
-            <FileTextOutlined aria-hidden="true" />
-            <span>{formatWorkflowTaskSource(task)}</span>
-          </Text>
-          {reason?.value ? (
-            <Text
-              className="erp-business-board-task-reason"
-              type={reason.kind === 'blocked' ? 'danger' : 'secondary'}
-            >
-              {reason.label}：{reason.value}
-            </Text>
-          ) : null}
-          <WorkflowTaskTiming task={task} />
-          <div className="erp-business-board-task-meta">
-            <Text type="secondary">
-              <UserOutlined aria-hidden="true" />{' '}
-              {getWorkflowTaskOwnerRoleLabel(task)}
-            </Text>
-          </div>
-        </>
-      ) : total > 0 ? (
-        <Text type="secondary">暂无可展示事项</Text>
-      ) : (
-        <Text type="secondary">暂无</Text>
+      <span>{label}</span>
+      <strong>{text}</strong>
+    </button>
+  )
+}
+
+function Delivery({ row, onClick }) {
+  const delivery = progressDelivery(row)
+  return (
+    <button
+      type="button"
+      className="erp-progress-delivery"
+      onClick={onClick}
+      aria-label={`${delivery.label}：${delivery.text}`}
+    >
+      <span>{delivery.label}</span>
+      <strong>{delivery.text}</strong>
+      {delivery.percent !== undefined && (
+        <span
+          className="erp-progress-track"
+          role="progressbar"
+          aria-label={row.view === 'orders' ? '实际出货比例' : '有效完工比例'}
+          aria-valuenow={Math.round(delivery.percent)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <i style={{ width: `${delivery.percent}%` }} />
+        </span>
       )}
-      <div className="erp-business-board-alert-actions">
-        {canOpenEntry ? (
-          <Button
-            type="link"
-            size="small"
-            className="erp-dashboard-link-button erp-business-board-task-entry"
-            onClick={() => onOpenEntry(task, access)}
-            aria-label={`查看${task.task_name || definition.title}的单据`}
-          >
-            查看单据
-          </Button>
-        ) : null}
-        {taskBoardReady && total > 0 && onViewAll ? (
-          <Button
-            type="link"
-            size="small"
-            icon={<ArrowRightOutlined aria-hidden="true" />}
-            iconPosition="end"
-            onClick={() => onViewAll(definition.key)}
-          >
-            查看全部 {formatCount(total)} 项
-          </Button>
-        ) : null}
-      </div>
-    </div>
+    </button>
   )
 }
 
 export default function BusinessDashboardPage() {
-  const [loading, setLoading] = useState(false)
-  const [moduleStats, setModuleStats] = useState([])
-  const [dashboardLoadError, setDashboardLoadError] = useState(false)
-  const [taskBoard, setTaskBoard] = useState(null)
-  const [taskBoardReady, setTaskBoardReady] = useState(false)
-  const [workflowLoadError, setWorkflowLoadError] = useState(false)
+  const outlet = useOutletContext()
+  const adminProfile = outlet?.adminProfile || null
   const navigate = useNavigate()
-  const outletContext = useOutletContext()
-  const adminProfile = outletContext?.adminProfile || null
-  const beginLatestRequest = useLatestRequestCoordinator()
-
-  const loadDashboardStats = useCallback(async () => {
-    const request = beginLatestRequest('business-dashboard')
+  const [params, setParams] = useSearchParams()
+  const queryKey = JSON.stringify(progressQueryFromURL(params))
+  const query = useMemo(() => JSON.parse(queryKey), [queryKey])
+  const [keyword, setKeyword] = useState(query.keyword)
+  const [owner, setOwner] = useState(query.owner)
+  const [state, setState] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [selection, setSelection] = useState(null)
+  const begin = useLatestRequestCoordinator()
+  const data =
+    state?.key === queryKey && state?.profile === adminProfile
+      ? state.data
+      : null
+  const view =
+    query.view ||
+    (data && !data.access.sales && data.access.production
+      ? 'production'
+      : 'orders')
+  const access = data?.access
+  const [moreOpen, setMoreOpen] = useState(false)
+  const update = useCallback(
+    (changes) => {
+      setParams((previous) => {
+        const next = new URLSearchParams(previous)
+        next.delete('page')
+        for (const [key, value] of Object.entries(changes)) {
+          if (value === '' || value === null || value === undefined) {
+            next.delete(key)
+          } else next.set(key, String(value))
+        }
+        return next
+      })
+      setSelection(null)
+    },
+    [setParams]
+  )
+  const load = useCallback(async () => {
+    const request = begin('business-progress')
     if (!adminProfile?.id) {
-      setLoading(false)
       request.finish()
       return false
     }
-
     setLoading(true)
+    setError('')
     try {
-      const [dashboardResult, workflowResult] = await Promise.allSettled([
-        getBusinessDashboardStats({}, { signal: request.signal }),
-        getWorkflowTaskBoard(
-          { limit: 1, offset: 0 },
-          { signal: request.signal }
-        ),
-      ])
-
-      if (!request.isCurrent()) {
-        return false
+      const result = await listBusinessProgress(query, {
+        signal: request.signal,
+      })
+      if (!request.isCurrent()) return false
+      setState({ key: queryKey, profile: adminProfile, data: result })
+      if (result.total > 0 && query.offset >= result.total) {
+        update({ page: Math.ceil(result.total / query.limit) })
       }
-
-      if (dashboardResult.status === 'fulfilled') {
-        setModuleStats(
-          dashboardResult.value.modules.map((item) =>
-            normalizeDashboardModuleStats(item)
-          )
-        )
-        setDashboardLoadError(false)
-      } else {
-        setModuleStats([])
-        setDashboardLoadError(true)
-        message.error(
-          getActionErrorMessage(dashboardResult.reason, '加载业务统计')
-        )
+      return true
+    } catch (failure) {
+      if (request.isCurrent()) {
+        setState(null)
+        setError(getActionErrorMessage(failure, '查询业务进度'))
       }
-
-      if (workflowResult.status === 'fulfilled') {
-        setTaskBoard(workflowResult.value)
-        setTaskBoardReady(true)
-        setWorkflowLoadError(false)
-      } else {
-        setTaskBoard(null)
-        setTaskBoardReady(false)
-        setWorkflowLoadError(true)
-        message.error(
-          getActionErrorMessage(workflowResult.reason, '加载待办概览')
-        )
-      }
-
-      return (
-        dashboardResult.status === 'fulfilled' &&
-        workflowResult.status === 'fulfilled'
-      )
+      return false
     } finally {
       if (request.isCurrent()) {
         setLoading(false)
         request.finish()
       }
     }
-  }, [adminProfile, beginLatestRequest])
-
+  }, [adminProfile, begin, query, queryKey, update])
   useEffect(() => {
-    setModuleStats([])
-    setDashboardLoadError(false)
-    setTaskBoard(null)
-    setTaskBoardReady(false)
-    setWorkflowLoadError(false)
+    load()
+  }, [load])
+  useEffect(() => outlet?.registerPageRefresh?.(load), [load, outlet])
+  useEffect(() => {
+    setKeyword(query.keyword)
+    setOwner(query.owner)
+  }, [query.keyword, query.owner])
+  useEffect(() => {
+    setSelection(null)
   }, [adminProfile])
-
-  useEffect(() => {
-    loadDashboardStats()
-  }, [loadDashboardStats])
-
-  useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadDashboardStats)
-  }, [loadDashboardStats, outletContext])
-
-  const moduleRows = useMemo(
-    () => buildDashboardModuleRows(dashboardHealthModules, moduleStats),
-    [moduleStats]
+  const openDetail = useCallback(
+    (row, section = 'lines') =>
+      setSelection({
+        id: row.id,
+        view: row.view,
+        orderNo: row.order_no,
+        section,
+        profile: adminProfile,
+      }),
+    [adminProfile]
   )
-  const isSuperAdmin = adminProfile?.is_super_admin === true
-  const allowedMenuPaths = useMemo(
-    () =>
-      new Set(
-        Array.isArray(outletContext?.allowedMenuPaths)
-          ? outletContext.allowedMenuPaths
-          : []
+  const canOpen = useCallback(
+    (path) => {
+      if (path.startsWith('/erp/task-board')) {
+        return (
+          (adminProfile?.is_super_admin ||
+            outlet?.allowedMenuPaths?.includes('/erp/task-board')) &&
+          effectiveSessionAllowsPage(adminProfile, 'task-board', {
+            isLocalDev: false,
+            isSuperAdmin: adminProfile?.is_super_admin === true,
+          })
+        )
+      }
+      return canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths: outlet?.allowedMenuPaths,
+      })
+    },
+    [adminProfile, outlet?.allowedMenuPaths]
+  )
+  const columns = [
+    {
+      title: view === 'orders' ? '订单 / 客户 / 产品' : '生产单 / 产品',
+      key: 'identity',
+      width: 244,
+      render: (_, row) => (
+        <div className="erp-progress-identity">
+          <button
+            type="button"
+            onClick={() => openDetail(row)}
+            className="erp-progress-order"
+            data-progress-order-id={row.id}
+          >
+            {row.order_no}
+          </button>
+          <strong>
+            {row.product}
+            {row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}
+          </strong>
+          <span>
+            {row.customer || (row.unlinked ? '含未关联订单的生产明细' : '—')} ·{' '}
+            {progressStatusLabel(row.status)}
+          </span>
+        </div>
       ),
-    [outletContext?.allowedMenuPaths]
-  )
-  const taskEntryAdminProfile = useMemo(
-    () => ({
-      ...(adminProfile || {}),
-      menus: [...allowedMenuPaths],
-    }),
-    [adminProfile, allowedMenuPaths]
-  )
-  const businessSourceRows = useMemo(
-    () =>
-      moduleRows.flatMap((moduleRow) =>
-        moduleRow.sources.map((source) => {
-          const pageKey = PAGE_KEY_BY_DASHBOARD_SOURCE[source.key] || source.key
-          const rbacAllowsPath =
-            isSuperAdmin || allowedMenuPaths.has(source.path)
-          const canOpen =
-            rbacAllowsPath &&
-            effectiveSessionAllowsPage(adminProfile, pageKey, {
-              isLocalDev: false,
-              isSuperAdmin,
-            })
-          return {
-            ...source,
-            module: moduleRow.module,
-            canOpen,
-          }
-        })
+    },
+    {
+      title: view === 'orders' ? '交期' : '计划结束',
+      key: 'due',
+      width: 106,
+      render: (_, row) => (
+        <div className="erp-progress-date">
+          <strong className={row.overdue ? 'erp-progress-danger' : ''}>
+            {row.due_date || '待确定'}
+          </strong>
+          {row.overdue ? (
+            <Tag color="red">已逾期</Tag>
+          ) : row.due_soon ? (
+            <Tag color="orange">7 天内到期</Tag>
+          ) : !row.active ? (
+            <span>已结束</span>
+          ) : (
+            <span>交期跟踪</span>
+          )}
+        </div>
       ),
-    [adminProfile, allowedMenuPaths, isSuperAdmin, moduleRows]
-  )
-  const managementSourceKeys = [
-    'sales-orders',
-    'accessories-purchase',
-    'production-orders',
-  ]
-  const managementSources = managementSourceKeys
-    .map((key) => businessSourceRows.find((source) => source.key === key))
-    .filter(Boolean)
-  const canOpenTaskBoard =
-    (isSuperAdmin || allowedMenuPaths.has('/erp/task-board')) &&
-    effectiveSessionAllowsPage(adminProfile, 'task-board', {
-      isLocalDev: false,
-      isSuperAdmin,
-    })
-  const openTaskEntry = (task, access) => {
-    const entryPath = resolveWorkflowTaskEntryPath(task)
-    if (
-      canOpenWorkflowTaskEntry(
-        taskEntryAdminProfile,
-        entryPath,
-        access?.sourceAccess
-      )
-    ) {
-      navigate(entryPath)
-    }
-  }
-
-  return (
-    <Space
-      direction="vertical"
-      size={10}
-      className="erp-dashboard-page erp-business-dashboard-page"
-    >
-      <div className="erp-business-board-workspace">
-        <section className="erp-management-glance" aria-label="管理概览">
-          <div className="erp-management-glance__title">
-            <strong>管理概览</strong>
-            <span className="erp-management-glance__hint">
-              独立口径，点击进入明细
-            </span>
-          </div>
-          {managementSources.map((source) => (
-            <button
-              key={source.key}
-              type="button"
-              className="erp-management-glance__item"
-              disabled={!source.canOpen}
-              onClick={() => source.canOpen && navigate(source.path)}
-            >
-              <span className="erp-management-glance__label">
-                {source.label}
-              </span>
-              <strong className="erp-management-glance__value">
-                {source.available ? formatCount(source.total) : '—'}
-              </strong>
-            </button>
-          ))}
-          {BUSINESS_ATTENTION_LANES.map((definition) => (
-            <button
-              key={definition.key}
-              type="button"
-              className="erp-management-glance__item"
-              data-lane={definition.key}
-              disabled={!canOpenTaskBoard}
-              onClick={() =>
-                canOpenTaskBoard &&
-                navigate(`/erp/task-board?lane=${definition.key}`)
+    },
+    {
+      title: '各环节进展',
+      key: 'stages',
+      width: view === 'orders' ? 314 : 256,
+      render: (_, row) => (
+        <div className="erp-progress-stages">
+          {view === 'orders' && (
+            <Stage
+              label="资料"
+              text={
+                row.engineering_total
+                  ? `${row.engineering_ready}/${row.engineering_total} 确认`
+                  : '待完善'
               }
-            >
-              <span className="erp-management-glance__label">
-                {definition.title}任务
-              </span>
-              <strong className="erp-management-glance__value">
-                {taskBoardReady
-                  ? formatCount(taskBoard?.counts?.[definition.key])
-                  : '—'}
-              </strong>
-            </button>
-          ))}
-        </section>
-
-        <Card
-          className="erp-dashboard-card erp-business-board-attention-card"
-          variant="borderless"
-        >
-          <Space direction="vertical" className="erp-dashboard-block" size={8}>
-            <Title level={5} className="erp-dashboard-section-title">
-              需要关注
-            </Title>
-            {workflowLoadError ? (
-              <Alert
-                type="warning"
-                showIcon
-                message="待办概览暂不可用"
-                description="业务统计和各业务页面不受影响，可稍后刷新重试。"
-                className="erp-business-board-inline-alert"
-              />
-            ) : null}
-            <div className="erp-business-board-alert-grid">
-              {BUSINESS_ATTENTION_LANES.map((definition) => (
-                <BusinessAttentionItem
-                  key={definition.key}
-                  adminProfile={taskEntryAdminProfile}
-                  definition={definition}
-                  onOpenEntry={openTaskEntry}
-                  taskBoard={taskBoard}
-                  taskBoardReady={taskBoardReady}
-                  onViewAll={
-                    canOpenTaskBoard
-                      ? (lane) => navigate(`/erp/task-board?lane=${lane}`)
-                      : null
-                  }
-                />
-              ))}
-            </div>
-            <Text type="secondary">显示当前账号可见的任务，每类预览一项。</Text>
-          </Space>
-        </Card>
-
-        <Card
-          className="erp-dashboard-card erp-dashboard-table-card"
-          variant="borderless"
-          title="业务数据"
-        >
-          {dashboardLoadError ? (
-            <Alert
-              type="warning"
-              showIcon
-              message="业务统计暂不可用"
-              description="仍可进入各业务页面；数字恢复后请刷新本页。"
-              className="erp-business-board-inline-alert"
+              onClick={() => openDetail(row, 'lines')}
+              tone={
+                row.engineering_ready === row.engineering_total &&
+                row.engineering_total
+                  ? 'is-complete'
+                  : ''
+              }
             />
-          ) : null}
-          <Paragraph type="secondary" className="erp-business-board-table-note">
-            各项独立统计；0 表示暂无记录，— 表示数量暂不可用。
-          </Paragraph>
-          <Table
-            size="middle"
-            loading={{
-              spinning: loading,
-              indicator: <Spin size="small" />,
-            }}
-            pagination={false}
-            rowKey="key"
-            scroll={{ x: 760 }}
-            rowClassName={(source) =>
-              source.canOpen ? 'erp-business-board-source-item--openable' : ''
+          )}
+          <Stage
+            label="领料"
+            text={
+              !access?.production
+                ? '无权限'
+                : !row.material_total
+                  ? '待核对'
+                  : row.material_pending
+                    ? `${row.material_pending} 项待领`
+                    : '已领齐'
             }
-            onRow={(source) =>
-              source.canOpen
-                ? {
-                    'data-open-on-double-click': 'true',
-                    'data-target-path': source.path,
-                    title: `双击进入${source.label}`,
-                    onDoubleClick: (event) =>
-                      openDashboardItemOnDoubleClick(event, () =>
-                        navigate(source.path)
-                      ),
-                  }
-                : {}
+            disabled={!access?.production}
+            tone={row.material_pending ? 'is-attention' : ''}
+            onClick={() => openDetail(row, 'materials')}
+          />
+          <Stage
+            label="生产"
+            text={
+              !access?.wip
+                ? '无权限'
+                : row.current_operation
+                  ? row.current_operation +
+                    (row.operation_count > 1 ? '等' : '')
+                  : row.in_progress_batches
+                    ? `${row.in_progress_batches} 批在制`
+                    : row.outsourced_batches
+                      ? `${row.outsourced_batches} 批委外`
+                      : row.planned_batches
+                        ? `${row.planned_batches} 批待开`
+                        : row.production_orders
+                          ? `${row.production_orders} 张单`
+                          : '未关联'
             }
-            columns={[
+            disabled={!access?.wip}
+            onClick={() =>
+              openDetail(
+                row,
+                row.in_progress_batches ||
+                  row.outsourced_batches ||
+                  row.planned_batches
+                  ? 'batches'
+                  : 'production'
+              )
+            }
+          />
+          <Stage
+            label="质检"
+            text={
+              !access?.wip
+                ? '无权限'
+                : row.waiting_batches
+                  ? `${row.waiting_batches} 批待检`
+                  : row.rejected_batches
+                    ? `${row.rejected_batches} 批不合格`
+                    : '查看批次'
+            }
+            disabled={!access?.wip}
+            tone={
+              row.waiting_batches || row.rejected_batches ? 'is-attention' : ''
+            }
+            onClick={() => openDetail(row, 'batches')}
+          />
+        </div>
+      ),
+    },
+    {
+      title: view === 'orders' ? '交付进度' : '完工进度',
+      key: 'delivery',
+      width: 170,
+      render: (_, row) => (
+        <Delivery row={row} onClick={() => openDetail(row)} />
+      ),
+    },
+    {
+      title: '当前待办 / 处理人',
+      key: 'attention',
+      width: 214,
+      render: (_, row) => (
+        <div className="erp-progress-attention">
+          {row.attention_task ? (
+            <>
+              <button
+                type="button"
+                className={row.blocked ? 'erp-progress-danger' : ''}
+                onClick={() => openDetail(row, 'tasks')}
+              >
+                {row.attention_reason || row.attention_task}
+              </button>
+              <span>
+                {row.attention_owner || '未分配处理人'} ·{' '}
+                {roleLabel(row.attention_role)}
+              </span>
+              {row.open_tasks > 1 && (
+                <button
+                  type="button"
+                  className="erp-progress-more-tasks"
+                  onClick={() => openDetail(row, 'tasks')}
+                >
+                  另有 {row.open_tasks - 1} 项待办
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <span>{access?.tasks ? '暂无可见待办' : '任务无查看权限'}</span>
+              {row.sales_owner && <span>业务负责人：{row.sales_owner}</span>}
+            </>
+          )}
+        </div>
+      ),
+    },
+  ]
+  const metrics = [
+    {
+      key: 'all',
+      label:
+        SCOPES.find((item) => item.value === query.scope)?.label || '在执行',
+      number: data?.counts.total,
+    },
+    { key: 'overdue', label: '已逾期', number: data?.counts.overdue },
+    { key: 'due_soon', label: '7 天内到期', number: data?.counts.due_soon },
+    {
+      key: 'blocked',
+      label: '任务阻塞',
+      number: access?.tasks === false ? undefined : data?.counts.blocked,
+    },
+    { key: 'undated', label: '未定交期', number: data?.counts.undated },
+  ]
+  const extraFilters = [
+    query.owner && `处理人：${query.owner}`,
+    query.date_from && `从 ${query.date_from}`,
+    query.date_to && `至 ${query.date_to}`,
+  ].filter(Boolean)
+  const hasFilters =
+    query.keyword ||
+    query.owner ||
+    query.date_from ||
+    query.date_to ||
+    query.risk !== 'all' ||
+    query.scope !== 'active'
+  return (
+    <section className="erp-progress-board" aria-label="进度看板">
+      <div className="erp-progress-controls">
+        <div className="erp-progress-toolbar">
+          <SlidingSegmented
+            aria-label="进度查看方式"
+            value={view}
+            onChange={(next) => update({ view: next, risk: 'all' })}
+            options={[
               {
-                align: 'left',
-                title: '业务环节',
-                dataIndex: 'module',
-                fixed: 'left',
-                width: 125,
-                render: (value) => <Text strong>{value}</Text>,
+                label: '订单交付',
+                value: 'orders',
+                disabled: access?.sales === false,
               },
               {
-                align: 'left',
-                title: '业务记录',
-                dataIndex: 'label',
-                width: 155,
-                render: (value) => <Text>{value}</Text>,
-              },
-              {
-                title: '当前数量',
-                dataIndex: 'total',
-                width: 110,
-                align: 'right',
-                render: (_, source) => (
-                  <strong
-                    className="erp-business-board-source-count"
-                    aria-label={`${source.label}数量${
-                      source.available ? formatCount(source.total) : '暂不可用'
-                    }`}
-                  >
-                    {source.available ? formatCount(source.total) : '—'}
-                  </strong>
-                ),
-              },
-              {
-                align: 'left',
-                title: '统计口径',
-                dataIndex: 'truthKind',
-                width: 120,
-                render: (value) => DATA_BOUNDARY_LABELS[value] || '业务数据',
-              },
-              {
-                title: '进入业务',
-                key: 'entry',
-                width: 110,
-                fixed: 'right',
-                render: (_, source) =>
-                  source.canOpen ? (
-                    <Button
-                      type="link"
-                      size="small"
-                      className="erp-business-board-source-entry"
-                      onClick={() => navigate(source.path)}
-                      aria-label={`查看${source.label}`}
-                    >
-                      查看记录 <ArrowRightOutlined aria-hidden="true" />
-                    </Button>
-                  ) : (
-                    <Text
-                      type="secondary"
-                      className="erp-business-board-source-readonly"
-                    >
-                      只读
-                    </Text>
-                  ),
+                label: '生产执行',
+                value: 'production',
+                disabled: access?.production === false,
               },
             ]}
-            dataSource={businessSourceRows}
           />
-        </Card>
-      </div>
-
-      <details className="erp-business-board-boundary-summary">
-        <summary>
-          <InfoCircleOutlined aria-hidden="true" /> 统计说明
-        </summary>
-        <dl>
-          {DATA_BOUNDARIES.map((item) => (
-            <div key={item.key}>
-              <dt>{item.title}</dt>
-              <dd>{item.description}</dd>
-            </div>
+          <SearchInput
+            className="erp-progress-search"
+            aria-label="搜索订单、客户或产品"
+            placeholder="搜单号、客户、产品"
+            value={keyword}
+            allowClear
+            maxLength={100}
+            onChange={(event) => {
+              setKeyword(event.target.value)
+              if (!event.target.value && query.keyword) update({ q: '' })
+            }}
+            onPressEnter={(event) => update({ q: event.target.value.trim() })}
+            suffix={
+              <Button
+                type="text"
+                size="small"
+                aria-label="查询进度"
+                onClick={() => update({ q: keyword.trim() })}
+              >
+                查询
+              </Button>
+            }
+          />
+          <Select
+            aria-label="记录范围"
+            value={query.scope}
+            options={SCOPES}
+            onChange={(value) => update({ scope: value })}
+            className="erp-progress-scope"
+          />
+          <Popover
+            trigger="click"
+            open={moreOpen}
+            onOpenChange={setMoreOpen}
+            placement="bottom"
+            content={
+              <div className="erp-progress-filters">
+                <label htmlFor="progress-owner">处理人或业务负责人</label>
+                <SearchInput
+                  id="progress-owner"
+                  value={owner}
+                  placeholder="输入姓名"
+                  allowClear
+                  onChange={(event) => setOwner(event.target.value)}
+                  onPressEnter={(event) => {
+                    update({ owner: event.target.value.trim() })
+                    setMoreOpen(false)
+                  }}
+                  suffix={
+                    <Button
+                      type="text"
+                      size="small"
+                      onClick={() => {
+                        update({ owner: owner.trim() })
+                        setMoreOpen(false)
+                      }}
+                    >
+                      应用
+                    </Button>
+                  }
+                  maxLength={100}
+                />
+                <span>交期范围</span>
+                <DateRangeFilter
+                  startValue={query.date_from}
+                  endValue={query.date_to}
+                  onStartChange={(value) => update({ from: value })}
+                  onEndChange={(value) => update({ to: value })}
+                />
+                {view === 'production' && (
+                  <Button
+                    onClick={() => {
+                      update({ risk: 'unlinked' })
+                      setMoreOpen(false)
+                    }}
+                  >
+                    查看未关联销售的生产单
+                  </Button>
+                )}
+              </div>
+            }
+          >
+            <Button icon={<FilterOutlined />} aria-label="筛选">
+              筛选{extraFilters.length ? ` · ${extraFilters.length}` : ''}
+            </Button>
+          </Popover>
+          {canOpen('/erp/task-board') && (
+            <Button type="text" onClick={() => navigate('/erp/task-board')}>
+              全部任务
+            </Button>
+          )}
+          <Popover
+            trigger="click"
+            title="进度如何计算"
+            content={
+              <div className="erp-progress-help">
+                <p>
+                  出货进度按已实际出货数量计算，取消的出货不计入。不同单位分开查看。
+                </p>
+                <p>
+                  领料按计划用量与已登记领料核对，不代表库存齐套。生产和质检展示批次状态，有效完工会扣除已登记返工量。
+                </p>
+                <p>
+                  顶部统计对应当前搜索及范围，风险分类可重叠；关联任务仅包含当前账号可见内容。
+                </p>
+              </div>
+            }
+          >
+            <Button
+              type="text"
+              icon={<InfoCircleOutlined />}
+              aria-label="查看进度计算说明"
+            />
+          </Popover>
+        </div>
+        <div
+          className="erp-progress-metric-row"
+          role="group"
+          aria-label="按风险筛选进度"
+        >
+          {metrics.map((metric) => (
+            <FilterChip
+              className="erp-progress-metric"
+              key={metric.key}
+              selected={query.risk === metric.key}
+              count={count(metric.number)}
+              disabled={metric.key === 'blocked' && access?.tasks === false}
+              onClick={() => update({ risk: metric.key })}
+            >
+              {metric.label}
+            </FilterChip>
           ))}
-        </dl>
-      </details>
-    </Space>
+          <div className="erp-progress-freshness">
+            {data
+              ? `更新于 ${dayjs(data.snapshot_at).format('HH:mm')}`
+              : loading
+                ? '正在查询…'
+                : '等待查询'}
+          </div>
+        </div>
+        {(extraFilters.length > 0 || hasFilters) && (
+          <div className="erp-progress-active-filters">
+            {query.keyword && <Tag>搜索：{query.keyword}</Tag>}
+            {extraFilters.map((item) => (
+              <Tag key={item}>{item}</Tag>
+            ))}
+            {query.risk === 'unlinked' && <Tag>含未关联销售的生产明细</Tag>}
+            <Button
+              type="link"
+              size="small"
+              onClick={() => {
+                setKeyword('')
+                setOwner('')
+                update({
+                  q: '',
+                  owner: '',
+                  from: '',
+                  to: '',
+                  risk: '',
+                  scope: '',
+                })
+              }}
+            >
+              清空筛选
+            </Button>
+          </div>
+        )}
+      </div>
+      {!error && (
+        <p className="erp-progress-mobile-hint">
+          左右滑动查看进度，点单号查看全部明细
+        </p>
+      )}
+      {error ? (
+        <Alert
+          className="erp-progress-error"
+          type="error"
+          showIcon
+          message={error}
+          description="未显示旧结果，请重试或调整查询范围。"
+          action={
+            <Button onClick={load} aria-label="重试">
+              重试
+            </Button>
+          }
+        />
+      ) : (
+        <Table
+          aria-label={view === 'orders' ? '订单交付进度' : '生产执行进度'}
+          className="erp-progress-table"
+          columns={columns.map((column) => ({ ...column, align: 'left' }))}
+          rowKey="id"
+          size="middle"
+          loading={loading}
+          dataSource={data?.rows || []}
+          scroll={{ x: view === 'orders' ? 1048 : 990 }}
+          locale={{
+            emptyText: loading ? (
+              '正在查询进度…'
+            ) : (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={
+                  hasFilters ? '没有符合条件的记录' : '当前范围暂无记录'
+                }
+              />
+            ),
+          }}
+          pagination={{
+            current: query.offset / query.limit + 1,
+            pageSize: query.limit,
+            total: data?.total || 0,
+            showSizeChanger: false,
+            showTotal: (total) => `共 ${count(total)} 单`,
+            onChange: (page) => update({ page }),
+          }}
+        />
+      )}
+      <BusinessProgressDrawer
+        selection={selection?.profile === adminProfile ? selection : null}
+        onClose={() => setSelection(null)}
+        adminProfile={adminProfile}
+        canOpen={canOpen}
+        onNavigate={navigate}
+      />
+    </section>
   )
 }

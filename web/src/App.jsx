@@ -2,6 +2,8 @@
 import React, { Suspense, useEffect } from 'react'
 import { App as AntdApp, ConfigProvider, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
+import dayjs from 'dayjs'
+import 'dayjs/locale/zh-cn'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { authBus } from '@/common/auth/authBus'
@@ -16,6 +18,8 @@ import {
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
+
+dayjs.locale('zh-cn')
 
 const ERPRouter = lazyWithDynamicImportRetry(() => import('@/erp/router'))
 

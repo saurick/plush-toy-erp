@@ -90,7 +90,7 @@ export function createBusinessCellTextScenarios(deps) {
       key: 'outsourcing',
       path: '/erp/purchase/processing-contracts',
       open: '新建加工合同',
-      fields: ['加工项目', '备注'],
+      fields: ['加工项目', '行备注'],
     },
     {
       key: 'shipment',

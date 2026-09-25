@@ -411,7 +411,13 @@ async function main() {
 
     activeBrowser = await chromium.launch({
       headless,
-      args: ['--no-proxy-server', '--proxy-bypass-list=<-loopback>'],
+      args: [
+        '--no-proxy-server',
+        '--proxy-bypass-list=<-loopback>',
+        // Route-fulfilled fixture documents have no trustworthy IP address
+        // space in Chrome 153, so their same-runner Vite socket is blocked.
+        '--disable-features=LocalNetworkAccessChecks',
+      ],
     })
     for (const scenario of selectedScenarios) {
       await runScenario(activeBrowser, scenario)
