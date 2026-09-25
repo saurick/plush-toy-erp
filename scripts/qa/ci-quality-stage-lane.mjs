@@ -30,7 +30,7 @@ import {
 } from "./run-gate-with-receipt.mjs";
 
 export const CI_QUALITY_STAGE_LANE_SCHEMA = "plush.ci-quality-stage-lane/v2";
-export const CI_POSTGRES_IMAGE = "postgres:18.1";
+export const CI_POSTGRES_IMAGE = "postgres:18.6";
 export const CI_POSTGRES_TMPFS = Object.freeze({
   destination: "/var/lib/postgresql",
   options: "rw,noexec,nosuid,nodev,size=1073741824",

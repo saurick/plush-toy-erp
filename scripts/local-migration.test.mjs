@@ -299,9 +299,9 @@ test("local migration: a direct CLI failure still emits a safe unavailable-targe
   );
 });
 
-test("local migration: Atlas schema readback pins PostgreSQL 18.1", () => {
+test("local migration: Atlas schema readback pins PostgreSQL 18.6", () => {
   const source = fs.readFileSync(cliPath, "utf8");
-  assert.match(source, /docker:\/\/postgres\/18\.1\/dev\?search_path=public/u);
+  assert.match(source, /docker:\/\/postgres\/18\.6\/dev\?search_path=public/u);
   assert.doesNotMatch(
     source,
     /docker:\/\/postgres\/18\/dev\?search_path=public/u,

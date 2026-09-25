@@ -3,8 +3,8 @@
 # Build from the repository root:
 # docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 
-ARG NODE_BUILDER_IMAGE=node:24.14.0
-ARG RUNTIME_BASE_IMAGE=node:24.14.0-slim
+ARG NODE_BUILDER_IMAGE=node:24.21.0
+ARG RUNTIME_BASE_IMAGE=node:24.21.0-slim
 
 FROM ${NODE_BUILDER_IMAGE} AS builder
 
@@ -13,7 +13,7 @@ WORKDIR /app
 COPY web/package.json web/pnpm-lock.yaml ./web/
 
 RUN npm config set registry https://registry.npmmirror.com && \
-    npm install -g pnpm@10.13.1 && \
+    npm install -g pnpm@10.34.5 && \
     pnpm config set store-dir /app/.pnpm-store && \
     pnpm config set registry https://registry.npmmirror.com && \
     cd web && \

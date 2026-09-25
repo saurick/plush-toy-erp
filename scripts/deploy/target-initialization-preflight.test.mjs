@@ -48,8 +48,11 @@ test("initialization preflight source binds only the registered target and parse
 
   assert.equal(syntax.status, 0, syntax.stderr);
   assert.match(script, /root=\/home\/simon\/plush-toy-erp-demo-v1/u);
-  assert.match(script, /postgres:18\.1/u);
-  assert.match(script, /jaegertracing\/all-in-one:1\.76\.0/u);
+  assert.match(script, /postgres:18.6/u);
+  assert.match(
+    script,
+    /jaegertracing\/jaeger:2\.21\.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3/u
+  );
   assert.doesNotMatch(script, /admin\.yoyoosun\.net/u);
   assert.doesNotMatch(script, /__[A-Z0-9_]+__/u);
 });

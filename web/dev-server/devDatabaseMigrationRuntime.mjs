@@ -52,7 +52,7 @@ const MIGRATION_TOOL_CHECKS = Object.freeze([
   {
     key: 'atlas',
     label: 'Atlas',
-    blockedMessage: 'Atlas CLI 未安装或版本不是项目固定的 v1.2.0',
+    blockedMessage: 'Atlas CLI 未安装或版本不是项目固定的 v1.3.0',
   },
   {
     key: 'postgresql_client',
@@ -104,7 +104,7 @@ export async function readDatabaseMigrationToolReadiness({
         (output) => output.trim().length > 0
       ),
       probeTool(execFile, 'atlas', ['version'], env, (output) =>
-        /(?:^|\s)v1\.2\.0(?:\s|$)/u.test(output)
+        /(?:^|\s)v1\.3\.0(?:\s|$)/u.test(output)
       ),
       probeTool(execFile, pgDump, ['--version'], env, (output) =>
         /PostgreSQL\) 18\./u.test(output)

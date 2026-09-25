@@ -83,12 +83,12 @@ fi
 
 if [[ ! -x /usr/local/bin/atlas ]] ||
   ! /usr/local/bin/atlas version 2>&1 |
-    grep -Eq '(^|[[:space:]])v1[.]2[.]0([[:space:]]|$)'; then
+    grep -Eq '(^|[[:space:]])v1[.]3[.]0([[:space:]]|$)'; then
   atlas_status=blocked
   block initialization_atlas_unavailable
 fi
 
-for image in postgres:18.1 jaegertracing/all-in-one:1.76.0 chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62; do
+for image in postgres:18.6 jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3 chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882; do
   if ! docker image inspect "$image" >/dev/null 2>&1 ||
     [[ "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image" 2>/dev/null || true)" != linux/amd64 ]]; then
     base_images_status=blocked

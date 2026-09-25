@@ -268,7 +268,7 @@ IFS='|' read -r backup_user backup_postgres_version postgres_version_num \
   backup_read_only backup_super \
   backup_createdb backup_createrole backup_bypassrls backup_database_create \
   backup_schema_create backup_invalid_table_count <<<"$backup_identity"
-[[ "$backup_user" == "erp_backup" && "$backup_postgres_version" =~ ^18\.1([[:space:].]|$) &&
+[[ "$backup_user" == "erp_backup" && "$backup_postgres_version" =~ ^18\.6([[:space:].]|$) &&
   "$postgres_version_num" =~ ^18[0-9]{4}$ &&
   "$backup_read_only" == "on" && "$backup_super" == "f" &&
   "$backup_createdb" == "f" && "$backup_createrole" == "f" &&
@@ -277,14 +277,14 @@ IFS='|' read -r backup_user backup_postgres_version postgres_version_num \
   echo "[scheduled-backup] erp_backup 身份或只读权限对账失败" >&2
   exit 1
 }
-backup_postgres_version="18.1"
+backup_postgres_version="18.6"
 backup_pg_dump_version="$("${compose[@]}" exec -T postgres pg_dump --version)"
 backup_pg_dump_version="${backup_pg_dump_version//$'\r'/}"
-[[ "$backup_pg_dump_version" == *"PostgreSQL) 18.1"* ]] || {
-  echo "[scheduled-backup] pg_dump 必须固定为 PostgreSQL 18.1" >&2
+[[ "$backup_pg_dump_version" == *"PostgreSQL) 18.6"* ]] || {
+  echo "[scheduled-backup] pg_dump 必须固定为 PostgreSQL 18.6" >&2
   exit 1
 }
-backup_pg_dump_version="18.1"
+backup_pg_dump_version="18.6"
 
 # shellcheck disable=SC2016
 migration_version="$("${compose[@]}" exec -T postgres sh -eu -c '

@@ -27,7 +27,7 @@ test("scheduled backup is bounded, verified, offsite and failure-visible", () =>
   assert.match(backupSource, /--username erp_backup/u);
   assert.match(backupSource, /PGPASSWORD="\$POSTGRES_BACKUP_PASSWORD"/u);
   assert.match(backupSource, /default_transaction_read_only/u);
-  assert.match(backupSource, /pg_dump 必须固定为 PostgreSQL 18\.1/u);
+  assert.match(backupSource, /pg_dump 必须固定为 PostgreSQL 18\.6/u);
   assert.match(backupSource, /exec pg_dump .*--format=custom/u);
   assert.doesNotMatch(backupSource, /pg_dump --username "\$POSTGRES_USER"/u);
   assert.match(backupSource, /pg_restore --list/u);
@@ -57,7 +57,7 @@ test("scheduled restore check uses the newest checksum-bound dump in an isolated
   assert.match(restoreSource, /age --decrypt --identity/u);
   assert.match(restoreSource, /mktemp -d \/tmp\/plush-scheduled-restore/u);
   assert.match(restoreSource, /chmod 0700 "\$restore_tmp_dir"/u);
-  assert.match(restoreSource, /postgres:18\.1/u);
+  assert.match(restoreSource, /postgres:18.6/u);
   assert.match(restoreSource, /docker run --detach --rm/u);
   assert.match(restoreSource, /--network none/u);
   assert.match(restoreSource, /--memory 1g/u);

@@ -72,7 +72,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 正式 target cache v2 精确包含七资产与 `source.tar` 八项；legacy cache 只允许既有 v1 代码回滚按目标精确命中，缺失即阻断，禁止用于 promotion、远端补取、迁入 v2 或新建 legacy cache。operation 私有 incoming 可以包含控制文件，但只有逐项复核过的 payload 才能被物化或提升为对应正式 cache。允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 package/image cache；正式 cache 不完整、存在额外项或符号链接，或任一 payload 身份不一致时失败关闭。工作台首次升级还要在 target write 前证明当前运行 SHA 的 direct-fetch 或同目标 legacy 回滚输入可用；这一核对完成前 operation 保持 `running`，只能从 `running` 直接进入最终 `ready / blocked`，避免新版本成功后才发现旧版本不可回取，也不暴露可误确认的中间 ready。
 
-即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。operation 分别记录 Mac 控制包字节/耗时、目标宿主内部取件期望与实际字节/耗时、校验与缓存命中，不把控制面等待伪装成制品传输。传输不使用 `--delete`，不全局 prune，不删除数据库、volume、env、证书、当前版本或规定回滚版本。
+即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。promotion 在已创建权限为 `0600` 的 env 备份后，同时推进 release 固定的 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 版本；外部附件存储不在该动作中变更。固定的基础服务镜像须在执行前预置到目标，执行器使用 `--pull never`，并在创建新备份和进入维护窗口前核对所需镜像与 `linux/amd64` 平台，缺失时失败关闭。operation 分别记录 Mac 控制包字节/耗时、目标宿主内部取件期望与实际字节/耗时、校验与缓存命中，不把控制面等待伪装成制品传输。传输不使用 `--delete`，不全局 prune，不删除数据库、volume、env、证书、当前版本或规定回滚版本。
 
 ## 数据库重建
 

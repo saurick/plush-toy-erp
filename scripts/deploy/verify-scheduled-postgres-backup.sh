@@ -9,7 +9,7 @@ print_help() {
     --backup-dir </absolute/offsite-dir> \
     --age-identity-file </absolute/age-identity.txt> \
     --report </absolute/report.json> \
-    [--postgres-image postgres:18.1] \
+    [--postgres-image postgres:18.6] \
     [--max-backup-age-hours 36]
 
 作用:
@@ -22,7 +22,7 @@ USAGE
 backup_dir=""
 age_identity_file=""
 report_file=""
-postgres_image="postgres:18.1"
+postgres_image="postgres:18.6"
 max_backup_age_hours="36"
 
 while [[ $# -gt 0 ]]; do
@@ -89,8 +89,8 @@ offsite_marker="$backup_dir/.plush-toy-erp-offsite-target"
   echo "[scheduled-restore-check] --report 必须是无 dot segment 的绝对 JSON 路径" >&2
   exit 2
 }
-[[ "$postgres_image" == "postgres:18.1" ]] || {
-  echo "[scheduled-restore-check] --postgres-image 必须固定为 postgres:18.1" >&2
+[[ "$postgres_image" == "postgres:18.6" ]] || {
+  echo "[scheduled-restore-check] --postgres-image 必须固定为 postgres:18.6" >&2
   exit 2
 }
 [[ "$max_backup_age_hours" =~ ^[0-9]+$ && "$max_backup_age_hours" -ge 1 && "$max_backup_age_hours" -le 168 ]] || {

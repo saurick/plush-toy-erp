@@ -6,7 +6,7 @@ import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
-export const MANAGED_DATABASE_IMAGE = "postgres:18.1";
+export const MANAGED_DATABASE_IMAGE = "postgres:18.6";
 export const MANAGED_DATABASE_LABELS = Object.freeze({
   managed: "com.plush-toy-erp.qa.managed",
   operation: "com.plush-toy-erp.qa.operation",

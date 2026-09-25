@@ -32,7 +32,7 @@ import { buildLocalTestApplyRuntimeManifest } from "../qa/customer-config-runtim
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 
 const RECEIPT_SCHEMA = "plush-local-release-rehearsal/v1";
-const REHEARSAL_POSTGRES_IMAGE = "postgres:18.1";
+const REHEARSAL_POSTGRES_IMAGE = "postgres:18.6";
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/u;
 const MIGRATION_PATTERN = /^[0-9]{14}$/u;
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{7,44}$/u;
@@ -263,7 +263,7 @@ export function buildRehearsalEnvironment({
     APP_IMAGE: serverImage.ref,
     WEB_IMAGE: webImage.ref,
     POSTGRES_IMAGE: REHEARSAL_POSTGRES_IMAGE,
-    JAEGER_IMAGE: "jaegertracing/all-in-one:1.76.0",
+    JAEGER_IMAGE: "jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3",
     TZ: "Asia/Shanghai",
     ...databasePasswords,
     POSTGRES_DB: database,
@@ -317,8 +317,8 @@ export function buildRehearsalEnvironment({
     ERP_RELEASE_REHEARSAL_ID: safeRunId(runId),
     POSTGRES_MEM_LIMIT: "384m",
     POSTGRES_MEM_RESERVATION: "128m",
-    JAEGER_MEM_LIMIT: "128m",
-    JAEGER_MEM_RESERVATION: "48m",
+    JAEGER_MEM_LIMIT: "192m",
+    JAEGER_MEM_RESERVATION: "96m",
     APP_MEM_LIMIT: "2g",
     APP_MEM_RESERVATION: "512m",
     WEB_MEM_LIMIT: "128m",
@@ -1868,8 +1868,8 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
     const expectedImages = [
       manifest.images.find((item) => item.kind === "server").ref,
       manifest.images.find((item) => item.kind === "web").ref,
-      "postgres:18.1",
-      "jaegertracing/all-in-one:1.76.0",
+      "postgres:18.6",
+      "jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3",
     ];
     if (
       expectedImages.some((item) => !configuredImages.includes(item)) ||

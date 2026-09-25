@@ -90,7 +90,7 @@ backups_root=$root/backups
 operations_root=$root/operations
 operation_dir=$operations_root/$operation_id
 run_root=$root/run
-tools_root=$root/tools/atlas/v1.2.0
+tools_root=$root/tools/atlas/v1.3.0
 log_file=$operation_dir/operation.log
 receipt=$operation_dir/receipt.json
 secret_file=$incoming/target-initialization.secret
@@ -351,7 +351,7 @@ cleanup_exact_target() {
       --network none --read-only --pids-limit 64 --memory 64m \
       --cap-drop ALL --cap-add DAC_OVERRIDE --cap-add FOWNER \
       --security-opt no-new-privileges --user 0:0 \
-      --volume "$data_dir:/target" --entrypoint sh postgres:18.1 \
+      --volume "$data_dir:/target" --entrypoint sh postgres:18.6 \
       -ceu 'find /target -mindepth 1 -depth -delete' >/dev/null 2>&1 || return 1
   fi
   rm -rf -- "$root"
@@ -648,11 +648,11 @@ postgres_dsn="postgres://erp_app:${secret_values[POSTGRES_APP_PASSWORD]}@postgre
   printf 'ERP_CUSTOMER_KEY=yoyoosun\n'
   printf 'APP_IMAGE=%s\n' "$server_ref"
   printf 'WEB_IMAGE=%s\n' "$web_ref"
-  printf 'POSTGRES_IMAGE=postgres:18.1\n'
-  printf 'JAEGER_IMAGE=jaegertracing/all-in-one:1.76.0\n'
+  printf 'POSTGRES_IMAGE=postgres:18.6\n'
+  printf 'JAEGER_IMAGE=jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3\n'
   printf 'TZ=Asia/Shanghai\n'
   printf 'POSTGRES_MEM_LIMIT=512m\nPOSTGRES_MEM_RESERVATION=256m\n'
-  printf 'JAEGER_MEM_LIMIT=96m\nJAEGER_MEM_RESERVATION=48m\n'
+  printf 'JAEGER_MEM_LIMIT=192m\nJAEGER_MEM_RESERVATION=96m\n'
   printf 'APP_MEM_LIMIT=2g\nAPP_MEM_RESERVATION=768m\nAPP_SHM_SIZE=256m\nAPP_TMPFS_SIZE=256m\n'
   printf 'WEB_MEM_LIMIT=96m\nWEB_MEM_RESERVATION=48m\n'
   printf 'POSTGRES_PASSWORD=%s\n' "${secret_values[POSTGRES_PASSWORD]}"
@@ -666,7 +666,7 @@ postgres_dsn="postgres://erp_app:${secret_values[POSTGRES_APP_PASSWORD]}@postgre
   printf 'POSTGRES_DATA_DIR=%s\nMIGRATION_LOCK_FILE=%s\n' "$data_dir" "$root/run/atlas-migrate.lock"
   printf 'ATTACHMENT_DATA_DIR=%s\nATTACHMENT_RAID_MOUNT=/srv/raid5\n' "$attachment_dir"
   printf 'ATTACHMENT_STORAGE_MODE=managed\nCOMPOSE_PROFILES=attachment-local\n'
-  printf 'ATTACHMENT_STORE_IMAGE=chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62\n'
+  printf 'ATTACHMENT_STORE_IMAGE=chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882\n'
   printf 'ATTACHMENT_S3_ENDPOINT=http://attachment-store:8333\nATTACHMENT_S3_REGION=us-east-1\n'
   printf 'ATTACHMENT_S3_BUCKET=plush-%s-files\n' "$target"
   printf 'ATTACHMENT_S3_ACCESS_KEY_ID=%s\nATTACHMENT_S3_SECRET_ACCESS_KEY=%s\n' "$attachment_access_key" "$attachment_secret_key"

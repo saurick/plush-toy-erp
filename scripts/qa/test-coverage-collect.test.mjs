@@ -91,10 +91,10 @@ test("coverage collector CLI only accepts the explicit baseline profile", () => 
 });
 
 test("coverage collector requires the repository-pinned Node runtime", async () => {
-  assert.equal(await assertProjectNodeRuntime(ROOT, "v24.14.0"), "24.14.0");
+  assert.equal(await assertProjectNodeRuntime(ROOT, "v24.21.0"), "24.21.0");
   await assert.rejects(
     () => assertProjectNodeRuntime(ROOT, "v26.5.0"),
-    /requires Node 24\.14\.0/u,
+    /requires Node 24.21.0/u,
   );
 });
 

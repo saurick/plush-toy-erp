@@ -5,10 +5,10 @@ ARG BUILDPLATFORM=linux/amd64
 ARG RUNTIMEPLATFORM=linux/amd64
 ARG GO_TARGETOS=linux
 ARG GO_TARGETARCH=amd64
-ARG NODE_BUILDER_IMAGE=node:24.14.0
-ARG GO_BUILDER_IMAGE=golang:1.26.6
-ARG WEB_RUNTIME_BASE_IMAGE=node:24.14.0-slim
-ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
+ARG NODE_BUILDER_IMAGE=node:24.21.0
+ARG GO_BUILDER_IMAGE=golang:1.26.8
+ARG WEB_RUNTIME_BASE_IMAGE=node:24.21.0-slim
+ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
 # 同时固定 Debian 包源与浏览器版本；升级由最终镜像的真实 PDF 检查验证。
 ARG DEBIAN_SNAPSHOT=20260918T180000Z
 ARG CHROMIUM_VERSION=153.0.8010.47-2~deb12u1
@@ -25,7 +25,7 @@ COPY web/package.json web/pnpm-lock.yaml ./
 RUN --mount=type=cache,id=plush-npm,target=/root/.npm,sharing=locked \
     --mount=type=cache,id=plush-pnpm,target=/web/.pnpm-store,sharing=locked \
     npm config set registry https://registry.npmmirror.com && \
-    npm install -g pnpm@10.13.1 && \
+    npm install -g pnpm@10.34.5 && \
     pnpm config set store-dir /web/.pnpm-store && \
     pnpm config set registry https://registry.npmmirror.com && \
     pnpm install --frozen-lockfile

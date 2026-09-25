@@ -77,6 +77,15 @@ web_container=$project-web-desktop
 minimum_available_bytes=32212254720
 promotion_lock=$run_root/promotion.lock
 
+# Infrastructure dependencies move with the immutable release source. The
+# previous runtime env is copied before these values change, so any failed
+# promotion restores both the prior application images and service versions.
+promotion_postgres_image=postgres:18.6
+promotion_jaeger_image=jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3
+promotion_attachment_store_image=chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+promotion_jaeger_mem_limit=192m
+promotion_jaeger_mem_reservation=96m
+
 uuid_v4_pattern='^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
 sha_pattern='^[0-9a-f]{40}$'
 sha256_pattern='^[0-9a-f]{64}$'
@@ -971,6 +980,38 @@ for image_ref in "$server_ref" "$web_ref"; do
     fail "loaded image platform or embedded release identity does not match"
 done
 
+enter_stage runtime_dependency_preflight
+[[ -f "$runtime_env" && ! -L "$runtime_env" &&
+  "$(stat -c '%u' "$runtime_env")" == "$(id -u)" &&
+  "$(stat -c '%a' "$runtime_env")" == 600 ]] ||
+  fail "target runtime env is invalid"
+runtime_attachment_mode="$(
+  awk -F= '
+    $1 == "ATTACHMENT_STORAGE_MODE" {
+      count++
+      mode=$2
+    }
+    END {
+      if (count != 1 || (mode != "managed" && mode != "external")) exit 42
+      print mode
+    }
+  ' "$runtime_env"
+)" || fail "target attachment storage mode is invalid"
+required_runtime_images=(
+  "$promotion_postgres_image"
+  "$promotion_jaeger_image"
+)
+compose_start_services=(postgres jaeger app-server web-desktop)
+if [[ "$runtime_attachment_mode" == managed ]]; then
+  required_runtime_images+=("$promotion_attachment_store_image")
+  compose_start_services+=(attachment-store)
+fi
+for image_ref in "${required_runtime_images[@]}"; do
+  image_platform="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image_ref" 2>/dev/null || true)"
+  [[ "$image_platform" == linux/amd64 ]] ||
+    fail "required runtime dependency image is unavailable or incompatible"
+done
+
 enter_stage fresh_backup_and_restore_check
 postgres_cid="$(docker ps -q \
   --filter "label=com.docker.compose.project=$project" \
@@ -1014,10 +1055,54 @@ backup_size_bytes="$(stat -c '%s' "$backup_final")"
 update_env_image_refs() {
   local source="$1"
   local destination="$2"
-  awk -v app_ref="$server_ref" -v web_ref="$web_ref" '
-    BEGIN { app_count=0; web_count=0; proxy_count=0 }
+  awk \
+    -v app_ref="$server_ref" \
+    -v web_ref="$web_ref" \
+    -v postgres_ref="$promotion_postgres_image" \
+    -v jaeger_ref="$promotion_jaeger_image" \
+    -v attachment_ref="$promotion_attachment_store_image" \
+    -v jaeger_mem_limit="$promotion_jaeger_mem_limit" \
+    -v jaeger_mem_reservation="$promotion_jaeger_mem_reservation" '
+    BEGIN {
+      app_count=0; web_count=0; postgres_count=0; jaeger_count=0;
+      attachment_count=0; attachment_mode=""; attachment_mode_count=0;
+      jaeger_limit_count=0;
+      jaeger_reservation_count=0; proxy_count=0
+    }
+    NR == FNR {
+      if ($0 ~ /^ATTACHMENT_STORAGE_MODE=/) {
+        attachment_mode=substr($0, index($0, "=") + 1)
+        attachment_mode_count++
+      }
+      next
+    }
     /^APP_IMAGE=/ { print "APP_IMAGE=" app_ref; app_count++; next }
     /^WEB_IMAGE=/ { print "WEB_IMAGE=" web_ref; web_count++; next }
+    /^POSTGRES_IMAGE=/ { print "POSTGRES_IMAGE=" postgres_ref; postgres_count++; next }
+    /^JAEGER_IMAGE=/ { print "JAEGER_IMAGE=" jaeger_ref; jaeger_count++; next }
+    /^ATTACHMENT_STORAGE_MODE=/ {
+      print
+      next
+    }
+    /^ATTACHMENT_STORE_IMAGE=/ {
+      if (attachment_mode == "managed") {
+        print "ATTACHMENT_STORE_IMAGE=" attachment_ref
+      } else {
+        print
+      }
+      attachment_count++
+      next
+    }
+    /^JAEGER_MEM_LIMIT=/ {
+      print "JAEGER_MEM_LIMIT=" jaeger_mem_limit
+      jaeger_limit_count++
+      next
+    }
+    /^JAEGER_MEM_RESERVATION=/ {
+      print "JAEGER_MEM_RESERVATION=" jaeger_mem_reservation
+      jaeger_reservation_count++
+      next
+    }
     /^WEB_PROXY_PREFIXES=/ {
       print "WEB_PROXY_PREFIXES=/rpc,/templates,/readyz/runtime-identity"
       proxy_count++
@@ -1025,16 +1110,18 @@ update_env_image_refs() {
     }
     { print }
     END {
-      if (app_count != 1 || web_count != 1 || proxy_count != 1) exit 42
+      if (app_count != 1 || web_count != 1 || postgres_count != 1 ||
+          jaeger_count != 1 || jaeger_limit_count != 1 ||
+          jaeger_reservation_count != 1 || proxy_count != 1) exit 42
+      if (attachment_mode == "managed" && attachment_count != 1) exit 42
+      if (attachment_mode == "external" && attachment_count > 1) exit 42
+      if (attachment_mode_count != 1 ||
+          (attachment_mode != "managed" && attachment_mode != "external")) exit 42
     }
-  ' "$source" >"$destination"
+  ' "$source" "$source" >"$destination"
 }
 
 enter_stage env_and_static_preflight
-[[ -f "$runtime_env" && ! -L "$runtime_env" &&
-  "$(stat -c '%u' "$runtime_env")" == "$(id -u)" &&
-  "$(stat -c '%a' "$runtime_env")" == 600 ]] ||
-  fail "target runtime env is invalid"
 env_backup="$runtime_env.bak-before-${release_sha:0:12}-${operation_id:0:8}"
 [[ ! -e "$env_backup" ]] || fail "operation env backup already exists"
 cp "$runtime_env" "$env_backup"
@@ -1125,7 +1212,7 @@ enter_stage migration_applied
 
 enter_stage compose_start
 "${clean_env[@]}" "${compose[@]}" up -d --no-build --pull never \
-  postgres jaeger app-server web-desktop >>"$log_file" 2>&1
+  "${compose_start_services[@]}" >>"$log_file" 2>&1
 
 enter_stage runtime_verified
 "${clean_env[@]}" bash "$preflight_script" \

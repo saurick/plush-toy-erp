@@ -195,7 +195,7 @@ test("local release rehearsal removes PostgreSQL and attachment state through sc
     "--cpus=0.25",
     "--mount",
   ]);
-  assert.equal(calls[0].args.includes("postgres:18.1"), true);
+  assert.equal(calls[0].args.includes("postgres:18.6"), true);
   assert.equal(
     calls[0].args.some((value) => value.includes("chown 0:0 /cleanup")),
     true,
@@ -306,11 +306,11 @@ test("local release rehearsal environment binds isolated database fixed images a
     `plush-toy-erp-server:yoyoosun-${commit}`,
   );
   assert.equal(built.values.WEB_IMAGE, `plush-toy-erp-web:yoyoosun-${commit}`);
-  assert.equal(built.values.POSTGRES_IMAGE, "postgres:18.1");
+  assert.equal(built.values.POSTGRES_IMAGE, "postgres:18.6");
   assert.equal(built.values.POSTGRES_APP_PASSWORD, "app-password");
   assert.equal(built.values.POSTGRES_MIGRATOR_PASSWORD, "migrator-password");
   assert.equal(built.values.POSTGRES_BACKUP_PASSWORD, "backup-password");
-  assert.equal(built.values.JAEGER_IMAGE, "jaegertracing/all-in-one:1.76.0");
+  assert.equal(built.values.JAEGER_IMAGE, "jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3");
   assert.equal(built.values.ERP_DEBUG_ENV, "prod");
   assert.equal(built.values.ERP_DEBUG_SEED_ENABLED, "false");
   assert.equal(built.values.BOOTSTRAP_ADMIN_ONCE, "false");

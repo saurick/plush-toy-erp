@@ -18,7 +18,7 @@ print_help() {
     '' \
     '作用:' \
     '  对 SOURCE_POSTGRES_DSN 指向的库执行一次真实备份恢复演练：' \
-    '  1. 用经过权限对账的 erp_backup 和本机 PostgreSQL 18.1 pg_dump 生成 custom dump 到 output/。' \
+    '  1. 用经过权限对账的 erp_backup 和本机 PostgreSQL 18.6 pg_dump 生成 custom dump 到 output/。' \
     '  2. 启动临时隔离 PostgreSQL 容器。' \
     '  3. 将 dump 恢复到临时库。' \
     '  4. 对恢复库先读取 migrationBefore，依次运行存量升级与客户配置切换只读审计，再执行 Atlas migration apply 和 migration status。' \
@@ -43,10 +43,10 @@ environment="local-dev"
 release_id=""
 backup_purpose="pre-migration"
 out_root="output/customers/yoyoosun/backup-restore-rehearsal"
-postgres_image="${POSTGRES_REHEARSAL_IMAGE:-postgres:18.1}"
+postgres_image="${POSTGRES_REHEARSAL_IMAGE:-postgres:18.6}"
 pg_dump_bin="${PG_DUMP_BIN:-}"
 psql_bin="${PSQL_BIN:-}"
-atlas_required_version="${ATLAS_REQUIRED_VERSION:-v1.2.0}"
+atlas_required_version="${ATLAS_REQUIRED_VERSION:-v1.3.0}"
 source_env="SOURCE_POSTGRES_DSN"
 source_policy="dedicated-backup"
 backend_url=""
@@ -189,12 +189,12 @@ if [[ -z "$psql_bin" ]]; then
 fi
 
 if [[ -z "$pg_dump_bin" || -z "$psql_bin" ]]; then
-  echo "[backup-restore-rehearsal] 缺少 PostgreSQL 18.1 pg_dump / psql 客户端" >&2
+  echo "[backup-restore-rehearsal] 缺少 PostgreSQL 18.6 pg_dump / psql 客户端" >&2
   exit 1
 fi
 
-[[ "$postgres_image" == "postgres:18.1" ]] || {
-  echo "[backup-restore-rehearsal] 恢复镜像必须与生产固定为 postgres:18.1" >&2
+[[ "$postgres_image" == "postgres:18.6" ]] || {
+  echo "[backup-restore-rehearsal] 恢复镜像必须与生产固定为 postgres:18.6" >&2
   exit 1
 }
 pg_dump_version="$("$pg_dump_bin" --version)"
@@ -596,7 +596,7 @@ if grep -Eq '^(20260911062436|20260911062537)$' "$pending_versions_file"; then
       chmod 600 "$attachment_secret_file"
       docker run -d --name "$attachment_container" --env-file "$attachment_secret_file" \
         -p 127.0.0.1::8333 \
-        chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62 \
+        chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882 \
         mini -dir=/data -admin.ui=false -webdav=false -s3.iam=false -s3.port.iceberg=0 -s3.port.lance=0 >/dev/null
       attachment_ready=0
       for ((attempt=0; attempt<30; attempt++)); do

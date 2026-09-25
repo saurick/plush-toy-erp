@@ -13,7 +13,7 @@
 
 ## 环境版本
 
-前端依赖 pnpm，版本由 `web/package.json` 的 `packageManager` 固定为 `pnpm@10.13.1`；Node.js 版本由仓库根目录 `.n-node-version`、`.node-version` 和 `.nvmrc` 共同锁定为 `24.14.0`。
+前端依赖 pnpm，版本由 `web/package.json` 的 `packageManager` 固定为 `pnpm@10.34.5`；Node.js 版本由仓库根目录 `.n-node-version`、`.node-version` 和 `.nvmrc` 共同锁定为 `24.21.0`。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"

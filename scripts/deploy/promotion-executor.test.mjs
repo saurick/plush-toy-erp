@@ -875,3 +875,54 @@ test("ordinary promotion cannot rebuild or reseed target data", () => {
     );
   }
 });
+
+test("remote promotion advances only release-bound runtime dependencies", () => {
+  const source = readFileSync(
+    path.join(import.meta.dirname, "remote-promotion.sh"),
+    "utf8",
+  );
+
+  for (const expected of [
+    "promotion_postgres_image=postgres:18.6",
+    "promotion_jaeger_image=jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3",
+    "promotion_attachment_store_image=chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882",
+    "promotion_jaeger_mem_limit=192m",
+    "promotion_jaeger_mem_reservation=96m",
+  ]) {
+    assert.match(source, new RegExp(expected.replaceAll(".", "[.]"), "u"));
+  }
+  assert.match(source, /\^POSTGRES_IMAGE=/u);
+  assert.match(source, /\^JAEGER_IMAGE=/u);
+  assert.match(source, /\^ATTACHMENT_STORAGE_MODE=/u);
+  assert.match(source, /attachment_mode == "managed"/u);
+  assert.match(source, /attachment_mode == "external"/u);
+  assert.match(
+    source,
+    /if \(attachment_mode == "managed"\) \{\s*print "ATTACHMENT_STORE_IMAGE=" attachment_ref\s*\} else \{\s*print\s*\}/u,
+  );
+  assert.match(source, /enter_stage runtime_dependency_preflight/u);
+  assert.match(
+    source,
+    /required_runtime_images\+=\("\$promotion_attachment_store_image"\)/u,
+  );
+  assert.match(source, /compose_start_services\+=\(attachment-store\)/u);
+  assert.match(
+    source,
+    /up -d --no-build --pull never \\\n+  "\$\{compose_start_services\[@\]\}"/u,
+  );
+  assert.match(
+    source,
+    /docker image inspect --format '\{\{\.Os\}\}\/\{\{\.Architecture\}\}' "\$image_ref"/u,
+  );
+  assert.ok(
+    source.indexOf("enter_stage runtime_dependency_preflight") <
+      source.indexOf("enter_stage fresh_backup_and_restore_check"),
+    "runtime dependency images must be proven before backup and maintenance",
+  );
+  assert.match(source, /cp "\$runtime_env" "\$env_backup"/u);
+  assert.ok(
+    source.indexOf('cp "$runtime_env" "$env_backup"') <
+      source.indexOf('update_env_image_refs "$runtime_env"'),
+    "the prior runtime env must be durable before service versions change",
+  );
+});

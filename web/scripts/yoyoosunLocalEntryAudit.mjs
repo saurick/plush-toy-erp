@@ -368,6 +368,32 @@ async function defaultFetchHead(url) {
 }
 
 async function defaultGetPortProcess(port) {
+  if (process.platform === 'darwin') {
+    try {
+      const { stdout } = await execFileAsync('/usr/sbin/netstat', [
+        '-anv',
+        '-p',
+        'tcp',
+      ])
+      const entry = parseDarwinNetstatListener(stdout, port)
+      if (!entry.listening) {
+        return { listening: false, pid: '', command: '', cwd: '' }
+      }
+      return {
+        ...entry,
+        command: entry.pid
+          ? (await readProcessCommand(entry.pid)) || entry.command
+          : entry.command,
+        // macOS netstat already proves the listener owner without walking every
+        // mounted filesystem. Avoid lsof here because an unavailable network
+        // mount can otherwise block this read-only audit indefinitely.
+        cwd: '',
+      }
+    } catch {
+      return { listening: false, pid: '', command: '', cwd: '' }
+    }
+  }
+
   try {
     const { stdout } = await execFileAsync('lsof', [
       '-nP',
@@ -392,6 +418,29 @@ async function defaultGetPortProcess(port) {
   } catch {
     return { listening: false, pid: '', command: '', cwd: '' }
   }
+}
+
+export function parseDarwinNetstatListener(output, port) {
+  const expectedPort = String(port || '').trim()
+  for (const line of String(output || '').split(/\r?\n/)) {
+    const fields = line.trim().split(/\s+/)
+    if (
+      !fields[0]?.startsWith('tcp') ||
+      fields[5] !== 'LISTEN' ||
+      fields[3]?.split('.').at(-1) !== expectedPort
+    ) {
+      continue
+    }
+    const owner = line.match(
+      /\sLISTEN\s+\d+\s+\d+\s+\d+\s+\d+\s+(.+):(\d+)\s+[0-9A-Fa-f]{5}\b/u
+    )
+    return {
+      listening: true,
+      pid: owner?.[2] || '',
+      command: owner?.[1]?.trim() || '',
+    }
+  }
+  return { listening: false, pid: '', command: '' }
 }
 
 function parseLsofProcess(output) {

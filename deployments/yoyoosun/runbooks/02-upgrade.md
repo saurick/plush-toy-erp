@@ -21,8 +21,8 @@ docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env ps
 sh migrate_online.sh --status-only
 ```
 
-1. `docker load` 新镜像。
-2. 更新受控 `.env` 中 `APP_IMAGE` 和 `WEB_IMAGE`。
+1. `docker load` 新应用镜像，并在停机前预置 release 固定的 PostgreSQL、Jaeger；仅受管附件模式预置 SeaweedFS。执行器以 `--pull never` 读回镜像和平台，缺失时不得进入备份或维护窗口。
+2. 更新受控 `.env` 中 `APP_IMAGE`、`WEB_IMAGE` 和 release 固定的 PostgreSQL / Jaeger / 受管附件存储版本；外部附件存储保持独立维护。
 3. 再次执行 `verify-env.sh`。
 4. 进入已通知客户的停写维护窗口，停止旧后端和 Web；PostgreSQL、备份和 tracing 服务保持运行：
 

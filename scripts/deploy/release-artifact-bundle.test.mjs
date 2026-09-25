@@ -309,7 +309,7 @@ test("release artifact builds a non-empty CycloneDX dependency inventory", () =>
     "web/pnpm-lock.yaml":
       "lockfileVersion: '9.0'\npackages:\n\n  '@scope/pkg@2.0.0':\n    resolution: {}\n\n  plain@1.0.0:\n    resolution: {}\n\nsnapshots:\n",
     "server/Dockerfile":
-      "ARG NODE_BUILDER_IMAGE=node:24.14.0\nARG GO_BUILDER_IMAGE=golang:1.26.6\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
+      "ARG NODE_BUILDER_IMAGE=node:24.21.0\nARG GO_BUILDER_IMAGE=golang:1.26.8\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
     "web/Dockerfile": "ARG UNUSED_DEVELOPMENT_IMAGE=example.invalid/unused:1\n",
   };
   const sbom = buildDependencySbom({
@@ -515,15 +515,15 @@ test("release artifact builder normalizes the source hash and writes complete ch
     "config/customers/yoyoosun/roleFlowMatrix.mjs":
       "export const roles = [];\n",
     "server/go.sum": "example.com/module v1.2.3 h1:one\n",
-    "server/go.mod": "module example.com/release\n\ntoolchain go1.26.6\n",
+    "server/go.mod": "module example.com/release\n\ntoolchain go1.26.8\n",
     "web/pnpm-lock.yaml":
       "lockfileVersion: '9.0'\npackages:\n\n  plain@1.0.0:\n    resolution: {}\n\nsnapshots:\n",
     "server/Dockerfile":
-      "ARG GO_BUILDER_IMAGE=golang:1.26.6\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
+      "ARG GO_BUILDER_IMAGE=golang:1.26.8\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
     "web/Dockerfile":
-      "ARG NODE_BUILDER_IMAGE=node:24.14.0\nARG RUNTIME_BASE_IMAGE=node:24.14.0-slim\n",
+      "ARG NODE_BUILDER_IMAGE=node:24.21.0\nARG RUNTIME_BASE_IMAGE=node:24.21.0-slim\n",
     "web/package.json":
-      '{"packageManager":"pnpm@10.13.1","name":"fixture","version":"1.0.0"}\n',
+      '{"packageManager":"pnpm@10.34.5","name":"fixture","version":"1.0.0"}\n',
   };
   const sourceImages = {
     server: `plush-source-archive-server:${commit.slice(0, 12)}`,

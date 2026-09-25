@@ -178,7 +178,7 @@ test("backup restore rehearsal keeps credentials private and uses the full migra
   const source = fs.readFileSync(scriptPath, "utf8").replaceAll('\\"', '"');
 
   assert.match(source, /^umask 077$/m);
-  assert.match(source, /postgres:18\.1/);
+  assert.match(source, /postgres:18.6/);
   assert.doesNotMatch(source, /postgres:18(?:["'\s]|$)/);
   assert.doesNotMatch(source, /postgresql@(?:16|17)/);
   assert.match(source, /source_user" == "erp_backup"/);

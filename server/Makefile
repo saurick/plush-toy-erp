@@ -5,7 +5,7 @@ GOHOSTOS:=$(shell go env GOHOSTOS)
 # 数据模型与版本化迁移由 `make data` 生成；自定义迁移和目标执行边界见 docs/ent.md。
 GOPATH:=$(shell go env GOPATH)
 ATLAS_BIN ?= atlas
-ATLAS_VERSION ?= v1.2.0
+ATLAS_VERSION ?= v1.3.0
 
 # ========================
 # Git 信息（兼容在子目录执行 & 没有提交的情况）
@@ -134,7 +134,7 @@ ent_migrate: atlas_check
 	"$(ATLAS_BIN)" migrate diff migrate \
 		--dir "file://internal/data/model/migrate" \
 		--to "ent://internal/data/model/schema" \
-		--dev-url "docker://postgres/18.1/dev?search_path=public"
+		--dev-url "docker://postgres/18.6/dev?search_path=public"
 
 # 重新计算迁移目录校验，如果改了 migration 的 sql 文件，必须重新计算校验，否则migrate_apply会报错，提示Error: checksum mismatch
 .PHONY: migrate_hash
@@ -458,8 +458,8 @@ image_gc:
 # 本地/开发环境额外打一个固定tag，可以是dev或者latest
 # 部署时就可以一直写 plush-toy-erp-server:dev（或 :latest）
 FIXED_TAG ?= dev
-NODE_BUILDER_IMAGE ?= node:24.14.0
-GO_BUILDER_IMAGE ?= golang:1.26.6
+NODE_BUILDER_IMAGE ?= node:24.21.0
+GO_BUILDER_IMAGE ?= golang:1.26.8
 RUNTIME_BASE_IMAGE ?= debian:bookworm-slim
 
 # 构建服务器镜像（在 server/ 目录执行）

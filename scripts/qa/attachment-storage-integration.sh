@@ -20,9 +20,9 @@ password=secrets.token_hex(24)
 (p/'pg.env').write_text(f'POSTGRES_PASSWORD={password}\nPOSTGRES_DB=plush_erp_attachment_drill\n')
 (p/'client.env').write_text(f'export ATTACHMENT_S3_ACCESS_KEY_ID={access}\nexport ATTACHMENT_S3_SECRET_ACCESS_KEY={secret}\nexport PGPASSWORD={password}\n')
 PY
-docker run -d --name "$fixture_id-pg" --env-file "$fixture_dir/pg.env" -p 127.0.0.1::5432 postgres:18.1 >/dev/null
+docker run -d --name "$fixture_id-pg" --env-file "$fixture_dir/pg.env" -p 127.0.0.1::5432 postgres:18.6 >/dev/null
 docker run -d --name "$fixture_id-s3" --env-file "$fixture_dir/s3.env" -p 127.0.0.1::8333 \
-  chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62 \
+  chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882 \
   mini -dir=/data -admin.ui=false -webdav=false -s3.iam=false -s3.port.iceberg=0 -s3.port.lance=0 >/dev/null
 for ((attempt = 0; attempt < 45; attempt++)); do
   if docker exec "$fixture_id-pg" pg_isready -U postgres -q &&

@@ -1192,7 +1192,7 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
   );
   assert.match(
     runnerCloudInit,
-    /retry_command env ATLAS_VERSION=v1[.]2[.]0 bash/u,
+    /retry_command env ATLAS_VERSION=v1[.]3[.]0 bash/u,
   );
   assert.match(
     runnerCloudInit,

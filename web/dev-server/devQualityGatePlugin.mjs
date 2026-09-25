@@ -625,7 +625,7 @@ function statusProjection({
       description: environment.message,
       releaseEligible: false,
       recommendation:
-        '启动本机 Docker 并准备 postgres:18.1 镜像，或显式登记合规的本机一次性数据库环境。',
+        '启动本机 Docker 并准备 postgres:18.6 镜像，或显式登记合规的本机一次性数据库环境。',
       notProven: ['当前版本严格门禁', '目标环境发布', '客户 UAT'],
     }
   }

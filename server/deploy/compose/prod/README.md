@@ -3,6 +3,7 @@
 本目录是仓库内唯一的单宿主机 Compose 部署真源：
 
 - `compose.yml`：PostgreSQL、SeaweedFS 私有对象存储、Jaeger、业务服务与单一 Web 入口。
+- `jaeger-v2.yml`：Jaeger v2 的 OTLP / Jaeger / Zipkin 接收、内存 trace store、查询 UI、健康端点与外部 Prometheus 查询配置。
 - `compose.demo-133.yml`：`demo-133` 的固定 Compose project 覆盖。
 - `compose.customer-test-133.yml`：`customer-test-133` 的固定 Compose project 覆盖。
 - `.env.example`：运行环境变量示例，不保存真实凭据。
@@ -154,9 +155,9 @@ DEPLOYMENT_TARGET_KEY='<demo-133|customer-test-133>' \
 
 ## 发布与回滚
 
-目标机不构建源码，只 load / pull 已发布的不可变制品。promotion 必须绑定同一 Git SHA、image digest、migration 序列、客户配置源指纹和 release rehearsal；成功后分别读回 Compose、容器 image/content identity、`GIT_SHA`、health、ready、公网入口和 rollback point。
+目标机不构建源码，只 load / pull 已发布的不可变制品。promotion 必须绑定同一 Git SHA、image digest、migration 序列、客户配置源指纹和 release rehearsal；同一原子 env 备份还绑定 release 固定的 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 版本。`ATTACHMENT_STORAGE_MODE=external` 时不新增或修改 `ATTACHMENT_STORE_IMAGE`，共享外部存储必须走自己的维护窗口。成功后分别读回 Compose、容器 image/content identity、`GIT_SHA`、health、ready、公网入口和 rollback point。
 
-代码回滚只允许 migration 序列与客户配置源指纹兼容的旧 manifest；不自动 down migration，也不把数据库恢复隐藏在代码回滚中。任何结果为 `not_proven` 时先只读核对目标，禁止重试。
+代码回滚只允许 migration 序列与客户配置源指纹兼容的旧 manifest；不自动 down migration，也不把数据库恢复隐藏在代码回滚中。兼容的 PostgreSQL 小版本、Jaeger v2 和 S3 服务版本不会随代码回滚降级；若基础服务本身需要回退，必须使用 promotion 前 env 备份、对应旧镜像和数据库/附件恢复点单独执行。任何结果为 `not_proven` 时先只读核对目标，禁止重试。
 
 ## 最小检查
 
@@ -182,7 +183,7 @@ git diff --check
 
 外部模式不启动 `attachment-store`，无需在 ERP env 中保存存储管理员密码或数据目录。S3 origin 允许 HTTPS 或局域网 HTTP IP 地址，不接受带凭据、文件路径、query 的 URL。Compose profile 只允许表中值，宿主环境仍不得覆盖受控 env。业务服务会在存储不可用时拒绝文件操作，不能用数据库内容回退。
 
-本机模式使用 SeaweedFS `4.46` 固定 digest，所有 volume、filer metadata 和 master 数据均挂载到 `ATTACHMENT_DATA_DIR`。`ATTACHMENT_RAID_MOUNT=/srv/raid5`；demo 建议目录 `/srv/raid5/plush-toy-erp/demo-133/attachments`、bucket `plush-demo-133-files`，test 使用对应 `customer-test-133` 路径和 bucket。新目标初始化按这组路径生成独立随机凭据；已存在目标在发布前准备运行 env、目录和固定镜像，不能直接套用新目标初始化。
+本机模式使用 SeaweedFS `4.47` 固定 digest，所有 volume、filer metadata 和 master 数据均挂载到 `ATTACHMENT_DATA_DIR`。`ATTACHMENT_RAID_MOUNT=/srv/raid5`；demo 建议目录 `/srv/raid5/plush-toy-erp/demo-133/attachments`、bucket `plush-demo-133-files`，test 使用对应 `customer-test-133` 路径和 bucket。新目标初始化按这组路径生成独立随机凭据；已存在目标在发布前准备运行 env、目录和固定镜像，不能直接套用新目标初始化。
 
 目标主机先确认 `/srv/raid5` 已挂载到预期块设备，再创建专用目录并限制权限。启动前执行：
 

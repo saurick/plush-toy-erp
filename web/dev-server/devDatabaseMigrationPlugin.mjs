@@ -178,7 +178,7 @@ function normalizeToolReadiness(value) {
 }
 
 function migrationToolIssueMessage() {
-  return '迁移准备环境未就绪；请准备可用的 Docker-compatible 容器运行环境、Atlas v1.2.0、PostgreSQL 18 客户端及基础命令。容器运行环境不限定操作系统或产品，可使用 Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack，或提供兼容 docker CLI/socket 的 Podman 配置'
+  return '迁移准备环境未就绪；请准备可用的 Docker-compatible 容器运行环境、Atlas v1.3.0、PostgreSQL 18 客户端及基础命令。容器运行环境不限定操作系统或产品，可使用 Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack，或提供兼容 docker CLI/socket 的 Podman 配置'
 }
 
 function databaseClientDiagnosticMessage(diagnostic) {

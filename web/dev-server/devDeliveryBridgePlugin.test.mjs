@@ -193,7 +193,7 @@ function backupRestoreReport(overrides = {}) {
     releaseVersion: SHA,
     backupId: 'br-yoyoosun-20260814T225613+0800',
     verifiedAt: '2026-08-14T14:56:26Z',
-    restoreTarget: 'temp-postgres-container:postgres:18.1:removed-after-run',
+    restoreTarget: 'temp-postgres-container:postgres:18.6:removed-after-run',
     backup: {
       databaseBackupSize: 837_713,
       databaseBackupHash: 'b'.repeat(64),

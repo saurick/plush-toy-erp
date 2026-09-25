@@ -12,9 +12,9 @@ GitLab `.gitlab-ci.yml` 是 main / MR 的 canonical CI/CD；GitHub main 只接�
 
 `demo-133` 与 `customer-test-133` 的 promotion 由 `scripts/deploy/promotion-controller.mjs` 与 `promotion-executor.mjs` 编排，代码回滚由对应 rollback controller / executor 编排。Mac 只传 operation、manifest、执行脚本和目标取件描述符；专用 `read_package_registry` deploy token 只经唯一 SSH 进程标准输入交给已加锁的远端执行器，不进入参数、控制包或目标 secret 文件。目标宿主通过固定内网 GitLab TLS 入口直接取得七资产与 `source.tar`，再校验名称、大小、SHA-256、manifest、演练回执、image content ID 和 cache v2 身份。Mac 不再下载后回传镜像、SBOM 或 source，也没有大文件中转 fallback。首次升级前还必须证明当前运行 SHA 具备同样的直接取件回滚输入；已有 v2 七资产但缺少 source 包时，只能由 protected main 的受控 `backfill_release_source` job 在 Runner 内校验旧 Release 后补齐该 SHA 的单一 source 包，不改写七资产或 Release。
 
-执行器复用既有 digest，不在目标机重新构建，并分别读回 `demo.yoyoosun.net` 与 `test.yoyoosun.net` 的 Compose、`GIT_SHA`、健康和 Provider 能力。普通 promotion 保留目标现有数据；清空重建只能通过独立 database rebuild operation 显式执行。根域 `yoyoosun.net` 临时 `302` 跳转到未来可能使用的 `erp.yoyoosun.net`，但不会把它登记为生产 target；`admin.yoyoosun.net` 退役后也不进入目标、检查、发布或回滚矩阵。目标 registry、只读 preflight、operation 和安全边界见 `scripts/deploy/README.md` 与 `docs/engineering/研发效能工作台与CI-CD设计.md`。
+执行器复用既有 digest，不在目标机重新构建，并分别读回 `demo.yoyoosun.net` 与 `test.yoyoosun.net` 的 Compose、`GIT_SHA`、健康和 Provider 能力。promotion 会在同一份受保护 env 备份边界内，把 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 更新到该 release 固定的兼容版本；外部附件存储不由 ERP promotion 重启或改版。普通 promotion 保留目标现有数据；清空重建只能通过独立 database rebuild operation 显式执行。根域 `yoyoosun.net` 临时 `302` 跳转到未来可能使用的 `erp.yoyoosun.net`，但不会把它登记为生产 target；`admin.yoyoosun.net` 退役后也不进入目标、检查、发布或回滚矩阵。目标 registry、只读 preflight、operation 和安全边界见 `scripts/deploy/README.md` 与 `docs/engineering/研发效能工作台与CI-CD设计.md`。
 
-Atlas migration 在普通生产 / 低配服务器上使用宿主机 `/usr/local/bin/atlas`，版本统一固定为 `v1.2.0`。demo / test 使用各自目标根下固定、非符号链接、精确版本的 Atlas，并使用各自 registry 登记的数据库端口和 migration lock；运行环境不得通过 `ATLAS_BIN` 覆盖，也不得替换系统 Atlas。不要拉起 `arigaio/atlas:*` 临时容器，也不要把 Atlas 增加到 Compose。每个目标都在自己的私有 `flock` 锁内完成 `status -> populated upgrade 只读审计（含 20260714055504 与 WIP 20260717043625 切换边界） -> 20260714055825 客户配置切换只读审计 -> dry-run -> apply`，避免跨目标或并发发布穿插。`--status-only` 只查看状态，不执行后续步骤。
+Atlas migration 在普通生产 / 低配服务器上使用宿主机 `/usr/local/bin/atlas`，版本统一固定为 `v1.3.0`。demo / test 使用各自目标根下固定、非符号链接、精确版本的 Atlas，并使用各自 registry 登记的数据库端口和 migration lock；运行环境不得通过 `ATLAS_BIN` 覆盖，也不得替换系统 Atlas。不要拉起 `arigaio/atlas:*` 临时容器，也不要把 Atlas 增加到 Compose。每个目标都在自己的私有 `flock` 锁内完成 `status -> populated upgrade 只读审计（含 20260714055504 与 WIP 20260717043625 切换边界） -> 20260714055825 客户配置切换只读审计 -> dry-run -> apply`，避免跨目标或并发发布穿插。`--status-only` 只查看状态，不执行后续步骤。
 
 升级链跨越 `20260714055504`、WIP 委外分配切换 `20260717035245 -> 20260717043625` 或 `20260714055825` 时，必须在 apply 前分别通过 `scripts/qa/populated-upgrade-preflight.sh --audit populated-upgrade` 和 `--audit customer-config-cutover`。前者还会阻断旧 WIP 委外关联列中仍有数据的中间态，以及切换后缺少 allocation 的活动外发批次。两项审计只读检查现存行，不执行 migration，也不自动 `INSERT / UPDATE / DELETE`；发现阻断数据后应停止发布，按单独评审的人工治理方案处理并保留审计与回滚证据。fresh schema、静态 DDL 或空库 Atlas 通过只能证明迁移链可执行，不能替代 populated upgrade 证据；备份恢复演练也必须在 restored DB 上先审计、再 apply。
 
@@ -30,6 +30,7 @@ Atlas migration 在普通生产 / 低配服务器上使用宿主机 `/usr/local/
 关键文件：
 
 - `compose.yml`
+- `jaeger-v2.yml`
 - `.env.example`
 - `migrate_online.sh`
 

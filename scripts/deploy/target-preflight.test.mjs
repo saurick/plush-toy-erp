@@ -507,15 +507,15 @@ test("Atlas version check consumes delayed output and preserves CLI failures", (
     );
     chmodSync(atlasPath, 0o700);
     for (const [version, exitCode, expectedBlocker] of [
-      ["v1.2.0", "0", ""],
-      ["v1.3.0", "0", "target_atlas_tooling_invalid"],
-      ["v1.2.0", "42", "target_atlas_tooling_invalid"],
+      ["v1.3.0", "0", ""],
+      ["v1.2.0", "0", "target_atlas_tooling_invalid"],
+      ["v1.3.0", "42", "target_atlas_tooling_invalid"],
     ]) {
       const result = spawnSync("bash", ["-s", "--", atlasPath], {
         input: [
           "set -euo pipefail",
           'trial_atlas_bin="$1"',
-          "trial_atlas_required_version=v1.2.0",
+          "trial_atlas_required_version=v1.3.0",
           'plain_file() { [[ -f "$1" && ! -L "$1" ]]; }',
           "stat() { id -u; }",
           'block() { printf "%s" "$1"; }',
@@ -554,11 +554,11 @@ test("remote target preflight script is read-only and contains no build command"
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /target_rsync_unavailable/u);
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
-    /trial_atlas_bin=\/home\/simon\/plush-toy-erp-demo-v1\/tools\/atlas\/v1[.]2[.]0\/atlas/u,
+    /trial_atlas_bin=\/home\/simon\/plush-toy-erp-demo-v1\/tools\/atlas\/v1[.]3[.]0\/atlas/u,
   );
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
-    /trial_atlas_required_version=v1[.]2[.]0/u,
+    /trial_atlas_required_version=v1[.]3[.]0/u,
   );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /stat -c '%u'/u);
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /target_atlas_tooling_invalid/u);

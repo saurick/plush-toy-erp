@@ -317,14 +317,14 @@ test('database migration runtime accepts platform-neutral compatible tooling', a
       calls.push([command, ...args])
       if (command === 'docker') return { stdout: '28.0.0\n', stderr: '' }
       if (command === 'atlas') {
-        return { stdout: 'atlas version v1.2.0\n', stderr: '' }
+        return { stdout: 'atlas version v1.3.0\n', stderr: '' }
       }
       if (
         path.basename(command) === 'pg_dump' ||
         path.basename(command) === 'psql'
       ) {
         return {
-          stdout: `${path.basename(command)} (PostgreSQL) 18.1\n`,
+          stdout: `${path.basename(command)} (PostgreSQL) 18.6\n`,
           stderr: '',
         }
       }
@@ -369,13 +369,13 @@ test('database migration runtime requires every supporting command before prepar
       execFile: async (command, args) => {
         if (command === 'docker') return { stdout: '29.0.0', stderr: '' }
         if (command === 'atlas') {
-          return { stdout: 'atlas version v1.2.0', stderr: '' }
+          return { stdout: 'atlas version v1.3.0', stderr: '' }
         }
         if (
           path.basename(command) === 'pg_dump' ||
           path.basename(command) === 'psql'
         ) {
-          return { stdout: 'PostgreSQL) 18.1', stderr: '' }
+          return { stdout: 'PostgreSQL) 18.6', stderr: '' }
         }
         assert.equal(command, 'bash')
         return {
@@ -408,12 +408,12 @@ test('database migration runtime identifies an unavailable container daemon with
     env: {},
     execFile: async (command) => {
       if (command === 'docker') throw new Error('daemon unavailable')
-      if (command === 'atlas') return { stdout: 'atlas version v1.2.0\n' }
+      if (command === 'atlas') return { stdout: 'atlas version v1.3.0\n' }
       if (
         path.basename(command) === 'pg_dump' ||
         path.basename(command) === 'psql'
       ) {
-        return { stdout: `${path.basename(command)} (PostgreSQL) 18.1\n` }
+        return { stdout: `${path.basename(command)} (PostgreSQL) 18.6\n` }
       }
       return { stdout: '' }
     },

@@ -29,10 +29,10 @@
 - 数据准备摘要只输出数据集版本、安全数据库名、migration、客户配置 revision 和读回时间；不输出凭据、DSN、主机、端口、命令、路径或内部幂等键。本地与 133 的读取失败分别建模，结果未证明时不自动重试或创建 operation。
 - 本地 Core profile 固定执行 V6 合同的角色账号、11 个审定模拟单位与 4 个仓库引用，只允许登记的长期开发库和服务端生成的精确确认；它不再从工作台调用旧 `SIM-PLUSH-CORE` 全量 seed，材料、产品、工序、BOM、Source、Task 与 Fact 由同一 V6 Scenario 合同补齐并独立读回。
 - 133 Scenario 只能在对应目标卡中准备和二次确认；执行前重新读取固定 target attestation，并创建绑定 exact release / database / migration 的新备份回滚点。备份通过 `erp_backup` 只读角色生成并校验，只向页面返回 alias、hash、大小和时间。
-- 质量门禁没有显式 database base 时只允许本机 Docker 的固定 `postgres:18.1` 托管模式：每次随机凭据、仅绑定 `127.0.0.1` 动态端口、按 operation 与 repository label 精确清理；不得删除外部容器或占用者。
+- 质量门禁没有显式 database base 时只允许本机 Docker 的固定 `postgres:18.6` 托管模式：每次随机凭据、仅绑定 `127.0.0.1` 动态端口、按 operation 与 repository label 精确清理；不得删除外部容器或占用者。
 - production build、production preview 和正式部署不包含本目录模块、`/__dev` 路由或本机私有路径。
 - `devDatabaseMigrationRuntime.mjs` 的 source identity 包含迁移 Bridge、高层 CLI 与安全真源；路径或内容变化后，既有迁移 plan 必须失效并重新准备，不保留旧路径兼容。execute 在 apply 前还必须重新验证 operation 绑定的备份文件身份。
-- 数据库迁移准备先检查能力而非绑定操作系统或桌面产品：固定需要兼容 `docker` CLI/socket 的容器运行环境、Atlas v1.2.0、PostgreSQL 18 客户端及备份恢复基础命令。Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack 或提供兼容入口的 Podman 均可；环境不完整时不得先停止后端。
+- 数据库迁移准备先检查能力而非绑定操作系统或桌面产品：固定需要兼容 `docker` CLI/socket 的容器运行环境、Atlas v1.3.0、PostgreSQL 18 客户端及备份恢复基础命令。Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack 或提供兼容入口的 Podman 均可；环境不完整时不得先停止后端。
 
 调整本目录后至少运行同目录 Node 测试、工作台源码边界测试、production build、制品零残留扫描和 production `/__dev` 浏览器 smoke。
 

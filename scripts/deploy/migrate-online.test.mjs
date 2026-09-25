@@ -84,7 +84,7 @@ function createFixture({ useSystemFlock = false } = {}) {
   const productionMigrateDirContract =
     "TARGET_MIG_DIR=$SERVER_ROOT/internal/data/model/migrate";
   const productionAtlasContract =
-    "TARGET_ATLAS_BIN=$TARGET_ROOT/tools/atlas/v1.2.0/atlas";
+    "TARGET_ATLAS_BIN=$TARGET_ROOT/tools/atlas/v1.3.0/atlas";
   const productionPreflightContract =
     "TARGET_POPULATED_UPGRADE_PREFLIGHT=$SERVER_ROOT/../scripts/qa/populated-upgrade-preflight.sh";
   let fixtureMigrateSource = fs.readFileSync(migrateScript, "utf8");
@@ -109,7 +109,7 @@ function createFixture({ useSystemFlock = false } = {}) {
   fs.chmodSync(fixtureMigrateScript, 0o755);
   fs.writeFileSync(
     composeFile,
-    "services:\n  postgres:\n    image: postgres:18.1\n",
+    "services:\n  postgres:\n    image: postgres:18.6\n",
     "utf8",
   );
 
@@ -185,7 +185,7 @@ exit 1
     atlasBin,
     `#!/bin/sh
 if [ "$1" = "version" ]; then
-  printf '%s\n' 'atlas version v1.2.0'
+  printf '%s\n' 'atlas version v1.3.0'
   exit 0
 fi
 case "$*" in
@@ -627,7 +627,7 @@ test("migrate_online canonical 模式保持单 compose 文件且不注入登记�
   }
 });
 
-test("migrate_online 接受 Atlas v1.2.0 的全新数据库 Applied null 状态", () => {
+test("migrate_online 接受 Atlas v1.3.0 的全新数据库 Applied null 状态", () => {
   const fixture = createFixture();
   try {
     const result = runMigration(fixture, ["--status-only"], {

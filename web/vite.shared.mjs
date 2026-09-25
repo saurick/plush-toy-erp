@@ -20,7 +20,10 @@ const ROOT_DIR = fileURLToPath(new URL('.', import.meta.url))
 const PROJECT_ROOT = resolve(ROOT_DIR, '..')
 const devPorts = loadDevPorts(PROJECT_ROOT)
 const DEV_HOST = '127.0.0.1'
-const DEV_WORKBENCH_PLUGIN_MODULE = './dev-server/devWorkbenchPlugins.mjs'
+const DEV_WORKBENCH_PLUGIN_MODULE = new URL(
+  './dev-server/devWorkbenchPlugins.mjs',
+  import.meta.url
+).href
 
 export function resolveERPDevServerPort(rawPort, ports = devPorts) {
   return resolvePort(rawPort, ports)

@@ -38,8 +38,8 @@ function writeFixture({
       "ERP_CUSTOMER_KEY=demo",
       `APP_IMAGE=${appImage}`,
       "WEB_IMAGE=plush-toy-erp-web:20260628",
-      "POSTGRES_IMAGE=postgres:18.1",
-      "JAEGER_IMAGE=jaegertracing/all-in-one:1.76.0",
+      "POSTGRES_IMAGE=postgres:18.6",
+      "JAEGER_IMAGE=jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3",
       "TZ=Asia/Shanghai",
       `POSTGRES_DSN=postgres://erp_app:${postgresAppPassword}@postgres:5432/plush_erp?sslmode=disable`,
       `POSTGRES_PASSWORD=${postgresPassword}`,
@@ -53,7 +53,7 @@ function writeFixture({
       "COMPOSE_PROFILES=attachment-local",
       `ATTACHMENT_DATA_DIR=${root}/raid/attachments`,
       `ATTACHMENT_RAID_MOUNT=${root}/raid`,
-      "ATTACHMENT_STORE_IMAGE=chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62",
+      "ATTACHMENT_STORE_IMAGE=chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882",
       "ATTACHMENT_S3_ENDPOINT=http://attachment-store:8333",
       "ATTACHMENT_S3_BUCKET=plush-test-files",
       "ATTACHMENT_S3_ACCESS_KEY_ID=fixture-access-key",
@@ -461,10 +461,10 @@ fi
 if [[ "\${1:-}" == "image" && "\${2:-}" == "inspect" ]]; then
   image_ref="\${@: -1}"
   case "$image_ref" in
-  postgres:18.1) image_id="sha256:1111111111111111111111111111111111111111111111111111111111111111" ;;
-  jaegertracing/all-in-one:1.76.0) image_id="sha256:2222222222222222222222222222222222222222222222222222222222222222" ;;
+  postgres:18.6) image_id="sha256:1111111111111111111111111111111111111111111111111111111111111111" ;;
+  jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3) image_id="sha256:2222222222222222222222222222222222222222222222222222222222222222" ;;
   plush-toy-erp-server:20260628) image_id="sha256:3333333333333333333333333333333333333333333333333333333333333333" ;;
-  chrislusf/seaweedfs:4.46@sha256:*) image_id="sha256:5555555555555555555555555555555555555555555555555555555555555555" ;;
+  chrislusf/seaweedfs:4.47@sha256:*) image_id="sha256:5555555555555555555555555555555555555555555555555555555555555555" ;;
   plush-toy-erp-web:20260628) image_id="sha256:4444444444444444444444444444444444444444444444444444444444444444" ;;
   *) exit 1 ;;
   esac
@@ -508,15 +508,15 @@ if [[ "\${1:-}" == "inspect" ]]; then
   cid="\${@: -1}"
   case "$cid" in
   attachment-store-cid)
-    runtime_image_ref=chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62
+    runtime_image_ref=chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
     runtime_image_id="sha256:5555555555555555555555555555555555555555555555555555555555555555"
     ;;
   postgres-cid)
-    runtime_image_ref=postgres:18.1
+    runtime_image_ref=postgres:18.6
     runtime_image_id="sha256:1111111111111111111111111111111111111111111111111111111111111111"
     ;;
   jaeger-cid)
-    runtime_image_ref=jaegertracing/all-in-one:1.76.0
+    runtime_image_ref=jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3
     runtime_image_id="sha256:2222222222222222222222222222222222222222222222222222222222222222"
     ;;
   app-server-cid)
@@ -2018,7 +2018,7 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
       "npm config set registry https://registry.npmmirror.com",
     );
     const pnpmInstallIndex = builderDockerfile.indexOf(
-      "npm install -g pnpm@10.13.1",
+      "npm install -g pnpm@10.34.5",
     );
     assert.ok(registryIndex >= 0);
     assert.ok(pnpmInstallIndex > registryIndex);

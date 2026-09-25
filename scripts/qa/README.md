@@ -31,8 +31,8 @@
 | `bash scripts/qa/strict.sh` | full 的真实覆盖超集：先运行独有 shell / YAML 检查，再以 strict profile 单次运行 full；扩展视口、零 warning 和严格 govulncheck 各执行一次；各阶段输出统一耗时标记 | 发版前 / 大改后 |
 | `bash scripts/qa/full.sh` | 完整本地检查；一次运行五个显式 Node 测试组，不复跑会由 Web / server 全集覆盖的 fast 子集；资源敏感发布合同在 shared / Web / server 汇合后单独执行；另含 secrets、Chromium、根入口浏览器 smoke、存量升级、当前 schema PostgreSQL、前后端测试 / 构建和 govulncheck；DEV 页面与共享布局桌面 smoke 由 affected 选择，不进入默认场景集 | 独立完整诊断、prepare-push 或 strict 内部 |
 | `node scripts/qa/run-gate-with-receipt.mjs --gate <full\|strict>` | 执行正式门禁并写入同一脱敏回执；passed 必须具备完整阶段耗时、非零测试、零失败、零 skip 和运行前后仓库身份一致，工作台据此展示总耗时与瓶颈 | 需要可核验效能证据时 |
-| `node scripts/qa/run-gate-with-managed-database.mjs --exact-sha <40sha> --main-ref HEAD --operation-id <uuid>` | 本地 clean 候选的唯一受管 exact-SHA 入口；复用固定 `postgres:18.1`、随机凭据、loopback 动态端口和精确 cleanup，再以无 shell 的固定参数执行 `exact-sha-gate.mjs`；DSN 只进入子进程环境，终态仍以 exact-SHA gate 为唯一真源 | 需要独立本地受管诊断时 |
-| `run-gate-with-managed-database.mjs` | 质量门禁页面的 full / strict 内部包装器；固定使用本机 `postgres:18.1`，为每次 operation 生成随机凭据和 loopback 动态端口，执行原正式 runner 后按精确 label 删除容器并读回零残留；不接受浏览器提供命令、DSN、镜像或凭据 | DEV 页面未显式登记本机数据库 base 时 |
+| `node scripts/qa/run-gate-with-managed-database.mjs --exact-sha <40sha> --main-ref HEAD --operation-id <uuid>` | 本地 clean 候选的唯一受管 exact-SHA 入口；复用固定 `postgres:18.6`、随机凭据、loopback 动态端口和精确 cleanup，再以无 shell 的固定参数执行 `exact-sha-gate.mjs`；DSN 只进入子进程环境，终态仍以 exact-SHA gate 为唯一真源 | 需要独立本地受管诊断时 |
+| `run-gate-with-managed-database.mjs` | 质量门禁页面的 full / strict 内部包装器；固定使用本机 `postgres:18.6`，为每次 operation 生成随机凭据和 loopback 动态端口，执行原正式 runner 后按精确 label 删除容器并读回零残留；不接受浏览器提供命令、DSN、镜像或凭据 | DEV 页面未显式登记本机数据库 base 时 |
 | `node scripts/qa/exact-sha-gate.mjs --sha <40sha> [--run]` | 绑定 clean SHA、strict profile、锁文件和门禁实现形成 fingerprint；已有同 fingerprint 终态时复用，不自动新开 lifecycle | 不可变 Release workflow |
 | `node scripts/qa/ci-quality-shard.mjs --shard <name>` | 只在 protected main 的 GitLab 上生成七类固定外部 strict 分片之一；Node 类聚合内部 `core / release_preflight_a / release_preflight_b / release_a / release_b / release_c`，resource-sensitive 类聚合内部 `contract_a / contract_b / runtime_a / runtime_b`，两者对外仍各自只保留一个规范回执；所有回执继续绑定同一 plan/range/exact SHA，并保留资源清理读回 | GitLab main 普通 CI；不提供本地通用入口 |
 | `node scripts/qa/pnpm-audit-retry.mjs` | 对 npm 官方接口执行固定的 production/high pnpm 审计；首次强制直连，只对网络、429 和 5xx 瞬态错误重试一次，若环境已配置代理则仅第二次使用该代理；单次 100 秒、总计 205 秒封顶，合法漏洞报告不重试，高危或严重漏洞立即阻断，错误只输出有界脱敏诊断 | GitLab security 分片内部；可作本地只读诊断 |
@@ -95,7 +95,7 @@
 
 ## 门禁完整性与 CI 边界
 
-`/__dev/quality-gates` 通过 development-only Bridge 异步调用固定的 full / strict 正式 runner。若开发服务已有合规的 loopback `DISPOSABLE_DATABASE_BASE_URL`，继续直接使用；未显式登记时，Bridge 会先核对本机 Docker 和固定 `postgres:18.1` 镜像，再由 `run-gate-with-managed-database.mjs` 为本次 operation 创建随机凭据、`127.0.0.1` 动态端口和精确标签的独立容器。默认 `origin/main` 的 `prepare-push.sh` 不进入该托管生命周期，只签发 `server-ci` 短门禁回执；显式 `--full` 或非标准 remote/ref 需要完整本地门禁时仍使用原受管路径，失败或清理读回不完整即形成终态失败。浏览器不能提交命令、参数、路径、数据库、镜像、环境变量、Git ref、DSN、凭据或 SSH 目标；服务端固定校验 loopback、same-origin、CSRF、JSON 合同和请求大小，并与 coverage / testing 共用唯一 QA 执行锁。
+`/__dev/quality-gates` 通过 development-only Bridge 异步调用固定的 full / strict 正式 runner。若开发服务已有合规的 loopback `DISPOSABLE_DATABASE_BASE_URL`，继续直接使用；未显式登记时，Bridge 会先核对本机 Docker 和固定 `postgres:18.6` 镜像，再由 `run-gate-with-managed-database.mjs` 为本次 operation 创建随机凭据、`127.0.0.1` 动态端口和精确标签的独立容器。默认 `origin/main` 的 `prepare-push.sh` 不进入该托管生命周期，只签发 `server-ci` 短门禁回执；显式 `--full` 或非标准 remote/ref 需要完整本地门禁时仍使用原受管路径，失败或清理读回不完整即形成终态失败。浏览器不能提交命令、参数、路径、数据库、镜像、环境变量、Git ref、DSN、凭据或 SSH 目标；服务端固定校验 loopback、same-origin、CSRF、JSON 合同和请求大小，并与 coverage / testing 共用唯一 QA 执行锁。
 
 运行、取消和超时均按精确进程组收口。托管模式只有正式 receipt、门禁内部一次性数据库 cleanup、托管容器删除及不存在读回、进程组消失全部成立时才能标为通过；清理只允许当前 operation 且 repository label 同时匹配的容器，不处理外部容器或监听。浏览器关闭、开发服务中断、进程被强杀或任一清理事件缺失都会 fail closed，不会伪造绿色结果。
 
@@ -783,7 +783,7 @@ make purchase_return_pg_test
 - 若定义了前端 `test`，会一并执行；它仍不替代浏览器里的样式 / box 模型回归
 - 始终真实执行固定门禁，不读取或签发本地推送回执；CI strict 也永不读取该回执
 
-研发效能工作台的质量门禁页仍调用同一 full / strict 正式入口。开发服务没有显式 loopback `DISPOSABLE_DATABASE_BASE_URL` 时，会使用本机已有的固定 `postgres:18.1` 镜像自动创建本次专用容器；凭据、DSN、容器命令和本机路径不会返回浏览器。该包装不改变 full / strict 的命令或阶段顺序，容器与内部临时数据库任一清理读回缺失都会使本次结果失败。
+研发效能工作台的质量门禁页仍调用同一 full / strict 正式入口。开发服务没有显式 loopback `DISPOSABLE_DATABASE_BASE_URL` 时，会使用本机已有的固定 `postgres:18.6` 镜像自动创建本次专用容器；凭据、DSN、容器命令和本机路径不会返回浏览器。该包装不改变 full / strict 的命令或阶段顺序，容器与内部临时数据库任一清理读回缺失都会使本次结果失败。
 
 ### strict
 

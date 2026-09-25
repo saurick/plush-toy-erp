@@ -121,8 +121,8 @@ server_endpoint=__SERVER_ENDPOINT__
 web_endpoint=__WEB_ENDPOINT__
 server_container="\${project}-server"
 web_container="\${project}-web-desktop"
-trial_atlas_bin=__ROOT__/tools/atlas/v1.2.0/atlas
-trial_atlas_required_version=v1.2.0
+trial_atlas_bin=__ROOT__/tools/atlas/v1.3.0/atlas
+trial_atlas_required_version=v1.3.0
 
 status=passed
 blockers=()

@@ -77,7 +77,7 @@ function createFixtureRepo({
     `${JSON.stringify(
       {
         engines: { node: process.versions.node },
-        packageManager: "pnpm@10.13.1",
+        packageManager: "pnpm@10.34.5",
       },
       null,
       2,
@@ -492,7 +492,7 @@ test("release mode resolves pnpm through the repository-locked toolchain helper"
   const root = createFixtureRepo();
   try {
     const fakePnpm = path.join(root, "project-pnpm");
-    writeFileSync(fakePnpm, "#!/usr/bin/env bash\nprintf '10.13.1\\n'\n");
+    writeFileSync(fakePnpm, "#!/usr/bin/env bash\nprintf '10.34.5\\n'\n");
     chmodSync(fakePnpm, 0o755);
     const resolved = resolveProjectPnpm({
       archiveRoot: root,

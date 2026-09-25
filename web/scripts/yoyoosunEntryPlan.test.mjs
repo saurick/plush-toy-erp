@@ -11,10 +11,35 @@ import {
   buildYoyoosunLocalEntryAudit,
   classifyAssetResponse,
   classifyCustomerConfigResponse,
+  parseDarwinNetstatListener,
 } from './yoyoosunLocalEntryAudit.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const webRoot = path.join(repoRoot, 'web')
+
+test('macOS listener lookup reads process identity without filesystem scans', () => {
+  const output = [
+    'Active Internet connections (including servers)',
+    'tcp4 0 0 *.15200 *.* LISTEN 0 0 131072 131072 node:93050 00100 00000106',
+    'tcp4 0 0 127.0.0.1.15201 *.* LISTEN 0 0 131072 131072 Code Helper:3586 00100 00000106',
+  ].join('\n')
+
+  assert.deepEqual(parseDarwinNetstatListener(output, '15200'), {
+    listening: true,
+    pid: '93050',
+    command: 'node',
+  })
+  assert.deepEqual(parseDarwinNetstatListener(output, '15201'), {
+    listening: true,
+    pid: '3586',
+    command: 'Code Helper',
+  })
+  assert.deepEqual(parseDarwinNetstatListener(output, '15202'), {
+    listening: false,
+    pid: '',
+    command: '',
+  })
+})
 
 function runScript(scriptName, env = {}) {
   return spawnSync(
