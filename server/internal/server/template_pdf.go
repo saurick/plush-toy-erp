@@ -22,11 +22,13 @@ import (
 	"server/internal/conf"
 	"server/internal/errcode"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
+	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
 	"github.com/go-kratos/kratos/v2/log"
 	httpx "github.com/go-kratos/kratos/v2/transport/http"
@@ -839,8 +841,11 @@ func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, printScale flo
 	allocCtx, cancelAllocator := chromedp.NewRemoteAllocator(ctx, wsURL)
 	defer cancelAllocator()
 
-	browserCtx, cancelBrowser := chromedp.NewContext(allocCtx, chromedp.WithNewBrowserContext())
-	defer cancelBrowser()
+	browserCtx, cleanupBrowser, err := newTemplatePDFBrowserContext(allocCtx)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanupBrowser()
 	installTemplatePDFNetworkGuard(browserCtx)
 
 	if printScale <= 0 {
@@ -921,6 +926,58 @@ func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, printScale flo
 		return nil, errors.New("生成的 PDF 超出大小限制")
 	}
 	return pdfBytes, nil
+}
+
+func newTemplatePDFBrowserContext(allocCtx context.Context) (context.Context, func(), error) {
+	rootCtx, cancelRoot := chromedp.NewContext(allocCtx)
+	if _, err := chromedp.Targets(rootCtx); err != nil {
+		cancelRoot()
+		return nil, nil, fmt.Errorf("连接 Chrome 调试端点失败: %w", err)
+	}
+
+	root := chromedp.FromContext(rootCtx)
+	if root == nil || root.Browser == nil {
+		cancelRoot()
+		return nil, nil, errors.New("浏览器调试连接未初始化")
+	}
+	browserExecutor := cdp.WithExecutor(rootCtx, root.Browser)
+	browserContextID, err := target.CreateBrowserContext().WithDisposeOnDetach(true).Do(browserExecutor)
+	if err != nil {
+		cancelRoot()
+		return nil, nil, fmt.Errorf("创建隔离 Chrome 上下文失败: %w", err)
+	}
+
+	targetID, err := templatePDFCreateTargetParams(browserContextID).Do(browserExecutor)
+	if err != nil {
+		cleanupTemplatePDFBrowserContext(root.Browser, browserContextID)
+		cancelRoot()
+		return nil, nil, fmt.Errorf("创建 Chrome 打印页失败: %w", err)
+	}
+
+	browserCtx, cancelBrowser := chromedp.NewContext(rootCtx, chromedp.WithTargetID(targetID))
+	cleanup := func() {
+		cancelBrowser()
+		cleanupTemplatePDFBrowserContext(root.Browser, browserContextID)
+		cancelRoot()
+	}
+	return browserCtx, cleanup, nil
+}
+
+func templatePDFCreateTargetParams(browserContextID cdp.BrowserContextID) *target.CreateTargetParams {
+	// Chrome 153 rejects the generated explicit newWindow:false form for remote CDP sessions.
+	// Keep the isolated target in a new headless window until cdproto can omit that unset field again.
+	return target.CreateTarget("about:blank").
+		WithBrowserContextID(browserContextID).
+		WithNewWindow(true)
+}
+
+func cleanupTemplatePDFBrowserContext(browser *chromedp.Browser, browserContextID cdp.BrowserContextID) {
+	if browser == nil || browserContextID == "" {
+		return
+	}
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_ = target.DisposeBrowserContext(browserContextID).Do(cdp.WithExecutor(cleanupCtx, browser))
 }
 
 func installTemplatePDFNetworkGuard(ctx context.Context) {

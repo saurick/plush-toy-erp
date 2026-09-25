@@ -6,13 +6,16 @@ import {
 } from './colorAssertions.mjs'
 
 function assertAffixInputMetric(metric, scenarioName) {
+  const hasNoVisibleOutline =
+    metric.outlineStyle === 'none' ||
+    Number.parseFloat(metric.outlineWidth) === 0
   assert(
     metric.radii.every((radius) => Number.parseFloat(radius) === 0) &&
       metric.borderWidth === '0px' &&
       metric.padding === '0px' &&
       metric.background === 'rgba(0, 0, 0, 0)' &&
       metric.boxShadow === 'none' &&
-      Number.parseFloat(metric.outlineWidth) === 0 &&
+      hasNoVisibleOutline &&
       metric.contained,
     `${scenarioName} 组合输入框内层必须无圆角、边框、背景、内边距和焦点阴影，外观由外层负责: ${JSON.stringify(metric)}`
   )
@@ -48,6 +51,7 @@ async function assertVisibleAffixInputIsolation(page, scenarioName) {
           padding: style.padding,
           background: style.backgroundColor,
           boxShadow: style.boxShadow,
+          outlineStyle: style.outlineStyle,
           outlineWidth: style.outlineWidth,
           contained:
             rect.left >= outer.left &&

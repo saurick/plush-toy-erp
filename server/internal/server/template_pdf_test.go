@@ -15,6 +15,7 @@ import (
 
 	"server/internal/biz"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
 	httpx "github.com/go-kratos/kratos/v2/transport/http"
@@ -632,6 +633,19 @@ func TestTemplatePDFChromeArgsKeepSandboxEnabled(t *testing.T) {
 	}
 	if !strings.Contains(joined, "--remote-debugging-address=127.0.0.1") {
 		t.Fatalf("Chrome debugging must stay loopback-only: %v", args)
+	}
+}
+
+func TestTemplatePDFCreateTargetParamsKeepsRemoteChromeCompatible(t *testing.T) {
+	t.Parallel()
+
+	browserContextID := cdp.BrowserContextID("isolated-context")
+	params := templatePDFCreateTargetParams(browserContextID)
+	if params.BrowserContextID != browserContextID {
+		t.Fatalf("BrowserContextID = %q, want %q", params.BrowserContextID, browserContextID)
+	}
+	if !params.NewWindow {
+		t.Fatal("remote Chrome target must set newWindow=true")
 	}
 }
 

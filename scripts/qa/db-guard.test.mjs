@@ -194,6 +194,54 @@ test("db guard requires a newly added migration for structural schema changes", 
   });
 });
 
+test("db guard accepts Ent runtime generator metadata without a migration", async () => {
+  await withRepository(async (root) => {
+    const runtimePath = "server/internal/data/model/ent/runtime/runtime.go";
+    await write(
+      root,
+      runtimePath,
+      [
+        "package runtime",
+        "const (",
+        '  Version = "v0.14.5" // Version of ent codegen.',
+        '  Sum = "h1:old" // Sum of ent codegen.',
+        ")",
+        "",
+      ].join("\n"),
+    );
+    commitAll(root, "Ent runtime metadata baseline");
+
+    await write(
+      root,
+      runtimePath,
+      [
+        "package runtime",
+        "const (",
+        '  Version = "v0.14.6" // Version of ent codegen.',
+        '  Sum = "h1:new" // Sum of ent codegen.',
+        ")",
+        "",
+      ].join("\n"),
+    );
+
+    const result = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+  });
+});
+
+test("db guard keeps requiring schema proof for other Ent runtime changes", async () => {
+  await withRepository(async (root) => {
+    const runtimePath = "server/internal/data/model/ent/runtime/runtime.go";
+    await write(root, runtimePath, "package runtime\n\nvar hooks = 1\n");
+    commitAll(root, "Ent runtime baseline");
+    await write(root, runtimePath, "package runtime\n\nvar hooks = 2\n");
+
+    const result = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "missing-new-migration");
+  });
+});
+
 test("db guard rejects editing an old migration as schema proof", async () => {
   await withRepository(async (root) => {
     await write(

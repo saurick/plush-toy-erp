@@ -54,6 +54,10 @@ const CREATE_PROGRAMMABILITY_OBJECT =
   /\bcreate\s+(?:or\s+replace\s+)?(?:(?:constraint|event)\s+)?(function|procedure|trigger)\s+"?([a-z_][a-z0-9_]*)"?/giu;
 const EXECUTE_PROGRAMMABILITY_OBJECT =
   /\bexecute\s+(?:function|procedure)\b/iu;
+const ENT_RUNTIME_METADATA_FILE =
+  "server/internal/data/model/ent/runtime/runtime.go";
+const ENT_RUNTIME_METADATA_CHANGE =
+  /^[+-]\s*(?:Version|Sum)\s*=\s*"[^"]*"\s*\/\/\s*(?:Version|Sum) of ent codegen\.\s*$/u;
 
 function collectProgrammabilityFiles(root) {
   const files = [];
@@ -245,6 +249,19 @@ function schemaDiffText(root, file, range, untrackedFiles, unified = 0) {
 function schemaDiffRequiresMigration(root, file, range, untrackedFiles) {
   return STRUCTURAL_SCHEMA_CHANGE.test(
     schemaDiffText(root, file, range, untrackedFiles),
+  );
+}
+
+function isEntRuntimeMetadataOnlyChange(root, file, range, untrackedFiles) {
+  if (file !== ENT_RUNTIME_METADATA_FILE || untrackedFiles.has(file)) {
+    return false;
+  }
+  const changedLines = schemaDiffText(root, file, range, untrackedFiles)
+    .split("\n")
+    .filter((line) => /^[+-][^+-]/u.test(line));
+  return (
+    changedLines.length > 0 &&
+    changedLines.every((line) => ENT_RUNTIME_METADATA_CHANGE.test(line))
   );
 }
 
@@ -1354,7 +1371,18 @@ export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
     schemaRequirements.set(file, netRequirements);
     return requirements.length === 0 || netRequirements.length > 0;
   });
-  const generatedEntChanged = [...changedFiles].some(isGeneratedEntFile);
+  const generatedEntProofFiles = [...changedFiles]
+    .filter(isGeneratedEntFile)
+    .filter(
+      (file) =>
+        !isEntRuntimeMetadataOnlyChange(
+          root,
+          file,
+          transitionRange,
+          untrackedFiles,
+        ),
+    );
+  const generatedEntChanged = generatedEntProofFiles.length > 0;
   const schemaRequiresMigration = structuralSchemaFiles.length > 0;
   const needsMigration = schemaRequiresMigration || (generatedEntChanged && schemaFiles.length === 0);
 
@@ -1383,7 +1411,7 @@ export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
     return {
       ok: false,
       reason: "generated-ent-without-schema-proof",
-      files: [...changedFiles].filter(isGeneratedEntFile).sort(),
+      files: generatedEntProofFiles.sort(),
       range: effectiveRange,
     };
   }
