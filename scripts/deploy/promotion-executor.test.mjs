@@ -30,6 +30,7 @@ const PROMOTION_STAGES = [
   "capacity_recheck",
   "release_materialization",
   "image_load_and_readback",
+  "runtime_dependency_preflight",
   "fresh_backup_and_restore_check",
   "env_and_static_preflight",
   "maintenance_window",
@@ -901,6 +902,13 @@ test("remote promotion advances only release-bound runtime dependencies", () => 
     /if \(attachment_mode == "managed"\) \{\s*print "ATTACHMENT_STORE_IMAGE=" attachment_ref\s*\} else \{\s*print\s*\}/u,
   );
   assert.match(source, /enter_stage runtime_dependency_preflight/u);
+  assert.deepEqual(
+    [...source.matchAll(/^enter_stage ([a-z_]+)$/gmu)].map(
+      (match) => match[1],
+    ),
+    [...PROMOTION_STAGES, "passed"],
+    "remote promotion stage order must match the receipt validator",
+  );
   assert.match(
     source,
     /required_runtime_images\+=\("\$promotion_attachment_store_image"\)/u,
