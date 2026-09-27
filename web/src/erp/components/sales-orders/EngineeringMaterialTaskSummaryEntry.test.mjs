@@ -33,7 +33,7 @@ test('task summary loads on demand, stays read-only and clears on source or acce
             material_id: 1,
             unit_id: 1,
             material_name: '测试布料',
-            unit_name: 'Y',
+            unit_name: '码',
             required_quantity: '3.125',
           },
         ],
@@ -153,7 +153,7 @@ test('task summary loads on demand, stays read-only and clears on source or acce
   assert.equal(button('批准并生成采购订单'), undefined)
   assert.equal(button('退回工程'), undefined)
   assert.match(document.body.textContent, /测试布料/u)
-  assert.match(document.body.textContent, /3.13/u)
+  assert.match(document.body.textContent, /3\.125/u)
   assert.ok(
     calls.every(({ method }) => method === 'get_engineering_material_request')
   )

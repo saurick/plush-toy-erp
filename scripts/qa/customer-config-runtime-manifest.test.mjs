@@ -364,10 +364,10 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
     (section) => section.title === "财务管理",
   );
   assert.deepEqual(financeMenu?.items, [
-    "reconciliation",
     "receivables",
     "payables",
     "finance-payments",
+    "reconciliation",
     "invoices",
   ]);
 

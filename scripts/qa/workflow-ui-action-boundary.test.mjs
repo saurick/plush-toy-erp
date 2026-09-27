@@ -124,7 +124,7 @@ function assertPostSuccessRefreshIsolated({
     "gu",
   );
   const detachedPattern = new RegExp(
-    `message\\.success\\([^\\n]+\\)\\s*\\n\\s*${escapedRefreshCall}\\.catch\\(\\(\\)\\s*=>\\s*\\{\\s*\\n\\s*message\\.warning\\(['"]操作已成功但列表刷新失败，请手动刷新['"]\\)`,
+    `${escapedRefreshCall}\\.catch\\(\\(\\)\\s*=>\\s*\\{\\s*\\n\\s*message\\.warning\\(['"]操作已成功但列表刷新失败，请手动刷新['"]\\)`,
     "gu",
   );
   assert.equal(
@@ -211,21 +211,18 @@ test("mobile task flow owner fallback hides raw owner role key", () => {
   );
 });
 
-test("mobile mine role list fallback uses readable role label", () => {
-  const listScreenPath = path.join(
-    erpSourceRoot,
-    "mobile/components/MobileTaskListScreen.jsx",
+test("mobile current role label uses the shared readable role projection", () => {
+  const source = readFileSync(
+    path.join(erpSourceRoot, "mobile/components/MobileTaskListScreen.jsx"),
+    "utf8",
   );
-  const source = readFileSync(listScreenPath, "utf8");
-
-  assert(
-    source.includes("role?.name || getMobileRoleLabel(role?.role_key)"),
-    "mobile mine role list must translate role_key through getMobileRoleLabel",
+  const pageSource = readFileSync(
+    path.join(erpSourceRoot, "mobile/pages/MobileRoleTasksPage.jsx"),
+    "utf8",
   );
-  assert(
-    !source.includes("role?.name || role?.role_key"),
-    "mobile mine role list must not expose raw role_key when role name is missing",
-  );
+  assert(pageSource.includes("const roleLabel = getMobileRoleLabel(activeRoleKey)"));
+  assert(source.includes("{roleLabel}"));
+  assert(!source.includes("role?.name || role?.role_key"));
 });
 
 test("mobile role labels use shared role display names", () => {

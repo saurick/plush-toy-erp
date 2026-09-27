@@ -18,6 +18,7 @@ const productionExceptionPanelPath = resolve(
 const FORMAL_SELECTION_PAGE_CONSUMERS = Object.freeze({
   'BOMVersionsPage.jsx': 'BOMVersionsPage.jsx',
   'FinancePaymentsPage.jsx': 'FinancePaymentsPage.jsx',
+  'HistoryRecordsPage.jsx': 'HistoryRecordsPage.jsx',
   'OperationalFactsPage.jsx': 'OperationalFactsPage.jsx',
   'ShipmentsPage.jsx': 'ShipmentsPage.jsx',
   'V1InventoryLedgerPage.jsx': 'V1InventoryLedgerPage.jsx',
@@ -34,6 +35,7 @@ const FORMAL_SELECTION_PAGE_CONSUMERS = Object.freeze({
 const FORMAL_SELECTION_STABLE_ACTION_EVIDENCE = Object.freeze({
   'BOMVersionsPage.jsx': /data-business-action-key="activate"/u,
   'FinancePaymentsPage.jsx': /data-business-action-key="payment-allocation"/u,
+  'HistoryRecordsPage.jsx': /data-business-action-key="history-view-detail"/u,
   'OperationalFactsPage.jsx':
     /data-business-action-key="operational-fact-post"/u,
   'ShipmentsPage.jsx': /data-business-action-key="shipment-ship"/u,

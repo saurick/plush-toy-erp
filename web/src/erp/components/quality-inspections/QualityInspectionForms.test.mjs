@@ -84,8 +84,9 @@ test('quality decision form offers accessible presets and clears stale custom in
     /setFieldValue\('defect_rate_custom_percent', undefined\)/u
   )
   assert.match(decisionForm, /stringMode/u)
-  assert.match(decisionForm, /max=\{100\}/u)
-  assert.match(decisionForm, /precision=\{2\}/u)
+  assert.match(decisionForm, /normalizeQualityDefectPercent\(value\)/u)
+  assert.match(decisionForm, /step="0\.01"/u)
+  assert.doesNotMatch(decisionForm, /max=|precision=/u)
   assert.match(decisionForm, /不需要逐件计数/u)
   assert.match(decisionForm, /不会自动换算成退货数量/u)
   assert.match(decisionForm, /allowConcession = true/u)

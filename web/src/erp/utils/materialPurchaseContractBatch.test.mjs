@@ -27,6 +27,7 @@ function validDraft(overrides = {}) {
     lines: [
       {
         materialName: '示例材料',
+        unit: '码',
         quantity: '10',
         unitPrice: '1.25',
       },
@@ -165,7 +166,7 @@ test('采购合同批量预检按订单指出缺失字段', () => {
       orderNo: 'PO-002',
       draft: validDraft({
         supplierName: '',
-        lines: [{ materialName: '示例材料', quantity: '10', unitPrice: '' }],
+        lines: [{ materialName: '示例材料', unit: '码', quantity: '10', unitPrice: '' }],
       }),
     },
   ])

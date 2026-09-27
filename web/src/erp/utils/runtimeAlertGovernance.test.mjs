@@ -95,7 +95,7 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
   assert.match(production, /message="请先选择本次外发的材料/u)
   assert.match(
     read('web/src/erp/components/permission-center/RoleNavigationEditor.jsx'),
-    /message="有菜单入口已不在当前最终权限中"/u
+    /message="部分已保存页面当前不可进入"/u
   )
   assert.match(shipment, /message="预计总净重暂不可计算"/u)
   assert.match(finance, /message="当前没有可核销的应收或应付记录"/u)

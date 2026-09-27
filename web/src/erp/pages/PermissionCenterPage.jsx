@@ -1,7 +1,7 @@
-import { Typography, Alert, Input } from 'antd'
-import { SearchOutlined } from '@ant-design/icons'
+import { Typography, Alert } from 'antd'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import SearchInput from '@/common/components/SearchInput.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { usePermissionRoleSettings } from '../components/permission-center/usePermissionRoleSettings.jsx'
 import PermissionAdminAccounts from '../components/permission-center/PermissionAdminAccounts.jsx'
@@ -396,11 +396,10 @@ export default function PermissionCenterPage() {
             ))}
           </SlidingTabList>
           {activeTabKey === PERMISSION_CENTER_TAB_KEYS.ROLES ? (
-            <Input
+            <SearchInput
               className="erp-permission-toolbar__search"
               aria-label="搜索功能或页面"
               placeholder="搜索功能名称或页面"
-              prefix={<SearchOutlined aria-hidden="true" />}
               allowClear
               value={permissionSearch}
               onChange={(event) => setPermissionSearch(event.target.value)}

@@ -493,7 +493,7 @@ export default function EngineeringMaterialSummarySheet({
           </li>
           <li>
             <strong>材料汇总：</strong>
-            相同材料和单位的部位用量合并，不同单位分开合计；汇总表默认显示两位小数，展开明细保留原有精度。
+            相同材料和单位的部位用量合并，不同单位分开合计；数量按标准单位精度显示，展开明细可查看各部位用量。
           </li>
           <li>
             <strong>采购生成：</strong>

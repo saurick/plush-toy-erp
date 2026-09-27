@@ -179,11 +179,17 @@ test("frontend error message boundary: shared helper blocks technical fields eve
 });
 
 test("frontend error message boundary: audit log visible fallbacks do not expose raw backend keys", () => {
-  const source = readFileSync(
+  const pageSource = readFileSync(
     path.join(repoRoot, "web/src/erp/pages/AuditLogsPage.jsx"),
     "utf8",
   );
 
+  const changesSource = readFileSync(
+    path.join(repoRoot, "web/src/erp/utils/auditLogChanges.mjs"),
+    "utf8",
+  );
+  const source = `${pageSource}\n${changesSource}`;
+  assert(pageSource.includes("return summarizeChange(event.payload)"));
   assert(source.includes("getAuditChangeSummary"));
   assert(source.includes("visibleAuditChangeKeys"));
   assert(source.includes("return '本次操作已记录'"));

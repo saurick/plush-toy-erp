@@ -106,7 +106,7 @@ test('catalog fill rows: purchase batch picker declares its business policy', ()
 
   assert.match(
     purchaseForm,
-    /buildCatalogFillRowsPlan\(\{/u,
+    /buildCatalogFillRowsPlan\(\s*\{/u,
     'purchase order material fill must use the shared planner'
   )
   assert.match(

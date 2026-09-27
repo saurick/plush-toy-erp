@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { SearchOutlined, UserAddOutlined } from '@ant-design/icons'
+import { UserAddOutlined } from '@ant-design/icons'
 import {
   Typography,
   Alert,
@@ -22,6 +22,7 @@ import React, {
   useState,
 } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import SearchInput from '@/common/components/SearchInput.jsx'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
@@ -906,10 +907,9 @@ export default function PermissionAdminAccounts({
   const accountToolbar = (
     <div className="erp-permission-list-toolbar">
       <div className="erp-permission-list-toolbar__filters">
-        <Input
+        <SearchInput
           allowClear
           className="erp-permission-list-toolbar__search"
-          prefix={<SearchOutlined aria-hidden="true" />}
           aria-label="搜索员工账号"
           value={adminSearchKeyword}
           placeholder="搜索姓名、员工账号、手机号或岗位"

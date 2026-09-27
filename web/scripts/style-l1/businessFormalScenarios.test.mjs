@@ -113,10 +113,10 @@ test('product table headers keep the shared single-line browser regression', () 
   )
   assert.match(
     scenario,
-    /business-table-headers-column-menu-hit-area-dark\.png/u
+    /business-table-headers-column-settings-dark\.png/u
   )
-  assert.match(scenario, /triggerBox\.width >= 23\.5/u)
-  assert.match(scenario, /sortStateBeforeColumnMenu/u)
+  assert.match(scenario, /beforeSettings/u)
+  assert.match(scenario, /关闭列设置后焦点应回到触发按钮/u)
   assert.match(scenario, /business-table-headers-single-line-dark-narrow\.png/u)
 })
 
@@ -136,7 +136,7 @@ test('production exception workflow scenario follows the current approval empty 
   assert.match(source, /business-production-exceptions-decisions-tab\.png/u)
   assert.match(source, /business-production-exceptions-tasks-tab\.png/u)
   assert.match(source, /business-production-exception-tabs-desktop/u)
-  assert.match(source, /tabInsideCurrentTableCard/u)
+  assert.match(source, /tabOutsideCurrentTableCard/u)
   assert.match(source, /tabBeforeCurrentTable/u)
   assert.match(source, /currentOperationPanelExists/u)
   assert.match(source, /currentWorkspaceRenderedGap/u)

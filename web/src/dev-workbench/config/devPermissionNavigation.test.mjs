@@ -143,7 +143,7 @@ test('role menu projection shows complete recommended navigation without inventi
   )
   assert.deepEqual(
     model.primaryItems.map((item) => item.label),
-    ['客户档案', '销售订单', '出货单']
+    ['基础资料', '销售管理', '出货管理']
   )
   assert.deepEqual(
     model.secondarySections.map((section) => [
@@ -151,8 +151,8 @@ test('role menu projection shows complete recommended navigation without inventi
       section.items.map((item) => item.label),
     ]),
     [
-      ['库存管理', ['库存台账']],
-      ['使用帮助', ['帮助中心']],
+      ['业务模块', ['库存管理']],
+      ['工具与查询', ['帮助中心']],
     ]
   )
   assert.equal(model.totalItemCount, 6)
@@ -182,13 +182,13 @@ test('role menu projection preserves a saved custom layout and appends remaining
   assert.equal(model.modeLabel, '自定义布局')
   assert.deepEqual(
     model.primaryItems.map((item) => item.label),
-    ['库存台账', '销售订单']
+    ['库存管理', '销售管理']
   )
   assert.deepEqual(
     model.secondarySections.flatMap((section) =>
       section.items.map((item) => item.label)
     ),
-    ['客户档案', '出货单', '帮助中心']
+    ['基础资料', '出货管理', '帮助中心']
   )
 })
 

@@ -1637,7 +1637,35 @@ test('style-l1 workflow assignment mock keeps operator authority separate from e
 })
 
 test('style-l1 workflow role task view mock applies role, view and cursor boundaries', async () => {
-  const call = await workflowMockHarness()
+  const actions = [
+    'erp.workbench.read',
+    'workflow.task.read',
+    'workflow.task.create',
+    'workflow.task.complete',
+  ]
+  const call = await workflowMockHarness({
+    id: 1,
+    is_super_admin: false,
+    roles: [{ role_key: 'sales' }],
+    permissions: actions,
+    effective_session: {
+      actions,
+      workflow_visible_owner_role_keys_by_capability: workflowScopes('sales', actions),
+    },
+  }, {
+    workflowTaskFixtures: [{
+      id: 104,
+      version: 1,
+      task_code: 'STYLE-L1-ROLE-OTHER',
+      task_name: '老板待办任务',
+      task_group: 'workflow-contract',
+      source_type: 'workflow-contract',
+      source_id: 104,
+      task_status_key: 'ready',
+      owner_role_key: 'boss',
+      payload: {},
+    }],
+  })
   const createTask = (params) =>
     call('create_task', {
       task_group: 'workflow-contract',
@@ -1673,15 +1701,9 @@ test('style-l1 workflow role task view mock applies role, view and cursor bounda
     expected_version: 1,
     idempotency_key: 'style-l1-role-history',
     action_key: 'complete',
+    payload: {},
   })
   assert.equal(history.result.code, 0)
-  await createTask({
-    task_code: 'STYLE-L1-ROLE-OTHER',
-    task_name: '老板已办任务',
-    source_id: 104,
-    task_status_key: 'ready',
-    owner_role_key: 'boss',
-  })
 
   const firstTodoPage = await call('list_role_tasks', {
     view_key: 'todo',
@@ -1710,7 +1732,7 @@ test('style-l1 workflow role task view mock applies role, view and cursor bounda
     total: 3,
     withdrawn: 0,
   })
-  assert.equal(firstTodoPage.result.data.risk_scope, 'supervised')
+  assert.equal(firstTodoPage.result.data.risk_scope, 'role')
 
   const secondTodoPage = await call('list_role_tasks', {
     view_key: 'todo',

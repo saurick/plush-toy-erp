@@ -400,7 +400,7 @@ test('mobile processing uses the active process tab, requires a rejection reason
   assert.equal(document.querySelector('[role="dialog"]'), null)
   assert.match(
     document.querySelector('[aria-current="step"]').textContent,
-    /处理任务/
+    /任务办理/
   )
   assert.equal(document.querySelector('.erp-material-sheet'), null)
   assert.equal(document.querySelector('[aria-label="采购金额合计"]'), null)
