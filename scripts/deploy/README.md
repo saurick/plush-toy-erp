@@ -90,6 +90,8 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 `demo-133` 的受控重建可以随后重放 `customer-trial-133` 模拟数据。`customer-test-133` 的受控重建只建立甲方最小可登录的干净业务基线，不重放 demo seed/fixture；客户配置激活后，可在独立明确授权下运行一次性 core bootstrap 恢复 8 个标准单位和 4 个仓库。没有数据分类和恢复证明时不得执行重建；target 登记、普通 Goal 或一次 promotion 都不代表已授权或已完成清理。
 
+fresh generation 允许迁移初始化的标准单位，但必须与该 release 的单位合同逐项匹配（代码、名称、精度和启用状态），额外、缺失或篡改的单位均阻断；仓库及所有业务对象仍必须为空。
+
 fresh generation 的客户配置在 migration 和一次性管理员 bootstrap 之后才激活。因此 rebuild controller 只允许将 preflight 明确读回的 `customerConfigState=absent` 延后到重建后闭环；`invalid`、`unknown`、读取失败但未证明为空，以及磁盘、锁、运行版本、数据库身份等其他 blocker 仍全部失败关闭。普通 promotion 不使用这一例外。
 
 ```bash

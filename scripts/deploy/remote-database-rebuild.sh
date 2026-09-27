@@ -686,7 +686,6 @@ SELECT
   (SELECT count(*) FROM customers) +
   (SELECT count(*) FROM suppliers) +
   (SELECT count(*) FROM contacts) +
-  (SELECT count(*) FROM units) +
   (SELECT count(*) FROM warehouses) +
   (SELECT count(*) FROM materials) +
   (SELECT count(*) FROM products) +
@@ -710,6 +709,18 @@ SELECT
 SQL')"
 [[ "$business_row_count" == 0 ]] ||
   fail "fresh database already contains business rows"
+# Migrations initialize canonical units; verify their exact immutable contract
+# separately so arbitrary master data cannot pass the empty business baseline.
+unit_contract=$current/server/internal/unitpolicy/units.json
+[[ -f "$unit_contract" && ! -L "$unit_contract" ]] ||
+  fail "standard unit contract is unavailable"
+expected_units="$(jq -c '[.[] | {code, name, precision, is_active: true}] | sort_by(.code)' "$unit_contract")"
+actual_units="$(docker exec "$postgres_cid" sh -ceu 'psql -X -A -t -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<SQL
+SELECT json_agg(row_to_json(u) ORDER BY code)
+FROM (SELECT code, name, precision, is_active FROM units) AS u;
+SQL')"
+[[ "$(jq -c 'sort_by(.code)' <<<"$actual_units")" == "$expected_units" ]] ||
+  fail "fresh database standard units do not match the release contract"
 admin_count="$(docker exec "$postgres_cid" sh -ceu \
   'psql -X -A -t -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT count(*) FROM admin_users WHERE is_super_admin AND NOT disabled"')"
 [[ "$admin_count" == 1 ]] || fail "fresh database administrator readback failed"

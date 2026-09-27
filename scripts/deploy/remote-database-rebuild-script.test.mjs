@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import os from "node:os";
 import test from "node:test";
 
 const script = path.join(import.meta.dirname, "remote-database-rebuild.sh");
@@ -197,6 +198,44 @@ test("remote database rebuild uses one-use bootstrap secret and exact readbacks"
     source,
     /printf[^\n]*admin_secret|echo[^\n]*admin_secret/u,
   );
+});
+
+test("fresh baseline accepts only the release canonical units and still excludes business rows", () => {
+  const section = source.slice(
+    source.indexOf("unit_contract=$current/server/internal/unitpolicy/units.json"),
+    source.indexOf('admin_count="$(docker exec'),
+  );
+  assert.ok(section.length > 0);
+  const contract = JSON.parse(readFileSync(new URL("../../server/internal/unitpolicy/units.json", import.meta.url), "utf8"));
+  const canonical = contract.map(({ code, name, precision }) => ({ code, name, precision, is_active: true }));
+  const temp = mkdtempSync(path.join(os.tmpdir(), "plush-rebuild-units-"));
+  try {
+    for (const [label, units, passed] of [
+      ["canonical", canonical, true],
+      ["missing", canonical.slice(1), false],
+      ["extra", [...canonical, { code: "EXTRA", name: "额外单位", precision: 0, is_active: true }], false],
+      ["precision", canonical.map((u, i) => i === 0 ? { ...u, precision: 3 } : u), false],
+      ["disabled", canonical.map((u, i) => i === 0 ? { ...u, is_active: false } : u), false],
+      ["renamed", canonical.map((u, i) => i === 0 ? { ...u, name: "错误名称" } : u), false],
+    ]) {
+      const fixture = path.join(temp, `${label}.json`);
+      writeFileSync(fixture, JSON.stringify(units));
+      const script = 'fail() { exit 11; }\ndocker() { cat "$UNIT_FIXTURE"; }\n' + section;
+      const result = spawnSync("bash", ["-euc", script], {
+        encoding: "utf8",
+        env: { ...process.env, current: path.resolve(import.meta.dirname, "../.."), postgres_cid: "fixture", UNIT_FIXTURE: fixture },
+      });
+      assert.equal(result.status, passed ? 0 : 11, `${label}: ${result.stderr}`);
+    }
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+  const business = source.slice(source.indexOf('business_row_count="'), source.indexOf("unit_contract="));
+  assert.doesNotMatch(business, /FROM units/u);
+  assert.match(business, /FROM warehouses/u);
+  assert.match(business, /FROM sales_orders/u);
+  assert.match(business, /FROM inventory_txns/u);
+  assert.match(business, /business_row_count.*== 0/u);
 });
 
 test("remote database rebuild help and shell syntax are no-write", () => {
