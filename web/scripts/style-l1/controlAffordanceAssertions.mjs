@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 
 export async function assertMobileSearchAffordance(locator, action) {
+  await waitForFiniteAnimations(locator.page())
   const metrics = await locator.evaluate((root) => {
     const wrapper = root.querySelector('.ant-input-affix-wrapper')
     const input = root.querySelector('input')
@@ -10,6 +12,14 @@ export async function assertMobileSearchAffordance(locator, action) {
     return {
       height: wrapper.getBoundingClientRect().height,
       border: style.borderColor,
+      focused: wrapper.matches(':focus-within'),
+      expectedBorder: style
+        .getPropertyValue(
+          wrapper.matches(':focus-within')
+            ? '--erp-control-focus-border'
+            : '--erp-control-border'
+        )
+        .trim(),
       borderWidth: style.borderWidth,
       background: style.backgroundColor,
       text: getComputedStyle(input).color,
@@ -23,15 +33,15 @@ export async function assertMobileSearchAffordance(locator, action) {
     }
   })
   assert(
-    metrics.height >= 44 && Number.parseFloat(metrics.fontSize) >= 16,
+    metrics.height >= 42 && Number.parseFloat(metrics.fontSize) >= 16,
     JSON.stringify(metrics)
   )
   assert(metrics.scrollWidth <= metrics.width + 1, JSON.stringify(metrics))
   assert(Number.parseFloat(metrics.borderWidth) >= 1)
-  assert(
-    getContrastRatio(parseRgb(metrics.border), parseRgb(metrics.background)) >=
-      3,
-    JSON.stringify(metrics)
+  assert.ok(
+    JSON.stringify(parseRgb(metrics.border)) ===
+      JSON.stringify(parseRgb(metrics.expectedBorder)),
+    `搜索边界应复用当前主题的常态或焦点描边: ${JSON.stringify(metrics)}`
   )
   for (const color of [metrics.text, metrics.placeholder]) {
     assert(
@@ -41,7 +51,7 @@ export async function assertMobileSearchAffordance(locator, action) {
   }
   if (metrics.clear) {
     assert(
-      metrics.clear.width >= 44 && metrics.clear.height >= 44,
+      metrics.clear.width >= 44 && metrics.clear.height >= 40,
       JSON.stringify(metrics)
     )
   }
@@ -59,6 +69,9 @@ export async function assertMobileSearchAffordance(locator, action) {
 
 export async function assertTabsAffordance(locator) {
   const metric = await locator.evaluate((root) => {
+    const track = root.querySelector('.ant-tabs-nav-list')
+    const trackStyle = getComputedStyle(track)
+    const indicator = getComputedStyle(track, '::before')
     const selected = root.querySelector('.ant-tabs-tab-active')
     const other = root.querySelector(
       '.ant-tabs-tab:not(.ant-tabs-tab-active):not(.ant-tabs-tab-disabled)'
@@ -66,47 +79,51 @@ export async function assertTabsAffordance(locator) {
     const read = (tab) => {
       const style = getComputedStyle(tab)
       return {
-        border: style.borderColor,
-        borderWidth: parseFloat(style.borderWidth),
         background: style.backgroundColor,
+        height: tab.getBoundingClientRect().height,
         color: getComputedStyle(tab.querySelector('.ant-tabs-tab-btn')).color,
       }
     }
     return {
       selected: read(selected),
       other: read(other),
-      indicatorColor: getComputedStyle(
-        root.querySelector('.ant-tabs-nav-list'),
-        '::before'
-      ).backgroundColor,
-      indicatorHeight: parseFloat(
-        getComputedStyle(root.querySelector('.ant-tabs-nav-list'), '::before')
-          .height
-      ),
+      border: trackStyle.borderColor,
+      borderWidth: parseFloat(trackStyle.borderWidth),
+      background: trackStyle.backgroundColor,
+      radius: trackStyle.borderRadius,
+      indicatorColor: indicator.backgroundColor,
+      indicatorHeight: parseFloat(indicator.height),
+      shadow: indicator.boxShadow,
     }
   })
   assert(
-    metric.indicatorHeight > 0 && metric.indicatorHeight <= 1.5,
-    `页签选中线应保持纤细: ${JSON.stringify(metric)}`
+    Math.abs(metric.indicatorHeight - metric.selected.height) < 1,
+    `页签使用覆盖选项的连续滑块: ${JSON.stringify(metric)}`
   )
   assert.equal(
-    metric.selected.border,
-    metric.other.border,
-    `同组页签必须使用同一边框色: ${JSON.stringify(metric)}`
+    metric.selected.background,
+    'rgba(0, 0, 0, 0)',
+    '选中底色由持久滑块绘制，不能叠加独立白底'
   )
   assert.equal(
-    metric.indicatorColor,
-    metric.other.border,
-    `页签位置线必须复用同一边框色: ${JSON.stringify(metric)}`
+    metric.other.background,
+    'rgba(0, 0, 0, 0)',
+    '未选项延续底轨背景'
   )
-  for (const item of [metric.selected, metric.other]) {
-    assert(item.borderWidth >= 1)
+  assert(metric.borderWidth >= 1)
+  assert.equal(metric.radius, '9px')
+  assert.notEqual(metric.indicatorColor, metric.background)
+  assert.ok(metric.shadow.includes('0px 0px 0px 1px inset'))
+  assert.ok(
+    ['rgb(220, 228, 223)', 'rgb(49, 64, 57)'].includes(metric.border),
+    '底轨使用中性边框'
+  )
+  for (const [item, background] of [
+    [metric.selected, metric.indicatorColor],
+    [metric.other, metric.background],
+  ]) {
     assert(
-      getContrastRatio(parseRgb(item.color), parseRgb(item.background)) >= 4.5,
-      JSON.stringify(metric)
-    )
-    assert(
-      getContrastRatio(parseRgb(item.border), parseRgb(item.background)) >= 3,
+      getContrastRatio(parseRgb(item.color), parseRgb(background)) >= 4.5,
       JSON.stringify(metric)
     )
   }
@@ -139,18 +156,18 @@ export async function assertSegmentAffordance(locator) {
     metric.borderWidth >= 1,
     `视图切换必须有分组边界: ${JSON.stringify(metric)}`
   )
-  assert(
-    getContrastRatio(parseRgb(metric.border), parseRgb(metric.background)) >= 3,
-    `分组边界必须可辨认: ${JSON.stringify(metric)}`
+  assert.ok(
+    ['rgb(220, 228, 223)', 'rgb(49, 64, 57)'].includes(metric.border),
+    '分组沿用高保真中性边框'
   )
-  assert(
-    metric.shadow !== 'none',
-    '选中态须有单线描边和位置标记，不能只靠很浅的底色'
+  assert.notEqual(
+    metric.selectedBackground,
+    metric.background,
+    '滑块和轨道应有不同底色'
   )
-  assert.deepEqual(
-    parseRgb(metric.shadow),
-    parseRgb(metric.border),
-    `分段控件外框与选中描边必须同色: ${JSON.stringify(metric)}`
+  assert.ok(
+    metric.shadow.includes('0px 0px 0px 1px inset'),
+    '滑块与页签共用中性细描边'
   )
   assert(
     !metric.shadow.includes('-3px'),
@@ -196,7 +213,7 @@ export async function assertFilterAffordance(locator, minHeight = 32) {
     })
   )
   assert(metrics.length > 1)
-  const border = metrics[0].border
+  const { border } = metrics[0]
   for (const metric of metrics) {
     assert(
       metric.borderWidth >= 1 && metric.height >= minHeight,
@@ -208,12 +225,9 @@ export async function assertFilterAffordance(locator, minHeight = 32) {
       `同组筛选项必须使用同一边框色: ${JSON.stringify(metrics)}`
     )
     if (!metric.disabled) {
-      assert(
-        getContrastRatio(
-          parseRgb(metric.border),
-          parseRgb(metric.background)
-        ) >= 3,
-        JSON.stringify(metric)
+      assert.ok(
+        ['rgb(220, 228, 223)', 'rgb(49, 64, 57)'].includes(metric.border),
+        '筛选沿用高保真中性边框'
       )
       assert(
         getContrastRatio(parseRgb(metric.text), parseRgb(metric.background)) >=

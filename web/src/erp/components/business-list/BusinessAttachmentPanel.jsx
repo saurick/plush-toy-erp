@@ -8,7 +8,17 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Button, Input, List, Space, Tag, Tooltip, Typography } from 'antd'
+import {
+  Alert,
+  Button,
+  Input,
+  List,
+  Space,
+  Spin,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd'
 import {
   DeleteOutlined,
   DownloadOutlined,
@@ -19,8 +29,11 @@ import {
   UploadOutlined,
 } from '@ant-design/icons'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import SlidingSegmented from '@/common/components/navigation/SlidingSegmented.jsx'
+import BusinessAttachmentThumbnail from './BusinessAttachmentThumbnail.jsx'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import BusinessImage from './BusinessImage.jsx'
 import { message } from '@/common/utils/antdApp'
 import {
   downloadBusinessAttachment,
@@ -35,13 +48,18 @@ import {
   resolveBusinessAttachmentWithdrawalMeta,
 } from '../../utils/businessAttachmentPresentation.mjs'
 import { settleBusinessAttachmentBatchUpload } from '../../utils/businessAttachmentBatchUpload.mjs'
-import { resolveBusinessAttachmentPanelState } from '../../utils/businessAttachmentPanelState.mjs'
+import {
+  isBusinessAttachmentImage,
+  mergeBusinessAttachmentSelection,
+  resolveBusinessAttachmentPanelState,
+  selectBusinessAttachmentUploadItems,
+} from '../../utils/businessAttachmentPanelState.mjs'
 import { PRINT_APPENDIX_ATTACHMENT_TYPE } from '../../utils/businessAttachmentPrintAppendix.mjs'
 import { isMutationResultUnknown } from '../../utils/sourceDocumentMutation.mjs'
 import { BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
 
-const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024
-const MAX_ATTACHMENT_SIZE_LABEL = '5MB'
+const MAX_ATTACHMENT_SIZE = 100 * 1024 * 1024
+const MAX_ATTACHMENT_SIZE_LABEL = '100MB'
 
 const ACCEPTED_ATTACHMENT_MIME_TYPES = new Set([
   'image/png',
@@ -309,10 +327,13 @@ const BusinessAttachmentPanel = forwardRef(
       canWithdraw = false,
       className = '',
       variant = 'section',
+      compact = false,
       allowPendingAttachmentsWithoutOwner = true,
       enablePrintAppendixUpload = false,
       missingOwnerDescription,
       missingOwnerEmptyText,
+      onStateChange,
+      onClose,
     },
     ref
   ) => {
@@ -320,23 +341,53 @@ const BusinessAttachmentPanel = forwardRef(
     const printAppendixInputRef = useRef(null)
     const withdrawalReasonRef = useRef(null)
     const pendingAttachmentsRef = useRef([])
+    const uploadBusyRef = useRef(false)
     const batchRetryResolveRef = useRef(null)
+    const listRequestRef = useRef(0)
+    const previousOwnerRef = useRef({
+      ownerType,
+      ownerId: Number(ownerId || 0),
+    })
+    const scope = `${ownerType}:${Number(ownerId || 0)}`
+    const scopeRef = useRef(scope)
     const [attachments, setAttachments] = useState([])
     const [pendingAttachments, setPendingAttachments] = useState([])
-    const reportPendingAttachments = useContext(BusinessFormPendingAttachmentsContext)
-    useEffect(() => {
-      reportPendingAttachments?.(pendingAttachments.length)
-      return () => reportPendingAttachments?.(0)
-    }, [pendingAttachments.length, reportPendingAttachments])
+    const reportPendingAttachments = useContext(
+      BusinessFormPendingAttachmentsContext
+    )
     const [batchRetryState, setBatchRetryState] = useState(null)
     const [uploadMessageKey] = useState(createAttachmentPanelMessageKey)
     const [loading, setLoading] = useState(false)
     const [uploading, setUploading] = useState(false)
+    const [preparing, setPreparing] = useState(false)
+    const [loadError, setLoadError] = useState('')
+    const [expanded, setExpanded] = useState(false)
+    useEffect(() => setExpanded(false), [scope])
+    useEffect(() => {
+      if (loadError || pendingAttachments.length > 0) setExpanded(true)
+    }, [loadError, pendingAttachments.length])
+    const [category, setCategory] = useState('all')
+    const [expandedNames, setExpandedNames] = useState(new Set())
+    const [dragging, setDragging] = useState(false)
+    const [uploadProgress, setUploadProgress] = useState(null)
     const [previewing, setPreviewing] = useState(false)
     const [previewAttachment, setPreviewAttachment] = useState(null)
     const [withdrawalTarget, setWithdrawalTarget] = useState(null)
     const [withdrawalReason, setWithdrawalReason] = useState('')
     const [withdrawing, setWithdrawing] = useState(false)
+    useEffect(() => {
+      reportPendingAttachments?.(
+        pendingAttachments.length,
+        uploading || preparing || withdrawing
+      )
+      return () => reportPendingAttachments?.(0, false)
+    }, [
+      pendingAttachments.length,
+      preparing,
+      reportPendingAttachments,
+      uploading,
+      withdrawing,
+    ])
 
     const {
       normalizedOwnerId,
@@ -350,18 +401,32 @@ const BusinessAttachmentPanel = forwardRef(
       ownerType,
       ownerId,
       canUpload,
-      uploading,
+      uploading: uploading || preparing,
       description,
       allowPendingAttachmentsWithoutOwner,
       missingOwnerDescription,
       missingOwnerEmptyText,
     })
 
+    useEffect(() => {
+      onStateChange?.({
+        busy: uploading || preparing || withdrawing,
+        pendingCount: pendingAttachments.length,
+      })
+    }, [
+      onStateChange,
+      pendingAttachments.length,
+      preparing,
+      uploading,
+      withdrawing,
+    ])
+
     const containerClassName = useMemo(
       () =>
         [
           'business-attachment-panel',
           variant === 'inline' ? 'business-attachment-panel--inline' : '',
+          variant === 'manager' ? 'business-attachment-panel--manager' : '',
           className,
         ]
           .filter(Boolean)
@@ -377,9 +442,30 @@ const BusinessAttachmentPanel = forwardRef(
     )
     const retryablePendingAttachments = useMemo(
       () =>
-        pendingAttachments.filter((item) => item.upload_status === 'failed'),
+        selectBusinessAttachmentUploadItems(pendingAttachments, {
+          retryOnly: true,
+        }),
       [pendingAttachments]
     )
+    const queuedAttachments = pendingAttachments.filter(
+      (item) => !item.upload_status || item.upload_status === 'pending'
+    )
+    const visibleItems = listItems.filter(
+      (item) =>
+        category === 'all' ||
+        (category === 'image') === isBusinessAttachmentImage(item)
+    )
+    const categoryOptions = [
+      { value: 'all', label: `全部 ${listItems.length}` },
+      {
+        value: 'image',
+        label: `图片 ${listItems.filter(isBusinessAttachmentImage).length}`,
+      },
+      {
+        value: 'file',
+        label: `文件 ${listItems.filter((item) => !isBusinessAttachmentImage(item)).length}`,
+      },
+    ]
     const batchIssueItems = useMemo(
       () => [
         ...(batchRetryState?.retryableItems || []),
@@ -412,30 +498,46 @@ const BusinessAttachmentPanel = forwardRef(
 
     const reload = useCallback(
       async (nextOwnerId = normalizedOwnerId) => {
+        const request = ++listRequestRef.current
+        const requestScope = scopeRef.current
         const targetOwnerId = Number(nextOwnerId || 0)
         if (!ownerType || targetOwnerId <= 0) {
           setAttachments([])
+          setLoading(false)
+          setLoadError('')
           return
         }
         setLoading(true)
+        setLoadError('')
         try {
           const nextItems = await listBusinessAttachments({
             owner_type: ownerType,
             owner_id: targetOwnerId,
           })
-          setAttachments(Array.isArray(nextItems) ? nextItems : [])
+          if (
+            request === listRequestRef.current &&
+            requestScope === scopeRef.current
+          ) {
+            setAttachments(Array.isArray(nextItems) ? nextItems : [])
+          }
         } catch (error) {
-          message.error(getActionErrorMessage(error, '加载业务附件'))
+          if (
+            request === listRequestRef.current &&
+            requestScope === scopeRef.current
+          ) {
+            setLoadError(getActionErrorMessage(error, '加载业务附件'))
+          }
         } finally {
-          setLoading(false)
+          if (
+            request === listRequestRef.current &&
+            requestScope === scopeRef.current
+          ) {
+            setLoading(false)
+          }
         }
       },
       [normalizedOwnerId, ownerType]
     )
-
-    useEffect(() => {
-      reload()
-    }, [reload])
 
     const uploadPreparedAttachment = useCallback(
       async (item, targetOwnerId) => {
@@ -457,10 +559,25 @@ const BusinessAttachmentPanel = forwardRef(
     )
 
     const settlePreparedAttachments = useCallback(
-      (items, targetOwnerId) =>
-        settleBusinessAttachmentBatchUpload(items, (item) =>
-          uploadPreparedAttachment(item, targetOwnerId)
-        ),
+      async (items, targetOwnerId) => {
+        let completed = 0
+        setUploadProgress({ completed, total: items.length })
+        try {
+          return await settleBusinessAttachmentBatchUpload(
+            items,
+            async (item) => {
+              try {
+                return await uploadPreparedAttachment(item, targetOwnerId)
+              } finally {
+                completed += 1
+                setUploadProgress({ completed, total: items.length })
+              }
+            }
+          )
+        } finally {
+          setUploadProgress(null)
+        }
+      },
       [uploadPreparedAttachment]
     )
 
@@ -496,6 +613,29 @@ const BusinessAttachmentPanel = forwardRef(
       resolveBatchRetryDecision(false)
     }, [resolveBatchRetryDecision])
 
+    useEffect(() => {
+      // 先激活当前归属再加载，清理与重启必须使用同一个请求生命周期。
+      scopeRef.current = scope
+      const previous = previousOwnerRef.current
+      if (
+        previous.ownerType !== ownerType ||
+        (previous.ownerId > 0 && previous.ownerId !== normalizedOwnerId)
+      ) {
+        clearPendingAttachments()
+        setCategory('all')
+        setExpandedNames(new Set())
+        setPreviewAttachment(null)
+        setWithdrawalTarget(null)
+      }
+      previousOwnerRef.current = { ownerType, ownerId: normalizedOwnerId }
+      setAttachments([])
+      reload()
+      return () => {
+        listRequestRef.current += 1
+        scopeRef.current = ''
+      }
+    }, [clearPendingAttachments, normalizedOwnerId, ownerType, reload, scope])
+
     const waitForBatchRetryDecision = useCallback((nextState) => {
       const previousResolve = batchRetryResolveRef.current
       batchRetryResolveRef.current = null
@@ -512,14 +652,21 @@ const BusinessAttachmentPanel = forwardRef(
         clearPendingAttachments,
         hasPendingAttachments: () => pendingAttachmentsRef.current.length > 0,
         async flushPendingAttachments(nextOwnerId = normalizedOwnerId) {
+          if (uploadBusyRef.current || uploading || preparing) return false
           const targetOwnerId = Number(nextOwnerId || 0)
-          const items = pendingAttachmentsRef.current
-          if (items.length <= 0) return true
+          const allItems = pendingAttachmentsRef.current
+          if (allItems.length <= 0) return true
+          if (!canUpload) return false
+          const items = selectBusinessAttachmentUploadItems(allItems)
+          const unconfirmedItems = allItems.filter(
+            (item) => item.upload_status === 'unconfirmed'
+          )
           if (!ownerType || targetOwnerId <= 0) {
             message.warning('业务记录保存后才能绑定附件')
             return false
           }
           message.destroy(uploadMessageKey)
+          uploadBusyRef.current = true
           setUploading(true)
           let result
           let issueItems = []
@@ -534,25 +681,27 @@ const BusinessAttachmentPanel = forwardRef(
               await reload(targetOwnerId)
             }
           } finally {
+            uploadBusyRef.current = false
             setUploading(false)
           }
 
-          if (result.failed.length <= 0) {
+          if (result.failed.length <= 0 && unconfirmedItems.length <= 0) {
             return true
           }
 
           return waitForBatchRetryDecision(
             createBatchRetryState({
               targetOwnerId,
-              totalCount: items.length,
+              totalCount: allItems.length,
               succeededCount: result.succeeded.length,
-              issueItems,
+              issueItems: [...unconfirmedItems, ...issueItems],
             })
           )
         },
       }),
       [
         clearPendingAttachments,
+        canUpload,
         normalizedOwnerId,
         ownerType,
         reload,
@@ -560,6 +709,8 @@ const BusinessAttachmentPanel = forwardRef(
         settlePreparedAttachments,
         uploadMessageKey,
         waitForBatchRetryDecision,
+        preparing,
+        uploading,
       ]
     )
 
@@ -569,7 +720,16 @@ const BusinessAttachmentPanel = forwardRef(
     ) {
       const files = Array.from(event.target.files || [])
       event.target.value = ''
+      await prepareFiles(files, requestedAttachmentType)
+    }
+
+    async function prepareFiles(
+      files,
+      requestedAttachmentType = attachmentType
+    ) {
+      if (uploadBusyRef.current || uploadDisabled || preparing) return
       if (files.length <= 0) return
+      const selectionScope = scopeRef.current
 
       const validFiles = []
       for (const file of files) {
@@ -596,40 +756,69 @@ const BusinessAttachmentPanel = forwardRef(
       }
 
       message.destroy(uploadMessageKey)
-      setUploading(true)
+      uploadBusyRef.current = true
+      setPreparing(true)
       try {
         const preparedItems = []
         for (const file of validFiles) {
-          preparedItems.push({
-            uid: createPendingAttachmentID(),
-            file_name: file.name,
-            mime_type: inferMimeType(file),
-            file_size: file.size,
-            content_base64: await readFileAsBase64(file),
-            attachment_type: requestedAttachmentType,
-          })
+          try {
+            const content = await readFileAsBase64(file)
+            if (selectionScope !== scopeRef.current) return
+            preparedItems.push({
+              uid: createPendingAttachmentID(),
+              file_name: file.name,
+              mime_type: inferMimeType(file),
+              file_size: file.size,
+              content_base64: content,
+              attachment_type: requestedAttachmentType,
+              upload_status: 'pending',
+            })
+          } catch {
+            if (selectionScope === scopeRef.current) {
+              message.error(`${file.name} 读取失败，请重新选择`)
+            }
+          }
         }
-
-        if (missingOwner && canQueuePending) {
-          setPendingAttachments((current) => {
-            const next = [...current, ...preparedItems]
-            pendingAttachmentsRef.current = next
-            return next
-          })
-          message.success({
+        if (selectionScope !== scopeRef.current || preparedItems.length <= 0) {
+          return
+        }
+        const { items, duplicates } = mergeBusinessAttachmentSelection(
+          pendingAttachmentsRef.current,
+          preparedItems
+        )
+        pendingAttachmentsRef.current = items
+        setPendingAttachments(items)
+        if (duplicates.length > 0) {
+          message.info({
             key: uploadMessageKey,
-            content:
-              preparedItems.length > 1
-                ? `${preparedItems.length} 个附件将在保存后上传`
-                : '附件将在保存后上传',
+            content: `已跳过 ${duplicates.length} 个重复文件`,
           })
-          return
         }
-        if (missingOwner) {
-          message.warning(missingOwnerDescription || '请先选择业务记录')
-          return
-        }
+        setCategory('all')
+      } finally {
+        uploadBusyRef.current = false
+        setPreparing(false)
+      }
+    }
 
+    async function handleUploadQueuedAttachments() {
+      if (
+        uploadBusyRef.current ||
+        uploading ||
+        preparing ||
+        missingOwner ||
+        !canUpload
+      ) {
+        return
+      }
+      const preparedItems = pendingAttachmentsRef.current.filter(
+        (item) => !item.upload_status || item.upload_status === 'pending'
+      )
+      if (!preparedItems.length) return
+      message.destroy(uploadMessageKey)
+      uploadBusyRef.current = true
+      setUploading(true)
+      try {
         const result = await settlePreparedAttachments(
           preparedItems,
           normalizedOwnerId
@@ -667,14 +856,23 @@ const BusinessAttachmentPanel = forwardRef(
       } catch (error) {
         message.error(getActionErrorMessage(error, '上传业务附件'))
       } finally {
+        uploadBusyRef.current = false
         setUploading(false)
       }
     }
 
     const handleBatchRetry = useCallback(async () => {
       const current = batchRetryState
-      if (!current || current.retryableItems.length <= 0) return
+      if (
+        uploadBusyRef.current ||
+        !canUpload ||
+        !current ||
+        current.retryableItems.length <= 0
+      ) {
+        return
+      }
 
+      uploadBusyRef.current = true
       setUploading(true)
       let result
       let issueItems = []
@@ -695,6 +893,7 @@ const BusinessAttachmentPanel = forwardRef(
           await reload(current.targetOwnerId)
         }
       } finally {
+        uploadBusyRef.current = false
         setUploading(false)
       }
 
@@ -725,6 +924,7 @@ const BusinessAttachmentPanel = forwardRef(
       )
     }, [
       batchRetryState,
+      canUpload,
       reload,
       replacePendingUploadItems,
       resolveBatchRetryDecision,
@@ -754,7 +954,10 @@ const BusinessAttachmentPanel = forwardRef(
     }, [batchRetryState, resolveBatchRetryDecision, uploadMessageKey])
 
     async function handleRetryPendingAttachments(items) {
-      const retryItems = items.filter((item) => item.upload_status === 'failed')
+      if (uploadBusyRef.current || uploading || preparing || !canUpload) return
+      const retryItems = selectBusinessAttachmentUploadItems(items, {
+        retryOnly: true,
+      })
       if (retryItems.length <= 0) return
       const targetOwnerId = Number(
         retryItems[0]?.retry_owner_id || normalizedOwnerId || 0
@@ -772,6 +975,7 @@ const BusinessAttachmentPanel = forwardRef(
         return
       }
 
+      uploadBusyRef.current = true
       setUploading(true)
       let result
       let issueItems = []
@@ -786,6 +990,7 @@ const BusinessAttachmentPanel = forwardRef(
           await reload(targetOwnerId)
         }
       } finally {
+        uploadBusyRef.current = false
         setUploading(false)
       }
 
@@ -828,11 +1033,13 @@ const BusinessAttachmentPanel = forwardRef(
       }
 
       setPreviewing(true)
+      const previewScope = scopeRef.current
       try {
         const attachment =
           item.__kind === 'pending'
             ? item
             : await downloadBusinessAttachment({ id: item.id })
+        if (previewScope !== scopeRef.current) return
         if (!attachment?.content_base64) {
           message.warning('附件内容为空，无法预览')
           return
@@ -849,13 +1056,16 @@ const BusinessAttachmentPanel = forwardRef(
           return nextPreview
         })
       } catch (error) {
-        message.error(getActionErrorMessage(error, '预览业务附件'))
+        if (previewScope === scopeRef.current) {
+          message.error(getActionErrorMessage(error, '预览业务附件'))
+        }
       } finally {
         setPreviewing(false)
       }
     }
 
     function handleRemovePending(item) {
+      if (uploadBusyRef.current || uploading || preparing) return
       setPendingAttachments((current) => {
         const next = current.filter((entry) => entry.uid !== item.uid)
         pendingAttachmentsRef.current = next
@@ -937,10 +1147,9 @@ const BusinessAttachmentPanel = forwardRef(
       return (
         <Button
           key="preview"
-          type="link"
           size="small"
           aria-label="预览附件"
-          icon={<EyeOutlined />}
+          icon={<EyeOutlined aria-hidden="true" />}
           loading={previewing}
           onClick={() => handlePreview(item)}
         >
@@ -956,11 +1165,10 @@ const BusinessAttachmentPanel = forwardRef(
         <Button
           key="withdraw"
           danger
-          type="link"
           size="small"
           aria-label="撤销附件"
-          icon={<StopOutlined />}
-          disabled={withdrawn}
+          icon={<StopOutlined aria-hidden="true" />}
+          disabled={withdrawn || uploading || preparing || withdrawing}
           onClick={() => openWithdrawal(item)}
         >
           撤销附件
@@ -981,10 +1189,9 @@ const BusinessAttachmentPanel = forwardRef(
           item.upload_status === 'failed' ? (
             <Button
               key="retry-pending"
-              type="link"
               size="small"
               aria-label={`重试附件 ${item.file_name}`}
-              icon={<RedoOutlined />}
+              icon={<RedoOutlined aria-hidden="true" />}
               disabled={uploading}
               onClick={() => handleRetryPendingAttachments([item])}
             >
@@ -994,10 +1201,10 @@ const BusinessAttachmentPanel = forwardRef(
           <Button
             key="remove-pending"
             danger
-            type="link"
             size="small"
             aria-label="移除待上传附件"
-            icon={<DeleteOutlined />}
+            icon={<DeleteOutlined aria-hidden="true" />}
+            disabled={uploading || preparing}
             onClick={() => handleRemovePending(item)}
           >
             移除
@@ -1011,10 +1218,9 @@ const BusinessAttachmentPanel = forwardRef(
         renderPreviewAction(item),
         <Button
           key="download"
-          type="link"
           size="small"
           aria-label="下载附件"
-          icon={<DownloadOutlined />}
+          icon={<DownloadOutlined aria-hidden="true" />}
           onClick={() => handleDownload(item)}
         >
           下载
@@ -1023,133 +1229,323 @@ const BusinessAttachmentPanel = forwardRef(
       ].filter(Boolean)
     }
 
+    function renderAttachmentRow(item) {
+      const key = item.uid || item.id
+      const expanded = expandedNames.has(key)
+      const pending = item.__kind === 'pending'
+      const status = item.upload_status
+      const failed = status === 'failed' || status === 'unconfirmed'
+      return (
+        <article
+          key={key}
+          className={`business-attachment-panel__row${failed ? ' business-attachment-panel__row--failed' : ''}`}
+        >
+          <BusinessAttachmentThumbnail item={item} />
+          <div className="business-attachment-panel__file-copy">
+            <button
+              type="button"
+              className={`business-attachment-panel__file-name${expanded ? ' business-attachment-panel__file-name--expanded' : ''}`}
+              title={item.file_name}
+              aria-expanded={expanded}
+              onClick={() =>
+                setExpandedNames((current) => {
+                  const next = new Set(current)
+                  if (expanded) next.delete(key)
+                  else next.add(key)
+                  return next
+                })
+              }
+            >
+              {item.file_name}
+            </button>
+            <div className="business-attachment-panel__file-meta">
+              <span>{formatFileSize(item.file_size)}</span>
+              {item.attachment_type === PRINT_APPENDIX_ATTACHMENT_TYPE ? (
+                <Tag color="purple">合同附图</Tag>
+              ) : null}
+              {pending ? (
+                <Tag
+                  color={
+                    failed
+                      ? status === 'unconfirmed'
+                        ? 'warning'
+                        : 'error'
+                      : 'blue'
+                  }
+                >
+                  {status === 'failed'
+                    ? '上传失败'
+                    : status === 'unconfirmed'
+                      ? '结果待确认'
+                      : uploading
+                        ? '上传中'
+                        : missingOwner
+                          ? '保存后上传'
+                          : '待上传'}
+                </Tag>
+              ) : (
+                <>
+                  {!isBusinessAttachmentWithdrawn(item) ? (
+                    <Tag color="success">已上传</Tag>
+                  ) : null}
+                  <SavedAttachmentAuditMeta item={item} />
+                </>
+              )}
+            </div>
+            {item.upload_error ? (
+              <div
+                className="business-attachment-panel__file-error"
+                role="status"
+              >
+                {item.upload_error}
+              </div>
+            ) : null}
+          </div>
+          <div className="business-attachment-panel__row-actions">
+            {renderAttachmentActions(item)}
+          </div>
+        </article>
+      )
+    }
+
     return (
-      <section className={containerClassName}>
-        <div className="business-attachment-panel__header">
-          <div>
-            <Typography.Text strong>{title}</Typography.Text>
+      <section className={containerClassName} aria-label={title}>
+        {compact ? (
+          <div className="business-attachment-panel__compact-summary">
+            <span>
+              <PaperClipOutlined aria-hidden="true" /> {title} ·{' '}
+              {loading
+                ? '正在读取'
+                : loadError
+                  ? '读取失败'
+                  : `${attachments.length} 个已上传`}
+              {pendingAttachments.length > 0
+                ? ` · ${pendingAttachments.length} 个待处理`
+                : ''}
+            </span>
+            <Button
+              size="small"
+              aria-expanded={
+                expanded || pendingAttachments.length > 0 || Boolean(loadError)
+              }
+              onClick={() => setExpanded((value) => !value)}
+              disabled={
+                pendingAttachments.length > 0 ||
+                preparing ||
+                uploading ||
+                withdrawing ||
+                Boolean(loadError)
+              }
+            >
+              {expanded || pendingAttachments.length > 0 || loadError
+                ? '收起附件'
+                : canUpload
+                  ? '管理附件'
+                  : '查看附件'}
+            </Button>
+          </div>
+        ) : null}
+        <div
+          hidden={
+            compact &&
+            !expanded &&
+            pendingAttachments.length === 0 &&
+            !loadError
+          }
+        >
+          <div className="business-attachment-panel__header">
+            {variant !== 'manager' ? (
+              <Typography.Text strong>{title}</Typography.Text>
+            ) : null}
             <Typography.Paragraph type="secondary">
               {panelDescription}
             </Typography.Paragraph>
           </div>
-          {canUpload ? (
-            <>
-              <Space wrap>
-                {retryablePendingAttachments.length > 1 ? (
-                  <Button
-                    icon={<RedoOutlined />}
-                    loading={uploading}
-                    disabled={uploading}
-                    onClick={() =>
-                      handleRetryPendingAttachments(retryablePendingAttachments)
-                    }
-                  >
-                    重试失败项（{retryablePendingAttachments.length}）
-                  </Button>
-                ) : null}
-                {enablePrintAppendixUpload ? (
-                  <Button
-                    icon={<UploadOutlined />}
-                    loading={uploading}
-                    disabled={uploadDisabled}
-                    onClick={() => printAppendixInputRef.current?.click()}
-                  >
-                    选择合同附图
-                  </Button>
-                ) : null}
+          <div className="business-attachment-panel__toolbar">
+            <SlidingSegmented
+              aria-label="附件分类"
+              options={categoryOptions}
+              value={category}
+              onChange={setCategory}
+            />
+            <Space wrap>
+              {!missingOwner ? (
                 <Button
-                  type="primary"
-                  icon={<UploadOutlined />}
-                  loading={uploading}
-                  disabled={uploadDisabled}
-                  onClick={() => inputRef.current?.click()}
+                  icon={<RedoOutlined aria-hidden="true" />}
+                  loading={loading}
+                  disabled={uploading || preparing}
+                  onClick={() => reload()}
                 >
-                  {uploadButtonText}
+                  刷新列表
                 </Button>
-              </Space>
-              <input
-                ref={inputRef}
-                hidden
-                multiple
-                type="file"
-                accept={ACCEPTED_ATTACHMENT_TYPES}
-                onChange={handleFileChange}
-              />
-              {enablePrintAppendixUpload ? (
-                <input
-                  ref={printAppendixInputRef}
-                  hidden
-                  multiple
-                  type="file"
-                  accept={PRINT_APPENDIX_ACCEPT}
-                  onChange={(event) =>
-                    handleFileChange(event, PRINT_APPENDIX_ATTACHMENT_TYPE)
-                  }
-                />
               ) : null}
-            </>
-          ) : null}
-        </div>
-        <List
-          size="small"
-          loading={loading}
-          dataSource={listItems}
-          locale={{
-            emptyText: (
-              <div className="business-attachment-panel__empty">
-                <PaperClipOutlined />
-                <Typography.Text type="secondary">
-                  {emptyDescription}
-                </Typography.Text>
-              </div>
-            ),
-          }}
-          renderItem={(item) => (
-            <List.Item actions={renderAttachmentActions(item)}>
-              <List.Item.Meta
-                avatar={<PaperClipOutlined />}
-                title={item.file_name}
-                description={
-                  <Space size={6} wrap>
-                    <Tag>{formatFileSize(item.file_size)}</Tag>
-                    {item.attachment_type === PRINT_APPENDIX_ATTACHMENT_TYPE ? (
-                      <Tag color="purple">合同附图</Tag>
-                    ) : null}
-                    {item.__kind === 'pending' ? (
-                      <>
-                        <Tag
-                          color={
-                            item.upload_status === 'failed' ||
-                            item.upload_status === 'unconfirmed'
-                              ? 'error'
-                              : 'blue'
-                          }
-                        >
-                          {item.upload_status === 'failed'
-                            ? '上传失败'
-                            : item.upload_status === 'unconfirmed'
-                              ? '结果待确认'
-                              : '保存后上传'}
-                        </Tag>
-                        {item.upload_error ? (
-                          <Typography.Text
-                            type="danger"
-                            title={item.upload_error}
-                            style={{ overflowWrap: 'anywhere' }}
-                          >
-                            {item.upload_error}
-                          </Typography.Text>
-                        ) : null}
-                      </>
-                    ) : (
-                      <SavedAttachmentAuditMeta item={item} />
-                    )}
-                  </Space>
+              {canUpload ? (
+                <>
+                  {enablePrintAppendixUpload ? (
+                    <Button
+                      icon={<UploadOutlined aria-hidden="true" />}
+                      disabled={uploadDisabled}
+                      onClick={() => printAppendixInputRef.current?.click()}
+                    >
+                      选择合同附图
+                    </Button>
+                  ) : null}
+                  <Button
+                    icon={<PaperClipOutlined aria-hidden="true" />}
+                    loading={preparing}
+                    disabled={uploadDisabled}
+                    onClick={() => inputRef.current?.click()}
+                  >
+                    {uploadButtonText}
+                  </Button>
+                  <input
+                    ref={inputRef}
+                    hidden
+                    multiple
+                    type="file"
+                    accept={ACCEPTED_ATTACHMENT_TYPES}
+                    onChange={handleFileChange}
+                  />
+                  {enablePrintAppendixUpload ? (
+                    <input
+                      ref={printAppendixInputRef}
+                      hidden
+                      multiple
+                      type="file"
+                      accept={PRINT_APPENDIX_ACCEPT}
+                      onChange={(event) =>
+                        handleFileChange(event, PRINT_APPENDIX_ATTACHMENT_TYPE)
+                      }
+                    />
+                  ) : null}
+                </>
+              ) : null}
+            </Space>
+          </div>
+          {canUpload ? (
+            <button
+              type="button"
+              className={`business-attachment-panel__dropzone${dragging ? ' business-attachment-panel__dropzone--active' : ''}`}
+              disabled={uploadDisabled}
+              onClick={() => inputRef.current?.click()}
+              onDragOver={(event) => {
+                event.preventDefault()
+                if (!uploadDisabled) setDragging(true)
+              }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  setDragging(false)
                 }
-              />
-            </List.Item>
-          )}
-        />
+              }}
+              onDrop={(event) => {
+                event.preventDefault()
+                setDragging(false)
+                if (!uploadDisabled) {
+                  prepareFiles(Array.from(event.dataTransfer.files || []))
+                }
+              }}
+            >
+              <UploadOutlined aria-hidden="true" />
+              <strong>
+                {preparing ? '正在读取文件…' : '点击或拖拽文件到此处'}
+              </strong>
+              <span>
+                支持图片、PDF、Office、WPS、邮件、文本与压缩包；单个文件不超过
+                100 MB
+              </span>
+            </button>
+          ) : null}
+          {loadError ? (
+            <Alert
+              type="error"
+              showIcon
+              message="附件列表加载失败"
+              description={loadError}
+              action={
+                <Button
+                  size="small"
+                  disabled={uploading || preparing}
+                  onClick={() => reload()}
+                >
+                  重试加载
+                </Button>
+              }
+            />
+          ) : null}
+          <Spin spinning={loading}>
+            <div
+              className="business-attachment-panel__list"
+              aria-label="附件列表"
+              aria-busy={loading}
+            >
+              {visibleItems.length ? (
+                visibleItems.map(renderAttachmentRow)
+              ) : !loadError ? (
+                <div className="business-attachment-panel__empty">
+                  <PaperClipOutlined aria-hidden="true" />
+                  <strong>
+                    {loading
+                      ? '正在加载附件…'
+                      : category === 'all'
+                        ? emptyDescription
+                        : '当前分类没有附件'}
+                  </strong>
+                  {!loading && canUpload && !uploadDisabled ? (
+                    <span>
+                      {missingOwner
+                        ? '选择文件后，保存业务记录时上传'
+                        : '选择文件后先核对，再点击上传'}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </Spin>
+          <div className="business-attachment-panel__footer">
+            <span className="business-attachment-panel__status" role="status">
+              {uploadProgress ? (
+                <>
+                  <Spin size="small" /> 上传中（{uploadProgress.completed}/
+                  {uploadProgress.total}）
+                </>
+              ) : missingOwner && canQueuePending ? (
+                '待上传附件将在保存业务记录后绑定'
+              ) : (
+                '保留上传记录；已上传附件按权限撤销'
+              )}
+            </span>
+            {onClose ? (
+              <Button
+                disabled={uploading || preparing || withdrawing}
+                onClick={onClose}
+              >
+                完成
+              </Button>
+            ) : null}
+            {canUpload && retryablePendingAttachments.length > 1 ? (
+              <Button
+                icon={<RedoOutlined aria-hidden="true" />}
+                disabled={uploading || preparing}
+                onClick={() =>
+                  handleRetryPendingAttachments(retryablePendingAttachments)
+                }
+              >
+                重试失败项（{retryablePendingAttachments.length}）
+              </Button>
+            ) : null}
+            {canUpload && !missingOwner && queuedAttachments.length > 0 ? (
+              <Button
+                type="primary"
+                icon={<UploadOutlined aria-hidden="true" />}
+                loading={uploading}
+                disabled={preparing || uploading}
+                onClick={() => handleUploadQueuedAttachments()}
+              >
+                上传 {queuedAttachments.length} 个文件
+              </Button>
+            ) : null}
+          </div>
+        </div>
         <BusinessModal
           size="confirm"
           centered
@@ -1164,7 +1560,7 @@ const BusinessAttachmentPanel = forwardRef(
           }
           confirmLoading={uploading}
           okButtonProps={{
-            icon: <RedoOutlined />,
+            icon: <RedoOutlined aria-hidden="true" />,
             disabled:
               uploading || (batchRetryState?.retryableItems.length || 0) <= 0,
           }}
@@ -1272,7 +1668,7 @@ const BusinessAttachmentPanel = forwardRef(
             />
           ) : (
             <div className="business-attachment-panel__preview-image-wrap">
-              <img
+              <BusinessImage
                 className="business-attachment-panel__preview-image"
                 src={previewAttachment?.url}
                 alt={previewAttachment?.file_name || '附件预览'}

@@ -139,6 +139,12 @@ export function createProductPaginationScenarios({
         assert(saveDispatched, '新建产品保存按钮应可提交')
         await modal.waitFor({ state: 'hidden' })
         await expectText(page, '分页最新产品')
+        await page
+          .locator(
+            '.erp-business-data-table-card .ant-table-tbody > tr.ant-table-row'
+          )
+          .filter({ hasText: '分页最新产品' })
+          .waitFor({ state: 'visible' })
         assert(
           listRequests.some((request) => request.offset === 0),
           `新建产品后应回到第一页重新读取: ${JSON.stringify(listRequests)}`

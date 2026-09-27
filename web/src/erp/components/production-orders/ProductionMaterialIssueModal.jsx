@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react'
 import { Alert, Descriptions, Form, Input, Select } from 'antd'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 
@@ -40,6 +42,7 @@ export default function ProductionMaterialIssueModal({
   onSubmit,
 }) {
   const [form] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open)
   const editing = mode === 'edit'
   const Editor = editing ? BusinessFormPage : BusinessModal
   const formConnectedRef = useRef(false)
@@ -121,7 +124,7 @@ export default function ProductionMaterialIssueModal({
       ) : null}
       <Descriptions
         size="small"
-        column={{ xs: 1, sm: 2 }}
+        column={{ xs: 1, sm: 2, lg: editing ? 3 : 2 }}
         style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           {
@@ -197,7 +200,13 @@ export default function ProductionMaterialIssueModal({
           },
         ]}
       />
-      <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+      <Form
+        className={editing ? 'erp-business-action-form' : undefined}
+        form={form}
+        layout="vertical"
+        preserve={false}
+        disabled={loading}
+      >
         <Form.Item
           name="warehouse_id"
           label="领料仓库"
@@ -234,6 +243,10 @@ export default function ProductionMaterialIssueModal({
           name="quantity"
           label="本次领料数量"
           rules={[
+            unitQuantityRuleFromOptions(
+              quantityUnitOptions,
+              requirement?.unit_id
+            ),
             { required: true, message: '请填写本次领料数量' },
             {
               validator: (_, value) => {
@@ -266,8 +279,12 @@ export default function ProductionMaterialIssueModal({
         >
           <Input type="datetime-local" />
         </Form.Item>
-        <Form.Item name="note" label="备注">
-          <Input.TextArea rows={3} maxLength={255} showCount />
+        <Form.Item
+          name="note"
+          label="备注"
+          className="erp-business-action-form__field--full"
+        >
+          <Input.TextArea rows={editing ? 2 : 3} maxLength={255} showCount />
         </Form.Item>
       </Form>
     </Editor>

@@ -5,11 +5,12 @@ import { Alert, Button, Descriptions, Divider, Empty, Spin } from 'antd'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
-import { BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE } from '../../utils/businessRowItemsPreview.mjs'
 
 import { getColumnLabel } from './ColumnOrderModal.jsx'
 import BusinessFormModal from './BusinessFormModal.jsx'
-import BusinessDetailsPagination from './BusinessDetailsPagination.jsx'
+import BusinessDetailsPagination, {
+  BUSINESS_DETAILS_PAGE_SIZE,
+} from './BusinessDetailsPagination.jsx'
 import BusinessRowItemCards, {
   visibleDetailValue,
 } from './BusinessRowItemCards.jsx'
@@ -53,12 +54,12 @@ function useBusinessLineItems(config, open, record) {
     items: EMPTY_LINE_ITEMS,
   })
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE)
+  const [pageSize, setPageSize] = useState(BUSINESS_DETAILS_PAGE_SIZE)
   const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     setPage(1)
-    setPageSize(BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE)
+    setPageSize(BUSINESS_DETAILS_PAGE_SIZE)
     if (!open || !record) {
       setLoadState({ status: 'idle', items: EMPTY_LINE_ITEMS })
       return undefined
@@ -125,7 +126,7 @@ function BusinessLineItems({ config, record, state, contentRef }) {
           : title}
       </Divider>
       {loadState.status === 'loading' || loadState.status === 'idle' ? (
-        <div className="erp-business-row-items-preview__loading">
+        <div className="erp-business-detail-items__loading">
           <Spin size="small" />
           <span>正在加载明细…</span>
         </div>
@@ -154,7 +155,7 @@ function BusinessLineItems({ config, record, state, contentRef }) {
         />
       ) : null}
       {loadState.status === 'success' && pageItems.length > 0 ? (
-        <div className="erp-business-row-items-preview__items">
+        <div className="erp-business-detail-items__items">
           <BusinessRowItemCards
             getItemFields={getItemFields}
             getItemKey={getItemKey}
@@ -163,7 +164,6 @@ function BusinessLineItems({ config, record, state, contentRef }) {
             items={pageItems}
             record={record}
             startIndex={pageStart}
-            view="details"
           />
         </div>
       ) : null}
@@ -173,6 +173,7 @@ function BusinessLineItems({ config, record, state, contentRef }) {
 
 export default function BusinessDetailsModal({
   children,
+  extraActions,
   columns = [],
   description,
   lineItems,
@@ -202,6 +203,7 @@ export default function BusinessDetailsModal({
       destroyOnHidden
       footer={
         <>
+          {extraActions}
           {lineItems && lineItemsState.loadState.status === 'success' ? (
             <BusinessDetailsPagination
               current={lineItemsState.page}

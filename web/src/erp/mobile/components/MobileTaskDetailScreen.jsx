@@ -1,18 +1,19 @@
 import React from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
-  BranchesOutlined,
   ExclamationCircleFilled,
-  FileTextOutlined,
-  LinkOutlined,
   LoadingOutlined,
   ReloadOutlined,
-  RightOutlined,
-  UserOutlined,
 } from '@ant-design/icons'
+import WorkflowFollowupDetails from '../../components/workflow/WorkflowFollowupDetails.jsx'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
-import WorkflowTaskTiming from '../../components/workflow/WorkflowTaskTiming.jsx'
+import WorkflowTaskProductImage from '../../components/workflow/WorkflowTaskProductImage.jsx'
+import { getWorkflowTaskTiming } from '../../utils/workflowTaskTiming.mjs'
+import {
+  getWorkflowTaskIdentityPresentation,
+  getWorkflowTaskIdentityCode,
+} from '../../utils/workflowTaskIdentity.mjs'
 import {
   WorkflowTaskCopySummary,
   WorkflowTaskSource,
@@ -80,7 +81,8 @@ export default function MobileTaskDetailScreen({
   const [taskEventsState, setTaskEventsState] = React.useState('idle')
   const [processContext, setProcessContext] = React.useState(null)
   const [processContextState, setProcessContextState] = React.useState('idle')
-  const [processContextReloadKey, setProcessContextReloadKey] = React.useState(0)
+  const [processContextReloadKey, setProcessContextReloadKey] =
+    React.useState(0)
   const [productionArrangementOpen, setProductionArrangementOpen] =
     React.useState(false)
   const productionArrangementContext = React.useMemo(
@@ -101,9 +103,9 @@ export default function MobileTaskDetailScreen({
   )
   const canOpenProductionArrangement = Boolean(
     productionArrangementContext &&
-      selectedCanOperate &&
-      canReadProductionWip &&
-      canAssignProductionWip
+    selectedCanOperate &&
+    canReadProductionWip &&
+    canAssignProductionWip
   )
 
   React.useEffect(() => {
@@ -128,6 +130,7 @@ export default function MobileTaskDetailScreen({
       signal: controller.signal,
     })
       .then(({ items, truncated }) => {
+        if (controller.signal.aborted) return
         setTaskEvents(items)
         setTaskEventsTruncated(truncated)
         setTaskEventsState('ready')
@@ -187,6 +190,13 @@ export default function MobileTaskDetailScreen({
   )
   const relatedSource = resolveTaskSourceLabel(selectedTask)
   const ownerRoleLabel = getMobileRoleLabel(selectedTask.owner_role_key)
+  const identity = getWorkflowTaskIdentityPresentation(selectedTask)
+  const timingRows = getWorkflowTaskTiming(selectedTask, {
+    detail: true,
+    events: taskEventsState === 'ready' ? taskEvents : [],
+  })
+  const dueTiming = timingRows.find((row) => row.key === 'due')
+  const businessTimingRows = timingRows.filter((row) => row.key !== 'due')
   const taskReason = resolveTaskReason(selectedTask)
   const taskReasonLabel = resolveTaskReasonLabel(selectedTask)
   const exceptionContact =
@@ -233,7 +243,7 @@ export default function MobileTaskDetailScreen({
 
   return (
     <div
-      className="mobile-role-tasks-page mobile-role-tasks-page--detail surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
+      className="mobile-role-tasks-page mobile-role-tasks-page--detail md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
       data-testid="mobile-task-detail-screen"
     >
       <MobileTaskFlowHeader
@@ -251,7 +261,7 @@ export default function MobileTaskDetailScreen({
         onOpenReceipt={onViewReceipt}
         processUnavailableLabel={processUnavailableLabel}
         receiptUnavailableLabel="暂无可信回执"
-        title="任务详情"
+        title="任务信息"
         trailing={
           <span
             className={`mobile-task-flow-status shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${selectedSeverity.badgeClass}`}
@@ -261,47 +271,49 @@ export default function MobileTaskDetailScreen({
         }
       />
 
-      <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-4">
-        <section className="mobile-task-detail-hero erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="erp-task-copy-heading">
-            <h2 className="break-words text-xl font-semibold leading-7 text-slate-950 [overflow-wrap:anywhere]">
-              {getWorkflowTaskDisplayName(selectedTask)}
-            </h2>
-            <WorkflowTaskCopySummary task={selectedTask} />
-          </div>
-          <div className="mt-3">
-            <WorkflowTaskIdentity task={selectedTask} />
-          </div>
-          <div className="mt-3 flex min-w-0 items-start gap-2 text-sm leading-6 text-slate-500">
-            <FileTextOutlined className="mt-1 shrink-0" aria-hidden="true" />
-            <span className="shrink-0">来源：</span>
-            <span className="min-w-0 break-all">
-              <WorkflowTaskSource task={selectedTask} label={relatedSource} />
+      <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
+        <section className="mobile-task-detail-hero erp-mobile-card mobile-detail-section">
+          <h2>{getWorkflowTaskDisplayName(selectedTask)}</h2>
+          <div className="mobile-detail-identity">
+            {identity.first?.imageAttachmentID ? (
+              <WorkflowTaskProductImage item={identity.first} />
+            ) : null}
+            <span>
+              <WorkflowTaskSource
+                task={selectedTask}
+                label={relatedSource}
+                copyable={false}
+              />
+              {identity.first
+                ? ` · ${identity.first.name || getWorkflowTaskIdentityCode(identity.first)}${identity.compactCountLabel ? ` · ${identity.compactCountLabel}` : ''}`
+                : ''}
+              {!identity.available ? ' · 关联单据已不可用' : ''}
             </span>
           </div>
-          <EngineeringMaterialTaskSummaryEntry
-            key={selectedTask.id}
-            task={selectedTask}
-            profile={adminProfile}
-            mobile
-          />
-          <div
-            className="mobile-task-detail-meta mt-3 text-sm text-slate-600"
+          <dl
+            className="mobile-detail-facts"
             data-testid="mobile-task-detail-summary"
           >
-            <span>
-              <UserOutlined aria-hidden="true" />
-              负责：{ownerRoleLabel}
-            </span>
-          </div>
-          <WorkflowTaskTiming
-            task={selectedTask}
-            detail
-            events={taskEventsState === 'ready' ? taskEvents : []}
-          />
+            <div className="mobile-detail-fact">
+              <dt>负责岗位</dt>
+              <dd>{ownerRoleLabel}</dd>
+            </div>
+            <div className="mobile-detail-fact" data-task-time="due">
+              <dt>截止时间</dt>
+              <dd data-tone={dueTiming?.tone}>
+                {dueTiming?.dateTime ? (
+                  <time dateTime={dueTiming.dateTime} title={dueTiming.title}>
+                    {dueTiming.value}
+                  </time>
+                ) : (
+                  dueTiming?.value
+                )}
+              </dd>
+            </div>
+          </dl>
           {(isTaskRisk(selectedTask) && taskReason) || exceptionContactHint ? (
             <section
-              className="mobile-role-detail-risk mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-4 text-sm leading-6 text-red-700"
+              className="mobile-role-detail-risk mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-700"
               data-testid="mobile-task-exception-contact"
               role="note"
             >
@@ -338,43 +350,34 @@ export default function MobileTaskDetailScreen({
             </section>
           ) : null}
 
-          <div
-            className="mt-4 border-t border-slate-200 pt-3"
-            data-testid="mobile-task-attachment-action"
-          >
-            <BusinessAttachmentModalButton
-              ownerType="workflow_task"
-              ownerId={selectedTask.id}
-              ownerVersion={selectedTask.version}
-              buttonText="任务附件"
-              modalTitle="任务附件"
-              panelTitle="附件内容"
-              description={
-                canManageAttachments
-                  ? '上传照片、异常截图或处理凭证。'
-                  : '查看照片、异常截图或处理凭证。'
-              }
-              canUpload={canManageAttachments}
-              canWithdraw={canManageAttachments}
-              disabled={!selectedTask}
-              disabledReason="请先进入一条任务详情"
-              showAttachmentCount
-              buttonProps={{
-                className: 'min-h-11 w-full justify-center',
-                size: 'middle',
-              }}
-            />
+          <div className="mobile-detail-inline-actions">
+            <div data-testid="mobile-task-attachment-action">
+              <BusinessAttachmentModalButton
+                ownerType="workflow_task"
+                ownerId={selectedTask.id}
+                ownerVersion={selectedTask.version}
+                buttonText="任务附件"
+                modalTitle="任务附件"
+                panelTitle="附件内容"
+                description={
+                  canManageAttachments
+                    ? '上传照片、异常截图或处理凭证。'
+                    : '查看照片、异常截图或处理凭证。'
+                }
+                canUpload={canManageAttachments}
+                canWithdraw={canManageAttachments}
+                disabled={!selectedTask}
+                disabledReason="请先进入一条任务详情"
+                showAttachmentCount
+                buttonProps={{
+                  className: 'mobile-detail-attachment-button',
+                  size: 'middle',
+                }}
+              />
+            </div>
+            <WorkflowTaskCopySummary task={selectedTask} />
           </div>
         </section>
-
-        {completeCondition ? (
-          <section className="erp-mobile-card rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
-            <div className="text-sm font-semibold text-blue-700">完成条件</div>
-            <p className="mt-2 break-words text-base leading-7 text-slate-800">
-              {completeCondition}
-            </p>
-          </section>
-        ) : null}
 
         {actionGuidance ? (
           <section
@@ -386,47 +389,75 @@ export default function MobileTaskDetailScreen({
           </section>
         ) : null}
 
-        {factRows.length > 0 ? (
-          <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
-              <FileTextOutlined className="text-blue-500" aria-hidden="true" />
-              业务信息
-            </h2>
-            <div className="mobile-role-detail-fact-grid mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200">
-              {factRows.map(([label, value], index) => (
-                <div
-                  key={label}
-                  className={`mobile-role-detail-fact-row p-4 ${
-                    index === factRows.length - 1 && factRows.length % 2 === 1
-                      ? 'col-span-2'
-                      : ''
-                  }`}
-                >
-                  <div className="text-sm text-slate-500">{label}</div>
-                  <div className="mt-1 break-words text-base font-medium leading-6 text-slate-950">
-                    {mobileFactValueText(value)}
-                  </div>
+        {factRows.length > 0 ||
+        completeCondition ||
+        businessTimingRows.length > 0 ? (
+          <section
+            className="erp-mobile-card mobile-detail-section"
+            aria-label="业务信息"
+          >
+            <h3>业务信息</h3>
+            <dl className="mobile-detail-facts">
+              {factRows.map(([label, value]) => (
+                <div key={label} className="mobile-detail-fact">
+                  <dt>{label}</dt>
+                  <dd>{mobileFactValueText(value)}</dd>
                 </div>
               ))}
-            </div>
+              {completeCondition ? (
+                <div className="mobile-detail-fact">
+                  <dt>完成条件</dt>
+                  <dd>{completeCondition}</dd>
+                </div>
+              ) : null}
+              {businessTimingRows.map((row) => (
+                <div
+                  key={row.key}
+                  className="mobile-detail-fact"
+                  data-task-time={row.key}
+                >
+                  <dt>{row.label}</dt>
+                  <dd>
+                    {row.dateTime ? (
+                      <time dateTime={row.dateTime} title={row.title}>
+                        {row.value}
+                      </time>
+                    ) : (
+                      row.value
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {identity.items.length > 0 || !identity.available ? (
+              <details className="mobile-detail-associated">
+                <summary>查看产品与来源</summary>
+                <WorkflowTaskIdentity task={selectedTask} />
+                <WorkflowTaskSource task={selectedTask} label={relatedSource} />
+              </details>
+            ) : null}
+            <WorkflowFollowupDetails task={selectedTask} />
+            <EngineeringMaterialTaskSummaryEntry
+              key={selectedTask.id}
+              task={selectedTask}
+              profile={adminProfile}
+              mobile
+            />
           </section>
         ) : null}
 
         {canOpenProductionArrangement ? (
           <section
-            className="erp-mobile-card rounded-2xl border border-blue-200 bg-white p-4 shadow-sm"
+            className="erp-mobile-card mobile-detail-section"
             data-testid="mobile-production-arrangement-entry"
           >
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
-              <BranchesOutlined className="text-blue-500" aria-hidden="true" />
-              返工生产安排
-            </h2>
+            <h3>返工生产安排</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               为当前返工批次选择本厂生产或外发加工。保存安排后，再回到任务处理页记录本次处理结论。
             </p>
             <button
               type="button"
-              className="mt-4 min-h-11 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
+              className="mobile-detail-primary mt-4 min-h-11 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
               onClick={() => setProductionArrangementOpen(true)}
             >
               安排本厂 / 外发
@@ -439,11 +470,14 @@ export default function MobileTaskDetailScreen({
           profile={adminProfile}
           processContext={processContext}
           processContextState={processContextState}
-          onRetryProcess={() => setProcessContextReloadKey((value) => value + 1)}
+          onRetryProcess={() =>
+            setProcessContextReloadKey((value) => value + 1)
+          }
           variant="mobile"
         />
 
         <WorkflowTaskEventTrail
+          className="mobile-detail-section"
           approvalTask={approvalTask}
           errorMessage="本任务处理记录加载失败，请刷新后重试。"
           events={taskEvents}
@@ -464,11 +498,8 @@ export default function MobileTaskDetailScreen({
         ) : null}
 
         {relatedDocuments.length > 0 ? (
-          <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
-              <LinkOutlined className="text-purple-500" aria-hidden="true" />
-              相关单据（{relatedDocuments.length}）
-            </h2>
+          <section className="erp-mobile-card mobile-detail-section">
+            <h3>相关单据（{relatedDocuments.length}）</h3>
             <div className="mt-4 space-y-2">
               {relatedDocuments.map((document, index) => (
                 <div
@@ -521,19 +552,19 @@ export default function MobileTaskDetailScreen({
       ) : null}
 
       {showFooterAction ? (
-        <div className="mobile-role-action-bar border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="mobile-role-action-bar">
           {canProcessMaterial ? (
             <button
               type="button"
-              className="mobile-role-action-bar__button mobile-role-action-bar__button--done min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
+              className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
               onClick={() => onOpenAction?.()}
             >
-              处理任务 <RightOutlined aria-hidden="true" />
+              处理任务
             </button>
           ) : canOpenProcess ? (
             <button
               type="button"
-              className="mobile-role-action-bar__button mobile-role-action-bar__button--done min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
+              className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
               onClick={() =>
                 onOpenAction?.(
                   selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
@@ -541,7 +572,6 @@ export default function MobileTaskDetailScreen({
               }
             >
               {selectedCanUrge && !selectedCanOperate ? '催办任务' : '处理任务'}
-              <RightOutlined className="ml-2" aria-hidden="true" />
             </button>
           ) : canViewReceipt ? (
             <button
@@ -554,7 +584,7 @@ export default function MobileTaskDetailScreen({
           ) : retryAccess ? (
             <button
               type="button"
-              className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
+              className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
               onClick={retryAccess}
             >
               <ReloadOutlined className="mr-2" aria-hidden="true" />

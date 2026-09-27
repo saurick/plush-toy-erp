@@ -124,14 +124,8 @@ export function getSingleSelectedPurchaseOrder({
 
 export function buildPurchaseOrderStats({ orders = [], total = 0 }) {
   return [
-    { key: 'total', label: '总订单', value: total },
+    { key: 'total', label: '符合条件', value: total },
     { key: 'current', label: '本页显示', value: orders.length },
-    {
-      key: 'approved',
-      label: '已审核',
-      value: orders.filter((item) => item.lifecycle_status === 'approved')
-        .length,
-    },
   ]
 }
 

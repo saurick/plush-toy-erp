@@ -54,7 +54,7 @@ test('quantities preserve null versus zero, precision and large exact decimal va
   assert.equal(formatMaterialQuantity(null), '—')
   assert.equal(formatMaterialQuantity(''), '—')
   assert.equal(formatMaterialQuantity('0'), '0')
-  assert.equal(formatMaterialQuantity('23.999'), '24')
+  assert.equal(formatMaterialQuantity('23.999'), '23.999')
   assert.equal(
     formatMaterialQuantity('99999999999999.999999', true),
     '99,999,999,999,999.999999'

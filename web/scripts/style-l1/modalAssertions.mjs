@@ -1,7 +1,7 @@
 import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
 import assert from 'node:assert/strict'
 import {
-  assertNoBlueFocusStyle,
+  assertNoUnconfiguredFocusStyle,
   isAcceptedFocusBorder,
 } from './colorAssertions.mjs'
 
@@ -456,7 +456,7 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
   ]
   assert(
     controlRadii.length === 1 &&
-      Number.parseFloat(controlRadii[0] || '0') >= 10,
+      Number.parseFloat(controlRadii[0] || '0') === 8,
     `${scenarioName} 创建员工账号弹窗输入框圆角不一致: ${JSON.stringify(metrics)}`
   )
 }
@@ -641,7 +641,7 @@ async function assertVisibleModalInputFocusStyle(
       isAcceptedFocusBorder(metrics),
       `${scenarioName} ${metrics.label} focus 边框未统一到绿色主题: ${JSON.stringify(metrics)}`
     )
-    assertNoBlueFocusStyle(metrics, scenarioName)
+    assertNoUnconfiguredFocusStyle(metrics, scenarioName)
   })
 }
 

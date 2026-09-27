@@ -840,6 +840,12 @@ export function createDevQualityGateScenarios({
       verify: async (page) => {
         await expectHeading(page, '质量门禁')
         await page.getByText('GitLab 普通 CI 已通过', { exact: true }).waitFor()
+        assert.equal(
+          await page.getByRole('region', { name: '质量门禁操作区' })
+            .evaluate((node) => getComputedStyle(node).backgroundColor),
+          'rgb(255, 255, 255)',
+          '质量门禁导航和视图说明由同一白色操作区承载'
+        )
 
         const serverPanel = page.getByRole('region', {
           name: 'GitLab CI 质量证据',

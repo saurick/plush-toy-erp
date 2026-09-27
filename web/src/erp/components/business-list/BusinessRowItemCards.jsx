@@ -34,13 +34,12 @@ export default function BusinessRowItemCards({
   items,
   record,
   startIndex = 0,
-  view,
 }) {
   return (
-    <div className="erp-business-row-items-preview__items">
+    <div className="erp-business-detail-items__items">
       {items.map((item, localIndex) => {
         const index = startIndex + localIndex
-        const context = { index, record, view }
+        const context = { index, record }
         const fields = getItemFields?.(item, context) || []
         const label = getItemLabel?.(item, context) || `明细 ${index + 1}`
         const summary = getItemSummary?.(item, context)

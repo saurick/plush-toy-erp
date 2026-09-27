@@ -262,6 +262,8 @@ export default function SalesOrderExcelImport({
               placeholder="原表缺少单位时，统一选择单位"
               style={{ width: '100%' }}
               allowClear
+              showSearch
+              optionFilterProp="searchText"
               options={unitOptions}
               value={defaultUnitID}
               onChange={setDefaultUnitID}

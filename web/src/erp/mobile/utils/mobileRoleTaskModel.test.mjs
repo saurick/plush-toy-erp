@@ -226,10 +226,10 @@ test('mobileRoleTaskModel: 最近动态动作展示不透出技术 action key', 
   assert.equal(resolveDetailActionLabel('done'), '完成反馈（必填）')
   assert.equal(requiresMobileActionFeedback('done'), true)
   assert.equal(requiresMobileActionFeedback('blocked'), false)
-  assert.equal(resolveMobileActionLabel('blocked'), '阻塞')
-  assert.equal(resolveMobileActionLabel('block'), '阻塞')
-  assert.equal(resolveMobileActionLabel('done'), '完成')
-  assert.equal(resolveMobileActionLabel('complete'), '完成')
+  assert.equal(resolveMobileActionLabel('blocked'), '标记阻塞')
+  assert.equal(resolveMobileActionLabel('block'), '标记阻塞')
+  assert.equal(resolveMobileActionLabel('done'), '完成本岗')
+  assert.equal(resolveMobileActionLabel('complete'), '完成本岗')
   assert.equal(resolveMobileActionLabel('rejected'), '退回')
   assert.equal(resolveMobileActionLabel('reject'), '退回')
   assert.equal(resolveMobileActionLabel('urge'), '催办')
@@ -239,7 +239,7 @@ test('mobileRoleTaskModel: 最近动态动作展示不透出技术 action key', 
       action_key: 'done',
       action_label: 'unknown_action_key',
     }),
-    '完成'
+    '完成本岗'
   )
   assert.equal(
     resolveMobileActionDisplayLabel({
@@ -369,6 +369,7 @@ test('mobileRoleTaskModel: 到期状态不透出 raw due status label', () => {
 
 test('mobileRoleTaskModel: 岗位标签复用共享角色显示口径', () => {
   assert.equal(getMobileRoleLabel('warehouse'), '仓库')
+  assert.equal(getMobileRoleLabel('all'), '全部岗位')
   assert.equal(getMobileRoleLabel('quality'), '品质')
   assert.equal(getMobileRoleLabel('production'), '生产经理')
   assert.equal(getMobileRoleLabel('business'), '业务')

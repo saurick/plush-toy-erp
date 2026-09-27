@@ -7,7 +7,8 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Button, Empty, Form, Input, Select, Space } from 'antd'
+import { Button, Form, Input, Select, Space } from 'antd'
+import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTable.jsx'
 import { message } from '@/common/utils/antdApp'
 import BOMMaterialCreateModal from './BOMMaterialCreateModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
@@ -310,7 +311,9 @@ export default function BOMMaterialGroupsForm({
         {(fields, { add, remove }) => (
           <>
             {fields.length === 0 ? (
-              <Empty description="先添加一种物料，再填写它的部位和用量" />
+              <BusinessLineItemsEmpty>
+                先添加一种物料，再填写它的部位和用量
+              </BusinessLineItemsEmpty>
             ) : (
               <div
                 className="erp-bom-parts-scroll"
@@ -498,6 +501,8 @@ export default function BOMMaterialGroupsForm({
                                         aria-label={`单位 ${index + 1}`}
                                         disabled={!canEdit}
                                         options={unitOptions}
+                                        showSearch
+                                        optionFilterProp="searchText"
                                         placeholder="单位"
                                         popupMatchSelectWidth={180}
                                         onChange={(unitID) => {

@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path'
 import {
   applyBusinessColumnSorters,
   applyModuleColumnOrder,
+  applyModuleColumnVisibility,
   buildModuleColumnOrder,
   compareBusinessTableValues,
   createBusinessColumnSorter,
@@ -15,7 +16,45 @@ import {
   repositionModuleColumnOrder,
   resolveModuleColumnKey,
   sanitizeModuleColumnOrder,
+  sanitizeModuleHiddenColumns,
 } from './moduleTableColumns.mjs'
+
+test('column visibility: ignores unavailable columns and leaves the source and export definitions intact', () => {
+  const source = [
+    { dataIndex: 'code' },
+    { dataIndex: 'name' },
+    { dataIndex: 'secret', hiddenByEffectiveFieldPolicy: true },
+    { dataIndex: 'details', listHidden: true },
+    { dataIndex: 'exportOnly', hidden: true },
+  ]
+  const snapshot = structuredClone(source)
+  assert.deepEqual(sanitizeModuleHiddenColumns(['name', 'name', 'secret', 'details', 'missing'], source), ['name'])
+  assert.deepEqual(applyModuleColumnVisibility(source, ['name']), [source[0]])
+  assert.deepEqual(source, snapshot)
+  assert.deepEqual(applyModuleColumnOrder(source, ['name']).map((column) => column.dataIndex), ['name', 'code', 'details'])
+  assert.deepEqual(applyModuleColumnVisibility(source, []), source.slice(0, 2))
+})
+
+test('column visibility: preserves one usable column after definitions or permissions change', () => {
+  const source = [{ dataIndex: 'code' }, { dataIndex: 'name' }]
+  assert.deepEqual(sanitizeModuleHiddenColumns(['code', 'name'], source), ['name'])
+  assert.deepEqual(sanitizeModuleHiddenColumns(['name'], [source[1]]), [])
+  assert.deepEqual(sanitizeModuleHiddenColumns(['name'], []), [])
+  assert.deepEqual(applyModuleColumnVisibility(source, null), source)
+})
+
+test('column visibility: display-only keys retain original positions across permission filtering and reordering', () => {
+  const source = [
+    { dataIndex: 'private', hiddenByEffectiveFieldPolicy: true },
+    { title: '日期' },
+    { dataIndex: 'code' },
+    { title: '新列' },
+  ]
+  assert.deepEqual(buildModuleColumnOrder(source), ['__column__1', 'code', '__column__3'])
+  assert.deepEqual(applyModuleColumnVisibility(source, ['__column__1']), source.slice(2))
+  assert.deepEqual(moveModuleColumnOrder(['code'], source, '__column__3', -1), ['code', '__column__3', '__column__1'])
+  assert.deepEqual(applyModuleColumnOrder(source, ['__column__3', 'code']), [source[3], source[2], source[1]])
+})
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const erpSourceRoot = resolve(__dirname, '..')

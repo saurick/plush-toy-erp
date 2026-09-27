@@ -1,7 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Card, Form, Input, Space } from 'antd'
+import {
+  DesktopOutlined,
+  EyeInvisibleOutlined,
+  EyeOutlined,
+  MobileOutlined,
+} from '@ant-design/icons'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import {
   AUTH_SCOPE,
   getStoredAdminProfile,
@@ -10,6 +17,7 @@ import {
 } from '@/common/auth/auth'
 import { useAuthCapabilities } from '@/common/auth/useAuthCapabilities'
 import { getActiveERPBrand } from '@/common/consts/brand'
+import { applyERPFavicon } from '@/common/consts/favicon.mjs'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
@@ -25,7 +33,10 @@ import {
   resolveDefaultEntryTarget,
 } from '@/erp/config/entryConfig.mjs'
 import { useERPWorkspace } from '@/erp/context/ERPWorkspaceProvider'
-import { optionalMainlandMobilePhoneRule } from '@/erp/utils/contactValidation.mjs'
+import {
+  normalizeMainlandMobilePhone,
+  optionalMainlandMobilePhoneRule,
+} from '@/erp/utils/contactValidation.mjs'
 import { resolveAdminPostLoginPath } from './adminLoginRouting.mjs'
 import {
   LOGIN_MODE,
@@ -116,6 +127,18 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   const [smsNow, setSmsNow] = useState(() => Date.now())
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [passwordVisible, setPasswordVisible] = useState(false)
+  const [capsLock, setCapsLock] = useState(false)
+  const pendingRequest = useRef(false)
+  const mounted = useRef(true)
+  const busy = submitting || requestingCode
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   const authRpc = useMemo(
     () =>
@@ -138,6 +161,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   const canRequestSMSCode =
     smsLoginEnabled &&
     smsPhone.trim().length > 0 &&
+    !submitting &&
     !requestingCode &&
     smsCooldownSeconds === 0
 
@@ -148,10 +172,18 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   }
   const entryOptions = [
     canSelectDesktopEntry
-      ? { label: '电脑端业务管理', value: ENTRY_TARGET.DESKTOP }
+      ? {
+          label: '电脑版',
+          icon: <DesktopOutlined aria-hidden="true" />,
+          value: ENTRY_TARGET.DESKTOP,
+        }
       : null,
     canSelectMobileEntry
-      ? { label: '手机端待办', value: ENTRY_TARGET.MOBILE_TASKS }
+      ? {
+          label: '手机版',
+          icon: <MobileOutlined aria-hidden="true" />,
+          value: ENTRY_TARGET.MOBILE_TASKS,
+        }
       : null,
   ].filter(Boolean)
   const loginModeOptions = [
@@ -164,6 +196,14 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
     loginMode === LOGIN_MODE.SMS && (smsLoginEnabled || !authCapabilitiesLoaded)
       ? LOGIN_MODE.SMS
       : LOGIN_MODE.PASSWORD
+
+  useEffect(() => {
+    applyERPFavicon(document, '/admin-login', {
+      customerFaviconHref: activeBrand.faviconHref,
+      customerMobileFaviconHref: activeBrand.mobileFaviconHref,
+      isMobileExperience: entryTarget === ENTRY_TARGET.MOBILE_TASKS,
+    })
+  }, [activeBrand.faviconHref, activeBrand.mobileFaviconHref, entryTarget])
 
   useEffect(() => {
     if (!smsCooldownUntil) return undefined
@@ -230,7 +270,21 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   }
 
   const requestSMSCode = async () => {
-    if (!canRequestSMSCode) return
+    if (!canRequestSMSCode || pendingRequest.current || !entryTarget) return
+    const requestLocation = window.location.href
+    const isCurrentRequest = () =>
+      mounted.current && window.location.href === requestLocation
+    pendingRequest.current = true
+    try {
+      await form.validateFields(['phone'])
+    } catch {
+      pendingRequest.current = false
+      return
+    }
+    if (!isCurrentRequest()) {
+      pendingRequest.current = false
+      return
+    }
 
     setError('')
     setSmsHint('')
@@ -238,10 +292,11 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
 
     try {
       const result = await authRpc.call('send_sms_code', {
-        phone: smsPhone.trim(),
+        phone: normalizeMainlandMobilePhone(form.getFieldValue('phone')),
         scope: 'admin',
         mobile_role_key: mobileRoleForRequest,
       })
+      if (!isCurrentRequest()) return
       const data = result?.data || {}
       const resendAfter = Number(data.resend_after || 0)
       let cooldownUntil = 0
@@ -254,6 +309,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
           ? `本次登录验证码：${data.mock_code}`
           : '验证码已发送，请查看手机短信'
       setSmsHint(nextHint)
+      form.setFieldValue('code', '')
       if (data.mock_delivery && data.mock_code) {
         rememberSMSLoginSession({
           phone: smsPhone.trim(),
@@ -270,13 +326,16 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
         })
       }
     } catch (err) {
-      setError(getActionErrorMessage(err, '获取验证码'))
+      if (isCurrentRequest()) setError(getActionErrorMessage(err, '获取验证码'))
     } finally {
-      setRequestingCode(false)
+      pendingRequest.current = false
+      if (mounted.current) setRequestingCode(false)
     }
   }
 
   const onFinish = async (values) => {
+    if (pendingRequest.current) return
+    if (entryOptions.length === 0) return
     if (!entryTarget && entryOptions.length > 1) {
       setError('请选择工作方式。')
       return
@@ -286,6 +345,11 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       return
     }
 
+    // A lazy destination may keep this component mounted after the URL changes.
+    const requestLocation = window.location.href
+    const isCurrentRequest = () =>
+      mounted.current && window.location.href === requestLocation
+    pendingRequest.current = true
     setSubmitting(true)
     setError('')
 
@@ -297,12 +361,13 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
               password: values.password,
             })
           : await authRpc.call('sms_login', {
-              phone: values.phone.trim(),
+              phone: normalizeMainlandMobilePhone(values.phone),
               code: values.code.trim(),
               scope: 'admin',
               mobile_role_key: mobileRoleForRequest,
             })
 
+      if (!isCurrentRequest()) return
       persistAuth(result?.data, AUTH_SCOPE.ADMIN)
       const nextPath = resolvePostLoginPath(result?.data)
       if (!nextPath) {
@@ -312,22 +377,29 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       }
       navigate(nextPath, { replace: true })
     } catch (err) {
-      setError(getActionErrorMessage(err, '登录'))
+      if (isCurrentRequest()) setError(getActionErrorMessage(err, '登录'))
     } finally {
-      setSubmitting(false)
+      pendingRequest.current = false
+      if (mounted.current) setSubmitting(false)
     }
   }
 
+  const changeLoginMode = (value) => {
+    if (pendingRequest.current || value === activeLoginMode) return
+    setLoginMode(value)
+    rememberLoginModePreference(value)
+    setPasswordVisible(false)
+    setCapsLock(false)
+    setError('')
+    setSmsHint('')
+    form.resetFields(['password', 'code'])
+  }
+
   return (
-    <div className="erp-login-page">
-      <div className="erp-login-page__bg" />
+    <main className="erp-login-page" aria-label="登录">
+      <div className="erp-login-page__bg" aria-hidden="true" />
       <Card variant="borderless" className="erp-login-card">
-        <ERPThemeToggle
-          className="erp-login-card__theme-toggle"
-          size="large"
-          variant="menu"
-        />
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <header className="erp-login-brand-row">
           <div className="erp-login-logo">
             <span
               className="erp-admin-brand__logo-mark erp-login-logo__mark"
@@ -335,72 +407,82 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
             >
               {activeBrand.brandMark}
             </span>
-            <div className="erp-login-logo__copy">
-              <h1 className="erp-login-logo__title">
-                {activeBrand.companyName}
-              </h1>
-            </div>
+            <h1 className="erp-login-logo__title">{activeBrand.companyName}</h1>
           </div>
-
-          {error ? <Alert type="error" showIcon message={error} /> : null}
-          {entryOptions.length === 0 ? (
-            <Alert
-              type="warning"
-              showIcon
-              message="暂时无法登录，请联系系统管理员"
+          <ERPThemeToggle
+            className="erp-login-card__theme-toggle"
+            showDensity={false}
+          />
+        </header>
+        <Form
+          form={form}
+          initialValues={{ phone: initialSMSLoginSession.phone }}
+          layout="vertical"
+          requiredMark={false}
+          disabled={busy || entryOptions.length === 0}
+          aria-busy={busy}
+          onValuesChange={() => setError('')}
+          onFinish={onFinish}
+        >
+          {entryOptions.length > 1 ? (
+            <Segmented
+              aria-label="工作方式"
+              block
+              className="erp-login-segmented"
+              value={entryTarget}
+              disabled={busy}
+              onChange={(value) => {
+                if (pendingRequest.current) return
+                setEntryTarget(value)
+                rememberEntryChoice(value)
+                setError('')
+              }}
+              options={entryOptions}
             />
           ) : null}
-
-          <Form
-            form={form}
-            initialValues={{ phone: initialSMSLoginSession.phone }}
-            layout="vertical"
-            onFinish={onFinish}
+          {loginModeOptions.length > 1 ? (
+            <SlidingTabList className="erp-login-methods" aria-label="登录方式">
+              {loginModeOptions.map(({ label, value }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  id={`login-tab-${value}`}
+                  aria-controls="login-fields"
+                  aria-selected={activeLoginMode === value}
+                  disabled={busy}
+                  onClick={() => changeLoginMode(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </SlidingTabList>
+          ) : null}
+          <div
+            className="erp-login-fields"
+            id="login-fields"
+            role={loginModeOptions.length > 1 ? 'tabpanel' : 'group'}
+            aria-labelledby={
+              loginModeOptions.length > 1
+                ? `login-tab-${activeLoginMode}`
+                : undefined
+            }
+            aria-label={loginModeOptions.length > 1 ? undefined : '密码登录'}
           >
-            {entryOptions.length > 1 ? (
-              <Form.Item>
-                <Segmented
-                  aria-label="工作方式"
-                  block
-                  className="erp-login-segmented"
-                  value={entryTarget}
-                  onChange={(value) => {
-                    setEntryTarget(value)
-                    rememberEntryChoice(value)
-                    setError('')
-                  }}
-                  options={entryOptions}
-                />
-              </Form.Item>
-            ) : null}
-
-            {loginModeOptions.length > 1 ? (
-              <Form.Item>
-                <Segmented
-                  block
-                  className="erp-login-segmented"
-                  value={loginMode}
-                  onChange={(value) => {
-                    setLoginMode(value)
-                    rememberLoginModePreference(value)
-                    setError('')
-                    setSmsHint('')
-                  }}
-                  options={loginModeOptions}
-                />
-              </Form.Item>
-            ) : null}
-
             {activeLoginMode === LOGIN_MODE.PASSWORD ? (
               <>
                 <Form.Item
                   label="账号"
                   name="username"
-                  rules={[{ required: true, message: '请输入账号' }]}
+                  rules={[
+                    { required: true, whitespace: true, message: '请输入账号' },
+                  ]}
                 >
                   <Input
                     placeholder="请输入账号"
                     autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     size="large"
                   />
                 </Form.Item>
@@ -409,10 +491,34 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
                   name="password"
                   rules={[{ required: true, message: '请输入密码' }]}
                 >
-                  <Input.Password
+                  <Input
+                    type={passwordVisible ? 'text' : 'password'}
                     placeholder="请输入密码"
                     autoComplete="current-password"
                     size="large"
+                    onKeyDown={(event) =>
+                      setCapsLock(event.getModifierState('CapsLock'))
+                    }
+                    onKeyUp={(event) =>
+                      setCapsLock(event.getModifierState('CapsLock'))
+                    }
+                    onBlur={() => setCapsLock(false)}
+                    suffix={
+                      <button
+                        className="erp-login-password-toggle"
+                        type="button"
+                        aria-label={passwordVisible ? '隐藏密码' : '显示密码'}
+                        aria-pressed={passwordVisible}
+                        disabled={busy || entryOptions.length === 0}
+                        onClick={() => setPasswordVisible((value) => !value)}
+                      >
+                        {passwordVisible ? (
+                          <EyeOutlined />
+                        ) : (
+                          <EyeInvisibleOutlined />
+                        )}
+                      </button>
+                    }
                   />
                 </Form.Item>
               </>
@@ -435,6 +541,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
                       const nextPhone = event.target.value
                       setSmsPhone(nextPhone)
                       setSmsHint('')
+                      form.setFieldValue('code', '')
                       if (smsCooldownUntil > Date.now()) {
                         rememberSMSLoginSession({
                           phone: nextPhone,
@@ -446,17 +553,15 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
                     }}
                   />
                 </Form.Item>
-                <Form.Item label="验证码" required>
-                  <Space.Compact
-                    className="erp-login-sms-code-compact"
-                    style={{ width: '100%' }}
-                  >
+                <Form.Item label="验证码" htmlFor="login-code" required>
+                  <Space.Compact className="erp-login-sms-code-compact">
                     <Form.Item
                       name="code"
                       noStyle
                       rules={[{ required: true, message: '请输入验证码' }]}
                     >
                       <Input
+                        id="login-code"
                         placeholder="请输入验证码"
                         autoComplete="one-time-code"
                         inputMode="numeric"
@@ -467,7 +572,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
                       htmlType="button"
                       size="large"
                       loading={requestingCode}
-                      disabled={!canRequestSMSCode}
+                      disabled={!canRequestSMSCode || !entryTarget}
                       onClick={requestSMSCode}
                     >
                       {smsCooldownSeconds > 0
@@ -476,36 +581,52 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
                     </Button>
                   </Space.Compact>
                 </Form.Item>
-                {smsHint ? (
-                  <Alert
-                    className="erp-login-sms-hint"
-                    type="info"
-                    showIcon
-                    message={smsHint}
-                  />
-                ) : null}
               </>
             )}
-            <Form.Item style={{ marginBottom: 4 }}>
-              <Button
-                type="primary"
-                htmlType="submit"
-                size="large"
-                block
-                loading={submitting}
-              >
-                登录
-              </Button>
-            </Form.Item>
-          </Form>
-          <nav className="erp-login-legal-links" aria-label="隐私与使用规则">
-            <span>使用系统前可查阅</span>
-            <Link to="/legal/privacy">个人信息处理规则</Link>
-            <span aria-hidden="true">·</span>
-            <Link to="/legal/system-rules">系统使用规则</Link>
-          </nav>
-        </Space>
+          </div>
+          <div
+            className="erp-login-feedback"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {error ? <Alert type="error" showIcon message={error} /> : null}
+            {entryOptions.length === 0 ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="暂时无法登录，请联系系统管理员"
+              />
+            ) : null}
+            {capsLock && activeLoginMode === LOGIN_MODE.PASSWORD && !error ? (
+              <p>大写锁定已开启</p>
+            ) : null}
+            {smsHint && activeLoginMode === LOGIN_MODE.SMS && !error ? (
+              <Alert
+                className="erp-login-sms-hint"
+                type="info"
+                showIcon
+                message={smsHint}
+              />
+            ) : null}
+          </div>
+          <Button
+            className="erp-login-submit"
+            type="primary"
+            htmlType="submit"
+            size="large"
+            block
+            loading={submitting}
+            disabled={busy || entryOptions.length === 0}
+          >
+            {submitting ? '正在登录…' : '登录'}
+          </Button>
+        </Form>
+        <nav className="erp-login-legal-links" aria-label="隐私与使用规则">
+          <Link to="/legal/privacy">个人信息处理规则</Link>
+          <span aria-hidden="true">·</span>
+          <Link to="/legal/system-rules">系统使用规则</Link>
+        </nav>
       </Card>
-    </div>
+    </main>
   )
 }

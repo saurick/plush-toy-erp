@@ -12,6 +12,12 @@ import {
   Typography,
 } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import BusinessCompactFieldTable, {
+  BusinessCompactFieldRow,
+} from '../components/business-list/BusinessCompactFieldTable.jsx'
+import useBusinessPageState from '../hooks/useBusinessPageState.js'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -237,7 +243,10 @@ export default function FinancePaymentsPage() {
   const linkedFinancePaymentID = Number(
     searchParams.get('finance_payment_id') || 0
   )
-  const [activeTab, setActiveTab] = useState('payments')
+  const [activeTab, setActiveTab] = useBusinessPageState(
+    'activeTab',
+    'payments'
+  )
   const [currentPayment, setCurrentPayment] = useState(null)
   const [currentCredit, setCurrentCredit] = useState(null)
   const [payments, setPayments] = useState([])
@@ -253,20 +262,35 @@ export default function FinancePaymentsPage() {
   })
   const [referenceLoading, setReferenceLoading] = useState(false)
   const [paymentTotal, setPaymentTotal] = useState(0)
+  const [paymentStatusCounts, setPaymentStatusCounts] = useState(null)
   const [creditTotal, setCreditTotal] = useState(0)
-  const [paymentPagination, setPaymentPagination] = useState({
-    current: 1,
-    pageSize: 20,
-  })
-  const [creditPagination, setCreditPagination] = useState({
-    current: 1,
-    pageSize: 20,
-  })
-  const [paymentKeyword, setPaymentKeyword] = useState('')
-  const [creditKeyword, setCreditKeyword] = useState('')
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState('')
-  const [paymentDirectionFilter, setPaymentDirectionFilter] = useState('')
-  const [creditStatusFilter, setCreditStatusFilter] = useState('')
+  const [creditStatusCounts, setCreditStatusCounts] = useState(null)
+  const [paymentPagination, setPaymentPagination] = useBusinessPageState(
+    'paymentPagination',
+    { current: 1, pageSize: 20 }
+  )
+  const [creditPagination, setCreditPagination] = useBusinessPageState(
+    'creditPagination',
+    { current: 1, pageSize: 20 }
+  )
+  const [paymentKeyword, setPaymentKeyword] = useBusinessPageState(
+    'paymentKeyword',
+    ''
+  )
+  const [creditKeyword, setCreditKeyword] = useBusinessPageState(
+    'creditKeyword',
+    ''
+  )
+  const [paymentStatusFilter, setPaymentStatusFilter] = useBusinessPageState(
+    'paymentStatusFilter',
+    ''
+  )
+  const [paymentDirectionFilter, setPaymentDirectionFilter] =
+    useBusinessPageState('paymentDirectionFilter', '')
+  const [creditStatusFilter, setCreditStatusFilter] = useBusinessPageState(
+    'creditStatusFilter',
+    ''
+  )
   const [paymentDetail, setPaymentDetail] = useState(null)
   const [creditDetail, setCreditDetail] = useState(null)
   const [paymentOpen, setPaymentOpen] = useState(false)
@@ -345,9 +369,11 @@ export default function FinancePaymentsPage() {
   const loadPaymentRows = useCallback(async () => {
     const request = beginLatestRequest('finance-payment-list')
     setTableLoading((current) => ({ ...current, payments: true }))
+    setPaymentStatusCounts(null)
     try {
       const result = await listFinancePayments(
         compactParams({
+          include_status_counts: true,
           status: paymentStatusFilter,
           keyword: paymentKeyword.trim(),
           direction: paymentDirectionFilter,
@@ -359,6 +385,7 @@ export default function FinancePaymentsPage() {
       const nextRows = Array.isArray(result?.payments) ? result.payments : []
       setPayments(nextRows)
       setPaymentTotal(Number(result?.total || 0))
+      setPaymentStatusCounts(resolveBusinessStatusCounts(result))
       setCurrentPayment((current) =>
         current?.id
           ? nextRows.find((item) => Number(item.id) === Number(current.id)) ||
@@ -385,9 +412,11 @@ export default function FinancePaymentsPage() {
   const loadCreditRows = useCallback(async () => {
     const request = beginLatestRequest('finance-credit-list')
     setTableLoading((current) => ({ ...current, credits: true }))
+    setCreditStatusCounts(null)
     try {
       const result = await listFinanceCreditNotes(
         compactParams({
+          include_status_counts: true,
           status: creditStatusFilter,
           keyword: creditKeyword.trim(),
           ...getBusinessPaginationParams(creditPagination),
@@ -400,6 +429,7 @@ export default function FinancePaymentsPage() {
         : []
       setCreditNotes(nextRows)
       setCreditTotal(Number(result?.total || 0))
+      setCreditStatusCounts(resolveBusinessStatusCounts(result))
       setCurrentCredit((current) =>
         current?.id
           ? nextRows.find((item) => Number(item.id) === Number(current.id)) ||
@@ -522,12 +552,13 @@ export default function FinancePaymentsPage() {
       Number.isSafeInteger(linkedFinancePaymentID) &&
       linkedFinancePaymentID > 0
     ) {
+      setActiveTab('payments')
       recoverPayment(linkedFinancePaymentID)
     } else if (storageKey) {
       const paymentID = Number(window.sessionStorage.getItem(storageKey) || 0)
       if (paymentID > 0) recoverPayment(paymentID, true)
     }
-  }, [linkedFinancePaymentID, recoverPayment, storageKey])
+  }, [linkedFinancePaymentID, recoverPayment, setActiveTab, storageKey])
   useEffect(
     () => outletContext?.registerPageRefresh?.(loadReferences),
     [loadReferences, outletContext]
@@ -689,9 +720,7 @@ export default function FinancePaymentsPage() {
     allocationForm.setFieldsValue({
       allocations: allocationCandidates.map((fact) => ({
         finance_fact_id: fact.id,
-        label: `${fact.fact_no || '财务记录'} / 未核销 ${
-          fact.outstanding_amount || '0'
-        } / 原金额 ${fact.amount || '-'} ${fact.currency || ''}`,
+        label: `${fact.fact_no || '财务记录'} / 原金额 ${fact.amount || '-'} ${fact.currency || ''}`,
         outstanding_amount: fact.outstanding_amount,
         amount: '',
       })),
@@ -1408,7 +1437,7 @@ export default function FinancePaymentsPage() {
           <BusinessOperationPanel
             compact
             filters={
-              <Space wrap>
+              <>
                 <SearchInput
                   {...BUSINESS_SEARCH_SCOPES.payment}
                   value={paymentKeyword}
@@ -1420,7 +1449,11 @@ export default function FinancePaymentsPage() {
                     }))
                   }}
                 />
-                <SelectFilter
+                <BusinessStatusFilter
+                  inline
+                  aria-label="收付款状态"
+                  counts={paymentStatusCounts}
+                  loading={tableLoading.payments}
                   className="erp-business-filter-control--status"
                   value={paymentStatusFilter}
                   options={PAYMENT_STATUS_OPTIONS}
@@ -1444,7 +1477,7 @@ export default function FinancePaymentsPage() {
                     }))
                   }}
                 />
-              </Space>
+              </>
             }
             actions={
               <BusinessListToolbarActions
@@ -1658,7 +1691,7 @@ export default function FinancePaymentsPage() {
           <BusinessOperationPanel
             compact
             filters={
-              <Space wrap>
+              <>
                 <SearchInput
                   {...BUSINESS_SEARCH_SCOPES.credit}
                   value={creditKeyword}
@@ -1670,7 +1703,11 @@ export default function FinancePaymentsPage() {
                     }))
                   }}
                 />
-                <SelectFilter
+                <BusinessStatusFilter
+                  inline
+                  aria-label="红冲状态"
+                  counts={creditStatusCounts}
+                  loading={tableLoading.credits}
                   className="erp-business-filter-control--status"
                   value={creditStatusFilter}
                   options={CREDIT_STATUS_OPTIONS}
@@ -1682,7 +1719,7 @@ export default function FinancePaymentsPage() {
                     }))
                   }}
                 />
-              </Space>
+              </>
             }
             actions={
               <BusinessListToolbarActions
@@ -1944,44 +1981,69 @@ export default function FinancePaymentsPage() {
         >
           <Form.List name="allocations">
             {(fields) => (
-              <Space
-                direction="vertical"
-                style={{ width: '100%', marginTop: 16 }}
+              <BusinessCompactFieldTable
+                label="核销明细"
+                columns={[
+                  { label: '应收 / 应付' },
+                  { label: '未核销余额', width: '23%' },
+                  {
+                    label: (
+                      <BusinessHelpLabel
+                        itemKey="allocation-amount"
+                        label="本次核销金额"
+                        pageKey="finance-payments"
+                      />
+                    ),
+                    width: '23%',
+                  },
+                ]}
               >
                 {fields.map((field) => (
-                  <Space key={field.key} align="start" wrap>
-                    <Form.Item name={[field.name, 'finance_fact_id']} hidden>
-                      <Input />
-                    </Form.Item>
-                    <Form.Item name={[field.name, 'label']} label="应收 / 应付">
-                      <Input disabled style={{ width: 360 }} />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'amount']}
-                      label={
-                        <BusinessHelpLabel
-                          itemKey="allocation-amount"
-                          label="本次核销金额"
-                          pageKey="finance-payments"
-                        />
-                      }
-                      rules={[
-                        {
-                          validator: (_, value) =>
-                            !String(value || '').trim() ||
-                            isPositiveNumeric20Scale6Units(
-                              numeric20Scale6Units(value)
-                            )
-                              ? Promise.resolve()
-                              : Promise.reject(new Error('金额必须大于 0')),
-                        },
-                      ]}
-                    >
-                      <Input inputMode="decimal" style={{ width: 180 }} />
-                    </Form.Item>
-                  </Space>
+                  <BusinessCompactFieldRow
+                    key={field.key}
+                    label={`核销明细 ${field.name + 1}`}
+                    cells={[
+                      <>
+                        <Form.Item
+                          name={[field.name, 'finance_fact_id']}
+                          hidden
+                        >
+                          <Input />
+                        </Form.Item>
+                        <Form.Item
+                          name={[field.name, 'label']}
+                          label="应收 / 应付"
+                        >
+                          <Input disabled />
+                        </Form.Item>
+                      </>,
+                      <Form.Item
+                        name={[field.name, 'outstanding_amount']}
+                        label="未核销余额"
+                      >
+                        <Input disabled />
+                      </Form.Item>,
+                      <Form.Item
+                        name={[field.name, 'amount']}
+                        label="本次核销金额"
+                        rules={[
+                          {
+                            validator: (_, value) =>
+                              !String(value || '').trim() ||
+                              isPositiveNumeric20Scale6Units(
+                                numeric20Scale6Units(value)
+                              )
+                                ? Promise.resolve()
+                                : Promise.reject(new Error('金额必须大于 0')),
+                          },
+                        ]}
+                      >
+                        <Input inputMode="decimal" />
+                      </Form.Item>,
+                    ]}
+                  />
                 ))}
-              </Space>
+              </BusinessCompactFieldTable>
             )}
           </Form.List>
         </Form>

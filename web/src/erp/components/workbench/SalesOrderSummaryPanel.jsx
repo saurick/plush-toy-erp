@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Space, Tag } from 'antd'
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DownloadOutlined } from '@ant-design/icons'
 import {
   useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import useLiveSearch from '@/common/hooks/useLiveSearch'
 import {
   listSalesOrderSummary,
   listAllSalesOrderSummary,
@@ -45,8 +46,7 @@ const statusLabel = (row) => {
 }
 
 function SearchFilter({ label, placeholder = label, value, onSearch }) {
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
+  const search = useLiveSearch({ value, onSearch })
   return (
     <SearchInput
       type="search"
@@ -54,17 +54,16 @@ function SearchFilter({ label, placeholder = label, value, onSearch }) {
       placeholder={placeholder}
       allowClear
       maxLength={100}
-      value={draft}
-      onChange={(event) => {
-        setDraft(event.target.value)
-        if (!event.target.value) onSearch('')
-      }}
-      onPressEnter={() => onSearch(draft.trim())}
+      value={search.value}
+      onChange={search.onChange}
+      onCompositionStart={search.onCompositionStart}
+      onCompositionEnd={search.onCompositionEnd}
+      onPressEnter={search.onPressEnter}
     />
   )
 }
 
-export default function SalesOrderSummaryPanel() {
+export default function SalesOrderSummaryPanel({ refreshRevision = 0 }) {
   const { adminProfile } = useOutletContext() || {}
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -95,7 +94,7 @@ export default function SalesOrderSummaryPanel() {
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [requestKey, revision])
+  }, [requestKey, revision, refreshRevision])
 
   const columns = [
     {
@@ -254,6 +253,7 @@ export default function SalesOrderSummaryPanel() {
         filters={
           <>
             <SearchFilter
+              primarySearch
               label="搜索订单号、产品名称或款号"
               placeholder="订单号、产品或款号"
               value={filters.keyword}
@@ -302,13 +302,6 @@ export default function SalesOrderSummaryPanel() {
         }
         actions={
           <Space wrap>
-            <Button
-              icon={<ReloadOutlined aria-hidden="true" />}
-              loading={loading}
-              onClick={() => setRevision((value) => value + 1)}
-            >
-              刷新
-            </Button>
             <Button
               icon={<DownloadOutlined aria-hidden="true" />}
               loading={exporting}

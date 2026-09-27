@@ -11,24 +11,31 @@ function readRepoFile(relativePath) {
 
 test('HelpCenterPage: 使用当前账号岗位和已开放页面生成帮助', () => {
   const source = readRepoFile('web/src/erp/pages/HelpCenterPage.jsx')
+  const content = readRepoFile(
+    'web/src/erp/components/help/HelpScenarioContent.jsx'
+  )
 
   assert.match(source, /useOutletContext\(\)/u)
   assert.match(source, /getRoleHelpGuidesForProfile\(adminProfile/u)
-  assert.match(source, /filterRoleHelpPriorities\(selectedGuide/u)
-  assert.match(source, /priority\.available/u)
+  assert.match(source, /getRoleHelpScenarios\(selectedGuide/u)
+  assert.match(source, /selectedScenario\.available/u)
+  assert.match(source, /allowedMenuPaths: visibleMenuPaths/u)
   assert.match(source, /data-role-help-key=\{selectedGuide\.key\}/u)
   assert.match(source, /htmlFor="erp-help-center-role-select"/u)
   assert.match(source, /id="erp-help-center-role-select"/u)
-  assert.match(source, /当前岗位没有常用入口/u)
-  assert.match(source, /正常怎么做/u)
-  assert.match(source, /完成标准/u)
-  assert.match(source, /遇到异常怎么办/u)
-  assert.match(source, /退回对象/u)
-  assert.match(source, /异常完成标准/u)
-  assert.match(source, /特别注意/u)
-  assert.match(source, /selectedGuide\.exception\.steps/u)
+  assert.match(source, /当前账号未开放此页面/u)
+  assert.match(content, /办理概览/u)
+  assert.match(content, /完成后应看到/u)
+  assert.match(content, /遇到异常/u)
+  assert.match(content, /处理后怎样继续/u)
+  assert.match(content, /scenario\.exception\.action/u)
+  assert.match(content, /SlidingSegmented/u)
+  assert.match(
+    source,
+    /key=\{`\$\{selectedGuide.key\}:\$\{selectedScenario.key\}`\}/u
+  )
   assert.match(source, /切换这里只查看说明/u)
-  assert.match(source, /查看其他岗位说明/u)
+  assert.match(source, /查看岗位/u)
   assert.match(source, /不改变岗位或权限/u)
   assert.doesNotMatch(source, /<Alert|showIcon/u)
   assert.doesNotMatch(source, /常见问题/u)
@@ -62,7 +69,10 @@ test('HelpCenterPage: 通用帮助由登录壳追加且不依赖业务权限项'
     layoutSource,
     /currentEntry\?\.sidebarParentPath \|\| currentNavigationEntry\.menuPath/u
   )
-  assert.match(layoutSource, /item\.path === currentSidebarPath/u)
+  assert.match(
+    layoutSource,
+    /\(item\.sidebarKey \|\| item\.path\) === currentSidebarPath/u
+  )
   assert.doesNotMatch(
     layoutSource,
     /roleGuidedNavigation\.secondaryItems\.some\([\s\S]*item\.path === currentMenuPath/u

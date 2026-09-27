@@ -1,31 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  KeyOutlined,
-  SafetyCertificateOutlined,
-  StopOutlined,
-  UserSwitchOutlined,
-} from '@ant-design/icons'
 import { useOutletContext } from 'react-router-dom'
-import {
-  Alert,
-  Button,
-  Drawer,
-  Empty,
-  Grid,
-  Pagination,
-  Select,
-  Tag,
-  Typography,
-} from 'antd'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
+import { Alert, Button, Drawer, Grid, Tag, Typography } from 'antd'
 import { AUTH_SCOPE } from '@/common/auth/auth'
-import SearchInput from '@/common/components/SearchInput'
-import { Loading } from '@/common/components/loading'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
-import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError, JsonRpc } from '@/common/utils/jsonRpc'
-import { DateInput } from '../components/business-list/BusinessListLayout.jsx'
+import {
+  BusinessDataTable,
+  BusinessOperationPanel,
+  BusinessPageLayout,
+  DateInput,
+  PageHeaderCard,
+  SearchInput,
+  SelectFilter,
+} from '../components/business-list/BusinessListLayout.jsx'
+import {
+  BusinessListToolbarActions,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
+import { getAuditChanges, summarizeChange } from '../utils/auditLogChanges.mjs'
+import '../styles/app/audit-records.css'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { buildAuditActionSelectOptions } from '../utils/auditActionSelectOptions.mjs'
 import { buildAuditLogParams } from '../utils/auditLogParams.mjs'
@@ -153,70 +150,12 @@ const sourceOptions = [
 
 const actionOptions = buildAuditActionSelectOptions(actionMetaMap)
 
-const quickLocateActions = [
-  { key: 'admin_user.password.reset', icon: <KeyOutlined /> },
-  { key: 'admin_user.disabled.set', icon: <StopOutlined /> },
-  { key: 'role.permissions.set', icon: <SafetyCertificateOutlined /> },
-  { key: 'admin_user.roles.set', icon: <UserSwitchOutlined /> },
-]
-
 const riskOptions = [
-  { label: '全部', value: 'all' },
+  { label: '全部风险（本页）', value: 'all' },
   { label: '高风险', value: 'high' },
   { label: '需核对', value: 'warning' },
   { label: '常规', value: 'normal' },
 ]
-
-const fieldLabelMap = {
-  account_status: '账号状态',
-  disabled: '账号状态',
-  is_super_admin: '超级管理员',
-  name: '岗位名称',
-  phone: '手机号',
-  role_type: '岗位类型',
-  role_keys: '岗位',
-  permission_keys: '可用功能',
-  password_reset: '密码',
-  password_changed: '密码',
-  reset_to_default: '重置方式',
-  session_revoke_reason: '登录状态',
-  status_reason: '状态说明',
-  version: '岗位信息',
-}
-
-const visibleAuditChangeKeys = new Set(Object.keys(fieldLabelMap))
-
-const accountStatusLabelMap = Object.freeze({
-  ACTIVE: '正常使用',
-  DISABLED: '已停用',
-  REVOKED: '已注销',
-})
-
-const roleTypeLabelMap = Object.freeze({
-  BUILTIN: '系统岗位',
-  CUSTOM: '自定义岗位',
-})
-
-const technicalAuditValueKeys = new Set([
-  'id',
-  'actor_id',
-  'target_id',
-  'source_id',
-  'source_line_id',
-  'source_type',
-  'owner_role_key',
-  'task_status_key',
-  'payload',
-])
-
-function isTechnicalAuditValueKey(key) {
-  const normalized = String(key || '').trim()
-  if (!normalized) return false
-  return (
-    technicalAuditValueKeys.has(normalized) ||
-    /(?:^|_)(?:id|key)$/u.test(normalized)
-  )
-}
 
 function normalizeAuditEvents(events = []) {
   return Array.isArray(events)
@@ -234,12 +173,12 @@ function formatTime(event = {}) {
   if (event.created_at_iso) {
     const date = new Date(event.created_at_iso)
     if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleString()
+      return date.toLocaleString('zh-CN', { hour12: false })
     }
   }
   const unix = Number(event.created_at || 0)
   if (unix > 0) {
-    return new Date(unix * 1000).toLocaleString()
+    return new Date(unix * 1000).toLocaleString('zh-CN', { hour12: false })
   }
   return '-'
 }
@@ -333,71 +272,6 @@ function getEventTargetTypeText(event = {}) {
   )
 }
 
-function compactValue(value, key) {
-  if (value === null || value === undefined) {
-    return '-'
-  }
-  if (key === 'disabled') {
-    return value ? '已禁用' : '已启用'
-  }
-  if (key === 'password_reset') {
-    return value ? '已重置' : '未重置'
-  }
-  if (key === 'password_changed') {
-    return value ? '本人已修改' : '修改前'
-  }
-  if (key === 'reset_to_default') {
-    return value ? '默认密码' : '指定新密码'
-  }
-  if (key === 'account_status') {
-    return accountStatusLabelMap[String(value || '').toUpperCase()] || '已更新'
-  }
-  if (key === 'role_type') {
-    return roleTypeLabelMap[String(value || '').toUpperCase()] || '已更新'
-  }
-  if (key === 'status_reason' || key === 'session_revoke_reason') {
-    return value ? '已填写' : '-'
-  }
-  if (key === 'version') {
-    return value ? '已更新' : '-'
-  }
-  if (typeof value === 'boolean') {
-    return value ? '是' : '否'
-  }
-  if (Array.isArray(value)) {
-    return value.length > 0 ? `${value.length} 项` : '-'
-  }
-  if (typeof value === 'object') {
-    return '已记录'
-  }
-  return isTechnicalAuditValueKey(key) ? '已记录' : String(value)
-}
-
-function getAuditFieldLabel(key) {
-  return fieldLabelMap[key] || '字段变更'
-}
-
-function summarizeChange(payload = {}) {
-  const before = payload.before || {}
-  const after = payload.after || {}
-  const keys = [
-    ...new Set([...Object.keys(before || {}), ...Object.keys(after || {})]),
-  ].filter((key) => visibleAuditChangeKeys.has(key))
-  if (keys.length === 0) {
-    return '本次操作已记录'
-  }
-  return keys
-    .slice(0, 4)
-    .map(
-      (key) =>
-        `${getAuditFieldLabel(key)}：${compactValue(
-          before[key],
-          key
-        )} → ${compactValue(after[key], key)}`
-    )
-    .join('；')
-}
-
 function getAuditChangeSummary(event = {}) {
   if (event.event_key === 'admin_bootstrap.completed') {
     return '系统已准备完成'
@@ -469,73 +343,73 @@ function buildAuditConclusion(event = {}) {
   return `${actor} 对 ${target} 执行了 ${meta.label}`
 }
 
-function countByRisk(events = []) {
-  return events.reduce(
-    (summary, event) => {
-      const { risk } = getActionMeta(event)
-      summary[risk] = (summary[risk] || 0) + 1
-      summary.total += 1
-      return summary
-    },
-    { total: 0, high: 0, warning: 0, normal: 0 }
-  )
-}
-
 function getEventDomId(event = {}) {
   return event.id || `${event.event_key || 'event'}-${event.created_at || ''}`
 }
 
 function AuditEventDetail({ event }) {
-  if (!event) {
-    return (
-      <Empty
-        description="选择一条操作记录后查看详情"
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
-      />
-    )
-  }
-
+  if (!event) return null
+  const changes = getAuditChanges(event.payload)
   return (
-    <>
-      <div className="erp-audit-detail__head">
+    <div className="erp-audit-record-detail">
+      <section aria-label="操作概况">
         <Tag color={riskColorMap[getActionMeta(event).risk]}>
           {riskLabelMap[getActionMeta(event).risk]}
         </Tag>
         <Title level={5}>{buildAuditConclusion(event)}</Title>
-        <Text type="secondary">{formatTime(event)}</Text>
-      </div>
-      <div className="erp-audit-next-step">
-        <Text type="secondary">下一步</Text>
+        <dl className="erp-audit-record-detail__facts">
+          <dt>发生时间</dt>
+          <dd>{formatTime(event)}</dd>
+          <dt>操作人</dt>
+          <dd>{getEventActorText(event)}</dd>
+          <dt>业务对象</dt>
+          <dd>
+            {getEventTargetText(event)}（{getEventTargetTypeText(event)}）
+          </dd>
+          <dt>操作来源</dt>
+          <dd>{getSourceLabel(event.source)}</dd>
+        </dl>
+      </section>
+      <section aria-label="字段变化">
+        <Title level={5}>字段变化</Title>
+        {changes.length ? (
+          <div className="erp-audit-record-detail__changes">
+            <table>
+              <thead>
+                <tr>
+                  <th>字段</th>
+                  <th>修改前</th>
+                  <th>修改后</th>
+                </tr>
+              </thead>
+              <tbody>
+                {changes.map((change) => (
+                  <tr key={change.key}>
+                    <th scope="row">{change.label}</th>
+                    <td>{change.before}</td>
+                    <td>{change.after}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Text type="secondary">{getAuditChangeSummary(event)}</Text>
+        )}
+      </section>
+      <section aria-label="核对建议">
+        <Title level={5}>核对建议</Title>
         <Paragraph>{getActionMeta(event).next}</Paragraph>
-      </div>
-      <div className="erp-audit-facts">
-        <div>
-          <span>操作人</span>
-          <strong>{getEventActorText(event)}</strong>
-        </div>
-        <div>
-          <span>相关账号或岗位</span>
-          <strong>{getEventTargetText(event)}</strong>
-          <em>{getEventTargetTypeText(event)}</em>
-        </div>
-        <div>
-          <span>操作来源</span>
-          <strong>{getSourceLabel(event.source)}</strong>
-        </div>
-        <div>
-          <span>修改内容</span>
-          <strong>{getAuditChangeSummary(event)}</strong>
-        </div>
-      </div>
-    </>
+      </section>
+    </div>
   )
 }
 
 export default function AuditLogsPage() {
   const outletContext = useOutletContext()
+  const adminProfile = outletContext?.adminProfile
   const beginLatestRequest = useLatestRequestCoordinator()
   const screens = Grid.useBreakpoint()
-  const compactAuditLayout = !screens.lg
   const eventTriggerRef = useRef(null)
   const focusRestoreTimerRef = useRef(null)
   const adminRpc = useMemo(
@@ -547,7 +421,6 @@ export default function AuditLogsPage() {
       }),
     []
   )
-
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [events, setEvents] = useState([])
@@ -564,7 +437,6 @@ export default function AuditLogsPage() {
     current: 1,
     pageSize: DEFAULT_PAGE_SIZE,
   })
-
   const filteredEvents = useMemo(
     () =>
       events.filter(
@@ -573,24 +445,29 @@ export default function AuditLogsPage() {
       ),
     [events, riskFilter]
   )
-  const riskSummary = useMemo(() => countByRisk(events), [events])
-  const selectedEvent = useMemo(
+  const selectedEvent =
+    filteredEvents.find((event) => getEventDomId(event) === selectedEventId) ||
+    null
+  const dateRangeInvalid = Boolean(
+    createdFrom && createdTo && createdFrom > createdTo
+  )
+  const queryParams = useMemo(
     () =>
-      filteredEvents.find(
-        (event) => getEventDomId(event) === selectedEventId
-      ) ||
-      filteredEvents[0] ||
-      null,
-    [filteredEvents, selectedEventId]
+      buildAuditLogParams({
+        source,
+        eventKey,
+        keyword,
+        createdFrom,
+        createdTo,
+      }),
+    [source, eventKey, keyword, createdFrom, createdTo]
   )
 
   const restoreEventTriggerFocus = useCallback(() => {
-    const trigger = eventTriggerRef.current?.isConnected
-      ? eventTriggerRef.current
-      : document.querySelector('.erp-audit-event--selected')
+    const trigger = eventTriggerRef.current
     const { activeElement } = document
     if (
-      !trigger ||
+      !trigger?.isConnected ||
       (activeElement &&
         activeElement !== document.body &&
         activeElement !== trigger &&
@@ -601,14 +478,12 @@ export default function AuditLogsPage() {
     trigger.focus({ preventScroll: true })
     return document.activeElement === trigger
   }, [])
-
   const clearFocusRestoreTimer = useCallback(() => {
     if (focusRestoreTimerRef.current !== null) {
       window.clearTimeout(focusRestoreTimerRef.current)
       focusRestoreTimerRef.current = null
     }
   }, [])
-
   const closeDetailDrawer = useCallback(() => {
     setDetailDrawerOpen(false)
     clearFocusRestoreTimer()
@@ -618,24 +493,31 @@ export default function AuditLogsPage() {
       restoreEventTriggerFocus()
     }, DRAWER_FOCUS_RESTORE_FALLBACK_MS)
   }, [clearFocusRestoreTimer, restoreEventTriggerFocus])
+  const openDetail = useCallback((record, event) => {
+    const trigger = event?.currentTarget || document.activeElement
+    eventTriggerRef.current =
+      trigger?.querySelector?.('[data-audit-detail-trigger]') || trigger
+    setSelectedEventId(getEventDomId(record))
+    setDetailDrawerOpen(true)
+  }, [])
 
   const loadData = useCallback(async () => {
     const request = beginLatestRequest('audit-logs')
     setLoading(true)
     setLoadError('')
+    setEvents([])
+    setTotal(0)
+    setSelectedEventId(null)
+    setDetailDrawerOpen(false)
     try {
-      const offset = (pagination.current - 1) * pagination.pageSize
+      if (dateRangeInvalid) return false
       const result = await adminRpc.call(
         'audit_logs',
-        buildAuditLogParams({
-          source,
-          eventKey,
-          keyword,
-          createdFrom,
-          createdTo,
-          pageSize: pagination.pageSize,
-          offset,
-        }),
+        {
+          ...queryParams,
+          limit: pagination.pageSize,
+          offset: (pagination.current - 1) * pagination.pageSize,
+        },
         { signal: request.signal }
       )
       if (!request.isCurrent()) {
@@ -649,12 +531,7 @@ export default function AuditLogsPage() {
         return false
       }
       const errorMessage = getActionErrorMessage(err, '加载操作记录')
-      setEvents([])
-      setTotal(0)
-      setSelectedEventId(null)
-      setDetailDrawerOpen(false)
       setLoadError(errorMessage)
-      message.error(errorMessage)
       return false
     } finally {
       if (request.isCurrent()) {
@@ -662,176 +539,245 @@ export default function AuditLogsPage() {
         request.finish()
       }
     }
-  }, [
-    adminRpc,
-    beginLatestRequest,
-    createdFrom,
-    createdTo,
-    eventKey,
-    keyword,
-    pagination,
-    source,
-  ])
-
+  }, [adminRpc, beginLatestRequest, dateRangeInvalid, pagination, queryParams])
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadData)
-  }, [loadData, outletContext])
-
-  useEffect(() => {
-    if (!selectedEventId && filteredEvents[0]) {
-      setSelectedEventId(getEventDomId(filteredEvents[0]))
-      return
-    }
-    if (
-      selectedEventId &&
-      !filteredEvents.some((event) => getEventDomId(event) === selectedEventId)
-    ) {
-      setSelectedEventId(
-        filteredEvents[0] ? getEventDomId(filteredEvents[0]) : null
-      )
-    }
-  }, [filteredEvents, selectedEventId])
-
-  useEffect(() => {
-    if (!compactAuditLayout || !selectedEvent) {
-      setDetailDrawerOpen(false)
-    }
-  }, [compactAuditLayout, selectedEvent])
-
+  useEffect(
+    () => outletContext?.registerPageRefresh?.(loadData),
+    [loadData, outletContext]
+  )
   useEffect(() => clearFocusRestoreTimer, [clearFocusRestoreTimer])
 
-  const segmentedOptions = riskOptions.map((option) => ({
-    value: option.value,
-    label:
-      option.value === 'all'
-        ? `${option.label} ${riskSummary.total}`
-        : `${option.label} ${riskSummary[option.value] || 0}`,
-  }))
-
-  if (loading && events.length === 0) {
-    return (
-      <Loading
-        title="操作记录加载中"
-        description="正在读取系统管理操作记录..."
-      />
-    )
-  }
+  const columns = useMemo(
+    () => [
+      {
+        title: '发生时间',
+        key: 'time',
+        width: 175,
+        render: (_, record) => formatTime(record),
+        exportValue: formatTime,
+      },
+      {
+        title: '操作人',
+        key: 'actor',
+        width: 160,
+        render: (_, record) => getEventActorText(record),
+        exportValue: getEventActorText,
+      },
+      {
+        title: '动作',
+        key: 'action',
+        width: 280,
+        render: (_, record) => (
+          <div className="erp-audit-records-page__action">
+            <strong>{getActionMeta(record).label}</strong>
+            <Text type="secondary">
+              {getAuditChanges(record.payload).length
+                ? summarizeChange(record.payload, { limit: 1 })
+                : getAuditChangeSummary(record)}
+            </Text>
+          </div>
+        ),
+        exportValue: (record) => getActionMeta(record).label,
+      },
+      {
+        title: '业务对象',
+        key: 'target',
+        width: 180,
+        render: (_, record) => getEventTargetText(record),
+        exportValue: getEventTargetText,
+      },
+      {
+        title: '风险',
+        key: 'risk',
+        width: 95,
+        render: (_, record) => (
+          <Tag color={riskColorMap[getActionMeta(record).risk]}>
+            {riskLabelMap[getActionMeta(record).risk]}
+          </Tag>
+        ),
+        exportValue: (record) => riskLabelMap[getActionMeta(record).risk],
+      },
+      {
+        title: '操作来源',
+        dataIndex: 'source',
+        width: 130,
+        render: getSourceLabel,
+        exportValue: (record) => getSourceLabel(record.source),
+      },
+      {
+        title: '变化摘要',
+        key: 'summary',
+        hidden: true,
+        exportValue: getAuditChangeSummary,
+      },
+    ],
+    []
+  )
+  const { tableColumns, exportColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
+      adminProfile,
+      moduleKey: 'system-audit-logs',
+      moduleTitle: '系统操作记录',
+      columns,
+    })
+  const detailColumn = useMemo(
+    () => ({
+      title: '详情',
+      key: 'detail',
+      width: 105,
+      fixed: 'right',
+      exportable: false,
+      render: (_, record) => (
+        <Button
+          data-audit-detail-trigger
+          type="link"
+          onClick={(event) => openDetail(record, event)}
+        >
+          查看变化
+        </Button>
+      ),
+    }),
+    [openDetail]
+  )
+  const loadExportRows = useCallback(
+    async ({ signal }) => {
+      const result = await listAllPaginatedRecords(
+        async (params, options) =>
+          (await adminRpc.call('audit_logs', params, options))?.data,
+        queryParams,
+        'events',
+        { signal }
+      )
+      return normalizeAuditEvents(result.events)
+    },
+    [adminRpc, queryParams]
+  )
+  const { exporting, exportRows } = useBusinessListExport({
+    requestKey: 'audit-logs-export',
+    loadRows: loadExportRows,
+    filename: `系统操作记录-${currentBusinessDate()}.csv`,
+    columns: exportColumns,
+    recordLabel: '操作记录',
+  })
+  const hasActiveFilters = Boolean(
+    source ||
+    eventKey ||
+    keyword.trim() ||
+    createdFrom ||
+    createdTo ||
+    riskFilter !== 'all'
+  )
+  const resetPage = () =>
+    setPagination((previous) => ({ ...previous, current: 1 }))
 
   return (
-    <div className="erp-audit-page">
-      <section className="erp-audit-command" aria-label="系统操作记录总览">
-        <div className="erp-audit-command__title">
-          <Title level={4}>系统操作记录</Title>
-        </div>
-        <div className="erp-audit-command__stats" aria-label="当前页操作摘要">
-          <div className="erp-audit-stat erp-audit-stat--danger">
-            <span>高风险</span>
-            <strong>{riskSummary.high}</strong>
-          </div>
-          <div className="erp-audit-stat erp-audit-stat--warning">
-            <span>需核对</span>
-            <strong>{riskSummary.warning}</strong>
-          </div>
-          <div className="erp-audit-stat">
-            <span>当前命中</span>
-            <strong>{riskSummary.total}</strong>
-          </div>
-        </div>
-      </section>
-
-      <section className="erp-audit-toolbar" aria-label="操作记录筛选">
-        <label className="erp-audit-field">
-          <span>操作来源</span>
-          <Select
-            value={source}
-            options={sourceOptions}
-            onChange={(value) => {
-              setSource(value || '')
-              setPagination((prev) => ({ ...prev, current: 1 }))
-            }}
-          />
-        </label>
-        <label className="erp-audit-field erp-audit-field--wide">
-          <span>操作类型</span>
-          <Select
-            value={eventKey}
-            options={actionOptions}
-            onChange={(value) => {
-              setEventKey(value || '')
-              setPagination((prev) => ({ ...prev, current: 1 }))
-            }}
-          />
-        </label>
-        <label className="erp-audit-field erp-audit-field--search">
-          <span>搜索</span>
-          <SearchInput
-            allowClear
-            value={keyword}
-            placeholder="搜索操作记录"
-            searchHint="可搜索：操作人、相关账号或岗位、操作类型或说明"
-            onChange={(event) => {
-              setKeyword(event.target.value)
-              setPagination((prev) => ({ ...prev, current: 1 }))
-            }}
-          />
-        </label>
-        <label className="erp-audit-field">
-          <span>开始日期</span>
-          <DateInput
-            value={createdFrom}
-            placeholder="开始"
-            onChange={(value) => {
-              setCreatedFrom(value)
-              setPagination((prev) => ({ ...prev, current: 1 }))
-            }}
-          />
-        </label>
-        <label className="erp-audit-field">
-          <span>结束日期</span>
-          <DateInput
-            value={createdTo}
-            placeholder="结束"
-            onChange={(value) => {
-              setCreatedTo(value)
-              setPagination((prev) => ({ ...prev, current: 1 }))
-            }}
-          />
-        </label>
-        <Text className="erp-audit-toolbar__count" type="secondary">
-          {keyword || riskFilter !== 'all'
-            ? `当前页命中 ${filteredEvents.length}/${events.length}`
-            : `共 ${total} 条`}
-        </Text>
-      </section>
-
-      <section className="erp-audit-lens" aria-label="常查操作">
-        <Segmented
-          value={riskFilter}
-          options={segmentedOptions}
-          onChange={(value) => setRiskFilter(value)}
-        />
-        <div className="erp-audit-quick-actions">
-          {quickLocateActions.map(({ key, icon }) => (
-            <Button
-              key={key}
-              size="small"
-              icon={icon}
-              type={eventKey === key ? 'primary' : 'default'}
-              onClick={() => {
-                setEventKey(eventKey === key ? '' : key)
-                setPagination((prev) => ({ ...prev, current: 1 }))
+    <BusinessPageLayout className="erp-audit-records-page">
+      <PageHeaderCard
+        compact
+        title="系统操作记录"
+        tags={<Tag>只读查询</Tag>}
+        stats={[{ key: 'total', label: '筛选结果', value: total }]}
+      />
+      <BusinessOperationPanel
+        compact
+        clearFiltersDisabled={!hasActiveFilters}
+        onClearFilters={() => {
+          setSource('')
+          setEventKey('')
+          setKeyword('')
+          setCreatedFrom('')
+          setCreatedTo('')
+          setRiskFilter('all')
+          resetPage()
+        }}
+        filters={
+          <>
+            <SelectFilter
+              inline
+              aria-label="操作来源"
+              value={source}
+              options={sourceOptions}
+              onChange={(value) => {
+                setSource(value || '')
+                setEventKey('')
+                resetPage()
               }}
-            >
-              {actionMetaMap[key].label}
-            </Button>
-          ))}
-        </div>
-      </section>
-
+            />
+            <SearchInput
+              value={keyword}
+              placeholder="搜索操作记录"
+              searchHint="按操作账号、业务对象或记录内容搜索"
+              onChange={(event) => {
+                setKeyword(event.target.value)
+                resetPage()
+              }}
+              onPressEnter={loadData}
+            />
+            <SelectFilter
+              aria-label="操作类型"
+              value={eventKey}
+              options={actionOptions}
+              showSearch
+              optionFilterProp="label"
+              onChange={(value) => {
+                setEventKey(value || '')
+                resetPage()
+              }}
+            />
+            <SelectFilter
+              aria-label="本页风险"
+              value={riskFilter}
+              options={riskOptions}
+              onChange={(value) => {
+                setRiskFilter(value)
+                setSelectedEventId(null)
+                setDetailDrawerOpen(false)
+              }}
+            />
+            <DateInput
+              aria-label="开始日期"
+              value={createdFrom}
+              placeholder="开始日期"
+              onChange={(value) => {
+                setCreatedFrom(value)
+                resetPage()
+              }}
+            />
+            <DateInput
+              aria-label="结束日期"
+              value={createdTo}
+              placeholder="结束日期"
+              onChange={(value) => {
+                setCreatedTo(value)
+                resetPage()
+              }}
+            />
+          </>
+        }
+        actions={
+          <BusinessListToolbarActions
+            onExport={exportRows}
+            exportDisabled={
+              loading ||
+              exporting ||
+              !total ||
+              dateRangeInvalid ||
+              riskFilter !== 'all'
+            }
+            exportDisabledReason={
+              riskFilter !== 'all'
+                ? '清空本页风险条件后，可导出完整筛选结果'
+                : ''
+            }
+            onOpenColumnOrder={openColumnOrder}
+          />
+        }
+      />
+      {dateRangeInvalid ? (
+        <Alert type="warning" showIcon message="开始日期不能晚于结束日期" />
+      ) : null}
       {loadError ? (
         <Alert
           type="error"
@@ -845,110 +791,55 @@ export default function AuditLogsPage() {
           }
         />
       ) : null}
-
-      <div className="erp-audit-workspace">
-        <section className="erp-audit-feed" aria-label="操作记录列表">
-          <div className="erp-audit-feed__head">
-            <Text strong>操作记录</Text>
-            {loading ? <Text type="secondary">正在刷新...</Text> : null}
-          </div>
-          {filteredEvents.length > 0 ? (
-            <div className="erp-audit-event-list">
-              {filteredEvents.map((record) => {
-                const meta = getActionMeta(record)
-                const eventDomId = getEventDomId(record)
-                const selected = eventDomId === selectedEventId
-                return (
-                  <button
-                    key={eventDomId}
-                    type="button"
-                    className={[
-                      'erp-audit-event',
-                      `erp-audit-event--${meta.risk}`,
-                      selected ? 'erp-audit-event--selected' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    onClick={(event) => {
-                      setSelectedEventId(eventDomId)
-                      if (compactAuditLayout) {
-                        eventTriggerRef.current = event.currentTarget
-                        setDetailDrawerOpen(true)
-                      }
-                    }}
-                  >
-                    <span className="erp-audit-event__risk">
-                      {riskLabelMap[meta.risk]}
-                    </span>
-                    <span className="erp-audit-event__body">
-                      <span className="erp-audit-event__title">
-                        {buildAuditConclusion(record)}
-                      </span>
-                      <span className="erp-audit-event__meta">
-                        <span>{formatTime(record)}</span>
-                        <span>{getSourceLabel(record.source)}</span>
-                        <span>{meta.label}</span>
-                      </span>
-                      <span className="erp-audit-event__summary">
-                        {getAuditChangeSummary(record)}
-                      </span>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            <Empty
-              className="erp-audit-empty"
-              description="当前条件下没有操作记录"
-            />
-          )}
-          <Pagination
-            className="erp-audit-pagination"
-            current={pagination.current}
-            pageSize={pagination.pageSize}
-            pageSizeOptions={PAGE_SIZE_OPTIONS}
-            showSizeChanger
-            total={total}
-            showTotal={(value) => `共 ${value} 条`}
-            onChange={(current, pageSize) =>
-              setPagination({
-                current,
-                pageSize: Number(pageSize) || DEFAULT_PAGE_SIZE,
-              })
-            }
-          />
-        </section>
-
-        <aside className="erp-audit-detail" aria-label="操作详情">
-          <AuditEventDetail event={selectedEvent} />
-        </aside>
-      </div>
+      <BusinessDataTable
+        loading={loading}
+        rowKey={getEventDomId}
+        columns={[...tableColumns, detailColumn]}
+        dataSource={filteredEvents}
+        onOpenRecord={openDetail}
+        onRow={() => ({ title: '双击查看变化' })}
+        emptyDescription={
+          loadError ? '操作记录读取失败，请重新加载' : '当前条件下没有操作记录'
+        }
+        tableHeader={
+          riskFilter !== 'all' ? (
+            <p className="erp-audit-records-page__scope">
+              本页风险：{riskLabelMap[riskFilter]} · 显示{' '}
+              {filteredEvents.length} / {events.length} 条；翻页后按新一页筛选
+            </p>
+          ) : null
+        }
+        pagination={{
+          ...pagination,
+          total,
+          showSizeChanger: true,
+          pageSizeOptions: PAGE_SIZE_OPTIONS,
+          showTotal: (value) =>
+            `共 ${value} 条${riskFilter !== 'all' ? '（风险仅筛选本页）' : ''}`,
+          onChange: (current, pageSize) => setPagination({ current, pageSize }),
+        }}
+      />
+      {columnOrderModal}
       <Drawer
         rootClassName="erp-audit-detail-drawer"
-        title="操作详情"
-        width={screens.md ? 560 : '100%'}
-        open={compactAuditLayout && detailDrawerOpen && Boolean(selectedEvent)}
+        title="操作记录详情"
+        width={screens.md ? 640 : '100%'}
+        open={detailDrawerOpen && Boolean(selectedEvent)}
         keyboard
         maskClosable
         destroyOnHidden
         onClose={closeDetailDrawer}
+        footer={<Button onClick={closeDetailDrawer}>完成</Button>}
         afterOpenChange={(open) => {
           if (!open) {
             window.requestAnimationFrame(() => {
-              window.requestAnimationFrame(() => {
-                if (restoreEventTriggerFocus()) {
-                  clearFocusRestoreTimer()
-                }
-              })
+              if (restoreEventTriggerFocus()) clearFocusRestoreTimer()
             })
           }
         }}
       >
-        <div className="erp-audit-detail erp-audit-detail--drawer">
-          <AuditEventDetail event={selectedEvent} />
-        </div>
+        <AuditEventDetail event={selectedEvent} />
       </Drawer>
-    </div>
+    </BusinessPageLayout>
   )
 }

@@ -21,7 +21,10 @@ body
   .ant-select-outlined:not(.ant-select-disabled):not(
     .ant-select-customize-input
   ):not(.ant-pagination-size-changer):is(:focus-within, .ant-select-open)
-  > .ant-select-selector {
+  > .ant-select-selector,
+body
+  .erp-item-field-with-unit
+  .ant-input-affix-wrapper.ant-input-outlined.ant-input-status-error:focus-within {
   border-color: var(--erp-control-focus-border);
   box-shadow: var(
     --erp-control-focus-shadow,

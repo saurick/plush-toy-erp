@@ -1,4 +1,5 @@
-import { UserAddOutlined } from '@ant-design/icons'
+import { createPortal } from 'react-dom'
+import { SearchOutlined, UserAddOutlined } from '@ant-design/icons'
 import {
   Typography,
   Alert,
@@ -82,6 +83,8 @@ import {
 } from '../../utils/permissionCenterAdminDialog.mjs'
 
 export default function PermissionAdminAccounts({
+  toolbarContainer,
+  active = true,
   editorContainer,
   currentAdmin,
   roles,
@@ -222,7 +225,7 @@ export default function PermissionAdminAccounts({
 
   const hasAdminFilter = Boolean(
     String(adminSearchKeyword || '').trim() ||
-      adminStatusFilter !== ADMIN_STATUS_FILTERS.ALL
+    adminStatusFilter !== ADMIN_STATUS_FILTERS.ALL
   )
 
   useEffect(() => {
@@ -900,70 +903,63 @@ export default function PermissionAdminAccounts({
     <Empty description="暂无员工账号" />
   )
 
+  const accountToolbar = (
+    <div className="erp-permission-list-toolbar">
+      <div className="erp-permission-list-toolbar__filters">
+        <Input
+          allowClear
+          className="erp-permission-list-toolbar__search"
+          prefix={<SearchOutlined aria-hidden="true" />}
+          aria-label="搜索员工账号"
+          value={adminSearchKeyword}
+          placeholder="搜索姓名、员工账号、手机号或岗位"
+          onChange={(event) => {
+            setAdminSearchKeyword(event.target.value)
+            setTablePagination((prev) => ({ ...prev, current: 1 }))
+          }}
+        />
+        <Select
+          aria-label="账号状态"
+          value={adminStatusFilter}
+          options={adminStatusOptions}
+          onChange={(value) => {
+            setAdminStatusFilter(value || ADMIN_STATUS_FILTERS.ALL)
+            setTablePagination((prev) => ({ ...prev, current: 1 }))
+          }}
+        />
+      </div>
+      <Text type="secondary">
+        {!canReadUsers
+          ? '无权查看员工账号列表'
+          : hasAdminFilter
+            ? `命中 ${filteredAdmins.length}/${admins.length} 个员工账号`
+            : `共 ${admins.length} 个员工账号`}
+      </Text>
+      <Button
+        icon={<UserAddOutlined aria-hidden="true" />}
+        className="erp-action-button"
+        type="primary"
+        disabled={!canCreateUsers}
+        onClick={openCreateModal}
+      >
+        创建员工账号
+      </Button>
+    </div>
+  )
+
   const adminAccountTab = (
     <Card
       className="erp-permission-section erp-permission-section--admins"
       variant="borderless"
     >
-      <Space
-        size={12}
-        style={{ width: '100%', justifyContent: 'space-between' }}
-        wrap
-      >
-        <div>
-          <Text className="erp-permission-section__eyebrow">账号分配</Text>
-          <Title level={5} style={{ margin: 0 }}>
-            员工账号与岗位
-          </Title>
-          <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            新账号默认不能进入业务页面。分配多个岗位时，员工获得各岗位最终有效页面和操作的合并，仍受客户设置和业务状态限制。
-          </Paragraph>
-        </div>
-        <Space size={8} wrap>
-          {canReadUsers ? (
-            <Tag color="green">共 {admins.length} 个员工账号</Tag>
-          ) : null}
-          <Button
-            icon={<UserAddOutlined aria-hidden="true" />}
-            className="erp-action-button"
-            type="primary"
-            disabled={!canCreateUsers}
-            onClick={openCreateModal}
-          >
-            创建员工账号
-          </Button>
-        </Space>
-      </Space>
-
-      <div className="erp-permission-list-toolbar">
-        <div className="erp-permission-list-toolbar__filters">
-          <Input
-            allowClear
-            className="erp-permission-list-toolbar__search"
-            value={adminSearchKeyword}
-            placeholder="搜索姓名、员工账号、手机号或岗位"
-            onChange={(event) => {
-              setAdminSearchKeyword(event.target.value)
-              setTablePagination((prev) => ({ ...prev, current: 1 }))
-            }}
-          />
-          <Select
-            value={adminStatusFilter}
-            options={adminStatusOptions}
-            onChange={(value) => {
-              setAdminStatusFilter(value || ADMIN_STATUS_FILTERS.ALL)
-              setTablePagination((prev) => ({ ...prev, current: 1 }))
-            }}
-          />
-        </div>
-        <Text type="secondary">
-          {!canReadUsers
-            ? '无权查看员工账号列表'
-            : hasAdminFilter
-              ? `命中 ${filteredAdmins.length}/${admins.length} 个员工账号`
-              : `共 ${admins.length} 个员工账号`}
-        </Text>
-      </div>
+      {toolbarContainer
+        ? active
+          ? createPortal(accountToolbar, toolbarContainer)
+          : null
+        : accountToolbar}
+      <Paragraph type="secondary" className="erp-permission-account-note">
+        新账号分配岗位后才能进入业务页面；多个岗位的有效权限合并，仍受公司设置和业务状态限制。
+      </Paragraph>
       <Table
         rowKey="id"
         columns={columns}
@@ -1329,4 +1325,4 @@ export default function PermissionAdminAccounts({
   )
 }
 
-const { Paragraph, Text, Title } = Typography
+const { Paragraph, Text } = Typography

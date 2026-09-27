@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo } from 'react'
-import { Alert, Card, Descriptions, Form, Input, Select } from 'antd'
+import { Alert, Descriptions, Form, Input, Select } from 'antd'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import { BusinessOptionalField } from '../business-list/BusinessCompactFieldTable.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { warehouseAcceptsSubject } from '../../utils/warehouseClassification.mjs'
 
@@ -79,6 +82,7 @@ export default function InventoryOperationModal({
   onSubmit,
 }) {
   const [form] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open)
   const isEdit = mode === 'edit'
   const effectiveType = operation?.operation_type || operationType
   const meta = TYPE_META[effectiveType] || TYPE_META.CYCLE_COUNT
@@ -136,25 +140,26 @@ export default function InventoryOperationModal({
         disabled={loading}
         style={{ marginTop: 16 }}
       >
-        <Form.Item
-          name="operation_no"
-          label="作业单号"
-          rules={[
-            { required: true, whitespace: true, message: '请填写作业单号' },
-          ]}
-        >
-          <Input maxLength={64} autoComplete="off" />
-        </Form.Item>
-        <Form.Item
-          name="reason"
-          label="业务原因"
-          rules={[
-            { required: true, whitespace: true, message: '请填写业务原因' },
-          ]}
-        >
-          <BusinessTextArea minRows={2} maxLength={255} showCount />
-        </Form.Item>
-
+        <div className="erp-inventory-operation-fields">
+          <Form.Item
+            name="operation_no"
+            label="作业单号"
+            rules={[
+              { required: true, whitespace: true, message: '请填写作业单号' },
+            ]}
+          >
+            <Input maxLength={64} autoComplete="off" />
+          </Form.Item>
+          <Form.Item
+            name="reason"
+            label="业务原因"
+            rules={[
+              { required: true, whitespace: true, message: '请填写业务原因' },
+            ]}
+          >
+            <BusinessTextArea minRows={1} maxLength={255} />
+          </Form.Item>
+        </div>
         <Form.List name="items">
           {(fields) =>
             fields.map(({ key, name }, index) => {
@@ -175,12 +180,14 @@ export default function InventoryOperationModal({
               )
 
               return (
-                <Card
+                <section
                   key={key}
-                  size="small"
-                  title={`作业明细 ${index + 1}`}
-                  style={{ marginBottom: 12 }}
+                  className="erp-inventory-operation-row"
+                  aria-label={`作业明细 ${index + 1}`}
                 >
+                  {fields.length > 1 ? (
+                    <strong>作业明细 {index + 1}</strong>
+                  ) : null}
                   <Form.Item name={[name, 'id']} hidden>
                     <Input />
                   </Form.Item>
@@ -205,81 +212,102 @@ export default function InventoryOperationModal({
                       },
                     ]}
                   />
-                  {effectiveType === 'CYCLE_COUNT' ? (
-                    <Form.Item
-                      name={[name, 'counted_quantity']}
-                      label="实盘数量"
-                      rules={[
-                        { required: true, message: '请填写实盘数量' },
-                        {
-                          validator: (_, value) =>
-                            numeric20Scale6Units(value) !== null
-                              ? Promise.resolve()
-                              : Promise.reject(
-                                  new Error('实盘数量必须是非负数')
-                                ),
-                        },
-                      ]}
-                    >
-                      <Input inputMode="decimal" autoComplete="off" />
-                    </Form.Item>
-                  ) : null}
-                  {effectiveType === 'TRANSFER' ? (
-                    <>
+                  <div className="erp-inventory-operation-fields">
+                    {effectiveType === 'CYCLE_COUNT' ? (
                       <Form.Item
-                        name={[name, 'adjustment_quantity']}
-                        label="调拨数量"
+                        name={[name, 'counted_quantity']}
+                        label="实盘数量"
                         rules={[
-                          { required: true, message: '请填写调拨数量' },
+                          unitQuantityRuleFromOptions(
+                            quantityUnitOptions,
+                            source.unit_id
+                          ),
+                          { required: true, message: '请填写实盘数量' },
                           {
                             validator: (_, value) =>
-                              isPositiveNumeric20Scale6Units(
-                                numeric20Scale6Units(value)
-                              )
+                              numeric20Scale6Units(value) !== null
                                 ? Promise.resolve()
                                 : Promise.reject(
-                                    new Error('调拨数量必须大于 0')
+                                    new Error('实盘数量必须是非负数')
                                   ),
                           },
                         ]}
                       >
                         <Input inputMode="decimal" autoComplete="off" />
                       </Form.Item>
+                    ) : null}
+                    {effectiveType === 'TRANSFER' ? (
+                      <>
+                        <Form.Item
+                          name={[name, 'adjustment_quantity']}
+                          label="调拨数量"
+                          rules={[
+                            unitQuantityRuleFromOptions(
+                              quantityUnitOptions,
+                              source.unit_id
+                            ),
+                            { required: true, message: '请填写调拨数量' },
+                            {
+                              validator: (_, value) =>
+                                isPositiveNumeric20Scale6Units(
+                                  numeric20Scale6Units(value)
+                                )
+                                  ? Promise.resolve()
+                                  : Promise.reject(
+                                      new Error('调拨数量必须大于 0')
+                                    ),
+                            },
+                          ]}
+                        >
+                          <Input inputMode="decimal" autoComplete="off" />
+                        </Form.Item>
+                        <Form.Item
+                          name={[name, 'to_warehouse_id']}
+                          label="目标仓库"
+                          rules={[
+                            { required: true, message: '请选择目标仓库' },
+                          ]}
+                        >
+                          <Select
+                            showSearch
+                            optionFilterProp="label"
+                            options={targetWarehouseOptions}
+                          />
+                        </Form.Item>
+                      </>
+                    ) : null}
+                    {effectiveType === 'MANUAL_ADJUSTMENT' ? (
                       <Form.Item
-                        name={[name, 'to_warehouse_id']}
-                        label="目标仓库"
-                        rules={[{ required: true, message: '请选择目标仓库' }]}
+                        name={[name, 'adjustment_quantity']}
+                        label="调整数量（增加填正数，扣减填负数）"
+                        rules={[
+                          unitQuantityRuleFromOptions(
+                            quantityUnitOptions,
+                            source.unit_id
+                          ),
+                          { required: true, message: '请填写调整数量' },
+                          {
+                            validator: (_, value) =>
+                              isSignedNumeric20Scale6(value) &&
+                              Number(value) !== 0
+                                ? Promise.resolve()
+                                : Promise.reject(new Error('调整数量不能为 0')),
+                          },
+                        ]}
                       >
-                        <Select
-                          showSearch
-                          optionFilterProp="label"
-                          options={targetWarehouseOptions}
-                        />
+                        <Input inputMode="decimal" autoComplete="off" />
                       </Form.Item>
-                    </>
-                  ) : null}
-                  {effectiveType === 'MANUAL_ADJUSTMENT' ? (
-                    <Form.Item
-                      name={[name, 'adjustment_quantity']}
-                      label="调整数量（增加填正数，扣减填负数）"
-                      rules={[
-                        { required: true, message: '请填写调整数量' },
-                        {
-                          validator: (_, value) =>
-                            isSignedNumeric20Scale6(value) &&
-                            Number(value) !== 0
-                              ? Promise.resolve()
-                              : Promise.reject(new Error('调整数量不能为 0')),
-                        },
-                      ]}
+                    ) : null}
+                    <BusinessOptionalField
+                      name={['items', name, 'note']}
+                      label="明细备注"
                     >
-                      <Input inputMode="decimal" autoComplete="off" />
-                    </Form.Item>
-                  ) : null}
-                  <Form.Item name={[name, 'note']} label="明细备注">
-                    <BusinessTextArea maxLength={255} />
-                  </Form.Item>
-                </Card>
+                      <Form.Item name={[name, 'note']} label="明细备注">
+                        <BusinessTextArea maxLength={255} />
+                      </Form.Item>
+                    </BusinessOptionalField>
+                  </div>
+                </section>
               )
             })
           }

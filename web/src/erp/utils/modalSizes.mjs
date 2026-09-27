@@ -3,7 +3,7 @@ export const ERP_MODAL_WIDTHS = Object.freeze({
   localAction: 'min(860px, calc(100vw - 32px))',
   recordDetails: 'min(1120px, calc(100vw - 32px))',
   lineItems: 'min(1800px, 94vw, calc(100vw - 32px))',
-  columnOrder: 'min(960px, calc(100vw - 32px))',
+  columnOrder: 'min(640px, calc(100vw - 32px))',
 })
 
 export function resolveBusinessModalWidth(size = 'localAction', width = null) {

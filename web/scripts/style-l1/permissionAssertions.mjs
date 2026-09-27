@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 
 async function assertPermissionSectionVisualSeparation(page, { scenarioName }) {
   const metrics = await page.evaluate(() => {
-    const tabNav = document.querySelector('.erp-permission-tabs .ant-tabs-nav')
+    const tabNav = document.querySelector('.erp-permission-tabs')
     const adminSection = document.querySelector(
       '.erp-permission-section--admins'
     )
@@ -49,9 +49,7 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
   const metrics = await page.evaluate(() => {
     const checklist = document.querySelector('.erp-permission-checklist')
     const wrappers = [
-      ...document.querySelectorAll(
-        '.erp-permission-list .erp-permission-row.ant-checkbox-wrapper'
-      ),
+      ...document.querySelectorAll('.erp-permission-row.ant-checkbox-wrapper'),
     ].slice(0, 8)
     const bodyText = document.body.textContent || ''
     const readWrapper = (wrapper) => {
@@ -66,6 +64,10 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
         wrapperScrollWidth: wrapper.scrollWidth,
         wrapperHeight: wrapperRect.height,
         labelWidth: labelRect?.width || 0,
+        compact: wrapper.classList.contains('erp-permission-row--compact'),
+        accessibleName: wrapper
+          .querySelector('input')
+          ?.getAttribute('aria-label'),
         hasVisiblePermissionKey: Boolean(
           wrapper.querySelector('.erp-permission-row__key')
         ),
@@ -93,9 +95,10 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
   )
   const invalid = metrics.wrappers.filter(
     (item) =>
-      item.labelWidth <= 0 ||
+      (!item.compact && item.labelWidth <= 0) ||
+      !item.accessibleName ||
       !['menu', 'action'].includes(item.kind) ||
-      item.wrapperHeight < 48 ||
+      item.wrapperHeight < 32 ||
       item.hasVisiblePermissionKey ||
       item.wrapperScrollWidth > item.wrapperWidth + 1
   )

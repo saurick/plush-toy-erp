@@ -219,6 +219,7 @@ materials
         )
         // The shared modal restores trigger focus 80 ms after its close transition.
         await page.waitForTimeout(120)
+        await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
         await page
           .locator('.ant-select')
           .filter({ has: page.getByRole('combobox', { name: '材料库存类别' }) })

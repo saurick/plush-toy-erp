@@ -58,20 +58,19 @@ export function createBusinessColumnPriorityScenarios({
 
   const verifySavedOrderAndReset = async (page, targetLabel, direction) => {
     const defaults = await readLabels(page)
-    const target = page
-      .locator(headerSelector)
-      .filter({ hasText: targetLabel })
-      .first()
-    const cell = target.locator('xpath=ancestor::th')
-    await cell.locator('.erp-module-column-header-trigger').click()
-    const menu = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)').last()
+    const openColumnSettings = async () => {
+      await page.getByRole('button', { name: /列设置$/u }).click()
+      return page.getByRole('dialog', { name: /^列设置/u })
+    }
+    let dialog = await openColumnSettings()
+    await dialog.getByRole('button', { name: `${targetLabel} ${direction}`, exact: true }).click()
     const saved = page.waitForResponse((response) => {
       if (!response.url().includes('/rpc/admin')) return false
       return (
         response.request().postDataJSON()?.method === 'set_erp_column_order'
       )
     })
-    await menu.getByText(direction, { exact: true }).click()
+    await dialog.getByRole('button', { name: /^完\s*成$/u }).click()
     await saved
     const expected = defaults.filter((label) => label !== targetLabel)
     if (direction === '移到最前') expected.unshift(targetLabel)
@@ -85,18 +84,7 @@ export function createBusinessColumnPriorityScenarios({
       '刷新后应保留个人排列及展示列标识'
     )
 
-    await page
-      .locator(headerSelector)
-      .first()
-      .locator('xpath=ancestor::th')
-      .locator('.erp-module-column-header-trigger')
-      .click()
-    await page
-      .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
-      .last()
-      .getByText('打开列顺序面板', { exact: true })
-      .click()
-    const dialog = page.getByRole('dialog', { name: '调整列表列顺序' })
+    dialog = await openColumnSettings()
     await dialog.getByRole('button', { name: '恢复默认' }).click()
     const reset = page.waitForResponse((response) => {
       if (!response.url().includes('/rpc/admin')) return false

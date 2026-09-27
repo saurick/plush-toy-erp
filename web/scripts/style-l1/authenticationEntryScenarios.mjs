@@ -3,6 +3,8 @@ import {
   assertVisibleInputFocusRingNotClipped,
 } from './inputControlAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { createMockAdminToken } from './adminRpcMocks.mjs'
+import { createMobileAdminReviewScenarios } from './mobileAdminReviewScenarios.mjs'
 
 export function createAuthenticationEntryScenarios({
   expectHeading,
@@ -67,6 +69,315 @@ export function createAuthenticationEntryScenarios({
     },
   })
   return [
+    ...createMobileAdminReviewScenarios({ assert, expectText, waitForPath, customerRuntimeEffectiveSession }),
+    {
+      name: 'admin-login-small-screen-disabled-entries',
+      path: '/admin-login',
+      mockAdminRpc: true,
+      viewport: { width: 320, height: 420 },
+      themeMode: 'dark',
+      customerConfig: {
+        brand: {
+          brandMark: '样',
+          companyName: '用于验证长名称换行的毛绒玩具生产与贸易示例有限公司',
+        },
+      },
+      beforeNavigate: async (page) => {
+        await page.addInitScript(() => {
+          window.__PLUSH_ERP_ENTRY_CONFIG__ = {
+            desktop: false,
+            mobileTasks: false,
+          }
+        })
+      },
+      verify: async (page) => {
+        await page
+          .getByText('暂时无法登录，请联系系统管理员', { exact: true })
+          .waitFor()
+        assert.equal(
+          await page.getByRole('button', { name: /^登\s*录$/ }).isDisabled(),
+          true
+        )
+        assert.equal(
+          await page.getByRole('radiogroup', { name: '工作方式' }).count(),
+          0
+        )
+        const geometry = await page.evaluate(() => {
+          const title = document
+            .querySelector('.erp-login-logo__title')
+            .getBoundingClientRect()
+          const appearance = document
+            .querySelector('.erp-login-card__theme-toggle')
+            .getBoundingClientRect()
+          const card = document
+            .querySelector('.erp-login-card')
+            .getBoundingClientRect()
+          return {
+            titleRight: title.right,
+            buttonLeft: appearance.left,
+            top: card.top,
+            scrollHeight: document.documentElement.scrollHeight,
+            bottom: card.bottom,
+            viewport: innerHeight,
+          }
+        })
+        assert(
+          geometry.titleRight <= geometry.buttonLeft - 6,
+          '长公司名称不能挤压外观按钮'
+        )
+        assert(geometry.top >= 0, '短屏不能裁掉卡片顶部')
+        assert(
+          geometry.scrollHeight >= geometry.bottom,
+          '超高卡片必须能滚动到底部'
+        )
+        await page
+          .getByRole('link', { name: '系统使用规则' })
+          .scrollIntoViewIfNeeded()
+        await page.getByRole('link', { name: '系统使用规则' }).click()
+        await waitForPath(page, '/legal/system-rules')
+      },
+    },
+    {
+      name: 'admin-login-late-response',
+      path: '/admin-login',
+      mockAdminRpc: true,
+      viewport: { width: 1280, height: 800 },
+      verify: async (page) => {
+        await page.getByLabel('账号').fill('style-l1-admin')
+        await page.getByLabel('密码', { exact: true }).fill('style-l1-password')
+        let release
+        let markRequested
+        const requested = new Promise((resolve) => {
+          markRequested = resolve
+        })
+        await page.route('**/rpc/auth', async (route) => {
+          const { id, method } = route.request().postDataJSON()
+          if (method !== 'admin_login') {
+            await route.fallback()
+            return
+          }
+          markRequested()
+          await new Promise((done) => {
+            release = done
+          })
+          await route.fulfill({
+            json: {
+              jsonrpc: '2.0',
+              id,
+              result: {
+                code: 0,
+                data: {
+                  access_token: createMockAdminToken(),
+                  username: 'style-l1-admin',
+                  is_super_admin: true,
+                },
+              },
+            },
+          })
+        })
+        await page.getByRole('button', { name: /^登\s*录$/ }).click()
+        await requested
+        await page.getByRole('link', { name: '个人信息处理规则' }).click()
+        await waitForPath(page, '/legal/privacy')
+        const response = page.waitForResponse(
+          (response) =>
+            response.url().endsWith('/rpc/auth') &&
+            response.request().postDataJSON().method === 'admin_login'
+        )
+        release()
+        await response
+        await page.evaluate(
+          () =>
+            new Promise((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(resolve))
+            )
+        )
+        assert.equal(
+          new URL(page.url()).pathname,
+          '/legal/privacy',
+          '离开登录页后迟到响应不能改变页面'
+        )
+        assert.equal(
+          await page.evaluate(() => localStorage.getItem('admin_access_token')),
+          null,
+          '离开登录页后迟到响应不能保存登录态'
+        )
+      },
+    },
+    {
+      name: 'admin-login-interactions',
+      path: '/admin-login',
+      mockAdminRpc: true,
+      viewport: { width: 1280, height: 800 },
+      verify: async (page) => {
+        await page.getByRole('tab', { name: '短信登录' }).waitFor()
+        await page
+          .getByLabel('密码', { exact: true })
+          .fill('temporary-password')
+        await page.getByRole('button', { name: '显示密码' }).press('Enter')
+        assert.equal(
+          await page.getByLabel('密码', { exact: true }).getAttribute('type'),
+          'text'
+        )
+        const motion = await page
+          .locator('.erp-login-methods')
+          .evaluate(async (strip) => {
+            const samples = []
+            const box = () => {
+              const r = strip.getBoundingClientRect()
+              return [r.x, r.y, r.width, r.height]
+            }
+            const before = box()
+            const tabs = [...strip.querySelectorAll('[role="tab"]')]
+            const x = () =>
+              new DOMMatrixReadOnly(
+                getComputedStyle(strip, '::before').transform
+              ).m41
+            samples.push(x())
+            tabs[1].click()
+            for (let i = 0; i < 18; i += 1) {
+              await new Promise(requestAnimationFrame)
+              samples.push(x())
+            }
+            return {
+              samples,
+              before,
+              after: box(),
+              stable: strip.isConnected && tabs.every((tab) => tab.isConnected),
+            }
+          })
+        assert.equal(motion.stable, true)
+        assert.deepEqual(motion.before, motion.after)
+        assert(
+          motion.samples.some(
+            (x) => x > motion.samples[0] + 1 && x < motion.samples.at(-1) - 1
+          ),
+          '登录方式切换应有真实中间帧'
+        )
+        let sends = 0
+        let logins = 0
+        let releaseSend
+        let releaseLogin
+        let sentPhone
+        await page.route('**/rpc/auth', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method === 'send_sms_code') {
+            sends += 1
+            sentPhone = params.phone
+            await new Promise((resolve) => {
+              releaseSend = resolve
+            })
+            await route.fulfill({
+              json: {
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  code: 0,
+                  data: {
+                    resend_after: Math.floor(Date.now() / 1000) + 60,
+                    mock_delivery: true,
+                    mock_code: '123456',
+                  },
+                },
+              },
+            })
+          } else if (method === 'admin_login') {
+            logins += 1
+            await new Promise((resolve) => {
+              releaseLogin = resolve
+            })
+            await route.fulfill({
+              json: {
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  code: RpcErrorCode.AUTH_INVALID_PASSWORD,
+                  message: '密码错误',
+                  data: null,
+                },
+              },
+            })
+          } else await route.fallback()
+        })
+        await page.getByLabel('手机号').fill('123')
+        await page.getByRole('button', { name: '获取验证码' }).click()
+        await page.getByText('请输入有效手机号', { exact: true }).waitFor()
+        assert.equal(sends, 0, '无效手机号不能触发发码请求')
+        await page.getByLabel('手机号').fill('+86 13800000000')
+        await page.getByRole('button', { name: '获取验证码' }).click()
+        await page.waitForFunction(
+          () =>
+            document.querySelector('form').getAttribute('aria-busy') === 'true'
+        )
+        assert.equal(await page.getByLabel('手机号').isDisabled(), true)
+        assert.equal(
+          await page.getByRole('tab', { name: '密码登录' }).isDisabled(),
+          true
+        )
+        assert.equal(
+          await page.getByRole('button', { name: /^登\s*录$/ }).isDisabled(),
+          true
+        )
+        assert.equal(sends, 1)
+        assert.equal(sentPhone, '13800000000')
+        releaseSend()
+        await page.getByText('本次登录验证码：123456').waitFor()
+        await page.getByLabel('验证码', { exact: true }).fill('123456')
+        await page.getByLabel('手机号').fill('13900000000')
+        assert.equal(
+          await page.getByLabel('验证码', { exact: true }).inputValue(),
+          ''
+        )
+        assert.equal(await page.getByText('本次登录验证码：123456').count(), 0)
+        await page.getByRole('tab', { name: '密码登录' }).click()
+        assert.equal(
+          await page.getByLabel('密码', { exact: true }).inputValue(),
+          ''
+        )
+        assert.equal(
+          await page.getByLabel('密码', { exact: true }).getAttribute('type'),
+          'password'
+        )
+        await page.getByLabel('账号').fill('style-l1-admin')
+        await page.getByLabel('密码', { exact: true }).fill('wrong-password')
+        await page.getByRole('button', { name: /^登\s*录$/ }).click()
+        await page.waitForFunction(
+          () =>
+            document.querySelector('form').getAttribute('aria-busy') === 'true'
+        )
+        await page.locator('form').evaluate((form) => {
+          form.requestSubmit()
+          form.requestSubmit()
+        })
+        assert.equal(logins, 1, '连续提交只发出一次登录请求')
+        assert.equal(
+          await page.getByRole('tab', { name: '短信登录' }).isDisabled(),
+          true
+        )
+        releaseLogin()
+        await page.getByText('密码错误', { exact: true }).waitFor()
+        assert.equal(
+          await page.getByLabel('密码', { exact: true }).inputValue(),
+          'wrong-password'
+        )
+        assert.equal(
+          await page.getByRole('button', { name: /^登\s*录$/ }).isEnabled(),
+          true
+        )
+        await page.emulateMedia({ reducedMotion: 'reduce' })
+        await page.getByRole('tab', { name: '密码登录' }).press('ArrowRight')
+        assert.equal(
+          await page
+            .getByRole('tab', { name: '短信登录' })
+            .getAttribute('aria-selected'),
+          'true'
+        )
+        const duration = await page
+          .locator('.erp-login-methods')
+          .evaluate((el) => getComputedStyle(el, '::before').transitionDuration)
+        assert(duration.split(',').every((value) => parseFloat(value) === 0))
+      },
+    },
     {
       name: 'root-redirect-desktop',
       path: '/',
@@ -75,7 +386,7 @@ export function createAuthenticationEntryScenarios({
       verify: async (page) => {
         await expectHeading(page, '毛绒玩具管理系统')
         await expectButton(page, /^登\s*录$/)
-        await assertAdminLoginLayout(page, { minCardWidth: 520 })
+        await assertAdminLoginLayout(page, { minCardWidth: 456 })
       },
     },
     {
@@ -155,7 +466,7 @@ export function createAuthenticationEntryScenarios({
       verify: async (page) => {
         await expectHeading(page, '毛绒玩具管理系统')
         const username = page.getByLabel('账号')
-        const password = page.getByLabel('密码')
+        const password = page.getByLabel('密码', { exact: true })
         const submit = page.locator('.erp-login-card button[type="submit"]')
         const alert = page.locator('.erp-login-card .ant-alert-message')
         for (const [account, message] of [
@@ -202,14 +513,11 @@ export function createAuthenticationEntryScenarios({
         await assertLoginSegmentedReadable(page, {
           scenarioName: 'admin-login-theme-modes-desktop',
         })
-        await page.getByText('手机端待办', { exact: true }).click()
+        await page.getByText('手机版', { exact: true }).click()
         await assertLoginSegmentedReadable(page, {
           scenarioName: 'admin-login-theme-modes-desktop-entry-switch',
         })
-        await page
-          .locator('.erp-login-card label.ant-segmented-item')
-          .filter({ hasText: '短信登录' })
-          .click()
+        await page.getByRole('tab', { name: '短信登录' }).click()
         await assertLoginSegmentedReadable(page, {
           scenarioName: 'admin-login-theme-modes-desktop-login-mode-switch',
         })
@@ -225,8 +533,7 @@ export function createAuthenticationEntryScenarios({
         })
         await page.reload({ waitUntil: 'domcontentloaded' })
         await page
-          .locator('.erp-login-card label.ant-segmented-item')
-          .filter({ hasText: '短信登录' })
+          .getByRole('tab', { name: '短信登录' })
           .waitFor({ state: 'visible', timeout: 10_000 })
         await page.waitForFunction(
           () =>
@@ -238,7 +545,7 @@ export function createAuthenticationEntryScenarios({
         const persistedLoginState = await page.evaluate(() => {
           const selectedTexts = [
             ...document.querySelectorAll(
-              '.erp-login-card .ant-segmented-item-selected'
+              '.erp-login-card .ant-segmented-item-selected, .erp-login-methods [aria-selected="true"]'
             ),
           ].map((item) => item.textContent.replace(/\s+/g, ' ').trim())
           const codeButton = document.querySelector(
@@ -255,10 +562,8 @@ export function createAuthenticationEntryScenarios({
           }
         })
         assert(
-          persistedLoginState.selectedTexts.includes('手机端待办'),
-          `工作方式刷新后未保持手机端待办: ${JSON.stringify(
-            persistedLoginState
-          )}`
+          persistedLoginState.selectedTexts.includes('手机版'),
+          `工作方式刷新后未保持手机版: ${JSON.stringify(persistedLoginState)}`
         )
         assert(
           persistedLoginState.selectedTexts.includes('短信登录'),
@@ -371,7 +676,7 @@ export function createAuthenticationEntryScenarios({
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
         await expectHeading(page, '毛绒玩具管理系统')
-        await page.getByText('电脑端业务管理', { exact: true }).click()
+        await page.getByText('电脑版', { exact: true }).click()
         await page.getByLabel('账号').fill('style-l1-admin')
         await page.locator('#password').fill('style-l1-password')
         await page.getByRole('button', { name: /^登\s*录$/ }).click()
@@ -445,7 +750,7 @@ export function createAuthenticationEntryScenarios({
         })
       },
       verify: async (page) => {
-        await page.getByText('手机端待办', { exact: true }).click()
+        await page.getByText('手机版', { exact: true }).click()
         await page.getByLabel('账号').fill('style-l1-sales-quality')
         await page.locator('#password').fill('style-l1-password')
         await page.getByRole('button', { name: /^登\s*录$/u }).click()
@@ -487,9 +792,9 @@ export function createAuthenticationEntryScenarios({
           () =>
             Boolean(
               document.querySelector('.mobile-role-tasks-page') ||
-                document.querySelector(
-                  '[data-mobile-customer-runtime-guard="true"]'
-                )
+              document.querySelector(
+                '[data-mobile-customer-runtime-guard="true"]'
+              )
             ),
           null,
           { timeout: 10_000 }
@@ -527,8 +832,6 @@ export function createAuthenticationEntryScenarios({
           'mobile-role-work-entry-switch'
         )
         await mobileEntrySwitch.waitFor({ state: 'visible', timeout: 10_000 })
-        await expectText(page, '可用入口')
-        await expectText(page, '电脑端 / 手机待办')
         const mobileMetrics = await mobileEntrySwitch.evaluate((node) => {
           const rect = node.getBoundingClientRect()
           return {
@@ -761,7 +1064,7 @@ export function createAuthenticationEntryScenarios({
       },
     },
     {
-      name: 'admin-only-mobile-login-role-boundary',
+      name: 'admin-only-mobile-login-global-review',
       path: '/admin-login',
       mockAdminRpc: true,
       customerKey: 'yoyoosun',
@@ -769,29 +1072,43 @@ export function createAuthenticationEntryScenarios({
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await page.getByText('手机端待办', { exact: true }).click()
+        await page.getByText('手机版', { exact: true }).click()
         await page.getByLabel('账号').fill('style-l1-admin-only')
         await page.locator('#password').fill('style-l1-password')
         await page.getByRole('button', { name: /^登\s*录$/u }).click()
-        await page.waitForURL(
-          (url) =>
-            url.pathname === '/entry' &&
-            url.searchParams.get('reason') === 'mobile-role-unassigned',
-          { timeout: 10_000 }
-        )
-        await expectText(page, '当前账号未分配业务岗位')
-        await expectButton(page, '电脑端')
-        await expectButton(page, '退出登录')
-        await expectNoButton(page, '手机待办')
-        await assertTextAbsent(page, '老板手机待办')
+        await waitForPath(page, '/m/all/tasks')
+        await expectText(page, '全部岗位')
+        await expectText(page, '管理员视角')
+        await page.locator('.mobile-admin-review .ant-select-selector').click()
+        await page.locator('.ant-select-item-option').filter({ hasText: '仓库' }).click()
+        await waitForPath(page, '/m/warehouse/tasks')
+        await expectText(page, '管理员视角')
+        await page.reload()
+        await expectText(page, '管理员视角')
+        await waitForPath(page, '/m/warehouse/tasks')
       },
     },
     {
-      name: 'admin-only-mobile-deep-link-role-boundary',
+      name: 'admin-only-mobile-deep-link-review',
       path: '/m/boss/tasks',
       auth: 'admin',
       adminProfile: adminOnlySuperProfile,
       effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectText(page, '管理员视角')
+        await waitForPath(page, '/m/boss/tasks')
+        await page.locator('.mobile-admin-review .ant-select-selector').click()
+        await page.locator('.ant-select-item-option').filter({ hasText: '全部岗位' }).click()
+        await waitForPath(page, '/m/all/tasks')
+      },
+    },
+    {
+      name: 'ordinary-admin-mobile-global-review-denied',
+      path: '/m/all/tasks',
+      auth: 'admin',
+      adminProfile: { ...adminOnlySuperProfile, is_super_admin: false, permissions: ['system.user.read'] },
+      effectiveSession: { ...customerRuntimeEffectiveSession, roles: ['admin'], actions: ['system.user.read'] },
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await page.waitForURL(
@@ -916,9 +1233,8 @@ export function createAuthenticationEntryScenarios({
           .first()
         await focusOrigin.focus()
         await page.evaluate(async () => {
-          const { appAlert } = await import(
-            '../../../../../../../src/common/components/modal/alertBridge.js'
-          )
+          const { appAlert } =
+            await import('../../../../../../../src/common/components/modal/alertBridge.js')
           appAlert({
             title: '登录状态已失效',
             message: '请先登录',
@@ -936,9 +1252,8 @@ export function createAuthenticationEntryScenarios({
         )
 
         await page.evaluate(async () => {
-          const { appAlert } = await import(
-            '../../../../../../../src/common/components/modal/alertBridge.js'
-          )
+          const { appAlert } =
+            await import('../../../../../../../src/common/components/modal/alertBridge.js')
           window.__appAlertConfirmCount = 0
           appAlert({
             title: '登录状态已失效',

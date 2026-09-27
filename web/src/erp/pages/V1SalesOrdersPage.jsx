@@ -15,11 +15,17 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
+import { DEFAULT_DELIVERY_COUNTRY } from '../utils/deliveryAddress.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessActionTooltip,
@@ -36,11 +42,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
-import {
-  ColumnOrderHeaderMenu,
-  ColumnOrderModal,
-} from '../components/business-list/ColumnOrderModal.jsx'
-import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
+import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessLineItemOrderModal from '../components/business-list/BusinessLineItemOrderModal.jsx'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
@@ -54,7 +56,6 @@ import {
   listAllSalesOrderItems,
   listAllSalesOrderSummary,
   listAllSalesOrders,
-  listSalesOrderItemsPreview,
   listSalesOrders,
   listAllUnits,
   listAllWarehouses,
@@ -93,7 +94,6 @@ import {
   SALES_ORDERS_MODULE_KEY,
 } from '../components/sales-orders/salesOrderPageConfig.mjs'
 import { useSalesOrderPaymentReview } from '../components/sales-orders/useSalesOrderPaymentReview.mjs'
-import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   V1_ROUTE_PATHS,
   buildSequentialDraftCode,
@@ -115,15 +115,9 @@ import {
   buildSalesOrderCustomerSourceValues,
   deliverySnapshotFormValues,
 } from '../utils/sourcePartySnapshots.mjs'
-import {
-  applyModuleColumnOrder,
-  sanitizeModuleColumnOrder,
-} from '../utils/moduleTableColumns.mjs'
 import { filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.mjs'
 import {
-  getPreferredColumnOrder,
   parseBusinessSortValue,
-  writeStoredColumnOrder,
 } from '../utils/businessTableActions.mjs'
 import { isDraftSourceDocument } from '../utils/sourceDocumentEditing.mjs'
 import {
@@ -253,31 +247,57 @@ export default function V1SalesOrdersPage() {
   const [itemLoading, setItemLoading] = useState(false)
   const [referencesLoading, setReferencesLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [keyword, setKeyword] = useState('')
+  const [keyword, setKeyword] = useBusinessPageState('keyword', '')
   const [lifecycleScope, setLifecycleScope] = useState(() =>
     lifecycleScopeFromSearchParams(searchParams)
   )
-  const [statusFilter, setStatusFilter] = useState('')
-  const [customerFilter, setCustomerFilter] = useState('')
-  const [dateFilterField, setDateFilterField] = useState('order_date')
-  const [dateFilterStart, setDateFilterStart] = useState('')
-  const [dateFilterEnd, setDateFilterEnd] = useState('')
-  const [sortFilter, setSortFilter] = useState('updated_at:desc')
-  const [contentView, setContentView] = useState('list')
+  const [statusFilter, setStatusFilter] = useBusinessPageState(
+    'statusFilter',
+    ''
+  )
+  const [customerFilter, setCustomerFilter] = useBusinessPageState(
+    'customerFilter',
+    ''
+  )
+  const [dateFilterField, setDateFilterField] = useBusinessPageState(
+    'dateFilterField',
+    'order_date'
+  )
+  const [dateFilterStart, setDateFilterStart] = useBusinessPageState(
+    'dateFilterStart',
+    ''
+  )
+  const [dateFilterEnd, setDateFilterEnd] = useBusinessPageState(
+    'dateFilterEnd',
+    ''
+  )
+  const [sortFilter, setSortFilter] = useBusinessPageState(
+    'sortFilter',
+    'updated_at:desc'
+  )
+  const [contentView, setContentView] = useBusinessPageState(
+    'contentView',
+    'list'
+  )
+  const [deliveryViewState, setDeliveryViewState] = useBusinessPageState(
+    'deliveryViewState',
+    {}
+  )
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
   const [units, setUnits] = useState([])
   const [total, setTotal] = useState(0)
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [statusCounts, setStatusCounts] = useState(null)
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: 20,
+  })
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const [engineeringOrderID, setEngineeringOrderID] = useState(null)
   const [materialRequestOrderID, setMaterialRequestOrderID] = useState(null)
   const [editingOrder, setEditingOrder] = useState(null)
   const [detailOrder, setDetailOrder] = useState(null)
-  const [orderColumnOrder, setOrderColumnOrder] = useState(null)
-  const [columnOrderTarget, setColumnOrderTarget] = useState(null)
-  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [lineOrderLoading, setLineOrderLoading] = useState(false)
   const [lineOrderOpen, setLineOrderOpen] = useState(false)
   const [lineOrderContext, setLineOrderContext] = useState({
@@ -348,7 +368,6 @@ export default function V1SalesOrdersPage() {
 
   const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
   const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
-  const canReadOrder = hasActionPermission(adminProfile, 'sales_order.read')
   const canReadOrderItems = hasActionPermission(
     adminProfile,
     'sales_order_item.read'
@@ -366,7 +385,7 @@ export default function V1SalesOrdersPage() {
   )
   const selectedOrderCanReorder = Boolean(
     canUpdateOrder &&
-      canReorderSourceDocumentItems('sales_order', selectedOrder)
+    canReorderSourceDocumentItems('sales_order', selectedOrder)
   )
   const selectedOrderLifecycleStatus = String(
     selectedOrder?.lifecycle_status || ''
@@ -393,7 +412,7 @@ export default function V1SalesOrdersPage() {
     [units]
   )
   const getSalesOrderItemFields = useCallback(
-    (item, { view }) => [
+    (item) => [
       {
         label: '产品图',
         media: true,
@@ -460,26 +479,11 @@ export default function V1SalesOrdersPage() {
       { label: '设计师', value: item?.designer, wide: true },
       { label: '工艺要求', value: item?.process_requirement, fullWidth: true },
       { label: '打样说明', value: item?.sample_note, fullWidth: true },
-      ...(view !== 'preview'
-        ? [{ label: '备注', value: item?.note, fullWidth: true }]
-        : []),
+      { label: '备注', value: item?.note, fullWidth: true },
     ],
     [unitOptions]
   )
-  const loadSalesOrderItemsPreview = useCallback(async (order, { signal }) => {
-    const data = await listSalesOrderItemsPreview(
-      {
-        sales_order_id: order.id,
-        expected_version: order.version,
-      },
-      { signal }
-    )
-    return {
-      items: data?.sales_order_items,
-      total: data?.total,
-    }
-  }, [])
-  const loadAllSalesOrderItemsForPreview = useCallback(
+  const loadSalesOrderDetailsItems = useCallback(
     async (order, { signal }) => {
       const data = await listAllSalesOrderItems(
         {
@@ -495,21 +499,6 @@ export default function V1SalesOrdersPage() {
     },
     []
   )
-  const salesOrderItemsPreview = useBusinessRowItemsPreview({
-    records: orders,
-    getItemTotal: (order) => order?.item_count,
-    rowExpandable: (order) =>
-      canReadOrder &&
-      canReadOrderItems &&
-      Number(order?.id || 0) > 0 &&
-      Number(order?.version || 0) > 0,
-    loadPreview: loadSalesOrderItemsPreview,
-    onOpenDetails: (order) => openSalesOrderDetails(order),
-    getItemFields: getSalesOrderItemFields,
-    getItemLabel: (item, { index }) => `明细 ${item?.line_no || index + 1}`,
-    getRecordLabel: (order) => order?.order_no || '当前销售订单',
-    emptyDescription: '当前销售订单暂无明细',
-  })
   const {
     applyCustomerPaymentDefaults,
     applyPaymentMethodTermDays,
@@ -714,16 +703,19 @@ export default function V1SalesOrdersPage() {
     load: loadDeliveryItems,
     actionLabel: '加载销售交付进度',
   })
+  const reloadDeliveryData = deliveryData.reload
 
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
     setLoading(true)
+    setStatusCounts(null)
     try {
       const routeSelectedID = Number(routeSalesOrderID || 0)
       const [result, routeOrder] = await Promise.all([
         listSalesOrders(
           {
             ...orderListParams,
+            include_status_counts: true,
             ...getBusinessPaginationParams(pagination),
           },
           { signal: request.signal }
@@ -747,6 +739,9 @@ export default function V1SalesOrdersPage() {
       const nextOrders = exactPage.records
       setOrders(nextOrders)
       setTotal(exactPage.total)
+      setStatusCounts(resolveBusinessStatusCounts(result, {
+        hasExactContext: routeSelectedID > 0, exactRecord: routeOrder, statusField: 'lifecycle_status',
+      }))
       setSelectedOrder((current) => {
         if (routeSelectedID > 0) {
           return routeOrder || null
@@ -775,8 +770,11 @@ export default function V1SalesOrdersPage() {
   }, [loadCustomers, loadOrders])
 
   useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadOrders)
-  }, [loadOrders, outletContext])
+    return outletContext?.registerPageRefresh?.(() => {
+      if (contentView === 'delivery') reloadDeliveryData()
+      return loadOrders()
+    })
+  }, [contentView, loadOrders, outletContext, reloadDeliveryData])
 
   const loadReservationBalances = useCallback(
     async (item) => {
@@ -1009,6 +1007,7 @@ export default function V1SalesOrdersPage() {
       freight_terms: undefined,
       quoted_freight_amount: undefined,
       order_date: currentBusinessDate(),
+      delivery_country_region: DEFAULT_DELIVERY_COUNTRY,
       items: [],
     })
     rememberPaymentCondition({})
@@ -1171,7 +1170,6 @@ export default function V1SalesOrdersPage() {
       })
       const { sales_order: savedOrder } = result
       const openItems = selectOpenSourceDocumentItems(result.sales_order_items)
-      salesOrderItemsPreview.invalidate(order)
       setOrders((current) =>
         current.map((item) => (item.id === savedOrder.id ? savedOrder : item))
       )
@@ -1338,7 +1336,11 @@ export default function V1SalesOrdersPage() {
           null
         )
       }
-      message.success(action.successMessage || `销售订单已${action.label}`)
+      message.success(
+        action.key === 'submit'
+          ? orderSubmissionSuccessMessage('sales_order', updated)
+          : action.successMessage || `销售订单已${action.label}`
+      )
       const nextSelectedOrder =
         action.returnsRecord === false ? order : updated || order
       setSelectedOrder(nextSelectedOrder)
@@ -1399,32 +1401,6 @@ export default function V1SalesOrdersPage() {
     })
   }
 
-  const persistColumnOrder = useCallback(
-    async ({ moduleKey, columns, nextOrder, setLocalOrder }) => {
-      const sanitizedOrder = sanitizeModuleColumnOrder(nextOrder, columns)
-      setLocalOrder(sanitizedOrder)
-      writeStoredColumnOrder(moduleKey, sanitizedOrder)
-      setColumnOrderSaving(true)
-      try {
-        const erpPreferences = await setERPColumnOrder({
-          module_key: moduleKey,
-          order: sanitizedOrder,
-        })
-        outletContext?.updateAdminERPPreferences?.(erpPreferences)
-        message.success(
-          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
-        )
-      } catch (error) {
-        message.warning(
-          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
-        )
-      } finally {
-        setColumnOrderSaving(false)
-      }
-    },
-    [outletContext]
-  )
-
   const orderDataColumns = useMemo(
     () =>
       filterColumnsByEffectiveFieldPolicy(
@@ -1435,52 +1411,17 @@ export default function V1SalesOrdersPage() {
     [adminProfile]
   )
 
-  const effectiveOrderColumnOrder = useMemo(
-    () =>
-      getPreferredColumnOrder({
-        adminProfile,
-        moduleKey: SALES_ORDERS_MODULE_KEY,
-        columns: orderDataColumns,
-        localOrder: orderColumnOrder,
-      }),
-    [adminProfile, orderColumnOrder, orderDataColumns]
-  )
-
-  const visibleOrderDataColumns = useMemo(
-    () => applyModuleColumnOrder(orderDataColumns, effectiveOrderColumnOrder),
-    [effectiveOrderColumnOrder, orderDataColumns]
-  )
-
-  const orderColumns = useMemo(
-    () =>
-      visibleOrderDataColumns.map((column) => ({
-        ...column,
-        title: (
-          <ColumnOrderHeaderMenu
-            column={column}
-            columns={orderDataColumns}
-            order={effectiveOrderColumnOrder}
-            saving={columnOrderSaving}
-            onChange={(nextOrder) =>
-              persistColumnOrder({
-                moduleKey: SALES_ORDERS_MODULE_KEY,
-                columns: orderDataColumns,
-                nextOrder,
-                setLocalOrder: setOrderColumnOrder,
-              })
-            }
-            onOpenPanel={() => setColumnOrderTarget('orders')}
-          />
-        ),
-      })),
-    [
-      columnOrderSaving,
-      effectiveOrderColumnOrder,
-      orderDataColumns,
-      persistColumnOrder,
-      visibleOrderDataColumns,
-    ]
-  )
+  const {
+    tableColumns: orderColumns,
+    exportColumns: visibleOrderDataColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: SALES_ORDERS_MODULE_KEY,
+    moduleTitle: '销售订单列表',
+    columns: orderDataColumns,
+  })
 
   const loadExportOrders = useCallback(
     async ({ signal }) => {
@@ -1504,13 +1445,13 @@ export default function V1SalesOrdersPage() {
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
-      linkedKeyword ||
-      routeSalesOrderID ||
-      lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
-      statusFilter ||
-      customerFilter ||
-      dateFilterStart ||
-      dateFilterEnd
+    linkedKeyword ||
+    routeSalesOrderID ||
+    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
+    statusFilter ||
+    customerFilter ||
+    dateFilterStart ||
+    dateFilterEnd
   )
   const clearRouteContext = useCallback(
     (resetScope = false) => {
@@ -1524,7 +1465,7 @@ export default function V1SalesOrdersPage() {
       )
       resetBusinessPaginationCurrent(setPagination)
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams, setPagination]
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -1536,14 +1477,17 @@ export default function V1SalesOrdersPage() {
     setDateFilterEnd('')
     resetBusinessPaginationCurrent(setPagination)
     clearRouteContext(true)
-  }, [clearRouteContext])
+  }, [
+    clearRouteContext,
+    setKeyword,
+    setPagination,
+    setStatusFilter,
+    setCustomerFilter,
+    setDateFilterField,
+    setDateFilterStart,
+    setDateFilterEnd,
+  ])
 
-  const activeOrderCount = useMemo(
-    () =>
-      orders.filter((order) => String(order.lifecycle_status) === 'active')
-        .length,
-    [orders]
-  )
   const selectedOrderDisplayText = useMemo(() => {
     if (!selectedOrder) return '请先选择销售订单'
     const customerName =
@@ -1634,9 +1578,7 @@ export default function V1SalesOrdersPage() {
         { value: 'list', label: '订单列表' },
         { value: 'delivery', label: '交付进度' },
       ]}
-      loading={deliveryData.loading}
       onChange={setContentView}
-      onReload={deliveryData.reload}
     />
   )
 
@@ -1646,10 +1588,10 @@ export default function V1SalesOrdersPage() {
         compact
         helpKey="sales-orders"
         title="销售订单"
+        viewSwitch={salesViewSwitch}
         stats={[
-          { key: 'total', label: '总订单', value: total },
+          { key: 'total', label: '符合条件', value: total },
           { key: 'current', label: '本页显示', value: orders.length },
-          { key: 'active', label: '已生效', value: activeOrderCount },
         ]}
       />
 
@@ -1692,7 +1634,12 @@ export default function V1SalesOrdersPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <BusinessStatusFilter
+              inline
+              counts={statusCounts}
+              loading={loading}
+              exact={Boolean(routeSalesOrderID)}
+              aria-label="销售订单状态"
               className="erp-business-filter-control--status"
               options={lifecycleStatusOptions}
               value={statusFilter}
@@ -1762,13 +1709,13 @@ export default function V1SalesOrdersPage() {
               disabled={loading || exporting || total === 0}
               onClick={exportOrders}
             >
-              导出筛选结果
+              导出
             </ToolbarButton>
             <ToolbarButton
               icon={<SettingOutlined />}
-              onClick={() => setColumnOrderTarget('orders')}
+              onClick={openColumnOrder}
             >
-              列顺序
+              列设置
             </ToolbarButton>
           </Space>
         }
@@ -2017,12 +1964,18 @@ export default function V1SalesOrdersPage() {
               }
             />
           ))}
+          <BusinessTaskActions sourceType="sales_order" record={selectedOrder} adminProfile={adminProfile} disabled={saving} />
         </SelectionActionBar>
       </BusinessOperationPanel>
 
-      <BusinessViewSurface switcher={salesViewSwitch}>
+      <BusinessViewSurface
+        activeView={contentView}
+        loading={contentView === 'list' ? loading : deliveryData.loading}
+      >
         {contentView === 'delivery' ? (
           <SalesDeliveryProgress
+            viewState={deliveryViewState}
+            onViewStateChange={setDeliveryViewState}
             items={deliveryData.rows}
             loading={deliveryData.loading}
             error={deliveryData.error}
@@ -2035,10 +1988,6 @@ export default function V1SalesOrdersPage() {
             loading={loading}
             columns={orderColumns}
             dataSource={orders}
-            expandable={{
-              ...salesOrderItemsPreview.expandable,
-              columnWidth: 48,
-            }}
             pagination={createBusinessTablePagination({
               pagination,
               total,
@@ -2080,7 +2029,7 @@ export default function V1SalesOrdersPage() {
                 getItemFields: getSalesOrderItemFields,
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
-                load: loadAllSalesOrderItemsForPreview,
+                load: loadSalesOrderDetailsItems,
                 title: '销售订单明细',
               }
             : null
@@ -2091,22 +2040,7 @@ export default function V1SalesOrdersPage() {
         onClose={() => setDetailOrder(null)}
       />
 
-      <ColumnOrderModal
-        open={columnOrderTarget === 'orders'}
-        moduleTitle="销售订单列表"
-        columns={orderDataColumns}
-        order={effectiveOrderColumnOrder}
-        saving={columnOrderSaving}
-        onChange={(nextOrder) =>
-          persistColumnOrder({
-            moduleKey: SALES_ORDERS_MODULE_KEY,
-            columns: orderDataColumns,
-            nextOrder,
-            setLocalOrder: setOrderColumnOrder,
-          })
-        }
-        onClose={() => setColumnOrderTarget(null)}
-      />
+      {columnOrderModal}
 
       <BusinessLineItemOrderModal
         description="保存后只调整当前销售订单的订货明细顺序，不修改产品、数量、价格或稳定行号。"

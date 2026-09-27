@@ -1,3 +1,4 @@
+import { assertBusinessFormSections } from './businessFormSectionAssertions.mjs'
 import {
   assertBusinessFormPage,
   closeBusinessFormPage,
@@ -113,6 +114,7 @@ export function createBusinessFormPageDraftScenarios(deps) {
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       await editor.getByRole('heading', { name: title, exact: true }).waitFor()
       await assertBusinessFormPage(page, editor)
+      await assertBusinessFormSections(page, editor, key)
       await editor.getByRole('status').getByText('尚未修改').waitFor()
       deps.assert.equal(
         await editor.locator('input[id$="quantity"]').inputValue(),
@@ -161,9 +163,7 @@ export function createBusinessFormPageDraftScenarios(deps) {
         await editor.locator('textarea').fill('红冲登记未保存')
         await closeBusinessFormPage(page, editor)
         await page.getByRole('tab', { name: /收付款/ }).click()
-        await page
-          .getByRole('button', { name: '登记收付款' })
-          .click()
+        await page.getByRole('button', { name: '登记收付款' }).click()
         await editor
           .getByRole('heading', { name: '登记收付款', exact: true })
           .waitFor()

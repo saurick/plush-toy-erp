@@ -1,6 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Empty, Popover, Select, Tag } from 'antd'
-import { FilterOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, Empty, Popover, Select, Spin, Tag } from 'antd'
+import {
+  ArrowRightOutlined,
+  FilterOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
   useNavigate,
@@ -8,21 +12,25 @@ import {
   useSearchParams,
 } from 'react-router-dom'
 import FilterChip from '@/common/components/navigation/FilterChip'
-import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
+import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { listBusinessProgress } from '../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { canOpenRelatedDocumentPath } from '../utils/relatedDocumentNavigation.mjs'
 import { effectiveSessionAllowsPage } from '../utils/adminProfileSync.mjs'
-import { getWorkflowTaskOwnerRoleLabel } from '../utils/workflowTaskBoard.mjs'
+import { getWorkflowTaskDisplayName } from '../utils/processRuntimePresentation.mjs'
 import {
   progressQueryFromURL,
   progressDelivery,
-  progressStatusLabel,
+  progressStages,
 } from '../utils/businessProgress.mjs'
 import BusinessProgressDrawer from '../components/business-visualizations/BusinessProgressDrawer.jsx'
+import BusinessProgressSummary, {
+  ProgressBadges,
+} from '../components/business-visualizations/BusinessProgressSummary.jsx'
+import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
 import { DateRangeFilter } from '../components/business-list/BusinessListLayout.jsx'
 import '../styles/app/progress-board.css'
 
@@ -31,39 +39,19 @@ const SCOPES = [
   { value: 'ended', label: '已结束' },
   { value: 'all', label: '全部记录' },
 ]
-const roleLabel = (key) =>
-  key ? getWorkflowTaskOwnerRoleLabel({ owner_role_key: key }) : '未分配岗位'
 const count = (value) =>
   Number.isSafeInteger(value)
     ? new Intl.NumberFormat('zh-CN').format(value)
     : '—'
 
-function Stage({ label, text, tone = '', onClick, disabled }) {
-  return (
-    <button
-      type="button"
-      className={`erp-progress-stage ${tone}`}
-      disabled={disabled}
-      onClick={onClick}
-      aria-label={`${label}：${text}`}
-    >
-      <span>{label}</span>
-      <strong>{text}</strong>
-    </button>
-  )
-}
-
-function Delivery({ row, onClick }) {
+function Delivery({ row }) {
   const delivery = progressDelivery(row)
   return (
-    <button
-      type="button"
-      className="erp-progress-delivery"
-      onClick={onClick}
-      aria-label={`${delivery.label}：${delivery.text}`}
-    >
-      <span>{delivery.label}</span>
-      <strong>{delivery.text}</strong>
+    <span className="erp-progress-delivery">
+      <span className="erp-progress-delivery-copy">
+        <span>{delivery.label}</span>
+        <strong>{delivery.text}</strong>
+      </span>
       {delivery.percent !== undefined && (
         <span
           className="erp-progress-track"
@@ -76,7 +64,7 @@ function Delivery({ row, onClick }) {
           <i style={{ width: `${delivery.percent}%` }} />
         </span>
       )}
-    </button>
+    </span>
   )
 }
 
@@ -87,12 +75,13 @@ export default function BusinessDashboardPage() {
   const [params, setParams] = useSearchParams()
   const queryKey = JSON.stringify(progressQueryFromURL(params))
   const query = useMemo(() => JSON.parse(queryKey), [queryKey])
-  const [keyword, setKeyword] = useState(query.keyword)
   const [owner, setOwner] = useState(query.owner)
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [selection, setSelection] = useState(null)
+  const summaryRef = useRef(null)
+  const listRef = useRef(null)
   const begin = useLatestRequestCoordinator()
   const data =
     state?.key === queryKey && state?.profile === adminProfile
@@ -110,6 +99,7 @@ export default function BusinessDashboardPage() {
       setParams((previous) => {
         const next = new URLSearchParams(previous)
         next.delete('page')
+        next.delete('selected')
         for (const [key, value] of Object.entries(changes)) {
           if (value === '' || value === null || value === undefined) {
             next.delete(key)
@@ -121,6 +111,10 @@ export default function BusinessDashboardPage() {
     },
     [setParams]
   )
+  const progressSearch = useLiveSearch({
+    value: query.keyword,
+    onSearch: (keyword) => update({ q: keyword }),
+  })
   const load = useCallback(async () => {
     const request = begin('business-progress')
     if (!adminProfile?.id) {
@@ -135,9 +129,6 @@ export default function BusinessDashboardPage() {
       })
       if (!request.isCurrent()) return false
       setState({ key: queryKey, profile: adminProfile, data: result })
-      if (result.total > 0 && query.offset >= result.total) {
-        update({ page: Math.ceil(result.total / query.limit) })
-      }
       return true
     } catch (failure) {
       if (request.isCurrent()) {
@@ -151,15 +142,19 @@ export default function BusinessDashboardPage() {
         request.finish()
       }
     }
-  }, [adminProfile, begin, query, queryKey, update])
+  }, [adminProfile, begin, query, queryKey])
   useEffect(() => {
     load()
   }, [load])
+  useEffect(() => {
+    if (data?.total > 0 && query.offset >= data.total) {
+      update({ page: Math.ceil(data.total / query.limit) })
+    }
+  }, [data, query.offset, query.limit, update])
   useEffect(() => outlet?.registerPageRefresh?.(load), [load, outlet])
   useEffect(() => {
-    setKeyword(query.keyword)
     setOwner(query.owner)
-  }, [query.keyword, query.owner])
+  }, [query.owner])
   useEffect(() => {
     setSelection(null)
   }, [adminProfile])
@@ -194,188 +189,6 @@ export default function BusinessDashboardPage() {
     },
     [adminProfile, outlet?.allowedMenuPaths]
   )
-  const columns = [
-    {
-      title: view === 'orders' ? '订单 / 客户 / 产品' : '生产单 / 产品',
-      key: 'identity',
-      width: 244,
-      render: (_, row) => (
-        <div className="erp-progress-identity">
-          <button
-            type="button"
-            onClick={() => openDetail(row)}
-            className="erp-progress-order"
-            data-progress-order-id={row.id}
-          >
-            {row.order_no}
-          </button>
-          <strong>
-            {row.product}
-            {row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}
-          </strong>
-          <span>
-            {row.customer || (row.unlinked ? '含未关联订单的生产明细' : '—')} ·{' '}
-            {progressStatusLabel(row.status)}
-          </span>
-        </div>
-      ),
-    },
-    {
-      title: view === 'orders' ? '交期' : '计划结束',
-      key: 'due',
-      width: 106,
-      render: (_, row) => (
-        <div className="erp-progress-date">
-          <strong className={row.overdue ? 'erp-progress-danger' : ''}>
-            {row.due_date || '待确定'}
-          </strong>
-          {row.overdue ? (
-            <Tag color="red">已逾期</Tag>
-          ) : row.due_soon ? (
-            <Tag color="orange">7 天内到期</Tag>
-          ) : !row.active ? (
-            <span>已结束</span>
-          ) : (
-            <span>交期跟踪</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: '各环节进展',
-      key: 'stages',
-      width: view === 'orders' ? 314 : 256,
-      render: (_, row) => (
-        <div className="erp-progress-stages">
-          {view === 'orders' && (
-            <Stage
-              label="资料"
-              text={
-                row.engineering_total
-                  ? `${row.engineering_ready}/${row.engineering_total} 确认`
-                  : '待完善'
-              }
-              onClick={() => openDetail(row, 'lines')}
-              tone={
-                row.engineering_ready === row.engineering_total &&
-                row.engineering_total
-                  ? 'is-complete'
-                  : ''
-              }
-            />
-          )}
-          <Stage
-            label="领料"
-            text={
-              !access?.production
-                ? '无权限'
-                : !row.material_total
-                  ? '待核对'
-                  : row.material_pending
-                    ? `${row.material_pending} 项待领`
-                    : '已领齐'
-            }
-            disabled={!access?.production}
-            tone={row.material_pending ? 'is-attention' : ''}
-            onClick={() => openDetail(row, 'materials')}
-          />
-          <Stage
-            label="生产"
-            text={
-              !access?.wip
-                ? '无权限'
-                : row.current_operation
-                  ? row.current_operation +
-                    (row.operation_count > 1 ? '等' : '')
-                  : row.in_progress_batches
-                    ? `${row.in_progress_batches} 批在制`
-                    : row.outsourced_batches
-                      ? `${row.outsourced_batches} 批委外`
-                      : row.planned_batches
-                        ? `${row.planned_batches} 批待开`
-                        : row.production_orders
-                          ? `${row.production_orders} 张单`
-                          : '未关联'
-            }
-            disabled={!access?.wip}
-            onClick={() =>
-              openDetail(
-                row,
-                row.in_progress_batches ||
-                  row.outsourced_batches ||
-                  row.planned_batches
-                  ? 'batches'
-                  : 'production'
-              )
-            }
-          />
-          <Stage
-            label="质检"
-            text={
-              !access?.wip
-                ? '无权限'
-                : row.waiting_batches
-                  ? `${row.waiting_batches} 批待检`
-                  : row.rejected_batches
-                    ? `${row.rejected_batches} 批不合格`
-                    : '查看批次'
-            }
-            disabled={!access?.wip}
-            tone={
-              row.waiting_batches || row.rejected_batches ? 'is-attention' : ''
-            }
-            onClick={() => openDetail(row, 'batches')}
-          />
-        </div>
-      ),
-    },
-    {
-      title: view === 'orders' ? '交付进度' : '完工进度',
-      key: 'delivery',
-      width: 170,
-      render: (_, row) => (
-        <Delivery row={row} onClick={() => openDetail(row)} />
-      ),
-    },
-    {
-      title: '当前待办 / 处理人',
-      key: 'attention',
-      width: 214,
-      render: (_, row) => (
-        <div className="erp-progress-attention">
-          {row.attention_task ? (
-            <>
-              <button
-                type="button"
-                className={row.blocked ? 'erp-progress-danger' : ''}
-                onClick={() => openDetail(row, 'tasks')}
-              >
-                {row.attention_reason || row.attention_task}
-              </button>
-              <span>
-                {row.attention_owner || '未分配处理人'} ·{' '}
-                {roleLabel(row.attention_role)}
-              </span>
-              {row.open_tasks > 1 && (
-                <button
-                  type="button"
-                  className="erp-progress-more-tasks"
-                  onClick={() => openDetail(row, 'tasks')}
-                >
-                  另有 {row.open_tasks - 1} 项待办
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <span>{access?.tasks ? '暂无可见待办' : '任务无查看权限'}</span>
-              {row.sales_owner && <span>业务负责人：{row.sales_owner}</span>}
-            </>
-          )}
-        </div>
-      ),
-    },
-  ]
   const metrics = [
     {
       key: 'all',
@@ -404,6 +217,39 @@ export default function BusinessDashboardPage() {
     query.date_to ||
     query.risk !== 'all' ||
     query.scope !== 'active'
+  const selectedRow =
+    data?.rows.find(
+      (row) => `${row.view}:${row.id}` === params.get('selected')
+    ) || data?.rows[0]
+  const selectRow = (row, focusSummary = false) => {
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        next.set('selected', `${row.view}:${row.id}`)
+        return next
+      },
+      { replace: true }
+    )
+    if (focusSummary) {
+      requestAnimationFrame(() => {
+        summaryRef.current?.focus({ preventScroll: true })
+        summaryRef.current?.scrollIntoView({ block: 'nearest' })
+      })
+    }
+  }
+  const selectedKey = params.get('selected')
+  const selectedID = selectedRow?.id
+  useEffect(() => {
+    if (
+      selectedKey &&
+      selectedID &&
+      window.matchMedia('(min-width: 901px)').matches
+    ) {
+      listRef.current
+        ?.querySelector(`[data-progress-order-id="${selectedID}"]`)
+        ?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [selectedKey, selectedID])
   return (
     <section className="erp-progress-board" aria-label="进度看板">
       <div className="erp-progress-controls">
@@ -429,24 +275,13 @@ export default function BusinessDashboardPage() {
             className="erp-progress-search"
             aria-label="搜索订单、客户或产品"
             placeholder="搜单号、客户、产品"
-            value={keyword}
+            value={progressSearch.value}
             allowClear
             maxLength={100}
-            onChange={(event) => {
-              setKeyword(event.target.value)
-              if (!event.target.value && query.keyword) update({ q: '' })
-            }}
-            onPressEnter={(event) => update({ q: event.target.value.trim() })}
-            suffix={
-              <Button
-                type="text"
-                size="small"
-                aria-label="查询进度"
-                onClick={() => update({ q: keyword.trim() })}
-              >
-                查询
-              </Button>
-            }
+            onChange={progressSearch.onChange}
+            onCompositionStart={progressSearch.onCompositionStart}
+            onCompositionEnd={progressSearch.onCompositionEnd}
+            onPressEnter={progressSearch.onPressEnter}
           />
           <Select
             aria-label="记录范围"
@@ -550,8 +385,12 @@ export default function BusinessDashboardPage() {
               className="erp-progress-metric"
               key={metric.key}
               selected={query.risk === metric.key}
-              count={count(metric.number)}
-              disabled={metric.key === 'blocked' && access?.tasks === false}
+              count={count(loading ? undefined : metric.number)}
+              disabled={
+                loading ||
+                !data ||
+                (metric.key === 'blocked' && access?.tasks === false)
+              }
               onClick={() => update({ risk: metric.key })}
             >
               {metric.label}
@@ -576,7 +415,6 @@ export default function BusinessDashboardPage() {
               type="link"
               size="small"
               onClick={() => {
-                setKeyword('')
                 setOwner('')
                 update({
                   q: '',
@@ -593,11 +431,6 @@ export default function BusinessDashboardPage() {
           </div>
         )}
       </div>
-      {!error && (
-        <p className="erp-progress-mobile-hint">
-          左右滑动查看进度，点单号查看全部明细
-        </p>
-      )}
       {error ? (
         <Alert
           className="erp-progress-error"
@@ -612,36 +445,133 @@ export default function BusinessDashboardPage() {
           }
         />
       ) : (
-        <Table
-          aria-label={view === 'orders' ? '订单交付进度' : '生产执行进度'}
-          className="erp-progress-table"
-          columns={columns.map((column) => ({ ...column, align: 'left' }))}
-          rowKey="id"
-          size="middle"
-          loading={loading}
-          dataSource={data?.rows || []}
-          scroll={{ x: view === 'orders' ? 1048 : 990 }}
-          locale={{
-            emptyText: loading ? (
-              '正在查询进度…'
-            ) : (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  hasFilters ? '没有符合条件的记录' : '当前范围暂无记录'
-                }
-              />
-            ),
-          }}
-          pagination={{
-            current: query.offset / query.limit + 1,
-            pageSize: query.limit,
-            total: data?.total || 0,
-            showSizeChanger: false,
-            showTotal: (total) => `共 ${count(total)} 单`,
-            onChange: (page) => update({ page }),
-          }}
-        />
+        <>
+          <Spin spinning={loading}>
+            <div className="erp-progress-layout" aria-busy={loading}>
+              <section
+                className="erp-progress-list-panel"
+                aria-label={view === 'orders' ? '订单交付进度' : '生产执行进度'}
+              >
+                <div className="erp-progress-list" ref={listRef}>
+                  {data?.rows.length ? (
+                    data.rows.map((row) => {
+                      const productionStage = progressStages(row, access).find(
+                        (stage) => stage.key === 'production'
+                      )
+                      const selected =
+                        selectedRow?.id === row.id &&
+                        selectedRow?.view === row.view
+                      return (
+                        <article
+                          key={`${row.view}:${row.id}`}
+                          className={`erp-progress-row${selected ? ' is-selected' : ''}`}
+                        >
+                          <button
+                            type="button"
+                            className="erp-progress-row-select"
+                            data-progress-order-id={row.id}
+                            aria-label={row.order_no}
+                            aria-pressed={selected}
+                            aria-controls="progress-summary"
+                            onClick={() => selectRow(row, true)}
+                          >
+                            <span className="erp-progress-row-head">
+                              <strong className="erp-progress-order">
+                                {row.order_no}
+                              </strong>
+                              <ProgressBadges row={row} />
+                            </span>
+                            <span className="erp-progress-row-copy">
+                              <strong>
+                                {row.product}
+                                {row.product_count > 1
+                                  ? ` 等 ${row.product_count} 项`
+                                  : ''}
+                              </strong>
+                              <span>
+                                {row.customer ||
+                                  (row.unlinked
+                                    ? '含未关联订单的生产明细'
+                                    : '—')}
+                              </span>
+                              <span
+                                className={
+                                  row.overdue ? 'erp-progress-danger' : ''
+                                }
+                              >
+                                {row.due_date || '待确定'} ·{' '}
+                                {view === 'orders' ? '交期' : '计划结束'}
+                              </span>
+                            </span>
+                            <Delivery row={row} />
+                            <span className="erp-progress-row-foot">
+                              <span>
+                                {access?.tasks && row.attention_task
+                                  ? row.attention_reason ||
+                                    getWorkflowTaskDisplayName({
+                                      task_name: row.attention_task,
+                                    })
+                                  : productionStage && !productionStage.disabled
+                                    ? `生产：${productionStage.text}`
+                                    : '查看资料与交付进度'}
+                              </span>
+                              <ArrowRightOutlined aria-hidden="true" />
+                            </span>
+                          </button>
+                        </article>
+                      )
+                    })
+                  ) : loading ? (
+                    <div className="erp-progress-empty" role="status">
+                      正在查询进度…
+                    </div>
+                  ) : (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description={
+                        hasFilters ? '没有符合条件的记录' : '当前范围暂无记录'
+                      }
+                    />
+                  )}
+                </div>
+              </section>
+              <aside
+                className="erp-progress-summary"
+                id="progress-summary"
+                aria-label="当前订单阶段摘要"
+              >
+                {selectedRow ? (
+                  <BusinessProgressSummary
+                    row={selectedRow}
+                    access={access}
+                    headingRef={summaryRef}
+                    onSelectSection={(section) =>
+                      openDetail(selectedRow, section)
+                    }
+                    onOpenDetail={() => openDetail(selectedRow)}
+                  />
+                ) : loading ? (
+                  <div className="erp-progress-empty" role="status">
+                    正在读取阶段摘要…
+                  </div>
+                ) : (
+                  <Empty description="暂无可查看的阶段摘要" />
+                )}
+              </aside>
+            </div>
+          </Spin>
+          {!!data?.total && (
+            <WorkflowTaskPagination
+              recordLabel="进度"
+              unit="单"
+              current={query.offset / query.limit + 1}
+              pageSize={query.limit}
+              total={data.total}
+              loading={loading}
+              onChange={(page, size) => update({ page, page_size: size })}
+            />
+          )}
+        </>
       )}
       <BusinessProgressDrawer
         selection={selection?.profile === adminProfile ? selection : null}

@@ -1,3 +1,6 @@
+import { Buffer } from 'node:buffer'
+import process from 'node:process'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createBusinessFormPagesScenarios } from './businessFormPagesScenarios.mjs'
 import { createWarehouseClassificationScenarios } from './warehouseClassificationScenarios.mjs'
 import { createOrderEngineeringScenarios } from './orderEngineeringScenarios.mjs'
@@ -5,8 +8,6 @@ import {
   createBOMMaterialGroupsScenarios,
   verifyBOMMaterialGroups,
 } from './bomMaterialGroupsScenarios.mjs'
-import { Buffer } from 'node:buffer'
-import process from 'node:process'
 
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 
@@ -272,7 +273,7 @@ export function createBusinessFormalScenarios(deps) {
           .filter(
             (item) =>
               !item.closest('.erp-line-item-details__fields') &&
-              !item.closest('.erp-master-contact-list__grid') &&
+              !item.closest('.erp-contact-editor') &&
               !item.closest('.erp-purchase-receipt-inline-item-form') &&
               item.querySelector('textarea')
           )
@@ -389,7 +390,7 @@ export function createBusinessFormalScenarios(deps) {
       columnOrderDisabled = false,
     }
   ) => {
-    const labels = exportVisible ? ['导出筛选结果', '列顺序'] : ['列顺序']
+    const labels = exportVisible ? ['导出筛选结果', '列设置'] : ['列设置']
     for (const label of labels) {
       await expectButton(page, label)
     }
@@ -397,7 +398,7 @@ export function createBusinessFormalScenarios(deps) {
       .getByRole('button', { name: '导出筛选结果' })
       .first()
     const columnOrderButton = page
-      .getByRole('button', { name: '列顺序' })
+      .getByRole('button', { name: '列设置' })
       .first()
     if (exportVisible) {
       assert.equal(
@@ -501,9 +502,18 @@ export function createBusinessFormalScenarios(deps) {
     page,
     { scenarioName }
   ) => {
+    const dialog = page.getByRole('dialog', { name: '筛选条件' })
+    const opened = !(await dialog.isVisible())
+    if (opened) {
+      await page
+        .locator('.erp-business-operation-panel button[aria-haspopup="dialog"]')
+        .click()
+    }
+    await dialog.waitFor()
+    await waitForFiniteAnimations(page)
     const metrics = await page.evaluate(() => {
       const panel = document.querySelector(
-        '.erp-workflow-business-page .erp-business-operation-panel__filters'
+        '.erp-business-filter-popover .erp-business-operation-panel__filters'
       )
       const range = panel?.querySelector('.erp-business-date-range-filter')
       const typeLabel = range?.querySelector(
@@ -587,6 +597,9 @@ export function createBusinessFormalScenarios(deps) {
           metrics
         )}`
       )
+    }
+    if (opened) {
+      await dialog.getByRole('button', { name: '完成', exact: true }).click()
     }
   }
 
@@ -839,9 +852,12 @@ export function createBusinessFormalScenarios(deps) {
       '实际运费应展示销售订单币种'
     )
     assert.equal(
-      await modal.getByLabel('实际运费币种（自动）').evaluate(
-        (node) => node.isContentEditable || node.matches('input, textarea, select')
-      ),
+      await modal
+        .getByLabel('实际运费币种（自动）')
+        .evaluate(
+          (node) =>
+            node.isContentEditable || node.matches('input, textarea, select')
+        ),
       false,
       '自动带出的实际运费币种不可编辑'
     )
@@ -929,7 +945,7 @@ export function createBusinessFormalScenarios(deps) {
     await assertCurrentOperationBarCompact(page, {
       scenarioName: 'business-v1-sales-orders',
     })
-    await page.getByRole('button', { name: /展开SO-STYLE-L1明细/u }).waitFor()
+    await page.getByText('SO-STYLE-L1', { exact: true }).first().waitFor()
     await assertBusinessCollaborationPanelAbsent(
       page,
       'business-v1-sales-orders'
@@ -972,7 +988,9 @@ export function createBusinessFormalScenarios(deps) {
           request.url().endsWith('/rpc/sales_order') &&
           request.postDataJSON()?.method === 'save_sales_order_with_items'
       ),
-      draftForm.locator('.erp-business-form-page__footer .ant-btn-primary').click(),
+      draftForm
+        .locator('.erp-business-form-page__footer .ant-btn-primary')
+        .click(),
     ])
     assert.deepEqual(
       draftSaved.postDataJSON().params.items,
@@ -1010,21 +1028,25 @@ export function createBusinessFormalScenarios(deps) {
             .count(),
           0
         )
-        await modal.locator('.erp-business-form-page__footer .ant-btn-primary').click()
+        await modal
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .click()
         await modal.getByText('请填写订单数量', { exact: true }).waitFor()
         assert.equal(
           await modal.getByLabel('订货产品名称', { exact: true }).inputValue(),
           '客户新款毛绒挂件',
           '校验失败应保留已填写的需求'
         )
-        await modal.getByLabel('订货产品名称', { exact: true }).scrollIntoViewIfNeeded()
+        await modal
+          .getByLabel('订货产品名称', { exact: true })
+          .scrollIntoViewIfNeeded()
         await assertNonItemTextareaFullRow(modal, {
           labels: ['报价备注', '备注'],
           scenarioName: 'business-v1-sales-order-form-modal',
         })
         await assertLineQuantityUnitSuffix(modal, {
           label: '订单数量',
-          expectedText: '件（PCS）',
+          expectedText: '个',
           scenarioName: 'business-v1-sales-order-form-modal-empty-line',
         })
         await assertLineItemFieldLayout(modal, {
@@ -1067,70 +1089,141 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-sales-order-form-modal-empty-line',
         })
         assert.equal(
-          await modal.locator('.erp-line-items-form__stat').filter({ hasText: '货款金额' }).locator('strong').innerText(),
+          await modal
+            .locator('.erp-line-items-form__stat')
+            .filter({ hasText: '货款金额' })
+            .locator('strong')
+            .innerText(),
           'CNY 133.21',
           '数量和单价齐全时，货款应显示真实计算结果'
         )
-        const demandRow = modal.locator('.erp-sales-order-lines-form__row').first()
+        const demandRow = modal
+          .locator('.erp-sales-order-lines-form__row')
+          .first()
         const details = demandRow.locator('.erp-line-item-details')
         assert.equal(await details.evaluate((node) => node.open), false)
         await details.locator('summary').click()
         await demandRow.getByLabel('备注', { exact: true }).fill('分两批交货')
-        const sampleQuantity = demandRow.getByLabel('船头版数量', { exact: true })
+        const sampleQuantity = demandRow.getByLabel('船头版数量', {
+          exact: true,
+        })
         await sampleQuantity.fill('-1')
         await details.locator('summary').click()
         await modal.getByLabel('客户', { exact: true }).click()
         await page.getByText('CUS-STYLE-L1 - 暗色客户', { exact: true }).click()
-        await modal.locator('.erp-business-form-page__footer .ant-btn-primary').click()
-        await demandRow.getByText('请填写符合单位精度的非负数量', { exact: true }).waitFor()
-        assert.equal(await details.evaluate((node) => node.open), true, '校验应自动展开含错误的补充信息')
-        assert.equal(await sampleQuantity.evaluate((node) => document.activeElement === node), true, '校验应聚焦出错字段')
+        await modal
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .click()
+        await demandRow
+          .getByText('请填写符合单位精度的非负数量', { exact: true })
+          .waitFor()
+        assert.equal(
+          await details.evaluate((node) => node.open),
+          true,
+          '校验应自动展开含错误的补充信息'
+        )
+        assert.equal(
+          await sampleQuantity.evaluate(
+            (node) => document.activeElement === node
+          ),
+          true,
+          '校验应聚焦出错字段'
+        )
         await sampleQuantity.fill('0')
         await details.locator('summary').click()
-        assert.equal(await demandRow.getByLabel('备注', { exact: true }).inputValue(), '分两批交货')
+        assert.equal(
+          await demandRow.getByLabel('备注', { exact: true }).inputValue(),
+          '分两批交货'
+        )
         const [savedDemand] = await Promise.all([
-          page.waitForRequest((request) => request.url().endsWith('/rpc/sales_order') && request.postDataJSON()?.method === 'save_sales_order_with_items'),
-          modal.locator('.erp-business-form-page__footer .ant-btn-primary').click(),
+          page.waitForRequest(
+            (request) =>
+              request.url().endsWith('/rpc/sales_order') &&
+              request.postDataJSON()?.method === 'save_sales_order_with_items'
+          ),
+          modal
+            .locator('.erp-business-form-page__footer .ant-btn-primary')
+            .click(),
         ])
         const savedItems = savedDemand.postDataJSON().params.items
         assert.equal(savedItems.length, 1)
-        assert.equal(savedItems[0].note, '分两批交货', '收起补充信息不能丢失保存内容')
+        assert.equal(
+          savedItems[0].note,
+          '分两批交货',
+          '收起补充信息不能丢失保存内容'
+        )
         assert.equal(savedItems[0].requested_product_name, '客户新款毛绒挂件')
         await modal.waitFor({ state: 'hidden' })
         await page.getByRole('button', { name: '新建订单' }).click()
-        await modal.getByRole('button', { name: '添加订货明细', exact: true }).click()
-        await modal.getByLabel('订货产品名称', { exact: true }).fill('客户新款毛绒挂件')
+        await modal
+          .getByRole('button', { name: '添加订货明细', exact: true })
+          .click()
+        await modal
+          .getByLabel('订货产品名称', { exact: true })
+          .fill('客户新款毛绒挂件')
         await modal.getByLabel('订单数量', { exact: true }).fill('11')
         await modal.getByLabel('单价', { exact: true }).fill('12.11')
-        const linkedRow = modal.locator('.erp-sales-order-lines-form__row').first()
+        const linkedRow = modal
+          .locator('.erp-sales-order-lines-form__row')
+          .first()
         await linkedRow.locator('.erp-line-item-details > summary').click()
-        const skuSelect = linkedRow.getByLabel('已有规格（选填）', { exact: true })
+        const skuSelect = linkedRow.getByLabel('已有规格（选填）', {
+          exact: true,
+        })
         await skuSelect.click()
         await skuSelect.fill('SKU-STYLE-L1')
-        await page.getByText('SKU-STYLE-L1 / 样式产品 SKU', { exact: true }).click()
-        assert.equal(await linkedRow.getByLabel('订货产品名称', { exact: true }).inputValue(), '客户新款毛绒挂件')
-        assert.equal(await linkedRow.getByLabel('订单数量', { exact: true }).inputValue(), '11')
-        assert.equal(await linkedRow.getByLabel('单价', { exact: true }).inputValue(), '12.11')
+        await page
+          .getByText('SKU-STYLE-L1 / 样式产品 SKU', { exact: true })
+          .click()
+        assert.equal(
+          await linkedRow
+            .getByLabel('订货产品名称', { exact: true })
+            .inputValue(),
+          '客户新款毛绒挂件'
+        )
+        assert.equal(
+          await linkedRow.getByLabel('订单数量', { exact: true }).inputValue(),
+          '11'
+        )
+        assert.equal(
+          await linkedRow.getByLabel('单价', { exact: true }).inputValue(),
+          '12.11'
+        )
         await assertLineQuantityUnitSuffix(modal, {
           label: '订单数量',
-          expectedText: '件（PCS）',
+          expectedText: '个',
           scenarioName: 'business-v1-sales-order-form-modal',
         })
         await assertLineSourceSummaryReadableUnit(modal, {
           label: '已关联产品',
-          expectedText: '件（PCS）',
+          expectedText: '个',
           scenarioName: 'business-v1-sales-order-form-modal',
         })
-        const skuField = linkedRow.locator('.erp-line-item-field--source .ant-select')
+        const skuField = linkedRow.locator(
+          '.erp-line-item-field--source .ant-select'
+        )
         await skuField.hover()
         await skuField.locator('.ant-select-clear').click()
-        assert.equal(await linkedRow.getByText('已关联产品', { exact: true }).count(), 0)
-        assert.equal(await linkedRow.getByLabel('订单数量', { exact: true }).inputValue(), '11')
-        assert.equal(await linkedRow.getByLabel('单价', { exact: true }).inputValue(), '12.11')
+        assert.equal(
+          await linkedRow.getByText('已关联产品', { exact: true }).count(),
+          0
+        )
+        assert.equal(
+          await linkedRow.getByLabel('订单数量', { exact: true }).inputValue(),
+          '11'
+        )
+        assert.equal(
+          await linkedRow.getByLabel('单价', { exact: true }).inputValue(),
+          '12.11'
+        )
         await skuSelect.click()
         await skuSelect.fill('SKU-STYLE-L1')
-        await page.getByText('SKU-STYLE-L1 / 样式产品 SKU', { exact: true }).click()
-        await modal.getByRole('button', { name: '添加订货明细', exact: true }).click()
+        await page
+          .getByText('SKU-STYLE-L1 / 样式产品 SKU', { exact: true })
+          .click()
+        await modal
+          .getByRole('button', { name: '添加订货明细', exact: true })
+          .click()
         const readDemandRows = () =>
           modal
             .locator('.erp-sales-order-lines-form__row')
@@ -1148,7 +1241,11 @@ export function createBusinessFormalScenarios(deps) {
               )
             )
         const beforeOrder = await readDemandRows()
-        assert.equal(beforeOrder.length, 2, '行内关联规格不新增明细，添加按钮每次新增一行')
+        assert.equal(
+          beforeOrder.length,
+          2,
+          '行内关联规格不新增明细，添加按钮每次新增一行'
+        )
         const reorder = modal.getByRole('button', {
           name: '调整明细顺序',
           exact: true,
@@ -1162,9 +1259,7 @@ export function createBusinessFormalScenarios(deps) {
           .getByRole('button', { name: / 上移$/u })
           .last()
           .click()
-        await orderDialog
-          .getByRole('button', { name: /^取\s*消$/u })
-          .click()
+        await orderDialog.getByRole('button', { name: /^取\s*消$/u }).click()
         await orderDialog.waitFor({ state: 'hidden' })
         assert.deepEqual(
           await readDemandRows(),
@@ -1206,16 +1301,22 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-sales-order-form-modal',
         })
         assert.equal(
-          await modal.locator('.erp-line-items-form__stat').filter({ hasText: '货款金额' }).locator('strong').innerText(),
+          await modal
+            .locator('.erp-line-items-form__stat')
+            .filter({ hasText: '货款金额' })
+            .locator('strong')
+            .innerText(),
           '待补齐',
           '存在未填写数量或单价的明细时，货款不能被显示成零'
         )
         await page.setViewportSize({ width: 1920, height: 1080 })
-        await modal.locator('.erp-sales-order-demand-toolbar').evaluate(
-          (node) => node.scrollIntoView({ block: 'start' })
-        )
+        await modal
+          .locator('.erp-sales-order-demand-toolbar')
+          .evaluate((node) => node.scrollIntoView({ block: 'start' }))
         await page.waitForTimeout(350)
-        await page.screenshot({ path: path.join(outputDir, 'sales-order-lines-wide.png') })
+        await page.screenshot({
+          path: path.join(outputDir, 'sales-order-lines-wide.png'),
+        })
         await page.setViewportSize({ width: 1440, height: 900 })
       },
     })
@@ -1226,15 +1327,23 @@ export function createBusinessFormalScenarios(deps) {
       scenarioName: 'business-v1-sales-orders',
       afterModalOpen: async () => {
         await expectText(page, '订货明细')
-        const editedRow = page.locator('.erp-business-form-page:not([hidden]) .erp-sales-order-lines-form__row').first()
+        const editedRow = page
+          .locator(
+            '.erp-business-form-page:not([hidden]) .erp-sales-order-lines-form__row'
+          )
+          .first()
         await editedRow.getByText('已保存', { exact: true }).waitFor()
         const editedDetails = editedRow.locator('.erp-line-item-details')
         if (!(await editedDetails.evaluate((node) => node.open))) {
           await editedDetails.locator('summary').click()
         }
-        await editedRow.getByLabel('已有规格（选填）', { exact: true }).scrollIntoViewIfNeeded()
+        await editedRow
+          .getByLabel('已有规格（选填）', { exact: true })
+          .scrollIntoViewIfNeeded()
         await expectText(page, '已有规格（选填）')
-        await editedRow.getByText('已关联产品', { exact: true }).scrollIntoViewIfNeeded()
+        await editedRow
+          .getByText('已关联产品', { exact: true })
+          .scrollIntoViewIfNeeded()
         await expectText(page, '已关联产品')
         await assertTextAbsent(page, '产品引用 ID')
         await assertTextAbsent(page, '单位引用 ID')
@@ -1253,7 +1362,9 @@ export function createBusinessFormalScenarios(deps) {
         try {
           await verifySalesOrderDemandEntry(page)
         } catch (error) {
-          await page.screenshot({ path: path.join(outputDir, 'sales-order-demand-entry-failed.png') })
+          await page.screenshot({
+            path: path.join(outputDir, 'sales-order-demand-entry-failed.png'),
+          })
           throw error
         }
       },
@@ -1352,7 +1463,9 @@ export function createBusinessFormalScenarios(deps) {
               )
             }
             const visibleEditModals = Array.from(
-              document.querySelectorAll('.ant-modal, .erp-business-form-page:not([hidden])')
+              document.querySelectorAll(
+                '.ant-modal, .erp-business-form-page:not([hidden])'
+              )
             ).filter(
               (node) =>
                 isVisible(node) &&
@@ -1699,12 +1812,14 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '产品档案')
         await page.getByRole('button', { name: '新建产品' }).click()
         const modal = page
-          .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
+          .locator(
+            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+          )
           .last()
         await expectText(page, '产品单重（净重）')
         const suffix = modal.locator('.erp-item-field-unit-suffix').first()
         await suffix.waitFor()
-        await expectText(modal, '件（PCS）')
+        await expectText(modal, '个')
         await modal.screenshot({
           path: path.join(
             outputDir,
@@ -1752,8 +1867,8 @@ export function createBusinessFormalScenarios(deps) {
         })
         assert.equal(suffixMetrics.inputCount, 1, '单位不得成为第二个输入框')
         assert.equal(suffixMetrics.innerBorder, '0px', '数值与单位共用外边框')
-        assert.equal(suffixMetrics.radius, '12px')
-        assert.equal(suffixMetrics.height, 36, '单位框与相邻控件等高')
+        assert.equal(suffixMetrics.radius, '8px')
+        assert.equal(suffixMetrics.height, 34, '单位框与相邻控件等高')
         assert.equal(
           suffixMetrics.text,
           '克',
@@ -1796,7 +1911,9 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '物料清单（BOM）')
         await page.getByRole('button', { name: '新建草稿' }).click()
         const modal = page
-          .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
+          .locator(
+            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+          )
           .last()
         await expectText(page, '新建 BOM 草稿')
         await modal.locator('summary').click()
@@ -1915,7 +2032,9 @@ export function createBusinessFormalScenarios(deps) {
         })
 
         const modal = page
-          .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
+          .locator(
+            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+          )
           .last()
         await modal.waitFor({ state: 'visible' })
         await expectText(page, '检查并保存导入草稿')
@@ -1944,9 +2063,7 @@ export function createBusinessFormalScenarios(deps) {
           const alert = node.querySelector('.erp-bom-import-review')
           const modalBody = node.querySelector('.erp-business-form-page__body')
           const rows = Array.from(
-            node.querySelectorAll(
-              'tr[data-bom-part-index]'
-            )
+            node.querySelectorAll('tr[data-bom-part-index]')
           )
           const statuses = rows.map((row) =>
             row
@@ -1995,21 +2112,26 @@ export function createBusinessFormalScenarios(deps) {
           '待补全的 BOM 导入不得提前写入草稿'
         )
 
-        const rows = modal.locator(
-          'tr[data-bom-part-index]'
-        )
+        const rows = modal.locator('tr[data-bom-part-index]')
         const unresolvedRow = rows.nth(1)
         await unresolvedRow.scrollIntoViewIfNeeded()
-        const materialSelect = unresolvedRow.locator(
-          '.erp-bom-material-cell .ant-select'
-        ).first()
+        const materialSelect = unresolvedRow
+          .locator('.erp-bom-material-cell .ant-select')
+          .first()
         await materialSelect.click()
         await materialSelect.locator('input').fill('MAT-STYLE-L1')
         await page.keyboard.press('Enter')
-        await modal.locator('.erp-bom-material-group').first()
+        await modal
+          .locator('.erp-bom-material-group')
+          .first()
           .locator('.erp-bom-material-cell .ant-select-selection-item')
-          .filter({ hasText: '样式材料' }).waitFor({ state: 'visible' })
-        assert.equal(await modal.locator('.erp-bom-material-group').count(), 1, '同一物料和单位在补全后应合并身份栏')
+          .filter({ hasText: '样式材料' })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await modal.locator('.erp-bom-material-group').count(),
+          1,
+          '同一物料和单位在补全后应合并身份栏'
+        )
         await modal
           .locator('.erp-bom-import-review[data-bom-import-issue-count="0"]')
           .waitFor({ state: 'visible' })
@@ -2333,6 +2455,16 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName,
           expectedTab
         ) => {
+          const filterDialog = page.getByRole('dialog', { name: '筛选条件' })
+          if (expectedTab === '异常处理') {
+            await page
+              .locator(
+                '.erp-business-operation-panel button[aria-haspopup="dialog"]'
+              )
+              .click()
+            await filterDialog.waitFor()
+            await waitForFiniteAnimations(page)
+          }
           const metrics = await page.evaluate(() => {
             const visibleTables = Array.from(
               document.querySelectorAll('.ant-table-wrapper')
@@ -2346,14 +2478,14 @@ export function createBusinessFormalScenarios(deps) {
                 style.visibility !== 'hidden'
               )
             })
-            const tabs = document.querySelector(
-              '[aria-label="生产记录工作区"]'
-            )
+            const tabs = document.querySelector('[aria-label="生产记录工作区"]')
             const tabList = tabs?.querySelector('[role="tablist"]')
             const activeTab = tabs?.querySelector(
               '[role="tab"][aria-selected="true"]'
             )
-            const tabCard = tabs?.closest('.erp-business-data-table-card')
+            const tabWorkspace = tabs?.closest(
+              '.erp-production-record-workspace'
+            )
             const visibleTable = visibleTables[0]
             const visibleTableCard = visibleTable?.closest(
               '.erp-business-data-table-card'
@@ -2383,7 +2515,9 @@ export function createBusinessFormalScenarios(deps) {
               '审批状态',
               '业务状态',
             ].filter((label) =>
-              currentOperationPanel?.querySelector(`[aria-label="${label}"]`)
+              document.querySelector(
+                `.erp-business-filter-popover [aria-label="${label}"]`
+              )
             )
             const currentActionVisible = String(
               currentOperationPanel?.textContent || ''
@@ -2420,8 +2554,8 @@ export function createBusinessFormalScenarios(deps) {
                 : null
             return {
               activeTab: String(activeTab?.textContent || '').trim(),
-              tabInsideCurrentTableCard:
-                Boolean(tabCard) && tabCard === visibleTableCard,
+              tabOutsideCurrentTableCard:
+                Boolean(tabWorkspace) && !visibleTableCard?.contains(tabs),
               tabBeforeCurrentTable:
                 Boolean(tabRect && tableRect) &&
                 tabRect.bottom <= tableRect.top + 1,
@@ -2456,9 +2590,9 @@ export function createBusinessFormalScenarios(deps) {
             )}`
           )
           assert.equal(
-            metrics.tabInsideCurrentTableCard,
+            metrics.tabOutsideCurrentTableCard,
             true,
-            `${scenarioName} 页签应与当前表格共用数据卡片: ${JSON.stringify(
+            `${scenarioName} 页签应由共享工作区承载，不随当前表格重建: ${JSON.stringify(
               metrics
             )}`
           )
@@ -2480,20 +2614,20 @@ export function createBusinessFormalScenarios(deps) {
           )
           assert.equal(
             metrics.currentWorkspaceRowGap,
-            6,
+            0,
             `${scenarioName} 应复用业务页面标准模块间距: ${JSON.stringify(
               metrics
             )}`
           )
           assert(
-            Math.abs(metrics.currentWorkspaceRenderedGap - 6) <= 0.5,
-            `${scenarioName} 操作区与表格应保持 6px 间距: ${JSON.stringify(
+            Math.abs(metrics.currentWorkspaceRenderedGap - 9) <= 0.5,
+            `${scenarioName} 操作区与表格应保持 9px 间距: ${JSON.stringify(
               metrics
             )}`
           )
           assert.deepEqual(
             metrics.tableToolLabels,
-            ['列顺序'],
+            ['列设置'],
             `${scenarioName} 应只保留列顺序，不展示业务数据导出: ${JSON.stringify(
               metrics
             )}`
@@ -2522,35 +2656,49 @@ export function createBusinessFormalScenarios(deps) {
           if (expectedTab === '待审批') {
             assert.equal(
               metrics.taskWorkspaceRowGap,
-              6,
+              0,
               `${scenarioName} 应复用业务页面标准模块间距: ${JSON.stringify(
                 metrics
               )}`
             )
             assert(
-              Math.abs(metrics.taskWorkspaceRenderedGap - 6) <= 0.5,
-              `${scenarioName} 操作区与表格应保持 6px 间距: ${JSON.stringify(
+              Math.abs(metrics.taskWorkspaceRenderedGap - 9) <= 0.5,
+              `${scenarioName} 操作区与表格应保持 9px 间距: ${JSON.stringify(
                 metrics
               )}`
             )
+          }
+          if (expectedTab === '异常处理') {
+            await filterDialog
+              .getByRole('button', { name: '完成', exact: true })
+              .click()
           }
           await assertNoHorizontalOverflow(page, scenarioName)
         }
 
         await expectHeading(page, '生产记录')
         await expectText(page, '暂无生产异常处置申请')
+        await page
+          .locator(
+            '.erp-business-operation-panel button[aria-haspopup="dialog"]'
+          )
+          .click()
         await expectText(page, '全部异常类型')
         await expectText(page, '全部审批状态')
         await expectText(page, '全部业务状态')
+        await page
+          .getByRole('dialog', { name: '筛选条件' })
+          .getByRole('button', { name: '完成', exact: true })
+          .click()
         await expectText(page, '当前操作')
         await expectText(page, '请选择一条记录')
         await assertProductionExceptionTabGeometry(
           'business-production-exceptions-decisions-tab',
           '异常处理'
         )
-        await page.getByRole('button', { name: /列顺序/u }).click()
+        await page.getByRole('button', { name: /列设置/u }).click()
         const decisionColumnOrderDialog = page.getByRole('dialog', {
-          name: '调整列表列顺序',
+          name: '列设置',
         })
         await decisionColumnOrderDialog.waitFor({ state: 'visible' })
         await expectText(page, '异常单号')
@@ -2576,9 +2724,9 @@ export function createBusinessFormalScenarios(deps) {
           'business-production-exceptions-tasks-tab',
           '待审批'
         )
-        await page.getByRole('button', { name: /列顺序/u }).click()
+        await page.getByRole('button', { name: /列设置/u }).click()
         const taskColumnOrderDialog = page.getByRole('dialog', {
-          name: '调整列表列顺序',
+          name: '列设置',
         })
         await taskColumnOrderDialog.waitFor({ state: 'visible' })
         await expectText(page, '任务编号')
@@ -2757,7 +2905,9 @@ export function createBusinessFormalScenarios(deps) {
         await page.getByRole('button', { name: '新建供应商' }).click()
 
         const modal = page
-          .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
+          .locator(
+            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+          )
           .last()
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
         const processField = modal
@@ -2889,60 +3039,39 @@ export function createBusinessFormalScenarios(deps) {
           ),
         })
 
-        const firstHeaderTrigger = page
+        const firstSortableHeader = page
           .locator(
-            '.erp-business-data-table-card .ant-table-thead th .erp-module-column-header-trigger'
+            '.erp-business-data-table-card .ant-table-thead th.ant-table-column-has-sorters'
           )
           .first()
-        const triggerBox = await firstHeaderTrigger.boundingBox()
-        assert(
-          triggerBox && triggerBox.width >= 23.5 && triggerBox.height >= 23.5,
-          `产品档案列设置按钮应保留 24px 点击范围: ${JSON.stringify(triggerBox)}`
+        const beforeSettings =
+          await firstSortableHeader.getAttribute('aria-sort')
+        const settingsTrigger = page.getByRole('button', { name: /列设置$/u })
+        await settingsTrigger.click()
+        const columnDialog = page.getByRole('dialog', { name: /^列设置/u })
+        await columnDialog.waitFor({ state: 'visible' })
+        await page.waitForFunction(() =>
+          Boolean(document.activeElement?.closest('.ant-modal'))
         )
-        const readFirstHeaderSortState = () =>
-          firstHeaderTrigger.evaluate((node) => {
-            const headerCell = node.closest('th')
-            return {
-              ariaSort: headerCell?.getAttribute('aria-sort') || '',
-              ascending: Boolean(
-                headerCell?.querySelector(
-                  '.ant-table-column-sorter-up.active, .ant-table-column-sorter-up.ant-table-column-sorter-active'
-                )
-              ),
-              descending: Boolean(
-                headerCell?.querySelector(
-                  '.ant-table-column-sorter-down.active, .ant-table-column-sorter-down.ant-table-column-sorter-active'
-                )
-              ),
-            }
-          })
-        const sortStateBeforeColumnMenu = await readFirstHeaderSortState()
-        await firstHeaderTrigger.click({
-          position: {
-            x: triggerBox.width - 2,
-            y: triggerBox.height / 2,
-          },
-        })
-        const columnMenu = page
-          .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
-          .last()
-        await columnMenu
-          .getByText('右移一列')
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await page.waitForTimeout(180)
-        assert.deepEqual(
-          await readFirstHeaderSortState(),
-          sortStateBeforeColumnMenu,
-          '点击列设置按钮靠排序侧边缘不应触发表格排序'
+        assert.equal(
+          await firstSortableHeader.getAttribute('aria-sort'),
+          beforeSettings,
+          '工具栏列设置不应改变当前排序'
         )
         await page.screenshot({
           path: path.join(
             outputDir,
-            'business-table-headers-column-menu-hit-area-dark.png'
+            'business-table-headers-column-settings-dark.png'
           ),
         })
         await page.keyboard.press('Escape')
-        await columnMenu.waitFor({ state: 'hidden', timeout: 10_000 })
+        await columnDialog.waitFor({ state: 'hidden' })
+        assert(
+          await settingsTrigger.evaluate(
+            (node) => node === document.activeElement
+          ),
+          '关闭列设置后焦点应回到触发按钮'
+        )
         await page.mouse.move(0, 0)
         await page.waitForTimeout(120)
 
@@ -3059,13 +3188,14 @@ export function createBusinessFormalScenarios(deps) {
             '经营 / 加工地址',
             '可加工工序',
             '联系人',
-            '添加条目',
+            '添加联系人',
           ],
           expectContactItemsLayout: true,
           afterOpen: async (modal) => {
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-suppliers-contact-form-modal',
               targetRowCount: 5,
+              addButtonName: '添加联系人',
               listSelector: '.erp-master-contact-list__items',
               rowSelector: '.erp-master-contact-list__row',
             })
@@ -3077,7 +3207,7 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-suppliers',
           afterModalOpen: async () => {
             await expectText(page, '联系人')
-            await expectButton(page, '添加条目')
+            await expectButton(page, '添加联系人')
           },
         })
 
@@ -3114,12 +3244,13 @@ export function createBusinessFormalScenarios(deps) {
           titleText: '新建客户档案',
           minFieldCount: 5,
           screenshotName: 'business-v1-customers-form-modal',
-          expectedTexts: ['联系人', '添加条目'],
+          expectedTexts: ['联系人', '添加联系人'],
           expectContactItemsLayout: true,
           afterOpen: async (modal) => {
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-customers-contact-form-modal',
               targetRowCount: 5,
+              addButtonName: '添加联系人',
               listSelector: '.erp-master-contact-list__items',
               rowSelector: '.erp-master-contact-list__row',
             })
@@ -3132,7 +3263,7 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-customers',
           afterModalOpen: async () => {
             await expectText(page, '联系人')
-            await expectButton(page, '添加条目')
+            await expectButton(page, '添加联系人')
           },
         })
 
@@ -3206,7 +3337,9 @@ export function createBusinessFormalScenarios(deps) {
         await closeBusinessFormModal(
           page,
           page
-            .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
+            .locator(
+              '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+            )
             .last()
         )
         const beforeProductSKUTabRequests = masterDataMethods.length
@@ -3240,7 +3373,9 @@ export function createBusinessFormalScenarios(deps) {
         await closeBusinessFormModal(
           page,
           page
-            .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
+            .locator(
+              '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+            )
             .last()
         )
         await assertNoHorizontalOverflow(page, 'business-standard-products')
@@ -3310,8 +3445,15 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '可用量')
         await expectText(page, '8.5')
         await expectText(page, 'SKU-STYLE-L1')
+        await page
+          .locator(
+            '.erp-business-operation-panel button[aria-haspopup="dialog"]'
+          )
+          .click()
+        await page.getByRole('dialog', { name: '筛选条件' }).waitFor()
+        await waitForFiniteAnimations(page)
         const inventoryFilterSelects = page.locator(
-          '.erp-v1-inventory-ledger-page .erp-business-operation-panel__filters .ant-select'
+          '.erp-business-filter-popover .erp-business-operation-panel__filters .ant-select'
         )
         assert.equal(
           await inventoryFilterSelects.count(),
@@ -3376,7 +3518,7 @@ export function createBusinessFormalScenarios(deps) {
           .waitFor({ state: 'visible' })
         const inventorySKUMetrics = await page.evaluate(() => {
           const filters = document.querySelector(
-            '.erp-v1-inventory-ledger-page .erp-business-operation-panel__filters'
+            '.erp-business-filter-popover .erp-business-operation-panel__filters'
           )
           const table = document.querySelector(
             '.erp-v1-inventory-ledger-page .ant-table-content'
@@ -3424,7 +3566,7 @@ export function createBusinessFormalScenarios(deps) {
         await page.waitForTimeout(160)
         const inventoryNarrowMetrics = await page.evaluate(() => {
           const filters = document.querySelector(
-            '.erp-v1-inventory-ledger-page .erp-business-operation-panel__filters'
+            '.erp-business-filter-popover .erp-business-operation-panel__filters'
           )
           const table = document.querySelector(
             '.erp-v1-inventory-ledger-page .ant-table-content'
@@ -3567,7 +3709,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '质量检验')
         await expectButton(page, '补建来料质检')
         await expectButton(page, '导出筛选结果')
-        await expectButton(page, '列顺序')
+        await expectButton(page, '列设置')
         await assertNoListDeleteTrashToolbar(page)
         await assertTextAbsent(page, 'quality_inspections')
         const qualityDispositionAction = await findSelectionActionButton(
@@ -3680,10 +3822,7 @@ export function createBusinessFormalScenarios(deps) {
           staleText: 'QI-STYLE-L1',
         })
         forceEmptyQualityInspections = false
-        await page
-          .getByPlaceholder('搜单号、产品、材料、批次')
-          .first()
-          .fill('')
+        await page.getByPlaceholder('搜单号、产品、材料、批次').first().fill('')
         await page.keyboard.press('Enter')
         await expectText(page, 'QI-STYLE-L1')
         await verifyBusinessRowDoubleClickModal(page, {
@@ -3836,6 +3975,12 @@ export function createBusinessFormalScenarios(deps) {
           await route.fallback()
         })
         await page
+          .locator(
+            '.erp-business-operation-panel button[aria-haspopup="dialog"]'
+          )
+          .click()
+        await page.getByRole('dialog', { name: '筛选条件' }).waitFor()
+        await page
           .locator('.erp-business-filter-control--status')
           .first()
           .click()
@@ -3850,6 +3995,10 @@ export function createBusinessFormalScenarios(deps) {
           .first()
           .click()
         await page.getByTitle('全部状态', { exact: true }).click()
+        await page
+          .getByRole('dialog', { name: '筛选条件' })
+          .getByRole('button', { name: '完成', exact: true })
+          .click()
         await expectText(page, 'SHIP-STYLE-L1')
         await verifyBusinessRowDoubleClickModal(page, {
           rowText: 'SHIP-STYLE-L1',
@@ -4017,7 +4166,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '委外订单')
         await expectButton(page, '新建加工合同')
         await expectButton(page, '导出筛选结果')
-        await expectButton(page, '列顺序')
+        await expectButton(page, '列设置')
         await assertNoListDeleteTrashToolbar(page)
         await expectText(page, '业务单据：加工合同')
         await assertTextAbsent(page, '加工合同只表达委外承诺和打印快照')
@@ -4243,7 +4392,7 @@ export function createBusinessFormalScenarios(deps) {
           page,
           'business-production-exceptions-decisions-tab'
         )
-        await expectButton(page, '列顺序')
+        await expectButton(page, '列设置')
         await expectNoButton(page, '导出筛选结果')
         for (const text of [
           '登记异常协同',
@@ -4279,7 +4428,7 @@ export function createBusinessFormalScenarios(deps) {
           '待审批页签点击后应成为唯一活动工作区'
         )
         await assertTextAbsent(page, '暂无生产异常处置申请')
-        await expectButton(page, '列顺序')
+        await expectButton(page, '列设置')
         await expectNoButton(page, '导出筛选结果')
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '异常处理任务已刷新')
@@ -4446,15 +4595,7 @@ export function createBusinessFormalScenarios(deps) {
               }
               await route.fallback()
             })
-            await page.evaluate(() => {
-              const refreshButton = Array.from(
-                document.querySelectorAll('button')
-              ).find(
-                (button) =>
-                  String(button.textContent || '').trim() === '刷新当前页'
-              )
-              refreshButton?.click()
-            })
+            await page.getByRole('button', { name: '刷新当前页' }).click()
             await expectText(page, '出货放行任务已刷新')
             await page.waitForFunction(() => {
               const isVisible = (node) => {
@@ -4563,7 +4704,11 @@ export function createBusinessFormalScenarios(deps) {
           'business-v1-production-progress'
         )
 
-        await page.getByRole('menuitem', { name: '对账管理' }).click()
+        await page.getByRole('menuitem', { name: /财务管理/u }).click()
+        await page
+          .locator('.erp-business-module-tabs')
+          .getByRole('tab', { name: '对账', exact: true })
+          .click()
         await expectHeading(page, '对账管理')
         await expectText(page, 'REC-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
@@ -4579,7 +4724,7 @@ export function createBusinessFormalScenarios(deps) {
         await gotoScenarioPath(page, '/erp/warehouse/outbound', {
           waitUntil: 'domcontentloaded',
         })
-        await expectHeading(page, '出库管理')
+        await expectHeading(page, '库存预留')
         await expectText(page, 'RSV-STYLE-L1')
         await expectText(page, 'SO-RESERVATION-STYLE-L1')
         await expectText(page, '第 3 行')
@@ -5393,7 +5538,8 @@ export function createBusinessFormalScenarios(deps) {
           })
           await orderText.click()
           const releaseButton = page.getByRole('button', {
-            name: /发\s*布/u,
+            name: '发布',
+            exact: true,
           })
           for (let attempt = 0; attempt < 40; attempt += 1) {
             if (await releaseButton.isEnabled()) break
@@ -5417,11 +5563,25 @@ export function createBusinessFormalScenarios(deps) {
             .last()
           await detailModal.waitFor({ state: 'visible', timeout: 10_000 })
           await detailModal
-            .getByText('物料需求与领料', { exact: true })
+            .getByRole('heading', { name: '物料需求与领料', exact: true })
             .waitFor()
           await detailModal
             .getByText(/物料需求已按发布时的 BOM 冻结/u)
             .waitFor()
+          await detailModal
+            .getByRole('navigation', { name: '表单分区' })
+            .getByRole('button', { name: '物料需求与领料', exact: true })
+            .click()
+          const requirementWidth = await detailModal
+            .locator('[data-form-section="物料需求与领料"]')
+            .boundingBox()
+          const formBody = await detailModal
+            .locator('.erp-business-form-page__body')
+            .boundingBox()
+          assert(
+            requirementWidth.width >= formBody.width - 40,
+            '冻结物料表应占满表单内容宽度'
+          )
           const materialRequirementCells = detailModal
             .locator('.ant-table-cell:visible')
             .filter({ hasText: 'MAT-STYLE-L1 / 样式短毛绒布' })
@@ -5444,7 +5604,7 @@ export function createBusinessFormalScenarios(deps) {
           )
           if (
             (await detailModal
-              .getByRole('button', { name: /领\s*料/u })
+              .getByRole('button', { name: '领料', exact: true })
               .count()) === 0
           ) {
             throw new Error(
@@ -5453,7 +5613,9 @@ export function createBusinessFormalScenarios(deps) {
               ).replace(/\s+/gu, ' ')}`
             )
           }
-          await detailModal.getByRole('button', { name: /领\s*料/u }).click()
+          await detailModal
+            .getByRole('button', { name: '领料', exact: true })
+            .click()
 
           const issueModal = page
             .locator('.ant-modal:visible')
@@ -5971,6 +6133,10 @@ export function createBusinessFormalScenarios(deps) {
               buffer: Buffer.from('batch-success-c'),
             },
           ])
+          assert.equal(uploadCalls.length, 0, '选择文件只进入待上传队列')
+          await orderModal
+            .getByRole('button', { name: '上传 3 个文件', exact: true })
+            .click()
 
           const retryModal = page
             .getByRole('dialog', {
@@ -6094,7 +6260,9 @@ export function createBusinessFormalScenarios(deps) {
           await page.getByRole('tab', { name: '产品规格' }).waitFor()
           await page.getByRole('button', { name: '新建产品规格' }).click()
           const newSKUProductModal = page
-            .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
+            .locator(
+              '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+            )
             .filter({ hasText: '新建产品规格' })
             .last()
           await newSKUProductModal.waitFor({

@@ -383,6 +383,45 @@ async function mountRecoveryHarness(initialPath = '/erp/business-dashboard') {
   }
 }
 
+test('ERPLayout: 桌面侧栏可收起为图标栏并恢复完整菜单', async () => {
+  const h = await mountRecoveryHarness()
+  try {
+    const sider = h.container.querySelector('.erp-admin-sider')
+    const menu = sider.querySelector('.erp-admin-menu')
+    const catalog = sider.querySelector('.erp-module-catalog-trigger')
+    const collapse = () =>
+      sider.querySelector('.erp-admin-brand__collapse.ant-btn')
+
+    assert.equal(sider.dataset.sidebarCollapsed, 'false')
+    assert.equal(menu.classList.contains('ant-menu-inline-collapsed'), false)
+    assert(sider.querySelector('.erp-admin-brand__logo-copy'))
+    assert.match(catalog.textContent, /全部模块/u)
+    assert.equal(collapse().getAttribute('aria-label'), '收起侧边菜单')
+
+    await act(async () => collapse().click())
+    await h.settle()
+
+    assert.equal(sider.dataset.sidebarCollapsed, 'true')
+    assert(sider.classList.contains('ant-layout-sider-collapsed'))
+    assert(menu.classList.contains('ant-menu-inline-collapsed'))
+    assert.equal(sider.querySelector('.erp-admin-brand__logo-copy'), null)
+    assert.equal(catalog.textContent.trim(), '')
+    assert.equal(catalog.getAttribute('aria-label'), '全部模块')
+    assert.equal(collapse().getAttribute('aria-label'), '展开侧边菜单')
+
+    await act(async () => collapse().click())
+    await h.settle()
+
+    assert.equal(sider.dataset.sidebarCollapsed, 'false')
+    assert.equal(menu.classList.contains('ant-menu-inline-collapsed'), false)
+    assert(sider.querySelector('.erp-admin-brand__logo-copy'))
+    assert.match(catalog.textContent, /全部模块/u)
+    assert.equal(collapse().getAttribute('aria-label'), '收起侧边菜单')
+  } finally {
+    await h.cleanup()
+  }
+})
+
 test('ERPLayout: 断连保留草稿、暂停业务请求，重复重试合并且恢复不重挂载', async () => {
   const h = await mountRecoveryHarness()
   try {

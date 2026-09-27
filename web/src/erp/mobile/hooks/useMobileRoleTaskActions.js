@@ -125,6 +125,7 @@ function resolveScopedMobileTaskActionReason({
 
 export default function useMobileRoleTaskActions({
   activeRoleKey,
+  isAdminReview = false,
   initialAction = '',
   initialActionReceipt = null,
   initialActionTaskID = null,
@@ -439,7 +440,7 @@ export default function useMobileRoleTaskActions({
         evidence_refs: [],
         feedback: completionFeedback,
         message: confirmedTask
-          ? '任务办理结果已经确认。'
+          ? ''
           : '办理已返回，但没有取得可确认的任务信息，请刷新任务列表核对。',
         reason: actionReason,
         status: confirmedTask ? 'confirmed' : 'unknown',
@@ -465,7 +466,6 @@ export default function useMobileRoleTaskActions({
           return next
         })
       }
-      message.success('任务状态已更新')
       loadTasks({ canonicalTask: confirmedTask }).catch(() => {
         message.warning('操作已成功但列表刷新失败，请手动刷新')
       })
@@ -521,7 +521,7 @@ export default function useMobileRoleTaskActions({
       const params = {
         task_id: task.id,
         expected_version: task.version,
-        action: resolveMobileUrgeAction(activeRoleKey, task),
+        action: isAdminReview ? 'urge_task' : resolveMobileUrgeAction(activeRoleKey, task),
         reason,
         payload: mobileActionPayload,
       }
@@ -589,7 +589,7 @@ export default function useMobileRoleTaskActions({
         action: 'urge',
         evidence_refs: [],
         message: confirmedTask
-          ? '催办结果已经确认。'
+          ? ''
           : '催办已返回，但没有取得可确认的任务信息，请刷新任务列表核对。',
         reason,
         status: confirmedTask ? 'confirmed' : 'unknown',
@@ -600,7 +600,6 @@ export default function useMobileRoleTaskActions({
         delete next[scopedTaskKey]
         return next
       })
-      message.success('催办已记录')
       loadTasks({ canonicalTask: confirmedTask }).catch(() => {
         message.warning('操作已成功但列表刷新失败，请手动刷新')
       })

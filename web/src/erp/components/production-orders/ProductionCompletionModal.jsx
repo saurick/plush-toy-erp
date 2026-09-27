@@ -8,11 +8,13 @@ import {
   Select,
   Typography,
 } from 'antd'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
-import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import {
   buildProductionCompletionChoices,
   buildProductionCompletionLotOptions,
@@ -53,6 +55,7 @@ export default function ProductionCompletionModal({
   onSubmit,
 }) {
   const [form] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open)
   const editing = mode === 'edit'
   const Editor = editing ? BusinessFormPage : BusinessModal
   const selectedItemID = Form.useWatch('production_order_item_id', form)
@@ -83,7 +86,9 @@ export default function ProductionCompletionModal({
       editing ||
       !selectedChoice?.requiresBatch ||
       form.getFieldValue('production_wip_batch_id')
-    ) return
+    ) {
+      return
+    }
     const firstBatch = selectedChoice.batchChoices.find(
       (batch) => !batch.disabled
     )
@@ -191,7 +196,7 @@ export default function ProductionCompletionModal({
       ) : null}
       <Descriptions
         size="small"
-        column={1}
+        column={editing ? { xs: 1, sm: 2, lg: 3 } : 1}
         style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           { key: 'order', label: '生产订单', children: order?.order_no || '-' },
@@ -229,198 +234,206 @@ export default function ProductionCompletionModal({
         preserve={false}
         disabled={loading}
       >
-        <BusinessFormSectionTitle>完工来源与数量</BusinessFormSectionTitle>
-        <Form.Item
-          name="production_order_item_id"
-          label="生产明细"
-          rules={[{ required: true, message: '请选择要完工的生产明细' }]}
-        >
-          <Select
-            disabled={editing}
-            showSearch
-            optionFilterProp="label"
-            options={choices.map(({ value, label, disabled }) => ({
-              value,
-              label,
-              disabled,
-            }))}
-            onChange={(value) => {
-              const choice = choiceByID(choices, value)
-              const nextBatch = choice?.batchChoices?.find(
-                (batch) => !batch.disabled
-              )
-              const nextLotOptions = buildProductionCompletionLotOptions(
-                choice?.item,
-                lots
-              )
-              const nextLotSelection =
-                sourceInboundLotSelectionForOptions(nextLotOptions)
-              form.setFieldsValue({
-                production_wip_batch_id: nextBatch?.value,
-                quantity: nextBatch?.remaining || choice?.remaining || '',
-                lot_selection: nextLotSelection,
-                lot_id:
-                  nextLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
-                    ? nextLotOptions[0]?.value
-                    : undefined,
-                new_lot_no: undefined,
-              })
-            }}
-          />
-        </Form.Item>
-        {selectedChoice?.requiresBatch ? (
+        <BusinessFormSection title="完工来源与数量">
           <Form.Item
-            name="production_wip_batch_id"
-            label="完工来源批次"
-            rules={[{ required: true, message: '请选择对应的包装验收批次' }]}
+            name="production_order_item_id"
+            label="生产明细"
+            rules={[{ required: true, message: '请选择要完工的生产明细' }]}
           >
             <Select
               disabled={editing}
               showSearch
               optionFilterProp="label"
-              options={selectedChoice.batchChoices.map(
-                ({ value, label, disabled }) => ({
-                  value,
-                  label,
-                  disabled,
-                })
-              )}
-              placeholder="选择已完成包装验收的批次"
+              options={choices.map(({ value, label, disabled }) => ({
+                value,
+                label,
+                disabled,
+              }))}
               onChange={(value) => {
-                const batchChoice = choiceByID(
-                  selectedChoice.batchChoices,
-                  value
+                const choice = choiceByID(choices, value)
+                const nextBatch = choice?.batchChoices?.find(
+                  (batch) => !batch.disabled
                 )
-                form.setFieldValue('quantity', batchChoice?.remaining || '')
+                const nextLotOptions = buildProductionCompletionLotOptions(
+                  choice?.item,
+                  lots
+                )
+                const nextLotSelection =
+                  sourceInboundLotSelectionForOptions(nextLotOptions)
+                form.setFieldsValue({
+                  production_wip_batch_id: nextBatch?.value,
+                  quantity: nextBatch?.remaining || choice?.remaining || '',
+                  lot_selection: nextLotSelection,
+                  lot_id:
+                    nextLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+                      ? nextLotOptions[0]?.value
+                      : undefined,
+                  new_lot_no: undefined,
+                })
               }}
             />
           </Form.Item>
-        ) : null}
-        {selectedChoice ? (
-          <div className="erp-business-source-summary">
-            <Text type="secondary">
-              {selectedBatchChoice
-                ? `所选批次 ${selectedBatchChoice.quantity || '0'} / 已入库 ${selectedBatchChoice.posted || '0'} / 待入库 ${selectedBatchChoice.draft || '0'} / 剩余 ${selectedBatchChoice.remaining || '0'}`
-                : `计划 ${selectedChoice.planned || '0'} / 当前可完工上限 ${selectedChoice.acceptedPackaging || '0'} / 已入库 ${selectedChoice.posted || '0'} / 待入库 ${selectedChoice.draft || '0'}`}
-            </Text>
-          </div>
-        ) : null}
-        <Form.Item
-          name="quantity"
-          label="本次完工数量"
-          rules={[
-            { required: true, message: '请填写本次完工数量' },
-            {
-              validator: (_, value) => {
-                try {
-                  if (
-                    compareProductionCompletionQuantity(
-                      value,
-                      selectedBatchChoice?.remaining ||
-                        selectedChoice?.remaining ||
-                        '0'
-                    ) > 0
-                  ) {
-                    return Promise.reject(
-                      new Error(
-                        '本次数量不能超过所选包装验收批次扣减已入库和待入库后的剩余数量'
+          {selectedChoice?.requiresBatch ? (
+            <Form.Item
+              name="production_wip_batch_id"
+              label="完工来源批次"
+              rules={[{ required: true, message: '请选择对应的包装验收批次' }]}
+            >
+              <Select
+                disabled={editing}
+                showSearch
+                optionFilterProp="label"
+                options={selectedChoice.batchChoices.map(
+                  ({ value, label, disabled }) => ({
+                    value,
+                    label,
+                    disabled,
+                  })
+                )}
+                placeholder="选择已完成包装验收的批次"
+                onChange={(value) => {
+                  const batchChoice = choiceByID(
+                    selectedChoice.batchChoices,
+                    value
+                  )
+                  form.setFieldValue('quantity', batchChoice?.remaining || '')
+                }}
+              />
+            </Form.Item>
+          ) : null}
+          {selectedChoice ? (
+            <div className="erp-business-source-summary">
+              <Text type="secondary">
+                {selectedBatchChoice
+                  ? `所选批次 ${selectedBatchChoice.quantity || '0'} / 已入库 ${selectedBatchChoice.posted || '0'} / 待入库 ${selectedBatchChoice.draft || '0'} / 剩余 ${selectedBatchChoice.remaining || '0'}`
+                  : `计划 ${selectedChoice.planned || '0'} / 当前可完工上限 ${selectedChoice.acceptedPackaging || '0'} / 已入库 ${selectedChoice.posted || '0'} / 待入库 ${selectedChoice.draft || '0'}`}
+              </Text>
+            </div>
+          ) : null}
+          <Form.Item
+            name="quantity"
+            label="本次完工数量"
+            rules={[
+              unitQuantityRuleFromOptions(
+                quantityUnitOptions,
+                selectedChoice?.item?.unit_id
+              ),
+              { required: true, message: '请填写本次完工数量' },
+              {
+                validator: (_, value) => {
+                  try {
+                    if (
+                      compareProductionCompletionQuantity(
+                        value,
+                        selectedBatchChoice?.remaining ||
+                          selectedChoice?.remaining ||
+                          '0'
+                      ) > 0
+                    ) {
+                      return Promise.reject(
+                        new Error(
+                          '本次数量不能超过所选包装验收批次扣减已入库和待入库后的剩余数量'
+                        )
                       )
-                    )
+                    }
+                  } catch {
+                    return Promise.reject(new Error('完工数量必须大于 0'))
                   }
-                } catch {
-                  return Promise.reject(new Error('完工数量必须大于 0'))
-                }
-                return Promise.resolve()
-              },
-            },
-          ]}
-        >
-          <Input inputMode="decimal" maxLength={21} placeholder="例如：100" />
-        </Form.Item>
-        <BusinessFormSectionTitle>
-          待核对的入库仓库与批次
-        </BusinessFormSectionTitle>
-        <Form.Item
-          name="warehouse_id"
-          label="拟入库仓库"
-          rules={[{ required: true, message: '请选择拟入库仓库' }]}
-        >
-          <Select
-            showSearch
-            optionFilterProp="label"
-            options={warehouseOptions}
-            placeholder="选择仓库"
-          />
-        </Form.Item>
-        <Form.Item
-          name="lot_selection"
-          label="拟入库批次方式"
-          rules={[{ required: true, message: '请选择拟入库批次方式' }]}
-        >
-          <Radio.Group
-            options={[
-              {
-                label: '选择已有批次',
-                value: SOURCE_INBOUND_LOT_SELECTION.EXISTING,
-              },
-              {
-                label: '填写新批次号',
-                value: SOURCE_INBOUND_LOT_SELECTION.NEW,
+                  return Promise.resolve()
+                },
               },
             ]}
-            onChange={(event) => {
-              const nextSelection = event.target.value
-              form.setFieldsValue({
-                lot_id:
-                  nextSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
-                    ? lotOptions[0]?.value
-                    : undefined,
-                new_lot_no: undefined,
-              })
-            }}
-          />
-        </Form.Item>
-        {lotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING ? (
+          >
+            <Input inputMode="decimal" maxLength={21} placeholder="例如：100" />
+          </Form.Item>
+        </BusinessFormSection>
+        <BusinessFormSection title="待核对的入库仓库与批次">
           <Form.Item
-            name="lot_id"
-            label="拟使用的已有入库批次"
-            rules={[{ required: true, message: '请选择拟使用的已有入库批次' }]}
+            name="warehouse_id"
+            label="拟入库仓库"
+            rules={[{ required: true, message: '请选择拟入库仓库' }]}
           >
             <Select
               showSearch
               optionFilterProp="label"
-              options={lotOptions}
-              notFoundContent="暂无匹配的已有批次"
-              placeholder="选择已有批次"
+              options={warehouseOptions}
+              placeholder="选择仓库"
             />
           </Form.Item>
-        ) : null}
-        {lotSelection === SOURCE_INBOUND_LOT_SELECTION.NEW ? (
           <Form.Item
-            name="new_lot_no"
-            label="新批次号"
-            rules={[
-              { required: true, message: '请填写本次完工的新批次号' },
-              { max: 64, message: '新批次号不能超过 64 个字符' },
-            ]}
+            name="lot_selection"
+            label="拟入库批次方式"
+            rules={[{ required: true, message: '请选择拟入库批次方式' }]}
           >
-            <Input maxLength={64} placeholder="填写本次完工的新批次号" />
+            <Radio.Group
+              options={[
+                {
+                  label: '选择已有批次',
+                  value: SOURCE_INBOUND_LOT_SELECTION.EXISTING,
+                },
+                {
+                  label: '填写新批次号',
+                  value: SOURCE_INBOUND_LOT_SELECTION.NEW,
+                },
+              ]}
+              onChange={(event) => {
+                const nextSelection = event.target.value
+                form.setFieldsValue({
+                  lot_id:
+                    nextSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+                      ? lotOptions[0]?.value
+                      : undefined,
+                  new_lot_no: undefined,
+                })
+              }}
+            />
           </Form.Item>
-        ) : null}
-        <Form.Item
-          name="occurred_at"
-          label="完工时间"
-          rules={[{ required: true, message: '请选择完工时间' }]}
-        >
-          <Input type="datetime-local" />
-        </Form.Item>
-        <Form.Item
-          className="erp-business-action-form__field--full"
-          name="note"
-          label="备注"
-        >
-          <Input.TextArea rows={3} maxLength={255} showCount />
-        </Form.Item>
+          {lotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING ? (
+            <Form.Item
+              name="lot_id"
+              label="拟使用的已有入库批次"
+              rules={[
+                { required: true, message: '请选择拟使用的已有入库批次' },
+              ]}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                options={lotOptions}
+                notFoundContent="暂无匹配的已有批次"
+                placeholder="选择已有批次"
+              />
+            </Form.Item>
+          ) : null}
+          {lotSelection === SOURCE_INBOUND_LOT_SELECTION.NEW ? (
+            <Form.Item
+              name="new_lot_no"
+              label="新批次号"
+              rules={[
+                { required: true, message: '请填写本次完工的新批次号' },
+                { max: 64, message: '新批次号不能超过 64 个字符' },
+              ]}
+            >
+              <Input maxLength={64} placeholder="填写本次完工的新批次号" />
+            </Form.Item>
+          ) : null}
+          <Form.Item
+            name="occurred_at"
+            label="完工时间"
+            rules={[{ required: true, message: '请选择完工时间' }]}
+          >
+            <Input type="datetime-local" />
+          </Form.Item>
+        </BusinessFormSection>
+        <BusinessFormSection title="备注">
+          <Form.Item
+            className="erp-business-action-form__field--full"
+            name="note"
+            label="备注"
+          >
+            <Input.TextArea rows={editing ? 2 : 3} maxLength={255} showCount />
+          </Form.Item>
+        </BusinessFormSection>
       </Form>
     </Editor>
   )

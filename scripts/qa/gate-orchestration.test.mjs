@@ -10,6 +10,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import {
   installStyleL1TerminationHandlers,
   isOwnedProcessGroupAlive,
+  listDevServerPortPIDs,
   terminateOwnedProcessGroup,
 } from "../../web/scripts/styleL1.mjs";
 
@@ -344,6 +345,26 @@ for (const [signal, exitCode] of [
   });
 }
 
+test("style listener lookup times out without leaving its probe running", async () => {
+  let probe;
+  await assert.rejects(
+    listDevServerPortPIDs(process.pid, {
+      port: 15200,
+      timeoutMs: 100,
+      spawnProcess: () => {
+        probe = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
+        return probe;
+      },
+    }),
+    /owned listener lookup timed out/u,
+  );
+  assert.equal(probe.killed, true);
+  if (probe.exitCode === null && probe.signalCode === null) {
+    await once(probe, "exit");
+  }
+  assert.equal(probe.signalCode, "SIGKILL");
+});
+
 test("style cleanup SIGKILLs a surviving owned group without touching an unrelated listener", async () => {
   const [ownedPort, unrelatedPort] = await reserveDistinctPorts(2);
   const ownedLeader = spawnLeaderWithStubbornListener(ownedPort);
@@ -367,6 +388,15 @@ test("style cleanup SIGKILLs a surviving owned group without touching an unrelat
     );
     assert.equal(readProcessGroupID(ownedGrandchildPID), ownedLeader.pid);
     assert.equal(isOwnedProcessGroupAlive(ownedLeader.pid), true);
+    assert.deepEqual(
+      await listDevServerPortPIDs(ownedLeader.pid, { port: ownedPort }),
+      [ownedGrandchildPID],
+    );
+    assert.deepEqual(
+      await listDevServerPortPIDs(ownedLeader.pid, { port: unrelatedPort }),
+      [],
+      "an unrelated listener must not prove ownership for the test server",
+    );
 
     const leaderExit = once(ownedLeader, "exit");
     const cleanup = terminateOwnedProcessGroup(ownedLeader.pid, {

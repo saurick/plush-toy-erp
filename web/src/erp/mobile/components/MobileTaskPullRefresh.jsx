@@ -18,6 +18,13 @@ export default function MobileTaskPullRefresh({
     latest.current = { busy, onRefresh }
   }, [busy, onRefresh])
 
+  useLayoutEffect(() => {
+    if (!enabled) {
+      setPullHeight(0)
+      setRefreshing(false)
+    }
+  }, [enabled])
+
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!enabled || !container) return undefined

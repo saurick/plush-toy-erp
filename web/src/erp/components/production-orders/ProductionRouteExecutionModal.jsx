@@ -16,6 +16,8 @@ import {
   Typography,
 } from 'antd'
 import { BranchesOutlined, ReloadOutlined } from '@ant-design/icons'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import Table from '@/common/components/table/AppTable'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import ProductionOutsourcingPrepareModal from './ProductionOutsourcingPrepareModal.jsx'
@@ -234,6 +236,7 @@ export default function ProductionRouteExecutionModal({
   onChanged,
 }) {
   const [actionForm] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open)
   const [aggregate, setAggregate] = useState(null)
   const [selectedBatchID, setSelectedBatchID] = useState(null)
   const [activeAction, setActiveAction] = useState('')
@@ -853,6 +856,10 @@ export default function ProductionRouteExecutionModal({
             label="拆出数量"
             extra={`当前批次数量：${selectedBatch?.quantity || '-'}`}
             rules={[
+              unitQuantityRuleFromOptions(
+                quantityUnitOptions,
+                selectedOrderItem?.unit_id
+              ),
               { required: true, message: '请填写拆出数量' },
               {
                 validator: async (_, value) => {
@@ -1261,6 +1268,10 @@ export default function ProductionRouteExecutionModal({
               label="返工数量"
               extra={`当前批次数量：${selectedBatch?.quantity || '-'}`}
               rules={[
+                unitQuantityRuleFromOptions(
+                  quantityUnitOptions,
+                  selectedOrderItem?.unit_id
+                ),
                 { required: true, message: '请填写返工数量' },
                 {
                   validator: async (_, value) => {

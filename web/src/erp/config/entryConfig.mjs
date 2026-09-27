@@ -1,6 +1,7 @@
 import { mobileRoleDefinitions } from './appRegistry.mjs'
 import { resolveMenuPermissionKey } from './menuPermissions.mjs'
 import { normalizeRoleKey } from '../utils/roleKeys.mjs'
+import { MOBILE_ALL_ROLES_KEY } from '../utils/mobileRolePermissions.mjs'
 
 export const ENTRY_TARGET = Object.freeze({
   DESKTOP: 'desktop',
@@ -129,6 +130,9 @@ export function isMobileTasksEntryEnabled(config = getEntryConfig()) {
 
 export function isMobileRoleEntryEnabled(roleKey, config = getEntryConfig()) {
   const normalizedRoleKey = normalizeRoleKey(roleKey)
+  if (normalizedRoleKey === MOBILE_ALL_ROLES_KEY) {
+    return getEnabledMobileRoleKeys(config).length > 0
+  }
   return Boolean(
     isMobileTasksEntryEnabled(config) &&
       normalizedRoleKey &&

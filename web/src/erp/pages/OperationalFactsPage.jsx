@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -15,9 +15,12 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
+import { canReadProductionProcess } from '../utils/productionRecordViews.mjs'
 import { useOperationalFactQuery } from '../components/operational-facts/useOperationalFactQuery.mjs'
 import { useOperationalFactMutations } from '../components/operational-facts/useOperationalFactMutations.mjs'
 import {
@@ -111,6 +114,7 @@ import {
   EMPTY_VIEW_OVERRIDES,
   OCCURRED_DATE_FILTER_OPTIONS,
   STATUS_OPTIONS,
+  FINANCE_STATUS_OPTIONS,
   buildOperationalFactColumns,
   buildOperationalFactRelatedMenuItems,
   buildOperationalFactStats,
@@ -126,19 +130,31 @@ export function OperationalFactWorkspace({
   enabledViews,
   viewOverrides = EMPTY_VIEW_OVERRIDES,
   showTabs = true,
-  workspaceNavigation = null,
 }) {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [contentView, setContentView] = useState(() =>
-    searchParams.get('display') === 'process' ? 'process' : 'list'
+  const [savedContentView, setContentView] = useBusinessPageState(
+    'contentView',
+    () => (searchParams.get('display') === 'process' ? 'process' : 'list')
+  )
+
+  const [visualViewState, setVisualViewState] = useBusinessPageState(
+    'visualViewState',
+    {}
   )
 
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
+  const contentView =
+    toolbarModuleKey === 'production-progress'
+      ? searchParams.get('display') === 'process' &&
+        canReadProductionProcess(adminProfile)
+        ? 'process'
+        : 'list'
+      : savedContentView
   const {
     setActiveKey,
     keyword,
@@ -154,6 +170,7 @@ export function OperationalFactWorkspace({
     selectedByKey,
     setSelectedByKey,
     detailRecord,
+    detailRecordID,
     setDetailRecord,
     routeSalesOrderID,
     routeSourceID,
@@ -164,6 +181,7 @@ export function OperationalFactWorkspace({
     currentActiveKey,
     activeConfig,
     activeTotal,
+    statusCounts,
     openOperationalFactDetails,
     activePagination,
     activeDateField,
@@ -177,7 +195,6 @@ export function OperationalFactWorkspace({
     enabledViews,
     viewOverrides,
     adminProfile,
-    outletContext,
   })
 
   const allowedMenuPaths = useMemo(
@@ -255,9 +272,7 @@ export function OperationalFactWorkspace({
     'production.rework.create',
     'warehouse.inbound.confirm',
   ].some((permission) => hasActionPermission(adminProfile, permission))
-  const canViewProductionReworkProgress =
-    hasActionPermission(adminProfile, 'production.fact.read') &&
-    hasActionPermission(adminProfile, 'production.wip.read')
+  const canViewProductionReworkProgress = canReadProductionProcess(adminProfile)
   const isProductionRecordsPage =
     toolbarModuleKey === 'production-progress' &&
     currentActiveKey === 'production'
@@ -273,7 +288,12 @@ export function OperationalFactWorkspace({
     ) {
       setContentView('list')
     }
-  }, [canUseProductionProcessView, contentView, isFinanceDuePage])
+  }, [
+    canUseProductionProcessView,
+    contentView,
+    isFinanceDuePage,
+    setContentView,
+  ])
 
   const loadFinanceDueRows = useCallback(
     ({ signal }) => loadExportRows({ signal }),
@@ -284,6 +304,21 @@ export function OperationalFactWorkspace({
     load: loadFinanceDueRows,
     actionLabel: '加载财务到期顺序',
   })
+  const reloadFinanceDueData = financeDueData.reload
+
+  const visibleDetailRecord =
+    detailRecord ||
+    [...activeRows, ...financeDueData.rows].find(
+      (record) => record.id === detailRecordID
+    ) ||
+    null
+  const detailSourceRoute = visibleDetailRecord
+    ? businessSourceRouteFor(
+        visibleDetailRecord.source_type,
+        visibleDetailRecord.source_id,
+        { keyword: visibleDetailRecord.source_no, source: 'finance-fact' }
+      )
+    : ''
 
   const loadProcessOrders = useCallback(async ({ signal }) => {
     const data = await listAllProductionOrders(
@@ -307,9 +342,17 @@ export function OperationalFactWorkspace({
     String(routeSourceType || '').toUpperCase() === 'PRODUCTION_ORDER'
       ? Number(routeSourceID || 0)
       : Number(activeSelectedRow?.production_order_id || 0)
-  const [selectedProcessOrderID, setSelectedProcessOrderID] = useState(0)
+  const [selectedProcessOrderID, setSelectedProcessOrderID] =
+    useBusinessPageState('selectedProcessOrderID', 0)
   useEffect(() => {
-    if (contentView !== 'process') return
+    if (
+      contentView !== 'process' ||
+      !processOrdersData.loaded ||
+      processOrdersData.loading ||
+      processOrdersData.error
+    ) {
+      return
+    }
     const availableIDs = new Set(
       processOrdersData.rows.map((order) => Number(order?.id || 0))
     )
@@ -323,7 +366,15 @@ export function OperationalFactWorkspace({
       if (current && availableIDs.has(current)) return current
       return Number(processOrdersData.rows[0]?.id || 0)
     })
-  }, [contentView, preferredProcessOrderID, processOrdersData.rows])
+  }, [
+    contentView,
+    preferredProcessOrderID,
+    processOrdersData.loaded,
+    processOrdersData.loading,
+    processOrdersData.error,
+    processOrdersData.rows,
+    setSelectedProcessOrderID,
+  ])
   const loadProcessAggregate = useCallback(
     async ({ signal }) => {
       if (!selectedProcessOrderID) return []
@@ -339,16 +390,41 @@ export function OperationalFactWorkspace({
     load: loadProcessAggregate,
     actionLabel: '加载生产工序进度',
   })
+  const reloadProcessOrders = processOrdersData.reload
+  const reloadProcessAggregate = processAggregateData.reload
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(() => {
+      if (contentView === 'process' && canUseProductionProcessView) {
+        reloadProcessOrders()
+        reloadProcessAggregate()
+        return false
+      }
+      if (contentView === 'due' && isFinanceDuePage) {
+        reloadFinanceDueData()
+      }
+      return loadRows(currentActiveKey)
+    })
+  }, [
+    canUseProductionProcessView,
+    contentView,
+    currentActiveKey,
+    isFinanceDuePage,
+    loadRows,
+    outletContext,
+    reloadProcessOrders,
+    reloadProcessAggregate,
+    reloadFinanceDueData,
+  ])
   const selectedProductionDraftSaveAction =
     currentActiveKey === 'production' && activeSelectedRow?.status === 'DRAFT'
       ? productionDraftSaveActionFor(activeSelectedRow)
       : ''
   const canEditSelectedProductionDraft = Boolean(
     selectedProductionDraftSaveAction &&
-      hasAnyPermission(
-        adminProfile,
-        productionDraftEditPermissions(selectedProductionDraftSaveAction)
-      )
+    hasAnyPermission(
+      adminProfile,
+      productionDraftEditPermissions(selectedProductionDraftSaveAction)
+    )
   )
 
   const {
@@ -532,7 +608,7 @@ export function OperationalFactWorkspace({
       : null
   const selectedCanSettleFinance = Boolean(
     activeSelectedRow?.status === 'POSTED' &&
-      financeSettlementActionFor(activeSelectedRow?.fact_type)
+    financeSettlementActionFor(activeSelectedRow?.fact_type)
   )
   const selectedLabel = selectedLabelForKey(currentActiveKey, activeSelectedRow)
   const selectedIsProductionCompletion =
@@ -729,34 +805,34 @@ export function OperationalFactWorkspace({
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
-      statusFilter ||
-      activeDateRange[0] ||
-      activeDateRange[1] ||
-      routeSalesOrderID ||
-      routeSourceType ||
-      routeSourceID ||
-      routeFactID ||
-      linkedKeyword
+    statusFilter ||
+    activeDateRange[0] ||
+    activeDateRange[1] ||
+    routeSalesOrderID ||
+    routeSourceType ||
+    routeSourceID ||
+    routeFactID ||
+    linkedKeyword
   )
 
   const pageStats = buildOperationalFactStats({
     activeRows,
     activeTotal,
+    showStatusSummary: currentActiveKey !== 'finance',
   })
   const tabItems = Object.entries(configs).map(([key, config]) => ({
     key,
     label: config.title,
   }))
   const workspaceTabs =
-    workspaceNavigation ||
-    (showTabs && tabItems.length > 1 ? (
+    showTabs && tabItems.length > 1 ? (
       <Tabs
         className="erp-business-view-tabs"
         activeKey={currentActiveKey}
         onChange={setActiveKey}
         items={tabItems}
       />
-    ) : null)
+    ) : null
   const contentViewSwitch = isFinanceDuePage ? (
     <BusinessViewSwitch
       value={contentView}
@@ -764,23 +840,7 @@ export function OperationalFactWorkspace({
         { value: 'list', label: '账款列表' },
         { value: 'due', label: '到期顺序' },
       ]}
-      loading={financeDueData.loading}
       onChange={setContentView}
-      onReload={financeDueData.reload}
-    />
-  ) : canUseProductionProcessView ? (
-    <BusinessViewSwitch
-      value={contentView}
-      options={[
-        { value: 'list', label: '记录明细' },
-        { value: 'process', label: '生产工序' },
-      ]}
-      loading={processOrdersData.loading || processAggregateData.loading}
-      onChange={setContentView}
-      onReload={() => {
-        processOrdersData.reload()
-        processAggregateData.reload()
-      }}
     />
   ) : null
   const visualizationHeader =
@@ -815,20 +875,7 @@ export function OperationalFactWorkspace({
       <PageHeaderCard
         compact
         title={pageTitle}
-        tags={[
-          <Tag color="cyan" key="view">
-            {activeConfig.title}
-          </Tag>,
-          <Tag color="blue" key="fact">
-            正式业务记录
-          </Tag>,
-          <Tag color="green" key="backend">
-            系统过账 / 撤销调整
-          </Tag>,
-          <Tag color="gold" key="boundary">
-            任务完成不等于过账
-          </Tag>,
-        ]}
+        viewSwitch={visualizationHeader}
         stats={pageStats}
       />
 
@@ -862,15 +909,31 @@ export function OperationalFactWorkspace({
               }}
               onPressEnter={() => loadRows(currentActiveKey)}
             />
-            <SelectFilter
-              className="erp-business-filter-control--status"
-              value={statusFilter}
-              options={STATUS_OPTIONS}
-              onChange={(nextStatus) => {
-                setStatusFilter(nextStatus)
-                resetPaginationForKey()
-              }}
-            />
+            {currentActiveKey === 'finance' ? (
+              <BusinessStatusFilter
+                inline
+                aria-label="单据状态"
+                counts={statusCounts}
+                loading={loading}
+                className="erp-business-filter-control--status"
+                value={statusFilter}
+                options={FINANCE_STATUS_OPTIONS}
+                onChange={(nextStatus) => {
+                  setStatusFilter(nextStatus)
+                  resetPaginationForKey()
+                }}
+              />
+            ) : (
+              <SelectFilter
+                className="erp-business-filter-control--status"
+                value={statusFilter}
+                options={STATUS_OPTIONS}
+                onChange={(nextStatus) => {
+                  setStatusFilter(nextStatus)
+                  resetPaginationForKey()
+                }}
+              />
+            )}
             <DateRangeFilter
               options={activeConfig.dateOptions || OCCURRED_DATE_FILTER_OPTIONS}
               value={activeDateField}
@@ -1595,9 +1658,21 @@ export function OperationalFactWorkspace({
         </SelectionActionBar>
       </BusinessOperationPanel>
 
-      <BusinessViewSurface switcher={visualizationHeader}>
+      <BusinessViewSurface
+        activeView={contentView}
+        loading={
+          loading ||
+          financeDueData.loading ||
+          processOrdersData.loading ||
+          processAggregateData.loading
+        }
+      >
         {contentView === 'due' && isFinanceDuePage ? (
           <FinanceDueOverview
+            viewState={visualViewState.finance}
+            onViewStateChange={(value) =>
+              setVisualViewState((current) => ({ ...current, finance: value }))
+            }
             facts={financeDueData.rows}
             loading={financeDueData.loading}
             error={financeDueData.error}
@@ -1611,6 +1686,13 @@ export function OperationalFactWorkspace({
           />
         ) : contentView === 'process' && canUseProductionProcessView ? (
           <ProductionProcessProgress
+            viewState={visualViewState[selectedProcessOrderID]}
+            onViewStateChange={(value) =>
+              setVisualViewState((current) => ({
+                ...current,
+                [selectedProcessOrderID]: value,
+              }))
+            }
             orders={processOrdersData.rows}
             selectedOrderID={selectedProcessOrderID}
             aggregate={processAggregate}
@@ -1676,8 +1758,15 @@ export function OperationalFactWorkspace({
       <BusinessDetailsModal
         columns={visibleColumns}
         description="当前弹窗只用于查看记录；如需编辑草稿、确认、结清、取消、返工或继续办理，请使用列表上方的当前操作区。"
-        open={Boolean(detailRecord)}
-        record={detailRecord}
+        open={Boolean(visibleDetailRecord)}
+        record={visibleDetailRecord}
+        extraActions={
+          detailSourceRoute && canOpenRelatedPath(detailSourceRoute) ? (
+            <Button onClick={() => navigate(detailSourceRoute)}>
+              查看来源单据
+            </Button>
+          ) : null
+        }
         title={`${activeConfig.title}详情`}
         onClose={() => setDetailRecord(null)}
       />

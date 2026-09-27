@@ -607,7 +607,7 @@ export default function MobileRoleTasksPage() {
             {
               key: MOBILE_TASK_FILTER_KEYS.APPROVAL,
               label: '审批',
-              ariaLabel: '待我审批',
+              ariaLabel: adminProfile?.is_super_admin === true ? '待审批' : '待我审批',
               count: authoritativeTaskCounts?.approval ?? null,
             },
           ]
@@ -624,6 +624,7 @@ export default function MobileRoleTasksPage() {
       },
     ],
     [
+      adminProfile?.is_super_admin,
       authoritativeTaskCounts?.approval,
       authoritativeTaskCounts?.overdue,
       authoritativeTaskCounts?.risk,
@@ -1163,6 +1164,7 @@ export default function MobileRoleTasksPage() {
     urgingID,
   } = useMobileRoleTaskActions({
     activeRoleKey,
+    isAdminReview: adminProfile?.is_super_admin === true,
     detailAction,
     initialAction:
       initialHistoryScreen === 'action'

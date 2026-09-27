@@ -28,90 +28,30 @@ export function createFinanceBusinessSourceScenarios(deps) {
   }
 
   const clickSelectionAction = async (page, actionName) => {
-    const hasVisibleAction = await page.evaluate((label) =>
-      Array.from(document.querySelectorAll('button')).some((button) => {
-        const box = button.getBoundingClientRect()
-        return (
-          box.width > 0 &&
-          box.height > 0 &&
-          String(button.textContent || '').replace(/\s+/gu, '') ===
-            String(label).replace(/\s+/gu, '')
-        )
-      }), actionName)
-    if (!hasVisibleAction) {
-      const moreButtons = page.getByRole('button', { name: /更多操作/u })
-      for (let index = 0; index < (await moreButtons.count()); index += 1) {
-        const more = moreButtons.nth(index)
-        if (await more.isVisible()) {
-          await more.click()
-          break
-        }
-      }
-      await page
-        .locator('.erp-business-selection-action-menu:visible')
-        .waitFor({ state: 'visible', timeout: 10_000 })
+    const actionLabel = new RegExp(
+      actionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+      'u'
+    )
+    const direct = page.getByRole('button', { name: actionLabel }).first()
+    const more = page.getByRole('button', { name: /^更多操作，共/u }).first()
+    await direct.or(more).first().waitFor({ state: 'visible' })
+    if (await direct.isVisible().catch(() => false)) {
+      await direct.click({ timeout: 10_000 })
+      return
     }
-    try {
-      await page.waitForFunction(
-        (label) =>
-          Array.from(document.querySelectorAll('button')).some((button) => {
-            const box = button.getBoundingClientRect()
-            return (
-              box.width > 0 &&
-              box.height > 0 &&
-              !button.disabled &&
-              String(button.textContent || '').replace(/\s+/gu, '') ===
-                String(label).replace(/\s+/gu, '')
-            )
-          }),
-        actionName,
-        { timeout: 10_000 }
-      )
-    } catch (error) {
-      const metrics = await page.evaluate((label) => ({
-        selectedRows: Array.from(
-          document.querySelectorAll('.ant-table-row-selected')
-        ).map((row) =>
-          String(row.textContent || '')
-            .replace(/\s+/gu, ' ')
-            .trim()
-        ),
-        actions: Array.from(document.querySelectorAll('button'))
-          .filter(
-            (button) =>
-              String(button.textContent || '').replace(/\s+/gu, '') ===
-              String(label).replace(/\s+/gu, '')
-          )
-          .map((button) => {
-            const box = button.getBoundingClientRect()
-            return {
-              disabled: button.disabled,
-              visible: box.width > 0 && box.height > 0,
-              describedBy: button.getAttribute('aria-describedby') || '',
-            }
-          }),
-      }), actionName)
-      throw new Error(
-        `操作“${actionName}”未变为可用: ${JSON.stringify(metrics)}; ${error.message}`
-      )
-    }
-    const clicked = await page.evaluate((label) => {
-      const button = Array.from(document.querySelectorAll('button')).find(
-        (candidate) => {
-          const box = candidate.getBoundingClientRect()
-          return (
-            box.width > 0 &&
-            box.height > 0 &&
-            !candidate.disabled &&
-            String(candidate.textContent || '').replace(/\s+/gu, '') ===
-              String(label).replace(/\s+/gu, '')
-          )
-        }
-      )
-      button?.click()
-      return Boolean(button)
-    }, actionName)
-    assert(clicked, `未找到可用操作“${actionName}”`)
+    await more.click()
+    const menu = page.locator('.erp-business-selection-action-menu:visible')
+    const action = menu.getByRole('button', { name: actionLabel }).first()
+    await action.click({ timeout: 10_000 })
+  }
+
+  const clearFilters = async (page) => {
+    await page
+      .locator('.erp-business-operation-panel button[aria-haspopup="dialog"]')
+      .click()
+    const filters = page.getByRole('dialog', { name: '筛选条件' })
+    await filters.getByRole('button', { name: '清空筛选' }).click()
+    await filters.getByRole('button', { name: '完成', exact: true }).click()
   }
 
   const assertFinanceSourceModal = async (
@@ -476,8 +416,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
             () =>
               document.querySelector(
                 'input[placeholder="搜单号、往来单位、产品、来源"]'
-              )?.value ===
-              'INV-STYLE-L1'
+              )?.value === 'INV-STYLE-L1'
           )
           assert.equal(await search.inputValue(), 'INV-STYLE-L1')
           const firstInvoiceExactRequestCount = invoiceListRequests.filter(
@@ -499,8 +438,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
             () =>
               document.querySelector(
                 'input[placeholder="搜单号、客户、产品、款号"]'
-              )?.value ===
-              'SHIP-STYLE-L1'
+              )?.value === 'SHIP-STYLE-L1'
           )
           assert.equal(await search.inputValue(), 'SHIP-STYLE-L1')
           url = new URL(page.url())
@@ -525,8 +463,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
             () =>
               document.querySelector(
                 'input[placeholder="搜单号、往来单位、产品、来源"]'
-              )?.value ===
-              'INV-STYLE-L1'
+              )?.value === 'INV-STYLE-L1'
           )
           assert.equal(await search.inputValue(), 'INV-STYLE-L1')
           url = new URL(page.url())
@@ -563,13 +500,12 @@ export function createFinanceBusinessSourceScenarios(deps) {
             ).join(' / ')}`
           )
 
-          await page.getByRole('button', { name: '清空筛选' }).click()
+          await clearFilters(page)
           await page.waitForFunction(
             () =>
               document.querySelector(
                 'input[placeholder="搜单号、往来单位、产品、来源"]'
-              )?.value ===
-              ''
+              )?.value === ''
           )
           assert.equal(await search.inputValue(), '')
           url = new URL(page.url())
@@ -590,7 +526,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '入库管理')
+        await expectHeading(page, '采购入库')
         await selectRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, '生成应付')
         const modal = await assertFinanceSourceModal(page, {
@@ -710,13 +646,12 @@ export function createFinanceBusinessSourceScenarios(deps) {
             await page.locator('.ant-message-error').allTextContents()
           ).join(' / ')}`
         )
-        await page.getByRole('button', { name: '清空筛选' }).click()
+        await clearFilters(page)
         await page.waitForFunction(
           () =>
             document.querySelector(
               'input[placeholder="搜单号、产品、材料、批次"]'
-            )?.value ===
-            ''
+            )?.value === ''
         )
         assert.equal(new URL(page.url()).searchParams.has('source_type'), false)
         assert.equal(new URL(page.url()).searchParams.has('source_id'), false)
@@ -756,7 +691,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
       },
       verify: async (page) => {
         await openPayableSource(page, 'AP-RELATED-PR-L1')
-        await expectHeading(page, '入库管理')
+        await expectHeading(page, '采购入库')
         await expectText(page, 'PR-STYLE-L1')
         const search = page.getByPlaceholder('搜单号、供应商、材料、产品')
         assert.equal(await search.inputValue(), 'PR-STYLE-L1')
@@ -770,13 +705,12 @@ export function createFinanceBusinessSourceScenarios(deps) {
             await page.locator('.ant-message-error').allTextContents()
           ).join(' / ')}`
         )
-        await page.getByRole('button', { name: '清空筛选' }).click()
+        await clearFilters(page)
         await page.waitForFunction(
           () =>
             document.querySelector(
               'input[placeholder="搜单号、供应商、材料、产品"]'
-            )?.value ===
-            ''
+            )?.value === ''
         )
         assert.equal(await search.inputValue(), '')
         assert.equal(new URL(page.url()).searchParams.has('receipt_id'), false)
@@ -894,13 +828,12 @@ export function createFinanceBusinessSourceScenarios(deps) {
             await page.locator('.ant-message-error').allTextContents()
           ).join(' / ')}`
         )
-        await page.getByRole('button', { name: '清空筛选' }).click()
+        await clearFilters(page)
         await page.waitForFunction(
           () =>
             document.querySelector(
               'input[placeholder="合同、厂家、产品、材料"]'
-            )?.value ===
-            ''
+            )?.value === ''
         )
         assert.equal(await search.inputValue(), '')
         assert.equal(

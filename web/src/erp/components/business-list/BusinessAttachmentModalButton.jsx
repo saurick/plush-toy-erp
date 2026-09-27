@@ -26,11 +26,28 @@ export default function BusinessAttachmentModalButton({
   emptyReadLabel = '查看附件',
 }) {
   const [open, setOpen] = useState(false)
+  const [panelState, setPanelState] = useState({ busy: false, pendingCount: 0 })
+  const [confirmClose, setConfirmClose] = useState(false)
   const [attachmentCount, setAttachmentCount] = useState(null)
   const countRequestSeqRef = useRef(0)
   const normalizedOwnerId = Number(ownerId || 0)
   const missingOwner = !ownerType || normalizedOwnerId <= 0
   const actionDisabled = disabled || missingOwner
+  const close = () => {
+    if (panelState.busy) return
+    if (panelState.pendingCount > 0) {
+      setConfirmClose(true)
+      return
+    }
+    setOpen(false)
+    loadAttachmentCount()
+  }
+
+  useEffect(() => {
+    setOpen(false)
+    setConfirmClose(false)
+    setPanelState({ busy: false, pendingCount: 0 })
+  }, [ownerType, normalizedOwnerId])
   const loadAttachmentCount = useCallback(async () => {
     const requestID = countRequestSeqRef.current + 1
     countRequestSeqRef.current = requestID
@@ -99,16 +116,19 @@ export default function BusinessAttachmentModalButton({
       <BusinessModal
         centered
         destroyOnHidden
+        className="business-attachment-modal"
         footer={null}
         open={open}
         title={modalTitle}
         size="localAction"
-        onCancel={() => {
-          setOpen(false)
-          loadAttachmentCount()
-        }}
+        width="min(780px, calc(100vw - 32px))"
+        closable={!panelState.busy}
+        maskClosable={false}
+        keyboard={!panelState.busy}
+        onCancel={close}
       >
         <BusinessAttachmentPanel
+          key={`${ownerType}:${normalizedOwnerId}`}
           ownerType={ownerType}
           ownerId={normalizedOwnerId}
           ownerVersion={ownerVersion}
@@ -119,8 +139,28 @@ export default function BusinessAttachmentModalButton({
           allowPendingAttachmentsWithoutOwner={false}
           missingOwnerDescription={disabledReason}
           missingOwnerEmptyText={disabledReason}
-          variant="inline"
+          variant="manager"
+          onStateChange={setPanelState}
+          onClose={close}
         />
+      </BusinessModal>
+      <BusinessModal
+        size="confirm"
+        open={confirmClose}
+        title="放弃未上传附件？"
+        okText="放弃并关闭"
+        cancelText="继续处理"
+        okButtonProps={{ danger: true }}
+        onCancel={() => setConfirmClose(false)}
+        onOk={() => {
+          setConfirmClose(false)
+          setOpen(false)
+          setPanelState({ busy: false, pendingCount: 0 })
+          loadAttachmentCount()
+        }}
+      >
+        当前还有 {panelState.pendingCount}{' '}
+        个附件未完成。关闭后需要重新选择文件；已上传的附件会保留。结果待确认的文件请重新打开列表核对。
       </BusinessModal>
     </>
   )

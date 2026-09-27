@@ -6,6 +6,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
     companyName: "东莞市永绅玩具有限公司",
     systemName: "业务管理",
     faviconHref: "/customer-assets/yoyoosun/favicon-yoyoosun.svg",
+    mobileFaviconHref: "/customer-assets/yoyoosun/favicon-yoyoosun-mobile.svg",
   }),
   legalNotice: Object.freeze({
     noticeVersion: "2026-08-11.1",
@@ -62,14 +63,6 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
         items: Object.freeze(["accessories-purchase"]),
       }),
       Object.freeze({
-        title: "质检管理",
-        items: Object.freeze(["quality-inspections"]),
-      }),
-      Object.freeze({
-        title: "库存管理",
-        items: Object.freeze(["inbound", "inventory"]),
-      }),
-      Object.freeze({
         title: "委外管理",
         items: Object.freeze(["processing-contracts"]),
       }),
@@ -78,16 +71,24 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
         items: Object.freeze(["production-orders", "production-progress"]),
       }),
       Object.freeze({
+        title: "库存管理",
+        items: Object.freeze(["inbound", "inventory"]),
+      }),
+      Object.freeze({
+        title: "质检管理",
+        items: Object.freeze(["quality-inspections"]),
+      }),
+      Object.freeze({
         title: "出货管理",
-        items: Object.freeze(["shipping-release", "outbound", "shipments"]),
+        items: Object.freeze(["shipments", "shipping-release", "outbound"]),
       }),
       Object.freeze({
         title: "财务管理",
         items: Object.freeze([
-          "reconciliation",
           "receivables",
           "payables",
           "finance-payments",
+          "reconciliation",
           "invoices",
         ]),
       }),

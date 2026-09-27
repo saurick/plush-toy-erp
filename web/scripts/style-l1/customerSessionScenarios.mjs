@@ -1,5 +1,6 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createSessionRecoveryScenarios } from './sessionRecoveryScenarios.mjs'
+import { createModuleCatalogScenarios } from './moduleCatalogScenarios.mjs'
 import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
 
 export function createCustomerSessionScenarios({
@@ -43,6 +44,68 @@ export function createCustomerSessionScenarios({
       hiddenItemKeys: Object.freeze([]),
     }),
   })
+  const assertMoreFunctionsPresentation = async (menu, expanded = false) => {
+    const trigger = menu
+      .locator('.ant-menu-submenu-title')
+      .filter({ hasText: '更多功能' })
+    assert.equal((await trigger.innerText()).trim(), '更多功能')
+    assert.equal(await trigger.getAttribute('aria-expanded'), String(expanded))
+    if (expanded) {
+      await menu.page().waitForFunction(() => {
+        const visibleMenu = Array.from(
+          document.querySelectorAll('.erp-admin-menu')
+        ).find((node) => node.getClientRects().length > 0)
+        const submenu = visibleMenu?.querySelector(
+          '.ant-menu-submenu-open > .ant-menu-sub'
+        )
+        return (
+          submenu?.clientHeight > 0 &&
+          submenu.clientHeight >= submenu.scrollHeight - 1
+        )
+      })
+    }
+    const metrics = await trigger.evaluate((node) => {
+      const group = node.closest('.ant-menu-item-group')
+      const icon = node.querySelector('[data-icon="ellipsis"]')
+      const arrow = node.querySelector('[data-icon="right"]')
+      const label = node.querySelector('.ant-menu-title-content')
+      const matrix = new DOMMatrix(getComputedStyle(arrow).transform)
+      const iconRect = icon?.getBoundingClientRect()
+      const labelRange = document.createRange()
+      labelRange.selectNodeContents(label)
+      const labelRect = labelRange.getBoundingClientRect()
+      const arrowRect = arrow?.getBoundingClientRect()
+      const rect = node.getBoundingClientRect()
+      return {
+        groupTitle: group
+          ?.querySelector(':scope > .ant-menu-item-group-title')
+          ?.textContent.trim(),
+        arrowDirection: [matrix.a, matrix.b, matrix.c, matrix.d],
+        boxes: {
+          icon: iconRect?.toJSON(),
+          label: labelRect?.toJSON(),
+          arrow: arrowRect?.toJSON(),
+          trigger: rect.toJSON(),
+        },
+        fits:
+          rect.height >= 38 &&
+          iconRect?.width > 0 &&
+          labelRect?.left >= iconRect.right &&
+          labelRect?.right <= arrowRect?.left + 1 &&
+          arrowRect?.right <= rect.right + 1,
+      }
+    })
+    assert.equal(metrics.groupTitle, '按需入口')
+    assert.deepEqual(
+      metrics.arrowDirection,
+      expanded ? [0, 1, -1, 0] : [1, 0, 0, 1],
+      '更多功能箭头应在收起时向右、展开时向下'
+    )
+    assert(
+      metrics.fits,
+      `更多功能图标、文字和箭头不应重叠或越界: ${JSON.stringify(metrics)}`
+    )
+  }
   const yoyoosunBrandHomeCustomerConfig = Object.freeze({
     ...roleGuidedCustomerConfig,
     brand: Object.freeze({
@@ -74,7 +137,17 @@ export function createCustomerSessionScenarios({
   let permissionSafeInventoryReferenceRequests = []
   let permissionSafeProductReferenceRequests = []
   return [
-    ...createSessionRecoveryScenarios({ customerRuntimeEffectiveSession, outputDir }),
+    ...createModuleCatalogScenarios({
+      customerRoleAdminProfile,
+      customerRoleRuntimeSession,
+      roleGuidedCustomerConfig,
+      customerRuntimeEffectiveSession,
+      outputDir,
+    }),
+    ...createSessionRecoveryScenarios({
+      customerRuntimeEffectiveSession,
+      outputDir,
+    }),
     {
       name: 'erp-dashboard-redirect',
       path: '/erp/dashboard',
@@ -1970,13 +2043,13 @@ export function createCustomerSessionScenarios({
       ),
       viewport: { width: 1280, height: 720 },
       verify: async (page) => {
-        await expectText(page, '看板中心')
+        await expectText(page, '工作中心')
         await expectText(page, '工作台')
         await expectText(page, '任务看板')
         await expectText(page, '常用工作')
-        await expectText(page, '客户档案')
-        await expectText(page, '销售订单')
-        await expectText(page, '出货单')
+        await expectText(page, '基础资料')
+        await expectText(page, '销售管理')
+        await expectText(page, '出货管理')
         await expectText(page, '更多功能')
 
         const menu = page.locator('.erp-admin-menu')
@@ -2002,7 +2075,7 @@ export function createCustomerSessionScenarios({
         )
         assert.deepEqual(
           visibleLeafTexts,
-          ['工作台', '任务看板', '客户档案', '销售订单', '出货单'],
+          ['工作台', '任务看板', '基础资料', '销售管理', '出货管理'],
           `销售岗位导航应按看板、常用工作的顺序展示: ${JSON.stringify(visibleLeafTexts)}`
         )
 
@@ -2015,7 +2088,7 @@ export function createCustomerSessionScenarios({
             const helpItem = Array.from(
               node.querySelectorAll('.ant-menu-item')
             ).find((item) =>
-              String(item.textContent || '').includes('岗位使用帮助')
+              String(item.textContent || '').includes('帮助中心')
             )
             const submenu = node.querySelector('.ant-menu-sub')
             return {
@@ -2026,19 +2099,12 @@ export function createCustomerSessionScenarios({
                 helpItem?.classList.contains('ant-menu-item-selected') === true,
             }
           })
-        const moreFunctionsLabel = String(
-          await moreFunctions.innerText()
-        ).trim()
-        const moreFunctionsCountMatch =
-          moreFunctionsLabel.match(/^更多功能（(\d+)）$/u)
-        assert(
-          moreFunctionsCountMatch,
-          `更多功能应显示已授权页面数量: ${moreFunctionsLabel}`
-        )
-        await moreFunctions.click()
-        await expectText(page, '产品档案')
-        await expectText(page, '库存台账')
-        await expectText(page, '岗位使用帮助')
+        await assertMoreFunctionsPresentation(menu)
+        await moreFunctions.focus()
+        await page.keyboard.press('Enter')
+        await expectText(page, '库存管理')
+        await expectText(page, '帮助中心')
+        await assertMoreFunctionsPresentation(menu, true)
         const expandedVisibleLeafCount = await menu.evaluate(
           (node) =>
             Array.from(node.querySelectorAll('.ant-menu-item')).filter(
@@ -2047,8 +2113,8 @@ export function createCustomerSessionScenarios({
         )
         assert.equal(
           expandedVisibleLeafCount,
-          visibleLeafCount + Number(moreFunctionsCountMatch[1]),
-          `更多功能数量应与展开后的页面一致：${moreFunctionsLabel}`
+          visibleLeafCount + 5,
+          '销售岗位展开后应保留全部五个按需入口'
         )
         await page.screenshot({
           path: path.resolve(
@@ -2059,13 +2125,15 @@ export function createCustomerSessionScenarios({
         })
         const helpMenuItem = menu
           .locator('.ant-menu-item')
-          .filter({ hasText: '岗位使用帮助' })
+          .filter({ hasText: '帮助中心' })
         await helpMenuItem.click()
         await page.waitForURL((url) => url.pathname === '/erp/help-center')
-        await expectText(page, '正常怎么做')
-        await expectText(page, '完成标准')
-        await expectText(page, '遇到异常怎么办')
-        await expectText(page, '退回对象')
+        await expectText(page, '办理概览')
+        await page.getByText('完成后', { exact: true }).click()
+        await expectText(page, '完成后应看到')
+        await page.getByText('遇到异常', { exact: true }).click()
+        await expectText(page, '什么时候停下来')
+        await page.getByText('怎么做', { exact: true }).click()
         await helpMenuItem.scrollIntoViewIfNeeded()
         const activeHelpState = await readMoreFunctionsState()
         assert.equal(
@@ -2087,7 +2155,7 @@ export function createCustomerSessionScenarios({
         await page
           .reload({ waitUntil: 'domcontentloaded' })
           .then(() => page.waitForLoadState('networkidle').catch(() => {}))
-        await expectText(page, '正常怎么做')
+        await expectText(page, '办理概览')
         await helpMenuItem.waitFor({ state: 'visible', timeout: 10_000 })
         const reloadedHelpState = await readMoreFunctionsState()
         assert.equal(
@@ -2159,24 +2227,18 @@ export function createCustomerSessionScenarios({
           .filter({ hasText: '更多功能' })
           .first()
         const moreFunctionsRoot = moreFunctions.locator('..')
-        const moreFunctionsLabel = String(
-          await moreFunctions.innerText()
-        ).trim()
-        const countMatch = moreFunctionsLabel.match(/^更多功能（(\d+)）$/u)
-        assert(countMatch, `移动端更多功能数量格式异常: ${moreFunctionsLabel}`)
+        await assertMoreFunctionsPresentation(menu)
         await moreFunctions.click()
         await page.waitForTimeout(250)
+        await assertMoreFunctionsPresentation(menu, true)
 
         const groupTitles = moreFunctionsRoot.locator(
           '.erp-role-guided-more-group > .ant-menu-item-group-title'
         )
         assert.deepEqual(await groupTitles.allTextContents(), [
-          '基础资料',
-          '库存管理',
-          '生产管理',
-          '运营工具',
-          '历史查询',
-          '使用帮助',
+          '业务模块',
+          '工具与查询',
+          '系统与帮助',
         ])
         const groupingMetrics = await moreFunctionsRoot.evaluate((node) => {
           const groupTitleNodes = Array.from(
@@ -2213,14 +2275,14 @@ export function createCustomerSessionScenarios({
           }
         })
         assert(
-          groupingMetrics.groupTitleCount === 6 &&
-            groupingMetrics.leafCount === Number(countMatch[1]) &&
-            groupingMetrics.leafTexts.at(-1) === '岗位使用帮助' &&
+          groupingMetrics.groupTitleCount === 3 &&
+            groupingMetrics.leafCount === 5 &&
+            groupingMetrics.leafTexts.at(-1) === '帮助中心' &&
             groupingMetrics.interactiveGroupTitleCount === 0 &&
             groupingMetrics.focusableGroupTitleCount === 0 &&
             groupingMetrics.groupTitleStyles.every(
               (style) =>
-                style.color === 'rgb(148, 163, 184)' &&
+                style.color === 'rgb(189, 201, 192)' &&
                 style.fontSize >= 11 &&
                 style.fontWeight >= 600
             ) &&
@@ -2252,7 +2314,7 @@ export function createCustomerSessionScenarios({
         })
         const helpItem = moreFunctionsRoot
           .locator('.ant-menu-item')
-          .filter({ hasText: '岗位使用帮助' })
+          .filter({ hasText: '帮助中心' })
         await helpItem.scrollIntoViewIfNeeded()
         await assertThemeReadable(page, {
           scenarioName: 'yoyoosun-sales-role-guided-navigation-mobile-dark',
@@ -2266,11 +2328,11 @@ export function createCustomerSessionScenarios({
           fullPage: false,
         })
 
-        const productItem = moreFunctionsRoot
+        const inventoryItem = moreFunctionsRoot
           .locator('.ant-menu-item')
-          .filter({ hasText: '产品档案' })
-        await productItem.click()
-        await waitForPath(page, '/erp/master/products')
+          .filter({ hasText: '库存管理' })
+        await inventoryItem.click()
+        await waitForPath(page, '/erp/warehouse/inventory')
         await page.getByRole('button', { name: '打开导航菜单' }).click()
         await drawer.waitFor({ state: 'visible', timeout: 10_000 })
         await page.waitForFunction(() =>
@@ -2278,7 +2340,7 @@ export function createCustomerSessionScenarios({
             document.querySelectorAll(
               '.erp-admin-drawer .ant-menu-item-selected'
             )
-          ).some((item) => String(item.textContent || '').includes('产品档案'))
+          ).some((item) => String(item.textContent || '').includes('库存管理'))
         )
         const selectedState = await moreFunctionsRoot.evaluate((node) => {
           const selected = node.querySelector('.ant-menu-item-selected')
@@ -2289,7 +2351,7 @@ export function createCustomerSessionScenarios({
         })
         assert.deepEqual(selectedState, {
           open: true,
-          selectedText: '产品档案',
+          selectedText: '库存管理',
         })
 
         await page
@@ -2302,7 +2364,7 @@ export function createCustomerSessionScenarios({
             document.querySelectorAll(
               '.erp-admin-drawer .ant-menu-item-selected'
             )
-          ).some((item) => String(item.textContent || '').includes('产品档案'))
+          ).some((item) => String(item.textContent || '').includes('库存管理'))
         )
         const reloadedSelectedState = await moreFunctionsRoot.evaluate(
           (node) => {
@@ -2333,9 +2395,9 @@ export function createCustomerSessionScenarios({
       viewport: { width: 1280, height: 720 },
       verify: async (page) => {
         const menu = page.locator('.erp-admin-menu')
-        await expectText(page, '看板中心')
+        await expectText(page, '工作中心')
         await expectText(page, '常用工作')
-        await expectText(page, '更多功能（14）')
+        await assertMoreFunctionsPresentation(menu)
         const visibleLeafTexts = await menu.evaluate((node) =>
           Array.from(node.querySelectorAll('.ant-menu-item'))
             .filter((item) => item.getClientRects().length > 0)
@@ -2347,9 +2409,9 @@ export function createCustomerSessionScenarios({
             '工作台',
             '任务看板',
             '进度看板',
-            '销售订单',
-            '采购订单',
-            '质量检验',
+            '销售管理',
+            '采购管理',
+            '委外管理',
           ],
           `老板电脑端应有三个看板和三个常用业务: ${JSON.stringify(visibleLeafTexts)}`
         )
@@ -2359,28 +2421,24 @@ export function createCustomerSessionScenarios({
           .first()
           .locator('..')
         await moreFunctionsRoot.locator('.ant-menu-submenu-title').click()
-        await expectText(page, '生产订单')
-        await expectText(page, '岗位使用帮助')
+        await expectText(page, '生产管理')
+        await expectText(page, '帮助中心')
+        await assertMoreFunctionsPresentation(menu, true)
         assert.deepEqual(
           await moreFunctionsRoot
             .locator('.erp-role-guided-more-group > .ant-menu-item-group-title')
             .allTextContents(),
           [
-            '库存管理',
-            '委外管理',
-            '生产管理',
-            '出货管理',
-            '财务管理',
-            '运营工具',
-            '历史查询',
-            '使用帮助',
+            '业务模块',
+            '工具与查询',
+            '系统与帮助',
           ]
         )
         const bossMoreItems = await moreFunctionsRoot
           .locator('.ant-menu-item')
           .allTextContents()
-        assert.equal(bossMoreItems.length, 14)
-        assert.equal(String(bossMoreItems.at(-1) || '').trim(), '岗位使用帮助')
+        assert.equal(bossMoreItems.length, 8)
+        assert.equal(String(bossMoreItems.at(-1) || '').trim(), '帮助中心')
         await page.screenshot({
           path: path.resolve(
             outputDir,
@@ -2426,6 +2484,7 @@ export function createCustomerSessionScenarios({
           false,
           '财务首次进入工作台时更多功能应保持折叠'
         )
+        await assertMoreFunctionsPresentation(menu)
         const menuMetrics = await menu.evaluate((node) => {
           const menuRect = node.getBoundingClientRect()
           const moreTitle = Array.from(
@@ -2446,7 +2505,7 @@ export function createCustomerSessionScenarios({
           `财务侧栏不应产生横向溢出: ${JSON.stringify(menuMetrics)}`
         )
         assert.equal(
-          menuMetrics.moreTitleHeight >= 40 &&
+          menuMetrics.moreTitleHeight >= 38 &&
             menuMetrics.moreTitleRight <= menuMetrics.menuRight + 1,
           true,
           `更多功能入口应保持可点击且不越界: ${JSON.stringify(menuMetrics)}`
@@ -2461,10 +2520,7 @@ export function createCustomerSessionScenarios({
           [
             '工作台',
             '任务看板',
-            '应收管理',
-            '应付管理',
-            '发票管理',
-            '对账管理',
+            '财务管理',
           ],
           `财务系统推荐应突出应收、应付、发票和对账: ${JSON.stringify(visibleLeafTexts)}`
         )
@@ -2478,7 +2534,7 @@ export function createCustomerSessionScenarios({
         await moreFunctions.click()
         const customerItem = menu
           .locator('.ant-menu-item')
-          .filter({ hasText: '客户档案' })
+          .filter({ hasText: '基础资料' })
           .first()
         await customerItem.waitFor({ state: 'visible', timeout: 10_000 })
         await customerItem.click()
@@ -2491,6 +2547,7 @@ export function createCustomerSessionScenarios({
           true,
           '访问更多功能里的页面时应保持展开以显示当前位置'
         )
+        await assertMoreFunctionsPresentation(menu, true)
         await page.screenshot({
           path: path.resolve(
             outputDir,
@@ -2509,6 +2566,7 @@ export function createCustomerSessionScenarios({
           true,
           '刷新更多功能页面后仍应展开并显示当前位置'
         )
+        await assertMoreFunctionsPresentation(menu, true)
         await menu
           .locator('.ant-menu-item')
           .filter({ hasText: '工作台' })
@@ -2520,6 +2578,7 @@ export function createCustomerSessionScenarios({
           false,
           '返回看板或常用工作后更多功能应自动收起'
         )
+        await assertMoreFunctionsPresentation(menu)
         await customerItem.waitFor({
           state: 'hidden',
           timeout: 10_000,
@@ -2557,7 +2616,7 @@ export function createCustomerSessionScenarios({
         )
         assert.deepEqual(
           visibleLeafTexts,
-          ['工作台', '任务看板', '应收管理', '应付管理', '收付款核销'],
+          ['工作台', '任务看板', '财务管理'],
           `财务自定义常用入口应按保存顺序显示且不自动补满: ${JSON.stringify(visibleLeafTexts)}`
         )
         assert.equal(
@@ -2604,8 +2663,9 @@ export function createCustomerSessionScenarios({
           '岗位帮助默认页面不应堆叠 Alert 卡片'
         )
         await expectText(page, '采购')
-        await expectText(page, '正常怎么做')
-        await expectText(page, '异常完成标准')
+        await expectText(page, '办理概览')
+        await page.getByText('完成后', { exact: true }).click()
+        await expectText(page, '完成后应看到')
         await assertTextAbsent(page, '常见问题')
 
         await page
@@ -2621,7 +2681,9 @@ export function createCustomerSessionScenarios({
         await page
           .locator('[data-role-help-key="finance"]')
           .waitFor({ state: 'visible', timeout: 10_000 })
-        await expectText(page, '办理发票')
+        await page.locator('.erp-help-mobile-picker .ant-select-selector').click()
+        await page.locator('.ant-select-item-option').filter({ hasText: '处理对账' }).click()
+        await page.getByText('完成后', { exact: true }).click()
         await expectText(page, '发现差异时到对账页面记录')
         await assertTextAbsent(page, '办理收付款与核销')
         await assertTextAbsent(page, '多笔应收或应付核销')
@@ -2664,7 +2726,7 @@ export function createCustomerSessionScenarios({
           for (const label of [
             '出货单',
             '质量检验',
-            '入库管理',
+            '采购入库',
             '销售订单',
             '采购订单',
             '委外订单',
@@ -2727,7 +2789,7 @@ export function createCustomerSessionScenarios({
         await gotoScenarioPath(page, '/erp/warehouse/inbound', {
           waitUntil: 'domcontentloaded',
         })
-        await expectHeading(page, '入库管理')
+        await expectHeading(page, '采购入库')
         await expectText(page, 'PR-STYLE-L1-DRAFT')
         await page.getByText('PR-STYLE-L1-DRAFT', { exact: false }).click()
         await expectNoButton(page, '添加明细')

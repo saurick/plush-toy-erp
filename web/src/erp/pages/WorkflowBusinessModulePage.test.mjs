@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { canReadProductionExceptionDecisions } from '../utils/productionRecordViews.mjs'
 
 const source = readFileSync(
   fileURLToPath(new URL('./WorkflowBusinessModulePage.jsx', import.meta.url)),
@@ -38,7 +39,7 @@ const businessListToolbarActions = readFileSync(
 test('workflow business page consumes the dashboard source keyword without mutating business data', () => {
   assert.match(source, /useSearchParams/u)
   assert.match(source, /searchParams\.get\('link_keyword'\)/u)
-  assert.match(source, /useState\(linkedKeyword\)/u)
+  assert.match(source, /useBusinessPageState\(\s*`keyword:\$\{linkedKeyword\}`,\s*linkedKeyword/u)
   assert.match(source, /linkedKeywordRef\s*=\s*useRef\(linkedKeyword\)/u)
   assert.match(
     source,
@@ -52,48 +53,23 @@ test('workflow business page consumes the dashboard source keyword without mutat
   )
 })
 
-test('production exception disposition page separates applications and pending approvals into accessible tabs', () => {
-  assert.match(source, /ProductionRecordsNavigation/u)
-  assert.match(productionRecordsNavigation, /'生产记录'/u)
-  assert.match(productionRecordsNavigation, /'异常处理'/u)
-  assert.match(productionRecordsNavigation, /'待审批'/u)
+test('production records navigation belongs to the persistent route layout, outside conditional tables', () => {
+  const layout = readFileSync(new URL('../components/production-records/ProductionRecordsLayout.jsx', import.meta.url), 'utf8')
+  assert.match(layout, /<ProductionRecordsNavigation[\s\S]*<Suspense[\s\S]*<Outlet/u)
+  for (const label of ['记录明细', '生产工序', '异常处理', '待审批']) {
+    assert.ok(productionRecordsNavigation.includes(label))
+  }
   assert.match(productionRecordsNavigation, /aria-label="生产记录工作区"/u)
-  assert.match(
-    source,
-    /'production-exceptions': \{[\s\S]*ownerRoleOptions: \[workflowRoleOption\('boss'\)\]/u
-  )
-  assert.match(source, /activeKey=\{effectiveProductionExceptionTab\}/u)
-  assert.match(source, /onChange=\{handleProductionExceptionTabChange\}/u)
-  assert.match(
-    source,
-    /<BusinessDataTable[\s\S]*tableHeader=\{[\s\S]*isProductionExceptionPage \? productionExceptionViewTabs : null[\s\S]*\}/u
-  )
-  assert.match(
-    source,
-    /<ProductionExceptionDecisionPanel[\s\S]*tableHeader=\{productionExceptionViewTabs\}/u
-  )
-  assert.match(
-    productionExceptionPanel,
-    /<Card className="erp-business-data-table-card erp-business-module-table-card">[\s\S]*\{tableHeader\}[\s\S]*<Alert[\s\S]*<Table/u
-  )
-  assert.match(
-    source,
-    /showingProductionExceptionDecisions[\s\S]*<BusinessPageLayout className="erp-workflow-business-page__tab-workspace">[\s\S]*\{workflowTaskWorkspace\}[\s\S]*<\/BusinessPageLayout>/u
-  )
-  assert.match(
-    source,
-    /linkedProductionExceptionID > 0 && canReadRecords[\s\S]*PRODUCTION_EXCEPTION_TAB_KEYS\.DECISIONS/u
-  )
-  assert.match(
-    source,
-    /linkedKeyword && canReadTasks[\s\S]*PRODUCTION_EXCEPTION_TAB_KEYS\.TASKS/u
-  )
+  assert.doesNotMatch(source, /<ProductionRecordsNavigation|productionExceptionViewTabs/u)
+  assert.doesNotMatch(productionExceptionPanel, /tableHeader/u)
+  assert.match(source, /resolveProductionExceptionTab/u)
+  assert.match(source, /'production-exceptions': \{[\s\S]*ownerRoleOptions: \[workflowRoleOption\('boss'\)\]/u)
 })
 
 test('ordinary workflow pages keep task language separate from exception approvals', () => {
   assert.match(
     source,
-    /showingProductionExceptionDecisions[\s\S]*isProductionExceptionPage[\s\S]*'待审批'[\s\S]*'待办任务'/u
+    /tags=\{\s*isProductionExceptionPage \? null[\s\S]*待办任务/u
   )
 })
 
@@ -210,12 +186,11 @@ test('production exception decision reads expose only real decision-list permiss
     'production.exception.submit',
     'production.exception.approve',
   ]) {
-    assert.match(
-      productionExceptionPanel,
-      new RegExp(`['"]${permission.replaceAll('.', '\\.')}['"]`, 'u')
-    )
+    assert.equal(canReadProductionExceptionDecisions({
+      permissions: [permission], effective_session: { actions: [permission] },
+    }), true)
   }
-  assert.doesNotMatch(productionExceptionPanel, /quality\.inspection\.read/u)
+  assert.equal(canReadProductionExceptionDecisions({ permissions: ['quality.inspection.read'] }), false)
   assert.match(
     productionExceptionPanel,
     /if \(!canRead\) \{[\s\S]*setRows\(\[\]\)[\s\S]*return \[\][\s\S]*listProductionExceptions/u

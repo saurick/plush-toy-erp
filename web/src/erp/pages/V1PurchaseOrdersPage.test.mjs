@@ -43,24 +43,24 @@ function sourceSlice(source, start, end) {
   return source.slice(startIndex, endIndex)
 }
 
-test('purchase commercial and arrival fields stay in readable groups before attachments and line items', () => {
+test('purchase line items precede grouped commercial fields and attachments', () => {
   for (const copy of [
-    '结算与发票',
+    '交付与结算',
     '付款方式',
     '是否需要发票',
     '发票类别',
-    '到货与收货',
     '供应商确认到货日期',
     '收货地址',
   ]) {
     assert.match(form, new RegExp(copy, 'u'))
   }
-  const fieldsIndex = form.indexOf('<BusinessFormSectionTitle>订单与供应商')
+  const fieldsIndex = form.indexOf('<BusinessFormSection title="订单与供应商"')
   const attachmentsIndex = form.indexOf('{attachmentPanel}')
   const itemsIndex = form.indexOf('<BusinessLineItemsSection')
   assert(fieldsIndex >= 0)
   assert(attachmentsIndex > fieldsIndex)
-  assert(itemsIndex > attachmentsIndex)
+  assert(itemsIndex > fieldsIndex)
+  assert(attachmentsIndex > itemsIndex)
 })
 
 test('purchase form references fail closed, support latest-wins, and distinguish a legal empty result', () => {
@@ -118,7 +118,10 @@ test('purchase inbound uses active warehouse master data without coupling form r
     inboundModal,
     /const disabled = loading \|\| !!loadError \|\| !referenceDataReady \|\| submitting/u
   )
-  assert.match(inboundModal, /okButtonProps=\{\{ disabled: disabled \|\| !hasRemaining \}\}/u)
+  assert.match(
+    inboundModal,
+    /okButtonProps=\{\{ disabled: disabled \|\| !hasRemaining \}\}/u
+  )
   assert.match(inboundModal, /<Form[\s\S]*?disabled=\{disabled\}/u)
 })
 
@@ -200,8 +203,14 @@ test('purchase selection actions keep one authorized catalog across record state
     )
   }
   assert.match(page, /actionStates: lifecycleActionStates/u)
-  assert.match(operationPanel, /<BusinessLifecycleSecondaryAction[\s\S]*?disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u)
-  assert.match(operationPanel, /disabledReason=\{lifecycleActionStates\[action.key\]\?\.disabledReason\}/u)
+  assert.match(
+    operationPanel,
+    /<BusinessLifecycleSecondaryAction[\s\S]*?disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u
+  )
+  assert.match(
+    operationPanel,
+    /disabledReason=\{lifecycleActionStates\[action.key\]\?\.disabledReason\}/u
+  )
   assert.match(operationPanel, /disabled=\{primaryLifecycleState\.disabled\}/u)
   assert.doesNotMatch(
     operationPanel,

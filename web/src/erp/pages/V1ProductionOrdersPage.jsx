@@ -1,14 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Form, Input, Select, Tag, Typography } from 'antd'
+import { Alert, Button, Form, Input, Tag, Typography } from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
-import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -28,7 +31,6 @@ import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
-import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
 import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
@@ -199,23 +201,6 @@ function optionIDs(items, key) {
   ]
 }
 
-function productionOptionLabel(options, value, fallback) {
-  if (!value) return '-'
-  const matched = (Array.isArray(options) ? options : []).find(
-    (option) => Number(option?.value) === Number(value)
-  )
-  return matched?.label || `${fallback}已关联`
-}
-
-function productionSnapshotLabel(values, fallback) {
-  return (
-    values
-      .map((value) => String(value || '').trim())
-      .filter(Boolean)
-      .join(' / ') || fallback
-  )
-}
-
 function productionCompletionBlockerText(blockedItems = []) {
   const details = blockedItems
     .slice(0, 3)
@@ -287,7 +272,15 @@ export default function V1ProductionOrdersPage() {
   const [query, setQuery] = useState(() => queryFromSearchParams(searchParams))
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
-  const [contentView, setContentView] = useState('list')
+  const [statusCounts, setStatusCounts] = useState(null)
+  const [contentView, setContentView] = useBusinessPageState(
+    'contentView',
+    'list'
+  )
+  const [overviewViewState, setOverviewViewState] = useBusinessPageState(
+    'overviewViewState',
+    {}
+  )
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [mutationLoading, setMutationLoading] = useState(false)
@@ -536,12 +529,14 @@ export default function V1ProductionOrdersPage() {
     if (!canRead) return
     const request = beginLatestRequest('production-orders')
     setLoading(true)
+    setStatusCounts(null)
     try {
       const routeSelectedID = Number(routeProductionOrderID || 0)
       const [data, routeAggregate] = await Promise.all([
         listProductionOrders(
           {
             ...productionOrderListParams,
+            include_status_counts: true,
             limit: query.page_size,
             offset: (query.page - 1) * query.page_size,
           },
@@ -563,6 +558,9 @@ export default function V1ProductionOrdersPage() {
       const nextOrders = exactPage.records
       setOrders(nextOrders)
       setTotal(exactPage.total)
+      setStatusCounts(resolveBusinessStatusCounts(data, {
+        hasExactContext: routeSelectedID > 0, exactRecord: routeOrder, statusField: 'status',
+      }))
       if (routeSelectedID > 0) {
         setSelected(routeOrder)
         setAggregate(routeAggregate)
@@ -586,10 +584,6 @@ export default function V1ProductionOrdersPage() {
   useEffect(() => {
     loadOrders()
   }, [loadOrders])
-
-  useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadOrders)
-  }, [loadOrders, outletContext])
 
   useEffect(() => {
     if (!formMode || !formValues) return
@@ -640,102 +634,6 @@ export default function V1ProductionOrdersPage() {
     [productionReferenceAccess]
   )
 
-  const productionItemsPreview = useBusinessRowItemsPreview({
-    records: orders,
-    getItemTotal: (record) => record?.item_count,
-    rowExpandable: (record) =>
-      canRead && Number.isSafeInteger(record?.id) && record.id > 0,
-    getRecordLabel: (record) => record?.order_no || '当前生产订单',
-    loadPreview: async (record, { signal }) => {
-      const nextAggregate = await getProductionOrder(record.id, { signal })
-      return {
-        items: nextAggregate.items,
-        total: nextAggregate.items.length,
-      }
-    },
-    getItemKey: (item) => item?.id,
-    getItemLabel: (item, { index }) =>
-      item?.line_no ? `第 ${item.line_no} 行` : `明细 ${index + 1}`,
-    getItemFields: (item, { view }) => [
-      {
-        key: 'product',
-        label: '产品',
-        strong: true,
-        value: (
-          <ProductIdentity
-            productId={item?.product_id}
-            name={productionSnapshotLabel(
-              [item?.product_code_snapshot, item?.product_name_snapshot],
-              productionOptionLabel(
-                optionsByType.product,
-                item?.product_id,
-                '产品'
-              )
-            )}
-          />
-        ),
-        wide: true,
-      },
-      {
-        key: 'product_sku',
-        label: '规格',
-        value: productionSnapshotLabel(
-          [item?.sku_code_snapshot],
-          productionOptionLabel(
-            optionsByType.product_sku,
-            item?.product_sku_id,
-            '规格'
-          )
-        ),
-      },
-      {
-        key: 'quantity',
-        label: '计划数量',
-        value: item?.planned_quantity || '-',
-      },
-      {
-        key: 'unit',
-        label: '单位',
-        value:
-          item?.unit_name_snapshot ||
-          productionOptionLabel(optionsByType.unit, item?.unit_id, '单位'),
-      },
-      {
-        key: 'sales_order_item',
-        rowStart: true,
-        label: '销售订单行',
-        value: productionOptionLabel(
-          optionsByType.sales_order_item,
-          item?.sales_order_item_id,
-          '销售订单行'
-        ),
-        wide: true,
-      },
-      {
-        key: 'bom',
-        label: 'BOM 版本',
-        value:
-          item?.bom_version_snapshot ||
-          productionOptionLabel(
-            optionsByType.active_bom,
-            item?.bom_header_id,
-            'BOM 版本'
-          ),
-      },
-      ...(view === 'modal'
-        ? [
-            {
-              key: 'note',
-              label: '备注',
-              value: item?.note || '-',
-              fullWidth: true,
-            },
-          ]
-        : []),
-    ],
-    modalTitle: '生产订单完整明细',
-  })
-
   const loadDetail = async (record, mode = 'view') => {
     setDetailLoading(true)
     try {
@@ -752,10 +650,6 @@ export default function V1ProductionOrdersPage() {
       }
       await loadHistoricalOptions(nextAggregate.items, {
         mode: detailAccess.mode,
-      })
-      productionItemsPreview.prime(nextAggregate.order, {
-        items: nextAggregate.items,
-        total: nextAggregate.items.length,
       })
       setAggregate(nextAggregate)
       setSelected(nextAggregate.order)
@@ -777,11 +671,7 @@ export default function V1ProductionOrdersPage() {
         signal: request.signal,
       })
       if (request.isCurrent() && nextAggregate.order.id === record.id) {
-        productionItemsPreview.prime(nextAggregate.order, {
-          items: nextAggregate.items,
-          total: nextAggregate.items.length,
-        })
-        setAggregate(nextAggregate)
+          setAggregate(nextAggregate)
         setSelected(nextAggregate.order)
       }
     } catch (error) {
@@ -906,10 +796,6 @@ export default function V1ProductionOrdersPage() {
       const facts = Array.isArray(factData?.production_facts)
         ? factData.production_facts
         : []
-      productionItemsPreview.prime(nextAggregate.order, {
-        items: nextAggregate.items,
-        total: nextAggregate.items.length,
-      })
       setAggregate(nextAggregate)
       setSelected(nextAggregate.order)
       setCompletionContext((current) =>
@@ -1514,10 +1400,6 @@ export default function V1ProductionOrdersPage() {
       const result = await execute(attempt.params)
       attemptsRef.current.finish(scope, attempt)
       message.success(successText)
-      productionItemsPreview.prime(result.order, {
-        items: result.items,
-        total: result.items.length,
-      })
       setAggregate(result)
       setSelected(result.order)
       return true
@@ -1667,6 +1549,13 @@ export default function V1ProductionOrdersPage() {
     load: loadExportOrders,
     actionLabel: '加载生产总览',
   })
+  const reloadOverviewData = overviewData.reload
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(() => {
+      if (contentView === 'overview') reloadOverviewData()
+      return loadOrders()
+    })
+  }, [contentView, loadOrders, outletContext, reloadOverviewData])
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: 'production-orders-export',
     loadRows: loadExportOrders,
@@ -1681,9 +1570,7 @@ export default function V1ProductionOrdersPage() {
         { value: 'list', label: '订单列表' },
         { value: 'overview', label: '生产总览' },
       ]}
-      loading={overviewData.loading}
       onChange={setContentView}
-      onReload={overviewData.reload}
     />
   )
 
@@ -1703,6 +1590,7 @@ export default function V1ProductionOrdersPage() {
   return (
     <BusinessPageLayout>
       <PageHeaderCard
+        viewSwitch={productionViewSwitch}
         helpKey="production-orders"
         title="生产订单"
         stats={[{ key: 'total', label: '符合条件', value: total }]}
@@ -1732,11 +1620,13 @@ export default function V1ProductionOrdersPage() {
                 })
               }
             />
-            <Select
-              value={query.status || undefined}
-              allowClear
-              placeholder="全部状态"
-              style={{ width: 150 }}
+            <BusinessStatusFilter
+              inline
+              aria-label="生产订单状态"
+              value={query.status || ''}
+              counts={statusCounts}
+              loading={loading}
+              exact={Boolean(routeProductionOrderID)}
               options={productionStatusOptions}
               onChange={(value) => writeQuery({ status: value || '', page: 1 })}
             />
@@ -2115,11 +2005,17 @@ export default function V1ProductionOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
+          <BusinessTaskActions sourceType="production_order" record={selected} adminProfile={adminProfile} disabled={mutationLoading || detailLoading} />
         </SelectionActionBar>
       </BusinessOperationPanel>
-      <BusinessViewSurface switcher={productionViewSwitch}>
+      <BusinessViewSurface
+        activeView={contentView}
+        loading={contentView === 'list' ? loading : overviewData.loading}
+      >
         {contentView === 'overview' ? (
           <ProductionOrderOverview
+            viewState={overviewViewState}
+            onViewStateChange={setOverviewViewState}
             orders={overviewData.rows}
             loading={overviewData.loading}
             error={overviewData.error}
@@ -2184,7 +2080,6 @@ export default function V1ProductionOrdersPage() {
               onChange: (page, pageSize) =>
                 writeQuery({ page, page_size: pageSize }),
             }}
-            expandable={productionItemsPreview.expandable}
             emptyDescription={
               canCreate
                 ? '暂无生产订单，可新建生产计划单'
@@ -2193,7 +2088,6 @@ export default function V1ProductionOrdersPage() {
           />
         )}
       </BusinessViewSurface>
-      {productionItemsPreview.modal}
       {columnOrderModal}
 
       <ProductionOrderEditor

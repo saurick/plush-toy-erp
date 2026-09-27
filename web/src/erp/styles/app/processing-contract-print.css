@@ -81,15 +81,15 @@
 }
 
 .erp-processing-contract-table__row--selected td {
-  background: rgb(47 143 75 / 12%);
+  background: var(--erp-print-selection-background);
 }
 
 .erp-processing-contract-table__cell-selected {
-  background: rgb(59 130 246 / 0.1);
+  background: var(--erp-print-selection-background);
 }
 
 .erp-processing-contract-table__cell-selected-anchor {
-  box-shadow: inset 0 0 0 1px rgb(37 99 235 / 0.55);
+  box-shadow: inset 0 0 0 1px var(--erp-print-selection-color);
 }
 
 .erp-processing-contract-table__cell-merged {

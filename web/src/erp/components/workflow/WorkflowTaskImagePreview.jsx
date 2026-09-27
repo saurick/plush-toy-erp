@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons'
 import { Image, Spin } from 'antd'
 import './workflowTaskImagePreview.css'
+import { isUsableImageDimensions } from '../../utils/imageDisplay.mjs'
 
 export default function WorkflowTaskImagePreview({
   item,
@@ -73,7 +74,12 @@ export default function WorkflowTaskImagePreview({
             </button>
           </div>
         ) : original ? (
-          cloneElement(image, { onError: () => setFailed(true) })
+          cloneElement(image, {
+            onLoad: (event) => {
+              if (!isUsableImageDimensions(event.currentTarget)) setFailed(true)
+            },
+            onError: () => setFailed(true),
+          })
         ) : (
           <div className="erp-task-image-preview__status" role="status">
             <Spin />

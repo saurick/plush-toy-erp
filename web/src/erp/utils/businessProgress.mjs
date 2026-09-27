@@ -1,3 +1,5 @@
+import { TASK_BOARD_PAGE_SIZE_OPTIONS } from './workflowTaskBoard.mjs'
+
 const integer = (value) => Number.isSafeInteger(value) && value >= 0
 const decimal = (value) =>
   value === null || (typeof value === 'string' && /^\d+(\.\d+)?$/u.test(value))
@@ -139,6 +141,10 @@ export function progressQueryFromURL(params) {
     1,
     Math.min(50000, Number.parseInt(params.get('page'), 10) || 1)
   )
+  const requestedLimit = Number(params.get('page_size'))
+  const limit = TASK_BOARD_PAGE_SIZE_OPTIONS.includes(requestedLimit)
+    ? requestedLimit
+    : 20
   return {
     view: allowed('view', ['orders', 'production'], ''),
     keyword: (params.get('q') || '').slice(0, 100),
@@ -151,8 +157,8 @@ export function progressQueryFromURL(params) {
     owner: (params.get('owner') || '').slice(0, 100),
     date_from: date('from'),
     date_to: date('to'),
-    limit: 20,
-    offset: (page - 1) * 20,
+    limit,
+    offset: (page - 1) * limit,
   }
 }
 
@@ -186,6 +192,108 @@ const statusLabels = {
 export const progressStatusLabel = (status) => statusLabels[status] || '待核对'
 export const progressQuantity = (value) =>
   value === null || value === undefined || value === '' ? '—' : String(value)
+
+export function progressStages(row, access = {}) {
+  const stages = []
+  if (row.view === 'orders') {
+    stages.push({
+      key: 'engineering',
+      label: '资料',
+      text: row.engineering_total
+        ? `${row.engineering_ready}/${row.engineering_total} 确认`
+        : '待完善',
+      percent:
+        row.engineering_total > 0
+          ? Math.min(100, (row.engineering_ready / row.engineering_total) * 100)
+          : undefined,
+      section: 'lines',
+      tone:
+        row.engineering_total && row.engineering_ready === row.engineering_total
+          ? 'is-complete'
+          : '',
+    })
+  }
+  stages.push(
+    {
+      key: 'materials',
+      label: '领料',
+      text: !access.production
+        ? '无权限'
+        : !row.material_total
+          ? '待核对'
+          : row.material_pending
+            ? `${row.material_pending} 项待领`
+            : '已领齐',
+      section: 'materials',
+      disabled: !access.production,
+      percent:
+        access.production && row.material_total > 0
+          ? Math.max(
+              0,
+              ((row.material_total - row.material_pending) /
+                row.material_total) *
+                100
+            )
+          : undefined,
+      tone: access.production && row.material_pending ? 'is-attention' : '',
+    },
+    {
+      key: 'production',
+      label: '生产',
+      text: !access.wip
+        ? '无权限'
+        : row.current_operation
+          ? row.current_operation + (row.operation_count > 1 ? '等' : '')
+          : row.in_progress_batches
+            ? `${row.in_progress_batches} 批在制`
+            : row.outsourced_batches
+              ? `${row.outsourced_batches} 批委外`
+              : row.planned_batches
+                ? `${row.planned_batches} 批待开`
+                : row.production_orders
+                  ? `${row.production_orders} 张单`
+                  : '未关联',
+      section:
+        row.in_progress_batches || row.outsourced_batches || row.planned_batches
+          ? 'batches'
+          : 'production',
+      disabled: !access.wip,
+      percent:
+        access.wip && row.view === 'production'
+          ? progressDelivery(row).percent
+          : undefined,
+    },
+    {
+      key: 'quality',
+      label: '质检',
+      text: !access.wip
+        ? '无权限'
+        : [
+            row.waiting_batches && `${row.waiting_batches} 批待检`,
+            row.rejected_batches && `${row.rejected_batches} 批不合格`,
+          ]
+            .filter(Boolean)
+            .join(' · ') || '查看批次',
+      section: 'batches',
+      disabled: !access.wip,
+      tone:
+        access.wip && (row.waiting_batches || row.rejected_batches)
+          ? 'is-attention'
+          : '',
+    }
+  )
+  if (row.view === 'orders') {
+    const delivery = progressDelivery(row)
+    stages.push({
+      key: 'shipment',
+      label: '出货',
+      text: delivery.text,
+      percent: delivery.percent,
+      section: 'lines',
+    })
+  }
+  return stages
+}
 
 export function progressDelivery(row) {
   if (row.view !== 'orders') {

@@ -6,6 +6,10 @@ import ProductIdentity, {
 } from '../master-data/ProductIdentity.jsx'
 
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import BusinessCompactFieldTable, {
+  BusinessCompactFieldRow,
+  BusinessOptionalField,
+} from '../business-list/BusinessCompactFieldTable.jsx'
 import {
   getSalesOrder,
   listAllProducts,
@@ -20,6 +24,153 @@ import {
   SALES_ORDER_ENGINEERING_OPTIONS,
   salesOrderRequirementName,
 } from '../../utils/salesOrderRequirements.mjs'
+
+function EngineeringRow({ field, form, context }) {
+  const source = context?.items[field.name]
+  const productID = Form.useWatch(['items', field.name, 'product_id'], form)
+  const bomID = Form.useWatch(['items', field.name, 'sample_bom_id'], form)
+  const product = context?.products?.find((item) => item.id === productID)
+  const bom = context?.boms.find((item) => item.id === bomID)
+  return (
+    <BusinessCompactFieldRow
+      label={`工程资料 ${field.name + 1}`}
+      cells={[
+        <div>
+          <strong>{source ? salesOrderRequirementName(source) : ''}</strong>
+          {source?.customer_product_no ? (
+            <Tag>{source.customer_product_no}</Tag>
+          ) : null}
+        </div>,
+        <>
+          <Form.Item name={[field.name, 'id']} hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item label="工程产品" name={[field.name, 'product_id']}>
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="选择工程建立的产品"
+              listItemHeight={48}
+              optionRender={renderProductOption}
+              options={(context?.products || []).map((p) => ({
+                value: p.id,
+                label: `${p.code} / ${p.name}`,
+              }))}
+              onChange={() => {
+                form.setFieldValue(
+                  ['items', field.name, 'product_sku_id'],
+                  undefined
+                )
+                form.setFieldValue(
+                  ['items', field.name, 'sample_bom_id'],
+                  undefined
+                )
+                form.setFieldValue(
+                  ['items', field.name, 'engineering_status'],
+                  'PREPARING'
+                )
+              }}
+            />
+          </Form.Item>
+        </>,
+        <Form.Item label="规格（选填）" name={[field.name, 'product_sku_id']}>
+          <Select
+            allowClear
+            disabled={!productID}
+            options={(context?.skus || [])
+              .filter((sku) => sku.product_id === productID)
+              .map((sku) => ({
+                value: sku.id,
+                label: [sku.sku_code, sku.sku_name].filter(Boolean).join(' / '),
+              }))}
+            onChange={() =>
+              form.setFieldValue(
+                ['items', field.name, 'engineering_status'],
+                'PREPARING'
+              )
+            }
+          />
+        </Form.Item>,
+        <Form.Item label="打样 BOM" name={[field.name, 'sample_bom_id']}>
+          <Select
+            allowClear
+            disabled={!productID}
+            placeholder="选择该产品的 BOM"
+            options={(context?.boms || [])
+              .filter(
+                (item) =>
+                  item.product_id === productID && item.status !== 'ARCHIVED'
+              )
+              .map((item) => ({
+                value: item.id,
+                label: `${item.version}${item.status === 'DRAFT' ? '（草稿）' : ''}`,
+              }))}
+            onChange={() =>
+              form.setFieldValue(
+                ['items', field.name, 'engineering_status'],
+                'PREPARING'
+              )
+            }
+          />
+        </Form.Item>,
+        <Form.Item label="设计师">
+          <Input
+            value={bom?.designer || ''}
+            readOnly
+            placeholder="由 BOM 工程资料带出"
+          />
+        </Form.Item>,
+        <Form.Item
+          label="工程 / 打样进度"
+          name={[field.name, 'engineering_status']}
+          rules={[{ required: true }]}
+        >
+          <Select options={SALES_ORDER_ENGINEERING_OPTIONS} />
+        </Form.Item>,
+      ]}
+    >
+      {source?.order_category === 'REPEAT' ? (
+        <Form.Item
+          name={[field.name, 'reuse_confirmed_sample']}
+          valuePropName="checked"
+        >
+          <Checkbox
+            onChange={(event) => {
+              if (event.target.checked) {
+                form.setFieldValue(
+                  ['items', field.name, 'engineering_status'],
+                  'CONFIRMED'
+                )
+              }
+            }}
+          >
+            本次返单沿用该客户已确认的同款样品（资料须完全一致）
+          </Checkbox>
+        </Form.Item>
+      ) : null}
+      <BusinessOptionalField
+        name={['items', field.name, 'sample_note']}
+        label="打样说明"
+      >
+        <Form.Item label="打样说明" name={[field.name, 'sample_note']}>
+          <Input.TextArea
+            maxLength={255}
+            rows={2}
+            placeholder="确认结果或退回重做原因"
+          />
+        </Form.Item>
+        {productID ? (
+          <ProductIdentity
+            productId={productID}
+            name={product?.name}
+            code={product?.code}
+          />
+        ) : null}
+      </BusinessOptionalField>
+    </BusinessCompactFieldRow>
+  )
+}
 
 export default function SalesOrderEngineeringModal({
   orderID,
@@ -190,202 +341,28 @@ export default function SalesOrderEngineeringModal({
           className="erp-sales-order-engineering-form"
         >
           <Form.List name="items">
-            {(fields) =>
-              fields.map((field) => {
-                const source = context?.items[field.name]
-                return (
-                  <section
-                    className="erp-sales-order-engineering-section"
+            {(fields) => (
+              <BusinessCompactFieldTable
+                label="订单工程资料"
+                columns={[
+                  { label: '订货要求', width: '20%' },
+                  { label: '工程产品', width: '20%' },
+                  { label: '规格', width: '15%' },
+                  { label: '打样 BOM', width: '17%' },
+                  { label: '设计师', width: '12%' },
+                  { label: '工程 / 打样进度', required: true },
+                ]}
+              >
+                {fields.map((field) => (
+                  <EngineeringRow
                     key={field.key}
-                  >
-                    <strong>
-                      {source ? salesOrderRequirementName(source) : ''}
-                    </strong>
-                    {source?.customer_product_no ? (
-                      <Tag>{source.customer_product_no}</Tag>
-                    ) : null}
-                    <div className="erp-business-action-form">
-                      {source?.order_category === 'REPEAT' ? (
-                        <Form.Item
-                          name={[field.name, 'reuse_confirmed_sample']}
-                          valuePropName="checked"
-                        >
-                          <Checkbox
-                            onChange={(event) => {
-                              if (event.target.checked) {
-                                form.setFieldValue(
-                                  ['items', field.name, 'engineering_status'],
-                                  'CONFIRMED'
-                                )
-                              }
-                            }}
-                          >
-                            本次返单沿用该客户已确认的同款样品（资料须完全一致）
-                          </Checkbox>
-                        </Form.Item>
-                      ) : null}
-                      <Form.Item name={[field.name, 'id']} hidden>
-                        <Input />
-                      </Form.Item>
-                      <Form.Item
-                        label="工程产品"
-                        name={[field.name, 'product_id']}
-                      >
-                        <Select
-                          allowClear
-                          showSearch
-                          optionFilterProp="label"
-                          placeholder="选择工程建立的产品"
-                          listItemHeight={48}
-                          optionRender={renderProductOption}
-                          options={(context?.products || []).map((p) => ({
-                            value: p.id,
-                            label: `${p.code} / ${p.name}`,
-                          }))}
-                          onChange={() => {
-                            form.setFieldValue(
-                              ['items', field.name, 'product_sku_id'],
-                              undefined
-                            )
-                            form.setFieldValue(
-                              ['items', field.name, 'sample_bom_id'],
-                              undefined
-                            )
-                            form.setFieldValue(
-                              ['items', field.name, 'engineering_status'],
-                              'PREPARING'
-                            )
-                          }}
-                        />
-                      </Form.Item>
-                      <Form.Item noStyle shouldUpdate>
-                        {({ getFieldValue }) => {
-                          const productID = getFieldValue([
-                            'items',
-                            field.name,
-                            'product_id',
-                          ])
-                          const product = context?.products?.find(
-                            (item) => item.id === productID
-                          )
-                          return productID ? (
-                            <ProductIdentity
-                              productId={productID}
-                              name={product?.name}
-                              code={product?.code}
-                            />
-                          ) : null
-                        }}
-                      </Form.Item>
-                      <Form.Item noStyle shouldUpdate>
-                        {({ getFieldValue }) => {
-                          const productID = getFieldValue([
-                            'items',
-                            field.name,
-                            'product_id',
-                          ])
-                          const bomID = getFieldValue([
-                            'items',
-                            field.name,
-                            'sample_bom_id',
-                          ])
-                          const bom = context?.boms.find(
-                            (item) => item.id === bomID
-                          )
-                          return (
-                            <>
-                              <Form.Item
-                                label="规格（选填）"
-                                name={[field.name, 'product_sku_id']}
-                              >
-                                <Select
-                                  allowClear
-                                  disabled={!productID}
-                                  options={(context?.skus || [])
-                                    .filter(
-                                      (sku) => sku.product_id === productID
-                                    )
-                                    .map((sku) => ({
-                                      value: sku.id,
-                                      label: [sku.sku_code, sku.sku_name]
-                                        .filter(Boolean)
-                                        .join(' / '),
-                                    }))}
-                                  onChange={() =>
-                                    form.setFieldValue(
-                                      [
-                                        'items',
-                                        field.name,
-                                        'engineering_status',
-                                      ],
-                                      'PREPARING'
-                                    )
-                                  }
-                                />
-                              </Form.Item>
-                              <Form.Item
-                                label="打样 BOM"
-                                name={[field.name, 'sample_bom_id']}
-                              >
-                                <Select
-                                  allowClear
-                                  disabled={!productID}
-                                  placeholder="选择该产品的 BOM"
-                                  options={(context?.boms || [])
-                                    .filter(
-                                      (item) =>
-                                        item.product_id === productID &&
-                                        item.status !== 'ARCHIVED'
-                                    )
-                                    .map((item) => ({
-                                      value: item.id,
-                                      label: `${item.version}${item.status === 'DRAFT' ? '（草稿）' : ''}`,
-                                    }))}
-                                  onChange={() =>
-                                    form.setFieldValue(
-                                      [
-                                        'items',
-                                        field.name,
-                                        'engineering_status',
-                                      ],
-                                      'PREPARING'
-                                    )
-                                  }
-                                />
-                              </Form.Item>
-                              <Form.Item label="设计师">
-                                <Input
-                                  value={bom?.designer || ''}
-                                  readOnly
-                                  placeholder="由 BOM 工程资料带出"
-                                />
-                              </Form.Item>
-                            </>
-                          )
-                        }}
-                      </Form.Item>
-                      <Form.Item
-                        label="工程 / 打样进度"
-                        name={[field.name, 'engineering_status']}
-                        rules={[{ required: true }]}
-                      >
-                        <Select options={SALES_ORDER_ENGINEERING_OPTIONS} />
-                      </Form.Item>
-                      <Form.Item
-                        label="打样说明"
-                        name={[field.name, 'sample_note']}
-                      >
-                        <Input.TextArea
-                          maxLength={255}
-                          rows={2}
-                          placeholder="确认结果或退回重做原因"
-                        />
-                      </Form.Item>
-                    </div>
-                  </section>
-                )
-              })
-            }
+                    field={field}
+                    form={form}
+                    context={context}
+                  />
+                ))}
+              </BusinessCompactFieldTable>
+            )}
           </Form.List>
         </Form>
       </Spin>

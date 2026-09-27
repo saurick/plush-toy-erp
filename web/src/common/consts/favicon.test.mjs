@@ -8,6 +8,8 @@ import {
 } from './favicon.mjs'
 
 const CUSTOMER_FAVICON_HREF = '/customer-assets/yoyoosun/favicon-yoyoosun.svg'
+const CUSTOMER_MOBILE_FAVICON_HREF =
+  '/customer-assets/yoyoosun/favicon-yoyoosun-mobile.svg'
 
 function createDocumentStub(existingLinks = []) {
   const removed = []
@@ -109,7 +111,7 @@ test('favicon: mobile login redirect keeps the task icon by source route', () =>
   )
 })
 
-test('favicon: customer favicon overrides customer-facing admin and task routes', () => {
+test('favicon: customer favicon applies to desktop and mobile without a mobile override', () => {
   assert.deepEqual(
     resolveERPFavicon('/erp/dashboard', {
       customerFaviconHref: CUSTOMER_FAVICON_HREF,
@@ -132,9 +134,53 @@ test('favicon: customer favicon overrides customer-facing admin and task routes'
   )
 })
 
+test('favicon: mobile branding follows mobile routes and login redirects without changing desktop', () => {
+  const options = {
+    customerFaviconHref: CUSTOMER_FAVICON_HREF,
+    customerMobileFaviconHref: CUSTOMER_MOBILE_FAVICON_HREF,
+  }
+  for (const pathname of ['/m/warehouse/tasks', '/m/login', '/m/sales/tasks']) {
+    assert.equal(
+      resolveERPFavicon(pathname, options).href,
+      CUSTOMER_MOBILE_FAVICON_HREF
+    )
+  }
+  for (const loginOptions of [
+    { fromPathname: '/m/warehouse/tasks' },
+    { isMobileExperience: true },
+  ]) {
+    assert.equal(
+      resolveERPFavicon('/admin-login', { ...options, ...loginOptions }).href,
+      CUSTOMER_MOBILE_FAVICON_HREF
+    )
+  }
+  for (const pathname of ['/erp/dashboard', '/admin-login']) {
+    assert.equal(
+      resolveERPFavicon(pathname, options).href,
+      CUSTOMER_FAVICON_HREF
+    )
+  }
+})
+
+test('favicon: blank mobile branding uses the configured customer or neutral task icon', () => {
+  assert.equal(
+    resolveERPFavicon('/m/warehouse/tasks', {
+      customerFaviconHref: CUSTOMER_FAVICON_HREF,
+      customerMobileFaviconHref: ' ',
+    }).href,
+    CUSTOMER_FAVICON_HREF
+  )
+  assert.equal(
+    resolveERPFavicon('/m/warehouse/tasks', { customerMobileFaviconHref: ' ' }),
+    ERP_FAVICON_VARIANTS.tasks
+  )
+})
+
 test('favicon: print workspace keeps template glyph before customer branding', () => {
   const result = resolveERPFavicon('/erp/print-workspace/processing-contract', {
     customerFaviconHref: CUSTOMER_FAVICON_HREF,
+    customerMobileFaviconHref: CUSTOMER_MOBILE_FAVICON_HREF,
+    isMobileExperience: true,
   })
 
   assert.equal(result.key, 'print-template:processing-contract')
@@ -210,4 +256,27 @@ test('favicon: runtime update creates an icon link when HTML has none', () => {
     documentStub.appended[0].getAttribute('href'),
     '/favicon-admin.svg'
   )
+})
+
+test('favicon: returning from mobile to desktop restores the desktop icon', () => {
+  const documentStub = createDocumentStub([
+    { rel: 'icon', href: '/favicon.svg' },
+  ])
+  const options = {
+    customerFaviconHref: CUSTOMER_FAVICON_HREF,
+    customerMobileFaviconHref: CUSTOMER_MOBILE_FAVICON_HREF,
+  }
+
+  applyERPFavicon(documentStub, '/m/warehouse/tasks', options)
+  assert.equal(
+    documentStub.links[0].getAttribute('href'),
+    CUSTOMER_MOBILE_FAVICON_HREF
+  )
+
+  applyERPFavicon(documentStub, '/erp/dashboard', options)
+  assert.equal(
+    documentStub.links[0].getAttribute('href'),
+    CUSTOMER_FAVICON_HREF
+  )
+  assert.equal(documentStub.appended.length, 0)
 })

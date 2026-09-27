@@ -50,6 +50,7 @@ const PERMISSION_CENTER_TAB_KEYS = {
   ROLES: 'roles',
   ADMINS: 'admins',
   APPROVALS: 'approvals',
+  NAVIGATION: 'navigation',
 }
 
 const ROLE_NAVIGATION_VIEW_KEYS = {
@@ -223,6 +224,8 @@ function buildPermissionGroups(permissions = [], menuOptions = []) {
       label: getPermissionVisibleName(permission),
       description: permission.description || '',
       action: String(permission.action || '').trim(),
+      resource: String(permission.resource || '').trim(),
+      module: rawModuleKey,
       usage: normalizePermissionUsage(permission.usage || {}),
       menuLinks: getPermissionMenuLinks(permission, menuOptions),
     })

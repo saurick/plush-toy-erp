@@ -13,6 +13,33 @@
   color: var(--erp-text, inherit);
 }
 
+.erp-task-identity__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  min-width: 0;
+  color: var(--erp-text, inherit);
+  overflow-wrap: anywhere;
+}
+
+.erp-task-identity__heading > strong,
+.erp-task-identity__task-name {
+  min-width: 0;
+}
+
+.erp-task-identity__task-name {
+  color: var(--erp-text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.erp-task-identity__task-name::before {
+  content: '·';
+  margin-inline-end: 4px;
+}
+
 .erp-task-identity__code,
 .erp-task-identity__unavailable {
   color: var(--erp-text-muted, #64748b);

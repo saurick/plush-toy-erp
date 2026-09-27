@@ -1,19 +1,18 @@
 .erp-task-action-drawer__action-copy.ant-typography {
   margin: 0;
-  color: #475467;
+  color: var(--erp-text-muted);
   overflow-wrap: anywhere;
 }
 
 .erp-task-action-drawer__confirm-copy {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
   align-items: start;
-  border: 1px solid rgb(25 114 80 / 0.22);
   border-radius: 8px;
-  background: rgb(25 114 80 / 0.08);
+  background: var(--erp-surface-bg-soft);
   padding: 10px;
-  color: #245f3e;
+  color: var(--erp-text-muted);
 }
 
 .erp-task-action-drawer__confirm-copy .anticon {
@@ -21,7 +20,12 @@
 }
 
 .erp-task-action-drawer__action-prompt {
-  padding: 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.erp-task-action-drawer__action-prompt strong {
+  font-size: 15px;
 }
 
 .erp-task-action-drawer__footer {
@@ -115,13 +119,9 @@
   }
 
   .erp-task-action-drawer__meta-grid,
-  .erp-task-action-drawer__guide-steps {
+  .erp-task-action-drawer__action-options,
+  .erp-task-action-drawer .erp-task-timing--detail dl {
     grid-template-columns: 1fr;
-  }
-
-  .erp-task-action-drawer__step + .erp-task-action-drawer__step {
-    border-top: 1px solid #edf2f7;
-    border-left: 0;
   }
 
   .erp-task-action-drawer__footer {

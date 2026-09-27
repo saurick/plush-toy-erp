@@ -6,6 +6,8 @@ import { requireWorkflowTaskMutationParams } from '../utils/workflowTaskMutation
 import { requireWorkflowTaskBoardResponse } from '../utils/workflowTaskBoardContract.mjs'
 import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'
 
+import { requireFollowupCreateParams, requireFollowupOptions, requireFollowupReceipt } from '../utils/workflowFollowup.mjs'
+
 const workflowRpc = new JsonRpc({
   url: 'workflow',
   basePath: ADMIN_BASE_PATH,
@@ -721,4 +723,15 @@ export async function explainWorkflowTaskAssignment(params = {}, options = {}) {
 export async function listWorkflowBusinessStates(params = {}) {
   const result = await workflowRpc.call('list_business_states', params)
   return dataOf(result)
+}
+
+export async function getWorkflowTaskCreateOptions(source, options = {}) {
+  const result = await workflowRpc.call('get_task_create_options', source, options)
+  return requireFollowupOptions(dataOf(result), source)
+}
+
+export async function createWorkflowFollowupTask(params) {
+  const input = requireFollowupCreateParams(params)
+  const result = await workflowRpc.call('create_followup_task', input)
+  return requireFollowupReceipt(dataOf(result), input)
 }

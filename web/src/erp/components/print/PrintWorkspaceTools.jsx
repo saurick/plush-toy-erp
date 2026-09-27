@@ -1,4 +1,5 @@
 import React, { useRef } from 'react'
+import BusinessImage from '../business-list/BusinessImage.jsx'
 
 const TOOL_ICON_PATHS = {
   preview:
@@ -90,11 +91,7 @@ export function PrintImageSlotTool({
   return (
     <div className="erp-print-image-tool" role="group" aria-label={label}>
       <div className="erp-print-image-tool__thumbnail">
-        {image?.dataURL ? (
-          <img src={image.dataURL} alt={label} />
-        ) : (
-          <PrintToolIcon name="image" />
-        )}
+        <BusinessImage src={image?.dataURL} alt={label} compact />
       </div>
       <div className="erp-print-image-tool__copy">
         <strong>{label}</strong>

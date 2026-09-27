@@ -10,6 +10,7 @@ export default function useBusinessVisualizationData({
   const [revision, setRevision] = useState(0)
   const [state, setState] = useState({
     loading: false,
+    loaded: false,
     rows: [],
     error: '',
   })
@@ -23,6 +24,7 @@ export default function useBusinessVisualizationData({
         if (controller.signal.aborted) return
         setState({
           loading: false,
+          loaded: true,
           rows: Array.isArray(rows) ? rows : [],
           error: '',
         })
@@ -39,5 +41,11 @@ export default function useBusinessVisualizationData({
   }, [actionLabel, enabled, load, revision])
 
   const reload = useCallback(() => setRevision((value) => value + 1), [])
-  return { ...state, reload }
+  return {
+    ...state,
+    loading: Boolean(
+      enabled && (!state.loaded || state.loading) && !state.error
+    ),
+    reload,
+  }
 }

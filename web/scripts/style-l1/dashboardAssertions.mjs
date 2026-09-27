@@ -1,3 +1,4 @@
+import { pullToRefresh } from './mobileGestureAssertions.mjs'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -294,28 +295,24 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
   }
 
   async function assertMobileTaskRefreshFeedback(page, { scenarioName }) {
-    const refreshButton = page
-      .locator('.mobile-role-tasks-page header button')
-      .filter({ hasText: '刷新' })
-      .first()
-    await refreshButton.waitFor({ state: 'visible', timeout: 10_000 })
     const refreshRequestPromise = page.waitForRequest(
       (request) => {
         if (!request.url().includes('/rpc/workflow')) return false
         try {
-          return request.postDataJSON()?.method === 'list_role_tasks'
+          const body = request.postDataJSON()
+          return body?.method === 'list_role_tasks' && body.params.limit > 1
         } catch {
           return false
         }
       },
       { timeout: 10_000 }
     )
-    await refreshButton.click()
+    await pullToRefresh(page, page.getByTestId('mobile-role-scroll'))
     const refreshRequestBody =
       (await refreshRequestPromise).postDataJSON() || {}
     assert(
       !String(refreshRequestBody?.params?.cursor || '').trim(),
-      `${scenarioName} 顶部刷新应重新获取最新快照，不应携带续页游标: ${JSON.stringify(refreshRequestBody)}`
+      `${scenarioName} 任务刷新应重新获取最新快照，不应携带续页游标: ${JSON.stringify(refreshRequestBody)}`
     )
     await expectText(page, '数据已刷新')
     const beforeFailureMetrics = await readMobileTaskVisibleListMetrics(
@@ -326,7 +323,11 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     let failedOnce = false
     await page.route('**/rpc/workflow', async (route) => {
       const body = route.request().postDataJSON() || {}
-      if (!failedOnce && body.method === 'list_role_tasks') {
+      if (
+        !failedOnce &&
+        body.method === 'list_role_tasks' &&
+        body.params.limit > 1
+      ) {
         failedOnce = true
         await route.fulfill({
           status: 200,
@@ -346,7 +347,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       await route.fallback()
     })
 
-    await refreshButton.click()
+    await pullToRefresh(page, page.getByTestId('mobile-role-scroll'))
     await expectText(page, '刷新任务失败，已保留上次数据')
     const afterFailureMetrics = await readMobileTaskVisibleListMetrics(
       page,
@@ -409,13 +410,11 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
             headerVertical: getComputedStyle(header).verticalAlign,
             cellAlign: cell ? getComputedStyle(cell).textAlign : null,
             bodyVertical: cell ? getComputedStyle(cell).verticalAlign : null,
-            contentAlign: content
-              ? getComputedStyle(content).textAlign
-              : null,
+            contentAlign: content ? getComputedStyle(content).textAlign : null,
             alignedGeometry: Boolean(
               cellRect &&
-                Math.abs(headerRect.left - cellRect.left) <= 1 &&
-                Math.abs(headerRect.width - cellRect.width) <= 1
+              Math.abs(headerRect.left - cellRect.left) <= 1 &&
+              Math.abs(headerRect.width - cellRect.width) <= 1
             ),
           }
         }),
@@ -449,35 +448,35 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       ),
       [
         {
-          headerAlign: 'center',
+          headerAlign: 'left',
           headerVertical: 'middle',
           cellAlign: 'left',
           bodyVertical: 'middle',
           contentAlign: 'left',
         },
         {
-          headerAlign: 'center',
+          headerAlign: 'left',
           headerVertical: 'middle',
           cellAlign: 'left',
           bodyVertical: 'middle',
           contentAlign: 'left',
         },
         {
-          headerAlign: 'center',
+          headerAlign: 'left',
           headerVertical: 'middle',
-          cellAlign: 'center',
+          cellAlign: 'left',
           bodyVertical: 'middle',
-          contentAlign: 'center',
+          contentAlign: 'left',
         },
         {
-          headerAlign: 'center',
+          headerAlign: 'left',
           headerVertical: 'middle',
           cellAlign: 'left',
           bodyVertical: 'middle',
           contentAlign: 'left',
         },
       ],
-      `${scenarioName} 工作台表头应统一居中，正文保持字段语义对齐`
+      `${scenarioName} 工作台表头与正文保持字段语义对齐`
     )
     assert(
       metrics.columns.every((column) => column.alignedGeometry),
@@ -712,7 +711,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     assert(
       metrics.laneVisuals.every(
         ({ cardBorderRadius, cardOverflow }) =>
-          Number.parseFloat(cardBorderRadius || '0') >= 12 &&
+          Number.parseFloat(cardBorderRadius || '0') === 10 &&
           cardOverflow === 'hidden'
       ),
       `${scenarioName} 任务看板泳道内容应按卡片外圆角裁切: ${JSON.stringify(metrics)}`
@@ -889,18 +888,24 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           body,
           textArea,
           metaItems,
-          activeStep: drawerElement?.querySelector(
-            '.erp-task-action-drawer__step[role="tab"][aria-selected="true"]'
-          )?.getAttribute('aria-controls'),
-          hasActionReceipt: Boolean(drawerElement?.querySelector(
-            '[data-testid="workflow-task-action-receipt"]'
-          )),
-          viewButtons: Array.from(drawerElement?.querySelectorAll(
-            '.erp-task-action-drawer__footer button'
-          ) || []).filter((button) => /查看/.test(button.textContent || '')).length,
-          visibleChains: Array.from(drawerElement?.querySelectorAll(
-            '[aria-label="任务处理链"]'
-          ) || []).filter(isVisible).length,
+          activeStep: drawerElement
+            ?.querySelector(
+              '.erp-task-action-drawer__step[role="tab"][aria-selected="true"]'
+            )
+            ?.getAttribute('aria-controls'),
+          hasActionReceipt: Boolean(
+            drawerElement?.querySelector(
+              '[data-testid="workflow-task-action-receipt"]'
+            )
+          ),
+          viewButtons: Array.from(
+            drawerElement?.querySelectorAll(
+              '.erp-task-action-drawer__footer button'
+            ) || []
+          ).filter((button) => /查看/.test(button.textContent || '')).length,
+          visibleChains: Array.from(
+            drawerElement?.querySelectorAll('[aria-label="任务处理链"]') || []
+          ).filter(isVisible).length,
           timingKeys: Array.from(
             drawerElement?.querySelectorAll(
               '.erp-task-timing [data-task-time]'
@@ -943,8 +948,16 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
         `${scenarioName} 核对任务和办理回执应显示入岗和处理截止时间: ${JSON.stringify(metrics)}`
       )
     } else {
-      assert.equal(metrics.metaItems, 0, `${scenarioName} 办理步骤不应重复任务详情`)
-      assert.equal(metrics.timingKeys.length, 0, `${scenarioName} 办理步骤不应重复任务日期`)
+      assert.equal(
+        metrics.metaItems,
+        0,
+        `${scenarioName} 办理步骤不应重复任务详情`
+      )
+      assert.equal(
+        metrics.timingKeys.length,
+        0,
+        `${scenarioName} 办理步骤不应重复任务日期`
+      )
     }
     assert.equal(
       metrics.visibleChains,
@@ -952,7 +965,11 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       `${scenarioName} 任务处理链只在核对任务步骤展示`
     )
     if (!isContext) {
-      assert.equal(metrics.viewButtons, 0, `${scenarioName} 办理与结果步骤不应提供查看入口`)
+      assert.equal(
+        metrics.viewButtons,
+        0,
+        `${scenarioName} 办理与结果步骤不应提供查看入口`
+      )
     }
     assert.equal(
       metrics.guideNoteCount,
@@ -984,7 +1001,8 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     )
     assert(
       metrics.summary.right <= metrics.scopeRect.right + 2 &&
-        (!metrics.metaGrid || metrics.metaGrid.right <= metrics.scopeRect.right + 2) &&
+        (!metrics.metaGrid ||
+          metrics.metaGrid.right <= metrics.scopeRect.right + 2) &&
         metrics.guide.right <= metrics.scopeRect.right + 2 &&
         metrics.guideSteps.right <= metrics.scopeRect.right + 2 &&
         metrics.actionPanel.right <= metrics.scopeRect.right + 2,

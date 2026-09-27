@@ -33,6 +33,15 @@ test('entryConfig: 默认展示后台和全部岗位任务端角色', () => {
   ])
 })
 
+test('entryConfig: 全部岗位查看仍遵守手机总入口及岗位开关', () => {
+  const config = getEntryConfig()
+  assert.equal(isMobileRoleEntryEnabled('all', config), true)
+  assert.equal(isMobileRoleEntryEnabled('all', { ...config, mobileTasks: false }), false)
+  assert.equal(isMobileRoleEntryEnabled('all', { ...config, mobileRoles: {} }), false)
+  assert.equal(resolveAllowedMobileEntryPath(['all', 'sales']), '/m/all/tasks')
+  assert.equal(resolveAllowedMobileEntryPath(['all', 'sales'], 'sales'), '/m/sales/tasks')
+})
+
 test('entryConfig: 支持运行时配置隐藏单个岗位任务端角色', () => {
   globalThis.window = {
     __PLUSH_ERP_ENTRY_CONFIG__: {

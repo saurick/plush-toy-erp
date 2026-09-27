@@ -29,9 +29,11 @@ export function createSalesOrderImportScenarios(deps) {
     const menuButton = menu
       .locator(`button[data-business-action-key="${actionKey}"]`)
       .first()
-    if ((await menuButton.count()) > 0 && (await menuButton.isVisible())) {
+    try {
       await menuButton.click()
       return
+    } catch {
+      // Collect the visible action state only after actionability has settled.
     }
     const metrics = await page.evaluate(() => ({
       selectedRows: Array.from(

@@ -1529,7 +1529,7 @@ async function findVisibleMenuItem(page, label) {
   const submenuClass = String((await parentSubmenu.getAttribute('class')) || '')
   assert.match(
     String((await moreFunctions.innerText()) || '').trim(),
-    /^更多功能（\d+）$/u,
+    /^更多功能$/u,
     `${label} 的父菜单必须是正式“更多功能”分组`
   )
   if (!submenuClass.includes('ant-menu-submenu-open')) {

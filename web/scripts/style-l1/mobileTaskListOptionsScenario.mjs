@@ -1,6 +1,8 @@
+import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { assertMobileSearchAffordance } from './controlAffordanceAssertions.mjs'
+import { assertMobileFilterOutsideDismissal } from './mobileFilterPopoverAssertions.mjs'
 
 export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
   const baseTime = 1_788_840_000
@@ -108,15 +110,26 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         )
       const openFilters = async (contextLabel = '任务') => {
         await filterTrigger.click()
-        const dropdown = page.getByRole('group', {
+        const dropdown = page.getByRole('dialog', {
           name: `筛选${contextLabel}`,
           exact: true,
         })
         await dropdown.waitFor({ state: 'visible' })
         return dropdown
       }
+      const tapFilterTrigger = async () => {
+        const bounds = await filterTrigger.boundingBox()
+        await page.touchscreen.tap(
+          bounds.x + bounds.width / 2,
+          bounds.y + bounds.height / 2
+        )
+      }
       const chooseFilter = async (dropdown, label) => {
         await dropdown.getByText(label, { exact: true }).click()
+        assert(await dropdown.isVisible(), '即时筛选保持浮层打开，允许连续切换')
+        await dropdown
+          .getByRole('button', { name: '关闭筛选', exact: true })
+          .click()
         await dropdown.waitFor({ state: 'hidden' })
       }
       const applyFilters = async ({ sort, status, contextLabel = '任务' }) => {
@@ -156,7 +169,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
           JSON.stringify(geometry)
         )
         assert(
-          geometry.query.height <= 48 && geometry.filter.height >= 44,
+          geometry.query.height === 42 && geometry.filter.height === 42,
           `搜索和统一筛选保持同一行：${JSON.stringify(geometry)}`
         )
         assert(
@@ -175,6 +188,23 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         )
       }
       await page.setViewportSize({ width: 390, height: 844 })
+
+      for (const fromField of [false, true]) {
+        const escapeDropdown = await openFilters()
+        if (fromField) await escapeDropdown.locator('input').first().focus()
+        await page.keyboard.press('Escape')
+        await escapeDropdown.waitFor({ state: 'hidden' })
+        await page.waitForFunction(
+          () =>
+            document.activeElement?.getAttribute('data-testid') ===
+            'mobile-task-list-filter-trigger'
+        )
+        assert.equal(
+          await filterTrigger.getAttribute('aria-label'),
+          '筛选任务',
+          'Escape 只关闭浮层，不改变查询'
+        )
+      }
 
       const immediateDropdown = await openFilters()
       const alignedControls = await immediateDropdown.evaluate((node) => {
@@ -195,7 +225,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
             ? Math.abs(centerX(fieldset) - centerX(legend))
             : Infinity
         })
-        const reset = node.querySelector('.mobile-task-filter-dropdown__reset')
+        const reset = node.querySelector('footer button')
         return {
           itemDeltas,
           legendDeltas,
@@ -210,6 +240,20 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
           alignedControls.resetDelta <= 1,
         `筛选标题、选项和重置动作必须共用居中基线：${JSON.stringify(alignedControls)}`
       )
+      await verifyMobileNavigationMotion(
+        page,
+        assert,
+        '.mobile-filter-panel [aria-label="任务排序"]',
+        1
+      )
+      assert(await immediateDropdown.isVisible(), '滑动选中过程不卸载筛选层')
+      await verifyMobileNavigationMotion(
+        page,
+        assert,
+        '.mobile-filter-panel [aria-label="任务排序"]',
+        0,
+        true
+      )
       await chooseFilter(immediateDropdown, '等待最久')
       await waitFirst(97001)
       assert.equal(
@@ -221,10 +265,21 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         await filterTrigger.evaluate((node) => node === document.activeElement),
         '收起后焦点返回筛选入口'
       )
+      await assertMobileFilterOutsideDismissal({
+        page,
+        assert,
+        trigger: filterTrigger,
+        dialog: page.getByRole('dialog', { name: '筛选任务', exact: true }),
+      })
+      await waitFirst(97001)
 
       const resetDropdown = await openFilters()
       await resetDropdown
         .getByRole('button', { name: '重置筛选', exact: true })
+        .click()
+      assert(await resetDropdown.isVisible(), '重置后浮层保持打开')
+      await resetDropdown
+        .getByRole('button', { name: '关闭筛选', exact: true })
         .click()
       await resetDropdown.waitFor({ state: 'hidden' })
       await waitFirst(97063)
@@ -306,6 +361,10 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       const appliedResetDropdown = await openFilters()
       await appliedResetDropdown
         .getByRole('button', { name: '重置筛选', exact: true })
+        .click()
+      assert(await appliedResetDropdown.isVisible(), '重置后浮层保持打开')
+      await appliedResetDropdown
+        .getByRole('button', { name: '关闭筛选', exact: true })
         .click()
       await appliedResetDropdown.waitFor({ state: 'hidden' })
       await waitFirst(97063)
@@ -413,6 +472,10 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await riskDropdown
         .getByRole('button', { name: '重置筛选', exact: true })
         .click()
+      assert(await riskDropdown.isVisible(), '重置后浮层保持打开')
+      await riskDropdown
+        .getByRole('button', { name: '关闭筛选', exact: true })
+        .click()
       await riskDropdown.waitFor({ state: 'hidden' })
       assert.equal(
         await filterTrigger.getAttribute('aria-label'),
@@ -438,8 +501,8 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       const narrowDropdown = await openFilters()
       await page.waitForTimeout(200)
       const narrowGeometry = await page.evaluate(() => {
-        const root = document.querySelector('.mobile-task-filter-popover')
-        const panel = root?.querySelector('.mobile-task-filter-dropdown')
+        const root = document.querySelector('.mobile-filter-popover')
+        const panel = root?.querySelector('.mobile-filter-panel')
         return {
           viewport: {
             width: document.documentElement.clientWidth,
@@ -463,7 +526,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
             narrowGeometry.viewport.height * 0.52 + 2,
         `窄屏任务筛选下拉层保持在视口内：${JSON.stringify(narrowGeometry)}`
       )
-      await filterTrigger.click()
+      await tapFilterTrigger()
       await narrowDropdown.waitFor({ state: 'hidden' })
 
       await page.setViewportSize({ width: 390, height: 844 })
@@ -482,7 +545,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
           'mobile-task-list-filter-dropdown-light.png'
         ),
       })
-      await filterTrigger.click()
+      await tapFilterTrigger()
       await lightDropdown.waitFor({ state: 'hidden' })
 
       await clickMobileThemeOption(page, '暗色')
@@ -500,7 +563,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await page.screenshot({
         path: path.join(outputDir, 'mobile-task-list-filter-dropdown-dark.png'),
       })
-      await filterTrigger.click()
+      await tapFilterTrigger()
       await darkDropdown.waitFor({ state: 'hidden' })
     },
   }

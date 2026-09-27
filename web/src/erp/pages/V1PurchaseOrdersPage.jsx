@@ -5,6 +5,9 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
+import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -16,11 +19,7 @@ import {
   BusinessPageLayout,
   PageHeaderCard,
 } from '../components/business-list/BusinessListLayout.jsx'
-import {
-  ColumnOrderHeaderMenu,
-  ColumnOrderModal,
-} from '../components/business-list/ColumnOrderModal.jsx'
-import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
+import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessLineItemOrderModal from '../components/business-list/BusinessLineItemOrderModal.jsx'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
@@ -38,7 +37,6 @@ import {
   listAllContactsByOwner,
   listAllPurchaseOrderItems,
   listAllPurchaseOrders,
-  listPurchaseOrderItemsPreview,
   listPurchaseOrders,
   getPurchaseOrder,
   listAllSuppliers,
@@ -67,7 +65,6 @@ import {
   BusinessViewSwitch,
 } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
-import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   V1_ROUTE_PATHS,
@@ -107,13 +104,7 @@ import {
   settleSourceDocumentPostSaveEffect,
 } from '../utils/sourceDocumentMutation.mjs'
 import {
-  applyModuleColumnOrder,
-  sanitizeModuleColumnOrder,
-} from '../utils/moduleTableColumns.mjs'
-import {
-  getPreferredColumnOrder,
   parseBusinessSortValue,
-  writeStoredColumnOrder,
 } from '../utils/businessTableActions.mjs'
 import {
   referenceLabel,
@@ -189,14 +180,12 @@ export default function V1PurchaseOrdersPage() {
   const workflowTaskSourceIDRef = useRef(0)
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
+  const [statusCounts, setStatusCounts] = useState(null)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
   const lifecycleInFlightRef = useRef(false)
   const lifecycleAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
-  const [columnOrder, setColumnOrder] = useState(null)
-  const [columnOrderOpen, setColumnOrderOpen] = useState(false)
-  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [lineOrderLoading, setLineOrderLoading] = useState(false)
   const [lineOrderOpen, setLineOrderOpen] = useState(false)
   const [lineOrderContext, setLineOrderContext] = useState({
@@ -211,18 +200,43 @@ export default function V1PurchaseOrdersPage() {
   const [referenceDataState, setReferenceDataState] = useState('loading')
   const [inboundReferenceDataState, setInboundReferenceDataState] =
     useState('loading')
-  const [keyword, setKeyword] = useState('')
+  const [keyword, setKeyword] = useBusinessPageState('keyword', '')
   const [lifecycleScope, setLifecycleScope] = useState(() =>
     lifecycleScopeFromSearchParams(searchParams)
   )
-  const [status, setStatus] = useState('')
-  const [supplierFilter, setSupplierFilter] = useState('')
-  const [dateFilterField, setDateFilterField] = useState('purchase_date')
-  const [dateFilterStart, setDateFilterStart] = useState('')
-  const [dateFilterEnd, setDateFilterEnd] = useState('')
-  const [sortValue, setSortValue] = useState('updated_at:desc')
-  const [contentView, setContentView] = useState('list')
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [status, setStatus] = useBusinessPageState('status', '')
+  const [supplierFilter, setSupplierFilter] = useBusinessPageState(
+    'supplierFilter',
+    ''
+  )
+  const [dateFilterField, setDateFilterField] = useBusinessPageState(
+    'dateFilterField',
+    'purchase_date'
+  )
+  const [dateFilterStart, setDateFilterStart] = useBusinessPageState(
+    'dateFilterStart',
+    ''
+  )
+  const [dateFilterEnd, setDateFilterEnd] = useBusinessPageState(
+    'dateFilterEnd',
+    ''
+  )
+  const [sortValue, setSortValue] = useBusinessPageState(
+    'sortValue',
+    'updated_at:desc'
+  )
+  const [contentView, setContentView] = useBusinessPageState(
+    'contentView',
+    'list'
+  )
+  const [arrivalViewState, setArrivalViewState] = useBusinessPageState(
+    'arrivalViewState',
+    {}
+  )
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: 20,
+  })
   const [editingOrder, setEditingOrder] = useState(null)
   const [detailOrder, setDetailOrder] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -276,7 +290,7 @@ export default function V1PurchaseOrdersPage() {
     [units]
   )
   const getPurchaseOrderItemFields = useCallback(
-    (item, { view }) => [
+    (item) => [
       {
         label: '下单材料名称',
         value: item?.material_name_snapshot,
@@ -308,29 +322,11 @@ export default function V1PurchaseOrdersPage() {
       { label: '产品订单编号', value: item?.product_order_no_snapshot },
       { label: '产品编号', value: item?.product_no_snapshot },
       { label: '产品名称', value: item?.product_name_snapshot, strong: true },
-      ...(view !== 'preview'
-        ? [{ label: '备注', value: item?.note, fullWidth: true }]
-        : []),
+      { label: '备注', value: item?.note, fullWidth: true },
     ],
     [unitOptions]
   )
-  const loadPurchaseOrderItemsPreview = useCallback(
-    async (order, { signal }) => {
-      const data = await listPurchaseOrderItemsPreview(
-        {
-          purchase_order_id: order.id,
-          expected_version: order.version,
-        },
-        { signal }
-      )
-      return {
-        items: data?.purchase_order_items,
-        total: data?.total,
-      }
-    },
-    []
-  )
-  const loadAllPurchaseOrderItemsForPreview = useCallback(
+  const loadPurchaseOrderDetailsItems = useCallback(
     async (order, { signal }) => {
       const data = await listAllPurchaseOrderItems(
         {
@@ -346,18 +342,6 @@ export default function V1PurchaseOrdersPage() {
     },
     []
   )
-  const purchaseOrderItemsPreview = useBusinessRowItemsPreview({
-    records: orders,
-    getItemTotal: (order) => order?.item_count,
-    rowExpandable: (order) =>
-      canRead && Number(order?.id || 0) > 0 && Number(order?.version || 0) > 0,
-    loadPreview: loadPurchaseOrderItemsPreview,
-    onOpenDetails: (order) => openPurchaseOrderDetails(order),
-    getItemFields: getPurchaseOrderItemFields,
-    getItemLabel: (item, { index }) => `明细 ${item?.line_no || index + 1}`,
-    getRecordLabel: (order) => order?.purchase_order_no || '当前采购订单',
-    emptyDescription: '当前采购订单暂无明细',
-  })
   const warehouseOptions = useMemo(
     () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
     [warehouses]
@@ -455,16 +439,19 @@ export default function V1PurchaseOrdersPage() {
     load: loadArrivalOrders,
     actionLabel: '加载采购到货日历',
   })
+  const reloadArrivalData = arrivalData.reload
 
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
     setLoading(true)
+    setStatusCounts(null)
     try {
       const routeSelectedID = Number(routePurchaseOrderID || 0)
       const [data, routeOrder] = await Promise.all([
         listPurchaseOrders(
           {
             ...orderListParams,
+            include_status_counts: true,
             limit: pagination.pageSize,
             offset: (pagination.current - 1) * pagination.pageSize,
           },
@@ -490,6 +477,9 @@ export default function V1PurchaseOrdersPage() {
       const nextOrders = exactPage.records
       setOrders(nextOrders)
       setTotal(exactPage.total)
+      setStatusCounts(resolveBusinessStatusCounts(data, {
+        hasExactContext: routeSelectedID > 0, exactRecord: routeOrder, statusField: 'lifecycle_status',
+      }))
       if (routeSelectedID > 0) {
         applySelectedRowKeys(routeOrder ? [routeSelectedID] : [])
         setSelectedOrder(routeOrder)
@@ -600,6 +590,7 @@ export default function V1PurchaseOrdersPage() {
   }, [loadOrders])
 
   const refreshPageData = useCallback(async () => {
+    if (contentView === 'arrival') reloadArrivalData()
     const [ordersOK, referencesOK, inboundReferencesOK, workflowResult] =
       await Promise.all([
         loadOrders(),
@@ -614,10 +605,12 @@ export default function V1PurchaseOrdersPage() {
       workflowResult?.status !== 'error'
     )
   }, [
+    contentView,
     loadInboundReferenceData,
     loadOrders,
     loadReferenceData,
     loadWorkflowTasks,
+    reloadArrivalData,
   ])
 
   useEffect(() => {
@@ -858,7 +851,7 @@ export default function V1PurchaseOrdersPage() {
           items: (values.items || []).map((line, index) =>
             buildPurchaseOrderItemParams(line, {
               id: line.id,
-              line_no: Number(line.line_no || index + 1),
+              line_no: index + 1,
             })
           ),
         })
@@ -966,7 +959,11 @@ export default function V1PurchaseOrdersPage() {
           null
         )
       }
-      message.success(action.successMessage || `采购订单已${action.label}`)
+      message.success(
+        action.key === 'submit'
+          ? orderSubmissionSuccessMessage('purchase_order', updated)
+          : action.successMessage || `采购订单已${action.label}`
+      )
       if (updated && action.returnsRecord !== false) {
         setSelectedOrder(updated)
         applySelectedRowKeys([updated.id])
@@ -1056,79 +1053,22 @@ export default function V1PurchaseOrdersPage() {
     [suppliers]
   )
 
-  const persistColumnOrder = useCallback(
-    async (nextOrder, columnsForOrder) => {
-      const sanitizedOrder = sanitizeModuleColumnOrder(
-        nextOrder,
-        columnsForOrder
-      )
-      setColumnOrder(sanitizedOrder)
-      writeStoredColumnOrder(PURCHASE_ORDERS_MODULE_KEY, sanitizedOrder)
-      setColumnOrderSaving(true)
-      try {
-        const erpPreferences = await setERPColumnOrder({
-          module_key: PURCHASE_ORDERS_MODULE_KEY,
-          order: sanitizedOrder,
-        })
-        outletContext?.updateAdminERPPreferences?.(erpPreferences)
-        message.success(
-          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
-        )
-      } catch (error) {
-        message.warning(
-          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
-        )
-      } finally {
-        setColumnOrderSaving(false)
-      }
-    },
-    [outletContext]
-  )
-
   const dataColumns = useMemo(
     () => buildPurchaseOrderColumns({ resolveSupplierName }),
     [resolveSupplierName]
   )
 
-  const preferredColumnOrder = useMemo(
-    () =>
-      getPreferredColumnOrder({
-        adminProfile,
-        moduleKey: PURCHASE_ORDERS_MODULE_KEY,
-        columns: dataColumns,
-        localOrder: columnOrder,
-      }),
-    [adminProfile, columnOrder, dataColumns]
-  )
-
-  const visibleDataColumns = useMemo(
-    () => applyModuleColumnOrder(dataColumns, preferredColumnOrder),
-    [dataColumns, preferredColumnOrder]
-  )
-
-  const columns = useMemo(
-    () =>
-      visibleDataColumns.map((column) => ({
-        ...column,
-        title: (
-          <ColumnOrderHeaderMenu
-            column={column}
-            columns={dataColumns}
-            order={preferredColumnOrder}
-            saving={columnOrderSaving}
-            onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-            onOpenPanel={() => setColumnOrderOpen(true)}
-          />
-        ),
-      })),
-    [
-      columnOrderSaving,
-      dataColumns,
-      persistColumnOrder,
-      preferredColumnOrder,
-      visibleDataColumns,
-    ]
-  )
+  const {
+    tableColumns: columns,
+    exportColumns: visibleDataColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: PURCHASE_ORDERS_MODULE_KEY,
+    moduleTitle: '采购订单列表',
+    columns: dataColumns,
+  })
 
   const loadExportOrders = useCallback(
     async ({ signal }) => {
@@ -1155,13 +1095,13 @@ export default function V1PurchaseOrdersPage() {
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
-      linkedKeyword ||
-      routePurchaseOrderID ||
-      lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
-      status ||
-      supplierFilter ||
-      dateFilterStart ||
-      dateFilterEnd
+    linkedKeyword ||
+    routePurchaseOrderID ||
+    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
+    status ||
+    supplierFilter ||
+    dateFilterStart ||
+    dateFilterEnd
   )
   const clearRouteContext = useCallback(
     (resetScope = false) => {
@@ -1175,7 +1115,7 @@ export default function V1PurchaseOrdersPage() {
       )
       setPagination((current) => ({ ...current, current: 1 }))
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams, setPagination]
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -1187,7 +1127,16 @@ export default function V1PurchaseOrdersPage() {
     setDateFilterEnd('')
     setPagination((current) => ({ ...current, current: 1 }))
     clearRouteContext(true)
-  }, [clearRouteContext])
+  }, [
+    clearRouteContext,
+    setKeyword,
+    setPagination,
+    setStatus,
+    setSupplierFilter,
+    setDateFilterField,
+    setDateFilterStart,
+    setDateFilterEnd,
+  ])
 
   const selectedOrders = useMemo(
     () => orders.filter((record) => selectedRowKeys.includes(record.id)),
@@ -1325,7 +1274,7 @@ export default function V1PurchaseOrdersPage() {
   })
   const selectedOrderCanReorder = Boolean(
     canUpdate &&
-      canReorderSourceDocumentItems('purchase_order', singleSelectedOrder)
+    canReorderSourceDocumentItems('purchase_order', singleSelectedOrder)
   )
   const openPurchaseOrderLineOrder = async () => {
     const order = singleSelectedOrder
@@ -1379,7 +1328,6 @@ export default function V1PurchaseOrdersPage() {
       const openItems = selectOpenSourceDocumentItems(
         result.purchase_order_items
       )
-      purchaseOrderItemsPreview.invalidate(order)
       setOrders((current) =>
         current.map((item) => (item.id === savedOrder.id ? savedOrder : item))
       )
@@ -1491,17 +1439,16 @@ export default function V1PurchaseOrdersPage() {
       value={contentView}
       options={[
         { value: 'list', label: '订单列表' },
-        { value: 'arrival', label: '到货日历' },
+        { value: 'arrival', label: '到货计划' },
       ]}
-      loading={arrivalData.loading}
       onChange={setContentView}
-      onReload={arrivalData.reload}
     />
   )
 
   return (
     <BusinessPageLayout className="erp-v1-purchase-orders-page">
       <PageHeaderCard
+        viewSwitch={purchaseViewSwitch}
         helpKey="accessories-purchase"
         title="采购订单"
         stats={stats}
@@ -1509,6 +1456,10 @@ export default function V1PurchaseOrdersPage() {
       />
 
       <PurchaseOrderOperationPanel
+        adminProfile={adminProfile}
+        statusCounts={statusCounts}
+        statusLoading={loading}
+        exactStatusContext={Boolean(routePurchaseOrderID)}
         applySelectedRowKeys={applySelectedRowKeys}
         canCreate={canCreate}
         canCreateInboundDraftAction={canCreatePurchaseReceipt}
@@ -1572,7 +1523,7 @@ export default function V1PurchaseOrdersPage() {
         selectedOrderCanReorder={selectedOrderCanReorder}
         selectedOrderDisplayText={selectedOrderDisplayText}
         selectedRowKeys={selectedRowKeys}
-        setColumnOrderOpen={setColumnOrderOpen}
+        setColumnOrderOpen={openColumnOrder}
         setDateFilterEnd={setDateFilterEnd}
         setDateFilterField={setDateFilterField}
         setDateFilterStart={setDateFilterStart}
@@ -1594,9 +1545,14 @@ export default function V1PurchaseOrdersPage() {
         supplierOptions={supplierOptions}
       />
 
-      <BusinessViewSurface switcher={purchaseViewSwitch}>
+      <BusinessViewSurface
+        activeView={contentView}
+        loading={contentView === 'list' ? loading : arrivalData.loading}
+      >
         {contentView === 'arrival' ? (
           <PurchaseArrivalCalendar
+            viewState={arrivalViewState}
+            onViewStateChange={setArrivalViewState}
             orders={arrivalData.rows}
             loading={arrivalData.loading}
             error={arrivalData.error}
@@ -1615,7 +1571,6 @@ export default function V1PurchaseOrdersPage() {
             rowKey="id"
             columns={columns}
             dataSource={orders}
-            expandable={purchaseOrderItemsPreview.expandable}
             rowSelection={{
               type: 'checkbox',
               selectedRowKeys,
@@ -1676,7 +1631,7 @@ export default function V1PurchaseOrdersPage() {
                 getItemFields: getPurchaseOrderItemFields,
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
-                load: loadAllPurchaseOrderItemsForPreview,
+                load: loadPurchaseOrderDetailsItems,
                 title: '采购订单明细',
               }
             : null
@@ -1707,15 +1662,7 @@ export default function V1PurchaseOrdersPage() {
         }
       />
 
-      <ColumnOrderModal
-        open={columnOrderOpen}
-        columns={dataColumns}
-        order={preferredColumnOrder}
-        saving={columnOrderSaving}
-        moduleTitle="采购订单列表"
-        onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-        onClose={() => setColumnOrderOpen(false)}
-      />
+      {columnOrderModal}
 
       <BusinessLineItemOrderModal
         description="保存后只调整当前采购订单的材料展示顺序，不修改材料、数量、价格或稳定行号。"

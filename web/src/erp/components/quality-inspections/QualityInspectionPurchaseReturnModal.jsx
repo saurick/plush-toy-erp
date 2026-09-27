@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
+import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 
 import {
@@ -133,6 +134,7 @@ export default function QualityInspectionPurchaseReturnModal({
           name="quantity"
           label="本次退货数量"
           rules={[
+            unitQuantityRule(inspection?.unit_precision),
             { required: true, message: '请填写退货数量' },
             {
               validator: (_, value) =>

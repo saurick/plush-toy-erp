@@ -1,0 +1,141 @@
+.mobile-mine-panel {
+  display: grid;
+  gap: 12px;
+  margin: 8px 12px 0;
+  padding-bottom: 16px;
+}
+.mobile-mine-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 16px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+}
+.mobile-mine-card h2 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 650;
+}
+.mobile-mine-identity {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.mobile-mine-identity > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.mobile-mine-identity strong {
+  font-size: 17px;
+}
+.mobile-mine-identity span:not(.mobile-mine-avatar, .anticon) {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.mobile-mine-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+}
+.mobile-mine-facts > div {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--erp-surface-bg-soft);
+}
+.mobile-mine-facts dt {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.mobile-mine-facts dd {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.mobile-mine-actions {
+  display: grid;
+  gap: 8px;
+}
+.mobile-mine-action {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 8px;
+  color: var(--erp-text);
+  background: var(--erp-surface-bg);
+  font-size: 13px;
+  text-align: left;
+  transition:
+    background var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+.mobile-mine-action > span:nth-child(2) {
+  flex: 1;
+}
+.mobile-mine-action:focus-visible {
+  outline: 2px solid var(--erp-control-focus-border);
+  outline-offset: 2px;
+}
+.mobile-mine-action:disabled {
+  color: var(--erp-text-subtle);
+  cursor: not-allowed;
+}
+.mobile-mine-action:active:not(:disabled) {
+  background: var(--erp-primary-softer);
+}
+.mobile-mine-action--danger {
+  color: var(--erp-visual-danger-text);
+}
+.mobile-mine-version {
+  margin: 12px 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.mobile-mine-avatar {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: var(--erp-primary-softer);
+  color: var(--erp-primary-strong);
+  font-size: 26px;
+}
+.erp-appearance-settings--mobile {
+  gap: 12px;
+}
+.erp-appearance-settings--mobile fieldset {
+  margin: 0;
+}
+.erp-appearance-settings--mobile .erp-appearance-swatches {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+}
+.erp-appearance-settings--mobile .erp-appearance-swatches button {
+  flex-direction: column;
+  min-width: 0;
+  min-height: 54px;
+  padding: 6px 2px;
+  gap: 5px;
+  font-size: 11px;
+}
+.erp-appearance-settings--mobile .ant-segmented-item-label {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+}

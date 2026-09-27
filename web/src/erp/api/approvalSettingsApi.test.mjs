@@ -47,6 +47,7 @@ test('approval settings API uses fixed strict revision contract', async () => {
     items: [
       {
         approval_key: 'sales_order',
+        condition: { mode: 'all', amount: '', currency: '' },
         enabled: true,
         members: [
           {

@@ -1,6 +1,7 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { clickERPThemeOption } from './themeAssertions.mjs'
 import { MOBILE_ROLE_TASK_PAGE_LIMIT } from '../../src/erp/utils/mobileTaskQueries.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
   const permissions = [
@@ -62,11 +63,11 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       const scroll = page.getByTestId('mobile-role-scroll')
       const indicator = page.getByTestId('mobile-task-pull-refresh')
       const rows = page.locator('.erp-mobile-list-item')
-      const refresh = page.getByRole('button', { name: '刷新', exact: true })
+      const refresh = page.getByRole('button', { name: /刷新任务/ })
       const filterTrigger = page.getByTestId('mobile-task-list-filter-trigger')
       const openTaskFilters = async () => {
         await filterTrigger.click()
-        const dropdown = page.getByRole('group', {
+        const dropdown = page.getByRole('dialog', {
           name: '筛选任务',
           exact: true,
         })
@@ -76,6 +77,10 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       const chooseTaskFilter = async (label) => {
         const dropdown = await openTaskFilters()
         await dropdown.getByText(label, { exact: true }).click()
+        assert(await dropdown.isVisible())
+        await dropdown
+          .getByRole('button', { name: '关闭筛选', exact: true })
+          .click()
         await dropdown.waitFor({ state: 'hidden' })
       }
       const applyTaskFilters = async ({ sort, status }) => {
@@ -167,7 +172,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         page.evaluate(() => {
           const rect = (node) => node?.getBoundingClientRect().toJSON() ?? null
           const controls = {
-            header: '.mobile-task-list-header',
+            header: '.mobile-role-task-query',
             search: '.mobile-role-task-search',
             tabs: '.mobile-role-task-filters, .mobile-role-message-tabs',
             filter: '[data-testid="mobile-task-list-filter-trigger"]',
@@ -262,8 +267,9 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
             title: document.querySelector(
               '[data-testid="mobile-role-list-heading"]'
             )?.textContent,
-            busy: document.querySelector('.mobile-task-list-header__refresh')
-              ?.disabled,
+            busy: document
+              .querySelector('[data-testid="mobile-role-scroll"]')
+              ?.getAttribute('data-refreshing'),
             scrollTop: document.querySelector(
               '[data-testid="mobile-role-scroll"]'
             )?.scrollTop,
@@ -283,11 +289,11 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       }
       const settle = async () => {
         await state('idle')
-        await refresh.waitFor({ state: 'visible' })
         await page.waitForFunction(
           () =>
-            !document.querySelector('.mobile-task-list-header__refresh')
-              ?.disabled
+            document
+              .querySelector('[data-testid="mobile-role-scroll"]')
+              ?.getAttribute('data-refreshing') === 'false'
         )
       }
       const noRefresh = async (gesture, label) => {
@@ -306,7 +312,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
             document.querySelector(selector).getBoundingClientRect().toJSON()
           return {
             header: rect('[data-testid="mobile-task-list-header"]'),
-            refresh: rect('.mobile-task-list-header__refresh'),
+            filter: rect('[data-testid="mobile-task-list-filter-trigger"]'),
             search: rect('.mobile-role-task-search'),
             width: document.documentElement.clientWidth,
             scrollWidth: document.documentElement.scrollWidth,
@@ -314,8 +320,8 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         })
         assert(geometry.header.height <= 72, '顶部保持一行紧凑布局')
         assert(
-          geometry.refresh.height >= 44 && geometry.refresh.width >= 72,
-          '刷新文字与点击区不能缩成难点的小图标'
+          geometry.filter.height >= 42 && geometry.filter.width >= 72,
+          '筛选菜单与刷新入口保持可触控范围'
         )
         assert(
           geometry.search.y <= 76,
@@ -326,13 +332,37 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
           JSON.stringify(geometry)
         )
         const beforePull = await pull()
-        await send('touchCancel')
+        if (width === 390) {
+          const [frames] = await Promise.all([
+            indicator.evaluate(
+              (node) =>
+                new Promise((resolve) => {
+                  const samples = []
+                  const start = performance.now()
+                  const tick = () => {
+                    samples.push(node.getBoundingClientRect().height)
+                    if (performance.now() - start < 400)
+                      requestAnimationFrame(tick)
+                    else resolve(samples)
+                  }
+                  requestAnimationFrame(tick)
+                })
+            ),
+            send('touchCancel'),
+          ])
+          assert(
+            frames.some((height) => height > 1 && height < 70),
+            '下拉取消后平滑收起，能观测到中间帧'
+          )
+          assert.equal(frames.at(-1), 0)
+        } else await send('touchCancel')
         await state('idle')
+        await waitForFiniteAnimations(page)
         await assertRefreshLayout(beforePull, `${width}px取消下拉后`)
       }
       await page.setViewportSize({ width: 390, height: 844 })
       assert.equal(
-        await page.locator('.erp-theme-toggle, .erp-theme-menu-toggle').count(),
+        await page.locator('.erp-theme-toggle, .erp-appearance-trigger').count(),
         0
       )
       assert.equal(
@@ -344,9 +374,9 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         fullPage: true,
       })
       const headingClip = await page
-        .getByTestId('mobile-role-list-heading')
+        .locator('.mobile-role-task-query')
         .boundingBox()
-      const restingHeading = await page.screenshot({ clip: headingClip })
+      await page.screenshot({ clip: headingClip })
 
       await noRefresh(async () => {
         await start()
@@ -373,7 +403,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         const after = await refreshLayout()
         assert(
           after.controls.header.y < before.controls.header.y,
-          '正常浏览时标题仍随列表滚动'
+          '正常浏览时搜索区仍随列表滚动'
         )
       }, '上滑浏览列表不请求')
       await noRefresh(async () => {
@@ -407,13 +437,26 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         await end()
       }, '搜索框内手势不触发刷新')
 
+      await page.getByRole('searchbox').blur()
+      await page.evaluate(async () => {
+        await Promise.all(
+          document
+            .getAnimations()
+            .filter(
+              (animation) =>
+                animation.effect?.getTiming().iterations !== Infinity
+            )
+            .map((animation) => animation.finished.catch(() => {}))
+        )
+      })
+      const restingQuery = await page.screenshot({ clip: headingClip })
       const firstTask = await rows.first().elementHandle()
       const beforeRefresh = requests.length
       nextResponse = 'hold'
       const beforePull = await pull()
       assert(
-        restingHeading.equals(await page.screenshot({ clip: headingClip })),
-        '下拉时标题的实际画面保持原位，不受浏览器原生回弹带动'
+        restingQuery.equals(await page.screenshot({ clip: headingClip })),
+        '下拉时搜索区的实际画面保持原位，不受浏览器原生回弹带动'
       )
       await page.screenshot({
         path: path.join(outputDir, 'mobile-refresh-pull-ready.png'),
@@ -423,7 +466,9 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       await state('refreshing')
       await page.waitForFunction(
         () =>
-          document.querySelector('.mobile-task-list-header__refresh')?.disabled
+          document
+            .querySelector('[data-testid="mobile-role-scroll"]')
+            ?.getAttribute('data-refreshing') === 'true'
       )
       await assertRefreshLayout(beforePull, '刷新中')
       assert.equal(requests.length, beforeRefresh + 1)
@@ -493,7 +538,9 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
           .isChecked(),
         true
       )
-      await filterTrigger.click()
+      await persistedFilterDropdown
+        .getByRole('button', { name: '关闭筛选', exact: true })
+        .click()
       await persistedFilterDropdown.waitFor({ state: 'hidden' })
       assert.equal(
         await page
@@ -521,11 +568,11 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
             ).map((item) => item.getBoundingClientRect().toJSON()),
           }))
         assert(geometry.scrollWidth <= geometry.width + 1)
-        assert.equal(geometry.buttons.length, 3)
+        assert.equal(geometry.buttons.length, 5)
         assert(
           geometry.buttons.every(
             (button) =>
-              button.height >= 48 && button.width >= 44 && button.right <= width
+              button.height >= 34 && button.width >= 44 && button.right <= width
           ),
           JSON.stringify(geometry)
         )
@@ -562,10 +609,14 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
 
       await page.locator('.ant-message-error').waitFor({ state: 'hidden' })
       nextResponse = 'hold-fail'
-      await refresh.click()
-      await page
-        .getByRole('button', { name: '刷新中', exact: true })
-        .waitFor({ state: 'visible' })
+      await pull()
+      await end()
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="mobile-role-scroll"]')
+            ?.getAttribute('data-refreshing') === 'true'
+      )
       await page.getByTestId('mobile-role-nav-mine').click()
       releaseResponse()
       await page.waitForTimeout(250)

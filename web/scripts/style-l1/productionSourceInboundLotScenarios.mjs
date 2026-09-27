@@ -59,7 +59,10 @@ export function createProductionSourceInboundLotScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '生产订单')
         await page.getByText('MO-STYLE-L1-20260713', { exact: true }).click()
-        const releaseButton = page.getByRole('button', { name: /发\s*布/u })
+        const releaseButton = page.getByRole('button', {
+          name: '发布',
+          exact: true,
+        })
         for (let attempt = 0; attempt < 40; attempt += 1) {
           if (await releaseButton.isEnabled()) break
           await page.waitForTimeout(100)

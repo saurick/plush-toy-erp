@@ -10,6 +10,8 @@ import {
 } from '@ant-design/icons'
 import { Button, Space, Tag } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { useOutsourcingOrderLifecycle } from '../components/outsourcing-orders/useOutsourcingOrderLifecycle.jsx'
@@ -39,15 +41,8 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
-import {
-  ColumnOrderHeaderMenu,
-  ColumnOrderModal,
-} from '../components/business-list/ColumnOrderModal.jsx'
+import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 
-import {
-  getPreferredColumnOrder,
-  writeStoredColumnOrder,
-} from '../components/business-list/businessListPreferences.mjs'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessLineItemOrderModal from '../components/business-list/BusinessLineItemOrderModal.jsx'
@@ -71,7 +66,6 @@ import {
 } from '../api/attachmentApi.mjs'
 
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
-import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 
 import {
   OUTSOURCING_ORDER_STATUS_LABELS,
@@ -89,10 +83,6 @@ import {
 } from '../utils/businessActionAvailability.mjs'
 
 import { canReorderSourceDocumentItems } from '../utils/sourceDocumentMutation.mjs'
-import {
-  applyModuleColumnOrder,
-  sanitizeModuleColumnOrder,
-} from '../utils/moduleTableColumns.mjs'
 import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   PROCESSING_CONTRACT_TEMPLATE_KEY,
@@ -149,6 +139,7 @@ export default function V1OutsourcingOrdersPage() {
     rows,
     setRows,
     total,
+    statusCounts,
     loading,
     keyword,
     setKeyword,
@@ -255,10 +246,6 @@ export default function V1OutsourcingOrdersPage() {
   const [printingAction, setPrintingAction] = useState('')
   const summaryRef = useRef(null)
 
-  const [columnOrder, setColumnOrder] = useState(null)
-  const [columnOrderOpen, setColumnOrderOpen] = useState(false)
-  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
-
   const canPostOutsourcingFact = hasActionPermission(
     adminProfile,
     'outsourcing.fact.post'
@@ -361,8 +348,7 @@ export default function V1OutsourcingOrdersPage() {
     openOutsourcingFactDraftEditor,
     closeOutsourcingSourceFact,
     getOutsourcingOrderItemFields,
-    loadAllOutsourcingOrderItemsForPreview,
-    outsourcingOrderItemsPreview,
+    loadOutsourcingOrderDetailsItems,
     submitOutsourcingSourceFact,
   } = useOutsourcingSourceFacts({
     canReadOutsourcingFacts,
@@ -379,9 +365,6 @@ export default function V1OutsourcingOrdersPage() {
     canCreateMaterialIssue,
     canCreateReturnReceipt,
     unitOptions,
-    rows,
-    canRead,
-    onOpenDetails: openOutsourcingOrderDetails,
   })
 
   const {
@@ -397,7 +380,6 @@ export default function V1OutsourcingOrdersPage() {
     loadOrderItems,
     setSaving,
     activeCustomerKey,
-    outsourcingOrderItemsPreview,
     setRows,
     setSelectedRow,
     loadOrders,
@@ -559,35 +541,6 @@ export default function V1OutsourcingOrdersPage() {
       )}`
     : '请先选择一份加工合同'
 
-  const persistColumnOrder = useCallback(
-    async (nextOrder, columnsForOrder) => {
-      const sanitizedOrder = sanitizeModuleColumnOrder(
-        nextOrder,
-        columnsForOrder
-      )
-      setColumnOrder(sanitizedOrder)
-      writeStoredColumnOrder(OUTSOURCING_ORDERS_MODULE_KEY, sanitizedOrder)
-      setColumnOrderSaving(true)
-      try {
-        const erpPreferences = await setERPColumnOrder({
-          module_key: OUTSOURCING_ORDERS_MODULE_KEY,
-          order: sanitizedOrder,
-        })
-        outletContext?.updateAdminERPPreferences?.(erpPreferences)
-        message.success(
-          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
-        )
-      } catch (error) {
-        message.warning(
-          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
-        )
-      } finally {
-        setColumnOrderSaving(false)
-      }
-    },
-    [outletContext]
-  )
-
   const dataColumns = useMemo(
     () => buildOutsourcingOrderColumns({ resolveSupplierName }),
     [resolveSupplierName]
@@ -653,45 +606,17 @@ export default function V1OutsourcingOrdersPage() {
     [dataColumns]
   )
 
-  const preferredColumnOrder = useMemo(
-    () =>
-      getPreferredColumnOrder({
-        adminProfile,
-        moduleKey: OUTSOURCING_ORDERS_MODULE_KEY,
-        columns: dataColumns,
-        localOrder: columnOrder,
-      }),
-    [adminProfile, columnOrder, dataColumns]
-  )
-
-  const visibleDataColumns = useMemo(
-    () => applyModuleColumnOrder(dataColumns, preferredColumnOrder),
-    [dataColumns, preferredColumnOrder]
-  )
-
-  const columns = useMemo(
-    () =>
-      visibleDataColumns.map((column) => ({
-        ...column,
-        title: (
-          <ColumnOrderHeaderMenu
-            column={column}
-            columns={dataColumns}
-            order={preferredColumnOrder}
-            saving={columnOrderSaving}
-            onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-            onOpenPanel={() => setColumnOrderOpen(true)}
-          />
-        ),
-      })),
-    [
-      columnOrderSaving,
-      dataColumns,
-      persistColumnOrder,
-      preferredColumnOrder,
-      visibleDataColumns,
-    ]
-  )
+  const {
+    tableColumns: columns,
+    exportColumns: visibleDataColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: OUTSOURCING_ORDERS_MODULE_KEY,
+    moduleTitle: '加工合同列表',
+    columns: dataColumns,
+  })
 
   const { exporting, exportRows: exportOrders } = useBusinessListExport({
     requestKey: 'outsourcing-orders-export',
@@ -751,19 +676,21 @@ export default function V1OutsourcingOrdersPage() {
 
   return (
     <BusinessPageLayout className="erp-v1-outsourcing-orders-page">
-      <Tabs
-        activeKey={searchParams.get('view') === 'items' ? 'items' : 'contracts'}
-        items={[
-          { key: 'contracts', label: '加工合同' },
-          ...(canRead ? [{ key: 'items', label: '加工明细' }] : []),
-        ]}
-        onChange={(view) => {
-          const next = new URLSearchParams(searchParams)
-          if (view === 'items') next.set('view', 'items')
-          else next.delete('view')
-          setSearchParams(next, { replace: true })
-        }}
-      />
+      <div className="erp-business-page-navigation">
+        <Tabs
+          activeKey={searchParams.get('view') === 'items' ? 'items' : 'contracts'}
+          items={[
+            { key: 'contracts', label: '加工合同' },
+            ...(canRead ? [{ key: 'items', label: '加工明细' }] : []),
+          ]}
+          onChange={(view) => {
+            const next = new URLSearchParams(searchParams)
+            if (view === 'items') next.set('view', 'items')
+            else next.delete('view')
+            setSearchParams(next, { replace: true })
+          }}
+        />
+      </div>
       {summaryVisible ? (
         <OutsourcingOrderSummaryPanel
           ref={summaryRef}
@@ -851,7 +778,14 @@ export default function V1OutsourcingOrdersPage() {
                     setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
                   }}
                 />
-                <SelectFilter
+                <BusinessStatusFilter
+                  inline
+                  aria-label="委外订单状态"
+                  counts={statusCounts}
+                  loading={loading}
+                  exact={Boolean(
+                    routeOutsourcingOrderID || routeOutsourcingFactID
+                  )}
                   className="erp-business-filter-control--status"
                   value={statusFilter}
                   options={lifecycleStatusOptions}
@@ -916,9 +850,9 @@ export default function V1OutsourcingOrdersPage() {
                 </ToolbarButton>
                 <ToolbarButton
                   icon={<SettingOutlined />}
-                  onClick={() => setColumnOrderOpen(true)}
+                  onClick={openColumnOrder}
                 >
-                  列顺序
+                  列设置
                 </ToolbarButton>
               </Space>
             }
@@ -1122,6 +1056,7 @@ export default function V1OutsourcingOrdersPage() {
                   onAction={runLifecycleAction}
                 />
               ))}
+              <BusinessTaskActions sourceType="outsourcing_order" record={selectedRow} adminProfile={adminProfile} disabled={saving} />
             </SelectionActionBar>
           </BusinessOperationPanel>
 
@@ -1130,7 +1065,6 @@ export default function V1OutsourcingOrdersPage() {
             columns={columns}
             dataSource={rows}
             loading={loading}
-            expandable={outsourcingOrderItemsPreview.expandable}
             rowSelection={{
               type: 'radio',
               selectedRowKeys: selectedRow ? [selectedRow.id] : [],
@@ -1170,7 +1104,7 @@ export default function V1OutsourcingOrdersPage() {
                 getItemFields: getOutsourcingOrderItemFields,
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
-                load: loadAllOutsourcingOrderItemsForPreview,
+                load: loadOutsourcingOrderDetailsItems,
                 title: '加工合同明细',
               }
             : null
@@ -1285,15 +1219,7 @@ export default function V1OutsourcingOrdersPage() {
         }
       />
 
-      <ColumnOrderModal
-        open={columnOrderOpen}
-        columns={dataColumns}
-        order={preferredColumnOrder}
-        saving={columnOrderSaving}
-        moduleTitle="委外订单列表"
-        onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-        onClose={() => setColumnOrderOpen(false)}
-      />
+      {columnOrderModal}
 
       <BusinessLineItemOrderModal
         description="保存后只调整当前加工合同的明细展示顺序，不修改产品或材料、数量、价格或稳定行号。"
@@ -1338,6 +1264,7 @@ export default function V1OutsourcingOrdersPage() {
           onUnitChange={handleUnitChange}
           attachmentPanel={
             <BusinessAttachmentPanel
+              compact
               ref={orderAttachmentRef}
               ownerType="outsourcing_order"
               ownerId={editingRow?.id}

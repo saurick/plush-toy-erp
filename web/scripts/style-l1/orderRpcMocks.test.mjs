@@ -151,6 +151,7 @@ test('purchase order mocks preserve filters, total and requested slices', async 
 test('production order list mock accepts the current page filters and returns its fixture', async () => {
   const call = await orderMockHarness('**/rpc/production_order')
   const response = await call('list_production_orders', {
+    include_status_counts: true,
     keyword: '',
     status: '',
     lifecycle_scope: 'current',
@@ -168,6 +169,11 @@ test('production order list mock accepts the current page filters and returns it
     response.result.data.production_orders[0].order_no,
     'MO-STYLE-L1-20260713'
   )
+  assert.deepEqual(response.result.data.status_counts, { DRAFT: 1 })
+  const invalid = await call('list_production_orders', {
+    include_status_counts: 'true',
+  })
+  assert.notEqual(invalid.result.code, 0)
 })
 
 test('production WIP mock always returns the nullable finished-goods rework lineage contract', async () => {

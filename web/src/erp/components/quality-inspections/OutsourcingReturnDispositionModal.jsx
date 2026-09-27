@@ -1,6 +1,11 @@
 import { RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Select, Space, Tag } from 'antd'
+import {
+  unitQuantityRule,
+  unitPrecisionFromOptions,
+} from '../../utils/unitQuantity.mjs'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
@@ -29,6 +34,7 @@ export default function OutsourcingReturnDispositionModal({
   onChanged,
 }) {
   const [form] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open && !!fact?.unit_id)
   const [rows, setRows] = useState([])
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -269,7 +275,16 @@ export default function OutsourcingReturnDispositionModal({
               <Form.Item
                 name="quantity"
                 label="处置数量"
-                rules={[{ required: true }]}
+                rules={[
+                  unitQuantityRule(
+                    inspection?.unit_precision ??
+                      unitPrecisionFromOptions(
+                        quantityUnitOptions,
+                        fact?.unit_id
+                      )
+                  ),
+                  { required: true },
+                ]}
               >
                 <Input inputMode="decimal" />
               </Form.Item>

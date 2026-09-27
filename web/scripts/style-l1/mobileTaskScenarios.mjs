@@ -255,7 +255,7 @@ export function createMobileTaskScenarios({
             `搜索表单不应绘制第二层 outline：${JSON.stringify(focusStyle)}`
           )
           assert(
-            focusStyle.wrapperHeight >= 44 && focusStyle.wrapperHeight <= 48,
+            focusStyle.wrapperHeight >= 42 && focusStyle.wrapperHeight <= 44,
             `搜索框高度应保持在移动端可触控的紧凑范围：${JSON.stringify(
               focusStyle
             )}`
@@ -417,21 +417,10 @@ export function createMobileTaskScenarios({
           path: path.join(outputDir, 'mobile-task-search-product-image.png'),
           fullPage: true,
         })
-        const copyStyle = rows
-          .first()
-          .getByRole('button', { name: '复制产品编号', exact: true })
-        await assertTaskCopy(page, copyStyle, 'PRODUCT-7')
-        await assertTaskCopy(
-          page,
-          rows
-            .first()
-            .getByRole('button', { name: '复制单据编号', exact: true }),
-          'SO-IMAGE-0'
-        )
-        const copySize = await copyStyle.boundingBox()
-        assert.ok(
-          copySize.width >= 44 && copySize.height >= 44,
-          '手机复制按钮点击范围至少 44px'
+        assert.equal(
+          await rows.first().getByRole('button', { name: /复制/ }).count(),
+          0,
+          '任务卡只保留扫描和进入动作，完整复制入口在详情中'
         )
         await clickTaskCardContent(
           rows.first(),
@@ -441,6 +430,26 @@ export function createMobileTaskScenarios({
           .getByTestId('mobile-task-detail-screen')
           .waitFor({ state: 'visible' })
         const copyDetail = page.getByTestId('mobile-task-detail-screen')
+        await copyDetail.screenshot({
+          path: path.join(outputDir, 'mobile-task-product-detail.png'),
+        })
+        await copyDetail.getByText('查看产品与来源', { exact: true }).click()
+        const copyStyle = copyDetail
+          .getByRole('button', { name: '复制产品编号', exact: true })
+          .first()
+        await assertTaskCopy(page, copyStyle, 'PRODUCT-7')
+        await assertTaskCopy(
+          page,
+          copyDetail
+            .getByRole('button', { name: '复制单据编号', exact: true })
+            .first(),
+          'SO-IMAGE-0'
+        )
+        const copySize = await copyStyle.boundingBox()
+        assert.ok(
+          copySize.width >= 44 && copySize.height >= 44,
+          '详情复制按钮保持可触控范围'
+        )
         await assertTaskCopy(
           page,
           copyDetail.getByRole('button', { name: '复制产品信息', exact: true }),
@@ -457,6 +466,7 @@ export function createMobileTaskScenarios({
         )
         await page
           .getByRole('button', { name: '查看图片识别模拟产品大图' })
+          .first()
           .click()
         await page.waitForFunction(
           () =>
@@ -484,7 +494,7 @@ export function createMobileTaskScenarios({
         await search.fill('不应触发的搜索')
         await clickTaskCardContent(
           rows.first(),
-          rows.first().locator('.mobile-task-list-row__head')
+          rows.first().locator('.erp-task-identity__heading')
         )
         await page
           .getByTestId('mobile-task-detail-screen')
@@ -560,8 +570,8 @@ export function createMobileTaskScenarios({
           assert.equal((await frame.innerText()).trim(), label)
           assert.equal(await frame.locator('img, button').count(), 0)
           const geometry = await frame.boundingBox()
-          assert.equal(geometry.width, 52)
-          assert.equal(geometry.height, 52)
+          assert.equal(geometry.width, 40)
+          assert.equal(geometry.height, 40)
           if (state === 'empty') {
             assert.equal(
               page.__imageReads.length,
@@ -574,8 +584,10 @@ export function createMobileTaskScenarios({
             'mobile-task-detail-screen'
           )
           await placeholderDetail.waitFor({ state: 'visible' })
+          await placeholderDetail.getByText('查看产品与来源', { exact: true }).click()
           await placeholderDetail
             .locator(`.erp-task-product-image[data-image-state="${state}"]`)
+            .first()
             .waitFor({ state: 'visible' })
           assert.equal(
             await placeholderDetail
@@ -602,20 +614,22 @@ export function createMobileTaskScenarios({
             .count(),
           0
         )
-        await assertTaskCopy(
-          page,
-          materialCard.getByRole('button', {
-            name: '复制款号',
-            exact: true,
-          }),
-          '示例织造AB-001#-02#米白'
-        )
         await clickTaskCardContent(
           materialCard,
           materialCard.locator('.erp-task-product-image')
         )
         const materialDetail = page.getByTestId('mobile-task-detail-screen')
         await materialDetail.waitFor({ state: 'visible' })
+        await materialDetail.getByText('查看产品与来源', { exact: true }).click()
+        await assertTaskCopy(
+          page,
+          materialDetail.getByRole('button', {
+            name: '复制款号',
+            exact: true,
+          }),
+          '示例织造AB-001#-02#米白'
+        )
+
         await assertTaskCopy(
           page,
           materialDetail.getByRole('button', {
@@ -1045,13 +1059,8 @@ export function createMobileTaskScenarios({
             })
             await assertFilterAffordance(
               page.locator('.mobile-role-task-filter'),
-              44
+              34
             )
-            const expectedFilterWidth =
-              (filterMetrics.tabsClientWidth -
-                filterMetrics.padding -
-                2 * filterMetrics.gap) /
-              3
             assert(
               JSON.stringify(filterMetrics.labels) ===
                 JSON.stringify(['全部', '风险', '超时']) &&
@@ -1065,9 +1074,10 @@ export function createMobileTaskScenarios({
                 filterMetrics.tabsScrollWidth <=
                   filterMetrics.tabsClientWidth + 1 &&
                 filterMetrics.widths.every(
-                  (width) => Math.abs(width - expectedFilterWidth) <= 1.5
+                  (width) =>
+                    width >= 44 && width < filterMetrics.tabsClientWidth / 2
                 ),
-              `无审批权限的 430px 岗位页应首屏显示全部 / 风险 / 超时三项服务端总数并保持等宽: ${JSON.stringify(
+              `无审批权限的 430px 岗位页应首屏显示全部 / 风险 / 超时三项服务端总数，使用内容宽度的紧凑筛选胶囊: ${JSON.stringify(
                 filterMetrics
               )}`
             )
@@ -1154,6 +1164,7 @@ export function createMobileTaskScenarios({
             roleTaskCard.getByText(role.taskName, { exact: true })
           )
           await expectText(page, role.taskName)
+          await page.getByText('查看产品与来源', { exact: true }).click()
           const identity = page.locator('[aria-label="任务关联内容"]')
           await expectText(
             identity,
@@ -1253,14 +1264,14 @@ export function createMobileTaskScenarios({
             const card = screen.querySelector(
               '[data-testid="mobile-task-action-options"]'
             )
-            const heading = card?.querySelector('h2')
+            const heading = card?.querySelector('h3')
             const cardRect = card?.getBoundingClientRect()
             const headingRect = heading?.getBoundingClientRect()
             return {
               actions: Array.from(
                 screen.querySelectorAll('label[data-action-key]')
               ).map((choice) => ({
-                text: choice.textContent?.replace(/\s+/g, ' ').trim() || '',
+                text: choice.querySelector('strong')?.textContent?.replace(/\s+/g, ' ').trim() || '',
                 disabled:
                   choice.querySelector('input[type="radio"]')?.disabled ?? true,
                 selected:
@@ -1273,11 +1284,11 @@ export function createMobileTaskScenarios({
               ).length,
               cardContainsHeading: Boolean(
                 cardRect &&
-                  headingRect &&
-                  headingRect.top >= cardRect.top - 1 &&
-                  headingRect.bottom <= cardRect.bottom + 1 &&
-                  headingRect.left >= cardRect.left - 1 &&
-                  headingRect.right <= cardRect.right + 1
+                headingRect &&
+                headingRect.top >= cardRect.top - 1 &&
+                headingRect.bottom <= cardRect.bottom + 1 &&
+                headingRect.left >= cardRect.left - 1 &&
+                headingRect.right <= cardRect.right + 1
               ),
               cardOverflowX:
                 card instanceof HTMLElement
@@ -1289,11 +1300,11 @@ export function createMobileTaskScenarios({
           })
           assert(
             actionMetrics.actions.some(
-              (action) => action.text === '阻塞' && !action.disabled
+              (action) => action.text === '标记阻塞' && !action.disabled
             ) &&
               actionMetrics.actions.some(
                 (action) =>
-                  action.text === '完成' && !action.disabled && action.selected
+                  action.text === '完成本岗' && !action.disabled && action.selected
               ) &&
               actionMetrics.radiogroupCount === 1 &&
               actionMetrics.fakeActionButtonCount === 0 &&
@@ -1441,9 +1452,9 @@ export function createMobileTaskScenarios({
             mobileTrajectoryMetrics430.mainOverflow <= 1 &&
             mobileTrajectoryMetrics430.eventOverflow <= 1 &&
             mobileTrajectoryMetrics430.eventItemCount === 1 &&
-            mobileTrajectoryMetrics430.summaryText.includes('负责：工程') &&
-            mobileTrajectoryMetrics430.timingText.includes('进入本岗') &&
-            mobileTrajectoryMetrics430.timingText.includes('处理截止') &&
+            mobileTrajectoryMetrics430.summaryText.includes('负责岗位工程') &&
+            mobileTrajectoryMetrics430.summaryText.includes('截止时间未设置截止') &&
+            mobileTrajectoryMetrics430.timingText === '' &&
             mobileTrajectoryMetrics430.optionalBusinessInformationCount === 0 &&
             mobileTrajectoryMetrics430.optionalRelatedDocumentsCount === 0 &&
             mobileTrajectoryMetrics430.ordered,
@@ -1478,9 +1489,9 @@ export function createMobileTaskScenarios({
             mobileTrajectoryMetrics390.mainOverflow <= 1 &&
             mobileTrajectoryMetrics390.eventOverflow <= 1 &&
             mobileTrajectoryMetrics390.eventItemCount === 1 &&
-            mobileTrajectoryMetrics390.summaryText.includes('负责：工程') &&
-            mobileTrajectoryMetrics390.timingText.includes('进入本岗') &&
-            mobileTrajectoryMetrics390.timingText.includes('处理截止') &&
+            mobileTrajectoryMetrics390.summaryText.includes('负责岗位工程') &&
+            mobileTrajectoryMetrics390.summaryText.includes('截止时间未设置截止') &&
+            mobileTrajectoryMetrics390.timingText === '' &&
             mobileTrajectoryMetrics390.optionalBusinessInformationCount === 0 &&
             mobileTrajectoryMetrics390.optionalRelatedDocumentsCount === 0 &&
             mobileTrajectoryMetrics390.ordered,
@@ -2000,7 +2011,7 @@ export function createMobileTaskScenarios({
           undefined,
           { timeout: 10_000 }
         )
-        await expectText(page, '本次操作')
+        await expectText(page, '本次可执行操作')
         await expectText(page, '催办原因')
         assert.equal(
           await actionScreen.getByLabel('现场证据').count(),
@@ -2042,7 +2053,7 @@ export function createMobileTaskScenarios({
           const summary = screen.querySelector(
             '[data-testid="mobile-task-single-action-summary"]'
           )
-          const heading = card?.querySelector('h2')
+          const heading = card?.querySelector('h3')
           const submit = screen.querySelector('button[type="submit"]')
           const cardRect = card?.getBoundingClientRect()
           const summaryRect = summary?.getBoundingClientRect()
@@ -2051,11 +2062,11 @@ export function createMobileTaskScenarios({
           const contained = (outer, inner) =>
             Boolean(
               outer &&
-                inner &&
-                inner.top >= outer.top - 1 &&
-                inner.bottom <= outer.bottom + 1 &&
-                inner.left >= outer.left - 1 &&
-                inner.right <= outer.right + 1
+              inner &&
+              inner.top >= outer.top - 1 &&
+              inner.bottom <= outer.bottom + 1 &&
+              inner.left >= outer.left - 1 &&
+              inner.right <= outer.right + 1
             )
           return {
             actionOptionsCount: screen.querySelectorAll(
@@ -2083,7 +2094,7 @@ export function createMobileTaskScenarios({
         })
         assert(
           singleActionMetrics.actionOptionsCount === 0 &&
-            singleActionMetrics.headingText === '本次操作' &&
+            singleActionMetrics.headingText === '本次可执行操作' &&
             singleActionMetrics.summaryText.includes('催办') &&
             singleActionMetrics.cardContainsHeading &&
             singleActionMetrics.cardContainsSummary &&
@@ -2093,7 +2104,7 @@ export function createMobileTaskScenarios({
             singleActionMetrics.submitText === '确认催办' &&
             singleActionMetrics.submitType === 'submit' &&
             !singleActionMetrics.submitDisabled &&
-            singleActionMetrics.submitHeight >= 48,
+            singleActionMetrics.submitHeight >= 44,
           `仅催办处理页的语义或布局异常: ${JSON.stringify(singleActionMetrics)}`
         )
         await actionScreen.screenshot({
@@ -2111,11 +2122,11 @@ export function createMobileTaskScenarios({
         })
         await assertThemeReadable(page, {
           scenarioName: 'mobile-yoyo-boss-urge-only-dark',
-          selector: '[data-testid="mobile-task-single-action"]',
+          selector: '.mobile-task-action-form',
         })
         await assertDarkThemeContrast(page, {
           scenarioName: 'mobile-yoyo-boss-urge-only-dark',
-          selector: '[data-testid="mobile-task-single-action"]',
+          selector: '.mobile-task-action-form',
           minRatio: 4.5,
         })
         const darkSubmitMetrics = await actionScreen
@@ -2129,6 +2140,9 @@ export function createMobileTaskScenarios({
             const textRect = textElement?.getBoundingClientRect() || null
             return {
               actionScreenWidth: screenRect?.width || 0,
+              returnLabel: button.previousElementSibling?.textContent.trim(),
+              returnWidth:
+                button.previousElementSibling?.getBoundingClientRect().width || 0,
               buttonRect: {
                 bottom: buttonRect.bottom,
                 left: buttonRect.left,
@@ -2154,8 +2168,10 @@ export function createMobileTaskScenarios({
           })
         assert(
           darkSubmitMetrics.text === '确认催办' &&
+            darkSubmitMetrics.returnLabel === '返回任务' &&
+            darkSubmitMetrics.returnWidth >= 70 &&
             darkSubmitMetrics.buttonRect.width >=
-              darkSubmitMetrics.actionScreenWidth - 24 - 1 &&
+              darkSubmitMetrics.actionScreenWidth * 0.65 &&
             darkSubmitMetrics.scrollWidth <= darkSubmitMetrics.clientWidth &&
             darkSubmitMetrics.scrollHeight <= darkSubmitMetrics.clientHeight &&
             darkSubmitMetrics.textRect?.width >= 56 &&
@@ -2395,21 +2411,26 @@ export function createMobileTaskScenarios({
           'effective-session 只读详情的处理步骤应保持锁定'
         )
         const factGridMetrics = await page.evaluate(() => {
-          const grid = document.querySelector('.mobile-role-detail-fact-grid')
+          const grid = document.querySelector(
+            '[data-testid="mobile-task-detail-screen"] [aria-label="业务信息"] .mobile-detail-facts'
+          )
           const rows = Array.from(
-            grid?.querySelectorAll('.mobile-role-detail-fact-row') || []
+            grid?.querySelectorAll('.mobile-detail-fact') || []
           )
           const gridRect = grid?.getBoundingClientRect()
-          const lastRowRect = rows.at(-1)?.getBoundingClientRect()
           return {
-            rowCount: rows.length,
+            businessRowCount: rows.filter(
+              (row) => !row.hasAttribute('data-task-time')
+            ).length,
             gridWidth: gridRect?.width || 0,
-            lastRowWidth: lastRowRect?.width || 0,
+            rowWidths: rows.map((row) => row.getBoundingClientRect().width),
           }
         })
         assert(
-          factGridMetrics.rowCount === 1 &&
-            factGridMetrics.lastRowWidth >= factGridMetrics.gridWidth - 2,
+          factGridMetrics.businessRowCount === 1 &&
+            factGridMetrics.rowWidths.every(
+              (width) => width >= factGridMetrics.gridWidth - 2
+            ),
           `只读详情的单个业务字段不应留下半格空白: ${JSON.stringify(factGridMetrics)}`
         )
         await page.screenshot({
@@ -2419,6 +2440,113 @@ export function createMobileTaskScenarios({
           ),
           fullPage: true,
         })
+      },
+    },
+    {
+      name: 'mobile-task-resume-receipt',
+      path: '/m/boss/tasks',
+      auth: 'admin',
+      themeMode: 'light',
+      viewport: { width: 393, height: 852 },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        configRevision: 'style-l1-mobile-resume-receipt',
+        actions: [
+          'mobile.boss.access',
+          'workflow.task.read',
+          'workflow.task.update',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['boss'],
+          'workflow.task.update': ['boss'],
+        },
+      },
+      adminProfile: {
+        username: 'style-l1-mobile-resume',
+        is_super_admin: false,
+        roles: [{ role_key: 'boss', name: '老板' }],
+        permissions: [
+          'mobile.boss.access',
+          'workflow.task.read',
+          'workflow.task.update',
+        ],
+        menus: [],
+      },
+      workflowTaskFixtures: [
+        {
+          id: 9471,
+          task_code: 'STYLE-L1-MOBILE-RESUME',
+          task_group: 'project-orders',
+          task_name: '确认重点订单排期',
+          source_type: 'project-orders',
+          source_id: 9471,
+          source_no: 'SO-20260927-006',
+          task_status_key: 'blocked',
+          owner_role_key: 'boss',
+          required_capability_key: 'workflow.task.approve',
+          created_at: 1790085600,
+          version: 1,
+          payload: { product_name: '云朵小熊', blocked_reason: '排期待核对' },
+        },
+      ],
+      verify: async (page) => {
+        const previousAppearance = await page.evaluate(() => {
+          const previous = localStorage.getItem('plush_erp_appearance')
+          localStorage.setItem(
+            'plush_erp_appearance',
+            JSON.stringify({ accent: 'pink', density: 'standard' })
+          )
+          return previous
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        const row = page
+          .locator('.erp-mobile-list-item')
+          .filter({ hasText: '确认重点订单排期' })
+        await clickTaskCardContent(
+          row,
+          row.getByText('确认重点订单排期', { exact: true })
+        )
+        await page.getByRole('button', { name: '处理任务', exact: true }).click()
+        const action = page.getByTestId('mobile-task-action-screen')
+        await action.getByRole('radio', { name: '解除阻塞', exact: true }).check()
+        const reason = action.getByRole('textbox', { name: /阻塞解除说明/ })
+        await reason.fill('排期已核对，继续由老板岗位确认订单。')
+        await action.getByRole('button', { name: '返回任务', exact: true }).click()
+        await page.getByRole('button', { name: '处理任务', exact: true }).click()
+        assert.equal(
+          await reason.inputValue(),
+          '排期已核对，继续由老板岗位确认订单。',
+          '底部返回任务后再次进入，应保留解除阻塞说明'
+        )
+        await action.screenshot({
+          path: path.join(outputDir, 'mobile-resume-action-pink-393.png'),
+        })
+        await action.getByRole('button', { name: '确认解除阻塞', exact: true }).click()
+        const receipt = page.getByTestId('mobile-task-receipt-screen')
+        await expectText(receipt, '任务办理已确认')
+        await assertTextAbsent(receipt, '审批办理已确认')
+        await expectText(receipt.locator('.mobile-task-flow-status'), '可执行')
+        await expectText(receipt.locator('.mobile-detail-facts'), '解除阻塞')
+        await expectText(receipt.locator('.mobile-detail-facts'), '排期已核对，继续由老板岗位确认订单。')
+        assert.equal(
+          await page.locator('.ant-message-notice').count(),
+          0,
+          '成功回执已经反馈办理结果，不应再弹浮层遮住页标题'
+        )
+        await receipt.screenshot({
+          path: path.join(outputDir, 'mobile-resume-receipt-pink-393.png'),
+        })
+        await receipt
+          .locator('.mobile-role-action-bar')
+          .getByRole('button', { name: '返回任务列表', exact: true })
+          .click()
+        await expectText(page, '确认重点订单排期')
+        await page.evaluate((previous) => {
+          if (previous === null) localStorage.removeItem('plush_erp_appearance')
+          else localStorage.setItem('plush_erp_appearance', previous)
+        }, previousAppearance)
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectText(page, '确认重点订单排期')
       },
     },
     {
@@ -2518,28 +2646,30 @@ export function createMobileTaskScenarios({
             return mutationPayload.result.data?.task || null
           }
 
-          await Promise.all(
-            Array.from({ length: 30 }, (_, index) =>
-              createTask({
-                task_code: `STYLE-L1-MOBILE-SPARSE-OVERDUE-${String(index + 1).padStart(2, '0')}`,
-                task_group: 'project-orders',
-                task_name: `稀疏超时任务 ${index + 1}`,
-                source_type: 'project-orders',
-                source_id: 9050 + index,
-                source_no: `STYLE-L1-SPARSE-OVERDUE-${String(index + 1).padStart(2, '0')}`,
-                business_status_key: 'project_pending',
-                task_status_key: 'ready',
-                owner_role_key: 'sales',
-                priority: 1,
-                due_at: 1780272000,
-                payload: {
-                  customer_name: `稀疏超时客户 ${index + 1}`,
-                  style_no: `SPARSE-OVERDUE-${index + 1}`,
-                  due_date: '2026-06-01',
-                },
-              })
-            )
+          const sparseOverdueTasks = Array.from(
+            { length: 30 },
+            (_, index) => ({
+              task_code: `STYLE-L1-MOBILE-SPARSE-OVERDUE-${String(index + 1).padStart(2, '0')}`,
+              task_group: 'project-orders',
+              task_name: `稀疏超时任务 ${index + 1}`,
+              source_type: 'project-orders',
+              source_id: 9050 + index,
+              source_no: `STYLE-L1-SPARSE-OVERDUE-${String(index + 1).padStart(2, '0')}`,
+              business_status_key: 'project_pending',
+              task_status_key: 'ready',
+              owner_role_key: 'sales',
+              priority: 1,
+              due_at: 1780272000,
+              payload: {
+                customer_name: `稀疏超时客户 ${index + 1}`,
+                style_no: `SPARSE-OVERDUE-${index + 1}`,
+                due_date: '2026-06-01',
+              },
+            })
           )
+          // 深分页目标先创建，保证默认倒序中需要滚动才能到达。
+          await createTask(sparseOverdueTasks.at(-1))
+          await Promise.all(sparseOverdueTasks.slice(0, -1).map(createTask))
 
           const bulkTasks = [
             ...Array.from({ length: 30 }, (_, index) => ({
@@ -2987,7 +3117,7 @@ export function createMobileTaskScenarios({
           .first()
         await clickTaskCardContent(
           blockedTaskItem,
-          blockedTaskItem.locator('.mobile-task-list-row__head')
+          blockedTaskItem.locator('.erp-task-identity__heading')
         )
         await page
           .getByTestId('mobile-task-detail-screen')
@@ -3109,7 +3239,7 @@ export function createMobileTaskScenarios({
         })
         await assertThemeReadable(page, {
           scenarioName: 'mobile-tasks-dark',
-          selector: '.mobile-app-layout .surface-panel',
+          selector: '.mobile-role-tasks-page--tabs',
         })
         await assertThemeReadable(page, {
           scenarioName: 'mobile-tasks-dark',

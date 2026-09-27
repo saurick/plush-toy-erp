@@ -8,9 +8,10 @@ import React, {
   useState,
 } from 'react'
 import { Alert, Button, Space, Tag } from 'antd'
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DownloadOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import useLiveSearch from '@/common/hooks/useLiveSearch'
 import {
   listOutsourcingOrderSummary,
   listAllOutsourcingOrderSummary,
@@ -50,14 +51,16 @@ export default forwardRef((
   const [params, setParams] = useSearchParams()
   const filters = useMemo(() => readOutsourcingSummaryFilters(params), [params])
   const requestKey = JSON.stringify(filters)
-  const [draftKeyword, setDraftKeyword] = useState(filters.keyword)
   const [result, setResult] = useState({ items: [], total: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const requestRef = useRef(null)
   const update = (values) =>
     setParams(updateOutsourcingSummarySearch(params, values), { replace: true })
-  useEffect(() => setDraftKeyword(filters.keyword), [filters.keyword])
+  const search = useLiveSearch({
+    value: filters.keyword,
+    onSearch: (keyword) => update({ q: keyword }),
+  })
 
   const loadRows = useCallback(async () => {
     requestRef.current?.abort()
@@ -255,12 +258,11 @@ export default forwardRef((
               placeholder="合同、产品订单、产品或加工项目"
               allowClear
               maxLength={100}
-              value={draftKeyword}
-              onChange={(event) => {
-                setDraftKeyword(event.target.value)
-                if (!event.target.value) update({ q: '' })
-              }}
-              onPressEnter={() => update({ q: draftKeyword.trim() })}
+              value={search.value}
+              onChange={search.onChange}
+              onCompositionStart={search.onCompositionStart}
+              onCompositionEnd={search.onCompositionEnd}
+              onPressEnter={search.onPressEnter}
             />
             <SelectFilter
               aria-label="明细加工厂"
@@ -316,13 +318,6 @@ export default forwardRef((
         }
         actions={
           <Space wrap>
-            <Button
-              icon={<ReloadOutlined aria-hidden="true" />}
-              loading={loading}
-              onClick={loadRows}
-            >
-              刷新明细
-            </Button>
             <Button
               icon={<DownloadOutlined aria-hidden="true" />}
               loading={exporting}

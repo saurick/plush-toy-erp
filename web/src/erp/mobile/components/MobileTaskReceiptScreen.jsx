@@ -1,15 +1,15 @@
 import React from 'react'
 import {
-  CheckCircleFilled,
+  CheckOutlined,
   ClockCircleOutlined,
-  CloseCircleFilled,
+  CloseOutlined,
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
-import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
 import {
   normalizeMobileTaskActionKey,
+  getTaskSeverityView,
   resolveMobileActionDisplayLabel,
   resolveMobileTaskStatusLabel,
   resolveTaskSourceLabel,
@@ -27,10 +27,10 @@ const MOBILE_TASK_RECEIPT_OUTCOMES = Object.freeze({
 
 const OUTCOME_META = Object.freeze({
   [MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED]: {
-    icon: CheckCircleFilled,
+    icon: CheckOutlined,
     iconClass: 'bg-emerald-50 text-emerald-600',
     title: '任务办理已确认',
-    description: '本次办理结果已记录；最新状态可返回列表刷新核对。',
+    description: '本次办理结果已记录，可返回列表继续处理其他任务。',
   },
   [MOBILE_TASK_RECEIPT_OUTCOMES.UNKNOWN]: {
     icon: ClockCircleOutlined,
@@ -40,14 +40,14 @@ const OUTCOME_META = Object.freeze({
       '系统尚未确认本次提交是否生效，请先重新确认结果，避免重复办理。',
   },
   [MOBILE_TASK_RECEIPT_OUTCOMES.FAILED]: {
-    icon: CloseCircleFilled,
+    icon: CloseOutlined,
     iconClass: 'bg-red-50 text-red-600',
     title: '本次操作未完成',
     description: '任务状态没有得到确认。您可以查看任务并重新办理。',
   },
 })
 
-function resolveReceiptActionLabel({ action, outcome, task }) {
+function resolveReceiptAction({ action, outcome, task }) {
   const candidate =
     outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
       ? task?.mobile_action || action
@@ -56,11 +56,14 @@ function resolveReceiptActionLabel({ action, outcome, task }) {
     typeof candidate === 'string' ? candidate : candidate?.action_key
   )
   if (isWorkflowApprovalTask(task) && candidateActionKey === 'done') {
-    return '审批通过'
+    return { key: candidateActionKey, label: '审批通过' }
   }
-  return candidate
-    ? resolveMobileActionDisplayLabel(candidate)
-    : '办理信息暂不可用'
+  return {
+    key: candidateActionKey,
+    label: candidate
+      ? resolveMobileActionDisplayLabel(candidate)
+      : '办理信息暂不可用',
+  }
 }
 
 export default function MobileTaskReceiptScreen({
@@ -89,13 +92,20 @@ export default function MobileTaskReceiptScreen({
     statusLabel ||
     (task ? resolveMobileTaskStatusLabel(task) : '任务状态暂不可用')
   const taskSource = task ? resolveTaskSourceLabel(task) : '来源信息暂不可用'
-  const actionLabel = resolveReceiptActionLabel({ action, outcome, task })
-  const approvalTask = isWorkflowApprovalTask(task)
+  const { key: actionKey, label: actionLabel } = resolveReceiptAction({
+    action,
+    outcome,
+    task,
+  })
+  const approvalAction =
+    isWorkflowApprovalTask(task) && ['done', 'rejected'].includes(actionKey)
+  const confirmed = outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
   const hasProcessAnchor = Boolean(
     task?.id && task?.process_instance_id && task?.process_node_instance_id
   )
   const canRetry =
     outcome !== MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED && onRetryConfirm
+  const canReload = Boolean(taskRecoveryError && onRetryTaskLoad)
   const [processContext, setProcessContext] = React.useState(null)
   const [processContextState, setProcessContextState] = React.useState('idle')
 
@@ -113,6 +123,7 @@ export default function MobileTaskReceiptScreen({
     setProcessContextState('loading')
     getWorkflowTaskProcessContext(task.id, { signal: controller.signal })
       .then((context) => {
+        if (controller.signal.aborted) return
         setProcessContext(context)
         setProcessContextState('ready')
       })
@@ -133,11 +144,12 @@ export default function MobileTaskReceiptScreen({
 
   return (
     <div
-      className="mobile-role-tasks-page mobile-role-tasks-page--detail surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
+      className="mobile-role-tasks-page mobile-role-tasks-page--detail md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
       aria-busy={busy}
       data-testid="mobile-task-receipt-screen"
     >
       <MobileTaskFlowHeader
+        backLabel="返回任务列表"
         busy={busy}
         canOpenProcess={typeof onOpenProcess === 'function'}
         canOpenReceipt
@@ -147,24 +159,34 @@ export default function MobileTaskReceiptScreen({
         onOpenProcess={onOpenProcess}
         processUnavailableLabel="结果已确认"
         title="结果回执"
+        trailing={
+          <span
+            className={`mobile-task-flow-status ${confirmed ? (task?.task_status_key === 'done' ? 'bg-emerald-50 text-emerald-600' : getTaskSeverityView(task || {}).badgeClass) : outcomeMeta.iconClass}`}
+            data-outcome={outcome}
+          >
+            {confirmed
+              ? taskStatus
+              : outcome === MOBILE_TASK_RECEIPT_OUTCOMES.FAILED
+                ? '未完成'
+                : '待确认'}
+          </span>
+        }
       />
 
-      <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-4">
+      <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
         <section
-          className="mobile-task-receipt-outcome erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+          className="mobile-task-receipt-outcome erp-mobile-card mobile-detail-section"
           role={
             outcome === MOBILE_TASK_RECEIPT_OUTCOMES.FAILED ? 'alert' : 'status'
           }
         >
           <span
-            className={`mobile-task-receipt-outcome__icon inline-flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${outcomeMeta.iconClass}`}
+            className={`mobile-task-receipt-outcome__icon ${outcomeMeta.iconClass}`}
           >
             <OutcomeIcon aria-hidden="true" />
           </span>
-          <h2 className="text-xl font-semibold text-slate-950">
-            {approvalTask && outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
-              ? '审批办理已确认'
-              : outcomeMeta.title}
+          <h2 className="text-base font-semibold text-slate-950">
+            {approvalAction && confirmed ? '审批办理已确认' : outcomeMeta.title}
           </h2>
           <p className="break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
             {message || outcomeMeta.description}
@@ -201,65 +223,48 @@ export default function MobileTaskReceiptScreen({
           </section>
         ) : null}
 
-        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="break-words text-lg font-semibold leading-7 text-slate-950 [overflow-wrap:anywhere]">
-            {taskName}
-          </h2>
-          <div className="mt-2">
-            <WorkflowTaskIdentity task={task} compact />
-          </div>
+        <section
+          className="erp-mobile-card mobile-detail-section"
+          aria-label="办理结果"
+        >
+          <h2>{taskName}</h2>
+          <p className="mobile-detail-identity">{taskSource}</p>
 
-          <dl className="mt-3 divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200">
-            <div className="mobile-task-receipt-row grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-3">
-              <dt className="text-sm font-medium text-slate-500">
+          <dl className="mobile-detail-facts">
+            <div className="mobile-task-receipt-row mobile-detail-fact">
+              <dt>
                 {outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
-                  ? '已确认方式'
+                  ? '办理方式'
                   : '本次办理'}
               </dt>
-              <dd className="min-w-0 break-words text-right text-base font-semibold text-slate-950 [overflow-wrap:anywhere]">
-                {actionLabel}
-              </dd>
+              <dd>{actionLabel}</dd>
             </div>
-            <div className="mobile-task-receipt-row grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-3">
-              <dt className="text-sm font-medium text-slate-500">
+            <div className="mobile-task-receipt-row mobile-detail-fact">
+              <dt>
                 {outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
-                  ? '本次确认状态'
-                  : '本次返回状态'}
+                  ? '确认状态'
+                  : '已知任务状态'}
               </dt>
-              <dd className="min-w-0 break-words text-right text-base font-semibold text-slate-950 [overflow-wrap:anywhere]">
-                {taskStatus}
-              </dd>
-            </div>
-            <div className="mobile-task-receipt-row grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-3">
-              <dt className="text-sm font-medium text-slate-500">来源</dt>
-              <dd className="min-w-0 break-words text-right text-base font-semibold text-slate-950 [overflow-wrap:anywhere]">
-                {taskSource}
-              </dd>
+              <dd>{taskStatus}</dd>
             </div>
             {String(feedback || '').trim() ? (
-              <div className="mobile-task-receipt-row mobile-task-receipt-row--long grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-3">
-                <dt className="text-sm font-medium text-slate-500">
-                  {approvalTask ? '审批意见' : '完成反馈'}
-                </dt>
-                <dd className="min-w-0 break-words text-right text-base font-semibold text-slate-950 [overflow-wrap:anywhere]">
+              <div className="mobile-task-receipt-row mobile-detail-fact">
+                <dt>{approvalAction ? '审批意见' : '办理说明'}</dt>
+                <dd className="whitespace-pre-wrap">
                   {String(feedback).trim()}
                 </dd>
               </div>
             ) : null}
             {String(reason || '').trim() ? (
-              <div className="mobile-task-receipt-row mobile-task-receipt-row--long grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-3">
-                <dt className="text-sm font-medium text-slate-500">处理说明</dt>
-                <dd className="min-w-0 break-words text-right text-base font-semibold text-slate-950 [overflow-wrap:anywhere]">
-                  {String(reason).trim()}
-                </dd>
+              <div className="mobile-task-receipt-row mobile-detail-fact">
+                <dt>办理说明</dt>
+                <dd className="whitespace-pre-wrap">{String(reason).trim()}</dd>
               </div>
             ) : null}
             {Array.isArray(evidenceRefs) && evidenceRefs.length > 0 ? (
-              <div className="mobile-task-receipt-row mobile-task-receipt-row--long grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-3">
-                <dt className="text-sm font-medium text-slate-500">
-                  历史处理线索
-                </dt>
-                <dd className="min-w-0 space-y-1 text-right text-base font-semibold text-slate-950">
+              <div className="mobile-task-receipt-row mobile-detail-fact">
+                <dt>历史处理线索</dt>
+                <dd className="space-y-1">
                   {evidenceRefs.map((reference) => (
                     <div
                       key={reference}
@@ -277,10 +282,10 @@ export default function MobileTaskReceiptScreen({
         {outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED &&
         hasProcessAnchor ? (
           <section
-            className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            className="erp-mobile-card mobile-detail-section"
             data-testid="mobile-task-receipt-handoff"
           >
-            <h2 className="text-lg font-semibold text-slate-950">
+            <h2 className="text-sm font-semibold text-slate-950">
               流程交接结果
             </h2>
             {processContextState === 'error' ? (
@@ -302,12 +307,26 @@ export default function MobileTaskReceiptScreen({
         ) : null}
       </main>
 
-      <div className="mobile-role-action-bar shrink-0 space-y-3 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
-        {taskRecoveryError && onRetryTaskLoad ? (
+      <div
+        className={`mobile-role-action-bar ${canRetry || canReload ? 'mobile-task-receipt-footer' : ''}`}
+      >
+        <button
+          type="button"
+          className={
+            canRetry || canReload
+              ? 'mobile-detail-secondary'
+              : 'mobile-detail-primary'
+          }
+          disabled={busy}
+          onClick={onBackToList}
+        >
+          {confirmed ? '返回任务列表' : '返回列表'}
+        </button>
+        {canReload ? (
           <button
             type="button"
             aria-label={taskRecoveryBusy ? '正在重新载入' : '重新载入任务'}
-            className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="mobile-detail-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
             disabled={taskRecoveryBusy}
             onClick={onRetryTaskLoad}
           >
@@ -315,11 +334,11 @@ export default function MobileTaskReceiptScreen({
             {taskRecoveryBusy ? '正在重新载入' : '重新载入任务'}
           </button>
         ) : null}
-        {canRetry ? (
+        {canRetry && !canReload ? (
           <button
             type="button"
             aria-label={busy ? '正在确认' : '重新确认结果'}
-            className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="mobile-detail-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
             disabled={busy}
             onClick={onRetryConfirm}
           >
@@ -327,14 +346,6 @@ export default function MobileTaskReceiptScreen({
             {busy ? '正在确认' : '重新确认结果'}
           </button>
         ) : null}
-        <button
-          type="button"
-          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={busy}
-          onClick={onBackToList}
-        >
-          返回列表
-        </button>
       </div>
     </div>
   )

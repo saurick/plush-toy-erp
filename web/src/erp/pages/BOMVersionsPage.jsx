@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import { Alert, Button, Form, Popconfirm, Select, Space } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import useBusinessPageState from '../hooks/useBusinessPageState'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -30,7 +31,6 @@ import {
   downloadBusinessAttachment,
   listBusinessAttachments,
 } from '../api/attachmentApi.mjs'
-import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   getProduct,
   listAllMaterials,
@@ -49,18 +49,15 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
-import {
-  ColumnOrderHeaderMenu,
-  ColumnOrderModal,
-} from '../components/business-list/ColumnOrderModal.jsx'
+import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
+import BusinessFormSection from '../components/business-list/BusinessFormSection.jsx'
 import { invalidateBOMUsageSnapshots } from '../utils/bomMaterialGroups.mjs'
 import { loadBOMPrintSnapshot } from '../utils/bomPrintSnapshot.mjs'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import BOMMaterialGroupsForm from '../components/bom/BOMMaterialGroupsForm.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
-import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import { useLineItemAppendScroll } from '../components/business-list/useLineItemAppendScroll.mjs'
 import {
   LIFECYCLE_SCOPE,
@@ -90,10 +87,6 @@ import {
   unixToDateInputValue,
 } from '../components/bom/BOMVersionForms.jsx'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
-import {
-  applyModuleColumnOrder,
-  sanitizeModuleColumnOrder,
-} from '../utils/moduleTableColumns.mjs'
 import { suggestNextBOMVersion } from '../utils/bomVersionSuggestion.mjs'
 import {
   createBusinessTablePagination,
@@ -129,46 +122,6 @@ import {
   buildMaterialDetailDraftFromBOMVersion,
   buildWorkInstructionDraftFromBOMVersion,
 } from '../data/engineeringPrintTemplates.mjs'
-
-const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
-
-function readStoredColumnOrder(moduleKey) {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(
-      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-    )
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function writeStoredColumnOrder(moduleKey, order = []) {
-  if (typeof window === 'undefined') return
-  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-  if (!Array.isArray(order) || order.length === 0) {
-    window.localStorage.removeItem(storageKey)
-    return
-  }
-  window.localStorage.setItem(storageKey, JSON.stringify(order))
-}
-
-function getPreferredColumnOrder({
-  adminProfile,
-  moduleKey,
-  columns,
-  localOrder,
-}) {
-  if (Array.isArray(localOrder)) {
-    return sanitizeModuleColumnOrder(localOrder, columns)
-  }
-  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
-  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
-  if (sanitizedAccountOrder.length > 0) return sanitizedAccountOrder
-  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
-}
 
 function normalizeBOMLineForForm(headerID, item = {}) {
   return {
@@ -268,29 +221,36 @@ export default function BOMVersionsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [printingTemplateKey, setPrintingTemplateKey] = useState('')
-  const [keyword, setKeyword] = useState(
+  const [keyword, setKeyword] = useBusinessPageState(
+    `keyword:${searchParams.get('keyword') || ''}`,
     () => searchParams.get('keyword') || ''
   )
-  const [lifecycleScope, setLifecycleScope] = useState(() =>
-    lifecycleScopeFromSearchParams(searchParams)
+  const [lifecycleScope, setLifecycleScope] = useBusinessPageState(
+    `lifecycleScope:${searchParams.get('scope') || ''}`,
+    () => lifecycleScopeFromSearchParams(searchParams)
   )
-  const [status, setStatus] = useState(() => searchParams.get('status') || '')
-  const [productID, setProductID] = useState(() => {
-    const value = Number(searchParams.get('product_id') || 0)
-    return Number.isSafeInteger(value) && value > 0 ? value : undefined
-  })
+  const [status, setStatus] = useBusinessPageState(
+    `status:${searchParams.get('status') || ''}`,
+    () => searchParams.get('status') || ''
+  )
+  const [productID, setProductID] = useBusinessPageState(
+    `productID:${searchParams.get('product_id') || ''}`,
+    () => {
+      const value = Number(searchParams.get('product_id') || 0)
+      return Number.isSafeInteger(value) && value > 0 ? value : undefined
+    }
+  )
   const [versions, setVersions] = useState([])
   const [total, setTotal] = useState(0)
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: 20,
+  })
   const [selectedVersion, setSelectedVersion] = useState(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
-  const itemsPreviewGenerationRef = useRef(0)
   const headerAttachmentRef = useRef(null)
   const importFileInputRef = useRef(null)
-  const [columnOrder, setColumnOrder] = useState(null)
-  const [columnOrderOpen, setColumnOrderOpen] = useState(false)
-  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [headerModalOpen, setHeaderModalOpen] = useState(false)
   const [headerMode, setHeaderMode] = useState('create')
   const [headerDetailsOpen, setHeaderDetailsOpen] = useState(false)
@@ -348,83 +308,6 @@ export default function BOMVersionsPage() {
     () => uniqueReferenceOptions(units, unitOption),
     [units]
   )
-  const bomItemsPreview = useBusinessRowItemsPreview({
-    records: versions,
-    getItemTotal: (record) => record?.item_count,
-    rowExpandable: (record) =>
-      canRead && Number.isSafeInteger(record?.id) && record.id > 0,
-    getCacheKey: (record) =>
-      `${record?.id}:${record?.version || record?.updated_at || 'current'}:${itemsPreviewGenerationRef.current}`,
-    getRecordLabel: (record) =>
-      record?.version ? `BOM ${record.version}` : '当前 BOM 版本',
-    loadPreview: async (record) => {
-      const detail = await getBOMVersion({ id: record.id })
-      const items = Array.isArray(detail?.items) ? detail.items : []
-      return { items, total: items.length }
-    },
-    getItemKey: (item) => item?.id,
-    getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
-    getItemFields: (item, { view }) => [
-      {
-        key: 'material',
-        label: '材料',
-        value: referenceLabel(materialOptions, item?.material_id, '材料'),
-        wide: true,
-        strong: true,
-      },
-      { key: 'position', label: '部位', value: item?.position || '-' },
-      {
-        key: 'quantity',
-        label: '材料用量',
-        value: item?.quantity || '-',
-      },
-      {
-        key: 'unit',
-        label: '单位',
-        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
-      },
-      {
-        key: 'loss_rate',
-        label: '损耗率',
-        value: item?.loss_rate || '0',
-      },
-      {
-        key: 'piece_count',
-        label: '片数',
-        value: item?.piece_count || '-',
-        rowStart: true,
-      },
-      {
-        key: 'total_usage',
-        label: '总用量',
-        value: item?.total_usage_snapshot || '-',
-      },
-      {
-        key: 'process_base',
-        label: '加工基础',
-        value: item?.process_base || '-',
-        wide: true,
-      },
-      {
-        key: 'process_method',
-        label: '加工方式',
-        value: item?.process_method || '-',
-        wide: true,
-      },
-      ...(view === 'modal'
-        ? [
-            {
-              key: 'note',
-              label: '备注',
-              value: item?.note || '-',
-              fullWidth: true,
-            },
-          ]
-        : []),
-    ],
-    modalTitle: 'BOM 完整明细',
-  })
-  const primeBOMItemsPreview = bomItemsPreview.prime
   const headerVersionSuggestion = useMemo(() => {
     if (!headerVersionCandidates.loaded) return ''
     return suggestNextBOMVersion(
@@ -457,10 +340,6 @@ export default function BOMVersionsPage() {
         if (!request.isCurrent()) {
           return null
         }
-        const items = Array.isArray(detail?.items) ? detail.items : []
-        if (detail?.id) {
-          primeBOMItemsPreview(detail, { items, total: items.length })
-        }
         setSelectedVersion(detail)
         return detail
       } catch (error) {
@@ -476,7 +355,7 @@ export default function BOMVersionsPage() {
         }
       }
     },
-    [beginLatestRequest, primeBOMItemsPreview]
+    [beginLatestRequest]
   )
 
   const bomListParams = useMemo(
@@ -516,7 +395,6 @@ export default function BOMVersionsPage() {
       const nextVersions = Array.isArray(result?.bom_versions)
         ? result.bom_versions
         : []
-      itemsPreviewGenerationRef.current += 1
       setVersions(nextVersions)
       setTotal(Number(result?.total || nextVersions.length || 0))
       const validKeys = selectedRowKeysRef.current.filter((key) =>
@@ -1061,74 +939,18 @@ export default function BOMVersionsPage() {
     [productOptions]
   )
 
-  const persistColumnOrder = useCallback(
-    async (nextOrder, columnsForOrder) => {
-      const sanitizedOrder = sanitizeModuleColumnOrder(
-        nextOrder,
-        columnsForOrder
-      )
-      setColumnOrder(sanitizedOrder)
-      writeStoredColumnOrder(BOM_MODULE_KEY, sanitizedOrder)
-      setColumnOrderSaving(true)
-      try {
-        const erpPreferences = await setERPColumnOrder({
-          module_key: BOM_MODULE_KEY,
-          order: sanitizedOrder,
-        })
-        outletContext?.updateAdminERPPreferences?.(erpPreferences)
-        message.success(
-          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
-        )
-      } catch (error) {
-        message.warning(
-          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
-        )
-      } finally {
-        setColumnOrderSaving(false)
-      }
-    },
-    [outletContext]
-  )
+  const {
+    tableColumns: columns,
+    exportColumns: orderedDataColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: BOM_MODULE_KEY,
+    moduleTitle: 'BOM 版本列表',
+    columns: dataColumns,
+  })
 
-  const preferredColumnOrder = useMemo(
-    () =>
-      getPreferredColumnOrder({
-        adminProfile,
-        moduleKey: BOM_MODULE_KEY,
-        columns: dataColumns,
-        localOrder: columnOrder,
-      }),
-    [adminProfile, columnOrder, dataColumns]
-  )
-
-  const orderedDataColumns = useMemo(
-    () => applyModuleColumnOrder(dataColumns, preferredColumnOrder),
-    [dataColumns, preferredColumnOrder]
-  )
-
-  const columns = useMemo(
-    () =>
-      orderedDataColumns.map((column) => ({
-        ...column,
-        title: (
-          <ColumnOrderHeaderMenu
-            column={column}
-            columns={dataColumns}
-            order={preferredColumnOrder}
-            saving={columnOrderSaving}
-            onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-            onOpenPanel={() => setColumnOrderOpen(true)}
-          />
-        ),
-      })),
-    [
-      columnOrderSaving,
-      dataColumns,
-      orderedDataColumns,
-      persistColumnOrder,
-      preferredColumnOrder,
-    ]
-  )
   const exportColumns = useMemo(
     () => [
       ...orderedDataColumns,
@@ -1169,7 +991,7 @@ export default function BOMVersionsPage() {
     setStatus('')
     setSearchParams(new URLSearchParams(), { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [setSearchParams])
+  }, [setKeyword, setLifecycleScope, setPagination, setProductID, setSearchParams, setStatus])
 
   return (
     <BusinessPageLayout>
@@ -1285,9 +1107,9 @@ export default function BOMVersionsPage() {
             </ToolbarButton>
             <ToolbarButton
               icon={<SettingOutlined />}
-              onClick={() => setColumnOrderOpen(true)}
+              onClick={openColumnOrder}
             >
-              列顺序
+              列设置
             </ToolbarButton>
           </Space>
         }
@@ -1565,7 +1387,6 @@ export default function BOMVersionsPage() {
         rowClassName={(record) =>
           selectedRowKeys.includes(record?.id) ? 'ant-table-row-selected' : ''
         }
-        expandable={bomItemsPreview.expandable}
         onRow={(record) => ({
           onClick: (event) => {
             if (
@@ -1586,7 +1407,6 @@ export default function BOMVersionsPage() {
           openView(record)
         }}
       />
-      {bomItemsPreview.modal}
 
       <BusinessFormPage
         open={headerModalOpen}
@@ -1657,77 +1477,76 @@ export default function BOMVersionsPage() {
             versionSuggestion={headerVersionSuggestion}
             versionSuggestionLoading={headerVersionCandidates.loading}
             onUseVersionSuggestion={useHeaderVersionSuggestion}
-          />
-          {headerMode === 'import' ? (
-            <BOMImportReviewSummary
-              form={headerForm}
-              review={importReview}
-              productOptions={productOptions}
-            />
-          ) : null}
-          <BusinessAttachmentPanel
-            ref={headerAttachmentRef}
-            ownerType="bom_header"
-            ownerId={
-              headerMode === 'edit' || headerMode === 'view'
-                ? activeActionVersion?.id || selectedVersion?.id
-                : undefined
+            attachmentPanel={
+              <BusinessAttachmentPanel
+                ref={headerAttachmentRef}
+                ownerType="bom_header"
+                ownerId={
+                  headerMode === 'edit' || headerMode === 'view'
+                    ? activeActionVersion?.id || selectedVersion?.id
+                    : undefined
+                }
+                title="BOM 附件"
+                description="色卡、工艺图、作业说明和原始材料清单"
+                canUpload={
+                  headerMode !== 'view' &&
+                  (headerMode === 'edit' ? modalActionCanEdit : canCreate)
+                }
+                canWithdraw={
+                  headerMode !== 'view' &&
+                  (headerMode === 'edit' ? modalActionCanEdit : canCreate)
+                }
+                variant="inline"
+                compact
+              />
             }
-            title="BOM 附件"
-            description="色卡、工艺图、作业说明和原始材料清单"
-            canUpload={
-              headerMode !== 'view' &&
-              (headerMode === 'edit' ? modalActionCanEdit : canCreate)
-            }
-            canWithdraw={
-              headerMode !== 'view' &&
-              (headerMode === 'edit' ? modalActionCanEdit : canCreate)
-            }
-            variant="inline"
-          />
-          {headerMode === 'copy' ? (
-            <p className="erp-business-selection-action-bar__hint">
-              保存复制草稿后，可打开新版本继续维护物料和部位。
-            </p>
-          ) : (
-            <BOMMaterialGroupsForm
-              canEdit={
-                headerMode === 'create' || headerMode === 'import'
-                  ? canCreate
-                  : modalActionCanEdit
-              }
-              form={headerForm}
-              materialByID={materialByID}
-              canCreateMaterial={hasActionPermission(
-                adminProfile,
-                'material.create'
+          >
+            {headerMode === 'import' ? (
+              <BOMImportReviewSummary
+                form={headerForm}
+                review={importReview}
+                productOptions={productOptions}
+              />
+            ) : null}
+
+            <BusinessFormSection title="材料分析明细表" showHeading={false}>
+              {headerMode === 'copy' ? (
+                <p className="erp-business-selection-action-bar__hint">
+                  保存复制草稿后，可打开新版本继续维护物料和部位。
+                </p>
+              ) : (
+                <BOMMaterialGroupsForm
+                  canEdit={
+                    headerMode === 'create' || headerMode === 'import'
+                      ? canCreate
+                      : modalActionCanEdit
+                  }
+                  form={headerForm}
+                  materialByID={materialByID}
+                  canCreateMaterial={hasActionPermission(
+                    adminProfile,
+                    'material.create'
+                  )}
+                  onMaterialCreated={(material) =>
+                    setMaterials((current) => [material, ...current])
+                  }
+                  materialOptions={materialOptions}
+                  registerLineItemRow={registerLineItemRow}
+                  requestLineItemScroll={requestLineItemScroll}
+                  selectedVersionID={
+                    headerMode === 'create' || headerMode === 'import'
+                      ? undefined
+                      : modalActionVersion?.id
+                  }
+                  unitOptions={unitOptions}
+                />
               )}
-              onMaterialCreated={(material) =>
-                setMaterials((current) => [material, ...current])
-              }
-              materialOptions={materialOptions}
-              registerLineItemRow={registerLineItemRow}
-              requestLineItemScroll={requestLineItemScroll}
-              selectedVersionID={
-                headerMode === 'create' || headerMode === 'import'
-                  ? undefined
-                  : modalActionVersion?.id
-              }
-              unitOptions={unitOptions}
-            />
-          )}
+            </BusinessFormSection>
+          </BOMHeaderFormFields>
         </Form>
       </BusinessFormPage>
 
-      <ColumnOrderModal
-        open={columnOrderOpen}
-        columns={dataColumns}
-        order={preferredColumnOrder}
-        saving={columnOrderSaving}
-        moduleTitle="物料清单列表"
-        onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-        onClose={() => setColumnOrderOpen(false)}
-      />
+      {columnOrderModal}
     </BusinessPageLayout>
   )
 }

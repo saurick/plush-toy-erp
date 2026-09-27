@@ -98,9 +98,6 @@ export function createBusinessFieldDensityScenarios(deps) {
               const box = cell.getBoundingClientRect()
               const cellStyle = window.getComputedStyle(cell)
               const title = node.closest('.ant-table-column-title')
-              const trigger = title?.querySelector(
-                '.erp-module-column-header-trigger'
-              )
               const sorter = node
                 .closest('.ant-table-column-sorters')
                 ?.querySelector('.ant-table-column-sorter')
@@ -114,9 +111,6 @@ export function createBusinessFieldDensityScenarios(deps) {
                   Number.parseFloat(cellStyle.paddingRight || '0'),
                 titleWidth: Math.round(
                   title?.getBoundingClientRect().width || 0
-                ),
-                triggerWidth: Math.round(
-                  trigger?.getBoundingClientRect().width || 0
                 ),
                 sorterWidth: Math.round(
                   sorter?.getBoundingClientRect().width || 0
@@ -154,7 +148,7 @@ export function createBusinessFieldDensityScenarios(deps) {
           await assertHeaders(page, entry)
           const [download] = await Promise.all([
             page.waitForEvent('download'),
-            page.getByRole('button', { name: /导出筛选结果/u }).click(),
+            page.getByRole('button', { name: /导出/u }).click(),
           ])
           const csv = await downloadedText(download)
           for (const label of entry.detail)
@@ -189,18 +183,14 @@ export function createBusinessFieldDensityScenarios(deps) {
           .click()
         await editor.waitFor({ state: 'hidden' })
 
-        await page
-          .locator(headerSelector)
-          .filter({ hasText: '名称' })
-          .first()
-          .locator('xpath=ancestor::th')
-          .locator('.erp-module-column-header-trigger')
-          .click()
-        await page
-          .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
-          .last()
-          .getByText('移到最前', { exact: true })
-          .click()
+        const openColumns = async () => {
+          await page.getByRole('button', { name: /列设置$/u }).click()
+          return page.getByRole('dialog', { name: /^列设置/u })
+        }
+        let panel = await openColumns()
+        await panel.getByRole('button', { name: '名称 移到最前', exact: true }).click()
+        await panel.getByRole('button', { name: /^完\s*成$/u }).click()
+        await panel.waitFor({ state: 'hidden' })
         await page.waitForFunction(
           (selector) =>
             document.querySelector(selector)?.textContent.trim() === '名称',
@@ -212,18 +202,7 @@ export function createBusinessFieldDensityScenarios(deps) {
           (await page.locator(headerSelector).first().textContent()).trim(),
           '名称'
         )
-        await page
-          .locator(headerSelector)
-          .first()
-          .locator('xpath=ancestor::th')
-          .locator('.erp-module-column-header-trigger')
-          .click()
-        await page
-          .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
-          .last()
-          .getByText('打开列顺序面板', { exact: true })
-          .click()
-        const panel = page.getByRole('dialog', { name: '调整列表列顺序' })
+        panel = await openColumns()
         for (const label of cases[0].detail)
           assert.equal(await panel.getByText(label, { exact: true }).count(), 0)
         await panel

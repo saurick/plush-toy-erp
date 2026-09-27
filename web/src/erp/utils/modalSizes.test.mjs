@@ -14,7 +14,7 @@ test('modalSizes: keep ERP modal width tiers explicit', () => {
     'min(1800px, 94vw, calc(100vw - 32px))'
   )
   assert.equal(ERP_MODAL_WIDTHS.localAction, 'min(860px, calc(100vw - 32px))')
-  assert.equal(ERP_MODAL_WIDTHS.columnOrder, 'min(960px, calc(100vw - 32px))')
+  assert.equal(ERP_MODAL_WIDTHS.columnOrder, 'min(640px, calc(100vw - 32px))')
 })
 
 test('business modals default to a local form and select a named size', () => {

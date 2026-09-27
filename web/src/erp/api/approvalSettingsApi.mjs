@@ -1,3 +1,4 @@
+import { normalizeApprovalCondition } from '../utils/approvalCondition.mjs'
 import { AUTH_SCOPE } from '../../common/auth/auth.js'
 import { ADMIN_BASE_PATH } from '../../common/utils/adminRpc.js'
 import { JsonRpc } from '../../common/utils/jsonRpc.js'
@@ -84,6 +85,10 @@ export function buildApprovalSettingsRevisionPayload(input = {}) {
     ? input.items.map((item) => ({
         approval_key: requireText(item.approval_key, '审批事项'),
         enabled: item.enabled === true,
+        condition: normalizeApprovalCondition(
+          item.approval_key,
+          item.condition
+        ),
         members: Array.isArray(item.members)
           ? item.members.map(normalizeMember)
           : [],

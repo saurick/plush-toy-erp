@@ -1,4 +1,7 @@
-import { assertBusinessFormPage, closeBusinessFormPage } from './businessFormPageAssertions.mjs'
+import {
+  assertBusinessFormPage,
+  closeBusinessFormPage,
+} from './businessFormPageAssertions.mjs'
 import { createBusinessColumnPriorityScenarios } from './businessColumnPriorityScenarios.mjs'
 export function createBusinessPageContractScenarios({
   customerRuntimeEffectiveSession,
@@ -56,9 +59,7 @@ export function createBusinessPageContractScenarios({
   ) => {
     const stableURL = page.url()
     await page.getByRole('button', { name: buttonName }).click()
-    const modal = page
-      .locator('.erp-business-form-page:not([hidden])')
-      .last()
+    const modal = page.locator('.erp-business-form-page:not([hidden])').last()
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(modal, titleText)
     await assertBusinessFormPage(page, modal)
@@ -182,8 +183,12 @@ export function createBusinessPageContractScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const salesHeadings = [
-          '订单与客户', '联系人与负责人', '结算条件',
-          '税费与运费条件', '交付与收货', '其他说明',
+          '订单与客户',
+          '联系人与负责人',
+          '结算条件',
+          '税费与运费条件',
+          '交付与收货',
+          '其他说明',
         ]
         const paymentHeadings = ['往来与金额', '账户与凭据']
 
@@ -511,7 +516,7 @@ export function createBusinessPageContractScenarios({
         await expectText(page, '质检管理')
         await expectText(page, '质量检验')
         await expectText(page, '库存管理')
-        await expectText(page, '入库管理')
+        await expectText(page, '采购入库')
         await expectText(page, '库存台账')
         await expectText(page, '委外管理')
         await expectText(page, '委外订单')
@@ -522,8 +527,11 @@ export function createBusinessPageContractScenarios({
         await expectText(page, '出货放行')
         await expectText(page, '财务管理')
         await expectText(page, '应收管理')
-        await expectText(page, '导出筛选结果')
-        await expectText(page, '列顺序')
+        await page.getByRole('button', { name: /导出/u }).waitFor()
+        await page
+          .locator('.erp-business-operation-panel')
+          .getByRole('button', { name: /列顺序|列设置/u })
+          .waitFor()
         await expectText(page, '运营工具')
         await expectText(page, '模板打印中心')
         await verifyBusinessModuleColumnOrderDialog(page, {
@@ -569,7 +577,7 @@ export function createBusinessPageContractScenarios({
           '侧栏不应再显示“开发与验收”分组'
         )
         await expectText(page, '使用帮助')
-        await expectText(page, '岗位使用帮助')
+        await expectText(page, '帮助中心')
         assert.equal(
           await page.getByText('高级文档', { exact: true }).count(),
           0,

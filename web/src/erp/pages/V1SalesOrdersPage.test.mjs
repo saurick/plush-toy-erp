@@ -21,6 +21,10 @@ const form = readFileSync(
   new URL('../components/sales-orders/SalesOrderForm.jsx', import.meta.url),
   'utf8'
 )
+const deliveryForm = readFileSync(
+  new URL('../components/business-list/DeliveryAddressFields.jsx', import.meta.url),
+  'utf8'
+)
 const businessModal = readFileSync(
   new URL(
     '../components/sales-orders/SalesOrderEditor.jsx',
@@ -29,18 +33,14 @@ const businessModal = readFileSync(
   'utf8'
 )
 
-test('sales order commercial and delivery fields stay grouped without changing the established modal order', () => {
+test('sales order commercial fields preserve their contracts with demand before attachments', () => {
   for (const copy of [
     '税费与运费条件',
     '计税方式',
     '税率',
     '报价是否含运费',
     '报价运费',
-    '交付与收货',
-    '国家 / 地区',
-    '收货人',
-    '收货电话',
-    '收货地址',
+    '联系与交付',
     '订单数量',
     '单价',
     '金额',
@@ -49,6 +49,10 @@ test('sales order commercial and delivery fields stay grouped without changing t
     '订单总额',
   ]) {
     assert.match(form, new RegExp(copy.replace('/', '\\/'), 'u'))
+  }
+  assert.match(form, /<DeliveryAddressFields\s+form=\{form\}/u)
+  for (const copy of ['国家 / 地区', '收货人', '收货电话', '所在地区', '详细地址', '完整地址']) {
+    assert.ok(deliveryForm.includes(copy), `shared delivery form keeps ${copy}`)
   }
   assert.match(form, /unitText="%"/u)
   assert.match(form, /name="quoted_freight_amount"/u)
@@ -63,7 +67,9 @@ test('sales order commercial and delivery fields stay grouped without changing t
   const itemsIndex = businessModal.indexOf('<SalesOrderItemsFormSection')
   assert(headerIndex >= 0)
   assert(attachmentsIndex > headerIndex)
-  assert(itemsIndex > attachmentsIndex)
+  assert(itemsIndex > headerIndex && itemsIndex < attachmentsIndex)
+  assert(form.indexOf('{itemsSection}') < form.indexOf('联系与交付'))
+  assert(form.indexOf('备注与附件') < form.indexOf('{attachmentPanel}'))
 })
 
 test('planned delivery date header keeps enough width for one line', () => {

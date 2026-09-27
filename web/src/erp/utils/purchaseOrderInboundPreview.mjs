@@ -124,6 +124,7 @@ export function buildPurchaseInboundDraftPreviewRows(progress) {
     lineNo: item.line_no,
     material: materialLabel(item),
     unit: item.unit_name || item.unit_code,
+    unitID: item.unit_id,
     purchasedQuantity: item.purchased_quantity,
     effectiveReceivedQuantity: item.effective_received_quantity,
     draftReservedQuantity: item.draft_reserved_quantity,

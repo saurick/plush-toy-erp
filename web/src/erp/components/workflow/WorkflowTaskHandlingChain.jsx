@@ -76,7 +76,7 @@ export default function WorkflowTaskHandlingChain({
     <section
       className={
         variant === 'mobile'
-          ? 'erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm'
+          ? 'erp-mobile-card mobile-detail-section'
           : 'erp-task-action-drawer__summary'
       }
       aria-label="任务处理链"

@@ -85,7 +85,7 @@ for (const pageCase of formalBusinessListCases) {
     assert.match(source, /loading \|\| exporting/u)
     assert.ok(
       source.includes('BusinessListToolbarActions') ||
-        source.includes('列顺序'),
+        source.includes('列设置'),
       `${pageCase.path} must expose column ordering`
     )
     assert.ok(

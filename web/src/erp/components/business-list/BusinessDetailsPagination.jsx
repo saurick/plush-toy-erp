@@ -1,6 +1,8 @@
 import React from 'react'
 import { Grid, Pagination, Select } from 'antd'
 
+export const BUSINESS_DETAILS_PAGE_SIZE = 10
+
 const PAGE_SIZE_OPTIONS = [10, 20, 50].map((value) => ({
   label: `${value} 条/页`,
   value,

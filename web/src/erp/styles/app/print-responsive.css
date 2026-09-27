@@ -180,7 +180,7 @@
   }
 
   .erp-admin-header {
-    padding: 16px;
+    padding: 0 12px;
   }
 
   .erp-admin-header__menu-button {
@@ -192,7 +192,7 @@
   }
 
   .erp-admin-content {
-    padding: 16px;
+    padding: 12px;
   }
 
   .erp-admin-page-head__aside,

@@ -1,13 +1,15 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { Button } from 'antd'
-import { buildProductionOrderOverviewModel } from '../../utils/businessVisualizationModels.mjs'
+import {
+  buildProductionOrderOverviewModel,
+  paginateVisualizationRows,
+} from '../../utils/businessVisualizationModels.mjs'
 import {
   BusinessVisualizationFrame,
   VisualizationState,
+  VisualizationPagination,
 } from './BusinessVisualizationFrame.jsx'
-
-const INITIAL_VISIBLE_ROWS = 12
 
 function scheduleText(row) {
   if (!row.plannedStartDate && !row.plannedEndDate) return '计划日期未填写'
@@ -23,24 +25,45 @@ export default function ProductionOrderOverview({
   onShowProcess,
   onFilterStatus,
   switcher,
+  viewState = {},
+  onViewStateChange,
 }) {
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_ROWS)
   const model = useMemo(
     () => buildProductionOrderOverviewModel(orders),
     [orders]
   )
-  const rows = model.rows.slice(0, visibleCount)
+  const filter = viewState.filter || 'all'
+  const filtered = model.rows.filter(
+    (row) =>
+      filter === 'all' ||
+      (filter === 'active'
+        ? row.orderStatus === 'RELEASED'
+        : row.scheduleStatus.key === filter)
+  )
+  const pagination = paginateVisualizationRows(filtered, viewState.page)
+  const { rows } = pagination
+  const changeFilter = (next) =>
+    onViewStateChange?.({ ...viewState, filter: next, page: 1 })
 
   return (
     <BusinessVisualizationFrame
       className="erp-production-overview"
       switcher={switcher}
       title="生产总览"
+      loading={loading}
+      error={error}
       metrics={[
+        {
+          key: 'all',
+          label: '全部',
+          value: model.counts.total,
+          tone: 'neutral',
+        },
         {
           key: 'active',
           label: '生产中',
           value: model.counts.active,
+          tone: 'neutral',
         },
         {
           key: 'overdue',
@@ -49,7 +72,7 @@ export default function ProductionOrderOverview({
           tone: 'danger',
         },
         {
-          key: 'due-soon',
+          key: 'dueSoon',
           label: '7 天内结束',
           value: model.counts.dueSoon,
           tone: 'warning',
@@ -58,14 +81,18 @@ export default function ProductionOrderOverview({
           key: 'unscheduled',
           label: '未排结束日',
           value: model.counts.unscheduled,
-          tone: model.counts.unscheduled > 0 ? 'warning' : 'success',
+          tone: 'neutral',
         },
-      ]}
+      ].map((metric) => ({
+        ...metric,
+        selected: filter === metric.key,
+        onClick: () => changeFilter(metric.key),
+      }))}
     >
       <VisualizationState
         loading={loading}
         error={error}
-        empty={!loading && !error && model.rows.length === 0}
+        empty={!loading && !error && filtered.length === 0}
         onRetry={onRetry}
       />
       {!loading && !error && model.rows.length > 0 ? (
@@ -132,15 +159,10 @@ export default function ProductionOrderOverview({
               </div>
             ))}
           </div>
-          {model.rows.length > rows.length ? (
-            <Button
-              type="text"
-              className="erp-business-visual-more"
-              onClick={() => setVisibleCount((count) => count + 20)}
-            >
-              再显示 {Math.min(20, model.rows.length - rows.length)} 条
-            </Button>
-          ) : null}
+          <VisualizationPagination
+            pagination={pagination}
+            onChange={(page) => onViewStateChange?.({ ...viewState, page })}
+          />
         </>
       ) : null}
     </BusinessVisualizationFrame>

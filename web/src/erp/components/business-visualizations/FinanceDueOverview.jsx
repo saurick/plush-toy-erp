@@ -1,15 +1,16 @@
-import React, { useMemo, useState } from 'react'
-import { Button } from 'antd'
-import { buildFinanceDueModel } from '../../utils/businessVisualizationModels.mjs'
+import React, { useMemo } from 'react'
+import {
+  buildFinanceDueModel,
+  paginateVisualizationRows,
+} from '../../utils/businessVisualizationModels.mjs'
 import {
   BusinessVisualizationFrame,
   VisualizationState,
+  VisualizationPagination,
 } from './BusinessVisualizationFrame.jsx'
 
-const INITIAL_VISIBLE_ROWS = 12
-
 function money(value, currency) {
-  if (value === null) return '—'
+  if (value === null || !currency) return '—'
   return `${currency} ${new Intl.NumberFormat('zh-CN', {
     maximumFractionDigits: 2,
   }).format(value)}`
@@ -22,16 +23,32 @@ export default function FinanceDueOverview({
   onRetry,
   onOpen,
   switcher,
+  viewState = {},
+  onViewStateChange,
 }) {
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_ROWS)
   const model = useMemo(() => buildFinanceDueModel(facts), [facts])
-  const rows = model.rows.slice(0, visibleCount)
+  const filter = viewState.filter || 'all'
+  const filtered = model.rows.filter(
+    (row) => filter === 'all' || row.dueStatus.key === filter
+  )
+  const pagination = paginateVisualizationRows(filtered, viewState.page)
+  const { rows } = pagination
+  const changeFilter = (next) =>
+    onViewStateChange?.({ ...viewState, filter: next, page: 1 })
   return (
     <BusinessVisualizationFrame
       className="erp-finance-due-visual"
       switcher={switcher}
       title="财务到期顺序"
+      loading={loading}
+      error={error}
       metrics={[
+        {
+          key: 'all',
+          label: '全部',
+          value: model.counts.total,
+          tone: 'neutral',
+        },
         {
           key: 'overdue',
           label: '逾期未结',
@@ -39,15 +56,22 @@ export default function FinanceDueOverview({
           tone: 'danger',
         },
         {
-          key: 'due-soon',
+          key: 'dueSoon',
           label: '7 天内',
           value: model.counts.dueSoon,
+          tone: 'warning',
+        },
+        {
+          key: 'unknown',
+          label: '金额待核对',
+          value: model.counts.unknown,
           tone: 'warning',
         },
         {
           key: 'unscheduled',
           label: '未填到期日',
           value: model.counts.unscheduled,
+          tone: 'neutral',
         },
         {
           key: 'settled',
@@ -55,12 +79,16 @@ export default function FinanceDueOverview({
           value: model.counts.settled,
           tone: 'success',
         },
-      ]}
+      ].map((metric) => ({
+        ...metric,
+        selected: filter === metric.key,
+        onClick: () => changeFilter(metric.key),
+      }))}
     >
       <VisualizationState
         loading={loading}
         error={error}
-        empty={!loading && !error && model.rows.length === 0}
+        empty={!loading && !error && filtered.length === 0}
         onRetry={onRetry}
       />
       {!loading && !error && rows.length > 0 ? (
@@ -97,15 +125,10 @@ export default function FinanceDueOverview({
               </span>
             </button>
           ))}
-          {model.rows.length > rows.length ? (
-            <Button
-              type="text"
-              className="erp-business-visual-more"
-              onClick={() => setVisibleCount((count) => count + 20)}
-            >
-              再显示 {Math.min(20, model.rows.length - rows.length)} 条
-            </Button>
-          ) : null}
+          <VisualizationPagination
+            pagination={pagination}
+            onChange={(page) => onViewStateChange?.({ ...viewState, page })}
+          />
         </div>
       ) : null}
     </BusinessVisualizationFrame>

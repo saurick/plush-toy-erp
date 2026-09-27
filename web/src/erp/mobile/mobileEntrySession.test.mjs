@@ -96,11 +96,6 @@ test('entry session: 手机待办和电脑端都通过入口选择页对称切�
   assert.doesNotMatch(pageSource, /handleEnterDesktop/u)
   assert.match(screenSource, /data-testid="mobile-role-work-entry-switch"/u)
   assert.match(screenSource, />\s*切换工作入口\s*</u)
-  assert.match(screenSource, />可用入口</u)
-  assert.match(
-    screenSource,
-    /canEnterDesktop\s*\? '电脑端 \/ 手机待办'\s*: '手机待办'/u
-  )
   assert.doesNotMatch(screenSource, /mobile-role-desktop-entry|进入电脑端/u)
   assert.match(desktopSource, /getAllowedMobileRoleKeys/u)
   assert.match(desktopSource, /const canSwitchToMobileTasks = useMemo/u)

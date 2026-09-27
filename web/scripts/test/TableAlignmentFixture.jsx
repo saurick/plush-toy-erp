@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { Button, ConfigProvider, Form, Input, Space, Tag, theme } from 'antd'
 import AppTable from '../../src/common/components/table/AppTable'
 import { BusinessDataTable } from '../../src/erp/components/business-list/BusinessListLayout'
-import { ColumnOrderHeaderMenu } from '../../src/erp/components/business-list/ColumnOrderModal'
+import { ColumnOrderModal } from '../../src/erp/components/business-list/ColumnOrderModal'
 import BusinessLineItemsTable, {
   BusinessLineItemRow,
 } from '../../src/erp/components/business-list/BusinessLineItemsTable'
@@ -112,17 +112,13 @@ function Fixture() {
   const [mobile, setMobile] = useState(false)
   const [empty, setEmpty] = useState(false)
   const [order, setOrder] = useState(columns.map((column) => column.key))
+  const [columnPanelOpen, setColumnPanelOpen] = useState(false)
   const [selected, setSelected] = useState([])
   const [opened, setOpened] = useState('')
   const listColumns = applyModuleColumnOrder(columns, order).map((column) => ({
     ...column,
     title: (
-      <ColumnOrderHeaderMenu
-        column={column}
-        columns={columns}
-        order={order}
-        onChange={setOrder}
-      />
+      <span className="erp-module-column-header-text">{column.title}</span>
     ),
   }))
   return (
@@ -157,9 +153,17 @@ function Fixture() {
           <Button id="toggle-empty" onClick={() => setEmpty(!empty)}>
             切换空表
           </Button>
+          <Button onClick={() => setColumnPanelOpen(true)}>列设置</Button>
           <output id="selection-count">{selected.length}</output>
           <output id="opened-record">{opened}</output>
         </Space>
+        <ColumnOrderModal
+          open={columnPanelOpen}
+          columns={columns}
+          order={order}
+          onChange={setOrder}
+          onClose={() => setColumnPanelOpen(false)}
+        />
         <section id="business-table" style={{ minWidth: 0 }}>
           <h2>业务列表</h2>
           <BusinessDataTable
@@ -179,7 +183,19 @@ function Fixture() {
           <h2>弹窗与工作台共用表格</h2>
           <AppTable
             rowKey="key"
-            columns={columns}
+            columns={[
+              {
+                title: '材料资料',
+                children: columns.slice(0, 3).map((column) => ({ ...column, fixed: undefined })),
+              },
+              columns[3],
+              {
+                ...columns[4],
+                filters: [{ text: '待审核', value: '待审核' }, { text: '已批准', value: '已批准' }],
+                onFilter: (value, row) => row.status === value,
+              },
+              { ...columns[5], title: '备注 / 需要核对的详细说明' },
+            ]}
             dataSource={rows}
             pagination={false}
             scroll={{ x: 1150 }}

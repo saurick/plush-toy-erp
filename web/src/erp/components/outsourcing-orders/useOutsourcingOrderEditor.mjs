@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Form } from 'antd'
+import {
+  buildUnitSelectOptions,
+  buildSequentialDraftCode,
+  createBlankOutsourcingLine,
+  hasActionPermission,
+  normalizeOutsourcingLineFormValue,
+  unixToDateInputValue,
+} from '../../utils/masterDataOrderView.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { currentBusinessDate } from '../../utils/businessDate.mjs'
@@ -8,7 +16,6 @@ import {
   productLabel,
   processLabel,
   supplierLabel,
-  unitLabel,
 } from './OutsourcingOrderForm.jsx'
 import {
   listAllOutsourcingOrderItems,
@@ -22,13 +29,6 @@ import {
   listAllWarehouses,
   saveOutsourcingOrderWithItems,
 } from '../../api/masterDataOrderApi.mjs'
-import {
-  buildSequentialDraftCode,
-  createBlankOutsourcingLine,
-  hasActionPermission,
-  normalizeOutsourcingLineFormValue,
-  unixToDateInputValue,
-} from '../../utils/masterDataOrderView.mjs'
 import {
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
@@ -159,22 +159,7 @@ export function useOutsourcingOrderEditor({
     [processes]
   )
 
-  const unitOptions = useMemo(
-    () =>
-      units.map((item) => ({
-        value: item.id,
-        label: unitLabel(item),
-        searchText: [item.code, item.name].filter(Boolean).join(' '),
-        suffixLabel: item.name,
-        precision:
-          Number.isInteger(Number(item.precision)) &&
-          Number(item.precision) >= 0
-            ? Number(item.precision)
-            : undefined,
-        item,
-      })),
-    [units]
-  )
+  const unitOptions = useMemo(() => buildUnitSelectOptions(units), [units])
 
   const unitByID = useMemo(
     () => new Map(units.map((item) => [item.id, item])),

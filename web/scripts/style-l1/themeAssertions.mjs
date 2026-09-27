@@ -57,9 +57,7 @@ async function assertDevPageUsesGlobalThemeOnly(
   const themeToggleMetrics = await page.evaluate((targetSelector) => {
     const root = document.querySelector(targetSelector)
     const toggles = root
-      ? Array.from(
-          root.querySelectorAll('.erp-theme-toggle, .erp-theme-menu-toggle')
-        )
+      ? Array.from(root.querySelectorAll('.erp-appearance-trigger'))
       : []
     const toggle = toggles[0]
     const rect = toggle?.getBoundingClientRect()
@@ -74,10 +72,10 @@ async function assertDevPageUsesGlobalThemeOnly(
       height: rect ? Number(rect.height.toFixed(1)) : 0,
       visible: Boolean(
         rect &&
-          rect.width > 0 &&
-          rect.height > 0 &&
-          style?.display !== 'none' &&
-          style?.visibility !== 'hidden'
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style?.display !== 'none' &&
+        style?.visibility !== 'hidden'
       ),
     }
   }, selector)
@@ -91,10 +89,10 @@ async function assertDevPageUsesGlobalThemeOnly(
     true,
     `${scenarioName} 主题切换控件应位于共享导航操作区: ${JSON.stringify(themeToggleMetrics)}`
   )
-  assert.match(
+  assert.equal(
     themeToggleMetrics.ariaLabel,
-    /^主题模式：(跟系统|浅色|暗色)$/u,
-    `${scenarioName} 主题切换控件缺少当前模式可访问名称: ${JSON.stringify(themeToggleMetrics)}`
+    '外观与密度',
+    `${scenarioName} 外观入口缺少可访问名称: ${JSON.stringify(themeToggleMetrics)}`
   )
   assert(
     themeToggleMetrics.visible &&
@@ -127,32 +125,25 @@ async function clickERPThemeOption(page, label) {
     暗色: 'dark',
   }
   const expectedMode = expectedModeByLabel[label]
-  const segmentedOption = page
-    .locator('.erp-theme-toggle .ant-segmented-item')
-    .filter({ hasText: label })
-  if ((await segmentedOption.count()) > 0) {
-    await segmentedOption.click()
+  const inlineSettings = page.locator('.erp-appearance-settings--mobile')
+  if ((await inlineSettings.count()) > 0) {
+    await inlineSettings.getByText(label, { exact: true }).click()
   } else {
-    const menuToggle = page.locator('.erp-theme-menu-toggle')
+    const appearanceTrigger = page.getByRole('button', {
+      name: /^外观(?:与密度|设置)$/,
+      exact: true,
+    })
     assert.equal(
-      await menuToggle.count(),
+      await appearanceTrigger.count(),
       1,
-      `主题菜单按钮数量异常，无法切换到 ${label}`
+      `外观入口数量异常，无法切换到 ${label}`
     )
-    await menuToggle.click()
-    await assertNoERPThemeTooltip(page, '主题菜单打开后不应显示 tooltip')
-    const menuItem = page
-      .locator(
-        '.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item'
-      )
-      .filter({ hasText: label })
-    await menuItem.waitFor({ state: 'visible', timeout: 10_000 })
-    await menuItem.click()
-    await page.keyboard.press('Escape')
-    await page
-      .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
-      .waitFor({ state: 'hidden', timeout: 10_000 })
-      .catch(() => {})
+    await appearanceTrigger.click()
+    const dialog = page.getByRole('dialog', { name: /^外观(?:与密度|设置)$/ })
+    await dialog.waitFor({ state: 'visible', timeout: 10_000 })
+    await dialog.getByText(label, { exact: true }).click()
+    await dialog.getByRole('button', { name: '完成', exact: true }).click()
+    await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
   }
   if (expectedMode) {
     await page.waitForFunction(
@@ -295,8 +286,8 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
       })
 
   assert(
-    metrics.segmentedControls.length >= 2,
-    `${scenarioName} 登录页缺少主题或入口 Segmented 控件: ${JSON.stringify(metrics)}`
+    metrics.segmentedControls.length === 1,
+    `${scenarioName} 登录页应保留一组工作方式分段控件: ${JSON.stringify(metrics)}`
   )
   metrics.segmentedControls.forEach((control) => {
     const maxDuration = Math.max(
@@ -308,8 +299,8 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
     const activeItems = control.items.filter((item) => item.isActiveByState)
     const indicatorBackground = parseRgb(control.indicatorBackgroundColor)
     assert(
-      maxDuration >= 400 &&
-        control.motionEasing.includes('0.215') &&
+      maxDuration === 220 &&
+        control.motionEasing.includes('0.2, 0.7, 0.2, 1') &&
         !control.motionEasing.includes('0.2, 0, 0, 1'),
       `${scenarioName} 登录页 Segmented 共享动效变量缺失或被短动效覆盖: ${JSON.stringify(
         {
@@ -323,8 +314,10 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
         control.indicatorContent !== 'none' &&
         control.indicatorContent !== 'normal' &&
         indicatorBackground &&
-        maxIndicatorDuration >= 400 &&
-        control.indicatorTransitionTimingFunction.includes('0.215') &&
+        maxIndicatorDuration === 220 &&
+        control.indicatorTransitionTimingFunction.includes(
+          '0.2, 0.7, 0.2, 1'
+        ) &&
         !control.indicatorTransitionTimingFunction.includes('0.2, 0, 0, 1'),
       `${scenarioName} 登录页 Segmented 缺少常驻滑动底板: ${JSON.stringify({
         ...control,
@@ -360,8 +353,8 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
         )}`
       )
       assert(
-        maxItemDuration >= 400 &&
-          item.itemTransitionTimingFunction.includes('0.215') &&
+        maxItemDuration === 220 &&
+          item.itemTransitionTimingFunction.includes('0.2, 0.7, 0.2, 1') &&
           !item.itemTransitionTimingFunction.includes('0.2, 0, 0, 1'),
         `${scenarioName} 登录页 Segmented 文字动效被全局短动效覆盖: ${JSON.stringify(
           {
@@ -486,7 +479,6 @@ async function assertDarkThemeContrast(
         '.ant-empty-image',
         '.ant-select-arrow',
         '.ant-table-column-sorter',
-        '.erp-module-column-header-trigger',
       ].join(',')
       const visibleTextSelector =
         'a, button, label, th, td, h1, h2, h3, h4, p, span, strong, small, input, textarea, .ant-typography, .ant-tag, .ant-btn, .ant-select-selection-item, .ant-select-selection-placeholder, .ant-empty-description'
@@ -582,11 +574,6 @@ async function assertDarkThemeNeutralInteractions(
     {
       label: '普通工具按钮 hover',
       selector: '.erp-business-toolbar-button:not(.ant-btn-primary)',
-      action: 'hover',
-    },
-    {
-      label: '表头工具按钮 hover',
-      selector: '.erp-module-column-header-trigger.ant-btn',
       action: 'hover',
     },
     {

@@ -14,12 +14,15 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
-import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
+import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import {
   cancelShipment,
   createInvoiceFromShipment,
@@ -62,7 +65,6 @@ import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
-import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import ShipmentEditor, {
   salesOrderCustomerText,
   sourceLineProductText,
@@ -85,6 +87,7 @@ import {
   deliverySnapshotFormValues,
 } from '../utils/sourcePartySnapshots.mjs'
 import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
+import { DEFAULT_DELIVERY_COUNTRY } from '../utils/deliveryAddress.mjs'
 import {
   buildShipmentItemParams,
   createBlankShipmentItem,
@@ -117,7 +120,6 @@ import {
   inventoryLotOption,
   productOption,
   productSKUOption,
-  referenceLabel,
   salesOrderItemOption,
   salesOrderOption,
   uniqueReferenceOptions,
@@ -138,8 +140,6 @@ import {
   relatedDocumentRoute,
 } from '../utils/relatedDocumentNavigation.mjs'
 import {
-  calculateShipmentLineNetWeightG,
-  hasFinalShipmentWeight,
   listAllShipmentWeightReferenceRecords,
   normalizeShipmentQuantity,
   resolveShipmentSubmittedTotalNetWeight,
@@ -259,15 +259,34 @@ export default function ShipmentsPage() {
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
-  const [keyword, setKeyword] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [customerFilter, setCustomerFilter] = useState('')
-  const [productFilter, setProductFilter] = useState('')
-  const [warehouseFilter, setWarehouseFilter] = useState('')
-  const [dateFilterField, setDateFilterField] = useState('planned_ship_at')
-  const [dateFilterStart, setDateFilterStart] = useState('')
-  const [dateFilterEnd, setDateFilterEnd] = useState('')
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [statusCounts, setStatusCounts] = useState(null)
+  const [keyword, setKeyword] = useBusinessPageState('keyword', '')
+  const [statusFilter, setStatusFilter] = useBusinessPageState('statusFilter', '')
+  const [customerFilter, setCustomerFilter] = useBusinessPageState(
+    'customerFilter',
+    ''
+  )
+  const [productFilter, setProductFilter] = useBusinessPageState(
+    'productFilter',
+    ''
+  )
+  const [warehouseFilter, setWarehouseFilter] = useBusinessPageState(
+    'warehouseFilter',
+    ''
+  )
+  const [dateFilterField, setDateFilterField] = useBusinessPageState(
+    'dateFilterField',
+    'planned_ship_at'
+  )
+  const [dateFilterStart, setDateFilterStart] = useBusinessPageState(
+    'dateFilterStart',
+    ''
+  )
+  const [dateFilterEnd, setDateFilterEnd] = useBusinessPageState('dateFilterEnd', '')
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: 20,
+  })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
@@ -548,98 +567,6 @@ export default function ShipmentsPage() {
       ),
     [inventoryLots, rows]
   )
-  const shipmentItemsPreview = useBusinessRowItemsPreview({
-    records: rows,
-    getEmbeddedItems: (record) => record?.items,
-    getItemTotal: (record) =>
-      Array.isArray(record?.items) ? record.items.length : undefined,
-    rowExpandable: (record) =>
-      canRead && Number.isSafeInteger(record?.id) && record.id > 0,
-    getRecordLabel: (record) => record?.shipment_no || '当前出货单',
-    getItemKey: (item) => item?.id,
-    getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
-    getItemFields: (item, { record, view }) => [
-      {
-        key: 'sales_order_item',
-        label: '销售订单行',
-        value: referenceLabel(
-          salesOrderItemOptions,
-          item?.sales_order_item_id,
-          '销售订单行'
-        ),
-        wide: true,
-      },
-      {
-        key: 'product',
-        label: '产品',
-        strong: true,
-        value: (
-          <ProductIdentity
-            productId={item?.product_id}
-            name={referenceLabel(productOptions, item?.product_id, '产品')}
-          />
-        ),
-      },
-      {
-        key: 'product_sku',
-        label: 'SKU',
-        value: referenceLabel(productSKUOptions, item?.product_sku_id, 'SKU'),
-      },
-      {
-        key: 'warehouse',
-        label: '仓库',
-        value: referenceLabel(warehouseOptions, item?.warehouse_id, '仓库'),
-      },
-      {
-        key: 'lot',
-        label: '批次',
-        value: referenceLabel(inventoryLotOptions, item?.lot_id, '批次'),
-      },
-      {
-        key: 'quantity',
-        label: '数量',
-        value: formatQuantity(item?.quantity),
-        rowStart: true,
-      },
-      {
-        key: 'unit',
-        label: '单位',
-        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
-      },
-      ...(hasFinalShipmentWeight(record?.status)
-        ? [
-            {
-              key: 'confirmed_unit_net_weight',
-              label: '确认出货单重（克）',
-              value: item?.unit_net_weight_g_snapshot
-                ? `${item.unit_net_weight_g_snapshot} 克`
-                : '-',
-            },
-            {
-              key: 'line_net_weight',
-              label: '行净重（克）',
-              value:
-                calculateShipmentLineNetWeightG(
-                  item?.quantity,
-                  item?.unit_net_weight_g_snapshot
-                ) || '-',
-            },
-          ]
-        : []),
-      ...(view === 'modal'
-        ? [
-            {
-              key: 'note',
-              label: '备注',
-              value: item?.note || '-',
-              fullWidth: true,
-            },
-          ]
-        : []),
-    ],
-    modalTitle: '出货单完整明细',
-  })
-
   const shipmentListParams = useMemo(
     () =>
       compactParams({
@@ -677,12 +604,14 @@ export default function ShipmentsPage() {
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
     setLoading(true)
+    setStatusCounts(null)
     try {
       const routeSelectedID = Number(routeShipmentID || 0)
       const [data, routeShipment] = await Promise.all([
         listShipments(
           {
             ...shipmentListParams,
+            include_status_counts: true,
             ...getBusinessPaginationParams(pagination),
           },
           { signal: request.signal }
@@ -712,6 +641,9 @@ export default function ShipmentsPage() {
           : null
       })
       setTotal(exactPage.total)
+      setStatusCounts(resolveBusinessStatusCounts(data, {
+        hasExactContext: routeSelectedID > 0, exactRecord: routeShipment, statusField: 'status',
+      }))
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return
@@ -736,7 +668,7 @@ export default function ShipmentsPage() {
       setSearchParams(nextParams, { replace: true })
       resetBusinessPaginationCurrent(setPagination)
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams, setPagination]
   )
 
   useEffect(() => {
@@ -1094,7 +1026,9 @@ export default function ShipmentsPage() {
       sales_order_id: undefined,
       customer_id: undefined,
       customer_snapshot: '',
-      ...deliverySnapshotFormValues(),
+      ...deliverySnapshotFormValues({
+        country_region: DEFAULT_DELIVERY_COUNTRY,
+      }),
       idempotency_key: idempotencyKey('shipment'),
       planned_ship_at: currentBusinessDate(),
       transport_method: '',
@@ -1539,7 +1473,17 @@ export default function ShipmentsPage() {
     setDateFilterStart('')
     setDateFilterEnd('')
     clearRouteContext()
-  }, [clearRouteContext])
+  }, [
+    clearRouteContext,
+    setKeyword,
+    setStatusFilter,
+    setCustomerFilter,
+    setProductFilter,
+    setWarehouseFilter,
+    setDateFilterField,
+    setDateFilterStart,
+    setDateFilterEnd,
+  ])
   const selectedRowLabel = selectedRow
     ? `${selectedRow.shipment_no || '已登记出货单'} / ${
         selectedRow.customer_snapshot ||
@@ -1604,17 +1548,12 @@ export default function ShipmentsPage() {
             出货单：实际出货记录
           </Tag>,
           <Tag color="green" key="inventory">
-            出库管理：库存出库记录
+            库存预留：订单库存占用
           </Tag>,
         ]}
         stats={[
-          { key: 'total', label: '总出货单', value: total },
+          { key: 'total', label: '符合条件', value: total },
           { key: 'current', label: '本页显示', value: rows.length },
-          {
-            key: 'draft',
-            label: '草稿',
-            value: rows.filter((item) => item.status === 'DRAFT').length,
-          },
         ]}
       />
 
@@ -1636,7 +1575,12 @@ export default function ShipmentsPage() {
               }}
               onPressEnter={loadRows}
             />
-            <SelectFilter
+            <BusinessStatusFilter
+              inline
+              aria-label="出货单状态"
+              counts={statusCounts}
+              loading={loading}
+              exact={Boolean(routeShipmentID)}
               className="erp-business-filter-control--status"
               value={statusFilter}
               options={SHIPMENT_STATUS_OPTIONS}
@@ -1964,6 +1908,7 @@ export default function ShipmentsPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
+          <BusinessTaskActions sourceType="shipment" record={selectedRow} adminProfile={adminProfile} disabled={saving} />
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -1987,13 +1932,11 @@ export default function ShipmentsPage() {
         rowClassName={(record) =>
           record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
         }
-        expandable={shipmentItemsPreview.expandable}
         onRow={(record) => ({
           onClick: () => setSelectedRow(record),
         })}
         onOpenRecord={openShipmentRecord}
       />
-      {shipmentItemsPreview.modal}
       {columnOrderModal}
 
       <ShipmentEditor

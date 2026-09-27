@@ -1,10 +1,14 @@
 import React, { useMemo } from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
-import { Button, Select } from 'antd'
-import { buildProductionProcessModel } from '../../utils/businessVisualizationModels.mjs'
+import { Button, Select, Drawer, Empty } from 'antd'
+import {
+  buildProductionProcessModel,
+  paginateVisualizationRows,
+} from '../../utils/businessVisualizationModels.mjs'
 import {
   BusinessVisualizationFrame,
   VisualizationState,
+  VisualizationPagination,
 } from './BusinessVisualizationFrame.jsx'
 
 const ORDER_STATUS_LABELS = Object.freeze({
@@ -30,6 +34,8 @@ export default function ProductionProcessProgress({
   onSelectOrder,
   onOpenOrder,
   switcher,
+  viewState = {},
+  onViewStateChange,
 }) {
   const model = useMemo(
     () => buildProductionProcessModel(aggregate),
@@ -42,6 +48,23 @@ export default function ProductionProcessProgress({
         .map(orderOption),
     [orders]
   )
+  const filter = viewState.filter || 'all'
+  const filtered = model.items.filter(
+    (item) =>
+      filter === 'all' ||
+      item.steps.some(
+        (step) =>
+          step.state.key === filter ||
+          (filter === 'quality' &&
+            step.batches.some((batch) => batch.statusKey === 'WAITING_QUALITY'))
+      )
+  )
+  const pagination = paginateVisualizationRows(filtered, viewState.page)
+  const selectedItem = model.items.find((item) => item.id === viewState.itemID)
+  const selectedStep = selectedItem?.steps.find(
+    (step) => step.id === viewState.stepID
+  )
+  const change = (patch) => onViewStateChange?.({ ...viewState, ...patch })
   const empty = !loading && !error && options.length === 0
 
   return (
@@ -49,11 +72,15 @@ export default function ProductionProcessProgress({
       className="erp-production-process"
       switcher={switcher}
       title="生产工序"
+      loading={loading}
+      error={error}
       metrics={[
         {
-          key: 'products',
-          label: '产品行',
+          key: 'all',
+          label: '全部产品行',
           value: model.counts.products,
+          selected: filter === 'all',
+          onClick: () => change({ filter: 'all', page: 1 }),
         },
         {
           key: 'active-batches',
@@ -62,13 +89,17 @@ export default function ProductionProcessProgress({
         },
         {
           key: 'quality',
-          label: '待质检',
+          label: '待质检批次',
+          selected: filter === 'quality',
+          onClick: () => change({ filter: 'quality', page: 1 }),
           value: model.counts.waitingQuality,
           tone: model.counts.waitingQuality > 0 ? 'warning' : 'success',
         },
         {
           key: 'exception',
-          label: '需处理',
+          label: '需处理批次',
+          selected: filter === 'exception',
+          onClick: () => change({ filter: 'exception', page: 1 }),
           value: model.counts.exceptions,
           tone: model.counts.exceptions > 0 ? 'danger' : 'success',
         },
@@ -115,7 +146,8 @@ export default function ProductionProcessProgress({
       ) : null}
       {!loading && !error && model.initialized ? (
         <div className="erp-production-process__lanes">
-          {model.items.map((item) => (
+          <VisualizationState empty={filtered.length === 0} />
+          {pagination.rows.map((item) => (
             <section className="erp-production-process__lane" key={item.id}>
               <div className="erp-production-process__identity">
                 <strong>{item.productName}</strong>
@@ -130,7 +162,10 @@ export default function ProductionProcessProgress({
               </div>
               <div className="erp-production-process__steps">
                 {item.steps.map((step) => (
-                  <article
+                  <button
+                    type="button"
+                    aria-label={`查看${item.productName}的${step.name}`}
+                    onClick={() => change({ itemID: item.id, stepID: step.id })}
                     key={step.id}
                     className={`erp-production-process__step erp-production-process__step--${step.state.key}`}
                   >
@@ -151,13 +186,77 @@ export default function ProductionProcessProgress({
                         {step.qualityText}
                       </span>
                     ) : null}
-                  </article>
+                  </button>
                 ))}
               </div>
             </section>
           ))}
+          <VisualizationPagination
+            pagination={pagination}
+            onChange={(page) => change({ page })}
+          />
         </div>
       ) : null}
+      <Drawer
+        title={
+          selectedStep
+            ? `${selectedItem.productName} · ${selectedStep.name}`
+            : '工序明细'
+        }
+        open={Boolean(selectedStep) && !loading && !error}
+        onClose={() => change({ stepID: null, itemID: null })}
+        width={640}
+        destroyOnHidden
+      >
+        {selectedStep ? (
+          <>
+            <p>
+              {selectedStep.state.label} ·{' '}
+              {selectedStep.executionText || '尚未安排生产方式'}
+            </p>
+            <h3>在制批次</h3>
+            {selectedStep.batches.length ? (
+              selectedStep.batches.map((batch) => (
+                <div
+                  className="erp-production-process__detail-row"
+                  key={batch.id}
+                >
+                  <strong>{batch.batchNo}</strong>
+                  <span>
+                    {batch.quantity} {selectedItem.unitName}
+                  </span>
+                  <span>{batch.status}</span>
+                </div>
+              ))
+            ) : (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="此工序暂无批次"
+              />
+            )}
+            <h3>品质检验</h3>
+            {selectedStep.inspections.length ? (
+              selectedStep.inspections.map((inspection) => (
+                <div
+                  className="erp-production-process__detail-row"
+                  key={inspection.id}
+                >
+                  <strong>{inspection.inspectionNo}</strong>
+                  <span>{inspection.gate}</span>
+                  <span>{inspection.status}</span>
+                </div>
+              ))
+            ) : (
+              <p>
+                {selectedStep.qualityText
+                  ? `待登记：${selectedStep.qualityText}`
+                  : '本工序无需品质关口'}
+              </p>
+            )}
+            <p>完工入库请到生产记录核对。</p>
+          </>
+        ) : null}
+      </Drawer>
     </BusinessVisualizationFrame>
   )
 }

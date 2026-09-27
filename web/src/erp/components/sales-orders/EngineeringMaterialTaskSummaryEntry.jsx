@@ -34,7 +34,8 @@ export default function EngineeringMaterialTaskSummaryEntry({
         block
         icon={<FileTextOutlined aria-hidden="true" />}
         size={mobile ? 'large' : 'middle'}
-        onClick={() => {
+        onClick={(event) => {
+          entryRef.current = event.currentTarget
           setView('summary')
           setOpenedSourceKey(sourceKey)
         }}
@@ -46,7 +47,8 @@ export default function EngineeringMaterialTaskSummaryEntry({
         <Button
           block
           size={mobile ? 'large' : 'middle'}
-          onClick={() => {
+          onClick={(event) => {
+            entryRef.current = event.currentTarget
             setView('preview')
             setOpenedSourceKey(sourceKey)
           }}
@@ -65,7 +67,7 @@ export default function EngineeringMaterialTaskSummaryEntry({
           onCancel={() => {
             setOpenedSourceKey(null)
             requestAnimationFrame(() => {
-              entryRef.current?.focus()
+              entryRef.current?.focus({ preventScroll: true })
             })
           }}
         />

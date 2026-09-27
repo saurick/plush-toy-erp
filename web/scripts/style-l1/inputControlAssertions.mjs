@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  assertNoBlueFocusStyle,
+  assertNoUnconfiguredFocusStyle,
   isAcceptedFocusBorder,
   isBluePrimaryColor,
 } from './colorAssertions.mjs'
@@ -67,7 +67,7 @@ async function assertVisibleAffixInputIsolation(page, scenarioName) {
 
 async function assertVisibleInputControlRadius(page, scenarioName) {
   const issues = await page.evaluate(() => {
-    const minRadius = 10
+    const minRadius = 8
     const ignoredAncestorSelector = [
       '.ant-picker-dropdown',
       '.ant-select-dropdown',
@@ -750,7 +750,7 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
         isAcceptedFocusBorder(item),
         `${scenarioName} 输入控件 focus 边框未统一到主题色: ${JSON.stringify(item)}`
       )
-      assertNoBlueFocusStyle(item, scenarioName)
+      assertNoUnconfiguredFocusStyle(item, scenarioName)
     }
   })
 }
@@ -863,7 +863,7 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
           : null
         const hasClosedSelection = Boolean(
           selectedItem?.textContent?.trim() &&
-            !owner.closest('.ant-select')?.classList.contains('ant-select-open')
+          !owner.closest('.ant-select')?.classList.contains('ant-select-open')
         )
         const selectTextNodes = owner.matches('.ant-select-selector')
           ? Array.from(
@@ -1096,7 +1096,40 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
   )
 }
 
+async function assertVisibleDateFilterGeometry(page, scenarioName) {
+  const issues = await page.evaluate(() =>
+    [
+      ...document.querySelectorAll(
+        '.erp-business-date-range-filter :is(.erp-business-date-input, .erp-business-date-range-filter__type-label)'
+      ),
+    ].flatMap((element) => {
+      const rect = element.getBoundingClientRect()
+      if (!rect.width || !rect.height) return []
+      const style = getComputedStyle(element)
+      const expected =
+        parseFloat(style.getPropertyValue('--erp-business-control-height')) - 2
+      return Math.abs(rect.height - expected) <= 1
+        ? []
+        : [
+            {
+              className: element.className,
+              height: rect.height,
+              expected,
+              flexBasis: style.flexBasis,
+              direction: getComputedStyle(element.parentElement).flexDirection,
+            },
+          ]
+    })
+  )
+  assert.deepEqual(
+    issues,
+    [],
+    `${scenarioName} 日期筛选控件不能随纵向 flex 被拉长: ${JSON.stringify(issues)}`
+  )
+}
+
 export {
+  assertVisibleDateFilterGeometry,
   assertVisibleAffixInputIsolation,
   assertVisibleInputControlRadius,
   assertVisibleSearchPlaceholdersFit,

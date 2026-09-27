@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
+import useBusinessPageState from '../../hooks/useBusinessPageState.js'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -29,31 +31,72 @@ export function useOperationalFactQuery({
   enabledViews,
   viewOverrides,
   adminProfile,
-  outletContext,
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [activeKey, setActiveKey] = useState(initialActiveKey)
 
-  const [keyword, setKeyword] = useState('')
+  const [keyword, setKeyword] = useBusinessPageState('keyword', '')
 
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useBusinessPageState(
+    'statusFilter',
+    ''
+  )
 
-  const [dateFieldByKey, setDateFieldByKey] = useState({})
+  const [dateFieldByKey, setDateFieldByKey] = useBusinessPageState(
+    'dateFieldByKey',
+    {}
+  )
 
-  const [dateRangeByKey, setDateRangeByKey] = useState({})
+  const [dateRangeByKey, setDateRangeByKey] = useBusinessPageState(
+    'dateRangeByKey',
+    {}
+  )
 
   const [loading, setLoading] = useState(false)
 
   const [rowsByKey, setRowsByKey] = useState({})
 
   const [totalByKey, setTotalByKey] = useState({})
+  const [statusCountsByKey, setStatusCountsByKey] = useState({})
 
-  const [paginationByKey, setPaginationByKey] = useState({})
+  const [paginationByKey, setPaginationByKey] = useBusinessPageState(
+    'paginationByKey',
+    {}
+  )
 
   const [selectedByKey, setSelectedByKey] = useState({})
+  const [selectedIDsByKey, setSelectedIDsByKey] = useBusinessPageState(
+    'selectedIDs',
+    {}
+  )
+  const selectedIDsRef = useRef(selectedIDsByKey)
+  selectedIDsRef.current = selectedIDsByKey
+  useEffect(() => {
+    if (Object.keys(selectedByKey).length === 0) return
+    setSelectedIDsByKey((previous) => ({
+      ...previous,
+      ...Object.fromEntries(
+        Object.entries(selectedByKey).map(([key, record]) => [
+          key,
+          record?.id || null,
+        ])
+      ),
+    }))
+  }, [selectedByKey, setSelectedIDsByKey])
 
-  const [detailRecord, setDetailRecord] = useState(null)
+  const [detailRecord, setDetailRecordValue] = useState(null)
+  const [detailRecordID, setDetailRecordID] = useBusinessPageState(
+    'detailRecordID',
+    0
+  )
+  const setDetailRecord = useCallback(
+    (record) => {
+      setDetailRecordValue(record)
+      setDetailRecordID(record?.id || 0)
+    },
+    [setDetailRecordID]
+  )
 
   const listRequestVersionRef = useRef(0)
 
@@ -134,7 +177,7 @@ export function useOperationalFactQuery({
       }))
       setDetailRecord(record)
     },
-    [currentActiveKey]
+    [currentActiveKey, setDetailRecord]
   )
 
   const activePagination =
@@ -155,7 +198,7 @@ export function useOperationalFactQuery({
         },
       }))
     },
-    [currentActiveKey]
+    [currentActiveKey, setPaginationByKey]
   )
 
   const routeListParamsForKey = useCallback(
@@ -195,6 +238,7 @@ export function useOperationalFactQuery({
         config.readPermissions.length > 0 &&
         !hasAnyPermission(adminProfile, config.readPermissions)
       ) {
+        setStatusCountsByKey((prev) => ({ ...prev, [key]: null }))
         setRowsByKey((prev) => ({ ...prev, [key]: [] }))
         setSelectedByKey((prev) => ({ ...prev, [key]: null }))
         setTotalByKey((prev) => ({ ...prev, [key]: 0 }))
@@ -206,6 +250,7 @@ export function useOperationalFactQuery({
       const shouldApplyRequest = () =>
         mountedRef.current && requestVersion === listRequestVersionRef.current
       setLoading(true)
+      setStatusCountsByKey((prev) => ({ ...prev, [key]: null }))
       try {
         const pagination = paginationByKey[key] || activePagination
         const exactRouteContext = Boolean(
@@ -220,6 +265,7 @@ export function useOperationalFactQuery({
               })
             : await config.list(
                 compactParams({
+                  include_status_counts: key === 'finance' ? true : undefined,
                   status: statusFilter,
                   keyword: trimOptional(
                     linkedDocumentRequestKeyword({
@@ -248,6 +294,10 @@ export function useOperationalFactQuery({
         if (!shouldApplyRequest()) {
           return
         }
+        setStatusCountsByKey((prev) => ({
+          ...prev,
+          [key]: resolveBusinessStatusCounts(data),
+        }))
         setRowsByKey((prev) => ({
           ...prev,
           [key]: nextRows,
@@ -265,7 +315,7 @@ export function useOperationalFactQuery({
           })
           const hasRouteSelection = Boolean(
             (key === 'production' && routeFactID) ||
-              (key === 'finance' && routeSourceType && routeSourceID)
+            (key === 'finance' && routeSourceType && routeSourceID)
           )
           if (hasRouteSelection) {
             return {
@@ -273,7 +323,7 @@ export function useOperationalFactQuery({
               [key]: routeRecord,
             }
           }
-          const current = prev[key]
+          const current = prev[key] || { id: selectedIDsRef.current[key] }
           if (!current?.id) return prev
           const refreshed = nextRows.find((item) => item.id === current.id)
           return {
@@ -318,18 +368,13 @@ export function useOperationalFactQuery({
       routeSourceID,
       routeSourceType,
       statusFilter,
+      setDetailRecord,
     ]
   )
 
   useEffect(() => {
     loadRows(currentActiveKey)
   }, [currentActiveKey, loadRows])
-
-  useEffect(() => {
-    return outletContext?.registerPageRefresh?.(() =>
-      loadRows(currentActiveKey)
-    )
-  }, [currentActiveKey, loadRows, outletContext])
 
   const loadExportRows = useCallback(
     async ({ signal }) => {
@@ -419,7 +464,15 @@ export function useOperationalFactQuery({
       [currentActiveKey]: ['', ''],
     }))
     clearRouteContext()
-  }, [activeConfig.defaultDateField, clearRouteContext, currentActiveKey])
+  }, [
+    activeConfig.defaultDateField,
+    clearRouteContext,
+    currentActiveKey,
+    setKeyword,
+    setStatusFilter,
+    setDateFieldByKey,
+    setDateRangeByKey,
+  ])
   const routeView = searchParamText(searchParams, 'view')
   useEffect(() => {
     if (routeView && configs[routeView] && routeView !== activeKey) {
@@ -441,6 +494,7 @@ export function useOperationalFactQuery({
     selectedByKey,
     setSelectedByKey,
     detailRecord,
+    detailRecordID,
     setDetailRecord,
     routeSalesOrderID,
     routeSourceID,
@@ -451,6 +505,7 @@ export function useOperationalFactQuery({
     currentActiveKey,
     activeConfig,
     activeTotal,
+    statusCounts: statusCountsByKey[currentActiveKey] ?? null,
     openOperationalFactDetails,
     activePagination,
     activeDateField,

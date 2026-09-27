@@ -164,15 +164,15 @@ export function createOutsourcingSummaryScenarios({
         await assertTableSemanticAlignment(region, {
           scenarioName: name,
           expected: {
-            '产品 / 材料编号': 'center',
+            '产品 / 材料编号': 'left',
             '产品 / 材料名称': 'left',
             加工项目: 'left',
             厂家名称: 'left',
-            单位: 'center',
+            单位: 'left',
             加工数量: 'right',
             行备注: 'left',
-            委托人: 'center',
-            合同状态: 'center',
+            委托人: 'left',
+            合同状态: 'left',
           },
         })
         await region.locator('.ant-pagination-item-2').click()
@@ -197,7 +197,6 @@ export function createOutsourcingSummaryScenarios({
         assert.equal(fullCSV.includes('020-00000000'), !readOnly)
         const search = region.getByRole('textbox', { name: '搜索加工明细' })
         await search.fill('耳*2')
-        await search.press('Enter')
         await region.getByText('模拟筛选布料', { exact: true }).waitFor()
         assert.equal(calls.at(-1).offset, 0)
         await region.getByText('共 1 条加工明细', { exact: true }).waitFor()
@@ -222,7 +221,13 @@ export function createOutsourcingSummaryScenarios({
             exact: true,
           })
           .click()
-        await page.getByRole('tab', { name: '加工合同', exact: true }).waitFor()
+        await page.waitForFunction(() =>
+          [...document.querySelectorAll('[role="tab"]')].some(
+            (node) =>
+              node.textContent === '加工合同' &&
+              node.getAttribute('aria-selected') === 'true'
+          )
+        )
         assert.equal(
           new URL(page.url()).searchParams.get('outsourcing_order_id'),
           '1'
@@ -231,9 +236,7 @@ export function createOutsourcingSummaryScenarios({
         await region.getByText('模拟筛选布料', { exact: true }).waitFor()
         assert.equal(await search.inputValue(), '耳*2')
         failNext = true
-        await region
-          .getByRole('button', { name: '刷新明细', exact: true })
-          .click()
+        await page.getByRole('button', { name: '刷新当前页' }).click()
         try {
           await region
             .getByRole('button', { name: '重新加载', exact: true })

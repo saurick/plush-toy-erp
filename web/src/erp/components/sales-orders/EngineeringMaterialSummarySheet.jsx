@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Space } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -77,10 +77,20 @@ function MaterialParts({ parts }) {
           align: 'left',
           title: '加工 / 备注',
           width: 230,
-          render: (_, part) =>
-            [part.process_base, part.process_method, part.material_note]
-              .filter(Boolean)
-              .join(' · ') || '—',
+          render: (_, part) => (
+            <MaterialNotes
+              notes={[
+                ...new Set(
+                  [
+                    part.process_base,
+                    part.process_method,
+                    part.material_note,
+                  ].filter(Boolean)
+                ),
+              ]}
+              compact
+            />
+          ),
         },
       ]}
     />
@@ -88,6 +98,22 @@ function MaterialParts({ parts }) {
 }
 
 const renderMaterialParts = (item) => <MaterialParts parts={item.parts} />
+
+const renderMaterialExpandIcon = ({
+  expanded,
+  onExpand,
+  record,
+  expandable,
+}) =>
+  expandable ? (
+    <button
+      type="button"
+      className={`ant-table-row-expand-icon ant-table-row-expand-icon-${expanded ? 'expanded' : 'collapsed'}`}
+      aria-label={`${expanded ? '收起' : '查看'}${record.material_name}部位用量`}
+      aria-expanded={expanded}
+      onClick={(event) => onExpand(record, event)}
+    />
+  ) : null
 
 function MaterialNotes({ notes, compact = false }) {
   if (!notes.length) return '—'
@@ -120,6 +146,7 @@ export default function EngineeringMaterialSummarySheet({
 }) {
   const [mobileView, setMobileView] = useState('cards')
   const [expanded, setExpanded] = useState([])
+  const [tableOverflow, setTableOverflow] = useState(false)
   const tableHost = useRef(null)
   const rows = useMemo(() => materialSummaryRows(request), [request])
   const products = useMemo(
@@ -128,6 +155,18 @@ export default function EngineeringMaterialSummarySheet({
   )
   const totals = materialSummaryTotals(request.items)
   const inventory = request.inventory_reference
+  useEffect(() => {
+    const scroller = tableHost.current?.querySelector('.ant-table-body')
+    if (!scroller || mobile) return undefined
+    const measure = () =>
+      setTableOverflow(scroller.scrollWidth > scroller.clientWidth + 1)
+    const observer = new ResizeObserver(measure)
+    observer.observe(scroller)
+    const table = scroller.querySelector('table')
+    if (table) observer.observe(table)
+    measure()
+    return () => observer.disconnect()
+  }, [mobile, rows])
   const displayQuantity = (value) => (
     <span
       className="erp-material-number"
@@ -226,12 +265,17 @@ export default function EngineeringMaterialSummarySheet({
     const scroller = tableHost.current?.querySelector('.ant-table-body')
     scroller?.scrollTo({
       left: right ? scroller.scrollWidth : 0,
-      behavior: 'smooth',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
     })
   }
 
   return (
-    <section className="erp-material-sheet" aria-label="材料汇总明细">
+    <section
+      className={`erp-material-sheet${mobile ? ' erp-material-sheet--mobile' : ''}`}
+      aria-label="材料汇总明细"
+    >
       {mobile ? (
         <p className="erp-material-sheet__order">订单号：{request.order_no}</p>
       ) : null}
@@ -292,15 +336,17 @@ export default function EngineeringMaterialSummarySheet({
         ))}
       </div>
       <div className="erp-material-sheet__toolbar">
-        <span>{request.items.length} 种材料</span>
-        {mobile ? (
+        <strong>{request.items.length} 种材料</strong>
+        {mobile || inventory?.status === 'UNAVAILABLE' ? (
           <Button
             type="text"
             aria-label="重新读取"
             icon={<ReloadOutlined aria-hidden />}
             disabled={saving}
             onClick={onReload}
-          />
+          >
+            {!mobile ? '重新读取' : null}
+          </Button>
         ) : null}
         {mobile ? (
           <Segmented
@@ -322,8 +368,8 @@ export default function EngineeringMaterialSummarySheet({
               },
             ]}
           />
-        ) : (
-          <Space size={4}>
+        ) : tableOverflow ? (
+          <Space size={4} className="erp-material-sheet__scroll-actions">
             <Button
               icon={<ArrowLeftOutlined aria-hidden />}
               onClick={() => scrollToSide(false)}
@@ -337,7 +383,7 @@ export default function EngineeringMaterialSummarySheet({
               库存 / 备注
             </Button>
           </Space>
-        )}
+        ) : null}
       </div>
       <p className="erp-material-sheet__purchase-basis">
         <strong>采购口径：</strong>
@@ -409,6 +455,8 @@ export default function EngineeringMaterialSummarySheet({
               fixed: 'left',
               columnTitle: '明细',
               columnWidth: 48,
+              rowExpandable: (item) => item.parts.length > 0,
+              expandIcon: renderMaterialExpandIcon,
               expandedRowKeys: expanded,
               onExpandedRowsChange: setExpanded,
               expandedRowRender: renderMaterialParts,

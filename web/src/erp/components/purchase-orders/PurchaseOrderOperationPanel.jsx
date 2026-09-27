@@ -12,6 +12,8 @@ import {
   SettingOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Space } from 'antd'
+import BusinessTaskActions from '../workflow/BusinessTaskActions.jsx'
+import BusinessStatusFilter from '../business-list/BusinessStatusFilter.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 
 import {
@@ -37,6 +39,7 @@ import { filterLifecycleStatusOptions } from '../../utils/lifecycleScope.mjs'
 import { resolveRelatedRecordActionAvailability } from '../../utils/operationalActionAvailability.mjs'
 
 export default function PurchaseOrderOperationPanel({
+  adminProfile,
   applySelectedRowKeys,
   canCreate = false,
   canCreateInboundDraftAction = false,
@@ -96,6 +99,9 @@ export default function PurchaseOrderOperationPanel({
   singleSelectedOrder,
   sortValue = 'updated_at:desc',
   status = '',
+  statusCounts = null,
+  statusLoading = false,
+  exactStatusContext = false,
   supplierFilter = '',
   supplierOptions = [],
 }) {
@@ -152,7 +158,12 @@ export default function PurchaseOrderOperationPanel({
             value={lifecycleScope}
             onChange={onLifecycleScopeChange}
           />
-          <SelectFilter
+          <BusinessStatusFilter
+            inline
+            counts={statusCounts}
+            loading={statusLoading}
+            exact={exactStatusContext}
+            aria-label="采购订单状态"
             className="erp-business-filter-control--status"
             value={status}
             options={filterLifecycleStatusOptions(
@@ -220,7 +231,7 @@ export default function PurchaseOrderOperationPanel({
             icon={<SettingOutlined />}
             onClick={() => setColumnOrderOpen(true)}
           >
-            列顺序
+            列设置
           </ToolbarButton>
         </Space>
       }
@@ -465,6 +476,7 @@ export default function PurchaseOrderOperationPanel({
             }
           />
         ))}
+        <BusinessTaskActions sourceType="purchase_order" record={singleSelectedOrder} adminProfile={adminProfile} disabled={recordActionBusy} />
       </SelectionActionBar>
     </BusinessOperationPanel>
   )

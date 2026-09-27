@@ -98,17 +98,23 @@ export function resolveERPFavicon(pathname = '', options = {}) {
   if (printTemplateFavicon) {
     return printTemplateFavicon
   }
+  const isMobileExperience =
+    options.isMobileExperience ||
+    isMobileTaskPath(normalizedPathname) ||
+    isMobileTaskPath(normalizedFromPathname)
+  const mobileCustomerFavicon = isMobileExperience
+    ? buildCustomerFaviconVariant(options.customerMobileFaviconHref)
+    : null
+  if (mobileCustomerFavicon) {
+    return mobileCustomerFavicon
+  }
   const customerFavicon = buildCustomerFaviconVariant(
     options.customerFaviconHref
   )
   if (customerFavicon) {
     return customerFavicon
   }
-  if (
-    options.isMobileExperience ||
-    isMobileTaskPath(normalizedPathname) ||
-    isMobileTaskPath(normalizedFromPathname)
-  ) {
+  if (isMobileExperience) {
     return ERP_FAVICON_VARIANTS.tasks
   }
   return ERP_FAVICON_VARIANTS.admin

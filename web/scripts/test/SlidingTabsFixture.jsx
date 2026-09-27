@@ -211,6 +211,21 @@ function Fixture() {
             }))}
           />
         </section>
+        <section id="overflow-tabs" style={{ minWidth: 0 }}>
+          <Tabs
+            items={[
+              '订单与产品明细',
+              '生产执行与异常',
+              '来源与协同任务',
+              '库存与出货记录',
+              '财务与结算记录',
+            ].map((label) => ({
+              key: label,
+              label,
+              children: label,
+            }))}
+          />
+        </section>
         <ActionBarMountFixture />
       </main>
     </ConfigProvider>

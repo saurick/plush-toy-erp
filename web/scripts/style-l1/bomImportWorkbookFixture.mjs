@@ -145,7 +145,7 @@ export function createBOMImportWorkbookFixture({
       '样式材料',
       '示例织造AB-001#-02#米白',
       '短毛绒 300g',
-      '核心演示单位-件',
+      '个',
       '前片*1',
       '0.5',
       '55',
@@ -157,7 +157,7 @@ export function createBOMImportWorkbookFixture({
       '尚未建档材料',
       'SUP-MISSING',
       '测试规格',
-      '核心演示单位-件',
+      '个',
       '后片*1',
       '1',
       '100',
@@ -191,15 +191,7 @@ export function createBOMImportWorkbookFixture({
         { formula: 'SUM(F7:F8)', value: '1.123456789' },
         { formula: 'SUM(G7:G8)', value: '113.58024679' },
       ],
-      [
-        '尚未建档材料',
-        'SUP-OTHER',
-        '另一规格',
-        '核心演示单位-件',
-        '尾片*1',
-        '1',
-        '100',
-      ]
+      ['尚未建档材料', 'SUP-OTHER', '另一规格', '个', '尾片*1', '1', '100']
     )
   }
   if (mergedNotes) {

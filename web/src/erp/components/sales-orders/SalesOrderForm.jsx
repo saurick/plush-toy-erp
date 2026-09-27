@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  ArrowUpOutlined,
   CopyOutlined,
   DeleteOutlined,
   OrderedListOutlined,
@@ -7,18 +8,25 @@ import {
 import {
   AutoComplete,
   Button,
-  Empty,
   Form,
   Input,
   InputNumber,
   Select,
   Space,
 } from 'antd'
+import {
+  formatUnitQuantitySummary,
+  calculateSalesOrderAmounts,
+  deriveSalesOrderItemAmount,
+} from '../../utils/sourceOrderAmounts.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTable.jsx'
 import SalesOrderSourceEvidence from './SalesOrderSourceEvidence.jsx'
 import SalesOrderSourcePaymentSection from './SalesOrderSourcePaymentSection.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
+import DeliveryAddressFields from '../business-list/DeliveryAddressFields.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
   singleUnitSuffixTextFromOptions,
@@ -50,11 +58,6 @@ import {
   salesOrderRequirementName,
 } from '../../utils/salesOrderRequirements.mjs'
 import { paymentConditionCompleteness } from '../../utils/paymentConditions.mjs'
-import {
-  calculateSalesOrderAmounts,
-  deriveSalesOrderItemAmount,
-  summarizeSalesOrderLines,
-} from '../../utils/sourceOrderAmounts.mjs'
 import {
   optionalContactEmailRule,
   optionalContactPhoneRule,
@@ -244,6 +247,8 @@ function optionalMoneyRule(label) {
 
 export function SalesOrderFormFields({
   form,
+  itemsSection,
+  attachmentPanel,
   customers,
   contactOptions = [],
   salesOwnerOptions = [],
@@ -269,378 +274,344 @@ export function SalesOrderFormFields({
 
   return (
     <>
-      <BusinessFormSectionTitle>订单与客户</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="订单号（自动）"
-        name="order_no"
-        rules={[{ required: true, message: '请填写或保留自动订单号' }]}
-      >
-        <Input
-          allowClear
-          autoComplete="off"
-          placeholder="自动生成，可按需要调整"
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="客户"
-        name="customer_id"
-        rules={[{ required: true, message: '请选择客户' }]}
-      >
-        <Select
-          allowClear
-          showSearch
-          optionFilterProp="label"
-          options={customers.map((customer) => {
-            const customerCode = String(customer.code || '').trim()
-            const customerName = String(customer.name || '').trim()
-            return {
-              label: customerCode
-                ? `${customerCode} - ${customerName || '未命名客户'}`
-                : customerName || '客户已关联',
-              value: customer.id,
-            }
-          })}
-          onChange={onCustomerChange}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="客户订单号"
-        name="customer_order_no"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="币种"
-        name="currency"
-        rules={[{ required: true, message: '请选择币种' }]}
-      >
-        <Select options={BUSINESS_CURRENCY_OPTIONS} />
-      </Form.Item>
-      <BusinessFormSectionTitle>联系人与负责人</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="业务员 / 跟单人"
-        name="sales_owner"
-      >
-        <AutoComplete
-          allowClear
-          autoComplete="off"
-          filterOption={(inputValue, option) =>
-            String(option?.value || '')
-              .toLowerCase()
-              .includes(String(inputValue || '').toLowerCase())
-          }
-          options={salesOwnerOptions}
-          placeholder="录入本单负责人"
-          maxLength={128}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="联系人"
-        name="contact_name"
-      >
-        <AutoComplete
-          allowClear
-          autoComplete="off"
-          filterOption={(inputValue, option) =>
-            String(option?.label || option?.value || '')
-              .toLowerCase()
-              .includes(String(inputValue || '').toLowerCase())
-          }
-          options={contactOptions
-            .map((contact) => ({
-              value: contact.name,
-              label: contactOptionLabel(contact),
-              contact,
-            }))
-            .filter((option) => option.value)}
-          placeholder="选择客户联系人或手动录入"
-          maxLength={128}
-          onChange={(value) => {
-            if (!value) {
-              form.setFieldsValue({
-                contact_phone: '',
-                contact_mobile: '',
-                contact_email: '',
-                contact_title: '',
-              })
-            }
-          }}
-          onSelect={(_, option) => onContactSelect?.(option?.contact)}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="联系电话"
-        name="contact_phone"
-        rules={[optionalContactPhoneRule()]}
-      >
-        <Input allowClear autoComplete="off" maxLength={64} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="联系邮箱"
-        name="contact_email"
-        rules={[optionalContactEmailRule()]}
-      >
-        <Input allowClear autoComplete="off" maxLength={128} />
-      </Form.Item>
-      <Form.Item name="contact_mobile" hidden>
-        <Input />
-      </Form.Item>
-      <Form.Item name="contact_title" hidden>
-        <Input />
-      </Form.Item>
-      <BusinessFormSectionTitle>结算条件</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['payment_term_days']}
-        label="付款方式"
-        name="payment_method"
-        rules={[
-          paymentConditionRule({
-            form,
-            methodField: 'payment_method',
-            termDaysField: 'payment_term_days',
-            field: 'method',
-          }),
-        ]}
-      >
-        <AutoComplete
-          allowClear
-          autoComplete="off"
-          filterOption={(inputValue, option) =>
-            String(option?.value || '')
-              .toLowerCase()
-              .includes(String(inputValue || '').toLowerCase())
-          }
-          options={paymentConditionOptions}
-          placeholder="选择或输入本单付款方式"
-          onBlur={onPaymentConditionBlur}
-          onChange={onPaymentMethodChange}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['payment_method']}
-        label="付款周期(天)"
-        name="payment_term_days"
-        rules={[
-          paymentConditionRule({
-            form,
-            methodField: 'payment_method',
-            termDaysField: 'payment_term_days',
-            field: 'termDays',
-          }),
-        ]}
-      >
-        <InputNumber
-          min={0}
-          precision={0}
-          style={{ width: '100%' }}
-          onBlur={onPaymentConditionBlur}
-        />
-      </Form.Item>
-      <SalesOrderSourcePaymentSection form={form} />
-      <BusinessFormSectionTitle>税费与运费条件</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="计税方式"
-        name="tax_mode"
-      >
-        <Select
-          allowClear
-          options={SALES_ORDER_TAX_MODE_OPTIONS}
-          placeholder="草稿可暂缺，提交前补齐"
-          onChange={(value) => {
-            if (!value || value === 'NONE') {
-              form.setFieldValue('tax_rate', undefined)
-            }
-          }}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['tax_mode']}
-        label="税率"
-        name="tax_rate"
-        rules={[
-          {
-            validator: async (_, value) => {
-              if (!taxMode || taxMode === 'NONE') return
-              if (value === undefined || value === null || value === '') return
-              const units = numeric20Scale6Units(value)
-              if (
-                units === null ||
-                BigInt(units) <= BigInt(0) ||
-                BigInt(units) > BigInt(100_000_000)
-              ) {
-                throw new Error(
-                  '税率必须大于 0 且不超过 100%，最多保留 6 位小数'
-                )
+      <BusinessFormSection title="订单与客户">
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="订单号（自动）"
+          name="order_no"
+          rules={[{ required: true, message: '请填写或保留自动订单号' }]}
+        >
+          <Input
+            allowClear
+            autoComplete="off"
+            placeholder="自动生成，可按需要调整"
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="客户"
+          name="customer_id"
+          rules={[{ required: true, message: '请选择客户' }]}
+        >
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            options={customers.map((customer) => {
+              const customerCode = String(customer.code || '').trim()
+              const customerName = String(customer.name || '').trim()
+              return {
+                label: customerCode
+                  ? `${customerCode} - ${customerName || '未命名客户'}`
+                  : customerName || '客户已关联',
+                value: customer.id,
               }
+            })}
+            onChange={onCustomerChange}
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="客户订单号"
+          name="customer_order_no"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="币种"
+          name="currency"
+          rules={[{ required: true, message: '请选择币种' }]}
+        >
+          <Select options={BUSINESS_CURRENCY_OPTIONS} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="下单日期"
+          name="order_date"
+          rules={[
+            { required: true, message: '请选择下单日期' },
+            dateInputNotAfterRule({
+              getEndValue: () => form.getFieldValue('planned_delivery_date'),
+              message: '下单日期不能晚于计划交付日期',
+            }),
+          ]}
+        >
+          <DateInput
+            disabledDate={
+              plannedDeliveryDate
+                ? disableOrderDateAfterPlannedDelivery
+                : undefined
+            }
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          dependencies={['order_date']}
+          label="计划交付日期"
+          name="planned_delivery_date"
+          rules={[
+            dateInputNotBeforeRule({
+              getStartValue: () => form.getFieldValue('order_date'),
+              message: '计划交付日期不能早于下单日期',
+            }),
+          ]}
+        >
+          <DateInput
+            disabledDate={
+              orderDate ? disablePlannedDeliveryBeforeOrderDate : undefined
+            }
+          />
+        </Form.Item>
+      </BusinessFormSection>
+      {itemsSection}
+      <BusinessFormSection title="联系与交付">
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="业务员 / 跟单人"
+          name="sales_owner"
+        >
+          <AutoComplete
+            allowClear
+            autoComplete="off"
+            filterOption={(inputValue, option) =>
+              String(option?.value || '')
+                .toLowerCase()
+                .includes(String(inputValue || '').toLowerCase())
+            }
+            options={salesOwnerOptions}
+            placeholder="录入本单负责人"
+            maxLength={128}
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="联系人"
+          name="contact_name"
+        >
+          <AutoComplete
+            allowClear
+            autoComplete="off"
+            filterOption={(inputValue, option) =>
+              String(option?.label || option?.value || '')
+                .toLowerCase()
+                .includes(String(inputValue || '').toLowerCase())
+            }
+            options={contactOptions
+              .map((contact) => ({
+                value: contact.name,
+                label: contactOptionLabel(contact),
+                contact,
+              }))
+              .filter((option) => option.value)}
+            placeholder="选择客户联系人或手动录入"
+            maxLength={128}
+            onChange={(value) => {
+              if (!value) {
+                form.setFieldsValue({
+                  contact_phone: '',
+                  contact_mobile: '',
+                  contact_email: '',
+                  contact_title: '',
+                })
+              }
+            }}
+            onSelect={(_, option) => onContactSelect?.(option?.contact)}
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="联系电话"
+          name="contact_phone"
+          rules={[optionalContactPhoneRule()]}
+        >
+          <Input allowClear autoComplete="off" maxLength={64} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="联系邮箱"
+          name="contact_email"
+          rules={[optionalContactEmailRule()]}
+        >
+          <Input allowClear autoComplete="off" maxLength={128} />
+        </Form.Item>
+        <Form.Item name="contact_mobile" hidden>
+          <Input />
+        </Form.Item>
+        <Form.Item name="contact_title" hidden>
+          <Input />
+        </Form.Item>
+        <DeliveryAddressFields
+          form={form}
+          extra="从客户档案带出后可按本单调整；保存后固定为本单收货信息。"
+        />
+      </BusinessFormSection>
+      <BusinessFormSection title="结算与报价">
+        <Form.Item
+          className="erp-business-action-form__field"
+          dependencies={['payment_term_days']}
+          label="付款方式"
+          name="payment_method"
+          rules={[
+            paymentConditionRule({
+              form,
+              methodField: 'payment_method',
+              termDaysField: 'payment_term_days',
+              field: 'method',
+            }),
+          ]}
+        >
+          <AutoComplete
+            allowClear
+            autoComplete="off"
+            filterOption={(inputValue, option) =>
+              String(option?.value || '')
+                .toLowerCase()
+                .includes(String(inputValue || '').toLowerCase())
+            }
+            options={paymentConditionOptions}
+            placeholder="选择或输入本单付款方式"
+            onBlur={onPaymentConditionBlur}
+            onChange={onPaymentMethodChange}
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          dependencies={['payment_method']}
+          label="付款周期(天)"
+          name="payment_term_days"
+          rules={[
+            paymentConditionRule({
+              form,
+              methodField: 'payment_method',
+              termDaysField: 'payment_term_days',
+              field: 'termDays',
+            }),
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            onBlur={onPaymentConditionBlur}
+          />
+        </Form.Item>
+        <SalesOrderSourcePaymentSection form={form} />
+        <BusinessFormSectionTitle>税费与运费条件</BusinessFormSectionTitle>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="计税方式"
+          name="tax_mode"
+        >
+          <Select
+            allowClear
+            options={SALES_ORDER_TAX_MODE_OPTIONS}
+            placeholder="草稿可暂缺，提交前补齐"
+            onChange={(value) => {
+              if (!value || value === 'NONE') {
+                form.setFieldValue('tax_rate', undefined)
+              }
+            }}
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          dependencies={['tax_mode']}
+          label="税率"
+          name="tax_rate"
+          rules={[
+            {
+              validator: async (_, value) => {
+                if (!taxMode || taxMode === 'NONE') return
+                if (value === undefined || value === null || value === '') {
+                  return
+                }
+                const units = numeric20Scale6Units(value)
+                if (
+                  units === null ||
+                  BigInt(units) <= BigInt(0) ||
+                  BigInt(units) > BigInt(100_000_000)
+                ) {
+                  throw new Error(
+                    '税率必须大于 0 且不超过 100%，最多保留 6 位小数'
+                  )
+                }
+              },
             },
-          },
-        ]}
-      >
-        <FieldWithUnitSuffix
-          control={
-            <InputNumber
-              disabled={!taxMode || taxMode === 'NONE'}
-              max="100"
-              min="0.000001"
-              precision={6}
-              stringMode
-            />
-          }
-          unitText="%"
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="报价是否含运费"
-        name="freight_terms"
-      >
-        <Select
-          allowClear
-          options={SALES_ORDER_FREIGHT_TERMS_OPTIONS}
-          placeholder="草稿可暂缺，提交前补齐"
-          onChange={(value) => {
-            if (value !== 'EXCLUDED') {
-              form.setFieldValue('quoted_freight_amount', undefined)
+          ]}
+        >
+          <FieldWithUnitSuffix
+            control={
+              <InputNumber
+                disabled={!taxMode || taxMode === 'NONE'}
+                stringMode
+              />
             }
-          }}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['freight_terms', 'currency']}
-        extra={
-          freightTerms === 'INCLUDED'
-            ? '已包含在产品单价中，不重复计入订单总额'
-            : '报价不含运费时填写另行向客户收取的金额；提交前需补齐'
-        }
-        label="报价运费"
-        name="quoted_freight_amount"
-        rules={[optionalMoneyRule('报价运费')]}
-      >
-        <FieldWithUnitSuffix
-          control={
-            <InputNumber
-              disabled={freightTerms !== 'EXCLUDED'}
-              min="0"
-              precision={6}
-              stringMode
-              placeholder={
-                freightTerms === 'EXCLUDED' ? '填写另计运费' : '已含在单价'
+            unitText="%"
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="报价是否含运费"
+          name="freight_terms"
+        >
+          <Select
+            allowClear
+            options={SALES_ORDER_FREIGHT_TERMS_OPTIONS}
+            placeholder="草稿可暂缺，提交前补齐"
+            onChange={(value) => {
+              if (value !== 'EXCLUDED') {
+                form.setFieldValue('quoted_freight_amount', undefined)
               }
-            />
+            }}
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          dependencies={['freight_terms', 'currency']}
+          extra={
+            freightTerms === 'INCLUDED'
+              ? '已包含在产品单价中，不重复计入订单总额'
+              : '报价不含运费时填写另行向客户收取的金额；提交前需补齐'
           }
-          unitText={currency || '币种'}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        label="报价备注"
-        name="price_condition_note"
-      >
-        <BusinessTextArea
-          allowClear
-          showCount
-          maxLength={255}
-          placeholder="账期影响报价时记录核对结论"
-        />
-      </Form.Item>
-      <BusinessFormSectionTitle>交付与收货</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="下单日期"
-        name="order_date"
-        rules={[
-          { required: true, message: '请选择下单日期' },
-          dateInputNotAfterRule({
-            getEndValue: () => form.getFieldValue('planned_delivery_date'),
-            message: '下单日期不能晚于计划交付日期',
-          }),
-        ]}
-      >
-        <DateInput
-          disabledDate={
-            plannedDeliveryDate
-              ? disableOrderDateAfterPlannedDelivery
-              : undefined
-          }
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="国家 / 地区"
-        name="delivery_country_region"
-      >
-        <Input allowClear autoComplete="off" maxLength={128} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="收货人"
-        name="delivery_recipient"
-      >
-        <Input allowClear autoComplete="off" maxLength={128} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="收货电话"
-        name="delivery_phone"
-        rules={[optionalContactPhoneRule()]}
-      >
-        <Input allowClear autoComplete="off" maxLength={64} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        extra="从客户档案带出后可按本单调整；保存后固定为本单收货信息。"
-        label="收货地址"
-        name="delivery_address"
-      >
-        <BusinessTextArea
-          allowClear
-          maxLength={512}
-          showCount
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['order_date']}
-        label="计划交付日期"
-        name="planned_delivery_date"
-        rules={[
-          dateInputNotBeforeRule({
-            getStartValue: () => form.getFieldValue('order_date'),
-            message: '计划交付日期不能早于下单日期',
-          }),
-        ]}
-      >
-        <DateInput
-          disabledDate={
-            orderDate ? disablePlannedDeliveryBeforeOrderDate : undefined
-          }
-        />
-      </Form.Item>
-      <BusinessFormSectionTitle>其他说明</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        label="备注"
-        name="note"
-      >
-        <BusinessTextArea
-          allowClear
-          showCount
-          maxLength={300}
-        />
-      </Form.Item>
+          label="报价运费"
+          name="quoted_freight_amount"
+          rules={[optionalMoneyRule('报价运费')]}
+        >
+          <FieldWithUnitSuffix
+            control={
+              <InputNumber
+                disabled={freightTerms !== 'EXCLUDED'}
+                stringMode
+                placeholder={
+                  freightTerms === 'EXCLUDED' ? '填写另计运费' : '已含在单价'
+                }
+              />
+            }
+            unitText={currency || '币种'}
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field erp-business-action-form__field--full"
+          label="报价备注"
+          name="price_condition_note"
+        >
+          <BusinessTextArea
+            allowClear
+            showCount
+            maxLength={255}
+            placeholder="账期影响报价时记录核对结论"
+          />
+        </Form.Item>
+      </BusinessFormSection>
+      <BusinessFormSection title="备注与附件">
+        <Form.Item
+          className="erp-business-action-form__field erp-business-action-form__field--full"
+          label="备注"
+          name="note"
+        >
+          <BusinessTextArea allowClear showCount maxLength={300} />
+        </Form.Item>
+        {attachmentPanel}
+      </BusinessFormSection>
     </>
   )
 }
@@ -715,7 +686,7 @@ export function SalesOrderItemsFormSection({
   return (
     <section className="erp-sales-order-lines-form">
       <Form.List name="items">
-        {(fields, { add, remove }) => (
+        {(fields, { add, remove, move }) => (
           <>
             <div className="erp-sales-order-demand-toolbar">
               <strong className="erp-sales-order-demand-toolbar__title">
@@ -749,10 +720,9 @@ export function SalesOrderItemsFormSection({
               title="调整明细顺序"
             />
             {fields.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="暂无订货明细，可先保存订单草稿"
-              />
+              <BusinessLineItemsEmpty>
+                暂无订货明细，可先保存订单草稿
+              </BusinessLineItemsEmpty>
             ) : (
               <BusinessLineItemsTable
                 columns={SALES_ORDER_COLUMNS}
@@ -774,7 +744,9 @@ export function SalesOrderItemsFormSection({
                       index={index}
                       rowRef={(node) => registerLineItemRow(index, node)}
                       status={isExistingLine ? '已保存' : '新增'}
-                      detailsOpen={Boolean(watchedItems?.[field.name]?.import_source)}
+                      detailsOpen={Boolean(
+                        watchedItems?.[field.name]?.import_source
+                      )}
                       detailsLabel="款号、船头版、工艺与原表资料"
                       actions={
                         <Space
@@ -782,6 +754,24 @@ export function SalesOrderItemsFormSection({
                           size={4}
                           wrap
                         >
+                          <Button
+                            aria-label={`上移第 ${index + 1} 行`}
+                            size="small"
+                            type="text"
+                            icon={<ArrowUpOutlined />}
+                            disabled={
+                              index === 0 ||
+                              !canEditLine ||
+                              (Boolean(watchedItems?.[field.name - 1]?.id) &&
+                                !canUpdateItem)
+                            }
+                            onClick={() => {
+                              move(field.name, field.name - 1)
+                              requestLineItemScroll(index - 1)
+                            }}
+                          >
+                            上移
+                          </Button>
                           <Button
                             aria-label={`复制第 ${index + 1} 行`}
                             size="small"
@@ -1038,7 +1028,11 @@ export function SalesOrderItemsFormSection({
                       ]}
                     >
                       <Form.Item name={[field.name, 'import_source']} noStyle>
-                        <SalesOrderSourceEvidence images={importImages} attachments={orderAttachments} ownerID={orderID} />
+                        <SalesOrderSourceEvidence
+                          images={importImages}
+                          attachments={orderAttachments}
+                          ownerID={orderID}
+                        />
                       </Form.Item>
                       <Form.Item
                         className="erp-line-item-field erp-line-item-field--snapshot-code"
@@ -1109,11 +1103,22 @@ export function SalesOrderItemsFormSection({
                       </Form.Item>
                       {isExistingLine ? (
                         <>
-                          <Form.Item label="未出货数" name={[field.name, 'unshipped_quantity']} className="erp-line-item-field erp-line-item-field--snapshot-small">
+                          <Form.Item
+                            label="未出货数"
+                            name={[field.name, 'unshipped_quantity']}
+                            className="erp-line-item-field erp-line-item-field--snapshot-small"
+                          >
                             <Input readOnly placeholder="由出货记录计算" />
                           </Form.Item>
-                          <Form.Item label="工程设计师" name={[field.name, 'designer']} className="erp-line-item-field erp-line-item-field--snapshot-small">
-                            <Input readOnly placeholder="工程关联物料清单后显示" />
+                          <Form.Item
+                            label="工程设计师"
+                            name={[field.name, 'designer']}
+                            className="erp-line-item-field erp-line-item-field--snapshot-small"
+                          >
+                            <Input
+                              readOnly
+                              placeholder="工程关联物料清单后显示"
+                            />
                           </Form.Item>
                         </>
                       ) : null}
@@ -1188,8 +1193,8 @@ export function SalesOrderItemsFormSection({
                           )
                           const hasProductSource = Boolean(
                             line?.product_id ||
-                              line?.product_code_snapshot ||
-                              line?.product_name_snapshot
+                            line?.product_code_snapshot ||
+                            line?.product_name_snapshot
                           )
                           if (!hasProductSource) return null
                           const sourceText = [
@@ -1246,10 +1251,14 @@ export function SalesOrderItemsFormSection({
                   label: '数量合计',
                   value: (
                     <BusinessLineItemsSummaryValue
-                      summarize={summarizeSalesOrderLines}
-                      select={(summary) =>
-                        formatNumeric20Scale6Summary(summary.quantity)
+                      summarize={(lines) =>
+                        formatUnitQuantitySummary(
+                          lines,
+                          'ordered_quantity',
+                          unitOptions
+                        )
                       }
+                      select={(text) => text}
                     />
                   ),
                 },

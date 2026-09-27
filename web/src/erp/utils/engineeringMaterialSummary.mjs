@@ -34,24 +34,15 @@ export function materialSummaryRows(request) {
   })
 }
 
-export function formatMaterialQuantity(value, precise = false) {
+export function formatMaterialQuantity(value) {
   if (value === null || value === undefined || value === '') return '—'
-  // Group decimal text directly; converting to Number loses large quantities.
-  const text = String(value).replace(/,/gu, '')
-  if (!/^\d+(?:\.\d+)?$/u.test(text)) return '—'
-  const rounded = precise
-    ? text
-    : (() => {
-        const [integer, fraction = ''] = text.split('.')
-        const cents =
-          BigInt(integer) * BigInt(100) +
-          BigInt(fraction.padEnd(2, '0').slice(0, 2)) +
-          (Number(fraction[2] || 0) >= 5 ? BigInt(1) : BigInt(0))
-        return `${cents / BigInt(100)}.${String(cents % BigInt(100)).padStart(2, '0')}`
-      })()
-  const [integer, fraction = ''] = rounded.split('.')
-  const tail = fraction.replace(/0+$/u, '')
-  return `${integer.replace(/\B(?=(\d{3})+(?!\d))/gu, ',')}${tail ? `.${tail}` : ''}`
+  const units = numeric20Scale6Units(value)
+  if (units === null) return '—'
+  const [integer, fraction] = numeric20Scale6TextFromUnits(units).split('.')
+  return (
+    integer.replace(/\B(?=(\d{3})+(?!\d))/gu, ',') +
+    (fraction ? `.${fraction}` : '')
+  )
 }
 
 export function materialSummaryTotals(items = []) {

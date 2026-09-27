@@ -37,7 +37,7 @@ const menus = [
   },
   {
     key: 'inbound',
-    label: '入库管理',
+    label: '采购入库',
     path: '/erp/warehouse/inbound',
     required_any: ['warehouse.inbound.read', 'purchase.receipt.read'],
     required_all: [],

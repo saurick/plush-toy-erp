@@ -99,7 +99,7 @@ test('mobile task action screen separates a single command from multiple choices
     actionScreenSource,
     /data-testid="mobile-task-single-action-summary"/u
   )
-  assert.match(actionScreenSource, />\s*本次操作\s*</u)
+  assert.match(actionScreenSource, />\s*本次可执行操作\s*</u)
   assert.match(actionScreenSource, /`确认\$\{effectiveActionLabel\}`/u)
   assert.doesNotMatch(actionScreenSource, /<legend/u)
   assert.doesNotMatch(actionScreenSource, /aria-pressed/u)
@@ -156,7 +156,7 @@ test('mobile task flow exposes one shared three-step navigation contract', () =>
   ]) {
     assert.match(source, /MobileTaskFlowHeader/u)
   }
-  for (const label of ['查看任务', '处理任务', '结果回执']) {
+  for (const label of ['任务信息', '任务办理', '结果回执']) {
     assert.match(flowHeaderSource, new RegExp(label, 'u'))
   }
   assert.match(flowHeaderSource, /aria-current=\{current \? 'step'/u)
@@ -171,7 +171,7 @@ test('mobile task flow exposes one shared three-step navigation contract', () =>
   )
   assert.match(
     flowStyleSource,
-    /\.mobile-task-flow-step\s*\{[\s\S]*?min-height:\s*48px;/u
+    /\.mobile-task-flow-step\s*\{[\s\S]*?min-height:\s*44px;/u
   )
   assert.doesNotMatch(flowHeaderSource, /mobile-task-flow-step__subtitle/u)
   assert.doesNotMatch(flowHeaderSource, /subtitle:/u)
@@ -244,7 +244,7 @@ test('mobile task list keeps approval in the primary filter row and gates it by 
   )
   assert.match(
     roleTaskPageSource,
-    /canViewApprovalInbox[\s\S]*MOBILE_TASK_FILTER_KEYS\.APPROVAL[\s\S]*label: '审批'[\s\S]*ariaLabel: '待我审批'/u
+    /canViewApprovalInbox[\s\S]*MOBILE_TASK_FILTER_KEYS\.APPROVAL[\s\S]*label: '审批'[\s\S]*ariaLabel: adminProfile\?\.is_super_admin === true \? '待审批' : '待我审批'/u
   )
   assert.match(
     listScreenSource,
@@ -285,10 +285,10 @@ test('mobile task processing explains business boundaries before submit without 
 
 test('mobile task detail keeps one compact task summary and leaves completion feedback to the receipt', () => {
   assert.match(detailScreenSource, /mobile-task-detail-summary/u)
-  assert.match(detailScreenSource, /负责：\{ownerRoleLabel\}/u)
+  assert.match(detailScreenSource, /<dt>负责岗位<\/dt>[\s\S]*?<dd>\{ownerRoleLabel\}<\/dd>/u)
   assert.match(
     detailScreenSource,
-    /<WorkflowTaskTiming\s+task=\{selectedTask\}\s+detail/u
+    /getWorkflowTaskTiming\(selectedTask,\s*\{\s*detail: true/u
   )
   assert.match(detailScreenSource, />\s*业务信息\s*</u)
   assert.doesNotMatch(detailScreenSource, />\s*当前任务\s*</u)
@@ -400,16 +400,16 @@ test('mobile task receipt has explicit outcomes without fabricated actor or time
   )
   assert.match(receiptScreenSource, /重新确认结果/u)
   assert.match(receiptScreenSource, /返回列表/u)
-  assert.match(receiptScreenSource, /完成反馈/u)
-  assert.match(receiptScreenSource, /approvalTask \? '审批意见' : '完成反馈'/u)
+  assert.match(receiptScreenSource, /办理说明/u)
+  assert.match(receiptScreenSource, /approvalAction \? '审批意见' : '办理说明'/u)
   assert.match(
     receiptScreenSource,
-    /isWorkflowApprovalTask\(task\)[\s\S]*candidateActionKey === 'done'[\s\S]*return '审批通过'/u
+    /isWorkflowApprovalTask\(task\)[\s\S]*candidateActionKey === 'done'[\s\S]*label: '审批通过'/u
   )
-  assert.match(receiptScreenSource, /处理说明/u)
+  assert.match(receiptScreenSource, /办理说明/u)
   assert.match(receiptScreenSource, /历史处理线索/u)
-  assert.match(receiptScreenSource, /本次确认状态/u)
-  assert.match(receiptScreenSource, /本次返回状态/u)
+  assert.match(receiptScreenSource, /确认状态/u)
+  assert.match(receiptScreenSource, /已知任务状态/u)
   assert.match(receiptScreenSource, /正在恢复可重试任务/u)
   assert.match(receiptScreenSource, /重新载入任务/u)
   assert.match(receiptScreenSource, /mobile-task-receipt-handoff/u)

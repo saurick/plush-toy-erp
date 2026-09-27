@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 
@@ -26,6 +28,7 @@ export default function ProductionReworkModal({
   onSubmit,
 }) {
   const [form] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open)
   const editing = mode === 'edit'
   const Editor = editing ? BusinessFormPage : BusinessModal
   const summary = productionReworkQuantitySummary(source, facts)
@@ -131,6 +134,7 @@ export default function ProductionReworkModal({
         ]}
       />
       <Form
+        className={editing ? 'erp-business-action-form' : undefined}
         form={form}
         name={editing ? 'production_rework_edit' : 'production_rework_create'}
         layout="vertical"
@@ -151,6 +155,7 @@ export default function ProductionReworkModal({
           name="quantity"
           label="本次返工数量"
           rules={[
+            unitQuantityRuleFromOptions(quantityUnitOptions, source?.unit_id),
             { required: true, message: '请填写返工数量' },
             {
               validator: (_, value) => {
@@ -183,6 +188,7 @@ export default function ProductionReworkModal({
           <Input type="datetime-local" />
         </Form.Item>
         <Form.Item
+          className="erp-business-action-form__field--full"
           name="reason"
           label="返工原因"
           rules={[
@@ -191,7 +197,7 @@ export default function ProductionReworkModal({
           ]}
         >
           <Input.TextArea
-            rows={4}
+            rows={editing ? 2 : 4}
             maxLength={255}
             showCount
             placeholder="请说明不合格现象、返工要求或处理依据"

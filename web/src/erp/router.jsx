@@ -15,6 +15,7 @@ import {
   lazyWithDynamicImportRetry,
 } from '@/common/utils/lazyImportRetry.mjs'
 import ERPLayout from './components/ERPLayout.jsx'
+import ProductionRecordsLayout from './components/production-records/ProductionRecordsLayout.jsx'
 import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
@@ -328,19 +329,19 @@ export default function ERPRouter() {
             />
             <Route
               path="master/partners/customers"
-              element={<V1MasterDataPage type="customers" />}
+              element={<V1MasterDataPage key="customers" type="customers" />}
             />
             <Route
               path="master/partners/suppliers"
-              element={<V1MasterDataPage type="suppliers" />}
+              element={<V1MasterDataPage key="suppliers" type="suppliers" />}
             />
             <Route
               path="master/materials"
-              element={<V1MasterDataPage type="materials" />}
+              element={<V1MasterDataPage key="materials" type="materials" />}
             />
             <Route
               path="master/products"
-              element={<V1MasterDataPage type="product_skus" />}
+              element={<V1MasterDataPage key="product_skus" type="product_skus" />}
             />
             <Route
               path="sales/project-orders/sales-orders"
@@ -365,7 +366,7 @@ export default function ERPRouter() {
             <Route path="purchase/material-bom" element={<BOMVersionsPage />} />
             <Route
               path="engineering/processes"
-              element={<V1MasterDataPage type="processes" />}
+              element={<V1MasterDataPage key="processes" type="processes" />}
             />
             <Route path="warehouse/shipments" element={<ShipmentsPage />} />
             <Route
@@ -376,12 +377,20 @@ export default function ERPRouter() {
               path="production/orders"
               element={<V1ProductionOrdersPage />}
             />
-            <Route
-              path="production/progress"
-              element={
-                <V1OperationalFactPage moduleKey="production-progress" />
-              }
-            />
+            <Route element={<ProductionRecordsLayout />}>
+              <Route
+                path="production/progress"
+                element={
+                  <V1OperationalFactPage moduleKey="production-progress" />
+                }
+              />
+              <Route
+                path="production/exceptions"
+                element={
+                  <WorkflowBusinessModulePage moduleKey="production-exceptions" />
+                }
+              />
+            </Route>
             <Route
               path="production/scheduling"
               element={
@@ -389,15 +398,12 @@ export default function ERPRouter() {
               }
             />
             <Route
-              path="production/exceptions"
-              element={
-                <WorkflowBusinessModulePage moduleKey="production-exceptions" />
-              }
-            />
-            <Route
               path="warehouse/shipping-release"
               element={
-                <WorkflowBusinessModulePage moduleKey="shipping-release" />
+                <WorkflowBusinessModulePage
+                  key="shipping-release"
+                  moduleKey="shipping-release"
+                />
               }
             />
             <Route

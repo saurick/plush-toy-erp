@@ -589,8 +589,8 @@ test('buildBOMImportDraft: only unique existing master data is linked and source
       { id: 23, code: 'M-23', name: '测试扣', spec: '10mm' },
     ],
     units: [
-      { id: 31, code: 'Y', name: '码' },
-      { id: 32, code: 'PCS', name: '个' },
+      { id: 31, code: 'YD', name: '码' },
+      { id: 32, code: 'EA', name: '个' },
     ],
   })
 
@@ -629,7 +629,7 @@ test('buildBOMImportDraft: missing or ambiguous mappings stay blank until the us
         spec: '51"',
       },
     ],
-    units: [{ id: 31, code: 'Y', name: '码' }],
+    units: [{ id: 31, code: 'YD', name: '码' }],
   })
 
   assert.equal(draft.values.product_id, undefined)
@@ -698,7 +698,11 @@ test('import review counts shared selectors once and keeps each invalid part act
       field,
       itemIndex,
     ]),
-    [['quantity', 0], ['quantity', 1], ['loss_rate', 1]]
+    [
+      ['quantity', 0],
+      ['quantity', 1],
+      ['loss_rate', 1],
+    ]
   )
   assert.equal(
     describeBOMImportIssues(getBOMImportDraftIssues(invalidParts)),
@@ -721,7 +725,10 @@ test('import review counts shared selectors once and keeps each invalid part act
     '选择产品、关联 2 种物料、补全 1 组物料的单位'
   )
   cleared.items.splice(0, 2)
-  assert.equal(describeBOMImportIssues(getBOMImportDraftIssues(cleared)), '选择产品')
+  assert.equal(
+    describeBOMImportIssues(getBOMImportDraftIssues(cleared)),
+    '选择产品'
+  )
   assert.equal(
     describeBOMImportIssues(getBOMImportDraftIssues({ items: [] })),
     '选择产品、添加 BOM 明细'
@@ -779,4 +786,40 @@ test('BOM import accepts the confirmed style-number label and original workbook 
   const current = await parseBOMXlsx(firstFormatWorkbook('款号'))
   assert.deepEqual(current.rows, original.rows)
   assert.deepEqual(current.context, original.context)
+})
+
+test('BOM import preserves excess precision for correction and keeps fractional per-piece usage', async () => {
+  const parsed = await parseBOMXlsx(
+    createWorkbook([
+      {
+        name: '材料分析明细表',
+        rows: [
+          ['物料名称', '单位', '单位用量', '总用量', '损耗率'],
+          ['模拟面料', 'Y', '0.00438037654384971', '0.876075308769942', '0'],
+          ['模拟辅料', 'PCS', '0.25', '50', '0'],
+        ],
+      },
+    ])
+  )
+  assert.equal(parsed.rows[0].quantity, '0.00438037654384971')
+  assert.equal(parsed.rows[0].totalUsageSnapshot, '0.876075308769942')
+  assert.equal(parsed.rows[1].quantity, '0.25')
+  const draft = buildBOMImportDraft(parsed, {
+    materials: [
+      { id: 1, name: '模拟面料' },
+      { id: 2, name: '模拟辅料' },
+    ],
+    units: [
+      { id: 1, code: 'YD', name: '码', precision: 6 },
+      { id: 2, code: 'EA', name: '个', precision: 0 },
+    ],
+  })
+  const issues = getBOMImportDraftIssues(draft.values)
+  assert.ok(
+    issues.some((issue) => issue.field === 'quantity' && issue.itemIndex === 0)
+  )
+  assert.ok(
+    !issues.some((issue) => issue.field === 'quantity' && issue.itemIndex === 1)
+  )
+  assert.equal(draft.values.items[1].unit_id, 2)
 })

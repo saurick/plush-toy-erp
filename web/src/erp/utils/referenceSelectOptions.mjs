@@ -1,3 +1,9 @@
+import {
+  normalizeUnitPrecision,
+  standardUnitForLabel,
+  standardUnitLabels,
+} from './unitQuantity.mjs'
+
 function positiveID(value) {
   const id = Number(value || 0)
   return Number.isFinite(id) && id > 0 ? id : undefined
@@ -10,24 +16,9 @@ function compactParts(parts = []) {
     .join(' / ')
 }
 
-function shortDemoUnitName(name) {
-  const text = String(name ?? '').trim()
-  const matched = text.match(/^核心演示单位[-－]\s*(.+)$/)
-  return matched?.[1]?.trim() || text
-}
-
-function shortUnitCode(code) {
-  const text = String(code ?? '').trim()
-  if (!text) return ''
-  if (text.startsWith('SIM-')) {
-    return text.split('-').filter(Boolean).at(-1) || text
-  }
-  return text.length <= 8 ? text : ''
-}
-
 export function uniqueReferenceOptions(records, toOption) {
   const seen = new Set()
-  return (Array.isArray(records) ? records : [])
+  const options = (Array.isArray(records) ? records : [])
     .map(toOption)
     .filter((option) => option && positiveID(option.value))
     .filter((option) => {
@@ -36,6 +27,7 @@ export function uniqueReferenceOptions(records, toOption) {
       seen.add(key)
       return true
     })
+  return toOption === unitOption ? sortUnitOptions(options) : options
 }
 
 export function referenceLabel(options, value, fallbackPrefix = '记录') {
@@ -93,28 +85,28 @@ export function productSKUOption(sku = {}) {
 export function unitOption(unit = {}) {
   const value = positiveID(unit.id)
   if (!value) return null
-  const precision = Number(unit.precision)
-  const name = shortDemoUnitName(unit.name)
-  const code = shortUnitCode(unit.code)
-  const fullName = String(unit.name ?? '').trim()
-  const fullCode = String(unit.code ?? '').trim()
-  const label =
-    name && code && name !== code
-      ? `${name}（${code}）`
-      : name || code || '单位已关联'
-  const fullLabel =
-    fullName && fullCode && fullName !== fullCode
-      ? `${fullName}（${fullCode}）`
-      : fullName || fullCode || label
+  const name = String(unit.name ?? '').trim()
+  const code = String(unit.code ?? '').trim()
+  const label = name || code || '单位已关联'
+  const aliases = standardUnitForLabel(name)?.aliases || []
   return {
     value,
     label,
     suffixLabel: label,
-    searchText: [label, fullLabel].filter(Boolean).join(' '),
-    title: fullLabel,
-    precision:
-      Number.isInteger(precision) && precision >= 0 ? precision : undefined,
+    searchText: [label, code, ...aliases].filter(Boolean).join(' '),
+    title: label,
+    precision: normalizeUnitPrecision(unit.precision),
   }
+}
+
+export function sortUnitOptions(options) {
+  const names = standardUnitLabels()
+  const rank = (label) =>
+    names.includes(label) ? names.indexOf(label) : names.length
+  return [...options].sort(
+    (a, b) =>
+      rank(a.label) - rank(b.label) || a.label.localeCompare(b.label, 'zh-CN')
+  )
 }
 
 function partyOption(party, fallbackLabel) {

@@ -1,4 +1,5 @@
 import React from 'react'
+import { Empty } from 'antd'
 import { buildWorkflowTaskEventTrailModel } from '../../utils/workflowTaskEventPresentation.mjs'
 import './workflowTaskEventTrail.css'
 
@@ -142,7 +143,7 @@ export default function WorkflowTaskEventTrail({
           ) : null}
         </>
       ) : (
-        <p className="workflow-task-event-trail__state">暂无本任务处理记录。</p>
+        <Empty description="暂无本任务处理记录" />
       )}
     </section>
   )

@@ -1,7 +1,8 @@
-import { Typography, Alert, Space, Tag } from 'antd'
+import { Typography, Alert, Input } from 'antd'
+import { SearchOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import Tabs from '@/common/components/navigation/SlidingTabs'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { usePermissionRoleSettings } from '../components/permission-center/usePermissionRoleSettings.jsx'
 import PermissionAdminAccounts from '../components/permission-center/PermissionAdminAccounts.jsx'
 import { usePermissionCenterData } from '../components/permission-center/usePermissionCenterData.mjs'
@@ -30,6 +31,8 @@ import ApprovalResponsibilityPanel from './ApprovalResponsibilityPanel.jsx'
 
 export default function PermissionCenterPage() {
   const [editorContainer, setEditorContainer] = useState(null)
+  const [toolbarContainer, setToolbarContainer] = useState(null)
+  const [permissionSearch, setPermissionSearch] = useState('')
   const outletContext = useOutletContext()
   const onOpenRoleAccounts = useCallback((role) => {
     setAdminFilterRequest({ keyword: getRoleVisibleName(role || {}) })
@@ -77,6 +80,10 @@ export default function PermissionCenterPage() {
     adminRpc,
     loadData,
     onOpenRoleAccounts,
+    onOpenNavigation: () =>
+      setActiveTabKey(PERMISSION_CENTER_TAB_KEYS.NAVIGATION),
+    navigationMode: activeTabKey === PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
+    searchKeyword: permissionSearch,
     setSaving,
     saving,
   })
@@ -188,6 +195,19 @@ export default function PermissionCenterPage() {
       })
       return
     }
+    if (
+      [
+        PERMISSION_CENTER_TAB_KEYS.ROLES,
+        PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
+      ].includes(activeTabKey) &&
+      [
+        PERMISSION_CENTER_TAB_KEYS.ROLES,
+        PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
+      ].includes(nextTabKey)
+    ) {
+      setActiveTabKey(nextTabKey)
+      return
+    }
     confirmDiscardRoleChanges({
       title: '切换页面前要放弃未保存的修改吗？',
       content: '切换后，当前岗位尚未保存的功能调整会丢失。',
@@ -286,6 +306,8 @@ export default function PermissionCenterPage() {
   const adminAccountTab = (
     <PermissionAdminAccounts
       editorContainer={editorContainer}
+      toolbarContainer={toolbarContainer}
+      active={activeTabKey === PERMISSION_CENTER_TAB_KEYS.ADMINS}
       currentAdmin={currentAdmin}
       roles={roles}
       setSaving={setSaving}
@@ -298,14 +320,38 @@ export default function PermissionCenterPage() {
     />
   )
 
+  const tabs = [
+    {
+      key: PERMISSION_CENTER_TAB_KEYS.ROLES,
+      label: '岗位设置',
+      count: roles.length,
+    },
+    {
+      key: PERMISSION_CENTER_TAB_KEYS.ADMINS,
+      label: '员工账号',
+      count: canReadUsers ? admins.length : null,
+    },
+    ...(canReadApprovalResponsibilities
+      ? [
+          {
+            key: PERMISSION_CENTER_TAB_KEYS.APPROVALS,
+            label: '审批责任',
+            count: 3,
+          },
+        ]
+      : []),
+    {
+      key: PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
+      label: '岗位导航',
+    },
+  ]
+  const roleView = [
+    PERMISSION_CENTER_TAB_KEYS.ROLES,
+    PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
+  ].includes(activeTabKey)
   return (
     <div className="erp-business-page-layout" ref={setEditorContainer}>
-      <Space
-        className="erp-permission-page"
-        direction="vertical"
-        size={12}
-        style={{ width: '100%' }}
-      >
+      <div className="erp-permission-page">
         <Title level={1} className="erp-permission-page__title">
           权限管理
         </Title>
@@ -314,69 +360,90 @@ export default function PermissionCenterPage() {
             type="warning"
             showIcon
             message="当前账号部分操作受限"
-            description={`${permissionWarningMessages.join('；')}。超级管理员账号只能由超级管理员维护。`}
+            description={`${permissionWarningMessages.join(
+              '；'
+            )}。超级管理员账号只能由超级管理员维护。`}
           />
         ) : null}
-
-        <Tabs
-          activeKey={activeTabKey}
-          className="erp-permission-tabs"
-          items={[
-            {
-              key: PERMISSION_CENTER_TAB_KEYS.ROLES,
-              label: (
-                <span className="erp-permission-tabs__label">
-                  岗位设置
-                  <Tag color="blue">{roles.length}</Tag>
-                </span>
-              ),
-              children: roleTemplateTab,
-            },
-            {
-              key: PERMISSION_CENTER_TAB_KEYS.ADMINS,
-              label: (
-                <span className="erp-permission-tabs__label">
-                  员工账号
-                  {canReadUsers ? (
-                    <Tag color="green">{admins.length}</Tag>
-                  ) : null}
-                </span>
-              ),
-              children: adminAccountTab,
-            },
-            canReadApprovalResponsibilities
-              ? {
-                  key: PERMISSION_CENTER_TAB_KEYS.APPROVALS,
-                  label: (
-                    <span className="erp-permission-tabs__label">
-                      审批责任
-                      <Tag color="purple">3</Tag>
-                    </span>
-                  ),
-                  children: (
-                    <ApprovalResponsibilityPanel
-                      active={
-                        activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS
-                      }
-                      admins={admins}
-                      roles={roles}
-                      currentAdmin={currentAdmin}
-                      canRead={canReadApprovalResponsibilities}
-                      canManage={canManageApprovalResponsibilities}
-                      readOnlyReason={approvalReadOnlyReason}
-                      discardVersion={approvalDiscardVersion}
-                      refreshVersion={approvalRefreshVersion}
-                      onDirtyChange={setApprovalResponsibilityDirty}
-                    />
-                  ),
+        <div className="erp-permission-toolbar">
+          <SlidingTabList
+            className="erp-permission-tabs erp-navigation-tabs"
+            aria-label="权限管理"
+          >
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={activeTabKey === tab.key}
+                aria-controls={
+                  [
+                    PERMISSION_CENTER_TAB_KEYS.ROLES,
+                    PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
+                  ].includes(tab.key)
+                    ? 'permission-roles-panel'
+                    : `permission-${tab.key}-panel`
                 }
-              : null,
-          ].filter(Boolean)}
-          onChange={changePermissionCenterTab}
-        />
-      </Space>
+                onClick={() => changePermissionCenterTab(tab.key)}
+              >
+                {tab.label}
+                {tab.count !== null ? (
+                  <span className="erp-permission-tabs__count">
+                    {tab.count}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </SlidingTabList>
+          {activeTabKey === PERMISSION_CENTER_TAB_KEYS.ROLES ? (
+            <Input
+              className="erp-permission-toolbar__search"
+              aria-label="搜索功能或页面"
+              placeholder="搜索功能名称或页面"
+              prefix={<SearchOutlined aria-hidden="true" />}
+              allowClear
+              value={permissionSearch}
+              onChange={(event) => setPermissionSearch(event.target.value)}
+            />
+          ) : null}
+          <div
+            className="erp-permission-toolbar__account"
+            ref={setToolbarContainer}
+            hidden={activeTabKey !== PERMISSION_CENTER_TAB_KEYS.ADMINS}
+          />
+        </div>
+        <div id="permission-roles-panel" role="tabpanel" hidden={!roleView}>
+          {roleTemplateTab}
+        </div>
+        <div
+          id="permission-admins-panel"
+          role="tabpanel"
+          hidden={activeTabKey !== PERMISSION_CENTER_TAB_KEYS.ADMINS}
+        >
+          {adminAccountTab}
+        </div>
+        {canReadApprovalResponsibilities ? (
+          <div
+            id="permission-approvals-panel"
+            role="tabpanel"
+            hidden={activeTabKey !== PERMISSION_CENTER_TAB_KEYS.APPROVALS}
+          >
+            <ApprovalResponsibilityPanel
+              active={activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS}
+              admins={admins}
+              roles={roles}
+              currentAdmin={currentAdmin}
+              canRead={canReadApprovalResponsibilities}
+              canManage={canManageApprovalResponsibilities}
+              readOnlyReason={approvalReadOnlyReason}
+              discardVersion={approvalDiscardVersion}
+              refreshVersion={approvalRefreshVersion}
+              onDirtyChange={setApprovalResponsibilityDirty}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }
-
 const { Title } = Typography

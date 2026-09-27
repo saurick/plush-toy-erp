@@ -122,10 +122,9 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
         icon={<QuestionCircleOutlined />}
         aria-label={`查看${entry.title}页面说明`}
         aria-haspopup="dialog"
+        title="这页怎么用"
         onClick={() => setOpen(true)}
-      >
-        这页怎么用
-      </Button>
+      />
       <BusinessModal
         centered
         destroyOnHidden
@@ -139,7 +138,7 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
         onCancel={() => setOpen(false)}
         footer={[
           <Button key="role-help" href="/erp/help-center">
-            打开岗位使用帮助
+            打开帮助中心
             <ArrowRightOutlined />
           </Button>,
           <Button

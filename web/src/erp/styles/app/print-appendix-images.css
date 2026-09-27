@@ -7,9 +7,9 @@
   display: grid;
   gap: 10px;
   padding: 12px;
-  border: 1px solid #c7d5ca;
+  border: 1px solid var(--erp-border);
   border-radius: 10px;
-  background: rgb(245 248 245 / 96%);
+  background: var(--erp-surface-bg-soft);
 }
 
 .erp-print-appendix-manager__heading {
@@ -17,13 +17,13 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  color: #243b2a;
+  color: var(--erp-text);
 }
 
 .erp-print-appendix-manager__heading > span,
 .erp-print-appendix-manager__empty,
 .erp-print-appendix-manager__item-copy > span {
-  color: #5c6f61;
+  color: var(--erp-text-muted);
   font-size: 12px;
 }
 
@@ -50,9 +50,9 @@
   align-items: center;
   min-width: 0;
   padding: 8px;
-  border: 1px solid #d9e2db;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--erp-surface-bg);
 }
 
 .erp-print-appendix-manager__item > img {
@@ -60,7 +60,7 @@
   width: 48px;
   height: 48px;
   border-radius: 6px;
-  background: #f8fafc;
+  background: var(--erp-surface-bg-soft);
   object-fit: cover;
 }
 
@@ -94,23 +94,23 @@
 .erp-print-appendix-manager__layout-actions button {
   min-height: 30px;
   padding: 4px 9px;
-  border: 1px solid #c5d1c8;
+  border: 1px solid var(--erp-border-strong);
   border-radius: 7px;
-  background: #fff;
-  color: #334b39;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
   cursor: pointer;
 }
 
 .erp-print-appendix-manager__layout-actions button[aria-pressed='true'] {
-  border-color: #2f8f4b;
-  background: #e8f5eb;
-  color: #1f6b38;
-  box-shadow: inset 0 0 0 1px rgb(47 143 75 / 16%);
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
+  box-shadow: inset 0 0 0 1px var(--erp-focus-ring);
 }
 
 .erp-print-appendix-manager__item-actions button:last-child {
   border-color: #efcaca;
-  color: #a52a2a;
+  color: var(--erp-visual-danger-text);
 }
 
 .erp-print-appendix-manager__item-actions button:disabled,
@@ -122,7 +122,7 @@
 .erp-print-appendix-manager__item-actions button:focus-visible,
 .erp-print-appendix-manager__layout-actions button:focus-visible,
 .erp-print-appendix-manager > button:focus-visible {
-  outline: 2px solid #1f7a3f;
+  outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
 }
 

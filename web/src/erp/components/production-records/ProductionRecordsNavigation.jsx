@@ -1,14 +1,10 @@
 import React from 'react'
 import Tabs from '@/common/components/navigation/SlidingTabs'
-
-export const PRODUCTION_RECORD_VIEW_KEYS = Object.freeze({
-  RECORDS: 'records',
-  DECISIONS: 'decisions',
-  TASKS: 'tasks',
-})
+import { PRODUCTION_RECORD_VIEW_KEYS } from '../../utils/productionRecordViews.mjs'
 
 const VIEW_LABELS = Object.freeze({
-  [PRODUCTION_RECORD_VIEW_KEYS.RECORDS]: '生产记录',
+  [PRODUCTION_RECORD_VIEW_KEYS.RECORDS]: '记录明细',
+  [PRODUCTION_RECORD_VIEW_KEYS.PROCESS]: '生产工序',
   [PRODUCTION_RECORD_VIEW_KEYS.DECISIONS]: '异常处理',
   [PRODUCTION_RECORD_VIEW_KEYS.TASKS]: '待审批',
 })
@@ -26,12 +22,12 @@ export default function ProductionRecordsNavigation({
   onChange,
 }) {
   const items = buildProductionRecordViewItems(availableKeys)
-  if (items.length === 0) return null
+  if (items.length < 2) return null
 
   return (
     <Tabs
       aria-label="生产记录工作区"
-      className="erp-business-view-tabs erp-production-record-tabs"
+      className="erp-production-record-tabs"
       activeKey={activeKey}
       items={items}
       onChange={onChange}

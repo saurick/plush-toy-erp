@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
+import { getAllowedMobileRoleKeys } from '../../src/erp/utils/mobileRolePermissions.mjs'
 import { requireWorkflowTaskExplainParams } from '../../src/erp/utils/workflowTaskActionAccess.mjs'
 import { isWorkflowApprovalTask } from '../../src/erp/utils/workflowTaskActionContract.mjs'
 import { requireWorkflowTaskCreateParams } from '../../src/erp/utils/workflowTaskCreateContract.mjs'
@@ -2460,6 +2461,14 @@ export async function installFactRpcMocks(page, context) {
           .toLowerCase()
         const roleKey = String(params.role_key || '').trim()
         const viewKey = String(params.view_key || '').trim()
+        const mobileReview = method === 'list_role_tasks' && adminProfile?.is_super_admin === true
+        const reviewRoles = mobileReview
+          ? getAllowedMobileRoleKeys({ ...adminProfile, effective_session: effectiveSession }, effectiveSession?.roles || []).filter((role) => role !== 'all' && (roleKey === 'all' || role === roleKey))
+          : []
+        if (method === 'list_role_tasks' && ((roleKey === 'all' && !mobileReview) || (mobileReview && reviewRoles.length === 0))) {
+          fail('当前账号缺少查看该岗位权限')
+          break
+        }
         const sortKey = params.sort_key || ''
         const statusKey = params.status_key || ''
         const limit = Math.min(Math.max(Number(params.limit || 50), 1), 100)
@@ -2480,7 +2489,7 @@ export async function installFactRpcMocks(page, context) {
           Boolean(task.escalated_at) ||
           task.payload?.critical_path === true
         const supervisorRiskAllowed =
-          adminProfile?.is_super_admin === true ||
+          mobileReview ? roleKey === 'all' : adminProfile?.is_super_admin === true ||
           workflowMockPermissionAllowed(
             adminProfile,
             effectiveSession,
@@ -2506,6 +2515,7 @@ export async function installFactRpcMocks(page, context) {
             Number(task.assignee_id || 0) > 0 &&
             Number(task.assignee_id) === Number(adminProfile?.id || 0)
           const roleMatched =
+            mobileReview ? reviewRoles.includes(task.owner_role_key) :
             (targetViewKey === 'risk' && supervisorRiskAllowed) ||
             task.owner_role_key === roleKey ||
             assignedToCurrentAdmin

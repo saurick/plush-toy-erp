@@ -7,31 +7,37 @@ import React, {
   useState,
 } from 'react'
 import {
-  AlertOutlined,
+  AccountBookOutlined,
   ApartmentOutlined,
   AppstoreOutlined,
-  BarsOutlined,
-  DashboardOutlined,
+  BarChartOutlined,
+  DatabaseOutlined,
   DownOutlined,
+  EllipsisOutlined,
   FileSearchOutlined,
-  FileTextOutlined,
   HistoryOutlined,
   HomeOutlined,
   InboxOutlined,
   InfoCircleOutlined,
+  InteractionOutlined,
   KeyOutlined,
   LogoutOutlined,
   MenuOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   PrinterOutlined,
   QuestionCircleOutlined,
   ReloadOutlined,
+  RightOutlined,
   SafetyCertificateOutlined,
   ScheduleOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
+  ShoppingOutlined,
   SwapOutlined,
+  ToolOutlined,
+  TruckOutlined,
   UserOutlined,
-  WalletOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -46,6 +52,17 @@ import {
   Typography,
 } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import BusinessModuleTabs from './BusinessModuleTabs.jsx'
+import ModuleCatalogModal from './ModuleCatalogModal.jsx'
+import {
+  getBusinessModuleSidebarKey,
+  getBusinessModuleTabs,
+  groupSidebarNavigationSections,
+  projectBusinessModuleSections,
+  projectRoleGuidedModuleNavigation,
+  rememberBusinessModuleLocation,
+  resolveBusinessModuleMenuTarget,
+} from '../utils/businessModuleGroups.mjs'
 import { notifyProductImagesChanged } from '../utils/productImageReferences.mjs'
 import { isAuthFailureCode } from '@/common/consts/errorCodes'
 import {
@@ -124,34 +141,25 @@ const ROLE_GUIDED_MORE_MENU_KEY = 'role-more-functions'
 const ADMIN_AUTH_STORAGE_KEYS = new Set(['admin_access_token', 'admin_user_id'])
 
 const navIconRegistry = {
-  'workspace-home': <AppstoreOutlined />,
-  'global-dashboard': <DashboardOutlined />,
-  'task-board': <ScheduleOutlined />,
-  'business-dashboard': <AppstoreOutlined />,
-  customers: <ApartmentOutlined />,
-  suppliers: <ApartmentOutlined />,
-  products: <AppstoreOutlined />,
-  materials: <InboxOutlined />,
-  'sales-orders': <ScheduleOutlined />,
-  'material-bom': <BarsOutlined />,
-  'accessories-purchase': <ShoppingCartOutlined />,
-  'processing-contracts': <FileTextOutlined />,
-  inbound: <InboxOutlined />,
-  inventory: <HomeOutlined />,
-  'shipping-release': <ScheduleOutlined />,
-  outbound: <FileSearchOutlined />,
-  shipments: <FileTextOutlined />,
-  'production-orders': <FileTextOutlined />,
-  'production-scheduling': <ScheduleOutlined />,
-  'production-progress': <DashboardOutlined />,
-  'production-exceptions': <AlertOutlined />,
-  reconciliation: <WalletOutlined />,
-  payables: <WalletOutlined />,
-  'print-center': <PrinterOutlined />,
-  'permission-center': <SettingOutlined />,
-  'system-audit-logs': <FileSearchOutlined />,
-  'history-records': <HistoryOutlined />,
-  'help-center': <QuestionCircleOutlined />,
+  'workspace-home': <HomeOutlined aria-hidden />,
+  'global-dashboard': <HomeOutlined aria-hidden />,
+  'task-board': <ScheduleOutlined aria-hidden />,
+  'business-dashboard': <BarChartOutlined aria-hidden />,
+  'module:master': <DatabaseOutlined aria-hidden />,
+  'module:sales': <ShoppingOutlined aria-hidden />,
+  'module:engineering': <ApartmentOutlined aria-hidden />,
+  'module:purchase': <ShoppingCartOutlined aria-hidden />,
+  'module:outsourcing': <InteractionOutlined aria-hidden />,
+  'module:production': <ToolOutlined aria-hidden />,
+  'module:warehouse': <InboxOutlined aria-hidden />,
+  'module:quality': <SafetyCertificateOutlined aria-hidden />,
+  'module:shipment': <TruckOutlined aria-hidden />,
+  'module:finance': <AccountBookOutlined aria-hidden />,
+  'print-center': <PrinterOutlined aria-hidden />,
+  'permission-center': <SettingOutlined aria-hidden />,
+  'system-audit-logs': <FileSearchOutlined aria-hidden />,
+  'history-records': <HistoryOutlined aria-hidden />,
+  'help-center': <QuestionCircleOutlined aria-hidden />,
 }
 
 const productCoreReviewFallbackByPageKey = {
@@ -333,6 +341,8 @@ export default function ERPLayout({ legalNotice }) {
   const entryConfig = useMemo(() => getEntryConfig(), [])
   const [loggingOut, setLoggingOut] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(false)
+  const [moduleCatalogOpen, setModuleCatalogOpen] = useState(false)
   const [systemVersionOpen, setSystemVersionOpen] = useState(false)
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [profileLoading, setProfileLoading] = useState(!getStoredAdminProfile())
@@ -821,12 +831,18 @@ export default function ERPLayout({ legalNotice }) {
     () => getSidebarNavigationSections(visibleSections),
     [visibleSections]
   )
+  const moduleSidebarSections = useMemo(
+    () => projectBusinessModuleSections(sidebarVisibleSections),
+    [sidebarVisibleSections]
+  )
   const roleGuidedNavigation = useMemo(
     () =>
-      buildRoleGuidedNavigation({
-        visibleSections: sidebarVisibleSections,
-        adminProfile,
-      }),
+      projectRoleGuidedModuleNavigation(
+        buildRoleGuidedNavigation({
+          visibleSections: sidebarVisibleSections,
+          adminProfile,
+        })
+      ),
     [adminProfile, sidebarVisibleSections]
   )
 
@@ -938,9 +954,12 @@ export default function ERPLayout({ legalNotice }) {
 
   const menuItems = useMemo(() => {
     const buildMenuLeaf = (item) => ({
-      key: item.path,
-      icon: navIconRegistry[item.key] || <FileTextOutlined />,
+      key: item.sidebarKey || item.path,
+      icon: navIconRegistry[item.sidebarKey || item.key] || (
+        <AppstoreOutlined aria-hidden />
+      ),
       label: item.label,
+      title: item.label,
     })
     const buildMenuGroup = (section, keyPrefix = 'group') => ({
       type: 'group',
@@ -952,7 +971,10 @@ export default function ERPLayout({ legalNotice }) {
     })
 
     if (!useRoleGuidedNavigation) {
-      return sidebarVisibleSections.map((section) => buildMenuGroup(section))
+      const sections = shouldUseProductCoreNavigation
+        ? moduleSidebarSections
+        : groupSidebarNavigationSections(moduleSidebarSections)
+      return sections.map((section) => buildMenuGroup(section))
     }
 
     const guidedItems = []
@@ -960,7 +982,7 @@ export default function ERPLayout({ legalNotice }) {
       guidedItems.push({
         type: 'group',
         key: 'group-role-dashboards',
-        label: '看板中心',
+        label: '工作中心',
         children: roleGuidedNavigation.dashboardItems.map(buildMenuLeaf),
       })
     }
@@ -974,30 +996,48 @@ export default function ERPLayout({ legalNotice }) {
     }
     if (roleGuidedNavigation.secondaryItemCount > 0) {
       guidedItems.push({
-        key: ROLE_GUIDED_MORE_MENU_KEY,
-        icon: <AppstoreOutlined />,
-        label: `更多功能（${roleGuidedNavigation.secondaryItemCount}）`,
-        children: roleGuidedNavigation.secondarySections.map((section) =>
-          buildMenuGroup(section, 'role-more')
-        ),
+        type: 'group',
+        key: 'group-role-secondary',
+        label: '按需入口',
+        children: [
+          {
+            key: ROLE_GUIDED_MORE_MENU_KEY,
+            icon: <EllipsisOutlined aria-hidden />,
+            label: '更多功能',
+            children: groupSidebarNavigationSections(
+              roleGuidedNavigation.secondarySections
+            ).map((section) => buildMenuGroup(section, 'role-more')),
+          },
+        ],
       })
     }
     return guidedItems
-  }, [roleGuidedNavigation, sidebarVisibleSections, useRoleGuidedNavigation])
+  }, [
+    roleGuidedNavigation,
+    moduleSidebarSections,
+    useRoleGuidedNavigation,
+    shouldUseProductCoreNavigation,
+  ])
 
-  const currentSidebarPath =
+  const currentSidebarPath = getBusinessModuleSidebarKey(
     currentEntry?.sidebarParentPath || currentNavigationEntry.menuPath
+  )
 
   const roleGuidedSecondaryContainsCurrent = useMemo(
     () =>
       roleGuidedNavigation.secondaryItems.some(
-        (item) => item.path === currentSidebarPath
+        (item) => (item.sidebarKey || item.path) === currentSidebarPath
       ),
     [currentSidebarPath, roleGuidedNavigation.secondaryItems]
   )
 
   const roleGuidedSecondaryPaths = useMemo(
-    () => new Set(roleGuidedNavigation.secondaryItems.map((item) => item.path)),
+    () =>
+      new Set(
+        roleGuidedNavigation.secondaryItems.map(
+          (item) => item.sidebarKey || item.path
+        )
+      ),
     [roleGuidedNavigation.secondaryItems]
   )
 
@@ -1092,6 +1132,20 @@ export default function ERPLayout({ legalNotice }) {
     })
   }, [])
 
+  const pageUIState = useMemo(
+    () => ({ generation: businessPageGeneration, values: new Map() }),
+    [businessPageGeneration]
+  )
+  const moduleWorkspace = useMemo(
+    () => getBusinessModuleTabs(location.pathname, visibleSections),
+    [location.pathname, visibleSections]
+  )
+  useEffect(() => {
+    if (!currentPageShouldRedirect) {
+      rememberBusinessModuleLocation(pageUIState.values, location)
+    }
+  }, [currentPageShouldRedirect, location, pageUIState])
+
   const outletContext = useMemo(
     () => ({
       adminProfile,
@@ -1102,6 +1156,7 @@ export default function ERPLayout({ legalNotice }) {
       registerPageLeaveGuard,
       registerPageRefresh,
       updateAdminERPPreferences,
+      pageUIState,
     }),
     [
       adminProfile,
@@ -1112,6 +1167,7 @@ export default function ERPLayout({ legalNotice }) {
       registerPageLeaveGuard,
       registerPageRefresh,
       updateAdminERPPreferences,
+      pageUIState,
     ]
   )
 
@@ -1164,11 +1220,14 @@ export default function ERPLayout({ legalNotice }) {
       setMobileNavOpen(false)
       return
     }
+    const nextSidebarKey = getBusinessModuleSidebarKey(
+      nextPath.split(/[?#]/u)[0]
+    )
 
     if (nextPath === location.pathname) {
       if (useRoleGuidedNavigation) {
         setRoleGuidedOpenKeys(
-          roleGuidedSecondaryPaths.has(nextPath)
+          roleGuidedSecondaryPaths.has(nextSidebarKey)
             ? [ROLE_GUIDED_MORE_MENU_KEY]
             : []
         )
@@ -1183,13 +1242,31 @@ export default function ERPLayout({ legalNotice }) {
 
     if (useRoleGuidedNavigation) {
       setRoleGuidedOpenKeys(
-        roleGuidedSecondaryPaths.has(nextPath)
+        roleGuidedSecondaryPaths.has(nextSidebarKey)
           ? [ROLE_GUIDED_MORE_MENU_KEY]
           : []
       )
     }
     navigate(nextPath, navigateOptions)
     setMobileNavOpen(false)
+  }
+
+  const handleModuleMenuNavigate = (key) => {
+    const items = useRoleGuidedNavigation
+      ? [
+          ...roleGuidedNavigation.dashboardItems,
+          ...roleGuidedNavigation.primaryItems,
+          ...roleGuidedNavigation.secondaryItems,
+        ]
+      : moduleSidebarSections.flatMap((section) => section.items)
+    const item = items.find((entry) => (entry.sidebarKey || entry.path) === key)
+    if (item) {
+      handleNavigate(
+        resolveBusinessModuleMenuTarget(
+          item, location, pageUIState.values, visibleMenuPaths
+        )
+      )
+    }
   }
 
   const handleAccountMenuClick = async ({ key }) => {
@@ -1220,49 +1297,90 @@ export default function ERPLayout({ legalNotice }) {
     return undefined
   }
 
-  const sideNav = (
+  const renderSideNav = ({ collapsed = false, collapsible = false } = {}) => (
     <div className="erp-admin-sider__body">
       <div className="erp-admin-brand">
-        <button
-          type="button"
-          className="erp-admin-brand__home"
-          aria-label={`返回首页：${desktopHomeEntry.label || DEFAULT_DESKTOP_ENTRY.label}`}
-          title={`返回${desktopHomeEntry.label || DEFAULT_DESKTOP_ENTRY.label}`}
-          data-testid="desktop-home-entry"
-          onClick={() => handleNavigate(desktopHomeEntry.path)}
-        >
-          <div className="erp-admin-brand__logo">
-            <span className="erp-admin-brand__logo-mark">
-              {activeBrand.brandMark}
-            </span>
-            <div className="erp-admin-brand__logo-copy">
-              <div className="erp-admin-brand__logo-title">
-                {activeBrand.companyName}
+        {!collapsed ? (
+          <button
+            type="button"
+            className="erp-admin-brand__home"
+            aria-label={`返回首页：${desktopHomeEntry.label || DEFAULT_DESKTOP_ENTRY.label}`}
+            title={`返回${desktopHomeEntry.label || DEFAULT_DESKTOP_ENTRY.label}`}
+            data-testid="desktop-home-entry"
+            onClick={() => handleNavigate(desktopHomeEntry.path)}
+          >
+            <div className="erp-admin-brand__logo">
+              <span className="erp-admin-brand__logo-mark">
+                {activeBrand.brandMark}
+              </span>
+              <div className="erp-admin-brand__logo-copy">
+                <div className="erp-admin-brand__logo-title">
+                  {activeBrand.companyName}
+                </div>
               </div>
             </div>
-          </div>
-        </button>
+          </button>
+        ) : null}
+        {collapsible ? (
+          <Button
+            type="text"
+            icon={
+              collapsed ? (
+                <MenuUnfoldOutlined aria-hidden />
+              ) : (
+                <MenuFoldOutlined aria-hidden />
+              )
+            }
+            className="erp-admin-brand__collapse"
+            aria-label={collapsed ? '展开侧边菜单' : '收起侧边菜单'}
+            title={collapsed ? '展开侧边菜单' : '收起侧边菜单'}
+            onClick={() => setDesktopNavCollapsed((current) => !current)}
+          />
+        ) : null}
       </div>
 
       <Menu
         mode="inline"
+        inlineCollapsed={collapsed}
         selectedKeys={selectedKeys}
         openKeys={useRoleGuidedNavigation ? roleGuidedOpenKeys : undefined}
+        expandIcon={
+          useRoleGuidedNavigation ? (
+            <RightOutlined
+              aria-hidden
+              rotate={
+                roleGuidedOpenKeys.includes(ROLE_GUIDED_MORE_MENU_KEY) ? 90 : 0
+              }
+            />
+          ) : undefined
+        }
         onOpenChange={(nextOpenKeys) => {
           if (!useRoleGuidedNavigation) return
-          setRoleGuidedOpenKeys(
-            nextOpenKeys.includes(ROLE_GUIDED_MORE_MENU_KEY)
-              ? [ROLE_GUIDED_MORE_MENU_KEY]
-              : []
-          )
+          const opensMore = nextOpenKeys.includes(ROLE_GUIDED_MORE_MENU_KEY)
+          if (collapsed && opensMore) {
+            setDesktopNavCollapsed(false)
+          }
+          setRoleGuidedOpenKeys(opensMore ? [ROLE_GUIDED_MORE_MENU_KEY] : [])
         }}
         items={menuItems}
-        onClick={({ key }) => handleNavigate(String(key || ''))}
+        onClick={({ key }) => handleModuleMenuNavigate(key)}
         className="erp-admin-menu"
         data-navigation-presentation={
           useRoleGuidedNavigation ? 'role_guided' : 'sectioned'
         }
       />
+      <div className="erp-module-catalog-footer">
+        <Button
+          type="text"
+          icon={<AppstoreOutlined aria-hidden />}
+          className="erp-module-catalog-trigger"
+          aria-label="全部模块"
+          title={collapsed ? '全部模块' : undefined}
+          onClick={() => setModuleCatalogOpen(true)}
+        >
+          {collapsed ? null : '全部模块'}
+        </Button>
+      </div>
     </div>
   )
 
@@ -1386,8 +1504,18 @@ export default function ERPLayout({ legalNotice }) {
           effectiveSessionDiagnostic.dataRuntimeScope
         }
       >
-        <Sider width={240} className="erp-admin-sider">
-          {sideNav}
+        <Sider
+          width={206}
+          collapsedWidth={64}
+          collapsed={desktopNavCollapsed}
+          trigger={null}
+          className="erp-admin-sider"
+          data-sidebar-collapsed={desktopNavCollapsed}
+        >
+          {renderSideNav({
+            collapsed: desktopNavCollapsed,
+            collapsible: true,
+          })}
         </Sider>
 
         <Drawer
@@ -1397,32 +1525,49 @@ export default function ERPLayout({ legalNotice }) {
           onClose={() => setMobileNavOpen(false)}
           className="erp-admin-drawer"
         >
-          {sideNav}
+          {renderSideNav()}
         </Drawer>
 
         <Layout>
           <Header className="erp-admin-header">
             <div className="erp-admin-header__row">
-              <Space align="start" size={16} className="erp-admin-header__left">
+              <Space
+                align="center"
+                size={10}
+                className="erp-admin-header__left"
+              >
                 <Button
                   icon={<MenuOutlined />}
                   aria-label="打开导航菜单"
                   className="erp-admin-header__menu-button"
                   onClick={() => setMobileNavOpen(true)}
                 />
+                <Breadcrumb
+                  className="erp-admin-breadcrumb"
+                  items={[
+                    { title: '业务中心' },
+                    {
+                      title: (
+                        <strong>
+                          {currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label}
+                        </strong>
+                      ),
+                    },
+                  ]}
+                />
               </Space>
 
-              <Space size={12} wrap className="erp-admin-header__right">
+              <Space size={7} className="erp-admin-header__right">
                 <Button
                   icon={<ReloadOutlined />}
                   loading={refreshingCurrentPage}
                   onClick={handleRefreshCurrentPage}
+                  aria-label="刷新当前页"
                 >
-                  刷新当前页
+                  <span className="erp-admin-header__refresh-label">刷新</span>
                 </Button>
                 <ERPThemeToggle
                   className="erp-admin-header__theme-toggle"
-                  variant="menu"
                 />
                 <div className="erp-admin-header__meta">
                   <Tag color={isSuperAdmin ? 'gold' : 'blue'}>{roleLabel}</Tag>
@@ -1436,12 +1581,15 @@ export default function ERPLayout({ legalNotice }) {
                     }}
                   >
                     <Button
+                      className="erp-admin-header__account"
                       icon={<UserOutlined />}
                       loading={loggingOut}
                       data-testid="desktop-account-menu-trigger"
                       aria-label={`账号菜单：${displayAdminIdentity}`}
                     >
-                      <span>{displayAdminIdentity}</span>
+                      <span className="erp-admin-header__account-name">
+                        {displayAdminIdentity}
+                      </span>
                       <DownOutlined />
                     </Button>
                   </Dropdown>
@@ -1452,14 +1600,6 @@ export default function ERPLayout({ legalNotice }) {
 
           <Content className="erp-admin-content">
             {!retainingBusinessPage ? legalNotice : null}
-            <div className="erp-admin-breadcrumb">
-              <Breadcrumb
-                items={[
-                  { title: currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label },
-                ]}
-              />
-            </div>
-
             {isLocalCustomerDesktopPreview ? (
               <Alert
                 type="warning"
@@ -1480,7 +1620,20 @@ export default function ERPLayout({ legalNotice }) {
               </div>
             ) : null}
 
-            <div className="erp-admin-outlet">
+            <div
+              className={`erp-admin-outlet${
+                moduleWorkspace && !shouldBlockOutlet && !shouldGuardProductCoreBusinessData
+                  ? ' erp-admin-outlet--module'
+                  : ''
+              }`}
+            >
+              {!shouldBlockOutlet && !shouldGuardProductCoreBusinessData ? (
+                <BusinessModuleTabs
+                  workspace={moduleWorkspace}
+                  cache={pageUIState.values}
+                  onNavigate={handleNavigate}
+                />
+              ) : null}
               {shouldBlockOutlet ? (
                 <Alert
                   type="warning"
@@ -1510,6 +1663,24 @@ export default function ERPLayout({ legalNotice }) {
         buildIdentity={runtimeBuildIdentity}
         onClose={() => setSystemVersionOpen(false)}
         open={systemVersionOpen}
+      />
+      <ModuleCatalogModal
+        open={moduleCatalogOpen}
+        sections={
+          shouldUseProductCoreNavigation
+            ? sidebarVisibleSections
+            : groupSidebarNavigationSections(sidebarVisibleSections, {
+                pageCatalog: true,
+              })
+        }
+        currentPath={
+          currentEntry?.sidebarParentPath || currentNavigationEntry.menuPath
+        }
+        onClose={() => setModuleCatalogOpen(false)}
+        onNavigate={(path) => {
+          setModuleCatalogOpen(false)
+          handleNavigate(path)
+        }}
       />
     </>
   )

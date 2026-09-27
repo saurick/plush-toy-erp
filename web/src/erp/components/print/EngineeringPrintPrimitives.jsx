@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useLayoutEffect, useRef } from 'react'
 import { WorkInstructionImageAnnotationLayer } from './WorkInstructionImageAnnotationEditor.jsx'
+import BusinessImage from '../business-list/BusinessImage.jsx'
 import {
   createEmptyEngineeringImageSlot,
   engineeringImageSlots,
@@ -521,7 +522,7 @@ function ImageSlot({
     >
       <div className="erp-engineering-print-image-slot__viewport">
         {hasImage ? (
-          <img src={snapshot.dataURL} alt={label} style={cropStyle} />
+          <BusinessImage src={snapshot.dataURL} alt={label} style={cropStyle} compact printable />
         ) : (
           <span>{label}</span>
         )}

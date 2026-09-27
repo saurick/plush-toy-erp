@@ -1,271 +1,989 @@
+.erp-help-source-details li {
+  padding: 4px 0;
+}
+
 .erp-help-center-page {
-  display: flex;
-  width: 100%;
   min-width: 0;
-  flex-direction: column;
-  gap: 16px;
+  color: var(--erp-text);
+  font-size: 13px;
+  line-height: 1.65;
 }
 
-.erp-help-center-hero.ant-card,
-.erp-help-center-priority-card.ant-card,
-.erp-help-center-detail-card.ant-card {
-  border: 1px solid var(--erp-border, #dfe9e1);
-  background: var(--erp-surface-bg, rgb(255 255 255 / 0.96));
-}
-
-.erp-help-center-hero .ant-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  padding: 24px;
-}
-
-.erp-help-center-hero__main {
-  display: flex;
+.erp-help-center-workspace {
+  display: grid;
   min-width: 0;
-  align-items: flex-start;
-  justify-content: space-between;
+  grid-template-columns: 180px minmax(0, 1fr);
   gap: 24px;
 }
 
-.erp-help-center-hero__main > div:first-child {
+.erp-help-sidebar {
   min-width: 0;
-  flex: 1;
+  padding: 4px 0;
 }
 
-.erp-help-center-hero__title.ant-typography {
-  max-width: 820px;
-  margin: 14px 0 8px;
-  color: var(--erp-text, #1f2937);
-  font-size: clamp(24px, 3vw, 34px);
-  line-height: 1.25;
-}
-
-.erp-help-center-role-picker {
-  display: flex;
-  width: min(240px, 100%);
-  flex: 0 0 240px;
-  flex-direction: column;
+.erp-help-center-role-picker,
+.erp-help-current-role,
+.erp-help-mobile-picker {
+  display: grid;
+  min-width: 0;
   gap: 6px;
 }
 
-.erp-help-center-role-picker .ant-select {
+.erp-help-center-role-picker label,
+.erp-help-mobile-picker label,
+.erp-help-sidebar__label {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-current-role > strong {
+  font-size: 18px;
+}
+
+.erp-help-mobile-picker {
+  display: none;
+}
+
+.erp-help-topics {
+  margin-top: 24px;
+}
+
+.erp-help-topics h2 {
+  margin: 0 10px 8px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.erp-help-topic {
+  display: flex;
   width: 100%;
-}
-
-.erp-help-center-role-note.ant-typography {
-  margin: -4px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.erp-help-center-page .ant-empty {
-  margin-block: 14px;
-}
-
-.erp-help-center-hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.erp-help-center-section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin: 2px 0 12px;
-}
-
-.erp-help-center-section-head .ant-typography {
-  margin: 0;
-}
-
-.erp-help-center-priority-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.erp-help-center-priority-card {
-  min-width: 0;
-}
-
-.erp-help-center-priority-card .ant-card-body {
-  display: flex;
-  min-height: 210px;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 20px;
-}
-
-.erp-help-center-priority-card__index {
-  display: inline-flex;
-  width: 30px;
-  height: 30px;
+  min-height: 40px;
   align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  background: var(--erp-primary-soft, #e8f5ea);
-  color: var(--erp-primary, #2f8f4b);
-  font-weight: 700;
-}
-
-.erp-help-center-priority-card .ant-typography {
-  margin: 14px 0 6px;
-  color: var(--erp-text, #1f2937);
-}
-
-.erp-help-center-priority-card .ant-typography-paragraph {
-  flex: 1;
-  margin: 0 0 14px;
-  color: var(--erp-text-muted, #64748b);
-  line-height: 1.7;
-}
-
-.erp-help-center-priority-card .ant-btn-link {
-  height: auto;
-  padding: 0;
-  white-space: normal;
+  justify-content: space-between;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--erp-control-radius, 6px);
+  margin-bottom: 5px;
+  gap: 8px;
+  background: transparent;
+  color: var(--erp-text);
+  cursor: pointer;
+  font: inherit;
   text-align: left;
 }
 
-.erp-help-center-detail-grid {
+.erp-help-topic > .anticon {
+  flex: 0 0 auto;
+  opacity: 0;
+}
+
+.erp-help-topic[aria-current='page'] {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-softer);
+  color: var(--erp-primary-strong);
+  font-weight: 600;
+}
+
+.erp-help-topic[aria-current='page'] > .anticon {
+  opacity: 1;
+}
+
+.erp-help-sidebar__footer {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  gap: 14px;
+  margin-top: 24px;
+  gap: 8px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
 }
 
-.erp-help-center-detail-card .ant-card-body {
-  padding: 22px;
+.erp-help-sidebar__footer p {
+  margin: 0 4px 8px;
 }
 
-.erp-help-center-card-heading {
+.erp-help-sidebar__footer .ant-btn {
+  height: auto;
+  min-height: 34px;
+  white-space: normal;
+}
+
+.erp-help-article {
+  min-width: 0;
+  container-type: inline-size;
+  overflow-wrap: anywhere;
+}
+
+.erp-help-article__heading {
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: var(--erp-primary, #2f8f4b);
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 20px;
 }
 
-.erp-help-center-card-heading--warning {
-  color: #b26a00;
+.erp-help-article__heading > div {
+  min-width: 0;
 }
 
-.erp-help-center-card-heading .ant-typography {
+.erp-help-article__heading h3.ant-typography {
+  margin: 0 0 6px;
+  font-size: 23px;
+}
+
+.erp-help-article__heading > .ant-btn {
+  height: auto;
+  min-height: 34px;
+  flex: 0 0 auto;
+  white-space: normal;
+}
+
+.erp-help-flow,
+.erp-help-instructions {
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius, 10px);
+  background: var(--erp-surface-bg);
+}
+
+.erp-help-flow {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.erp-help-flow__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.erp-help-flow__heading h3,
+.erp-help-view-body h3 {
   margin: 0;
-  color: var(--erp-text, #1f2937);
+  font-size: 14px;
+  font-weight: 600;
 }
 
-.erp-help-center-workflow {
+.erp-help-flow__heading > span,
+.erp-help-caption {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-flow__scroll {
+  overflow-x: auto;
+  padding: 4px;
+  margin: 10px -4px 0;
+}
+
+.erp-help-flow__canvas {
+  position: relative;
+  min-width: var(--help-flow-min-width);
+}
+
+.erp-help-flow__steps {
   display: grid;
-  gap: 14px;
-  margin: 20px 0 0;
+  grid-template-columns: repeat(var(--help-step-count), minmax(0, 1fr));
+  gap: 2.4%;
   padding: 0;
+  margin: 0;
   list-style: none;
 }
 
-.erp-help-center-workflow li {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  align-items: start;
-  gap: 10px;
+.erp-help-flow__steps > li {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
 }
 
-.erp-help-center-workflow li > span:first-child {
+.erp-help-flow__step {
+  display: flex;
+  width: 100%;
+  min-height: 96px;
+  height: 100%;
+  align-items: flex-start;
+  padding: 12px 9px;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 7px;
+  gap: 7px;
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.erp-help-flow__step-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.erp-help-flow__step-copy > span,
+.erp-help-flow__step-copy em {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.erp-help-flow__step-copy em {
+  color: var(--erp-primary-strong);
+}
+
+.erp-help-flow__number,
+.erp-help-point {
   display: inline-flex;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--erp-border, #dfe9e1);
-  border-radius: 999px;
-  background: var(--erp-surface-bg-soft, #f7faf7);
-  color: var(--erp-primary, #2f8f4b);
-  font-weight: 700;
-}
-
-.erp-help-center-workflow li > .ant-typography {
-  min-width: 0;
-  padding-top: 2px;
-  color: var(--erp-text-muted, #475569);
-  line-height: 1.75;
-}
-
-.erp-help-center-workflow--compact {
-  margin-top: 14px;
-}
-
-.erp-help-center-exception-title.ant-typography {
-  margin: 18px 0 8px;
-  color: var(--erp-text, #1f2937);
-}
-
-.erp-help-center-result {
-  display: grid;
-  gap: 6px;
-  margin-top: 18px;
-  padding: 14px 16px;
-  border: 1px solid var(--erp-border, #dfe9e1);
-  border-radius: 12px;
-  background: var(--erp-surface-bg-soft, #f7faf7);
-}
-
-.erp-help-center-result strong {
-  color: var(--erp-text, #1f2937);
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 50%;
+  background: var(--erp-surface-bg);
+  color: var(--erp-primary-strong);
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.75;
 }
 
-.erp-help-center-handoff.ant-typography {
-  margin: 18px 0 0;
-  color: var(--erp-text-muted, #475569);
-  line-height: 1.75;
+.erp-help-flow__step[aria-pressed='true'] {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-soft);
+  box-shadow: inset 0 0 0 1px var(--erp-primary);
 }
 
-[data-erp-theme='dark'] .erp-help-center-card-heading--warning {
-  color: #f5c96b;
+.erp-help-flow--chain .erp-help-flow__canvas {
+  min-height: var(--help-flow-height);
 }
 
-[data-erp-theme='dark'] .erp-help-center-role-picker .ant-typography {
+.erp-help-flow__edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: var(--help-flow-height);
+  overflow: visible;
+  color: var(--erp-text-subtle);
+  pointer-events: none;
+}
+
+.erp-help-flow__edges > path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+
+.erp-help-flow__edges .erp-help-flow__branch {
+  color: var(--erp-warning-text);
+  stroke-dasharray: 5 4;
+}
+
+.erp-help-flow__issue {
+  position: absolute;
+  width: 28%;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.erp-help-flow__condition,
+.erp-help-flow__return {
+  display: block;
+  min-height: 26px;
+  color: var(--erp-warning-text);
+  font-size: 12px;
+}
+
+.erp-help-flow__condition {
+  position: absolute;
+  top: -29px;
+  left: calc(50% + 8px);
+  width: max-content;
+  text-align: left;
+}
+
+.erp-help-flow__issue button {
+  display: grid;
+  width: 100%;
+  min-height: 68px;
+  align-content: center;
+  padding: 7px;
+  border: 1px dashed var(--erp-warning-text);
+  border-radius: 7px;
+  gap: 2px;
+  background: color-mix(
+    in srgb,
+    var(--erp-warning-text) 7%,
+    var(--erp-surface-bg)
+  );
+  color: var(--erp-warning-text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.erp-help-flow__issue button[aria-pressed='true'] {
+  border-style: solid;
+  box-shadow: inset 0 0 0 1px var(--erp-warning-text);
+}
+
+.erp-help-flow__issue :where(button) > span {
+  font-size: 12px;
+}
+
+.erp-help-flow__return {
+  padding-top: 5px;
+}
+
+.erp-help-flow__detail {
+  display: flex;
+  align-items: baseline;
+  padding-top: 10px;
+  margin: 0;
+  gap: 10px;
+  color: var(--erp-text-muted);
+}
+
+.erp-help-flow__detail > strong {
+  flex: 0 0 auto;
+  color: var(--erp-primary-strong);
+}
+
+.erp-help-flow--path .erp-help-flow__steps > li:where(:not(:last-child))::after,
+.erp-help-flow--steps
+  .erp-help-flow__steps
+  > li:where(:not(:last-child))::after {
+  position: absolute;
+  top: 35px;
+  right: -16px;
+  color: var(--erp-text-subtle);
+  content: '→';
+}
+
+.erp-help-view-switch {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--erp-border);
+}
+
+.erp-help-view-body {
+  min-height: 200px;
+  padding: 18px;
+}
+
+.erp-help-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.erp-help-caption {
+  margin: 0 0 14px;
+}
+
+.erp-help-example,
+.erp-help-result {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 8px;
+  margin: 0;
+}
+
+.erp-help-example figcaption,
+.erp-help-result > h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--erp-border);
+  gap: 4px 10px;
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-help-example :where(figcaption) > span {
+  color: var(--erp-text-muted);
+  font-size: 11px;
+}
+
+.erp-help-example__area {
+  position: relative;
+  padding: 16px 13px 16px 46px;
+  border-left: 3px solid transparent;
+}
+
+.erp-help-example__area + .erp-help-example__area {
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-help-example__area[data-active='true'] {
+  border-left-color: var(--erp-primary);
+  background: var(--erp-primary-softer);
+}
+
+.erp-help-example__area > .erp-help-point {
+  position: absolute;
+  top: 13px;
+  left: 9px;
+  cursor: pointer;
+}
+
+.erp-help-example__content {
+  min-width: 0;
+}
+
+.erp-help-example__content p {
+  margin: 6px 0 2px;
+}
+
+.erp-help-example__row,
+.erp-help-example__quantity,
+.erp-help-example__sequence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-help-example__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-example__fields strong,
+.erp-help-example__quantity strong {
+  display: block;
   color: var(--erp-text);
+  font-size: 14px;
 }
 
-@media screen and (max-width: 980px) {
-  .erp-help-center-priority-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.erp-help-example__quantity {
+  margin-top: 16px;
+}
 
-  .erp-help-center-detail-grid {
+.erp-help-example__quantity > :where(span:first-child) {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-example__quantity strong {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.erp-help-example__quantity small {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.erp-help-example__status {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
+  font-size: 12px;
+}
+
+.erp-help-example__action {
+  padding: 6px 10px;
+  border: 1px solid var(--erp-primary);
+  border-radius: 5px;
+  color: var(--erp-primary-strong);
+  font-weight: 600;
+}
+
+.erp-help-example__link {
+  color: var(--erp-primary-strong);
+}
+
+.erp-help-example__table {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.erp-help-example table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-help-example th,
+.erp-help-example td {
+  padding: 7px 5px;
+  border-bottom: 1px solid var(--erp-border);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.erp-help-example th {
+  color: var(--erp-text-muted);
+  font-weight: 400;
+}
+
+.erp-help-example th:first-child,
+.erp-help-example td:first-child {
+  padding-left: 0;
+  text-align: left;
+}
+
+.erp-help-example__filters {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  gap: 6px;
+}
+
+.erp-help-example__filters > span {
+  padding: 3px 7px;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 4px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-help-example__bars > div {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 9px;
+}
+
+.erp-help-example__bars > div + div {
+  margin-top: 10px;
+}
+
+.erp-help-example__bars strong {
+  text-align: right;
+}
+
+.erp-help-example__track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-help-example__track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--erp-primary);
+}
+
+.erp-help-notes {
+  display: grid;
+  gap: 7px;
+}
+
+.erp-help-note {
+  display: flex;
+  align-items: flex-start;
+  padding: 11px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  gap: 9px;
+  background: transparent;
+  color: var(--erp-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.erp-help-note > :where(span:last-child) {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.erp-help-note > :where(span:last-child) > span {
+  color: var(--erp-text-muted);
+}
+
+.erp-help-note[aria-pressed='true'] {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-softer);
+}
+
+.erp-help-point[aria-pressed='true'],
+.erp-help-note[aria-pressed='true'] > .erp-help-point {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-soft);
+}
+
+.erp-help-boundary {
+  padding: 8px 4px;
+  margin: 0;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-result__change {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  padding: 26px 12px;
+  gap: 8px;
+  text-align: center;
+}
+
+.erp-help-result__change strong,
+.erp-help-result__change small {
+  display: block;
+}
+
+.erp-help-result__change strong {
+  font-size: 30px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-help-result__change > span:last-child > strong {
+  color: var(--erp-primary-strong);
+}
+
+.erp-help-result__change small {
+  margin-top: 4px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-result__delta {
+  display: grid;
+  gap: 5px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-result dl,
+.erp-help-exception-example dl {
+  padding: 0 14px;
+  margin: 0;
+}
+
+.erp-help-result dl > div,
+.erp-help-exception-example dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid var(--erp-border);
+  gap: 12px;
+}
+
+.erp-help-result dt,
+.erp-help-exception-example dt {
+  color: var(--erp-text-muted);
+}
+
+.erp-help-result dd,
+.erp-help-exception-example dd {
+  margin: 0;
+  text-align: right;
+}
+
+.erp-help-outcome-copy p,
+.erp-help-exception-copy p,
+.erp-help-current-step p {
+  margin: 8px 0 18px;
+  color: var(--erp-text-muted);
+  line-height: 1.85;
+}
+
+.erp-help-outcome-copy .erp-help-boundary {
+  padding: 10px 0 0;
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-help-exception-path {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+  margin: 0 0 20px;
+  gap: 24px;
+  list-style: none;
+}
+
+.erp-help-exception-path > li {
+  position: relative;
+  display: grid;
+  align-content: center;
+  padding: 12px 8px;
+  border-radius: 7px;
+  gap: 2px;
+  background: var(--erp-surface-bg-soft);
+  text-align: center;
+}
+
+.erp-help-exception-path > li:first-child {
+  background: color-mix(
+    in srgb,
+    var(--erp-warning-text) 8%,
+    var(--erp-surface-bg)
+  );
+  color: var(--erp-warning-text);
+}
+
+.erp-help-exception-path > li > span {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-exception-path > li:not(:last-child)::after {
+  position: absolute;
+  top: 50%;
+  right: -18px;
+  color: var(--erp-text-subtle);
+  content: '→';
+  transform: translateY(-50%);
+}
+
+.erp-help-exception-example {
+  padding: 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 7px;
+}
+
+.erp-help-exception-example h4 {
+  margin: 0 0 10px;
+  color: var(--erp-warning-text);
+  font-size: 13px;
+}
+
+.erp-help-exception-example dl {
+  padding: 0;
+}
+
+.erp-help-exception-example p {
+  margin-bottom: 0;
+}
+
+.erp-help-current-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.erp-help-current-step__number {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--erp-primary-softer);
+  color: var(--erp-primary-strong);
+  font-size: 26px;
+}
+
+.erp-help-current-step h3 {
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.erp-help-muted {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-source-details {
+  border-top: 1px solid var(--erp-border);
+  margin-top: 18px;
+}
+
+.erp-help-source-details > summary,
+.erp-help-role-context > summary {
+  padding: 12px 0;
+  color: var(--erp-text-muted);
+  cursor: pointer;
+}
+
+.erp-help-source-details ol {
+  padding-left: 24px;
+  margin: 0;
+}
+
+.erp-help-source-details p,
+.erp-help-role-context p {
+  margin: 4px 0 12px;
+  color: var(--erp-text-muted);
+}
+
+.erp-help-role-context {
+  margin: 4px 2px 0;
+  font-size: 12px;
+}
+
+.erp-help-topic:focus-visible,
+.erp-help-flow__step:focus-visible,
+.erp-help-flow__issue button:focus-visible,
+.erp-help-example__area > button:focus-visible,
+.erp-help-note:focus-visible,
+.erp-help-source-details > summary:focus-visible,
+.erp-help-role-context > summary:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.erp-help-topic:hover,
+.erp-help-flow__step:hover,
+.erp-help-note:hover {
+  border-color: var(--erp-primary);
+}
+
+.erp-help-topic__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-help-example__bars > div:nth-child(2) .erp-help-example__track > span {
+  background: var(--erp-text-subtle);
+}
+
+@container (max-width: 720px) {
+  .erp-help-content-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media screen and (max-width: 640px) {
-  .erp-help-center-hero .ant-card-body,
-  .erp-help-center-detail-card .ant-card-body {
-    padding: 18px;
+    gap: 16px;
   }
 
-  .erp-help-center-hero__main,
-  .erp-help-center-section-head {
-    align-items: stretch;
+  .erp-help-notes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .erp-help-note {
     flex-direction: column;
   }
 
-  .erp-help-center-role-picker {
-    width: 100%;
-    flex-basis: auto;
+  .erp-help-notes .erp-help-boundary {
+    grid-column: 1 / -1;
+  }
+}
+
+@container (max-width: 620px) {
+  .erp-help-flow__canvas,
+  .erp-help-flow--chain .erp-help-flow__canvas {
+    min-width: 0;
+    min-height: 0;
   }
 
-  .erp-help-center-hero__actions .ant-btn {
-    width: 100%;
+  .erp-help-flow__steps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
   }
 
-  .erp-help-center-priority-grid {
+  .erp-help-flow__step {
+    min-height: 0;
+    padding: 10px;
+  }
+
+  .erp-help-flow__step-copy {
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+    gap: 2px 8px;
+  }
+
+  .erp-help-flow__step-copy em {
+    grid-column: 1 / -1;
+  }
+
+  .erp-help-flow__edges,
+  .erp-help-flow--path
+    .erp-help-flow__steps
+    > li:where(:not(:last-child))::after,
+  .erp-help-flow--steps
+    .erp-help-flow__steps
+    > li:where(:not(:last-child))::after {
+    display: none;
+  }
+
+  .erp-help-flow__issue {
+    position: static;
+    width: 100%;
+    margin-top: 12px;
+    transform: none;
+  }
+
+  .erp-help-flow__issue button {
+    min-height: 56px;
+  }
+
+  .erp-help-flow__condition {
+    position: static;
+    width: auto;
+    text-align: center;
+  }
+
+  .erp-help-flow__detail {
+    align-items: flex-start;
+  }
+
+  .erp-help-notes {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .erp-help-center-priority-card .ant-card-body {
-    min-height: 0;
+  .erp-help-note {
+    flex-direction: row;
+  }
+
+  .erp-help-article__heading {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .erp-help-view-body {
+    padding: 14px;
+  }
+
+  .erp-help-exception-path {
+    gap: 15px;
+    font-size: 12px;
+  }
+
+  .erp-help-exception-path > li:not(:last-child)::after {
+    right: -13px;
+  }
+}
+
+@media (max-width: 760px) {
+  .erp-help-center-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .erp-help-sidebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+    align-items: end;
+    gap: 12px;
+  }
+
+  .erp-help-mobile-picker {
+    display: grid;
+  }
+
+  .erp-help-topics {
+    display: none;
+  }
+
+  .erp-help-sidebar__footer {
+    display: flex;
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    margin: 0;
+    gap: 6px;
+  }
+
+  .erp-help-sidebar__footer p {
+    width: 100%;
+    margin: 0 0 3px;
+  }
+
+  .erp-help-sidebar__footer .ant-btn {
+    width: auto;
+  }
+
+  .erp-help-article__heading h3.ant-typography {
+    font-size: 21px;
   }
 }

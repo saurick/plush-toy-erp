@@ -138,7 +138,7 @@ test('adminLoginRouting: 多个手机岗位登录后直接进入首个可用岗�
   assert.equal(path, '/m/sales/tasks')
 })
 
-test('adminLoginRouting: 仅系统管理员岗位的超级管理员不自动进入老板端', () => {
+test('adminLoginRouting: 超级管理员默认进入全部岗位查看', () => {
   const path = resolveAdminPostLoginPath({
     adminProfile: {
       ...buildAdminProfile(),
@@ -153,10 +153,10 @@ test('adminLoginRouting: 仅系统管理员岗位的超级管理员不自动进�
     shouldRemember: false,
   })
 
-  assert.equal(path, '/entry?reason=mobile-role-unassigned')
+  assert.equal(path, '/m/all/tasks')
 })
 
-test('adminLoginRouting: 系统管理员从老板深链登录后保留登录态并进入岗位提示页', () => {
+test('adminLoginRouting: 超级管理员从老板深链登录后进入该岗位查看', () => {
   const path = resolveAdminPostLoginPath({
     adminProfile: {
       ...buildAdminProfile(),
@@ -172,7 +172,7 @@ test('adminLoginRouting: 系统管理员从老板深链登录后保留登录态�
     shouldRemember: false,
   })
 
-  assert.equal(path, '/entry?reason=mobile-role-unassigned')
+  assert.equal(path, '/m/boss/tasks')
 })
 
 test('adminLoginRouting: 已分配其他岗位的账号访问错误岗位深链时提示岗位不可用', () => {
@@ -189,7 +189,7 @@ test('adminLoginRouting: 已分配其他岗位的账号访问错误岗位深链�
   assert.equal(path, '/entry?reason=mobile-role-unavailable')
 })
 
-test('adminLoginRouting: 超级管理员明确分配老板岗位后可以进入老板端', () => {
+test('adminLoginRouting: 超级管理员已分配业务岗位也默认进入全部岗位查看', () => {
   const path = resolveAdminPostLoginPath({
     adminProfile: {
       ...buildAdminProfile(),
@@ -207,5 +207,5 @@ test('adminLoginRouting: 超级管理员明确分配老板岗位后可以进入�
     shouldRemember: false,
   })
 
-  assert.equal(path, '/m/boss/tasks')
+  assert.equal(path, '/m/all/tasks')
 })

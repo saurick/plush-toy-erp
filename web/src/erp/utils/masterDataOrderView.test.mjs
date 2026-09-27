@@ -1330,58 +1330,30 @@ test('FL_shipment_ship_date__retains_planned_and_actual_ship_dates masterDataOrd
   )
 })
 
-test('masterDataOrderView: unit display uses readable unit truth instead of raw ids', () => {
+test('masterDataOrderView: unit display shares concise labels, sorting and alias search', () => {
   const units = [
-    { id: 12, code: 'M', name: '米', precision: 2, is_active: true },
-    { id: 13, code: 'PCS', name: 'PCS', precision: 0, is_active: true },
-    {
-      id: 15,
-      code: 'SIM-PLUSH-CORE-KG',
-      name: '核心演示单位-千克',
-      precision: 3,
-      is_active: true,
-    },
-    { id: 14, code: 'BOX', name: '箱', is_active: false },
+    { id: 12, code: 'YD', name: '码', precision: 6, is_active: true },
+    { id: 13, code: 'EA', name: '个', precision: 0, is_active: true },
+    { id: 15, code: 'KG', name: '千克', precision: 3, is_active: true },
+    { id: 14, code: 'BOX', name: '箱', precision: 0, is_active: false },
   ]
-  const unitByID = new Map(units.map((unit) => [unit.id, unit]))
-
-  assert.equal(formatUnitDisplayName(12, unitByID), '米（M）')
-  assert.equal(formatUnitDisplayName(13, unitByID), 'PCS')
-  assert.equal(
-    formatUnitDisplayName(15, unitByID),
-    '核心演示单位-千克（SIM-PLUSH-CORE-KG）'
+  const byID = new Map(units.map((unit) => [unit.id, unit]))
+  assert.equal(formatUnitDisplayName(12, byID), '码')
+  assert.equal(formatUnitShortDisplayName(15, byID), '千克')
+  assert.equal(formatUnitDisplayName(undefined, byID), '-')
+  assert.equal(formatUnitDisplayName(99, byID), '单位已关联')
+  const options = buildUnitSelectOptions(units)
+  assert.deepEqual(
+    options.map(({ value, label, precision }) => ({ value, label, precision })),
+    [
+      { value: 13, label: '个', precision: 0 },
+      { value: 12, label: '码', precision: 6 },
+      { value: 15, label: '千克', precision: 3 },
+    ]
   )
-  assert.equal(formatUnitShortDisplayName(15, unitByID), '千克（KG）')
-  assert.equal(formatUnitDisplayName(undefined, unitByID), '-')
-  assert.equal(formatUnitDisplayName(99, unitByID), '单位已关联')
-  assert.equal(formatUnitShortDisplayName(99, unitByID), '单位已关联')
-
-  assert.deepEqual(buildUnitSelectOptions(units), [
-    {
-      value: 12,
-      label: '米（M）',
-      suffixLabel: '米（M）',
-      searchText: '米（M） 米（M）',
-      title: '米（M）',
-      precision: 2,
-    },
-    {
-      value: 13,
-      label: 'PCS',
-      suffixLabel: 'PCS',
-      searchText: 'PCS PCS',
-      title: 'PCS',
-      precision: 0,
-    },
-    {
-      value: 15,
-      label: '千克（KG）',
-      suffixLabel: '千克（KG）',
-      searchText: '千克（KG） 核心演示单位-千克（SIM-PLUSH-CORE-KG）',
-      title: '核心演示单位-千克（SIM-PLUSH-CORE-KG）',
-      precision: 3,
-    },
-  ])
+  assert.match(options[0].searchText, /PCS/)
+  assert.match(options[1].searchText, /Y/)
+  assert.match(options[2].searchText, /kg/)
 })
 
 test('masterDataOrderView: material create helpers reduce repetitive manual entry', () => {
@@ -3089,7 +3061,10 @@ test('source document line summaries preserve numeric(20,6) boundary values exac
     amount: '100000000000000',
   }
   assert.deepEqual(summarizePurchaseOrderLines(lines), expected)
-  assert.deepEqual(summarizeOutsourcingOrderLines(lines), { ...expected, amount: '0' })
+  assert.deepEqual(summarizeOutsourcingOrderLines(lines), {
+    ...expected,
+    amount: '0',
+  })
 })
 
 test('masterDataOrderView: outsourcing order item amount derives from quantity and unit price', () => {

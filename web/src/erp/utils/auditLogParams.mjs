@@ -35,12 +35,16 @@ export function buildAuditLogParams({
 
   const normalizedCreatedFrom = normalizeString(createdFrom)
   if (normalizedCreatedFrom) {
-    params.created_from = normalizedCreatedFrom
+    params.created_from = /^\d{4}-\d{2}-\d{2}$/u.test(normalizedCreatedFrom)
+      ? `${normalizedCreatedFrom}T00:00:00+08:00`
+      : normalizedCreatedFrom
   }
 
   const normalizedCreatedTo = normalizeString(createdTo)
   if (normalizedCreatedTo) {
-    params.created_to = normalizedCreatedTo
+    params.created_to = /^\d{4}-\d{2}-\d{2}$/u.test(normalizedCreatedTo)
+      ? `${normalizedCreatedTo}T23:59:59.999999999+08:00`
+      : normalizedCreatedTo
   }
 
   return params

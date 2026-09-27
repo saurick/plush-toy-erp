@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Descriptions, Form, Input, Select, Typography } from 'antd'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 
 import {
@@ -42,6 +44,7 @@ export default function SalesOrderReservationModal({
   onSubmit,
 }) {
   const [form] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open)
   const selectedItemID = Form.useWatch('sales_order_item_id', form)
   const itemChoices = useMemo(
     () => buildSalesOrderReservationItemChoices(items, reservations, shipments),
@@ -210,6 +213,10 @@ export default function SalesOrderReservationModal({
           name="quantity"
           label="本次预留数量"
           rules={[
+            unitQuantityRuleFromOptions(
+              quantityUnitOptions,
+              selectedItem?.unit_id
+            ),
             { required: true, message: '请填写预留数量' },
             {
               validator: (_, value) => {

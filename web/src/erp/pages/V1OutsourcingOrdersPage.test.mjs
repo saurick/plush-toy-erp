@@ -117,9 +117,11 @@ test('outsourcing order source actions stay on the matching confirmed open line'
   assert.match(sourceFactActions, /label: '登记回货'/u)
   assert.match(sourceFactActions, /isOutsourcingSourceActionEligible/u)
   assert.match(sourceFactActions, /filterOutsourcingSourceActionLots/u)
-  assert.match(sourceFactActions, /sourceAction && view === 'details'/u)
-  assert.doesNotMatch(source, /sourceAction && view !== 'preview'/u)
-  assert.doesNotMatch(source, /sourceAction && view === 'modal'/u)
+  assert.match(sourceFactActions, /sourceAction\s*\? \[\{ label: '业务操作'/u)
+  assert.match(
+    source,
+    /<BusinessDetailsModal[\s\S]*getItemFields: getOutsourcingOrderItemFields/u
+  )
 })
 
 test('outsourcing page explains follow-up work in business language', () => {

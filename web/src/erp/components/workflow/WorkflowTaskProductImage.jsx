@@ -10,6 +10,7 @@ import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
 import { createTaskProductImageLoader } from '../../utils/taskProductImage.mjs'
 import WorkflowTaskImagePreview from './WorkflowTaskImagePreview.jsx'
+import { isUsableImageDimensions } from '../../utils/imageDisplay.mjs'
 
 // A profile's cache becomes unreachable on logout; permission changes use a new loader.
 const profileLoaders = new WeakMap()
@@ -90,6 +91,9 @@ function ProductImage({ item, load, preview }) {
       alt={`${item.name || '产品'}主图`}
       width="64"
       height="64"
+      onLoad={(event) => {
+        if (!isUsableImageDimensions(event.currentTarget)) setFailed(true)
+      }}
       onError={() => setFailed(true)}
     />
   ) : (

@@ -21,9 +21,11 @@
 }
 
 .erp-business-form-page {
-  --erp-control-height: 36px;
+  container: business-editor / inline-size;
+  --erp-control-height: 34px;
   --erp-textarea-rows: 3;
   display: grid;
+  flex: 1;
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
@@ -39,14 +41,18 @@
 }
 
 .erp-business-form-page__header {
-  padding: 16px 20px 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--erp-border-strong, #c6d5ca);
-  background: var(--erp-surface-bg-soft, #eef4f0);
+  background: color-mix(
+    in srgb,
+    var(--erp-surface-bg) 76%,
+    var(--erp-border-strong)
+  );
 }
 
 .erp-business-form-page__header h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.5;
   font-weight: 650;
 }
@@ -58,13 +64,199 @@
 }
 
 .erp-business-form-page__body {
+  container: business-form-fields / inline-size;
   min-height: 0;
   min-width: 0;
   overflow: auto;
-  padding: 16px 20px;
+  padding: 14px 16px;
   background: var(--erp-business-action-modal-bg, #fff);
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+}
+
+.erp-business-form-page__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.erp-business-form-page__main[data-section-navigation='true'] {
+  grid-template-columns: 164px minmax(0, 1fr);
+}
+
+.erp-business-form-page__navigation {
+  min-height: 0;
+  padding: 12px 8px;
+  overflow: auto;
+  border-right: 1px solid var(--erp-border);
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-business-form-page__section-links {
+  display: grid;
+  gap: 4px;
+}
+
+.erp-business-form-page__section-links button {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--erp-text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.erp-business-form-page__section-links button:hover {
+  background: var(--erp-primary-softer);
+}
+
+.erp-business-form-page__section-links button[aria-current='location'] {
+  border-color: var(--erp-primary-soft);
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
+  font-weight: 650;
+}
+
+.erp-business-form-page__section-picker {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  color: var(--erp-text-muted);
+  font-size: 13px;
+}
+
+.erp-business-form-page__section-picker select {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 6px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  font: inherit;
+}
+
+.erp-business-form-page__section-links button:focus-visible,
+.erp-business-form-page__section-picker select:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.erp-business-form-section {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--erp-border);
+  scroll-margin-top: 12px;
+}
+
+.erp-business-form-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.erp-business-form-section > .erp-business-action-form__section-title,
+.erp-business-form-section > summary {
+  margin-bottom: 12px;
+}
+
+.erp-business-form-section > summary {
+  cursor: pointer;
+}
+
+.erp-business-form-section > summary .erp-business-action-form__section-title {
+  display: inline-flex;
+  width: calc(100% - 24px);
+}
+
+.erp-business-form-section:not([open]) > summary {
+  margin-bottom: 0;
+}
+
+.erp-business-form-section__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px 16px;
+  min-width: 0;
+}
+
+.erp-business-form-section__content {
+  min-width: 0;
+}
+
+.erp-business-form-section__content > .erp-master-contact-list,
+.erp-business-form-section__content > .product-image-slots {
+  margin-block-start: 0;
+}
+
+.erp-business-form-section__fields .ant-form-item-label {
+  padding-bottom: 5px;
+}
+
+.erp-business-form-section__fields > .business-attachment-panel--inline {
+  margin-block-start: 0;
+}
+
+@container business-editor (max-width: 1080px) {
+  .erp-business-form-page__main[data-section-navigation='true'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .erp-business-form-page__navigation {
+    padding: 7px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--erp-border);
+  }
+
+  .erp-business-form-page__section-links {
+    display: none;
+  }
+
+  .erp-business-form-page__section-picker {
+    display: flex;
+  }
+}
+
+.erp-business-form-section__fields > .erp-supplier-address-field {
+  grid-column: 1 / -1;
+}
+
+@container business-form-fields (min-width: 921px) {
+  .erp-business-form-section__fields > .erp-supplier-address-field {
+    grid-column: span 3;
+  }
+
+  .erp-business-form-section__fields {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@container business-form-fields (max-width: 920px) {
+  .erp-business-form-section__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.erp-production-order-line__wide {
+  grid-column: span 2;
+}
+
+@container business-form-fields (max-width: 520px) {
+  .erp-production-order-line__wide {
+    grid-column: 1 / -1;
+  }
+
+  .erp-business-form-section__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .erp-business-form-page__body > .ant-spin-nested-loading > .ant-spin-container {
@@ -80,15 +272,24 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 20px;
+  padding: 10px 16px;
   border-top: 1px solid var(--erp-border-strong, #c6d5ca);
-  background: var(--erp-surface-bg-soft, #eef4f0);
-  box-shadow: 0 -4px 12px rgb(0 0 0 / 0.06);
+  background: color-mix(
+    in srgb,
+    var(--erp-surface-bg) 68%,
+    var(--erp-border-strong)
+  );
+  box-shadow: 0 -4px 12px rgb(0 0 0 / 0.1);
 }
 
 .erp-business-form-page__status {
   color: var(--erp-text-muted, #64748b);
   font-size: 12px;
+}
+
+.erp-business-form-page[data-unsaved='true'] .erp-business-form-page__status {
+  color: color-mix(in srgb, var(--erp-warning-text) 92%, var(--erp-text));
+  font-weight: 600;
 }
 
 .erp-business-form-page[data-unsaved='true']
@@ -99,7 +300,7 @@
   height: 7px;
   margin-right: 7px;
   border-radius: 50%;
-  background: #d78d2e;
+  background: currentColor;
 }
 
 .erp-business-form-page__actions {

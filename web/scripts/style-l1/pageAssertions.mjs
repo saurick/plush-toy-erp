@@ -98,6 +98,33 @@ async function assertNoHorizontalOverflow(page, scenarioName) {
     docScrollWidth: document.documentElement.scrollWidth,
     viewportWidth: window.innerWidth,
   }))
+  if (
+    metrics.docScrollWidth > metrics.viewportWidth + 2 ||
+    metrics.bodyScrollWidth > metrics.viewportWidth + 2
+  ) {
+    metrics.overflowElements = await page.evaluate(() =>
+      Array.from(document.body.querySelectorAll('*'))
+        .flatMap((element) => {
+          const box = element.getBoundingClientRect()
+          const style = getComputedStyle(element)
+          return box.width &&
+            box.right > innerWidth + 2 &&
+            style.visibility !== 'hidden'
+            ? [
+                {
+                  tag: element.tagName,
+                  className: String(element.className),
+                  left: box.left,
+                  right: box.right,
+                  width: box.width,
+                  position: style.position,
+                },
+              ]
+            : []
+        })
+        .slice(0, 20)
+    )
+  }
 
   assert(
     metrics.bodyScrollWidth <= metrics.viewportWidth + 2,

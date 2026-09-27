@@ -1,3 +1,4 @@
+import { standardUnitForLabel } from '../utils/unitQuantity.mjs'
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
 import { unixSecondsToBusinessDate } from '../utils/businessDate.mjs'
 import {
@@ -302,7 +303,7 @@ export function normalizeProcessingLine(line = {}) {
     processingItem: normalizeText(line.processingItem),
     supplierAlias: normalizeText(line.supplierAlias),
     processCategory: normalizeText(line.processCategory),
-    unit: normalizeText(line.unit),
+    unit: standardUnitForLabel(line.unit)?.name || normalizeText(line.unit),
     unitPrice: normalizeText(line.unitPrice),
     quantity: normalizeText(line.quantity),
     amount: resolveProcessingLineAmount(line),
@@ -370,6 +371,7 @@ export function calculateProcessingContractTotals(
   { merges = [] } = {}
 ) {
   const quantityValues = []
+  const quantityUnits = new Set()
   const amountValues = []
 
   lines.forEach((line, rowIndex) => {
@@ -391,6 +393,7 @@ export function calculateProcessingContractTotals(
 
     if (numeric20Scale6Units(quantity) !== null) {
       quantityValues.push(quantity)
+      quantityUnits.add(normalizedLine.unit)
     }
 
     if (numeric20Scale6Units(amount) !== null) {
@@ -402,10 +405,8 @@ export function calculateProcessingContractTotals(
   const totalAmount = sumNumeric20Scale6Values(amountValues)
   return {
     totalQuantityText:
-      quantityValues.length > 0
-        ? trimProcessingDecimalText(
-            multiplyNumeric20Scale6Values(totalQuantity, '1', 3)
-          )
+      quantityValues.length > 0 && quantityUnits.size === 1
+        ? totalQuantity
         : '',
     totalAmountText:
       amountValues.length > 0

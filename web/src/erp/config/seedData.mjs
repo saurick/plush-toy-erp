@@ -38,6 +38,7 @@ export function getRoleWorkbench(roleKey) {
 const navItemRegistry = {
   'global-dashboard': {
     key: 'global-dashboard',
+    sidebarArea: 'work',
     label: '工作台',
     path: '/erp/dashboard',
     shortLabel: '工作台',
@@ -45,6 +46,7 @@ const navItemRegistry = {
   },
   'task-board': {
     key: 'task-board',
+    sidebarArea: 'work',
     label: '任务看板',
     path: '/erp/task-board',
     shortLabel: '任务',
@@ -52,6 +54,7 @@ const navItemRegistry = {
   },
   'business-dashboard': {
     key: 'business-dashboard',
+    sidebarArea: 'work',
     label: '进度看板',
     path: '/erp/business-dashboard',
     shortLabel: '业务',
@@ -59,6 +62,7 @@ const navItemRegistry = {
   },
   'print-center': {
     key: 'print-center',
+    sidebarArea: 'tools',
     label: '模板打印中心',
     path: '/erp/print-center',
     shortLabel: '打印',
@@ -66,6 +70,7 @@ const navItemRegistry = {
   },
   'permission-center': {
     key: 'permission-center',
+    sidebarArea: 'system',
     label: '权限管理',
     path: '/erp/system/permissions',
     shortLabel: '权限',
@@ -73,6 +78,7 @@ const navItemRegistry = {
   },
   'system-audit-logs': {
     key: 'system-audit-logs',
+    sidebarArea: 'system',
     label: '系统操作记录',
     path: '/erp/system/audit-logs',
     shortLabel: '审计',
@@ -80,6 +86,7 @@ const navItemRegistry = {
   },
   'history-records': {
     key: 'history-records',
+    sidebarArea: 'tools',
     label: '历史记录中心',
     path: '/erp/history',
     shortLabel: '历史',
@@ -88,7 +95,8 @@ const navItemRegistry = {
   },
   'help-center': {
     key: 'help-center',
-    label: '岗位使用帮助',
+    sidebarArea: 'system',
+    label: '帮助中心',
     path: '/erp/help-center',
     shortLabel: '帮助',
     description: '根据当前账号的岗位查看常用入口、办理顺序和异常处理。',

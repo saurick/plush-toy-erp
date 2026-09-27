@@ -24,6 +24,8 @@ export default function InventoryDistributionOverview({
       className="erp-inventory-distribution-visual"
       switcher={switcher}
       title="仓库库存分布"
+      loading={loading}
+      error={error}
       metrics={[
         {
           key: 'warehouses',

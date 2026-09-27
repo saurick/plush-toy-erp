@@ -19,7 +19,7 @@
 
 - `customer-config.example.js`：永绅 yoyoosun 前端部署注入示例。默认产品 Web 包只带中性的 `web/public/customer-config.js` 占位，不能把本示例复制进 Product Core 默认产物。
 
-- `public-assets/`：唯一允许复制到公开前端产物的客户静态资源，目前只含 favicon 等经过审查的品牌资源。
+- `public-assets/`：唯一允许复制到公开前端产物的客户静态资源。桌面端使用蓝色“永”字 favicon（`brand.faviconHref`），手机端使用青绿色“永”字 favicon（`brand.mobileFaviconHref`）；登录页随“电脑版 / 手机版”选择即时切换。未配置手机端图标时沿用 `brand.faviconHref`；打印工作区继续使用模板专属图标。
 - 版本化配置和试用 fixture 不保存真实员工姓名、手机号或签字人；真实合同经办信息由客户 active revision 或本单 `contract_party_snapshot` 受控维护并审计。
 
 - `fieldNumberingConfig.mjs`：永绅 yoyoosun 字段显示和编号规则配置草案。该文件当前 `runtimeEnabled=false`，只作为 Customer Config 评审清单；不接前端运行时、不改后端、不改 schema、不执行导入。

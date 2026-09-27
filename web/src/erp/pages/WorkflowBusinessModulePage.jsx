@@ -8,11 +8,7 @@ import {
 } from '@ant-design/icons'
 import { Alert, Button, Input, Space, Tag } from 'antd'
 import dayjs from 'dayjs'
-import {
-  useNavigate,
-  useOutletContext,
-  useSearchParams,
-} from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -44,18 +40,16 @@ import {
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
-import ProductionExceptionDecisionPanel, {
+import ProductionExceptionDecisionPanel from '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
+import {
   canReadProductionExceptionDecisions,
-} from '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
-import ProductionRecordsNavigation, {
   PRODUCTION_RECORD_VIEW_KEYS,
-} from '../components/production-records/ProductionRecordsNavigation.jsx'
+  resolveProductionExceptionTab,
+} from '../utils/productionRecordViews.mjs'
 import { getBusinessModule } from '../config/businessModules.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
-import {
-  hasActionPermission,
-  V1_ROUTE_PATHS,
-} from '../utils/masterDataOrderView.mjs'
+import useBusinessPageState from '../hooks/useBusinessPageState.js'
+import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
 import { getRoleDisplayName } from '../utils/roleKeys.mjs'
 import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
@@ -97,8 +91,6 @@ import {
   requireWorkflowProcessDecisionSubmission,
   workflowProcessDecisionAllowsApprovedQuantity,
 } from '../utils/workflowProcessDecision.mjs'
-import { canOpenRelatedDocumentPath } from '../utils/relatedDocumentNavigation.mjs'
-import { routeWithQuery } from '../utils/routeQuery.mjs'
 
 function businessActionModalTitle(title, description) {
   return (
@@ -178,43 +170,8 @@ function getTaskID(task = {}) {
   return Number(task.id || 0)
 }
 
-function resolveProductionExceptionTab({
-  linkedProductionExceptionID = 0,
-  linkedKeyword = '',
-  requestedView = '',
-  canReadRecords = false,
-  canReadTasks = false,
-  current = '',
-} = {}) {
-  if (linkedProductionExceptionID > 0 && canReadRecords) {
-    return PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
-  }
-  if (linkedKeyword && canReadTasks) {
-    return PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
-  }
-  if (
-    requestedView === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS &&
-    canReadRecords
-  ) {
-    return PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
-  }
-  if (requestedView === PRODUCTION_EXCEPTION_TAB_KEYS.TASKS && canReadTasks) {
-    return PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
-  }
-  if (current === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS && canReadRecords) {
-    return current
-  }
-  if (current === PRODUCTION_EXCEPTION_TAB_KEYS.TASKS && canReadTasks) {
-    return current
-  }
-  return canReadRecords
-    ? PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
-    : PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
-}
-
 export default function WorkflowBusinessModulePage({ moduleKey }) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
   const beginLatestRequest = useLatestRequestCoordinator()
   const mutationAttemptsRef = useRef(null)
   mutationAttemptsRef.current ||= createTaskMutationAttemptStore()
@@ -238,7 +195,10 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   )
   const [tasks, setTasks] = useState([])
   const [total, setTotal] = useState(0)
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: 10,
+  })
   const [loading, setLoading] = useState(false)
   const [taskReasonModal, setTaskReasonModal] = useState(null)
   const [taskReasonProcessContext, setTaskReasonProcessContext] = useState(null)
@@ -253,12 +213,15 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       Number.isSafeInteger(routeSourceID) &&
       routeSourceID > 0
   )
-  const [keyword, setKeyword] = useState(linkedKeyword)
+  const [keyword, setKeyword] = useBusinessPageState(
+    `keyword:${linkedKeyword}`,
+    linkedKeyword
+  )
   const linkedKeywordRef = useRef(linkedKeyword)
-  const [status, setStatus] = useState('')
-  const [ownerRoleKey, setOwnerRoleKey] = useState('')
-  const [dueFrom, setDueFrom] = useState('')
-  const [dueTo, setDueTo] = useState('')
+  const [status, setStatus] = useBusinessPageState('status', '')
+  const [ownerRoleKey, setOwnerRoleKey] = useBusinessPageState('ownerRoleKey', '')
+  const [dueFrom, setDueFrom] = useBusinessPageState('dueFrom', '')
+  const [dueTo, setDueTo] = useBusinessPageState('dueTo', '')
   const [selectedTaskKeys, setSelectedTaskKeys] = useState([])
   const [detailTask, setDetailTask] = useState(null)
   const [taskActionLoadingID, setTaskActionLoadingID] = useState(0)
@@ -295,29 +258,12 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const canReadProductionExceptionRecords =
     isProductionExceptionPage &&
     canReadProductionExceptionDecisions(adminProfile)
-  const canOpenProductionRecords =
-    isProductionExceptionPage &&
-    canOpenRelatedDocumentPath({
-      path: V1_ROUTE_PATHS.productionProgress,
-      adminProfile,
-      allowedMenuPaths: outletContext?.allowedMenuPaths || [],
-    })
   const linkedProductionExceptionID = Number(
     searchParams.get('production_exception_id') || 0
   )
   const requestedProductionExceptionView = String(
     searchParams.get('view') || ''
   ).trim()
-  const [activeProductionExceptionTab, setActiveProductionExceptionTab] =
-    useState(() =>
-      resolveProductionExceptionTab({
-        linkedProductionExceptionID,
-        linkedKeyword,
-        requestedView: requestedProductionExceptionView,
-        canReadRecords: canReadProductionExceptionRecords,
-        canReadTasks: canReadWorkflowTasks,
-      })
-    )
   const [productionExceptionSummary, setProductionExceptionSummary] = useState({
     total: 0,
     pageCount: 0,
@@ -333,35 +279,24 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       ].filter(Boolean),
     [canReadProductionExceptionRecords, canReadWorkflowTasks]
   )
-  const effectiveProductionExceptionTab = productionExceptionTabKeys.includes(
-    activeProductionExceptionTab
-  )
-    ? activeProductionExceptionTab
-    : productionExceptionTabKeys[0] || PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
+  const effectiveProductionExceptionTab = resolveProductionExceptionTab({
+    linkedProductionExceptionID,
+    linkedKeyword,
+    requestedView: requestedProductionExceptionView,
+    canReadRecords: canReadProductionExceptionRecords,
+    canReadTasks: canReadWorkflowTasks,
+  })
   const isWorkflowTaskWorkspaceActive =
     !isProductionExceptionPage ||
     effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
 
   useEffect(() => {
-    if (!isProductionExceptionPage) return
-    setActiveProductionExceptionTab((current) =>
-      resolveProductionExceptionTab({
-        linkedProductionExceptionID,
-        linkedKeyword,
-        requestedView: requestedProductionExceptionView,
-        canReadRecords: canReadProductionExceptionRecords,
-        canReadTasks: canReadWorkflowTasks,
-        current,
-      })
-    )
-  }, [
-    canReadProductionExceptionRecords,
-    canReadWorkflowTasks,
-    isProductionExceptionPage,
-    linkedKeyword,
-    linkedProductionExceptionID,
-    requestedProductionExceptionView,
-  ])
+    if (isWorkflowTaskWorkspaceActive) return
+    setDetailTask(null)
+    setTaskReasonModal(null)
+    setTaskReasonProcessContext(null)
+    setTaskReasonProcessContextState('idle')
+  }, [isWorkflowTaskWorkspaceActive])
 
   const loadWorkflowTasks = useCallback(async () => {
     const request = beginLatestRequest('workflow-business-tasks')
@@ -465,6 +400,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     routeSourceID,
     routeSourceType,
     status,
+    setPagination,
   ])
 
   useEffect(() => {
@@ -476,7 +412,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     linkedKeywordRef.current = linkedKeyword
     setKeyword(linkedKeyword)
     resetBusinessPaginationCurrent(setPagination)
-  }, [linkedKeyword])
+  }, [linkedKeyword, setKeyword, setPagination])
 
   useEffect(() => {
     if (!moduleItem) return undefined
@@ -1172,43 +1108,16 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     nextParams.delete('source_id')
     setSearchParams(nextParams, { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [searchParams, setSearchParams])
-  const handleProductionExceptionTabChange = useCallback(
-    (nextTab) => {
-      if (nextTab === PRODUCTION_RECORD_VIEW_KEYS.RECORDS) {
-        const productionOrderID = Number(
-          searchParams.get('production_order_id') || 0
-        )
-        const hasProductionOrder =
-          Number.isSafeInteger(productionOrderID) && productionOrderID > 0
-        navigate(
-          routeWithQuery(V1_ROUTE_PATHS.productionProgress, {
-            source_type: hasProductionOrder ? 'PRODUCTION_ORDER' : undefined,
-            source_id: hasProductionOrder ? productionOrderID : undefined,
-          })
-        )
-        return
-      }
-
-      setActiveProductionExceptionTab(nextTab)
-      const nextParams = new URLSearchParams(searchParams)
-      nextParams.set('view', nextTab)
-      if (nextTab === PRODUCTION_EXCEPTION_TAB_KEYS.TASKS) {
-        nextParams.delete('production_exception_id')
-        nextParams.delete('production_order_id')
-      } else {
-        nextParams.delete('link_keyword')
-        nextParams.delete('link_source')
-        nextParams.delete('link_fields')
-        setDetailTask(null)
-        setTaskReasonModal(null)
-        setTaskReasonProcessContext(null)
-        setTaskReasonProcessContextState('idle')
-      }
-      setSearchParams(nextParams, { replace: true })
-    },
-    [navigate, searchParams, setSearchParams]
-  )
+  }, [
+    searchParams,
+    setSearchParams,
+    setKeyword,
+    setStatus,
+    setOwnerRoleKey,
+    setDueFrom,
+    setDueTo,
+    setPagination,
+  ])
   const handleProductionExceptionRefreshReady = useCallback((refresh) => {
     productionExceptionRefreshRef.current = refresh
   }, [])
@@ -1227,23 +1136,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     )
   }
 
-  const productionRecordViewKeys = [
-    ...(canOpenProductionRecords
-      ? [PRODUCTION_RECORD_VIEW_KEYS.RECORDS]
-      : []),
-    ...(canReadProductionExceptionRecords
-      ? [PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS]
-      : []),
-    ...(canReadWorkflowTasks ? [PRODUCTION_EXCEPTION_TAB_KEYS.TASKS] : []),
-  ]
-  const productionExceptionViewTabs =
-    isProductionExceptionPage && productionRecordViewKeys.length > 0 ? (
-      <ProductionRecordsNavigation
-        activeKey={effectiveProductionExceptionTab}
-        availableKeys={productionRecordViewKeys}
-        onChange={handleProductionExceptionTabChange}
-      />
-    ) : null
   const showingProductionExceptionDecisions =
     isProductionExceptionPage &&
     effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
@@ -1574,9 +1466,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       </BusinessOperationPanel>
 
       <BusinessDataTable
-        tableHeader={
-          isProductionExceptionPage ? productionExceptionViewTabs : null
-        }
         rowKey="id"
         loading={loading}
         columns={tableColumns}
@@ -1737,16 +1626,12 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       <PageHeaderCard
         title={isProductionExceptionPage ? '生产记录' : moduleItem.title}
         tags={
-          <Space size={6} wrap>
-            <Tag color="blue">
-              {showingProductionExceptionDecisions
-                ? '异常处理'
-                : isProductionExceptionPage
-                  ? '待审批'
-                  : '待办任务'}
-            </Tag>
-            <Tag color="gold">业务处理分开完成</Tag>
-          </Space>
+          isProductionExceptionPage ? null : (
+            <Space size={6} wrap>
+              <Tag color="blue">待办任务</Tag>
+              <Tag color="gold">业务处理分开完成</Tag>
+            </Space>
+          )
         }
         stats={headerStats}
         compact
@@ -1759,7 +1644,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               adminProfile={adminProfile}
               onRefreshReady={handleProductionExceptionRefreshReady}
               onSummaryChange={setProductionExceptionSummary}
-              tableHeader={productionExceptionViewTabs}
             />
           ) : (
             <BusinessPageLayout className="erp-workflow-business-page__tab-workspace">

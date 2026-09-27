@@ -6,7 +6,38 @@ import {
   moveWorkflowTaskActionStep,
   resolveWorkflowTaskActionInitialStep,
   resolveWorkflowTaskActionStep,
+  splitWorkflowTaskActions,
 } from './workflowTaskActionFlow.mjs'
+
+test('action grouping keeps ordinary and approval primary choices small without removing allowed actions', () => {
+  const actions = ['complete', 'block', 'reject', 'urge', 'assign']
+  assert.deepEqual(splitWorkflowTaskActions({ actions }), {
+    primary: ['complete', 'block'],
+    secondary: ['reject', 'urge', 'assign'],
+  })
+  assert.deepEqual(splitWorkflowTaskActions({ actions, approvalTask: true }), {
+    primary: ['complete', 'reject'],
+    secondary: ['block', 'urge', 'assign'],
+  })
+  assert.deepEqual(splitWorkflowTaskActions({ actions: ['resume', 'urge'] }), {
+    primary: ['resume'], secondary: ['urge'],
+  })
+})
+
+test('mobile grouping preserves permissions, single-action access and empty states', () => {
+  assert.deepEqual(splitWorkflowTaskActions({
+    actions: ['done', 'blocked', 'rejected', 'urge'], approvalTask: true,
+  }), { primary: ['done', 'rejected'], secondary: ['blocked', 'urge'] })
+  for (const action of ['urge', 'assign', 'rejected']) {
+    assert.deepEqual(splitWorkflowTaskActions({ actions: [action] }), {
+      primary: [action], secondary: [],
+    })
+  }
+  assert.deepEqual(splitWorkflowTaskActions(), { primary: [], secondary: [] })
+  assert.deepEqual(splitWorkflowTaskActions({ actions: ['urge', 'urge', 'assign'] }), {
+    primary: ['urge'], secondary: ['assign'],
+  })
+})
 
 test('task action flow opens on context unless an action was explicitly preselected', () => {
   assert.equal(resolveWorkflowTaskActionInitialStep(), 'context')

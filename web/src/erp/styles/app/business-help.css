@@ -7,12 +7,14 @@
 }
 
 .erp-business-page-help-trigger.ant-btn {
-  min-height: 32px;
-  border: 1px solid var(--erp-border, #dfe9e1);
-  border-radius: 999px;
-  color: var(--erp-primary, #2b8a3e);
-  background: var(--erp-primary-soft, #f0f8f2);
-  font-weight: 600;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: var(--erp-text-subtle);
+  background: transparent;
 }
 
 .erp-business-page-help-trigger.ant-btn:hover,

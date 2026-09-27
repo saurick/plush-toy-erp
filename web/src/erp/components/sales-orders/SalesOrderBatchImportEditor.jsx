@@ -1,8 +1,15 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { Alert, Button, Form, Select, Space, Tag, Typography } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import {
   SalesOrderFormFields,
   SalesOrderItemsFormSection,
@@ -368,6 +375,20 @@ export default function SalesOrderBatchImportEditor({
         onFieldsChange={refreshReview}
       >
         <SalesOrderFormFields
+          itemsSection={
+            <BusinessFormSection title="订货明细" showHeading={false}>
+              <SalesOrderItemsFormSection
+                form={form}
+                canCreateItem={!locked}
+                canUpdateItem={false}
+                canCancelItem={false}
+                unitOptions={unitOptions}
+                productSKUs={productSKUs}
+                importImages={current.images}
+                orderID={current.savedOrder?.id}
+              />
+            </BusinessFormSection>
+          }
           form={form}
           customers={customers}
           contactOptions={contacts}
@@ -379,16 +400,6 @@ export default function SalesOrderBatchImportEditor({
           }
           onPaymentMethodChange={payment.applyPaymentMethodTermDays}
           onPaymentConditionBlur={payment.requestPaymentConditionPriceReview}
-        />
-        <SalesOrderItemsFormSection
-          form={form}
-          canCreateItem={!locked}
-          canUpdateItem={false}
-          canCancelItem={false}
-          unitOptions={unitOptions}
-          productSKUs={productSKUs}
-          importImages={current.images}
-          orderID={current.savedOrder?.id}
         />
       </Form>
     </BusinessFormPage>

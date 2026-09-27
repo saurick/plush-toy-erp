@@ -1,28 +1,25 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownOutlined,
-  ArrowLeftOutlined,
-  ArrowRightOutlined,
   ArrowUpOutlined,
-  DoubleLeftOutlined,
-  DoubleRightOutlined,
-  MoreOutlined,
-  SettingOutlined,
   UndoOutlined,
   VerticalAlignBottomOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Space } from 'antd'
+import { Button, Checkbox, Space } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import {
   applyModuleColumnOrder,
-  buildModuleColumnOrder,
+  completeModuleColumnOrder,
   filterBusinessListColumns,
   moveModuleColumnOrder,
   repositionModuleColumnOrder,
   resolveModuleColumnKey,
   sanitizeModuleColumnOrder,
+  sanitizeModuleHiddenColumns,
 } from '../../utils/moduleTableColumns.mjs'
+
+const EMPTY_COLUMNS = Object.freeze([])
 
 export function getColumnLabel(column = {}) {
   return String(column.exportTitle || column.title || column.key || '').trim()
@@ -36,160 +33,34 @@ export function getColumnDisplayLabel(column = {}) {
   return getColumnLabel(column)
 }
 
-export function ColumnOrderHeaderMenu({
-  column = {},
-  columns = [],
-  order = [],
-  saving = false,
-  onChange,
-  onOpenPanel,
-}) {
-  const label = getColumnDisplayLabel(column) || '当前列'
-  const normalizedOrder = useMemo(() => {
-    const sanitizedOrder = sanitizeModuleColumnOrder(order, columns)
-    return sanitizedOrder.length > 0
-      ? sanitizedOrder
-      : buildModuleColumnOrder(columns)
-  }, [columns, order])
-  const columnKey = useMemo(() => {
-    return resolveModuleColumnKey(column, columns)
-  }, [column, columns])
-  const currentIndex = normalizedOrder.indexOf(columnKey)
-  const isFirst = currentIndex <= 0
-  const isLast = currentIndex < 0 || currentIndex >= normalizedOrder.length - 1
-  const updateOrder = (nextOrder) => {
-    if (saving) {
-      return
-    }
-    onChange?.(nextOrder)
-  }
-
-  return (
-    <span className="erp-module-column-header">
-      <span className="erp-module-column-header-text">{label}</span>
-      <Dropdown
-        trigger={['click']}
-        destroyOnHidden
-        getPopupContainer={(triggerNode) =>
-          triggerNode.closest('.erp-business-data-table-card') ||
-          triggerNode.parentElement ||
-          document.body
-        }
-        menu={{
-          items: [
-            {
-              key: 'move-left',
-              icon: <ArrowLeftOutlined />,
-              label: '左移一列',
-              disabled: saving || isFirst,
-            },
-            {
-              key: 'move-right',
-              icon: <ArrowRightOutlined />,
-              label: '右移一列',
-              disabled: saving || isLast,
-            },
-            { type: 'divider' },
-            {
-              key: 'move-first',
-              icon: <DoubleLeftOutlined />,
-              label: '移到最前',
-              disabled: saving || isFirst,
-            },
-            {
-              key: 'move-last',
-              icon: <DoubleRightOutlined />,
-              label: '移到最后',
-              disabled: saving || isLast,
-            },
-            { type: 'divider' },
-            {
-              key: 'open-panel',
-              icon: <SettingOutlined />,
-              label: '打开列顺序面板',
-            },
-          ],
-          onClick: ({ key, domEvent }) => {
-            domEvent?.stopPropagation?.()
-            if (key === 'move-left') {
-              updateOrder(
-                moveModuleColumnOrder(normalizedOrder, columns, columnKey, -1)
-              )
-              return
-            }
-            if (key === 'move-right') {
-              updateOrder(
-                moveModuleColumnOrder(normalizedOrder, columns, columnKey, 1)
-              )
-              return
-            }
-            if (key === 'move-first') {
-              updateOrder(
-                repositionModuleColumnOrder(
-                  normalizedOrder,
-                  columns,
-                  columnKey,
-                  0
-                )
-              )
-              return
-            }
-            if (key === 'move-last') {
-              updateOrder(
-                repositionModuleColumnOrder(
-                  normalizedOrder,
-                  columns,
-                  columnKey,
-                  normalizedOrder.length - 1
-                )
-              )
-              return
-            }
-            onOpenPanel?.()
-          },
-        }}
-      >
-        <Button
-          type="text"
-          size="small"
-          className="erp-module-column-header-trigger"
-          icon={<MoreOutlined />}
-          aria-label={`${label} 列设置`}
-          title="调整列顺序"
-          onClick={(event) => event.stopPropagation()}
-          disabled={saving && normalizedOrder.length <= 1}
-        />
-      </Dropdown>
-    </span>
-  )
-}
-
 export function ColumnOrderModal({
   open,
-  columns = [],
-  order = [],
+  columns = EMPTY_COLUMNS,
+  order = EMPTY_COLUMNS,
+  hiddenColumns = EMPTY_COLUMNS,
   saving = false,
   moduleTitle = '',
   onChange,
   onClose,
 }) {
   const [draftOrder, setDraftOrder] = useState([])
+  const [draftHidden, setDraftHidden] = useState([])
 
   useEffect(() => {
     if (open) {
       setDraftOrder(sanitizeModuleColumnOrder(order, columns))
+      setDraftHidden(sanitizeModuleHiddenColumns(hiddenColumns, columns))
     }
-  }, [columns, open, order])
+  }, [columns, hiddenColumns, open, order])
 
   const normalizedOrder = useMemo(() => {
-    const sanitizedOrder = sanitizeModuleColumnOrder(draftOrder, columns)
-    return sanitizedOrder.length > 0
-      ? sanitizedOrder
-      : buildModuleColumnOrder(columns)
+    return completeModuleColumnOrder(draftOrder, columns)
   }, [columns, draftOrder])
   const orderedColumns = useMemo(
     () =>
-      filterBusinessListColumns(applyModuleColumnOrder(columns, normalizedOrder)),
+      filterBusinessListColumns(
+        applyModuleColumnOrder(columns, normalizedOrder)
+      ),
     [columns, normalizedOrder]
   )
 
@@ -214,13 +85,17 @@ export function ColumnOrderModal({
       return
     }
     setDraftOrder([])
+    setDraftHidden([])
   }
   const saveDraftOrder = async () => {
     if (saving) {
       return
     }
-    await onChange?.(sanitizeModuleColumnOrder(draftOrder, columns))
-    onClose?.()
+    const saved = await onChange?.(
+      sanitizeModuleColumnOrder(draftOrder, columns),
+      sanitizeModuleHiddenColumns(draftHidden, columns)
+    )
+    if (saved !== false) onClose?.()
   }
 
   return (
@@ -228,13 +103,18 @@ export function ColumnOrderModal({
       className="erp-business-action-modal erp-business-action-modal--columns"
       title={
         <div className="erp-business-action-modal__title">
-          <span>调整列表列顺序</span>
-          <small>调整后的列顺序会保存到当前账号，下次打开仍会保留。</small>
+          <span>列设置</span>
+          <small>
+            勾选显示列并调整顺序，点击完成保存到当前账号；不影响详情和导出。
+          </small>
         </div>
       }
       open={open}
       size="columnOrder"
-      onCancel={onClose}
+      onCancel={saving ? undefined : onClose}
+      closable={!saving}
+      maskClosable={!saving}
+      keyboard={!saving}
       destroyOnHidden={false}
       footer={
         <Space wrap className="erp-business-column-order-modal__footer">
@@ -255,13 +135,16 @@ export function ColumnOrderModal({
       <div
         className="erp-business-column-order-modal"
         role="list"
-        aria-label={`${moduleTitle || '列表'}列顺序`}
+        aria-label={`${moduleTitle || '列表'}列设置`}
       >
         {orderedColumns.map((column, index) => {
           const key = resolveModuleColumnKey(column, columns)
           const label = getColumnDisplayLabel(column)
           const isFirst = index === 0
           const isLast = index === orderedColumns.length - 1
+          const checked = !draftHidden.includes(key)
+          const isOnlyVisible =
+            checked && orderedColumns.length - draftHidden.length <= 1
           return (
             <div
               key={key}
@@ -271,9 +154,21 @@ export function ColumnOrderModal({
               <span className="erp-business-column-order-modal__index">
                 {index + 1}
               </span>
-              <span className="erp-business-column-order-modal__label">
+              <Checkbox
+                className="erp-business-column-order-modal__label"
+                checked={checked}
+                disabled={saving || isOnlyVisible}
+                title={isOnlyVisible ? '至少保留一列' : undefined}
+                onChange={(event) =>
+                  setDraftHidden((current) =>
+                    event.target.checked
+                      ? current.filter((item) => item !== key)
+                      : [...current, key]
+                  )
+                }
+              >
                 {label}
-              </span>
+              </Checkbox>
               <Space
                 size={8}
                 wrap
@@ -286,9 +181,7 @@ export function ColumnOrderModal({
                   title="移到最前"
                   disabled={saving || isFirst}
                   onClick={() => repositionColumn(key, 0)}
-                >
-                  移到最前
-                </Button>
+                />
                 <Button
                   className="erp-business-column-order-modal__action"
                   icon={<ArrowUpOutlined />}
@@ -296,9 +189,7 @@ export function ColumnOrderModal({
                   title="上移"
                   disabled={saving || isFirst}
                   onClick={() => moveColumn(key, -1)}
-                >
-                  上移
-                </Button>
+                />
                 <Button
                   className="erp-business-column-order-modal__action"
                   icon={<ArrowDownOutlined />}
@@ -306,9 +197,7 @@ export function ColumnOrderModal({
                   title="下移"
                   disabled={saving || isLast}
                   onClick={() => moveColumn(key, 1)}
-                >
-                  下移
-                </Button>
+                />
                 <Button
                   className="erp-business-column-order-modal__action"
                   icon={<VerticalAlignBottomOutlined />}
@@ -318,9 +207,7 @@ export function ColumnOrderModal({
                   onClick={() =>
                     repositionColumn(key, orderedColumns.length - 1)
                   }
-                >
-                  移到最后
-                </Button>
+                />
               </Space>
             </div>
           )

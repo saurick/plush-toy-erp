@@ -1,3 +1,5 @@
+import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 
@@ -39,21 +41,18 @@ export function createPurchaseReceiptScenarios(deps) {
     }
     const menu = page.locator('.erp-business-selection-action-menu:visible')
     await menu.waitFor({ state: 'visible', timeout: 10_000 })
-    const menuButtons = menu.getByRole('button', { name, exact: true })
-    for (let index = 0; index < (await menuButtons.count()); index += 1) {
-      const button = menuButtons.nth(index)
-      if (await button.isVisible()) return button
-    }
-    throw new Error(`更多操作中缺少“${String(name)}”`)
+    const button = menu.getByRole('button', { name, exact: true }).first()
+    await button.waitFor({ state: 'visible', timeout: 10_000 })
+    return button
   }
 
   const clickSelectionAction = async (page, name) => {
     const button = await getSelectionActionButton(page, name)
-    await button.dispatchEvent('click')
+    await button.click()
   }
 
   const assertPurchaseReceiptToolbarShell = async (page, scenarioName) => {
-    for (const label of ['导出筛选结果', '列顺序']) {
+    for (const label of ['导出筛选结果', '列设置']) {
       await expectButton(page, label)
     }
     assert.equal(
@@ -75,7 +74,7 @@ export function createPurchaseReceiptScenarios(deps) {
       .getByRole('button', { name: '导出筛选结果' })
       .first()
     const columnOrderButton = page
-      .getByRole('button', { name: '列顺序' })
+      .getByRole('button', { name: '列设置' })
       .first()
     assert.equal(
       await exportButton.isDisabled(),
@@ -93,6 +92,13 @@ export function createPurchaseReceiptScenarios(deps) {
     page,
     scenarioName
   ) => {
+    const filterDialog = page.getByRole('dialog', { name: '筛选条件' })
+    if (!(await filterDialog.isVisible()))
+      await page
+        .locator('.erp-business-operation-panel button[aria-haspopup="dialog"]')
+        .click()
+    await filterDialog.waitFor()
+    await waitForFiniteAnimations(page)
     const metrics = await page.evaluate(() => {
       const control = Array.from(
         document.querySelectorAll('.erp-business-date-range-filter')
@@ -164,9 +170,12 @@ export function createPurchaseReceiptScenarios(deps) {
         metrics
       )}`
     )
+    await filterDialog
+      .getByRole('button', { name: '完成', exact: true })
+      .click()
   }
 
-  const assertPurchaseReceiptExpandedItemsReadable = async (
+  const assertPurchaseReceiptDetailsReadable = async (
     page,
     { receiptNo, scenarioName }
   ) => {
@@ -175,14 +184,11 @@ export function createPurchaseReceiptScenarios(deps) {
       .filter({ has: page.getByText(receiptNo, { exact: true }) })
       .first()
     await row.scrollIntoViewIfNeeded()
-    await row
-      .getByRole('button', { name: new RegExp(`展开${receiptNo}明细`) })
-      .click()
-    await page
-      .locator('.erp-business-row-items-preview')
-      .waitFor({ state: 'visible', timeout: 10_000 })
+    await openBusinessRecordDetails(page, receiptNo)
+    const details = page.getByRole('dialog', { name: /^采购入库详情/u })
+    await details.locator('.erp-business-row-item-card').first().waitFor()
     const metrics = await page.evaluate(() => {
-      const list = document.querySelector('.erp-business-row-items-preview')
+      const list = document.querySelector('.erp-business-details-modal')
       const cards = list
         ? Array.from(list.querySelectorAll('.erp-business-row-item-card'))
         : []
@@ -237,15 +243,15 @@ export function createPurchaseReceiptScenarios(deps) {
       '来源行号',
       '备注',
     ]
-    assert(metrics.hasList, `${scenarioName} 展开后应显示入库明细`)
+    assert(metrics.hasList, `${scenarioName} 完整详情应显示入库明细`)
     assert.equal(
       metrics.nestedTableCount,
       0,
-      `${scenarioName} 展开区不应继续嵌套一张横向表格: ${JSON.stringify(metrics)}`
+      `${scenarioName} 明细区不应继续嵌套一张横向表格: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.cardCount > 0,
-      `${scenarioName} 展开后应显示至少一条入库明细卡片: ${JSON.stringify(metrics)}`
+      `${scenarioName} 完整详情应显示至少一条入库明细卡片: ${JSON.stringify(metrics)}`
     )
     assert.deepEqual(
       metrics.fields.map((field) => field.label),
@@ -273,13 +279,15 @@ export function createPurchaseReceiptScenarios(deps) {
     )
     assert(
       metrics.listOverflow <= 1 && metrics.cardOverflows.length === 0,
-      `${scenarioName} 展开明细卡片不应产生内部水平溢出: ${JSON.stringify(metrics)}`
+      `${scenarioName} 完整明细卡片不应产生内部水平溢出: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.documentOverflow,
       0,
-      `${scenarioName} 展开明细不应造成页面级横向溢出: ${JSON.stringify(metrics)}`
+      `${scenarioName} 完整明细不应造成页面级横向溢出: ${JSON.stringify(metrics)}`
     )
+    await details.getByRole('button', { name: /关\s*闭/u }).click()
+    await details.waitFor({ state: 'hidden' })
   }
 
   return [
@@ -293,7 +301,7 @@ export function createPurchaseReceiptScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '入库管理')
+        await expectHeading(page, '采购入库')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, triggerName)
         const modal = page.getByRole('dialog', { name: title, exact: true })
@@ -304,9 +312,7 @@ export function createPurchaseReceiptScenarios(deps) {
         ]) {
           await page.setViewportSize(viewport)
           for (let count = 0; count < 3; count += 1) {
-            const rows = modal.getByRole('group', {
-              name: /^(退货|调整)明细 \d+$/u,
-            })
+            const rows = modal.locator('.erp-purchase-receipt-exception-row')
             const before = await rows.count()
             assert.equal(
               await modal
@@ -329,6 +335,18 @@ export function createPurchaseReceiptScenarios(deps) {
             )
           }
         }
+        const noteRows = modal.locator('.erp-purchase-receipt-exception-row')
+        for (const [index, note] of ['待移除说明', '保留的明细说明'].entries()) {
+          await noteRows.nth(index).locator('summary').click()
+          await noteRows.nth(index).getByLabel('明细备注', { exact: true }).fill(note)
+          await noteRows.nth(index).locator('summary').click()
+        }
+        await noteRows.first().getByRole('button', { name: '移除明细 1' }).click()
+        assert.match(await noteRows.first().locator('summary').innerText(), /保留的明细说明/u)
+        await noteRows.first().locator('summary').click()
+        assert.equal(await noteRows.first().getByLabel('明细备注', { exact: true }).inputValue(), '保留的明细说明')
+        await noteRows.first().getByLabel('明细备注', { exact: true }).fill('')
+        assert.doesNotMatch(await noteRows.first().locator('summary').innerText(), /保留的明细说明/u)
         await page.setViewportSize({ width: 1440, height: 900 })
         await modal.getByRole('button', { name: /^取\s*消$/u }).click()
         await modal.waitFor({ state: 'hidden' })
@@ -336,7 +354,7 @@ export function createPurchaseReceiptScenarios(deps) {
         await modal.waitFor({ state: 'visible' })
         assert.equal(
           await modal
-            .getByRole('group', { name: /^(退货|调整)明细 \d+$/u })
+            .locator('.erp-purchase-receipt-exception-row')
             .count(),
           1
         )
@@ -350,7 +368,7 @@ export function createPurchaseReceiptScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '入库管理')
+        await expectHeading(page, '采购入库')
         await expectText(page, 'PR-STYLE-L1')
         await assertPurchaseReceiptToolbarShell(
           page,
@@ -427,19 +445,13 @@ export function createPurchaseReceiptScenarios(deps) {
 
         assert.deepEqual(
           metrics.headers.map((header) => header.text),
-          ['明细', '', '入库单号'],
+          ['', '入库单号', '状态'],
           `入库表格前置选择列不应显示“选择”二字: ${JSON.stringify(metrics)}`
         )
         assert(
-          metrics.headers[0].width <= 104 &&
+          metrics.headers[0].width <= 56 + 1 &&
             metrics.headers[0].scrollWidth <= metrics.headers[0].clientWidth &&
             metrics.headers[0].textAlign === 'center',
-          `入库表格明细条数列应完整显示且居中: ${JSON.stringify(metrics)}`
-        )
-        assert(
-          metrics.headers[1].width <= 56 &&
-            metrics.headers[1].scrollWidth <= metrics.headers[1].clientWidth &&
-            metrics.headers[1].textAlign === 'center',
           `入库表格选择列应保持窄列、居中且不裁字: ${JSON.stringify(metrics)}`
         )
         assert(
@@ -462,9 +474,9 @@ export function createPurchaseReceiptScenarios(deps) {
           0,
           `入库表格不应造成页面级横向溢出: ${JSON.stringify(metrics)}`
         )
-        await assertPurchaseReceiptExpandedItemsReadable(page, {
+        await assertPurchaseReceiptDetailsReadable(page, {
           receiptNo: 'PR-STYLE-L1',
-          scenarioName: 'purchase-receipts-expanded-items-readable-desktop',
+          scenarioName: 'purchase-receipts-details-readable-desktop',
         })
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await assertPageAttachmentModalEntrypoint(page, {
@@ -474,7 +486,7 @@ export function createPurchaseReceiptScenarios(deps) {
         })
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'inbound',
-          heading: '入库管理',
+          heading: '采购入库',
         })
       },
     },
@@ -485,7 +497,7 @@ export function createPurchaseReceiptScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '入库管理')
+        await expectHeading(page, '采购入库')
         await expectText(page, 'PR-STYLE-L1-DRAFT')
         await expectText(page, '入库单：正式入库记录')
         await expectText(page, '过账后更新库存记录')
@@ -493,24 +505,6 @@ export function createPurchaseReceiptScenarios(deps) {
         await assertTextAbsent(page, '添加明细')
         await assertTextAbsent(page, '添加入库明细')
 
-        const draftRow = page
-          .getByRole('row')
-          .filter({
-            has: page.getByText('PR-STYLE-L1-DRAFT', { exact: true }),
-          })
-          .first()
-        await draftRow
-          .getByRole('button', { name: '展开PR-STYLE-L1-DRAFT明细' })
-          .click()
-        const draftPreview = page.getByRole('region', {
-          name: '明细快速预览',
-        })
-        await draftPreview.waitFor({ state: 'visible', timeout: 10_000 })
-        assert.equal(
-          await draftPreview.locator('.erp-business-row-item-card').count(),
-          1
-        )
-        await expectText(page, '已显示 1 / 1 条')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
         await clickSelectionAction(page, /相关单据/u)
@@ -570,7 +564,7 @@ export function createPurchaseReceiptScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '入库管理')
+        await expectHeading(page, '采购入库')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, '退货与调整记录')
 
@@ -661,7 +655,7 @@ export function createPurchaseReceiptScenarios(deps) {
       themeMode: 'dark',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '入库管理')
+        await expectHeading(page, '采购入库')
         await assertERPThemeMode(page, {
           scenarioName:
             'purchase-receipt-source-generated-boundary-dark-desktop',
@@ -686,7 +680,7 @@ export function createPurchaseReceiptScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectHeading(page, '入库管理')
+        await expectHeading(page, '采购入库')
         await expectText(page, '入库单：正式入库记录')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)

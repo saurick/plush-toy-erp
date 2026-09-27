@@ -251,7 +251,7 @@
 
   border: 1px solid var(--erp-task-board-lane-border);
   overflow: hidden;
-  background: rgb(255 255 255 / 0.96);
+  background: var(--erp-surface-bg);
   box-shadow: 0 1px 2px rgb(31 64 104 / 0.04);
 }
 
@@ -276,7 +276,8 @@
 .erp-task-board-lane .ant-card-head {
   min-height: 44px;
   border-bottom-color: var(--erp-task-board-lane-border);
-  border-radius: 12px 12px 0 0;
+  /* 标题与色条统一由外层卡片裁切，避免内外圆角形成错位弧线。 */
+  border-radius: 0;
   background: var(--erp-task-board-lane-head-bg);
   box-shadow: inset 3px 0 0 var(--erp-task-board-lane-accent);
 }
@@ -330,7 +331,7 @@
   min-width: 0;
   border: 1px solid #e6eee9;
   border-radius: 10px;
-  background: #fff;
+  background: var(--erp-surface-bg);
   padding: 10px;
   color: inherit;
   font: inherit;
@@ -366,13 +367,9 @@
   flex: 0 0 auto;
 }
 
-.erp-task-board-card-entry {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--erp-primary, #2b8a3e);
-  font-size: 12px;
+.erp-task-board-card-title {
+  flex: 1;
+  min-width: 0;
 }
 
 .erp-task-board-card-head .ant-typography,
@@ -399,23 +396,50 @@
 }
 
 .erp-task-action-drawer .ant-drawer-header {
-  padding: 16px 20px;
+  min-height: 52px;
+  padding: 9px 14px;
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
+}
+
+.erp-task-action-drawer .ant-drawer-header-title {
+  flex-direction: row-reverse;
+  gap: 8px;
+}
+
+.erp-task-action-drawer .ant-drawer-close {
+  margin: 0;
+}
+
+.erp-task-action-drawer__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-task-action-drawer__heading .ant-tag {
+  flex-shrink: 0;
+  margin: 0;
+  font-weight: 400;
 }
 
 .erp-task-action-drawer .ant-drawer-body {
-  background: #f6f8fb;
+  background: var(--erp-page-bg);
   padding: 0;
 }
 
 .erp-task-action-drawer .ant-drawer-footer {
-  background: #fff;
-  padding: 12px 16px;
+  min-height: 56px;
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
+  padding: 10px 12px;
 }
 
 .erp-task-action-drawer__title {
   display: block;
   min-width: 0;
-  color: #172033;
+  color: var(--erp-text);
   font-size: 16px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -424,7 +448,7 @@
 .erp-task-action-drawer__action-head span,
 .erp-task-action-drawer__meta-grid span,
 .erp-task-action-drawer__reason span {
-  color: #667085;
+  color: var(--erp-text-muted);
   font-size: 12px;
   line-height: 1.35;
 }
@@ -433,57 +457,57 @@
 .erp-task-action-drawer__meta-grid strong,
 .erp-task-action-drawer__reason strong,
 .erp-task-action-drawer__action-prompt strong {
-  color: #172033;
+  color: var(--erp-text);
   overflow-wrap: anywhere;
 }
 
 .erp-task-action-drawer__body {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .erp-task-action-drawer__navigation {
   position: sticky;
   top: 0;
   z-index: 3;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--erp-border, #dfe7ee);
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--erp-border);
   background: var(--erp-surface-bg, #fff);
 }
 
 .erp-task-action-drawer__summary,
-.erp-task-action-drawer__guide,
 .erp-task-action-drawer__action-panel,
-.erp-task-action-drawer__action-prompt {
+.erp-task-action-drawer__action-choices {
   min-width: 0;
-  border: 1px solid #dfe7ee;
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
 }
 
 .erp-task-action-drawer__summary {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 13px;
 }
 
 .erp-task-action-drawer__summary--task {
-  gap: 10px;
-  padding: 14px 16px;
+  gap: 12px;
 }
 
 .erp-task-action-drawer__section-title {
   margin: 0;
-  color: #344054;
-  font-size: 14px;
+  color: var(--erp-text);
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.45;
 }
 
 .erp-task-action-drawer__task-title.ant-typography {
   margin: 0;
-  color: #172033;
+  color: var(--erp-text);
+  font-size: 16px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
@@ -498,9 +522,9 @@
   display: grid;
   gap: 4px;
   min-width: 0;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #f8fafc;
+  background: var(--erp-surface-bg-soft);
   padding: 10px;
 }
 
@@ -511,20 +535,20 @@
 }
 
 .erp-task-action-drawer__task-meta {
-  grid-template-columns: 1fr;
-  gap: 0;
-  border-top: 1px solid #edf2f7;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  border-top: 1px solid var(--erp-border);
+  padding-top: 12px;
 }
 
 .erp-task-action-drawer__task-meta > div {
-  grid-template-columns: 84px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
   align-items: baseline;
   border: 0;
-  border-bottom: 1px solid #edf2f7;
   border-radius: 0;
   background: transparent;
-  padding: 9px 0;
+  padding: 0;
 }
 
 .erp-task-action-drawer__responsibility {
@@ -537,13 +561,13 @@
 
 .erp-task-action-drawer__responsibility
   .erp-task-action-drawer__responsibility-role {
-  color: var(--erp-text, #172033);
+  color: var(--erp-text);
   font-size: 14px;
   font-weight: 800;
 }
 
 .erp-task-action-drawer__responsibility-separator {
-  color: var(--erp-text-muted, #98a2b3);
+  color: var(--erp-text-subtle);
   font-weight: 400;
 }
 
@@ -585,7 +609,7 @@
   border-radius: 6px;
   background: var(--erp-surface-bg-soft, #f7faf7);
   padding: 9px 11px;
-  color: var(--erp-text-muted, #475569);
+  color: var(--erp-text-muted);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -600,44 +624,54 @@
 
 .erp-task-action-drawer__guide {
   display: grid;
+  min-width: 0;
   overflow: hidden;
+  border-radius: 8px;
 }
 
 .erp-task-action-drawer__guide-steps {
-  --erp-slider-bg: #edf5ff;
-  --erp-slider-radius: 0;
+  --erp-slider-radius: 8px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .erp-task-action-drawer__step {
   appearance: none;
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  gap: 8px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 7px;
   align-items: center;
   min-width: 0;
+  min-height: 38px;
   border: 0;
   background: transparent;
-  padding: 12px;
-  color: inherit;
+  padding: 6px 8px;
+  color: var(--erp-control-text);
   font: inherit;
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
 }
 
-.erp-task-action-drawer__step + .erp-task-action-drawer__step {
-  border-left: 1px solid #edf2f7;
+.erp-task-action-drawer__step:not(:last-child)::after {
+  position: absolute;
+  right: 0;
+  width: 1px;
+  height: 24px;
+  background: var(--erp-border);
+  content: '';
 }
 
 .erp-task-action-drawer__step > span {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid #cbd5e1;
+  flex-shrink: 0;
+  width: 23px;
+  height: 23px;
+  border: 1px solid var(--erp-border-strong);
   border-radius: 999px;
-  color: #475467;
+  color: inherit;
   font-size: 12px;
   font-weight: 700;
 }
@@ -651,7 +685,7 @@
 .erp-task-action-drawer__step:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 2px solid #2d64a7;
+  outline: 2px solid var(--erp-primary);
   outline-offset: -2px;
 }
 
@@ -659,11 +693,11 @@
     .erp-task-action-drawer__step--disabled,
     .erp-task-action-drawer__step--active
   ) {
-  background: #f4f8ff;
+  background: var(--erp-control-hover);
 }
 
 .erp-task-action-drawer__step--disabled {
-  color: #98a2b3;
+  color: var(--erp-text-subtle);
   cursor: not-allowed;
 }
 
@@ -673,14 +707,14 @@
 }
 
 .erp-task-action-drawer__step--active > span {
-  border-color: #2d64a7;
-  background: #2d64a7;
-  color: #fff;
+  border-color: var(--erp-control-accent);
+  background: var(--erp-control-accent);
+  color: var(--erp-control-on-accent);
 }
 
 .erp-task-action-drawer__action-prompt span {
   display: block;
-  color: #667085;
+  color: var(--erp-text-muted);
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -689,7 +723,7 @@
 .erp-task-action-drawer__action-panel {
   display: grid;
   gap: 10px;
-  padding: 14px;
+  padding: 13px;
 }
 
 .erp-task-action-drawer__assignment {
@@ -699,7 +733,7 @@
 }
 
 .erp-task-action-drawer__assignment > label {
-  color: #344054;
+  color: var(--erp-text);
   font-size: 13px;
   font-weight: 600;
 }
@@ -712,7 +746,7 @@
 .erp-task-action-drawer__step-panel,
 .erp-task-action-drawer__action-workspace {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -722,21 +756,29 @@
 
 .erp-task-action-drawer__action-options {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.erp-task-action-drawer__action-choices {
+  display: grid;
+  gap: 11px;
+  padding: 13px;
 }
 
 .erp-task-action-drawer__action-option {
   appearance: none;
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
   align-items: start;
   min-width: 0;
-  border: 1px solid #dfe7ee;
+  min-height: 90px;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--erp-surface-bg);
   padding: 12px;
-  color: #172033;
+  color: var(--erp-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -747,49 +789,42 @@
 }
 
 .erp-task-action-drawer__action-option:disabled {
+  background: var(--erp-control-disabled-bg);
   cursor: not-allowed;
   opacity: 0.64;
 }
 
-.erp-task-action-drawer__action-option:focus-visible,
+.erp-task-action-drawer__action-option:focus-visible:not(:disabled),
 .erp-task-action-drawer__action-option:hover:not(:disabled) {
-  border-color: #8aaad0;
-  background: #f8fbff;
+  border-color: var(--erp-primary);
+  background: var(--erp-control-hover);
   outline: none;
-  box-shadow: 0 0 0 3px rgb(45 100 167 / 0.12);
+  box-shadow: 0 0 0 3px var(--erp-focus-ring);
 }
 
 .erp-task-action-drawer__action-option--selected {
-  border-color: #2d64a7;
-  background: #edf5ff;
-  box-shadow: inset 3px 0 0 #2d64a7;
-}
-
-.erp-task-action-drawer__action-option--danger.erp-task-action-drawer__action-option--selected {
-  border-color: #d92d20;
-  background: #fff5f6;
-  box-shadow: inset 3px 0 0 #d92d20;
-}
-
-.erp-task-action-drawer__action-option--warning.erp-task-action-drawer__action-option--selected {
-  border-color: #dc8b19;
-  background: #fff8e8;
-  box-shadow: inset 3px 0 0 #dc8b19;
+  border-color: var(--erp-control-accent);
+  background: var(--erp-control-hover);
+  box-shadow: 0 0 0 2px var(--erp-focus-ring);
 }
 
 .erp-task-action-drawer__action-option-mark {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid #cbd5e1;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--erp-border-strong);
   border-radius: 999px;
-  color: #2d64a7;
+  color: var(--erp-control-selected-text);
 }
 
 .erp-task-action-drawer__action-option--selected
   .erp-task-action-drawer__action-option-mark {
-  border-color: currentcolor;
+  border-color: transparent;
+}
+
+.erp-task-action-drawer__action-option-mark .anticon {
+  font-size: 18px;
 }
 
 .erp-task-action-drawer__action-option strong,
@@ -801,7 +836,7 @@
 
 .erp-task-action-drawer__action-option small {
   margin-top: 3px;
-  color: #667085;
+  color: var(--erp-text-muted);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -810,10 +845,10 @@
   display: grid;
   gap: 14px;
   min-width: 0;
-  border: 1px solid #dfe7ee;
-  border-radius: 8px;
-  background: #fff;
-  padding: 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+  padding: 13px;
 }
 
 .erp-task-action-drawer__confirm-head {
@@ -823,20 +858,25 @@
 
 .erp-task-action-drawer__confirm-head span,
 .erp-task-action-drawer__confirm-list dt {
-  color: #667085;
+  color: var(--erp-text-muted);
   font-size: 12px;
 }
 
 .erp-task-action-drawer__confirm-head strong {
-  color: #172033;
-  font-size: 18px;
+  color: var(--erp-text);
+  font-size: 16px;
 }
 
 .erp-task-action-drawer__confirm-list {
   display: grid;
   gap: 0;
   margin: 0;
-  border-block: 1px solid #edf2f7;
+  border-block: 1px solid var(--erp-border);
+}
+
+.erp-task-action-drawer__action-head > div {
+  display: grid;
+  gap: 3px;
 }
 
 .erp-task-action-drawer__confirm-list > div {
@@ -847,7 +887,7 @@
 }
 
 .erp-task-action-drawer__confirm-list > div + div {
-  border-top: 1px solid #edf2f7;
+  border-top: 1px solid var(--erp-border);
 }
 
 .erp-task-action-drawer__confirm-list dt,
@@ -857,23 +897,8 @@
 }
 
 .erp-task-action-drawer__confirm-list dd {
-  color: #172033;
+  color: var(--erp-text);
   font-weight: 600;
-}
-
-.erp-task-action-drawer__action-panel--success {
-  border-color: #b7ebc6;
-  background: #f6ffed;
-}
-
-.erp-task-action-drawer__action-panel--danger {
-  border-color: #ffd5d9;
-  background: #fff5f6;
-}
-
-.erp-task-action-drawer__action-panel--warning {
-  border-color: #ffe0a3;
-  background: #fff8e8;
 }
 
 .erp-task-action-drawer__action-head {
@@ -881,4 +906,29 @@
   justify-content: space-between;
   gap: 10px;
   align-items: flex-start;
+}
+
+.erp-task-action-drawer .erp-task-timing--detail {
+  margin: 0;
+}
+
+.erp-task-action-drawer .erp-task-timing__icon {
+  display: none;
+}
+
+.erp-task-action-drawer .erp-task-timing--detail dl {
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+
+.erp-task-action-drawer .erp-task-timing__row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.erp-task-action-drawer .erp-task-timing--detail dt {
+  width: auto;
+  font-size: 12px;
 }

@@ -6,6 +6,7 @@ export const yoyoosunMenuConfig = Object.freeze({
     companyName: "东莞市永绅玩具有限公司",
     systemName: "业务管理",
     faviconHref: "/customer-assets/yoyoosun/favicon-yoyoosun.svg",
+    mobileFaviconHref: "/customer-assets/yoyoosun/favicon-yoyoosun-mobile.svg",
   },
   desktopMenu: {
     presentation: "role_guided",
@@ -33,14 +34,6 @@ export const yoyoosunMenuConfig = Object.freeze({
         items: ["accessories-purchase"],
       },
       {
-        title: "质检管理",
-        items: ["quality-inspections"],
-      },
-      {
-        title: "库存管理",
-        items: ["inbound", "inventory"],
-      },
-      {
         title: "委外管理",
         items: ["processing-contracts"],
       },
@@ -49,16 +42,24 @@ export const yoyoosunMenuConfig = Object.freeze({
         items: ["production-orders", "production-progress"],
       },
       {
+        title: "库存管理",
+        items: ["inbound", "inventory"],
+      },
+      {
+        title: "质检管理",
+        items: ["quality-inspections"],
+      },
+      {
         title: "出货管理",
-        items: ["shipping-release", "outbound", "shipments"],
+        items: ["shipments", "shipping-release", "outbound"],
       },
       {
         title: "财务管理",
         items: [
-          "reconciliation",
           "receivables",
           "payables",
           "finance-payments",
+          "reconciliation",
           "invoices",
         ],
       },

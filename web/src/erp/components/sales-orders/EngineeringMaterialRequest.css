@@ -51,22 +51,34 @@
 
 .erp-material-sheet__products {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .erp-material-product {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
-  gap: 8px 16px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 6px 12px;
   align-items: center;
   border: 1px solid var(--erp-border, #e2e8f0);
   border-radius: 10px;
-  padding: 14px 16px;
+  padding: 10px 12px;
   background: var(--erp-surface-bg, #fff);
 }
 
-.erp-material-product h3,
+.erp-material-product .erp-task-product-image {
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
+}
+
+.erp-material-product h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
 .erp-material-card h3 {
   margin: 0 0 6px;
   font-size: 17px;
@@ -80,6 +92,8 @@
 }
 
 .erp-material-product__quantity {
+  min-width: 0;
+  max-width: 150px;
   display: grid;
   gap: 3px;
   text-align: right;
@@ -87,7 +101,8 @@
 }
 
 .erp-material-product__quantity > strong {
-  font-size: 24px;
+  overflow-wrap: anywhere;
+  font-size: 20px;
   line-height: 1.3;
 }
 
@@ -100,7 +115,7 @@
 .erp-material-product__note {
   grid-column: 1 / -1;
   margin: 6px 0 0;
-  padding-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid var(--erp-border, #e2e8f0);
   white-space: pre-wrap;
   line-height: 1.65;
@@ -129,7 +144,7 @@
   margin-bottom: 12px;
 }
 
-.erp-material-sheet__toolbar > .ant-space:last-child {
+.erp-material-sheet__scroll-actions {
   margin-left: auto;
 }
 
@@ -196,7 +211,7 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 14px;
-  padding: 14px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--erp-border, #e2e8f0);
 }
 
@@ -285,19 +300,23 @@
   display: block;
 }
 
-.erp-material-summary-modal--mobile .erp-material-product,
-.erp-material-task-action--mobile .erp-material-product {
-  grid-template-columns: 64px minmax(0, 1fr);
-  padding: 12px;
-  gap: 10px;
+.erp-material-sheet--mobile .erp-material-sheet__products {
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.erp-material-summary-modal--mobile .erp-material-product__quantity,
-.erp-material-task-action--mobile .erp-material-product__quantity {
-  grid-column: 1 / -1;
-  grid-template-columns: 1fr auto;
-  align-items: baseline;
-  text-align: left;
+@media (max-width: 600px) {
+  .erp-material-product {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 8px 10px;
+  }
+
+  .erp-material-product__quantity {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto;
+    max-width: none;
+    align-items: baseline;
+    text-align: left;
+  }
 }
 
 .erp-material-summary-modal--mobile .erp-material-view-switch.ant-segmented,

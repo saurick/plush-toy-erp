@@ -6,8 +6,35 @@ import {
   getPrintOutputProblem,
   inspectPrintImageBudget,
   PRINT_IMAGE_LIMITS,
+  assertPrintSnapshotBudget,
 } from './printOutputPreflight.mjs'
 import { unicodeRangeContainsText } from './printFonts.mjs'
+
+test('缺图可输出，已有图片加载中、损坏或仅为单像素时必须更换或清空', () => {
+  const image = { complete: false, naturalWidth: 0, naturalHeight: 0 }
+  let failed = null
+  let images = [image]
+  const paper = {
+    querySelector: () => failed,
+    querySelectorAll: (selector) => (selector === 'img[src]' ? images : []),
+  }
+  assert.match(getPrintOutputProblem({}, {}, paper), /仍在加载/)
+  image.complete = true
+  assert.match(getPrintOutputProblem({}, {}, paper), /更换或清空/)
+  image.naturalWidth = image.naturalHeight = 1
+  assert.match(getPrintOutputProblem({}, {}, paper), /更换或清空/)
+  image.naturalWidth = 640
+  image.naturalHeight = 400
+  image.getAttribute = () => 'data:image/png;base64,aGVsbG8='
+  assert.equal(getPrintOutputProblem({}, {}, paper), '')
+  images = []
+  failed = {}
+  assert.match(getPrintOutputProblem({}, {}, paper), /更换或清空/)
+  assert.throws(() => assertPrintSnapshotBudget(paper, '<html/>'), /更换或清空/)
+  failed = null
+  assert.equal(getPrintOutputProblem({}, {}, paper), '')
+  assert.doesNotThrow(() => assertPrintSnapshotBudget(paper, '<html/>'))
+})
 
 const purchase = printTemplateCatalog.find(
   (item) => item.key === 'material-purchase-contract'
@@ -17,7 +44,7 @@ test('合同缺值逐项提示，零价、选填项和明确空表均可输出',
     contractNo: 'PO-1',
     supplierName: '供应方',
     buyerCompany: '订货单位',
-    lines: [{ materialName: '面料', quantity: 1, unitPrice: 0 }],
+    lines: [{ materialName: '面料', quantity: 1, unitPrice: 0, unit: '码' }],
   }
   assert.deepEqual(getPrintDraftProblems(purchase, draft), [])
   assert(

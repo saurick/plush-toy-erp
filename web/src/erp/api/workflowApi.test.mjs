@@ -59,7 +59,8 @@ async function loadWorkflowApi(call) {
       "import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'",
       'const isWorkflowApprovalTask = globalThis.__workflowApiTestIsApprovalTask'
     )
-  const encoded = Buffer.from(transformed).toString('base64')
+  const resolved = transformed.replace('../utils/workflowFollowup.mjs', new URL('../utils/workflowFollowup.mjs', import.meta.url).href)
+  const encoded = Buffer.from(resolved).toString('base64')
   return import(`data:text/javascript;base64,${encoded}#${Date.now()}`)
 }
 
@@ -78,6 +79,22 @@ function validTask(overrides = {}) {
     ...overrides,
   }
 }
+
+test('workflowApi: 单据发起使用受控接口并校验来源和完整回执', async () => {
+  const params = { source_type: 'sales_order', source_id: 42, task_name: '核实交期', description: '请反馈交期', owner_role_key: 'sales', assignee_id: null, due_at: 1_900_000_000, priority: 0, idempotency_key: 'followup:api' }
+  const calls = []
+  const api = await loadWorkflowApi(async (method, sent) => {
+    calls.push(method)
+    if (method === 'get_task_create_options') return { data: { ...sent, source_no: 'SO-42', can_create: true, roles: [{ role_key: 'sales', label: '销售', assignees: [{ admin_id: 7, display_name: '销售员' }] }] } }
+    assert.equal(method, 'create_followup_task')
+    assert.deepEqual(sent, params)
+    return { data: { task: { ...params, id: 99, version: 1, task_group: 'business_followup', task_status_key: 'ready', payload: { description: params.description } } } }
+  })
+  assert.equal((await api.getWorkflowTaskCreateOptions({ source_type: 'sales_order', source_id: 42 })).source_no, 'SO-42')
+  assert.equal((await api.createWorkflowFollowupTask(params)).id, 99)
+  await assert.rejects(api.createWorkflowFollowupTask({ ...params, source_no: 'FORGED' }))
+  assert.deepEqual(calls, ['get_task_create_options', 'create_followup_task'])
+})
 
 test('workflowApi: 单任务读取按准确身份校验，并保留取消信号', async () => {
   const controller = new AbortController()

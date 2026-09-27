@@ -791,3 +791,84 @@ test('V1SalesOrdersPage: process submit payload does not replace selected sales 
   )
   assert.match(salesOrderPageSource, /setSelectedOrder\(nextSelectedOrder\)/)
 })
+
+test('customerConfigApi: exempt orders require completed source activation, including retries', async (t) => {
+  for (const kind of ['sales_order', 'purchase_order']) {
+    for (const replay of [false, true]) {
+      for (const receipt of [
+        'completed',
+        'missing',
+        'wrong_process',
+        'blocked',
+      ]) {
+        await t.test(
+          `${kind}/${replay ? 'replay' : 'fresh'}/${receipt}`,
+          async () => {
+            const sales = kind === 'sales_order'
+            const start = sales ? processStartData : purchaseProcessStartData
+            const execution = sales
+              ? processExecutionData
+              : purchaseProcessExecutionData
+            const data = replay
+              ? start({
+                  status: 'completed',
+                  outcome: `${kind}.submitted_without_approval`,
+                })
+              : execution()
+            const submit = data.started_node || data.completed_node
+            submit.outcome = `${kind}.submitted_without_approval`
+            const effective = {
+              id: 30,
+              process_instance_id: submit.process_instance_id,
+              node_key: sales
+                ? 'activate_sales_order'
+                : 'approve_purchase_order',
+              node_type: 'domain_command',
+              status: 'completed',
+              version: 2,
+              outcome: sales
+                ? 'sales_order.activated'
+                : 'purchase_order.approved',
+            }
+            if (receipt === 'wrong_process') effective.process_instance_id += 1
+            if (receipt === 'blocked') effective.status = 'blocked'
+            data.nodes = [submit, ...(receipt === 'missing' ? [] : [effective])]
+            let executions = 0
+            const api = await loadCustomerConfigApiForTest(async (method) => {
+              if (method === 'get_sales_order_acceptance_process') {
+                return {
+                  data: replay
+                    ? processReadData(data)
+                    : { process_context: null },
+                }
+              }
+              if (method.startsWith('start_'))
+                return { data: replay ? data : start() }
+              if (method.startsWith('execute_')) {
+                executions += 1
+                return { data }
+              }
+              throw new Error(`unexpected method ${method}`)
+            })
+            const action = () =>
+              sales
+                ? api.submitSalesOrderAcceptanceProcess({ sales_order_id: 81 })
+                : api.submitPurchaseOrderApprovalProcess({
+                    purchase_order_id: 5001,
+                  })
+            if (receipt === 'completed') {
+              const result = await action()
+              assert.equal(
+              (result.completed_node || result.started_node).outcome,
+                `${kind}.submitted_without_approval`
+              )
+            } else {
+              await assert.rejects(action(), /提交结果无法确认/)
+            }
+            assert.equal(executions, replay ? 0 : 1)
+          }
+        )
+      }
+    }
+  }
+})

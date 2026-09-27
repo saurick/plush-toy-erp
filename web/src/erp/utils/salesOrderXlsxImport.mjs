@@ -1,4 +1,5 @@
 import { sha256 } from 'js-sha256'
+import { unitRecordMatchesLabel } from './unitQuantity.mjs'
 import {
   XlsxImportError,
   normalizeText,
@@ -379,13 +380,20 @@ export async function parseSalesOrderXlsx(
               : source.value || (source.formula ? `=${source.formula}` : '')
         sourceCells.push({
           column: column + 1,
-          label: boundedText(label || `第 ${column + 1} 列（无标题）`, 128, location, '原表字段名'),
+          label: boundedText(
+            label || `第 ${column + 1} 列（无标题）`,
+            128,
+            location,
+            '原表字段名'
+          ),
           value: boundedText(value, 2048, location, label || '无标题字段'),
           ...(source.merged_rows ? { merged_rows: source.merged_rows } : {}),
         })
       }
       if (sourceCells.length > 64 || images.length > 10) {
-        fail(`${location}字段或图片过多，请将每行内容控制在 64 列、10 张图片以内`)
+        fail(
+          `${location}字段或图片过多，请将每行内容控制在 64 列、10 张图片以内`
+        )
       }
       item.import_source = {
         file_name: fileName,
@@ -518,7 +526,16 @@ export function buildSalesOrderImportDraft(
   let missingUnitCount = 0
   const items = order.lines.map((line, index) => {
     const unit = line.unit
-      ? matchingRecord(line.unit, units, ['code', 'name'])
+      ? (() => {
+          const matches = units.filter(
+            (record) =>
+              record.is_active !== false &&
+              Number.isSafeInteger(record.id) &&
+              record.id > 0 &&
+              unitRecordMatchesLabel(record, line.unit)
+          )
+          return matches.length === 1 ? matches[0] : null
+        })()
       : defaultUnit
     if (!unit) missingUnitCount += 1
     return { ...line.item, line_no: index + 1, unit_id: unit?.id }

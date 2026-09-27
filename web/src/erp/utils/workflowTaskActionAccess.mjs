@@ -51,6 +51,7 @@ export function workflowTaskAdminAccessRequestIdentity(adminProfile = {}) {
     String(session?.config_revision || session?.configRevision || '').trim(),
     String(session?.config_hash || session?.configHash || '').trim(),
     sortedIdentityStrings(session?.actions),
+    sortedIdentityStrings(session?.roles),
   ])
 }
 

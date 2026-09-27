@@ -217,9 +217,6 @@ export function QualityInspectionDecisionForm({
                   <InputNumber
                     aria-label="自定义不良比例"
                     controls={false}
-                    max={100}
-                    min={0}
-                    precision={2}
                     step="0.01"
                     stringMode
                   />

@@ -724,6 +724,7 @@ export async function installAdminRpcMocks(
         configurable: true,
         configured: itemConfigured,
         enabled: source.enabled === true,
+        condition: source.condition || { mode: 'all', amount: '', currency: '' },
         members,
         effective_role_keys: effective ? [effective.role_key] : [],
         effective_strategy: effective?.strategy || '',

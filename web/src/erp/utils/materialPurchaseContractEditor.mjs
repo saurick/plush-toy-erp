@@ -1,3 +1,4 @@
+import { standardUnitForLabel } from './unitQuantity.mjs'
 import {
   applyTableCellMerge,
   cloneDetailCellMerges,
@@ -70,9 +71,9 @@ const toText = (value) =>
 
 const MATERIAL_PURCHASE_PRINT_UNIT_TEXT_BY_CODE = new Map(
   Object.entries({
-    PCS: '件',
-    PC: '件',
-    EA: '件',
+    PCS: '个',
+    PC: '个',
+    EA: '个',
     PAIR: '对',
     PR: '对',
     SET: '套',
@@ -106,6 +107,8 @@ export const normalizeMaterialPurchaseUnitText = (value) => {
   if (!text) {
     return ''
   }
+  const standard = standardUnitForLabel(text)
+  if (standard) return standard.name
   const wrappedCode = text.match(
     /^(.*?)\s*[（(]\s*([A-Za-z][A-Za-z0-9./_-]*)\s*[）)]\s*$/u
   )
@@ -200,10 +203,10 @@ const normalizeAmountText = (raw) => {
   return normalized ? formatNumeric20Scale6Summary(normalized, 2) : ''
 }
 
-const normalizeLineDecimalText = (raw) =>
-  normalizeNumeric20Scale6(
-    sanitizePositiveDecimalText(raw, { fractionDigits: 3 })
-  )
+const normalizeLineDecimalText = (raw) => {
+  const text = toText(raw)
+  return normalizeNumeric20Scale6(text) || text
+}
 
 const computeAmountText = (quantity, unitPrice) =>
   multiplyNumeric20Scale6Values(quantity, unitPrice, 2)

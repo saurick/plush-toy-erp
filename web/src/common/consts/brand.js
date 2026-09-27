@@ -26,6 +26,11 @@ function normalizeBrandConfig(brandConfig = {}) {
       brandConfig.faviconHref.trim()
         ? brandConfig.faviconHref.trim()
         : undefined,
+    mobileFaviconHref:
+      typeof brandConfig.mobileFaviconHref === 'string' &&
+      brandConfig.mobileFaviconHref.trim()
+        ? brandConfig.mobileFaviconHref.trim()
+        : undefined,
   }
 }
 
@@ -55,5 +60,6 @@ export function getActiveERPBrand() {
     companyName: runtimeBrand.companyName || ERP_COMPANY_NAME,
     systemName: runtimeBrand.systemName || ERP_ADMIN_SYSTEM_NAME,
     faviconHref: runtimeBrand.faviconHref,
+    mobileFaviconHref: runtimeBrand.mobileFaviconHref,
   }
 }

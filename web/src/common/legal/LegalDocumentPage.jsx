@@ -32,7 +32,7 @@ function LegalPageHeader({ activeDocument, bundle }) {
         >
           返回系统
         </Button>
-        <ERPThemeToggle variant="menu" />
+        <ERPThemeToggle />
       </div>
       <div className="legal-document-brand">
         <span className="legal-document-brand__mark" aria-hidden="true">

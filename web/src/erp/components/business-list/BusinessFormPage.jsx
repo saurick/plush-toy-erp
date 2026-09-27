@@ -11,6 +11,7 @@ import { useBlocker, useOutletContext } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
 import { BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
+import BusinessFormBody from './BusinessFormBody.jsx'
 import '../../styles/app/business-form-page.css'
 
 function FormChangeObserver({ form, baselineRef, onChange }) {
@@ -31,10 +32,10 @@ function NavigationGuard({ dirty, saving, leavingRef, confirmDiscard }) {
   const blocker = useBlocker(({ currentLocation, nextLocation }) =>
     Boolean(
       !leavingRef.current &&
-        (dirty || saving) &&
-        (currentLocation.pathname !== nextLocation.pathname ||
-          currentLocation.search !== nextLocation.search ||
-          currentLocation.hash !== nextLocation.hash)
+      (dirty || saving) &&
+      (currentLocation.pathname !== nextLocation.pathname ||
+        currentLocation.search !== nextLocation.search ||
+        currentLocation.hash !== nextLocation.hash)
     )
   )
   useEffect(() => {
@@ -84,6 +85,12 @@ export default function BusinessFormPage({
   const initializedRef = useRef(false)
   const focusedRef = useRef(false)
   const [pendingAttachments, setPendingAttachments] = useState(0)
+  const [attachmentBusy, setAttachmentBusy] = useState(false)
+  const busy = confirmLoading || attachmentBusy
+  const reportPendingAttachments = useCallback((count, processing = false) => {
+    setPendingAttachments(count)
+    setAttachmentBusy(processing)
+  }, [])
   const pageRef = useRef(null)
   const triggerRef = useRef(null)
   const scrollPositionRef = useRef(null)
@@ -93,14 +100,14 @@ export default function BusinessFormPage({
   const currentRef = useRef(null)
   const dirty = Boolean(
     open &&
-      !readOnly &&
-      baseline !== null &&
-      (initialDirty ||
-        hasChanges ||
-        pendingAttachments > 0 ||
-        businessFormSnapshot(form?.getFieldsValue(true)) !== baseline)
+    !readOnly &&
+    baseline !== null &&
+    (initialDirty ||
+      hasChanges ||
+      pendingAttachments > 0 ||
+      businessFormSnapshot(form?.getFieldsValue(true)) !== baseline)
   )
-  currentRef.current = { dirty, saving: confirmLoading, onCancel }
+  currentRef.current = { dirty, saving: busy, attachmentBusy, onCancel }
 
   // The form remains mounted so each business page can initialize its own fields before opening.
   useEffect(() => {
@@ -185,7 +192,11 @@ export default function BusinessFormPage({
 
   const confirmDiscard = useCallback(async () => {
     if (currentRef.current.saving) {
-      message.info('正在保存，请稍候')
+      message.info(
+        currentRef.current.attachmentBusy
+          ? '正在处理附件，请稍候'
+          : '正在保存，请稍候'
+      )
       return false
     }
     if (!currentRef.current.dirty) return true
@@ -222,7 +233,7 @@ export default function BusinessFormPage({
   }, [confirmDiscard, open, registerPageLeaveGuard])
 
   useEffect(() => {
-    if (!open || (!dirty && !confirmLoading)) return undefined
+    if (!open || (!dirty && !busy)) return undefined
     const warnBeforeUnload = (event) => {
       if (leavingRef.current) return
       event.preventDefault()
@@ -230,14 +241,14 @@ export default function BusinessFormPage({
     }
     window.addEventListener('beforeunload', warnBeforeUnload)
     return () => window.removeEventListener('beforeunload', warnBeforeUnload)
-  }, [confirmLoading, dirty, open])
+  }, [busy, dirty, open])
 
   const close = async () => {
     if (await confirmDiscard()) onCancel?.()
   }
 
   const save = async () => {
-    if (submittingRef.current || confirmLoading || loading) return
+    if (submittingRef.current || busy || loading) return
     submittingRef.current = true
     let validationErrors = []
     try {
@@ -274,7 +285,7 @@ export default function BusinessFormPage({
       className={`erp-business-form-page ${className}`.trim()}
       hidden={!open}
       aria-label={title}
-      aria-busy={confirmLoading || loading}
+      aria-busy={busy || loading}
       data-business-form-page="true"
       data-unsaved={dirty ? 'true' : 'false'}
     >
@@ -288,7 +299,7 @@ export default function BusinessFormPage({
       {open ? (
         <NavigationGuard
           dirty={dirty}
-          saving={confirmLoading}
+          saving={busy}
           leavingRef={leavingRef}
           confirmDiscard={confirmDiscard}
         />
@@ -297,30 +308,29 @@ export default function BusinessFormPage({
         <h1 tabIndex={-1}>{title}</h1>
         {description ? <p>{description}</p> : null}
       </header>
-      <div
-        className="erp-business-form-page__body"
-        inert={confirmLoading || loading ? '' : undefined}
-      >
+      <BusinessFormBody open={open} loading={loading} busy={busy}>
         <Spin spinning={loading}>
           <BusinessFormPendingAttachmentsContext.Provider
-            value={setPendingAttachments}
+            value={reportPendingAttachments}
           >
             {children}
           </BusinessFormPendingAttachmentsContext.Provider>
         </Spin>
-      </div>
+      </BusinessFormBody>
       <footer className="erp-business-form-page__footer">
         <span className="erp-business-form-page__status" role="status">
           {readOnly
             ? '只读查看'
-            : confirmLoading
-              ? '正在保存…'
-              : dirty
-                ? '有未保存修改'
-                : '尚未修改'}
+            : attachmentBusy
+              ? '正在处理附件…'
+              : confirmLoading
+                ? '正在保存…'
+                : dirty
+                  ? '有未保存修改'
+                  : '尚未修改'}
         </span>
         <div className="erp-business-form-page__actions">
-          <Button onClick={close} disabled={confirmLoading}>
+          <Button onClick={close} disabled={busy}>
             返回列表
           </Button>
           {!readOnly && onOk ? (
@@ -328,7 +338,7 @@ export default function BusinessFormPage({
               {...okButtonProps}
               type="primary"
               loading={confirmLoading}
-              disabled={loading || okButtonProps.disabled}
+              disabled={busy || loading || okButtonProps.disabled}
               onClick={save}
             >
               {okText}

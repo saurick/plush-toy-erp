@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { DownloadOutlined, SettingOutlined } from '@ant-design/icons'
 import { Space, Tooltip } from 'antd'
 import { message } from '@/common/utils/antdApp'
@@ -7,72 +8,17 @@ import { setERPColumnOrder } from '../../api/erpPreferenceApi.mjs'
 import { applyEffectiveFieldPolicyFlags } from '../../utils/adminProfileSync.mjs'
 import {
   applyModuleColumnOrder,
+  applyModuleColumnVisibility,
+  sanitizeModuleHiddenColumns,
   sanitizeModuleColumnOrder,
 } from '../../utils/moduleTableColumns.mjs'
 import { downloadCSVRows } from '../../utils/csvExport.mjs'
 import { ToolbarButton } from './BusinessListLayout.jsx'
 import {
-  ColumnOrderHeaderMenu,
   ColumnOrderModal,
+  getColumnDisplayLabel,
   getColumnLabel,
 } from './ColumnOrderModal.jsx'
-
-const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
-
-function readStoredColumnOrder(moduleKey) {
-  if (typeof window === 'undefined') {
-    return []
-  }
-
-  try {
-    const raw = window.localStorage.getItem(
-      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-    )
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function writeStoredColumnOrder(moduleKey, order = []) {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-  if (!Array.isArray(order) || order.length === 0) {
-    window.localStorage.removeItem(storageKey)
-    return
-  }
-  window.localStorage.setItem(storageKey, JSON.stringify(order))
-}
-
-function getPreferredColumnOrder({
-  adminProfile,
-  moduleKey,
-  columns,
-  localOrder,
-}) {
-  applyEffectiveFieldPolicyFlags({ adminProfile, moduleKey, columns })
-  const orderableColumns = columns.filter((column) => column?.hidden !== true)
-  if (Array.isArray(localOrder)) {
-    return sanitizeModuleColumnOrder(localOrder, orderableColumns)
-  }
-
-  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
-  const sanitizedAccountOrder = sanitizeModuleColumnOrder(
-    accountOrder,
-    orderableColumns
-  )
-  if (sanitizedAccountOrder.length > 0) {
-    return sanitizedAccountOrder
-  }
-  return sanitizeModuleColumnOrder(
-    readStoredColumnOrder(moduleKey),
-    orderableColumns
-  )
-}
 
 function getColumnRawValue(row, column = {}) {
   if (typeof column.exportValue === 'function') {
@@ -105,104 +51,116 @@ export function useBusinessColumnOrder({
   moduleTitle,
   columns,
 }) {
-  const normalizedColumns = useMemo(
-    () => (Array.isArray(columns) ? columns : []),
-    [columns]
-  )
-  const [localOrder, setLocalOrder] = useState(null)
-  const [panelOpen, setPanelOpen] = useState(false)
+  const outletContext = useOutletContext()
+  const scopeKey = `${adminProfile?.id || adminProfile?.user_id || ''}:${moduleKey}`
+  const [savedSettings, setSavedSettings] = useState(null)
+  const [panelScope, setPanelScope] = useState(null)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const currentScopeRef = useRef(scopeKey)
+  currentScopeRef.current = scopeKey
+  useEffect(() => {
+    currentScopeRef.current = scopeKey
+    return () => {
+      currentScopeRef.current = null
+    }
+  }, [scopeKey])
+
+  const normalizedColumns = useMemo(() => {
+    const next = (Array.isArray(columns) ? columns : []).map((column) => ({
+      ...column,
+    }))
+    applyEffectiveFieldPolicyFlags({ adminProfile, moduleKey, columns: next })
+    return next
+  }, [adminProfile, columns, moduleKey])
   const orderableColumns = useMemo(
     () => normalizedColumns.filter((column) => column?.hidden !== true),
     [normalizedColumns]
   )
-
+  const preferences =
+    savedSettings?.scopeKey === scopeKey
+      ? savedSettings.preferences
+      : adminProfile?.erp_preferences
   const effectiveOrder = useMemo(
     () =>
-      getPreferredColumnOrder({
-        adminProfile,
-        moduleKey,
-        columns: normalizedColumns,
-        localOrder,
-      }),
-    [adminProfile, localOrder, moduleKey, normalizedColumns]
+      sanitizeModuleColumnOrder(
+        preferences?.column_orders?.[moduleKey],
+        orderableColumns
+      ),
+    [moduleKey, orderableColumns, preferences]
   )
-
+  const hiddenColumns = useMemo(
+    () =>
+      sanitizeModuleHiddenColumns(
+        preferences?.hidden_columns?.[moduleKey],
+        orderableColumns
+      ),
+    [moduleKey, orderableColumns, preferences]
+  )
   const visibleColumns = useMemo(
     () => applyModuleColumnOrder(orderableColumns, effectiveOrder),
     [effectiveOrder, orderableColumns]
   )
-
-  const exportColumns = useMemo(() => {
-    applyEffectiveFieldPolicyFlags({
-      adminProfile,
-      moduleKey,
-      columns: normalizedColumns,
-    })
-    return [
+  const exportColumns = useMemo(
+    () => [
       ...visibleColumns,
       ...normalizedColumns.filter(
         (column) =>
           column?.hidden === true &&
           column?.hiddenByEffectiveFieldPolicy !== true
       ),
-    ]
-  }, [adminProfile, moduleKey, normalizedColumns, visibleColumns])
+    ],
+    [normalizedColumns, visibleColumns]
+  )
 
   const persistColumnOrder = useCallback(
-    async (nextOrder) => {
-      const sanitizedOrder = sanitizeModuleColumnOrder(
-        nextOrder,
-        orderableColumns
-      )
-      writeStoredColumnOrder(moduleKey, sanitizedOrder)
-      setLocalOrder(sanitizedOrder)
+    async (nextOrder, nextHidden = hiddenColumns) => {
+      if (savingRef.current) return false
+      const order = sanitizeModuleColumnOrder(nextOrder, orderableColumns)
+      const hidden = sanitizeModuleHiddenColumns(nextHidden, orderableColumns)
+      savingRef.current = true
       setSaving(true)
       try {
         const erpPreferences = await setERPColumnOrder({
           module_key: moduleKey,
-          order: sanitizedOrder,
+          order,
+          hidden_columns: hidden,
         })
-        setLocalOrder(
-          erpPreferences?.column_orders?.[moduleKey] || sanitizedOrder
-        )
+        if (currentScopeRef.current !== scopeKey) return false
+        setSavedSettings({ scopeKey, preferences: erpPreferences })
+        outletContext?.updateAdminERPPreferences?.(erpPreferences)
         message.success(
-          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
+          order.length || hidden.length ? '列设置已保存' : '列设置已恢复默认'
         )
+        return true
       } catch (error) {
-        message.warning(
-          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
-        )
+        if (currentScopeRef.current === scopeKey) {
+          message.error(getActionErrorMessage(error, '保存列设置'))
+        }
+        return false
       } finally {
+        savingRef.current = false
         setSaving(false)
       }
     },
-    [moduleKey, orderableColumns]
+    [hiddenColumns, moduleKey, orderableColumns, outletContext, scopeKey]
   )
 
-  const tableColumns = useMemo(
-    () =>
-      visibleColumns.map((column) => ({
+  const tableColumns = useMemo(() => {
+    const displayed = new Set(
+      applyModuleColumnVisibility(orderableColumns, hiddenColumns)
+    )
+    return visibleColumns
+      .filter((column) => displayed.has(column))
+      .map((column) => ({
         ...column,
         title: (
-          <ColumnOrderHeaderMenu
-            column={column}
-            columns={orderableColumns}
-            order={effectiveOrder}
-            saving={saving}
-            onChange={persistColumnOrder}
-            onOpenPanel={() => setPanelOpen(true)}
-          />
+          <span className="erp-module-column-header-text">
+            {getColumnDisplayLabel(column)}
+          </span>
         ),
-      })),
-    [
-      effectiveOrder,
-      orderableColumns,
-      persistColumnOrder,
-      saving,
-      visibleColumns,
-    ]
-  )
+      }))
+  }, [hiddenColumns, orderableColumns, visibleColumns])
 
   return {
     effectiveOrder,
@@ -210,16 +168,18 @@ export function useBusinessColumnOrder({
     saving,
     visibleColumns,
     tableColumns,
-    openColumnOrder: () => setPanelOpen(true),
+    openColumnOrder: () => setPanelScope(scopeKey),
     columnOrderModal: (
       <ColumnOrderModal
-        open={panelOpen}
+        key={scopeKey}
+        open={panelScope === scopeKey}
         columns={orderableColumns}
         order={effectiveOrder}
+        hiddenColumns={hiddenColumns}
         saving={saving}
         moduleTitle={moduleTitle}
         onChange={persistColumnOrder}
-        onClose={() => setPanelOpen(false)}
+        onClose={() => setPanelScope(null)}
       />
     ),
   }
@@ -247,7 +207,7 @@ export function BusinessListToolbarActions({
     exportDisabledReason || (exportDisabled ? '当前没有可导出的列表数据' : '')
   const normalizedColumnReason =
     columnOrderDisabledReason ||
-    (columnOrderDisabled ? '当前列表暂不支持安全调整列顺序' : '')
+    (columnOrderDisabled ? '当前列表暂不支持列设置' : '')
 
   return (
     <Space size={8} wrap>
@@ -268,7 +228,7 @@ export function BusinessListToolbarActions({
           disabled={columnOrderDisabled || !onOpenColumnOrder}
           onClick={onOpenColumnOrder}
         >
-          列顺序
+          列设置
         </ToolbarButton>
       </TooltipButton>
     </Space>

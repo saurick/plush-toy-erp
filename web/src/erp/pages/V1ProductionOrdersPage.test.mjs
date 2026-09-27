@@ -91,7 +91,8 @@ test('production order lifecycle keeps backend authority and separates refresh e
 })
 
 test('production order page reuses the ERP shell refresh entrypoint', () => {
-  assert.match(page, /registerPageRefresh\?\.\(loadOrders\)/u)
+  assert.match(page, /registerPageRefresh\?\.\(\(\) => \{/u)
+  assert.match(page, /if \(contentView === 'overview'\) reloadOverviewData\(\)/u)
   assert.doesNotMatch(page, />\s*刷新当前页\s*</u)
   assert.doesNotMatch(page, /ReloadOutlined/u)
 })

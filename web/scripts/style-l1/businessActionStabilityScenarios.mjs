@@ -2,6 +2,7 @@ import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleF
 import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const SALES_ORDER_PATH = '/erp/sales/project-orders/sales-orders'
 const PURCHASE_ORDER_PATH = '/erp/purchase/accessories'
@@ -257,7 +258,7 @@ async function installActionStabilityRpcRows(
     includeShipments = false,
     includeFinance = false,
     includeProductionExceptions = false,
-    delaySalesSubmit = false,
+    salesSubmitGate = null,
   } = {}
 ) {
   const salesOrders = createSalesOrderRows()
@@ -301,7 +302,7 @@ async function installActionStabilityRpcRows(
     })
   }
 
-  if (delaySalesSubmit) {
+  if (salesSubmitGate) {
     await page.route('**/rpc/customer_config', async (route) => {
       const body = route.request().postDataJSON() || {}
       if (body.method === 'get_sales_order_acceptance_process') {
@@ -320,9 +321,7 @@ async function installActionStabilityRpcRows(
         return
       }
       if (body.method === 'start_sales_order_acceptance_process') {
-        await new Promise((resolve) => {
-          setTimeout(resolve, 1_200)
-        })
+        await salesSubmitGate
         await fulfillRpc(route, body.id || 'action-stability-sales-start', {
           process_instance: {
             id: 91_001,
@@ -535,8 +534,8 @@ async function captureActionLayout(page) {
   const actionBar = page.locator('.erp-business-module-current-action').first()
   if (await actionBar.locator('button').count()) {
     await assertButtonSpacing(actionBar, '当前操作区', {
-      contentSized: await page.evaluate(() =>
-        window.matchMedia('(min-width: 992px)').matches
+      contentSized: await page.evaluate(
+        () => window.matchMedia('(min-width: 992px)').matches
       ),
     })
   }
@@ -613,6 +612,7 @@ async function assertDesktopActionState(
   const opened = (await action.count()) === 0 && (await more.count()) > 0
   if (opened) await openActionMenu(page)
   action = page.locator(scope).locator(selector)
+  if (visible) await action.waitFor({ state: 'visible' })
   assert.equal(
     (await action.count()) > 0,
     visible,
@@ -758,17 +758,26 @@ async function openActionMenu(page) {
     .locator('.erp-business-module-current-action')
     .first()
     .locator('.erp-business-selection-action-bar__compact-more')
-  await button.click()
+  await waitForFiniteAnimations(page)
+  if ((await button.getAttribute('aria-expanded')) !== 'true')
+    await button.click()
   await page
     .locator('.erp-business-selection-action-menu')
     .waitFor({ state: 'visible', timeout: 10_000 })
+  await waitForFiniteAnimations(page)
+  await page
+    .locator('.erp-business-selection-action-menu .ant-btn')
+    .first()
+    .waitFor({ state: 'visible' })
 }
 
 async function closeActionMenu(page) {
+  await page.locator('.erp-business-selection-action-menu').focus()
   await page.keyboard.press('Escape')
   await page
     .locator('.erp-business-selection-action-menu')
     .waitFor({ state: 'hidden', timeout: 10_000 })
+  await waitForFiniteAnimations(page)
 }
 
 async function screenshot(page, path, outputDir, fileName) {
@@ -779,6 +788,7 @@ async function screenshot(page, path, outputDir, fileName) {
 }
 
 export function createBusinessActionStabilityScenarios(deps) {
+  let releaseSalesSubmit
   const {
     assert,
     assertERPThemeMode,
@@ -863,10 +873,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         )
         assert.equal(await printButton.count(), 1)
         assert.equal(await printButton.isEnabled(), true)
-        assert.match(
-          await printButton.textContent(),
-          /批量打印合同/u
-        )
+        assert.match(await printButton.textContent(), /批量打印合同/u)
         if (printActionInMenu) await closeActionMenu(page)
         await assertDesktopActionState(page, assert, 'purchase-details', {
           visible: true,
@@ -1243,12 +1250,12 @@ export function createBusinessActionStabilityScenarios(deps) {
                 1,
               `${name} 主按钮和更多操作应对齐，桌面宽度不能变成窄屏高度: ${JSON.stringify(metrics)}`
             )
-            const more = actions.locator(
-              '.erp-business-selection-action-bar__compact-more'
+            await openActionMenu(page)
+            const actionMenu = page.locator(
+              '.erp-business-selection-action-menu'
             )
-            await more.click()
-            const actionMenu = page.locator('.erp-business-selection-action-menu')
             await actionMenu.waitFor({ state: 'visible' })
+            await waitForFiniteAnimations(page)
             await assertButtonSpacing(actionMenu, `${name}-more`)
             await closeActionMenu(page)
             await actionMenu.waitFor({ state: 'hidden' })
@@ -1269,11 +1276,9 @@ export function createBusinessActionStabilityScenarios(deps) {
         }
 
         await page.setViewportSize({ width: 1440, height: 900 })
-        await page
-          .getByRole('button', { name: /列顺序/u })
-          .click()
+        await page.getByRole('button', { name: /列设置/u }).click()
         const modal = page.getByRole('dialog', {
-          name: /^调整列表列顺序/u,
+          name: /^列设置/u,
         })
         await modal.waitFor({ state: 'visible' })
         await modal.evaluate(async (element) => {
@@ -1327,9 +1332,12 @@ export function createBusinessActionStabilityScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
+        const salesSubmitGate = new Promise((resolve) => {
+          releaseSalesSubmit = resolve
+        })
         await installActionStabilityRpcRows(page, {
           includeSales: true,
-          delaySalesSubmit: true,
+          salesSubmitGate,
         })
       },
       verify: async (page) => {
@@ -1354,12 +1362,16 @@ export function createBusinessActionStabilityScenarios(deps) {
             visible: ['draft', 'submitted', 'active'].includes(status),
             disabled: false,
           })
-          await assertDesktopActionState(page, assert, 'lifecycle-short_close', {
-            visible: status === 'active',
-            disabled: false,
-          })
-          if (status === 'draft')
-            draftLayout = await captureActionLayout(page)
+          await assertDesktopActionState(
+            page,
+            assert,
+            'lifecycle-short_close',
+            {
+              visible: status === 'active',
+              disabled: false,
+            }
+          )
+          if (status === 'draft') draftLayout = await captureActionLayout(page)
           await assertNoHorizontalOverflow(page, `销售订单 ${status}`)
           await screenshot(
             page,
@@ -1517,6 +1529,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           outputDir,
           'business-action-stability-sales-saving-desktop.png'
         )
+        releaseSalesSubmit()
         await page
           .getByText('销售订单已提交，已进入审批流程')
           .waitFor({ state: 'visible', timeout: 10_000 })
@@ -1688,14 +1701,19 @@ export function createBusinessActionStabilityScenarios(deps) {
             visible: status !== 'CLOSED',
             disabled: false,
           })
-          await assertDesktopActionState(page, assert, 'lifecycle-short_close', {
-            visible: status === 'APPROVED',
-            disabled: false,
-          })
+          await assertDesktopActionState(
+            page,
+            assert,
+            'lifecycle-short_close',
+            {
+              visible: status === 'APPROVED',
+              disabled: false,
+            }
+          )
           await assertNoHorizontalOverflow(page, '采购订单 ' + status)
         }
         await gotoScenarioPath(page, PURCHASE_RECEIPT_PATH)
-        await waitForBusinessPage(page, '入库管理')
+        await waitForBusinessPage(page, '采购入库')
         await assertUnselectedActions(page, assert)
         await selectBusinessRow(page, 'PR-STYLE-L1-DRAFT')
         await assertDesktopActionState(page, assert, 'post', {
@@ -1776,7 +1794,11 @@ export function createBusinessActionStabilityScenarios(deps) {
           includeFinance: true,
         })
         await page.route('**/rpc/customer_config', async (route) => {
-          const { id, method, params = {} } = route.request().postDataJSON() || {}
+          const {
+            id,
+            method,
+            params = {},
+          } = route.request().postDataJSON() || {}
           if (method !== 'get_finance_payment_approval_process') {
             await route.fallback()
             return
@@ -1824,25 +1846,56 @@ export function createBusinessActionStabilityScenarios(deps) {
           await assertNoHorizontalOverflow(page, '收付款 ' + status)
         }
         await selectBusinessRow(page, 'PAY-ACTION-DRAFT')
-        if ((await page.locator('[data-business-action-key="payment-cancel"]').count()) === 0) {
+        if (
+          (await page
+            .locator('[data-business-action-key="payment-cancel"]')
+            .count()) === 0
+        ) {
           await openActionMenu(page)
         }
-        await page.locator('[data-business-action-key="payment-cancel"]').click()
-        const cancelDialog = page.getByRole('dialog').filter({ hasText: '取消收付款' }).last()
-        await assertBusinessModalViewport(page, cancelDialog, { label: 'finance-cancel-compact', maxWidth: 480 })
-        await page.screenshot({ path: path.join(outputDir, 'finance-cancel-compact.png'), fullPage: true })
+        await page
+          .locator('[data-business-action-key="payment-cancel"]')
+          .click()
+        const cancelDialog = page
+          .getByRole('dialog')
+          .filter({ hasText: '取消收付款' })
+          .last()
+        await assertBusinessModalViewport(page, cancelDialog, {
+          label: 'finance-cancel-compact',
+          maxWidth: 480,
+        })
+        await page.screenshot({
+          path: path.join(outputDir, 'finance-cancel-compact.png'),
+          fullPage: true,
+        })
         const reason = cancelDialog.getByRole('textbox')
         await reason.fill('模拟取消原因'.repeat(30))
-        assert.ok((await reason.boundingBox()).width > 350, '简短确认中的原因应占满可用正文宽度')
+        assert.ok(
+          (await reason.boundingBox()).width > 350,
+          '简短确认中的原因应占满可用正文宽度'
+        )
         await page.setViewportSize({ width: 390, height: 600 })
-        await assertBusinessModalViewport(page, cancelDialog, { label: 'finance-cancel-narrow', maxWidth: 480 })
-        await page.screenshot({ path: path.join(outputDir, 'finance-cancel-narrow.png'), fullPage: true })
+        await assertBusinessModalViewport(page, cancelDialog, {
+          label: 'finance-cancel-narrow',
+          maxWidth: 480,
+        })
+        await page.screenshot({
+          path: path.join(outputDir, 'finance-cancel-narrow.png'),
+          fullPage: true,
+        })
         await cancelDialog.getByRole('button', { name: /^返\s*回$/u }).click()
         await cancelDialog.waitFor({ state: 'hidden' })
         await page.setViewportSize({ width: 1440, height: 900 })
-        await page.locator('[data-business-action-key="clear-selection"]').click()
+        await page
+          .locator('[data-business-action-key="clear-selection"]')
+          .click()
         await assertUnselectedActions(page, assert)
-        await screenshot(page, path, outputDir, 'business-action-stability-finance-none-desktop.png')
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-finance-none-desktop.png'
+        )
       },
     },
     {

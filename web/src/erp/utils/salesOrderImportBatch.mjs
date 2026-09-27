@@ -1,5 +1,6 @@
 import { sha256 } from 'js-sha256'
 import { numeric20Scale6Units } from './numeric20Scale6.mjs'
+import { isQuantityTextWithinUnitPrecision } from './unitQuantity.mjs'
 import {
   buildSalesOrderItemParams,
   buildSalesOrderParams,
@@ -55,10 +56,10 @@ export function salesOrderImportIssues(
         add(['items', index, key], `${label}无效`)
       } else if (
         unit &&
-        Number.isInteger(unit.precision) &&
-        unit.precision >= 0 &&
-        unit.precision < 6 &&
-        !amount.padStart(6, '0').endsWith('0'.repeat(6 - unit.precision))
+        !isQuantityTextWithinUnitPrecision(
+          item[key] || (positive ? '' : '0'),
+          unit.precision
+        )
       ) {
         add(['items', index, key], `${label}不符合单位精度`)
       }
@@ -138,8 +139,9 @@ export function salesOrderImportParams(values, customers) {
 
 async function imageUploadParams(image, ownerID) {
   let binary = ''
-  for (let i = 0; i < image.bytes.length; i += 8192)
-    { binary += String.fromCharCode(...image.bytes.subarray(i, i + 8192)) }
+  for (let i = 0; i < image.bytes.length; i += 8192) {
+    binary += String.fromCharCode(...image.bytes.subarray(i, i + 8192))
+  }
   return {
     owner_type: 'sales_order',
     owner_id: ownerID,

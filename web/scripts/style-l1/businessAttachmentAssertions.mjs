@@ -1,3 +1,4 @@
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 export function createBusinessAttachmentAssertions({
   assert,
   assertAntdModalCentered,
@@ -36,6 +37,7 @@ export function createBusinessAttachmentAssertions({
     const openedMore = !(await button.isVisible()) && (await more.isVisible())
     if (openedMore) await more.click()
     await button.waitFor({ state: 'visible', timeout: 10_000 })
+    await waitForFiniteAnimations(page)
     const buttonMetrics = await button.evaluate((node) => ({
       text: node.textContent?.replace(/\s+/g, ' ').trim() || '',
       disabled: Boolean(node.disabled),
@@ -71,6 +73,7 @@ export function createBusinessAttachmentAssertions({
       const bodyRect = body?.getBoundingClientRect()
       return {
         hasPanel: Boolean(panel),
+        panelLabel: panel?.getAttribute('aria-label'),
         panelText: panel?.textContent?.replace(/\s+/g, ' ').trim() || '',
         panelHeaderText:
           panelHeader?.textContent?.replace(/\s+/g, ' ').trim() || '',
@@ -81,7 +84,7 @@ export function createBusinessAttachmentAssertions({
     })
     assert(
       modalMetrics.hasPanel &&
-        modalMetrics.panelHeaderText.includes(panelTitle),
+        modalMetrics.panelLabel === panelTitle,
       `${scenarioName} 附件弹窗应承载附件面板标题: ${JSON.stringify(
         modalMetrics
       )}`

@@ -1,18 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
-import { Button } from 'antd'
+import { Button, DatePicker, Select } from 'antd'
+import dayjs from 'dayjs'
 import { currentBusinessDate } from '../../utils/businessDate.mjs'
 import {
   buildPurchaseArrivalModel,
-  moveMonthKey,
-  normalizeMonthKey,
+  moveBusinessDate,
+  paginateVisualizationRows,
 } from '../../utils/businessVisualizationModels.mjs'
 import {
   BusinessVisualizationFrame,
+  VisualizationPagination,
   VisualizationState,
 } from './BusinessVisualizationFrame.jsx'
-
-const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 
 export default function PurchaseArrivalCalendar({
   orders,
@@ -21,29 +21,64 @@ export default function PurchaseArrivalCalendar({
   onRetry,
   onOpen,
   switcher,
+  viewState = {},
+  onViewStateChange,
 }) {
   const today = currentBusinessDate()
-  const [monthKey, setMonthKey] = useState(() => normalizeMonthKey('', today))
-  const [selectedDate, setSelectedDate] = useState(today)
+  const startDate = viewState.startDate || today
+  const filter = viewState.filter || 'period'
+  const confirmation = viewState.confirmation || 'all'
+  const change = (patch) =>
+    onViewStateChange?.({ ...viewState, page: 1, ...patch })
   const model = useMemo(
-    () => buildPurchaseArrivalModel(orders, { monthKey, today }),
-    [monthKey, orders, today]
+    () => buildPurchaseArrivalModel(orders, { startDate, today }),
+    [orders, startDate, today]
   )
-  useEffect(() => {
-    if (selectedDate === 'unscheduled') return
-    if (!selectedDate.startsWith(monthKey)) {
-      setSelectedDate(`${monthKey}-01`)
+  const filtered = model.rows.filter((row) => {
+    if (confirmation === 'confirmed' && !row.confirmedDate) return false
+    if (confirmation === 'unconfirmed' && row.confirmedDate) return false
+    if (filter === 'all') return true
+    if (filter === 'date') {
+      return (
+        row.arrivalDate === viewState.selectedDate &&
+        !['closed', 'cancelled'].includes(row.status.key)
+      )
     }
-  }, [monthKey, selectedDate])
-  const selectedItems =
-    model.days.find((day) => day.dateKey === selectedDate)?.items || []
-
+    if (filter === 'period') {
+      return (
+        row.arrivalDate >= model.startDate &&
+        row.arrivalDate <= model.endDate &&
+        !['closed', 'cancelled'].includes(row.status.key)
+      )
+    }
+    return row.status.key === filter
+  })
+  const pagination = paginateVisualizationRows(filtered, viewState.page)
+  const selectionLabel =
+    filter === 'date'
+      ? viewState.selectedDate
+      : {
+          all: '全部到货安排',
+          period: '当前 14 天',
+          overdue: '已逾期',
+          dueSoon: '7 天内到货',
+          unscheduled: '未填日期',
+        }[filter]
+  const movePeriod = (delta) =>
+    change({
+      startDate: moveBusinessDate(startDate, delta),
+      filter: 'period',
+      selectedDate: '',
+    })
   return (
     <BusinessVisualizationFrame
       className="erp-purchase-arrival-visual"
       switcher={switcher}
-      title="采购到货日历"
+      title="采购到货计划"
+      loading={loading}
+      error={error}
       metrics={[
+        { key: 'all', label: '全部', value: model.counts.total },
         {
           key: 'overdue',
           label: '已逾期',
@@ -51,126 +86,130 @@ export default function PurchaseArrivalCalendar({
           tone: 'danger',
         },
         {
-          key: 'due-soon',
+          key: 'dueSoon',
           label: '7 天内',
           value: model.counts.dueSoon,
           tone: 'warning',
-        },
-        {
-          key: 'confirmed',
-          label: '已确认日期',
-          value: model.counts.confirmed,
-          tone: 'success',
         },
         {
           key: 'unscheduled',
           label: '未填日期',
           value: model.counts.unscheduled,
         },
-      ]}
+      ].map((metric) => ({
+        ...metric,
+        selected: filter === metric.key,
+        onClick: () => change({ filter: metric.key, selectedDate: '' }),
+      }))}
     >
-      <VisualizationState
-        loading={loading}
-        error={error}
-        empty={!loading && !error && model.rows.length === 0}
-        onRetry={onRetry}
-      />
-      {!loading && !error && model.rows.length > 0 ? (
-        <div className="erp-arrival-calendar-layout">
-          <div className="erp-arrival-calendar">
-            <div className="erp-arrival-calendar__toolbar">
-              <Button
-                type="text"
-                aria-label="上一个月"
-                icon={<LeftOutlined aria-hidden="true" />}
-                onClick={() => setMonthKey((value) => moveMonthKey(value, -1))}
-              />
-              <strong>{model.monthLabel}</strong>
-              <Button
-                type="text"
-                aria-label="下一个月"
-                icon={<RightOutlined aria-hidden="true" />}
-                onClick={() => setMonthKey((value) => moveMonthKey(value, 1))}
-              />
-              <Button
-                type="link"
-                size="small"
-                onClick={() => {
-                  setMonthKey(normalizeMonthKey('', today))
-                  setSelectedDate(today)
-                }}
-              >
-                今天
-              </Button>
-            </div>
-            <div className="erp-arrival-calendar__weekdays" aria-hidden="true">
-              {WEEKDAYS.map((weekday) => (
-                <span key={weekday}>周{weekday}</span>
-              ))}
-            </div>
-            <div className="erp-arrival-calendar__days">
-              {model.days.map((day) => (
+      <div className="erp-arrival-calendar__toolbar">
+        <Button
+          aria-label="前 14 天"
+          icon={<LeftOutlined aria-hidden="true" />}
+          onClick={() => movePeriod(-14)}
+        />
+        <strong>
+          {model.startDate} — {model.endDate}
+        </strong>
+        <Button
+          aria-label="后 14 天"
+          icon={<RightOutlined aria-hidden="true" />}
+          onClick={() => movePeriod(14)}
+        />
+        <Button
+          onClick={() =>
+            change({ startDate: today, filter: 'period', selectedDate: '' })
+          }
+        >
+          今天
+        </Button>
+        <DatePicker
+          aria-label="跳转到货日期"
+          placeholder="跳转日期"
+          value={viewState.selectedDate ? dayjs(viewState.selectedDate) : null}
+          onChange={(_date, date) =>
+            change(
+              date
+                ? { startDate: date, selectedDate: date, filter: 'date' }
+                : { selectedDate: '', filter: 'period' }
+            )
+          }
+        />
+        <Select
+          aria-label="到货日期确认状态"
+          value={confirmation}
+          onChange={(value) => change({ confirmation: value })}
+          options={[
+            { value: 'all', label: '全部确认状态' },
+            { value: 'confirmed', label: '供应商已确认' },
+            { value: 'unconfirmed', label: '待供应商确认' },
+          ]}
+        />
+      </div>
+      <VisualizationState loading={loading} error={error} onRetry={onRetry} />
+      {!loading && !error ? (
+        <>
+          <div
+            className="erp-arrival-calendar__days"
+            aria-label="14 天到货安排"
+          >
+            {model.days.map((day) => {
+              const count = day.items.filter(
+                (row) =>
+                  !['closed', 'cancelled'].includes(row.status.key) &&
+                  (confirmation === 'all' ||
+                    (confirmation === 'confirmed'
+                      ? row.confirmedDate
+                      : !row.confirmedDate))
+              ).length
+              return (
                 <button
                   key={day.dateKey}
                   type="button"
-                  aria-label={`${day.dateKey}，${day.items.length} 张采购订单`}
+                  aria-label={`${day.dateKey}，${count} 张采购订单`}
+                  aria-current={day.dateKey === today ? 'date' : undefined}
+                  aria-pressed={
+                    filter === 'date' && day.dateKey === viewState.selectedDate
+                  }
                   className={[
                     'erp-arrival-calendar__day',
-                    day.inMonth ? '' : 'erp-arrival-calendar__day--muted',
                     day.dateKey === today
                       ? 'erp-arrival-calendar__day--today'
                       : '',
-                    day.dateKey === selectedDate
+                    filter === 'date' && day.dateKey === viewState.selectedDate
                       ? 'erp-arrival-calendar__day--selected'
                       : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  onClick={() => setSelectedDate(day.dateKey)}
+                  onClick={() =>
+                    change({ selectedDate: day.dateKey, filter: 'date' })
+                  }
                 >
-                  <span className="erp-arrival-calendar__day-number">
-                    {day.day}
+                  <span className="erp-arrival-calendar__day-label">
+                    <span className="erp-arrival-calendar__day-number">
+                      <span className="erp-arrival-calendar__day-month">
+                        {dayjs(day.dateKey).format('MM-')}
+                      </span>
+                      {dayjs(day.dateKey).format('DD')}
+                    </span>
+                    <small>
+                      周{'日一二三四五六'[dayjs(day.dateKey).day()]}
+                    </small>
                   </span>
-                  {day.items.length > 0 ? (
-                    <strong>{day.items.length} 单</strong>
-                  ) : null}
-                  <span className="erp-arrival-calendar__markers">
-                    {[...new Set(day.items.map((item) => item.status.key))]
-                      .slice(0, 3)
-                      .map((status) => (
-                        <i key={status} data-status={status} />
-                      ))}
-                  </span>
+                  <strong>{count} 单</strong>
                 </button>
-              ))}
-            </div>
+              )
+            })}
           </div>
-          <aside className="erp-arrival-calendar__detail">
+          <div className="erp-arrival-calendar__detail">
             <div className="erp-arrival-calendar__detail-head">
-              <div>
-                <strong>{selectedDate}</strong>
-                <span className="erp-arrival-calendar__detail-count">
-                  {selectedDate === 'unscheduled'
-                    ? model.unscheduled.length
-                    : selectedItems.length}{' '}
-                  张订单
-                </span>
-              </div>
-              {model.unscheduled.length > 0 ? (
-                <button
-                  type="button"
-                  className="erp-arrival-calendar__unscheduled"
-                  onClick={() => setSelectedDate('unscheduled')}
-                >
-                  未填日期 {model.unscheduled.length}
-                </button>
-              ) : null}
+              <strong>{selectionLabel}</strong>
+              <span>{filtered.length} 张订单</span>
             </div>
+            <VisualizationState empty={filtered.length === 0} />
             <div className="erp-arrival-calendar__orders">
-              {(selectedDate === 'unscheduled'
-                ? model.unscheduled
-                : selectedItems
-              ).map((order) => (
+              {pagination.rows.map((order) => (
                 <button
                   key={order.id}
                   type="button"
@@ -187,6 +226,7 @@ export default function PurchaseArrivalCalendar({
                     {order.status.label}
                   </span>
                   <small className="erp-arrival-calendar__order-source">
+                    {order.arrivalDate || '未填日期'} ·{' '}
                     {order.dateSource === 'confirmed'
                       ? '供应商确认日期'
                       : order.dateSource === 'expected'
@@ -195,15 +235,13 @@ export default function PurchaseArrivalCalendar({
                   </small>
                 </button>
               ))}
-              {(selectedDate === 'unscheduled'
-                ? model.unscheduled
-                : selectedItems
-              ).length === 0 ? (
-                <p className="erp-arrival-calendar__empty">当天没有到货安排</p>
-              ) : null}
             </div>
-          </aside>
-        </div>
+            <VisualizationPagination
+              pagination={pagination}
+              onChange={(page) => change({ page })}
+            />
+          </div>
+        </>
       ) : null}
     </BusinessVisualizationFrame>
   )

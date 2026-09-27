@@ -12,10 +12,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   QuestionCircleOutlined,
   ReloadOutlined,
-  RightOutlined,
   SaveOutlined,
 } from '@ant-design/icons'
 import Tabs from '@/common/components/navigation/SlidingTabs'
+import BusinessModal from '../business-list/BusinessModal.jsx'
 import {
   IS_PRODUCTION_BUILD,
   READ_USER_PERMISSION,
@@ -94,9 +94,13 @@ export function usePermissionRoleSettings({
   adminRpc,
   loadData,
   onOpenRoleAccounts,
+  onOpenNavigation,
+  navigationMode = false,
+  searchKeyword = '',
   setSaving,
   saving,
 }) {
+  const [detailView, setDetailView] = useState(null)
   const [effectiveRoleAccess, setEffectiveRoleAccess] = useState(null)
 
   const [effectiveRoleAccessLoading, setEffectiveRoleAccessLoading] =
@@ -478,12 +482,6 @@ export function usePermissionRoleSettings({
     [admins, selectedRoleKey]
   )
 
-  const selectedRolePermissionSummary = useMemo(
-    () =>
-      summarizeRolePermissions(selectedRolePermissionKeys, permissionDetailMap),
-    [permissionDetailMap, selectedRolePermissionKeys]
-  )
-
   const canReadUsers = hasPermission(currentAdmin, READ_USER_PERMISSION)
 
   const canManageRolePermissions = hasPermission(
@@ -626,6 +624,7 @@ export function usePermissionRoleSettings({
       title: '切换页面前要放弃未保存的修改吗？',
       content: '切换到员工账号后，当前岗位尚未保存的功能调整会丢失。',
       onDiscard: () => {
+        setDetailView(null)
         onOpenRoleAccounts(selectedRole)
       },
     })
@@ -882,6 +881,158 @@ export function usePermissionRoleSettings({
     }
   }
 
+  const roleNavigationContent = (
+    <Tabs
+      className="erp-role-navigation-workspace-tabs"
+      type="card"
+      size="small"
+      activeKey={roleNavigationViewKey}
+      destroyOnHidden={false}
+      onChange={setRoleNavigationViewKey}
+      items={[
+        {
+          key: ROLE_NAVIGATION_VIEW_KEYS.LAYOUT,
+          label: '菜单排列',
+          children: (
+            <Space direction="vertical" size={20} style={{ width: '100%' }}>
+              {roleAccessForCurrentDraft?.is_final !== true ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="页面访问尚未完成核对"
+                  description="完成公司当前启用范围核对后，才能调整岗位导航。"
+                  action={
+                    <Button
+                      size="small"
+                      onClick={() =>
+                        setRoleNavigationViewKey(
+                          ROLE_NAVIGATION_VIEW_KEYS.ACCESS
+                        )
+                      }
+                    >
+                      查看页面访问
+                    </Button>
+                  }
+                />
+              ) : null}
+              <RoleNavigationEditor
+                mode={selectedRoleNavigationMode}
+                primaryMenuPaths={selectedRolePrimaryMenuPaths}
+                secondaryMenuPaths={selectedRoleSecondaryMenuPaths}
+                options={roleNavigationOptions}
+                unavailablePaths={unavailableRoleNavigationPaths}
+                disabled={
+                  !canManageRolePermissions ||
+                  selectedRoleReadOnly ||
+                  roleAccessForCurrentDraft?.is_final !== true
+                }
+                onModeChange={(nextMode) => {
+                  setSelectedRoleNavigationDraft((current) => {
+                    const currentDraft =
+                      current.roleKey === selectedRoleKey &&
+                      current.roleVersion === selectedRoleVersion
+                        ? current
+                        : {
+                            roleKey: selectedRoleKey,
+                            roleVersion: selectedRoleVersion,
+                            mode: selectedRoleNavigationMode,
+                            primaryMenuPaths: selectedRolePrimaryMenuPaths,
+                            secondaryMenuPaths: selectedRoleSecondaryMenuPaths,
+                          }
+                    if (nextMode === ROLE_NAVIGATION_MODES.RECOMMENDED) {
+                      return {
+                        roleKey: selectedRoleKey,
+                        roleVersion: selectedRoleVersion,
+                        mode: ROLE_NAVIGATION_MODES.RECOMMENDED,
+                        primaryMenuPaths: [],
+                        secondaryMenuPaths: [],
+                      }
+                    }
+                    return {
+                      ...currentDraft,
+                      mode: ROLE_NAVIGATION_MODES.CUSTOM,
+                    }
+                  })
+                }}
+                onPrimaryMenuPathsChange={(primaryMenuPaths) =>
+                  setSelectedRoleNavigationDraft((current) => {
+                    const currentDraft =
+                      current.roleKey === selectedRoleKey &&
+                      current.roleVersion === selectedRoleVersion
+                        ? current
+                        : {
+                            roleKey: selectedRoleKey,
+                            roleVersion: selectedRoleVersion,
+                            mode: selectedRoleNavigationMode,
+                            primaryMenuPaths: selectedRolePrimaryMenuPaths,
+                            secondaryMenuPaths: selectedRoleSecondaryMenuPaths,
+                          }
+                    return {
+                      ...currentDraft,
+                      primaryMenuPaths,
+                    }
+                  })
+                }
+                onSecondaryMenuPathsChange={(secondaryMenuPaths) =>
+                  setSelectedRoleNavigationDraft((current) => {
+                    const currentDraft =
+                      current.roleKey === selectedRoleKey &&
+                      current.roleVersion === selectedRoleVersion
+                        ? current
+                        : {
+                            roleKey: selectedRoleKey,
+                            roleVersion: selectedRoleVersion,
+                            mode: selectedRoleNavigationMode,
+                            primaryMenuPaths: selectedRolePrimaryMenuPaths,
+                            secondaryMenuPaths: selectedRoleSecondaryMenuPaths,
+                          }
+                    return {
+                      ...currentDraft,
+                      secondaryMenuPaths,
+                    }
+                  })
+                }
+                onViewPageAccess={() =>
+                  setRoleNavigationViewKey(ROLE_NAVIGATION_VIEW_KEYS.ACCESS)
+                }
+              />
+              <NavigationPlacementOverview
+                access={roleAccessForCurrentDraft}
+                roleKey={selectedRoleKey}
+                navigationMode={selectedRoleNavigationMode}
+                primaryMenuPaths={selectedRolePrimaryMenuPaths}
+                secondaryMenuPaths={selectedRoleSecondaryMenuPaths}
+                dirty={roleConfigurationDirty}
+                loading={roleAccessForCurrentDraftLoading}
+              />
+            </Space>
+          ),
+        },
+        {
+          key: ROLE_NAVIGATION_VIEW_KEYS.ACCESS,
+          label: '页面访问',
+          children: (
+            <Space direction="vertical" size={20} style={{ width: '100%' }}>
+              <EffectiveRoleAccessOverview
+                access={roleAccessForCurrentDraft}
+                loading={roleAccessForCurrentDraftLoading}
+              />
+              <details className="erp-role-permission-impact">
+                <summary>查看功能与页面操作的对应关系</summary>
+                <Paragraph type="secondary">
+                  查看已选功能对应的页面与操作；最终能否进入以上方页面访问结果为准。
+                </Paragraph>
+                <PermissionImpactMap
+                  permissions={[...permissionDetailMap.values()]}
+                  permissionKeys={selectedRolePermissionKeys}
+                />
+              </details>
+            </Space>
+          ),
+        },
+      ]}
+    />
+  )
   const roleTemplateTab = (
     <Card
       className="erp-permission-section erp-permission-section--roles"
@@ -912,7 +1063,6 @@ export function usePermissionRoleSettings({
                 >
                   <span className="erp-role-template-card__main">
                     <Text strong>{getRoleVisibleName(role)}</Text>
-                    <RightOutlined aria-hidden="true" />
                   </span>
                   <span className="erp-role-template-card__meta">
                     <Text type="secondary">
@@ -934,24 +1084,8 @@ export function usePermissionRoleSettings({
             <>
               <div className="erp-role-center-detail__head">
                 <div className="erp-role-center-detail__identity">
-                  <Space size={8} wrap>
-                    <Title level={5} style={{ margin: 0 }}>
-                      {getRoleVisibleName(selectedRole)}
-                    </Title>
-                    <Tag
-                      color={
-                        selectedRole.role_type === 'system' ? 'cyan' : 'blue'
-                      }
-                    >
-                      {getRoleTypeLabel(selectedRole)}
-                    </Tag>
-                  </Space>
-                  <Text type="secondary">
-                    {selectedRolePermissionSummary.total} 项功能
-                    {canReadUsers
-                      ? ` · ${selectedRoleAdmins.length} 个账号`
-                      : ''}
-                  </Text>
+                  <Title level={5}>{getRoleVisibleName(selectedRole)}</Title>
+                  <Text type="secondary">{getRoleTypeLabel(selectedRole)}</Text>
                 </div>
                 <div className="erp-role-center-actions">
                   <Popover
@@ -992,9 +1126,21 @@ export function usePermissionRoleSettings({
                       className="erp-permission-help-trigger"
                     />
                   </Popover>
-                  <Tag color={roleConfigurationDirty ? 'orange' : 'green'}>
-                    {roleConfigurationDirty ? '有未保存调整' : '已保存'}
-                  </Tag>
+                  <Button
+                    type="text"
+                    size="small"
+                    onClick={() => setDetailView('fields')}
+                  >
+                    敏感字段
+                  </Button>
+                  <Button
+                    type="text"
+                    size="small"
+                    onClick={() => setDetailView('accounts')}
+                  >
+                    关联账号
+                    {canReadUsers ? `（${selectedRoleAdmins.length}）` : ''}
+                  </Button>
                   <Button
                     icon={<SaveOutlined aria-hidden="true" />}
                     type="primary"
@@ -1055,290 +1201,94 @@ export function usePermissionRoleSettings({
                 />
               ) : null}
 
-              <Tabs
-                className="erp-role-policy-tabs"
-                defaultActiveKey="functions"
-                items={[
-                  {
-                    key: 'functions',
-                    label: '可用功能',
-                    children: (
-                      <div className="erp-role-policy-tab-content">
-                        {permissionDraftAccessError ? (
-                          <Alert
-                            type="warning"
-                            showIcon
-                            message="公司当前启用范围暂时核对失败"
-                            description={`${permissionDraftAccessError}。页面先按当前岗位权限显示，保存前请重试。`}
-                          />
-                        ) : null}
-                        <PermissionChecklist
-                          groups={permissionGroups}
-                          access={roleAccessForCurrentDraft}
-                          accessLoading={roleAccessForCurrentDraftLoading}
-                          placementByPath={permissionMenuPlacementByPath}
-                          permissionDetailMap={permissionDetailMap}
-                          value={selectedRolePermissionKeys}
-                          disabled={
-                            !canManageRolePermissions ||
-                            !selectedRoleKey ||
-                            selectedRoleReadOnly
-                          }
-                          onChange={changeSelectedRolePermissions}
-                        />
-                      </div>
-                    ),
-                  },
-                  {
-                    key: 'data-scope',
-                    label: '数据范围',
-                    children: (
-                      <DataScopeOverview
-                        mode={selectedWarehouseScopeMode}
-                        warehouseIds={selectedWarehouseScopeIDs}
-                        warehouseOptions={warehouseScopeSelectOptions}
-                        disabled={
-                          !canManageRolePermissions || selectedRoleReadOnly
-                        }
-                        onModeChange={(nextMode) => {
-                          setSelectedWarehouseScopeMode(nextMode)
-                          if (nextMode !== 'ASSIGNED') {
-                            setSelectedWarehouseScopeIDs([])
-                          }
+              {navigationMode ? (
+                roleNavigationContent
+              ) : (
+                <div className="erp-role-settings-workspace">
+                  <div className="erp-role-policy-tab-content">
+                    {permissionDraftAccessError ? (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        message="公司当前启用范围暂时核对失败"
+                        description={`${permissionDraftAccessError}。页面先按当前岗位权限显示，保存前请重试。`}
+                      />
+                    ) : null}
+                    <PermissionChecklist
+                      searchKeyword={searchKeyword}
+                      groups={permissionGroups}
+                      access={roleAccessForCurrentDraft}
+                      accessLoading={roleAccessForCurrentDraftLoading}
+                      placementByPath={permissionMenuPlacementByPath}
+                      permissionDetailMap={permissionDetailMap}
+                      value={selectedRolePermissionKeys}
+                      savedValue={selectedRoleSavedPermissionKeys}
+                      disabled={
+                        !canManageRolePermissions ||
+                        !selectedRoleKey ||
+                        selectedRoleReadOnly
+                      }
+                      onChange={changeSelectedRolePermissions}
+                    />
+                  </div>
+                  <div
+                    className="erp-role-settings-row"
+                    role="group"
+                    aria-label="岗位入口与仓库范围"
+                  >
+                    <div className="erp-role-settings-links">
+                      <Button
+                        type="link"
+                        onClick={() => {
+                          setRoleNavigationViewKey(
+                            ROLE_NAVIGATION_VIEW_KEYS.ACCESS
+                          )
+                          onOpenNavigation?.()
                         }}
-                        onWarehouseIdsChange={setSelectedWarehouseScopeIDs}
-                      />
-                    ),
-                  },
-                  {
-                    key: 'sensitive-fields',
-                    label: '敏感字段',
-                    children: (
-                      <SensitiveFieldOverview
-                        permissionKeys={selectedRolePermissionKeys}
-                      />
-                    ),
-                  },
-                  {
-                    key: 'effective-pages',
-                    label: '页面与导航',
-                    children: (
-                      <Tabs
-                        className="erp-role-navigation-workspace-tabs"
-                        type="card"
-                        size="small"
-                        activeKey={roleNavigationViewKey}
-                        destroyOnHidden={false}
-                        onChange={setRoleNavigationViewKey}
-                        items={[
-                          {
-                            key: ROLE_NAVIGATION_VIEW_KEYS.LAYOUT,
-                            label: '菜单布局',
-                            children: (
-                              <Space
-                                direction="vertical"
-                                size={20}
-                                style={{ width: '100%' }}
-                              >
-                                {roleAccessForCurrentDraft?.is_final !==
-                                true ? (
-                                  <Alert
-                                    type="warning"
-                                    showIcon
-                                    message="页面可用范围尚未完成核对"
-                                    description="完成公司当前启用范围核对后，才能调整岗位菜单布局。"
-                                    action={
-                                      <Button
-                                        size="small"
-                                        onClick={() =>
-                                          setRoleNavigationViewKey(
-                                            ROLE_NAVIGATION_VIEW_KEYS.ACCESS
-                                          )
-                                        }
-                                      >
-                                        查看页面可用范围
-                                      </Button>
-                                    }
-                                  />
-                                ) : null}
-                                <RoleNavigationEditor
-                                  mode={selectedRoleNavigationMode}
-                                  primaryMenuPaths={
-                                    selectedRolePrimaryMenuPaths
-                                  }
-                                  secondaryMenuPaths={
-                                    selectedRoleSecondaryMenuPaths
-                                  }
-                                  options={roleNavigationOptions}
-                                  unavailablePaths={
-                                    unavailableRoleNavigationPaths
-                                  }
-                                  disabled={
-                                    !canManageRolePermissions ||
-                                    selectedRoleReadOnly ||
-                                    roleAccessForCurrentDraft?.is_final !== true
-                                  }
-                                  onModeChange={(nextMode) => {
-                                    setSelectedRoleNavigationDraft(
-                                      (current) => {
-                                        const currentDraft =
-                                          current.roleKey === selectedRoleKey &&
-                                          current.roleVersion ===
-                                            selectedRoleVersion
-                                            ? current
-                                            : {
-                                                roleKey: selectedRoleKey,
-                                                roleVersion:
-                                                  selectedRoleVersion,
-                                                mode: selectedRoleNavigationMode,
-                                                primaryMenuPaths:
-                                                  selectedRolePrimaryMenuPaths,
-                                                secondaryMenuPaths:
-                                                  selectedRoleSecondaryMenuPaths,
-                                              }
-                                        if (
-                                          nextMode ===
-                                          ROLE_NAVIGATION_MODES.RECOMMENDED
-                                        ) {
-                                          return {
-                                            roleKey: selectedRoleKey,
-                                            roleVersion: selectedRoleVersion,
-                                            mode: ROLE_NAVIGATION_MODES.RECOMMENDED,
-                                            primaryMenuPaths: [],
-                                            secondaryMenuPaths: [],
-                                          }
-                                        }
-                                        return {
-                                          ...currentDraft,
-                                          mode: ROLE_NAVIGATION_MODES.CUSTOM,
-                                        }
-                                      }
-                                    )
-                                  }}
-                                  onPrimaryMenuPathsChange={(
-                                    primaryMenuPaths
-                                  ) =>
-                                    setSelectedRoleNavigationDraft(
-                                      (current) => {
-                                        const currentDraft =
-                                          current.roleKey === selectedRoleKey &&
-                                          current.roleVersion ===
-                                            selectedRoleVersion
-                                            ? current
-                                            : {
-                                                roleKey: selectedRoleKey,
-                                                roleVersion:
-                                                  selectedRoleVersion,
-                                                mode: selectedRoleNavigationMode,
-                                                primaryMenuPaths:
-                                                  selectedRolePrimaryMenuPaths,
-                                                secondaryMenuPaths:
-                                                  selectedRoleSecondaryMenuPaths,
-                                              }
-                                        return {
-                                          ...currentDraft,
-                                          primaryMenuPaths,
-                                        }
-                                      }
-                                    )
-                                  }
-                                  onSecondaryMenuPathsChange={(
-                                    secondaryMenuPaths
-                                  ) =>
-                                    setSelectedRoleNavigationDraft(
-                                      (current) => {
-                                        const currentDraft =
-                                          current.roleKey === selectedRoleKey &&
-                                          current.roleVersion ===
-                                            selectedRoleVersion
-                                            ? current
-                                            : {
-                                                roleKey: selectedRoleKey,
-                                                roleVersion:
-                                                  selectedRoleVersion,
-                                                mode: selectedRoleNavigationMode,
-                                                primaryMenuPaths:
-                                                  selectedRolePrimaryMenuPaths,
-                                                secondaryMenuPaths:
-                                                  selectedRoleSecondaryMenuPaths,
-                                              }
-                                        return {
-                                          ...currentDraft,
-                                          secondaryMenuPaths,
-                                        }
-                                      }
-                                    )
-                                  }
-                                  onViewPageAccess={() =>
-                                    setRoleNavigationViewKey(
-                                      ROLE_NAVIGATION_VIEW_KEYS.ACCESS
-                                    )
-                                  }
-                                />
-                                <NavigationPlacementOverview
-                                  access={roleAccessForCurrentDraft}
-                                  roleKey={selectedRoleKey}
-                                  navigationMode={selectedRoleNavigationMode}
-                                  primaryMenuPaths={
-                                    selectedRolePrimaryMenuPaths
-                                  }
-                                  secondaryMenuPaths={
-                                    selectedRoleSecondaryMenuPaths
-                                  }
-                                  dirty={roleConfigurationDirty}
-                                  loading={roleAccessForCurrentDraftLoading}
-                                />
-                              </Space>
-                            ),
-                          },
-                          {
-                            key: ROLE_NAVIGATION_VIEW_KEYS.ACCESS,
-                            label: `页面可用范围（${effectiveRolePageCount}）`,
-                            children: (
-                              <Space
-                                direction="vertical"
-                                size={20}
-                                style={{ width: '100%' }}
-                              >
-                                <EffectiveRoleAccessOverview
-                                  access={roleAccessForCurrentDraft}
-                                  loading={roleAccessForCurrentDraftLoading}
-                                />
-                                <div>
-                                  <Text strong>当前勾选的功能影响</Text>
-                                  <Paragraph type="secondary">
-                                    根据已选功能预览这个岗位可进入的页面；保存后还会结合公司当前启用范围。
-                                  </Paragraph>
-                                  <PermissionImpactMap
-                                    permissions={[
-                                      ...permissionDetailMap.values(),
-                                    ]}
-                                    permissionKeys={selectedRolePermissionKeys}
-                                  />
-                                </div>
-                              </Space>
-                            ),
-                          },
-                        ]}
-                      />
-                    ),
-                  },
-                  {
-                    key: 'associated-accounts',
-                    label: canReadUsers
-                      ? `关联账号（${selectedRoleAdmins.length}）`
-                      : '关联账号',
-                    children: (
-                      <RoleAssociatedAccounts
-                        admins={selectedRoleAdmins}
-                        currentRoleKey={selectedRoleKey}
-                        canReadUsers={canReadUsers}
-                        onOpenAdminAccounts={openSelectedRoleAdminAccounts}
-                      />
-                    ),
-                  },
-                ]}
-              />
+                      >
+                        可访问 {effectiveRolePageCount} 页
+                      </Button>
+                      <Button
+                        type="link"
+                        onClick={() => {
+                          setRoleNavigationViewKey(
+                            ROLE_NAVIGATION_VIEW_KEYS.LAYOUT
+                          )
+                          onOpenNavigation?.()
+                        }}
+                      >
+                        岗位导航
+                      </Button>
+                      <Popover
+                        content="页面入口按最终可访问范围显示；隐藏菜单不会撤销权限。"
+                        trigger={['hover', 'focus', 'click']}
+                      >
+                        <Button
+                          type="text"
+                          icon={<QuestionCircleOutlined />}
+                          aria-label="页面入口说明"
+                        />
+                      </Popover>
+                    </div>
+                    <DataScopeOverview
+                      compact
+                      mode={selectedWarehouseScopeMode}
+                      warehouseIds={selectedWarehouseScopeIDs}
+                      warehouseOptions={warehouseScopeSelectOptions}
+                      disabled={
+                        !canManageRolePermissions || selectedRoleReadOnly
+                      }
+                      onModeChange={(nextMode) => {
+                        setSelectedWarehouseScopeMode(nextMode)
+                        if (nextMode !== 'ASSIGNED') {
+                          setSelectedWarehouseScopeIDs([])
+                        }
+                      }}
+                      onWarehouseIdsChange={setSelectedWarehouseScopeIDs}
+                    />
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <Empty
@@ -1348,6 +1298,34 @@ export function usePermissionRoleSettings({
           )}
         </section>
       </div>
+      <footer className="erp-role-center-footer">
+        <Text type="secondary">
+          {roleConfigurationDirty ? '有未保存调整' : '当前设置已保存'}
+        </Text>
+        <Text type="secondary">菜单可见 ≠ 数据权限 ≠ 状态动作权限</Text>
+      </footer>
+      <BusinessModal
+        title={
+          detailView === 'fields'
+            ? '敏感字段'
+            : `关联账号 · ${getRoleVisibleName(selectedRole || {})}`
+        }
+        open={Boolean(detailView)}
+        onCancel={() => setDetailView(null)}
+        footer={<Button onClick={() => setDetailView(null)}>关闭</Button>}
+        width={960}
+      >
+        {detailView === 'fields' ? (
+          <SensitiveFieldOverview permissionKeys={selectedRolePermissionKeys} />
+        ) : detailView === 'accounts' ? (
+          <RoleAssociatedAccounts
+            admins={selectedRoleAdmins}
+            currentRoleKey={selectedRoleKey}
+            canReadUsers={canReadUsers}
+            onOpenAdminAccounts={openSelectedRoleAdminAccounts}
+          />
+        ) : null}
+      </BusinessModal>
     </Card>
   )
   return {

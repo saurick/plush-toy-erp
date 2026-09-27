@@ -1,0 +1,202 @@
+.erp-compact-field-table {
+  width: 100%;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.erp-compact-field-table > table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.erp-compact-field-table th {
+  padding: 7px 6px;
+  background: var(--erp-sales-order-lines-bg, #f8fbf9);
+  color: var(--erp-text-muted, #64748b);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.erp-compact-field-table td {
+  min-width: 0;
+  padding: 8px 6px;
+  vertical-align: top;
+}
+
+.erp-compact-field-table__row {
+  border-bottom: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
+}
+
+.erp-compact-field-table .ant-form-item {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.erp-compact-field-table__fields .ant-form-item-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.erp-compact-field-table__required {
+  margin-right: 4px;
+  color: var(--erp-danger, #dc2626);
+}
+
+.erp-compact-field-table__actions {
+  text-align: right;
+}
+
+.erp-compact-field-table__details > td {
+  padding-top: 0;
+}
+
+.erp-optional-field {
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+
+.erp-optional-field > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  color: var(--erp-text-muted, #64748b);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.erp-optional-field > summary::before {
+  content: '▸';
+  flex: none;
+}
+
+.erp-optional-field[open] > summary::before {
+  content: '▾';
+}
+
+.erp-optional-field > summary:focus-visible {
+  outline: 2px solid var(--erp-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+.erp-optional-field > summary > span:first-child {
+  flex: none;
+}
+
+.erp-optional-field__summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-optional-field__body {
+  padding-block: 6px 8px;
+}
+
+.erp-compact-field-table__supplement {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px 16px;
+  padding-block: 6px;
+}
+
+.erp-line-items-empty {
+  min-width: 0;
+  padding: 10px 0;
+  color: var(--erp-text-muted, #64748b);
+  font-size: 13px;
+}
+
+.erp-inventory-operation-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.erp-inventory-operation-fields > .ant-form-item,
+.erp-inventory-operation-fields .ant-form-item {
+  margin-bottom: 0;
+}
+
+.erp-inventory-operation-row {
+  margin-block: 16px;
+  padding-block: 12px;
+  border-top: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
+}
+
+@container (max-width: 720px) {
+  .erp-compact-field-table > table,
+  .erp-compact-field-table__row {
+    display: block;
+  }
+
+  .erp-compact-field-table thead,
+  .erp-compact-field-table colgroup {
+    display: none;
+  }
+
+  .erp-compact-field-table thead:has(.erp-business-help-label),
+  .erp-compact-field-table thead:has(.erp-business-help-label) tr {
+    display: block;
+  }
+
+  .erp-compact-field-table thead:has(.erp-business-help-label) th {
+    display: none;
+  }
+
+  .erp-compact-field-table thead th:has(.erp-business-help-label) {
+    display: block;
+    padding: 4px 0;
+    background: transparent;
+  }
+
+  .erp-compact-field-table__fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+    padding-block: 12px;
+  }
+
+  .erp-compact-field-table td {
+    display: block;
+    padding: 0;
+  }
+
+  .erp-compact-field-table__fields .ant-form-item-label {
+    position: static;
+    width: auto;
+    height: auto;
+    padding-bottom: 5px;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  .erp-compact-field-table__actions {
+    grid-column: 1 / -1;
+  }
+
+  .erp-compact-field-table__details {
+    display: block;
+    padding-bottom: 10px;
+  }
+}
+
+@media (max-width: 540px) {
+  .erp-inventory-operation-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.erp-compact-field-table__supplement > .erp-production-order-line__wide {
+  grid-column: 1 / -1;
+}

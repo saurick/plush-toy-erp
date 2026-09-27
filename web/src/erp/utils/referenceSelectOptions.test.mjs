@@ -11,21 +11,31 @@ import {
 test('referenceSelectOptions: 客户和供应商的同名简称不重复，独立简称仍可搜索', () => {
   for (const toOption of [customerOption, supplierOption]) {
     assert.deepEqual(
-      toOption({ id: 1, code: 'PARTY-1', name: '晴空品牌', short_name: ' 晴空品牌 ' }),
+      toOption({
+        id: 1,
+        code: 'PARTY-1',
+        name: '晴空品牌',
+        short_name: ' 晴空品牌 ',
+      }),
       { value: 1, label: 'PARTY-1 / 晴空品牌' }
     )
     assert.deepEqual(
-      toOption({ id: 1, code: 'PARTY-1', name: '晴空品牌有限公司', short_name: '晴空' }),
+      toOption({
+        id: 1,
+        code: 'PARTY-1',
+        name: '晴空品牌有限公司',
+        short_name: '晴空',
+      }),
       { value: 1, label: 'PARTY-1 / 晴空品牌有限公司 / 晴空' }
     )
     assert.deepEqual(
       toOption({ id: 1, code: 'PARTY-1', name: '晴空品牌', short_name: ' ' }),
       { value: 1, label: 'PARTY-1 / 晴空品牌' }
     )
-    assert.deepEqual(
-      toOption({ id: 1, code: 'PARTY-1', short_name: '晴空' }),
-      { value: 1, label: 'PARTY-1 / 晴空' }
-    )
+    assert.deepEqual(toOption({ id: 1, code: 'PARTY-1', short_name: '晴空' }), {
+      value: 1,
+      label: 'PARTY-1 / 晴空',
+    })
   }
 })
 
@@ -61,16 +71,16 @@ test('referenceSelectOptions: unit option keeps precision for quantity validatio
   assert.deepEqual(
     unitOption({
       id: 1,
-      code: 'SIM-PLUSH-CORE-PCS',
-      name: '核心演示单位-件',
+      code: 'EA',
+      name: '个',
       precision: 0,
     }),
     {
       value: 1,
-      label: '件（PCS）',
-      suffixLabel: '件（PCS）',
-      searchText: '件（PCS） 核心演示单位-件（SIM-PLUSH-CORE-PCS）',
-      title: '核心演示单位-件（SIM-PLUSH-CORE-PCS）',
+      label: '个',
+      suffixLabel: '个',
+      searchText: '个 EA PCS PC 件',
+      title: '个',
       precision: 0,
     }
   )

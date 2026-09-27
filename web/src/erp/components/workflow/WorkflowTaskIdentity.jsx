@@ -2,14 +2,16 @@ import React from 'react'
 import WorkflowTaskProductImage from './WorkflowTaskProductImage.jsx'
 import { TaskCopyButton, TaskCopyField } from './WorkflowTaskCopy.jsx'
 import { formatWorkflowProductCopy } from '../../utils/workflowTaskCopy.mjs'
+import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import {
   getWorkflowTaskIdentityCode,
   getWorkflowTaskIdentityPresentation,
 } from '../../utils/workflowTaskIdentity.mjs'
 import './workflowTaskIdentity.css'
 
-function IdentityCode({ item }) {
+function IdentityCode({ item, copyable = true }) {
   const material = item.kind === 'material'
+  if (!copyable) return getWorkflowTaskIdentityCode(item)
   return (
     <TaskCopyField
       value={material ? item.supplierItemNo : item.code}
@@ -67,36 +69,72 @@ function IdentityItem({ item }) {
   )
 }
 
-export default function WorkflowTaskIdentity({ task, compact = false }) {
+export default function WorkflowTaskIdentity({
+  task,
+  compact = false,
+  copyable = true,
+  showTaskName = false,
+  renderCompactTitle,
+}) {
   const identity = getWorkflowTaskIdentityPresentation(task)
+  const renderTaskHeading = (title) => (
+    <span className="erp-task-identity__heading">
+      <strong>{title || getWorkflowTaskDisplayName(task)}</strong>
+      {title ? (
+        <span className="erp-task-identity__task-name">
+          {getWorkflowTaskDisplayName(task)}
+        </span>
+      ) : null}
+    </span>
+  )
+  const renderTitle = renderCompactTitle || (showTaskName ? renderTaskHeading : null)
   if (!identity.available) {
     return (
-      <span className="erp-task-identity__unavailable">关联单据已不可用</span>
+      <>
+        {compact ? renderTitle?.() : null}
+        <span className="erp-task-identity__unavailable">关联单据已不可用</span>
+      </>
     )
   }
-  if (!identity.items.length) return null
+  if (!identity.items.length) {
+    return compact ? renderTitle?.() || null : null
+  }
   if (compact) {
     const { first } = identity
+    const title = (
+      <>
+        {first.name ||
+          (renderTitle ? (
+            `${first.kind === 'material' ? '物料' : '产品'}名称未填写`
+          ) : (
+            <IdentityCode item={first} copyable={copyable} />
+          ))}
+        {identity.compactCountLabel ? `（${identity.compactCountLabel}）` : ''}
+      </>
+    )
     return (
       <span className="erp-task-identity erp-task-identity--compact erp-task-identity__row">
         <WorkflowTaskProductImage item={first} />
         <span className="erp-task-identity__item">
-          <strong>
-            {first.name || <IdentityCode item={first} />}
-            {identity.compactCountLabel
-              ? `（${identity.compactCountLabel}）`
-              : ''}
-          </strong>
-          {first.name ? (
+          {renderTitle ? (
+            renderTitle(title)
+          ) : (
+            <strong>{title}</strong>
+          )}
+          {first.name || renderTitle ? (
             <span className="erp-task-identity__code">
-              <IdentityCode item={first} />
+              <IdentityCode item={first} copyable={copyable} />
             </span>
           ) : null}
           {first.orderNo && first.orderNo !== identity.sourceNo ? (
             <span className="erp-task-identity__code">
-              <TaskCopyField value={first.orderNo} label="订单编号">
-                关联订单 {first.orderNo}
-              </TaskCopyField>
+              {copyable ? (
+                <TaskCopyField value={first.orderNo} label="订单编号">
+                  关联订单 {first.orderNo}
+                </TaskCopyField>
+              ) : (
+                `关联订单 ${first.orderNo}`
+              )}
             </span>
           ) : null}
         </span>

@@ -4,10 +4,8 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import {
-  SOURCE_DOCUMENT_ITEMS_PREVIEW_LIMIT,
   listAllSourceDocumentItems,
   listSourceDocumentItemsAtVersion,
-  listSourceDocumentItemsPreview,
 } from '../utils/sourceDocumentPagination.mjs'
 
 const source = readFileSync(
@@ -281,36 +279,6 @@ test('masterDataOrderApi: dedicated source-document reorder validates version an
   }
 })
 
-test('masterDataOrderApi: source-document previews use version fences without forwarding expected_version', () => {
-  for (const [functionName, pageFunctionName, documentFunctionName] of [
-    ['listSalesOrderItemsPreview', 'listSalesOrderItems', 'getSalesOrder'],
-    [
-      'listPurchaseOrderItemsPreview',
-      'listPurchaseOrderItems',
-      'getPurchaseOrder',
-    ],
-    [
-      'listOutsourcingOrderItemsPreview',
-      'listOutsourcingOrderItems',
-      'getOutsourcingOrder',
-    ],
-  ]) {
-    const functionSource = exportedFunctionSource(functionName)
-    assert.match(functionSource, /delete itemParams\.expected_version/)
-    assert.match(functionSource, /listSourceDocumentItemsAtVersion\(\{/)
-    assert.match(
-      functionSource,
-      new RegExp(`getDocument:[\\s\\S]*?${documentFunctionName}\\(`)
-    )
-    assert.match(
-      functionSource,
-      new RegExp(
-        `listItems:[\\s\\S]*?listSourceDocumentItemsPreview\\(\\s*${pageFunctionName}`
-      )
-    )
-  }
-})
-
 test('masterDataOrderApi: purchase receipt progress is a validated server-owned projection', () => {
   const functionSource = exportedFunctionSource(
     'getPurchaseOrderReceiptProgress'
@@ -327,136 +295,6 @@ test('masterDataOrderApi: purchase receipt progress is a validated server-owned 
     functionSource,
     /listPurchaseReceipts|listPurchaseOrderItems|subtract|Math\./u
   )
-})
-
-test('source-document item preview requests exactly one first page of five items', async () => {
-  assert.equal(SOURCE_DOCUMENT_ITEMS_PREVIEW_LIMIT, 5)
-  for (const itemKey of [
-    'sales_order_items',
-    'purchase_order_items',
-    'outsourcing_order_items',
-  ]) {
-    let pageReads = 0
-    const options = { signal: new AbortController().signal }
-    const result = await listSourceDocumentItemsPreview(
-      async (params, receivedOptions) => {
-        pageReads += 1
-        assert.deepEqual(params, {
-          source_document_id: 7,
-          line_status: 'open',
-          limit: 5,
-          offset: 0,
-        })
-        assert.equal(receivedOptions, options)
-        return {
-          [itemKey]: sourceDocumentItems(1, 5),
-          total: 201,
-          limit: 5,
-          offset: 0,
-        }
-      },
-      {
-        source_document_id: 7,
-        line_status: 'open',
-        expected_version: 3,
-        limit: 200,
-        offset: 100,
-      },
-      itemKey,
-      options
-    )
-
-    assert.equal(pageReads, 1, itemKey)
-    assert.equal(result[itemKey].length, 5, itemKey)
-    assert.equal(result.total, 201, itemKey)
-  }
-})
-
-test('source-document item preview accepts complete short and empty first pages', async () => {
-  for (const count of [0, 3]) {
-    const result = await listSourceDocumentItemsPreview(
-      async () => ({
-        purchase_order_items: sourceDocumentItems(1, count),
-        total: count,
-        limit: 5,
-        offset: 0,
-      }),
-      { purchase_order_id: 7 },
-      'purchase_order_items'
-    )
-    assert.equal(result.purchase_order_items.length, count)
-  }
-})
-
-test('source-document item preview rejects malformed pagination responses', async () => {
-  for (const response of [
-    {
-      sales_order_items: null,
-      total: 0,
-      limit: 5,
-      offset: 0,
-    },
-    {
-      sales_order_items: [],
-      total: '0',
-      limit: 5,
-      offset: 0,
-    },
-    {
-      sales_order_items: [],
-      total: 0,
-      limit: 4,
-      offset: 0,
-    },
-    {
-      sales_order_items: [],
-      total: 0,
-      limit: 5,
-      offset: 1,
-    },
-    {
-      sales_order_items: sourceDocumentItems(1, 4),
-      total: 5,
-      limit: 5,
-      offset: 0,
-    },
-    {
-      sales_order_items: sourceDocumentItems(1, 5),
-      total: 4,
-      limit: 5,
-      offset: 0,
-    },
-  ]) {
-    await assertInvalidSourceDocumentPagination(() =>
-      listSourceDocumentItemsPreview(
-        async () => response,
-        { sales_order_id: 7 },
-        'sales_order_items'
-      )
-    )
-  }
-})
-
-test('source-document item preview rejects invalid or duplicate item identities', async () => {
-  for (const items of [
-    [{ id: '1' }],
-    [{ id: 0 }],
-    [{ id: 1.5 }],
-    [{ id: 1 }, { id: 1 }],
-  ]) {
-    await assertInvalidSourceDocumentPagination(() =>
-      listSourceDocumentItemsPreview(
-        async () => ({
-          outsourcing_order_items: items,
-          total: items.length,
-          limit: 5,
-          offset: 0,
-        }),
-        { outsourcing_order_id: 7 },
-        'outsourcing_order_items'
-      )
-    )
-  }
 })
 
 test('all three source-document item wrappers share complete multi-page collection', async () => {

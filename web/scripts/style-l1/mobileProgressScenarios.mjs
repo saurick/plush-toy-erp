@@ -1,91 +1,63 @@
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
+import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
+import { pullToRefresh } from './mobileGestureAssertions.mjs'
 import {
   assertSegmentAffordance,
   assertFilterAffordance,
   assertMobileSearchAffordance,
 } from './controlAffordanceAssertions.mjs'
 import { progressFixtureData } from './businessProgressFixtures.mjs'
+import { assertMobileFilterOutsideDismissal } from './mobileFilterPopoverAssertions.mjs'
 
-async function verifyMobileNavigationMotion(
-  page,
-  assert,
-  selector,
-  targetIndex,
-  reduced = false
-) {
-  await page.emulateMedia({
-    reducedMotion: reduced ? 'reduce' : 'no-preference',
-  })
-  const result = await page.locator(selector).evaluate(async (root, index) => {
-    const segmented = root.querySelector('.ant-segmented-group')
-    const group = segmented || root
-    const target = group.querySelectorAll(
-      segmented ? '.ant-segmented-item' : '[role="tab"]'
-    )[index]
-    const before = root.getBoundingClientRect()
-    const read = () => {
-      const style = getComputedStyle(group, '::before')
-      return {
-        x: new DOMMatrixReadOnly(
-          style.transform === 'none' ? undefined : style.transform
-        ).m41,
-        duration: style.transitionDuration,
-      }
+async function assertMobileDetailSurface(root, assert) {
+  await root.locator('.mobile-task-flow-back').click({ trial: true })
+  const geometry = await root.evaluate((node) => {
+    const header = node.querySelector('.mobile-task-flow-header')
+    const main = node.querySelector('.mobile-detail-content')
+    const footer = node.querySelector('.mobile-role-action-bar')
+    const title = header?.querySelector('h1')
+    const box = (element) => {
+      const rect = element?.getBoundingClientRect()
+      return rect
+        ? {
+            top: rect.top,
+            bottom: rect.bottom,
+            left: rect.left,
+            width: rect.width,
+          }
+        : null
     }
-    const start = read().x
-    const frames = []
-    target.click()
-    const began = performance.now()
-    await new Promise((resolve) => {
-      const tick = () => {
-        frames.push(read())
-        if (performance.now() - began < 650) requestAnimationFrame(tick)
-        else resolve()
-      }
-      requestAnimationFrame(tick)
-    })
-    const after = root.getBoundingClientRect()
     return {
-      start,
-      target: target.offsetLeft,
-      frames,
-      mounted: root.isConnected && group.isConnected,
-      widthDelta: after.width - before.width,
-      heightDelta: after.height - before.height,
-      selected: segmented
-        ? target.querySelector('input').checked
-        : target.getAttribute('aria-selected') === 'true',
+      header: box(header),
+      main: box(main),
+      footer: box(footer),
+      padding: main ? getComputedStyle(main).paddingLeft : '',
+      titleSize: title ? getComputedStyle(title).fontSize : '',
+      overflow: main ? main.scrollWidth - main.clientWidth : 0,
+      height: window.innerHeight,
+      smallTargets: [
+        ...node.querySelectorAll(
+          '.mobile-task-flow-back, .mobile-role-action-bar button'
+        ),
+      ]
+        .filter((button) => button.getBoundingClientRect().height < 44)
+        .map((button) => button.textContent),
     }
-  }, targetIndex)
-  assert(result.mounted && result.selected, JSON.stringify(result))
-  assert(
-    Math.abs(result.widthDelta) < 1 && Math.abs(result.heightDelta) < 1,
-    JSON.stringify(result)
-  )
-  assert(
-    Math.abs(result.frames.at(-1).x - result.target) < 1.5,
-    JSON.stringify(result)
-  )
-  if (reduced) {
-    assert(
-      result.frames.every((frame) =>
-        frame.duration.split(',').every((value) => parseFloat(value) === 0)
-      ),
-      JSON.stringify(result)
-    )
-  } else {
-    assert(
-      result.frames.some(
-        (frame) =>
-          frame.x > Math.min(result.start, result.target) + 2 &&
-          frame.x < Math.max(result.start, result.target) - 2
-      ),
-      JSON.stringify(result)
-    )
+  })
+  assert.equal(geometry.padding, '12px')
+  assert.equal(geometry.titleSize, '18px')
+  assert(Math.abs(geometry.header.left) <= 1)
+  assert(geometry.main.top >= geometry.header.bottom - 1)
+  if (geometry.footer) {
+    assert(geometry.main.bottom <= geometry.footer.top + 1)
+    assert(geometry.footer.bottom <= geometry.height + 1)
   }
-  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  assert(geometry.overflow <= 1)
+  assert.deepEqual(geometry.smallTargets, [])
+  return geometry
 }
 
 export function createMobileProgressScenarios({
@@ -96,6 +68,11 @@ export function createMobileProgressScenarios({
 }) {
   return ['boss', 'pmc', 'warehouse'].map((role) => {
     let fail = false
+    let failDetail = false
+    let longDetail = false
+    let failRecent = false
+    let failureCode = RpcErrorCode.INTERNAL
+    let heldListResponse = null
     const calls = []
     const imageCalls = []
     const allowed = role !== 'warehouse'
@@ -168,6 +145,23 @@ export function createMobileProgressScenarios({
         calls.length = 0
         imageCalls.length = 0
         fail = false
+        failDetail = false
+        longDetail = false
+        failRecent = false
+        failureCode = RpcErrorCode.INTERNAL
+        heldListResponse = null
+        await page.route('**/rpc/workflow', async (route) => {
+          const { id, method } = route.request().postDataJSON()
+          if (method !== 'list_task_events' || !failRecent)
+            return route.fallback()
+          return route.fulfill({
+            json: {
+              jsonrpc: '2.0',
+              id,
+              result: { code: RpcErrorCode.INTERNAL, message: '读取失败' },
+            },
+          })
+        })
         const productImage = await page.evaluate(() => {
           const canvas = document.createElement('canvas')
           canvas.width = 128
@@ -230,20 +224,44 @@ export function createMobileProgressScenarios({
             return route.fallback()
           }
           calls.push({ method, params })
+          if (method === 'list_progress' && heldListResponse) {
+            const pending = heldListResponse
+            heldListResponse = null
+            await pending
+          }
           if (params.keyword === '迟到响应') await delay(500)
+          const data = progressFixtureData(params, {
+            detail: method === 'get_progress',
+          })
+          if (method === 'get_progress' && longDetail) {
+            Object.assign(data.row, {
+              product:
+                '模拟长名称产品：可拆洗服装与展示底座的周年庆联名毛绒公仔'.repeat(
+                  3
+                ),
+              customer: '模拟客户采购中心与跨区域产品确认负责人',
+              attention_reason:
+                '模拟异常说明：交期和包装资料仍待责任岗位确认。'.repeat(5),
+              product_count: 3,
+              ordered_quantity: null,
+              shipped_quantity: null,
+              completed_quantity: null,
+              delivery_known: false,
+              unit: '',
+            })
+          }
           return route.fulfill({
             contentType: 'application/json',
             body: JSON.stringify({
               jsonrpc: '2.0',
               id,
-              result: fail
-                ? { code: 50000, message: '查询失败' }
-                : {
-                    code: 0,
-                    data: progressFixtureData(params, {
-                      detail: method === 'get_progress',
-                    }),
-                  },
+              result:
+                fail || (failDetail && method === 'get_progress')
+                  ? { code: failureCode, message: '查询失败' }
+                  : {
+                      code: 0,
+                      data,
+                    },
             }),
           })
         })
@@ -327,8 +345,8 @@ export function createMobileProgressScenarios({
           })
         assert(
           productMetrics.summaryHeight <= 72 &&
-            Math.abs(productMetrics.imageWidth - 52) < 1 &&
-            Math.abs(productMetrics.imageHeight - 52) < 1 &&
+            Math.abs(productMetrics.imageWidth - 40) < 1 &&
+            Math.abs(productMetrics.imageHeight - 40) < 1 &&
             productMetrics.overflow <= 1,
           `产品缩略图应嵌入原信息区且不撑宽卡片：${JSON.stringify(productMetrics)}`
         )
@@ -363,7 +381,7 @@ export function createMobileProgressScenarios({
         await assertSegmentAffordance(panel.locator('.erp-sliding-segmented'))
         await assertFilterAffordance(
           panel.locator('.mobile-progress-risks button'),
-          44
+          34
         )
         const controlMetrics = await panel.evaluate((root) => {
           const read = (element, pseudo) => {
@@ -411,7 +429,8 @@ export function createMobileProgressScenarios({
                 (node) =>
                   node.offsetParent &&
                   getComputedStyle(node).visibility !== 'hidden' &&
-                  node.getBoundingClientRect().height < 43
+                  node.getBoundingClientRect().height <
+                    (node.matches('.erp-filter-chip') ? 34 : 42)
               )
               .map((node) => node.textContent)
           )
@@ -426,13 +445,133 @@ export function createMobileProgressScenarios({
           })
           .click()
         const drawer = page.locator('.erp-progress-drawer--mobile')
-        await drawer.getByRole('tab', { name: '关联任务', exact: true }).click()
+        await drawer
+          .getByRole('heading', { name: `${prefix}-0001`, exact: true })
+          .waitFor()
+        await page.waitForFunction(() => {
+          const header = document.querySelector(
+            '.erp-progress-drawer--mobile .mobile-task-flow-header'
+          )
+          return header && Math.abs(header.getBoundingClientRect().left) <= 1
+        })
+        const detailGeometry = await assertMobileDetailSurface(drawer, assert)
+        const stageRegion = drawer.getByRole('region', { name: '阶段进度' })
+        assert.equal(
+          await stageRegion.locator('[data-progress-stage]').count(),
+          role === 'pmc' ? 3 : 5
+        )
+        const factualStage = role === 'pmc' ? 'production' : 'shipment'
+        assert.equal(
+          await stageRegion
+            .locator(
+              `[data-progress-stage="${factualStage}"] [role="progressbar"]`
+            )
+            .getAttribute('aria-valuenow'),
+          role === 'pmc' ? '70' : '50'
+        )
+        assert.equal(
+          await stageRegion
+            .locator('[data-progress-stage="quality"] [role="progressbar"]')
+            .count(),
+          0
+        )
+        const overviewGeometry = await drawer.evaluate((root) => {
+          const content = root.querySelector('.mobile-detail-content')
+          const summary = root.querySelector('[aria-label="单据摘要"]')
+          const stages = root.querySelector('[aria-label="阶段进度"]')
+          const footer = root.querySelector('.mobile-progress-detail-actions')
+          const buttons = [...footer.querySelectorAll('button')].map((button) =>
+            button.getBoundingClientRect()
+          )
+          return {
+            sections: [
+              ...content.querySelectorAll(':scope > .mobile-detail-section'),
+            ]
+              .filter((section) => section.getClientRects().length > 0)
+              .map((section) => section.getAttribute('aria-label')),
+            summaryRows: summary.querySelectorAll('.mobile-detail-fact').length,
+            stageHeight: stages.getBoundingClientRect().height,
+            backWidth: buttons[0].width,
+            primaryWidth: buttons[1].width,
+            buttonHeight: buttons[1].height,
+          }
+        })
+        assert.deepEqual(overviewGeometry.sections, [
+          '单据摘要',
+          '阶段进度',
+          '最近记录',
+        ])
+        assert.equal(overviewGeometry.summaryRows, 4)
+        assert(
+          overviewGeometry.stageHeight < 220,
+          JSON.stringify(overviewGeometry)
+        )
+        assert(
+          overviewGeometry.primaryWidth > overviewGeometry.backWidth * 2,
+          JSON.stringify(overviewGeometry)
+        )
+        assert.equal(overviewGeometry.buttonHeight, 44)
+        assert.equal(await stageRegion.getByRole('button').count(), 0)
+        await page.screenshot({
+          path: path.join(outputDir, `mobile-progress-${role}-detail.png`),
+        })
+        await drawer
+          .getByRole('button', { name: '查看关联任务', exact: true })
+          .click()
+        assert.equal(
+          await drawer
+            .getByRole('tab', { name: '关联任务', exact: true })
+            .getAttribute('aria-selected'),
+          'true'
+        )
         await page.waitForTimeout(350)
         await page.screenshot({
           path: path.join(outputDir, `mobile-progress-${role}-tasks.png`),
         })
         await drawer.getByRole('button', { name: '查看任务 TASK-0100' }).click()
         await page.getByTestId('mobile-task-detail-screen').waitFor()
+        const taskGeometry = await assertMobileDetailSurface(
+          page.getByTestId('mobile-task-detail-screen'),
+          assert
+        )
+        const taskSurface = page.getByTestId('mobile-task-detail-screen')
+        await taskSurface
+          .getByRole('heading', { name: '任务信息', exact: true })
+          .waitFor()
+        const taskLayout = await taskSurface.evaluate((root) => {
+          const hero = root.querySelector('.mobile-task-detail-hero')
+          const attachment = hero.querySelector(
+            '[data-testid="mobile-task-attachment-action"] button'
+          )
+          return {
+            heroRows: hero.querySelectorAll('.mobile-detail-fact').length,
+            productDetailsInHero:
+              hero.querySelectorAll('.erp-task-identity').length,
+            heroWidth: hero.getBoundingClientRect().width,
+            attachmentWidth: attachment.getBoundingClientRect().width,
+            steps: [
+              ...root.querySelectorAll('.mobile-task-flow-step__title'),
+            ].map((node) => node.textContent),
+          }
+        })
+        assert.equal(taskLayout.heroRows, 2)
+        assert.equal(taskLayout.productDetailsInHero, 0)
+        assert(
+          taskLayout.attachmentWidth < taskLayout.heroWidth / 2,
+          JSON.stringify(taskLayout)
+        )
+        assert.deepEqual(taskLayout.steps, ['任务信息', '任务办理', '结果回执'])
+        await writeFile(
+          path.join(outputDir, `mobile-progress-${role}-detail-geometry.json`),
+          JSON.stringify(
+            { progress: detailGeometry, task: taskGeometry },
+            null,
+            2
+          )
+        )
+        await page.screenshot({
+          path: path.join(outputDir, `mobile-progress-${role}-task-detail.png`),
+        })
         assert.equal(
           await page.getByTestId('mobile-role-bottom-nav').count(),
           0
@@ -443,6 +582,68 @@ export function createMobileProgressScenarios({
           .waitFor()
         await page.goBack()
         await drawer.waitFor({ state: 'hidden' })
+        failDetail = true
+        await panel
+          .getByRole('button', {
+            name: `查看 ${prefix}-0001 进度`,
+            exact: true,
+          })
+          .click()
+        await drawer.getByRole('alert').waitFor()
+        assert.equal(
+          await drawer
+            .getByRole('button', { name: '查看关联任务', exact: true })
+            .count(),
+          0
+        )
+        failDetail = false
+        longDetail = true
+        failRecent = true
+        await drawer.getByRole('button', { name: '重试', exact: true }).click()
+        await drawer
+          .getByRole('button', { name: '重新读取记录', exact: true })
+          .waitFor()
+        failRecent = false
+        await drawer
+          .getByRole('button', { name: '重新读取记录', exact: true })
+          .click()
+        await drawer
+          .getByRole('button', { name: '重新读取记录', exact: true })
+          .waitFor({ state: 'hidden' })
+        await drawer
+          .getByRole('heading', { name: `${prefix}-0001`, exact: true })
+          .waitFor()
+        for (const width of [320, 430]) {
+          await page.setViewportSize({ width, height: 844 })
+          await assertMobileDetailSurface(drawer, assert)
+          assert.equal(
+            await drawer
+              .locator(
+                '[data-progress-stage="shipment"] [role="progressbar"], [data-progress-stage="production"] [role="progressbar"]'
+              )
+              .count(),
+            0
+          )
+          await page.screenshot({
+            path: path.join(
+              outputDir,
+              `mobile-progress-${role}-long-detail-${width}.png`
+            ),
+          })
+        }
+        await page.setViewportSize({ width: 390, height: 844 })
+        await drawer
+          .getByRole('button', { name: '查看业务明细', exact: true })
+          .click()
+        await drawer
+          .getByRole('region', { name: '进度明细', exact: true })
+          .waitFor()
+        await drawer
+          .locator('.mobile-task-flow-header')
+          .getByRole('button', { name: '返回进度', exact: true })
+          .click()
+        await drawer.waitFor({ state: 'hidden' })
+        longDetail = false
         await panel
           .getByRole('button', {
             name: `查看 ${prefix}-0001 的关联任务`,
@@ -552,7 +753,7 @@ export function createMobileProgressScenarios({
           '查找目标客户'
         )
         await panel
-          .getByRole('button', { name: '清空筛选', exact: true })
+          .getByRole('button', { name: '清除搜索', exact: true })
           .click()
         await panel
           .getByRole('button', {
@@ -560,22 +761,29 @@ export function createMobileProgressScenarios({
             exact: true,
           })
           .waitFor()
+        const filterPanel = page.getByRole('dialog', {
+          name: '筛选进度',
+          exact: true,
+        })
+        await assertMobileFilterOutsideDismissal({
+          page,
+          assert,
+          trigger: panel.getByRole('button', {
+            name: '筛选进度',
+            exact: true,
+          }),
+          dialog: filterPanel,
+        })
         await panel
           .getByRole('button', { name: '筛选进度', exact: true })
           .click()
-        const filterPanel = page.getByRole('group', {
-          name: '更多进度筛选',
-          exact: true,
-        })
         await filterPanel.waitFor({ state: 'visible' })
         await page.waitForTimeout(350)
-        await assertSegmentAffordance(
-          filterPanel.locator('.erp-sliding-segmented')
-        )
-        await assertFilterAffordance(
-          filterPanel.locator('.mobile-progress-filter-options button'),
-          44
-        )
+        for (const segment of await filterPanel
+          .locator('.erp-sliding-segmented')
+          .all()) {
+          await assertSegmentAffordance(segment)
+        }
         await page.screenshot({
           path: path.join(outputDir, `mobile-progress-${role}-filter.png`),
         })
@@ -592,14 +800,14 @@ export function createMobileProgressScenarios({
         await page.setViewportSize({ width: 320, height: 568 })
         await page.waitForTimeout(200)
         const narrowFilter = await page
-          .locator('.mobile-progress-filter-popover')
+          .locator('.mobile-filter-popover')
           .evaluate((node) => ({
             viewportHeight: document.documentElement.clientHeight,
             viewportWidth: document.documentElement.clientWidth,
             scrollWidth: document.documentElement.scrollWidth,
             bounds: node.getBoundingClientRect().toJSON(),
             panelHeight: node
-              .querySelector('.mobile-progress-filter-dropdown')
+              .querySelector('.mobile-filter-panel')
               .getBoundingClientRect().height,
           }))
         assert(
@@ -621,10 +829,10 @@ export function createMobileProgressScenarios({
         })
         await filterPanel.getByText('全部', { exact: true }).click()
         await panel.getByText('全部记录', { exact: true }).waitFor()
-        const appliedFilter = panel.locator('.mobile-progress-filter-trigger')
+        const appliedFilter = panel.locator('.mobile-filter-trigger')
         assert.equal(
           await appliedFilter.getAttribute('aria-label'),
-          '筛选进度，已应用 1 项隐藏条件'
+          '筛选进度，已应用 1 项'
         )
         await filterPanel.getByText('在执行', { exact: true }).click()
         await page.setViewportSize({ width: 390, height: 844 })
@@ -633,7 +841,9 @@ export function createMobileProgressScenarios({
           0,
           '筛选下拉层不应要求用户二次搜索'
         )
-        await appliedFilter.click()
+        await filterPanel
+          .getByRole('button', { name: '关闭筛选', exact: true })
+          .click()
         await filterPanel.waitFor({ state: 'hidden' })
         assert.equal(
           await appliedFilter.getAttribute('data-active'),
@@ -655,14 +865,43 @@ export function createMobileProgressScenarios({
           '主搜索应直接查询负责人且不再发送二次负责人条件'
         )
         await panel
-          .getByRole('button', { name: '清空筛选', exact: true })
+          .getByRole('button', { name: '清除搜索', exact: true })
           .click()
-        fail = true
         await panel
-          .getByRole('button', { name: '刷新进度', exact: true })
-          .click()
+          .getByRole('button', {
+            name: `查看 ${prefix}-0001 进度`,
+            exact: true,
+          })
+          .waitFor()
+        const snapshotCards = () =>
+          panel.locator('.mobile-progress-card').evaluateAll((cards) =>
+            cards.map((card) => {
+              const copy = card.cloneNode(true)
+              copy.querySelector('.mobile-progress-product-image')?.remove()
+              return copy.textContent
+            })
+          )
+        const previousCards = await snapshotCards()
+        fail = true
+        await pullToRefresh(page, panel.locator('.mobile-progress-scroll'))
         await panel.getByRole('button', { name: '重试', exact: true }).waitFor()
-        assert.equal(await panel.locator('.mobile-progress-card').count(), 0)
+        assert.deepEqual(
+          await snapshotCards(),
+          previousCards,
+          '刷新失败保留同一筛选下已加载的进度'
+        )
+        await panel.getByLabel('搜索进度').fill('查找目标客户')
+        await page.waitForTimeout(380)
+        await panel.getByRole('button', { name: '重试', exact: true }).waitFor()
+        assert.equal(
+          await panel.locator('.mobile-progress-card').count(),
+          0,
+          '新查询失败不能显示旧条件的结果'
+        )
+        await panel
+          .getByRole('button', { name: '清除搜索', exact: true })
+          .click()
+        await page.waitForTimeout(380)
         fail = false
         await panel.getByRole('button', { name: '重试', exact: true }).click()
         await panel
@@ -671,6 +910,56 @@ export function createMobileProgressScenarios({
             exact: true,
           })
           .waitFor()
+        fail = true
+        failureCode = RpcErrorCode.PERMISSION_DENIED
+        await pullToRefresh(page, panel.locator('.mobile-progress-scroll'))
+        await panel.getByRole('button', { name: '重试', exact: true }).waitFor()
+        assert.equal(
+          await panel.locator('.mobile-progress-card').count(),
+          0,
+          '明确撤权后清除旧进度，不使用失败保留规则'
+        )
+        fail = false
+        failureCode = RpcErrorCode.INTERNAL
+        await panel.getByRole('button', { name: '重试', exact: true }).click()
+        await panel
+          .getByRole('button', {
+            name: `查看 ${prefix}-0001 进度`,
+            exact: true,
+          })
+          .waitFor()
+        let releaseListResponse
+        heldListResponse = new Promise((resolve) => {
+          releaseListResponse = resolve
+        })
+        await pullToRefresh(page, panel.locator('.mobile-progress-scroll'))
+        await page.waitForFunction(
+          () =>
+            document.querySelector('[data-testid="mobile-progress-panel"]')
+              .dataset.refreshing === 'true'
+        )
+        await page.getByTestId('mobile-role-nav-mine').click()
+        releaseListResponse()
+        await page.getByTestId('mobile-role-nav-progress').click()
+        await panel
+          .getByRole('button', {
+            name: `查看 ${prefix}-0001 进度`,
+            exact: true,
+          })
+          .waitFor()
+        await page.waitForFunction(() => {
+          const panel = document.querySelector(
+            '[data-testid="mobile-progress-panel"]'
+          )
+          const indicator = panel.querySelector(
+            '[data-testid="mobile-task-pull-refresh"]'
+          )
+          return (
+            panel.dataset.refreshing === 'false' &&
+            indicator?.dataset.state === 'idle' &&
+            indicator.getBoundingClientRect().height === 0
+          )
+        })
         await panel.getByLabel('搜索进度').fill('迟到响应')
         await page.waitForTimeout(330)
         await panel.getByLabel('搜索进度').fill('查找目标客户')
@@ -724,7 +1013,7 @@ export function createMobileProgressScenarios({
             await assertNoHorizontalOverflow(page, `progress-width-${width}`)
           }
           await panel
-            .getByRole('button', { name: '清空筛选', exact: true })
+            .getByRole('button', { name: '清除搜索', exact: true })
             .click()
           await panel
             .getByRole('button', {
@@ -741,6 +1030,10 @@ export function createMobileProgressScenarios({
             .getByRole('button', { name: '处理任务', exact: true })
             .click()
           const action = page.getByTestId('mobile-task-action-screen')
+          await assertMobileDetailSurface(action, assert)
+          await page.screenshot({
+            path: path.join(outputDir, `mobile-progress-${role}-action.png`),
+          })
           const resume = action.locator('[data-action-key="resume"]')
           if (await resume.count()) await resume.click()
           await action
@@ -755,8 +1048,13 @@ export function createMobileProgressScenarios({
           assert.equal((await (await posted).json()).result.code, 0)
           const receipt = page.getByTestId('mobile-task-receipt-screen')
           await receipt.waitFor()
+          await assertMobileDetailSurface(receipt, assert)
+          await page.screenshot({
+            path: path.join(outputDir, `mobile-progress-${role}-receipt.png`),
+          })
           await receipt
-            .getByRole('button', { name: '返回列表', exact: true })
+            .locator('.mobile-role-action-bar')
+            .getByRole('button', { name: '返回任务列表', exact: true })
             .click()
           await drawer.waitFor()
           const rereadResponse = page.waitForResponse(

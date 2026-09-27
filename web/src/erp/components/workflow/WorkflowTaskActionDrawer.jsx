@@ -5,7 +5,8 @@ import {
   LinkOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Drawer, Input, Select, Tag, Typography } from 'antd'
+import { Alert, Button, Drawer, Dropdown, Input, Select, Tag, Typography } from 'antd'
+import WorkflowFollowupDetails from './WorkflowFollowupDetails.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
@@ -34,6 +35,7 @@ import {
   moveWorkflowTaskActionStep,
   resolveWorkflowTaskActionInitialStep,
   resolveWorkflowTaskActionStep,
+  splitWorkflowTaskActions,
 } from '../../utils/workflowTaskActionFlow.mjs'
 import {
   isWorkflowApprovalTask,
@@ -106,6 +108,9 @@ export function getWorkflowTaskActionMeta(task = {}, actionMode = '') {
   const base = TASK_ACTION_META[actionMode]
   if (!base) return null
 
+  if (task?.task_group === 'business_followup' && actionMode === 'complete') {
+    return { ...base, requireReason: true }
+  }
   const processLinked = Number(task?.process_instance_id || 0) > 0
   if (!isWorkflowApprovalTask(task)) {
     if (!processLinked) return base
@@ -273,9 +278,16 @@ export default function WorkflowTaskActionDrawer({
   const navigationRef = React.useRef(null)
   const stepButtonRefs = React.useRef(new Map())
   const actionOptionRefs = React.useRef(new Map())
+  const moreActionTriggerRef = React.useRef(null)
+  const [moreActionsOpen, setMoreActionsOpen] = React.useState(false)
+  React.useEffect(() => {
+    setMoreActionsOpen(false)
+  }, [task?.id, activeStepKey])
   const visibleActionModes = allowedActionModes.filter(
     (mode) => TASK_ACTION_META[mode]
   )
+  const { primary: primaryActionModes, secondary: secondaryActionModes } =
+    splitWorkflowTaskActions({ actions: visibleActionModes, approvalTask })
   const processDecisionRequired =
     actionMode === 'complete' && isWorkflowProcessDecisionTask(task)
   const processApprovalForm = getWorkflowProcessDecisionApprovalForm(
@@ -316,7 +328,7 @@ export default function WorkflowTaskActionDrawer({
   const assignmentTargetLabel =
     assignmentTargets.find((option) => option.value === assignmentTarget)
       ?.label || ''
-  const hasVisibleActionSelection = visibleActionModes.includes(actionMode)
+  const hasVisibleActionSelection = primaryActionModes.includes(actionMode)
   const canConfirm =
     assignmentTargetValid &&
     processDecisionReady &&
@@ -520,23 +532,23 @@ export default function WorkflowTaskActionDrawer({
     ) {
       return
     }
-    const currentIndex = visibleActionModes.indexOf(mode)
-    if (currentIndex < 0 || visibleActionModes.length === 0) return
+    const currentIndex = primaryActionModes.indexOf(mode)
+    if (currentIndex < 0 || primaryActionModes.length === 0) return
 
     let nextIndex = currentIndex
     if (event.key === 'Home') {
       nextIndex = 0
     } else if (event.key === 'End') {
-      nextIndex = visibleActionModes.length - 1
+      nextIndex = primaryActionModes.length - 1
     } else {
       const offset =
         event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 1
       nextIndex =
-        (currentIndex + offset + visibleActionModes.length) %
-        visibleActionModes.length
+        (currentIndex + offset + primaryActionModes.length) %
+        primaryActionModes.length
     }
 
-    const nextMode = visibleActionModes[nextIndex]
+    const nextMode = primaryActionModes[nextIndex]
     event.preventDefault()
     selectAction(nextMode, nextMode === 'block' ? taskReason : '')
     requestAnimationFrame(() => actionOptionRefs.current.get(nextMode)?.focus())
@@ -556,13 +568,20 @@ export default function WorkflowTaskActionDrawer({
   return (
     <Drawer
       title={
-        <strong className="erp-task-action-drawer__title">
-          {hasActionReceipt
-            ? '办理结果'
-            : approvalTask
-              ? '审批详情'
-              : '任务详情'}
-        </strong>
+        <div className="erp-task-action-drawer__heading">
+          <strong className="erp-task-action-drawer__title">
+            {hasActionReceipt
+              ? '办理结果'
+              : approvalTask
+                ? '审批详情'
+                : '任务详情'}
+          </strong>
+          {task ? (
+            <Tag color={statusMeta?.color}>
+              {actionReceipt?.statusLabel || statusMeta?.label}
+            </Tag>
+          ) : null}
+        </div>
       }
       width="min(640px, calc(100vw - 24px))"
       open={Boolean(task)}
@@ -574,13 +593,6 @@ export default function WorkflowTaskActionDrawer({
         if (!actionSaving) onClose?.()
       }}
       className="erp-task-action-drawer"
-      extra={
-        task ? (
-          <Tag color={statusMeta?.color}>
-            {actionReceipt?.statusLabel || statusMeta?.label}
-          </Tag>
-        ) : null
-      }
       footer={
         showFooter ? (
           <div className="erp-task-action-drawer__footer">
@@ -783,6 +795,7 @@ export default function WorkflowTaskActionDrawer({
                 assigneeLabel={hasActionReceipt ? '' : currentAssigneeLabel}
               />
             </div>
+            <WorkflowFollowupDetails task={task} />
             {showTaskContext ? <WorkflowTaskIdentity task={task} /> : !hasActionReceipt ? (
               <WorkflowTaskSource task={taskWithSource} />
             ) : null}
@@ -919,80 +932,113 @@ export default function WorkflowTaskActionDrawer({
               ) : null
             ) : (
               <div className="erp-task-action-drawer__action-workspace">
-                <div className="erp-task-action-drawer__action-prompt">
-                  <strong>
-                    {canChooseActions ? '选择处理方式' : '当前只能查看任务'}
-                  </strong>
-                  <span>
-                    {canChooseActions
-                      ? '选择一项当前可用操作；催办只是处理方式之一，不会代替负责人办理任务。'
-                      : readonlyReason || '当前账号不能直接处理该任务。'}
-                  </span>
-                </div>
-                {canChooseActions ? (
-                  <div
-                    className="erp-task-action-drawer__action-options"
-                    role="radiogroup"
-                    aria-label="处理方式"
-                  >
-                    {visibleActionModes.map((mode, index) => {
-                      const meta = getWorkflowTaskActionMeta(task, mode)
-                      const selected = actionMode === mode
-                      return (
-                        <button
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          disabled={actionSaving}
-                          key={mode}
-                          ref={(node) => {
-                            if (node) actionOptionRefs.current.set(mode, node)
-                            else actionOptionRefs.current.delete(mode)
-                          }}
-                          tabIndex={
-                            selected ||
-                            (!hasVisibleActionSelection && index === 0)
-                              ? 0
-                              : -1
-                          }
-                          className={[
-                            'erp-task-action-drawer__action-option',
-                            `erp-task-action-drawer__action-option--${getTaskActionTone(mode)}`,
-                            selected
-                              ? 'erp-task-action-drawer__action-option--selected'
-                              : '',
-                          ]
-                            .filter(Boolean)
-                            .join(' ')}
-                          onClick={() =>
-                            selectAction(
-                              mode,
-                              mode === 'block' ? taskReason : ''
-                            )
-                          }
-                          onKeyDown={(event) =>
-                            handleActionKeyDown(event, mode)
-                          }
-                        >
-                          <span className="erp-task-action-drawer__action-option-mark">
-                            {selected ? <CheckCircleOutlined /> : null}
-                          </span>
-                          <span>
-                            <strong>{meta.title}</strong>
-                            <small>{TASK_ACTION_DESCRIPTIONS[mode]}</small>
-                          </span>
-                        </button>
-                      )
-                    })}
+                <section className="erp-task-action-drawer__action-choices">
+                  <div className="erp-task-action-drawer__action-prompt">
+                    <strong>
+                      {canChooseActions ? '选择处理方式' : '当前只能查看任务'}
+                    </strong>
+                    <span>
+                      {canChooseActions
+                        ? '选择本次操作，再核对处理内容。'
+                        : readonlyReason || '当前账号不能直接处理该任务。'}
+                    </span>
                   </div>
-                ) : null}
+                  {canChooseActions ? (
+                    <div
+                      className="erp-task-action-drawer__action-options"
+                      role="radiogroup"
+                      aria-label="处理方式"
+                    >
+                      {primaryActionModes.map((mode, index) => {
+                        const meta = getWorkflowTaskActionMeta(task, mode)
+                        const selected = actionMode === mode
+                        return (
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            disabled={actionSaving}
+                            key={mode}
+                            ref={(node) => {
+                              if (node) actionOptionRefs.current.set(mode, node)
+                              else actionOptionRefs.current.delete(mode)
+                            }}
+                            tabIndex={
+                              selected ||
+                              (!hasVisibleActionSelection && index === 0)
+                                ? 0
+                                : -1
+                            }
+                            className={[
+                              'erp-task-action-drawer__action-option',
+                              selected
+                                ? 'erp-task-action-drawer__action-option--selected'
+                                : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                            onClick={() =>
+                              selectAction(
+                                mode,
+                                mode === 'block' ? taskReason : ''
+                              )
+                            }
+                            onKeyDown={(event) =>
+                              handleActionKeyDown(event, mode)
+                            }
+                          >
+                            <span className="erp-task-action-drawer__action-option-mark">
+                              {selected ? <CheckCircleOutlined /> : null}
+                            </span>
+                            <span>
+                              <strong>{meta.title}</strong>
+                              <small>{TASK_ACTION_DESCRIPTIONS[mode]}</small>
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                  {canChooseActions && secondaryActionModes.length > 0 ? (
+                    <Dropdown
+                      autoFocus
+                      open={moreActionsOpen}
+                      onOpenChange={setMoreActionsOpen}
+                      trigger={['click']}
+                      disabled={actionSaving}
+                      menu={{
+                        selectable: true,
+                        selectedKeys: secondaryActionModes.includes(actionMode)
+                          ? [actionMode]
+                          : [],
+                        items: secondaryActionModes.map((mode) => ({
+                          key: mode,
+                          label: getWorkflowTaskActionMeta(task, mode).title,
+                        })),
+                        onClick: ({ key }) => {
+                          selectAction(key, key === 'block' ? taskReason : '')
+                          setMoreActionsOpen(false)
+                          moreActionTriggerRef.current?.focus()
+                        },
+                        onKeyDown: (event) => {
+                          if (event.key !== 'Escape') return
+                          event.preventDefault()
+                          event.stopPropagation()
+                          setMoreActionsOpen(false)
+                          moreActionTriggerRef.current?.focus()
+                        },
+                      }}
+                    >
+                      <Button ref={moreActionTriggerRef} disabled={actionSaving}>
+                        {secondaryActionModes.includes(actionMode)
+                          ? `更多处理方式：${getWorkflowTaskActionMeta(task, actionMode).title}`
+                          : '更多处理方式'}
+                      </Button>
+                    </Dropdown>
+                  ) : null}
+                </section>
                 {actionMeta ? (
-                  <section
-                    className={[
-                      'erp-task-action-drawer__action-panel',
-                      `erp-task-action-drawer__action-panel--${actionTone}`,
-                    ].join(' ')}
-                  >
+                  <section className="erp-task-action-drawer__action-panel">
                     <div className="erp-task-action-drawer__action-head">
                       <div>
                         <span>当前操作</span>
@@ -1008,9 +1054,11 @@ export default function WorkflowTaskActionDrawer({
                           : '确认即可'}
                       </Tag>
                     </div>
-                    <Paragraph className="erp-task-action-drawer__action-copy">
-                      {getTaskActionDescription(actionMode)}
-                    </Paragraph>
+                    {actionMeta.requireReason ? (
+                      <Paragraph className="erp-task-action-drawer__action-copy">
+                        {getTaskActionDescription(actionMode)}
+                      </Paragraph>
+                    ) : null}
                     {actionMode === 'assign' ? (
                       <div className="erp-task-action-drawer__assignment">
                         <label htmlFor="erp-task-assignment-target">
@@ -1092,7 +1140,9 @@ export default function WorkflowTaskActionDrawer({
                         showCount
                         disabled={actionSaving || !canSubmitAction}
                         placeholder={
-                          approvalTask && actionMode === 'complete'
+                          task?.task_group === 'business_followup' && actionMode === 'complete'
+                            ? '填写处理结果和需要发起人了解的情况'
+                            : approvalTask && actionMode === 'complete'
                             ? '填写审批意见和判断依据'
                             : actionMode === 'assign'
                               ? '填写请假、人员调整等转交原因'

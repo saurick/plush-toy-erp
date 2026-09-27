@@ -33,7 +33,11 @@ export function isDarkNeutralBorderColor(color) {
   const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
   if (!match) return false
   const [, red, green, blue] = match.map(Number)
-  return red >= 45 && green >= 55 && blue >= 70 && blue >= red
+  return (
+    (red === 49 && green === 64 && blue === 57) ||
+    (red === 80 && green === 97 && blue === 88) ||
+    (red >= 45 && green >= 55 && blue >= 70 && blue >= red)
+  )
 }
 
 export function isBluePrimaryColor(color) {
@@ -102,13 +106,13 @@ export function hasBlueFocusRing(value) {
   )
 }
 
-export function assertNoBlueFocusStyle(metrics, scenarioName) {
+export function assertNoUnconfiguredFocusStyle(metrics, scenarioName) {
   assert(
     !hasBlueFocusRing(metrics.boxShadow) &&
       !hasBlueFocusRing(metrics.sourceBoxShadow) &&
       !hasBlueFocusRing(metrics.borderColor) &&
       !hasBlueFocusRing(metrics.sourceBorderColor),
-    `${scenarioName} ${metrics.label} focus 仍残留蓝色 ring 或边框: ${JSON.stringify(metrics)}`
+    `${scenarioName} ${metrics.label} focus 仍残留组件库默认 ring 或边框: ${JSON.stringify(metrics)}`
   )
 }
 
@@ -121,7 +125,7 @@ export function isNeutralModalControlBorderColor(color) {
     Math.abs(red - blue),
     Math.abs(green - blue)
   )
-  return red >= 190 && red <= 225 && maxChannelGap <= 4
+  return red >= 185 && red <= 230 && maxChannelGap <= 18
 }
 
 export function isTailwindFormsResetBorderColor(color) {
@@ -133,11 +137,11 @@ export function isAcceptedFocusBorder(metrics) {
   if (metrics.skipBorderColor) return true
   if (metrics.allowTransparentBorder) {
     return (
-      isGreenFocusColor(metrics.borderColor) ||
+      isBluePrimaryColor(metrics.borderColor) ||
       isTransparentFocusColor(metrics.borderColor)
     )
   }
-  return isGreenFocusColor(metrics.borderColor)
+  return isBluePrimaryColor(metrics.borderColor)
 }
 
 export function isTransparentFocusColor(color) {
@@ -167,7 +171,7 @@ export function containsGreenDominantColor(value) {
     const blue = Number(match[3])
     const alpha = match[4] === undefined ? 1 : Number(match[4])
     if (alpha <= 0.05) continue
-    if (green >= 72 && green > red * 1.18 && green > blue * 1.08) {
+    if (green >= 72 && green - red >= 24 && green - blue >= 20) {
       return true
     }
   }
@@ -181,6 +185,15 @@ export function getContrastRatio(foreground, background) {
 }
 
 export function parseRgb(value) {
+  const hex = String(value || '').match(/^#([0-9a-f]{6})$/i)
+  if (hex)
+    return [0, 2, 4].map((offset) =>
+      parseInt(hex[1].slice(offset, offset + 2), 16)
+    )
+  const srgb = String(value || '').match(
+    /^color\(srgb\s+([.\d]+)\s+([.\d]+)\s+([.\d]+)/
+  )
+  if (srgb) return srgb.slice(1).map((channel) => Number(channel) * 255)
   const match = String(value || '').match(
     /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/
   )

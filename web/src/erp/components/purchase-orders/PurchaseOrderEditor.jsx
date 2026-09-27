@@ -53,6 +53,7 @@ export default function PurchaseOrderEditor({
             canUpload={canUpdate || canCreate}
             canWithdraw={canCreate || canUpdate}
             variant="inline"
+            compact
           />
         }
       />

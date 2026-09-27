@@ -67,8 +67,8 @@ export async function assertTableSemanticAlignment(
     )
     assert.equal(
       column.headerAlign,
-      'center',
-      `${scenarioName} ${column.title} 表头应水平居中`
+      expected[column.title],
+      `${scenarioName} ${column.title} 表头应沿对应字段对齐`
     )
     assert.equal(
       column.headerVertical,
@@ -99,7 +99,7 @@ export async function assertTableHeaderControlsFit(
         if (outer.height < 1) return []
         return [
           ...cell.querySelectorAll(
-            '.erp-module-column-header-trigger, .ant-table-column-sorter'
+            '.ant-table-column-sorter'
           ),
         ].map((control) => {
           const inner = control.getBoundingClientRect()
@@ -121,7 +121,6 @@ export async function assertTableHeaderControlsFit(
       })
     )
   )
-  assert(controls.length > 0, `${scenarioName} 应有可检查的表头按钮`)
   assert.deepEqual(
     controls.filter(
       (control) =>
@@ -131,6 +130,37 @@ export async function assertTableHeaderControlsFit(
     ),
     [],
     `${scenarioName} 表头按钮应完整位于所属单元格内，不能越界或被相邻列遮挡`
+  )
+  const headers = await page.locator(tableSelector).evaluateAll((tables) =>
+    tables.flatMap((table) =>
+      [...table.querySelectorAll('thead:not([aria-hidden="true"]) th')]
+        .filter((cell) => cell.getBoundingClientRect().height > 1)
+        .map((cell) => {
+          const style = getComputedStyle(cell)
+          const label = cell.querySelector('.erp-module-column-header-text, .ant-table-column-title')
+          const sorter = cell.querySelector('.ant-table-column-sorter')
+          return {
+            label: cell.textContent,
+            height: cell.getBoundingClientRect().height,
+            split: cell.nextElementSibling
+              ? Number.parseFloat(style.borderInlineEndWidth) >= 1 &&
+                style.borderInlineEndStyle === 'solid' &&
+                style.borderInlineEndColor !== style.backgroundColor
+              : true,
+            clipped: label ? label.scrollWidth > label.clientWidth + 1 : false,
+            sorterGap: label && sorter
+              ? sorter.getBoundingClientRect().left - label.getBoundingClientRect().right
+              : null,
+          }
+        })
+    )
+  )
+  assert(headers.length > 0, `${scenarioName} 应有可读表头`)
+  assert.deepEqual(
+    headers.filter((header) => !header.split || header.clipped || header.height < 39 ||
+      (header.sorterGap !== null && (header.sorterGap < 3 || header.sorterGap > 8))),
+    [],
+    `${scenarioName} 字段边界应清楚，列名完整显示，排序紧邻所属列名`
   )
 }
 
@@ -269,20 +299,6 @@ async function assertBusinessMainTableSortableColumns(
           })
         )
       : []
-    const columnHeaderTriggers = tableCard
-      ? Array.from(
-          tableCard.querySelectorAll(
-            '.ant-table-thead th .erp-module-column-header-trigger'
-          )
-        ).map((node) => ({
-          label: node.getAttribute('aria-label') || '',
-          opacity: Number(window.getComputedStyle(node).opacity || 1),
-          display: window.getComputedStyle(node).display,
-          visibility: window.getComputedStyle(node).visibility,
-          width: node.getBoundingClientRect().width,
-          height: node.getBoundingClientRect().height,
-        }))
-      : []
     const columnHeaderTexts = tableCard
       ? Array.from(
           tableCard.querySelectorAll(
@@ -292,13 +308,6 @@ async function assertBusinessMainTableSortableColumns(
           const style = window.getComputedStyle(node)
           const textRect = node.getBoundingClientRect()
           const cellRect = node.closest('th').getBoundingClientRect()
-          const triggerRect = node
-            .closest('.erp-module-column-header')
-            ?.querySelector('.erp-module-column-header-trigger')
-            ?.getBoundingClientRect()
-          const titleRect = node
-            .closest('.ant-table-column-title')
-            ?.getBoundingClientRect()
           const sorterRect = node
             .closest('.ant-table-column-sorters')
             ?.querySelector('.ant-table-column-sorter')
@@ -314,17 +323,9 @@ async function assertBusinessMainTableSortableColumns(
             textOverflow: style.textOverflow,
             overflow: style.overflow,
             whiteSpace: style.whiteSpace,
-            triggerOverlap: triggerRect
-              ? textRect.right > triggerRect.left + 1
-              : false,
-            triggerRightGap:
-              triggerRect && titleRect
-                ? titleRect.right - triggerRect.right
-                : null,
-            triggerSorterGap:
-              triggerRect && sorterRect
-                ? sorterRect.left - triggerRect.right
-                : null,
+            sorterGap: sorterRect ? sorterRect.left - textRect.right : null,
+            outsideCell: textRect.left < cellRect.left || textRect.right > cellRect.right,
+
           }
         })
       : []
@@ -341,7 +342,6 @@ async function assertBusinessMainTableSortableColumns(
     )
     return {
       headers,
-      columnHeaderTriggers,
       columnHeaderTexts,
       ellipsisCells,
       hasCurrentAction: Boolean(currentAction),
@@ -366,30 +366,10 @@ async function assertBusinessMainTableSortableColumns(
     (header) =>
       header.whiteSpace !== 'nowrap' ||
       header.verticalAlign !== 'middle' ||
-      header.textAlign !== 'center'
-  )
-  const offCenterHeaders = metrics.columnHeaderTexts.filter(
-    (header) => Math.abs(header.centerOffset) > 1
-  )
-  assert.equal(
-    offCenterHeaders.length,
-    0,
-    `${scenarioName} 表头文字应与单元格中心对齐: ${JSON.stringify(offCenterHeaders)}`
+      !['left', 'right', 'center'].includes(header.textAlign)
   )
   const unstableSorters = sortableHeaders.filter(
     (header) => header.hasSorter && header.sorterAlignItems !== 'center'
-  )
-  const hiddenColumnHeaderTriggers = metrics.columnHeaderTriggers.filter(
-    (node) =>
-      node.display === 'none' ||
-      node.visibility === 'hidden' ||
-      node.opacity < 0.95
-  )
-  const oversizedColumnHeaderTriggers = metrics.columnHeaderTriggers.filter(
-    (node) => node.width > 24 || node.height > 24
-  )
-  const undersizedColumnHeaderTriggers = metrics.columnHeaderTriggers.filter(
-    (node) => node.width < 23.5 || node.height < 23.5
   )
   const ellipsisHeaderTexts = metrics.columnHeaderTexts.filter(
     (node) =>
@@ -402,19 +382,7 @@ async function assertBusinessMainTableSortableColumns(
     (node) => node.text && node.whiteSpace !== 'nowrap'
   )
   const overlappingHeaderTexts = metrics.columnHeaderTexts.filter(
-    (node) => node.text && node.triggerOverlap
-  )
-  const misplacedHeaderTriggers = metrics.columnHeaderTexts.filter(
-    (node) =>
-      node.text &&
-      Number.isFinite(node.triggerRightGap) &&
-      Math.abs(node.triggerRightGap) > 1
-  )
-  const crowdedHeaderControls = metrics.columnHeaderTexts.filter(
-    (node) =>
-      node.text &&
-      Number.isFinite(node.triggerSorterGap) &&
-      node.triggerSorterGap < 7
+    (node) => node.outsideCell || (node.sorterGap !== null && node.sorterGap < 3)
   )
 
   assert(
@@ -447,25 +415,6 @@ async function assertBusinessMainTableSortableColumns(
     [],
     `${scenarioName} 业务主表排序控件应与标题垂直居中: ${JSON.stringify(metrics)}`
   )
-  assert(
-    metrics.columnHeaderTriggers.length > 0,
-    `${scenarioName} 业务主表应默认展示列设置快捷入口: ${JSON.stringify(metrics)}`
-  )
-  assert.deepEqual(
-    hiddenColumnHeaderTriggers,
-    [],
-    `${scenarioName} 业务主表列设置快捷入口默认态应可见可点: ${JSON.stringify(metrics)}`
-  )
-  assert.deepEqual(
-    oversizedColumnHeaderTriggers,
-    [],
-    `${scenarioName} 业务主表列设置快捷入口应保持紧凑尺寸: ${JSON.stringify(metrics)}`
-  )
-  assert.deepEqual(
-    undersizedColumnHeaderTriggers,
-    [],
-    `${scenarioName} 业务主表列设置快捷入口应保留 24px 点击范围: ${JSON.stringify(metrics)}`
-  )
   assert.deepEqual(
     wrappedHeaderTexts,
     [],
@@ -474,17 +423,7 @@ async function assertBusinessMainTableSortableColumns(
   assert.deepEqual(
     overlappingHeaderTexts,
     [],
-    `${scenarioName} 业务主表列标题不应与列设置按钮重叠: ${JSON.stringify(metrics)}`
-  )
-  assert.deepEqual(
-    misplacedHeaderTriggers,
-    [],
-    `${scenarioName} 业务主表列设置按钮应贴住标题区右侧: ${JSON.stringify(metrics)}`
-  )
-  assert.deepEqual(
-    crowdedHeaderControls,
-    [],
-    `${scenarioName} 业务主表列设置与排序入口之间应保留 8px 间距: ${JSON.stringify(metrics)}`
+    `${scenarioName} 业务主表列名和排序应清楚分开且完整位于所属列内: ${JSON.stringify(metrics)}`
   )
   assert.deepEqual(
     ellipsisHeaderTexts,
@@ -733,14 +672,13 @@ async function assertBusinessHeaderStatsSingleLine(
   )
   assert.equal(
     metrics.stats.display,
-    'grid',
-    `${scenarioName} 业务页头部统计区应使用 grid 稳定列宽: ${JSON.stringify(metrics)}`
+    'flex',
+    `${scenarioName} 业务页头部摘要使用紧凑横向布局: ${JSON.stringify(metrics)}`
   )
   assert(
     statsBelowMain ||
       (metrics.header.right - metrics.stats.right <= 24 &&
-        metrics.stats.justifySelf === 'end' &&
-        metrics.stats.justifyContent === 'end'),
+        metrics.stats.justifyContent === 'flex-end'),
     `${scenarioName} 桌面业务页头部摘要组应在空间足够时右对齐: ${JSON.stringify(metrics)}`
   )
   assert(
@@ -750,8 +688,8 @@ async function assertBusinessHeaderStatsSingleLine(
   const compactViewport = metrics.viewportWidth <= 768
   if (!compactViewport) {
     assert.equal(
-      metrics.stats.gridAutoFlow,
-      'column',
+      metrics.stats.flexWrap,
+      'nowrap',
       `${scenarioName} 桌面业务页头部摘要应横向排列，不能竖排占用高度: ${JSON.stringify(metrics)}`
     )
   }
@@ -766,17 +704,17 @@ async function assertBusinessHeaderStatsSingleLine(
   assert(
     metrics.tiles.every(
       (tile) =>
-        tile.width >= 104 &&
-        tile.width <= (metrics.viewportWidth <= 480 ? 180 : 130) &&
-        tile.height >= 48 &&
-        tile.height <= 72
+        tile.width >= 50 &&
+        tile.width <= 190 &&
+        tile.height >= 30 &&
+        tile.height <= 34
     ),
     `${scenarioName} 业务页头部统计卡尺寸异常: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.tiles.every(
       (tile) =>
-        tile.labelWhiteSpace === 'normal' &&
+        ['normal', 'nowrap'].includes(tile.labelWhiteSpace) &&
         tile.labelTextOverflow !== 'ellipsis' &&
         tile.labelOverflow === 'visible'
     ),

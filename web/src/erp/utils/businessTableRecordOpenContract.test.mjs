@@ -12,6 +12,7 @@ const businessListLayoutSource = readFileSync(
 )
 
 const expectedBusinessDataTablePages = [
+  'AuditLogsPage.jsx',
   'BOMVersionsPage.jsx',
   'FinancePaymentsPage.jsx',
   'HistoryRecordsPage.jsx',
@@ -148,7 +149,6 @@ test('BusinessDataTable 双击打开前过滤表格内交互元素', () => {
     '.ant-table-selection-column',
     '.ant-radio-wrapper',
     '.ant-checkbox-wrapper',
-    '.erp-business-row-expand-button',
   ]) {
     assert.equal(
       interactiveTargetSource.includes(selector),
@@ -173,7 +173,7 @@ test('BusinessDataTable 双击打开前过滤表格内交互元素', () => {
   )
 })
 
-test('当前 14 个正式 BusinessDataTable 主表都声明双击打开合同', () => {
+test('当前正式 BusinessDataTable 主表都声明双击打开合同', () => {
   const pages = readBusinessDataTablePages()
   assert.deepEqual(
     pages.map(({ fileName }) => fileName),

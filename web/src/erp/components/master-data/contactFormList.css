@@ -1,0 +1,169 @@
+.erp-master-contact-list.erp-contact-editor {
+  container-type: inline-size;
+  gap: 10px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.erp-contact-editor .erp-master-contact-list__items {
+  width: 100%;
+  min-width: 0;
+}
+
+.erp-contact-editor__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: left;
+}
+
+.erp-contact-editor__email-column {
+  width: 21%;
+}
+.erp-contact-editor__primary-column {
+  width: 76px;
+}
+.erp-contact-editor__actions-column {
+  width: 120px;
+}
+
+.erp-contact-editor__table th {
+  padding: 7px 6px;
+  color: var(--erp-text-muted, #64748b);
+  background: var(--erp-sales-order-lines-bg, #f8fbf9);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.erp-contact-editor__table td {
+  min-width: 0;
+  padding: var(--erp-table-cell-padding-block) 6px;
+  vertical-align: top;
+}
+
+.erp-contact-editor .erp-master-contact-list__row {
+  border-bottom: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
+}
+
+.erp-contact-editor .ant-form-item {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.erp-contact-editor__fields .ant-form-item-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.erp-contact-editor__required {
+  margin-inline-end: 4px;
+  color: var(--erp-danger, #dc2626);
+}
+.erp-contact-editor__mobile-label {
+  display: none;
+}
+
+.erp-contact-editor__primary,
+.erp-contact-editor__actions {
+  text-align: center;
+}
+
+.erp-contact-editor__primary .ant-radio-wrapper,
+.erp-contact-editor__actions .ant-space {
+  min-height: var(--erp-control-height, 36px);
+  margin: 0;
+  align-items: center;
+}
+
+.erp-contact-editor__note-summary td {
+  padding-top: 0;
+}
+
+.erp-contact-editor__note-summary button {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 4px;
+  padding: 2px 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--erp-text-muted, #64748b);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.erp-contact-editor__note-summary button:focus-visible {
+  outline: 2px solid var(--erp-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+.erp-contact-editor__note-editor[hidden] {
+  display: none;
+}
+
+@container (max-width: 820px) {
+  .erp-contact-editor__table,
+  .erp-contact-editor .erp-master-contact-list__row {
+    display: block;
+  }
+
+  .erp-contact-editor__table colgroup,
+  .erp-contact-editor__table thead {
+    display: none;
+  }
+
+  .erp-contact-editor__fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+    padding-block: 12px;
+  }
+
+  .erp-contact-editor__table td {
+    display: block;
+    padding: 0;
+  }
+
+  .erp-contact-editor__fields .ant-form-item-label {
+    position: static;
+    width: auto;
+    height: auto;
+    padding-bottom: 5px;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  .erp-contact-editor__email,
+  .erp-contact-editor__actions {
+    grid-column: 1 / -1;
+  }
+  .erp-contact-editor__actions {
+    text-align: right;
+  }
+  .erp-contact-editor__primary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .erp-contact-editor__mobile-label {
+    display: inline;
+  }
+  .erp-contact-editor__note-summary,
+  .erp-contact-editor__note-editor:not([hidden]) {
+    display: block;
+    padding-bottom: 10px;
+  }
+}

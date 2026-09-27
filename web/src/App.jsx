@@ -1,6 +1,6 @@
 // web/src/App.jsx
 import React, { Suspense, useEffect } from 'react'
-import { App as AntdApp, ConfigProvider, theme } from 'antd'
+import { App as AntdApp, ConfigProvider, Empty, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
@@ -18,6 +18,7 @@ import {
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
+import '@/common/components/empty/empty-state.css'
 
 dayjs.locale('zh-cn')
 
@@ -71,13 +72,17 @@ function AppContent() {
 
   useEffect(() => {
     if (isDevWorkbenchRoute) return
+    // 登录页按当前选择的工作方式更新图标。
+    if (/^\/admin-login\/?$/.test(location.pathname)) return
     applyERPFavicon(document, location.pathname, {
       customerFaviconHref: activeBrand.faviconHref,
+      customerMobileFaviconHref: activeBrand.mobileFaviconHref,
       fromPathname: location.state?.from?.pathname,
       isMobileExperience,
     })
   }, [
     activeBrand.faviconHref,
+    activeBrand.mobileFaviconHref,
     isDevWorkbenchRoute,
     isMobileExperience,
     location.pathname,
@@ -99,11 +104,14 @@ function AppContent() {
 }
 
 function ThemedApp() {
-  const { isDark } = useERPTheme()
+  const { isDark, accent, appearance } = useERPTheme()
+  const tableCellPaddingBlock = appearance.density === 'compact' ? 4 : 9
 
   return (
     <ConfigProvider
       locale={zhCN}
+      empty={{ className: 'erp-empty', image: Empty.PRESENTED_IMAGE_SIMPLE }}
+      button={{ autoInsertSpace: false }}
       modal={{
         centered: true,
       }}
@@ -114,20 +122,36 @@ function ThemedApp() {
             paddingInline: 12,
             paddingInlineSM: 12,
             paddingInlineLG: 16,
+            primaryColor: isDark ? '#111713' : accent.onPrimary,
+          },
+          Table: {
+            cellPaddingBlock: tableCellPaddingBlock,
+            cellPaddingBlockMD: tableCellPaddingBlock,
+            cellPaddingBlockSM: tableCellPaddingBlock,
+            cellPaddingInlineSM: 11,
+            headerBg: isDark ? '#202b24' : '#f7f9f8',
+            headerColor: isDark ? '#bdc9c0' : '#4d5d53',
+            rowSelectedBg: 'var(--erp-primary-softer)',
+            rowSelectedHoverBg: 'var(--erp-primary-soft)',
+            rowHoverBg: 'var(--erp-surface-bg-soft)',
           },
         },
         token: {
-          colorPrimary: isDark ? '#60a5fa' : '#2b8a3e',
-          colorInfo: isDark ? '#60a5fa' : '#2f8f4b',
-          borderRadius: 10,
+          colorPrimary: isDark ? accent.dark : accent.primary,
+          colorInfo: isDark ? '#75b9ff' : '#3275c7',
+          colorLink: isDark ? accent.dark : accent.strong,
+          borderRadius: 8,
+          controlHeight: 34,
+          controlHeightSM: 28,
           fontFamily:
-            '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
-          colorBgLayout: isDark ? '#0f172a' : '#f4f8f3',
-          colorBgContainer: isDark ? '#111827' : '#ffffff',
-          colorBgElevated: isDark ? '#1b2538' : '#ffffff',
-          colorBorder: isDark ? '#334155' : '#d9d9d9',
-          colorText: isDark ? '#e5edf4' : 'rgba(0, 0, 0, 0.88)',
-          colorTextSecondary: isDark ? '#94a3b8' : 'rgba(0, 0, 0, 0.65)',
+            '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
+          colorBgLayout: isDark ? '#111713' : '#f2f5f3',
+          colorBgContainer: isDark ? '#18201b' : '#ffffff',
+          colorBgElevated: isDark ? '#1d2721' : '#ffffff',
+          colorBorder: isDark ? '#314039' : '#dce4df',
+          colorBorderSecondary: isDark ? '#314039' : '#dce4df',
+          colorText: isDark ? '#edf4ef' : '#1f2a24',
+          colorTextSecondary: isDark ? '#bdc9c0' : '#4d5d53',
         },
       }}
     >

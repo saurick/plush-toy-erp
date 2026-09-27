@@ -1,3 +1,4 @@
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertAntdModalCentered } from './modalAssertions.mjs'
 import {
   expectHeading,
@@ -386,7 +387,9 @@ export function createBusinessListAssertions({ outputDir }) {
       ).filter(
         (button) =>
           isVisible(button) &&
-          String(button.textContent || '').trim() === '刷新当前页'
+          String(
+            button.getAttribute('aria-label') || button.textContent || ''
+          ).trim() === '刷新当前页'
       )
 
       return {
@@ -480,18 +483,20 @@ export function createBusinessListAssertions({ outputDir }) {
     await page.evaluate((key) => {
       window.localStorage.removeItem(key)
     }, storageKey)
-    await verifyBusinessModuleColumnOrderHeaderMenu(page, {
+    await verifyBusinessModuleColumnSettings(page, {
       storageKey,
       targetLabel: headerMenuTargetLabel,
     })
     const primaryToolbarActions = page
       .locator('.erp-business-operation-panel__actions')
       .first()
-    await primaryToolbarActions.getByRole('button', { name: /列顺序/ }).click()
+    await primaryToolbarActions
+      .getByRole('button', { name: /列顺序|列设置/ })
+      .click()
     const dialog = page.locator('.erp-business-action-modal--columns:visible')
     await dialog.waitFor({ state: 'visible', timeout: 10_000 })
     await assertAntdModalCentered(page, dialog, 'business-column-order-modal')
-    await expectText(page, '调整后的列顺序会保存到当前账号')
+    await expectText(page, '点击完成保存到当前账号')
     await dialog.screenshot({
       path: path.resolve(outputDir, 'business-column-order-modal.png'),
     })
@@ -595,9 +600,11 @@ export function createBusinessListAssertions({ outputDir }) {
     const storedOrder = await page.evaluate((key) => {
       return window.localStorage.getItem(key)
     }, storageKey)
-    assert(Boolean(storedOrder), '列顺序面板点击完成后未写入本地缓存兜底')
+    assert.equal(storedOrder, null, '列设置应只保存账号偏好，不使用跨账号的本地兜底')
 
-    await primaryToolbarActions.getByRole('button', { name: /列顺序/ }).click()
+    await primaryToolbarActions
+      .getByRole('button', { name: /列顺序|列设置/ })
+      .click()
     await dialog.waitFor({ state: 'visible', timeout: 10_000 })
     const persistedDialogBoundaryLabels = await page.evaluate(() => {
       return {
@@ -625,7 +632,9 @@ export function createBusinessListAssertions({ outputDir }) {
     }, storageKey)
     await page.reload({ waitUntil: 'networkidle' })
     await expectHeading(page, heading)
-    await primaryToolbarActions.getByRole('button', { name: /列顺序/ }).click()
+    await primaryToolbarActions
+      .getByRole('button', { name: /列顺序|列设置/ })
+      .click()
     await dialog.waitFor({ state: 'visible', timeout: 10_000 })
     await assertAntdModalCentered(
       page,
@@ -659,22 +668,24 @@ export function createBusinessListAssertions({ outputDir }) {
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
   }
 
-  async function verifyBusinessModuleColumnOrderHeaderMenu(
+  async function verifyBusinessModuleColumnSettings(
     page,
     { storageKey, targetLabel = '' }
   ) {
     const headerLabelsBefore = await readBusinessModuleHeaderLabels(page)
     assert(
       headerLabelsBefore.length >= 2,
-      `表头列顺序菜单缺少可调整列样本: ${JSON.stringify(headerLabelsBefore)}`
+      `列设置缺少可调整列样本: ${JSON.stringify(headerLabelsBefore)}`
     )
     assert(
       !headerLabelsBefore.includes('下一步'),
       `正式业务页列表不应展示施工型“下一步”列: ${JSON.stringify(headerLabelsBefore)}`
     )
 
-    const headerTriggers = page.locator(
-      '.erp-business-data-table-card .erp-module-column-header-trigger'
+    assert.equal(
+      await page.locator('.erp-module-column-header-trigger').count(),
+      0,
+      '表头不应重复提供列设置按钮'
     )
     const requestedTargetIndex = targetLabel
       ? headerLabelsBefore.indexOf(targetLabel)
@@ -683,40 +694,16 @@ export function createBusinessListAssertions({ outputDir }) {
     const expectedFirstLabel = headerLabelsBefore[targetIndex]
     assert(
       expectedFirstLabel,
-      `表头列顺序菜单未找到可移动目标列: ${JSON.stringify({ targetLabel, headerLabelsBefore })}`
+      `列设置未找到可移动目标列: ${JSON.stringify({ targetLabel, headerLabelsBefore })}`
     )
-    const clickHeaderTrigger = async (index) => {
-      const trigger = headerTriggers.nth(index)
-      await trigger.waitFor({ state: 'visible', timeout: 10_000 })
-      await trigger.click()
-    }
-    await clickHeaderTrigger(targetIndex)
-
-    const menu = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)').last()
-    await menu
-      .getByText('左移一列')
-      .waitFor({ state: 'visible', timeout: 10_000 })
-    await menu
-      .getByText('右移一列')
-      .waitFor({ state: 'visible', timeout: 10_000 })
-    await menu
-      .getByText('移到最前')
-      .waitFor({ state: 'visible', timeout: 10_000 })
-    await menu
-      .getByText('移到最后')
-      .waitFor({ state: 'visible', timeout: 10_000 })
-    await menu
-      .getByText('打开列顺序面板')
-      .waitFor({ state: 'visible', timeout: 10_000 })
-    assert.equal(
-      await page.getByRole('dialog', { name: '调整列表列顺序' }).count(),
-      0,
-      '点击表头列设置应先打开快捷菜单，不应直接弹出列顺序面板'
-    )
-
+    await page.getByRole('button', { name: /列设置$/u })
+      .click()
+    const dialog = page.getByRole('dialog', { name: /^列设置/u })
+    await dialog.getByRole('button', { name: `${expectedFirstLabel} 移到最前` }).click()
     const headerColumnOrderSync = waitForAdminColumnOrderSync(page)
-    await menu.getByText('移到最前').click()
+    await dialog.getByRole('button', { name: /^完\s*成$/u }).click()
     await headerColumnOrderSync
+    await dialog.waitFor({ state: 'hidden' })
     await page.waitForFunction(
       ({ expectedFirstLabel }) => {
         const firstLabel = document.querySelector(
@@ -732,17 +719,8 @@ export function createBusinessListAssertions({ outputDir }) {
     const storedOrder = await page.evaluate((key) => {
       return window.localStorage.getItem(key)
     }, storageKey)
-    assert(Boolean(storedOrder), '表头快捷调整后未写入本地缓存兜底')
+    assert.equal(storedOrder, null, '列设置应只保存账号偏好')
 
-    await clickHeaderTrigger(0)
-    await menu
-      .getByText('打开列顺序面板')
-      .waitFor({ state: 'visible', timeout: 10_000 })
-    await menu.getByText('打开列顺序面板').click()
-    const dialog = page.getByRole('dialog', { name: '调整列表列顺序' })
-    await dialog.waitFor({ state: 'visible', timeout: 10_000 })
-    await dialog.locator('.ant-modal-close').click()
-    await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
   }
 
   function waitForAdminColumnOrderSync(page) {
@@ -1262,7 +1240,10 @@ export function createBusinessListAssertions({ outputDir }) {
         isVisible
       )
       const refreshButtons = allButtons.filter(
-        (button) => String(button.textContent || '').trim() === '刷新当前页'
+        (button) =>
+          String(
+            button.getAttribute('aria-label') || button.textContent || ''
+          ).trim() === '刷新当前页'
       )
       const operationRefreshButtons = allButtons.filter(
         (button) =>
@@ -1326,261 +1307,137 @@ export function createBusinessListAssertions({ outputDir }) {
     page,
     { scenarioName, requireSearch = true }
   ) {
+    const trigger = page.locator(
+      '.erp-business-operation-panel button[aria-haspopup="dialog"]'
+    )
+    const dialog = page.getByRole('dialog', { name: '筛选条件' })
+    const opened = (await trigger.count()) > 0 && !(await dialog.isVisible())
+    if (opened) {
+      await trigger.click()
+      await dialog.waitFor()
+    }
+    await waitForFiniteAnimations(page)
     const metrics = await page.evaluate(() => {
-      const measureTextWidth = (() => {
-        const canvas = document.createElement('canvas')
-        const context = canvas.getContext('2d')
-        return (text, font) => {
-          if (!context) return 0
-          context.font = font
-          return context.measureText(text).width
-        }
-      })()
-      const readControlFromElement = (element, selector = '') => {
-        const rect = element.getBoundingClientRect()
-        const style = window.getComputedStyle(element)
-        const text = String(
-          element.textContent || element.getAttribute('placeholder') || ''
-        ).trim()
-        const dateTextInput = element.matches?.('.erp-business-date-input')
-          ? element.querySelector('input')
-          : null
-        const textSource = dateTextInput || element
-        const textSourceStyle = window.getComputedStyle(textSource)
-        const sampleText = element.matches?.('.erp-business-date-input')
-          ? dateTextInput?.value || dateTextInput?.placeholder || 'yyyy/mm/dd'
-          : text
-        const paddingX =
-          Number.parseFloat(textSourceStyle.paddingLeft || '0') +
-          Number.parseFloat(textSourceStyle.paddingRight || '0')
-        const textClientWidth =
-          dateTextInput?.clientWidth || element.clientWidth
-        const textScrollWidth =
-          dateTextInput?.scrollWidth || element.scrollWidth
+      const read = (node) => {
+        if (!node) return null
+        const box = node.getBoundingClientRect(),
+          style = getComputedStyle(node)
         return {
-          selector,
-          text,
+          width: box.width,
+          height: box.height,
+          radius: style.borderRadius,
+          border: style.borderColor,
           cursor: style.cursor,
-          inputCursor: dateTextInput ? textSourceStyle.cursor : '',
-          borderRadius: style.borderRadius,
-          borderTopLeftRadius: style.borderTopLeftRadius,
-          borderTopRightRadius: style.borderTopRightRadius,
-          borderBottomLeftRadius: style.borderBottomLeftRadius,
-          borderBottomRightRadius: style.borderBottomRightRadius,
-          borderColor: style.borderTopColor,
-          height: rect.height,
-          top: rect.top,
-          bottom: rect.bottom,
-          centerY: rect.top + rect.height / 2,
-          width: rect.width,
-          scrollWidth: textScrollWidth,
-          clientWidth: textClientWidth,
-          effectiveTextWidth: Math.max(0, textClientWidth - paddingX),
-          requiredTextWidth: Math.ceil(
-            measureTextWidth(sampleText, style.font) + 6
-          ),
+          scrollWidth: node.scrollWidth,
+          clientWidth: node.clientWidth,
         }
       }
-      const readControl = (selector) => {
-        const element = document.querySelector(selector)
-        return element ? readControlFromElement(element, selector) : null
-      }
-      const filterRootSelectors = [
+      const roots = [
+        '.erp-business-operation-panel__search',
         '.erp-business-operation-panel__filters',
         '.erp-business-filter-panel__grid',
       ]
-      const joinFilterRootSelector = (selector) =>
-        filterRootSelectors.map((root) => `${root} ${selector}`).join(', ')
-      const readFromFilterRoot = (selector) =>
-        readControl(joinFilterRootSelector(selector))
-      const dateControls = Array.from(
-        document.querySelectorAll(
-          joinFilterRootSelector('.erp-business-date-range-filter')
-        )
-      ).map((node) => readControlFromElement(node))
-      const selectControls = Array.from(
-        document.querySelectorAll(
-          filterRootSelectors
-            .map((root) => `${root} > .ant-select .ant-select-selector`)
-            .join(', ')
-        )
-      ).map((node) => readControlFromElement(node))
-      const filterControls = [
-        readFromFilterRoot('.ant-input-affix-wrapper'),
-        ...selectControls,
-        ...dateControls,
-      ].filter(Boolean)
-
-      return {
-        search: readFromFilterRoot('.ant-input-affix-wrapper'),
-        searchInput: readFromFilterRoot(
-          '.erp-business-filter-control--search input'
-        ),
-        dateInput: readFromFilterRoot('.erp-business-date-input'),
-        dateControl: readFromFilterRoot('.erp-business-date-range-filter'),
-        dateInputs: Array.from(
-          document.querySelectorAll(
-            joinFilterRootSelector('.erp-business-date-input')
+      const selector = (suffix) =>
+        roots
+          .flatMap((root) =>
+            suffix.split(',').map((part) => `${root} ${part.trim()}`)
           )
-        ).map((node) => readControlFromElement(node)),
-        dateControls,
-        selectControls,
-        filterControls,
-        statusSelector: readControl(
-          '.erp-business-filter-control--status .ant-select-selector'
+          .join(', ')
+      const date = document.querySelector(
+        selector('.erp-business-date-range-filter')
+      )
+      const inputs = [
+        ...(date?.querySelectorAll('.erp-business-date-input') || []),
+      ]
+      const controls = [
+        ...document.querySelectorAll(
+          selector('.ant-input-affix-wrapper, .ant-select-selector')
         ),
-        statusSelectionItem: readControl(
-          '.erp-business-filter-control--status .ant-select-selection-item'
+      ].filter(
+        (node) =>
+          node.checkVisibility() &&
+          !node.closest('.erp-business-date-range-filter')
+      )
+      return {
+        search: read(
+          document.querySelector(
+            '.erp-business-operation-panel__search .ant-input-affix-wrapper'
+          )
         ),
-        statusPlaceholder: readControl(
-          '.erp-business-filter-control--status .ant-select-selection-placeholder'
+        date: read(date),
+        dateCount: document.querySelectorAll(
+          selector('.erp-business-date-range-filter')
+        ).length,
+        dateInputs: inputs.map((node) => ({
+          ...read(node),
+          input: read(node.querySelector('input')),
+        })),
+        controls: controls.map(read),
+        status: read(
+          document.querySelector(
+            '.erp-business-filter-control--status .ant-select-selector, .erp-business-operation-panel__quick .ant-segmented'
+          )
         ),
-        statusSearchInput: readControl(
-          '.erp-business-filter-control--status .ant-select-selection-search-input'
-        ),
-        statusArrow: readControl(
-          '.erp-business-filter-control--status .ant-select-arrow'
-        ),
-        actionButton: readControl(
-          '.erp-business-operation-panel__toolbar .ant-btn, .erp-business-module-toolbar .ant-btn'
+        action: read(
+          document.querySelector(
+            '.erp-business-operation-panel__toolbar .ant-btn, .erp-business-module-toolbar .ant-btn'
+          )
         ),
       }
     })
-
-    const baselineControl = metrics.search || metrics.statusSelector
+    const evidence = `${scenarioName}: ${JSON.stringify(metrics)}`
+    assert(!requireSearch || metrics.search, `保留主要搜索入口 ${evidence}`)
     assert(
-      (!requireSearch || metrics.search) &&
-        baselineControl &&
-        metrics.dateInput &&
-        metrics.dateControl &&
-        metrics.dateInputs.length === 2 &&
-        metrics.statusSelector &&
-        (metrics.statusPlaceholder || metrics.statusSelectionItem) &&
-        metrics.statusSearchInput &&
-        metrics.statusArrow &&
-        metrics.actionButton,
-      `${scenarioName} 工具栏控件缺失: ${JSON.stringify(metrics)}`
+      metrics.status && metrics.action,
+      `状态筛选与整表操作必须可见 ${evidence}`
+    )
+    assert.equal(metrics.dateCount, 1, `日期范围使用一个整体控件 ${evidence}`)
+    assert.equal(
+      metrics.dateInputs.length,
+      2,
+      `日期范围保留起止输入 ${evidence}`
     )
     assert.equal(
-      metrics.dateControls.length,
-      1,
-      `${scenarioName} 日期范围控件应收口为一个整体: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.dateInputs.every(
-        (item) => item.scrollWidth <= item.clientWidth + 1
-      ),
-      `${scenarioName} 起止日期文字出现裁切: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.dateInputs.every((item) => item.width >= 160),
-      `${scenarioName} 起止日期输入宽度不足以完整显示 yyyy/mm/dd: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.dateInputs.every(
-        (item) => item.effectiveTextWidth >= item.requiredTextWidth
-      ),
-      `${scenarioName} 起止日期可见文本区不足，日期组件会裁切 placeholder: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.dateInputs.every(
-        (item) => Math.abs(item.centerY - metrics.dateControl.centerY) <= 1
-      ),
-      `${scenarioName} 起止日期输入不应脱离日期范围控件同一行: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.filterControls.every(
-        (item) => Math.abs(item.height - baselineControl.height) <= 1
-      ),
-      `${scenarioName} 筛选输入框高度未统一: ${JSON.stringify(metrics)}`
+      metrics.date.height,
+      34,
+      `日期筛选遵循 34px 高保真控件 ${evidence}`
     )
     assert.equal(
-      metrics.dateInput.cursor,
+      metrics.date.radius,
+      '8px',
+      `日期筛选圆角与共享控件一致 ${evidence}`
+    )
+    assert(
+      metrics.controls.every(
+        (control) => control.height === 34 && control.radius === '8px'
+      ),
+      `筛选控件的高度与圆角一致 ${evidence}`
+    )
+    assert(
+      metrics.dateInputs.every(
+        (control) =>
+          control.width >= 132 &&
+          control.input.scrollWidth <= control.input.clientWidth + 1
+      ),
+      `起止日期完整可读 ${evidence}`
+    )
+    assert(
+      metrics.dateInputs.every(
+        (control) =>
+          control.cursor === 'pointer' && control.input.cursor === 'pointer'
+      ),
+      `日期输入有可点击光标 ${evidence}`
+    )
+    assert.equal(
+      metrics.action.cursor,
       'pointer',
-      `${scenarioName} 日期组件 cursor 未统一为 pointer: ${JSON.stringify(metrics)}`
+      `动作保留可点击光标 ${evidence}`
     )
-    assert(
-      metrics.dateInputs.every((item) => item.inputCursor === 'pointer'),
-      `${scenarioName} 日期输入框 cursor 未统一为 pointer: ${JSON.stringify(metrics)}`
-    )
-    await page
-      .locator('.erp-business-date-range-filter .erp-business-date-input')
-      .first()
-      .click({ position: { x: 16, y: 16 } })
-    const datePanelVisible = await page
-      .waitForSelector(
-        '.ant-picker-dropdown:not(.ant-picker-dropdown-hidden) .ant-picker-panel',
-        { state: 'visible', timeout: 1500 }
-      )
-      .then(() => true)
-      .catch(() => false)
-    assert(
-      datePanelVisible,
-      `${scenarioName} 点击日期输入框文本区域后应打开日期面板`
-    )
-    await page.keyboard.press('Escape')
     await assertBusinessDateRangePickerOrderGuard(page, { scenarioName })
-    assert.equal(
-      metrics.actionButton.cursor,
-      'pointer',
-      `${scenarioName} 工具栏按钮 cursor 未统一为 pointer: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(
-      metrics.dateControl.borderTopLeftRadius,
-      baselineControl.borderTopLeftRadius,
-      `${scenarioName} 日期控件左上圆角未对齐筛选控件: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(
-      metrics.dateControl.borderBottomLeftRadius,
-      baselineControl.borderBottomLeftRadius,
-      `${scenarioName} 日期控件左下圆角未对齐筛选控件: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(
-      metrics.dateControl.borderTopRightRadius,
-      baselineControl.borderTopRightRadius,
-      `${scenarioName} 日期控件右上圆角未对齐筛选控件: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(
-      metrics.dateControl.borderBottomRightRadius,
-      baselineControl.borderBottomRightRadius,
-      `${scenarioName} 日期控件右下圆角未对齐筛选控件: ${JSON.stringify(metrics)}`
-    )
-    if (metrics.search) {
-      assert.equal(
-        metrics.dateControl.borderColor,
-        metrics.search.borderColor,
-        `${scenarioName} 日期控件边框颜色未对齐搜索框: ${JSON.stringify(metrics)}`
-      )
+    if (opened) {
+      await dialog.getByRole('button', { name: '完成', exact: true }).click()
+      await dialog.waitFor({ state: 'hidden' })
     }
-    if (metrics.searchInput?.text) {
-      assert(
-        metrics.searchInput.effectiveTextWidth >=
-          metrics.searchInput.requiredTextWidth,
-        `${scenarioName} 搜索框 placeholder 可见文本区不足: ${JSON.stringify(metrics)}`
-      )
-    }
-    assert(
-      Math.abs(metrics.dateControl.height - baselineControl.height) <= 1,
-      `${scenarioName} 日期控件高度未对齐筛选控件: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      Math.abs(
-        (metrics.statusPlaceholder || metrics.statusSelectionItem).centerY -
-          metrics.statusSelector.centerY
-      ) <= 1,
-      `${scenarioName} 状态筛选显示值未上下居中: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      Math.abs(
-        metrics.statusSearchInput.centerY - metrics.statusSelector.centerY
-      ) <= 1,
-      `${scenarioName} 状态筛选内部搜索 input 未上下居中: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      Math.abs(metrics.statusArrow.centerY - metrics.statusSelector.centerY) <=
-        1,
-      `${scenarioName} 状态筛选箭头未上下居中: ${JSON.stringify(metrics)}`
-    )
   }
 
   async function assertBusinessDateRangePickerOrderGuard(
@@ -1784,7 +1641,7 @@ export function createBusinessListAssertions({ outputDir }) {
     assertShellRefreshButton,
     assertNoDuplicatedAdminPageTitle,
     verifyBusinessModuleColumnOrderDialog,
-    verifyBusinessModuleColumnOrderHeaderMenu,
+    verifyBusinessModuleColumnSettings,
     verifySourceImportPicker,
     assertBusinessToolbarDisabledButtons,
     assertBusinessPageRefreshEntrypoint,

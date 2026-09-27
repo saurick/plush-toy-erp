@@ -1,8 +1,11 @@
 import { installAdminRpcMocks } from './adminRpcMocks.mjs'
+import { readFileSync } from 'node:fs'
 
 const PRODUCT_IMAGE_PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+  readFileSync(new URL('../../../scripts/qa/fixtures/manual-acceptance-image.png', import.meta.url)).toString('base64')
 const PRODUCT_IMAGE_LEGACY_MAX_BYTES = 5 * 1024 * 1024
+const SINGLE_PIXEL_PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
 
 function createOversizedProductImageSourceBuffer() {
   return Buffer.concat([
@@ -28,7 +31,7 @@ function productImageAttachment(slotKey, id, fileName, nowUnix) {
     slot_key: slotKey,
     file_name: fileName,
     mime_type: 'image/png',
-    file_size: 68,
+    file_size: Buffer.from(PRODUCT_IMAGE_PNG_BASE64, 'base64').length,
     sha256: `${id}`.padStart(64, '0'),
     uploaded_by: 1,
     note: null,
@@ -41,6 +44,7 @@ function createProductImageMockState() {
   return {
     nextID: 103,
     calls: [],
+    failList: false,
     nextWriteGate: null,
     attachments: [
       productImageAttachment('primary', 101, '产品主图.png', nowUnix),
@@ -72,6 +76,10 @@ async function installProductImageAttachmentMocks(page, state) {
     }
 
     state.calls.push({ method, params: { ...params } })
+    if (method === 'list_attachments' && state.failList) {
+      await route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 50000, message: '读取失败' } } })
+      return
+    }
     if (
       state.nextWriteGate &&
       ['upload_attachment', 'clear_product_image'].includes(method)
@@ -164,6 +172,7 @@ async function openProductEditModal(page, assert) {
   await modal.waitFor()
   await modal.getByText('产品图 1（主图）', { exact: true }).waitFor()
   await modal.getByText('产品图 2（辅图）', { exact: true }).waitFor()
+  await modal.locator('.product-image-slots').scrollIntoViewIfNeeded()
   return modal
 }
 
@@ -211,6 +220,95 @@ export function createProductImageSlotScenarios(deps) {
   let bomPrintState = createProductImageMockState()
 
   return [
+    ...[
+      { suffix: 'desktop', width: 1440, themeMode: 'light' },
+      { suffix: 'dark', width: 1440, themeMode: 'dark' },
+      { suffix: 'narrow', width: 390, themeMode: 'light' },
+    ].map(({ suffix, width, themeMode }) => {
+      let state
+      return {
+        name: `product-image-empty-failure-recovery-${suffix}`,
+        path: '/erp/master/products',
+        auth: 'admin',
+        themeMode,
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width, height: 900 },
+        beforeNavigate: async (page) => {
+          state = createProductImageMockState()
+          state.attachments = []
+          await installProductImageAttachmentMocks(page, state)
+        },
+        verify: async (page) => {
+          await expectHeading(page, '产品档案')
+          let form = await openProductEditModal(page, assert)
+          const slots = form.locator('.product-image-slots')
+          assert.equal(await slots.getByText('暂无图片', { exact: true }).count(), 2)
+          assert.equal(await slots.getByRole('button', { name: /预览/u }).count(), 0)
+          assert.equal(await slots.getByRole('button', { name: /清空/u }).count(), 0)
+          await form.screenshot({ path: path.join(outputDir, `product-image-empty-${suffix}.png`) })
+          await closeBusinessFormModal(page, form)
+
+          const populated = createProductImageMockState()
+          state.attachments = populated.attachments
+          state.attachmentContents = new Map([[101, SINGLE_PIXEL_PNG], [102, 'bm90LWFuLWltYWdl']])
+          state.failList = true
+          form = await openProductEditModal(page, assert)
+          await form.getByText('图片读取失败', { exact: true }).first().waitFor()
+          assert.equal(await form.getByText('暂无图片', { exact: true }).count(), 0, '读取失败不能误报无图')
+          for (const button of await form.getByRole('button', { name: /选择图片/u }).all()) {
+            assert(await button.isDisabled())
+          }
+          assert.equal(await form.getByRole('button', { name: /选择图片/u }).count(), 2)
+          state.failList = false
+          await form.getByRole('button', { name: '重新加载', exact: true }).first().click()
+          const primary = form.locator('.product-image-slot').filter({ hasText: '产品图 1（主图）' })
+          const secondary = form.locator('.product-image-slot').filter({ hasText: '产品图 2（辅图）' })
+          await primary.getByText('图片不可用', { exact: true }).waitFor()
+          await secondary.getByText('图片加载失败', { exact: true }).waitFor()
+          assert.equal(await form.locator('.product-image-slot__preview img').count(), 0)
+          assert.equal(await form.getAttribute('data-unsaved'), 'false', '展示错误状态不能修改已保存附件')
+          await form.screenshot({ path: path.join(outputDir, `product-image-failure-${suffix}.png`) })
+          await primary.getByRole('button', { name: /预览/u }).click()
+          const preview = page.getByRole('dialog', { name: '产品主图.png', exact: true })
+          await preview.getByText('图片不可用', { exact: true }).waitFor()
+          await preview.locator('.ant-modal-close').click()
+
+          await primary.locator('input[type="file"]').setInputFiles({
+            name: '单像素.png', mimeType: 'image/png', buffer: Buffer.from(SINGLE_PIXEL_PNG, 'base64'),
+          })
+          await page.getByText('图片尺寸过小，请选择可辨认的产品图片', { exact: true }).waitFor()
+          assert.equal(await primary.getByText('保存产品后替换', { exact: true }).count(), 0)
+          const blackImage = await page.evaluate(() => {
+            const canvas = document.createElement('canvas')
+            canvas.width = canvas.height = 64
+            canvas.getContext('2d').fillRect(0, 0, 64, 64)
+            return canvas.toDataURL('image/png').split(',')[1]
+          })
+          await primary.locator('input[type="file"]').setInputFiles({
+            name: '正常黑色图片.png', mimeType: 'image/png', buffer: Buffer.from(blackImage, 'base64'),
+          })
+          await primary.getByText('保存产品后替换', { exact: true }).waitFor()
+          await primary.locator('img').evaluate((img) => img.decode())
+          assert.equal(await primary.getByText('图片不可用', { exact: true }).count(), 0)
+          await primary.locator('input[type="file"]').setInputFiles({
+            name: '替换后的有效样品图片.jpg', mimeType: 'image/jpeg',
+            buffer: readFileSync(new URL('../../../scripts/qa/fixtures/manual-acceptance-image.jpg', import.meta.url)),
+          })
+          await primary.getByText('保存产品后替换', { exact: true }).waitFor()
+          await primary.locator('img').waitFor()
+          await primary.locator('img').evaluate((img) => img.decode())
+          assert(await primary.locator('img').evaluate((img) => img.complete && img.naturalWidth === 640))
+          await secondary.getByRole('button', { name: /清空/u }).click()
+          await secondary.getByText('暂无图片', { exact: true }).waitFor()
+          assert.equal(await secondary.getByRole('button', { name: /预览/u }).count(), 0)
+          assert.equal(state.calls.filter(({ method }) => ['upload_attachment', 'clear_product_image'].includes(method)).length, 0)
+          const metrics = await readProductImageSlotMetrics(form)
+          assert(metrics.sectionScrollWidth <= metrics.sectionClientWidth + 1)
+          await closeBusinessFormModal(page, form)
+          await assertNoHorizontalOverflow(page, `product-image-recovery-${suffix}`)
+        },
+      }
+    }),
     {
       name: 'product-image-slots-desktop',
       path: '/erp/master/products',
@@ -651,6 +749,25 @@ export function createProductImageSlotScenarios(deps) {
           page,
           'product-image-bom-print-snapshot'
         )
+
+        bomPrintState.attachmentContents.set(101, SINGLE_PIXEL_PNG)
+        bomPrintState.attachmentContents.set(102, 'bm90LWFuLWltYWdl')
+        const [invalidPopup] = await Promise.all([
+          page.waitForEvent('popup', { timeout: 10_000 }),
+          printButton.click(),
+        ])
+        await installAdminRpcMocks(invalidPopup, { baseURL: new URL(page.url()).origin })
+        try {
+          const invalidPaper = invalidPopup.locator('.erp-material-detail-paper')
+          await invalidPaper.getByText('不可用', { exact: true }).waitFor()
+          await invalidPaper.getByText('加载失败', { exact: true }).waitFor()
+          assert.equal(await invalidPaper.locator('[data-print-image-error]').count(), 2)
+          await invalidPopup.getByRole('button', { name: /下载 PDF/u }).click()
+          await invalidPopup.getByText('有图片无法使用，请更换或清空后再输出。', { exact: true }).waitFor()
+          await invalidPopup.screenshot({ path: path.join(outputDir, 'product-image-print-unavailable.png') })
+        } finally {
+          if (!invalidPopup.isClosed()) await invalidPopup.close()
+        }
       },
     },
   ]

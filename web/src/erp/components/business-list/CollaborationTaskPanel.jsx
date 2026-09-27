@@ -5,7 +5,7 @@ import {
   DownOutlined,
   UpOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Space, Tag, Typography } from 'antd'
+import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -430,11 +430,7 @@ export function CollaborationTaskPanel({
   ])
   const renderTaskList = (items, emptyText, hiddenCount = 0) => {
     if (items.length === 0) {
-      return (
-        <div className="erp-business-collaboration-task-panel__empty">
-          <Text type="secondary">{emptyText}</Text>
-        </div>
-      )
+      return <Empty description={emptyText} />
     }
 
     return (

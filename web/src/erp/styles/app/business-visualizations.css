@@ -1,31 +1,28 @@
 .erp-business-visual-switch {
   display: flex;
-  min-height: 42px;
+  min-height: 32px;
   align-items: center;
   gap: 12px;
-  padding: 6px 4px;
-}
-
-.erp-business-visual-switch__reload.is-placeholder {
-  visibility: hidden;
-  pointer-events: none;
+  padding: 0;
 }
 
 .erp-business-view-surface {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr);
+  margin-top: 9px;
 }
 
 .erp-business-view-surface__toolbar {
   position: relative;
   z-index: 1;
   min-width: 0;
-  padding: 10px 12px 8px;
-  border: 1px solid var(--erp-business-card-border, #dfe9e1);
-  border-bottom: 0;
-  border-radius: 12px 12px 0 0;
-  background: var(--erp-surface-bg, #fff);
+  margin-bottom: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
 }
 
 .erp-business-visual-frame {
@@ -37,8 +34,8 @@
 
 .erp-business-view-surface > .erp-business-data-table-card.ant-card,
 .erp-business-view-surface > .erp-business-visual-frame {
-  border-top: 0;
-  border-radius: 0 0 12px 12px;
+  flex: 1;
+  border-radius: 10px;
 }
 
 .erp-business-view-surface
@@ -95,7 +92,7 @@
   border: 1px solid var(--erp-border, #dfe7e2);
   border-radius: 8px;
   background: var(--erp-surface-bg-soft, #f8faf8);
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 11px;
 }
 
@@ -106,15 +103,20 @@
 }
 
 .erp-business-visual-metric--danger strong {
-  color: #c24148;
+  color: var(--erp-visual-danger-text, #b8323f);
 }
 
 .erp-business-visual-metric--warning strong {
-  color: #b56614;
+  color: var(--erp-warning-text, #936314);
 }
 
 .erp-business-visual-metric--success strong {
-  color: #26734d;
+  color: var(--erp-primary, #26734d);
+}
+
+.erp-business-visual-frame .ant-btn-link,
+.erp-business-visual-pagination .ant-pagination-item-active a {
+  color: var(--erp-primary, #26734d);
 }
 
 .erp-business-visual-state {
@@ -124,11 +126,11 @@
   justify-content: center;
   gap: 12px;
   padding: 24px;
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
 }
 
 .erp-business-visual-state--error {
-  color: var(--ant-color-error, #b4232c);
+  color: var(--erp-visual-danger-text, #b4232c);
 }
 
 .erp-business-visual-list__columns,
@@ -145,7 +147,7 @@
   padding: 8px 18px;
   border-top: 1px solid var(--erp-border, #e5ece7);
   border-bottom: 1px solid var(--erp-border, #e5ece7);
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 12px;
   font-weight: 600;
 }
@@ -184,7 +186,7 @@
 .erp-business-visual-identity span,
 .erp-business-visual-identity small,
 .erp-business-visual-progress small {
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 12px;
 }
 
@@ -202,6 +204,11 @@
 .erp-business-visual-date,
 .erp-business-visual-quantity {
   font-variant-numeric: tabular-nums;
+}
+
+.erp-business-visual-mobile-label {
+  display: none;
+  color: var(--erp-text-muted, #52627a);
 }
 
 .erp-business-visual-status {
@@ -245,7 +252,7 @@
 
 .erp-business-visual-status--cancelled {
   background: #eef0ef;
-  color: #68736d;
+  color: #56635b;
 }
 
 .erp-business-visual-status--unknown {
@@ -290,7 +297,7 @@
 
 .erp-arrival-calendar__weekdays span {
   padding: 6px;
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 11px;
   text-align: center;
 }
@@ -315,8 +322,22 @@
   border-bottom-width: 1px;
 }
 
+.erp-arrival-calendar__day-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.erp-arrival-calendar__day-label small {
+  color: var(--erp-text-muted, #52627a);
+  font-size: 11px;
+}
+
 .erp-arrival-calendar__day-number {
   font-size: 12px;
+  line-height: 21px;
 }
 
 .erp-arrival-calendar__day > strong {
@@ -327,7 +348,7 @@
 }
 
 .erp-arrival-calendar__day--muted {
-  color: #a9b3ad;
+  color: var(--erp-text-muted, #52627a);
   background: color-mix(
     in srgb,
     var(--erp-surface-bg-soft, #f8faf8) 70%,
@@ -403,7 +424,7 @@
 .erp-arrival-calendar__unscheduled,
 .erp-arrival-calendar__order-source,
 .erp-arrival-calendar__empty {
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 11px;
 }
 
@@ -438,6 +459,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
+  overflow-wrap: anywhere;
 }
 
 .erp-arrival-calendar__order-source {
@@ -467,11 +489,13 @@
 
 .erp-finance-due-list__amount {
   display: flex;
+  min-width: 0;
   flex-direction: column;
+  overflow-wrap: anywhere;
 }
 
 .erp-finance-due-list__amount small {
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 11px;
 }
 
@@ -511,7 +535,7 @@
 }
 
 .erp-inventory-distribution-grid__head b {
-  color: var(--ant-color-primary, #397655);
+  color: var(--erp-primary, #397655);
   font-size: 18px;
   font-variant-numeric: tabular-nums;
 }
@@ -536,7 +560,7 @@
 
 .erp-inventory-distribution-grid__fact-label {
   overflow: hidden;
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -545,7 +569,6 @@
 .erp-operational-visual-toolbar {
   display: grid;
   min-width: 0;
-  background: var(--erp-surface-bg, #fff);
 }
 
 .erp-operational-visual-toolbar--split {
@@ -568,17 +591,12 @@
   margin: 0;
 }
 
-.erp-business-view-tabs .ant-tabs-tab {
-  padding-block: 8px;
-}
-
 .erp-operational-visual-toolbar__secondary {
   display: flex;
   min-width: 0;
   align-items: center;
   justify-content: flex-start;
   padding: 3px 14px;
-  background: var(--erp-surface-bg-soft, #f8faf8);
 }
 
 .erp-operational-visual-toolbar--split
@@ -586,7 +604,6 @@
   justify-content: flex-end;
   padding-block: 2px;
   padding-left: 8px;
-  background: transparent;
 }
 
 .erp-operational-visual-toolbar__secondary > .erp-business-visual-switch {
@@ -672,7 +689,7 @@
   padding: 8px 18px;
   border-top: 1px solid var(--erp-border, #e5ece7);
   border-bottom: 1px solid var(--erp-border, #e5ece7);
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 12px;
   font-weight: 600;
 }
@@ -696,7 +713,7 @@
 }
 
 .erp-production-overview__schedule {
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
@@ -722,7 +739,7 @@
 }
 
 .erp-production-process__toolbar-label {
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 11px;
 }
 
@@ -760,7 +777,7 @@
 
 .erp-production-process__identity span,
 .erp-production-process__identity small {
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 11px;
 }
 
@@ -797,7 +814,7 @@
     var(--ant-color-primary, #397655) 10%,
     transparent
   );
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
@@ -821,7 +838,7 @@
 .erp-production-process__quality {
   grid-column: 1 / -1;
   overflow: hidden;
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 10px;
   font-style: normal;
   text-overflow: ellipsis;
@@ -877,7 +894,7 @@
   padding: 9px 12px;
   border: 1px solid #dfe9e1;
   border-radius: 10px;
-  background: rgb(255 255 255 / 0.96);
+  background: var(--erp-surface-bg);
 }
 
 .erp-management-glance__title {
@@ -886,7 +903,7 @@
 }
 
 .erp-management-glance__hint {
-  color: var(--erp-text-muted, #64748b);
+  color: var(--erp-text-muted, #52627a);
   font-size: 10px;
 }
 
@@ -1033,12 +1050,28 @@
   }
 
   .erp-business-visual-list__row {
-    grid-template-columns: minmax(190px, 1fr) minmax(180px, 1fr) auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: 'identity status' 'date quantity' 'progress progress';
   }
 
-  .erp-business-visual-list__row > :nth-child(2),
+  .erp-business-visual-list__row > :nth-child(1) {
+    grid-area: identity;
+  }
+  .erp-business-visual-list__row > :nth-child(2) {
+    grid-area: date;
+  }
+  .erp-business-visual-list__row > :nth-child(3) {
+    grid-area: progress;
+  }
   .erp-business-visual-list__row > :nth-child(4) {
-    display: none;
+    grid-area: quantity;
+  }
+  .erp-business-visual-list__row > :nth-child(5) {
+    grid-area: status;
+    justify-self: end;
+  }
+  .erp-business-visual-mobile-label {
+    display: block;
   }
 
   .erp-arrival-calendar-layout {
@@ -1051,13 +1084,11 @@
   }
 
   .erp-finance-due-list__row {
-    grid-template-columns:
-      minmax(200px, 1fr) repeat(2, minmax(110px, 0.65fr))
-      auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .erp-finance-due-list__row > :nth-child(3) {
-    display: none;
+  .erp-finance-due-list__row > :first-child {
+    grid-column: 1 / -1;
   }
 }
 
@@ -1072,14 +1103,26 @@
 
   .erp-production-overview__main {
     grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'identity identity' 'schedule status';
+    gap: 8px;
+  }
+
+  .erp-production-overview__main > :first-child {
+    grid-area: identity;
   }
 
   .erp-production-overview__main > :nth-child(2) {
-    display: none;
+    grid-area: schedule;
+    overflow-wrap: anywhere;
+  }
+
+  .erp-production-overview__main > :nth-child(3) {
+    grid-area: status;
   }
 
   .erp-production-overview__row > .ant-btn {
-    display: none;
+    justify-self: end;
+    margin: 0 18px 10px;
   }
 
   .erp-production-process__toolbar {
@@ -1121,18 +1164,13 @@
     flex-wrap: wrap;
   }
 
+  .erp-inventory-ledger-view-bar .erp-business-visual-switch {
+    flex: 0 0 auto;
+    justify-content: space-between;
+  }
+
   .erp-business-visual-metric {
     min-width: calc(50% - 4px);
-  }
-
-  .erp-business-visual-list__row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .erp-business-visual-list__row > :nth-child(2),
-  .erp-business-visual-list__row > :nth-child(3),
-  .erp-business-visual-list__row > :nth-child(4) {
-    display: none;
   }
 
   .erp-arrival-calendar {
@@ -1144,21 +1182,74 @@
     padding: 5px;
   }
 
+  .erp-arrival-calendar__day-month {
+    display: none;
+  }
+
   .erp-arrival-calendar__day > strong {
     font-size: 9px;
-  }
-
-  .erp-finance-due-list__row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .erp-finance-due-list__row > :nth-child(2),
-  .erp-finance-due-list__row > :nth-child(3),
-  .erp-finance-due-list__row > :nth-child(4) {
-    display: none;
   }
 
   .erp-inventory-distribution-grid__facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.erp-business-visual-pagination {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 18px;
+}
+
+.erp-business-visual-unknown {
+  color: var(--erp-text-muted, #52627a);
+}
+
+.erp-purchase-arrival-visual > .erp-arrival-calendar__toolbar {
+  flex-wrap: wrap;
+  padding: 12px 18px;
+}
+
+.erp-purchase-arrival-visual .erp-arrival-calendar__toolbar .ant-select {
+  min-width: 150px;
+}
+
+.erp-purchase-arrival-visual .erp-arrival-calendar__orders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+
+.erp-business-visual-filter:focus-visible {
+  outline: 2px solid var(--erp-primary, #1677ff);
+  outline-offset: 2px;
+}
+
+button.erp-production-process__step {
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.erp-production-process__step:hover,
+button.erp-production-process__step:focus-visible {
+  border-color: var(--ant-color-primary, #397655);
+  outline: 2px solid
+    color-mix(in srgb, var(--ant-color-primary, #397655) 35%, transparent);
+  outline-offset: 1px;
+}
+
+.erp-production-process__detail-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--erp-border, #dfe7e2);
+  overflow-wrap: anywhere;
+}
+
+.erp-business-page-header-card .erp-operational-visual-toolbar__secondary {
+  margin: 0;
+  padding: 0;
+  background: transparent;
 }

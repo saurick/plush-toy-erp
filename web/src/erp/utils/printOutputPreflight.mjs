@@ -1,3 +1,9 @@
+import {
+  standardUnitForLabel,
+  isQuantityTextWithinUnitPrecision,
+} from './unitQuantity.mjs'
+import { isUsableImageDimensions } from './imageDisplay.mjs'
+
 export const PRINT_IMAGE_LIMITS = Object.freeze({
   count: 32,
   eachBytes: 5 * 1024 * 1024,
@@ -46,6 +52,27 @@ export function getPrintDraftProblems(template, draft = {}) {
     const lines = Array.isArray(draft.lines) ? draft.lines : []
     if (!lines.length) problems.push('至少一行明细')
     lines.forEach((line, index) => {
+      if (contract.family === 'contract') {
+        const unit = standardUnitForLabel(line.unit)
+        if (!unit) problems.push(`第 ${index + 1} 行单位（请选择标准单位）`)
+        if (
+          unit &&
+          !missing(line.quantity) &&
+          (!isQuantityTextWithinUnitPrecision(line.quantity, unit.precision) ||
+            !(Number(line.quantity) > 0))
+        ) {
+          problems.push(
+            `第 ${index + 1} 行数量（${unit.name}最多 ${unit.precision} 位小数）`
+          )
+        }
+        if (
+          !missing(line.unitPrice) &&
+          (!isQuantityTextWithinUnitPrecision(line.unitPrice, 6) ||
+            Number(line.unitPrice) < 0)
+        ) {
+          problems.push(`第 ${index + 1} 行单价（须为非负数，最多 6 位小数）`)
+        }
+      }
       for (const [key, label] of contract.requiredLineFields) {
         if (missing(line[key])) problems.push(`第 ${index + 1} 行${label}`)
       }
@@ -58,6 +85,20 @@ export function getPrintOutputProblem(template, draft, paper) {
   const fields = getPrintDraftProblems(template, draft)
   if (fields.length) {
     return `请先补充：${fields.slice(0, 8).join('、')}${fields.length > 8 ? `等 ${fields.length} 项` : ''}。需要打印空表时，请选择“空白模板”。`
+  }
+  if (paper?.querySelector?.('[data-print-image-error]')) {
+    return '有图片无法使用，请更换或清空后再输出。'
+  }
+  const images = Array.from(paper?.querySelectorAll?.('img[src]') || [])
+  if (images.some((image) => image.complete === false)) {
+    return '图片仍在加载，请稍后再输出。'
+  }
+  if (
+    images.some(
+      (image) => image.complete === true && !isUsableImageDimensions(image)
+    )
+  ) {
+    return '有图片无法使用，请更换或清空后再输出。'
   }
   const callouts = Array.from(
     paper?.querySelectorAll?.(
@@ -78,6 +119,9 @@ export function getPrintOutputProblem(template, draft, paper) {
 }
 
 export function assertPrintSnapshotBudget(root, html) {
+  if (root?.querySelector?.('[data-print-image-error]')) {
+    throw new Error('有图片无法使用，请更换或清空后再输出。')
+  }
   const { problem } = inspectPrintImageBudget(root)
   if (problem) throw new Error(problem)
   if (

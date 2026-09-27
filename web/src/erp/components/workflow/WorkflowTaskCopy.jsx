@@ -50,7 +50,8 @@ export function TaskCopyField({ value, label, children }) {
   )
 }
 
-export function WorkflowTaskSource({ task, label }) {
+export function WorkflowTaskSource({ task, label, copyable = true }) {
+  if (!copyable) return label || formatWorkflowTaskSource(task)
   return (
     <TaskCopyField value={getWorkflowTaskSourceNo(task)} label="单据编号">
       {label || formatWorkflowTaskSource(task)}

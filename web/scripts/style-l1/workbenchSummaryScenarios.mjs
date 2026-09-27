@@ -3,6 +3,7 @@ import path from 'node:path'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertTableSemanticAlignment } from './businessTableAssertions.mjs'
+import { createMaterialSummaryScenarios } from './materialSummaryScenarios.mjs'
 
 const baseActions = ['erp.workbench.read', 'workflow.task.read']
 const salesActions = ['sales_order.read', 'sales_order_item.read']
@@ -160,14 +161,35 @@ export function createWorkbenchSummaryScenarios({
         )
         if (mode === 'none') {
           assert.equal(
-            await page.getByRole('tab', { name: '汇总', exact: true }).count(),
+            await page
+              .getByLabel('工作台视图')
+              .getByText('业务汇总', { exact: true })
+              .count(),
             0
           )
           await assertNoHorizontalOverflow(page)
           return
         }
-        await page.getByRole('tab', { name: '汇总', exact: true }).click()
+        await page
+          .getByLabel('工作台视图')
+          .getByText('业务汇总', { exact: true })
+          .click()
         const region = page.getByRole('region', { name: '工作台汇总' })
+        await region.locator('.erp-workbench-summaries__heading > *').waitFor()
+        const headingInset = await region.evaluate((node) => {
+          const surface = node.getBoundingClientRect()
+          const heading = node
+            .querySelector('.erp-workbench-summaries__heading > *')
+            .getBoundingClientRect()
+          return {
+            left: heading.left - surface.left,
+            top: heading.top - surface.top,
+          }
+        })
+        assert.ok(
+          headingInset.left >= 11.5 && headingInset.top >= 9.5,
+          `汇总标题或选择器保留左上间距 ${JSON.stringify(headingInset)}`
+        )
         if (mode === 'materials') {
           await region
             .getByRole('heading', { name: '材料汇总', exact: true })
@@ -212,60 +234,56 @@ export function createWorkbenchSummaryScenarios({
             客户: 'left',
             产品名称: 'left',
             订单数量: 'right',
-            单位: 'center',
+            单位: 'left',
             备注: 'left',
             工艺: 'left',
-            订单状态: 'center',
+            订单状态: 'left',
           },
         })
-        const summaryLayout = await region.evaluate((element) => {
-          const panel = element.querySelector('.erp-business-operation-panel')
-          const filters = element.querySelector(
-            '.erp-business-operation-panel__filters'
-          )
-          const toolbar = element.querySelector(
-            '.erp-business-operation-panel__toolbar'
-          )
-          const dateRange = element.querySelector(
-            '.erp-business-date-range-filter'
-          )
-          const elementStyle = getComputedStyle(element)
-          const panelStyle = getComputedStyle(panel)
-          const dateRangeStyle = getComputedStyle(dateRange)
-          const filterRect = filters.getBoundingClientRect()
-          const toolbarRect = toolbar.getBoundingClientRect()
-          return {
-            controlHeight: elementStyle
-              .getPropertyValue('--erp-business-control-height')
-              .trim(),
-            panelBorderRadius: panelStyle.borderRadius,
-            dateBorderStyle: dateRangeStyle.borderTopStyle,
-            dateBorderWidth: dateRangeStyle.borderTopWidth,
-            filterBottom: filterRect.bottom,
-            toolbarTop: toolbarRect.top,
-            searchControlCount: element.querySelectorAll(
-              '.erp-business-filter-control--search.ant-input-affix-wrapper'
-            ).length,
-          }
+        const search = region.getByRole('searchbox', {
+          name: '搜索订单号、产品名称或款号',
         })
-        assert.equal(summaryLayout.controlHeight, '36px')
-        assert.equal(summaryLayout.panelBorderRadius, '8px')
-        assert.equal(summaryLayout.dateBorderStyle, 'solid')
-        assert.equal(summaryLayout.dateBorderWidth, '1px')
-        assert.equal(summaryLayout.searchControlCount, 3)
-        assert(
-          summaryLayout.toolbarTop >= summaryLayout.filterBottom + 7,
-          `${name} 工作台汇总操作不能覆盖筛选区: ${JSON.stringify(summaryLayout)}`
+        assert.equal(await search.count(), 1, '汇总保留一个主要搜索入口')
+        await search.fill('模拟产品 21')
+        await region.getByText('模拟产品 21', { exact: true }).waitFor()
+        assert.equal(calls.at(-1).params.keyword, '模拟产品 21')
+        await search.fill('')
+        await region.getByText('模拟产品 1', { exact: true }).waitFor()
+        assert.equal(calls.at(-1).params.keyword, '')
+        const filterTrigger = region.locator('button[aria-haspopup="dialog"]')
+        await filterTrigger.click()
+        const filterDialog = page.getByRole('dialog', { name: '筛选条件' })
+        await filterDialog.waitFor()
+        assert.equal(
+          await filterDialog.getByRole('searchbox').count(),
+          2,
+          '客户与业务人员筛选在同一浮层'
         )
+        const dateRange = filterDialog.locator(
+          '.erp-business-date-range-filter'
+        )
+        assert.equal(
+          await dateRange.evaluate(
+            (node) => getComputedStyle(node).borderTopWidth
+          ),
+          '1px'
+        )
+        await filterDialog
+          .getByRole('button', { name: '完成', exact: true })
+          .click()
         await region.locator('.ant-pagination-item-2').click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
         assert.equal(calls.at(-1).params.offset, 20)
-        const customer = region.getByRole('searchbox', {
+        await filterTrigger.click()
+        const customer = filterDialog.getByRole('searchbox', {
           name: '搜索客户',
           exact: true,
         })
         await customer.fill('模拟筛选客户')
         await customer.press('Enter')
+        await filterDialog
+          .getByRole('button', { name: '完成', exact: true })
+          .click()
         await page.waitForFunction(() =>
           document
             .querySelector('.ant-pagination-total-text')
@@ -281,13 +299,23 @@ export function createWorkbenchSummaryScenarios({
         const csv = await fs.readFile(await download.path(), 'utf8')
         assert(csv.includes('模拟产品 21') && !csv.includes('模拟产品 20'))
         assert.equal(csv.includes('单价'), mode !== 'sales')
-        await page.getByRole('tab', { name: '待办', exact: true }).click()
+        await page
+          .getByLabel('工作台视图')
+          .getByText('待办', { exact: true })
+          .click()
         await page.locator('[aria-label="工作台任务筛选"]').waitFor()
-        await page.getByRole('tab', { name: '汇总', exact: true }).click()
+        await page
+          .getByLabel('工作台视图')
+          .getByText('业务汇总', { exact: true })
+          .click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
+        await filterTrigger.click()
         assert.equal(await customer.inputValue(), '模拟筛选客户')
+        await filterDialog
+          .getByRole('button', { name: '完成', exact: true })
+          .click()
         failNext = true
-        await region.getByRole('button', { name: '刷新', exact: true }).click()
+        await page.getByRole('button', { name: '刷新当前页' }).click()
         await region
           .getByRole('button', { name: '重新加载', exact: true })
           .waitFor()
@@ -299,13 +327,21 @@ export function createWorkbenchSummaryScenarios({
           .getByRole('button', { name: '重新加载', exact: true })
           .click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
+        await filterTrigger.click()
         await customer.fill('没有这家客户')
         await customer.press('Enter')
+        await filterDialog
+          .getByRole('button', { name: '完成', exact: true })
+          .click()
         await region
           .getByText('暂无符合条件的销售订单明细', { exact: true })
           .waitFor()
+        await filterTrigger.click()
         await customer.fill('模拟筛选客户')
         await customer.press('Enter')
+        await filterDialog
+          .getByRole('button', { name: '完成', exact: true })
+          .click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
         await page.waitForFunction(() =>
           [
@@ -401,5 +437,6 @@ export function createWorkbenchSummaryScenarios({
       'materials'
     ),
     makeScenario('erp-workbench-summary-unrelated-role', [], 'none'),
+    ...createMaterialSummaryScenarios({ assert, outputDir, customerRuntimeEffectiveSession }),
   ]
 }

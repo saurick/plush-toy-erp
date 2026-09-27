@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from 'react'
@@ -12,6 +13,12 @@ import {
   normalizeERPThemeMode,
   resolveEffectiveERPTheme,
 } from './erpThemeMode.mjs'
+import {
+  ERP_ACCENTS,
+  ERP_APPEARANCE_STORAGE_KEY,
+  normalizeERPAppearance,
+  readERPAppearance,
+} from './erpAppearance.mjs'
 
 export {
   ERP_THEME_MODE,
@@ -22,13 +29,25 @@ export {
 
 const ERPThemeContext = createContext(null)
 
+function getBrowserStorage() {
+  try {
+    return globalThis.window?.localStorage
+  } catch {
+    return undefined
+  }
+}
+
 function getInitialThemeMode() {
   if (typeof window === 'undefined') {
     return ERP_THEME_MODE.SYSTEM
   }
-  return normalizeERPThemeMode(
-    window.localStorage.getItem(ERP_THEME_STORAGE_KEY)
-  )
+  try {
+    return normalizeERPThemeMode(
+      getBrowserStorage()?.getItem(ERP_THEME_STORAGE_KEY)
+    )
+  } catch {
+    return ERP_THEME_MODE.SYSTEM
+  }
 }
 
 function getInitialPrefersDark() {
@@ -40,6 +59,9 @@ function getInitialPrefersDark() {
 
 export function ERPThemeProvider({ children }) {
   const [themeMode, setThemeModeState] = useState(getInitialThemeMode)
+  const [appearance, setAppearanceState] = useState(() =>
+    readERPAppearance(getBrowserStorage())
+  )
   const [prefersDark, setPrefersDark] = useState(getInitialPrefersDark)
 
   useEffect(() => {
@@ -63,10 +85,14 @@ export function ERPThemeProvider({ children }) {
       setThemeModeState((currentMode) =>
         currentMode === nextMode ? currentMode : nextMode
       )
+      setAppearanceState(readERPAppearance(getBrowserStorage()))
     }
     const handleStorage = (event) => {
       if (event.key === ERP_THEME_STORAGE_KEY || event.key === null) {
         setThemeModeState(normalizeERPThemeMode(event.newValue))
+      }
+      if (event.key === ERP_APPEARANCE_STORAGE_KEY || event.key === null) {
+        setAppearanceState(readERPAppearance(getBrowserStorage()))
       }
     }
     const handleVisibilityChange = () => {
@@ -88,18 +114,48 @@ export function ERPThemeProvider({ children }) {
 
   const effectiveTheme = resolveEffectiveERPTheme(themeMode, prefersDark)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement
     root.dataset.erpTheme = effectiveTheme
     root.dataset.erpThemeMode = themeMode
     root.style.colorScheme =
       effectiveTheme === ERP_THEME_MODE.DARK ? 'dark' : 'light'
-  }, [effectiveTheme, themeMode])
+    const accent = ERP_ACCENTS[appearance.accent]
+    root.dataset.erpAccent = appearance.accent
+    root.dataset.erpDensity = appearance.density
+    root.style.setProperty('--erp-accent', accent.primary)
+    root.style.setProperty('--erp-accent-strong', accent.strong)
+    root.style.setProperty('--erp-accent-hover', accent.hover)
+    root.style.setProperty('--erp-accent-dark', accent.dark)
+    root.style.setProperty(
+      '--erp-on-accent',
+      effectiveTheme === ERP_THEME_MODE.DARK ? '#111713' : accent.onPrimary
+    )
+  }, [appearance, effectiveTheme, themeMode])
+
+  const setAppearance = useCallback((next) => {
+    setAppearanceState((current) => {
+      const normalized = normalizeERPAppearance({ ...current, ...next })
+      try {
+        window.localStorage.setItem(
+          ERP_APPEARANCE_STORAGE_KEY,
+          JSON.stringify(normalized)
+        )
+      } catch {
+        /* Display preferences remain usable when storage is unavailable. */
+      }
+      return normalized
+    })
+  }, [])
 
   const setThemeMode = useCallback((nextMode) => {
     const normalizedMode = normalizeERPThemeMode(nextMode)
     setThemeModeState(normalizedMode)
-    window.localStorage.setItem(ERP_THEME_STORAGE_KEY, normalizedMode)
+    try {
+      getBrowserStorage()?.setItem(ERP_THEME_STORAGE_KEY, normalizedMode)
+    } catch {
+      /* The current theme still works when browser storage is unavailable. */
+    }
   }, [])
 
   const value = useMemo(
@@ -108,8 +164,11 @@ export function ERPThemeProvider({ children }) {
       effectiveTheme,
       isDark: effectiveTheme === ERP_THEME_MODE.DARK,
       setThemeMode,
+      appearance,
+      setAppearance,
+      accent: ERP_ACCENTS[appearance.accent],
     }),
-    [effectiveTheme, setThemeMode, themeMode]
+    [appearance, effectiveTheme, setAppearance, setThemeMode, themeMode]
   )
 
   return (

@@ -787,6 +787,7 @@ export async function installOrderRpcMocks(page, context) {
   }
   const productionAllowedParams = {
     list_production_orders: new Set([
+      'include_status_counts',
       'keyword',
       'status',
       'lifecycle_scope',
@@ -907,7 +908,12 @@ export async function installOrderRpcMocks(page, context) {
         'active_bom',
       ].includes(params.reference_type)
     }
-    return method === 'list_production_orders'
+    return (
+      method === 'list_production_orders' &&
+      (params.include_status_counts === undefined ||
+        params.include_status_counts === null ||
+        typeof params.include_status_counts === 'boolean')
+    )
   }
 
   await page.route('**/rpc/production_order', async (route) => {
@@ -923,6 +929,9 @@ export async function installOrderRpcMocks(page, context) {
         total: 1,
         limit: Number(params.limit || 20),
         offset: Number(params.offset || 0),
+        ...(params.include_status_counts
+          ? { status_counts: { [productionOrder.status]: 1 } }
+          : {}),
       }
     } else if (method === 'get_production_order') {
       data = {

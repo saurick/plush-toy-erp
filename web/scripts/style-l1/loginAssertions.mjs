@@ -60,7 +60,7 @@ async function assertAdminLoginLayout(page, { minCardWidth }) {
     `登录卡片宽度异常: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.cardWidth <= 622,
+    metrics.cardWidth <= 458,
     `登录卡片不应撑满桌面视口: ${JSON.stringify(metrics)}`
   )
   assert.equal(
@@ -96,7 +96,7 @@ async function assertAdminLoginLayout(page, { minCardWidth }) {
     `登录页背景未覆盖视口: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.cardRadius >= 16,
+    metrics.cardRadius === 10,
     `登录卡片圆角回退: ${JSON.stringify(metrics)}`
   )
   assert(metrics.logoWidth > 0, `登录品牌头未渲染: ${JSON.stringify(metrics)}`)
@@ -105,19 +105,19 @@ async function assertAdminLoginLayout(page, { minCardWidth }) {
     `登录品牌头溢出卡片: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.usernameHeight >= 54,
+    metrics.usernameHeight >= 44 && metrics.usernameHeight <= 46,
     `登录账号输入框高度异常: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.passwordHeight >= 54,
+    metrics.passwordHeight >= 44 && metrics.passwordHeight <= 46,
     `登录密码输入框高度异常: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.submitHeight >= 54,
+    metrics.submitHeight >= 44 && metrics.submitHeight <= 46,
     `登录按钮高度异常: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.submitRadius >= 20,
+    metrics.submitRadius === 8,
     `登录按钮圆角回退: ${JSON.stringify(metrics)}`
   )
   assert.equal(
@@ -184,7 +184,7 @@ async function assertAdminLoginSmsHintLayout(page, { scenarioName }) {
     `${scenarioName} 短信提示高度应是轻量反馈: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.borderRadius >= 18,
+    metrics.borderRadius === 8,
     `${scenarioName} 短信提示圆角回退: ${JSON.stringify(metrics)}`
   )
   assert(
@@ -192,7 +192,7 @@ async function assertAdminLoginSmsHintLayout(page, { scenarioName }) {
     `${scenarioName} 短信提示和登录按钮间距不足或重叠: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.submitHeight >= 54,
+    metrics.submitHeight >= 44 && metrics.submitHeight <= 46,
     `${scenarioName} 登录按钮高度被短信提示影响: ${JSON.stringify(metrics)}`
   )
   assert(

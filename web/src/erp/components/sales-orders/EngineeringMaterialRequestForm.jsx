@@ -191,7 +191,7 @@ export default function EngineeringMaterialRequestForm({
               ? '已提交老板审核'
               : '审核已通过，已交财务审核'
       onChanged?.(value, { action, reason: values.note || '', successMessage })
-      message.success(successMessage)
+      if (!mobile || !taskProcessing) message.success(successMessage)
     } catch (cause) {
       setError(getActionErrorMessage(cause, '办理工程用料审批'))
     } finally {

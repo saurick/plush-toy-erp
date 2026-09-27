@@ -17,8 +17,10 @@ import {
 } from '@ant-design/icons'
 import { Button, Form, Popconfirm, Space } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import useBusinessPageState from '../hooks/useBusinessPageState'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../utils/warehouseClassification.mjs'
+import { DEFAULT_DELIVERY_COUNTRY } from '../utils/deliveryAddress.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -34,14 +36,8 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
-import {
-  ColumnOrderHeaderMenu,
-  ColumnOrderModal,
-} from '../components/business-list/ColumnOrderModal.jsx'
-import {
-  getPreferredColumnOrder,
-  writeStoredColumnOrder,
-} from '../components/business-list/businessListPreferences.mjs'
+import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
+import BusinessFormSection from '../components/business-list/BusinessFormSection.jsx'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
@@ -61,7 +57,6 @@ import {
   listProducts,
   listUnits,
 } from '../api/masterDataOrderApi.mjs'
-import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   buildMaterialDraftCode,
   buildSequentialDraftCode,
@@ -84,10 +79,6 @@ import {
   resolvePaymentTermDays,
 } from '../utils/paymentConditions.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
-import {
-  applyModuleColumnOrder,
-  sanitizeModuleColumnOrder,
-} from '../utils/moduleTableColumns.mjs'
 import { filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.mjs'
 import {
   processOption,
@@ -162,22 +153,33 @@ export default function V1MasterDataPage({ type }) {
   const isProcessDictionaryPage = effectiveType === 'processes'
   const [loading, setLoading] = useState(false)
   const [contactLoading, setContactLoading] = useState(false)
-  const [keyword, setKeyword] = useState(
+  const [keyword, setKeyword] = useBusinessPageState(
+    `keyword:${searchParams.get('keyword') || ''}`,
     () => searchParams.get('keyword') || ''
   )
-  const [stockCategory, setStockCategory] = useState('')
-  const [lifecycleScope, setLifecycleScope] = useState(() =>
-    lifecycleScopeFromSearchParams(searchParams)
+  const [stockCategory, setStockCategory] = useBusinessPageState(
+    'stockCategory',
+    ''
   )
-  const [supplierTypeFilter, setSupplierTypeFilter] = useState(() => {
-    const requestedType = searchParams.get('supplier_type') || ''
-    return SUPPLIER_TYPE_OPTIONS.some((item) => item.value === requestedType)
-      ? requestedType
-      : ''
-  })
+  const [lifecycleScope, setLifecycleScope] = useBusinessPageState(
+    `lifecycleScope:${searchParams.get('scope') || ''}`,
+    () => lifecycleScopeFromSearchParams(searchParams)
+  )
+  const [supplierTypeFilter, setSupplierTypeFilter] = useBusinessPageState(
+    `supplierTypeFilter:${searchParams.get('supplier_type') || ''}`,
+    () => {
+      const requestedType = searchParams.get('supplier_type') || ''
+      return SUPPLIER_TYPE_OPTIONS.some((item) => item.value === requestedType)
+        ? requestedType
+        : ''
+    }
+  )
   const [records, setRecords] = useState([])
   const [total, setTotal] = useState(0)
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: 20,
+  })
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [, setContacts] = useState([])
   const [productReferences, setProductReferences] = useState([])
@@ -185,12 +187,9 @@ export default function V1MasterDataPage({ type }) {
   const [units, setUnits] = useState([])
   const [unitLoading, setUnitLoading] = useState(false)
   const [recordModalOpen, setRecordModalOpen] = useState(false)
-  const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
   const [detailRecord, setDetailRecord] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [columnOrder, setColumnOrder] = useState(null)
-  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [recordForm] = Form.useForm()
   const productImageSlotsRef = useRef(null)
   const skuAttachmentRef = useRef(null)
@@ -628,12 +627,14 @@ export default function V1MasterDataPage({ type }) {
     return outletContext?.registerPageRefresh?.(refreshCurrentData)
   }, [outletContext, refreshCurrentData])
 
+  const previousEffectiveType = useRef(effectiveType)
   useEffect(() => {
+    if (previousEffectiveType.current === effectiveType) return
+    previousEffectiveType.current = effectiveType
     setSelectedRecord(null)
     setContacts([])
     setEditingRecord(null)
     setRecordModalOpen(false)
-    setColumnOrder(null)
     setPagination((current) =>
       current.current === 1 && current.pageSize === 20
         ? current
@@ -641,13 +642,13 @@ export default function V1MasterDataPage({ type }) {
     )
     setKeyword((current) => (current ? '' : current))
     setStockCategory('')
-  }, [effectiveType])
+  }, [effectiveType, setKeyword, setPagination, setStockCategory])
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
-      lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
-      (effectiveType === 'suppliers' && supplierTypeFilter) ||
-      (effectiveType === 'materials' && stockCategory)
+    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
+    (effectiveType === 'suppliers' && supplierTypeFilter) ||
+    (effectiveType === 'materials' && stockCategory)
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -662,7 +663,7 @@ export default function V1MasterDataPage({ type }) {
     nextParams.delete('supplier_type')
     setSearchParams(nextParams, { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [searchParams, setSearchParams])
+  }, [searchParams, setKeyword, setLifecycleScope, setPagination, setSearchParams, setStockCategory, setSupplierTypeFilter])
 
   const handleProductCatalogTabChange = useCallback(
     (nextType) => {
@@ -679,13 +680,7 @@ export default function V1MasterDataPage({ type }) {
       nextParams.set('catalog', nextType)
       setSearchParams(nextParams, { replace: true })
     },
-    [
-      canReadProductSKUs,
-      canReadProducts,
-      searchParams,
-      setSearchParams,
-      startProductCatalogTransition,
-    ]
+    [canReadProductSKUs, canReadProducts, searchParams, setSearchParams]
   )
 
   const openCreateRecord = () => {
@@ -717,6 +712,9 @@ export default function V1MasterDataPage({ type }) {
     }
     if (showContactForm) {
       createDefaults.contacts = [createEmptyContactRow()]
+    }
+    if (effectiveType === 'customers') {
+      createDefaults.country_region = DEFAULT_DELIVERY_COUNTRY
     }
     if (effectiveType === 'suppliers') {
       createDefaults.default_payment_term_days = 0
@@ -893,32 +891,6 @@ export default function V1MasterDataPage({ type }) {
     }
   }
 
-  const persistColumnOrder = useCallback(
-    async (nextOrder, columns) => {
-      const sanitizedOrder = sanitizeModuleColumnOrder(nextOrder, columns)
-      setColumnOrder(sanitizedOrder)
-      writeStoredColumnOrder(moduleKey, sanitizedOrder)
-      setColumnOrderSaving(true)
-      try {
-        const erpPreferences = await setERPColumnOrder({
-          module_key: moduleKey,
-          order: sanitizedOrder,
-        })
-        outletContext?.updateAdminERPPreferences?.(erpPreferences)
-        message.success(
-          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
-        )
-      } catch (error) {
-        message.warning(
-          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
-        )
-      } finally {
-        setColumnOrderSaving(false)
-      }
-    },
-    [moduleKey, outletContext]
-  )
-
   const baseRecordColumns = useMemo(
     () =>
       buildMasterDataRecordColumns({
@@ -938,41 +910,18 @@ export default function V1MasterDataPage({ type }) {
       ),
     [adminProfile, baseRecordColumns, effectiveType]
   )
-  const preferredRecordColumnOrder = useMemo(
-    () =>
-      getPreferredColumnOrder({
-        adminProfile,
-        moduleKey,
-        columns: recordColumns,
-        localOrder: columnOrder,
-      }),
-    [adminProfile, columnOrder, moduleKey, recordColumns]
-  )
-  const orderedRecordColumns = useMemo(() => {
-    const nextColumns = applyModuleColumnOrder(
-      recordColumns,
-      preferredRecordColumnOrder
-    )
+  const {
+    tableColumns: orderedRecordColumns,
+    exportColumns: exportRecordColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey,
+    moduleTitle: config.title,
+    columns: recordColumns,
+  })
 
-    return nextColumns.map((column) => ({
-      ...column,
-      title: (
-        <ColumnOrderHeaderMenu
-          column={column}
-          columns={recordColumns}
-          order={preferredRecordColumnOrder}
-          saving={columnOrderSaving}
-          onChange={(nextOrder) => persistColumnOrder(nextOrder, recordColumns)}
-          onOpenPanel={() => setColumnOrderOpen(true)}
-        />
-      ),
-    }))
-  }, [
-    columnOrderSaving,
-    persistColumnOrder,
-    preferredRecordColumnOrder,
-    recordColumns,
-  ])
   const loadExportRecords = useCallback(
     async ({ signal }) => {
       if (!canReadCurrentRecord) return []
@@ -985,7 +934,7 @@ export default function V1MasterDataPage({ type }) {
     requestKey: `master-data-export:${effectiveType}`,
     loadRows: loadExportRecords,
     filename: `${config.title}-筛选结果-${currentBusinessDate()}.csv`,
-    columns: orderedRecordColumns,
+    columns: exportRecordColumns,
     recordLabel: `${entityLabel}记录`,
   })
 
@@ -1106,11 +1055,8 @@ export default function V1MasterDataPage({ type }) {
             >
               导出筛选结果
             </ToolbarButton>
-            <ToolbarButton
-              icon={<SettingOutlined />}
-              onClick={() => setColumnOrderOpen(true)}
-            >
-              列顺序
+            <ToolbarButton icon={<SettingOutlined />} onClick={openColumnOrder}>
+              列设置
             </ToolbarButton>
           </Space>
         }
@@ -1296,29 +1242,49 @@ export default function V1MasterDataPage({ type }) {
             supplierTypeOptions={SUPPLIER_TYPE_OPTIONS}
             customerPaymentConditionOptions={customerPaymentConditionOptions}
             onCustomerPaymentMethodChange={applyCustomerPaymentMethod}
+            contactSection={
+              showContactForm ? (
+                <BusinessFormSection
+                  title="联系人"
+                  showHeading={false}
+                  layout="content"
+                >
+                  <ContactFormList
+                    form={recordForm}
+                    entityLabel={entityLabel}
+                  />
+                </BusinessFormSection>
+              ) : null
+            }
           />
           {effectiveType === 'products' ? (
-            <ProductImageSlots
-              ref={productImageSlotsRef}
-              productId={editingRecord?.id}
-              open={recordModalOpen}
-              canEdit={editingRecord?.id ? canUpdate : canCreate}
-            />
+            <BusinessFormSection
+              title="产品图片"
+              showHeading={false}
+              layout="content"
+            >
+              <ProductImageSlots
+                ref={productImageSlotsRef}
+                productId={editingRecord?.id}
+                open={recordModalOpen}
+                canEdit={editingRecord?.id ? canUpdate : canCreate}
+              />
+            </BusinessFormSection>
           ) : null}
           {effectiveType === 'product_skus' ? (
-            <BusinessAttachmentPanel
-              ref={skuAttachmentRef}
-              ownerType="product_sku"
-              ownerId={editingRecord?.id}
-              title="产品规格附件"
-              description="上传产品图、样品图、包装图或客户款式确认资料；附件不会改变产品规格的启用状态。"
-              canUpload={canCreate || canUpdate}
-              canWithdraw={canCreate || canUpdate}
-              variant="inline"
-            />
-          ) : null}
-          {showContactForm ? (
-            <ContactFormList form={recordForm} entityLabel={entityLabel} />
+            <BusinessFormSection title="附件">
+              <BusinessAttachmentPanel
+                compact
+                ref={skuAttachmentRef}
+                ownerType="product_sku"
+                ownerId={editingRecord?.id}
+                title="产品规格附件"
+                description="上传产品图、样品图、包装图或客户款式确认资料；附件不会改变产品规格的启用状态。"
+                canUpload={canCreate || canUpdate}
+                canWithdraw={canCreate || canUpdate}
+                variant="inline"
+              />
+            </BusinessFormSection>
           ) : null}
         </Form>
       </BusinessFormPage>
@@ -1332,15 +1298,7 @@ export default function V1MasterDataPage({ type }) {
         onClose={() => setDetailRecord(null)}
       />
 
-      <ColumnOrderModal
-        open={columnOrderOpen}
-        moduleTitle={config.title}
-        columns={recordColumns}
-        order={preferredRecordColumnOrder}
-        saving={columnOrderSaving}
-        onChange={(nextOrder) => persistColumnOrder(nextOrder, recordColumns)}
-        onClose={() => setColumnOrderOpen(false)}
-      />
+      {columnOrderModal}
     </BusinessPageLayout>
   )
 }

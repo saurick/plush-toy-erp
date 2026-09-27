@@ -975,7 +975,7 @@ async function runMobileAuthScenario(
     `${role.roleKey} 退出登录后应清空管理员 token`
   )
 
-  await page.getByText('电脑端业务管理').click()
+  await page.getByText('电脑版').click()
   await page.getByLabel('账号').fill(`${role.roleKey}-desktop-admin`)
   await page.locator('#password').fill('desktop-password')
   await page.getByRole('button', { name: /登\s*录/ }).click()
@@ -1012,7 +1012,7 @@ async function runMobileAuthScenario(
     }
   )
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await page.getByText('手机端待办').click()
+  await page.getByText('手机版').click()
   await page.getByLabel('账号').fill(`${role.roleKey}-mobile-admin`)
   await page.locator('#password').fill('mobile-password')
   await page.getByRole('button', { name: /登\s*录/ }).click()

@@ -252,6 +252,14 @@ export function getWorkflowTaskDisplayName(task = {}) {
 }
 
 export function getProcessNodeStatusLabel(node = {}) {
+  if (
+    [
+      'sales_order.submitted_without_approval',
+      'purchase_order.submitted_without_approval',
+    ].includes(node.outcome)
+  ) {
+    return '按规则免审'
+  }
   if (node.outcome === 'rejected') return '已退回'
   return NODE_STATUS_LABELS[node.status] || '状态待确认'
 }

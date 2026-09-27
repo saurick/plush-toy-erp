@@ -58,6 +58,10 @@ export const STATUS_OPTIONS = [
   { label: '已取消', value: 'CANCELLED' },
 ]
 
+export const FINANCE_STATUS_OPTIONS = STATUS_OPTIONS.filter(({ value }) =>
+  ['', 'DRAFT', 'POSTED', 'SETTLED', 'CANCELLED'].includes(value)
+)
+
 export const OCCURRED_DATE_FILTER_OPTIONS = [
   { label: '发生日期', value: 'occurred_at' },
 ]
@@ -737,7 +741,14 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
 export function buildOperationalFactStats({
   activeRows = [],
   activeTotal = 0,
+  showStatusSummary = true,
 }) {
+  if (!showStatusSummary) {
+    return [
+      { key: 'total', label: '符合条件', value: activeTotal },
+      { key: 'current', label: '本页显示', value: activeRows.length },
+    ]
+  }
   const activeDraftCount = activeRows.filter(
     (item) => item.status === 'DRAFT'
   ).length

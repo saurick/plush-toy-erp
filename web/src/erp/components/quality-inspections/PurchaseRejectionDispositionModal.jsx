@@ -10,6 +10,7 @@ import {
   Space,
   Tag,
 } from 'antd'
+import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
@@ -381,6 +382,7 @@ export default function PurchaseRejectionDispositionModal({
           name="quantity"
           label="处置数量"
           rules={[
+            unitQuantityRule(inspection?.unit_precision),
             { required: true, message: '请填写处置数量' },
             {
               validator: (_, value) =>

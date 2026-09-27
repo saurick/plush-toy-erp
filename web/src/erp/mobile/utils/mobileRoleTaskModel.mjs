@@ -3,6 +3,7 @@ import {
   getMobileTaskDueStatusLabel,
 } from '../../utils/mobileTaskView.mjs'
 import { formatWorkflowTaskSource } from '../../utils/dashboardTaskDisplay.mjs'
+import { MOBILE_ALL_ROLES_KEY } from '../../utils/mobileRolePermissions.mjs'
 import { getWorkflowTaskStatusMeta } from '../../utils/workflowTaskBoard.mjs'
 import {
   getRoleDisplayName,
@@ -141,6 +142,7 @@ export const MOBILE_SCROLL_TOP_VISIBLE_OFFSET = 280
 
 export function getMobileRoleLabel(roleKey) {
   const normalizedRoleKey = normalizeRoleKey(roleKey)
+  if (normalizedRoleKey === MOBILE_ALL_ROLES_KEY) return '全部岗位'
   const displayRoleKey =
     MOBILE_ROLE_ALIASES[normalizedRoleKey] || normalizedRoleKey
   return getRoleDisplayName(displayRoleKey, '岗位')
@@ -307,8 +309,8 @@ export function requiresMobileActionFeedback(action) {
 }
 
 export function resolveMobileActionLabel(action) {
-  if (action === 'blocked' || action === 'block') return '阻塞'
-  if (action === 'done' || action === 'complete') return '完成'
+  if (action === 'blocked' || action === 'block') return '标记阻塞'
+  if (action === 'done' || action === 'complete') return '完成本岗'
   if (action === 'rejected' || action === 'reject') return '退回'
   if (action === 'resume') return '解除阻塞'
   if (action === 'urge') return '催办'

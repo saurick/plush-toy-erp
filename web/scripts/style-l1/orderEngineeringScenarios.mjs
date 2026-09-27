@@ -190,8 +190,9 @@ export function createOrderEngineeringScenarios(deps) {
           .filter({ hasText: '工程与打样 ·' })
           .last()
         await engineering
-          .locator('.erp-sales-order-engineering-section')
+          .locator('.erp-compact-field-table')
           .waitFor({ state: 'visible' })
+        await engineering.locator('.erp-optional-field > summary').click()
         await engineering
           .locator('textarea[id$="sample_note"]')
           .fill('待工程建档，先记录客户的设计要求')
@@ -203,14 +204,14 @@ export function createOrderEngineeringScenarios(deps) {
           )
         })
         const engineeringWidth = await engineering
-          .locator('.erp-sales-order-engineering-section')
+          .locator('.erp-compact-field-table')
           .evaluate((node) => node.getBoundingClientRect().width)
         await page.screenshot({
           path: `${deps.outputDir}/sales-order-engineering-form.png`,
           fullPage: true,
         })
         const engineeringLayout = await engineering
-          .locator('.erp-sales-order-engineering-section')
+          .locator('.erp-compact-field-table')
           .evaluate((node) =>
             Array.from(
               (function* ancestors() {
@@ -243,6 +244,7 @@ export function createOrderEngineeringScenarios(deps) {
           (call) => call.method === 'save_sales_order_engineering'
         )
         deps.assert.ok(engineeringSave)
+        deps.assert.equal(engineeringSave.params.items[0].sample_note, '待工程建档，先记录客户的设计要求')
         deps.assert.equal(engineeringSave.params.items[0].id, 1)
         deps.assert.ok(!engineeringSave.params.items[0].product_id)
         deps.assert.equal(

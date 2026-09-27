@@ -12,6 +12,8 @@ import {
   Tag,
 } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { modal } from '@/common/utils/antdApp'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
@@ -29,7 +31,15 @@ import {
 } from '../../utils/numeric20Scale6.mjs'
 import './purchaseOrderArrival.css'
 
-function ArrivalRecord({ field, item, row, form, disabled, onRemove }) {
+function ArrivalRecord({
+  field,
+  item,
+  row,
+  form,
+  disabled,
+  onRemove,
+  quantityUnitOptions,
+}) {
   const number = field.name + 1
   const dependencies = [
     'quantity',
@@ -39,6 +49,9 @@ function ArrivalRecord({ field, item, row, form, disabled, onRemove }) {
     'note',
   ].map((key) => ['arrival_items', field.name, key])
   const rules = (key) => [
+    ...(['quantity', 'declared_quantity'].includes(key)
+      ? [unitQuantityRuleFromOptions(quantityUnitOptions, row.unitID)]
+      : []),
     {
       validator: async () => {
         const error = arrivalItemErrors(
@@ -188,6 +201,7 @@ export default function PurchaseOrderInboundDraftModal({
 }) {
   const values = Form.useWatch('arrival_items', form) || []
   const [dirty, setDirty] = useState(false)
+  const quantityUnitOptions = useQuantityUnits(open)
   const [emptyError, setEmptyError] = useState(false)
   const confirmingRef = useRef(false)
   const initialFocusRef = useRef(false)
@@ -450,6 +464,7 @@ export default function PurchaseOrderInboundDraftModal({
                                   field={field}
                                   item={values[field.name] || {}}
                                   row={row}
+                                  quantityUnitOptions={quantityUnitOptions}
                                   form={form}
                                   disabled={disabled}
                                   onRemove={() => {

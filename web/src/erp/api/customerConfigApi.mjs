@@ -131,9 +131,21 @@ function requireSalesOrderAcceptanceStart(data, salesOrderID) {
   ) {
     throw new Error(PROCESS_RESULT_INVALID_MESSAGE)
   }
-  if (node.status === 'completed' && node.outcome !== 'sales_order.submitted') {
+  if (
+    node.status === 'completed' &&
+    ![
+      'sales_order.submitted',
+      'sales_order.submitted_without_approval',
+    ].includes(node.outcome)
+  ) {
     throw new Error(PROCESS_RESULT_INVALID_MESSAGE)
   }
+  requireExemptOrderActivation(
+    data,
+    node,
+    'sales_order',
+    PROCESS_RESULT_INVALID_MESSAGE
+  )
   return { instance, node }
 }
 
@@ -161,6 +173,27 @@ function salesOrderAcceptanceStartFromContext(data, salesOrderID) {
   }
 }
 
+function requireExemptOrderActivation(data, node, kind, message) {
+  if (node?.outcome !== `${kind}.submitted_without_approval`) return
+  const effectiveKey =
+    kind === 'sales_order' ? 'activate_sales_order' : 'approve_purchase_order'
+  const effectiveOutcome =
+    kind === 'sales_order' ? 'sales_order.activated' : 'purchase_order.approved'
+  if (
+    !Array.isArray(data?.nodes) ||
+    !data.nodes.some(
+      (item) =>
+        item.node_key === effectiveKey &&
+        item.node_type === 'domain_command' &&
+        item.process_instance_id === node.process_instance_id &&
+        item.status === 'completed' &&
+        item.outcome === effectiveOutcome
+    )
+  ) {
+    throw new Error(message)
+  }
+}
+
 function requireSalesOrderAcceptanceExecution(data, expected) {
   const node = data?.completed_node
   const nodes = data?.nodes
@@ -182,12 +215,21 @@ function requireSalesOrderAcceptanceExecution(data, expected) {
     node.node_key !== 'submit_sales_order' ||
     node.node_type !== 'domain_command' ||
     node.status !== 'completed' ||
-    node.outcome !== 'sales_order.submitted' ||
+    ![
+      'sales_order.submitted',
+      'sales_order.submitted_without_approval',
+    ].includes(node.outcome) ||
     node.version !== expected.version + 1 ||
     !matchingNode
   ) {
     throw new Error(PROCESS_RESULT_INVALID_MESSAGE)
   }
+  requireExemptOrderActivation(
+    data,
+    node,
+    'sales_order',
+    PROCESS_RESULT_INVALID_MESSAGE
+  )
   return node
 }
 
@@ -302,10 +344,19 @@ function requireMaterialSupplyPurchaseStart(data, purchaseOrderID) {
   }
   if (
     node.status === 'completed' &&
-    node.outcome !== 'purchase_order.submitted'
+    ![
+      'purchase_order.submitted',
+      'purchase_order.submitted_without_approval',
+    ].includes(node.outcome)
   ) {
     throw new Error(PURCHASE_PROCESS_RESULT_INVALID_MESSAGE)
   }
+  requireExemptOrderActivation(
+    data,
+    node,
+    'purchase_order',
+    PURCHASE_PROCESS_RESULT_INVALID_MESSAGE
+  )
   return { instance, node }
 }
 
@@ -330,12 +381,21 @@ function requireMaterialSupplyPurchaseExecution(data, expected) {
     node.node_key !== 'submit_purchase_order' ||
     node.node_type !== 'domain_command' ||
     node.status !== 'completed' ||
-    node.outcome !== 'purchase_order.submitted' ||
+    ![
+      'purchase_order.submitted',
+      'purchase_order.submitted_without_approval',
+    ].includes(node.outcome) ||
     node.version !== expected.version + 1 ||
     !matchingNode
   ) {
     throw new Error(PURCHASE_PROCESS_RESULT_INVALID_MESSAGE)
   }
+  requireExemptOrderActivation(
+    data,
+    node,
+    'purchase_order',
+    PURCHASE_PROCESS_RESULT_INVALID_MESSAGE
+  )
   return node
 }
 
@@ -733,15 +793,15 @@ export function exceptionProcessRecoveryReadbackMatches(data, expected = {}) {
   )
   return Boolean(
     node &&
-      node.version === expected.expected_version + 1 &&
-      node.domain_command_effect_state === 'compensated' &&
-      node.domain_command_result_hash === expected.expected_result_hash &&
-      node.domain_command_compensation_hash ===
-        expected.expected_compensation_hash &&
-      node.domain_command_recovery_decision ===
-        PROCESS_DOMAIN_COMMAND_RECOVERY_DECISION &&
-      Number(node.domain_command_recovered_at) > 0 &&
-      Number(node.domain_command_recovered_by) > 0
+    node.version === expected.expected_version + 1 &&
+    node.domain_command_effect_state === 'compensated' &&
+    node.domain_command_result_hash === expected.expected_result_hash &&
+    node.domain_command_compensation_hash ===
+      expected.expected_compensation_hash &&
+    node.domain_command_recovery_decision ===
+      PROCESS_DOMAIN_COMMAND_RECOVERY_DECISION &&
+    Number(node.domain_command_recovered_at) > 0 &&
+    Number(node.domain_command_recovered_by) > 0
   )
 }
 

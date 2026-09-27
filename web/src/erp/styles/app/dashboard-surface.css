@@ -1,11 +1,13 @@
 .erp-dashboard-page {
   width: 100%;
   container-type: inline-size;
+  flex: 1;
+  min-height: 100%;
 }
 
 .erp-dashboard-card.ant-card {
   border: 1px solid #dfe9e1;
-  background: rgb(255 255 255 / 0.96);
+  background: var(--erp-surface-bg);
 }
 
 .erp-dashboard-card .ant-card-body {

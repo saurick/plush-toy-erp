@@ -166,9 +166,8 @@ export function createQualitySourceActionScenarios(deps) {
           await expectHeading(page, '质量检验')
           await expectText(page, '暂无质量检验单')
 
-          const filters = page.locator(
-            '.erp-v1-quality-inspections-page .erp-business-operation-panel__filters'
-          )
+          await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
+          const filters = page.getByRole('dialog', { name: '筛选条件' })
           const inspectionTypeSelect = filters
             .locator('.ant-select')
             .filter({ hasText: '全部检验类型' })
@@ -183,6 +182,7 @@ export function createQualitySourceActionScenarios(deps) {
             .filter({ hasText: '生产分段质检' })
             .first()
             .click()
+          await filters.getByRole('button', { name: '完成', exact: true }).click()
 
           const row = page
             .getByRole('row')

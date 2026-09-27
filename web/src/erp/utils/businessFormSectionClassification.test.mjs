@@ -27,7 +27,7 @@ function assertOrdered(value, labels) {
 function assertUsesSharedSectionTitle(relativePath) {
   const value = source(relativePath)
   assert(value.includes('BusinessFormSectionTitle'))
-  assert(value.includes('<BusinessFormSectionTitle>'))
+  assert.match(value, /<BusinessFormSectionTitle[\s>]/u)
   assert(!value.includes('className="erp-business-action-form__section-title"'))
 }
 
@@ -48,31 +48,37 @@ test('shared section title exposes heading semantics and a responsive divider', 
 
 test('all governed long forms use the shared section-title component', () => {
   const paths = [
-    '../components/sales-orders/SalesOrderForm.jsx',
-    '../components/master-data/MasterDataForm.jsx',
-    '../components/production-orders/ProductionCompletionModal.jsx',
     '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx',
     '../pages/FinancePaymentsPage.jsx',
     '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx',
-    '../components/outsourcing-orders/OutsourcingOrderForm.jsx',
-    '../components/purchase-orders/PurchaseOrderForm.jsx',
-    '../components/shipments/ShipmentEditor.jsx',
-    '../components/bom/BOMVersionForms.jsx',
+    '../components/business-list/BusinessFormSection.jsx',
   ]
 
   for (const relativePath of paths) {
     assertUsesSharedSectionTitle(relativePath)
   }
+  for (const relativePath of [
+    '../components/purchase-orders/PurchaseOrderForm.jsx',
+    '../components/bom/BOMVersionForms.jsx',
+    '../components/sales-orders/SalesOrderForm.jsx',
+    '../components/master-data/MasterDataForm.jsx',
+    '../components/production-orders/ProductionOrderEditor.jsx',
+    '../components/production-orders/ProductionCompletionModal.jsx',
+    '../components/outsourcing-orders/OutsourcingOrderForm.jsx',
+    '../components/shipments/ShipmentEditor.jsx',
+  ]) {
+    assert.match(source(relativePath), /<BusinessFormSection[\s>]/u)
+  }
 })
 
-test('sales order header follows the six audited business sections', () => {
+test('sales order editing puts demand before supplementary commercial and delivery fields', () => {
   assertOrdered(source('../components/sales-orders/SalesOrderForm.jsx'), [
     '订单与客户',
-    '联系人与负责人',
-    '结算条件',
+    '{itemsSection}',
+    '联系与交付',
+    '结算与报价',
     '税费与运费条件',
-    '交付与收货',
-    '其他说明',
+    '备注与附件',
   ])
 })
 
@@ -97,13 +103,8 @@ test('master-data variants expose stable business section order', () => {
   )
 
   assertOrdered(productBlock, ['基本资料', '外贸信息', '计量信息'])
-  assertOrdered(skuBlock, ['归属与编号', '规格属性', '计量与附件'])
+  assertOrdered(skuBlock, ['归属与编号', '规格属性', '计量信息'])
   assertOrdered(processBlock, ['基本资料', '路线与加工能力'])
-  assert(
-    masterDataSource.includes(
-      "type === 'customers' || type === 'suppliers' ? ("
-    )
-  )
   assertOrdered(
     masterDataSource.slice(masterDataSource.indexOf('  return (\n    <>')),
     ['基本资料', '加工能力', '结算方式']
@@ -136,19 +137,32 @@ test('document-style long forms follow stable business section order', () => {
   const contracts = [
     [
       '../components/purchase-orders/PurchaseOrderForm.jsx',
-      ['订单与供应商', '合同订购方信息', '备注与附件'],
+      [
+        '订单与供应商',
+        '采购明细',
+        '交付与结算',
+        '合同订购方信息',
+        '备注与附件',
+      ],
     ],
     [
       '../components/outsourcing-orders/OutsourcingOrderForm.jsx',
-      ['合同与加工厂', '加工方信息', '委托方信息', '备注与附件'],
+      [
+        '合同与加工厂',
+        '加工明细',
+        '合同双方信息',
+        '加工方信息',
+        '委托方信息',
+        '备注与附件',
+      ],
     ],
     [
       '../components/shipments/ShipmentEditor.jsx',
-      ['单据与客户', '计划与收货', '运输与包装', '实际运费', '其他说明'],
+      ['单据与客户', '{itemsSection}', '收货信息', '运输与费用', '备注与附件'],
     ],
     [
       '../components/bom/BOMVersionForms.jsx',
-      ['版本信息', '订单与数量', '制表与说明'],
+      ['版本信息', '{children}', '订单与制表资料', '备注与附件'],
     ],
   ]
 

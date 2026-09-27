@@ -1,3 +1,5 @@
+import { normalizeApprovalCondition } from './approvalCondition.mjs'
+
 const APPROVAL_SETTINGS_BLOCKER_LABELS = Object.freeze({
   approval_settings_not_published: '尚未发布审批责任',
   approval_disabled: '该审批事项已停用',
@@ -12,6 +14,10 @@ function normalizedItems(items = []) {
       return {
         approval_key: String(item.approval_key || '').trim(),
         enabled: itemEnabled,
+        condition: normalizeApprovalCondition(
+          item.approval_key,
+          item.condition
+        ),
         members: (Array.isArray(item.members) ? item.members : [])
           .map((member) => ({
             role_key: String(member.role_key || '').trim(),

@@ -12,6 +12,7 @@ import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 import { createPrintPolishScenarios } from './printPolishScenarios.mjs'
 import { createPrintWorkspaceControlScenarios } from './printWorkspaceControlScenarios.mjs'
 import { createPrintWorkspaceFeedbackScenarios } from './printWorkspaceFeedbackScenarios.mjs'
+import { createPrintWorkspaceThemeScenario } from './printWorkspaceThemeScenario.mjs'
 import { expandPrintToolSection } from './printToolHelpers.mjs'
 import {
   assertEmptyEditorCaret,
@@ -68,6 +69,13 @@ export function createPrintWorkspaceScenarios({
         const group = element.closest('[data-print-focus-group]')
         const frame = group || cell || element
         const frameStyle = getComputedStyle(frame)
+        const themeProbe = document.createElement('span')
+        themeProbe.style.color = 'var(--erp-print-focus-color)'
+        themeProbe.style.background = 'var(--erp-print-focus-background)'
+        frame.append(themeProbe)
+        const expectedOutlineColor = getComputedStyle(themeProbe).color
+        const expectedBackground = getComputedStyle(themeProbe).backgroundColor
+        themeProbe.remove()
         const box = frame.getBoundingClientRect()
         const after = element.getBoundingClientRect()
         const scale = box.width / frame.offsetWidth
@@ -128,6 +136,8 @@ export function createPrintWorkspaceScenarios({
           activeElementMatches: document.activeElement === element,
           outlineStyle: frameStyle.outlineStyle,
           outlineColor: frameStyle.outlineColor,
+          expectedOutlineColor,
+          expectedBackground,
           background: frameStyle.backgroundColor,
           wholeCell: Boolean(cell),
           grouped: Boolean(group),
@@ -148,8 +158,8 @@ export function createPrintWorkspaceScenarios({
     assert(
       metrics.activeElementMatches &&
         metrics.outlineStyle === 'dashed' &&
-        metrics.outlineColor === 'rgba(47, 143, 75, 0.82)' &&
-        metrics.background === 'rgba(47, 143, 75, 0.08)' &&
+        metrics.outlineColor === metrics.expectedOutlineColor &&
+        metrics.background === metrics.expectedBackground &&
         (!(metrics.wholeCell || metrics.grouped) ||
           metrics.frameIsEditable ||
           metrics.innerOutlineStyle === 'none') &&
@@ -157,7 +167,7 @@ export function createPrintWorkspaceScenarios({
           metrics.cellFrameOutset <= -0.99) &&
         Math.abs(metrics.widthChange) < 0.5 &&
         Math.abs(metrics.heightChange) < 0.5,
-      `${scenarioLabel} 焦点应显示单一绿色虚线框，表格覆盖整格，聚焦不改变纸面尺寸: ${JSON.stringify(metrics)}`
+      `${scenarioLabel} 焦点应显示单一主题色虚线框，表格覆盖整格，聚焦不改变纸面尺寸: ${JSON.stringify(metrics)}`
     )
     // 单元格内框与固定纸面文字至少留半像素净空；独立字段继续向外留白。
     const minimum = metrics.wholeCell ? 0.49 : 1.75
@@ -653,6 +663,12 @@ export function createPrintWorkspaceScenarios({
       gotoScenarioPath,
     }),
     ...createPrintWorkspaceControlScenarios({
+      assert,
+      path,
+      outputDir,
+      gotoScenarioPath,
+    }),
+    createPrintWorkspaceThemeScenario({
       assert,
       path,
       outputDir,

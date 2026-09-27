@@ -21,7 +21,7 @@ export const resolveModuleColumnKey = (column = {}, columns = []) => {
 }
 
 const isModuleColumnVisible = (column = {}) =>
-  column?.hiddenByEffectiveFieldPolicy !== true
+  column?.hiddenByEffectiveFieldPolicy !== true && column?.hidden !== true
 
 const visibleModuleColumns = (columns = []) =>
   (Array.isArray(columns) ? columns : []).filter(isModuleColumnVisible)
@@ -30,7 +30,7 @@ export const filterBusinessListColumns = (columns = []) =>
   visibleModuleColumns(columns).filter((column) => column?.listHidden !== true)
 
 export const buildModuleColumnOrder = (columns = []) =>
-  visibleModuleColumns(columns)
+  (Array.isArray(columns) ? columns : [])
     // 先确定列标识，再调整默认顺序，避免展示列的已保存偏好随位置改变。
     .map((column, index) => ({
       key: getModuleColumnKey(column, index),
@@ -38,9 +38,10 @@ export const buildModuleColumnOrder = (columns = []) =>
         ? column.defaultPriority
         : Number.MAX_SAFE_INTEGER,
       listHidden: column.listHidden === true,
+      available: isModuleColumnVisible(column),
       index,
     }))
-    .filter((column) => !column.listHidden)
+    .filter((column) => column.available && !column.listHidden)
     .sort(
       (left, right) =>
         left.priority - right.priority || left.index - right.index
@@ -61,20 +62,45 @@ export const sanitizeModuleColumnOrder = (order = [], columns = []) => {
   }, [])
 }
 
+export const completeModuleColumnOrder = (order = [], columns = []) => {
+  const saved = sanitizeModuleColumnOrder(order, columns)
+  const savedKeys = new Set(saved)
+  return [
+    ...saved,
+    ...buildModuleColumnOrder(columns).filter((key) => !savedKeys.has(key)),
+  ]
+}
+
+export const sanitizeModuleHiddenColumns = (hidden = [], columns = []) => {
+  const keys = buildModuleColumnOrder(columns)
+  const hiddenKeys = sanitizeModuleColumnOrder(hidden, columns)
+  // 即使字段权限或列定义改变，也至少保留一个可用的数据列。
+  return keys.length > 0 && hiddenKeys.length === keys.length
+    ? hiddenKeys.filter((key) => key !== keys[0])
+    : hiddenKeys
+}
+
+export const applyModuleColumnVisibility = (columns = [], hidden = []) => {
+  const hiddenKeys = new Set(sanitizeModuleHiddenColumns(hidden, columns))
+  return filterBusinessListColumns(columns).filter(
+    (column) => !hiddenKeys.has(resolveModuleColumnKey(column, columns))
+  )
+}
+
 export const applyModuleColumnOrder = (columns = [], order = []) => {
   const normalizedColumns = visibleModuleColumns(columns)
   const keyToColumn = new Map(
-    normalizedColumns.map((column, index) => [
+    (Array.isArray(columns) ? columns : []).map((column, index) => [
       getModuleColumnKey(column, index),
       column,
     ])
   )
-  const sanitizedOrder = sanitizeModuleColumnOrder(order, normalizedColumns)
+  const sanitizedOrder = sanitizeModuleColumnOrder(order, columns)
   const orderedColumns = sanitizedOrder
     .map((key) => keyToColumn.get(key))
     .filter(Boolean)
   const orderedKeySet = new Set(sanitizedOrder)
-  const remainingColumns = buildModuleColumnOrder(normalizedColumns)
+  const remainingColumns = buildModuleColumnOrder(columns)
     .filter((key) => !orderedKeySet.has(key))
     .map((key) => keyToColumn.get(key))
   // 辅助列退出列表排列，但详情和导出仍使用完整的获权列定义。
@@ -90,10 +116,7 @@ export const moveModuleColumnOrder = (
   targetKey = '',
   direction = 0
 ) => {
-  const fallbackOrder = buildModuleColumnOrder(columns)
-  const sanitizedOrder = sanitizeModuleColumnOrder(order, columns)
-  const normalizedOrder =
-    sanitizedOrder.length > 0 ? sanitizedOrder : fallbackOrder
+  const normalizedOrder = completeModuleColumnOrder(order, columns)
   const normalizedTargetKey = String(targetKey || '').trim()
   const currentIndex = normalizedOrder.indexOf(normalizedTargetKey)
   if (currentIndex < 0) {
@@ -115,10 +138,7 @@ export const repositionModuleColumnOrder = (
   targetKey = '',
   targetIndex = 0
 ) => {
-  const fallbackOrder = buildModuleColumnOrder(columns)
-  const sanitizedOrder = sanitizeModuleColumnOrder(order, columns)
-  const normalizedOrder =
-    sanitizedOrder.length > 0 ? sanitizedOrder : fallbackOrder
+  const normalizedOrder = completeModuleColumnOrder(order, columns)
   const normalizedTargetKey = String(targetKey || '').trim()
   const currentIndex = normalizedOrder.indexOf(normalizedTargetKey)
   if (currentIndex < 0) {

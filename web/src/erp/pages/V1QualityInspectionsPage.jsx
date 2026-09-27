@@ -27,6 +27,8 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import { IncomingCheckItemsDetails } from '../components/quality-inspections/IncomingCheckItems.jsx'
 import {
   initialIncomingChecks,
@@ -66,7 +68,6 @@ import {
   listAllProducts,
   listAllWarehouses,
 } from '../api/masterDataOrderApi.mjs'
-import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   BusinessActionTooltip,
   BusinessDataTable,
@@ -80,10 +81,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
-import {
-  ColumnOrderHeaderMenu,
-  ColumnOrderModal,
-} from '../components/business-list/ColumnOrderModal.jsx'
+import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
@@ -128,10 +126,6 @@ import {
   resetBusinessPaginationCurrent,
   resolveExactRecordPage,
 } from '../utils/businessPagination.mjs'
-import {
-  applyModuleColumnOrder,
-  sanitizeModuleColumnOrder,
-} from '../utils/moduleTableColumns.mjs'
 import { applyEffectiveFieldPolicyFlags } from '../utils/adminProfileSync.mjs'
 import {
   inventoryLotOption,
@@ -164,7 +158,6 @@ import {
 import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
-const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const EMPTY_ADMIN_PROFILE = Object.freeze({})
 const PURCHASE_RECEIPT_STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
@@ -172,45 +165,6 @@ const PURCHASE_RECEIPT_STATUS_LABELS = Object.freeze({
   CANCELLED: '已取消',
 })
 const { Text } = Typography
-
-function readStoredColumnOrder(moduleKey) {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(
-      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-    )
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function writeStoredColumnOrder(moduleKey, order = []) {
-  if (typeof window === 'undefined') return
-  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-  if (!Array.isArray(order) || order.length === 0) {
-    window.localStorage.removeItem(storageKey)
-    return
-  }
-  window.localStorage.setItem(storageKey, JSON.stringify(order))
-}
-
-function getPreferredColumnOrder({
-  adminProfile,
-  moduleKey,
-  columns,
-  localOrder,
-}) {
-  applyEffectiveFieldPolicyFlags({ adminProfile, moduleKey, columns })
-  if (Array.isArray(localOrder)) {
-    return sanitizeModuleColumnOrder(localOrder, columns)
-  }
-  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
-  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
-  if (sanitizedAccountOrder.length > 0) return sanitizedAccountOrder
-  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
-}
 
 function findByPositiveID(id, records = []) {
   const targetID = positiveInt(id)
@@ -321,6 +275,7 @@ export default function V1QualityInspectionsPage() {
   )
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
+  const [statusCounts, setStatusCounts] = useState(null)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [resultFilter, setResultFilter] = useState('')
@@ -354,9 +309,6 @@ export default function V1QualityInspectionsPage() {
   const [returnedInspectionIDs, setReturnedInspectionIDs] = useState(
     () => new Set()
   )
-  const [columnOrder, setColumnOrder] = useState(null)
-  const [columnOrderOpen, setColumnOrderOpen] = useState(false)
-  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [purchaseReceipts, setPurchaseReceipts] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
   const [materials, setMaterials] = useState([])
@@ -741,35 +693,6 @@ export default function V1QualityInspectionsPage() {
     warehouseOptions,
   ])
 
-  const persistColumnOrder = useCallback(
-    async (nextOrder, columnsForOrder) => {
-      const sanitizedOrder = sanitizeModuleColumnOrder(
-        nextOrder,
-        columnsForOrder
-      )
-      setColumnOrder(sanitizedOrder)
-      writeStoredColumnOrder(QUALITY_INSPECTIONS_MODULE_KEY, sanitizedOrder)
-      setColumnOrderSaving(true)
-      try {
-        const erpPreferences = await setERPColumnOrder({
-          module_key: QUALITY_INSPECTIONS_MODULE_KEY,
-          order: sanitizedOrder,
-        })
-        outletContext?.updateAdminERPPreferences?.(erpPreferences)
-        message.success(
-          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
-        )
-      } catch (error) {
-        message.warning(
-          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
-        )
-      } finally {
-        setColumnOrderSaving(false)
-      }
-    },
-    [outletContext]
-  )
-
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
     const pathByKey = {
@@ -815,6 +738,7 @@ export default function V1QualityInspectionsPage() {
   const loadQualityInspectionList = useCallback(
     ({ signal, all = false }) => {
       const baseParams = compactParams({
+        include_status_counts: all ? undefined : true,
         status: statusFilter,
         result: resultFilter,
         keyword: trimOptional(
@@ -915,6 +839,7 @@ export default function V1QualityInspectionsPage() {
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
     setLoading(true)
+    setStatusCounts(null)
     try {
       const routeSelectedID = Number(routeQualityInspectionID || 0)
       const [data, routeInspection] = await Promise.all([
@@ -951,6 +876,9 @@ export default function V1QualityInspectionsPage() {
           : null
       })
       setTotal(exactPage.total)
+      setStatusCounts(resolveBusinessStatusCounts(data, {
+        hasExactContext: routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE', exactRecord: selectedRouteInspection, statusField: 'status',
+      }))
       return true
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
@@ -1570,45 +1498,17 @@ export default function V1QualityInspectionsPage() {
     ]
   )
 
-  const preferredColumnOrder = useMemo(
-    () =>
-      getPreferredColumnOrder({
-        adminProfile,
-        moduleKey: QUALITY_INSPECTIONS_MODULE_KEY,
-        columns: dataColumns,
-        localOrder: columnOrder,
-      }),
-    [adminProfile, columnOrder, dataColumns]
-  )
-
-  const visibleDataColumns = useMemo(
-    () => applyModuleColumnOrder(dataColumns, preferredColumnOrder),
-    [preferredColumnOrder, dataColumns]
-  )
-
-  const columns = useMemo(
-    () =>
-      visibleDataColumns.map((column) => ({
-        ...column,
-        title: (
-          <ColumnOrderHeaderMenu
-            column={column}
-            columns={dataColumns}
-            order={preferredColumnOrder}
-            saving={columnOrderSaving}
-            onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-            onOpenPanel={() => setColumnOrderOpen(true)}
-          />
-        ),
-      })),
-    [
-      columnOrderSaving,
-      dataColumns,
-      persistColumnOrder,
-      preferredColumnOrder,
-      visibleDataColumns,
-    ]
-  )
+  const {
+    tableColumns: columns,
+    exportColumns: visibleDataColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: QUALITY_INSPECTIONS_MODULE_KEY,
+    moduleTitle: '质量检验列表',
+    columns: dataColumns,
+  })
 
   const loadExportQualityInspections = useCallback(
     async ({ signal }) => {
@@ -1685,18 +1585,8 @@ export default function V1QualityInspectionsPage() {
           </Tag>,
         ]}
         stats={[
-          { key: 'total', label: '总质检单', value: total },
+          { key: 'total', label: '符合条件', value: total },
           { key: 'current', label: '本页显示', value: rows.length },
-          {
-            key: 'submitted',
-            label: '已提交',
-            value: rows.filter((item) => item.status === 'SUBMITTED').length,
-          },
-          {
-            key: 'rejected',
-            label: '不合格',
-            value: rows.filter((item) => item.status === 'REJECTED').length,
-          },
         ]}
       />
 
@@ -1725,7 +1615,12 @@ export default function V1QualityInspectionsPage() {
               }}
               onPressEnter={loadRows}
             />
-            <SelectFilter
+            <BusinessStatusFilter
+              inline
+              aria-label="质检状态"
+              counts={statusCounts}
+              loading={loading}
+              exact={Boolean(routeQualityInspectionID) && inspectionTypeFilter !== 'PRODUCTION_STAGE'}
               className="erp-business-filter-control--status"
               value={statusFilter}
               options={QUALITY_STATUS_OPTIONS}
@@ -1909,9 +1804,9 @@ export default function V1QualityInspectionsPage() {
             </ToolbarButton>
             <ToolbarButton
               icon={<SettingOutlined />}
-              onClick={() => setColumnOrderOpen(true)}
+              onClick={openColumnOrder}
             >
-              列顺序
+              列设置
             </ToolbarButton>
           </Space>
         }
@@ -2205,15 +2100,7 @@ export default function V1QualityInspectionsPage() {
         emptyDescription="暂无质量检验单"
       />
 
-      <ColumnOrderModal
-        open={columnOrderOpen}
-        columns={dataColumns}
-        order={preferredColumnOrder}
-        saving={columnOrderSaving}
-        moduleTitle="质量检验列表"
-        onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-        onClose={() => setColumnOrderOpen(false)}
-      />
+      {columnOrderModal}
 
       <QualityInspectionPurchaseReturnModal
         open={Boolean(purchaseReturnModal)}

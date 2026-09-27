@@ -36,6 +36,7 @@ test('brand: 默认品牌保持产品中性，不包含客户公司名', () => {
       companyName: ERP_COMPANY_NAME,
       customerKey: undefined,
       faviconHref: undefined,
+      mobileFaviconHref: undefined,
       systemName: ERP_ADMIN_SYSTEM_NAME,
     })
     assert.equal(ERP_BRAND_MARK, '绒')
@@ -62,6 +63,7 @@ test('brand: customer key alone does not load bundled customer brand', () => {
       companyName: ERP_COMPANY_NAME,
       customerKey: undefined,
       faviconHref: undefined,
+      mobileFaviconHref: undefined,
       systemName: ERP_ADMIN_SYSTEM_NAME,
     })
   } finally {
@@ -82,6 +84,7 @@ test('brand: runtime customer config can override neutral product brand', () => 
         brandMark: '测',
         companyName: '测试客户',
         faviconHref: '/favicon-test.svg',
+        mobileFaviconHref: ' /favicon-test-mobile.svg ',
         systemName: '测试 ERP',
       },
     },
@@ -93,6 +96,7 @@ test('brand: runtime customer config can override neutral product brand', () => 
       companyName: '测试客户',
       customerKey: 'demo',
       faviconHref: '/favicon-test.svg',
+      mobileFaviconHref: '/favicon-test-mobile.svg',
       systemName: '测试 ERP',
     })
   } finally {

@@ -1,202 +1,208 @@
-/* Shared by the login and post-login entry pages; keep outside DEV-only styles. */
+/* Login and entry selection share the product theme and responsive shell. */
 .erp-login-page {
   position: relative;
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  overflow: hidden;
+  padding: max(24px, env(safe-area-inset-top)) 24px
+    max(24px, env(safe-area-inset-bottom));
+  background: var(--erp-page-bg);
 }
 
 .erp-login-page__bg {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(circle at 14% 18%, rgb(32 65 96 / 0.14) 0, transparent 38%),
-    radial-gradient(
-      circle at 88% 84%,
-      rgb(47 143 75 / 0.16) 0,
-      transparent 36%
-    ),
-    linear-gradient(130deg, #eef5fa 0%, #f8fbfd 45%, #f4f8f3 100%);
+  background: var(--erp-page-bg);
+  pointer-events: none;
 }
 
 .erp-login-card.ant-card {
   position: relative;
   width: 100%;
-  max-width: 620px;
-  border: 1px solid #dbe7ef;
-  border-radius: 16px;
-  background: white;
-  box-shadow: 0 18px 46px rgb(15 23 42 / 0.1);
+  max-width: 456px;
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
+  box-shadow: var(--erp-surface-shadow);
 }
 
 .erp-login-card .ant-card-body {
-  padding: 28px 32px 30px;
+  padding: 28px;
 }
 
+.erp-login-brand-row,
 .erp-login-logo {
   display: flex;
   align-items: center;
-  gap: 16px;
   min-width: 0;
+  gap: 11px;
+}
+
+.erp-login-brand-row {
+  margin-bottom: 22px;
+}
+
+.erp-login-logo {
+  flex: 1;
 }
 
 .erp-login-logo__mark.erp-admin-brand__logo-mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  font-size: 24px;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 18px;
+  box-shadow: none;
 }
 
 .erp-login-logo__copy {
-  display: grid;
-  gap: 4px;
   min-width: 0;
 }
 
 .erp-login-logo__title {
+  min-width: 0;
   margin: 0;
-  color: #204160;
-  font-size: clamp(1.45rem, 4vw, 2.1rem);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  line-height: 1.08;
+  color: var(--erp-text);
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .erp-login-card__theme-toggle.ant-btn {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  z-index: 1;
+  position: static;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
 }
 
-.erp-login-card .ant-form-item {
-  margin-bottom: 24px;
-}
-
-.erp-login-card .ant-form-item-label {
-  min-width: 0;
-}
-
-.erp-login-card .ant-form-item-label > label {
-  align-items: flex-start;
-  min-width: 0;
-  max-width: 100%;
-  height: auto;
-  min-height: 22px;
-  color: #1f2937;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-  white-space: normal;
-  word-break: break-word;
+.erp-login-card .erp-login-segmented {
+  width: 100%;
 }
 
 .erp-login-card .ant-segmented .ant-segmented-item-label {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  font-size: 15px;
-}
-
-.erp-login-card .ant-alert {
-  border-radius: 14px;
-}
-
-.erp-login-card .erp-login-sms-hint.ant-alert {
-  display: inline-flex;
-  align-items: center;
-  width: auto;
-  max-width: 100%;
-  min-height: 36px;
-  margin: 8px 0 18px;
-  padding: 8px 12px;
-  border-color: #cfe3d7;
-  border-radius: 999px;
-  background: #f4faf6;
-}
-
-.erp-login-card .erp-login-sms-hint .ant-alert-icon {
-  flex: 0 0 auto;
-  margin-inline-end: 8px;
-  color: #248b4f;
-  font-size: 15px;
-}
-
-.erp-login-card .erp-login-sms-hint .ant-alert-content {
-  min-width: 0;
-}
-
-.erp-login-card .erp-login-sms-hint .ant-alert-message {
-  color: #1f5d3a;
+  min-height: 34px;
   font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
 }
 
-.erp-login-legal-links a {
-  margin: 0 3px;
-  color: #237a38;
-  font-weight: 700;
-}
-
-.erp-login-legal-links a:hover,
-.erp-login-legal-links a:focus-visible {
-  color: #175d29;
-  text-decoration: underline;
-}
-
-.erp-login-legal-links {
+.erp-login-methods.erp-sliding-tab-list {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  color: #748178;
+  align-items: stretch;
+  gap: 16px;
+  margin-top: 10px;
+  border-bottom: 1px solid var(--erp-border);
+}
+
+.erp-login-methods > button {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--erp-text-muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.erp-login-methods.erp-sliding-tab-list::before {
+  top: auto;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--erp-primary);
+  box-shadow: none;
+  transform: translateX(var(--erp-slider-x, 0px));
+}
+
+.erp-login-methods > button[aria-selected='true'] {
+  font-weight: 650;
+}
+
+.erp-login-methods > button:disabled {
+  cursor: wait;
+}
+
+.erp-login-fields {
+  margin-top: 18px;
+}
+
+.erp-login-card .ant-form-item {
+  margin-bottom: 14px;
+}
+
+.erp-login-card .ant-form-item-label {
+  padding-bottom: 6px;
+}
+
+.erp-login-card .ant-form-item-label > label {
+  height: auto;
+  min-height: 20px;
+  color: var(--erp-text-muted);
   font-size: 13px;
-  line-height: 1.6;
-  text-align: center;
-}
-
-[data-erp-theme='dark'] .erp-login-legal-links {
-  color: #94a3b8;
-}
-
-[data-erp-theme='dark'] .erp-login-legal-links a {
-  color: #86efac;
+  font-weight: 600;
 }
 
 .erp-login-card .ant-input:not(:where(.ant-input-affix-wrapper > input)),
 .erp-login-card .ant-input-affix-wrapper {
-  min-height: 56px;
-  border-color: #d1d5db;
-  box-shadow: none;
+  height: 44px;
+  min-height: 44px;
+  padding-block: 0;
+  border-color: var(--erp-border-strong);
+  background: var(--erp-surface-bg);
+  font-size: 14px;
+  line-height: 42px;
 }
 
 .erp-login-card .ant-input-affix-wrapper .ant-input {
-  min-height: auto;
+  height: auto;
+  min-height: 0;
+  background: transparent;
+  line-height: 42px;
+}
+
+.erp-login-card .ant-input-affix-wrapper {
+  height: 44px;
+  padding-block: 0;
+}
+
+.erp-login-password-toggle {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--erp-text-muted);
+  cursor: pointer;
+}
+
+.erp-login-password-toggle:hover {
+  background: var(--erp-primary-softer);
+  color: var(--erp-primary-strong);
+}
+
+.erp-login-methods > button:focus-visible,
+.erp-login-password-toggle:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
 }
 
 .erp-login-card .erp-login-sms-code-compact.ant-space-compact {
-  --erp-login-sms-border: #d1d5db;
-  --erp-login-sms-button-bg: #f7f9fa;
-  --erp-login-sms-button-hover-bg: #eef5f0;
-  --erp-login-sms-button-disabled-bg: #f4f6f8;
-  --erp-login-sms-button-color: #204160;
-  --erp-login-sms-button-disabled-color: #8793a1;
-
   position: relative;
+  width: 100%;
   align-items: stretch;
   overflow: hidden;
-  border-radius: var(--erp-control-radius, 12px);
-  background: #ffffff;
-  box-shadow: none;
-  transition: box-shadow 160ms ease;
+  border-radius: var(--erp-control-radius, 8px);
+  background: var(--erp-surface-bg);
 }
 
 .erp-login-card .erp-login-sms-code-compact.ant-space-compact::after {
@@ -204,109 +210,157 @@
   inset: 0;
   z-index: 4;
   box-sizing: border-box;
-  border: 1px solid var(--erp-login-sms-border);
+  border: 1px solid var(--erp-border-strong);
   border-radius: inherit;
   content: '';
   pointer-events: none;
-  transition: border-color 160ms ease;
 }
 
-.erp-login-card .erp-login-sms-code-compact.ant-space-compact:hover {
-  --erp-login-sms-border: #b6c5d3;
-}
+#root .erp-login-sms-code-compact.ant-space-compact > .ant-input.ant-input-lg {
+  --erp-control-radius: 0;
 
-#root
-  .erp-login-card
-  .erp-login-sms-code-compact.ant-space-compact
-  > .ant-input.ant-input-lg {
   flex: 1 1 auto;
   z-index: 0;
   min-width: 0;
   margin: 0;
   border: 0;
-  --erp-control-radius: 0;
   outline: none;
   box-shadow: none;
-  transition: none;
+  line-height: 44px;
 }
 
-#root
-  .erp-login-card
-  .erp-login-sms-code-compact.ant-space-compact
-  > .ant-input.ant-input-lg:focus {
+.erp-login-card .erp-login-sms-code-compact .ant-btn.ant-btn-lg {
+  flex: 0 0 110px;
   z-index: 0;
-}
-
-.erp-login-card
-  .erp-login-sms-code-compact.ant-space-compact
-  .ant-btn.ant-btn-lg {
-  flex: 0 0 124px;
-  z-index: 0;
-  min-width: 124px;
-  min-height: 56px;
+  min-width: 110px;
+  height: 44px;
   margin-inline-start: 0;
+  padding: 0 10px;
   border: 0;
+  border-inline-start: 1px solid var(--erp-border);
   border-radius: 0;
-  background: var(--erp-login-sms-button-bg);
+  background: var(--erp-surface-bg);
   box-shadow: none;
-  color: var(--erp-login-sms-button-color);
-  font-size: 15px;
-  font-weight: 700;
-  transition:
-    background-color 160ms ease,
-    color 160ms ease;
+  color: var(--erp-primary-strong);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
-.erp-login-card
-  .erp-login-sms-code-compact.ant-space-compact
-  .ant-btn.ant-btn-lg:hover,
-.erp-login-card
-  .erp-login-sms-code-compact.ant-space-compact
-  .ant-btn.ant-btn-lg:focus-visible {
-  border-color: transparent;
-  background: var(--erp-login-sms-button-hover-bg);
-  color: var(--erp-login-sms-button-color);
+.erp-login-card .erp-login-sms-code-compact .ant-btn:disabled {
+  color: var(--erp-text-subtle);
 }
 
-.erp-login-card
-  .erp-login-sms-code-compact.ant-space-compact
-  .ant-btn.ant-btn-lg:disabled {
-  border-color: transparent;
-  background: var(--erp-login-sms-button-disabled-bg);
-  color: var(--erp-login-sms-button-disabled-color);
-  opacity: 1;
+.erp-login-card .erp-login-sms-code-compact .ant-btn:hover:enabled {
+  background: var(--erp-primary-softer);
 }
 
-[data-erp-theme='dark']
-  .erp-login-card
-  .erp-login-sms-code-compact.ant-space-compact {
-  --erp-login-sms-border: var(--erp-border);
-  --erp-login-sms-button-bg: #182235;
-  --erp-login-sms-button-hover-bg: var(--erp-interactive-bg-hover);
-  --erp-login-sms-button-disabled-bg: rgb(17 24 39 / 0.58);
-  --erp-login-sms-button-color: var(--erp-text);
-  --erp-login-sms-button-disabled-color: var(--erp-text-subtle);
-
-  background: #0f172a;
+.erp-login-feedback:not(:empty) {
+  margin: 4px 0 10px;
 }
 
-.erp-login-card .ant-input:not(:where(.ant-input-affix-wrapper > input)):hover,
-.erp-login-card .ant-input-affix-wrapper:hover {
-  border-color: #b6c5d3;
+.erp-login-feedback > p {
+  margin: 0;
+  color: var(--erp-warning-text);
+  font-size: 12px;
 }
 
-.erp-login-card .ant-btn.ant-btn-primary {
-  min-height: 56px;
-  border-radius: 22px;
-  border-color: #2f8f4b;
-  background: #2f8f4b;
-  box-shadow: none;
-  font-size: 18px;
-  font-weight: 700;
+.erp-login-card .ant-alert {
+  border-radius: 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
-.erp-login-card .ant-btn.ant-btn-primary:hover,
-.erp-login-card .ant-btn.ant-btn-primary:focus-visible {
-  border-color: #27753d;
-  background: #27753d;
+.erp-login-card .erp-login-sms-hint.ant-alert {
+  padding: 8px 10px;
+  border: 0;
+  background: var(--erp-primary-softer);
+}
+
+.erp-login-sms-hint .ant-alert-message,
+.erp-login-sms-hint .ant-alert-icon {
+  color: var(--erp-text-muted);
+}
+
+.erp-login-card .erp-login-submit.ant-btn.ant-btn-primary {
+  height: 44px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.erp-login-legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 10px;
+  margin-top: 16px;
+  color: var(--erp-text-subtle);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.erp-login-legal-links a {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  color: var(--erp-text-muted);
+}
+
+.erp-login-legal-links a:hover,
+.erp-login-legal-links a:focus-visible {
+  color: var(--erp-primary-strong);
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .erp-login-page {
+    padding: max(20px, env(safe-area-inset-top)) 16px
+      max(20px, env(safe-area-inset-bottom));
+  }
+
+  .erp-login-card .ant-card-body {
+    padding: 24px;
+  }
+
+  .erp-login-logo__title {
+    font-size: 18px;
+  }
+
+  .erp-login-logo__mark.erp-admin-brand__logo-mark {
+    width: 32px;
+    height: 32px;
+    font-size: 17px;
+  }
+
+  .erp-login-card .ant-input {
+    font-size: 16px;
+  }
+
+  .erp-login-card__theme-toggle.ant-btn,
+  .erp-login-card .ant-segmented .ant-segmented-item-label,
+  .erp-login-methods > button,
+  .erp-login-password-toggle {
+    min-height: 40px;
+  }
+
+  .erp-login-legal-links a {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 360px) {
+  .erp-login-page {
+    padding-inline: 12px;
+  }
+  .erp-login-card .ant-card-body {
+    padding: 18px;
+  }
+  .erp-login-brand-row,
+  .erp-login-logo {
+    gap: 8px;
+  }
+  .erp-login-logo__title {
+    font-size: 16px;
+  }
 }

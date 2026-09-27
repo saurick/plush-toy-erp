@@ -1,15 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  ArrowUpOutlined,
   CopyOutlined,
   DeleteOutlined,
   FolderOpenOutlined,
   OrderedListOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Select, Space } from 'antd'
+import {
+  formatUnitQuantitySummary,
+  summarizePurchaseOrderLines,
+} from '../../utils/sourceOrderAmounts.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
-import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
   unitPrecisionErrorMessage,
@@ -35,7 +40,6 @@ import {
   unixToDateInputValue,
 } from '../../utils/masterDataOrderView.mjs'
 import { buildPurchaseOrderItemSourceValuesFromMaterial } from '../../utils/sourceOrderLineValues.mjs'
-import { summarizePurchaseOrderLines } from '../../utils/sourceOrderAmounts.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 import {
   CATALOG_FILL_DUPLICATE_POLICIES,
@@ -266,561 +270,588 @@ export function PurchaseOrderFormFields({
       <Form.Item name="supplier_snapshot" hidden>
         <Input />
       </Form.Item>
-      <BusinessFormSectionTitle>订单与供应商</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name="purchase_order_no"
-        label="采购单号（自动）"
-        rules={[{ required: true, message: '请输入或保留自动采购单号' }]}
-      >
-        <Input maxLength={64} placeholder="自动生成，可按需要调整" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name="supplier_id"
-        label="供应商"
-        rules={[{ required: true, message: '请选择供应商' }]}
-      >
-        <Select
-          showSearch
-          options={supplierOptions}
-          optionFilterProp="label"
-          onChange={onSupplierChange}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name="supplier_purchase_order_no"
-        label="供应商单号"
-      >
-        <Input maxLength={128} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name="currency"
-        label="币种"
-        rules={[{ required: true, message: '请选择币种' }]}
-      >
-        <Select options={BUSINESS_CURRENCY_OPTIONS} />
-      </Form.Item>
-      <BusinessFormSectionTitle>结算与发票</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        extra="从供应商档案带出后可按本单调整。"
-        name="payment_method"
-        label="付款方式"
-      >
-        <Input allowClear maxLength={128} placeholder="如银行转账、月结" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        extra="保存后冻结为本单付款条件，不随供应商档案后续调整。"
-        name="payment_term_days"
-        label="付款周期（天）"
-        rules={[
-          { required: true, message: '请填写付款周期' },
-          {
-            type: 'integer',
-            min: 0,
-            message: '付款周期必须为不小于 0 的整数',
-          },
-        ]}
-      >
-        <InputNumber min={0} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name="invoice_required"
-        label="是否需要发票"
-      >
-        <Select
-          allowClear
-          options={PURCHASE_INVOICE_REQUIRED_OPTIONS}
-          placeholder="请选择"
-          onChange={(value) => {
-            if (value !== true) {
-              form.setFieldValue('invoice_category', undefined)
+      <BusinessFormSection title="订单与供应商">
+        <Form.Item
+          className="erp-business-action-form__field"
+          name="purchase_order_no"
+          label="采购单号（自动）"
+          rules={[{ required: true, message: '请输入或保留自动采购单号' }]}
+        >
+          <Input maxLength={64} placeholder="自动生成，可按需要调整" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          name="supplier_id"
+          label="供应商"
+          rules={[{ required: true, message: '请选择供应商' }]}
+        >
+          <Select
+            showSearch
+            options={supplierOptions}
+            optionFilterProp="label"
+            onChange={onSupplierChange}
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          name="supplier_purchase_order_no"
+          label="供应商单号"
+        >
+          <Input maxLength={128} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          name="currency"
+          label="币种"
+          rules={[{ required: true, message: '请选择币种' }]}
+        >
+          <Select options={BUSINESS_CURRENCY_OPTIONS} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          name="purchase_date"
+          label="下单日期"
+          rules={[
+            { required: true, message: '请选择下单日期' },
+            dateInputNotAfterRule({
+              getEndValue: () => form.getFieldValue('expected_arrival_date'),
+              message: '下单日期不能晚于预计到货日期',
+            }),
+            dateInputNotAfterRule({
+              getEndValue: () =>
+                form.getFieldValue('supplier_confirmed_arrival_date'),
+              message: '下单日期不能晚于供应商确认到货日期',
+            }),
+          ]}
+        >
+          <DateInput
+            disabledDate={
+              expectedArrivalDate || supplierConfirmedArrivalDate
+                ? disablePurchaseDateAfterArrival
+                : undefined
             }
-          }}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['invoice_required']}
-        name="invoice_category"
-        label="发票类别"
-        rules={[
-          {
-            required: invoiceRequired === true,
-            message: '请选择发票类别',
-          },
-        ]}
-      >
-        <Select
-          allowClear
-          disabled={invoiceRequired !== true}
-          options={PURCHASE_INVOICE_CATEGORY_OPTIONS}
-          placeholder="请先选择需要发票"
-        />
-      </Form.Item>
-      <BusinessFormSectionTitle>到货与收货</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name="purchase_date"
-        label="下单日期"
-        rules={[
-          { required: true, message: '请选择下单日期' },
-          dateInputNotAfterRule({
-            getEndValue: () => form.getFieldValue('expected_arrival_date'),
-            message: '下单日期不能晚于预计到货日期',
-          }),
-          dateInputNotAfterRule({
-            getEndValue: () =>
-              form.getFieldValue('supplier_confirmed_arrival_date'),
-            message: '下单日期不能晚于供应商确认到货日期',
-          }),
-        ]}
-      >
-        <DateInput
-          disabledDate={
-            expectedArrivalDate || supplierConfirmedArrivalDate
-              ? disablePurchaseDateAfterArrival
-              : undefined
-          }
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['purchase_date']}
-        name="expected_arrival_date"
-        label="预计到货日期"
-        rules={[
-          dateInputNotBeforeRule({
-            getStartValue: () => form.getFieldValue('purchase_date'),
-            message: '预计到货日期不能早于下单日期',
-          }),
-        ]}
-      >
-        <DateInput
-          disabledDate={
-            purchaseDate ? disableExpectedArrivalBeforePurchaseDate : undefined
-          }
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['purchase_date']}
-        name="supplier_confirmed_arrival_date"
-        label="供应商确认到货日期"
-        rules={[
-          dateInputNotBeforeRule({
-            getStartValue: () => form.getFieldValue('purchase_date'),
-            message: '供应商确认到货日期不能早于下单日期',
-          }),
-        ]}
-      >
-        <DateInput
-          disabledDate={
-            purchaseDate ? disableExpectedArrivalBeforePurchaseDate : undefined
-          }
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        label="收货地址"
-        name="delivery_address"
-      >
-        <BusinessTextArea allowClear maxLength={512} showCount />
-      </Form.Item>
-      <BusinessFormSectionTitle>合同订购方信息</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['contract_party_snapshot', 'buyerCompany']}
-        label="订购单位"
-      >
-        <Input maxLength={128} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['contract_party_snapshot', 'buyerContact']}
-        label="订购人"
-      >
-        <Input maxLength={64} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['contract_party_snapshot', 'buyerPhone']}
-        label="订购方电话"
-      >
-        <Input maxLength={64} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['contract_party_snapshot', 'buyerAddress']}
-        label="公司地址"
-      >
-        <Input maxLength={255} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        name={['contract_party_snapshot', 'buyerSigner']}
-        label="订购方签字人"
-      >
-        <Input maxLength={64} />
-      </Form.Item>
-      <BusinessFormSectionTitle>备注与附件</BusinessFormSectionTitle>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        name="note"
-        label="备注"
-      >
-        <BusinessTextArea allowClear showCount maxLength={255} />
-      </Form.Item>
-      {attachmentPanel}
-
-      <BusinessLineItemsSection
-        columns={PURCHASE_ORDER_COLUMNS}
-        title="采购明细"
-        description="同一个采购订单内维护多条供应商承诺明细。"
-        emptyDescription="暂无采购明细"
-        renderBeforeHeader={({ add, fields }) => (
-          <>
-            <div className="erp-line-items-form__import-row">
-              <div className="erp-line-items-form__import-copy">
-                <strong>从材料库添加明细</strong>
-                <span>
-                  从材料库添加；数量、单价和预计到货日期回到采购明细维护。
-                </span>
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          dependencies={['purchase_date']}
+          name="expected_arrival_date"
+          label="预计到货日期"
+          rules={[
+            dateInputNotBeforeRule({
+              getStartValue: () => form.getFieldValue('purchase_date'),
+              message: '预计到货日期不能早于下单日期',
+            }),
+          ]}
+        >
+          <DateInput
+            disabledDate={
+              purchaseDate
+                ? disableExpectedArrivalBeforePurchaseDate
+                : undefined
+            }
+          />
+        </Form.Item>
+      </BusinessFormSection>
+      <BusinessFormSection title="采购明细" showHeading={false}>
+        <BusinessLineItemsSection
+          columns={PURCHASE_ORDER_COLUMNS}
+          title="采购明细"
+          description="同一个采购订单内维护多条供应商承诺明细。"
+          emptyDescription="暂无采购明细"
+          renderBeforeHeader={({ add, fields }) => (
+            <>
+              <div className="erp-line-items-form__import-row">
+                <div className="erp-line-items-form__import-copy">
+                  <strong>从材料库添加明细</strong>
+                  <span>
+                    从材料库添加；数量、单价和预计到货日期回到采购明细维护。
+                  </span>
+                </div>
+                <Space className="erp-line-item-order-actions" wrap>
+                  <Button
+                    icon={<FolderOpenOutlined aria-hidden="true" />}
+                    className="erp-line-items-form__import-button erp-action-button"
+                    disabled={!referenceDataReady}
+                    title={
+                      !referenceDataReady
+                        ? '采购基础资料加载完成后可选择材料'
+                        : undefined
+                    }
+                    onClick={() => setMaterialImportOpen(true)}
+                  >
+                    从材料库添加
+                  </Button>
+                  <Button
+                    icon={<OrderedListOutlined />}
+                    disabled={!referenceDataReady || fields.length < 2}
+                    onClick={() => {
+                      const currentLines = form.getFieldValue('items') || []
+                      setLineOrderItems([...currentLines])
+                      setLineOrderOpen(true)
+                    }}
+                  >
+                    材料顺序
+                  </Button>
+                </Space>
               </div>
-              <Space className="erp-line-item-order-actions" wrap>
-                <Button
-                  icon={<FolderOpenOutlined aria-hidden="true" />}
-                  className="erp-line-items-form__import-button erp-action-button"
-                  disabled={!referenceDataReady}
-                  title={
-                    !referenceDataReady
-                      ? '采购基础资料加载完成后可选择材料'
-                      : undefined
-                  }
-                  onClick={() => setMaterialImportOpen(true)}
-                >
-                  从材料库添加
-                </Button>
-                <Button
-                  icon={<OrderedListOutlined />}
-                  disabled={!referenceDataReady || fields.length < 2}
-                  onClick={() => {
-                    const currentLines = form.getFieldValue('items') || []
-                    setLineOrderItems([...currentLines])
-                    setLineOrderOpen(true)
-                  }}
-                >
-                  材料顺序
-                </Button>
-              </Space>
-            </div>
-            <BusinessLineItemOrderModal
-              getItemLabel={purchaseOrderLineOrderLabel}
-              itemNoun="采购明细"
-              items={lineOrderItems}
-              onApply={(orderedItems) =>
-                form.setFieldsValue({ items: orderedItems })
-              }
-              onClose={() => setLineOrderOpen(false)}
-              open={lineOrderOpen}
-              title="调整材料顺序"
-            />
-            <SourceImportPickerModal
-              open={materialImportOpen}
-              title="选择材料添加采购明细"
-              description="这里只选择材料档案；数量、单价和预计到货日期在编辑页的采购明细里维护。"
-              rows={materials}
-              columns={materialImportColumns}
-              getSelectedLabel={materialLabel}
-              searchPlaceholder="搜索材料"
-              searchHint="可搜索：材料编码、名称、分类、规格、颜色"
-              importText="添加到采购明细"
-              selectedNoun="材料"
-              emptyDescription="暂无可选材料"
-              onCancel={() => setMaterialImportOpen(false)}
-              onImport={(selectedMaterials) => {
-                const currentLines = form.getFieldValue('items') || []
-                const nextLineNo = getNextLineNo(currentLines)
-                const startIndex = currentLines.length
-                const { rowsToAdd: importedLines } = buildCatalogFillRowsPlan({
-                  currentRows: currentLines,
-                  selectedRows: selectedMaterials,
-                  mode: CATALOG_FILL_MODES.APPEND,
-                  // 同一材料可因交期、单价或批次承诺拆成多行。
-                  duplicatePolicy: CATALOG_FILL_DUPLICATE_POLICIES.ALLOW,
-                  getCurrentSourceKey: (line) => line.material_id,
-                  getSelectedSourceKey: (material) => material.id,
-                  mapSelectedRow: (material, { acceptedIndex }) =>
-                    createLineFromMaterial(
-                      material,
-                      nextLineNo + acceptedIndex
-                    ),
-                })
-                importedLines.forEach(() => {
-                  add()
-                })
-                requestLineItemScroll(startIndex)
-                window.setTimeout(() => {
-                  form.setFields(
-                    importedLines.flatMap((line, index) =>
-                      Object.entries(line).map(([key, value]) => ({
-                        name: ['items', startIndex + index, key],
-                        value,
-                      }))
-                    )
+              <BusinessLineItemOrderModal
+                getItemLabel={purchaseOrderLineOrderLabel}
+                itemNoun="采购明细"
+                items={lineOrderItems}
+                onApply={(orderedItems) =>
+                  form.setFieldsValue({ items: orderedItems })
+                }
+                onClose={() => setLineOrderOpen(false)}
+                open={lineOrderOpen}
+                title="调整材料顺序"
+              />
+              <SourceImportPickerModal
+                open={materialImportOpen}
+                title="选择材料添加采购明细"
+                description="这里只选择材料档案；数量、单价和预计到货日期在编辑页的采购明细里维护。"
+                rows={materials}
+                columns={materialImportColumns}
+                getSelectedLabel={materialLabel}
+                searchPlaceholder="搜索材料"
+                searchHint="可搜索：材料编码、名称、分类、规格、颜色"
+                importText="添加到采购明细"
+                selectedNoun="材料"
+                emptyDescription="暂无可选材料"
+                onCancel={() => setMaterialImportOpen(false)}
+                onImport={(selectedMaterials) => {
+                  const currentLines = form.getFieldValue('items') || []
+                  const nextLineNo = getNextLineNo(currentLines)
+                  const startIndex = currentLines.length
+                  const { rowsToAdd: importedLines } = buildCatalogFillRowsPlan(
+                    {
+                      currentRows: currentLines,
+                      selectedRows: selectedMaterials,
+                      mode: CATALOG_FILL_MODES.APPEND,
+                      // 同一材料可因交期、单价或批次承诺拆成多行。
+                      duplicatePolicy: CATALOG_FILL_DUPLICATE_POLICIES.ALLOW,
+                      getCurrentSourceKey: (line) => line.material_id,
+                      getSelectedSourceKey: (material) => material.id,
+                      mapSelectedRow: (material, { acceptedIndex }) =>
+                        createLineFromMaterial(
+                          material,
+                          nextLineNo + acceptedIndex
+                        ),
+                    }
                   )
-                })
-                setMaterialImportOpen(false)
-              }}
-            />
-          </>
-        )}
-        renderRow={({ add, field, fields, index, remove }) => (
-          <BusinessLineItemRow
-            key={field.key}
-            index={index}
-            rowRef={(node) => registerLineItemRow(index, node)}
-            actions={
-              <Space
-                className="erp-sales-order-lines-form__row-actions"
-                size={4}
-                wrap
-              >
-                <Button
-                  aria-label={`复制第 ${index + 1} 行`}
-                  type="text"
-                  icon={<CopyOutlined />}
-                  onClick={() => {
-                    const currentLines = form.getFieldValue('items') || []
-                    const sourceLine =
-                      currentLines[field.name] || currentLines[index] || {}
-                    add(createDuplicatedDraftLineItem(sourceLine), index + 1)
-                    requestLineItemScroll(index + 1)
-                  }}
+                  importedLines.forEach(() => {
+                    add()
+                  })
+                  requestLineItemScroll(startIndex)
+                  window.setTimeout(() => {
+                    form.setFields(
+                      importedLines.flatMap((line, index) =>
+                        Object.entries(line).map(([key, value]) => ({
+                          name: ['items', startIndex + index, key],
+                          value,
+                        }))
+                      )
+                    )
+                  })
+                  setMaterialImportOpen(false)
+                }}
+              />
+            </>
+          )}
+          renderRow={({ add, field, fields, index, remove, move }) => (
+            <BusinessLineItemRow
+              key={field.key}
+              index={index}
+              rowRef={(node) => registerLineItemRow(index, node)}
+              actions={
+                <Space
+                  className="erp-sales-order-lines-form__row-actions"
+                  size={4}
+                  wrap
                 >
-                  复制行
-                </Button>
-                <Button
-                  danger
-                  type="text"
-                  icon={<DeleteOutlined />}
-                  disabled={fields.length <= 1}
-                  onClick={() => remove(field.name)}
+                  <Button
+                    aria-label={`上移第 ${index + 1} 行`}
+                    size="small"
+                    type="text"
+                    icon={<ArrowUpOutlined />}
+                    disabled={index === 0}
+                    onClick={() => {
+                      move(field.name, field.name - 1)
+                      requestLineItemScroll(index - 1)
+                    }}
+                  >
+                    上移
+                  </Button>
+                  <Button
+                    aria-label={`复制第 ${index + 1} 行`}
+                    type="text"
+                    icon={<CopyOutlined />}
+                    onClick={() => {
+                      const currentLines = form.getFieldValue('items') || []
+                      const sourceLine =
+                        currentLines[field.name] || currentLines[index] || {}
+                      add(createDuplicatedDraftLineItem(sourceLine), index + 1)
+                      requestLineItemScroll(index + 1)
+                    }}
+                  >
+                    复制行
+                  </Button>
+                  <Button
+                    danger
+                    type="text"
+                    icon={<DeleteOutlined />}
+                    disabled={fields.length <= 1}
+                    onClick={() => remove(field.name)}
+                  >
+                    移除行
+                  </Button>
+                </Space>
+              }
+              hiddenFields={
+                <>
+                  <Form.Item name={[field.name, 'id']} hidden>
+                    <Input />
+                  </Form.Item>
+                  <Form.Item name={[field.name, 'line_no']} hidden>
+                    <Input />
+                  </Form.Item>
+                </>
+              }
+              cells={[
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--snapshot-code"
+                  name={[field.name, 'product_order_no_snapshot']}
+                  label="产品订单编号"
                 >
-                  移除行
-                </Button>
-              </Space>
-            }
-            hiddenFields={
-              <>
-                <Form.Item name={[field.name, 'id']} hidden>
+                  <Input maxLength={128} />
+                </Form.Item>,
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--snapshot-code"
+                  name={[field.name, 'product_no_snapshot']}
+                  label="产品编号"
+                >
+                  <Input maxLength={128} />
+                </Form.Item>,
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--snapshot-name"
+                  name={[field.name, 'product_name_snapshot']}
+                  label="产品名称"
+                >
+                  <BusinessTextArea maxLength={255} />
+                </Form.Item>,
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--source"
+                  name={[field.name, 'material_id']}
+                  label="材料名称"
+                  rules={[{ required: true, message: '请选择材料' }]}
+                >
+                  <Select
+                    allowClear
+                    showSearch
+                    options={materialOptions}
+                    optionFilterProp="label"
+                    onChange={(value) => onMaterialChange(field.name, value)}
+                  />
+                </Form.Item>,
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--unit"
+                  name={[field.name, 'unit_id']}
+                  label="单位"
+                  rules={[{ required: true, message: '请选择单位' }]}
+                >
+                  <Select
+                    allowClear
+                    optionFilterProp="searchText"
+                    options={unitOptions}
+                    placeholder="请选择单位"
+                    showSearch
+                    onChange={() => {
+                      form
+                        .validateFields([
+                          ['items', field.name, 'purchased_quantity'],
+                        ])
+                        .catch(() => {})
+                    }}
+                  />
+                </Form.Item>,
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--money"
+                  name={[field.name, 'unit_price']}
+                  label="单价"
+                >
                   <Input />
-                </Form.Item>
-                <Form.Item name={[field.name, 'line_no']} hidden>
-                  <Input />
-                </Form.Item>
-              </>
-            }
-            cells={[
+                </Form.Item>,
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(previous, current) =>
+                    previous?.items?.[field.name]?.unit_id !==
+                    current?.items?.[field.name]?.unit_id
+                  }
+                >
+                  {({ getFieldValue }) => (
+                    <Form.Item
+                      className="erp-line-item-field erp-line-item-field--quantity"
+                      name={[field.name, 'purchased_quantity']}
+                      label="采购数量"
+                      rules={[
+                        { required: true, message: '请输入采购数量' },
+                        quantityPrecisionRule({
+                          form,
+                          fieldName: field.name,
+                          unitOptions,
+                        }),
+                      ]}
+                    >
+                      <FieldWithUnitSuffix
+                        control={<Input />}
+                        unitText={unitSuffixTextFromOptions(
+                          unitOptions,
+                          getFieldValue(['items', field.name, 'unit_id'])
+                        )}
+                      />
+                    </Form.Item>
+                  )}
+                </Form.Item>,
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--money"
+                  name={[field.name, 'amount']}
+                  label="金额"
+                >
+                  <Input placeholder="留空时根据数量和单价自动计算" />
+                </Form.Item>,
+                <Form.Item
+                  className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
+                  name={[field.name, 'note']}
+                  label="备注"
+                >
+                  <BusinessTextArea allowClear showCount maxLength={255} />
+                </Form.Item>,
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--date"
+                  name={[field.name, 'expected_arrival_date']}
+                  label="预计到货日期"
+                  dependencies={['purchase_date']}
+                  rules={[
+                    dateInputNotBeforeRule({
+                      getStartValue: () => form.getFieldValue('purchase_date'),
+                      message: '明细预计到货日期不能早于下单日期',
+                    }),
+                  ]}
+                >
+                  <DateInput
+                    disabledDate={
+                      purchaseDate
+                        ? disableExpectedArrivalBeforePurchaseDate
+                        : undefined
+                    }
+                  />
+                </Form.Item>,
+              ]}
+            >
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--snapshot-code"
-                name={[field.name, 'product_order_no_snapshot']}
-                label="产品订单编号"
+                name={[field.name, 'material_code_snapshot']}
+                label="下单材料编码"
               >
-                <Input maxLength={128} />
-              </Form.Item>,
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--snapshot-code"
-                name={[field.name, 'product_no_snapshot']}
-                label="产品编号"
-              >
-                <Input maxLength={128} />
-              </Form.Item>,
+                <Input maxLength={64} />
+              </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--snapshot-name"
-                name={[field.name, 'product_name_snapshot']}
-                label="产品名称"
+                name={[field.name, 'material_name_snapshot']}
+                label="下单材料名称"
               >
                 <BusinessTextArea maxLength={255} />
-              </Form.Item>,
+              </Form.Item>
               <Form.Item
-                className="erp-line-item-field erp-line-item-field--source"
-                name={[field.name, 'material_id']}
-                label="材料名称"
-                rules={[{ required: true, message: '请选择材料' }]}
+                className="erp-line-item-field erp-line-item-field--snapshot-small"
+                name={[field.name, 'color_snapshot']}
+                label="下单颜色"
               >
-                <Select
-                  allowClear
-                  showSearch
-                  options={materialOptions}
-                  optionFilterProp="label"
-                  onChange={(value) => onMaterialChange(field.name, value)}
-                />
-              </Form.Item>,
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--unit"
-                name={[field.name, 'unit_id']}
-                label="单位"
-                rules={[{ required: true, message: '请选择单位' }]}
-              >
-                <Select
-                  allowClear
-                  optionFilterProp="searchText"
-                  options={unitOptions}
-                  placeholder="请选择单位"
-                  showSearch
-                  onChange={() => {
-                    form
-                      .validateFields([
-                        ['items', field.name, 'purchased_quantity'],
-                      ])
-                      .catch(() => {})
-                  }}
-                />
-              </Form.Item>,
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--money"
-                name={[field.name, 'unit_price']}
-                label="单价"
-              >
-                <Input />
-              </Form.Item>,
-              <Form.Item
-                noStyle
-                shouldUpdate={(previous, current) =>
-                  previous?.items?.[field.name]?.unit_id !==
-                  current?.items?.[field.name]?.unit_id
-                }
-              >
-                {({ getFieldValue }) => (
-                  <Form.Item
-                    className="erp-line-item-field erp-line-item-field--quantity"
-                    name={[field.name, 'purchased_quantity']}
-                    label="采购数量"
-                    rules={[
-                      { required: true, message: '请输入采购数量' },
-                      quantityPrecisionRule({
-                        form,
-                        fieldName: field.name,
-                        unitOptions,
-                      }),
-                    ]}
-                  >
-                    <FieldWithUnitSuffix
-                      control={<Input />}
-                      unitText={unitSuffixTextFromOptions(
-                        unitOptions,
-                        getFieldValue(['items', field.name, 'unit_id'])
-                      )}
-                    />
-                  </Form.Item>
-                )}
-              </Form.Item>,
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--money"
-                name={[field.name, 'amount']}
-                label="金额"
-              >
-                <Input placeholder="留空时根据数量和单价自动计算" />
-              </Form.Item>,
-              <Form.Item
-                className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
-                name={[field.name, 'note']}
-                label="备注"
-              >
-                <BusinessTextArea allowClear showCount maxLength={255} />
-              </Form.Item>,
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--date"
-                name={[field.name, 'expected_arrival_date']}
-                label="预计到货日期"
-                dependencies={['purchase_date']}
-                rules={[
-                  dateInputNotBeforeRule({
-                    getStartValue: () => form.getFieldValue('purchase_date'),
-                    message: '明细预计到货日期不能早于下单日期',
-                  }),
-                ]}
-              >
-                <DateInput
-                  disabledDate={
-                    purchaseDate
-                      ? disableExpectedArrivalBeforePurchaseDate
-                      : undefined
-                  }
-                />
-              </Form.Item>,
-            ]}
-          >
-            <Form.Item
-              className="erp-line-item-field erp-line-item-field--snapshot-code"
-              name={[field.name, 'material_code_snapshot']}
-              label="下单材料编码"
-            >
-              <Input maxLength={64} />
-            </Form.Item>
-            <Form.Item
-              className="erp-line-item-field erp-line-item-field--snapshot-name"
-              name={[field.name, 'material_name_snapshot']}
-              label="下单材料名称"
-            >
-              <BusinessTextArea maxLength={255} />
-            </Form.Item>
-            <Form.Item
-              className="erp-line-item-field erp-line-item-field--snapshot-small"
-              name={[field.name, 'color_snapshot']}
-              label="下单颜色"
-            >
-              <Input maxLength={64} />
-            </Form.Item>
-          </BusinessLineItemRow>
-        )}
-        footerProps={({ add, fields }) => ({
-          addLabel: '添加条目',
-          onAdd: () => {
-            const currentLines = form.getFieldValue('items') || []
-            add(createBlankPurchaseLine(getNextLineNo(currentLines)))
-            requestLineItemScroll(currentLines.length)
-          },
-          stats: [
-            {
-              key: 'count',
-              label: '已录入',
-              value: fields.length,
-              suffix: '条',
+                <Input maxLength={64} />
+              </Form.Item>
+            </BusinessLineItemRow>
+          )}
+          footerProps={({ add, fields }) => ({
+            addLabel: '添加条目',
+            onAdd: () => {
+              const currentLines = form.getFieldValue('items') || []
+              add(createBlankPurchaseLine(getNextLineNo(currentLines)))
+              requestLineItemScroll(currentLines.length)
             },
+            stats: [
+              {
+                key: 'count',
+                label: '已录入',
+                value: fields.length,
+                suffix: '条',
+              },
+              {
+                key: 'quantity',
+                label: '数量合计',
+                value: (
+                  <BusinessLineItemsSummaryValue
+                    summarize={(lines) =>
+                      formatUnitQuantitySummary(
+                        lines,
+                        'purchased_quantity',
+                        unitOptions
+                      )
+                    }
+                    select={(text) => text}
+                  />
+                ),
+              },
+              {
+                key: 'amount',
+                label: '金额合计',
+                value: (
+                  <BusinessLineItemsSummaryValue
+                    summarize={summarizePurchaseOrderLines}
+                    select={(summary) =>
+                      formatNumeric20Scale6Summary(summary.amount, 2)
+                    }
+                  />
+                ),
+              },
+            ],
+          })}
+        />
+      </BusinessFormSection>
+      <BusinessFormSection title="交付与结算">
+        <Form.Item
+          className="erp-business-action-form__field"
+          dependencies={['purchase_date']}
+          name="supplier_confirmed_arrival_date"
+          label="供应商确认到货日期"
+          rules={[
+            dateInputNotBeforeRule({
+              getStartValue: () => form.getFieldValue('purchase_date'),
+              message: '供应商确认到货日期不能早于下单日期',
+            }),
+          ]}
+        >
+          <DateInput
+            disabledDate={
+              purchaseDate
+                ? disableExpectedArrivalBeforePurchaseDate
+                : undefined
+            }
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field erp-business-action-form__field--full"
+          label="收货地址"
+          name="delivery_address"
+        >
+          <BusinessTextArea allowClear maxLength={512} showCount />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          extra="从供应商档案带出后可按本单调整。"
+          name="payment_method"
+          label="付款方式"
+        >
+          <Input allowClear maxLength={128} placeholder="如银行转账、月结" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          extra="保存后冻结为本单付款条件，不随供应商档案后续调整。"
+          name="payment_term_days"
+          label="付款周期（天）"
+          rules={[
+            { required: true, message: '请填写付款周期' },
             {
-              key: 'quantity',
-              label: '数量合计',
-              value: (
-                <BusinessLineItemsSummaryValue
-                  summarize={summarizePurchaseOrderLines}
-                  select={(summary) =>
-                    formatNumeric20Scale6Summary(summary.quantity)
-                  }
-                />
-              ),
+              type: 'integer',
+              min: 0,
+              message: '付款周期必须为不小于 0 的整数',
             },
+          ]}
+        >
+          <InputNumber style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          name="invoice_required"
+          label="是否需要发票"
+        >
+          <Select
+            allowClear
+            options={PURCHASE_INVOICE_REQUIRED_OPTIONS}
+            placeholder="请选择"
+            onChange={(value) => {
+              if (value !== true) {
+                form.setFieldValue('invoice_category', undefined)
+              }
+            }}
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          dependencies={['invoice_required']}
+          name="invoice_category"
+          label="发票类别"
+          rules={[
             {
-              key: 'amount',
-              label: '金额合计',
-              value: (
-                <BusinessLineItemsSummaryValue
-                  summarize={summarizePurchaseOrderLines}
-                  select={(summary) =>
-                    formatNumeric20Scale6Summary(summary.amount, 2)
-                  }
-                />
-              ),
+              required: invoiceRequired === true,
+              message: '请选择发票类别',
             },
-          ],
-        })}
-      />
+          ]}
+        >
+          <Select
+            allowClear
+            disabled={invoiceRequired !== true}
+            options={PURCHASE_INVOICE_CATEGORY_OPTIONS}
+            placeholder="请先选择需要发票"
+          />
+        </Form.Item>
+      </BusinessFormSection>
+      <BusinessFormSection title="合同订购方信息">
+        <Form.Item
+          className="erp-business-action-form__field"
+          name={['contract_party_snapshot', 'buyerCompany']}
+          label="订购单位"
+        >
+          <Input maxLength={128} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          name={['contract_party_snapshot', 'buyerContact']}
+          label="订购人"
+        >
+          <Input maxLength={64} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          name={['contract_party_snapshot', 'buyerPhone']}
+          label="订购方电话"
+        >
+          <Input maxLength={64} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          name={['contract_party_snapshot', 'buyerAddress']}
+          label="公司地址"
+        >
+          <Input maxLength={255} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          name={['contract_party_snapshot', 'buyerSigner']}
+          label="订购方签字人"
+        >
+          <Input maxLength={64} />
+        </Form.Item>
+      </BusinessFormSection>
+      <BusinessFormSection title="备注与附件">
+        <Form.Item
+          className="erp-business-action-form__field erp-business-action-form__field--full"
+          name="note"
+          label="备注"
+        >
+          <BusinessTextArea allowClear showCount maxLength={255} />
+        </Form.Item>
+        {attachmentPanel}
+      </BusinessFormSection>
     </Form>
   )
 }

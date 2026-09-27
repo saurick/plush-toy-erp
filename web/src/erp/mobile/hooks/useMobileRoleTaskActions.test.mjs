@@ -139,6 +139,7 @@ function loadMobileActionHook({
   completeWorkflowTaskAction = async () => {},
   resumeWorkflowTaskAction = async () => {},
   urgeWorkflowTask = async () => {},
+  resolveMobileUrgeAction = () => 'urge_task',
   verifyWorkflowTaskActionAccessBeforeSubmit = async () => true,
   messages = { errors: [], successes: [], warnings: [] },
 } = {}) {
@@ -224,7 +225,7 @@ module.exports = { useMobileRoleTaskActions }`,
           resolveMobileActionLabel: (action) => action,
           resolveMobileTaskActionReason: ({ task, action, reasonDrafts }) =>
             reasonDrafts[`${task?.id || ''}:${action || ''}`] || '',
-          resolveMobileUrgeAction: () => 'urge_task',
+          resolveMobileUrgeAction,
         },
         '../../utils/workflowTaskActionSubmitGuard.mjs': {
           verifyWorkflowTaskActionAccessBeforeSubmit,
@@ -270,6 +271,7 @@ function createHookHarness(options = {}) {
   const { hook, reactRuntime } = loadMobileActionHook(options)
   const props = {
     activeRoleKey: options.activeRoleKey || 'warehouse',
+    isAdminReview: options.isAdminReview === true,
     initialAction: detailAction,
     initialActionReceipt: options.initialActionReceipt,
     initialActionTaskID: selectedTask.id,
@@ -742,6 +744,26 @@ test('useMobileRoleTaskActions: failed urge preflight releases lock for retry', 
   assert.deepEqual(harness.loadCalls, [42])
 })
 
+test('useMobileRoleTaskActions: admin review scope never impersonates a role during urging', async () => {
+  for (const activeRoleKey of ['all', 'boss', 'sales']) {
+    let submitted
+    const harness = createHookHarness({
+      activeRoleKey,
+      isAdminReview: true,
+      detailAction: 'urge',
+      resolveMobileUrgeAction: () => { throw new Error('viewing scope is not an actor role') },
+      urgeWorkflowTask: async (params) => { submitted = params },
+    })
+    let view = harness.render()
+    view.updateDetailReason('请责任岗位跟进')
+    view = harness.render()
+    await view.submitDetailAction()
+    assert.equal(submitted.action, 'urge_task')
+    assert.equal(submitted.task_id, 42)
+    assert.equal(submitted.role_key, undefined)
+  }
+})
+
 test('useMobileRoleTaskActions: unknown network result reuses frozen key and payload', async () => {
   const submitted = []
   const networkError = Object.assign(new Error('network result unknown'), {
@@ -959,7 +981,7 @@ test('useMobileRoleTaskActions: successful status mutation clears drafts when re
   assert.deepEqual(harness.loadCalls, [42])
   assert.deepEqual(harness.detailActionChanges, [null])
   assert.deepEqual(messages.errors, [])
-  assert.deepEqual(messages.successes, ['任务状态已更新'])
+  assert.deepEqual(messages.successes, [])
   assert.deepEqual(messages.warnings, ['操作已成功但列表刷新失败，请手动刷新'])
 
   harness.setDetailAction('blocked')
@@ -994,7 +1016,7 @@ test('useMobileRoleTaskActions: successful urge clears its draft when refresh fa
   assert.deepEqual(harness.loadCalls, [42])
   assert.deepEqual(harness.detailActionChanges, [null])
   assert.deepEqual(messages.errors, [])
-  assert.deepEqual(messages.successes, ['催办已记录'])
+  assert.deepEqual(messages.successes, [])
   assert.deepEqual(messages.warnings, ['操作已成功但列表刷新失败，请手动刷新'])
 
   harness.setDetailAction('urge')

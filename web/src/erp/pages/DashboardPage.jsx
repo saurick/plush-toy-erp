@@ -26,8 +26,8 @@ import { getWorkflowTaskDisplayName } from '../utils/processRuntimePresentation.
 import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
-import Tabs from '@/common/components/navigation/SlidingTabs'
 import FilterChip from '@/common/components/navigation/FilterChip'
+import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -103,7 +103,6 @@ import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import EngineeringMaterialTaskAction from '../components/sales-orders/EngineeringMaterialTaskAction.jsx'
 import EngineeringMaterialTaskSummaryEntry from '../components/sales-orders/EngineeringMaterialTaskSummaryEntry.jsx'
 import {
-  engineeringMaterialTaskEntryLabel,
   canProcessEngineeringMaterialTask,
   ENGINEERING_MATERIAL_STATUS,
 } from '../utils/engineeringMaterialTask.mjs'
@@ -368,12 +367,12 @@ function getWorkflowTaskStableKey(task) {
   return String(task?.id || task?.task_code || '')
 }
 
-function TaskTitleEntry({ task, onOpenTask }) {
+function TaskTitleEntry({ task, onOpenTask, children, compact = false }) {
   const name = getWorkflowTaskDisplayName(task)
   return (
     <button
       type="button"
-      className="erp-task-title-entry"
+      className={`erp-task-title-entry${compact ? ' erp-task-title-entry--compact' : ''}`}
       aria-label={`查看${name}详情`}
       aria-haspopup="dialog"
       onClick={(event) => {
@@ -382,8 +381,14 @@ function TaskTitleEntry({ task, onOpenTask }) {
         onOpenTask(task)
       }}
     >
-      <span>{name}</span>
-      <ArrowRightOutlined aria-hidden="true" />
+      <span>{children || name}</span>
+      {compact ? (
+        children ? (
+          <span className="erp-task-title-entry__type">· {name}</span>
+        ) : null
+      ) : (
+        <ArrowRightOutlined aria-hidden="true" />
+      )}
     </button>
   )
 }
@@ -434,8 +439,15 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
               width: '36%',
               render: (_, task) => (
                 <div className="erp-workbench-task-cell">
-                  <TaskTitleEntry task={task} onOpenTask={onOpenTask} />
-                  <WorkflowTaskIdentity task={task} compact />
+                  <WorkflowTaskIdentity
+                    task={task}
+                    compact
+                    renderCompactTitle={(title) => (
+                      <TaskTitleEntry task={task} onOpenTask={onOpenTask} compact>
+                        {title}
+                      </TaskTitleEntry>
+                    )}
+                  />
                 </div>
               ),
             },
@@ -539,12 +551,11 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
                 onOpen={() => onOpenTask(task)}
               >
                 <span className="erp-task-board-card-head">
-                  <Text strong className="erp-task-board-card-title">
-                    {getWorkflowTaskDisplayName(task)}
-                  </Text>
+                  <span className="erp-task-board-card-title">
+                    <WorkflowTaskIdentity task={task} compact showTaskName />
+                  </span>
                   <Tag color={statusMeta.color}>{statusMeta.label}</Tag>
                 </span>
-                <WorkflowTaskIdentity task={task} compact />
                 <Text
                   type="secondary"
                   className="erp-task-board-card-meta erp-task-board-card-source"
@@ -571,13 +582,6 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
                   <Text type="secondary" className="erp-task-board-card-meta">
                     {getWorkflowTaskOwnerRoleLabel(task)}
                   </Text>
-                  <span
-                    className="erp-task-board-card-entry"
-                    aria-hidden="true"
-                  >
-                    {engineeringMaterialTaskEntryLabel(task)}{' '}
-                    <ArrowRightOutlined />
-                  </span>
                 </span>
               </WorkflowTaskCard>
             )
@@ -655,11 +659,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }, [])
 
   const [loading, setLoading] = useState(false)
+  const [summaryRefreshRevision, setSummaryRefreshRevision] = useState(0)
   const [workbenchResponseState, setWorkbenchResponseState] = useState(null)
   const [workbenchCountsState, setWorkbenchCountsState] = useState(null)
   const [taskBoardResponseState, setTaskBoardResponseState] = useState(null)
   const [taskBoardSummaryState, setTaskBoardSummaryState] = useState(null)
-  const [taskBoardKeywordDraft, setTaskBoardKeywordDraft] = useState('')
   const [taskBoardFiltersOpen, setTaskBoardFiltersOpen] = useState(false)
   const taskBoardFilterButtonRef = useRef(null)
   const [selectedTask, setSelectedTask] = useState(null)
@@ -922,8 +926,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }, [loadDashboardStats])
 
   useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadDashboardStats)
-  }, [loadDashboardStats, outletContext])
+    return outletContext?.registerPageRefresh?.(() => {
+      if (summaryOpen) setSummaryRefreshRevision((value) => value + 1)
+      return loadDashboardStats()
+    })
+  }, [loadDashboardStats, outletContext, summaryOpen])
 
   useEffect(() => {
     setActiveView(initialView)
@@ -1036,10 +1043,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const actionMeta = actionMode
     ? getWorkflowTaskActionMeta(selectedTask, actionMode)
     : null
-  useEffect(() => {
-    setTaskBoardKeywordDraft(filters.keyword)
-  }, [filters.keyword])
-
   useEffect(() => {
     if (
       !taskBoardReady ||
@@ -1285,6 +1288,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       { replace: true }
     )
   }
+  const taskBoardSearch = useLiveSearch({
+    value: filters.keyword,
+    onSearch: (keyword) => updateFilter('keyword', keyword),
+  })
 
   const clearFilters = () => {
     taskBoardFilterButtonRef.current?.focus({ preventScroll: true })
@@ -1601,8 +1608,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       dataIndex: 'task_name',
       render: (_, record) => (
         <div className="erp-workbench-task-cell">
-          <TaskTitleEntry task={record} onOpenTask={openTaskDrawer} />
-          <WorkflowTaskIdentity task={record} compact />
+          <WorkflowTaskIdentity
+            task={record}
+            compact
+            renderCompactTitle={(title) => (
+              <TaskTitleEntry task={record} onOpenTask={openTaskDrawer} compact>
+                {title}
+              </TaskTitleEntry>
+            )}
+          />
           <Text type="secondary">
             <WorkflowTaskSource task={record} />
           </Text>
@@ -1688,18 +1702,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ) : null}
 
       {!shouldShowProductCoreDashboard && activeView === 'workbench' ? (
-        <Card
-          className="erp-dashboard-card erp-workbench-command-card"
-          variant="borderless"
-        >
-          <div className="erp-workbench-command">
-            {summaryOptions.length > 0 ? (
-              <Tabs
+        <div className="erp-workbench-layout">
+          {summaryOptions.length > 0 ? (
+            <div className="erp-workbench-view-toolbar">
+              <Segmented
                 aria-label="工作台视图"
-                activeKey={summaryOpen ? 'summary' : 'tasks'}
-                items={[
-                  { key: 'tasks', label: '待办' },
-                  { key: 'summary', label: '汇总' },
+                value={summaryOpen ? 'summary' : 'tasks'}
+                options={[
+                  { value: 'tasks', label: '待办' },
+                  { value: 'summary', label: '业务汇总' },
                 ]}
                 onChange={(value) => {
                   const next = new URLSearchParams(searchParams)
@@ -1708,110 +1719,128 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   setSearchParams(next, { replace: true })
                 }}
               />
-            ) : null}
-            {summaryOpen ? (
-              <Suspense fallback={<div role="status">正在加载汇总…</div>}>
-                <WorkbenchSummaries options={summaryOptions} />
-              </Suspense>
-            ) : (
-              <>
-                <div
-                  className="erp-workbench-queue-filter-strip"
-                  aria-label="工作台任务筛选"
-                >
-                  {visibleWorkbenchQueueOptions.map((option) => {
-                    const count = workbenchCounts?.[option.key]
-                    const countReady = Number.isSafeInteger(count)
-                    const active = option.key === workbenchQueueKey
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        className={[
-                          'erp-workbench-queue-filter',
-                          active ? 'erp-workbench-queue-filter--active' : '',
-                          option.key === 'risk' && countReady && count > 0
-                            ? 'erp-workbench-queue-filter--danger'
-                            : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                        aria-pressed={active}
-                        aria-label={
-                          countReady
-                            ? `${option.label}，${count} 项，${option.hint}`
-                            : `${option.label}，数量读取中，${option.hint}`
-                        }
-                        onClick={() => selectWorkbenchQueue(option.key)}
-                      >
-                        <span>{option.label}</span>
-                        <strong>{countReady ? count : '—'}</strong>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="erp-workbench-main-grid">
-                  <section
-                    ref={workbenchListRef}
-                    className="erp-workbench-panel erp-workbench-queue-panel"
-                    aria-label="优先处理"
-                    aria-busy={loading}
-                  >
-                    {workbenchLoadError ? (
-                      <Alert
-                        type="error"
-                        showIcon
-                        message="工作台任务加载失败"
-                        description={workbenchLoadError}
-                        action={
-                          <Button size="small" onClick={loadDashboardStats}>
-                            重新加载
-                          </Button>
-                        }
-                      />
-                    ) : null}
-                    <Table
-                      size="small"
-                      rowKey={(record) => record.id || record.task_code}
-                      columns={workbenchTaskColumns}
-                      dataSource={workbenchQueuePageTasks}
-                      loading={{ spinning: loading, delay: 120 }}
-                      pagination={false}
-                      scroll={{ x: 680 }}
-                      rowClassName="erp-task-table-row"
-                      onRow={(record) => ({
-                        'data-task-code': record.task_code || undefined,
-                        'data-task-group': record.task_group || undefined,
-                        onClick: (event) =>
-                          openTaskTableRow(event, record, openTaskDrawer),
-                      })}
-                      locale={{
-                        emptyText: (
-                          <WorkbenchQueueEmpty
-                            activeOption={activeWorkbenchQueueOption}
-                            fallbackOption={fallbackWorkbenchQueueOption}
-                            onSwitchQueue={selectWorkbenchQueue}
-                          />
-                        ),
-                      }}
-                    />
-                  </section>
-                </div>
-                {workbenchCounts ? (
-                  <WorkflowTaskPagination
-                    total={workbenchQueueTotal}
-                    current={activeWorkbenchQueuePage}
-                    pageSize={workbenchQueuePageSize}
-                    loading={loading}
-                    error={Boolean(workbenchLoadError)}
-                    onChange={selectWorkbenchQueuePage}
+            </div>
+          ) : null}
+          <Card
+            className="erp-dashboard-card erp-workbench-command-card"
+            variant="borderless"
+          >
+            <div className="erp-workbench-command">
+              {summaryOpen ? (
+                <Suspense fallback={<div role="status">正在加载汇总…</div>}>
+                  <WorkbenchSummaries
+                    options={summaryOptions}
+                    refreshRevision={summaryRefreshRevision}
                   />
-                ) : null}
-              </>
-            )}
-          </div>
-        </Card>
+                </Suspense>
+              ) : (
+                <>
+                  <div className="erp-workbench-queue-heading">
+                    <div className="erp-workbench-queue-heading__copy">
+                      <small>当前岗位</small>
+                      <strong>先处理需要我判断或推进的事项</strong>
+                    </div>
+                    <div
+                      className="erp-workbench-queue-filter-strip"
+                      aria-label="工作台任务筛选"
+                    >
+                      {visibleWorkbenchQueueOptions.map((option) => {
+                        const count = workbenchCounts?.[option.key]
+                        const countReady = Number.isSafeInteger(count)
+                        const active = option.key === workbenchQueueKey
+                        return (
+                          <button
+                            key={option.key}
+                            type="button"
+                            className={[
+                              'erp-workbench-queue-filter',
+                              active
+                                ? 'erp-workbench-queue-filter--active'
+                                : '',
+                              option.key === 'risk' && countReady && count > 0
+                                ? 'erp-workbench-queue-filter--danger'
+                                : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                            aria-pressed={active}
+                            aria-label={
+                              countReady
+                                ? `${option.label}，${count} 项，${option.hint}`
+                                : `${option.label}，数量读取中，${option.hint}`
+                            }
+                            onClick={() => selectWorkbenchQueue(option.key)}
+                          >
+                            <span>{option.label}</span>
+                            <strong>{countReady ? count : '—'}</strong>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="erp-workbench-main-grid">
+                    <section
+                      ref={workbenchListRef}
+                      className="erp-workbench-panel erp-workbench-queue-panel"
+                      aria-label="优先处理"
+                      aria-busy={loading}
+                    >
+                      {workbenchLoadError ? (
+                        <Alert
+                          type="error"
+                          showIcon
+                          message="工作台任务加载失败"
+                          description={workbenchLoadError}
+                          action={
+                            <Button size="small" onClick={loadDashboardStats}>
+                              重新加载
+                            </Button>
+                          }
+                        />
+                      ) : null}
+                      <Table
+                        size="small"
+                        rowKey={(record) => record.id || record.task_code}
+                        columns={workbenchTaskColumns}
+                        dataSource={workbenchQueuePageTasks}
+                        loading={{ spinning: loading, delay: 120 }}
+                        pagination={false}
+                        scroll={{ x: 680 }}
+                        rowClassName="erp-task-table-row"
+                        onRow={(record) => ({
+                          'data-task-code': record.task_code || undefined,
+                          'data-task-group': record.task_group || undefined,
+                          onClick: (event) =>
+                            openTaskTableRow(event, record, openTaskDrawer),
+                        })}
+                        locale={{
+                          emptyText: (
+                            <WorkbenchQueueEmpty
+                              activeOption={activeWorkbenchQueueOption}
+                              fallbackOption={fallbackWorkbenchQueueOption}
+                              onSwitchQueue={selectWorkbenchQueue}
+                            />
+                          ),
+                        }}
+                      />
+                    </section>
+                  </div>
+                  {workbenchCounts ? (
+                    <WorkflowTaskPagination
+                      total={workbenchQueueTotal}
+                      current={activeWorkbenchQueuePage}
+                      pageSize={workbenchQueuePageSize}
+                      loading={loading}
+                      error={Boolean(workbenchLoadError)}
+                      onChange={selectWorkbenchQueuePage}
+                    />
+                  ) : null}
+                </>
+              )}
+            </div>
+          </Card>
+        </div>
       ) : null}
 
       {activeView === 'task-board' ? (
@@ -1849,17 +1878,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   placeholder="订单 / 产品 / 物料 / 款号"
                   searchHint="可搜索：任务、单号、产品、款号、物料、处理原因"
                   showSearchScope
-                  value={taskBoardKeywordDraft}
-                  onChange={(event) => {
-                    const nextKeyword = event.target.value
-                    setTaskBoardKeywordDraft(nextKeyword)
-                    if (!nextKeyword && filters.keyword) {
-                      updateFilter('keyword', '')
-                    }
-                  }}
-                  onPressEnter={(event) =>
-                    updateFilter('keyword', event.currentTarget.value)
-                  }
+                  value={taskBoardSearch.value}
+                  onChange={taskBoardSearch.onChange}
+                  onCompositionStart={taskBoardSearch.onCompositionStart}
+                  onCompositionEnd={taskBoardSearch.onCompositionEnd}
+                  onPressEnter={taskBoardSearch.onPressEnter}
                 />
                 {roleOptions.length > 1 ? (
                   <SelectFilter

@@ -128,8 +128,8 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #238348;
-  color: #fff;
+  background: var(--erp-primary);
+  color: var(--erp-on-accent);
   font-size: 14px;
   font-weight: 600;
   line-height: 1;

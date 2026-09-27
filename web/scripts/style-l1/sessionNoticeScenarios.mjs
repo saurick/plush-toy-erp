@@ -35,6 +35,13 @@ export function createSessionNoticeScenarios({
       theme: 'light',
     },
     {
+      name: 'mobile-wide',
+      mobile: true,
+      width: 1024,
+      height: 600,
+      theme: 'light',
+    },
+    {
       name: 'entry',
       entry: true,
       width: 390,

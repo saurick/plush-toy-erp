@@ -13,8 +13,8 @@ const appSource = readFileSync(
 
 test('admin login visible copy uses ordinary work entry language', () => {
   for (const expectedText of [
-    '电脑端业务管理',
-    '手机端待办',
+    '电脑版',
+    '手机版',
     '请选择工作方式',
     '当前账号不能使用所选工作方式，请联系系统管理员',
     '暂时无法登录，请联系系统管理员',

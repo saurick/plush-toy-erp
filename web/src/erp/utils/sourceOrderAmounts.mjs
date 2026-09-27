@@ -281,3 +281,29 @@ export {
   summarizePurchaseOrderLines,
   summarizeOutsourcingOrderLines,
 }
+
+export function formatUnitQuantitySummary(
+  lines = [],
+  quantityField = 'quantity',
+  unitOptions = []
+) {
+  const groups = new Map()
+  for (const line of Array.isArray(lines) ? lines : []) {
+    if (numeric20Scale6Units(line?.[quantityField]) === null) continue
+    const unitID = Number(line.unit_id || 0)
+    const name =
+      unitOptions.find((unit) => Number(unit.value) === unitID)?.label ||
+      line.unit_name_snapshot ||
+      line.unit_name
+    if (!unitID && !name) return '待选择单位'
+    const key = unitID || name
+    const group = groups.get(key) || { name: name || '单位待核对', values: [] }
+    group.values.push(line[quantityField])
+    groups.set(key, group)
+  }
+  return (
+    [...groups.values()]
+      .map(({ name, values }) => `${sumNumeric20Scale6Values(values)} ${name}`)
+      .join(' / ') || '—'
+  )
+}

@@ -512,6 +512,13 @@ export function createDevVersionCenterScenarios({
         await page
           .locator('.erp-dev-version-workspace')
           .waitFor({ state: 'visible' })
+        assert.equal(
+          await page
+            .locator('.erp-dev-version-workspace > .erp-sliding-tabs > .ant-tabs-nav')
+            .evaluate((node) => getComputedStyle(node).backgroundColor),
+          'rgb(255, 255, 255)',
+          '版本中心导航使用完整白色操作区'
+        )
         const evidenceNote = page.locator(
           '.erp-dev-version-workspace__evidence-note'
         )

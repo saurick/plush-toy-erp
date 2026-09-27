@@ -125,7 +125,7 @@ export default [
               name: 'antd',
               importNames: ['Segmented', 'Tabs'],
               message:
-                'Use SlidingSegmented or SlidingTabs for visible boundaries, selected states, keyboard and motion. See DEV prototypes → 交互控件规范.',
+                'Use SlidingSegmented or SlidingTabs for visible boundaries, selected states, keyboard and motion. See DEV UI 交互设计 → 交互控件规范.',
             },
           ],
         },

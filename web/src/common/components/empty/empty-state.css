@@ -1,0 +1,34 @@
+.erp-empty.ant-empty {
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 24px 16px;
+  color: var(--erp-text-muted);
+  font-size: 14px;
+  line-height: 22px;
+  text-align: center;
+}
+
+.erp-empty.ant-empty .ant-empty-image {
+  height: 40px;
+  margin-bottom: 10px;
+}
+
+.erp-empty.ant-empty .ant-empty-description {
+  color: var(--erp-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.erp-empty.ant-empty .ant-empty-footer {
+  margin-top: 12px;
+}
+
+/* Dropdown results use the same language at the scale of their control. */
+.erp-empty.ant-empty-small {
+  padding: 12px;
+}
+
+.erp-empty.ant-empty-small .ant-empty-image {
+  height: 28px;
+  margin-bottom: 8px;
+}

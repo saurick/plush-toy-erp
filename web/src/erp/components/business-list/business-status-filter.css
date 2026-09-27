@@ -1,0 +1,16 @@
+.erp-business-status-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.erp-business-status-filters .erp-filter-chip {
+  flex: 0 0 auto;
+}
+
+.erp-business-status-filters .erp-filter-chip__count {
+  font-variant-numeric: tabular-nums;
+}

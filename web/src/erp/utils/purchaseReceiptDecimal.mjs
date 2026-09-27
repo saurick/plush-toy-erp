@@ -11,10 +11,18 @@ export function sumPurchaseReceiptQuantities(items = []) {
 }
 
 export function formatPurchaseReceiptQuantityTotal(items = []) {
+  if (new Set(items.map((item) => item.unit_id)).size > 1) {
+    return '按单位查看明细'
+  }
   return formatNumeric20Scale6(sumPurchaseReceiptQuantities(items))
 }
 
 export function comparePurchaseReceiptQuantityTotals(leftItems, rightItems) {
+  if (
+    new Set([...leftItems, ...rightItems].map((item) => item.unit_id)).size > 1
+  ) {
+    return 0
+  }
   return compareNumeric20Scale6Values(
     sumPurchaseReceiptQuantities(leftItems),
     sumPurchaseReceiptQuantities(rightItems)

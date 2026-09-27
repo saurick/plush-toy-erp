@@ -7,7 +7,7 @@ import {
   hasMobileRolePermission,
 } from './mobileRolePermissions.mjs'
 
-test('mobileRolePermissions: 超级管理员不自动获得业务岗位任务端入口', () => {
+test('mobileRolePermissions: 超级管理员无需分配业务岗位即可查看手机端', () => {
   assert.equal(
     hasMobileRolePermission(
       {
@@ -17,7 +17,7 @@ test('mobileRolePermissions: 超级管理员不自动获得业务岗位任务端
       },
       'boss'
     ),
-    false
+    true
   )
   assert.equal(
     hasMobileRolePermission(
@@ -30,6 +30,27 @@ test('mobileRolePermissions: 超级管理员不自动获得业务岗位任务端
     ),
     true
   )
+})
+
+test('mobileRolePermissions: 全部岗位仅供超级管理员且随有效岗位和动作收窄', () => {
+  const profile = {
+    is_super_admin: true,
+    roles: [{ role_key: 'admin' }],
+    effective_session: {
+      roles: ['sales', 'purchase'],
+      actions: ['mobile.sales.access', 'mobile.warehouse.access'],
+    },
+  }
+  assert.deepEqual(getAllowedMobileRoleKeys(profile, ['sales', 'purchase', 'warehouse']), ['all', 'sales'])
+  assert.equal(hasMobileRolePermission(profile, 'all'), true)
+  assert.equal(hasMobileRolePermission(profile, 'purchase'), false)
+  assert.equal(hasMobileRolePermission(profile, 'warehouse'), false)
+  assert.deepEqual(profile.roles, [{ role_key: 'admin' }])
+  assert.deepEqual(getAllowedMobileRoleKeys(profile, []), [])
+  assert.equal(hasMobileRolePermission({ ...profile, disabled: true }, 'all'), false)
+  assert.equal(hasMobileRolePermission({ ...profile, is_super_admin: false }, 'all'), false)
+  assert.equal(hasMobileRolePermission({ ...profile, effective_session: { roles: ['sales'], actions: [] } }, 'all'), false)
+  assert.equal(hasMobileRolePermission(profile, 'unknown'), false)
 })
 
 test('mobileRolePermissions: 缺失超级管理员标识不会被误判成超级管理员', () => {

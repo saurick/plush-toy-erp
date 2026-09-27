@@ -12,6 +12,8 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { formatUnitQuantitySummary } from '../utils/sourceOrderAmounts.mjs'
+import useBusinessPageState from '../hooks/useBusinessPageState'
 import { arrivalDifference } from '../utils/incomingAcceptance.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -54,7 +56,6 @@ import {
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
-import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import PurchaseReceiptExceptionModal from '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx'
 import PurchaseReceiptExceptionRecordsModal from '../components/purchase-receipts/PurchaseReceiptExceptionRecordsModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
@@ -175,16 +176,40 @@ export default function V1PurchaseReceiptsPage() {
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
-  const [keyword, setKeyword] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [dateFilterField, setDateFilterField] = useState('received_at')
-  const [dateFilterStart, setDateFilterStart] = useState('')
-  const [dateFilterEnd, setDateFilterEnd] = useState('')
-  const [supplierFilter, setSupplierFilter] = useState('')
-  const [materialFilter, setMaterialFilter] = useState('')
-  const [warehouseFilter, setWarehouseFilter] = useState('')
-  const [lotFilter, setLotFilter] = useState('')
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [keyword, setKeyword] = useBusinessPageState('keyword', '')
+  const [statusFilter, setStatusFilter] = useBusinessPageState(
+    'statusFilter',
+    ''
+  )
+  const [dateFilterField, setDateFilterField] = useBusinessPageState(
+    'dateFilterField',
+    'received_at'
+  )
+  const [dateFilterStart, setDateFilterStart] = useBusinessPageState(
+    'dateFilterStart',
+    ''
+  )
+  const [dateFilterEnd, setDateFilterEnd] = useBusinessPageState(
+    'dateFilterEnd',
+    ''
+  )
+  const [supplierFilter, setSupplierFilter] = useBusinessPageState(
+    'supplierFilter',
+    ''
+  )
+  const [materialFilter, setMaterialFilter] = useBusinessPageState(
+    'materialFilter',
+    ''
+  )
+  const [warehouseFilter, setWarehouseFilter] = useBusinessPageState(
+    'warehouseFilter',
+    ''
+  )
+  const [lotFilter, setLotFilter] = useBusinessPageState('lotFilter', '')
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: 20,
+  })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
@@ -235,7 +260,6 @@ export default function V1PurchaseReceiptsPage() {
 
   const beginLatestRequest = useLatestRequestCoordinator()
 
-  const canRead = hasActionPermission(adminProfile, 'purchase.receipt.read')
   const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')
   const canPost = hasActionPermission(adminProfile, 'warehouse.inbound.confirm')
   const canCancelDraft = hasActionPermission(
@@ -425,20 +449,6 @@ export default function V1PurchaseReceiptsPage() {
     ],
     [inventoryLotOptions, materialOptions, unitOptions, warehouseOptions]
   )
-  const receiptItemsPreview = useBusinessRowItemsPreview({
-    records: rows,
-    getEmbeddedItems: (record) => record?.items,
-    getItemTotal: (record) =>
-      Array.isArray(record?.items) ? record.items.length : undefined,
-    rowExpandable: (record) =>
-      canRead && Number.isSafeInteger(record?.id) && record.id > 0,
-    getRecordLabel: (record) => record?.receipt_no || '当前采购入库单',
-    getItemKey: (item) => item?.id,
-    getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
-    getItemFields: getPurchaseReceiptItemFields,
-    onOpenDetails: (receipt) => openPurchaseReceiptDetails(receipt),
-  })
-
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
     const pathByKey = {
@@ -583,7 +593,7 @@ export default function V1PurchaseReceiptsPage() {
       setSearchParams(nextParams, { replace: true })
       resetBusinessPaginationCurrent(setPagination)
     },
-    [searchParams, setSearchParams]
+    [searchParams, setPagination, setSearchParams]
   )
 
   useEffect(() => {
@@ -949,8 +959,10 @@ export default function V1PurchaseReceiptsPage() {
           sortValue: receiptQuantityTotal,
           sorter: (left, right) =>
             comparePurchaseReceiptQuantityTotals(left?.items, right?.items),
-          render: (_, record) => formatQuantity(receiptQuantityTotal(record)),
-          exportValue: (record) => formatQuantity(receiptQuantityTotal(record)),
+          render: (_, record) =>
+            formatUnitQuantitySummary(record.items, 'quantity', unitOptions),
+          exportValue: (record) =>
+            formatUnitQuantitySummary(record.items, 'quantity', unitOptions),
         },
         {
           align: 'left',
@@ -961,7 +973,7 @@ export default function V1PurchaseReceiptsPage() {
           sortable: false,
         },
       ]),
-    []
+    [unitOptions]
   )
   const {
     tableColumns,
@@ -972,7 +984,7 @@ export default function V1PurchaseReceiptsPage() {
   } = useBusinessColumnOrder({
     adminProfile,
     moduleKey: 'inbound',
-    moduleTitle: '入库管理',
+    moduleTitle: '采购入库',
     columns,
   })
   const loadExportRows = useCallback(
@@ -1001,16 +1013,16 @@ export default function V1PurchaseReceiptsPage() {
   })
   const hasActiveFilters = Boolean(
     keyword.trim() ||
-      statusFilter ||
-      supplierFilter ||
-      materialFilter ||
-      warehouseFilter ||
-      lotFilter ||
-      dateFilterStart ||
-      dateFilterEnd ||
-      routePurchaseOrderID ||
-      routeReceiptID ||
-      linkedKeyword
+    statusFilter ||
+    supplierFilter ||
+    materialFilter ||
+    warehouseFilter ||
+    lotFilter ||
+    dateFilterStart ||
+    dateFilterEnd ||
+    routePurchaseOrderID ||
+    routeReceiptID ||
+    linkedKeyword
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -1023,14 +1035,25 @@ export default function V1PurchaseReceiptsPage() {
     setDateFilterStart('')
     setDateFilterEnd('')
     clearRouteContext()
-  }, [clearRouteContext])
+  }, [
+    clearRouteContext,
+    setDateFilterEnd,
+    setDateFilterField,
+    setDateFilterStart,
+    setKeyword,
+    setLotFilter,
+    setMaterialFilter,
+    setStatusFilter,
+    setSupplierFilter,
+    setWarehouseFilter,
+  ])
 
   return (
     <BusinessPageLayout className="erp-v1-purchase-receipts-page">
       <PageHeaderCard
         compact
         helpKey="inbound"
-        title="入库管理"
+        title="采购入库"
         tags={[
           <Tag color="gold" key="workflow">
             待办任务：入库跟进
@@ -1183,7 +1206,7 @@ export default function V1PurchaseReceiptsPage() {
         }
         actions={
           <BusinessListToolbarActions
-            moduleTitle="入库管理"
+            moduleTitle="采购入库"
             onExport={exportRows}
             exportDisabled={loading || exporting || total === 0}
             exportDisabledReason={
@@ -1523,7 +1546,6 @@ export default function V1PurchaseReceiptsPage() {
           onClick: () => setSelectedRow(record),
         })}
         onOpenRecord={openPurchaseReceiptDetails}
-        expandable={receiptItemsPreview.expandable}
         emptyDescription="暂无采购入库单"
       />
       <BusinessDetailsModal

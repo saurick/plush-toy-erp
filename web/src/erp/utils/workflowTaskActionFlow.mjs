@@ -4,6 +4,20 @@ export const WORKFLOW_TASK_ACTION_STEP_KEYS = Object.freeze([
   'confirm',
 ])
 
+// Desktop and mobile use different action keys; grouping never adds permission.
+export function splitWorkflowTaskActions({ actions = [], approvalTask = false } = {}) {
+  const allowed = [...new Set(actions)]
+  const preferred = approvalTask
+    ? ['complete', 'done', 'reject', 'rejected', 'resume']
+    : ['complete', 'done', 'block', 'blocked', 'resume']
+  const primary = preferred.filter((action) => allowed.includes(action)).slice(0, 2)
+  if (primary.length === 0 && allowed.length > 0) primary.push(allowed[0])
+  return {
+    primary,
+    secondary: allowed.filter((action) => !primary.includes(action)),
+  }
+}
+
 export function resolveWorkflowTaskActionInitialStep(actionMode = '') {
   return String(actionMode || '').trim() ? 'action' : 'context'
 }

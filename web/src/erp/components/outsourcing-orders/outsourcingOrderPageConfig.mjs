@@ -128,18 +128,8 @@ export function getOutsourcingOrderDisplayNo(record = {}) {
 }
 
 export function buildOutsourcingOrderStats({ rows = [], total = 0 }) {
-  const activeRows = rows.length
-  const draftCount = rows.filter(
-    (item) => item.lifecycle_status === 'draft'
-  ).length
-  const confirmedCount = rows.filter(
-    (item) => item.lifecycle_status === 'confirmed'
-  ).length
-
   return [
-    { key: 'total', label: '总记录', value: total },
-    { key: 'current', label: '本页显示', value: activeRows },
-    { key: 'draft', label: '草稿', value: draftCount },
-    { key: 'confirmed', label: '已确认', value: confirmedCount },
+    { key: 'total', label: '符合条件', value: total },
+    { key: 'current', label: '本页显示', value: rows.length },
   ]
 }

@@ -1,22 +1,26 @@
 .erp-progress-board {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   min-width: 0;
   width: 100%;
-  color: var(--erp-text, #233329);
+  color: var(--erp-text);
+  font-size: 13px;
 }
 .erp-progress-controls {
-  margin-bottom: 12px;
-  border: 1px solid var(--erp-border, #dfe7e2);
-  border-radius: 12px;
-  background: var(--erp-surface-bg, #fff);
-}
-.erp-progress-mobile-hint {
-  display: none;
+  flex: 0 0 auto;
+  margin-bottom: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
 }
 .erp-progress-toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 16px 10px;
+  gap: 8px;
+  padding-bottom: 9px;
 }
 .erp-progress-toolbar .erp-sliding-segmented {
   flex: 0 0 auto;
@@ -24,7 +28,7 @@
 .erp-progress-search {
   flex: 1 1 260px;
   min-width: 160px;
-  max-width: 520px;
+  max-width: 620px;
 }
 .erp-progress-scope {
   flex: 0 0 116px;
@@ -34,12 +38,12 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 0 12px 10px;
+  padding: 0;
 }
 .erp-progress-freshness {
   margin-left: auto;
-  padding: 0 8px;
-  color: var(--erp-text-muted, #607268);
+  padding: 0 4px;
+  color: var(--erp-text-muted);
   font-size: 12px;
 }
 .erp-progress-active-filters {
@@ -47,37 +51,163 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 0 16px 10px;
+  padding-top: 9px;
 }
 .erp-progress-active-filters .ant-tag {
   margin: 0;
 }
-.erp-progress-table {
-  max-width: 100%;
-  overflow: hidden;
-  border: 1px solid var(--erp-border, #dfe7e2);
-  border-radius: 12px;
-  background: var(--erp-surface-bg, #fff);
+.erp-progress-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  align-items: start;
+  gap: 9px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
-.erp-progress-table .ant-table-thead > tr > th {
-  padding-top: 11px;
-  padding-bottom: 11px;
-  color: var(--erp-text-muted, #607268);
+.erp-progress-board > .ant-spin-nested-loading {
+  flex: 1;
+  min-height: 0;
+}
+.erp-progress-board > .ant-spin-nested-loading > .ant-spin-container {
+  height: 100%;
+}
+.erp-progress-list-panel,
+.erp-progress-summary {
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+.erp-progress-list {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.erp-progress-list-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.erp-progress-board > .erp-task-pagination {
+  margin-top: 9px;
+  flex: 0 0 auto;
+}
+.erp-progress-row {
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: 9px;
+  background: var(--erp-surface-bg);
+}
+.erp-progress-row-select {
+  display: grid;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.erp-progress-row-select:hover {
+  background: var(--erp-interactive-bg-hover);
+}
+.erp-progress-row.is-selected {
+  border-color: var(--erp-primary);
+  box-shadow: inset 3px 0 0 var(--erp-primary);
+}
+.erp-progress-row-head,
+.erp-progress-row-foot,
+.erp-progress-delivery-copy {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.erp-progress-row-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  margin: 6px 0 10px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.erp-progress-row-copy strong {
+  color: var(--erp-text);
   font-weight: 500;
 }
-.erp-progress-table .ant-table-tbody > tr > td {
-  padding: 12px 14px;
-  vertical-align: middle;
+.erp-progress-row-foot {
+  flex-wrap: nowrap;
+  margin-top: 6px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
 }
-.erp-progress-table .ant-pagination {
-  padding: 0 16px;
+.erp-progress-row-foot > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
-.erp-progress-identity,
-.erp-progress-date,
-.erp-progress-attention,
-.erp-progress-delivery,
-.erp-progress-stage,
-.erp-progress-detail-summary,
+.erp-progress-row-foot > .anticon {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--erp-primary-strong);
+}
+.erp-progress-delivery {
+  display: block;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.erp-progress-delivery-copy {
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.erp-progress-delivery-copy > span {
+  color: var(--erp-text-muted);
+}
+.erp-progress-delivery-copy > strong {
+  font-weight: 600;
+}
+.erp-progress-track {
+  display: block;
+  height: 6px;
+  border-radius: 4px;
+  background: var(--erp-border);
+  overflow: hidden;
+}
+.erp-progress-track > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--erp-primary);
+}
+.erp-progress-summary {
+  padding: 13px;
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.erp-progress-order {
+  padding: 0;
+  color: var(--erp-primary-strong);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.erp-progress-row-head .erp-progress-order {
+  font-size: 14px;
+}
 .erp-progress-record-main,
 .erp-progress-record-actions {
   display: flex;
@@ -86,106 +216,23 @@
   gap: 4px;
   min-width: 0;
 }
-.erp-progress-identity > strong {
-  font-size: 13px;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-.erp-progress-identity > span,
-.erp-progress-date > span,
-.erp-progress-attention > span,
-.erp-progress-detail-summary > span,
 .erp-progress-record-main > span,
 .erp-progress-hint {
-  color: var(--erp-text-muted, #607268);
+  color: var(--erp-text-muted);
   font-size: 12px;
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
-.erp-progress-order,
-.erp-progress-attention button,
-.erp-progress-delivery,
-.erp-progress-stage {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-}
-.erp-progress-order {
-  padding: 0;
-  color: var(--erp-primary-strong, #237234);
-  font-weight: 650;
-  overflow-wrap: anywhere;
-}
-
-.erp-progress-date {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-.erp-progress-date .ant-tag {
-  margin: 0;
-}
-.erp-progress-stages {
-  display: flex;
-  gap: 4px;
-  align-items: stretch;
-}
-.erp-progress-stage {
-  flex: 1;
-  padding: 6px 5px;
-  border-radius: 7px;
-  gap: 7px;
-}
-.erp-progress-stage > span,
-.erp-progress-delivery > span:first-child {
-  font-size: 11px;
-  color: var(--erp-text-muted, #607268);
-}
-.erp-progress-stage > strong {
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.erp-progress-delivery {
-  padding: 0;
-  width: 100%;
-  font-variant-numeric: tabular-nums;
-}
-.erp-progress-delivery > strong {
-  font-size: 12px;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-.erp-progress-track {
-  display: block;
-  width: 100%;
-  max-width: 138px;
-  height: 4px;
-  border-radius: 4px;
-  margin-top: 3px;
-  background: var(--erp-border, #dfe7e2);
-  overflow: hidden;
-}
-.erp-progress-track > i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--erp-primary, #398454);
-}
-.erp-progress-attention button {
-  padding: 0;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-.erp-progress-attention .erp-progress-more-tasks {
-  color: var(--erp-text-muted, #607268);
-  font-size: 11px;
-}
 .erp-progress-danger {
   color: var(--erp-progress-danger-text, #bb3c45);
+}
+.erp-progress-empty {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  padding: 16px;
+  color: var(--erp-text-muted);
+  text-align: center;
 }
 .erp-progress-filters {
   --erp-business-control-height: 32px;
@@ -219,12 +266,6 @@
 .erp-progress-drawer .ant-drawer-body {
   padding: 20px 24px;
 }
-.erp-progress-detail-summary {
-  margin-bottom: 14px;
-}
-.erp-progress-detail-summary > p {
-  margin: 4px 0 0;
-}
 .erp-progress-record {
   display: flex;
   justify-content: space-between;
@@ -252,60 +293,89 @@
 .erp-progress-error {
   margin-top: 12px;
 }
-.erp-progress-metric:disabled,
-.erp-progress-stage:disabled {
+.erp-progress-modal .ant-modal-body {
+  max-height: min(70dvh, 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.erp-progress-detail-records {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--erp-border);
+}
+.erp-progress-detail-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.erp-progress-detail-tabs > [role='tab'] {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--erp-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.erp-progress-detail-tabs > [role='tab']:hover {
+  background: var(--erp-interactive-bg-hover);
+}
+.erp-progress-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.erp-progress-metric:disabled {
   opacity: 0.55;
   cursor: default;
 }
-.erp-progress-metric:hover,
-.erp-progress-stage:hover:not(:disabled) {
-  background: var(--erp-surface-bg-soft, #f4f8f5);
-}
-
-.erp-progress-board button:focus-visible {
-  outline: 2px solid var(--erp-primary, #398454);
+.erp-progress-board button:focus-visible,
+.erp-progress-summary h2:focus-visible {
+  outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
-}
-.erp-progress-stage.is-complete strong {
-  color: var(--erp-primary-strong, #237234);
-}
-.erp-progress-stage.is-attention strong {
-  color: var(--erp-warning-text, #936314);
 }
 .erp-progress-help p:last-child {
   margin-bottom: 0;
 }
-.erp-progress-order:hover,
-.erp-progress-attention button:hover {
+.erp-progress-row-select:hover .erp-progress-order {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-@media (width <= 900px) {
+@media (width <= 1100px) {
   .erp-progress-toolbar {
     flex-wrap: wrap;
   }
   .erp-progress-search {
     max-width: none;
   }
-  .erp-progress-toolbar .erp-sliding-segmented {
+  .erp-progress-layout {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+}
+@media (width <= 900px) {
+  .erp-progress-board {
     flex: 0 0 auto;
   }
-  .erp-progress-freshness {
-    width: 100%;
-    margin-left: 0;
-    margin-top: 4px;
+  .erp-progress-board > .ant-spin-nested-loading > .ant-spin-container,
+  .erp-progress-layout,
+  .erp-progress-list-panel {
+    height: auto;
+  }
+  .erp-progress-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .erp-progress-summary {
+    grid-row: 1;
+    max-height: none;
   }
 }
 @media (width <= 600px) {
-  .erp-progress-mobile-hint {
-    display: block;
-    margin: 0 4px 8px;
-    color: var(--erp-text-muted, #607268);
-    font-size: 12px;
-  }
   .erp-progress-toolbar {
     gap: 8px;
-    padding: 12px;
   }
   .erp-progress-toolbar .erp-sliding-segmented {
     width: 100%;
@@ -313,18 +383,14 @@
   .erp-progress-search {
     flex-basis: 100%;
   }
-  .erp-progress-metric {
-    padding: 6px 8px;
-    gap: 6px;
-  }
-  .erp-progress-metric strong {
-    font-size: 14px;
+  .erp-progress-freshness {
+    width: 100%;
+    margin: 4px 0 0;
   }
   .erp-progress-drawer .ant-drawer-body {
     padding: 16px;
   }
 }
-
 [data-erp-theme='dark'] .erp-progress-board,
 [data-erp-theme='dark'] .erp-progress-drawer {
   --erp-progress-danger-text: #fda4af;

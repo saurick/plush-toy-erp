@@ -18,7 +18,7 @@ test('auditLogParams: omits empty optional filters from JSON-RPC payload', () =>
   )
 })
 
-test('auditLogParams: keeps non-empty filters and date-only values', () => {
+test('auditLogParams: uses complete business days for date-only filters', () => {
   assert.deepEqual(
     buildAuditLogParams({
       source: ' admin_manage ',
@@ -33,10 +33,19 @@ test('auditLogParams: keeps non-empty filters and date-only values', () => {
       source: 'admin_manage',
       event_key: 'admin_user.password.reset',
       keyword: 'password',
-      created_from: '2026-06-01',
-      created_to: '2026-06-30',
+      created_from: '2026-06-01T00:00:00+08:00',
+      created_to: '2026-06-30T23:59:59.999999999+08:00',
       limit: 50,
       offset: 100,
     }
   )
+})
+
+test('auditLogParams: preserves explicit timestamps without adding day boundaries', () => {
+  const params = buildAuditLogParams({
+    createdFrom: '2026-09-26T09:30:00+08:00',
+    createdTo: '2026-09-26T10:30:00+08:00',
+  })
+  assert.equal(params.created_from, '2026-09-26T09:30:00+08:00')
+  assert.equal(params.created_to, '2026-09-26T10:30:00+08:00')
 })

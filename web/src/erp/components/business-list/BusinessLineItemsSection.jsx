@@ -1,5 +1,6 @@
 import React from 'react'
-import { Empty, Form } from 'antd'
+import { Form } from 'antd'
+import { BusinessLineItemsEmpty } from './BusinessCompactFieldTable.jsx'
 
 import BusinessLineItemsFooter from './BusinessLineItemsFooter.jsx'
 import BusinessLineItemsTable from './BusinessLineItemsTable.jsx'
@@ -40,10 +41,7 @@ export default function BusinessLineItemsSection({
                 </div>
               </div>
               {fields.length === 0 ? (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={emptyDescription}
-                />
+                <BusinessLineItemsEmpty>{emptyDescription}</BusinessLineItemsEmpty>
               ) : (
                 <BusinessLineItemsTable
                   columns={columns}

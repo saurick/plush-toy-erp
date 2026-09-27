@@ -1,13 +1,13 @@
 .mobile-progress-panel {
-  --mobile-progress-bg: #f7faf8;
-  --mobile-progress-card: #fff;
-  --mobile-progress-text: #183128;
-  --mobile-progress-muted: #576f64;
-  --mobile-progress-line: #dce7e1;
-  --mobile-progress-accent: #18794e;
-  --mobile-progress-soft: #eaf5ee;
-  --mobile-progress-danger: #ad3444;
-  --mobile-progress-warning: #895e17;
+  --mobile-progress-bg: var(--erp-page-bg);
+  --mobile-progress-card: var(--erp-surface-bg);
+  --mobile-progress-text: var(--erp-text);
+  --mobile-progress-muted: var(--erp-text-muted);
+  --mobile-progress-line: var(--erp-border);
+  --mobile-progress-accent: var(--erp-primary);
+  --mobile-progress-soft: var(--erp-primary-soft);
+  --mobile-progress-danger: var(--erp-visual-danger-text);
+  --mobile-progress-warning: var(--erp-warning-text);
   display: flex;
   min-height: 0;
   flex: 1;
@@ -24,48 +24,20 @@
   overflow: auto;
   overscroll-behavior-y: contain;
 }
-.mobile-progress-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px 4px;
-}
-.mobile-progress-header > div {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.mobile-progress-header h1 {
-  margin: 0;
-  font-size: 21px;
-  font-weight: 650;
-}
-.mobile-progress-header span {
-  color: var(--mobile-progress-muted);
-}
 .mobile-progress-panel button {
   font: inherit;
   cursor: pointer;
 }
-.mobile-progress-header button,
-.mobile-progress-search > button {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 10px;
-  padding: 0 12px;
-}
 
 .mobile-progress-controls {
-  padding: 6px 16px 0;
+  padding: 8px 12px 0;
+  background: var(--mobile-progress-bg);
 }
 .mobile-progress-controls .erp-sliding-segmented {
-  max-width: 440px;
+  max-width: 100%;
 }
 .mobile-progress-controls .ant-segmented-item-label {
-  min-height: 44px;
+  min-height: 34px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -74,24 +46,25 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .mobile-progress-risks {
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  padding: 10px 0 2px;
+  padding: 8px 0;
+  scrollbar-width: none;
 }
 .mobile-progress-risks .erp-filter-chip {
-  min-height: 44px;
-  padding-inline: 4px;
+  min-height: 34px;
+  padding: 5px 10px;
   font-size: 13px;
 }
 .mobile-progress-range {
   display: flex;
-  min-height: 44px;
+  min-height: 32px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 6px;
   color: var(--mobile-progress-muted);
   font-size: 12px;
@@ -108,7 +81,7 @@
 .mobile-progress-list {
   display: grid;
   gap: 10px;
-  padding: 0 16px 16px;
+  padding: 8px 12px 12px;
   min-height: 60px;
 }
 .mobile-progress-card {
@@ -117,7 +90,7 @@
   min-width: 0;
   flex-direction: column;
   border: 1px solid var(--mobile-progress-line);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--mobile-progress-card);
   color: var(--mobile-progress-text);
   text-align: left;
@@ -127,10 +100,10 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   border: 0;
-  border-radius: 14px;
-  padding: 14px;
+  border-radius: 16px;
+  padding: 12px;
   background: transparent;
   color: inherit;
   text-align: left;
@@ -151,20 +124,20 @@
 .mobile-progress-product-summary {
   display: grid;
   min-width: 0;
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 40px minmax(0, 1fr);
   align-items: start;
   gap: 10px;
 }
 .mobile-progress-product-image {
   position: relative;
   display: inline-flex;
-  width: 52px;
-  height: 52px;
+  width: 40px;
+  height: 40px;
 }
 .mobile-progress-product-image .erp-task-product-image {
-  width: 52px;
-  height: 52px;
-  flex-basis: 52px;
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
 }
 .mobile-progress-product-count {
   position: absolute;
@@ -178,7 +151,7 @@
   border-radius: 10px;
   padding: 0 4px;
   background: var(--mobile-progress-accent);
-  color: #fff;
+  color: var(--erp-on-accent);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
@@ -189,29 +162,39 @@
   gap: 3px;
 }
 .mobile-progress-product {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
 }
 .mobile-progress-muted,
 .mobile-progress-facts,
 .mobile-progress-owner {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--mobile-progress-muted);
 }
-.mobile-progress-quantity {
+.mobile-progress-execution {
   display: flex;
   flex-wrap: wrap;
+  align-items: end;
   justify-content: space-between;
-  gap: 4px 10px;
-  margin-top: 3px;
-  font-size: 13px;
+  gap: 6px 12px;
+}
+.mobile-progress-execution > .mobile-progress-facts {
+  flex: 1 1 120px;
+}
+.mobile-progress-quantity {
+  display: grid;
+  min-width: 0;
+  margin-left: auto;
+  text-align: right;
+  font-size: 12px;
 }
 .mobile-progress-quantity > span {
   color: var(--mobile-progress-muted);
+  font-size: 11px;
 }
 .mobile-progress-track {
   display: block;
-  height: 5px;
+  height: 7px;
   border-radius: 4px;
   background: var(--mobile-progress-line);
   overflow: hidden;
@@ -220,6 +203,7 @@
   display: block;
   height: 100%;
   background: var(--mobile-progress-accent);
+  transition: width var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
 }
 .mobile-progress-issue,
 .mobile-progress-danger {
@@ -236,21 +220,22 @@
   justify-content: space-between;
   gap: 8px;
   border: 0;
+  color: var(--erp-primary-strong);
   border-top: 1px solid var(--mobile-progress-line);
-  margin: 0 14px;
+  margin: 0 12px;
   padding: 8px 0;
   background: transparent;
   text-align: left;
 }
 .mobile-progress-error {
-  margin: 8px 16px 16px;
+  margin: 8px 12px;
 }
 .mobile-progress-error .ant-btn {
   min-height: 44px;
 }
 .mobile-progress-continuation {
   display: flex;
-  min-height: 44px;
+  min-height: 42px;
   align-items: center;
   justify-content: center;
   gap: 12px;
@@ -263,88 +248,210 @@
   border-radius: 10px;
   padding-inline: 14px;
 }
-.mobile-progress-filter-chevron {
-  font-size: 10px;
-  transition: transform 160ms ease;
-}
-.mobile-progress-filter-trigger[aria-expanded='true']
-  .mobile-progress-filter-chevron {
-  transform: rotate(180deg);
-}
-.mobile-progress-filter-popover {
-  max-width: calc(100vw - 16px);
-}
-.mobile-progress-filter-popover .ant-popover-inner {
+.erp-progress-drawer--mobile .ant-drawer-header {
   padding: 0;
-  border: 1px solid var(--erp-control-border);
-  border-radius: 12px;
-  background: var(--erp-control-surface);
-  box-shadow: 0 12px 30px rgb(24 49 40 / 18%);
+  border-bottom: 0;
 }
-.mobile-progress-filter-dropdown {
-  display: grid;
-  width: min(360px, calc(100vw - 24px));
-  max-height: min(52dvh, 420px);
-  gap: 12px;
+.erp-progress-drawer--mobile .ant-drawer-body.mobile-detail-content {
   padding: 12px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  background: var(--erp-page-bg);
 }
-.mobile-progress-filter-group {
-  min-width: 0;
-  border: 0;
+.erp-progress-drawer--mobile .ant-drawer-footer {
+  padding: 0;
+  border-top: 0;
+}
+.erp-progress-drawer--mobile .mobile-task-flow-status {
+  margin: 0;
+  white-space: normal;
+}
+.mobile-progress-detail-records:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.mobile-progress-overview h2 {
+  font-weight: 700;
+}
+
+.mobile-progress-attention-reason {
+  margin: 10px 0 0;
+  color: var(--erp-visual-danger-text);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.mobile-progress-stage-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.mobile-progress-stage-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mobile-progress-stage-row > strong {
+  font-weight: 600;
+  text-align: right;
+}
+
+.mobile-progress-stage-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--erp-surface-bg-soft);
+}
+
+.mobile-progress-stage-track > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--erp-primary);
+}
+
+.mobile-progress-stage-note,
+.mobile-detail-muted {
+  margin: 0;
+  color: var(--erp-text-subtle);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mobile-progress-recent-source {
+  margin: 0 0 10px;
+  color: var(--erp-text-subtle);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.mobile-detail-timeline {
+  display: grid;
   margin: 0;
   padding: 0;
+  list-style: none;
 }
-.mobile-progress-filter-group legend {
-  margin-bottom: 5px;
-  color: var(--erp-control-text);
-  font-size: 14px;
+
+.mobile-detail-timeline > li {
+  position: relative;
+  padding: 0 0 14px 21px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.mobile-detail-timeline > li:last-child {
+  padding-bottom: 0;
+}
+
+.mobile-detail-timeline > li::before {
+  position: absolute;
+  top: 7px;
+  bottom: -3px;
+  left: 5px;
+  width: 1px;
+  background: var(--erp-border);
+  content: '';
+}
+
+.mobile-detail-timeline > li:last-child::before {
+  display: none;
+}
+
+.mobile-detail-timeline > li::after {
+  position: absolute;
+  top: 5px;
+  left: 1px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--erp-surface-bg);
+  border-radius: 50%;
+  background: var(--erp-primary);
+  box-shadow: 0 0 0 1px var(--erp-primary);
+  content: '';
+}
+
+.mobile-detail-timeline strong {
   font-weight: 600;
 }
-.mobile-progress-filter-group .ant-segmented-item-label {
-  display: flex;
+
+.mobile-detail-timeline small,
+.mobile-detail-timeline p {
+  display: block;
+  margin: 3px 0 0;
+  color: var(--erp-text-subtle);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.mobile-progress-detail-toggle,
+.mobile-progress-recent-error > button {
   min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  padding-inline: 6px;
+  padding: 9px 11px;
+  border: 1px solid var(--erp-border);
+  border-radius: 12px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-primary-strong);
+  font-size: 13px;
+  cursor: pointer;
 }
-.mobile-progress-filter-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+
+.mobile-progress-detail-toggle:focus-visible,
+.mobile-progress-recent-error > button:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
 }
-.mobile-progress-filter-options .erp-filter-chip {
-  width: 100%;
-  min-width: 0;
+
+.mobile-progress-recent-error {
+  color: var(--erp-visual-danger-text);
+  font-size: 12px;
+}
+
+.mobile-progress-detail-actions {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.mobile-progress-detail-actions > .ant-btn {
   min-height: 44px;
 }
-.erp-progress-drawer--mobile .ant-drawer-header {
-  padding: 12px 16px;
-}
-.erp-progress-drawer--mobile .ant-drawer-body {
-  padding: 16px;
-}
-.erp-progress-drawer--mobile .ant-tabs-tab {
+
+.mobile-progress-detail-source > .ant-btn {
   min-height: 44px;
 }
-.erp-progress-drawer--mobile .ant-drawer-close {
-  min-width: 44px;
-  min-height: 44px;
-  margin: 0 8px 0 0;
+
+.mobile-progress-detail-actions > .ant-btn:only-child {
+  grid-column: 1 / -1;
 }
+
 .erp-progress-drawer--mobile .erp-progress-record .ant-btn {
   min-height: 44px;
 }
 
+.mobile-progress-detail-source {
+  text-align: right;
+}
+
+.mobile-progress-detail-records .erp-progress-record {
+  gap: 10px;
+  padding-block: 12px;
+}
+
+.mobile-progress-detail-records .erp-progress-record:last-child {
+  border-bottom: 0;
+}
+
 [data-erp-theme='dark'] .mobile-progress-panel {
-  --mobile-progress-bg: #101e19;
-  --mobile-progress-card: #192b23;
-  --mobile-progress-text: #e7f0eb;
-  --mobile-progress-muted: #adc2b7;
-  --mobile-progress-line: #355145;
-  --mobile-progress-accent: #7ad2a1;
-  --mobile-progress-soft: #244837;
+  --mobile-progress-bg: var(--erp-page-bg);
+  --mobile-progress-card: var(--erp-surface-bg);
+  --mobile-progress-text: var(--erp-text);
+  --mobile-progress-muted: var(--erp-text-muted);
+  --mobile-progress-line: var(--erp-border);
+  --mobile-progress-accent: var(--erp-primary);
+  --mobile-progress-soft: var(--erp-primary-soft);
   --mobile-progress-danger: #fda4af;
   --mobile-progress-warning: #edc479;
 }
@@ -356,4 +463,30 @@
 .mobile-progress-panel button:focus-visible {
   outline: 2px solid var(--mobile-progress-accent);
   outline-offset: 2px;
+}
+
+.mobile-progress-state {
+  border: 1px solid var(--mobile-progress-line);
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: var(--erp-surface-bg-soft);
+}
+.mobile-progress-state.mobile-progress-danger {
+  background: color-mix(
+    in srgb,
+    var(--mobile-progress-danger) 7%,
+    var(--mobile-progress-card)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--mobile-progress-danger) 25%,
+    var(--mobile-progress-line)
+  );
+}
+.mobile-progress-state.mobile-progress-warning {
+  background: color-mix(
+    in srgb,
+    var(--mobile-progress-warning) 7%,
+    var(--mobile-progress-card)
+  );
 }

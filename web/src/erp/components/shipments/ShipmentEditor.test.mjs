@@ -25,7 +25,7 @@ test('shipment source references can only be established by candidate import', (
   )
   assert.match(
     source,
-    /sourceSelectionDisabled=\{Boolean\(selectedSalesOrder\)\}/u
+    /sourceSelectionDisabled=\{\s*Boolean\(\s*selectedSalesOrder\s*\)\s*\}/u
   )
   assert.match(source, /disabled=\{sourceSelectionDisabled\}/u)
   assert.match(source, /addDisabled=\{Boolean\(selectedSalesOrder\)\}/u)
@@ -62,14 +62,10 @@ test('shipment source labels prefer immutable snapshots and use current display 
   assert.doesNotMatch(source, /selectedSourceRows\.reduce|剩余可出货合计/u)
 })
 
-test('shipment logistics fields keep freight on the sales-order currency and remain before attachments and details', () => {
+test('shipment details precede supplementary logistics and freight keeps the sales-order currency', () => {
   for (const copy of [
-    '计划与收货',
-    '国家 / 地区',
-    '收货人',
-    '收货电话',
-    '收货地址',
-    '运输与包装',
+    '收货信息',
+    '运输与费用',
     '运输方式',
     '承运商',
     '物流 / 提单号',
@@ -98,10 +94,13 @@ test('shipment logistics fields keep freight on the sales-order currency and rem
   assert.doesNotMatch(source, /addonAfter=/u)
   assert.doesNotMatch(source, /name="freight_currency"/u)
 
-  const fieldsIndex = source.indexOf('<ShipmentFormFields')
-  const attachmentsIndex = source.indexOf('<BusinessAttachmentPanel')
-  const itemsIndex = source.indexOf('<Form.List name="items">')
+  assert.match(source, /<DeliveryAddressFields[\s\S]*?disabled=\{disabled\}/u)
+  const fieldsIndex = source.indexOf('title="单据与客户"')
+  const itemsIndex = source.indexOf('{itemsSection}')
+  const deliveryIndex = source.indexOf('title="收货信息"')
+  const attachmentsIndex = source.indexOf('{attachmentPanel}')
   assert(fieldsIndex >= 0)
-  assert(attachmentsIndex > fieldsIndex)
-  assert(itemsIndex > attachmentsIndex)
+  assert(itemsIndex > fieldsIndex)
+  assert(deliveryIndex > itemsIndex)
+  assert(attachmentsIndex > deliveryIndex)
 })

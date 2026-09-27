@@ -57,3 +57,36 @@ export function resolveBusinessAttachmentActionLabel({
   }
   return canUpload ? emptyUploadLabel : emptyReadLabel
 }
+
+export function isBusinessAttachmentImage(item) {
+  return String(item?.mime_type || '').startsWith('image/')
+}
+
+export function mergeBusinessAttachmentSelection(currentItems, selectedItems) {
+  const items = [...currentItems]
+  const duplicates = []
+  for (const selected of selectedItems) {
+    const exists = items.some(
+      (item) =>
+        item.file_name === selected.file_name &&
+        item.content_base64 === selected.content_base64 &&
+        item.attachment_type === selected.attachment_type
+    )
+    if (exists) duplicates.push(selected)
+    else items.push(selected)
+  }
+  return { items, duplicates }
+}
+
+export function selectBusinessAttachmentUploadItems(
+  items,
+  { retryOnly = false } = {}
+) {
+  return items.filter((item) =>
+    retryOnly
+      ? item.upload_status === 'failed'
+      : !item.upload_status ||
+        item.upload_status === 'pending' ||
+        item.upload_status === 'failed'
+  )
+}

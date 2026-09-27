@@ -19,6 +19,7 @@ const messages = stylelint.utils.ruleMessages(ruleName, {
 
 // 这些文件维护应用级基线；业务页面和按需加载的组件不进入此列表。
 const sharedFiles = new Set([
+  'src/erp/styles/app/design-tokens.css',
   'src/erp/styles/app/control-foundation.css',
   'src/erp/styles/app/business-control-rhythm.css',
   'src/erp/styles/app/control-focus.css',

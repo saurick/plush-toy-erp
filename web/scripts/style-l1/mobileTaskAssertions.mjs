@@ -1,4 +1,6 @@
+import { writeFile } from 'node:fs/promises'
 import { assertFilterAffordance } from './controlAffordanceAssertions.mjs'
+import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
 
 export function createMobileTaskAssertions(deps) {
   const {
@@ -15,6 +17,186 @@ export function createMobileTaskAssertions(deps) {
     outputDir,
     path,
   } = deps
+
+  async function assertMobileFlowReferenceLayout(
+    page,
+    screen,
+    kind,
+    scenarioName
+  ) {
+    const viewport = page.viewportSize()
+    const original = await page.evaluate(() => ({
+      theme: document.documentElement.getAttribute('data-erp-theme'),
+      style: document.documentElement.getAttribute('style'),
+    }))
+    const checks = []
+    const settleScreen = () =>
+      page.waitForFunction(
+        (selector) => {
+          const root = document.querySelector(selector)
+          return root
+            ?.getAnimations({ subtree: true })
+            .every(
+              (animation) =>
+                animation.playState !== 'running' ||
+                animation.effect?.getTiming().iterations === Infinity ||
+                !(animation.timeline instanceof window.DocumentTimeline)
+            )
+        },
+        `[data-testid="mobile-task-${kind}-screen"]`,
+        { timeout: 5000 }
+      )
+    try {
+      await page.setViewportSize({ width: 393, height: 852 })
+      await page.waitForFunction(
+        () => !document.querySelector('.ant-message-notice'),
+        undefined,
+        { timeout: 10_000 }
+      )
+      for (const accentName of ['purple', 'pink']) {
+        await page.evaluate(async (accent) => {
+          const root = document.documentElement
+          root.setAttribute('data-erp-theme', 'light')
+          root.style.setProperty('--erp-accent', accent.primary)
+          root.style.setProperty('--erp-accent-strong', accent.strong)
+          root.style.setProperty('--erp-accent-hover', accent.hover)
+          root.style.setProperty('--erp-on-accent', accent.onPrimary)
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        }, ERP_ACCENTS[accentName])
+        await settleScreen()
+        const metrics = await screen.evaluate((root, surface) => {
+          const rect = (selector) =>
+            root.querySelector(selector)?.getBoundingClientRect()
+          const footer = root.querySelector('.mobile-role-action-bar')
+          const buttons = Array.from(footer.querySelectorAll('button'))
+          const primary = buttons.at(-1)
+          const result = {
+            overflow: root.scrollWidth - root.clientWidth,
+            footerButtons: buttons.map((button) => ({
+              text: button.textContent.trim(),
+              width: button.getBoundingClientRect().width,
+              height: button.getBoundingClientRect().height,
+            })),
+            primaryColor: getComputedStyle(primary).backgroundColor,
+          }
+          if (surface === 'action') {
+            const selected = root.querySelector('[data-selected="true"]')
+            result.choices = Array.from(
+              root.querySelectorAll('.mobile-task-action-choice')
+            )
+              .filter((choice) => choice.getBoundingClientRect().height > 0)
+              .map((choice) => ({
+                width: choice.getBoundingClientRect().width,
+                availableWidth:
+                  choice.parentElement.getBoundingClientRect().width,
+                height: choice.getBoundingClientRect().height,
+                description: choice.querySelector('small')?.textContent,
+              }))
+            result.sameCard =
+              root.querySelector('[role="radiogroup"]').closest('section') ===
+              root.querySelector('textarea').closest('section')
+            result.selectedColor = getComputedStyle(selected).borderColor
+            result.radioColor = getComputedStyle(
+              selected.querySelector('input')
+            ).borderColor
+          } else {
+            const icon = rect('.mobile-task-receipt-outcome__icon')
+            const title = rect('.mobile-task-receipt-outcome h2')
+            const card = rect('.mobile-task-receipt-outcome')
+            result.iconCenterOffset = Math.abs(
+              icon.x + icon.width / 2 - card.x - card.width / 2
+            )
+            result.titleBelowIcon = title.top >= icon.bottom
+            result.sourceOutsideFacts = root.querySelector(
+              '[aria-label="办理结果"] > .mobile-detail-identity'
+            )?.textContent
+            result.status = root.querySelector(
+              '.mobile-task-flow-status'
+            )?.textContent
+            result.factAlignment = Array.from(
+              root.querySelectorAll('.mobile-detail-fact dd')
+            ).every((field) => getComputedStyle(field).textAlign === 'right')
+            result.productCards =
+              root.querySelectorAll('.erp-task-identity').length
+          }
+          return result
+        }, kind)
+        assert(
+          metrics.overflow <= 1 &&
+            metrics.footerButtons.every((button) => button.height >= 44),
+          JSON.stringify(metrics)
+        )
+        if (kind === 'action') {
+          assert(
+            metrics.sameCard &&
+              metrics.choices.length >= 2 &&
+              metrics.choices.every(
+                (choice) =>
+                  Math.abs(choice.width - choice.availableWidth) < 1 &&
+                  choice.height >= 62 &&
+                  choice.description
+              ),
+            JSON.stringify(metrics)
+          )
+          assert.equal(
+            metrics.selectedColor,
+            metrics.primaryColor,
+            `${accentName} 选项必须跟随主题色`
+          )
+          assert.equal(
+            metrics.radioColor,
+            metrics.primaryColor,
+            `${accentName} 单选标记必须跟随主题色`
+          )
+          assert.equal(metrics.footerButtons[0].text, '返回任务')
+          assert(
+            metrics.footerButtons[1].width > metrics.footerButtons[0].width * 2,
+            JSON.stringify(metrics)
+          )
+        } else {
+          assert(
+            metrics.iconCenterOffset < 1 &&
+              metrics.titleBelowIcon &&
+              metrics.sourceOutsideFacts &&
+              metrics.status &&
+              metrics.factAlignment &&
+              metrics.productCards === 0,
+            JSON.stringify(metrics)
+          )
+          assert.equal(metrics.footerButtons[0].text, '返回任务列表')
+          assert.notEqual(
+            metrics.primaryColor,
+            'rgb(255, 255, 255)',
+            '成功回执应提供主色返回按钮'
+          )
+        }
+        checks.push({ accentName, ...metrics })
+        await screen.screenshot({
+          path: path.join(
+            outputDir,
+            `${scenarioName}-${kind}-${accentName}-393.png`
+          ),
+        })
+      }
+      await writeFile(
+        path.join(outputDir, `${scenarioName}-${kind}-geometry.json`),
+        JSON.stringify(checks, null, 2)
+      )
+    } finally {
+      await page.evaluate(({ theme, style }) => {
+        for (const [name, value] of [
+          ['data-erp-theme', theme],
+          ['style', style],
+        ]) {
+          if (value === null) document.documentElement.removeAttribute(name)
+          else document.documentElement.setAttribute(name, value)
+        }
+      }, original)
+      await page.setViewportSize(viewport)
+      await settleScreen()
+    }
+  }
 
   function assertMobileTaskCompactCountTags(
     metrics,
@@ -42,11 +224,10 @@ export function createMobileTaskAssertions(deps) {
           ['flex', 'inline-flex'].includes(tag.display) &&
           tag.whiteSpace === 'nowrap' &&
           Number.parseFloat(tag.borderRadius) >= 12 &&
-          tag.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
-          tag.width >= 24 &&
-          tag.height >= 22 &&
+          tag.width >= 7 &&
+          tag.height >= 12 &&
           tag.scrollWidth <= tag.clientWidth + 1,
-        `${scenarioName} ${tabLabel}数字标签应完整、可读且呈胶囊形: ${JSON.stringify(metrics)}`
+        `${scenarioName} ${tabLabel}筛选数字应完整、可读且保持单行: ${JSON.stringify(metrics)}`
       )
     })
   }
@@ -366,7 +547,7 @@ export function createMobileTaskAssertions(deps) {
         '[data-testid="mobile-role-scroll"]'
       )
       const cards = Array.from(
-        scroll?.querySelectorAll('.erp-mobile-card') || []
+        scroll?.querySelectorAll('.mobile-mine-card') || []
       ).map((card) => {
         const style = window.getComputedStyle(card)
         const rect = card.getBoundingClientRect()
@@ -414,14 +595,22 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 我的页不应恢复已删除的重复任务指标: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.cards.length === 3 &&
+      metrics.cards.length === 5 &&
         metrics.cards.some(
           (card) =>
-            card.text.includes('账号岗位') &&
-            card.text.includes('可用入口') &&
-            card.text.includes('电脑端 / 手机待办')
+            card.text.includes('账号：') &&
+            !card.text.includes('账号岗位') &&
+            !card.text.includes('可用入口')
         ) &&
         metrics.cards.some((card) => card.text.includes('入口与安全')) &&
+        metrics.cards.some(
+          (card) =>
+            card.text.includes('显示设置') &&
+            card.text.includes('明暗模式') &&
+            card.text.includes('主题色') &&
+            !card.text.includes('表格密度')
+        ) &&
+        metrics.cards.some((card) => card.text.includes('退出登录')) &&
         metrics.cards.some(
           (card) =>
             card.text.includes('系统信息') &&
@@ -430,7 +619,7 @@ export function createMobileTaskAssertions(deps) {
             card.text.includes('前后台版本一致')
         ) &&
         metrics.cards.every((card) => !card.text.includes('任务端')),
-      `${scenarioName} 我的页应展示真实可用入口、入口安全和一致的系统版本且不重复任务端身份: ${JSON.stringify(metrics)}`
+      `${scenarioName} 我的页应展示账号身份、入口安全和一致的系统版本且不重复岗位与入口说明: ${JSON.stringify(metrics)}`
     )
     metrics.cards.forEach((card) => {
       assert(
@@ -455,7 +644,7 @@ export function createMobileTaskAssertions(deps) {
     assert(
       metrics.actionButtons.every(
         (button) =>
-          !button.disabled && button.width > 280 && button.height >= 44
+          !button.disabled && button.width > 280 && button.height >= 42
       ) && metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
       `${scenarioName} 我的页操作点击区或横向布局异常: ${JSON.stringify(metrics)}`
     )
@@ -493,7 +682,7 @@ export function createMobileTaskAssertions(deps) {
       !metrics.hasCheck &&
         metrics.borderWidth >= 1 &&
         metrics.boxShadow === 'none' &&
-        metrics.height >= 44,
+        metrics.height >= 34,
       `${scenarioName} ${label} 筛选应以单线强调边框、底色及足够点击区域表达选中，不应添加勾号或粗边框: ${JSON.stringify(metrics)}`
     )
     assert(
@@ -1146,7 +1335,7 @@ export function createMobileTaskAssertions(deps) {
             ?.textContent?.replace(/\s+/g, ' ')
             .trim() || '',
         timingText:
-          document.querySelector('.mobile-task-detail-hero .erp-task-timing')
+          document.querySelector('[data-testid="mobile-task-detail-screen"] [aria-label="业务信息"]')
             ?.textContent || '',
         redundantCopy: Array.from(
           shell.querySelectorAll('h1, h2, h3, h4, [role="heading"]')
@@ -1184,9 +1373,9 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 详情页不应继续平铺全部写动作: ${JSON.stringify(detailMetrics)}`
     )
     assert(
-      detailMetrics.summaryText.includes('负责：业务') &&
+      detailMetrics.summaryText.includes('负责岗位业务') &&
+        detailMetrics.summaryText.includes('截止时间') &&
         detailMetrics.timingText.includes('进入本岗') &&
-        detailMetrics.timingText.includes('处理截止') &&
         detailMetrics.redundantCopy.length === 0,
       `${scenarioName} 详情页摘要缺失或仍有重复区块: ${JSON.stringify(detailMetrics)}`
     )
@@ -1231,7 +1420,7 @@ export function createMobileTaskAssertions(deps) {
     )
     detailMetrics.buttons.forEach((button) => {
       assert(
-        button.width >= 280 && button.height >= 48,
+        button.width >= 280 && button.height >= 44,
         `${scenarioName} 详情页主动作点击区不稳定: ${JSON.stringify(detailMetrics)}`
       )
     })
@@ -1350,18 +1539,18 @@ export function createMobileTaskAssertions(deps) {
     await actionScreen.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(page, '选择处理方式')
     const actionLabels = (
-      await actionScreen.locator('label[data-action-key]').allTextContents()
+      await actionScreen.locator('label[data-action-key] strong').allTextContents()
     ).map((label) => label.replace(/\s+/g, ' ').trim())
     assert(
-      actionLabels.includes('完成') && actionLabels.includes('阻塞'),
+      actionLabels.includes('完成本岗') && actionLabels.includes('标记阻塞'),
       `${scenarioName} 独立处理页没有展示后端授权的完成和阻塞动作: ${JSON.stringify({ actionLabels, screenText: (await actionScreen.innerText()).replace(/\s+/g, ' ').trim() })}`
     )
     const doneRadio = actionScreen.getByRole('radio', {
-      name: '完成',
+      name: '完成本岗',
       exact: true,
     })
     const blockedRadio = actionScreen.getByRole('radio', {
-      name: '阻塞',
+      name: '标记阻塞',
       exact: true,
     })
     assert.equal(
@@ -1393,7 +1582,7 @@ export function createMobileTaskAssertions(deps) {
     )
     assert.equal(
       await actionScreen
-        .getByRole('button', { name: '完成', exact: true })
+        .getByRole('button', { name: '完成本岗', exact: true })
         .count(),
       0,
       `${scenarioName} 完成动作不能渲染成单击即执行的按钮`
@@ -1405,8 +1594,9 @@ export function createMobileTaskAssertions(deps) {
       true,
       `${scenarioName} 多动作选择应支持原生方向键切换`
     )
+    await assertMobileFlowReferenceLayout(page, actionScreen, 'action', scenarioName)
     await doneRadio.check()
-    await page.getByRole('button', { name: '确认完成' }).click()
+    await page.getByRole('button', { name: '确认完成本岗' }).click()
     const completionFeedbackInput = page.getByLabel('完成反馈')
     assert.equal(
       await page.getByLabel('现场证据').count(),
@@ -1496,7 +1686,7 @@ export function createMobileTaskAssertions(deps) {
         const style = window.getComputedStyle(choice)
         const inputStyle = input ? window.getComputedStyle(input) : null
         return {
-          text: choice.textContent?.replace(/\s+/g, ' ').trim() || '',
+          text: choice.querySelector('strong')?.textContent?.replace(/\s+/g, ' ').trim() || '',
           width: rect.width,
           height: rect.height,
           disabled: input?.disabled ?? true,
@@ -1509,7 +1699,7 @@ export function createMobileTaskAssertions(deps) {
       const optionsCard = screen.querySelector(
         '[data-testid="mobile-task-action-options"]'
       )
-      const optionsHeading = optionsCard?.querySelector('h2')
+      const optionsHeading = optionsCard?.querySelector('h3')
       const cardRect = optionsCard?.getBoundingClientRect()
       const headingRect = optionsHeading?.getBoundingClientRect()
       const flowSteps = Array.from(
@@ -1526,11 +1716,11 @@ export function createMobileTaskAssertions(deps) {
         actionChoices,
         cardContainsHeading: Boolean(
           cardRect &&
-            headingRect &&
-            headingRect.top >= cardRect.top - 1 &&
-            headingRect.bottom <= cardRect.bottom + 1 &&
-            headingRect.left >= cardRect.left - 1 &&
-            headingRect.right <= cardRect.right + 1
+          headingRect &&
+          headingRect.top >= cardRect.top - 1 &&
+          headingRect.bottom <= cardRect.bottom + 1 &&
+          headingRect.left >= cardRect.left - 1 &&
+          headingRect.right <= cardRect.right + 1
         ),
         cardHasNoHorizontalOverflow: Boolean(
           optionsCard && optionsCard.scrollWidth <= optionsCard.clientWidth + 1
@@ -1547,10 +1737,10 @@ export function createMobileTaskAssertions(deps) {
     })
     assert(
       actionMetrics.actionChoices.some(
-        (choice) => choice.text === '完成' && !choice.disabled
+        (choice) => choice.text === '完成本岗' && !choice.disabled
       ) &&
         actionMetrics.actionChoices.some(
-          (choice) => choice.text === '阻塞' && !choice.disabled
+          (choice) => choice.text === '标记阻塞' && !choice.disabled
         ) &&
         actionMetrics.actionChoices.every(
           (choice) => choice.width >= 120 && choice.height >= 48
@@ -1571,7 +1761,7 @@ export function createMobileTaskAssertions(deps) {
         actionMetrics.flowSteps.find((step) => step.key === 'result')?.state ===
           'locked' &&
         JSON.stringify(actionMetrics.footerButtons) ===
-          JSON.stringify(['确认完成']) &&
+          JSON.stringify(['返回任务', '确认完成本岗']) &&
         actionMetrics.documentScrollWidth <=
           actionMetrics.documentClientWidth + 1,
       `${scenarioName} 独立处理页动作或布局异常: ${JSON.stringify(actionMetrics)}`
@@ -1643,7 +1833,7 @@ export function createMobileTaskAssertions(deps) {
           '[data-testid="mobile-task-action-screen"] label[data-action-key]'
         )
       ).map((choice) => ({
-        text: choice.textContent?.replace(/\s+/g, ' ').trim() || '',
+        text: choice.querySelector('strong')?.textContent?.replace(/\s+/g, ' ').trim() || '',
         disabled: choice.querySelector('input[type="radio"]')?.disabled ?? true,
       })),
       documentScrollWidth: document.documentElement.scrollWidth,
@@ -1651,10 +1841,10 @@ export function createMobileTaskAssertions(deps) {
     }))
     assert(
       crossRoleMetrics.actionChoices.some(
-        (choice) => choice.text === '阻塞' && !choice.disabled
+        (choice) => choice.text === '标记阻塞' && !choice.disabled
       ) &&
         crossRoleMetrics.actionChoices.some(
-          (choice) => choice.text === '完成' && !choice.disabled
+          (choice) => choice.text === '完成本岗' && !choice.disabled
         ) &&
         crossRoleMetrics.actionChoices.some(
           (choice) => choice.text === '退回' && !choice.disabled
@@ -1670,7 +1860,7 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 路径切换后任务详情造成横向溢出: ${JSON.stringify(crossRoleMetrics)}`
     )
     await page.getByLabel('完成反馈').fill('暗色任务已完成并核对')
-    await page.getByRole('button', { name: '确认完成', exact: true }).click()
+    await page.getByRole('button', { name: '确认完成本岗', exact: true }).click()
     const receiptScreen = page.getByTestId('mobile-task-receipt-screen')
     await receiptScreen.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(page, '任务办理已确认')
@@ -1711,7 +1901,7 @@ export function createMobileTaskAssertions(deps) {
         !receiptMetrics.text.includes('历史处理线索') &&
         receiptMetrics.handoffCount === 0 &&
         JSON.stringify(receiptMetrics.actionButtons) ===
-          JSON.stringify(['返回列表']) &&
+          JSON.stringify(['返回任务列表']) &&
         !['结果边界', '流程锚点', '未来分支', '领域单据', '审计记录'].some(
           (copy) => receiptMetrics.text.includes(copy)
         ) &&
@@ -1725,8 +1915,10 @@ export function createMobileTaskAssertions(deps) {
     await receiptScreen.screenshot({
       path: path.join(outputDir, `${scenarioName}-receipt-copy-cleanup.png`),
     })
+    await assertMobileFlowReferenceLayout(page, receiptScreen, 'receipt', scenarioName)
     await receiptScreen
-      .getByRole('button', { name: '返回列表', exact: true })
+      .locator('.mobile-role-action-bar')
+      .getByRole('button', { name: '返回任务列表', exact: true })
       .click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
@@ -1792,6 +1984,19 @@ export function createMobileTaskAssertions(deps) {
     await deepDetail
       .getByRole('heading', { name: deepTaskName, exact: true })
       .waitFor({ state: 'visible', timeout: 10_000 })
+    const deepListHistory = await page.evaluate(() => ({
+      visibleTodoLimit: Number(
+        window.history.state?.mobileRoleTasksListLimits?.todo || 0
+      ),
+      loadedRiskCount: Number(
+        window.history.state?.mobileRoleTasksLoadedCountsByView?.risk || 0
+      ),
+    }))
+    assert(
+      deepListHistory.visibleTodoLimit > 12 &&
+        deepListHistory.loadedRiskCount >= 150,
+      `${scenarioName} 进入详情时应保存真实的深分页列表: ${JSON.stringify(deepListHistory)}`
+    )
     await page.reload({ waitUntil: 'domcontentloaded' })
     await page
       .getByTestId('mobile-task-detail-screen')
@@ -1813,8 +2018,8 @@ export function createMobileTaskAssertions(deps) {
     assert(
       restoredHistory.screen === 'detail' &&
         restoredHistory.taskID === String(deepTaskID) &&
-        restoredHistory.visibleTodoLimit >= 24 &&
-        restoredHistory.loadedRiskCount >= 150 &&
+        restoredHistory.visibleTodoLimit === deepListHistory.visibleTodoLimit &&
+        restoredHistory.loadedRiskCount >= deepListHistory.loadedRiskCount &&
         restoredHistory.activeFilter === 'overdue',
       `${scenarioName} 稀疏筛选深分页详情刷新后没有恢复任务、服务端批次与筛选: ${JSON.stringify(restoredHistory)}`
     )
@@ -1883,7 +2088,7 @@ export function createMobileTaskAssertions(deps) {
         .getByLabel('完成反馈')
         .fill('深页任务已完成并核对')
       await recoveryActionScreen
-        .getByRole('button', { name: '确认完成', exact: true })
+        .getByRole('button', { name: '确认完成本岗', exact: true })
         .click()
       const failedReceipt = page.getByTestId('mobile-task-receipt-screen')
       await failedReceipt.waitFor({ state: 'visible', timeout: 10_000 })
@@ -1911,7 +2116,7 @@ export function createMobileTaskAssertions(deps) {
         `${scenarioName} 确定失败后应保留深分页缓存，不应重扫任务队列`
       )
       await failedReceipt
-        .getByRole('button', { name: '查看任务', exact: true })
+        .getByRole('button', { name: '任务信息', exact: true })
         .waitFor({ state: 'visible', timeout: 10_000 })
     } finally {
       await page.unroute('**/rpc/workflow', deterministicFailureRoute)
@@ -1922,7 +2127,7 @@ export function createMobileTaskAssertions(deps) {
     await expectText(page, '任务办理已确认')
     const confirmedReceipt = page.getByTestId('mobile-task-receipt-screen')
     await confirmedReceipt
-      .getByRole('button', { name: '查看任务', exact: true })
+      .getByRole('button', { name: '任务信息', exact: true })
       .click()
     const confirmedDetail = page.getByTestId('mobile-task-detail-screen')
     await confirmedDetail.waitFor({ state: 'visible', timeout: 10_000 })
@@ -1944,7 +2149,8 @@ export function createMobileTaskAssertions(deps) {
       .waitFor({ state: 'visible', timeout: 10_000 })
     await page
       .getByTestId('mobile-task-receipt-screen')
-      .getByRole('button', { name: '返回列表', exact: true })
+      .locator('.mobile-role-action-bar')
+      .getByRole('button', { name: '返回任务列表', exact: true })
       .click()
     await page.getByTestId('mobile-role-bottom-nav').waitFor({
       state: 'visible',
@@ -2478,7 +2684,7 @@ export function createMobileTaskAssertions(deps) {
     assert(
       largeCountMetrics &&
         largeCountMetrics.countText === '150' &&
-        largeCountMetrics.countWidth >= 24 &&
+        largeCountMetrics.countWidth >= 23 &&
         largeCountMetrics.countScrollWidth <=
           largeCountMetrics.countClientWidth + 1 &&
         largeCountMetrics.contentScrollWidth <=
@@ -2487,10 +2693,10 @@ export function createMobileTaskAssertions(deps) {
           largeCountMetrics.documentClientWidth + 1,
       `${scenarioName} 三位数筛选数量标签不应被裁切或导致横向溢出: ${JSON.stringify(largeCountMetrics)}`
     )
-    await assertFilterAffordance(page.locator('.mobile-role-task-filter'), 44)
+    await assertFilterAffordance(page.locator('.mobile-role-task-filter'), 34)
     assert(
       metrics.filterItems.every(
-        (item) => item.width >= 44 && item.buttonHeight >= 44
+        (item) => item.width >= 44 && item.buttonHeight >= 34
       ) &&
         metrics.filterItems.reduce((sum, item) => sum + item.width, 0) +
           metrics.gap * (metrics.buttonCount - 1) <=

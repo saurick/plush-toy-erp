@@ -32,6 +32,7 @@ async function measureTables(page) {
       headers: headers.map((cell) => ({
         text: cell.textContent,
         align: getComputedStyle(cell).textAlign,
+        expected: cell.dataset.columnAlign || null,
         vertical: getComputedStyle(cell).verticalAlign,
       })),
       labelOffsets: [
@@ -40,7 +41,12 @@ async function measureTables(page) {
         ),
       ].map((label) => ({
         text: label.textContent,
-        offset: centerOffset(label.closest('th'), label),
+        left:
+          label.getBoundingClientRect().left -
+          label.closest('th').getBoundingClientRect().left,
+        right:
+          label.closest('th').getBoundingClientRect().right -
+          label.getBoundingClientRect().right,
       })),
       copyOffsets: [
         ...document.querySelectorAll(
@@ -76,13 +82,14 @@ function assertCommonAlignment(evidence) {
     assert.equal(cell.vertical, 'middle', cell.text)
   }
   for (const header of evidence.headers) {
-    assert.equal(header.align, 'center', header.text)
+    if (header.expected)
+      assert.equal(header.align, header.expected, header.text)
     assert.equal(header.vertical, 'middle', header.text)
   }
   for (const label of evidence.labelOffsets) {
     assert(
-      Math.abs(label.offset) < 1,
-      `header label shifted: ${JSON.stringify(label)}`
+      label.left >= 6 && label.right >= 6,
+      `header label must stay inside its padded column: ${JSON.stringify(label)}`
     )
   }
   for (const offset of evidence.copyOffsets) {
@@ -94,11 +101,11 @@ function assertAligned(evidence) {
   assertCommonAlignment(evidence)
   assert(evidence.bodyAlignment.length > 20, 'expected real table rows')
   assert.equal(evidence.material[0][1].text, '1')
-  assert.equal(evidence.material[0][1].align, 'center')
+  assert.equal(evidence.material[0][1].align, 'left')
   assert.equal(evidence.material[0][2].text, '黑色毛绒')
   assert.equal(evidence.material[0][2].align, 'left')
-  assert.equal(evidence.material[0][4].align, 'center')
-  assert.equal(evidence.material[0][5].align, 'center')
+  assert.equal(evidence.material[0][4].align, 'left')
+  assert.equal(evidence.material[0][5].align, 'left')
   assert.equal(evidence.material[0][6].align, 'right')
 }
 
@@ -147,17 +154,39 @@ export function createTableAlignmentScenarios({
       await assertTableSemanticAlignment(page.locator('#business-table'), {
         scenarioName: `global-table-alignment-${mode}`,
         expected: {
-          材料编号: 'center',
+          材料编号: 'left',
           品名: 'left',
-          单位: 'center',
+          单位: 'left',
           数量: 'right',
-          状态: 'center',
+          状态: 'left',
           备注: 'left',
         },
       })
       await assertTableHeaderControlsFit(page, {
         scenarioName: `global-table-alignment-${mode}`,
       })
+      const plainSort = page.locator('#plain-table th.ant-table-column-has-sorters')
+      await plainSort.focus()
+      assert(await plainSort.evaluate((node) => {
+        const style = getComputedStyle(node)
+        return node === document.activeElement && Number.parseFloat(style.outlineWidth) >= 2
+      }), '表头键盘焦点必须清晰可见')
+      await plainSort.press('Enter')
+      assert.equal(await plainSort.getAttribute('aria-sort'), 'ascending')
+      await plainSort.press('Enter')
+      assert.equal(await plainSort.getAttribute('aria-sort'), 'descending')
+      await plainSort.press('Enter')
+      assert.equal(await plainSort.getAttribute('aria-sort'), null)
+      const filter = page.locator('#plain-table thead .ant-table-filter-trigger')
+      await filter.click()
+      const filterPanel = page.locator('.ant-table-filter-dropdown')
+      await filterPanel.getByRole('checkbox').first().check()
+      await filterPanel.getByRole('button', { name: /^(OK|确\s*定)$/u }).click()
+      assert.equal(await page.locator('#plain-table tr.ant-table-row').count(), 1)
+      await filter.click()
+      await filterPanel.getByRole('button', { name: /^(Reset|重\s*置)$/u }).click()
+      await filterPanel.getByRole('button', { name: /^(OK|确\s*定)$/u }).click()
+      assert.equal(await page.locator('#plain-table tr.ant-table-row').count(), 2)
       const firstRow = page.locator('#business-table tr[data-row-key="1"]')
       await firstRow.getByRole('checkbox').check()
       assert.equal(await page.locator('#selection-count').textContent(), '1')
@@ -176,8 +205,35 @@ export function createTableAlignmentScenarios({
       const sorter = page.locator(
         '#business-table thead .ant-table-column-sorters'
       )
-      await sorter.click()
-      await sorter.click()
+      if (mode === 'mobile') {
+        await sorter.evaluate((node) => {
+          const table = node.closest('.ant-table-container')
+          const scroller = table.querySelector(
+            '.ant-table-body, .ant-table-content'
+          )
+          const fixedRight = Math.max(
+            ...[
+              ...table.querySelectorAll('thead .ant-table-cell-fix-left'),
+            ].map((cell) => cell.getBoundingClientRect().right)
+          )
+          scroller.scrollLeft +=
+            node.closest('th').getBoundingClientRect().left - fixedRight - 8
+        })
+      }
+      await sorter.click({ position: { x: 8, y: 10 } })
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('#business-table th[aria-sort]')
+            ?.getAttribute('aria-sort') === 'ascending'
+      )
+      await sorter.click({ position: { x: 8, y: 10 } })
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('#business-table th[aria-sort]')
+            ?.getAttribute('aria-sort') === 'descending'
+      )
       assert.equal(
         await page
           .locator('#business-table .ant-table-row')
@@ -185,8 +241,11 @@ export function createTableAlignmentScenarios({
           .getAttribute('data-row-key'),
         '2'
       )
-      await page.getByRole('button', { name: '单位 列设置' }).click()
-      await page.getByRole('menuitem', { name: '移到最前' }).click()
+      await page.getByRole('button', { name: '列设置', exact: true }).click()
+      const columnPanel = page.getByRole('dialog', { name: /^列设置/u })
+      await columnPanel.getByRole('button', { name: '单位 移到最前' }).click()
+      await columnPanel.getByRole('button', { name: /^完\s*成$/u }).click()
+      await columnPanel.waitFor({ state: 'hidden' })
       assert.equal(
         await page
           .locator('#business-table thead .erp-module-column-header-text')
@@ -207,7 +266,7 @@ export function createTableAlignmentScenarios({
         tableSelector: '.erp-material-parts',
         expected: {
           '产品 / 订单行': 'left',
-          BOM: 'center',
+          BOM: 'left',
           部位: 'left',
           片数: 'right',
           单位用量: 'right',
@@ -277,6 +336,9 @@ export function createTableAlignmentScenarios({
           )
           const measurement = await measureTables(page)
           evidence.push({ route, ...measurement })
+          if (route === '/erp/warehouse/inbound') {
+            await page.screenshot({ path: path.join(outputDir, 'table-headers-inbound-light.png') })
+          }
           try {
             assertCommonAlignment(measurement)
             await assertTableHeaderControlsFit(page, { scenarioName: route })

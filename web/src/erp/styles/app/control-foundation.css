@@ -1,12 +1,12 @@
 #root,
 body {
-  --erp-control-radius: 12px;
-  --erp-form-control-height: 36px;
-  --erp-control-focus-border: #2b8a3e;
-  --erp-control-focus-ring: rgb(43 138 62 / 14%);
+  --erp-control-radius: 8px;
+  --erp-form-control-height: 34px;
+  --erp-control-focus-border: var(--erp-primary);
+  --erp-control-focus-ring: var(--erp-focus-ring);
   --erp-popup-option-divider: rgb(15 23 42 / 8%);
-  --erp-popup-option-hover: #edf3ee;
-  --erp-popup-option-selected: #dbe9de;
+  --erp-popup-option-hover: var(--erp-primary-softer);
+  --erp-popup-option-selected: var(--erp-primary-soft);
   --erp-popup-danger-hover: #fff1f0;
   --erp-popup-danger-text: #ff4d4f;
 }

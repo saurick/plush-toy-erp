@@ -1,4 +1,9 @@
 import {
+  productionWipStatusMeta,
+  productionWipQualityInspectionMeta,
+  PRODUCTION_WIP_QUALITY_GATE_LABELS as PRODUCTION_QUALITY_GATE_LABELS,
+} from './productionWipModel.mjs'
+import {
   currentBusinessDate,
   unixSecondsToBusinessDate,
 } from './businessDate.mjs'
@@ -18,7 +23,10 @@ function clampPercent(value) {
 function dateKeyToUTC(dateKey) {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(String(dateKey || ''))) return null
   const time = Date.parse(`${dateKey}T00:00:00Z`)
-  return Number.isFinite(time) ? time : null
+  return Number.isFinite(time) &&
+    new Date(time).toISOString().slice(0, 10) === dateKey
+    ? time
+    : null
 }
 
 function dayDistance(fromDateKey, toDateKey) {
@@ -38,19 +46,19 @@ function normalizedText(value, fallback = '') {
 
 function salesDeliveryStatus(row, today) {
   if (row.lineStatus === 'canceled' || row.lifecycleStatus === 'canceled') {
-    return { key: 'cancelled', label: '已取消', rank: 6 }
+    return { key: 'cancelled', label: '已取消', rank: 7 }
   }
   if (!row.progressKnown) {
-    return { key: 'unknown', label: '进度待核对', rank: 0 }
+    return { key: 'unknown', label: '进度待核对', rank: 4 }
   }
   if (row.remaining <= 0) {
-    return { key: 'delivered', label: '已交付', rank: 5 }
+    return { key: 'delivered', label: '已交付', rank: 6 }
   }
   if (row.lifecycleStatus === 'closed' || row.lineStatus === 'closed') {
     return { key: 'closed', label: '已关闭未交完', rank: 1 }
   }
   if (!row.deliveryDate) {
-    return { key: 'unscheduled', label: '未排交期', rank: 2 }
+    return { key: 'unscheduled', label: '未排交期', rank: 3 }
   }
   const days = dayDistance(today, row.deliveryDate)
   if (days !== null && days < 0) {
@@ -64,10 +72,10 @@ function salesDeliveryStatus(row, today) {
     return {
       key: 'dueSoon',
       label: days === 0 ? '今天到期' : `${days} 天后到期`,
-      rank: 1,
+      rank: 2,
     }
   }
-  return { key: 'inProgress', label: '交付中', rank: 3 }
+  return { key: 'inProgress', label: '交付中', rank: 5 }
 }
 
 export function buildSalesDeliveryModel(items = [], options = {}) {
@@ -117,6 +125,9 @@ export function buildSalesDeliveryModel(items = [], options = {}) {
       overdue: rows.filter((row) => row.status.key === 'overdue').length,
       dueSoon: rows.filter((row) => row.status.key === 'dueSoon').length,
       unknown: rows.filter((row) => row.status.key === 'unknown').length,
+      closed: rows.filter((row) => row.status.key === 'closed').length,
+      unscheduled: rows.filter((row) => row.status.key === 'unscheduled')
+        .length,
       delivered: rows.filter((row) => row.status.key === 'delivered').length,
     },
   }
@@ -153,57 +164,35 @@ function purchaseArrivalStatus(order, today) {
   return { key: 'planned', label: '预计到货', rank: 3 }
 }
 
-function monthParts(monthKey) {
-  const match = /^(\d{4})-(\d{2})$/u.exec(String(monthKey || ''))
-  if (!match) return null
-  const year = Number(match[1])
-  const month = Number(match[2])
-  if (month < 1 || month > 12) return null
-  return { year, month }
+export function moveBusinessDate(dateKey, delta) {
+  const timestamp = dateKeyToUTC(dateKey)
+  if (timestamp === null || !Number.isInteger(delta)) return ''
+  return new Date(timestamp + delta * DAY_MS).toISOString().slice(0, 10)
 }
 
-export function normalizeMonthKey(value, fallbackDate = currentBusinessDate()) {
-  const valueParts = monthParts(value)
-  if (valueParts) {
-    return `${valueParts.year}-${String(valueParts.month).padStart(2, '0')}`
-  }
-  return String(fallbackDate).slice(0, 7)
-}
-
-export function moveMonthKey(monthKey, delta) {
-  const normalized = normalizeMonthKey(monthKey)
-  const parts = monthParts(normalized)
-  const date = new Date(
-    Date.UTC(parts.year, parts.month - 1 + Number(delta), 1)
+export function paginateVisualizationRows(
+  rows,
+  requestedPage = 1,
+  pageSize = 25
+) {
+  const size = Number.isSafeInteger(pageSize) && pageSize > 0 ? pageSize : 25
+  const pageCount = Math.max(1, Math.ceil(rows.length / size))
+  const page = Math.min(
+    pageCount,
+    Math.max(1, Math.floor(Number(requestedPage) || 1))
   )
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
-}
-
-export function monthLabel(monthKey) {
-  const parts = monthParts(normalizeMonthKey(monthKey))
-  return `${parts.year} 年 ${parts.month} 月`
-}
-
-function calendarDays(monthKey) {
-  const parts = monthParts(normalizeMonthKey(monthKey))
-  const first = new Date(Date.UTC(parts.year, parts.month - 1, 1))
-  const mondayOffset = (first.getUTCDay() + 6) % 7
-  const start = new Date(first.getTime() - mondayOffset * DAY_MS)
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(start.getTime() + index * DAY_MS)
-    const dateKey = date.toISOString().slice(0, 10)
-    return {
-      dateKey,
-      day: date.getUTCDate(),
-      inMonth: date.getUTCMonth() === parts.month - 1,
-      items: [],
-    }
-  })
+  return {
+    rows: rows.slice((page - 1) * size, page * size),
+    page,
+    pageSize: size,
+    total: rows.length,
+  }
 }
 
 export function buildPurchaseArrivalModel(orders = [], options = {}) {
   const today = options.today || currentBusinessDate()
-  const monthKey = normalizeMonthKey(options.monthKey, today)
+  const startDate =
+    dateKeyToUTC(options.startDate) !== null ? options.startDate : today
   const rows = (Array.isArray(orders) ? orders : []).map((item) => {
     const confirmedDate = unixDateKey(item?.supplier_confirmed_arrival_date)
     const expectedDate = unixDateKey(item?.expected_arrival_date)
@@ -230,22 +219,29 @@ export function buildPurchaseArrivalModel(orders = [], options = {}) {
     )
   })
 
-  const days = calendarDays(monthKey)
+  const days = Array.from({ length: 14 }, (_, index) => {
+    const dateKey = moveBusinessDate(startDate, index)
+    return { dateKey, day: Number(dateKey.slice(-2)), items: [] }
+  })
   const dayMap = new Map(days.map((day) => [day.dateKey, day]))
   rows.forEach((row) => dayMap.get(row.arrivalDate)?.items.push(row))
 
   return {
     rows,
     days,
-    monthKey,
-    monthLabel: monthLabel(monthKey),
-    unscheduled: rows.filter((row) => !row.arrivalDate),
+    startDate,
+    endDate: days.at(-1).dateKey,
+    unscheduled: rows.filter((row) => row.status.key === 'unscheduled'),
     counts: {
       total: rows.length,
       overdue: rows.filter((row) => row.status.key === 'overdue').length,
       dueSoon: rows.filter((row) => row.status.key === 'dueSoon').length,
-      confirmed: rows.filter((row) => row.confirmedDate).length,
-      unscheduled: rows.filter((row) => !row.arrivalDate).length,
+      confirmed: rows.filter(
+        (row) =>
+          row.confirmedDate && !['closed', 'cancelled'].includes(row.status.key)
+      ).length,
+      unscheduled: rows.filter((row) => row.status.key === 'unscheduled')
+        .length,
     },
   }
 }
@@ -253,6 +249,9 @@ export function buildPurchaseArrivalModel(orders = [], options = {}) {
 function financeDueStatus(row, today) {
   if (row.status === 'CANCELLED') {
     return { key: 'cancelled', label: '已取消', rank: 6 }
+  }
+  if (row.outstanding === null || row.amount === null || !row.currency) {
+    return { key: 'unknown', label: '金额待核对', rank: 2 }
   }
   if (row.status === 'SETTLED' || row.outstanding === 0) {
     return { key: 'settled', label: '已结清', rank: 5 }
@@ -295,7 +294,7 @@ export function buildFinanceDueModel(facts = [], options = {}) {
         sourceNo: normalizedText(item?.source_no, '来源单据已关联'),
         amount: decimalNumber(item?.amount),
         outstanding: decimalNumber(item?.outstanding_amount),
-        currency: normalizedText(item?.currency, '币种'),
+        currency: normalizedText(item?.currency),
         dueDate: unixDateKey(item?.due_at),
       }
       return { ...row, dueStatus: financeDueStatus(row, today) }
@@ -317,6 +316,7 @@ export function buildFinanceDueModel(facts = [], options = {}) {
       total: rows.length,
       overdue: rows.filter((row) => row.dueStatus.key === 'overdue').length,
       dueSoon: rows.filter((row) => row.dueStatus.key === 'dueSoon').length,
+      unknown: rows.filter((row) => row.dueStatus.key === 'unknown').length,
       unscheduled: rows.filter((row) => row.dueStatus.key === 'unscheduled')
         .length,
       settled: rows.filter((row) => row.dueStatus.key === 'settled').length,
@@ -329,9 +329,7 @@ function warehouseLabel(warehouse, warehouseID) {
   const code = normalizedText(warehouse?.code)
   if (name && code) return `${name}（${code}）`
   return (
-    name ||
-    code ||
-    (warehouseID ? `仓库 #${warehouseID}（未启用）` : '未分仓')
+    name || code || (warehouseID ? `仓库 #${warehouseID}（未启用）` : '未分仓')
   )
 }
 
@@ -508,26 +506,6 @@ export function buildProductionOrderOverviewModel(orders = [], options = {}) {
   }
 }
 
-const PRODUCTION_WIP_STATUS_LABELS = Object.freeze({
-  PLANNED: '待安排',
-  IN_PROGRESS: '本厂生产中',
-  OUTSOURCED: '外发加工中',
-  WAITING_QUALITY: '待品质检验',
-  ACCEPTED: '检验合格',
-  REJECTED: '检验不合格',
-  SPLIT: '已拆分',
-  CANCELLED: '已取消',
-})
-
-const PRODUCTION_QUALITY_GATE_LABELS = Object.freeze({
-  CUT_PIECE: '裁片检验',
-  SHELL: '皮套检验',
-  FINISHED_GOODS: '成品检验',
-  NEEDLE: '针检',
-  SAMPLING: '抽检',
-  CUSTOMER_ACCEPTANCE: '客户验货',
-})
-
 function countBy(items, keyOf) {
   const counts = new Map()
   items.forEach((item) => {
@@ -541,9 +519,14 @@ function productionStepState({ batches, inspections, hasDownstream }) {
   const activeBatches = batches.filter(
     (batch) => !['CANCELLED', 'SPLIT'].includes(batch.status)
   )
-  const hasRejectedQuality = inspections.some(
+  const activeBatchIDs = new Set(activeBatches.map((batch) => batch.id))
+  const activeInspections = inspections.filter(
     (inspection) =>
-      inspection.status === 'REJECTED' || inspection.result === 'REJECT'
+      activeBatchIDs.has(inspection.production_wip_batch_id) &&
+      inspection.status !== 'CANCELLED'
+  )
+  const hasRejectedQuality = activeInspections.some(
+    (inspection) => inspection.status === 'REJECTED'
   )
   if (
     hasRejectedQuality ||
@@ -552,7 +535,7 @@ function productionStepState({ batches, inspections, hasDownstream }) {
     return { key: 'exception', label: '需要处理' }
   }
   if (
-    inspections.some((inspection) => inspection.status === 'SUBMITTED') ||
+    activeInspections.some((inspection) => inspection.status === 'SUBMITTED') ||
     activeBatches.some((batch) => batch.status === 'WAITING_QUALITY')
   ) {
     return { key: 'quality', label: '等待质检' }
@@ -580,8 +563,7 @@ function batchSummary(batches) {
   if (batches.length === 0) return ''
   return Array.from(countBy(batches, (batch) => batch.status).entries())
     .map(
-      ([status, count]) =>
-        `${count} 批${PRODUCTION_WIP_STATUS_LABELS[status] || '状态待核对'}`
+      ([status, count]) => `${count} 批${productionWipStatusMeta(status).label}`
     )
     .join(' · ')
 }
@@ -622,8 +604,9 @@ export function buildProductionProcessModel(aggregate) {
       )
       const hasDownstream = itemBatches.some(
         (batch) =>
+          batch.status !== 'CANCELLED' &&
           (operationPosition.get(batch.production_order_operation_id) ?? -1) >
-          index
+            index
       )
       const state = productionStepState({
         batches: operationBatches,
@@ -647,6 +630,23 @@ export function buildProductionProcessModel(aggregate) {
         ),
         state,
         batchCount: operationBatches.length,
+        batches: operationBatches.map((batch) => ({
+          id: batch.id,
+          batchNo: normalizedText(batch.batch_no, '批次未编号'),
+          quantity: normalizedText(batch.quantity, '—'),
+          statusKey: batch.status,
+          status: productionWipStatusMeta(batch.status).label,
+        })),
+        inspections: operationInspections.map((inspection) => ({
+          id: inspection.id,
+          inspectionNo: normalizedText(
+            inspection.inspection_no,
+            '检验单未编号'
+          ),
+          gate:
+            PRODUCTION_QUALITY_GATE_LABELS[inspection.gate_code] || '品质检验',
+          status: productionWipQualityInspectionMeta(inspection).label,
+        })),
         batchSummary: batchSummary(operationBatches),
         executionText: activeModes
           .map((mode) => (mode === 'OUTSOURCED' ? '外发' : '本厂'))
@@ -676,10 +676,7 @@ export function buildProductionProcessModel(aggregate) {
   )
   const rejectedInspectionBatchIDs = new Set(
     inspections
-      .filter(
-        (inspection) =>
-          inspection.status === 'REJECTED' || inspection.result === 'REJECT'
-      )
+      .filter((inspection) => inspection.status === 'REJECTED')
       .map((inspection) => inspection.production_wip_batch_id)
   )
 

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
+import { writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import {
   assertSegmentAffordance,
   assertTabsAffordance,
   assertFilterAffordance,
 } from './controlAffordanceAssertions.mjs'
-import { writeFile } from 'node:fs/promises'
-import path from 'node:path'
 
 const fixturePath = '/__tab-motion-fixture'
 const fixtureHTML = `<!doctype html><html><head><meta charset="utf-8">
@@ -59,11 +59,11 @@ async function sampleMotion(
       }
       const samples = []
       items[config.targetIndex].click()
-      const start = performance.now()
+      const start = document.timeline.currentTime
       let reversed = false
       await new Promise((resolve) => {
-        const frame = () => {
-          const elapsed = performance.now() - start
+        const frame = (timestamp) => {
+          const elapsed = timestamp - start
           samples.push({ elapsed, ...read() })
           if (config.reverse && !reversed && elapsed >= 110) {
             items[0].click()
@@ -111,12 +111,16 @@ function assertMotion(result, label, reverse = false) {
   for (let index = 1; index < samples.length; index += 1) {
     const previous = samples[index - 1]
     const current = samples[index]
-    // Ignore frames where the runner itself was descheduled for a long time.
+    // Bound each step by the 220ms easing slope and one compositor frame of sampling skew.
+    // Long runner stalls do not measure an animation discontinuity.
     if (current.elapsed - previous.elapsed < 40) {
       assert(
         Math.hypot(current.x - previous.x, current.y - previous.y) / distance <
-          0.45,
-        `${label}: discontinuity between animation frames`
+          Math.min(
+            0.85,
+            0.15 + (4 * (current.elapsed - previous.elapsed)) / 220
+          ),
+        `${label}: discontinuity between animation frames ${JSON.stringify({ distance, previous, current })}`
       )
     }
   }
@@ -216,11 +220,11 @@ export function createTabMotionScenarios({ outputDir }) {
         const motionEvidence = []
         await page.locator('#unequal [data-sliding-ready="true"]').waitFor()
         if (mode === 'dark') {
-        await page.locator('#toggle-theme').click()
-        await page.waitForTimeout(460)
-      }
+          await page.locator('#toggle-theme').click()
+          await page.waitForTimeout(460)
+        }
         await assertSegmentAffordance(page.locator('#unequal .ant-segmented'))
-      await assertTabsAffordance(page.locator('#ant-tabs .ant-tabs'))
+        await assertTabsAffordance(page.locator('#ant-tabs .ant-tabs'))
         for (let index = 0; index < 3; index += 1) {
           assertActionBarRemountStable(
             await sampleActionBarRemount(page),
@@ -265,6 +269,10 @@ export function createTabMotionScenarios({ outputDir }) {
           await page.waitForTimeout(460)
           const reverse = await sampleMotion(page, id, { reverse: true })
           motionEvidence.push({ id, direction: 'reverse', ...reverse })
+          await writeFile(
+            path.join(outputDir, `global-tab-sliding-${mode}-frames.json`),
+            JSON.stringify(motionEvidence, null, 2)
+          )
           assertMotion(reverse, `${mode}/${id}/reverse`, true)
         }
         assertMotion(
@@ -321,6 +329,28 @@ export function createTabMotionScenarios({ outputDir }) {
         )
         await assertAligned(page, 'equal')
         await assertAligned(page, 'dev-nav')
+        const overflow = await page
+          .locator('#overflow-tabs')
+          .evaluate((root) => {
+            const strip = root.querySelector('.ant-tabs-nav-list')
+            const viewport = root.querySelector('.ant-tabs-nav-wrap')
+            const items = [...strip.querySelectorAll('.ant-tabs-tab')]
+            return {
+              stripWidth: strip.getBoundingClientRect().width,
+              viewportWidth: viewport.getBoundingClientRect().width,
+              lastRight: items.at(-1).offsetLeft + items.at(-1).offsetWidth,
+              pageOverflow: document.documentElement.scrollWidth - innerWidth,
+            }
+          })
+        assert(
+          overflow.stripWidth > overflow.viewportWidth,
+          '长标签在页签内部滚动'
+        )
+        assert(
+          overflow.stripWidth >= overflow.lastRight,
+          '底轨完整包住全部选项'
+        )
+        assert(overflow.pageOverflow <= 1, '长页签不能撑宽页面')
         assertMotion(
           await sampleMotion(page, 'dev-nav', { targetIndex: 2 }),
           `${mode}/wrapped tabs`
@@ -382,7 +412,7 @@ export function createTabMotionScenarios({ outputDir }) {
     .concat([
       {
         name: 'dev-control-standards',
-        path: '/__dev/prototypes?controls=1',
+        path: '/__dev/ui-design?controls=1',
         viewport: { width: 1440, height: 1050 },
         verify: async (page) => {
           const dialog = page.getByRole('dialog', {

@@ -33,6 +33,7 @@ import {
   useBusinessColumnOrder,
 } from '../business-list/BusinessListToolbarActions.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
+import { canReadProductionExceptionDecisions } from '../../utils/productionRecordViews.mjs'
 import { resolveProductionExceptionActionAvailability } from '../../utils/operationalActionAvailability.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
@@ -82,19 +83,6 @@ const EXECUTION_FILTER_OPTIONS = [
   { label: EXECUTION_LABELS.APPLIED, value: 'APPLIED' },
   { label: EXECUTION_LABELS.REVERSED, value: 'REVERSED' },
 ]
-const READ_PERMISSIONS = Object.freeze([
-  'pmc.risk.read',
-  'production.fact.read',
-  'production.exception.submit',
-  'production.exception.approve',
-])
-
-export function canReadProductionExceptionDecisions(adminProfile) {
-  return READ_PERMISSIONS.some((permission) =>
-    hasActionPermission(adminProfile, permission)
-  )
-}
-
 function mutationReceiptMatches(item, action, reason, actorID) {
   const record = action?.record
   if (
@@ -130,7 +118,6 @@ export default function ProductionExceptionDecisionPanel({
   adminProfile,
   onRefreshReady,
   onSummaryChange,
-  tableHeader,
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
@@ -788,7 +775,6 @@ export default function ProductionExceptionDecisionPanel({
         </SelectionActionBar>
       </BusinessOperationPanel>
       <Card className="erp-business-data-table-card erp-business-module-table-card">
-        {tableHeader}
         <Alert
           type="info"
           showIcon

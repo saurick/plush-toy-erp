@@ -3,6 +3,7 @@ import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
 import { assertTaskEventTrailMarkers } from './taskEventTrailAssertions.mjs'
+import { createTaskDrawerAppearanceScenarios } from './taskDrawerAppearanceScenarios.mjs'
 
 export function createDashboardTaskScenarios({
   expectText,
@@ -29,6 +30,13 @@ export function createDashboardTaskScenarios({
   assertDarkThemeNeutralInteractions,
 }) {
   return [
+    ...createTaskDrawerAppearanceScenarios({
+      assert,
+      path,
+      outputDir,
+      customerRuntimeEffectiveSession,
+      assertTaskActionDrawerLayout,
+    }),
     {
       name: 'erp-task-board-desktop',
       path: '/erp/task-board',
@@ -264,7 +272,6 @@ export function createDashboardTaskScenarios({
         await moreFilters.click()
         const layoutSearch = page.getByPlaceholder('订单 / 产品 / 物料 / 款号')
         await layoutSearch.fill('布局验证无匹配任务')
-        await layoutSearch.press('Enter')
         await expectText(page, '当前分类暂无匹配任务')
         await page
           .locator('.erp-task-board-controls')
@@ -556,8 +563,8 @@ export function createDashboardTaskScenarios({
                   Boolean(contentRect && connectorTop < contentRect.top - 1),
                 contentBelowMarker: Boolean(
                   markerRect &&
-                    contentRect &&
-                    contentRect.top >= markerRect.bottom + 4
+                  contentRect &&
+                  contentRect.top >= markerRect.bottom + 4
                 ),
               }
             })
@@ -600,9 +607,9 @@ export function createDashboardTaskScenarios({
           const rect = wrapper?.getBoundingClientRect()
           return Boolean(
             rect &&
-              rect.width >= 480 &&
-              rect.left >= 0 &&
-              rect.right <= window.innerWidth
+            rect.width >= 480 &&
+            rect.left >= 0 &&
+            rect.right <= window.innerWidth
           )
         })
         await page.screenshot({
@@ -992,9 +999,7 @@ export function createDashboardTaskScenarios({
               ?.getBoundingClientRect()
             const lanes = document.querySelector('.erp-task-board-lanes')
             const metricButtons = [
-              ...document.querySelectorAll(
-                '.erp-task-progress-rail__value'
-              ),
+              ...document.querySelectorAll('.erp-task-progress-rail__value'),
             ]
             const content = document.querySelector('.erp-admin-content')
             const summaryRect = summary?.getBoundingClientRect()
@@ -1128,6 +1133,14 @@ export function createDashboardTaskScenarios({
         await page.keyboard.press('Escape')
         await focusedListDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
         const focusedListEntry = focusedListRow.locator('.erp-task-title-entry')
+        await page.waitForFunction(
+          () =>
+            document.querySelector(
+              '.erp-task-board-lane--focused .erp-task-title-entry'
+            ) === document.activeElement,
+          undefined,
+          { timeout: 3000 }
+        )
         assert.equal(
           await focusedListEntry.evaluate(
             (button) => document.activeElement === button
@@ -1225,9 +1238,9 @@ export function createDashboardTaskScenarios({
             scrollTop: content?.scrollTop || 0,
             paginationVisible: Boolean(
               contentRect &&
-                paginationRect &&
-                paginationRect.top >= contentRect.top &&
-                paginationRect.bottom <= contentRect.bottom
+              paginationRect &&
+              paginationRect.top >= contentRect.top &&
+              paginationRect.bottom <= contentRect.bottom
             ),
           }
         })
@@ -1294,9 +1307,9 @@ export function createDashboardTaskScenarios({
             lanesTopError: Math.abs((lanesRect?.top || 0) - expectedTop),
             firstCardVisible: Boolean(
               contentRect &&
-                firstCardRect &&
-                firstCardRect.top >= contentRect.top &&
-                firstCardRect.top < contentRect.bottom
+              firstCardRect &&
+              firstCardRect.top >= contentRect.top &&
+              firstCardRect.top < contentRect.bottom
             ),
           }
         })
@@ -1461,7 +1474,6 @@ export function createDashboardTaskScenarios({
         const taskBoardSearch =
           page.getByPlaceholder('订单 / 产品 / 物料 / 款号')
         await taskBoardSearch.fill('RB-018')
-        await taskBoardSearch.press('Enter')
         await page.waitForFunction(
           () =>
             new URLSearchParams(window.location.search).get('q') === 'RB-018'
@@ -1489,9 +1501,10 @@ export function createDashboardTaskScenarios({
           'OUT-DASH-NAV'
         )
         await taskBoardSearch.fill('OUT-DASH-NAV')
-        await taskBoardSearch.press('Enter')
-        await page.waitForFunction(() =>
-          new URLSearchParams(window.location.search).has('q')
+        await page.waitForFunction(
+          () =>
+            new URLSearchParams(window.location.search).get('q') ===
+            'OUT-DASH-NAV'
         )
         await page.evaluate(async () => {
           const response = await fetch('/rpc/workflow', {
@@ -1559,7 +1572,7 @@ export function createDashboardTaskScenarios({
           .filter({ has: navigationTaskCard })
         await clickTaskCardContent(
           navigationCard,
-          navigationCard.locator('.erp-task-board-card-title')
+          navigationCard.locator('.erp-task-identity__heading')
         )
         const taskDrawer = page.locator('.erp-task-action-drawer')
         await taskDrawer.waitFor({ state: 'visible', timeout: 10_000 })
@@ -1900,9 +1913,7 @@ export function createDashboardTaskScenarios({
               focusWithin: Boolean(affix?.matches(':focus-within')),
               sharedWrapper: Boolean(
                 affix?.classList.contains('erp-business-filter-control') &&
-                  affix?.classList.contains(
-                    'erp-business-filter-control--search'
-                  )
+                affix?.classList.contains('erp-business-filter-control--search')
               ),
               hasInputSearchAncestor: Boolean(
                 input.closest('.ant-input-search')
@@ -1989,12 +2000,12 @@ export function createDashboardTaskScenarios({
             emptySearchFocusMetrics.affixRect &&
             emptySearchFocusMetrics.inputRect &&
             emptySearchFocusMetrics.prefixRect &&
-            emptySearchFocusMetrics.affixRect.height >= 35 &&
-            emptySearchFocusMetrics.affixRect.height <= 37 &&
-            emptySearchFocusMetrics.inputRect.height >= 33 &&
-            emptySearchFocusMetrics.inputRect.height <= 35 &&
-            emptySearchFocusMetrics.inputLineHeight >= 33 &&
-            emptySearchFocusMetrics.inputLineHeight <= 35 &&
+            emptySearchFocusMetrics.affixRect.height >= 34 &&
+            emptySearchFocusMetrics.affixRect.height <= 34 &&
+            emptySearchFocusMetrics.inputRect.height >= 32 &&
+            emptySearchFocusMetrics.inputRect.height <= 32 &&
+            emptySearchFocusMetrics.inputLineHeight >= 32 &&
+            emptySearchFocusMetrics.inputLineHeight <= 32 &&
             emptySearchFocusMetrics.inputPaddingBlockStart === 0 &&
             emptySearchFocusMetrics.inputPaddingBlockEnd === 0 &&
             emptySearchFocusMetrics.prefixRect.right <=
@@ -2015,7 +2026,7 @@ export function createDashboardTaskScenarios({
             ) <= 1 &&
             emptySearchFocusMetrics.controlRects.length === 3 &&
             emptySearchFocusMetrics.controlRects.every(
-              ({ height }) => height >= 35 && height <= 37
+              ({ height }) => Math.abs(height - 34) < 1
             ) &&
             emptySearchFocusMetrics.controlRowCount >= 1 &&
             emptySearchFocusMetrics.controlRowCount <= 2,
@@ -2035,7 +2046,6 @@ export function createDashboardTaskScenarios({
             'erp-task-board-search-shared-filled-focused-adjacent.png'
           ),
         })
-        await taskBoardSearch.press('Enter')
         await page
           .locator('.erp-task-board-card')
           .filter({ hasText: '看板跳转测试任务' })
@@ -2230,7 +2240,9 @@ export function createDashboardTaskScenarios({
       auth: 'admin',
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectText(page, '超级管理员')
+        await page
+          .getByRole('button', { name: /^账号菜单：系统管理员/u })
+          .waitFor({ state: 'visible' })
         await page
           .getByRole('region', { name: '工作台', exact: true })
           .waitFor({ state: 'visible' })
@@ -2302,7 +2314,9 @@ export function createDashboardTaskScenarios({
         })
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '移动端任务处理回归')
-        await expectText(page, '超级管理员')
+        await page
+          .getByRole('button', { name: /^账号菜单：系统管理员/u })
+          .waitFor({ state: 'visible' })
         await page
           .getByRole('region', { name: '任务看板', exact: true })
           .waitFor({ state: 'visible' })
@@ -2513,7 +2527,6 @@ export function createDashboardTaskScenarios({
         await page
           .getByPlaceholder('订单 / 产品 / 物料 / 款号')
           .fill('OUT-DASH-WIDE-LAYOUT')
-        await page.getByPlaceholder('订单 / 产品 / 物料 / 款号').press('Enter')
         await expectText(page, '宽屏重叠回归任务')
         await assertTextAbsent(page, '当前选中任务')
         await page

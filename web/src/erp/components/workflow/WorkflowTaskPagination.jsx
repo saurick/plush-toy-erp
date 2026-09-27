@@ -23,31 +23,33 @@ export default function WorkflowTaskPagination({
   loading = false,
   error = false,
   onChange,
+  recordLabel = '任务',
+  unit = '项',
 }) {
   const screens = Grid.useBreakpoint()
   const compact = screens.md === false
   const start = total > 0 ? (current - 1) * pageSize + 1 : 0
   const end = Math.min(current * pageSize, total)
   return (
-    <nav className="erp-task-pagination" aria-label="任务分页">
+    <nav className="erp-task-pagination" aria-label={`${recordLabel}分页`}>
       <div className="erp-task-pagination__summary">
         <span role="status">
           {loading
-            ? '正在加载任务…'
+            ? `正在加载${recordLabel}…`
             : error
-              ? '任务加载失败'
+              ? `${recordLabel}加载失败`
               : compact
-                ? `${start}–${end} / ${total} 项`
-                : `第 ${start}–${end} 项，共 ${total} 项`}
+                ? `${start}–${end} / ${total} ${unit}`
+                : `第 ${start}–${end} ${unit}，共 ${total} ${unit}`}
         </span>
         <Select
-          aria-label="每页任务数"
+          aria-label={`每页${recordLabel}数`}
           value={pageSize}
           disabled={loading}
           showSearch={false}
           options={TASK_BOARD_PAGE_SIZE_OPTIONS.map((value) => ({
             value,
-            label: `${value} 项 / 页`,
+            label: `${value} ${unit} / 页`,
           }))}
           onChange={(size) => onChange(1, size)}
         />

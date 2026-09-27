@@ -49,7 +49,7 @@ test('approval responsibility panel exposes only the three configurable approval
     source,
     /APPROVAL_KEYS = \['sales_order', 'purchase_order', 'shipment_finance'\]/
   )
-  assert.match(source, /为三项可配置审批指定主办、备用和升级责任/)
+  assert.match(source, /设置审批条件，以及主办、备用和升级责任/)
   assert.doesNotMatch(source, /付款审批|暂不可配置/)
   assert.match(source, /保存并生效/)
   assert.match(source, /确认并生效/)
@@ -96,7 +96,7 @@ test('approval responsibility panel protects modal and page drafts', () => {
     source,
     /message\.success\(\{\s*key: APPROVAL_SETTINGS_RESULT_MESSAGE_KEY/
   )
-  assert.match(source, /放弃本次责任调整/)
+  assert.match(source, /放弃本次审批设置调整/)
   assert.match(source, /discardVersion/)
   assert.match(source, /\[active, discardVersion, load, refreshVersion\]/)
   assert.doesNotMatch(source, /const requestReload = \(\) =>/)

@@ -1,5 +1,9 @@
 import React from 'react'
 import { Button, Form, Input, Select, Space, Typography } from 'antd'
+import { DeleteOutlined } from '@ant-design/icons'
+import BusinessCompactFieldTable, {
+  BusinessCompactFieldRow,
+} from '../business-list/BusinessCompactFieldTable.jsx'
 import { CHECK_RESULT_LABELS } from '../../utils/incomingAcceptance.mjs'
 
 export function IncomingCheckItemsForm() {
@@ -11,80 +15,99 @@ export function IncomingCheckItemsForm() {
       <Form.List name="check_items">
         {(fields, { add, remove }) => (
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            {fields.map(({ key, name, ...rest }) => (
-              <div
-                key={key}
-                className="erp-business-action-form erp-business-action-form--grid"
-                style={{
-                  border: '1px solid var(--ant-color-border, #d9d9d9)',
-                  borderRadius: 6,
-                  padding: 12,
-                }}
-              >
-                <Form.Item
-                  {...rest}
-                  name={[name, 'name']}
+            <BusinessCompactFieldTable
+              label="来料检查项"
+              columns={[
+                { label: '检查项目', required: true, width: '19%' },
+                { label: '检查结果', width: '12%' },
+                { label: '要求 / 依据', width: '18%' },
+                { label: '实际情况', width: '18%' },
+                { label: '检查范围', width: '12%' },
+                { label: '说明 / 抽检范围' },
+                { label: '操作', width: 52 },
+              ]}
+            >
+              {fields.map(({ key, name, ...rest }) => (
+                <BusinessCompactFieldRow
+                  key={key}
                   label={`检查项目 ${name + 1}`}
-                  rules={[{ required: true, message: '请填写检查项目' }]}
-                >
-                  <Input
-                    maxLength={80}
-                    placeholder="如色差、克重、异味，或其他检查项"
-                  />
-                </Form.Item>
-                <Form.Item {...rest} name={[name, 'result']} label="检查结果">
-                  <Select
-                    options={Object.entries(CHECK_RESULT_LABELS).map(
-                      ([value, label]) => ({ value, label })
-                    )}
-                  />
-                </Form.Item>
-                <Form.Item
-                  {...rest}
-                  name={[name, 'requirement']}
-                  label="要求 / 依据"
-                >
-                  <Input
-                    maxLength={255}
-                    placeholder="采购约定、确认样或具体要求"
-                  />
-                </Form.Item>
-                <Form.Item
-                  {...rest}
-                  name={[name, 'observation']}
-                  label="实际情况"
-                >
-                  <Input maxLength={255} placeholder="填写观察或测量结果" />
-                </Form.Item>
-                <Form.Item {...rest} name={[name, 'scope']} label="检查范围">
-                  <Select
-                    allowClear
-                    placeholder="请选择"
-                    options={[
-                      { value: 'FULL', label: '全检' },
-                      { value: 'SAMPLE', label: '抽检' },
-                    ]}
-                  />
-                </Form.Item>
-                <Form.Item
-                  {...rest}
-                  name={[name, 'note']}
-                  label="说明 / 抽检范围"
-                >
-                  <Input
-                    maxLength={500}
-                    placeholder="抽检数量、位置、不适用原因等"
-                  />
-                </Form.Item>
-                <Button
-                  size="small"
-                  style={{ gridColumn: '1 / -1', justifySelf: 'start' }}
-                  onClick={() => remove(name)}
-                >
-                  移除此检查项
-                </Button>
-              </div>
-            ))}
+                  cells={[
+                    <Form.Item
+                      {...rest}
+                      name={[name, 'name']}
+                      label={`检查项目 ${name + 1}`}
+                      rules={[{ required: true, message: '请填写检查项目' }]}
+                    >
+                      <Input
+                        maxLength={80}
+                        placeholder="如色差、克重、异味，或其他检查项"
+                      />
+                    </Form.Item>,
+                    <Form.Item
+                      {...rest}
+                      name={[name, 'result']}
+                      label="检查结果"
+                    >
+                      <Select
+                        options={Object.entries(CHECK_RESULT_LABELS).map(
+                          ([value, label]) => ({ value, label })
+                        )}
+                      />
+                    </Form.Item>,
+                    <Form.Item
+                      {...rest}
+                      name={[name, 'requirement']}
+                      label="要求 / 依据"
+                    >
+                      <Input
+                        maxLength={255}
+                        placeholder="采购约定、确认样或具体要求"
+                      />
+                    </Form.Item>,
+                    <Form.Item
+                      {...rest}
+                      name={[name, 'observation']}
+                      label="实际情况"
+                    >
+                      <Input maxLength={255} placeholder="填写观察或测量结果" />
+                    </Form.Item>,
+                    <Form.Item
+                      {...rest}
+                      name={[name, 'scope']}
+                      label="检查范围"
+                    >
+                      <Select
+                        allowClear
+                        placeholder="请选择"
+                        options={[
+                          { value: 'FULL', label: '全检' },
+                          { value: 'SAMPLE', label: '抽检' },
+                        ]}
+                      />
+                    </Form.Item>,
+                    <Form.Item
+                      {...rest}
+                      name={[name, 'note']}
+                      label="说明 / 抽检范围"
+                    >
+                      <Input
+                        maxLength={500}
+                        placeholder="抽检数量、位置、不适用原因等"
+                      />
+                    </Form.Item>,
+                  ]}
+                  actions={
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      aria-label={`移除此检查项 ${name + 1}`}
+                      onClick={() => remove(name)}
+                    />
+                  }
+                />
+              ))}
+            </BusinessCompactFieldTable>
             <Button
               disabled={fields.length >= 50}
               onClick={() => add({ result: 'NOT_CHECKED' })}

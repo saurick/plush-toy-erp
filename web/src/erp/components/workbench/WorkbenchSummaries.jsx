@@ -6,7 +6,7 @@ import SalesOrderSummaryPanel from './SalesOrderSummaryPanel.jsx'
 import EngineeringMaterialSummaryPanel from './EngineeringMaterialSummaryPanel.jsx'
 import './workbenchSummaries.css'
 
-export default function WorkbenchSummaries({ options }) {
+export default function WorkbenchSummaries({ options, refreshRevision = 0 }) {
   const [params, setParams] = useSearchParams()
   const { adminProfile } = useOutletContext() || {}
   const selected =
@@ -36,9 +36,15 @@ export default function WorkbenchSummaries({ options }) {
         )}
       </div>
       {selected === 'sales-orders' ? (
-        <SalesOrderSummaryPanel key={`sales:${accessKey}`} />
+        <SalesOrderSummaryPanel
+          key={`sales:${accessKey}`}
+          refreshRevision={refreshRevision}
+        />
       ) : (
-        <EngineeringMaterialSummaryPanel key={`materials:${accessKey}`} />
+        <EngineeringMaterialSummaryPanel
+          key={`materials:${accessKey}`}
+          refreshRevision={refreshRevision}
+        />
       )}
     </section>
   )

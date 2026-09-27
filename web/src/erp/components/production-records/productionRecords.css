@@ -1,0 +1,35 @@
+.erp-production-record-workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.erp-production-record-workspace > .erp-production-record-tabs {
+  flex: 0 0 auto;
+  margin: 0 0 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+
+.erp-production-record-tabs > .ant-tabs-nav {
+  margin: 0;
+}
+
+.erp-production-record-tabs > .ant-tabs-content-holder {
+  display: none;
+}
+
+.erp-production-record-workspace > .erp-business-page-layout {
+  min-height: 0;
+}
+
+.erp-production-record-workspace:has(
+    > .erp-business-page-layout[data-business-form-editing='true']
+  )
+  > .erp-production-record-tabs {
+  display: none;
+}

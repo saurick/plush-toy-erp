@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react'
 import { Alert, Descriptions, Form, Input, Radio, Select } from 'antd'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
@@ -64,6 +66,7 @@ export default function OutsourcingOrderSourceFactModal({
   onSubmit,
 }) {
   const [form] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open)
   const editing = mode === 'edit'
   const lotSelection = Form.useWatch('lot_selection', form)
   const copy = actionCopy(actionType)
@@ -317,6 +320,7 @@ export default function OutsourcingOrderSourceFactModal({
           name="quantity"
           label="本次办理数量"
           rules={[
+            unitQuantityRuleFromOptions(quantityUnitOptions, item?.unit_id),
             { required: true, message: '请填写办理数量' },
             {
               validator: (_, value) => {

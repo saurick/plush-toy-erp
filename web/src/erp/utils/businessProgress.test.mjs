@@ -11,6 +11,7 @@ import {
   progressDelivery,
   progressStatusLabel,
   progressSourcePath,
+  progressStages,
 } from './businessProgress.mjs'
 
 test('progress responses reject missing, malformed and duplicate records instead of showing zero', () => {
@@ -98,6 +99,17 @@ test('URL state preserves filters while bounding paging and ignoring unsupported
   assert.equal(bad.scope, 'active')
   assert.equal(bad.offset, 0)
   assert.equal(bad.date_from, '')
+  for (const pageSize of [8, 20, 50]) {
+    const paged = progressQueryFromURL(
+      new URLSearchParams(`page=2&page_size=${pageSize}`)
+    )
+    assert.equal(paged.limit, pageSize)
+    assert.equal(paged.offset, pageSize)
+  }
+  assert.equal(
+    progressQueryFromURL(new URLSearchParams('page_size=1000')).limit,
+    20
+  )
 })
 test('source links identify the source record and keep task codes encoded', () => {
   assert.equal(
@@ -111,5 +123,93 @@ test('source links identify the source record and keep task codes encoded', () =
   assert.equal(
     progressSourcePath({ kind: 'task', number: 'TASK + 1' }),
     '/erp/task-board?q=TASK%20%2B%201&status=all'
+  )
+})
+
+test('stage summaries preserve independent facts, missing values and permission boundaries', () => {
+  const access = { production: true, wip: true }
+  const row = progressFixtureRow()
+  const stages = progressStages(
+    { ...row, waiting_batches: 2, rejected_batches: 1 },
+    access
+  )
+  assert.equal(
+    stages.find((stage) => stage.key === 'engineering').text,
+    '1/1 确认'
+  )
+  assert.equal(
+    stages.find((stage) => stage.key === 'materials').text,
+    '1 项待领'
+  )
+  assert.equal(
+    stages.find((stage) => stage.key === 'quality').text,
+    '2 批待检 · 1 批不合格'
+  )
+  assert.equal(stages.find((stage) => stage.key === 'engineering').percent, 100)
+  assert.equal(stages.find((stage) => stage.key === 'materials').percent, 75)
+  assert.equal(stages.find((stage) => stage.key === 'shipment').percent, 50)
+  assert.equal(
+    stages.find((stage) => stage.key === 'production').percent,
+    undefined
+  )
+  assert.equal(
+    stages.find((stage) => stage.key === 'quality').percent,
+    undefined
+  )
+  const empty = progressStages(
+    { ...row, engineering_total: 0, material_total: 0, material_pending: 0 },
+    access
+  )
+  assert.equal(empty[0].text, '待完善')
+  assert.equal(empty[1].text, '待核对')
+  assert.equal(empty[0].percent, undefined)
+  assert.equal(empty[1].percent, undefined)
+  const restricted = progressStages(row, { production: false, wip: false })
+  assert(
+    restricted
+      .filter((stage) =>
+        ['materials', 'production', 'quality'].includes(stage.key)
+      )
+      .every(
+        (stage) =>
+          stage.disabled &&
+          stage.text === '无权限' &&
+          !stage.tone &&
+          stage.percent === undefined
+      )
+  )
+  const production = progressStages(progressFixtureRow(0, 'production'), access)
+  assert(!production.some((stage) => stage.key === 'engineering'))
+  assert.equal(
+    production.find((stage) => stage.key === 'production').percent,
+    70
+  )
+  const mixed = progressStages(progressFixtureRow(2), access)
+  assert.equal(
+    mixed.find((stage) => stage.key === 'shipment').percent,
+    undefined
+  )
+  assert.equal(
+    production.find((stage) => stage.key === 'production').section,
+    'batches'
+  )
+  const noBatch = progressStages(
+    {
+      ...row,
+      in_progress_batches: 0,
+      outsourced_batches: 0,
+      planned_batches: 0,
+      current_operation: '',
+      production_orders: 0,
+    },
+    access
+  )
+  assert.equal(
+    noBatch.find((stage) => stage.key === 'production').text,
+    '未关联'
+  )
+  assert.equal(
+    noBatch.find((stage) => stage.key === 'production').section,
+    'production'
   )
 })

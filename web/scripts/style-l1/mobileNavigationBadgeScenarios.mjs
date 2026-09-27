@@ -1,5 +1,7 @@
+import { pullToRefresh } from './mobileGestureAssertions.mjs'
 import path from 'node:path'
 import { progressFixtureData } from './businessProgressFixtures.mjs'
+import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 
 export function createMobileNavigationBadgeScenarios({
   assert,
@@ -74,7 +76,7 @@ export function createMobileNavigationBadgeScenarios({
       },
       workflowTaskFixtures: [task],
       beforeNavigate: async (page) => {
-        currentCounts = summary(124, 7, 3)
+        currentCounts = summary(22, 124, 3)
         fail = withProgress
         countRequests.length = 0
         await page.route('**/rpc/workflow', async (route) => {
@@ -143,7 +145,7 @@ export function createMobileNavigationBadgeScenarios({
           fail = false
           await retry.tap()
         }
-        await expectCounts('99+', '7')
+        await expectCounts('22', '99+')
         assert.deepEqual(
           await nav
             .getByRole('tab')
@@ -162,7 +164,7 @@ export function createMobileNavigationBadgeScenarios({
                 document.getElementById(node.getAttribute('aria-describedby'))
                   ?.textContent
             ),
-          '124 项待办'
+          '22 项待办'
         )
         assert.equal(await nav.locator('.mobile-navigation-badge').count(), 2)
         await page.getByTestId('mobile-role-nav-tasks').tap()
@@ -181,17 +183,63 @@ export function createMobileNavigationBadgeScenarios({
         await page.screenshot({
           path: path.join(outputDir, `${name}-tasks.png`),
         })
+        await page.getByTestId('mobile-role-nav-messages').tap()
+        await nav.evaluate(async (node) => {
+          await Promise.allSettled(
+            node
+              .getAnimations({ subtree: true })
+              .map((animation) => animation.finished)
+          )
+        })
         const boxes = await nav.getByRole('tab').evaluateAll((nodes) =>
           nodes.map((node) => {
             const tab = node.getBoundingClientRect()
             const badge = node
               .querySelector('.mobile-navigation-badge')
               ?.getBoundingClientRect()
+            const icon = node
+              .querySelector('.mobile-navigation-icon')
+              ?.getBoundingClientRect()
+            const glyph = node
+              .querySelector('.mobile-navigation-icon > svg')
+              ?.getBoundingClientRect()
+            const label = node
+              .querySelector('.mobile-role-bottom-nav__label')
+              ?.getBoundingClientRect()
+            const badgeOverlap =
+              badge && glyph
+                ? {
+                    horizontal: Math.max(
+                      0,
+                      Math.min(badge.right, glyph.right) -
+                        Math.max(badge.left, glyph.left)
+                    ),
+                    vertical: Math.max(
+                      0,
+                      Math.min(badge.bottom, glyph.bottom) -
+                        Math.max(badge.top, glyph.top)
+                    ),
+                  }
+                : null
             return {
               tab: tab.toJSON(),
               badge: badge?.toJSON(),
               width: tab.width,
               height: tab.height,
+              contentInsets:
+                icon && label
+                  ? {
+                      top: icon.top - tab.top,
+                      bottom: tab.bottom - label.bottom,
+                      gap: label.top - icon.bottom,
+                    }
+                  : null,
+              badgeGlyphOcclusion:
+                badgeOverlap && glyph
+                  ? (badgeOverlap.horizontal * badgeOverlap.vertical) /
+                    (glyph.width * glyph.height)
+                  : 0,
+              badgeGlyphHorizontalOverlap: badgeOverlap?.horizontal || 0,
               contained:
                 !badge ||
                 (badge.left >= tab.left &&
@@ -204,22 +252,58 @@ export function createMobileNavigationBadgeScenarios({
         for (const box of boxes) {
           assert(box.width >= 44 && box.height >= 44)
           assert(
+            box.contentInsets &&
+              box.contentInsets.bottom >= 7 &&
+              box.contentInsets.gap >= 2 &&
+              Math.abs(box.contentInsets.top - box.contentInsets.bottom) <= 1.5,
+            `底部导航图标与文字应垂直居中并保留底部留白: ${JSON.stringify(box)}`
+          )
+          assert(
+            box.badgeGlyphHorizontalOverlap <= 4 &&
+              box.badgeGlyphOcclusion <= 0.12,
+            `底部导航角标只能轻触图标右上角，不得遮挡图标主体: ${JSON.stringify(box)}`
+          )
+          assert(
             box.contained,
             `badge must stay inside the tab touch target: ${JSON.stringify(box)}`
           )
         }
         const bounds = await nav.boundingBox()
         assert(bounds.y + bounds.height <= 844)
-        const colors = await nav
+        const paints = await nav
           .locator('.mobile-navigation-badge')
           .evaluateAll((nodes) =>
-            nodes.map((node) => getComputedStyle(node).backgroundColor)
+            nodes.map((node) => {
+              const style = getComputedStyle(node)
+              return {
+                foreground: style.color,
+                background: style.backgroundColor,
+                notification: style.getPropertyValue(
+                  '--erp-visual-danger-text'
+                ),
+              }
+            })
           )
-        assert.notEqual(colors[0], colors[1], 'risk has its own alert color')
+        for (const paint of paints) {
+          assert.deepEqual(
+            parseRgb(paint.background),
+            parseRgb(paint.notification),
+            '底部待办与风险角标统一使用高保真通知色'
+          )
+          assert.ok(
+            getContrastRatio(
+              parseRgb(paint.foreground),
+              parseRgb(paint.background)
+            ) >= 4.5,
+            '浅色和深色主题的角标数字保持可读'
+          )
+        }
         await nav.screenshot({
           path: path.join(outputDir, `${name}-navigation.png`),
         })
         await page.screenshot({ path: path.join(outputDir, `${name}.png`) })
+        await page.getByTestId('mobile-role-nav-tasks').tap()
+        await page.locator('.erp-mobile-list-item').first().waitFor()
 
         const searchResponse = page.waitForResponse((response) => {
           if (!response.url().endsWith('/rpc/workflow')) return false
@@ -236,23 +320,23 @@ export function createMobileNavigationBadgeScenarios({
         await page.waitForFunction(
           () => document.querySelectorAll('.erp-mobile-list-item').length === 0
         )
-        await expectCounts('99+', '7')
+        await expectCounts('22', '99+')
         await page.getByTestId('mobile-role-nav-messages').tap()
-        await expectCounts('99+', '7')
+        await expectCounts('22', '99+')
         await page.getByTestId('mobile-role-nav-mine').tap()
-        await expectCounts('99+', '7')
+        await expectCounts('22', '99+')
         await page.getByTestId('mobile-role-nav-tasks').tap()
         await page
           .getByLabel('任务状态', { exact: true })
           .getByText('已办', { exact: true })
           .tap()
         await page.getByText('已办任务', { exact: true }).waitFor()
-        await expectCounts('99+', '7')
+        await expectCounts('22', '99+')
 
         fail = true
         await page.evaluate(() => window.dispatchEvent(new Event('online')))
         await retry.waitFor()
-        await expectCounts('99+', '7')
+        await expectCounts('22', '99+')
         assert.equal(
           await nav
             .getByRole('tab', { name: '任务', exact: true })
@@ -261,7 +345,7 @@ export function createMobileNavigationBadgeScenarios({
                 document.getElementById(node.getAttribute('aria-describedby'))
                   ?.textContent
             ),
-          '124 项待办，数量待更新'
+          '22 项待办，数量待更新'
         )
         await page.screenshot({
           path: path.join(outputDir, `${name}-retry.png`),
@@ -273,7 +357,7 @@ export function createMobileNavigationBadgeScenarios({
         await retry.waitFor({ state: 'hidden' })
 
         currentCounts = summary(0, 0)
-        await page.getByRole('button', { name: '刷新', exact: true }).tap()
+        await pullToRefresh(page, page.getByTestId('mobile-role-scroll'))
         await todo.waitFor({ state: 'hidden' })
         await risk.waitFor({ state: 'hidden' })
         assert.equal(

@@ -1,16 +1,15 @@
-import { useEffect, useRef } from 'react'
-import { LeftOutlined } from '@ant-design/icons'
+import MobileDetailHeader from './MobileDetailHeader.jsx'
 
 const MOBILE_TASK_FLOW_STEPS = Object.freeze([
   {
     key: 'detail',
     number: '1',
-    title: '查看任务',
+    title: '任务信息',
   },
   {
     key: 'process',
     number: '2',
-    title: '处理任务',
+    title: '任务办理',
   },
   {
     key: 'result',
@@ -31,15 +30,9 @@ export default function MobileTaskFlowHeader({
   onOpenReceipt = null,
   processUnavailableLabel = '当前不可办理',
   receiptUnavailableLabel = '办理后开放',
-  title = '任务详情',
+  title = '任务信息',
   trailing = null,
 }) {
-  const titleRef = useRef(null)
-
-  useEffect(() => {
-    titleRef.current?.focus({ preventScroll: true })
-  }, [])
-
   const stepActions = {
     detail: onOpenDetail,
     process: onOpenProcess,
@@ -56,23 +49,13 @@ export default function MobileTaskFlowHeader({
   }
 
   return (
-    <header className="mobile-role-detail-header mobile-task-flow-header">
-      <div className="mobile-task-flow-topbar">
-        <button
-          type="button"
-          className="mobile-task-flow-back"
-          aria-label={backLabel}
-          disabled={busy}
-          onClick={onBack}
-        >
-          <LeftOutlined aria-hidden="true" />
-        </button>
-        <h1 ref={titleRef} className="mobile-task-flow-title" tabIndex={-1}>
-          {title}
-        </h1>
-        <div className="mobile-task-flow-trailing">{trailing}</div>
-      </div>
-
+    <MobileDetailHeader
+      title={title}
+      backLabel={backLabel}
+      onBack={onBack}
+      busy={busy}
+      trailing={trailing}
+    >
       <nav
         className="mobile-task-flow-steps"
         aria-label="任务处理步骤"
@@ -118,6 +101,6 @@ export default function MobileTaskFlowHeader({
           )
         })}
       </nav>
-    </header>
+    </MobileDetailHeader>
   )
 }

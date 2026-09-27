@@ -10,7 +10,15 @@ import {
   requireWorkflowTaskExplainParams,
   resolveWorkflowActionAccessRequestOutcome,
   workflowTaskActionAccessRequestIdentity,
+  workflowTaskAdminAccessRequestIdentity,
 } from './workflowTaskActionAccess.mjs'
+
+test('workflowTaskActionAccess: effective review roles participate in request identity', () => {
+  const profile = { id: 1, is_super_admin: true, effective_session: { roles: ['sales', 'warehouse'], actions: ['workflow.task.read'] } }
+  const original = workflowTaskAdminAccessRequestIdentity(profile)
+  assert.equal(original, workflowTaskAdminAccessRequestIdentity({ ...profile, effective_session: { ...profile.effective_session, roles: ['warehouse', 'sales'] } }))
+  assert.notEqual(original, workflowTaskAdminAccessRequestIdentity({ ...profile, effective_session: { ...profile.effective_session, roles: ['sales'] } }))
+})
 
 function admin(overrides = {}) {
   return {

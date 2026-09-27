@@ -264,12 +264,21 @@ export async function installSystemRpcMocks(page, context) {
           } else {
             adminProfile.erp_preferences.column_orders[moduleKey] = order
           }
+          if (Array.isArray(params?.hidden_columns)) {
+            adminProfile.erp_preferences.hidden_columns ||= {}
+            if (params.hidden_columns.length === 0) {
+              delete adminProfile.erp_preferences.hidden_columns[moduleKey]
+            } else {
+              adminProfile.erp_preferences.hidden_columns[moduleKey] = [...params.hidden_columns]
+            }
+          }
         }
         data = {
           erp_preferences: {
             column_orders: {
               ...adminProfile.erp_preferences.column_orders,
             },
+            hidden_columns: { ...adminProfile.erp_preferences.hidden_columns },
           },
         }
         break

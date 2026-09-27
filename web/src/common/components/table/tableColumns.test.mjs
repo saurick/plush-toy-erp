@@ -3,7 +3,7 @@ import test from 'node:test'
 import { readFileSync, readdirSync } from 'node:fs'
 import { normalizeTableColumns } from './tableColumns.mjs'
 
-test('table alignment centers short cells and headers while preserving text and number columns', () => {
+test('table headers follow their body alignment and default to the reading edge', () => {
   const render = (value) => value
   const columns = [
     { title: '状态', dataIndex: 'status' },
@@ -13,13 +13,13 @@ test('table alignment centers short cells and headers while preserving text and 
   const result = normalizeTableColumns(columns)
   assert.deepEqual(
     result.map((column) => column.align),
-    ['center', 'left', 'right']
+    ['left', 'left', 'right']
   )
   assert.equal(result[1].render, render)
   assert.equal(result[2].sorter, true)
   for (const column of result) {
     assert.deepEqual(column.onHeaderCell().style, {
-      textAlign: 'center',
+      textAlign: column.align,
       verticalAlign: 'middle',
     })
   }
@@ -47,11 +47,11 @@ test('grouped headers preserve callbacks and non-alignment styles while enforcin
   assert.equal(props['aria-label'], '采购')
   assert.deepEqual(props.style, {
     width: 120,
-    textAlign: 'center',
+    textAlign: 'left',
     verticalAlign: 'middle',
   })
   assert.equal(result[0].children[0].align, 'right')
-  assert.equal(result[0].children[0].onHeaderCell().style.textAlign, 'center')
+  assert.equal(result[0].children[0].onHeaderCell().style.textAlign, 'right')
   assert.deepEqual(normalizeTableColumns(), [])
 })
 

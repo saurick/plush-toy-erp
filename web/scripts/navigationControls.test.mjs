@@ -30,6 +30,14 @@ const mobileTaskOptionsSource = readFileSync(
   'utf8'
 )
 
+const mobileFilterSource = readFileSync(
+  new URL(
+    '../src/erp/mobile/components/MobileFilterPopover.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
+
 test('shared filter buttons use aria state without decorative check icons', () => {
   assert.match(filterChipSource, /aria-pressed=\{selected\}/u)
   assert.doesNotMatch(filterChipSource, /CheckOutlined|filter-chip__check/u)
@@ -48,8 +56,8 @@ test('shared selection controls use one neutral border token in every state', ()
 })
 
 test('mobile progress uses an anchored dropdown without desktop date inputs', () => {
-  assert.match(mobileProgressSource, /<Popover/u)
-  assert.match(mobileProgressSource, /mobile-progress-filter-popover/u)
+  assert.match(mobileProgressSource, /<MobileFilterPopover/u)
+  assert.match(mobileFilterSource, /<Popover/u)
   assert.equal(
     (mobileProgressSource.match(/<MobileSearchInput/gu) || []).length,
     1,
@@ -59,7 +67,10 @@ test('mobile progress uses an anchored dropdown without desktop date inputs', ()
   assert.doesNotMatch(mobileProgressSource, /mobile-progress-owner-filter/u)
   assert.match(mobileProgressSource, /IntersectionObserver/u)
   assert.match(mobileProgressSource, /继续下滑加载/u)
-  assert.doesNotMatch(mobileProgressSource, /上一页|下一页|mobile-progress-pagination/u)
+  assert.doesNotMatch(
+    mobileProgressSource,
+    /上一页|下一页|mobile-progress-pagination/u
+  )
   assert.doesNotMatch(mobileProgressSource, /<Drawer/u)
   assert.doesNotMatch(mobileProgressSource, /<DateInput/u)
   assert.doesNotMatch(mobileProgressSource, /type="date"/u)
@@ -70,8 +81,9 @@ test('mobile progress uses an anchored dropdown without desktop date inputs', ()
 })
 
 test('shallow mobile task filters use the same anchored dropdown pattern', () => {
-  assert.match(mobileTaskOptionsSource, /<Popover/u)
-  assert.match(mobileTaskOptionsSource, /mobile-task-filter-popover/u)
+  assert.match(mobileTaskOptionsSource, /<MobileFilterPopover/u)
+  assert.match(mobileFilterSource, /mobile-filter-popover/u)
+  assert.match(mobileFilterSource, /role="dialog"/u)
   assert.doesNotMatch(mobileTaskOptionsSource, /<Drawer/u)
 })
 

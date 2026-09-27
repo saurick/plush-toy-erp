@@ -7,7 +7,8 @@ import {
   buildProductionProcessModel,
   buildPurchaseArrivalModel,
   buildSalesDeliveryModel,
-  moveMonthKey,
+  moveBusinessDate,
+  paginateVisualizationRows,
 } from './businessVisualizationModels.mjs'
 
 const unix = (date) => Date.parse(`${date}T00:00:00Z`) / 1000
@@ -67,7 +68,7 @@ test('sales delivery keeps unknown shipment facts explicit and sorts risks first
   assert.equal(model.counts.delivered, 1)
 })
 
-test('purchase arrival uses supplier confirmation before expected date and builds a monday calendar', () => {
+test('purchase arrival uses supplier confirmation before expected date and builds an exact fourteen-day window', () => {
   const model = buildPurchaseArrivalModel(
     [
       {
@@ -84,19 +85,22 @@ test('purchase arrival uses supplier confirmation before expected date and build
         lifecycle_status: 'approved',
       },
     ],
-    { today: '2026-09-22', monthKey: '2026-09' }
+    { today: '2026-09-22', startDate: '2026-09-22' }
   )
 
   const confirmed = model.rows.find((row) => row.id === 1)
   assert.equal(confirmed.arrivalDate, '2026-09-24')
   assert.equal(confirmed.dateSource, 'confirmed')
-  assert.equal(model.days[0].dateKey, '2026-08-31')
+  assert.equal(model.days.length, 14)
+  assert.equal(model.days[0].dateKey, '2026-09-22')
+  assert.equal(model.days.at(-1).dateKey, '2026-10-05')
   assert.equal(
     model.days.find((day) => day.dateKey === '2026-09-24').items.length,
     1
   )
   assert.equal(model.unscheduled.length, 1)
-  assert.equal(moveMonthKey('2026-12', 1), '2027-01')
+  assert.equal(moveBusinessDate('2026-12-25', 14), '2027-01-08')
+  assert.equal(moveBusinessDate('2026-02-30', 1), '')
 })
 
 test('finance due uses outstanding facts without combining currencies', () => {
@@ -300,4 +304,98 @@ test('production process derives each product lane from authoritative operations
   assert.equal(model.counts.outsourced, 1)
   assert.equal(model.counts.waitingQuality, 1)
   assert.equal(model.lineageCount, 1)
+})
+
+test('visual pagination bounds 500 records and recovers after a narrower filter', () => {
+  const rows = Array.from({ length: 500 }, (_, id) => ({ id }))
+  const first = paginateVisualizationRows(rows)
+  const last = paginateVisualizationRows(rows, 20)
+  assert.equal(first.rows.length, 25)
+  assert.equal(last.rows[0].id, 475)
+  assert.equal(last.rows.at(-1).id, 499)
+  assert.equal(paginateVisualizationRows(rows.slice(0, 10), 20).page, 1)
+  assert.deepEqual(paginateVisualizationRows([], 20).rows, [])
+  assert.equal(paginateVisualizationRows(rows, -3).page, 1)
+})
+
+test('cancelled quality and downstream batches remain history without current risk or completion', () => {
+  const model = buildProductionProcessModel({
+    items: [{ id: 11 }],
+    operations: [
+      { id: 41, production_order_item_id: 11, step_no: 10 },
+      { id: 42, production_order_item_id: 11, step_no: 20 },
+    ],
+    batches: [
+      {
+        id: 31,
+        production_order_item_id: 11,
+        production_order_operation_id: 41,
+        status: 'PLANNED',
+      },
+      {
+        id: 32,
+        production_order_item_id: 11,
+        production_order_operation_id: 42,
+        status: 'CANCELLED',
+      },
+    ],
+    qualityInspections: [
+      {
+        id: 71,
+        production_wip_batch_id: 31,
+        status: 'CANCELLED',
+        result: 'REJECT',
+      },
+      {
+        id: 72,
+        production_wip_batch_id: 32,
+        status: 'REJECTED',
+        result: 'REJECT',
+      },
+    ],
+  })
+  assert.deepEqual(
+    model.items[0].steps.map((step) => step.state.key),
+    ['ready', 'waiting']
+  )
+  assert.equal(model.counts.exceptions, 0)
+  assert.equal(model.counts.activeBatches, 1)
+  assert.equal(model.items[0].steps[0].inspections.length, 1)
+})
+
+test('finance missing amounts or currency never become zero, settled or overdue', () => {
+  const rows = [
+    { id: 1, amount: null, outstanding_amount: null, currency: 'CNY' },
+    { id: 2, amount: '10', outstanding_amount: '5', currency: '' },
+  ].map((row) => ({
+    fact_type: 'RECEIVABLE',
+    status: 'POSTED',
+    due_at: unix('2026-09-01'),
+    ...row,
+  }))
+  const model = buildFinanceDueModel(rows, { today: '2026-09-26' })
+  assert.equal(model.counts.unknown, 2)
+  assert.equal(model.counts.overdue, 0)
+  assert.equal(model.counts.settled, 0)
+  assert.equal(model.rows[0].outstanding, null)
+})
+
+test('closed and cancelled purchasing orders never enter outstanding arrival reminders', () => {
+  const model = buildPurchaseArrivalModel(
+    [
+      { id: 1, lifecycle_status: 'closed' },
+      {
+        id: 2,
+        lifecycle_status: 'canceled',
+        expected_arrival_date: unix('2026-09-01'),
+      },
+      { id: 3, lifecycle_status: 'approved' },
+    ],
+    { today: '2026-09-26', startDate: '2026-12-30' }
+  )
+  assert.equal(model.counts.unscheduled, 1)
+  assert.equal(model.counts.overdue, 0)
+  assert.equal(model.startDate, '2026-12-30')
+  assert.equal(model.endDate, '2027-01-12')
+  assert.equal(model.rows.length, 3)
 })

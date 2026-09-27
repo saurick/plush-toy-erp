@@ -27,31 +27,11 @@ export function unitSuffixTextFromOptions(
   return fallback && !/#\d+/.test(fallback) ? fallback : ''
 }
 
-export function unitPrecisionFromOptions(unitOptions, unitID) {
-  const normalizedID = positiveID(unitID)
-  if (!normalizedID) return undefined
-  const matched = (Array.isArray(unitOptions) ? unitOptions : []).find(
-    (option) => Number(option?.value || 0) === normalizedID
-  )
-  const precision = Number(matched?.precision)
-  return Number.isInteger(precision) && precision >= 0 ? precision : undefined
-}
-
-export function isQuantityTextWithinUnitPrecision(value, precision) {
-  if (!Number.isInteger(precision) || precision < 0) return true
-  const text = normalizeText(value).replace(/,/g, '')
-  if (!text) return true
-  const matched = text.match(/^(?:\d+(?:\.(\d*))?|\.(\d+))$/)
-  if (!matched) return true
-  const fractionText = matched[1] ?? matched[2] ?? ''
-  return fractionText.length <= precision
-}
-
-export function unitPrecisionErrorMessage(precision) {
-  return precision === 0
-    ? '当前单位只允许整数数量'
-    : `当前单位最多允许 ${precision} 位小数`
-}
+export {
+  unitPrecisionFromOptions,
+  isQuantityTextWithinUnitPrecision,
+  unitPrecisionErrorMessage,
+} from '../../utils/unitQuantity.mjs'
 
 export function singleUnitSuffixTextFromOptions(unitOptions) {
   const options = Array.isArray(unitOptions) ? unitOptions : []

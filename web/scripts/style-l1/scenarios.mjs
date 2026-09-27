@@ -1,15 +1,25 @@
+import { createEmptyStateScenarios } from './emptyStateScenarios.mjs'
+import { createBusinessStatusCountsScenarios } from './businessStatusCountsScenarios.mjs'
+import { createBusinessFollowupScenarios } from './businessFollowupScenarios.mjs'
+import { createHighFidelityScenarios } from './highFidelityScenarios.mjs'
+import { createUnifiedInteractionScenarios } from './unifiedInteractionScenarios.mjs'
+import { createDevUIDesignDetailScenarios } from './devUIDesignDetailScenarios.mjs'
+import { createDevUIDesignWorkflowScenarios } from './devUIDesignWorkflowScenarios.mjs'
 import { createMobileProgressScenarios } from './mobileProgressScenarios.mjs'
 import { createMobileNavigationBadgeScenarios } from './mobileNavigationBadgeScenarios.mjs'
 import { createBusinessFormInteractionScenarios } from './businessFormInteractionScenarios.mjs'
 import { createBusinessPageContractScenarios } from './businessPageContractScenarios.mjs'
 import { createAuditLogScenarios } from './auditLogScenarios.mjs'
+import { createHistoryRecordScenarios } from './historyRecordScenarios.mjs'
 import { createTabMotionScenarios } from './tabMotionScenarios.mjs'
 import { createTableAlignmentScenarios } from './tableAlignmentScenarios.mjs'
+import { createBusinessTableScrollScenarios } from './businessTableScrollScenarios.mjs'
 import { createMobileTaskScenarios } from './mobileTaskScenarios.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
 import { createTaskImagePreviewScenarios } from './taskImagePreviewScenarios.mjs'
 import { createProductIdentityScenarios } from './productIdentityScenarios.mjs'
 import { createCustomerSessionScenarios } from './customerSessionScenarios.mjs'
+import { createHelpCenterScenarios } from './helpCenterScenarios.mjs'
 import { createAuthenticationEntryScenarios } from './authenticationEntryScenarios.mjs'
 import { createPrintWorkspaceScenarios } from './printWorkspaceScenarios.mjs'
 import { createPermissionCenterScenarios } from './permissionCenterScenarios.mjs'
@@ -20,8 +30,9 @@ import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleF
 import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
 
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
+import { createBusinessAttachmentScenarios } from './businessAttachmentScenarios.mjs'
 import { createBusinessActionStabilityScenarios } from './businessActionStabilityScenarios.mjs'
-import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPreviewScenarios.mjs'
+import { createBusinessDetailsScenarios } from './businessDetailsScenarios.mjs'
 import { createDevBusinessUsabilityScenarios } from './devBusinessUsabilityScenarios.mjs'
 import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservatoryScenarios.mjs'
 import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs'
@@ -29,6 +40,7 @@ import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 import { createDevWorkbenchDesktopScenarios } from './devWorkbenchDesktopScenarios.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
+import { createBusinessModuleNavigationScenarios } from './businessModuleNavigationScenarios.mjs'
 import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliveryScenarios.mjs'
 
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
@@ -40,6 +52,11 @@ import { createOutsourcingFormFieldsScenarios } from './outsourcingFormFieldsSce
 import { createSalesOrderImportValidationScenarios } from './salesOrderImportValidationScenarios.mjs'
 import { createBusinessCellTextScenarios } from './businessCellTextScenarios.mjs'
 import { createBusinessFieldDensityScenarios } from './businessFieldDensityScenarios.mjs'
+import { createDeliveryAddressScenarios } from './deliveryAddressScenarios.mjs'
+import { createContactEditorScenarios } from './contactEditorScenarios.mjs'
+import { createFormDensityScenarios } from './formDensityScenarios.mjs'
+import { createTableDensityScenarios } from './tableDensityScenarios.mjs'
+import { createBusinessColumnSettingsScenarios } from './businessColumnSettingsScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
   const {
@@ -240,6 +257,7 @@ export function createStyleL1Scenarios(deps) {
     configRevision: 'style-l1-customer-runtime',
     configHash: 'style-l1-customer-runtime-hash',
     customer: { key: 'yoyoosun', name: '永绅' },
+    roles: yoyoosunRoleFlowMatrix.roles.map((role) => role.roleKey),
     pages: customerRuntimePages,
     actions: customerRuntimeActions,
     fieldPolicies: {},
@@ -321,18 +339,60 @@ export function createStyleL1Scenarios(deps) {
   }
 
   return [
-    ...createBusinessFieldDensityScenarios({ ...deps, customerRuntimeEffectiveSession }),
-    ...createBusinessCellTextScenarios({ ...deps, customerRuntimeEffectiveSession }),
-    ...createSalesOrderImportScenarios({ ...deps, customerRuntimeEffectiveSession }),
-    ...createWorkbenchSummaryScenarios({ ...deps, customerRuntimeEffectiveSession }),
-    ...createOutsourcingSummaryScenarios({ ...deps, customerRuntimeEffectiveSession }),
-    ...createOutsourcingFormFieldsScenarios({ ...deps, customerRuntimeEffectiveSession }),
-    ...createSalesOrderImportValidationScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createBusinessFollowupScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createEmptyStateScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createDeliveryAddressScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createContactEditorScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createFormDensityScenarios(deps),
+    ...createTableDensityScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createBusinessModuleNavigationScenarios({
+      customerRuntimeEffectiveSession,
+      assertNoHorizontalOverflow,
+      outputDir,
+      path,
+    }),
+    ...createBusinessColumnSettingsScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createBusinessStatusCountsScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createHighFidelityScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createUnifiedInteractionScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createBusinessFieldDensityScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createBusinessCellTextScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createSalesOrderImportScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createWorkbenchSummaryScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createOutsourcingSummaryScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createOutsourcingFormFieldsScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createSalesOrderImportValidationScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
     ...createDevWorkbenchDesktopScenarios({
       assert,
       assertNoHorizontalOverflow,
       expectHeading,
     }),
+    ...createDevUIDesignDetailScenarios(deps),
+    ...createDevUIDesignWorkflowScenarios(deps),
     ...createDevQualityGateScenarios({
       assert,
       assertNoHorizontalOverflow,
@@ -380,7 +440,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
-    ...createBusinessRowItemsPreviewScenarios({
+    ...createBusinessDetailsScenarios({
       assert,
       assertDarkThemeContrast,
       assertNoHorizontalOverflow,
@@ -395,6 +455,11 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       customerRuntimeEffectiveSession,
       gotoScenarioPath,
+    }),
+    ...createBusinessTableScrollScenarios({
+      outputDir,
+      customerRuntimeEffectiveSession,
+      clickERPThemeOption,
     }),
     ...createAuthenticationEntryScenarios({
       expectHeading,
@@ -418,6 +483,7 @@ export function createStyleL1Scenarios(deps) {
       assertTextAbsent,
       assertAppAlertDialogLayout,
     }),
+    ...createHelpCenterScenarios({ ...deps, customerRoleAdminProfile, customerRoleRuntimeSession, customerRuntimeEffectiveSession }),
     ...createCustomerSessionScenarios({
       expectHeading,
       expectButton,
@@ -472,7 +538,10 @@ export function createStyleL1Scenarios(deps) {
       assertDarkThemeContrast,
       assertDarkThemeNeutralInteractions,
     }),
-    ...createMobileProgressScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createMobileProgressScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
     ...createMobileNavigationBadgeScenarios({
       ...deps,
       customerRuntimeEffectiveSession,
@@ -526,6 +595,7 @@ export function createStyleL1Scenarios(deps) {
       openControlledAntSelectDropdown,
       selectVirtualizedAntOption,
     }),
+    ...createHistoryRecordScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createAuditLogScenarios({
       expectHeading,
       expectText,
@@ -659,6 +729,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
+    ...createBusinessAttachmentScenarios({ assert, customerRuntimeEffectiveSession, outputDir, path }),
     ...createBusinessFormalScenarios({
       assert,
       assertAntdModalCentered,

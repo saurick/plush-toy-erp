@@ -1,6 +1,8 @@
+import { unitRecordMatchesLabel } from './unitQuantity.mjs'
 import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
+  numeric20Scale6TextFromUnits,
 } from './numeric20Scale6.mjs'
 import { groupBOMMaterials } from './bomMaterialGroups.mjs'
 import {
@@ -242,6 +244,13 @@ function formatDecimal(value, { nonNegative = false } = {}) {
   return rounded === '-0' ? '0' : rounded
 }
 
+function quantityInputText(value) {
+  const text = normalizeText(value)
+  const units = numeric20Scale6Units(text)
+  // Keep excess precision visible in the import draft for explicit correction.
+  return units === null ? text : numeric20Scale6TextFromUnits(units)
+}
+
 function normalizeLossRate(value) {
   const text = normalizeText(value)
   if (!text) return null
@@ -346,11 +355,11 @@ function isMaterialSubtotal(row, header, current) {
       .match(/^SUM\(\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)\)$/iu)
     return Boolean(
       match &&
-        columnIndex(match[1]) === descriptor.startColumn &&
-        columnIndex(match[3]) === descriptor.startColumn &&
-        Number(match[2]) > header.rowNumber &&
-        Number(match[2]) <= Number(match[4]) &&
-        Number(match[4]) < row.rowNumber
+      columnIndex(match[1]) === descriptor.startColumn &&
+      columnIndex(match[3]) === descriptor.startColumn &&
+      Number(match[2]) > header.rowNumber &&
+      Number(match[2]) <= Number(match[4]) &&
+      Number(match[4]) < row.rowNumber
     )
   })
 }
@@ -510,14 +519,12 @@ function extractBOMRows(sheet, header, context) {
       unit: carried.unit,
       position: truncateText(position, 255),
       pieceCount: truncateText(valueByAlias(row, header, 'pieceCount'), 64),
-      quantity: formatDecimal(rawUnitQuantity, { nonNegative: true }),
+      quantity: quantityInputText(rawUnitQuantity),
       rawQuantity: rawUnitQuantity,
       lossRate: loss.value,
       lossSource: loss.source,
       lossIssue: loss.issue,
-      totalUsageSnapshot: formatDecimal(totalQuantity, {
-        nonNegative: true,
-      }),
+      totalUsageSnapshot: quantityInputText(totalQuantity),
       rawTotalUsage: totalQuantity,
       processBase: truncateText(processBase, 255),
       processMethod: truncateText(processMethod, 255),
@@ -674,7 +681,7 @@ function matchMaterial(source, materials) {
 
 function matchUnit(sourceUnit, units) {
   const matches = usableRecords(units).filter((record) =>
-    [record.code, record.name].some((value) => sameText(value, sourceUnit))
+    unitRecordMatchesLabel(record, sourceUnit)
   )
   if (matches.length === 1) {
     return { status: 'matched', by: '单位代码/名称', record: matches[0] }

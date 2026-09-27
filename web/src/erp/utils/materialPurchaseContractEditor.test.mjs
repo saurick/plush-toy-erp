@@ -223,7 +223,7 @@ test('FL_material_purchase_business_draft__does_not_fill_missing_business_fields
 
 test('FL_material_purchase_unit__normalizes_unit_to_chinese_for_print materialPurchaseContractEditor: 采购合同单位按映射保存中文单位', () => {
   assert.equal(normalizeMaterialPurchaseUnitText(' 米（M） '), '米')
-  assert.equal(normalizeMaterialPurchaseUnitText('pcs'), '件')
+  assert.equal(normalizeMaterialPurchaseUnitText('pcs'), '个')
   assert.equal(normalizeMaterialPurchaseUnitText('米'), '米')
   assert.equal(normalizeMaterialPurchaseUnitText('片'), '片')
   assert.equal(normalizeMaterialPurchaseUnitText('对'), '对')

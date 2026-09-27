@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -38,6 +40,7 @@ export default function ProductionOverIssueRequestModal({
   onChanged,
 }) {
   const [form] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open)
   const [loading, setLoading] = useState(false)
   const attempts = useRef(createSourceBusinessActionAttemptStore())
 
@@ -190,6 +193,10 @@ export default function ProductionOverIssueRequestModal({
           name="requested_quantity"
           label="申请增加额度"
           rules={[
+            unitQuantityRuleFromOptions(
+              quantityUnitOptions,
+              requirement?.unit_id
+            ),
             { required: true, message: '请填写申请增加额度' },
             {
               validator: (_, value) =>

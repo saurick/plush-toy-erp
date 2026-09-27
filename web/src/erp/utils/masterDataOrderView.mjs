@@ -1,12 +1,10 @@
+import { unitOption, sortUnitOptions } from './referenceSelectOptions.mjs'
 import {
   OUTSOURCING_ORDER_SUBJECT_TYPES,
   normalizeOutsourcingOrderSubjectType,
 } from './sourceOrderLineValues.mjs'
 
-import {
-  trimOptional,
-  normalizeOptionalNonNegativeInteger,
-} from './sourceDocumentValues.mjs'
+import { trimOptional } from './sourceDocumentValues.mjs'
 import { effectiveSessionAllowsAction } from './adminProfileSync.mjs'
 import { BUSINESS_CURRENCY_OPTIONS } from './businessCurrency.mjs'
 import { unixSecondsToBusinessDate } from './businessDate.mjs'
@@ -351,81 +349,23 @@ export function statusText(status, labels = {}, fallback = '业务状态') {
 }
 
 export function formatUnitDisplayName(unitID, unitByID = new Map()) {
-  const normalizedID = Number(unitID || 0)
-  if (!Number.isFinite(normalizedID) || normalizedID <= 0) {
-    return '-'
-  }
-  const unit = unitByID instanceof Map ? unitByID.get(normalizedID) : null
-  if (!unit) {
-    return '单位已关联'
-  }
-  const name = trimOptional(unit.name)
-  const code = trimOptional(unit.code)
-  if (name && code && name !== code) {
-    return `${name}（${code}）`
-  }
-  return name || code || '单位已关联'
-}
-
-function shortDemoUnitName(name) {
-  const text = trimOptional(name)
-  const matched = text.match(/^核心演示单位[-－]\s*(.+)$/)
-  return matched?.[1]?.trim() || text
-}
-
-function shortUnitCode(code) {
-  const text = trimOptional(code)
-  if (!text) return ''
-  if (text.startsWith('SIM-')) {
-    return text.split('-').filter(Boolean).at(-1) || text
-  }
-  return text.length <= 8 ? text : ''
+  return formatUnitShortDisplayName(unitID, unitByID)
 }
 
 export function formatUnitShortDisplayName(unitID, unitByID = new Map()) {
   const normalizedID = Number(unitID || 0)
-  if (!Number.isFinite(normalizedID) || normalizedID <= 0) {
-    return '-'
-  }
+  if (!Number.isSafeInteger(normalizedID) || normalizedID <= 0) return '-'
   const unit = unitByID instanceof Map ? unitByID.get(normalizedID) : null
-  if (!unit) {
-    return '单位已关联'
-  }
-  const name = shortDemoUnitName(unit.name)
-  const code = shortUnitCode(unit.code)
-  if (name && code && name !== code) {
-    return `${name}（${code}）`
-  }
-  return name || code || '单位已关联'
+  return unitOption(unit || {})?.label || '单位已关联'
 }
 
 export function buildUnitSelectOptions(units = []) {
-  const activeUnits = Array.isArray(units)
-    ? units.filter((unit) => unit?.is_active !== false)
-    : []
-  const unitByID = new Map(
-    activeUnits
-      .map((unit) => [Number(unit?.id || 0), unit])
-      .filter(([unitID]) => Number.isFinite(unitID) && unitID > 0)
+  return sortUnitOptions(
+    (Array.isArray(units) ? units : [])
+      .filter((unit) => unit?.is_active !== false)
+      .map(unitOption)
+      .filter(Boolean)
   )
-  return activeUnits
-    .map((unit) => {
-      const value = Number(unit?.id || 0)
-      if (!Number.isFinite(value) || value <= 0) {
-        return null
-      }
-      const label = formatUnitShortDisplayName(value, unitByID)
-      const fullLabel = formatUnitDisplayName(value, unitByID)
-      return {
-        value,
-        label,
-        suffixLabel: label,
-        searchText: [label, fullLabel].filter(Boolean).join(' '),
-        title: fullLabel,
-        precision: normalizeOptionalNonNegativeInteger(unit?.precision) ?? 0,
-      }
-    })
-    .filter(Boolean)
 }
 
 export function buildTextSelectOptions(records = [], fieldName = '') {

@@ -225,7 +225,7 @@ test('business list toolbar: 不提供通用删除和回收站壳能力', () => 
     )
   }
 
-  for (const text of ['导出筛选结果', '列顺序']) {
+  for (const text of ['导出筛选结果', '列设置']) {
     assert.equal(
       source.includes(text),
       true,

@@ -14,5 +14,15 @@ function dataOf(result) {
 
 export async function setERPColumnOrder(params = {}) {
   const result = await adminRpc.call('set_erp_column_order', params)
-  return dataOf(result)?.erp_preferences || { column_orders: {} }
+  const preferences = dataOf(result)?.erp_preferences
+  if (
+    !preferences ||
+    !preferences.column_orders ||
+    !preferences.hidden_columns
+  ) {
+    const error = new Error('服务器未返回完整列设置，请刷新后重试')
+    error.isInvalidResponse = true
+    throw error
+  }
+  return preferences
 }

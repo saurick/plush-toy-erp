@@ -63,6 +63,7 @@ import {
   assertVisibleInputFocusRingNotClipped,
   assertVisibleInputTextVerticalRhythm,
   assertVisibleBusinessFormControlHeight,
+  assertVisibleDateFilterGeometry,
 } from './style-l1/inputControlAssertions.mjs'
 
 import {
@@ -72,7 +73,7 @@ import {
   installAdminRpcMocks,
 } from './style-l1/adminRpcMocks.mjs'
 import {
-  assertNoBlueFocusStyle,
+  assertNoUnconfiguredFocusStyle,
   isAcceptedFocusBorder,
   isLightSurfaceColor,
 } from './style-l1/colorAssertions.mjs'
@@ -419,10 +420,33 @@ async function main() {
         '--disable-features=LocalNetworkAccessChecks',
       ],
     })
+    const results = []
     for (const scenario of selectedScenarios) {
-      await runScenario(activeBrowser, scenario)
+      try {
+        await runScenario(activeBrowser, scenario)
+        results.push({ name: scenario.name, status: 'passed' })
+        console.log(`[style:l1] passed ${scenario.name}`)
+      } catch (error) {
+        results.push({
+          name: scenario.name,
+          status: 'failed',
+          error: String(error.stack || error),
+        })
+        if (process.env.STYLE_L1_CONTINUE_ON_FAILURE !== '1') throw error
+        console.error(String(error.stack || error))
+      } finally {
+        await fs.writeFile(
+          path.join(outputDir, 'scenario-results.json'),
+          JSON.stringify(results, null, 2)
+        )
+      }
     }
-
+    const failed = results.filter((item) => item.status === 'failed')
+    assert.equal(
+      failed.length,
+      0,
+      `[style:l1] ${failed.length} / ${results.length} 个场景失败；详见 scenario-results.json`
+    )
     console.log(`[style:l1] 通过，共验证 ${selectedScenarios.length} 个场景`)
   } finally {
     await cleanupStyleL1Runtime()
@@ -438,7 +462,7 @@ function startDevServer() {
       '--config',
       'vite.config.mjs',
       '--host',
-      '0.0.0.0',
+      '127.0.0.1',
       '--port',
       String(devServerPort),
       '--strictPort',
@@ -598,18 +622,41 @@ function assertPortAvailable(port) {
   })
 }
 
-function listDevServerPortPIDs() {
+export function listDevServerPortPIDs(
+  processGroupID,
+  { port = devServerPort, timeoutMs = 5000, spawnProcess = spawn } = {}
+) {
+  assert(Number.isInteger(processGroupID) && processGroupID > 0)
+  assert(Number.isInteger(port) && port > 0 && port <= 65535)
   return new Promise((resolve, reject) => {
-    const child = spawn('lsof', [
-      `-tiTCP:${String(devServerPort)}`,
+    // The free-port probe and strict loopback bind establish an exclusive
+    // listener. Inspect its verified group without scanning unrelated macOS
+    // descriptors, which can block inside proc_pidfdinfo.
+    const child = spawnProcess('lsof', [
+      '-nP',
+      '-a',
+      `-g${processGroupID}`,
+      `-iTCP:${port}`,
       '-sTCP:LISTEN',
+      '-t',
     ])
     let output = ''
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL')
+      child.stdout?.destroy()
+      child.stderr?.destroy()
+      child.unref()
+      reject(new Error('[style:l1] owned listener lookup timed out'))
+    }, timeoutMs)
     child.stdout.on('data', (chunk) => {
       output += chunk.toString()
     })
-    child.once('error', reject)
+    child.once('error', (error) => {
+      clearTimeout(timer)
+      reject(error)
+    })
     child.once('close', (code) => {
+      clearTimeout(timer)
       if (code !== 0 && code !== 1) {
         reject(new Error(`lsof exited with code ${code}`))
         return
@@ -659,7 +706,7 @@ async function verifyDevServerProcessGroup() {
 }
 
 async function assertDevServerPortOwnership(expectedGroup) {
-  const listenerPIDs = await listDevServerPortPIDs()
+  const listenerPIDs = await listDevServerPortPIDs(expectedGroup)
   assert(
     listenerPIDs.length > 0,
     `[style:l1] no listener found for self-host port ${devServerPort}`
@@ -999,6 +1046,7 @@ async function runScenarioOnce(browser, scenario) {
     }
 
     await scenario.verify(page)
+    await assertVisibleDateFilterGeometry(page, scenario.name)
     await assertVisibleAffixInputIsolation(page, scenario.name)
     await assertVisibleInputControlRadius(page, scenario.name)
     await assertVisibleRoundedInputWrapperClipping(page, scenario.name)
@@ -1032,6 +1080,12 @@ async function runScenarioOnce(browser, scenario) {
     const screenshotPath = path.resolve(outputDir, `${scenario.name}.png`)
     await page.screenshot({ path: screenshotPath, fullPage: true })
   } catch (error) {
+    await page
+      .screenshot({
+        path: path.resolve(outputDir, `${scenario.name}-failure.png`),
+        fullPage: true,
+      })
+      .catch(() => {})
     if (errors.length > 0) {
       error.message = `${error.message}\n浏览器错误：\n${errors.join('\n')}`
     }
@@ -1099,7 +1153,7 @@ const {
   path,
   outputDir,
   assertAntdModalCentered,
-  assertNoBlueFocusStyle,
+  assertNoUnconfiguredFocusStyle,
   assertBusinessFormModalKeyboardRecovery,
   assertThemeReadable,
   expectText,

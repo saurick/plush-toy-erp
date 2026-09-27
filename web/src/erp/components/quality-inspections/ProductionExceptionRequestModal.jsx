@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Form, Input, Select } from 'antd'
+import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -145,7 +146,10 @@ export default function ProductionExceptionRequestModal({
         <Form.Item
           name="requested_quantity"
           label="申请数量"
-          rules={[{ required: true }]}
+          rules={[
+            unitQuantityRule(inspection?.unit_precision),
+            { required: true },
+          ]}
         >
           <Input inputMode="decimal" />
         </Form.Item>

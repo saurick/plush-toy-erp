@@ -11,6 +11,8 @@ import {
   Card,
   Empty,
   Form,
+  InputNumber,
+  Radio,
   Popover,
   Select,
   Space,
@@ -39,6 +41,13 @@ import {
 } from '../utils/approvalSettingsDraft.mjs'
 import { formatAdminIdentity } from '../utils/adminIdentity.mjs'
 import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
+
+import {
+  AMOUNT_APPROVAL_KEYS,
+  approvalConditionSummary,
+  normalizeApprovalCondition,
+} from '../utils/approvalCondition.mjs'
+import { BUSINESS_CURRENCY_OPTIONS } from '../utils/businessCurrency.mjs'
 
 const { Text, Title } = Typography
 
@@ -73,7 +82,7 @@ function notifyApprovalSettingsApplied() {
   message.success({
     key: APPROVAL_SETTINGS_RESULT_MESSAGE_KEY,
     content:
-      '审批责任已保存并生效；之后新发起审批使用新责任，在途审批继续按原责任办理',
+      '审批设置已保存并生效；新发起流程使用新条件和责任，在途流程继续按原设置办理',
   })
 }
 
@@ -175,6 +184,7 @@ function normalizeDraftItems(
     const shouldInitialize = !configured && initializeUnconfigured
     return {
       approval_key: approvalKey,
+      condition: normalizeApprovalCondition(approvalKey, item?.condition),
       configured,
       enabled: shouldInitialize ? true : item?.enabled === true,
       members:
@@ -566,7 +576,16 @@ export default function ApprovalResponsibilityPanel({
     const draft = draftItems.find(
       (candidate) => candidate.approval_key === item.approval_key
     ) || { enabled: false, members: [] }
-    const values = { enabled: draft.enabled }
+    const condition = normalizeApprovalCondition(
+      item.approval_key,
+      draft.condition
+    )
+    const values = {
+      enabled: draft.enabled,
+      approval_mode: condition.mode,
+      approval_amount: condition.amount || undefined,
+      approval_currency: condition.currency || 'CNY',
+    }
     STRATEGIES.forEach(({ key }) => {
       const member = draft.members.find(
         (candidate) => candidate.strategy === key
@@ -585,7 +604,7 @@ export default function ApprovalResponsibilityPanel({
     if (!force && editorDirty) {
       modal.confirm({
         centered: true,
-        title: '放弃本次责任调整？',
+        title: '放弃本次审批设置调整？',
         content: '弹窗内尚未保存的选择会丢失。',
         okText: '放弃调整',
         cancelText: '继续编辑',
@@ -605,6 +624,17 @@ export default function ApprovalResponsibilityPanel({
     try {
       values = await form.validateFields()
     } catch {
+      return
+    }
+    let condition
+    try {
+      condition = normalizeApprovalCondition(editingKey, {
+        mode: values.approval_mode,
+        amount: values.approval_amount,
+        currency: values.approval_currency,
+      })
+    } catch {
+      message.warning('审批条件不完整，请核对金额与币种')
       return
     }
     const members = STRATEGIES.filter(({ key }) => values[`${key}_role`]).map(
@@ -630,7 +660,7 @@ export default function ApprovalResponsibilityPanel({
     setDraftItems((current) =>
       current.map((item) =>
         item.approval_key === editingKey
-          ? { ...item, enabled: values.enabled === true, members }
+          ? { ...item, enabled: values.enabled === true, members, condition }
           : item
       )
     )
@@ -752,7 +782,8 @@ export default function ApprovalResponsibilityPanel({
       align: 'left',
       title: '审批事项',
       dataIndex: 'label',
-      width: 210,
+      width: 170,
+      fixed: 'left',
       render: (_, item) => (
         <Space direction="vertical" size={1}>
           <Text strong>{item.label}</Text>
@@ -771,6 +802,24 @@ export default function ApprovalResponsibilityPanel({
             {item.enabled ? '启用' : '停用'}
           </Tag>
         ),
+    },
+    {
+      title: '审批条件',
+      width: 235,
+      render: (_, item) => (
+        <Space direction="vertical" size={1}>
+          <Text>
+            {approvalConditionSummary(item.approval_key, item.condition)}
+          </Text>
+          <Text type="secondary">
+            {item.approval_key === 'shipment_finance'
+              ? '提交财务审批时发起'
+              : item.condition?.mode === 'amount'
+                ? '低于门槛免审；其他币种仍需审批'
+                : '提交订单后发起审批'}
+          </Text>
+        </Space>
+      ),
     },
     {
       title: '责任顺序',
@@ -796,7 +845,7 @@ export default function ApprovalResponsibilityPanel({
     {
       align: 'left',
       title: '检查',
-      width: 190,
+      width: 150,
       render: (_, item) => {
         if (!item.enabled) {
           return <Text type="secondary">不参与流程</Text>
@@ -824,6 +873,7 @@ export default function ApprovalResponsibilityPanel({
       align: 'center',
       title: '操作',
       width: 76,
+      fixed: 'right',
       render: (_, item) =>
         canManage ? (
           <Button
@@ -886,7 +936,7 @@ export default function ApprovalResponsibilityPanel({
             <div>
               <Title level={5}>审批责任</Title>
               <Text type="secondary">
-                为三项可配置审批指定主办、备用和升级责任。
+                设置审批条件，以及主办、备用和升级责任。
               </Text>
             </div>
             <Space size={6} wrap>
@@ -912,9 +962,9 @@ export default function ApprovalResponsibilityPanel({
                 trigger={['hover', 'focus', 'click']}
                 content={
                   <div className="erp-approval-responsibility__help">
-                    <Text strong>这里设置谁来审批</Text>
+                    <Text strong>这里设置何时审批、由谁审批</Text>
                     <Text>
-                      岗位权限先决定谁具备审批资格；本页再指定主办、备用和升级责任。
+                      销售和采购订单可按金额触发审批，默认全部审批。岗位权限决定审批资格，本页指定主办、备用和升级责任。
                     </Text>
                     <Text>
                       新设置只影响新启动的流程，在途审批继续使用原责任。
@@ -950,7 +1000,7 @@ export default function ApprovalResponsibilityPanel({
             columns={columns}
             dataSource={displayItems}
             pagination={false}
-            scroll={{ x: 880 }}
+            scroll={{ x: 980 }}
           />
 
           {canManage && (draftDirty || appliedReceipt || pendingPayload) ? (
@@ -1012,6 +1062,75 @@ export default function ApprovalResponsibilityPanel({
           <Form.Item name="enabled" label="启用此审批" valuePropName="checked">
             <Switch />
           </Form.Item>
+          {AMOUNT_APPROVAL_KEYS.has(editingKey) ? (
+            <>
+              <Form.Item name="approval_mode" label="审批方式">
+                <Radio.Group
+                  options={[
+                    { value: 'all', label: '全部审批' },
+                    { value: 'amount', label: '按金额审批' },
+                  ]}
+                />
+              </Form.Item>
+              {editorValues.approval_mode === 'amount' ? (
+                <>
+                  <Form.Item
+                    name="approval_currency"
+                    label="门槛币种"
+                    rules={[{ required: true, message: '请选择币种' }]}
+                  >
+                    <Select options={BUSINESS_CURRENCY_OPTIONS} />
+                  </Form.Item>
+                  <Form.Item
+                    name="approval_amount"
+                    label="审批起始金额"
+                    extra="达到或超过此金额需审批；低于门槛免审生效。0 表示全部审批。"
+                    rules={[
+                      { required: true, message: '请输入审批起始金额' },
+                      ({ getFieldValue }) => ({
+                        validator(_, value) {
+                          try {
+                            normalizeApprovalCondition(editingKey, {
+                              mode: 'amount',
+                              amount: value,
+                              currency: getFieldValue('approval_currency'),
+                            })
+                            return Promise.resolve()
+                          } catch {
+                            return Promise.reject(
+                              new Error(
+                                '请输入非负金额，最多 14 位整数和 6 位小数'
+                              )
+                            )
+                          }
+                        },
+                      }),
+                    ]}
+                  >
+                    <InputNumber
+                      stringMode
+                      min="0"
+                      controls={false}
+                      style={{ width: '100%' }}
+                      placeholder="请输入金额"
+                    />
+                  </Form.Item>
+                  <Text type="secondary">
+                    {editingKey === 'sales_order'
+                      ? '按订单总额（含税费及约定运费）判断。'
+                      : '按采购明细金额合计判断。'}
+                    金额不完整或币种不匹配时仍需审批。
+                  </Text>
+                </>
+              ) : (
+                <Text type="secondary">
+                  所有提交的订单都需审批，不设免审额度。
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text type="secondary">出货财务确认保持全部审批。</Text>
+          )}
           {editorEligibilityNotice ? (
             <Alert
               showIcon

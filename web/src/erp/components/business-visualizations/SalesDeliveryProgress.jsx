@@ -1,12 +1,14 @@
-import React, { useMemo, useState } from 'react'
-import { Button, Progress } from 'antd'
-import { buildSalesDeliveryModel } from '../../utils/businessVisualizationModels.mjs'
+import React, { useMemo } from 'react'
+import { Progress } from 'antd'
+import {
+  buildSalesDeliveryModel,
+  paginateVisualizationRows,
+} from '../../utils/businessVisualizationModels.mjs'
 import {
   BusinessVisualizationFrame,
   VisualizationState,
+  VisualizationPagination,
 } from './BusinessVisualizationFrame.jsx'
-
-const INITIAL_VISIBLE_ROWS = 12
 
 function quantityText(value, unitName) {
   return value === null ? '—' : `${value} ${unitName}`
@@ -19,17 +21,33 @@ export default function SalesDeliveryProgress({
   onRetry,
   onOpen,
   switcher,
+  viewState = {},
+  onViewStateChange,
 }) {
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_ROWS)
   const model = useMemo(() => buildSalesDeliveryModel(items), [items])
-  const rows = model.rows.slice(0, visibleCount)
+  const filter = viewState.filter || 'all'
+  const filtered = model.rows.filter(
+    (row) => filter === 'all' || row.status.key === filter
+  )
+  const pagination = paginateVisualizationRows(filtered, viewState.page)
+  const { rows } = pagination
+  const changeFilter = (next) =>
+    onViewStateChange?.({ ...viewState, filter: next, page: 1 })
 
   return (
     <BusinessVisualizationFrame
       className="erp-sales-delivery-visual"
       switcher={switcher}
       title="销售交付进度"
+      loading={loading}
+      error={error}
       metrics={[
+        {
+          key: 'all',
+          label: '全部',
+          value: model.counts.total,
+          tone: 'neutral',
+        },
         {
           key: 'overdue',
           label: '逾期',
@@ -37,15 +55,28 @@ export default function SalesDeliveryProgress({
           tone: 'danger',
         },
         {
-          key: 'due-soon',
+          key: 'closed',
+          label: '关闭未交完',
+          value: model.counts.closed,
+          tone: 'warning',
+        },
+        {
+          key: 'dueSoon',
           label: '7 天内',
           value: model.counts.dueSoon,
           tone: 'warning',
         },
         {
+          key: 'unscheduled',
+          label: '未排交期',
+          value: model.counts.unscheduled,
+          tone: 'neutral',
+        },
+        {
           key: 'unknown',
           label: '待核对',
           value: model.counts.unknown,
+          tone: 'neutral',
         },
         {
           key: 'delivered',
@@ -53,12 +84,16 @@ export default function SalesDeliveryProgress({
           value: model.counts.delivered,
           tone: 'success',
         },
-      ]}
+      ].map((metric) => ({
+        ...metric,
+        selected: filter === metric.key,
+        onClick: () => changeFilter(metric.key),
+      }))}
     >
       <VisualizationState
         loading={loading}
         error={error}
-        empty={!loading && !error && model.rows.length === 0}
+        empty={!loading && !error && filtered.length === 0}
         onRetry={onRetry}
       />
       {!loading && !error && rows.length > 0 ? (
@@ -86,15 +121,24 @@ export default function SalesDeliveryProgress({
                 </small>
               </span>
               <span className="erp-business-visual-date">
+                <small className="erp-business-visual-mobile-label">
+                  交付日期{' '}
+                </small>
                 {row.deliveryDate || '未填写'}
               </span>
               <span className="erp-business-visual-progress">
-                <Progress
-                  percent={row.percent || 0}
-                  showInfo={false}
-                  status={row.status.key === 'overdue' ? 'exception' : 'normal'}
-                  size="small"
-                />
+                {row.progressKnown ? (
+                  <Progress
+                    percent={row.percent}
+                    showInfo={false}
+                    status={
+                      row.status.key === 'overdue' ? 'exception' : 'normal'
+                    }
+                    size="small"
+                  />
+                ) : (
+                  <span className="erp-business-visual-unknown">—</span>
+                )}
                 <small>
                   {row.progressKnown
                     ? `${quantityText(row.shipped, row.unitName)} / ${quantityText(row.ordered, row.unitName)}`
@@ -102,6 +146,9 @@ export default function SalesDeliveryProgress({
                 </small>
               </span>
               <span className="erp-business-visual-quantity">
+                <small className="erp-business-visual-mobile-label">
+                  剩余待交{' '}
+                </small>
                 {quantityText(row.remaining, row.unitName)}
               </span>
               <span
@@ -111,15 +158,10 @@ export default function SalesDeliveryProgress({
               </span>
             </button>
           ))}
-          {model.rows.length > rows.length ? (
-            <Button
-              type="text"
-              className="erp-business-visual-more"
-              onClick={() => setVisibleCount((count) => count + 20)}
-            >
-              再显示 {Math.min(20, model.rows.length - rows.length)} 条
-            </Button>
-          ) : null}
+          <VisualizationPagination
+            pagination={pagination}
+            onChange={(page) => onViewStateChange?.({ ...viewState, page })}
+          />
         </div>
       ) : null}
     </BusinessVisualizationFrame>

@@ -7,18 +7,18 @@ import React, {
   useState,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Alert, Button, Empty, Popover, Spin } from 'antd'
-import {
-  DownOutlined,
-  FilterOutlined,
-  ReloadOutlined,
-  RightOutlined,
-} from '@ant-design/icons'
+import { Alert, Button, Empty, Spin } from 'antd'
+import { RightOutlined } from '@ant-design/icons'
 import { canOpenRelatedDocumentPath } from '../../utils/relatedDocumentNavigation.mjs'
 import { resolveMenuPermissionKey } from '../../config/menuPermissions.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import {
+  isAuthFailureCode,
+  isAdminSessionUnavailableCode,
+  RpcErrorCode,
+} from '@/common/consts/errorCodes'
 import { listBusinessProgress } from '../../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
 import BusinessProgressDrawer from '../../components/business-visualizations/BusinessProgressDrawer'
@@ -35,6 +35,7 @@ import {
   readMobileProgressState,
 } from '../utils/mobileProgress.mjs'
 import MobileTaskPullRefresh from './MobileTaskPullRefresh'
+import MobileFilterPopover from './MobileFilterPopover'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import '../../styles/app/progress-board.css'
 import '../mobileProgress.css'
@@ -216,10 +217,18 @@ export default function MobileProgressPanel({
       } catch (failure) {
         if (request.isCurrent()) {
           const message = getActionErrorMessage(failure, '查询进度失败，请重试')
-          if (append) setLoadMoreError(message)
+          const accessLost =
+            isAuthFailureCode(failure?.code) ||
+            isAdminSessionUnavailableCode(failure?.code) ||
+            Number(failure?.code) === RpcErrorCode.PERMISSION_DENIED
+          if (append && !accessLost) setLoadMoreError(message)
           else {
-            setResult(null)
-            setError(message)
+            if (!currentData || accessLost) setResult(null)
+            setError(
+              currentData && !accessLost
+                ? `${message}，已保留上次数据`
+                : message
+            )
           }
         }
         return false
@@ -331,7 +340,7 @@ export default function MobileProgressPanel({
   const riskOptions = [
     ['all', '全部', counts?.total],
     ['overdue', '已逾期', counts?.overdue],
-    ['due_soon', '7天内到期', counts?.due_soon],
+    ['due_soon', '7天内', counts?.due_soon],
     ['blocked', '任务受阻', counts?.blocked],
   ]
   const moreRiskOptions = [
@@ -343,6 +352,7 @@ export default function MobileProgressPanel({
     <section
       hidden={!active}
       className="mobile-progress-panel erp-mobile-controls"
+      data-refreshing={loading || loadingMore}
       aria-label="手机进度看板"
       data-testid="mobile-progress-panel"
     >
@@ -351,32 +361,10 @@ export default function MobileProgressPanel({
         ref={scrollRef}
         onScroll={() => remember()}
       >
-        <MobileTaskPullRefresh
-          scrollContainerRef={scrollRef}
-          enabled={active && !selection}
-          busy={loading || loadingMore}
-          onRefresh={refresh}
-          lastUpdated={timeLabel(data?.snapshot_at)}
-        />
-        <header className="mobile-progress-header">
-          <div>
-            <h1>进度</h1>
-            <span>{roleLabel(roleKey)}</span>
-          </div>
-          <button
-            type="button"
-            className="erp-control-button"
-            onClick={refresh}
-            disabled={loading || loadingMore}
-            aria-label="刷新进度"
-          >
-            <ReloadOutlined spin={loading} />
-            <span>刷新</span>
-          </button>
-        </header>
         <div className="mobile-progress-controls">
           <SlidingSegmented
             block
+            className="mobile-progress-view-switch"
             aria-label="进度视图"
             options={options}
             value={query.view}
@@ -424,80 +412,46 @@ export default function MobileProgressPanel({
                 update({ q: '' })
               }}
             />
-            <Popover
-              trigger="click"
+            <MobileFilterPopover
+              contextLabel="进度"
+              title="更多进度筛选"
               open={filtersOpen && active}
               onOpenChange={setFiltersOpen}
-              placement="bottomRight"
-              arrow={false}
-              autoAdjustOverflow
-              classNames={{
-                root: 'mobile-progress-filter-popover erp-mobile-controls',
-              }}
-              content={
-                <div
-                  className="mobile-progress-filter-dropdown"
-                  role="group"
-                  aria-label="更多进度筛选"
-                >
-                  <fieldset className="mobile-progress-filter-group">
-                    <legend>记录范围</legend>
-                    <SlidingSegmented
-                      block
-                      aria-label="记录范围"
-                      value={values.scope}
-                      options={[
-                        { value: 'active', label: '在执行' },
-                        { value: 'all', label: '全部' },
-                        { value: 'ended', label: '已结束' },
-                      ]}
-                      onChange={(scope) => update({ scope })}
-                    />
-                  </fieldset>
-                  <fieldset className="mobile-progress-filter-group">
-                    <legend>其他关注</legend>
-                    <div
-                      className="mobile-progress-filter-options"
-                      role="group"
-                      aria-label="其他关注"
-                    >
-                      {moreRiskOptions.map(([value, label]) => (
-                        <FilterChip
-                          key={value}
-                          selected={values.risk === value}
-                          onClick={() => update({ risk: value })}
-                        >
-                          {label}
-                        </FilterChip>
-                      ))}
-                    </div>
-                  </fieldset>
-                </div>
-              }
+              count={hiddenFilterCount}
+              onReset={() => update({ scope: 'active', risk: 'all' })}
             >
-              <button
-                type="button"
-                className="erp-control-button mobile-progress-filter-trigger"
-                aria-label={
-                  hiddenFilterCount
-                    ? `筛选进度，已应用 ${hiddenFilterCount} 项隐藏条件`
-                    : '筛选进度'
-                }
-                aria-haspopup="true"
-                aria-expanded={filtersOpen}
-                data-active={hiddenFilterCount > 0}
-              >
-                <FilterOutlined aria-hidden="true" />
-                筛选
-                {hiddenFilterCount > 0 && (
-                  <span className="erp-control-count">{hiddenFilterCount}</span>
-                )}
-                <DownOutlined
-                  className="mobile-progress-filter-chevron"
-                  aria-hidden="true"
+              <fieldset>
+                <legend>记录范围</legend>
+                <SlidingSegmented
+                  block
+                  aria-label="记录范围"
+                  value={values.scope}
+                  options={[
+                    { value: 'active', label: '在执行' },
+                    { value: 'all', label: '全部' },
+                    { value: 'ended', label: '已结束' },
+                  ]}
+                  onChange={(scope) => update({ scope })}
                 />
-              </button>
-            </Popover>
+              </fieldset>
+              <fieldset>
+                <legend>其他关注</legend>
+                <SlidingSegmented
+                  block
+                  aria-label="其他关注"
+                  value={
+                    moreRiskOptions.some(([key]) => key === values.risk)
+                      ? values.risk
+                      : null
+                  }
+                  options={moreRiskOptions.map(([value, label]) => ({
+                    value,
+                    label,
+                  }))}
+                  onChange={(risk) => update({ risk })}
+                />
+              </fieldset>
+            </MobileFilterPopover>
           </div>
           <div
             className="mobile-progress-risks"
@@ -516,31 +470,6 @@ export default function MobileProgressPanel({
               </FilterChip>
             ))}
           </div>
-          <div className="mobile-progress-range">
-            <span>
-              {data
-                ? `共 ${data.total} 张${query.view === 'orders' ? '订单' : '生产单'} · ${timeLabel(data.snapshot_at)} 更新`
-                : loading
-                  ? '正在查询…'
-                  : '等待查询'}
-            </span>
-            {filtered && (
-              <button
-                type="button"
-                className="erp-control-button erp-control-button--text"
-                onClick={() => {
-                  setKeyword('')
-                  update({
-                    q: '',
-                    risk: 'all',
-                    scope: 'active',
-                  })
-                }}
-              >
-                清空筛选
-              </button>
-            )}
-          </div>
           {(values.scope !== 'active' ||
             query.risk === 'undated' ||
             query.risk === 'unlinked') && (
@@ -556,6 +485,14 @@ export default function MobileProgressPanel({
             </p>
           )}
         </div>
+        <MobileTaskPullRefresh
+          key={`${scopeKey}|${queryKey}`}
+          scrollContainerRef={scrollRef}
+          enabled={active && !selection}
+          busy={loading || loadingMore}
+          onRefresh={refresh}
+          lastUpdated={timeLabel(data?.snapshot_at)}
+        />
         {error ? (
           <Alert
             className="mobile-progress-error"
@@ -568,76 +505,73 @@ export default function MobileProgressPanel({
               </Button>
             }
           />
-        ) : (
-          <Spin spinning={loading}>
-            <div
-              className="mobile-progress-list"
-              aria-busy={loading || loadingMore}
-            >
-              {data?.rows.map((row) => {
-                const delivery = progressDelivery(row)
-                return (
-                  <article key={row.id} className="mobile-progress-card">
-                    <button
-                      type="button"
-                      className="mobile-progress-card-main"
-                      onClick={() => open(row)}
-                      aria-label={`查看 ${row.order_no} 进度`}
-                    >
-                      <span className="mobile-progress-card-head">
-                        <strong>{row.order_no}</strong>
-                        <span
-                          className={
-                            row.overdue
-                              ? 'mobile-progress-danger'
-                              : row.due_soon
-                                ? 'mobile-progress-warning'
-                                : ''
-                          }
-                        >
-                          {row.overdue
-                            ? '已逾期'
+        ) : null}
+        <Spin spinning={loading}>
+          <div
+            className="mobile-progress-list"
+            aria-busy={loading || loadingMore}
+          >
+            {data?.rows.map((row) => {
+              const delivery = progressDelivery(row)
+              return (
+                <article key={row.id} className="mobile-progress-card">
+                  <button
+                    type="button"
+                    className="mobile-progress-card-main"
+                    onClick={() => open(row)}
+                    aria-label={`查看 ${row.order_no} 进度`}
+                  >
+                    <span className="mobile-progress-card-head">
+                      <strong>{row.order_no}</strong>
+                      <span
+                        className={
+                          row.overdue
+                            ? 'mobile-progress-state mobile-progress-danger'
                             : row.due_soon
-                              ? '7天内到期'
-                              : progressStatusLabel(row.status)}
-                        </span>
-                        <RightOutlined />
+                              ? 'mobile-progress-state mobile-progress-warning'
+                              : 'mobile-progress-state'
+                        }
+                      >
+                        {row.overdue
+                          ? '已逾期'
+                          : row.due_soon
+                            ? '7天内到期'
+                            : progressStatusLabel(row.status)}
                       </span>
-                      <span className="mobile-progress-product-summary">
-                        <span className="mobile-progress-product-image">
-                          <ProductThumbnail
-                            productId={row.product_id}
-                            name={row.product}
-                            preview={false}
-                          />
-                          {row.product_count > 1 && (
-                            <span
-                              className="mobile-progress-product-count"
-                              aria-hidden="true"
-                            >
-                              +{row.product_count - 1}
-                            </span>
-                          )}
+                      <RightOutlined />
+                    </span>
+                    <span className="mobile-progress-product-summary">
+                      <span className="mobile-progress-product-image">
+                        <ProductThumbnail
+                          productId={row.product_id}
+                          name={row.product}
+                          preview={false}
+                        />
+                        {row.product_count > 1 && (
+                          <span
+                            className="mobile-progress-product-count"
+                            aria-hidden="true"
+                          >
+                            +{row.product_count - 1}
+                          </span>
+                        )}
+                      </span>
+                      <span className="mobile-progress-product-copy">
+                        <span className="mobile-progress-product">
+                          {row.product}
+                          {row.product_count > 1
+                            ? ` 等 ${row.product_count} 项`
+                            : ''}
                         </span>
-                        <span className="mobile-progress-product-copy">
-                          <span className="mobile-progress-product">
-                            {row.product}
-                            {row.product_count > 1
-                              ? ` 等 ${row.product_count} 项`
-                              : ''}
-                          </span>
-                          {row.customer && (
-                            <span className="mobile-progress-muted">
-                              {row.customer}
-                            </span>
-                          )}
-                          <span className="mobile-progress-facts">
-                            {query.view === 'orders' ? '交期' : '计划结束'}：
-                            {row.due_date || '尚未确定'}
-                            {row.unlinked ? ' · 含未关联销售明细' : ''}
-                          </span>
+                        <span className="mobile-progress-facts">
+                          {row.customer ? `${row.customer} · ` : ''}
+                          {query.view === 'orders' ? '交期' : '计划结束'}：
+                          {row.due_date || '尚未确定'}
+                          {row.unlinked ? ' · 含未关联销售明细' : ''}
                         </span>
                       </span>
+                    </span>
+                    <span className="mobile-progress-execution">
                       {data.access.wip && (
                         <span className="mobile-progress-facts">
                           {row.current_operation
@@ -657,82 +591,88 @@ export default function MobileProgressPanel({
                         <span>{delivery.label}</span>
                         <strong>{delivery.text}</strong>
                       </span>
-                      {delivery.percent !== undefined && (
-                        <span
-                          className="mobile-progress-track"
-                          role="progressbar"
-                          aria-label={delivery.label}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-valuenow={Math.round(delivery.percent)}
-                        >
-                          <i style={{ width: `${delivery.percent}%` }} />
-                        </span>
-                      )}
-                      {row.attention_reason && (
-                        <span className="mobile-progress-issue">
-                          任务受阻：{row.attention_reason}
-                        </span>
-                      )}
-                    </button>
-                    {data.access.tasks && (
-                      <button
-                        type="button"
-                        className="mobile-progress-owner"
-                        aria-label={`查看 ${row.order_no} 的关联任务`}
-                        onClick={() => open(row, 'tasks')}
+                    </span>
+                    {delivery.percent !== undefined && (
+                      <span
+                        className="mobile-progress-track"
+                        role="progressbar"
+                        aria-label={delivery.label}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(delivery.percent)}
                       >
-                        {mobileProgressTaskOwner(row, roleLabel)}
-                        <RightOutlined />
-                      </button>
+                        <i style={{ width: `${delivery.percent}%` }} />
+                      </span>
                     )}
-                  </article>
-                )
-              })}
-              {data?.rows.length === 0 && (
-                <Empty
-                  description={
-                    filtered ? '没有符合条件的记录' : '当前范围暂无记录'
-                  }
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                />
-              )}
-            </div>
-            {data &&
-              data.total > 0 &&
-              (hasMore ||
-                loadingMore ||
-                loadMoreError ||
-                data.rows.length > query.limit) && (
-                <div
-                  className="mobile-progress-continuation"
-                  ref={hasMore && !loadMoreError ? loadMoreRef : null}
-                  role="status"
-                  aria-live="polite"
-                >
-                  {loadMoreError ? (
-                    <>
-                      <span>继续加载失败</span>
-                      <button
-                        type="button"
-                        className="erp-control-button"
-                        disabled={loadingMore}
-                        onClick={() => load({ append: true })}
-                      >
-                        重试
-                      </button>
-                    </>
-                  ) : loadingMore ? (
-                    <span>正在加载更多…</span>
-                  ) : hasMore ? (
-                    <span>继续下滑加载</span>
-                  ) : (
-                    <span>已显示全部 {data.rows.length} 条</span>
+                    {row.attention_reason && (
+                      <span className="mobile-progress-issue">
+                        任务受阻：{row.attention_reason}
+                      </span>
+                    )}
+                  </button>
+                  {data.access.tasks && (
+                    <button
+                      type="button"
+                      className="mobile-progress-owner"
+                      aria-label={`查看 ${row.order_no} 的关联任务`}
+                      onClick={() => open(row, 'tasks')}
+                    >
+                      {mobileProgressTaskOwner(row, roleLabel)}
+                      <RightOutlined />
+                    </button>
                   )}
-                </div>
-              )}
-          </Spin>
-        )}
+                </article>
+              )
+            })}
+            {data?.rows.length === 0 && (
+              <Empty
+                description={
+                  filtered ? '没有符合条件的记录' : '当前范围暂无记录'
+                }
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            )}
+          </div>
+          {data &&
+            data.total > 0 &&
+            (hasMore ||
+              loadingMore ||
+              loadMoreError ||
+              data.rows.length > query.limit) && (
+              <div
+                className="mobile-progress-continuation"
+                ref={hasMore && !loadMoreError ? loadMoreRef : null}
+                role="status"
+                aria-live="polite"
+              >
+                {loadMoreError ? (
+                  <>
+                    <span>继续加载失败</span>
+                    <button
+                      type="button"
+                      className="erp-control-button"
+                      disabled={loadingMore}
+                      onClick={() => load({ append: true })}
+                    >
+                      重试
+                    </button>
+                  </>
+                ) : loadingMore ? (
+                  <span>正在加载更多…</span>
+                ) : hasMore ? (
+                  <span>继续下滑加载</span>
+                ) : (
+                  <span>已显示全部 {data.rows.length} 条</span>
+                )}
+              </div>
+            )}
+        </Spin>
+        {data ? (
+          <div className="mobile-progress-range" role="status">
+            已显示 {data.rows.length} / 共 {data.total} 张
+            {query.view === 'orders' ? '订单' : '生产单'}
+          </div>
+        ) : null}
       </div>
       <BusinessProgressDrawer
         mobile

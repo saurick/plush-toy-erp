@@ -247,7 +247,7 @@ test('production rework uses a source-bound retry-safe command and rereads unkno
 
 test('posted rework records open authoritative progress and link back to the production order', () => {
   assert.match(source, /ProductionReworkProgressModal/u)
-  assert.match(source, /'production\.wip\.read'/u)
+  assert.match(source, /canViewProductionReworkProgress = canReadProductionProcess\(adminProfile\)/u)
   assert.match(source, /selectedCanViewProductionReworkProgress/u)
   assert.match(productionActions, /getProductionWip\(orderID\)/u)
   assert.match(productionActions, /origin_rework_fact_id/u)

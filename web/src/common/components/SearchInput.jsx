@@ -27,8 +27,9 @@ export default function SearchInput({
       open={showHint}
       trigger={[]}
       placement="bottomLeft"
+      styles={{ root: { maxWidth: 'min(384px, calc(100vw - 64px))' } }}
       content={
-        <div id={hintID} style={{ maxWidth: 'min(360px, calc(100vw - 48px))' }}>
+        <div id={hintID} style={{ overflowWrap: 'anywhere' }}>
           {searchHint}
         </div>
       }
@@ -41,9 +42,11 @@ export default function SearchInput({
         placeholder={placeholder}
         aria-label={accessibleLabel}
         title={title}
-        aria-describedby={showHint
-          ? [restProps['aria-describedby'], hintID].filter(Boolean).join(' ')
-          : restProps['aria-describedby']}
+        aria-describedby={
+          showHint
+            ? [restProps['aria-describedby'], hintID].filter(Boolean).join(' ')
+            : restProps['aria-describedby']
+        }
         onFocus={(event) => {
           setFocused(true)
           restProps.onFocus?.(event)

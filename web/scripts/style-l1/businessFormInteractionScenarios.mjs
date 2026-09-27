@@ -1,9 +1,11 @@
-import { verifyPurchaseArrivalRedesign } from './purchaseArrivalRedesignScenarios.mjs'
 import { Buffer } from 'node:buffer'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { verifyPurchaseArrivalRedesign } from './purchaseArrivalRedesignScenarios.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 export function createBusinessFormInteractionScenarios({
   customerRuntimeEffectiveSession,
@@ -202,6 +204,124 @@ export function createBusinessFormInteractionScenarios({
   let releasePurchaseOrderInitialReference = () => {}
   return [
     {
+      name: 'unit-quantity-precision-desktop',
+      path: '/erp/sales/project-orders/sales-orders',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 1000 },
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/masterdata', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (body.method !== 'list_units') return route.fallback()
+          await route.fulfill({
+            json: {
+              jsonrpc: '2.0',
+              id: body.id,
+              result: styleRpcResult(
+                stylePaginatedRpcData(
+                  [
+                    {
+                      id: 1,
+                      code: 'EA',
+                      name: '个',
+                      precision: 0,
+                      is_active: true,
+                    },
+                    {
+                      id: 2,
+                      code: 'YD',
+                      name: '码',
+                      precision: 6,
+                      is_active: true,
+                    },
+                    {
+                      id: 3,
+                      code: 'KG',
+                      name: '千克',
+                      precision: 3,
+                      is_active: true,
+                    },
+                  ],
+                  'units',
+                  body.params
+                )
+              ),
+            },
+          })
+        })
+      },
+      verify: async (page) => {
+        await page.getByRole('button', { name: '新建订单' }).click()
+        const form = page.locator('.erp-business-form-page:not([hidden])')
+        await form
+          .getByRole('button', { name: '添加订货明细', exact: true })
+          .click()
+        await form
+          .getByLabel('订货产品名称', { exact: true })
+          .fill('模拟精度校验材料')
+        const quantity = form
+          .locator('.ant-form-item')
+          .filter({ has: page.locator('label', { hasText: /^订单数量$/u }) })
+          .locator('input:not(.erp-item-field-unit-suffix)')
+          .first()
+        const unit = form
+          .locator(
+            '.erp-line-item-field--unit .ant-select-selection-search-input'
+          )
+          .first()
+        const selectUnit = async (search, label) => {
+          await unit.fill(search)
+          await page
+            .locator(
+              '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content'
+            )
+            .getByText(label, { exact: true })
+            .click()
+        }
+        await selectUnit('PCS', '个')
+        await quantity.fill('1.5')
+        await quantity.blur()
+        await form
+          .getByText('当前单位只允许整数数量', { exact: true })
+          .first()
+          .waitFor()
+        assert.equal(
+          await quantity.inputValue(),
+          '1.5',
+          'count input must not silently round'
+        )
+        await selectUnit('kg', '千克')
+        await quantity.fill('1.125')
+        await quantity.blur()
+        await form
+          .getByText('当前单位只允许整数数量', { exact: true })
+          .waitFor({ state: 'hidden' })
+        await quantity.fill('0.0001')
+        await quantity.blur()
+        await form
+          .getByText('当前单位最多允许 3 位小数', { exact: true })
+          .first()
+          .waitFor()
+        assert.equal(await quantity.inputValue(), '0.0001')
+        await selectUnit('Y', '码')
+        await quantity.fill('0.000001')
+        await quantity.blur()
+        await form
+          .getByText('当前单位最多允许 3 位小数', { exact: true })
+          .waitFor({ state: 'hidden' })
+        assert.equal(await quantity.inputValue(), '0.000001')
+        await selectUnit('PCS', '个')
+        await form
+          .getByText('当前单位只允许整数数量', { exact: true })
+          .first()
+          .waitFor()
+        await page.screenshot({
+          path: path.join(outputDir, 'unit-quantity-precision.png'),
+          fullPage: true,
+        })
+      },
+    },
+    {
       name: 'material-master-header-desktop',
       path: '/erp/master/materials',
       auth: 'admin',
@@ -211,7 +331,7 @@ export function createBusinessFormInteractionScenarios({
         await expectHeading(page, '材料档案')
         await expectText(page, '样式材料')
         await expectText(page, '默认单位')
-        await expectText(page, '件（PCS）')
+        await expectText(page, '个')
         await assertTextAbsent(page, '默认单位 ID')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'material-master-header-desktop',
@@ -234,7 +354,9 @@ export function createBusinessFormInteractionScenarios({
         })
         await page.getByRole('button', { name: '新建材料' }).click()
         const materialModal = page
-          .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
+          .locator(
+            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+          )
           .last()
         await materialModal.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '新建材料档案')
@@ -294,7 +416,7 @@ export function createBusinessFormInteractionScenarios({
           ),
           '材料颜色候选浮层不应退回浏览器黑底样式'
         )
-        await expectText(page, '件（PCS）')
+        await expectText(page, '个')
         await assertTextAbsent(page, '默认单位 ID')
         await closeBusinessFormModal(page, materialModal)
         await page
@@ -481,8 +603,7 @@ export function createBusinessFormInteractionScenarios({
           .filter({ hasText: '新建采购订单' })
           .first()
         const refreshButton = page
-          .locator('.erp-admin-header button')
-          .filter({ hasText: '刷新当前页' })
+          .getByRole('button', { name: '刷新当前页', exact: true })
           .first()
         await createButton.waitFor({ state: 'visible', timeout: 10_000 })
         await refreshButton.waitFor({ state: 'visible', timeout: 10_000 })
@@ -493,7 +614,9 @@ export function createBusinessFormInteractionScenarios({
         )
         assert.equal(
           await page
-            .locator('.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible')
+            .locator(
+              '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+            )
             .count(),
           0,
           '采购基础资料尚在加载时不应打开空白采购订单弹窗'
@@ -625,7 +748,7 @@ export function createBusinessFormInteractionScenarios({
             })
             await assertLineQuantityUnitSuffix(modal, {
               label: '采购数量',
-              expectedText: '件（PCS）',
+              expectedText: '个',
               scenarioName: 'business-v1-purchase-order-form-modal',
             })
             await assertLineItemAddActionScrollsToNewRow(modal, {
@@ -771,7 +894,8 @@ export function createBusinessFormInteractionScenarios({
           })
         })
       },
-      verify: async (page) => verifyPurchaseArrivalRedesign(page, { outputDir }),
+      verify: async (page) =>
+        verifyPurchaseArrivalRedesign(page, { outputDir }),
     },
     {
       name: 'processing-contract-form-modal-title-desktop',
@@ -857,7 +981,10 @@ export function createBusinessFormInteractionScenarios({
             const productSKUInput = modal
               .locator('input[id$="_product_sku_id"]')
               .first()
-            await modal.locator('.erp-line-item-details > summary').first().click()
+            await modal
+              .locator('.erp-line-item-details > summary')
+              .first()
+              .click()
             await productSKUInput.click()
             await productSKUInput.fill('SKU-OUTSOURCE-CATALOG-L1')
             const secondPageSKUOption = page
@@ -1133,6 +1260,13 @@ export function createBusinessFormInteractionScenarios({
         await expectHeading(page, '出货单')
         await expectText(page, '计划出货日期')
         await expectText(page, '实际出货日期')
+        await page
+          .locator(
+            '.erp-business-operation-panel button[aria-haspopup="dialog"]'
+          )
+          .click()
+        await page.getByRole('dialog', { name: '筛选条件' }).waitFor()
+        await waitForFiniteAnimations(page)
         const metrics = await page.evaluate(() => {
           const control = document.querySelector(
             '.erp-business-date-range-filter'
@@ -1359,11 +1493,14 @@ export function createBusinessFormInteractionScenarios({
           titleText: '新建供应商或加工厂',
           minFieldCount: 5,
           screenshotName: 'textarea-show-count-supplier-form-modal',
-          expectedTexts: ['备注', '联系人', '添加条目'],
+          expectedTexts: ['备注', '联系人', '添加联系人'],
           expectContactItemsLayout: true,
           beforeMeasure: async (modal) => {
             await modal
-              .locator('.erp-master-contact-list__field--full textarea')
+              .getByRole('button', { name: '展开联系人备注 1', exact: true })
+              .click()
+            await modal
+              .locator('.erp-contact-editor__note-editor textarea')
               .first()
               .fill('123123123123123123123123123123123123123123123123')
           },
@@ -1448,7 +1585,7 @@ export function createBusinessFormInteractionScenarios({
         await expectText(page, '暗色客户')
         await expectButton(page, '登记收付款')
         await expectButton(page, '导出筛选结果')
-        await expectButton(page, '列顺序')
+        await expectButton(page, '列设置')
         const paymentExportButton = page.getByRole('button', {
           name: '导出筛选结果',
         })
@@ -1577,7 +1714,7 @@ export function createBusinessFormInteractionScenarios({
         )
         await expectButton(page, '登记红冲')
         await expectButton(page, '导出筛选结果')
-        await expectButton(page, '列顺序')
+        await expectButton(page, '列设置')
         const creditToolbarActions = page
           .locator('.erp-business-operation-panel__actions')
           .first()
@@ -1590,7 +1727,7 @@ export function createBusinessFormInteractionScenarios({
           '没有红冲记录时导出筛选结果应保持禁用'
         )
         await creditToolbarActions
-          .getByRole('button', { name: '列顺序' })
+          .getByRole('button', { name: '列设置' })
           .click()
         const creditColumnOrderDialog = page.locator(
           '.erp-business-action-modal--columns:visible'
@@ -1601,7 +1738,7 @@ export function createBusinessFormInteractionScenarios({
         })
         await page
           .getByRole('list', {
-            name: '收付款与核销 / 红冲记录列顺序',
+            name: '收付款与核销 / 红冲记录列设置',
             exact: true,
           })
           .waitFor({ state: 'visible', timeout: 10_000 })
@@ -1683,10 +1820,26 @@ export function createBusinessFormInteractionScenarios({
           .getByLabel('应收 / 应付')
           .inputValue()
         assert.match(allocationLabel, /AR-STYLE-L1/)
-        assert.match(allocationLabel, /未核销 1200/)
+        assert.equal(
+          await allocationDialog.getByLabel('未核销余额').inputValue(),
+          '1200'
+        )
         await allocationDialog
           .getByRole('textbox', { name: /本次核销金额/u })
           .fill('1200')
+        await page.setViewportSize({ width: 600, height: 1000 })
+        await allocationDialog
+          .getByRole('button', { name: '查看本次核销金额说明', exact: true })
+          .click()
+        await page
+          .locator('.erp-business-inline-help-popover')
+          .waitFor({ state: 'visible' })
+        await allocationDialog.locator('.ant-modal-title').click()
+        await page.screenshot({
+          path: `${outputDir}/finance-allocation-narrow-help.png`,
+          fullPage: true,
+        })
+        await page.setViewportSize({ width: 1600, height: 900 })
         await assertOperationalFactModalViewport(
           page,
           'exception-finance-payment-dark-desktop-allocation'

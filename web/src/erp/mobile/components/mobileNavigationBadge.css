@@ -1,36 +1,36 @@
 .mobile-navigation-icon {
   position: relative;
   display: inline-flex;
-  width: 34px;
-  height: 32px;
+  width: 24px;
+  height: 20px;
   align-items: center;
   justify-content: center;
 }
 
 .mobile-navigation-badge {
   position: absolute;
-  top: 0;
-  right: -13px;
+  top: -6px;
+  left: calc(50% + 6px);
   display: inline-flex;
-  min-width: 21px;
-  height: 21px;
+  min-width: 17px;
+  height: 17px;
   align-items: center;
   justify-content: center;
-  border: 2px solid #fff;
-  border-radius: 12px;
+  border: 2px solid var(--erp-surface-bg);
+  border-radius: 999px;
   padding: 0 4px;
-  background: #047857;
+  background: var(--erp-visual-danger-text);
   color: #fff;
-  font-size: 11px;
-  font-weight: 650;
+  font-size: 9px;
+  font-weight: 750;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   white-space: nowrap;
   pointer-events: none;
 }
 
-.mobile-navigation-badge--risk {
-  background: #dc2626;
+.mobile-role-bottom-nav__item--active .mobile-navigation-badge {
+  border-color: var(--erp-control-selected);
 }
 
 .mobile-navigation-count-error {
@@ -47,13 +47,6 @@
 }
 
 [data-erp-theme='dark'] .mobile-navigation-badge {
-  border-color: #172334;
-  background: #6ee7b7;
-  color: #062d23;
-}
-
-[data-erp-theme='dark'] .mobile-navigation-badge--risk {
-  background: #fda4af;
   color: #450a0a;
 }
 

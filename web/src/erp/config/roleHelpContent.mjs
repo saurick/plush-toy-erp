@@ -124,7 +124,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         title: '跟进到料入库',
         description: '跟催已批准采购订单的到货，查看仓库登记和品质检验进度。',
         path: '/erp/warehouse/inbound',
-        actionLabel: '打开入库管理',
+        actionLabel: '打开采购入库',
       },
     ],
     workflow: [
@@ -215,7 +215,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         title: '办理入库',
         description: '从采购来源核对收货、待检和入库状态。',
         path: '/erp/warehouse/inbound',
-        actionLabel: '打开入库管理',
+        actionLabel: '打开采购入库',
       },
       {
         title: '确认成品入库',
@@ -382,7 +382,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         title: '查看来料来源',
         description: '核对采购到料、批次和当前入库状态。',
         path: '/erp/warehouse/inbound',
-        actionLabel: '打开入库管理',
+        actionLabel: '打开采购入库',
       },
       {
         title: '跟进异常处理',

@@ -41,7 +41,7 @@
 
 .erp-secondary-button {
   border: 1px solid #d9e6da;
-  background: white;
+  background: var(--erp-surface-bg);
   color: #1f2937;
 }
 
@@ -63,7 +63,7 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 10px;
-  color: #2c7b4e;
+  color: var(--erp-primary-strong);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -75,7 +75,7 @@
 }
 
 .erp-print-center-nav-title {
-  color: #6f7f73;
+  color: var(--erp-text-muted);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -84,7 +84,7 @@
 
 .erp-print-center-note-text,
 .erp-print-center-workbench-note {
-  color: #6d7b70;
+  color: var(--erp-text-muted);
   line-height: 1.6;
 }
 
@@ -117,9 +117,9 @@
 .erp-print-center-preview-panel {
   min-width: 0;
   padding: 16px;
-  border: 1px solid #e3eee6;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #fbfdfb;
+  background: var(--erp-surface-bg-soft);
   overflow: hidden;
 }
 
@@ -143,11 +143,11 @@
   min-width: 0;
   min-height: 62px;
   padding: 12px;
-  color: #223127;
+  color: var(--erp-text);
   text-align: left;
-  border: 1px solid #dce9df;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--erp-surface-bg);
   cursor: pointer;
   transition:
     border-color 0.2s ease,
@@ -157,15 +157,15 @@
 
 .erp-print-center-template-btn:hover,
 .erp-print-center-template-btn--active {
-  border-color: #9fcca9;
-  background: #f4fbf4;
-  box-shadow: 0 6px 14px rgb(52 118 72 / 8%);
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-softer);
+  box-shadow: var(--erp-surface-shadow);
 }
 
 .erp-print-center-template-btn:disabled {
-  color: #718074;
+  color: var(--erp-text-subtle);
   cursor: not-allowed;
-  background: #f8faf8;
+  background: var(--erp-surface-bg-soft);
   box-shadow: none;
 }
 
@@ -189,7 +189,7 @@
 }
 
 .erp-print-center-template-meta {
-  color: #2c7b4e;
+  color: var(--erp-primary-strong);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
@@ -208,7 +208,7 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 5px;
-  color: #1f6f43;
+  color: var(--erp-primary-strong);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
@@ -229,7 +229,7 @@
   align-items: flex-start;
   padding: 9px 11px;
   border-radius: 12px;
-  background: #f8faf8;
+  background: var(--erp-surface-bg-soft);
 }
 
 .erp-print-center-note-dot {
@@ -238,7 +238,7 @@
   height: 8px;
   margin-top: 7px;
   border-radius: 50%;
-  background: #2f8f4b;
+  background: var(--erp-primary);
 }
 
 .erp-print-center-paper-preview {
@@ -336,10 +336,22 @@
 }
 
 .erp-print-shell {
+  --erp-print-selection-color: var(--erp-accent);
+  --erp-print-selection-background: color-mix(
+    in srgb,
+    var(--erp-accent) 10%,
+    #fff
+  );
+  --erp-print-selection-anchor-background: color-mix(
+    in srgb,
+    var(--erp-accent) 18%,
+    #fff
+  );
+  color: var(--erp-text);
   position: relative;
   min-height: 100vh;
   padding: 10px 14px 14px;
-  background: #f5f7fa;
+  background: var(--erp-page-bg);
 }
 
 .erp-print-shell__toolbar {
@@ -352,9 +364,9 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 10px 14px;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--erp-surface-bg);
 }
 
 .erp-print-shell__toolbar-copy {
@@ -365,7 +377,7 @@
   align-content: flex-start;
   flex-wrap: wrap;
   gap: 6px 10px;
-  color: #262626;
+  color: var(--erp-text);
 }
 
 .erp-print-shell__source-tag {
@@ -374,14 +386,14 @@
   min-height: 24px;
   padding: 2px 10px;
   border-radius: 999px;
-  background: #e6f4ea;
-  color: #1f7a3f;
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
   font-size: 12px;
 }
 
 .erp-print-shell__toolbar-status {
   font-size: 12px;
-  color: #595959;
+  color: var(--erp-text-muted);
 }
 
 .erp-print-shell__toolbar-actions {
@@ -424,31 +436,31 @@
 }
 
 .erp-print-shell__button--ghost {
-  border: 1px solid #8c8c8c;
-  background: #fff;
-  color: #262626;
+  border: 1px solid var(--erp-border-strong);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
 }
 
 .erp-print-shell__button--ghost:hover:not(:disabled) {
-  border-color: #1f7a3f;
-  color: #1f7a3f;
+  border-color: var(--erp-primary-strong);
+  color: var(--erp-primary-strong);
 }
 
 .erp-print-shell__button--primary {
-  border: 1px solid #1f7a3f;
-  background: #1f7a3f;
-  color: #fff;
+  border: 1px solid var(--erp-primary);
+  background: var(--erp-primary);
+  color: var(--erp-on-accent);
 }
 
 .erp-print-shell__button--primary:hover:not(:disabled) {
-  border-color: #166534;
-  background: #166534;
+  border-color: color-mix(in srgb, var(--erp-primary) 90%, #000);
+  background: color-mix(in srgb, var(--erp-primary) 90%, #000);
 }
 
 .erp-print-shell__button--active {
-  border-color: #1f7a3f;
-  background: #f6ffed;
-  color: #1f7a3f;
+  border-color: var(--erp-primary-strong);
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
 }
 
 .erp-print-shell__counter {
@@ -456,11 +468,11 @@
   align-items: center;
   min-height: 32px;
   padding: 0 12px;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--erp-border);
   border-radius: 16px;
-  background: #fafafa;
+  background: var(--erp-surface-bg-soft);
   font-size: 12px;
-  color: #595959;
+  color: var(--erp-text-muted);
   white-space: nowrap;
 }
 
@@ -469,12 +481,12 @@
   gap: 6px;
   margin-top: 0;
   padding: 10px 12px;
-  border: 1px solid #d9e7da;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #f6faf6;
+  background: var(--erp-surface-bg-soft);
   font-size: 12px;
   line-height: 1.6;
-  color: #243428;
+  color: var(--erp-text);
 }
 
 .erp-print-shell__content {
@@ -493,8 +505,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f7fa;
-  color: #434343;
+  background: var(--erp-page-bg);
+  color: var(--erp-text);
   font:
     14px/1.6 -apple-system,
     BlinkMacSystemFont,
@@ -516,9 +528,9 @@
   max-height: calc(100vh - 96px);
   padding: 12px;
   overflow: auto;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--erp-surface-bg);
   font:
     400 13px/20px system-ui,
     -apple-system,
@@ -531,12 +543,12 @@
   margin: 8px 0 10px;
   font-size: 12px;
   line-height: 1.6;
-  color: #595959;
+  color: var(--erp-text-muted);
 }
 
 .erp-print-shell__tool-section {
   padding: 12px 0;
-  border-top: 1px solid #edf0ed;
+  border-top: 1px solid var(--erp-border);
 }
 
 .erp-print-shell__tool-section:first-child {
@@ -550,7 +562,7 @@
 
 .erp-print-shell__tool-section h3 {
   margin: 0 0 8px;
-  color: #36433a;
+  color: var(--erp-text);
   font-size: 12px;
   line-height: 20px;
 }
@@ -567,10 +579,10 @@
   box-sizing: border-box;
   height: 32px;
   padding: 0 8px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--erp-border-strong);
   border-radius: 6px;
-  background: #fff;
-  color: #334155;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
   font:
     400 13px/20px system-ui,
     -apple-system,
@@ -581,13 +593,13 @@
 }
 
 .erp-print-shell__tool-section .erp-print-shell__button:hover:not(:disabled) {
-  border-color: #94a3b8;
+  border-color: var(--erp-primary);
 }
 
 .erp-print-shell__tool-section .erp-print-shell__button--active {
-  border-color: #1f7a3f;
-  background: #f6ffed;
-  color: #1f7a3f;
+  border-color: var(--erp-primary-strong);
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
 }
 
 .erp-print-shell__tool-section .erp-print-shell__counter {
@@ -609,7 +621,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #334155;
+  color: var(--erp-text);
   font:
     400 13px/20px system-ui,
     -apple-system,
@@ -634,8 +646,8 @@
   box-sizing: border-box;
   width: 6px;
   height: 6px;
-  border-right: 1.5px solid #64748b;
-  border-bottom: 1.5px solid #64748b;
+  border-right: 1.5px solid var(--erp-text-subtle);
+  border-bottom: 1.5px solid var(--erp-text-subtle);
   transform: translateY(-70%) rotate(45deg);
   pointer-events: none;
 }
@@ -649,10 +661,10 @@
   min-width: 0;
   margin: 0;
   padding: 4px 28px 4px 10px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--erp-border-strong);
   border-radius: 6px;
-  background: #fff;
-  color: #334155;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
   font: inherit;
   letter-spacing: normal;
   line-height: 20px;
@@ -661,11 +673,11 @@
 }
 
 .erp-print-shell .print-zoom-select select:hover {
-  border-color: #94a3b8;
+  border-color: var(--erp-primary);
 }
 
 .erp-print-shell .print-zoom-select select:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
 }
 
@@ -684,10 +696,10 @@
   overflow: auto;
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid #d7e1da;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #fff;
-  color: #334155;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
   font:
     400 13px/20px system-ui,
     -apple-system,
@@ -712,7 +724,7 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: #64748b;
+  color: var(--erp-text-subtle);
   font:
     20px/24px system-ui,
     sans-serif;
@@ -720,24 +732,24 @@
 }
 
 .erp-print-shell__feedback-close:hover {
-  background: #f1f5f9;
+  background: var(--erp-surface-bg-soft);
 }
 
 .erp-print-shell__feedback-close:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
 }
 
 .erp-print-shell__record-panel .erp-print-shell__tool-feedback {
   margin: 8px 0 0;
-  color: #52605a;
+  color: var(--erp-text-muted);
   font-size: 12px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
 .erp-print-shell [data-print-feedback][data-tone='error'] {
-  color: #b42318;
+  color: var(--erp-visual-danger-text);
 }
 
 @media screen {
@@ -759,8 +771,16 @@
   }
 
   .erp-print-shell__stage {
-    --erp-print-focus-color: rgb(47 143 75 / 82%);
-    --erp-print-focus-background: rgb(47 143 75 / 8%);
+    --erp-print-focus-color: color-mix(
+      in srgb,
+      var(--erp-accent) 82%,
+      transparent
+    );
+    --erp-print-focus-background: color-mix(
+      in srgb,
+      var(--erp-accent) 8%,
+      transparent
+    );
     --erp-print-focus-outset: 5px;
   }
 
@@ -841,9 +861,9 @@
   max-height: calc(100vh - 96px);
   padding: 24px;
   overflow: auto;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #d9d9d9;
+  background: var(--erp-page-bg);
 }
 
 .erp-print-shell__stage-wrap {
@@ -859,7 +879,7 @@
 .erp-print-shell__selection-impact {
   display: block;
   margin-top: 4px;
-  color: #66736b;
+  color: var(--erp-text-muted);
   font-size: 12px;
   font-weight: 400;
 }
@@ -869,7 +889,7 @@
   align-items: center;
   gap: 8px;
   min-height: 32px;
-  color: #334155;
+  color: var(--erp-text);
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
@@ -887,8 +907,8 @@
   width: 6px;
   height: 6px;
   margin: 0 3px 3px auto;
-  border-right: 1.5px solid #64748b;
-  border-bottom: 1.5px solid #64748b;
+  border-right: 1.5px solid var(--erp-text-subtle);
+  border-bottom: 1.5px solid var(--erp-text-subtle);
   transform: rotate(45deg);
 }
 
@@ -904,7 +924,7 @@
 }
 
 .erp-print-shell__tool-count {
-  color: #64748b;
+  color: var(--erp-text-subtle);
   font-size: 12px;
   font-weight: 400;
 }
@@ -927,7 +947,7 @@
   flex: 0 0 16px;
   width: 16px;
   height: 16px;
-  color: #2c7b4e;
+  color: var(--erp-primary-strong);
 }
 
 .erp-print-shell__toolbar .erp-print-tool-button {
@@ -940,19 +960,19 @@
 }
 
 .erp-print-shell__record-panel :is(button, summary, select):focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
 }
 
 .erp-print-shell__selection {
   margin-bottom: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px dashed #cbd5e1;
+  border-bottom: 1px dashed var(--erp-border-strong);
 }
 
 .erp-print-shell__selection > p {
   margin: 0;
-  color: #1d4ed8;
+  color: var(--erp-primary-strong);
 }
 
 .erp-print-image-tools {
@@ -967,7 +987,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--erp-border);
   border-radius: 6px;
 }
 
@@ -978,7 +998,7 @@
   width: 56px;
   height: 56px;
   border-radius: 4px;
-  background: #f8fafc;
+  background: var(--erp-surface-bg-soft);
   overflow: hidden;
 }
 
@@ -1012,7 +1032,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: #2c7b4e;
+  color: var(--erp-primary-strong);
   font: inherit;
   cursor: pointer;
 }
@@ -1025,7 +1045,7 @@
 }
 
 .erp-print-image-tool__actions button:last-child {
-  color: #64748b;
+  color: var(--erp-text-subtle);
 }
 
 .erp-print-shell__record-panel > .erp-print-shell__tool-section > h3 {

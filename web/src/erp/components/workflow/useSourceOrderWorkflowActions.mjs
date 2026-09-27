@@ -34,14 +34,14 @@ export function useSourceOrderWorkflowActions({
     }
   }, [])
   const completeWorkflowTask = useCallback(
-    async (task) => {
+    async (task, { reason = '' } = {}) => {
       const scope = `${task.id}:complete`
       const operation = 'complete'
       const params = {
         task_id: task.id,
         expected_version: task.version,
         action_key: operation,
-        reason: '',
+        reason: task.task_group === 'business_followup' ? reason.trim() : '',
         payload: {
           surface_key: surfaceKey,
         },

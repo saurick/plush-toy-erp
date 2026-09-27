@@ -1,12 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
-import {
-  ArrowRightOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  MobileOutlined,
-  SwapOutlined,
-} from '@ant-design/icons'
-import { Button, Card, Empty, Select, Space, Tag, Typography } from 'antd'
+import { ArrowRightOutlined, MobileOutlined } from '@ant-design/icons'
+import { Button, Select, Typography } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -16,18 +10,23 @@ import {
   getEnabledMobileRoleKeys,
   getEntryConfig,
 } from '../config/entryConfig.mjs'
+import { getRoleHelpGuidesForProfile } from '../config/roleHelpContent.mjs'
 import {
-  filterRoleHelpPriorities,
-  getRoleHelpGuidesForProfile,
-} from '../config/roleHelpContent.mjs'
+  getRoleHelpScenarios,
+  resolveHelpScenario,
+} from '../config/helpScenarios.mjs'
 import { getAllowedMobileRoleKeys } from '../utils/mobileRolePermissions.mjs'
+import { HELP_VISUAL_EXAMPLES } from '../config/helpScenarioPresentation.mjs'
+import HelpScenarioContent from '../components/help/HelpScenarioContent'
 
-const { Paragraph, Text, Title } = Typography
+const { Text, Title } = Typography
+const scenarioTitle = (scenario) =>
+  HELP_VISUAL_EXAMPLES[scenario.key]?.title || scenario.title
 
 export default function HelpCenterPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { adminProfile = null, allowedMenuPaths = [] } =
+  const { adminProfile = null, visibleMenuPaths = [] } =
     useOutletContext() || {}
   const guides = useMemo(
     () => getRoleHelpGuidesForProfile(adminProfile || {}),
@@ -36,24 +35,34 @@ export default function HelpCenterPage() {
   const requestedRoleKey = String(searchParams.get('role') || '').trim()
   const selectedGuide =
     guides.find((guide) => guide.key === requestedRoleKey) || guides[0]
+  const scenarios = useMemo(
+    () =>
+      getRoleHelpScenarios(selectedGuide, {
+        allowedMenuPaths: visibleMenuPaths,
+      }),
+    [visibleMenuPaths, selectedGuide]
+  )
+  const selectedScenario = resolveHelpScenario(
+    scenarios,
+    searchParams.get('scene')
+  )
 
   useEffect(() => {
-    if (!selectedGuide || requestedRoleKey === selectedGuide.key) {
+    if (!selectedGuide || !selectedScenario) return
+    if (
+      searchParams.getAll('role').length === 1 &&
+      searchParams.get('role') === selectedGuide.key &&
+      searchParams.getAll('scene').length === 1 &&
+      searchParams.get('scene') === selectedScenario.key
+    ) {
       return
     }
-    const nextSearchParams = new URLSearchParams(searchParams)
-    nextSearchParams.set('role', selectedGuide.key)
-    setSearchParams(nextSearchParams, { replace: true })
-  }, [requestedRoleKey, searchParams, selectedGuide, setSearchParams])
+    const next = new URLSearchParams(searchParams)
+    next.set('role', selectedGuide.key)
+    next.set('scene', selectedScenario.key)
+    setSearchParams(next, { replace: true })
+  }, [searchParams, selectedGuide, selectedScenario, setSearchParams])
 
-  const priorities = useMemo(
-    () =>
-      filterRoleHelpPriorities(selectedGuide, {
-        allowedMenuPaths,
-        isSuperAdmin: adminProfile?.is_super_admin === true,
-      }).filter((priority) => priority.available),
-    [adminProfile?.is_super_admin, allowedMenuPaths, selectedGuide]
-  )
   const allowedMobileRoleKeys = useMemo(
     () =>
       new Set(
@@ -64,188 +73,145 @@ export default function HelpCenterPage() {
       ),
     [adminProfile]
   )
-  const mobileEntryAvailable = allowedMobileRoleKeys.has(selectedGuide?.key)
-  const hiddenPriorityCount = Math.max(
-    0,
-    (selectedGuide?.priorities?.length || 0) - priorities.length
-  )
 
   const handleRoleChange = (roleKey) => {
-    const nextSearchParams = new URLSearchParams(searchParams)
-    nextSearchParams.set('role', roleKey)
-    setSearchParams(nextSearchParams)
+    const next = new URLSearchParams(searchParams)
+    next.set('role', roleKey)
+    next.delete('scene')
+    setSearchParams(next)
+  }
+  const handleScenarioChange = (scenarioKey) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('scene', scenarioKey)
+    setSearchParams(next)
   }
 
-  if (!selectedGuide) {
-    return null
-  }
+  if (!selectedGuide || !selectedScenario) return null
 
   return (
     <div
       className="erp-help-center-page"
       data-role-help-key={selectedGuide.key}
     >
-      <Card className="erp-page-card erp-help-center-hero" variant="borderless">
-        <div className="erp-help-center-hero__main">
-          <div>
-            <Space size={8} wrap>
-              <Tag color="green">岗位使用帮助</Tag>
-              <Tag>{selectedGuide.label}</Tag>
-            </Space>
-            <Title level={2} className="erp-help-center-hero__title">
-              {selectedGuide.headline}
-            </Title>
-          </div>
-
-          {guides.length > 1 ? (
-            <div className="erp-help-center-role-picker">
-              <label htmlFor="erp-help-center-role-select">
-                <Text type="secondary">查看其他岗位说明</Text>
-              </label>
-              <Select
-                id="erp-help-center-role-select"
-                value={selectedGuide.key}
-                options={guides.map((guide) => ({
-                  value: guide.key,
-                  label: guide.label,
-                }))}
-                onChange={handleRoleChange}
-                suffixIcon={<SwapOutlined aria-hidden="true" />}
-              />
-            </div>
-          ) : null}
-        </div>
-
-        <div className="erp-help-center-hero__actions">
-          <Button
-            icon={<CheckCircleOutlined />}
-            onClick={() => navigate('/erp/dashboard')}
+      <div className="erp-help-center-workspace">
+        <aside className="erp-help-sidebar" aria-label="岗位与场景">
+          <div
+            className={
+              guides.length > 1
+                ? 'erp-help-center-role-picker'
+                : 'erp-help-current-role'
+            }
           >
-            返回工作台
-          </Button>
-          {mobileEntryAvailable ? (
-            <Button
-              type="primary"
-              icon={<MobileOutlined />}
-              onClick={() => navigate(`/m/${selectedGuide.key}/tasks`)}
-            >
-              打开{selectedGuide.label}手机待办
-            </Button>
-          ) : null}
-        </div>
-      </Card>
-
-      {guides.length > 1 ? (
-        <Text type="secondary" className="erp-help-center-role-note">
-          当前查看“{selectedGuide.label}
-          ”说明；切换这里只查看说明，不改变岗位或权限。
-        </Text>
-      ) : null}
-
-      <section aria-labelledby="help-priorities-title">
-        <div className="erp-help-center-section-head">
-          <div>
-            <Title level={4} id="help-priorities-title">
-              今天先做什么
-            </Title>
-            <Text type="secondary">只显示当前账号已经开放的常用入口。</Text>
+            {guides.length > 1 ? (
+              <>
+                <label htmlFor="erp-help-center-role-select">查看岗位</label>
+                <Select
+                  id="erp-help-center-role-select"
+                  value={selectedGuide.key}
+                  options={guides.map((guide) => ({
+                    value: guide.key,
+                    label: guide.label,
+                  }))}
+                  onChange={handleRoleChange}
+                  virtual={false}
+                />
+              </>
+            ) : (
+              <>
+                <span className="erp-help-sidebar__label">帮助中心</span>
+                <strong>{selectedGuide.label}</strong>
+              </>
+            )}
           </div>
-          {hiddenPriorityCount > 0 ? (
-            <Tag>{hiddenPriorityCount} 个入口未开放</Tag>
-          ) : null}
-        </div>
-
-        {priorities.length > 0 ? (
-          <div className="erp-help-center-priority-grid">
-            {priorities.map((priority, index) => (
-              <Card
-                key={priority.path}
-                className="erp-page-card erp-help-center-priority-card"
-                variant="borderless"
+          <div className="erp-help-mobile-picker">
+            <label htmlFor="erp-help-scene-select">我要办什么</label>
+            <Select
+              id="erp-help-scene-select"
+              value={selectedScenario.key}
+              options={scenarios.map((scenario) => ({
+                value: scenario.key,
+                label: scenarioTitle(scenario),
+              }))}
+              onChange={handleScenarioChange}
+              virtual={false}
+            />
+          </div>
+          <nav className="erp-help-topics" aria-label="办事场景">
+            <h2>我要办什么</h2>
+            {scenarios.map((scenario) => (
+              <button
+                key={scenario.key}
+                type="button"
+                className="erp-help-topic"
+                aria-current={
+                  scenario.key === selectedScenario.key ? 'page' : undefined
+                }
+                onClick={() => handleScenarioChange(scenario.key)}
               >
-                <span className="erp-help-center-priority-card__index">
-                  {index + 1}
+                <span className="erp-help-topic__label">
+                  {scenarioTitle(scenario)}
                 </span>
-                <Title level={5}>{priority.title}</Title>
-                <Paragraph>{priority.description}</Paragraph>
-                <Button type="link" onClick={() => navigate(priority.path)}>
-                  {priority.actionLabel}
-                  <ArrowRightOutlined aria-hidden="true" />
-                </Button>
-              </Card>
+                <ArrowRightOutlined aria-hidden="true" />
+              </button>
             ))}
+          </nav>
+          <div className="erp-help-sidebar__footer">
+            {guides.length > 1 ? (
+              <p>切换这里只查看说明，不改变岗位或权限。</p>
+            ) : null}
+            {visibleMenuPaths.includes('/erp/dashboard') ? (
+              <Button block onClick={() => navigate('/erp/dashboard')}>
+                返回工作台
+              </Button>
+            ) : null}
+            {allowedMobileRoleKeys.has(selectedGuide.key) ? (
+              <Button
+                block
+                icon={<MobileOutlined />}
+                onClick={() => navigate(`/m/${selectedGuide.key}/tasks`)}
+              >
+                打开{selectedGuide.label}手机待办
+              </Button>
+            ) : null}
           </div>
-        ) : (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="当前岗位没有常用入口，请从左侧可见页面开始"
+        </aside>
+        <article
+          className="erp-help-article"
+          data-help-scenario={selectedScenario.key}
+        >
+          <header className="erp-help-article__heading">
+            <div>
+              <Title level={3}>{scenarioTitle(selectedScenario)}</Title>
+              <Text type="secondary">
+                {HELP_VISUAL_EXAMPLES[selectedScenario.key]?.description ||
+                  selectedScenario.description}
+              </Text>
+            </div>
+            {selectedScenario.available ? (
+              <Button
+                type="primary"
+                onClick={() => navigate(selectedScenario.path)}
+              >
+                {selectedScenario.actionLabel}
+                <ArrowRightOutlined aria-hidden="true" />
+              </Button>
+            ) : selectedScenario.path ? (
+              <Text type="secondary">
+                当前账号未开放此页面，可查看办理说明。
+              </Text>
+            ) : null}
+          </header>
+          <HelpScenarioContent
+            key={`${selectedGuide.key}:${selectedScenario.key}`}
+            scenario={selectedScenario}
+            roleKey={selectedGuide.key}
           />
-        )}
-      </section>
-
-      <div className="erp-help-center-detail-grid">
-        <Card
-          className="erp-page-card erp-help-center-detail-card"
-          variant="borderless"
-        >
-          <div className="erp-help-center-card-heading">
-            <CheckCircleOutlined aria-hidden="true" />
-            <Title level={4}>正常怎么做</Title>
-          </div>
-          <ol className="erp-help-center-workflow">
-            {selectedGuide.workflow.map((step, index) => (
-              <li key={step}>
-                <span>{index + 1}</span>
-                <Text>{step}</Text>
-              </li>
-            ))}
-          </ol>
-          <div className="erp-help-center-result">
-            <Text type="secondary">完成标准</Text>
-            <strong>{selectedGuide.completion}</strong>
-          </div>
-          <div className="erp-help-center-result">
-            <Text type="secondary">交接给谁</Text>
-            <strong>{selectedGuide.handoff}</strong>
-          </div>
-        </Card>
-
-        <Card
-          className="erp-page-card erp-help-center-detail-card"
-          variant="borderless"
-        >
-          <div className="erp-help-center-card-heading erp-help-center-card-heading--warning">
-            <ExclamationCircleOutlined aria-hidden="true" />
-            <Title level={4}>遇到异常怎么办</Title>
-          </div>
-          <Title level={5} className="erp-help-center-exception-title">
-            {selectedGuide.exception.title}
-          </Title>
-          <Paragraph className="erp-help-center-handoff">
-            <Text strong>什么时候停下来：</Text>
-            {selectedGuide.exception.trigger}
-          </Paragraph>
-          <ol className="erp-help-center-workflow erp-help-center-workflow--compact">
-            {selectedGuide.exception.steps.map((step, index) => (
-              <li key={step}>
-                <span>{index + 1}</span>
-                <Text>{step}</Text>
-              </li>
-            ))}
-          </ol>
-          <div className="erp-help-center-result">
-            <Text type="secondary">退回对象</Text>
-            <strong>{selectedGuide.exception.returnTo}</strong>
-          </div>
-          <div className="erp-help-center-result">
-            <Text type="secondary">异常完成标准</Text>
-            <strong>{selectedGuide.exception.doneWhen}</strong>
-          </div>
-          <div className="erp-help-center-result">
-            <Text type="secondary">特别注意</Text>
-            <strong>{selectedGuide.caution}</strong>
-          </div>
-        </Card>
+          <details className="erp-help-role-context">
+            <summary>了解岗位交接与提醒</summary>
+            <p>{selectedGuide.handoff}</p>
+            <p>{selectedGuide.caution}</p>
+          </details>
+        </article>
       </div>
     </div>
   )

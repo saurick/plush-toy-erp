@@ -6,6 +6,7 @@ import {
   CheckSquareOutlined,
   CopyOutlined,
   DownOutlined,
+  FilterOutlined,
   RollbackOutlined,
   SendOutlined,
   StopOutlined,
@@ -28,6 +29,7 @@ import {
 } from 'antd'
 import Table from '@/common/components/table/AppTable'
 import SharedSearchInput from '@/common/components/SearchInput'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
 import { BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
@@ -452,7 +454,7 @@ function CopyableBusinessTableCell({ column, value, record, children }) {
     <div
       className="erp-business-table-copyable-cell"
       data-copyable-column={businessTableCopyColumnKey(column) || undefined}
-      data-align={column.align || 'center'}
+      data-align={column.align || 'left'}
     >
       <div
         className="erp-business-table-copyable-cell__content"
@@ -480,6 +482,17 @@ function normalizeBusinessTableColumn(column) {
   }
 
   const nextColumn = { ...column }
+  const { onCell } = column
+  nextColumn.onCell = (...args) => {
+    const props = onCell?.(...args) || {}
+    return {
+      ...props,
+      style: {
+        minWidth: resolveBusinessTableColumnWidth(column),
+        ...props.style,
+      },
+    }
+  }
   delete nextColumn.ellipsis
   if (Array.isArray(nextColumn.children)) {
     nextColumn.children = normalizeBusinessTableColumns(nextColumn.children)
@@ -630,6 +643,7 @@ export function PageHeaderCard({
   tags = null,
   stats = [],
   compact = false,
+  viewSwitch = null,
 }) {
   const numericStats = normalizeBusinessPageHeaderStats(stats)
 
@@ -654,6 +668,7 @@ export function PageHeaderCard({
             </div>
           ) : null}
         </div>
+        {viewSwitch}
         {numericStats.length > 0 ? (
           <div className="erp-business-page-header-card__stats erp-business-module-stats">
             {numericStats.map((item) => (
@@ -750,6 +765,7 @@ export function SelectFilter({
   className = '',
   onOpenChange,
   onMouseDownCapture,
+  inline = false,
   ...restProps
 }) {
   const selectRef = React.useRef(null)
@@ -791,6 +807,17 @@ export function SelectFilter({
     [onOpenChange, scrollMobileSelectIntoView]
   )
 
+  if (inline) {
+    return (
+      <Segmented
+        className="erp-business-status-filter"
+        aria-label={restProps['aria-label'] || '业务状态'}
+        value={value}
+        options={options}
+        onChange={onChange}
+      />
+    )
+  }
   return (
     <Select
       ref={selectRef}
@@ -924,12 +951,32 @@ export function BusinessOperationPanel({
   actions = null,
   primaryAction = null,
   onClearFilters = null,
-  clearFiltersDisabled = false,
+  clearFiltersDisabled,
   children,
   compact = false,
 }) {
   const hasToolbar = Boolean(actions || primaryAction)
   const hasClearFilters = typeof onClearFilters === 'function'
+  const hasActiveFilters = hasClearFilters && clearFiltersDisabled === false
+  const [filtersOpen, setFiltersOpen] = React.useState(false)
+  const filterTriggerRef = React.useRef(null)
+  const filterPanelRef = React.useRef(null)
+  const filterPanelId = React.useId()
+  const closeFilters = () => {
+    setFiltersOpen(false)
+    filterTriggerRef.current?.focus({ preventScroll: true })
+  }
+  const filterControls = React.Children.toArray(
+    flattenSelectionActions(filters)
+  )
+  const primarySearch = filterControls.find(
+    (child) => child.type === SearchInput || child.props?.primarySearch
+  )
+  const searchControls = primarySearch ? [primarySearch] : []
+  const additionalFilters = filterControls.filter(
+    (child) => child !== primarySearch && !child.props?.inline
+  )
+  const quickFilters = filterControls.filter((child) => child.props?.inline)
   return (
     <Card
       className={joinClassNames(
@@ -937,34 +984,138 @@ export function BusinessOperationPanel({
         compact ? 'erp-business-operation-panel--compact' : ''
       )}
     >
-      <div className="erp-business-operation-panel__filters">
-        {filters}
-        {hasClearFilters ? (
-          <Button
-            className="erp-business-filter-control erp-business-filter-control--clear"
-            disabled={clearFiltersDisabled}
-            icon={<RollbackOutlined />}
-            onClick={onClearFilters}
+      <div className="erp-business-operation-panel__command">
+        {quickFilters.length ? (
+          <div className="erp-business-operation-panel__quick">
+            {quickFilters}
+          </div>
+        ) : null}
+        <div className="erp-business-operation-panel__search">
+          {searchControls}
+        </div>
+        {additionalFilters.length > 0 ? (
+          <Popover
+            trigger="click"
+            placement="bottomLeft"
+            open={filtersOpen}
+            onOpenChange={setFiltersOpen}
+            classNames={{ root: 'erp-business-filter-popover' }}
+            afterOpenChange={(open) => {
+              // Opening motion must not take focus back from a field already in use.
+              if (
+                open &&
+                (document.activeElement === filterTriggerRef.current ||
+                  document.activeElement === document.body)
+              ) {
+                filterPanelRef.current?.focus({ preventScroll: true })
+              }
+            }}
+            content={
+              <section
+                className="erp-business-filter-popover__content"
+                aria-label="筛选条件"
+                role="dialog"
+                id={filterPanelId}
+                ref={filterPanelRef}
+                tabIndex={-1}
+                onKeyDownCapture={(event) => {
+                  if (
+                    event.defaultPrevented ||
+                    document.querySelector(
+                      '.ant-select-dropdown:not(.ant-select-dropdown-hidden), .ant-picker-dropdown:not(.ant-picker-dropdown-hidden)'
+                    )
+                  ) {
+                    return
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    closeFilters()
+                  }
+                  if (event.key === 'Tab') {
+                    const controls = [
+                      ...event.currentTarget.querySelectorAll(
+                        'button:not(:disabled), input:not(:disabled), [tabindex="0"]'
+                      ),
+                    ].filter((node) => node.getClientRects().length)
+                    const first = controls[0]
+                    const last = controls.at(-1)
+                    if (
+                      event.shiftKey &&
+                      (document.activeElement === first ||
+                        document.activeElement === event.currentTarget)
+                    ) {
+                      event.preventDefault()
+                      last?.focus()
+                    } else if (
+                      !event.shiftKey &&
+                      document.activeElement === last
+                    ) {
+                      event.preventDefault()
+                      first?.focus()
+                    }
+                  }
+                }}
+              >
+                <header>
+                  <strong>筛选条件</strong>
+                  {hasClearFilters ? (
+                    <Button
+                      size="small"
+                      type="text"
+                      disabled={clearFiltersDisabled}
+                      icon={<RollbackOutlined />}
+                      onClick={onClearFilters}
+                    >
+                      清空筛选
+                    </Button>
+                  ) : null}
+                </header>
+                <div className="erp-business-operation-panel__filters">
+                  {additionalFilters}
+                </div>
+                <footer>
+                  <Button type="primary" onClick={closeFilters}>
+                    完成
+                  </Button>
+                </footer>
+              </section>
+            }
           >
-            清空筛选
-          </Button>
+            <Button
+              ref={filterTriggerRef}
+              icon={<FilterOutlined />}
+              aria-haspopup="dialog"
+              aria-controls={filtersOpen ? filterPanelId : undefined}
+              aria-expanded={filtersOpen}
+              className={
+                hasActiveFilters ? 'erp-business-filter-trigger--active' : ''
+              }
+            >
+              筛选{hasActiveFilters ? ' · 已应用' : ''}
+            </Button>
+          </Popover>
+        ) : null}
+        {hasToolbar ? (
+          <div className="erp-business-operation-panel__toolbar">
+            {actions ? (
+              <div className="erp-business-operation-panel__actions">
+                {actions}
+              </div>
+            ) : null}
+            {primaryAction ? (
+              <div className="erp-business-operation-panel__primary">
+                {primaryAction}
+              </div>
+            ) : null}
+          </div>
         ) : null}
       </div>
-      {hasToolbar ? (
-        <div className="erp-business-operation-panel__toolbar">
-          {actions ? (
-            <div className="erp-business-operation-panel__actions">
-              {actions}
-            </div>
-          ) : null}
-          {primaryAction ? (
-            <div className="erp-business-operation-panel__primary">
-              {primaryAction}
-            </div>
-          ) : null}
+      {children ? (
+        <div className="erp-business-operation-panel__selection">
+          {children}
         </div>
       ) : null}
-      <div className="erp-business-operation-panel__selection">{children}</div>
     </Card>
   )
 }
@@ -1251,13 +1402,12 @@ const BUSINESS_DATA_TABLE_INTERACTIVE_TARGET = [
   '.ant-table-selection-column',
   '.ant-radio-wrapper',
   '.ant-checkbox-wrapper',
-  '.erp-business-row-expand-button',
 ].join(', ')
 
 function isBusinessDataTableInteractiveTarget(target) {
   return Boolean(
     target instanceof Element &&
-      target.closest(BUSINESS_DATA_TABLE_INTERACTIVE_TARGET)
+    target.closest(BUSINESS_DATA_TABLE_INTERACTIVE_TARGET)
   )
 }
 
@@ -1291,7 +1441,7 @@ export function BusinessDataTable({
     () =>
       Boolean(
         pagination &&
-          resolvedColumns.some((column) => typeof column?.sorter === 'function')
+        resolvedColumns.some((column) => typeof column?.sorter === 'function')
       ),
     [pagination, resolvedColumns]
   )
@@ -1330,8 +1480,11 @@ export function BusinessDataTable({
 
   return (
     <Card className="erp-business-data-table-card erp-business-module-table-card">
-      {tableHeader}
+      {tableHeader ? (
+        <div className="erp-business-data-table-card__header">{tableHeader}</div>
+      ) : null}
       <Table
+        size="small"
         loading={loading}
         rowKey={rowKey}
         columns={resolvedColumns}

@@ -1,3 +1,5 @@
+import { getPermissionPageEntry } from './permissionNavigation.mjs'
+
 function normalizeString(value = '') {
   return String(value || '').trim()
 }
@@ -43,7 +45,7 @@ export function normalizePermissionMenuOptions(menuOptions = []) {
   return menuOptions
     .map((menu) => ({
       key: normalizeString(menu?.key),
-      label: normalizeString(menu?.label) || '其他页面',
+      label: getPermissionPageEntry(menu).label,
       path: normalizeString(menu?.path),
       requiredAny: normalizeStringList(menu?.required_any || menu?.requiredAny),
       requiredAll: normalizeStringList(menu?.required_all || menu?.requiredAll),
@@ -262,7 +264,7 @@ export function getMenuPlacementMap(placement = {}) {
     ? placement.dashboardItems
     : []
   ).forEach((item) => {
-    if (item?.path) out.set(item.path, '看板中心')
+    if (item?.path) out.set(item.path, '工作中心')
   })
   ;(Array.isArray(placement?.primaryItems)
     ? placement.primaryItems

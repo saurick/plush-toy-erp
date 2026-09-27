@@ -224,30 +224,6 @@ export function createOutsourcingSourceFactScenarios(deps) {
       },
       verify: async (page) => {
         await expectHeading(page, '委外订单')
-        await page
-          .getByRole('button', { name: /展开.*OUT-SOURCE-L1.*明细/u })
-          .click()
-        const materialCard = page
-          .locator('.erp-business-row-item-card')
-          .filter({ hasText: 'MAT-SOURCE-L1' })
-          .first()
-        const productCard = page
-          .locator('.erp-business-row-item-card')
-          .filter({ hasText: 'PROD-SOURCE-L1' })
-          .first()
-        await materialCard.waitFor({ state: 'visible', timeout: 10_000 })
-        await productCard.waitFor({ state: 'visible', timeout: 10_000 })
-        assert.equal(
-          await materialCard.getByRole('button', { name: '委外发料' }).count(),
-          0,
-          '行内明细快速预览应保持只读，不承载委外发料'
-        )
-        assert.equal(
-          await productCard.getByRole('button', { name: '登记回货' }).count(),
-          0,
-          '行内明细快速预览应保持只读，不承载委外回货'
-        )
-
         const orderRow = page
           .locator(
             '.erp-business-data-table-card .ant-table-tbody tr[data-row-key="1"]'

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -36,6 +37,7 @@ export function useOutsourcingOrderQuery({ adminProfile }) {
   const [rows, setRows] = useState([])
 
   const [total, setTotal] = useState(0)
+  const [statusCounts, setStatusCounts] = useState(null)
 
   const [loading, setLoading] = useState(false)
 
@@ -171,11 +173,13 @@ export function useOutsourcingOrderQuery({ adminProfile }) {
     const requestRouteKey = `${routeOutsourcingOrderID}:${routeOutsourcingFactID}`
     setResolvedLinkedContext({ routeKey: requestRouteKey, keyword: '' })
     setLoading(true)
+    setStatusCounts(null)
     try {
       const [data, routeOrder] = await Promise.all([
         listOutsourcingOrders(
           {
             ...outsourcingListParams,
+            include_status_counts: true,
             limit: pagination.pageSize,
             offset: (pagination.current - 1) * pagination.pageSize,
           },
@@ -196,6 +200,9 @@ export function useOutsourcingOrderQuery({ adminProfile }) {
       const nextRows = exactPage.records
       setRows(nextRows)
       setTotal(exactPage.total)
+      setStatusCounts(resolveBusinessStatusCounts(data, {
+        hasExactContext: routeSelectedID > 0 || routeFactID > 0, exactRecord: routeOrder, statusField: 'lifecycle_status',
+      }))
       setSelectedRow((prev) => {
         if (routeSelectedID > 0 || routeFactID > 0) return routeOrder
         return prev
@@ -298,6 +305,7 @@ export function useOutsourcingOrderQuery({ adminProfile }) {
     rows,
     setRows,
     total,
+    statusCounts,
     loading,
     keyword,
     setKeyword,

@@ -1,3 +1,5 @@
+import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
+
 export function createPurchaseReceiptAssertions(deps) {
   const { assert, path, outputDir, assertThemeReadable, expectText } = deps
 
@@ -53,15 +55,12 @@ export function createPurchaseReceiptAssertions(deps) {
       .filter({ has: page.getByText(receiptNo, { exact: true }) })
       .first()
     await row.waitFor({ state: 'visible', timeout: 10_000 })
-    const count = row.locator(
-      '.erp-business-row-expand-button, .erp-business-row-item-count'
-    )
-    await count.waitFor({ state: 'visible', timeout: 10_000 })
-    assert.equal(
-      String((await count.innerText()) || '').replace(/\s+/gu, ''),
-      `${expectedCount}条`,
-      `${receiptNo} 明细条数未刷新为 ${expectedCount}条`
-    )
+    await openBusinessRecordDetails(page, receiptNo)
+    const modal = page.getByRole('dialog', { name: /^采购入库详情/u })
+    await modal.getByText(`采购入库明细（共 ${expectedCount} 条）`, { exact: true }).waitFor()
+    assert.equal(await modal.locator('.erp-business-row-item-card').count(), Math.min(expectedCount, 10))
+    await modal.getByRole('button', { name: /关\s*闭/u }).click()
+    await modal.waitFor({ state: 'hidden' })
   }
 
   async function openPurchaseReceiptAddItemEditor(page) {

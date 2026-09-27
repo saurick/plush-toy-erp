@@ -16,6 +16,8 @@ import {
   UploadOutlined,
 } from '@ant-design/icons'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import BusinessImage from '../business-list/BusinessImage.jsx'
+import { isUsableImageDimensions } from '../../utils/imageDisplay.mjs'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -191,6 +193,9 @@ async function prepareProductImage(file, signal) {
   let image = null
   try {
     image = await loadImageFromObjectURL(sourcePreviewURL, signal)
+    if (!isUsableImageDimensions(image)) {
+      throw new Error('图片尺寸过小，请选择可辨认的产品图片')
+    }
     const shouldOptimize = shouldOptimizeProductImageSnapshot({
       fileSize: file.size,
       width: image.naturalWidth,
@@ -292,6 +297,7 @@ const ProductImageSlots = forwardRef(
     const mountedRef = useRef(true)
     const [session, setSession] = useState(() => sessionRef.current)
     const [loading, setLoading] = useState(false)
+    const [loadFailed, setLoadFailed] = useState(false)
     const [saving, setSaving] = useState(false)
     const [preparingSlotKey, setPreparingSlotKey] = useState('')
     const [previewingSlotKey, setPreviewingSlotKey] = useState('')
@@ -406,6 +412,7 @@ const ProductImageSlots = forwardRef(
         filePreparationPromisesRef.current = {}
         setPreparingSlotKey('')
         applySavedAttachments([])
+        setLoadFailed(false)
         if (targetProductID <= 0) {
           setLoading(false)
           return true
@@ -430,6 +437,7 @@ const ProductImageSlots = forwardRef(
           return true
         } catch (error) {
           if (requestSequenceRef.current === requestSequence) {
+            setLoadFailed(true)
             message.error(getActionErrorMessage(error, '加载产品图片'))
           }
           return false
@@ -461,6 +469,7 @@ const ProductImageSlots = forwardRef(
       revokeSessionImageURLs(sessionRef.current)
       setCurrentSession(resetProductImageSession(sessionRef.current))
       setLoading(false)
+      setLoadFailed(false)
       setPreparingSlotKey('')
       setPreviewingSlotKey('')
     }, [abortAllFilePreparations, closePreview, setCurrentSession])
@@ -704,7 +713,7 @@ const ProductImageSlots = forwardRef(
       }
     }
 
-    const controlsDisabled = loading || saving || !canEdit
+    const controlsDisabled = loading || loadFailed || saving || !canEdit
 
     return (
       <section className="product-image-slots" aria-label="产品图片">
@@ -747,8 +756,16 @@ const ProductImageSlots = forwardRef(
                       <Spin size="small" />
                       <span>正在读取图片</span>
                     </div>
+                  ) : loadFailed ? (
+                    <div className="product-image-slot__placeholder">
+                      <PictureOutlined />
+                      <span>图片读取失败</span>
+                      <Button size="small" onClick={() => beginSession(productId)}>
+                        重新加载
+                      </Button>
+                    </div>
                   ) : visibleImage?.preview_url ? (
-                    <img src={visibleImage.preview_url} alt={`${label}预览`} />
+                    <BusinessImage src={visibleImage.preview_url} alt={`${label}预览`} />
                   ) : visibleImage?.preview_load_failed ? (
                     <div className="product-image-slot__placeholder">
                       <PictureOutlined />
@@ -757,14 +774,14 @@ const ProductImageSlots = forwardRef(
                   ) : (
                     <div className="product-image-slot__placeholder">
                       <PictureOutlined />
-                      <span>暂未设置</span>
+                      <span>暂无图片</span>
                     </div>
                   )}
                 </div>
 
                 <div className="product-image-slot__meta">
                   <Typography.Text ellipsis title={visibleImage?.file_name}>
-                    {visibleImage?.file_name || '可不上传'}
+                    {visibleImage?.file_name || (loadFailed ? '重新加载后可编辑图片' : '可不上传')}
                   </Typography.Text>
                   {visibleImage?.file_size ? (
                     <Typography.Text type="secondary">
@@ -841,7 +858,7 @@ const ProductImageSlots = forwardRef(
           onCancel={closePreview}
         >
           <div className="product-image-slots__modal-preview">
-            <img src={preview?.url} alt={preview?.fileName || '产品图片预览'} />
+            <BusinessImage src={preview?.url} alt={preview?.fileName || '产品图片预览'} />
           </div>
         </BusinessModal>
       </section>

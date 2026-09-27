@@ -14,7 +14,6 @@ export function useOutsourcingOrderLineOrder({
   loadOrderItems,
   setSaving,
   activeCustomerKey,
-  outsourcingOrderItemsPreview,
   setRows,
   setSelectedRow,
   loadOrders,
@@ -98,7 +97,6 @@ export function useOutsourcingOrderLineOrder({
       const openItems = selectOpenSourceDocumentItems(
         result.outsourcing_order_items
       )
-      outsourcingOrderItemsPreview.invalidate(order)
       setRows((current) =>
         current.map((item) => (item.id === savedOrder.id ? savedOrder : item))
       )

@@ -4,6 +4,7 @@ import { listBusinessAttachments } from '../../api/attachmentApi.mjs'
 
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import {
   SalesOrderFormFields,
   SalesOrderItemsFormSection,
@@ -40,7 +41,9 @@ export default function SalesOrderEditor({
     let active = true
     setAttachments([])
     if (open && editingOrder?.id) listBusinessAttachments({ owner_type: 'sales_order', owner_id: editingOrder.id }).then((items) => { if (active) setAttachments(items) }).catch(() => { if (active) setAttachments([]) })
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [open, editingOrder?.id])
   return (
     <BusinessFormPage
@@ -55,6 +58,33 @@ export default function SalesOrderEditor({
     >
       <Form form={form} layout="vertical" className="erp-business-action-form">
         <SalesOrderFormFields
+          itemsSection={
+            <BusinessFormSection title="订货明细" showHeading={false}>
+              <SalesOrderItemsFormSection
+                form={form}
+                canCreateItem={canCreateItem}
+                canUpdateItem={canUpdateItem}
+                canCancelItem={canCancelItem}
+                productSKUs={productSKUs}
+                unitOptions={unitOptions}
+                orderID={editingOrder?.id}
+                orderAttachments={attachments}
+              />
+            </BusinessFormSection>
+          }
+          attachmentPanel={
+            <BusinessAttachmentPanel
+              ref={orderAttachmentRef}
+              ownerType="sales_order"
+              ownerId={editingOrder?.id}
+              title="订单附件"
+              description="上传客户 PO、合同、样品图或确认截图；附件不改变订单状态。"
+              canUpload={canUpdateOrder || canCreateOrder}
+              canWithdraw={canCreateOrder || canUpdateOrder}
+              variant="inline"
+              compact
+            />
+          }
           form={form}
           customers={customers}
           contactOptions={customerContacts}
@@ -64,26 +94,6 @@ export default function SalesOrderEditor({
           onContactSelect={onContactSelect}
           onPaymentMethodChange={onPaymentMethodChange}
           onPaymentConditionBlur={onPaymentConditionBlur}
-        />
-        <BusinessAttachmentPanel
-          ref={orderAttachmentRef}
-          ownerType="sales_order"
-          ownerId={editingOrder?.id}
-          title="订单附件"
-          description="上传客户 PO、合同、样品图或确认截图；附件不改变订单状态。"
-          canUpload={canUpdateOrder || canCreateOrder}
-          canWithdraw={canCreateOrder || canUpdateOrder}
-          variant="inline"
-        />
-        <SalesOrderItemsFormSection
-          form={form}
-          canCreateItem={canCreateItem}
-          canUpdateItem={canUpdateItem}
-          canCancelItem={canCancelItem}
-          productSKUs={productSKUs}
-          unitOptions={unitOptions}
-          orderID={editingOrder?.id}
-          orderAttachments={attachments}
         />
       </Form>
     </BusinessFormPage>

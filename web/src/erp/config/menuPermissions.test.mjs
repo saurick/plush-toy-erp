@@ -52,10 +52,10 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
       '销售管理',
       '产品工程',
       '采购管理',
-      '质检管理',
-      '库存管理',
       '委外管理',
       '生产管理',
+      '库存管理',
+      '质检管理',
       '出货管理',
       '财务管理',
       '运营工具',
@@ -83,10 +83,10 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
       (section) => section.title === '财务管理'
     )?.items.map((item) => [item.key, item.label]),
     [
-      ['/erp/finance/reconciliation', '对账管理'],
       ['/erp/finance/receivables', '应收管理'],
       ['/erp/finance/payables', '应付管理'],
       ['/erp/finance/payments', '收付款核销'],
+      ['/erp/finance/reconciliation', '对账管理'],
       ['/erp/finance/invoices', '发票管理'],
     ]
   )

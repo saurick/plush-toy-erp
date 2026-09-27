@@ -39,6 +39,40 @@ const defaults = {
   reconcileOrder: async () => null,
 }
 
+test('batch quantity validation requires configured precision and preserves valid yard/kg values', () => {
+  const { values } = makeEntries()[0]
+  for (const precision of [undefined, null, -1, 7]) {
+    assert.ok(
+      salesOrderImportIssues(values, {
+        customers,
+        units: [{ ...units[0], precision }],
+      }).length > 0
+    )
+  }
+  values.items[0].ordered_quantity = '0.000001'
+  assert.deepEqual(
+    salesOrderImportIssues(values, {
+      customers,
+      units: [{ ...units[0], precision: 6 }],
+    }),
+    []
+  )
+  assert.ok(
+    salesOrderImportIssues(values, {
+      customers,
+      units: [{ ...units[0], precision: 3 }],
+    }).length > 0
+  )
+  values.items[0].ordered_quantity = '0.001'
+  assert.deepEqual(
+    salesOrderImportIssues(values, {
+      customers,
+      units: [{ ...units[0], precision: 3 }],
+    }),
+    []
+  )
+})
+
 test('batch preflight identifies missing references, currencies and unit precision without inventing defaults', () => {
   const { values } = makeEntries()[0]
   assert.deepEqual(salesOrderImportIssues(values, { customers, units }), [])

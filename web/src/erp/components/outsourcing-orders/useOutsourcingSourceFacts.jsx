@@ -5,11 +5,9 @@ import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { useOutsourcingReturnPayable } from './useOutsourcingReturnPayable.mjs'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { useBusinessRowItemsPreview } from '../business-list/BusinessRowItemsPreview.jsx'
 import {
   listAllOutsourcingOrderItems,
   getOutsourcingOrder,
-  listOutsourcingOrderItemsPreview,
   listAllWarehouses,
 } from '../../api/masterDataOrderApi.mjs'
 import {
@@ -90,9 +88,6 @@ export function useOutsourcingSourceFacts({
   canCreateMaterialIssue,
   canCreateReturnReceipt,
   unitOptions,
-  rows,
-  canRead,
-  onOpenDetails,
 }) {
   const [sourceFactOpen, setSourceFactOpen] = useState(false)
 
@@ -796,7 +791,7 @@ export function useOutsourcingSourceFacts({
   )
 
   const getOutsourcingOrderItemFields = useCallback(
-    (item, { record, view }) => {
+    (item, { record }) => {
       const isMaterial =
         item?.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
       const sourceAction = renderOutsourcingSourceFactAction(record, item)
@@ -861,10 +856,8 @@ export function useOutsourcingSourceFacts({
             '明细状态待核对'
           ),
         },
-        ...(view !== 'preview'
-          ? [{ label: '备注', value: item?.note, fullWidth: true }]
-          : []),
-        ...(sourceAction && view === 'details'
+        { label: '备注', value: item?.note, fullWidth: true },
+        ...(sourceAction
           ? [{ label: '业务操作', value: sourceAction, fullWidth: true }]
           : []),
       ]
@@ -872,24 +865,7 @@ export function useOutsourcingSourceFacts({
     [renderOutsourcingSourceFactAction, unitOptions]
   )
 
-  const loadOutsourcingOrderItemsPreview = useCallback(
-    async (order, { signal }) => {
-      const data = await listOutsourcingOrderItemsPreview(
-        {
-          outsourcing_order_id: order.id,
-          expected_version: order.version,
-        },
-        { signal }
-      )
-      return {
-        items: data?.outsourcing_order_items,
-        total: data?.total,
-      }
-    },
-    []
-  )
-
-  const loadAllOutsourcingOrderItemsForPreview = useCallback(
+  const loadOutsourcingOrderDetailsItems = useCallback(
     async (order, { signal }) => {
       const data = await listAllOutsourcingOrderItems(
         {
@@ -905,19 +881,6 @@ export function useOutsourcingSourceFacts({
     },
     []
   )
-
-  const outsourcingOrderItemsPreview = useBusinessRowItemsPreview({
-    records: rows,
-    getItemTotal: (order) => order?.item_count,
-    rowExpandable: (order) =>
-      canRead && Number(order?.id || 0) > 0 && Number(order?.version || 0) > 0,
-    loadPreview: loadOutsourcingOrderItemsPreview,
-    onOpenDetails,
-    getItemFields: getOutsourcingOrderItemFields,
-    getItemLabel: (item, { index }) => `明细 ${item?.line_no || index + 1}`,
-    getRecordLabel: (order) => order?.outsourcing_order_no || '当前加工合同',
-    emptyDescription: '当前加工合同暂无明细',
-  })
 
   const submitOutsourcingSourceFact = useCallback(
     async (values) => {
@@ -1069,7 +1032,6 @@ export function useOutsourcingSourceFacts({
           confirmedByReread = true
         }
         sourceFactAttemptsRef.current.settle(scope, attempt, null)
-        outsourcingOrderItemsPreview.invalidate(order)
         try {
           await loadRelatedOutsourcingFacts(order.id)
         } catch (refreshError) {
@@ -1098,7 +1060,6 @@ export function useOutsourcingSourceFacts({
       canCreateMaterialIssue,
       canCreateReturnReceipt,
       loadRelatedOutsourcingFacts,
-      outsourcingOrderItemsPreview,
       sourceFactContext,
     ]
   )
@@ -1135,8 +1096,7 @@ export function useOutsourcingSourceFacts({
     openOutsourcingFactDraftEditor,
     closeOutsourcingSourceFact,
     getOutsourcingOrderItemFields,
-    loadAllOutsourcingOrderItemsForPreview,
-    outsourcingOrderItemsPreview,
+    loadOutsourcingOrderDetailsItems,
     submitOutsourcingSourceFact,
   }
 }

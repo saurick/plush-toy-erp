@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
+import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
 
 async function installImages(page) {
   const image = await page.evaluate(() => {
@@ -322,14 +323,9 @@ export function createProductIdentityScenarios({
       viewport: { width: 1440, height: 1000 },
       beforeNavigate: installImages,
       verify: async (page) => {
-        await page
-          .getByRole('button', { name: /^展开.+明细/ })
-          .first()
-          .click()
-        const image = page
-          .getByRole('region', { name: '明细快速预览' })
-          .locator('.erp-product-identity button')
-          .first()
+        const production = key === 'production'
+        await openBusinessRecordDetails(page, production ? 'MO-STYLE-L1-20260713' : 'SIM-OUTSOURCE-CONTRACT-L1', production ? '查看' : '查看详情')
+        const image = page.locator(production ? '.erp-business-form-page:visible' : '.erp-business-details-modal:visible').locator('.erp-product-identity button').first()
         await image.click()
         await closeImage(page)
         await page.screenshot({

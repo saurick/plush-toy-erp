@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Button, Tag } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { listEngineeringMaterialRequests } from '../../api/masterDataOrderApi.mjs'
 import {
   BusinessDataTable,
@@ -31,7 +31,9 @@ const STATUS_OPTIONS = [
 const formatTime = (value) =>
   new Date(value).toLocaleString('zh-CN', { hour12: false })
 
-export default function EngineeringMaterialSummaryPanel() {
+export default function EngineeringMaterialSummaryPanel({
+  refreshRevision = 0,
+}) {
   const { adminProfile } = useOutletContext() || {}
   const [params, setParams] = useSearchParams()
   const keyword = (params.get('materials.q') || '').slice(0, 100)
@@ -41,7 +43,6 @@ export default function EngineeringMaterialSummaryPanel() {
     ? params.get('materials.status')
     : ''
   const page = summaryPage(params.get('materials.page'))
-  const [draft, setDraft] = useState(keyword)
   const [result, setResult] = useState({ items: [], total: 0 })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -49,7 +50,6 @@ export default function EngineeringMaterialSummaryPanel() {
   const [selected, setSelected] = useState(null)
   const canRead = canListEngineeringMaterial(adminProfile)
 
-  useEffect(() => setDraft(keyword), [keyword])
   useEffect(() => {
     const controller = new AbortController()
     setResult({ items: [], total: 0 })
@@ -73,13 +73,17 @@ export default function EngineeringMaterialSummaryPanel() {
         })
     }
     return () => controller.abort()
-  }, [canRead, keyword, status, page, reload, adminProfile])
+  }, [canRead, keyword, status, page, reload, refreshRevision, adminProfile])
 
   const updateFilter = (key, value) => {
     setParams(updateSummarySearch(params, 'materials', { [key]: value }), {
       replace: true,
     })
   }
+  const search = useLiveSearch({
+    value: keyword,
+    onSearch: (value) => updateFilter('q', value),
+  })
 
   const statusTag = (record) => (
     <span>
@@ -103,14 +107,13 @@ export default function EngineeringMaterialSummaryPanel() {
         type="search"
         aria-label={BUSINESS_SEARCH_SCOPES.engineering.searchHint}
         {...BUSINESS_SEARCH_SCOPES.engineering}
-        value={draft}
+        value={search.value}
         allowClear
         maxLength={100}
-        onChange={(event) => {
-          setDraft(event.target.value)
-          if (!event.target.value) updateFilter('q', '')
-        }}
-        onPressEnter={() => updateFilter('q', draft.trim())}
+        onChange={search.onChange}
+        onCompositionStart={search.onCompositionStart}
+        onCompositionEnd={search.onCompositionEnd}
+        onPressEnter={search.onPressEnter}
       />
       <SelectFilter
         aria-label="审批状态"
@@ -119,15 +122,6 @@ export default function EngineeringMaterialSummaryPanel() {
         onChange={(value) => updateFilter('status', value)}
       />
     </>
-  )
-  const refresh = (
-    <Button
-      icon={<ReloadOutlined aria-hidden="true" />}
-      onClick={() => setReload((value) => value + 1)}
-      loading={loading}
-    >
-      刷新
-    </Button>
   )
   const accessError = !canRead ? '当前账号未开放材料汇总查看权限' : error
   const modal =
@@ -144,9 +138,20 @@ export default function EngineeringMaterialSummaryPanel() {
 
   return (
     <>
-      <BusinessOperationPanel compact filters={filters} actions={refresh} />
+      <BusinessOperationPanel compact filters={filters} />
       {accessError ? (
-        <Alert type="error" showIcon message={accessError} />
+        <Alert
+          type="error"
+          showIcon
+          message={accessError}
+          action={
+            canRead ? (
+              <Button onClick={() => setReload((value) => value + 1)}>
+                重新加载
+              </Button>
+            ) : null
+          }
+        />
       ) : (
         <BusinessDataTable
           loading={loading}

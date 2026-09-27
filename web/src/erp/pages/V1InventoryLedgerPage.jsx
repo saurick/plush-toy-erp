@@ -25,6 +25,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import useBusinessPageState from '../hooks/useBusinessPageState'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import Table from '@/common/components/table/AppTable'
@@ -415,30 +416,51 @@ export default function V1InventoryLedgerPage() {
   const requestControllersRef = useRef({})
   const requestSequenceRef = useRef({})
   const operationAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
-  const [activeView, setActiveView] = useState(VIEW_BALANCES)
-  const [balanceDisplay, setBalanceDisplay] = useState('list')
+  const [activeView, setActiveView] = useBusinessPageState(
+    'activeView',
+    VIEW_BALANCES
+  )
+  const [balanceDisplay, setBalanceDisplay] = useBusinessPageState(
+    'balanceDisplay',
+    'list'
+  )
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
-  const [keyword, setKeyword] = useState('')
-  const [subjectType, setSubjectType] = useState('')
-  const [stockCategory, setStockCategory] = useState('')
+  const [keyword, setKeyword] = useBusinessPageState('keyword', '')
+  const [subjectType, setSubjectType] = useBusinessPageState('subjectType', '')
+  const [stockCategory, setStockCategory] = useBusinessPageState(
+    'stockCategory',
+    ''
+  )
   const [warehouseSettingsOpen, setWarehouseSettingsOpen] = useState(false)
-  const [subjectID, setSubjectID] = useState('')
-  const [productSkuID, setProductSkuID] = useState('')
-  const [warehouseID, setWarehouseID] = useState('')
-  const [lotID, setLotID] = useState('')
-  const [lotStatus, setLotStatus] = useState('')
-  const [txnType, setTxnType] = useState('')
-  const [sourceType, setSourceType] = useState('')
-  const [dateFilterStart, setDateFilterStart] = useState('')
-  const [dateFilterEnd, setDateFilterEnd] = useState('')
+  const [subjectID, setSubjectID] = useBusinessPageState('subjectID', '')
+  const [productSkuID, setProductSkuID] = useBusinessPageState(
+    'productSkuID',
+    ''
+  )
+  const [warehouseID, setWarehouseID] = useBusinessPageState('warehouseID', '')
+  const [lotID, setLotID] = useBusinessPageState('lotID', '')
+  const [lotStatus, setLotStatus] = useBusinessPageState('lotStatus', '')
+  const [txnType, setTxnType] = useBusinessPageState('txnType', '')
+  const [sourceType, setSourceType] = useBusinessPageState('sourceType', '')
+  const [dateFilterStart, setDateFilterStart] = useBusinessPageState(
+    'dateFilterStart',
+    ''
+  )
+  const [dateFilterEnd, setDateFilterEnd] = useBusinessPageState(
+    'dateFilterEnd',
+    ''
+  )
   const [materials, setMaterials] = useState([])
   const [products, setProducts] = useState([])
   const [productSKUs, setProductSKUs] = useState([])
   const [units, setUnits] = useState([])
   const [warehouses, setWarehouses] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: 20,
+  })
   const [loading, setLoading] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [detailRecord, setDetailRecord] = useState(null)
@@ -689,6 +711,7 @@ export default function V1InventoryLedgerPage() {
     load: loadDistributionBalances,
     actionLabel: '加载仓库库存分布',
   })
+  const reloadDistributionData = distributionData.reload
 
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
@@ -738,15 +761,26 @@ export default function V1InventoryLedgerPage() {
       setSelectedRow(null)
       setDetailRecord(null)
     }
-  }, [activeView, routeView])
+  }, [activeView, routeView, setActiveView])
 
   useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadRows)
-  }, [loadRows, outletContext])
+    return outletContext?.registerPageRefresh?.(() => {
+      if (activeView === VIEW_BALANCES && balanceDisplay === 'distribution') {
+        reloadDistributionData()
+      }
+      return loadRows()
+    })
+  }, [
+    activeView,
+    balanceDisplay,
+    loadRows,
+    outletContext,
+    reloadDistributionData,
+  ])
 
   const resetCurrentPage = useCallback(() => {
     resetBusinessPaginationCurrent(setPagination)
-  }, [])
+  }, [setPagination])
 
   const handleViewChange = useCallback(
     (nextView) => {
@@ -758,7 +792,7 @@ export default function V1InventoryLedgerPage() {
       setDateFilterEnd('')
       resetCurrentPage()
     },
-    [resetCurrentPage]
+    [resetCurrentPage, setActiveView, setBalanceDisplay, setDateFilterEnd, setDateFilterStart]
   )
 
   const activeLabel = VIEW_LABELS[activeView]
@@ -769,9 +803,7 @@ export default function V1InventoryLedgerPage() {
         { value: 'list', label: '余额明细' },
         { value: 'distribution', label: '仓库分布' },
       ]}
-      loading={distributionData.loading}
       onChange={setBalanceDisplay}
-      onReload={distributionData.reload}
     />
   )
   const openInventoryDetails = useCallback((record) => {
@@ -1964,7 +1996,7 @@ export default function V1InventoryLedgerPage() {
     setDateFilterStart('')
     setDateFilterEnd('')
     clearRouteContext()
-  }, [clearRouteContext])
+  }, [clearRouteContext, setDateFilterEnd, setDateFilterStart, setKeyword, setLotID, setLotStatus, setProductSkuID, setSourceType, setStockCategory, setSubjectID, setSubjectType, setTxnType, setWarehouseID])
   const openOperationCancellation = async () => {
     if (!currentOperation?.id) return
     if (
@@ -2503,7 +2535,7 @@ export default function V1InventoryLedgerPage() {
       </BusinessOperationPanel>
 
       <Card className="erp-business-data-table-card erp-business-module-table-card">
-        <div className="erp-inventory-ledger-view-bar">
+        <div className="erp-business-data-table-card__header erp-inventory-ledger-view-bar">
           <Tabs
             activeKey={activeView}
             items={VIEW_ITEMS}
@@ -2553,7 +2585,7 @@ export default function V1InventoryLedgerPage() {
               onDoubleClick: (event) => {
                 if (
                   event.target?.closest?.(
-                    'a, button, input, textarea, select, label, [role="button"], [role="link"], .ant-table-selection-column, .ant-radio-wrapper, .ant-checkbox-wrapper, .erp-business-row-expand-button'
+                    'a, button, input, textarea, select, label, [role="button"], [role="link"], .ant-table-selection-column, .ant-radio-wrapper, .ant-checkbox-wrapper'
                   )
                 ) {
                   return

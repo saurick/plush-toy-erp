@@ -1,10 +1,11 @@
+import '../mobileMine.css'
 import React, { useEffect, useId, useRef, useState } from 'react'
+import { Empty } from 'antd'
 import {
   ArrowUpOutlined,
   BarChartOutlined,
   BellOutlined,
   FileTextOutlined,
-  InfoCircleOutlined,
   KeyOutlined,
   InboxOutlined,
   LogoutOutlined,
@@ -39,7 +40,6 @@ import {
   MOBILE_MAIN_TAB_KEYS,
   MOBILE_MESSAGE_TAB_KEYS,
   MOBILE_TASK_FILTER_KEYS,
-  getMobileRoleLabel,
   getTaskQueueTone,
   getTaskSeverityView,
   resolveTaskBusinessChip,
@@ -48,7 +48,6 @@ import {
   resolveTaskReasonLabel,
   resolveMobileTaskStatusLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
-import { mobileTheme } from '../theme'
 
 const MOBILE_MAIN_TAB_ITEMS = [
   { key: 'tasks', label: '任务', Icon: InboxOutlined },
@@ -303,8 +302,13 @@ export default function MobileTaskListScreen({
         }}
       >
         <div className="mobile-task-list-row__head">
-          <span className="min-w-0 break-words text-base font-semibold leading-snug text-slate-950">
-            {getWorkflowTaskDisplayName(task)}
+          <span className="mobile-task-list-row__identity">
+            <WorkflowTaskIdentity
+              task={task}
+              compact
+              copyable={false}
+              showTaskName
+            />
           </span>
           <span
             className={`inline-flex min-w-[52px] items-center justify-center rounded-md border px-2 py-1 text-sm font-semibold ${severity.badgeClass}`}
@@ -317,11 +321,10 @@ export default function MobileTaskListScreen({
           </span>
         </div>
         <div className="mobile-task-list-row__body min-w-0">
-          <WorkflowTaskIdentity task={task} compact />
           <div className="mobile-task-list-row__source text-sm leading-5 text-slate-500">
             <FileTextOutlined aria-hidden="true" />
             <span className="mobile-task-list-row__source-text">
-              <WorkflowTaskSource task={task} />
+              <WorkflowTaskSource task={task} copyable={false} />
             </span>
           </div>
           {listMeta ? (
@@ -335,17 +338,14 @@ export default function MobileTaskListScreen({
             </div>
           ) : null}
         </div>
-        <WorkflowTaskTiming task={task} />
         <div className="mobile-task-list-row__footer min-w-0">
           <div className="mobile-task-list-row__context text-sm leading-5 text-slate-500">
+            <WorkflowTaskTiming task={task} />
             {businessLabel &&
             businessLabel !== resolveMobileTaskStatusLabel(task) ? (
               <span>{businessLabel}</span>
             ) : null}
           </div>
-          <span className="mobile-task-list-row__entry" aria-hidden="true">
-            查看任务 <RightOutlined />
-          </span>
         </div>
       </WorkflowTaskCard>
     )
@@ -400,6 +400,9 @@ export default function MobileTaskListScreen({
 
   const renderListToolbar = (tabs) => <MobileTaskListToolbar tabs={tabs} />
 
+  const renderEmptyState = (description) =>
+    loading || loadError ? null : <Empty description={description} />
+
   const renderListFeedback = () => (
     <>
       <MobileTaskPullRefresh
@@ -442,9 +445,9 @@ export default function MobileTaskListScreen({
       <>
         {renderListToolbar(renderTaskFilters())}
         {renderListFeedback()}
-        <section className="mx-4 mt-4 pb-4">
+        <section className="mobile-task-results">
           <div
-            className="pb-3 text-sm text-slate-500"
+            className="erp-sr-only"
             data-testid="mobile-task-list-range"
             aria-live="polite"
           >
@@ -475,9 +478,7 @@ export default function MobileTaskListScreen({
               </div>
             ) : filteredTasks.length === 0 ? (
               <>
-                <div className="px-5 py-8 text-center text-sm text-slate-500">
-                  当前筛选下暂无任务
-                </div>
+                {renderEmptyState('当前筛选下暂无任务')}
                 {renderListLimitControl(
                   filteredTasks,
                   activeTodoListKey,
@@ -508,23 +509,22 @@ export default function MobileTaskListScreen({
         key={task.id}
         data-mobile-task-id={task.id}
         data-task-code={task.task_code || undefined}
-        className="erp-mobile-list-item w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
+        className="erp-mobile-list-item mobile-task-list-row w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left"
         label={`查看${getWorkflowTaskDisplayName(task)}处理结果`}
         onOpen={() => {
           setSelectedTaskID(task.id)
           setDetailAction(null)
         }}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="break-words text-base font-semibold text-slate-950">
-              {getWorkflowTaskDisplayName(task)}
-            </div>
-            <WorkflowTaskIdentity task={task} compact />
-            <div className="mt-1 break-all text-sm text-slate-500">
-              <WorkflowTaskSource task={task} />
-            </div>
-          </div>
+        <div className="mobile-task-list-row__head">
+          <span className="mobile-task-list-row__identity">
+            <WorkflowTaskIdentity
+              task={task}
+              compact
+              copyable={false}
+              showTaskName
+            />
+          </span>
           <span
             className={`shrink-0 rounded-md border px-2 py-1 text-sm font-semibold ${
               rejected
@@ -535,8 +535,18 @@ export default function MobileTaskListScreen({
             {resolveMobileTaskStatusLabel(task)}
           </span>
         </div>
-        <div className="mt-2">
-          <WorkflowTaskTiming task={task} />
+        <div className="mobile-task-list-row__body min-w-0">
+          <div className="mobile-task-list-row__source text-sm leading-5 text-slate-500">
+            <FileTextOutlined aria-hidden="true" />
+            <span className="mobile-task-list-row__source-text">
+              <WorkflowTaskSource task={task} copyable={false} />
+            </span>
+          </div>
+        </div>
+        <div className="mobile-task-list-row__footer min-w-0">
+          <div className="mobile-task-list-row__context text-sm leading-5 text-slate-500">
+            <WorkflowTaskTiming task={task} />
+          </div>
         </div>
       </WorkflowTaskCard>
     )
@@ -545,10 +555,10 @@ export default function MobileTaskListScreen({
   const renderDonePanel = () => (
     <>
       {renderListFeedback()}
-      <section className="mx-4 mt-5 space-y-4 pb-5">
-        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-slate-950">已办任务</h2>
+      <section className="mobile-task-results mobile-task-history">
+        <section>
+          <div className="mobile-task-history-summary">
+            <h2>已办任务</h2>
             <span
               className="mobile-role-count-tag mobile-role-section-count"
               data-testid="mobile-role-done-count"
@@ -561,12 +571,10 @@ export default function MobileTaskListScreen({
               {authoritativeTaskCounts?.history ?? '—'}
             </span>
           </div>
-          <div className="mt-3 space-y-3">
+          <div className="space-y-3">
             {doneTasks.length === 0 ? (
               <>
-                <div className="rounded-xl border border-dashed border-slate-200 px-3 py-5 text-center text-sm text-slate-500">
-                  暂无已办任务
-                </div>
+                {renderEmptyState('暂无已办任务')}
                 {renderListLimitControl(
                   doneTasks,
                   MOBILE_LIST_KEYS.DONE,
@@ -636,16 +644,20 @@ export default function MobileTaskListScreen({
   }
 
   const renderWarningMessages = () => (
-    <section className="mobile-role-message-section mobile-role-message-section--warning erp-mobile-card rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+    <section
+      className={`mobile-role-message-section erp-mobile-card rounded-2xl border p-4 ${
+        riskTasks.length > 0
+          ? 'mobile-role-message-section--warning border-amber-200 bg-amber-50/70'
+          : 'border-slate-200 bg-white'
+      }`}
+    >
       <h2 className="text-lg font-semibold text-slate-950">
         {riskScope === 'supervised' ? '跨岗风险' : '风险'}
       </h2>
       <div className="mt-3 space-y-2">
         {riskTasks.length === 0 ? (
           <>
-            <div className="mobile-role-message-empty rounded-xl border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-sm text-slate-500">
-              暂无风险任务
-            </div>
+            {renderEmptyState('暂无风险任务')}
             {renderListLimitControl(
               riskTasks,
               MOBILE_LIST_KEYS.WARNING,
@@ -666,12 +678,16 @@ export default function MobileTaskListScreen({
                   <div className="mobile-role-message-card__tone font-semibold text-amber-800">
                     {getTaskQueueTone(task)}
                   </div>
-                  <div className="mobile-role-message-card__title mt-1 text-sm text-slate-900">
-                    {getWorkflowTaskDisplayName(task)}
+                  <div className="mobile-role-message-card__title mt-1">
+                    <WorkflowTaskIdentity
+                      task={task}
+                      compact
+                      copyable={false}
+                      showTaskName
+                    />
                   </div>
-                  <WorkflowTaskIdentity task={task} compact />
                   <div className="mobile-role-message-card__source mt-1 break-all text-xs text-amber-700">
-                    <WorkflowTaskSource task={task} />
+                    <WorkflowTaskSource task={task} copyable={false} />
                   </div>
                   {resolveTaskReason(task) ? (
                     <div className="mobile-role-message-card__reason mt-1 text-sm text-red-600">
@@ -701,9 +717,7 @@ export default function MobileTaskListScreen({
       <div className="mt-3 space-y-2">
         {overdueTasks.length === 0 ? (
           <>
-            <div className="mobile-role-message-empty rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-500">
-              暂无超时任务
-            </div>
+            {renderEmptyState('暂无超时任务')}
             {renderListLimitControl(
               overdueTasks,
               MOBILE_LIST_KEYS.NOTICE,
@@ -722,12 +736,14 @@ export default function MobileTaskListScreen({
                   onOpen={() => setSelectedTaskID(task.id)}
                 >
                   <span className="min-w-0">
-                    <span className="mobile-role-message-card__title text-sm font-medium text-slate-700">
-                      {getWorkflowTaskDisplayName(task)}
-                    </span>
-                    <WorkflowTaskIdentity task={task} compact />
+                    <WorkflowTaskIdentity
+                      task={task}
+                      compact
+                      copyable={false}
+                      showTaskName
+                    />
                     <span className="mobile-role-message-card__source mt-1 block break-all text-xs text-slate-500">
-                      <WorkflowTaskSource task={task} />
+                      <WorkflowTaskSource task={task} copyable={false} />
                     </span>
                   </span>
                   <div className="mt-2">
@@ -760,145 +776,124 @@ export default function MobileTaskListScreen({
   )
 
   const renderMinePanel = () => {
-    const roleNames = (adminProfile?.roles || [])
-      .map((role) => role?.name || getMobileRoleLabel(role?.role_key))
-      .filter(Boolean)
-      .join(' / ')
-    const availableEntryLabel = canEnterDesktop
-      ? '电脑端 / 手机待办'
-      : '手机待办'
     return (
-      <section className="mx-4 mt-5 space-y-4 pb-5">
-        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-3xl text-emerald-700">
+      <section className="mobile-mine-panel">
+        <section className="mobile-mine-card">
+          <div className="mobile-mine-identity">
+            <span className="mobile-mine-avatar">
               <UserOutlined />
             </span>
-            <div className="min-w-0">
-              <div className="truncate text-xl font-semibold text-slate-950">
+            <div>
+              <strong>
                 {adminProfile?.display_name ||
                   adminProfile?.username ||
                   '当前账号'}
-              </div>
+              </strong>
               {adminProfile?.display_name && adminProfile?.username ? (
-                <div className="mt-1 truncate text-sm text-slate-500">
-                  账号：{adminProfile.username}
-                </div>
+                <span>账号：{adminProfile.username}</span>
               ) : null}
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl bg-slate-50 px-3 py-3">
-              <div className="text-slate-500">账号岗位</div>
-              <div className="mt-1 min-w-0 break-words font-semibold text-slate-950">
-                {roleNames || '-'}
-              </div>
-            </div>
-            <div className="rounded-xl bg-slate-50 px-3 py-3">
-              <div className="text-slate-500">可用入口</div>
-              <div className="mt-1 min-w-0 break-words font-semibold text-slate-950">
-                {availableEntryLabel}
-              </div>
-            </div>
-          </div>
-          <div className="mobile-task-display-settings mt-4 border-t border-slate-200 pt-4">
-            <h2 className="mb-3 text-base font-semibold text-slate-950">
-              显示设置
-            </h2>
-            <ERPThemeToggle size="large" />
+        </section>
+
+        <section className="mobile-mine-card mobile-task-display-settings">
+          <h2>显示设置</h2>
+          <ERPThemeToggle variant="settings" />
+        </section>
+
+        <section className="mobile-mine-card">
+          <h2>入口与安全</h2>
+          <div className="mobile-mine-actions">
+            <button
+              type="button"
+              className="mobile-mine-action"
+              onClick={() => setPasswordModalOpen(true)}
+            >
+              <KeyOutlined aria-hidden="true" />
+              <span>修改密码</span>
+              <RightOutlined aria-hidden="true" />
+            </button>
+            {passwordModalOpen ? (
+              <AccountPasswordModal
+                onClose={() => setPasswordModalOpen(false)}
+              />
+            ) : null}
+            {canEnterDesktop ? (
+              <button
+                type="button"
+                data-testid="mobile-role-work-entry-switch"
+                className="mobile-mine-action"
+                onClick={handleSwitchEntry}
+              >
+                <SwapOutlined aria-hidden="true" />
+                <span>切换工作入口</span>
+                <RightOutlined aria-hidden="true" />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              data-testid="mobile-privacy-rules-entry"
+              className="mobile-mine-action"
+              onClick={handleOpenLegalNotice}
+            >
+              <SafetyCertificateOutlined aria-hidden="true" />
+              <span>隐私与使用规则</span>
+              <RightOutlined aria-hidden="true" />
+            </button>
           </div>
         </section>
 
-        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-950">入口与安全</h2>
-          <button
-            type="button"
-            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
-            onClick={() => setPasswordModalOpen(true)}
+        <section
+          className="mobile-mine-card"
+          data-testid="mobile-system-version-card"
+        >
+          <h2>系统信息</h2>
+          <dl className="mobile-mine-facts">
+            <div>
+              <dt>系统版本</dt>
+              <dd data-testid="mobile-system-version-value">
+                {runtimeBuildIdentity.status.systemVersion}
+              </dd>
+            </div>
+            <div>
+              <dt>构建号</dt>
+              <dd>{runtimeBuildIdentity.web.gitSHAShort || '未标记'}</dd>
+            </div>
+          </dl>
+          <p
+            className="mobile-mine-version"
+            data-testid="mobile-system-version-status"
           >
-            <KeyOutlined aria-hidden="true" />
-            修改密码
-          </button>
-          {passwordModalOpen ? (
-            <AccountPasswordModal onClose={() => setPasswordModalOpen(false)} />
-          ) : null}
-          {canEnterDesktop ? (
+            {runtimeBuildIdentity.status.label}
+          </p>
+          {runtimeBuildIdentity.status.key === 'unavailable' ? (
             <button
               type="button"
-              data-testid="mobile-role-work-entry-switch"
-              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
-              onClick={handleSwitchEntry}
+              className="mobile-mine-action"
+              onClick={runtimeBuildIdentity.retry}
+              disabled={runtimeBuildIdentity.loading}
             >
-              <SwapOutlined aria-hidden="true" />
-              切换工作入口
+              <ReloadOutlined aria-hidden="true" />
+              <span>
+                {runtimeBuildIdentity.loading ? '核对中' : '重新核对版本'}
+              </span>
+              <RightOutlined aria-hidden="true" />
             </button>
           ) : null}
-          <button
-            type="button"
-            data-testid="mobile-privacy-rules-entry"
-            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
-            onClick={handleOpenLegalNotice}
-          >
-            <SafetyCertificateOutlined aria-hidden="true" />
-            隐私与使用规则
-          </button>
+        </section>
+
+        <section className="mobile-mine-card">
           <button
             type="button"
             data-testid="mobile-role-logout-button"
-            className={`${mobileTheme.logoutButton} mt-3 w-full`}
+            className="mobile-mine-action mobile-mine-action--danger"
             onClick={handleLogout}
             disabled={loggingOut || typeof handleLogout !== 'function'}
           >
             <LogoutOutlined aria-hidden="true" />
             <span>{loggingOut ? '退出中' : '退出登录'}</span>
+            <RightOutlined aria-hidden="true" />
           </button>
-        </section>
-
-        <section
-          className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-          data-testid="mobile-system-version-card"
-        >
-          <div className="flex items-center gap-2">
-            <InfoCircleOutlined
-              className="text-emerald-700"
-              aria-hidden="true"
-            />
-            <h2 className="text-lg font-semibold text-slate-950">系统信息</h2>
-          </div>
-          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl bg-slate-50 px-3 py-3">
-              <dt className="text-slate-500">系统版本</dt>
-              <dd
-                className="mt-1 min-w-0 break-words font-semibold text-slate-950"
-                data-testid="mobile-system-version-value"
-              >
-                {runtimeBuildIdentity.status.systemVersion}
-              </dd>
-            </div>
-            <div className="rounded-xl bg-slate-50 px-3 py-3">
-              <dt className="text-slate-500">构建号</dt>
-              <dd className="mt-1 min-w-0 break-words font-semibold text-slate-950">
-                {runtimeBuildIdentity.web.gitSHAShort || '未标记'}
-              </dd>
-            </div>
-          </dl>
-          <div
-            className="mt-3 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-700"
-            data-testid="mobile-system-version-status"
-          >
-            {runtimeBuildIdentity.status.label}
-          </div>
-          {runtimeBuildIdentity.status.key === 'unavailable' ? (
-            <button
-              type="button"
-              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
-              onClick={runtimeBuildIdentity.retry}
-              disabled={runtimeBuildIdentity.loading}
-            >
-              <ReloadOutlined aria-hidden="true" />
-              {runtimeBuildIdentity.loading ? '核对中' : '重新核对版本'}
-            </button>
-          ) : null}
         </section>
       </section>
     )
@@ -979,7 +974,7 @@ export default function MobileTaskListScreen({
     '任务'
 
   return (
-    <div className="mobile-role-tasks-page mobile-role-tasks-page--tabs erp-mobile-controls surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
+    <div className="mobile-role-tasks-page mobile-role-tasks-page--tabs erp-mobile-controls md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
       <div
         ref={scrollContainerRef}
         style={{ display: isProgress ? 'none' : undefined }}
@@ -990,12 +985,10 @@ export default function MobileTaskListScreen({
         }`}
         data-testid="mobile-role-scroll"
         aria-busy={initialLoading ? 'true' : 'false'}
+        data-refreshing={loading || loadingMore ? 'true' : 'false'}
         onScroll={handleMainScroll}
       >
-        <header
-          className="mobile-task-list-header"
-          data-testid="mobile-task-list-header"
-        >
+        <header className="erp-sr-only" data-testid="mobile-task-list-header">
           <div className="flex min-w-0 items-center gap-2">
             <h1
               className="shrink-0 text-xl font-semibold tracking-normal text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500"
@@ -1006,25 +999,11 @@ export default function MobileTaskListScreen({
             </h1>
             <span
               className="min-w-0 truncate text-sm text-slate-500"
-              aria-label={`当前岗位：${roleLabel}`}
+              aria-label={`${adminProfile?.is_super_admin === true ? '查看岗位' : '当前岗位'}：${roleLabel}`}
             >
               {roleLabel}
             </span>
           </div>
-          {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE ? (
-            <button
-              type="button"
-              className="mobile-task-list-header__refresh erp-control-button"
-              onClick={() => loadTasks({ showRefreshFeedback: true })}
-              disabled={loading || loadingMore}
-            >
-              <ReloadOutlined
-                className={loading ? 'animate-spin' : ''}
-                aria-hidden="true"
-              />
-              <span>{loading ? '刷新中' : '刷新'}</span>
-            </button>
-          ) : null}
         </header>
 
         {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE ? (
@@ -1102,8 +1081,24 @@ export default function MobileTaskListScreen({
             aria-label="任务状态"
             value={isTasks ? activeMainTabKey : lastTaskTab.current}
             options={[
-              { value: MOBILE_MAIN_TAB_KEYS.TODO, label: '待办' },
-              { value: MOBILE_MAIN_TAB_KEYS.DONE, label: '已办' },
+              {
+                value: MOBILE_MAIN_TAB_KEYS.TODO,
+                label: (
+                  <>
+                    <span>待办</span>{' '}
+                    <span>{authoritativeTaskCounts?.todo ?? ''}</span>
+                  </>
+                ),
+              },
+              {
+                value: MOBILE_MAIN_TAB_KEYS.DONE,
+                label: (
+                  <>
+                    <span>已办</span>{' '}
+                    <span>{authoritativeTaskCounts?.history ?? ''}</span>
+                  </>
+                ),
+              },
             ]}
             onChange={(key) =>
               openTaskBucket({

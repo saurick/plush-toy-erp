@@ -4,6 +4,7 @@ import {
 } from './businessFormPageAssertions.mjs'
 import { createBusinessFormPageDraftScenarios } from './businessFormPageDraftScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
+import { assertBusinessFormSections } from './businessFormSectionAssertions.mjs'
 
 export function createBusinessFormPagesScenarios(deps) {
   const documents = [
@@ -64,11 +65,17 @@ export function createBusinessFormPagesScenarios(deps) {
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       const trigger = page.getByRole('button', { name: triggerName })
+      await trigger.click({ trial: true })
       await trigger.focus()
       await page.keyboard.press('Enter')
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       await editor.getByRole('heading', { name: title, exact: true }).waitFor()
       await assertBusinessFormPage(page, editor)
+      await page.screenshot({
+        path: `${deps.outputDir}/business-form-page-${key}-initial.png`,
+        fullPage: true,
+      })
+      await assertBusinessFormSections(page, editor, key)
       if (key === 'outsourcing') {
         const headers = await editor
           .locator('.erp-line-item-table thead th')
@@ -131,6 +138,10 @@ export function createBusinessFormPagesScenarios(deps) {
 
       await trigger.click()
       await editor.waitFor()
+      // The page focuses its first control after business defaults and the dirty baseline are ready.
+      await page.waitForFunction(() =>
+        document.activeElement?.closest('.erp-business-form-page__body')
+      )
       const note =
         key === 'payment'
           ? editor.getByLabel('收付款单号')
@@ -141,6 +152,11 @@ export function createBusinessFormPagesScenarios(deps) {
               : editor.locator('textarea:visible').first()
       const originalNote = await note.inputValue()
       await note.fill('整页编辑保留输入')
+      await page.waitForFunction(
+        () =>
+          document.querySelector('.erp-business-form-page:not([hidden])')
+            ?.dataset.unsaved === 'true'
+      )
       deps.assert.equal(await editor.getAttribute('data-unsaved'), 'true')
       await editor
         .getByRole('button', { name: '返回列表', exact: true })
@@ -253,6 +269,7 @@ export function createBusinessFormPagesScenarios(deps) {
             ...(key === 'sales' ? { addButtonName: '添加订货明细' } : {}),
             ...(['customers', 'suppliers'].includes(key)
               ? {
+                  addButtonName: '添加联系人',
                   listSelector: '.erp-master-contact-list__items',
                   rowSelector: '.erp-master-contact-list__row',
                 }
@@ -299,6 +316,17 @@ export function createBusinessFormPagesScenarios(deps) {
           if (['sales', 'purchase', 'outsourcing'].includes(key)) {
             const rows = list.locator('.erp-sales-order-lines-form__row')
             const count = await rows.count()
+            const nameLabel = key === 'sales' ? '订货产品名称' : '产品名称'
+            if (key !== 'outsourcing') {
+              await rows
+                .first()
+                .getByLabel(nameLabel, { exact: true })
+                .fill('尚未保存的明细甲')
+              await rows
+                .nth(1)
+                .getByLabel(nameLabel, { exact: true })
+                .fill('相邻明细乙')
+            }
             await rows
               .first()
               .getByRole('button', { name: '复制第 1 行' })
@@ -308,6 +336,31 @@ export function createBusinessFormPagesScenarios(deps) {
               .locator('input:focus, textarea:focus, select:focus')
               .waitFor({ state: 'visible' })
             deps.assert.equal(await rows.count(), count + 1)
+            if (key !== 'outsourcing') {
+              const valueAt = (index) =>
+                rows
+                  .nth(index)
+                  .getByLabel(nameLabel, { exact: true })
+                  .inputValue()
+              deps.assert.equal(await valueAt(1), '尚未保存的明细甲')
+              deps.assert.equal(await valueAt(2), '相邻明细乙')
+              await rows
+                .nth(1)
+                .getByLabel(nameLabel, { exact: true })
+                .fill('独立修改的复制行')
+              await rows
+                .nth(1)
+                .getByRole('button', { name: '上移第 2 行', exact: true })
+                .click()
+              deps.assert.equal(await valueAt(0), '独立修改的复制行')
+              deps.assert.equal(await valueAt(1), '尚未保存的明细甲')
+              await rows
+                .first()
+                .getByRole('button', { name: /移除行/ })
+                .click()
+              deps.assert.equal(await valueAt(0), '尚未保存的明细甲')
+              deps.assert.equal(await valueAt(1), '相邻明细乙')
+            }
           }
           for (const [variant, viewport] of [
             ['desktop', { width: 1440, height: 900 }],
@@ -321,7 +374,7 @@ export function createBusinessFormPagesScenarios(deps) {
             const rowCount = await editor.locator(rowSelector).count()
             await editor
               .getByRole('button', {
-                name: key === 'sales' ? '添加订货明细' : '添加条目',
+                name: contacts ? '添加联系人' : key === 'sales' ? '添加订货明细' : '添加条目',
                 exact: true,
               })
               .click()
@@ -381,7 +434,7 @@ export function createBusinessFormPagesScenarios(deps) {
             )
             const firstRow = list
               .locator(
-                contacts ? '.erp-master-contact-list__row-head' : 'thead'
+                contacts ? '.erp-contact-editor__fields' : 'thead'
               )
               .first()
             await firstRow.evaluate((node) =>
@@ -439,6 +492,18 @@ export function createBusinessFormPagesScenarios(deps) {
           await assertBusinessFormPage(page, editor)
         }
         await page.setViewportSize({ width: 1440, height: 900 })
+        const rows = editor.locator('.erp-production-order-line')
+        for (const [index, note] of ['待移除说明', '保留生产说明'].entries()) {
+          await rows.nth(index).locator('summary').click()
+          await rows.nth(index).getByLabel('明细备注', { exact: true }).fill(note)
+          await rows.nth(index).locator('summary').click()
+        }
+        await rows.first().getByRole('button', { name: '移除明细 1' }).click()
+        deps.assert.match(await rows.first().locator('summary').innerText(), /保留生产说明/u)
+        await rows.first().locator('summary').click()
+        deps.assert.equal(await rows.first().getByLabel('明细备注', { exact: true }).inputValue(), '保留生产说明')
+        await rows.first().getByLabel('明细备注', { exact: true }).fill('')
+        deps.assert.doesNotMatch(await rows.first().locator('summary').innerText(), /保留生产说明/u)
         await closeBusinessFormPage(page, editor)
         await page.getByRole('button', { name: '新建生产订单' }).click()
         await editor.getByRole('heading', { name: '新建生产订单' }).waitFor()

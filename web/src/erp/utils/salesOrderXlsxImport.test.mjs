@@ -15,7 +15,7 @@ const customers = [
   { id: 1, code: 'CUS-STYLE-L1', name: '模拟客户', is_active: true },
 ]
 const units = [
-  { id: 1, code: 'PCS', name: '个', is_active: true },
+  { id: 1, code: 'EA', name: '个', is_active: true },
   { id: 2, name: '套', is_active: true },
 ]
 const parseRows = (rows, options = {}) =>
@@ -125,16 +125,27 @@ test('keeps merged payment note provenance even when continuation rows have no t
   const rows = salesOrderFixtureRows()
   rows[3][21] = '收5000定金'
   rows[3][22] = '尾款已付'
-  const result = await parseSalesOrderXlsx(createSalesOrderWorkbook({
-    sheets: [{ name: '订单', rows, merges: ['V4:V5'] }],
-  }))
+  const result = await parseSalesOrderXlsx(
+    createSalesOrderWorkbook({
+      sheets: [{ name: '订单', rows, merges: ['V4:V5'] }],
+    })
+  )
   const [, second] = result.orders
   for (const line of second.lines) {
-    assert.deepEqual(line.item.import_source.cells.find((cell) => cell.column === 22), {
-      column: 22, label: '第 22 列（无标题）', value: '收5000定金', merged_rows: [4, 5],
-    })
+    assert.deepEqual(
+      line.item.import_source.cells.find((cell) => cell.column === 22),
+      {
+        column: 22,
+        label: '第 22 列（无标题）',
+        value: '收5000定金',
+        merged_rows: [4, 5],
+      }
+    )
   }
-  assert.equal(second.lines[1].item.import_source.cells.find((cell) => cell.column === 23), undefined)
+  assert.equal(
+    second.lines[1].item.import_source.cells.find((cell) => cell.column === 23),
+    undefined
+  )
 })
 
 test('matches only unique active customer and unit records and never replaces an explicit unrecognized unit', async () => {
@@ -227,7 +238,12 @@ test('validates source numbers without rounding business precision, negative qua
   const parsed = await parseRows(rows)
   assert.equal(parsed.orders[0].lines[0].item.unit_price, '15.8')
   assert.equal(parsed.orders[0].lines[0].item.pre_shipment_sample_quantity, '0')
-  assert.equal(parsed.orders[0].warnings.filter((warning) => warning.includes('原生产数量')).length, 1)
+  assert.equal(
+    parsed.orders[0].warnings.filter((warning) =>
+      warning.includes('原生产数量')
+    ).length,
+    1
+  )
   for (const value of [{ type: 'e', value: '#REF!' }, { formula: 'A1' }]) {
     const invalid = salesOrderFixtureRows()
     invalid[2][5] = value
