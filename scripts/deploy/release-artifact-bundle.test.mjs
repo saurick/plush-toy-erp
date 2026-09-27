@@ -355,6 +355,14 @@ test("release image builders consume the committed generated projection without 
   assert.match(webDockerfile, /RUN pnpm build:committed/u);
   assert.match(serverDockerfile, /RUN pnpm run build:committed/u);
   assert.match(serverDockerfile, /COPY web\/\*\.mjs \.\//u);
+  assert.match(
+    serverDockerfile,
+    /^COPY server\/internal\/unitpolicy\/units[.]json \/server\/internal\/unitpolicy\/units[.]json$/mu,
+  );
+  assert.match(
+    webDockerfile,
+    /^COPY server\/internal\/unitpolicy\/units[.]json [.]\/server\/internal\/unitpolicy\/units[.]json$/mu,
+  );
   assert.doesNotMatch(serverDockerfile, /COPY web\/dev-server/u);
   assert.doesNotMatch(serverDockerfile, /COPY scripts \/scripts/u);
   assert.match(

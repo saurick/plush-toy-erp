@@ -22,6 +22,7 @@ RUN npm config set registry https://registry.npmmirror.com && \
 COPY web ./web
 COPY config ./config
 COPY scripts ./scripts
+COPY server/internal/unitpolicy/units.json ./server/internal/unitpolicy/units.json
 
 WORKDIR /app/web
 
