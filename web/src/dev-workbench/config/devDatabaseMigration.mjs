@@ -349,7 +349,13 @@ export function createDevDatabaseMigrationClient({
   }
 }
 
-export function databaseMigrationStatusPresentation(status) {
+export function databaseMigrationStatusPresentation(status, issues = []) {
+  if (
+    status === 'blocked' &&
+    issues.some((issue) => issue.code === 'database_migration_busy')
+  ) {
+    return { color: 'warning', label: '未开始' }
+  }
   return (
     {
       preparing: { color: 'processing', label: '正在准备' },
@@ -378,6 +384,201 @@ export function selectActiveDatabaseMigrationOperation(operations = []) {
     operations.find((operation) => ACTIVE_STATUSES.has(operation.status)) ||
     null
   )
+}
+
+export function databaseMigrationPreparationAvailable(summary) {
+  return (
+    summary?.status === 'success' &&
+    summary.target?.key === 'shared-dev' &&
+    Number.isSafeInteger(summary.target.pendingFiles) &&
+    summary.target.pendingFiles > 0 &&
+    summary.tools?.status === 'ready' &&
+    !(summary.operations || []).some((operation) =>
+      isDatabaseMigrationOperationPolling(operation.status)
+    )
+  )
+}
+
+export function selectDatabaseMigrationPathOperation(summary) {
+  const target = summary?.target
+  const candidates = (summary?.operations || []).filter(
+    (operation) =>
+      operation.kind === 'migration' &&
+      (!operation.target ||
+        operation.target.latestVersion === target?.latestVersion)
+  )
+  const active = selectActiveDatabaseMigrationOperation(candidates)
+  if (active) return active
+  const latest = candidates[0] || null
+  // A rejected preparation must not replace an already proven upgrade path.
+  if (target?.pendingFiles === 0) {
+    return (
+      candidates.find(
+        (operation) =>
+          operation.status === 'not_proven' ||
+          operation.events?.some((event) => event.status === 'applying')
+      ) || latest
+    )
+  }
+  return latest
+}
+
+export function databaseMigrationExecutionText(operation) {
+  if (operation?.readback?.migrationVerified === true) {
+    return `原库已核对至 ${operation.readback.currentVersion}，待执行 ${operation.readback.pendingFiles} 条`
+  }
+  if (operation?.status === 'not_proven') {
+    return '原库执行结果未知，请先刷新核对；不要重复执行'
+  }
+  if (operation?.events?.some((event) => event.status === 'applying')) {
+    return '已进入执行阶段，原库结果尚未完成核对'
+  }
+  return '本次尚未执行原库迁移'
+}
+
+export function databaseMigrationDataScopeText(backup) {
+  if (!backup?.restoreVerified) return '尚无本次恢复演练通过的证据'
+  if (backup.businessRowsBeforeUpgrade === 0) {
+    return '业务表为空，按清理后重建的数据状态验证；不证明清理前业务数据可以保留升级'
+  }
+  if (
+    Number.isSafeInteger(backup.businessRowsBeforeUpgrade) &&
+    backup.businessRowsBeforeUpgrade > 0
+  ) {
+    return `保留本次备份中的 ${backup.businessRowsBeforeUpgrade} 条业务记录进行升级验证`
+  }
+  return '历史证据未记录业务数据范围，不能据此判断是否清理过数据'
+}
+
+export function databaseMigrationUpgradePresentation(summary) {
+  const target = summary?.target
+  if (!target) {
+    return {
+      type: 'warning',
+      label: '候选升级：目标状态待核对',
+      description: '请刷新状态后再操作。',
+    }
+  }
+  const candidates = (summary.operations || []).filter(
+    (item) =>
+      item.kind === 'migration' &&
+      (!item.target || item.target.latestVersion === target.latestVersion)
+  )
+  const latest = candidates[0]
+  const executing =
+    latest &&
+    ['preparing', 'ready', 'applying', 'restarting'].includes(latest.status)
+  if (!executing && target.pendingFiles === 0) {
+    return {
+      type: summary.runtime?.available ? 'success' : 'warning',
+      label: summary.runtime?.available
+        ? '候选升级：原库已是最新版本'
+        : '候选升级：迁移已完成，服务尚未恢复',
+      description: `原库已在 ${target.currentVersion}，待执行 0 条。${summary.runtime?.available ? '历史阻断只保留在操作记录中。' : '请重启后端并核对运行状态，无需重复迁移。'}`,
+    }
+  }
+  // A later infrastructure failure does not resolve an earlier data conflict.
+  let conflict = null
+  for (const item of candidates) {
+    if (
+      item.readback?.dataAuditPassed ||
+      item.plan ||
+      item.backup ||
+      item.status === 'passed'
+    ) {
+      break
+    }
+    if (
+      item.issues?.some((issue) => issue.code === 'unit_normalization_blocked')
+    ) {
+      conflict = item
+      break
+    }
+  }
+  const label =
+    {
+      preparing: '正在准备',
+      ready: '准备完成，等待确认',
+      applying: '正在迁移',
+      restarting: '原库已升级，正在验证后端',
+      not_proven: '原库执行结果待核对',
+    }[latest?.status] ||
+    (conflict ? '数据冲突，等待处理或复验' : latest ? '准备未完成' : '尚未准备')
+  return {
+    type:
+      latest?.status === 'not_proven'
+        ? 'error'
+        : executing
+          ? 'info'
+          : 'warning',
+    label: `候选升级：${label}`,
+    description: [
+      `目标 ${target.latestVersion}，待执行 ${target.pendingFiles} 条。`,
+      databaseMigrationExecutionText(latest),
+      conflict
+        ? '上次数据审计发现数量与单位冲突，尚无后续审计通过的证据；数据处置后请重新检查。'
+        : '',
+      latest?.issues?.map((issue) => issue.message).join('；') || '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+  }
+}
+
+export function databaseMigrationPathStatuses(operation) {
+  const statuses = Array(6).fill('wait')
+  if (operation?.kind !== 'migration') return statuses
+
+  const { backup, readback, target } = operation
+  const candidate = backup?.candidate
+  const fixedCandidate = Boolean(
+    operation.plan?.hash &&
+    operation.source?.fingerprint &&
+    backup?.bundleId &&
+    candidate?.bundleId === backup.bundleId
+  )
+  if (fixedCandidate) statuses[0] = 'finish'
+  if (
+    fixedCandidate &&
+    backup.restoreVerified === true &&
+    [
+      'populatedRestore',
+      'attachmentsRestored',
+      'health',
+      'ready',
+      'login',
+      'customerConfig',
+      'business',
+    ].every((check) => candidate[check] === true)
+  ) {
+    statuses[1] = 'finish'
+  }
+
+  // Applying also covers maintenance and backup; only readback proves completion.
+  const databaseVerified =
+    readback?.migrationVerified === true &&
+    readback.pendingFiles === 0 &&
+    Boolean(target?.latestVersion) &&
+    readback.currentVersion === target.latestVersion
+  if (
+    databaseVerified &&
+    operation.events?.some((event) => event.status === 'applying')
+  ) {
+    statuses[2] = 'finish'
+    if (target.pendingFiles > 0) statuses[3] = 'finish'
+  }
+  if (
+    databaseVerified &&
+    operation.status === 'passed' &&
+    backup?.bundleId &&
+    readback.runtime?.available === true &&
+    readback.runtime.bundleId === backup.bundleId &&
+    readback.runtime.activeVersion === target.latestVersion
+  ) {
+    statuses[4] = 'finish'
+    statuses[5] = 'finish'
+  }
+  return statuses
 }
 
 export function isDatabaseMigrationOperationPolling(status) {

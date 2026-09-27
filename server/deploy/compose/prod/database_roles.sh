@@ -3,6 +3,7 @@ set -euo pipefail
 umask 077
 
 mode="${1:-reconcile}"
+role_prefix="${POSTGRES_ROLE_PREFIX:-erp}"
 
 fail() {
   printf '[database-roles] ERROR: %s\n' "$*" >&2
@@ -14,12 +15,22 @@ reconcile | verify) ;;
 *) fail "用法: database_roles.sh [reconcile|verify]" ;;
 esac
 
+[[ "$role_prefix" =~ ^[a-z][a-z0-9_]{1,35}$ ]] || fail "POSTGRES_ROLE_PREFIX 无效"
+
+# A dedicated development prefix reuses the production privilege policy without
+# changing credentials or ownership of roles used by other databases.
+role_psql() {
+  sed -e "s/erp_migrator/${role_prefix}_migrator/g" \
+    -e "s/erp_app/${role_prefix}_app/g" \
+    -e "s/erp_backup/${role_prefix}_backup/g" | psql "$@"
+}
+
 for variable in POSTGRES_DB POSTGRES_USER; do
   [[ -n "${!variable:-}" ]] || fail "$variable 不能为空"
 done
 
 case "$POSTGRES_USER" in
-erp_app | erp_migrator | erp_backup)
+erp_app | erp_migrator | erp_backup | "${role_prefix}_app" | "${role_prefix}_migrator" | "${role_prefix}_backup")
   fail "POSTGRES_USER 必须保留为容器初始化管理员，不能复用业务角色"
   ;;
 esac
@@ -39,11 +50,13 @@ done
 
 if [[ "$mode" == "reconcile" ]]; then
 
-  psql -X --no-psqlrc --set ON_ERROR_STOP=1 \
+  role_psql -X --no-psqlrc --set ON_ERROR_STOP=1 \
     --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'SQL'
 \getenv app_password POSTGRES_APP_PASSWORD
 \getenv migrator_password POSTGRES_MIGRATOR_PASSWORD
 \getenv backup_password POSTGRES_BACKUP_PASSWORD
+
+BEGIN;
 
 SELECT format(
   'CREATE ROLE erp_migrator LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS',
@@ -230,6 +243,7 @@ SELECT format(
 \gexec
 
 ALTER ROLE erp_backup SET default_transaction_read_only = on;
+GRANT EXECUTE ON FUNCTION pg_catalog.pg_control_system() TO erp_app, erp_migrator, erp_backup;
 SELECT format(
   'ALTER ROLE erp_backup IN DATABASE %I SET application_name TO %L',
   current_database(),
@@ -241,10 +255,11 @@ SELECT format(
   current_database()
 )
 \gexec
+COMMIT;
 SQL
 fi
 
-psql -X --no-psqlrc --set ON_ERROR_STOP=1 \
+role_psql -X --no-psqlrc --set ON_ERROR_STOP=1 \
   --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'SQL'
 DO $verify$
 DECLARE
@@ -494,7 +509,7 @@ expect_permission_denied() {
   set +e
   output="$(PGPASSWORD="$POSTGRES_APP_PASSWORD" psql -X --no-psqlrc \
     --set ON_ERROR_STOP=1 --set VERBOSITY=verbose \
-    --username erp_app --dbname "$POSTGRES_DB" \
+    --username "${role_prefix}_app" --dbname "$POSTGRES_DB" \
     --command "$statement" 2>&1)"
   status=$?
   set -e
@@ -504,7 +519,7 @@ expect_permission_denied() {
 }
 
 app_identity="$(PGPASSWORD="$POSTGRES_APP_PASSWORD" psql -X --no-psqlrc \
-  --set ON_ERROR_STOP=1 --username erp_app --dbname "$POSTGRES_DB" \
+  --set ON_ERROR_STOP=1 --username "${role_prefix}_app" --dbname "$POSTGRES_DB" \
   --tuples-only --no-align \
   --command "
     SELECT current_user
@@ -512,14 +527,14 @@ app_identity="$(PGPASSWORD="$POSTGRES_APP_PASSWORD" psql -X --no-psqlrc \
       || '|' || (current_setting('statement_timeout')::interval = interval '30 seconds')::text
       || '|' || (current_setting('lock_timeout')::interval = interval '5 seconds')::text
       || '|' || (current_setting('idle_in_transaction_session_timeout')::interval = interval '60 seconds')::text;")"
-[[ "$app_identity" == "erp_app|public|true|true|true" ]] ||
+[[ "$app_identity" == "${role_prefix}_app|public|true|true|true" ]] ||
   fail "erp_app session policy readback failed"
 
 backup_identity="$(PGPASSWORD="$POSTGRES_BACKUP_PASSWORD" psql -X --no-psqlrc \
-  --set ON_ERROR_STOP=1 --username erp_backup --dbname "$POSTGRES_DB" \
+  --set ON_ERROR_STOP=1 --username "${role_prefix}_backup" --dbname "$POSTGRES_DB" \
   --tuples-only --no-align \
   --command "SELECT current_user || '|' || current_setting('default_transaction_read_only') || '|' || current_setting('search_path');")"
-[[ "$backup_identity" == "erp_backup|on|public" ]] ||
+[[ "$backup_identity" == "${role_prefix}_backup|on|public" ]] ||
   fail "erp_backup read-only session policy readback failed"
 
 permission_probe="__plush_permission_probe_$$"
@@ -551,7 +566,7 @@ if psql -X --no-psqlrc --set ON_ERROR_STOP=1 \
   --command "SELECT to_regclass('atlas_schema_revisions.atlas_schema_revisions') IS NOT NULL;" | \
   grep -qx 't'; then
   atlas_revision_readable="$(PGPASSWORD="$POSTGRES_APP_PASSWORD" psql -X --no-psqlrc \
-    --set ON_ERROR_STOP=1 --username erp_app --dbname "$POSTGRES_DB" \
+    --set ON_ERROR_STOP=1 --username "${role_prefix}_app" --dbname "$POSTGRES_DB" \
     --tuples-only --no-align \
     --command "SELECT (count(*) >= 0)::text FROM atlas_schema_revisions.atlas_schema_revisions;")"
   [[ "$atlas_revision_readable" == "true" ]] ||
@@ -590,7 +605,7 @@ done < <(
 )
 
 PGPASSWORD="$POSTGRES_MIGRATOR_PASSWORD" psql -X --no-psqlrc \
-  --set ON_ERROR_STOP=1 --username erp_migrator --dbname "$POSTGRES_DB" \
+  --set ON_ERROR_STOP=1 --username "${role_prefix}_migrator" --dbname "$POSTGRES_DB" \
   --command "BEGIN; CREATE TABLE public.${permission_probe} (id bigint); ROLLBACK;" \
   >/dev/null
 

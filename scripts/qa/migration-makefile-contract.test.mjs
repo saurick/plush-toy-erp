@@ -24,7 +24,7 @@ test("migration make targets keep the guarded low-level plan and apply wrapper",
   const workflow = targetBody(source, "migrate", "migrate_prepare:");
   const prepare = targetBody(source, "migrate_prepare", "migrate_execute:");
   const execute = targetBody(source, "migrate_execute", "migrate_status:");
-  const status = targetBody(source, "migrate_status", "migrate_plan:");
+  const status = targetBody(source, "migrate_status", "migrate_audit:");
   const plan = targetBody(source, "migrate_plan", "migrate_apply:");
   const apply = targetBody(source, "migrate_apply", ".PHONY: print_db_url");
   assert.match(workflow, /local-migration-workflow\.mjs/u);
@@ -87,6 +87,16 @@ test("bare legacy plan and apply targets route into the safe high-level workflow
   }
 });
 
+test("migration data audit is a read-only entry without stopping the backend or applying migrations", async () => {
+  const source = await readFile(makefileURL, "utf8");
+  const audit = targetBody(source, "migrate_audit", "migrate_plan:");
+  assert.match(audit, /node \.\.\/scripts\/local-migration\.mjs audit/u);
+  assert.doesNotMatch(
+    audit,
+    /local-migration-workflow|dev_stop|migrate_apply|MIGRATE_CONFIRM|--tx-mode/u,
+  );
+});
+
 test("migration makefile separates interactive run from explicit non-interactive phases", async () => {
   const source = await readFile(makefileURL, "utf8");
   const workflow = targetBody(source, "migrate", "migrate_prepare:");
@@ -137,7 +147,8 @@ test("shared-development migration targets preserve terminal receipts without tr
     targetBody(source, "migrate", "migrate_prepare:"),
     targetBody(source, "migrate_prepare", "migrate_execute:"),
     targetBody(source, "migrate_execute", "migrate_status:"),
-    targetBody(source, "migrate_status", "migrate_plan:"),
+    targetBody(source, "migrate_status", "migrate_audit:"),
+    targetBody(source, "migrate_audit", "migrate_plan:"),
     targetBody(source, "migrate_plan", "migrate_apply:"),
     targetBody(source, "migrate_apply", ".PHONY: print_db_url"),
   ];

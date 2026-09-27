@@ -451,6 +451,37 @@ test("local migration workflow: real prepare blockers remain errors", async () =
   assert.equal(service.calls.filter((call) => call === "execute").length, 0);
 });
 
+test("local migration workflow: unit data blockers require data repair, not another automatic apply", async () => {
+  const service = createService({ blocked: true });
+  const readOperation = service.readOperation.bind(service);
+  service.readOperation = (...args) => ({
+    ...readOperation(...args),
+    issues: [
+      {
+        code: "unit_normalization_blocked",
+        severity: "blocked",
+        message: "单位归并被存量记录阻断",
+      },
+    ],
+  });
+  const buffer = outputBuffer();
+  await assert.rejects(
+    runLocalMigrationWorkflow({
+      service,
+      mode: "prepare",
+      environment: {},
+      output: buffer.output,
+      waitOptions,
+    }),
+    /单位归并被存量记录阻断/u,
+  );
+  assert.match(
+    receiptLines(buffer.read()),
+    /error_code=unit_normalization_blocked next_action=resolve_unit_data_conflicts/u,
+  );
+  assert.equal(service.calls.includes("execute"), false);
+});
+
 test("local migration workflow: execute without the ready identity exits action-required", async () => {
   const service = createService();
   const buffer = outputBuffer();

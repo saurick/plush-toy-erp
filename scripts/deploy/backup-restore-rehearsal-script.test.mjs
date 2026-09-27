@@ -181,7 +181,7 @@ test("backup restore rehearsal keeps credentials private and uses the full migra
   assert.match(source, /postgres:18.6/);
   assert.doesNotMatch(source, /postgres:18(?:["'\s]|$)/);
   assert.doesNotMatch(source, /postgresql@(?:16|17)/);
-  assert.match(source, /source_user" == "erp_backup"/);
+  assert.match(source, /source_user" == "\$expected_backup_role"/);
   assert.match(source, /source_policy="dedicated-backup"/);
   assert.match(source, /restore_dsn="postgres:\/\/erp_migrator:/);
   assert.match(
@@ -240,9 +240,10 @@ test("backup documents are written without Bash heredoc pipe blocking", (t) => {
     backup_size: "1234",
     backup_hash: "a".repeat(64),
     repo_root: "/test/repo with spaces",
+    rehearsal_source_root: "/test/repo with spaces",
     migration_status: "ok",
     pending_files: "0",
-    source_policy: "shared-dev-session-read-only",
+    source_policy: "shared-dev-dedicated-backup",
   });
   const result = spawnSync("bash", ["-eu", "-c", writes.join("\n")], {
     env,
@@ -254,7 +255,7 @@ test("backup documents are written without Bash heredoc pipe blocking", (t) => {
   const report = JSON.parse(fs.readFileSync(env.report_file, "utf8"));
   assert.equal(report.backup.databaseBackupSize, 1234);
   assert.equal(report.backup.databaseBackupHash, "a".repeat(64));
-  assert.equal(report.backup.sourcePolicy, "shared-dev-session-read-only");
+  assert.equal(report.backup.sourcePolicy, "shared-dev-dedicated-backup");
   assert.equal(report.restore.pendingFiles, "0");
   assert.equal(report.summary.restoreCompleted, true);
   assert.equal(report.redaction.containsSecrets, false);
@@ -274,14 +275,14 @@ test("backup documents are written without Bash heredoc pipe blocking", (t) => {
 test("backup restore rehearsal scopes the shared development source exception", () => {
   const source = fs.readFileSync(scriptPath, "utf8").replaceAll('\\"', '"');
   const sharedPolicyStart = source.indexOf(
-    'if [[ "$source_policy" == "shared-dev-session-read-only" ]]',
+    'if [[ "$source_policy" == "shared-dev-dedicated-backup" ]]',
   );
   const sourceIdentityStart = source.indexOf(
     'source_identity="',
     sharedPolicyStart,
   );
   const dedicatedPolicyStart = source.indexOf(
-    'if [[ "$source_policy" == "dedicated-backup" ]]',
+    'if [[ "$source_policy" == "dedicated-backup" || "$source_policy" == "shared-dev-dedicated-backup" ]]',
     sourceIdentityStart,
   );
   const postgresMajorStart = source.indexOf(
@@ -304,7 +305,7 @@ test("backup restore rehearsal scopes the shared development source exception", 
 
   assert.match(
     sharedPolicyBlock,
-    /source_policy" == "shared-dev-session-read-only"[\s\S]*environment" == "shared-dev"[\s\S]*source_pg_host" == "192\.168\.0\.133"[\s\S]*source_pg_port" == "5432"[\s\S]*source_pg_database" == "plush_erp"/,
+    /source_policy" == "shared-dev-dedicated-backup"[\s\S]*environment" == "shared-dev"[\s\S]*source_pg_host" == "192\.168\.0\.133"[\s\S]*source_pg_port" == "5432"[\s\S]*source_pg_database" == "plush_erp"/,
   );
   assert.match(
     sharedPolicyBlock,
@@ -318,7 +319,7 @@ test("backup restore rehearsal scopes the shared development source exception", 
   assert.match(source, /PGOPTIONS="\$source_pg_options"[\s\S]*"\$pg_dump_bin"/);
   assert.match(
     dedicatedPolicyBlock,
-    /source_policy" == "dedicated-backup"[\s\S]*source_user" == "erp_backup"[\s\S]*source_super" == "f"[\s\S]*source_createdb" == "f"[\s\S]*source_createrole" == "f"[\s\S]*source_bypassrls" == "f"[\s\S]*source_database_create" == "f"[\s\S]*source_schema_create" == "f"[\s\S]*source_invalid_table_count" == "0"/,
+    /source_policy" == "dedicated-backup"[\s\S]*source_user" == "\$expected_backup_role"[\s\S]*source_super" == "f"[\s\S]*source_createdb" == "f"[\s\S]*source_createrole" == "f"[\s\S]*source_bypassrls" == "f"[\s\S]*source_database_create" == "f"[\s\S]*source_schema_create" == "f"[\s\S]*source_invalid_table_count" == "0"/,
   );
   assert.match(source, /"sourcePolicy": "\$source_policy"/);
   assert.match(source, /"sourceRole": "\$source_role_alias"/);

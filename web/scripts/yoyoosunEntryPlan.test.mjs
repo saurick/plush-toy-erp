@@ -146,13 +146,15 @@ test('start:yoyoosun print-plan describes dev injection without publishing custo
 })
 
 test('managed yoyoosun entrypoints reject ports outside the plush auxiliary block', () => {
-  for (const scriptName of [
-    'startYoyoosunDev.mjs',
-    'previewYoyoosun.mjs',
-  ]) {
+  for (const scriptName of ['startYoyoosunDev.mjs', 'previewYoyoosun.mjs']) {
     const result = spawnSync(
       process.execPath,
-      [path.join(webRoot, 'scripts', scriptName), '--print-plan', '--port', '5177'],
+      [
+        path.join(webRoot, 'scripts', scriptName),
+        '--print-plan',
+        '--port',
+        '5177',
+      ],
       {
         cwd: webRoot,
         encoding: 'utf8',
@@ -162,6 +164,30 @@ test('managed yoyoosun entrypoints reject ports outside the plush auxiliary bloc
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /must be inside 15200-15299/u)
   }
+})
+
+test('customer restart keeps the requested occupied port and print-plan never stops it', async (t) => {
+  const port = await findConsecutiveFreePortPair()
+  const server = net.createServer()
+  await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve))
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.join(webRoot, 'scripts/startYoyoosunDev.mjs'),
+      '--restart',
+      '--print-plan',
+      '--port',
+      String(port),
+    ],
+    { cwd: webRoot, encoding: 'utf8' }
+  )
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(
+    result.stdout,
+    new RegExp(`\\[start-yoyoosun\\] port=${port}\\n`, 'u')
+  )
+  assert.equal(await canListenOnPort(port), false)
 })
 
 test('start:yoyoosun statically verifies the dev customer config and public asset sources', () => {

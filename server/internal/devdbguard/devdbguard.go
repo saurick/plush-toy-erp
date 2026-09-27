@@ -25,6 +25,7 @@ const (
 )
 
 var customerConfigReleaseRehearsalIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_]{7,44}$`)
+var localRuntimeRehearsalIDPattern = regexp.MustCompile(`^local_[a-f0-9]{32}$`)
 
 func IsDevConfigPath(confPath string) bool {
 	normalized := filepath.ToSlash(filepath.Clean(strings.TrimSpace(confPath)))
@@ -148,7 +149,8 @@ func RequireCustomerConfigLocalTestRuntime(dsn string, currentDatabase string, s
 }
 
 // RequireCustomerConfigReleaseRehearsalDSN keeps the release-only local-test
-// capability inside the disposable Compose database named by the exact run ID.
+// capability inside the disposable database named by the exact run ID. Native
+// local candidates use its loopback-published port and verify the live cluster.
 // It is separate from the registered 133 development-family capability.
 func RequireCustomerConfigReleaseRehearsalDSN(dsn string, runID string) error {
 	runID = strings.TrimSpace(runID)
@@ -160,9 +162,10 @@ func RequireCustomerConfigReleaseRehearsalDSN(dsn string, runID string) error {
 		return fmt.Errorf("parse postgres dsn for customer config release rehearsal guard failed: %w", err)
 	}
 	expectedDatabase := "plush_erp_release_" + runID
+	composeTarget := config.Host == customerConfigReleaseRehearsalHost && config.Port == customerConfigReleaseRehearsalPort
+	localTarget := localRuntimeRehearsalIDPattern.MatchString(runID) && config.Host == "127.0.0.1" && config.Port >= 1024
 	if len(config.Fallbacks) != 0 ||
-		strings.TrimSpace(config.Host) != customerConfigReleaseRehearsalHost ||
-		config.Port != customerConfigReleaseRehearsalPort ||
+		(!composeTarget && !localTarget) ||
 		strings.TrimSpace(config.Database) != expectedDatabase {
 		return fmt.Errorf(
 			"customer config release rehearsal gate requires %s:%d/%s with no fallback",
@@ -200,7 +203,8 @@ func RequireCustomerConfigReleaseRehearsalRuntime(
 		len(systemIdentifier) > 20 ||
 		expectedSystemIdentifier == "" ||
 		systemIdentifier != expectedSystemIdentifier ||
-		!allDecimalDigits(systemIdentifier) {
+		!allDecimalDigits(systemIdentifier) ||
+		(localRuntimeRehearsalIDPattern.MatchString(runID) && systemIdentifier == CustomerConfigLocalTestSystemIdentifier) {
 		return fmt.Errorf("customer config release rehearsal PostgreSQL cluster identity mismatch")
 	}
 	return nil

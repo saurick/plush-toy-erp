@@ -1,14 +1,69 @@
-import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { realpathSync } from 'node:fs'
+import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { promisify } from 'node:util'
+import {
+  findListenerPids,
+  readProcessCwd,
+  runProcessInspection as runInspection,
+} from '../../scripts/dev-process-inspection.mjs'
 import { normalizeAPIOrigin } from '../../scripts/local-runtime-preflight-core.mjs'
 import { canListenOnPort } from './localPort.mjs'
 
 export const DEV_WEB_INSTANCE_PATH = '/__dev/api/web-instance'
-const execFileAsync = promisify(execFile)
+
+const RUNTIME_SOURCE_PATHS = [
+  'web/dev-server',
+  'web/vite.config.mjs',
+  'web/vite.shared.mjs',
+  'web/scripts/startWebDev.mjs',
+  'web/scripts/startYoyoosunDev.mjs',
+  'web/scripts/devWebInstance.mjs',
+  'web/scripts/localPort.mjs',
+  'web/scripts/viteParentLifetime.mjs',
+  'scripts/local-migration.mjs',
+  'scripts/local-database-roles.mjs',
+  'scripts/local-runtime-bundle.mjs',
+  'scripts/local-runtime-rehearsal.mjs',
+  'scripts/local-runtime-preflight.mjs',
+  'scripts/local-runtime-preflight-core.mjs',
+  'scripts/qa/database-programmability.mjs',
+  'scripts/qa/dev-database-migration-operation-store.mjs',
+]
+
+export function runtimeSourceSignature(projectRoot) {
+  const hash = createHash('sha256')
+  const include = (relativePath) => {
+    const absolutePath = path.join(projectRoot, relativePath)
+    let stats
+    try {
+      stats = statSync(absolutePath)
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error
+      hash.update(`${relativePath}\0missing\0`)
+      return
+    }
+    if (stats.isFile()) {
+      hash.update(`${relativePath}\0file\0`)
+      hash.update(readFileSync(absolutePath))
+      hash.update('\0')
+      return
+    }
+    const entries = readdirSync(absolutePath, { withFileTypes: true })
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (
+        entry.isDirectory() ||
+        (entry.isFile() &&
+          /\.(?:mjs|js)$/u.test(entry.name) &&
+          !/\.test\.(?:mjs|js)$/u.test(entry.name))
+      ) {
+        include(path.join(relativePath, entry.name))
+      }
+    }
+  }
+  for (const source of RUNTIME_SOURCE_PATHS) include(source)
+  return hash.digest('hex')
+}
 
 export function webInstanceSignature({
   projectRoot,
@@ -25,6 +80,8 @@ export function webInstanceSignature({
         frontendOnly: Boolean(frontendOnly),
         viteArgs,
         customerKey,
+        // DEV plugins are loaded in Node and do not receive page HMR updates.
+        runtimeSource: runtimeSourceSignature(projectRoot),
       })
     )
     .digest('hex')
@@ -43,8 +100,9 @@ export async function readWebInstance(port) {
     if (
       !response.ok ||
       !response.headers.get('content-type')?.includes('application/json')
-    )
+    ) {
       return null
+    }
     let body = ''
     for await (const chunk of response.body) {
       body += Buffer.from(chunk).toString('utf8')
@@ -61,50 +119,19 @@ export async function readWebInstance(port) {
   }
 }
 
-async function runInspection(command, args) {
-  return execFileAsync(command, args, {
-    encoding: 'utf8',
-    timeout: 2000,
-    maxBuffer: 8192,
-  })
-}
-
 export async function inspectWebListeners(port, webRoot) {
-  let stdout
-  try {
-    ;({ stdout } = await runInspection('lsof', [
-      '-nP',
-      '-a',
-      `-iTCP:${port}`,
-      '-sTCP:LISTEN',
-      '-Fp',
-    ]))
-  } catch (error) {
-    if (error.code === 1 && !error.stdout && !error.stderr) return []
-    throw new Error('无法核对端口进程归属；需要可用的 lsof，未停止任何服务')
-  }
-  const pids = [
-    ...new Set(
-      stdout
-        .split('\n')
-        .filter((line) => /^p\d+$/u.test(line))
-        .map((line) => Number(line.slice(1)))
-    ),
-  ]
-  if (!pids.length) throw new Error('无法识别端口进程，未停止任何服务')
+  const pids = await findListenerPids(port)
+  if (!pids.length) return []
   const expectedCwd = realpathSync(webRoot)
   return Promise.all(
     pids.map(async (pid) => {
-      const [{ stdout: cwdOutput }, { stdout: command }, { stdout: started }] =
-        await Promise.all([
-          runInspection('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn']),
+      const [cwd, { stdout: command }, { stdout: started }] = await Promise.all(
+        [
+          readProcessCwd(pid),
           runInspection('ps', ['-p', String(pid), '-o', 'command=']),
           runInspection('ps', ['-p', String(pid), '-o', 'lstart=']),
-        ])
-      const cwd = cwdOutput
-        .split('\n')
-        .find((line) => line.startsWith('n'))
-        ?.slice(1)
+        ]
+      )
       // cwd 相同还不够：同目录内的任意 Node/Python 服务不能被当作 Vite 停掉。
       const viteCommand =
         /^(?:\S*\/)?node\s+(?:--import\s+\S*\/viteParentLifetime\.mjs\s+)?\S*\/(?:vite\/bin\/vite\.js|\.bin\/vite)(?:\s|$)/u.test(
@@ -172,6 +199,6 @@ export async function prepareWebInstance(
     return { reused: true, pid: instance.pid }
   }
   throw new Error(
-    `端口 ${port} 已被占用，现有服务无法确认或启动配置不同。需要重启本工作区前端时执行 pnpm start --restart；临时验证使用 pnpm start --isolated。未停止任何服务`
+    `端口 ${port} 已被占用，现有服务无法确认、启动配置不同或开发服务代码已更新。需要重新加载本工作区前端时执行 pnpm start --local --restart；临时验证使用 pnpm start --isolated。未停止任何服务`
   )
 }

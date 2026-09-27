@@ -311,7 +311,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "web/src/dev-workbench/pages/DevTestingPage.jsx",
   );
   const devTestingCssSource = read(
-    "web/src/dev-workbench/styles/dev-prototypes.css",
+    "web/src/dev-workbench/styles/dev-workbench-shared.css",
   );
   assert.deepEqual(DEV_TESTING_CURRENT_DOC_PATHS, [
     "docs/product/自动化测试策略.md",
@@ -458,7 +458,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
       "v1-local-acceptance-plan",
       "mobile-workflow-smoke",
       "customer-config-dev-console",
-      "dev-prototype-registry",
+      "dev-ui-design",
       "dev-doc-governance",
       "customer-config-package-runtime",
       "customer-import-tooling",
@@ -848,33 +848,33 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "dev-page-customer-config-desktop-light",
     "customer config dev console preset",
   );
-  const devPrototypePreset = DEV_TESTING_COPY_PRESETS.find(
-    (item) => item.key === "dev-prototype-registry",
+  const devUIDesignPreset = DEV_TESTING_COPY_PRESETS.find(
+    (item) => item.key === "dev-ui-design",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devPrototypePreset),
-    "devPrototypes.test.mjs",
-    "dev prototype registry preset",
+    buildDevTestingCopyPresetSource(devUIDesignPreset),
+    "devUIDesign.test.mjs",
+    "UI design viewer preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devPrototypePreset),
+    buildDevTestingCopyPresetSource(devUIDesignPreset),
     "devHub.test.mjs",
-    "dev prototype registry preset",
+    "UI design viewer preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devPrototypePreset),
-    "dev-page-prototypes-desktop-light",
-    "dev prototype registry preset",
+    buildDevTestingCopyPresetSource(devUIDesignPreset),
+    "dev-page-ui-design-desktop-light",
+    "UI design viewer preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devPrototypePreset),
-    "不晋级 Current",
-    "dev prototype registry preset",
+    buildDevTestingCopyPresetSource(devUIDesignPreset),
+    "只证明 dev-only 交互设计查看器",
+    "UI design viewer preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devPrototypePreset),
+    buildDevTestingCopyPresetSource(devUIDesignPreset),
     "不改正式菜单",
-    "dev prototype registry preset",
+    "UI design viewer preset",
   );
   const devDocGovernancePreset = DEV_TESTING_COPY_PRESETS.find(
     (item) => item.key === "dev-doc-governance",
@@ -1317,14 +1317,21 @@ test("dev entry boundary: customer config console stays preview or gated apply o
 test("dev entry boundary: make dev_restart 先预检再停服并且不自动执行 migration", () => {
   const makefile = read("server/Makefile");
   const target = makefile.match(
-    /^dev_restart:\s*dev_preflight\n(?<recipe>(?:\t.*\n)+)/mu,
+    /^dev_restart:\s*dev_ports_preflight\n(?<recipe>(?:\t.*\n)+)/mu,
   );
-  assert(target?.groups?.recipe, "dev_restart 必须显式依赖 dev_preflight");
-  const recipe = target.groups.recipe;
   assert(
-    recipe.indexOf("$(MAKE) dev_stop") < recipe.indexOf("$(MAKE) dev_build"),
+    target?.groups?.recipe,
+    "dev_restart 必须先核对端口再进入受控启动入口",
   );
-  assert(recipe.indexOf("$(MAKE) dev_build") < recipe.indexOf("$(DEV_BIN)"));
+  const recipe = target.groups.recipe;
+  assert.match(recipe, /node \.\.\/scripts\/local-runtime-start\.mjs/u);
+  const startup = read("scripts/local-runtime-start.mjs");
+  assert(
+    startup.indexOf("await preflight()") < startup.indexOf("await build("),
+  );
+  assert(
+    startup.indexOf("await build(") < startup.indexOf("await runtime.restart("),
+  );
 
   const preflight = read("scripts/local-runtime-preflight.mjs");
   assert.doesNotMatch(preflight, /migrate\s+apply/u);

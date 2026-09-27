@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -14,6 +15,8 @@ import {
   migrationPlanID,
   normalizeSchemaDiffOutput,
   redactMigrationDiagnostic,
+  migrationAuditPaths,
+  runPendingMigrationAudits,
   targetConfirmation,
   unsafeRehearsalReason,
 } from "./local-migration.mjs";
@@ -26,6 +29,168 @@ const identity = Object.freeze({
 const cliPath = fileURLToPath(
   new URL("./local-migration.mjs", import.meta.url),
 );
+
+function migrationAuditFixture(t, entries) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-migration-audit-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const directory = path.join(root, "migrations");
+  fs.mkdirSync(directory);
+  fs.mkdirSync(path.join(root, "scripts/qa"), { recursive: true });
+  fs.mkdirSync(path.join(root, "server"));
+  for (const [name, audit] of entries) {
+    fs.writeFileSync(
+      path.join(directory, name),
+      `-- preflight: ${audit}\nSELECT 1;\n`,
+    );
+    if (audit.endsWith(".sql") && !audit.includes("..")) {
+      fs.writeFileSync(path.join(root, audit), "SELECT 1;\n");
+    }
+  }
+  return { root, directory };
+}
+
+test("local migration: new declared SQL audits run once without registering migration versions in code", async (t) => {
+  const options = migrationAuditFixture(t, [
+    ["20990101000001_first.sql", "scripts/qa/new-rule.sql"],
+    ["20990101000002_second.sql", "scripts/qa/new-rule.sql"],
+    ["20990101000003_applied.sql", "scripts/qa/old-rule.sql"],
+  ]);
+  const status = {
+    Available: ["20990101000001", "20990101000002", "20990101000003"].map(
+      (Version) => ({ Version }),
+    ),
+    Applied: [{ Version: "20990101000003" }],
+  };
+  assert.deepEqual(migrationAuditPaths(options.directory), [
+    "scripts/qa/new-rule.sql",
+    "scripts/qa/old-rule.sql",
+  ]);
+  const calls = [];
+  await runPendingMigrationAudits(
+    "unused",
+    status,
+    async (...args) => calls.push(args),
+    options,
+  );
+  assert.equal(calls.length, 1);
+  assert.match(calls[0][3].failureMessage, /new-rule.sql/u);
+  assert.match(calls[0][3].env.PGOPTIONS, /default_transaction_read_only=on/u);
+});
+
+test("local migration: missing or unsupported declared audits fail before any migration write", async (t) => {
+  const options = migrationAuditFixture(t, [
+    ["20990101000001_first.sql", "scripts/qa/not-connected.sh"],
+  ]);
+  const status = { Available: [{ Version: "20990101000001" }], Applied: [] };
+  const execute = async () =>
+    assert.fail("an undeclared runner must not execute");
+  await assert.rejects(
+    runPendingMigrationAudits("unused", status, execute, options),
+    /尚未接入只读执行/u,
+  );
+  fs.writeFileSync(
+    path.join(options.directory, "20990101000001_first.sql"),
+    "-- preflight: scripts/qa/missing.sql\nSELECT 1;",
+  );
+  await assert.rejects(
+    runPendingMigrationAudits("unused", status, execute, options),
+    /ENOENT/u,
+  );
+  fs.writeFileSync(
+    path.join(options.directory, "20990101000001_first.sql"),
+    "-- preflight: scripts/qa/../../private.sql\nSELECT 1;",
+  );
+  assert.throws(
+    () => migrationAuditPaths(options.directory),
+    /迁移预检必须引用/u,
+  );
+});
+
+test("local migration: pending unit normalization audits read-only before any write rehearsal", async () => {
+  const version = "20260927100348";
+  const status = { Applied: [], Available: [{ Version: version }] };
+  const calls = [];
+  await runPendingMigrationAudits(
+    "postgres://test/test",
+    status,
+    async (...args) => {
+      calls.push(args);
+    },
+  );
+  assert.equal(calls.length, 1);
+  const [command, args, sql, options] = calls[0];
+  assert.equal(command, "psql");
+  assert.equal(args.at(-1), "postgres://test/test");
+  assert.match(sql, /BEGIN TRANSACTION READ ONLY;/u);
+  assert.match(options.env.PGOPTIONS, /default_transaction_read_only=on/u);
+  assert.match(options.env.PGOPTIONS, /statement_timeout=30000/u);
+  await runPendingMigrationAudits(
+    "unused",
+    {
+      ...status,
+      Applied: [{ Version: version }],
+    },
+    async () =>
+      assert.fail("an applied migration must not re-audit historical data"),
+  );
+  await runPendingMigrationAudits(
+    "unused",
+    {
+      Applied: [],
+      Available: [],
+    },
+    async () =>
+      assert.fail("unrelated pending migrations must not run the unit audit"),
+  );
+});
+
+test("local migration: long unit conflicts keep a bounded typed cause and no row IDs or credentials", async () => {
+  await assert.rejects(
+    runPendingMigrationAudits(
+      "unused",
+      {
+        Applied: [],
+        Available: [{ Version: "20260927100348" }],
+      },
+      async () => {
+        const rows = Array.from(
+          { length: 1500 },
+          (_, i) => `production_facts.quantity#${i + 1}`,
+        );
+        throw new Error(
+          `ERROR: unit normalization blocked: ${rows.join(", ")}, engineering_material_requests.pending_unit_change#8 postgres://secret:password@host/db`,
+        );
+      },
+    ),
+    (error) => {
+      assert.equal(error.receipt.errorCode, "unit_normalization_blocked");
+      assert.equal(error.receipt.writes, "0");
+      assert.equal(error.receipt.apply, "not_started");
+      assert.match(error.message, /production_facts.quantity=1500/u);
+      assert.match(error.message, /pending_unit_change=1/u);
+      assert.ok(error.message.length < 300);
+      assert.doesNotMatch(error.message, /#|secret|password/u);
+      return true;
+    },
+  );
+});
+
+test("local migration: a failed unit audit connection is not mislabeled as a data conflict", async () => {
+  const cause = new Error("connection refused");
+  await assert.rejects(
+    runPendingMigrationAudits(
+      "unused",
+      {
+        Applied: [],
+        Available: [{ Version: "20260927100348" }],
+      },
+      async () => {
+        throw cause;
+      },
+    ),
+    (error) => error === cause,
+  );
+});
 
 function outputBuffer() {
   let value = "";
@@ -348,5 +513,88 @@ test("local migration: operational lifecycle audit is read-only and reports ever
   assert.doesNotMatch(
     source,
     /\b(?:INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE|COPY)\b/iu,
+  );
+});
+
+test("shared development apply rejects a low-level confirmation without the verified operation", async () => {
+  const { requireSharedDevOperationEvidence } =
+    await import("./local-migration.mjs");
+  await assert.rejects(
+    requireSharedDevOperationEvidence(
+      "/not-used",
+      "",
+      "APPLY_DEV_MIGRATIONS:guessed",
+    ),
+    /operation/u,
+  );
+});
+
+test("apply evidence requires the confirmed operation, owned lock, matching content and verified backup", async (t) => {
+  const { randomUUID } = await import("node:crypto");
+  const { fixtureBundle } =
+    await import("./qa/test-fixtures/local-runtime-bundle.mjs");
+  const { requireSharedDevOperationEvidence } =
+    await import("./local-migration.mjs");
+  const {
+    createOrReuseDatabaseMigrationOperation,
+    transitionDatabaseMigrationOperation,
+    resolveDatabaseMigrationOperationStore,
+    acquireDatabaseMigrationExecutionLock,
+    releaseDatabaseMigrationExecutionLock,
+  } = await import("./qa/dev-database-migration-operation-store.mjs");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-apply-proof-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const bundle = fixtureBundle(root),
+    id = randomUUID(),
+    store = resolveDatabaseMigrationOperationStore(root);
+  createOrReuseDatabaseMigrationOperation(store, {
+    operationId: id,
+    idempotencyKey: `database-migration:prepare:${id}`,
+    kind: "migration",
+    status: "preparing",
+    message: "fixture",
+  });
+  transitionDatabaseMigrationOperation(store, id, {
+    status: "ready",
+    message: "ready",
+    confirmationPrompt: "confirm",
+    backup: { bundleId: bundle.id },
+    internal: { applyConfirmation: "exact" },
+  });
+  acquireDatabaseMigrationExecutionLock(store, id);
+  const checks = {
+    source: async () => ({ fingerprint: bundle.sourceFingerprint }),
+    verify: async () => true,
+  };
+  await assert.rejects(
+    requireSharedDevOperationEvidence(root, id, "exact", checks),
+  );
+  transitionDatabaseMigrationOperation(store, id, {
+    status: "applying",
+    message: "confirmed",
+    confirmationPrompt: null,
+  });
+  assert.equal(
+    (await requireSharedDevOperationEvidence(root, id, "exact", checks)).id,
+    id,
+  );
+  await assert.rejects(
+    requireSharedDevOperationEvidence(root, id, "wrong", checks),
+  );
+  await assert.rejects(
+    requireSharedDevOperationEvidence(root, id, "exact", {
+      ...checks,
+      verify: async () => false,
+    }),
+  );
+  await assert.rejects(
+    requireSharedDevOperationEvidence(root, id, "exact", {
+      ...checks,
+      source: async () => ({ fingerprint: "changed" }),
+    }),
+  );
+  releaseDatabaseMigrationExecutionLock(store, id);
+  await assert.rejects(
+    requireSharedDevOperationEvidence(root, id, "exact", checks),
   );
 });

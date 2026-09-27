@@ -34,6 +34,7 @@ test("local runtime preflight: 每个外部命令有超时与取消信号，错�
     const calls = [];
     await assert.rejects(
       checkLocalDatabaseMigrations({
+        readActiveBundle: () => null,
         signal: controller.signal,
         writeLine: () => {},
         execFile: async (command, args, options) => {
@@ -135,6 +136,7 @@ test("local runtime preflight: healthz 与 readyz 都通过才接受后端", asy
   };
 
   await checkBackendReadiness("http://127.0.0.1:8300", {
+    readActiveBundle: () => null,
     fetch,
     writeLine: (line) => output.push(line),
   });
@@ -150,6 +152,7 @@ test("local runtime preflight: healthz 与 readyz 都通过才接受后端", asy
 test("local runtime preflight: readyz 失败时 fail closed", async () => {
   await assert.rejects(
     checkBackendReadiness("http://127.0.0.1:8300", {
+      readActiveBundle: () => null,
       endpointTimeoutMs: 1,
       retryIntervalMs: 1,
       sleep: async () => {},
@@ -203,6 +206,7 @@ for (const diagnostic of [
     const calls = [];
     await assert.rejects(
       checkLocalDatabaseMigrations({
+        readActiveBundle: () => null,
         writeLine: () => {},
         execFile: async (command) => {
           calls.push(command);
@@ -228,6 +232,7 @@ test("local runtime preflight: 数据库配置失败不回显 DSN 或密码", as
   const calls = [];
   await assert.rejects(
     checkLocalDatabaseMigrations({
+      readActiveBundle: () => null,
       writeLine: () => {},
       execFile: async (command) => {
         calls.push(command);
@@ -255,6 +260,7 @@ test("local runtime preflight: pending migration 指向高层迁移入口，不�
 
   await assert.rejects(
     checkLocalDatabaseMigrations({
+      readActiveBundle: () => null,
       writeLine: () => {},
       execFile: async (command, args) => {
         calls.push([command, ...args]);
@@ -331,6 +337,7 @@ test("local runtime preflight: migration 最新后仍强制数据库可编程对
   const calls = [];
   const output = [];
   const result = await checkLocalDatabaseMigrations({
+    readActiveBundle: () => null,
     writeLine: (line) => output.push(line),
     execFile: async (command, args, options) => {
       calls.push([command, ...args]);
@@ -365,6 +372,7 @@ test("local runtime preflight: migration 最新后仍强制数据库可编程对
 test("local runtime preflight: 自定义数据库执行对象阻断启动且诊断不泄露 DSN", async () => {
   await assert.rejects(
     checkLocalDatabaseMigrations({
+      readActiveBundle: () => null,
       writeLine: () => {},
       execFile: async (command) => {
         if (command === "bash") return { stdout: "", stderr: "" };
@@ -394,5 +402,46 @@ test("local runtime preflight: 自定义数据库执行对象阻断启动且诊�
       assert.doesNotMatch(error.message, /private-secret|postgres:\/\//u);
       return true;
     },
+  );
+});
+
+test("explicit fixed runtime checks its snapshot; ordinary startup checks workspace migrations", async () => {
+  let verified = false;
+  const active = { id: "fixed", migrationVersion: "144" };
+  const result = await checkLocalDatabaseMigrations({
+    readActiveBundle: () => active,
+    useFixedRuntime: true,
+    verifyActiveBundle: async (value) => {
+      assert.equal(value, active);
+      verified = true;
+    },
+    execFile: async () => {
+      throw new Error("must not inspect an unfinished working tree");
+    },
+    writeLine() {},
+  });
+  assert.equal(verified, true);
+  assert.equal(result.bundleId, "fixed");
+  await assert.rejects(
+    checkLocalDatabaseMigrations({
+      readActiveBundle: () => active,
+      execFile: async (command) => {
+        assert.equal(command, "bash");
+        throw new Error("current workspace check failed");
+      },
+      writeLine() {},
+    }),
+    { code: "workspace_migration_invalid" },
+  );
+  await assert.rejects(
+    checkLocalDatabaseMigrations({
+      readActiveBundle: () => active,
+      useFixedRuntime: true,
+      verifyActiveBundle: async () => {
+        throw new Error("database drift");
+      },
+      writeLine() {},
+    }),
+    { code: "database_status_unavailable" },
   );
 });

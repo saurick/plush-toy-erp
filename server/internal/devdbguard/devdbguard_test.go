@@ -227,3 +227,26 @@ func TestDevelopmentMigrationRejectsRetiredAndForeignTargets(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestNativeLocalRehearsalRequiresLoopbackUniqueDatabaseAndIsolatedCluster(t *testing.T) {
+	t.Parallel()
+	const runID = "local_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const database = "plush_erp_release_" + runID
+	const dsn = "postgres://erp_app:secret@127.0.0.1:15432/" + database + "?sslmode=disable"
+	if err := RequireCustomerConfigReleaseRehearsalRuntime(dsn, runID, database, "12345", "12345"); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []string{
+		strings.Replace(dsn, "127.0.0.1", CustomerConfigLocalTestHost, 1),
+		strings.Replace(dsn, database, "plush_erp", 1),
+		strings.Replace(dsn, ":15432", ":80", 1),
+		dsn + "&host=192.168.0.133",
+	} {
+		if err := RequireCustomerConfigReleaseRehearsalDSN(candidate, runID); err == nil {
+			t.Fatal("accepted an unregistered candidate target")
+		}
+	}
+	if err := RequireCustomerConfigReleaseRehearsalRuntime(dsn, runID, database, CustomerConfigLocalTestSystemIdentifier, CustomerConfigLocalTestSystemIdentifier); err == nil {
+		t.Fatal("accepted shared development cluster")
+	}
+}

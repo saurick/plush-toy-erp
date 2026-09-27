@@ -13,6 +13,8 @@ import {
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import { fixtureBundle } from '../../scripts/qa/test-fixtures/local-runtime-bundle.mjs'
+import { hashRuntimeBackup } from '../../scripts/local-runtime-bundle.mjs'
 
 import {
   DEV_DATABASE_MIGRATION_SOURCE_FILES,
@@ -75,20 +77,21 @@ test('migration timeout kills an owned child tree before reporting failure', asy
     { stdio: 'ignore' }
   )
   t.after(() => unrelated.kill('SIGKILL'))
+  // Use an already available shell so interpreter startup cannot consume the
+  // short command deadline before the owned child tree has been created.
   const script = `
-    const { spawn } = require('node:child_process');
-    const { writeFileSync } = require('node:fs');
-    process.on('SIGTERM', () => {});
-    const child = spawn(process.execPath, ['-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'], { stdio: 'inherit' });
-    writeFileSync(process.argv[1], String(child.pid));
-    setInterval(() => {}, 1000);
+    trap '' TERM
+    sleep 60 &
+    printf '%s' "$!" > "$1"
+    wait
   `
   const started = Date.now()
   await assert.rejects(
-    executeCommand(process.execPath, ['-e', script, pidFile], {
-      timeout: 500,
-      killGraceMs: 100,
-    }),
+    executeCommand(
+      '/bin/sh',
+      ['-c', script, 'migration-timeout-fixture', pidFile],
+      { timeout: 500, killGraceMs: 100 }
+    ),
     (error) => error.code === 'migration_command_timeout'
   )
   assert(Date.now() - started < 5000)
@@ -174,12 +177,12 @@ test('database migration backup binds the narrow shared-dev source policy', () =
   const args = buildSharedDevBackupRehearsalArgs(
     '019ff53e-e92a-7822-876b-d5702198b7e0'
   )
-  assert.equal(SHARED_DEV_BACKUP_SOURCE_POLICY, 'shared-dev-session-read-only')
+  assert.equal(SHARED_DEV_BACKUP_SOURCE_POLICY, 'shared-dev-dedicated-backup')
   assert.deepEqual(args.slice(1, 5), [
     '--environment',
     'shared-dev',
     '--source-policy',
-    'shared-dev-session-read-only',
+    'shared-dev-dedicated-backup',
   ])
   assert.deepEqual(args.slice(-4), [
     '--backup-purpose',
@@ -241,6 +244,27 @@ function createRoot(t) {
   return root
 }
 
+test('database migration runtime invokes the read-only audit command and retains its typed failure', async (t) => {
+  const root = createRoot(t)
+  mkdirSync(path.join(root, 'scripts'))
+  writeFileSync(
+    path.join(root, 'scripts/local-migration.mjs'),
+    `
+    if (process.argv[2] !== 'audit') throw new Error('unexpected command');
+    console.error('[migration-summary] error_code=unit_normalization_blocked');
+    process.exit(1);
+  `
+  )
+  const runtime = createDevDatabaseMigrationRuntime(
+    root,
+    'http://127.0.0.1:8300'
+  )
+  await assert.rejects(runtime.audit(), (error) => {
+    assert.match(error.diagnostic, /error_code=unit_normalization_blocked/u)
+    return true
+  })
+})
+
 test('database migration runtime verifies the exact ignored backup file', async (t) => {
   const root = createRoot(t)
   const directory = path.join(
@@ -263,7 +287,37 @@ test('database migration runtime verifies the exact ignored backup file', async 
     sha256: createHash('sha256').update(content).digest('hex'),
     restoreVerified: true,
   }
-  assert.equal(await runtime.verifyBackup(backup), true)
+  assert.equal(
+    await runtime.verifyBackup(backup),
+    false,
+    'a dump alone does not prove the candidate runtime'
+  )
+  const bundle = fixtureBundle(root)
+  const objects = path.join(directory, 'attachments')
+  mkdirSync(objects)
+  writeFileSync(
+    path.join(objects, 'manifest.json'),
+    '{"fixture":"paired objects"}'
+  )
+  writeFileSync(path.join(objects, 'object'), 'immutable object')
+  const proven = {
+    ...backup,
+    bundleId: bundle.id,
+    migrationAfter: bundle.migrationVersion,
+    candidate: {
+      artifactHash: bundle.artifactHash,
+      populatedRestore: true,
+      health: true,
+      ready: true,
+      business: true,
+      migrationVersion: bundle.migrationVersion,
+      attachmentsRestored: true,
+      attachmentBackupSHA256: hashRuntimeBackup(objects),
+    },
+  }
+  assert.equal(await runtime.verifyBackup(proven), true)
+  writeFileSync(path.join(objects, 'object'), 'changed object')
+  assert.equal(await runtime.verifyBackup(proven), false)
   assert.equal(
     await runtime.verifyBackup({ ...backup, sha256: '0'.repeat(64) }),
     false

@@ -179,9 +179,6 @@ test(
         })
         return
       }
-      if (request.url === '/templates/slow') {
-        return
-      }
       response.writeHead(404)
       response.end()
     })
@@ -197,7 +194,6 @@ test(
         HOST: '127.0.0.1',
         PORT: String(port),
         PROXY_PREFIXES: '/rpc,/templates,/readyz/runtime-identity',
-        PROXY_TIMEOUT_MS: '100',
         READINESS_TIMEOUT_MS: '2000',
         STATIC_ROOT: root,
       },
@@ -265,6 +261,15 @@ test(
     })
     assert.equal(knownOversized.statusCode, 413)
 
+    const knownOversizedAttachment = await requestServer({
+      port,
+      pathname: '/rpc/attachment',
+      method: 'POST',
+      headers: { 'content-length': String(140 * 1024 * 1024 + 1) },
+      body: 'small',
+    })
+    assert.equal(knownOversizedAttachment.statusCode, 413)
+
     const chunkedOversized = await requestServer({
       port,
       pathname: '/rpc/slow-upload',
@@ -276,11 +281,49 @@ test(
       413,
       JSON.stringify(chunkedOversized)
     )
+  }
+)
 
-    const timedOut = await requestServer({
-      port,
-      pathname: '/templates/slow',
+test(
+  'production static server enforces the configured proxy deadline independently of body limits',
+  { timeout: 10_000 },
+  async (t) => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'serve-static-timeout-'))
+    const port = await reservePort()
+    const backend = http.createServer(() => {})
+    await new Promise((resolve) => backend.listen(0, '127.0.0.1', resolve))
+    await writeFile(
+      path.join(root, 'index.html'),
+      '<!doctype html><title>ok</title>'
+    )
+    const child = spawn(process.execPath, [scriptPath], {
+      env: {
+        ...process.env,
+        API_ORIGIN: `http://127.0.0.1:${backend.address().port}`,
+        HOST: '127.0.0.1',
+        PORT: String(port),
+        PROXY_PREFIXES: '/templates',
+        PROXY_TIMEOUT_MS: '100',
+        STATIC_ROOT: root,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
     })
+    const completion = new Promise((resolve, reject) => {
+      child.once('error', reject)
+      child.once('close', (code, signal) => resolve({ code, signal }))
+    })
+    t.after(async () => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGTERM')
+        await completion.catch(() => {})
+      }
+      backend.closeAllConnections()
+      await new Promise((resolve) => backend.close(resolve))
+      await rm(root, { recursive: true, force: true })
+    })
+    await waitForHealth(port)
+    const timedOut = await requestServer({ port, pathname: '/templates/slow' })
     assert.equal(timedOut.statusCode, 504)
+    assert.equal(timedOut.body, 'Gateway Timeout')
   }
 )

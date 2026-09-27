@@ -9,10 +9,7 @@ const scriptPath = path.join(
   root,
   "server/deploy/compose/prod/database_roles.sh",
 );
-const composePath = path.join(
-  root,
-  "server/deploy/compose/prod/compose.yml",
-);
+const composePath = path.join(root, "server/deploy/compose/prod/compose.yml");
 const source = readFileSync(scriptPath, "utf8");
 const compose = readFileSync(composePath, "utf8");
 
@@ -26,11 +23,17 @@ test("database role reconciliation is repeatable and keeps credentials out of ar
     /\\getenv migrator_password POSTGRES_MIGRATOR_PASSWORD/u,
   );
   assert.match(source, /\\getenv backup_password POSTGRES_BACKUP_PASSWORD/u);
-  assert.doesNotMatch(source, /psql[^\n]*POSTGRES_(?:APP|MIGRATOR|BACKUP)_PASSWORD/u);
+  assert.doesNotMatch(
+    source,
+    /psql[^\n]*POSTGRES_(?:APP|MIGRATOR|BACKUP)_PASSWORD/u,
+  );
   assert.match(source, /CREATE ROLE erp_migrator LOGIN/u);
   assert.match(source, /CREATE ROLE erp_app LOGIN/u);
   assert.match(source, /CREATE ROLE erp_backup LOGIN/u);
-  assert.match(source, /NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS/u);
+  assert.match(
+    source,
+    /NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS/u,
+  );
   assert.match(source, /角色密码必须彼此不同/u);
 });
 
@@ -72,10 +75,7 @@ test("runtime identity receives only the canonical Atlas revision read grant", (
     /SELECT EXISTS \(SELECT 1 FROM atlas_schema_revisions\.atlas_schema_revisions/u,
   );
   assert.match(source, /Atlas revision UPDATE/u);
-  assert.match(
-    source,
-    /INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER/u,
-  );
+  assert.match(source, /INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER/u);
 });
 
 test("append-only grants and direct SQL permission probes stay enforced", () => {
@@ -99,7 +99,7 @@ test("append-only grants and direct SQL permission probes stay enforced", () => 
   assert.match(source, /Atlas revision UPDATE/u);
   assert.match(source, /append-only UPDATE/u);
   assert.match(source, /append-only DELETE/u);
-  assert.match(source, /username erp_migrator/u);
+  assert.match(source, /username "\$\{role_prefix\}_migrator"/u);
   assert.match(source, /CREATE TABLE public\.\$\{permission_probe\}/u);
   assert.match(source, /ROLLBACK/u);
 });

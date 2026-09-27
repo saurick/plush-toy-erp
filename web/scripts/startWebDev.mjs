@@ -83,6 +83,7 @@ export function parseStartWebDevArgs(argv, env = process.env) {
   let frontendOnly = false
   let isolated = isCodexDevSession(env)
   let restart = false
+  let stop = false
   if (argv.includes('--local') && argv.includes('--isolated')) {
     throw new Error('--local 与 --isolated 不能同时使用')
   }
@@ -95,6 +96,8 @@ export function parseStartWebDevArgs(argv, env = process.env) {
       isolated = false
     } else if (arg === '--restart') {
       restart = true
+    } else if (arg === '--stop') {
+      stop = true
     } else if (arg !== '--') {
       viteArgs.push(arg)
     }
@@ -104,6 +107,7 @@ export function parseStartWebDevArgs(argv, env = process.env) {
     frontendOnly,
     isolated,
     restart,
+    stop,
     viteArgs,
   }
 }
@@ -248,7 +252,11 @@ export function runManagedVite(
 
 async function main() {
   const options = parseStartWebDevArgs(process.argv.slice(2))
-  if (options.restart && options.isolated && !process.env.ERP_VITE_PORT) {
+  if (
+    (options.restart || options.stop) &&
+    options.isolated &&
+    !process.env.ERP_VITE_PORT
+  ) {
     throw new Error(
       '重启需要明确端口；本地前端使用 pnpm start --local --restart'
     )
@@ -262,9 +270,10 @@ async function main() {
     port
   )
   const startup = await resolveWebRuntimeStartup(options)
-  const gitlabCredential = startup.recoveryMode
-    ? { source: 'missing', token: '' }
-    : await resolveDevGitlabCredential()
+  const gitlabCredential =
+    startup.recoveryMode || options.stop
+      ? { source: 'missing', token: '' }
+      : await resolveDevGitlabCredential()
   const signature = webInstanceSignature({
     ...options,
     projectRoot: repoRoot,
@@ -275,8 +284,14 @@ async function main() {
     port,
     signature,
     projectRoot: repoRoot,
-    restart: options.restart,
+    restart: options.restart || options.stop,
   })
+  if (options.stop) {
+    process.stdout.write(
+      `[start-web] 本工作区前端端口 ${port} 已停止或原本空闲\n`
+    )
+    return
+  }
   const url = `http://127.0.0.1:${port}${startup.recoveryMode ? '/__dev/database-migration' : '/'}`
   if (instance.reused) {
     process.stdout.write(

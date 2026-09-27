@@ -22,7 +22,9 @@
 | `doctor.sh` | 检查当前工具链、版本锁、hooks 与可执行入口 |
 | `project-scan.sh` | 扫描命名、默认配置、密钥占位和不需要的部署残留；`--strict` 用于收口 |
 | `dev-ports.mjs`、`dev-listener-stop.sh` | 校验固定端口组，只停止已证明属于本仓库的后端进程 |
-| `local-runtime-preflight.mjs` | 只读核对 schema、migration 与同目标 health / ready，不自动 apply |
+| `dev-process-inspection.mjs` | 前后端共用的有超时进程检查；macOS 从系统端口表定位 PID，再逐个核对工作目录，失败时不停止服务 |
+| `local-runtime-bundle.mjs`、`local-runtime-start.mjs`、`local-runtime-preflight.mjs` | 固定前后端与配置、验证版本和目标库、启动已验证版本；保留迁移恢复页 |
+| `local-database-roles.mjs`、`local-runtime-rehearsal.mjs` | 复用部署角色策略，使用独立只读账号审计，并在临时恢复库验证固定候选版本 |
 | `local-migration-workflow.mjs`、`local-migration.mjs` | 迁移高层编排与低层受控实现，通过 Make / 迁移页使用 |
 | `seed-role-demo-admins.sh`、`seed-core-demo-data.sh`、`seed-trial-sim-masterdata.sh` | 显式准备模拟账号或主数据；目标、命名、读回与清理见 QA 数据合同 |
 | `build/apply-customer-web-config.mjs` | 将已审查客户配置与 public-assets 注入构建产物，不复制客户原件 |
@@ -39,7 +41,7 @@
 
 2. 修改配置、命名或默认值后运行 `bash scripts/project-scan.sh --strict`。
 3. 开发验证先用 `bash scripts/qa/affected.sh --plan` 查看影响面，再运行所需验证；定向检查优先，完整门禁按任务需要执行。
-4. 需要迁移时进入 `server/`，交互使用 `make migrate`；非交互严格使用同一次 `make migrate_prepare` 输出执行 `make migrate_execute`。准备成功不表示已升级，结果未知先只读核对。
+4. 需要迁移时进入 `server/`，交互使用 `make migrate`；非交互严格使用同一次 `make migrate_prepare` 输出执行 `make migrate_execute`。准备保持日常固定版本运行，先只读审计，再固定当前前后端、配置及迁移，完成成套备份与临时恢复库升级、登录和业务读取验证。确认后才进入短维护窗口、生成新的成套恢复点、执行一次迁移并切换固定版本。单位精度或单据引用冲突必须处理后重新准备，不能直接取整或删除已过账记录。准备成功不表示已升级，结果未知先只读核对。
 5. 已获提交 / 推送授权并形成 clean HEAD 后，运行 `bash scripts/qa/prepare-push.sh`。默认单一 `origin/main` 只签发短门禁回执，高成本验证由 GitLab exact-SHA CI 完成；其他目标和显式 `--full` 按 [QA 回执合同](qa/README.md#推送准备与回执) 执行。
 6. 发布、部署和恢复分别使用 [部署脚本](deploy/README.md)，固定 SHA / digest 并读回目标结果；GitLab push 不自动部署。
 

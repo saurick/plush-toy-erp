@@ -21,9 +21,15 @@ importers:
       '@fontsource-variable/noto-serif-sc':
         specifier: 5.3.0
         version: 5.3.0
+      '@vant/area-data':
+        specifier: 2.2.0
+        version: 2.2.0
       antd:
         specifier: ^5.29.3
         version: 5.29.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      i18n-iso-countries:
+        specifier: 7.14.0
+        version: 7.14.0
       js-sha256:
         specifier: 0.11.1
         version: 0.11.1
@@ -1008,6 +1014,9 @@ packages:
   '@upsetjs/venn.js@2.0.0':
     resolution: {integrity: sha512-WbBhLrooyePuQ1VZxrJjtLvTc4NVfpOyKx0sKqioq9bX1C1m7Jgykkn8gLrtwumBioXIqam8DLxp88Adbue6Hw==}
 
+  '@vant/area-data@2.2.0':
+    resolution: {integrity: sha512-H1payEoXLnUqTNPdt2zftv0yoZBP8AZF69XntMqqGOn5LGtuaZ/VeRXQnJLiBPgGuHs2sXPgZ4gUVGp4Cg154w==}
+
   '@vitejs/plugin-react@5.2.0':
     resolution: {integrity: sha512-YmKkfhOAi3wsB1PhJq5Scj3GXMn3WvtQ/JC0xoopuHoXSdmtdStOpFrYaT1kie2YgFBcIe64ROzMYRjCrYOdYw==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1500,6 +1509,9 @@ packages:
   delaunator@5.1.0:
     resolution: {integrity: sha512-AGrQ4QSgssa1NGmWmLPqN5NY2KajF5MqxetNEO+o0n3ZwZZeTmt7bBnvzHWrmkZFxGgr4HdyFgelzgi06otLuQ==}
 
+  diacritics@1.3.0:
+    resolution: {integrity: sha512-wlwEkqcsaxvPJML+rDh/2iS824jbREk6DUMUKkEaSlxdYHeS43cClJtsWglvw2RfeXGm6ohKDqsXteJ5sP5enA==}
+
   didyoumean@1.2.2:
     resolution: {integrity: sha512-gxtyfqMg7GKyhQmb056K7M3xszy/myH8w+B4RT+QXBQsvAOdc3XymqDDPHx1BgPgsdAA5SIifona89YtRATDzw==}
 
@@ -1923,6 +1935,10 @@ packages:
   html-tags@3.3.1:
     resolution: {integrity: sha512-ztqyC3kLto0e9WbNp0aeP+M3kTt+nbaIveGmUxAtZa+8iFgKLUOD4YKM5j+f3QD89bra7UeumolZHKuOXnTmeQ==}
     engines: {node: '>=8'}
+
+  i18n-iso-countries@7.14.0:
+    resolution: {integrity: sha512-nXHJZYtNrfsi1UQbyRqm3Gou431elgLjKl//CYlnBGt5aTWdRPH1PiS2T/p/n8Q8LnqYqzQJik3Q7mkwvLokeg==}
+    engines: {node: '>= 12'}
 
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
@@ -4183,6 +4199,8 @@ snapshots:
       d3-selection: 3.0.0
       d3-transition: 3.0.1(d3-selection@3.0.0)
 
+  '@vant/area-data@2.2.0': {}
+
   '@vitejs/plugin-react@5.2.0(vite@6.4.3(@types/node@26.4.1)(jiti@1.21.7))':
     dependencies:
       '@babel/core': 7.29.7
@@ -4774,6 +4792,8 @@ snapshots:
   delaunator@5.1.0:
     dependencies:
       robust-predicates: 3.0.3
+
+  diacritics@1.3.0: {}
 
   didyoumean@1.2.2: {}
 
@@ -5370,6 +5390,10 @@ snapshots:
   hookified@2.2.0: {}
 
   html-tags@3.3.1: {}
+
+  i18n-iso-countries@7.14.0:
+    dependencies:
+      diacritics: 1.3.0
 
   iconv-lite@0.6.3:
     dependencies:

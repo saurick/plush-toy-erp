@@ -39,11 +39,15 @@ make init
 make run
 ```
 
-`make run`、`make dev` 和 `make dev_restart` 会先校验仓库根目录 `config/dev-ports.env`，并把其中固定的 HTTP `8300` 注入 dev 配置；生产配置不消费这组覆盖。随后共享本地启动预检运行 `db-guard` 核对 Ent schema、versioned migration 与“禁止新增数据库可编程对象”规则，再读取当前 dev 配置命中的数据库，要求 Atlas status 已到最新 revision、pending 为 0，且 `public` 下自定义 Function、Procedure、非内部 Trigger 均为 0。`make dev_restart` 只在预检通过后才停止旧进程，避免先停服再发现缺 migration。该预检始终只读，不会自动执行 migration；pending 时在交互终端运行 `make migrate`，非交互环境运行显式的 prepare / execute 两阶段，不应绕过。
+`make run`、`make dev` 和 `make dev_restart` 先校验端口清单、当前工作区的迁移及禁止数据库可编程对象规则，再从当前代码构建新制品；构建通过后才停止旧后端，启动并验证新后端。预检、代码漂移或编译失败均保留原进程，不会把旧制品重启当作最新代码已启动。成功输出 `workspace-source` 内容摘要及 health / ready / business 结果。进程以后台方式运行，日志在 `output/dev-workbench/database-migration-runtime/`，停止使用 `make dev_stop`。首次使用先执行 `make dev_database_roles`；有待执行迁移时通过迁移页或 `make migrate` 完成检查、恢复演练及确认，启动入口不自动 apply。
 
-主端口不自动顺延。`make dev_stop` / `make dev_restart` 虽按登记端口查找 listener，但停止前会逐个校验进程 cwd 位于本仓库；端口被其他项目占用时会报告 PID、cwd 和命令并拒绝 kill。整组本机覆盖必须写入 ignored 的 `config/dev-ports.local.env`，且包含完整端口组。
+前端开发页直接使用当前工作区和 Vite 热更新。后端每次启动构建的代码、配置与 migration 快照保存在 `output/dev-workbench/runtime-bundles/`，用于运行身份核对和迁移恢复证据，不覆盖开发页面。数据库迁移的准备阶段保留现有服务，在临时恢复库验证存量升级、附件恢复、PDF 就绪、登录与业务读取；确认后进入维护窗口，重新备份与演练，再迁移、读回和切换。无待执行迁移的代码变更直接使用日常重启入口。详情见 [数据库迁移工作流](../docs/engineering/研发效能工作台与CI-CD设计.md#数据库迁移-__devdatabase-migration)。
 
-启动提示区分工作区数据库规则失败与目标库待升级：前者保留 `db-guard` 的具体原因，后者显示已应用数量与待执行迁移数，并指向受控迁移入口。
+终端与迁移页共用忽略 Git 的 `server/.env`（权限 `0600`），固定版本按白名单读取附件、认证及客户运行配置，仅读取文本，不执行 shell。开发附件必须使用独立桶，配置和恢复边界见 [附件存储](deploy/compose/prod/README.md#附件存储与raid5)。数据库角色凭据保存在同样受保护的 `configs/dev/database-roles.local.json`；应用、迁移、审计分别使用 `plush_dev_app`、`plush_dev_migrator`、`plush_dev_backup`。审计账号无表所有权、写入或角色切换权限，不能以超级用户加默认只读参数替代。角色配置中断后使用 `make dev_database_roles ARGS=--reconcile` 恢复已有凭据对应的权限，不生成新密码。
+
+主端口不自动顺延。`make dev_stop` / `make dev_restart` 虽按登记端口查找 listener，但停止前会逐个校验进程 cwd 位于本仓库；端口被其他项目占用时会报告 PID、cwd 和命令并拒绝 kill。前后端共用有超时的进程检查；macOS 通过系统端口表定位 PID，再逐个读取 cwd，避免全机 `lsof` 扫描阻塞启动。检查失败或超时时保留服务并退出。整组本机覆盖必须写入 ignored 的 `config/dev-ports.local.env`，且包含完整端口组。
+
+启动提示区分固定版本不可用与候选升级未完成；候选数据冲突不会把仍与数据库匹配的日常版本停掉。数据库、固定制品或 health / ready 核对失败时，保留迁移恢复入口。
 
 Linux 本地终端确实以 root 运行时，`make run` / `make dev_restart` 会把 `ERP_PDF_ALLOW_LOCAL_NO_SANDBOX=1` 只传给本地后端，供 Playwright Chromium 完成 PDF warmup；服务端还会同时核对 Linux 与 effective UID 0。非 root 本地进程继续启用 Chromium sandbox，生产镜像也不设置该开关，并由运行预检拒绝 root app-server。
 
@@ -60,7 +64,7 @@ make run_yoyoosun
 make dev_restart_yoyoosun
 ```
 
-确需启动 demo 时必须显式覆盖，例如 `ERP_CUSTOMER_KEY=demo make dev_restart`。永绅本地测试配置仍需登录后在 Vite 开发控制台显式应用；上述目标不会自动发布或激活配置。未通过本地 Make 入口启动的后端默认拒绝 local-test manifest 及其切换操作；本地 gate 开启时，启动预检和 JSON-RPC dispatcher 会基于同一份启动时配置，按 pgx 最终连接结果把 DSN 固定到 `192.168.0.133:5432` 上的 `plush_erp` 或 `plush_erp_*_dev` 开发库，不会因运行中修改环境变量、query override、multi-host fallback 或 `ERP_ALLOW_TEST_DB_AS_DEV=1` 放行 133 其他实例或 loopback tunnel。人工验收数据 runner 另行把 `local-dev` 精确绑定到当前版本的隔离验收库，不会写共享开发库；production 配置发现该环境开关时也会直接失败。
+客户选择随每次构建记录到运行制品；更改 `server/.env` 中的 `ERP_CUSTOMER_KEY` 后执行 `make dev_restart`，或在本次重启时显式设置该变量，新配置经业务验证后生效。前端构建复用 `apply-customer-web-config.mjs` 将同一客户的公开配置与素材写入固定制品；客户业务配置仍须在开发控制台显式发布、激活并读回，上述启动目标不会代为操作。未通过本地 Make 入口启动的后端默认拒绝 local-test manifest 及其切换操作；本地 gate 开启时，启动预检和 JSON-RPC dispatcher 会基于同一份启动时配置，按 pgx 最终连接结果把 DSN 固定到 `192.168.0.133:5432` 上的 `plush_erp` 或 `plush_erp_*_dev` 开发库，不会因运行中修改环境变量、query override、multi-host fallback 或 `ERP_ALLOW_TEST_DB_AS_DEV=1` 放行 133 其他实例或 loopback tunnel。人工验收数据 runner 另行把 `local-dev` 精确绑定到当前版本的隔离验收库，不会写共享开发库；production 配置发现该环境开关时也会直接失败。
 
 ## 常用命令
 

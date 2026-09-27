@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { Readable } from 'node:stream'
@@ -7,6 +7,8 @@ import test from 'node:test'
 import { LocalRuntimePreflightError } from '../../scripts/local-runtime-preflight.mjs'
 
 import {
+  acquireDatabaseMigrationExecutionLock,
+  releaseDatabaseMigrationExecutionLock,
   resolveDatabaseMigrationOperationStore,
   transitionDatabaseMigrationOperation,
 } from '../../scripts/qa/dev-database-migration-operation-store.mjs'
@@ -63,6 +65,9 @@ function dependencies(calls) {
     async workspaceCheck() {
       calls.push('workspace-check')
     },
+    async maintenance(enabled) {
+      calls.push(`maintenance:${enabled}`)
+    },
     async verifyReadiness() {
       calls.push('verify-readiness')
     },
@@ -109,6 +114,9 @@ function dependencies(calls) {
     },
     async stopRuntime() {
       calls.push('stop')
+    },
+    async audit() {
+      calls.push('audit')
     },
     async plan(confirmation) {
       calls.push(`plan:${confirmation}`)
@@ -214,6 +222,8 @@ test('database migration service prepares once, applies once, reads back, and re
     ['ready']
   )
   assert.equal(prepared.backup.restoreVerified, true)
+  assert.equal(calls.includes('stop'), false)
+  assert.equal(calls.includes('maintenance:true'), false)
   assert.equal(Object.hasOwn(prepared, 'internal'), false)
   assert.doesNotMatch(
     JSON.stringify(prepared),
@@ -246,6 +256,36 @@ test('database migration service prepares once, applies once, reads back, and re
     }),
     /确认文本或操作状态/u
   )
+})
+
+test('a later plan failure preserves successful data audit evidence and leaves the running service intact', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  runtime.plan = async () => {
+    throw new Error('plan unavailable')
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const prepared = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const blocked = await waitForOperation(service, prepared.operation.id, [
+    'blocked',
+  ])
+  assert.equal(blocked.readback.dataAuditPassed, true)
+  assert.equal(calls.includes('stop'), false)
+  assert.equal(
+    calls.some(
+      (call) => call.startsWith('apply:') || call.startsWith('restart:')
+    ),
+    false
+  )
+  assert.equal((await service.summary()).runtime.available, true)
 })
 
 test('preparation records live backup stages and allows retry after a cleaned-up timeout', async (t) => {
@@ -286,7 +326,7 @@ test('preparation records live backup stages and allows retry after a cleaned-up
   assert(preparing.updatedAt > preparing.createdAt)
   assert(
     preparing.events.some(
-      (event) => event.message === '正在验证迁移计划及事务回滚'
+      (event) => event.message === '正在只读生成迁移计划；当前服务继续运行'
     )
   )
   releaseBackup()
@@ -383,6 +423,42 @@ test('migration contract failure stops preparation before database access or bac
   assert.equal(blocked.confirmationPrompt, null)
 })
 
+test('data conflicts stop preparation before backend shutdown and explain the unit blocker', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  runtime.audit = async () => {
+    calls.push('audit')
+    const error = new Error('read-only audit failed')
+    error.diagnostic =
+      '[migration-summary] error_code=unit_normalization_blocked\nunit normalization blocked: production_facts.quantity=409 postgres://private_user:private_password@localhost/db'
+    throw error
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const blocked = await waitForOperation(service, result.operation.id, [
+    'blocked',
+  ])
+  assert.equal(blocked.issues[0].code, 'unit_normalization_blocked')
+  assert.match(blocked.message, /只读检查存量数据/u)
+  assert.match(blocked.issues[0].message, /数量精度或单据引用冲突/u)
+  assert.match(blocked.issues[0].message, /未执行迁移/u)
+  assert.doesNotMatch(JSON.stringify(blocked), /private_|production_facts/u)
+  assert.equal(blocked.confirmationPrompt, null)
+  assert.ok(calls.indexOf('tools') < calls.indexOf('audit'))
+  assert.equal(
+    calls.some((call) => /^(stop|plan|backup|apply)/u.test(call)),
+    false
+  )
+})
+
 test('migration edits during the workspace check invalidate preparation before backend shutdown', async (t) => {
   const { root, store } = createProject(t)
   const calls = []
@@ -407,6 +483,35 @@ test('migration edits during the workspace check invalidate preparation before b
   assert.equal(blocked.issues[0].code, 'migration_source_changed')
   assert.equal(blocked.confirmationPrompt, null)
   assert.equal(calls.includes('workspace-check'), true)
+  assert.equal(
+    calls.some((call) => /^(stop|plan|backup|apply)/u.test(call)),
+    false
+  )
+})
+
+test('migration edits during the data audit leave the running backend untouched', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  let fingerprint = 'b'.repeat(64)
+  runtime.sourceIdentity = async () => ({ commit: 'a'.repeat(40), fingerprint })
+  runtime.audit = async () => {
+    fingerprint = 'c'.repeat(64)
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const blocked = await waitForOperation(service, result.operation.id, [
+    'blocked',
+  ])
+  assert.equal(blocked.issues[0].code, 'migration_source_changed')
+  assert.equal(blocked.confirmationPrompt, null)
   assert.equal(
     calls.some((call) => /^(stop|plan|backup|apply)/u.test(call)),
     false
@@ -514,7 +619,7 @@ test('database migration summary distinguishes connection and identity failures 
   }
 })
 
-test('database migration service does not require backup tools for an up-to-date database', async (t) => {
+test('an up-to-date database only needs readback even without a matching runtime bundle or backup tools', async (t) => {
   const { root, store } = createProject(t)
   const calls = []
   const runtime = dependencies(calls)
@@ -535,9 +640,76 @@ test('database migration service does not require backup tools for an up-to-date
     'passed',
   ])
   assert.equal(operation.readback.migrationVerified, true)
+  assert.equal(operation.readback.pendingFiles, 0)
+  assert.equal(operation.backup, null)
+  assert.equal(operation.confirmationPrompt, null)
+  assert.match(operation.message, /无需迁移/u)
   assert.deepEqual(calls.slice(0, 2), ['source', 'workspace-check'])
   assert.equal(
     calls.some((call) => /^(?:stop|plan|backup|apply|restart)/u.test(call)),
+    false
+  )
+})
+
+test('concurrent migration and restart requests explain the busy owner and leave its lock and backend intact', async (t) => {
+  const { root, store } = createProject(t)
+  const ownerId = '33333333-3333-4333-8333-333333333333'
+  acquireDatabaseMigrationExecutionLock(store, ownerId)
+  const before = readFileSync(path.join(store, 'execution.lock'), 'utf8')
+  const calls = []
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: dependencies(calls),
+  })
+  for (const action of ['prepare', 'restart']) {
+    const result = await service.act({
+      action,
+      idempotencyKey: PREPARE_KEY.replace(':prepare:', `:${action}:`),
+    })
+    assert.equal(result.operation.status, 'blocked')
+    assert.equal(result.operation.issues[0].code, 'database_migration_busy')
+    assert.equal(result.operation.issues[0].severity, 'warning')
+    assert.match(result.operation.message, /本次操作未开始/u)
+    assert.match(
+      result.operation.issues[0].message,
+      /后端重启正在进行.*未停止后端/u
+    )
+    assert.equal(result.operation.target, null)
+    assert.equal(result.operation.readback, null)
+  }
+  assert.deepEqual(calls, [])
+  assert.equal(readFileSync(path.join(store, 'execution.lock'), 'utf8'), before)
+  releaseDatabaseMigrationExecutionLock(store, ownerId)
+})
+
+test('runtime verification failure preserves an already current database without preparing another upgrade', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  runtime.status = async () => target({ pendingFiles: 0 })
+  runtime.verifyReadiness = async () => {
+    throw new Error('runtime readiness unavailable')
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const operation = await waitForOperation(service, result.operation.id, [
+    'blocked',
+  ])
+  assert.equal(operation.readback.migrationVerified, true)
+  assert.equal(operation.readback.pendingFiles, 0)
+  assert.match(operation.message, /数据库升级已完成.*只需重启后端/u)
+  assert.equal(
+    calls.some((call) =>
+      /^(?:tools|audit|stop|plan|backup|apply|restart)/u.test(call)
+    ),
     false
   )
 })
@@ -574,6 +746,11 @@ test('database migration service marks lost apply or readback evidence as not-pr
     })
     const result = await waitForOperation(service, ready.id, ['not_proven'])
     assert.equal(result.issues[0].code, 'migration_outcome_unknown')
+    assert.equal(
+      calls.includes('maintenance:false'),
+      false,
+      'unknown apply outcome keeps application writes disabled'
+    )
     assert.equal(calls.filter((call) => call.startsWith('apply:')).length, 1)
     assert.equal(
       calls.some((call) => call.startsWith('restart:')),
@@ -760,7 +937,7 @@ test('database migration service explains preflight blockers without exposing di
     assert.equal(blocked.issues[0].code, 'migration_preflight_failed')
     assert.equal(blocked.target.currentVersion, target().currentVersion)
     assert.equal(blocked.source.fingerprint, 'b'.repeat(64))
-    assert.match(blocked.message, /迁移计划及事务回滚/u)
+    assert.match(blocked.message, /只读生成迁移计划/u)
     assert.match(blocked.issues[0].message, /本次未执行迁移/u)
     assert.match(
       blocked.issues[0].message,
@@ -905,7 +1082,7 @@ test('database migration service re-verifies the prepared backup before apply', 
   assert.equal(calls.filter((call) => call.startsWith('apply:')).length, 0)
 })
 
-test('database migration service reuses an unchanged verified backup', async (t) => {
+test('database migration service takes a fresh backup even when schema is unchanged', async (t) => {
   const { root, store } = createProject(t)
   const calls = []
   const service = createDevDatabaseMigrationService({
@@ -942,8 +1119,8 @@ test('database migration service reuses an unchanged verified backup', async (t)
     'ready',
   ])
   assert.equal(second.backup.id, first.backup.id)
-  assert.equal(calls.filter((call) => call.startsWith('backup:')).length, 1)
-  assert.equal(calls.filter((call) => call === 'verify-backup').length, 1)
+  assert.equal(calls.filter((call) => call.startsWith('backup:')).length, 2)
+  assert.equal(calls.filter((call) => call === 'verify-backup').length, 0)
 })
 
 function requestMiddleware(
@@ -1087,5 +1264,39 @@ test('database migration action rejects arbitrary targets, commands, and fields'
         command: 'psql',
       }),
     /unsupported fields/u
+  )
+})
+
+test('a verified daily version can restart while an unfinished candidate has pending migrations', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  const originalRuntime = runtime.runtime
+  runtime.runtime = async () => ({
+    ...(await originalRuntime()),
+    bundleId: 'verified-daily-version',
+  })
+  const originalRestart = runtime.restart
+  runtime.restart = async (...args) => ({
+    ...(await originalRestart(...args)),
+    bundleId: 'verified-daily-version',
+  })
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const accepted = await service.act({
+    action: 'restart',
+    idempotencyKey:
+      'database-migration:restart:11111111-1111-4111-8111-111111111111',
+  })
+  const result = await waitForOperation(service, accepted.operation.id, [
+    'passed',
+  ])
+  assert.equal(result.readback.pendingFiles, 1)
+  assert.equal(
+    calls.some((value) => value.startsWith('apply:')),
+    false
   )
 })

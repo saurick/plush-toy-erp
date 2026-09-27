@@ -30,7 +30,7 @@ print_help() {
     '  - 不读取、不提交真实 .env。' \
     '  - 不把 dump、secret、完整 DSN 或客户 raw rows 写入 git。' \
     '  - 默认 SOURCE_POSTGRES_DSN 必须使用只读 erp_backup；恢复和 migration 由隔离库管理员 / erp_migrator 完成。' \
-    '  - shared-dev-session-read-only 只供本项目本地迁移入口备份已登记的 133 开发库，并强制当前源连接只读；不能用于目标或发布环境。' \
+    '  - shared-dev-dedicated-backup 只供本项目本地迁移入口备份已登记的 133 开发库，并强制当前源连接只读；不能用于目标或发布环境。' \
     '  - --environment 会写入正式恢复报告；目标演练必须显式填写实际环境（例如 customer-trial-133），不能沿用默认 local-dev。' \
     '  - 默认拒绝把 192.168.0.133 测试 / 目标库当成本地 source，除非显式设置' \
     '    ERP_ALLOW_TEST_DB_AS_DEV=1 或 ALLOW_TARGET_DB_BACKUP_REHEARSAL=1。'
@@ -53,6 +53,8 @@ backend_url=""
 web_url=""
 keep_container="0"
 evidence_dir=""
+runtime_bundle=""
+rehearsal_source_root="$repo_root"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -104,6 +106,12 @@ while [[ $# -gt 0 ]]; do
     web_url="${2:-}"
     shift 2
     ;;
+  --runtime-bundle)
+    runtime_bundle="${2:-}"
+    [[ "$runtime_bundle" =~ ^[a-f0-9-]{36}$ ]] || { echo "invalid runtime bundle" >&2; exit 1; }
+    rehearsal_source_root="$repo_root/output/dev-workbench/runtime-bundles/$runtime_bundle/source"
+    shift 2
+    ;;
   --keep-container)
     keep_container="1"
     shift
@@ -146,14 +154,14 @@ if [[ -z "$source_dsn" ]]; then
 fi
 
 case "$source_policy" in
-dedicated-backup | shared-dev-session-read-only) ;;
+dedicated-backup | shared-dev-dedicated-backup) ;;
 *)
-  echo "[backup-restore-rehearsal] --source-policy 只支持 dedicated-backup / shared-dev-session-read-only" >&2
+  echo "[backup-restore-rehearsal] --source-policy 只支持 dedicated-backup / shared-dev-dedicated-backup" >&2
   exit 1
   ;;
 esac
 
-if [[ "$source_dsn" == *"192.168.0.133"* && "$source_policy" != "shared-dev-session-read-only" && "${ERP_ALLOW_TEST_DB_AS_DEV:-}" != "1" && "${ALLOW_TARGET_DB_BACKUP_REHEARSAL:-}" != "1" ]]; then
+if [[ "$source_dsn" == *"192.168.0.133"* && "$source_policy" != "shared-dev-dedicated-backup" && "${ERP_ALLOW_TEST_DB_AS_DEV:-}" != "1" && "${ALLOW_TARGET_DB_BACKUP_REHEARSAL:-}" != "1" ]]; then
   echo "[backup-restore-rehearsal] 拒绝默认使用 192.168.0.133 测试 / 目标库作为 source" >&2
   echo "[backup-restore-rehearsal] 如确需对目标库演练，显式设置 ALLOW_TARGET_DB_BACKUP_REHEARSAL=1" >&2
   exit 1
@@ -267,16 +275,16 @@ unset 'source_pg_settings'
 source_dsn=""
 unset "$source_env"
 
-if [[ "$source_policy" == "shared-dev-session-read-only" ]]; then
+if [[ "$source_policy" == "shared-dev-dedicated-backup" ]]; then
   [[ "$environment" == "shared-dev" &&
     "$source_pg_host" == "192.168.0.133" &&
     "$source_pg_port" == "5432" &&
     "$source_pg_database" == "plush_erp" ]] || {
-    echo "[backup-restore-rehearsal] shared-dev-session-read-only 只允许已登记的 192.168.0.133:5432/plush_erp shared-dev" >&2
+    echo "[backup-restore-rehearsal] shared-dev-dedicated-backup 只允许已登记的 192.168.0.133:5432/plush_erp shared-dev" >&2
     exit 1
   }
   source_pg_options="-c default_transaction_read_only=on"
-  source_role_alias="shared-dev-configured-role"
+  source_role_alias="plush_dev_backup"
 fi
 
 source_identity="$(PGHOST="$source_pg_host" PGPORT="$source_pg_port" \
@@ -322,8 +330,10 @@ IFS='|' read -r source_user source_database source_postgres_version source_read_
   echo "[backup-restore-rehearsal] 源库身份、目标或只读会话安全检查失败" >&2
   exit 1
 }
-if [[ "$source_policy" == "dedicated-backup" ]]; then
-  [[ "$source_user" == "erp_backup" &&
+if [[ "$source_policy" == "dedicated-backup" || "$source_policy" == "shared-dev-dedicated-backup" ]]; then
+  expected_backup_role="erp_backup"
+  if [[ "$source_policy" == "shared-dev-dedicated-backup" ]]; then expected_backup_role="plush_dev_backup"; fi
+  [[ "$source_user" == "$expected_backup_role" &&
     "$source_super" == "f" && "$source_createdb" == "f" &&
     "$source_createrole" == "f" && "$source_bypassrls" == "f" &&
     "$source_database_create" == "f" && "$source_schema_create" == "f" &&
@@ -395,6 +405,7 @@ database_roles_script="$repo_root/server/deploy/compose/prod/database_roles.sh"
 container_name="plush-${customer}-restore-${backup_id//[^A-Za-z0-9]/-}"
 restore_pass="restore-$(date +%s)-$RANDOM"
 restore_db="plush_restore"
+if [[ -n "$runtime_bundle" ]]; then restore_db="plush_erp_release_local_${runtime_bundle//-/}"; fi
 restore_port=""
 restore_dsn=""
 role_secret_file=""
@@ -483,6 +494,22 @@ fi
 echo "[backup-restore-rehearsal] restoring dump into isolated container"
 docker exec "$container_name" pg_restore --username postgres --no-owner --no-acl --dbname "$restore_db" /work/database.dump
 
+# Count the restored snapshot before migration; account, configuration and audit
+# rows do not prove that the upgrade retained existing business records.
+business_rows_before_upgrade="$(docker exec "$container_name" psql -U postgres -d "$restore_db" -XAt --set ON_ERROR_STOP=1 -c "
+SELECT coalesce(sum((xpath('/row/row_count/text()', query_to_xml(
+  format('SELECT count(*) AS row_count FROM %I.%I', table_schema, table_name),
+  false, true, '')))[1]::text::bigint), 0)
+FROM information_schema.tables
+WHERE table_schema='public' AND table_type='BASE TABLE'
+  AND table_name NOT IN (
+    'access_entitlements', 'admin_sessions', 'admin_user_roles', 'admin_users',
+    'customer_config_revisions', 'deployment_module_states', 'permissions',
+    'role_data_scopes', 'role_permissions', 'role_profiles', 'roles',
+    'runtime_audit_events', 'runtime_markers', 'work_pool_memberships', 'work_pools'
+  );")"
+[[ "$business_rows_before_upgrade" =~ ^[0-9]+$ ]]
+
 restore_app_pass="rehearsal-app-${RANDOM}-$(date +%s)"
 restore_migrator_pass="rehearsal-migrator-${RANDOM}-$(date +%s)"
 restore_backup_pass="rehearsal-backup-${RANDOM}-$(date +%s)"
@@ -510,7 +537,7 @@ restore_dsn="postgres://erp_migrator:${restore_migrator_pass}@127.0.0.1:${restor
 printf '%s\n' "env \"restore\" {
   url = getenv(\"ATLAS_DATABASE_URL\")
   migration {
-    dir = \"file://$repo_root/server/internal/data/model/migrate\"
+    dir = \"file://$rehearsal_source_root/server/internal/data/model/migrate\"
   }
 }" >"$atlas_config_file"
 chmod 600 "$atlas_config_file"
@@ -518,7 +545,7 @@ chmod 600 "$atlas_config_file"
 atlas_restore_migrate() {
   ATLAS_DATABASE_URL="$restore_dsn" atlas migrate "$@" \
     --config "file://$atlas_config_file" --env restore \
-    --dir "file://$repo_root/server/internal/data/model/migrate"
+    --dir "file://$rehearsal_source_root/server/internal/data/model/migrate"
 }
 
 atlas_restore_schema() {
@@ -528,7 +555,7 @@ atlas_restore_schema() {
 }
 
 echo "[backup-restore-rehearsal] validating migration directory"
-atlas migrate validate --dir "file://$repo_root/server/internal/data/model/migrate"
+atlas migrate validate --dir "file://$rehearsal_source_root/server/internal/data/model/migrate"
 
 echo "[backup-restore-rehearsal] reading pre-apply migration status against restored DB"
 atlas_restore_migrate status >"$pre_migration_status_file"
@@ -635,7 +662,7 @@ if [[ "$pending_before" -gt 0 ]]; then
         echo "[backup-restore-rehearsal] pending migration version 非法" >&2
         exit 1
       }
-      mapfile -t migration_matches < <(find "$repo_root/server/internal/data/model/migrate" \
+      mapfile -t migration_matches < <(find "$rehearsal_source_root/server/internal/data/model/migrate" \
         -maxdepth 1 -type f -name "${pending_version}_*.sql" -print)
       [[ "${#migration_matches[@]}" -eq 1 ]] || {
         echo "[backup-restore-rehearsal] pending migration 未唯一匹配 SQL" >&2
@@ -777,6 +804,11 @@ else
   smoke_query_status="failed"
 fi
 
+if [[ -n "$runtime_bundle" ]]; then
+  echo "[backup-restore-rehearsal] verifying fixed candidate runtime on restored data"
+  CANDIDATE_APP_PASSWORD="$restore_app_pass" node "$repo_root/scripts/local-runtime-rehearsal.mjs" "$runtime_bundle" "$container_name" "$run_dir"
+fi
+
 backend_health_status="not-run"
 backend_ready_status="not-run"
 if [[ -n "$backend_url" ]]; then
@@ -907,6 +939,7 @@ printf '%s\n' "{
   },
   \"restore\": {
     \"restoreTestStatus\": \"passed-temp-container\",
+    \"businessRowsBeforeUpgrade\": $business_rows_before_upgrade,
     \"migrationBeforeApply\": \"${pre_migration_version:-unknown}\",
     \"restoreMigrationVersion\": \"${current_version:-unknown}\",
     \"pendingFiles\": \"${pending_files:-unknown}\",

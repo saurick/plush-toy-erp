@@ -158,7 +158,7 @@ ifneq ("$(wildcard $(ENV_FILE))","")
   export
 endif	
 
-.PHONY: migrate_check migrate migrate_prepare migrate_execute migrate_status migrate_plan migrate_apply
+.PHONY: migrate_check migrate migrate_prepare migrate_execute migrate_status migrate_audit migrate_plan migrate_apply
 # 检查当前工作区的迁移链路合同；不要求提交，不连接目标库。
 migrate_check:
 	@node ../scripts/qa/migration-contracts.mjs
@@ -187,6 +187,10 @@ migrate_execute:
 # 只读检查工作区、目标身份和 Atlas revision；不执行 migration。
 migrate_status:
 	@node ../scripts/local-migration.mjs status
+
+# 只读核对现库存量升级规则；不停止后端，不进行预演写入或正式 apply。
+migrate_audit:
+	@node ../scripts/local-migration.mjs audit
 
 # 兼容旧习惯：裸目标进入高层 prepare；显式目标确认只供 operation service 复用低层 plan。
 migrate_plan:
@@ -248,6 +252,7 @@ ent_generate:
 .PHONY: data
 # 最推荐流程：只生成 diff，不自动 apply
 data: ent_migrate ent_generate
+	@echo "[data] 生成完成；交付前运行 make migrate_check 和 make migrate_audit。空库生成通过不表示现库存量可升级。"
 
 .PHONY: db_create
 db_create:
@@ -389,13 +394,12 @@ dev_build:
 	@go build -ldflags "-X main.Version=$(VERSION)" -o $(DEV_BIN) $(MAIN_PKG)
 
 .PHONY: run run_yoyoosun
-# run dev binary (stable path)
+# compile the current workspace after database checks, then verify and switch
 run: export ERP_CUSTOMER_KEY ?= yoyoosun
 run: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
 run: export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := $(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX)
-run: dev_preflight dev_build
-	@echo ">>> running: $(DEV_BIN) $(ARGS)"
-	@$(DEV_BIN) $(ARGS)
+run: dev_ports_preflight
+	@node ../scripts/local-runtime-start.mjs
 
 # run the local backend with the stable yoyoosun customer context.
 run_yoyoosun: export ERP_CUSTOMER_KEY := yoyoosun
@@ -412,15 +416,17 @@ dev_stop: dev_ports_preflight
 	@bash ../scripts/dev-listener-stop.sh .. $(DEV_PORTS)
 
 .PHONY: dev_restart dev_restart_yoyoosun
-# restart local dev binary after clearing stale listeners
+# compile current source before stopping the previous verified backend
 dev_restart: export ERP_CUSTOMER_KEY ?= yoyoosun
 dev_restart: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
 dev_restart: export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := $(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX)
-dev_restart: dev_preflight
-	@$(MAKE) dev_stop
-	@$(MAKE) dev_build
-	@echo ">>> running: $(DEV_BIN) $(ARGS)"
-	@$(DEV_BIN) $(ARGS)
+dev_restart: dev_ports_preflight
+	@node ../scripts/local-runtime-start.mjs
+
+.PHONY: dev_database_roles
+# Provision database-specific least-privilege accounts through the deployment policy.
+dev_database_roles:
+	@node ../scripts/local-database-roles.mjs $(ARGS)
 
 # restart the local backend with the stable yoyoosun customer context.
 dev_restart_yoyoosun: export ERP_CUSTOMER_KEY := yoyoosun

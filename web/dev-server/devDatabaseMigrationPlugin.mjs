@@ -203,6 +203,8 @@ const PREPARE_FAILURE_MESSAGES = Object.freeze({
     '无法核对当前迁移文件；请检查本地开发终端的具体原因后重新准备',
   migration_backend_stop_failed:
     '本地后端停止未完成；请检查进程状态后重新准备。本次未执行迁移',
+  migration_data_audit_failed:
+    '存量数据只读检查未通过；请查看本地开发终端的阻断项并处理后重新准备。本次未停止后端或执行迁移',
   migration_plan_failed:
     '迁移计划或事务回滚验证未通过；请查看本地开发终端的具体原因，修复后重新准备。本次未执行迁移',
   backup_restore_failed:
@@ -216,6 +218,14 @@ const PREPARE_FAILURE_MESSAGES = Object.freeze({
 
 function publicIssue(error, fallbackCode = 'operation_blocked') {
   const diagnostic = String(error?.diagnostic || error?.message || '')
+  if (error?.code === 'DATABASE_MIGRATION_LOCKED') {
+    return {
+      code: 'database_migration_busy',
+      severity: 'warning',
+      message:
+        '另一个数据库迁移或后端重启正在进行；请等待完成后刷新状态。本次操作未开始，未执行迁移，也未停止后端',
+    }
+  }
   if (error?.code === 'migration_workspace_check_failed') {
     return {
       code: error.code,
@@ -225,6 +235,18 @@ function publicIssue(error, fallbackCode = 'operation_blocked') {
   }
   if (error instanceof LocalRuntimePreflightError) {
     return { code: error.code, severity: 'blocked', message: error.message }
+  }
+  if (
+    /\berror_code=unit_normalization_blocked\b|unit normalization blocked:/u.test(
+      diagnostic
+    )
+  ) {
+    return {
+      code: 'unit_normalization_blocked',
+      severity: 'blocked',
+      message:
+        '单位归并被现有数量精度或单据引用冲突阻断；需要处理采购、领料、库存等存量记录，并复验单位迁移。请保留原数量，勿直接四舍五入或删除已过账记录。本次未执行迁移',
+    }
   }
   if (
     error?.outcome === 'not_proven' ||
@@ -379,7 +401,7 @@ export function createDevDatabaseMigrationService({
   const reportRuntimeReady = async (target, runtimeReadback) => {
     if (
       target?.key !== 'shared-dev' ||
-      target?.pendingFiles !== 0 ||
+      (target?.pendingFiles !== 0 && !runtimeReadback?.bundleId) ||
       runtimeReadback?.available !== true
     ) {
       return
@@ -409,13 +431,15 @@ export function createDevDatabaseMigrationService({
     return transitionDatabaseMigrationOperation(store, operationId, {
       status,
       message:
-        status === 'not_proven'
-          ? '操作结果尚未证明，已停止自动处理'
-          : previous.readback?.migrationVerified
-            ? '数据库升级已完成，后端恢复未完成；修正启动问题后只需重启后端'
-            : previous.status === 'preparing'
-              ? `${previous.message.replace(/^正在/u, '')}未完成，操作已停止`
-              : '操作被安全停止',
+        issue.code === 'database_migration_busy'
+          ? '已有迁移或后端重启正在运行，本次操作未开始'
+          : status === 'not_proven'
+            ? '操作结果尚未证明，已停止自动处理'
+            : previous.readback?.migrationVerified
+              ? '数据库升级已完成，后端恢复未完成；修正启动问题后只需重启后端'
+              : previous.status === 'preparing'
+                ? `${previous.message.replace(/^正在/u, '')}未完成，操作已停止`
+                : '操作被安全停止',
       issues: [issue],
       now: now().toISOString(),
     })
@@ -461,7 +485,18 @@ export function createDevDatabaseMigrationService({
       })
       if (initialTarget.pendingFiles === 0) {
         failureCode = 'migration_runtime_check_failed'
-        progress('正在核对后端运行状态')
+        const readback = {
+          migrationVerified: true,
+          currentVersion: initialTarget.currentVersion,
+          latestVersion: initialTarget.latestVersion,
+          pendingFiles: 0,
+        }
+        transitionDatabaseMigrationOperation(store, operationId, {
+          status: 'preparing',
+          message: '数据库已是最新版本，正在核对后端运行状态',
+          readback,
+          now: now().toISOString(),
+        })
         const runtimeReadback = await runtime.runtime()
         await reportRuntimeReady(initialTarget, runtimeReadback)
         transitionDatabaseMigrationOperation(store, operationId, {
@@ -470,10 +505,7 @@ export function createDevDatabaseMigrationService({
           target: normalizeTarget(initialTarget),
           source,
           readback: {
-            migrationVerified: true,
-            currentVersion: initialTarget.currentVersion,
-            latestVersion: initialTarget.latestVersion,
-            pendingFiles: 0,
+            ...readback,
             runtime: runtimeReadback,
           },
           now: now().toISOString(),
@@ -488,35 +520,27 @@ export function createDevDatabaseMigrationService({
           code: 'migration_tool_unavailable',
         })
       }
-      failureCode = 'migration_backend_stop_failed'
-      progress('正在停止本地后端')
-      await runtime.stopRuntime()
+      failureCode = 'migration_data_audit_failed'
+      progress('正在只读检查存量数据')
+      await runtime.audit()
+      if ((await runtime.sourceIdentity()).fingerprint !== source.fingerprint) {
+        throw new DatabaseMigrationActionError(
+          '迁移文件在存量数据检查期间发生变化，请重新准备',
+          { code: 'migration_source_changed' }
+        )
+      }
+      transitionDatabaseMigrationOperation(store, operationId, {
+        status: 'preparing',
+        message: '存量数据只读审计已通过',
+        readback: { dataAuditPassed: true },
+        now: now().toISOString(),
+      })
       failureCode = 'migration_plan_failed'
-      progress('正在验证迁移计划及事务回滚')
+      progress('正在只读生成迁移计划；当前服务继续运行')
       const plan = await runtime.plan(initialTarget.targetConfirmation)
-      const reusableBackupOperation = listDatabaseMigrationOperations(store, {
-        limit: 30,
-      }).find(
-        (operation) =>
-          operation.id !== operationId &&
-          operation.backup?.restoreVerified === true &&
-          operation.source?.fingerprint === source.fingerprint &&
-          operation.target?.key === initialTarget.key &&
-          operation.target?.currentVersion === initialTarget.currentVersion &&
-          operation.target?.latestVersion === initialTarget.latestVersion &&
-          operation.target?.pendingFiles === initialTarget.pendingFiles
-      )
       failureCode = 'backup_restore_failed'
-      const reusableBackup =
-        reusableBackupOperation &&
-        typeof runtime.verifyBackup === 'function' &&
-        (await runtime.verifyBackup(reusableBackupOperation.backup))
-          ? reusableBackupOperation.backup
-          : null
       progress('正在验证备份与隔离恢复')
-      const backup =
-        reusableBackup ||
-        (await runtime.backup(operationId, initialTarget, progress))
+      const backup = await runtime.backup(operationId, initialTarget, progress)
       failureCode = 'migration_recheck_failed'
       progress('正在复核迁移文件、目标状态和备份证据')
       const finalSource = await runtime.sourceIdentity()
@@ -555,6 +579,7 @@ export function createDevDatabaseMigrationService({
         backup,
         confirmationPrompt: prompt,
         internal: {
+          operationId,
           targetConfirmation: initialTarget.targetConfirmation,
           applyConfirmation: plan.applyConfirmation,
           maintenanceConfirmation: plan.maintenanceConfirmation,
@@ -572,6 +597,7 @@ export function createDevDatabaseMigrationService({
   const runExecute = async (operationId) => {
     let applyStarted = false
     let noWritesProven = false
+    let maintenanceEntered = false
     try {
       const operation = readDatabaseMigrationOperation(store, operationId)
       const source = await runtime.sourceIdentity()
@@ -606,9 +632,29 @@ export function createDevDatabaseMigrationService({
           { code: 'backup_restore_failed' }
         )
       }
+      // The confirmation is consumed before entering maintenance. A new backup
+      // is required because normal business writes can continue after prepare.
+      await runtime.maintenance(true)
+      maintenanceEntered = true
+      await runtime.stopRuntime()
+      const finalBackup = await runtime.backup(operationId, before)
+      transitionDatabaseMigrationOperation(store, operationId, {
+        status: 'applying',
+        message: '停服后的恢复点已验证，正在执行已确认的迁移',
+        backup: finalBackup,
+        now: now().toISOString(),
+      })
+      if ((await runtime.sourceIdentity()).fingerprint !== source.fingerprint) {
+        throw new DatabaseMigrationActionError(
+          '停服验证期间代码已变化，请重新准备',
+          { code: 'migration_source_changed' }
+        )
+      }
       try {
-        applyStarted = true
-        await runtime.apply(operation.internal)
+        if (before.pendingFiles > 0) {
+          applyStarted = true
+          await runtime.apply(operation.internal)
+        }
       } catch (error) {
         const diagnostic = String(error?.diagnostic || '')
         noWritesProven =
@@ -641,7 +687,12 @@ export function createDevDatabaseMigrationService({
         internal: null,
         now: now().toISOString(),
       })
-      const runtimeReadback = await runtime.restart(operationId)
+      await runtime.maintenance(false)
+      maintenanceEntered = false
+      const runtimeReadback = await runtime.restart(
+        operationId,
+        operation.backup.bundleId
+      )
       await reportRuntimeReady(after, runtimeReadback)
       transitionDatabaseMigrationOperation(store, operationId, {
         status: 'passed',
@@ -664,12 +715,39 @@ export function createDevDatabaseMigrationService({
       ) {
         error.outcome = 'not_proven'
       }
+      if (
+        maintenanceEntered &&
+        (!applyStarted || noWritesProven || current.readback?.migrationVerified)
+      ) {
+        try {
+          await runtime.maintenance(false)
+          maintenanceEntered = false
+        } catch (restoreError) {
+          logFailure(operationId, restoreError)
+        }
+      } else if (maintenanceEntered) {
+        // An unknown database result keeps application writes disabled. An
+        // explicit restart first proves a compatible fixed database version.
+        maintenanceEntered = false
+      }
+      if (!applyStarted || noWritesProven) {
+        // Only a previously verified artifact matching the live database may
+        // restore service. There is no automatic apply or database rollback.
+        await runtime
+          .restorePrevious?.(operationId)
+          .catch((restoreError) => logFailure(operationId, restoreError))
+      }
       transitionFailure(
         operationId,
         error,
         current.status === 'restarting' ? 'failed' : 'blocked'
       )
     } finally {
+      if (maintenanceEntered) {
+        await runtime
+          .maintenance(false)
+          .catch((error) => logFailure(operationId, error))
+      }
       releaseDatabaseMigrationExecutionLock(store, operationId)
     }
   }
@@ -677,16 +755,26 @@ export function createDevDatabaseMigrationService({
   const runRestart = async (operationId) => {
     try {
       const target = await runtime.status()
+      const currentRuntime = await runtime.runtime()
       if (
         target.key !== 'shared-dev' ||
         !target.targetConfirmation ||
-        target.pendingFiles !== 0
+        (target.pendingFiles !== 0 && !currentRuntime.bundleId)
       ) {
         throw new DatabaseMigrationActionError(
-          '数据库仍有待执行 migration，不能只重启后端'
+          '尚无与当前数据库匹配的固定运行版本，请先检查并准备'
         )
       }
-      const runtimeReadback = await runtime.restart(operationId)
+      const proven = listDatabaseMigrationOperations(store).find(
+        (operation) =>
+          operation.readback?.migrationVerified &&
+          operation.backup?.bundleId &&
+          operation.readback.currentVersion === target.currentVersion
+      )
+      const runtimeReadback = await runtime.restart(
+        operationId,
+        proven?.backup.bundleId
+      )
       await reportRuntimeReady(target, runtimeReadback)
       transitionDatabaseMigrationOperation(store, operationId, {
         status: 'passed',
@@ -696,7 +784,7 @@ export function createDevDatabaseMigrationService({
           migrationVerified: true,
           currentVersion: target.currentVersion,
           latestVersion: target.latestVersion,
-          pendingFiles: 0,
+          pendingFiles: target.pendingFiles,
           runtime: runtimeReadback,
         },
         now: now().toISOString(),
@@ -998,7 +1086,9 @@ export function createDevDatabaseMigrationMiddleware({
         status: 'failed',
         message: inputError
           ? '请求参数不符合固定数据库迁移合同'
-          : '操作未完成；请刷新数据库迁移页查看已记录状态',
+          : error?.code === 'DATABASE_MIGRATION_LOCKED'
+            ? publicIssue(error).message
+            : '操作未完成；请刷新数据库迁移页查看已记录状态',
       })
     }
   }

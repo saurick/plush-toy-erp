@@ -93,9 +93,15 @@ pnpm start
 
 默认地址：`http://127.0.0.1:5175`。开发服务器会把 `http://localhost:5175` 自动规范到同一 IPv4 地址。
 
-本地开发端口由仓库根目录 `config/dev-ports.env` 统一提供。人工终端的 `pnpm start` 固定使用 `5175`，通过同一预检后，若已有同一工作区、后端、客户配置、启动参数和恢复状态的前端，会输出地址并成功退出，继续使用原服务。其他程序、其他工作区或不同启动配置的占用会明确阻断，保持 `strictPort`，不会自动停止占用者或把主入口顺延。
+本地开发端口由仓库根目录 `config/dev-ports.env` 统一提供。人工终端的 `pnpm start` 固定使用 `5175`，通过同一预检后，若已有同一工作区、后端、客户配置、启动参数、开发服务代码和恢复状态的前端，会输出地址并成功退出，继续使用原服务。实例摘要覆盖 `web/dev-server`、Vite / 启动入口及迁移服务在进程内加载的共享脚本；文档、页面和测试变化不影响复用。其他程序、其他工作区、不同启动配置或旧服务代码的占用会明确阻断并提示重启，保持 `strictPort`，不会自动停止占用者或把主入口顺延。
 
-需要重新加载启动配置或接管遗留的本工作区 Vite 时运行 `pnpm start:restart`（等价于 `pnpm start --local --restart`）。它先完成预检，再用 `lsof` 与 `ps` 连续核对监听 PID、工作目录、Vite 命令和进程启动时间，仅向已确认的本工作区 Vite 发送 `SIGTERM`；归属不明、现场变化或端口未释放时停止，不强制杀进程。
+需要重新加载启动配置或接管遗留的本工作区 Vite 时运行 `pnpm restart` / `pnpm start:restart`（等价于 `pnpm start --local --restart`）。客户辅助入口使用 `pnpm restart:yoyoosun` / `pnpm start:yoyoosun --restart`，重启指定端口（默认 `15200`），不会顺延到新端口。入口先完成预检，再通过共享进程检查连续核对监听 PID、工作目录、Vite 命令和进程启动时间；macOS 从系统端口表定位 PID，避免全机 `lsof` 扫描，逐进程检查均有超时。仅向已确认的本工作区 Vite 发送 `SIGTERM`；归属不明、现场变化或端口未释放时停止，不强制杀进程。
+
+`pnpm restart` 会先调用包的 `stop` 生命周期，项目将其接到同一启动器的 `--local --stop`：完成预检和进程归属检查后只释放主前端端口。随后 `restart` 生命周期启动当前源码的 Vite，并继续由当前终端管理；中断时返回非零退出码，避免 pnpm 再接续启动。可单独用 `pnpm stop` 停止主前端。
+
+修改迁移页服务端插件或上述启动代码后，交付前须在用户实际使用的端口显式重启并复验；页面热更新和辅助端口验证不会更新已运行进程中的 Node 模块。仅刷新浏览器不能加载这些服务端改动。
+
+主入口和客户辅助入口在每次迁移准备、执行或后端重启请求前，都会核对本进程加载时的开发服务代码摘要。代码已变化或无法读取时，拒绝动作并提示重新启动当前前端；仍允许查看状态和访问已验证的日常业务。Vite 配置热重载不能更新该摘要，必须重新启动前端进程。`make dev_restart` 只恢复后端，不会更新仍在运行的前端开发服务。
 
 Codex 会话通过 `CODEX_THREAD_ID` / `CODEX_CI` 自动选择辅助端口；人工临时验证可用 `pnpm start:isolated`。辅助端口只从 `15200-15299` 中选取，终端输出实际 URL，HMR 与监听端口同步；耗尽时阻断。启动器直接管理 Vite 子进程，通过信号和 IPC 在中断、终端关闭或启动器被强制结束后释放其监听端口；不会清理其他会话的服务。直接运行 Vite 时也会按 Codex 环境选择并固定辅助端口，生命周期由调用方管理。
 
@@ -103,7 +109,9 @@ Codex 会话通过 `CODEX_THREAD_ID` / `CODEX_CI` 自动选择辅助端口；人
 
 Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:yoyoosun` 通过同一受管浏览器入口打开页面。它只在 Chrome、Edge 或 Brave 中检查标题属于本项目的候选标签，并在地址栏精确匹配 `127.0.0.1` / `localhost` 与实际端口后激活、刷新该标签；窗口保持原有最大化或普通状态，只有已最小化时才恢复。未命中或 Windows UI Automation 不可用时回退到系统默认的新标签页。它不会输出浏览地址、关闭历史重复标签或读取其他标题标签的地址栏；显式 `BROWSER=none` 或自定义 `BROWSER` 始终优先。macOS 与原生 Linux 保留 Vite 的平台默认打开行为。
 
-`pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查工作区 schema / versioned migration、开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，只开放 `/__dev/database-migration` 恢复页；恢复期间除启动器所需的只读实例摘要外，普通 ERP 页面、其它 DEV API 与 `/rpc`、`/templates` 失败关闭，修正环境后刷新状态，重新通过同一完整启动检查和同目标 health / ready，才能进入完整工作台。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
+`pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查当前工作区 schema / migration 与开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过并核对运行制品身份；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，只开放 `/__dev/database-migration` 恢复页；恢复期间除启动器所需的只读实例摘要外，普通 ERP 页面、其它 DEV API 与 `/rpc`、`/templates` 失败关闭，修正环境后刷新状态，重新通过同一完整启动检查和同目标 health / ready，才能进入完整工作台。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
+
+普通业务页和开发工作台均从当前工作区加载，Vite 提供热更新；固定运行制品不会截获开发页面。后端代码通过 `make dev_restart` 重新编译，数据库迁移仍须“检查并准备 → 确认执行”。辅助端口只隔离前端监听，不产生第二个日常数据库。预检或构建失败时保留已有后端，但不会将其标成最新工作区代码。
 
 开发工作台读取 GitLab CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`；macOS 未显式提供时，`pnpm start` 会自动读取钥匙串 service `plush-toy-erp.gitlab-read-api`，account 使用当前 macOS 登录用户名。该凭据只允许当前项目的最小读取权限，只保存在本机钥匙串和 DEV 服务私有内存；版本中心将它收口到不含发布方法的只读 Provider，不进入浏览器、仓库、日志、质量门禁子进程或部署执行子进程，也不替代创建新发布使用的短期 `PLUSH_GITLAB_TOKEN`。钥匙串未登记时业务开发仍可启动，但 GitLab 服务端证据保持失败关闭，不以本机结果补证。
 

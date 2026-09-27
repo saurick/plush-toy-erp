@@ -10,6 +10,13 @@ import {
 // fixtures and never prepare or apply migrations against a real target.
 export const MIGRATION_CONTRACT_TESTS = Object.freeze([
   "scripts/local-migration.test.mjs",
+  "scripts/local-runtime-bundle.test.mjs",
+  "scripts/local-runtime-rehearsal.test.mjs",
+  "scripts/local-runtime-start.test.mjs",
+  "scripts/local-runtime-preflight.test.mjs",
+  "scripts/local-database-roles.test.mjs",
+  "web/dev-server/devWorkbenchPlugins.test.mjs",
+  "web/src/dev-workbench/config/devDatabaseMigration.test.mjs",
   "scripts/local-migration-workflow.test.mjs",
   "scripts/qa/migration-contracts.test.mjs",
   "scripts/qa/migration-makefile-contract.test.mjs",

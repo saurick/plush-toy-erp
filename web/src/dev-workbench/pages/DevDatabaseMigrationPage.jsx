@@ -25,6 +25,7 @@ import {
 } from 'antd'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
+import DevDatabaseMigrationFlow from '../components/DevDatabaseMigrationFlow.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
@@ -32,9 +33,15 @@ import {
   DEV_DATABASE_MIGRATION_SOURCE_PATH,
   createDatabaseMigrationIdempotencyKey,
   createDevDatabaseMigrationClient,
+  databaseMigrationPathStatuses,
+  databaseMigrationDataScopeText,
+  databaseMigrationExecutionText,
+  databaseMigrationPreparationAvailable,
+  databaseMigrationUpgradePresentation,
   databaseMigrationStatusPresentation,
   isDatabaseMigrationOperationPolling,
   selectActiveDatabaseMigrationOperation,
+  selectDatabaseMigrationPathOperation,
 } from '../config/devDatabaseMigration.mjs'
 import {
   formatDevSummaryCheckedAt,
@@ -48,8 +55,8 @@ const { Paragraph, Text, Title } = Typography
 const OPERATION_POLL_INTERVAL_MS = 1500
 const DATABASE_MIGRATION_SNAPSHOT_KEY = 'database-migration'
 
-function StatusTag({ status }) {
-  const presentation = databaseMigrationStatusPresentation(status)
+function StatusTag({ status, issues }) {
+  const presentation = databaseMigrationStatusPresentation(status, issues)
   return <Tag color={presentation.color}>{presentation.label}</Tag>
 }
 
@@ -108,32 +115,6 @@ function toolReadinessPresentation(tools) {
   return tools?.status === 'ready'
     ? { color: 'success', label: '迁移准备环境已就绪' }
     : { color: 'error', label: '迁移准备环境未就绪' }
-}
-
-function operationStepStatus(operation, step) {
-  if (!operation) return 'wait'
-  const failed = ['failed', 'blocked', 'not_proven'].includes(operation.status)
-  const ranks = {
-    preparing: 0,
-    ready: 3,
-    applying: 3,
-    restarting: 4,
-    passed: 5,
-    failed: 3,
-    blocked: 0,
-    not_proven: 3,
-  }
-  const rank = ranks[operation.status] ?? 0
-  if (failed && step === Math.min(rank, 4)) return 'error'
-  if (step < rank || operation.status === 'passed') return 'finish'
-  if (
-    (operation.status === 'preparing' && step <= 2) ||
-    (operation.status === 'applying' && step === 3) ||
-    (operation.status === 'restarting' && step === 4)
-  ) {
-    return 'process'
-  }
-  return 'wait'
 }
 
 export default function DevDatabaseMigrationPage() {
@@ -266,13 +247,19 @@ export default function DevDatabaseMigrationPage() {
             }
           : current
       )
-      message.success(
-        action.action === 'prepare'
-          ? '已开始检查、计划与备份恢复验证'
-          : action.action === 'restart'
-            ? '已开始重启本地后端'
-            : '已接受确认，开始升级数据库'
-      )
+      if (['blocked', 'failed', 'not_proven'].includes(operation.status)) {
+        message.warning(issueText(operation.issues) || operation.message)
+      } else {
+        message.success(
+          operation.status === 'passed'
+            ? operation.message
+            : action.action === 'prepare'
+              ? '已开始检查、计划与备份恢复验证'
+              : action.action === 'restart'
+                ? '已开始重启本地后端'
+                : '已接受确认，开始升级数据库'
+        )
+      }
       refresh()
       return operation
     } catch (error) {
@@ -292,25 +279,21 @@ export default function DevDatabaseMigrationPage() {
   const toolState = toolReadinessPresentation(tools)
   const pendingFiles = target?.pendingFiles
   const isLatest = pendingFiles === 0
+  const pathOperation = selectDatabaseMigrationPathOperation(summary)
+  const pathStatuses = databaseMigrationPathStatuses(pathOperation)
+  const upgradeState = databaseMigrationUpgradePresentation(summary)
   const hasRunningOperation = operations.some((operation) =>
     ['preparing', 'applying', 'restarting'].includes(operation.status)
   )
   const readyOperation =
     activeOperation?.status === 'ready' ? activeOperation : null
   const canPrepare =
-    summaryFresh &&
-    !actionKey &&
-    summary?.status === 'success' &&
-    target?.key === 'shared-dev' &&
-    Number.isSafeInteger(pendingFiles) &&
-    pendingFiles > 0 &&
-    tools?.status === 'ready' &&
-    !hasRunningOperation
+    summaryFresh && !actionKey && databaseMigrationPreparationAvailable(summary)
   const canRestart =
     summaryFresh &&
     !actionKey &&
     summary?.status === 'success' &&
-    isLatest &&
+    (isLatest || runtime?.bundleId) &&
     !runtime?.available &&
     !hasRunningOperation
   const refreshBusy = initialLoading || refreshing
@@ -356,7 +339,9 @@ export default function DevDatabaseMigrationPage() {
       dataIndex: 'status',
       key: 'status',
       width: 126,
-      render: (value) => <StatusTag status={value} />,
+      render: (value, record) => (
+        <StatusTag status={value} issues={record.issues} />
+      ),
     },
     {
       align: 'left',
@@ -367,7 +352,15 @@ export default function DevDatabaseMigrationPage() {
         <Space direction="vertical" size={2}>
           <Text>{value}</Text>
           {record.issues.length > 0 ? (
-            <Text type="danger">{issueText(record.issues)}</Text>
+            <Text
+              type={
+                record.issues.some((issue) => issue.severity === 'blocked')
+                  ? 'danger'
+                  : 'warning'
+              }
+            >
+              {issueText(record.issues)}
+            </Text>
           ) : null}
         </Space>
       ),
@@ -414,10 +407,10 @@ export default function DevDatabaseMigrationPage() {
                   ? ''
                   : !summaryFresh
                     ? '正在核对最新状态；上次结果只供查看'
-                    : tools?.status !== 'ready'
-                      ? '迁移准备环境未就绪，请按下方检查项处理后刷新'
-                      : isLatest
-                        ? '数据库已是最新版本'
+                    : isLatest
+                      ? '没有待执行迁移；如需重新核对，请使用“刷新状态”'
+                      : tools?.status !== 'ready'
+                        ? '迁移准备环境未就绪，请按下方检查项处理后刷新'
                         : hasRunningOperation
                           ? '已有操作正在执行'
                           : '当前目标或 migration 状态未通过检查'
@@ -436,7 +429,11 @@ export default function DevDatabaseMigrationPage() {
                   })
                 }
               >
-                {readyOperation ? '重新检查并准备' : '检查并准备'}
+                {summaryFresh && isLatest
+                  ? '无需迁移'
+                  : readyOperation
+                    ? '重新检查并准备'
+                    : '检查并准备'}
               </Button>
             </Tooltip>
           </Space>
@@ -450,7 +447,7 @@ export default function DevDatabaseMigrationPage() {
         {recoveryActive ? (
           summaryFresh &&
           summary?.status === 'success' &&
-          isLatest &&
+          (isLatest || runtime?.bundleId) &&
           runtime?.available ? (
             <Alert
               type="success"
@@ -491,8 +488,16 @@ export default function DevDatabaseMigrationPage() {
           <Alert
             type="warning"
             showIcon
-            message="当前状态被阻断"
+            message="候选版本检查未通过"
             description={issueText(summary.issues)}
+          />
+        ) : null}
+        {summary ? (
+          <Alert
+            type={summaryFresh ? upgradeState.type : 'info'}
+            showIcon
+            message={upgradeState.label}
+            description={upgradeState.description}
           />
         ) : null}
         <DevStaticGuidance title="固定安全边界" hint="数据库目标与执行限制">
@@ -520,13 +525,33 @@ export default function DevDatabaseMigrationPage() {
               </Text>
             </Space>
           </Card>
-          <Card title="本地后端">
+          <Card title="日常运行">
             <Space direction="vertical" size={8}>
+              <Text strong>
+                {!summaryFresh
+                  ? '状态待刷新核对'
+                  : runtime?.available
+                    ? '本地服务可用'
+                    : '本地服务未恢复'}
+              </Text>
               <Tag color={runtimeState.color}>{runtimeState.label}</Tag>
               <Text type="secondary">
                 health {runtime?.health?.httpCode || '—'} · ready{' '}
                 {runtime?.ready?.httpCode || '—'}
               </Text>
+              {runtime?.activeVersion ? (
+                <Text>运行迁移版本：{runtime.activeVersion}</Text>
+              ) : null}
+              {runtime?.bundleId ? (
+                <Text type="secondary">运行制品：{runtime.bundleId}</Text>
+              ) : null}
+              {summaryFresh &&
+              runtime?.available &&
+              (!recoveryActive || isLatest) ? (
+                <Button type="primary" href="/erp">
+                  进入业务系统
+                </Button>
+              ) : null}
               <Button
                 icon={<SyncOutlined />}
                 disabled={!canRestart}
@@ -539,16 +564,19 @@ export default function DevDatabaseMigrationPage() {
                   })
                 }
               >
-                重启后端
+                恢复已验证后端
               </Button>
             </Space>
           </Card>
           <Card title="执行策略">
             <Space direction="vertical" size={8}>
               <Tag color="blue">一次准备 · 一次执行</Tag>
-              <Text>只绑定 migration / schema 真源与目标身份</Text>
+              <Text>固定后端、页面、迁移及目标数据库身份</Text>
               <Text type="secondary">
-                无关文档或页面变化不会让已准备计划反复重建。
+                准备期间保留日常版本；候选代码变化后必须重新验证。
+              </Text>
+              <Text type="secondary">
+                开发前端加载当前源码；后端代码修改后运行 make dev_restart。
               </Text>
             </Space>
           </Card>
@@ -586,41 +614,82 @@ export default function DevDatabaseMigrationPage() {
         <Card
           title="本次升级路径"
           extra={
-            activeOperation ? (
-              <StatusTag status={activeOperation.status} />
-            ) : null
+            pathOperation ? (
+              <Space size={8} wrap>
+                <Text type="secondary">
+                  {activeOperation?.kind === 'migration'
+                    ? '当前升级'
+                    : '最近一次升级'}
+                  {pathOperation.target?.latestVersion
+                    ? ` · 目标 ${pathOperation.target.latestVersion}`
+                    : ''}
+                </Text>
+                <StatusTag
+                  status={pathOperation.status}
+                  issues={pathOperation.issues}
+                />
+              </Space>
+            ) : (
+              <Text type="secondary">流程示意</Text>
+            )
           }
         >
-          <Steps
-            responsive
-            items={[
-              {
-                title: '检查目标',
-                description: '固定 shared-dev 与 migration 状态',
-                status: operationStepStatus(activeOperation, 0),
-              },
-              {
-                title: '不可变计划',
-                description: 'dry-run 与事务回滚预演',
-                status: operationStepStatus(activeOperation, 1),
-              },
-              {
-                title: '备份恢复',
-                description: '真实 dump、隔离恢复与升级验证',
-                status: operationStepStatus(activeOperation, 2),
-              },
-              {
-                title: '明确确认',
-                description: '只消费当前计划一次',
-                status: operationStepStatus(activeOperation, 3),
-              },
-              {
-                title: '读回重启',
-                description: 'pending=0、health 与 ready',
-                status: operationStepStatus(activeOperation, 4),
-              },
-            ]}
-          />
+          <div className="erp-dev-database-migration-flow">
+            <Steps
+              responsive
+              size="small"
+              labelPlacement="vertical"
+              items={[
+                {
+                  title: '固定候选版本',
+                  description: '核对目标，固定代码、配置与迁移计划',
+                  status: pathStatuses[0],
+                },
+                {
+                  title: '恢复演练',
+                  description: '临时库升级、附件恢复与候选业务验证',
+                  status: pathStatuses[1],
+                },
+                {
+                  title: '停写与恢复点',
+                  description: '确认后暂停写入，验证最新成套备份',
+                  status: pathStatuses[2],
+                },
+                {
+                  title: '原库迁移事务',
+                  description:
+                    pathOperation?.target?.pendingFiles === 0
+                      ? '本次无待执行迁移，跳过此步'
+                      : 'BEGIN → 迁移 SQL → COMMIT',
+                  status: pathStatuses[3],
+                },
+                {
+                  title: '业务验证',
+                  description: '读回原库，验证新后端、登录与业务',
+                  status: pathStatuses[4],
+                },
+                {
+                  title: '切换日常版本',
+                  description: '验证通过后更新固定运行版本',
+                  status: pathStatuses[5],
+                },
+              ]}
+            />
+            <Text type="secondary">
+              仅点亮已有完成证据的节点，具体进展见操作记录。数据库事务只覆盖原库迁移，不包含恢复演练、业务验证和版本切换。
+            </Text>
+            {pathOperation ? (
+              <Text>{databaseMigrationExecutionText(pathOperation)}</Text>
+            ) : null}
+            {pathOperation?.backup ? (
+              <Text type="secondary">
+                演练范围（{pathOperation.backup.migrationBefore} →{' '}
+                {pathOperation.backup.migrationAfter}）：
+                {databaseMigrationDataScopeText(pathOperation.backup)}
+              </Text>
+            ) : null}
+            <DevDatabaseMigrationFlow />
+          </div>
           {readyOperation ? (
             <div className="erp-dev-database-migration-ready">
               <Alert
@@ -651,14 +720,14 @@ export default function DevDatabaseMigrationPage() {
                 showIcon
                 icon={<CheckCircleOutlined />}
                 message="数据库已经是最新版本"
-                description="无需再次 plan、备份或 apply；如果本地后端未运行，只使用上方“重启后端”。"
+                description="前端使用当前源码并支持热更新；后端代码变化后执行 make dev_restart，先编译验证再替换运行进程。"
               />
             </div>
           ) : null}
         </Card>
 
         <Card
-          title="Operation 记录"
+          title="历史操作记录"
           extra={<HistoryOutlined aria-hidden="true" />}
         >
           <Table
@@ -727,7 +796,7 @@ export default function DevDatabaseMigrationPage() {
             type="warning"
             showIcon
             message="该动作会写入共享开发数据库并重启本地后端"
-            description="执行前会再次核对 migration / schema 指纹、目标身份与 pending revisions；不一致时直接阻断。若提交结果未知，不会自动重试。"
+            description="确认后会短暂停止业务写入，验证最新备份，再执行当前计划并切换到已验证的固定版本。此确认不包含清空业务数据；结果未知时保留现场，不自动重试。"
           />
           <Descriptions
             size="small"
@@ -783,7 +852,10 @@ export default function DevDatabaseMigrationPage() {
         {operationDetail ? (
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
             <Space wrap>
-              <StatusTag status={operationDetail.status} />
+              <StatusTag
+                status={operationDetail.status}
+                issues={operationDetail.issues}
+              />
               <Text code copyable>
                 {operationDetail.id}
               </Text>
@@ -801,6 +873,9 @@ export default function DevDatabaseMigrationPage() {
               />
             </Space>
             <Paragraph>{operationDetail.message}</Paragraph>
+            <Paragraph>
+              {databaseMigrationExecutionText(operationDetail)}
+            </Paragraph>
             {operationDetail.issues.length > 0 ? (
               <Alert
                 type="error"
@@ -868,6 +943,13 @@ export default function DevDatabaseMigrationPage() {
                     children: operationDetail.backup.restoreVerified
                       ? `${operationDetail.backup.migrationBefore} → ${operationDetail.backup.migrationAfter}`
                       : '未证明',
+                  },
+                  {
+                    key: 'data-scope',
+                    label: '演练数据范围',
+                    children: databaseMigrationDataScopeText(
+                      operationDetail.backup
+                    ),
                   },
                   {
                     key: 'verified-at',

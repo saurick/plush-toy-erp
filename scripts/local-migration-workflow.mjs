@@ -91,6 +91,12 @@ function operationIssueCode(operation) {
 }
 
 function nextActionForIssue(code, fallback = "review_error_and_retry") {
+  if (code === "unit_normalization_blocked") {
+    return "resolve_unit_data_conflicts";
+  }
+  if (code === "migration_data_audit_failed") {
+    return "resolve_preflight_blockers";
+  }
   if (code === "database_clients_active") {
     return "close_database_clients_and_retry";
   }

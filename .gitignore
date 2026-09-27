@@ -12,6 +12,7 @@
 web/.npmrc.local
 web/.yarnrc.local.yml
 config/dev-ports.local.env
+server/configs/dev/database-roles.local.json
 
 web/node_modules/
 web/build/

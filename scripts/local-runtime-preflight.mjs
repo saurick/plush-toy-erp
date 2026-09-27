@@ -4,6 +4,16 @@ import path from "node:path";
 import process from "node:process";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+  readActiveRuntimeBundle,
+  verifyBundleDatabase,
+  verifyLocalRuntimeIdentity,
+} from "./local-runtime-bundle.mjs";
+import {
+  configuredDatabaseURL,
+  readLocalDatabaseRoles,
+  verifyAuditRole,
+} from "./local-database-roles.mjs";
 
 import {
   defaultAPIOrigin,
@@ -95,12 +105,41 @@ async function runCommand(
 }
 
 export async function checkLocalDatabaseMigrations(runtime = {}) {
+  try {
+    const active = runtime.useFixedRuntime
+      ? await (runtime.readActiveBundle || readActiveRuntimeBundle)(repoRoot)
+      : null;
+    if (active) {
+      if (runtime.verifyActiveBundle) await runtime.verifyActiveBundle(active);
+      else {
+        const configured = await configuredDatabaseURL(repoRoot);
+        const roles = readLocalDatabaseRoles(repoRoot, configured);
+        await verifyAuditRole(roles.audit);
+        await verifyBundleDatabase(repoRoot, active, roles.audit);
+      }
+      writeLine(
+        runtime,
+        `[local-preflight] 固定运行版本 ${active.id} 与数据库 ${active.migrationVersion} 已核对；候选工作区单独验证`,
+      );
+      return {
+        ok: true,
+        currentVersion: active.migrationVersion,
+        pendingFiles: 0,
+        bundleId: active.id,
+      };
+    }
+  } catch {
+    throw new LocalRuntimePreflightError(
+      "database_status_unavailable",
+      "固定运行版本与数据库未能通过核对；业务启动已停止，可在恢复页检查状态",
+    );
+  }
   await runCommand(
     "bash",
     [path.join(repoRoot, "scripts/qa/db-guard.sh")],
     {
       cwd: repoRoot,
-      env: { ...process.env, SKIP_DB_GUARD: "" },
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", SKIP_DB_GUARD: "" },
       maxBuffer: 4 * 1024 * 1024,
     },
     runtime,
@@ -114,7 +153,7 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     ["run", "./cmd/dburl", "-conf", "./configs/dev/config.yaml"],
     {
       cwd: serverRoot,
-      env: process.env,
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
       maxBuffer: 1024 * 1024,
     },
     runtime,
@@ -143,7 +182,7 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     ],
     {
       cwd: serverRoot,
-      env: process.env,
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
       maxBuffer: 4 * 1024 * 1024,
     },
     runtime,
@@ -252,6 +291,18 @@ export async function checkBackendReadiness(apiOrigin, runtime = {}) {
     const url = new URL(`/${endpoint}`, `${normalizedOrigin}/`).toString();
     await fetchEndpoint(url, expectedBody, runtime);
     writeLine(runtime, `[local-preflight] 后端 ${endpoint} 通过：${url}`);
+  }
+  if (isLoopbackAPIOrigin(normalizedOrigin)) {
+    const active = await (runtime.readActiveBundle || readActiveRuntimeBundle)(
+      repoRoot,
+    );
+    if (active)
+      await verifyLocalRuntimeIdentity(
+        active,
+        normalizedOrigin,
+        "plush_erp",
+        runtime.fetch || fetch,
+      );
   }
   return { apiOrigin: normalizedOrigin, ready: true };
 }

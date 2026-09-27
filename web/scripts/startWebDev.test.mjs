@@ -21,8 +21,19 @@ test('start web dev: 默认启用共享 runtime preflight', () => {
     frontendOnly: false,
     isolated: false,
     restart: false,
+    stop: false,
     viteArgs: [],
   })
+})
+
+test('start web dev: pnpm lifecycle stop is explicit, local and never forwarded to Vite', () => {
+  const options = parseStartWebDevArgs(['--local', '--stop'], {
+    CODEX_THREAD_ID: 'fixture',
+  })
+  assert.equal(options.stop, true)
+  assert.equal(options.isolated, false)
+  assert.equal(options.restart, false)
+  assert.deepEqual(options.viteArgs, [])
 })
 
 test('start web dev: frontend-only 必须显式启用且保留 Vite 参数', () => {
@@ -35,6 +46,7 @@ test('start web dev: frontend-only 必须显式启用且保留 Vite 参数', () 
       frontendOnly: true,
       isolated: false,
       restart: false,
+      stop: false,
       viteArgs: ['--host', '127.0.0.1'],
     }
   )

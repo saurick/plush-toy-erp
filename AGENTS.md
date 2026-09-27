@@ -132,7 +132,9 @@
 - 发布前确认 commit/image、migration、config、rollback；线上 Atlas 使用项目文档指定的宿主机工具和串行锁。
 - 镜像清理先保留当前及项目要求的回滚版本，再按 `$plush-operations-governance` 和发布文档执行。
 - 修改 `server/internal/data/model/schema/**` 后，本轮收口前必须在 `server/` 执行 `make data`，审查并纳入由此产生的 Ent 生成物、新 Atlas migration 与 `atlas.sum`，再运行 `bash scripts/qa/db-guard.sh`；结构变更缺 migration 或生成零漂移证据时只能报告 `incomplete`。Git hook 只做 check-only，不自动生成或改写 migration。
+- 数据库改动（含精度、枚举 / 状态约束与数据转换）收口前，在登记开发库运行 `make migrate_check` 与 `make migrate_audit`，并检查 seed / fixture 是否仍会生成违规数据。涉及存量转换须用现库备份在隔离库验证升级，覆盖已过账事实、冻结快照和历史缺值；空库通过不能代替现库升级。审计失败或缺少证据时报告 `incomplete`，由修改会话处理或明确交接，不能留到用户重启才发现；真实 apply 仍按下条授权与流程执行。
 - 登记共享开发库使用迁移页或 `make migrate`；非交互环境先 `make migrate_prepare`，再按同一次 ready 输出执行 `make migrate_execute`；`migrate_status` 只读，低层入口边界见 `scripts/README.md`。隔离库走对应 lifecycle，测试、生产或归属不明数据库走正式目标流程；未 apply 必须明确报告。
+- 本地开发入口运行当前工作区：前端使用 Vite 源码与热更新，后端重启先核对工作区迁移、编译最新代码，再验证并切换。预检或编译失败保留原进程，但不得报告最新代码已启动；固定制品不得覆盖开发页面。数据库及数量规则变更仍须经现有迁移准备链路验证实际存量升级、附件恢复和候选业务，明确确认后才 apply；启动不得自动迁移。入口与证据边界见 `server/README.md` 和工作台设计文档。
 - 本地启动与迁移修复必须实测 `pnpm start`、故障下迁移页可达和恢复后业务入口。数据库预检失败或超时只阻断业务，须保留恢复页；不得以跳过检查、自动 apply 或自动重试换取启动成功。相关回归由启动与迁移同名测试守住。
 
 ## 前端、原型与错误

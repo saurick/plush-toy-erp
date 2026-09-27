@@ -3,13 +3,168 @@ import test from 'node:test'
 
 import {
   createDevDatabaseMigrationClient,
+  databaseMigrationPathStatuses,
+  databaseMigrationDataScopeText,
+  databaseMigrationExecutionText,
+  databaseMigrationPreparationAvailable,
+  databaseMigrationUpgradePresentation,
   databaseMigrationStatusPresentation,
   selectActiveDatabaseMigrationOperation,
+  selectDatabaseMigrationPathOperation,
   validateDatabaseMigrationOperation,
   validateDatabaseMigrationSummary,
 } from './devDatabaseMigration.mjs'
 
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
+
+test('preparation is available only for known pending migrations and a ready idle target', () => {
+  const value = summary()
+  assert.equal(databaseMigrationPreparationAvailable(value), true)
+  for (const pendingFiles of [0, undefined, null, -1]) {
+    value.target.pendingFiles = pendingFiles
+    assert.equal(databaseMigrationPreparationAvailable(value), false)
+  }
+  value.target.pendingFiles = 1
+  value.operations = [operation('preparing')]
+  assert.equal(databaseMigrationPreparationAvailable(value), false)
+  value.operations = [operation('blocked')]
+  assert.equal(databaseMigrationPreparationAvailable(value), true)
+  value.status = 'blocked'
+  assert.equal(databaseMigrationPreparationAvailable(value), false)
+  value.status = 'success'
+  value.tools.status = 'blocked'
+  assert.equal(databaseMigrationPreparationAvailable(value), false)
+})
+
+test('a rejected preparation leaves the completed upgrade path visible without hiding unknown execution outcomes', () => {
+  const value = summary()
+  const completed = {
+    ...operation('passed'),
+    readback: {
+      migrationVerified: true,
+      currentVersion: value.target.latestVersion,
+      pendingFiles: 0,
+    },
+    events: [{ status: 'applying' }, { status: 'passed' }],
+  }
+  const rejected = { ...operation('blocked'), target: null }
+  value.operations = [rejected, completed]
+  value.target = {
+    ...value.target,
+    currentVersion: value.target.latestVersion,
+    pendingFiles: 0,
+  }
+  assert.equal(selectDatabaseMigrationPathOperation(value), completed)
+  rejected.status = 'not_proven'
+  assert.equal(selectDatabaseMigrationPathOperation(value), rejected)
+  rejected.status = 'blocked'
+  rejected.events = [{ status: 'applying' }]
+  assert.equal(selectDatabaseMigrationPathOperation(value), rejected)
+  const unknown = { ...rejected, status: 'not_proven' }
+  rejected.events = [{ status: 'blocked' }]
+  value.operations = [rejected, unknown, completed]
+  assert.equal(selectDatabaseMigrationPathOperation(value), unknown)
+  value.target.pendingFiles = 1
+  assert.equal(selectDatabaseMigrationPathOperation(value), rejected)
+  value.target.latestVersion = '20260928120000'
+  value.operations = [completed]
+  assert.equal(selectDatabaseMigrationPathOperation(value), null)
+})
+
+test('busy requests are shown as not started while real blockers retain the blocked label', () => {
+  assert.deepEqual(
+    databaseMigrationStatusPresentation('blocked', [
+      { code: 'database_migration_busy' },
+    ]),
+    { color: 'warning', label: '未开始' }
+  )
+  assert.equal(databaseMigrationStatusPresentation('blocked').label, '已阻断')
+})
+
+test('candidate data conflicts survive later infrastructure failures until a newer audit passes', () => {
+  const value = summary()
+  const conflict = {
+    ...operation('blocked'),
+    plan: null,
+    backup: null,
+    issues: [{ code: 'unit_normalization_blocked', message: '数量与单位冲突' }],
+  }
+  const laterFailure = {
+    ...operation('blocked'),
+    plan: null,
+    backup: null,
+    issues: [
+      { code: 'migration_workspace_check_failed', message: '代码检查失败' },
+    ],
+  }
+  value.operations = [laterFailure, conflict]
+  let state = databaseMigrationUpgradePresentation(value)
+  assert.match(state.description, /数量与单位冲突/u)
+  assert.match(state.description, /代码检查失败/u)
+  assert.match(state.description, /尚未执行原库迁移/u)
+  laterFailure.readback = { dataAuditPassed: true }
+  state = databaseMigrationUpgradePresentation(value)
+  assert.doesNotMatch(state.description, /数量与单位冲突/u)
+})
+
+test('live upgraded database and runtime recovery are independent of historical blockers', () => {
+  const value = summary()
+  value.operations = [
+    {
+      ...operation('blocked'),
+      issues: [{ code: 'unit_normalization_blocked', message: '旧冲突' }],
+    },
+  ]
+  value.target = {
+    ...value.target,
+    currentVersion: value.target.latestVersion,
+    pendingFiles: 0,
+  }
+  value.runtime.available = false
+  let state = databaseMigrationUpgradePresentation(value)
+  assert.match(state.label, /迁移已完成，服务尚未恢复/u)
+  assert.match(state.description, /无需重复迁移/u)
+  assert.doesNotMatch(state.description, /旧冲突/u)
+  value.runtime.available = true
+  state = databaseMigrationUpgradePresentation(value)
+  assert.equal(state.type, 'success')
+  assert.match(state.label, /原库已是最新版本/u)
+})
+
+test('rehearsal evidence distinguishes empty business data, retained records and unrecorded historical scope', () => {
+  assert.match(
+    databaseMigrationDataScopeText({
+      restoreVerified: true,
+      businessRowsBeforeUpgrade: 0,
+    }),
+    /清理后重建.*不证明清理前/u
+  )
+  assert.match(
+    databaseMigrationDataScopeText({
+      restoreVerified: true,
+      businessRowsBeforeUpgrade: 25,
+    }),
+    /保留.*25 条/u
+  )
+  assert.match(
+    databaseMigrationDataScopeText({ restoreVerified: true }),
+    /未记录/u
+  )
+  assert.match(
+    databaseMigrationExecutionText({ status: 'not_proven' }),
+    /结果未知.*不要重复执行/u
+  )
+  assert.match(
+    databaseMigrationExecutionText({
+      readback: {
+        migrationVerified: true,
+        currentVersion: 'v2',
+        pendingFiles: 0,
+      },
+    }),
+    /原库已核对至 v2/u
+  )
+})
 
 function operation(status = 'ready') {
   return {
@@ -111,6 +266,133 @@ function summary() {
     },
   }
 }
+
+function rehearsedOperation(status = 'ready') {
+  const result = operation(status)
+  result.backup.bundleId = OPERATION_ID
+  result.backup.candidate = {
+    bundleId: OPERATION_ID,
+    populatedRestore: true,
+    attachmentsRestored: true,
+    health: true,
+    ready: true,
+    login: true,
+    customerConfig: true,
+    business: true,
+  }
+  return result
+}
+
+function migratedOperation(status = 'restarting') {
+  const result = rehearsedOperation(status)
+  result.events.unshift({
+    at: '2026-07-29T08:00:55.000Z',
+    status: 'applying',
+    message: '正在执行已确认的迁移',
+  })
+  result.readback = {
+    migrationVerified: true,
+    currentVersion: result.target.latestVersion,
+    pendingFiles: 0,
+    runtime: null,
+  }
+  return result
+}
+
+test('migration path never treats rehearsal or an applying status as original database completion', () => {
+  assert.deepEqual(databaseMigrationPathStatuses(null), Array(6).fill('wait'))
+  assert.deepEqual(
+    databaseMigrationPathStatuses(operation('passed')),
+    Array(6).fill('wait')
+  )
+  for (const status of ['ready', 'applying', 'blocked', 'not_proven']) {
+    assert.deepEqual(
+      databaseMigrationPathStatuses(rehearsedOperation(status)),
+      ['finish', 'finish', 'wait', 'wait', 'wait', 'wait']
+    )
+  }
+  const incomplete = rehearsedOperation()
+  incomplete.backup.candidate.business = false
+  assert.deepEqual(databaseMigrationPathStatuses(incomplete), [
+    'finish',
+    'wait',
+    'wait',
+    'wait',
+    'wait',
+    'wait',
+  ])
+})
+
+test('migration path preserves proven database completion when startup fails', () => {
+  const failed = migratedOperation('failed')
+  assert.deepEqual(databaseMigrationPathStatuses(failed), [
+    'finish',
+    'finish',
+    'finish',
+    'finish',
+    'wait',
+    'wait',
+  ])
+  for (const mismatch of [
+    { migrationVerified: false },
+    { pendingFiles: 1 },
+    { currentVersion: failed.target.currentVersion },
+  ]) {
+    assert.deepEqual(
+      databaseMigrationPathStatuses({
+        ...failed,
+        readback: { ...failed.readback, ...mismatch },
+      }),
+      ['finish', 'finish', 'wait', 'wait', 'wait', 'wait']
+    )
+  }
+})
+
+test('migration path requires the verified candidate runtime before marking the version switched', () => {
+  const completed = migratedOperation('passed')
+  completed.readback.runtime = {
+    available: true,
+    bundleId: completed.backup.bundleId,
+    activeVersion: completed.target.latestVersion,
+  }
+  assert.deepEqual(
+    databaseMigrationPathStatuses(completed),
+    Array(6).fill('finish')
+  )
+  for (const mismatch of [
+    { available: false },
+    { bundleId: '22222222-2222-4222-8222-222222222222' },
+    { activeVersion: completed.target.currentVersion },
+  ]) {
+    assert.deepEqual(
+      databaseMigrationPathStatuses({
+        ...completed,
+        readback: {
+          ...completed.readback,
+          runtime: { ...completed.readback.runtime, ...mismatch },
+        },
+      }),
+      ['finish', 'finish', 'finish', 'finish', 'wait', 'wait']
+    )
+  }
+  assert.deepEqual(
+    databaseMigrationPathStatuses({ ...completed, kind: 'restart' }),
+    Array(6).fill('wait')
+  )
+})
+
+test('migration path does not mark a SQL transaction completed when no migrations were pending', () => {
+  const unchanged = migratedOperation()
+  unchanged.target.pendingFiles = 0
+  assert.deepEqual(databaseMigrationPathStatuses(unchanged), [
+    'finish',
+    'finish',
+    'finish',
+    'wait',
+    'wait',
+    'wait',
+  ])
+})
 
 test('database migration client accepts fixed safe summaries and operations', () => {
   assert.equal(

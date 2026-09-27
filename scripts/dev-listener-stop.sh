@@ -8,16 +8,12 @@ if [[ -z "${project_root}" || "$#" -eq 0 ]]; then
   echo "usage: $0 <project-root> <port>..." >&2
   exit 2
 fi
-if ! command -v lsof >/dev/null 2>&1; then
-  echo "ERROR: lsof is required; refusing unsafe port-based process cleanup" >&2
-  exit 1
-fi
-
 project_root="$(cd "${project_root}" && pwd -P)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 owned_pids=()
 
 listener_cwd() {
-  lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
+  node "${script_dir}/dev-process-inspection.mjs" cwd "$1"
 }
 
 is_owned_cwd() {
@@ -32,6 +28,8 @@ for port in "$@"; do
     echo "ERROR: invalid development port: ${port}" >&2
     exit 2
   fi
+  # Capture first so a failed inspection cannot masquerade as an empty port.
+  listener_pids="$(node "${script_dir}/dev-process-inspection.mjs" listeners "${port}")"
   while IFS= read -r pid; do
     [[ -n "${pid}" ]] || continue
     cwd="$(listener_cwd "${pid}")"
@@ -44,7 +42,7 @@ for port in "$@"; do
     if [[ " ${owned_pids[*]} " != *" ${pid} "* ]]; then
       owned_pids+=("${pid}")
     fi
-  done < <(lsof -tiTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)
+  done <<<"${listener_pids}"
 done
 
 if [[ "${#owned_pids[@]}" -eq 0 ]]; then

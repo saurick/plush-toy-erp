@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import http from 'node:http'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -33,8 +33,69 @@ test('已有前端必须匹配真实工作区、后端、客户、模式和 Vite
     { frontendOnly: true },
     { viteArgs: ['--mode', 'staging'] },
     { customerKey: 'demo' },
-  ])
+  ]) {
     assert.notEqual(webInstanceSignature({ ...options, ...change }), signature)
+  }
+})
+
+test('迁移服务代码变化后不能复用旧进程，文档、页面和测试变化不要求重启', async (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'plush-web-source-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const write = (name, content) => {
+    const file = path.join(root, name)
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, content)
+  }
+  const plugin = 'web/dev-server/devDatabaseMigrationPlugin.mjs'
+  write(plugin, 'export const auditBeforeStop = false')
+  const options = {
+    projectRoot: root,
+    apiOrigin: 'http://127.0.0.1:8300',
+    frontendOnly: false,
+    viteArgs: [],
+  }
+  const loadedSignature = webInstanceSignature(options)
+  write('README.md', '说明')
+  write('web/src/Page.jsx', 'export default () => null')
+  write('web/dev-server/devDatabaseMigrationPlugin.test.mjs', 'test()')
+  assert.equal(webInstanceSignature(options), loadedSignature)
+
+  write(plugin, 'export const auditBeforeStop = true')
+  const currentSignature = webInstanceSignature(options)
+  assert.notEqual(currentSignature, loadedSignature)
+  await assert.rejects(
+    prepareWebInstance(
+      { ...options, port: 5175, signature: currentSignature },
+      {
+        available: async () => false,
+        readInstance: async () => ({
+          pid: 123,
+          signature: loadedSignature,
+          recovery: false,
+        }),
+        stop: () =>
+          assert.fail('code changes do not authorize stopping a process'),
+      }
+    ),
+    /开发服务代码已更新.*pnpm start --local --restart/u
+  )
+  for (const file of [
+    'web/dev-server/nested/newRuntime.mjs',
+    'web/vite.shared.mjs',
+    'scripts/local-migration.mjs',
+    'scripts/local-database-roles.mjs',
+    'scripts/local-runtime-bundle.mjs',
+    'scripts/local-runtime-rehearsal.mjs',
+  ]) {
+    const before = webInstanceSignature(options)
+    write(file, 'export const revision = 1')
+    assert.notEqual(webInstanceSignature(options), before)
+    rmSync(path.join(root, file))
+    // Empty directories do not change the code that a process has loaded.
+    assert.equal(webInstanceSignature(options), before)
+  }
+  rmSync(path.join(root, plugin))
+  assert.notEqual(webInstanceSignature(options), currentSignature)
 })
 
 test('真实占用端口仅复用同配置服务，普通 HTTP/HTML、恢复状态不符均阻断', async (t) => {
@@ -51,7 +112,7 @@ test('真实占用端口仅复用同配置服务，普通 HTTP/HTML、恢复状�
   })
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   t.after(() => server.close())
-  const port = server.address().port
+  const { port } = server.address()
   const options = {
     port,
     projectRoot: os.tmpdir(),

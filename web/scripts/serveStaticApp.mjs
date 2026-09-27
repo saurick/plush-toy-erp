@@ -71,6 +71,7 @@ const shutdownTimeoutMs = resolvePositiveInteger(
   process.env.SHUTDOWN_TIMEOUT_MS,
   10_000
 )
+const attachmentProxyBodyLimitBytes = 140 * 1024 * 1024
 const httpAgent = new http.Agent({
   keepAlive: true,
   maxFreeSockets: 4,
@@ -332,7 +333,7 @@ function shouldProxy(pathname) {
 }
 
 function proxyBodyLimit(pathname) {
-  if (pathname === '/rpc/attachment') return 7 * 1024 * 1024
+  if (pathname === '/rpc/attachment') return attachmentProxyBodyLimitBytes
   if (pathname === '/templates' || pathname.startsWith('/templates/')) {
     return 32 * 1024 * 1024
   }

@@ -12,7 +12,15 @@ import {
 } from './devDatabaseMigrationRecoveryPlugin.mjs'
 import { DEV_DATABASE_MIGRATION_RECOVERY_ROUTE } from '../src/dev-workbench/config/devRuntimeRecovery.mjs'
 
-test('development serve registry is exact and absent from all builds', async () => {
+test('development serve registry is exact with and without a customer, and absent from all builds', async (t) => {
+  const previousCustomerKey = process.env.ERP_DEV_CUSTOMER_KEY
+  t.after(() => {
+    if (previousCustomerKey === undefined) {
+      delete process.env.ERP_DEV_CUSTOMER_KEY
+    } else {
+      process.env.ERP_DEV_CUSTOMER_KEY = previousCustomerKey
+    }
+  })
   assert.deepEqual(DEV_WORKBENCH_SERVE_PLUGIN_NAMES, [
     'plush-dev-web-instance',
     'plush-dev-customer-import-dry-run-api',
@@ -41,40 +49,44 @@ test('development serve registry is exact and absent from all builds', async () 
     []
   )
 
-  const configFactory = createERPViteConfig('desktop')
-  const pluginNames = (config) => config.plugins.map((plugin) => plugin.name)
-  const developmentServe = await configFactory({
-    command: 'serve',
-    mode: 'development',
-  })
-  const developmentBuild = await configFactory({
-    command: 'build',
-    mode: 'development',
-  })
-  const productionBuild = await configFactory({
-    command: 'build',
-    mode: 'production',
-  })
-  const installedServePlugins = pluginNames(developmentServe).filter((name) =>
-    DEV_WORKBENCH_SERVE_PLUGIN_NAMES.includes(name)
-  )
-  assert.deepEqual(installedServePlugins, [
-    'plush-dev-web-instance',
-    'plush-dev-customer-import-dry-run-api',
-    'plush-dev-database-migration',
-    'plush-dev-data-preparation',
-    'plush-dev-qa-testing',
-    'plush-dev-quality-gates',
-    'plush-dev-qa-coverage',
-    'plush-dev-delivery-bridge',
-  ])
-  for (const config of [developmentBuild, productionBuild]) {
-    assert.deepEqual(
-      pluginNames(config).filter((name) =>
-        DEV_WORKBENCH_SERVE_PLUGIN_NAMES.includes(name)
-      ),
-      []
+  for (const customerKey of ['', 'test-customer']) {
+    process.env.ERP_DEV_CUSTOMER_KEY = customerKey
+    const configFactory = createERPViteConfig('desktop')
+    const pluginNames = (config) => config.plugins.map((plugin) => plugin.name)
+    const developmentServe = await configFactory({
+      command: 'serve',
+      mode: 'development',
+    })
+    const developmentBuild = await configFactory({
+      command: 'build',
+      mode: 'development',
+    })
+    const productionBuild = await configFactory({
+      command: 'build',
+      mode: 'production',
+    })
+    const installedServePlugins = pluginNames(developmentServe).filter((name) =>
+      DEV_WORKBENCH_SERVE_PLUGIN_NAMES.includes(name)
     )
+    assert.deepEqual(installedServePlugins, [
+      'plush-dev-web-instance',
+      'plush-dev-customer-import-dry-run-api',
+      ...(customerKey ? ['plush-dev-customer-config'] : []),
+      'plush-dev-database-migration',
+      'plush-dev-data-preparation',
+      'plush-dev-qa-testing',
+      'plush-dev-quality-gates',
+      'plush-dev-qa-coverage',
+      'plush-dev-delivery-bridge',
+    ])
+    for (const config of [developmentBuild, productionBuild]) {
+      assert.deepEqual(
+        pluginNames(config).filter((name) =>
+          DEV_WORKBENCH_SERVE_PLUGIN_NAMES.includes(name)
+        ),
+        []
+      )
+    }
   }
 })
 

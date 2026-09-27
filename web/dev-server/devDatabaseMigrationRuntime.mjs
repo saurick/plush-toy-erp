@@ -2,7 +2,6 @@ import { execFile as execFileCallback, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   closeSync,
-  createReadStream,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -12,6 +11,25 @@ import {
 } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { migrationAuditPaths } from '../../scripts/local-migration.mjs'
+import {
+  buildRuntimeBundle,
+  readRuntimeSource,
+  readRuntimeBundle,
+  assertRuntimeEnvironment,
+  readActiveRuntimeBundle,
+  activateRuntimeBundle,
+  verifyBundleDatabase,
+  verifyRuntimeBackup,
+  verifyLocalRuntimeIdentity,
+} from '../../scripts/local-runtime-bundle.mjs'
+import {
+  configuredDatabaseURL,
+  readLocalDatabaseRoles,
+  verifyAuditRole,
+  setLocalDatabaseMaintenance,
+} from '../../scripts/local-database-roles.mjs'
+import { verifyRuntimeBusiness } from '../../scripts/local-runtime-rehearsal.mjs'
 import {
   LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
   runWebRuntimePreflight,
@@ -21,7 +39,7 @@ const execFileAsync = promisify(execFileCallback)
 const HASH_PATTERN = /^[0-9a-f]{64}$/u
 const COMMAND_TIMEOUT_MS = 15 * 60 * 1000
 const RUNTIME_WAIT_TIMEOUT_MS = 90 * 1000
-export const SHARED_DEV_BACKUP_SOURCE_POLICY = 'shared-dev-session-read-only'
+export const SHARED_DEV_BACKUP_SOURCE_POLICY = 'shared-dev-dedicated-backup'
 export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'scripts/local-migration.mjs',
   'scripts/local-migration-workflow.mjs',
@@ -173,7 +191,7 @@ export async function executeCommand(
   args,
   {
     cwd,
-    env,
+    env = { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
     timeout = COMMAND_TIMEOUT_MS,
     maxBuffer = 16 * 1024 * 1024,
     onStdout,
@@ -403,12 +421,16 @@ export async function readMigrationSourceIdentity(projectRoot) {
   const root = path.resolve(projectRoot)
   const files = [
     ...DEV_DATABASE_MIGRATION_SOURCE_FILES,
+    ...migrationAuditPaths(
+      path.join(root, 'server/internal/data/model/migrate')
+    ),
     ...walkRegularFiles(root, 'server/internal/data/model/migrate'),
     ...walkRegularFiles(root, 'server/internal/data/model/schema').filter(
       (file) => file.endsWith('.go')
     ),
   ].sort()
   const hash = createHash('sha256')
+  hash.update((await readRuntimeSource(root)).fingerprint)
   for (const relativePath of files) {
     const absolutePath = path.join(root, relativePath)
     if (!existsSync(absolutePath)) {
@@ -454,6 +476,9 @@ function validateBackupReport(report, expected) {
     summary?.customerConfigCutoverAuditStatus !== 'passed' ||
     summary?.smokeQueryStatus !== 'passed' ||
     restore?.restoreTestStatus !== 'passed-temp-container' ||
+    (restore.businessRowsBeforeUpgrade !== undefined &&
+      (!Number.isSafeInteger(restore.businessRowsBeforeUpgrade) ||
+        restore.businessRowsBeforeUpgrade < 0)) ||
     String(restore?.migrationBeforeApply || '') !== expected.currentVersion ||
     String(restore?.restoreMigrationVersion || '') !== expected.latestVersion ||
     String(restore?.pendingFiles || '') !== '0'
@@ -467,6 +492,7 @@ function validateBackupReport(report, expected) {
     restoreVerified: true,
     migrationBefore: restore.migrationBeforeApply,
     migrationAfter: restore.restoreMigrationVersion,
+    businessRowsBeforeUpgrade: restore.businessRowsBeforeUpgrade,
     verifiedAt: new Date(report.verifiedAt).toISOString(),
   }
 }
@@ -604,6 +630,13 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
         timeout: 90_000,
       })
     },
+    async audit() {
+      await executeCommand(
+        process.execPath,
+        [path.join(root, 'scripts/local-migration.mjs'), 'audit'],
+        { cwd: root, timeout: 120_000 }
+      )
+    },
     async plan(targetConfirmation) {
       const result = await executeCommand('make', ['migrate_plan'], {
         cwd: serverRoot,
@@ -615,23 +648,45 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
       return parseMigrationPlanOutput(result.stdout)
     },
     async backup(operationId, expectedTarget, onProgress = () => {}) {
-      const dsnResult = await executeCommand(
-        'go',
-        ['run', './cmd/dburl', '-conf', './configs/dev/config.yaml'],
-        {
-          cwd: serverRoot,
-          timeout: 120_000,
-          maxBuffer: 1024 * 1024,
-        }
+      const configured = await configuredDatabaseURL(root)
+      const roles = readLocalDatabaseRoles(root, configured)
+      await verifyAuditRole(roles.audit)
+      const sourceDsn = roles.audit
+      let bundle
+      const manifest = path.join(
+        root,
+        'output/dev-workbench/runtime-bundles',
+        operationId,
+        'manifest.json'
       )
-      const sourceDsn = dsnResult.stdout.trim()
+      if (existsSync(manifest)) bundle = readRuntimeBundle(root, operationId)
+      else {
+        bundle = await buildRuntimeBundle(
+          root,
+          operationId,
+          executeCommand,
+          onProgress
+        )
+      }
       if (!/^postgres(?:ql)?:\/\//u.test(sourceDsn)) {
         throw new Error('shared development database URL is unavailable')
       }
+      assertRuntimeEnvironment(
+        JSON.parse(
+          readFileSync(
+            path.join(bundle.directory, 'runtime/environment.json'),
+            'utf8'
+          )
+        )
+      )
       onProgress('正在备份共享开发库，源库连接只读')
       const result = await executeCommand(
         'bash',
-        buildSharedDevBackupRehearsalArgs(operationId),
+        [
+          ...buildSharedDevBackupRehearsalArgs(operationId),
+          '--runtime-bundle',
+          bundle.id,
+        ],
         {
           cwd: root,
           env: { ...process.env, SOURCE_POSTGRES_DSN: sourceDsn },
@@ -639,47 +694,31 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
         }
       )
       const reportPath = parseBackupReportPath(result.stdout, root)
-      return validateBackupReport(
+      const backup = validateBackupReport(
         JSON.parse(readFileSync(reportPath, 'utf8')),
         expectedTarget
       )
+      const proof = JSON.parse(
+        readFileSync(
+          path.join(path.dirname(reportPath), 'candidate-runtime-proof.json'),
+          'utf8'
+        )
+      )
+      if (
+        proof.artifactHash !== bundle.artifactHash ||
+        proof.migrationVersion !== expectedTarget.latestVersion ||
+        proof.populatedRestore !== true ||
+        proof.attachmentsRestored !== true ||
+        proof.health !== true ||
+        proof.ready !== true ||
+        proof.business !== true
+      ) {
+        throw new Error('候选版本未通过带数据升级和业务验证')
+      }
+      return { ...backup, bundleId: bundle.id, candidate: proof }
     },
     async verifyBackup(backup) {
-      if (
-        !backup ||
-        !/^br-yoyoosun-[A-Za-z0-9+_-]+$/u.test(String(backup.id || '')) ||
-        !Number.isSafeInteger(backup.sizeBytes) ||
-        backup.sizeBytes < 1 ||
-        !HASH_PATTERN.test(String(backup.sha256 || '')) ||
-        backup.restoreVerified !== true
-      ) {
-        return false
-      }
-      const backupFile = path.join(
-        root,
-        'output',
-        'dev-workbench',
-        'database-migration-backups',
-        backup.id,
-        'database.dump'
-      )
-      if (!existsSync(backupFile)) return false
-      const stats = lstatSync(backupFile)
-      if (
-        !stats.isFile() ||
-        stats.isSymbolicLink() ||
-        stats.size !== backup.sizeBytes
-      ) {
-        return false
-      }
-      const hash = createHash('sha256')
-      await new Promise((resolve, reject) => {
-        createReadStream(backupFile)
-          .on('data', (chunk) => hash.update(chunk))
-          .once('error', reject)
-          .once('end', resolve)
-      })
-      return hash.digest('hex') === backup.sha256
+      return verifyRuntimeBackup(root, backup)
     },
     async apply(internal) {
       const result = await executeCommand('make', ['migrate_apply'], {
@@ -687,6 +726,7 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
         env: {
           ...process.env,
           MIGRATE_CONFIRM: internal.applyConfirmation,
+          LOCAL_MIGRATION_OPERATION_ID: internal.operationId,
           MIGRATE_MAINTENANCE_CONFIRM: internal.maintenanceConfirmation,
         },
       })
@@ -697,7 +737,24 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
       }
     },
     async runtime() {
-      return readRuntime(apiOrigin)
+      const runtime = await readRuntime(apiOrigin)
+      const active = readActiveRuntimeBundle(root)
+      if (active && runtime.available) {
+        await verifyLocalRuntimeIdentity(active, apiOrigin)
+      }
+      return {
+        ...runtime,
+        activeVersion: active?.migrationVersion || '',
+        bundleId: active?.id || '',
+      }
+    },
+    async maintenance(enabled) {
+      await setLocalDatabaseMaintenance(root, enabled)
+    },
+    async restorePrevious(operationId) {
+      const active = readActiveRuntimeBundle(root)
+      if (!active) return null
+      return this.restart(operationId, active.id)
     },
     async verifyReadiness() {
       await runWebRuntimePreflight(
@@ -708,12 +765,25 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
         }
       )
     },
-    async restart(operationId) {
+    async restart(operationId, bundleId) {
+      const selected = bundleId || readActiveRuntimeBundle(root)?.id
+      if (!selected) {
+        throw new Error('没有验证通过的固定运行版本；请先检查并准备')
+      }
+      const bundle = readRuntimeBundle(root, selected)
+      const environmentFile = path.join(
+        bundle.directory,
+        'runtime/environment.json'
+      )
+      const fixedEnvironment = existsSync(environmentFile)
+        ? JSON.parse(readFileSync(environmentFile, 'utf8'))
+        : {}
+      assertRuntimeEnvironment(fixedEnvironment)
+      const configured = await configuredDatabaseURL(root)
+      const roles = readLocalDatabaseRoles(root, configured)
       // Stop the previous process before health checks can accept its response.
-      await executeCommand('make', ['dev_preflight'], {
-        cwd: serverRoot,
-        timeout: 30_000,
-      })
+      await verifyBundleDatabase(root, bundle, roles.audit)
+      await setLocalDatabaseMaintenance(root, false)
       await executeCommand('make', ['dev_stop'], {
         cwd: serverRoot,
         timeout: 30_000,
@@ -722,9 +792,19 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
       const descriptor = openSync(logFile, 'a', 0o600)
       let child
       try {
-        child = spawn('make', ['dev'], {
-          cwd: serverRoot,
-          env: process.env,
+        child = spawn(path.join(bundle.directory, 'runtime/server'), [], {
+          cwd: path.join(bundle.directory, 'source/server'),
+          env: {
+            ...process.env,
+            ...fixedEnvironment,
+            PLUSH_GITLAB_READ_TOKEN: '',
+            PLUSH_GITLAB_TOKEN: '',
+            GIT_OPTIONAL_LOCKS: '0',
+            GIT_SHA: `local-${bundle.id}`,
+            POSTGRES_DSN: roles.app,
+            ERP_CUSTOMER_KEY: fixedEnvironment.ERP_CUSTOMER_KEY || 'yoyoosun',
+            ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG: '1',
+          },
           detached: true,
           stdio: ['ignore', descriptor, descriptor],
         })
@@ -733,7 +813,29 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
       }
       child.unref()
       try {
-        return await waitForRuntime(apiOrigin, child, RUNTIME_WAIT_TIMEOUT_MS)
+        const runtime = await waitForRuntime(
+          apiOrigin,
+          child,
+          RUNTIME_WAIT_TIMEOUT_MS
+        )
+        await verifyLocalRuntimeIdentity(bundle, apiOrigin)
+        await verifyRuntimeBusiness(apiOrigin, {
+          username: fixedEnvironment.APP_ADMIN_USERNAME,
+          password: fixedEnvironment.APP_ADMIN_PASSWORD,
+          customerKey: fixedEnvironment.ERP_CUSTOMER_KEY || 'yoyoosun',
+        })
+        activateRuntimeBundle(root, bundle.id, {
+          artifactHash: bundle.artifactHash,
+          migrationVersion: bundle.migrationVersion,
+          health: true,
+          ready: true,
+          business: true,
+        })
+        return {
+          ...runtime,
+          bundleId: bundle.id,
+          activeVersion: bundle.migrationVersion,
+        }
       } catch (error) {
         if (child.pid && child.exitCode === null && !child.signalCode) {
           try {

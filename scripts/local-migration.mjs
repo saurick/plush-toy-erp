@@ -11,6 +11,19 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { evaluateMigrationStatus } from "./local-runtime-preflight-core.mjs";
 import { databaseProgrammabilityReceiptSQL } from "./qa/database-programmability.mjs";
+import {
+  readLocalDatabaseRoles,
+  verifyAuditRole,
+} from "./local-database-roles.mjs";
+import {
+  readRuntimeSource,
+  readRuntimeBundle,
+  verifyRuntimeBackup,
+} from "./local-runtime-bundle.mjs";
+import {
+  readDatabaseMigrationOperation,
+  resolveDatabaseMigrationOperationStore,
+} from "./qa/dev-database-migration-operation-store.mjs";
 
 const execFileAsync = promisify(execFileCallback);
 const repoRoot = path.resolve(import.meta.dirname, "..");
@@ -254,6 +267,9 @@ function workflowFingerprint() {
       repoRoot,
       "scripts/qa/operational-fact-lifecycle-20260726173943.sql",
     ),
+    ...migrationAuditPaths(migrationDir).map((file) =>
+      path.join(repoRoot, file),
+    ),
     ...schemaFiles,
   ];
   const hash = crypto.createHash("sha256");
@@ -353,7 +369,6 @@ export function targetConfirmation(target, identity) {
       target.port,
       target.database,
       identity.database,
-      identity.user,
       identity.systemIdentifier,
     ].join("\n"),
     20,
@@ -804,7 +819,9 @@ function writeDatabaseClientSummary(summary) {
 }
 
 async function inspectDatabaseClients(context) {
-  const sessions = await readOtherClientSessions(context.resolved.databaseURL);
+  const sessions = await readOtherClientSessions(
+    context.resolved.inspectionURL || context.resolved.databaseURL,
+  );
   const summary = databaseClientSummary(sessions);
   writeDatabaseClientSummary(summary);
   return summary;
@@ -996,6 +1013,102 @@ async function runLifecycleAudit(databaseURL, status) {
   if (result.stderr) process.stdout.write(result.stderr);
 }
 
+export function migrationAuditPaths(directory, versions = null) {
+  const selected = versions ? new Set(versions) : null;
+  const audits = new Set();
+  for (const file of fs
+    .readdirSync(directory)
+    .filter((file) => file.endsWith(".sql"))
+    .sort()) {
+    if (selected && !selected.has(file.split("_")[0])) continue;
+    const source = fs.readFileSync(path.join(directory, file), "utf8");
+    for (const match of source.matchAll(
+      /^\s*--\s*preflight:\s*(scripts\/qa\/\S+)\s*$/gmu,
+    )) {
+      const audit = match[1];
+      if (
+        !/^scripts\/qa\/[A-Za-z0-9._/-]+\.(?:sql|sh)$/u.test(audit) ||
+        audit.split("/").some((part) => part === "." || part === "..")
+      ) {
+        throw new MigrationCommandError(
+          "迁移预检必须引用 scripts/qa 下的现有 SQL 或已接入脚本",
+        );
+      }
+      audits.add(audit);
+    }
+  }
+  return [...audits].sort();
+}
+
+export async function runPendingMigrationAudits(
+  databaseURL,
+  status,
+  execute = runCommandWithInput,
+  { directory = migrationDir, root = repoRoot } = {},
+) {
+  const paths = migrationAuditPaths(
+    directory,
+    statusVersions(status).pendingVersions,
+  );
+  for (const audit of paths) {
+    // The two populated-upgrade modes already run in runExistingUpgradeAudits.
+    if (audit === "scripts/qa/populated-upgrade-preflight.sh") continue;
+    if (!audit.endsWith(".sql")) {
+      throw new MigrationCommandError(
+        `迁移预检 ${audit} 尚未接入只读执行；请提供 SQL 审计后重新检查`,
+      );
+    }
+    const sql = fs.readFileSync(path.join(root, audit), "utf8");
+    try {
+      await execute(
+        "psql",
+        [
+          "-X",
+          "--no-psqlrc",
+          "--set",
+          "ON_ERROR_STOP=1",
+          "--dbname",
+          databaseURL,
+        ],
+        sql,
+        {
+          cwd: path.join(root, "server"),
+          env: {
+            ...process.env,
+            PGOPTIONS: `${process.env.PGOPTIONS || ""} -c default_transaction_read_only=on -c statement_timeout=30000`,
+          },
+          failureMessage: `存量只读预检 ${audit} 失败；未执行 migration`,
+        },
+      );
+    } catch (error) {
+      if (!/unit normalization blocked:/u.test(String(error?.message || ""))) {
+        throw error;
+      }
+      // Keep a bounded diagnosis instead of burying the cause under every row ID.
+      const counts = new Map();
+      for (const match of error.message.matchAll(
+        /\b([a-z_]+\.[a-z_]+)#\d+\b/gu,
+      )) {
+        counts.set(match[1], (counts.get(match[1]) || 0) + 1);
+      }
+      const details = [...counts]
+        .map(([field, count]) => `${field}=${count}`)
+        .join(" ");
+      throw new MigrationCommandError(
+        `unit normalization blocked: ${details || "存量单位、数量或引用不符合归并规则"}`,
+        {
+          phase: "preflight",
+          result: "blocked",
+          writes: "0",
+          apply: "not_started",
+          errorCode: "unit_normalization_blocked",
+          nextAction: "resolve_unit_data_conflicts",
+        },
+      );
+    }
+  }
+}
+
 function pendingSQL(snapshot, pendingVersions) {
   const files = fs
     .readdirSync(snapshot.snapshotDir)
@@ -1096,6 +1209,13 @@ async function prepare(command, receipt) {
     resolved.databaseURL,
     resolved.source,
   );
+  if (target.scope === "shared-dev") {
+    const roles = readLocalDatabaseRoles(repoRoot, resolved.databaseURL);
+    await verifyAuditRole(roles.audit);
+    resolved.inspectionURL = resolved.databaseURL;
+    resolved.auditURL = roles.audit;
+    resolved.databaseURL = command === "apply" ? roles.migrator : roles.audit;
+  }
   receipt.update({ target, phase: "target_identity" });
   const identity = await readIdentity(resolved.databaseURL);
   if (identity.database !== target.database) {
@@ -1171,11 +1291,20 @@ async function enforceDatabaseClientBoundary(context, label) {
   }
 }
 
-async function runPreflight(context, receipt) {
-  const { resolved, snapshot, status, versions } = context;
+async function runReadOnlyPreflight(context, receipt) {
+  const { resolved, status, snapshot } = context;
   receipt.update({ phase: "preflight" });
-  await runExistingUpgradeAudits(resolved.databaseURL);
-  await runLifecycleAudit(resolved.databaseURL, status);
+  const auditURL = resolved.auditURL || resolved.databaseURL;
+  await runExistingUpgradeAudits(auditURL);
+  await runLifecycleAudit(auditURL, status);
+  await runPendingMigrationAudits(auditURL, status, runCommandWithInput, {
+    directory: snapshot.snapshotDir,
+  });
+}
+
+async function runPreflight(context, receipt) {
+  const { resolved, snapshot, versions } = context;
+  await runReadOnlyPreflight(context, receipt);
   await enforceDatabaseClientBoundary(context, "initial");
   await runDryRun(resolved.databaseURL, snapshot);
   await runRollbackRehearsal(
@@ -1184,6 +1313,23 @@ async function runPreflight(context, receipt) {
     versions.pendingVersions,
   );
   await enforceDatabaseClientBoundary(context, "final");
+}
+
+async function runAudit(receipt) {
+  const context = await prepare("audit", receipt);
+  try {
+    assertTrustedTarget(context.target);
+    await runReadOnlyPreflight(context, receipt);
+    receipt.finish({
+      phase: "preflight",
+      result: "passed",
+      writes: "0",
+      apply: "not_requested",
+      nextAction: "run_make_migrate_prepare",
+    });
+  } finally {
+    removeSnapshot(context.snapshot);
+  }
 }
 
 async function runStatus(receipt) {
@@ -1239,18 +1385,11 @@ async function runPlan(receipt) {
         },
       );
     }
-    if (context.evaluated.pendingFiles === 0) {
-      process.stdout.write("[migration] 数据库已是最新版本，无需 apply\n");
-      terminal = {
-        phase: "status",
-        result: "up_to_date",
-        writes: "0",
-        apply: "skipped",
-        nextAction: "none",
-      };
-      return;
-    }
-    await runPreflight(context, receipt);
+    // Preparation must not take DDL locks or stop the daily backend. The
+    // controlled workflow proves rollback and upgrade on a restored database;
+    // apply repeats these checks under its final maintenance boundary.
+    await runReadOnlyPreflight(context, receipt);
+    await runDryRun(context.resolved.databaseURL, context.snapshot);
     const planID = migrationPlanID({
       targetID: context.confirmation.targetID,
       migrationHash: `${context.snapshot.hash}\n${context.workflowHash}`,
@@ -1280,6 +1419,38 @@ async function runPlan(receipt) {
     removeSnapshot(context.snapshot);
     if (terminal) receipt.finish(terminal);
   }
+}
+
+export async function requireSharedDevOperationEvidence(
+  root,
+  operationId,
+  confirmation,
+  { source = readRuntimeSource, verify = verifyRuntimeBackup } = {},
+) {
+  if (!migrationReceiptOperationPattern.test(String(operationId || "")))
+    throw new Error("共享开发库 apply 只能由已确认的 operation 执行");
+  const store = resolveDatabaseMigrationOperationStore(root);
+  const operation = readDatabaseMigrationOperation(store, operationId);
+  const lock = JSON.parse(
+    fs.readFileSync(path.join(store, "execution.lock"), "utf8"),
+  );
+  if (
+    operation.status !== "applying" ||
+    operation.confirmationPrompt !== null ||
+    lock.operationId !== operationId ||
+    !Number.isSafeInteger(lock.pid) ||
+    lock.pid < 1 ||
+    operation.internal?.applyConfirmation !== confirmation ||
+    !(await verify(root, operation.backup))
+  )
+    throw new Error(
+      "当前 operation、执行锁或恢复证据未通过，不能执行共享库迁移",
+    );
+  process.kill(lock.pid, 0);
+  const bundle = readRuntimeBundle(root, operation.backup.bundleId);
+  if ((await source(root)).fingerprint !== bundle.sourceFingerprint)
+    throw new Error("已验证的运行代码或配置已变化，不能执行共享库迁移");
+  return operation;
 }
 
 async function runApply(receipt) {
@@ -1337,6 +1508,24 @@ async function runApply(receipt) {
       );
     }
 
+    if (context.target.scope === "shared-dev") {
+      try {
+        await requireSharedDevOperationEvidence(
+          repoRoot,
+          process.env.LOCAL_MIGRATION_OPERATION_ID,
+          expectedApply,
+        );
+      } catch {
+        throw new MigrationCommandError(
+          "缺少本次已确认 operation 的固定候选版本、成套恢复证据或排他执行锁；请使用 migrate_prepare / migrate_execute",
+          {
+            result: "action_required",
+            errorCode: "operation_evidence_required",
+            nextAction: "run_make_migrate_prepare",
+          },
+        );
+      }
+    }
     await runPreflight(context, receipt);
     receipt.update({ phase: "source_verification" });
     if (workflowFingerprint() !== context.workflowHash) {
@@ -1466,11 +1655,13 @@ function usage() {
 低层诊断 / 编排入口:
   node scripts/local-migration.mjs status
   node scripts/local-migration.mjs clients
+  node scripts/local-migration.mjs audit   # 只读存量检查，不停止后端或预演写入
   node scripts/local-migration.mjs plan
   node scripts/local-migration.mjs apply
 
 Makefile 入口:
   make migrate_status
+  make migrate_audit                       # 只读存量检查，不停止后端
   MIGRATE_TARGET_CONFIRM='<status 输出>' make migrate_plan
   MIGRATE_CONFIRM='<plan 输出>' MIGRATE_MAINTENANCE_CONFIRM='<共享库 plan 输出>' make migrate_apply
 `);
@@ -1572,6 +1763,8 @@ async function main() {
       await runStatus(receipt);
     } else if (command === "clients") {
       await runClients(receipt);
+    } else if (command === "audit") {
+      await runAudit(receipt);
     } else if (command === "plan") {
       await runPlan(receipt);
     } else if (command === "apply") {
