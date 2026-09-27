@@ -7,6 +7,7 @@ export const NODE_TEST_GROUP_ORDER = Object.freeze([
 ]);
 
 export const EXPLICIT_ONLY_NODE_TESTS = Object.freeze([
+  "scripts/qa/unit-normalization-postgres.test.mjs",
   "scripts/qa/yoyoosun-role-flow-handbook.test.mjs",
 ]);
 
@@ -14,6 +15,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
   fast: Object.freeze([
     "scripts/build/apply-customer-web-config.test.mjs",
     "scripts/dev-ports.test.mjs",
+    "scripts/dev-process-inspection.test.mjs",
     "scripts/gen-error-codes.test.mjs",
     "scripts/git-hooks/commit-msg.test.mjs",
     "scripts/git-hooks/pre-commit.test.mjs",
@@ -97,6 +99,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/trial-account-rbac.test.mjs",
     "scripts/qa/trial-role-entry-docs.test.mjs",
     "scripts/qa/trial-simulated-data.test.mjs",
+    "scripts/qa/unit-quantity.test.mjs",
     "scripts/qa/v1-acceptance-plan.test.mjs",
     "scripts/qa/verify-go-test-json.test.mjs",
     "scripts/qa/verify-node-test-summary.test.mjs",
@@ -107,9 +110,13 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/yoyoosun-role-jsonrpc-access.test.mjs",
   ]),
   database: Object.freeze([
+    "scripts/local-database-roles.test.mjs",
     "scripts/local-migration-workflow.test.mjs",
     "scripts/local-migration.test.mjs",
+    "scripts/local-runtime-bundle.test.mjs",
     "scripts/local-runtime-preflight.test.mjs",
+    "scripts/local-runtime-rehearsal.test.mjs",
+    "scripts/local-runtime-start.test.mjs",
     "scripts/qa/critical-postgres-gate.test.mjs",
     "scripts/qa/database-archive.test.mjs",
     "scripts/qa/database-base-preflight.test.mjs",

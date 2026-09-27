@@ -423,24 +423,21 @@ func validateReferenceDataset(dataset data.CoreDemoReferenceSeedDataset) error {
 		return fmt.Errorf("%w: default dataset must contain exactly %d units and %d warehouses", errCoreBoundaryViolation, len(contract.Units), len(contract.Warehouses))
 	}
 	unitCodes := make(map[string]struct{}, len(dataset.Units))
-	unitPattern := ""
 	for _, unit := range dataset.Units {
-		if !strings.HasPrefix(unit.Code, dataset.Prefix+"-") || strings.TrimSpace(unit.Name) == "" || unit.Precision < 0 {
-			return fmt.Errorf("%w: default unit is invalid", errCoreBoundaryViolation)
+		matched := false
+		for _, expected := range contract.Units {
+			if unit.Code == expected.Code && unit.Name == expected.Name && unit.Precision == expected.Precision {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return fmt.Errorf("%w: default unit is outside the canonical allowlist", errCoreBoundaryViolation)
 		}
 		if _, duplicate := unitCodes[unit.Code]; duplicate {
 			return fmt.Errorf("%w: default unit code is duplicated", errCoreBoundaryViolation)
 		}
 		unitCodes[unit.Code] = struct{}{}
-		pattern, err := coreCodeNamespacePattern(unit.Code)
-		if err != nil {
-			return err
-		}
-		if unitPattern == "" {
-			unitPattern = pattern
-		} else if pattern != unitPattern {
-			return fmt.Errorf("%w: default unit namespace is inconsistent", errCoreBoundaryViolation)
-		}
 	}
 	warehouseCodes := make(map[string]struct{}, len(dataset.Warehouses))
 	warehousePattern := ""
@@ -462,7 +459,7 @@ func validateReferenceDataset(dataset data.CoreDemoReferenceSeedDataset) error {
 			return fmt.Errorf("%w: default warehouse namespace is inconsistent", errCoreBoundaryViolation)
 		}
 	}
-	if unitPattern == warehousePattern {
+	if dataset.Prefix+"-DW-%" == warehousePattern {
 		return fmt.Errorf("%w: unit and warehouse namespaces must be distinct", errCoreBoundaryViolation)
 	}
 	return nil
@@ -471,18 +468,19 @@ func validateReferenceDataset(dataset data.CoreDemoReferenceSeedDataset) error {
 func inspectCoreBoundary(ctx context.Context, tx *sql.Tx, dataset data.CoreDemoReferenceSeedDataset) (coreBoundary, error) {
 	units := dataset.Units
 	warehouses := dataset.Warehouses
-	unitPattern, err := coreCodeNamespacePattern(units[0].Code)
-	if err != nil {
-		return coreBoundary{}, err
-	}
+	// Canonical units are shared master data; the batch namespace remains
+	// reserved so a misplaced simulated record cannot enter this bootstrap.
+	unitPattern := dataset.Prefix + "-DW-%"
 	warehousePattern, err := coreCodeNamespacePattern(warehouses[0].Code)
 	if err != nil {
 		return coreBoundary{}, err
 	}
 	args := []any{unitPattern, warehousePattern}
 	unitClauses := make([]string, 0, len(units))
+	unitCodeParams := make([]string, 0, len(units))
 	for _, unit := range units {
 		base := len(args) + 1
+		unitCodeParams = append(unitCodeParams, fmt.Sprintf("$%d", base))
 		unitClauses = append(unitClauses, fmt.Sprintf("(code = $%d AND name = $%d AND precision = $%d)", base, base+1, base+2))
 		args = append(args, unit.Code, unit.Name, unit.Precision)
 	}
@@ -495,14 +493,14 @@ func inspectCoreBoundary(ctx context.Context, tx *sql.Tx, dataset data.CoreDemoR
 	query := fmt.Sprintf(`
 /* manual-acceptance-core-boundary */
 SELECT
-  (SELECT COUNT(*) FROM units WHERE code LIKE $1 OR code LIKE $2),
+  (SELECT COUNT(*) FROM units WHERE code IN (%s) OR code LIKE $1 OR code LIKE $2),
   (SELECT COUNT(*) FROM units WHERE is_active IS TRUE AND (%s)),
   (SELECT COUNT(*) FROM warehouses WHERE code LIKE $1 OR code LIKE $2),
   (SELECT COUNT(*) FROM warehouses WHERE is_active IS TRUE AND (%s)),
   (SELECT COUNT(*) FROM materials WHERE code LIKE $1 OR code LIKE $2),
   (SELECT COUNT(*) FROM products WHERE code LIKE $1 OR code LIKE $2),
   (SELECT COUNT(*) FROM processes WHERE code LIKE $1 OR code LIKE $2),
-  (SELECT COUNT(*) FROM bom_headers WHERE version LIKE $1 OR version LIKE $2)`, strings.Join(unitClauses, " OR "), strings.Join(warehouseClauses, " OR "))
+  (SELECT COUNT(*) FROM bom_headers WHERE version LIKE $1 OR version LIKE $2)`, strings.Join(unitCodeParams, ", "), strings.Join(unitClauses, " OR "), strings.Join(warehouseClauses, " OR "))
 	var boundary coreBoundary
 	err = tx.QueryRowContext(ctx, query, args...).Scan(
 		&boundary.unitTotal,

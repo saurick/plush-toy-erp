@@ -11,7 +11,7 @@ INSERT INTO units (
 ) VALUES (
   910001,
   '__qa_populated_upgrade_unit__',
-  'QA populated upgrade unit',
+  '千克',
   '2026-07-10 15:00:01+00',
   '2026-07-10 15:00:01+00'
 );

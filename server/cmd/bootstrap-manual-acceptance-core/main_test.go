@@ -219,24 +219,29 @@ func TestDockerfileBuildsAndCopiesOneShotBinaryWithReleaseVersion(t *testing.T) 
 	}
 }
 
-func TestCoreCodeNamespacePatternUsesDefaultBusinessCodes(t *testing.T) {
+func TestCoreReferencesUseCanonicalUnitsAndReservedWarehouseNamespace(t *testing.T) {
 	dataset := data.DefaultCoreDemoReferenceSeedDataset()
 	if err := validateReferenceDataset(dataset); err != nil {
 		t.Fatalf("validateReferenceDataset() error = %v", err)
-	}
-	unitPattern, err := coreCodeNamespacePattern(dataset.Units[0].Code)
-	if err != nil {
-		t.Fatalf("coreCodeNamespacePattern(unit) error = %v", err)
 	}
 	warehousePattern, err := coreCodeNamespacePattern(dataset.Warehouses[0].Code)
 	if err != nil {
 		t.Fatalf("coreCodeNamespacePattern(warehouse) error = %v", err)
 	}
-	if unitPattern != "YS7-DW-%" || warehousePattern != "YS7-CK-%" {
-		t.Fatalf("unexpected reference namespaces unit=%q warehouse=%q", unitPattern, warehousePattern)
+	if warehousePattern != dataset.Prefix+"-CK-%" {
+		t.Fatalf("unexpected reference warehouse namespace %q", warehousePattern)
 	}
-	if strings.Contains(unitPattern+warehousePattern, data.CoreDemoSeedPrefix) {
-		t.Fatalf("references-only boundary leaked the full demo seed prefix")
+	for _, mutate := range []func(*data.CoreDemoReferenceSeedDataset){
+		func(value *data.CoreDemoReferenceSeedDataset) { value.Units[0].Code = value.Prefix + "-DW-001" },
+		func(value *data.CoreDemoReferenceSeedDataset) { value.Units[0].Precision++ },
+		func(value *data.CoreDemoReferenceSeedDataset) { value.Units[0].Name = "米" },
+		func(value *data.CoreDemoReferenceSeedDataset) { value.Units[0] = value.Units[1] },
+	} {
+		invalid := data.DefaultCoreDemoReferenceSeedDataset()
+		mutate(&invalid)
+		if err := validateReferenceDataset(invalid); !errors.Is(err, errCoreBoundaryViolation) {
+			t.Fatalf("expected changed canonical unit to fail, got %v", err)
+		}
 	}
 	if _, err := coreCodeNamespacePattern("invalid"); !errors.Is(err, errCoreBoundaryViolation) {
 		t.Fatalf("expected invalid namespace error, got %v", err)
@@ -287,7 +292,7 @@ func expectDatabasePreflight(
 }
 
 func boundaryValues(dataset data.CoreDemoReferenceSeedDataset) []driver.Value {
-	unitPattern, _ := coreCodeNamespacePattern(dataset.Units[0].Code)
+	unitPattern := dataset.Prefix + "-DW-%"
 	warehousePattern, _ := coreCodeNamespacePattern(dataset.Warehouses[0].Code)
 	values := []driver.Value{
 		unitPattern,
@@ -303,7 +308,7 @@ func boundaryValues(dataset data.CoreDemoReferenceSeedDataset) []driver.Value {
 }
 
 func expectBoundary(mock sqlmock.Sqlmock, dataset data.CoreDemoReferenceSeedDataset, boundary coreBoundary) {
-	mock.ExpectQuery(`manual-acceptance-core-boundary`).
+	mock.ExpectQuery(`manual-acceptance-core-boundary[\s\S]+FROM units WHERE code IN \([^)]+\) OR code LIKE \$1 OR code LIKE \$2`).
 		WithArgs(boundaryValues(dataset)...).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"unit_total",

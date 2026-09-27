@@ -19,7 +19,7 @@ print_help() {
   browser: 动态独立端口自启当前 worktree Vite，再运行 Chromium 无写入 smoke
   server: 存量数据真实升级 -> 真实 Chromium PDF 安全集成 -> go test JSON 非零执行/零 skip -> make build
   shared / web / server: 环境与 secrets 通过后并行运行；浏览器仍等待 Web 产物
-  resource_sensitive_node: shared / web / server 汇合后单独运行资源敏感发布合同，不放宽超时
+  resource_sensitive_node: shared / web / server 汇合后单独运行资源敏感发布合同，保留各场景的业务等待期限
   critical_postgres: 汇合后单独运行当前完整 Schema 关键 PostgreSQL 矩阵（含采购退货），不放宽超时
   govulncheck: 最后执行 Go 漏洞扫描，避免外部网络扰动本地 PostgreSQL 并发门禁
 
@@ -296,6 +296,7 @@ qa_full_server_upgrade() {
   cd "$ROOT_DIR/server"
   PURCHASE_RECEIPT_PG_DB_URL="$DISPOSABLE_DATABASE_BASE_URL" \
     make populated_upgrade_pg_test
+  bash "$ROOT_DIR/scripts/qa/unit-normalization-postgres.sh"
   bash "$ROOT_DIR/scripts/qa/attachment-storage-integration.sh"
 }
 

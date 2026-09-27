@@ -842,8 +842,9 @@ test('customerConfigApi: exempt orders require completed source activation, incl
                     : { process_context: null },
                 }
               }
-              if (method.startsWith('start_'))
+              if (method.startsWith('start_')) {
                 return { data: replay ? data : start() }
+              }
               if (method.startsWith('execute_')) {
                 executions += 1
                 return { data }

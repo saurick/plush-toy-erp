@@ -35,8 +35,9 @@ const adminPassword = "FreshAdmin9!";
 const postgresAppPassword = "test-app-password-12345";
 const postgresDSN = `postgres://erp_app:${postgresAppPassword}@postgres:5432/${expectedDatabase}?sslmode=disable`;
 const fixtureScratchRoot = path.join(repoRoot, "output", "qa-tmp");
-// This test owns a background fixture process, so keep bounded scheduling headroom for startup and cleanup.
-const fixtureProcessTimeoutMs = 30_000;
+// Independent CI lanes share the runner CPU. Allow bounded process scheduling
+// headroom while retaining the helper's short marker deadline in each scenario.
+const fixtureProcessTimeoutMs = 90_000;
 const fixtureReadyTimeoutMs = 15_000;
 
 const registeredBootstrapTests = new Map();
@@ -812,12 +813,18 @@ function helperRunSpec(
 
 function runHelper(fixture, options = {}) {
   const spec = helperRunSpec(fixture, options);
-  return spawnSync("bash", spec.args, {
+  const result = spawnSync("bash", spec.args, {
     cwd: repoRoot,
     encoding: "utf8",
     env: spec.env,
     timeout: fixtureProcessTimeoutMs,
   });
+  assert.equal(
+    result.error,
+    undefined,
+    `bootstrap fixture process failed: ${result.error?.code || result.signal || "unknown"}`,
+  );
+  return result;
 }
 
 function installGnuStatShim(fixture) {

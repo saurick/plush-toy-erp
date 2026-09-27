@@ -238,6 +238,7 @@ test("backup documents are written without Bash heredoc pipe blocking", (t) => {
     env[name] = path.join(directory, name);
   Object.assign(env, {
     backup_size: "1234",
+    business_rows_before_upgrade: "17",
     backup_hash: "a".repeat(64),
     repo_root: "/test/repo with spaces",
     rehearsal_source_root: "/test/repo with spaces",
@@ -257,6 +258,7 @@ test("backup documents are written without Bash heredoc pipe blocking", (t) => {
   assert.equal(report.backup.databaseBackupHash, "a".repeat(64));
   assert.equal(report.backup.sourcePolicy, "shared-dev-dedicated-backup");
   assert.equal(report.restore.pendingFiles, "0");
+  assert.equal(report.restore.businessRowsBeforeUpgrade, 17);
   assert.equal(report.summary.restoreCompleted, true);
   assert.equal(report.redaction.containsSecrets, false);
   const summary = fs.readFileSync(env.command_summary_file, "utf8");

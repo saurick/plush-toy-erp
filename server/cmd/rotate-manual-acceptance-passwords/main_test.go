@@ -50,7 +50,7 @@ func TestRotationReceiptPublishesDatabaseIdentity(t *testing.T) {
 func validOptions(target string) options {
 	opts := options{
 		target:                   target,
-		datasetVersion:           "2026.09.16-v7",
+		datasetVersion:           currentDatasetVersion,
 		expectedMigrationVersion: "20260710150001",
 		expectedRelease:          strings.Repeat("a", 40),
 		operationID:              "123e4567-e89b-42d3-a456-426614174000",
@@ -90,7 +90,7 @@ func TestValidateOptionsBindsConfirmationToTargetAndVersion(t *testing.T) {
 		t.Fatal("valid operation marker key exceeds runtime marker capacity")
 	}
 	opts = validOptions(targetCustomerTest133)
-	opts.targetIdentity = "customer-trial-133:2026.09.16-v7"
+	opts.targetIdentity = targetCustomerTrial133 + ":" + currentDatasetVersion
 	opts.confirm = expectedConfirmation(opts.target, opts.targetIdentity)
 	if err := validateOptions(opts); err == nil {
 		t.Fatal("customer-test-133 accepted a misleading target identity")
@@ -744,7 +744,7 @@ func TestActiveCustomerConfigReadsCompiledSnapshotIdentity(t *testing.T) {
 		sqlmock.NewRows([]string{"revision", "product_version", "compiled_snapshot"}).AddRow(
 			customerTrial133Revision,
 			customerTrial133ProductVersion,
-			[]byte(`{"applyPurpose":"customer_trial_test_apply","datasetVersion":"2026.09.16-v7","target":"customer-trial-133"}`),
+			[]byte(`{"applyPurpose":"customer_trial_test_apply","datasetVersion":"`+currentDatasetVersion+`","target":"customer-trial-133"}`),
 		),
 	)
 	identity, err := activeCustomerConfig(t.Context(), db)

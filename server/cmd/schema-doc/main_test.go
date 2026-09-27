@@ -36,7 +36,7 @@ func TestRepositoryCatalogAndGeneratedOutputsAreCurrent(t *testing.T) {
 		ForeignKeys:    154,
 		Indexes:        343,
 		PartialIndexes: 34,
-		Checks:         312,
+		Checks:         314,
 	}
 	if got := db.metrics(); got != wantMetrics {
 		t.Fatalf("schema metrics changed without an intentional data-dictionary review: got %+v want %+v", got, wantMetrics)
