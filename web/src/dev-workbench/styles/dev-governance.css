@@ -1,7 +1,7 @@
 .erp-dev-governance-page {
   min-height: 100vh;
-  background: #f4f7f5;
-  color: #1f2937;
+  background: var(--erp-page-bg);
+  color: var(--erp-text);
   padding: 18px;
 }
 
@@ -14,9 +14,9 @@
 
 .erp-dev-governance-header {
   margin-bottom: 14px;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 16px;
-  background: rgb(255 255 255 / 0.96);
+  background: var(--erp-surface-bg);
   padding: 18px 20px;
   box-shadow:
     0 1px 2px rgb(15 23 42 / 0.04),
@@ -31,7 +31,7 @@
 .erp-dev-governance-kicker {
   justify-self: start;
   margin-bottom: 6px;
-  color: #2b7a3d;
+  color: var(--erp-primary-strong);
   font-size: 12px;
   font-weight: 720;
 }
@@ -49,7 +49,7 @@
 .erp-dev-governance-summary.ant-typography {
   max-width: 820px;
   margin: 9px 0 0;
-  color: #647067;
+  color: var(--erp-text-muted);
   line-height: 1.6;
 }
 
@@ -64,9 +64,9 @@
 .erp-dev-governance-sidebar,
 .erp-dev-governance-decision {
   min-width: 0;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 16px;
-  background: rgb(255 255 255 / 0.96);
+  background: var(--erp-surface-bg);
   box-shadow:
     0 1px 2px rgb(15 23 42 / 0.04),
     0 12px 28px rgb(15 23 42 / 0.06);
@@ -96,7 +96,8 @@
 .erp-dev-governance-task-nav {
   --erp-slider-bg: #eff6ff;
   --erp-slider-radius: 11px;
-  --erp-slider-shadow: inset 4px 0 0 #2563eb, inset 0 0 0 1px #2563eb;
+  --erp-slider-shadow:
+    inset 4px 0 0 var(--erp-primary), inset 0 0 0 1px var(--erp-primary);
   display: grid;
   gap: 8px;
 }
@@ -114,7 +115,7 @@
   border-radius: 11px;
   background: transparent;
   padding: 9px 11px;
-  color: #1f2937;
+  color: var(--erp-text);
   text-align: left;
   cursor: pointer;
   transition:
@@ -127,14 +128,14 @@
 }
 
 .erp-dev-governance-task-nav__item:focus-visible {
-  border-color: #2563eb;
+  border-color: var(--erp-primary);
   outline: 3px solid rgb(37 99 235 / 0.22);
   outline-offset: 2px;
 }
 
 .erp-dev-governance-task-nav__item--active {
-  border-color: #2563eb;
-  color: #1d4ed8;
+  border-color: var(--erp-primary);
+  color: var(--erp-primary-strong);
 }
 
 .erp-dev-governance-task-nav__index {
@@ -151,7 +152,7 @@
 
 .erp-dev-governance-task-nav__item--active .erp-dev-governance-task-nav__index {
   background: #dbeafe;
-  color: #1d4ed8;
+  color: var(--erp-primary-strong);
 }
 
 .erp-dev-governance-task-nav__title {
@@ -188,13 +189,13 @@
 .erp-dev-governance-decision__head p.ant-typography {
   max-width: 780px;
   margin: 7px 0 0;
-  color: #647067;
+  color: var(--erp-text-muted);
   line-height: 1.6;
 }
 
 .erp-dev-governance-eyebrow,
 .erp-dev-governance-decision-step__eyebrow {
-  color: #647067;
+  color: var(--erp-text-muted);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -209,19 +210,19 @@
   grid-template-columns: 38px minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-inline-start-width: 4px;
   border-radius: 13px;
-  background: #f8fbf7;
+  background: var(--erp-surface-bg-soft);
   padding: 14px;
 }
 
 .erp-dev-governance-decision-step--primary {
-  border-inline-start-color: #2563eb;
+  border-inline-start-color: var(--erp-primary);
 }
 
 .erp-dev-governance-decision-step--check {
-  border-inline-start-color: #2b7a3d;
+  border-inline-start-color: var(--erp-primary-strong);
 }
 
 .erp-dev-governance-decision-step--boundary {
@@ -236,7 +237,7 @@
   place-items: center;
   border-radius: 11px;
   background: #eaf2ff;
-  color: #1d4ed8;
+  color: var(--erp-primary-strong);
   font-size: 17px;
 }
 
@@ -267,7 +268,7 @@
 
 .erp-dev-governance-decision-step__body p {
   margin: 0;
-  color: #334155;
+  color: var(--erp-text-muted);
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -287,9 +288,9 @@
   gap: 4px;
   border: 1px solid #cfe0d2;
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--erp-surface-bg);
   padding: 3px 4px 3px 10px;
-  color: #1f2937;
+  color: var(--erp-text);
 }
 
 .erp-dev-governance-link > a,
@@ -342,7 +343,7 @@
 
 .erp-dev-governance-internal-scope > summary::after {
   content: '＋';
-  color: #2b7a3d;
+  color: var(--erp-primary-strong);
 }
 
 .erp-dev-governance-reference-details > summary::after {
@@ -351,7 +352,7 @@
   border: 1px solid #cfe0d2;
   border-radius: 999px;
   padding: 4px 10px;
-  color: #2b7a3d;
+  color: var(--erp-primary-strong);
   font-size: 12px;
   font-weight: 680;
 }
@@ -362,20 +363,20 @@
 
 .erp-dev-governance-internal-scope p {
   margin: 4px 0 0;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 10px;
-  background: #f8fbf7;
+  background: var(--erp-surface-bg-soft);
   padding: 10px 12px;
-  color: #475569;
+  color: var(--erp-text-muted);
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
 .erp-dev-governance-reference-details {
   margin-top: 14px;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 16px;
-  background: rgb(255 255 255 / 0.96);
+  background: var(--erp-surface-bg);
   box-shadow:
     0 1px 2px rgb(15 23 42 / 0.04),
     0 12px 28px rgb(15 23 42 / 0.06);
@@ -400,7 +401,7 @@
 
 .erp-dev-governance-reference-details > summary small {
   margin-left: auto;
-  color: #647067;
+  color: var(--erp-text-muted);
   font-size: 12px;
   font-weight: 400;
 }
@@ -416,9 +417,9 @@
 .erp-dev-governance-reference-section,
 .erp-dev-governance-source-card {
   min-width: 0;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 14px;
-  background: #f8fbf7;
+  background: var(--erp-surface-bg-soft);
   padding: 16px;
 }
 
@@ -446,12 +447,12 @@
 .erp-dev-governance-reference-section__head p.ant-typography {
   max-width: 980px;
   margin: 7px 0 0;
-  color: #647067;
+  color: var(--erp-text-muted);
   line-height: 1.6;
 }
 
 .erp-dev-governance-delivery-loop__head .anticon {
-  color: #2563eb;
+  color: var(--erp-primary);
   font-size: 18px;
 }
 
@@ -469,10 +470,10 @@
   min-width: 0;
   align-content: start;
   gap: 8px;
-  border: 1px solid #dce8dd;
-  border-top: 3px solid #60a5fa;
+  border: 1px solid var(--erp-border);
+  border-top: 3px solid var(--erp-primary);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--erp-surface-bg);
   padding: 12px;
 }
 
@@ -483,7 +484,7 @@
   place-items: center;
   border-radius: 999px;
   background: #dbeafe;
-  color: #1d4ed8;
+  color: var(--erp-primary-strong);
   font-size: 13px;
   font-weight: 760;
 }
@@ -506,7 +507,7 @@
 
 .erp-dev-governance-delivery-loop__step p {
   margin: 0;
-  color: #334155;
+  color: var(--erp-text-muted);
   font-size: 13px;
   line-height: 1.55;
   overflow-wrap: anywhere;
@@ -518,7 +519,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  border-top: 1px solid #dce8dd;
+  border-top: 1px solid var(--erp-border);
   padding-top: 12px;
 }
 
@@ -534,9 +535,9 @@
   min-width: 0;
   align-content: start;
   gap: 7px;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--erp-surface-bg);
   padding: 13px;
 }
 
@@ -548,7 +549,7 @@
 
 .erp-dev-governance-axis-reference p {
   margin: 0;
-  color: #334155;
+  color: var(--erp-text-muted);
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -557,9 +558,9 @@
   min-width: 0;
   margin-top: 14px;
   overflow: auto;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--erp-surface-bg);
   padding: 10px;
 }
 
@@ -576,7 +577,7 @@
 }
 
 .erp-dev-governance-source-card code {
-  color: #1d4ed8;
+  color: var(--erp-primary-strong);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
@@ -585,14 +586,14 @@
   display: grid;
   min-height: 360px;
   place-items: center;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 16px;
-  background: rgb(255 255 255 / 0.96);
+  background: var(--erp-surface-bg);
 }
 
 [data-erp-theme='dark'] .erp-dev-governance-page {
   background: #0f172a;
-  color: #e5edf5;
+  color: var(--erp-border);
 }
 
 [data-erp-theme='dark'] .erp-dev-governance-header,
@@ -602,7 +603,7 @@
 [data-erp-theme='dark'] .erp-dev-governance-empty {
   border-color: #263446;
   background: rgb(15 23 42 / 0.96);
-  color: #e5edf5;
+  color: var(--erp-border);
 }
 
 [data-erp-theme='dark'] .erp-dev-governance-summary.ant-typography,
@@ -623,37 +624,38 @@
 [data-erp-theme='dark'] .erp-dev-governance-delivery-loop__step,
 [data-erp-theme='dark'] .erp-dev-governance-axis-reference,
 [data-erp-theme='dark'] .erp-dev-governance-mermaid {
-  border-color: #334155;
-  background: #111827;
-  color: #e5edf5;
+  border-color: var(--erp-text-muted);
+  background: var(--erp-text);
+  color: var(--erp-border);
 }
 
 [data-erp-theme='dark'] .erp-dev-governance-link:hover,
 [data-erp-theme='dark'] .erp-dev-governance-link:focus-within {
-  border-color: #60a5fa;
+  border-color: var(--erp-primary);
   background: #172554;
   color: #dbeafe;
 }
 
 [data-erp-theme='dark'] .erp-dev-governance-task-nav__index {
-  background: #1f2937;
+  background: var(--erp-text);
   color: #cbd5e1;
 }
 
 [data-erp-theme='dark'] .erp-dev-governance-task-nav {
   --erp-slider-bg: #172554;
-  --erp-slider-shadow: inset 4px 0 0 #60a5fa, inset 0 0 0 1px #60a5fa;
+  --erp-slider-shadow:
+    inset 4px 0 0 var(--erp-primary), inset 0 0 0 1px var(--erp-primary);
 }
 
 [data-erp-theme='dark'] .erp-dev-governance-task-nav__item {
-  border-color: #334155;
-  color: #e5edf5;
+  border-color: var(--erp-text-muted);
+  color: var(--erp-border);
 }
 
 [data-erp-theme='dark'] .erp-dev-governance-task-nav__item:hover,
 [data-erp-theme='dark'] .erp-dev-governance-task-nav__item:focus-visible,
 [data-erp-theme='dark'] .erp-dev-governance-task-nav__item--active {
-  border-color: #60a5fa;
+  border-color: var(--erp-primary);
   color: #dbeafe;
 }
 
@@ -676,9 +678,9 @@
 [data-erp-theme='dark'] .erp-dev-governance-delivery-loop,
 [data-erp-theme='dark'] .erp-dev-governance-reference-section,
 [data-erp-theme='dark'] .erp-dev-governance-source-card {
-  border-color: #334155;
-  background: #111827;
-  color: #e5edf5;
+  border-color: var(--erp-text-muted);
+  background: var(--erp-text);
+  color: var(--erp-border);
 }
 
 [data-erp-theme='dark'] .erp-dev-governance-decision-step--boundary {
@@ -713,7 +715,7 @@
   svg
   foreignObject
   p {
-  color: #f8fafc;
+  color: var(--erp-surface-bg-soft);
 }
 
 @media (prefers-reduced-motion: reduce) {

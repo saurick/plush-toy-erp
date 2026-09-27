@@ -1,0 +1,99 @@
+.erp-dev-ui-design-page {
+  min-width: 0;
+}
+.erp-dev-ui-design-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.erp-dev-ui-design-header h1.ant-typography {
+  margin: 0;
+  font-size: 16px;
+}
+.erp-dev-ui-design-header .ant-typography {
+  margin-bottom: 0;
+}
+.erp-dev-ui-design-page > .ant-tabs > .ant-tabs-nav {
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+.erp-dev-ui-design-reader {
+  display: flex;
+  min-width: 0;
+  height: max(580px, calc(100vh - 140px));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--erp-border, #dfe7e2);
+  border-radius: 10px;
+  background: var(--erp-surface-bg, #fff);
+}
+.erp-dev-ui-design-reader[hidden] {
+  display: none;
+}
+.erp-dev-ui-design-toolbar {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--erp-border, #dfe7e2);
+}
+.erp-dev-ui-design-toolbar > span {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.erp-dev-ui-design-toolbar small {
+  color: var(--erp-text-muted);
+}
+.erp-dev-ui-design-frame {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  border: 0;
+  background: var(--erp-page-bg);
+}
+.erp-dev-ui-design-document {
+  max-width: 1200px;
+  padding: 20px;
+  border: 1px solid var(--erp-border, #dfe7e2);
+  border-radius: 12px;
+  background: var(--erp-surface-bg, #fff);
+}
+.erp-dev-ui-design-reader.is-fullscreen {
+  position: fixed;
+  z-index: 1100;
+  inset: 12px;
+  width: auto;
+  height: auto;
+  box-shadow: 0 0 0 30px rgb(0 0 0 / 50%);
+}
+.erp-dev-ui-design-focus-guard {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+@media (min-width: 981px) {
+  .erp-dev-ui-design-header > div:first-child {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .erp-dev-ui-design-header h1.ant-typography {
+    flex: 0 0 auto;
+  }
+  .erp-dev-ui-design-header div.ant-typography {
+    color: var(--erp-text-muted);
+    font-size: 12px;
+  }
+}

@@ -1,14 +1,27 @@
-# Page Semantics / 页面语义与原型
+# Page Semantics / 页面语义与交互设计
 
-页面任务、字段、动作、状态、信息层级或原型关系变化时读取。仓库内引用相对当前任务仓库根解析。
+页面任务、字段、动作、状态、信息层级或交互设计变化时读取。仓库内引用相对当前任务仓库根解析。
 
-## Sync prototype design conditionally.
-   - If the page has a matching asset under `docs/product/prototypes/**`, read `docs/product/prototypes/README.md` and the prototype README before changing runtime UI. Confirm whether the prototype is Draft, To Implement, or Current.
-   - If no matching prototype exists, do not create one just to satisfy process. Create or update a prototype only when the user explicitly asks for prototype/design work, the task is a new reusable UI pattern, or missing prototype context would make implementation ambiguous.
-   - Absorb prototype intent, structure, interaction, information hierarchy, and meaningful business semantics. Do not copy static numbers, fake customers, mock tasks, dev-only shells, or visual-only decoration into runtime.
-   - If runtime implementation changes a prototype's promised structure, interaction, business meaning, absorbed scope, index entry, or status wording, update the prototype README, prototype index, registry, and related tests in the same round.
-   - If the change is a small style, copy, or feature-detail correction and the existing prototype remains accurate, leave prototype files untouched; explain only when this affects the user’s conclusion.
-   - Do not promote To Implement assets to Current without explicit user confirmation, even if code and tests pass.
+<a id="design-sync"></a>
+
+## 设计与实现同步 / Design Sync
+
+按页面、动作或共享组件名定位 `docs/product/ui-design/交互设计说明.md` 的相关章节；需要核对外观或操作演示时，再读取 `docs/product/ui-design/index.html` 的对应片段。入口不清才读该目录 README；小改动不默认全量读取或重写 HTML。
+
+统一视觉语言、控件语义和同类操作，保留不同岗位与业务任务所需的布局。风格改动优先使用共享主题、组件和样式。工作台直接读取同一份设计文件，控件规范复用真实共享组件；组件变化仍需核对独立 HTML 中受影响的表达。
+
+以下同步用于已授权的实现改动；仅评估或设计提案不自动扩大为系统修改。
+
+| 改动 | 同步范围 |
+| --- | --- |
+| 改变统一颜色、字体、密度或控件外观 | 修改共享实现，同轮更新 HTML 中受影响的外观及说明；核对业务页和工作台受影响的展示。 |
+| 改变页面结构、主要入口、保存、返回、筛选或恢复行为 | 同轮更新相关 HTML 演示和说明；专有页面或字段变化只同步其实际影响的表达。 |
+| 修复实现使其符合现有设计，或内部重构、性能修复未改变可见行为 | 核对设计仍准确即可，无须机械修改设计文件；验证受影响的实现。 |
+| 改变设计取舍或原因 | 更新 `docs/product/ui-design/设计依据.md` 对应段落；仅变更实现时无须改写依据。 |
+
+- 每轮只修改受影响的内容。设计稿表达通用页面与关键路径，不逐页复制全部字段和业务状态机；保留单份 HTML，历史由 Git 追溯，不恢复图片方案、版本目录或原型晋级状态。
+- 实施设计意图前核对 API、RBAC、路由及 Workflow / Fact 合同；虚构样例与模拟动作留在 dev-only 设计查看器，不进入业务真源。
+- 统一评审使用同一份代码与设计快照，按影响提供相关规则、设计片段、代码差异及必要浏览器证据。只读设计时结论限于设计；实现、目标运行、发布与验收分别核对，设计稿不替代运行证据。
 
 ## Define the page's single primary job.
    - State who uses the page and what they should finish there.

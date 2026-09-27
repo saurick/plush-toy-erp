@@ -29,7 +29,7 @@ test('devVisibleLabels: 十五个开发页和共享导航不保留无说明纯�
     'web/src/dev-workbench/pages/DevBusinessUsabilityPage.jsx',
     'web/src/dev-workbench/pages/DevDocsPage.jsx',
     'web/src/dev-workbench/pages/DevTestingPage.jsx',
-    'web/src/dev-workbench/pages/DevPrototypesPage.jsx',
+    'web/src/dev-workbench/pages/DevUIDesignPage.jsx',
     'web/src/dev-workbench/pages/DevCustomerConfigPage.jsx',
     'web/src/dev-workbench/pages/DevVersionCenterPage.jsx',
     'web/src/dev-workbench/pages/DevDataPreparationPage.jsx',

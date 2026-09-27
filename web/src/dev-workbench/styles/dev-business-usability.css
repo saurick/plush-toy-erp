@@ -1,8 +1,8 @@
 .erp-dev-business-usability-page {
   min-height: 100vh;
   overflow-x: hidden;
-  background: #f4f7f5;
-  color: #1f2937;
+  background: var(--erp-page-bg);
+  color: var(--erp-text);
   padding: 18px;
 }
 
@@ -16,15 +16,15 @@
   display: grid;
   gap: 8px;
   margin-bottom: 14px;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 16px;
-  background: rgb(255 255 255 / 0.96);
+  background: var(--erp-surface-bg);
   padding: 18px 20px;
   box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
 }
 
 .erp-dev-business-usability-kicker {
-  color: #2b7a3d;
+  color: var(--erp-primary-strong);
   font-size: 12px;
   font-weight: 720;
 }
@@ -37,7 +37,7 @@
 .erp-dev-business-usability-header p.ant-typography {
   max-width: 880px;
   margin: 0;
-  color: #647067;
+  color: var(--erp-text-muted);
   line-height: 1.65;
 }
 
@@ -54,7 +54,7 @@
 }
 
 .erp-dev-business-usability-summary .ant-card {
-  border-color: #dce8dd;
+  border-color: var(--erp-border);
 }
 
 .erp-dev-business-usability-summary .ant-card-body {
@@ -77,7 +77,7 @@
 
 .erp-dev-business-usability-table-card.ant-card {
   min-width: 0;
-  border-color: #dce8dd;
+  border-color: var(--erp-border);
 }
 
 .erp-dev-business-usability-table-card .ant-card-body {
@@ -113,13 +113,13 @@
 }
 
 .erp-dev-business-usability-page-cell strong {
-  color: #1f2937;
+  color: var(--erp-text);
   font-size: 14px;
 }
 
 .erp-dev-business-usability-page-cell p {
   margin: 0;
-  color: #647067;
+  color: var(--erp-text-muted);
   line-height: 1.55;
 }
 
@@ -152,7 +152,7 @@
 
 .erp-dev-business-usability-outcomes dd {
   margin: 0;
-  color: #647067;
+  color: var(--erp-text-muted);
   line-height: 1.55;
 }
 
@@ -166,7 +166,7 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-business-usability-header {
-  border-color: #334155;
+  border-color: var(--erp-text-muted);
   background: rgb(23 33 50 / 0.96);
 }
 

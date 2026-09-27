@@ -1,7 +1,7 @@
 .erp-dev-product-core-page {
   min-height: 100vh;
   background: #f3f7f2;
-  color: #1f2937;
+  color: var(--erp-text);
   padding: 16px;
 }
 
@@ -17,9 +17,9 @@
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 14px;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 14px;
-  background: rgb(255 255 255 / 96%);
+  background: var(--erp-surface-bg);
   padding: 18px 20px;
   box-shadow:
     0 1px 2px rgb(15 23 42 / 4%),
@@ -61,7 +61,7 @@
 }
 
 .erp-dev-product-core-eyebrow {
-  color: #2b7a3d;
+  color: var(--erp-primary-strong);
   font-size: 12px;
   font-weight: 720;
   letter-spacing: 0.04em;
@@ -100,9 +100,9 @@
 .erp-dev-product-core-inventory,
 .erp-dev-product-core-empty {
   min-width: 0;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 14px;
-  background: rgb(255 255 255 / 96%);
+  background: var(--erp-surface-bg);
 }
 
 .erp-dev-product-core-inventory {
@@ -157,7 +157,7 @@
   gap: 7px;
   border: 1px solid #d9e5dc;
   border-radius: 999px;
-  background: #f8fbf8;
+  background: var(--erp-surface-bg-soft);
   padding: 7px 13px;
   color: #3b4d40;
   cursor: pointer;
@@ -187,7 +187,7 @@
 
 .erp-dev-product-core-table-wrap {
   overflow-x: auto;
-  border: 1px solid #dce8dd;
+  border: 1px solid var(--erp-border);
   border-radius: 12px;
 }
 
@@ -247,6 +247,8 @@
 }
 
 .erp-dev-product-core-table td {
+  height: var(--erp-row-height);
+  padding-block: var(--erp-table-cell-padding-block);
   color: #445149;
   line-height: 1.58;
 }
@@ -445,9 +447,9 @@
   .erp-dev-product-core-table tr {
     display: grid;
     overflow: hidden;
-    border: 1px solid #dce8dd;
+    border: 1px solid var(--erp-border);
     border-radius: 11px;
-    background: #fff;
+    background: var(--erp-surface-bg);
   }
 
   .erp-dev-product-core-table td {

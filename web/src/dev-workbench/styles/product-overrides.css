@@ -36,7 +36,7 @@
 .erp-dev-testing-validation-plan__head p.ant-typography {
   max-width: 760px;
   margin-top: 5px;
-  color: #647067;
+  color: var(--erp-text-muted);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -44,16 +44,16 @@
 .erp-dev-testing-validation-plan,
 .erp-dev-testing-validation-action {
   min-width: 0;
-  border: 1px solid #d5e4dc;
+  border: 1px solid var(--erp-border);
   border-radius: 13px;
-  background: #ffffff;
+  background: var(--erp-surface-bg);
 }
 
 .erp-dev-testing-validation-plan {
   display: grid;
   gap: 12px;
   padding: 14px;
-  box-shadow: inset 3px 0 0 #2563eb;
+  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
 .erp-dev-testing-validation-plan__head > div {
@@ -85,7 +85,7 @@
   min-width: 0;
   align-content: start;
   gap: 5px;
-  border: 1px solid #e4ede7;
+  border: 1px solid var(--erp-border);
   border-radius: 9px;
   background: #f8fbf9;
   padding: 9px 10px;
@@ -94,12 +94,12 @@
 .erp-dev-testing-validation-plan__identity small,
 .erp-dev-testing-validation-plan__note,
 .erp-dev-testing-validation-plan__empty {
-  color: #647067;
+  color: var(--erp-text-muted);
   font-size: 12px;
 }
 
 .erp-dev-testing-validation-plan__identity code {
-  color: #475569;
+  color: var(--erp-text-muted);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
@@ -112,7 +112,7 @@
 
 .erp-dev-testing-validation-plan__lists > div {
   min-width: 0;
-  border: 1px solid #e4ede7;
+  border: 1px solid var(--erp-border);
   border-radius: 9px;
   background: #fbfdfc;
   padding: 10px 12px;
@@ -128,7 +128,7 @@
 
 .erp-dev-testing-validation-plan__lists li,
 .erp-dev-testing-validation-plan__lists p {
-  color: #475569;
+  color: var(--erp-text-muted);
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -141,7 +141,7 @@
   margin-top: 3px;
   border-radius: 6px;
   background: #eef7ef;
-  color: #173f2a;
+  color: var(--erp-text);
   padding: 3px 6px;
   overflow-wrap: anywhere;
 }
@@ -163,7 +163,7 @@
   align-content: start;
   gap: 9px;
   padding: 12px;
-  box-shadow: inset 3px 0 0 #0f766e;
+  box-shadow: inset 3px 0 0 var(--erp-primary-strong);
 }
 
 .erp-dev-testing-validation-action--success {
@@ -192,7 +192,7 @@
 
 .erp-dev-testing-validation-action__head small,
 .erp-dev-testing-validation-action__boundary {
-  color: #647067;
+  color: var(--erp-text-muted);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -204,7 +204,7 @@
 
 .erp-dev-testing-validation-action p {
   margin: 0;
-  color: #475569;
+  color: var(--erp-text-muted);
   font-size: 12px;
   line-height: 1.55;
   overflow-wrap: anywhere;
@@ -212,7 +212,7 @@
 
 .erp-dev-testing-validation-action__message {
   border-radius: 8px;
-  background: #f4f7f5;
+  background: var(--erp-page-bg);
   padding: 7px 8px;
 }
 
@@ -240,7 +240,7 @@
     height: auto;
   }
 
-  .erp-dev-prototypes-shell {
+  .erp-dev-ui-design-shell {
     grid-template-columns: 1fr;
     height: auto;
   }
@@ -254,8 +254,8 @@
   .erp-dev-docs-reader,
   .erp-dev-governance-sidebar,
   .erp-dev-governance-main,
-  .erp-dev-prototypes-sidebar,
-  .erp-dev-prototypes-reader,
+  .erp-dev-ui-design-sidebar,
+  .erp-dev-ui-design-reader,
   .erp-dev-testing-reader {
     max-height: none;
   }
@@ -264,7 +264,7 @@
     max-height: 260px;
   }
 
-  .erp-dev-prototypes-list {
+  .erp-dev-ui-design-list {
     max-height: 360px;
   }
 
@@ -298,7 +298,7 @@
     width: 100%;
   }
 
-  .erp-dev-prototypes-preview__frame {
+  .erp-dev-ui-design-preview__frame {
     height: 720px;
     flex-basis: 720px;
   }
@@ -321,7 +321,7 @@
     padding: 10px;
   }
 
-  .erp-dev-prototypes-page {
+  .erp-dev-ui-design-page {
     padding: 10px;
   }
 
@@ -338,9 +338,9 @@
   .erp-dev-governance-sidebar,
   .erp-dev-governance-decision,
   .erp-dev-governance-reference-details,
-  .erp-dev-prototypes-header,
-  .erp-dev-prototypes-sidebar,
-  .erp-dev-prototypes-reader,
+  .erp-dev-ui-design-header,
+  .erp-dev-ui-design-sidebar,
+  .erp-dev-ui-design-reader,
   .erp-dev-testing-header,
   .erp-dev-testing-reader {
     border-radius: 12px;
@@ -353,10 +353,10 @@
   .erp-dev-governance-header,
   .erp-dev-governance-decision__head,
   .erp-dev-governance-reference-section__head,
-  .erp-dev-prototypes-header,
-  .erp-dev-prototypes-reader__toolbar,
-  .erp-dev-prototypes-reader__info,
-  .erp-dev-prototypes-fullscreen__bar {
+  .erp-dev-ui-design-header,
+  .erp-dev-ui-design-reader__toolbar,
+  .erp-dev-ui-design-reader__info,
+  .erp-dev-ui-design-fullscreen__bar {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -466,7 +466,7 @@
 
   .erp-dev-testing-coverage-identity > span {
     border-right: 0;
-    border-bottom: 1px solid #e4ede7;
+    border-bottom: 1px solid var(--erp-border);
     padding: 0 0 8px;
   }
 
@@ -479,23 +479,23 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-prototypes-reader__meta,
-  .erp-dev-prototypes-reader__meta .ant-btn,
-  .erp-dev-prototypes-fullscreen__bar .ant-btn {
+  .erp-dev-ui-design-reader__meta,
+  .erp-dev-ui-design-reader__meta .ant-btn,
+  .erp-dev-ui-design-fullscreen__bar .ant-btn {
     width: 100%;
   }
 
-  .erp-dev-prototypes-header__stats {
+  .erp-dev-ui-design-header__stats {
     justify-content: flex-start;
     min-width: 0;
   }
 
-  .erp-dev-prototypes-filter {
+  .erp-dev-ui-design-filter {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .erp-dev-prototypes-filter__item {
+  .erp-dev-ui-design-filter__item {
     width: 100%;
   }
 
@@ -520,7 +520,7 @@
     font-size: 18px;
   }
 
-  .erp-dev-prototypes-preview__frame {
+  .erp-dev-ui-design-preview__frame {
     height: 640px;
     flex-basis: 640px;
   }
@@ -596,14 +596,14 @@
   .erp-dev-hub-page,
   .erp-dev-governance-page,
   .erp-dev-testing-page,
-  .erp-dev-prototypes-page {
+  .erp-dev-ui-design-page {
     padding: 12px;
   }
 
   .erp-dev-hub-page *,
   .erp-dev-governance-page *,
   .erp-dev-testing-page *,
-  .erp-dev-prototypes-page * {
+  .erp-dev-ui-design-page * {
     min-width: 0;
   }
 
@@ -626,7 +626,7 @@
 
   .erp-dev-governance-header,
   .erp-dev-testing-header,
-  .erp-dev-prototypes-header {
+  .erp-dev-ui-design-header {
     align-items: stretch;
     flex-direction: column;
     gap: 10px;
@@ -668,12 +668,12 @@
     font-size: 20px;
   }
 
-  .erp-dev-prototypes-header__stats {
+  .erp-dev-ui-design-header__stats {
     justify-content: flex-start;
     min-width: 0;
   }
 
-  .erp-dev-prototypes-header__stats > * {
+  .erp-dev-ui-design-header__stats > * {
     max-width: 100%;
     overflow-wrap: anywhere;
   }
@@ -910,7 +910,7 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-docs-markdown code {
-  background: #e5edf5;
+  background: var(--erp-border);
   color: #166534;
 }
 
@@ -921,7 +921,7 @@
 
 [data-erp-theme='dark'] .erp-dev-docs-markdown pre code {
   background: transparent;
-  color: #e5edf5;
+  color: var(--erp-border);
 }
 
 [data-erp-theme='dark'] .erp-dev-docs-markdown .erp-markdown-mermaid {
@@ -931,7 +931,7 @@
 
 [data-erp-theme='dark'] .erp-dev-docs-markdown .erp-markdown-mermaid__tool {
   border-color: var(--erp-border);
-  background: #111827;
+  background: var(--erp-text);
   color: var(--erp-text);
 }
 
@@ -999,7 +999,12 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-console {
-  background: linear-gradient(135deg, #111827 0%, #102016 58%, #172554 100%);
+  background: linear-gradient(
+    135deg,
+    var(--erp-text) 0%,
+    #102016 58%,
+    #172554 100%
+  );
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-title.ant-typography,
@@ -1064,7 +1069,7 @@
 
 [data-erp-theme='dark'] .erp-dev-customer-import-step__index {
   background: var(--erp-interactive-bg-hover);
-  color: #99f6e4;
+  color: var(--erp-border-strong);
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-import-hero__copy .ant-typography,
@@ -1118,12 +1123,12 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-decision-card {
-  box-shadow: inset 3px 0 0 #334155;
+  box-shadow: inset 3px 0 0 var(--erp-text-muted);
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-quick-action {
-  border-color: #2563eb;
-  box-shadow: inset 3px 0 0 #60a5fa;
+  border-color: var(--erp-primary);
+  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-quick-action:hover,
@@ -1180,7 +1185,7 @@
 [data-erp-theme='dark'] .erp-dev-hub-card:focus-within {
   border-color: var(--erp-interactive-border-hover);
   box-shadow:
-    inset 3px 0 0 #60a5fa,
+    inset 3px 0 0 var(--erp-primary),
     0 10px 24px rgb(0 0 0 / 0.28);
 }
 
@@ -1198,14 +1203,14 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-hub-card__link {
-  border-color: #1d4ed8;
+  border-color: var(--erp-primary-strong);
   background: #172554;
   color: #93c5fd;
 }
 
 [data-erp-theme='dark'] .erp-dev-hub-card__link:hover,
 [data-erp-theme='dark'] .erp-dev-hub-card__link:focus-visible {
-  border-color: #60a5fa;
+  border-color: var(--erp-primary);
   background: #1e3a8a;
   color: #bfdbfe;
 }
@@ -1269,16 +1274,16 @@
 [data-erp-theme='dark'] .erp-dev-testing-tier__level,
 [data-erp-theme='dark'] .erp-dev-testing-command-tags :where(code) {
   background: var(--erp-interactive-bg-hover);
-  color: #99f6e4;
+  color: var(--erp-border-strong);
 }
 
 [data-erp-theme='dark'] .erp-dev-testing-preset__head {
-  color: #99f6e4;
+  color: var(--erp-border-strong);
 }
 
 [data-erp-theme='dark'] .erp-dev-testing-filter__item {
-  border-color: #334155;
-  background: #111827;
+  border-color: var(--erp-text-muted);
+  background: var(--erp-text);
   color: var(--erp-text-muted);
 }
 
@@ -1292,7 +1297,7 @@
 [data-erp-theme='dark'] .erp-dev-testing-filter__item:focus-visible {
   border-color: var(--erp-interactive-border-hover);
   background: var(--erp-interactive-bg-hover);
-  color: #99f6e4;
+  color: var(--erp-border-strong);
 }
 
 [data-erp-theme='dark'] .erp-dev-testing-filter__item--active {
@@ -1326,18 +1331,18 @@
 [data-erp-theme='dark'] .erp-dev-testing-validation-plan__lists :where(li code),
 [data-erp-theme='dark'] .erp-dev-testing-validation-action__message {
   background: var(--erp-interactive-bg-hover);
-  color: #99f6e4;
+  color: var(--erp-border-strong);
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-page {
+[data-erp-theme='dark'] .erp-dev-ui-design-page {
   background: var(--erp-page-bg);
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-header,
-[data-erp-theme='dark'] .erp-dev-prototypes-sidebar,
-[data-erp-theme='dark'] .erp-dev-prototypes-reader,
-[data-erp-theme='dark'] .erp-dev-prototypes-fullscreen {
+[data-erp-theme='dark'] .erp-dev-ui-design-header,
+[data-erp-theme='dark'] .erp-dev-ui-design-sidebar,
+[data-erp-theme='dark'] .erp-dev-ui-design-reader,
+[data-erp-theme='dark'] .erp-dev-ui-design-fullscreen {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
   box-shadow:
@@ -1345,86 +1350,86 @@
     0 14px 32px rgb(0 0 0 / 0.26);
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-reader__toolbar,
-[data-erp-theme='dark'] .erp-dev-prototypes-reader__info,
-[data-erp-theme='dark'] .erp-dev-prototypes-fullscreen__bar {
+[data-erp-theme='dark'] .erp-dev-ui-design-reader__toolbar,
+[data-erp-theme='dark'] .erp-dev-ui-design-reader__info,
+[data-erp-theme='dark'] .erp-dev-ui-design-fullscreen__bar {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-title.ant-typography,
-[data-erp-theme='dark'] .erp-dev-prototypes-card__title {
+[data-erp-theme='dark'] .erp-dev-ui-design-title.ant-typography,
+[data-erp-theme='dark'] .erp-dev-ui-design-card__title {
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-summary.ant-typography,
-[data-erp-theme='dark'] .erp-dev-prototypes-filter-note.ant-typography,
-[data-erp-theme='dark'] .erp-dev-prototypes-card__dir,
-[data-erp-theme='dark'] .erp-dev-prototypes-reader__applies,
-[data-erp-theme='dark'] .erp-dev-prototypes-group__head,
-[data-erp-theme='dark'] .erp-dev-prototypes-list-section__head {
+[data-erp-theme='dark'] .erp-dev-ui-design-summary.ant-typography,
+[data-erp-theme='dark'] .erp-dev-ui-design-filter-note.ant-typography,
+[data-erp-theme='dark'] .erp-dev-ui-design-card__dir,
+[data-erp-theme='dark'] .erp-dev-ui-design-reader__applies,
+[data-erp-theme='dark'] .erp-dev-ui-design-group__head,
+[data-erp-theme='dark'] .erp-dev-ui-design-list-section__head {
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-header__stats span,
-[data-erp-theme='dark'] .erp-dev-prototypes-card,
-[data-erp-theme='dark'] .erp-dev-prototypes-filter__item,
-[data-erp-theme='dark'] .erp-dev-prototypes-group-controls .ant-btn,
-[data-erp-theme='dark'] .erp-dev-prototypes-group__head,
-[data-erp-theme='dark'] .erp-dev-prototypes-list-section__head,
-[data-erp-theme='dark'] .erp-dev-prototypes-group__count,
-[data-erp-theme='dark'] .erp-dev-prototypes-reader__applies,
-[data-erp-theme='dark'] .erp-dev-prototypes-card__pin {
+[data-erp-theme='dark'] .erp-dev-ui-design-header__stats span,
+[data-erp-theme='dark'] .erp-dev-ui-design-card,
+[data-erp-theme='dark'] .erp-dev-ui-design-filter__item,
+[data-erp-theme='dark'] .erp-dev-ui-design-group-controls .ant-btn,
+[data-erp-theme='dark'] .erp-dev-ui-design-group__head,
+[data-erp-theme='dark'] .erp-dev-ui-design-list-section__head,
+[data-erp-theme='dark'] .erp-dev-ui-design-group__count,
+[data-erp-theme='dark'] .erp-dev-ui-design-reader__applies,
+[data-erp-theme='dark'] .erp-dev-ui-design-card__pin {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-filter__item {
-  border-color: #334155;
-  background: #111827;
+[data-erp-theme='dark'] .erp-dev-ui-design-filter__item {
+  border-color: var(--erp-text-muted);
+  background: var(--erp-text);
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-card {
+[data-erp-theme='dark'] .erp-dev-ui-design-card {
   box-shadow: inset 3px 0 0 #1e3a5f;
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-card:hover,
-[data-erp-theme='dark'] .erp-dev-prototypes-card:focus-within,
-[data-erp-theme='dark'] .erp-dev-prototypes-card--active,
-[data-erp-theme='dark'] .erp-dev-prototypes-filter__item:hover,
-[data-erp-theme='dark'] .erp-dev-prototypes-filter__item:focus-visible,
-[data-erp-theme='dark'] .erp-dev-prototypes-group-controls .ant-btn:hover,
+[data-erp-theme='dark'] .erp-dev-ui-design-card:hover,
+[data-erp-theme='dark'] .erp-dev-ui-design-card:focus-within,
+[data-erp-theme='dark'] .erp-dev-ui-design-card--active,
+[data-erp-theme='dark'] .erp-dev-ui-design-filter__item:hover,
+[data-erp-theme='dark'] .erp-dev-ui-design-filter__item:focus-visible,
+[data-erp-theme='dark'] .erp-dev-ui-design-group-controls .ant-btn:hover,
 [data-erp-theme='dark']
-  .erp-dev-prototypes-group-controls
+  .erp-dev-ui-design-group-controls
   .ant-btn:focus-visible,
-[data-erp-theme='dark'] .erp-dev-prototypes-group__head:hover,
-[data-erp-theme='dark'] .erp-dev-prototypes-group__head:focus-visible,
-[data-erp-theme='dark'] .erp-dev-prototypes-card__pin:hover,
-[data-erp-theme='dark'] .erp-dev-prototypes-card__pin:focus-visible,
-[data-erp-theme='dark'] .erp-dev-prototypes-card__pin--active {
+[data-erp-theme='dark'] .erp-dev-ui-design-group__head:hover,
+[data-erp-theme='dark'] .erp-dev-ui-design-group__head:focus-visible,
+[data-erp-theme='dark'] .erp-dev-ui-design-card__pin:hover,
+[data-erp-theme='dark'] .erp-dev-ui-design-card__pin:focus-visible,
+[data-erp-theme='dark'] .erp-dev-ui-design-card__pin--active {
   border-color: var(--erp-interactive-border-hover);
   background: var(--erp-interactive-bg-hover);
   color: var(--erp-text);
-  box-shadow: inset 3px 0 0 #60a5fa;
+  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-filter__item--active {
-  border-color: #60a5fa;
+[data-erp-theme='dark'] .erp-dev-ui-design-filter__item--active {
+  border-color: var(--erp-primary);
   background: #1e3a8a;
-  color: #f8fafc;
-  box-shadow: inset 3px 0 0 #60a5fa;
+  color: var(--erp-surface-bg-soft);
+  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-preview__frame,
-[data-erp-theme='dark'] .erp-dev-prototypes-preview__image-wrap,
-[data-erp-theme='dark'] .erp-dev-prototypes-preview__empty {
+[data-erp-theme='dark'] .erp-dev-ui-design-preview__frame,
+[data-erp-theme='dark'] .erp-dev-ui-design-preview__image-wrap,
+[data-erp-theme='dark'] .erp-dev-ui-design-preview__empty {
   background-color: #0f172a;
   background-image: none;
 }
 
-[data-erp-theme='dark'] .erp-dev-prototypes-preview__image {
+[data-erp-theme='dark'] .erp-dev-ui-design-preview__image {
   border-color: var(--erp-border);
   background: #ffffff;
   box-shadow: 0 18px 46px rgb(0 0 0 / 0.36);

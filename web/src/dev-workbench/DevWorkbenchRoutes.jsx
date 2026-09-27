@@ -15,7 +15,7 @@ import {
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_PRODUCT_CORE_ROUTE,
   DEV_PRODUCT_ENGINEERING_ROUTE,
-  DEV_PROTOTYPES_ROUTE,
+  DEV_UI_DESIGN_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
   DEV_QUALITY_ROUTE,
   DEV_STATUS_FLOWS_ROUTE,
@@ -87,9 +87,9 @@ const DevBusinessUsabilityPage = createDevLazyRoute(
   DEV_BUSINESS_USABILITY_ROUTE,
   () => import('./pages/DevBusinessUsabilityPage.jsx')
 )
-const DevPrototypesPage = createDevLazyRoute(
-  DEV_PROTOTYPES_ROUTE,
-  () => import('./pages/DevPrototypesPage.jsx')
+const DevUIDesignPage = createDevLazyRoute(
+  DEV_UI_DESIGN_ROUTE,
+  () => import('./pages/DevUIDesignPage.jsx')
 )
 const DevCustomerConfigPage = createDevLazyRoute(
   DEV_CUSTOMER_CONFIG_ROUTE,
@@ -212,7 +212,7 @@ export default function DevWorkbenchRoutes() {
           <Route path="testing" element={<DevTestingPage />} />
           <Route path="quality-gates" element={<DevQualityGatesPage />} />
           <Route path="data-preparation" element={<DevDataPreparationPage />} />
-          <Route path="prototypes" element={<DevPrototypesPage />} />
+          <Route path="ui-design" element={<DevUIDesignPage />} />
           <Route path="customer-config" element={<DevCustomerConfigPage />} />
           <Route
             path="database-migration"

@@ -209,7 +209,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
       'v1-local-acceptance-plan',
       'mobile-workflow-smoke',
       'customer-config-dev-console',
-      'dev-prototype-registry',
+      'dev-ui-design',
       'dev-doc-governance',
       'customer-config-package-runtime',
       'customer-import-tooling',
@@ -530,20 +530,17 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     getPreset('customer-config-dev-console').description,
     /只证明 dev-only 控制台/
   )
+  assert.match(getPresetCopyText('dev-ui-design'), /devUIDesign\.test\.mjs/)
+  assert.match(getPresetCopyText('dev-ui-design'), /devHub\.test\.mjs/)
   assert.match(
-    getPresetCopyText('dev-prototype-registry'),
-    /devPrototypes\.test\.mjs/
-  )
-  assert.match(getPresetCopyText('dev-prototype-registry'), /devHub\.test\.mjs/)
-  assert.match(
-    getPresetCopyText('dev-prototype-registry'),
-    /dev-page-prototypes-desktop-light/
+    getPresetCopyText('dev-ui-design'),
+    /dev-page-ui-design-desktop-light/
   )
   assert.match(
-    getPreset('dev-prototype-registry').description,
-    /不晋级 Current/
+    getPreset('dev-ui-design').description,
+    /只证明 dev-only 交互设计查看器/
   )
-  assert.match(getPreset('dev-prototype-registry').description, /不改正式菜单/)
+  assert.match(getPreset('dev-ui-design').description, /不改正式菜单/)
   assert.match(getPresetCopyText('dev-doc-governance'), /devDocs\.test\.mjs/)
   assert.match(
     getPresetCopyText('dev-doc-governance'),
@@ -794,7 +791,8 @@ test('devTesting: 只索引当前测试入口白名单文档', () => {
       deliveryEvidenceMarkdown,
     '../../../../docs/reference/第一次20260519/自动化测试计划.md':
       deliveryEvidenceMarkdown,
-    '../../../../docs/architecture/主数据源单据事实边界评审.md': unrelatedMarkdown,
+    '../../../../docs/architecture/主数据源单据事实边界评审.md':
+      unrelatedMarkdown,
     '../../../../README.md': unrelatedMarkdown,
   })
 

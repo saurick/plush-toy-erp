@@ -84,7 +84,7 @@
 }
 
 .erp-dev-version-overview__eyebrow.ant-typography {
-  color: var(--ant-color-primary, #1677ff);
+  color: var(--ant-color-primary, var(--erp-primary));
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -117,7 +117,7 @@
 
 .erp-dev-version-fact dt {
   margin-bottom: 7px;
-  color: var(--ant-color-text-secondary, #667085);
+  color: var(--ant-color-text-secondary, var(--erp-text-muted));
   font-size: 12px;
 }
 
@@ -153,9 +153,9 @@
   flex-direction: column;
   align-items: flex-start;
   padding: 16px;
-  border: 1px solid var(--ant-color-border-secondary, #dbe3ea);
+  border: 1px solid var(--ant-color-border-secondary, var(--erp-border));
   border-radius: 10px;
-  background: var(--ant-color-fill-quaternary, #f7faf7);
+  background: var(--ant-color-fill-quaternary, var(--erp-surface-bg-soft));
 }
 
 .erp-dev-version-next h3.ant-typography {
@@ -186,7 +186,7 @@
   width: 100%;
   min-width: 0;
   margin-top: auto;
-  border-top: 1px solid var(--ant-color-border-secondary, #dbe3ea);
+  border-top: 1px solid var(--ant-color-border-secondary, var(--erp-border));
   padding-top: 14px;
 }
 
@@ -242,7 +242,7 @@
 
 .erp-dev-version-current-operation {
   overflow: hidden;
-  border-left: 3px solid var(--ant-color-primary, #1677ff);
+  border-left: 3px solid var(--ant-color-primary, var(--erp-primary));
 }
 
 .erp-dev-version-current-operation .ant-card-body {
@@ -363,7 +363,7 @@
   height: 32px;
   place-items: center;
   border-radius: 50%;
-  color: var(--ant-color-primary, #1677ff);
+  color: var(--ant-color-primary, var(--erp-primary));
   font-weight: 600;
   background: var(--ant-color-primary-bg, #e6f4ff);
 }
@@ -403,6 +403,13 @@
   min-width: 0;
 }
 
+.erp-dev-version-workspace > .ant-tabs > .ant-tabs-nav {
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+
 .erp-dev-version-workspace,
 .erp-dev-version-tab--versions,
 .erp-dev-version-tab--history {
@@ -417,10 +424,6 @@
 
 .erp-dev-version-workspace__evidence-note strong {
   color: var(--ant-color-text, rgb(0 0 0 / 88%));
-}
-
-.erp-dev-version-workspace .ant-tabs-nav {
-  margin-bottom: 16px;
 }
 
 .erp-dev-version-table-card .ant-pagination {
@@ -528,7 +531,7 @@
   min-height: 44px;
   padding: 8px 12px;
   cursor: pointer;
-  color: var(--ant-color-primary, #1677ff);
+  color: var(--ant-color-primary, var(--erp-primary));
   list-style: none;
 }
 
@@ -595,7 +598,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--ant-color-primary, #1677ff);
+  background: var(--ant-color-primary, var(--erp-primary));
 }
 
 .erp-dev-timing-bars__fill--failed {
@@ -616,7 +619,7 @@
   display: grid;
   gap: 4px;
   padding: 12px 14px;
-  border-left: 3px solid var(--ant-color-primary, #1677ff);
+  border-left: 3px solid var(--ant-color-primary, var(--erp-primary));
   border-radius: 0 8px 8px 0;
   background: var(--ant-color-primary-bg, #e6f4ff);
 }
@@ -637,7 +640,7 @@
   min-height: 44px;
   padding: 8px 4px;
   cursor: pointer;
-  color: var(--ant-color-primary, #1677ff);
+  color: var(--ant-color-primary, var(--erp-primary));
 }
 
 .erp-dev-pipeline-timing__details > summary::before,
@@ -685,7 +688,7 @@
 .erp-dev-pipeline-timing__details > summary:focus-visible,
 .erp-dev-pipeline-timing__jobs > details > summary:focus-visible {
   border-radius: 6px;
-  outline: 2px solid var(--ant-color-primary, #1677ff);
+  outline: 2px solid var(--ant-color-primary, var(--erp-primary));
   outline-offset: 2px;
 }
 

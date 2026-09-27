@@ -110,7 +110,7 @@ test("dev workbench boundary: source and styles live outside product directories
     ".erp-dev-docs",
     ".erp-dev-governance",
     ".erp-dev-capability",
-    ".erp-dev-prototypes",
+    ".erp-dev-ui-design",
     ".erp-dev-hub",
     ".erp-dev-flow-state",
     ".erp-dev-data-",
@@ -234,8 +234,8 @@ const allowedERPImports = new Set([
 ]);
 const allowedERPImportsByFile = new Map([
   [
-    "web/src/dev-workbench/config/currentPageAtlasPrototype.test.mjs",
-    new Set(["config/businessModules.mjs", "config/seedData.mjs"]),
+    "web/src/dev-workbench/config/devUIDesign.test.mjs",
+    new Set(["config/helpScenarios.mjs"]),
   ],
   [
     "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
@@ -292,6 +292,20 @@ test("dev workbench boundary: imports from ERP stay on explicit read/API adapter
 });
 
 test("dev workbench boundary: resolved imports preserve module and file scope", () => {
+  assert.equal(
+    isAllowedERPImport(
+      "web/src/dev-workbench/config/devUIDesign.test.mjs",
+      "../../erp/config/helpScenarios.mjs",
+    ),
+    true,
+  );
+  assert.equal(
+    isAllowedERPImport(
+      "web/src/dev-workbench/pages/UIDesignPage.jsx",
+      "../../erp/config/helpScenarios.mjs",
+    ),
+    false,
+  );
   const workflowFile =
     "web/src/dev-workbench/components/flow-state/WorkflowView.jsx";
   for (const prefix of ["@/erp/", "../../../erp/"]) {

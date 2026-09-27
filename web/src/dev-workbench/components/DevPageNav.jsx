@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { CopyOutlined, FileTextOutlined } from '@ant-design/icons'
+import {
+  AppstoreOutlined,
+  CodeOutlined,
+  CopyOutlined,
+  DeploymentUnitOutlined,
+  FileTextOutlined,
+  SafetyCertificateOutlined,
+} from '@ant-design/icons'
 import { Button, theme } from 'antd'
 import { Link, useLocation } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
@@ -15,6 +22,12 @@ import {
 import { preloadDevRoute } from '../config/devRouteModules.mjs'
 
 const COPY_MESSAGE_KEY = 'dev-page-nav-copy-deep-link'
+const navIcons = [
+  <AppstoreOutlined key="overview" />,
+  <CodeOutlined key="product" />,
+  <SafetyCertificateOutlined key="quality" />,
+  <DeploymentUnitOutlined key="delivery" />,
+]
 const EMPTY_NAVIGATION_INTENT = Object.freeze({
   sourcePathname: '',
   targetPathname: '',
@@ -208,7 +221,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
           </span>
           <span className="erp-dev-workspace-nav__brand-copy">
             <strong>研发效能工作台</strong>
-            <small>Engineering Delivery Workbench</small>
+            <small>Engineering Workbench</small>
           </span>
         </div>
         <div
@@ -216,7 +229,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
           aria-label="开发工作台页面"
         >
           <div className="erp-dev-workspace-nav__primary">
-            {DEV_WORKSPACE_NAV_ITEMS.map((item) => {
+            {DEV_WORKSPACE_NAV_ITEMS.map((item, index) => {
               const isExact = currentPathname === item.route
               const isContext = currentAreaKey === item.key && !isExact
               return (
@@ -240,7 +253,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
                     className="erp-dev-workspace-nav__route-mark"
                     aria-hidden="true"
                   >
-                    {item.label.slice(0, 1)}
+                    {navIcons[index]}
                   </span>
                   <span>{item.label}</span>
                   <small>{item.description}</small>
@@ -284,7 +297,6 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
         <div className="erp-dev-workspace-nav__actions">
           <ERPThemeToggle
             className="erp-dev-workspace-nav__theme-toggle"
-            variant="menu"
             showLabel
           />
           <Button

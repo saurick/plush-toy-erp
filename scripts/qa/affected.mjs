@@ -15,7 +15,9 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "../..");
 const MIGRATION_CONTRACT_PATHS = new Set([
   ...MIGRATION_CONTRACT_TESTS,
-  ...MIGRATION_CONTRACT_TESTS.map((file) => file.replace(/\.test\.mjs$/u, ".mjs")),
+  ...MIGRATION_CONTRACT_TESTS.map((file) =>
+    file.replace(/\.test\.mjs$/u, ".mjs"),
+  ),
   "scripts/qa/populated-upgrade-preflight.sh",
 ]);
 const AFFECTED_SCOPE_ORDER = [
@@ -58,7 +60,7 @@ const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-page-permission-relationships-desktop-light",
   "dev-page-governance-desktop-light",
   "dev-page-docs-desktop-light",
-  "dev-page-prototypes-desktop-light",
+  "dev-page-ui-design-desktop-light",
   "dev-page-testing-desktop-light",
   "dev-page-data-preparation-desktop-light",
   "dev-page-customer-config-desktop-light",
@@ -561,7 +563,7 @@ function devBrowserScenarioNames(file) {
     ],
     [/Governance|governance/u, ["dev-page-governance-desktop-light"]],
     [/DevDocs|devDocs|dev-docs/u, ["dev-page-docs-desktop-light"]],
-    [/Prototype|prototypes/u, ["dev-page-prototypes-desktop-light"]],
+    [/UIDesign|ui-design/u, ["dev-page-ui-design-desktop-light"]],
     [/DevTesting|devTesting/u, ["dev-page-testing-desktop-light"]],
     [
       /DataPreparation|data-preparation/u,

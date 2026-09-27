@@ -75,7 +75,7 @@ const ICON_BY_KEY = {
   docs: <FileSearchOutlined />,
   testing: <SafetyCertificateOutlined />,
   'data-preparation': <DatabaseOutlined />,
-  prototypes: <AppstoreOutlined />,
+  'ui-design': <AppstoreOutlined />,
   'customer-config': <DeploymentUnitOutlined />,
   'status-flows': <ApartmentOutlined />,
   'business-usability': <QuestionCircleOutlined />,
@@ -249,7 +249,7 @@ export default function DevHubPage() {
         <div className="erp-dev-hub-header__copy">
           <ExperimentOutlined className="erp-dev-hub-header__icon" />
           <Title level={1} className="erp-dev-hub-title">
-            研发效能工作台 / Engineering Delivery Workbench
+            研发效能工作台
           </Title>
           <Text className="erp-dev-hub-summary">
             按改动、验证和交付的顺序选择下一步；只在需要时再查具体工具。

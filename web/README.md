@@ -48,12 +48,15 @@ pnpm install
 | 场景 | 入口 |
 | --- | --- |
 | 日常开发 | `pnpm start` |
-| 重新加载本工作区服务 | `pnpm start:restart`，先预检并核对进程归属 |
+| 重新加载本工作区服务 | `pnpm restart` / `pnpm start:restart`，先预检并核对进程归属 |
 | 独立前端验证 | `pnpm start:isolated`，自动选择辅助端口 |
 | 只调布局，不登录或调用 RPC | `pnpm start:frontend-only`，明确为降级模式 |
 | 客户热更新 / 静态预览 | `pnpm start:yoyoosun --print-plan` / `pnpm preview:yoyoosun --print-plan` |
+| 重启客户开发入口 | `pnpm restart:yoyoosun`，固定重启 `15200`；可用 `--port` 指定辅助端口 |
 
 普通启动先只读检查 schema、migration 和后端 health / ready。可恢复的本机预检失败时保留 `/__dev/database-migration`，业务入口继续阻断；修正后重新通过完整检查才恢复，不自动 apply。完整启动、进程保护、端口审计及客户包核对见 [前端脚本](scripts/README.md#本地启动与进程范围)。
+
+所有开发入口直接加载当前工作区的 React / CSS 源文件并支持热更新，重启后不会用历史固定制品覆盖登录页或业务页。`pnpm restart` 对应主端口 `5175`；使用 `15200` 客户入口时运行 `pnpm restart:yoyoosun`。后端代码需在 `server/` 执行 `make dev_restart` 重新编译。
 
 ### 岗位任务端本地调试
 
@@ -106,6 +109,8 @@ pnpm css
 pnpm test
 STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 ```
+
+需要一次收集多个页面问题时，可设置 `STYLE_L1_CONTINUE_ON_FAILURE=1`；失败仍使命令退出非零，逐场景结果写入本轮输出目录的 `scenario-results.json`。默认遇到第一个失败停止。高保真外观与效能工作台检查使用 `high-fidelity-*` 场景；具体名称由场景注册表维护。
 
 `pnpm test` 自动发现 `*.test.mjs`，不手工枚举文件。浏览器输入模板、no-write preflight、真实登录和持久测试数据范围见 [前端回归脚本](scripts/README.md) 与 [QA 操作](../scripts/qa/README.md)；页面级 mock 不能代替真实后端、目标发布或客户验收。
 

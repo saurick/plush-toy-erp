@@ -162,7 +162,7 @@ test("DEV testing presets reference only the affected desktop scene names", () =
 
   assert.deepEqual(scenarioLists, [
     "dev-page-customer-config-desktop-light",
-    "dev-page-prototypes-desktop-light",
+    "dev-page-ui-design-desktop-light",
     "dev-page-overview-desktop-light",
     "dev-page-docs-desktop-light",
     "dev-page-governance-desktop-light",

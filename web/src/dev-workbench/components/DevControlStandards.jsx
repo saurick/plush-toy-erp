@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Button, ConfigProvider, Popover, theme } from 'antd'
+import { Button, ConfigProvider, Empty, Popover, theme } from 'antd'
 import { DownOutlined, FilterOutlined, ReloadOutlined } from '@ant-design/icons'
 import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
@@ -45,11 +45,26 @@ export default function DevControlStandards() {
           className="erp-dev-control-standards__examples"
           data-erp-theme={mode}
         >
+          <section aria-label="空状态样例">
+            <h3>空状态：同一图标、文案与留白</h3>
+            <p>
+              电脑列表、手机任务和工作台统一使用简洁图标、14px
+              中性说明与居中留白；无风险时不显示黄色警示框。加载失败保留重试提示，不能显示为空记录。
+            </p>
+            <Empty
+              description={keyword ? '没有符合条件的记录' : '当前范围暂无记录'}
+            >
+              {keyword && (
+                <Button onClick={() => setKeyword('')}>清除搜索</Button>
+              )}
+            </Empty>
+          </section>
           <section aria-label="页签样例">
             <h3>页签：切换同级内容</h3>
             <p>
               使用
-              SlidingTabs。所有页签共用中性边框，选中底色和字重指向下方内容。
+              SlidingTabs。与视图切换共用圆角底轨、主题浅色滑块和中性边框。
+              桌面高 38px，与操作区内部左对齐；页面底色、操作区内容面、底轨和选中块分层清晰。
             </p>
             <SlidingTabs
               aria-label="订单详情样例"
@@ -73,6 +88,7 @@ export default function DevControlStandards() {
             <p>
               使用
               SlidingSegmented。桌面按内容宽度排列，窄屏再均分；不把两个选项铺成整页大卡片。
+              与页签使用相同底轨和主题浅色滑块，选中项不再单独使用白底。
             </p>
             <SlidingSegmented
               aria-label="进度视图样例"

@@ -22,17 +22,17 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
 
 | 当前任务 | 必要读取 |
 | --- | --- |
-| 页面任务、字段、动作、状态、密度、原型 | [Page Semantics](references/page-semantics.md) |
+| 页面任务、字段、动作、状态、密度、交互设计 | [Page Semantics](references/page-semantics.md) |
 | 布局、主题、弹窗、键盘、运行交互、浏览器验证 | [Page Implementation](references/page-implementation.md) |
 | 纯文档 / Skill 修改 | 文本、metadata、引用和 scoped diff 检查 |
 
-只加载命中的分支。原型未变化且仍准确时不机械同步；小改动不强制检查全部页面或固定截图数量，高成本验证遵循 `$plush-test-governance`。
+只加载命中的分支。设计同步按 [Design Sync](references/page-semantics.md#design-sync) 判断，按需读取相关章节及 HTML 片段；小改动不强制检查全部页面或固定截图数量，高成本验证遵循 `$plush-test-governance`。
 
 ## Workflow
 
 1. Establish the page state and truth source.
-   - Determine whether the work is Draft, To Implement, or Current.
-   - 范围或页面入口不清时，用 `docs/当前真源与交接顺序.md` 与 `web/README.md` 定位；涉及原型时才读 `docs/product/prototypes/README.md` 和对应原型说明。
+   - 分开核对设计意图与当前代码、测试及运行证据，不以设计稿存在推定已实现。
+   - 范围或页面入口不清时，用 `docs/当前真源与交接顺序.md` 与 `web/README.md` 定位；涉及交互设计时才读 `docs/product/ui-design/README.md` 与相关页面族说明。
    - Inspect the real runtime page and existing components when the task touches layout, density, spacing, styles, interactions, or visible page structure.
 
 2. 根据影响面读取上表的语义或实现分支，在现有组件、helper 和真实后端能力上修改。
@@ -40,4 +40,4 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
 
 ## Deliverable Standard
 
-结论先行，说明页面行为或信息结构的变化、修改文件、实际验证和盲区。原型、字段链或权限边界仅在本次相关时展开；不逐项填报未触达内容。
+结论先行，说明页面行为或信息结构的变化、修改文件、实际验证和盲区。设计同步、字段链或权限边界仅在本次相关时展开；不逐项填报未触达内容。

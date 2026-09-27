@@ -3090,19 +3090,24 @@ export default function DevQualityGatesPage() {
           }
         />
 
-        <DevTaskNav
-          idPrefix="quality-gates"
-          ariaLabel="质量门禁视图"
-          items={VIEW_ITEMS.map(({ value, label }) => ({ value, label }))}
-          value={activeView}
-          onChange={selectView}
-          disabled={!parsed.valid}
-          compact
-          className="erp-dev-quality-tabs"
-        />
-        <Text className="erp-dev-quality-view-description">
-          {activeDescription}
-        </Text>
+        <section
+          className="erp-dev-quality-navigation"
+          aria-label="质量门禁操作区"
+        >
+          <DevTaskNav
+            idPrefix="quality-gates"
+            ariaLabel="质量门禁视图"
+            items={VIEW_ITEMS.map(({ value, label }) => ({ value, label }))}
+            value={activeView}
+            onChange={selectView}
+            disabled={!parsed.valid}
+            compact
+            className="erp-dev-quality-tabs"
+          />
+          <Text className="erp-dev-quality-view-description">
+            {activeDescription}
+          </Text>
+        </section>
         <ContextStrip
           summary={summary}
           view={activeView}

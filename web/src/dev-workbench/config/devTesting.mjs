@@ -102,12 +102,10 @@ const DEV_TESTING_DOCUMENT_ROLE_BY_PATH = new Map(
 
 // Copy presets must follow the checkout that is currently open, including an
 // App Worktree, instead of pointing back to one developer's main checkout.
-const CURRENT_CHECKOUT_ROOT_COMMAND =
-  'cd "$(git rev-parse --show-toplevel)"'
+const CURRENT_CHECKOUT_ROOT_COMMAND = 'cd "$(git rev-parse --show-toplevel)"'
 const CURRENT_CHECKOUT_SERVER_COMMAND =
   'cd "$(git rev-parse --show-toplevel)/server"'
-const CURRENT_CHECKOUT_WEB_COMMAND =
-  'cd "$(git rev-parse --show-toplevel)/web"'
+const CURRENT_CHECKOUT_WEB_COMMAND = 'cd "$(git rev-parse --show-toplevel)/web"'
 
 export const DEV_TESTING_COPY_PRESETS = Object.freeze([
   {
@@ -247,14 +245,14 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     ],
   },
   {
-    key: 'dev-prototype-registry',
-    label: '原型登记与查看器 / Prototype Registry',
+    key: 'dev-ui-design',
+    label: '交互设计与查看器 / UI Design Viewer',
     description:
-      'docs/product/prototypes、原型资产登记或 /__dev/prototypes 查看器改动时复制；只证明 dev-only 原型查看器和本地资产登记，不晋级 Current、不改正式菜单。',
+      'docs/product/ui-design、交互设计说明或 /__dev/ui-design 查看器改动时复制；只证明 dev-only 交互设计查看器与本地资产、不改正式菜单。',
     commands: [
       CURRENT_CHECKOUT_ROOT_COMMAND,
-      'node --test web/src/dev-workbench/config/devPrototypes.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
-      'STYLE_L1_SCENARIOS=dev-page-prototypes-desktop-light pnpm --dir web style:l1',
+      'node --test web/src/dev-workbench/config/devUIDesign.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
+      'STYLE_L1_SCENARIOS=dev-page-ui-design-desktop-light pnpm --dir web style:l1',
     ],
   },
   {

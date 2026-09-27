@@ -72,7 +72,7 @@ const navigationSections = [
     items: [
       {
         key: 'help-center',
-        label: '岗位使用帮助',
+        label: '帮助中心',
         path: '/erp/help-center',
         access: 'authenticated',
       },
@@ -152,7 +152,7 @@ test('role menu projection shows complete recommended navigation without inventi
     ]),
     [
       ['库存管理', ['库存台账']],
-      ['使用帮助', ['岗位使用帮助']],
+      ['使用帮助', ['帮助中心']],
     ]
   )
   assert.equal(model.totalItemCount, 6)
@@ -188,7 +188,7 @@ test('role menu projection preserves a saved custom layout and appends remaining
     model.secondarySections.flatMap((section) =>
       section.items.map((item) => item.label)
     ),
-    ['客户档案', '出货单', '岗位使用帮助']
+    ['客户档案', '出货单', '帮助中心']
   )
 })
 
@@ -228,7 +228,7 @@ test('employee menu projection merges multiple roles once and marks an inactive 
   )
   assert.deepEqual(
     model.secondarySections.at(-1).items.map((item) => item.label),
-    ['岗位使用帮助']
+    ['帮助中心']
   )
 })
 

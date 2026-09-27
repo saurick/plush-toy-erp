@@ -19,8 +19,7 @@ export const DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY =
   'plush_erp_dev_docs_expanded_dirs'
 export const DEV_DOCS_TOC_EXPANDED_STORAGE_KEY =
   'plush_erp_dev_docs_toc_expanded'
-export const DEV_DOCS_LIFECYCLE_STORAGE_KEY =
-  'plush_erp_dev_docs_lifecycle'
+export const DEV_DOCS_LIFECYCLE_STORAGE_KEY = 'plush_erp_dev_docs_lifecycle'
 
 export const DEV_DOCS_SEARCH_SCOPE_ALL = 'all'
 export const DEV_DOCS_SEARCH_SCOPE_TITLE = 'title'
@@ -92,9 +91,7 @@ function fallbackTitleFromPath(path = '') {
 }
 
 export function getDevDocsTitle(source = '', path = '') {
-  return source
-    ? titleFromMarkdown(source, path)
-    : fallbackTitleFromPath(path)
+  return source ? titleFromMarkdown(source, path) : fallbackTitleFromPath(path)
 }
 
 export function getDevDocsLifecycle(path = '') {
@@ -104,8 +101,8 @@ export function getDevDocsLifecycle(path = '') {
   }
   if (
     normalizedPath.startsWith('docs/reference/') ||
-    (normalizedPath.startsWith('docs/product/prototypes/') &&
-      normalizedPath !== 'docs/product/prototypes/README.md')
+    (normalizedPath.startsWith('docs/product/ui-design/') &&
+      normalizedPath !== 'docs/product/ui-design/README.md')
   ) {
     return DEV_DOCS_LIFECYCLE_REVIEW
   }
@@ -126,8 +123,7 @@ export function filterDevDocsByLifecycle(
 ) {
   const normalizedLifecycle = normalizeDevDocsLifecycle(lifecycle)
   return items.filter(
-    (item) =>
-      normalizeDevDocsLifecycle(item.lifecycle) === normalizedLifecycle
+    (item) => normalizeDevDocsLifecycle(item.lifecycle) === normalizedLifecycle
   )
 }
 

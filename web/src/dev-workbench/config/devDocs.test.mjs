@@ -225,8 +225,8 @@ test('devDocs: 默认按当前、评审参考和历史三层分流', async () =>
   const loadArchive = async () => '# 历史过程记录'
   const docs = buildDevDocsItems({
     '../../../../docs/当前真源与交接顺序.md': '# 当前真源',
-    '../../../../docs/product/prototypes/README.md': '# 原型总入口',
-    '../../../../docs/product/prototypes/menu-v1/README.md': '# 菜单候选原型',
+    '../../../../docs/product/ui-design/README.md': '# 交互设计入口',
+    '../../../../docs/product/ui-design/交互设计说明.md': '# 交互设计说明',
     '../../../../docs/reference/外部输入.md': '# 外部输入参考',
     '../../../../docs/archive/progress-2026-06.md': loadArchive,
   })
@@ -234,11 +234,11 @@ test('devDocs: 默认按当前、评审参考和历史三层分流', async () =>
   assert.equal(DEV_DOCS_LIFECYCLE_STORAGE_KEY, 'plush_erp_dev_docs_lifecycle')
   assert.equal(getDevDocsLifecycle('docs/当前真源与交接顺序.md'), 'current')
   assert.equal(
-    getDevDocsLifecycle('docs/product/prototypes/README.md'),
+    getDevDocsLifecycle('docs/product/ui-design/README.md'),
     'current'
   )
   assert.equal(
-    getDevDocsLifecycle('docs/product/prototypes/menu-v1/README.md'),
+    getDevDocsLifecycle('docs/product/ui-design/交互设计说明.md'),
     'review'
   )
   assert.equal(getDevDocsLifecycle('docs/reference/外部输入.md'), 'review')
@@ -251,13 +251,13 @@ test('devDocs: 默认按当前、评审参考和历史三层分流', async () =>
     filterDevDocsByLifecycle(docs, DEV_DOCS_LIFECYCLE_CURRENT)
       .map((item) => item.path)
       .sort(),
-    ['docs/product/prototypes/README.md', 'docs/当前真源与交接顺序.md']
+    ['docs/product/ui-design/README.md', 'docs/当前真源与交接顺序.md']
   )
   assert.deepEqual(
     filterDevDocsByLifecycle(docs, DEV_DOCS_LIFECYCLE_REVIEW)
       .map((item) => item.path)
       .sort(),
-    ['docs/product/prototypes/menu-v1/README.md', 'docs/reference/外部输入.md']
+    ['docs/product/ui-design/交互设计说明.md', 'docs/reference/外部输入.md']
   )
   const archive = filterDevDocsByLifecycle(docs, DEV_DOCS_LIFECYCLE_ARCHIVE)
   assert.equal(archive.length, 1)

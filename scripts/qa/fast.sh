@@ -193,7 +193,7 @@ web_tests=(
   "$ROOT_DIR/web/src/dev-workbench/config/devTesting.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devDocs.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devGovernance.test.mjs"
-  "$ROOT_DIR/web/src/dev-workbench/config/devPrototypes.test.mjs"
+  "$ROOT_DIR/web/src/dev-workbench/config/devUIDesign.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devCustomerConfig.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devDataPreparation.test.mjs"
   "$ROOT_DIR/web/src/dev-workbench/config/devDatabaseMigration.test.mjs"

@@ -36,7 +36,7 @@ const devPageSources = [
   'DevTestingPage.jsx',
   'DevQualityGatesPage.jsx',
   'DevDataPreparationPage.jsx',
-  'DevPrototypesPage.jsx',
+  'DevUIDesignPage.jsx',
   'DevCustomerConfigPage.jsx',
   'DevDatabaseMigrationPage.jsx',
   'DevVersionCenterPage.jsx',
@@ -174,7 +174,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       ['product-engineering', '业务链观察'],
       ['product-engineering', '业务易用性'],
       ['product-engineering', '开发文档'],
-      ['product-engineering', '产品原型'],
+      ['product-engineering', 'UI 交互设计'],
       ['quality', '改动验证'],
       ['quality', '质量门禁'],
       ['quality', '测试数据'],
@@ -392,7 +392,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/testing',
       '/__dev/quality-gates',
       '/__dev/data-preparation',
-      '/__dev/prototypes',
+      '/__dev/ui-design',
       '/__dev/customer-config',
       '/__dev/database-migration',
       '/__dev/version-center',
@@ -614,7 +614,7 @@ test('devHub: pinned routes keep valid unique dev entries up to the pin limit', 
       '/__dev/governance',
       '/__dev/docs',
       '/__dev/customer-config',
-      '/__dev/prototypes',
+      '/__dev/ui-design',
       '/erp/dashboard',
       '/__dev/docs',
     ]),
@@ -623,7 +623,7 @@ test('devHub: pinned routes keep valid unique dev entries up to the pin limit', 
       '/__dev/governance',
       '/__dev/docs',
       '/__dev/customer-config',
-      '/__dev/prototypes',
+      '/__dev/ui-design',
     ]
   )
   assert.deepEqual(normalizeDevHubPinnedRoutes('invalid'), [])
@@ -649,9 +649,9 @@ test('devHub: toggling pinned routes adds, removes and ignores invalid routes', 
 test('devHub: builds pinned items in stored route order', () => {
   assert.deepEqual(
     buildDevHubPinnedItems(DEV_HUB_ITEMS, [
-      '/__dev/prototypes',
+      '/__dev/ui-design',
       '/__dev/docs',
     ]).map((item) => item.key),
-    ['prototypes', 'docs']
+    ['ui-design', 'docs']
   )
 })

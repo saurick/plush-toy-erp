@@ -121,12 +121,12 @@ const PRODUCT_ENGINEERING_ENTRY_PRESENTATION = Object.freeze({
     action: '搜索文档',
     boundary: '适合核对口径、操作说明和维护边界',
   }),
-  prototypes: Object.freeze({
-    eyebrow: '方案评审',
+  'ui-design': Object.freeze({
+    eyebrow: '交互设计',
     title: '页面应该怎样组织才更易用？',
     description:
-      '按当前、待实现或参考资料筛选，预览页面方案并核对它适用于什么范围。',
-    action: '评审原型',
+      '操作唯一的最新 HTML，阅读设计说明与设计依据，核对完整操作路径。',
+    action: '查看 UI 交互设计',
     boundary: '适合评审交互层级，不代表功能已经实现',
   }),
 })

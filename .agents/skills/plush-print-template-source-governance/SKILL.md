@@ -15,7 +15,7 @@ description: 项目打印模板源治理（plush-toy-erp）。Use to interpret c
 
 - 范围、模板职责或入口不清时，用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位。
 - 修改模板 runtime 时读 `web/README.md`、打印模板字段与编辑行为清单、打印模板实现原理以及相关代码和测试。
-- `docs/product/prototypes/README.md`；涉及 UI / prototype intent 时再读对应 prototype README
+- `docs/product/ui-design/README.md`；涉及 UI 交互时再读交互设计说明中的打印合同
 - `scripts/import/README.md` 和 `scripts/import/customerSourceManifestCheck.mjs`；涉及客户原件时，由客户 Private 仓库显式传入 `<private-root>/manifests/source-manifest.json` 与 `<private-root>/sources`，不在 Product Core 猜测路径
 - `config/customers/<customer-key>/README.md`；涉及 runtime samples、extracted image assets 或 `printTemplateDefaults` 时必读
 
