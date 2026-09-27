@@ -377,7 +377,7 @@ function validateWorkflowTaskRevisionVisibilityContract() {
       ).length === 2,
     `${predicatePath} formal tasks must require both positive ProcessRuntime anchors`,
   );
-  for (const legacyNullCheck of [
+  for (const standaloneNullCheck of [
     "workflowtask.ConfigRevisionIsNil()",
     "workflowtask.ProcessInstanceIDIsNil()",
     "workflowtask.ProcessNodeInstanceIDIsNil()",
@@ -385,12 +385,18 @@ function validateWorkflowTaskRevisionVisibilityContract() {
     assert(
       (
         predicateSource.match(
-          new RegExp(legacyNullCheck.replace(/[()]/g, "\\$&"), "g"),
+          new RegExp(standaloneNullCheck.replace(/[()]/g, "\\$&"), "g"),
         ) || []
-      ).length === 2,
-      `${predicatePath} legacy visibility must require all runtime anchors to be absent`,
+      ).length === 3,
+      `${predicatePath} standalone role and follow-up creator visibility must require all runtime anchors to be absent`,
     );
   }
+
+  assert(
+    predicateSource.includes("if scope.FollowupCreatorID != nil") &&
+      predicateSource.includes("workflowtask.TaskGroup(biz.WorkflowFollowupTaskGroup), workflowtask.CreatedBy(*scope.FollowupCreatorID), workflowtask.ConfigRevisionIsNil(), workflowtask.ProcessInstanceIDIsNil(), workflowtask.ProcessNodeInstanceIDIsNil()"),
+    `${predicatePath} creator visibility must be limited to standalone follow-up tasks`,
+  );
 
   const customerConfigPath =
     "server/internal/biz/customer_config_runtime.go";
