@@ -152,7 +152,7 @@ async function run() {
       `production login centering is missing: ${JSON.stringify(result)}`
     )
     assert(
-      result.loginCardWidth >= 520 && result.loginCardWidth <= 622,
+      Math.abs(result.loginCardWidth - 456) <= 1,
       `production login card width is invalid: ${JSON.stringify(result)}`
     )
     assert(
