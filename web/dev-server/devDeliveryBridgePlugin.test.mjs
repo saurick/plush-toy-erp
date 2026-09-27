@@ -1453,7 +1453,7 @@ test('upgrade promotion proves the current direct-fetch rollback transport befor
   child.emit('close', 1)
 })
 
-test('promotion preparation binds the newest passed rollback from the same recovery drill', async (t) => {
+test('promotion preparation binds recovery drill only when it is the newest passed rollback', async (t) => {
   const { root, store } = createProject(t)
   const recoveryDrillId = '123e4567-e89b-42d3-a456-426614174009'
   const rollbackGitSha = 'b'.repeat(40)
@@ -1500,7 +1500,7 @@ test('promotion preparation binds the newest passed rollback from the same recov
     },
     async preparePromotionAction(input) {
       capturedLineage = input.recoveryLineage
-      let { operation } = createOrReuseDeliveryOperation(store, {
+      const created = createOrReuseDeliveryOperation(store, {
         action: 'promote',
         target: input.targetKey,
         gitSha: SHA,
@@ -1508,15 +1508,19 @@ test('promotion preparation binds the newest passed rollback from the same recov
         idempotencyKey: input.idempotencyKey,
         operationId: OPERATION_ID,
       })
-      operation = transitionDeliveryOperation(store, operation.id, {
-        status: 'running',
-        message: 'promotion qualification started',
-      })
-      operation = transitionDeliveryOperation(store, operation.id, {
-        status: 'ready',
-        message: 'promotion ready',
-      })
-      return { operation, plan: { status: 'eligible' }, reused: false }
+      let { operation } = created
+      const { reused } = created
+      if (!reused) {
+        operation = transitionDeliveryOperation(store, operation.id, {
+          status: 'running',
+          message: 'promotion qualification started',
+        })
+        operation = transitionDeliveryOperation(store, operation.id, {
+          status: 'ready',
+          message: 'promotion ready',
+        })
+      }
+      return { operation, plan: { status: 'eligible' }, reused }
     },
   })
 
@@ -1535,6 +1539,38 @@ test('promotion preparation binds the newest passed rollback from the same recov
     rollbackOperationId: ROLLBACK_OPERATION_ID,
     rollbackGitSha,
   })
+
+  const ordinaryRollbackId = '33333333-3333-4333-8333-333333333333'
+  createOrReuseDeliveryOperation(store, {
+    action: 'rollback',
+    target: 'demo-133',
+    gitSha: rollbackGitSha,
+    version: '2026.07.28-1',
+    idempotencyKey: 'version-center:rollback:ordinary-later',
+    operationId: ordinaryRollbackId,
+    metadata: { currentGitSha: SHA },
+    now: '2030-01-01T00:00:00.000Z',
+  })
+  transitionDeliveryOperation(store, ordinaryRollbackId, {
+    status: 'running',
+    message: 'ordinary rollback started',
+    now: '2030-01-01T00:00:01.000Z',
+  })
+  transitionDeliveryOperation(store, ordinaryRollbackId, {
+    status: 'passed',
+    message: 'ordinary rollback completed',
+    now: '2030-01-01T00:00:02.000Z',
+  })
+  await service.act({
+    action: 'prepare-promotion',
+    payload: {
+      gitSha: SHA,
+      version: '2026.07.29-1',
+      target: 'demo-133',
+      idempotencyKey: `${IDEMPOTENCY_KEY}:after-ordinary-rollback`,
+    },
+  })
+  assert.equal(capturedLineage, null)
 })
 
 test('upgrade promotion is blocked before target write when current rollback transport is missing', async (t) => {

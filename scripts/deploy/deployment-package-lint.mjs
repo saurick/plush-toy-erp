@@ -275,6 +275,11 @@ function validateNginxRouting(packageDir, errors) {
     errors,
   );
   assert(
+    /client_max_body_size\s+150m;/u.test(content),
+    "nginx example must allow the 100 MiB attachment upload envelope",
+    errors,
+  );
+  assert(
     !/server_name[^;]*admin[.]yoyoosun[.]net/u.test(content),
     "nginx example must not restore the retired admin route",
     errors,

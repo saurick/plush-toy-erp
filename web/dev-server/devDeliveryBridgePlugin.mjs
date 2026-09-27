@@ -1185,26 +1185,26 @@ export function createDevDeliveryService({
     payload,
     { retryOfOperationId = null } = {}
   ) {
-    const recoveryRollback = listDeliveryOperations(store, { limit: 200 })
+    const latestRollback = listDeliveryOperations(store, { limit: 200 })
       .filter(
         (operation) =>
           operation.action === 'rollback' &&
           operation.target === payload.target &&
           operation.status === 'passed' &&
-          operation.metadata?.currentGitSha === payload.gitSha &&
-          UUID_V4_PATTERN.test(
-            String(operation.metadata?.recoveryDrillId || '')
-          )
+          operation.metadata?.noTargetWriteRequired !== true &&
+          operation.metadata?.currentGitSha === payload.gitSha
       )
       .sort(
         (left, right) =>
           Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
       )[0]
-    const recoveryLineage = recoveryRollback
+    const recoveryLineage = UUID_V4_PATTERN.test(
+      String(latestRollback?.metadata?.recoveryDrillId || '')
+    )
       ? {
-          drillId: recoveryRollback.metadata.recoveryDrillId,
-          rollbackOperationId: recoveryRollback.id,
-          rollbackGitSha: recoveryRollback.gitSha,
+          drillId: latestRollback.metadata.recoveryDrillId,
+          rollbackOperationId: latestRollback.id,
+          rollbackGitSha: latestRollback.gitSha,
         }
       : null
     const versions = await Promise.resolve(

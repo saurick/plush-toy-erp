@@ -17,8 +17,10 @@ import {
   readPromotionPlan,
 } from "./promotion-controller.mjs";
 import {
+  createOrReuseDeliveryOperation,
   readDeliveryOperation,
   resolveDeliveryOperationStore,
+  transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
 import { releaseManifestV2Fixture } from "./release-catalog-test-fixtures.mjs";
 
@@ -185,6 +187,10 @@ function targetPreflight(blocked = false) {
           datasetVersion: "dataset-1",
         },
       },
+      publicEntry: {
+        status: "passed",
+        gitSha: CURRENT_SHA,
+      },
       backup: {
         latestSha256: "6".repeat(64),
         latestSizeBytes: 612412,
@@ -298,6 +304,112 @@ test("promotion preparation awaits one read-only preflight and becomes ready", a
     readPromotionPlan(data.store, first.operation.id).status,
     "eligible",
   );
+});
+
+test("ordinary passed rollback starts a new promotion intent for the same release", async (t) => {
+  const data = fixture(t);
+  const common = {
+    repoRoot: data.root,
+    releaseManifestPath: data.releaseManifestPath,
+    targetKey: "demo-133",
+    operationStore: data.store,
+  };
+  const runtime = {
+    classifyRelation,
+    runPreflight: () => targetPreflight(false),
+  };
+  const first = await preparePromotion(
+    { ...common, idempotencyKey: IDEMPOTENCY_KEY },
+    runtime,
+  );
+  transitionDeliveryOperation(data.store, first.operation.id, {
+    status: "running",
+    message: "promotion executing",
+  });
+  transitionDeliveryOperation(data.store, first.operation.id, {
+    status: "passed",
+    message: "promotion completed",
+  });
+  const rollback = createOrReuseDeliveryOperation(data.store, {
+    action: "rollback",
+    target: "demo-133",
+    gitSha: CURRENT_SHA,
+    version: "2026.07.28-1",
+    idempotencyKey: "rollback-controller:ordinary:0001",
+    metadata: { currentGitSha: SHA },
+  }).operation;
+  transitionDeliveryOperation(data.store, rollback.id, {
+    status: "running",
+    message: "rollback executing",
+  });
+  transitionDeliveryOperation(data.store, rollback.id, {
+    status: "passed",
+    message: "rollback completed",
+  });
+
+  const request = {
+    ...common,
+    idempotencyKey: `${IDEMPOTENCY_KEY}:after-rollback`,
+  };
+  const forward = await preparePromotion(request, runtime);
+  const repeated = await preparePromotion(request, runtime);
+  assert.equal(forward.reused, false);
+  assert.equal(forward.operation.status, "ready");
+  assert.notEqual(forward.operation.id, first.operation.id);
+  assert.equal(
+    forward.operation.metadata.precedingRollbackOperationId,
+    rollback.id,
+  );
+  assert.equal(repeated.reused, true);
+  assert.equal(repeated.operation.id, forward.operation.id);
+});
+
+test("a passed promotion receipt is reused only while the live target remains current", async (t) => {
+  const data = fixture(t);
+  const request = {
+    repoRoot: data.root,
+    releaseManifestPath: data.releaseManifestPath,
+    targetKey: "demo-133",
+    idempotencyKey: IDEMPOTENCY_KEY,
+    operationStore: data.store,
+  };
+  const first = await preparePromotion(request, {
+    classifyRelation,
+    runPreflight: () => targetPreflight(false),
+  });
+  transitionDeliveryOperation(data.store, first.operation.id, {
+    status: "running",
+    message: "promotion executing",
+  });
+  transitionDeliveryOperation(data.store, first.operation.id, {
+    status: "passed",
+    message: "promotion completed",
+  });
+
+  await assert.rejects(
+    preparePromotion(request, {
+      runPreflight: () => targetPreflight(false),
+    }),
+    /previous promotion success is stale/u,
+  );
+  const mismatchedPublicEntry = targetPreflight(false);
+  mismatchedPublicEntry.remote.runtime.serverSha = SHA;
+  mismatchedPublicEntry.remote.runtime.webSha = SHA;
+  await assert.rejects(
+    preparePromotion(request, {
+      runPreflight: () => mismatchedPublicEntry,
+    }),
+    /previous promotion success is stale/u,
+  );
+  const current = targetPreflight(false);
+  current.remote.runtime.serverSha = SHA;
+  current.remote.runtime.webSha = SHA;
+  current.remote.publicEntry.gitSha = SHA;
+  const repeated = await preparePromotion(request, {
+    runPreflight: () => current,
+  });
+  assert.equal(repeated.reused, true);
+  assert.equal(repeated.operation.id, first.operation.id);
 });
 
 test("promotion preparation persists an explicit rollback-forward recovery lineage", async (t) => {

@@ -29,6 +29,27 @@ test("deployment package lint retains inspection coverage after checklist consol
   );
 });
 
+test("deployment package lint keeps the 100 MiB attachment upload envelope", (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "deploy-package-attachment-limit-lint-"),
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
+  const targetPackage = path.join(root, "deployments/yoyoosun");
+  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+
+  const configPath = path.join(targetPackage, "compose/nginx.example.conf");
+  const config = fs
+    .readFileSync(configPath, "utf8")
+    .replace("client_max_body_size 150m;", "client_max_body_size 20m;");
+  fs.writeFileSync(configPath, config);
+
+  assert.throws(
+    () => validateDeploymentPackage({ repoRoot: root, customer: "yoyoosun" }),
+    /must allow the 100 MiB attachment upload envelope/,
+  );
+});
+
 test("deployment package lint keeps the temporary root redirect", (t) => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-domain-lint-"),

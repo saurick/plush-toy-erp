@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   createOrReuseDeliveryOperation,
+  listDeliveryOperations,
   readDeliveryOperation,
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
@@ -142,6 +143,16 @@ export async function preparePromotion(
   ) {
     throw new Error("promotion requires the exact v2 seven-asset evidence");
   }
+  const precedingRollback = recoveryLineage
+    ? null
+    : listDeliveryOperations(store, { limit: 200 }).find(
+        (operation) =>
+          operation.action === "rollback" &&
+          operation.target === targetKey &&
+          operation.status === "passed" &&
+          operation.metadata?.noTargetWriteRequired !== true &&
+          operation.metadata?.currentGitSha === releaseManifest.gitSha,
+      );
   const created = createOrReuseDeliveryOperation(store, {
     action: "promote",
     target: targetKey,
@@ -160,10 +171,27 @@ export async function preparePromotion(
             recoveryRollbackGitSha: recoveryLineage.rollbackGitSha,
           }
         : {}),
+      ...(precedingRollback
+        ? { precedingRollbackOperationId: precedingRollback.id }
+        : {}),
     },
     now: now(),
   });
   if (created.reused) {
+    if (created.operation.status === "passed") {
+      const live = await runPreflight(targetKey);
+      if (
+        live.status !== "passed" ||
+        live.remote?.runtime?.serverSha !== releaseManifest.gitSha ||
+        live.remote?.runtime?.webSha !== releaseManifest.gitSha ||
+        live.remote?.publicEntry?.status !== "passed" ||
+        live.remote?.publicEntry?.gitSha !== releaseManifest.gitSha
+      ) {
+        throw new Error(
+          "previous promotion success is stale: live target identity is not the requested release",
+        );
+      }
+    }
     return {
       schemaVersion: "plush.promotion-controller/v1",
       reused: true,
