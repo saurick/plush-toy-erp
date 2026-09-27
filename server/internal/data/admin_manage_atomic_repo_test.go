@@ -346,13 +346,13 @@ func TestAdminManageRepoControlPlaneMutationsCommitWithAudit(t *testing.T) {
 func TestAdminManageRepoERPColumnOrdersPreserveOtherModules(t *testing.T) {
 	fx := newAdminManageAtomicFixture(t)
 
-	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "customers", []string{"name", "status"}); err != nil {
+	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "customers", []string{"name", "status"}, []string{"status"}); err != nil {
 		t.Fatalf("save customers columns: %v", err)
 	}
-	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "suppliers", []string{"code", "name"}); err != nil {
+	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "suppliers", []string{"code", "name"}, []string{"code"}); err != nil {
 		t.Fatalf("save suppliers columns: %v", err)
 	}
-	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, " customers ", []string{"status"}); err != nil {
+	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, " customers ", []string{"status"}, nil); err != nil {
 		t.Fatalf("update customers columns: %v", err)
 	}
 
@@ -363,6 +363,22 @@ func TestAdminManageRepoERPColumnOrdersPreserveOtherModules(t *testing.T) {
 	}
 	if got := preferences.ColumnOrders["suppliers"]; len(got) != 2 || got[0] != "code" || got[1] != "name" {
 		t.Fatalf("suppliers columns were lost: %#v", got)
+	}
+	if got := preferences.HiddenColumns["customers"]; len(got) != 1 || got[0] != "status" {
+		t.Fatalf("order-only update lost hidden columns: %#v", got)
+	}
+	if got := preferences.HiddenColumns["suppliers"]; len(got) != 1 || got[0] != "code" {
+		t.Fatalf("other module hidden columns were lost: %#v", got)
+	}
+	if got := decodeAdminERPPreferences(fx.client.AdminUser.GetX(fx.ctx, fx.operator.ID).ErpPreferences); len(got.HiddenColumns) != 0 {
+		t.Fatalf("preferences leaked to another account: %#v", got)
+	}
+	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "customers", nil, []string{}); err != nil {
+		t.Fatal(err)
+	}
+	reset := decodeAdminERPPreferences(fx.client.AdminUser.GetX(fx.ctx, fx.target.ID).ErpPreferences)
+	if len(reset.ColumnOrders["customers"]) != 0 || len(reset.HiddenColumns["customers"]) != 0 || len(reset.HiddenColumns["suppliers"]) != 1 {
+		t.Fatalf("reset must preserve other lists: %#v", reset)
 	}
 }
 

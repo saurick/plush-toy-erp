@@ -5,6 +5,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	entschema "entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -12,6 +13,12 @@ import (
 
 type Unit struct {
 	ent.Schema
+}
+
+func (Unit) Annotations() []entschema.Annotation {
+	return []entschema.Annotation{entsql.Annotation{Checks: map[string]string{
+		"units_precision_allowed": "precision BETWEEN 0 AND 6",
+	}}}
 }
 
 func (Unit) Fields() []ent.Field {
@@ -24,7 +31,7 @@ func (Unit) Fields() []ent.Field {
 			MaxLen(64),
 		field.Int("precision").
 			Default(0).
-			NonNegative(),
+			Range(0, 6),
 		field.Bool("is_active").
 			Default(true),
 		field.Time("created_at").

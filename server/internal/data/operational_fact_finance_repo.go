@@ -728,6 +728,38 @@ func (r *operationalFactRepo) listFinanceFacts(
 	filter biz.OperationalFactFilter,
 	scope *biz.FinanceFactAccessScope,
 ) ([]*biz.FinanceFact, int, error) {
+	q := r.financeFactListQuery(filter, scope)
+	total, err := q.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := q.WithPoster().WithSettler().WithCanceller().Order(ent.Desc(financefact.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	references := make([]businessSourceReference, 0, len(rows))
+	for _, row := range rows {
+		references = append(references, businessSourceReference{sourceType: row.SourceType, sourceID: row.SourceID})
+	}
+	sourceNos, err := resolveBusinessSourceNos(ctx, r.data.postgres, references)
+	if err != nil {
+		return nil, 0, err
+	}
+	outstanding, err := financeFactOutstandingAmounts(ctx, r.data.postgres, rows)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.FinanceFact, 0, len(rows))
+	for _, row := range rows {
+		item := entFinanceFactToBiz(row)
+		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
+		item.OutstandingAmount = outstanding[row.ID]
+		out = append(out, item)
+	}
+	return out, total, nil
+}
+
+func (r *operationalFactRepo) financeFactListQuery(filter biz.OperationalFactFilter, scope *biz.FinanceFactAccessScope) *ent.FinanceFactQuery {
 	q := r.data.postgres.FinanceFact.Query()
 	if scope != nil {
 		q = q.Where(financefact.FactTypeIn(scope.AllowedTypes()...))
@@ -773,34 +805,16 @@ func (r *operationalFactRepo) listFinanceFacts(
 	if filter.DateTo != nil {
 		q = q.Where(financefact.OccurredAtLTE(endOfDateFilter(*filter.DateTo)))
 	}
-	total, err := q.Clone().Count(ctx)
-	if err != nil {
-		return nil, 0, err
+	return q
+}
+
+func (r *operationalFactRepo) CountFinanceFactsByStatusForAccess(ctx context.Context, filter biz.OperationalFactFilter, scope biz.FinanceFactAccessScope) (map[string]int, error) {
+	if scope.Empty() {
+		return map[string]int{}, nil
 	}
-	rows, err := q.WithPoster().WithSettler().WithCanceller().Order(ent.Desc(financefact.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	references := make([]businessSourceReference, 0, len(rows))
-	for _, row := range rows {
-		references = append(references, businessSourceReference{sourceType: row.SourceType, sourceID: row.SourceID})
-	}
-	sourceNos, err := resolveBusinessSourceNos(ctx, r.data.postgres, references)
-	if err != nil {
-		return nil, 0, err
-	}
-	outstanding, err := financeFactOutstandingAmounts(ctx, r.data.postgres, rows)
-	if err != nil {
-		return nil, 0, err
-	}
-	out := make([]*biz.FinanceFact, 0, len(rows))
-	for _, row := range rows {
-		item := entFinanceFactToBiz(row)
-		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
-		item.OutstandingAmount = outstanding[row.ID]
-		out = append(out, item)
-	}
-	return out, total, nil
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, r.financeFactListQuery(filter, &scope).
+		GroupBy(financefact.FieldStatus).Aggregate(ent.Count()).Scan)
 }
 
 func calculateFinanceFactOutstanding(

@@ -3,14 +3,20 @@ package biz
 import "strings"
 
 type AdminERPPreferences struct {
-	ColumnOrders map[string][]string
+	ColumnOrders  map[string][]string
+	HiddenColumns map[string][]string
 }
 
 func NormalizeAdminERPPreferences(input AdminERPPreferences) AdminERPPreferences {
-	out := AdminERPPreferences{
-		ColumnOrders: map[string][]string{},
+	return AdminERPPreferences{
+		ColumnOrders:  normalizeAdminERPColumnMap(input.ColumnOrders),
+		HiddenColumns: normalizeAdminERPColumnMap(input.HiddenColumns),
 	}
-	for rawModuleKey, rawOrder := range input.ColumnOrders {
+}
+
+func normalizeAdminERPColumnMap(input map[string][]string) map[string][]string {
+	out := map[string][]string{}
+	for rawModuleKey, rawOrder := range input {
 		moduleKey := normalizeAdminERPPreferenceModuleKey(rawModuleKey)
 		if moduleKey == "" {
 			continue
@@ -19,10 +25,10 @@ func NormalizeAdminERPPreferences(input AdminERPPreferences) AdminERPPreferences
 		if len(normalizedOrder) == 0 {
 			continue
 		}
-		out.ColumnOrders[moduleKey] = normalizedOrder
+		out[moduleKey] = normalizedOrder
 	}
-	if len(out.ColumnOrders) == 0 {
-		out.ColumnOrders = nil
+	if len(out) == 0 {
+		return nil
 	}
 	return out
 }

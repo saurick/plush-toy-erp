@@ -670,7 +670,7 @@ func TestAdminCanAccessMobileRoleUsesPermissionCode(t *testing.T) {
 	}
 }
 
-func TestAdminCanAccessMobileRoleRequiresExplicitBusinessRoleForSuperAdmin(t *testing.T) {
+func TestAdminCanAccessMobileRoleSuperAdminReviewDoesNotRequireAssignedRoles(t *testing.T) {
 	admin := &AdminUser{
 		ID:           1,
 		Username:     "root",
@@ -679,12 +679,21 @@ func TestAdminCanAccessMobileRoleRequiresExplicitBusinessRoleForSuperAdmin(t *te
 		Permissions:  AllPermissionKeys(),
 	}
 
-	if AdminCanAccessMobileRole(admin, BossRoleKey) {
-		t.Fatal("super admin without boss role must not enter boss mobile tasks")
+	for _, roleKey := range []string{MobileAllRolesKey, BossRoleKey, SalesRoleKey, WarehouseRoleKey} {
+		if !AdminCanAccessMobileRole(admin, roleKey) {
+			t.Fatalf("super admin should review scope %s", roleKey)
+		}
 	}
-	admin.Roles = append(admin.Roles, AdminRole{Key: BossRoleKey})
-	if !AdminCanAccessMobileRole(admin, BossRoleKey) {
-		t.Fatal("super admin with explicit boss role should enter boss mobile tasks")
+	if len(admin.Roles) != 1 || AdminHasRole(admin, BossRoleKey) || AdminCanAccessMobileRole(admin, "unknown") {
+		t.Fatal("review must not assign a business role or authorize an unknown role")
+	}
+	admin.IsSuperAdmin = false
+	if AdminCanAccessMobileRole(admin, MobileAllRolesKey) {
+		t.Fatal("ordinary admin role cannot review all roles")
+	}
+	admin.IsSuperAdmin, admin.Disabled = true, true
+	if AdminCanAccessMobileRole(admin, BossRoleKey) || AdminCanAccessMobileRole(admin, MobileAllRolesKey) || AdminCanAccessMobileRole(nil, "") {
+		t.Fatal("inactive accounts cannot enter mobile")
 	}
 }
 

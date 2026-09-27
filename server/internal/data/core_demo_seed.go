@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/shopspring/decimal"
 	"server/internal/biz"
 	"server/internal/manualacceptance"
 )
@@ -166,22 +167,14 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 	if prefix == "" {
 		prefix = CoreDemoSeedPrefix
 	}
-	pcs := prefix + "-PCS"
-	meter := prefix + "-M"
-	kg := prefix + "-KG"
-	box := prefix + "-BOX"
+	pcs, meter, kg, box := "EA", "YD", "KG", "EA"
 	productA := prefix + "-PRODUCT-A"
 	productB := prefix + "-PRODUCT-B"
 	productC := prefix + "-PRODUCT-C"
 	productD := prefix + "-PRODUCT-D"
 	return CoreDemoSeedDataset{
 		Prefix: prefix,
-		Units: []CoreDemoUnitSeed{
-			{Code: pcs, Name: "核心演示单位-件", Precision: 0},
-			{Code: meter, Name: "核心演示单位-米", Precision: 2},
-			{Code: kg, Name: "核心演示单位-千克", Precision: 3},
-			{Code: box, Name: "核心演示单位-箱", Precision: 0},
-		},
+		Units:  DefaultCoreDemoReferenceSeedDataset().Units,
 		Materials: []CoreDemoMaterialSeed{
 			{
 				Code:            prefix + "-MAT-FABRIC",
@@ -706,7 +699,7 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 	materialCodes := map[string]struct{}{}
 	productCodes := map[string]struct{}{}
 	for _, unit := range dataset.Units {
-		if !safeSeedCode(unit.Code, prefix) || strings.TrimSpace(unit.Name) == "" || unit.Precision < 0 {
+		if !validStandardUnitSeed(unit) {
 			return fmt.Errorf("%w: unit %q", ErrCoreDemoSeedInvalidRecord, unit.Code)
 		}
 		if err := biz.ValidateNoNumberedImplementationStageLabels(unit.Code, unit.Name); err != nil {
@@ -785,6 +778,10 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 			if strings.TrimSpace(item.Quantity) == "" || strings.TrimSpace(item.LossRate) == "" {
 				return fmt.Errorf("%w: bom item quantity and loss_rate are required", ErrCoreDemoSeedInvalidRecord)
 			}
+			quantity, err := decimal.NewFromString(item.Quantity)
+			if err != nil || !quantity.IsPositive() || biz.ValidateUnitQuantity(quantity, 6) != nil {
+				return fmt.Errorf("%w: bom item quantity must be positive with at most six decimal places", ErrCoreDemoSeedInvalidRecord)
+			}
 			if err := biz.ValidateNoNumberedImplementationStageLabels(item.MaterialCode, item.UnitCode, item.Position, item.Note); err != nil {
 				return fmt.Errorf("%w: bom item naming: %v", ErrCoreDemoSeedInvalidRecord, err)
 			}
@@ -839,6 +836,15 @@ func validateCoreDemoReferenceSeedDataset(dataset CoreDemoReferenceSeedDataset) 
 func safeSeedCode(value, prefix string) bool {
 	value = strings.TrimSpace(value)
 	return value != "" && strings.HasPrefix(value, prefix)
+}
+
+func validStandardUnitSeed(unit CoreDemoUnitSeed) bool {
+	for _, expected := range DefaultCoreDemoReferenceSeedDataset().Units {
+		if unit == expected {
+			return true
+		}
+	}
+	return false
 }
 
 func upsertCoreDemoUnit(ctx context.Context, tx *sql.Tx, unit CoreDemoUnitSeed) (int, error) {

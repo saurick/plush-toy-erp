@@ -45,7 +45,7 @@ func beginReadSnapshot(ctx context.Context, data *Data) (*readSnapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	client := ent.NewClient(ent.Driver(entsql.NewDriver(
+	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(
 		sqlDialect,
 		entsql.Conn{ExecQuerier: sqlTx},
 	)))

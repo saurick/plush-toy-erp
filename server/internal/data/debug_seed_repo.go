@@ -478,6 +478,15 @@ func (r *debugSeedRepo) ClearBusinessData(ctx context.Context, in biz.DebugBusin
 }
 
 func detachDebugBusinessDataReference(ctx context.Context, tx *stdsql.Tx, detachment debugBusinessDataClearDetachment) error {
+	if detachment.tableName == "production_wip_batches" && detachment.columnName == "origin_rework_fact_id" {
+		// These rows are deleted in this transaction. Keep the rework bundle
+		// valid while breaking its cycle with production facts; a later failure
+		// rolls back both the detachment and every deletion.
+		_, err := tx.ExecContext(ctx, `UPDATE production_wip_batches
+			SET origin_rework_fact_id = NULL, flow_type = 'NORMAL', rework_reason = NULL
+			WHERE origin_rework_fact_id IS NOT NULL`)
+		return err
+	}
 	_, err := tx.ExecContext(ctx, fmt.Sprintf(
 		"UPDATE %s SET %s = NULL WHERE %s IS NOT NULL",
 		quoteSQLIdentifier(detachment.tableName),

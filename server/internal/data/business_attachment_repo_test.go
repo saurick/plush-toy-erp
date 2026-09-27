@@ -109,7 +109,7 @@ func TestBusinessAttachmentRepoListSelectsMetadataWithoutContent(t *testing.T) {
 	defer closeRepo()
 	ctx := context.Background()
 	taskID := createAttachmentWorkflowTask(t, repo, "ready", 1, nil)
-	large := make([]byte, biz.BusinessAttachmentMaxBytes)
+	large := make([]byte, 5*1024*1024+1)
 	_, err := repo.data.postgres.BusinessAttachment.Create().
 		SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
 		SetOwnerID(taskID).
@@ -484,8 +484,11 @@ func TestBusinessAttachmentSchemaDefinesProductImageContract(t *testing.T) {
 	if !strings.Contains(ownerCheck, "'product'") {
 		t.Fatalf("owner type check must include product: %q", ownerCheck)
 	}
-	if got := checks["business_attachments_file_size_max"]; got != "file_size <= 5242880" {
+	if got := checks["business_attachments_file_size_max"]; got != "file_size <= 104857600" {
 		t.Fatalf("file size check changed unexpectedly: %q", got)
+	}
+	if got := checks["business_attachments_product_image_size_max"]; got != "attachment_type <> 'product_image' OR file_size <= 5242880" {
+		t.Fatalf("product image size check changed unexpectedly: %q", got)
 	}
 	if got := checks["business_attachments_object_key_shape"]; !strings.Contains(got, "attachments/") {
 		t.Fatalf("object key check missing: %q", got)

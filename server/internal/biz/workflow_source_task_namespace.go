@@ -76,7 +76,7 @@ func IsReservedPublicWorkflowTransitionTaskGroup(taskGroup string) bool {
 // ValidatePublicWorkflowTaskNamespace keeps public task creation in the
 // ordinary-collaboration boundary without blocking trusted internal producers.
 func ValidatePublicWorkflowTaskNamespace(taskGroup, taskCode string) error {
-	if IsReservedWorkflowSourceTaskNamespace(taskGroup, taskCode) ||
+	if strings.TrimSpace(taskGroup) == WorkflowFollowupTaskGroup || strings.HasPrefix(strings.TrimSpace(taskCode), "FOLLOWUP-") || IsReservedWorkflowSourceTaskNamespace(taskGroup, taskCode) ||
 		IsReservedPublicWorkflowTransitionTaskGroup(taskGroup) {
 		return ErrWorkflowTaskSourceGeneratedOnly
 	}

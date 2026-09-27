@@ -803,7 +803,7 @@ func (r *inventoryRepo) beginInventoryDBTx(ctx context.Context) (*inventoryDBTx,
 	if sqlDialect == "" {
 		sqlDialect = dialect.Postgres
 	}
-	client := ent.NewClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
+	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
 	return &inventoryDBTx{
 		sqlTx:   sqlTx,
 		client:  client,

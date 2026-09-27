@@ -53,6 +53,26 @@ func (r *outsourcingOrderRepo) GetOutsourcingOrder(ctx context.Context, id int) 
 }
 
 func (r *outsourcingOrderRepo) ListOutsourcingOrders(ctx context.Context, filter biz.OutsourcingOrderFilter) ([]*biz.OutsourcingOrder, int, error) {
+	query := r.outsourcingOrderListQuery(filter)
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(outsourcingOrderSortOrder(filter), outsourcingorder.ByID(sql.OrderDesc())).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	orders := entOutsourcingOrdersToBiz(rows)
+	if err := r.populateOutsourcingOrderItemCounts(ctx, orders); err != nil {
+		return nil, 0, err
+	}
+	return orders, total, nil
+}
+
+func (r *outsourcingOrderRepo) outsourcingOrderListQuery(filter biz.OutsourcingOrderFilter) *ent.OutsourcingOrderQuery {
 	query := r.data.postgres.OutsourcingOrder.Query()
 	if filter.Keyword != "" {
 		query = query.Where(outsourcingorder.Or(
@@ -76,22 +96,13 @@ func (r *outsourcingOrderRepo) ListOutsourcingOrders(ctx context.Context, filter
 	if filter.DateField != "" {
 		query = applyOutsourcingOrderDateRange(query, filter)
 	}
-	total, err := query.Clone().Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := query.Order(outsourcingOrderSortOrder(filter), outsourcingorder.ByID(sql.OrderDesc())).
-		Limit(filter.Limit).
-		Offset(filter.Offset).
-		All(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	orders := entOutsourcingOrdersToBiz(rows)
-	if err := r.populateOutsourcingOrderItemCounts(ctx, orders); err != nil {
-		return nil, 0, err
-	}
-	return orders, total, nil
+	return query
+}
+
+func (r *outsourcingOrderRepo) CountOutsourcingOrdersByStatus(ctx context.Context, filter biz.OutsourcingOrderFilter) (map[string]int, error) {
+	filter.LifecycleStatus = ""
+	return scanBusinessStatusCounts(ctx, r.outsourcingOrderListQuery(filter).
+		GroupBy(outsourcingorder.FieldLifecycleStatus).Aggregate(ent.Count()).Scan)
 }
 
 func (r *outsourcingOrderRepo) populateOutsourcingOrderItemCounts(ctx context.Context, orders []*biz.OutsourcingOrder) error {

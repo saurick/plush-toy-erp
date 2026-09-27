@@ -529,6 +529,60 @@ func TestBusinessAttachmentContentRejectsTooLargeContent(t *testing.T) {
 	}
 }
 
+func TestBusinessAttachmentUploadAcceptsOrdinaryContentAboveLegacyFiveMiBLimit(t *testing.T) {
+	payload := bytes.Repeat([]byte("a"), 5*1024*1024+1)
+	repo := &stubBusinessAttachmentRepo{ownerExists: true}
+
+	attachment, err := NewBusinessAttachmentUsecase(repo).UploadBusinessAttachment(context.Background(), &BusinessAttachmentUploadInput{
+		OwnerType:     BusinessAttachmentOwnerSalesOrder,
+		OwnerID:       7,
+		FileName:      "evidence.txt",
+		MimeType:      "text/plain",
+		ContentBase64: base64.StdEncoding.EncodeToString(payload),
+	})
+	if err != nil {
+		t.Fatalf("ordinary attachment above the legacy limit should pass: %v", err)
+	}
+	if attachment.FileSize != len(payload) || repo.created == nil || repo.created.FileSize != len(payload) {
+		t.Fatalf("uploaded size = %d, repo = %#v, want %d", attachment.FileSize, repo.created, len(payload))
+	}
+}
+
+func TestBusinessAttachmentUploadKeepsProductImageSnapshotAtFiveMiB(t *testing.T) {
+	primary := BusinessAttachmentProductImageSlotPrimary
+	payload := make([]byte, BusinessAttachmentProductImageMaxBytes+1)
+	repo := &stubBusinessAttachmentRepo{ownerExists: true}
+
+	_, err := NewBusinessAttachmentUsecase(repo).UploadBusinessAttachment(context.Background(), &BusinessAttachmentUploadInput{
+		OwnerType:      BusinessAttachmentOwnerProduct,
+		OwnerID:        7,
+		AttachmentType: BusinessAttachmentTypeProductImage,
+		SlotKey:        &primary,
+		FileName:       "product.png",
+		MimeType:       "image/png",
+		ContentBase64:  base64.StdEncoding.EncodeToString(payload),
+	})
+	if !errors.Is(err, ErrBusinessAttachmentProductImageTooLarge) {
+		t.Fatalf("product image above snapshot budget error = %v", err)
+	}
+	if repo.created != nil {
+		t.Fatalf("oversized product image must not reach repo: %#v", repo.created)
+	}
+}
+
+func TestBusinessAttachmentSizeBudgetsCoverHundredMiBBase64Envelope(t *testing.T) {
+	if BusinessAttachmentMaxBytes != 100*1024*1024 {
+		t.Fatalf("attachment max bytes = %d, want 100 MiB", BusinessAttachmentMaxBytes)
+	}
+	if BusinessAttachmentProductImageMaxBytes != 5*1024*1024 {
+		t.Fatalf("product image max bytes = %d, want 5 MiB", BusinessAttachmentProductImageMaxBytes)
+	}
+	encodedBytes := base64.StdEncoding.EncodedLen(BusinessAttachmentMaxBytes)
+	if BusinessAttachmentMaxJSONRPCBodyBytes != 140*1024*1024 || BusinessAttachmentMaxJSONRPCBodyBytes <= encodedBytes {
+		t.Fatalf("attachment body budget = %d, encoded payload = %d", BusinessAttachmentMaxJSONRPCBodyBytes, encodedBytes)
+	}
+}
+
 func TestBusinessAttachmentContentChecksEncodedBoundaryBeforeDecode(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString([]byte("12345"))
 	content, err := decodeBusinessAttachmentContentWithMax(encoded, 5)

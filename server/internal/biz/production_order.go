@@ -284,6 +284,14 @@ func (uc *ProductionOrderUsecase) List(ctx context.Context, filter ProductionOrd
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
+	filter, err := normalizeProductionOrderListFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListProductionOrders(ctx, filter)
+}
+
+func normalizeProductionOrderListFilter(filter ProductionOrderFilter) (ProductionOrderFilter, error) {
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	filter.Status = strings.TrimSpace(filter.Status)
 	var scopeOK bool
@@ -295,7 +303,7 @@ func (uc *ProductionOrderUsecase) List(ctx context.Context, filter ProductionOrd
 		(filter.DateFrom != nil && filter.DateTo != nil && filter.DateFrom.After(*filter.DateTo)) ||
 		!validProductionOrderStatusFilter(filter.Status) || !validProductionOrderDateField(filter.DateField) ||
 		!validProductionOrderSort(filter.SortBy, filter.SortDirection) {
-		return nil, 0, ErrBadParam
+		return ProductionOrderFilter{}, ErrBadParam
 	}
 	if !LifecycleScopeAllowsStatus(
 		filter.LifecycleScope,
@@ -303,7 +311,7 @@ func (uc *ProductionOrderUsecase) List(ctx context.Context, filter ProductionOrd
 		[]string{ProductionOrderStatusDraft, ProductionOrderStatusReleased},
 		[]string{ProductionOrderStatusClosed, ProductionOrderStatusCancelled},
 	) {
-		return nil, 0, ErrBadParam
+		return ProductionOrderFilter{}, ErrBadParam
 	}
 	if filter.DateField == "" && (filter.DateFrom != nil || filter.DateTo != nil) {
 		filter.DateField = "planned_start_at"
@@ -314,7 +322,7 @@ func (uc *ProductionOrderUsecase) List(ctx context.Context, filter ProductionOrd
 	if filter.SortDirection == "" {
 		filter.SortDirection = "desc"
 	}
-	return uc.repo.ListProductionOrders(ctx, filter)
+	return filter, nil
 }
 
 func (uc *ProductionOrderUsecase) ListReferenceOptions(ctx context.Context, filter ProductionOrderReferenceFilter) ([]*ProductionOrderReferenceOption, int, error) {

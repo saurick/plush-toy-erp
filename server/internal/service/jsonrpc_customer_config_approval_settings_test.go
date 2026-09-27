@@ -56,6 +56,32 @@ func TestApprovalSettingsRevisionInputRequiresExactCASAndMembers(t *testing.T) {
 	}
 }
 
+func TestApprovalSettingsRevisionConditionUsesStrictDecimalContract(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		condition map[string]any
+		valid     bool
+	}{
+		{"amount", map[string]any{"mode": "amount", "amount": "10000.01", "currency": "CNY"}, true},
+		{"zero", map[string]any{"mode": "amount", "amount": "0", "currency": "CNY"}, true},
+		{"all", map[string]any{"mode": "all", "amount": "", "currency": ""}, true},
+		{"float", map[string]any{"mode": "amount", "amount": float64(10000), "currency": "CNY"}, false},
+		{"expression", map[string]any{"mode": "amount", "amount": "10000", "currency": "CNY", "expression": "true"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			params := approvalSettingsParamsForTest()
+			params["items"].([]any)[0].(map[string]any)["condition"] = tc.condition
+			in, ok := approvalSettingsRevisionInputFromParams(params)
+			if ok != tc.valid {
+				t.Fatalf("accepted=%v input=%+v", ok, in)
+			}
+			if ok && in.Items[0].Condition.Amount != tc.condition["amount"] {
+				t.Fatalf("decimal contract changed: %+v", in.Items[0].Condition)
+			}
+		})
+	}
+}
+
 func TestApprovalSettingsOrdinaryAdminCannotIncludeSelfOrOwnRole(t *testing.T) {
 	admin := &biz.AdminUser{
 		ID: 12,

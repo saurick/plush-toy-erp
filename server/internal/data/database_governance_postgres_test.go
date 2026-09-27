@@ -1,12 +1,14 @@
 package data
 
 import (
-	"server/internal/attachmentstore"
 	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"server/internal/attachmentstore"
+	"server/internal/biz"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
@@ -308,9 +310,15 @@ func TestDatabaseGovernancePostgresQualityAndAttachmentConstraints(t *testing.T)
 	assertDatabaseGovernancePGError(t, err, "23514", "business_attachments_object_key_shape")
 	_, err = data.sqldb.ExecContext(ctx, `UPDATE business_attachments SET sha256 = 'NOT-A-SHA256' WHERE id = $1`, attachment.ID)
 	assertDatabaseGovernancePGError(t, err, "23514", "business_attachments_sha256_lower_hex")
-	tooLarge := make([]byte, 5*1024*1024+1)
-	_, err = data.sqldb.ExecContext(ctx, `UPDATE business_attachments SET file_size = $2 WHERE id = $1`, attachment.ID, len(tooLarge))
+	_, err = data.sqldb.ExecContext(ctx, `UPDATE business_attachments SET file_size = $2 WHERE id = $1`, attachment.ID, biz.BusinessAttachmentMaxBytes+1)
 	assertDatabaseGovernancePGError(t, err, "23514", "business_attachments_file_size_max")
+	_, err = data.sqldb.ExecContext(
+		ctx,
+		`UPDATE business_attachments SET owner_type = 'product', attachment_type = 'product_image', slot_key = 'primary', mime_type = 'image/png', file_size = $2 WHERE id = $1`,
+		attachment.ID,
+		biz.BusinessAttachmentProductImageMaxBytes+1,
+	)
+	assertDatabaseGovernancePGError(t, err, "23514", "business_attachments_product_image_size_max")
 }
 
 func TestDatabaseGovernanceWorkflowTaskEventHookRejectsMutation(t *testing.T) {

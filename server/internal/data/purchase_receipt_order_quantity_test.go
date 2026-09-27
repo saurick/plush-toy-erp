@@ -69,6 +69,7 @@ func TestPurchaseReceiptOrderQuantityGuard(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "purchase_receipt_order_quantity_guard")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
+	client.Unit.UpdateOneID(fixtures.unitID).SetName("码").SetPrecision(6).SaveX(ctx)
 	orderItem := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, client, fixtures, "SQLITE", mustDecimal(t, "10"))
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 

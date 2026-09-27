@@ -139,7 +139,13 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		return id, okData(map[string]any{"shipments": shipmentsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.operationalFactUC.CountShipmentsByStatus(ctx, filter)
+		})
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		return id, okData(withBusinessStatusCounts(map[string]any{"shipments": shipmentsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}, statusCounts)), nil
 	default:
 		return id, unknownOperationalFactResult(method), nil
 	}

@@ -19,6 +19,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/shopspring/decimal"
 )
 
 type purchaseOrderRepo struct {
@@ -135,6 +136,26 @@ func (r *purchaseOrderRepo) GetPurchaseOrder(ctx context.Context, id int) (*biz.
 }
 
 func (r *purchaseOrderRepo) ListPurchaseOrders(ctx context.Context, filter biz.PurchaseOrderFilter) ([]*biz.PurchaseOrder, int, error) {
+	query := r.purchaseOrderListQuery(filter)
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(purchaseOrderSortOrder(filter), purchaseorder.ByID(sql.OrderDesc())).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	orders := entPurchaseOrdersToBiz(rows)
+	if err := r.populatePurchaseOrderItemCounts(ctx, orders); err != nil {
+		return nil, 0, err
+	}
+	return orders, total, nil
+}
+
+func (r *purchaseOrderRepo) purchaseOrderListQuery(filter biz.PurchaseOrderFilter) *ent.PurchaseOrderQuery {
 	query := r.data.postgres.PurchaseOrder.Query()
 	if filter.Keyword != "" {
 		query = query.Where(purchaseorder.Or(
@@ -158,22 +179,13 @@ func (r *purchaseOrderRepo) ListPurchaseOrders(ctx context.Context, filter biz.P
 	if filter.DateField != "" {
 		query = applyPurchaseOrderDateRange(query, filter)
 	}
-	total, err := query.Clone().Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := query.Order(purchaseOrderSortOrder(filter), purchaseorder.ByID(sql.OrderDesc())).
-		Limit(filter.Limit).
-		Offset(filter.Offset).
-		All(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	orders := entPurchaseOrdersToBiz(rows)
-	if err := r.populatePurchaseOrderItemCounts(ctx, orders); err != nil {
-		return nil, 0, err
-	}
-	return orders, total, nil
+	return query
+}
+
+func (r *purchaseOrderRepo) CountPurchaseOrdersByStatus(ctx context.Context, filter biz.PurchaseOrderFilter) (map[string]int, error) {
+	filter.LifecycleStatus = ""
+	return scanBusinessStatusCounts(ctx, r.purchaseOrderListQuery(filter).
+		GroupBy(purchaseorder.FieldLifecycleStatus).Aggregate(ent.Count()).Scan)
 }
 
 func (r *purchaseOrderRepo) populatePurchaseOrderItemCounts(ctx context.Context, orders []*biz.PurchaseOrder) error {
@@ -454,6 +466,32 @@ func (r *purchaseOrderRepo) updatePurchaseOrderForProcessCommand(
 			return nil, biz.ErrPurchaseOrderConflict
 		}
 		return nil, err
+	}
+	if nextStatus == biz.PurchaseOrderStatusSubmitted {
+		items, err := tx.PurchaseOrderItem.Query().Where(purchaseorderitem.PurchaseOrderID(purchaseOrderID)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		total := decimal.Zero
+		complete := len(items) > 0
+		for _, item := range items {
+			if item.Amount == nil || item.Amount.IsNegative() {
+				complete = false
+				break
+			}
+			total = total.Add(*item.Amount)
+		}
+		var amount *decimal.Decimal
+		if complete {
+			amount = &total
+		}
+		if err := biz.ApplyOrderApprovalDecision(command, result, row.Currency, amount, row.Version); err != nil {
+			return nil, err
+		}
+		record, err = biz.BuildProcessNodeDomainCommandResultRecord(command, result)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if _, err := recordProcessNodeDomainCommandResultWithClient(ctx, tx.Client(), record, actorID); err != nil {
 		return nil, err

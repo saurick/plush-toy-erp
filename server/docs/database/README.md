@@ -26,7 +26,7 @@ go run ./cmd/schema-doc --write
 | 外键 | 154 |
 | 显式索引 | 343 |
 | 其中 partial index | 34 |
-| 命名 / 表级 CHECK | 312 |
+| 命名 / 表级 CHECK | 314 |
 
 ## 分域入口
 

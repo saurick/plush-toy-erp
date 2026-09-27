@@ -26,36 +26,40 @@ const (
 )
 
 type workflowRoleTaskViewRequest struct {
-	Keyword         string
-	SortKey         string
-	StatusKey       string
-	BeforeTime      *time.Time
-	Method          string
-	ViewKey         string
-	RoleKey         string
-	Limit           int
-	BeforeID        int
-	SnapshotAt      time.Time
-	ExpectedTotal   int
-	SeenTotal       int
-	CursorRiskScope string
-	HasCursor       bool
+	Keyword              string
+	SortKey              string
+	StatusKey            string
+	BeforeTime           *time.Time
+	Method               string
+	ViewKey              string
+	RoleKey              string
+	Limit                int
+	BeforeID             int
+	SnapshotAt           time.Time
+	ExpectedTotal        int
+	SeenTotal            int
+	CursorRiskScope      string
+	ReviewRoleKeys       []string
+	ReviewScopeKey       string
+	CursorReviewScopeKey string
+	HasCursor            bool
 }
 
 type workflowRoleTaskViewCursor struct {
-	Keyword       string     `json:"keyword"`
-	SortKey       string     `json:"sort_key"`
-	StatusKey     string     `json:"status_key"`
-	BeforeTime    *time.Time `json:"before_time"`
-	Version       int        `json:"v"`
-	Method        string     `json:"method"`
-	ViewKey       string     `json:"view_key"`
-	RoleKey       string     `json:"role_key"`
-	BeforeID      int        `json:"before_id"`
-	SnapshotUnix  int64      `json:"snapshot_unix"`
-	ExpectedTotal int        `json:"expected_total"`
-	SeenTotal     int        `json:"seen_total"`
-	RiskScope     string     `json:"risk_scope"`
+	Keyword        string     `json:"keyword"`
+	SortKey        string     `json:"sort_key"`
+	StatusKey      string     `json:"status_key"`
+	BeforeTime     *time.Time `json:"before_time"`
+	Version        int        `json:"v"`
+	Method         string     `json:"method"`
+	ViewKey        string     `json:"view_key"`
+	RoleKey        string     `json:"role_key"`
+	BeforeID       int        `json:"before_id"`
+	SnapshotUnix   int64      `json:"snapshot_unix"`
+	ExpectedTotal  int        `json:"expected_total"`
+	SeenTotal      int        `json:"seen_total"`
+	RiskScope      string     `json:"risk_scope"`
+	ReviewScopeKey string     `json:"review_scope_key,omitempty"`
 }
 
 var workflowTaskCreateProcessRuntimeAnchorKeys = []string{
@@ -195,9 +199,12 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if adminRes != nil {
 			return id, adminRes, nil
 		}
-		if res := d.requireActiveMobileRoleAccess(ctx, admin, request.RoleKey); res != nil {
+		reviewRoles, reviewScopeKey, res := d.resolveActiveMobileRoleAccess(ctx, admin, request.RoleKey)
+		if res != nil {
 			return id, res, nil
 		}
+		request.ReviewRoleKeys = reviewRoles
+		request.ReviewScopeKey = reviewScopeKey
 		visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
 		if visibilityErr != nil {
 			return id, d.mapCustomerConfigError(ctx, visibilityErr), nil
@@ -1310,6 +1317,7 @@ func parseWorkflowRoleTaskViewRequest(
 		request.ExpectedTotal = cursorState.ExpectedTotal
 		request.SeenTotal = cursorState.SeenTotal
 		request.CursorRiskScope = cursorState.RiskScope
+		request.CursorReviewScopeKey = cursorState.ReviewScopeKey
 		request.HasCursor = true
 	}
 	return request, nil
@@ -1384,11 +1392,15 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 	if permissionResult != nil {
 		return permissionResult
 	}
+	if len(request.ReviewRoleKeys) > 0 {
+		// A selected review role also scopes risk; it never changes the actor.
+		crossRoleRisk = request.RoleKey == biz.MobileAllRolesKey
+	}
 	riskScope := workflowRoleTaskRiskScopeRole
 	if crossRoleRisk {
 		riskScope = workflowRoleTaskRiskScopeSupervised
 	}
-	if request.HasCursor && request.CursorRiskScope != riskScope {
+	if request.HasCursor && (request.CursorRiskScope != riskScope || request.CursorReviewScopeKey != request.ReviewScopeKey) {
 		return invalidWorkflowRoleTaskViewCursorResult()
 	}
 	page, err := d.workflowUC.ListRoleTaskView(ctx, biz.WorkflowRoleTaskViewQuery{
@@ -1398,6 +1410,7 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 		BeforeTime:               request.BeforeTime,
 		ViewKey:                  request.ViewKey,
 		RoleKey:                  request.RoleKey,
+		ReviewRoleKeys:           request.ReviewRoleKeys,
 		Limit:                    request.Limit,
 		BeforeID:                 request.BeforeID,
 		IncludeCounts:            includeCounts,
@@ -1434,18 +1447,19 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 			cursorExpectedTotal = -1
 		}
 		nextCursor = encodeWorkflowRoleTaskViewCursor(workflowRoleTaskViewCursor{
-			Keyword:       request.Keyword,
-			SortKey:       request.SortKey,
-			StatusKey:     request.StatusKey,
-			BeforeTime:    page.NextTime,
-			Method:        request.Method,
-			ViewKey:       request.ViewKey,
-			RoleKey:       request.RoleKey,
-			BeforeID:      page.NextID,
-			SnapshotUnix:  page.SnapshotAt.Unix(),
-			ExpectedTotal: cursorExpectedTotal,
-			SeenTotal:     seenTotal,
-			RiskScope:     riskScope,
+			Keyword:        request.Keyword,
+			SortKey:        request.SortKey,
+			StatusKey:      request.StatusKey,
+			BeforeTime:     page.NextTime,
+			Method:         request.Method,
+			ViewKey:        request.ViewKey,
+			RoleKey:        request.RoleKey,
+			BeforeID:       page.NextID,
+			SnapshotUnix:   page.SnapshotAt.Unix(),
+			ExpectedTotal:  cursorExpectedTotal,
+			SeenTotal:      seenTotal,
+			RiskScope:      riskScope,
+			ReviewScopeKey: request.ReviewScopeKey,
 		})
 		if nextCursor == "" {
 			return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
@@ -2197,6 +2211,9 @@ func workflowAdminCanViewTask(admin *biz.AdminUser, task *biz.WorkflowTask, visi
 	if admin == nil || admin.Disabled || task == nil {
 		return false
 	}
+	if biz.IsWorkflowFollowupCreator(task, admin.ID) {
+		return true
+	}
 	if admin.IsSuperAdmin {
 		return true
 	}
@@ -2238,6 +2255,9 @@ func workflowAdminCanUrgeTask(admin *biz.AdminUser, task *biz.WorkflowTask, visi
 	}
 	if biz.IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
 		return false
+	}
+	if biz.IsWorkflowFollowupCreator(task, admin.ID) {
+		return true
 	}
 	if admin.IsSuperAdmin || biz.AdminHasRole(admin, biz.PMCRoleKey) || biz.AdminHasRole(admin, biz.BossRoleKey) {
 		return true

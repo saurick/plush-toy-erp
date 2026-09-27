@@ -260,19 +260,28 @@ func (uc *OperationalFactUsecase) ListFinanceCreditNotes(ctx context.Context, fi
 	if !ok {
 		return nil, 0, ErrBadParam
 	}
+	filter, err := normalizeFinanceCreditNoteListFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return repo.ListFinanceCreditNotes(ctx, filter)
+}
+
+func normalizeFinanceCreditNoteListFilter(filter FinanceCreditNoteFilter) (FinanceCreditNoteFilter, error) {
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
 	if filter.Status != "" && filter.Status != "POSTED" && filter.Status != "REVERSED" {
-		return nil, 0, ErrBadParam
+		return FinanceCreditNoteFilter{}, ErrBadParam
 	}
 	if filter.FinanceFactID < 0 || filter.Offset < 0 {
-		return nil, 0, ErrBadParam
+		return FinanceCreditNoteFilter{}, ErrBadParam
 	}
 	if filter.Limit <= 0 || filter.Limit > 200 {
 		filter.Limit = 50
 	}
-	return repo.ListFinanceCreditNotes(ctx, filter)
+	return filter, nil
 }
+
 func (uc *OperationalFactUsecase) GetFinancePayment(ctx context.Context, id int) (*FinancePayment, error) {
 	repo, ok := uc.financePaymentRepo()
 	if !ok || id <= 0 {
@@ -285,6 +294,14 @@ func (uc *OperationalFactUsecase) ListFinancePayments(ctx context.Context, filte
 	if !ok {
 		return nil, 0, ErrBadParam
 	}
+	filter, err := normalizeFinancePaymentListFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return repo.ListFinancePayments(ctx, filter)
+}
+
+func normalizeFinancePaymentListFilter(filter FinancePaymentFilter) (FinancePaymentFilter, error) {
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
 	filter.Direction = strings.ToUpper(strings.TrimSpace(filter.Direction))
@@ -296,22 +313,23 @@ func (uc *OperationalFactUsecase) ListFinancePayments(ctx context.Context, filte
 		filter.Status != FinancePaymentStatusPosted &&
 		filter.Status != FinancePaymentStatusReversed &&
 		filter.Status != FinancePaymentStatusCancelled {
-		return nil, 0, ErrBadParam
+		return FinancePaymentFilter{}, ErrBadParam
 	}
 	if filter.Direction != "" && filter.Direction != FinancePaymentDirectionReceipt && filter.Direction != FinancePaymentDirectionDisbursement {
-		return nil, 0, ErrBadParam
+		return FinancePaymentFilter{}, ErrBadParam
 	}
 	if filter.CounterpartyType != "" && filter.CounterpartyType != FinanceCounterpartyCustomer && filter.CounterpartyType != FinanceCounterpartySupplier {
-		return nil, 0, ErrBadParam
+		return FinancePaymentFilter{}, ErrBadParam
 	}
 	if filter.CounterpartyID < 0 || filter.Offset < 0 {
-		return nil, 0, ErrBadParam
+		return FinancePaymentFilter{}, ErrBadParam
 	}
 	if filter.Limit <= 0 || filter.Limit > 200 {
 		filter.Limit = 50
 	}
-	return repo.ListFinancePayments(ctx, filter)
+	return filter, nil
 }
+
 func (uc *OperationalFactUsecase) financePaymentRepo() (FinancePaymentRepo, bool) {
 	if uc == nil || uc.repo == nil {
 		return nil, false

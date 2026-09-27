@@ -32,23 +32,20 @@ func TestDefaultCoreDemoReferenceSeedDatasetIsExact(t *testing.T) {
 	want := CoreDemoReferenceSeedDataset{
 		Prefix: CoreDemoReferenceSeedPrefix,
 		Units: []CoreDemoUnitSeed{
-			{Code: "YS7-DW-01", Name: "件", Precision: 0},
-			{Code: "YS7-DW-02", Name: "Y", Precision: 6},
-			{Code: "YS7-DW-03", Name: "套", Precision: 0},
-			{Code: "YS7-DW-04", Name: "PCS", Precision: 0},
-			{Code: "YS7-DW-05", Name: "对", Precision: 0},
-			{Code: "YS7-DW-06", Name: "片", Precision: 0},
-			{Code: "YS7-DW-07", Name: "码", Precision: 6},
-			{Code: "YS7-DW-08", Name: "个", Precision: 0},
-			{Code: "YS7-DW-09", Name: "条", Precision: 0},
-			{Code: "YS7-DW-10", Name: "kg", Precision: 3},
-			{Code: "YS7-DW-11", Name: "块", Precision: 0},
+			{Code: "EA", Name: "个", Precision: 0},
+			{Code: "SET", Name: "套", Precision: 0},
+			{Code: "PAIR", Name: "对", Precision: 0},
+			{Code: "SHEET", Name: "片", Precision: 0},
+			{Code: "STRIP", Name: "条", Precision: 0},
+			{Code: "BLOCK", Name: "块", Precision: 0},
+			{Code: "YD", Name: "码", Precision: 6},
+			{Code: "KG", Name: "千克", Precision: 3},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
-			{Code: "YS7-CK-01", Name: "原料仓", Type: "MATERIAL"},
-			{Code: "YS7-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
-			{Code: "YS7-CK-03", Name: "待检仓", Type: "MATERIAL"},
-			{Code: "YS7-CK-04", Name: "在制仓", Type: "MATERIAL"},
+			{Code: "YS8-CK-01", Name: "原料仓", Type: "MATERIAL"},
+			{Code: "YS8-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
+			{Code: "YS8-CK-03", Name: "待检仓", Type: "MATERIAL"},
+			{Code: "YS8-CK-04", Name: "在制仓", Type: "MATERIAL"},
 		},
 	}
 	got := DefaultCoreDemoReferenceSeedDataset()
@@ -92,7 +89,7 @@ func TestCoreDemoReferenceSeedRejectsAnythingOutsideExactAllowlist(t *testing.T)
 		{
 			name: "extra warehouse",
 			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
-				dataset.Warehouses = append(dataset.Warehouses, CoreDemoWarehouseSeed{Code: "YS7-CK-05", Name: "其他仓", Type: "OTHER"})
+				dataset.Warehouses = append(dataset.Warehouses, CoreDemoWarehouseSeed{Code: "YS8-CK-05", Name: "其他仓", Type: "OTHER"})
 			},
 		},
 		{
@@ -415,10 +412,10 @@ func TestSeedCoreDemoDataRejectsForeignRouteOwnerBeforeWrites(t *testing.T) {
 	dataset := CoreDemoSeedDataset{
 		Prefix: "SIM-TEST",
 		Units: []CoreDemoUnitSeed{
-			{Code: "SIM-TEST-PCS", Name: "件", Precision: 0},
+			{Code: "EA", Name: "个", Precision: 0},
 		},
 		Products: []CoreDemoProductSeed{
-			{Code: "SIM-TEST-PROD", Name: "演示产品", DefaultUnitCode: "SIM-TEST-PCS"},
+			{Code: "SIM-TEST-PROD", Name: "演示产品", DefaultUnitCode: "EA"},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
 			{Code: "SIM-TEST-FG", Name: "成品仓", Type: "FINISHED_GOODS"},
@@ -467,13 +464,13 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 	dataset := CoreDemoSeedDataset{
 		Prefix: "SIM-TEST",
 		Units: []CoreDemoUnitSeed{
-			{Code: "SIM-TEST-PCS", Name: "件", Precision: 0},
+			{Code: "EA", Name: "个", Precision: 0},
 		},
 		Materials: []CoreDemoMaterialSeed{
-			{Code: "SIM-TEST-MAT", Name: "演示材料", Category: "fabric", StockCategory: "MAIN", DefaultUnitCode: "SIM-TEST-PCS"},
+			{Code: "SIM-TEST-MAT", Name: "演示材料", Category: "fabric", StockCategory: "MAIN", DefaultUnitCode: "EA"},
 		},
 		Products: []CoreDemoProductSeed{
-			{Code: "SIM-TEST-PROD", Name: "演示产品", StyleNo: "SIM-TEST-STYLE", DefaultUnitCode: "SIM-TEST-PCS"},
+			{Code: "SIM-TEST-PROD", Name: "演示产品", StyleNo: "SIM-TEST-STYLE", DefaultUnitCode: "EA"},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
 			{Code: "SIM-TEST-FG", Name: "成品仓", Type: "FINISHED_GOODS"},
@@ -487,7 +484,7 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 				Version:     "SIM-TEST-BOM-V1",
 				Status:      "ACTIVE",
 				Items: []CoreDemoBOMItemSeed{
-					{MaterialCode: "SIM-TEST-MAT", Quantity: "1.000000", UnitCode: "SIM-TEST-PCS", LossRate: "0.000000"},
+					{MaterialCode: "SIM-TEST-MAT", Quantity: "1.000000", UnitCode: "EA", LossRate: "0.000000"},
 				},
 			},
 		},
@@ -495,7 +492,7 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectQuery("INSERT INTO units").
-		WithArgs("SIM-TEST-PCS", "件", 0).
+		WithArgs("EA", "个", 0).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
 	mock.ExpectQuery("INSERT INTO materials").
 		WithArgs("SIM-TEST-MAT", "演示材料", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), 11, "MAIN").

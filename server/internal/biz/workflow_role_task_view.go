@@ -37,6 +37,8 @@ type WorkflowRoleTaskViewQuery struct {
 	ApprovalVisibilityScopes []WorkflowApprovalVisibilityScope
 	CrossRoleRiskAllowed     bool
 	SnapshotAt               time.Time
+	// ReviewRoleKeys is resolved by the server for super-admin reading only.
+	ReviewRoleKeys []string
 }
 
 type WorkflowRoleTaskViewCounts struct {
@@ -123,6 +125,15 @@ func (uc *WorkflowUsecase) ListRoleTaskView(ctx context.Context, query WorkflowR
 	}
 	query.ViewKey = strings.TrimSpace(query.ViewKey)
 	query.RoleKey = NormalizeRoleKey(query.RoleKey)
+	query.ReviewRoleKeys = NormalizeAdminRoleKeys(query.ReviewRoleKeys)
+	if query.RoleKey == MobileAllRolesKey && len(query.ReviewRoleKeys) == 0 {
+		return nil, ErrForbidden
+	}
+	for _, roleKey := range query.ReviewRoleKeys {
+		if MobileRoleAccessPermission(roleKey) == "" || (query.RoleKey != MobileAllRolesKey && query.RoleKey != roleKey) {
+			return nil, ErrBadParam
+		}
+	}
 	query.VisibilityScope = NormalizeWorkflowTaskVisibilityScope(query.VisibilityScope)
 	query.ApprovalVisibilityScopes = NormalizeWorkflowApprovalVisibilityScopes(query.ApprovalVisibilityScopes)
 	if query.RoleKey == "" || query.BeforeID < 0 ||

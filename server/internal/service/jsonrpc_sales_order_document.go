@@ -87,7 +87,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.salesOrderUC.ListSalesOrders(ctx, biz.SalesOrderFilter{
+		filter := biz.SalesOrderFilter{
 			Keyword:         getString(pm, "keyword"),
 			CustomerID:      getInt(pm, "customer_id", 0),
 			LifecycleStatus: getString(pm, "lifecycle_status"),
@@ -99,6 +99,13 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 			SortDirection:   getString(pm, "sort_direction"),
 			Limit:           getInt(pm, "limit", 50),
 			Offset:          getInt(pm, "offset", 0),
+		}
+		items, total, err := d.salesOrderUC.ListSalesOrders(ctx, filter)
+		if err != nil {
+			return id, d.mapSalesOrderError(ctx, err), nil
+		}
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.salesOrderUC.CountSalesOrdersByStatus(ctx, filter)
 		})
 		if err != nil {
 			return id, d.mapSalesOrderError(ctx, err), nil
@@ -107,12 +114,12 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		if permissionResult != nil {
 			return id, permissionResult, nil
 		}
-		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(withBusinessStatusCounts(map[string]any{
 			"sales_orders": salesOrdersToAny(items, includeItemCount),
 			"total":        total,
 			"limit":        normalizedLimit(pm),
 			"offset":       normalizedOffset(pm),
-		})}, nil
+		}, statusCounts))}, nil
 	default:
 		return id, unknownSalesOrderResult(method), nil
 	}

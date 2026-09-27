@@ -1130,7 +1130,7 @@ func mapEntAdminRole(row *ent.Role) biz.AdminRole {
 	}
 }
 
-func (r *adminManageRepo) UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order []string) error {
+func (r *adminManageRepo) UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order, hiddenColumns []string) error {
 	moduleKey = strings.TrimSpace(moduleKey)
 	if id <= 0 || moduleKey == "" {
 		return biz.ErrBadParam
@@ -1158,6 +1158,18 @@ func (r *adminManageRepo) UpdateAdminERPColumnOrder(ctx context.Context, id int,
 		delete(preferences.ColumnOrders, moduleKey)
 	} else {
 		preferences.ColumnOrders[moduleKey] = normalizedOrder
+	}
+	// 排列与显隐在同一账号行锁下保存；仅调整排列时保留现有显隐。
+	if hiddenColumns != nil {
+		if preferences.HiddenColumns == nil {
+			preferences.HiddenColumns = map[string][]string{}
+		}
+		normalizedHidden := biz.NormalizeAdminERPColumnOrder(hiddenColumns)
+		if len(normalizedHidden) == 0 {
+			delete(preferences.HiddenColumns, moduleKey)
+		} else {
+			preferences.HiddenColumns[moduleKey] = normalizedHidden
+		}
 	}
 	encoded := encodeAdminERPPreferences(preferences)
 	if encoded == row.ErpPreferences {
@@ -1744,25 +1756,29 @@ func decodeAdminERPPreferences(raw string) biz.AdminERPPreferences {
 		return biz.AdminERPPreferences{}
 	}
 	var decoded struct {
-		ColumnOrders map[string][]string `json:"column_orders"`
+		ColumnOrders  map[string][]string `json:"column_orders"`
+		HiddenColumns map[string][]string `json:"hidden_columns"`
 	}
 	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
 		return biz.AdminERPPreferences{}
 	}
 	return biz.NormalizeAdminERPPreferences(biz.AdminERPPreferences{
-		ColumnOrders: decoded.ColumnOrders,
+		ColumnOrders:  decoded.ColumnOrders,
+		HiddenColumns: decoded.HiddenColumns,
 	})
 }
 
 func encodeAdminERPPreferences(preferences biz.AdminERPPreferences) string {
 	normalized := biz.NormalizeAdminERPPreferences(preferences)
-	if len(normalized.ColumnOrders) == 0 {
+	if len(normalized.ColumnOrders) == 0 && len(normalized.HiddenColumns) == 0 {
 		return "{}"
 	}
 	payload := struct {
-		ColumnOrders map[string][]string `json:"column_orders"`
+		ColumnOrders  map[string][]string `json:"column_orders"`
+		HiddenColumns map[string][]string `json:"hidden_columns,omitempty"`
 	}{
-		ColumnOrders: normalized.ColumnOrders,
+		ColumnOrders:  normalized.ColumnOrders,
+		HiddenColumns: normalized.HiddenColumns,
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {

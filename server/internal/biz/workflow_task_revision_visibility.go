@@ -38,6 +38,7 @@ type WorkflowTaskVisibilityScope struct {
 	StandaloneVisibleOwnerRoleKeys []string
 	StandaloneAllowAllOwnerRoles   bool
 	VisibleAssigneeID              *int
+	FollowupCreatorID              *int
 }
 
 // WorkflowApprovalVisibilityScope keeps one approval capability paired with
@@ -293,6 +294,10 @@ func NormalizeWorkflowTaskVisibilityScope(scope *WorkflowTaskVisibilityScope) *W
 	if scope.VisibleAssigneeID != nil && *scope.VisibleAssigneeID > 0 {
 		value := *scope.VisibleAssigneeID
 		out.VisibleAssigneeID = &value
+	}
+	if scope.FollowupCreatorID != nil && *scope.FollowupCreatorID > 0 {
+		value := *scope.FollowupCreatorID
+		out.FollowupCreatorID = &value
 	}
 	byRevision := map[string]WorkflowTaskRevisionRoleScope{}
 	for _, raw := range scope.RevisionRoleScopes {

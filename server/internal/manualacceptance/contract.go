@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"server/internal/unitpolicy"
 	"strconv"
 	"strings"
 	"time"
@@ -32,9 +33,10 @@ type datasetIdentity struct {
 }
 
 type SourceNormalization struct {
-	TrimWhitespace bool       `json:"trimWhitespace"`
-	PreserveCase   bool       `json:"preserveCase"`
-	DistinctPairs  [][]string `json:"distinctPairs"`
+	TrimWhitespace bool              `json:"trimWhitespace"`
+	PreserveCase   bool              `json:"preserveCase"`
+	DistinctPairs  [][]string        `json:"distinctPairs"`
+	Aliases        map[string]string `json:"aliases"`
 }
 
 type Unit struct {
@@ -146,15 +148,23 @@ func Validate(contract Contract) error {
 		len(contract.SourceNormalization.DistinctPairs) < 5 {
 		return fmt.Errorf("source normalization boundary is incomplete")
 	}
-	if len(contract.Units) != 11 || len(contract.Warehouses) != 4 {
-		return fmt.Errorf("expected 11 units and four warehouses")
+	if len(contract.Units) != 8 || len(contract.Warehouses) != 4 {
+		return fmt.Errorf("expected eight units and four warehouses")
+	}
+	standards := map[string]unitpolicy.Unit{}
+	for _, unit := range unitpolicy.Standards() {
+		standards[unit.Code] = unit
 	}
 	unitKeys := make(map[string]struct{}, len(contract.Units))
 	unitCodes := make(map[string]struct{}, len(contract.Units))
 	unitLabels := make(map[string]struct{}, len(contract.Units))
 	for _, unit := range contract.Units {
+		standard, exists := standards[unit.Code]
+		if !exists || standard.Name != unit.Name || standard.Precision != unit.Precision {
+			return fmt.Errorf("unit catalog mismatch: %q", unit.Code)
+		}
 		if !codePattern.MatchString(unit.Key) ||
-			!strings.HasPrefix(unit.Code, contract.VisiblePrefix+"-DW-") ||
+			!regexp.MustCompile("^[A-Z][A-Z0-9]{1,15}$").MatchString(unit.Code) ||
 			strings.TrimSpace(unit.Name) == "" || unit.Name != unit.SourceLabel ||
 			unit.Precision < 0 || unit.Precision > 6 {
 			return fmt.Errorf("invalid unit %q", unit.Key)

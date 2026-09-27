@@ -276,7 +276,8 @@ func adminProfileToMap(admin *biz.AdminUser, includeTokenMeta map[string]any) ma
 		"created_at":        admin.CreatedAt.Unix(),
 		"updated_at":        admin.UpdatedAt.Unix(),
 		"erp_preferences": map[string]any{
-			"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
+			"column_orders":  toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
+			"hidden_columns": toAnyMapStringSlice(admin.ERPPreferences.HiddenColumns),
 		},
 	}
 	for key, value := range includeTokenMeta {

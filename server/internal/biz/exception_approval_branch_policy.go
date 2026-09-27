@@ -95,6 +95,16 @@ type exceptionApprovalProcessBranchPolicyRegistration struct {
 func exceptionApprovalProcessBranchPolicyRegistrations() []exceptionApprovalProcessBranchPolicyRegistration {
 	return []exceptionApprovalProcessBranchPolicyRegistration{
 		{
+			key:          ProcessBranchPolicySalesOrderRequirement,
+			nextNodeKeys: []string{"order_approval", "activate_sales_order"},
+			handler:      orderApprovalRequirementBranchHandler{ApprovalSettingSalesOrder, "order_approval", "activate_sales_order"},
+		},
+		{
+			key:          ProcessBranchPolicyPurchaseOrderRequirement,
+			nextNodeKeys: []string{"purchase_order_approval", "approve_purchase_order"},
+			handler:      orderApprovalRequirementBranchHandler{ApprovalSettingPurchaseOrder, "purchase_order_approval", "approve_purchase_order"},
+		},
+		{
 			key:          ProcessBranchPolicySalesOrderApproval,
 			nextNodeKeys: []string{"activate_sales_order", "reject_sales_order"},
 			handler: approvalOutcomeBranchPolicyHandler{

@@ -274,11 +274,11 @@ func TestWorkflowMobileRoleTaskRiskScopeUsesEffectiveSupervisePermission(t *test
 			wantSupervise: true,
 		},
 		{
-			name:          "super admin receives supervised risk",
+			name:          "super admin selected role keeps risk scoped",
 			roles:         []string{biz.BossRoleKey},
 			permissions:   []string{biz.PermissionWorkflowTaskRead, biz.PermissionMobileBossAccess},
 			superAdmin:    true,
-			wantSupervise: true,
+			wantSupervise: false,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -291,6 +291,9 @@ func TestWorkflowMobileRoleTaskRiskScopeUsesEffectiveSupervisePermission(t *test
 				workflowUC:  biz.NewWorkflowUsecase(repo),
 			}
 			roleKey := testCase.roles[0]
+			if testCase.superAdmin {
+				dispatcher.customerConfigUC = biz.NewCustomerConfigUsecase(mobileReviewCustomerConfigRepo(biz.DefaultCustomerKey))
+			}
 			_, result, err := dispatcher.handleWorkflow(
 				workflowJSONRPCAdminContext(),
 				"list_role_tasks",

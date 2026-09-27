@@ -14,6 +14,7 @@ import (
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
+	"server/internal/unitpolicy"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -590,8 +591,9 @@ func (r *masterDataRepo) ListUnits(ctx context.Context, filter biz.MasterDataFil
 	query := r.data.postgres.Unit.Query()
 	if filter.Keyword != "" {
 		query = query.Where(unit.Or(
-			unit.CodeContains(filter.Keyword),
-			unit.NameContains(filter.Keyword),
+			unit.CodeContainsFold(filter.Keyword),
+			unit.NameContainsFold(filter.Keyword),
+			unit.NameEQ(unitpolicy.CanonicalLabel(filter.Keyword)),
 		))
 	}
 	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {

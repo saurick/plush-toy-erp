@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"sort"
 	"strings"
 
 	v1 "server/api/jsonrpc/v1"
@@ -14,28 +16,54 @@ type workflowTaskRoleVisibility struct {
 	Valid    bool
 }
 
-func (d *jsonrpcDispatcher) requireActiveMobileRoleAccess(
+func (d *jsonrpcDispatcher) resolveActiveMobileRoleAccess(
 	ctx context.Context,
 	admin *biz.AdminUser,
 	roleKey string,
-) *v1.JsonrpcResult {
+) ([]string, string, *v1.JsonrpcResult) {
 	permissionKey := biz.MobileRoleAccessPermission(roleKey)
-	if permissionKey == "" || !biz.AdminCanAccessMobileRole(admin, roleKey) {
-		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	denied := &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	if roleKey == "" || !biz.AdminCanAccessMobileRole(admin, roleKey) {
+		return nil, "", denied
 	}
 	if d == nil || d.customerConfigUC == nil {
-		return nil
+		if admin.IsSuperAdmin {
+			return nil, "", denied
+		}
+		return nil, "", nil
 	}
 	session, err := d.currentWorkflowEffectiveSession(ctx, admin)
 	if err != nil {
-		return d.mapCustomerConfigError(ctx, err)
+		return nil, "", d.mapCustomerConfigError(ctx, err)
+	}
+	if admin.IsSuperAdmin {
+		// Review uses the active customer projection, not assigned roles or a
+		// development fallback. Mutation handlers retain their own authorization.
+		if session.Source != "active_customer_config_revision" || session.ConfigRevision == "" {
+			return nil, "", denied
+		}
+		actions := biz.PermissionKeySet(session.Actions)
+		roles := []string{}
+		for _, role := range biz.NormalizeAdminRoleKeys(session.Roles) {
+			if mobilePermission := biz.MobileRoleAccessPermission(role); mobilePermission != "" &&
+				biz.PermissionSetHasAll(actions, mobilePermission) &&
+				(roleKey == biz.MobileAllRolesKey || roleKey == role) {
+				roles = append(roles, role)
+			}
+		}
+		if len(roles) == 0 {
+			return nil, "", denied
+		}
+		sort.Strings(roles)
+		scopeKey := fmt.Sprintf("%d|%s|%s|%s", admin.ID, session.ConfigRevision, session.ConfigHash, strings.Join(roles, ","))
+		return roles, scopeKey, nil
 	}
 	for _, actionKey := range session.Actions {
 		if strings.TrimSpace(actionKey) == permissionKey {
-			return nil
+			return nil, "", nil
 		}
 	}
-	return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	return nil, "", denied
 }
 
 func (d *jsonrpcDispatcher) requireEffectiveWorkflowWorkbenchRead(ctx context.Context) *v1.JsonrpcResult {
@@ -224,6 +252,10 @@ func (d *jsonrpcDispatcher) workflowTaskReadVisibilityScope(
 	canSupervise, permissionResult := d.AdminHasPermission(ctx, biz.PermissionWorkflowTaskSupervise)
 	if permissionResult != nil {
 		return nil, permissionResult
+	}
+	if admin.ID > 0 {
+		actorID := admin.ID
+		scope.FollowupCreatorID = &actorID
 	}
 	return expandWorkflowTaskVisibilityForSupervision(scope, canSupervise), nil
 }

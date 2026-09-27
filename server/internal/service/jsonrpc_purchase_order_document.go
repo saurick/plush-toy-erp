@@ -103,7 +103,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.purchaseOrderUC.ListPurchaseOrders(ctx, biz.PurchaseOrderFilter{
+		filter := biz.PurchaseOrderFilter{
 			Keyword:         getString(pm, "keyword"),
 			SupplierID:      getInt(pm, "supplier_id", 0),
 			LifecycleStatus: getString(pm, "lifecycle_status"),
@@ -115,16 +115,23 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 			SortDirection:   getString(pm, "sort_direction"),
 			Limit:           getInt(pm, "limit", 50),
 			Offset:          getInt(pm, "offset", 0),
+		}
+		items, total, err := d.purchaseOrderUC.ListPurchaseOrders(ctx, filter)
+		if err != nil {
+			return id, d.mapPurchaseOrderError(ctx, err), nil
+		}
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.purchaseOrderUC.CountPurchaseOrdersByStatus(ctx, filter)
 		})
 		if err != nil {
 			return id, d.mapPurchaseOrderError(ctx, err), nil
 		}
-		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(withBusinessStatusCounts(map[string]any{
 			"purchase_orders": purchaseOrdersToAny(items),
 			"total":           total,
 			"limit":           normalizedLimit(pm),
 			"offset":          normalizedOffset(pm),
-		})}, nil
+		}, statusCounts))}, nil
 	default:
 		return id, unknownPurchaseOrderResult(method), nil
 	}

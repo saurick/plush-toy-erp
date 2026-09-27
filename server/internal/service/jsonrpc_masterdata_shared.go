@@ -17,7 +17,16 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "list_units":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialRead); res != nil {
+		if res := d.RequireAdminAnyPermission(ctx,
+			biz.PermissionMaterialRead, biz.PermissionProductRead,
+			biz.PermissionBOMRead, biz.PermissionSalesOrderItemRead, biz.PermissionWarehouseInboundRead,
+			biz.PermissionSalesOrderRead, biz.PermissionPurchaseOrderRead,
+			biz.PermissionOutsourcingOrderRead, biz.PermissionPMCPlanRead,
+			biz.PermissionProductionWIPRead, biz.PermissionWarehouseInventoryRead,
+			biz.PermissionShipmentRead, biz.PermissionQualityInspectionRead,
+			biz.PermissionProductionFactRead, biz.PermissionOutsourcingFactRead,
+			biz.PermissionPurchaseReceiptRead,
+		); res != nil {
 			return id, res, nil
 		}
 		items, total, err := d.masterDataUC.ListUnits(ctx, masterDataFilterFromParams(pm))
@@ -71,6 +80,9 @@ func masterDataFilterFromParams(pm map[string]any) biz.MasterDataFilter {
 }
 
 func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
 	if result := warehouseClassificationError(err); result != nil {
 		return result
 	}

@@ -331,7 +331,7 @@ func approvalSettingsRevisionInputFromParams(pm map[string]any) (biz.ApprovalSet
 	items := make([]biz.ApprovalSettingItemInput, 0, len(rawItems))
 	for _, rawItem := range rawItems {
 		itemMap, ok := rawItem.(map[string]any)
-		if !ok || !customerConfigAllowsOnly(itemMap, "approval_key", "enabled", "members") {
+		if !ok || !customerConfigAllowsOnly(itemMap, "approval_key", "enabled", "members", "condition") {
 			return biz.ApprovalSettingsRevisionInput{}, false
 		}
 		rawMembers, ok := itemMap["members"].([]any)
@@ -359,7 +359,12 @@ func approvalSettingsRevisionInputFromParams(pm map[string]any) (biz.ApprovalSet
 		if !ok {
 			return biz.ApprovalSettingsRevisionInput{}, false
 		}
+		condition, err := biz.ApprovalConditionFromMap(itemMap["condition"])
+		if err != nil {
+			return biz.ApprovalSettingsRevisionInput{}, false
+		}
 		items = append(items, biz.ApprovalSettingItemInput{
+			Condition:   condition,
 			ApprovalKey: getString(itemMap, "approval_key"),
 			Enabled:     enabled,
 			Members:     members,
@@ -569,6 +574,7 @@ func approvalSettingsExplanationToMap(settings *biz.ApprovalSettingsExplanation)
 		}
 		items = append(items, map[string]any{
 			"approval_key":        item.ApprovalKey,
+			"condition":           item.Condition.Snapshot(),
 			"label":               item.Label,
 			"domain":              item.Domain,
 			"pool_key":            item.PoolKey,

@@ -167,6 +167,7 @@ func TestInventoryRepo_PreservesDecimalPrecision(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "inventory_repo_decimal")
 
 	fixtures := createInventoryTestFixtures(t, ctx, client)
+	client.Unit.UpdateOneID(fixtures.unitID).SetName("码").SetPrecision(6).SaveX(ctx)
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(
 		data,
 		log.NewStdLogger(io.Discard),

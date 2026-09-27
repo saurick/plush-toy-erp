@@ -98,7 +98,11 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		return nil, biz.ErrBusinessAttachmentStorageUnavailable
 	}
 	digest := sha256.Sum256(in.Content)
-	if len(in.Content) != in.FileSize || in.FileSize <= 0 || in.FileSize > biz.BusinessAttachmentMaxBytes ||
+	maxFileBytes := biz.BusinessAttachmentMaxBytes
+	if productImageWrite {
+		maxFileBytes = biz.BusinessAttachmentProductImageMaxBytes
+	}
+	if len(in.Content) != in.FileSize || in.FileSize <= 0 || in.FileSize > maxFileBytes ||
 		hex.EncodeToString(digest[:]) != in.SHA256 {
 		return nil, biz.ErrBusinessAttachmentIntegrity
 	}
@@ -528,7 +532,11 @@ func (r *businessAttachmentRepo) GetBusinessAttachmentContent(ctx context.Contex
 	if r.objects == nil {
 		return nil, biz.ErrBusinessAttachmentStorageUnavailable
 	}
-	if !attachmentstore.ValidKey(objectKey) || fileSize <= 0 || fileSize > biz.BusinessAttachmentMaxBytes {
+	maxFileBytes := int64(biz.BusinessAttachmentMaxBytes)
+	if ownerType == biz.BusinessAttachmentOwnerProduct {
+		maxFileBytes = int64(biz.BusinessAttachmentProductImageMaxBytes)
+	}
+	if !attachmentstore.ValidKey(objectKey) || fileSize <= 0 || fileSize > maxFileBytes {
 		return nil, biz.ErrBusinessAttachmentIntegrity
 	}
 	content, err := r.objects.Get(ctx, objectKey, fileSize)

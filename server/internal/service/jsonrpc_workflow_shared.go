@@ -21,6 +21,9 @@ func unknownWorkflowResult(method string) *v1.JsonrpcResult {
 }
 
 func (d *jsonrpcDispatcher) mapWorkflowError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
 	l := d.log.WithContext(ctx)
 
 	switch {

@@ -69,7 +69,7 @@ func productionWIPClientForSQLTx(data *Data, sqlTx *stdsql.Tx) *ent.Client {
 	if sqlDialect == "" {
 		sqlDialect = dialect.Postgres
 	}
-	return ent.NewClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
+	return newBusinessEntClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
 }
 
 func freezeProductionOrderWIPRoute(ctx context.Context, client *ent.Client, orderID, actorID int) error {

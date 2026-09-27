@@ -110,6 +110,7 @@ func TestProductionOverIssueApprovalRejectsEffectiveLimitOverflow(t *testing.T) 
 	factRepo := NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard))
 	released := createAndReleaseProductionMaterialIssueOrder(t, ctx, f, "MO-OVER-OVERFLOW", "over-overflow")
 	requirement := released.MaterialRequirements[0]
+	f.client.Unit.UpdateOneID(requirement.UnitID).SetName("码").SetPrecision(6).SaveX(ctx)
 	decision, err := factUC.SubmitProductionException(ctx, &biz.ProductionExceptionSubmit{
 		DecisionNo: "EX-OVER-OVERFLOW", DecisionType: biz.ProductionExceptionOverIssue,
 		ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,

@@ -19,7 +19,7 @@ import (
 )
 
 const Format = "plush.attachment-objects/v1"
-const MaxFileBytes = 5 * 1024 * 1024
+const MaxFileBytes = 100 * 1024 * 1024
 
 type File struct {
 	ID     int64  `json:"id"`

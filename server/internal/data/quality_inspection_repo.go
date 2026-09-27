@@ -399,11 +399,54 @@ func (r *inventoryRepo) GetQualityInspection(ctx context.Context, id int) (_ *bi
 	}
 	item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
 	enrichProductionWIPQualityInspection(item, row)
+	if err := enrichQualityQuantityUnits(ctx, r.data.postgres, []*biz.QualityInspection{item}); err != nil {
+		return nil, err
+	}
 	return item, nil
 }
 
 func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.QualityInspectionFilter) (_ []*biz.QualityInspection, _ int, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
+	query := r.qualityInspectionListQuery(filter)
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := withProductionWIPQualityContext(query).
+		Order(ent.Desc(qualityinspection.FieldCreatedAt), ent.Desc(qualityinspection.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, row := range rows {
+		if err := validateProductionWIPQualityInspectionRead(row); err != nil {
+			return nil, 0, err
+		}
+	}
+	references := make([]businessSourceReference, 0, len(rows))
+	for _, row := range rows {
+		references = append(references, businessSourceReference{sourceType: row.SourceType, sourceID: row.SourceID})
+	}
+	sourceNos, err := resolveBusinessSourceNos(ctx, r.data.postgres, references)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.QualityInspection, 0, len(rows))
+	for _, row := range rows {
+		item := entQualityInspectionToBiz(row)
+		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
+		enrichProductionWIPQualityInspection(item, row)
+		out = append(out, item)
+	}
+	if err := enrichQualityQuantityUnits(ctx, r.data.postgres, out); err != nil {
+		return nil, 0, err
+	}
+	return out, total, nil
+}
+
+func (r *inventoryRepo) qualityInspectionListQuery(filter biz.QualityInspectionFilter) *ent.QualityInspectionQuery {
 	query := r.data.postgres.QualityInspection.Query()
 	if filter.Status != "" {
 		query = query.Where(qualityinspection.Status(filter.Status))
@@ -499,39 +542,13 @@ func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.Q
 	if filter.CorrectionOfInspectionID > 0 {
 		query = query.Where(qualityinspection.CorrectionOfInspectionID(filter.CorrectionOfInspectionID))
 	}
-	total, err := query.Clone().Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := withProductionWIPQualityContext(query).
-		Order(ent.Desc(qualityinspection.FieldCreatedAt), ent.Desc(qualityinspection.FieldID)).
-		Limit(filter.Limit).
-		Offset(filter.Offset).
-		All(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	for _, row := range rows {
-		if err := validateProductionWIPQualityInspectionRead(row); err != nil {
-			return nil, 0, err
-		}
-	}
-	references := make([]businessSourceReference, 0, len(rows))
-	for _, row := range rows {
-		references = append(references, businessSourceReference{sourceType: row.SourceType, sourceID: row.SourceID})
-	}
-	sourceNos, err := resolveBusinessSourceNos(ctx, r.data.postgres, references)
-	if err != nil {
-		return nil, 0, err
-	}
-	out := make([]*biz.QualityInspection, 0, len(rows))
-	for _, row := range rows {
-		item := entQualityInspectionToBiz(row)
-		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
-		enrichProductionWIPQualityInspection(item, row)
-		out = append(out, item)
-	}
-	return out, total, nil
+	return query
+}
+
+func (r *inventoryRepo) CountQualityInspectionsByStatus(ctx context.Context, filter biz.QualityInspectionFilter) (map[string]int, error) {
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, r.qualityInspectionListQuery(filter).
+		GroupBy(qualityinspection.FieldStatus).Aggregate(ent.Count()).Scan)
 }
 
 func (r *inventoryRepo) EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (_ *biz.PurchaseReceiptQualityGate, resultErr error) {

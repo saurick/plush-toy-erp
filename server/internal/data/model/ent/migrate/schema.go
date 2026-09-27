@@ -5056,11 +5056,12 @@ func init() {
 	}
 	BusinessAttachmentsTable.Annotation = &entsql.Annotation{}
 	BusinessAttachmentsTable.Annotation.Checks = map[string]string{
-		"business_attachments_file_size_max":          "file_size <= 5242880",
+		"business_attachments_file_size_max":          "file_size <= 104857600",
 		"business_attachments_file_size_positive":     "file_size > 0",
 		"business_attachments_object_key_shape":       "length(object_key) IN (44, 76) AND substr(object_key, 1, 12) = 'attachments/' AND object_key = lower(object_key)",
 		"business_attachments_owner_type_allowed":     "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task')",
 		"business_attachments_product_image_contract": "((owner_type = 'product' AND attachment_type = 'product_image' AND slot_key IS NOT NULL AND slot_key IN ('primary', 'secondary') AND mime_type IN ('image/png', 'image/jpeg', 'image/webp')) OR (owner_type <> 'product' AND attachment_type <> 'product_image'))",
+		"business_attachments_product_image_size_max": "attachment_type <> 'product_image' OR file_size <= 5242880",
 		"business_attachments_sha256_lower_hex":       "length(sha256) = 64 AND sha256 = lower(sha256)",
 		"business_attachments_withdrawal_contract":    "((withdrawn_at IS NULL AND withdrawn_by IS NULL AND withdrawal_reason IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND withdrawn_by > 0 AND withdrawal_reason IS NOT NULL AND length(trim(withdrawal_reason)) BETWEEN 1 AND 255 AND owner_type <> 'product' AND attachment_type <> 'product_image'))",
 	}
@@ -5662,6 +5663,10 @@ func init() {
 		"suppliers_default_invoice_category_allowed": "default_invoice_category IS NULL OR default_invoice_category IN ('EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
 		"suppliers_default_invoice_pair_valid":       "((default_invoice_required IS NULL AND default_invoice_category IS NULL) OR (default_invoice_required = false AND default_invoice_category IS NULL) OR (default_invoice_required = true AND default_invoice_category IS NOT NULL))",
 		"suppliers_supplier_type_allowed":            "supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service', 'mixed')",
+	}
+	UnitsTable.Annotation = &entsql.Annotation{}
+	UnitsTable.Annotation.Checks = map[string]string{
+		"units_precision_allowed": "precision BETWEEN 0 AND 6",
 	}
 	WarehousesTable.Annotation = &entsql.Annotation{}
 	WarehousesTable.Annotation.Checks = map[string]string{

@@ -344,6 +344,9 @@ func updateProductionFactDraft(ctx context.Context, tx *inventoryDBTx, row *ent.
 	if tx == nil || tx.sqlTx == nil || row == nil || in == nil {
 		return biz.ErrBadParam
 	}
+	if err := validateUnitQuantities(ctx, tx.client, row.UnitID, in.Quantity); err != nil {
+		return err
+	}
 	var query string
 	var args []any
 	if in.FactType == biz.ProductionFactRework {

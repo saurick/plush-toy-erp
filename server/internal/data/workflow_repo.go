@@ -343,6 +343,11 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 			return replayed, err
 		}
 	}
+	if in.TaskGroup == biz.WorkflowFollowupTaskGroup {
+		if err := r.prepareWorkflowFollowupInTx(ctx, tx, in); err != nil {
+			return nil, err
+		}
+	}
 	if err := validateWorkflowTaskProcessAnchors(
 		ctx,
 		tx.Client(),

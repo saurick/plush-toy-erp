@@ -33,6 +33,7 @@ type ApprovalSettingMemberInput struct {
 }
 
 type ApprovalSettingItemInput struct {
+	Condition   ApprovalCondition
 	ApprovalKey string
 	Enabled     bool
 	Members     []ApprovalSettingMemberInput
@@ -55,6 +56,7 @@ type ApprovalSettingMemberExplanation struct {
 }
 
 type ApprovalSettingItemExplanation struct {
+	Condition         ApprovalCondition
 	ApprovalKey       string
 	Label             string
 	Domain            string
@@ -520,6 +522,11 @@ func normalizeApprovalSettingItems(items []ApprovalSettingItemInput) ([]Approval
 		if _, duplicate := byKey[raw.ApprovalKey]; duplicate {
 			return nil, ErrBadParam
 		}
+		condition, err := NormalizeApprovalCondition(raw.ApprovalKey, raw.Condition)
+		if err != nil {
+			return nil, err
+		}
+		raw.Condition = condition
 		seen := map[string]struct{}{}
 		strategySeen := map[string]struct{}{}
 		hasEnabledMember := false
@@ -606,6 +613,10 @@ func validateApprovalSettingsPublishInput(in CustomerConfigPublishInput) error {
 	if !ok || strings.TrimSpace(getStringFromAnyMap(snapshot, "schema_version")) != ApprovalSettingsSchemaVersion {
 		return fmt.Errorf("%w: approval settings snapshot is invalid", ErrBadParam)
 	}
+	conditions, err := approvalConditionsFromSnapshot(in.CompiledSnapshot)
+	if err != nil {
+		return err
+	}
 	enabledByKey := map[string]bool{}
 	for _, rawItem := range anyListFromMap(snapshot, "items") {
 		item, ok := rawItem.(map[string]any)
@@ -641,7 +652,7 @@ func validateApprovalSettingsPublishInput(in CustomerConfigPublishInput) error {
 		if exists && strings.TrimSpace(pool.ModuleKey) != catalog.ModuleKey {
 			return fmt.Errorf("%w: approval pool %s is invalid", ErrBadParam, catalog.PoolKey)
 		}
-		item := ApprovalSettingItemInput{ApprovalKey: catalog.Key, Enabled: enabled}
+		item := ApprovalSettingItemInput{ApprovalKey: catalog.Key, Enabled: enabled, Condition: conditions[catalog.Key]}
 		if !exists {
 			items = append(items, item)
 			continue
@@ -733,6 +744,7 @@ func approvalSettingsSnapshot(items []ApprovalSettingItemInput) map[string]any {
 	for _, item := range items {
 		rawItems = append(rawItems, map[string]any{
 			"approval_key": item.ApprovalKey,
+			"condition":    item.Condition.Snapshot(),
 			"enabled":      item.Enabled,
 		})
 	}
@@ -773,6 +785,10 @@ func (uc *CustomerConfigUsecase) explainApprovalSettingsAtRevision(
 		return nil, ErrBadParam
 	}
 	enabled := approvalSettingsEnabledMap(revision.CompiledSnapshot)
+	conditions, err := approvalConditionsFromSnapshot(revision.CompiledSnapshot)
+	if err != nil {
+		return nil, err
+	}
 	out := &ApprovalSettingsExplanation{
 		CustomerKey: revision.CustomerKey, ConfigRevision: revision.Revision,
 		ConfigHash: revision.ConfigHash, ProductVersion: revision.ProductVersion,
@@ -786,6 +802,7 @@ func (uc *CustomerConfigUsecase) explainApprovalSettingsAtRevision(
 			BlockedReasons: append([]string(nil), catalog.BlockedReasons...),
 		}
 		if catalog.Configurable {
+			item.Condition, _ = NormalizeApprovalCondition(catalog.Key, conditions[catalog.Key])
 			item.Enabled, item.Configured = enabled[catalog.Key]
 			if !item.Configured {
 				item.BlockedReasons = append(item.BlockedReasons, "approval_settings_not_published")

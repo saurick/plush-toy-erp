@@ -110,6 +110,20 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 			return nil, ErrBadParam
 		}
 	}
+	if current.TaskGroup == WorkflowFollowupTaskGroup && in.TaskStatusKey == "done" {
+		feedback, _ := in.Payload["feedback"].(string)
+		if strings.TrimSpace(feedback) == "" {
+			feedback = in.Reason
+		}
+		feedback = strings.TrimSpace(feedback)
+		if feedback == "" || utf8.RuneCountInString(feedback) > 2000 {
+			return nil, ErrBadParam
+		}
+		if in.Payload == nil {
+			in.Payload = map[string]any{}
+		}
+		in.Payload["feedback"] = feedback
+	}
 	in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 	switch in.TaskStatusKey {
 	case "blocked", "rejected":

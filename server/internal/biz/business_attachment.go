@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	BusinessAttachmentMaxBytes            = 5 * 1024 * 1024
-	BusinessAttachmentMaxJSONRPCBodyBytes = 7 * 1024 * 1024
+	BusinessAttachmentMaxBytes             = 100 * 1024 * 1024
+	BusinessAttachmentProductImageMaxBytes = 5 * 1024 * 1024
+	BusinessAttachmentMaxJSONRPCBodyBytes  = 140 * 1024 * 1024
 
 	BusinessAttachmentProductImageMaxWidth  = 8192
 	BusinessAttachmentProductImageMaxHeight = 8192
@@ -73,6 +74,7 @@ var (
 
 	ErrBusinessAttachmentProductImageContentInvalid    = fmt.Errorf("product image content invalid: %w", ErrBusinessAttachmentContentInvalid)
 	ErrBusinessAttachmentProductImageMimeNotAllowed    = fmt.Errorf("product image mime type not allowed: %w", ErrBusinessAttachmentMimeNotAllowed)
+	ErrBusinessAttachmentProductImageTooLarge          = fmt.Errorf("product image too large: %w", ErrBusinessAttachmentTooLarge)
 	ErrBusinessAttachmentProductImageDimensionsInvalid = fmt.Errorf(
 		"product image dimensions invalid: %w",
 		ErrBusinessAttachmentContentInvalid,
@@ -296,10 +298,19 @@ func (uc *BusinessAttachmentUsecase) UploadBusinessAttachment(ctx context.Contex
 	if !exists {
 		return nil, ErrBusinessAttachmentOwnerNotFound
 	}
-	content, err := decodeBusinessAttachmentContent(in.ContentBase64)
+	maxBytes := BusinessAttachmentMaxBytes
+	if normalized.AttachmentType == BusinessAttachmentTypeProductImage {
+		maxBytes = BusinessAttachmentProductImageMaxBytes
+	}
+	content, err := decodeBusinessAttachmentContentWithMax(in.ContentBase64, maxBytes)
 	if err != nil {
-		if normalized.AttachmentType == BusinessAttachmentTypeProductImage && errors.Is(err, ErrBusinessAttachmentContentInvalid) {
-			return nil, ErrBusinessAttachmentProductImageContentInvalid
+		if normalized.AttachmentType == BusinessAttachmentTypeProductImage {
+			switch {
+			case errors.Is(err, ErrBusinessAttachmentTooLarge):
+				return nil, ErrBusinessAttachmentProductImageTooLarge
+			case errors.Is(err, ErrBusinessAttachmentContentInvalid):
+				return nil, ErrBusinessAttachmentProductImageContentInvalid
+			}
 		}
 		return nil, err
 	}
@@ -604,10 +615,6 @@ func isBusinessAttachmentProductImageDimensionsAllowed(width, height int) bool {
 	height64 := int64(height)
 	return height64 <= BusinessAttachmentProductImageMaxPixels &&
 		width64 <= BusinessAttachmentProductImageMaxPixels/height64
-}
-
-func decodeBusinessAttachmentContent(raw string) ([]byte, error) {
-	return decodeBusinessAttachmentContentWithMax(raw, BusinessAttachmentMaxBytes)
 }
 
 func decodeBusinessAttachmentContentWithMax(raw string, maxBytes int) ([]byte, error) {

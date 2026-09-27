@@ -507,6 +507,9 @@ func updateOutsourcingFactDraft(ctx context.Context, tx *inventoryDBTx, row *ent
 	if tx == nil || tx.sqlTx == nil || row == nil || in == nil {
 		return biz.ErrBadParam
 	}
+	if err := validateUnitQuantities(ctx, tx.client, row.UnitID, in.Quantity); err != nil {
+		return err
+	}
 	p := inventorySQLPlaceholders(tx.dialect, 9)
 	query := fmt.Sprintf(`UPDATE outsourcing_facts SET warehouse_id = %s, lot_id = %s, quantity = %s, occurred_at = %s, occurred_at_specified = %s, note = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8])
 	result, err := tx.sqlTx.ExecContext(

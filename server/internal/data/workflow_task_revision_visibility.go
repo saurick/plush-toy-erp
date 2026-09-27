@@ -30,6 +30,13 @@ func workflowTaskRevisionVisibilityPredicate(
 			visibility,
 		))
 	}
+	if scope.FollowupCreatorID != nil {
+		creator := workflowtask.And(workflowtask.TaskGroup(biz.WorkflowFollowupTaskGroup), workflowtask.CreatedBy(*scope.FollowupCreatorID), workflowtask.ConfigRevisionIsNil(), workflowtask.ProcessInstanceIDIsNil(), workflowtask.ProcessNodeInstanceIDIsNil())
+		if ownerRoleKey != "" {
+			creator = workflowtask.And(creator, workflowtask.OwnerRoleKey(ownerRoleKey))
+		}
+		branches = append(branches, creator)
+	}
 	for _, revision := range scope.RevisionRoleScopes {
 		visibility, ok := workflowTaskRuntimeOwnerPredicate(ownerRoleKey, revision, scope.VisibleAssigneeID)
 		if !ok {

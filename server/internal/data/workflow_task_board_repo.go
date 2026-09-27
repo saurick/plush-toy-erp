@@ -56,7 +56,7 @@ func (r *workflowRepo) getWorkflowTaskBoardInSQLTx(ctx context.Context, query bi
 		return nil, err
 	}
 	defer func() { _ = sqlTx.Rollback() }()
-	client := ent.NewClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
+	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
 	board, err := loadWorkflowTaskBoard(ctx, client, query)
 	if err != nil {
 		return nil, err

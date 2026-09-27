@@ -59,7 +59,7 @@ func (r *workflowRepo) listWorkflowRoleTaskViewInSQLTx(ctx context.Context, quer
 		return nil, err
 	}
 	defer func() { _ = sqlTx.Rollback() }()
-	client := ent.NewClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
+	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
 	page, err := loadWorkflowRoleTaskView(ctx, client, query)
 	if err != nil {
 		return nil, err
@@ -229,6 +229,17 @@ func buildWorkflowRoleTaskVisibilityEntQuery(
 	}
 	if query.Keyword != "" {
 		dbQuery = dbQuery.Where(workflowTaskKeywordPredicate(query.Keyword))
+	}
+	if len(query.ReviewRoleKeys) > 0 {
+		dbQuery = dbQuery.Where(workflowtask.OwnerRoleKeyIn(query.ReviewRoleKeys...))
+		if viewKey == biz.WorkflowRoleTaskViewApproval {
+			return dbQuery.Where(workflowApprovalTaskVisibilityPredicate(query.ApprovalVisibilityScopes, ""))
+		}
+		visibility := workflowTaskRevisionVisibilityPredicate(query.VisibilityScope, "")
+		if visibility == nil {
+			return dbQuery.Where(workflowtask.ID(0))
+		}
+		return dbQuery.Where(visibility)
 	}
 	if viewKey == biz.WorkflowRoleTaskViewApproval {
 		return dbQuery.Where(workflowApprovalRoleTaskVisibilityPredicate(

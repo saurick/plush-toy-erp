@@ -158,12 +158,18 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if err != nil {
 			return id, d.mapQualityError(ctx, err), nil
 		}
-		return id, okData(map[string]any{
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.inventoryUC.CountQualityInspectionsByStatus(ctx, filter)
+		})
+		if err != nil {
+			return id, d.mapQualityError(ctx, err), nil
+		}
+		return id, okData(withBusinessStatusCounts(map[string]any{
 			"quality_inspections": qualityInspectionsToAny(items),
 			"total":               total,
 			"limit":               normalizedLimit(pm),
 			"offset":              normalizedOffset(pm),
-		}), nil
+		}, statusCounts)), nil
 	case "list_finished_goods_quality_inspections":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
 			return id, res, nil
@@ -182,12 +188,18 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if err != nil {
 			return id, d.mapQualityError(ctx, err), nil
 		}
-		return id, okData(map[string]any{
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.inventoryUC.CountFinishedGoodsQualityInspectionsByStatus(ctx, filter)
+		})
+		if err != nil {
+			return id, d.mapQualityError(ctx, err), nil
+		}
+		return id, okData(withBusinessStatusCounts(map[string]any{
 			"quality_inspections": qualityInspectionsToAny(items),
 			"total":               total,
 			"limit":               normalizedLimit(pm),
 			"offset":              normalizedOffset(pm),
-		}), nil
+		}, statusCounts)), nil
 	case "list_outsourcing_return_quality_inspections":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
 			return id, res, nil
@@ -206,12 +218,18 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if err != nil {
 			return id, d.mapQualityError(ctx, err), nil
 		}
-		return id, okData(map[string]any{
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.inventoryUC.CountOutsourcingReturnQualityInspectionsByStatus(ctx, filter)
+		})
+		if err != nil {
+			return id, d.mapQualityError(ctx, err), nil
+		}
+		return id, okData(withBusinessStatusCounts(map[string]any{
 			"quality_inspections": qualityInspectionsToAny(items),
 			"total":               total,
 			"limit":               normalizedLimit(pm),
 			"offset":              normalizedOffset(pm),
-		}), nil
+		}, statusCounts)), nil
 	case "list_production_stage_quality_inspections":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
 			return id, res, nil
@@ -230,12 +248,18 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if err != nil {
 			return id, d.mapQualityError(ctx, err), nil
 		}
-		return id, okData(map[string]any{
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.inventoryUC.CountProductionStageQualityInspectionsByStatus(ctx, filter)
+		})
+		if err != nil {
+			return id, d.mapQualityError(ctx, err), nil
+		}
+		return id, okData(withBusinessStatusCounts(map[string]any{
 			"quality_inspections": qualityInspectionsToAny(items),
 			"total":               total,
 			"limit":               normalizedLimit(pm),
 			"offset":              normalizedOffset(pm),
-		}), nil
+		}, statusCounts)), nil
 	default:
 		return id, &v1.JsonrpcResult{Code: errcode.UnknownMethod.Code, Message: fmt.Sprintf("未知 quality 接口 method=%s", method)}, nil
 	}
@@ -409,7 +433,7 @@ func finishedGoodsQualityInspectionFilterFromParams(pm map[string]any) (biz.Qual
 }
 
 func outsourcingReturnQualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspectionFilter, bool) {
-	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_id", "status", "result", "keyword", "inventory_lot_id", "warehouse_id", "product_id", "date_from", "date_to", "limit", "offset") {
+	if !jsonRPCParamsAllowed(pm, "include_status_counts", "customer_key", "fact_id", "status", "result", "keyword", "inventory_lot_id", "warehouse_id", "product_id", "date_from", "date_to", "limit", "offset") {
 		return biz.QualityInspectionFilter{}, false
 	}
 	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
@@ -437,7 +461,7 @@ func outsourcingReturnQualityInspectionFilterFromParams(pm map[string]any) (biz.
 
 func productionStageQualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspectionFilter, bool) {
 	if !jsonRPCParamsAllowed(
-		pm,
+		pm, "include_status_counts",
 		"customer_key",
 		"status",
 		"result",
@@ -480,6 +504,9 @@ func qualityInspectionResult(ctx context.Context, d *jsonrpcDispatcher, item *bi
 }
 
 func (d *jsonrpcDispatcher) mapQualityError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
 	l := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrIdempotencyConflict):
@@ -537,6 +564,9 @@ func qualityInspectionToAny(item *biz.QualityInspection) map[string]any {
 	}
 	return map[string]any{
 		"id":                          item.ID,
+		"unit_id":                     optionalIntValue(item.UnitID),
+		"unit_name":                   optionalStringValue(item.UnitName),
+		"unit_precision":              optionalIntValue(item.UnitPrecision),
 		"inspection_no":               item.InspectionNo,
 		"purchase_receipt_id":         positiveIntToAny(item.PurchaseReceiptID),
 		"purchase_receipt_item_id":    optionalIntToAny(item.PurchaseReceiptItemID),

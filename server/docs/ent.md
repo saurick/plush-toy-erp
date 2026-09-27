@@ -72,7 +72,21 @@ CHECK/UNIQUE/FK 约束。
     ```
     `migrate_prepare` 成功只表示 `writes=0 / ready`，不能冒充迁移完成；裸
     `make migrate` 在非交互环境以 `ACTION_REQUIRED` / exit 2 停止，且不会先做
-    plan、备份或写库。`migrate_status` 保留为只读诊断。为兼容旧操作习惯，裸
+    plan、备份或写库。`migrate_status` 保留为只读版本诊断，`migrate_audit`
+    只读检查现库已登记的存量升级规则，不停止后端，不进行事务写入预演。
+    入口从待执行迁移的 `-- preflight: scripts/qa/<name>.sql` 声明选取并去重
+    执行 SQL，以只读 PostgreSQL 会话运行；新增 SQL 预检无需另加版本分支。
+    预检源文件纳入准备计划指纹；缺失文件或尚未接入的脚本会阻断准备。
+    在登记共享开发库上开发并新增迁移时，交付前运行 `make migrate_audit`，
+    由迁移实现会话处理发现的存量阻断；无法连接或未通过时明确保留未完成项。
+    精度、枚举 / 状态约束和数据转换也属于该范围；同时核对 seed / fixture
+    是否遵守新规则。存量转换须用当前库的备份在隔离库验证升级，覆盖已有的
+    已过账事实、冻结快照与历史缺值；测试样本应包含实际发现的冲突形态。
+    `make data` 完成后会提示这两个交付检查，但不会自动连接目标库或 apply。
+    空库和合成样本测试不能证明现库可升级；只读审计通过后，仍须经正式 prepare
+    完成事务回滚、真实备份与隔离恢复升级验证，再按授权 execute。
+    准备流程先做只读检查，通过后才停止后端；不自动 apply 或重试。
+    为兼容旧操作习惯，裸
     `make migrate_plan` 进入同一高层 prepare；裸 TTY `make migrate_apply`
     恢复唯一 ready operation，找不到时重新准备并等待完整确认。只有携带完整
     内部确认的调用才进入底层 plan / apply 守卫，旧目标不会再因缺 token 必然失败。

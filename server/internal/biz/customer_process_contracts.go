@@ -111,6 +111,10 @@ func normalizeCustomerProcessContracts(snapshot map[string]any) (map[string]any,
 
 func applyApprovalSettingsToCustomerProcessContract(snapshot map[string]any, contract customerProcessContract) (customerProcessContract, error) {
 	settings := approvalSettingsEnabledMap(snapshot)
+	conditions, err := approvalConditionsFromSnapshot(snapshot)
+	if err != nil {
+		return customerProcessContract{}, err
+	}
 	if len(settings) == 0 {
 		return contract, nil
 	}
@@ -125,6 +129,20 @@ func applyApprovalSettingsToCustomerProcessContract(snapshot map[string]any, con
 	}
 	for index := range contract.Nodes {
 		node := &contract.Nodes[index]
+		if configuredRule, hasCondition := conditions[approvalKey]; hasCondition && (node.NodeKey == "submit_sales_order" || node.NodeKey == "submit_purchase_order") {
+			rule, err := NormalizeApprovalCondition(approvalKey, configuredRule)
+			if err != nil {
+				return customerProcessContract{}, err
+			}
+			node.PolicySnapshot["approval_condition"] = rule.Snapshot()
+			if rule.Mode == ApprovalConditionAmount {
+				policy := ProcessBranchPolicySalesOrderRequirement
+				if approvalKey == ApprovalSettingPurchaseOrder {
+					policy = ProcessBranchPolicyPurchaseOrderRequirement
+				}
+				node.PolicySnapshot["branch_policy_key"] = policy
+			}
+		}
 		if node.NodeType != ProcessNodeTypeApproval {
 			continue
 		}

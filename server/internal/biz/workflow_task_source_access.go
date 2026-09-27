@@ -133,6 +133,12 @@ func ResolveWorkflowTaskSourceAccessContract(task *WorkflowTask) WorkflowTaskSou
 	}
 
 	switch {
+	case task.TaskGroup == WorkflowFollowupTaskGroup:
+		spec, ok := WorkflowFollowupSourceSpecFor(sourceType)
+		if !ok || task.SourceID <= 0 {
+			return unresolvedWorkflowTaskSourceAccessContract(sourceType)
+		}
+		return WorkflowTaskSourceAccessContract{Applicable: true, Resolved: true, Kind: WorkflowFollowupTaskGroup, SourceType: sourceType, RequiredAny: spec.ReadPermissions}
 	case IsTrustedFulfillmentTask(task):
 		spec, _ := FulfillmentTaskSpecFor(task.TaskGroup)
 		return WorkflowTaskSourceAccessContract{Applicable: true, Resolved: true, Kind: "fulfillment", SourceType: sourceType, RequiredAll: []string{spec.ReadCapability}}

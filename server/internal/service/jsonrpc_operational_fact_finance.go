@@ -204,7 +204,14 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		return id, okData(map[string]any{"finance_facts": financeFactsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.operationalFactUC.CountFinanceFactsByStatusForAccess(ctx, filter, scope)
+		})
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+
+		return id, okData(withBusinessStatusCounts(map[string]any{"finance_facts": financeFactsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}, statusCounts)), nil
 	default:
 		return id, unknownOperationalFactResult(method), nil
 	}

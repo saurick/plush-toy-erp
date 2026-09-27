@@ -119,7 +119,7 @@ type AdminManageRepo interface {
 	ListRoles(ctx context.Context) ([]AdminRole, error)
 	ListPermissions(ctx context.Context) ([]AdminPermission, error)
 	GetRoleByKey(ctx context.Context, roleKey string) (*AdminRole, error)
-	UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order []string) error
+	UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order, hiddenColumns []string) error
 	SetAdminProfileWithAudit(ctx context.Context, change *AdminProfileChange) (*AdminUser, error)
 	ChangeAdminLifecycle(ctx context.Context, change *AdminLifecycleChange) (updated *AdminUser, releasedTaskCount int, err error)
 	ResetAdminPasswordWithAudit(ctx context.Context, reset *AdminPasswordReset) (*AdminUser, error)
@@ -1079,6 +1079,7 @@ func (uc *AdminManageUsecase) SetCurrentERPColumnOrder(
 	ctx context.Context,
 	moduleKey string,
 	order []string,
+	hiddenColumns []string,
 ) (admin *AdminUser, err error) {
 	ctx, span := uc.Tracer().Start(ctx, "admin_manage.set_erp_column_order",
 		trace.WithAttributes(
@@ -1106,7 +1107,10 @@ func (uc *AdminManageUsecase) SetCurrentERPColumnOrder(
 		return nil, ErrUserDisabled
 	}
 
-	if err = uc.repo.UpdateAdminERPColumnOrder(ctx, currentAdmin.ID, moduleKey, normalizedOrder); err != nil {
+	if hiddenColumns != nil {
+		hiddenColumns = NormalizeAdminERPColumnOrder(hiddenColumns)
+	}
+	if err = uc.repo.UpdateAdminERPColumnOrder(ctx, currentAdmin.ID, moduleKey, normalizedOrder, hiddenColumns); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err

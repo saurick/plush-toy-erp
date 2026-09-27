@@ -206,7 +206,7 @@ func TestProductionOrderRepoAggregateLifecycleCASAndExactReplay(t *testing.T) {
 	if len(released.MaterialRequirements) != 1 || released.MaterialRequirements[0].MaterialID != f.materialID ||
 		!released.MaterialRequirements[0].UnitQuantitySnapshot.Equal(decimal.NewFromInt(2)) ||
 		!released.MaterialRequirements[0].LossRateSnapshot.Equal(decimal.RequireFromString("0.1")) ||
-		!released.MaterialRequirements[0].PlannedQuantity.Equal(decimal.RequireFromString("26.4")) {
+		!released.MaterialRequirements[0].PlannedQuantity.Equal(decimal.RequireFromString("27")) {
 		t.Fatalf("release material requirements = %#v", released.MaterialRequirements)
 	}
 	schedulingTask := f.client.WorkflowTask.Query().Where(

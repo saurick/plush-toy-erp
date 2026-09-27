@@ -958,6 +958,27 @@ func (r *operationalFactRepo) GetShipment(ctx context.Context, id int) (*biz.Shi
 }
 
 func (r *operationalFactRepo) ListShipments(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.Shipment, int, error) {
+	q := r.shipmentListQuery(filter)
+	total, err := q.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := q.Order(ent.Desc(shipment.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.Shipment, 0, len(rows))
+	for _, row := range rows {
+		item, err := shipmentWithItems(ctx, r.data.postgres, row)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, item)
+	}
+	return out, total, nil
+}
+
+func (r *operationalFactRepo) shipmentListQuery(filter biz.OperationalFactFilter) *ent.ShipmentQuery {
 	q := r.data.postgres.Shipment.Query()
 	if filter.Status != "" {
 		q = q.Where(shipment.Status(filter.Status))
@@ -1002,23 +1023,13 @@ func (r *operationalFactRepo) ListShipments(ctx context.Context, filter biz.Oper
 		))
 	}
 	q = applyShipmentDateRange(q, filter)
-	total, err := q.Clone().Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := q.Order(ent.Desc(shipment.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	out := make([]*biz.Shipment, 0, len(rows))
-	for _, row := range rows {
-		item, err := shipmentWithItems(ctx, r.data.postgres, row)
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, item)
-	}
-	return out, total, nil
+	return q
+}
+
+func (r *operationalFactRepo) CountShipmentsByStatus(ctx context.Context, filter biz.OperationalFactFilter) (map[string]int, error) {
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, r.shipmentListQuery(filter).
+		GroupBy(shipment.FieldStatus).Aggregate(ent.Count()).Scan)
 }
 
 func applyShipmentDateRange(query *ent.ShipmentQuery, filter biz.OperationalFactFilter) *ent.ShipmentQuery {

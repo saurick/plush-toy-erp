@@ -199,7 +199,7 @@ func (d *jsonrpcDispatcher) getProductionOrder(ctx context.Context, pm map[strin
 }
 
 func (d *jsonrpcDispatcher) listProductionOrders(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "keyword", "status", "lifecycle_scope", "date_field", "date_from", "date_to", "sort_by", "sort_direction", "limit", "offset") {
+	if !productionOrderAllowsOnly(pm, "include_status_counts", "keyword", "status", "lifecycle_scope", "date_field", "date_from", "date_to", "sort_by", "sort_direction", "limit", "offset") {
 		return invalidParamResult()
 	}
 	if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanRead, biz.PermissionProductionWIPRead); res != nil {
@@ -216,11 +216,18 @@ func (d *jsonrpcDispatcher) listProductionOrders(ctx context.Context, pm map[str
 	if err != nil {
 		return d.mapProductionOrderError(ctx, err)
 	}
+	statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+		return d.productionOrderUC.CountProductionOrdersByStatus(ctx, filter)
+	})
+	if err != nil {
+		return d.mapProductionOrderError(ctx, err)
+	}
+
 	values := make([]any, 0, len(items))
 	for _, item := range items {
 		values = append(values, productionOrderToMap(item))
 	}
-	return okData(map[string]any{"production_orders": values, "total": total, "limit": filter.Limit, "offset": filter.Offset})
+	return okData(withBusinessStatusCounts(map[string]any{"production_orders": values, "total": total, "limit": filter.Limit, "offset": filter.Offset}, statusCounts))
 }
 
 func (d *jsonrpcDispatcher) listProductionOrderReferenceOptions(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
@@ -604,6 +611,9 @@ func productionOrderItemToMap(item *biz.ProductionOrderItem) map[string]any {
 }
 
 func (d *jsonrpcDispatcher) mapProductionOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
 	logger := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrSalesOrderEngineeringNotReady):

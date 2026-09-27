@@ -67,7 +67,7 @@ func (r *productionOrderRepo) beginProductionOrderCommandTx(ctx context.Context)
 	if sqlDialect == "" {
 		sqlDialect = dialect.Postgres
 	}
-	client := ent.NewClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
+	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
 	return &productionOrderCommandTx{sqlTx: sqlTx, client: client}, nil
 }
 
@@ -159,7 +159,7 @@ func (r *productionOrderRepo) GetProductionOrderAggregate(ctx context.Context, i
 	if sqlDialect == "" {
 		sqlDialect = dialect.Postgres
 	}
-	client := ent.NewClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
+	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
 	aggregate, err := loadProductionOrderAggregate(ctx, client, id)
 	if err != nil {
 		return nil, err
@@ -174,36 +174,7 @@ func (r *productionOrderRepo) ListProductionOrders(ctx context.Context, filter b
 	if r == nil || r.data == nil || r.data.postgres == nil {
 		return nil, 0, biz.ErrBadParam
 	}
-	query := r.data.postgres.ProductionOrder.Query()
-	if filter.Keyword != "" {
-		query = query.Where(productionorder.Or(
-			businessDocumentKeyword("production", filter.Keyword), productionorder.OrderNoContainsFold(filter.Keyword), productionorder.NoteContainsFold(filter.Keyword)))
-	}
-	if filter.Status != "" {
-		query = query.Where(productionorder.Status(filter.Status))
-	} else if statuses := biz.LifecycleStatusesForScope(
-		filter.LifecycleScope,
-		[]string{biz.ProductionOrderStatusDraft, biz.ProductionOrderStatusReleased},
-		[]string{biz.ProductionOrderStatusClosed, biz.ProductionOrderStatusCancelled},
-	); len(statuses) > 0 {
-		query = query.Where(productionorder.StatusIn(statuses...))
-	}
-	if filter.DateFrom != nil || filter.DateTo != nil {
-		field := map[string]string{
-			"planned_start_at": productionorder.FieldPlannedStartAt,
-			"planned_end_at":   productionorder.FieldPlannedEndAt,
-			"created_at":       productionorder.FieldCreatedAt,
-			"updated_at":       productionorder.FieldUpdatedAt,
-		}[filter.DateField]
-		query = query.Where(func(selector *entsql.Selector) {
-			if filter.DateFrom != nil {
-				selector.Where(entsql.GTE(selector.C(field), *filter.DateFrom))
-			}
-			if filter.DateTo != nil {
-				selector.Where(entsql.LTE(selector.C(field), *filter.DateTo))
-			}
-		})
-	}
+	query := r.productionOrderListQuery(filter)
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -250,6 +221,46 @@ func (r *productionOrderRepo) ListProductionOrders(ctx context.Context, filter b
 		items = append(items, item)
 	}
 	return items, total, nil
+}
+
+func (r *productionOrderRepo) productionOrderListQuery(filter biz.ProductionOrderFilter) *ent.ProductionOrderQuery {
+	query := r.data.postgres.ProductionOrder.Query()
+	if filter.Keyword != "" {
+		query = query.Where(productionorder.Or(
+			businessDocumentKeyword("production", filter.Keyword), productionorder.OrderNoContainsFold(filter.Keyword), productionorder.NoteContainsFold(filter.Keyword)))
+	}
+	if filter.Status != "" {
+		query = query.Where(productionorder.Status(filter.Status))
+	} else if statuses := biz.LifecycleStatusesForScope(
+		filter.LifecycleScope,
+		[]string{biz.ProductionOrderStatusDraft, biz.ProductionOrderStatusReleased},
+		[]string{biz.ProductionOrderStatusClosed, biz.ProductionOrderStatusCancelled},
+	); len(statuses) > 0 {
+		query = query.Where(productionorder.StatusIn(statuses...))
+	}
+	if filter.DateFrom != nil || filter.DateTo != nil {
+		field := map[string]string{
+			"planned_start_at": productionorder.FieldPlannedStartAt,
+			"planned_end_at":   productionorder.FieldPlannedEndAt,
+			"created_at":       productionorder.FieldCreatedAt,
+			"updated_at":       productionorder.FieldUpdatedAt,
+		}[filter.DateField]
+		query = query.Where(func(selector *entsql.Selector) {
+			if filter.DateFrom != nil {
+				selector.Where(entsql.GTE(selector.C(field), *filter.DateFrom))
+			}
+			if filter.DateTo != nil {
+				selector.Where(entsql.LTE(selector.C(field), *filter.DateTo))
+			}
+		})
+	}
+	return query
+}
+
+func (r *productionOrderRepo) CountProductionOrdersByStatus(ctx context.Context, filter biz.ProductionOrderFilter) (map[string]int, error) {
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, r.productionOrderListQuery(filter).
+		GroupBy(productionorder.FieldStatus).Aggregate(ent.Count()).Scan)
 }
 
 type productionOrderMutationResult struct {
@@ -1350,10 +1361,13 @@ func freezeProductionOrderMaterialRequirements(ctx context.Context, client *ent.
 				}
 				return err
 			}
-			planned := orderItem.PlannedQuantity.
-				Mul(bomRow.Quantity).
-				Mul(decimal.NewFromInt(1).Add(bomRow.LossRate)).
-				Round(6)
+			planned, err := biz.RoundRequiredUnitQuantity(
+				orderItem.PlannedQuantity.Mul(bomRow.Quantity).Mul(decimal.NewFromInt(1).Add(bomRow.LossRate)),
+				unitRow.Precision,
+			)
+			if err != nil {
+				return err
+			}
 			if !planned.GreaterThan(decimal.Zero) {
 				return biz.ErrProductionOrderMaterialRequirementInvalid
 			}

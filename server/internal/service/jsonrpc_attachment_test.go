@@ -341,6 +341,15 @@ func TestJsonrpcDispatcher_ProductImageMessagesDoNotChangeOrdinaryAttachmentErro
 		t.Fatalf("product image dimension error mapped to %#v", dimensionRes)
 	}
 
+	ordinarySizeRes := dispatcher.mapBusinessAttachmentError(ctx, biz.ErrBusinessAttachmentTooLarge)
+	if ordinarySizeRes.Code != errcode.PayloadTooLarge.Code || ordinarySizeRes.Message != "附件超过 100MB，请压缩后再上传" {
+		t.Fatalf("ordinary attachment size error mapped to %#v", ordinarySizeRes)
+	}
+	productImageSizeRes := dispatcher.mapBusinessAttachmentError(ctx, biz.ErrBusinessAttachmentProductImageTooLarge)
+	if productImageSizeRes.Code != errcode.PayloadTooLarge.Code || productImageSizeRes.Message != "产品图片超过 5MB，请更换或压缩后重试" {
+		t.Fatalf("product image size error mapped to %#v", productImageSizeRes)
+	}
+
 	integrityRes := dispatcher.mapBusinessAttachmentError(ctx, biz.ErrBusinessAttachmentIntegrity)
 	if integrityRes.Code != errcode.Internal.Code || integrityRes.Message != "附件内容校验失败，请联系管理员" {
 		t.Fatalf("stored attachment integrity error mapped to %#v", integrityRes)

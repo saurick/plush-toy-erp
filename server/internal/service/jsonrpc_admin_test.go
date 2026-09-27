@@ -318,7 +318,7 @@ func (r *memAdminManageRepoForData) SetAdminProfileWithAudit(ctx context.Context
 	return r.GetAdminByID(ctx, change.AdminID)
 }
 
-func (r *memAdminManageRepoForData) UpdateAdminERPColumnOrder(_ context.Context, id int, moduleKey string, order []string) error {
+func (r *memAdminManageRepoForData) UpdateAdminERPColumnOrder(_ context.Context, id int, moduleKey string, order, hiddenColumns []string) error {
 	admin, ok := r.admins[id]
 	if !ok {
 		return biz.ErrAdminNotFound
@@ -332,6 +332,17 @@ func (r *memAdminManageRepoForData) UpdateAdminERPColumnOrder(_ context.Context,
 		delete(preferences.ColumnOrders, moduleKey)
 	} else {
 		preferences.ColumnOrders[moduleKey] = normalizedOrder
+	}
+	if hiddenColumns != nil {
+		if preferences.HiddenColumns == nil {
+			preferences.HiddenColumns = map[string][]string{}
+		}
+		normalizedHidden := biz.NormalizeAdminERPColumnOrder(hiddenColumns)
+		if len(normalizedHidden) == 0 {
+			delete(preferences.HiddenColumns, moduleKey)
+		} else {
+			preferences.HiddenColumns[moduleKey] = normalizedHidden
+		}
 	}
 	admin.ERPPreferences = biz.NormalizeAdminERPPreferences(preferences)
 	return nil
@@ -484,6 +495,7 @@ func TestJsonrpcDispatcher_AdminMe_ReturnsERPPreferences(t *testing.T) {
 			ColumnOrders: map[string][]string{
 				"project-orders": {"customer_name", "document_no"},
 			},
+			HiddenColumns: map[string][]string{"project-orders": {"status"}},
 		},
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -519,6 +531,14 @@ func TestJsonrpcDispatcher_AdminMe_ReturnsERPPreferences(t *testing.T) {
 	rawOrder, ok := columnOrders["project-orders"].([]any)
 	if !ok || len(rawOrder) != 2 {
 		t.Fatalf("expected project-orders order, got %#v", columnOrders["project-orders"])
+	}
+	hiddenColumns, ok := preferences["hidden_columns"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected hidden_columns object, got %#v", preferences["hidden_columns"])
+	}
+	hidden, ok := hiddenColumns["project-orders"].([]any)
+	if !ok || len(hidden) != 1 || hidden[0] != "status" {
+		t.Fatalf("profile did not restore column visibility: %#v", hiddenColumns)
 	}
 }
 
@@ -1305,8 +1325,9 @@ func TestJsonrpcDispatcher_AdminSetERPColumnOrder(t *testing.T) {
 		Role:     biz.RoleAdmin,
 	})
 	params, _ := structpb.NewStruct(map[string]any{
-		"module_key": "project-orders",
-		"order":      []any{"customer_name", "", "document_no", "customer_name"},
+		"module_key":     "project-orders",
+		"order":          []any{"customer_name", "", "document_no", "customer_name"},
+		"hidden_columns": []any{" status ", "status"},
 	})
 
 	_, res, err := j.handleAdmin(ctx, "set_erp_column_order", "1", params)
@@ -1319,6 +1340,24 @@ func TestJsonrpcDispatcher_AdminSetERPColumnOrder(t *testing.T) {
 	order := repo.admins[1].ERPPreferences.ColumnOrders["project-orders"]
 	if len(order) != 2 || order[0] != "customer_name" || order[1] != "document_no" {
 		t.Fatalf("unexpected stored order: %#v", repo.admins[1].ERPPreferences.ColumnOrders)
+	}
+	hidden := repo.admins[1].ERPPreferences.HiddenColumns["project-orders"]
+	if len(hidden) != 1 || hidden[0] != "status" {
+		t.Fatalf("unexpected hidden columns: %#v", hidden)
+	}
+	if got := res.Data.AsMap()["erp_preferences"].(map[string]any)["hidden_columns"]; got == nil {
+		t.Fatal("save response must return visibility")
+	}
+	for _, invalid := range []map[string]any{
+		{"module_key": "project-orders", "order": []any{}, "hidden_columns": "status"},
+		{"module_key": "project-orders", "order": []any{}, "hidden_columns": []any{123}},
+		{"module_key": "project-orders", "order": []any{}, "hidden_columns": []any{}, "id": 2},
+	} {
+		bad, _ := structpb.NewStruct(invalid)
+		_, result, err := j.handleAdmin(ctx, "set_erp_column_order", "1", bad)
+		if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+			t.Fatalf("invalid preference update accepted: %#v, result=%#v, err=%v", invalid, result, err)
+		}
 	}
 }
 

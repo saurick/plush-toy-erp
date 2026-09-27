@@ -57,7 +57,7 @@ func BackfillMissingWorkflowSourceTasks(
 			_ = sqlTx.Rollback()
 		}
 	}()
-	client := ent.NewClient(ent.Driver(entsql.NewDriver(
+	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(
 		dialect.Postgres,
 		entsql.Conn{ExecQuerier: sqlTx},
 	)))

@@ -93,7 +93,7 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.outsourcingOrderUC.ListOutsourcingOrders(ctx, biz.OutsourcingOrderFilter{
+		filter := biz.OutsourcingOrderFilter{
 			Keyword:         getString(pm, "keyword"),
 			SupplierID:      getInt(pm, "supplier_id", 0),
 			LifecycleStatus: getString(pm, "lifecycle_status"),
@@ -105,16 +105,23 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 			SortDirection:   getString(pm, "sort_direction"),
 			Limit:           getInt(pm, "limit", 50),
 			Offset:          getInt(pm, "offset", 0),
+		}
+		items, total, err := d.outsourcingOrderUC.ListOutsourcingOrders(ctx, filter)
+		if err != nil {
+			return id, d.mapOutsourcingOrderError(ctx, err), nil
+		}
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.outsourcingOrderUC.CountOutsourcingOrdersByStatus(ctx, filter)
 		})
 		if err != nil {
 			return id, d.mapOutsourcingOrderError(ctx, err), nil
 		}
-		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(withBusinessStatusCounts(map[string]any{
 			"outsourcing_orders": outsourcingOrdersToAny(items),
 			"total":              total,
 			"limit":              normalizedLimit(pm),
 			"offset":             normalizedOffset(pm),
-		})}, nil
+		}, statusCounts))}, nil
 	default:
 		return id, unknownOutsourcingOrderResult(method), nil
 	}

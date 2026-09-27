@@ -775,6 +775,31 @@ func TestJsonrpcDispatcher_ListUnitsUsesMaterialReadPermission(t *testing.T) {
 	}
 }
 
+func TestJsonrpcDispatcher_ListUnitsSupportsQuantityEntryRoles(t *testing.T) {
+	for _, permission := range []string{biz.PermissionBOMRead, biz.PermissionSalesOrderItemRead, biz.PermissionWarehouseInboundRead, biz.PermissionSalesOrderRead, biz.PermissionPurchaseOrderRead, biz.PermissionOutsourcingOrderRead, biz.PermissionPMCPlanRead, biz.PermissionProductionWIPRead, biz.PermissionWarehouseInventoryRead, biz.PermissionShipmentRead, biz.PermissionQualityInspectionRead, biz.PermissionProductionFactRead, biz.PermissionOutsourcingFactRead, biz.PermissionPurchaseReceiptRead} {
+		t.Run(permission, func(t *testing.T) {
+			role := biz.WarehouseRoleKey
+			if permission == biz.PermissionBOMRead {
+				role = biz.EngineeringRoleKey
+			}
+			if permission == biz.PermissionPMCPlanRead {
+				role = biz.PMCRoleKey
+			}
+			j := newMasterDataJSONRPCTestData(t, &stubMasterDataJSONRPCRepo{}, workflowJSONRPCAdmin([]string{role}, permission))
+			if permission == biz.PermissionPMCPlanRead {
+				activateMasterDataTestModuleState(t, j, "unit-quantity-role", productionOrderModuleKey, "enabled")
+			}
+			if permission == biz.PermissionBOMRead {
+				activateMasterDataTestModuleState(t, j, "unit-quantity-bom-role", bomModuleKeyMaterialBOM, "enabled")
+			}
+			_, res, err := j.handleMasterData(workflowJSONRPCAdminContext(), "list_units", "1", nil)
+			if err != nil || res == nil || res.Code != errcode.OK.Code {
+				t.Fatalf("quantity role cannot read unit precision: %#v, %v", res, err)
+			}
+		})
+	}
+}
+
 func TestJsonrpcDispatcher_ListWarehousesUsesInventoryReadPermission(t *testing.T) {
 	j := newMasterDataJSONRPCTestData(t,
 		&stubMasterDataJSONRPCRepo{},

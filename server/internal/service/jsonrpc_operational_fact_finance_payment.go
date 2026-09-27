@@ -61,10 +61,17 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		out, err := d.operationalFactUC.GetFinancePayment(ctx, getInt(pm, "id", 0))
 		return id, financePaymentResult(d, ctx, out, err), nil
 	case "list_finance_payments":
-		if !jsonRPCParamsAllowed(pm, "customer_key", "keyword", "status", "direction", "counterparty_type", "counterparty_id", "limit", "offset") {
+		if !jsonRPCParamsAllowed(pm, "include_status_counts", "customer_key", "keyword", "status", "direction", "counterparty_type", "counterparty_id", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.operationalFactUC.ListFinancePayments(ctx, biz.FinancePaymentFilter{Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), Direction: getString(pm, "direction"), CounterpartyType: getString(pm, "counterparty_type"), CounterpartyID: getInt(pm, "counterparty_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)})
+		filter := biz.FinancePaymentFilter{Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), Direction: getString(pm, "direction"), CounterpartyType: getString(pm, "counterparty_type"), CounterpartyID: getInt(pm, "counterparty_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}
+		items, total, err := d.operationalFactUC.ListFinancePayments(ctx, filter)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.operationalFactUC.CountFinancePaymentsByStatus(ctx, filter)
+		})
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -72,7 +79,7 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		for _, item := range items {
 			out = append(out, financePaymentToMap(item))
 		}
-		return id, okData(map[string]any{"payments": out, "total": total, "limit": getInt(pm, "limit", 50), "offset": getInt(pm, "offset", 0)}), nil
+		return id, okData(withBusinessStatusCounts(map[string]any{"payments": out, "total": total, "limit": getInt(pm, "limit", 50), "offset": getInt(pm, "offset", 0)}, statusCounts)), nil
 	case "get_finance_credit_note":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id") {
 			return id, invalidParamResult(), nil
@@ -80,11 +87,18 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		out, err := d.operationalFactUC.GetFinanceCreditNote(ctx, getInt(pm, "id", 0))
 		return id, financeCreditNoteResult(d, ctx, out, err), nil
 	case "list_finance_credit_notes":
-		if !jsonRPCParamsAllowed(pm, "customer_key", "keyword", "status", "finance_fact_id", "limit", "offset") {
+		if !jsonRPCParamsAllowed(pm, "include_status_counts", "customer_key", "keyword", "status", "finance_fact_id", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
 		limit, offset := getInt(pm, "limit", 50), getInt(pm, "offset", 0)
-		items, total, err := d.operationalFactUC.ListFinanceCreditNotes(ctx, biz.FinanceCreditNoteFilter{Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), FinanceFactID: getInt(pm, "finance_fact_id", 0), Limit: limit, Offset: offset})
+		filter := biz.FinanceCreditNoteFilter{Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), FinanceFactID: getInt(pm, "finance_fact_id", 0), Limit: limit, Offset: offset}
+		items, total, err := d.operationalFactUC.ListFinanceCreditNotes(ctx, filter)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.operationalFactUC.CountFinanceCreditNotesByStatus(ctx, filter)
+		})
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -92,7 +106,7 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		for _, item := range items {
 			out = append(out, financeCreditNoteToMap(item))
 		}
-		return id, okData(map[string]any{"credit_notes": out, "total": total, "limit": limit, "offset": offset}), nil
+		return id, okData(withBusinessStatusCounts(map[string]any{"credit_notes": out, "total": total, "limit": limit, "offset": offset}, statusCounts)), nil
 	case "create_finance_credit_note":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "credit_note_no", "finance_fact_id", "amount", "reason", "idempotency_key") {
 			return id, invalidParamResult(), nil

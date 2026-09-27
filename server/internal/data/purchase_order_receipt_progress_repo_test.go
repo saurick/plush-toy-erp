@@ -19,6 +19,7 @@ func TestPurchaseOrderReceiptProgressProjectsExactServerOwnedQuantities(t *testi
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "purchase_order_receipt_progress")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
+	client.Unit.UpdateOneID(fixtures.unitID).SetName("码").SetPrecision(6).SaveX(ctx)
 	orderItem := createApprovedPurchaseOrderItemForReceiptTest(
 		t,
 		ctx,

@@ -50,6 +50,10 @@ var (
 )
 
 type QualityInspection struct {
+	// Quantity unit is a read projection of the inspected source, never an input.
+	UnitID                   *int
+	UnitName                 *string
+	UnitPrecision            *int
 	CheckItems               []qualitycheck.Item
 	ID                       int
 	InspectionNo             string

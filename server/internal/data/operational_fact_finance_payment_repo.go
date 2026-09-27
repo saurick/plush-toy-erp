@@ -754,6 +754,23 @@ func (r *operationalFactRepo) GetFinancePayment(ctx context.Context, id int) (*b
 	return financePaymentWithAllocations(ctx, r.data.postgres, row)
 }
 func (r *operationalFactRepo) ListFinancePayments(ctx context.Context, filter biz.FinancePaymentFilter) ([]*biz.FinancePayment, int, error) {
+	query := r.financePaymentListQuery(filter)
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Desc(financepayment.FieldOccurredAt), ent.Desc(financepayment.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out, err := financePaymentsWithAllocations(ctx, r.data.postgres, rows)
+	if err != nil {
+		return nil, 0, err
+	}
+	return out, total, nil
+}
+
+func (r *operationalFactRepo) financePaymentListQuery(filter biz.FinancePaymentFilter) *ent.FinancePaymentQuery {
 	query := r.data.postgres.FinancePayment.Query()
 	if strings.TrimSpace(filter.Keyword) != "" {
 		query = query.Where(businessDocumentKeyword("payment", filter.Keyword))
@@ -770,20 +787,15 @@ func (r *operationalFactRepo) ListFinancePayments(ctx context.Context, filter bi
 	if filter.CounterpartyID > 0 {
 		query = query.Where(financepayment.CounterpartyID(filter.CounterpartyID))
 	}
-	total, err := query.Clone().Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := query.Order(ent.Desc(financepayment.FieldOccurredAt), ent.Desc(financepayment.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	out, err := financePaymentsWithAllocations(ctx, r.data.postgres, rows)
-	if err != nil {
-		return nil, 0, err
-	}
-	return out, total, nil
+	return query
 }
+
+func (r *operationalFactRepo) CountFinancePaymentsByStatus(ctx context.Context, filter biz.FinancePaymentFilter) (map[string]int, error) {
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, r.financePaymentListQuery(filter).
+		GroupBy(financepayment.FieldStatus).Aggregate(ent.Count()).Scan)
+}
+
 func (r *operationalFactRepo) GetFinanceCreditNote(ctx context.Context, id int) (*biz.FinanceCreditNote, error) {
 	row, err := r.data.postgres.FinanceCreditNote.Get(ctx, id)
 	if err != nil {
@@ -792,16 +804,7 @@ func (r *operationalFactRepo) GetFinanceCreditNote(ctx context.Context, id int) 
 	return financeCreditNoteWithFact(ctx, r.data.postgres, row)
 }
 func (r *operationalFactRepo) ListFinanceCreditNotes(ctx context.Context, filter biz.FinanceCreditNoteFilter) ([]*biz.FinanceCreditNote, int, error) {
-	query := r.data.postgres.FinanceCreditNote.Query()
-	if strings.TrimSpace(filter.Keyword) != "" {
-		query = query.Where(businessDocumentKeyword("credit", filter.Keyword))
-	}
-	if filter.Status != "" {
-		query = query.Where(financecreditnote.Status(filter.Status))
-	}
-	if filter.FinanceFactID > 0 {
-		query = query.Where(financecreditnote.FinanceFactID(filter.FinanceFactID))
-	}
+	query := r.financeCreditNoteListQuery(filter)
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -816,6 +819,27 @@ func (r *operationalFactRepo) ListFinanceCreditNotes(ctx context.Context, filter
 	}
 	return out, total, nil
 }
+
+func (r *operationalFactRepo) financeCreditNoteListQuery(filter biz.FinanceCreditNoteFilter) *ent.FinanceCreditNoteQuery {
+	query := r.data.postgres.FinanceCreditNote.Query()
+	if strings.TrimSpace(filter.Keyword) != "" {
+		query = query.Where(businessDocumentKeyword("credit", filter.Keyword))
+	}
+	if filter.Status != "" {
+		query = query.Where(financecreditnote.Status(filter.Status))
+	}
+	if filter.FinanceFactID > 0 {
+		query = query.Where(financecreditnote.FinanceFactID(filter.FinanceFactID))
+	}
+	return query
+}
+
+func (r *operationalFactRepo) CountFinanceCreditNotesByStatus(ctx context.Context, filter biz.FinanceCreditNoteFilter) (map[string]int, error) {
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, r.financeCreditNoteListQuery(filter).
+		GroupBy(financecreditnote.FieldStatus).Aggregate(ent.Count()).Scan)
+}
+
 func (r *operationalFactRepo) findFinancePaymentReplay(ctx context.Context, actorID int, key, hash string) (*biz.FinancePayment, bool, error) {
 	return r.findFinancePaymentReplayWithClient(ctx, r.data.postgres, actorID, key, hash)
 }

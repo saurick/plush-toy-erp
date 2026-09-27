@@ -221,6 +221,8 @@ test("database constraint SQL is read-only and covers the target business invari
     "quality_inspections",
     "business_attachments",
     "octet_length(content) <> file_size",
+    "file_size NOT BETWEEN 1 AND 104857600",
+    "attachment_type = 'product_image' AND file_size > 5242880",
     "sha256 !~ '^[0-9a-f]{64}$'",
   ]) {
     assert(source.includes(required), "missing constraint boundary: " + required);

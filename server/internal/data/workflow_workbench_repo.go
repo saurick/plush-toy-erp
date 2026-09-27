@@ -56,7 +56,7 @@ func (r *workflowRepo) getWorkflowWorkbenchInSQLTx(ctx context.Context, query bi
 		return nil, err
 	}
 	defer func() { _ = sqlTx.Rollback() }()
-	client := ent.NewClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
+	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
 	page, err := loadWorkflowWorkbench(ctx, client, query)
 	if err != nil {
 		return nil, err

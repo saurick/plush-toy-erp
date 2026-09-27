@@ -150,6 +150,9 @@ func unknownOperationalFactResult(method string) *v1.JsonrpcResult {
 }
 
 func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
 	if result := warehouseClassificationError(err); result != nil {
 		return result
 	}

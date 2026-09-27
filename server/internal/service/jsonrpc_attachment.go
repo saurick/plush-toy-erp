@@ -547,8 +547,10 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 	switch {
 	case errors.Is(err, biz.ErrBusinessAttachmentStorageUnavailable):
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: "文件存储暂不可用，请稍后重试；重复上传前请先查看附件列表"}
+	case errors.Is(err, biz.ErrBusinessAttachmentProductImageTooLarge):
+		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "产品图片超过 5MB，请更换或压缩后重试"}
 	case errors.Is(err, biz.ErrBusinessAttachmentTooLarge):
-		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 5MB，请压缩后再上传"}
+		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 100MB，请压缩后再上传"}
 	case errors.Is(err, biz.ErrBusinessAttachmentIntegrity):
 		d.log.WithContext(ctx).Errorf("business attachment integrity verification failed: %v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: "附件内容校验失败，请联系管理员"}

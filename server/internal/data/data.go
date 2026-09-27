@@ -250,7 +250,7 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		return nil, nil, err
 	}
 
-	postgresClient := ent.NewClient(
+	postgresClient := newBusinessEntClient(
 		ent.Log(entLogger.NewEntLogger(logger)),
 		ent.Driver(entsql.OpenDB(dialect.Postgres, db)),
 	)

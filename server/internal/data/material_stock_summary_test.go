@@ -15,6 +15,7 @@ func TestMaterialStockSummaryKeepsWarehouseScopeAndMaterialIdentity(t *testing.T
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "material_stock_summary")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
+	client.Unit.UpdateOneID(fixtures.unitID).SetName("码").SetPrecision(6).SaveX(ctx)
 	second := createTestWarehouse(t, ctx, client, "WH-SUMMARY-002")
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	for index, warehouseID := range []int{fixtures.warehouseID, second.ID} {

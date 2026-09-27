@@ -333,7 +333,7 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		}, nil
 
 	case "set_erp_column_order":
-		if res := rejectUnknownAdminParams(pm, "module_key", "order"); res != nil {
+		if res := rejectUnknownAdminParams(pm, "module_key", "order", "hidden_columns"); res != nil {
 			return id, res, nil
 		}
 		moduleKey := getString(pm, "module_key")
@@ -341,7 +341,11 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if !ok {
 			return id, invalidAdminParamResult(), nil
 		}
-		admin, err := d.adminManageUC.SetCurrentERPColumnOrder(ctx, moduleKey, order)
+		hiddenColumns, ok := getStrictStringSlice(pm, "hidden_columns", false)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		admin, err := d.adminManageUC.SetCurrentERPColumnOrder(ctx, moduleKey, order, hiddenColumns)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -350,7 +354,8 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
 				"erp_preferences": map[string]any{
-					"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
+					"column_orders":  toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
+					"hidden_columns": toAnyMapStringSlice(admin.ERPPreferences.HiddenColumns),
 				},
 			}),
 		}, nil

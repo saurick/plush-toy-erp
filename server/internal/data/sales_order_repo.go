@@ -169,6 +169,26 @@ func (r *salesOrderRepo) GetSalesOrder(ctx context.Context, id int) (*biz.SalesO
 }
 
 func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOrderFilter) ([]*biz.SalesOrder, int, error) {
+	query := r.salesOrderListQuery(filter)
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(salesOrderSortOrder(filter), salesorder.ByID(sql.OrderDesc())).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	orders := entSalesOrdersToBiz(rows)
+	if err := r.populateSalesOrderItemCounts(ctx, orders); err != nil {
+		return nil, 0, err
+	}
+	return orders, total, nil
+}
+
+func (r *salesOrderRepo) salesOrderListQuery(filter biz.SalesOrderFilter) *ent.SalesOrderQuery {
 	query := r.data.postgres.SalesOrder.Query()
 	if filter.Keyword != "" {
 		query = query.Where(salesorder.Or(
@@ -200,22 +220,13 @@ func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOr
 	if filter.DateField != "" {
 		query = applySalesOrderDateRange(query, filter)
 	}
-	total, err := query.Clone().Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := query.Order(salesOrderSortOrder(filter), salesorder.ByID(sql.OrderDesc())).
-		Limit(filter.Limit).
-		Offset(filter.Offset).
-		All(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	orders := entSalesOrdersToBiz(rows)
-	if err := r.populateSalesOrderItemCounts(ctx, orders); err != nil {
-		return nil, 0, err
-	}
-	return orders, total, nil
+	return query
+}
+
+func (r *salesOrderRepo) CountSalesOrdersByStatus(ctx context.Context, filter biz.SalesOrderFilter) (map[string]int, error) {
+	filter.LifecycleStatus = ""
+	return scanBusinessStatusCounts(ctx, r.salesOrderListQuery(filter).
+		GroupBy(salesorder.FieldLifecycleStatus).Aggregate(ent.Count()).Scan)
 }
 
 func (r *salesOrderRepo) populateSalesOrderItemCounts(ctx context.Context, orders []*biz.SalesOrder) error {
@@ -634,6 +645,13 @@ func (r *salesOrderRepo) SubmitSalesOrderForProcessCommand(
 			// the transition; result-missing rows require explicit review.
 			return nil, biz.ErrProcessDomainCommandRecoveryRequired
 		}
+	}
+	if err := biz.ApplyOrderApprovalDecision(command, result, row.Currency, row.OrderTotal, row.Version); err != nil {
+		return nil, err
+	}
+	record, err = biz.BuildProcessNodeDomainCommandResultRecord(command, result)
+	if err != nil {
+		return nil, err
 	}
 	if _, err := recordProcessNodeDomainCommandResultWithClient(ctx, tx.Client(), record, actorID); err != nil {
 		return nil, err

@@ -353,6 +353,7 @@ func TestInventoryPostgresFlow(t *testing.T) {
 	data, client := openInventoryPostgresTestData(t)
 
 	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	client.Unit.UpdateOneID(fixtures.unitID).SetName("码").SetPrecision(6).SaveX(ctx)
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(
 		data,
 		log.NewStdLogger(io.Discard),

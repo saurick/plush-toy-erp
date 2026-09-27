@@ -397,7 +397,7 @@ func (r *stubAdminManageRepo) SetAdminProfileWithAudit(ctx context.Context, chan
 	return r.clone(admin), nil
 }
 
-func (r *stubAdminManageRepo) UpdateAdminERPColumnOrder(_ context.Context, id int, moduleKey string, order []string) error {
+func (r *stubAdminManageRepo) UpdateAdminERPColumnOrder(_ context.Context, id int, moduleKey string, order, hiddenColumns []string) error {
 	admin, ok := r.adminsByID[id]
 	if !ok {
 		return ErrAdminNotFound
@@ -411,6 +411,17 @@ func (r *stubAdminManageRepo) UpdateAdminERPColumnOrder(_ context.Context, id in
 		delete(preferences.ColumnOrders, moduleKey)
 	} else {
 		preferences.ColumnOrders[moduleKey] = normalizedOrder
+	}
+	if hiddenColumns != nil {
+		if preferences.HiddenColumns == nil {
+			preferences.HiddenColumns = map[string][]string{}
+		}
+		normalizedHidden := NormalizeAdminERPColumnOrder(hiddenColumns)
+		if len(normalizedHidden) == 0 {
+			delete(preferences.HiddenColumns, moduleKey)
+		} else {
+			preferences.HiddenColumns[moduleKey] = normalizedHidden
+		}
 	}
 	admin.ERPPreferences = NormalizeAdminERPPreferences(preferences)
 	return nil
@@ -1534,7 +1545,7 @@ func TestAdminManageUsecase_SetCurrentERPColumnOrder(t *testing.T) {
 		"",
 		"document_no",
 		"customer_name",
-	})
+	}, []string{" status ", "status"})
 	if err != nil {
 		t.Fatalf("SetCurrentERPColumnOrder() error = %v", err)
 	}
@@ -1543,11 +1554,21 @@ func TestAdminManageUsecase_SetCurrentERPColumnOrder(t *testing.T) {
 		t.Fatalf("unexpected column order: %#v", updated.ERPPreferences.ColumnOrders)
 	}
 
-	updated, err = uc.SetCurrentERPColumnOrder(ctx, "project-orders", nil)
+	updated, err = uc.SetCurrentERPColumnOrder(ctx, "project-orders", nil, []string{})
 	if err != nil {
 		t.Fatalf("SetCurrentERPColumnOrder(clear) error = %v", err)
 	}
 	if len(updated.ERPPreferences.ColumnOrders) != 0 {
 		t.Fatalf("expected cleared column order, got %#v", updated.ERPPreferences.ColumnOrders)
+	}
+	if len(updated.ERPPreferences.HiddenColumns) != 0 {
+		t.Fatalf("expected cleared visibility, got %#v", updated.ERPPreferences.HiddenColumns)
+	}
+	repo.adminsByID[2].Disabled = true
+	if _, err := uc.SetCurrentERPColumnOrder(ctx, "project-orders", nil, []string{"status"}); !errors.Is(err, ErrUserDisabled) {
+		t.Fatalf("disabled account error = %v", err)
+	}
+	if _, err := uc.SetCurrentERPColumnOrder(context.Background(), "project-orders", nil, []string{"status"}); err == nil {
+		t.Fatal("unauthenticated request must fail")
 	}
 }

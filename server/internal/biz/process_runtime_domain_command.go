@@ -510,6 +510,12 @@ func processDomainCommandResultRecord(
 		"effect_state":         effectState,
 		"result_version":       1,
 	}
+	if result.ApprovalDecision != nil {
+		if err := validateOrderApprovalDecision(node, commandKey, result); err != nil {
+			return nil, err
+		}
+		payload["approval_decision"] = result.ApprovalDecision.snapshot()
+	}
 	hash, err := processCanonicalSHA256(struct {
 		ResultState   string         `json:"result_state"`
 		Result        map[string]any `json:"result"`
@@ -619,6 +625,10 @@ func processDomainCommandResultFromNode(node *ProcessNodeInstance) (*ProcessDoma
 		BlockReason:        strings.TrimSpace(blockReason),
 		LinkedBusinessRefs: refs,
 		EffectState:        initialEffectState,
+	}
+	result.ApprovalDecision, err = orderApprovalDecisionFromResult(node.DomainCommandResult["approval_decision"])
+	if err != nil {
+		return nil, ErrProcessDomainCommandRecoveryRequired
 	}
 	if node.DomainCommandEffectRefType != nil || node.DomainCommandEffectRefID != nil {
 		if node.DomainCommandEffectRefType == nil || node.DomainCommandEffectRefID == nil {

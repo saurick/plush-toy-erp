@@ -192,6 +192,17 @@ func updateInventoryOperationDraftItem(
 	if tx == nil || tx.sqlTx == nil || itemID <= 0 || operationID <= 0 {
 		return biz.ErrBadParam
 	}
+	row, err := tx.client.InventoryOperationItem.Get(ctx, itemID)
+	if err != nil {
+		return err
+	}
+	quantities := []decimal.Decimal{adjustmentQuantity}
+	if countedQuantity != nil {
+		quantities = append(quantities, *countedQuantity)
+	}
+	if err := validateUnitQuantities(ctx, tx.client, row.UnitID, quantities...); err != nil {
+		return err
+	}
 	p := inventorySQLPlaceholders(tx.dialect, 8)
 	query := fmt.Sprintf(`UPDATE inventory_operation_items SET expected_quantity = %s, counted_quantity = %s, adjustment_quantity = %s, to_warehouse_id = %s, to_lot_id = %s, note = %s WHERE id = %s AND operation_id = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7])
 	result, err := tx.sqlTx.ExecContext(

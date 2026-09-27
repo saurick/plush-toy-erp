@@ -40,6 +40,8 @@ func (d *jsonrpcDispatcher) handleWorkflow(
 	}
 
 	switch method {
+	case "get_task_create_options", "create_followup_task":
+		return d.handleWorkflowFollowup(ctx, method, id, pm, claims.UserID)
 	case "metadata":
 		return d.handleWorkflowMetadata(ctx, id)
 	case "get_task", "list_tasks", "list_role_tasks", "list_workbench_role_tasks", "get_workbench", "get_task_board", "list_task_events", "get_task_process_context", "get_task_assignment_options", "create_task", "complete_task_action", "block_task_action", "reject_task_action", "resume_task_action", "urge_task", "reassign_task", "explain_action_access", "explain_task_assignment":
@@ -55,7 +57,7 @@ const workflowModuleKeyTasks = "workflow_tasks"
 
 func workflowMethodRequiresEnabledModule(method string) bool {
 	switch method {
-	case "create_task", "complete_task_action", "block_task_action", "reject_task_action", "resume_task_action", "urge_task", "reassign_task":
+	case "create_followup_task", "create_task", "complete_task_action", "block_task_action", "reject_task_action", "resume_task_action", "urge_task", "reassign_task":
 		return true
 	default:
 		return false

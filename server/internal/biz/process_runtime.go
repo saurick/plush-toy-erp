@@ -323,7 +323,8 @@ type ProcessDomainCommandInput struct {
 }
 
 type ProcessDomainCommandResult struct {
-	Outcome string
+	ApprovalDecision *OrderApprovalDecision
+	Outcome          string
 	// BlockReason lets a domain gate settle the current node and process as
 	// blocked without pretending that the business fact command succeeded.
 	BlockReason        string

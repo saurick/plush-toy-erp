@@ -164,6 +164,9 @@ func purchaseReceiptItemResult(ctx context.Context, d *jsonrpcDispatcher, item *
 }
 
 func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
 	if result := warehouseClassificationError(err); result != nil {
 		return result
 	}

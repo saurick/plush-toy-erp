@@ -761,6 +761,9 @@ func BuiltinRoles() []RoleDefinition {
 	return roles
 }
 
+// MobileAllRolesKey is a read-only viewing scope, never a business role.
+const MobileAllRolesKey = "all"
+
 var builtinMobileRoleAccessPermissions = map[string]string{
 	BossRoleKey:        PermissionMobileBossAccess,
 	SalesRoleKey:       PermissionMobileSalesAccess,
@@ -839,12 +842,19 @@ func AdminHasRole(admin *AdminUser, roleKey string) bool {
 }
 
 func AdminCanAccessMobileRole(admin *AdminUser, roleKey string) bool {
-	permissionKey := MobileRoleAccessPermission(roleKey)
-	if permissionKey == "" {
+	if !admin.IsActive() {
+		return false
+	}
+	roleKey = NormalizeRoleKey(roleKey)
+	if roleKey == "" {
 		return true
 	}
-	if admin != nil && admin.IsSuperAdmin {
-		return AdminHasRole(admin, roleKey)
+	if roleKey == MobileAllRolesKey {
+		return admin.IsSuperAdmin
+	}
+	permissionKey := MobileRoleAccessPermission(roleKey)
+	if permissionKey == "" {
+		return false
 	}
 	return AdminHasPermission(admin, permissionKey)
 }
@@ -861,7 +871,7 @@ var builtinAdminMenus = []AdminMenu{
 	{Key: "sales-orders", Label: "销售订单", Path: "/erp/sales/project-orders/sales-orders", RequiredAny: []string{PermissionSalesOrderRead}},
 	{Key: "material-bom", Label: "BOM 管理", Path: "/erp/purchase/material-bom", RequiredAny: []string{PermissionBOMRead}},
 	{Key: "accessories-purchase", Label: "采购订单", Path: "/erp/purchase/accessories", RequiredAny: []string{PermissionPurchaseOrderRead}},
-	{Key: "inbound", Label: "入库管理", Path: "/erp/warehouse/inbound", RequiredAny: []string{PermissionWarehouseInboundRead, PermissionPurchaseReceiptRead}},
+	{Key: "inbound", Label: "采购入库", Path: "/erp/warehouse/inbound", RequiredAny: []string{PermissionWarehouseInboundRead, PermissionPurchaseReceiptRead}},
 	{Key: "quality-inspections", Label: "质量检验", Path: "/erp/production/quality-inspections", RequiredAny: []string{PermissionQualityInspectionRead}},
 	{Key: "inventory", Label: "库存台账", Path: "/erp/warehouse/inventory", RequiredAny: []string{PermissionWarehouseInventoryRead}},
 	{Key: "processing-contracts", Label: "委外订单", Path: "/erp/purchase/processing-contracts", RequiredAny: []string{PermissionOutsourcingOrderRead}},
@@ -870,7 +880,7 @@ var builtinAdminMenus = []AdminMenu{
 	{Key: "production-progress", Label: "生产记录", Path: "/erp/production/progress", RequiredAny: []string{PermissionProductionFactRead}},
 	{Key: "production-exceptions", Label: "异常处理", Path: "/erp/production/exceptions", RequiredAny: []string{PermissionWorkflowTaskRead, PermissionPMCRiskRead, PermissionProductionFactRead, PermissionProductionExceptionSubmit, PermissionProductionExceptionApprove}},
 	{Key: "shipping-release", Label: "出货放行", Path: "/erp/warehouse/shipping-release", RequiredAny: []string{PermissionWarehouseOutboundRead, PermissionFinanceReceivableRead, PermissionSalesOrderRead}, RequiredAll: []string{PermissionWorkflowTaskRead}},
-	{Key: "outbound", Label: "出库管理", Path: "/erp/warehouse/outbound", RequiredAny: []string{PermissionWarehouseOutboundRead}},
+	{Key: "outbound", Label: "库存预留", Path: "/erp/warehouse/outbound", RequiredAny: []string{PermissionWarehouseOutboundRead}},
 	{Key: "shipments", Label: "出货单", Path: "/erp/warehouse/shipments", RequiredAny: []string{PermissionShipmentRead}},
 	{Key: "reconciliation", Label: "对账管理", Path: "/erp/finance/reconciliation", RequiredAny: []string{PermissionFinanceReconciliationRead}},
 	{Key: "receivables", Label: "应收管理", Path: "/erp/finance/receivables", RequiredAny: []string{PermissionFinanceReceivableRead}},

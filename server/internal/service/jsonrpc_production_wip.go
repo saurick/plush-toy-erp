@@ -364,6 +364,9 @@ func productionWIPQualitySummaryToMap(value *biz.ProductionWIPQualityInspectionS
 }
 
 func (d *jsonrpcDispatcher) mapProductionWIPError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
 	logger := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrIdempotencyConflict):

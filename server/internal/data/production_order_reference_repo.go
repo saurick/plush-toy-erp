@@ -16,6 +16,7 @@ import (
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/unit"
+	"server/internal/unitpolicy"
 )
 
 func (r *productionOrderRepo) ListProductionOrderReferenceOptions(ctx context.Context, filter biz.ProductionOrderReferenceFilter) ([]*biz.ProductionOrderReferenceOption, int, error) {
@@ -119,7 +120,7 @@ func (r *productionOrderRepo) listProductionOrderUnitOptions(ctx context.Context
 	} else {
 		query = query.Where(unit.IsActive(true))
 		if filter.Keyword != "" {
-			query = query.Where(unit.Or(unit.CodeContainsFold(filter.Keyword), unit.NameContainsFold(filter.Keyword)))
+			query = query.Where(unit.Or(unit.CodeContainsFold(filter.Keyword), unit.NameContainsFold(filter.Keyword), unit.NameEQ(unitpolicy.CanonicalLabel(filter.Keyword))))
 		}
 	}
 	total, err := query.Clone().Count(ctx)
@@ -132,7 +133,7 @@ func (r *productionOrderRepo) listProductionOrderUnitOptions(ctx context.Context
 	}
 	options := make([]*biz.ProductionOrderReferenceOption, 0, len(rows))
 	for _, row := range rows {
-		option := &biz.ProductionOrderReferenceOption{ReferenceType: filter.ReferenceType, Value: row.ID, Selectable: row.IsActive, UnitValue: productionOrderIntPtr(row.ID), UnitCode: productionOrderStringPtr(row.Code), UnitName: productionOrderStringPtr(row.Name), UnitPrecision: productionOrderIntPtr(row.Precision), Label: compactProductionOrderReferenceLabel(row.Name, row.Code)}
+		option := &biz.ProductionOrderReferenceOption{ReferenceType: filter.ReferenceType, Value: row.ID, Selectable: row.IsActive, UnitValue: productionOrderIntPtr(row.ID), UnitCode: productionOrderStringPtr(row.Code), UnitName: productionOrderStringPtr(row.Name), UnitPrecision: productionOrderIntPtr(row.Precision), Label: row.Name}
 		markHistoricalReference(option)
 		options = append(options, option)
 	}

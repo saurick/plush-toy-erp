@@ -753,7 +753,11 @@ supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service',
 
 ### CHECK 约束
 
-无表级 CHECK。
+- <code>units_precision_allowed</code>
+
+```sql
+precision BETWEEN 0 AND 6
+```
 
 ### 代码与业务真源
 
