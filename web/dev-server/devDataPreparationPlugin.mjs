@@ -156,7 +156,7 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
   Object.freeze({
     key: 'core-demo',
     title: '本地长期基础数据',
-    purpose: '稳定准备十个演示账号与当前 V7 的单位、仓库引用',
+    purpose: '准备演示账号与当前数据合同的标准单位、仓库引用',
     writesDatabase: true,
     dataRetention: 'long-lived',
     cleanupMode: 'not-supported',
@@ -167,7 +167,7 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
     key: 'scenario-demo',
     title: '长期业务场景数据',
     purpose:
-      '本地开发与 demo-133 分别按固定目标身份，共用同一 V7 语义精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
+      '本地开发与 demo-133 分别按固定目标身份，共用当前数据合同精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
     writesDatabase: true,
     dataRetention: 'long-lived',
     cleanupMode: 'forward-only',
@@ -585,7 +585,7 @@ function corePreflightEvidence(stdout) {
     /migration 已是最新版本（([^，\r\n]+)，(\d+)\/(\d+)）/u
   )
   if (
-    !/schema\/migration 守卫通过/u.test(output) ||
+    !/工作区数据库规则检查通过/u.test(output) ||
     !migration ||
     migration[2] !== migration[3] ||
     !/non-system-schema function=0 procedure=0 non-internal-trigger=0/u.test(
@@ -1620,7 +1620,7 @@ export function createDevDataPreparationService({
       issues.push({
         code: 'historical_operation_contract_preserved',
         severity: 'warning',
-        message: `已保留 ${historicalOperations.length} 条旧合同历史回执，但不会参与当前 V7 执行或环境判断`,
+        message: `已保留 ${historicalOperations.length} 条旧合同历史回执，但不会参与当前数据合同的执行或环境判断`,
       })
     }
     if (unresolvedContractOperations.length > 0) {
@@ -1908,7 +1908,8 @@ export function createDevDataPreparationService({
         outputs.set(command.key, String(result.stdout || ''))
         completed.push(command.key)
       } catch (error) {
-        const stage = command.key === 'role-seed' ? '角色账号' : 'V7 单位与仓库'
+        const stage =
+          command.key === 'role-seed' ? '角色账号' : '标准单位与仓库'
         const partial =
           completed.length > 0
             ? `；已完成 ${completed.join('、')}，目标可能已部分更新，禁止按全量成功使用`

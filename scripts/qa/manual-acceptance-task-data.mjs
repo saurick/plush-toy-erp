@@ -2752,6 +2752,24 @@ async function mutateSalesOrderProcessTask({
   return updated;
 }
 
+export function countManualAcceptanceProcessInstances(runtimeEvidence) {
+  if (!Array.isArray(runtimeEvidence)) {
+    throw new CliError("formal process runtime evidence must be an array");
+  }
+  const ids = new Set();
+  for (const evidence of runtimeEvidence) {
+    if (evidence?.evidenceClass !== "formal_process_runtime") {
+      throw new CliError("display-only tasks cannot prove process instances");
+    }
+    const instance =
+      evidence.caseKey === "started_only"
+        ? evidence.processInstance
+        : evidence.processContext?.process_instance;
+    ids.add(positiveSafeInteger(instance?.id, "process instance.id"));
+  }
+  return ids.size;
+}
+
 export async function applySalesOrderAcceptanceRuntimeEvidence({
   plan,
   sources,
@@ -3163,6 +3181,8 @@ export async function applyManualAcceptanceTaskData(
     },
     summary: {
       ...effectivePlan.summary,
+      processRuntimeCount:
+        countManualAcceptanceProcessInstances(runtimeEvidence),
       persisted: finalTasks.length,
       created: createdCount,
       resumed: resumedCount,

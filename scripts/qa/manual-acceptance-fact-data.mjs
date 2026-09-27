@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { roundRequiredMaterialQuantity } from "./lib/unit-quantity.mjs";
 
 import {
   FORMAL_RPC_PARAM_ALLOWLIST,
@@ -46,6 +47,7 @@ const APPLY_CONFIRMATION = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const RECEIPT_COUNT = 54;
 const FACT_RUN_COUNT = 45;
+const PRODUCTION_PLANNED_QUANTITY = "3";
 const FINANCE_PAYMENT_REFERENCE_COUNT = 4;
 const FINANCE_CREDIT_NOTE_REFERENCE_COUNT = 3;
 const REQUIRED_MODULES = Object.freeze([
@@ -452,6 +454,9 @@ function correctionStatus(index) {
 export function buildManualAcceptanceFactPlan(sourceReport) {
   const { report, policy } = validateSourceReport(sourceReport);
   const refs = report.referenceRecords;
+  const units = new Map(
+    (refs.units || []).map((unit) => [Number(unit.id), unit]),
+  );
   const sourceCandidates = refs.sourceDrivenFacts.sourceCandidates || {};
   const warehouses = Array.isArray(sourceCandidates.warehouses)
     ? sourceCandidates.warehouses
@@ -494,6 +499,18 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
     const fabricOutsourcing = productionWIPOutsourcingByOffset.get(offset);
     return {
       ...candidate,
+      bom: {
+        ...candidate.bom,
+        items: candidate.bom.items.map((item) => ({
+          ...item,
+          requiredQuantity: roundRequiredMaterialQuantity(
+            item.quantity,
+            PRODUCTION_PLANNED_QUANTITY,
+            item.lossRate,
+            units.get(Number(item.unitId))?.precision,
+          ),
+        })),
+      },
       ...(ROUTED_PRODUCTION_SAMPLE_OFFSETS.has(offset)
         ? { route: ROUTED_PRODUCTION_SAMPLE, fabricOutsourcing }
         : {}),
@@ -1132,7 +1149,16 @@ async function advanceQuality(rpc, inspection, target, plan) {
       method: "pass_quality_inspection",
       params: {
         result: "PASS",
-        check_items: [{ name: "外观", requirement: "符合模拟确认样", observation: "已核对模拟确认样", result: "PASS", scope: "FULL", note: "模拟验收记录" }],
+        check_items: [
+          {
+            name: "外观",
+            requirement: "符合模拟确认样",
+            observation: "已核对模拟确认样",
+            result: "PASS",
+            scope: "FULL",
+            note: "模拟验收记录",
+          },
+        ],
         defect_rate_operator: "APPROX",
         defect_rate_percent: "5",
         inspected_at: plan.anchorDate,
@@ -1143,7 +1169,16 @@ async function advanceQuality(rpc, inspection, target, plan) {
       method: "reject_quality_inspection",
       params: {
         result: "REJECT",
-        check_items: [{ name: "颜色", requirement: "符合模拟确认样", observation: "模拟颜色偏差", result: "FAIL", scope: "FULL", note: "模拟验收记录" }],
+        check_items: [
+          {
+            name: "颜色",
+            requirement: "符合模拟确认样",
+            observation: "模拟颜色偏差",
+            result: "FAIL",
+            scope: "FULL",
+            note: "模拟验收记录",
+          },
+        ],
         defect_rate_operator: "GT",
         defect_rate_percent: "50",
         inspected_at: plan.anchorDate,
@@ -1919,17 +1954,6 @@ function overrideReadyReport(sourceReport, enabledPhases) {
   return copy;
 }
 
-function productionMaterialQuantity(item, plannedQuantity) {
-  const lossRate = Number(item.lossRate || 0);
-  if (!Number.isFinite(lossRate) || lossRate < 0) {
-    throw new CliError("BOM lossRate must be a non-negative decimal", 2);
-  }
-  return decimal(
-    Number(item.quantity) * Number(plannedQuantity) * (1 + lossRate),
-    "production material quantity",
-  );
-}
-
 async function exactRequired(options) {
   const item = await exactByBusinessNo(options);
   if (!item)
@@ -2206,14 +2230,17 @@ export function sourceDrivenPhaseIdentitySpecs(sourcePlan, phase) {
   if (phase === "production") {
     const identity = sourcePlan.identities.production;
     return [
-      { ...phaseIdentitySpec({
-        domain: "production_order",
-        method: "list_production_orders",
-        listKey: "production_orders",
-        businessField: "order_no",
-        identity: identity.order,
-        statuses: ["RELEASED", "CLOSED"],
-      }), partialStatuses: new Set(["DRAFT", "RELEASED", "CLOSED"]) },
+      {
+        ...phaseIdentitySpec({
+          domain: "production_order",
+          method: "list_production_orders",
+          listKey: "production_orders",
+          businessField: "order_no",
+          identity: identity.order,
+          statuses: ["RELEASED", "CLOSED"],
+        }),
+        partialStatuses: new Set(["DRAFT", "RELEASED", "CLOSED"]),
+      },
       ...identity.materialIssues.map((item) =>
         phaseIdentitySpec({
           domain: "operational_fact",
@@ -2777,7 +2804,9 @@ export async function reuseOrApplyManualAcceptanceFactPhase({
     }
     for (let index = 0; index < firstMissing; index += 1) {
       const status = String(records[index].status || "").toUpperCase();
-      if (!(specs[index].partialStatuses || specs[index].statuses).has(status)) {
+      if (
+        !(specs[index].partialStatuses || specs[index].statuses).has(status)
+      ) {
         throw new CliError(
           `${phase} phase record ${specs[index].businessNo} has conflicting status ${status || "missing"}`,
           2,
@@ -4699,7 +4728,7 @@ export async function runSourceDrivenFactStage(
   for (let offset = 0; offset < FACT_RUN_COUNT; offset += 1) {
     const candidate = plan.productionCandidates[offset];
     const completionLotNo = shortBusinessNo(plan, "CP", offset + 1);
-    const plannedQuantity = "3";
+    const plannedQuantity = PRODUCTION_PLANNED_QUANTITY;
     const production = {
       salesOrder: candidate.salesOrder,
       item: candidate.item,
@@ -4722,13 +4751,15 @@ export async function runSourceDrivenFactStage(
           unitId: item.unitId,
           warehouseId: stock.warehouseId,
           lotId: stock.lotId,
-          quantity: productionMaterialQuantity(item, plannedQuantity),
+          quantity: item.requiredQuantity,
         };
       }),
     };
     if (candidate.fabricOutsourcing) {
       const fabricItem = candidate.bom.items.find(
-        (item) => item.materialId === candidate.fabricOutsourcing.item.materialId && item.unitId === candidate.fabricOutsourcing.item.unitId,
+        (item) =>
+          item.materialId === candidate.fabricOutsourcing.item.materialId &&
+          item.unitId === candidate.fabricOutsourcing.item.unitId,
       );
       const contractItem = candidate.fabricOutsourcing.item;
       if (!fabricItem) {
@@ -4737,10 +4768,7 @@ export async function runSourceDrivenFactStage(
           2,
         );
       }
-      const expectedQuantity = productionMaterialQuantity(
-        fabricItem,
-        plannedQuantity,
-      );
+      const expectedQuantity = fabricItem.requiredQuantity;
       if (
         contractItem?.subjectType !== "MATERIAL" ||
         Number(contractItem.materialId) !== Number(fabricItem.materialId) ||
@@ -5259,36 +5287,82 @@ function assertReferenceRecords(plan, records) {
   return records;
 }
 
-export async function readManualAcceptanceFulfillmentHandoffs(rpc, purchase, facts) {
+export async function readManualAcceptanceFulfillmentHandoffs(
+  rpc,
+  purchase,
+  facts,
+) {
   const expected = [
-    ...dedupeByID(purchase.purchaseReceipts).filter((record) => record.status === "POSTED").map((record) => ({
-      group: "handoff_receipt_inbound", sourceType: "purchase_receipt", id: record.id, status: "done",
-    })),
-    ...dedupeByID(facts.productionFacts).filter((record) => record.fact_type === "FINISHED_GOODS_RECEIPT").map((record) => ({
-      group: "handoff_production_inbound", sourceType: "production_fact", id: record.id,
-      status: record.status === "POSTED" ? "done" : record.status === "CANCELLED" ? "withdrawn" : "ready",
-    })),
+    ...dedupeByID(purchase.purchaseReceipts)
+      .filter((record) => record.status === "POSTED")
+      .map((record) => ({
+        group: "handoff_receipt_inbound",
+        sourceType: "purchase_receipt",
+        id: record.id,
+        status: "done",
+      })),
+    ...dedupeByID(facts.productionFacts)
+      .filter((record) => record.fact_type === "FINISHED_GOODS_RECEIPT")
+      .map((record) => ({
+        group: "handoff_production_inbound",
+        sourceType: "production_fact",
+        id: record.id,
+        status:
+          record.status === "POSTED"
+            ? "done"
+            : record.status === "CANCELLED"
+              ? "withdrawn"
+              : "ready",
+      })),
   ];
-  if (!expected.some((item) => item.group === "handoff_receipt_inbound") ||
-      !expected.some((item) => item.group === "handoff_production_inbound")) {
-    throw new CliError("fulfillment handoff readback requires both material and finished goods sources");
+  if (
+    !expected.some((item) => item.group === "handoff_receipt_inbound") ||
+    !expected.some((item) => item.group === "handoff_production_inbound")
+  ) {
+    throw new CliError(
+      "fulfillment handoff readback requires both material and finished goods sources",
+    );
   }
   const tasks = [];
   for (const item of expected) {
-    const data = await rpc({ actor: "warehouse", domain: "workflow", method: "list_tasks", params: {
-      task_group: item.group, source_type: item.sourceType, source_id: item.id, limit: 20, offset: 0,
-    } });
+    const data = await rpc({
+      actor: "warehouse",
+      domain: "workflow",
+      method: "list_tasks",
+      params: {
+        task_group: item.group,
+        source_type: item.sourceType,
+        source_id: item.id,
+        limit: 20,
+        offset: 0,
+      },
+    });
     const rows = data.tasks || [];
     const task = rows[0];
-    if (Number(data.total) !== 1 || rows.length !== 1 ||
-        task.task_group !== item.group || task.source_type !== item.sourceType ||
-        Number(task.source_id) !== Number(item.id) || task.owner_role_key !== "warehouse" ||
-        task.task_status_key !== item.status || task.payload?.source_task_producer !== "fulfillment.source" ||
-        !String(task.payload?.entry_path || "").startsWith("/erp/")) {
-      throw new CliError(`fulfillment handoff ${item.group}/${item.id} does not match its source and responsible role`);
+    if (
+      Number(data.total) !== 1 ||
+      rows.length !== 1 ||
+      task.task_group !== item.group ||
+      task.source_type !== item.sourceType ||
+      Number(task.source_id) !== Number(item.id) ||
+      task.owner_role_key !== "warehouse" ||
+      task.task_status_key !== item.status ||
+      task.payload?.source_task_producer !== "fulfillment.source" ||
+      !String(task.payload?.entry_path || "").startsWith("/erp/")
+    ) {
+      throw new CliError(
+        `fulfillment handoff ${item.group}/${item.id} does not match its source and responsible role`,
+      );
     }
-    tasks.push({ id: task.id, taskGroup: item.group, sourceType: item.sourceType, sourceId: item.id,
-      role: task.owner_role_key, status: task.task_status_key, entryPath: task.payload.entry_path });
+    tasks.push({
+      id: task.id,
+      taskGroup: item.group,
+      sourceType: item.sourceType,
+      sourceId: item.id,
+      role: task.owner_role_key,
+      status: task.task_status_key,
+      entryPath: task.payload.entry_path,
+    });
   }
   return { verified: true, count: tasks.length, tasks };
 }
@@ -5510,7 +5584,13 @@ export async function applyManualAcceptanceFactPlan(
       purchase,
     });
   }
-  const engineeringPreparation = options.factStage ? undefined : await prepareManualAcceptanceEngineering({ plan, sourceReport, rpc: context.rpc });
+  const engineeringPreparation = options.factStage
+    ? undefined
+    : await prepareManualAcceptanceEngineering({
+        plan,
+        sourceReport,
+        rpc: context.rpc,
+      });
   const facts = options.factStage
     ? await options.factStage(plan, sourceReport, purchase, {
         ...context,
@@ -5528,15 +5608,24 @@ export async function applyManualAcceptanceFactPlan(
           ...purchase.inventoryLots,
           ...facts.inventoryLots,
         ]);
-  return { ...buildFactReport({
-    mode: "apply",
-    plan,
-    runtime: context.runtime,
-    purchase,
-    facts,
-    finalInventory,
-    fulfillmentHandoffs: options.factStage ? undefined : await readManualAcceptanceFulfillmentHandoffs(context.rpc, purchase, facts),
-  }), engineeringPreparation };
+  return {
+    ...buildFactReport({
+      mode: "apply",
+      plan,
+      runtime: context.runtime,
+      purchase,
+      facts,
+      finalInventory,
+      fulfillmentHandoffs: options.factStage
+        ? undefined
+        : await readManualAcceptanceFulfillmentHandoffs(
+            context.rpc,
+            purchase,
+            facts,
+          ),
+    }),
+    engineeringPreparation,
+  };
 }
 
 export async function verifyManualAcceptanceFactPlan(
@@ -5558,7 +5647,14 @@ export async function verifyManualAcceptanceFactPlan(
       purchase,
     });
   }
-  const engineeringPreparation = options.factStage ? undefined : await prepareManualAcceptanceEngineering({ plan, sourceReport, rpc: context.rpc, apply: false });
+  const engineeringPreparation = options.factStage
+    ? undefined
+    : await prepareManualAcceptanceEngineering({
+        plan,
+        sourceReport,
+        rpc: context.rpc,
+        apply: false,
+      });
   const facts = options.factStage
     ? await options.factStage(plan, sourceReport, purchase, {
         ...context,
@@ -5576,15 +5672,24 @@ export async function verifyManualAcceptanceFactPlan(
           ...purchase.inventoryLots,
           ...facts.inventoryLots,
         ]);
-  return { ...buildFactReport({
-    mode: "verify",
-    plan,
-    runtime: context.runtime,
-    purchase,
-    facts,
-    finalInventory,
-    fulfillmentHandoffs: options.factStage ? undefined : await readManualAcceptanceFulfillmentHandoffs(context.rpc, purchase, facts),
-  }), engineeringPreparation };
+  return {
+    ...buildFactReport({
+      mode: "verify",
+      plan,
+      runtime: context.runtime,
+      purchase,
+      facts,
+      finalInventory,
+      fulfillmentHandoffs: options.factStage
+        ? undefined
+        : await readManualAcceptanceFulfillmentHandoffs(
+            context.rpc,
+            purchase,
+            facts,
+          ),
+    }),
+    engineeringPreparation,
+  };
 }
 
 export function parseManualAcceptanceFactArgs(argv = []) {

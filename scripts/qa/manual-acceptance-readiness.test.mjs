@@ -2471,7 +2471,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
     targetAttestation: {
       source: "out-of-band",
       release: "929ec0b3a563bec0796274d033a97277519bcb51",
-      migration: "20260916090000",
+      migration: "20260927100348",
     },
   };
   const plan = buildManualAcceptanceReadinessPlan({
@@ -2504,7 +2504,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
     customerKey: "yoyoosun",
     environment: "prod",
     release: "929ec0b3a563bec0796274d033a97277519bcb51",
-    migration: "20260916090000",
+    migration: "20260927100348",
     debug: {
       seedEnabled: false,
       seedAllowed: false,
@@ -2618,7 +2618,7 @@ test("local and 133 database mismatches stop before the first network request", 
     targetAttestation: {
       source: "out-of-band",
       release: "929ec0b3a563bec0796274d033a97277519bcb51",
-      migration: "20260916090000",
+      migration: "20260927100348",
     },
   };
   const remotePlan = buildManualAcceptanceReadinessPlan({

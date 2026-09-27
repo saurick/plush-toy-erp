@@ -62,7 +62,7 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 
 GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，由 GitLab Provider 单独读取；它们不会被伪造成 operation。Codex 聊天、普通 SSH、手工排障和没有正式回执的动作也不会进入 operation store。
 
-同一动作、target、Exact-SHA、版本和发布输入只认领一个 operation；不同窗口的同一意图会合并。`failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。执行器子进程启动或过早退出时只把 4 KiB 以内的 stderr 转成 240 字符以内的脱敏诊断写入 operation，命令、参数、PID、凭据和真实路径仍不入库。数据库重建执行器只允许同一 operation、target、Exact-SHA、版本均匹配且通过合同校验的远端终态回执收敛这次冻结；该收敛不是重试，也不会再次写目标。
+同一动作、target、Exact-SHA、版本和发布输入通常只认领一个 operation；不同窗口对未因回滚改变的同一意图会合并。成功回滚后，同版前向部署以该回滚 operation ID 区分新意图，不复用回滚前的部署成功回执；复用已通过的部署回执前还须只读核对目标服务与公网入口确为该 SHA，否则失败关闭。`failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。执行器子进程启动或过早退出时只把 4 KiB 以内的 stderr 转成 240 字符以内的脱敏诊断写入 operation，命令、参数、PID、凭据和真实路径仍不入库。数据库重建执行器只允许同一 operation、target、Exact-SHA、版本均匹配且通过合同校验的远端终态回执收敛这次冻结；该收敛不是重试，也不会再次写目标。
 
 `/__dev/delivery` 首屏显示最近 operation、最严重阻断、最后核对时间和完整记录入口；`/__dev/version-center?view=history` 读取同一持久化 store，并明确显示加载、正常、空、失败和过期状态。
 
@@ -88,7 +88,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 4. 旧物理数据目录、dump 与 rollback identity 可读回。
 5. 只停止目标自身的 app/web/PostgreSQL，不影响另一个环境。
 
-`demo-133` 的受控重建可以随后重放 `customer-trial-133` 模拟数据。`customer-test-133` 的受控重建只建立甲方最小可登录的干净业务基线，不重放 demo seed/fixture；客户配置激活后，可在独立明确授权下运行一次性 core bootstrap 恢复 11 个单位和 4 个仓库。没有数据分类和恢复证明时不得执行重建；target 登记、普通 Goal 或一次 promotion 都不代表已授权或已完成清理。
+`demo-133` 的受控重建可以随后重放 `customer-trial-133` 模拟数据。`customer-test-133` 的受控重建只建立甲方最小可登录的干净业务基线，不重放 demo seed/fixture；客户配置激活后，可在独立明确授权下运行一次性 core bootstrap 恢复 8 个标准单位和 4 个仓库。没有数据分类和恢复证明时不得执行重建；target 登记、普通 Goal 或一次 promotion 都不代表已授权或已完成清理。
 
 fresh generation 的客户配置在 migration 和一次性管理员 bootstrap 之后才激活。因此 rebuild controller 只允许将 preflight 明确读回的 `customerConfigState=absent` 延后到重建后闭环；`invalid`、`unknown`、读取失败但未证明为空，以及磁盘、锁、运行版本、数据库身份等其他 blocker 仍全部失败关闭。普通 promotion 不使用这一例外。
 

@@ -224,6 +224,12 @@
   vertical-align: middle;
 }
 
+.erp-dev-data-table-wrap tbody th,
+.erp-dev-data-table-wrap tbody td {
+  height: var(--erp-row-height);
+  padding-block: var(--erp-table-cell-padding-block);
+}
+
 .erp-dev-data-table-wrap thead th {
   text-align: center;
   background: color-mix(in srgb, var(--dev-data-selected) 62%, transparent);

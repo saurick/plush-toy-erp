@@ -492,7 +492,7 @@ export function buildScenarioDemoReadback({ plan, datasetReport } = {}) {
     source,
     SOURCE_DOCUMENT_COUNT_KEYS,
   );
-  const processRuntimeCount = Object.keys(task?.byRole || {}).length;
+  const processRuntimeCount = sumNumericFields(task, ["processRuntimeCount"]);
   const factCount = sumNumericFields(facts, FACT_COUNT_KEYS);
   if (
     sourceDocumentCount < 1 ||

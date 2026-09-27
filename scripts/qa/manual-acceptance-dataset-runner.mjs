@@ -33,6 +33,7 @@ import {
   TASK_COPY_REVISION,
   TASK_PROFILE_LONG_LIVED_WORKBENCH,
   applyManualAcceptanceTaskData,
+  countManualAcceptanceProcessInstances,
   buildLegacyManualAcceptanceTaskBatchReference,
   buildManualAcceptanceTaskDataPlan,
   buildManualAcceptanceTaskSchedule,
@@ -638,7 +639,17 @@ function receipt(execution, component) {
     dataVersion: execution.businessInput.dataVersion,
     semanticDigest: execution.businessInput.semanticDigest,
     operation: component.operation,
-    summary: component.summary,
+    summary: {
+      ...component.summary,
+      ...(execution.stageKey === "task" &&
+      Array.isArray(component.report.runtimeEvidence)
+        ? {
+            processRuntimeCount: countManualAcceptanceProcessInstances(
+              component.report.runtimeEvidence,
+            ),
+          }
+        : {}),
+    },
     references: {
       ...component.references,
       runner: {

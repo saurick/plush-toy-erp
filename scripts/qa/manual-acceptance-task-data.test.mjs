@@ -8,6 +8,7 @@ import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catal
 import {
   applyManualAcceptanceTaskData,
   applySalesOrderAcceptanceRuntimeEvidence,
+  countManualAcceptanceProcessInstances,
   buildLegacyManualAcceptanceTaskBatchReference,
   buildManualAcceptanceTaskDataPlan,
   CONFIRM_PHRASE,
@@ -58,6 +59,38 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 const NOW_SEC = 1_800_000_000;
+
+test("process runtime count uses distinct verified instances rather than roles or display tasks", () => {
+  const started = {
+    caseKey: "started_only",
+    evidenceClass: "formal_process_runtime",
+    processInstance: { id: 7 },
+  };
+  const active = {
+    caseKey: "active_ready",
+    evidenceClass: "formal_process_runtime",
+    processContext: { process_instance: { id: 8 } },
+  };
+  assert.equal(
+    countManualAcceptanceProcessInstances([started, active, active]),
+    2,
+  );
+  assert.equal(countManualAcceptanceProcessInstances([]), 0);
+  assert.throws(
+    () =>
+      countManualAcceptanceProcessInstances([
+        { evidenceClass: "simulated_display_only" },
+      ]),
+    /display-only/,
+  );
+  assert.throws(
+    () =>
+      countManualAcceptanceProcessInstances([
+        { ...active, processContext: {} },
+      ]),
+    /process instance.id/,
+  );
+});
 const LOCAL_ACCEPTANCE_BACKEND_URL = "http://127.0.0.1:8310";
 const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_local_fixture_dev";
 const SCRIPT_PATH = fileURLToPath(
@@ -67,8 +100,8 @@ const RUNTIME_ADMIN_ID = 100;
 
 test("manual acceptance runtime source report binds five exact forward-only sales order candidates to the same simulated dataset", () => {
   const plan = buildLocalTaskMutationPlan({
-    dataVersion: "2026.09.16-v7",
-    runId: "20260916-V7",
+    dataVersion: "2026.09.27-v8",
+    runId: "20260927-V8",
   });
   const candidates = Array.from({ length: 5 }, (_, index) => ({
     id: 100 + index,
@@ -160,7 +193,7 @@ function customerTrial133Attestation(overrides = {}) {
     customerKey: "yoyoosun",
     environment: "prod",
     release: WORKFLOW_TASK_CAS_RELEASE,
-    migration: "20260916090000",
+    migration: "20260927100348",
     debug: {
       seedEnabled: false,
       seedAllowed: false,
@@ -533,8 +566,8 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
 
 test("runtime evidence advances five simulated sales orders through the formal process path", async () => {
   const plan = buildLocalTaskMutationPlan({
-    dataVersion: "2026.09.16-v7",
-    runId: "20260916-V7",
+    dataVersion: "2026.09.27-v8",
+    runId: "20260927-V8",
   });
   const sources = Array.from({ length: 5 }, (_, index) => ({
     id: 201 + index,
@@ -1400,15 +1433,15 @@ test("long-lived workbench keeps twelve stable actionable tasks for every role",
 
 test("warehouse scenarios stay in the trial namespace and never fill the formal shipping release page", () => {
   const plan = buildManualAcceptanceTaskDataPlan({
-    runId: "20260916-V7",
-    dataVersion: "2026.09.16-v7",
+    runId: "20260927-V8",
+    dataVersion: "2026.09.27-v8",
     nowSec: NOW_SEC,
   });
   const warehouseTasks = plan.tasks.filter(
     (task) => task.roleKey === "warehouse",
   );
 
-  assert.equal(TASK_COPY_REVISION, "PLAIN7");
+  assert.equal(TASK_COPY_REVISION, "PLAIN8");
   assert.equal(warehouseTasks.length, 20);
   assert.equal(plan.summary.byTaskGroup.trial_warehouse_work, 20);
   assert.equal(plan.summary.byTaskGroup.shipment_finance_approval, undefined);
@@ -1693,7 +1726,7 @@ test("CLI documents and parses the output report boundary", () => {
     help.stdout,
     /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
-  assert.match(help.stdout, /--run-id 20260916-V7/u);
+  assert.match(help.stdout, /--run-id 20260927-V8/u);
   assert.doesNotMatch(help.stdout, /127\.0\.0\.1:8300/u);
   assert.match(help.stdout, /MANUAL_ACCEPTANCE_ADMIN_PASSWORD/u);
   assert.match(help.stdout, /used only for debug\.capabilities/u);
@@ -2012,13 +2045,13 @@ test("applies and safely resumes the 180-task batch through current CAS action c
 test("long-lived workbench reuses its immutable batch across Scenario run upgrades", async () => {
   const previousPlan = buildLocalTaskMutationPlan({
     runId: LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
-    dataVersion: "2026.09.16-v7",
+    dataVersion: "2026.09.27-v8",
     nowSec: NOW_SEC,
     taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
   });
   const currentPlan = buildLocalTaskMutationPlan({
-    runId: "20260916-V7",
-    dataVersion: "2026.09.16-v7",
+    runId: "20260927-V8",
+    dataVersion: "2026.09.27-v8",
     nowSec: NOW_SEC + 86_400,
     taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
   });
@@ -2213,7 +2246,7 @@ test("legacy retirement rebinds the immutable keep batch schedule before validat
 
 test("long-lived workbench supersession is a no-op only when the whole legacy batch is absent", async () => {
   const keepPlan = buildLocalTaskMutationPlan({
-    runId: "20260916-V7",
+    runId: "20260927-V8",
     nowSec: NOW_SEC,
     taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
   });
@@ -2293,7 +2326,7 @@ test("long-lived workbench supersession is a no-op only when the whole legacy ba
 
 test("PLAIN6 legacy references retain the short visible code scheme for future retirement", () => {
   const legacyBatch = buildLegacyManualAcceptanceTaskBatchReference({
-    runId: "20260916-V7",
+    runId: "20260927-V8",
     copyRevision: "PLAIN6",
   });
   assert.equal(legacyBatch.codeScheme, "short-v5");
@@ -2324,8 +2357,8 @@ test("customer-trial-133 task apply binds exact attestation and live debug capab
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.09.16-v7",
-    runId: "20260916-V7",
+    dataVersion: "2026.09.27-v8",
+    runId: "20260927-V8",
     nowSec: NOW_SEC,
   });
   const mock = createMockRuntime({
@@ -2344,13 +2377,13 @@ test("customer-trial-133 task apply binds exact attestation and live debug capab
 
   assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(report.datasetKey, MANUAL_ACCEPTANCE_DATASET_KEY);
-  assert.equal(report.dataVersion, "2026.09.16-v7");
-  assert.equal(report.runId, "20260916-V7");
+  assert.equal(report.dataVersion, "2026.09.27-v8");
+  assert.equal(report.runId, "20260927-V8");
   assert.equal(report.summary.persisted, 180);
   assert.deepEqual(report.runtime.targetAttestation, {
     source: "out-of-band",
     release: WORKFLOW_TASK_CAS_RELEASE,
-    migration: "20260916090000",
+    migration: "20260927100348",
   });
   assert.equal(
     mock.calls.some(
@@ -2364,8 +2397,8 @@ test("customer-trial-133 accepts a later immutable release when the CAS migratio
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.09.16-v7",
-    runId: "20260916-V7",
+    dataVersion: "2026.09.27-v8",
+    runId: "20260927-V8",
     nowSec: NOW_SEC,
   });
   const laterRelease = "56ecf873796ffafc53f12a3cd5f8b7adb0214581";
@@ -2390,8 +2423,8 @@ test("customer-trial-133 rejects an old Workflow migration before login or write
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.09.16-v7",
-    runId: "20260916-V7",
+    dataVersion: "2026.09.27-v8",
+    runId: "20260927-V8",
     nowSec: NOW_SEC,
   });
   let fetchCount = 0;
@@ -2410,7 +2443,7 @@ test("customer-trial-133 rejects an old Workflow migration before login or write
           throw new Error("must not fetch");
         },
       }),
-    /attestation\.migration must be at least 20260916090000/u,
+    /attestation\.migration must be at least 20260927100348/u,
   );
   assert.equal(fetchCount, 0);
 });

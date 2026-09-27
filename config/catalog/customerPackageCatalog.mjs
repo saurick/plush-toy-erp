@@ -134,7 +134,7 @@ export const customerPackageCatalog = Object.freeze({
     },
     {
       key: "inbound",
-      label: "入库管理",
+      label: "采购入库",
       requiredCapabilityKeys: [
         "purchase.receipt.read",
         "supplier.read",
@@ -202,7 +202,7 @@ export const customerPackageCatalog = Object.freeze({
     },
     {
       key: "outbound",
-      label: "出库管理",
+      label: "库存预留",
       requiredCapabilityKeys: [
         "warehouse.outbound.read",
         "warehouse.inventory.read",

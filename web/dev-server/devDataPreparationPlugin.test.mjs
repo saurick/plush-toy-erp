@@ -20,6 +20,7 @@ import {
   readDataPreparationOperation,
   transitionDataPreparationOperation,
 } from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../scripts/qa/manual-acceptance-core-contract.mjs'
 import {
   buildManualAcceptanceSemanticPlan,
   digestManualAcceptanceSemanticPlan,
@@ -138,7 +139,7 @@ function successfulRunner(calls) {
     if (args.some((arg) => arg.endsWith('seed-core-demo-data.sh'))) {
       return {
         stdout:
-          'core demo seed completed prefix=YS7 units=11 materials=0 products=0 warehouses=4 processes=0 bom_headers=0\n' +
+          `core demo seed completed prefix=${MANUAL_ACCEPTANCE_CORE_CONTRACT.visiblePrefix} units=${MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length} materials=0 products=0 warehouses=${MANUAL_ACCEPTANCE_CORE_CONTRACT.warehouses.length} processes=0 bom_headers=0\n` +
           'simulated_only=true real_customer_import=false no_direct_fact_posting=true\n' +
           'references_only=false scenario_references=true exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0\n',
         stderr: '',
@@ -146,7 +147,7 @@ function successfulRunner(calls) {
     }
     return {
       stdout:
-        '[local-preflight] 工作区 schema/migration 守卫通过\n' +
+        '[local-preflight] 工作区数据库规则检查通过\n' +
         '[local-preflight] 开发数据库 migration 已是最新版本（20260729，10/10）\n' +
         '[local-preflight] non-system-schema function=0 procedure=0 non-internal-trigger=0\n',
       stderr: '',
@@ -258,7 +259,7 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
           '--expected-database',
           'plush_erp',
           '--confirm',
-          'SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:plush_erp:2026.09.16-v7:20260916-V7',
+          `SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:plush_erp:${MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion}:${MANUAL_ACCEPTANCE_CORE_CONTRACT.runId}`,
         ],
       },
     ]
@@ -390,7 +391,7 @@ test('core demo prepares an immutable plan, reuses idempotency, executes asynchr
     preflight: 'passed',
     roleAccounts: 10,
     core: {
-      units: 11,
+      units: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
       materials: 0,
       products: 0,
       warehouses: 4,
@@ -418,7 +419,59 @@ test('core demo prepares an immutable plan, reuses idempotency, executes asynchr
   )
 })
 
-test('scenario demo binds the fixed V7 plan, needs no browser credential input, and stores exact readback', async (t) => {
+test('core preparation rejects stale, missing, or incomplete migration proof before seeding', async (t) => {
+  const invalidProofs = {
+    staleGuard: (output) =>
+      output.replace(
+        '工作区数据库规则检查通过',
+        '工作区 schema/migration 守卫通过'
+      ),
+    missingGuard: (output) =>
+      output.replace('工作区数据库规则检查通过', '工作区数据库规则检查失败'),
+    incompleteMigration: (output) =>
+      output.replace(/（[^，]+，\d+\/\d+）/u, '（20260729，2/3）'),
+    programmableObject: (output) => output.replace('function=0', 'function=1'),
+  }
+  for (const [name, alter] of Object.entries(invalidProofs)) {
+    await t.test(name, async (subtest) => {
+      const fixture = createFixture(subtest)
+      const calls = []
+      const baseRunner = successfulRunner(calls)
+      const service = createDevDataPreparationService({
+        projectRoot: fixture.root,
+        operationStore: fixture.store,
+        readRepositoryState: async () => REPOSITORY,
+        commandRunner: async (...args) => {
+          const result = await baseRunner(...args)
+          return args[1][0]?.endsWith('local-runtime-preflight.mjs')
+            ? { ...result, stdout: alter(result.stdout) }
+            : result
+        },
+      })
+      await assert.rejects(
+        service.act({
+          action: 'prepare',
+          payload: {
+            profileKey: 'core-demo',
+            targetKey: 'local-development',
+            idempotencyKey: IDEMPOTENCY_KEY,
+          },
+        }),
+        /migration preflight contract/u
+      )
+      assert.equal(
+        calls.some(({ args }) =>
+          args.some((arg) =>
+            /seed-(?:core-demo-data|role-demo-admins)\.sh$/u.test(arg)
+          )
+        ),
+        false
+      )
+    })
+  }
+})
+
+test('scenario demo binds the current dataset plan, needs no browser credential input, and stores exact readback', async (t) => {
   const fixture = createFixture(t)
   const calls = []
   const planDigest = 'd'.repeat(64)
@@ -438,8 +491,8 @@ test('scenario demo binds the fixed V7 plan, needs no browser credential input, 
           profileKey: 'scenario-demo',
           targetAlias: 'scenario-demo',
           datasetKey: 'yoyoosun-manual-acceptance',
-          dataVersion: '2026.09.16-v7',
-          runId: '20260916-V7',
+          dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+          runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
           semanticDigest: SCENARIO_SEMANTIC_DIGEST,
           backendURL: 'http://127.0.0.1:8300',
           databaseName: 'plush_erp',
@@ -495,7 +548,7 @@ test('scenario demo binds the fixed V7 plan, needs no browser credential input, 
       assert.equal(options.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD, undefined)
       assert.equal(
         options.env.SCENARIO_DEMO_CONFIRM,
-        `APPLY_SCENARIO_DEMO:scenario-demo:plush_erp:2026.09.16-v7:20260916-V7:${planDigest}`
+        `APPLY_SCENARIO_DEMO:scenario-demo:plush_erp:${MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion}:${MANUAL_ACCEPTANCE_CORE_CONTRACT.runId}:${planDigest}`
       )
       return {
         stdout: JSON.stringify({
@@ -510,8 +563,8 @@ test('scenario demo binds the fixed V7 plan, needs no browser credential input, 
           customerConfigRevision:
             'yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1',
           datasetKey: 'yoyoosun-manual-acceptance',
-          dataVersion: '2026.09.16-v7',
-          runId: '20260916-V7',
+          dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+          runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
           semanticDigest: SCENARIO_SEMANTIC_DIGEST,
           stageCount: 9,
           sourceDocumentCount: 135,
@@ -563,7 +616,7 @@ test('scenario demo binds the fixed V7 plan, needs no browser credential input, 
     prepared.operation.id,
     'passed'
   )
-  assert.equal(passed.readback.runId, '20260916-V7')
+  assert.equal(passed.readback.runId, MANUAL_ACCEPTANCE_CORE_CONTRACT.runId)
   assert.equal(passed.readback.catalogReadyCount, 41)
   assert.equal(passed.readback.browserChecksPending, 10)
   assert.equal(passed.readback.cleanupSupported, false)
@@ -581,11 +634,11 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
   const fixture = createFixture(t)
   const order = []
   const planDigest = '8'.repeat(64)
-  const migrationVersion = '20260916090000'
+  const migrationVersion =
+    MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration
   const databaseName = 'plush_erp_demo_v1'
-  const configRevision =
-    'yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1'
-  const configProductVersion = 'customer-trial-133-test-2026.09.16-v7'
+  const { configRevision, configProductVersion } =
+    MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133
   const targetFingerprint = hashDataPreparationPlan({
     targetAlias: 'customer-trial-133',
     databaseName,
@@ -607,7 +660,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
         activeCustomerConfig: {
           revision: configRevision,
           productVersion: configProductVersion,
-          datasetVersion: '2026.09.16-v7',
+          datasetVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
         },
         debug: {
           environment: 'prod',
@@ -644,8 +697,8 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
           profileKey: 'scenario-demo',
           targetAlias: 'customer-trial-133',
           datasetKey: 'yoyoosun-manual-acceptance',
-          dataVersion: '2026.09.16-v7',
-          runId: '20260916-V7',
+          dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+          runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
           semanticDigest: SCENARIO_SEMANTIC_DIGEST,
           backendURL: 'https://demo.yoyoosun.net',
           databaseName,
@@ -693,8 +746,8 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
         migrationVersion,
         customerConfigRevision: configRevision,
         datasetKey: 'yoyoosun-manual-acceptance',
-        dataVersion: '2026.09.16-v7',
-        runId: '20260916-V7',
+        dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+        runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
         semanticDigest: SCENARIO_SEMANTIC_DIGEST,
         stageCount: 9,
         sourceDocumentCount: 135,
@@ -948,8 +1001,8 @@ test('summary keeps legacy scenario receipts on disk but omits them from the cur
       migrationVersion: '20260916090000',
       customerConfigRevision: 'yoyoosun-local-test.runtime-v1',
       datasetKey: 'yoyoosun-manual-acceptance',
-      dataVersion: '2026.09.16-v7',
-      runId: '20260916-V7',
+      dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+      runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
       semanticDigest: SCENARIO_SEMANTIC_DIGEST,
       stageCount: 9,
       sourceDocumentCount: 16,
@@ -1227,9 +1280,9 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
         summary.datasetContract.customerTrial133.databaseLifecycle,
     },
     {
-      dataVersion: '2026.09.16-v7',
-      runId: '20260916-V7',
-      unitCount: 11,
+      dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+      runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
+      unitCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
       warehouseCount: 4,
       simulatedOnly: true,
       realCustomerImport: false,
@@ -1273,7 +1326,7 @@ test('full acceptance receipt binds the latest chain contract and nine stage tim
       evidence: {
         dataset: {
           ok: true,
-          dataVersion: '2026.09.16-v7',
+          dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
           chainDataDigest: acceptancePlan.chainDataDigest,
           chainVerificationDigest: acceptancePlan.chainVerificationDigest,
           startedAt: '2026-07-29T02:03:00.000Z',
@@ -1301,7 +1354,7 @@ test('full acceptance receipt binds the latest chain contract and nine stage tim
             dataset: {
               ...readback,
               ok: true,
-              dataVersion: '2026.09.16-v7',
+              dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
               chainDataDigest: '0'.repeat(64),
               chainVerificationDigest: acceptancePlan.chainVerificationDigest,
               startedAt: '2026-07-29T02:03:00.000Z',
@@ -1532,10 +1585,10 @@ test('a later authoritative scenario readback releases the resolved unknown outc
     databaseName: 'plush_erp',
     migrationVersion: '20260916090000',
     customerConfigRevision: 'yoyoosun-local-test.runtime-v1',
-    datasetVersion: '2026.09.16-v7',
-    datasetRunId: '20260916-V7',
+    datasetVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+    datasetRunId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
     semanticDigest: SCENARIO_SEMANTIC_DIGEST,
-    rollbackPoint: 'forward-only:plush_erp:20260916-V7',
+    rollbackPoint: `forward-only:plush_erp:${MANUAL_ACCEPTANCE_CORE_CONTRACT.runId}`,
   }
   const coreCandidate = {
     id: '323e4567-e89b-42d3-a456-426614174000',
@@ -1571,8 +1624,8 @@ test('a later authoritative scenario readback releases the resolved unknown outc
       migrationVersion: '20260916090000',
       customerConfigRevision: 'yoyoosun-local-test.runtime-v1',
       datasetKey: 'yoyoosun-manual-acceptance',
-      dataVersion: '2026.09.16-v7',
-      runId: '20260916-V7',
+      dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+      runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
       semanticDigest: SCENARIO_SEMANTIC_DIGEST,
       stageCount: 9,
       sourceDocumentCount: 135,
@@ -1632,7 +1685,7 @@ test('failed command receipts redact credentials and full DSNs', async (t) => {
         }
         return {
           stdout:
-            '[local-preflight] 工作区 schema/migration 守卫通过\n' +
+            '[local-preflight] 工作区数据库规则检查通过\n' +
             '[local-preflight] 开发数据库 migration 已是最新版本（20260729，10/10）\n' +
             '[local-preflight] non-system-schema function=0 procedure=0 non-internal-trigger=0\n',
         }

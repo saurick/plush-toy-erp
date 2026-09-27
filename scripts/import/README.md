@@ -90,6 +90,8 @@ checker 至少阻断：
 
 `customerSourceSnapshotFreezeCheck.mjs` 和 `customerImportDryRun.mjs` 继续只读取 JSON snapshot。Product Core 内的 synthetic / sanitized fixture 用于锁住正常、边界和禁止自动导入合同；真实客户 snapshot 只能留在客户私有 ignored output。
 
+单位识别复用 `server/internal/unitpolicy/units.json`：PCS / PC / 件归为“个”，Y / YD 归为“码”，kg / 公斤归为“千克”；套、对、片、条、块各自保留。实际数量按目标单位精度校验，未知单位、歧义匹配和超精度输入进入待处理项，不自动换算或四舍五入。BOM 单件用量系数允许最多 6 位小数；Excel 中更长的小数保留在待复核表单中并阻止保存，原表总用量快照保留原文。正式口径见[业务公式与计算口径](../../docs/product/业务公式与计算口径.md)。
+
 合成示例命令：
 
 ```bash

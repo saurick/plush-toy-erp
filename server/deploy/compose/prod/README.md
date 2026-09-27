@@ -93,7 +93,7 @@ APP_ADMIN_PASSWORD='<ephemeral-secret>' \
 
 ## customer-test 干净基线
 
-`customer-test-133` 用于甲方自行录入测试数据。它不执行 demo 的 fixture、整批模拟业务造数或 Fact 写入。普通 promotion 不清空、不重建、也不重放基础资料；只有当前 Codex 任务明确授权目标写入时，才允许在 fresh backup 与实时 preflight 后运行一次性 core bootstrap。该入口只幂等创建当前 allowlist 中的 11 个单位和 4 个仓库，不创建材料、产品、工艺、BOM、客户、订单、Workflow 或 Fact，也不停用旧批次或人工维护的资料。
+`customer-test-133` 用于甲方自行录入测试数据。它不执行 demo 的 fixture、整批模拟业务造数或 Fact 写入。普通 promotion 不清空、不重建、也不重放基础资料；只有当前 Codex 任务明确授权目标写入时，才允许在 fresh backup 与实时 preflight 后运行一次性 core bootstrap。该入口只幂等创建当前 allowlist 中的 8 个标准单位和 4 个仓库，不创建材料、产品、工艺、BOM、客户、订单、Workflow 或 Fact，也不停用旧批次或人工维护的资料。
 
 ```bash
 cd /home/simon/plush-toy-erp-test-v1/current/server/deploy/compose/prod

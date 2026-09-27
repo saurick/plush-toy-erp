@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "./manual-acceptance-core-contract.mjs";
 
 import {
   VISUALIZATION_DEMO_RPC_METHODS,
@@ -8,33 +9,38 @@ import {
 } from "./visualization-demo-data.mjs";
 
 function sourceReport() {
+  const contract = MANUAL_ACCEPTANCE_CORE_CONTRACT;
   const products = Array.from({ length: 5 }, (_, offset) => ({
     id: 100 + offset,
-    code: `YS7-CP-${offset + 1}`,
+    code: `${contract.visiblePrefix}-CP-${offset + 1}`,
     name: `模拟产品 ${offset + 1}`,
     unitId: 200 + offset,
   }));
   const skus = products.map((product, offset) => ({
     id: 300 + offset,
-    code: `YS7-GG-${offset + 1}`,
+    code: `${contract.visiblePrefix}-GG-${offset + 1}`,
     name: `规格 ${offset + 1}`,
     productId: product.id,
   }));
   const materials = Array.from({ length: 5 }, (_, offset) => ({
     id: 400 + offset,
-    code: `YS7-WL-${offset + 1}`,
+    code: `${contract.visiblePrefix}-WL-${offset + 1}`,
     name: `模拟材料 ${offset + 1}`,
     unitId: 500 + offset,
   }));
   return {
-    datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.16-v7",
-    runId: "20260916-V7",
+    datasetKey: contract.datasetKey,
+    dataVersion: contract.dataVersion,
+    runId: contract.runId,
     target: "scenario-demo",
     mode: "apply",
     referenceRecords: {
-      customers: [{ id: 1, code: "YS7-KH-1", name: "模拟客户" }],
-      suppliers: [{ id: 2, code: "YS7-GYS-1", name: "模拟供应商" }],
+      customers: [
+        { id: 1, code: `${contract.visiblePrefix}-KH-1`, name: "模拟客户" },
+      ],
+      suppliers: [
+        { id: 2, code: `${contract.visiblePrefix}-GYS-1`, name: "模拟供应商" },
+      ],
       products,
       skus,
       materials,
@@ -86,6 +92,17 @@ test("visualization plan provides compact risk matrices and a five-line routed o
     plan.expectedConfirmation,
     `APPLY_VISUALIZATION_DEMO:scenario-demo:VIS-20260922:${plan.planDigest}`,
   );
+});
+
+test("visualization plan rejects a stale source dataset identity", () => {
+  for (const key of ["dataVersion", "runId"]) {
+    const report = sourceReport();
+    report[key] = "stale-dataset";
+    assert.throws(
+      () => buildVisualizationDemoPlan(report),
+      /source|dataset|来源/iu,
+    );
+  }
 });
 
 test("visualization writer stays on the declared formal server API surface", async () => {

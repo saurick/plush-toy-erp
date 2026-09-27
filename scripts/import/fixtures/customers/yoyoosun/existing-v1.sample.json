@@ -54,9 +54,10 @@
   "units": [
     {
       "id": "unit-pcs",
-      "code": "PCS",
-      "name": "只",
-      "status": "active"
+      "code": "EA",
+      "name": "个",
+      "status": "active",
+      "precision": 0
     }
   ],
   "warehouses": [

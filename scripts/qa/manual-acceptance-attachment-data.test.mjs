@@ -259,6 +259,20 @@ test("attachment fixtures include multiple formats and one near-limit sample", (
   const fixtures = buildAttachmentFixtures();
   assert.equal(fixtures.length, 5);
   assert(new Set(fixtures.map((item) => item.mime_type)).size >= 4);
+  const png = fixtures.find((item) => item.mime_type === "image/png").content;
+  assert.equal(
+    png.readUInt32BE(16),
+    640,
+    "PNG sample must contain a visible illustration",
+  );
+  assert.equal(png.readUInt32BE(20), 400);
+  const jpeg = fixtures.find((item) => item.mime_type === "image/jpeg").content;
+  assert(
+    jpeg.length > 1000,
+    "JPEG sample must include image content, not only headers",
+  );
+  assert.equal(jpeg.readUInt16BE(0), 0xffd8);
+  assert.equal(jpeg.readUInt16BE(jpeg.length - 2), 0xffd9);
   assert(
     fixtures.some(
       (item) =>
@@ -407,7 +421,7 @@ test("attachment report batch binds exact dataset identity and registered target
     targetAttestation: {
       source: "out-of-band",
       release: "929ec0b3a563bec0796274d033a97277519bcb51",
-      migration: "20260916090000",
+      migration: "20260927100348",
     },
   };
   const remote = reports({ target, backendURL, runtime: remoteRuntime });
@@ -426,7 +440,7 @@ test("attachment report batch binds exact dataset identity and registered target
     customerKey: "yoyoosun",
     environment: "prod",
     release: "929ec0b3a563bec0796274d033a97277519bcb51",
-    migration: "20260916090000",
+    migration: "20260927100348",
     debug: {
       seedEnabled: false,
       seedAllowed: false,

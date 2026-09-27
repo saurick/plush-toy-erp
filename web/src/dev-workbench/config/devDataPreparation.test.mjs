@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../../../scripts/qa/manual-acceptance-core-contract.mjs'
+
 import { buildManualAcceptanceBusinessChainReviewPlan } from '../../../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
 import { MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS } from '../../../../scripts/qa/manual-acceptance-dataset.mjs'
 import {
@@ -66,7 +68,7 @@ const TARGET_FINGERPRINT = 'b'.repeat(64)
 const REPOSITORY_FINGERPRINT = 'c'.repeat(64)
 const RUN_ID = 'core_demo_20260729'
 const SCENARIO_OPERATION_RUN_ID = 'scenario_demo_20260729'
-const SCENARIO_DATASET_RUN_ID = '20260916-V7'
+const SCENARIO_DATASET_RUN_ID = MANUAL_ACCEPTANCE_CORE_CONTRACT.runId
 const CREATED_AT = '2026-07-29T02:00:00.000Z'
 const UPDATED_AT = '2026-07-29T02:01:00.000Z'
 const ACCEPTANCE_PLAN = buildManualAcceptanceBusinessChainReviewPlan({
@@ -93,8 +95,8 @@ function operationFixture(overrides = {}) {
     contract: {
       schemaVersion: 'plush.dev-data-preparation-operation-contract/v1',
       classification: 'current',
-      dataVersion: '2026.09.16-v7',
-      datasetRunId: '20260916-V7',
+      dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+      datasetRunId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
       semanticDigest: '6'.repeat(64),
     },
     repository: {
@@ -142,11 +144,12 @@ function scenarioReadbackFixture(overrides = {}) {
     targetFingerprint: '9'.repeat(64),
     databaseName: 'plush_erp',
     release: 'd'.repeat(40),
-    migrationVersion: '20260728100514',
+    migrationVersion:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
     customerConfigRevision:
       'yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1',
     datasetKey: 'yoyoosun-manual-acceptance',
-    dataVersion: '2026.09.16-v7',
+    dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
     runId: SCENARIO_DATASET_RUN_ID,
     semanticDigest: '6'.repeat(64),
     stageCount: 9,
@@ -216,7 +219,7 @@ function fullOperationFixture(overrides = {}) {
       reportStatus: 'passed',
       cleanupComplete: true,
       residualDatabaseCount: 0,
-      dataVersion: '2026.09.16-v7',
+      dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
       chainDataDigest: ACCEPTANCE_PLAN.chainDataDigest,
       chainVerificationDigest: ACCEPTANCE_PLAN.chainVerificationDigest,
       chainCount: ACCEPTANCE_PLAN.chainCount,
@@ -247,22 +250,24 @@ function summaryFixture() {
     datasetContract: {
       schemaVersion: 'plush.dev-data-environment-contract/v1',
       datasetKey: 'yoyoosun-manual-acceptance',
-      dataVersion: '2026.09.16-v7',
-      runId: '20260916-V7',
+      dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+      runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
       semanticDigest: '6'.repeat(64),
       simulatedOnly: true,
       realCustomerImport: false,
-      unitCount: 11,
+      unitCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
       warehouseCount: 4,
       customerTrial133: {
         target: 'customer-trial-133',
         deploymentTarget: 'demo-133',
         databaseName: 'plush_erp_demo_v1',
         databaseLifecycle: 'long-lived-registered-target',
-        minimumMigration: '20260728100514',
+        minimumMigration:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         configRevision:
-          'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-        configProductVersion: 'customer-trial-133-test-2026.09.16-v7',
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+        configProductVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
       },
     },
     target: {
@@ -270,7 +275,8 @@ function summaryFixture() {
         status: 'available',
         safeTarget: '共享开发库（固定身份）',
         databaseName: 'plush_erp',
-        migrationVersion: '20260728100514',
+        migrationVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         customerConfigRevision: 'not-proven',
         customerConfigProductVersion: 'not-proven',
         targetFingerprint: TARGET_FINGERPRINT,
@@ -279,7 +285,8 @@ function summaryFixture() {
         status: 'available',
         safeTarget: '共享开发库业务场景（固定身份）',
         databaseName: 'plush_erp',
-        migrationVersion: '20260728100514',
+        migrationVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         customerConfigRevision:
           'yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1',
         customerConfigProductVersion: 'local-customer-package-test-apply',
@@ -289,10 +296,12 @@ function summaryFixture() {
         status: 'not_proven',
         safeTarget: 'customer-trial-133:plush_erp_demo_v1',
         databaseName: 'plush_erp_demo_v1',
-        migrationVersion: '20260728100514',
+        migrationVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         customerConfigRevision:
-          'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-        customerConfigProductVersion: 'customer-trial-133-test-2026.09.16-v7',
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+        customerConfigProductVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
         targetFingerprint: '7'.repeat(64),
       },
       fullAcceptance: {
@@ -617,10 +626,11 @@ test('scenario demo readback binds the fixed batch and rejects half batches or d
     automaticCleanup: false,
     releaseSha: 'd'.repeat(40),
     databaseName: 'plush_erp_demo_v1',
-    migrationVersion: '20260728100514',
+    migrationVersion:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
     customerConfigRevision:
-      'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-    datasetVersion: '2026.09.16-v7',
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+    datasetVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
     datasetRunId: SCENARIO_DATASET_RUN_ID,
     semanticDigest: '6'.repeat(64),
     rollbackPoint: 'pre-data-dddddddddddd-d260729020304_01020304',

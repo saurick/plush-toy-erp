@@ -120,15 +120,16 @@ export function buildAttachmentFixtures({ includeNearLimit = true } = {}) {
     fixture(
       "产品正面图.png",
       "image/png",
-      Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
-        "base64",
+      fs.readFileSync(
+        new URL("./fixtures/manual-acceptance-image.png", import.meta.url),
       ),
     ),
     fixture(
       "包装唛头.jpg",
       "image/jpeg",
-      Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==", "base64"),
+      fs.readFileSync(
+        new URL("./fixtures/manual-acceptance-image.jpg", import.meta.url),
+      ),
     ),
     fixture(
       "数量交期表.xlsx",

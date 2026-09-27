@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { findSalesOrderAcceptanceExecution } from "./manual-acceptance-sales-order-process.mjs";
+import { roundRequiredMaterialQuantity } from "./lib/unit-quantity.mjs";
 
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -81,7 +82,7 @@ export const DEFAULT_SOURCE_DATA_SCALE = Object.freeze({
 });
 const ROUTED_PRODUCTION_SAMPLE_OFFSETS = Object.freeze([3, 4]);
 const ROUTED_PRODUCTION_PLANNED_QUANTITY = 3;
-const REGISTERED_PREVIOUS_ROUTE_PREFIX = "YS6";
+const REGISTERED_PREVIOUS_ROUTE_PREFIX = `YS${Number(CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION.match(/-v(\d+)$/u)[1]) - 1}`;
 const CURRENT_ROUTE_PREFIX = manualAcceptanceVisibleSourcePrefix(
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
 );
@@ -469,7 +470,7 @@ function buildMaterials(prefix, count, suppliers) {
   );
   const templates = [
     ["短毛绒", "面料", "58 英寸 / 280g", "米白", "yard"],
-    ["提花布", "面料", "57 英寸", "浅粉", "chineseYard"],
+    ["提花布", "面料", "57 英寸", "浅粉", "yard"],
     ["网布", "面料", "60 英寸", "黑色", "sheet"],
     ["填充棉", "填充", "A级 PP棉", "白色", "kilogram"],
     ["眼睛", "胶件", "12mm", "黑色", "pair"],
@@ -477,7 +478,7 @@ function buildMaterials(prefix, count, suppliers) {
     ["洗水标", "洗水标", "白底黑字", "白色", "sheet"],
     ["外箱", "包装", "12只装", "牛皮色", "piece"],
     ["丝带", "辅料", "10mm", "浅蓝", "strip"],
-    ["钥匙圈", "五金", "25mm", "银色", "pcs"],
+    ["钥匙圈", "五金", "25mm", "银色", "piece"],
     ["定型海绵", "填充", "20mm", "白色", "block"],
   ];
   return Array.from({ length: count }, (_, offset) => {
@@ -535,7 +536,7 @@ function buildProducts(prefix, count, skusPerProduct) {
   ];
   const colors = ["米白", "浅粉", "雾蓝"];
   const sizes = ["小号", "中号", "大号"];
-  const unitKeys = ["piece", "set", "pcs", "individual"];
+  const unitKeys = ["piece", "set"];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
     const product = {
@@ -1056,11 +1057,15 @@ function bindRoutedProductionOutsourcingContracts({
         2,
       );
     }
-    const quantity = (
-      Number(fabricItem.quantity) *
-      ROUTED_PRODUCTION_PLANNED_QUANTITY *
-      (1 + Number(fabricItem.loss_rate || 0))
-    ).toFixed(6);
+    const unit = MANUAL_ACCEPTANCE_CORE_UNITS.find(
+      (definition) => definition.key === fabricItem.unitKey,
+    );
+    const quantity = roundRequiredMaterialQuantity(
+      fabricItem.quantity,
+      ROUTED_PRODUCTION_PLANNED_QUANTITY,
+      fabricItem.loss_rate,
+      unit?.precision,
+    );
     const reservedOrder = reservedOrders[contractOffset];
     const existing = reservedOrder.items[0];
     reservedOrder.source_order_no = candidate.order.customer_order_no;

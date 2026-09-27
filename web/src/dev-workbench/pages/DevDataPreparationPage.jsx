@@ -625,7 +625,7 @@ const READBACK_PRESENTATIONS = Object.freeze({
       },
       {
         key: 'processRuntimeCount',
-        label: '流程运行时',
+        label: '已验证流程实例',
         children: readback.processRuntimeCount,
       },
       {
@@ -1537,7 +1537,7 @@ export default function DevDataPreparationPage() {
                     onChange={customerScope.selectCustomer}
                     disabled={preparing || executing}
                     label="业务场景甲方"
-                    note="仅业务场景模拟数据按甲方选择；当前永绅对应固定 yoyoosun V7 场景批次。"
+                    note="仅业务场景模拟数据按甲方选择；永绅使用当前数据合同登记的固定场景批次。"
                     invalidDescription="当前甲方没有登记固定场景数据；业务场景的准备与执行已停止，其他数据准备方式不受影响。"
                   />
                 </Space>
@@ -1689,7 +1689,7 @@ export default function DevDataPreparationPage() {
                     type="info"
                     showIcon
                     message="这些记录只用于追溯"
-                    description="旧数据合同和无法识别版本的历史记录不会参与当前 V7 执行、恢复选择或环境就绪判断。"
+                    description="旧数据合同和无法识别版本的历史记录不会参与当前数据合同的执行、恢复选择或环境就绪判断。"
                   />
                   <List
                     size="small"
@@ -1766,7 +1766,7 @@ export default function DevDataPreparationPage() {
             showIcon
             message={
               currentIsScenarioDemo
-                ? '确认后生成固定 V7 业务场景数据'
+                ? '确认后按当前数据合同生成业务场景数据'
                 : '确认后才会写入固定目标'
             }
             description={

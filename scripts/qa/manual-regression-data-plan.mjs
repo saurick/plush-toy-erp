@@ -99,10 +99,9 @@ function buildProductCorePlan() {
     simulatedOnly: true,
     realCustomerImport: false,
     writesCustomerRuntimeFacts: false,
-    seedCommand:
-      "bash scripts/seed-core-demo-data.sh",
+    seedCommand: "bash scripts/seed-core-demo-data.sh",
     expectedCoverage: {
-      units: 4,
+      units: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
       materials: 7,
       products: 4,
       warehouses: 4,
@@ -110,14 +109,7 @@ function buildProductCorePlan() {
       bomVersions: 2,
       bomItemsMinimum: 6,
     },
-    domains: [
-      "unit",
-      "material",
-      "product",
-      "warehouse",
-      "process",
-      "bom",
-    ],
+    domains: ["unit", "material", "product", "warehouse", "process", "bom"],
     boundary:
       "这批 Product Core 基础资料只供本地开发复用，不包含永绅客户记录、订单、库存、出货、财务或真实导入授权。",
   };
@@ -193,15 +185,11 @@ function buildYoyoosunPlan() {
     commands: {
       fixtureBoundary:
         "node --test scripts/qa/yoyoosun-customer-closure.test.mjs",
-      datasetPlan:
-        "node scripts/qa/manual-acceptance-dataset.mjs",
-      sourcePlan:
-        `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version ${identity.dataVersion} --run-id ${identity.runId} --json`,
+      datasetPlan: "node scripts/qa/manual-acceptance-dataset.mjs",
+      sourcePlan: `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version ${identity.dataVersion} --run-id ${identity.runId} --json`,
       factsEntrypoint: "scripts/qa/manual-acceptance-fact-data.mjs",
-      factsHelper:
-        "scripts/qa/manual-acceptance-source-driven-facts.mjs",
-      readinessPlan:
-        "node scripts/qa/manual-acceptance-readiness.mjs",
+      factsHelper: "scripts/qa/manual-acceptance-source-driven-facts.mjs",
+      readinessPlan: "node scripts/qa/manual-acceptance-readiness.mjs",
     },
   };
 }
@@ -259,7 +247,9 @@ export function formatManualRegressionDataPlan(plan) {
     `- 统一数据合同: units=${plan.yoyoosun.canonicalCore.units.length}, warehouses=${plan.yoyoosun.canonicalCore.warehouses.length}, semanticDigest=${plan.yoyoosun.currentContract.semanticDigest}`,
     `- 单位候选: ${plan.yoyoosun.canonicalCore.units.map((item) => item.name).join(", ")}`,
     `- 参考样例: ${plan.yoyoosun.fixtureKey} (${plan.yoyoosun.fixtureStatus})`,
-    `- 参考样例数量（不代表当前库）: ${Object.entries(plan.yoyoosun.fixtureCounts)
+    `- 参考样例数量（不代表当前库）: ${Object.entries(
+      plan.yoyoosun.fixtureCounts,
+    )
       .map(([key, value]) => `${key}=${value}`)
       .join(", ")}`,
     `- 销售订单状态: ${plan.yoyoosun.fixtureStateCoverage.salesOrderLifecycleStatuses.join(", ")}`,

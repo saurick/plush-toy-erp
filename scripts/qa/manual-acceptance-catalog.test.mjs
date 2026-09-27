@@ -161,7 +161,7 @@ test("manual acceptance catalog is independently backed by the current router", 
   assert.doesNotMatch(router.source, /path="operations\/exceptions"/u);
   assert.match(
     router.source,
-    /path="warehouse\/shipping-release"[\s\S]*?<WorkflowBusinessModulePage moduleKey="shipping-release"\s*\/>/u,
+    /path="warehouse\/shipping-release"[\s\S]*?<WorkflowBusinessModulePage\s+key="shipping-release"\s+moduleKey="shipping-release"\s*\/>/u,
   );
 });
 
@@ -282,7 +282,7 @@ test("manual acceptance catalog treats production and outbound pages as source-g
     catalog.acceptanceGuide.desktopPages.map((item) => [item.title, item]),
   );
   const production = byTitle.get("生产记录");
-  const outbound = byTitle.get("出库管理");
+  const outbound = byTitle.get("库存预留");
 
   assert(production);
   assert(outbound);

@@ -1334,7 +1334,7 @@ function requireCurrentBatchTargetEvidence(target, datasetBinding) {
     )
   ) {
     throw new BrowserAcceptanceError(
-      `${target.title} 缺少当前 V7 批次 readiness 证据`,
+      `${target.title} 缺少当前 ${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION} 批次 readiness 证据`,
     );
   }
   return currentBatch;
@@ -2032,10 +2032,10 @@ export function evaluateShipmentReleaseEvidence(rows, schedule, nowMs) {
     return { passed: false, reason: "即将到期样例已超出本批有效时间窗口" };
   }
   const requirements = [
-    ["YS-V7-CK-02", "可执行", "即将到期"],
-    ["YS-V7-CK-13", "阻塞", "已超时"],
-    ["YS-V7-CK-16", "已完成", null],
-    ["YS-V7-CK-19", "退回", null],
+    [`${TASK_VISIBLE_CODE_PREFIX_BY_ROLE.warehouse}-02`, "可执行", "即将到期"],
+    [`${TASK_VISIBLE_CODE_PREFIX_BY_ROLE.warehouse}-13`, "阻塞", "已超时"],
+    [`${TASK_VISIBLE_CODE_PREFIX_BY_ROLE.warehouse}-16`, "已完成", null],
+    [`${TASK_VISIBLE_CODE_PREFIX_BY_ROLE.warehouse}-19`, "退回", null],
   ];
   const expectedCodes = requirements.map(([code]) => code);
   const visibleCodes = (rows || []).map((item) => String(item?.code || ""));

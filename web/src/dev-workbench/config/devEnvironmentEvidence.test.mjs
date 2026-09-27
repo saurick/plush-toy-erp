@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../../../scripts/qa/manual-acceptance-core-contract.mjs'
+
 import {
   buildDevDeliveryOperationOverview,
   buildDevEnvironmentEvidence,
@@ -38,29 +40,35 @@ function dataSummaryFixture() {
       fingerprint: 'd'.repeat(64),
     },
     datasetContract: {
-      dataVersion: '2026.09.16-v7',
-      runId: '20260916-V7',
+      dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+      runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
       semanticDigest: DIGEST,
-      unitCount: 11,
+      unitCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
       warehouseCount: 4,
       customerTrial133: {
         databaseName: 'plush_erp_demo_v1',
-        minimumMigration: '20260728100514',
+        minimumMigration:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         configRevision:
-          'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-        configProductVersion: 'customer-trial-133-test-2026.09.16-v7',
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+        configProductVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
       },
     },
     target: {
       scenarioDemo: {
         status: 'available',
         databaseName: 'plush_erp',
-        migrationVersion: '20260728100514',
+        migrationVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         customerConfigRevision: 'local-v8',
-        customerConfigProductVersion: 'local-2026.09.16-v7',
+        customerConfigProductVersion: `local-${MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion}`,
         targetFingerprint: TARGET_FINGERPRINT,
       },
-      fullAcceptance: { migrationVersion: '20260728100514' },
+      fullAcceptance: {
+        migrationVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
+      },
     },
     acceptancePlan: {
       chainDataDigest: 'e'.repeat(64),
@@ -68,15 +76,18 @@ function dataSummaryFixture() {
     },
     currentOperations: [
       operation('core-demo', {
-        core: { units: 11, warehouses: 4 },
+        core: {
+          units: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
+          warehouses: 4,
+        },
       }),
       operation('scenario-demo', {
-        dataVersion: '2026.09.16-v7',
-        runId: '20260916-V7',
+        dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+        runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
         targetFingerprint: TARGET_FINGERPRINT,
       }),
       operation('full-acceptance', {
-        dataVersion: '2026.09.16-v7',
+        dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
         reportStatus: 'passed',
         cleanupComplete: true,
         residualDatabaseCount: 0,
@@ -95,11 +106,12 @@ function addTrialReadback(summary) {
         targetKey: 'customer-trial-133',
         databaseName: 'plush_erp_demo_v1',
         release: COMMIT,
-        migrationVersion: '20260728100514',
+        migrationVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         customerConfigRevision:
-          'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-        dataVersion: '2026.09.16-v7',
-        runId: '20260916-V7',
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+        dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+        runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
         semanticDigest: DIGEST,
         backupReceipt: {
           status: 'passed',
@@ -125,12 +137,15 @@ function deliverySummaryFixture() {
         serverSha: COMMIT,
         webSha: COMMIT,
         databaseName,
-        migrationVersion: '20260728100514',
+        migrationVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         activeCustomerConfig: {
           revision:
-            'yoyoosun-customer-trial-133-package-v8.runtime-manifest-v1',
-          productVersion: 'customer-trial-133-test-2026.09.16-v7',
-          datasetVersion: '2026.09.16-v7',
+            MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+          productVersion:
+            MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133
+              .configProductVersion,
+          datasetVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
         },
         serverHealth: 'passed',
         serverReady: 'passed',
@@ -235,7 +250,8 @@ test('customer test data rebuild is independent from normal deployment readiness
       physicalGeneration: 'fresh',
       databaseRebuildFingerprint: '4'.repeat(64),
       databaseRebuildReceiptSha256: '5'.repeat(64),
-      migrationReadback: '20260728100514',
+      migrationReadback:
+        MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
       predecessorPreserved: true,
       backupSha256: '6'.repeat(64),
       backupSizeBytes: 4096,

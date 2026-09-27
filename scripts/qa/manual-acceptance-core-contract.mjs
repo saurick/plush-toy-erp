@@ -1,3 +1,4 @@
+import standardUnits from "../../server/internal/unitpolicy/units.json" with { type: "json" };
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -84,7 +85,7 @@ export function validateManualAcceptanceCoreContract(contract) {
     !Array.isArray(contract?.sourceNormalization?.distinctPairs) ||
     contract.sourceNormalization.distinctPairs.length < 5 ||
     !Array.isArray(contract?.units) ||
-    contract.units.length !== 11 ||
+    contract.units.length !== 8 ||
     !Array.isArray(contract?.warehouses) ||
     contract.warehouses.length !== 4
   ) {
@@ -99,7 +100,12 @@ export function validateManualAcceptanceCoreContract(contract) {
     contract.units.some(
       (item) =>
         !/^[A-Za-z][A-Za-z0-9]{1,31}$/u.test(String(item.key || "")) ||
-        !String(item.code || "").startsWith(`${contract.visiblePrefix}-DW-`) ||
+        !standardUnits.some(
+          (unit) =>
+            unit.code === item.code &&
+            unit.name === item.name &&
+            unit.precision === item.precision,
+        ) ||
         String(item.name || "") !== String(item.sourceLabel || "") ||
         !Number.isInteger(item.precision) ||
         item.precision < 0 ||

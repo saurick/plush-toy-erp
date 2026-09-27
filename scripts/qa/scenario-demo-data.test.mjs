@@ -42,7 +42,7 @@ const LOCAL_DATABASE = Object.freeze({
   safeTarget: "registered-development:plush_erp",
   targetFingerprint: "a".repeat(64),
 });
-const MIGRATION_VERSION = "20260916090000";
+const MIGRATION_VERSION = "20260927100348";
 
 function trialAttestation() {
   return {
@@ -84,7 +84,7 @@ function remotePlan() {
 
 function completedDatasetReport(plan) {
   const summaries = {
-    core: { units: 11, warehouses: 4 },
+    core: { units: 8, warehouses: 4 },
     baseline: { legacyDataPreserved: true },
     role: { accounts: 13 },
     source: {
@@ -92,7 +92,10 @@ function completedDatasetReport(plan) {
       "purchase_order.create": 1,
       "outsourcing_order.create": 1,
     },
-    task: { byRole: { sales: 2, purchase: 2, production: 2 } },
+    task: {
+      byRole: { sales: 2, purchase: 2, production: 2 },
+      processRuntimeCount: 1,
+    },
     "purchase-quality": { purchaseReceipts: 1 },
     facts: { productionFacts: 2, inventoryTxns: 3, shipments: 1 },
     attachments: { attachments: 4 },
@@ -127,8 +130,8 @@ test("local and 133 plans share one canonical semantic contract with independent
   assert.equal(local.targetEnvironment, "local-development");
   assert.equal(local.backendURL, SCENARIO_DEMO_ORIGIN);
   assert.equal(local.databaseName, "plush_erp");
-  assert.equal(local.dataVersion, "2026.09.16-v7");
-  assert.equal(local.runId, "20260916-V7");
+  assert.equal(local.dataVersion, "2026.09.27-v8");
+  assert.equal(local.runId, "20260927-V8");
   assert.equal(local.canonicalRunner.stageCount, 9);
   assert.equal(local.canonicalRunner.persistentBaseline, true);
   assert.equal(local.execution.replayMode, SCENARIO_DEMO_REPLAY_MODE);
@@ -214,12 +217,12 @@ test("readback requires every canonical stage and reports target-bound evidence"
     migrationVersion: MIGRATION_VERSION,
     customerConfigRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.16-v7",
-    runId: "20260916-V7",
+    dataVersion: "2026.09.27-v8",
+    runId: "20260927-V8",
     semanticDigest: plan.semanticDigest,
     stageCount: 9,
     sourceDocumentCount: 3,
-    processRuntimeCount: 3,
+    processRuntimeCount: 1,
     factCount: 6,
     catalogReadyCount: 41,
     catalogTargetCount: 51,
@@ -242,6 +245,12 @@ test("readback requires every canonical stage and reports target-bound evidence"
   );
 
   const incomplete = completedDatasetReport(plan);
+  delete incomplete.stages.find(({ key }) => key === "task").summary
+    .processRuntimeCount;
+  assert.throws(
+    () => buildScenarioDemoReadback({ plan, datasetReport: incomplete }),
+    /exact readback is incomplete/u,
+  );
   incomplete.stages = incomplete.stages.filter(
     ({ key }) => key !== "attachments",
   );
