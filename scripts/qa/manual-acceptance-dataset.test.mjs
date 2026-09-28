@@ -32,6 +32,7 @@ import {
 } from "./manual-acceptance-dataset.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
@@ -43,6 +44,7 @@ import {
   verifyManualAcceptanceEmptyBaseline,
   verifyManualAcceptanceCoreReferences,
   manualAcceptanceDatasetStageReportPath,
+  resolveManualAcceptanceDatasetStageLogicFingerprints,
   runDefaultManualAcceptanceTaskComponent,
 } from "./manual-acceptance-dataset-runner.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
@@ -82,6 +84,56 @@ const REGISTERED_DATASET_TARGETS = [
 ];
 let runnerOutputSequence = 0;
 const CORE_UNIT_CODES = MANUAL_ACCEPTANCE_CORE_UNITS.map((item) => item.code);
+
+function stageLogicFingerprints(overrides = {}) {
+  return new Map(
+    MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.map((stageKey) => [
+      stageKey,
+      overrides[stageKey] ||
+        createHash("sha256").update(`stage:${stageKey}`).digest("hex"),
+    ]),
+  );
+}
+
+test("stage logic fingerprints are deterministic and isolate declared component changes", () => {
+  const projectRoot = "/virtual/plush-toy-erp";
+  const readDependency = (filePath, changedFactData = false) => {
+    const relativePath = path.relative(projectRoot, filePath);
+    return Buffer.from(
+      changedFactData &&
+        relativePath === "scripts/qa/manual-acceptance-fact-data.mjs"
+        ? `${relativePath}:changed`
+        : `${relativePath}:current`,
+      "utf8",
+    );
+  };
+  const first = resolveManualAcceptanceDatasetStageLogicFingerprints({
+    projectRoot,
+    readFileImpl: (filePath) => readDependency(filePath),
+  });
+  const repeated = resolveManualAcceptanceDatasetStageLogicFingerprints({
+    projectRoot,
+    readFileImpl: (filePath) => readDependency(filePath),
+  });
+  const factDataChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
+    projectRoot,
+    readFileImpl: (filePath) => readDependency(filePath, true),
+  });
+
+  assert.deepEqual([...first.keys()], MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS);
+  assert.deepEqual([...first], [...repeated]);
+  assert.ok(
+    [...first.values()].every((fingerprint) =>
+      /^[0-9a-f]{64}$/u.test(fingerprint),
+    ),
+  );
+  assert.notEqual(factDataChanged.get("facts"), first.get("facts"));
+  for (const stageKey of MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS) {
+    if (stageKey !== "facts") {
+      assert.equal(factDataChanged.get(stageKey), first.get(stageKey));
+    }
+  }
+});
 
 test("component report digest treats undefined object fields as omitted JSON fields", () => {
   assert.equal(
@@ -529,6 +581,9 @@ function completedStageResult(
       runner: {
         revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
         handlerId: `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${context.stage.key}`,
+        logicFingerprintContract:
+          MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
+        logicFingerprint: "b".repeat(64),
         componentEntrypoint: `fake/${context.stage.key}`,
         componentDigest: "a".repeat(64),
         reportPath: `/tmp/${context.stage.key}-report.json`,
@@ -663,6 +718,9 @@ function runnerDeps(options = {}) {
           readDatabaseRebuildReceipt: options.readDatabaseRebuildReceipt,
         }
       : {}),
+    ...(options.stageLogicFingerprints
+      ? { stageLogicFingerprints: options.stageLogicFingerprints }
+      : {}),
     components: fakeComponents(options),
   };
 }
@@ -733,12 +791,56 @@ function durableComponentReport({
   return report;
 }
 
+function trialPersistentBaselineComponentReport({
+  businessInput,
+  targetAdapter,
+}) {
+  return {
+    ...fakeComponentReport({
+      stageKey: "baseline",
+      businessInput,
+      targetAdapter,
+    }),
+    contract: "manual-acceptance-persistent-baseline-report-v1",
+    mode: "verify",
+    databaseName: targetAdapter.databaseName,
+    runtimeIdentity: {
+      scope: "release-v1",
+      proof: "matched-v1",
+      databaseName: targetAdapter.databaseName,
+      release: targetAdapter.attestation.release,
+      migration: targetAdapter.attestation.migration,
+    },
+    customerConfig: {
+      configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+      configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+      configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+      configDatasetVersion: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+      configTarget: CUSTOMER_TRIAL_133_TARGET,
+    },
+    core: {
+      units: CORE_UNIT_CODES.length,
+      warehouses: 4,
+      unitCodes: [...CORE_UNIT_CODES].sort(),
+      warehouseCodes: ["YS8-CK-01", "YS8-CK-02", "YS8-CK-03", "YS8-CK-04"],
+    },
+    summary: {
+      exactEmptyBusinessBaseline: false,
+      legacyDataPreserved: true,
+      currentBatchGuard: "component-exact-create-or-readback",
+      units: CORE_UNIT_CODES.length,
+      warehouses: 4,
+    },
+  };
+}
+
 function durableRunnerDeps({
   outputRoot,
   onCall,
   override = {},
   configRevision = "local-config-v5",
   now = GENERATED_AT,
+  stageLogicFingerprints: fingerprints,
 } = {}) {
   return {
     now: () => new Date(now),
@@ -747,6 +849,7 @@ function durableRunnerDeps({
       rolePassword: "role-password",
       adminPassword: "admin-password",
     },
+    ...(fingerprints ? { stageLogicFingerprints: fingerprints } : {}),
     components: Object.fromEntries(
       MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter(
         (stageKey) => stageKey !== "purchase-quality",
@@ -2131,6 +2234,17 @@ test("canonical apply report persists and a complete same-batch replay safely re
       ),
     );
 
+    const legacyV10 = structuredClone(first);
+    for (const stage of legacyV10.stages) {
+      delete stage.references.runner.logicFingerprintContract;
+      delete stage.references.runner.logicFingerprint;
+    }
+    await fs.writeFile(
+      expectedApplyReportPath,
+      `${JSON.stringify(legacyV10, null, 2)}\n`,
+      "utf8",
+    );
+
     const replayCalls = [];
     const replay = await applyManualAcceptanceDataset(
       plan,
@@ -2151,6 +2265,12 @@ test("canonical apply report persists and a complete same-batch replay safely re
     assert.deepEqual(replay.taskSchedule, first.taskSchedule);
     assert.equal(replay.resume.requested, true);
     assert.equal(replay.resume.priorSucceeded, true);
+    assert.deepEqual(
+      replay.resume.legacyFingerprintAdoptedStages,
+      MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter(
+        (stageKey) => !["core", "readiness"].includes(stageKey),
+      ),
+    );
     assert.deepEqual(replayCalls, ["core", "readiness"]);
     assert.equal(
       replay.stages.find((stage) => stage.key === "core").operation,
@@ -2191,6 +2311,192 @@ test("canonical apply report persists and a complete same-batch replay safely re
       /task schedule does not match its controlled anchor/u,
     );
     assert.equal(tamperCalls, 0);
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("resume reruns only a changed stage and its registered dependents", async () => {
+  const outputRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-dataset-stage-logic-refresh-"),
+  );
+  try {
+    const plan = localApplyPlan();
+    const currentFingerprints = stageLogicFingerprints();
+    const first = await applyManualAcceptanceDataset(
+      plan,
+      localApplyBinding(plan),
+      durableRunnerDeps({
+        outputRoot,
+        stageLogicFingerprints: currentFingerprints,
+      }),
+    );
+    const changedFingerprints = stageLogicFingerprints({
+      facts: "f".repeat(64),
+    });
+    const calls = [];
+    const resumed = await applyManualAcceptanceDataset(
+      plan,
+      {
+        ...localApplyBinding(plan),
+        resumeReportPath: first.applyReportPath,
+      },
+      durableRunnerDeps({
+        outputRoot,
+        stageLogicFingerprints: changedFingerprints,
+        onCall: (stageKey) => calls.push(stageKey),
+      }),
+    );
+
+    assert.equal(resumed.ok, true);
+    assert.deepEqual(resumed.resume.logicChangedStages, ["facts"]);
+    assert.deepEqual(resumed.resume.dependencyRefreshedStages, [
+      "purchase-quality",
+      "attachments",
+    ]);
+    assert.deepEqual(resumed.resume.refreshedStages, [
+      "facts",
+      "purchase-quality",
+      "attachments",
+      "readiness",
+    ]);
+    assert.deepEqual(resumed.resume.reusedStages, [
+      "baseline",
+      "role",
+      "source",
+      "task",
+    ]);
+    assert.deepEqual(calls, ["core", "facts", "attachments", "readiness"]);
+    assert.equal(
+      resumed.stages.find((stage) => stage.key === "facts").operation,
+      "applied",
+    );
+    assert.ok(
+      resumed.stages
+        .filter((stage) =>
+          ["baseline", "role", "source", "task"].includes(stage.key),
+        )
+        .every((stage) => stage.operation === "reused"),
+    );
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("release-only changes reuse data stages while migration changes refresh them", async () => {
+  const outputRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-dataset-release-aware-resume-"),
+  );
+  const fingerprints = stageLogicFingerprints();
+  const overrides = {
+    core: async (invocation) => ({
+      operation: "verified",
+      report: trialCoreComponentReport(invocation),
+    }),
+    baseline: async (invocation) => ({
+      operation: "verified",
+      report: trialPersistentBaselineComponentReport(invocation),
+    }),
+  };
+  try {
+    const firstAttestation = trialAttestation("1".repeat(40));
+    const firstPlan = buildManualAcceptanceDatasetTargetPlan({
+      targetAlias: CUSTOMER_TRIAL_133_TARGET,
+      targetAttestation: firstAttestation,
+      generatedAt: GENERATED_AT,
+    });
+    const first = await applyManualAcceptanceDataset(
+      firstPlan,
+      {
+        confirmation: firstPlan.target.expectedConfirmation,
+        targetAttestation: firstAttestation,
+      },
+      runnerDeps({
+        outputRoot,
+        override: overrides,
+        stageLogicFingerprints: fingerprints,
+      }),
+    );
+    assert.equal(
+      first.ok,
+      true,
+      JSON.stringify({ failedStage: first.failedStage, stages: first.stages }),
+    );
+
+    const releaseAttestation = trialAttestation("2".repeat(40));
+    const releasePlan = buildManualAcceptanceDatasetTargetPlan({
+      targetAlias: CUSTOMER_TRIAL_133_TARGET,
+      targetAttestation: releaseAttestation,
+      generatedAt: GENERATED_AT,
+    });
+    const releaseCalls = [];
+    const releaseReplay = await applyManualAcceptanceDataset(
+      releasePlan,
+      {
+        confirmation: releasePlan.target.expectedConfirmation,
+        targetAttestation: releaseAttestation,
+        resumeReportPath: first.applyReportPath,
+      },
+      runnerDeps({
+        outputRoot,
+        override: overrides,
+        stageLogicFingerprints: fingerprints,
+        onCall: (stageKey) => releaseCalls.push(stageKey),
+      }),
+    );
+    assert.equal(releaseReplay.ok, true);
+    assert.deepEqual(releaseReplay.resume.targetAttestationChange, {
+      releaseChanged: true,
+      migrationChanged: false,
+    });
+    assert.deepEqual(releaseCalls, ["core", "readiness"]);
+    assert.deepEqual(releaseReplay.resume.refreshedStages, ["readiness"]);
+    assert.ok(
+      releaseReplay.stages
+        .filter((stage) => !["core", "readiness"].includes(stage.key))
+        .every((stage) => stage.operation === "reused"),
+    );
+
+    const migrationAttestation = trialAttestation(
+      "3".repeat(40),
+      "20260928112233",
+    );
+    const migrationPlan = buildManualAcceptanceDatasetTargetPlan({
+      targetAlias: CUSTOMER_TRIAL_133_TARGET,
+      targetAttestation: migrationAttestation,
+      generatedAt: GENERATED_AT,
+    });
+    const migrationCalls = [];
+    const migrationReplay = await applyManualAcceptanceDataset(
+      migrationPlan,
+      {
+        confirmation: migrationPlan.target.expectedConfirmation,
+        targetAttestation: migrationAttestation,
+        resumeReportPath: releaseReplay.applyReportPath,
+      },
+      runnerDeps({
+        outputRoot,
+        override: overrides,
+        stageLogicFingerprints: fingerprints,
+        onCall: (stageKey) => migrationCalls.push(stageKey),
+      }),
+    );
+    assert.equal(migrationReplay.ok, true);
+    assert.deepEqual(migrationReplay.resume.targetAttestationChange, {
+      releaseChanged: true,
+      migrationChanged: true,
+    });
+    assert.deepEqual(migrationReplay.resume.reusedStages, []);
+    assert.deepEqual(
+      migrationReplay.resume.refreshedStages,
+      MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.slice(1),
+    );
+    assert.deepEqual(
+      migrationCalls,
+      MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter(
+        (stageKey) => stageKey !== "purchase-quality",
+      ),
+    );
   } finally {
     await fs.rm(outputRoot, { recursive: true, force: true });
   }
@@ -2835,6 +3141,24 @@ test("stage receipt requires exact identity and explicit report objects", () => 
         plan,
       ),
     /invalid componentDigest/u,
+  );
+  assert.throws(
+    () =>
+      normalizeManualAcceptanceStageResult(
+        {
+          ...valid,
+          references: {
+            ...valid.references,
+            runner: {
+              ...valid.references.runner,
+              logicFingerprint: "not-a-fingerprint",
+            },
+          },
+        },
+        stage,
+        plan,
+      ),
+    /invalid logicFingerprint/u,
   );
 });
 

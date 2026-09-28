@@ -57,6 +57,7 @@ import {
 import {
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   digestManualAcceptanceDatasetComponentReport,
   manualAcceptanceDatasetStageReportPath,
@@ -406,6 +407,9 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
         runner: {
           revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
           handlerId: `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${stageKey}`,
+          logicFingerprintContract:
+            MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
+          logicFingerprint: "b".repeat(64),
           componentEntrypoint: `fixture/${stageKey}`,
           componentDigest: digestManualAcceptanceDatasetComponentReport(
             reports[stageKey],
@@ -1356,6 +1360,34 @@ test("browser dataset binding rejects incomplete stages and task coverage digest
     );
   } finally {
     await fs.rm(incomplete.outputRoot, { recursive: true, force: true });
+  }
+
+  const invalidFingerprint = await datasetApplyEvidenceFixture();
+  try {
+    delete invalidFingerprint.datasetReport.stages.find(
+      (stage) => stage.key === "facts",
+    ).references.runner.logicFingerprint;
+    await fs.writeFile(
+      invalidFingerprint.datasetReportPath,
+      `${JSON.stringify(invalidFingerprint.datasetReport, null, 2)}\n`,
+      "utf8",
+    );
+    await assert.rejects(
+      () =>
+        verifyManualAcceptanceDatasetApplyReportBinding({
+          datasetReportPath: invalidFingerprint.datasetReportPath,
+          sourceReportPath: invalidFingerprint.sourceReportPath,
+          factReportPath: invalidFingerprint.factReportPath,
+          readinessReportPath: invalidFingerprint.readinessReportPath,
+          printInput: invalidFingerprint.printInput,
+        }),
+      /没有完整完成全部 canonical stages/u,
+    );
+  } finally {
+    await fs.rm(invalidFingerprint.outputRoot, {
+      recursive: true,
+      force: true,
+    });
   }
 
   const drifted = await datasetApplyEvidenceFixture();

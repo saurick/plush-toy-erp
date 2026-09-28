@@ -328,7 +328,9 @@ node scripts/qa/manual-acceptance-dataset.mjs \
 
 登录输入只从受控进程环境或凭据合同进入，不写进命令示例、仓库或回执。历史回执、错误 SHA、相同 system identifier 或当前非空都会停止。长期 scenario-demo 可按其既有长期库语义保留历史，但不能冒充 fresh full acceptance。
 
-首次执行前，该目标的规范总回执必须不存在。若某阶段失败，或完整成功后需要证明同批幂等重放，保留原回执，并在完全相同的目标、版本、批次、后端和带外证明参数后追加 `--resume-report output/qa/manual-acceptance/datasets/2026.09.27-v8/<target>/dataset/apply-report.json`。禁止删除回执后重新冒充 fresh apply；resume 会重验 core、客户配置、数据库、release / migration、连续阶段和各组件 digest。
+首次执行前，该目标的规范总回执必须不存在。若某阶段失败，或完整成功后需要证明同批幂等重放，保留原回执，并在相同目标范围、版本、批次和后端后追加 `--resume-report output/qa/manual-acceptance/datasets/2026.09.27-v8/<target>/dataset/apply-report.json`。禁止删除回执后重新冒充 fresh apply；resume 始终实时重验 core、客户配置、数据库和当前 release / migration，并校验连续阶段与各组件 digest。
+
+每个阶段回执同时记录由登记入口、阶段实现及显式依赖文件计算出的逻辑指纹。逻辑指纹未变时，数据写阶段直接复用原组件回执；某阶段指纹变化时，只重跑该阶段及依赖它的后续阶段。仅 release SHA 变化不会重造业务数据，core 和只读 readiness 仍会实时重验；migration 变化会刷新 baseline 及全部后续阶段。当前 V10 的旧回执若只有完整 component digest 和精确 handler identity，可一次性补写当前指纹；指纹伪造、依赖未登记或目标范围漂移仍失败关闭。常规部署不得因为“发布过一次”无条件重跑九阶段造数。
 
 fresh apply 会在开始时捕获一次岗位任务时间锚点并写入总回执；同批 resume 必须校验并复用该锚点，不能按当前时间重排到期日。业务数据版本中的日期只用于来源单业务日期，不再充当任务到期锚点。本地和 133 共享同一时间策略与语义 digest，但分别在自己的 fresh 回执中绑定执行锚点。浏览器必须在回执记录的有效期内同时看到出货放行的“即将到期”和“已超时”；锚点过期后不得继续沿用旧报告宣称通过，应换新数据版本并从 fresh 空库重放。
 

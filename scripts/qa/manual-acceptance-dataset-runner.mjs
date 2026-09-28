@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 import { applyAttachmentData } from "./manual-acceptance-attachment-data.mjs";
 import {
@@ -53,8 +55,15 @@ import { resolveManualAcceptanceRoleCredential } from "./manual-acceptance-accou
 
 export const MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION =
   "manual-acceptance-dataset-runner-v10";
+export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT =
+  "manual-acceptance-dataset-stage-logic-fingerprint-v1";
 export const MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT =
   "manual-acceptance-database-rebuild-proof-v1";
+
+const RUNNER_PROJECT_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 
 const DATASET_CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const ISOLATED_LOCAL_TARGET_ALIAS = "local";
@@ -74,6 +83,46 @@ const BROWSER_ONLY_READINESS_GROUPS = Object.freeze({
 const BROWSER_ONLY_READINESS_TARGET_COUNT = Object.values(
   BROWSER_ONLY_READINESS_GROUPS,
 ).reduce((total, count) => total + count, 0);
+
+export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
+  Object.freeze({
+    core: Object.freeze([
+      "scripts/qa/manual-acceptance-core-contract.mjs",
+      "scripts/qa/manual-acceptance-source-data.mjs",
+      "scripts/qa/manual-acceptance-target-policy.mjs",
+    ]),
+    baseline: Object.freeze([
+      "scripts/qa/manual-acceptance-core-contract.mjs",
+      "scripts/qa/manual-acceptance-target-policy.mjs",
+    ]),
+    role: Object.freeze([
+      "scripts/qa/manual-acceptance-account-identities.mjs",
+      "scripts/qa/manual-acceptance-account-scenarios.mjs",
+    ]),
+    source: Object.freeze([
+      "scripts/qa/manual-acceptance-core-contract.mjs",
+      "scripts/qa/manual-acceptance-source-data.mjs",
+    ]),
+    task: Object.freeze(["scripts/qa/manual-acceptance-task-data.mjs"]),
+    facts: Object.freeze([
+      "scripts/qa/manual-acceptance-fact-data.mjs",
+      "scripts/qa/manual-acceptance-fact-report-contract.mjs",
+      "scripts/qa/manual-acceptance-source-driven-facts.mjs",
+    ]),
+    "purchase-quality": Object.freeze([
+      "scripts/qa/manual-acceptance-fact-report-contract.mjs",
+    ]),
+    attachments: Object.freeze([
+      "scripts/qa/manual-acceptance-account-identities.mjs",
+      "scripts/qa/manual-acceptance-attachment-data.mjs",
+    ]),
+    readiness: Object.freeze([
+      "scripts/qa/manual-acceptance-catalog.mjs",
+      "scripts/qa/manual-acceptance-fact-report-contract.mjs",
+      "scripts/qa/manual-acceptance-page-data-contract.mjs",
+      "scripts/qa/manual-acceptance-readiness.mjs",
+    ]),
+  });
 
 export const MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES = Object.freeze(
   [
@@ -655,6 +704,9 @@ function receipt(execution, component) {
       runner: {
         revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
         handlerId: execution.handlerId,
+        logicFingerprintContract:
+          MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
+        logicFingerprint: execution.logicFingerprint,
         componentEntrypoint: COMPONENT_ENTRYPOINTS[execution.stageKey],
         componentDigest: digest,
         reportPath: component.reportPath,
@@ -1989,15 +2041,14 @@ function assertReusableBaseline(execution, report) {
   }
   const attestation = execution.targetAdapter.attestation;
   const remoteIdentityMatches = attestation
-    ? report.runtimeIdentity?.release === attestation.release &&
-      report.runtimeIdentity?.migration === attestation.migration
+    ? report.runtimeIdentity?.migration === attestation.migration
     : report.runtimeIdentity?.release == null &&
       report.runtimeIdentity?.migration == null;
   if (!remoteIdentityMatches) {
     throw new ManualAcceptanceDatasetRunnerError(
       "resume_baseline_runtime_mismatch",
-      "resume baseline release/migration does not match the current target binding",
-      { stageKey: "baseline", field: "release/migration" },
+      "resume baseline migration does not match the current target binding",
+      { stageKey: "baseline", field: "migration" },
     );
   }
 }
@@ -2173,8 +2224,138 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY = Object.freeze({
   readiness: readinessStageHandler,
 });
 
+function stageLogicFunctions(stageKey) {
+  const commonFunctions = [
+    buildManualAcceptanceRunnerBusinessInput,
+    buildManualAcceptanceTargetAdapter,
+    componentInvocation,
+    normalizeComponentResult,
+    executeRegisteredComponent,
+    reuseStageComponent,
+    registeredStage,
+  ];
+  const stageFunctions = {
+    core: [
+      coreStageHandler,
+      defaultCoreComponent,
+      verifyManualAcceptanceCoreReferences,
+      coreRPC,
+    ],
+    baseline: [
+      baselineStageHandler,
+      defaultBaselineComponent,
+      verifyManualAcceptanceEmptyBaseline,
+      coreRPC,
+    ],
+    role: [roleStageHandler, defaultRoleComponent],
+    source: [sourceStageHandler, defaultSourceComponent],
+    task: [taskStageHandler, runDefaultManualAcceptanceTaskComponent],
+    facts: [factsStageHandler, defaultFactsComponent],
+    "purchase-quality": [purchaseQualityStageHandler],
+    attachments: [attachmentsStageHandler, defaultAttachmentsComponent],
+    readiness: [readinessStageHandler, defaultReadinessComponent],
+  }[stageKey];
+  if (!stageFunctions) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "stage_logic_fingerprint_unregistered",
+      `stage ${stageKey} has no logic fingerprint descriptor`,
+      { stageKey },
+    );
+  }
+  return [...commonFunctions, ...stageFunctions].map((entrypoint) =>
+    entrypoint.toString(),
+  );
+}
+
+function stageLogicConstants(stageKey) {
+  if (stageKey === "core") {
+    return {
+      unitCodes: MANUAL_ACCEPTANCE_CORE_UNIT_CODES,
+      warehouseCodes: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
+    };
+  }
+  if (stageKey === "baseline") {
+    return { emptyBaselineProbes: MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES };
+  }
+  if (stageKey === "readiness") {
+    return {
+      browserOnlyReadinessGroups: BROWSER_ONLY_READINESS_GROUPS,
+      browserOnlyReadinessTargetCount: BROWSER_ONLY_READINESS_TARGET_COUNT,
+      pageTargetCount: MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT,
+    };
+  }
+  return {};
+}
+
+export function resolveManualAcceptanceDatasetStageLogicFingerprints({
+  projectRoot = RUNNER_PROJECT_ROOT,
+  readFileImpl = readFileSync,
+} = {}) {
+  const fingerprints = new Map();
+  for (const stageKey of Object.keys(
+    MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY,
+  )) {
+    const dependencyFiles =
+      MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES[stageKey];
+    if (!Array.isArray(dependencyFiles)) {
+      throw new ManualAcceptanceDatasetRunnerError(
+        "stage_logic_fingerprint_unregistered",
+        `stage ${stageKey} has no declared logic dependencies`,
+        { stageKey },
+      );
+    }
+    const files = dependencyFiles.map((relativePath) => {
+      let content;
+      try {
+        content = readFileImpl(path.join(projectRoot, relativePath));
+      } catch (error) {
+        throw new ManualAcceptanceDatasetRunnerError(
+          "stage_logic_dependency_unreadable",
+          `cannot read ${stageKey} logic dependency ${relativePath}`,
+          { stageKey, relativePath, reason: String(error?.message || error) },
+        );
+      }
+      const bytes = Buffer.isBuffer(content)
+        ? content
+        : Buffer.from(String(content), "utf8");
+      return {
+        path: relativePath,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+      };
+    });
+    const descriptor = {
+      contract: MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
+      stageKey,
+      componentEntrypoint: COMPONENT_ENTRYPOINTS[stageKey],
+      functions: stageLogicFunctions(stageKey),
+      constants: stageLogicConstants(stageKey),
+      files,
+    };
+    fingerprints.set(
+      stageKey,
+      createHash("sha256").update(canonicalJSON(descriptor)).digest("hex"),
+    );
+  }
+  return fingerprints;
+}
+
+function stageLogicFingerprint(stageLogicFingerprints, stageKey) {
+  const fingerprint = String(stageLogicFingerprints?.get?.(stageKey) || "");
+  if (!/^[0-9a-f]{64}$/u.test(fingerprint)) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "stage_logic_fingerprint_invalid",
+      `stage ${stageKey} has no valid current logic fingerprint`,
+      { stageKey },
+    );
+  }
+  return fingerprint;
+}
+
 export function createManualAcceptanceDatasetStageRunner(deps = {}) {
   const registry = deps.registry || MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY;
+  const stageLogicFingerprints =
+    deps.stageLogicFingerprints ||
+    resolveManualAcceptanceDatasetStageLogicFingerprints();
   const registeredStageKeys = Object.keys(registry);
   const state = { componentReports: new Map(), completedStageKeys: [] };
   return async function runManualAcceptanceDatasetStage(context) {
@@ -2206,6 +2387,7 @@ export function createManualAcceptanceDatasetStageRunner(deps = {}) {
     const execution = {
       stageKey,
       handlerId,
+      logicFingerprint: stageLogicFingerprint(stageLogicFingerprints, stageKey),
       businessInput,
       targetAdapter,
       reportPath: reportPathFor(
@@ -2213,7 +2395,7 @@ export function createManualAcceptanceDatasetStageRunner(deps = {}) {
         stageKey,
         businessInput.dataVersion,
       ),
-      deps: { ...deps, state },
+      deps: { ...deps, stageLogicFingerprints, state },
       state,
     };
     const resumeComponent = deps.resumeComponents?.get?.(stageKey);

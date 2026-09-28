@@ -51,11 +51,13 @@ import {
 import {
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
   MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT,
+  MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   createManualAcceptanceDatasetStageRunner,
   digestManualAcceptanceDatasetComponentReport,
   manualAcceptanceDatasetStageReportPath,
+  resolveManualAcceptanceDatasetStageLogicFingerprints,
 } from "./manual-acceptance-dataset-runner.mjs";
 import {
   TASK_SCHEDULE_POLICY,
@@ -99,6 +101,17 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS = Object.freeze([
   "attachments",
   "readiness",
 ]);
+export const MANUAL_ACCEPTANCE_DATASET_STAGE_DEPENDENTS = Object.freeze({
+  core: Object.freeze(["baseline", "source"]),
+  baseline: Object.freeze([]),
+  role: Object.freeze(["source"]),
+  source: Object.freeze(["task", "facts"]),
+  task: Object.freeze(["attachments"]),
+  facts: Object.freeze(["purchase-quality", "attachments"]),
+  "purchase-quality": Object.freeze([]),
+  attachments: Object.freeze([]),
+  readiness: Object.freeze([]),
+});
 export const MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT =
   "manual-acceptance-dataset-apply-report-v4";
 export const MANUAL_ACCEPTANCE_DATASET_APPLY_LOCK_CONTRACT =
@@ -1703,6 +1716,57 @@ function validateApplyPlan(
   };
 }
 
+function classifyResumeTargetAttestation(priorValue, currentValue) {
+  if (
+    canonicalJSON(priorValue ?? null) === canonicalJSON(currentValue ?? null)
+  ) {
+    return Object.freeze({ releaseChanged: false, migrationChanged: false });
+  }
+  if (!isPlainRecord(priorValue) || !isPlainRecord(currentValue)) {
+    throw new ManualAcceptanceDatasetError(
+      "resume report target attestation does not match the current target binding",
+    );
+  }
+  const stablePrior = { ...priorValue, release: null, migration: null };
+  const stableCurrent = { ...currentValue, release: null, migration: null };
+  if (canonicalJSON(stablePrior) !== canonicalJSON(stableCurrent)) {
+    throw new ManualAcceptanceDatasetError(
+      "resume report target attestation scope does not match the current target binding",
+    );
+  }
+  return Object.freeze({
+    releaseChanged: priorValue.release !== currentValue.release,
+    migrationChanged: priorValue.migration !== currentValue.migration,
+  });
+}
+
+function currentStageLogicFingerprint(stageLogicFingerprints, stageKey) {
+  const fingerprint = String(stageLogicFingerprints?.get?.(stageKey) || "");
+  if (!/^[0-9a-f]{64}$/u.test(fingerprint)) {
+    throw new ManualAcceptanceDatasetError(
+      `current ${stageKey} logic fingerprint is missing or invalid`,
+    );
+  }
+  return fingerprint;
+}
+
+function expandManualAcceptanceStageRefreshClosure(stageKeys) {
+  const refresh = new Set(stageKeys);
+  const pending = [...refresh];
+  while (pending.length > 0) {
+    const stageKey = pending.shift();
+    for (const dependent of MANUAL_ACCEPTANCE_DATASET_STAGE_DEPENDENTS[
+      stageKey
+    ] || []) {
+      if (!refresh.has(dependent)) {
+        refresh.add(dependent);
+        pending.push(dependent);
+      }
+    }
+  }
+  return refresh;
+}
+
 function assertResumeIdentity(prior, plan, executionBinding) {
   if (
     prior?.contract !== MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT ||
@@ -1751,14 +1815,10 @@ function assertResumeIdentity(prior, plan, executionBinding) {
       );
     }
   }
-  if (
-    canonicalJSON(prior.targetAttestation ?? null) !==
-    canonicalJSON(executionBinding.targetAttestation ?? null)
-  ) {
-    throw new ManualAcceptanceDatasetError(
-      "resume report target attestation does not match the current target binding",
-    );
-  }
+  const targetAttestationChange = classifyResumeTargetAttestation(
+    prior.targetAttestation,
+    executionBinding.targetAttestation,
+  );
   if (
     canonicalJSON(prior.databaseRebuildProof ?? null) !==
     canonicalJSON(executionBinding.databaseRebuildProof ?? null)
@@ -1784,7 +1844,7 @@ function assertResumeIdentity(prior, plan, executionBinding) {
       "resume report task schedule does not match its controlled anchor",
     );
   }
-  return businessChainReuse;
+  return { businessChainReuse, targetAttestationChange };
 }
 
 async function prepareManualAcceptanceResume({
@@ -1793,6 +1853,7 @@ async function prepareManualAcceptanceResume({
   resumeReportPath,
   outputRoot,
   applyReportPath,
+  stageLogicFingerprints,
 }) {
   if (!resumeReportPath) {
     return {
@@ -1828,7 +1889,7 @@ async function prepareManualAcceptanceResume({
       `cannot read resume report: ${error?.message || error}`,
     );
   }
-  const businessChainReuse = assertResumeIdentity(
+  const { businessChainReuse, targetAttestationChange } = assertResumeIdentity(
     prior,
     plan,
     executionBinding,
@@ -1846,9 +1907,16 @@ async function prepareManualAcceptanceResume({
     );
   }
 
-  const components = new Map();
+  const candidateComponents = new Map();
   const completedStageKeys = [];
-  let refreshFactEvidence = false;
+  const directRefreshStages = new Set(["readiness"]);
+  const logicChangedStages = [];
+  const legacyFingerprintAdoptedStages = [];
+  if (targetAttestationChange.migrationChanged) {
+    for (const stageKey of MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.slice(1)) {
+      directRefreshStages.add(stageKey);
+    }
+  }
   let terminalStatus = null;
   let failedStage = null;
   for (const stage of prior.stages) {
@@ -1899,6 +1967,41 @@ async function prepareManualAcceptanceResume({
         );
       }
       completedStageKeys.push(stage.key);
+      const currentLogicFingerprint = currentStageLogicFingerprint(
+        stageLogicFingerprints,
+        stage.key,
+      );
+      const priorLogicFingerprint = String(
+        stage.references.runner.logicFingerprint || "",
+      );
+      if (priorLogicFingerprint) {
+        if (
+          stage.references.runner.logicFingerprintContract !==
+            MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT ||
+          !/^[0-9a-f]{64}$/u.test(priorLogicFingerprint)
+        ) {
+          throw new ManualAcceptanceDatasetError(
+            `resume report ${stage.key} logic fingerprint is invalid`,
+          );
+        }
+        if (priorLogicFingerprint !== currentLogicFingerprint) {
+          directRefreshStages.add(stage.key);
+          logicChangedStages.push(stage.key);
+        }
+      } else if (
+        stage.references.runner.revision ===
+          MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION &&
+        stage.references.runner.handlerId ===
+          `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${stage.key}`
+      ) {
+        // v10 receipts predate stage fingerprints. Their exact component
+        // digest and handler identity are accepted once, then the reused
+        // receipt is rewritten with the current per-stage fingerprint.
+        legacyFingerprintAdoptedStages.push(stage.key);
+      } else {
+        directRefreshStages.add(stage.key);
+        logicChangedStages.push(stage.key);
+      }
       if (
         stage.key === "role" &&
         !manualAcceptanceAccountProfilesMatch(
@@ -1908,7 +2011,7 @@ async function prepareManualAcceptanceResume({
       ) {
         // Reconcile the current registered profiles before reusing business
         // data; a valid older receipt cannot prove newly required operators.
-        continue;
+        directRefreshStages.add("role");
       }
       if (
         stage.key === "facts" &&
@@ -1917,16 +2020,10 @@ async function prepareManualAcceptanceResume({
         // Earlier V5 reports omitted the outsourcing-return inventory lots.
         // The original digest is still verified above, then the idempotent fact
         // stage and its consumers are rerun to regenerate complete evidence.
-        refreshFactEvidence = true;
-      }
-      if (
-        refreshFactEvidence &&
-        ["facts", "purchase-quality", "attachments"].includes(stage.key)
-      ) {
-        continue;
+        directRefreshStages.add("facts");
       }
       if (!["core", "readiness"].includes(stage.key)) {
-        components.set(stage.key, {
+        candidateComponents.set(stage.key, {
           report: componentReport,
           reportPath: expectedPath,
           componentDigest: digest,
@@ -1958,6 +2055,23 @@ async function prepareManualAcceptanceResume({
       "resume report completion state is inconsistent",
     );
   }
+  const refreshStages =
+    expandManualAcceptanceStageRefreshClosure(directRefreshStages);
+  const components = new Map(
+    [...candidateComponents].filter(
+      ([stageKey]) => !refreshStages.has(stageKey),
+    ),
+  );
+  const refreshedStages = MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter(
+    (stageKey) => stageKey !== "core" && !components.has(stageKey),
+  );
+  const dependencyRefreshedStages = MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter(
+    (stageKey) =>
+      refreshStages.has(stageKey) && !directRefreshStages.has(stageKey),
+  );
+  const adoptedLegacyFingerprints = legacyFingerprintAdoptedStages.filter(
+    (stageKey) => components.has(stageKey),
+  );
   return {
     components,
     taskSchedule: structuredClone(prior.taskSchedule),
@@ -1970,9 +2084,13 @@ async function prepareManualAcceptanceResume({
       priorFailedStage: prior.failedStage || null,
       reusedStages: [...components.keys()],
       businessChainReuse,
-      refreshedStages: refreshFactEvidence
-        ? ["facts", "purchase-quality", "attachments", "readiness"]
-        : ["readiness"],
+      targetAttestationChange,
+      logicFingerprintContract:
+        MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
+      logicChangedStages,
+      dependencyRefreshedStages,
+      legacyFingerprintAdoptedStages: adoptedLegacyFingerprints,
+      refreshedStages,
     },
   };
 }
@@ -2069,6 +2187,19 @@ export function normalizeManualAcceptanceStageResult(result, stage, plan) {
   ) {
     throw new ManualAcceptanceDatasetError(
       `${stage.key} runner receipt has an unexpected handler identity`,
+    );
+  }
+  if (
+    runner.logicFingerprintContract !==
+    MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      `${stage.key} runner receipt has an unexpected logic fingerprint contract`,
+    );
+  }
+  if (!/^[0-9a-f]{64}$/u.test(String(runner.logicFingerprint || ""))) {
+    throw new ManualAcceptanceDatasetError(
+      `${stage.key} runner receipt has an invalid logicFingerprint`,
     );
   }
   for (const field of ["componentEntrypoint", "reportPath"]) {
@@ -2191,16 +2322,23 @@ export async function applyManualAcceptanceDataset(
       await assertFreshApplyReportSlot(applyReportPath);
     }
     const generatedAt = timestampNow(deps);
+    const stageLogicFingerprints =
+      deps.stageLogicFingerprints ||
+      resolveManualAcceptanceDatasetStageLogicFingerprints({
+        projectRoot: deps.projectRoot || REPO_ROOT,
+      });
     const resume = await prepareManualAcceptanceResume({
       plan,
       executionBinding,
       resumeReportPath,
       outputRoot,
       applyReportPath,
+      stageLogicFingerprints,
     });
     const runStage = createManualAcceptanceDatasetStageRunner({
       ...deps,
       resumeComponents: resume.components,
+      stageLogicFingerprints,
     });
     let taskSchedule =
       resume.taskSchedule ||

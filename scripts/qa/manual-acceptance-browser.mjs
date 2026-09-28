@@ -27,6 +27,7 @@ import {
 import {
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   assertManualAcceptanceDatasetReadinessBoundary,
   digestManualAcceptanceDatasetComponentReport,
@@ -2854,7 +2855,12 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
         stage?.dataVersion !== printInput.dataVersion ||
         stage?.semanticDigest !== datasetSemanticDigest ||
         stage?.references?.runner?.revision !==
-          MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+          MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION ||
+        stage?.references?.runner?.logicFingerprintContract !==
+          MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT ||
+        !/^[0-9a-f]{64}$/u.test(
+          String(stage?.references?.runner?.logicFingerprint || ""),
+        ),
     )
   ) {
     throw new BrowserAcceptanceError(
