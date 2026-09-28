@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
+import { ERP_DARK_PALETTE } from '../../src/common/theme/erpThemePalette.mjs'
 import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 import { assertReadableOnBackground } from './colorAssertions.mjs'
 
@@ -76,7 +77,7 @@ export function createPrintWorkspaceThemeScenario({
                 mode === 'dark' ? palette.dark : palette.primary
               )
               const onPrimary = rgb(
-                mode === 'dark' ? '#111713' : palette.onPrimary
+                mode === 'dark' ? ERP_DARK_PALETTE.onAccent : palette.onPrimary
               )
               await page.waitForFunction(
                 ({ mode, accent, primary, onPrimary }) => {
@@ -119,7 +120,11 @@ export function createPrintWorkspaceThemeScenario({
               const label = `${template.key} ${mode} ${accent}`
               assert.equal(
                 metrics.button.color,
-                rgb(mode === 'dark' ? '#111713' : palette.onPrimary),
+                rgb(
+                  mode === 'dark'
+                    ? ERP_DARK_PALETTE.onAccent
+                    : palette.onPrimary
+                ),
                 `${label} 主按钮文字`
               )
               assert.equal(

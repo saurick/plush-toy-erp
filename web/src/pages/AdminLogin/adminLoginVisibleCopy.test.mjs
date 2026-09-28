@@ -36,7 +36,8 @@ test('admin login uses the product name as its only visible heading', () => {
   assert.doesNotMatch(loginPageSource, /erp-login-card__title/u)
 })
 
-test('application title fallback uses ordinary Chinese copy', () => {
-  assert.match(appSource, /'毛绒玩具管理系统'/u)
-  assert.doesNotMatch(appSource, /'Plush Toy ERP'/u)
+test('browser tab title uses the same active company name as login', () => {
+  assert.match(appSource, /<title>\{activeBrand\.companyName\}<\/title>/u)
+  assert.doesNotMatch(appSource, /appConfig\.title/u)
+  assert.doesNotMatch(appSource, /VITE_APP_TITLE/u)
 })

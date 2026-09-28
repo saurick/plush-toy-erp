@@ -19,6 +19,7 @@ import {
   normalizeERPAppearance,
   readERPAppearance,
 } from './erpAppearance.mjs'
+import { ERP_DARK_PALETTE } from './erpThemePalette.mjs'
 
 export {
   ERP_THEME_MODE,
@@ -129,7 +130,9 @@ export function ERPThemeProvider({ children }) {
     root.style.setProperty('--erp-accent-dark', accent.dark)
     root.style.setProperty(
       '--erp-on-accent',
-      effectiveTheme === ERP_THEME_MODE.DARK ? '#111713' : accent.onPrimary
+      effectiveTheme === ERP_THEME_MODE.DARK
+        ? ERP_DARK_PALETTE.onAccent
+        : accent.onPrimary
     )
   }, [appearance, effectiveTheme, themeMode])
 

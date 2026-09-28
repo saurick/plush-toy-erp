@@ -5,6 +5,7 @@ import {
   normalizeERPAppearance,
   readERPAppearance,
 } from './erpAppearance.mjs'
+import { ERP_DARK_PALETTE } from './erpThemePalette.mjs'
 
 test('appearance recovers from stale or unavailable storage without losing valid preferences', () => {
   for (const value of [
@@ -58,6 +59,13 @@ test('every accent supplies readable primary button text and link colors', () =>
       `${name}: primary button`
     )
     assert.ok(contrast(accent.strong, '#ffffff') >= 4.5, `${name}: light link`)
-    assert.ok(contrast(accent.dark, '#18201b') >= 4.5, `${name}: dark link`)
+    assert.ok(
+      contrast(accent.dark, ERP_DARK_PALETTE.surface) >= 4.5,
+      `${name}: dark link`
+    )
+    assert.ok(
+      contrast(ERP_DARK_PALETTE.onAccent, accent.dark) >= 4.5,
+      `${name}: dark primary button`
+    )
   }
 })

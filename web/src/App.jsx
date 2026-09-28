@@ -17,6 +17,7 @@ import {
   useERPWorkspace,
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
+import { ERP_DARK_PALETTE } from '@/common/theme/erpThemePalette.mjs'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import '@/common/components/empty/empty-state.css'
 
@@ -27,9 +28,7 @@ const ERPRouter = lazyWithDynamicImportRetry(() => import('@/erp/router'))
 function AppContent() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { appConfig, isMobileExperience } = useERPWorkspace()
-  const appTitle =
-    appConfig.title || import.meta.env.VITE_APP_TITLE || '毛绒玩具管理系统'
+  const { isMobileExperience } = useERPWorkspace()
   const activeBrand = getActiveERPBrand()
   const isDevWorkbenchRoute =
     import.meta.env.DEV && /^\/__dev(?:\/|$)/u.test(location.pathname)
@@ -93,7 +92,7 @@ function AppContent() {
     <>
       {!isDevWorkbenchRoute ? (
         <Helmet>
-          <title>{appTitle}</title>
+          <title>{activeBrand.companyName}</title>
         </Helmet>
       ) : null}
       <Suspense fallback={null}>
@@ -122,15 +121,15 @@ function ThemedApp() {
             paddingInline: 12,
             paddingInlineSM: 12,
             paddingInlineLG: 16,
-            primaryColor: isDark ? '#111713' : accent.onPrimary,
+            primaryColor: isDark ? ERP_DARK_PALETTE.onAccent : accent.onPrimary,
           },
           Table: {
             cellPaddingBlock: tableCellPaddingBlock,
             cellPaddingBlockMD: tableCellPaddingBlock,
             cellPaddingBlockSM: tableCellPaddingBlock,
             cellPaddingInlineSM: 11,
-            headerBg: isDark ? '#202b24' : '#f7f9f8',
-            headerColor: isDark ? '#bdc9c0' : '#4d5d53',
+            headerBg: isDark ? ERP_DARK_PALETTE.surfaceSoft : '#f7f9f8',
+            headerColor: isDark ? ERP_DARK_PALETTE.textMuted : '#4d5d53',
             rowSelectedBg: 'var(--erp-primary-softer)',
             rowSelectedHoverBg: 'var(--erp-primary-soft)',
             rowHoverBg: 'var(--erp-surface-bg-soft)',
@@ -145,13 +144,20 @@ function ThemedApp() {
           controlHeightSM: 28,
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
-          colorBgLayout: isDark ? '#111713' : '#f2f5f3',
-          colorBgContainer: isDark ? '#18201b' : '#ffffff',
-          colorBgElevated: isDark ? '#1d2721' : '#ffffff',
-          colorBorder: isDark ? '#314039' : '#dce4df',
-          colorBorderSecondary: isDark ? '#314039' : '#dce4df',
-          colorText: isDark ? '#edf4ef' : '#1f2a24',
-          colorTextSecondary: isDark ? '#bdc9c0' : '#4d5d53',
+          colorBgBase: isDark ? ERP_DARK_PALETTE.page : '#ffffff',
+          colorBgLayout: isDark ? ERP_DARK_PALETTE.page : '#f2f5f3',
+          colorBgContainer: isDark ? ERP_DARK_PALETTE.surface : '#ffffff',
+          colorBgElevated: isDark
+            ? ERP_DARK_PALETTE.surfaceRaised
+            : '#ffffff',
+          colorBorder: isDark ? ERP_DARK_PALETTE.border : '#dce4df',
+          colorBorderSecondary: isDark
+            ? ERP_DARK_PALETTE.border
+            : '#dce4df',
+          colorText: isDark ? ERP_DARK_PALETTE.text : '#1f2a24',
+          colorTextSecondary: isDark
+            ? ERP_DARK_PALETTE.textMuted
+            : '#4d5d53',
         },
       }}
     >

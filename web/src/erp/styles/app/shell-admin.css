@@ -95,7 +95,7 @@
 
 .erp-admin-sider,
 .erp-admin-drawer .ant-drawer-body {
-  background: var(--erp-surface-bg);
+  background: var(--erp-shell-bg);
 }
 
 .erp-admin-sider {
@@ -394,7 +394,7 @@
   height: var(--erp-topbar-height);
   flex: 0 0 var(--erp-topbar-height);
   border-bottom: 1px solid var(--erp-border);
-  background: var(--erp-surface-bg);
+  background: var(--erp-shell-bg);
   line-height: normal;
   padding: 0 14px;
 }

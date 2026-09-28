@@ -33,9 +33,11 @@ export function isDarkNeutralBorderColor(color) {
   const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
   if (!match) return false
   const [, red, green, blue] = match.map(Number)
+  const channelSpread = Math.max(red, green, blue) - Math.min(red, green, blue)
   return (
     (red === 49 && green === 64 && blue === 57) ||
     (red === 80 && green === 97 && blue === 88) ||
+    (red >= 36 && green >= 40 && blue >= 44 && channelSpread <= 24) ||
     (red >= 45 && green >= 55 && blue >= 70 && blue >= red)
   )
 }
@@ -186,10 +188,11 @@ export function getContrastRatio(foreground, background) {
 
 export function parseRgb(value) {
   const hex = String(value || '').match(/^#([0-9a-f]{6})$/i)
-  if (hex)
+  if (hex) {
     return [0, 2, 4].map((offset) =>
       parseInt(hex[1].slice(offset, offset + 2), 16)
     )
+  }
   const srgb = String(value || '').match(
     /^color\(srgb\s+([.\d]+)\s+([.\d]+)\s+([.\d]+)/
   )

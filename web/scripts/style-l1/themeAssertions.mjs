@@ -1,5 +1,5 @@
-import { assertNoHorizontalOverflow } from './pageAssertions.mjs'
 import assert from 'node:assert/strict'
+import { assertNoHorizontalOverflow } from './pageAssertions.mjs'
 import {
   assertReadableOnDark,
   getContrastRatio,
@@ -11,6 +11,7 @@ import {
   isTransparentColor,
   parseRgb,
 } from './colorAssertions.mjs'
+import { ERP_DARK_PALETTE } from '../../src/common/theme/erpThemePalette.mjs'
 
 async function assertERPThemeMode(
   page,
@@ -21,6 +22,23 @@ async function assertERPThemeMode(
     effectiveTheme: document.documentElement.dataset.erpTheme || '',
     colorScheme: document.documentElement.style.colorScheme || '',
     storedMode: window.localStorage.getItem('plush_erp_theme_mode') || '',
+    palette: {
+      page: getComputedStyle(document.documentElement)
+        .getPropertyValue('--erp-page-bg')
+        .trim(),
+      shell: getComputedStyle(document.documentElement)
+        .getPropertyValue('--erp-shell-bg')
+        .trim(),
+      surface: getComputedStyle(document.documentElement)
+        .getPropertyValue('--erp-surface-bg')
+        .trim(),
+      raised: getComputedStyle(document.documentElement)
+        .getPropertyValue('--erp-surface-raised')
+        .trim(),
+      soft: getComputedStyle(document.documentElement)
+        .getPropertyValue('--erp-surface-bg-soft')
+        .trim(),
+    },
   }))
 
   assert.equal(
@@ -42,6 +60,19 @@ async function assertERPThemeMode(
     expectedMode === 'system' || metrics.storedMode === expectedMode,
     `${scenarioName} 手动主题未持久化: ${JSON.stringify(metrics)}`
   )
+  if (expectedEffectiveTheme === 'dark') {
+    assert.deepEqual(
+      metrics.palette,
+      {
+        page: ERP_DARK_PALETTE.page,
+        shell: ERP_DARK_PALETTE.shell,
+        surface: ERP_DARK_PALETTE.surface,
+        raised: ERP_DARK_PALETTE.surfaceRaised,
+        soft: ERP_DARK_PALETTE.surfaceSoft,
+      },
+      `${scenarioName} 未使用统一黑色暗色调色板`
+    )
+  }
 }
 
 async function assertDevPageUsesGlobalThemeOnly(

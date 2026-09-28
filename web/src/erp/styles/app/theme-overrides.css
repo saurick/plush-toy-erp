@@ -5,7 +5,7 @@
     gap: 6px;
   }
 
-  .erp-business-date-range-filter__range > span {
+  .erp-business-date-range-filter__separator {
     display: none;
   }
 
@@ -16,24 +16,25 @@
 
 /* stylelint-disable no-descending-specificity -- dark theme overrides must win over the existing light-theme component rules. */
 [data-erp-theme='dark'] {
-  --erp-surface-bg: #18201b;
-  --erp-surface-bg-soft: #202b24;
-  --erp-surface-bg-muted: #202b24;
-  --erp-surface-raised: #1d2721;
-  --erp-page-bg: #111713;
-  --erp-border: #314039;
-  --erp-border-strong: #506158;
+  --erp-page-bg: #050607;
+  --erp-shell-bg: #080a0c;
+  --erp-surface-bg: #0d1013;
+  --erp-surface-bg-soft: #151a1f;
+  --erp-surface-bg-muted: #151a1f;
+  --erp-surface-raised: #121619;
+  --erp-border: #2a3138;
+  --erp-border-strong: #3b4650;
   --erp-modal-mask: rgb(2 6 23 / 0.72);
-  --erp-modal-bg: #18201b;
-  --erp-modal-bg-soft: #1d2721;
-  --erp-modal-bg-elevated: #202b24;
+  --erp-modal-bg: var(--erp-surface-bg);
+  --erp-modal-bg-soft: var(--erp-surface-raised);
+  --erp-modal-bg-elevated: var(--erp-surface-bg-soft);
   --erp-modal-border: rgb(203 213 225 / 0.7);
   --erp-modal-divider: rgb(71 85 105 / 0.82);
   --erp-modal-shadow:
     0 28px 90px rgb(0 0 0 / 0.58), 0 0 0 1px rgb(148 163 184 / 0.16);
-  --erp-text: #edf4ef;
-  --erp-text-muted: #bdc9c0;
-  --erp-text-subtle: #a3b2a8;
+  --erp-text: #f4f7fa;
+  --erp-text-muted: #a7b0b9;
+  --erp-text-subtle: #7f8993;
   --erp-primary: var(--erp-accent-dark);
   --erp-primary-strong: var(--erp-accent-dark);
   --erp-primary-soft: color-mix(
@@ -41,20 +42,20 @@
     var(--erp-accent) 20%,
     var(--erp-surface-bg)
   );
-  --erp-interactive-border-hover: #64748b;
+  --erp-interactive-border-hover: var(--erp-border-strong);
   --erp-interactive-border-focus: var(--erp-accent-dark);
   --erp-interactive-bg-hover: var(--erp-primary-softer);
   --erp-interactive-bg-active: var(--erp-primary-soft);
-  --erp-interactive-text-hover: #e5edf5;
+  --erp-interactive-text-hover: var(--erp-text);
   --erp-focus-ring: color-mix(in srgb, var(--erp-accent-dark) 22%, transparent);
   --erp-warning-bg: #2a2110;
   --erp-warning-border: #8a6b24;
   --erp-warning-text: #f5c96b;
   --erp-visual-danger-text: #fda4af;
-  --erp-theme-toggle-bg: rgb(15 23 42 / 0.72);
-  --erp-theme-toggle-border: #3a5265;
-  --erp-theme-toggle-selected-bg: #123123;
-  --erp-theme-toggle-selected-text: #d1fae5;
+  --erp-theme-toggle-bg: var(--erp-surface-raised);
+  --erp-theme-toggle-border: var(--erp-border-strong);
+  --erp-theme-toggle-selected-bg: var(--erp-primary-soft);
+  --erp-theme-toggle-selected-text: var(--erp-primary-strong);
 }
 
 [data-erp-theme='dark'] body {
@@ -68,7 +69,7 @@
 
 [data-erp-theme='dark'] .erp-admin-sider,
 [data-erp-theme='dark'] .erp-admin-drawer .ant-drawer-body {
-  background: var(--erp-surface-bg);
+  background: var(--erp-shell-bg);
 }
 
 [data-erp-theme='dark'] .erp-admin-sider {
@@ -78,7 +79,7 @@
 
 [data-erp-theme='dark'] .erp-admin-brand,
 [data-erp-theme='dark'] .erp-admin-header {
-  background: var(--erp-surface-bg);
+  background: var(--erp-shell-bg);
 }
 
 [data-erp-theme='dark'] .erp-admin-brand__logo-mark {
@@ -134,7 +135,7 @@
 }
 
 [data-erp-theme='dark'] .erp-admin-menu.ant-menu .ant-menu-item-selected {
-  background: #203047;
+  background: var(--erp-primary-soft);
   color: var(--erp-primary-strong);
 }
 
@@ -242,7 +243,7 @@
   border-color: var(--erp-primary-strong);
   color: var(--erp-primary-strong);
   --erp-workbench-queue-count-bg: var(--erp-primary-strong);
-  --erp-workbench-queue-count-color: #111713;
+  --erp-workbench-queue-count-color: var(--erp-on-accent);
 }
 
 [data-erp-theme='dark'] .erp-workbench-queue-filter--danger {
@@ -433,7 +434,12 @@
 [data-erp-theme='dark'] .app-shell > div:first-child {
   background:
     linear-gradient(rgb(15 23 42 / 0.82), rgb(15 23 42 / 0.82)),
-    linear-gradient(155deg, #12213a 0%, #111713 52%, #1d2721 100%);
+    linear-gradient(
+      155deg,
+      var(--erp-surface-raised) 0%,
+      var(--erp-page-bg) 52%,
+      var(--erp-surface-bg) 100%
+    );
 }
 
 [data-erp-theme='dark'] .ant-card,
@@ -471,7 +477,7 @@
 [data-erp-theme='dark'] .ant-picker,
 [data-erp-theme='dark'] .ant-select-selector,
 [data-erp-theme='dark'] .ant-input-number-input {
-  background: #111713;
+  background: var(--erp-page-bg);
   color: var(--erp-text);
 }
 
@@ -622,7 +628,7 @@
   --erp-business-action-modal-bg: var(--erp-modal-bg);
   --erp-business-action-modal-border: var(--erp-modal-border);
   --erp-business-action-modal-divider: var(--erp-modal-divider);
-  --erp-business-action-field-bg: #111713;
+  --erp-business-action-field-bg: var(--erp-page-bg);
   --erp-business-action-field-border: var(--erp-border-strong);
   --erp-line-items-accent: var(--erp-primary);
   --erp-line-items-import-bg: rgb(15 23 42 / 72%);
@@ -677,7 +683,7 @@
 [data-erp-theme='dark'] .ant-modal .ant-modal-footer {
   border-top: 1px solid var(--erp-modal-divider);
   background: var(--erp-modal-bg);
-  padding: 14px 22px 18px;
+  padding: 16px 22px;
   margin: 0;
 }
 
@@ -816,7 +822,7 @@
 }
 
 [data-erp-theme='dark'] .erp-business-action-modal__title small,
-[data-erp-theme='dark'] .erp-business-date-range-filter__range > span,
+[data-erp-theme='dark'] .erp-business-date-range-filter__separator,
 [data-erp-theme='dark'] .erp-business-status-transition-option span,
 [data-erp-theme='dark'] .erp-business-module-task-item span,
 [data-erp-theme='dark'] .erp-business-filter-panel__summary,
@@ -856,7 +862,7 @@
   :where(.ant-input-affix-wrapper),
 [data-erp-theme='dark'] :where(.erp-business-action-form) .ant-select-selector {
   border-color: var(--erp-border-strong);
-  background: #111713;
+  background: var(--erp-page-bg);
   color: var(--erp-text);
 }
 
@@ -955,7 +961,6 @@
 [data-erp-theme='dark']
   :where(.erp-business-filter-control.ant-select)
   .ant-select-selector,
-[data-erp-theme='dark'] .erp-business-date-range-filter,
 [data-erp-theme='dark']
   :where(.erp-business-date-range-filter__type.ant-select)
   .ant-select-selector,
@@ -965,18 +970,12 @@
   .erp-business-date-input.ant-picker,
 [data-erp-theme='dark'] .erp-business-date-input.ant-picker {
   border-color: var(--erp-border-strong);
-  background: #111713;
+  background: var(--erp-page-bg);
   color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-business-date-range-filter--invalid {
-  border-color: #ff7875;
-}
-
-[data-erp-theme='dark']
-  .erp-business-date-range-filter
-  .erp-business-date-input.ant-picker {
-  border-color: transparent;
+  --erp-business-control-border: #ff7875;
 }
 
 [data-erp-theme='dark'] .erp-business-date-input .ant-picker-input > input,
@@ -984,8 +983,10 @@
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-business-date-range-filter__divider {
-  background: var(--erp-border-strong);
+[data-erp-theme='dark']
+  .erp-business-date-range-filter--invalid
+  .erp-business-date-range-filter__separator {
+  color: #ff7875;
 }
 
 [data-erp-theme='dark'] .erp-business-module-select-popup.ant-select-dropdown {
@@ -999,7 +1000,7 @@
 [data-erp-theme='dark'] .erp-business-entry-form,
 [data-erp-theme='dark'] .erp-permission-modal,
 [data-erp-theme='dark'] .erp-business-status-reason-modal {
-  --erp-modal-control-background: #111713;
+  --erp-modal-control-background: var(--erp-page-bg);
   --erp-modal-control-border: var(--erp-border-strong);
   --erp-modal-control-hover: var(--erp-interactive-border-hover);
   color: var(--erp-text);
@@ -1010,7 +1011,7 @@
   .ant-input-number-affix-wrapper,
 [data-erp-theme='dark'] .erp-business-entry-form__add-item-button.ant-btn {
   border-color: var(--erp-border-strong);
-  background: #111713;
+  background: var(--erp-page-bg);
   color: var(--erp-text);
 }
 
@@ -1057,7 +1058,7 @@
 
 [data-erp-theme='dark'] .erp-print-center-template-btn:disabled {
   color: var(--erp-text-muted);
-  background: #18201b;
+  background: var(--erp-surface-bg);
 }
 
 [data-erp-theme='dark'] .erp-print-center-paper-preview,
