@@ -87,18 +87,19 @@ type BusinessProgressBoard struct {
 // Detail records contain navigation context only; editable documents remain on
 // their domain pages. Sections are independently bounded and report truncation.
 type BusinessProgressRecord struct {
-	ID       int    `json:"id"`
-	Kind     string `json:"kind"`
-	Number   string `json:"number"`
-	Label    string `json:"label"`
-	Status   string `json:"status"`
-	Quantity string `json:"quantity"`
-	Unit     string `json:"unit"`
-	Date     string `json:"date"`
-	Owner    string `json:"owner"`
-	Role     string `json:"role"`
-	Note     string `json:"note"`
-	ParentID int    `json:"parent_id"`
+	ID        int    `json:"id"`
+	Kind      string `json:"kind"`
+	Number    string `json:"number"`
+	Label     string `json:"label"`
+	Status    string `json:"status"`
+	Quantity  string `json:"quantity"`
+	Unit      string `json:"unit"`
+	Date      string `json:"date"`
+	Owner     string `json:"owner"`
+	Role      string `json:"role"`
+	Note      string `json:"note"`
+	ProductID int    `json:"product_id"`
+	ParentID  int    `json:"parent_id"`
 }
 
 type BusinessProgressDetail struct {

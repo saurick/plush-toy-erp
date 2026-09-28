@@ -30,7 +30,7 @@ func TestBusinessDocumentSearchPostgresProgress(t *testing.T) {
 	}
 	q.ID = so.ID
 	detail, err := uc.Detail(ctx, q)
-	if err != nil || len(detail.Sections["production"]) != 1 || len(detail.Sections["tasks"]) != 1 || detail.Sections["lines"][0].Date != "2026-09-24" {
+	if err != nil || len(detail.Sections["production"]) != 1 || len(detail.Sections["tasks"]) != 1 || detail.Sections["lines"][0].Date != "2026-09-24" || detail.Sections["lines"][0].ProductID != product.ID {
 		t.Fatalf("detail=%+v err=%v", detail, err)
 	}
 	q.ID = 0

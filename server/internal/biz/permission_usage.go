@@ -352,7 +352,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	)
 	workflowTaskCreateSurfaces := []PermissionUsageSurface{}
 	for _, pageKey := range []string{"sales-orders", "accessories-purchase", "processing-contracts", "production-orders", "shipments"} {
-		workflowTaskCreateSurfaces = append(workflowTaskCreateSurfaces, menuPermissionSurface(pageKey, "record-tasks", "单据任务", "create-followup", "发起任务", permissionControlButton, "显示并允许从当前单据发起任务", permissionMethods("workflow", "get_task_create_options", "create_followup_task"), workflowUsageConditions))
+		workflowTaskCreateSurfaces = append(workflowTaskCreateSurfaces, menuPermissionSurface(pageKey, "record-tasks", "单据任务", "create-followup", "新建跟进任务", permissionControlButton, "显示并允许从当前单据新建跟进任务", permissionMethods("workflow", "get_task_create_options", "create_followup_task"), workflowUsageConditions))
 		workflowTaskReadSurfaces = append(workflowTaskReadSurfaces, menuPermissionSurface(pageKey, "record-tasks", "单据任务", "related-tasks", "相关任务", permissionControlButton, "允许查看当前单据的可见任务", permissionMethods("workflow", "get_task_create_options", "list_tasks", "get_task", "list_task_events"), workflowUsageConditions))
 	}
 	add(PermissionWorkflowTaskCreate, workflowTaskCreateSurfaces...)

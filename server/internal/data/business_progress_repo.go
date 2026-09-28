@@ -152,7 +152,7 @@ func (r *businessProgressRepo) GetBusinessProgress(ctx context.Context, q biz.Bu
 			for records.Next() {
 				var x biz.BusinessProgressRecord
 				var number, label, status, quantity, unit, date, owner, role, note stdsql.NullString
-				err = records.Scan(&x.ID, &x.Kind, &number, &label, &status, &quantity, &unit, &date, &owner, &role, &note, &x.ParentID)
+				err = records.Scan(&x.ID, &x.Kind, &number, &label, &status, &quantity, &unit, &date, &owner, &role, &note, &x.ProductID, &x.ParentID)
 				if err != nil {
 					return errors.Join(err, records.Close())
 				}
@@ -182,7 +182,7 @@ func progressDetailQueries(q biz.BusinessProgressQuery, id, sqlDialect string) m
 		queries["lines"] = `SELECT l.id,'sales_line',CAST(l.line_no AS TEXT),l.product_label,l.engineering_status,
  CAST(l.ordered_quantity AS TEXT),l.unit_name,` + progressDateSQL("l.due_at", sqlDialect) + `,'','',
  CASE WHEN EXISTS(SELECT 1 FROM shipment_mismatch m WHERE m.order_id=l.sales_order_id) THEN '出货关联待核对'
- ELSE '已出货 ' || CAST(l.shipped_quantity AS TEXT) END,l.sales_order_id FROM sales_lines l
+ ELSE '已出货 ' || CAST(l.shipped_quantity AS TEXT) END,COALESCE(l.product_id,0),l.sales_order_id FROM sales_lines l
  WHERE l.sales_order_id=` + id + " ORDER BY l.line_no,l.id"
 	} else {
 		linkedNote := "'已关联销售明细'"
@@ -191,7 +191,7 @@ func progressDetailQueries(q biz.BusinessProgressQuery, id, sqlDialect string) m
 		}
 		queries["lines"] = `SELECT i.id,'production_line',CAST(i.line_no AS TEXT),COALESCE(NULLIF(i.product_name_snapshot,''),p.name),'',
  CAST(i.planned_quantity AS TEXT),COALESCE(NULLIF(i.unit_name_snapshot,''),u.name),'','','',
- CASE WHEN i.sales_order_item_id IS NULL THEN '未关联销售订单' ELSE ` + linkedNote + ` END,i.production_order_id
+ CASE WHEN i.sales_order_item_id IS NULL THEN '未关联销售订单' ELSE ` + linkedNote + ` END,i.product_id,i.production_order_id
  FROM production_order_items i JOIN products p ON p.id=i.product_id JOIN units u ON u.id=i.unit_id
  WHERE i.production_order_id=` + id + " ORDER BY i.line_no,i.id"
 	}
@@ -201,16 +201,16 @@ func progressDetailQueries(q biz.BusinessProgressQuery, id, sqlDialect string) m
 			productionCondition = "EXISTS(SELECT 1 FROM production_order_items i JOIN sales_order_items s ON s.id=i.sales_order_item_id WHERE i.production_order_id=p.id AND s.sales_order_id=" + id + ")"
 		}
 		queries["production"] = `SELECT p.id,'production',p.order_no,'',p.status,'','',` + progressDateSQL("p.planned_end_at", sqlDialect) + `,'','',
- COALESCE(p.close_reason,p.cancel_reason,''),p.id FROM production_orders p WHERE ` + productionCondition + " ORDER BY p.id DESC"
+ COALESCE(p.close_reason,p.cancel_reason,''),0,p.id FROM production_orders p WHERE ` + productionCondition + " ORDER BY p.id DESC"
 		queries["batches"] = `SELECT b.id,'batch',b.batch_no,o.process_name_snapshot,b.status,CAST(b.quantity AS TEXT),
- w.unit_name_snapshot,` + progressDateSQL("b.updated_at", sqlDialect) + `,'','',COALESCE(b.rework_reason,''),b.production_order_id
+ w.unit_name_snapshot,` + progressDateSQL("b.updated_at", sqlDialect) + `,'','',COALESCE(b.rework_reason,''),w.product_id,b.production_order_id
  FROM production_wip_batches b JOIN work_lines w ON w.id=b.production_order_item_id
  JOIN production_order_operations o ON o.id=b.production_order_operation_id
  WHERE w.board_id=` + id + ` AND b.status NOT IN ('SPLIT','CANCELLED')
  ORDER BY CASE WHEN b.status IN ('REJECTED','WAITING_QUALITY') THEN 0 WHEN b.status IN ('IN_PROGRESS','OUTSOURCED') THEN 1 ELSE 2 END,o.step_no,b.id`
 		queries["materials"] = `SELECT m.id,'material',m.material_code_snapshot,m.material_name_snapshot,
  CASE WHEN COALESCE(i.quantity,0)<m.planned_quantity THEN 'PENDING' ELSE 'ISSUED' END,
- CAST(m.planned_quantity AS TEXT),m.unit_name_snapshot,'','','','已领 ' || CAST(COALESCE(i.quantity,0) AS TEXT),m.production_order_id
+ CAST(m.planned_quantity AS TEXT),m.unit_name_snapshot,'','','','已领 ' || CAST(COALESCE(i.quantity,0) AS TEXT),0,m.production_order_id
  FROM production_order_material_requirements m JOIN work_lines w ON w.id=m.production_order_item_id
  LEFT JOIN issued i ON i.source_line_id=m.id WHERE w.board_id=` + id + " ORDER BY CASE WHEN COALESCE(i.quantity,0)<m.planned_quantity THEN 0 ELSE 1 END,m.id"
 	}
@@ -219,7 +219,7 @@ func progressDetailQueries(q biz.BusinessProgressQuery, id, sqlDialect string) m
 	}
 	if q.Access.Tasks {
 		queries["tasks"] = `SELECT id,'task',task_code,task_name,task_status_key,'','',` + progressDateSQL("due_at", sqlDialect) + `,
- assignee_name,owner_role_key,COALESCE(blocked_reason,''),source_id FROM task_rows WHERE view_key='` + q.View + "' AND board_id=" + id + " ORDER BY attention_rank"
+ assignee_name,owner_role_key,COALESCE(blocked_reason,''),0,source_id FROM task_rows WHERE view_key='` + q.View + "' AND board_id=" + id + " ORDER BY attention_rank"
 	}
 	return queries
 }

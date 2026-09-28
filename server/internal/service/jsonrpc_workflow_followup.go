@@ -21,7 +21,7 @@ func followupSourceParams(pm map[string]any) (string, int, bool) {
 func (d *jsonrpcDispatcher) requireFollowupSourceAccess(ctx context.Context, sourceType string) *v1.JsonrpcResult {
 	spec, ok := biz.WorkflowFollowupSourceSpecFor(sourceType)
 	if !ok {
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前单据暂不支持发起任务"}
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前单据暂不支持新建跟进任务"}
 	}
 	if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 		return res
@@ -103,9 +103,9 @@ func (d *jsonrpcDispatcher) handleWorkflowFollowup(ctx context.Context, method, 
 		reason := ""
 		roles := []any{}
 		if !canCreate {
-			reason = "当前账号没有发起任务权限"
+			reason = "当前账号没有新建跟进任务权限"
 		} else if !allowed {
-			reason = "当前单据已结束，不能再发起任务；已有任务仍可查看"
+			reason = "当前单据已结束，不能再新建跟进任务；已有任务仍可查看"
 		}
 		if allowed {
 			roles, _, err = d.workflowFollowupCandidates(ctx, source)
@@ -152,10 +152,10 @@ func (d *jsonrpcDispatcher) handleWorkflowFollowup(ctx context.Context, method, 
 	if replayed, found, replayErr := d.workflowUC.ResolveFollowupCreate(ctx, input, actorID); replayErr != nil {
 		return id, d.mapWorkflowError(ctx, replayErr), nil
 	} else if found {
-		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "任务已发起", Data: newDataStruct(map[string]any{"task": workflowTaskToMap(replayed)})}, nil
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "跟进任务已创建", Data: newDataStruct(map[string]any{"task": workflowTaskToMap(replayed)})}, nil
 	}
 	if !spec.CanCreate(source.Status) {
-		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前单据已结束，不能再发起任务"}, nil
+		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前单据已结束，不能再新建跟进任务"}, nil
 	}
 	if !dueAt.After(time.Now()) {
 		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "截止时间须晚于当前时间"}, nil
@@ -178,5 +178,5 @@ func (d *jsonrpcDispatcher) handleWorkflowFollowup(ctx context.Context, method, 
 	if err != nil {
 		return id, d.mapWorkflowError(ctx, err), nil
 	}
-	return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "任务已发起", Data: newDataStruct(map[string]any{"task": workflowTaskToMap(task)})}, nil
+	return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "跟进任务已创建", Data: newDataStruct(map[string]any{"task": workflowTaskToMap(task)})}, nil
 }

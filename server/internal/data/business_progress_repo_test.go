@@ -101,7 +101,7 @@ func TestBusinessProgressPaginationFactsAndVisibility(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(detail.Sections["lines"]) != 1 || len(detail.Sections["tasks"]) != 1 || detail.Sections["lines"][0].Note != "已出货 6" {
+	if len(detail.Sections["lines"]) != 1 || len(detail.Sections["tasks"]) != 1 || detail.Sections["lines"][0].Note != "已出货 6" || detail.Sections["lines"][0].ProductID != f.productID {
 		t.Fatalf("detail=%+v", detail)
 	}
 	q.ID = 0
@@ -160,7 +160,7 @@ func TestBusinessProgressMixedUnitsAndIndependentProduction(t *testing.T) {
 	f.client.ProductionOrderItem.Create().SetProductionOrderID(closed.ID).SetLineNo(2).SetProductID(f.productID).SetUnitID(f.unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SetSalesOrderItemID(otherSalesLine.ID).SaveX(ctx)
 	q.Access.Sales = true
 	detail, err = uc.Detail(ctx, q)
-	if err != nil || detail.Row.Customer != "多客户 · 查看明细" || len(detail.Sections["lines"]) != 2 || !strings.Contains(detail.Sections["lines"][1].Note, otherSales.OrderNo) {
+	if err != nil || detail.Row.Customer != "多客户 · 查看明细" || len(detail.Sections["lines"]) != 2 || detail.Sections["lines"][0].ProductID != f.productID || !strings.Contains(detail.Sections["lines"][1].Note, otherSales.OrderNo) {
 		t.Fatalf("multi-customer=%+v err=%v", detail, err)
 	}
 	q.ID = 0
