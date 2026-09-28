@@ -62,6 +62,7 @@ const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/readiness";
 const MOBILE_TASK_TOTAL = 180;
 const MOBILE_TASKS_PER_ROLE = 20;
 const QUERY_LIMIT = 200;
+const QUERY_MAX_PAGES = 100;
 const BUSINESS_DASHBOARD_PROJECTION_PROBE_ID = "business-progress";
 const RUNTIME_PREFLIGHT_USERNAME = "admin";
 const SOURCE_DRIVEN_FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
@@ -2409,7 +2410,7 @@ async function rpcCall({
 
 async function readProbeData({ backendURL, probe, token, fetchImpl }) {
   if (probe.batchEvidence !== "exact_references") {
-    return rpcCall({
+    const firstPage = await rpcCall({
       backendURL,
       domain: probe.domain,
       method: probe.method,
@@ -2418,6 +2419,73 @@ async function readProbeData({ backendURL, probe, token, fetchImpl }) {
       token,
       fetchImpl,
     });
+    if (probe.batchEvidence !== "prefix_filtered") return firstPage;
+
+    const firstItems = firstPage?.[probe.listKey];
+    const total = positiveInteger(firstPage?.total);
+    const initialOffset = positiveInteger(probe.params?.offset) ?? 0;
+    const limit =
+      positiveInteger(firstPage?.limit) ??
+      positiveInteger(probe.params?.limit);
+    if (
+      !Array.isArray(firstItems) ||
+      total == null ||
+      firstItems.length >= total
+    ) {
+      return firstPage;
+    }
+    if (initialOffset !== 0 || !limit || firstItems.length === 0) {
+      throw new Error(
+        `${probe.domain}.${probe.method} 返回 ${firstItems.length}/${total} 条，但缺少可继续读取的分页信息`,
+      );
+    }
+
+    const items = [...firstItems];
+    let offset = initialOffset + firstItems.length;
+    let pageCount = 1;
+    while (items.length < total) {
+      if (pageCount >= QUERY_MAX_PAGES) {
+        throw new Error(
+          `${probe.domain}.${probe.method} 超过 ${QUERY_MAX_PAGES} 页仍未读完 ${total} 条记录`,
+        );
+      }
+      const page = await rpcCall({
+        backendURL,
+        domain: probe.domain,
+        method: probe.method,
+        params: { ...probe.params, limit, offset },
+        includeCustomerKey: probe.includeCustomerKey !== false,
+        token,
+        fetchImpl,
+      });
+      const pageItems = page?.[probe.listKey];
+      const pageTotal = positiveInteger(page?.total);
+      if (!Array.isArray(pageItems)) {
+        throw new Error(
+          `${probe.domain}.${probe.method} 第 ${pageCount + 1} 页缺少 ${probe.listKey}`,
+        );
+      }
+      if (pageTotal !== total) {
+        throw new Error(
+          `${probe.domain}.${probe.method} 分页读取期间总数由 ${total} 变为 ${pageTotal ?? "未知"}`,
+        );
+      }
+      if (pageItems.length === 0) {
+        throw new Error(
+          `${probe.domain}.${probe.method} 在 ${items.length}/${total} 条处提前结束`,
+        );
+      }
+      items.push(...pageItems);
+      offset += pageItems.length;
+      pageCount += 1;
+    }
+    return {
+      ...firstPage,
+      [probe.listKey]: items,
+      total,
+      limit,
+      offset: initialOffset,
+    };
   }
   const queries = [
     ...new Map(

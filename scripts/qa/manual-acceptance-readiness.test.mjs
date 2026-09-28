@@ -1254,6 +1254,22 @@ function createReadinessFetch(runtimeOptions = {}) {
       });
       return okResponse({ [listKey]: filtered, total: filtered.length });
     }
+    if (
+      body.method === "list_purchase_orders" &&
+      Array.isArray(runtimeOptions.purchaseOrderRecords)
+    ) {
+      const offset = Number(body.params.offset || 0);
+      const limit = Number(body.params.limit || 50);
+      return okResponse({
+        purchase_orders: runtimeOptions.purchaseOrderRecords.slice(
+          offset,
+          offset + limit,
+        ),
+        total: runtimeOptions.purchaseOrderRecords.length,
+        limit,
+        offset,
+      });
+    }
     const spec = listSpecs[body.method];
     assert(spec, `unexpected read method ${body.method}`);
     const [
@@ -2325,6 +2341,60 @@ test("explicit verification reports page data, nine role totals, and honest manu
         method,
       ),
     ),
+  );
+});
+
+test("prefix-filtered readiness reads every API page before counting the current batch", async () => {
+  const source = sourceReport();
+  const currentBatch = records(
+    45,
+    "lifecycle_status",
+    ["DRAFT", "SUBMITTED", "APPROVED", "CLOSED", "CANCELED"],
+    "purchase_order_no",
+    source.prefix,
+  );
+  const deferred = currentBatch.filter(
+    (item) => item.lifecycle_status !== "CANCELED",
+  ).slice(0, 4);
+  const deferredIDs = new Set(deferred.map((item) => item.id));
+  const firstPageBatch = currentBatch.filter(
+    (item) => !deferredIDs.has(item.id),
+  );
+  const historical = records(
+    159,
+    "lifecycle_status",
+    ["DRAFT"],
+    "purchase_order_no",
+    "OLD",
+  ).map((item, index) => ({ ...item, id: 10_000 + index }));
+  const plan = buildManualAcceptanceReadinessPlan({
+    sourceReport: source,
+    factReport: factReport(),
+    taskReport: taskReport(),
+  });
+  const { fetchImpl, calls } = createReadinessFetch({
+    purchaseOrderRecords: [...firstPageBatch, ...historical, ...deferred],
+  });
+
+  const report = await verifyManualAcceptanceReadiness(
+    plan,
+    localVerificationOptions({
+      password: "local-demo-password",
+      adminPassword: "local-admin-password",
+      fetchImpl,
+      now: () => new Date("2026-07-11T10:00:00.000Z"),
+    }),
+  );
+
+  const probe = report.probes.find((item) => item.id === "purchase-orders");
+  assert.equal(probe.status, "pass", JSON.stringify(probe));
+  assert.equal(probe.actual, 45);
+  assert.equal(probe.responseReturned, 204);
+  assert.deepEqual(
+    calls
+      .filter((call) => call.method === "list_purchase_orders")
+      .map((call) => call.params.offset),
+    [0, 200],
   );
 });
 
