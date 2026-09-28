@@ -51,7 +51,7 @@ pnpm install
 | 重新加载本工作区服务 | `pnpm restart` / `pnpm start:restart`，先预检并核对进程归属 |
 | 独立前端验证 | `pnpm start:isolated`，自动选择辅助端口 |
 | 只调布局，不登录或调用 RPC | `pnpm start:frontend-only`，明确为降级模式 |
-| 客户热更新 / 静态预览 | `pnpm start:yoyoosun --print-plan` / `pnpm preview:yoyoosun --print-plan` |
+| 客户热更新 / 静态预览 | `pnpm start:yoyoosun --print-plan`（固定 `15200`）/ `pnpm preview:yoyoosun --print-plan` |
 | 重启客户开发入口 | `pnpm restart:yoyoosun`，固定重启 `15200`；可用 `--port` 指定辅助端口 |
 
 普通启动先只读检查 schema、migration 和后端 health / ready。可恢复的本机预检失败时保留 `/__dev/database-migration`，业务入口继续阻断；修正后重新通过完整检查才恢复，不自动 apply。完整启动、进程保护、端口审计及客户包核对见 [前端脚本](scripts/README.md#本地启动与进程范围)。

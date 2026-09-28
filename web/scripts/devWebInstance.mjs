@@ -179,7 +179,14 @@ export async function stopWebInstance(
 }
 
 export async function prepareWebInstance(
-  { port, projectRoot, signature, recoveryMode, restart },
+  {
+    port,
+    projectRoot,
+    signature,
+    recoveryMode,
+    restart,
+    restartCommand = 'pnpm start --local --restart',
+  },
   {
     available = canListenOnPort,
     readInstance = readWebInstance,
@@ -199,6 +206,6 @@ export async function prepareWebInstance(
     return { reused: true, pid: instance.pid }
   }
   throw new Error(
-    `端口 ${port} 已被占用，现有服务无法确认、启动配置不同或开发服务代码已更新。需要重新加载本工作区前端时执行 pnpm start --local --restart；临时验证使用 pnpm start --isolated。未停止任何服务`
+    `端口 ${port} 已被占用，现有服务无法确认、启动配置不同或开发服务代码已更新。需要重新加载本工作区前端时执行 ${restartCommand}。未停止任何服务`
   )
 }

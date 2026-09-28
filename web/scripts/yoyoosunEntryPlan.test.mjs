@@ -225,7 +225,7 @@ test('preview:yoyoosun print-plan describes static package injection without pub
   )
 })
 
-test('start:yoyoosun and preview:yoyoosun print-plan explain port fallback when requested port is occupied', async () => {
+test('start:yoyoosun keeps an occupied port; only static preview selects another port', async () => {
   const occupiedPort = await findConsecutiveFreePortPair()
   const server = net.createServer()
 
@@ -235,11 +235,8 @@ test('start:yoyoosun and preview:yoyoosun print-plan explain port fallback when 
   })
 
   try {
-    for (const [scriptName, label] of [
-      ['startYoyoosunDev.mjs', 'start-yoyoosun'],
-      ['previewYoyoosun.mjs', 'preview-yoyoosun'],
-    ]) {
-      const result = spawnSync(
+    const runAtOccupiedPort = (scriptName) =>
+      spawnSync(
         process.execPath,
         [
           path.join(webRoot, 'scripts', scriptName),
@@ -261,21 +258,22 @@ test('start:yoyoosun and preview:yoyoosun print-plan explain port fallback when 
         }
       )
 
-      assert.equal(result.status, 0, result.stderr)
-      assert.match(
-        result.stdout,
-        new RegExp(
-          `\\[${label}\\] requested port ${occupiedPort} is occupied; using ${
-            occupiedPort + 1
-          }`,
-          'u'
-        )
+    const start = runAtOccupiedPort('startYoyoosunDev.mjs')
+    assert.equal(start.status, 0, start.stderr)
+    assert.match(start.stdout, new RegExp(`\\[start-yoyoosun\\] port=${occupiedPort}\\n`, 'u'))
+    assert.match(start.stdout, /port policy=fixed; reuse a matching instance/u)
+    assert.doesNotMatch(start.stdout, /using 152\d+/u)
+
+    const preview = runAtOccupiedPort('previewYoyoosun.mjs')
+    assert.equal(preview.status, 0, preview.stderr)
+    assert.match(
+      preview.stdout,
+      new RegExp(
+        `\\[preview-yoyoosun\\] requested port ${occupiedPort} is occupied; using ${occupiedPort + 1}`,
+        'u'
       )
-      assert.doesNotMatch(
-        result.stdout,
-        new RegExp(`\\[${label}\\] port=${occupiedPort}`, 'u')
-      )
-    }
+    )
+    assert.equal(await canListenOnPort(occupiedPort), false)
   } finally {
     await new Promise((resolve) => server.close(resolve))
   }

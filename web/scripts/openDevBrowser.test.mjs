@@ -48,7 +48,7 @@ test('dev browser: 原生 Windows 使用系统 PowerShell', () => {
   )
 })
 
-test('dev browser: 显式 BROWSER 和非 Windows 环境保持原行为', () => {
+test('dev browser: 显式 BROWSER 优先，无桌面 Linux 只输出地址', () => {
   assert.deepEqual(
     resolveDevBrowserLaunchEnv(
       { BROWSER: 'none' },
@@ -63,6 +63,17 @@ test('dev browser: 显式 BROWSER 和非 Windows 环境保持原行为', () => {
   assert.deepEqual(
     resolveDevBrowserLaunchEnv(
       {},
+      {
+        fileExists: () => true,
+        platform: 'linux',
+        release: '6.8.0-generic',
+      }
+    ),
+    { BROWSER: 'none' }
+  )
+  assert.deepEqual(
+    resolveDevBrowserLaunchEnv(
+      { DISPLAY: ':0' },
       {
         fileExists: () => true,
         platform: 'linux',

@@ -6,7 +6,6 @@ import { pathToFileURL } from 'node:url'
 
 import { normalizeDevCustomerKey } from '../dev-server/devCustomerConfigPlugin.mjs'
 import { loadDevPorts, validateDevAuxPort } from '../../scripts/dev-ports.mjs'
-import { resolveAvailablePort } from './localPort.mjs'
 import { prepareWebInstance, webInstanceSignature } from './devWebInstance.mjs'
 import { normalizeAPIOrigin } from '../../scripts/local-runtime-preflight.mjs'
 import {
@@ -99,10 +98,6 @@ export function checkDevCustomerPackage(customer, projectRoot = repoRoot) {
 
 function printPlan(options) {
   const label = 'start-yoyoosun'
-  const portNote =
-    options.port === options.requestedPort
-      ? `[${label}] port=${options.port}`
-      : `[${label}] requested port ${options.requestedPort} is occupied; using ${options.port}`
   const verificationLines = [
     `[${label}] verify customer config: curl -fsS http://localhost:${options.port}/customer-config.js | grep 'customerKey: "${options.customer}"'`,
   ]
@@ -116,7 +111,8 @@ function printPlan(options) {
   process.stdout.write(
     [
       `[${label}] customer=${options.customer}`,
-      portNote,
+      `[${label}] port=${options.port}`,
+      `[${label}] port policy=fixed; reuse a matching instance or use pnpm restart:yoyoosun to replace it`,
       `[${label}] url=http://localhost:${options.port}/erp`,
       `[${label}] backend=${options.apiOrigin}`,
       `[${label}] preflight=${
@@ -168,13 +164,7 @@ async function main() {
     options.port,
     'start:yoyoosun port'
   )
-  options.requestedPort = String(requestedPort)
-  options.port = options.restart
-    ? String(requestedPort)
-    : await resolveAvailablePort(
-        requestedPort,
-        devPorts.auxStart + 100 - requestedPort
-      )
+  options.port = String(requestedPort)
 
   printPlan(options)
 
@@ -190,23 +180,49 @@ async function main() {
     customerKey: options.customer,
     viteArgs: [],
   })
+  const restartCommand =
+    options.port === String(devPorts.auxStart)
+      ? 'pnpm restart:yoyoosun'
+      : `pnpm start:yoyoosun --restart --port ${options.port}`
   const instance = await prepareWebInstance({
     ...startup,
     port: Number(options.port),
     projectRoot: repoRoot,
     signature: options.signature,
     restart: options.restart,
+    restartCommand,
   })
   if (instance.reused) {
     process.stdout.write(
-      `[start-yoyoosun] 已复用本工作区前端：${options.port}\n`
+      `[start-yoyoosun] 已复用本工作区前端（PID ${instance.pid}）：http://127.0.0.1:${options.port}/erp\n`
     )
     return
   }
   process.stdout.write(
     `[start-yoyoosun] 客户配置与公开资源预检通过：${options.customer}\n`
   )
-  process.exitCode = await runVite(options, startup)
+  const code = await runVite(options, startup)
+  // 同时启动时，只有一个 Vite 能占用固定端口；失败者复用已启动的同配置实例。
+  if (code === 1 && !options.restart) {
+    try {
+      const winner = await prepareWebInstance({
+        ...startup,
+        port: Number(options.port),
+        projectRoot: repoRoot,
+        signature: options.signature,
+        restart: false,
+      })
+      if (winner.reused) {
+        process.stdout.write(
+          `[start-yoyoosun] 已复用同时启动的本工作区前端（PID ${winner.pid}）：http://127.0.0.1:${options.port}/erp\n`
+        )
+        return
+      }
+    } catch {
+      // 保留 Vite 本次启动失败的退出码与诊断。
+    }
+  }
+  process.exitCode = code
 }
 
 const isDirectRun =

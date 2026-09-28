@@ -128,6 +128,14 @@ test('真实占用端口仅复用同配置服务，普通 HTTP/HTML、恢复状�
     /配置不同/u
   )
   await assert.rejects(
+    prepareWebInstance({
+      ...options,
+      signature: 'other',
+      restartCommand: 'pnpm restart:yoyoosun',
+    }),
+    /pnpm restart:yoyoosun。未停止任何服务/u
+  )
+  await assert.rejects(
     prepareWebInstance({ ...options, recoveryMode: 'database-migration' }),
     /配置不同/u
   )

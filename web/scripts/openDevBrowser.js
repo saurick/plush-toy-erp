@@ -302,6 +302,13 @@ export function resolveDevBrowserLaunchEnv(
 
   const powerShellPath = resolveWindowsPowerShellPath({ env, ...runtime })
   if (!powerShellPath) {
+    if (
+      (runtime.platform || process.platform) === 'linux' &&
+      !String(env.DISPLAY || '').trim() &&
+      !String(env.WAYLAND_DISPLAY || '').trim()
+    ) {
+      return { BROWSER: 'none' }
+    }
     return {}
   }
 
