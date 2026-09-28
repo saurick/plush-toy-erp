@@ -74,17 +74,17 @@ test("business code, seed, pages and private configuration invalidate evidence; 
     initial.fingerprint,
   );
   fs.writeFileSync(path.join(root, "web/src/page.jsx"), "candidate page");
-  assert.notEqual(
-    (await readRuntimeSource(root)).fingerprint,
-    initial.fingerprint,
-  );
   const page = await readRuntimeSource(root);
-  fs.writeFileSync(path.join(root, "server/seed.go"), "candidate quantities");
-  assert.notEqual(
-    (await readRuntimeSource(root)).fingerprint,
-    page.fingerprint,
+  assert.notEqual(page.fingerprint, initial.fingerprint);
+  assert.equal(
+    page.backendFingerprint,
+    initial.backendFingerprint,
+    "Vite serves frontend changes directly, so they do not invalidate a backend restart",
   );
+  fs.writeFileSync(path.join(root, "server/seed.go"), "candidate quantities");
   const seed = await readRuntimeSource(root);
+  assert.notEqual(seed.fingerprint, page.fingerprint);
+  assert.notEqual(seed.backendFingerprint, page.backendFingerprint);
   fs.mkdirSync(path.join(root, "scripts/build"), { recursive: true });
   fs.writeFileSync(
     path.join(root, "scripts/build/config.mjs"),
@@ -119,6 +119,15 @@ test("private runtime configuration is data, never an executable shell file", (t
   );
   fs.chmodSync(file, 0o644);
   assert.throws(() => readLocalRuntimeEnvironment(root, {}), /仅当前用户/u);
+});
+
+test("the implicit customer matches the make dev restart default", (t) => {
+  const root = fixture(t);
+  fs.mkdirSync(path.join(root, "server"), { recursive: true });
+  assert.deepEqual(
+    readLocalRuntimeEnvironment(root, {}),
+    readLocalRuntimeEnvironment(root, { ERP_CUSTOMER_KEY: "yoyoosun" }),
+  );
 });
 
 test("healthy responses alone cannot prove the expected runtime and database identity", async (t) => {

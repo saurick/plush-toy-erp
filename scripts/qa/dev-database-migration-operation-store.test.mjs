@@ -9,6 +9,7 @@ import {
   createOrReuseDatabaseMigrationOperation,
   listDatabaseMigrationOperations,
   publicDatabaseMigrationOperation,
+  readDatabaseMigrationExecutionLock,
   readDatabaseMigrationOperation,
   recoverInterruptedDatabaseMigrationOperations,
   releaseDatabaseMigrationExecutionLock,
@@ -110,6 +111,10 @@ test("database migration operation store is idempotent and serializes execution"
   assert.equal(second.operation.id, OPERATION_ID);
 
   acquireDatabaseMigrationExecutionLock(store, OPERATION_ID);
+  assert.equal(
+    readDatabaseMigrationExecutionLock(store).purpose,
+    "database-operation",
+  );
   assert.throws(
     () =>
       acquireDatabaseMigrationExecutionLock(
@@ -122,6 +127,26 @@ test("database migration operation store is idempotent and serializes execution"
     releaseDatabaseMigrationExecutionLock(store, OPERATION_ID),
     true,
   );
+});
+
+test("database migration execution lock records and validates its purpose", (t) => {
+  const store = createStore(t);
+  acquireDatabaseMigrationExecutionLock(store, OPERATION_ID, {
+    purpose: "workspace-runtime-restart",
+  });
+  const lock = readDatabaseMigrationExecutionLock(store);
+  assert.equal(lock.operationId, OPERATION_ID);
+  assert.equal(lock.purpose, "workspace-runtime-restart");
+  assert.throws(
+    () =>
+      acquireDatabaseMigrationExecutionLock(
+        store,
+        "22222222-2222-4222-8222-222222222222",
+        { purpose: "unsupported" },
+      ),
+    /purpose is invalid/u,
+  );
+  releaseDatabaseMigrationExecutionLock(store, OPERATION_ID);
 });
 
 test("database migration operation store recovers interrupted work without retry", (t) => {

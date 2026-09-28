@@ -39,7 +39,7 @@ make init
 make run
 ```
 
-`make run`、`make dev` 和 `make dev_restart` 先校验端口清单、当前工作区的迁移及禁止数据库可编程对象规则，再从当前代码构建新制品；构建通过后才停止旧后端，启动并验证新后端。预检、代码漂移或编译失败均保留原进程，不会把旧制品重启当作最新代码已启动。成功输出 `workspace-source` 内容摘要及 health / ready / business 结果。进程以后台方式运行，日志在 `output/dev-workbench/database-migration-runtime/`，停止使用 `make dev_stop`。首次使用先执行 `make dev_database_roles`；有待执行迁移时通过迁移页或 `make migrate` 完成检查、恢复演练及确认，启动入口不自动 apply。
+`make run`、`make dev` 和 `make dev_restart` 先校验端口清单、当前工作区的迁移及禁止数据库可编程对象规则，再从当前代码构建新制品；构建通过后才停止旧后端，启动并验证新后端。预检或编译失败均保留原进程，不会把旧制品重启当作最新代码已启动；构建或后端切换验证期间检测到后端代码、migration、端口或运行配置更新时，命令丢弃未激活候选或保留已验证候选继续服务，并有界重读、重建，持续多轮仍有写入才明确退出。前端开发页由 Vite 直接读取工作区并热更新，单纯页面改动不会再阻断后端重启；迁移准备仍固定并核对完整前后端候选。构建期间终端分阶段显示后端、附件、页面和候选核对进度；只有最终出现 `started ... health=passed ready=passed business=passed` 才表示本次重启完成，在此之前无需重复执行。成功输出还包含 `workspace-source`、`backend-source` 内容摘要。重复执行 `make dev_restart` 时，后发命令等待同类工作区重启完成，再重新核对并加载届时的当前后端工作区；数据库迁移或迁移页后端恢复仍会立即阻断本次重启。进程以后台方式运行，日志在 `output/dev-workbench/database-migration-runtime/`，停止使用 `make dev_stop`。首次使用先执行 `make dev_database_roles`；有待执行迁移时通过迁移页或 `make migrate` 完成检查、恢复演练及确认，启动入口不自动 apply。
 
 前端开发页直接使用当前工作区和 Vite 热更新。后端每次启动构建的代码、配置与 migration 快照保存在 `output/dev-workbench/runtime-bundles/`，用于运行身份核对和迁移恢复证据，不覆盖开发页面。数据库迁移的准备阶段保留现有服务，在临时恢复库验证存量升级、附件恢复、PDF 就绪、登录与业务读取；确认后进入维护窗口，重新备份与演练，再迁移、读回和切换。无待执行迁移的代码变更直接使用日常重启入口。详情见 [数据库迁移工作流](../docs/engineering/研发效能工作台与CI-CD设计.md#数据库迁移-__devdatabase-migration)。
 

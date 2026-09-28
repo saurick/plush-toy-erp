@@ -35,6 +35,10 @@ const TERMINAL_STATUSES = new Set([
   "blocked",
   "not_proven",
 ]);
+const EXECUTION_LOCK_PURPOSES = new Set([
+  "database-operation",
+  "workspace-runtime-restart",
+]);
 const TRANSITIONS = Object.freeze({
   preparing: new Set([
     "preparing",
@@ -213,12 +217,18 @@ function readExecutionLock(store) {
     lock.schemaVersion !== "plush.dev-database-migration-lock/v1" ||
     !UUID_PATTERN.test(String(lock.operationId || "")) ||
     !Number.isSafeInteger(lock.pid) ||
-    lock.pid < 1
+    lock.pid < 1 ||
+    (lock.purpose !== undefined && !EXECUTION_LOCK_PURPOSES.has(lock.purpose))
   ) {
     throw new Error("database migration execution lock is invalid");
   }
   assertTimestamp(lock.acquiredAt, "execution lock timestamp");
   return lock;
+}
+
+export function readDatabaseMigrationExecutionLock(store) {
+  const lock = readExecutionLock(store);
+  return lock ? structuredClone(lock) : null;
 }
 
 function isProcessAlive(pid) {
@@ -387,10 +397,13 @@ export function transitionDatabaseMigrationOperation(
 export function acquireDatabaseMigrationExecutionLock(
   store,
   operationId,
-  { now = new Date().toISOString() } = {},
+  { now = new Date().toISOString(), purpose = "database-operation" } = {},
 ) {
   if (!UUID_PATTERN.test(String(operationId || ""))) {
     throw new Error("operation id is invalid");
+  }
+  if (!EXECUTION_LOCK_PURPOSES.has(purpose)) {
+    throw new Error("database migration execution lock purpose is invalid");
   }
   const file = executionLockFile(store);
   let descriptor;
@@ -403,6 +416,7 @@ export function acquireDatabaseMigrationExecutionLock(
         operationId,
         pid: process.pid,
         acquiredAt: now,
+        purpose,
       })}\n`,
     );
     fsyncSync(descriptor);
@@ -415,6 +429,12 @@ export function acquireDatabaseMigrationExecutionLock(
         "another database migration operation is running",
       );
       conflict.code = "DATABASE_MIGRATION_LOCKED";
+      try {
+        const current = readExecutionLock(store);
+        conflict.lockPurpose = current?.purpose || "unknown";
+      } catch {
+        conflict.lockPurpose = "unknown";
+      }
       throw conflict;
     }
     throw error;

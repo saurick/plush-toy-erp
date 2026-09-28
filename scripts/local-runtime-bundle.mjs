@@ -10,7 +10,10 @@ const exec = promisify(execFile);
 const ID =
   /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u;
 const HASH = /^[a-f0-9]{64}$/u;
+export const WORKSPACE_RUNTIME_SOURCE_CHANGED_CODE =
+  "WORKSPACE_RUNTIME_SOURCE_CHANGED";
 const SOURCE_ROOTS = ["server/", "web/", "config/", "scripts/", "deployments/"];
+const BACKEND_SOURCE_ROOTS = ["server/"];
 const omitted =
   /(?:^|\/)(?:node_modules|\.git|output|logs|\.vite-cache)(?:\/|$)|^(?:web\/build|server\/bin)(?:\/|$)/u;
 const runtimeKeys = [
@@ -26,6 +29,13 @@ const runtimeKeys = [
   "ERP_CUSTOMER_KEY",
   "ERP_PDF_CHROME_PATH",
 ];
+const defaultCustomerKey = "yoyoosun";
+
+function workspaceRuntimeSourceChanged(message) {
+  const error = new Error(message);
+  error.code = WORKSPACE_RUNTIME_SOURCE_CHANGED_CODE;
+  return error;
+}
 
 export function readLocalRuntimeEnvironment(root, env = process.env) {
   const file = path.join(root, "server/.env");
@@ -38,6 +48,10 @@ export function readLocalRuntimeEnvironment(root, env = process.env) {
     for (const key of runtimeKeys) if (values[key]) result[key] = values[key];
   }
   for (const key of runtimeKeys) if (env[key]) result[key] = env[key];
+  // `make dev_restart` exports this project default while direct read-only
+  // identity checks do not. Normalize the effective value so both entrypoints
+  // describe the same runtime configuration.
+  result.ERP_CUSTOMER_KEY ||= defaultCustomerKey;
   return result;
 }
 
@@ -121,13 +135,26 @@ export async function readRuntimeSource(root) {
   }
   files.sort();
   const environment = readLocalRuntimeEnvironment(root);
+  const backendFiles = files.filter(
+    (file) =>
+      BACKEND_SOURCE_ROOTS.some((prefix) => file.startsWith(prefix)) ||
+      file === "config/dev-ports.local.env",
+  );
+  const contentFingerprint = hashFiles(root, files);
+  const backendContentFingerprint = hashFiles(root, backendFiles);
   return {
     files,
     fingerprint: createHash("sha256")
-      .update(hashFiles(root, files))
+      .update(contentFingerprint)
       .update(JSON.stringify(environment))
       .digest("hex"),
-    contentFingerprint: hashFiles(root, files),
+    contentFingerprint,
+    backendFiles,
+    backendFingerprint: createHash("sha256")
+      .update(backendContentFingerprint)
+      .update(JSON.stringify(environment))
+      .digest("hex"),
+    backendContentFingerprint,
     environment,
   };
 }
@@ -240,6 +267,8 @@ export function readRuntimeBundle(root, id) {
     manifest.schemaVersion !== "plush.local-runtime-bundle/v1" ||
     manifest.id !== id ||
     !HASH.test(manifest.sourceFingerprint) ||
+    (manifest.backendSourceFingerprint !== undefined &&
+      !HASH.test(manifest.backendSourceFingerprint)) ||
     !Array.isArray(manifest.files) ||
     manifest.files.some(
       (file) =>
@@ -348,7 +377,11 @@ export async function buildRuntimeBundle(
   id,
   execute,
   progress = () => {},
+  { workspaceVerification = "full" } = {},
 ) {
+  if (!["full", "backend"].includes(workspaceVerification)) {
+    throw new Error("固定运行版本的工作区核对范围无效");
+  }
   const source = await readRuntimeSource(root);
   assertRuntimeEnvironment(source.environment);
   const directory = runtimeBundleDirectory(root, id);
@@ -365,7 +398,9 @@ export async function buildRuntimeBundle(
     );
   }
   if (hashFiles(sourceRoot, source.files) !== source.contentFingerprint)
-    throw new Error("工作区在固定版本期间发生变化，请重新准备");
+    throw workspaceRuntimeSourceChanged(
+      "工作区在固定版本期间发生变化，请重新准备",
+    );
   const env = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
   fs.mkdirSync(path.join(directory, "runtime"), { mode: 0o700 });
   fs.writeFileSync(
@@ -373,7 +408,9 @@ export async function buildRuntimeBundle(
     JSON.stringify(source.environment),
     { mode: 0o600, flag: "wx" },
   );
-  progress("正在构建固定后端与页面；日常版本继续运行");
+  progress(
+    "正在编译后端服务（1/4）；日常后端继续运行，完成前请勿重复执行",
+  );
   const goArgs = [
     "build",
     "-trimpath",
@@ -389,6 +426,7 @@ export async function buildRuntimeBundle(
       env,
     },
   );
+  progress("后端服务编译完成，正在编译附件服务（2/4）");
   await execute(
     "go",
     [
@@ -402,6 +440,7 @@ export async function buildRuntimeBundle(
       env,
     },
   );
+  progress("附件服务编译完成，正在构建固定页面（3/4）");
   const modules = path.join(sourceRoot, "web/node_modules");
   fs.symlinkSync(path.join(root, "web/node_modules"), modules, "dir");
   try {
@@ -428,7 +467,7 @@ export async function buildRuntimeBundle(
     [
       path.join(sourceRoot, "scripts/build/apply-customer-web-config.mjs"),
       "--customer",
-      source.environment.ERP_CUSTOMER_KEY || "yoyoosun",
+      source.environment.ERP_CUSTOMER_KEY,
       "--config-root",
       path.join(sourceRoot, "config"),
       "--web-build-dir",
@@ -436,9 +475,14 @@ export async function buildRuntimeBundle(
     ],
     { cwd: sourceRoot, env },
   );
+  progress("固定页面构建完成，正在核对候选内容（4/4）");
   const after = await readRuntimeSource(root);
-  if (after.fingerprint !== source.fingerprint)
-    throw new Error("构建期间运行代码已变化，请重新准备");
+  const changed =
+    workspaceVerification === "backend"
+      ? after.backendFingerprint !== source.backendFingerprint
+      : after.fingerprint !== source.fingerprint;
+  if (changed)
+    throw workspaceRuntimeSourceChanged("构建期间运行代码已变化，请重新准备");
   const migrationFiles = fs
     .readdirSync(path.join(sourceRoot, "server/internal/data/model/migrate"))
     .filter((file) => /^\d+_.+\.sql$/u.test(file))
@@ -448,6 +492,7 @@ export async function buildRuntimeBundle(
     schemaVersion: "plush.local-runtime-bundle/v1",
     id,
     sourceFingerprint: source.fingerprint,
+    backendSourceFingerprint: source.backendFingerprint,
     artifactHash: hashFiles(directory, files),
     files,
     migrationVersion: migrationFiles.at(-1)?.split("_")[0],
