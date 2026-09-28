@@ -17,6 +17,42 @@
   --erp-control-disabled-text: var(--erp-text-subtle);
 }
 
+/* Semantic cursor fallback. Component-specific resize, drag, text, and wait
+   cursors keep precedence because these selectors have zero specificity. */
+:where(
+  button:not(:disabled),
+  a[href],
+  summary,
+  select:not(:disabled),
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  label:has(input:is([type='checkbox'], [type='radio']):not(:disabled)),
+  [role='button']:not([aria-disabled='true']),
+  [role='link']:not([aria-disabled='true']),
+  [role='menuitem']:not([aria-disabled='true']),
+  [role='option']:not([aria-disabled='true']),
+  [role='tab']:not([aria-disabled='true']),
+  [role='treeitem']:not([aria-disabled='true'])
+) {
+  cursor: pointer;
+}
+
+:where(
+  button:disabled,
+  select:disabled,
+  input[type='checkbox']:disabled,
+  input[type='radio']:disabled,
+  label:has(input:is([type='checkbox'], [type='radio']):disabled),
+  [role='button'][aria-disabled='true'],
+  [role='link'][aria-disabled='true'],
+  [role='menuitem'][aria-disabled='true'],
+  [role='option'][aria-disabled='true'],
+  [role='tab'][aria-disabled='true'],
+  [role='treeitem'][aria-disabled='true']
+) {
+  cursor: not-allowed;
+}
+
 .erp-sliding-segmented.ant-segmented,
 .erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-nav-list,
 .erp-sliding-tab-list.erp-navigation-tabs {

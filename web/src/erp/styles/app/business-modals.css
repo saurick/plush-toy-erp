@@ -158,7 +158,7 @@
   border-top: 1px solid var(--erp-business-action-modal-divider, #dde6e0);
   background: var(--erp-business-action-modal-bg, #ffffff);
   box-shadow: 0 -8px 18px rgb(15 23 42 / 4%);
-  padding: 14px 24px 16px;
+  padding: 15px 24px;
 }
 
 .erp-business-action-modal .ant-modal-close {
@@ -788,6 +788,16 @@
   margin: 0;
   color: var(--erp-text-muted, #64748b);
   font-size: 12px;
+}
+
+.erp-sales-order-product-summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  border: 1px solid var(--erp-border, #d7e2dc);
+  border-radius: 8px;
+  padding: 4px 10px;
+  background: var(--erp-surface-bg-soft, #f8faf8);
 }
 
 @container (max-width: 640px) {

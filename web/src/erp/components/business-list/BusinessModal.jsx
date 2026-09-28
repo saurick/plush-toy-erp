@@ -7,12 +7,14 @@ export default function BusinessModal({
   width,
   className,
   centered = true,
+  maskClosable = true,
   ...props
 }) {
   return (
     <Modal
       {...props}
       centered={centered}
+      maskClosable={maskClosable}
       width={resolveBusinessModalWidth(size, width)}
       className={['erp-business-modal', className].filter(Boolean).join(' ')}
     />

@@ -29,6 +29,7 @@ export default function EngineeringMaterialRequestModal(props) {
           width={mobile ? '100%' : undefined}
           centered={!mobile}
           closable={!saving}
+          maskClosable={!saving}
           open={Boolean(orderID)}
           onCancel={() => discardThen(onCancel)}
           footer={footer}

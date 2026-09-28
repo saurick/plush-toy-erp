@@ -422,6 +422,19 @@ test('ERPLayout: 桌面侧栏可收起为图标栏并恢复完整菜单', async 
   }
 })
 
+test('ERPLayout: 顶栏只显示当前页面名称', async () => {
+  const h = await mountRecoveryHarness()
+  try {
+    const breadcrumb = h.container.querySelector('.erp-admin-breadcrumb')
+
+    assert(breadcrumb)
+    assert.equal(breadcrumb.textContent.trim(), '进度看板')
+    assert.equal(breadcrumb.textContent.includes('业务中心'), false)
+  } finally {
+    await h.cleanup()
+  }
+})
+
 test('ERPLayout: 断连保留草稿、暂停业务请求，重复重试合并且恢复不重挂载', async () => {
   const h = await mountRecoveryHarness()
   try {

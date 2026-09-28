@@ -125,7 +125,7 @@ export function createBusinessStatusCountsScenarios({
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame
-          .getByRole('button', { name: '销售订单', exact: true })
+          .getByRole('button', { name: '销售管理', exact: true })
           .click()
         const filter = frame.getByRole('group', {
           name: '状态筛选',

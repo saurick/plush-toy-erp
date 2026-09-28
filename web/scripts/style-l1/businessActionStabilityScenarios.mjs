@@ -1106,11 +1106,15 @@ export function createBusinessActionStabilityScenarios(deps) {
           new URL(page.url()).searchParams.get('purchase_order_id'),
           '1202'
         )
-        await page.getByText('1条', { exact: true }).click()
         await page
-          .getByText('核价短绒', { exact: true })
+          .locator('[data-business-action-key="purchase-details"]')
+          .click()
+        await page
+          .locator('.erp-business-detail-items__items')
+          .filter({ hasText: '核价短绒' })
           .first()
           .waitFor({ state: 'visible' })
+        await page.getByRole('button', { name: '关闭', exact: true }).click()
         const printButton = page.locator(
           '[data-business-action-key="print-contract"]'
         )

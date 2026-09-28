@@ -343,7 +343,7 @@ export default function SourceImportPickerModal({
       }
       centered
       destroyOnHidden
-      maskClosable={false}
+      maskClosable
     >
       <div className="erp-source-import-picker">
         <div className="erp-source-import-picker__toolbar">

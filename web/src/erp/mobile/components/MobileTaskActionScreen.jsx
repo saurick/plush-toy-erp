@@ -24,7 +24,7 @@ import {
 } from '../../utils/numeric20Scale6.mjs'
 import { getWorkflowTaskActionOutcomeHint } from '../../utils/workflowTaskProcessingHint.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
-import { splitWorkflowTaskActions } from '../../utils/workflowTaskActionFlow.mjs'
+import { orderWorkflowTaskActions } from '../../utils/workflowTaskActionFlow.mjs'
 
 const ACTION_OPTIONS = Object.freeze([
   {
@@ -195,11 +195,10 @@ function MobileWorkflowTaskActionScreen({
     : '任务状态暂不可用'
   const taskSource = task ? resolveTaskSourceLabel(task) : '来源信息暂不可用'
   const approvalTask = isWorkflowApprovalTask(task)
-  const { primary: primaryActions, secondary: secondaryActions } =
-    splitWorkflowTaskActions({
-      actions: visibleActions.map((option) => option.key),
-      approvalTask,
-    })
+  const visibleActionKeys = orderWorkflowTaskActions({
+    actions: visibleActions.map((option) => option.key),
+    approvalTask,
+  })
   const approvedQuantityAllowed =
     processDecisionReady &&
     processApprovalForm?.profile_key === 'production_exception_approval' &&
@@ -387,7 +386,7 @@ function MobileWorkflowTaskActionScreen({
         data-selected={selected ? 'true' : 'false'}
       >
         <input
-          ref={option.key === primaryActions[0] ? actionChoiceRef : null}
+          ref={option.key === visibleActionKeys[0] ? actionChoiceRef : null}
           type="radio"
           className="mobile-task-action-choice__radio"
           aria-label={label}
@@ -526,20 +525,8 @@ function MobileWorkflowTaskActionScreen({
                     aria-required="true"
                   >
                     <div className="mobile-task-action-choice-list">
-                      {primaryActions.map(renderActionOption)}
+                      {visibleActionKeys.map(renderActionOption)}
                     </div>
-                    {secondaryActions.length > 0 ? (
-                      <details className="mobile-task-more-actions">
-                        <summary>
-                          {secondaryActions.includes(effectiveAction)
-                            ? `更多处理方式：${effectiveActionLabel}`
-                            : '更多处理方式'}
-                        </summary>
-                        <div className="mobile-task-action-choice-list">
-                          {secondaryActions.map(renderActionOption)}
-                        </div>
-                      </details>
-                    ) : null}
                   </div>
                   {validationErrors.action ? (
                     <p

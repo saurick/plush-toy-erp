@@ -208,6 +208,7 @@ export default function BusinessFormPage({
         resolve(allowed)
       }
       modal.confirm({
+        maskClosable: true,
         centered: true,
         title: '放弃未保存的修改？',
         content: '当前填写的内容和待上传附件尚未保存。',

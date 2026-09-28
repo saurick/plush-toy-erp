@@ -32,7 +32,7 @@ export const OUTSOURCING_ORDER_DATE_FILTER_OPTIONS = [
 export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'submit',
-    label: '提交',
+    label: '提交合同',
     permission: 'outsourcing.order.submit',
     nextStatus: 'submitted',
     sourceLifecycle: true,

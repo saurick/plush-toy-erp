@@ -39,6 +39,7 @@ import {
   outsourcingSummarySubjectName,
   outsourcingSummaryStatus,
 } from '../../utils/outsourcingOrderSummary.mjs'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 const valueOrDash = (value) =>
   value === undefined || value === null || value === '' ? '—' : value
@@ -118,8 +119,18 @@ export default forwardRef((
       align: 'left',
       title: '产品 / 材料名称',
       key: 'subject_name',
-      width: 210,
-      render: (_, row) => valueOrDash(outsourcingSummarySubjectName(row)),
+      width: 270,
+      className: 'erp-product-identity-cell',
+      render: (_, row) =>
+        row.subject_type === 'MATERIAL' ? (
+          valueOrDash(outsourcingSummarySubjectName(row))
+        ) : (
+          <ProductIdentity
+            productId={row.product_id}
+            name={outsourcingSummarySubjectName(row) || '委外产品'}
+            compact
+          />
+        ),
       exportValue: outsourcingSummarySubjectName,
     },
     {

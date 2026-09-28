@@ -171,7 +171,7 @@ export function createHistoryRecordScenarios(deps) {
           page,
           'history-records-tablet-dark-detail'
         )
-        await page.keyboard.press('Escape')
+        await dialog.getByRole('button', { name: '关闭', exact: true }).click()
         await dialog.waitFor({ state: 'hidden' })
         await assertNoHorizontalOverflow(page, 'history-records-tablet-dark')
       },

@@ -162,7 +162,9 @@ export function createBusinessFormPageDraftScenarios(deps) {
         await assertBusinessFormPage(page, editor)
         await editor.locator('textarea').fill('红冲登记未保存')
         await closeBusinessFormPage(page, editor)
-        await page.getByRole('tab', { name: /收付款/ }).click()
+        await page
+          .getByRole('tab', { name: '收付款记录', exact: true })
+          .click()
         await page.getByRole('button', { name: '登记收付款' }).click()
         await editor
           .getByRole('heading', { name: '登记收付款', exact: true })

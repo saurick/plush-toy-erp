@@ -5,10 +5,15 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const erpRoot = resolve(__dirname, '..')
 const pagesRoot = resolve(__dirname, '../pages')
 const businessListLayoutPath = resolve(
   __dirname,
   '../components/business-list/BusinessListLayout.jsx'
+)
+const businessTaskActionsPath = resolve(
+  __dirname,
+  '../components/workflow/BusinessTaskActions.jsx'
 )
 const businessDateUsageCases = [
   [
@@ -138,6 +143,49 @@ test('business date filters: BusinessOperationPanel filters must use DateRangeFi
     `BusinessOperationPanel filters should not compose date ranges from standalone DateInput. Use DateRangeFilter instead: ${offenders.join(
       ', '
     )}`
+  )
+})
+
+test('业务日期控件统一使用 DateInput 或 DateTimeInput', () => {
+  const nativeDateInputPattern =
+    /<(?:Input|input)\b[^>]*\btype\s*=\s*["'](?:date|datetime-local)["'][^>]*>/u
+  const directDatePickerPattern = /<DatePicker\b/u
+  const offenders = listPageFiles(erpRoot).flatMap((filePath) => {
+    const source = readFileSync(filePath, 'utf8')
+    const isSharedDateInput = filePath === businessListLayoutPath
+    return (
+      nativeDateInputPattern.test(source) ||
+      (!isSharedDateInput && directDatePickerPattern.test(source))
+    )
+      ? [filePath.replace(`${erpRoot}/`, '')]
+      : []
+  })
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `业务日期不得退回只能点击原生日历图标的输入框，请复用 DateInput / DateTimeInput: ${offenders.join(', ')}`
+  )
+})
+
+test('只有跟进任务截止时间隐藏此刻并提供截止快捷项', () => {
+  const showNowDisabledPattern =
+    /<DateTimeInput\b[^>]*\bshowNow=\{false\}[^>]*>/u
+  const consumers = listPageFiles(erpRoot).flatMap((filePath) => {
+    const source = readFileSync(filePath, 'utf8')
+    return showNowDisabledPattern.test(source) ? [filePath] : []
+  })
+  const sharedSource = readFileSync(businessListLayoutPath, 'utf8')
+  const dateTimeInputDefinition = sharedSource.match(
+    /export const DateTimeInput[\s\S]*?\n\)\)\n/u
+  )?.[0]
+
+  assert.deepEqual(consumers, [businessTaskActionsPath])
+  assert.ok(dateTimeInputDefinition, '应保留共享 DateTimeInput 定义')
+  assert.doesNotMatch(dateTimeInputDefinition, /showNow=\{false\}/u)
+  assert.match(
+    readFileSync(businessTaskActionsPath, 'utf8'),
+    /quickOptions=\{WORKFLOW_DEADLINE_QUICK_OPTIONS\}/u
   )
 })
 

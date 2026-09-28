@@ -46,6 +46,34 @@ export function createPermissionCenterScenarios({
       optionLabel: roleLabel,
     })
   }
+  const assertApprovalHeaderHelp = async (
+    page,
+    { triggerName, expectedText }
+  ) => {
+    const trigger = page.getByRole('button', {
+      name: triggerName,
+      exact: true,
+    })
+    await trigger.waitFor({ state: 'visible', timeout: 10_000 })
+    await trigger.hover()
+    let tooltip = page.locator('.ant-tooltip:visible').last()
+    await tooltip.waitFor({ state: 'visible', timeout: 10_000 })
+    assert.match(String(await tooltip.textContent()).trim(), expectedText)
+
+    await page.mouse.move(0, 0)
+    await tooltip.waitFor({ state: 'hidden', timeout: 10_000 })
+    await trigger.focus()
+    assert.equal(
+      await trigger.evaluate((node) => node === document.activeElement),
+      true,
+      `${triggerName}应支持键盘聚焦`
+    )
+    tooltip = page.locator('.ant-tooltip:visible').last()
+    await tooltip.waitFor({ state: 'visible', timeout: 10_000 })
+    assert.match(String(await tooltip.textContent()).trim(), expectedText)
+    await trigger.evaluate((node) => node.blur())
+    await tooltip.waitFor({ state: 'hidden', timeout: 10_000 })
+  }
   return [
     ...createPermissionUnifiedScenarios({ assert, assertNoHorizontalOverflow }),
     ...['light', 'dark'].map((themeMode) => ({
@@ -225,6 +253,14 @@ export function createPermissionCenterScenarios({
         await assertTextAbsent(page, '付款审批')
         await expectText(page, '业务')
         await expectText(page, '老板')
+        await assertApprovalHeaderHelp(page, {
+          triggerName: '审批条件说明',
+          expectedText: /同币种金额低于门槛免审/u,
+        })
+        await assertApprovalHeaderHelp(page, {
+          triggerName: '责任顺序说明',
+          expectedText: /不是多人逐级会签/u,
+        })
         const disabledShipmentRow = page.getByRole('row', {
           name: /出货财务放行/,
         })

@@ -182,6 +182,12 @@ export async function installMasterDataRpcMocks(page, context) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const productionUnit = {
+      ...unit,
+      id: 501,
+      code: 'PIECE',
+      name: '只',
+    }
     const warehouse = {
       id: 1,
       code: 'WH-STYLE-L1',
@@ -223,7 +229,11 @@ export async function installMasterDataRpcMocks(page, context) {
         data = stylePaginatedMasterData(materials, 'materials', params)
         break
       case 'list_units':
-        data = stylePaginatedMasterData([unit], 'units', params)
+        data = stylePaginatedMasterData(
+          [unit, productionUnit],
+          'units',
+          params
+        )
         break
       case 'list_material_warehouses':
       case 'list_warehouses':

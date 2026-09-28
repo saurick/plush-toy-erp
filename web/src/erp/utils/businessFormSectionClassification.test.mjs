@@ -71,6 +71,26 @@ test('all governed long forms use the shared section-title component', () => {
   }
 })
 
+test('business form sections stay visible without collapse state', () => {
+  const componentSource = source(
+    '../components/business-list/BusinessFormSection.jsx'
+  )
+  const bodySource = source('../components/business-list/BusinessFormBody.jsx')
+  const bomFormSource = source('../components/bom/BOMVersionForms.jsx')
+  const bomPageSource = source('../pages/BOMVersionsPage.jsx')
+
+  assert.doesNotMatch(
+    componentSource,
+    /<details|<summary|expanded|onExpandedChange/u
+  )
+  assert.doesNotMatch(
+    bodySource,
+    /details:not\(\[open\]\)|querySelector\('summary/u
+  )
+  assert.doesNotMatch(bomFormSource, /detailsOpen|onDetailsOpenChange/u)
+  assert.doesNotMatch(bomPageSource, /headerDetailsOpen|setHeaderDetailsOpen/u)
+})
+
 test('sales order editing puts demand before supplementary commercial and delivery fields', () => {
   assertOrdered(source('../components/sales-orders/SalesOrderForm.jsx'), [
     '订单与客户',

@@ -120,7 +120,9 @@ export function createAccountPasswordScenarios({
         const submit = dialog.getByRole('button', { name: '修改并重新登录' })
         const assertInputStyle = async (state) => {
           assert.equal(
-            await assertVisibleAffixInputIsolation(page, `${name}/${state}`),
+            await assertVisibleAffixInputIsolation(page, `${name}/${state}`, {
+              rootSelector: '.erp-account-password-modal',
+            }),
             3,
             '必须检查弹窗中三个真实密码输入框'
           )

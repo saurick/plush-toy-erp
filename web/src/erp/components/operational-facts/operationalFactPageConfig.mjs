@@ -1,3 +1,4 @@
+import React from 'react'
 import {
   cancelFinanceFact,
   cancelOutsourcingFact,
@@ -40,6 +41,7 @@ import {
   statusTag,
 } from './OperationalFactForms.jsx'
 import { compareOperationalFactDecimalValues } from './operationalFactDecimal.mjs'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 export const DEFAULT_OPERATIONAL_FACT_PAGINATION = Object.freeze({
   current: 1,
@@ -681,9 +683,19 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         align: 'left',
         defaultPriority: 40,
         title: '产品 / 规格',
-        width: 240,
+        width: 300,
         sortValue: reservationProductText,
-        render: (_, record) => reservationProductText(record),
+        className: 'erp-product-identity-cell',
+        render: (_, record) =>
+          React.createElement(
+            ProductIdentity,
+            {
+              productId: record.product_id,
+              name: record.product_name || record.product_code || '产品',
+              compact: true,
+            },
+            reservationProductText(record)
+          ),
         exportValue: reservationProductText,
       },
       {

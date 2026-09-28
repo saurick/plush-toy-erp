@@ -5,7 +5,7 @@ import { canCreateFollowupFromRecord, requireFollowupCreateParams, requireFollow
 const input = { source_type: 'sales_order', source_id: 42, task_name: '核实交期', description: '请提供预计完成日期', owner_role_key: 'sales', assignee_id: null, due_at: 1_900_000_000, priority: 0, idempotency_key: 'followup:one' }
 const task = { id: 99, version: 1, task_group: 'business_followup', ...input, task_status_key: 'ready', payload: { description: input.description } }
 
-test('任务发起只接受有效来源、明确要求和同一重试意图', () => {
+test('跟进任务创建只接受有效来源、明确要求和同一重试意图', () => {
   assert.deepEqual(requireFollowupCreateParams(input), input)
   for (const override of [{ source_no: 'FORGED' }, { source_type: 'inventory_txn' }, { source_id: 0 }, { assignee_id: 1.2 }, { description: ' ' }, { priority: 1 }, { idempotency_key: '' }, { process_instance_id: 1 }]) {
     assert.throws(() => requireFollowupCreateParams({ ...input, ...override }))
@@ -15,7 +15,7 @@ test('任务发起只接受有效来源、明确要求和同一重试意图', ()
   for (const status of ['closed', 'canceled', 'SHIPPED', 'unknown']) assert.equal(canCreateFollowupFromRecord('sales_order', { id: 42, lifecycle_status: status }), false)
 })
 
-test('错误来源的候选资料和不完整回执不能冒充发起成功', () => {
+test('错误来源的候选资料和不完整回执不能冒充创建成功', () => {
   assert.equal(requireFollowupReceipt({ task }, input), task)
   for (const override of [{ source_id: 8 }, { version: undefined }, { assignee_id: 7 }, { due_at: 1 }, { payload: {} }, { process_instance_id: 1 }]) {
     assert.throws(() => requireFollowupReceipt({ task: { ...task, ...override } }, input), { isInvalidResponse: true })

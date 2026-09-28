@@ -50,6 +50,7 @@ export default function BOMMaterialCreateModal({
       onOk={save}
       onCancel={saving ? undefined : onCancel}
       confirmLoading={saving}
+      maskClosable={!saving}
     >
       <Form
         form={form}

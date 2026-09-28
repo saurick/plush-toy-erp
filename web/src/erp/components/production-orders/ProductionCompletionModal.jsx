@@ -13,6 +13,7 @@ import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import {
@@ -422,7 +423,7 @@ export default function ProductionCompletionModal({
             label="完工时间"
             rules={[{ required: true, message: '请选择完工时间' }]}
           >
-            <Input type="datetime-local" />
+            <DateTimeInput />
           </Form.Item>
         </BusinessFormSection>
         <BusinessFormSection title="备注">

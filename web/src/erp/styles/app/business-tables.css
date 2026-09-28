@@ -1343,47 +1343,35 @@
   flex: 1 0 500px;
   min-width: 500px;
   max-width: 560px;
-  align-items: stretch;
+  align-items: center;
+  gap: 8px;
   white-space: nowrap;
-  overflow: hidden;
-  border: 1px solid var(--erp-business-control-border);
-  background: var(--erp-surface-bg);
-  border-radius: var(--erp-control-radius);
-}
-
-.erp-business-date-range-filter--invalid {
-  border-color: #d4380d;
+  overflow: visible;
 }
 
 .erp-business-date-range-filter__type.ant-select,
 :where(.erp-business-date-range-filter__type.ant-select) .ant-select-selector {
   flex: 0 0 132px;
   min-width: 132px;
-  height: calc(var(--erp-business-control-height) - 2px);
+  height: var(--erp-business-control-height);
 }
 
 .erp-business-date-range-filter__type-label {
   display: inline-flex;
   flex: 0 0 132px;
   min-width: 132px;
-  height: calc(var(--erp-business-control-height) - 2px);
+  height: var(--erp-business-control-height);
   align-items: center;
   padding: 0 12px;
-  background: #fbfdfb;
+  border: 1px solid var(--erp-business-control-border);
+  border-radius: var(--erp-control-radius);
+  background: var(--erp-surface-bg-soft);
   color: var(--erp-text);
   font-size: 13px;
 }
 
 :where(.erp-business-date-range-filter__type.ant-select) .ant-select-selector {
-  border-color: transparent;
-  --erp-control-radius: 0;
-  background: #fbfdfb;
-  box-shadow: none;
-}
-
-.erp-business-date-range-filter__divider {
-  width: 1px;
-  background: #e1e8e3;
+  background: var(--erp-surface-bg-soft);
 }
 
 .erp-business-date-input.ant-picker {
@@ -1422,35 +1410,123 @@
   cursor: not-allowed;
 }
 
-.erp-business-date-range-filter__range {
+.erp-business-date-picker-quick-options {
   display: flex;
-  flex: 1 0 366px;
-  min-width: 366px;
+  min-width: 0;
   align-items: center;
-  gap: 4px;
-  padding-inline: 6px;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-block: 7px;
+  line-height: 1.4;
 }
 
-.erp-business-date-range-filter__range > span {
+.erp-business-date-picker-quick-options__label {
+  flex: none;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-business-date-picker-quick-options .ant-btn {
+  min-width: 0;
+  flex: none;
+}
+
+@media (max-width: 520px) {
+  .erp-business-date-time-picker-dropdown .ant-picker-panel-container,
+  .erp-business-date-time-picker-dropdown .ant-picker-panel-layout {
+    width: calc(100vw - 40px);
+    max-width: calc(100vw - 40px);
+  }
+
+  .erp-business-date-time-picker-dropdown .ant-picker-panel,
+  .erp-business-date-time-picker-dropdown .ant-picker-datetime-panel,
+  .erp-business-date-time-picker-dropdown .ant-picker-footer {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .erp-business-date-time-picker-dropdown .ant-picker-date-panel {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .erp-business-date-time-picker-dropdown .ant-picker-time-panel {
+    width: 104px;
+    min-width: 104px;
+    flex: 0 0 104px;
+  }
+
+  .erp-business-date-time-picker-dropdown .ant-picker-time-panel-column {
+    width: 52px;
+    flex-basis: 52px;
+  }
+
+  .erp-business-date-time-picker-dropdown .ant-picker-date-panel .ant-picker-body {
+    padding: 8px;
+  }
+
+  .erp-business-date-time-picker-dropdown
+    .ant-picker-date-panel
+    .ant-picker-content
+    :is(th, td) {
+    min-width: 24px;
+  }
+
+  .erp-business-date-time-picker-dropdown
+    .ant-picker-date-panel
+    .ant-picker-content
+    th {
+    height: 28px;
+  }
+
+  .erp-business-date-time-picker-dropdown .ant-picker-date-panel .ant-picker-cell {
+    padding-block: 2px;
+  }
+
+  .erp-business-date-time-picker-dropdown
+    .ant-picker-date-panel
+    .ant-picker-cell-inner {
+    min-width: 24px;
+    height: 24px;
+    line-height: 24px;
+  }
+
+  .erp-business-date-time-picker-dropdown .ant-picker-time-panel .ant-picker-content {
+    height: 252px;
+  }
+
+  .erp-business-date-time-picker-dropdown .erp-business-date-picker-quick-options {
+    padding-inline: 8px;
+  }
+}
+
+.erp-business-date-range-filter__range {
+  display: flex;
+  flex: 1 1 360px;
+  min-width: 360px;
+  align-items: center;
+  gap: 6px;
+}
+
+.erp-business-date-range-filter__separator {
   flex: none;
   color: #7b8c7e;
   font-size: 13px;
 }
 
+.erp-business-date-range-filter--invalid
+  .erp-business-date-range-filter__separator {
+  color: #d4380d;
+}
+
 .erp-business-date-range-filter .erp-business-date-input.ant-picker {
   flex: 1 1 160px;
   min-width: 160px;
-  height: calc(var(--erp-business-control-height) - 2px);
-  border-color: transparent;
-  --erp-control-radius: 0;
+  height: var(--erp-business-control-height);
+  border-color: var(--erp-business-control-border);
   background: var(--erp-surface-bg);
   box-shadow: none;
-}
-
-.erp-business-date-range-filter .erp-business-date-input.ant-picker:hover {
-  border-color: transparent;
-  box-shadow: none;
-  outline: 0;
 }
 
 .erp-business-list-toolbar__row {
@@ -1688,6 +1764,11 @@
   flex-basis: 760px;
 }
 
+:where(.erp-business-selection-action-bar--embedded)
+  .erp-business-selection-action-bar__copy {
+  flex-basis: 280px;
+}
+
 .erp-business-selection-action-bar--embedded
   .erp-business-selection-action-bar__actions
   .ant-btn {
@@ -1829,6 +1910,10 @@
   padding: 6px 10px;
 }
 
+.erp-business-column-order-modal__row--visibility {
+  padding-block: 0;
+}
+
 .erp-business-column-order-modal__index {
   display: inline-flex;
   width: 32px;
@@ -1848,6 +1933,14 @@
   color: #17231c;
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.erp-business-column-order-modal__row--visibility
+  .erp-business-column-order-modal__label {
+  display: inline-flex;
+  min-height: 44px;
+  align-self: stretch;
+  align-items: center;
 }
 
 .erp-business-column-order-modal__actions {

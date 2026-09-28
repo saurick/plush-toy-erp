@@ -127,6 +127,7 @@ export default function InventoryOperationModal({
       confirmLoading={loading}
       closable={!loading}
       keyboard={!loading}
+      maskClosable={!loading}
       destroyOnHidden
       forceRender
       onCancel={() => !loading && onCancel?.()}

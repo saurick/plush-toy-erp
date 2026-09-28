@@ -109,6 +109,61 @@ test('岗位操作在默认和清空选择后仍可发现，未选择或无权�
   assert.equal(handled, 1)
 })
 
+test('更多操作重新打开时使用最新选择状态', async (t) => {
+  const [{ SelectionActionBar, BusinessActionTooltip }, { Button }] =
+    await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  let selected = false
+  const render = async () =>
+    act(async () =>
+      root.render(
+        createElement(
+          SelectionActionBar,
+          { selectedCount: selected ? 1 : 0 },
+          [1, 2, 3, 4].map((index) =>
+            createElement(Button, { key: index }, `主操作${index}`)
+          ),
+          createElement(
+            BusinessActionTooltip,
+            {
+              disabled: !selected,
+              disabledReason: '请先选择一条记录',
+            },
+            createElement(Button, { disabled: !selected }, '加工合同打印')
+          )
+        )
+      )
+    )
+  const more = () =>
+    container.querySelector('.erp-business-selection-action-bar__compact-more')
+  const menu = () =>
+    document.querySelector('.erp-business-selection-action-menu')
+  const printButton = () =>
+    [...menu().querySelectorAll('button')].find(
+      (node) => node.textContent.replace(/\s+/gu, '') === '加工合同打印'
+    )
+  const click = async (node) => {
+    assert(node, '必须找到真实控件')
+    await act(async () => node.click())
+  }
+  t.after(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+  })
+
+  await render()
+  await click(more())
+  assert.equal(printButton().disabled, true)
+  await click(more())
+
+  selected = true
+  await render()
+  await click(more())
+  assert.equal(printButton().disabled, false)
+})
+
 test('更多下拉保留禁用原因、二级确认及弹窗状态，执行后收起且键盘可恢复', async (t) => {
   const [
     {

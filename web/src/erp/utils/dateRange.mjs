@@ -3,6 +3,8 @@ import customParseFormat from 'dayjs/plugin/customParseFormat.js'
 
 export const DATE_INPUT_VALUE_FORMAT = 'YYYY-MM-DD'
 export const DATE_INPUT_DISPLAY_FORMAT = 'YYYY/MM/DD'
+export const DATE_TIME_INPUT_VALUE_FORMAT = 'YYYY-MM-DDTHH:mm'
+export const DATE_TIME_INPUT_DISPLAY_FORMAT = 'YYYY/MM/DD HH:mm'
 
 dayjs.extend(customParseFormat)
 
@@ -17,6 +19,27 @@ export function parseDateInputValue(value) {
   if (!normalizedValue) return null
 
   const parsedValue = dayjs(normalizedValue, DATE_INPUT_VALUE_FORMAT, true)
+  return parsedValue.isValid() ? parsedValue : null
+}
+
+export function parseDateTimeInputValue(value) {
+  if (dayjs.isDayjs(value)) {
+    return value.isValid() ? value : null
+  }
+
+  const normalizedValue = String(value || '').trim()
+  if (!normalizedValue) return null
+
+  const parsedValue = dayjs(
+    normalizedValue,
+    [
+      DATE_TIME_INPUT_VALUE_FORMAT,
+      'YYYY-MM-DDTHH:mm:ss',
+      DATE_TIME_INPUT_DISPLAY_FORMAT,
+      'YYYY/MM/DD HH:mm:ss',
+    ],
+    true
+  )
   return parsedValue.isValid() ? parsedValue : null
 }
 

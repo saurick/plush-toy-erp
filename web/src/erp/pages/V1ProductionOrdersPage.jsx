@@ -1173,6 +1173,7 @@ export default function V1ProductionOrdersPage() {
       )
       if (hasRoutedItem && !canReadProductionWip) {
         modal.warning({
+          maskClosable: true,
           title: '暂不能核对生产完工条件',
           content:
             '当前账号没有查看生产工序的权限，无法核对路线明细是否完成包装并确认包材，请联系管理员调整岗位权限。',
@@ -1201,6 +1202,7 @@ export default function V1ProductionOrdersPage() {
         })
       if (eligibleItems.length === 0) {
         modal.warning({
+          maskClosable: true,
           title: '暂不能登记生产完工',
           content:
             productionCompletionBlockerText(blockedItems) ||
@@ -1900,6 +1902,7 @@ export default function V1ProductionOrdersPage() {
                 }
                 onClick={() =>
                   modal.confirm({
+                    maskClosable: true,
                     title: '确认发布生产订单？',
                     content: '发布后计划明细将不能直接修改。',
                     okText: '确认发布',
@@ -2192,6 +2195,7 @@ export default function V1ProductionOrdersPage() {
         okText={reasonAction === 'close' ? '确认关闭' : '确认取消'}
         cancelText="返回"
         confirmLoading={mutationLoading}
+        maskClosable={!mutationLoading}
         onCancel={() => setReasonAction(null)}
         onOk={() => reasonForm.submit()}
       >

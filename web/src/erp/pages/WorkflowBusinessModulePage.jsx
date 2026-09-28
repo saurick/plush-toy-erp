@@ -1545,6 +1545,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                   : '确认催办'
         }
         confirmLoading={taskActionLoadingID > 0 || urgingTaskID > 0}
+        maskClosable={taskActionLoadingID <= 0 && urgingTaskID <= 0}
         destroyOnHidden
       >
         {taskReasonProcessDecisionRequired &&

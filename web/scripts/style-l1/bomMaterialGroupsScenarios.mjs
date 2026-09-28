@@ -264,8 +264,12 @@ export function createBOMMaterialGroupsScenarios(deps) {
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         const review = editor.locator('.erp-bom-import-review')
         await review.waitFor()
-        assert.equal(await review.getAttribute('data-bom-import-issue-count'), '3')
-        assert.ok((await review.innerText()).includes('选择产品、关联 2 种物料（涉及 3 个部位）'))
+        assert.equal(await review.getAttribute('data-bom-import-issue-count'), '4')
+        assert.ok(
+          (await review.innerText()).includes(
+            '选择产品、关联 2 种物料、核对 1 个部位的用量（涉及 3 个部位）'
+          )
+        )
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
         await deps.expectText(page, '暂未保存：请先选择产品、关联 2 种物料')
         await page.waitForFunction(() => document.activeElement?.id === 'product_id')
@@ -287,7 +291,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         assert.ok((await review.innerText()).includes('尚未关联'))
         await product.fill('PROD-STYLE-L1')
         await product.press('Enter')
-        await editor.locator('[data-bom-import-issue-count="2"]').waitFor()
+        await editor.locator('[data-bom-import-issue-count="3"]').waitFor()
 
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
         await page.waitForFunction(() =>
@@ -297,7 +301,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         const material = editor.getByRole('combobox', { name: '物料名称 2', exact: true })
         await material.fill('MAT-STYLE-L1')
         await material.press('Enter')
-        await editor.locator('[data-bom-import-issue-count="1"]').waitFor()
+        await editor.locator('[data-bom-import-issue-count="2"]').waitFor()
         assert.equal(
           await editor.locator('.erp-bom-material-group').first()
             .locator('tr[data-bom-part-index]').count(),
@@ -307,7 +311,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         const lastMaterial = editor.getByRole('combobox', { name: '物料名称 4', exact: true })
         await lastMaterial.fill('MAT-STYLE-L1')
         await lastMaterial.press('Enter')
-        await editor.locator('[data-bom-import-issue-count="0"]').waitFor()
+        await editor.locator('[data-bom-import-issue-count="1"]').waitFor()
 
         await editor.getByLabel('单位用量 3', { exact: true }).fill('0')
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
@@ -384,11 +388,16 @@ export function createBOMMaterialGroupsScenarios(deps) {
         )
         assert.equal(
           await parts.nth(1).locator('.erp-bom-number-cell').innerText(),
-          '13.580247'
+          '—'
         )
-        assert.ok((await unresolved.innerText()).includes('总用量：113.580247'))
+        assert.ok(
+          (await unresolved.innerText()).includes(
+            '总用量：填写生产数量和用量后计算'
+          )
+        )
         await unresolved.getByLabel('单位用量 3', { exact: true }).fill('0.25')
         await parts.nth(1).getByText('27.5', { exact: true }).waitFor()
+        assert.ok((await unresolved.innerText()).includes('总用量：127.5'))
 
         await unresolved
           .getByRole('button', { name: '＋ 添加部位', exact: true })

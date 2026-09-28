@@ -5,7 +5,7 @@ import {
   LinkOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Drawer, Dropdown, Input, Select, Tag, Typography } from 'antd'
+import { Alert, Button, Drawer, Input, Select, Tag, Typography } from 'antd'
 import WorkflowFollowupDetails from './WorkflowFollowupDetails.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
@@ -33,9 +33,9 @@ import {
   getWorkflowTaskActionStepAvailability,
   isWorkflowTaskActionReady,
   moveWorkflowTaskActionStep,
+  orderWorkflowTaskActions,
   resolveWorkflowTaskActionInitialStep,
   resolveWorkflowTaskActionStep,
-  splitWorkflowTaskActions,
 } from '../../utils/workflowTaskActionFlow.mjs'
 import {
   isWorkflowApprovalTask,
@@ -278,16 +278,10 @@ export default function WorkflowTaskActionDrawer({
   const navigationRef = React.useRef(null)
   const stepButtonRefs = React.useRef(new Map())
   const actionOptionRefs = React.useRef(new Map())
-  const moreActionTriggerRef = React.useRef(null)
-  const [moreActionsOpen, setMoreActionsOpen] = React.useState(false)
-  React.useEffect(() => {
-    setMoreActionsOpen(false)
-  }, [task?.id, activeStepKey])
-  const visibleActionModes = allowedActionModes.filter(
-    (mode) => TASK_ACTION_META[mode]
-  )
-  const { primary: primaryActionModes, secondary: secondaryActionModes } =
-    splitWorkflowTaskActions({ actions: visibleActionModes, approvalTask })
+  const visibleActionModes = orderWorkflowTaskActions({
+    actions: allowedActionModes.filter((mode) => TASK_ACTION_META[mode]),
+    approvalTask,
+  })
   const processDecisionRequired =
     actionMode === 'complete' && isWorkflowProcessDecisionTask(task)
   const processApprovalForm = getWorkflowProcessDecisionApprovalForm(
@@ -328,7 +322,7 @@ export default function WorkflowTaskActionDrawer({
   const assignmentTargetLabel =
     assignmentTargets.find((option) => option.value === assignmentTarget)
       ?.label || ''
-  const hasVisibleActionSelection = primaryActionModes.includes(actionMode)
+  const hasVisibleActionSelection = visibleActionModes.includes(actionMode)
   const canConfirm =
     assignmentTargetValid &&
     processDecisionReady &&
@@ -532,23 +526,23 @@ export default function WorkflowTaskActionDrawer({
     ) {
       return
     }
-    const currentIndex = primaryActionModes.indexOf(mode)
-    if (currentIndex < 0 || primaryActionModes.length === 0) return
+    const currentIndex = visibleActionModes.indexOf(mode)
+    if (currentIndex < 0 || visibleActionModes.length === 0) return
 
     let nextIndex = currentIndex
     if (event.key === 'Home') {
       nextIndex = 0
     } else if (event.key === 'End') {
-      nextIndex = primaryActionModes.length - 1
+      nextIndex = visibleActionModes.length - 1
     } else {
       const offset =
         event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 1
       nextIndex =
-        (currentIndex + offset + primaryActionModes.length) %
-        primaryActionModes.length
+        (currentIndex + offset + visibleActionModes.length) %
+        visibleActionModes.length
     }
 
-    const nextMode = primaryActionModes[nextIndex]
+    const nextMode = visibleActionModes[nextIndex]
     event.preventDefault()
     selectAction(nextMode, nextMode === 'block' ? taskReason : '')
     requestAnimationFrame(() => actionOptionRefs.current.get(nextMode)?.focus())
@@ -949,7 +943,7 @@ export default function WorkflowTaskActionDrawer({
                       role="radiogroup"
                       aria-label="处理方式"
                     >
-                      {primaryActionModes.map((mode, index) => {
+                      {visibleActionModes.map((mode, index) => {
                         const meta = getWorkflowTaskActionMeta(task, mode)
                         const selected = actionMode === mode
                         return (
@@ -998,43 +992,6 @@ export default function WorkflowTaskActionDrawer({
                         )
                       })}
                     </div>
-                  ) : null}
-                  {canChooseActions && secondaryActionModes.length > 0 ? (
-                    <Dropdown
-                      autoFocus
-                      open={moreActionsOpen}
-                      onOpenChange={setMoreActionsOpen}
-                      trigger={['click']}
-                      disabled={actionSaving}
-                      menu={{
-                        selectable: true,
-                        selectedKeys: secondaryActionModes.includes(actionMode)
-                          ? [actionMode]
-                          : [],
-                        items: secondaryActionModes.map((mode) => ({
-                          key: mode,
-                          label: getWorkflowTaskActionMeta(task, mode).title,
-                        })),
-                        onClick: ({ key }) => {
-                          selectAction(key, key === 'block' ? taskReason : '')
-                          setMoreActionsOpen(false)
-                          moreActionTriggerRef.current?.focus()
-                        },
-                        onKeyDown: (event) => {
-                          if (event.key !== 'Escape') return
-                          event.preventDefault()
-                          event.stopPropagation()
-                          setMoreActionsOpen(false)
-                          moreActionTriggerRef.current?.focus()
-                        },
-                      }}
-                    >
-                      <Button ref={moreActionTriggerRef} disabled={actionSaving}>
-                        {secondaryActionModes.includes(actionMode)
-                          ? `更多处理方式：${getWorkflowTaskActionMeta(task, actionMode).title}`
-                          : '更多处理方式'}
-                      </Button>
-                    </Dropdown>
                   ) : null}
                 </section>
                 {actionMeta ? (

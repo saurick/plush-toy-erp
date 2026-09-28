@@ -24,7 +24,11 @@ test('outsourcing return quality modal exposes only operator-owned business fiel
     assert.doesNotMatch(source, new RegExp(`name="${derivedField}"`, 'u'))
   }
   assert.match(source, /产品、仓库、批次和委外来源由已过账回货记录确定/u)
-  assert.match(source, /label: '产品规格'/u)
+  assert.match(source, /label: '产品 \/ 规格'/u)
+  assert.match(
+    source,
+    /<ProductIdentity productId=\{fact\?\.subject_id\} name="委外回货产品">/u
+  )
   assert.match(source, /outsourcingFactProductSKUText\(fact\)/u)
   assert.doesNotMatch(source, /productSKUOption/u)
   assert.doesNotMatch(source, /productSKUs/u)

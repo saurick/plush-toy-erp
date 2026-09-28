@@ -261,16 +261,24 @@ materials
       beforeNavigate: install,
       verify: async (page) => {
         await deps.expectHeading(page, '采购订单')
-        await page
+        const orderRow = page
           .locator('.erp-business-data-table-card tbody tr')
           .filter({ hasText: 'PO-STYLE-L1' })
           .first()
-          .click()
+        if (page.viewportSize().width < 768) {
+          await orderRow.getByText('PO-STYLE-L1', { exact: true }).click()
+        } else {
+          await orderRow.click()
+        }
+        await page.waitForFunction(
+          (row) => row?.classList.contains('ant-table-row-selected'),
+          await orderRow.elementHandle()
+        )
         if (page.viewportSize().width < 768) {
           await page.getByRole('button', { name: /^更多操作，共/u }).click()
         }
         await page
-          .locator('[data-business-action-key="generate-inbound"]')
+          .locator('[data-business-action-key="generate-inbound"]:enabled')
           .click()
         const modal = page
           .getByRole('dialog')

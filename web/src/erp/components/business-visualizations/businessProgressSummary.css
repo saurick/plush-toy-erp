@@ -26,6 +26,20 @@
   color: var(--erp-text-muted);
   line-height: 1.6;
 }
+.erp-progress-overview-product {
+  display: grid;
+  gap: 5px;
+}
+.erp-progress-overview-product .erp-task-product-image {
+  width: 64px;
+  height: 64px;
+  flex-basis: 64px;
+}
+.erp-progress-overview-product > p {
+  margin: 0 0 0 76px;
+  color: var(--erp-text-muted);
+  line-height: 1.5;
+}
 .erp-progress-badges {
   display: flex;
   align-items: center;

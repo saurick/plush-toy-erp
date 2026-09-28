@@ -117,7 +117,8 @@
   text-align: left;
   cursor: pointer;
 }
-.erp-progress-row-select:hover {
+.erp-progress-row:hover .erp-progress-row-select,
+.erp-progress-row:focus-within .erp-progress-row-select {
   background: var(--erp-interactive-bg-hover);
 }
 .erp-progress-row.is-selected {
@@ -133,14 +134,48 @@
   gap: 8px;
 }
 .erp-progress-row-copy {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  min-width: 0;
   gap: 3px 12px;
-  margin: 6px 0 10px;
   color: var(--erp-text-muted);
   font-size: 12px;
   line-height: 1.6;
   overflow-wrap: anywhere;
+}
+.erp-progress-row-product {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  margin: 6px 0 10px;
+}
+.erp-progress-row-product-image {
+  position: relative;
+  display: inline-flex;
+  width: 56px;
+  height: 56px;
+}
+.erp-progress-row-product-image .erp-task-product-image {
+  width: 56px;
+  height: 56px;
+  flex-basis: 56px;
+}
+.erp-progress-product-count {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 2px solid var(--erp-surface-bg);
+  border-radius: 10px;
+  padding: 0 4px;
+  background: var(--erp-primary);
+  color: var(--erp-on-primary, #fff);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
 .erp-progress-row-copy strong {
   color: var(--erp-text);
@@ -341,7 +376,8 @@
 .erp-progress-help p:last-child {
   margin-bottom: 0;
 }
-.erp-progress-row-select:hover .erp-progress-order {
+.erp-progress-row:hover .erp-progress-order,
+.erp-progress-row:focus-within .erp-progress-order {
   text-decoration: underline;
   text-underline-offset: 3px;
 }

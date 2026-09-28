@@ -19,6 +19,7 @@ test('sales delivery keeps unknown shipment facts explicit and sorts risks first
       {
         id: 1,
         sales_order_id: 10,
+        product_id: 101,
         order_no: 'SO-DELIVERED',
         ordered_quantity: '10',
         shipped_quantity: '10',
@@ -62,8 +63,10 @@ test('sales delivery keeps unknown shipment facts explicit and sorts risks first
   )
   const unknown = model.rows.find((row) => row.status.key === 'unknown')
   const overdue = model.rows.find((row) => row.status.key === 'overdue')
+  const delivered = model.rows.find((row) => row.status.key === 'delivered')
   assert.equal(unknown.percent, null)
   assert.equal(overdue.percent, 40)
+  assert.equal(delivered.productID, 101)
   assert.equal(model.counts.overdue, 1)
   assert.equal(model.counts.delivered, 1)
 })
@@ -245,6 +248,7 @@ test('production process derives each product lane from authoritative operations
       {
         id: 11,
         line_no: 1,
+        product_id: 101,
         product_code_snapshot: 'BEAR-20',
         product_name_snapshot: '毛绒小熊',
         sku_code_snapshot: 'BROWN',
@@ -297,6 +301,7 @@ test('production process derives each product lane from authoritative operations
   })
 
   assert.equal(model.order.orderNo, 'MO-ROUTE-001')
+  assert.equal(model.items[0].productID, 101)
   assert.equal(model.items[0].steps[0].state.key, 'done')
   assert.equal(model.items[0].steps[1].state.key, 'quality')
   assert.equal(model.items[0].steps[1].batchSummary, '1 批待品质检验')

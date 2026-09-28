@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { Alert, Descriptions, Form, Input, Select } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 
 import {
   localDateTimeInputValue,
@@ -45,6 +46,7 @@ export default function ShipmentFinanceSourceModal({
       okText={config.okText}
       cancelText="取消"
       confirmLoading={loading}
+      maskClosable={!loading}
       destroyOnHidden
       onCancel={onCancel}
       onOk={submit}
@@ -85,7 +87,7 @@ export default function ShipmentFinanceSourceModal({
           </Form.Item>
         ) : null}
         <Form.Item name="occurred_at" label="发生时间">
-          <Input type="datetime-local" />
+          <DateTimeInput />
         </Form.Item>
         <Form.Item name="note" label="备注">
           <Input.TextArea rows={3} maxLength={255} showCount />

@@ -103,7 +103,7 @@ export default function BusinessFormModal({
   size = 'localAction',
   width,
   centered = true,
-  maskClosable = false,
+  maskClosable = true,
   children,
   open,
   ...modalProps

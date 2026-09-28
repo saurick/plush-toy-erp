@@ -94,6 +94,7 @@ export default function PermissionCenterPage() {
         return
       }
       modal.confirm({
+        maskClosable: true,
         centered: true,
         title,
         content,

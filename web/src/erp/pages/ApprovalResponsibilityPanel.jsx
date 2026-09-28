@@ -18,6 +18,7 @@ import {
   Space,
   Switch,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -77,6 +78,28 @@ const EDITOR_MEMBER_FIELDS = STRATEGIES.flatMap(({ key }) => [
 ])
 
 const APPROVAL_SETTINGS_RESULT_MESSAGE_KEY = 'approval-settings-result'
+
+const APPROVAL_CONDITION_HELP =
+  '全部审批表示每次提交都发起人工审批。销售和采购可按金额设置：同币种金额低于门槛免审，达到门槛、币种不同或金额不完整仍需审批；出货财务放行始终需要审批。'
+const APPROVAL_RESPONSIBILITY_HELP =
+  '系统按主办、备用、升级的优先级选择当前可办理责任。主办无人可处理时使用备用；超时或需要升级时由升级责任承接，不是多人逐级会签。'
+
+function approvalColumnTitle(label, help, ariaLabel) {
+  return (
+    <Space size={4}>
+      <span>{label}</span>
+      <Tooltip title={help} trigger={['hover', 'focus']}>
+        <Button
+          type="text"
+          shape="circle"
+          size="small"
+          icon={<QuestionCircleOutlined aria-hidden="true" />}
+          aria-label={ariaLabel}
+        />
+      </Tooltip>
+    </Space>
+  )
+}
 
 function notifyApprovalSettingsApplied() {
   message.success({
@@ -603,6 +626,7 @@ export default function ApprovalResponsibilityPanel({
   const closeEditor = (force = false) => {
     if (!force && editorDirty) {
       modal.confirm({
+        maskClosable: true,
         centered: true,
         title: '放弃本次审批设置调整？',
         content: '弹窗内尚未保存的选择会丢失。',
@@ -804,7 +828,11 @@ export default function ApprovalResponsibilityPanel({
         ),
     },
     {
-      title: '审批条件',
+      title: approvalColumnTitle(
+        '审批条件',
+        APPROVAL_CONDITION_HELP,
+        '审批条件说明'
+      ),
       width: 235,
       render: (_, item) => (
         <Space direction="vertical" size={1}>
@@ -822,7 +850,11 @@ export default function ApprovalResponsibilityPanel({
       ),
     },
     {
-      title: '责任顺序',
+      title: approvalColumnTitle(
+        '责任顺序',
+        APPROVAL_RESPONSIBILITY_HELP,
+        '责任顺序说明'
+      ),
       render: (_, item) =>
         !item.enabled ? (
           <Text type="secondary">—</Text>

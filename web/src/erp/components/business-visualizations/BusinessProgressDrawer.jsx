@@ -11,6 +11,7 @@ import MobileDetailHeader from '../../mobile/components/MobileDetailHeader.jsx'
 import MobileProgressSummary from '../../mobile/components/MobileProgressSummary.jsx'
 import BusinessModal from '../business-list/BusinessModal.jsx'
 import BusinessProgressSummary from './BusinessProgressSummary.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import {
   progressSourcePath,
   progressStatusLabel,
@@ -295,19 +296,32 @@ export default function BusinessProgressDrawer({
               ) : (
                 records.map((record) => {
                   const path = progressSourcePath(record, selection?.view)
+                  const productLine =
+                    record.kind === 'sales_line' ||
+                    record.kind === 'production_line'
+                  const recordTitle =
+                    record.kind === 'task'
+                      ? getWorkflowTaskDisplayName({
+                          task_name: record.label,
+                        })
+                      : record.label || record.number
                   return (
                     <article
                       className="erp-progress-record"
                       key={`${record.kind}:${record.id}`}
                     >
                       <div className="erp-progress-record-main">
-                        <strong>
-                          {record.kind === 'task'
-                            ? getWorkflowTaskDisplayName({
-                                task_name: record.label,
-                              })
-                            : record.label || record.number}
-                        </strong>
+                        {productLine ? (
+                          <ProductIdentity
+                            productId={record.product_id}
+                            name={recordTitle}
+                            compact
+                          >
+                            <strong>{recordTitle}</strong>
+                          </ProductIdentity>
+                        ) : (
+                          <strong>{recordTitle}</strong>
+                        )}
                         <span>
                           {record.label && record.number ? record.number : ''}
                           {record.quantity

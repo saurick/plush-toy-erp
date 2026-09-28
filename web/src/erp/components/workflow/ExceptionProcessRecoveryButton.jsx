@@ -95,6 +95,7 @@ export default function ExceptionProcessRecoveryButton({
         return
       }
       modal.confirm({
+        maskClosable: true,
         title: '确认终止异常流程并撤回下游待办？',
         content:
           '来源业务已取消或冲正。此操作只终止仍未生效的下游流程与待办，不会删除业务记录、事实或补偿证据。',

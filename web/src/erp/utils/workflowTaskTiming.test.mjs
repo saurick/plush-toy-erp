@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  buildWorkflowDeadlineQuickOptions,
   formatWorkflowTaskTime,
   getWorkflowTaskBlockedAt,
   getWorkflowTaskTiming,
@@ -19,6 +20,31 @@ const task = {
 }
 const timing = (value, options = {}) =>
   getWorkflowTaskTiming(value, { nowMs, ...options })
+
+test('跟进任务截止快捷项使用明确未来时间并按点击时刻重新计算', () => {
+  let current = new Date(2026, 8, 28, 12, 46, 37)
+  const options = buildWorkflowDeadlineQuickOptions(() => current)
+
+  assert.deepEqual(
+    options.map(({ label }) => label),
+    ['今天 23:59', '明天此时', '7 天后', '15 天后', '30 天后']
+  )
+  assert.deepEqual(
+    options.map(({ value }) => value()),
+    [
+      '2026-09-28T23:59',
+      '2026-09-29T12:46',
+      '2026-10-05T12:46',
+      '2026-10-13T12:46',
+      '2026-10-28T12:46',
+    ]
+  )
+  assert.equal(options[0].disabled(), false)
+
+  current = new Date(2026, 8, 28, 23, 59, 30)
+  assert.equal(options[0].disabled(), true)
+  assert.equal(options[1].value(), '2026-09-29T23:59')
+})
 
 test('pending tasks separate role arrival from deadline without adding other timestamps', () => {
   const rows = timing(task)

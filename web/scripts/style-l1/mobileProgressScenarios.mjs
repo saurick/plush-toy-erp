@@ -345,8 +345,8 @@ export function createMobileProgressScenarios({
           })
         assert(
           productMetrics.summaryHeight <= 72 &&
-            Math.abs(productMetrics.imageWidth - 40) < 1 &&
-            Math.abs(productMetrics.imageHeight - 40) < 1 &&
+            Math.abs(productMetrics.imageWidth - 56) < 1 &&
+            Math.abs(productMetrics.imageHeight - 56) < 1 &&
             productMetrics.overflow <= 1,
           `产品缩略图应嵌入原信息区且不撑宽卡片：${JSON.stringify(productMetrics)}`
         )

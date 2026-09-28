@@ -1,6 +1,7 @@
 import React from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
@@ -182,7 +183,7 @@ export default function FinanceBusinessSourceModal({
           <Input autoComplete="off" maxLength={64} showCount />
         </Form.Item>
         <Form.Item name="occurred_at" label="发生时间">
-          <Input type="datetime-local" />
+          <DateTimeInput />
         </Form.Item>
         <Form.Item name="note" label="备注">
           <Input.TextArea rows={3} maxLength={255} showCount />

@@ -1,3 +1,7 @@
+async function clickDialogBackdrop(dialog) {
+  await dialog.locator('xpath=..').click({ position: { x: 4, y: 4 } })
+}
+
 export function createBusinessFollowupScenarios({ assert, outputDir, path, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }) {
   const requests = []
   let created = null
@@ -53,15 +57,24 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
       },
       verify: async (page) => {
         const create = page.locator('[data-business-action-key="create-followup"]')
+        const dialog = page.getByRole('dialog', { name: '新建跟进任务', exact: true })
+        const openCreateDialog = async () => {
+          if (!(await create.isVisible())) await page.getByRole('button', { name: /^更多操作，共/ }).click()
+          await create.click()
+          await dialog.waitFor()
+        }
         await page.locator('.ant-table-tbody .ant-table-row').first().waitFor()
         await page.locator('.ant-table-tbody input[type="radio"]').first().check()
-        if (!(await create.isVisible())) await page.getByRole('button', { name: /^更多操作，共/ }).click()
-        await create.click()
-        const dialog = page.getByRole('dialog', { name: '发起任务', exact: true })
+        await openCreateDialog()
+        await clickDialogBackdrop(dialog)
+        await dialog.waitFor({ state: 'hidden' })
+        await openCreateDialog()
         await dialog.getByLabel('任务事项').fill('确认包装尺寸')
-        await dialog.getByRole('button', { name: '关闭', exact: true }).last().click()
-        const discard = page.getByRole('dialog').filter({ hasText: '放弃未发起的任务？' })
-        await discard.getByRole('button', { name: '继续编辑' }).click()
+        await clickDialogBackdrop(dialog)
+        const discard = page.getByRole('dialog').filter({ hasText: '放弃未创建的跟进任务？' })
+        await discard.waitFor()
+        await clickDialogBackdrop(discard)
+        await discard.waitFor({ state: 'hidden' })
         assert.equal(await dialog.getByLabel('任务事项').inputValue(), '确认包装尺寸')
         await dialog.getByLabel('需要对方完成什么').fill('请核对最终包装尺寸，并反馈结果。')
         await dialog.locator('.ant-form-item').filter({ hasText: '责任岗位' }).locator('.ant-select-selector').click()
@@ -71,15 +84,98 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await dialog.locator('.ant-form-item').filter({ hasText: '责任岗位' }).locator('.ant-select-selector').click()
         await page.getByTitle('业务', { exact: true }).click()
         assert.match(await dialog.innerText(), /由岗位共同办理/)
-        await dialog.getByLabel('截止时间').fill('2099-01-01T10:00')
+        const deadlineInput = dialog.getByLabel('截止时间')
+        const deadlinePicker = dialog.locator('.erp-business-date-time-input')
+        await deadlinePicker.click({ position: { x: 16, y: 16 } })
+        const pickerPopup = page
+          .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
+          .last()
+        await pickerPopup.waitFor()
+        assert.equal(
+          await deadlineInput.getAttribute('readonly'),
+          null,
+          '日期时间控件应保留键盘录入能力'
+        )
+        assert.equal(
+          await pickerPopup.locator('.ant-picker-now-btn').count(),
+          0,
+          '截止时间不应显示会立即失效的“此刻”'
+        )
+        for (const label of [
+          '今天 23:59',
+          '明天此时',
+          '7 天后',
+          '15 天后',
+          '30 天后',
+        ]) {
+          await pickerPopup.getByRole('button', { name: label, exact: true }).waitFor()
+        }
+        const quickOptionMetrics = await pickerPopup
+          .locator('.erp-business-date-picker-quick-options')
+          .evaluate((element) => ({
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+          }))
+        assert(
+          quickOptionMetrics.scrollWidth <= quickOptionMetrics.clientWidth + 1,
+          '快捷截止选项不应水平溢出'
+        )
+        const popupBounds = await pickerPopup.boundingBox()
+        const viewportWidth = page.viewportSize().width
+        const popupPartMetrics = await pickerPopup.evaluate((popup) =>
+          [
+            '.ant-picker-panel-layout',
+            '.ant-picker-panel',
+            '.ant-picker-datetime-panel',
+            '.ant-picker-date-panel',
+            '.ant-picker-time-panel',
+            '.ant-picker-footer',
+          ].map((selector) => ({
+            selector,
+            rect: (() => {
+              const bounds = popup.querySelector(selector)?.getBoundingClientRect()
+              return bounds
+                ? { width: bounds.width, height: bounds.height }
+                : null
+            })(),
+          }))
+        )
+        assert(
+          popupBounds &&
+            popupBounds.x >= -1 &&
+            popupBounds.x + popupBounds.width <= viewportWidth + 1,
+          `日期时间面板应完整位于视口内，实际为 ${JSON.stringify({ popupBounds, popupPartMetrics, viewportWidth })}`
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            `business-followup-deadline-shortcuts-${page.viewportSize().width}.png`
+          ),
+          animations: 'disabled',
+        })
+        await pickerPopup
+          .getByRole('button', { name: '7 天后', exact: true })
+          .click()
+        await pickerPopup.waitFor({ state: 'hidden' })
+        const quickDeadlineValue = await deadlineInput.inputValue()
+        assert(
+          /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/u.test(quickDeadlineValue),
+          `快捷选择应回填可读的本地日期时间，实际为 ${JSON.stringify(quickDeadlineValue)}`
+        )
+        await deadlinePicker.click({ position: { x: 16, y: 16 } })
+        await pickerPopup.waitFor()
+        await deadlineInput.fill('2099/01/01 10:00')
+        await deadlineInput.press('Enter')
+        assert.equal(await deadlineInput.inputValue(), '2099/01/01 10:00')
         await dialog.getByLabel('任务事项').click()
         await page.locator('.ant-select-dropdown:visible').first().waitFor({ state: 'hidden' })
         await page.screenshot({ path: path.join(outputDir, `business-followup-form-${page.viewportSize().width}.png`), animations: 'disabled' })
-        await dialog.getByRole('button', { name: '发起任务', exact: true }).click()
-        await dialog.getByText('发起结果暂未确认，内容已保留。请使用原内容重试，系统会核对已有结果。').waitFor()
+        await dialog.getByRole('button', { name: '新建跟进任务', exact: true }).click()
+        await dialog.getByText('创建结果暂未确认，内容已保留。请使用原内容重试，系统会核对已有结果。').waitFor()
         assert.equal(await dialog.getByLabel('任务事项').isDisabled(), true)
+        assert.equal(await deadlineInput.isDisabled(), true)
         await dialog.getByRole('button', { name: '重试并确认结果' }).click()
-        const receipt = page.getByRole('dialog', { name: '任务已发起', exact: true })
+        const receipt = page.getByRole('dialog', { name: '跟进任务已创建', exact: true })
         await receipt.waitFor()
         assert.equal(requests.length, 2)
         assert.deepEqual(requests[0], requests[1], '响应不完整时保留同一内容和幂等键')
@@ -121,19 +217,41 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await frame.locator('[data-action="select-row"]').first().check()
         assert.equal(await frame.locator('[data-action="open-task-create"]').isDisabled(), true)
         await frame.locator('[data-action="open-related-tasks"]').click()
-        await frame.getByRole('dialog', { name: '相关任务' }).waitFor()
-        await frame.getByRole('dialog', { name: '相关任务' }).getByRole('button', { name: '关闭', exact: true }).last().click()
+        const relatedTasks = frame.getByRole('dialog', { name: '相关任务' })
+        await relatedTasks.waitFor()
+        await clickDialogBackdrop(relatedTasks)
+        await relatedTasks.waitFor({ state: 'hidden' })
         await frame.locator('[data-action="status"][data-value="draft"]').click()
         await frame.locator('[data-action="select-row"]').first().check()
         await frame.locator('[data-action="open-task-create"]').click()
+        const taskCreate = frame.getByRole('dialog', {
+          name: '新建跟进任务',
+          exact: true,
+        })
+        await clickDialogBackdrop(taskCreate)
+        await taskCreate.waitFor({ state: 'hidden' })
+        await frame.locator('[data-action="open-task-create"]').click()
         await frame.locator('#task-create-name').fill('补充包装稿')
-        await frame.getByRole('dialog', { name: '发起任务', exact: true }).getByRole('button', { name: '取消', exact: true }).click()
-        await frame.getByRole('button', { name: '继续编辑', exact: true }).click()
+        await clickDialogBackdrop(taskCreate)
+        const discard = frame.getByRole('dialog', {
+          name: '放弃未创建的跟进任务？',
+          exact: true,
+        })
+        await discard.waitFor()
+        await clickDialogBackdrop(discard)
+        await discard.waitFor({ state: 'hidden' })
         assert.equal(await frame.locator('#task-create-name').inputValue(), '补充包装稿')
         await frame.locator('#task-create-role').selectOption('采购')
         await frame.locator('#task-create-assignee').selectOption('李倩')
         await frame.locator('#task-create-role').selectOption('销售')
         assert.equal(await frame.locator('#task-create-assignee').inputValue(), 'unassigned')
+        await frame
+          .getByRole('button', { name: '7 天后', exact: true })
+          .click()
+        assert.match(
+          await frame.locator('#task-create-deadline').inputValue(),
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u
+        )
         await frame.locator('#task-create-deadline').fill('2099-01-01T10:00')
         await frame.locator('#task-create-note').fill('请补充最终包装稿，附尺寸说明。')
         await frame.locator('[data-action="confirm-task-create"]').click()

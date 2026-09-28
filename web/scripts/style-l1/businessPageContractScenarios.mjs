@@ -184,11 +184,10 @@ export function createBusinessPageContractScenarios({
       verify: async (page) => {
         const salesHeadings = [
           '订单与客户',
-          '联系人与负责人',
-          '结算条件',
+          '联系与交付',
+          '结算与报价',
           '税费与运费条件',
-          '交付与收货',
-          '其他说明',
+          '备注与附件',
         ]
         const paymentHeadings = ['往来与金额', '账户与凭据']
 
@@ -500,40 +499,62 @@ export function createBusinessPageContractScenarios({
         await expectButton(page, '新建订单')
         await expectText(page, '当前操作')
         await expectText(page, '订单列表')
-        await expectText(page, '工作台')
-        await expectText(page, '任务看板')
-        await expectText(page, '进度看板')
-        await expectText(page, '基础资料')
-        await expectText(page, '客户档案')
-        await expectText(page, '供应商与加工厂')
-        await expectText(page, '产品档案')
-        await expectText(page, '销售管理')
-        await expectText(page, '销售订单')
-        await expectText(page, '产品工程')
-        await expectText(page, '物料清单（BOM）')
-        await expectText(page, '采购管理')
-        await expectText(page, '采购订单')
-        await expectText(page, '质检管理')
-        await expectText(page, '质量检验')
-        await expectText(page, '库存管理')
-        await expectText(page, '采购入库')
-        await expectText(page, '库存台账')
-        await expectText(page, '委外管理')
-        await expectText(page, '委外订单')
-        await expectText(page, '生产管理')
-        await expectText(page, '生产订单')
-        await expectText(page, '生产记录')
-        await expectText(page, '出货管理')
-        await expectText(page, '出货放行')
-        await expectText(page, '财务管理')
-        await expectText(page, '应收管理')
+        for (const group of [
+          '工作中心',
+          '基础资料',
+          '销售管理',
+          '产品工程',
+          '采购管理',
+          '委外管理',
+          '生产管理',
+          '库存管理',
+          '质检管理',
+          '出货管理',
+          '财务管理',
+          '工具与查询',
+          '系统与帮助',
+        ]) {
+          await expectAdminMenuText(page, group)
+        }
+        await page.getByRole('button', { name: '全部模块', exact: true }).click()
+        const moduleCatalog = page.getByRole('dialog', {
+          name: '全部模块',
+          exact: true,
+        })
+        await moduleCatalog.waitFor({ state: 'visible', timeout: 10_000 })
+        for (const entry of [
+          '工作台',
+          '任务看板',
+          '进度看板',
+          '客户档案',
+          '供应商与加工厂',
+          '产品档案',
+          '销售订单',
+          '物料清单（BOM）',
+          '采购订单',
+          '质量检验',
+          '采购入库',
+          '库存台账',
+          '委外订单',
+          '生产订单',
+          '生产记录',
+          '出货放行',
+          '应收管理',
+          '模板打印中心',
+          '权限管理',
+          '帮助中心',
+        ]) {
+          await moduleCatalog
+            .getByRole('button', { name: entry, exact: true })
+            .waitFor({ state: 'visible', timeout: 10_000 })
+        }
+        await moduleCatalog.locator('.ant-modal-close').click()
+        await moduleCatalog.waitFor({ state: 'hidden', timeout: 10_000 })
         await page.getByRole('button', { name: /导出/u }).waitFor()
         await page
           .locator('.erp-business-operation-panel')
           .getByRole('button', { name: /列顺序|列设置/u })
           .waitFor()
-        await expectText(page, '运营工具')
-        await expectText(page, '模板打印中心')
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'sales-orders',
           heading: '销售订单',
@@ -541,8 +562,7 @@ export function createBusinessPageContractScenarios({
         await page.locator('.erp-admin-menu').evaluate((node) => {
           node.scrollTop = node.scrollHeight
         })
-        await expectAdminMenuText(page, '系统管理')
-        await expectText(page, '权限管理')
+        await expectAdminMenuText(page, '系统与帮助')
         const menu = page.locator('.erp-admin-menu')
         assert.equal(
           await menu.getByText('异常处理', { exact: true }).count(),
@@ -576,8 +596,6 @@ export function createBusinessPageContractScenarios({
           0,
           '侧栏不应再显示“开发与验收”分组'
         )
-        await expectText(page, '使用帮助')
-        await expectText(page, '帮助中心')
         assert.equal(
           await page.getByText('高级文档', { exact: true }).count(),
           0,

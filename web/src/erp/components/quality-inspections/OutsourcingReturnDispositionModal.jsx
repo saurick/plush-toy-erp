@@ -229,6 +229,7 @@ export default function OutsourcingReturnDispositionModal({
         </Space>
       }
       onCancel={() => !loading && onClose?.()}
+      maskClosable={!loading}
     >
       <Alert
         type="warning"

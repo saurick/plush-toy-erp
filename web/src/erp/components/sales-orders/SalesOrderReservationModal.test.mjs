@@ -8,9 +8,14 @@ const source = readFileSync(
 )
 
 test('sales order reservation modal keeps the source summary business-readable', () => {
-  for (const label of ['销售订单', '产品', 'SKU / 规格', '单位']) {
+  for (const label of ['销售订单', '产品', '单位']) {
     assert.match(source, new RegExp(`label: '${label}'`, 'u'))
   }
+  assert.doesNotMatch(source, /label: 'SKU \/ 规格'/u)
+  assert.match(
+    source,
+    /<ProductIdentity[\s\S]*?code=\{sourceSpecificationText\}/u
+  )
   assert.match(source, /product_code_snapshot/u)
   assert.match(source, /product_name_snapshot/u)
   assert.match(source, /sku_code_snapshot/u)

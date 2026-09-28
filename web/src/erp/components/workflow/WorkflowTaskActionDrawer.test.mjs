@@ -337,39 +337,50 @@ test('drawer requires a reason and disables submission while saving or access is
   assert.equal(ui.button('提交阻塞'), undefined)
 })
 
-test('a selected secondary action keeps primary choices reachable and still requires a valid reason and permission', async (t) => {
+test('all allowed actions stay directly visible and still require a valid reason and permission', async (t) => {
   const ui = await mountDrawer(t, {
     allowedActionModes: ['complete', 'block', 'reject', 'urge', 'assign'],
     actionMode: 'urge',
   })
   await ui.click(ui.tabs()[1])
-  const primaryLabels = () => [...document.querySelectorAll('[role="radio"]')]
+  const actionLabels = () => [...document.querySelectorAll('[role="radio"]')]
     .map((node) => node.querySelector('strong').textContent)
-  assert.deepEqual(primaryLabels(), ['处理完成', '标记阻塞'])
-  assert.ok(ui.button('更多处理方式：催办'))
-  assert.equal(document.querySelector('[role="radio"]').tabIndex, 0)
+  assert.deepEqual(actionLabels(), [
+    '处理完成',
+    '标记阻塞',
+    '退回任务',
+    '催办',
+    '转交任务',
+  ])
+  assert.equal(ui.button('更多处理方式：催办'), undefined)
+  assert.equal(
+    [...document.querySelectorAll('[role="radio"]')].find((node) =>
+      node.textContent.includes('催办')
+    ).tabIndex,
+    0
+  )
   assert.equal(ui.tabs()[2].disabled, true)
   assert.equal(ui.submissions.length, 0)
   await ui.update({ actionReason: '等待责任人确认交期' })
   assert.equal(ui.tabs()[2].disabled, false)
   await ui.update({ allowedActionModes: ['complete', 'block'] })
-  assert.equal(ui.button('更多处理方式：催办'), undefined)
+  assert.deepEqual(actionLabels(), ['处理完成', '标记阻塞'])
   assert.equal(ui.tabs()[2].disabled, true)
 })
 
-test('approval and resume remain primary while urge-only access needs no more menu', async (t) => {
+test('approval, resume and urge actions all stay directly visible in their stable order', async (t) => {
   const ui = await mountDrawer(t, {
     task: { id: 51, required_capability_key: 'workflow.task.approve', task_status_key: 'ready' },
     allowedActionModes: ['complete', 'reject', 'urge'],
   })
   await ui.click(ui.tabs()[1])
-  const primaryLabels = () => [...document.querySelectorAll('[role="radio"]')]
+  const actionLabels = () => [...document.querySelectorAll('[role="radio"]')]
     .map((node) => node.querySelector('strong').textContent)
-  assert.deepEqual(primaryLabels(), ['审批通过', '审批退回'])
+  assert.deepEqual(actionLabels(), ['审批通过', '审批退回', '催办'])
   await ui.update({ allowedActionModes: ['resume', 'urge'] })
-  assert.deepEqual(primaryLabels(), ['解除阻塞'])
+  assert.deepEqual(actionLabels(), ['解除阻塞', '催办'])
   await ui.update({ allowedActionModes: ['urge'] })
-  assert.deepEqual(primaryLabels(), ['催办'])
+  assert.deepEqual(actionLabels(), ['催办'])
   assert.equal(ui.button('更多处理方式'), undefined)
 })
 

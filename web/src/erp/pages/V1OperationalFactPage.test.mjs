@@ -40,7 +40,10 @@ test('invoice and reconciliation copy matches the available actions', () => {
 
 test('production records keep fact truth and expose permission-aware internal views', () => {
   assert.match(source, /initialActiveKey: 'production'/u)
-  assert.doesNotMatch(source, /ProductionRecordsNavigation|workspaceNavigation/u)
+  assert.doesNotMatch(
+    source,
+    /ProductionRecordsNavigation|workspaceNavigation/u
+  )
   const help = readFileSync(
     new URL('../config/roleHelpContent.mjs', import.meta.url),
     'utf8'
@@ -96,6 +99,10 @@ test('operational fact workspace enforces exact outsourcing read and mutation co
   assert.match(
     viewConfig,
     /production:\s*\{[\s\S]*?readPermissions:\s*ACTION_PERMISSIONS\.productionRead/u
+  )
+  assert.match(
+    viewConfig,
+    /reservations:[\s\S]*?React\.createElement\([\s\S]*?ProductIdentity,[\s\S]*?productId:\s*record\.product_id/u
   )
   assert.match(workspace, /currentActiveKey === 'outsourcing'/u)
   assert.match(mutations, /customer_key: activeCustomerKey/u)

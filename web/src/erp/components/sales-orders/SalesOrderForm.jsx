@@ -70,6 +70,7 @@ import {
 import BusinessLineItemsTable, {
   BusinessLineItemRow,
 } from '../business-list/BusinessLineItemsTable.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 const SALES_ORDER_COLUMNS = [
   { label: '订货产品名称', width: 210 },
@@ -219,6 +220,7 @@ function quantityPrecisionRule({ form, fieldName, unitOptions }) {
   return {
     validator: async (_, value) => {
       const line = form.getFieldValue(['items', fieldName]) || {}
+      if (!line.unit_id) return
       const precision = unitPrecisionFromOptions(unitOptions, line.unit_id)
       if (!isQuantityTextWithinUnitPrecision(value, precision)) {
         throw new Error(unitPrecisionErrorMessage(precision))
@@ -1062,23 +1064,31 @@ export function SalesOrderItemsFormSection({
                         rules={[
                           {
                             validator: async (_, value) => {
+                              const quantity = value || '0'
+                              if (numeric20Scale6Units(quantity) === null) {
+                                throw new Error('请填写非负数量')
+                              }
+                              const unitID = form.getFieldValue([
+                                'items',
+                                field.name,
+                                'unit_id',
+                              ])
+                              if (!unitID) return
                               if (
-                                numeric20Scale6Units(value || '0') !== null &&
-                                isQuantityTextWithinUnitPrecision(
-                                  value || '0',
-                                  unitPrecisionFromOptions(
-                                    unitOptions,
-                                    form.getFieldValue([
-                                      'items',
-                                      field.name,
-                                      'unit_id',
-                                    ])
-                                  )
+                                !isQuantityTextWithinUnitPrecision(
+                                  quantity,
+                                  unitPrecisionFromOptions(unitOptions, unitID)
                                 )
                               ) {
-                                return
+                                throw new Error(
+                                  unitPrecisionErrorMessage(
+                                    unitPrecisionFromOptions(
+                                      unitOptions,
+                                      unitID
+                                    )
+                                  )
+                                )
                               }
-                              throw new Error('请填写符合单位精度的非负数量')
                             },
                           },
                         ]}
@@ -1211,13 +1221,19 @@ export function SalesOrderItemsFormSection({
                               className="erp-line-item-field erp-line-item-field--source-summary"
                               label="已关联产品"
                             >
-                              <Input
-                                title={sourceText}
-                                value={sourceText}
-                                disabled
-                                readOnly
-                                placeholder="自动带出"
-                              />
+                              <div className="erp-sales-order-product-summary">
+                                <ProductIdentity
+                                  productId={line?.product_id}
+                                  name={
+                                    line?.product_name_snapshot ||
+                                    line?.product_code_snapshot ||
+                                    '已关联产品'
+                                  }
+                                  compact
+                                >
+                                  {sourceText}
+                                </ProductIdentity>
+                              </div>
                             </Form.Item>
                           )
                         }}

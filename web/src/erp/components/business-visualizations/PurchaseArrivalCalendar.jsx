@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
-import { Button, DatePicker, Select } from 'antd'
+import { Button, Select } from 'antd'
 import dayjs from 'dayjs'
 import { currentBusinessDate } from '../../utils/businessDate.mjs'
 import {
@@ -8,6 +8,7 @@ import {
   moveBusinessDate,
   paginateVisualizationRows,
 } from '../../utils/businessVisualizationModels.mjs'
+import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import {
   BusinessVisualizationFrame,
   VisualizationPagination,
@@ -123,11 +124,11 @@ export default function PurchaseArrivalCalendar({
         >
           今天
         </Button>
-        <DatePicker
+        <DateInput
           aria-label="跳转到货日期"
           placeholder="跳转日期"
-          value={viewState.selectedDate ? dayjs(viewState.selectedDate) : null}
-          onChange={(_date, date) =>
+          value={viewState.selectedDate || ''}
+          onChange={(date) =>
             change(
               date
                 ? { startDate: date, selectedDate: date, filter: 'date' }

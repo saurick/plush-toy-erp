@@ -851,7 +851,7 @@ export default function WorkInstructionImageAnnotationEditor({
       data-work-instruction-annotation-editor="true"
       destroyOnHidden
       keyboard
-      maskClosable={false}
+      maskClosable
       focusTriggerAfterClose
       onCancel={onCancel}
       footer={

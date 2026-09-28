@@ -1545,7 +1545,6 @@ export default function ERPLayout({ legalNotice }) {
                 <Breadcrumb
                   className="erp-admin-breadcrumb"
                   items={[
-                    { title: '业务中心' },
                     {
                       title: (
                         <strong>

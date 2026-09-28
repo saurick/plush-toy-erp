@@ -7,6 +7,7 @@ import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 import WorkflowTaskActionDrawer, { getWorkflowTaskActionMeta } from './WorkflowTaskActionDrawer.jsx'
 import WorkflowFollowupDetails from './WorkflowFollowupDetails.jsx'
 import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess.js'
@@ -16,6 +17,9 @@ import { canCreateFollowupFromRecord, followupSource, requireFollowupTaskPage } 
 import { hasActionPermission, formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { getWorkflowTaskOwnerRoleLabel, getWorkflowTaskStatusMeta, writeWorkflowTaskBoardFiltersToSearch } from '../../utils/workflowTaskBoard.mjs'
 import { isWorkflowTaskMutationResultUnknown, workflowTaskMutationUUID } from '../../utils/workflowTaskMutation.mjs'
+import { buildWorkflowDeadlineQuickOptions } from '../../utils/workflowTaskTiming.mjs'
+
+const WORKFLOW_DEADLINE_QUICK_OPTIONS = buildWorkflowDeadlineQuickOptions()
 
 export default function BusinessTaskActions({ sourceType, record, adminProfile, disabled = false, onCreated }) {
   const navigate = useNavigate()
@@ -57,7 +61,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
     setError('')
     getWorkflowTaskCreateOptions({ source_type: contextType, source_id: sourceID }, { signal: controller.signal })
       .then((value) => { if (!controller.signal.aborted) setOptions(value) })
-      .catch((err) => { if (!controller.signal.aborted && !isRpcAbortError(err)) setError(getActionErrorMessage(err, '读取任务发起资料')) })
+      .catch((err) => { if (!controller.signal.aborted && !isRpcAbortError(err)) setError(getActionErrorMessage(err, '读取跟进任务资料')) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [open, view, sourceID, contextType, revision])
@@ -162,13 +166,13 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
       setPending(false)
       setReceipt(created)
       setView('receipt')
-      if (onCreated) Promise.resolve().then(() => onCreated(created)).catch(() => message.warning('任务已发起，来源页面刷新失败，请重新读取'))
+      if (onCreated) Promise.resolve().then(() => onCreated(created)).catch(() => message.warning('跟进任务已创建，来源页面刷新失败，请重新读取'))
     } catch (err) {
       if (err?.errorFields) return
       const unknown = isWorkflowTaskMutationResultUnknown(err)
       setPending(unknown)
       if (!unknown) attemptRef.current = null
-      setError(unknown ? '发起结果暂未确认，内容已保留。请使用原内容重试，系统会核对已有结果。' : getActionErrorMessage(err, '发起任务'))
+      setError(unknown ? '创建结果暂未确认，内容已保留。请使用原内容重试，系统会核对已有结果。' : getActionErrorMessage(err, '新建跟进任务'))
     } finally {
       busyRef.current = false
       setSaving(false)
@@ -178,9 +182,10 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
     if (saving) return
     if (view === 'create' && !pending && form.isFieldsTouched()) {
       modal.confirm({
+        maskClosable: true,
         centered: true,
-        title: '放弃未发起的任务？',
-        content: '当前填写的任务内容尚未发送。',
+        title: '放弃未创建的跟进任务？',
+        content: '当前填写的跟进任务尚未创建。',
         okText: '放弃填写',
         cancelText: '继续编辑',
         onOk: () => setOpen(false),
@@ -214,21 +219,22 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
   return (
     <>
       <Space size={4}>
-        {canCreate ? <Button size="small" icon={<CalendarOutlined />} data-business-action-key="create-followup" disabled={disabled || (!pending && !canCreateFollowupFromRecord(sourceType, record))} title={!source ? '请先选择一张单据' : !canCreateFollowupFromRecord(sourceType, record) ? '当前单据已结束，可查看已有任务' : undefined} onClick={() => openView('create')}>{pending ? '确认发起结果' : '发起任务'}</Button> : null}
+        {canCreate ? <Button size="small" icon={<CalendarOutlined />} data-business-action-key="create-followup" disabled={disabled || (!pending && !canCreateFollowupFromRecord(sourceType, record))} title={!source ? '请先选择一张单据' : !canCreateFollowupFromRecord(sourceType, record) ? '当前单据已结束，可查看已有任务' : undefined} onClick={() => openView('create')}>{pending ? '确认创建结果' : '新建跟进任务'}</Button> : null}
         <Button size="small" icon={<UnorderedListOutlined />} data-business-action-key="related-tasks" disabled={disabled || !source} onClick={() => openView('related')}>相关任务</Button>
       </Space>
       <BusinessFormModal
         open={open}
         forceRender
-        title={view === 'related' ? '相关任务' : view === 'receipt' ? '任务已发起' : '发起任务'}
+        title={view === 'related' ? '相关任务' : view === 'receipt' ? '跟进任务已创建' : '新建跟进任务'}
         width={760}
         onCancel={closeModal}
         closable={!saving}
         keyboard={!saving}
+        maskClosable={!saving}
         footer={
           <Space>
             <Button disabled={saving} onClick={closeModal}>关闭</Button>
-            {view === 'create' ? <Button type="primary" loading={saving} disabled={!pending && (loading || !options?.can_create)} onClick={submit}>{pending ? '重试并确认结果' : '发起任务'}</Button> : null}
+            {view === 'create' ? <Button type="primary" loading={saving} disabled={!pending && (loading || !options?.can_create)} onClick={submit}>{pending ? '重试并确认结果' : '新建跟进任务'}</Button> : null}
             {view === 'receipt' ? <Button type="primary" onClick={() => setView('related')}>查看相关任务</Button> : null}
             {view === 'related' ? <Button onClick={() => openTaskBoard()}>打开任务看板</Button> : null}
           </Space>
@@ -243,7 +249,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
               <Form.Item name="task_name" label="任务事项" className="erp-business-task-form__wide" rules={[{ required: true, whitespace: true, message: '请填写任务事项' }]}><Input maxLength={128} placeholder="例如：补充包装稿、确认交期变化" /></Form.Item>
               <Form.Item name="owner_role_key" label="责任岗位" rules={[{ required: true, message: '请选择责任岗位' }]}><Select placeholder="请选择责任岗位" options={(options?.roles || []).map((role) => ({ value: role.role_key, label: role.label }))} onChange={() => form.setFieldsValue({ assignee_id: 'pool' })} /></Form.Item>
               <Form.Item name="assignee_id" label="办理人"><Select options={[{ value: 'pool', label: '由岗位共同办理' }, ...(selectedRole?.assignees || []).map((person) => ({ value: person.admin_id, label: person.display_name }))]} /></Form.Item>
-              <Form.Item name="deadline" label="截止时间" rules={[{ required: true, message: '请选择截止时间' }]}><Input type="datetime-local" /></Form.Item>
+              <Form.Item name="deadline" label="截止时间" rules={[{ required: true, message: '请选择截止时间' }]}><DateTimeInput quickOptions={WORKFLOW_DEADLINE_QUICK_OPTIONS} quickOptionsLabel="快捷截止" showNow={false} /></Form.Item>
               <Form.Item name="priority" label="优先级"><Select options={[{ value: 0, label: '普通' }, { value: 10, label: '紧急' }]} /></Form.Item>
               <Form.Item name="description" label="需要对方完成什么" className="erp-business-task-form__wide" rules={[{ required: true, whitespace: true, message: '请写清任务要求和期望结果' }]}><Input.TextArea maxLength={2000} showCount autoSize={{ minRows: 3, maxRows: 7 }} /></Form.Item>
             </Form>

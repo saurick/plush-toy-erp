@@ -318,8 +318,8 @@ export function createContactEditorScenarios({
     viewport: { width: 1920, height: 1000 },
     verify: async (page) => {
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-      await frame.getByRole('button', { name: '更多功能', exact: true }).click()
-      await frame.getByRole('button', { name: '客户档案', exact: true }).click()
+      await frame.getByRole('button', { name: '基础资料', exact: true }).click()
+      await frame.getByRole('tab', { name: '客户档案', exact: true }).click()
       await frame.getByRole('button', { name: '新建客户', exact: true }).click()
       const editor = frame.locator('.compact-contacts')
       await frame

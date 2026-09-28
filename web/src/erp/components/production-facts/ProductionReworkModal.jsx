@@ -4,6 +4,7 @@ import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import {
@@ -185,7 +186,7 @@ export default function ProductionReworkModal({
           label="发生时间"
           rules={[{ required: true, message: '请选择发生时间' }]}
         >
-          <Input type="datetime-local" />
+          <DateTimeInput />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field--full"

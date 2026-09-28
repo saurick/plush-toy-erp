@@ -96,6 +96,9 @@
   text-align: left;
   overflow-wrap: anywhere;
 }
+.mobile-progress-card-selection {
+  border-radius: 16px;
+}
 .mobile-progress-card-main {
   display: flex;
   min-width: 0;
@@ -124,20 +127,20 @@
 .mobile-progress-product-summary {
   display: grid;
   min-width: 0;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 56px minmax(0, 1fr);
   align-items: start;
   gap: 10px;
 }
 .mobile-progress-product-image {
   position: relative;
   display: inline-flex;
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
 }
 .mobile-progress-product-image .erp-task-product-image {
-  width: 40px;
-  height: 40px;
-  flex-basis: 40px;
+  width: 56px;
+  height: 56px;
+  flex-basis: 56px;
 }
 .mobile-progress-product-count {
   position: absolute;
@@ -271,6 +274,16 @@
 
 .mobile-progress-overview h2 {
   font-weight: 700;
+}
+
+.mobile-progress-overview-product {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.mobile-progress-overview-product > .mobile-detail-identity {
+  margin: 0 0 0 68px;
 }
 
 .mobile-progress-attention-reason {

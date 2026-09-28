@@ -65,8 +65,22 @@ export function createBusinessDetailsScenarios(deps) {
     await pagination.waitFor()
     await footer.getByRole('combobox', { name: '每页明细条数' }).waitFor()
     const controls = await footer.evaluate((node) => {
-      const select = node
-        .querySelector('.erp-business-details-page-size')
+      const footerStyle = getComputedStyle(node)
+      const center = (rect) => ({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      })
+      const footerBox = node.getBoundingClientRect()
+      const selectNode = node.querySelector('.erp-business-details-page-size')
+      const select = selectNode.getBoundingClientRect()
+      const selectSurface = selectNode
+        .querySelector('.ant-select-selector')
+        .getBoundingClientRect()
+      const selectValue = selectNode
+        .querySelector('.ant-select-selection-item')
+        .getBoundingClientRect()
+      const selectArrow = selectNode
+        .querySelector('.ant-select-arrow')
         .getBoundingClientRect()
       const pages = node
         .querySelector('.ant-pagination')
@@ -81,10 +95,23 @@ export function createBusinessDetailsScenarios(deps) {
       ]
       return {
         overflow: node.scrollWidth - node.clientWidth,
+        footerPaddingDelta: Math.abs(
+          Number.parseFloat(footerStyle.paddingTop) -
+            Number.parseFloat(footerStyle.paddingBottom)
+        ),
         selectorBeforePages: select.right <= pages.left,
         sameRow:
           Math.abs(select.top - pages.top) <= 2 &&
           Math.abs(close.top - pages.top) <= 2,
+        footerCenterDeltas: {
+          select: Math.abs(center(select).y - center(footerBox).y),
+          pages: Math.abs(center(pages).y - center(footerBox).y),
+          close: Math.abs(center(close).y - center(footerBox).y),
+        },
+        selectContentCenterDeltas: {
+          value: Math.abs(center(selectValue).y - center(selectSurface).y),
+          arrow: Math.abs(center(selectArrow).y - center(selectSurface).y),
+        },
         buttonsBoxed: buttons.every(
           (button) =>
             Number.parseFloat(getComputedStyle(button).borderTopWidth) >= 1
@@ -94,6 +121,13 @@ export function createBusinessDetailsScenarios(deps) {
     assert(
       controls.overflow <= 1,
       `分页控件不得横向溢出: ${JSON.stringify(controls)}`
+    )
+    assert(
+      controls.footerPaddingDelta <= 0.1 &&
+        Object.values(controls.selectContentCenterDeltas).every(
+          (delta) => delta <= 1
+        ),
+      `分页条数、箭头及底部留白必须上下居中: ${JSON.stringify(controls)}`
     )
     if (page.viewportSize().width >= 768) {
       assert(

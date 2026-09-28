@@ -262,11 +262,14 @@ export function createWorkbenchSummaryScenarios({
         const dateRange = filterDialog.locator(
           '.erp-business-date-range-filter'
         )
-        assert.equal(
-          await dateRange.evaluate(
-            (node) => getComputedStyle(node).borderTopWidth
-          ),
-          '1px'
+        assert.deepEqual(
+          await dateRange
+            .locator('.erp-business-date-input')
+            .evaluateAll((nodes) =>
+              nodes.map((node) => getComputedStyle(node).borderTopWidth)
+            ),
+          ['1px', '1px'],
+          '起止日期各自保留清晰边框'
         )
         await filterDialog
           .getByRole('button', { name: '完成', exact: true })

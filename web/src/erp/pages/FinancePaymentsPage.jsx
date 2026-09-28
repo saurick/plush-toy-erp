@@ -54,6 +54,7 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
+  DateTimeInput,
   PageHeaderCard,
   SelectFilter,
   SearchInput,
@@ -1921,7 +1922,7 @@ export default function FinancePaymentsPage() {
             <Select options={BUSINESS_CURRENCY_OPTIONS} />
           </Form.Item>
           <Form.Item name="occurred_at" label="发生时间">
-            <Input type="datetime-local" />
+            <DateTimeInput />
           </Form.Item>
           <BusinessFormSectionTitle>账户与凭据</BusinessFormSectionTitle>
           <Form.Item
@@ -1958,6 +1959,7 @@ export default function FinancePaymentsPage() {
         okText="过账并核销"
         cancelText="取消"
         confirmLoading={loading}
+        maskClosable={!loading}
         okButtonProps={{ disabled: allocationCandidates.length === 0 }}
         afterOpenChange={initializeAllocationForm}
         onCancel={() => !loading && setAllocationOpen(false)}
@@ -2058,6 +2060,7 @@ export default function FinancePaymentsPage() {
         cancelText="返回"
         okButtonProps={{ danger: true }}
         confirmLoading={loading}
+        maskClosable={!loading}
         onCancel={() => !loading && setCancelOpen(false)}
         onOk={cancelPayment}
       >
@@ -2094,6 +2097,7 @@ export default function FinancePaymentsPage() {
         cancelText="返回"
         okButtonProps={{ danger: true }}
         confirmLoading={loading}
+        maskClosable={!loading}
         onCancel={() => !loading && setReverseOpen(false)}
         onOk={reversePayment}
       >

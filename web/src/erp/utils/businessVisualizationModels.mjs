@@ -89,6 +89,7 @@ export function buildSalesDeliveryModel(items = [], options = {}) {
     const row = {
       id: Number(item?.id || 0),
       salesOrderID: Number(item?.sales_order_id || 0),
+      productID: Number(item?.product_id || 0),
       orderNo: normalizedText(item?.order_no, '销售订单未编号'),
       customerName: normalizedText(item?.customer_name, '客户未填写'),
       productName: normalizedText(
@@ -659,6 +660,7 @@ export function buildProductionProcessModel(aggregate) {
     return {
       id: item.id,
       lineNo: item.line_no,
+      productID: Number(item.product_id || 0),
       productName: normalizedText(
         item.product_name_snapshot || item.product_code_snapshot,
         `产品行 ${item.line_no || ''}`.trim()

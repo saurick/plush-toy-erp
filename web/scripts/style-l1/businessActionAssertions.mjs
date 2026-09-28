@@ -704,8 +704,21 @@ export function createBusinessActionAssertions({ outputDir }) {
               String(node.textContent || '').includes(expectedTitle)
             ).length,
           visibleDetailDrawers: Array.from(
-            document.querySelectorAll('.ant-drawer')
-          ).filter(isVisible).length,
+            document.querySelectorAll('.ant-drawer.ant-drawer-open')
+          )
+            .filter(isVisible)
+            .map((node) => ({
+              className: node.className,
+              title:
+                node
+                  .querySelector('.ant-drawer-title')
+                  ?.textContent?.replace(/\s+/g, ' ')
+                  .trim() || '',
+              text: String(node.textContent || '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 160),
+            })),
         }
       },
       { expectedTitle: titleText }
@@ -716,7 +729,7 @@ export function createBusinessActionAssertions({ outputDir }) {
       `${scenarioName} 双击行应打开业务弹窗: ${JSON.stringify(modalMetrics)}`
     )
     assert.equal(
-      modalMetrics.visibleDetailDrawers,
+      modalMetrics.visibleDetailDrawers.length,
       0,
       `${scenarioName} 双击行不应打开详情抽屉: ${JSON.stringify(modalMetrics)}`
     )

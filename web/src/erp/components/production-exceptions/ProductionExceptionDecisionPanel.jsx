@@ -819,6 +819,7 @@ export default function ProductionExceptionDecisionPanel({
         title="确认生产异常处置"
         open={Boolean(action)}
         confirmLoading={loading}
+        maskClosable={!loading}
         okText="确认办理"
         cancelText="返回"
         onCancel={() => {

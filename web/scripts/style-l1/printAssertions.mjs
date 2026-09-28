@@ -109,10 +109,21 @@ export function createPrintAssertions({
     page,
     { buttonName, title, screenshotName }
   ) {
-    const [popup] = await Promise.all([
-      page.waitForEvent('popup', { timeout: 10_000 }),
-      page.getByRole('button', { name: buttonName }).click(),
-    ])
+    let popup
+    try {
+      const result = await Promise.all([
+        page.waitForEvent('popup', { timeout: 10_000 }),
+        page.getByRole('button', { name: buttonName }).click(),
+      ])
+      popup = result[0]
+    } catch (error) {
+      const feedback = await page
+        .locator('[data-print-feedback], [role="alert"]')
+        .allTextContents()
+      throw new Error(
+        `${error.message}\n打印输出反馈：${JSON.stringify(feedback)}`
+      )
+    }
 
     const popupErrors = []
     popup.on('console', (message) => {

@@ -54,13 +54,12 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['hidden', 'open', 'data-form-section'],
+      attributeFilter: ['hidden', 'data-form-section'],
     })
     const resize = new ResizeObserver(schedule)
     resize.observe(body)
     if (body.firstElementChild) resize.observe(body.firstElementChild)
     body.addEventListener('scroll', schedule, { passive: true })
-    body.addEventListener('toggle', schedule, true)
     navigationAnchor.current = null
     body.scrollTop = 0
     update()
@@ -68,7 +67,6 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
       mutation.disconnect()
       resize.disconnect()
       body.removeEventListener('scroll', schedule)
-      body.removeEventListener('toggle', schedule, true)
       window.cancelAnimationFrame(frame)
     }
   }, [loading, open])
@@ -79,9 +77,6 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
       (node) => node.id === id
     )
     if (!section) return
-    if (section.matches('details:not([open])')) {
-      section.querySelector('summary')?.click()
-    }
     window.requestAnimationFrame(() => {
       if (!section.isConnected) return
       const top = Math.max(
@@ -99,7 +94,7 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
       body.scrollTo({ top, behavior: 'instant' })
       setActive(id)
       const heading =
-        section.querySelector('summary, [role="heading"][tabindex]') || section
+        section.querySelector('[role="heading"][tabindex]') || section
       heading?.focus({ preventScroll: true })
     })
   }

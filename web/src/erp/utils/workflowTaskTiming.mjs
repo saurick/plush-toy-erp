@@ -1,6 +1,54 @@
 import { getWorkflowTaskDueStatus } from './workflowDashboardStats.mjs'
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 
+function readWorkflowDeadlineNow(now) {
+  const value = typeof now === 'function' ? now() : now
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) {
+    throw new TypeError('快捷截止时间基准无效')
+  }
+  return date
+}
+
+function formatWorkflowDeadlineInput(date) {
+  const part = (value) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}T${part(date.getHours())}:${part(date.getMinutes())}`
+}
+
+function resolveWorkflowDeadline(now, { days = 0, endOfDay = false } = {}) {
+  const date = readWorkflowDeadlineNow(now)
+  date.setDate(date.getDate() + days)
+  if (endOfDay) date.setHours(23, 59, 0, 0)
+  else date.setSeconds(0, 0)
+  return date
+}
+
+export function buildWorkflowDeadlineQuickOptions(
+  now = () => new Date()
+) {
+  const valueAfter = (days, options) => () =>
+    formatWorkflowDeadlineInput(resolveWorkflowDeadline(now, { days, ...options }))
+
+  return [
+    {
+      key: 'today-end',
+      label: '今天 23:59',
+      value: valueAfter(0, { endOfDay: true }),
+      disabled: () => {
+        const current = readWorkflowDeadlineNow(now)
+        return (
+          resolveWorkflowDeadline(current, { endOfDay: true }).getTime() <=
+          current.getTime()
+        )
+      },
+    },
+    { key: 'tomorrow', label: '明天此时', value: valueAfter(1) },
+    { key: 'seven-days', label: '7 天后', value: valueAfter(7) },
+    { key: 'fifteen-days', label: '15 天后', value: valueAfter(15) },
+    { key: 'thirty-days', label: '30 天后', value: valueAfter(30) },
+  ]
+}
+
 const END_LABELS = Object.freeze({
   done: '完成',
   rejected: '退回',

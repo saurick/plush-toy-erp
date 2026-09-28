@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Form, Input, Select } from 'antd'
+import { Alert, Form, Select } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import MaterialSupplierSelect from '../master-data/MaterialSupplierSelect.jsx'
 import { prepareProductionOutsourcingOrder } from '../../api/productionWipApi.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -66,6 +67,7 @@ export default function ProductionOutsourcingPrepareModal({
       onOk={prepare}
       okText="生成委外草稿"
       confirmLoading={saving}
+      maskClosable={!saving}
     >
       {error ? <Alert type="error" showIcon message={error} /> : null}
       <Form
@@ -112,7 +114,7 @@ export default function ProductionOutsourcingPrepareModal({
           label="预计回厂日期"
           rules={[{ required: true, message: '请填写预计回厂日期' }]}
         >
-          <Input type="date" />
+          <DateInput />
         </Form.Item>
       </Form>
     </BusinessFormModal>

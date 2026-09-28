@@ -134,7 +134,7 @@
 }
 
 .erp-business-visual-list__columns,
-.erp-business-visual-list__row {
+.erp-business-visual-list__row-content {
   display: grid;
   grid-template-columns:
     minmax(230px, 1.45fr) minmax(100px, 0.55fr) minmax(210px, 1.1fr)
@@ -154,7 +154,6 @@
 
 .erp-business-visual-list__row {
   width: 100%;
-  padding: 11px 18px;
   border: 0;
   border-bottom: 1px solid var(--erp-border, #edf1ee);
   background: transparent;
@@ -162,6 +161,10 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.erp-business-visual-list__row-content {
+  padding: 11px 18px;
 }
 
 .erp-business-visual-identity {
@@ -188,6 +191,16 @@
 .erp-business-visual-progress small {
   color: var(--erp-text-muted, #52627a);
   font-size: 12px;
+}
+
+.erp-business-visual-identity > .erp-product-identity {
+  margin-top: 5px;
+}
+
+.erp-business-visual-identity
+  > .erp-product-identity
+  .erp-product-identity__text {
+  gap: 0;
 }
 
 .erp-business-visual-progress {
@@ -767,6 +780,16 @@
   gap: 2px;
 }
 
+.erp-production-process__identity > .erp-product-identity {
+  margin-bottom: 3px;
+}
+
+.erp-production-process__identity
+  > .erp-product-identity
+  .erp-product-identity__text {
+  min-width: 0;
+}
+
 .erp-production-process__identity strong,
 .erp-production-process__identity span,
 .erp-production-process__identity small {
@@ -992,7 +1015,7 @@
 }
 
 .erp-business-visual-list__row:hover,
-.erp-business-visual-list__row:focus-visible,
+.erp-business-visual-list__row:focus-within,
 .erp-finance-due-list__row:hover,
 .erp-finance-due-list__row:focus-visible,
 .erp-inventory-distribution-grid__card:hover,
@@ -1050,23 +1073,27 @@
   }
 
   .erp-business-visual-list__row {
+    display: block;
+  }
+
+  .erp-business-visual-list__row-content {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas: 'identity status' 'date quantity' 'progress progress';
   }
 
-  .erp-business-visual-list__row > :nth-child(1) {
+  .erp-business-visual-list__row-content > :nth-child(1) {
     grid-area: identity;
   }
-  .erp-business-visual-list__row > :nth-child(2) {
+  .erp-business-visual-list__row-content > :nth-child(2) {
     grid-area: date;
   }
-  .erp-business-visual-list__row > :nth-child(3) {
+  .erp-business-visual-list__row-content > :nth-child(3) {
     grid-area: progress;
   }
-  .erp-business-visual-list__row > :nth-child(4) {
+  .erp-business-visual-list__row-content > :nth-child(4) {
     grid-area: quantity;
   }
-  .erp-business-visual-list__row > :nth-child(5) {
+  .erp-business-visual-list__row-content > :nth-child(5) {
     grid-area: status;
     justify-self: end;
   }

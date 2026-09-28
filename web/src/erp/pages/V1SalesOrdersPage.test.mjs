@@ -22,14 +22,14 @@ const form = readFileSync(
   'utf8'
 )
 const deliveryForm = readFileSync(
-  new URL('../components/business-list/DeliveryAddressFields.jsx', import.meta.url),
+  new URL(
+    '../components/business-list/DeliveryAddressFields.jsx',
+    import.meta.url
+  ),
   'utf8'
 )
 const businessModal = readFileSync(
-  new URL(
-    '../components/sales-orders/SalesOrderEditor.jsx',
-    import.meta.url
-  ),
+  new URL('../components/sales-orders/SalesOrderEditor.jsx', import.meta.url),
   'utf8'
 )
 
@@ -51,7 +51,14 @@ test('sales order commercial fields preserve their contracts with demand before 
     assert.match(form, new RegExp(copy.replace('/', '\\/'), 'u'))
   }
   assert.match(form, /<DeliveryAddressFields\s+form=\{form\}/u)
-  for (const copy of ['国家 / 地区', '收货人', '收货电话', '所在地区', '详细地址', '完整地址']) {
+  for (const copy of [
+    '国家 / 地区',
+    '收货人',
+    '收货电话',
+    '所在地区',
+    '详细地址',
+    '完整地址',
+  ]) {
     assert.ok(deliveryForm.includes(copy), `shared delivery form keeps ${copy}`)
   }
   assert.match(form, /unitText="%"/u)
@@ -113,6 +120,10 @@ test('reservation context uses existing facts and matching available stock', () 
   assert.match(modal, /已出货/u)
   assert.match(modal, /可预留/u)
   assert.match(modal, /defaultSalesOrderReservationQuantity/u)
+  assert.match(modal, /<ProductIdentity/u)
+  assert.match(modal, /optionRender=\{renderReservationProductOption\}/u)
+  assert.match(form, /erp-sales-order-product-summary/u)
+  assert.match(form, /productId=\{line\?\.product_id\}/u)
 })
 
 test('reservation submit owns its number and safe retry identity', () => {
@@ -147,7 +158,8 @@ test('reservation form keeps source and stock identities out of visible copy', (
   assert.match(modal, /disabled=\{loading\}/u)
   assert.match(modal, /预留只会锁定可用库存/u)
   assert.match(modal, /label: '产品'/u)
-  assert.match(modal, /label: 'SKU \/ 规格'/u)
+  assert.match(modal, /code=\{sourceSpecificationText\}/u)
+  assert.doesNotMatch(modal, /label: 'SKU \/ 规格'/u)
   assert.match(modal, /label: '单位'/u)
 })
 
@@ -184,8 +196,14 @@ test('sales selection actions keep one authorized catalog across record states',
     )
   }
   assert.match(page, /actionStates: lifecycleActionStates/u)
-  assert.match(page, /<BusinessLifecycleSecondaryAction[\s\S]*?disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u)
-  assert.match(page, /disabledReason=\{lifecycleActionStates\[action.key\]\?\.disabledReason\}/u)
+  assert.match(
+    page,
+    /<BusinessLifecycleSecondaryAction[\s\S]*?disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u
+  )
+  assert.match(
+    page,
+    /disabledReason=\{lifecycleActionStates\[action.key\]\?\.disabledReason\}/u
+  )
   assert.match(page, /disabled=\{primaryLifecycleState\.disabled\}/u)
   assert.doesNotMatch(page, /canUpdateOrder\s*&&[\s\S]{0,100}!selectedOrder/u)
   assert.doesNotMatch(

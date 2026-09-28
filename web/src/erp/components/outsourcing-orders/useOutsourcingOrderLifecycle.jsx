@@ -97,6 +97,7 @@ export function useOutsourcingOrderLifecycle({
       }
       if (!summary.complete) {
         modal.warning({
+          maskClosable: true,
           title: '加工合同信息尚未齐全',
           content: (
             <Alert
@@ -116,6 +117,7 @@ export function useOutsourcingOrderLifecycle({
         return
       }
       modal.confirm({
+        maskClosable: true,
         title: action.key === 'submit' ? '确认提交加工合同' : '确认下单',
         content: (
           <Descriptions
@@ -166,6 +168,7 @@ export function useOutsourcingOrderLifecycle({
     if (action.confirmTitle) {
       let reason = ''
       modal.confirm({
+        maskClosable: true,
         title: action.confirmTitle,
         content: (
           <SourceOrderLifecycleConfirmContent

@@ -253,7 +253,6 @@ export default function BOMVersionsPage() {
   const importFileInputRef = useRef(null)
   const [headerModalOpen, setHeaderModalOpen] = useState(false)
   const [headerMode, setHeaderMode] = useState('create')
-  const [headerDetailsOpen, setHeaderDetailsOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importReview, setImportReview] = useState(null)
   const [products, setProducts] = useState([])
@@ -650,7 +649,6 @@ export default function BOMVersionsPage() {
       headerForm.setFieldsValue(draft.values)
       setHeaderProductIDForSuggestion(draft.values.product_id)
       setImportReview(draft.review)
-      setHeaderDetailsOpen(false)
       setHeaderModalOpen(true)
       const issues = getBOMImportDraftIssues(draft.values)
       message.success(
@@ -695,7 +693,6 @@ export default function BOMVersionsPage() {
       items: [],
     })
     setHeaderProductIDForSuggestion(undefined)
-    setHeaderDetailsOpen(false)
     setHeaderModalOpen(true)
   }
 
@@ -728,7 +725,6 @@ export default function BOMVersionsPage() {
     setHeaderMode('view')
     fillHeaderForm(detail)
     setHeaderProductIDForSuggestion(undefined)
-    setHeaderDetailsOpen(false)
     setHeaderModalOpen(true)
   }
 
@@ -744,7 +740,6 @@ export default function BOMVersionsPage() {
     setHeaderMode('edit')
     fillHeaderForm(detail)
     setHeaderProductIDForSuggestion(undefined)
-    setHeaderDetailsOpen(false)
     setHeaderModalOpen(true)
   }
 
@@ -776,7 +771,6 @@ export default function BOMVersionsPage() {
       items: [],
     })
     setHeaderProductIDForSuggestion(record.product_id)
-    setHeaderDetailsOpen(false)
     setHeaderModalOpen(true)
   }
 
@@ -808,7 +802,6 @@ export default function BOMVersionsPage() {
     try {
       values = await headerForm.validateFields()
     } catch (error) {
-      setHeaderDetailsOpen(true)
       window.requestAnimationFrame(() => {
         const firstField = error?.errorFields?.[0]?.name
         if (firstField) {
@@ -1468,8 +1461,6 @@ export default function BOMVersionsPage() {
         >
           <BOMHeaderFormFields
             form={headerForm}
-            detailsOpen={headerDetailsOpen}
-            onDetailsOpenChange={setHeaderDetailsOpen}
             includeProduct
             disabled={headerMode === 'view'}
             productDisabled={headerMode === 'edit'}

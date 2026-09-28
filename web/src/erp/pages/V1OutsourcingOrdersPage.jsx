@@ -422,6 +422,7 @@ export default function V1OutsourcingOrdersPage() {
       const readiness = inspectOutsourcingContractReadiness(selectedRow, items)
       if (!readiness.complete) {
         modal.warning({
+          maskClosable: true,
           title: '加工合同信息尚未齐全',
           content: `请先补齐：${readiness.missing.join('、')}`,
           okText: '我知道了',

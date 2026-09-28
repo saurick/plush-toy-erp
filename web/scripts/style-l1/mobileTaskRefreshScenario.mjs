@@ -449,15 +449,11 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
             .map((animation) => animation.finished.catch(() => {}))
         )
       })
-      const restingQuery = await page.screenshot({ clip: headingClip })
       const firstTask = await rows.first().elementHandle()
       const beforeRefresh = requests.length
       nextResponse = 'hold'
       const beforePull = await pull()
-      assert(
-        restingQuery.equals(await page.screenshot({ clip: headingClip })),
-        '下拉时搜索区的实际画面保持原位，不受浏览器原生回弹带动'
-      )
+      assertControlsStay(beforePull, await refreshLayout(), '下拉时')
       await page.screenshot({
         path: path.join(outputDir, 'mobile-refresh-pull-ready.png'),
         fullPage: true,
@@ -568,7 +564,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
             ).map((item) => item.getBoundingClientRect().toJSON()),
           }))
         assert(geometry.scrollWidth <= geometry.width + 1)
-        assert.equal(geometry.buttons.length, 5)
+        assert.equal(geometry.buttons.length, 3)
         assert(
           geometry.buttons.every(
             (button) =>

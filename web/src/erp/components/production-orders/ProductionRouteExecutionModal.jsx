@@ -1362,7 +1362,7 @@ export default function ProductionRouteExecutionModal({
           关闭
         </Button>
       }
-      maskClosable={false}
+      maskClosable={!saving}
       keyboard={!saving}
       onCancel={saving ? undefined : onCancel}
       destroyOnHidden

@@ -9,6 +9,8 @@ import {
   VisualizationState,
   VisualizationPagination,
 } from './BusinessVisualizationFrame.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import WorkflowTaskCard from '../workflow/WorkflowTaskCard.jsx'
 
 function quantityText(value, unitName) {
   return value === null ? '—' : `${value} ${unitName}`
@@ -106,19 +108,23 @@ export default function SalesDeliveryProgress({
             <span>状态</span>
           </div>
           {rows.map((row) => (
-            <button
+            <WorkflowTaskCard
+              as="article"
               key={row.id}
-              type="button"
               className="erp-business-visual-list__row"
-              onClick={() => onOpen?.(row)}
+              contentClassName="erp-business-visual-list__row-content"
+              label={`打开销售订单 ${row.orderNo}`}
+              onOpen={() => onOpen?.(row)}
             >
               <span className="erp-business-visual-identity">
                 <strong>{row.orderNo}</strong>
                 <span>{row.customerName}</span>
-                <small>
-                  {row.productName}
-                  {row.customerProductNo ? ` · ${row.customerProductNo}` : ''}
-                </small>
+                <ProductIdentity
+                  productId={row.productID}
+                  name={row.productName}
+                  code={row.customerProductNo}
+                  compact
+                />
               </span>
               <span className="erp-business-visual-date">
                 <small className="erp-business-visual-mobile-label">
@@ -156,7 +162,7 @@ export default function SalesDeliveryProgress({
               >
                 {row.status.label}
               </span>
-            </button>
+            </WorkflowTaskCard>
           ))}
           <VisualizationPagination
             pagination={pagination}

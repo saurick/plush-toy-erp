@@ -2648,6 +2648,7 @@ export default function V1InventoryLedgerPage() {
         okButtonProps={{ danger: true }}
         confirmLoading={operationLoading}
         closable={!operationLoading}
+        maskClosable={!operationLoading}
         onCancel={() => !operationLoading && setOperationCancelOpen(false)}
         onOk={() => {
           if (!operationCancelReason.trim()) {

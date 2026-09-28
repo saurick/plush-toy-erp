@@ -49,7 +49,7 @@ export function requireFollowupOptions(data, source) {
       typeof data.source_no !== 'string' || typeof data.can_create !== 'boolean' || !Array.isArray(data.roles) ||
       data.roles.some((role) => !role.role_key || !role.label || !Array.isArray(role.assignees) ||
         role.assignees.some((person) => !Number.isSafeInteger(person.admin_id) || person.admin_id <= 0 || !person.display_name))) {
-    const error = new Error('任务发起资料不完整，请刷新后重试')
+    const error = new Error('跟进任务资料不完整，请刷新后重试')
     error.isInvalidResponse = true
     throw error
   }
@@ -64,7 +64,7 @@ export function requireFollowupReceipt(data, params) {
       task.assignee_id !== params.assignee_id || task.due_at !== params.due_at || task.priority !== params.priority ||
       task.payload?.description !== params.description || task.process_instance_id != null || task.config_revision != null ||
       task.task_status_key !== 'ready') {
-    const error = new Error('发起结果暂未确认，请使用原内容重试')
+    const error = new Error('创建结果暂未确认，请使用原内容重试')
     error.isInvalidResponse = true
     throw error
   }

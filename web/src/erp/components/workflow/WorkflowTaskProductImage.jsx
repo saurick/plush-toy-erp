@@ -114,11 +114,18 @@ function ProductImage({ item, load, preview }) {
             type="button"
             aria-label={`查看${item.name || '产品'}大图`}
             aria-haspopup="dialog"
+            onMouseDown={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+            }}
+            onTouchStart={(event) => event.stopPropagation()}
             onDoubleClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation()
-              event.currentTarget.focus({ preventScroll: true })
+              if (!event.currentTarget.closest('[role="option"]')) {
+                event.currentTarget.focus({ preventScroll: true })
+              }
               setOpened(true)
             }}
           >

@@ -56,6 +56,34 @@ const lifecycle = readFileSync(
   ),
   'utf8'
 )
+const summaryPanel = readFileSync(
+  new URL(
+    '../components/outsourcing-orders/OutsourcingOrderSummaryPanel.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
+const sourceFactModal = readFileSync(
+  new URL(
+    '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
+const returnRecordsModal = readFileSync(
+  new URL(
+    '../components/outsourcing-orders/OutsourcingReturnRecordsModal.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
+const returnQualityModal = readFileSync(
+  new URL(
+    '../components/quality-inspections/OutsourcingReturnQualityInspectionModal.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
 
 test('outsourcing records reopen exact DRAFT facts in the shared source modal', () => {
   assert.match(source, /openOutsourcingFactDraftEditor/u)
@@ -333,6 +361,11 @@ test('posted outsourcing returns expose source-bound quality inspection', () => 
   assert.match(sourceFactActions, /quality_inspection_id: inspection\.id/u)
   assert.match(source, /<OutsourcingReturnQualityInspectionModal/u)
   assert.doesNotMatch(source, /createQualityInspectionDraft/u)
+  assert.match(summaryPanel, /row\.subject_type === 'MATERIAL'/u)
+  assert.match(summaryPanel, /productId=\{row\.product_id\}/u)
+  assert.match(sourceFactModal, /productId=\{item\?\.product_id\}/u)
+  assert.match(returnRecordsModal, /productId=\{fact\.subject_id\}/u)
+  assert.match(returnQualityModal, /productId=\{fact\?\.subject_id\}/u)
 })
 
 test('outsourcing return quality request only accepts source-owned business fields', () => {
@@ -386,8 +419,14 @@ test('outsourcing selection actions keep one authorized catalog across record st
     )
   }
   assert.match(source, /actionStates: lifecycleActionStates/u)
-  assert.match(source, /<BusinessLifecycleSecondaryAction[\s\S]*?disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u)
-  assert.match(source, /disabledReason=\{\s*lifecycleActionStates\[action.key\]\?\.disabledReason\s*\}/u)
+  assert.match(
+    source,
+    /<BusinessLifecycleSecondaryAction[\s\S]*?disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u
+  )
+  assert.match(
+    source,
+    /disabledReason=\{\s*lifecycleActionStates\[action.key\]\?\.disabledReason\s*\}/u
+  )
   assert.match(source, /disabled=\{primaryLifecycleState\.disabled\}/u)
   assert.doesNotMatch(
     actionBarSource,

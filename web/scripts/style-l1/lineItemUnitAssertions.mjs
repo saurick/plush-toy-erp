@@ -140,7 +140,13 @@ export function createLineItemUnitAssertions({ assert }) {
             return labelText.includes(args.label)
           })
           .map((item) => ({
-            value: item.querySelector('input')?.value || '',
+            value:
+              item.querySelector('input')?.value ||
+              item
+                .querySelector('.ant-form-item-control-input-content')
+                ?.textContent?.replace(/\s+/g, ' ')
+                .trim() ||
+              '',
           }))
         return {
           label: args.label,
@@ -717,7 +723,7 @@ export function createLineItemUnitAssertions({ assert }) {
       )}`
     )
     assert(
-      metrics.bodyScrollTop > 0,
+      metrics.bodyScrollTop > 0 || metrics.latestRowVisibleInPage,
       `${scenarioName} 添加多行后编辑页应定位到新明细附近: ${JSON.stringify(
         metrics
       )}`

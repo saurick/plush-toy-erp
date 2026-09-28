@@ -77,7 +77,7 @@ export function createHighFidelityScenarios({
         assert.equal(dimensions.row.h, 52, '标准行密度')
         assert.ok(
           dimensions.table.y <= 230 && dimensions.table.bottom >= 886,
-          '表格占据主体并将分页放在底部'
+          `表格占据主体并将分页放在底部：${JSON.stringify(dimensions)}`
         )
         await shot(page, 'high-fidelity-sales-standard')
 

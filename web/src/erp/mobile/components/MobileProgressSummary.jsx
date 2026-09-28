@@ -3,6 +3,7 @@ import {
   progressStages,
 } from '../../utils/businessProgress.mjs'
 import { getWorkflowTaskOwnerRoleLabel } from '../../utils/workflowTaskBoard.mjs'
+import ProductIdentity from '../../components/master-data/ProductIdentity.jsx'
 import MobileProgressRecentRecords from './MobileProgressRecentRecords.jsx'
 
 export default function MobileProgressSummary({ data }) {
@@ -31,10 +32,15 @@ export default function MobileProgressSummary({ data }) {
         aria-label="单据摘要"
       >
         <h2>{row.order_no}</h2>
-        <p className="mobile-detail-identity">
-          {[row.customer, row.product].filter(Boolean).join(' · ')}
-          {row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}
-        </p>
+        <div className="mobile-progress-overview-product">
+          <ProductIdentity productId={row.product_id} name={row.product}>
+            {row.product}
+            {row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}
+          </ProductIdentity>
+          {row.customer ? (
+            <p className="mobile-detail-identity">{row.customer}</p>
+          ) : null}
+        </div>
         <dl className="mobile-detail-facts">
           <div className="mobile-detail-fact">
             <dt>{row.view === 'orders' ? '计划交期' : '计划结束'}</dt>

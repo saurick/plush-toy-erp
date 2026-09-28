@@ -81,6 +81,71 @@ export function createModuleCatalogScenarios({
     },
     {
       ...sales,
+      name: 'interactive-cursor-surfaces',
+      viewport: { width: 1280, height: 720 },
+      verify: async (page) => {
+        const assertPointerCursors = async (targets, label) => {
+          await targets.first().waitFor({ state: 'visible' })
+          await targets.first().hover()
+          const cursors = await targets.evaluateAll((nodes) =>
+            nodes.map((node) => getComputedStyle(node).cursor)
+          )
+          assert(
+            cursors.length > 0 &&
+              cursors.every((cursor) => cursor === 'pointer'),
+            `${label} hover 后应全部显示手型指针: ${JSON.stringify(cursors)}`
+          )
+        }
+
+        await assertPointerCursors(
+          page.locator(
+            '.erp-admin-sider .erp-admin-menu [role="menuitem"]:not([aria-disabled="true"])'
+          ),
+          '桌面侧栏菜单'
+        )
+
+        const catalogTrigger = page.locator(
+          '.erp-module-catalog-trigger:visible'
+        )
+        await assertPointerCursors(catalogTrigger, '全部模块入口')
+        const catalog = await openCatalog(page)
+        await assertPointerCursors(
+          catalog.locator('.erp-module-catalog__entry:not(:disabled)'),
+          '全部模块目录'
+        )
+        await page.keyboard.press('Escape')
+        await catalog.waitFor({ state: 'hidden' })
+
+        const accountTrigger = page.getByTestId('desktop-account-menu-trigger')
+        await assertPointerCursors(accountTrigger, '账号菜单入口')
+        await accountTrigger.click()
+        const accountMenu = page.locator('.ant-dropdown:visible')
+        await assertPointerCursors(
+          accountMenu.locator(
+            '[role="menuitem"]:not([aria-disabled="true"])'
+          ),
+          '账号下拉菜单'
+        )
+        await page.keyboard.press('Escape')
+        await accountMenu.waitFor({ state: 'hidden' })
+
+        await page.setViewportSize({ width: 390, height: 844 })
+        const mobileMenuTrigger = page.getByRole('button', {
+          name: '打开导航菜单',
+        })
+        await assertPointerCursors(mobileMenuTrigger, '移动导航入口')
+        await mobileMenuTrigger.click()
+        const mobileDrawer = page.locator('.erp-admin-drawer:visible')
+        await assertPointerCursors(
+          mobileDrawer.locator(
+            '.erp-admin-menu [role="menuitem"]:not([aria-disabled="true"])'
+          ),
+          '移动侧栏菜单'
+        )
+      },
+    },
+    {
+      ...sales,
       name: 'module-catalog-search-desktop',
       viewport: { width: 1280, height: 720 },
       verify: async (page) => {
@@ -152,12 +217,13 @@ export function createModuleCatalogScenarios({
         await dialog.waitFor({ state: 'hidden' })
         await page
           .locator('.erp-admin-menu .ant-menu-item-selected')
-          .filter({ hasText: '产品档案' })
+          .filter({ hasText: '基础资料' })
           .waitFor()
         assert.equal(
           await page
-            .locator('.erp-admin-menu .ant-menu-submenu-title')
-            .getAttribute('aria-expanded'),
+            .locator('.erp-business-module-tabs')
+            .getByRole('tab', { name: '产品档案', exact: true })
+            .getAttribute('aria-selected'),
           'true'
         )
       },

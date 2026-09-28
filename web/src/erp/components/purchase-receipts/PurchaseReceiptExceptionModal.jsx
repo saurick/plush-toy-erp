@@ -4,6 +4,7 @@ import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
@@ -116,7 +117,7 @@ export default function PurchaseReceiptExceptionModal({
             name={isReturn ? 'returned_at' : 'adjusted_at'}
             label={isReturn ? '退货时间' : '调整时间'}
           >
-            <Input type="datetime-local" />
+            <DateTimeInput />
           </Form.Item>
           {!isReturn ? (
             <Form.Item

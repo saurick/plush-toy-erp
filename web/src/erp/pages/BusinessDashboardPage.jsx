@@ -30,8 +30,10 @@ import BusinessProgressDrawer from '../components/business-visualizations/Busine
 import BusinessProgressSummary, {
   ProgressBadges,
 } from '../components/business-visualizations/BusinessProgressSummary.jsx'
+import WorkflowTaskCard from '../components/workflow/WorkflowTaskCard.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
 import { DateRangeFilter } from '../components/business-list/BusinessListLayout.jsx'
+import { ProductThumbnail } from '../components/master-data/ProductIdentity.jsx'
 import '../styles/app/progress-board.css'
 
 const SCOPES = [
@@ -462,24 +464,39 @@ export default function BusinessDashboardPage() {
                         selectedRow?.id === row.id &&
                         selectedRow?.view === row.view
                       return (
-                        <article
+                        <WorkflowTaskCard
+                          as="article"
                           key={`${row.view}:${row.id}`}
                           className={`erp-progress-row${selected ? ' is-selected' : ''}`}
+                          contentClassName="erp-progress-row-select"
+                          label={`查看 ${row.order_no} 进度摘要`}
+                          onOpen={() => selectRow(row, true)}
+                          openButtonProps={{
+                            'data-progress-order-id': row.id,
+                            'aria-pressed': selected,
+                            'aria-controls': 'progress-summary',
+                          }}
                         >
-                          <button
-                            type="button"
-                            className="erp-progress-row-select"
-                            data-progress-order-id={row.id}
-                            aria-label={row.order_no}
-                            aria-pressed={selected}
-                            aria-controls="progress-summary"
-                            onClick={() => selectRow(row, true)}
-                          >
-                            <span className="erp-progress-row-head">
-                              <strong className="erp-progress-order">
-                                {row.order_no}
-                              </strong>
-                              <ProgressBadges row={row} />
+                          <span className="erp-progress-row-head">
+                            <strong className="erp-progress-order">
+                              {row.order_no}
+                            </strong>
+                            <ProgressBadges row={row} />
+                          </span>
+                          <span className="erp-progress-row-product">
+                            <span className="erp-progress-row-product-image">
+                              <ProductThumbnail
+                                productId={row.product_id}
+                                name={row.product}
+                              />
+                              {row.product_count > 1 && (
+                                <span
+                                  className="erp-progress-product-count"
+                                  aria-hidden="true"
+                                >
+                                  +{row.product_count - 1}
+                                </span>
+                              )}
                             </span>
                             <span className="erp-progress-row-copy">
                               <strong>
@@ -503,22 +520,22 @@ export default function BusinessDashboardPage() {
                                 {view === 'orders' ? '交期' : '计划结束'}
                               </span>
                             </span>
-                            <Delivery row={row} />
-                            <span className="erp-progress-row-foot">
-                              <span>
-                                {access?.tasks && row.attention_task
-                                  ? row.attention_reason ||
-                                    getWorkflowTaskDisplayName({
-                                      task_name: row.attention_task,
-                                    })
-                                  : productionStage && !productionStage.disabled
-                                    ? `生产：${productionStage.text}`
-                                    : '查看资料与交付进度'}
-                              </span>
-                              <ArrowRightOutlined aria-hidden="true" />
+                          </span>
+                          <Delivery row={row} />
+                          <span className="erp-progress-row-foot">
+                            <span>
+                              {access?.tasks && row.attention_task
+                                ? row.attention_reason ||
+                                  getWorkflowTaskDisplayName({
+                                    task_name: row.attention_task,
+                                  })
+                                : productionStage && !productionStage.disabled
+                                  ? `生产：${productionStage.text}`
+                                  : '查看资料与交付进度'}
                             </span>
-                          </button>
-                        </article>
+                            <ArrowRightOutlined aria-hidden="true" />
+                          </span>
+                        </WorkflowTaskCard>
                       )
                     })
                   ) : loading ? (

@@ -21,10 +21,17 @@ function assertAffixInputMetric(metric, scenarioName) {
   )
 }
 
-async function assertVisibleAffixInputIsolation(page, scenarioName) {
-  const metrics = await page.evaluate(() =>
-    Array.from(
-      document.querySelectorAll('.ant-input-affix-wrapper > input.ant-input')
+async function assertVisibleAffixInputIsolation(
+  page,
+  scenarioName,
+  { rootSelector = '' } = {}
+) {
+  const metrics = await page.evaluate((selector) => {
+    const root = selector ? document.querySelector(selector) : document
+    return Array.from(
+      root?.querySelectorAll(
+        '.ant-input-affix-wrapper > input.ant-input'
+      ) || []
     )
       .filter((input) => {
         const rect = input.getBoundingClientRect()
@@ -60,7 +67,7 @@ async function assertVisibleAffixInputIsolation(page, scenarioName) {
             rect.bottom <= outer.bottom,
         }
       })
-  )
+  }, rootSelector)
   metrics.forEach((metric) => assertAffixInputMetric(metric, scenarioName))
   return metrics.length
 }
@@ -1100,14 +1107,15 @@ async function assertVisibleDateFilterGeometry(page, scenarioName) {
   const issues = await page.evaluate(() =>
     [
       ...document.querySelectorAll(
-        '.erp-business-date-range-filter :is(.erp-business-date-input, .erp-business-date-range-filter__type-label)'
+        '.erp-business-date-range-filter :is(.erp-business-date-input, .erp-business-date-range-filter__type-label, .erp-business-date-range-filter__type.ant-select > .ant-select-selector)'
       ),
     ].flatMap((element) => {
       const rect = element.getBoundingClientRect()
       if (!rect.width || !rect.height) return []
       const style = getComputedStyle(element)
-      const expected =
-        parseFloat(style.getPropertyValue('--erp-business-control-height')) - 2
+      const expected = parseFloat(
+        style.getPropertyValue('--erp-business-control-height')
+      )
       return Math.abs(rect.height - expected) <= 1
         ? []
         : [

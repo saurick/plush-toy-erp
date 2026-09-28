@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Descriptions, Form, Input, Select } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 import {
   sourceBusinessActionNo,
@@ -50,6 +51,18 @@ function sourceOptionLabel(
     ? `（${source.unavailableReason}）`
     : ''
   return `${product} / ${warehouse} / ${lot} · 数量 ${quantity}${unavailable}`
+}
+
+function renderShipmentQualityProductOption(option) {
+  return (
+    <ProductIdentity
+      productId={option.data.productID}
+      name={option.data.productName}
+      compact
+    >
+      {option.label}
+    </ProductIdentity>
+  )
 }
 
 export default function ShipmentQualityInspectionModal({
@@ -104,6 +117,12 @@ export default function ShipmentQualityInspectionModal({
           productSKUOptions,
           warehouseOptions,
           inventoryLotOptions
+        ),
+        productID: source.productID,
+        productName: referenceLabel(
+          productOptions,
+          source.productID,
+          '出货产品'
         ),
         disabled: Boolean(source.unavailableReason),
       })),
@@ -216,10 +235,21 @@ export default function ShipmentQualityInspectionModal({
                 {
                   key: 'product',
                   label: '送检产品',
-                  children: sourceProductText(
-                    selectedSource,
-                    productOptions,
-                    productSKUOptions
+                  children: (
+                    <ProductIdentity
+                      productId={selectedSource.productID}
+                      name={referenceLabel(
+                        productOptions,
+                        selectedSource.productID,
+                        '出货产品'
+                      )}
+                    >
+                      {sourceProductText(
+                        selectedSource,
+                        productOptions,
+                        productSKUOptions
+                      )}
+                    </ProductIdentity>
                   ),
                 },
                 {
@@ -262,6 +292,7 @@ export default function ShipmentQualityInspectionModal({
             showSearch
             optionFilterProp="label"
             options={sourceOptions}
+            optionRender={renderShipmentQualityProductOption}
             placeholder="请选择本次送检的成品批次"
           />
         </Form.Item>

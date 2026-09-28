@@ -35,7 +35,7 @@ async function clickVisibleAction(page, text) {
 
 async function releaseProductionOrder(page, expectText) {
   await page.getByText('MO-STYLE-L1-20260713', { exact: true }).first().click()
-  await clickVisibleAction(page, /发\s*布/u)
+  await clickVisibleAction(page, '发布')
   await page.getByRole('button', { name: '确认发布' }).click()
   await expectText(page, '生产订单已发布，排产确认已进入 PMC 待办')
 }
@@ -186,7 +186,11 @@ export function createProductionWipScenarios(deps) {
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
           .first()
           .click()
-        await modal.locator('input[type="date"]').fill('2026-10-01')
+        await modal.getByLabel('预计回厂日期', { exact: true }).click()
+        await page
+          .locator('.ant-picker-dropdown:visible')
+          .getByTitle('2026-10-01')
+          .click()
         await page.screenshot({
           path: path.join(outputDir, 'production-outsourcing-prepare.png'),
           fullPage: true,
@@ -385,10 +389,10 @@ export function createProductionWipScenarios(deps) {
         await routeModal.getByRole('button', { name: '返回工序' }).click()
 
         await splitButton.click()
-        await routeModal.getByLabel('拆出数量').fill('0.1')
+        await routeModal.getByLabel('拆出数量').fill('1')
         await routeModal.getByRole('button', { name: '确认办理' }).click()
         await expectText(page, '在制批次已拆分')
-        await expectText(page, '19.9')
+        await expectText(page, '19')
 
         const desktopMetrics = await routeModal.evaluate((element) => {
           const rect = element.getBoundingClientRect()

@@ -588,10 +588,16 @@ export function createBusinessFormPagesScenarios(deps) {
       effectiveSession: deps.customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await page
-          .locator('.erp-admin-menu')
-          .getByText('物料清单（BOM）', { exact: true })
-          .click()
+        const openModule = async (label) => {
+          await page.locator('.erp-module-catalog-trigger:visible').click()
+          const catalog = page.getByRole('dialog', {
+            name: '全部模块',
+            exact: true,
+          })
+          await catalog.waitFor({ state: 'visible' })
+          await catalog.getByRole('button', { name: label, exact: true }).click()
+        }
+        await openModule('物料清单（BOM）')
         await page.getByRole('button', { name: '新建草稿' }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.locator('textarea').fill('导航保护测试')
@@ -599,10 +605,7 @@ export function createBusinessFormPagesScenarios(deps) {
         await page
           .getByRole('button', { name: '继续编辑', exact: true })
           .click()
-        await page
-          .locator('.erp-admin-menu')
-          .getByText('材料档案', { exact: true })
-          .click()
+        await openModule('材料档案')
         await page
           .getByRole('button', { name: '继续编辑', exact: true })
           .click()
@@ -625,10 +628,7 @@ export function createBusinessFormPagesScenarios(deps) {
         await page
           .getByRole('heading', { name: '材料档案', exact: true })
           .waitFor()
-        await page
-          .locator('.erp-admin-menu')
-          .getByText('物料清单（BOM）', { exact: true })
-          .click()
+        await openModule('物料清单（BOM）')
         await page.getByRole('button', { name: '新建草稿' }).click()
         await editor.locator('textarea').fill('刷新放弃测试')
         await page.getByRole('button', { name: '刷新当前页' }).click()

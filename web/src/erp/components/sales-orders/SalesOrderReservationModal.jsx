@@ -3,6 +3,8 @@ import { Alert, Descriptions, Form, Input, Select, Typography } from 'antd'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 
 import {
   buildReservationBalanceChoices,
@@ -29,6 +31,18 @@ function localDateTimeValue() {
   const now = new Date()
   const offset = now.getTimezoneOffset() * 60_000
   return new Date(now.getTime() - offset).toISOString().slice(0, 16)
+}
+
+function renderReservationProductOption(option) {
+  return (
+    <ProductIdentity
+      productId={option.data.productID}
+      name={option.data.productName}
+      compact
+    >
+      {option.label}
+    </ProductIdentity>
+  )
 }
 
 export default function SalesOrderReservationModal({
@@ -78,6 +92,20 @@ export default function SalesOrderReservationModal({
     [selectedItem?.unit_name_snapshot, selectedItem?.unit_snapshot?.name],
     '单位已关联'
   )
+  const itemOptions = useMemo(
+    () =>
+      itemChoices.map(({ value, label, disabled, item }) => ({
+        value,
+        label,
+        disabled,
+        productID: Number(item?.product_id || 0),
+        productName:
+          item?.product_name_snapshot ||
+          item?.product_code_snapshot ||
+          '销售订单产品',
+      })),
+    [itemChoices]
+  )
 
   const initializeOpenForm = (visible) => {
     if (!visible) return
@@ -120,6 +148,7 @@ export default function SalesOrderReservationModal({
       okText="确认预留"
       cancelText="取消"
       confirmLoading={loading}
+      maskClosable={!loading}
       destroyOnHidden
       afterOpenChange={initializeOpenForm}
       onCancel={onCancel}
@@ -149,12 +178,19 @@ export default function SalesOrderReservationModal({
                 {
                   key: 'product',
                   label: '产品',
-                  children: sourceProductText,
-                },
-                {
-                  key: 'specification',
-                  label: 'SKU / 规格',
-                  children: sourceSpecificationText,
+                  children: (
+                    <ProductIdentity
+                      productId={selectedItem?.product_id}
+                      name={
+                        selectedItem?.product_name_snapshot ||
+                        selectedItem?.product_code_snapshot ||
+                        '销售订单产品'
+                      }
+                      code={sourceSpecificationText}
+                    >
+                      {sourceProductText}
+                    </ProductIdentity>
+                  ),
                 },
                 {
                   key: 'unit',
@@ -174,11 +210,8 @@ export default function SalesOrderReservationModal({
           <Select
             showSearch
             optionFilterProp="label"
-            options={itemChoices.map(({ value, label, disabled }) => ({
-              value,
-              label,
-              disabled,
-            }))}
+            options={itemOptions}
+            optionRender={renderReservationProductOption}
             onChange={(value) => {
               const choice = itemChoices.find((item) => item.value === value)
               form.setFieldsValue({ balance_id: undefined, quantity: '' })
@@ -252,7 +285,7 @@ export default function SalesOrderReservationModal({
           <Input inputMode="decimal" placeholder="例如：100" />
         </Form.Item>
         <Form.Item name="reserved_at" label="预留时间">
-          <Input type="datetime-local" />
+          <DateTimeInput />
         </Form.Item>
         <Form.Item name="note" label="备注">
           <Input.TextArea rows={3} maxLength={255} showCount />

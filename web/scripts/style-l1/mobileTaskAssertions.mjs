@@ -251,9 +251,10 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 退出登录不应出现在待办分区: ${JSON.stringify(todoMetrics)}`
     )
     assert(
-      !todoMetrics.sectionHeadings.includes('当前岗位任务状态') &&
+        !todoMetrics.sectionHeadings.includes('当前岗位任务状态') &&
         !todoMetrics.sectionHeadings.includes('已加载任务进度') &&
         !todoMetrics.sectionHeadings.includes('超时') &&
+        !todoMetrics.sectionHeadings.includes('风险') &&
         !todoMetrics.sectionHeadings.includes('跨岗风险'),
       `${scenarioName} 待办分区应直接展示任务且不重复状态统计或风险/超时区块: ${JSON.stringify(todoMetrics)}`
     )
@@ -288,9 +289,9 @@ export function createMobileTaskAssertions(deps) {
       tabLabel: '风险页',
     })
     assert(
-      reminderMetrics.sectionHeadings.includes('跨岗风险') &&
+      reminderMetrics.sectionHeadings.includes('风险') &&
         !reminderMetrics.sectionHeadings.includes('超时'),
-      `${scenarioName} 风险分区默认应先显示当前账号可监督的跨岗风险: ${JSON.stringify(reminderMetrics)}`
+      `${scenarioName} 超级管理员风险分区默认应显示全局风险: ${JSON.stringify(reminderMetrics)}`
     )
     await assertMobileTaskMessageTabsSwitch(page, { scenarioName })
     await assertMobileTaskDarkMessagesReadable(page, { scenarioName })
@@ -1005,10 +1006,10 @@ export function createMobileTaskAssertions(deps) {
       initialMetrics.tabItems.map((item) => [item.label, Number(item.count)])
     )
     assert(
-      Number.isSafeInteger(initialCountByLabel['跨岗风险']) &&
+      Number.isSafeInteger(initialCountByLabel['风险']) &&
         Number.isSafeInteger(initialCountByLabel['超时']) &&
-        initialCountByLabel['超时'] <= initialCountByLabel['跨岗风险'],
-      `${scenarioName} 超时必须是跨岗风险子集: ${JSON.stringify(initialMetrics)}`
+        initialCountByLabel['超时'] <= initialCountByLabel['风险'],
+      `${scenarioName} 超时必须是风险子集: ${JSON.stringify(initialMetrics)}`
     )
     await assertMobileTaskListToggle(page, {
       scenarioName,
@@ -1022,7 +1023,7 @@ export function createMobileTaskAssertions(deps) {
       const headings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
-      return headings.includes('超时') && !headings.includes('跨岗风险')
+      return headings.includes('超时') && !headings.includes('风险')
     })
 
     const noticeMetrics = await readMobileTaskMessageTabMetrics(page)
@@ -1048,7 +1049,7 @@ export function createMobileTaskAssertions(deps) {
     assert(
       noticeMetrics.sectionHeadings.length === 1 &&
         noticeMetrics.sectionHeadings[0] === '超时',
-      `${scenarioName} 超时 tab 不应混入跨岗风险列表: ${JSON.stringify(noticeMetrics)}`
+      `${scenarioName} 超时 tab 不应混入风险列表: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
       noticeMetrics.tabsSticky &&
@@ -1076,15 +1077,15 @@ export function createMobileTaskAssertions(deps) {
       const headings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
-      return headings.includes('跨岗风险') && !headings.includes('超时')
+      return headings.includes('风险') && !headings.includes('超时')
     })
     const warningMetrics = await readMobileTaskMessageTabMetrics(page)
     assert(
-      warningMetrics.activeTab === '跨岗风险' &&
+      warningMetrics.activeTab === '风险' &&
         warningMetrics.tabsClassName.includes(
           'mobile-role-message-tabs--warning'
         ),
-      `${scenarioName} 回到跨岗风险 tab 后滑动选中态未恢复: ${JSON.stringify(warningMetrics)}`
+      `${scenarioName} 回到风险 tab 后滑动选中态未恢复: ${JSON.stringify(warningMetrics)}`
     )
   }
 
@@ -1171,8 +1172,8 @@ export function createMobileTaskAssertions(deps) {
     )
     assert(
       metrics.sections.length === 1 &&
-        metrics.sections[0].heading === '跨岗风险',
-      `${scenarioName} 风险页默认应只渲染当前跨岗风险区块: ${JSON.stringify(metrics)}`
+        metrics.sections[0].heading === '风险',
+      `${scenarioName} 风险页默认应只渲染当前全局风险区块: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.cards.length >= 1,
@@ -1541,9 +1542,15 @@ export function createMobileTaskAssertions(deps) {
     const actionLabels = (
       await actionScreen.locator('label[data-action-key] strong').allTextContents()
     ).map((label) => label.replace(/\s+/g, ' ').trim())
-    assert(
-      actionLabels.includes('完成本岗') && actionLabels.includes('标记阻塞'),
-      `${scenarioName} 独立处理页没有展示后端授权的完成和阻塞动作: ${JSON.stringify({ actionLabels, screenText: (await actionScreen.innerText()).replace(/\s+/g, ' ').trim() })}`
+    assert.deepEqual(
+      actionLabels,
+      ['完成本岗', '标记阻塞', '退回', '催办'],
+      `${scenarioName} 独立处理页应直接展示全部后端授权动作: ${JSON.stringify({ actionLabels, screenText: (await actionScreen.innerText()).replace(/\s+/g, ' ').trim() })}`
+    )
+    assert.equal(
+      await actionScreen.getByText('更多处理方式', { exact: true }).count(),
+      0,
+      `${scenarioName} 动作数量少，不应再通过更多处理方式折叠`
     )
     const doneRadio = actionScreen.getByRole('radio', {
       name: '完成本岗',
@@ -1780,7 +1787,7 @@ export function createMobileTaskAssertions(deps) {
       return heading?.textContent?.trim() === '任务'
     })
 
-    await gotoScenarioPath(page, '/m/boss/tasks', {
+    await gotoScenarioPath(page, '/m/all/tasks', {
       waitUntil: 'domcontentloaded',
     })
     await page.getByTestId('mobile-role-nav-messages').click()
@@ -1788,6 +1795,8 @@ export function createMobileTaskAssertions(deps) {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
       return heading?.textContent?.trim() === '风险'
     })
+    const riskSearch = page.getByRole('searchbox').first()
+    await riskSearch.fill('暗色任务验证')
     await expectText(page, '暗色任务验证')
     await page
       .getByRole('button', { name: /暗色任务验证/ })
@@ -2634,10 +2643,13 @@ export function createMobileTaskAssertions(deps) {
       4,
       `${scenarioName} 待办筛选 sticky tab 应保留四项: ${JSON.stringify(metrics)}`
     )
-    assert.deepEqual(
-      metrics.filterItems.map((item) => item.label),
-      ['全部', '审批', '跨岗风险', '超时'],
-      `${scenarioName} 待办筛选标签应完整显示: ${JSON.stringify(metrics)}`
+    const filterLabels = metrics.filterItems.map((item) => item.label)
+    assert(
+      filterLabels[0] === '全部' &&
+        filterLabels[1] === '审批' &&
+        ['风险', '跨岗风险'].includes(filterLabels[2]) &&
+        filterLabels[3] === '超时',
+      `${scenarioName} 待办筛选标签应按当前风险范围完整显示: ${JSON.stringify(metrics)}`
     )
     metrics.filterItems.forEach((item) => {
       assert.match(

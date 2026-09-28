@@ -285,6 +285,7 @@ export default function SalesOrderEngineeringModal({
         if (!saving) onCancel()
       }}
       confirmLoading={saving}
+      maskClosable={!saving}
       okButtonProps={{
         disabled:
           loading ||

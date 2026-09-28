@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 import {
   sourceBusinessActionNo,
@@ -100,8 +101,12 @@ export default function OutsourcingReturnQualityInspectionModal({
           },
           {
             key: 'product_sku',
-            label: '产品规格',
-            children: outsourcingFactProductSKUText(fact),
+            label: '产品 / 规格',
+            children: (
+              <ProductIdentity productId={fact?.subject_id} name="委外回货产品">
+                {outsourcingFactProductSKUText(fact)}
+              </ProductIdentity>
+            ),
           },
           {
             key: 'occurred_at',

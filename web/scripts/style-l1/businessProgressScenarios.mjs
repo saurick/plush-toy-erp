@@ -157,6 +157,11 @@ export function createBusinessProgressScenarios({
           name: '进度看板',
           exact: true,
         })
+        const progressCard = (orderNo) =>
+          board.getByRole('button', {
+            name: `查看 ${orderNo} 进度摘要`,
+            exact: true,
+          })
         await board.waitFor({ state: 'visible' })
         if (failed) {
           const retry = board.getByRole('button', { name: '重试', exact: true })
@@ -164,9 +169,7 @@ export function createBusinessProgressScenarios({
           failNext = false
           await retry.click()
         }
-        await board
-          .getByRole('button', { name: 'SO-0001', exact: true })
-          .waitFor()
+        await progressCard('SO-0001').waitFor()
         assert.equal(
           await page.locator('.erp-business-board-source-count').count(),
           0
@@ -218,18 +221,13 @@ export function createBusinessProgressScenarios({
         const listReadCount = calls.filter(
           (call) => call.method === 'list_progress'
         ).length
-        const secondCard = board.getByRole('button', {
-          name: 'SO-0002',
-          exact: true,
-        })
-        await secondCard.getByText('模拟客户 2', { exact: true }).click()
+        const secondCard = progressCard('SO-0002')
+        await secondCard.click()
         await summary
           .getByRole('heading', { name: 'SO-0002', exact: true })
           .waitFor()
         assert.equal(
-          await board
-            .getByRole('button', { name: 'SO-0002', exact: true })
-            .getAttribute('aria-pressed'),
+          await progressCard('SO-0002').getAttribute('aria-pressed'),
           'true'
         )
         assert.equal(
@@ -245,9 +243,7 @@ export function createBusinessProgressScenarios({
           await board.getByRole('button', { name: /查看 .* 阶段/ }).count(),
           0
         )
-        await board
-          .getByRole('button', { name: 'SO-0001', exact: true })
-          .focus()
+        await progressCard('SO-0001').focus()
         await page.keyboard.press('Space')
         await summary
           .getByRole('heading', { name: 'SO-0001', exact: true })
@@ -320,14 +316,10 @@ export function createBusinessProgressScenarios({
             .getByText('第 1–20 单，共 24 单', { exact: true })
             .waitFor()
           await board.locator('.ant-pagination-next button').click()
-          await board
-            .getByRole('button', { name: 'SO-0025', exact: true })
-            .waitFor()
+          await progressCard('SO-0025').waitFor()
           assert.equal(new URL(page.url()).searchParams.get('page'), '2')
           await board.locator('.ant-pagination-prev button').click()
-          await board
-            .getByRole('button', { name: 'SO-0001', exact: true })
-            .waitFor()
+          await progressCard('SO-0001').waitFor()
           await board.getByRole('button', { name: '筛选', exact: true }).click()
           await page.getByPlaceholder('输入姓名').fill('查无负责人')
           await page.getByRole('button', { name: '应用', exact: true }).click()
@@ -339,9 +331,7 @@ export function createBusinessProgressScenarios({
           await board
             .getByRole('button', { name: '清空筛选', exact: true })
             .click()
-          await board
-            .getByRole('button', { name: 'SO-0001', exact: true })
-            .waitFor()
+          await progressCard('SO-0001').waitFor()
         }
         await board.getByRole('button', { name: /已逾期/ }).click()
         await page.waitForFunction(
@@ -444,9 +434,7 @@ export function createBusinessProgressScenarios({
           0
         )
         await search.fill('查找目标客户')
-        await board
-          .getByRole('button', { name: 'SO-0025', exact: true })
-          .waitFor()
+        await progressCard('SO-0025').waitFor()
         assert(
           calls.some(
             (call) =>
@@ -462,14 +450,10 @@ export function createBusinessProgressScenarios({
           await search.fill('迟到响应')
           await late
           await search.fill('查找目标客户')
-          await board
-            .getByRole('button', { name: 'SO-0025', exact: true })
-            .waitFor()
+          await progressCard('SO-0025').waitFor()
           await page.waitForTimeout(500)
           assert.equal(
-            await board
-              .getByRole('button', { name: 'SO-0025', exact: true })
-              .count(),
+            await progressCard('SO-0025').count(),
             1
           )
           assert.equal(await board.getByText('没有符合条件的记录').count(), 0)
@@ -479,13 +463,9 @@ export function createBusinessProgressScenarios({
         assert.equal(await summary.getByRole('heading').count(), 0)
         await summary.getByText('暂无可查看的阶段摘要').waitFor()
         await board.getByRole('button', { name: '清空筛选' }).click()
-        await board
-          .getByRole('button', { name: 'SO-0001', exact: true })
-          .waitFor()
+        await progressCard('SO-0001').waitFor()
         await verifyProgressMotion(page, assert, false)
-        await board
-          .getByRole('button', { name: 'MO-0001', exact: true })
-          .waitFor()
+        await progressCard('MO-0001').waitFor()
         await verifyProgressMotion(page, assert, true)
         await page.screenshot({
           path: path.join(outputDir, `${name}-production.png`),
@@ -539,9 +519,7 @@ export function createBusinessProgressScenarios({
         await page
           .locator('.ant-popover:has(.erp-progress-filters)')
           .waitFor({ state: 'hidden' })
-        await board
-          .getByRole('button', { name: 'MO-0003', exact: true })
-          .waitFor()
+        await progressCard('MO-0003').waitFor()
         await page.waitForFunction(
           () =>
             document.querySelectorAll('.erp-progress-list .erp-progress-row')
@@ -580,9 +558,7 @@ export function createBusinessProgressScenarios({
               url.searchParams.get('production_order_id') === '3'
           )
           await page.goBack()
-          await board
-            .getByRole('button', { name: 'MO-0003', exact: true })
-            .waitFor()
+          await progressCard('MO-0003').waitFor()
           assert(new URL(page.url()).searchParams.get('risk') === 'unlinked')
         }
       },

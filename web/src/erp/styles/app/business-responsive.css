@@ -622,8 +622,7 @@ body
 
   .erp-business-action-modal .ant-modal-footer {
     justify-content: stretch;
-    padding-top: 12px;
-    padding-bottom: 14px;
+    padding-block: 13px;
   }
 
   .erp-business-action-modal .ant-modal-footer .ant-btn {
@@ -1008,6 +1007,7 @@ body
     min-width: 0;
     height: auto;
     flex-direction: column;
+    align-items: stretch;
     max-width: none;
   }
 
@@ -1020,16 +1020,10 @@ body
     flex-basis: auto;
   }
 
-  .erp-business-date-range-filter__divider {
-    width: auto;
-    height: 1px;
-  }
-
   .erp-business-date-range-filter__range {
     width: 100%;
     min-width: 0;
     flex: 0 0 auto;
-    padding-inline: 8px;
   }
 
   .erp-business-date-range-filter .erp-business-date-input.ant-picker {

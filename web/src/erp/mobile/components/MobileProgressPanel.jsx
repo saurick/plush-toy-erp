@@ -22,6 +22,7 @@ import {
 import { listBusinessProgress } from '../../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
 import BusinessProgressDrawer from '../../components/business-visualizations/BusinessProgressDrawer'
+import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
 import { ProductThumbnail } from '../../components/master-data/ProductIdentity.jsx'
 import {
   progressDelivery,
@@ -515,11 +516,11 @@ export default function MobileProgressPanel({
               const delivery = progressDelivery(row)
               return (
                 <article key={row.id} className="mobile-progress-card">
-                  <button
-                    type="button"
-                    className="mobile-progress-card-main"
-                    onClick={() => open(row)}
-                    aria-label={`查看 ${row.order_no} 进度`}
+                  <WorkflowTaskCard
+                    className="mobile-progress-card-selection"
+                    contentClassName="mobile-progress-card-main"
+                    label={`查看 ${row.order_no} 进度`}
+                    onOpen={() => open(row)}
                   >
                     <span className="mobile-progress-card-head">
                       <strong>{row.order_no}</strong>
@@ -545,7 +546,6 @@ export default function MobileProgressPanel({
                         <ProductThumbnail
                           productId={row.product_id}
                           name={row.product}
-                          preview={false}
                         />
                         {row.product_count > 1 && (
                           <span
@@ -609,7 +609,7 @@ export default function MobileProgressPanel({
                         任务受阻：{row.attention_reason}
                       </span>
                     )}
-                  </button>
+                  </WorkflowTaskCard>
                   {data.access.tasks && (
                     <button
                       type="button"

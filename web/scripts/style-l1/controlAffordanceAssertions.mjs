@@ -88,6 +88,9 @@ export async function assertTabsAffordance(locator) {
       selected: read(selected),
       other: read(other),
       border: trackStyle.borderColor,
+      expectedBorder: trackStyle
+        .getPropertyValue('--erp-control-tab-border')
+        .trim(),
       borderWidth: parseFloat(trackStyle.borderWidth),
       background: trackStyle.backgroundColor,
       radius: trackStyle.borderRadius,
@@ -114,9 +117,10 @@ export async function assertTabsAffordance(locator) {
   assert.equal(metric.radius, '9px')
   assert.notEqual(metric.indicatorColor, metric.background)
   assert.ok(metric.shadow.includes('0px 0px 0px 1px inset'))
-  assert.ok(
-    ['rgb(220, 228, 223)', 'rgb(49, 64, 57)'].includes(metric.border),
-    '底轨使用中性边框'
+  assert.deepEqual(
+    parseRgb(metric.border),
+    parseRgb(metric.expectedBorder),
+    `底轨使用当前主题的中性边框: ${JSON.stringify(metric)}`
   )
   for (const [item, background] of [
     [metric.selected, metric.indicatorColor],
@@ -142,6 +146,9 @@ export async function assertSegmentAffordance(locator) {
     )
     return {
       border: track.borderColor,
+      expectedBorder: track
+        .getPropertyValue('--erp-control-tab-border')
+        .trim(),
       borderWidth: parseFloat(track.borderWidth),
       background: track.backgroundColor,
       selectedBackground: indicator.backgroundColor,
@@ -156,9 +163,10 @@ export async function assertSegmentAffordance(locator) {
     metric.borderWidth >= 1,
     `视图切换必须有分组边界: ${JSON.stringify(metric)}`
   )
-  assert.ok(
-    ['rgb(220, 228, 223)', 'rgb(49, 64, 57)'].includes(metric.border),
-    '分组沿用高保真中性边框'
+  assert.deepEqual(
+    parseRgb(metric.border),
+    parseRgb(metric.expectedBorder),
+    `分组沿用当前主题的中性边框: ${JSON.stringify(metric)}`
   )
   assert.notEqual(
     metric.selectedBackground,
@@ -199,6 +207,9 @@ export async function assertFilterAffordance(locator, minHeight = 32) {
       const style = getComputedStyle(button)
       return {
         border: style.borderColor,
+        expectedBorder: style
+          .getPropertyValue('--erp-control-tab-border')
+          .trim(),
         borderWidth: parseFloat(style.borderWidth),
         background: style.backgroundColor,
         text: style.color,
@@ -225,9 +236,10 @@ export async function assertFilterAffordance(locator, minHeight = 32) {
       `同组筛选项必须使用同一边框色: ${JSON.stringify(metrics)}`
     )
     if (!metric.disabled) {
-      assert.ok(
-        ['rgb(220, 228, 223)', 'rgb(49, 64, 57)'].includes(metric.border),
-        '筛选沿用高保真中性边框'
+      assert.deepEqual(
+        parseRgb(metric.border),
+        parseRgb(metric.expectedBorder),
+        `筛选沿用当前主题的中性边框: ${JSON.stringify(metric)}`
       )
       assert(
         getContrastRatio(parseRgb(metric.text), parseRgb(metric.background)) >=

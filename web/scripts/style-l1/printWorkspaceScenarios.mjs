@@ -1052,7 +1052,14 @@ export function createPrintWorkspaceScenarios({
         await expectText(page, '加工项目')
         await expectText(page, '面*1')
         const totalRow = page.locator('.erp-print-table__total')
-        await totalRow.getByText('300', { exact: true }).waitFor()
+        const totalValues = totalRow.locator(
+          '.erp-contract-table__total-value'
+        )
+        assert.equal(
+          (await totalValues.nth(0).innerText()).trim(),
+          '',
+          '混合“片 / 对”单位时不应伪造数量合计'
+        )
         await totalRow.getByText('45', { exact: true }).waitFor()
       },
     },
@@ -2076,7 +2083,7 @@ export function createPrintWorkspaceScenarios({
                     contractNo: `PO-GROUP-${index + 1}`,
                     productOrderNo: `SO-GROUP-${index + 1}`,
                     materialName: '来源材料',
-                    unit: index === 2 ? '米' : '件',
+                    unit: index === 2 ? '码' : '件',
                     quantity: '10',
                     unitPrice: index === 0 ? '' : '1',
                   },
@@ -2205,6 +2212,7 @@ export function createPrintWorkspaceScenarios({
                   {
                     materialName: '批量材料一',
                     quantity: '20',
+                    unit: '件',
                     unitPrice: '1.25',
                   },
                 ],
@@ -2222,6 +2230,7 @@ export function createPrintWorkspaceScenarios({
                   {
                     materialName: '批量材料二',
                     quantity: '30',
+                    unit: '件',
                     unitPrice: '',
                   },
                 ],
@@ -2406,6 +2415,7 @@ export function createPrintWorkspaceScenarios({
                     {
                       materialName: '模拟材料',
                       quantity: '10',
+                      unit: '件',
                       unitPrice: index === 20 ? '' : '1',
                     },
                   ],

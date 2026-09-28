@@ -208,18 +208,18 @@ export function createTaskDrawerAppearanceScenarios({
         )
         if (key === 'pink') await shot('pink-actions')
         if (key === 'blue') {
-          assert.equal(await drawer.getByRole('radio').count(), 2)
-          const more = drawer.getByRole('button', { name: '更多处理方式', exact: true })
-          await more.press('Enter')
-          await page.waitForFunction(() => Boolean(document.activeElement?.closest('[role="menu"]')))
-          await page.keyboard.press('Escape')
-          await page.locator('.ant-dropdown-menu[role="menu"]').waitFor({ state: 'hidden' })
-          await waitForFiniteAnimations(page)
-          assert.equal(await drawer.isVisible(), true)
-          assert.equal(await more.evaluate((node) => node === document.activeElement), true)
-          await more.click()
-          await page.getByRole('menuitem', { name: '退回任务', exact: true }).click()
-          assert.equal(await drawer.getByRole('button', { name: '更多处理方式：退回任务', exact: true }).count(), 1)
+          assert.equal(await drawer.getByRole('radio').count(), 4)
+          assert.equal(
+            await drawer.getByRole('button', { name: /更多处理方式/ }).count(),
+            0
+          )
+          const reject = drawer.getByRole('radio', { name: /退回任务/ })
+          await reject.focus()
+          assert.equal(
+            await reject.evaluate((node) => node === document.activeElement),
+            true
+          )
+          await reject.click()
           assert.equal(await drawer.getByRole('tab', { name: /确认与结果/ }).isDisabled(), true)
           await drawer.getByRole('radio', { name: /处理完成/ }).click()
         }
@@ -320,6 +320,9 @@ export function createTaskDrawerAppearanceScenarios({
           const title = getComputedStyle(root.querySelector('h3'))
           return {
             radius: style.borderRadius,
+            peerRadius: getComputedStyle(
+              document.querySelector('.mobile-task-detail-hero')
+            ).borderRadius,
             foreground: title.color,
             background: style.backgroundColor,
             expectedBackground: style
@@ -328,7 +331,11 @@ export function createTaskDrawerAppearanceScenarios({
             overflow: root.scrollWidth - root.clientWidth,
           }
         })
-        assert.equal(paint.radius, '16px', '共享记录卡保留手机端圆角')
+        assert.equal(
+          paint.radius,
+          paint.peerRadius,
+          '共享记录卡应与手机端详情卡保持同一圆角'
+        )
         assert.deepEqual(
           parseRgb(paint.background),
           parseRgb(paint.expectedBackground)
@@ -346,15 +353,18 @@ export function createTaskDrawerAppearanceScenarios({
         await detail.locator('.mobile-role-action-bar').getByRole('button', { name: '处理任务', exact: true }).click()
         const action = page.getByTestId('mobile-task-action-screen')
         await action.waitFor()
-        assert.equal(await action.getByRole('radio').count(), 2)
-        const more = action.locator('details')
-        assert.equal(await more.getAttribute('open'), null)
-        await more.locator('summary').press('Enter')
-        await more.locator('input[value="rejected"]').check()
-        assert.equal(await more.locator('input[value="rejected"]').isChecked(), true)
+        assert.deepEqual(
+          await action.locator('input[type="radio"]').evaluateAll((nodes) =>
+            nodes.map((node) => node.value)
+          ),
+          ['done', 'blocked', 'rejected', 'urge']
+        )
+        assert.equal(await action.locator('details').count(), 0)
+        await action.locator('input[value="rejected"]').check()
+        assert.equal(await action.locator('input[value="rejected"]').isChecked(), true)
         await action.locator('button[type="submit"]').click()
         assert.match(await action.innerText(), /退回原因为必填项/)
-        await action.screenshot({ path: path.join(outputDir, 'mobile-task-more-actions-dark.png') })
+        await action.screenshot({ path: path.join(outputDir, 'mobile-task-actions-dark.png') })
         await action.getByLabel('返回任务详情').click()
         await page.getByLabel('返回任务列表').click()
         await row.waitFor()

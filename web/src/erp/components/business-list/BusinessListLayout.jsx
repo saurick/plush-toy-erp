@@ -36,10 +36,13 @@ import { BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
 import {
   DATE_INPUT_DISPLAY_FORMAT,
   DATE_INPUT_VALUE_FORMAT,
+  DATE_TIME_INPUT_DISPLAY_FORMAT,
+  DATE_TIME_INPUT_VALUE_FORMAT,
   isDateInputAfter,
   isDateInputBefore,
   isDateInputRangeReversed,
   parseDateInputValue,
+  parseDateTimeInputValue,
 } from '../../utils/dateRange.mjs'
 import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
 import { normalizeBusinessPageHeaderStats } from '../../utils/businessPageHeader.mjs'
@@ -231,6 +234,20 @@ function containsDeferredSelectionAction(action) {
   )
 }
 
+function selectionActionRenderState(action) {
+  if (!React.isValidElement(action)) return String(action ?? '')
+  const children = React.Children.toArray(action.props.children)
+    .map(selectionActionRenderState)
+    .join(',')
+  return [
+    action.key || '',
+    action.props.disabled === true ? 'disabled' : 'enabled',
+    action.props.loading === true ? 'loading' : 'idle',
+    action.props.visible === false ? 'hidden' : 'visible',
+    children,
+  ].join(':')
+}
+
 function ResponsiveSelectionActions({ children }) {
   const { token } = theme.useToken()
   const { screenLG, screenMD } = token
@@ -251,6 +268,10 @@ function ResponsiveSelectionActions({ children }) {
   const { context, visible, overflow } = React.useMemo(
     () => partitionSelectionActions(children, visibleLimit),
     [children, visibleLimit]
+  )
+  const overflowRenderKey = React.useMemo(
+    () => overflow.map(selectionActionRenderState).join('|'),
+    [overflow]
   )
   const closeMoreActions = React.useCallback(() => {
     setMoreActionsOpen(false)
@@ -384,13 +405,16 @@ function ResponsiveSelectionActions({ children }) {
         {visible}
       </div>
       <Dropdown
+        key={overflowRenderKey}
         trigger={['click']}
         placement="bottomRight"
         open={moreActionsOpen}
         onOpenChange={setMoreActionsOpen}
         autoFocus
         autoAdjustOverflow
-        destroyOnHidden={false}
+        // Rebuild overflow actions after selection, permission, or loading
+        // changes so a reopened menu never keeps stale disabled controls.
+        destroyOnHidden
         overlayClassName="erp-business-selection-action-dropdown"
         popupRender={renderMoreActions}
       >
@@ -561,32 +585,46 @@ function resolveBusinessTableRowSelection(rowSelection) {
   }
 }
 
-export const DateInput = React.forwardRef(
+const BusinessDatePicker = React.forwardRef(
   (
     {
       value,
       onChange,
+      parseValue,
+      valueFormat,
+      displayFormat,
       className = '',
-      disabled = false,
-      placeholder = '选择日期',
+      disabled,
+      placeholder,
       allowClear = true,
+      inputReadOnly = true,
       onClick,
       onMouseDown,
+      onOpenChange,
+      quickOptions = [],
+      quickOptionsLabel = '快捷选择',
+      renderExtraFooter,
       ...restProps
     },
     ref
   ) => {
     const [open, setOpen] = React.useState(false)
-    const pickerValue = parseDateInputValue(value)
+    const pickerValue = parseValue(value)
     const handleChange = React.useCallback(
       (nextValue) => {
-        onChange?.(nextValue ? nextValue.format(DATE_INPUT_VALUE_FORMAT) : '')
+        const formattedValue = nextValue ? nextValue.format(valueFormat) : ''
+        onChange?.(formattedValue)
       },
-      [onChange]
+      [onChange, valueFormat]
     )
     const handlePointerOpen = React.useCallback(
       (event) => {
-        if (disabled) return
+        if (
+          disabled === true ||
+          event.currentTarget?.classList?.contains('ant-picker-disabled')
+        ) {
+          return
+        }
         if (event.target?.closest?.('.ant-picker-clear')) return
         setOpen(true)
       },
@@ -606,15 +644,91 @@ export const DateInput = React.forwardRef(
       },
       [handlePointerOpen, onMouseDown]
     )
+    const handleOpenChange = React.useCallback(
+      (nextOpen) => {
+        setOpen(nextOpen)
+        onOpenChange?.(nextOpen)
+      },
+      [onOpenChange]
+    )
+    const handleQuickOption = React.useCallback(
+      (option) => {
+        const optionDisabled =
+          typeof option?.disabled === 'function'
+            ? option.disabled()
+            : option?.disabled
+        if (optionDisabled) return
+        const rawValue =
+          typeof option?.value === 'function' ? option.value() : option?.value
+        const nextValue = parseValue(rawValue)
+        if (!nextValue) return
+        handleOpenChange(false)
+        // rc-picker emits its pending empty input once while a custom footer
+        // closes. Apply the shortcut after that close cycle so it remains the
+        // controlled Form value.
+        setTimeout(() => handleChange(nextValue), 0)
+      },
+      [handleChange, handleOpenChange, parseValue]
+    )
+    const mergedRenderExtraFooter = React.useCallback(
+      (mode) => {
+        const extraFooter = renderExtraFooter?.(mode)
+        if (!quickOptions.length) return extraFooter
+        return (
+          <>
+            <div
+              className="erp-business-date-picker-quick-options"
+              role="group"
+              aria-label={quickOptionsLabel}
+            >
+              <span className="erp-business-date-picker-quick-options__label">
+                {quickOptionsLabel}
+              </span>
+              {quickOptions.map((option) => {
+                const optionDisabled =
+                  typeof option.disabled === 'function'
+                    ? option.disabled()
+                    : option.disabled
+                return (
+                  <Button
+                    key={option.key || option.label}
+                    size="small"
+                    htmlType="button"
+                    disabled={optionDisabled}
+                    data-business-date-quick-option={
+                      option.key || option.label
+                    }
+                    title={option.title}
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleQuickOption(option)
+                    }}
+                  >
+                    {option.label}
+                  </Button>
+                )
+              })}
+            </div>
+            {extraFooter}
+          </>
+        )
+      },
+      [handleQuickOption, quickOptions, quickOptionsLabel, renderExtraFooter]
+    )
 
     return (
       <DatePicker
+        {...restProps}
         ref={ref}
         allowClear={allowClear}
         className={joinClassNames('erp-business-date-input', className)}
         disabled={disabled}
-        format={DATE_INPUT_DISPLAY_FORMAT}
-        inputReadOnly
+        format={displayFormat}
+        inputReadOnly={inputReadOnly}
         open={open}
         placeholder={placeholder}
         suffixIcon={<CalendarOutlined />}
@@ -622,12 +736,50 @@ export const DateInput = React.forwardRef(
         onChange={handleChange}
         onClick={handleClick}
         onMouseDown={handleMouseDown}
-        onOpenChange={setOpen}
-        {...restProps}
+        onOpenChange={handleOpenChange}
+        renderExtraFooter={mergedRenderExtraFooter}
       />
     )
   }
 )
+
+export const DateInput = React.forwardRef((props, ref) => (
+  <BusinessDatePicker
+    {...props}
+    ref={ref}
+    displayFormat={DATE_INPUT_DISPLAY_FORMAT}
+    parseValue={parseDateInputValue}
+    placeholder={props.placeholder || '选择日期'}
+    valueFormat={DATE_INPUT_VALUE_FORMAT}
+  />
+))
+
+export const DateTimeInput = React.forwardRef((props, ref) => (
+  <BusinessDatePicker
+    {...props}
+    ref={ref}
+    className={joinClassNames(
+      'erp-business-date-time-input',
+      props.className || ''
+    )}
+    classNames={{
+      ...props.classNames,
+      popup: {
+        ...props.classNames?.popup,
+        root: joinClassNames(
+          'erp-business-date-time-picker-dropdown',
+          props.classNames?.popup?.root || ''
+        ),
+      },
+    }}
+    displayFormat={DATE_TIME_INPUT_DISPLAY_FORMAT}
+    inputReadOnly={props.inputReadOnly ?? false}
+    parseValue={parseDateTimeInputValue}
+    placeholder={props.placeholder || '选择日期和时间'}
+    showTime={{ format: 'HH:mm', ...(props.showTime || {}) }}
+    valueFormat={DATE_TIME_INPUT_VALUE_FORMAT}
+  />
+))
 
 export function BusinessPageLayout({ children, className = '' }) {
   return (
@@ -866,31 +1018,27 @@ export function DateRangeFilter({
         'erp-business-filter-control erp-business-date-range-filter erp-business-module-date-filter',
         rangeInvalid ? 'erp-business-date-range-filter--invalid' : ''
       )}
+      role="group"
+      aria-label={selectedDateTypeLabel || '日期范围'}
     >
       {hasMultipleDateTypes ? (
-        <>
-          <Select
-            className="erp-business-date-range-filter__type"
-            aria-label="日期类型"
-            options={options}
-            value={value || undefined}
-            onChange={onTypeChange}
-            classNames={{
-              popup: { root: 'erp-business-module-select-popup' },
-            }}
-          />
-          <div className="erp-business-date-range-filter__divider" />
-        </>
+        <Select
+          className="erp-business-date-range-filter__type"
+          aria-label="日期类型"
+          options={options}
+          value={value || undefined}
+          onChange={onTypeChange}
+          classNames={{
+            popup: { root: 'erp-business-module-select-popup' },
+          }}
+        />
       ) : selectedDateTypeLabel ? (
-        <>
-          <span
-            className="erp-business-date-range-filter__type erp-business-date-range-filter__type-label"
-            aria-label="日期类型"
-          >
-            {selectedDateTypeLabel}
-          </span>
-          <div className="erp-business-date-range-filter__divider" />
-        </>
+        <span
+          className="erp-business-date-range-filter__type erp-business-date-range-filter__type-label"
+          aria-label="日期类型"
+        >
+          {selectedDateTypeLabel}
+        </span>
       ) : null}
       <div className="erp-business-date-range-filter__range">
         <DateInput
@@ -902,7 +1050,12 @@ export function DateRangeFilter({
           disabledDate={endValue ? startDisabledDate : undefined}
           onChange={onStartChange}
         />
-        <span aria-hidden="true">-</span>
+        <span
+          className="erp-business-date-range-filter__separator"
+          aria-hidden="true"
+        >
+          至
+        </span>
         <DateInput
           aria-label="结束日期"
           className="erp-business-date-range-filter__date"

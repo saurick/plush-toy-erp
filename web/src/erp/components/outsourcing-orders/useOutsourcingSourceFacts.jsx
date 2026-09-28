@@ -369,6 +369,7 @@ export function useOutsourcingSourceFacts({
       const isDraft = status === 'DRAFT'
       let cancelReason = ''
       modal.confirm({
+        maskClosable: true,
         title: isDraft ? '确认作废委外草稿？' : '确认取消已过账委外记录？',
         content: (
           <Space direction="vertical" style={{ width: '100%' }}>

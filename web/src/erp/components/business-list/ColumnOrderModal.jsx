@@ -148,7 +148,7 @@ export function ColumnOrderModal({
           return (
             <div
               key={key}
-              className="erp-business-column-order-modal__row"
+              className="erp-business-column-order-modal__row erp-business-column-order-modal__row--visibility"
               role="listitem"
             >
               <span className="erp-business-column-order-modal__index">

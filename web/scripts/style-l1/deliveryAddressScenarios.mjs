@@ -223,7 +223,7 @@ export function createDeliveryAddressScenarios({
         .getByRole('heading', { name: 'UI 交互设计', exact: true })
         .waitFor()
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-      await frame.getByRole('button', { name: '销售订单', exact: true }).click()
+      await frame.getByRole('button', { name: '销售管理', exact: true }).click()
       await frame.getByRole('button', { name: '新建订单', exact: true }).click()
       const country = frame.locator('[data-delivery-country]')
       assert.equal(await country.inputValue(), '中国')

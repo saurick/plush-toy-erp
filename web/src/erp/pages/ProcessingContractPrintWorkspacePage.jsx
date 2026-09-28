@@ -608,6 +608,7 @@ export default function ProcessingContractPrintWorkspacePage() {
   const handleBlankDraft = () => {
     clearFeedback()
     modal.confirm({
+      maskClosable: true,
       title: '生成空白加工合同',
       content:
         '将清空当前窗口中的合同内容、明细和末尾图片，保留模板结构与合同条款。此操作不会修改业务记录。',

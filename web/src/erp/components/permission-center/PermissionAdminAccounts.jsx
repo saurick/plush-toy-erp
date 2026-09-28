@@ -1104,6 +1104,7 @@ export default function PermissionAdminAccounts({
         onCancel={closeEditModal}
         onOk={saveAdminRoles}
         confirmLoading={saving}
+        maskClosable={!saving}
         okText="保存"
         cancelText="取消"
         centered
@@ -1248,6 +1249,7 @@ export default function PermissionAdminAccounts({
         }}
         onOk={() => statusForm.submit()}
         confirmLoading={statusUpdatingAdminID === statusActionAdmin?.id}
+        maskClosable={statusUpdatingAdminID !== statusActionAdmin?.id}
         okText={statusActionDisabled ? '确认临时停用' : '确认启用'}
         cancelText="取消"
         centered
@@ -1293,6 +1295,7 @@ export default function PermissionAdminAccounts({
         }}
         onOk={() => revokeForm.submit()}
         confirmLoading={saving}
+        maskClosable={!saving}
         okText="确认注销"
         okButtonProps={{ danger: true }}
         cancelText="取消"

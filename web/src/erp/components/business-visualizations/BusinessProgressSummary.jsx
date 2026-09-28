@@ -8,6 +8,7 @@ import {
 } from '../../utils/businessProgress.mjs'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import { getWorkflowTaskOwnerRoleLabel } from '../../utils/workflowTaskBoard.mjs'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import './businessProgressSummary.css'
 
 export function ProgressBadges({ row }) {
@@ -43,10 +44,13 @@ export default function BusinessProgressSummary({
         <h2 ref={headingRef} tabIndex={-1}>
           {row.order_no}
         </h2>
-        <p>
-          {[row.customer, row.product].filter(Boolean).join(' · ')}
-          {row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}
-        </p>
+        <div className="erp-progress-overview-product">
+          <ProductIdentity productId={row.product_id} name={row.product}>
+            {row.product}
+            {row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}
+          </ProductIdentity>
+          {row.customer ? <p>{row.customer}</p> : null}
+        </div>
         <ProgressBadges row={row} />
         <p className={row.overdue ? 'erp-progress-danger' : ''}>
           {row.due_date || '尚未确定'} ·{' '}

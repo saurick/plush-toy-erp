@@ -1564,7 +1564,7 @@ const BusinessAttachmentPanel = forwardRef(
             disabled:
               uploading || (batchRetryState?.retryableItems.length || 0) <= 0,
           }}
-          maskClosable={false}
+          maskClosable={!uploading}
           keyboard={!uploading}
           closable={!uploading}
           onCancel={handleDeferBatchRetry}

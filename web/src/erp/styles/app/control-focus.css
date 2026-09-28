@@ -14,8 +14,7 @@ body
         :where(.ant-input-number-affix-wrapper > .ant-input-number)
       ):focus-within,
     .ant-picker:focus-within,
-    .ant-checkbox-wrapper:focus-within .ant-checkbox-inner,
-    .erp-business-date-range-filter:focus-within
+    .ant-checkbox-wrapper:focus-within .ant-checkbox-inner
   ),
 body
   .ant-select-outlined:not(.ant-select-disabled):not(
@@ -80,12 +79,6 @@ body
   .ant-select.ant-select-outlined.ant-select-focused
   .ant-select-selection-search-input:focus {
   outline: 0;
-}
-
-/* 组合框子控件通过变量声明外观归属，不再以另一组焦点选择器争夺优先级。 */
-.erp-business-date-range-filter :is(.ant-picker, .ant-select-selector) {
-  --erp-control-focus-border: transparent;
-  --erp-control-focus-shadow: none;
 }
 
 /* 短信组合框在输入和验证码按钮之上统一绘制边框。 */

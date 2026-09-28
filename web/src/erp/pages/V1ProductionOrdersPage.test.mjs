@@ -92,7 +92,10 @@ test('production order lifecycle keeps backend authority and separates refresh e
 
 test('production order page reuses the ERP shell refresh entrypoint', () => {
   assert.match(page, /registerPageRefresh\?\.\(\(\) => \{/u)
-  assert.match(page, /if \(contentView === 'overview'\) reloadOverviewData\(\)/u)
+  assert.match(
+    page,
+    /if \(contentView === 'overview'\) reloadOverviewData\(\)/u
+  )
   assert.doesNotMatch(page, />\s*刷新当前页\s*</u)
   assert.doesNotMatch(page, /ReloadOutlined/u)
 })
@@ -119,10 +122,7 @@ test('production order core actions stay stable while record-specific readers us
     page,
     /\{canUpdate\s*&&\s*\(!selected|\{canCreateCompletion\s*&&\s*\(!selected|\{canReadProductionWip\s*&&\s*\(!selected/u
   )
-  assert.match(
-    page,
-    /selected\.status !== PRODUCTION_ORDER_STATUS\.DRAFT/u
-  )
+  assert.match(page, /selected\.status !== PRODUCTION_ORDER_STATUS\.DRAFT/u)
   assert.match(page, /当前生产订单状态不能取消/u)
   assert.match(page, /productionRouteActionAvailability\.visible/u)
   assert.match(page, /productionReworkProgressAvailability\.visible/u)
@@ -249,7 +249,10 @@ test('routed completion fails closed until packaging is accepted and packaging m
   assert.match(page, /eligibleItems\.length === 0/u)
   assert.match(page, /暂不能登记生产完工/u)
   assert.match(page, /工序状态已变化/u)
-  assert.match(page, /productionWipBatchID:\s*payload\.production_wip_batch_id/u)
+  assert.match(
+    page,
+    /productionWipBatchID:\s*payload\.production_wip_batch_id/u
+  )
   assert.match(
     page,
     /buildProductionCompletionPayload\([\s\S]*completionContext\.order,[\s\S]*orderItem/u
@@ -274,6 +277,8 @@ test('production order page exposes authoritative finished-goods rework progress
   assert.match(page, /onContinue=\{\(\) => \{/u)
   assert.match(reworkProgressModal, /成品返工进度/u)
   assert.match(reworkProgressModal, /补完工已过账/u)
+  assert.match(reworkProgressModal, /productID: Number\(item\?\.product_id/u)
+  assert.match(reworkProgressModal, /productId=\{item\.productID\}/u)
 })
 
 test('production help and completion form explain route order and warehouse inbound handoff', () => {

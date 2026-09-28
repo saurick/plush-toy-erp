@@ -21,12 +21,21 @@ export function createBusinessColumnSettingsScenarios({
     return dialog
   }
   const save = async (page, dialog) => {
+    const complete = dialog.getByRole('button', { name: /^完\s*成$/u })
+    const completeHandle = await complete.elementHandle()
+    await page.waitForFunction(
+      (button) =>
+        button &&
+        !button.disabled &&
+        !button.classList.contains('ant-btn-loading'),
+      completeHandle
+    )
     const response = page.waitForResponse(
       (res) =>
         res.url().includes('/rpc/admin') &&
         res.request().postDataJSON()?.method === 'set_erp_column_order'
     )
-    await dialog.getByRole('button', { name: /^完\s*成$/u }).click()
+    await complete.click()
     const result = await response
     await dialog.waitFor({ state: 'hidden' })
     return result.request().postDataJSON().params
@@ -45,6 +54,13 @@ export function createBusinessColumnSettingsScenarios({
     })
     const metrics = await dialog.evaluate((node) => {
       const box = node.getBoundingClientRect()
+      const hitTarget = node.querySelector(
+        '.erp-business-column-order-modal__row--visibility .erp-business-column-order-modal__label'
+      )
+      const hitTargetBox = hitTarget?.getBoundingClientRect()
+      const hitTargetRowBox = hitTarget
+        ?.closest('.erp-business-column-order-modal__row')
+        ?.getBoundingClientRect()
       return {
         width: box.width,
         inViewport:
@@ -56,9 +72,19 @@ export function createBusinessColumnSettingsScenarios({
         rowOverflow: [...node.querySelectorAll('[role="listitem"]')].some(
           (row) => row.scrollWidth > row.clientWidth
         ),
+        hitTargetHeight: hitTargetBox?.height || 0,
+        hitTargetTopInset:
+          hitTargetBox && hitTargetRowBox
+            ? hitTargetBox.top - hitTargetRowBox.top
+            : null,
+        hitTargetBottomInset:
+          hitTargetBox && hitTargetRowBox
+            ? hitTargetRowBox.bottom - hitTargetBox.bottom
+            : null,
       }
     })
     assert(metrics.width >= 300, '布局度量必须等弹窗展开动画结束')
+    assert(metrics.hitTargetHeight >= 44, JSON.stringify(metrics))
     assert(
       metrics.inViewport && !metrics.overflow && !metrics.rowOverflow,
       JSON.stringify(metrics)
@@ -76,9 +102,28 @@ export function createBusinessColumnSettingsScenarios({
         await page.locator(headerSelector).first().waitFor()
         const defaults = await labels(page)
         let dialog = await open(page)
-        await dialog
-          .getByRole('checkbox', { name: '颜色', exact: true })
-          .uncheck()
+        const colorCheckbox = dialog.getByRole('checkbox', {
+          name: '颜色',
+          exact: true,
+        })
+        const colorHitTarget = colorCheckbox.locator('xpath=ancestor::label')
+        const initialGeometry = await geometry(dialog)
+        assert(
+          initialGeometry.hitTargetTopInset <= 1.5 &&
+            initialGeometry.hitTargetBottomInset <= 1.5,
+          JSON.stringify(initialGeometry)
+        )
+        const hitTargetBox = await colorHitTarget.boundingBox()
+        assert(hitTargetBox, '颜色勾选热区必须可见')
+        await colorHitTarget.click({
+          position: { x: hitTargetBox.width / 2, y: 1 },
+        })
+        assert(!(await colorCheckbox.isChecked()), '热区上沿应可取消勾选')
+        await colorHitTarget.click({
+          position: { x: hitTargetBox.width / 2, y: hitTargetBox.height - 1 },
+        })
+        assert(await colorCheckbox.isChecked(), '热区下沿应可恢复勾选')
+        await colorCheckbox.uncheck()
         assert.deepEqual(
           await labels(page),
           defaults,
@@ -185,8 +230,8 @@ export function createBusinessColumnSettingsScenarios({
           '失败应保留草稿'
         )
         assert.deepEqual(await labels(page), defaults, '失败不得改变已保存设置')
-        await save(page, dialog)
         await page.unroute('**/rpc/admin', failureRoute)
+        await save(page, dialog)
 
         const cases = [
           '/erp/master/partners/customers',

@@ -15,6 +15,7 @@ import {
   resolveOutsourcingReturnQualityGate,
 } from '../../utils/qualityInspectionSourceAction.mjs'
 import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 const STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
@@ -203,8 +204,20 @@ export default function OutsourcingReturnRecordsModal({
       align: 'left',
       title: '产品规格',
       key: 'product_sku',
-      width: 180,
-      render: (_value, fact) => outsourcingFactProductSKUText(fact),
+      width: 240,
+      className: 'erp-product-identity-cell',
+      render: (_value, fact) =>
+        normalizedFactType(fact) === 'RETURN_RECEIPT' ? (
+          <ProductIdentity
+            productId={fact.subject_id}
+            name="委外回货产品"
+            compact
+          >
+            {outsourcingFactProductSKUText(fact)}
+          </ProductIdentity>
+        ) : (
+          outsourcingFactProductSKUText(fact)
+        ),
     },
     {
       title: '发生时间',

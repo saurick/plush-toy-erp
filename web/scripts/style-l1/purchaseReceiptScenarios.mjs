@@ -88,7 +88,7 @@ export function createPurchaseReceiptScenarios(deps) {
     )
   }
 
-  const assertPurchaseReceiptDateRangeRoundedShell = async (
+  const assertPurchaseReceiptDateRangeSegmentedControl = async (
     page,
     scenarioName
   ) => {
@@ -109,6 +109,9 @@ export function createPurchaseReceiptScenarios(deps) {
       const range = control?.querySelector(
         '.erp-business-date-range-filter__range'
       )
+      const dateInputs = Array.from(
+        control?.querySelectorAll('.erp-business-date-input.ant-picker') || []
+      )
       const style = control ? window.getComputedStyle(control) : null
       const labelStyle = label ? window.getComputedStyle(label) : null
       const controlBox = control?.getBoundingClientRect()
@@ -119,13 +122,24 @@ export function createPurchaseReceiptScenarios(deps) {
         labelText: label?.textContent?.trim() || '',
         overflowX: style?.overflowX || '',
         overflowY: style?.overflowY || '',
-        borderTopLeftRadius: style?.borderTopLeftRadius || '',
-        borderBottomLeftRadius: style?.borderBottomLeftRadius || '',
+        gap: Number.parseFloat(style?.gap || '0'),
         controlScrollWidth: control?.scrollWidth || 0,
         controlClientWidth: control?.clientWidth || 0,
         rangeScrollWidth: range?.scrollWidth || 0,
         rangeClientWidth: range?.clientWidth || 0,
         labelBackground: labelStyle?.backgroundColor || '',
+        labelBorder: labelStyle?.borderColor || '',
+        labelRadius: labelStyle?.borderRadius || '',
+        dateInputs: dateInputs.map((input) => {
+          const inputStyle = window.getComputedStyle(input)
+          const inputBox = input.getBoundingClientRect()
+          return {
+            width: inputBox.width,
+            height: inputBox.height,
+            border: inputStyle.borderColor,
+            radius: inputStyle.borderRadius,
+          }
+        }),
         labelLeftDelta:
           labelBox && controlBox
             ? Math.abs(labelBox.left - controlBox.left)
@@ -147,21 +161,20 @@ export function createPurchaseReceiptScenarios(deps) {
       `${scenarioName} 入库日期筛选控件应可见: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.overflowX === 'hidden' && metrics.overflowY === 'hidden',
-      `${scenarioName} 日期区间外壳应裁切内部标签背景到圆角内: ${JSON.stringify(
-        metrics
-      )}`
-    )
-    assert(
-      Number.parseFloat(metrics.borderTopLeftRadius) >= 8 &&
-        Number.parseFloat(metrics.borderBottomLeftRadius) >= 8,
-      `${scenarioName} 日期区间外壳左侧应保留可见圆角: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.labelLeftDelta <= 1 &&
+      metrics.gap >= 6 &&
+        Number.parseFloat(metrics.labelRadius) >= 8 &&
+        metrics.labelBorder !== 'rgba(0, 0, 0, 0)' &&
+        metrics.dateInputs.length === 2 &&
+        metrics.dateInputs.every(
+          (input) =>
+            input.width >= 120 &&
+            input.height === 34 &&
+            Number.parseFloat(input.radius) >= 8 &&
+            input.border !== 'rgba(0, 0, 0, 0)'
+        ) &&
         metrics.controlScrollWidth <= metrics.controlClientWidth + 1 &&
         metrics.rangeScrollWidth <= metrics.rangeClientWidth + 1,
-      `${scenarioName} 入库日期筛选内部不应挤压或横向溢出: ${JSON.stringify(metrics)}`
+      `${scenarioName} 入库日期类型和起止日期应有独立边界且不挤压: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.documentOverflow,
@@ -374,7 +387,7 @@ export function createPurchaseReceiptScenarios(deps) {
           page,
           'purchase-receipts-table-control-columns-desktop'
         )
-        await assertPurchaseReceiptDateRangeRoundedShell(
+        await assertPurchaseReceiptDateRangeSegmentedControl(
           page,
           'purchase-receipts-table-control-columns-desktop'
         )

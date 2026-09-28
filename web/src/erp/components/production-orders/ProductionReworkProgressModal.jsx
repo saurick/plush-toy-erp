@@ -16,6 +16,7 @@ import {
 } from '../../utils/numeric20Scale6.mjs'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 const { Text } = Typography
 
@@ -202,6 +203,7 @@ export function buildProductionReworkProgressItems({
           .join(' / ') || '生产产品'
       return Object.freeze({
         key: originFactID,
+        productID: Number(item?.product_id || 0),
         focus: originFactID === Number(focusReworkFactID || 0),
         recordLabel:
           String(reworkFact?.fact_no || '').trim() ||
@@ -264,8 +266,12 @@ export default function ProductionReworkProgressModal({
       key: 'product',
       width: 260,
       render: (_, item) => (
-        <Space direction="vertical" size={0}>
-          <span>{item.product}</span>
+        <Space direction="vertical" size={2}>
+          <ProductIdentity
+            productId={item.productID}
+            name={item.product}
+            compact
+          />
           <Text type="secondary">
             {item.quantity}
             {item.unit ? ` ${item.unit}` : ''}

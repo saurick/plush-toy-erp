@@ -570,8 +570,8 @@ export function createMobileTaskScenarios({
           assert.equal((await frame.innerText()).trim(), label)
           assert.equal(await frame.locator('img, button').count(), 0)
           const geometry = await frame.boundingBox()
-          assert.equal(geometry.width, 40)
-          assert.equal(geometry.height, 40)
+          assert.equal(geometry.width, 48)
+          assert.equal(geometry.height, 48)
           if (state === 'empty') {
             assert.equal(
               page.__imageReads.length,
@@ -2508,6 +2508,18 @@ export function createMobileTaskScenarios({
         )
         await page.getByRole('button', { name: '处理任务', exact: true }).click()
         const action = page.getByTestId('mobile-task-action-screen')
+        assert.deepEqual(
+          await action.locator('input[type="radio"]').evaluateAll((nodes) =>
+            nodes.map((node) => node.value)
+          ),
+          ['resume', 'urge'],
+          '解除阻塞与催办应直接展示，不再折叠更多处理方式'
+        )
+        assert.equal(
+          await action.locator('details').count(),
+          0,
+          '手机任务办理不应保留更多处理方式折叠区'
+        )
         await action.getByRole('radio', { name: '解除阻塞', exact: true }).check()
         const reason = action.getByRole('textbox', { name: /阻塞解除说明/ })
         await reason.fill('排期已核对，继续由老板岗位确认订单。')
@@ -2924,11 +2936,11 @@ export function createMobileTaskScenarios({
         }))
         assert(
           JSON.stringify(approvalFilterMetrics.labels) ===
-            JSON.stringify(['全部', '审批', '跨岗风险', '超时']) &&
-            approvalFilterMetrics.approvalAriaLabel.includes('待我审批') &&
+            JSON.stringify(['全部', '审批', '风险', '超时']) &&
+            approvalFilterMetrics.approvalAriaLabel.includes('待审批') &&
             !approvalFilterMetrics.standaloneApprovalCopy &&
             approvalFilterMetrics.mineCount === 0,
-          `有审批和监督权限的 390px 岗位页应显示审批与跨岗风险并移除我负责: ${JSON.stringify(
+          `超级管理员的 390px 岗位页应显示全局审批与风险并移除我负责: ${JSON.stringify(
             approvalFilterMetrics
           )}`
         )
@@ -3078,7 +3090,7 @@ export function createMobileTaskScenarios({
         assert.equal(
           await approvalFilter.getAttribute('aria-pressed'),
           'true',
-          '移动端待我审批筛选应进入选中态'
+          '移动端审批筛选应进入选中态'
         )
         assert.equal(
           await page
@@ -3338,10 +3350,6 @@ export function createMobileTaskScenarios({
         await taskRow.waitFor({ state: 'visible', timeout: 10_000 })
         await taskRow.click()
         await expectText(page, taskName)
-        const processFlowStep = page
-          .getByTestId('mobile-task-flow-steps')
-          .getByRole('button', { name: '处理任务', exact: true })
-        await processFlowStep.waitFor({ state: 'visible', timeout: 10_000 })
         const processButton = page
           .locator('.mobile-role-action-bar')
           .getByRole('button', { name: '处理任务', exact: true })

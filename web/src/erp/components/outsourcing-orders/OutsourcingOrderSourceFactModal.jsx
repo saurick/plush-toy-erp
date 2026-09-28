@@ -3,6 +3,8 @@ import { Alert, Descriptions, Form, Input, Radio, Select } from 'antd'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import {
@@ -156,6 +158,7 @@ export default function OutsourcingOrderSourceFactModal({
       okText={editing ? '保存草稿' : `确认${copy.title}`}
       cancelText="取消"
       confirmLoading={loading}
+      maskClosable={!loading}
       destroyOnHidden
       size="localAction"
       afterOpenChange={initializeOpenForm}
@@ -197,7 +200,21 @@ export default function OutsourcingOrderSourceFactModal({
             children: order?.outsourcing_order_no || '-',
           },
           { key: 'supplier', label: '加工厂', children: supplierText },
-          { key: 'subject', label: '产品 / 材料', children: sourceObject },
+          {
+            key: 'subject',
+            label: '产品 / 材料',
+            children:
+              String(item?.subject_type || '').toUpperCase() === 'PRODUCT' ? (
+                <ProductIdentity
+                  productId={item?.product_id}
+                  name={item?.product_name_snapshot || '委外产品'}
+                >
+                  {sourceObject}
+                </ProductIdentity>
+              ) : (
+                sourceObject
+              ),
+          },
           {
             key: 'process',
             label: '工序',
@@ -351,7 +368,7 @@ export default function OutsourcingOrderSourceFactModal({
           label="发生时间"
           rules={[{ required: true, message: '请选择发生时间' }]}
         >
-          <Input type="datetime-local" />
+          <DateTimeInput />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field--full"

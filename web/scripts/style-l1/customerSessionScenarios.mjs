@@ -1,7 +1,11 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { ERP_DARK_PALETTE } from '../../src/common/theme/erpThemePalette.mjs'
 import { createSessionRecoveryScenarios } from './sessionRecoveryScenarios.mjs'
 import { createModuleCatalogScenarios } from './moduleCatalogScenarios.mjs'
 import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
+import { parseRgb } from './colorAssertions.mjs'
+
+const DARK_TEXT_MUTED_RGB = `rgb(${parseRgb(ERP_DARK_PALETTE.textMuted).join(', ')})`
 
 export function createCustomerSessionScenarios({
   expectHeading,
@@ -156,7 +160,7 @@ export function createCustomerSessionScenarios({
       verify: async (page) => {
         await expectHeading(page, '毛绒玩具管理系统')
         await expectButton(page, /^登\s*录$/)
-        await assertAdminLoginLayout(page, { minCardWidth: 520 })
+        await assertAdminLoginLayout(page, { minCardWidth: 456 })
       },
     },
     {
@@ -261,6 +265,11 @@ export function createCustomerSessionScenarios({
       viewport: { width: 1280, height: 720 },
       verify: async (page) => {
         await waitForPath(page, '/erp/task-board')
+        assert.equal(
+          await page.title(),
+          yoyoosunBrandHomeCustomerConfig.brand.companyName,
+          '浏览器标签应与甲方登录品牌公司名一致'
+        )
         const homeEntry = page.locator(
           '.erp-admin-sider .erp-admin-brand__home'
         )
@@ -1155,10 +1164,18 @@ export function createCustomerSessionScenarios({
         assert.equal(pageMetrics.hasGuard, false)
         assert.equal(pageMetrics.hasTable, true)
         assert(
-          pageMetrics.menuText.includes('出货单'),
+          pageMetrics.menuText.includes('出货管理'),
           `super admin 客户运行态侧栏应显示客户业务导航: ${JSON.stringify(
             pageMetrics
           )}`
+        )
+        assert.equal(
+          await page
+            .locator('.erp-business-module-tabs')
+            .getByRole('tab', { name: '出货单', exact: true })
+            .getAttribute('aria-selected'),
+          'true',
+          'super admin 客户运行态应在出货管理模块中选中出货单'
         )
         assert(
           pageMetrics.scrollWidth <= pageMetrics.clientWidth + 1,
@@ -1849,8 +1866,11 @@ export function createCustomerSessionScenarios({
       verify: async (page) => {
         await expectHeading(page, '生产记录')
         const taskTab = page.getByRole('tab', { name: '待审批' })
-        await taskTab.waitFor({ state: 'visible' })
-        assert.equal(await taskTab.getAttribute('aria-selected'), 'true')
+        assert.equal(
+          await taskTab.count(),
+          0,
+          '只有待审批一个可访问工作区时直接展示内容，不保留单项页签'
+        )
         assert.equal(
           await page.getByRole('tab', { name: '异常处理' }).count(),
           0,
@@ -2282,7 +2302,7 @@ export function createCustomerSessionScenarios({
             groupingMetrics.focusableGroupTitleCount === 0 &&
             groupingMetrics.groupTitleStyles.every(
               (style) =>
-                style.color === 'rgb(189, 201, 192)' &&
+                style.color === DARK_TEXT_MUTED_RGB &&
                 style.fontSize >= 11 &&
                 style.fontWeight >= 600
             ) &&
@@ -2724,12 +2744,12 @@ export function createCustomerSessionScenarios({
             .locator('.erp-admin-menu')
             .evaluate((node) => node.textContent.replace(/\s+/g, ' ').trim())
           for (const label of [
-            '出货单',
-            '质量检验',
-            '采购入库',
-            '销售订单',
-            '采购订单',
-            '委外订单',
+            '出货管理',
+            '质检管理',
+            '库存管理',
+            '销售管理',
+            '采购管理',
+            '委外管理',
             '权限管理',
             '系统操作记录',
           ]) {
@@ -2740,9 +2760,9 @@ export function createCustomerSessionScenarios({
           }
           for (const label of [
             '模板打印中心',
-            '客户档案',
-            '供应商与加工厂',
-            '产品资料',
+            '基础资料',
+            '产品工程',
+            '生产管理',
           ]) {
             assert(
               !menuText.includes(label),

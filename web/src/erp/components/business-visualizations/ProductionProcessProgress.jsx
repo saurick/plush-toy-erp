@@ -10,6 +10,7 @@ import {
   VisualizationState,
   VisualizationPagination,
 } from './BusinessVisualizationFrame.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 const ORDER_STATUS_LABELS = Object.freeze({
   RELEASED: '生产中',
@@ -150,12 +151,18 @@ export default function ProductionProcessProgress({
           {pagination.rows.map((item) => (
             <section className="erp-production-process__lane" key={item.id}>
               <div className="erp-production-process__identity">
-                <strong>{item.productName}</strong>
-                <span>
-                  {[item.productCode, item.skuCode]
-                    .filter(Boolean)
-                    .join(' · ') || `第 ${item.lineNo} 行`}
-                </span>
+                <ProductIdentity
+                  productId={item.productID}
+                  name={item.productName}
+                  compact
+                >
+                  <strong>{item.productName}</strong>
+                  <small>
+                    {[item.productCode, item.skuCode]
+                      .filter(Boolean)
+                      .join(' · ') || `第 ${item.lineNo} 行`}
+                  </small>
+                </ProductIdentity>
                 <small>
                   计划 {item.plannedQuantity} {item.unitName}
                 </small>

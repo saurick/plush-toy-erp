@@ -385,7 +385,7 @@ export function createUnifiedInteractionScenarios({
           await panel
             .locator('.erp-business-visual-list__row')
             .first()
-            .evaluate((element) => element === document.activeElement),
+            .evaluate((element) => element.contains(document.activeElement)),
           true
         )
         assert.equal(
@@ -402,7 +402,7 @@ export function createUnifiedInteractionScenarios({
           (element) => element.closest('.erp-admin-content').scrollTop
         )
         assert.ok(scrollTop > 0)
-        await page.getByRole('menuitem', { name: /采购订单/ }).click()
+        await page.getByRole('menuitem', { name: /采购管理/ }).click()
         await page
           .getByRole('heading', { name: '采购订单', exact: true })
           .waitFor()

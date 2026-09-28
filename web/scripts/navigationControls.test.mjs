@@ -55,6 +55,25 @@ test('shared selection controls use one neutral border token in every state', ()
   )
 })
 
+test('semantic interactive controls expose pointer and disabled feedback', () => {
+  for (const selector of [
+    'button:not(:disabled)',
+    "[role='menuitem']:not([aria-disabled='true'])",
+    "[role='option']:not([aria-disabled='true'])",
+    "[role='tab']:not([aria-disabled='true'])",
+  ]) {
+    assert(controlAffordanceSource.includes(selector), selector)
+  }
+  assert.match(
+    controlAffordanceSource,
+    /\)\s*\{\s*cursor:\s*pointer;\s*\}/u
+  )
+  assert.match(
+    controlAffordanceSource,
+    /\[role='menuitem'\]\[aria-disabled='true'\][\s\S]*?cursor:\s*not-allowed;/u
+  )
+})
+
 test('mobile progress uses an anchored dropdown without desktop date inputs', () => {
   assert.match(mobileProgressSource, /<MobileFilterPopover/u)
   assert.match(mobileFilterSource, /<Popover/u)

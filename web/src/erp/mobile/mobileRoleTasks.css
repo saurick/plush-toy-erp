@@ -1035,14 +1035,6 @@
   line-height: 1.45;
 }
 
-.mobile-task-more-actions > summary {
-  min-height: 44px;
-  padding: 12px 0;
-  color: var(--erp-primary-strong);
-  font-size: 13px;
-  cursor: pointer;
-}
-
 .mobile-task-single-action__value {
   padding: 11px;
   border: 1px solid
@@ -1839,9 +1831,9 @@
 }
 
 .mobile-task-list-row__identity .erp-task-product-image {
-  width: 40px;
-  height: 40px;
-  flex-basis: 40px;
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
 }
 
 .mobile-task-list-row__identity .erp-task-identity__code {

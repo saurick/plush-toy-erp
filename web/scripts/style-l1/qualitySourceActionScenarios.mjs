@@ -21,13 +21,14 @@ export function createQualitySourceActionScenarios(deps) {
   }
 
   const findSelectionActionButton = async (page, actionName) => {
+    const compact = (value) => String(value || '').replace(/\s+/gu, '')
     const direct = page.locator('button').filter({ hasText: actionName })
     const directCount = await direct.count()
     for (let index = 0; index < directCount; index += 1) {
       const candidate = direct.nth(index)
       if (
         (await candidate.isVisible()) &&
-        String((await candidate.innerText()) || '').trim() === actionName
+        compact(await candidate.innerText()) === compact(actionName)
       ) {
         return candidate
       }
@@ -48,7 +49,7 @@ export function createQualitySourceActionScenarios(deps) {
       .filter({ hasText: actionName })
     for (let index = 0; index < (await overflowButtons.count()); index += 1) {
       const candidate = overflowButtons.nth(index)
-      if (String((await candidate.innerText()) || '').trim() === actionName) {
+      if (compact(await candidate.innerText()) === compact(actionName)) {
         return candidate
       }
     }
@@ -666,6 +667,9 @@ export function createQualitySourceActionScenarios(deps) {
               inventory_lot_id: 401,
               material_id: 1,
               warehouse_id: 1,
+              unit_id: 1,
+              unit_name: '个',
+              unit_precision: 0,
               source_type: 'PURCHASE_RECEIPT',
               source_id: 601,
               inspection_type: 'INCOMING',
@@ -761,6 +765,7 @@ export function createQualitySourceActionScenarios(deps) {
                             material_id: 1,
                             warehouse_id: 1,
                             lot_id: 401,
+                            unit_id: 1,
                           },
                         ],
                       },

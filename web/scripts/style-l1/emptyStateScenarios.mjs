@@ -178,6 +178,33 @@ export function createEmptyStateScenarios({
         assert.ok(
           await frame.getByRole('button', { name: '核对并准备' }).isDisabled()
         )
+        const lockFlowTrigger = frame.getByRole('button', {
+          name: '查看 Git 索引锁流程',
+          exact: true,
+        })
+        await lockFlowTrigger.click()
+        const lockFlowDialog = frame.getByRole('dialog', {
+          name: 'Git 索引锁恢复流程',
+          exact: true,
+        })
+        await lockFlowDialog.waitFor()
+        await lockFlowDialog
+          .getByRole('img', {
+            name: 'Git index.lock 检查与恢复流程',
+            exact: true,
+          })
+          .waitFor()
+        await lockFlowDialog
+          .getByText('owner 已结束且现场稳定？', { exact: true })
+          .waitFor()
+        await lockFlowDialog
+          .getByRole('button', { name: '返回版本发布', exact: true })
+          .click()
+        await lockFlowDialog.waitFor({ state: 'hidden' })
+        assert.equal(
+          await frame.locator(':focus').getAttribute('data-action'),
+          'dev-lock-flow'
+        )
         const tabs = await frame.locator('.dev-design-tabs').elementHandle()
         const motion = tabs.evaluate(async (node) => {
           const samples = []

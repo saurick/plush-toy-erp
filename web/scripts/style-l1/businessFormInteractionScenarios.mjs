@@ -144,6 +144,16 @@ export function createBusinessFormInteractionScenarios({
     await moreButton.click()
     const actionMenu = page.locator('.erp-business-selection-action-menu')
     await actionMenu.waitFor({ state: 'visible', timeout: 10_000 })
+    const enabledMenuActions = actionMenu.locator('button:not(:disabled)')
+    await enabledMenuActions.first().hover()
+    const actionMenuCursors = await enabledMenuActions.evaluateAll((nodes) =>
+      nodes.map((node) => getComputedStyle(node).cursor)
+    )
+    assert(
+      actionMenuCursors.length > 0 &&
+        actionMenuCursors.every((cursor) => cursor === 'pointer'),
+      `${scenarioName} 更多操作 hover 后应显示手型指针: ${JSON.stringify(actionMenuCursors)}`
+    )
     await page.waitForFunction(
       () => {
         const menuNode = document.querySelector(
@@ -686,7 +696,7 @@ export function createBusinessFormInteractionScenarios({
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
-          expectedLabels: ['总订单', '本页显示', '已审核'],
+          expectedLabels: ['符合条件', '本页显示'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
@@ -1160,7 +1170,7 @@ export function createBusinessFormInteractionScenarios({
         await purchaseOrderRow.click()
         await assertOrderLifecycleActionsConsolidated(page, {
           scenarioName: 'business-collaboration-purchase-selected-desktop',
-          primaryActionLabel: '提交',
+          primaryActionLabel: '提交订单',
           menuActionLabels: ['取消'],
           absentButtonLabels: ['审核', '关闭', '取消'],
         })
@@ -1226,7 +1236,7 @@ export function createBusinessFormInteractionScenarios({
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'shipment-date-filter-desktop',
-          expectedLabels: ['总出货单', '本页显示', '草稿'],
+          expectedLabels: ['符合条件', '本页显示'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'shipment-date-filter-desktop',

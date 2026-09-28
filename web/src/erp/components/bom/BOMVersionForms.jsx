@@ -89,8 +89,6 @@ export function BOMHeaderFormFields({
   versionSuggestion = '',
   versionSuggestionLoading = false,
   onUseVersionSuggestion,
-  detailsOpen = false,
-  onDetailsOpenChange,
 }) {
   const productID = Form.useWatch('product_id', form)
   const selectedProduct = productOptions.find(
@@ -191,11 +189,7 @@ export function BOMHeaderFormFields({
         </Form.Item>
       </BusinessFormSection>
       {children}
-      <BusinessFormSection
-        title="订单与制表资料"
-        expanded={detailsOpen}
-        onExpandedChange={onDetailsOpenChange}
-      >
+      <BusinessFormSection title="订单与制表资料">
         <Form.Item
           className="erp-business-action-form__field"
           label="生效开始"

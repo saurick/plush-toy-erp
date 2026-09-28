@@ -187,7 +187,7 @@ export function createProductIdentityScenarios({
             width: node.getBoundingClientRect().width,
             height: node.getBoundingClientRect().height,
           }))
-        assert.deepEqual(geometry, { width: 48, height: 48 })
+        assert.deepEqual(geometry, { width: 56, height: 56 })
         await page.screenshot({
           path: path.join(
             outputDir,
@@ -325,8 +325,33 @@ export function createProductIdentityScenarios({
       verify: async (page) => {
         const production = key === 'production'
         await openBusinessRecordDetails(page, production ? 'MO-STYLE-L1-20260713' : 'SIM-OUTSOURCE-CONTRACT-L1', production ? '查看' : '查看详情')
-        const image = page.locator(production ? '.erp-business-form-page:visible' : '.erp-business-details-modal:visible').locator('.erp-product-identity button').first()
-        await image.click()
+        const identityRoot = page.locator(
+          production
+            ? '.erp-business-form-page:visible'
+            : '.erp-business-details-modal:visible'
+        )
+        if (production) {
+          await identityRoot.locator('details').first().locator('summary').click()
+        }
+        const image = identityRoot
+          .locator('.erp-product-identity button')
+          .first()
+        await image.click().catch(async (error) => {
+          const identities = await identityRoot
+            .locator('.erp-product-identity')
+            .evaluateAll((nodes) =>
+              nodes.slice(0, 3).map((node) => ({
+                imageState: node
+                  .querySelector('.erp-task-product-image')
+                  ?.getAttribute('data-image-state'),
+                text: node.textContent?.replace(/\s+/g, ' ').trim() || '',
+                visible: node.getBoundingClientRect().height > 0,
+              }))
+            )
+          throw new Error(
+            `${error.message}\n产品识别现场：${JSON.stringify({ identities, requests: page.productImageProbe.requests })}`
+          )
+        })
         await closeImage(page)
         await page.screenshot({
           path: path.join(

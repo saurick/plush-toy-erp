@@ -996,7 +996,12 @@ export default function V1PurchaseOrdersPage() {
         )
       } else {
         message.error(
-          getActionErrorMessage(error, `${action.label}采购订单失败`)
+          getActionErrorMessage(
+            error,
+            action.key === 'submit'
+              ? '提交采购订单失败'
+              : `${action.label}采购订单失败`
+          )
         )
       }
     } finally {
@@ -1015,6 +1020,7 @@ export default function V1PurchaseOrdersPage() {
     }
     let reason = ''
     modal.confirm({
+      maskClosable: true,
       centered: true,
       title: action.confirmTitle,
       content: (

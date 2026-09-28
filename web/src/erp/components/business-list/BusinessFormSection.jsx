@@ -6,8 +6,6 @@ export default function BusinessFormSection({
   showHeading = true,
   layout = 'fields',
   children,
-  expanded,
-  onExpandedChange,
   className = '',
 }) {
   const id = useId()
@@ -24,26 +22,10 @@ export default function BusinessFormSection({
     tabIndex: -1,
     'data-form-section': title,
   }
-  const fields = (
-    <div className={`erp-business-form-section__${layout}`}>{children}</div>
-  )
-
-  return typeof expanded === 'boolean' ? (
-    <details {...props} open={expanded}>
-      <summary
-        onClick={(event) => {
-          event.preventDefault()
-          onExpandedChange?.(!expanded)
-        }}
-      >
-        {heading}
-      </summary>
-      {fields}
-    </details>
-  ) : (
+  return (
     <section {...props}>
       {showHeading ? heading : null}
-      {fields}
+      <div className={`erp-business-form-section__${layout}`}>{children}</div>
     </section>
   )
 }

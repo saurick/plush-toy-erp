@@ -71,6 +71,7 @@ import ShipmentEditor, {
 } from '../components/shipments/ShipmentEditor.jsx'
 import ShipmentFinanceSourceModal from '../components/shipments/ShipmentFinanceSourceModal.jsx'
 import ShipmentQualityInspectionModal from '../components/quality-inspections/ShipmentQualityInspectionModal.jsx'
+import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import {
   buildShipmentColumns,
   SHIPMENT_DATE_FILTER_OPTIONS,
@@ -761,9 +762,22 @@ export default function ShipmentsPage() {
       {
         align: 'left',
         title: '产品 / SKU',
-        width: 220,
-        render: (_, item) =>
-          sourceLineProductText(item, productOptions, productSKUOptions),
+        width: 280,
+        className: 'erp-product-identity-cell',
+        render: (_, item) => (
+          <ProductIdentity
+            productId={item.product_id}
+            name={
+              item.product_name_snapshot ||
+              item.product_name ||
+              item.product_code_snapshot ||
+              '销售订单产品'
+            }
+            compact
+          >
+            {sourceLineProductText(item, productOptions, productSKUOptions)}
+          </ProductIdentity>
+        ),
       },
       {
         align: 'right',

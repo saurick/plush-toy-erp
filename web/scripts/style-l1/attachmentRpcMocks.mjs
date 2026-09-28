@@ -1,3 +1,9 @@
+import { readFileSync } from 'node:fs'
+
+const PRODUCT_IMAGE_PNG_BASE64 = readFileSync(
+  new URL('../../../scripts/qa/fixtures/manual-acceptance-image.png', import.meta.url)
+).toString('base64')
+
 export async function installAttachmentRpcMocks(page, context) {
   const { nowUnix } = context
   let workflowAttachment = {
@@ -90,8 +96,7 @@ export async function installAttachmentRpcMocks(page, context) {
               owner_type: 'product',
               owner_id: 7,
               mime_type: 'image/png',
-              content_base64:
-                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+              content_base64: PRODUCT_IMAGE_PNG_BASE64,
             },
           }
           break

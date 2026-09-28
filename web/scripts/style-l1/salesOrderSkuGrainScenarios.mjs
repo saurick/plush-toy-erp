@@ -190,10 +190,11 @@ export function createSalesOrderSkuGrainScenarios(deps) {
           .filter({ hasText: 'SKU-NULL-CANDIDATE-B' })
           .waitFor({ state: 'visible', timeout: 10_000 })
 
-        const headerNoteField = modal.locator(
-          '.erp-business-action-form > .erp-business-action-form__field--full',
-          { has: page.getByText('备注', { exact: true }) }
-        )
+        const headerNoteField = modal
+          .locator('[data-form-section="备注与附件"]')
+          .locator('.erp-business-action-form__field--full', {
+            has: page.getByText('备注', { exact: true }),
+          })
         assert.equal(
           await headerNoteField.count(),
           1,

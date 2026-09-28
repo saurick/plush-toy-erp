@@ -30,7 +30,7 @@ export const SALES_ORDER_SORT_FILTER_OPTIONS = [
 export const SALES_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'submit',
-    label: '提交',
+    label: '提交订单',
     permission: 'sales_order.submit',
     nextStatus: 'submitted',
     run: submitSalesOrderAcceptanceProcess,

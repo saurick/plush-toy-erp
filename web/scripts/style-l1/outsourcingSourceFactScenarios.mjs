@@ -75,6 +75,44 @@ export function createOutsourcingSourceFactScenarios(deps) {
           }
         })
 
+        await page.route('**/rpc/masterdata', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (body.method !== 'list_units') {
+            await route.fallback()
+            return
+          }
+          const params = body.params || {}
+          const units = [
+            {
+              id: 1,
+              code: 'M',
+              name: '米',
+              precision: 6,
+              is_active: true,
+            },
+            {
+              id: 2,
+              code: 'EA',
+              name: '只',
+              precision: 0,
+              is_active: true,
+            },
+          ]
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: body.id || 'outsourcing-source-units',
+              result: {
+                code: 0,
+                message: 'OK',
+                data: stylePaginatedRpcData(units, 'units', params),
+              },
+            }),
+          })
+        })
+
         await page.route('**/rpc/outsourcing_order', async (route) => {
           const body = route.request().postDataJSON() || {}
           const { id = 'mock-id', method, params = {} } = body
@@ -407,8 +445,32 @@ export function createOutsourcingSourceFactScenarios(deps) {
             .locator('.ant-message-notice')
             .allInnerTexts()
             .catch(() => [])
+          const formState = await modal
+            .locator('.ant-form-item')
+            .evaluateAll((items) =>
+              items.map((item) => ({
+                label:
+                  item
+                    .querySelector('.ant-form-item-label')
+                    ?.textContent?.replace(/\s+/g, ' ')
+                    .trim() || '',
+                value:
+                  item.querySelector('input, textarea')?.value ||
+                  item
+                    .querySelector('.ant-select-selection-item')
+                    ?.textContent?.replace(/\s+/g, ' ')
+                    .trim() ||
+                  '',
+                error:
+                  item
+                    .querySelector('.ant-form-item-explain-error')
+                    ?.textContent?.replace(/\s+/g, ' ')
+                    .trim() || '',
+              }))
+            )
+            .catch(() => [])
           throw new Error(
-            `${error.message}; 当前消息=${JSON.stringify(notices)}; 请求=${JSON.stringify(createParams)}`
+            `${error.message}; 当前消息=${JSON.stringify(notices)}; 表单=${JSON.stringify(formState)}; 请求=${JSON.stringify(createParams)}`
           )
         }
 

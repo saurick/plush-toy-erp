@@ -58,7 +58,7 @@
 
 .erp-material-product {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
   gap: 6px 12px;
   align-items: center;
   border: 1px solid var(--erp-border, #e2e8f0);
@@ -68,9 +68,9 @@
 }
 
 .erp-material-product .erp-task-product-image {
-  width: 48px;
-  height: 48px;
-  flex-basis: 48px;
+  width: 64px;
+  height: 64px;
+  flex-basis: 64px;
 }
 
 .erp-material-product h3 {

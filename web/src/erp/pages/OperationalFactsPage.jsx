@@ -1869,6 +1869,7 @@ export function OperationalFactWorkspace({
         okText={selectedIsProductionCompletion ? cancelButtonLabel : '确认取消'}
         cancelText="暂不取消"
         confirmLoading={saving}
+        maskClosable={!saving}
         onOk={confirmFinanceCancellation}
         onCancel={() => {
           if (!saving) {

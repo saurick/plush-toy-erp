@@ -1358,7 +1358,14 @@ export default function V1SalesOrdersPage() {
           '暂时无法确认订单是否处理成功，请刷新核对最新状态；内容不变时可安全重试'
         )
       } else {
-        message.error(getActionErrorMessage(error, `${action.label}销售订单`))
+        message.error(
+          getActionErrorMessage(
+            error,
+            action.key === 'submit'
+              ? '提交销售订单'
+              : `${action.label}销售订单`
+          )
+        )
       }
     } finally {
       lifecycleInFlightRef.current = false
@@ -1376,6 +1383,7 @@ export default function V1SalesOrdersPage() {
     }
     let reason = ''
     modal.confirm({
+      maskClosable: true,
       centered: true,
       title: action.confirmTitle,
       content: (

@@ -6,6 +6,13 @@ const source = readFileSync(
   new URL('./ShipmentsPage.jsx', import.meta.url),
   'utf8'
 )
+const qualityModal = readFileSync(
+  new URL(
+    '../components/quality-inspections/ShipmentQualityInspectionModal.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
 
 test('shipped shipment finance actions require their exact confirm projections', () => {
   assert.match(
@@ -151,6 +158,10 @@ test('shipment source import uses server candidates with remote search and pagin
   assert.doesNotMatch(source, /remainingQuantity[\s\S]{0,160}value > 0/u)
   assert.match(source, /currentSourceItemIDs/u)
   assert.match(source, /newSourceItems/u)
+  assert.match(
+    source,
+    /<ProductIdentity[\s\S]*?productId=\{item\.product_id\}/u
+  )
 })
 
 test('shipment freight currency is derived from the selected sales order', () => {
@@ -251,6 +262,12 @@ test('draft shipment can generate a source-bound finished-goods inspection', () 
   assert.match(source, />\s*发起出货前检验\s*</u)
   assert.match(source, /<ShipmentQualityInspectionModal/u)
   assert.match(source, /quality_inspection_id: result\.id/u)
+  assert.match(qualityModal, /<ProductIdentity/u)
+  assert.match(
+    qualityModal,
+    /optionRender=\{renderShipmentQualityProductOption\}/u
+  )
+  assert.match(qualityModal, /productId=\{selectedSource\.productID\}/u)
 })
 
 test('draft shipment starts the versioned finance approval process', () => {

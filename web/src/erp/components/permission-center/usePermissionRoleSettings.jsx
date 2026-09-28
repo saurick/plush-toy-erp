@@ -425,6 +425,7 @@ export function usePermissionRoleSettings({
         return
       }
       modal.confirm({
+        maskClosable: true,
         centered: true,
         title,
         content,

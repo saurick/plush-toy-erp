@@ -39,6 +39,11 @@ export async function assertBusinessFormSections(page, editor, key) {
   assert.deepEqual(await nav.getByRole('button').allTextContents(), titles)
   const sections = editor.locator('[data-form-section]')
   const body = editor.locator('.erp-business-form-page__body')
+  assert.equal(
+    await editor.locator('details[data-form-section]').count(),
+    0,
+    `${key}: business form sections must stay expanded`
+  )
   const originalInput = await editor
     .locator('input:not([type="hidden"])')
     .first()
@@ -85,15 +90,6 @@ export async function assertBusinessFormSections(page, editor, key) {
     await attachment
       .getByRole('button', { name: '收起附件', exact: true })
       .click()
-  }
-  if (key === 'bom') {
-    const supplementary = editor.locator('details[data-form-section]')
-    assert.equal(await supplementary.getAttribute('open'), null)
-    await nav
-      .getByRole('button', { name: '订单与制表资料', exact: true })
-      .click()
-    await supplementary.locator('input').first().waitFor({ state: 'visible' })
-    await supplementary.locator('summary').click()
   }
   // Native scrolling, without clicking the directory, must also update its position.
   if (await body.evaluate((node) => node.scrollTop > 0)) {

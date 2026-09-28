@@ -256,6 +256,7 @@ export default function PurchaseOrderInboundDraftModal({
     }
     confirmingRef.current = true
     modal.confirm({
+      maskClosable: true,
       centered: true,
       title: '放弃本次到货登记？',
       content: '关闭后将清除当前填写的内容。',
@@ -291,6 +292,7 @@ export default function PurchaseOrderInboundDraftModal({
       confirmLoading={submitting}
       closable={!submitting}
       keyboard={!submitting}
+      maskClosable={!submitting}
       cancelButtonProps={{ disabled: submitting }}
       okButtonProps={{ disabled: disabled || !hasRemaining }}
       onOk={handleSave}

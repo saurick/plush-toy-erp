@@ -80,6 +80,7 @@ export function useSalesOrderPaymentReview({
       return
     }
     modal.confirm({
+      maskClosable: true,
       centered: true,
       title: '付款条件已变化，请核对单价',
       content:

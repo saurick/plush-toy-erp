@@ -1349,6 +1349,12 @@ export function createBusinessListAssertions({ outputDir }) {
       const inputs = [
         ...(date?.querySelectorAll('.erp-business-date-input') || []),
       ]
+      const dateType = date?.querySelector(
+        '.erp-business-date-range-filter__type-label, .erp-business-date-range-filter__type.ant-select .ant-select-selector'
+      )
+      const dateRange = date?.querySelector(
+        '.erp-business-date-range-filter__range'
+      )
       const controls = [
         ...document.querySelectorAll(
           selector('.ant-input-affix-wrapper, .ant-select-selector')
@@ -1365,6 +1371,10 @@ export function createBusinessListAssertions({ outputDir }) {
           )
         ),
         date: read(date),
+        dateType: read(dateType),
+        dateRangeGap: dateRange
+          ? Number.parseFloat(getComputedStyle(dateRange).gap || '0')
+          : 0,
         dateCount: document.querySelectorAll(
           selector('.erp-business-date-range-filter')
         ).length,
@@ -1386,30 +1396,32 @@ export function createBusinessListAssertions({ outputDir }) {
       }
     })
     const evidence = `${scenarioName}: ${JSON.stringify(metrics)}`
+    const isNominalControlHeight = (height) => Math.abs(height - 34) <= 0.5
     assert(!requireSearch || metrics.search, `保留主要搜索入口 ${evidence}`)
     assert(
       metrics.status && metrics.action,
       `状态筛选与整表操作必须可见 ${evidence}`
     )
-    assert.equal(metrics.dateCount, 1, `日期范围使用一个整体控件 ${evidence}`)
+    assert.equal(metrics.dateCount, 1, `日期范围使用一个共享组件 ${evidence}`)
     assert.equal(
       metrics.dateInputs.length,
       2,
       `日期范围保留起止输入 ${evidence}`
     )
-    assert.equal(
-      metrics.date.height,
-      34,
+    assert(
+      isNominalControlHeight(metrics.date.height),
       `日期筛选遵循 34px 高保真控件 ${evidence}`
     )
-    assert.equal(
-      metrics.date.radius,
-      '8px',
-      `日期筛选圆角与共享控件一致 ${evidence}`
+    assert(
+      metrics.dateType &&
+        isNominalControlHeight(metrics.dateType.height) &&
+        metrics.dateType.radius === '8px',
+      `日期类型应保持独立清晰的控件边界 ${evidence}`
     )
     assert(
       metrics.controls.every(
-        (control) => control.height === 34 && control.radius === '8px'
+        (control) =>
+          isNominalControlHeight(control.height) && control.radius === '8px'
       ),
       `筛选控件的高度与圆角一致 ${evidence}`
     )
@@ -1417,9 +1429,16 @@ export function createBusinessListAssertions({ outputDir }) {
       metrics.dateInputs.every(
         (control) =>
           control.width >= 132 &&
+          isNominalControlHeight(control.height) &&
+          control.radius === '8px' &&
+          control.border !== 'rgba(0, 0, 0, 0)' &&
           control.input.scrollWidth <= control.input.clientWidth + 1
       ),
-      `起止日期完整可读 ${evidence}`
+      `起止日期应各自完整可读并保留可点击边界 ${evidence}`
+    )
+    assert(
+      metrics.dateRangeGap >= 6,
+      `起止日期之间应保留清晰分隔 ${evidence}`
     )
     assert(
       metrics.dateInputs.every(
@@ -1528,6 +1547,7 @@ export function createBusinessListAssertions({ outputDir }) {
           ringColor: style.getPropertyValue('--tw-ring-color').trim(),
           width: rect.width,
           height: rect.height,
+          centerY: rect.top + rect.height / 2,
           active: element === document.activeElement,
         }
       }
@@ -1535,6 +1555,8 @@ export function createBusinessListAssertions({ outputDir }) {
         '.ant-pagination-options .ant-select'
       )
       const selector = select?.querySelector('.ant-select-selector')
+      const selectedItem = select?.querySelector('.ant-select-selection-item')
+      const arrow = select?.querySelector('.ant-select-arrow')
       const searchInput = select?.querySelector(
         '.ant-select-selection-search-input'
       )
@@ -1544,14 +1566,25 @@ export function createBusinessListAssertions({ outputDir }) {
 
       return {
         selector: readElement(selector),
+        selectedItem: readElement(selectedItem),
+        arrow: readElement(arrow),
         searchInput: readElement(searchInput),
         dropdown: readElement(dropdown),
       }
     })
 
     assert(
-      metrics.selector && metrics.searchInput && metrics.dropdown,
+      metrics.selector &&
+        metrics.selectedItem &&
+        metrics.arrow &&
+        metrics.searchInput &&
+        metrics.dropdown,
       `${scenarioName} 分页条数选择器缺少可检查节点: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      Math.abs(metrics.selectedItem.centerY - metrics.selector.centerY) <= 1 &&
+        Math.abs(metrics.arrow.centerY - metrics.selector.centerY) <= 1,
+      `${scenarioName} 分页条数和箭头必须上下居中: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.searchInput.active,

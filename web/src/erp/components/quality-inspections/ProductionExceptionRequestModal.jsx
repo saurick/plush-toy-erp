@@ -108,6 +108,7 @@ export default function ProductionExceptionRequestModal({
       title="提交生产异常申请"
       open={open}
       confirmLoading={loading}
+      maskClosable={!loading}
       okText="提交申请"
       cancelText="返回"
       onCancel={() => !loading && onClose?.()}

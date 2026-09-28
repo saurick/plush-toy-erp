@@ -123,7 +123,7 @@ export default function BusinessAttachmentModalButton({
         size="localAction"
         width="min(780px, calc(100vw - 32px))"
         closable={!panelState.busy}
-        maskClosable={false}
+        maskClosable={!panelState.busy}
         keyboard={!panelState.busy}
         onCancel={close}
       >
