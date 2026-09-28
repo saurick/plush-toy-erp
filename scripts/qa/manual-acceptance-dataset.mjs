@@ -2498,7 +2498,7 @@ function helpText() {
     "手工验收数据集编排器 / Manual Acceptance Dataset",
     "",
     `当前唯一数据合同为 ${DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION} / ${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}。`,
-    "包含 11 个审定模拟单位、4 个仓库，业务语义由同一 canonical contract 生成。",
+    `包含 ${MANUAL_ACCEPTANCE_CORE_UNITS.length} 个审定模拟单位、${MANUAL_ACCEPTANCE_CORE_WAREHOUSES.length} 个仓库，业务语义由同一 canonical contract 生成。`,
     "默认只生成 scenario-demo 与 customer-trial-133 两份长期目标同语义计划，",
     "不连接服务、不写文件、不写数据库：",
     `  node scripts/qa/manual-acceptance-dataset.mjs --data-version ${DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION} --run-id ${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}`,

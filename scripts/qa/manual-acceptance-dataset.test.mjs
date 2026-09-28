@@ -3598,7 +3598,7 @@ test("help is read-only and describes the explicit apply boundary", async () => 
   assert.match(result.text, /默认只生成/u);
   assert.match(result.text, /正式生产目标不在允许列表/u);
   assert.match(result.text, /fail-closed/u);
-  assert.match(result.text, /11 个审定模拟单位、4 个仓库/u);
+  assert.match(result.text, /8 个审定模拟单位、4 个仓库/u);
   assert.match(result.text, /--resume-report/u);
   assert.match(result.text, /不得删除回执/u);
   assert.match(result.text, /\.apply\.lock.*runner\/RPC 前阻断/u);
