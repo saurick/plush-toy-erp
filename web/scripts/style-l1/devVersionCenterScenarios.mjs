@@ -595,6 +595,76 @@ export function createDevVersionCenterScenarios({
           page,
           'dev-version-center-tabs-pagination-desktop'
         )
+
+        const takeoverTrigger = page.getByRole('button', {
+          name: /手动操作指引/u,
+        })
+        await takeoverTrigger.click()
+        const takeoverDialog = page.getByRole('dialog', {
+          name: '手动与应急发布指引',
+        })
+        const automationSection = takeoverDialog.getByRole('region', {
+          name: '自动续办怎么交接',
+        })
+        await automationSection
+          .locator('[data-mermaid-status="rendered"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await automationSection.getByText(/先删除并读回本次心跳/u).isVisible(),
+          true
+        )
+        const lockSection = takeoverDialog.getByRole('region', {
+          name: 'Git 索引锁怎么处理',
+        })
+        const lockDiagram = lockSection.locator(
+          '[data-mermaid-status="rendered"]'
+        )
+        await lockDiagram.waitFor({ state: 'visible', timeout: 10_000 })
+        const lockCanvas = lockSection.locator(
+          '.erp-markdown-mermaid__canvas'
+        )
+        await lockSection
+          .getByRole('button', {
+            name: '放大Git index.lock 检查与恢复流程',
+          })
+          .click()
+        assert.equal(await lockCanvas.getAttribute('data-mermaid-zoom'), '120')
+        await lockSection
+          .getByRole('button', {
+            name: '重置Git index.lock 检查与恢复流程为 100%',
+          })
+          .click()
+        assert.equal(await lockCanvas.getAttribute('data-mermaid-zoom'), '100')
+
+        await page.setViewportSize({ width: 480, height: 850 })
+        const takeoverBody = takeoverDialog.locator('.ant-modal-body')
+        assert.equal(
+          await takeoverBody.evaluate(
+            (node) => node.scrollWidth <= node.clientWidth
+          ),
+          true,
+          '窄屏弹窗不得被流程图撑宽'
+        )
+        assert.equal(
+          await lockSection
+            .locator('.erp-markdown-mermaid__viewport')
+            .evaluate((node) => node.scrollWidth > node.clientWidth),
+          true,
+          '窄屏流程图应在自身视口内横向滚动'
+        )
+        await takeoverDialog.getByRole('button', { name: '我知道了' }).click()
+        await takeoverDialog.waitFor({ state: 'hidden' })
+        await page.waitForFunction(
+          () => document.activeElement?.textContent?.includes('手动操作指引')
+        )
+        assert.equal(
+          await takeoverTrigger.evaluate(
+            (node) => node === document.activeElement
+          ),
+          true
+        )
+        await page.setViewportSize({ width: 1440, height: 900 })
+
         await page.getByRole('tab', { name: '流水线耗时' }).click()
         await waitForView(page, 'pipeline')
         await page

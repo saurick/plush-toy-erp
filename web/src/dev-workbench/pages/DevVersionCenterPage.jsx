@@ -25,6 +25,7 @@ import {
   Typography,
 } from 'antd'
 import { Link as RouterLink, useSearchParams } from 'react-router-dom'
+import { MermaidDiagram } from '@/common/components/markdown'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import Tabs from '@/common/components/navigation/SlidingTabs'
@@ -120,6 +121,36 @@ const OPERATION_HISTORY_TARGET_OPTIONS = [
     value: target.key,
   })),
 ]
+
+const GIT_INDEX_LOCK_RECOVERY_FLOW = `flowchart TD
+  A["准备暂存或提交"] --> B{"index.lock 是否存在"}
+  B -->|否| C["按精确文件或 hunk 写入 index<br/>启用 PID 旁车"]
+  B -->|是| D["只读检查 HEAD、当前 index、锁与 PID 旁车"]
+  D --> E{"有活动 owner、仓库 Git 进程<br/>或打开句柄吗"}
+  E -->|有| F["保留现场<br/>只停止 Git 动作"]
+  E -->|没有| G{"现场复核稳定<br/>当前 index 可解析吗"}
+  G -->|否| F
+  G -->|是| H["识别候选：空、相同、不同或损坏"]
+  H --> I["备份当前 index<br/>同盘隔离锁与 PID 旁车<br/>写入恢复回执"]
+  I --> J{"HEAD 与当前 index<br/>读回未变吗"}
+  J -->|否| F
+  J -->|是| K{"候选不同或损坏吗"}
+  K -->|是| L["复核隔离候选<br/>与本任务精确暂存范围"]
+  K -->|否| C
+  L --> C
+  C --> M["继续原授权的暂存、提交与推送"]`
+
+const AUTOMATION_EXECUTION_HANDOFF_FLOW = `flowchart TD
+  A["等待其他项目会话结束"] --> B["心跳每 10 分钟只读重查会话与后台 writer"]
+  B --> C{"全部结束且写入已停止？"}
+  C -->|否| B
+  C -->|是| D["先删除本次等待心跳"]
+  D --> E{"删除结果已读回为 deleted？"}
+  E -->|否| F["停止执行阶段<br/>报告自动化生命周期阻塞"]
+  E -->|是| G["同一次续办进入实现、验证、造数与部署"]
+  G --> H["执行期间不重建同目的心跳"]
+  H --> I["完成后报告结果"]
+  I --> J["只有用户再次要求等待<br/>才创建新的心跳"]`
 
 function upsertOperation(operations, operation) {
   const currentOperations = Array.isArray(operations) ? operations : []
@@ -294,6 +325,44 @@ function ManualTakeoverGuide() {
             </ul>
           </article>
         </div>
+      </section>
+
+      <section aria-labelledby="dev-version-takeover-automation-title">
+        <Title level={5} id="dev-version-takeover-automation-title">
+          自动续办怎么交接
+        </Title>
+        <Paragraph type="secondary">
+          等待心跳只负责只读观察。条件满足后，必须先删除并读回本次心跳，再在同一次续办中进入执行阶段，避免等待任务与主执行并发或重复消耗。
+        </Paragraph>
+        <div className="erp-dev-version-takeover-automation-flow">
+          <MermaidDiagram
+            chart={AUTOMATION_EXECUTION_HANDOFF_FLOW}
+            label="等待心跳移除与执行阶段交接流程"
+          />
+        </div>
+        <Text type="secondary">
+          本页只解释生命周期规则，不创建、删除或调度 Codex 会话与自动化；删除失败时不得开始写入、Git 或部署动作。
+        </Text>
+      </section>
+
+      <section aria-labelledby="dev-version-takeover-lock-title">
+        <Title level={5} id="dev-version-takeover-lock-title">
+          Git 索引锁怎么处理
+        </Title>
+        <Paragraph type="secondary">
+          锁是否为空不能判断它还在使用。先识别活动 owner，再保全当前 index
+          和旧候选；只有现场稳定且读回未变，才继续原来的 Git 收口。
+        </Paragraph>
+        <div className="erp-dev-version-takeover-lock-flow">
+          <MermaidDiagram
+            chart={GIT_INDEX_LOCK_RECOVERY_FLOW}
+            label="Git index.lock 检查与恢复流程"
+          />
+        </div>
+        <Text type="secondary">
+          候选与当前 index 不同或不可解析时，隔离文件仍会保留；复核精确文件或
+          hunk 后沿用已有授权继续，不因“非空锁”重复请求确认。
+        </Text>
       </section>
 
       <section aria-labelledby="dev-version-takeover-steps-title">

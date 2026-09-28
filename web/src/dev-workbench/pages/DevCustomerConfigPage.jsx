@@ -2688,6 +2688,7 @@ export default function DevCustomerConfigPage() {
 
   const requestApplyTestConfig = () => {
     modal.confirm({
+      maskClosable: true,
       centered: true,
       title: '确认应用测试配置？',
       content:

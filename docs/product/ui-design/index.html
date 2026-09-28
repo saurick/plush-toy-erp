@@ -15,6 +15,7 @@
       --brand-soft: color-mix(in srgb, var(--brand) 13%, var(--surface));
       --brand-softer: color-mix(in srgb, var(--brand) 6.5%, var(--surface));
       --canvas: #f2f5f3;
+      --shell: #ffffff;
       --surface: #ffffff;
       --surface-raised: #ffffff;
       --surface-muted: #f7f9f8;
@@ -47,16 +48,17 @@
 
     [data-mode="dark"] {
       color-scheme: dark;
-      --canvas: #111713;
-      --surface: #18201b;
-      --surface-raised: #1d2721;
-      --surface-muted: #202b24;
-      --surface-hover: #243128;
-      --text: #edf4ef;
-      --text-2: #bdc9c0;
-      --text-3: #87958b;
-      --line: #314039;
-      --line-strong: #506158;
+      --canvas: #050607;
+      --shell: #080a0c;
+      --surface: #0d1013;
+      --surface-raised: #121619;
+      --surface-muted: #151a1f;
+      --surface-hover: #181e24;
+      --text: #f4f7fa;
+      --text-2: #a7b0b9;
+      --text-3: #7f8993;
+      --line: #2a3138;
+      --line-strong: #3b4650;
       --shadow: 0 12px 34px rgba(0, 0, 0, .24);
       --brand-soft: color-mix(in srgb, var(--brand) 20%, var(--surface));
       --brand-softer: color-mix(in srgb, var(--brand) 6.5%, var(--surface));
@@ -89,7 +91,7 @@
     .sidebar {
       min-width: 0;
       min-height: 0;
-      background: var(--surface);
+      background: var(--shell);
       border-right: 1px solid var(--line);
       display: flex;
       flex-direction: column;
@@ -153,7 +155,7 @@
     }
     .nav-item:hover { background: var(--surface-muted); color: var(--text); }
     .nav-item.active { color: var(--brand-strong); background: var(--brand-soft); font-weight: 650; }
-    [data-mode="dark"] .nav-item.active { color: #dff4e5; }
+    [data-mode="dark"] .nav-item.active { color: var(--brand-strong); }
     .nav-item .badge { margin-left: auto; }
     .nav-item .nav-chevron { margin-left: auto; transition: transform .16s var(--ease); }
     .nav-item.expanded .nav-chevron { transform: rotate(90deg); }
@@ -170,7 +172,7 @@
     .shell { min-width: 0; min-height: 0; height: 100%; display: grid; grid-template-rows: var(--topbar-h) minmax(0, 1fr); overflow: hidden; }
     .topbar {
       min-width: 0;
-      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      background: var(--shell);
       backdrop-filter: blur(14px);
       border-bottom: 1px solid var(--line);
       display: flex;
@@ -411,7 +413,7 @@
     .badge.info { color: var(--info); background: var(--info-soft); border-color: color-mix(in srgb, var(--info) 28%, transparent); }
     .text-btn { padding: 4px 5px; border: 0; border-radius: 5px; background: transparent; color: var(--brand-strong); }
     .text-btn:hover { background: var(--brand-soft); }
-    [data-mode="dark"] .text-btn { color: #90d8a4; }
+    [data-mode="dark"] .text-btn { color: var(--brand-strong); }
     .table-footer {
       min-width: 0;
       min-height: 43px;
@@ -467,6 +469,10 @@
     }
     .field textarea { resize: vertical; min-height: 74px; }
     .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(var(--brand-rgb), .1); }
+    .field input:is([type="date"], [type="datetime-local"]) { cursor: pointer; }
+    .date-range-control { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; }
+    .date-range-control > span { color: var(--text-3); font-size: 12px; }
+    .date-range-control > input { min-width: 0; }
     .popover-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 6px; }
 
     .overlay {
@@ -563,7 +569,8 @@
     .progress-list { min-height: 0; overflow: auto; display: grid; align-content: start; gap: 8px; padding: 9px; }
     .progress-row { width: 100%; text-align: left; color: inherit; font: inherit; cursor: pointer; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
     .progress-row.is-selected { border-color: var(--brand); box-shadow: inset 3px 0 0 var(--brand); }
-    .progress-row:hover { background: var(--surface-hover); }
+    .progress-row:hover, .progress-row:focus-within { background: var(--surface-hover); }
+    .progress-row .interactive-image-row__content { display: block; }
     .progress-row-arrow { margin-left: auto; }
     .progress-row-head { display: flex; align-items: center; gap: 8px; }
     .progress-row-head strong { flex: 1; }
@@ -657,7 +664,7 @@
     .priority-list-head, .priority-list-row { display: grid; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
     .priority-list-head { position: sticky; top: 0; z-index: 3; min-height: 39px; padding: 0 12px; color: var(--text-2); background: var(--surface-muted); font-size: 11px; font-weight: 650; }
     .priority-list-row { width: 100%; min-height: 72px; padding: 9px 12px; border-top: 0; border-right: 0; border-left: 0; color: var(--text); background: var(--surface); text-align: left; }
-    .priority-list-row:hover, .priority-list-row:focus-visible { background: var(--brand-softer); box-shadow: inset 3px 0 var(--brand); }
+    .priority-list-row:hover, .priority-list-row:focus-within { background: var(--brand-softer); box-shadow: inset 3px 0 var(--brand); }
     .priority-list-row:last-child { border-bottom: 0; }
     .delivery-columns { grid-template-columns: minmax(260px, 2fr) 112px minmax(180px, 1.25fr) 125px 108px; }
     .finance-columns { grid-template-columns: minmax(220px, 1.7fr) minmax(180px, 1.25fr) 118px 145px 145px 104px; }
@@ -1339,7 +1346,34 @@
     .product-cell { display: flex; align-items: center; gap: 9px; }
     .product-cell > span:last-child { min-width: 0; }
     .product-art { width: 100%; height: 100%; display: block; }
-    .product-thumb { width: 38px; height: 38px; flex: 0 0 auto; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-muted); }
+    .product-thumb { position: relative; width: 48px; height: 48px; flex: 0 0 auto; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; padding: 0; background: var(--surface-muted); color: inherit; }
+    button.product-thumb { cursor: zoom-in; }
+    button.product-thumb:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .product-thumb-zoom { position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 4px; background: rgba(15,23,42,.78); color: #fff; opacity: 0; transition: opacity .12s ease; }
+    .product-thumb-zoom svg { width: 11px; height: 11px; }
+    button.product-thumb:hover .product-thumb-zoom, button.product-thumb:focus-visible .product-thumb-zoom { opacity: 1; }
+    @media (pointer: coarse) { .product-thumb-zoom { opacity: 1; } }
+    .interactive-image-row { position: relative; isolation: isolate; }
+    .interactive-image-row__open { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; border: 0; border-radius: inherit; padding: 0; background: transparent; }
+    .interactive-image-row__content { position: relative; z-index: 1; display: grid; width: 100%; align-items: center; gap: 12px; pointer-events: none; }
+    .interactive-image-row__content .product-thumb { pointer-events: auto; }
+    .product-image-preview { width: min(920px, calc(100vw - 32px)); }
+    .product-image-preview-stage { min-height: min(66vh, 620px); display: grid; place-items: center; overflow: auto; border-radius: 10px; background: #0f172a; }
+    .product-image-preview-stage .product-art { width: min(70vw, 560px); height: min(70vw, 560px); transform: scale(var(--preview-scale, 1)); transition: transform .16s ease; }
+    .product-image-preview-tools { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .product-image-preview-tools .data-note { margin-left: 8px; }
+    .progress-row-copy.product-cell { display: flex; align-items: center; gap: 10px; line-height: 1.5; }
+    .progress-row-copy.product-cell .product-thumb { width: 56px; height: 56px; }
+    .progress-row-copy.product-cell > span:last-child, .progress-summary .product-cell > span:last-child { display: grid; gap: 2px; }
+    .progress-row-copy.product-cell strong, .progress-summary .product-cell strong { color: var(--text); font-size: 12px; }
+    .progress-summary .product-cell { margin-bottom: 12px; }
+    .progress-summary .product-thumb { width: 64px; height: 64px; }
+    .priority-identity .product-cell { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+    .priority-identity .product-cell > span:last-child { min-width: 0; margin-top: 0; }
+    .priority-identity .product-thumb { margin-top: 0; }
+    .production-route-product .product-cell { display: flex; align-items: center; gap: 8px; }
+    .production-route-product .product-cell > span:last-child { min-width: 0; }
+    .production-route-product .product-thumb { margin-top: 0; }
     .product-detail-hero { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 16px; align-items: start; }
     .product-main-image { aspect-ratio: 1; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-muted); }
     .media-gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
@@ -1542,6 +1576,9 @@
     .task-create-object > div { min-width: 0; flex: 1; }
     .task-create-object strong, .task-create-object span { display: block; }
     .task-create-object span { margin-top: 3px; color: var(--text-3); font-size: 11px; }
+    .task-deadline-quick { margin-top: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+    .task-deadline-quick > span { color: var(--text-3); font-size: 11px; }
+    .task-deadline-quick .btn { min-height: 28px; padding: 0 8px; font-size: 11px; }
     .rm-nav-icon { position: relative; width: 24px; height: 21px; display: grid; place-items: center; }
     .rm-nav-badge { position: absolute; top: -6px; right: -9px; min-width: 17px; height: 17px; padding: 0 4px; display: grid; place-items: center; border: 2px solid var(--surface); border-radius: 99px; color: #fff; background: var(--danger); font-size: 9px; font-weight: 750; line-height: 1; }
     .rm-bottom-nav button.active .rm-nav-badge { border-color: var(--brand-softer); }
@@ -1585,8 +1622,9 @@
     .material-summary-modal { width: min(1440px, 100%); max-height: calc(100dvh - 36px); }
     .material-summary-body { min-height: 0; overflow: auto; padding: 12px; }
     .material-summary-products { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 10px; margin-bottom: 12px; }
-    .material-summary-product { min-width: 0; display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 6px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
-    .material-summary-image { width: 48px; height: 48px; display: grid; place-content: center; border-radius: 8px; background: var(--surface-muted); color: var(--text-3); font-size: 11px; }
+    .material-summary-product { min-width: 0; display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 6px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+    .material-summary-image { width: 64px; height: 64px; }
+    .material-summary-image .product-thumb { width: 64px; height: 64px; }
     .material-summary-product h3 { margin: 0 0 4px; font-size: 15px; }
     .material-summary-product p { margin: 0; color: var(--text-3); font-size: 12px; overflow-wrap: anywhere; }
     .material-summary-quantity { text-align: right; }
@@ -1611,7 +1649,7 @@
     .material-summary-totals { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
     .material-summary-help { margin-top: 10px; line-height: 1.7; color: var(--text-3); }
     @media (max-width: 600px) {
-      .material-summary-product { grid-template-columns: 48px minmax(0, 1fr); }
+      .material-summary-product { grid-template-columns: 64px minmax(0, 1fr); }
       .material-summary-quantity { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; }
       .material-summary-modal .modal-head > .badge { display: none; }
     }
@@ -2303,7 +2341,17 @@
     .dev-design-evidence { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; line-height: 1.6; }
     .dev-design-evidence dt { color: var(--text-3); }
     .dev-design-evidence dd { margin: 0; overflow-wrap: anywhere; }
+    .dev-git-lock-flow { display: grid; justify-items: center; gap: 8px; min-width: 0; }
+    .dev-git-lock-flow__node, .dev-git-lock-flow__decision { width: min(100%, 460px); padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface-muted); color: var(--text); text-align: center; line-height: 1.55; }
+    .dev-git-lock-flow__decision { border-radius: 999px; background: var(--brand-softer); }
+    .dev-git-lock-flow__arrow { color: var(--text-3); font-weight: 700; line-height: 1; }
+    .dev-git-lock-flow__branches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; width: 100%; }
+    .dev-git-lock-flow__branches article { display: grid; gap: 5px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); line-height: 1.55; }
+    .dev-git-lock-flow__branches article:first-child { border-color: var(--danger); }
+    .dev-git-lock-flow__branches article:last-child { border-color: var(--brand); }
+    .dev-git-lock-flow__branches span { color: var(--text-2); overflow-wrap: anywhere; }
     @media (max-width: 980px) { .dev-design-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 620px) { .dev-git-lock-flow__branches { grid-template-columns: 1fr; } }
     @media (prefers-reduced-motion: reduce) { .dev-design-tabs::before { transition: none; } }
   </style>
 </head>
@@ -3281,7 +3329,7 @@
       mobileOptionsOpen: false, mobileScreen: 'list', mobileTaskId: null, mobileAction: 'done', mobileReason: '', mobileError: '',
       mobileVisibleCount: 4, mobileScrollTop: 0, mobileReceipt: null, mobileCanProgress: true,
       mobileProgressView: 'orders', mobileProgressSearch: '', mobileProgressRisk: 'all', mobileProgressScope: 'active', mobileProgressId: null,
-      mobileProfileVersionStatus: '当前版本已核对', taskNote: '', taskTarget: '', taskError: '', productMediaPrimary: '正面图', productMediaOrder: ['正面图','侧面图','包装图','细节图']
+      mobileProfileVersionStatus: '当前版本已核对', taskNote: '', taskTarget: '', taskError: '', productMediaPrimary: '正面图', productMediaOrder: ['正面图','侧面图','包装图','细节图'], productImagePreview: null, productImageScale: 1
     };
 
     const accents = {
@@ -3296,6 +3344,11 @@
 
     function escapeHTML(value) {
       return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    }
+    function hexRGB(value) {
+      return [0, 2, 4]
+        .map(offset => Number.parseInt(value.slice(1 + offset, 3 + offset), 16))
+        .join(', ');
     }
     function money(v) { return new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v); }
     function icon(name) { return icons[name] || ''; }
@@ -3314,6 +3367,10 @@
       ];
       const [soft, strong, light] = palettes[Math.abs(Number(seed)) % palettes.length];
       return `<svg class="product-art" viewBox="0 0 120 120" role="img" aria-label="${escapeHTML(label)}产品图片"><rect width="120" height="120" rx="18" fill="${light}"/><circle cx="38" cy="33" r="17" fill="${soft}"/><circle cx="82" cy="33" r="17" fill="${soft}"/><circle cx="60" cy="49" r="34" fill="${soft}"/><ellipse cx="60" cy="88" rx="33" ry="27" fill="${soft}"/><circle cx="49" cy="46" r="4" fill="${strong}"/><circle cx="71" cy="46" r="4" fill="${strong}"/><ellipse cx="60" cy="59" rx="12" ry="9" fill="#fff" opacity=".72"/><circle cx="60" cy="57" r="4" fill="${strong}"/><path d="M53 67 Q60 73 67 67" fill="none" stroke="${strong}" stroke-width="3" stroke-linecap="round"/><path d="M39 88 Q60 99 81 88" fill="none" stroke="${strong}" stroke-width="5" stroke-linecap="round" opacity=".7"/></svg>`;
+    }
+
+    function renderProductThumb(seed = 0, label = '产品') {
+      return `<button type="button" class="product-thumb" data-action="product-image-preview" data-seed="${Number(seed) || 0}" data-label="${escapeHTML(label)}" aria-label="查看${escapeHTML(label)}大图">${renderProductArt(seed,label)}<span class="product-thumb-zoom" aria-hidden="true">${icon('search')}</span></button>`;
     }
 
     function copyValue(value) {
@@ -3477,11 +3534,12 @@
         localStorage.setItem('erp-prototype-v8-accent', state.accent);
       }
       const a = accents[state.accent];
-      document.documentElement.style.setProperty('--brand', a[0]);
-      document.documentElement.style.setProperty('--brand-rgb', a[1]);
+      const interactiveAccent = effectiveMode === 'dark' ? a[6] : a[0];
+      document.documentElement.style.setProperty('--brand', interactiveAccent);
+      document.documentElement.style.setProperty('--brand-rgb', effectiveMode === 'dark' ? hexRGB(interactiveAccent) : a[1]);
       document.documentElement.style.setProperty('--brand-strong', effectiveMode === 'dark' ? a[6] : a[2]);
-      document.documentElement.style.setProperty('--brand-hover', a[7]);
-      document.documentElement.style.setProperty('--on-brand', a[5]);
+      document.documentElement.style.setProperty('--brand-hover', effectiveMode === 'dark' ? `color-mix(in srgb, ${a[6]} 86%, #ffffff)` : a[7]);
+      document.documentElement.style.setProperty('--on-brand', effectiveMode === 'dark' ? '#050607' : a[5]);
     }
 
 
@@ -3563,7 +3621,7 @@
       const rows = state.devState === 'empty' ? [] : records.filter(row=>(filter==='all'||row.status==='待核对')&&`${row.title}${row.source}${row.detail}`.toLowerCase().includes(query.trim().toLowerCase()));
       const next = area==='overview'&&view==='next' ? `<section class="surface dev-design-section dev-design-next"><h3>下一步：补齐固定版本的质量证据</h3><p>样例版本的目标部署尚未证明。先查看质量门禁，再决定是否准备发布。</p><button class="btn primary" data-action="dev-area" data-value="quality">查看质量验证</button></section><div class="dev-design-grid">${[['engineering','查规则与业务链'],['delivery','核对交付与恢复']].map(([key,label])=>`<section class="surface dev-design-section"><h3>${label}</h3><p>${devDesignAreas[key].description}</p><button class="btn" data-action="dev-area" data-value="${key}">进入${devDesignAreas[key].label}</button></section>`).join('')}</div>` : '';
       const scope = area==='overview'&&view==='evidence' ? '<section class="surface dev-design-section"><h3>证据只证明自己的范围</h3><p>本地检查、固定版本 CI、不可变制品、目标读回与使用验收分别核对；缺失保持“待核对”。</p></section>' : '';
-      const operation = area==='delivery' ? `<section class="surface"><div class="dev-design-section"><h3>${view==='versions'?'版本发布':view==='migration'?'数据库迁移':'恢复演练'}的操作路径</h3><ol class="dev-design-steps"><li>核对版本与目标</li><li>准备并确认具体计划</li><li>执行后读取回执</li></ol><label>前置证据样例 <select id="dev-design-evidence" aria-label="前置证据样例"><option value="missing" ${state.devEvidence==='missing'?'selected':''}>证据缺失</option><option value="ready" ${state.devEvidence==='ready'?'selected':''}>准备就绪</option></select></label></div><div class="dev-design-operation"><span>${state.devEvidence==='missing'?'尚缺固定版本、备份或目标核验；先补证据。':'候选 DEMO-a1b2c3d · 隔离演示环境 · 恢复点 DEMO-r1'}</span><button class="btn primary" data-action="dev-prepare" ${state.devEvidence!=='ready'||state.devOperation?.status==='running'?'disabled':''}>核对并准备</button></div></section>` : '';
+      const operation = area==='delivery' ? `<section class="surface"><div class="dev-design-section"><h3>${view==='versions'?'版本发布':view==='migration'?'数据库迁移':'恢复演练'}的操作路径</h3><ol class="dev-design-steps"><li>核对版本与目标</li><li>准备并确认具体计划</li><li>执行后读取回执</li></ol><label>前置证据样例 <select id="dev-design-evidence" aria-label="前置证据样例"><option value="missing" ${state.devEvidence==='missing'?'selected':''}>证据缺失</option><option value="ready" ${state.devEvidence==='ready'?'selected':''}>准备就绪</option></select></label></div><div class="dev-design-operation"><span>${state.devEvidence==='missing'?'尚缺固定版本、备份或目标核验；先补证据。':'候选 DEMO-a1b2c3d · 隔离演示环境 · 恢复点 DEMO-r1'}</span><div class="record-actions">${view==='versions'?'<button class="btn" data-action="dev-automation-flow">查看自动续办交接流程</button><button class="btn" data-action="dev-lock-flow">查看 Git 索引锁流程</button>':''}<button class="btn primary" data-action="dev-prepare" ${state.devEvidence!=='ready'||state.devOperation?.status==='running'?'disabled':''}>核对并准备</button></div></div></section>` : '';
       return `${next}${scope}<section class="surface dev-design-toolbar"><label class="search">${icon('search')}<input id="dev-design-search" aria-label="搜索工作台条目" placeholder="搜索条目、来源或说明" value="${escapeHTML(query)}" /></label><div class="filter-chips"><button class="btn ${filter==='all'?'active':''}" aria-pressed="${filter==='all'}" data-action="dev-filter" data-value="all">全部 ${records.length}</button><button class="btn ${filter==='missing'?'active':''}" aria-pressed="${filter==='missing'}" data-action="dev-filter" data-value="missing">待核对 ${records.filter(row=>row.status==='待核对').length}</button></div></section><section class="surface"><div class="table-wrap"><table class="dev-design-table"><thead><tr><th>事项</th><th>来源与判断</th><th>证据状态</th><th>下一步</th></tr></thead><tbody>${rows.length?rows.map(row=>`<tr><td><strong>${row.title}</strong></td><td>${row.source}<small>${row.detail}</small></td><td><span class="badge ${row.status==='待核对'?'warning':''}">${row.status}</span></td><td><button class="btn" data-action="dev-evidence" data-value="${row.key}" aria-label="查看${row.title}证据">查看证据</button></td></tr>`).join(''):`<tr><td colspan="4">${devDesignEmpty('当前范围暂无记录',query||filter!=='all'?'<button class="btn" data-action="dev-clear">清除当前筛选</button>':'')}</td></tr>`}</tbody></table></div></section>${operation}`;
     }
     function handleDevDesignAction(action,target) {
@@ -3583,6 +3641,10 @@
       } else if (action==='dev-evidence') {
         const row=devDesignRecords.find(item=>item.key===target.dataset.value);if(!row)return true;
         state.infoModal={title:`${row.title} · 证据详情`,html:`<dl class="dev-design-evidence"><dt>来源</dt><dd>${row.source}</dd><dt>样例状态</dt><dd>${row.status}</dd><dt>核对入口</dt><dd>${row.path}</dd><dt>判断边界</dt><dd>${row.detail}</dd><dt>版本 / 时间</dt><dd>DEMO-a1b2c3d / 2026-09-26 10:30 +08:00</dd></dl><p class="data-note">这是固定样例，不证明当前代码、真实部署或客户验收。</p>`,confirmAction:'dev-close',confirmLabel:'返回工作台'};state.overlay='info';renderFloating();
+      } else if (action==='dev-automation-flow') {
+        state.infoModal={title:'自动续办交接流程',html:`<div class="dev-git-lock-flow" role="img" aria-label="等待心跳移除与执行阶段交接流程"><div class="dev-git-lock-flow__node">等待其他项目会话结束</div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">全部会话结束且后台 writer 已停止？</div><div class="dev-git-lock-flow__branches"><article><strong>尚未满足</strong><span>每 10 分钟只读重查，不改共享文件、不操作 Git、不造数或部署。</span></article><article><strong>条件满足</strong><span>先删除本次等待心跳，并读回删除结果。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">删除结果为 deleted？</div><div class="dev-git-lock-flow__branches"><article><strong>删除失败</strong><span>执行阶段保持未开始，报告自动化生命周期阻塞。</span></article><article><strong>删除成功</strong><span>同一次续办进入实现、验证、造数、Git 与部署。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">执行期间不重建同目的心跳；只有用户后来再次要求等待，才创建新的心跳。</div></div><p class="data-note">实际版本中心使用可缩放、可全屏的 Mermaid；本设计样例只说明生命周期，不调度 Codex 会话或自动化。</p>`,confirmAction:'dev-close',confirmLabel:'返回版本发布'};state.overlay='info';renderFloating();
+      } else if (action==='dev-lock-flow') {
+        state.infoModal={title:'Git 索引锁恢复流程',html:`<div class="dev-git-lock-flow" role="img" aria-label="Git index.lock 检查与恢复流程"><div class="dev-git-lock-flow__node">准备暂存或提交</div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">index.lock 是否存在？</div><div class="dev-git-lock-flow__branches"><article><strong>没有锁</strong><span>按精确文件或 hunk 受控写入 index，并启用 PID 旁车。</span></article><article><strong>发现锁</strong><span>只读核对 HEAD、当前 index、PID owner、仓库 Git 进程与打开句柄。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">owner 已结束且现场稳定？</div><div class="dev-git-lock-flow__branches"><article><strong>活动或漂移</strong><span>保留原现场，只停止 Git 动作。</span></article><article><strong>稳定陈旧</strong><span>备份当前 index，同盘隔离旧锁与旁车，并写恢复回执。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">候选不同或损坏时先复核隔离内容与精确暂存范围；HEAD 和当前 index 读回未变后，沿用已有授权继续收口。</div></div><p class="data-note">实际版本中心使用可缩放、可全屏的 Mermaid；本设计样例只展示相同的决策层级，不执行 Git。</p>`,confirmAction:'dev-close',confirmLabel:'返回版本发布'};state.overlay='info';renderFloating();
       } else if (action==='dev-prepare') {
         if (state.devEvidence!=='ready'||state.devOperation?.status==='running')return true;
         const key=state.devViews.delivery;const label=key==='versions'?'版本发布':key==='migration'?'数据库迁移':'恢复演练';
@@ -3650,7 +3712,7 @@
       if (state.page === 'dev-workbench') { renderDevTopbar(); return; }
       document.querySelector('#topbar').innerHTML = `
         <button class="btn icon-btn mobile-menu" data-action="open-nav" aria-label="打开导航" aria-controls="sidebar" aria-expanded="${document.body.classList.contains('nav-open')}">${icon('menu')}</button>
-        <div class="crumb"><span>业务中心</span><span>/</span><strong>${titleForPage()}</strong></div>
+        <div class="crumb"><strong>${titleForPage()}</strong></div>
         <div class="topbar-actions">
           <span class="preview-version" title="演示基准日：2026-09-26；修改仅在本次打开有效，刷新后恢复样例。">V8 · 本地交互样例</span><span class="badge role-chip hide-tablet">超级管理员</span>
           ${state.page === 'mobile-tasks'
@@ -4072,7 +4134,7 @@
       const chips=[['all','全部'],['attention','需跟进'],['delivered','已交付']].map(([value,label])=>visualChip('delivery-filter',value,label,counts[value],state.deliveryFilter===value)).join('');
       const operation=renderVisualToolbar(config,null,chips,'搜索订单、客户、产品或负责人');const empty=visibleDataState(operation,'销售交付进度');if(empty)return empty;
       const rank={overdue:0,closed:1,due:2,undated:3,unknown:4,progress:5,delivered:6,cancelled:7};const rows=all.filter(row=>state.deliveryFilter==='all'||(state.deliveryFilter==='attention'?attention.includes(row.status):row.status==='delivered')).sort((a,b)=>rank[a.status]-rank[b.status]||(a.date||'9999').localeCompare(b.date||'9999'));const p=visualPage(rows,config.key);
-      return `${operation}<section class="surface data-surface priority-visual-surface"><div class="priority-list-scroll"><div class="priority-list"><div class="priority-list-head delivery-columns"><span>订单 / 客户 / 产品行</span><span>计划交付</span><span>已出货 / 订购</span><span>剩余待交</span><span>交付状态</span></div>${p.rows.map(item=>`<button class="priority-list-row delivery-columns" data-action="delivery-open" data-id="${item.id}"><span class="priority-identity"><strong>${item.order}</strong><span title="${escapeHTML(item.customer)}">${escapeHTML(item.customer)}</span><small title="${escapeHTML(item.product)}">${escapeHTML(item.product)}</small></span><span>${displayDate(item.date)}</span><span class="delivery-progress-copy">${item.percent===null?'<span class="unknown-progress">待核对出货数量</span>':`<span class="delivery-progress-track"><i class="${item.status==='overdue'?'danger':item.status==='delivered'?'success':''}" style="width:${item.percent}%"></i></span><small>${item.shipped.toLocaleString('zh-CN')} / ${item.ordered.toLocaleString('zh-CN')} ${item.unit}</small>`}</span><strong>${item.remaining===null?'待核对':`${item.remaining.toLocaleString('zh-CN')} ${item.unit}`}</strong><span class="badge ${item.badge}">${item.statusText}</span></button>`).join('')||'<div class="empty">没有匹配的交付记录</div>'}</div></div>${renderVisualPager(p,config.key)}</section>`;
+      return `${operation}<section class="surface data-surface priority-visual-surface"><div class="priority-list-scroll"><div class="priority-list"><div class="priority-list-head delivery-columns"><span>订单 / 客户 / 产品行</span><span>计划交付</span><span>已出货 / 订购</span><span>剩余待交</span><span>交付状态</span></div>${p.rows.map((item,index)=>`<article class="priority-list-row interactive-image-row"><button type="button" class="interactive-image-row__open" data-action="delivery-open" data-id="${item.id}" aria-label="打开销售订单 ${item.order}"></button><div class="delivery-columns interactive-image-row__content"><span class="priority-identity"><strong>${item.order}</strong><span title="${escapeHTML(item.customer)}">${escapeHTML(item.customer)}</span><span class="product-cell">${renderProductThumb(index,item.product)}<span title="${escapeHTML(item.product)}">${escapeHTML(item.product)}</span></span></span><span>${displayDate(item.date)}</span><span class="delivery-progress-copy">${item.percent===null?'<span class="unknown-progress">待核对出货数量</span>':`<span class="delivery-progress-track"><i class="${item.status==='overdue'?'danger':item.status==='delivered'?'success':''}" style="width:${item.percent}%"></i></span><small>${item.shipped.toLocaleString('zh-CN')} / ${item.ordered.toLocaleString('zh-CN')} ${item.unit}</small>`}</span><strong>${item.remaining===null?'待核对':`${item.remaining.toLocaleString('zh-CN')} ${item.unit}`}</strong><span class="badge ${item.badge}">${item.statusText}</span></div></article>`).join('')||'<div class="empty">没有匹配的交付记录</div>'}</div></div>${renderVisualPager(p,config.key)}</section>`;
     }
     function renderFinanceDueView(config,hub) {
       const all=visualRows(config.key);const options=[['all','全部'],['overdue','已逾期'],['due','7 天内'],['undated','未填日期'],['unknown','待核对'],['settled','已结清']];const chips=options.map(([value,label])=>visualChip('finance-due-filter',value,label,value==='all'?all.length:all.filter(row=>row.status===value).length,state.financeDueFilter===value)).join('');const operation=renderVisualToolbar(config,hub,chips,'搜索账款、来源、往来方或负责人');const empty=visibleDataState(operation,'账款到期顺序');if(empty)return empty;
@@ -4081,7 +4143,7 @@
     }
     function renderProductionRouteView(config,hub) {
       const all=visualRows(config.key);const orderRows=all.filter(row=>row.order===state.productionRouteOrder);const attention=row=>row.processes.some(stage=>['blocked','review'].includes(stage.state))||['blocked','review'].includes(row.quality.state);const filtered=orderRows.filter(row=>state.productionRouteFilter==='all'||attention(row));const p=visualPage(filtered,config.key);const orders=[...new Set(productionRouteRows.map(row=>row.order))];const chips=visualChip('production-route-filter','all','全部产品行',orderRows.length,state.productionRouteFilter==='all')+visualChip('production-route-filter','attention','需关注',orderRows.filter(attention).length,state.productionRouteFilter==='attention');const operation=renderVisualToolbar(config,hub,chips,'搜索产品、SKU、责任岗位或状态');const empty=visibleDataState(operation,'生产工序进度');if(empty)return empty;
-      return `${operation}<section class="surface data-surface production-route-surface"><div class="process-order-bar"><label>生产订单 <select id="production-route-order">${orders.map(order=>`<option ${order===state.productionRouteOrder?'selected':''}>${order}</option>`).join('')}</select></label><button class="btn" data-action="route-open-order">打开生产订单 →</button><span>质检与入库结果独立核对</span></div><div class="production-route-scroll"><div class="production-route-matrix" style="--stage-count:${productionRouteStages.length}"><div class="production-route-head"><div class="production-route-product">产品 / SKU</div>${productionRouteStages.map(([no,label])=>`<div><span>${label}</span></div>`).join('')}<div class="process-milestones">独立结果</div></div>${p.rows.map(row=>`<div class="production-route-row"><div class="production-route-product"><strong title="${escapeHTML(row.product)}">${escapeHTML(row.product)}</strong><span>${row.sku} · ${row.quantity}</span><span>${row.owner}</span></div>${row.processes.map((stage,index)=>`<button class="production-stage-cell ${stage.state}" data-action="production-stage-open" data-id="${row.id}" data-index="${index}"><strong>${stage.status}</strong><span>${stage.meta}</span><small>${stage.owner}</small></button>`).join('')}<div class="process-milestones">${[['quality','质检',row.quality],['inbound','成品入库',row.inbound]].map(([key,label,result])=>`<button class="milestone-result ${result.state}" data-action="production-milestone-open" data-id="${row.id}" data-value="${key}"><span>${label}</span><strong>${result.status}</strong></button>`).join('')}</div></div>`).join('')||'<div class="empty">没有匹配的产品工序</div>'}</div></div>${renderVisualPager(p,config.key)}</section>`;
+      return `${operation}<section class="surface data-surface production-route-surface"><div class="process-order-bar"><label>生产订单 <select id="production-route-order">${orders.map(order=>`<option ${order===state.productionRouteOrder?'selected':''}>${order}</option>`).join('')}</select></label><button class="btn" data-action="route-open-order">打开生产订单 →</button><span>质检与入库结果独立核对</span></div><div class="production-route-scroll"><div class="production-route-matrix" style="--stage-count:${productionRouteStages.length}"><div class="production-route-head"><div class="production-route-product">产品 / SKU</div>${productionRouteStages.map(([no,label])=>`<div><span>${label}</span></div>`).join('')}<div class="process-milestones">独立结果</div></div>${p.rows.map((row,index)=>`<div class="production-route-row"><div class="production-route-product"><div class="product-cell">${renderProductThumb(index,row.product)}<span><strong title="${escapeHTML(row.product)}">${escapeHTML(row.product)}</strong><span>${row.sku} · ${row.quantity}</span></span></div><span>${row.owner}</span></div>${row.processes.map((stage,index)=>`<button class="production-stage-cell ${stage.state}" data-action="production-stage-open" data-id="${row.id}" data-index="${index}"><strong>${stage.status}</strong><span>${stage.meta}</span><small>${stage.owner}</small></button>`).join('')}<div class="process-milestones">${[['quality','质检',row.quality],['inbound','成品入库',row.inbound]].map(([key,label,result])=>`<button class="milestone-result ${result.state}" data-action="production-milestone-open" data-id="${row.id}" data-value="${key}"><span>${label}</span><strong>${result.status}</strong></button>`).join('')}</div></div>`).join('')||'<div class="empty">没有匹配的产品工序</div>'}</div></div>${renderVisualPager(p,config.key)}</section>`;
     }
     function renderPurchaseArrivalPlan(config) {
       const all=visualRows(config.key).filter(item=>state.arrivalFilter==='all'||(state.arrivalFilter==='confirmed'?item.confirmed:!item.confirmed||item.status==='overdue'));
@@ -4123,7 +4185,7 @@
             ${config.primary ? `<button class="btn primary" data-action="new-record">${icon('plus')}<span>${config.primary}</span></button>` : ''}
           </div>
         </div>
-        ${selectedRows.length > 1 ? `<div class="record-row batch-mode"><div class="batch-summary"><strong>已选择 ${selectedRows.length} 条</strong><span>${selectedRows.map(row=>row.no).slice(0,3).join('、')}${selectedRows.length>3?'…':''}</span><button class="text-btn" data-action="clear-selection">清除选择</button></div><div class="batch-actions"><button class="btn" data-action="batch-action" data-value="export">${icon('export')}导出所选</button>${supportsBatchPrint(config)?`<button class="btn" data-action="batch-action" data-value="print">${icon('printer')}批量打印</button>`:''}<button class="btn" data-action="batch-action" data-value="assign">分配负责人</button>${commonBatchAction?`<button class="btn primary" data-action="batch-action" data-value="primary" data-label="${commonBatchAction.label}">批量${commonBatchAction.label}</button>`:`<span class="batch-hint">状态不同，不提供批量状态变更</span>`}</div></div>` : `<div class="record-row"><div class="record-state"><strong>当前记录</strong><span>${selectedLabel}</span></div><div class="record-actions"><button class="btn desktop-only" ${selectedRows.length !== 1 ? 'disabled' : ''} data-action="open-selected">查看详情</button>${config.readOnly ? '' : `<button class="btn" ${canEditSelected ? '' : 'disabled'} title="${selectedRows.length===1&&!canEditSelected?'当前状态不可直接编辑':''}" data-action="edit-selected">编辑</button>${supportsTaskCreation(config)?`<button class="btn" ${canCreateRecordTask(config,selectedRows[0])?'':'disabled'} title="${selectedRows.length===1&&!canCreateRecordTask(config,selectedRows[0])?'当前单据已结束，可查看已有任务':''}" data-action="open-task-create">${icon('task')}发起任务</button><button class="btn" ${selectedRows.length!==1?'disabled':''} data-action="open-related-tasks">相关任务</button>`:''}${singleAction?`<button class="btn primary" data-action="submit-selected" data-label="${singleAction.label}">${singleAction.label}</button>`:''}<button class="btn icon-btn" ${selectedRows.length === 0 ? 'disabled' : ''} data-action="more-selected" aria-label="更多操作">${icon('more')}</button>`}</div></div>`}
+        ${selectedRows.length > 1 ? `<div class="record-row batch-mode"><div class="batch-summary"><strong>已选择 ${selectedRows.length} 条</strong><span>${selectedRows.map(row=>row.no).slice(0,3).join('、')}${selectedRows.length>3?'…':''}</span><button class="text-btn" data-action="clear-selection">清除选择</button></div><div class="batch-actions"><button class="btn" data-action="batch-action" data-value="export">${icon('export')}导出所选</button>${supportsBatchPrint(config)?`<button class="btn" data-action="batch-action" data-value="print">${icon('printer')}批量打印</button>`:''}<button class="btn" data-action="batch-action" data-value="assign">分配负责人</button>${commonBatchAction?`<button class="btn primary" data-action="batch-action" data-value="primary" data-label="${commonBatchAction.label}">批量${commonBatchAction.label}</button>`:`<span class="batch-hint">状态不同，不提供批量状态变更</span>`}</div></div>` : `<div class="record-row"><div class="record-state"><strong>当前记录</strong><span>${selectedLabel}</span></div><div class="record-actions"><button class="btn desktop-only" ${selectedRows.length !== 1 ? 'disabled' : ''} data-action="open-selected">查看详情</button>${config.readOnly ? '' : `<button class="btn" ${canEditSelected ? '' : 'disabled'} title="${selectedRows.length===1&&!canEditSelected?'当前状态不可直接编辑':''}" data-action="edit-selected">编辑</button>${supportsTaskCreation(config)?`<button class="btn" ${canCreateRecordTask(config,selectedRows[0])?'':'disabled'} title="${selectedRows.length===1&&!canCreateRecordTask(config,selectedRows[0])?'当前单据已结束，可查看已有任务':''}" data-action="open-task-create">${icon('task')}新建跟进任务</button><button class="btn" ${selectedRows.length!==1?'disabled':''} data-action="open-related-tasks">相关任务</button>`:''}${singleAction?`<button class="btn primary" data-action="submit-selected" data-label="${singleAction.label}">${singleAction.label}</button>`:''}<button class="btn icon-btn" ${selectedRows.length === 0 ? 'disabled' : ''} data-action="more-selected" aria-label="更多操作">${icon('more')}</button>`}</div></div>`}
       </section>`;
       if (state.previewState !== 'data') return `${operation}${renderDataState(config)}`;
       return `${operation}<section class="surface data-surface">
@@ -4152,7 +4214,7 @@
       const productIndex = Math.max(0, config.rows.indexOf(row));
       const cells = {
         no: `<button class="entity-link mono" data-action="open-detail" data-id="${row.id}">${row.no}</button><span class="subline">${row.lines} 条明细</span>`,
-        party: config.key === 'products' ? `<span class="product-cell"><span class="product-thumb">${renderProductArt(productIndex,rowParty(row,config))}</span><span><span class="strong">${rowParty(row, config)}</span><span class="subline">${rowItem(row, config)}</span></span></span>` : `<span class="strong">${rowParty(row, config)}</span><span class="subline">${rowItem(row, config)}</span>`,
+        party: config.key === 'products' ? `<span class="product-cell">${renderProductThumb(productIndex,rowParty(row,config))}<span><span class="strong">${rowParty(row, config)}</span><span class="subline">${rowItem(row, config)}</span></span></span>` : `<span class="strong">${rowParty(row, config)}</span><span class="subline">${rowItem(row, config)}</span>`,
         status: `<span class="badge ${badgeClass(row)}">${row.statusText}</span>`,
         date: `<span class="mono">${rowDate(row)}</span>`,
         metric: `<span class="mono">${rowMetric(row, config)}</span>`,
@@ -4219,7 +4281,7 @@
       const queryRows = viewRows.filter(row => !q || Object.values(row).join(' ').toLowerCase().includes(q));
       const operation = `<section class="page-navigation"><div class="navigation-row"><div class="segment">${[['orders','订单交付',mobileProgressRows.filter(row=>row.view==='orders').length],['production','生产执行',mobileProgressRows.filter(row=>row.view==='production').length]].map(([key,label,count])=>`<button class="${state.progressView===key?'active':''}" data-action="progress-view" data-value="${key}">${label}${count===null?'':`<b>${count}</b>`}</button>`).join('')}</div><label class="search">${icon('search')}<input id="progress-search" value="${escapeHTML(state.progressSearch)}" placeholder="搜索订单、客户、产品、负责人" /></label><div class="command-actions"><button class="btn" data-action="export">${icon('export')}导出</button></div></div><div class="navigation-row"><div class="segment">${[['all','全部',queryRows.length],['overdue','已逾期',queryRows.filter(row=>row.risk==='overdue').length],['due','7 天内到期',queryRows.filter(row=>row.risk==='due').length],['normal','正常',queryRows.filter(row=>row.risk==='normal').length]].map(([key,label,count])=>`<button class="${state.progressRisk===key?'active':''}" data-action="progress-risk" data-value="${key}">${label}${count===null?'':`<b>${count}</b>`}</button>`).join('')}</div><span class="data-note" style="margin-left:auto">进度只读汇总，业务动作回到对应单据或任务办理</span></div></section>`;
       if (state.previewState !== 'data') return `${operation}${renderDataState({title:'进度看板'})}`;
-      return `${operation}<section class="progress-layout"><section class="surface progress-list">${rows.length ? rows.map(row=>`<button type="button" class="progress-row${selected?.id===row.id?' is-selected':''}" aria-pressed="${selected?.id===row.id}" data-action="progress-select" data-id="${row.id}"><div class="progress-row-head"><strong class="entity-link">${row.no}</strong><span class="badge ${row.badge}">${row.status}</span></div><div class="progress-row-copy">${row.customer} · ${row.product} · ${row.due} 交付</div><div class="progress-bar"><i style="width:${row.percent}%"></i></div><div class="progress-row-foot"><strong>${row.stage}</strong><span>${row.quantity}</span><span class="progress-row-arrow">${icon('chevron')}</span></div></button>`).join('') : '<div class="empty"><div><strong>当前筛选没有进度记录</strong><span>调整搜索或风险条件后重试</span></div></div>'}</section><aside class="surface progress-summary">${selected?`<h2>${selected.no}</h2><div class="data-note">${selected.customer} · ${selected.product}</div><div style="margin-top:12px;display:flex;align-items:center;gap:8px"><span class="badge ${selected.badge}">${selected.status}</span><strong>${selected.percent}%</strong><span class="data-note">${selected.due} 交付</span></div><div class="stage-list" style="margin-top:16px">${selected.stages.map(([label,value])=>`<div class="stage-row"><span>${label}</span><div class="progress-bar"><i style="width:${value}%"></i></div><strong>${value}%</strong></div>`).join('')}</div><section class="detail-section" style="margin-top:16px"><h3>当前关注</h3><p style="margin:0;line-height:1.6;color:var(--text-2)">${selected.task}</p></section><button class="btn primary" style="margin-top:12px;width:100%" data-action="progress-open-detail" data-id="${selected.id}">查看完整进度</button>`:'<div class="empty">当前没有可查看的阶段摘要</div>'}</aside></section>`;
+      return `${operation}<section class="progress-layout"><section class="surface progress-list">${rows.length ? rows.map((row,index)=>`<article class="progress-row interactive-image-row${selected?.id===row.id?' is-selected':''}"><button type="button" class="interactive-image-row__open" aria-pressed="${selected?.id===row.id}" data-action="progress-select" data-id="${row.id}" aria-label="查看 ${row.no} 进度摘要"></button><div class="interactive-image-row__content"><div class="progress-row-head"><strong class="entity-link">${row.no}</strong><span class="badge ${row.badge}">${row.status}</span></div><div class="progress-row-copy product-cell">${renderProductThumb(index,row.product)}<span><strong>${escapeHTML(row.product)}</strong><span>${escapeHTML(row.customer)}</span><span>${row.due} 交付</span></span></div><div class="progress-bar"><i style="width:${row.percent}%"></i></div><div class="progress-row-foot"><strong>${row.stage}</strong><span>${row.quantity}</span><span class="progress-row-arrow">${icon('chevron')}</span></div></div></article>`).join('') : '<div class="empty"><div><strong>当前筛选没有进度记录</strong><span>调整搜索或风险条件后重试</span></div></div>'}</section><aside class="surface progress-summary">${selected?`<h2>${selected.no}</h2><div class="product-cell">${renderProductThumb(Math.max(0,rows.indexOf(selected)),selected.product)}<span><strong>${escapeHTML(selected.product)}</strong><span class="data-note">${escapeHTML(selected.customer)}</span></span></div><div style="margin-top:12px;display:flex;align-items:center;gap:8px"><span class="badge ${selected.badge}">${selected.status}</span><strong>${selected.percent}%</strong><span class="data-note">${selected.due} 交付</span></div><div class="stage-list" style="margin-top:16px">${selected.stages.map(([label,value])=>`<div class="stage-row"><span>${label}</span><div class="progress-bar"><i style="width:${value}%"></i></div><strong>${value}%</strong></div>`).join('')}</div><section class="detail-section" style="margin-top:16px"><h3>当前关注</h3><p style="margin:0;line-height:1.6;color:var(--text-2)">${selected.task}</p></section><button class="btn primary" style="margin-top:12px;width:100%" data-action="progress-open-detail" data-id="${selected.id}">查看完整进度</button>`:'<div class="empty">当前没有可查看的阶段摘要</div>'}</aside></section>`;
     }
 
     function getPrintProfile(template) {
@@ -6530,7 +6592,9 @@
     byId('businessChain').addEventListener('click',e=>{const node=e.target.closest('[data-step]');if(node)selectStep(node.dataset.step);});
     byId('entryButton').addEventListener('click',()=>{const p=specification();const entryStep=scene().steps.find(st=>st.roles.includes(state.role))||scene().steps[0];byId('entryBody').innerHTML=`<div class="entry-path"><span>登录 ERP</span>${icon('arrow')}<strong>${esc(p.entry)}</strong></div><p>${esc(entryStep.description)}</p><p>从对应来源记录继续办理。页面和操作以实际账号可见范围为准。</p>`;byId('entryDialog').showModal();});
     root().querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>byId('entryDialog').close()));
-    byId('entryDialog').addEventListener('close',()=>byId('entryButton').focus());
+    const entryDialog=byId('entryDialog');
+    entryDialog.addEventListener('click',event=>{if(event.target===entryDialog)entryDialog.close();});
+    entryDialog.addEventListener('close',()=>byId('entryButton').focus());
     render();
 
         }
@@ -6935,8 +6999,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function renderMobileTaskProcess(task) {
-      const actions = task.access === 'urge' ? ['urge'] : task.actions;
-      const groups=taskActionGroups({...task,actions});
+      const actions = taskActions({...task,actions:task.access === 'urge' ? ['urge'] : task.actions});
       const choice=action=>`<button class="rm-choice ${state.mobileAction===action?'active':''}" data-action="mobile-action-choice" data-value="${action}"><span class="rm-radio"></span><span><strong>${resolveMobileActionLabel(action,task)}</strong><small>${resolveMobileActionDescription(action,task)}</small></span></button>`;
       const selected = actions.includes(state.mobileAction) ? state.mobileAction : actions[0];
       state.mobileAction = selected;
@@ -6950,7 +7013,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
             <h3>${task.access === 'urge' ? '本次可执行操作' : '选择处理方式'}</h3>
             ${task.access === 'urge'
               ? `<div class="rm-action-summary"><strong>催办</strong><div style="margin-top:4px;font-size:12px">任务仍由责任岗位处理，本次只记录催办原因。</div></div>`
-              : `<div class="rm-choice-list">${groups.primary.map(choice).join('')}</div>${groups.secondary.length?`<details ${groups.secondary.includes(selected)?'open':''}><summary class="text-btn" style="padding:12px 0">更多处理方式</summary><div class="rm-choice-list">${groups.secondary.map(choice).join('')}</div></details>`:''}`}
+              : `<div class="rm-choice-list">${actions.map(choice).join('')}</div>`}
             <div class="rm-mobile-field ${state.mobileError ? 'error' : ''}"><label>${fieldLabel} <span style="color:var(--danger)">*</span></label><textarea id="mobile-reason" placeholder="${placeholder}">${escapeHTML(state.mobileReason)}</textarea>${state.mobileError ? `<span class="rm-error">${state.mobileError}</span>` : ''}</div>
           </section>
         </main>
@@ -7450,6 +7513,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function closeAttachmentManager() {
+      if (state.attachmentFiles.some(file=>file.status==='uploading')) {
+        toast('附件正在上传，请等待完成后关闭');
+        return;
+      }
       state.overlay = state.attachmentReturnOverlay;
       state.drawer = state.attachmentReturnDrawer;
       state.attachmentReturnOverlay = null;
@@ -7558,6 +7625,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if (state.overlay === 'media-sort') html += renderMediaSortModal();
       if (state.overlay === 'boundary-modal') html += renderBoundaryModal();
       if (state.overlay === 'info') html += renderInfoModal();
+      if (state.overlay === 'product-image-preview') html += renderProductImagePreview();
       if (state.overlay === 'account') html += renderAccountPopover();
       if (state.drawer?.type === 'detail') html += renderDetailModal(state.drawer.row);
       if (state.drawer?.type === 'task') html += renderTaskDrawer(state.drawer.task);
@@ -7596,7 +7664,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const config = currentPageConfig();
       const party = config?.party || '业务对象';
       const dateLabel = config?.dateLabel || '业务日期';
-      return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid"><div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><select id="filter-owner"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</select></div><div class="field"><label>业务提醒</label><select id="filter-risk"><option value="all">全部</option><option value="正常" ${state.filterRisk==='正常'?'selected':''}>正常</option><option value="near" ${state.filterRisk==='near'?'selected':''}>临近日期</option><option value="已逾期" ${state.filterRisk==='已逾期'?'selected':''}>已逾期</option><option value="blocked" ${state.filterRisk==='blocked'?'selected':''}>阻塞</option></select></div><div class="field"><label>包含结束记录</label><select id="filter-ended"><option value="no" ${!state.filterIncludeEnded?'selected':''}>否</option><option value="yes" ${state.filterIncludeEnded?'selected':''}>是</option></select></div><div class="field span-2"><label>${dateLabel}范围</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><input id="filter-date-from" aria-label="开始日期" type="date" value="${state.filterDateFrom}"/><input id="filter-date-to" aria-label="结束日期" type="date" value="${state.filterDateTo}"/></div></div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn primary" data-action="apply-filter">应用筛选</button></div></div>`;
+      return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid"><div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><select id="filter-owner"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</select></div><div class="field"><label>业务提醒</label><select id="filter-risk"><option value="all">全部</option><option value="正常" ${state.filterRisk==='正常'?'selected':''}>正常</option><option value="near" ${state.filterRisk==='near'?'selected':''}>临近日期</option><option value="已逾期" ${state.filterRisk==='已逾期'?'selected':''}>已逾期</option><option value="blocked" ${state.filterRisk==='blocked'?'selected':''}>阻塞</option></select></div><div class="field"><label>包含结束记录</label><select id="filter-ended"><option value="no" ${!state.filterIncludeEnded?'selected':''}>否</option><option value="yes" ${state.filterIncludeEnded?'selected':''}>是</option></select></div><div class="field span-2"><label>${dateLabel}范围</label><div class="date-range-control" role="group" aria-label="${dateLabel}范围"><input id="filter-date-from" aria-label="开始日期" type="date" value="${state.filterDateFrom}"/><span aria-hidden="true">至</span><input id="filter-date-to" aria-label="结束日期" type="date" value="${state.filterDateTo}"/></div></div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn primary" data-action="apply-filter">应用筛选</button></div></div>`;
     }
 
     function renderColumnsModal() {
@@ -7713,18 +7781,20 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(!row)return '';
       const values=state.taskCreateValues,error=state.taskCreateError;
       const fieldError=(key,text)=>error===key?`<span class="error-text">${text}</span>`:'';
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(660px,100%)" role="dialog" aria-modal="true" aria-label="发起任务">
-        <header class="modal-head"><strong>发起任务</strong><span class="badge info">${config.title}</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header>
+      const deadlineQuickOptions=[['today-end','今天 23:59'],['tomorrow','明天此时'],['seven-days','7 天后'],['fifteen-days','15 天后'],['thirty-days','30 天后']];
+      const todayDeadlineUnavailable=new Date(taskDeadlineQuickValue('today-end')).getTime()<=Date.now();
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(660px,100%)" role="dialog" aria-modal="true" aria-label="新建跟进任务">
+        <header class="modal-head"><strong>新建跟进任务</strong><span class="badge info">${config.title}</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header>
         <div class="modal-body"><div class="task-create-object"><span class="badge">来源单据</span><div><strong>${row.no}</strong><span>${rowParty(row,config)} · ${rowItem(row,config)}</span></div></div>
           <div class="form-grid" style="margin-top:13px">
             <div class="field span-2 ${error==='type'?'error':''}"><label for="task-create-name">任务事项 *</label><input id="task-create-name" data-task-create="type" maxlength="128" value="${escapeHTML(values.type||'')}" placeholder="例如：补充包装稿、确认交期变化" />${fieldError('type','请填写任务事项')}</div>
             <div class="field ${error==='role'?'error':''}"><label for="task-create-role">责任岗位 *</label><select id="task-create-role" data-task-create="role"><option value="">请选择责任岗位</option>${Object.keys(taskCreatePeople).map(role=>`<option value="${role}" ${values.role===role?'selected':''}>${role}</option>`).join('')}</select>${fieldError('role','请选择责任岗位')}</div>
             <div class="field"><label for="task-create-assignee">办理人</label><select id="task-create-assignee" data-task-create="assignee"><option value="unassigned">由岗位共同办理</option>${(taskCreatePeople[values.role]||[]).map(name=>`<option ${values.assignee===name?'selected':''}>${name}</option>`).join('')}</select></div>
-            <div class="field ${error==='deadline'?'error':''}"><label for="task-create-deadline">截止时间 *</label><input id="task-create-deadline" data-task-create="deadline" type="datetime-local" value="${escapeHTML(values.deadline||'')}" />${fieldError('deadline','请选择晚于当前时间的截止时间')}</div>
+            <div class="field ${error==='deadline'?'error':''}"><label for="task-create-deadline">截止时间 *</label><input id="task-create-deadline" data-task-create="deadline" type="datetime-local" value="${escapeHTML(values.deadline||'')}" /><div class="task-deadline-quick" role="group" aria-label="快捷截止"><span>快捷截止</span>${deadlineQuickOptions.map(([key,label])=>`<button class="btn" type="button" data-action="task-deadline-quick" data-value="${key}" ${key==='today-end'&&todayDeadlineUnavailable?'disabled':''}>${label}</button>`).join('')}</div>${fieldError('deadline','请选择晚于当前时间的截止时间')}</div>
             <div class="field"><label for="task-create-priority">优先级</label><select id="task-create-priority" data-task-create="priority"><option value="normal" ${values.priority!=='urgent'?'selected':''}>普通</option><option value="urgent" ${values.priority==='urgent'?'selected':''}>紧急</option></select></div>
             <div class="field span-2 ${error==='note'?'error':''}"><label for="task-create-note">需要对方完成什么 *</label><textarea id="task-create-note" data-task-create="note" maxlength="2000" placeholder="写清任务要求和期望结果">${escapeHTML(values.note||'')}</textarea>${fieldError('note','请填写任务要求')}</div>
           </div><p class="data-note" style="margin:12px 0 0">任务用于资料补充、交期沟通和异常核实。完成任务须反馈处理结果；业务单据仍按各自流程办理。</p>
-        </div><footer class="modal-foot"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-task-create">${icon('task')}发起任务</button></footer>
+        </div><footer class="modal-foot"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-task-create">${icon('task')}新建跟进任务</button></footer>
       </section></div>`;
     }
 
@@ -7735,8 +7805,19 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       renderFloating();
     }
 
+    function dismissOverlay() {
+      if (state.overlay === 'task-create') { closeTaskCreate(); return; }
+      if (state.overlay === 'task-create-confirm') { state.overlay='task-create'; renderFloating(); return; }
+      if (state.overlay === 'attachments') { closeAttachmentManager(); return; }
+      state.overlay = null;
+      state.pendingNav = null;
+      state.permissionPending = null;
+      state.boundaryMoreOpen = false;
+      renderFloating();
+    }
+
     function renderTaskCreateConfirm() {
-      return `<div class="overlay"><section class="modal" style="width:min(420px,100%)" role="dialog" aria-modal="true" aria-label="放弃未发起的任务？"><header class="modal-head"><strong>放弃未发起的任务？</strong></header><div class="modal-body">当前填写的任务内容尚未发送。</div><footer class="modal-foot"><button class="btn" data-action="task-create-continue">继续编辑</button><button class="btn danger" data-action="task-create-discard">放弃填写</button></footer></section></div>`;
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(420px,100%)" role="dialog" aria-modal="true" aria-label="放弃未创建的跟进任务？"><header class="modal-head"><strong>放弃未创建的跟进任务？</strong></header><div class="modal-body">当前填写的跟进任务尚未创建。</div><footer class="modal-foot"><button class="btn" data-action="task-create-continue">继续编辑</button><button class="btn danger" data-action="task-create-discard">放弃填写</button></footer></section></div>`;
     }
 
     function renderRelatedTasksModal() {
@@ -7770,6 +7851,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(650px,100%)"><header class="modal-head"><strong>${info.title}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body">${info.html || `<p style="margin:0;color:var(--text-2);line-height:1.75">${info.body}</p>`}</div><footer class="modal-foot">${(info.links||[]).map(link=>`<button class="btn" data-action="open-linked-record" data-page="${link.key}" data-id="${link.id}">${link.label} →</button>`).join('')}${info.confirmAction?'<button class="btn" data-action="close-overlay">取消</button>':''}<button class="btn primary" data-action="${info.confirmAction||'close-overlay'}">${info.confirmLabel||'完成'}</button></footer></section></div>`;
     }
 
+    function renderProductImagePreview() {
+      const preview = state.productImagePreview || { seed: 0, label: '产品' };
+      const scale = Math.max(1, Math.min(3, Number(state.productImageScale) || 1));
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal product-image-preview" role="dialog" aria-modal="true" aria-label="${escapeHTML(preview.label)}图片预览"><header class="modal-head"><strong>${escapeHTML(preview.label)}</strong><span class="data-note">产品图片预览</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭图片预览">${icon('close')}</button></header><div class="modal-body"><div class="product-image-preview-stage" style="--preview-scale:${scale}">${renderProductArt(preview.seed,preview.label)}</div></div><footer class="modal-foot product-image-preview-tools"><button class="btn" data-action="product-image-zoom" data-value="out" ${scale<=1?'disabled':''}>缩小</button><button class="btn" data-action="product-image-zoom" data-value="reset">适应屏幕</button><button class="btn" data-action="product-image-zoom" data-value="in" ${scale>=3?'disabled':''}>放大</button><span class="data-note">滚轮或双指缩放 · 放大后拖动查看</span></footer></section></div>`;
+    }
+
     function renderBoundaryModal() {
       const title = '编辑销售订单并核对海外客户多语言包装、分批交付、付款条件与跨岗位协同资料（超长标题边界）';
       const sections = [
@@ -7784,7 +7871,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         ['并发修改与恢复','若他人已更新同一订单，保存前展示冲突字段与最新值，由用户决定刷新或另存草稿；不会静默覆盖服务端新版本。'],
         ['审计与敏感动作','批量、导出、取消和跨岗位转交保留操作者、时间、范围与结果；无权限的动作不展示，权限刚失效时服务端仍会拒绝并说明如何恢复。']
       ];
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal boundary-modal" style="width:min(760px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong title="${title}">${title}</strong><span class="badge info">边界预览</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><div class="boundary-modal-copy">${sections.map(([heading,copy])=>`<section><h3>${heading}</h3><p>${copy}</p></section>`).join('')}</div></div><footer class="modal-foot"><span class="data-note">正文独立滚动；底部只保留高频动作，当前还有 4 个低频动作。</span><button class="btn" data-action="boundary-modal-action" data-value="attachments">${icon('paperclip')}附件</button><div class="boundary-more-wrap"><button class="btn" data-action="boundary-modal-more" aria-expanded="${state.boundaryMoreOpen}">${icon('more')}更多 4</button>${state.boundaryMoreOpen?`<div class="boundary-action-menu" role="menu"><button data-action="boundary-modal-action" data-value="copy">复制单据</button><button data-action="boundary-modal-action" data-value="print">打印预览</button><button data-action="boundary-modal-action" data-value="task">发起任务</button><button data-action="boundary-modal-action" data-value="cancel">取消单据</button></div>`:''}</div><button class="btn primary" data-action="boundary-modal-action" data-value="save">保存并继续</button></footer></section></div>`;
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal boundary-modal" style="width:min(760px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong title="${title}">${title}</strong><span class="badge info">边界预览</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><div class="boundary-modal-copy">${sections.map(([heading,copy])=>`<section><h3>${heading}</h3><p>${copy}</p></section>`).join('')}</div></div><footer class="modal-foot"><span class="data-note">正文独立滚动；底部只保留高频动作，当前还有 4 个低频动作。</span><button class="btn" data-action="boundary-modal-action" data-value="attachments">${icon('paperclip')}附件</button><div class="boundary-more-wrap"><button class="btn" data-action="boundary-modal-more" aria-expanded="${state.boundaryMoreOpen}">${icon('more')}更多 4</button>${state.boundaryMoreOpen?`<div class="boundary-action-menu" role="menu"><button data-action="boundary-modal-action" data-value="copy">复制单据</button><button data-action="boundary-modal-action" data-value="print">打印预览</button><button data-action="boundary-modal-action" data-value="task">新建跟进任务</button><button data-action="boundary-modal-action" data-value="cancel">取消单据</button></div>`:''}</div><button class="btn primary" data-action="boundary-modal-action" data-value="save">保存并继续</button></footer></section></div>`;
     }
 
     function renderThemeModal() {
@@ -7792,7 +7879,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function renderConfirmNav() {
-      return `<div class="overlay"><section class="modal" style="width:min(420px,100%)"><header class="modal-head"><strong>放弃未保存修改？</strong></header><div class="modal-body"><p style="margin:0;line-height:1.7;color:var(--text-2)">返回列表后，本次录入内容不会保留。</p></div><footer class="modal-foot"><button class="btn" data-action="close-overlay">继续编辑</button><button class="btn danger" data-action="confirm-nav">放弃并返回</button></footer></section></div>`;
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(420px,100%)"><header class="modal-head"><strong>放弃未保存修改？</strong></header><div class="modal-body"><p style="margin:0;line-height:1.7;color:var(--text-2)">返回列表后，本次录入内容不会保留。</p></div><footer class="modal-foot"><button class="btn" data-action="close-overlay">继续编辑</button><button class="btn danger" data-action="confirm-nav">放弃并返回</button></footer></section></div>`;
     }
 
     function renderDetailModal(row) {
@@ -7814,7 +7901,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(state.detailTab==='basic')body+=renderVisualRecordFacts(row,config);
       const printable = ['purchase','outsourcing','bom','products','production'].includes(config.key);
       const editable = !row.previewOnly && canEditRecord(config, row);
-      return `<div class="overlay" data-action="detail-bg"><section class="modal business-detail-modal" role="dialog" aria-modal="true" aria-label="${config.entity}详情"><header class="modal-head"><strong>${config.entity}详情</strong><span class="badge ${badgeClass(row)}">${row.statusText}</span><span class="data-note">${row.no}</span><button class="btn ghost icon-btn close" data-action="close-drawer" aria-label="关闭">${icon('close')}</button></header><nav class="detail-tabs">${tabs.map(([key,label])=>`<button class="${state.detailTab===key?'active':''}" data-action="detail-tab" data-value="${key}">${label}</button>`).join('')}</nav><div class="detail-modal-body">${body}</div><footer class="modal-foot"><button class="btn" data-action="open-attachments" data-context="${config.key==='products'?'product':'business'}" data-owner="${row.no}">${icon('paperclip')}${config.key==='products'?'图片与附件':'附件 2'}</button>${printable?`<button class="btn" data-action="business-print" data-value="${config.key}" data-id="${row.no}">${icon('printer')}打印</button>`:''}${supportsTaskCreation(config)&&!row.previewOnly?`<button class="btn" ${canCreateRecordTask(config,row)?'':'disabled title="当前单据已结束"'} data-action="open-task-create" data-id="${row.id}">${icon('task')}发起任务</button><button class="btn" data-action="open-related-tasks" data-id="${row.id}">相关任务</button>`:''}${config.readOnly||config.workflow?'':`<button class="btn" ${editable?'':'disabled title="当前状态不可直接编辑"'} data-action="edit-record" data-id="${row.id}">编辑</button>`}${config.readOnly||row.previewOnly?'':`<button class="btn primary" data-action="detail-primary">${config.workflow?config.rowAction:'更多操作'}</button>`}<button class="btn" data-action="close-drawer">返回原视图</button></footer></section></div>`;
+      return `<div class="overlay" data-action="detail-bg"><section class="modal business-detail-modal" role="dialog" aria-modal="true" aria-label="${config.entity}详情"><header class="modal-head"><strong>${config.entity}详情</strong><span class="badge ${badgeClass(row)}">${row.statusText}</span><span class="data-note">${row.no}</span><button class="btn ghost icon-btn close" data-action="close-drawer" aria-label="关闭">${icon('close')}</button></header><nav class="detail-tabs">${tabs.map(([key,label])=>`<button class="${state.detailTab===key?'active':''}" data-action="detail-tab" data-value="${key}">${label}</button>`).join('')}</nav><div class="detail-modal-body">${body}</div><footer class="modal-foot"><button class="btn" data-action="open-attachments" data-context="${config.key==='products'?'product':'business'}" data-owner="${row.no}">${icon('paperclip')}${config.key==='products'?'图片与附件':'附件 2'}</button>${printable?`<button class="btn" data-action="business-print" data-value="${config.key}" data-id="${row.no}">${icon('printer')}打印</button>`:''}${supportsTaskCreation(config)&&!row.previewOnly?`<button class="btn" ${canCreateRecordTask(config,row)?'':'disabled title="当前单据已结束"'} data-action="open-task-create" data-id="${row.id}">${icon('task')}新建跟进任务</button><button class="btn" data-action="open-related-tasks" data-id="${row.id}">相关任务</button>`:''}${config.readOnly||config.workflow?'':`<button class="btn" ${editable?'':'disabled title="当前状态不可直接编辑"'} data-action="edit-record" data-id="${row.id}">编辑</button>`}${config.readOnly||row.previewOnly?'':`<button class="btn primary" data-action="detail-primary">${config.workflow?config.rowAction:'更多操作'}</button>`}<button class="btn" data-action="close-drawer">返回原视图</button></footer></section></div>`;
     }
 
     // These examples describe presentation only; they never query or advance a business process.
@@ -7828,12 +7915,11 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true"><header class="drawer-head"><strong>任务办理</strong><span class="badge ${task.badge}">${task.state}</span><button class="btn ghost icon-btn close" data-action="close-drawer" aria-label="关闭">${icon('close')}</button></header><div class="task-steps">${[['1','核对任务'],['2','选择处理'],['3','确认与结果']].map(([n,label]) => { const number=Number(n); const enabled=number<=state.taskMaxStep||number===step+1; return `<button type="button" class="task-step ${step===number?'active':''} ${number<=state.taskMaxStep?'visited':''}" data-action="task-step" data-value="${number}" ${step===number?'aria-current="step"':''} ${enabled?'':'disabled'}><i>${n}</i><span>${label}</span></button>`; }).join('')}</div><div class="drawer-body">${renderTaskStep(task)}</div><footer class="drawer-foot"><button class="btn" data-action="detail-attachments" data-value="任务附件">${icon('paperclip')}查看附件</button>${step>1?'<button class="btn" data-action="task-prev">上一步</button>':''}<button class="btn primary" data-action="task-next">${step===3?'确认办理':'下一步'}</button></footer></aside></div>`;
     }
 
-    function taskActionGroups(task) {
+    function taskActions(task) {
       const actions = task.lane === 'done' || task.sourceAction ? [] : task.actions || [];
       const preferred = task.approval ? ['complete','done','reject','rejected','resume'] : ['complete','done','block','blocked','resume'];
-      const primary = preferred.filter(action=>actions.includes(action)).slice(0,2);
-      if(!primary.length && actions.length)primary.push(actions[0]);
-      return {primary,secondary:actions.filter(action=>!primary.includes(action))};
+      const prioritized = preferred.filter(action=>actions.includes(action));
+      return [...new Set([...prioritized,...actions])];
     }
 
     function taskActionLabel(task,action) {
@@ -7866,10 +7952,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const {products,materials} = materialSummaryExample(row);
       const number = value => value.toLocaleString('zh-CN',{maximumFractionDigits:2});
       const status = workbenchSummaries.materials.rows[workbenchSummaries.materials.sourceIds.indexOf(row.id)]?.[2] || '待核对';
-      return `<div class="overlay"><section class="modal material-summary-modal" role="dialog" aria-modal="true" aria-label="材料汇总">
+      return `<div class="overlay" data-action="detail-bg"><section class="modal material-summary-modal" role="dialog" aria-modal="true" aria-label="材料汇总">
         <header class="modal-head"><strong>材料汇总 · ${row.no}</strong><span class="badge ${status==='已退回'?'warning':'info'}">${status}</span><button class="btn ghost icon-btn close" data-action="close-drawer" aria-label="关闭材料汇总">${icon('close')}</button></header>
         <div class="material-summary-body">
-          <div class="material-summary-products">${products.map((product,index)=>`<article class="material-summary-product"><span class="material-summary-image" role="img" aria-label="${escapeHTML(product.name)}暂无图片">暂无图</span><div><h3>${escapeHTML(product.name)}</h3><p>产品编号：${product.code} · 订单第 ${index+1} 行</p><p>订单日期：2026-09-25 · BOM：${product.bom}</p></div><div class="material-summary-quantity"><span>产品总数量</span><strong>${number(product.quantity)} <small>只</small></strong><p>订单 ${number(product.ordered)} · 船头样 ${product.sample}</p></div></article>`).join('')}</div>
+          <div class="material-summary-products">${products.map((product,index)=>`<article class="material-summary-product"><span class="material-summary-image">${renderProductThumb(index,product.name)}</span><div><h3>${escapeHTML(product.name)}</h3><p>产品编号：${product.code} · 订单第 ${index+1} 行</p><p>订单日期：2026-09-25 · BOM：${product.bom}</p></div><div class="material-summary-quantity"><span>产品总数量</span><strong>${number(product.quantity)} <small>只</small></strong><p>订单 ${number(product.ordered)} · 船头样 ${product.sample}</p></div></article>`).join('')}</div>
           <div class="material-summary-toolbar"><strong>${materials.length} 种材料</strong><div class="material-summary-scroll-actions" hidden><button class="btn" data-action="material-scroll" data-value="left">← 材料</button><button class="btn" data-action="material-scroll" data-value="right">库存 / 备注 →</button></div></div>
           <p class="material-summary-basis">采购口径：财务批准后，采购订单按本表总用数量生成；当前库存仅供参考，未自动抵扣。</p>
           <div class="material-summary-table"><table><colgroup><col style="width:54px"><col style="width:54px"><col style="width:170px"><col style="width:180px"><col style="width:100px"><col style="width:60px"><col style="width:120px"><col style="width:120px"><col style="width:260px"></colgroup><thead><tr>${['明细','序号','材料品名','厂商料号 / 厂商','规格','单位','总用数量','当前库存','材料备注'].map((name,index)=>`<th${[6,7].includes(index)?' class="number"':''}>${name}</th>`).join('')}</tr></thead><tbody>${materials.map((item,index)=>`<tr><td><button class="btn icon-btn" data-action="material-expand" data-index="${index}" aria-expanded="false" aria-controls="material-parts-${index}" aria-label="查看${item.name}部位用量">+</button></td><td>${index+1}</td><td><strong>${item.name}</strong><small>${item.color}</small></td><td>${item.code}<small>${item.supplier}</small></td><td>${item.spec}</td><td>${item.unit}</td><td class="number"><strong>${number(item.quantity)}</strong></td><td class="number">${item.stock}</td><td>${item.note.length>40?`<details><summary>查看完整备注</summary><p>${item.note}</p></details>`:item.note}</td></tr><tr id="material-parts-${index}" class="material-summary-parts" hidden><td colspan="9"><div class="material-summary-part-table"><table><thead><tr>${['产品 / 订单行','BOM','部位','片数','单位用量','损耗 %','生产数量','含损耗用量','加工 / 备注'].map((label,i)=>`<th${i>=3&&i<=7?' class="number"':''}>${label}</th>`).join('')}</tr></thead><tbody>${item.parts.map(part=>`<tr><td>${escapeHTML(part.product.name)} · 第 ${products.indexOf(part.product)+1} 行</td><td>${part.product.bom}</td><td>${part.position}</td><td class="number">1</td><td class="number">${part.usage}</td><td class="number">${part.loss}</td><td class="number">${number(part.product.quantity)}</td><td class="number">${part.total}</td><td>${item.note.length>40?`<details><summary>查看完整备注</summary><p>${item.note}</p></details>`:item.note}</td></tr>`).join('')}</tbody></table></div></td></tr>`).join('')}</tbody></table></div>
@@ -7896,9 +7982,9 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         return `<section class="detail-section"><h3>${escapeHTML(task.title)}</h3><dl class="detail-grid"><dt>业务对象</dt><dd>${task.object}</dd><dt>当前岗位</dt><dd>${task.role}</dd><dt>时间</dt><dd>${task.time}</dd></dl>${task.reason?`<div class="rm-callout" style="margin-top:13px"><strong>当前原因</strong><div>${escapeHTML(task.reason)}</div></div>`:''}</section>${task.manualFollowup?`<section class="detail-section"><h3>任务要求</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.description)}</p>${task.receipt&&task.lane==='done'?`<h3>处理结果</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.receipt.feedback)}</p>`:''}</section>`:''}${renderTaskSourceSummary(task)}<section class="detail-section"><h3>来源与处理记录</h3>${source?`<button class="btn" data-action="task-context-open" data-page="${task.sourcePage}" data-id="${source.id}">查看来源单据 ${source.no}</button>`:'<span class="data-note">来源记录待核对</span>'}${task.sourceAction?`<p>${task.sourceAction}，在来源业务中提交并查看结果。</p>`:''}${task.history?.length?`<div class="timeline" style="margin-top:12px">${task.history.map(([label,time])=>`<div class="timeline-item"><strong>${escapeHTML(label)}</strong><small>${escapeHTML(time)}</small></div>`).join('')}</div>`:''}</section>`;
       }
       if (state.taskStep === 2) {
-        const groups = taskActionGroups(task);
+        const actions = taskActions(task);
         const choice = key => `<button class="action-choice ${state.taskAction===key?'active':''}" aria-pressed="${state.taskAction===key}" data-action="task-choice" data-value="${key}"><strong>${taskActionLabel(task,key)}</strong><span>${{complete:'记录本岗处理结果。',block:'说明当前卡点。',reject:'说明退回原因及需要补充的内容。',resume:'说明卡点如何解除。',assign:'转给同一负责岗位的接收人或退回共同待办。',urge:'记录催办原因，不改变任务状态。'}[key]}</span></button>`;
-        return `<section class="detail-section"><h3>选择处理方式</h3><div class="action-choice-grid">${groups.primary.map(choice).join('')}</div>${groups.secondary.length?`<details style="margin-top:12px" ${groups.secondary.includes(state.taskAction)?'open':''}><summary class="text-btn">更多处理方式</summary><div class="action-choice-grid" style="margin-top:8px">${groups.secondary.map(choice).join('')}</div></details>`:''}</section>`;
+        return `<section class="detail-section"><h3>选择处理方式</h3><div class="action-choice-grid">${actions.map(choice).join('')}</div></section>`;
       }
       const required = taskActionRequiresReason(task,state.taskAction);
       const fieldLabel = state.taskAction==='complete'?(task.approval?'审批意见':task.manualFollowup?'处理结果':'办理说明'):'处理原因';
@@ -7975,6 +8061,20 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         if (scroll) scroll.scrollTop = state.mobileScrollTop;
       });
     }
+
+    document.addEventListener('click', event => {
+      const dateInput = event.target.closest(
+        'input[type="date"], input[type="datetime-local"]'
+      );
+      if (
+        dateInput &&
+        !dateInput.disabled &&
+        !dateInput.readOnly &&
+        typeof dateInput.showPicker === 'function'
+      ) {
+        try { dateInput.showPicker(); } catch {}
+      }
+    });
 
     document.addEventListener('click', event => {
       const target = event.target.closest('[data-action]');
@@ -8163,10 +8263,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'page-next') { if(state.previewState==='stress'){state.pageNo=Math.min(1285,state.pageNo+1);renderView();}else{const config=currentPageConfig();if(config){const page=getPageSlice(getFilteredRows(config));state.pageNo=Math.min(page.pageCount,state.pageNo+1);renderView();}} }
       else if (action === 'open-columns') { state.overlay = 'columns'; renderFloating(); }
       else if (action === 'open-theme') { state.overlay = 'theme'; renderFloating(); }
+      else if (action === 'product-image-preview') { state.productImagePreview={seed:Number(target.dataset.seed)||0,label:target.dataset.label||'产品'};state.productImageScale=1;state.overlay='product-image-preview';renderFloating(); }
+      else if (action === 'product-image-zoom') { const direction=target.dataset.value;state.productImageScale=direction==='reset'?1:Math.max(1,Math.min(3,state.productImageScale+(direction==='in'?0.25:-0.25)));renderFloating(); }
       else if (action === 'task-create-continue') { state.overlay='task-create';renderFloating(); }
       else if (action === 'task-create-discard') { state.overlay=null;state.taskCreateValues={};renderFloating(); }
-      else if (action === 'close-overlay') { if (state.overlay === 'task-create') closeTaskCreate(); else if (state.overlay === 'attachments') closeAttachmentManager(); else { state.overlay = null; state.pendingNav = null; state.boundaryMoreOpen = false; renderFloating(); } }
-      else if (action === 'overlay-bg' && event.target === target) { if (state.overlay === 'task-create') closeTaskCreate(); else if (state.overlay === 'attachments') closeAttachmentManager(); else { state.overlay = null; state.boundaryMoreOpen = false; renderFloating(); } }
+      else if (action === 'close-overlay') dismissOverlay();
+      else if (action === 'overlay-bg' && event.target === target) dismissOverlay();
       else if (action === 'toggle-column') { target.checked ? state.visibleColumns.add(target.dataset.key) : state.visibleColumns.delete(target.dataset.key); renderView(); }
       else if (action === 'reset-columns') { state.visibleColumns = new Set(['no','party','status','date','metric','owner','progress','risk']); state.columnOrder=['no','party','status','date','metric','owner','progress','risk']; state.overlay = null; renderAll(); toast('列设置已恢复'); }
       else if (action === 'column-up' || action === 'column-down') { const key=target.dataset.key;const from=state.columnOrder.indexOf(key);const delta=action==='column-up'?-1:1;const to=Math.max(0,Math.min(state.columnOrder.length-1,from+delta));if(from>=0&&to!==from){const next=[...state.columnOrder];[next[from],next[to]]=[next[to],next[from]];state.columnOrder=next;renderFloating();renderView();} }
@@ -8251,10 +8353,15 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         const config=listConfig[sourcePage];
         const recordId=target.dataset.id||state.drawer?.row?.id||[...state.selected][0];
         const row=config?.rows.find(item=>item.id===recordId);
-        if(!canCreateRecordTask(config,row)){toast('当前单据不能发起任务，可查看已有任务');return;}
+        if(!canCreateRecordTask(config,row)){toast('当前单据不能新建跟进任务，可查看已有任务');return;}
         state.taskCreatePage=sourcePage;state.taskCreateRecordId=recordId;state.taskCreateError='';
         state.taskCreateValues={type:'',role:'',assignee:'unassigned',deadline:'',priority:'normal',note:''};
         state.drawer=null;state.overlay='task-create';renderFloating();
+      }
+      else if (action === 'task-deadline-quick') {
+        state.taskCreateValues.deadline=taskDeadlineQuickValue(target.dataset.value);
+        state.taskCreateError='';renderFloating();
+        requestAnimationFrame(()=>document.querySelector('#task-create-deadline')?.focus());
       }
       else if (action === 'confirm-task-create') {
         const config=listConfig[state.taskCreatePage],row=config?.rows.find(item=>item.id===state.taskCreateRecordId);
@@ -8263,16 +8370,16 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         const invalid=!(values.type||'').trim()?'type':!taskCreatePeople[values.role]?'role':!(new Date(values.deadline).getTime()>Date.now())?'deadline':!(values.note||'').trim()?'note':'';
         if(invalid){state.taskCreateError=invalid;renderFloating();requestAnimationFrame(()=>document.querySelector(`#task-create-${invalid==='type'?'name':invalid}`)?.focus());return;}
         if(values.assignee!=='unassigned'&&!taskCreatePeople[values.role].includes(values.assignee))return;
-        const task={id:`T${String(tasks.length+1).padStart(2,'0')}`,manualFollowup:true,description:values.note.trim(),assignee:values.assignee==='unassigned'?`${values.role}共同待办`:values.assignee,lane:values.priority==='urgent'?'due':'normal',title:values.type.trim(),object:`${row.no} · ${rowItem(row,config)}`,source:row.no,sourcePage:config.key,sourceRecordId:row.id,actions:['complete','block','urge'],role:values.role,time:`截止 ${values.deadline.replace('T',' ')}`,state:'可执行',badge:'info',reason:'',history:[['任务已发起','刚刚 · 当前账号']]};
+        const task={id:`T${String(tasks.length+1).padStart(2,'0')}`,manualFollowup:true,description:values.note.trim(),assignee:values.assignee==='unassigned'?`${values.role}共同待办`:values.assignee,lane:values.priority==='urgent'?'due':'normal',title:values.type.trim(),object:`${row.no} · ${rowItem(row,config)}`,source:row.no,sourcePage:config.key,sourceRecordId:row.id,actions:['complete','block','urge'],role:values.role,time:`截止 ${values.deadline.replace('T',' ')}`,state:'可执行',badge:'info',reason:'',history:[['跟进任务已创建','刚刚 · 当前账号']]};
         tasks.unshift(task);state.boardRole='all';state.taskCreateError='';
-        state.infoModal={title:'任务已发起',html:`<section class="task-receipt"><div class="task-receipt-row"><strong>来源单据</strong><span>${row.no}</span></div><div class="task-receipt-row"><strong>任务事项</strong><span>${escapeHTML(task.title)}</span></div><div class="task-receipt-row"><strong>责任岗位 / 办理人</strong><span>${values.role} · ${escapeHTML(task.assignee)}</span></div><div class="task-receipt-row"><strong>截止时间</strong><span>${values.deadline.replace('T',' ')}</span></div><div class="task-receipt-row"><strong>任务要求</strong><span>${escapeHTML(task.description)}</span></div></section><p>可在相关任务中查看进度、处理结果和催办。</p><button class="btn primary" data-action="open-related-tasks" data-page="${config.key}" data-id="${row.id}">查看相关任务</button>`};state.overlay='info';renderView();renderFloating();
+        state.infoModal={title:'跟进任务已创建',html:`<section class="task-receipt"><div class="task-receipt-row"><strong>来源单据</strong><span>${row.no}</span></div><div class="task-receipt-row"><strong>任务事项</strong><span>${escapeHTML(task.title)}</span></div><div class="task-receipt-row"><strong>责任岗位 / 办理人</strong><span>${values.role} · ${escapeHTML(task.assignee)}</span></div><div class="task-receipt-row"><strong>截止时间</strong><span>${values.deadline.replace('T',' ')}</span></div><div class="task-receipt-row"><strong>任务要求</strong><span>${escapeHTML(task.description)}</span></div></section><p>可在相关任务中查看进度、处理结果和催办。</p><button class="btn primary" data-action="open-related-tasks" data-page="${config.key}" data-id="${row.id}">查看相关任务</button>`};state.overlay='info';renderView();renderFloating();
       }
       else if (action === 'submit-selected') { state.businessAction = 'primary'; state.businessActionLabel = target.dataset.label || '确认业务动作'; state.overlay = 'business-action'; renderFloating(); }
       else if (action === 'more-selected') { state.businessAction = 'more'; state.overlay = 'business-action'; renderFloating(); }
       else if (action === 'detail-primary') { state.actionContext={page:state.drawer.page,recordId:state.drawer.row.id};state.businessAction=(listConfig[state.drawer.page]?.workflow?'submit':'more');state.drawer=null;state.overlay='business-action';renderFloating(); }
       else if (action === 'confirm-business-action') { const config=listConfig[state.actionContext?.page]||currentPageConfig()||listConfig.sales;const row=config.rows.find(item=>item.id===state.actionContext?.recordId)||config.rows.find(item=>state.selected.has(item.id));const label=state.businessAction==='more'?'业务操作':(state.businessActionLabel||'业务动作');state.infoModal={title:`${label}回执`,html:`<section class="task-receipt"><div class="task-receipt-row"><strong>业务对象</strong><span>${row?.no||'当前记录'}</span></div><div class="task-receipt-row"><strong>操作</strong><span>${label}</span></div><div class="task-receipt-row"><strong>结果</strong><span>已完成本次交互校验；正式系统将按当前状态与权限提交。</span></div><div class="task-receipt-row"><strong>业务边界</strong><span>${config.boundary}</span></div></section>`};state.selected.clear();state.overlay='info';renderView();renderFloating(); }
       else if (action === 'action-choice-info' || action === 'related-open') toast(`${target.dataset.value || '相关内容'}已打开（交互示意）`);
-      else if (action === 'open-task') { const task = tasks.find(item=>item.id===target.dataset.id); if (!task) return; state.overlay=null; state.drawer = {type:'task',task}; state.taskStep=1; state.taskMaxStep=1; state.taskAction=taskActionGroups(task).primary[0]||''; state.taskNote=''; state.taskTarget=''; state.taskError=''; renderFloating(); }
+      else if (action === 'open-task') { const task = tasks.find(item=>item.id===target.dataset.id); if (!task) return; state.overlay=null; state.drawer = {type:'task',task}; state.taskStep=1; state.taskMaxStep=1; state.taskAction=taskActions(task)[0]||''; state.taskNote=''; state.taskTarget=''; state.taskError=''; renderFloating(); }
       else if (action === 'task-context-open') { const page=target.dataset.page; const row=listConfig[page]?.rows.find(item=>item.id===target.dataset.id); if(row)openLinkedRecord(page,row); }
       else if (action === 'task-prev') { state.taskStep = Math.max(1,state.taskStep-1); state.taskError=''; renderFloating(); }
       else if (action === 'task-step') {
@@ -8283,7 +8390,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       else if (action === 'task-next') {
         const task=state.drawer?.task;
-        if(!task || ![...taskActionGroups(task).primary,...taskActionGroups(task).secondary].includes(state.taskAction))return;
+        if(!task || !taskActions(task).includes(state.taskAction))return;
         if(state.taskStep<3){state.taskStep+=1;state.taskMaxStep=Math.max(state.taskMaxStep,state.taskStep);state.taskError='';renderFloating();}
         else {
           const note=(document.querySelector('#task-note')?.value||state.taskNote).trim();
@@ -8300,7 +8407,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
           state.drawer=null;state.taskStep=1;state.taskMaxStep=1;state.infoModal={title:'任务办理回执',html:`<dl class="detail-grid"><dt>任务</dt><dd>${escapeHTML(task.title)}</dd><dt>办理动作</dt><dd>${label}</dd><dt>当前状态</dt><dd>${task.state}</dd><dt>处理说明</dt><dd>${escapeHTML(note)||'已核对并确认'}</dd>${action==='assign'?`<dt>接收人</dt><dd>${task.assignee}</dd>`:''}</dl><p class="source-summary-note">${action==='urge'?'催办已记录，任务状态保持不变。':'协同记录已更新，业务事实仍从所属单据核对。'}</p>`};state.overlay='info';renderView();renderFloating();
         }
       }
-      else if (action === 'task-choice') { const task=state.drawer?.task; if(!task||![...taskActionGroups(task).primary,...taskActionGroups(task).secondary].includes(target.dataset.value))return;state.taskAction=target.dataset.value;state.taskNote='';state.taskTarget='';state.taskError='';renderFloating(); }
+      else if (action === 'task-choice') { const task=state.drawer?.task; if(!task||!taskActions(task).includes(target.dataset.value))return;state.taskAction=target.dataset.value;state.taskNote='';state.taskTarget='';state.taskError='';renderFloating(); }
       else if (action === 'dashboard-drill') navigate('progress');
       else if (action === 'dashboard-view') { state.dashboardView = target.dataset.value; renderView(); }
       else if (action === 'dashboard-queue') { state.dashboardQueue = target.dataset.value; renderView(); }
@@ -8398,15 +8505,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       if (!state.authenticated) {
         if (event.key === 'Enter' && event.target.matches('#login-form input') && !state.overlay) { event.preventDefault(); submitDemoLogin(); }
-        if (event.key === 'Escape' && state.overlay) { state.overlay = null; renderFloating(); }
+        if (event.key === 'Escape' && state.overlay) dismissOverlay();
         return;
       }
       if (event.key === 'Escape') {
-        if (state.overlay === 'task-create') closeTaskCreate();
-        else if (state.overlay === 'task-create-confirm') {state.overlay='task-create';renderFloating();}
-        else if (state.overlay === 'attachments') closeAttachmentManager();
+        if (state.overlay) dismissOverlay();
         else if (state.drawer) closeLinkedDrawer();
-        else if (state.overlay) { state.overlay = null; renderFloating(); }
         else if (state.page === 'mobile-tasks' && state.mobileOptionsOpen) { state.mobileOptionsOpen = false; renderView(); }
         else if (state.page === 'mobile-tasks' && state.mobileScreen === 'progress-detail') { state.mobileScreen = 'list'; state.mobileProgressId = null; renderView(); }
         else if (state.page === 'mobile-tasks' && state.mobileScreen === 'process') { state.mobileScreen = 'detail'; renderView(); }
@@ -8448,6 +8552,18 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function isoDay(value) {
       const text=String(value||'').replaceAll('/','-');
       return /^\d{4}-\d{2}-\d{2}$/.test(text)?text:'';
+    }
+    function localDateTimeMinute(value) {
+      const part=number=>String(number).padStart(2,'0');
+      return `${value.getFullYear()}-${part(value.getMonth()+1)}-${part(value.getDate())}T${part(value.getHours())}:${part(value.getMinutes())}`;
+    }
+    function taskDeadlineQuickValue(key, now=new Date()) {
+      const value=new Date(now);
+      const days={tomorrow:1,'seven-days':7,'fifteen-days':15,'thirty-days':30}[key]||0;
+      value.setDate(value.getDate()+days);
+      if(key==='today-end')value.setHours(23,59,0,0);
+      else value.setSeconds(0,0);
+      return localDateTimeMinute(value);
     }
     function addDays(day, amount) { return new Date(Date.parse(day+'T00:00:00Z')+amount*86400000).toISOString().slice(0,10); }
     function dayDelta(day) { return day?Math.round((Date.parse(day+'T00:00:00Z')-Date.parse(DEMO_TODAY+'T00:00:00Z'))/86400000):null; }

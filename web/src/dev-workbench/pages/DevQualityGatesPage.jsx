@@ -2956,6 +2956,7 @@ export default function DevQualityGatesPage() {
   const cancel = useCallback(
     (operation) => {
       modal.confirm({
+        maskClosable: true,
         centered: true,
         title: '确认取消当前门禁？',
         content:

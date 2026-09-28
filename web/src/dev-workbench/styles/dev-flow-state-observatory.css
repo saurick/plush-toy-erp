@@ -1815,18 +1815,8 @@
   gap: 4px;
 }
 
-[data-erp-theme='dark'] .erp-dev-flow-state-page {
-  --erp-page-bg: #101411;
-  --erp-surface-bg: #171d18;
-  --erp-surface-bg-soft: #1d251f;
-  --erp-border: #35423a;
-  --erp-text: #e7eee9;
-  --erp-text-muted: #aebbb2;
-  --erp-primary: #73d13d;
-}
-
 [data-erp-theme='dark'] .erp-dev-flow-state-page :where(h1, h2, h3, strong) {
-  color: var(--erp-text, #e7eee9);
+  color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-dev-flow-transition-condition {

@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { ERP_DARK_PALETTE } from '../../src/common/theme/erpThemePalette.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 
 export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) {
@@ -41,21 +42,20 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
         assert.match(await frame.locator('.business-detail-modal').innerText(), /PO-20260924-013/)
         await frame.locator('.business-detail-modal [data-action="close-drawer"]').last().click()
         await frame.locator('[data-action="mobile-open-process"]').click()
-        assert.deepEqual(await frame.locator('.rm-choice-list').first().locator('strong').allTextContents(), ['解除阻塞'])
+        assert.deepEqual(await frame.locator('.rm-choice-list').first().locator('strong').allTextContents(), ['解除阻塞', '催办'])
         await frame.locator('#mobile-reason').fill('数量差异已经核实')
         await frame.locator('[data-action="mobile-submit"]').click()
         await frame.locator('[data-action="mobile-return-list"]').click()
         await openTask()
         assert.equal(await frame.locator('.rm-action-bar').innerText(), '处理任务')
         await frame.locator('[data-action="mobile-open-process"]').click()
-        assert.deepEqual(await frame.locator('.rm-choice-list').first().locator('strong').allTextContents(), ['完成本岗', '标记阻塞'])
+        assert.deepEqual(await frame.locator('.rm-choice-list').first().locator('strong').allTextContents(), ['完成本岗', '标记阻塞', '催办'])
         await frame.locator('[data-action="mobile-action-choice"][data-value="blocked"]').click()
         await frame.locator('#mobile-reason').fill('等待供应商补齐凭据')
         await frame.locator('[data-action="mobile-submit"]').click()
         await frame.locator('[data-action="mobile-return-list"]').click()
         await openTask()
         await frame.locator('[data-action="mobile-open-process"]').click()
-        await frame.locator('.rm-section summary').click()
         await frame.locator('[data-action="mobile-action-choice"][data-value="urge"]').click()
         await frame.locator('#mobile-reason').fill('请提供凭据')
         await frame.locator('[data-action="mobile-submit"]').click()
@@ -76,14 +76,13 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
         const next = () => frame.locator('[data-action="task-next"]').click()
         const closeReceipt = () => frame.locator('.modal [data-action="close-overlay"]').last().click()
         const closeTask = () => frame.locator('.drawer [data-action="close-drawer"]').first().click()
-        const primaryActions = () => frame.locator('.drawer .action-choice-grid').first().locator('strong').allTextContents()
+        const visibleActions = () => frame.locator('.drawer [data-action="task-choice"] strong').allTextContents()
 
         await openTask('T06')
         assert.equal(await frame.locator('.drawer .source-summary').count(), 0)
         await next()
-        assert.deepEqual(await primaryActions(), ['完成本岗', '标记阻塞'])
-        assert.equal(await frame.locator('[data-action="task-choice"][data-value="urge"]').isVisible(), false)
-        await frame.locator('.drawer summary').click()
+        assert.deepEqual(await visibleActions(), ['完成本岗', '标记阻塞', '催办', '转交任务'])
+        assert.equal(await frame.getByText('更多处理方式', { exact: true }).count(), 0)
         await frame.locator('[data-action="task-choice"][data-value="urge"]').click()
         await next()
         await next()
@@ -102,7 +101,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
         await closeReceipt()
         await openTask('T06')
         await next()
-        assert.deepEqual(await primaryActions(), ['解除阻塞'])
+        assert.deepEqual(await visibleActions(), ['解除阻塞', '催办', '转交任务'])
         await next()
         await frame.locator('#task-note').fill('资料已经补齐')
         await next()
@@ -125,9 +124,9 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
         assert.match(await frame.locator('.drawer').innerText(), /审批工程用料申请/)
         assert.equal(await frame.locator('[data-action="task-context-open"]').evaluate((node) => node === document.activeElement), true)
         await next()
-        assert.deepEqual(await primaryActions(), ['审批通过', '审批退回'])
+        assert.deepEqual(await visibleActions(), ['审批通过', '审批退回', '标记阻塞', '催办', '转交任务'])
         assert.equal(await frame.getByText('跳过处理', { exact: true }).count(), 0)
-        await frame.locator('.drawer summary').click()
+        await shot(page, 'ui-task-actions-all-visible')
         await frame.locator('[data-action="task-choice"][data-value="assign"]').click()
         await next()
         assert.deepEqual(await frame.locator('#task-target option').allTextContents(), ['请选择接收人', '产品工程共同待办', '周敏 · 产品工程'])
@@ -149,7 +148,8 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
         assert.equal(await frame.locator('.summary-table tbody tr').count(), 1)
         await frame.locator('[data-action="open-material-summary"]').click()
         assert.match(await materialSummary.innerText(), /SO-20260924-006/)
-        await materialSummary.getByRole('button', { name: '关闭材料汇总' }).click()
+        await materialSummary.locator('xpath=..').click({ position: { x: 4, y: 4 } })
+        await materialSummary.waitFor({ state: 'hidden' })
         assert.equal(await frame.locator('#dashboard-summary-search').inputValue(), 'IP 联名')
         const downloadPromise = page.waitForEvent('download')
         await frame.getByRole('button', { name: '导出当前汇总', exact: true }).click()
@@ -175,6 +175,26 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
         assert.equal(await frame.locator('.progress-row').count(), 0)
         assert.match(await frame.locator('.progress-summary').innerText(), /没有可查看/)
         assert.equal(await frame.locator('[data-action="progress-open-detail"]').count(), 0)
+
+        await frame.locator('[data-action="nav"][data-page="help"]').first().click()
+        const entryButton = frame.locator('#rh-entryButton')
+        await entryButton.click()
+        const entryDialog = frame.locator('#rh-entryDialog')
+        await entryDialog.waitFor()
+        const frameBox = await page
+          .locator('iframe[title="ERP 最新可交互设计"]')
+          .boundingBox()
+        const dialogBox = await entryDialog.boundingBox()
+        assert.ok(frameBox && dialogBox)
+        await page.mouse.click(
+          Math.max(frameBox.x + 4, dialogBox.x - 12),
+          dialogBox.y + 12
+        )
+        await entryDialog.waitFor({ state: 'hidden' })
+        assert.equal(
+          await entryButton.evaluate((node) => node === document.activeElement),
+          true
+        )
       },
     },
     {
@@ -217,10 +237,32 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
           sample.style.color = 'var(--text-3)'
           sample.style.background = 'var(--surface)'
           body.append(sample)
-          const result = { foreground: getComputedStyle(sample).color, background: getComputedStyle(sample).backgroundColor }
+          const root = getComputedStyle(body)
+          const result = {
+            foreground: getComputedStyle(sample).color,
+            background: getComputedStyle(sample).backgroundColor,
+            palette: {
+              page: root.getPropertyValue('--canvas').trim(),
+              shell: root.getPropertyValue('--shell').trim(),
+              surface: root.getPropertyValue('--surface').trim(),
+              raised: root.getPropertyValue('--surface-raised').trim(),
+              soft: root.getPropertyValue('--surface-muted').trim(),
+            },
+          }
           sample.remove()
           return result
         })
+        assert.deepEqual(
+          colors.palette,
+          {
+            page: ERP_DARK_PALETTE.page,
+            shell: ERP_DARK_PALETTE.shell,
+            surface: ERP_DARK_PALETTE.surface,
+            raised: ERP_DARK_PALETTE.surfaceRaised,
+            soft: ERP_DARK_PALETTE.surfaceSoft,
+          },
+          '交互设计未使用统一黑色暗色调色板'
+        )
         assert.ok(getContrastRatio(parseRgb(colors.foreground), parseRgb(colors.background)) >= 4.5, JSON.stringify(colors))
         await shot(page, 'ui-audit-dark')
       },

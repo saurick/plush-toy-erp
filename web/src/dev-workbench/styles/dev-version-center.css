@@ -298,6 +298,34 @@
   margin: 0 0 10px;
 }
 
+.erp-dev-version-takeover-guide > section {
+  min-width: 0;
+}
+
+.erp-dev-version-takeover-automation-flow,
+.erp-dev-version-takeover-lock-flow {
+  min-width: 0;
+  margin: 10px 0;
+}
+
+.erp-dev-version-takeover-automation-flow .erp-markdown-mermaid,
+.erp-dev-version-takeover-automation-flow .erp-markdown-mermaid__viewport,
+.erp-dev-version-takeover-lock-flow .erp-markdown-mermaid,
+.erp-dev-version-takeover-lock-flow .erp-markdown-mermaid__viewport {
+  width: 100%;
+  max-width: 100%;
+}
+
+.erp-dev-version-takeover-automation-flow .erp-markdown-mermaid__viewport,
+.erp-dev-version-takeover-lock-flow .erp-markdown-mermaid__viewport {
+  max-height: 440px;
+}
+
+.erp-dev-version-takeover-automation-flow .erp-markdown-mermaid__canvas,
+.erp-dev-version-takeover-lock-flow .erp-markdown-mermaid__canvas {
+  min-width: 620px;
+}
+
 .erp-dev-version-takeover-scope,
 .erp-dev-version-takeover-conditions {
   display: grid;

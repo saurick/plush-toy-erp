@@ -150,6 +150,59 @@ test('UI design has exactly one self-contained HTML and the current written cont
   }
 })
 
+test('UI design modal backdrops follow the shared dismissal contract', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const specification = read(UI_DESIGN_ASSET.specificationPath)
+  const rationale = read(UI_DESIGN_ASSET.rationalePath)
+  const overlays = html.match(/<div class="overlay"[^>]*>/gu) || []
+
+  assert.ok(overlays.length >= 19)
+  assert.deepEqual(
+    overlays.filter(
+      (opening) =>
+        !/data-action="(?:overlay-bg|detail-bg)"/u.test(opening) &&
+        !/data-backdrop-static="true"/u.test(opening)
+    ),
+    []
+  )
+  assert.match(html, /event[.]target===entryDialog/u)
+  assert.match(html, /state[.]overlay === 'task-create-confirm'/u)
+  assert.match(html, /附件正在上传，请等待完成后关闭/u)
+  assert.match(specification, /普通弹窗点击遮罩/u)
+  assert.match(specification, /法务确认、断连恢复/u)
+  assert.match(rationale, /点击确认层遮罩只返回继续编辑/u)
+})
+
+test('workbench design mirrors the Git index lock recovery decision flow', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const specification = read(UI_DESIGN_ASSET.specificationPath)
+  const rationale = read(UI_DESIGN_ASSET.rationalePath)
+  assert.match(html, /查看 Git 索引锁流程/u)
+  assert.match(html, /data-action="dev-lock-flow"/u)
+  assert.match(html, /Git index[.]lock 检查与恢复流程/u)
+  assert.match(html, /owner 已结束且现场稳定/u)
+  assert.match(html, /同盘隔离旧锁与旁车/u)
+  assert.match(specification, /Git `index[.]lock` Mermaid 判定图/u)
+  assert.match(specification, /沿用已有授权继续/u)
+  assert.match(rationale, /Mermaid 判定图/u)
+  assert.match(rationale, /非空候选先保全再复核/u)
+})
+
+test('workbench design mirrors the waiting heartbeat handoff rule', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const specification = read(UI_DESIGN_ASSET.specificationPath)
+  const rationale = read(UI_DESIGN_ASSET.rationalePath)
+  assert.match(html, /查看自动续办交接流程/u)
+  assert.match(html, /data-action="dev-automation-flow"/u)
+  assert.match(html, /等待心跳移除与执行阶段交接流程/u)
+  assert.match(html, /先删除本次等待心跳/u)
+  assert.match(html, /同一次续办进入实现、验证、造数、Git 与部署/u)
+  assert.match(specification, /自动续办交接图/u)
+  assert.match(specification, /删除失败保持执行阶段未开始/u)
+  assert.match(rationale, /先删除并读回当前等待心跳/u)
+  assert.match(rationale, /不让工作台成为新的任务调度真源/u)
+})
+
 test('preview isolates storage, disallows network and permits local exported downloads', () => {
   const html = prepareUIDesignSandboxSource(
     '<html><head><title>Design</title></head><body></body></html>'

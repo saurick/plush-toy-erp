@@ -625,13 +625,13 @@
 [data-erp-theme='dark'] .erp-dev-product-task__copy p.ant-typography,
 [data-erp-theme='dark'] .erp-dev-product-task__details dd,
 [data-erp-theme='dark'] .erp-dev-ui-design-boundary-details > div {
-  color: var(--erp-text-muted, #aebbb2);
+  color: var(--erp-text-muted, #a7b0b9);
 }
 
 [data-erp-theme='dark'] .erp-dev-flow-concepts,
 [data-erp-theme='dark'] .erp-dev-flow-definition-tools {
   border-color: var(--erp-border, #263446);
-  background: var(--erp-surface-bg, #171d18);
+  background: var(--erp-surface-bg, #0d1013);
 }
 
 [data-erp-theme='dark'] .erp-dev-flow-concepts > summary small,
@@ -642,13 +642,13 @@
   > summary
   > span:last-child,
 [data-erp-theme='dark'] .erp-dev-ui-design-reader__source-details > span {
-  color: var(--erp-text-muted, #aebbb2);
+  color: var(--erp-text-muted, #a7b0b9);
 }
 
 [data-erp-theme='dark'] .erp-dev-flow-concepts > summary::after,
 [data-erp-theme='dark'] .erp-dev-flow-definition-tools > summary::after {
-  border-color: var(--erp-border, #35423a);
-  color: var(--erp-text-muted, #aebbb2);
+  border-color: var(--erp-border, #2a3138);
+  color: var(--erp-text-muted, #a7b0b9);
 }
 
 [data-erp-theme='dark'] .erp-dev-docs-pinned-disclosure {
