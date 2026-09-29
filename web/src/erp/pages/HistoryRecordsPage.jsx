@@ -283,7 +283,6 @@ export default function HistoryRecordsPage() {
       <PageHeaderCard
         compact
         title="历史记录中心"
-        tags={<Tag>只读查询</Tag>}
         viewSwitch={
           <SelectFilter
             aria-label="历史记录类型"

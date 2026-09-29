@@ -43,14 +43,37 @@ export function createBusinessColumnSettingsScenarios({
   const geometry = async (dialog) => {
     await dialog.evaluate(async (node) => {
       await document.fonts.ready
-      await Promise.all(
-        node
-          .getAnimations({ subtree: true })
-          .filter(
-            (animation) => animation.effect?.getTiming().iterations !== Infinity
-          )
-          .map((animation) => animation.finished.catch(() => {}))
-      )
+      await new Promise((resolve, reject) => {
+        const deadline = performance.now() + 5_000
+        let previousWidth = 0
+        let stableFrames = 0
+        const check = () => {
+          const box = node.getBoundingClientRect()
+          const expectedWidth = parseFloat(getComputedStyle(node).width)
+          const animationRunning = node
+            .getAnimations({ subtree: true })
+            .some(
+              (animation) =>
+                animation.effect?.getTiming().iterations !== Infinity &&
+                ['pending', 'running'].includes(animation.playState)
+            )
+          const stable =
+            box.width >= 300 &&
+            Math.abs(box.width - expectedWidth) < 0.01 &&
+            Math.abs(box.width - previousWidth) < 0.01 &&
+            !animationRunning
+          stableFrames = stable ? stableFrames + 1 : 0
+          previousWidth = box.width
+          if (stableFrames >= 3) {
+            resolve()
+          } else if (performance.now() >= deadline) {
+            reject(new Error('列设置弹窗布局在 5 秒内未稳定'))
+          } else {
+            requestAnimationFrame(check)
+          }
+        }
+        requestAnimationFrame(check)
+      })
     })
     const metrics = await dialog.evaluate((node) => {
       const box = node.getBoundingClientRect()
@@ -83,7 +106,10 @@ export function createBusinessColumnSettingsScenarios({
             : null,
       }
     })
-    assert(metrics.width >= 300, '布局度量必须等弹窗展开动画结束')
+    assert(
+      metrics.width >= 300,
+      `布局度量必须等弹窗展开动画结束: ${JSON.stringify(metrics)}`
+    )
     assert(metrics.hitTargetHeight >= 44, JSON.stringify(metrics))
     assert(
       metrics.inViewport && !metrics.overflow && !metrics.rowOverflow,
@@ -234,21 +260,49 @@ export function createBusinessColumnSettingsScenarios({
         await save(page, dialog)
 
         const cases = [
-          '/erp/master/partners/customers',
-          '/erp/sales/project-orders/sales-orders',
-          '/erp/purchase/accessories',
-          '/erp/purchase/processing-contracts',
-          '/erp/purchase/material-bom',
-          '/erp/production/quality-inspections',
-          '/erp/warehouse/shipments',
-          '/erp/finance/payments',
+          ['/erp/master/partners/customers', '默认收货信息'],
+          ['/erp/master/partners/suppliers', '经营 / 加工地址'],
+          ['/erp/master/products', '英文品名'],
+          ['/erp/engineering/processes', '质检参考'],
+          ['/erp/sales/project-orders/sales-orders', '税额'],
+          ['/erp/purchase/accessories', '收货地址'],
+          ['/erp/purchase/processing-contracts'],
+          ['/erp/purchase/material-bom', '审核'],
+          ['/erp/production/quality-inspections', '检验员'],
+          ['/erp/warehouse/shipments', '唛头'],
+          ['/erp/finance/payments'],
         ]
-        for (const url of cases) {
+        for (const [url, optional] of cases) {
           await gotoScenarioPath(page, url, { waitUntil: 'domcontentloaded' })
           await page.locator(headerSelector).first().waitFor()
           const before = await labels(page)
           dialog = await open(page)
-          await dialog.getByRole('checkbox').last().uncheck()
+          if (optional) {
+            assert(!before.includes(optional), `${url} 辅助列默认不勾选`)
+            const option = dialog.getByRole('checkbox', { name: optional, exact: true })
+            assert(!(await option.isChecked()), `${url} 可在列设置中开启 ${optional}`)
+            const count = await dialog.getByRole('checkbox').count()
+            await dialog.getByRole('button', { name: '全部显示', exact: true }).click()
+            await save(page, dialog)
+            assert.equal((await labels(page)).length, count, `${url} 全部显示应覆盖所有可选列`)
+            assert((await labels(page)).includes(optional))
+            if (optional === '税额') {
+              await page.reload({ waitUntil: 'domcontentloaded' })
+              await page.locator(headerSelector).first().waitFor()
+              assert((await labels(page)).includes(optional), '全部显示应跨刷新保存')
+            }
+            dialog = await open(page)
+            await dialog.getByRole('button', { name: '恢复默认' }).click()
+            await save(page, dialog)
+            assert.deepEqual(await labels(page), before, `${url} 恢复默认应重新收起辅助列`)
+            dialog = await open(page)
+          }
+          const enabledOptions = await dialog.getByRole('checkbox').all()
+          let lastChecked
+          for (const option of enabledOptions) {
+            if (await option.isChecked()) lastChecked = option
+          }
+          await lastChecked.uncheck()
           await save(page, dialog)
           assert.equal(
             (await labels(page)).length,

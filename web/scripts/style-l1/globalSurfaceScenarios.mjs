@@ -444,7 +444,11 @@ export function createGlobalSurfaceScenarios({
             `global-surface-columns-${themeMode}-${width}.png`
           ),
         })
-        await page.keyboard.press('Escape')
+        assert.ok(
+          await dialog.evaluate((node) => node.contains(document.activeElement)),
+          '列设置打开后焦点应留在弹窗内'
+        )
+        await dialog.press('Escape')
         await dialog.waitFor({ state: 'hidden' })
         assert.ok(
           await trigger.evaluate((node) => node === document.activeElement),

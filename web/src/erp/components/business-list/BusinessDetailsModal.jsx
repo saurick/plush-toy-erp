@@ -5,8 +5,13 @@ import { Alert, Button, Descriptions, Divider, Empty, Spin } from 'antd'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
+import {
+  resolveBusinessDetailCopyText,
+  resolveBusinessTableCopyLabel,
+} from '../../utils/businessTableCopy.mjs'
 
 import { getColumnLabel } from './ColumnOrderModal.jsx'
+import BusinessCopyButton from './BusinessCopyButton.jsx'
 import BusinessFormModal from './BusinessFormModal.jsx'
 import BusinessDetailsPagination, {
   BUSINESS_DETAILS_PAGE_SIZE,
@@ -235,10 +240,22 @@ export default function BusinessDetailsModal({
               ? column.dataIndex.join('.')
               : column.dataIndex) ||
             `${label}-${index}`
+          const value = visibleDetailValue(detailValue(column, record || {}))
+          const copyText = resolveBusinessDetailCopyText(column, record)
           return {
             key,
             label,
-            children: visibleDetailValue(detailValue(column, record || {})),
+            children: copyText ? (
+              <span className="erp-business-details-modal__copy-value">
+                <span className="erp-business-details-modal__copy-text">{value}</span>
+                <BusinessCopyButton
+                  label={resolveBusinessTableCopyLabel(column)}
+                  value={copyText}
+                />
+              </span>
+            ) : (
+              value
+            ),
           }
         })}
       />

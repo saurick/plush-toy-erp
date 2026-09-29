@@ -660,6 +660,12 @@ body
     flex-direction: column;
   }
 
+  .erp-sales-order-lines-form__head
+    > .erp-line-items-form__head-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .erp-line-items-form__import-row {
     grid-template-columns: 1fr;
   }

@@ -42,6 +42,15 @@ export function resolveBusinessTableCopyText(column, value, record) {
   return normalizeBusinessTableCopyText(resolvedValue)
 }
 
+export function resolveBusinessDetailCopyText(column, record) {
+  if (!column?.detailCopyable || !record) return ''
+  return resolveBusinessTableCopyText(
+    column,
+    valueAtPath(record, column.dataIndex),
+    record
+  )
+}
+
 export function resolveBusinessTableCopyLabel(column) {
   const copyConfig =
     typeof column?.copyable === 'object' && column.copyable !== null

@@ -267,6 +267,15 @@ export function createBusinessFormPagesScenarios(deps) {
             scenarioName: name,
             targetRowCount: 10,
             ...(key === 'sales' ? { addButtonName: '添加订货明细' } : {}),
+            ...(key === 'purchase'
+              ? { addButtonName: '添加采购明细' }
+              : {}),
+            ...(key === 'outsourcing'
+              ? { addButtonName: '添加加工明细' }
+              : {}),
+            ...(key === 'shipment'
+              ? { addButtonName: '添加出货明细' }
+              : {}),
             ...(['customers', 'suppliers'].includes(key)
               ? {
                   addButtonName: '添加联系人',
@@ -281,6 +290,79 @@ export function createBusinessFormPagesScenarios(deps) {
               ? '.erp-master-contact-list__items'
               : '.erp-sales-order-lines-form__list'
           )
+          const columnWidths = () =>
+            list.locator('thead th').evaluateAll((headers) =>
+              headers.map((header) => ({
+                label: header.textContent.replace(/\*/gu, '').trim(),
+                width: header.getBoundingClientRect().width,
+              }))
+            )
+          await page.setViewportSize({ width: 1920, height: 1000 })
+          const desktopColumns = await columnWidths()
+          await page.setViewportSize({ width: 2560, height: 1000 })
+          const wideColumns = await columnWidths()
+          const shortColumn = contacts
+            ? /^(手机|电话|主联系人|操作)$/u
+            : /^(序号|.*数量|单位|单价|.*金额|.*日期|操作)$/u
+          const fixedColumns = wideColumns.filter(({ label }) =>
+            shortColumn.test(label)
+          )
+          deps.assert(fixedColumns.length >= 3, `${name}: 应覆盖短内容列`)
+          for (const column of fixedColumns) {
+            const previous = desktopColumns.find(
+              ({ label }) => label === column.label
+            )
+            deps.assert(
+              column.width <= 196 &&
+                Math.abs(column.width - previous.width) <= 1,
+              `${name}: ${column.label}不应随大屏继续拉宽 ${JSON.stringify({ previous, column })}`
+            )
+          }
+          const textColumn = contacts
+            ? '联系人'
+            : key === 'outsourcing'
+              ? '产品 / 材料'
+              : key === 'purchase'
+                ? '材料名称'
+                : key === 'sales'
+                  ? '订货产品 / 客户款号'
+                  : '产品'
+          deps.assert(
+            wideColumns.find(({ label }) => label === textColumn).width >
+              desktopColumns.find(({ label }) => label === textColumn).width,
+            `${name}: 剩余空间应分配给长内容`
+          )
+          if (!contacts) {
+            const quantity = list
+              .locator('.erp-sales-order-lines-form__row')
+              .first()
+              .getByLabel(
+                key === 'sales'
+                  ? '订单数量'
+                  : key === 'purchase'
+                    ? '采购数量'
+                    : key === 'outsourcing'
+                      ? '加工数量'
+                      : '数量',
+                { exact: true }
+              )
+            const previousValue = await quantity.inputValue()
+            await quantity.fill('123456789')
+            deps.assert.equal(await quantity.inputValue(), '123456789')
+            const inputWidth = await quantity.evaluate(
+              (node) => node.getBoundingClientRect().width
+            )
+            deps.assert(inputWidth >= 96, `${name}: 数量输入需保留可读宽度`)
+            await quantity.fill(previousValue)
+          }
+          await assertBusinessFormPage(page, editor)
+          if (key === 'sales') {
+            await list.scrollIntoViewIfNeeded()
+            await page.screenshot({
+              path: `${deps.outputDir}/${name}-wide.png`,
+            })
+          }
+          await page.setViewportSize({ width: 1440, height: 900 })
           if (contacts) {
             const rows = list.locator('.erp-master-contact-list__row')
             await rows
@@ -317,6 +399,10 @@ export function createBusinessFormPagesScenarios(deps) {
             const rows = list.locator('.erp-sales-order-lines-form__row')
             const count = await rows.count()
             const nameLabel = key === 'sales' ? '订货产品名称' : '产品名称'
+            if (key === 'purchase') {
+              await rows.nth(0).locator('summary').click()
+              await rows.nth(1).locator('summary').click()
+            }
             if (key !== 'outsourcing') {
               await rows
                 .first()
@@ -344,6 +430,9 @@ export function createBusinessFormPagesScenarios(deps) {
                   .inputValue()
               deps.assert.equal(await valueAt(1), '尚未保存的明细甲')
               deps.assert.equal(await valueAt(2), '相邻明细乙')
+              if (key === 'purchase') {
+                await rows.nth(1).locator('summary').click()
+              }
               await rows
                 .nth(1)
                 .getByLabel(nameLabel, { exact: true })
@@ -374,7 +463,15 @@ export function createBusinessFormPagesScenarios(deps) {
             const rowCount = await editor.locator(rowSelector).count()
             await editor
               .getByRole('button', {
-                name: contacts ? '添加联系人' : key === 'sales' ? '添加订货明细' : '添加条目',
+                name: contacts
+                  ? '添加联系人'
+                  : key === 'sales'
+                    ? '添加订货明细'
+                    : key === 'purchase'
+                      ? '添加采购明细'
+                      : key === 'outsourcing'
+                        ? '添加加工明细'
+                        : '添加出货明细',
                 exact: true,
               })
               .click()
@@ -414,6 +511,40 @@ export function createBusinessFormPagesScenarios(deps) {
               if (!(await details.evaluate((node) => node.open))) {
                 await details.locator('summary').click()
               }
+              const note = details.locator('textarea[id$="_note"]').first()
+              const previousNote = await note.inputValue()
+              await note.fill(
+                '第一行说明\n第二行说明\n第三行说明\n第四行说明\n第五行说明'
+              )
+              await page.waitForFunction(() =>
+                [
+                  ...document.querySelectorAll(
+                    '.erp-line-item-details[open] textarea'
+                  ),
+                ].some(
+                  (input) =>
+                    input.value.includes('第五行说明') &&
+                    input.clientHeight >= input.scrollHeight - 2
+                )
+              )
+              const noteHeight = (await note.boundingBox()).height
+              deps.assert(
+                noteHeight >= 100,
+                `${name}-${variant}: 长备注需要随内容增高`
+              )
+              await note.fill(previousNote)
+              if (variant === 'desktop' && key !== 'purchase') {
+                const paired = await details
+                  .locator('.erp-line-item-details__notes > .ant-form-item')
+                  .evaluateAll((nodes) =>
+                    nodes.map((node) => node.getBoundingClientRect().top)
+                  )
+                deps.assert.equal(paired.length, 2, `${name}: 两个关联字段同组`)
+                deps.assert(
+                  Math.abs(paired[0] - paired[1]) < 2,
+                  `${name}: 展开区关联字段应并排`
+                )
+              }
             }
             const flow = await list.evaluate((node) => {
               const body = node.closest('.erp-business-form-page__body')
@@ -433,9 +564,7 @@ export function createBusinessFormPagesScenarios(deps) {
               `${name}-${variant}: 宽表不能撑开页面 ${JSON.stringify(flow)}`
             )
             const firstRow = list
-              .locator(
-                contacts ? '.erp-contact-editor__fields' : 'thead'
-              )
+              .locator(contacts ? '.erp-contact-editor__fields' : 'thead')
               .first()
             await firstRow.evaluate((node) =>
               node.scrollIntoView({ block: 'start', inline: 'start' })
@@ -464,18 +593,66 @@ export function createBusinessFormPagesScenarios(deps) {
           { width: 390, height: 844 },
         ]) {
           await page.setViewportSize(viewport)
+          const first = editor.locator('.erp-production-order-line').first()
+          const details = first.locator('details')
+          await details.locator('summary').click()
+          const layout = await first
+            .locator('.erp-production-order-line__supplement')
+            .evaluate((node) => ({
+              height: node.getBoundingClientRect().height,
+              top: [...node.children].map(
+                (field) => field.getBoundingClientRect().top
+              ),
+            }))
+          if (viewport.width > 720) {
+            deps.assert(
+              layout.height < 200,
+              `生产展开区应紧凑：${JSON.stringify(layout)}`
+            )
+            deps.assert(
+              Math.abs(layout.top[0] - layout.top[1]) < 2,
+              '生产路线与验货应并排'
+            )
+          } else {
+            deps.assert(layout.top[1] > layout.top[0], '窄屏生产字段自然换行')
+          }
+          const note = first.getByLabel('明细备注', { exact: true })
+          await note.fill(
+            '第一行生产要求\n第二行生产要求\n第三行生产要求\n第四行生产要求\n第五行生产要求'
+          )
+          await page.waitForFunction(() => {
+            const input = document.querySelector(
+              '.erp-production-order-line textarea'
+            )
+            return (
+              input.clientHeight >= input.scrollHeight - 2 &&
+              input.clientHeight >= 100
+            )
+          })
+          await note.fill('')
+          await first.scrollIntoViewIfNeeded()
+          await page.screenshot({
+            path: `${deps.outputDir}/production-expanded-density-${viewport.width}.png`,
+          })
+          await details.locator('summary').click()
           for (let count = 0; count < 3; count += 1) {
             const rows = editor.locator('.erp-production-order-line')
             const before = await rows.count()
             deps.assert.equal(
               await editor
-                .getByRole('button', { name: '添加明细', exact: true })
+                .getByRole('button', {
+                  name: '添加生产明细',
+                  exact: true,
+                })
                 .count(),
               1,
               `production-${viewport.width}-${count}: ${await editor.innerText()}`
             )
             await editor
-              .getByRole('button', { name: '添加明细', exact: true })
+              .getByRole('button', {
+                name: '添加生产明细',
+                exact: true,
+              })
               .click()
             const input = rows.nth(before).locator('input:focus')
             await input.waitFor({ state: 'visible' })
@@ -495,15 +672,30 @@ export function createBusinessFormPagesScenarios(deps) {
         const rows = editor.locator('.erp-production-order-line')
         for (const [index, note] of ['待移除说明', '保留生产说明'].entries()) {
           await rows.nth(index).locator('summary').click()
-          await rows.nth(index).getByLabel('明细备注', { exact: true }).fill(note)
+          await rows
+            .nth(index)
+            .getByLabel('明细备注', { exact: true })
+            .fill(note)
           await rows.nth(index).locator('summary').click()
         }
         await rows.first().getByRole('button', { name: '移除明细 1' }).click()
-        deps.assert.match(await rows.first().locator('summary').innerText(), /保留生产说明/u)
+        deps.assert.match(
+          await rows.first().locator('summary').innerText(),
+          /保留生产说明/u
+        )
         await rows.first().locator('summary').click()
-        deps.assert.equal(await rows.first().getByLabel('明细备注', { exact: true }).inputValue(), '保留生产说明')
+        deps.assert.equal(
+          await rows
+            .first()
+            .getByLabel('明细备注', { exact: true })
+            .inputValue(),
+          '保留生产说明'
+        )
         await rows.first().getByLabel('明细备注', { exact: true }).fill('')
-        deps.assert.doesNotMatch(await rows.first().locator('summary').innerText(), /保留生产说明/u)
+        deps.assert.doesNotMatch(
+          await rows.first().locator('summary').innerText(),
+          /保留生产说明/u
+        )
         await closeBusinessFormPage(page, editor)
         await page.getByRole('button', { name: '新建生产订单' }).click()
         await editor.getByRole('heading', { name: '新建生产订单' }).waitFor()
@@ -595,7 +787,9 @@ export function createBusinessFormPagesScenarios(deps) {
             exact: true,
           })
           await catalog.waitFor({ state: 'visible' })
-          await catalog.getByRole('button', { name: label, exact: true }).click()
+          await catalog
+            .getByRole('button', { name: label, exact: true })
+            .click()
         }
         await openModule('物料清单（BOM）')
         await page.getByRole('button', { name: '新建草稿' }).click()

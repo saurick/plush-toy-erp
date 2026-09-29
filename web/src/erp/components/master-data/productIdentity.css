@@ -61,3 +61,22 @@
   outline: 2px solid var(--erp-primary, #24823a);
   outline-offset: 2px;
 }
+
+.erp-product-field-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-product-field-control > .ant-form-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.erp-product-field-control .erp-task-product-image,
+.erp-sales-order-product-summary .erp-task-product-image {
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
+}

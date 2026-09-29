@@ -31,6 +31,27 @@ export function isBusinessFormPageTitle(title) {
 }
 
 export async function assertBusinessFormPage(page, editor) {
+  const editorHandle = await editor.elementHandle()
+  await page
+    .waitForFunction(
+      (node) => {
+        const body = node.querySelector('.erp-business-form-page__body')
+        const visibleList = [...node.parentElement.children].some(
+          (child) =>
+            child !== node &&
+            child.matches('.erp-business-data-table-card') &&
+            child.getClientRects().length > 0
+        )
+        return (
+          body &&
+          body.scrollWidth - body.clientWidth <= 1 &&
+          !visibleList
+        )
+      },
+      editorHandle,
+      { timeout: 10_000 }
+    )
+    .catch(() => {})
   const metrics = await editor.evaluate((node) => {
     const rect = node.getBoundingClientRect()
     const body = node.querySelector('.erp-business-form-page__body')

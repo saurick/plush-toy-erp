@@ -151,6 +151,14 @@ export function createEmptyStateScenarios({
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame
+          .getByRole('heading', { name: '总览', level: 1, exact: true })
+          .waitFor()
+        assert.equal(
+          await frame.locator('#topbar .crumb').count(),
+          0,
+          '效能工作台内容区拥有主标题时，顶栏不应重复当前页面名称'
+        )
+        await frame
           .getByRole('button', { name: '查看质量验证', exact: true })
           .click()
         await frame.getByRole('tab', { name: '执行记录', exact: true }).click()
@@ -317,6 +325,32 @@ export function createEmptyStateScenarios({
         )
         await page.screenshot({
           path: path.join(outputDir, 'dev-ui-workbench.png'),
+        })
+      },
+    },
+    {
+      name: 'dev-ui-design-purchase-heading',
+      path: '/__dev/ui-design',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        await frame
+          .getByRole('button', { name: '采购管理', exact: true })
+          .click()
+        const heading = frame.getByRole('heading', {
+          name: '采购订单',
+          level: 1,
+          exact: true,
+        })
+        await heading.waitFor()
+        assert.equal(await heading.count(), 1)
+        assert.equal(
+          await frame.locator('#topbar .crumb').count(),
+          0,
+          '采购交互稿内容区拥有主标题时，顶栏不应重复当前页面名称'
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'dev-ui-purchase-heading.png'),
         })
       },
     },

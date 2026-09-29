@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Alert, Button, Drawer, Grid, Tag, Typography } from 'antd'
+import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -373,7 +374,7 @@ function AuditEventDetail({ event }) {
       <section aria-label="字段变化">
         <Title level={5}>字段变化</Title>
         {changes.length ? (
-          <div className="erp-audit-record-detail__changes">
+          <TableScrollRegion className="erp-audit-record-detail__changes">
             <table>
               <thead>
                 <tr>
@@ -392,7 +393,7 @@ function AuditEventDetail({ event }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScrollRegion>
         ) : (
           <Text type="secondary">{getAuditChangeSummary(event)}</Text>
         )}
@@ -609,7 +610,9 @@ export default function AuditLogsPage() {
       {
         title: '变化摘要',
         key: 'summary',
-        hidden: true,
+        defaultHidden: true,
+        width: 320,
+        render: (_, record) => getAuditChangeSummary(record),
         exportValue: getAuditChangeSummary,
       },
     ],
@@ -677,7 +680,6 @@ export default function AuditLogsPage() {
       <PageHeaderCard
         compact
         title="系统操作记录"
-        tags={<Tag>只读查询</Tag>}
         stats={[{ key: 'total', label: '筛选结果', value: total }]}
       />
       <BusinessOperationPanel

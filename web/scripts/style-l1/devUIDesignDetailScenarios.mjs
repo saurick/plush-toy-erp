@@ -35,9 +35,7 @@ export function createDevUIDesignDetailScenarios({
         await frame.getByRole('button', { name: '演示账号与验证码' }).click()
         await frame.getByRole('button', { name: '填入演示信息' }).click()
         await frame.getByRole('button', { name: '登录', exact: true }).click()
-        await frame
-          .getByRole('heading', { name: '先处理需要我判断或推进的事项' })
-          .waitFor()
+        await frame.locator('.workbench-queue-tabs button').first().waitFor()
         await frame.getByRole('button', { name: 'admin', exact: true }).click()
         await frame
           .getByRole('button', { name: '退出登录', exact: true })
@@ -50,9 +48,7 @@ export function createDevUIDesignDetailScenarios({
           ''
         )
         await page.getByText('业务界面', { exact: true }).click()
-        await frame
-          .getByRole('heading', { name: '先处理需要我判断或推进的事项' })
-          .waitFor()
+        await frame.locator('.workbench-queue-tabs button').first().waitFor()
         await assertNoHorizontalOverflow(page)
       },
     },
@@ -201,12 +197,27 @@ export function createDevUIDesignDetailScenarios({
           'erp-ui-interaction-design.html'
         )
         await page.getByRole('button', { name: /重置演示/ }).click()
-        await frame
-          .getByRole('heading', {
-            name: '先处理需要我判断或推进的事项',
-            exact: true,
-          })
-          .waitFor()
+        const queueHeading = frame.locator('.workbench-queue-head')
+        await queueHeading.waitFor()
+        const queueLayout = await queueHeading.evaluate((header) => {
+          const firstButton = header.querySelector(
+            '.workbench-queue-tabs button'
+          )
+          return {
+            copyPresent:
+              header.textContent.includes('先处理需要我判断或推进的事项'),
+            firstButtonOffset: firstButton
+              ? firstButton.getBoundingClientRect().left -
+                header.getBoundingClientRect().left
+              : null,
+          }
+        })
+        assert.equal(queueLayout.copyPresent, false)
+        assert.ok(
+          queueLayout.firstButtonOffset >= 0 &&
+            queueLayout.firstButtonOffset <= 16,
+          `工作台任务筛选应靠左显示: ${JSON.stringify(queueLayout)}`
+        )
         for (const colorScheme of ['light', 'dark']) {
           await page.emulateMedia({ colorScheme })
           await frame.locator(`body[data-mode="${colorScheme}"]`).waitFor()

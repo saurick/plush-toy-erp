@@ -356,7 +356,7 @@ export function createSalesOrderImportScenarios(deps) {
                 .nth(i)
                 .locator('details')
                 .getAttribute('open'),
-              ''
+              null
             )
           }
           if (salesOrderSourcePayment(order.lines.map((line) => line.item)).notes.length) {
@@ -367,6 +367,7 @@ export function createSalesOrderImportScenarios(deps) {
         await chooseOrder(0)
         if (!process.env.SALES_ORDER_IMPORT_TEST_FILE) {
           const originalNote = parsed.orders[0].lines[0].item.note || ''
+          await editor.locator('.erp-line-item-details > summary').first().click()
           await editor.locator('#items_0_note').fill('模拟逐单编辑保留校验')
           await editor.locator('#contact_email').fill('invalid-email')
           await chooseOrder(1)
@@ -376,7 +377,10 @@ export function createSalesOrderImportScenarios(deps) {
           assert.equal(mutations.length, 0)
           assert.equal(await editor.locator('#items_0_note').inputValue(), '模拟逐单编辑保留校验')
           await editor.locator('#contact_email').fill('')
+          const noteDetails = editor.locator('.erp-line-item-details').first()
+          if ((await noteDetails.getAttribute('open')) === null) await noteDetails.locator('summary').click()
           await editor.locator('#items_0_note').fill(originalNote)
+          await noteDetails.locator('summary').click()
         }
         await editor
           .getByRole('button', {
@@ -486,9 +490,16 @@ export function createSalesOrderImportScenarios(deps) {
         await editor.getByRole('heading', { name: '编辑销售订单', exact: true }).waitFor()
         await checkPaymentRecords(parsed.orders[0])
         assert.equal(await editor.locator('.erp-sales-order-lines-form__row').count(), parsed.orders[0].lines.length)
-        await editor.locator('img[alt="订单产品原表图片"]').first().waitFor()
+        assert.equal(await editor.locator('.erp-line-item-details').first().getAttribute('open'), null)
         const sourceButton = editor.getByRole('button', { name: `核对原表：${parsed.orders[0].lines[0].sheetName} 第 ${parsed.orders[0].lines[0].rowNumber} 行`, exact: true })
+        await page.setViewportSize({ width: 390, height: 844 })
+        await sourceButton.scrollIntoViewIfNeeded()
+        const sourceBounds = await editor.locator('.erp-sales-order-source-evidence').first().evaluate(node => ({ width: node.clientWidth, scrollWidth: node.scrollWidth }))
+        assert.ok(sourceBounds.scrollWidth <= sourceBounds.width + 1, JSON.stringify(sourceBounds))
+        await assertNoHorizontalOverflow(page, 'sales-order-import-source-narrow')
+        await page.setViewportSize({ width: 1440, height: 900 })
         await sourceButton.click()
+        await page.locator('.ant-popover:not(.ant-popover-hidden) img[alt="订单产品原表图片"]').first().waitFor()
         await page.getByText('首次导入的原表内容', { exact: true }).waitFor()
         await sourceButton.click()
         await editor.getByRole('button', { name: '返回列表', exact: true }).click()

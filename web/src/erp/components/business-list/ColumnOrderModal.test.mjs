@@ -17,3 +17,13 @@ test('column headers use the visible title without changing export labels', () =
     /column\.exportTitle \|\| column\.title \|\| column\.key/u
   )
 })
+
+test('column settings move focus inside after the opening transition', () => {
+  assert.match(source, /afterOpenChange=\{\(visible\) => \{/u)
+  assert.match(source, /window\.requestAnimationFrame/u)
+  assert.match(
+    source,
+    /querySelector\('input:not\(:disabled\), button:not\(:disabled\)'\)/u
+  )
+  assert.match(source, /focus\(\{ preventScroll: true \}\)/u)
+})

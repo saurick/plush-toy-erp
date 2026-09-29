@@ -447,6 +447,7 @@ export function buildQualityInspectionDataColumns({
       exportTitle: '质检单号',
       dataIndex: 'inspection_no',
       copyable: true,
+      detailCopyable: true,
       width: 170,
     },
     {
@@ -555,5 +556,22 @@ export function buildQualityInspectionDataColumns({
       render: (_value, record) => qualityRemarkText(record),
       exportValue: qualityRemarkText,
     },
+    ...buildQualityInspectionExportColumns({
+      allPurchaseReceiptItemOptions,
+      inventoryLotOptions,
+      materialOptions,
+      productOptions,
+      purchaseReceiptOptions,
+      warehouseOptions,
+    })
+      .filter((column) =>
+        [
+          'warehouse_id',
+          'inventory_lot_id',
+          'original_lot_status',
+          'inspector_id',
+        ].includes(column.dataIndex)
+      )
+      .map((column) => ({ ...column, defaultHidden: true, detailHidden: true })),
   ])
 }

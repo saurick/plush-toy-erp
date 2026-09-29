@@ -79,10 +79,6 @@ function buildProcessParams(values = {}, extra = {}) {
     outsourcing_enabled: values.outsourcing_enabled === true,
     inhouse_enabled: values.inhouse_enabled !== false,
     quality_required: values.quality_required === true,
-    sort_order:
-      values.sort_order === undefined
-        ? undefined
-        : Number(values.sort_order || 0),
     note: trimOptional(values.note),
   })
 }

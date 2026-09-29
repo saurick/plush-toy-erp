@@ -4,6 +4,7 @@ import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
@@ -197,8 +198,8 @@ export default function ProductionReworkModal({
             { max: 255, message: '返工原因不能超过 255 个字符' },
           ]}
         >
-          <Input.TextArea
-            rows={editing ? 2 : 4}
+          <BusinessTextArea
+            minRows={2}
             maxLength={255}
             showCount
             placeholder="请说明不合格现象、返工要求或处理依据"

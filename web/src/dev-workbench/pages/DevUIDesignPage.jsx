@@ -137,12 +137,7 @@ export default function DevUIDesignPage() {
     >
       <DevPageNav sourcePath="docs/product/ui-design/README.md" />
       <header className="erp-dev-ui-design-header">
-        <div>
-          <Typography.Title level={1}>UI 交互设计</Typography.Title>
-          <Typography.Paragraph>
-            查看最新界面、操作路径和设计依据；交互稿使用样例数据。
-          </Typography.Paragraph>
-        </div>
+        <Typography.Title level={1}>UI 交互设计</Typography.Title>
         <Button onClick={() => updateQuery('controls', '1')}>
           交互控件规范
         </Button>

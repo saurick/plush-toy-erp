@@ -19,8 +19,11 @@
   text-align: left;
 }
 
-.erp-contact-editor__email-column {
-  width: 21%;
+.erp-contact-editor__phone-column {
+  width: 160px;
+}
+.erp-contact-editor__sequence-column {
+  width: 44px;
 }
 .erp-contact-editor__primary-column {
   width: 76px;
@@ -75,6 +78,12 @@
   text-align: center;
 }
 
+.erp-contact-editor :is(th, td).erp-contact-editor__sequence {
+  color: var(--erp-text-muted, #64748b);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
 .erp-contact-editor__primary .ant-radio-wrapper,
 .erp-contact-editor__actions .ant-space {
   min-height: var(--erp-control-height, 36px);
@@ -125,10 +134,11 @@
   }
 
   .erp-contact-editor__fields {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px 12px;
-    padding-block: 12px;
+    padding: 12px 0 12px 36px;
   }
 
   .erp-contact-editor__table td {
@@ -149,6 +159,15 @@
   .erp-contact-editor__email,
   .erp-contact-editor__actions {
     grid-column: 1 / -1;
+  }
+  .erp-contact-editor__fields > td.erp-contact-editor__sequence {
+    position: absolute;
+    inset-block-start: 12px;
+    inset-inline-start: 0;
+    display: grid;
+    width: 28px;
+    min-height: var(--erp-control-height, 36px);
+    place-items: center;
   }
   .erp-contact-editor__actions {
     text-align: right;

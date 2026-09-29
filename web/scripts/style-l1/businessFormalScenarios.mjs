@@ -892,7 +892,9 @@ export function createBusinessFormalScenarios(deps) {
       '跨页选择的两条销售订单来源行都应导入出货明细'
     )
     assert.equal(
-      await modal.getByRole('button', { name: '添加条目' }).isDisabled(),
+      await modal
+        .getByRole('button', { name: '添加出货明细', exact: true })
+        .isDisabled(),
       true,
       '导入销售订单来源后应锁定为同一来源，禁止手工混加无来源明细'
     )
@@ -1337,7 +1339,7 @@ export function createBusinessFormalScenarios(deps) {
         )
         await page.setViewportSize({ width: 1920, height: 1080 })
         await modal
-          .locator('.erp-sales-order-demand-toolbar')
+          .locator('.erp-sales-order-lines-form__head')
           .evaluate((node) => node.scrollIntoView({ block: 'start' }))
         await page.waitForTimeout(350)
         await page.screenshot({
@@ -1780,6 +1782,7 @@ export function createBusinessFormalScenarios(deps) {
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'shipment-net-weight-incomplete',
               targetRowCount: 5,
+              addButtonName: '添加出货明细',
             })
           },
         })
@@ -2895,7 +2898,6 @@ export function createBusinessFormalScenarios(deps) {
           outsourcing_enabled: true,
           inhouse_enabled: true,
           quality_required: false,
-          sort_order: (index + 1) * 10,
           is_active: true,
         }))
 
@@ -3231,7 +3233,9 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-suppliers',
           afterModalOpen: async () => {
             await expectText(page, '联系人')
-            await expectButton(page, '添加联系人')
+            await page
+              .getByRole('button', { name: '添加联系人', exact: true })
+              .waitFor({ state: 'visible', timeout: 10_000 })
           },
         })
 
@@ -3287,7 +3291,9 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-customers',
           afterModalOpen: async () => {
             await expectText(page, '联系人')
-            await expectButton(page, '添加联系人')
+            await page
+              .getByRole('button', { name: '添加联系人', exact: true })
+              .waitFor({ state: 'visible', timeout: 10_000 })
           },
         })
 
@@ -3462,7 +3468,7 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '库存台账')
-        await expectText(page, '余额只读')
+        await assertTextAbsent(page, '余额只读')
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-standard-inventory',
           expectedLabels: ['筛选结果', '本页显示'],
@@ -4051,6 +4057,7 @@ export function createBusinessFormalScenarios(deps) {
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-shipment-create-form-modal',
               targetRowCount: 5,
+              addButtonName: '添加出货明细',
             })
             await verifyShipmentSourceCandidateContract(
               page,
@@ -4089,14 +4096,23 @@ export function createBusinessFormalScenarios(deps) {
           0,
           '出货只读明细页不应提供保存动作'
         )
-        assert.equal(
-          await shipmentDetailPage
-            .locator(
-              'input:visible:not([type="hidden"]):not([disabled]), textarea:visible:not([disabled]), .ant-select:visible:not(.ant-select-disabled)'
-            )
-            .count(),
-          0,
-          '出货只读明细页不应暴露可编辑表单控件'
+        const editableShipmentDetailControls = await shipmentDetailPage
+          .locator(
+            'input:visible:not([type="hidden"]):not([type="range"]):not([disabled]):not([readonly]), textarea:visible:not([disabled]):not([readonly]), .ant-select:visible:not(.ant-select-disabled)'
+          )
+          .evaluateAll((nodes) =>
+            nodes.map((node) => ({
+              tagName: node.tagName,
+              className: node.className,
+              name: node.getAttribute('name'),
+              placeholder: node.getAttribute('placeholder'),
+              selectClassName: node.closest('.ant-select')?.className || '',
+            }))
+          )
+        assert.deepEqual(
+          editableShipmentDetailControls,
+          [],
+          `出货只读明细页不应暴露可编辑表单控件: ${JSON.stringify(editableShipmentDetailControls)}`
         )
         await closeBusinessFormModal(page, shipmentDetailPage)
         assert.equal(
@@ -4147,7 +4163,6 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '包装')
         await expectText(page, '可委外')
         await expectText(page, '可内制')
-        await expectText(page, '需质检')
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建加工环节',
           titleText: '新建加工环节',
@@ -4159,11 +4174,9 @@ export function createBusinessFormalScenarios(deps) {
             '环节类别',
             '可委外',
             '可内制',
-            '需质检',
-            '列表显示顺序',
-            '只影响环节列表的展示顺序，不定义产品的生产先后顺序',
+            '质检参考',
             '可与“可内制”同时开启',
-            '只标记该工序后续可能需要质检',
+            '仅供查阅该工序通常是否需要检验',
           ],
           afterOpen: async (modal) => {
             await assertProcessSuggestionOptions(page, modal, {
@@ -4186,9 +4199,9 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '导出筛选结果')
         await expectButton(page, '列设置')
         await assertNoListDeleteTrashToolbar(page)
-        await expectText(page, '业务单据：加工合同')
+        await assertTextAbsent(page, '业务单据：加工合同')
         await assertTextAbsent(page, '加工合同只表达委外承诺和打印快照')
-        await expectText(page, '查货只是工序候选')
+        await assertTextAbsent(page, '查货只是工序候选')
         await assertTextAbsent(page, '判定结果回质检模块')
         await assertBusinessCollaborationPanelAbsent(
           page,
@@ -4316,6 +4329,7 @@ export function createBusinessFormalScenarios(deps) {
             })
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-processing-contracts-form-modal',
+              addButtonName: '添加加工明细',
             })
           },
         })
@@ -4328,7 +4342,9 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-processing-contracts',
           afterModalOpen: async () => {
             await expectText(page, '加工明细')
-            await expectButton(page, '添加条目')
+            await page
+              .getByRole('button', { name: '添加加工明细', exact: true })
+              .waitFor({ state: 'visible', timeout: 10_000 })
           },
         })
         await assertNoHorizontalOverflow(
@@ -4348,8 +4364,7 @@ export function createBusinessFormalScenarios(deps) {
             waitUntil: 'domcontentloaded',
           })
           await expectHeading(page, heading)
-          await expectText(page, '待办任务')
-          await expectText(page, '业务处理分开完成')
+          await assertTextAbsent(page, '业务处理分开完成')
           await assertBusinessCollaborationPanelAbsent(page, scenarioName)
           for (const text of absentTexts) {
             await assertTextAbsent(page, text)
@@ -4927,8 +4942,7 @@ export function createBusinessFormalScenarios(deps) {
           expectedEffectiveTheme: 'light',
         })
         await expectHeading(page, '出货放行')
-        await expectText(page, '待办任务')
-        await expectText(page, '业务处理分开完成')
+        await assertTextAbsent(page, '业务处理分开完成')
         await assertBusinessCollaborationPanelAbsent(
           page,
           'business-workflow-shipping-release-mobile'
@@ -5041,8 +5055,7 @@ export function createBusinessFormalScenarios(deps) {
         })
 
         await expectHeading(page, '出货放行')
-        await expectText(page, '待办任务')
-        await expectText(page, '业务处理分开完成')
+        await assertTextAbsent(page, '业务处理分开完成')
         await assertBusinessCollaborationPanelAbsent(
           page,
           'business-formal-shipping-release-no-permission-desktop'

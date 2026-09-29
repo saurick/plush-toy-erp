@@ -71,6 +71,7 @@ export function createMobileProgressScenarios({
     let failDetail = false
     let longDetail = false
     let failRecent = false
+    let sparseDetail = false
     let failureCode = RpcErrorCode.INTERNAL
     let heldListResponse = null
     const calls = []
@@ -148,6 +149,7 @@ export function createMobileProgressScenarios({
         failDetail = false
         longDetail = false
         failRecent = false
+        sparseDetail = false
         failureCode = RpcErrorCode.INTERNAL
         heldListResponse = null
         await page.route('**/rpc/workflow', async (route) => {
@@ -249,6 +251,12 @@ export function createMobileProgressScenarios({
               delivery_known: false,
               unit: '',
             })
+          }
+          if (method === 'get_progress' && sparseDetail) {
+            data.sections.production = []
+            data.sections.batches = []
+            data.sections.materials = []
+            data.sections.tasks = []
           }
           return route.fulfill({
             contentType: 'application/json',
@@ -516,12 +524,121 @@ export function createMobileProgressScenarios({
           path: path.join(outputDir, `mobile-progress-${role}-detail.png`),
         })
         await drawer
+          .getByRole('button', { name: '查看业务明细', exact: true })
+          .click()
+        const detailGroupNames = await drawer
+          .locator('.mobile-progress-detail-group-trigger')
+          .evaluateAll((buttons) =>
+            buttons.map((button) => button.getAttribute('aria-label'))
+          )
+        assert.deepEqual(detailGroupNames, [
+          '产品信息，1 项',
+          '生产执行，1 单 · 1 批次 · 1 项领料',
+          '关联任务，1 项',
+        ])
+        const detailGroupGeometry = await drawer
+          .locator('.mobile-progress-detail-groups')
+          .evaluate((root) => {
+            const rootRect = root.getBoundingClientRect()
+            return {
+              overflow: root.scrollWidth - root.clientWidth,
+              buttons: [
+                ...root.querySelectorAll(
+                  '.mobile-progress-detail-group-trigger'
+                ),
+              ].map((button) => {
+                const rect = button.getBoundingClientRect()
+                return {
+                  height: rect.height,
+                  left: rect.left - rootRect.left,
+                  right: rootRect.right - rect.right,
+                  width: rect.width,
+                }
+              }),
+            }
+          })
+        assert(
+          detailGroupGeometry.overflow <= 1 &&
+            detailGroupGeometry.buttons.every(
+              ({ height, left, right, width }) =>
+                height >= 52 && left >= -1 && right >= -1 && width > 280
+            ),
+          JSON.stringify(detailGroupGeometry)
+        )
+        assert.equal(
+          await drawer
+            .getByRole('button', { name: '产品信息，1 项', exact: true })
+            .getAttribute('aria-expanded'),
+          'true'
+        )
+        assert.equal(
+          await drawer
+            .getByRole('button', { name: '打开原单', exact: true })
+            .count(),
+          0
+        )
+        assert.equal(
+          await drawer
+            .getByRole('button', { name: '查看 1', exact: true })
+            .count(),
+          0
+        )
+        await drawer
+          .getByRole('button', {
+            name: '生产执行，1 单 · 1 批次 · 1 项领料',
+            exact: true,
+          })
+          .click()
+        assert.equal(
+          await drawer
+            .getByRole('button', {
+              name: '生产执行，1 单 · 1 批次 · 1 项领料',
+              exact: true,
+            })
+            .getAttribute('aria-expanded'),
+          'true'
+        )
+        const productionGroup = drawer.getByRole('region', {
+          name: '生产执行，1 单 · 1 批次 · 1 项领料',
+        })
+        assert.deepEqual(
+          await productionGroup.getByRole('heading').allTextContents(),
+          ['生产单', '工序批次', '领料']
+        )
+        assert.equal(
+          await productionGroup
+            .getByRole('button', { name: '查看生产进度', exact: true })
+            .count(),
+          1
+        )
+        await drawer
+          .getByRole('button', { name: '产品信息，1 项', exact: true })
+          .click()
+        assert.equal(
+          await drawer
+            .getByRole('button', { name: '收起业务明细', exact: true })
+            .count(),
+          1
+        )
+        assert.equal(
+          await drawer
+            .getByRole('button', { name: '产品信息，1 项', exact: true })
+            .getAttribute('aria-expanded'),
+          'true'
+        )
+        await drawer
+          .getByRole('button', {
+            name: '生产执行，1 单 · 1 批次 · 1 项领料',
+            exact: true,
+          })
+          .click()
+        await drawer
           .getByRole('button', { name: '查看关联任务', exact: true })
           .click()
         assert.equal(
           await drawer
-            .getByRole('tab', { name: '关联任务', exact: true })
-            .getAttribute('aria-selected'),
+            .getByRole('button', { name: '关联任务，1 项', exact: true })
+            .getAttribute('aria-expanded'),
           'true'
         )
         await page.waitForTimeout(350)
@@ -578,8 +695,14 @@ export function createMobileProgressScenarios({
         )
         await page.goBack()
         await drawer
-          .getByRole('tab', { name: '关联任务', exact: true, selected: true })
+          .getByRole('button', { name: '关联任务，1 项', exact: true })
           .waitFor()
+        assert.equal(
+          await drawer
+            .getByRole('button', { name: '关联任务，1 项', exact: true })
+            .getAttribute('aria-expanded'),
+          'true'
+        )
         await page.goBack()
         await drawer.waitFor({ state: 'hidden' })
         failDetail = true
@@ -630,6 +753,50 @@ export function createMobileProgressScenarios({
               `mobile-progress-${role}-long-detail-${width}.png`
             ),
           })
+          await drawer
+            .getByRole('button', { name: '查看业务明细', exact: true })
+            .click()
+          const narrowGroupGeometry = await drawer
+            .locator('.mobile-progress-detail-groups')
+            .evaluate((root) => {
+              const rootRect = root.getBoundingClientRect()
+              return {
+                overflow: root.scrollWidth - root.clientWidth,
+                buttons: [
+                  ...root.querySelectorAll(
+                    '.mobile-progress-detail-group-trigger'
+                  ),
+                ].map((button) => {
+                  const rect = button.getBoundingClientRect()
+                  return {
+                    height: rect.height,
+                    left: rect.left - rootRect.left,
+                    right: rootRect.right - rect.right,
+                    width: rect.width,
+                  }
+                }),
+              }
+            })
+          assert(
+            narrowGroupGeometry.overflow <= 1 &&
+              narrowGroupGeometry.buttons.every(
+                ({ height, left, right, width: buttonWidth }) =>
+                  height >= 52 &&
+                  left >= -1 &&
+                  right >= -1 &&
+                  buttonWidth >= width - 64
+              ),
+            `${width}: ${JSON.stringify(narrowGroupGeometry)}`
+          )
+          await page.screenshot({
+            path: path.join(
+              outputDir,
+              `mobile-progress-${role}-business-detail-${width}.png`
+            ),
+          })
+          await drawer
+            .getByRole('button', { name: '收起业务明细', exact: true })
+            .click()
         }
         await page.setViewportSize({ width: 390, height: 844 })
         await drawer
@@ -650,10 +817,18 @@ export function createMobileProgressScenarios({
             exact: true,
           })
           .click()
+        assert.equal(
+          await drawer
+            .getByRole('button', { name: '关联任务，1 项', exact: true })
+            .getAttribute('aria-expanded'),
+          'true'
+        )
         await drawer
-          .getByRole('tab', { name: '关联任务', exact: true, selected: true })
-          .waitFor()
-        await drawer.getByRole('tab', { name: '生产单', exact: true }).click()
+          .getByRole('button', {
+            name: '生产执行，1 单 · 1 批次 · 1 项领料',
+            exact: true,
+          })
+          .click()
         await drawer
           .getByRole('button', { name: '查看生产进度', exact: true })
           .click()
@@ -668,10 +843,55 @@ export function createMobileProgressScenarios({
         )
         await page.goBack()
         await drawer
-          .getByRole('tab', { name: '生产单', exact: true, selected: true })
+          .getByRole('button', {
+            name: '生产执行，1 单 · 1 批次 · 1 项领料',
+            exact: true,
+          })
           .waitFor()
+        assert.equal(
+          await drawer
+            .getByRole('button', {
+              name: '生产执行，1 单 · 1 批次 · 1 项领料',
+              exact: true,
+            })
+            .getAttribute('aria-expanded'),
+          'true'
+        )
         await page.goBack()
         await drawer.waitFor({ state: 'hidden' })
+        sparseDetail = true
+        await panel
+          .getByRole('button', {
+            name: `查看 ${prefix}-0001 进度`,
+            exact: true,
+          })
+          .click()
+        await drawer
+          .getByRole('heading', { name: `${prefix}-0001`, exact: true })
+          .waitFor()
+        assert.equal(
+          await drawer
+            .getByRole('button', { name: '查看关联任务', exact: true })
+            .count(),
+          0
+        )
+        await drawer
+          .getByRole('button', { name: '查看业务明细', exact: true })
+          .click()
+        assert.deepEqual(
+          await drawer
+            .locator('.mobile-progress-detail-group-trigger')
+            .evaluateAll((buttons) =>
+              buttons.map((button) => button.getAttribute('aria-label'))
+            ),
+          ['产品信息，1 项']
+        )
+        await drawer
+          .locator('.mobile-task-flow-header')
+          .getByRole('button', { name: '返回进度', exact: true })
+          .click()
+        await drawer.waitFor({ state: 'hidden' })
+        sparseDetail = false
         assert.equal(
           await panel
             .getByRole('button', { name: /^(上一页|下一页)$/u })

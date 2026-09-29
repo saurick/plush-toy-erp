@@ -6,13 +6,19 @@
 }
 
 .erp-workbench-summaries__heading {
+  display: flex;
   flex: 0 0 auto;
-  padding: 10px 12px 0;
+  align-items: center;
+  min-width: 0;
 }
 
 .erp-workbench-summaries > .erp-business-operation-panel,
 .erp-workbench-summaries > .ant-alert {
   margin-inline: 12px;
+}
+
+.erp-workbench-summaries > .erp-business-operation-panel {
+  margin-top: 10px;
 }
 
 .erp-workbench-summaries > .erp-business-data-table-card.ant-card {
@@ -23,15 +29,9 @@
   width: 200px;
 }
 
-.erp-workbench-summaries__heading h4,
-.erp-workbench-summaries__note {
+.erp-workbench-summaries__heading h4 {
   margin: 0;
-}
-
-.erp-workbench-summaries__note {
-  padding-inline: 12px;
-  color: var(--erp-text-muted);
-  font-size: 13px;
+  white-space: nowrap;
 }
 
 .erp-workbench-summaries__product {

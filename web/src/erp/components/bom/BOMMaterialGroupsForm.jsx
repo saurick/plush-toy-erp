@@ -1,4 +1,3 @@
-/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- The horizontal table region needs keyboard scrolling. */
 import React, {
   useCallback,
   useEffect,
@@ -8,6 +7,7 @@ import React, {
   useState,
 } from 'react'
 import { Button, Form, Input, Select, Space } from 'antd'
+import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTable.jsx'
 import { message } from '@/common/utils/antdApp'
 import BOMMaterialCreateModal from './BOMMaterialCreateModal.jsx'
@@ -315,7 +315,7 @@ export default function BOMMaterialGroupsForm({
                 先添加一种物料，再填写它的部位和用量
               </BusinessLineItemsEmpty>
             ) : (
-              <div
+              <TableScrollRegion
                 className="erp-bom-parts-scroll"
                 role="region"
                 aria-label="物料和部位明细"
@@ -655,8 +655,8 @@ export default function BOMMaterialGroupsForm({
                               {canEdit ? (
                                 <td className="erp-bom-part-actions">
                                   <Button
-                                    type="link"
                                     size="small"
+                                    className="erp-line-items-form__add-button"
                                     disabled={fields.length >= MAX_PARTS}
                                     onClick={() => {
                                       const copy = {
@@ -694,8 +694,8 @@ export default function BOMMaterialGroupsForm({
                               {canEdit ? (
                                 <Space size={8}>
                                   <Button
-                                    type="link"
                                     size="small"
+                                    className="erp-line-items-form__add-button"
                                     disabled={fields.length >= MAX_PARTS}
                                     onClick={() => {
                                       const nextIndex = group.indexes.at(-1) + 1
@@ -726,13 +726,12 @@ export default function BOMMaterialGroupsForm({
                     )
                   })}
                 </table>
-              </div>
+              </TableScrollRegion>
             )}
             {canEdit ? (
               <Button
                 block
-                type="dashed"
-                className="erp-bom-add-material"
+                className="erp-bom-add-material erp-line-items-form__add-button"
                 disabled={fields.length >= MAX_PARTS}
                 onClick={() => {
                   add(blankPart())

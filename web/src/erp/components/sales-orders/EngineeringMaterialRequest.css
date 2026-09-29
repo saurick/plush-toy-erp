@@ -144,10 +144,6 @@
   margin-bottom: 12px;
 }
 
-.erp-material-sheet__scroll-actions {
-  margin-left: auto;
-}
-
 .erp-material-sheet__purchase-basis {
   margin: 0 0 12px;
   color: var(--erp-text-muted, #64748b);

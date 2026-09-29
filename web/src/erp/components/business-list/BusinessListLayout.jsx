@@ -412,9 +412,10 @@ function ResponsiveSelectionActions({ children }) {
         onOpenChange={setMoreActionsOpen}
         autoFocus
         autoAdjustOverflow
-        // Rebuild overflow actions after selection, permission, or loading
-        // changes so a reopened menu never keeps stale disabled controls.
-        destroyOnHidden
+        // Stateful actions own dialogs and drawers that must outlive the menu.
+        // The render key still rebuilds them when external action state changes.
+        forceRender
+        destroyOnHidden={false}
         overlayClassName="erp-business-selection-action-dropdown"
         popupRender={renderMoreActions}
       >
@@ -783,7 +784,7 @@ export const DateTimeInput = React.forwardRef((props, ref) => (
 
 export function BusinessPageLayout({ children, className = '' }) {
   return (
-    <div className={joinClassNames('erp-business-page-layout', className)}>
+    <div className={joinClassNames('erp-business-page-layout', className)} data-table-scroll-scope>
       {children}
     </div>
   )
@@ -792,7 +793,6 @@ export function BusinessPageLayout({ children, className = '' }) {
 export function PageHeaderCard({
   title,
   helpKey = '',
-  tags = null,
   stats = [],
   compact = false,
   viewSwitch = null,
@@ -814,11 +814,6 @@ export function PageHeaderCard({
               <BusinessPageHelpTrigger pageKey={helpKey} />
             </div>
           </div>
-          {tags ? (
-            <div className="erp-business-page-header-card__tags erp-business-module-hero__tags">
-              {tags}
-            </div>
-          ) : null}
         </div>
         {viewSwitch}
         {numericStats.length > 0 ? (
@@ -1254,6 +1249,7 @@ export function BusinessOperationPanel({
             {actions ? (
               <div className="erp-business-operation-panel__actions">
                 {actions}
+                <span data-table-scroll-toolbar />
               </div>
             ) : null}
             {primaryAction ? (
@@ -1637,6 +1633,7 @@ export function BusinessDataTable({
         <div className="erp-business-data-table-card__header">{tableHeader}</div>
       ) : null}
       <Table
+        scrollToolbar
         size="small"
         loading={loading}
         rowKey={rowKey}

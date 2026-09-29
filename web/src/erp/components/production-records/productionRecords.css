@@ -1,18 +1,15 @@
 .erp-production-record-workspace {
-  display: flex;
   flex: 1;
-  flex-direction: column;
   min-width: 0;
   min-height: 0;
 }
 
-.erp-production-record-workspace > .erp-production-record-tabs {
-  flex: 0 0 auto;
-  margin: 0 0 9px;
-  padding: 10px 12px;
-  border: 1px solid var(--erp-border);
-  border-radius: var(--erp-business-card-radius);
-  background: var(--erp-surface-bg);
+.erp-production-record-workspace
+  > .erp-business-page-header-card
+  .erp-production-record-tabs {
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
 }
 
 .erp-production-record-tabs > .ant-tabs-nav {
@@ -23,13 +20,32 @@
   display: none;
 }
 
-.erp-production-record-workspace > .erp-business-page-layout {
-  min-height: 0;
-}
+@container (max-width: 820px) {
+  .erp-production-record-workspace
+    > .erp-business-page-header-card
+    .erp-business-page-header-card__grid {
+    flex-wrap: wrap;
+  }
 
-.erp-production-record-workspace:has(
-    > .erp-business-page-layout[data-business-form-editing='true']
-  )
-  > .erp-production-record-tabs {
-  display: none;
+  .erp-production-record-workspace
+    > .erp-business-page-header-card
+    .erp-business-page-header-card__main {
+    order: 1;
+  }
+
+  .erp-production-record-workspace
+    > .erp-business-page-header-card
+    .erp-production-record-tabs {
+    order: 2;
+    flex: 1 1 100%;
+  }
+
+  .erp-production-record-workspace
+    > .erp-business-page-header-card
+    .erp-business-page-header-card__stats {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
 }

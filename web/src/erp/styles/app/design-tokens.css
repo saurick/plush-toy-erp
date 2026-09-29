@@ -36,7 +36,6 @@
   --erp-warning-text: #996015;
   --erp-visual-danger-text: #bf3535;
   --erp-surface-shadow: 0 3px 14px rgb(35 65 45 / 3.5%);
-  --erp-line-items-accent: var(--erp-primary);
   --erp-row-height: 52px;
   --erp-table-cell-padding-block: calc((var(--erp-row-height) - 34px) / 2);
   --erp-business-control-height: 34px;

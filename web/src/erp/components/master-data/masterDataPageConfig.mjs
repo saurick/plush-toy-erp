@@ -71,7 +71,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     },
     entityLabel: '客户',
     draftCodePrefix: 'CUS',
-    formBoundary: '只维护交易主体资料，不在此写订单、库存或财务记录。',
   },
   suppliers: {
     title: '供应商与加工厂',
@@ -97,7 +96,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     },
     entityLabel: '供应商',
     draftCodePrefix: 'SUP',
-    formBoundary: '只维护交易主体资料，不在此写采购、库存、质检或财务记录。',
   },
   materials: {
     title: '材料档案',
@@ -115,8 +113,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     },
     entityLabel: '材料',
     draftCodePrefix: 'MAT',
-    formBoundary:
-      '这里只维护材料基础资料，不办理采购、库存、质检或物料清单用量。',
   },
   processes: {
     title: '加工环节',
@@ -134,13 +130,10 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     },
     entityLabel: '加工环节',
     draftCodePrefix: 'PROC',
-    formBoundary:
-      '只维护委外订单和后续质检可引用的标准加工环节；排序只影响列表展示，不定义前后工序。需质检只是工序属性标记，不在此生成委外订单、生产任务、库存记录或质检判定。',
     initialValues: {
       outsourcing_enabled: true,
       inhouse_enabled: false,
       quality_required: false,
-      sort_order: 0,
     },
   },
   products: {
@@ -160,8 +153,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     entityLabel: '产品',
     createTitleLabel: '产品',
     draftCodePrefix: 'PRD',
-    formBoundary:
-      '这里只维护产品基础信息，不办理订单、库存、物料清单、生产或出货业务。',
   },
   product_skus: {
     title: '产品档案',
@@ -181,8 +172,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     createTitleLabel: '产品规格',
     draftCodeField: 'sku_code',
     draftCodePrefix: 'SKU',
-    formBoundary:
-      '这里只维护产品规格，不办理订单、库存、物料清单、生产或出货业务。',
   },
 })
 

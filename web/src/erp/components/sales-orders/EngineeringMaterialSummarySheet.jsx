@@ -1,8 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Button, Space } from 'antd'
 import {
-  ArrowLeftOutlined,
-  ArrowRightOutlined,
   ReloadOutlined,
   TableOutlined,
   UnorderedListOutlined,
@@ -146,8 +144,6 @@ export default function EngineeringMaterialSummarySheet({
 }) {
   const [mobileView, setMobileView] = useState('cards')
   const [expanded, setExpanded] = useState([])
-  const [tableOverflow, setTableOverflow] = useState(false)
-  const tableHost = useRef(null)
   const rows = useMemo(() => materialSummaryRows(request), [request])
   const products = useMemo(
     () => materialSummaryProducts(request.sources),
@@ -155,18 +151,6 @@ export default function EngineeringMaterialSummarySheet({
   )
   const totals = materialSummaryTotals(request.items)
   const inventory = request.inventory_reference
-  useEffect(() => {
-    const scroller = tableHost.current?.querySelector('.ant-table-body')
-    if (!scroller || mobile) return undefined
-    const measure = () =>
-      setTableOverflow(scroller.scrollWidth > scroller.clientWidth + 1)
-    const observer = new ResizeObserver(measure)
-    observer.observe(scroller)
-    const table = scroller.querySelector('table')
-    if (table) observer.observe(table)
-    measure()
-    return () => observer.disconnect()
-  }, [mobile, rows])
   const displayQuantity = (value) => (
     <span
       className="erp-material-number"
@@ -261,15 +245,6 @@ export default function EngineeringMaterialSummarySheet({
       render: (_, item) => notes(item, true),
     },
   ]
-  const scrollToSide = (right) => {
-    const scroller = tableHost.current?.querySelector('.ant-table-body')
-    scroller?.scrollTo({
-      left: right ? scroller.scrollWidth : 0,
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'auto'
-        : 'smooth',
-    })
-  }
 
   return (
     <section
@@ -368,21 +343,6 @@ export default function EngineeringMaterialSummarySheet({
               },
             ]}
           />
-        ) : tableOverflow ? (
-          <Space size={4} className="erp-material-sheet__scroll-actions">
-            <Button
-              icon={<ArrowLeftOutlined aria-hidden />}
-              onClick={() => scrollToSide(false)}
-            >
-              材料
-            </Button>
-            <Button
-              icon={<ArrowRightOutlined aria-hidden />}
-              onClick={() => scrollToSide(true)}
-            >
-              库存 / 备注
-            </Button>
-          </Space>
         ) : null}
       </div>
       <p className="erp-material-sheet__purchase-basis">
@@ -436,7 +396,7 @@ export default function EngineeringMaterialSummarySheet({
           ))}
         </div>
       ) : (
-        <div ref={tableHost} className="erp-material-sheet__table">
+        <div className="erp-material-sheet__table">
           <Table
             size="small"
             bordered

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Form } from 'antd'
+import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import './businessCompactFieldTable.css'
 
 export default function BusinessCompactFieldTable({
@@ -7,17 +8,27 @@ export default function BusinessCompactFieldTable({
   label,
   children,
   className = '',
+  showSequence = false,
 }) {
   return (
-    <div className={`erp-compact-field-table ${className}`.trim()}>
+    <TableScrollRegion className={`erp-compact-field-table ${className}`.trim()}>
       <table aria-label={label}>
         <colgroup>
+          {showSequence ? <col style={{ width: 44 }} /> : null}
           {columns.map((column, index) => (
             <col key={index} style={{ width: column.width }} />
           ))}
         </colgroup>
         <thead>
           <tr>
+            {showSequence ? (
+              <th
+                className="erp-compact-field-table__sequence"
+                scope="col"
+              >
+                序号
+              </th>
+            ) : null}
             {columns.map((column, index) => (
               <th key={index} scope="col">
                 {column.required ? (
@@ -35,7 +46,7 @@ export default function BusinessCompactFieldTable({
         </thead>
         {children}
       </table>
-    </div>
+    </TableScrollRegion>
   )
 }
 
@@ -46,6 +57,7 @@ export function BusinessCompactFieldRow({
   label,
   className = '',
   rowRef,
+  sequence,
 }) {
   return (
     <tbody
@@ -54,6 +66,14 @@ export function BusinessCompactFieldRow({
       ref={rowRef}
     >
       <tr className="erp-compact-field-table__fields">
+        {sequence !== undefined ? (
+          <td
+            className="erp-compact-field-table__sequence"
+            aria-label={`第 ${sequence} 条`}
+          >
+            {sequence}
+          </td>
+        ) : null}
         {cells.map((cell, index) => (
           <td key={index}>{cell}</td>
         ))}
@@ -63,7 +83,13 @@ export function BusinessCompactFieldRow({
       </tr>
       {children ? (
         <tr className="erp-compact-field-table__details">
-          <td colSpan={cells.length + (actions !== undefined ? 1 : 0)}>
+          <td
+            colSpan={
+              cells.length +
+              (actions !== undefined ? 1 : 0) +
+              (sequence !== undefined ? 1 : 0)
+            }
+          >
             {children}
           </td>
         </tr>

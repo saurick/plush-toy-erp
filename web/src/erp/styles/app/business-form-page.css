@@ -42,11 +42,16 @@
 
 .erp-business-form-page__header {
   padding: 12px 16px;
-  border-bottom: 1px solid var(--erp-border-strong, #c6d5ca);
-  background: color-mix(
-    in srgb,
-    var(--erp-surface-bg) 76%,
-    var(--erp-border-strong)
+  border-bottom: 1px solid
+    color-mix(
+      in srgb,
+      var(--erp-primary) 28%,
+      var(--erp-border-strong, #c6d5ca)
+    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--erp-primary) 14%, var(--erp-surface-bg)) 0%,
+    color-mix(in srgb, var(--erp-primary) 8%, var(--erp-surface-bg)) 100%
   );
 }
 
@@ -55,12 +60,6 @@
   font-size: 18px;
   line-height: 1.5;
   font-weight: 650;
-}
-
-.erp-business-form-page__header p {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--erp-text-muted, #64748b);
 }
 
 .erp-business-form-page__body {
@@ -236,15 +235,7 @@
   }
 }
 
-.erp-production-order-line__wide {
-  grid-column: span 2;
-}
-
 @container business-form-fields (max-width: 520px) {
-  .erp-production-order-line__wide {
-    grid-column: 1 / -1;
-  }
-
   .erp-business-form-section__fields {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -264,11 +255,16 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 16px;
-  border-top: 1px solid var(--erp-border-strong, #c6d5ca);
-  background: color-mix(
-    in srgb,
-    var(--erp-surface-bg) 68%,
-    var(--erp-border-strong)
+  border-top: 1px solid
+    color-mix(
+      in srgb,
+      var(--erp-primary) 32%,
+      var(--erp-border-strong, #c6d5ca)
+    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--erp-primary) 12%, var(--erp-surface-bg)) 0%,
+    color-mix(in srgb, var(--erp-primary) 20%, var(--erp-surface-bg)) 100%
   );
   box-shadow: 0 -4px 12px rgb(0 0 0 / 0.1);
 }

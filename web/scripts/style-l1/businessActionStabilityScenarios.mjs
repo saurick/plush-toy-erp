@@ -1852,13 +1852,13 @@ export function createBusinessActionStabilityScenarios(deps) {
         await selectBusinessRow(page, 'PAY-ACTION-DRAFT')
         if (
           (await page
-            .locator('[data-business-action-key="payment-cancel"]')
+            .locator('[data-business-action-key="payment-cancel"]:visible')
             .count()) === 0
         ) {
           await openActionMenu(page)
         }
         await page
-          .locator('[data-business-action-key="payment-cancel"]')
+          .locator('[data-business-action-key="payment-cancel"]:visible')
           .click()
         const cancelDialog = page
           .getByRole('dialog')

@@ -131,7 +131,7 @@ export function createBusinessColumnPriorityScenarios({
           ['/erp/engineering/processes', ['环节编号', '环节名称', '状态']],
           [
             '/erp/purchase/material-bom',
-            ['产品', 'BOM 版本', '状态', '生效开始'],
+            ['产品', 'BOM 版本', '状态', '来源订单号'],
           ],
           [
             '/erp/purchase/accessories',
@@ -211,8 +211,9 @@ export function createBusinessColumnPriorityScenarios({
         for (const [url, leading, extra = [], tab] of cases) {
           console.info(`[style:l1:columns] ${url}${tab ? ` ${tab}` : ''}`)
           await gotoScenarioPath(page, url, { waitUntil: 'domcontentloaded' })
-          if (tab)
+          if (tab) {
             await page.getByRole('tab', { name: tab, exact: true }).click()
+          }
           await waitForLeadingLabels(page, leading)
           await assertVisibleColumns(page, [...leading, ...extra], url)
           await assertNoHorizontalOverflow(page, url)

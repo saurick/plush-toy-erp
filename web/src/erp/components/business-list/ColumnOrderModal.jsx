@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
@@ -10,6 +10,7 @@ import { Button, Checkbox, Space } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import {
   applyModuleColumnOrder,
+  buildDefaultModuleHiddenColumns,
   completeModuleColumnOrder,
   filterBusinessListColumns,
   moveModuleColumnOrder,
@@ -45,6 +46,7 @@ export function ColumnOrderModal({
 }) {
   const [draftOrder, setDraftOrder] = useState([])
   const [draftHidden, setDraftHidden] = useState([])
+  const contentRef = useRef(null)
 
   useEffect(() => {
     if (open) {
@@ -85,7 +87,7 @@ export function ColumnOrderModal({
       return
     }
     setDraftOrder([])
-    setDraftHidden([])
+    setDraftHidden(buildDefaultModuleHiddenColumns(columns))
   }
   const saveDraftOrder = async () => {
     if (saving) {
@@ -111,6 +113,14 @@ export function ColumnOrderModal({
       }
       open={open}
       size="columnOrder"
+      afterOpenChange={(visible) => {
+        if (!visible) return
+        window.requestAnimationFrame(() => {
+          contentRef.current
+            ?.querySelector('input:not(:disabled), button:not(:disabled)')
+            ?.focus({ preventScroll: true })
+        })
+      }}
       onCancel={saving ? undefined : onClose}
       closable={!saving}
       maskClosable={!saving}
@@ -118,6 +128,12 @@ export function ColumnOrderModal({
       destroyOnHidden={false}
       footer={
         <Space wrap className="erp-business-column-order-modal__footer">
+          <Button
+            disabled={saving || draftHidden.length === 0}
+            onClick={() => setDraftHidden([])}
+          >
+            全部显示
+          </Button>
           <Button
             icon={<UndoOutlined aria-hidden="true" />}
             className="erp-action-button"
@@ -133,6 +149,7 @@ export function ColumnOrderModal({
       }
     >
       <div
+        ref={contentRef}
         className="erp-business-column-order-modal"
         role="list"
         aria-label={`${moduleTitle || '列表'}列设置`}

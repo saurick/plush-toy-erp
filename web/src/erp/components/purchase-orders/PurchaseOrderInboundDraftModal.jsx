@@ -17,6 +17,10 @@ import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { modal } from '@/common/utils/antdApp'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import BusinessCompactFieldTable, {
+  BusinessCompactFieldRow,
+  BusinessOptionalField,
+} from '../business-list/BusinessCompactFieldTable.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import { formatQuantity } from '../../utils/businessLineItems.mjs'
 import {
@@ -68,36 +72,10 @@ function ArrivalRecord({
   const discrepant = difference.startsWith('少') || difference.startsWith('多')
 
   return (
-    <div
+    <BusinessCompactFieldRow
       className="erp-purchase-arrival__record"
-      role="group"
-      aria-label={`第${number}条到货记录`}
-    >
-      <div className="erp-purchase-arrival__record-head">
-        <span className="erp-purchase-arrival__record-label">
-          到货记录 {number}
-        </span>
-        <span className="erp-purchase-arrival__comparison" aria-live="polite">
-          {counted ? (
-            <Tag
-              color={
-                discrepant
-                  ? 'warning'
-                  : difference === '一致'
-                    ? 'success'
-                    : undefined
-              }
-            >
-              {discrepant
-                ? `比标示${difference} ${row.unit}`
-                : difference === '一致'
-                  ? '与标示一致'
-                  : '未提供标示数量'}
-            </Tag>
-          ) : (
-            '待清点'
-          )}
-        </span>
+      label={`第${number}条到货记录`}
+      actions={
         <Popconfirm
           title="移除这条到货记录？"
           description="这条记录已填写的内容将被清除。"
@@ -120,8 +98,10 @@ function ArrivalRecord({
             移除
           </Button>
         </Popconfirm>
-      </div>
-      <div className="erp-purchase-arrival__fields">
+      }
+      cells={[
+        <span>{number}</span>,
+
         <Form.Item
           name={[field.name, 'quantity']}
           label={`实点数量（${row.unit}）`}
@@ -135,7 +115,7 @@ function ArrivalRecord({
             controls={false}
             placeholder="填写本次实收"
           />
-        </Form.Item>
+        </Form.Item>,
         <Form.Item
           name={[field.name, 'declared_quantity']}
           label={`送货标示数量（${row.unit}）`}
@@ -149,7 +129,7 @@ function ArrivalRecord({
             controls={false}
             placeholder="未提供可不填"
           />
-        </Form.Item>
+        </Form.Item>,
         <Form.Item
           name={[field.name, 'warehouse_id']}
           label="入库仓库"
@@ -161,17 +141,41 @@ function ArrivalRecord({
             options={row.warehouseOptions || []}
             placeholder="请选择仓库"
           />
-        </Form.Item>
+        </Form.Item>,
         <Form.Item name={[field.name, 'lot_no']} label="批次 / 卷包编号">
           <Input
             maxLength={64}
             aria-label={`第${number}条批次号`}
             placeholder="选填"
           />
-        </Form.Item>
-      </div>
-      <details className="erp-purchase-arrival__record-note">
-        <summary>补充说明（选填）</summary>
+        </Form.Item>,
+        <span className="erp-purchase-arrival__comparison" aria-live="polite">
+          {counted ? (
+            <Tag
+              color={
+                discrepant
+                  ? 'warning'
+                  : difference === '一致'
+                    ? 'success'
+                    : undefined
+              }
+            >
+              {discrepant
+                ? `比标示${difference} ${row.unit}`
+                : difference === '一致'
+                  ? '与标示一致'
+                  : '未提供标示数量'}
+            </Tag>
+          ) : (
+            '待清点'
+          )}
+        </span>,
+      ]}
+    >
+      <BusinessOptionalField
+        name={['arrival_items', field.name, 'note']}
+        label="补充说明"
+      >
         <Form.Item name={[field.name, 'note']}>
           <BusinessTextArea
             maxLength={255}
@@ -179,8 +183,8 @@ function ArrivalRecord({
             placeholder="记录异常情况或数量计算依据"
           />
         </Form.Item>
-      </details>
-    </div>
+      </BusinessOptionalField>
+    </BusinessCompactFieldRow>
   )
 }
 
@@ -232,7 +236,7 @@ export default function PurchaseOrderInboundDraftModal({
     return () => window.clearTimeout(timer)
   }, [disabled, form, open, values.length])
 
-  const focusQuantity = (index) => {
+  const focusQuantity = (index, { highlight = false } = {}) => {
     window.requestAnimationFrame(() => {
       if (index < 0) {
         materialPickerRef.current?.focus()
@@ -241,6 +245,21 @@ export default function PurchaseOrderInboundDraftModal({
           block: 'nearest',
           focus: true,
         })
+        if (highlight) {
+          window.requestAnimationFrame(() => {
+            const row = document.activeElement?.closest(
+              '.erp-compact-field-table__row'
+            )
+            if (!row) return
+            row.classList.remove('erp-line-item--appended')
+            row.addEventListener(
+              'animationend',
+              () => row.classList.remove('erp-line-item--appended'),
+              { once: true }
+            )
+            row.classList.add('erp-line-item--appended')
+          })
+        }
       }
     })
   }
@@ -415,7 +434,7 @@ export default function PurchaseOrderInboundDraftModal({
                       index
                     )
                     markChanged()
-                    focusQuantity(index)
+                    focusQuantity(index, { highlight: true })
                   }
                   return (
                     <div className="erp-purchase-arrival__materials">
@@ -460,27 +479,47 @@ export default function PurchaseOrderInboundDraftModal({
                                   </strong>
                                 </div>
                               </div>
-                              {materialFields.map((field) => (
-                                <ArrivalRecord
-                                  key={field.key}
-                                  field={field}
-                                  item={values[field.name] || {}}
-                                  row={row}
-                                  quantityUnitOptions={quantityUnitOptions}
-                                  form={form}
-                                  disabled={disabled}
-                                  onRemove={() => {
-                                    remove(field.name)
-                                    markChanged()
-                                    focusQuantity(
-                                      Math.min(field.name, fields.length - 2)
-                                    )
-                                  }}
-                                />
-                              ))}
+                              <BusinessCompactFieldTable
+                                label={`${row.material}到货记录`}
+                                className="erp-purchase-arrival__table"
+                                columns={[
+                                  { label: '序号', width: 40 },
+                                  {
+                                    label: `实点数量（${row.unit}）`,
+                                    width: 144,
+                                  },
+                                  {
+                                    label: `送货标示（${row.unit}）`,
+                                    width: 144,
+                                  },
+                                  { label: '入库仓库' },
+                                  { label: '批次 / 卷包编号' },
+                                  { label: '差异', width: 112 },
+                                  { label: '操作', width: 52 },
+                                ]}
+                              >
+                                {materialFields.map((field) => (
+                                  <ArrivalRecord
+                                    key={field.key}
+                                    field={field}
+                                    item={values[field.name] || {}}
+                                    row={row}
+                                    quantityUnitOptions={quantityUnitOptions}
+                                    form={form}
+                                    disabled={disabled}
+                                    onRemove={() => {
+                                      remove(field.name)
+                                      markChanged()
+                                      focusQuantity(
+                                        Math.min(field.name, fields.length - 2)
+                                      )
+                                    }}
+                                  />
+                                ))}
+                              </BusinessCompactFieldTable>
                               <div className="erp-purchase-arrival__add-record">
                                 <Button
-                                  type="dashed"
+                                  className="erp-line-items-form__add-button"
                                   icon={<PlusOutlined />}
                                   disabled={disabled || fields.length >= 200}
                                   onClick={() =>

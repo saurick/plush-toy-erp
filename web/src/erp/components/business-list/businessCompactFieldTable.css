@@ -35,7 +35,8 @@
   margin-bottom: 0;
 }
 
-.erp-compact-field-table__fields .ant-form-item-label {
+.erp-compact-field-table__fields .ant-form-item-label,
+.erp-optional-field__body > .ant-form-item:only-child .ant-form-item-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -52,6 +53,13 @@
 
 .erp-compact-field-table__actions {
   text-align: right;
+}
+
+.erp-compact-field-table :is(th, td).erp-compact-field-table__sequence {
+  width: 44px;
+  color: var(--erp-text-muted, #64748b);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .erp-compact-field-table__details > td {
@@ -127,13 +135,16 @@
   margin-bottom: 0;
 }
 
-.erp-inventory-operation-row {
-  margin-block: 16px;
-  padding-block: 12px;
-  border-top: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
+.erp-inventory-operation-source-label {
+  display: none;
 }
 
 @container (max-width: 720px) {
+  .erp-inventory-operation-source-label {
+    display: block;
+    margin-bottom: 5px;
+  }
+
   .erp-compact-field-table > table,
   .erp-compact-field-table__row {
     display: block;
@@ -160,10 +171,11 @@
   }
 
   .erp-compact-field-table__fields {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px 12px;
-    padding-block: 12px;
+    padding: 12px 0 12px 36px;
   }
 
   .erp-compact-field-table td {
@@ -185,6 +197,17 @@
     grid-column: 1 / -1;
   }
 
+  .erp-compact-field-table__fields
+    > td.erp-compact-field-table__sequence {
+    position: absolute;
+    inset-block-start: 12px;
+    inset-inline-start: 0;
+    display: grid;
+    width: 28px;
+    min-height: var(--erp-control-height, 36px);
+    place-items: center;
+  }
+
   .erp-compact-field-table__details {
     display: block;
     padding-bottom: 10px;
@@ -197,6 +220,17 @@
   }
 }
 
-.erp-compact-field-table__supplement > .erp-production-order-line__wide {
+.erp-production-order-line__supplement {
+  grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr);
+  gap: 8px 16px;
+}
+
+.erp-production-order-line__note {
   grid-column: 1 / -1;
+}
+
+@container (max-width: 520px) {
+  .erp-production-order-line__supplement {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

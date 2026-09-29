@@ -79,8 +79,8 @@ test('更多操作使用点击下拉，未选择也可查看，并保留键盘�
   assert.doesNotMatch(layoutSource, /useState\(true\)/u)
   assert.match(layoutSource, /React\.Children\.map\(action\.props\.children/u)
   assert.match(layoutSource, /containsDeferredSelectionAction\(action\)/u)
-  assert.match(layoutSource, /destroyOnHidden/u)
-  assert.doesNotMatch(layoutSource, /destroyOnHidden=\{false\}/u)
+  assert.match(layoutSource, /forceRender/u)
+  assert.match(layoutSource, /destroyOnHidden=\{false\}/u)
 })
 
 test('临时不可用动作使用共享提示，禁用按钮仍可触发原因说明', () => {

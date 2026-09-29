@@ -256,6 +256,7 @@
 
 .erp-login-feedback:not(:empty) {
   margin: 4px 0 10px;
+  padding-top: 6px;
 }
 
 .erp-login-feedback > p {

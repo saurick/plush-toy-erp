@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { Button, Checkbox, Form, Input, Select, Space, Spin, Tag } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import ProductIdentity, {
+import {
+  ProductThumbnail,
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
 
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
   BusinessOptionalField,
@@ -34,6 +36,7 @@ function EngineeringRow({ field, form, context }) {
   return (
     <BusinessCompactFieldRow
       label={`工程资料 ${field.name + 1}`}
+      sequence={field.name + 1}
       cells={[
         <div>
           <strong>{source ? salesOrderRequirementName(source) : ''}</strong>
@@ -41,10 +44,17 @@ function EngineeringRow({ field, form, context }) {
             <Tag>{source.customer_product_no}</Tag>
           ) : null}
         </div>,
-        <>
+        <div className="erp-product-field-control">
           <Form.Item name={[field.name, 'id']} hidden>
             <Input />
           </Form.Item>
+          {productID ? (
+            <ProductThumbnail
+              productId={productID}
+              name={product?.name}
+              code={product?.code}
+            />
+          ) : null}
           <Form.Item label="工程产品" name={[field.name, 'product_id']}>
             <Select
               allowClear
@@ -73,7 +83,7 @@ function EngineeringRow({ field, form, context }) {
               }}
             />
           </Form.Item>
-        </>,
+        </div>,
         <Form.Item label="规格（选填）" name={[field.name, 'product_sku_id']}>
           <Select
             allowClear
@@ -154,19 +164,11 @@ function EngineeringRow({ field, form, context }) {
         label="打样说明"
       >
         <Form.Item label="打样说明" name={[field.name, 'sample_note']}>
-          <Input.TextArea
+          <BusinessTextArea
             maxLength={255}
-            rows={2}
             placeholder="确认结果或退回重做原因"
           />
         </Form.Item>
-        {productID ? (
-          <ProductIdentity
-            productId={productID}
-            name={product?.name}
-            code={product?.code}
-          />
-        ) : null}
       </BusinessOptionalField>
     </BusinessCompactFieldRow>
   )
@@ -345,13 +347,14 @@ export default function SalesOrderEngineeringModal({
             {(fields) => (
               <BusinessCompactFieldTable
                 label="订单工程资料"
+                showSequence
                 columns={[
-                  { label: '订货要求', width: '20%' },
-                  { label: '工程产品', width: '20%' },
-                  { label: '规格', width: '15%' },
-                  { label: '打样 BOM', width: '17%' },
-                  { label: '设计师', width: '12%' },
-                  { label: '工程 / 打样进度', required: true },
+                  { label: '订货要求' },
+                  { label: '工程产品', width: '26%' },
+                  { label: '规格' },
+                  { label: '打样 BOM' },
+                  { label: '设计师', width: 120 },
+                  { label: '工程 / 打样进度', width: 156, required: true },
                 ]}
               >
                 {fields.map((field) => (

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Space, Tag } from 'antd'
-import { DownloadOutlined } from '@ant-design/icons'
+import { DownloadOutlined, SettingOutlined } from '@ant-design/icons'
 import {
   useNavigate,
   useOutletContext,
@@ -21,6 +21,7 @@ import {
 } from '../business-list/BusinessListLayout.jsx'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
 import useBusinessListExport from '../../hooks/useBusinessListExport.js'
+import { useBusinessColumnOrder } from '../business-list/BusinessListToolbarActions.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import {
   currentBusinessDate,
@@ -63,7 +64,10 @@ function SearchFilter({ label, placeholder = label, value, onSearch }) {
   )
 }
 
-export default function SalesOrderSummaryPanel({ refreshRevision = 0 }) {
+export default function SalesOrderSummaryPanel({
+  refreshRevision = 0,
+  summaryTypeControl = null,
+}) {
   const { adminProfile } = useOutletContext() || {}
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -96,154 +100,178 @@ export default function SalesOrderSummaryPanel({ refreshRevision = 0 }) {
     return () => controller.abort()
   }, [requestKey, revision, refreshRevision])
 
-  const columns = [
-    {
-      title: '下单日期',
-      dataIndex: 'order_date',
-      width: 120,
-      render: dateLabel,
-      exportValue: (row) => dateLabel(row.order_date),
-    },
-    { align: 'left', title: '客户', dataIndex: 'customer_name', width: 150 },
-    {
-      title: '订单编号',
-      dataIndex: 'order_no',
-      width: 180,
-      render: (value, row) => (
-        <Button
-          type="link"
-          onClick={() =>
-            navigate(
-              `/erp/sales/project-orders/sales-orders?sales_order_id=${row.sales_order_id}`
+  const columns = useMemo(
+    () => [
+      {
+        title: '下单日期',
+        dataIndex: 'order_date',
+        width: 120,
+        render: dateLabel,
+        exportValue: (row) => dateLabel(row.order_date),
+      },
+      { align: 'left', title: '客户', dataIndex: 'customer_name', width: 150 },
+      {
+        title: '订单编号',
+        dataIndex: 'order_no',
+        width: 180,
+        render: (value, row) => (
+          <Button
+            type="link"
+            onClick={() =>
+              navigate(
+                `/erp/sales/project-orders/sales-orders?sales_order_id=${row.sales_order_id}`
+              )
+            }
+          >
+            {value}
+          </Button>
+        ),
+      },
+      {
+        title: '客户订单号',
+        dataIndex: 'customer_order_no',
+        width: 160,
+        render: valueOrDash,
+      },
+      {
+        title: '客户款号',
+        dataIndex: 'customer_product_no',
+        width: 160,
+        render: valueOrDash,
+      },
+      {
+        align: 'left',
+        title: '产品名称',
+        key: 'product',
+        width: 220,
+        render: (_, row) => (
+          <span className="erp-workbench-summaries__product">
+            <WorkflowTaskProductImage
+              item={{
+                kind: 'product',
+                name: productName(row),
+                productID: row.product_id,
+                imageAttachmentID: row.product_image_attachment_id,
+              }}
+              preview
+            />
+            <span>{productName(row)}</span>
+          </span>
+        ),
+        exportValue: productName,
+      },
+      {
+        title: '订单数量',
+        dataIndex: 'ordered_quantity',
+        width: 110,
+        align: 'right',
+      },
+      {
+        title: '船头版',
+        dataIndex: 'pre_shipment_sample_quantity',
+        width: 100,
+        align: 'right',
+      },
+      {
+        title: '生产数量',
+        dataIndex: 'production_quantity',
+        width: 110,
+        align: 'right',
+      },
+      { title: '单位', dataIndex: 'unit_name', width: 80 },
+      {
+        title: '计划交付日期',
+        dataIndex: 'planned_delivery_date',
+        width: 140,
+        render: dateLabel,
+        exportValue: (row) => dateLabel(row.planned_delivery_date),
+      },
+      {
+        title: '未出货数',
+        dataIndex: 'unshipped_quantity',
+        width: 110,
+        align: 'right',
+        render: valueOrDash,
+      },
+      {
+        title: '跟单业务人员',
+        dataIndex: 'sales_owner',
+        width: 140,
+        render: valueOrDash,
+      },
+      {
+        title: '类别',
+        dataIndex: 'order_category',
+        defaultHidden: true,
+        width: 90,
+        render: (value) => (value === 'REPEAT' ? '返单' : '新单'),
+        exportValue: (row) =>
+          row.order_category === 'REPEAT' ? '返单' : '新单',
+      },
+      ...(hasActionPermission(adminProfile, 'field.sales_commercial.read')
+        ? [
+            {
+              title: '单价',
+              dataIndex: 'unit_price',
+              width: 110,
+              align: 'right',
+              render: valueOrDash,
+            },
+            ...(hasActionPermission(
+              adminProfile,
+              'field.finance_settlement.read'
             )
-          }
-        >
-          {value}
-        </Button>
-      ),
-    },
-    {
-      title: '客户订单号',
-      dataIndex: 'customer_order_no',
-      width: 160,
-      render: valueOrDash,
-    },
-    {
-      title: '客户款号',
-      dataIndex: 'customer_product_no',
-      width: 160,
-      render: valueOrDash,
-    },
-    {
-      align: 'left',
-      title: '产品名称',
-      key: 'product',
-      width: 220,
-      render: (_, row) => (
-        <span className="erp-workbench-summaries__product">
-          <WorkflowTaskProductImage
-            item={{
-              kind: 'product',
-              name: productName(row),
-              productID: row.product_id,
-              imageAttachmentID: row.product_image_attachment_id,
-            }}
-            preview
-          />
-          <span>{productName(row)}</span>
-        </span>
-      ),
-      exportValue: productName,
-    },
-    {
-      title: '订单数量',
-      dataIndex: 'ordered_quantity',
-      width: 110,
-      align: 'right',
-    },
-    {
-      title: '船头版',
-      dataIndex: 'pre_shipment_sample_quantity',
-      width: 100,
-      align: 'right',
-    },
-    {
-      title: '生产数量',
-      dataIndex: 'production_quantity',
-      width: 110,
-      align: 'right',
-    },
-    { title: '单位', dataIndex: 'unit_name', width: 80 },
-    {
-      title: '计划交付日期',
-      dataIndex: 'planned_delivery_date',
-      width: 140,
-      render: dateLabel,
-      exportValue: (row) => dateLabel(row.planned_delivery_date),
-    },
-    {
-      title: '未出货数',
-      dataIndex: 'unshipped_quantity',
-      width: 110,
-      align: 'right',
-      render: valueOrDash,
-    },
-    {
-      title: '跟单业务人员',
-      dataIndex: 'sales_owner',
-      width: 140,
-      render: valueOrDash,
-    },
-    {
-      title: '类别',
-      dataIndex: 'order_category',
-      width: 90,
-      render: (value) => (value === 'REPEAT' ? '返单' : '新单'),
-      exportValue: (row) => (row.order_category === 'REPEAT' ? '返单' : '新单'),
-    },
-    ...(hasActionPermission(adminProfile, 'field.sales_commercial.read')
-      ? [
-          {
-            title: '单价',
-            dataIndex: 'unit_price',
-            width: 110,
-            align: 'right',
-            render: valueOrDash,
-          },
-          ...(hasActionPermission(adminProfile, 'field.finance_settlement.read')
-            ? [{ title: '币种', dataIndex: 'currency', width: 85 }]
-            : []),
-        ]
-      : []),
-    { title: '设计师', dataIndex: 'designer', width: 120, render: valueOrDash },
-    {
-      align: 'left',
-      title: '备注',
-      dataIndex: 'note',
-      width: 220,
-      render: valueOrDash,
-    },
-    {
-      align: 'left',
-      title: '工艺',
-      dataIndex: 'process_requirement',
-      width: 220,
-      render: valueOrDash,
-    },
-    {
-      title: '订单状态',
-      dataIndex: 'lifecycle_status',
-      width: 110,
-      render: (_, row) => <Tag>{statusLabel(row)}</Tag>,
-      exportValue: statusLabel,
-    },
-  ]
+              ? [{ title: '币种', dataIndex: 'currency', width: 85 }]
+              : []),
+          ]
+        : []),
+      {
+        title: '设计师',
+        dataIndex: 'designer',
+        defaultHidden: true,
+        width: 120,
+        render: valueOrDash,
+      },
+      {
+        align: 'left',
+        title: '备注',
+        dataIndex: 'note',
+        defaultHidden: true,
+        width: 220,
+        render: valueOrDash,
+      },
+      {
+        align: 'left',
+        title: '工艺',
+        dataIndex: 'process_requirement',
+        defaultHidden: true,
+        width: 220,
+        render: valueOrDash,
+      },
+      {
+        title: '订单状态',
+        dataIndex: 'lifecycle_status',
+        width: 110,
+        render: (_, row) => <Tag>{statusLabel(row)}</Tag>,
+        exportValue: statusLabel,
+      },
+    ],
+    [adminProfile, navigate]
+  )
+  const { tableColumns, exportColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
+      adminProfile,
+      moduleKey: 'sales-order-summary',
+      moduleTitle: '销售订单汇总',
+      columns,
+    })
+
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: `sales-summary:${requestKey}`,
     loadRows: async (options) =>
       (await listAllSalesOrderSummary(filters, options)).items,
     filename: () => `销售订单汇总-${currentBusinessDate()}.csv`,
-    columns,
+    columns: exportColumns,
     recordLabel: '产品明细',
   })
   return (
@@ -252,6 +280,7 @@ export default function SalesOrderSummaryPanel({ refreshRevision = 0 }) {
         compact
         filters={
           <>
+            {summaryTypeControl}
             <SearchFilter
               primarySearch
               label="搜索订单号、产品名称或款号"
@@ -303,6 +332,12 @@ export default function SalesOrderSummaryPanel({ refreshRevision = 0 }) {
         actions={
           <Space wrap>
             <Button
+              icon={<SettingOutlined aria-hidden="true" />}
+              onClick={openColumnOrder}
+            >
+              列设置
+            </Button>
+            <Button
               icon={<DownloadOutlined aria-hidden="true" />}
               loading={exporting}
               disabled={loading || Boolean(error)}
@@ -313,9 +348,6 @@ export default function SalesOrderSummaryPanel({ refreshRevision = 0 }) {
           </Space>
         }
       />
-      <p className="erp-workbench-summaries__note">
-        每行一款产品；生产数量含船头版，未出货数按实际出货扣减。缺少依据时显示“—”。
-      </p>
       {error ? (
         <Alert
           type="error"
@@ -330,7 +362,7 @@ export default function SalesOrderSummaryPanel({ refreshRevision = 0 }) {
       ) : (
         <BusinessDataTable
           rowKey="id"
-          columns={columns}
+          columns={tableColumns}
           dataSource={result.items}
           loading={loading}
           emptyDescription="暂无符合条件的销售订单明细"
@@ -344,6 +376,7 @@ export default function SalesOrderSummaryPanel({ refreshRevision = 0 }) {
           }}
         />
       )}
+      {columnOrderModal}
     </>
   )
 }

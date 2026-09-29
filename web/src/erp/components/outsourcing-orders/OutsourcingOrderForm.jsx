@@ -15,7 +15,8 @@ import {
   Space,
 } from 'antd'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
-import ProductIdentity, {
+import {
+  ProductThumbnail,
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
@@ -56,12 +57,12 @@ import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx
 const OUTSOURCING_ORDER_COLUMNS = [
   { label: '产品订单编号', width: 155 },
   { label: '加工品类', width: 115, required: true },
-  { label: '产品 / 材料', width: 230, required: true },
+  { label: '产品 / 材料', width: 230, flexible: true, required: true },
   { label: '加工项目', width: 160 },
   { label: '工序', width: 140, required: true },
   { label: '单位', width: 100, required: true },
   { label: '单价', width: 110 },
-  { label: '加工数量', width: 160, required: true },
+  { label: '加工数量', width: 180, required: true },
   {
     label: (
       <BusinessHelpLabel
@@ -70,9 +71,9 @@ const OUTSOURCING_ORDER_COLUMNS = [
         pageKey="processing-contracts"
       />
     ),
-    width: 112,
+    width: 144,
   },
-  { label: '预计回货日期', width: 155 },
+  { label: '预计回货日期', width: 160 },
 ]
 
 function decimalRule({ positive = false } = {}) {
@@ -368,17 +369,13 @@ export default function OutsourcingOrderForm({
             <BusinessLineItemRow
               key={field.key}
               index={index}
-              detailsLabel="规格与备注"
-              status={
-                <Form.Item noStyle shouldUpdate>
-                  {({ getFieldValue }) =>
-                    getFieldValue(['items', field.name, 'note'])
-                      ? '已填备注'
-                      : null
-                  }
-                </Form.Item>
-              }
               rowRef={(node) => registerLineItemRow(index, node)}
+              name={['items', field.name]}
+              detailsLabel="规格与行备注"
+              summaryFields={[
+                { key: 'sku_code_snapshot', label: '规格' },
+                { key: 'note', label: '备注' },
+              ]}
               actions={
                 <Space
                   className="erp-sales-order-lines-form__row-actions"
@@ -495,7 +492,11 @@ export default function OutsourcingOrderForm({
                   noStyle
                   shouldUpdate={(previous, current) =>
                     previous?.items?.[field.name]?.subject_type !==
-                    current?.items?.[field.name]?.subject_type
+                      current?.items?.[field.name]?.subject_type ||
+                    previous?.items?.[field.name]?.product_id !==
+                      current?.items?.[field.name]?.product_id ||
+                    previous?.items?.[field.name]?.product_name_snapshot !==
+                      current?.items?.[field.name]?.product_name_snapshot
                   }
                 >
                   {({ getFieldValue }) => {
@@ -528,27 +529,47 @@ export default function OutsourcingOrderForm({
                       )
                     }
                     return (
-                      <Form.Item
+                      <div
+                        className="erp-product-field-control"
                         key="product-source"
-                        className="erp-line-item-field erp-line-item-field--source"
-                        name={[field.name, 'product_id']}
-                        label="产品 / 半成品"
-                        rules={[
-                          { required: true, message: '请选择产品或半成品' },
-                        ]}
                       >
-                        <Select
-                          allowClear
-                          showSearch
-                          options={productOptions}
-                          listItemHeight={48}
-                          optionRender={renderProductOption}
-                          optionFilterProp="searchText"
-                          onChange={(value) =>
-                            onProductChange(field.name, value)
-                          }
-                        />
-                      </Form.Item>
+                        {getFieldValue(['items', field.name, 'product_id']) ? (
+                          <ProductThumbnail
+                            productId={getFieldValue([
+                              'items',
+                              field.name,
+                              'product_id',
+                            ])}
+                            name={
+                              getFieldValue([
+                                'items',
+                                field.name,
+                                'product_name_snapshot',
+                              ]) || '当前产品'
+                            }
+                          />
+                        ) : null}
+                        <Form.Item
+                          className="erp-line-item-field erp-line-item-field--source"
+                          name={[field.name, 'product_id']}
+                          label="产品 / 半成品"
+                          rules={[
+                            { required: true, message: '请选择产品或半成品' },
+                          ]}
+                        >
+                          <Select
+                            allowClear
+                            showSearch
+                            options={productOptions}
+                            listItemHeight={48}
+                            optionRender={renderProductOption}
+                            optionFilterProp="searchText"
+                            onChange={(value) =>
+                              onProductChange(field.name, value)
+                            }
+                          />
+                        </Form.Item>
+                      </div>
                     )
                   }}
                 </Form.Item>,
@@ -706,103 +727,84 @@ export default function OutsourcingOrderForm({
                 </Form.Item>,
               ]}
             >
-              <Form.Item
-                noStyle
-                shouldUpdate={(previous, current) =>
-                  previous?.items?.[field.name]?.subject_type !==
-                    current?.items?.[field.name]?.subject_type ||
-                  previous?.items?.[field.name]?.product_id !==
-                    current?.items?.[field.name]?.product_id ||
-                  previous?.items?.[field.name]?.product_sku_id !==
-                    current?.items?.[field.name]?.product_sku_id
-                }
-              >
-                {({ getFieldValue }) => {
-                  const line = getFieldValue(['items', field.name]) || {}
-                  if (
-                    line.subject_type !==
-                    OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT
-                  ) {
-                    return null
+              <div className="erp-line-item-details__notes">
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(previous, current) =>
+                    previous?.items?.[field.name]?.subject_type !==
+                      current?.items?.[field.name]?.subject_type ||
+                    previous?.items?.[field.name]?.product_id !==
+                      current?.items?.[field.name]?.product_id ||
+                    previous?.items?.[field.name]?.product_sku_id !==
+                      current?.items?.[field.name]?.product_sku_id
                   }
-                  const productID = Number(line.product_id || 0)
-                  const currentSKUID = Number(line.product_sku_id || 0)
-                  const options = productSKUs
-                    .filter(
-                      (item) => Number(item?.product_id || 0) === productID
+                >
+                  {({ getFieldValue }) => {
+                    const line = getFieldValue(['items', field.name]) || {}
+                    if (
+                      line.subject_type !==
+                      OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT
+                    ) {
+                      return null
+                    }
+                    const productID = Number(line.product_id || 0)
+                    const currentSKUID = Number(line.product_sku_id || 0)
+                    const options = productSKUs
+                      .filter(
+                        (item) => Number(item?.product_id || 0) === productID
+                      )
+                      .map((item) => ({
+                        value: item.id,
+                        label: productSKULabel(item),
+                        disabled:
+                          item.is_active === false ||
+                          Number(item.default_unit_id || 0) <= 0,
+                      }))
+                    if (
+                      currentSKUID > 0 &&
+                      !options.some(
+                        (option) => Number(option.value) === currentSKUID
+                      )
+                    ) {
+                      options.push({
+                        value: currentSKUID,
+                        label: line.sku_code_snapshot || '原产品规格已不可用',
+                        disabled: true,
+                      })
+                    }
+                    return (
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--source"
+                        name={[field.name, 'product_sku_id']}
+                        label="产品规格"
+                        tooltip="可选；选择规格后固定使用该规格的单位。需要调整单位时先清除规格。"
+                      >
+                        <Select
+                          allowClear
+                          showSearch
+                          disabled={!productID}
+                          options={options}
+                          optionFilterProp="label"
+                          onChange={(value) =>
+                            onProductSKUChange(field.name, value)
+                          }
+                        />
+                      </Form.Item>
                     )
-                    .map((item) => ({
-                      value: item.id,
-                      label: productSKULabel(item),
-                      disabled:
-                        item.is_active === false ||
-                        Number(item.default_unit_id || 0) <= 0,
-                    }))
-                  if (
-                    currentSKUID > 0 &&
-                    !options.some(
-                      (option) => Number(option.value) === currentSKUID
-                    )
-                  ) {
-                    options.push({
-                      value: currentSKUID,
-                      label: line.sku_code_snapshot || '原产品规格已不可用',
-                      disabled: true,
-                    })
-                  }
-                  return (
-                    <Form.Item
-                      className="erp-line-item-field erp-line-item-field--source"
-                      name={[field.name, 'product_sku_id']}
-                      label="产品规格"
-                      extra="可选；选择规格后固定使用该规格的单位。需要调整单位时先清除规格。"
-                    >
-                      <Select
-                        allowClear
-                        showSearch
-                        disabled={!productID}
-                        options={options}
-                        optionFilterProp="label"
-                        onChange={(value) =>
-                          onProductSKUChange(field.name, value)
-                        }
-                      />
-                    </Form.Item>
-                  )
-                }}
-              </Form.Item>
-              <Form.Item noStyle shouldUpdate>
-                {({ getFieldValue }) => {
-                  const line = getFieldValue(['items', field.name]) || {}
-                  if (
-                    line.subject_type !==
-                      OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT ||
-                    !line.product_id
-                  ) {
-                    return null
-                  }
-                  return (
-                    <ProductIdentity
-                      productId={line.product_id}
-                      name={line.product_name_snapshot}
-                      compact
-                    >
-                      产品图片
-                    </ProductIdentity>
-                  )
-                }}
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--note"
-                name={[field.name, 'note']}
-                label="行备注"
-              >
-                <BusinessTextArea allowClear showCount maxLength={255} />
-              </Form.Item>
+                  }}
+                </Form.Item>
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--note"
+                  name={[field.name, 'note']}
+                  label="行备注"
+                >
+                  <BusinessTextArea allowClear showCount maxLength={255} />
+                </Form.Item>
+              </div>
             </BusinessLineItemRow>
           )}
           footerProps={({ add, fields }) => ({
-            addLabel: '添加条目',
+            addLabel: '添加加工明细',
             onAdd: () => {
               const currentLines = form.getFieldValue('items') || []
               add(createBlankOutsourcingLine(getNextLineNo(currentLines)))

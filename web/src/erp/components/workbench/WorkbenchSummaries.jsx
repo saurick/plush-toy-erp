@@ -6,6 +6,23 @@ import SalesOrderSummaryPanel from './SalesOrderSummaryPanel.jsx'
 import EngineeringMaterialSummaryPanel from './EngineeringMaterialSummaryPanel.jsx'
 import './workbenchSummaries.css'
 
+function SummaryTypeControl({ options, selected, onChange }) {
+  return (
+    <div className="erp-workbench-summaries__heading">
+      {options.length > 1 ? (
+        <Select
+          aria-label="汇总类型"
+          value={selected}
+          options={options}
+          onChange={onChange}
+        />
+      ) : (
+        <h4>{options[0].label}</h4>
+      )}
+    </div>
+  )
+}
+
 export default function WorkbenchSummaries({ options, refreshRevision = 0 }) {
   const [params, setParams] = useSearchParams()
   const { adminProfile } = useOutletContext() || {}
@@ -14,36 +31,35 @@ export default function WorkbenchSummaries({ options, refreshRevision = 0 }) {
     options[0]?.value
   if (!selected) return null
   const accessKey = workflowTaskAdminAccessRequestIdentity(adminProfile)
+  const summaryTypeControl = (
+    <SummaryTypeControl
+      inline
+      options={options}
+      selected={selected}
+      onChange={(value) => {
+        const next = new URLSearchParams(params)
+        next.set('summary', value)
+        setParams(next, { replace: true })
+      }}
+    />
+  )
   return (
     <section
       className="erp-business-page-layout erp-workbench-summaries"
       aria-label="工作台汇总"
+      data-table-scroll-scope
     >
-      <div className="erp-workbench-summaries__heading">
-        {options.length > 1 ? (
-          <Select
-            aria-label="汇总类型"
-            value={selected}
-            options={options}
-            onChange={(value) => {
-              const next = new URLSearchParams(params)
-              next.set('summary', value)
-              setParams(next, { replace: true })
-            }}
-          />
-        ) : (
-          <h4>{options[0].label}</h4>
-        )}
-      </div>
       {selected === 'sales-orders' ? (
         <SalesOrderSummaryPanel
           key={`sales:${accessKey}`}
           refreshRevision={refreshRevision}
+          summaryTypeControl={summaryTypeControl}
         />
       ) : (
         <EngineeringMaterialSummaryPanel
           key={`materials:${accessKey}`}
           refreshRevision={refreshRevision}
+          summaryTypeControl={summaryTypeControl}
         />
       )}
     </section>

@@ -159,8 +159,24 @@ export function createOutsourcingSummaryScenarios({
           await region
             .getByRole('columnheader', { name: '委托方电话', exact: true })
             .count(),
-          readOnly ? 0 : 1
+          0
         )
+        await region.getByRole('button', { name: '列设置', exact: true }).click()
+        const settings = page.getByRole('dialog', { name: /^列设置/u })
+        await settings.waitFor()
+        assert.equal(await settings.getByRole('checkbox', { name: '委托方电话', exact: true }).count(), readOnly ? 0 : 1, '列设置沿用委外字段权限')
+        assert(!(await settings.getByRole('checkbox', { name: '行备注', exact: true }).isChecked()))
+        if (!readOnly) {
+          await settings.getByRole('button', { name: '全部显示', exact: true }).click()
+          const saved = page.waitForResponse(response => response.url().includes('/rpc/admin') && response.request().postDataJSON()?.method === 'set_erp_column_order')
+          await settings.getByRole('button', { name: /^完\s*成$/u }).click()
+          await saved
+          await settings.waitFor({ state: 'hidden' })
+          await region.getByRole('columnheader', { name: '委托方电话', exact: true }).waitFor()
+        } else {
+          await settings.locator('.ant-modal-close').click()
+          await settings.waitFor({ state: 'hidden' })
+        }
         await assertTableSemanticAlignment(region, {
           scenarioName: name,
           expected: {
@@ -170,8 +186,6 @@ export function createOutsourcingSummaryScenarios({
             厂家名称: 'left',
             单位: 'left',
             加工数量: 'right',
-            行备注: 'left',
-            委托人: 'left',
             合同状态: 'left',
           },
         })

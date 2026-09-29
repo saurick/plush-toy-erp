@@ -189,6 +189,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const moduleItem = getBusinessModule(moduleKey)
   const config = MODULE_WORKFLOW_CONFIG[moduleKey]
   const outletContext = useOutletContext()
+  const productionRecordsWorkspace =
+    outletContext?.productionRecordsWorkspace || null
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -526,6 +528,19 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
       ? productionExceptionStats
       : stats
+
+  useEffect(() => {
+    if (!isProductionExceptionPage || !productionRecordsWorkspace) return
+    productionRecordsWorkspace.setHeaderStats(
+      effectiveProductionExceptionTab,
+      headerStats
+    )
+  }, [
+    effectiveProductionExceptionTab,
+    headerStats,
+    isProductionExceptionPage,
+    productionRecordsWorkspace,
+  ])
 
   const selectedTaskLabel = selectedTask
     ? `${getWorkflowTaskCodeLabel(selectedTask)} / ${
@@ -1013,6 +1028,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           copyable: {
             resolveValue: (_value, record) => getWorkflowTaskCodeLabel(record),
           },
+          detailCopyable: true,
           width: 190,
           fixed: 'left',
           render: (value, record) => (
@@ -1033,6 +1049,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             resolveValue: (_value, record) =>
               resolveReadableWorkflowSourceNo(record, ['source_no']),
           },
+          detailCopyable: true,
           width: 170,
           render: (_, record) => formatWorkflowTaskSource(record),
           exportValue: formatWorkflowTaskSource,
@@ -1622,21 +1639,22 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     </>
   )
 
+  const LayoutRoot = productionRecordsWorkspace
+    ? React.Fragment
+    : BusinessPageLayout
+  const layoutProps = productionRecordsWorkspace
+    ? {}
+    : { className: 'erp-workflow-business-page' }
+
   return (
-    <BusinessPageLayout className="erp-workflow-business-page">
-      <PageHeaderCard
-        title={isProductionExceptionPage ? '生产记录' : moduleItem.title}
-        tags={
-          isProductionExceptionPage ? null : (
-            <Space size={6} wrap>
-              <Tag color="blue">待办任务</Tag>
-              <Tag color="gold">业务处理分开完成</Tag>
-            </Space>
-          )
-        }
-        stats={headerStats}
-        compact
-      />
+    <LayoutRoot {...layoutProps}>
+      {productionRecordsWorkspace ? null : (
+        <PageHeaderCard
+          title={isProductionExceptionPage ? '生产记录' : moduleItem.title}
+          stats={headerStats}
+          compact
+        />
+      )}
 
       {isProductionExceptionPage ? (
         productionExceptionTabKeys.length > 0 ? (
@@ -1661,6 +1679,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       ) : (
         workflowTaskWorkspace
       )}
-    </BusinessPageLayout>
+    </LayoutRoot>
   )
 }

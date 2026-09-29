@@ -4,6 +4,7 @@ import {
 } from './businessFormPageAssertions.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
+import { exerciseTableScrollControls } from './tableScrollControlAssertions.mjs'
 
 async function waitForMaterialDropdown(page) {
   const dropdown = page.locator('.ant-select-dropdown:visible')
@@ -32,6 +33,20 @@ export async function verifyBOMMaterialGroups(
   await modal.waitFor({ state: 'visible' })
   const groups = modal.locator('.erp-bom-material-group')
   await groups.first().waitFor({ state: 'visible' })
+  const partsScroll = modal.locator('.erp-bom-parts-scroll')
+  const hasHorizontalOverflow = await partsScroll.evaluate(
+    (node) => node.scrollWidth > node.clientWidth + 1
+  )
+  const scrollButtons = partsScroll.locator('.app-table-scroll-buttons')
+  if (hasHorizontalOverflow) {
+    await scrollButtons.waitFor({ state: 'visible' })
+  } else {
+    assert.equal(
+      await scrollButtons.count(),
+      0,
+      '宽度足够时不应显示无效横向定位按钮'
+    )
+  }
   assert.equal(await groups.count(), 3)
   assert.equal(
     await page.getByRole('button', { name: /^新建物料/ }).count(),
@@ -115,6 +130,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
   let saves = []
   let releaseSave
   let saveAttempts = 0
+  let createdMaterialUnitID = null
   const scenarios = [
     {
       name: 'bom-material-groups-desktop',
@@ -134,6 +150,25 @@ export function createBOMMaterialGroupsScenarios(deps) {
       },
       verify: async (page) => {
         const modal = await verifyBOMMaterialGroups(page, deps)
+        const scrollRegion = modal.locator('.erp-bom-parts-scroll')
+        await scrollRegion.scrollIntoViewIfNeeded()
+        await scrollRegion.evaluate((node) => {
+          node.scrollLeft = 0
+          node.dispatchEvent(new Event('scroll', { bubbles: true }))
+        })
+        await page.waitForFunction(
+          (node) =>
+            node.scrollLeft === 0 &&
+            node.querySelector('button[aria-label="向左查看列"]')?.disabled ===
+              true,
+          await scrollRegion.elementHandle()
+        )
+        await exerciseTableScrollControls(page, scrollRegion, scrollRegion)
+        deps.assert.equal(
+          await modal.getByLabel('单位用量 3', { exact: true }).inputValue(),
+          '0.015',
+          '横向查看后保留明细输入'
+        )
         await page.screenshot({
           path: `${deps.outputDir}/bom-material-groups-form${page.viewportSize().width < 600 ? '-mobile' : ''}.png`,
           fullPage: true,
@@ -790,6 +825,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
       ...scenarios[0],
       name: 'bom-material-create-and-reuse-desktop',
       beforeNavigate: async (page) => {
+        createdMaterialUnitID = null
         await scenarios[0].beforeNavigate(page)
         await page.route('**/rpc/masterdata', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
@@ -797,7 +833,12 @@ export function createBOMMaterialGroupsScenarios(deps) {
           deps.assert.equal(params.supplier_id, 1)
           deps.assert.equal(params.supplier_item_no, 'Q-001')
           deps.assert.equal(params.color, 'C01 米白')
-          deps.assert.equal(params.default_unit_id, 1)
+          createdMaterialUnitID = Number(params.default_unit_id)
+          deps.assert.ok(
+            Number.isSafeInteger(createdMaterialUnitID) &&
+              createdMaterialUnitID > 0,
+            '新建物料必须提交已选择的默认单位'
+          )
           deps.assert.equal(params.stock_category, 'MAIN')
           deps.assert.equal(params.default_warehouse_id, 1)
           return route.fulfill({
@@ -981,7 +1022,10 @@ export function createBOMMaterialGroupsScenarios(deps) {
         deps.assert.equal(saves.length, 1)
         const parts = saves[0].items.filter((item) => item.material_id === 77)
         deps.assert.equal(parts.length, 3)
-        deps.assert.ok(parts.every((item) => item.unit_id === 1))
+        deps.assert.ok(
+          parts.every((item) => item.unit_id === createdMaterialUnitID),
+          '复用新建物料时，全部部位必须继承该物料的默认单位'
+        )
         deps.assert.equal(saves[0].items.length, 5)
         deps.assert.equal(
           saves[0].items.filter((item) => item.material_id !== 77).length,

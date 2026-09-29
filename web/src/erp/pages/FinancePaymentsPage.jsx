@@ -1,16 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { QuestionCircleOutlined } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Form,
-  Input,
-  Popover,
-  Select,
-  Space,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, Button, Form, Input, Select, Tag } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
@@ -101,7 +90,6 @@ import {
 } from '../utils/financePaymentAllocation.mjs'
 import { resolveFinancePaymentActionAvailability } from '../utils/operationalActionAvailability.mjs'
 
-const { Text } = Typography
 const PAYMENT_STORAGE_PREFIX = 'plush-erp:finance-payment:last:v1:'
 const FINANCE_PAYMENT_COLUMN_ORDER_KEY = 'finance-payments-records'
 const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY = 'finance-credit-notes-records'
@@ -134,56 +122,6 @@ const FINANCE_VIEW_ITEMS = [
   { key: 'payments', label: '收付款记录' },
   { key: 'credits', label: '红冲记录' },
 ]
-
-function FinanceReversalTermHelp() {
-  const usesTouchInteraction =
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(hover: none), (pointer: coarse)').matches
-
-  return (
-    <Popover
-      placement="bottomLeft"
-      trigger={usesTouchInteraction ? ['click'] : ['hover', 'focus', 'click']}
-      title="冲销与红冲有什么区别？"
-      content={
-        <Space
-          direction="vertical"
-          size={8}
-          style={{
-            width: usesTouchInteraction
-              ? 'min(260px, calc(100vw - 64px))'
-              : 'min(340px, calc(100vw - 56px))',
-          }}
-        >
-          <div>
-            <Text strong>冲销：</Text>
-            <Text>
-              撤销一笔已经核销的收款或付款。相应金额会恢复为未核销，原收付款和核销记录仍会保留。
-            </Text>
-          </div>
-          <div>
-            <Text strong>红冲：</Text>
-            <Text>
-              对某笔应收或应付登记反向金额调整，减少该笔账款的未核销金额。原单不会删除，系统会另外保留红冲记录。
-            </Text>
-          </div>
-          <Text type="secondary">
-            这里只调整本系统中的应收、应付余额，不代表税控红字发票、总账凭证或银行对账已经完成。
-          </Text>
-        </Space>
-      }
-    >
-      <Button
-        type="text"
-        shape="circle"
-        size="small"
-        icon={<QuestionCircleOutlined />}
-        aria-label="查看冲销和红冲说明"
-      />
-    </Popover>
-  )
-}
 
 function paymentStatus(value) {
   const [label, color] = PAYMENT_STATUS_META[value] || ['状态待核对', 'default']
@@ -1069,6 +1007,7 @@ export default function FinancePaymentsPage() {
         title: '收付款单号',
         dataIndex: 'payment_no',
         copyable: { label: '收付款单号' },
+        detailCopyable: true,
         width: 200,
       },
       {
@@ -1150,6 +1089,7 @@ export default function FinancePaymentsPage() {
         title: '红冲单号',
         dataIndex: 'credit_note_no',
         copyable: { label: '红冲单号' },
+        detailCopyable: true,
         width: 200,
       },
       {
@@ -1157,6 +1097,7 @@ export default function FinancePaymentsPage() {
         title: '来源财务记录',
         dataIndex: 'finance_fact_no',
         copyable: { label: '来源财务记录' },
+        detailCopyable: true,
         width: 190,
         render: (value) => value || '已关联财务记录',
         exportValue: (record) => record?.finance_fact_no || '已关联财务记录',
@@ -1405,20 +1346,6 @@ export default function FinancePaymentsPage() {
         compact
         helpKey="finance-payments"
         title="收付款与核销"
-        tags={[
-          <Tag color="blue" key="payment">
-            真实收付款
-          </Tag>,
-          <Tag color="green" key="allocation">
-            多单核销
-          </Tag>,
-          <Space key="reversal" size={2}>
-            <Tag color="gold" style={{ marginInlineEnd: 0 }}>
-              冲销 / 红冲
-            </Tag>
-            <FinanceReversalTermHelp />
-          </Space>,
-        ]}
         stats={[
           {
             key: 'total',
@@ -1851,7 +1778,6 @@ export default function FinancePaymentsPage() {
       <BusinessFormPage
         form={paymentForm}
         title="登记收付款"
-        description="登记实际发生的收款或付款；创建后须完成审批，过账时再选择应收或应付核销。"
         open={paymentOpen}
         loading={referenceLoading}
         okText="创建收付款记录"
@@ -1985,9 +1911,10 @@ export default function FinancePaymentsPage() {
             {(fields) => (
               <BusinessCompactFieldTable
                 label="核销明细"
+                showSequence
                 columns={[
                   { label: '应收 / 应付' },
-                  { label: '未核销余额', width: '23%' },
+                  { label: '未核销余额', width: 180 },
                   {
                     label: (
                       <BusinessHelpLabel
@@ -1996,7 +1923,7 @@ export default function FinancePaymentsPage() {
                         pageKey="finance-payments"
                       />
                     ),
-                    width: '23%',
+                    width: 180,
                   },
                 ]}
               >
@@ -2004,6 +1931,7 @@ export default function FinancePaymentsPage() {
                   <BusinessCompactFieldRow
                     key={field.key}
                     label={`核销明细 ${field.name + 1}`}
+                    sequence={field.name + 1}
                     cells={[
                       <>
                         <Form.Item
@@ -2122,13 +2050,12 @@ export default function FinancePaymentsPage() {
       <CreditEditor
         {...(isCreatingCredit
           ? { form: creditForm }
-          : { size: 'localAction', cancelText: '取消' })}
+          : {
+              size: 'localAction',
+              cancelText: '取消',
+              description: '冲销会恢复该红冲对未核销金额的影响。',
+            })}
         title={creditOpen === 'reverse' ? '冲销红冲记录' : '登记红冲'}
-        description={
-          creditOpen === 'reverse'
-            ? '冲销会恢复该红冲对未核销金额的影响。'
-            : '红冲金额不得超过来源应收或应付的当前未核销金额。'
-        }
         open={Boolean(creditOpen)}
         okText={creditOpen === 'reverse' ? '确认冲销' : '确认红冲'}
         confirmLoading={loading}

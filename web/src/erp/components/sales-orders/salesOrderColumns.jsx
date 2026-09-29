@@ -106,6 +106,7 @@ export function buildSalesOrderColumns() {
       exportTitle: '订单号',
       dataIndex: 'order_no',
       copyable: true,
+      detailCopyable: true,
       width: 160,
       sorter: (a, b) => compareText(a?.order_no, b?.order_no),
     },
@@ -133,6 +134,7 @@ export function buildSalesOrderColumns() {
       exportTitle: '客户订单号',
       dataIndex: 'customer_order_no',
       copyable: true,
+      detailCopyable: true,
       effectiveFieldKey: 'source_no',
       width: 150,
       sorter: (a, b) => compareText(a?.customer_order_no, b?.customer_order_no),
@@ -153,7 +155,7 @@ export function buildSalesOrderColumns() {
       title: '联系人',
       exportTitle: '联系人',
       dataIndex: 'contact_snapshot',
-      listHidden: true,
+      defaultPriority: 75,
       copyable: {
         resolveValue: (value) => contactText(value, ''),
       },
@@ -180,7 +182,7 @@ export function buildSalesOrderColumns() {
       title: '货款金额',
       exportTitle: '货款金额',
       dataIndex: 'goods_amount',
-      listHidden: true,
+      defaultHidden: true,
       width: 140,
       sorter: (a, b) =>
         compareNumeric20Scale6Values(a?.goods_amount, b?.goods_amount),
@@ -192,7 +194,7 @@ export function buildSalesOrderColumns() {
       title: '计税方式 / 税率',
       exportTitle: '计税方式 / 税率',
       key: 'tax_terms',
-      listHidden: true,
+      defaultHidden: true,
       width: 200,
       sorter: (a, b) => compareText(taxTermsText(a), taxTermsText(b)),
       render: (_, record) => taxTermsText(record),
@@ -203,7 +205,7 @@ export function buildSalesOrderColumns() {
       title: '税额',
       exportTitle: '税额',
       dataIndex: 'tax_amount',
-      listHidden: true,
+      defaultHidden: true,
       width: 130,
       sorter: (a, b) =>
         compareNumeric20Scale6Values(a?.tax_amount, b?.tax_amount),
@@ -229,7 +231,7 @@ export function buildSalesOrderColumns() {
       title: '运费条件',
       exportTitle: '运费条件',
       dataIndex: 'freight_terms',
-      listHidden: true,
+      defaultHidden: true,
       width: 150,
       sorter: (a, b) => compareText(a?.freight_terms, b?.freight_terms),
       render: salesOrderFreightTermsText,
@@ -241,7 +243,7 @@ export function buildSalesOrderColumns() {
       title: '报价运费',
       exportTitle: '报价运费',
       dataIndex: 'quoted_freight_amount',
-      listHidden: true,
+      defaultHidden: true,
       width: 140,
       sorter: (a, b) =>
         compareNumeric20Scale6Values(
@@ -289,7 +291,7 @@ export function buildSalesOrderColumns() {
       title: '收货信息',
       exportTitle: '收货信息',
       dataIndex: 'delivery_snapshot',
-      listHidden: true,
+      defaultHidden: true,
       width: 360,
       sorter: (a, b) =>
         compareText(

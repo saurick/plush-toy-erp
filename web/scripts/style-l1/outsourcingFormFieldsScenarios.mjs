@@ -237,8 +237,14 @@ export function createOutsourcingFormFieldsScenarios({
           ''
         )
         await editor.locator('input#payment_term_days').fill('45')
-        await editor.locator('.erp-line-item-details summary').first().click()
-        await editor.getByText('已填备注', { exact: true }).waitFor()
+        const lineDetails = editor.locator('.erp-line-item-details').first()
+        await lineDetails
+          .getByText('规格与行备注', { exact: true })
+          .click()
+        assert.equal(await lineDetails.evaluate((details) => details.open), false)
+        await lineDetails
+          .getByText('备注：保留的逐行备注', { exact: true })
+          .waitFor()
         await assertNoHorizontalOverflow(page)
         await page.screenshot({
           path: path.join(outputDir, `${name}-editor.png`),

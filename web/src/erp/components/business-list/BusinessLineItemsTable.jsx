@@ -1,5 +1,26 @@
-/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- The shared wide table region supports keyboard scrolling. */
 import React from 'react'
+import { Form } from 'antd'
+import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
+
+function LineItemSummary({ name, fields }) {
+  const form = Form.useFormInstance()
+  const values = Form.useWatch(name[0], { form, preserve: true })
+  const row = name.slice(1).reduce((value, key) => value?.[key], values)
+  const text = fields
+    .map(({ key, label, options }) => {
+      const value = row?.[key]
+      const display = options
+        ? options.find((option) => String(option.value) === String(value))
+            ?.label
+        : value
+      return String(display ?? '').trim() ? `${label}：${display}` : ''
+    })
+    .filter(Boolean)
+    .join('；')
+  return text ? (
+    <span className="erp-line-item-details__summary">{text}</span>
+  ) : null
+}
 
 export default function BusinessLineItemsTable({
   columns,
@@ -7,7 +28,7 @@ export default function BusinessLineItemsTable({
   label = '单据明细',
 }) {
   return (
-    <div
+    <TableScrollRegion
       className="erp-sales-order-lines-form__list"
       role="region"
       aria-label={label}
@@ -25,7 +46,10 @@ export default function BusinessLineItemsTable({
         <colgroup>
           <col style={{ width: 40 }} />
           {columns.map((column, index) => (
-            <col key={index} style={{ width: column.width }} />
+            <col
+              key={index}
+              style={column.flexible ? undefined : { width: column.width }}
+            />
           ))}
           <col style={{ width: 160 }} />
         </colgroup>
@@ -52,7 +76,7 @@ export default function BusinessLineItemsTable({
         </thead>
         {children}
       </table>
-    </div>
+    </TableScrollRegion>
   )
 }
 
@@ -66,6 +90,9 @@ export function BusinessLineItemRow({
   status,
   detailsOpen = false,
   detailsLabel = '补充信息',
+  name = ['items', index],
+  summaryFields = [],
+  evidence,
 }) {
   return (
     <tbody
@@ -88,17 +115,28 @@ export function BusinessLineItemRow({
       {children ? (
         <tr>
           <td colSpan={cells.length + 2} className="erp-line-item-table__more">
-            <details className="erp-line-item-details" open={detailsOpen || undefined}>
-              <summary>
-                {detailsLabel}
-                {status ? (
-                  <span className="erp-line-item-details__status">
-                    {status}
+            <div className="erp-line-item-supplement">
+              <details
+                className="erp-line-item-details"
+                open={detailsOpen || undefined}
+              >
+                <summary>
+                  <span className="erp-line-item-details__label">
+                    {detailsLabel}
                   </span>
-                ) : null}
-              </summary>
-              <div className="erp-line-item-details__fields">{children}</div>
-            </details>
+                  {summaryFields.length ? (
+                    <LineItemSummary name={name} fields={summaryFields} />
+                  ) : null}
+                  {status ? (
+                    <span className="erp-line-item-details__status">
+                      {status}
+                    </span>
+                  ) : null}
+                </summary>
+                <div className="erp-line-item-details__fields">{children}</div>
+              </details>
+              {evidence}
+            </div>
           </td>
         </tr>
       ) : null}

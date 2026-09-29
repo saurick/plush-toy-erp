@@ -327,7 +327,7 @@ export function createContactEditorScenarios({
         .fill('紧凑联系人试用客户')
       await editor.locator('#contact-0-name').fill('小陈')
       await editor
-        .getByRole('button', { name: '＋ 添加联系人', exact: true })
+        .getByRole('button', { name: '添加联系人', exact: true })
         .click()
       await editor.locator('#contact-1-name').fill('小周')
       await editor

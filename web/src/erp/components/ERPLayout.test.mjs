@@ -50,6 +50,8 @@ function loadERPLayoutRuntime() {
       import('../../common/utils/jsonRpc.js'),
     ]).then(([layoutModule, rpcModule]) => ({
       ERPLayout: layoutModule.default,
+      hasSelfContainedBusinessPageHead:
+        layoutModule.hasSelfContainedBusinessPageHead,
       JsonRpc: rpcModule.JsonRpc,
     }))
   }
@@ -422,7 +424,7 @@ test('ERPLayout: 桌面侧栏可收起为图标栏并恢复完整菜单', async 
   }
 })
 
-test('ERPLayout: 顶栏只显示当前页面名称', async () => {
+test('ERPLayout: 没有独立内容标题的页面保留顶栏名称', async () => {
   const h = await mountRecoveryHarness()
   try {
     const breadcrumb = h.container.querySelector('.erp-admin-breadcrumb')
@@ -433,6 +435,23 @@ test('ERPLayout: 顶栏只显示当前页面名称', async () => {
   } finally {
     await h.cleanup()
   }
+})
+
+test('ERPLayout: 自带标题卡的业务页不在顶栏重复页面名称', async () => {
+  const { hasSelfContainedBusinessPageHead } = await loadERPLayoutRuntime()
+
+  assert.equal(
+    hasSelfContainedBusinessPageHead('/erp/purchase/accessories'),
+    true
+  )
+  assert.equal(
+    hasSelfContainedBusinessPageHead('/erp/production/records'),
+    true
+  )
+  assert.equal(
+    hasSelfContainedBusinessPageHead('/erp/business-dashboard'),
+    false
+  )
 })
 
 test('ERPLayout: 断连保留草稿、暂停业务请求，重复重试合并且恢复不重挂载', async () => {

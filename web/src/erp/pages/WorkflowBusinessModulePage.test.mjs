@@ -26,6 +26,10 @@ const productionRecordsNavigation = readFileSync(
   ),
   'utf8'
 )
+const operationalFactsPage = readFileSync(
+  fileURLToPath(new URL('./OperationalFactsPage.jsx', import.meta.url)),
+  'utf8'
+)
 const businessListToolbarActions = readFileSync(
   fileURLToPath(
     new URL(
@@ -53,24 +57,35 @@ test('workflow business page consumes the dashboard source keyword without mutat
   )
 })
 
-test('production records navigation belongs to the persistent route layout, outside conditional tables', () => {
+test('production records navigation stays mounted in the shared page header', () => {
   const layout = readFileSync(new URL('../components/production-records/ProductionRecordsLayout.jsx', import.meta.url), 'utf8')
-  assert.match(layout, /<ProductionRecordsNavigation[\s\S]*<Suspense[\s\S]*<Outlet/u)
+  assert.match(
+    layout,
+    /<BusinessPageLayout[\s\S]*<PageHeaderCard[\s\S]*<ProductionRecordsNavigation[\s\S]*<Suspense[\s\S]*<Outlet/u
+  )
+  assert.match(layout, /productionRecordsWorkspace:\s*\{ setHeaderStats \}/u)
   for (const label of ['记录明细', '生产工序', '异常处理', '待审批']) {
     assert.ok(productionRecordsNavigation.includes(label))
   }
   assert.match(productionRecordsNavigation, /aria-label="生产记录工作区"/u)
   assert.doesNotMatch(source, /<ProductionRecordsNavigation|productionExceptionViewTabs/u)
+  assert.match(source, /productionRecordsWorkspace\.setHeaderStats/u)
+  assert.match(operationalFactsPage, /productionRecordsWorkspace\.setHeaderStats/u)
+  assert.match(
+    operationalFactsPage,
+    /productionRecordsWorkspace\s*\?\s*React\.Fragment\s*:\s*BusinessPageLayout/u
+  )
   assert.doesNotMatch(productionExceptionPanel, /tableHeader/u)
   assert.match(source, /resolveProductionExceptionTab/u)
   assert.match(source, /'production-exceptions': \{[\s\S]*ownerRoleOptions: \[workflowRoleOption\('boss'\)\]/u)
 })
 
-test('ordinary workflow pages keep task language separate from exception approvals', () => {
+test('ordinary workflow pages keep the module title without persistent helper tags', () => {
   assert.match(
     source,
-    /tags=\{\s*isProductionExceptionPage \? null[\s\S]*待办任务/u
+    /title=\{isProductionExceptionPage \? '生产记录' : moduleItem\.title\}/u
   )
+  assert.doesNotMatch(source, /业务处理分开完成/u)
 })
 
 test('production exception disposition tabs refresh and summarize only the active workspace', () => {

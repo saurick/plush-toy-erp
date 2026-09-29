@@ -1,3 +1,4 @@
+import { exerciseTableScrollControls } from './tableScrollControlAssertions.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
@@ -183,7 +184,7 @@ export function createMaterialSummaryScenarios({
           .locator('.erp-material-sheet__table .ant-table-body')
           .first()
         assert.equal(
-          await dialog.locator('.erp-material-sheet__scroll-actions').count(),
+          await dialog.locator('.erp-material-sheet__table > .app-table .app-table-scroll-buttons').count(),
           0,
           '宽度足够时没有无效定位按钮'
         )
@@ -222,23 +223,8 @@ export function createMaterialSummaryScenarios({
         )
 
         await page.setViewportSize({ width: 850, height: 900 })
-        const right = dialog.getByRole('button', {
-          name: '库存 / 备注',
-          exact: true,
-        })
-        await right.waitFor()
-        await right.click()
-        await page.waitForFunction(
-          () =>
-            document.querySelector('.erp-material-sheet__table .ant-table-body')
-              .scrollLeft > 100
-        )
-        await dialog.getByRole('button', { name: '材料', exact: true }).click()
-        await page.waitForFunction(
-          () =>
-            document.querySelector('.erp-material-sheet__table .ant-table-body')
-              .scrollLeft < 1
-        )
+        await exerciseTableScrollControls(page, dialog.locator('.erp-material-sheet__table > .app-table'), scroller)
+
         assert(
           (await scroller.evaluate((node) => node.scrollWidth)) >
             (await scroller.evaluate((node) => node.clientWidth))
@@ -251,7 +237,7 @@ export function createMaterialSummaryScenarios({
         )
         await page.setViewportSize({ width: 1600, height: 1000 })
         await dialog
-          .locator('.erp-material-sheet__scroll-actions')
+          .locator('.erp-material-sheet__table > .app-table .app-table-scroll-buttons')
           .waitFor({ state: 'detached' })
         await dialog.locator('.ant-modal-close').press('Escape')
         await dialog.waitFor({ state: 'detached' })

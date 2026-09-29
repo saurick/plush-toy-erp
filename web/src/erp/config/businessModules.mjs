@@ -127,17 +127,17 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '环节',
     pageKind: 'formal-v1',
     description:
-      '加工环节维护委外订单和质检标记可引用的少量标准环节，不承接完整工艺路线、排程或报工。',
+      '加工环节维护委外合同与标准生产路线可引用的工序；质检参考仅供人工查阅。',
     primaryEntity: 'processes',
     factSource: 'processes',
     boundary:
-      '加工环节用于委外和质检引用；不会自动生成委外订单、生产任务、发料、回货、库存或质检记录。',
+      '加工环节用于委外合同和标准生产路线引用；质检参考仅供查阅，不会自动生成质检任务或结果。',
     sourceRefs: ['processes', 'bom_headers', 'outsourcing orders（后续评审）'],
     currentScope: [
       '环节编号和名称',
       '环节类别文本',
       '委外 / 内制适用标记',
-      '质检要求和启停状态',
+      '质检参考和启停状态',
     ],
   },
   {

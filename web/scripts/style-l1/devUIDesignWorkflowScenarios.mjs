@@ -28,6 +28,34 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
   const shot = (page, name) => page.screenshot({ path: path.join(outputDir, `${name}.png`) })
   return [
     {
+      name: 'dev-ui-design-column-settings',
+      path: '/__dev/ui-design',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const frame = await open(page)
+        await frame.locator('[data-action="nav"][data-page="sales"]').click()
+        const headers = frame.locator('.table-wrap .sort-btn')
+        const before = await headers.allTextContents()
+        const openSettings = () => frame.getByRole('button', { name: '列设置', exact: true }).click()
+        const dialog = frame.getByRole('dialog', { name: '列设置', exact: true })
+        await openSettings()
+        assert(!(await dialog.getByRole('checkbox', { name: '当前进度', exact: true }).isChecked()))
+        await dialog.getByRole('button', { name: '全部显示', exact: true }).click()
+        assert.deepEqual(await headers.allTextContents(), before, '草稿不改变表格')
+        await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+        await openSettings()
+        assert(!(await dialog.getByRole('checkbox', { name: '当前进度', exact: true }).isChecked()), '关闭放弃草稿')
+        await dialog.getByRole('button', { name: '全部显示', exact: true }).click()
+        await dialog.getByRole('button', { name: '完成', exact: true }).click()
+        assert.equal(await headers.count(), before.length + 1)
+        await openSettings()
+        await dialog.getByRole('button', { name: '恢复默认', exact: true }).click()
+        assert.equal(await headers.count(), before.length + 1, '恢复默认也须完成后生效')
+        await dialog.getByRole('button', { name: '完成', exact: true }).click()
+        assert.deepEqual(await headers.allTextContents(), before)
+      },
+    },
+    {
       name: 'dev-ui-design-mobile-task-recovery',
       path: '/__dev/ui-design',
       viewport: { width: 1440, height: 900 },
@@ -162,6 +190,44 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
         await frame.locator('[data-action="dashboard-summary-type"][data-value="sales"]').click()
         assert.match(await frame.locator('.summary-table').innerText(), /待核对/)
         assert.equal(await frame.locator('.summary-table .difference').count(), 0)
+        const summaryGeometry = await frame
+          .locator('.summary-table-wrap')
+          .evaluate((wrap) => ({
+            leftInset:
+              wrap.getBoundingClientRect().left -
+              wrap.closest('.summary-workspace').getBoundingClientRect().left,
+            horizontalRange: wrap.scrollWidth - wrap.clientWidth,
+          }))
+        assert(summaryGeometry.leftInset >= 11)
+        const summaryScrollActions = frame.locator('.summary-scroll-actions')
+        assert.equal(
+          await summaryScrollActions.isVisible(),
+          summaryGeometry.horizontalRange > 2
+        )
+        if (summaryGeometry.horizontalRange > 2) {
+          const rightArrow = summaryScrollActions.getByRole('button', { name: '向右查看列' })
+          const rightBox = await rightArrow.boundingBox()
+          await page.mouse.move(rightBox.x + rightBox.width / 2, rightBox.y + rightBox.height / 2)
+          await rightArrow.click()
+          await frame.locator('.summary-table-wrap').evaluate((wrap) =>
+            new Promise((resolve) => {
+              const check = () =>
+                wrap.scrollLeft > 1 ? resolve() : requestAnimationFrame(check)
+              check()
+            })
+          )
+          const leftArrow = summaryScrollActions.getByRole('button', { name: '向左查看列' })
+          const leftBox = await leftArrow.boundingBox()
+          await page.mouse.move(leftBox.x + leftBox.width / 2, leftBox.y + leftBox.height / 2)
+          await leftArrow.click()
+          await frame.locator('.summary-table-wrap').evaluate((wrap) =>
+            new Promise((resolve) => {
+              const check = () =>
+                wrap.scrollLeft <= 1 ? resolve() : requestAnimationFrame(check)
+              check()
+            })
+          )
+        }
         await frame.locator('[data-action="dashboard-summary-type"][data-value="outsourcing"]').click()
         assert.doesNotMatch((await frame.locator('.summary-table th').allTextContents()).join(' '), /已发出|已回货|未回/)
         await shot(page, 'ui-summary-contract-scope')

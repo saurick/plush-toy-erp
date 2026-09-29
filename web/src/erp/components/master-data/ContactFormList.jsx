@@ -1,8 +1,11 @@
 import React, { useId, useState } from 'react'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Form, Input, Radio, Space } from 'antd'
+import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
-import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
+import BusinessLineItemsFooter, {
+  BusinessLineItemsHeader,
+} from '../business-list/BusinessLineItemsFooter.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   optionalContactEmailRule,
@@ -41,12 +44,22 @@ function ContactRow({
 }) {
   const [noteOpen, setNoteOpen] = useState(false)
   const noteID = useId()
-  const columns = multiple ? 7 : 6
+  const columns = multiple ? 8 : 7
   const note = String(row?.note || '')
 
   return (
-    <tbody className="erp-master-contact-list__row" ref={registerRow}>
+    <tbody
+      className="erp-master-contact-list__row"
+      aria-label={`第 ${index + 1} 位联系人`}
+      ref={registerRow}
+    >
       <tr className="erp-contact-editor__fields">
+        <td
+          className="erp-contact-editor__sequence"
+          aria-label={`第 ${index + 1} 位`}
+        >
+          {index + 1}
+        </td>
         {contactFields.map(({ name, label, rules }) => (
           <td key={name} className={`erp-contact-editor__${name}`}>
             {name === 'name' ? (
@@ -150,6 +163,10 @@ export default function ContactFormList({ form, entityLabel }) {
   const primaryGroup = useId()
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
+  const appendContact = (add, index) => {
+    add({ is_primary: index === 0 })
+    requestLineItemScroll(index)
+  }
   return (
     <Form.List
       name="contacts"
@@ -168,20 +185,24 @@ export default function ContactFormList({ form, entityLabel }) {
     >
       {(fields, { add, remove }, { errors }) => (
         <div className="erp-master-contact-list erp-contact-editor">
-          <div className="erp-master-contact-list__head">
-            <strong>联系人</strong>
-          </div>
-          <div className="erp-master-contact-list__items">
+          <BusinessLineItemsHeader
+            title="联系人"
+            addLabel="添加联系人"
+            addDisabled={componentDisabled}
+            onAdd={() => appendContact(add, fields.length)}
+          />
+          <TableScrollRegion className="erp-master-contact-list__items">
             <table
               className="erp-contact-editor__table"
               aria-label={`${entityLabel}联系人`}
             >
               <colgroup>
+                <col className="erp-contact-editor__sequence-column" />
                 <col />
                 <col />
+                <col className="erp-contact-editor__phone-column" />
+                <col className="erp-contact-editor__phone-column" />
                 <col />
-                <col />
-                <col className="erp-contact-editor__email-column" />
                 {fields.length > 1 ? (
                   <col className="erp-contact-editor__primary-column" />
                 ) : null}
@@ -189,6 +210,9 @@ export default function ContactFormList({ form, entityLabel }) {
               </colgroup>
               <thead>
                 <tr>
+                  <th className="erp-contact-editor__sequence" scope="col">
+                    序号
+                  </th>
                   {contactFields.map(({ name, label, rules }) => (
                     <th key={name} scope="col">
                       {rules?.some((rule) => rule.required) ? (
@@ -243,14 +267,11 @@ export default function ContactFormList({ form, entityLabel }) {
                 />
               ))}
             </table>
-          </div>
+          </TableScrollRegion>
           <BusinessLineItemsFooter
             addLabel="添加联系人"
             addDisabled={componentDisabled}
-            onAdd={() => {
-              add({ is_primary: fields.length === 0 })
-              requestLineItemScroll(fields.length)
-            }}
+            onAdd={() => appendContact(add, fields.length)}
             stats={[
               {
                 key: 'count',

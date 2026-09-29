@@ -1736,10 +1736,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               ) : (
                 <>
                   <div className="erp-workbench-queue-heading">
-                    <div className="erp-workbench-queue-heading__copy">
-                      <small>当前岗位</small>
-                      <strong>先处理需要我判断或推进的事项</strong>
-                    </div>
                     <div
                       className="erp-workbench-queue-filter-strip"
                       aria-label="工作台任务筛选"

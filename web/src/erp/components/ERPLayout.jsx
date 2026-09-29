@@ -291,10 +291,29 @@ const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
   '/erp/history',
   '/erp/help-center',
 ])
+const BUSINESS_PAGE_HEAD_PATH_PREFIXES = [
+  '/erp/master/',
+  '/erp/sales/',
+  '/erp/product/',
+  '/erp/engineering/',
+  '/erp/purchase/',
+  '/erp/quality/',
+  '/erp/inventory/',
+  '/erp/production/',
+  '/erp/warehouse/',
+  '/erp/shipments/',
+  '/erp/finance/',
+]
 const LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS = new Set([
   'global-dashboard',
   'task-board',
 ])
+
+export function hasSelfContainedBusinessPageHead(path = '') {
+  return BUSINESS_PAGE_HEAD_PATH_PREFIXES.some((prefix) =>
+    String(path || '').startsWith(prefix)
+  )
+}
 
 function normalizeMenuPaths(menus = []) {
   if (!Array.isArray(menus)) {
@@ -1059,19 +1078,9 @@ export default function ERPLayout({ legalNotice }) {
     currentNavigationEntry.matched && currentSidebarPath
       ? [currentSidebarPath]
       : []
-  const hideCurrentEntryPageHead = [
-    '/erp/master/',
-    '/erp/sales/',
-    '/erp/product/',
-    '/erp/engineering/',
-    '/erp/purchase/',
-    '/erp/quality/',
-    '/erp/inventory/',
-    '/erp/production/',
-    '/erp/warehouse/',
-    '/erp/shipments/',
-    '/erp/finance/',
-  ].some((prefix) => currentEntry?.path?.startsWith(prefix))
+  const hideCurrentEntryPageHead = hasSelfContainedBusinessPageHead(
+    currentEntry?.path
+  )
   const hidePageHead =
     SELF_CONTAINED_PAGE_HEAD_PATHS.has(currentEntry?.path) ||
     hideCurrentEntryPageHead
@@ -1542,18 +1551,21 @@ export default function ERPLayout({ legalNotice }) {
                   className="erp-admin-header__menu-button"
                   onClick={() => setMobileNavOpen(true)}
                 />
-                <Breadcrumb
-                  className="erp-admin-breadcrumb"
-                  items={[
-                    {
-                      title: (
-                        <strong>
-                          {currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label}
-                        </strong>
-                      ),
-                    },
-                  ]}
-                />
+                {!hideCurrentEntryPageHead ? (
+                  <Breadcrumb
+                    className="erp-admin-breadcrumb"
+                    items={[
+                      {
+                        title: (
+                          <strong>
+                            {currentEntry?.label ||
+                              DEFAULT_DESKTOP_ENTRY.label}
+                          </strong>
+                        ),
+                      },
+                    ]}
+                  />
+                ) : null}
               </Space>
 
               <Space size={7} className="erp-admin-header__right">

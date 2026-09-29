@@ -215,25 +215,10 @@
 .erp-workbench-queue-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
   min-height: 58px;
   padding: 10px 12px;
-}
-
-.erp-workbench-queue-heading__copy {
-  display: grid;
-  gap: 2px;
-}
-
-.erp-workbench-queue-heading__copy small {
-  color: var(--erp-text-subtle);
-  font-size: 11px;
-}
-
-.erp-workbench-queue-heading__copy strong {
-  font-size: 15px;
 }
 
 .erp-product-core-dashboard .ant-card-body {

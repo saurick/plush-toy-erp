@@ -14,35 +14,57 @@ export function createBusinessFormModalAssertions({ assert }) {
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
     const isPage = isBusinessFormPageTitle(titleText)
     if (isPage) await assertBusinessFormPage(page, modal)
-    await page.waitForFunction(
-      (text) => {
-        const modals = Array.from(
-          document.querySelectorAll(
-            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal'
-          )
-        ).filter((node) => {
-          const rect = node.getBoundingClientRect()
-          const style = window.getComputedStyle(node)
+    try {
+      await page.waitForFunction(
+        (text) => {
+          const modals = Array.from(
+            document.querySelectorAll(
+              '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal'
+            )
+          ).filter((node) => {
+            const rect = node.getBoundingClientRect()
+            const style = window.getComputedStyle(node)
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden' &&
+              node.textContent?.includes(text)
+            )
+          })
+          const modalNode = modals.at(-1)
+          const root = modalNode?.closest('.ant-modal-root') || modalNode
           return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            node.textContent?.includes(text)
+            modalNode &&
+            document.activeElement instanceof Element &&
+            root?.contains(document.activeElement) &&
+            document.activeElement !== document.body
           )
-        })
-        const modalNode = modals.at(-1)
-        const root = modalNode?.closest('.ant-modal-root') || modalNode
-        return (
-          modalNode &&
-          document.activeElement instanceof Element &&
-          root?.contains(document.activeElement) &&
-          document.activeElement !== document.body
-        )
-      },
-      titleText,
-      { timeout: 2_000 }
-    )
+        },
+        titleText,
+        { timeout: 2_000 }
+      )
+    } catch (error) {
+      const focusMetric = await modal.evaluate((node) => {
+        const root = node.closest('.ant-modal-root') || node
+        const activeElement = document.activeElement
+        return {
+          activeTagName: activeElement?.tagName || '',
+          activeClassName: String(activeElement?.className || ''),
+          activeText:
+            activeElement?.textContent?.replace(/\s+/g, ' ').trim() || '',
+          activeInsideModal:
+            activeElement instanceof Element && root.contains(activeElement),
+          pageHidden: node.hidden,
+          enabledFieldCount: node.querySelectorAll(
+            'input:not([disabled]):not([readonly]):not([type="hidden"]), textarea:not([disabled]):not([readonly])'
+          ).length,
+        }
+      })
+      throw new Error(
+        `${error.message}; ${scenarioName} focus=${JSON.stringify(focusMetric)}`
+      )
+    }
 
     const openedFocusMetric = await modal.evaluate((node) => {
       const root = node.closest('.ant-modal-root') || node

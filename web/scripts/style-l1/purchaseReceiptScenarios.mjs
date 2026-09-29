@@ -314,6 +314,7 @@ export function createPurchaseReceiptScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
+        const addButtonName = mode === 'return' ? '添加退货明细' : '添加调整明细'
         await expectHeading(page, '采购入库')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, triggerName)
@@ -329,13 +330,13 @@ export function createPurchaseReceiptScenarios(deps) {
             const before = await rows.count()
             assert.equal(
               await modal
-                .getByRole('button', { name: '添加明细', exact: true })
+                .getByRole('button', { name: addButtonName, exact: true })
                 .count(),
               1,
               `${mode}-${viewport.width}-${count}: ${await modal.innerText()}`
             )
             await modal
-              .getByRole('button', { name: '添加明细', exact: true })
+              .getByRole('button', { name: addButtonName, exact: true })
               .click()
             const added = rows.nth(before).locator('input:focus')
             await added.waitFor({ state: 'visible' })
@@ -512,8 +513,8 @@ export function createPurchaseReceiptScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '采购入库')
         await expectText(page, 'PR-STYLE-L1-DRAFT')
-        await expectText(page, '入库单：正式入库记录')
-        await expectText(page, '过账后更新库存记录')
+        await assertTextAbsent(page, '入库单：正式入库记录')
+        await assertTextAbsent(page, '过账后更新库存记录')
         await assertTextAbsent(page, '维护明细')
         await assertTextAbsent(page, '添加明细')
         await assertTextAbsent(page, '添加入库明细')
@@ -675,7 +676,7 @@ export function createPurchaseReceiptScenarios(deps) {
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
-        await expectText(page, '入库单：正式入库记录')
+        await assertTextAbsent(page, '入库单：正式入库记录')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
         await assertTextAbsent(page, '添加明细')
@@ -694,7 +695,7 @@ export function createPurchaseReceiptScenarios(deps) {
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '采购入库')
-        await expectText(page, '入库单：正式入库记录')
+        await assertTextAbsent(page, '入库单：正式入库记录')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
         await assertTextAbsent(page, '添加明细')

@@ -4,9 +4,19 @@ import { DeleteOutlined } from '@ant-design/icons'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
 } from '../business-list/BusinessCompactFieldTable.jsx'
+import BusinessLineItemsFooter, {
+  BusinessLineItemsHeader,
+} from '../business-list/BusinessLineItemsFooter.jsx'
+import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import { CHECK_RESULT_LABELS } from '../../utils/incomingAcceptance.mjs'
 
 export function IncomingCheckItemsForm() {
+  const { registerLineItemRow, requestLineItemScroll } =
+    useLineItemAppendScroll()
+  const appendCheckItem = (add, index) => {
+    add({ result: 'NOT_CHECKED' })
+    requestLineItemScroll(index)
+  }
   return (
     <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
       <Typography.Paragraph type="secondary">
@@ -15,22 +25,31 @@ export function IncomingCheckItemsForm() {
       <Form.List name="check_items">
         {(fields, { add, remove }) => (
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <BusinessLineItemsHeader
+              title="检查项目"
+              addLabel="添加检查项"
+              addDisabled={fields.length >= 50}
+              onAdd={() => appendCheckItem(add, fields.length)}
+            />
             <BusinessCompactFieldTable
               label="来料检查项"
+              showSequence
               columns={[
-                { label: '检查项目', required: true, width: '19%' },
-                { label: '检查结果', width: '12%' },
-                { label: '要求 / 依据', width: '18%' },
-                { label: '实际情况', width: '18%' },
-                { label: '检查范围', width: '12%' },
+                { label: '检查项目', required: true },
+                { label: '检查结果', width: 120 },
+                { label: '要求 / 依据' },
+                { label: '实际情况' },
+                { label: '检查范围', width: 104 },
                 { label: '说明 / 抽检范围' },
                 { label: '操作', width: 52 },
               ]}
             >
-              {fields.map(({ key, name, ...rest }) => (
+              {fields.map(({ key, name, ...rest }, index) => (
                 <BusinessCompactFieldRow
                   key={key}
                   label={`检查项目 ${name + 1}`}
+                  rowRef={(node) => registerLineItemRow(index, node)}
+                  sequence={index + 1}
                   cells={[
                     <Form.Item
                       {...rest}
@@ -108,12 +127,19 @@ export function IncomingCheckItemsForm() {
                 />
               ))}
             </BusinessCompactFieldTable>
-            <Button
-              disabled={fields.length >= 50}
-              onClick={() => add({ result: 'NOT_CHECKED' })}
-            >
-              添加检查项
-            </Button>
+            <BusinessLineItemsFooter
+              addLabel="添加检查项"
+              addDisabled={fields.length >= 50}
+              onAdd={() => appendCheckItem(add, fields.length)}
+              stats={[
+                {
+                  key: 'count',
+                  label: '已录入',
+                  value: fields.length,
+                  suffix: '项',
+                },
+              ]}
+            />
           </Space>
         )}
       </Form.List>

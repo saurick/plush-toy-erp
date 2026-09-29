@@ -181,3 +181,54 @@ test('product image sizes remain identifiable across dense, standard, and summar
     /\.erp-material-product \.erp-task-product-image \{[\s\S]*?width: 64px;/u
   )
 })
+
+test('mobile progress restores history details without replaying the drawer opening motion', () => {
+  assert.match(
+    mobilePanel,
+    /const \[suppressDetailOpenMotion, setSuppressDetailOpenMotion\] = useState\(\s*Boolean\(initial\.selection\)\s*\)/u
+  )
+  assert.match(
+    mobilePanel,
+    /setSuppressDetailOpenMotion\(Boolean\(restored\.selection\)\)[\s\S]*?setSelection\(restored\.selection\)/u
+  )
+  assert.match(
+    mobilePanel,
+    /const open = \(row, section = 'lines'\) => \{[\s\S]*?setSuppressDetailOpenMotion\(false\)/u
+  )
+  assert.match(
+    mobilePanel,
+    /<BusinessProgressDrawer[\s\S]*?suppressOpenMotion=\{suppressDetailOpenMotion\}/u
+  )
+  assert.match(
+    drawer,
+    /suppressOpenMotion[\s\S]*?maskMotion: SUPPRESS_OPEN_MOTION,[\s\S]*?motion: SUPPRESS_OPEN_MOTION/u
+  )
+})
+
+test('mobile progress groups business details without desktop source links', async () => {
+  await transformWithEsbuild(drawer, 'BusinessProgressDrawer.jsx', {
+    loader: 'jsx',
+    jsx: 'automatic',
+  })
+  assert.match(
+    drawer,
+    /const MOBILE_GROUPS = \[[\s\S]*?产品信息[\s\S]*?生产执行[\s\S]*?关联任务/u
+  )
+  assert.match(drawer, /sections: \['production', 'batches', 'materials'\]/u)
+  assert.match(drawer, /mobile\s*\? sectionRecords\(item\.key\)\.length > 0/u)
+  assert.match(drawer, /!mobile && sourcePath && canOpen\(sourcePath\)/u)
+  assert.match(drawer, /!mobile && canOpen\(path\)/u)
+  assert.doesNotMatch(drawer, /mobile-progress-detail-source/u)
+  assert.match(
+    drawer,
+    /mobile-progress-detail-group-trigger[\s\S]*?aria-expanded=\{expanded\}/u
+  )
+  assert.match(
+    drawer,
+    /sectionRecords\('tasks'\)\.length > 0[\s\S]*?查看关联任务/u
+  )
+  assert.match(
+    mobileProgressStyles,
+    /\.mobile-progress-detail-group-trigger \{[\s\S]*?min-height: 52px;/u
+  )
+})

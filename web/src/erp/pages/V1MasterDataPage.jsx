@@ -1205,7 +1205,6 @@ export default function V1MasterDataPage({ type }) {
             ? `编辑${entityLabel}`
             : `新建${config.createTitleLabel || config.title}`
         }
-        description={config.formBoundary}
         open={recordModalOpen}
         onOk={saveRecord}
         onCancel={() => {

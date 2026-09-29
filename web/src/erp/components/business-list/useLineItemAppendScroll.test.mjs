@@ -92,6 +92,9 @@ test('append focuses the first editable field, skipping hidden, readonly and dis
   view.frame()
   assert.equal(document.activeElement === row.querySelector('#editable'), true)
   assert.equal(row.scrollIntoView.mock.callCount(), 1)
+  assert.equal(row.classList.contains('erp-line-item--appended'), true)
+  row.dispatchEvent(new Event('animationend'))
+  assert.equal(row.classList.contains('erp-line-item--appended'), false)
 })
 
 test('append can focus a non-searchable combobox while preserving a field already focused by BOM', async (t) => {

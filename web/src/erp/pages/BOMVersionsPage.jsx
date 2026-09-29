@@ -944,17 +944,6 @@ export default function BOMVersionsPage() {
     columns: dataColumns,
   })
 
-  const exportColumns = useMemo(
-    () => [
-      ...orderedDataColumns,
-      { title: '订单数量', dataIndex: 'quantity_text' },
-      { title: '备品', dataIndex: 'spare_text' },
-      { title: '制表', dataIndex: 'maker' },
-      { title: '审核', dataIndex: 'auditor' },
-      { title: '毛向', dataIndex: 'hair_direction' },
-    ],
-    [orderedDataColumns]
-  )
   const loadExportVersions = useCallback(
     async ({ signal }) => {
       if (!canRead) return []
@@ -967,7 +956,7 @@ export default function BOMVersionsPage() {
     requestKey: 'bom-versions-export',
     loadRows: loadExportVersions,
     filename: `物料清单-${currentBusinessDate()}.csv`,
-    columns: exportColumns,
+    columns: orderedDataColumns,
     recordLabel: '物料清单',
   })
 

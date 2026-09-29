@@ -12,6 +12,7 @@ import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 
@@ -432,7 +433,7 @@ export default function ProductionCompletionModal({
             name="note"
             label="备注"
           >
-            <Input.TextArea rows={editing ? 2 : 3} maxLength={255} showCount />
+            <BusinessTextArea maxLength={255} showCount />
           </Form.Item>
         </BusinessFormSection>
       </Form>

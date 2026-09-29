@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   businessTableCopyColumnKey,
   normalizeBusinessTableCopyText,
+  resolveBusinessDetailCopyText,
   resolveBusinessTableCopyLabel,
   resolveBusinessTableCopyText,
 } from './businessTableCopy.mjs'
@@ -70,5 +71,46 @@ test('table copy metadata stays business-readable', () => {
   assert.equal(
     businessTableCopyColumnKey({ dataIndex: ['primary_contact', 'mobile'] }),
     'primary_contact.mobile'
+  )
+})
+
+test('detail copy only exposes opted-in business identifiers with a real value', () => {
+  const record = {
+    order_no: '  SO-001  ',
+    customer_order_no: '-',
+    customer_name: '示例客户',
+    source_no: 'SO-000',
+  }
+  assert.equal(
+    resolveBusinessDetailCopyText(
+      { dataIndex: 'order_no', copyable: true, detailCopyable: true },
+      record
+    ),
+    'SO-001'
+  )
+  assert.equal(
+    resolveBusinessDetailCopyText(
+      { dataIndex: 'customer_order_no', detailCopyable: true },
+      record
+    ),
+    ''
+  )
+  assert.equal(
+    resolveBusinessDetailCopyText(
+      { dataIndex: 'customer_name', copyable: true },
+      record
+    ),
+    ''
+  )
+  assert.equal(
+    resolveBusinessDetailCopyText(
+      {
+        key: 'source_document',
+        copyable: { resolveValue: (_value, current) => current.source_no },
+        detailCopyable: true,
+      },
+      record
+    ),
+    'SO-000'
   )
 })

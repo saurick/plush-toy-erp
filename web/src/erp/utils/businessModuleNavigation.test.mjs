@@ -114,7 +114,6 @@ test('workflow business modules: 三页不冒充事实写入', () => {
 
   for (const text of [
     '待办任务',
-    '业务处理分开完成',
     'listWorkflowTasks',
     'completeWorkflowTaskAction',
     'blockWorkflowTaskAction',
@@ -134,6 +133,11 @@ test('workflow business modules: 三页不冒充事实写入', () => {
       `workflow V1 page should expose real workflow scope: ${text}`
     )
   }
+  assert.equal(
+    source.includes('业务处理分开完成'),
+    false,
+    'workflow/fact boundary should stay in the selected-action explanation instead of a decorative header tag'
+  )
 
   for (const text of [
     'resolveWorkflowTaskSourceEntryPath',

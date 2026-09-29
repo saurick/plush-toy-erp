@@ -2,6 +2,7 @@ import { Typography, Button, Checkbox, Empty, Popover, Switch } from 'antd'
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { DownOutlined, RightOutlined } from '@ant-design/icons'
+import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import {
   normalizeStringList,
   getPermissionLabel,
@@ -315,7 +316,7 @@ function PermissionChecklist({
           </Button>
         </div>
       </div>
-      <div className="erp-permission-checklist">
+      <TableScrollRegion className="erp-permission-checklist">
         {visibleGroups.length > 0 ? (
           <table className="erp-permission-matrix" aria-label="岗位功能权限">
             <colgroup>
@@ -488,7 +489,7 @@ function PermissionChecklist({
             })}
           </table>
         ) : null}
-      </div>
+      </TableScrollRegion>
       {visibleGroups.length === 0 ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}

@@ -696,10 +696,14 @@ export function createBusinessListAssertions({ outputDir }) {
       expectedFirstLabel,
       `列设置未找到可移动目标列: ${JSON.stringify({ targetLabel, headerLabelsBefore })}`
     )
-    await page.getByRole('button', { name: /列设置$/u })
-      .click()
+    await page.getByRole('button', { name: /列设置$/u }).click()
     const dialog = page.getByRole('dialog', { name: /^列设置/u })
-    await dialog.getByRole('button', { name: `${expectedFirstLabel} 移到最前` }).click()
+    await dialog
+      .getByRole('button', {
+        name: `${expectedFirstLabel} 移到最前`,
+        exact: true,
+      })
+      .click()
     const headerColumnOrderSync = waitForAdminColumnOrderSync(page)
     await dialog.getByRole('button', { name: /^完\s*成$/u }).click()
     await headerColumnOrderSync
@@ -720,7 +724,6 @@ export function createBusinessListAssertions({ outputDir }) {
       return window.localStorage.getItem(key)
     }, storageKey)
     assert.equal(storedOrder, null, '列设置应只保存账号偏好')
-
   }
 
   function waitForAdminColumnOrderSync(page) {

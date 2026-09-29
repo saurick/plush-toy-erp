@@ -300,7 +300,6 @@ export default function SalesOrderBatchImportEditor({
       open
       form={form}
       title="批量导入销售订单"
-      description={`已选 ${entries.length} 张订单。逐单核对后，一次保存为独立草稿。`}
       confirmLoading={saving}
       hasChanges={completed < entries.length}
       readOnly={completed === entries.length}

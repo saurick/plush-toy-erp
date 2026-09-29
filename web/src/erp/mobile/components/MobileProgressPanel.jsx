@@ -72,6 +72,9 @@ export default function MobileProgressPanel({
   const [values, setValues] = useState(initial.query)
   const [keyword, setKeyword] = useState(initial.query.q)
   const [selection, setSelection] = useState(initial.selection)
+  const [suppressDetailOpenMotion, setSuppressDetailOpenMotion] = useState(
+    Boolean(initial.selection)
+  )
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -125,6 +128,13 @@ export default function MobileProgressPanel({
   }, [remember, values, selection])
   useEffect(() => () => clearTimeout(timer.current), [])
   useEffect(() => {
+    if (!suppressDetailOpenMotion) return undefined
+    const frame = requestAnimationFrame(() => {
+      setSuppressDetailOpenMotion(false)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [suppressDetailOpenMotion])
+  useEffect(() => {
     if (!active) setFiltersOpen(false)
   }, [active])
   useEffect(() => {
@@ -134,6 +144,7 @@ export default function MobileProgressPanel({
         scopeKey,
         mobileProgressDefaultView(roleKey, access)
       )
+      setSuppressDetailOpenMotion(Boolean(restored.selection))
       setSelection(restored.selection)
       setValues(restored.query)
       setKeyword(restored.query.q)
@@ -305,6 +316,7 @@ export default function MobileProgressPanel({
 
   const open = (row, section = 'lines') => {
     remember()
+    setSuppressDetailOpenMotion(false)
     const next = { id: row.id, view: row.view, orderNo: row.order_no, section }
     window.history.pushState(
       {
@@ -676,6 +688,7 @@ export default function MobileProgressPanel({
       </div>
       <BusinessProgressDrawer
         mobile
+        suppressOpenMotion={suppressDetailOpenMotion}
         selection={active ? selection : null}
         adminProfile={adminProfile}
         onClose={close}

@@ -9,7 +9,8 @@ import { applyEffectiveFieldPolicyFlags } from '../../utils/adminProfileSync.mjs
 import {
   applyModuleColumnOrder,
   applyModuleColumnVisibility,
-  sanitizeModuleHiddenColumns,
+  buildModuleColumnSettings,
+  resolveModuleHiddenColumns,
   sanitizeModuleColumnOrder,
 } from '../../utils/moduleTableColumns.mjs'
 import { downloadCSVRows } from '../../utils/csvExport.mjs'
@@ -91,7 +92,8 @@ export function useBusinessColumnOrder({
   )
   const hiddenColumns = useMemo(
     () =>
-      sanitizeModuleHiddenColumns(
+      resolveModuleHiddenColumns(
+        preferences?.column_orders?.[moduleKey],
         preferences?.hidden_columns?.[moduleKey],
         orderableColumns
       ),
@@ -116,8 +118,11 @@ export function useBusinessColumnOrder({
   const persistColumnOrder = useCallback(
     async (nextOrder, nextHidden = hiddenColumns) => {
       if (savingRef.current) return false
-      const order = sanitizeModuleColumnOrder(nextOrder, orderableColumns)
-      const hidden = sanitizeModuleHiddenColumns(nextHidden, orderableColumns)
+      const { order, hidden_columns: hidden } = buildModuleColumnSettings(
+        nextOrder,
+        nextHidden,
+        orderableColumns
+      )
       savingRef.current = true
       setSaving(true)
       try {

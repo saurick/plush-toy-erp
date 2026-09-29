@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import {
+  exerciseTableScrollControls,
+  exerciseTableScrollPagination,
+  assertTableScrollDockVisible,
+  assertSingleTableScrollbar,
+} from './tableScrollControlAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 const tableSelector = '.erp-business-data-table-card .ant-table-wrapper'
@@ -21,8 +27,10 @@ const rows = Array.from({ length: 45 }, (_, index) => ({
 async function measureScroll(page) {
   return page.locator(tableSelector).evaluate((wrapper) => {
     const content = wrapper.querySelector('.ant-table-content')
+    const card = wrapper.closest('.erp-business-data-table-card')
     const pagination = wrapper.querySelector('.ant-pagination')
     const box = wrapper.getBoundingClientRect()
+    const cardBox = card.getBoundingClientRect()
     const lastRow = wrapper.querySelector('tr.ant-table-row:last-child')
     const lastBox = lastRow?.getBoundingClientRect()
     const paginationBox = pagination?.getBoundingClientRect()
@@ -33,6 +41,8 @@ async function measureScroll(page) {
       scrollTop: wrapper.scrollTop,
       scrollLeft: content.scrollLeft,
       horizontalRange: content.scrollWidth - content.clientWidth,
+      leftInset: box.left - cardBox.left,
+      topInset: box.top - cardBox.top,
       pageOverflow: document.documentElement.scrollWidth > innerWidth + 1,
       lastRowVisible: Boolean(
         lastBox && lastBox.bottom <= Math.min(box.bottom, innerHeight) + 1
@@ -112,8 +122,35 @@ export function createBusinessTableScrollScenarios({
       )
       assert.equal(initial.pageOverflow, false, '宽表不能撑出页面横向滚动')
       assert(initial.horizontalRange > 100, '宽列必须产生表内横向溢出')
+      assert(
+        initial.leftInset >= 11 && initial.topInset >= 9,
+        `表格应留出左上间距: ${JSON.stringify(initial)}`
+      )
+      await exerciseTableScrollControls(
+        page,
+        page.locator(tableSelector),
+        page.locator(`${tableSelector} .ant-table-content`)
+      )
+      if (mode === 'desktop') {
+        assert.equal(
+          await page
+            .locator('[data-table-scroll-toolbar] .app-table-scroll-buttons')
+            .count(),
+          1,
+          '主表复用原有工具栏'
+        )
+        assert.equal(
+          await page.locator(`${tableSelector} .app-table-scroll-top`).count(),
+          0,
+          '主表不另占导航行'
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'business-table-navigation-desktop.png'),
+        })
+      }
 
       const bottom = await scrollToTableEnd(page)
+      await assertTableScrollDockVisible(page, page.locator(tableSelector))
       const lastRow = page.locator(`${tableSelector} tr.ant-table-row`).last()
       await lastRow.hover()
       await page.mouse.wheel(10000, 0)
@@ -126,8 +163,29 @@ export function createBusinessTableScrollScenarios({
       }, tableSelector)
       const right = await measureScroll(page)
       assert(right.paginationVisible, '横向滚动后分页仍须可达')
-      await page.locator(`${tableSelector} .ant-pagination-item-2`).click()
-      await page.locator('tr[data-row-key="40"]').waitFor()
+      await page.waitForFunction(
+        (node) => node.disabled,
+        await page
+          .getByRole('button', { name: '向右查看列', exact: true })
+          .elementHandle()
+      )
+      await assertSingleTableScrollbar(
+        page.locator(tableSelector),
+        page.locator(`${tableSelector} .ant-table-content`)
+      )
+      if (mode === 'desktop') {
+        await page.screenshot({
+          path: path.join(outputDir, 'business-table-single-scrollbar-end.png'),
+        })
+      }
+      const paging = await exerciseTableScrollPagination(page, {
+        wrapper: page.locator(tableSelector),
+        trigger: page.locator(`${tableSelector} .ant-pagination-item-2`),
+        ready: page.locator('tr[data-row-key="40"]'),
+        endpoint: '**/rpc/operational_fact',
+        method: 'list_shipments',
+        offset: 20,
+      })
       const secondPage = await scrollToTableEnd(page)
 
       const search = page.locator('.erp-business-operation-panel input').first()
@@ -135,6 +193,13 @@ export function createBusinessTableScrollScenarios({
       await page.getByText('暂无出货单', { exact: true }).waitFor()
       const empty = await measureScroll(page)
       assert.equal(empty.pageOverflow, false)
+      assert.equal(
+        await page
+          .locator('.app-table-scroll-buttons, .app-table-scroll-dock')
+          .count(),
+        0,
+        '空结果不显示横向控件'
+      )
       await search.fill('')
       await page.locator('tr[data-row-key="20"]').waitFor()
       const restored = await scrollToTableEnd(page)
@@ -142,7 +207,7 @@ export function createBusinessTableScrollScenarios({
       await writeFile(
         path.join(outputDir, `business-table-scroll-${mode}.json`),
         JSON.stringify(
-          { initial, bottom, right, secondPage, empty, restored },
+          { initial, bottom, right, paging, secondPage, empty, restored },
           null,
           2
         )

@@ -334,7 +334,7 @@ export function createProductIdentityScenarios({
           await identityRoot.locator('details').first().locator('summary').click()
         }
         const image = identityRoot
-          .locator('.erp-product-identity button')
+          .locator(production ? '.erp-product-field-control button' : '.erp-product-identity button')
           .first()
         await image.click().catch(async (error) => {
           const identities = await identityRoot
@@ -353,6 +353,10 @@ export function createProductIdentityScenarios({
           )
         })
         await closeImage(page)
+        if (production) {
+          const main = identityRoot.locator('.erp-compact-field-table__fields').first()
+          assert.ok((await main.boundingBox()).height < 140, '长产品名与图片不应挤成高列')
+        }
         await page.screenshot({
           path: path.join(
             outputDir,

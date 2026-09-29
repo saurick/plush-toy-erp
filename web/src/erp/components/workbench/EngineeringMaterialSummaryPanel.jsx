@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Tag } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
@@ -12,6 +12,10 @@ import {
   SelectFilter,
 } from '../business-list/BusinessListLayout.jsx'
 import EngineeringMaterialRequestModal from '../sales-orders/EngineeringMaterialRequestModal.jsx'
+import {
+  BusinessListToolbarActions,
+  useBusinessColumnOrder,
+} from '../business-list/BusinessListToolbarActions.jsx'
 import {
   canListEngineeringMaterial,
   ENGINEERING_MATERIAL_STATUS,
@@ -31,8 +35,26 @@ const STATUS_OPTIONS = [
 const formatTime = (value) =>
   new Date(value).toLocaleString('zh-CN', { hour12: false })
 
+const statusTag = (record) => (
+  <span>
+    <Tag
+      color={
+        record.status === 'APPROVED'
+          ? 'green'
+          : record.status === 'REJECTED'
+            ? 'red'
+            : 'blue'
+      }
+    >
+      {ENGINEERING_MATERIAL_STATUS[record.status] || '状态待确认'}
+    </Tag>
+    {record.order_status !== 'active' ? <Tag>订单已结束</Tag> : null}
+  </span>
+)
+
 export default function EngineeringMaterialSummaryPanel({
   refreshRevision = 0,
+  summaryTypeControl = null,
 }) {
   const { adminProfile } = useOutletContext() || {}
   const [params, setParams] = useSearchParams()
@@ -85,24 +107,9 @@ export default function EngineeringMaterialSummaryPanel({
     onSearch: (value) => updateFilter('q', value),
   })
 
-  const statusTag = (record) => (
-    <span>
-      <Tag
-        color={
-          record.status === 'APPROVED'
-            ? 'green'
-            : record.status === 'REJECTED'
-              ? 'red'
-              : 'blue'
-        }
-      >
-        {ENGINEERING_MATERIAL_STATUS[record.status] || '状态待确认'}
-      </Tag>
-      {record.order_status !== 'active' ? <Tag>订单已结束</Tag> : null}
-    </span>
-  )
   const filters = (
     <>
+      {summaryTypeControl}
       <SearchInput
         type="search"
         aria-label={BUSINESS_SEARCH_SCOPES.engineering.searchHint}
@@ -123,6 +130,48 @@ export default function EngineeringMaterialSummaryPanel({
       />
     </>
   )
+  const columns = useMemo(
+    () => [
+      {
+        title: '订单号',
+        dataIndex: 'order_no',
+        width: 220,
+        render: (value, record) => (
+          <Button type="link" onClick={() => setSelected(record)}>
+            {value}
+          </Button>
+        ),
+      },
+      {
+        align: 'left',
+        title: '产品',
+        dataIndex: 'products',
+        width: 240,
+        render: (value) => value.join('、') || '未填写产品名称',
+      },
+      {
+        title: '审批状态',
+        key: 'status',
+        width: 190,
+        render: (_, record) => statusTag(record),
+      },
+      {
+        title: '提交时间',
+        dataIndex: 'submitted_at',
+        width: 180,
+        render: formatTime,
+      },
+    ],
+    []
+  )
+  const { tableColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
+      adminProfile,
+      moduleKey: 'engineering-material-summary',
+      moduleTitle: '工程材料汇总',
+      columns,
+    })
+
   const accessError = !canRead ? '当前账号未开放材料汇总查看权限' : error
   const modal =
     canRead && selected ? (
@@ -138,7 +187,17 @@ export default function EngineeringMaterialSummaryPanel({
 
   return (
     <>
-      <BusinessOperationPanel compact filters={filters} />
+      <BusinessOperationPanel
+        compact
+        filters={filters}
+        actions={
+          <BusinessListToolbarActions
+            showExport={false}
+            onOpenColumnOrder={openColumnOrder}
+            columnOrderDisabled={!canRead}
+          />
+        }
+      />
       {accessError ? (
         <Alert
           type="error"
@@ -159,35 +218,9 @@ export default function EngineeringMaterialSummaryPanel({
           dataSource={result.items}
           onOpenRecord={setSelected}
           columns={[
+            ...tableColumns,
             {
-              title: '订单号',
-              dataIndex: 'order_no',
-              width: 220,
-              render: (value, record) => (
-                <Button type="link" onClick={() => setSelected(record)}>
-                  {value}
-                </Button>
-              ),
-            },
-            {
-              align: 'left',
-              title: '产品',
-              dataIndex: 'products',
-              width: 240,
-              render: (value) => value.join('、') || '未填写产品名称',
-            },
-            {
-              title: '审批状态',
-              width: 190,
-              render: (_, record) => statusTag(record),
-            },
-            {
-              title: '提交时间',
-              dataIndex: 'submitted_at',
-              width: 180,
-              render: formatTime,
-            },
-            {
+              key: 'actions',
               align: 'center',
               title: '操作',
               width: 150,
@@ -208,6 +241,7 @@ export default function EngineeringMaterialSummaryPanel({
           }}
         />
       )}
+      {columnOrderModal}
       {modal}
     </>
   )

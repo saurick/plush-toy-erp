@@ -12,7 +12,6 @@ test('历史记录中心按菜单与读取权限选择真实来源并固定只�
   assert.match(source, /visibleMenuPaths/u)
   assert.match(source, /hasActionPermission/u)
   assert.match(source, /buildHistoryListParams/u)
-  assert.match(source, /只读查询/u)
 })
 
 test('历史记录中心只提供详情与所属模块跳转，不提供跨对象写动作', () => {

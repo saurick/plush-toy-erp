@@ -1,3 +1,4 @@
+import { exerciseTableScrollControls, exerciseTableScrollPagination } from './tableScrollControlAssertions.mjs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
@@ -190,6 +191,36 @@ export function createWorkbenchSummaryScenarios({
           headingInset.left >= 11.5 && headingInset.top >= 9.5,
           `汇总标题或选择器保留左上间距 ${JSON.stringify(headingInset)}`
         )
+        if (mode === 'both') {
+          const toolbarGeometry = await region
+            .locator('.erp-business-operation-panel__command')
+            .evaluate((command) => {
+              const controls = [
+                command.querySelector('.erp-workbench-summaries__heading'),
+                command.querySelector('.erp-business-operation-panel__search'),
+                command.querySelector('button[aria-haspopup="dialog"]'),
+                command.querySelector(
+                  '.erp-business-operation-panel__actions .ant-btn'
+                ),
+              ]
+              const boxes = controls.map((control) =>
+                control.getBoundingClientRect()
+              )
+              return {
+                tops: boxes.map(({ top }) => top),
+                bottoms: boxes.map(({ bottom }) => bottom),
+              }
+            })
+          assert.ok(
+            Math.max(...toolbarGeometry.tops) -
+              Math.min(...toolbarGeometry.tops) <=
+              1 &&
+              Math.max(...toolbarGeometry.bottoms) -
+                Math.min(...toolbarGeometry.bottoms) <=
+                1,
+            `汇总类型、搜索、筛选与导出应在同一行 ${JSON.stringify(toolbarGeometry)}`
+          )
+        }
         if (mode === 'materials') {
           await region
             .getByRole('heading', { name: '材料汇总', exact: true })
@@ -235,11 +266,80 @@ export function createWorkbenchSummaryScenarios({
             产品名称: 'left',
             订单数量: 'right',
             单位: 'left',
-            备注: 'left',
-            工艺: 'left',
             订单状态: 'left',
           },
         })
+        await region
+          .getByRole('button', { name: '列设置', exact: true })
+          .click()
+        const columnSettings = page.getByRole('dialog', { name: /^列设置/u })
+        await columnSettings.waitFor()
+        assert(
+          !(await columnSettings
+            .getByRole('checkbox', { name: '工艺', exact: true })
+            .isChecked()),
+          '工艺仍可按需开启'
+        )
+        if (mode === 'sales') {
+          assert.equal(
+            await columnSettings
+              .getByRole('checkbox', { name: '单价', exact: true })
+              .count(),
+            0,
+            '列设置不能绕过商业字段权限'
+          )
+        }
+        await columnSettings
+          .getByRole('button', { name: '全部显示', exact: true })
+          .click()
+        const savedColumns = page.waitForResponse(
+          (response) =>
+            response.url().includes('/rpc/admin') &&
+            response.request().postDataJSON()?.method === 'set_erp_column_order'
+        )
+        await columnSettings.getByRole('button', { name: /^完\s*成$/u }).click()
+        await savedColumns
+        await columnSettings.waitFor({ state: 'hidden' })
+        await region
+          .getByRole('columnheader', { name: '工艺', exact: true })
+          .waitFor()
+        await assertTableSemanticAlignment(region, {
+          scenarioName: name,
+          expected: { 备注: 'left', 工艺: 'left' },
+        })
+        const tableCard = region.locator('.erp-business-data-table-card')
+        const tableGeometry = await tableCard.evaluate((card) => {
+          const wrapper = card.querySelector('.ant-table-wrapper')
+          const content = card.querySelector('.ant-table-content')
+          const cardBox = card.getBoundingClientRect()
+          const wrapperBox = wrapper.getBoundingClientRect()
+          return {
+            leftInset: wrapperBox.left - cardBox.left,
+            topInset: wrapperBox.top - cardBox.top,
+            horizontalRange: content.scrollWidth - content.clientWidth,
+            pageOverflow: document.documentElement.scrollWidth > innerWidth + 1,
+          }
+        })
+        assert.ok(
+          tableGeometry.leftInset >= 11 && tableGeometry.topInset >= 9,
+          `${name} 表格应保留左上内边距: ${JSON.stringify(tableGeometry)}`
+        )
+        assert.equal(tableGeometry.pageOverflow, false)
+        const scrollActions = region.getByRole('group', {
+          name: '表格横向查看',
+        })
+        assert.equal(
+          await scrollActions.count(),
+          Number(tableGeometry.horizontalRange > 2),
+          `${name} 横向查看按钮应随溢出显示`
+        )
+        if (tableGeometry.horizontalRange > 2) {
+          await exerciseTableScrollControls(
+            page,
+            tableCard.locator('.ant-table-wrapper'),
+            tableCard.locator('.ant-table-content')
+          )
+        }
         const search = region.getByRole('searchbox', {
           name: '搜索订单号、产品名称或款号',
         })
@@ -274,8 +374,14 @@ export function createWorkbenchSummaryScenarios({
         await filterDialog
           .getByRole('button', { name: '完成', exact: true })
           .click()
-        await region.locator('.ant-pagination-item-2').click()
-        await region.getByText('模拟产品 21', { exact: true }).waitFor()
+        await region.locator('.ant-pagination-item-2').scrollIntoViewIfNeeded()
+        await exerciseTableScrollPagination(page, {
+          wrapper: tableCard.locator('.ant-table-wrapper'),
+          trigger: region.locator('.ant-pagination-item-2'),
+          ready: region.getByText('模拟产品 21', { exact: true }),
+          endpoint: '**/rpc/sales_order', method: 'list_sales_order_summary', offset: 20,
+          shorterPage: true,
+        })
         assert.equal(calls.at(-1).params.offset, 20)
         await filterTrigger.click()
         const customer = filterDialog.getByRole('searchbox', {
@@ -440,6 +546,10 @@ export function createWorkbenchSummaryScenarios({
       'materials'
     ),
     makeScenario('erp-workbench-summary-unrelated-role', [], 'none'),
-    ...createMaterialSummaryScenarios({ assert, outputDir, customerRuntimeEffectiveSession }),
+    ...createMaterialSummaryScenarios({
+      assert,
+      outputDir,
+      customerRuntimeEffectiveSession,
+    }),
   ]
 }

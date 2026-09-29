@@ -1515,6 +1515,7 @@ export default function V1InventoryLedgerPage() {
           title: '批次号',
           dataIndex: 'lot_no',
           copyable: { label: '批次号' },
+          detailCopyable: true,
           width: 180,
           render: (value, record) => value || (record.id ? '已登记批次' : '-'),
         },
@@ -1570,6 +1571,7 @@ export default function V1InventoryLedgerPage() {
           title: '供应商批次',
           dataIndex: 'supplier_lot_no',
           copyable: { label: '供应商批次' },
+          detailCopyable: true,
           width: 150,
           render: dash,
         },
@@ -1577,6 +1579,7 @@ export default function V1InventoryLedgerPage() {
           title: '色号',
           dataIndex: 'color_no',
           copyable: { label: '色号' },
+          detailCopyable: true,
           width: 110,
           render: dash,
         },
@@ -1584,6 +1587,7 @@ export default function V1InventoryLedgerPage() {
           title: '缸号',
           dataIndex: 'dye_lot_no',
           copyable: { label: '缸号' },
+          detailCopyable: true,
           width: 110,
           render: dash,
         },
@@ -1591,6 +1595,7 @@ export default function V1InventoryLedgerPage() {
           title: '生产批次',
           dataIndex: 'production_lot_no',
           copyable: { label: '生产批次' },
+          detailCopyable: true,
           width: 140,
           render: dash,
         },
@@ -1714,6 +1719,7 @@ export default function V1InventoryLedgerPage() {
             resolveValue: (_value, record) =>
               renderLotReference(record?.lot_id),
           },
+          detailCopyable: true,
           width: 180,
           render: renderLotReference,
           exportValue: (record) => renderLotReference(record?.lot_id),
@@ -1759,6 +1765,7 @@ export default function V1InventoryLedgerPage() {
               record?.document_no ||
               '',
           },
+          detailCopyable: true,
           width: 120,
           render: (_, record) => formatSourceDocumentRef(record),
           exportValue: formatSourceDocumentRef,
@@ -1873,6 +1880,7 @@ export default function V1InventoryLedgerPage() {
           label: '批次',
           resolveValue: (_value, record) => renderLotReference(record?.lot_id),
         },
+        detailCopyable: true,
         width: 180,
         render: renderLotReference,
         exportValue: (record) => renderLotReference(record?.lot_id),
@@ -2050,18 +2058,6 @@ export default function V1InventoryLedgerPage() {
         compact
         helpKey="inventory"
         title="库存台账"
-        tags={[
-          <Tag color="blue" key="balances">
-            余额只读
-          </Tag>,
-          <Tag color="gold" key="lots">
-            批次追溯
-          </Tag>,
-          <Tag color="green" key="txns">
-            变动追溯
-          </Tag>,
-          <Tag key="mode">草稿不改变库存</Tag>,
-        ]}
         stats={stats}
       />
 
@@ -2559,6 +2555,7 @@ export default function V1InventoryLedgerPage() {
           />
         ) : (
           <Table
+            scrollToolbar
             rowKey={(record) => `${activeView}-${record.id}`}
             loading={loading}
             dataSource={rows}

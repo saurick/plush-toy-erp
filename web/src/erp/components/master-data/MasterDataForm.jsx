@@ -478,14 +478,6 @@ export function MasterDataFormFields({
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
-            extra="只影响环节列表的展示顺序，不定义产品的生产先后顺序。"
-            label="列表显示顺序"
-            name="sort_order"
-          >
-            <InputNumber min={0} precision={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item
-            className="erp-business-action-form__field"
             extra="可与“可内制”同时开启；这里只记录工序能力，具体订单仍由生产经理另行决定。"
             label="可委外"
             name="outsourcing_enabled"
@@ -501,17 +493,17 @@ export function MasterDataFormFields({
           >
             <Switch />
           </Form.Item>
+        </BusinessFormSection>
+        <BusinessFormSection title="补充资料">
           <Form.Item
             className="erp-business-action-form__field"
-            label="需质检"
+            label="质检参考"
             name="quality_required"
-            extra="这里只标记该工序后续可能需要质检；合格、不合格、让步、返工等结果仍需到质检或对应业务页面登记。"
+            extra="仅供查阅该工序通常是否需要检验；不会生成质检任务，也不代替实际检验结果。"
             valuePropName="checked"
           >
             <Switch />
           </Form.Item>
-        </BusinessFormSection>
-        <BusinessFormSection title="备注">
           <Form.Item
             className="erp-business-action-form__field erp-business-action-form__field--full"
             label="备注"

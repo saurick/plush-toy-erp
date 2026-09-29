@@ -342,7 +342,6 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       outsourcing_enabled: true,
       inhouse_enabled: false,
       quality_required: true,
-      sort_order: '20',
       note: ' ',
     }),
     {
@@ -353,7 +352,6 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       outsourcing_enabled: true,
       inhouse_enabled: false,
       quality_required: true,
-      sort_order: 20,
     }
   )
 

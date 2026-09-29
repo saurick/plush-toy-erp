@@ -126,9 +126,10 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
     },
     {
       defaultPriority: 40,
-      title: '生效开始',
-      exportTitle: '生效开始',
+      title: '参考适用开始',
+      exportTitle: '参考适用开始',
       dataIndex: 'effective_from',
+      defaultHidden: true,
       width: 130,
       sortType: 'date',
       render: formatUnixDate,
@@ -136,9 +137,10 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
     },
     {
       defaultPriority: 50,
-      title: '生效结束',
-      exportTitle: '生效结束',
+      title: '参考适用结束',
+      exportTitle: '参考适用结束',
       dataIndex: 'effective_to',
+      defaultHidden: true,
       width: 130,
       sortType: 'date',
       render: formatUnixDate,
@@ -153,5 +155,18 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       sortable: false,
       render: (value) => value || '-',
     },
+    ...[
+      ['quantity_text', '订单数量', 130],
+      ['spare_text', '备品', 130],
+      ['maker', '制表', 120],
+      ['auditor', '审核', 120],
+      ['hair_direction', '毛向', 180],
+    ].map(([dataIndex, title, width]) => ({
+      title,
+      dataIndex,
+      width,
+      defaultHidden: true,
+      render: (value) => value || '—',
+    })),
   ])
 }

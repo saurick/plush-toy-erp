@@ -4,6 +4,7 @@ import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 
 import { inventoryLotOption } from '../../utils/referenceSelectOptions.mjs'
@@ -285,7 +286,7 @@ export default function ProductionMaterialIssueModal({
           label="备注"
           className="erp-business-action-form__field--full"
         >
-          <Input.TextArea rows={editing ? 2 : 3} maxLength={255} showCount />
+          <BusinessTextArea maxLength={255} showCount />
         </Form.Item>
       </Form>
     </Editor>

@@ -2,6 +2,7 @@ import React, { useCallback } from 'react'
 import { Button, Form, Input, Select, Space } from 'antd'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
 import ProductIdentity, {
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
@@ -91,6 +92,8 @@ export function BOMHeaderFormFields({
   onUseVersionSuggestion,
 }) {
   const productID = Form.useWatch('product_id', form)
+  const version = Form.useWatch('version', form)
+  const sourceOrderNo = Form.useWatch('source_order_no', form)
   const selectedProduct = productOptions.find(
     (option) => Number(option.value) === Number(productID)
   )
@@ -172,6 +175,12 @@ export function BOMHeaderFormFields({
             allowClear
             autoComplete="off"
             disabled={disabled}
+            suffix={
+              <BusinessCopyButton
+                label="BOM 版本"
+                value={disabled ? version : ''}
+              />
+            }
             placeholder="例如 V1、V2、打样版 A"
           />
         </Form.Item>
@@ -192,12 +201,13 @@ export function BOMHeaderFormFields({
       <BusinessFormSection title="订单与制表资料">
         <Form.Item
           className="erp-business-action-form__field"
-          label="生效开始"
+          label="参考适用开始"
           name="effective_from"
+          extra="仅供人工查阅；BOM 是否可选仍由启用状态决定，不会按日期自动启用或停用。"
           rules={[
             dateInputNotAfterRule({
               getEndValue: () => form.getFieldValue('effective_to'),
-              message: '生效开始必须早于生效结束',
+              message: '参考适用开始必须早于参考适用结束',
               allowSameDay: false,
             }),
           ]}
@@ -212,12 +222,12 @@ export function BOMHeaderFormFields({
         <Form.Item
           className="erp-business-action-form__field"
           dependencies={['effective_from']}
-          label="生效结束"
+          label="参考适用结束"
           name="effective_to"
           rules={[
             dateInputNotBeforeRule({
               getStartValue: () => form.getFieldValue('effective_from'),
-              message: '生效结束必须晚于生效开始',
+              message: '参考适用结束必须晚于参考适用开始',
               allowSameDay: false,
             }),
           ]}
@@ -238,6 +248,12 @@ export function BOMHeaderFormFields({
             allowClear
             autoComplete="off"
             disabled={disabled}
+            suffix={
+              <BusinessCopyButton
+                label="来源订单号"
+                value={disabled ? sourceOrderNo : ''}
+              />
+            }
             placeholder="例如 WL260102"
           />
         </Form.Item>

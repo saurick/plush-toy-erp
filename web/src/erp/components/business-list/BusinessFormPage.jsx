@@ -61,7 +61,6 @@ export default function BusinessFormPage({
   open,
   form,
   title,
-  description,
   className = '',
   loading = false,
   confirmLoading = false,
@@ -92,6 +91,8 @@ export default function BusinessFormPage({
     setAttachmentBusy(processing)
   }, [])
   const pageRef = useRef(null)
+  const openRef = useRef(open)
+  openRef.current = open
   const triggerRef = useRef(null)
   const scrollPositionRef = useRef(null)
   const leavingRef = useRef(false)
@@ -141,6 +142,9 @@ export default function BusinessFormPage({
   }, [open])
 
   useLayoutEffect(() => {
+    // A close and reopen can happen before passive effects flush. Rearm focus in
+    // the layout phase so every fresh editor instance receives focus reliably.
+    focusedRef.current = false
     if (!open) return undefined
     leavingRef.current = false
     triggerRef.current = document.activeElement
@@ -160,6 +164,8 @@ export default function BusinessFormPage({
       const position = scrollPositionRef.current
       const trigger = triggerRef.current
       window.requestAnimationFrame(() => {
+        // Do not let a pending close restore steal focus from a rapid reopen.
+        if (openRef.current) return
         if (position?.node.isConnected) position.node.scrollTop = position.top
         if (trigger?.isConnected) trigger.focus?.({ preventScroll: true })
       })
@@ -174,21 +180,24 @@ export default function BusinessFormPage({
     if (loading || baseline === null || focusedRef.current) return undefined
     // Parent initialization can reset and remount fields; focus only after that baseline exists.
     const frame = window.requestAnimationFrame(() => {
-      const firstControl = Array.from(
-        pageRef.current?.querySelectorAll(
-          '.erp-business-form-page__body input:not([disabled]):not([type="hidden"]), .erp-business-form-page__body textarea:not([disabled])'
-        ) || []
-      ).find(
-        (control) =>
-          control.getClientRects().length > 0 && !control.closest('[inert]')
-      )
+      const firstControl = readOnly
+        ? null
+        : Array.from(
+            pageRef.current?.querySelectorAll(
+              '.erp-business-form-page__body input:not([disabled]):not([readonly]):not([type="hidden"]), .erp-business-form-page__body textarea:not([disabled]):not([readonly])'
+            ) || []
+          ).find(
+            (control) =>
+              control.getClientRects().length > 0 &&
+              !control.closest('[inert], .ant-select-disabled')
+          )
       ;(firstControl || pageRef.current?.querySelector('h1'))?.focus({
         preventScroll: true,
       })
       focusedRef.current = true
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [baseline, loading, open])
+  }, [baseline, loading, open, readOnly])
 
   const confirmDiscard = useCallback(async () => {
     if (currentRef.current.saving) {
@@ -307,7 +316,6 @@ export default function BusinessFormPage({
       ) : null}
       <header className="erp-business-form-page__header">
         <h1 tabIndex={-1}>{title}</h1>
-        {description ? <p>{description}</p> : null}
       </header>
       <BusinessFormBody open={open} loading={loading} busy={busy}>
         <Spin spinning={loading}>

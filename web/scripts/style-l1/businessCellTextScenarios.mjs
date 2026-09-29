@@ -201,7 +201,10 @@ export function createBusinessCellTextScenarios(deps) {
         )
       }
       const details = line.locator('details')
-      if (await details.count()) await details.locator('summary').click()
+      if (await details.count()) {
+        deps.assert.equal(await details.getAttribute('open'), null)
+        await details.locator('summary').click()
+      }
       for (const label of config.fields) {
         if (config.readonly) {
           const control = line.getByLabel(label, { exact: true })
@@ -245,6 +248,21 @@ export function createBusinessCellTextScenarios(deps) {
         deps.assert.equal(await note.inputValue(), '')
         await note.fill(multilineNote)
         await assertReadable(note, deps.assert)
+      }
+      if (!config.key.startsWith('bom')) {
+        const expanded = await line.boundingBox()
+        await details.locator('summary').click()
+        const collapsed = await line.boundingBox()
+        deps.assert.ok(collapsed.height < expanded.height - 100)
+        deps.assert.match(await details.locator('summary').innerText(), /第1项/)
+        await details.locator('summary').click()
+        deps.assert.equal(await note.inputValue(), multilineNote)
+        await note.fill('')
+        deps.assert.doesNotMatch(
+          await details.locator('summary').innerText(),
+          /第1项/
+        )
+        await note.fill(multilineNote)
       }
       await assertBusinessFormPage(page, editor)
       await page.setViewportSize({ width: 1920, height: 1200 })

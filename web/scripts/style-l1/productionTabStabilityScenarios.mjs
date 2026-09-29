@@ -137,7 +137,7 @@ export function createProductionTabStabilityScenarios({
           .getByRole('heading', { name: '生产记录', exact: true })
           .waitFor()
         await page
-          .locator('.erp-v1-operational-fact-page .ant-table-wrapper')
+          .locator('.erp-production-record-workspace .ant-table-wrapper')
           .waitFor()
         assert.equal(
           await page.getByLabel('生产记录工作区', { exact: true }).count(),
@@ -169,9 +169,26 @@ export function createProductionTabStabilityScenarios({
       productionOrderReleased: true,
       verify: async (page) => {
         const navigation = page.getByLabel('生产记录工作区', { exact: true })
+        const pageHeader = page.locator(
+          '.erp-production-record-workspace > .erp-business-page-header-card'
+        )
         await page
           .getByRole('heading', { name: '生产记录', exact: true })
           .waitFor()
+        assert.equal(
+          await pageHeader.locator('.erp-production-record-tabs').count(),
+          1,
+          '生产记录视图切换应合并到共享页头'
+        )
+        assert.equal(
+          await page
+            .locator(
+              '.erp-production-record-workspace > .erp-production-record-tabs'
+            )
+            .count(),
+          0,
+          '生产记录视图切换不再单独占用一条卡片'
+        )
         assert.deepEqual(await navigation.getByRole('tab').allTextContents(), [
           '记录明细',
           '生产工序',
@@ -215,7 +232,7 @@ export function createProductionTabStabilityScenarios({
           .waitFor()
         await page.goBack()
         await page
-          .locator('.erp-v1-operational-fact-page .ant-table-wrapper')
+          .locator('.erp-production-record-workspace .ant-table-wrapper')
           .waitFor()
         assert.equal(
           await navigation
@@ -241,7 +258,7 @@ export function createProductionTabStabilityScenarios({
           await navigation.getByRole('tab', { name: '待审批' }).click()
           await navigation.getByRole('tab', { name: '记录明细' }).click()
           await page
-            .locator('.erp-v1-operational-fact-page .ant-table-wrapper')
+            .locator('.erp-production-record-workspace .ant-table-wrapper')
             .waitFor()
           await assertNoHorizontalOverflow(
             page,

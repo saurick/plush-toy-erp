@@ -495,8 +495,8 @@ export function createLineItemUnitAssertions({ assert }) {
     const metrics = await modal.evaluate((node) => {
       const list = node.querySelector('.erp-sales-order-lines-form__list')
       const footer = node.querySelector('.erp-line-items-form__footer')
-      const addButton = Array.from(node.querySelectorAll('button')).find(
-        (button) => button.textContent?.includes('添加条目')
+      const addButton = footer?.querySelector(
+        '.erp-line-items-form__add-button'
       )
       const modalBody =
         node.querySelector('.erp-business-form-page__body, .ant-modal-body') ||
@@ -624,13 +624,25 @@ export function createLineItemUnitAssertions({ assert }) {
       name: addButtonName,
       exact: true,
     })
+    const headerAddButton = modal.getByRole('button', {
+      name: `在顶部${addButtonName}`,
+      exact: true,
+    })
     await addButton.waitFor({ state: 'visible', timeout: 5_000 })
+    await headerAddButton.waitFor({ state: 'visible', timeout: 5_000 })
     assert.equal(
       await addButton.evaluate((button) =>
         Boolean(button.closest('.erp-line-items-form__footer'))
       ),
       true,
       `${scenarioName} 连续新增入口应位于明细底部`
+    )
+    assert.equal(
+      await headerAddButton.evaluate((button) =>
+        Boolean(button.closest('.erp-sales-order-lines-form__head'))
+      ),
+      true,
+      `${scenarioName} 首次新增入口应位于明细标题行`
     )
 
     const addDurations = []
@@ -686,6 +698,9 @@ export function createLineItemUnitAssertions({ assert }) {
           bodyTop: Math.round(bodyRect?.top || 0),
           bodyBottom: Math.round(bodyRect?.bottom || 0),
           footerBottom: Math.round(footerRect?.bottom || 0),
+          latestRowHighlighted: Boolean(
+            latestRow?.classList.contains('erp-line-item--appended')
+          ),
           latestRowVisibleInPage:
             Boolean(bodyRect && latestRect) &&
             latestRect.top >= bodyRect.top - 1 &&
@@ -732,6 +747,13 @@ export function createLineItemUnitAssertions({ assert }) {
       metrics.latestRowVisibleInPage,
       true,
       `${scenarioName} 最新添加的明细行应进入编辑页可视区: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert.equal(
+      metrics.latestRowHighlighted,
+      true,
+      `${scenarioName} 最新添加的明细行应提供短暂视觉反馈: ${JSON.stringify(
         metrics
       )}`
     )

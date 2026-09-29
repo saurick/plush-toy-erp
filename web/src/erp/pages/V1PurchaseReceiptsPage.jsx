@@ -893,6 +893,7 @@ export default function V1PurchaseReceiptsPage() {
           exportTitle: '入库单号',
           dataIndex: 'receipt_no',
           copyable: true,
+          detailCopyable: true,
           width: 160,
           sortType: 'text',
         },
@@ -1054,17 +1055,6 @@ export default function V1PurchaseReceiptsPage() {
         compact
         helpKey="inbound"
         title="采购入库"
-        tags={[
-          <Tag color="gold" key="workflow">
-            待办任务：入库跟进
-          </Tag>,
-          <Tag color="blue" key="receipt">
-            入库单：正式入库记录
-          </Tag>,
-          <Tag color="green" key="inventory">
-            过账后更新库存记录
-          </Tag>,
-        ]}
         stats={[
           { key: 'total', label: '总入库单', value: total },
           { key: 'current', label: '本页显示', value: rows.length },

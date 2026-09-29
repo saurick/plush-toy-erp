@@ -106,7 +106,7 @@ async function verifyArrival(page, { outputDir }) {
     await assertArrivalModalViewport(page, dialog, { label })
     const overflow = await dialog
       .locator(
-        '.erp-purchase-arrival__receipt, .erp-purchase-arrival__material, .erp-purchase-arrival__fields'
+        '.erp-purchase-arrival__receipt, .erp-purchase-arrival__material, .erp-purchase-arrival__table'
       )
       .evaluateAll((nodes) =>
         nodes
@@ -155,7 +155,7 @@ async function verifyArrival(page, { outputDir }) {
     .getByText('本次实点 100000000000000 件', { exact: true })
     .waitFor()
   await quantity(1).fill('8')
-  const second = dialog.getByRole('group', {
+  const second = dialog.getByRole('rowgroup', {
     name: '第2条到货记录',
     exact: true,
   })

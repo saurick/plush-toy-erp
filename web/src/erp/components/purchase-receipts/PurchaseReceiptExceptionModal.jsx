@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Button, Form, Input, Select, Space } from 'antd'
-import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
+import { MinusCircleOutlined } from '@ant-design/icons'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -12,6 +12,9 @@ import BusinessCompactFieldTable, {
 } from '../business-list/BusinessCompactFieldTable.jsx'
 
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import BusinessLineItemsFooter, {
+  BusinessLineItemsHeader,
+} from '../business-list/BusinessLineItemsFooter.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import { PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS } from '../../utils/purchaseReceiptExceptionAction.mjs'
 import {
@@ -56,6 +59,11 @@ export default function PurchaseReceiptExceptionModal({
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
   const isReturn = mode === 'return'
+  const detailTitle = isReturn ? '退货明细' : '调整明细'
+  const appendExceptionLine = (add, index) => {
+    add()
+    requestLineItemScroll(index)
+  }
   const itemOptions = useMemo(
     () =>
       (Array.isArray(receipt?.items) ? receipt.items : []).map((item) => ({
@@ -131,25 +139,28 @@ export default function PurchaseReceiptExceptionModal({
             </Form.Item>
           ) : null}
         </Space>
-        <BusinessFormSectionTitle>
-          {isReturn ? '退货明细' : '调整明细'}
-        </BusinessFormSectionTitle>
         <Form.List name="items">
           {(fields, { add, remove }) => (
             <>
+              <BusinessLineItemsHeader
+                title={detailTitle}
+                addLabel={`添加${detailTitle}`}
+                onAdd={() => appendExceptionLine(add, fields.length)}
+              />
               <BusinessCompactFieldTable
-                label={isReturn ? '退货明细' : '调整明细'}
+                label={detailTitle}
+                showSequence
                 columns={[
                   { label: '来源明细', required: true },
                   ...(!isReturn
-                    ? [{ label: '调整方式', required: true, width: '20%' }]
+                    ? [{ label: '调整方式', required: true, width: 144 }]
                     : []),
                   {
                     label: isReturn ? '退货数量' : '调整数量',
                     required: true,
-                    width: '16%',
+                    width: 180,
                   },
-                  ...(!isReturn ? [{ label: '调整目标', width: '22%' }] : []),
+                  ...(!isReturn ? [{ label: '调整目标' }] : []),
                   { label: '操作', width: 52 },
                 ]}
               >
@@ -159,6 +170,7 @@ export default function PurchaseReceiptExceptionModal({
                     rowRef={(node) => registerLineItemRow(index, node)}
                     className="erp-purchase-receipt-exception-row"
                     label={`${isReturn ? '退货' : '调整'}明细 ${index + 1}`}
+                    sequence={index + 1}
                     cells={[
                       <Form.Item
                         {...field}
@@ -303,16 +315,18 @@ export default function PurchaseReceiptExceptionModal({
                   </BusinessCompactFieldRow>
                 ))}
               </BusinessCompactFieldTable>
-              <Button
-                type="dashed"
-                icon={<PlusOutlined aria-hidden="true" />}
-                onClick={() => {
-                  add()
-                  requestLineItemScroll(fields.length)
-                }}
-              >
-                添加明细
-              </Button>
+              <BusinessLineItemsFooter
+                addLabel={`添加${detailTitle}`}
+                onAdd={() => appendExceptionLine(add, fields.length)}
+                stats={[
+                  {
+                    key: 'count',
+                    label: '已录入',
+                    value: fields.length,
+                    suffix: '条',
+                  },
+                ]}
+              />
             </>
           )}
         </Form.List>

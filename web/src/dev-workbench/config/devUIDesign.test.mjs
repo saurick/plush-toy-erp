@@ -150,6 +150,64 @@ test('UI design has exactly one self-contained HTML and the current written cont
   }
 })
 
+test('mobile progress design groups business details without desktop source jumps', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const specification = read(UI_DESIGN_ASSET.specificationPath)
+  const rationale = read(UI_DESIGN_ASSET.rationalePath)
+  const detail = html.match(
+    /function renderMobileProgressDetail\(\) \{([\s\S]*?)\n[ ]{4}\}\n\n[ ]{4}function renderMobileTaskPreview/u
+  )
+
+  assert.ok(detail)
+  assert.match(detail[1], /label: '产品信息'/u)
+  assert.match(detail[1], /label: '生产执行'/u)
+  assert.match(detail[1], /label: '关联任务'/u)
+  assert.match(detail[1], /mobile-progress-details-toggle/u)
+  assert.match(detail[1], /mobile-open-production-progress/u)
+  assert.doesNotMatch(detail[1], /打开原单/u)
+  assert.match(specification, /产品信息 \/ 生产执行 \/ 关联任务/u)
+  assert.match(rationale, /手机进度明细按判断路径分组/u)
+})
+
+test('UI design keeps persistent page headings concise like the formal ERP', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const formHeaders = [
+    ...html.matchAll(/<header class="form-head">([\s\S]*?)<\/header>/gu),
+  ]
+  const workbenchHeading = html.match(
+    /<header class="dev-design-heading">([\s\S]*?)<\/header>/u
+  )
+  const viewer = read('web/src/dev-workbench/pages/DevUIDesignPage.jsx')
+  const viewerHeading = viewer.match(
+    /<header className="erp-dev-ui-design-header">([\s\S]*?)<\/header>/u
+  )
+
+  assert.ok(formHeaders.length >= 9)
+  assert.deepEqual(
+    formHeaders.filter(([, content]) => /<p\b/u.test(content)),
+    []
+  )
+  assert.ok(workbenchHeading)
+  assert.doesNotMatch(workbenchHeading[1], /<p\b/u)
+  assert.match(workbenchHeading[1], /<h1>\$\{area[.]label\}<\/h1>/u)
+  assert.ok(viewerHeading)
+  assert.doesNotMatch(viewerHeading[1], /<Typography[.]Paragraph\b/u)
+  assert.match(
+    html,
+    /if\(!setup\)return `<div class=\\"view-mode-row\\"><h1>\$\{viewTitle\}<\/h1><\/div>`/u
+  )
+  assert.match(html, /<h1>\$\{viewTitle\}<\/h1><div class="segment"/u)
+  assert.match(
+    html,
+    /function renderTopbarPageTitle\(\)[\s\S]*contentOwnsPageHeading\(\)[\s\S]*class="crumb"/u
+  )
+  assert.doesNotMatch(html, /hub[.]note/u)
+  assert.doesNotMatch(
+    html,
+    /统一界面评审稿 V8|V8 · 本地交互样例|固定样例 · 不连接真实环境/u
+  )
+})
+
 test('UI design modal backdrops follow the shared dismissal contract', () => {
   const html = read(UI_DESIGN_ASSET.path)
   const specification = read(UI_DESIGN_ASSET.specificationPath)

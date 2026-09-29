@@ -20,7 +20,10 @@ import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
-import { canReadProductionProcess } from '../utils/productionRecordViews.mjs'
+import {
+  canReadProductionProcess,
+  PRODUCTION_RECORD_VIEW_KEYS,
+} from '../utils/productionRecordViews.mjs'
 import { useOperationalFactQuery } from '../components/operational-facts/useOperationalFactQuery.mjs'
 import { useOperationalFactMutations } from '../components/operational-facts/useOperationalFactMutations.mjs'
 import {
@@ -132,6 +135,8 @@ export function OperationalFactWorkspace({
   showTabs = true,
 }) {
   const outletContext = useOutletContext()
+  const productionRecordsWorkspace =
+    outletContext?.productionRecordsWorkspace || null
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [savedContentView, setContentView] = useBusinessPageState(
@@ -815,11 +820,15 @@ export function OperationalFactWorkspace({
     linkedKeyword
   )
 
-  const pageStats = buildOperationalFactStats({
-    activeRows,
-    activeTotal,
-    showStatusSummary: currentActiveKey !== 'finance',
-  })
+  const pageStats = useMemo(
+    () =>
+      buildOperationalFactStats({
+        activeRows,
+        activeTotal,
+        showStatusSummary: currentActiveKey !== 'finance',
+      }),
+    [activeRows, activeTotal, currentActiveKey]
+  )
   const tabItems = Object.entries(configs).map(([key, config]) => ({
     key,
     label: config.title,
@@ -869,15 +878,46 @@ export function OperationalFactWorkspace({
     processOrdersData.loading ||
     Boolean(selectedProcessOrderID && processAggregateData.loading)
   const processError = processOrdersData.error || processAggregateData.error
+  const productionRecordViewKey =
+    contentView === 'process'
+      ? PRODUCTION_RECORD_VIEW_KEYS.PROCESS
+      : PRODUCTION_RECORD_VIEW_KEYS.RECORDS
+
+  useEffect(() => {
+    if (
+      toolbarModuleKey !== 'production-progress' ||
+      !productionRecordsWorkspace
+    ) {
+      return
+    }
+    productionRecordsWorkspace.setHeaderStats(
+      productionRecordViewKey,
+      pageStats
+    )
+  }, [
+    pageStats,
+    productionRecordViewKey,
+    productionRecordsWorkspace,
+    toolbarModuleKey,
+  ])
+
+  const LayoutRoot = productionRecordsWorkspace
+    ? React.Fragment
+    : BusinessPageLayout
+  const layoutProps = productionRecordsWorkspace
+    ? {}
+    : { className: 'erp-v1-operational-fact-page' }
 
   return (
-    <BusinessPageLayout className="erp-v1-operational-fact-page">
-      <PageHeaderCard
-        compact
-        title={pageTitle}
-        viewSwitch={visualizationHeader}
-        stats={pageStats}
-      />
+    <LayoutRoot {...layoutProps}>
+      {productionRecordsWorkspace ? null : (
+        <PageHeaderCard
+          compact
+          title={pageTitle}
+          viewSwitch={visualizationHeader}
+          stats={pageStats}
+        />
+      )}
 
       <BusinessOperationPanel
         compact
@@ -1904,7 +1944,7 @@ export function OperationalFactWorkspace({
           onChange={(event) => setFinanceCancelReason(event.target.value)}
         />
       </BusinessModal>
-    </BusinessPageLayout>
+    </LayoutRoot>
   )
 }
 

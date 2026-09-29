@@ -630,7 +630,6 @@
   --erp-business-action-modal-divider: var(--erp-modal-divider);
   --erp-business-action-field-bg: var(--erp-page-bg);
   --erp-business-action-field-border: var(--erp-border-strong);
-  --erp-line-items-accent: var(--erp-primary);
   --erp-line-items-import-bg: rgb(15 23 42 / 72%);
   --erp-line-items-import-border: var(--erp-border);
   --erp-source-import-disabled-bg: rgb(15 23 42 / 58%);

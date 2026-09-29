@@ -152,8 +152,7 @@ test('outsourcing order source actions stay on the matching confirmed open line'
   )
 })
 
-test('outsourcing page explains follow-up work in business language', () => {
-  assert.match(source, /发料、质检、应付分开办理/u)
+test('outsourcing page keeps follow-up boundaries at the action context', () => {
   assert.match(
     source,
     /确认下单只确认加工合同，不会同时完成发料、回货、质检或应付/u

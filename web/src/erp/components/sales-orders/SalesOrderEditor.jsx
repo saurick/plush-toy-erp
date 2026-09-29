@@ -49,7 +49,6 @@ export default function SalesOrderEditor({
     <BusinessFormPage
       form={form}
       title={editingOrder?.id ? '编辑销售订单' : '新建销售订单'}
-      description="先记录客户订货需求；工程可在订单草稿阶段完善产品、物料清单并安排打样。"
       open={open}
       onOk={onOk}
       onCancel={onCancel}

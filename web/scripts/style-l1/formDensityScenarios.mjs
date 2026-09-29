@@ -19,9 +19,10 @@ async function assertCompactBounds(table, narrow) {
       ...node.querySelectorAll('tbody > tr:not(.compact-row-details)'),
     ].map((row) => ({
       height: row.getBoundingClientRect().height,
-      fields: [...row.querySelectorAll('input, select')].map(
-        (input) => ({ width: input.getBoundingClientRect().width, height: input.getBoundingClientRect().height })
-      ),
+      fields: [...row.querySelectorAll('input, select')].map((input) => ({
+        width: input.getBoundingClientRect().width,
+        height: input.getBoundingClientRect().height,
+      })),
     })),
   }))
   assert.ok(metrics.scrollWidth <= metrics.width + 1, JSON.stringify(metrics))
@@ -84,6 +85,7 @@ export function createFormDensityScenarios({ outputDir }) {
         ['采购入库', 'return'],
         ['采购入库', 'adjustment'],
         ['销售订单', 'engineering'],
+        ['采购订单', 'arrival'],
       ]) {
         await navigate(title)
         await frame
@@ -102,7 +104,9 @@ export function createFormDensityScenarios({ outputDir }) {
           await modal.getByLabel('实际情况 1').fill('与确认样一致')
           await modal.getByLabel('检查范围 1').selectOption('抽检')
           await modal.getByLabel('说明 / 抽检范围 1').fill('抽取三卷')
-          await modal.getByRole('button', { name: '添加检查项' }).click()
+          await modal
+            .getByRole('button', { name: '添加检查项', exact: true })
+            .click()
           await modal.getByLabel('检查项目 2').fill('克重')
           await modal.getByRole('button', { name: '移除明细 1' }).click()
           assert.equal(
@@ -128,6 +132,24 @@ export function createFormDensityScenarios({ outputDir }) {
             await modal.getByLabel('工程产品 1').selectOption('毛绒挂件')
             assert.equal(await modal.getByLabel('打样 BOM 1').inputValue(), '')
             assert.equal(await modal.getByLabel('设计师 1').inputValue(), '')
+          } else if (kind === 'arrival') {
+            await modal.getByLabel('实点数量 1', { exact: true }).fill('25.6')
+            await modal.getByLabel('送货标示数量 1', { exact: true }).fill('26')
+            assert.match(
+              await modal.locator('[data-arrival-difference="0"]').innerText(),
+              /少 0.4 码/
+            )
+            await modal
+              .getByRole('button', { name: '增加一卷 / 包', exact: true })
+              .click()
+            await modal.getByLabel('实点数量 2', { exact: true }).fill('18')
+            await modal.getByRole('button', { name: '移除明细 2' }).click()
+            assert.equal(
+              await modal
+                .getByLabel('实点数量 1', { exact: true })
+                .inputValue(),
+              '25.6'
+            )
           } else {
             await modal
               .getByLabel(kind === 'return' ? '退货数量 1' : '调整数量 1')
@@ -174,13 +196,36 @@ export function createFormDensityScenarios({ outputDir }) {
       await frame
         .getByLabel('产品 1', { exact: true })
         .selectOption('节庆毛绒礼盒')
-      await production.locator('summary').click()
+      await production.locator('.compact-optional > summary').click()
+      const expanded = await production
+        .locator('.production-line-fields')
+        .evaluate((node) => ({
+          height: node.getBoundingClientRect().height,
+          top: [...node.children].map(
+            (field) => field.getBoundingClientRect().top
+          ),
+        }))
+      if (size === 'desktop') {
+        assert.ok(expanded.height < 200, JSON.stringify(expanded))
+        assert.ok(
+          Math.abs(expanded.top[0] - expanded.top[1]) < 2,
+          JSON.stringify(expanded)
+        )
+      }
+      await production.screenshot({
+        path: `${outputDir}/form-density-production-expanded-${size}.png`,
+      })
       await frame.getByLabel('明细备注 1', { exact: true }).fill('生产首行备注')
-      await production.locator('summary').click()
-      await frame.getByRole('button', { name: '增加明细', exact: true }).click()
+      await production.locator('.compact-optional > summary').click()
+      await frame
+        .getByRole('button', { name: '添加生产明细', exact: true })
+        .click()
       assert.equal(await production.locator('tbody').count(), 2)
       assert.match(
-        await production.locator('summary').first().innerText(),
+        await production
+          .locator('.compact-optional > summary')
+          .first()
+          .innerText(),
         /生产首行备注/
       )
       await production
@@ -191,7 +236,7 @@ export function createFormDensityScenarios({ outputDir }) {
       await frame.getByRole('button', { name: '保存草稿', exact: true }).click()
       assert.equal(await production.locator('tbody').count(), 1)
       assert.match(
-        await production.locator('summary').innerText(),
+        await production.locator('.compact-optional > summary').innerText(),
         /生产首行备注/
       )
       await assertCompactBounds(production, size === 'narrow')
@@ -214,12 +259,110 @@ export function createFormDensityScenarios({ outputDir }) {
           .getByRole('button', { name: '返回列表', exact: true })
           .click()
       }
+      for (const [title, key] of [
+        ['销售订单', 'sales'],
+        ['采购订单', 'purchase'],
+        ['委外订单', 'outsourcing'],
+        ['出货管理', 'shipments'],
+      ]) {
+        await navigate(title)
+        await frame.locator('[data-action="new-record"]').click()
+        const addLabel = {
+          sales: '添加订货明细',
+          purchase: '添加采购明细',
+          outsourcing: '添加加工明细',
+          shipments: '添加出货明细',
+        }[key]
+        if (!(await frame.locator('.document-line-details').count())) {
+          await frame
+            .getByRole('button', { name: addLabel, exact: true })
+            .click()
+        }
+        const table = frame.locator('.document-line-table')
+        if (size === 'desktop') {
+          const columns = () =>
+            table.locator('th').evaluateAll((headers) =>
+              headers.map((header) => ({
+                label: header.textContent.trim(),
+                width: header.getBoundingClientRect().width,
+              }))
+            )
+          const normal = await columns()
+          await page.setViewportSize({ width: 2560, height: 1000 })
+          const wide = await columns()
+          for (const column of wide.filter(({ label }) =>
+            /^(序号|.*数量|数量|单位|单价|.*金额|计划交付|预计到货|预计回货|操作)$/u.test(
+              label
+            )
+          )) {
+            assert.ok(
+              column.width <= 196 &&
+                Math.abs(
+                  column.width -
+                    normal.find(({ label }) => label === column.label).width
+                ) <= 1,
+              `${key}: 短内容列在大屏上不应继续伸展 ${JSON.stringify(column)}`
+            )
+          }
+          await page.setViewportSize({ width: 1920, height: 1000 })
+        }
+        const row = table.locator('[data-form-row]').first()
+        const details = row.locator('.document-line-details')
+        assert.equal(await details.getAttribute('open'), null)
+        await details.locator('summary').click()
+        const note = details.locator('[data-form-field="note-0"]')
+        await note.fill('第一行的独立备注')
+        await details.locator('summary').click()
+        assert.match(
+          await details.locator('summary').innerText(),
+          /第一行的独立备注/
+        )
+        if (key !== 'shipments') {
+          await row.locator('[data-action="copy-line"]').click()
+          const copied = table.locator('[data-form-row]').nth(1)
+          assert.equal(
+            await copied.locator('[data-form-field="note-1"]').inputValue(),
+            '第一行的独立备注'
+          )
+          await copied.locator('summary').click()
+          await copied
+            .locator('[data-form-field="note-1"]')
+            .fill('第二行修改后的备注')
+          await copied.locator('summary').click()
+          assert.equal(await note.inputValue(), '第一行的独立备注')
+          await copied.locator('[data-action="remove-line"]').click()
+        }
+        await frame
+          .getByRole('button', { name: addLabel, exact: true })
+          .click()
+        assert.match(
+          await details.locator('summary').innerText(),
+          /第一行的独立备注/
+        )
+        await table.screenshot({
+          path: `${outputDir}/form-density-design-${key}-${size}.png`,
+        })
+        const bounds = await table.evaluate((node) => {
+          const block = node.querySelector('.document-line-supplement')
+          return {
+            viewport: document.documentElement.clientWidth,
+            page: document.documentElement.scrollWidth,
+            table: node.clientWidth,
+            supplement: block.getBoundingClientRect().width,
+          }
+        })
+        assert.ok(bounds.page <= bounds.viewport + 1, JSON.stringify(bounds))
+        assert.ok(bounds.supplement <= bounds.table + 1, JSON.stringify(bounds))
+        await frame.locator('[data-action="back-list"]').click()
+        const discard = frame.locator('[data-action="confirm-nav"]')
+        if (await discard.isVisible()) await discard.click()
+      }
       await navigate('库存台账')
       await frame.locator('[data-action="new-record"]').click()
       await frame.getByLabel('操作原因').fill('核对盘点差异')
       await frame.getByLabel('作业数量').fill('1200')
       await frame.locator('.compact-optional summary').click()
-      await frame.getByLabel('备注', { exact: true }).fill('盘点补充说明')
+      await frame.getByLabel('明细备注 1', { exact: true }).fill('盘点补充说明')
       await frame.locator('.compact-optional summary').click()
       await frame.getByRole('button', { name: '保存草稿', exact: true }).click()
       assert.equal(await frame.getByLabel('作业数量').inputValue(), '1200')
@@ -233,11 +376,9 @@ export function createFormDensityScenarios({ outputDir }) {
       await frame.getByLabel('目标仓库').selectOption('辅料仓')
       await frame.getByRole('button', { name: '保存修改', exact: true }).click()
       assert.equal(await frame.getByLabel('目标仓库').inputValue(), '辅料仓')
-      await frame
-        .locator('.form-view')
-        .screenshot({
-          path: `${outputDir}/form-density-design-inventory-${size}.png`,
-        })
+      await frame.locator('.form-view').screenshot({
+        path: `${outputDir}/form-density-design-inventory-${size}.png`,
+      })
     },
   }))
 }

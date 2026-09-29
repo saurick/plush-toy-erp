@@ -277,20 +277,20 @@ export function createUnifiedInteractionScenarios({
           .waitFor()
         await editor.getByLabel('付款周期（天）', { exact: true }).fill('30')
         const lines = editor.locator('.erp-sales-order-lines-form__row')
-        await lines
-          .first()
+        const firstLine = lines.first()
+        await firstLine.locator('summary').click()
+        await firstLine
           .getByLabel('产品名称', { exact: true })
           .fill('保存前原始行')
-        await lines
-          .first()
+        await firstLine
           .getByRole('button', { name: '复制第 1 行', exact: true })
           .click()
-        await lines
-          .nth(1)
+        const copiedLine = lines.nth(1)
+        await copiedLine.locator('summary').click()
+        await copiedLine
           .getByLabel('产品名称', { exact: true })
           .fill('复制后移到首行')
-        await lines
-          .nth(1)
+        await copiedLine
           .getByRole('button', { name: '上移第 2 行', exact: true })
           .click()
         const requestPromise = page.waitForRequest(
@@ -689,7 +689,9 @@ export function createUnifiedInteractionScenarios({
         await dialog.locator('.ant-drawer-close').click()
         await dialog.waitFor({ state: 'hidden' })
         await page.getByText('记录明细', { exact: true }).click()
-        await page.locator('.erp-v1-operational-fact-page .ant-table-wrapper').waitFor()
+        await page
+          .locator('.erp-production-record-workspace .ant-table-wrapper')
+          .waitFor()
         await assertProductionRecordTabMotion(page, '生产工序')
         await page.getByRole('tab', { name: '生产工序', exact: true }).click()
         await panel.locator('.erp-production-process__step').first().waitFor()

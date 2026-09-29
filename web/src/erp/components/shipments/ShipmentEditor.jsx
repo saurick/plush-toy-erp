@@ -17,14 +17,18 @@ import Table from '@/common/components/table/AppTable'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import DeliveryAddressFields from '../business-list/DeliveryAddressFields.jsx'
 import ProductIdentity, {
+  ProductThumbnail,
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
+import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
-import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
+import BusinessLineItemsFooter, {
+  BusinessLineItemsHeader,
+} from '../business-list/BusinessLineItemsFooter.jsx'
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
@@ -53,11 +57,11 @@ import BusinessLineItemsTable, {
 } from '../business-list/BusinessLineItemsTable.jsx'
 
 const SHIPMENT_ITEM_COLUMNS = [
-  { label: '产品', width: 220, required: true },
+  { label: '产品', width: 220, flexible: true, required: true },
   { label: 'SKU', width: 150 },
   { label: '仓库', width: 128, required: true },
   { label: '批次', width: 150 },
-  { label: '数量', width: 140, required: true },
+  { label: '数量', width: 180, required: true },
   { label: '单位', width: 94, required: true },
 ]
 
@@ -118,6 +122,7 @@ export function sourceLineProductText(
 function ShipmentFormFields({
   form,
   disabled = false,
+  copyShipmentNo = '',
   customerOptions = [],
   salesOrderOptions = [],
   sourceCurrency = '',
@@ -150,6 +155,12 @@ function ShipmentFormFields({
             allowClear
             autoComplete="off"
             disabled={disabled}
+            suffix={
+              <BusinessCopyButton
+                label="出货单号"
+                value={disabled ? copyShipmentNo : ''}
+              />
+            }
             placeholder="自动生成，可按需要调整"
           />
         </Form.Item>
@@ -639,29 +650,51 @@ function ShipmentItemFormFields({
   return (
     <BusinessLineItemRow
       index={index}
+      name={itemPath}
+      detailsLabel="来源、包装与备注"
+      summaryFields={[
+        {
+          key: 'sales_order_item_id',
+          label: '来源',
+          options: salesOrderItemOptions,
+        },
+        { key: 'case_no', label: '箱号' },
+        { key: 'package_description', label: '包装' },
+        { key: 'note', label: '备注' },
+      ]}
       rowRef={rowRef}
       actions={actions}
       cells={[
-        <Form.Item
-          className="erp-business-action-form__field"
-          label="产品"
-          name={fieldName('product_id')}
-          rules={[{ required: true, message: '请选择产品' }]}
-        >
-          <Select
-            allowClear
-            disabled={sourceLocked}
-            optionFilterProp="label"
-            options={productOptions}
-            listItemHeight={48}
-            optionRender={renderProductOption}
-            placeholder="请选择产品"
-            showSearch
-            onChange={(nextID) =>
-              applyItemPatch(buildShipmentProductChangePatch(nextID, products))
-            }
-          />
-        </Form.Item>,
+        <div className="erp-product-field-control">
+          {productID ? (
+            <ProductThumbnail
+              productId={productID}
+              name={referenceLabel(productOptions, productID, '产品')}
+            />
+          ) : null}
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="产品"
+            name={fieldName('product_id')}
+            rules={[{ required: true, message: '请选择产品' }]}
+          >
+            <Select
+              allowClear
+              disabled={sourceLocked}
+              optionFilterProp="label"
+              options={productOptions}
+              listItemHeight={48}
+              optionRender={renderProductOption}
+              placeholder="请选择产品"
+              showSearch
+              onChange={(nextID) =>
+                applyItemPatch(
+                  buildShipmentProductChangePatch(nextID, products)
+                )
+              }
+            />
+          </Form.Item>
+        </div>,
         <Form.Item
           className="erp-business-action-form__field"
           label="SKU"
@@ -767,21 +800,6 @@ function ShipmentItemFormFields({
           }
         />
       </Form.Item>
-      {productID ? (
-        <div className="erp-business-action-form__field">
-          <ProductIdentity
-            productId={productID}
-            name={referenceLabel(productOptions, productID, '产品')}
-          />
-        </div>
-      ) : null}
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="包装说明"
-        name={fieldName('package_description')}
-      >
-        <BusinessTextArea allowClear autoComplete="off" maxLength={255} />
-      </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
         label="箱号"
@@ -789,13 +807,22 @@ function ShipmentItemFormFields({
       >
         <Input allowClear autoComplete="off" maxLength={128} />
       </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        label="备注"
-        name={fieldName('note')}
-      >
-        <BusinessTextArea allowClear maxLength={300} showCount />
-      </Form.Item>
+      <div className="erp-line-item-details__notes">
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="包装说明"
+          name={fieldName('package_description')}
+        >
+          <BusinessTextArea allowClear autoComplete="off" maxLength={255} />
+        </Form.Item>
+        <Form.Item
+          className="erp-line-item-field--note"
+          label="备注"
+          name={fieldName('note')}
+        >
+          <BusinessTextArea allowClear maxLength={300} showCount />
+        </Form.Item>
+      </div>
     </BusinessLineItemRow>
   )
 }
@@ -948,6 +975,10 @@ export default function ShipmentEditor({
 }) {
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
+  const appendShipmentItem = (add, index) => {
+    add(createBlankShipmentItem())
+    requestLineItemScroll(index)
+  }
   const isWritableModal = isCreateModal || isEditModal
   const canSave = isCreateModal ? canCreate : isEditModal ? canUpdate : false
   const clearStaleManualWeight = () => {
@@ -971,13 +1002,6 @@ export default function ShipmentEditor({
             ? '编辑出货草稿'
             : '查看出货明细'
       }
-      description={
-        isCreateModal
-          ? '单头和出货明细将一次保存完成。'
-          : isEditModal
-            ? '单头和明细共用同一保存事务；进入质检或审批流程后将冻结编辑。'
-            : '只读查看当前出货单头和已保存明细。'
-      }
       open={Boolean(isWritableModal || isViewModal)}
       onCancel={onCancel}
       onOk={isWritableModal ? onOk : undefined}
@@ -990,6 +1014,7 @@ export default function ShipmentEditor({
           form={form}
           customerOptions={customerOptions}
           disabled={!isWritableModal}
+          copyShipmentNo={isViewModal ? modalSelectedShipment?.shipment_no : ''}
           salesOrderOptions={salesOrderOptions}
           sourceCurrency={
             selectedSalesOrder?.currency ||
@@ -1055,14 +1080,13 @@ export default function ShipmentEditor({
                 <Form.List name="items">
                   {(fields, { add, remove }) => (
                     <section className="erp-master-contact-list erp-shipment-modal-items">
-                      <div className="erp-master-contact-list__head">
-                        <div>
-                          <strong>出货明细</strong>
-                          <span>
-                            明细随当前编辑页保存；可从销售订单导入来源，确认出货时才会扣减相应库存。
-                          </span>
-                        </div>
-                      </div>
+                      <BusinessLineItemsHeader
+                        title="出货明细"
+                        description="明细随当前编辑页保存；可从销售订单导入来源，确认出货时才会扣减相应库存。"
+                        addLabel="添加出货明细"
+                        addDisabled={Boolean(selectedSalesOrder)}
+                        onAdd={() => appendShipmentItem(add, fields.length)}
+                      />
                       <div className="erp-line-items-form__import-row">
                         <div className="erp-line-items-form__import-copy">
                           <strong>从销售订单导入</strong>
@@ -1153,11 +1177,8 @@ export default function ShipmentEditor({
                       </BusinessLineItemsTable>
                       <BusinessLineItemsFooter
                         addDisabled={Boolean(selectedSalesOrder)}
-                        addLabel="添加条目"
-                        onAdd={() => {
-                          add(createBlankShipmentItem())
-                          requestLineItemScroll(fields.length)
-                        }}
+                        addLabel="添加出货明细"
+                        onAdd={() => appendShipmentItem(add, fields.length)}
                         stats={[
                           {
                             key: 'count',

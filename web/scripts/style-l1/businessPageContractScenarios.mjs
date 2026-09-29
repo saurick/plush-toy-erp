@@ -370,6 +370,10 @@ export function createBusinessPageContractScenarios({
             new URLSearchParams(window.location.search).get('source') ===
             'sales_orders'
         )
+        await historySelectRoot
+          .locator('.ant-select-selection-item')
+          .filter({ hasText: /^销售订单$/u })
+          .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           String(
             await historySelectRoot

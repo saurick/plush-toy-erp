@@ -2,7 +2,9 @@ import React from 'react'
 import { Form } from 'antd'
 import { BusinessLineItemsEmpty } from './BusinessCompactFieldTable.jsx'
 
-import BusinessLineItemsFooter from './BusinessLineItemsFooter.jsx'
+import BusinessLineItemsFooter, {
+  BusinessLineItemsHeader,
+} from './BusinessLineItemsFooter.jsx'
 import BusinessLineItemsTable from './BusinessLineItemsTable.jsx'
 
 function classNames(...values) {
@@ -34,12 +36,11 @@ export default function BusinessLineItemsSection({
           return (
             <>
               {renderBeforeHeader ? renderBeforeHeader(context) : null}
-              <div className="erp-sales-order-lines-form__head">
-                <div>
-                  <strong>{title}</strong>
-                  {description ? <span>{description}</span> : null}
-                </div>
-              </div>
+              <BusinessLineItemsHeader
+                title={title}
+                description={description}
+                {...normalizedFooterProps}
+              />
               {fields.length === 0 ? (
                 <BusinessLineItemsEmpty>{emptyDescription}</BusinessLineItemsEmpty>
               ) : (

@@ -8,7 +8,7 @@ import {
   PrinterOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Space, Tag } from 'antd'
+import { Button, Space } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
@@ -714,20 +714,6 @@ export default function V1OutsourcingOrdersPage() {
             compact
             helpKey="processing-contracts"
             title="委外订单"
-            tags={[
-              <Tag color="blue" key="source">
-                业务单据：加工合同
-              </Tag>,
-              <Tag color="green" key="process">
-                工序来自加工环节字典
-              </Tag>,
-              <Tag color="purple" key="checking">
-                查货只是工序候选
-              </Tag>,
-              <Tag color="gold" key="fact">
-                发料、质检、应付分开办理
-              </Tag>,
-            ]}
             stats={pageStats}
           />
 
@@ -1238,7 +1224,6 @@ export default function V1OutsourcingOrdersPage() {
       <BusinessFormPage
         form={form}
         title={editingRow ? '编辑加工合同' : '新建加工合同'}
-        description="填写加工厂、合同信息和加工内容；一份合同对应一家加工厂，可包含多个产品订单。"
         open={modalOpen}
         onCancel={closeModal}
         onOk={submitForm}

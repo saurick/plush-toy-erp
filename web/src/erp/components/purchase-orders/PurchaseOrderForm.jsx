@@ -50,13 +50,10 @@ import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
 import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx'
 
 const PURCHASE_ORDER_COLUMNS = [
-  { label: '产品订单编号', width: 144 },
-  { label: '产品编号', width: 136 },
-  { label: '产品名称', width: 176 },
-  { label: '材料名称', width: 240, required: true },
-  { label: '单位', width: 130, required: true },
+  { label: '材料名称', width: 240, flexible: true, required: true },
+  { label: '单位', width: 100, required: true },
   { label: '单价', width: 112 },
-  { label: '采购数量', width: 220, required: true },
+  { label: '采购数量', width: 180, required: true },
   {
     label: (
       <BusinessHelpLabel
@@ -65,10 +62,9 @@ const PURCHASE_ORDER_COLUMNS = [
         pageKey="accessories-purchase"
       />
     ),
-    width: 112,
+    width: 144,
   },
-  { label: '备注', width: 180 },
-  { label: '预计到货日期', width: 156 },
+  { label: '预计到货日期', width: 160 },
 ]
 
 function getNextLineNo(lines = []) {
@@ -462,6 +458,16 @@ export function PurchaseOrderFormFields({
             <BusinessLineItemRow
               key={field.key}
               index={index}
+              name={['items', field.name]}
+              detailsLabel="来源、下单资料与备注"
+              summaryFields={[
+                { key: 'product_order_no_snapshot', label: '订单' },
+                { key: 'product_no_snapshot', label: '产品编号' },
+                { key: 'product_name_snapshot', label: '产品' },
+                { key: 'material_code_snapshot', label: '材料编码' },
+                { key: 'color_snapshot', label: '颜色' },
+                { key: 'note', label: '备注' },
+              ]}
               rowRef={(node) => registerLineItemRow(index, node)}
               actions={
                 <Space
@@ -518,27 +524,6 @@ export function PurchaseOrderFormFields({
                 </>
               }
               cells={[
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--snapshot-code"
-                  name={[field.name, 'product_order_no_snapshot']}
-                  label="产品订单编号"
-                >
-                  <Input maxLength={128} />
-                </Form.Item>,
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--snapshot-code"
-                  name={[field.name, 'product_no_snapshot']}
-                  label="产品编号"
-                >
-                  <Input maxLength={128} />
-                </Form.Item>,
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--snapshot-name"
-                  name={[field.name, 'product_name_snapshot']}
-                  label="产品名称"
-                >
-                  <BusinessTextArea maxLength={255} />
-                </Form.Item>,
                 <Form.Item
                   className="erp-line-item-field erp-line-item-field--source"
                   name={[field.name, 'material_id']}
@@ -619,13 +604,7 @@ export function PurchaseOrderFormFields({
                 >
                   <Input placeholder="留空时根据数量和单价自动计算" />
                 </Form.Item>,
-                <Form.Item
-                  className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
-                  name={[field.name, 'note']}
-                  label="备注"
-                >
-                  <BusinessTextArea allowClear showCount maxLength={255} />
-                </Form.Item>,
+
                 <Form.Item
                   className="erp-line-item-field erp-line-item-field--date"
                   name={[field.name, 'expected_arrival_date']}
@@ -650,6 +629,27 @@ export function PurchaseOrderFormFields({
             >
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--snapshot-code"
+                name={[field.name, 'product_order_no_snapshot']}
+                label="产品订单编号"
+              >
+                <Input maxLength={128} />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--snapshot-code"
+                name={[field.name, 'product_no_snapshot']}
+                label="产品编号"
+              >
+                <Input maxLength={128} />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--snapshot-name"
+                name={[field.name, 'product_name_snapshot']}
+                label="产品名称"
+              >
+                <BusinessTextArea maxLength={255} />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--snapshot-code"
                 name={[field.name, 'material_code_snapshot']}
                 label="下单材料编码"
               >
@@ -669,10 +669,17 @@ export function PurchaseOrderFormFields({
               >
                 <Input maxLength={64} />
               </Form.Item>
+              <Form.Item
+                className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
+                name={[field.name, 'note']}
+                label="备注"
+              >
+                <BusinessTextArea allowClear showCount maxLength={255} />
+              </Form.Item>
             </BusinessLineItemRow>
           )}
           footerProps={({ add, fields }) => ({
-            addLabel: '添加条目',
+            addLabel: '添加采购明细',
             onAdd: () => {
               const currentLines = form.getFieldValue('items') || []
               add(createBlankPurchaseLine(getNextLineNo(currentLines)))

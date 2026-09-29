@@ -24,6 +24,10 @@ test('default plush process suggestions show sewing before handwork without beco
     sewingIndex < handworkIndex,
     '默认加工环节建议必须先展示车缝，再展示手工'
   )
-  assert.match(source, /排序只影响列表展示，不定义前后工序/u)
-  assert.match(source, /不在此生成委外订单、生产任务、库存记录或质检判定/u)
+  const processConfig = source.slice(
+    source.indexOf('  processes: {'),
+    source.indexOf('  products: {')
+  )
+  assert.doesNotMatch(processConfig, /sort_order/u)
+  assert.doesNotMatch(processConfig, /production_route_operation_code/u)
 })

@@ -73,7 +73,7 @@ export default function SalesOrderSourceEvidence({
 }) {
   if (!value?.row_number) return null
   return (
-    <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
+    <div className="erp-sales-order-source-evidence">
       <Popover
         title="首次导入的原表内容"
         trigger="click"
@@ -102,6 +102,25 @@ export default function SalesOrderSourceEvidence({
               ]}
               scroll={{ y: 360 }}
             />
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                flexWrap: 'wrap',
+                marginTop: 8,
+              }}
+            >
+              {(value.image_files || []).map((file) => (
+                <SalesOrderImportImage
+                  key={file}
+                  image={images.find((image) => image.fileName === file)}
+                  attachment={attachments.find(
+                    (item) => item.file_name === file && !item.withdrawn_at
+                  )}
+                  ownerID={ownerID}
+                />
+              ))}
+            </div>
           </div>
         }
       >
@@ -114,18 +133,11 @@ export default function SalesOrderSourceEvidence({
         {value.cells?.find((cell) => cell.label === '设计师')?.value ||
           '未填写'}
       </Typography.Text>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-        {(value.image_files || []).map((file) => (
-          <SalesOrderImportImage
-            key={file}
-            image={images.find((image) => image.fileName === file)}
-            attachment={attachments.find(
-              (item) => item.file_name === file && !item.withdrawn_at
-            )}
-            ownerID={ownerID}
-          />
-        ))}
-      </div>
+      {(value.image_files || []).length ? (
+        <Typography.Text type="secondary">
+          原表图片 {value.image_files.length} 张
+        </Typography.Text>
+      ) : null}
     </div>
   )
 }

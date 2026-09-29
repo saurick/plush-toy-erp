@@ -27,7 +27,6 @@ export default function PurchaseOrderEditor({
       form={form}
       open={open}
       title={editingOrder ? '编辑采购订单' : '新建采购订单'}
-      description="只维护采购承诺，入库、质检、库存或应付请到对应业务页面处理。"
       okText="保存"
       confirmLoading={saving}
       loading={itemsLoading || !referenceDataReady}

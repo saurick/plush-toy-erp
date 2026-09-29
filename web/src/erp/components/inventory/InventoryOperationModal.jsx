@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo } from 'react'
-import { Alert, Descriptions, Form, Input, Select } from 'antd'
+import { Alert, Form, Input, Select } from 'antd'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
-import { BusinessOptionalField } from '../business-list/BusinessCompactFieldTable.jsx'
+import BusinessCompactFieldTable, {
+  BusinessCompactFieldRow,
+  BusinessOptionalField,
+} from '../business-list/BusinessCompactFieldTable.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { warehouseAcceptsSubject } from '../../utils/warehouseClassification.mjs'
 
@@ -121,7 +124,7 @@ export default function InventoryOperationModal({
           : '从当前选中的库存余额生成可核对、可恢复的作业草稿。'
       }
       open={open}
-      size="localAction"
+      size={sourceRows.length > 1 ? 'lineItems' : 'localAction'}
       okText={isEdit ? '保存草稿' : meta.createSubmit}
       cancelText="取消"
       confirmLoading={loading}
@@ -162,83 +165,97 @@ export default function InventoryOperationModal({
           </Form.Item>
         </div>
         <Form.List name="items">
-          {(fields) =>
-            fields.map(({ key, name }, index) => {
-              const source = sourceRows[index] || {}
-              const labels = isEdit
-                ? resolveSourceLabels?.(source, index) || {}
-                : sourceLabels || {}
-              const fromWarehouseID =
-                source.from_warehouse_id || source.warehouse_id
-              const targetWarehouseOptions = warehouseOptions.filter(
-                (option) =>
-                  Number(option?.value || 0) !== Number(fromWarehouseID || 0) &&
-                  warehouseAcceptsSubject(
-                    option,
-                    source.subject_type,
-                    source.stock_category
-                  )
-              )
+          {(fields) => (
+            <BusinessCompactFieldTable
+              label="库存作业明细"
+              showSequence
+              columns={[
+                {
+                  label: '来源库存',
+                },
+                {
+                  label:
+                    effectiveType === 'CYCLE_COUNT'
+                      ? '实盘数量'
+                      : effectiveType === 'TRANSFER'
+                        ? '调拨数量'
+                        : '调整数量（增加填正数，扣减填负数）',
+                  required: true,
+                  width: 180,
+                },
+                ...(effectiveType === 'TRANSFER'
+                  ? [{ label: '目标仓库', width: '25%', required: true }]
+                  : []),
+              ]}
+            >
+              {fields.map(({ key, name }, index) => {
+                const source = sourceRows[index] || {}
+                const labels = isEdit
+                  ? resolveSourceLabels?.(source, index) || {}
+                  : sourceLabels || {}
+                const fromWarehouseID =
+                  source.from_warehouse_id || source.warehouse_id
+                const targetWarehouseOptions = warehouseOptions.filter(
+                  (option) =>
+                    Number(option?.value || 0) !==
+                      Number(fromWarehouseID || 0) &&
+                    warehouseAcceptsSubject(
+                      option,
+                      source.subject_type,
+                      source.stock_category
+                    )
+                )
 
-              return (
-                <section
-                  key={key}
-                  className="erp-inventory-operation-row"
-                  aria-label={`作业明细 ${index + 1}`}
-                >
-                  {fields.length > 1 ? (
-                    <strong>作业明细 {index + 1}</strong>
-                  ) : null}
-                  <Form.Item name={[name, 'id']} hidden>
-                    <Input />
-                  </Form.Item>
-                  <Descriptions
-                    size="small"
-                    column={1}
-                    items={[
-                      {
-                        key: 'stock',
-                        label: '来源库存',
-                        children:
-                          source.subject_type === 'PRODUCT' ? (
-                            <ProductIdentity
-                              productId={source.subject_id}
-                              name={labels.subject}
-                            >
-                              {selectedInventoryText(source, labels)}
-                            </ProductIdentity>
-                          ) : (
-                            selectedInventoryText(source, labels)
-                          ),
-                      },
-                    ]}
-                  />
-                  <div className="erp-inventory-operation-fields">
-                    {effectiveType === 'CYCLE_COUNT' ? (
-                      <Form.Item
-                        name={[name, 'counted_quantity']}
-                        label="实盘数量"
-                        rules={[
-                          unitQuantityRuleFromOptions(
-                            quantityUnitOptions,
-                            source.unit_id
-                          ),
-                          { required: true, message: '请填写实盘数量' },
-                          {
-                            validator: (_, value) =>
-                              numeric20Scale6Units(value) !== null
-                                ? Promise.resolve()
-                                : Promise.reject(
-                                    new Error('实盘数量必须是非负数')
-                                  ),
-                          },
-                        ]}
-                      >
-                        <Input inputMode="decimal" autoComplete="off" />
-                      </Form.Item>
-                    ) : null}
-                    {effectiveType === 'TRANSFER' ? (
-                      <>
+                return (
+                  <BusinessCompactFieldRow
+                    key={key}
+                    label={`作业明细 ${index + 1}`}
+                    sequence={index + 1}
+                    cells={[
+                      <div>
+                        <Form.Item name={[name, 'id']} hidden>
+                          <Input />
+                        </Form.Item>
+                        <span className="erp-inventory-operation-source-label">
+                          来源库存
+                        </span>
+                        {source.subject_type === 'PRODUCT' ? (
+                          <ProductIdentity
+                            productId={source.subject_id}
+                            name={labels.subject}
+                            compact
+                          >
+                            {selectedInventoryText(source, labels)}
+                          </ProductIdentity>
+                        ) : (
+                          selectedInventoryText(source, labels)
+                        )}
+                      </div>,
+
+                      effectiveType === 'CYCLE_COUNT' ? (
+                        <Form.Item
+                          name={[name, 'counted_quantity']}
+                          label="实盘数量"
+                          rules={[
+                            unitQuantityRuleFromOptions(
+                              quantityUnitOptions,
+                              source.unit_id
+                            ),
+                            { required: true, message: '请填写实盘数量' },
+                            {
+                              validator: (_, value) =>
+                                numeric20Scale6Units(value) !== null
+                                  ? Promise.resolve()
+                                  : Promise.reject(
+                                      new Error('实盘数量必须是非负数')
+                                    ),
+                            },
+                          ]}
+                        >
+                          <Input inputMode="decimal" autoComplete="off" />
+                        </Form.Item>
+                      ) : null,
+                      effectiveType === 'TRANSFER' ? (
                         <Form.Item
                           name={[name, 'adjustment_quantity']}
                           label="调拨数量"
@@ -262,6 +279,8 @@ export default function InventoryOperationModal({
                         >
                           <Input inputMode="decimal" autoComplete="off" />
                         </Form.Item>
+                      ) : null,
+                      effectiveType === 'TRANSFER' ? (
                         <Form.Item
                           name={[name, 'to_warehouse_id']}
                           label="目标仓库"
@@ -275,30 +294,33 @@ export default function InventoryOperationModal({
                             options={targetWarehouseOptions}
                           />
                         </Form.Item>
-                      </>
-                    ) : null}
-                    {effectiveType === 'MANUAL_ADJUSTMENT' ? (
-                      <Form.Item
-                        name={[name, 'adjustment_quantity']}
-                        label="调整数量（增加填正数，扣减填负数）"
-                        rules={[
-                          unitQuantityRuleFromOptions(
-                            quantityUnitOptions,
-                            source.unit_id
-                          ),
-                          { required: true, message: '请填写调整数量' },
-                          {
-                            validator: (_, value) =>
-                              isSignedNumeric20Scale6(value) &&
-                              Number(value) !== 0
-                                ? Promise.resolve()
-                                : Promise.reject(new Error('调整数量不能为 0')),
-                          },
-                        ]}
-                      >
-                        <Input inputMode="decimal" autoComplete="off" />
-                      </Form.Item>
-                    ) : null}
+                      ) : null,
+                      effectiveType === 'MANUAL_ADJUSTMENT' ? (
+                        <Form.Item
+                          name={[name, 'adjustment_quantity']}
+                          label="调整数量（增加填正数，扣减填负数）"
+                          rules={[
+                            unitQuantityRuleFromOptions(
+                              quantityUnitOptions,
+                              source.unit_id
+                            ),
+                            { required: true, message: '请填写调整数量' },
+                            {
+                              validator: (_, value) =>
+                                isSignedNumeric20Scale6(value) &&
+                                Number(value) !== 0
+                                  ? Promise.resolve()
+                                  : Promise.reject(
+                                      new Error('调整数量不能为 0')
+                                    ),
+                            },
+                          ]}
+                        >
+                          <Input inputMode="decimal" autoComplete="off" />
+                        </Form.Item>
+                      ) : null,
+                    ].filter(Boolean)}
+                  >
                     <BusinessOptionalField
                       name={['items', name, 'note']}
                       label="明细备注"
@@ -307,11 +329,11 @@ export default function InventoryOperationModal({
                         <BusinessTextArea maxLength={255} />
                       </Form.Item>
                     </BusinessOptionalField>
-                  </div>
-                </section>
-              )
-            })
-          }
+                  </BusinessCompactFieldRow>
+                )
+              })}
+            </BusinessCompactFieldTable>
+          )}
         </Form.List>
       </Form>
     </BusinessFormModal>

@@ -5,27 +5,34 @@ const cases = [
   {
     key: 'customers',
     path: '/erp/master/partners/customers',
-    visible: ['编号', '名称', '状态', '付款条件'],
-    detail: ['简称', '税号', '默认收货信息'],
+    visible: ['编号', '名称', '简称', '状态', '付款条件'],
+    optional: ['税号', '默认收货信息'],
   },
   {
     key: 'suppliers',
     path: '/erp/master/partners/suppliers',
-    visible: ['编号', '名称', '状态', '联系电话'],
-    detail: ['简称', '税号', '经营 / 加工地址'],
+    visible: ['编号', '名称', '简称', '状态', '联系电话'],
+    optional: ['税号', '经营 / 加工地址'],
   },
   {
     key: 'products',
     path: '/erp/master/products',
     visible: ['产品编号', '产品名称', '状态', '客户款号'],
-    detail: ['英文品名', '海关编码（HS Code）'],
+    optional: ['英文品名', '海关编码（HS Code）'],
   },
   {
     key: 'sales',
     path: '/erp/sales/project-orders/sales-orders',
-    visible: ['订单号', '客户', '状态', '订单总额', '币种', '计划交付日期'],
-    detail: [
+    visible: [
+      '订单号',
+      '客户',
       '联系人',
+      '状态',
+      '订单总额',
+      '币种',
+      '计划交付日期',
+    ],
+    optional: [
       '货款金额',
       '计税方式 / 税率',
       '税额',
@@ -44,13 +51,13 @@ const cases = [
       '预计到货日期',
       '供应商确认到货日期',
     ],
-    detail: ['收货地址'],
+    optional: ['收货地址'],
   },
   {
     key: 'shipments',
     path: '/erp/warehouse/shipments',
     visible: ['出货单号', '状态', '客户', '收货信息'],
-    detail: ['唛头'],
+    optional: ['唛头'],
   },
 ]
 
@@ -79,12 +86,15 @@ export function createBusinessFieldDensityScenarios(deps) {
     )
     for (const label of entry.visible)
       assert.ok(labels.includes(label), `${entry.key}: 保留 ${label}`)
-    for (const label of entry.detail)
-      assert.ok(!labels.includes(label), `${entry.key}: ${label} 应在详情查看`)
+    for (const label of entry.optional)
+      assert.ok(!labels.includes(label), `${entry.key}: ${label} 默认收起`)
     if (page.viewportSize().width >= 1280) {
-      const scanLabels = ['customers', 'sales'].includes(entry.key)
-        ? entry.visible
-        : entry.visible.slice(0, 3)
+      const scanLabels =
+        entry.key === 'customers'
+          ? entry.visible
+          : entry.key === 'sales'
+            ? entry.visible.filter((label) => label !== '联系人')
+            : entry.visible.slice(0, 3)
       const metrics = await page.evaluate(
         ({ selector, scanLabels }) => {
           const card = document.querySelector('.erp-business-data-table-card')
@@ -151,7 +161,7 @@ export function createBusinessFieldDensityScenarios(deps) {
             page.getByRole('button', { name: /导出/u }).click(),
           ])
           const csv = await downloadedText(download)
-          for (const label of entry.detail)
+          for (const label of entry.optional)
             assert.ok(
               csv.includes(label),
               `${entry.key}: 导出仍需包含 ${label}`
@@ -203,8 +213,11 @@ export function createBusinessFieldDensityScenarios(deps) {
           '名称'
         )
         panel = await openColumns()
-        for (const label of cases[0].detail)
-          assert.equal(await panel.getByText(label, { exact: true }).count(), 0)
+        for (const label of cases[0].optional) {
+          const option = panel.getByRole('checkbox', { name: label, exact: true })
+          assert.equal(await option.count(), 1)
+          assert.equal(await option.isChecked(), false)
+        }
         await panel
           .getByRole('button', { name: '恢复默认', exact: true })
           .click()

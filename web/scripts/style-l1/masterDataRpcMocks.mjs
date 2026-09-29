@@ -129,7 +129,6 @@ export async function installMasterDataRpcMocks(page, context) {
       outsourcing_enabled: true,
       inhouse_enabled: true,
       quality_required: true,
-      sort_order: 20,
       is_active: true,
       note: '',
       created_at: nowUnix(),
@@ -143,7 +142,6 @@ export async function installMasterDataRpcMocks(page, context) {
         name: '查货',
         category: '查货',
         quality_required: true,
-        sort_order: 10,
       },
       {
         ...process,
@@ -152,7 +150,6 @@ export async function installMasterDataRpcMocks(page, context) {
         name: '车缝',
         category: '车缝',
         quality_required: false,
-        sort_order: 20,
       },
       {
         ...process,
@@ -161,7 +158,6 @@ export async function installMasterDataRpcMocks(page, context) {
         name: '手工',
         category: '手工',
         quality_required: false,
-        sort_order: 30,
       },
       {
         ...process,
@@ -170,7 +166,6 @@ export async function installMasterDataRpcMocks(page, context) {
         name: '包装',
         category: '包装',
         quality_required: false,
-        sort_order: 40,
       },
     ]
     const unit = {

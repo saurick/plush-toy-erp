@@ -280,6 +280,7 @@ export function createBusinessDetailsScenarios(deps) {
         heading: '销售订单',
         title: '销售订单详情',
         numberKey: 'order_no',
+        copyLabel: '订单号',
       },
       {
         domain: 'outsourcing_order',
@@ -287,6 +288,7 @@ export function createBusinessDetailsScenarios(deps) {
         heading: '委外订单',
         title: '加工合同详情',
         numberKey: 'outsourcing_order_no',
+        copyLabel: '加工合同号',
       },
       {
         domain: 'purchase_receipt',
@@ -295,6 +297,7 @@ export function createBusinessDetailsScenarios(deps) {
         heading: '采购入库',
         title: '采购入库详情',
         numberKey: 'receipt_no',
+        copyLabel: '入库单号',
       },
     ].map((config) => {
       let fullReads = 0
@@ -346,6 +349,7 @@ export function createBusinessDetailsScenarios(deps) {
             supplier_name: '样式供应商',
             customer_id: 1,
             customer_snapshot: { id: 1, name: '样式客户' },
+            ...(retryFailure ? { customer_order_no: 'CUSTOMER-STYLE-001' } : {}),
             item_count: items.length,
             ...(isReceipt ? { items } : {}),
           }
@@ -409,6 +413,39 @@ export function createBusinessDetailsScenarios(deps) {
           })
           await modal.waitFor()
           assert.equal(await page.getByRole('dialog').count(), 1)
+          await page
+            .context()
+            .grantPermissions(['clipboard-read', 'clipboard-write'])
+          const copyButton = modal.getByRole('button', {
+            name: `复制${config.copyLabel}`,
+          })
+          if (retryFailure) {
+            await copyButton.focus()
+            await copyButton.press('Enter')
+            assert.equal(
+              await copyButton.evaluate(
+                (node) => document.activeElement === node
+              ),
+              true
+            )
+          } else {
+            await copyButton.click()
+          }
+          assert.equal(
+            await page.evaluate(() => navigator.clipboard.readText()),
+            recordNo
+          )
+          if (retryFailure) {
+            await modal.getByRole('button', { name: '复制客户订单号' }).click()
+            assert.equal(
+              await page.evaluate(() => navigator.clipboard.readText()),
+              'CUSTOMER-STYLE-001'
+            )
+          }
+          assert.equal(
+            await modal.getByRole('button', { name: '复制状态' }).count(),
+            0
+          )
           if (retryFailure) {
             await modal.getByRole('button', { name: '重试' }).click()
           }
@@ -647,6 +684,14 @@ export function createBusinessDetailsScenarios(deps) {
         await modal
           .getByText('采购订单明细（共 25 条）', { exact: true })
           .waitFor()
+        await page
+          .context()
+          .grantPermissions(['clipboard-read', 'clipboard-write'])
+        await modal.getByRole('button', { name: '复制采购单号' }).click()
+        assert.equal(
+          await page.evaluate(() => navigator.clipboard.readText()),
+          'PO-STYLE-WIDE'
+        )
         assert.equal(
           await page.getByRole('dialog').count(),
           1,
@@ -887,6 +932,7 @@ export function createBusinessDetailsScenarios(deps) {
         record: 'MO-STYLE-L1-20260713',
         action: '查看',
         title: '查看生产订单',
+        copyLabel: '生产单号',
         items: '.erp-production-order-line',
         count: 22,
       },
@@ -897,6 +943,7 @@ export function createBusinessDetailsScenarios(deps) {
         record: 'BOM-STYLE-L1',
         action: '查看',
         title: '查看 BOM 版本',
+        copyLabel: 'BOM 版本',
       },
       {
         name: 'shipment',
@@ -905,6 +952,7 @@ export function createBusinessDetailsScenarios(deps) {
         record: 'SHIP-STYLE-L1',
         action: '查看明细',
         title: '查看出货明细',
+        copyLabel: '出货单号',
       },
     ].map((config) => ({
       name: `business-details-entry-${config.name}`,
@@ -928,6 +976,18 @@ export function createBusinessDetailsScenarios(deps) {
           exact: true,
         })
         await details.waitFor()
+        if (config.copyLabel) {
+          await page
+            .context()
+            .grantPermissions(['clipboard-read', 'clipboard-write'])
+          await details
+            .getByRole('button', { name: `复制${config.copyLabel}` })
+            .click()
+          assert.equal(
+            await page.evaluate(() => navigator.clipboard.readText()),
+            config.record
+          )
+        }
         if (config.items) {
           assert.equal(
             await details.locator(config.items).count(),
@@ -946,7 +1006,7 @@ export function createBusinessDetailsScenarios(deps) {
         await page.screenshot({
           path: path.join(
             outputDir,
-            `business-details-entry-${config.name}.png`
+            `business-details-entry-${config.name}-open.png`
           ),
         })
         await details

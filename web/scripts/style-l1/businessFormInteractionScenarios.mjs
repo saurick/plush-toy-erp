@@ -133,7 +133,9 @@ export function createBusinessFormInteractionScenarios({
       `${scenarioName} 当前操作区不应横向溢出: ${JSON.stringify(metrics)}`
     )
     assert.equal(
-      await page.locator('.erp-business-selection-action-menu').count(),
+      await page
+        .locator('.erp-business-selection-action-menu:visible')
+        .count(),
       0,
       `${scenarioName} 更多操作面板默认必须关闭`
     )
@@ -604,6 +606,18 @@ export function createBusinessFormInteractionScenarios({
       },
       verify: async (page) => {
         await expectHeading(page, '采购订单')
+        assert.equal(
+          await page.locator('.erp-admin-breadcrumb').count(),
+          0,
+          '业务内容区已有采购订单主标题时，顶栏不应重复标题'
+        )
+        assert.equal(
+          await page
+            .getByRole('heading', { name: '采购订单', exact: true })
+            .count(),
+          1,
+          '采购订单页面应只有一个可见主标题'
+        )
         await expectText(page, '下单日期')
         await expectText(page, '预计到货日期')
         await expectText(page, '新建采购订单')
@@ -763,6 +777,7 @@ export function createBusinessFormInteractionScenarios({
             })
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-purchase-order-form-modal',
+              addButtonName: '添加采购明细',
             })
           },
         })
@@ -1094,6 +1109,7 @@ export function createBusinessFormInteractionScenarios({
             )
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'processing-contract-form-modal-title-desktop',
+              addButtonName: '添加加工明细',
             })
           },
         })
@@ -1567,6 +1583,33 @@ export function createBusinessFormInteractionScenarios({
           page,
           'exception-inventory-operation-dark-desktop'
         )
+        const dialog = page.getByRole('dialog')
+        await dialog.getByLabel('实盘数量', { exact: true }).fill('12')
+        const note = dialog.locator('.erp-optional-field')
+        await note.locator('summary').click()
+        await note.getByRole('textbox').fill('核对后保留的说明')
+        await note.locator('summary').click()
+        assert.match(await note.locator('summary').innerText(), /核对后保留/)
+        for (const [type, title, field, value] of [
+          ['transfer', '登记库存调拨', '调拨数量', '5'],
+          ['manual_adjustment', '登记人工库存调整', '调整数量（增加填正数，扣减填负数）', '-2'],
+        ]) {
+          await closeBusinessFormModal(page, dialog)
+          const action = page.locator(`button[data-business-action-key="inventory-${type}"]:visible`)
+          if (!(await action.count())) {
+            await page.getByRole('button', { name: /^更多操作，共/u }).click()
+          }
+          await action.click()
+          await dialog.getByText(title, { exact: true }).waitFor()
+          await dialog.getByLabel(field, { exact: true }).fill(value)
+          assert.equal(await dialog.getByLabel(field, { exact: true }).inputValue(), value)
+          assert.equal(await dialog.getByLabel('目标仓库', { exact: true }).count(), type === 'transfer' ? 1 : 0)
+          assert.equal(await dialog.locator('.erp-optional-field__summary').count(), 0)
+          await page.setViewportSize({ width: 390, height: 844 })
+          await assertNoHorizontalOverflow(page, `inventory-${type}-narrow`)
+          await dialog.screenshot({ path: path.join(outputDir, `inventory-${type}-narrow.png`) })
+          await page.setViewportSize({ width: 1600, height: 900 })
+        }
       },
     },
     {

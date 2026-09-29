@@ -63,6 +63,13 @@ export function useLineItemAppendScroll(itemCount) {
       block: 'nearest',
       inline: 'nearest',
     }
+    target.classList.remove('erp-line-item--appended')
+    target.addEventListener(
+      'animationend',
+      () => target.classList.remove('erp-line-item--appended'),
+      { once: true }
+    )
+    target.classList.add('erp-line-item--appended')
     target.scrollIntoView(scrollOptions)
     focusTarget?.focus({ preventScroll: true })
     focusTarget?.scrollIntoView(scrollOptions)

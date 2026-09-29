@@ -1428,15 +1428,13 @@ export default function V1QualityInspectionsPage() {
   )
 
   const modalDescription = {
-    create:
-      '入库准备通常已逐行生成待检记录；这里只为已取消等需要重建的采购入库行补建质检，材料、仓库和批次由来源行带出。',
     pass: decisionIsProductionStage
       ? '生产阶段质量关口当前只允许合格放行；让步接收需另有按关口审批策略和审计，在该能力落地前保持阻断。'
       : '选择合格或让步接收，并按来源记录估算不良比例；这里只登记质量结论，后续由对应来源规则处理。',
     reject:
       '记录不合格及来源的估算不良比例；后续返工、退货或阻断仍由对应来源业务办理。',
     cancel: '取消只关闭当前质检流程，不会直接改写库存数量或生产事实。',
-  }[inspectionModal?.mode || 'create']
+  }[inspectionModal?.mode]
 
   const decisionSourceSummary = buildDecisionSourceSummary({
     inspection: inspectionModal?.inspection,
@@ -1573,17 +1571,6 @@ export default function V1QualityInspectionsPage() {
         compact
         helpKey="quality-inspections"
         title="质量检验"
-        tags={[
-          <Tag color="gold" key="hold">
-            已提交：等待判定
-          </Tag>,
-          <Tag color="green" key="pass">
-            通过：按来源规则继续
-          </Tag>,
-          <Tag color="red" key="reject">
-            不合格：阻止对应后续
-          </Tag>,
-        ]}
         stats={[
           { key: 'total', label: '符合条件', value: total },
           { key: 'current', label: '本页显示', value: rows.length },
@@ -2162,9 +2149,12 @@ export default function V1QualityInspectionsPage() {
       <InspectionEditor
         {...(isCreatingInspection
           ? { form: inspectionForm, loading: referenceDataState === 'loading' }
-          : { destroyOnHidden: true, cancelText: '关闭' })}
+          : {
+              destroyOnHidden: true,
+              cancelText: '关闭',
+              description: modalDescription,
+            })}
         title={modalTitle}
-        description={modalDescription}
         open={Boolean(inspectionModal)}
         onCancel={closeModal}
         onOk={

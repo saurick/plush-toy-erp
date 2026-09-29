@@ -1554,17 +1554,6 @@ export default function ShipmentsPage() {
         compact
         helpKey="shipments"
         title="出货单"
-        tags={[
-          <Tag color="gold" key="release">
-            出货放行：财务审批
-          </Tag>,
-          <Tag color="blue" key="shipment">
-            出货单：实际出货记录
-          </Tag>,
-          <Tag color="green" key="inventory">
-            库存预留：订单库存占用
-          </Tag>,
-        ]}
         stats={[
           { key: 'total', label: '符合条件', value: total },
           { key: 'current', label: '本页显示', value: rows.length },

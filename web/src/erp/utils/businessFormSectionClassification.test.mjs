@@ -132,14 +132,23 @@ test('master-data variants expose stable business section order', () => {
 })
 
 test('operational long forms expose the audited semantic sections', () => {
+  const purchaseReceiptExceptionSource = source(
+    '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx'
+  )
+  assert.match(
+    purchaseReceiptExceptionSource,
+    /const detailTitle = isReturn \? '退货明细' : '调整明细'/u
+  )
+  assertOrdered(purchaseReceiptExceptionSource, [
+    '整单信息',
+    '<BusinessLineItemsHeader',
+    '整单备注',
+  ])
+
   const contracts = [
     [
       '../components/production-orders/ProductionCompletionModal.jsx',
       ['完工来源与数量', '入库仓库与批次'],
-    ],
-    [
-      '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx',
-      ['整单信息', '退货明细', '整单备注'],
     ],
     ['../pages/FinancePaymentsPage.jsx', ['往来与金额', '账户与凭据']],
     [

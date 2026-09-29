@@ -9,6 +9,9 @@ import {
   applyModuleColumnOrder,
   applyModuleColumnVisibility,
   buildModuleColumnOrder,
+  buildDefaultModuleHiddenColumns,
+  buildModuleColumnSettings,
+  resolveModuleHiddenColumns,
   compareBusinessTableValues,
   createBusinessColumnSorter,
   filterBusinessListColumns,
@@ -24,15 +27,15 @@ test('column visibility: ignores unavailable columns and leaves the source and e
     { dataIndex: 'code' },
     { dataIndex: 'name' },
     { dataIndex: 'secret', hiddenByEffectiveFieldPolicy: true },
-    { dataIndex: 'details', listHidden: true },
+    { dataIndex: 'details', defaultHidden: true },
     { dataIndex: 'exportOnly', hidden: true },
   ]
   const snapshot = structuredClone(source)
-  assert.deepEqual(sanitizeModuleHiddenColumns(['name', 'name', 'secret', 'details', 'missing'], source), ['name'])
-  assert.deepEqual(applyModuleColumnVisibility(source, ['name']), [source[0]])
+  assert.deepEqual(sanitizeModuleHiddenColumns(['name', 'name', 'secret', 'details', 'missing'], source), ['name', 'details'])
+  assert.deepEqual(applyModuleColumnVisibility(source, ['name', 'details']), [source[0]])
   assert.deepEqual(source, snapshot)
   assert.deepEqual(applyModuleColumnOrder(source, ['name']).map((column) => column.dataIndex), ['name', 'code', 'details'])
-  assert.deepEqual(applyModuleColumnVisibility(source, []), source.slice(0, 2))
+  assert.deepEqual(applyModuleColumnVisibility(source, []), [source[0], source[1], source[3]])
 })
 
 test('column visibility: preserves one usable column after definitions or permissions change', () => {
@@ -270,50 +273,42 @@ test('moduleTableColumns: 相同优先级保持声明顺序，非法优先级和
   ])
 })
 
-test('moduleTableColumns: 辅助字段退出列表但保留详情和导出，权限隐藏仍优先', () => {
-  const allColumns = [
+test('column defaults: optional business fields remain available while field permissions take precedence', () => {
+  const columns = [
     { dataIndex: 'code', defaultPriority: 10 },
-    { dataIndex: 'short_name', listHidden: true },
+    { dataIndex: 'short_name', defaultHidden: true },
     { title: '业务摘要', defaultPriority: 30 },
     { dataIndex: 'status', defaultPriority: 20 },
-    { dataIndex: 'tax_no', listHidden: true, hiddenByEffectiveFieldPolicy: true },
+    { dataIndex: 'tax_no', defaultHidden: true, hiddenByEffectiveFieldPolicy: true },
   ]
-  const original = structuredClone(allColumns)
-  const saved = ['short_name', '__column__2', 'tax_no', 'code']
-  assert.deepEqual(buildModuleColumnOrder(allColumns), [
-    'code', 'status', '__column__2',
-  ])
-  assert.deepEqual(sanitizeModuleColumnOrder(saved, allColumns), [
-    '__column__2', 'code',
-  ])
-  const ordered = applyModuleColumnOrder(allColumns, saved)
-  assert.deepEqual(ordered, [
-    allColumns[2], allColumns[0], allColumns[3], allColumns[1],
-  ])
-  assert.deepEqual(filterBusinessListColumns(ordered), [
-    allColumns[2], allColumns[0], allColumns[3],
-  ])
-  assert.deepEqual(allColumns, original)
+  const snapshot = structuredClone(columns)
+  assert.deepEqual(buildModuleColumnOrder(columns), ['code', 'status', '__column__2', 'short_name'])
+  assert.deepEqual(buildDefaultModuleHiddenColumns(columns), ['short_name'])
+  const hidden = resolveModuleHiddenColumns(undefined, undefined, columns)
+  assert.deepEqual(applyModuleColumnVisibility(columns, hidden), [columns[0], columns[2], columns[3]])
+  assert.deepEqual(filterBusinessListColumns(columns), columns.slice(0, 4))
+  assert.deepEqual(applyModuleColumnOrder(columns, ['short_name', '__column__2', 'tax_no', 'code']), [columns[1], columns[2], columns[0], columns[3]])
+  assert.deepEqual(columns, snapshot)
 })
 
-test('moduleTableColumns: 快捷移动和恢复默认不经过辅助列，展示列标识稳定', () => {
-  const allColumns = [
-    { dataIndex: 'code' },
-    { dataIndex: 'short_name', listHidden: true },
-    { title: '摘要' },
-    { dataIndex: 'status' },
-  ]
-  assert.deepEqual(moveModuleColumnOrder([], allColumns, 'code', 1), [
-    '__column__2', 'code', 'status',
-  ])
-  assert.deepEqual(repositionModuleColumnOrder([], allColumns, 'status', 0), [
-    'status', 'code', '__column__2',
-  ])
-  assert.deepEqual(
-    filterBusinessListColumns(applyModuleColumnOrder(allColumns, [])),
-    [allColumns[0], allColumns[2], allColumns[3]]
-  )
-  assert.deepEqual(filterBusinessListColumns(undefined), [])
+test('column defaults: show all and reset remain distinct after saving and reloading', () => {
+  const columns = [{ dataIndex: 'code' }, { dataIndex: 'tax', defaultHidden: true }]
+  const all = buildModuleColumnSettings([], [], columns)
+  assert.deepEqual(all, { order: ['code', 'tax'], hidden_columns: [] })
+  assert.deepEqual(resolveModuleHiddenColumns(all.order, all.hidden_columns, columns), [])
+  const reset = buildModuleColumnSettings([], ['tax'], columns)
+  assert.deepEqual(reset, { order: [], hidden_columns: [] })
+  assert.deepEqual(resolveModuleHiddenColumns(reset.order, reset.hidden_columns, columns), ['tax'])
+})
+
+test('column defaults: existing choices survive new optional fields, reordered fields and permission loss', () => {
+  const columns = [{ dataIndex: 'code' }, { dataIndex: 'status' }, { dataIndex: 'tax', defaultHidden: true }]
+  assert.deepEqual(resolveModuleHiddenColumns(['status', 'code'], ['status'], columns), ['status', 'tax'])
+  const saved = buildModuleColumnSettings(['tax', 'code'], ['status'], columns)
+  assert.deepEqual(saved, { order: ['tax', 'code', 'status'], hidden_columns: ['status'] })
+  assert.deepEqual(resolveModuleHiddenColumns(saved.order, saved.hidden_columns, columns), ['status'])
+  assert.deepEqual(resolveModuleHiddenColumns(saved.order, saved.hidden_columns, [columns[1], { ...columns[2], hiddenByEffectiveFieldPolicy: true }]), [])
+  assert.deepEqual(buildDefaultModuleHiddenColumns([{ dataIndex: 'only', defaultHidden: true }]), [])
 })
 
 test('moduleTableColumns: 支持列顺序上移和下移', () => {

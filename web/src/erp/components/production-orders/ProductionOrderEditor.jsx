@@ -1,16 +1,23 @@
 import React, { useMemo } from 'react'
 import { Alert, Button, Form, Input, Select, Space, Switch, Tag } from 'antd'
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import {
+  DeleteOutlined,
+  QuestionCircleOutlined,
+} from '@ant-design/icons'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import Table from '@/common/components/table/AppTable'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
 } from '../business-list/BusinessCompactFieldTable.jsx'
-import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { ProductThumbnail } from '../master-data/ProductIdentity.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import BusinessLineItemsFooter, {
+  BusinessLineItemsHeader,
+} from '../business-list/BusinessLineItemsFooter.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import ProductionOrderReferenceSelect from './ProductionOrderReferenceSelect.jsx'
@@ -188,6 +195,7 @@ function RowReference({
   referenceAccess,
   quantityUnitOptions,
   rowRef,
+  sequence,
   onRemove,
 }) {
   const index = field.name
@@ -210,6 +218,7 @@ function RowReference({
       className="erp-production-order-line"
       rowRef={rowRef}
       label={`生产明细 ${index + 1}`}
+      sequence={sequence}
       cells={[
         <Form.Item
           name={[field.name, 'sales_order_item_id']}
@@ -240,27 +249,39 @@ function RowReference({
             }}
           />
         </Form.Item>,
-        <Form.Item
-          name={[field.name, 'product_id']}
-          label="产品"
-          rules={[{ required: true, message: '请选择产品' }]}
-        >
-          <ProductionOrderReferenceSelect
-            referenceType="product"
-            disabled={readOnly || referenceAccess.product !== true}
-            initialOptions={optionsByType.product}
-            placeholder="搜索产品编号或名称"
-            onChange={(value, option) => {
-              setRow({
-                product_id: value || null,
-                product_sku_id: null,
-                unit_id: option?.unit_value || null,
-                sales_order_item_id: null,
-                bom_header_id: null,
-              })
-            }}
-          />
-        </Form.Item>,
+        <div className="erp-product-field-control">
+          {productID ? (
+            <ProductThumbnail
+              productId={productID}
+              name={
+                optionsByType.product.find(
+                  (option) => Number(option.value) === Number(productID)
+                )?.label || '当前产品'
+              }
+            />
+          ) : null}
+          <Form.Item
+            name={[field.name, 'product_id']}
+            label="产品"
+            rules={[{ required: true, message: '请选择产品' }]}
+          >
+            <ProductionOrderReferenceSelect
+              referenceType="product"
+              disabled={readOnly || referenceAccess.product !== true}
+              initialOptions={optionsByType.product}
+              placeholder="搜索产品编号或名称"
+              onChange={(value, option) => {
+                setRow({
+                  product_id: value || null,
+                  product_sku_id: null,
+                  unit_id: option?.unit_value || null,
+                  sales_order_item_id: null,
+                  bom_header_id: null,
+                })
+              }}
+            />
+          </Form.Item>
+        </div>,
         <Form.Item name={[field.name, 'product_sku_id']} label="规格（可选）">
           <ProductionOrderReferenceSelect
             referenceType="product_sku"
@@ -357,13 +378,22 @@ function RowReference({
             {note ? ` · ${note}` : ''}
           </span>
         </summary>
-        <div className="erp-compact-field-table__supplement">
+        <div className="erp-compact-field-table__supplement erp-production-order-line__supplement">
           <Form.Item
-            className="erp-production-order-line__wide"
             name={[field.name, 'route_code']}
             label="生产路线"
             rules={[{ required: true, message: '请选择生产路线' }]}
-            extra="发布后冻结为“布料加工 → 车缝 → 手工 → 包装”，车缝和手工分别决定本厂或外发。"
+            tooltip={{
+              title:
+                '发布后冻结为“布料加工 → 车缝 → 手工 → 包装”，车缝和手工分别决定本厂或外发。',
+              trigger: ['hover', 'focus', 'click'],
+              icon: (
+                <QuestionCircleOutlined
+                  tabIndex={0}
+                  aria-label="查看生产路线说明"
+                />
+              ),
+            }}
           >
             <Select
               disabled={readOnly}
@@ -379,7 +409,16 @@ function RowReference({
             name={[field.name, 'customer_inspection_required']}
             label="客户验货"
             valuePropName="checked"
-            extra="仅订单明确要求时开启；不等同于系统验收。"
+            tooltip={{
+              title: '仅订单明确要求时开启；不等同于系统验收。',
+              trigger: ['hover', 'focus', 'click'],
+              icon: (
+                <QuestionCircleOutlined
+                  tabIndex={0}
+                  aria-label="查看客户验货说明"
+                />
+              ),
+            }}
           >
             <Switch
               disabled={readOnly || routeCode !== PRODUCTION_WIP_ROUTE_CODE}
@@ -388,24 +427,12 @@ function RowReference({
             />
           </Form.Item>
           <Form.Item
-            className="erp-production-order-line__wide"
+            className="erp-production-order-line__note"
             name={[field.name, 'note']}
             label="明细备注"
           >
             <BusinessTextArea disabled={readOnly} maxLength={255} />
           </Form.Item>
-          {productID ? (
-            <div className="erp-business-action-form__field--full">
-              <ProductIdentity
-                productId={productID}
-                name={
-                  optionsByType.product.find(
-                    (option) => Number(option.value) === Number(productID)
-                  )?.label || '当前产品'
-                }
-              />
-            </div>
-          ) : null}
         </div>
       </details>
     </BusinessCompactFieldRow>
@@ -434,6 +461,15 @@ export default function ProductionOrderEditor({
   const quantityUnitOptions = useQuantityUnits(open && !readOnly)
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
+  const appendProductionLine = (add, index) => {
+    add({
+      line_no: index + 1,
+      planned_quantity: '1',
+      route_code: PRODUCTION_WIP_ROUTE_CODE,
+      customer_inspection_required: false,
+    })
+    requestLineItemScroll(index)
+  }
   const title =
     mode === 'create'
       ? '新建生产订单'
@@ -458,7 +494,6 @@ export default function ProductionOrderEditor({
       readOnly={readOnly}
       open={open}
       title={title}
-      description="生产订单维护计划与工艺路线；发布后冻结路线和物料需求。工序办理、质量结论与正式入库分别记账。"
       confirmLoading={loading}
       okText={mode === 'create' ? '创建草稿' : '保存草稿'}
       onCancel={onCancel}
@@ -478,7 +513,16 @@ export default function ProductionOrderEditor({
               { required: true, whitespace: true, message: '请输入生产单号' },
             ]}
           >
-            <Input disabled={readOnly} maxLength={64} />
+            <Input
+              disabled={readOnly}
+              maxLength={64}
+              suffix={
+                <BusinessCopyButton
+                  label="生产单号"
+                  value={readOnly ? order?.order_no : ''}
+                />
+              }
+            />
           </Form.Item>
           <Form.Item name="planned_start_at" label="计划开始">
             <DateInput disabled={readOnly} />
@@ -487,7 +531,11 @@ export default function ProductionOrderEditor({
             <DateInput disabled={readOnly} />
           </Form.Item>
         </BusinessFormSection>
-        <BusinessFormSection title="生产明细" layout="content">
+        <BusinessFormSection
+          title="生产明细"
+          showHeading={false}
+          layout="content"
+        >
           <Form.List name="items">
             {(fields, { add, remove }) => (
               <Space
@@ -495,14 +543,25 @@ export default function ProductionOrderEditor({
                 size="middle"
                 style={{ width: '100%' }}
               >
+                <BusinessLineItemsHeader
+                  title="生产明细"
+                  addLabel="添加生产明细"
+                  addDisabled={readOnly}
+                  onAdd={
+                    readOnly
+                      ? undefined
+                      : () => appendProductionLine(add, fields.length)
+                  }
+                />
                 <BusinessCompactFieldTable
                   label="生产明细"
+                  showSequence
                   columns={[
-                    { label: '销售订单行', width: '18%' },
-                    { label: '产品', required: true, width: '20%' },
-                    { label: '规格', width: '15%' },
-                    { label: '单位', required: true, width: '10%' },
-                    { label: '计划数量', required: true, width: '12%' },
+                    { label: '销售订单行' },
+                    { label: '产品', required: true, width: '28%' },
+                    { label: '规格' },
+                    { label: '单位', required: true, width: 100 },
+                    { label: '计划数量', required: true, width: 180 },
                     { label: 'BOM 版本' },
                     { label: '操作', width: 52 },
                   ]}
@@ -517,6 +576,7 @@ export default function ProductionOrderEditor({
                       readOnly={readOnly}
                       referenceAccess={referenceAccess}
                       rowRef={(node) => registerLineItemRow(index, node)}
+                      sequence={index + 1}
                       onRemove={
                         !readOnly && fields.length > 1
                           ? () => remove(field.name)
@@ -526,22 +586,18 @@ export default function ProductionOrderEditor({
                   ))}
                 </BusinessCompactFieldTable>
                 {!readOnly ? (
-                  <Button
-                    type="dashed"
-                    block
-                    icon={<PlusOutlined aria-hidden="true" />}
-                    onClick={() => {
-                      add({
-                        line_no: fields.length + 1,
-                        planned_quantity: '1',
-                        route_code: PRODUCTION_WIP_ROUTE_CODE,
-                        customer_inspection_required: false,
-                      })
-                      requestLineItemScroll(fields.length)
-                    }}
-                  >
-                    添加明细
-                  </Button>
+                  <BusinessLineItemsFooter
+                    addLabel="添加生产明细"
+                    onAdd={() => appendProductionLine(add, fields.length)}
+                    stats={[
+                      {
+                        key: 'count',
+                        label: '已录入',
+                        value: fields.length,
+                        suffix: '条',
+                      },
+                    ]}
+                  />
                 ) : null}
               </Space>
             )}
