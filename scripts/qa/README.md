@@ -164,7 +164,7 @@ V8 采用统一的 8 个标准单位和按单位校验的数量精度；保留 V
 
 `server/internal/manualacceptance/contract.json` 是这些版本值的唯一真源。`schemaVersion` 只表示合同结构，不随数据批次自动递增；`dataVersion / runId / visiblePrefix` 必须彼此一致。同一天可以冻结不同批次，明确登记的上一批次及客户配置版本只须早于当前版本，不强制相邻编号，也不要求 schema、数据和客户配置的数字相同。Go / JS 共同校验结构、模拟数据限制、单位 / 仓库与固定目标身份。
 
-`demo-133` 使用独立 Compose project `plush-toy-erp-demo-v1`、数据库 `plush_erp_demo_v1`、根目录 `/home/simon/plush-toy-erp-demo-v1`，PostgreSQL / API / Web 端口为 `55436 / 8325 / 5195`。所有精确路径、锁、Jaeger 端口和公网入口以 `scripts/deploy/deployment-targets.json` 为真源；正常整批造数只走后端 API。
+`demo-133` 使用独立 Compose project `plush-toy-erp-demo-v1`、数据库 `plush_erp_demo_v1`、根目录 `/root/deploy/plush-toy-erp-demo-v1`，PostgreSQL / API / Web 端口为 `55436 / 8325 / 5195`。所有精确路径、锁、Jaeger 端口和公网入口以 `scripts/deploy/deployment-targets.json` 为真源；正常整批造数只走后端 API。
 
 demo 造数前必须先在固定 release 上完成登记 target 的 migration、preflight 和 runtime identity 读回。精确命令以 [Compose 迁移脚本](../../server/deploy/compose/prod/README.md#迁移脚本) 为唯一运维入口。运行 env 必须由当前用户持有、精确 `0600` 且无符号链接父路径；启动后必须以 `production-preflight.sh --runtime --expected-release <40sha>` 证明服务 image/content identity 与 app/web `GIT_SHA` 都绑定同一 release，才能进入配置激活与整批造数。
 
@@ -330,7 +330,7 @@ node scripts/qa/manual-acceptance-dataset.mjs \
 
 首次执行前，该目标的规范总回执必须不存在。若某阶段失败，或完整成功后需要证明同批幂等重放，保留原回执，并在相同目标范围、版本、批次和后端后追加 `--resume-report output/qa/manual-acceptance/datasets/2026.09.27-v8/<target>/dataset/apply-report.json`。禁止删除回执后重新冒充 fresh apply；resume 始终实时重验 core、客户配置、数据库和当前 release / migration，并校验连续阶段与各组件 digest。
 
-每个阶段回执同时记录由登记入口、阶段实现及显式依赖文件计算出的逻辑指纹。逻辑指纹未变时，数据写阶段直接复用原组件回执；某阶段指纹变化时，只重跑该阶段及依赖它的后续阶段。仅 release SHA 变化不会重造业务数据，core 和只读 readiness 仍会实时重验；migration 变化会刷新 baseline 及全部后续阶段。当前 V10 的旧回执若只有完整 component digest 和精确 handler identity，可一次性补写当前指纹；指纹伪造、依赖未登记或目标范围漂移仍失败关闭。常规部署不得因为“发布过一次”无条件重跑九阶段造数。
+每个阶段回执同时记录由登记入口、阶段实现及显式依赖文件计算出的逻辑指纹。逻辑指纹未变时，数据写阶段直接复用原组件回执；某阶段指纹变化时，只重跑该阶段及依赖它的后续阶段。仅 release SHA 变化不会重造业务数据，core 和只读 readiness 仍会实时重验；migration 变化会刷新 baseline 及全部后续阶段。当前 V10 的旧回执没有阶段指纹，无法证明数据来自当前逻辑，因此首次 resume 必须一次性刷新完整阶段链并写入指纹；后续才按变化阶段与依赖闭包增量刷新。指纹伪造、依赖未登记或目标范围漂移仍失败关闭。常规部署不得因为“发布过一次”无条件重跑九阶段造数。
 
 fresh apply 会在开始时捕获一次岗位任务时间锚点并写入总回执；同批 resume 必须校验并复用该锚点，不能按当前时间重排到期日。业务数据版本中的日期只用于来源单业务日期，不再充当任务到期锚点。本地和 133 共享同一时间策略与语义 digest，但分别在自己的 fresh 回执中绑定执行锚点。浏览器必须在回执记录的有效期内同时看到出货放行的“即将到期”和“已超时”；锚点过期后不得继续沿用旧报告宣称通过，应换新数据版本并从 fresh 空库重放。
 

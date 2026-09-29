@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Seed Import Governance"
-  short_description: "Seed/导入/清理 Import / 数据质量门禁"
-  default_prompt: "Use $plush-seed-import-governance 区分 seed、fixture、模拟数据与真实导入，确认批次、目标和回收路径；验收目录、浏览器/PDF 与签收编排转交人工验收治理。"
+  short_description: "模块化 Seed / 模拟场景 / 增量复用 / 导入与清理边界"
+  default_prompt: "Use $plush-seed-import-governance 区分 seed、fixture、模拟数据与真实导入，按阶段指纹判断复用、重验或局部重造，并将甲方资料映射成脱敏场景；验收目录、浏览器/PDF 与签收编排转交人工验收治理。"

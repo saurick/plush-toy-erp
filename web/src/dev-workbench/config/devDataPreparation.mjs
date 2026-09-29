@@ -12,6 +12,34 @@ export const DEV_DATA_PREPARATION_OPERATION_API_PREFIX = `${DEV_DATA_PREPARATION
 export const DEV_DATA_PREPARATION_SOURCE_PATH =
   'docs/engineering/研发效能工作台与CI-CD设计.md'
 
+// Static explanation only. Runtime status and refresh decisions still come
+// from the backend dataset contracts and persisted operation receipts.
+export const DEV_DATA_PREPARATION_INCREMENTAL_FLOW = String.raw`flowchart TD
+  A["读取目标、当前合同与上一批回执"] --> B{"目标身份与组件回执有效"}
+  B -- "否" --> X["停止复用和写入，重新生成计划"]
+  B -- "是" --> C{"本次变化属于哪一类"}
+  C -- "migration" --> D["刷新 baseline 与后续阶段"]
+  C -- "业务数据摘要或阶段逻辑指纹变化" --> E["定位直接变化模块，并按登记依赖图展开刷新闭包"]
+  C -- "仅验证合同变化" --> F["复用数据并重验相关合同"]
+  C -- "无相关变化" --> G["复用未变化模块"]
+  D --> H["实时核对 core"]
+  E --> H
+  F --> H
+  G --> H
+  H --> I["始终执行只读 readiness"]
+  I --> J["回执列出复用、直接变化、依赖刷新与最终刷新阶段"]
+
+  subgraph Modules["当前阶段依赖；实际 registry 为真源"]
+    Core["core 身份与基础"] --> Baseline["baseline 基线"]
+    Core --> Source["source 来源单"]
+    Role["role 岗位与责任"] --> Source
+    Source --> Task["task 协同任务"]
+    Source --> Facts["facts 正式业务结果"]
+    Task --> Attachments["attachments 附件"]
+    Facts --> Quality["purchase-quality 采购质检"]
+    Facts --> Attachments
+  end`
+
 export const DEV_DATA_PREPARATION_PROFILE_KEYS = Object.freeze({
   coreDemo: 'core-demo',
   scenarioDemo: 'scenario-demo',

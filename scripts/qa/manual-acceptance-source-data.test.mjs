@@ -17,6 +17,7 @@ import {
   buildSalesOrderLineReferences,
   buildManualAcceptanceSourceDataPlan,
   buildSourceDrivenFactReferences,
+  listAll,
   planBOMItemReconciliation,
   parseManualAcceptanceSourceDataArgs,
   requireLifecycleMutationStatus,
@@ -294,6 +295,40 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
     "sales orders need an active 25-line source for linked shipment testing",
   );
   assert.ok(plan.records.bomVersions.some((item) => item.items.length === 25));
+});
+
+test("source readback paginates the complete long-lived prefix result", async () => {
+  const records = Array.from({ length: 445 }, (_, index) => ({
+    id: index + 1,
+    purchase_order_no: `YS8-CG-${String(index + 1).padStart(3, "0")}`,
+  }));
+  const offsets = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    assert.equal(body.method, "list_purchase_orders");
+    assert.equal(body.params.keyword, "YS8");
+    assert.equal(body.params.limit, 200);
+    offsets.push(body.params.offset);
+    return ok({
+      purchase_orders: records.slice(
+        body.params.offset,
+        body.params.offset + body.params.limit,
+      ),
+      total: records.length,
+    });
+  };
+
+  const actual = await listAll({
+    plan: { backendURL: LOCAL_ACCEPTANCE_BACKEND_URL, prefix: "YS8" },
+    token: "purchase-token",
+    domain: "purchase_order",
+    method: "list_purchase_orders",
+    listKey: "purchase_orders",
+    fetchImpl,
+  });
+
+  assert.deepEqual(offsets, [0, 200, 400]);
+  assert.deepEqual(actual, records);
 });
 
 test("current V8 plans use short yoyoosun-style visible business numbers", () => {

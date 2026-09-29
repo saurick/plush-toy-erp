@@ -1911,7 +1911,7 @@ async function prepareManualAcceptanceResume({
   const completedStageKeys = [];
   const directRefreshStages = new Set(["readiness"]);
   const logicChangedStages = [];
-  const legacyFingerprintAdoptedStages = [];
+  const legacyFingerprintRefreshedStages = [];
   if (targetAttestationChange.migrationChanged) {
     for (const stageKey of MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.slice(1)) {
       directRefreshStages.add(stageKey);
@@ -1994,10 +1994,12 @@ async function prepareManualAcceptanceResume({
         stage.references.runner.handlerId ===
           `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${stage.key}`
       ) {
-        // v10 receipts predate stage fingerprints. Their exact component
-        // digest and handler identity are accepted once, then the reused
-        // receipt is rewritten with the current per-stage fingerprint.
-        legacyFingerprintAdoptedStages.push(stage.key);
+        // v10 receipts predate stage fingerprints, so they cannot prove that
+        // their data was produced by the current stage logic. Refresh them
+        // once and persist fingerprints; later resumes can safely reuse
+        // unchanged stages and refresh only the registered dependency closure.
+        directRefreshStages.add(stage.key);
+        legacyFingerprintRefreshedStages.push(stage.key);
       } else {
         directRefreshStages.add(stage.key);
         logicChangedStages.push(stage.key);
@@ -2069,8 +2071,8 @@ async function prepareManualAcceptanceResume({
     (stageKey) =>
       refreshStages.has(stageKey) && !directRefreshStages.has(stageKey),
   );
-  const adoptedLegacyFingerprints = legacyFingerprintAdoptedStages.filter(
-    (stageKey) => components.has(stageKey),
+  const refreshedLegacyFingerprints = legacyFingerprintRefreshedStages.filter(
+    (stageKey) => refreshStages.has(stageKey),
   );
   return {
     components,
@@ -2089,7 +2091,7 @@ async function prepareManualAcceptanceResume({
         MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
       logicChangedStages,
       dependencyRefreshedStages,
-      legacyFingerprintAdoptedStages: adoptedLegacyFingerprints,
+      legacyFingerprintRefreshedStages: refreshedLegacyFingerprints,
       refreshedStages,
     },
   };

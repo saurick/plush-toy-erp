@@ -2193,7 +2193,7 @@ test("finally never removes a lock whose owner token was replaced", async () => 
   }
 });
 
-test("canonical apply report persists and a complete same-batch replay safely reuses mutations", async () => {
+test("canonical apply report refreshes a legacy receipt once, then safely reuses unchanged mutations", async () => {
   const outputRoot = await fs.mkdtemp(
     path.join(os.tmpdir(), "plush-dataset-resume-success-"),
   );
@@ -2266,12 +2266,12 @@ test("canonical apply report persists and a complete same-batch replay safely re
     assert.equal(replay.resume.requested, true);
     assert.equal(replay.resume.priorSucceeded, true);
     assert.deepEqual(
-      replay.resume.legacyFingerprintAdoptedStages,
+      replay.resume.legacyFingerprintRefreshedStages,
       MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter(
-        (stageKey) => !["core", "readiness"].includes(stageKey),
+        (stageKey) => stageKey !== "readiness",
       ),
     );
-    assert.deepEqual(replayCalls, ["core", "readiness"]);
+    assert.deepEqual(replayCalls, firstCalls);
     assert.equal(
       replay.stages.find((stage) => stage.key === "core").operation,
       "verified",
@@ -2279,13 +2279,39 @@ test("canonical apply report persists and a complete same-batch replay safely re
     assert.ok(
       replay.stages
         .filter((stage) => !["core", "readiness"].includes(stage.key))
-        .every((stage) => stage.operation === "reused"),
+        .every((stage) => stage.operation !== "reused"),
     );
-    assert.equal(replay.freshEmptyBaseline.origin, "validated_resume_receipt");
-    assert.equal(replay.freshEmptyBaseline.operation, "reused");
     assert.equal(replay.stages.at(-1).operation, "verified");
 
-    const tampered = structuredClone(replay);
+    const stableReplayCalls = [];
+    const stableReplay = await applyManualAcceptanceDataset(
+      plan,
+      {
+        ...localApplyBinding(plan),
+        resumeReportPath: expectedApplyReportPath,
+      },
+      durableRunnerDeps({
+        outputRoot,
+        now: "2026-07-20T02:03:04.000Z",
+        onCall(stageKey) {
+          stableReplayCalls.push(stageKey);
+        },
+      }),
+    );
+    assert.deepEqual(stableReplay.resume.legacyFingerprintRefreshedStages, []);
+    assert.deepEqual(stableReplayCalls, ["core", "readiness"]);
+    assert.ok(
+      stableReplay.stages
+        .filter((stage) => !["core", "readiness"].includes(stage.key))
+        .every((stage) => stage.operation === "reused"),
+    );
+    assert.equal(
+      stableReplay.freshEmptyBaseline.origin,
+      "validated_resume_receipt",
+    );
+    assert.equal(stableReplay.freshEmptyBaseline.operation, "reused");
+
+    const tampered = structuredClone(stableReplay);
     tampered.taskSchedule.anchorUnix += 1;
     await fs.writeFile(
       expectedApplyReportPath,

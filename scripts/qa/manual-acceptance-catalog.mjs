@@ -273,10 +273,10 @@ const DESKTOP_PLANS = Object.freeze({
     isList: true,
     minimumRecords: 30,
     minimumRecordUnit: "加工环节档案",
-    keyStates: ["启用", "停用", "可委外", "可内制", "需要质检"],
+    keyStates: ["启用", "停用", "可委外", "可内制", "质检参考"],
     whatToDo: [
       "你要按环节编号、名称、类别和状态查找。",
-      "你要新增一个试用环节，切换委外、内制和质检标记，再停用并重新启用。",
+      "你要新增一个试用环节，切换委外、内制和质检参考，再停用并重新启用。",
     ],
     whatToSee: [
       "应看到环节名称和各项适用标记清楚，筛选结果与所选条件一致。",

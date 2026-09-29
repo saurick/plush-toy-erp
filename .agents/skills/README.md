@@ -12,7 +12,7 @@
 | `$plush-domain-boundary-governance`       | Workflow / Fact、Product Core、客户差异、schema/migration 设计与生成、usecase/API/RBAC 和字段真源                                      |
 | `$plush-page-design-governance`           | 普通 ERP 页面业务语义、字段/动作/状态、原型和浏览器回归                                                                                |
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、纸张版式、字段映射、模板编辑与 PDF/打印保真                                                                     |
-| `$plush-seed-import-governance`           | seed、fixture、模拟数据、import dry-run、批次与数据 cleanup 边界                                                                       |
+| `$plush-seed-import-governance`           | 模块化 seed / fixture / 模拟数据、甲方资料到脱敏场景映射、增量复用、import dry-run、批次与数据 cleanup 边界                           |
 | `$plush-manual-acceptance-governance`     | 人工验收目录/批次、岗位账号/任务、浏览器/PDF 与人工证据、签收和退出清理                                                                |
 | `$plush-test-governance`                  | 验证范围需要判断，或改动需要浏览器、数据库、migration、CI 等专项证据；T0-T8 只作工作台追踪键                                         |
 | `$plush-operations-governance`            | runtime 诊断、可观测/错误、安全/隐私、发布、迁移和回滚                                                                                 |
@@ -28,7 +28,7 @@
 - 简单任务只选一个最贴近主目标的 skill；跨边界时再补相邻 skill。
 - schema / migration 的设计、生成和领域合同使用 Domain；目标库 apply、运行态迁移、发布与回滚使用 Operations。
 - 普通页面和原型使用 Page；客户源文件、纸张版式或 PDF/打印保真是主目标时使用 Print。
-- seed / fixture / dry-run / cleanup 的数据构造使用 Seed；验收目录、readiness、浏览器/PDF、人工结论和签收编排使用 Manual Acceptance。
+- seed / fixture / dry-run / cleanup、模拟场景覆盖、甲方资料脱敏映射和 `reuse / reverify / reseed` 判断使用 Seed；验收目录、readiness、浏览器/PDF、人工结论和签收编排使用 Manual Acceptance。
 - Manual Acceptance 只编排验收与证据；目标访问、migration、release、rollback 的真实执行仍由 Operations 负责。
 - 提示词整理使用全局显式 `$prompt-governance`。存在待提交 / 需交接改动时按 `AGENTS.md` 留一份被动 `Git handoff record`；只有当前任务已授权 commit / push 且实时现场复杂时，才使用全局 `$git-closeout-coordination`。
 - 项目 skill 不重复高内聚、低耦合等通用常识，只保留项目真源、判断流程、命令和验收。

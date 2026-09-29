@@ -93,9 +93,10 @@ const PROCESS_ROUTE_FIELDS = Object.freeze([
   "outsourcing_enabled",
   "inhouse_enabled",
   "quality_required",
-  "sort_order",
   "note",
 ]);
+const SOURCE_LIST_PAGE_SIZE = 200;
+const SOURCE_LIST_MAX_RECORDS = 10_000;
 export const SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES = Object.freeze([
   Object.freeze(["DRAFT"]),
   Object.freeze(["DRAFT", "SUBMITTED"]),
@@ -621,7 +622,6 @@ function buildProcesses(prefix, count) {
       ].includes(name),
       inhouse_enabled: true,
       quality_required: name.includes("检") || name.includes("确认"),
-      sort_order: index * 10,
       note: name.includes("检") ? "做完后记录检查结果" : "按生产安排办理",
       isActive: index <= count - 3,
     };
@@ -1638,7 +1638,6 @@ function processMutationFromReadback(record, routeCode) {
     outsourcing_enabled: record.outsourcing_enabled === true,
     inhouse_enabled: record.inhouse_enabled === true,
     quality_required: record.quality_required === true,
-    sort_order: record.sort_order,
     note: record.note ?? null,
   };
 }
@@ -1929,7 +1928,7 @@ function assertPersistedContacts(label, expected, actual) {
   }
 }
 
-async function listAll({
+export async function listAll({
   plan,
   token,
   domain,
@@ -1938,15 +1937,61 @@ async function listAll({
   fetchImpl,
   params = {},
 }) {
-  const data = await rpcCall({
-    backendURL: plan.backendURL,
-    domain,
-    method,
-    params: { keyword: plan.prefix, active_only: false, limit: 200, ...params },
-    token,
-    fetchImpl,
-  });
-  return data[listKey] || [];
+  const records = [];
+  let expectedTotal = null;
+  let offset = 0;
+  do {
+    const data = await rpcCall({
+      backendURL: plan.backendURL,
+      domain,
+      method,
+      params: {
+        keyword: plan.prefix,
+        active_only: false,
+        limit: SOURCE_LIST_PAGE_SIZE,
+        offset,
+        ...params,
+      },
+      token,
+      fetchImpl,
+    });
+    const page = data[listKey];
+    const total = Number(data.total);
+    if (
+      !Array.isArray(page) ||
+      !Number.isSafeInteger(total) ||
+      total < 0 ||
+      total > SOURCE_LIST_MAX_RECORDS ||
+      page.length > SOURCE_LIST_PAGE_SIZE
+    ) {
+      throw new CliError(
+        `${domain}.${method} returned an invalid bounded pagination result`,
+        2,
+      );
+    }
+    if (expectedTotal === null) expectedTotal = total;
+    if (expectedTotal !== total) {
+      throw new CliError(
+        `${domain}.${method} total changed during pagination`,
+        2,
+      );
+    }
+    records.push(...page);
+    offset += page.length;
+    if (records.length < total && page.length === 0) {
+      throw new CliError(
+        `${domain}.${method} pagination stopped before all records were read`,
+        2,
+      );
+    }
+  } while (records.length < expectedTotal);
+  if (records.length !== expectedTotal) {
+    throw new CliError(
+      `${domain}.${method} pagination count does not match total`,
+      2,
+    );
+  }
+  return records;
 }
 
 async function createMissingAggregate({
@@ -2365,7 +2410,6 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
           "outsourcing_enabled",
           "inhouse_enabled",
           "quality_required",
-          "sort_order",
           "note",
         ],
       });
@@ -2391,7 +2435,6 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
         "outsourcing_enabled",
         "inhouse_enabled",
         "quality_required",
-        "sort_order",
         "note",
       ],
     });

@@ -9,6 +9,7 @@ import { MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS } from '../../../../scripts/qa/man
 import {
   DEV_DATA_PREPARATION_ACTION_API_PATH,
   DEV_DATA_PREPARATION_API_PREFIX,
+  DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
   DEV_DATA_PREPARATION_OPERATION_API_PREFIX,
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
@@ -1031,6 +1032,9 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert.match(pageSource, /不是永绅真实客户导入/u)
   assert.match(pageSource, /选择只影响计划下钻/u)
   assert.match(pageSource, /代码变化后，旧数据怎么处理/u)
+  assert.match(pageSource, /MermaidDiagram/u)
+  assert.match(pageSource, /DEV_DATA_PREPARATION_INCREMENTAL_FLOW/u)
+  assert.match(pageSource, /增量造数判断与模块依赖/u)
   assert.match(pageSource, /实际执行：/u)
   assert.match(pageSource, /stageTimings/u)
   assert.match(pageSource, /PROFILE_QUERY_KEY/u)
@@ -1103,6 +1107,35 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert(
     buttonLabels.every((label) => !/(?:清理|删除)/u.test(label)),
     'the page must not expose cleanup or delete buttons'
+  )
+})
+
+test('incremental data flow stays reviewable and synchronized with the workbench design', () => {
+  assert.match(DEV_DATA_PREPARATION_INCREMENTAL_FLOW, /^flowchart TD/u)
+  assert.match(
+    DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
+    /业务数据摘要或阶段逻辑指纹变化/u
+  )
+  assert.match(
+    DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
+    /按登记依赖图展开刷新闭包/u
+  )
+  assert.match(DEV_DATA_PREPARATION_INCREMENTAL_FLOW, /始终执行只读 readiness/u)
+
+  const designSource = readFileSync(
+    new URL(
+      '../../../../docs/engineering/研发效能工作台与CI-CD设计.md',
+      import.meta.url
+    ),
+    'utf8'
+  )
+  const diagrams = Array.from(
+    designSource.matchAll(/```mermaid\s*\n([\s\S]*?)```/gu),
+    (match) => match[1].trim()
+  )
+  assert.ok(
+    diagrams.includes(DEV_DATA_PREPARATION_INCREMENTAL_FLOW.trim()),
+    'the data preparation page and design document must use the same Mermaid source'
   )
 })
 

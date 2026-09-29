@@ -26,11 +26,13 @@ import {
   Typography,
 } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import { MermaidDiagram } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
+  DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
   DEV_DATA_PREPARATION_PROFILE_QUERY_KEY,
@@ -281,6 +283,19 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="erp-dev-data-reuse-diagram">
+          <div className="erp-dev-data-reuse-diagram__heading">
+            <Text strong>增量造数判断与模块依赖</Text>
+            <Text type="secondary">
+              这是固定规则说明；本次实际复用和刷新范围仍以当前合同、阶段指纹与
+              operation 回执为准。
+            </Text>
+          </div>
+          <MermaidDiagram
+            chart={DEV_DATA_PREPARATION_INCREMENTAL_FLOW}
+            label="增量造数判断与模块依赖图"
+          />
         </div>
       </details>
     </div>
