@@ -32,10 +32,10 @@ const receiptSchema =
 
 const targetFixtures = Object.freeze({
   "demo-133": Object.freeze({
-    root: "/home/simon/plush-toy-erp-demo-v1",
+    root: "/root/deploy/plush-toy-erp-demo-v1",
   }),
   "customer-test-133": Object.freeze({
-    root: "/home/simon/plush-toy-erp-test-v1",
+    root: "/root/deploy/plush-toy-erp-test-v1",
   }),
 });
 
@@ -94,7 +94,7 @@ function argsFor(target, f, overrides = {}) {
     "--deployment-target",
     target,
     "--ssh-target",
-    "simon@192.168.0.133",
+    "root@192.168.0.133",
     "--expected-release",
     release,
     "--expected-migration",

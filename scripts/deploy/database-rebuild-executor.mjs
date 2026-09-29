@@ -392,8 +392,8 @@ operation_id="$1"
 target="$2"
 [[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
 case "$target" in
-  demo-133) root=/home/simon/plush-toy-erp-demo-v1 ;;
-  customer-test-133) root=/home/simon/plush-toy-erp-test-v1 ;;
+  demo-133) root=/root/deploy/plush-toy-erp-demo-v1 ;;
+  customer-test-133) root=/root/deploy/plush-toy-erp-test-v1 ;;
   *) exit 64 ;;
 esac
 incoming_root=$root/incoming
@@ -415,8 +415,8 @@ operation_id="$1"
 target="$2"
 [[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
 case "$target" in
-  demo-133) root=/home/simon/plush-toy-erp-demo-v1 ;;
-  customer-test-133) root=/home/simon/plush-toy-erp-test-v1 ;;
+  demo-133) root=/root/deploy/plush-toy-erp-demo-v1 ;;
+  customer-test-133) root=/root/deploy/plush-toy-erp-test-v1 ;;
   *) exit 64 ;;
 esac
 incoming=$root/incoming/$operation_id

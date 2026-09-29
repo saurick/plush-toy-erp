@@ -36,7 +36,7 @@ function remoteReport(overrides = {}) {
     STATUS: "passed",
     TARGET: "demo-133",
     HOSTNAME: "r740xd",
-    USER: "simon",
+    USER: "root",
     ROOT_AVAILABLE_BYTES: String(40 * 1024 ** 3),
     MINIMUM_AVAILABLE_BYTES: String(30 * 1024 ** 3),
     CAPACITY_STATUS: "passed",
@@ -150,7 +150,7 @@ test("target preflight parser returns bounded redacted evidence", () => {
     candidateStillRequiresManualReadback: true,
   });
   assert.equal("ssh" in report, false);
-  assert.doesNotMatch(JSON.stringify(report), /192\.168|\/home\/simon/u);
+  assert.doesNotMatch(JSON.stringify(report), /192\.168|\/root\/deploy/u);
 });
 
 test("customer test preflight treats the trial dataset identity as not applicable", () => {
@@ -368,14 +368,14 @@ test("target preflight uses only fixed SSH destination and streamed script", () 
   assert.equal(report.status, "passed");
   assert.equal(invocation.command, "ssh");
   assert.deepEqual(invocation.args.slice(-3), [
-    "simon@192.168.0.133",
+    "root@192.168.0.133",
     "bash",
     "-s",
   ]);
   assert.equal(invocation.options.input, REMOTE_TARGET_PREFLIGHT_SCRIPT);
   assert.doesNotMatch(
     invocation.args.join(" "),
-    /docker|compose|\/home\/simon|plush_erp/u,
+    /docker|compose|\/root\/deploy|plush_erp/u,
   );
   assert.equal(
     Object.keys(invocation.options).some((key) =>
@@ -554,7 +554,7 @@ test("remote target preflight script is read-only and contains no build command"
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /target_rsync_unavailable/u);
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
-    /trial_atlas_bin=\/home\/simon\/plush-toy-erp-demo-v1\/tools\/atlas\/v1[.]3[.]0\/atlas/u,
+    /trial_atlas_bin=\/root\/deploy\/plush-toy-erp-demo-v1\/tools\/atlas\/v1[.]3[.]0\/atlas/u,
   );
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,

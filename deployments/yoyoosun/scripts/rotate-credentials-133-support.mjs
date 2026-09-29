@@ -82,7 +82,7 @@ function printHelp() {
     "用法:",
     "  bash deployments/yoyoosun/scripts/rotate-credentials-133.sh \\",
     "    --deployment-target <demo-133|customer-test-133> \\",
-    "    --ssh-target simon@192.168.0.133 \\",
+    "    --ssh-target root@192.168.0.133 \\",
     "    --expected-release <40-character-lowercase-git-sha> \\",
     "    --expected-migration <14-digit-atlas-version> \\",
     "    --operation-id <lowercase-uuid-v4> \\",

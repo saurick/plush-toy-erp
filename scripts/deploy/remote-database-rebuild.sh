@@ -30,7 +30,7 @@ confirmation="${8:-}"
 
 case "$target" in
 demo-133)
-  root=/home/simon/plush-toy-erp-demo-v1
+  root=/root/deploy/plush-toy-erp-demo-v1
   runtime_env=$root/runtime/.env.demo-133
   project=plush-toy-erp-demo-v1
   database=plush_erp_demo_v1
@@ -39,7 +39,7 @@ demo-133)
   web_endpoint=http://127.0.0.1:5195
   ;;
 customer-test-133)
-  root=/home/simon/plush-toy-erp-test-v1
+  root=/root/deploy/plush-toy-erp-test-v1
   runtime_env=$root/runtime/.env.customer-test-133
   project=plush-toy-erp-test-v1
   database=plush_erp_customer_test_v1
@@ -81,7 +81,7 @@ fail() {
   fail "invalid database rebuild fingerprint"
 [[ "$confirmation" == "REBUILD_DATABASE:$target:$release_sha:$operation_id" ]] ||
   fail "database rebuild confirmation does not match"
-[[ "$(hostname)" == r740xd && "$(id -un)" == simon ]] ||
+[[ "$(hostname)" == r740xd && "$(id -un)" == root ]] ||
   fail "remote host/user identity does not match"
 
 incoming=$incoming_root/$operation_id

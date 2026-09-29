@@ -68,7 +68,7 @@ configure_registered_target() {
   demo-133)
     TARGET_COMPOSE_PROJECT=plush-toy-erp-demo-v1
     TARGET_POSTGRES_DB=plush_erp_demo_v1
-    TARGET_ROOT=/home/simon/plush-toy-erp-demo-v1
+    TARGET_ROOT=/root/deploy/plush-toy-erp-demo-v1
     TARGET_COMPOSE_OVERRIDE_FILE=$SCRIPT_DIR/compose.demo-133.yml
     TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.demo-133
     TARGET_POSTGRES_PORT=55436
@@ -81,7 +81,7 @@ configure_registered_target() {
   customer-test-133)
     TARGET_COMPOSE_PROJECT=plush-toy-erp-test-v1
     TARGET_POSTGRES_DB=plush_erp_customer_test_v1
-    TARGET_ROOT=/home/simon/plush-toy-erp-test-v1
+    TARGET_ROOT=/root/deploy/plush-toy-erp-test-v1
     TARGET_COMPOSE_OVERRIDE_FILE=$SCRIPT_DIR/compose.customer-test-133.yml
     TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.customer-test-133
     TARGET_POSTGRES_PORT=55437

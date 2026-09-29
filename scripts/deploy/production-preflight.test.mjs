@@ -259,7 +259,7 @@ const deploymentTargetFixtures = Object.freeze({
     key: "demo-133",
     project: "plush-toy-erp-demo-v1",
     database: "plush_erp_demo_v1",
-    root: "/home/simon/plush-toy-erp-demo-v1",
+    root: "/root/deploy/plush-toy-erp-demo-v1",
     override: "compose.demo-133.yml",
     trialEnabled: "1",
     trialTarget: "customer-trial-133",
@@ -281,7 +281,7 @@ const deploymentTargetFixtures = Object.freeze({
     key: "customer-test-133",
     project: "plush-toy-erp-test-v1",
     database: "plush_erp_customer_test_v1",
-    root: "/home/simon/plush-toy-erp-test-v1",
+    root: "/root/deploy/plush-toy-erp-test-v1",
     override: "compose.customer-test-133.yml",
     trialEnabled: "0",
     trialTarget: "",
@@ -704,7 +704,7 @@ test("production preflight resolves a packaged source root without Git metadata"
         FAKE_RUNTIME_TARGET_PROJECT: "plush-toy-erp-demo-v1",
         FAKE_RUNTIME_COMPOSE_PROJECT: "plush-toy-erp-demo-v1",
         FAKE_RUNTIME_POSTGRES_MOUNT:
-          "/home/simon/plush-toy-erp-demo-v1/data/postgres",
+          "/root/deploy/plush-toy-erp-demo-v1/data/postgres",
         FAKE_RUNTIME_POSTGRES_DSN:
           "postgres://erp_app:test-app-password-12345@postgres:5432/plush_erp_demo_v1?sslmode=disable",
         FAKE_RUNTIME_POSTGRES_PORT: "55436",
@@ -1398,7 +1398,7 @@ test("production preflight rejects registered runtime PostgreSQL mount drift", (
     {
       env: {
         FAKE_RUNTIME_POSTGRES_MOUNT:
-          "/home/simon/plush-toy-erp-prod/data/postgres",
+          "/root/deploy/plush-toy-erp-prod/data/postgres",
       },
     },
   );
@@ -1753,7 +1753,7 @@ test("production preflight enforces exact registered data and migration lock pat
     ],
     [
       "MIGRATION_LOCK_FILE",
-      "/home/simon/plush-toy-erp-demo-v1/run/../atlas-migrate.lock",
+      "/root/deploy/plush-toy-erp-demo-v1/run/../atlas-migrate.lock",
       /不得包含重复分隔符或 \. \/ \.\./u,
     ],
   ]) {

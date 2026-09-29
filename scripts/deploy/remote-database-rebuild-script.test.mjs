@@ -11,8 +11,8 @@ const source = readFileSync(script, "utf8");
 test("remote database rebuild accepts only the two isolated registered targets", () => {
   assert.match(source, /demo-133\)/u);
   assert.match(source, /customer-test-133\)/u);
-  assert.match(source, /root=\/home\/simon\/plush-toy-erp-demo-v1/u);
-  assert.match(source, /root=\/home\/simon\/plush-toy-erp-test-v1/u);
+  assert.match(source, /root=\/root\/deploy\/plush-toy-erp-demo-v1/u);
+  assert.match(source, /root=\/root\/deploy\/plush-toy-erp-test-v1/u);
   assert.match(source, /project=plush-toy-erp-demo-v1/u);
   assert.match(source, /project=plush-toy-erp-test-v1/u);
   assert.match(source, /database=plush_erp_demo_v1/u);

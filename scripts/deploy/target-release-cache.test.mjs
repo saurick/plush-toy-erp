@@ -220,7 +220,7 @@ function executableCacheRunCommand(
     assert.notEqual(separator, -1);
     const quotedRoot = `'${root.replaceAll("'", `'\"'\"'`)}'`;
     const source = options.input.replace(
-      /^root=\/home\/simon\/plush-toy-erp-demo-v1$/mu,
+      /^root=\/root\/deploy\/plush-toy-erp-demo-v1$/mu,
       `root=${quotedRoot}`,
     );
     return spawnSync("bash", ["-s", "--", ...args.slice(separator + 1)], {
@@ -560,7 +560,7 @@ test("both target cache paths use fixed SSH scripts and fail closed", (t) => {
     calls
       .slice(0, 3)
       .every((call) =>
-        call.input.includes("root=/home/simon/plush-toy-erp-demo-v1"),
+        call.input.includes("root=/root/deploy/plush-toy-erp-demo-v1"),
       ),
     true,
   );
@@ -568,7 +568,7 @@ test("both target cache paths use fixed SSH scripts and fail closed", (t) => {
     calls
       .slice(3)
       .every((call) =>
-        call.input.includes("root=/home/simon/plush-toy-erp-test-v1"),
+        call.input.includes("root=/root/deploy/plush-toy-erp-test-v1"),
       ),
     true,
   );

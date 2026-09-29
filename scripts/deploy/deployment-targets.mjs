@@ -38,14 +38,14 @@ const FIXED_TARGET_IDENTITIES = Object.freeze({
   "demo-133": Object.freeze({
     purpose: "project-demo-simulated",
     trialTarget: "customer-trial-133",
-    root: "/home/simon/plush-toy-erp-demo-v1",
-    runtimeEnv: "/home/simon/plush-toy-erp-demo-v1/runtime/.env.demo-133",
+    root: "/root/deploy/plush-toy-erp-demo-v1",
+    runtimeEnv: "/root/deploy/plush-toy-erp-demo-v1/runtime/.env.demo-133",
     projectName: "plush-toy-erp-demo-v1",
     overrideFile: "compose.demo-133.yml",
     databaseName: "plush_erp_demo_v1",
     postgresPort: 55436,
     postgresDataDirectory:
-      "/home/simon/plush-toy-erp-demo-v1/data/postgres",
+      "/root/deploy/plush-toy-erp-demo-v1/data/postgres",
     serverPort: 8325,
     webPort: 5195,
     jaegerPorts: Object.freeze({
@@ -66,14 +66,14 @@ const FIXED_TARGET_IDENTITIES = Object.freeze({
   "customer-test-133": Object.freeze({
     purpose: "customer-clean-acceptance",
     trialTarget: "none",
-    root: "/home/simon/plush-toy-erp-test-v1",
+    root: "/root/deploy/plush-toy-erp-test-v1",
     runtimeEnv:
-      "/home/simon/plush-toy-erp-test-v1/runtime/.env.customer-test-133",
+      "/root/deploy/plush-toy-erp-test-v1/runtime/.env.customer-test-133",
     projectName: "plush-toy-erp-test-v1",
     overrideFile: "compose.customer-test-133.yml",
     databaseName: "plush_erp_customer_test_v1",
     postgresPort: 55437,
-    postgresDataDirectory: "/home/simon/plush-toy-erp-test-v1/data/postgres",
+    postgresDataDirectory: "/root/deploy/plush-toy-erp-test-v1/data/postgres",
     serverPort: 8335,
     webPort: 5205,
     jaegerPorts: Object.freeze({

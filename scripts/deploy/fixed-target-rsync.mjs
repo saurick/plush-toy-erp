@@ -8,14 +8,14 @@ const FIXED_REMOTE_RSYNC_PATH = "/usr/bin/rsync";
 
 function assertFixedTarget(target) {
   const roots = {
-    "demo-133": "/home/simon/plush-toy-erp-demo-v1",
-    "customer-test-133": "/home/simon/plush-toy-erp-test-v1",
+    "demo-133": "/root/deploy/plush-toy-erp-demo-v1",
+    "customer-test-133": "/root/deploy/plush-toy-erp-test-v1",
   };
   if (
     !Object.hasOwn(roots, target?.key) ||
     target?.ssh?.host !== "192.168.0.133" ||
     target?.ssh?.port !== 22 ||
-    target?.ssh?.user !== "simon" ||
+    target?.ssh?.user !== "root" ||
     target?.filesystem?.root !== roots[target.key]
   ) {
     throw new Error("rsync target does not match a registered fixed contract");

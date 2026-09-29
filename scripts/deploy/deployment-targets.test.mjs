@@ -39,14 +39,14 @@ test("deployment registry exposes only the isolated demo and customer-test targe
   assert.equal(demo.purpose, "project-demo-simulated");
   assert.equal(demo.ssh.host, "192.168.0.133");
   assert.equal(demo.ssh.expectedHostname, "r740xd");
-  assert.equal(demo.filesystem.root, "/home/simon/plush-toy-erp-demo-v1");
+  assert.equal(demo.filesystem.root, "/root/deploy/plush-toy-erp-demo-v1");
   assert.equal(demo.compose.projectName, "plush-toy-erp-demo-v1");
   assert.equal(demo.database.name, "plush_erp_demo_v1");
   assert.deepEqual(demo.runtime, {
     postgres: {
       bindAddress: "127.0.0.1",
       hostPort: 55436,
-      dataDirectory: "/home/simon/plush-toy-erp-demo-v1/data/postgres",
+      dataDirectory: "/root/deploy/plush-toy-erp-demo-v1/data/postgres",
     },
     app: { bindAddress: "127.0.0.1", hostPort: 8325 },
     web: { bindAddress: "127.0.0.1", hostPort: 5195 },
@@ -79,14 +79,14 @@ test("deployment registry exposes only the isolated demo and customer-test targe
   assert.equal(customerTest.trialTarget, "none");
   assert.equal(
     customerTest.filesystem.root,
-    "/home/simon/plush-toy-erp-test-v1",
+    "/root/deploy/plush-toy-erp-test-v1",
   );
   assert.equal(customerTest.compose.projectName, "plush-toy-erp-test-v1");
   assert.equal(customerTest.database.name, "plush_erp_customer_test_v1");
   assert.equal(customerTest.runtime.postgres.hostPort, 55437);
   assert.equal(
     customerTest.runtime.postgres.dataDirectory,
-    "/home/simon/plush-toy-erp-test-v1/data/postgres",
+    "/root/deploy/plush-toy-erp-test-v1/data/postgres",
   );
   assert.equal(customerTest.runtime.app.hostPort, 8335);
   assert.equal(customerTest.runtime.web.hostPort, 5205);
@@ -160,5 +160,5 @@ test("deployment target CLI omits SSH and filesystem internals", () => {
     endpoint: "https://test.yoyoosun.net",
     hostPort: 5177,
   });
-  assert.doesNotMatch(result.stdout, /192\.168\.0\.133|\/home\/simon/u);
+  assert.doesNotMatch(result.stdout, /192\.168\.0\.133|\/root\/deploy/u);
 });

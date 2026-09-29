@@ -10,15 +10,15 @@
       "ssh": {
         "host": "192.168.0.133",
         "port": 22,
-        "user": "simon",
+        "user": "root",
         "expectedHostname": "r740xd"
       },
       "filesystem": {
-        "root": "/home/simon/plush-toy-erp-demo-v1",
-        "current": "/home/simon/plush-toy-erp-demo-v1/current",
-        "releases": "/home/simon/plush-toy-erp-demo-v1/releases",
-        "runtimeEnv": "/home/simon/plush-toy-erp-demo-v1/runtime/.env.demo-133",
-        "operationRoot": "/home/simon/plush-toy-erp-demo-v1/operations"
+        "root": "/root/deploy/plush-toy-erp-demo-v1",
+        "current": "/root/deploy/plush-toy-erp-demo-v1/current",
+        "releases": "/root/deploy/plush-toy-erp-demo-v1/releases",
+        "runtimeEnv": "/root/deploy/plush-toy-erp-demo-v1/runtime/.env.demo-133",
+        "operationRoot": "/root/deploy/plush-toy-erp-demo-v1/operations"
       },
       "compose": {
         "projectName": "plush-toy-erp-demo-v1",
@@ -31,13 +31,13 @@
       },
       "database": {
         "name": "plush_erp_demo_v1",
-        "migrationLock": "/home/simon/plush-toy-erp-demo-v1/run/atlas-migrate.lock"
+        "migrationLock": "/root/deploy/plush-toy-erp-demo-v1/run/atlas-migrate.lock"
       },
       "runtime": {
         "postgres": {
           "bindAddress": "127.0.0.1",
           "hostPort": 55436,
-          "dataDirectory": "/home/simon/plush-toy-erp-demo-v1/data/postgres"
+          "dataDirectory": "/root/deploy/plush-toy-erp-demo-v1/data/postgres"
         },
         "app": {
           "bindAddress": "127.0.0.1",
@@ -85,15 +85,15 @@
       "ssh": {
         "host": "192.168.0.133",
         "port": 22,
-        "user": "simon",
+        "user": "root",
         "expectedHostname": "r740xd"
       },
       "filesystem": {
-        "root": "/home/simon/plush-toy-erp-test-v1",
-        "current": "/home/simon/plush-toy-erp-test-v1/current",
-        "releases": "/home/simon/plush-toy-erp-test-v1/releases",
-        "runtimeEnv": "/home/simon/plush-toy-erp-test-v1/runtime/.env.customer-test-133",
-        "operationRoot": "/home/simon/plush-toy-erp-test-v1/operations"
+        "root": "/root/deploy/plush-toy-erp-test-v1",
+        "current": "/root/deploy/plush-toy-erp-test-v1/current",
+        "releases": "/root/deploy/plush-toy-erp-test-v1/releases",
+        "runtimeEnv": "/root/deploy/plush-toy-erp-test-v1/runtime/.env.customer-test-133",
+        "operationRoot": "/root/deploy/plush-toy-erp-test-v1/operations"
       },
       "compose": {
         "projectName": "plush-toy-erp-test-v1",
@@ -106,13 +106,13 @@
       },
       "database": {
         "name": "plush_erp_customer_test_v1",
-        "migrationLock": "/home/simon/plush-toy-erp-test-v1/run/atlas-migrate.lock"
+        "migrationLock": "/root/deploy/plush-toy-erp-test-v1/run/atlas-migrate.lock"
       },
       "runtime": {
         "postgres": {
           "bindAddress": "127.0.0.1",
           "hostPort": 55437,
-          "dataDirectory": "/home/simon/plush-toy-erp-test-v1/data/postgres"
+          "dataDirectory": "/root/deploy/plush-toy-erp-test-v1/data/postgres"
         },
         "app": {
           "bindAddress": "127.0.0.1",

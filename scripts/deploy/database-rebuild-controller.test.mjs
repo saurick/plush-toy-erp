@@ -177,7 +177,7 @@ test("database rebuild preparation persists a terminal blocker", (t) => {
       path.join(data.store, "operations", `${report.operation.id}.json`),
       "utf8",
     ),
-    /192\.168|\/home\/simon|password|token/iu,
+    /192\.168|\/root\/deploy|password|token/iu,
   );
 });
 

@@ -31,7 +31,7 @@ confirmation="${9:-}"
 
 case "$target" in
 demo-133)
-  root=/home/simon/plush-toy-erp-demo-v1
+  root=/root/deploy/plush-toy-erp-demo-v1
   runtime_env=$root/runtime/.env.demo-133
   public_endpoint=https://demo.yoyoosun.net
   public_network=plush-toy-erp-demo-v1_default
@@ -51,7 +51,7 @@ demo-133)
   jaeger_ports=(61002 61003 61005 61006 61007 61008 61009 61010)
   ;;
 customer-test-133)
-  root=/home/simon/plush-toy-erp-test-v1
+  root=/root/deploy/plush-toy-erp-test-v1
   runtime_env=$root/runtime/.env.customer-test-133
   public_endpoint=https://test.yoyoosun.net
   public_network=plush-toy-erp-test-v1_default
@@ -423,7 +423,7 @@ trap on_exit EXIT
 [[ "$release_rehearsal_sha256" =~ $sha256_pattern ]] || fail "invalid rehearsal checksum"
 [[ "$initialization_fingerprint" =~ $sha256_pattern ]] || fail "invalid initialization fingerprint"
 [[ "$confirmation" == "PROMOTE:$target:$release_sha:$operation_id" ]] || fail "confirmation does not match"
-[[ "$(hostname)" == r740xd && "$(id -un)" == simon ]] || fail "remote identity does not match"
+[[ "$(hostname)" == r740xd && "$(id -un)" == root ]] || fail "remote identity does not match"
 
 plain_owned_directory "$root" || fail "target root is invalid"
 plain_owned_file "$owner_marker" || fail "initialization owner marker is invalid"

@@ -15,7 +15,7 @@ function remoteReport(overrides = {}) {
     STATUS: "eligible",
     TARGET: "demo-133",
     HOSTNAME: "r740xd",
-    USER: "simon",
+    USER: "root",
     ROOT_STATE: "absent",
     TARGET_CONTAINER_COUNT: "0",
     TARGET_NETWORK_COUNT: "0",
@@ -47,7 +47,7 @@ test("initialization preflight source binds only the registered target and parse
   });
 
   assert.equal(syntax.status, 0, syntax.stderr);
-  assert.match(script, /root=\/home\/simon\/plush-toy-erp-demo-v1/u);
+  assert.match(script, /root=\/root\/deploy\/plush-toy-erp-demo-v1/u);
   assert.match(script, /postgres:18.6/u);
   assert.match(
     script,

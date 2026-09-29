@@ -212,7 +212,7 @@ function targetInitializationPreflight(status = "blocked") {
       schemaVersion: "plush.remote-target-initialization-preflight/v1",
       status,
       target: "demo-133",
-      host: { hostname: "r740xd", user: "simon" },
+      host: { hostname: "r740xd", user: "root" },
       rootState: eligible ? "absent" : "present",
       conflicts: {
         targetContainers: 0,
@@ -627,7 +627,7 @@ test("promotion preparation preserves existing-target blockers without reclassif
       path.join(data.store, "operations", `${first.operation.id}.json`),
       "utf8",
     ),
-    /192\.168|\/home\/simon|password|token/iu,
+    /192\.168|\/root\/deploy|password|token/iu,
   );
 });
 

@@ -39,7 +39,7 @@ bash deployments/yoyoosun/scripts/collect-evidence.sh --deployment-target demo-1
 bash scripts/deploy/production-preflight.sh \
   --profile customer-trial-acceptance \
   --deployment-target demo-133 \
-  --env-file /home/simon/plush-toy-erp-demo-v1/runtime/.env.demo-133 \
+  --env-file /root/deploy/plush-toy-erp-demo-v1/runtime/.env.demo-133 \
   --compose-dir server/deploy/compose/prod \
   --compose-override server/deploy/compose/prod/compose.demo-133.yml \
   --runtime \

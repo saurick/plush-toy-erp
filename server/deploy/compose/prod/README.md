@@ -84,7 +84,7 @@ APP_ADMIN_PASSWORD='<ephemeral-secret>' \
 
 - 数据库固定为 `plush_erp_demo_v1`。
 - Compose project 固定为 `plush-toy-erp-demo-v1`。
-- 运行根目录固定为 `/home/simon/plush-toy-erp-demo-v1`。
+- 运行根目录固定为 `/root/deploy/plush-toy-erp-demo-v1`。
 - 稳态仍必须 `BOOTSTRAP_ADMIN_ONCE=false`，不得持久保存 bootstrap 密码。
 - 造数只走正式 JSON-RPC / usecase，不复制数据库行，不用 Workflow payload 冒充 Fact。
 - 凭据轮换、完整账号矩阵、PDF 与业务页面验收均是独立证据。
@@ -96,10 +96,10 @@ APP_ADMIN_PASSWORD='<ephemeral-secret>' \
 `customer-test-133` 用于甲方自行录入测试数据。它不执行 demo 的 fixture、整批模拟业务造数或 Fact 写入。普通 promotion 不清空、不重建、也不重放基础资料；只有当前 Codex 任务明确授权目标写入时，才允许在 fresh backup 与实时 preflight 后运行一次性 core bootstrap。该入口只幂等创建当前 allowlist 中的 8 个标准单位和 4 个仓库，不创建材料、产品、工艺、BOM、客户、订单、Workflow 或 Fact，也不停用旧批次或人工维护的资料。
 
 ```bash
-cd /home/simon/plush-toy-erp-test-v1/current/server/deploy/compose/prod
+cd /root/deploy/plush-toy-erp-test-v1/current/server/deploy/compose/prod
 docker compose \
   -p plush-toy-erp-test-v1 \
-  --env-file /home/simon/plush-toy-erp-test-v1/runtime/.env.customer-test-133 \
+  --env-file /root/deploy/plush-toy-erp-test-v1/runtime/.env.customer-test-133 \
   -f compose.yml \
   -f compose.customer-test-133.yml \
   run --rm --no-deps --pull never \

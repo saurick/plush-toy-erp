@@ -35,8 +35,8 @@ const CACHE_BASIS = Object.freeze([
   "embedded_git_sha",
 ]);
 const FIXED_CACHE_ROOTS = new Set([
-  "/home/simon/plush-toy-erp-demo-v1",
-  "/home/simon/plush-toy-erp-test-v1",
+  "/root/deploy/plush-toy-erp-demo-v1",
+  "/root/deploy/plush-toy-erp-test-v1",
 ]);
 
 function fileMetadata(fetch, name) {

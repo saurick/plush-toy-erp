@@ -20,15 +20,15 @@ const expectedDatabase = "plush_erp_demo_v1";
 const trialDatabase = expectedDatabase;
 const trialProject = "plush-toy-erp-demo-v1";
 const productionTrialDataDir =
-  "/home/simon/plush-toy-erp-demo-v1/data/postgres";
+  "/root/deploy/plush-toy-erp-demo-v1/data/postgres";
 const productionTrialLockFile =
-  "/home/simon/plush-toy-erp-demo-v1/run/atlas-migrate.lock";
+  "/root/deploy/plush-toy-erp-demo-v1/run/atlas-migrate.lock";
 const customerTestDatabase = "plush_erp_customer_test_v1";
 const customerTestProject = "plush-toy-erp-test-v1";
 const productionCustomerTestDataDir =
-  "/home/simon/plush-toy-erp-test-v1/data/postgres";
+  "/root/deploy/plush-toy-erp-test-v1/data/postgres";
 const productionCustomerTestLockFile =
-  "/home/simon/plush-toy-erp-test-v1/run/atlas-migrate.lock";
+  "/root/deploy/plush-toy-erp-test-v1/run/atlas-migrate.lock";
 const expectedMigration = "20260715161753";
 const expectedRelease = "a".repeat(40);
 const adminPassword = "FreshAdmin9!";
@@ -1077,7 +1077,7 @@ defineBootstrapTest("customer-test-contract", (t) => {
 
 defineBootstrapTest("demo-target-drift", (t) => {
   const cases = [
-    ["POSTGRES_DATA_DIR", "/home/simon/plush-toy-erp-demo-v1/data/other"],
+    ["POSTGRES_DATA_DIR", "/root/deploy/plush-toy-erp-demo-v1/data/other"],
     ["MIGRATION_LOCK_FILE", path.join("__alternate__", "atlas-migrate.lock")],
     ["WEB_DESKTOP_BIND_ADDR", "0.0.0.0"],
     ["JAEGER_6831_PORT", "26831"],

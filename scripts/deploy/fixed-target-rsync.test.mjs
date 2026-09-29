@@ -9,8 +9,8 @@ import {
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
 const TARGET = Object.freeze({
   key: "customer-test-133",
-  ssh: Object.freeze({ host: "192.168.0.133", port: 22, user: "simon" }),
-  filesystem: Object.freeze({ root: "/home/simon/plush-toy-erp-test-v1" }),
+  ssh: Object.freeze({ host: "192.168.0.133", port: 22, user: "root" }),
+  filesystem: Object.freeze({ root: "/root/deploy/plush-toy-erp-test-v1" }),
 });
 
 test("fixed target rsync keeps the exact SSH and incoming-directory contract", () => {
@@ -27,7 +27,7 @@ test("fixed target rsync keeps the exact SSH and incoming-directory contract", (
   assert.equal(transfer.command, "rsync");
   assert.deepEqual(transfer.args.slice(-3), [
     ...sourceFiles,
-    `simon@192.168.0.133:/home/simon/plush-toy-erp-test-v1/incoming/${OPERATION_ID}/`,
+    `root@192.168.0.133:/root/deploy/plush-toy-erp-test-v1/incoming/${OPERATION_ID}/`,
   ]);
   assert(transfer.args.includes("--inplace"));
   assert(transfer.args.includes("--protect-args"));

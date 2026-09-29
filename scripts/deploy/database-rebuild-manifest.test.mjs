@@ -221,7 +221,7 @@ test("database rebuild plan is private, immutable and redacted", (t) => {
   assert.equal(statSync(file).mode & 0o777, 0o600);
   assert.doesNotMatch(
     readFileSync(file, "utf8"),
-    /192\.168|\/home\/simon|password|token/iu,
+    /192\.168|\/root\/deploy|password|token/iu,
   );
   assert.throws(
     () => writeDatabaseRebuildManifest(file, { ...manifest, status: "blocked" }),

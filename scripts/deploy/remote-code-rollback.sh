@@ -34,7 +34,7 @@ confirmation="${10:-}"
 
 case "$target" in
 demo-133)
-  root=/home/simon/plush-toy-erp-demo-v1
+  root=/root/deploy/plush-toy-erp-demo-v1
   runtime_env=$root/runtime/.env.demo-133
   public_endpoint=https://demo.yoyoosun.net
   public_network=plush-toy-erp-demo-v1_default
@@ -47,7 +47,7 @@ demo-133)
   web_endpoint=http://127.0.0.1:5195
   ;;
 customer-test-133)
-  root=/home/simon/plush-toy-erp-test-v1
+  root=/root/deploy/plush-toy-erp-test-v1
   runtime_env=$root/runtime/.env.customer-test-133
   public_endpoint=https://test.yoyoosun.net
   public_network=plush-toy-erp-test-v1_default
@@ -257,7 +257,7 @@ release_tree_digest() {
   fail "invalid rollback checksum"
 [[ "$confirmation" == "ROLLBACK:$target:$from_sha:$to_sha:$operation_id" ]] ||
   fail "rollback confirmation does not match"
-[[ "$(hostname)" == r740xd && "$(id -un)" == simon ]] ||
+[[ "$(hostname)" == r740xd && "$(id -un)" == root ]] ||
   fail "remote host/user identity does not match"
 
 incoming=$incoming_root/$operation_id

@@ -78,7 +78,7 @@ function createFixture({ useSystemFlock = false } = {}) {
   fs.writeFileSync(path.join(migrateDir, "atlas.sum"), "h1:test\n", "utf8");
   fs.mkdirSync(path.dirname(composeEnvFile), { recursive: true });
   const productionRootContract =
-    "TARGET_ROOT=/home/simon/plush-toy-erp-demo-v1";
+    "TARGET_ROOT=/root/deploy/plush-toy-erp-demo-v1";
   const productionEnvContract =
     "TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.demo-133";
   const productionMigrateDirContract =
@@ -440,7 +440,7 @@ function configureRegisteredCustomerTestFixture(fixture) {
     ".env.customer-test-133",
   );
   const productionRootContract =
-    "TARGET_ROOT=/home/simon/plush-toy-erp-test-v1";
+    "TARGET_ROOT=/root/deploy/plush-toy-erp-test-v1";
   const productionEnvContract =
     "TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.customer-test-133";
   const source = fs

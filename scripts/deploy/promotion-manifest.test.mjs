@@ -238,7 +238,7 @@ test("promotion manifest binds release target preflight and rollback boundary", 
   );
   assert.equal(manifest.rollback.automaticDatabaseDownMigration, false);
   assert.equal(manifest.release.rehearsalReceiptFile, "release-rehearsal.json");
-  assert.doesNotMatch(JSON.stringify(manifest), /192\.168|\/home\/simon/u);
+  assert.doesNotMatch(JSON.stringify(manifest), /192\.168|\/root\/deploy/u);
 });
 
 test("promotion manifest preserves capacity blocker and detects already-current", () => {

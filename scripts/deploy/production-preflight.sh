@@ -99,9 +99,9 @@ validate_absolute_path_without_aliases() {
     ;;
   esac
 
-  # macOS 本机只能静态审查 133 的 /home/simon 合同；它的 /home 是本机 automount，
-  # 不是目标机文件系统证据。在 133/Linux 执行时仍会逐段检查所有已存在的父路径。
-  if [[ "$(uname -s)" == "Darwin" && "$path" == /home/simon/plush-toy-erp-*/* && ! -e /home/simon ]]; then
+  # macOS 本机只能静态审查 133 的 /root/deploy 合同；本机没有目标机的该目录，
+  # 不能据此判断目标机存储。在 133/Linux 执行时仍会逐段检查已存在的父路径。
+  if [[ "$(uname -s)" == "Darwin" && "$path" == /root/deploy/plush-toy-erp-*/* && ! -e /root/deploy ]]; then
     return
   fi
 
@@ -259,8 +259,8 @@ demo-133)
   registered_target_mode=1
   target_project=plush-toy-erp-demo-v1
   target_database=plush_erp_demo_v1
-  target_data_dir=/home/simon/plush-toy-erp-demo-v1/data/postgres
-  target_lock_file=/home/simon/plush-toy-erp-demo-v1/run/atlas-migrate.lock
+  target_data_dir=/root/deploy/plush-toy-erp-demo-v1/data/postgres
+  target_lock_file=/root/deploy/plush-toy-erp-demo-v1/run/atlas-migrate.lock
   target_override_name=compose.demo-133.yml
   target_trial_enabled=1
   target_trial_target=customer-trial-133
@@ -276,8 +276,8 @@ customer-test-133)
   registered_target_mode=1
   target_project=plush-toy-erp-test-v1
   target_database=plush_erp_customer_test_v1
-  target_data_dir=/home/simon/plush-toy-erp-test-v1/data/postgres
-  target_lock_file=/home/simon/plush-toy-erp-test-v1/run/atlas-migrate.lock
+  target_data_dir=/root/deploy/plush-toy-erp-test-v1/data/postgres
+  target_lock_file=/root/deploy/plush-toy-erp-test-v1/run/atlas-migrate.lock
   target_override_name=compose.customer-test-133.yml
   target_trial_enabled=0
   target_trial_target=""
