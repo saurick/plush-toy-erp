@@ -656,6 +656,19 @@ func (r *masterDataRepo) listWarehouses(ctx context.Context, filter biz.MasterDa
 }
 
 func (r *masterDataRepo) CreateProcess(ctx context.Context, in *biz.ProcessMutation) (*biz.Process, error) {
+	sortOrder := 10
+	latest, err := r.data.postgres.Process.Query().
+		Order(ent.Desc(process.FieldSortOrder), ent.Desc(process.FieldID)).
+		First(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, err
+	}
+	if latest != nil {
+		sortOrder = latest.SortOrder
+		if sortOrder <= int(^uint(0)>>1)-10 {
+			sortOrder += 10
+		}
+	}
 	row, err := r.data.postgres.Process.Create().
 		SetCode(in.Code).
 		SetName(in.Name).
@@ -664,7 +677,7 @@ func (r *masterDataRepo) CreateProcess(ctx context.Context, in *biz.ProcessMutat
 		SetOutsourcingEnabled(in.OutsourcingEnabled).
 		SetInhouseEnabled(in.InhouseEnabled).
 		SetQualityRequired(in.QualityRequired).
-		SetSortOrder(in.SortOrder).
+		SetSortOrder(sortOrder).
 		SetNillableNote(in.Note).
 		Save(ctx)
 	if err != nil {
@@ -679,8 +692,7 @@ func (r *masterDataRepo) UpdateProcess(ctx context.Context, id int, in *biz.Proc
 		SetName(in.Name).
 		SetOutsourcingEnabled(in.OutsourcingEnabled).
 		SetInhouseEnabled(in.InhouseEnabled).
-		SetQualityRequired(in.QualityRequired).
-		SetSortOrder(in.SortOrder)
+		SetQualityRequired(in.QualityRequired)
 	if in.ProductionRouteOperationCode == nil {
 		update.ClearProductionRouteOperationCode()
 	} else {

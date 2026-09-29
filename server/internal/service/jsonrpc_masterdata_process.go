@@ -75,7 +75,6 @@ func processMutationFromParams(pm map[string]any) *biz.ProcessMutation {
 		OutsourcingEnabled:           getBool(pm, "outsourcing_enabled", false),
 		InhouseEnabled:               getBool(pm, "inhouse_enabled", true),
 		QualityRequired:              getBool(pm, "quality_required", false),
-		SortOrder:                    getInt(pm, "sort_order", 0),
 		Note:                         getWorkflowStringPtr(pm, "note"),
 	}
 }
@@ -100,7 +99,6 @@ func processToMap(item *biz.Process) map[string]any {
 		"outsourcing_enabled":             item.OutsourcingEnabled,
 		"inhouse_enabled":                 item.InhouseEnabled,
 		"quality_required":                item.QualityRequired,
-		"sort_order":                      item.SortOrder,
 		"note":                            optionalStringValue(item.Note),
 		"is_active":                       item.IsActive,
 		"created_at":                      item.CreatedAt.Unix(),

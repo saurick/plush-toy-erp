@@ -224,7 +224,6 @@ type ProcessMutation struct {
 	OutsourcingEnabled           bool
 	InhouseEnabled               bool
 	QualityRequired              bool
-	SortOrder                    int
 	Note                         *string
 }
 
@@ -1003,9 +1002,6 @@ func normalizeProcessMutation(in ProcessMutation) (ProcessMutation, error) {
 		in.ProductionRouteOperationCode = &operationCode
 	}
 	in.Note = normalizeOptionalString(in.Note)
-	if in.SortOrder < 0 {
-		in.SortOrder = 0
-	}
 	if in.Code == "" || in.Name == "" {
 		return ProcessMutation{}, ErrBadParam
 	}

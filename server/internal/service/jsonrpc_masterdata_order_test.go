@@ -198,11 +198,11 @@ func (s *stubMasterDataJSONRPCRepo) UnitIsActive(context.Context, int) (bool, er
 }
 func (s *stubMasterDataJSONRPCRepo) CreateProcess(_ context.Context, in *biz.ProcessMutation) (*biz.Process, error) {
 	s.createdProcess = in
-	return &biz.Process{ID: 1, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, SortOrder: in.SortOrder, Note: in.Note, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+	return &biz.Process{ID: 1, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, Note: in.Note, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) UpdateProcess(_ context.Context, id int, in *biz.ProcessMutation) (*biz.Process, error) {
 	s.updatedProcess = in
-	return &biz.Process{ID: id, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, SortOrder: in.SortOrder, Note: in.Note, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+	return &biz.Process{ID: id, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, Note: in.Note, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) GetProcess(_ context.Context, id int) (*biz.Process, error) {
 	category := "委外"
@@ -839,7 +839,6 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *
 		"outsourcing_enabled":             true,
 		"inhouse_enabled":                 true,
 		"quality_required":                true,
-		"sort_order":                      float64(20),
 	})
 
 	j := newMasterDataJSONRPCTestData(t,
@@ -866,6 +865,13 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *
 	if okRes == nil || okRes.Code != errcode.OK.Code {
 		t.Fatalf("expected OK, got %#v", okRes)
 	}
+	processData, ok := okRes.Data.AsMap()["process"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected process response, got %#v", okRes.Data.AsMap()["process"])
+	}
+	if _, exposed := processData["sort_order"]; exposed {
+		t.Fatalf("display order must stay internal, got %#v", processData)
+	}
 	if repo.createdProcess == nil ||
 		repo.createdProcess.Code != "PROC-SEW" ||
 		repo.createdProcess.Name != "车缝" ||
@@ -875,8 +881,7 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *
 		*repo.createdProcess.ProductionRouteOperationCode != biz.ProductionWIPOperationSewing ||
 		repo.createdProcess.OutsourcingEnabled != true ||
 		repo.createdProcess.InhouseEnabled != true ||
-		repo.createdProcess.QualityRequired != true ||
-		repo.createdProcess.SortOrder != 20 {
+		repo.createdProcess.QualityRequired != true {
 		t.Fatalf("unexpected process mutation %#v", repo.createdProcess)
 	}
 }

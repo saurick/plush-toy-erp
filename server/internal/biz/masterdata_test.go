@@ -95,7 +95,7 @@ func (s *masterDataRepoStub) UnitIsActive(_ context.Context, id int) (bool, erro
 func (s *masterDataRepoStub) CreateProcess(_ context.Context, in *ProcessMutation) (*Process, error) {
 	cp := *in
 	s.createdProcess = &cp
-	return &Process{ID: 1, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, SortOrder: in.SortOrder, Note: in.Note, IsActive: true}, nil
+	return &Process{ID: 1, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, Note: in.Note, IsActive: true}, nil
 }
 func (s *masterDataRepoStub) UpdateProcess(context.Context, int, *ProcessMutation) (*Process, error) {
 	return nil, nil
@@ -278,12 +278,12 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 	processCategory := " 委外车缝 "
 	processNote := "  "
 	operationCode := " sewing "
-	processInput, err := normalizeProcessMutation(ProcessMutation{Code: " PR-001 ", Name: " 车缝 ", Category: &processCategory, ProductionRouteOperationCode: &operationCode, SortOrder: -1, Note: &processNote})
+	processInput, err := normalizeProcessMutation(ProcessMutation{Code: " PR-001 ", Name: " 车缝 ", Category: &processCategory, ProductionRouteOperationCode: &operationCode, Note: &processNote})
 	if err != nil {
 		t.Fatalf("expected process mutation valid, got %v", err)
 	}
 	if processInput.Code != "PR-001" || processInput.Name != "车缝" || processInput.Category == nil || *processInput.Category != "委外车缝" ||
-		processInput.ProductionRouteOperationCode == nil || *processInput.ProductionRouteOperationCode != ProductionWIPOperationSewing || processInput.SortOrder != 0 {
+		processInput.ProductionRouteOperationCode == nil || *processInput.ProductionRouteOperationCode != ProductionWIPOperationSewing {
 		t.Fatalf("expected normalized process, got %#v", processInput)
 	}
 	if processInput.Note != nil {

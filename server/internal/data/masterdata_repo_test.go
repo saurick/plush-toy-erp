@@ -290,7 +290,6 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 		OutsourcingEnabled:           true,
 		InhouseEnabled:               false,
 		QualityRequired:              true,
-		SortOrder:                    20,
 	})
 	if err != nil {
 		t.Fatalf("create process failed: %v", err)
@@ -302,7 +301,7 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 		!processItem.OutsourcingEnabled ||
 		processItem.InhouseEnabled ||
 		!processItem.QualityRequired ||
-		processItem.SortOrder != 20 {
+		processItem.SortOrder != 10 {
 		t.Fatalf("expected process fields retained, got %#v", processItem)
 	}
 	if _, err := uc.CreateProcess(ctx, &biz.ProcessMutation{Code: "PROC-SEW", Name: "重复工序"}); !ent.IsConstraintError(err) {
@@ -321,7 +320,6 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 		OutsourcingEnabled: true,
 		InhouseEnabled:     true,
 		QualityRequired:    false,
-		SortOrder:          10,
 		Note:               &note,
 	})
 	if err != nil {
@@ -336,6 +334,17 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 		updated.Note == nil ||
 		*updated.Note != note {
 		t.Fatalf("expected process optional fields and flags updated, got %#v", updated)
+	}
+	appended, err := uc.CreateProcess(ctx, &biz.ProcessMutation{Code: "PROC-NEXT", Name: "后续工序"})
+	if err != nil {
+		t.Fatalf("create appended process failed: %v", err)
+	}
+	if appended.SortOrder != 20 {
+		t.Fatalf("expected new process appended after existing order, got %#v", appended)
+	}
+	ordered, orderedTotal, err := uc.ListProcesses(ctx, biz.MasterDataFilter{Limit: 20})
+	if err != nil || orderedTotal != 2 || len(ordered) != 2 || ordered[0].ID != processItem.ID || ordered[1].ID != appended.ID {
+		t.Fatalf("expected existing process order followed by new process, total=%d list=%#v err=%v", orderedTotal, ordered, err)
 	}
 	if _, err := uc.UpdateProcess(ctx, 999999, &biz.ProcessMutation{Code: "PROC-X", Name: "不存在"}); !errors.Is(err, biz.ErrProcessNotFound) {
 		t.Fatalf("expected missing process update rejected, got %v", err)
@@ -354,8 +363,8 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list active processes failed: %v", err)
 	}
-	if activeTotal != 0 || len(activeList) != 0 {
-		t.Fatalf("expected inactive process filtered out, total=%d len=%d", activeTotal, len(activeList))
+	if activeTotal != 1 || len(activeList) != 1 || activeList[0].ID != appended.ID {
+		t.Fatalf("expected only appended active process, total=%d list=%#v", activeTotal, activeList)
 	}
 }
 

@@ -332,8 +332,8 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 			process.QualityRequired != expected.quality {
 			t.Fatalf("unexpected default plush process %q: %#v", process.Name, process)
 		}
-		if !strings.Contains(process.Note, "排序仅供列表展示，不代表工艺路线") {
-			t.Fatalf("default plush process %q must explain the display-only sort boundary: %#v", process.Name, process)
+		if !strings.Contains(process.Note, "质检参考") || strings.Contains(process.Note, "排序") {
+			t.Fatalf("default plush process %q must describe only business-facing reference fields: %#v", process.Name, process)
 		}
 		defaultProcessSortOrder[process.Name] = process.SortOrder
 		delete(requiredProcesses, process.Name)
