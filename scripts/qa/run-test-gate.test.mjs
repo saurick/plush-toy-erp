@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
@@ -262,4 +263,22 @@ test("test gate formats incomplete summaries with the actual failure counts", ()
     }),
     "run=4 pass=3 fail=0 skip=1 excluded=2 unresolved=0",
   );
+});
+
+test("summary mode identifies a failed Go test without emitting its captured body", () => {
+  const events = [
+    { Action: "run", Package: "example.invalid/storage", Test: "TestBucketReady" },
+    { Action: "output", Package: "example.invalid/storage", Test: "TestBucketReady", Output: "private fixture body\n" },
+    { Action: "fail", Package: "example.invalid/storage", Test: "TestBucketReady" },
+  ];
+  const childScript = `console.log(${JSON.stringify(events.map((event) => JSON.stringify(event)).join("\n"))}); process.exit(1);`;
+  const result = spawnSync(process.execPath, [
+    new URL("./run-test-gate.mjs", import.meta.url).pathname,
+    "--kind", "go", "--label", "storage", "--output-mode", "summary", "--",
+    process.execPath, "--eval", childScript,
+  ], { encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /run=1 pass=0 fail=1 skip=0/u);
+  assert.match(result.stderr, /failedTests=\["example.invalid\/storage:TestBucketReady"\]/u);
+  assert.doesNotMatch(result.stdout + result.stderr, /private fixture body/u);
 });

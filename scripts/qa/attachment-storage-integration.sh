@@ -19,16 +19,12 @@ password=secrets.token_hex(24)
 (p/'s3.env').write_text(f'AWS_ACCESS_KEY_ID={access}\nAWS_SECRET_ACCESS_KEY={secret}\nS3_BUCKET=plush-attachment-test,plush-attachment-restore,plush-attachment-recovery\n')
 (p/'pg.env').write_text(f'POSTGRES_PASSWORD={password}\nPOSTGRES_DB=plush_erp_attachment_drill\n')
 (p/'client.env').write_text(f'export ATTACHMENT_S3_ACCESS_KEY_ID={access}\nexport ATTACHMENT_S3_SECRET_ACCESS_KEY={secret}\nexport PGPASSWORD={password}\n')
+(p/'s3-readiness.curl').write_text(f'aws-sigv4 = "aws:amz:us-east-1:s3"\nuser = "{access}:{secret}"\nhead\nfail\nsilent\nconnect-timeout = 2\nmax-time = 2\n')
 PY
 docker run -d --name "$fixture_id-pg" --env-file "$fixture_dir/pg.env" -p 127.0.0.1::5432 postgres:18.6 >/dev/null
 docker run -d --name "$fixture_id-s3" --env-file "$fixture_dir/s3.env" -p 127.0.0.1::8333 \
   chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882 \
   mini -dir=/data -admin.ui=false -webdav=false -s3.iam=false -s3.port.iceberg=0 -s3.port.lance=0 >/dev/null
-for ((attempt = 0; attempt < 45; attempt++)); do
-  if docker exec "$fixture_id-pg" pg_isready -U postgres -q &&
-    docker exec "$fixture_id-s3" curl -fsS --max-time 2 http://127.0.0.1:9333/cluster/healthz >/dev/null 2>&1; then break; fi
-  sleep 1
-done
 # shellcheck source=/dev/null
 source "$fixture_dir/client.env"
 pg_port="$(docker port "$fixture_id-pg" 5432/tcp | cut -d: -f2)"
@@ -37,6 +33,21 @@ export ATTACHMENT_S3_ENDPOINT="http://127.0.0.1:$s3_port"
 export ATTACHMENT_S3_BUCKET=plush-attachment-test
 export ATTACHMENT_STORAGE_INTEGRATION=1
 export ATTACHMENT_MIGRATION_TEST_DSN="postgres://postgres:$PGPASSWORD@127.0.0.1:$pg_port/plush_erp_attachment_drill?sslmode=disable"
+# Cluster health does not prove the authenticated S3 bucket is ready for tests.
+dependencies_ready=false
+for ((attempt = 0; attempt < 45; attempt++)); do
+  if docker exec "$fixture_id-pg" pg_isready -U postgres -q &&
+    docker exec "$fixture_id-s3" curl -fsS --max-time 2 http://127.0.0.1:9333/cluster/healthz >/dev/null 2>&1 &&
+    curl --config "$fixture_dir/s3-readiness.curl" "$ATTACHMENT_S3_ENDPOINT/$ATTACHMENT_S3_BUCKET" >/dev/null 2>&1; then
+    dependencies_ready=true
+    break
+  fi
+  sleep 1
+done
+if [[ "$dependencies_ready" != true ]]; then
+  echo "[qa:attachment-storage] PostgreSQL or authenticated S3 bucket did not become ready" >&2
+  exit 1
+fi
 cd "$root_dir/server"
 node "$root_dir/scripts/qa/run-test-gate.mjs" --kind go --label attachment-storage --output-mode summary -- \
   go test -tags=attachmentintegration ./internal/attachmentstore ./internal/attachmentmigration -count=1 -json

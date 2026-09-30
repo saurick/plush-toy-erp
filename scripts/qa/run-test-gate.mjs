@@ -47,7 +47,13 @@ export function formatIncompleteSummary(kind, result) {
     return `tests=${result.tests ?? "missing"} pass=${result.pass ?? "missing"} fail=${result.fail ?? "missing"} cancelled=${result.cancelled ?? "missing"} skipped=${result.skipped ?? "missing"} todo=${result.todo ?? "missing"}`;
   }
   if (kind === "go") {
-    return `run=${result.run} pass=${result.pass} fail=${result.fail} skip=${result.skip} excluded=${result.excluded ?? 0} unresolved=${result.unresolvedTests.length}`;
+    const failedTests = (result.failedTests || [])
+      .slice(0, 20)
+      .map((name) => String(name).slice(0, 512));
+    const failures = failedTests.length
+      ? ` failedTests=${JSON.stringify(failedTests)}`
+      : "";
+    return `run=${result.run} pass=${result.pass} fail=${result.fail} skip=${result.skip} excluded=${result.excluded ?? 0} unresolved=${result.unresolvedTests.length}${failures}`;
   }
   throw new Error(`unsupported test kind: ${kind}`);
 }
