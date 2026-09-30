@@ -23,6 +23,45 @@ const expectedSections = {
   sales: ['订单与客户', '订货明细', '联系与交付', '结算与报价', '备注与附件'],
 }
 
+async function assertAttachmentSummary(page, attachment) {
+  const summary = attachment.getByRole('button', { name: /(展开|收起)附件$/u })
+  const content = attachment.locator('.business-attachment-panel__content')
+  await summary.scrollIntoViewIfNeeded()
+  assert.equal(await summary.getAttribute('aria-expanded'), 'false')
+  assert.equal(await summary.locator('button').count(), 0)
+  const metrics = await summary.evaluate((node) => ({
+    width: node.getBoundingClientRect().width,
+    height: node.getBoundingClientRect().height,
+    panelWidth: node.parentElement.clientWidth,
+    overflow: node.parentElement.scrollWidth - node.parentElement.clientWidth,
+    controls: node.getAttribute('aria-controls'),
+    contentId: node.nextElementSibling.id,
+  }))
+  assert(
+    Math.abs(metrics.width - metrics.panelWidth) <= 1 &&
+      metrics.height >= 44 &&
+      metrics.overflow <= 1 &&
+      metrics.controls === metrics.contentId,
+    `附件摘要应覆盖整条卡片并关联展开内容: ${JSON.stringify(metrics)}`
+  )
+  await summary.click({ position: { x: metrics.width / 2, y: metrics.height / 2 } })
+  await content.waitFor({ state: 'visible' })
+  assert.equal(await summary.getAttribute('aria-expanded'), 'true')
+  await summary.locator('.business-attachment-panel__compact-copy').click()
+  await content.waitFor({ state: 'hidden' })
+  await summary.focus()
+  await page.keyboard.press('Space')
+  await content.waitFor({ state: 'visible' })
+  await page.keyboard.press('Enter')
+  await content.waitFor({ state: 'hidden' })
+  const action = summary.locator('.business-attachment-panel__compact-action')
+  await action.click()
+  await content.waitFor({ state: 'visible' })
+  await action.click()
+  await content.waitFor({ state: 'hidden' })
+  assert.equal(await summary.getAttribute('aria-expanded'), 'false')
+}
+
 export async function assertBusinessFormSections(page, editor, key) {
   const titles = expectedSections[key]
   if (!titles) {
@@ -81,15 +120,7 @@ export async function assertBusinessFormSections(page, editor, key) {
         .isVisible(),
       false
     )
-    await attachment
-      .getByRole('button', { name: '管理附件', exact: true })
-      .click()
-    await attachment
-      .getByRole('button', { name: '选择附件', exact: true })
-      .waitFor()
-    await attachment
-      .getByRole('button', { name: '收起附件', exact: true })
-      .click()
+    await assertAttachmentSummary(page, attachment)
   }
   // Native scrolling, without clicking the directory, must also update its position.
   if (await body.evaluate((node) => node.scrollTop > 0)) {
@@ -122,6 +153,9 @@ export async function assertBusinessFormSections(page, editor, key) {
     )
     await assertBusinessFormPage(page, editor)
     assert.equal(await picker.inputValue(), target)
+    if (width === 390 && (await attachment.count())) {
+      await assertAttachmentSummary(page, attachment)
+    }
   }
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.emulateMedia({ reducedMotion: 'reduce' })

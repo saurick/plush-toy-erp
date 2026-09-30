@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -21,11 +22,13 @@ import {
 } from 'antd'
 import {
   DeleteOutlined,
+  DownOutlined,
   DownloadOutlined,
   EyeOutlined,
   PaperClipOutlined,
   RedoOutlined,
   StopOutlined,
+  UpOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -337,6 +340,7 @@ const BusinessAttachmentPanel = forwardRef(
     },
     ref
   ) => {
+    const contentId = useId()
     const inputRef = useRef(null)
     const printAppendixInputRef = useRef(null)
     const withdrawalReasonRef = useRef(null)
@@ -427,11 +431,12 @@ const BusinessAttachmentPanel = forwardRef(
           'business-attachment-panel',
           variant === 'inline' ? 'business-attachment-panel--inline' : '',
           variant === 'manager' ? 'business-attachment-panel--manager' : '',
+          compact ? 'business-attachment-panel--compact' : '',
           className,
         ]
           .filter(Boolean)
           .join(' '),
-      [className, variant]
+      [className, compact, variant]
     )
     const listItems = useMemo(
       () => [
@@ -1308,11 +1313,27 @@ const BusinessAttachmentPanel = forwardRef(
       )
     }
 
+    const panelExpanded =
+      expanded || pendingAttachments.length > 0 || Boolean(loadError)
+
     return (
       <section className={containerClassName} aria-label={title}>
         {compact ? (
-          <div className="business-attachment-panel__compact-summary">
-            <span>
+          <button
+            type="button"
+            className="business-attachment-panel__compact-summary"
+            aria-expanded={panelExpanded}
+            aria-controls={contentId}
+            onClick={() => setExpanded((value) => !value)}
+            disabled={
+              pendingAttachments.length > 0 ||
+              preparing ||
+              uploading ||
+              withdrawing ||
+              Boolean(loadError)
+            }
+          >
+            <span className="business-attachment-panel__compact-copy">
               <PaperClipOutlined aria-hidden="true" /> {title} ·{' '}
               {loading
                 ? '正在读取'
@@ -1323,35 +1344,20 @@ const BusinessAttachmentPanel = forwardRef(
                 ? ` · ${pendingAttachments.length} 个待处理`
                 : ''}
             </span>
-            <Button
-              size="small"
-              aria-expanded={
-                expanded || pendingAttachments.length > 0 || Boolean(loadError)
-              }
-              onClick={() => setExpanded((value) => !value)}
-              disabled={
-                pendingAttachments.length > 0 ||
-                preparing ||
-                uploading ||
-                withdrawing ||
-                Boolean(loadError)
-              }
-            >
-              {expanded || pendingAttachments.length > 0 || loadError
-                ? '收起附件'
-                : canUpload
-                  ? '管理附件'
-                  : '查看附件'}
-            </Button>
-          </div>
+            <span className="business-attachment-panel__compact-action">
+              {panelExpanded ? '收起附件' : '展开附件'}
+              {panelExpanded ? (
+                <UpOutlined aria-hidden="true" />
+              ) : (
+                <DownOutlined aria-hidden="true" />
+              )}
+            </span>
+          </button>
         ) : null}
         <div
-          hidden={
-            compact &&
-            !expanded &&
-            pendingAttachments.length === 0 &&
-            !loadError
-          }
+          id={contentId}
+          className="business-attachment-panel__content"
+          hidden={compact && !panelExpanded}
         >
           <div className="business-attachment-panel__header">
             {variant !== 'manager' ? (
@@ -1368,19 +1374,54 @@ const BusinessAttachmentPanel = forwardRef(
               value={category}
               onChange={setCategory}
             />
-            <Space wrap>
-              {!missingOwner ? (
-                <Button
-                  icon={<RedoOutlined aria-hidden="true" />}
-                  loading={loading}
-                  disabled={uploading || preparing}
-                  onClick={() => reload()}
-                >
-                  刷新列表
-                </Button>
-              ) : null}
-              {canUpload ? (
-                <>
+            {!missingOwner ? (
+              <Button
+                type="text"
+                className="business-attachment-panel__refresh"
+                aria-label="刷新列表"
+                icon={<RedoOutlined aria-hidden="true" />}
+                loading={loading}
+                disabled={uploading || preparing}
+                onClick={() => reload()}
+              >
+                刷新
+              </Button>
+            ) : null}
+          </div>
+          {canUpload ? (
+            <>
+              <div
+                className={`business-attachment-panel__dropzone${dragging ? ' business-attachment-panel__dropzone--active' : ''}`}
+                role="group"
+                aria-label="添加附件"
+                aria-disabled={uploadDisabled}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  if (!uploadDisabled) setDragging(true)
+                }}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setDragging(false)
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  setDragging(false)
+                  if (!uploadDisabled) {
+                    prepareFiles(Array.from(event.dataTransfer.files || []))
+                  }
+                }}
+              >
+                <div className="business-attachment-panel__upload-actions">
+                  <Button
+                    type="primary"
+                    icon={<PaperClipOutlined aria-hidden="true" />}
+                    loading={preparing}
+                    disabled={uploadDisabled}
+                    onClick={() => inputRef.current?.click()}
+                  >
+                    {uploadButtonText}
+                  </Button>
                   {enablePrintAppendixUpload ? (
                     <Button
                       icon={<UploadOutlined aria-hidden="true" />}
@@ -1390,70 +1431,39 @@ const BusinessAttachmentPanel = forwardRef(
                       选择合同附图
                     </Button>
                   ) : null}
-                  <Button
-                    icon={<PaperClipOutlined aria-hidden="true" />}
-                    loading={preparing}
-                    disabled={uploadDisabled}
-                    onClick={() => inputRef.current?.click()}
-                  >
-                    {uploadButtonText}
-                  </Button>
-                  <input
-                    ref={inputRef}
-                    hidden
-                    multiple
-                    type="file"
-                    accept={ACCEPTED_ATTACHMENT_TYPES}
-                    onChange={handleFileChange}
-                  />
-                  {enablePrintAppendixUpload ? (
-                    <input
-                      ref={printAppendixInputRef}
-                      hidden
-                      multiple
-                      type="file"
-                      accept={PRINT_APPENDIX_ACCEPT}
-                      onChange={(event) =>
-                        handleFileChange(event, PRINT_APPENDIX_ATTACHMENT_TYPE)
-                      }
-                    />
-                  ) : null}
-                </>
+                </div>
+                <span className="business-attachment-panel__drop-hint">
+                  或将文件拖拽到此处
+                </span>
+                <span className="business-attachment-panel__mobile-hint">
+                  选择照片或文件
+                </span>
+                <span className="business-attachment-panel__upload-limit">
+                  支持图片、PDF、Office、WPS、邮件、文本与压缩包；单个文件不超过
+                  100 MB
+                </span>
+              </div>
+              <input
+                ref={inputRef}
+                hidden
+                multiple
+                type="file"
+                accept={ACCEPTED_ATTACHMENT_TYPES}
+                onChange={handleFileChange}
+              />
+              {enablePrintAppendixUpload ? (
+                <input
+                  ref={printAppendixInputRef}
+                  hidden
+                  multiple
+                  type="file"
+                  accept={PRINT_APPENDIX_ACCEPT}
+                  onChange={(event) =>
+                    handleFileChange(event, PRINT_APPENDIX_ATTACHMENT_TYPE)
+                  }
+                />
               ) : null}
-            </Space>
-          </div>
-          {canUpload ? (
-            <button
-              type="button"
-              className={`business-attachment-panel__dropzone${dragging ? ' business-attachment-panel__dropzone--active' : ''}`}
-              disabled={uploadDisabled}
-              onClick={() => inputRef.current?.click()}
-              onDragOver={(event) => {
-                event.preventDefault()
-                if (!uploadDisabled) setDragging(true)
-              }}
-              onDragLeave={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget)) {
-                  setDragging(false)
-                }
-              }}
-              onDrop={(event) => {
-                event.preventDefault()
-                setDragging(false)
-                if (!uploadDisabled) {
-                  prepareFiles(Array.from(event.dataTransfer.files || []))
-                }
-              }}
-            >
-              <UploadOutlined aria-hidden="true" />
-              <strong>
-                {preparing ? '正在读取文件…' : '点击或拖拽文件到此处'}
-              </strong>
-              <span>
-                支持图片、PDF、Office、WPS、邮件、文本与压缩包；单个文件不超过
-                100 MB
-              </span>
-            </button>
+            </>
           ) : null}
           {loadError ? (
             <Alert

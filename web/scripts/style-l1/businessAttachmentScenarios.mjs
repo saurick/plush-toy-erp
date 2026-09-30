@@ -1,6 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
-import { readFileSync } from 'node:fs'
 
 const PNG =
   readFileSync(new URL('../../../scripts/qa/fixtures/manual-acceptance-image.png', import.meta.url)).toString('base64')
@@ -8,7 +8,7 @@ const LONG_NAME = `${'客户确认包装唛头与交付资料'.repeat(12)}.pdf`
 
 async function expandInlineAttachments(container) {
   const toggle = container.getByRole('button', {
-    name: /^(管理|查看|收起)附件$/u,
+    name: /(展开|收起)附件$/u,
   })
   await toggle.click({ trial: true })
   if ((await toggle.getAttribute('aria-expanded')) === 'false') {
@@ -26,6 +26,7 @@ export function createBusinessAttachmentScenarios({
     { key: 'desktop', themeMode: 'light', width: 1440 },
     { key: 'dark', themeMode: 'dark', width: 1440 },
     { key: 'narrow', themeMode: 'light', width: 390 },
+    { key: 'small', themeMode: 'light', width: 320 },
     { key: 'readonly', themeMode: 'light', width: 1440, readonly: true },
   ].map(({ key, themeMode, width, readonly = false }) => {
     let files = []
@@ -162,7 +163,7 @@ export function createBusinessAttachmentScenarios({
       },
       verify: async (page) => {
         await page
-          .getByText('SHIP-ATTACHMENT-L1', { exact: false })
+          .getByText('style-l1-attachment-review', { exact: true })
           .first()
           .click()
         const openManager = async () => {
@@ -197,6 +198,18 @@ export function createBusinessAttachmentScenarios({
             const body = modal
               .querySelector('.ant-modal-body')
               .getBoundingClientRect()
+            const toolbar = node.querySelector(
+              '.business-attachment-panel__toolbar'
+            )
+            const category = toolbar
+              .querySelector('.erp-sliding-segmented')
+              .getBoundingClientRect()
+            const refresh = toolbar
+              .querySelector('button')
+              .getBoundingClientRect()
+            const selection = node.querySelector(
+              '.business-attachment-panel__upload-actions .ant-btn-primary'
+            )
             return {
               width: modal.getBoundingClientRect().width,
               overflow: node.scrollWidth - node.clientWidth,
@@ -204,6 +217,17 @@ export function createBusinessAttachmentScenarios({
               footerBottom: footer.bottom,
               footerTop: footer.top,
               viewport: innerHeight,
+              toolbarOverflow: toolbar.scrollWidth - toolbar.clientWidth,
+              categoryRight: category.right,
+              categoryCenter: category.top + category.height / 2,
+              refreshLeft: refresh.left,
+              refreshCenter: refresh.top + refresh.height / 2,
+              refreshHeight: refresh.height,
+              selectionHeight: selection?.getBoundingClientRect().height || 0,
+              dragHintVisible:
+                node
+                  .querySelector('.business-attachment-panel__drop-hint')
+                  ?.getBoundingClientRect().height > 0,
             }
           })
           assert(
@@ -211,6 +235,23 @@ export function createBusinessAttachmentScenarios({
             JSON.stringify(metrics)
           )
           assert(metrics.overflow <= 1, JSON.stringify(metrics))
+          assert(
+            metrics.toolbarOverflow <= 1 &&
+              metrics.categoryRight <= metrics.refreshLeft + 1 &&
+              Math.abs(metrics.categoryCenter - metrics.refreshCenter) <= 1,
+            `分类与刷新应保持同一行且不重叠: ${JSON.stringify(metrics)}`
+          )
+          if (width <= 640) {
+            assert(metrics.refreshHeight >= 44, JSON.stringify(metrics))
+            if (!readonly) {
+              assert(
+                metrics.selectionHeight >= 44 && !metrics.dragHintVisible,
+                JSON.stringify(metrics)
+              )
+            }
+          } else if (!readonly) {
+            assert(metrics.dragHintVisible, '电脑端保留拖拽提示')
+          }
           assert(
             metrics.footerBottom <= metrics.bodyBottom + 1 &&
               metrics.footerTop >= 0 &&
@@ -283,6 +324,15 @@ export function createBusinessAttachmentScenarios({
         await page.screenshot({
           path: path.join(outputDir, `attachment-manager-${key}.png`),
         })
+        if (width <= 640) {
+          files = []
+          await modal.getByRole('button', { name: '刷新列表', exact: true }).click()
+          await modal.getByText('暂无附件', { exact: true }).waitFor()
+          await geometry()
+          await modal.screenshot({
+            path: path.join(outputDir, `attachment-manager-${key}-empty.png`),
+          })
+        }
         if (key !== 'desktop') {
           await modal.getByRole('button', { name: '完成', exact: true }).click()
           return
@@ -305,9 +355,15 @@ export function createBusinessAttachmentScenarios({
           exact: true,
         })
         await preview.locator('img').waitFor()
-        assert(await preview.locator('img').evaluate((img) => img.complete && img.naturalWidth > 1))
+        assert(
+          await preview
+            .locator('img')
+            .evaluate((img) => img.complete && img.naturalWidth > 1)
+        )
         await preview.locator('.ant-modal-close').click()
-        const originalContent = files.find((item) => item.id === 11).content_base64
+        const originalContent = files.find(
+          (item) => item.id === 11
+        ).content_base64
         files.find((item) => item.id === 11).content_base64 = 'bm90LWFuLWltYWdl'
         await imageRow.getByRole('button', { name: '预览附件' }).click()
         await preview.getByText('图片加载失败', { exact: true }).waitFor()
@@ -352,7 +408,11 @@ export function createBusinessAttachmentScenarios({
         const repeatedRows = modal
           .locator('.business-attachment-panel__row')
           .filter({ hasText: repeatedFile.name })
-        await input.setInputFiles([repeatedFile, repeatedFile])
+        const [chooser] = await Promise.all([
+          page.waitForEvent('filechooser'),
+          modal.getByRole('button', { name: '选择附件', exact: true }).click(),
+        ])
+        await chooser.setFiles([repeatedFile, repeatedFile])
         await repeatedRows.first().waitFor()
         assert.equal(await repeatedRows.count(), 1, '同一批重复文件只入队一次')
         await input.setInputFiles(repeatedFile)
@@ -582,6 +642,7 @@ export function createBusinessAttachmentScenarios({
     viewport: { width: 1440, height: 900 },
     beforeNavigate: async (page) => {
       uploaded = []
+      holdList = false
       await page.route('**/rpc/attachment', async (route) => {
         const { id, method, params = {} } = route.request().postDataJSON()
         let data
@@ -629,7 +690,18 @@ export function createBusinessAttachmentScenarios({
       }
       await edit.click()
       const editor = page.locator('.erp-business-form-page:not([hidden])')
+      const panel = editor.locator('.business-attachment-panel')
+      const theme = await page.locator('html').getAttribute('data-erp-theme')
+      await panel.screenshot({
+        path: path.join(outputDir, `attachment-summary-${theme}-collapsed.png`),
+      })
       await expandInlineAttachments(editor)
+      const summary = editor.locator(
+        '.business-attachment-panel__compact-summary'
+      )
+      await panel.screenshot({
+        path: path.join(outputDir, `attachment-summary-${theme}-expanded.png`),
+      })
       await editor
         .getByText(/单个文件不超过\s*100 MB/u, { exact: false })
         .waitFor()
@@ -672,9 +744,13 @@ export function createBusinessAttachmentScenarios({
         .locator('.business-attachment-panel__row')
         .filter({ hasText: '原5MB边界已放行.txt' })
       await legacyBoundaryRow.waitFor()
+      assert(await summary.isDisabled(), '待处理文件存在时保持展开')
+      assert.equal(await summary.getAttribute('aria-expanded'), 'true')
       await legacyBoundaryRow
         .getByRole('button', { name: '移除待上传附件' })
         .click()
+      assert.equal(await summary.isDisabled(), false, '移除待处理文件后恢复收起')
+      assert.equal(await summary.getAttribute('aria-expanded'), 'true', '文件行操作不收起附件')
       await input.setInputFiles({
         name: '表单上传.txt',
         mimeType: 'text/plain',
@@ -691,6 +767,8 @@ export function createBusinessAttachmentScenarios({
         .click()
       await request
       await editor.getByText('正在处理附件…', { exact: true }).waitFor()
+      assert(await summary.isDisabled(), '上传中不能收起附件')
+      assert.equal(await summary.getAttribute('aria-expanded'), 'true')
       assert(
         await editor
           .getByRole('button', { name: '返回列表', exact: true })
@@ -708,6 +786,7 @@ export function createBusinessAttachmentScenarios({
       assert(blockedUnload, '上传中页面刷新仍有离开保护')
       releaseFormUpload()
       await editor.getByText('已上传', { exact: true }).waitFor()
+      assert.equal(await summary.isDisabled(), false, '上传结束后恢复收起')
       await editor
         .getByRole('button', { name: '返回列表', exact: true })
         .click()
@@ -890,6 +969,8 @@ export function createBusinessAttachmentScenarios({
           .getByRole('heading', { name: '查看 BOM 版本', exact: true })
           .waitFor()
         await panel.getByText('附件列表加载失败', { exact: true }).waitFor()
+        assert(await panel.locator('.business-attachment-panel__compact-summary').isDisabled())
+        assert.equal(await panel.locator('.business-attachment-panel__compact-summary').getAttribute('aria-expanded'), 'true')
         await assertSettled()
         await panel
           .getByRole('button', { name: '重试加载', exact: true })
@@ -912,5 +993,10 @@ export function createBusinessAttachmentScenarios({
       }
     },
   }
-  return [...managerScenarios, formBusyScenario, ownerLifecycleScenario]
+  return [
+    ...managerScenarios,
+    formBusyScenario,
+    { ...formBusyScenario, name: 'business-attachment-form-busy-dark', themeMode: 'dark' },
+    ownerLifecycleScenario,
+  ]
 }

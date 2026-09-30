@@ -18,6 +18,14 @@
   padding: 0;
 }
 
+.business-attachment-panel--compact {
+  padding: 0;
+}
+
+.business-attachment-panel--compact > .business-attachment-panel__content {
+  padding: 0 12px 12px;
+}
+
 .business-attachment-panel__header {
   display: grid;
   gap: 4px;
@@ -26,15 +34,51 @@
 
 .business-attachment-panel__compact-summary {
   display: flex;
+  box-sizing: border-box;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   font-size: 13px;
+  line-height: 1.6;
+  text-align: start;
+  cursor: pointer;
 }
 
-.business-attachment-panel__compact-summary:has(+ div:not([hidden])) {
-  margin-bottom: 12px;
+.business-attachment-panel__compact-summary:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: -2px;
+}
+
+.business-attachment-panel__compact-summary:disabled {
+  cursor: default;
+}
+
+.business-attachment-panel__compact-summary:not(:disabled):hover {
+  background: var(--erp-surface-bg-muted);
+}
+
+.business-attachment-panel__compact-copy {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.business-attachment-panel__compact-action {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 6px;
+  color: var(--erp-text-subtle);
+  white-space: nowrap;
 }
 
 .business-attachment-panel__header .ant-typography {
@@ -45,8 +89,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 8px;
+}
+
+.business-attachment-panel__toolbar > .erp-sliding-segmented {
+  min-width: 0;
+}
+
+.business-attachment-panel__refresh {
+  flex-shrink: 0;
+  margin-inline-start: auto;
 }
 
 .business-attachment-panel__dropzone {
@@ -61,21 +113,29 @@
   border-radius: 10px;
   background: var(--erp-surface-bg-muted);
   color: var(--erp-text);
-  cursor: pointer;
+  text-align: center;
 }
 
-.business-attachment-panel__dropzone > .anticon {
-  color: var(--erp-primary);
-  font-size: 20px;
+.business-attachment-panel__upload-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
 }
 
-.business-attachment-panel__dropzone > span:last-child {
+.business-attachment-panel__drop-hint,
+.business-attachment-panel__upload-limit,
+.business-attachment-panel__mobile-hint {
   color: var(--erp-text-subtle);
   font-size: 12px;
 }
 
-.business-attachment-panel__dropzone:disabled {
-  cursor: not-allowed;
+.business-attachment-panel__mobile-hint {
+  display: none;
+}
+
+.business-attachment-panel__dropzone[aria-disabled='true'] {
   opacity: 0.65;
 }
 
@@ -143,13 +203,11 @@
   cursor: pointer;
 }
 
-.business-attachment-panel__dropzone:focus-visible,
 .business-attachment-panel__file-name:focus-visible {
   outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
 }
 
-.business-attachment-panel__dropzone:not(:disabled):hover,
 .business-attachment-panel__dropzone--active {
   border-color: var(--erp-primary);
   background: var(--erp-primary-softer);
@@ -280,8 +338,40 @@
     grid-column: 2;
   }
 
-  .business-attachment-panel__toolbar > .ant-space {
-    margin-inline-start: auto;
+  .business-attachment-panel__toolbar > .erp-sliding-segmented {
+    flex: 1;
+  }
+
+  .business-attachment-panel__toolbar .ant-segmented-group {
+    width: 100%;
+  }
+
+  .business-attachment-panel__toolbar .ant-segmented-item {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .business-attachment-panel__toolbar .ant-segmented-item-label {
+    min-width: 0;
+    padding-inline: 6px;
+  }
+
+  .business-attachment-panel__refresh,
+  .business-attachment-panel__upload-actions > .ant-btn {
+    min-height: 44px;
+  }
+
+  .business-attachment-panel__dropzone {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .business-attachment-panel__drop-hint {
+    display: none;
+  }
+
+  .business-attachment-panel__mobile-hint {
+    display: block;
   }
 
   .business-attachment-panel__status {
