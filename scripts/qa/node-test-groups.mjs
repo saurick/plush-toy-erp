@@ -114,6 +114,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/local-migration-workflow.test.mjs",
     "scripts/local-migration.test.mjs",
     "scripts/local-runtime-bundle.test.mjs",
+    "scripts/local-runtime-console.test.mjs",
     "scripts/local-runtime-preflight.test.mjs",
     "scripts/local-runtime-rehearsal.test.mjs",
     "scripts/local-runtime-start.test.mjs",
