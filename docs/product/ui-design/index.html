@@ -1212,8 +1212,11 @@
     .rm-progress-copy { margin-top: 6px; color: var(--text-3); font-size: 12px; line-height: 1.45; }
     .rm-progress-stage { margin-top: 9px; display: flex; justify-content: space-between; color: var(--text-2); font-size: 12px; }
     .rm-progress-card .progress-bar { margin-top: 7px; }
-    .rm-progress-task { margin-top: 10px; padding-top: 9px; display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--line); color: var(--brand-strong); font-size: 12px; }
-    .rm-progress-task span { flex: 1; }
+    .rm-progress-card .rm-progress-task { min-height: 44px; margin-top: 10px; padding-top: 9px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--line); color: var(--brand-strong); font-size: 12px; }
+    .rm-progress-task > span { flex: 1; min-width: 0; display: grid; gap: 3px; overflow-wrap: anywhere; }
+    .rm-progress-task strong { font-size: 13px; font-weight: 600; }
+    .rm-progress-task small, .rm-progress-card .rm-progress-task.empty { color: var(--text-3); }
+    .rm-progress-task svg { flex-shrink: 0; }
     .rm-stage-track { margin-top: 12px; display: grid; gap: 10px; }
     .rm-stage-track-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 38px; gap: 8px; align-items: center; font-size: 12px; }
     .rm-stage-track-row .progress-bar { margin: 0; }
@@ -2577,6 +2580,16 @@
         facts: [['销售订单','SO-20260923-011'],['申请岗位','包装'],['申请数量','24 片'],['退回原因','缺少标签版次']],
         history: [['申请已退回','昨天 16:42 · 仓库主管'],['补打申请已提交','昨天 16:30 · 包装']],
         receipt: { outcome: 'confirmed', action: '退回上游', feedback: '请补充标签版次后重新提交。', status: '已退回' }
+      },
+      {
+        id: 'M12', status: 'todo', order: 12, title: '确认本厂或外发安排', source: 'MO-20260922-026', object: '乐园限定挂件 · 手工组装', role: '生产', deadline: '截止 今天 15:00', state: '待处理', badge: 'info', access: 'actionable', actions: ['done','blocked'], attachments: 0,
+        facts: [['生产订单','MO-20260922-026'],['当前工序','手工组装']],
+        history: [['任务进入生产岗位','今天 10:24']]
+      },
+      {
+        id: 'M13', status: 'todo', order: 13, title: '核对包装资料', source: 'MO-20260922-026', object: '乐园限定挂件 · 包装', role: '生产', deadline: '截止 明天 10:00', state: '待处理', badge: 'info', access: 'actionable', actions: ['done','blocked'], attachments: 0,
+        facts: [['生产订单','MO-20260922-026'],['待核对','包装说明与标签']],
+        history: [['任务进入生产岗位','今天 10:30']]
       }
     ];
 
@@ -2844,10 +2857,10 @@
     ];
 
     const mobileProgressRows = [
-      { id: 'MP01', view: 'orders', no: 'SO-20260924-006', customer: '星河文创有限公司', product: 'IP 联名公仔 · 18cm', due: '2026/10/03', status: '生产中', badge: 'warning', percent: 58, stage: '车缝进行中', quantity: '696 / 1,200 个', task: 'PMC · 1 项待处理', risk: 'due', stages: [['工程',100],['采购',84],['生产',58],['质检',20],['出货',0]] },
-      { id: 'MP02', view: 'orders', no: 'SO-20260922-003', customer: '云杉品牌管理有限公司', product: '品牌吉祥物 30cm', due: '2026/09/30', status: '已逾期', badge: 'danger', percent: 36, stage: '客供图阻塞', quantity: '720 / 2,000 个', task: '销售 · 客供图待确认', risk: 'overdue', stages: [['工程',70],['采购',52],['生产',36],['质检',0],['出货',0]] },
-      { id: 'MP03', view: 'production', no: 'MO-20260922-026', customer: '北辰乐园运营有限公司', product: '乐园限定挂件', due: '2026/10/18', status: '生产执行', badge: 'info', percent: 72, stage: '手工组装', quantity: '2,304 / 3,200 个', task: '生产 · 2 项待处理', risk: 'normal', stages: [['布料加工',100],['车缝',100],['手工',72],['包装',18]] },
-      { id: 'MP04', view: 'orders', no: 'SO-20260918-015', customer: '拾光零售有限公司', product: '冬日动物系列', due: '2026/09/28', status: '待出货', badge: 'warning', percent: 94, stage: '等待出货放行', quantity: '1,128 / 1,200 个', task: '仓库 · 截止明天 10:00', risk: 'due', stages: [['工程',100],['采购',100],['生产',100],['质检',100],['出货',94]] }
+      { id: 'MP01', view: 'orders', no: 'SO-20260924-006', customer: '星河文创有限公司', product: 'IP 联名公仔 · 18cm', due: '2026/10/03', status: '生产中', badge: 'warning', percent: 58, stage: '车缝进行中', quantity: '696 / 1,200 个', task: '暂无待处理任务', taskIds: [], risk: 'due', stages: [['工程',100],['采购',84],['生产',58],['质检',20],['出货',0]] },
+      { id: 'MP02', view: 'orders', no: 'SO-20260922-003', customer: '云杉品牌管理有限公司', product: '品牌吉祥物 30cm', due: '2026/09/30', status: '已逾期', badge: 'danger', percent: 36, stage: '客供图阻塞', quantity: '720 / 2,000 个', task: '销售 · 跟进客供包装到仓', taskIds: ['M04'], risk: 'overdue', stages: [['工程',70],['采购',52],['生产',36],['质检',0],['出货',0]] },
+      { id: 'MP03', view: 'production', no: 'MO-20260922-026', customer: '北辰乐园运营有限公司', product: '乐园限定挂件', due: '2026/10/18', status: '生产执行', badge: 'info', percent: 72, stage: '手工组装', quantity: '2,304 / 3,200 个', task: '生产 · 2 项待处理', taskIds: ['M12','M13'], risk: 'normal', stages: [['布料加工',100],['车缝',100],['手工',72],['包装',18]] },
+      { id: 'MP04', view: 'orders', no: 'SO-20260918-015', customer: '拾光零售有限公司', product: '冬日动物系列', due: '2026/09/28', status: '待出货', badge: 'warning', percent: 94, stage: '等待出货放行', quantity: '1,128 / 1,200 个', task: '仓库 · 完成出货放行复核', taskIds: ['M01'], risk: 'due', stages: [['工程',100],['采购',100],['生产',100],['质检',100],['出货',94]] }
     ];
 
     const productionRouteStages = [['10','布料加工'],['20','车缝'],['30','手工'],['40','包装']];
@@ -7276,6 +7289,18 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="rm-popover-layer" data-action="mobile-options-bg"><section class="rm-filter-popover" style="top:104px" role="dialog" aria-modal="false" aria-label="进度筛选"><div class="rm-sheet-head"><strong>更多进度筛选</strong><button class="rm-icon-button" data-action="mobile-options-close" aria-label="关闭">${icon('close')}</button></div><div class="rm-sheet-group"><span>记录范围</span><div class="rm-sheet-options">${[['active','在执行'],['all','全部'],['ended','已结束']].map(([key,label])=>`<button class="${state.mobileProgressScope===key?'active':''}" data-action="mobile-progress-scope" data-value="${key}">${label}</button>`).join('')}</div></div><div class="rm-sheet-group"><span>其他关注</span><div class="rm-sheet-options"><button class="${state.mobileProgressRisk==='all'?'active':''}" data-action="mobile-progress-risk" data-value="all">不限</button><button class="${state.mobileProgressRisk==='undated'?'active':''}" data-action="mobile-progress-risk" data-value="undated">未定交期</button></div></div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-progress-reset">重置筛选</button></div></section></div>`;
     }
 
+    function getMobileProgressTasks(row) {
+      return (row.taskIds || []).map(id => mobileTasks.find(task => task.id === id)).filter(task => task && task.status !== 'done');
+    }
+
+    function renderMobileProgressTaskEntry(row) {
+      const tasks = getMobileProgressTasks(row);
+      if (!tasks.length) return '<div class="rm-progress-task empty">暂无待处理任务</div>';
+      const title = tasks.length === 1 ? `任务：${tasks[0].title}` : `${tasks.length} 项待处理`;
+      const detail = tasks.length === 1 ? `${tasks[0].role}待领取` : `首要：${tasks[0].title} · ${tasks[0].role}待领取`;
+      return `<button class="rm-progress-task" data-action="mobile-progress-tasks" data-id="${row.id}"><span><strong>${escapeHTML(title)}</strong><small>${escapeHTML(detail)}</small></span>${icon('chevron')}</button>`;
+    }
+
     function renderMobileProgress() {
       const rows = getMobileProgressRows();
       const viewRows = mobileProgressRows.filter(row => state.mobileProgressView === 'production' ? row.no.startsWith('MO-') : !row.no.startsWith('MO-'));
@@ -7286,11 +7311,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         blocked: viewRows.filter(row => row.stage.includes('阻塞')).length
       };
       const optionCount = Number(state.mobileProgressScope !== 'active') + Number(state.mobileProgressRisk === 'undated');
-      return `<div class="role-mobile-screen"><div class="rm-scroll" id="mobile-task-scroll"><div class="rm-progress-controls"><div class="rm-inline-segment"><button class="${state.mobileProgressView==='orders'?'active':''}" data-action="mobile-progress-view" data-value="orders">订单交付</button><button class="${state.mobileProgressView==='production'?'active':''}" data-action="mobile-progress-view" data-value="production">生产执行</button></div><div class="rm-query" style="padding:0"><label class="rm-search">${icon('search')}<input id="mobile-progress-search" value="${escapeHTML(state.mobileProgressSearch)}" placeholder="单号、客户、产品、负责人" /></label><button class="rm-filter-button ${optionCount?'active':''}" data-action="mobile-options">${icon('filter')}筛选${optionCount?`<span class="rm-filter-count">${optionCount}</span>`:''}</button></div></div><div class="rm-quick-filters" role="group" aria-label="进度快捷筛选">${[['all','全部'],['overdue','已逾期'],['due','7天内'],['blocked','任务受阻']].map(([key,label])=>`<button class="rm-chip ${state.mobileProgressRisk===key?'active':''}" data-action="mobile-progress-risk" data-value="${key}">${label}<b>${quickCounts[key]}</b></button>`).join('')}</div><section class="rm-progress-list">${rows.length?rows.map(row=>`<article class="rm-progress-card"><button data-action="mobile-progress-open" data-id="${row.id}"><div class="rm-progress-head"><strong>${row.no}</strong><span class="badge ${row.badge}">${row.status}</span>${icon('chevron')}</div><div class="rm-progress-copy">${row.product}<br>${row.customer} · ${row.due} ${state.mobileProgressView==='orders'?'交付':'计划结束'}</div><div class="rm-progress-stage"><span>${row.stage}</span><strong>${row.quantity}</strong></div><div class="progress-bar" role="progressbar" aria-valuenow="${row.percent}"><i style="width:${row.percent}%"></i></div></button><div class="rm-progress-task"><span>${row.task}</span>${icon('chevron')}</div></article>`).join(''):'<div class="rm-empty"><div><strong>没有符合条件的进度记录</strong><span>调整搜索或筛选条件后重试</span></div></div>'}</section></div>${renderMobileBottomNav()}${state.mobileOptionsOpen?renderMobileProgressOptions():''}</div>`;
+      return `<div class="role-mobile-screen"><div class="rm-scroll" id="mobile-task-scroll"><div class="rm-progress-controls"><div class="rm-inline-segment"><button class="${state.mobileProgressView==='orders'?'active':''}" data-action="mobile-progress-view" data-value="orders">订单交付</button><button class="${state.mobileProgressView==='production'?'active':''}" data-action="mobile-progress-view" data-value="production">生产执行</button></div><div class="rm-query" style="padding:0"><label class="rm-search">${icon('search')}<input id="mobile-progress-search" value="${escapeHTML(state.mobileProgressSearch)}" placeholder="单号、客户、产品、负责人" /></label><button class="rm-filter-button ${optionCount?'active':''}" data-action="mobile-options">${icon('filter')}筛选${optionCount?`<span class="rm-filter-count">${optionCount}</span>`:''}</button></div></div><div class="rm-quick-filters" role="group" aria-label="进度快捷筛选">${[['all','全部'],['overdue','已逾期'],['due','7天内'],['blocked','任务受阻']].map(([key,label])=>`<button class="rm-chip ${state.mobileProgressRisk===key?'active':''}" data-action="mobile-progress-risk" data-value="${key}">${label}<b>${quickCounts[key]}</b></button>`).join('')}</div><section class="rm-progress-list">${rows.length?rows.map(row=>`<article class="rm-progress-card"><button data-action="mobile-progress-open" data-id="${row.id}"><div class="rm-progress-head"><strong>${row.no}</strong><span class="badge ${row.badge}">${row.status}</span>${icon('chevron')}</div><div class="rm-progress-copy">${row.product}<br>${row.customer} · ${row.due} ${state.mobileProgressView==='orders'?'交付':'计划结束'}</div><div class="rm-progress-stage"><span>${row.stage}</span><strong>${row.quantity}</strong></div><div class="progress-bar" role="progressbar" aria-valuenow="${row.percent}"><i style="width:${row.percent}%"></i></div></button>${renderMobileProgressTaskEntry(row)}</article>`).join(''):'<div class="rm-empty"><div><strong>没有符合条件的进度记录</strong><span>调整搜索或筛选条件后重试</span></div></div>'}</section></div>${renderMobileBottomNav()}${state.mobileOptionsOpen?renderMobileProgressOptions():''}</div>`;
     }
 
     function renderMobileProgressDetail() {
       const row = mobileProgressRows.find(item => item.id === state.mobileProgressId) || mobileProgressRows[0];
+      const tasks = getMobileProgressTasks(row);
       const groups = [
         {
           key: 'products',
@@ -7307,13 +7333,13 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         {
           key: 'tasks',
           label: '关联任务',
-          summary: '1 项',
-          content: `<div class="rm-business-detail-record"><strong>${escapeHTML(row.task)}</strong><small>仅显示当前岗位可见任务</small><button class="btn" data-action="mobile-open-linked-task" data-id="${row.id==='MP02'?'M04':'M01'}">查看任务</button></div>`
+          summary: `${tasks.length} 项`,
+          content: tasks.map(task => `<div class="rm-business-detail-record"><strong>${escapeHTML(task.title)}</strong><small>${escapeHTML(task.role)} · 仅显示当前岗位可见任务</small><button class="btn" data-action="mobile-open-linked-task" data-id="${task.id}">查看任务</button></div>`).join('')
         }
-      ];
+      ].filter(group => group.key !== 'tasks' || tasks.length);
       const activeGroup = groups.find(group => group.key === state.mobileProgressDetailGroup) || groups[0];
       const detailGroups = groups.map(group => `<div class="rm-business-detail-group"><button class="rm-business-detail-trigger ${group.key === activeGroup.key ? 'active' : ''}" data-action="mobile-progress-detail-group" data-value="${group.key}" aria-expanded="${group.key === activeGroup.key}"><strong>${group.label}</strong><span>${group.summary}</span>${icon('chevron')}</button>${group.key === activeGroup.key ? `<div class="rm-business-detail-body">${group.content}</div>` : ''}</div>`).join('');
-      return `<div class="role-mobile-screen"><header class="rm-flow-head"><div class="rm-flow-topbar"><button class="rm-back" data-action="mobile-progress-back" aria-label="返回">${icon('left')}</button><h1 class="rm-flow-title">进度详情</h1><span class="badge ${row.badge} rm-flow-status">${row.status}</span></div></header><main class="rm-flow-scroll"><section class="rm-section"><h2>${row.no}</h2><div class="rm-identity">${row.customer} · ${row.product}</div><dl class="rm-facts"><div class="rm-fact"><dt>计划日期</dt><dd>${row.due}</dd></div><div class="rm-fact"><dt>当前阶段</dt><dd>${row.stage}</dd></div><div class="rm-fact"><dt>完成进度</dt><dd>${row.percent}% · ${row.quantity}</dd></div><div class="rm-fact"><dt>当前关注</dt><dd>${row.task}</dd></div></dl></section><section class="rm-section"><h3>阶段进度</h3><div class="rm-stage-track">${row.stages.map(([label,value])=>`<div class="rm-stage-track-row"><span>${label}</span><div class="progress-bar"><i style="width:${value}%"></i></div><strong>${value}%</strong></div>`).join('')}</div></section><section class="rm-section"><h3>最近记录</h3><div class="rm-timeline"><div class="rm-timeline-item"><strong>${row.stage}</strong><small>今天 10:24 · 系统汇总</small></div><div class="rm-timeline-item"><strong>上游阶段已交接</strong><small>昨天 16:40 · 责任岗位</small></div></div></section><button class="rm-business-detail-toggle" data-action="mobile-progress-details-toggle" aria-expanded="${state.mobileProgressDetailsOpen}"><span>${state.mobileProgressDetailsOpen ? '收起业务明细' : '查看业务明细'}</span>${icon('chevron')}</button>${state.mobileProgressDetailsOpen ? `<section class="rm-section rm-business-details" aria-label="业务明细"><div class="rm-business-detail-groups">${detailGroups}</div></section>` : ''}</main><footer class="rm-action-bar"><button class="btn" data-action="mobile-progress-back">返回进度</button><button class="btn primary" data-action="mobile-open-linked-task" data-id="${row.id==='MP02'?'M04':'M01'}">查看关联任务</button></footer></div>`;
+      return `<div class="role-mobile-screen"><header class="rm-flow-head"><div class="rm-flow-topbar"><button class="rm-back" data-action="mobile-progress-back" aria-label="返回">${icon('left')}</button><h1 class="rm-flow-title">进度详情</h1><span class="badge ${row.badge} rm-flow-status">${row.status}</span></div></header><main class="rm-flow-scroll"><section class="rm-section"><h2>${row.no}</h2><div class="rm-identity">${row.customer} · ${row.product}</div><dl class="rm-facts"><div class="rm-fact"><dt>计划日期</dt><dd>${row.due}</dd></div><div class="rm-fact"><dt>当前阶段</dt><dd>${row.stage}</dd></div><div class="rm-fact"><dt>完成进度</dt><dd>${row.percent}% · ${row.quantity}</dd></div><div class="rm-fact"><dt>当前关注</dt><dd>${row.task}</dd></div></dl></section><section class="rm-section"><h3>阶段进度</h3><div class="rm-stage-track">${row.stages.map(([label,value])=>`<div class="rm-stage-track-row"><span>${label}</span><div class="progress-bar"><i style="width:${value}%"></i></div><strong>${value}%</strong></div>`).join('')}</div></section><section class="rm-section"><h3>最近记录</h3><div class="rm-timeline"><div class="rm-timeline-item"><strong>${row.stage}</strong><small>今天 10:24 · 系统汇总</small></div><div class="rm-timeline-item"><strong>上游阶段已交接</strong><small>昨天 16:40 · 责任岗位</small></div></div></section><button class="rm-business-detail-toggle" data-action="mobile-progress-details-toggle" aria-expanded="${state.mobileProgressDetailsOpen}"><span>${state.mobileProgressDetailsOpen ? '收起业务明细' : '查看业务明细'}</span>${icon('chevron')}</button>${state.mobileProgressDetailsOpen ? `<section class="rm-section rm-business-details" aria-label="业务明细"><div class="rm-business-detail-groups">${detailGroups}</div></section>` : ''}</main><footer class="rm-action-bar"><button class="btn" data-action="mobile-progress-back">返回进度</button>${tasks.length ? '<button class="btn primary" data-action="mobile-progress-show-tasks">查看关联任务</button>' : ''}</footer></div>`;
     }
 
     function renderMobileTaskPreview() {
@@ -8285,7 +8311,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function returnToMobileList() {
-      state.mobileScreen = 'list';
+      state.mobileScreen = state.mobileMain === 'progress' && state.mobileProgressId ? 'progress-detail' : 'list';
       state.mobileTaskId = null;
       state.mobileReason = '';
       state.mobileError = '';
@@ -8368,12 +8394,23 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'mobile-progress-scope') { state.mobileProgressScope = target.dataset.value; renderView(); }
       else if (action === 'mobile-progress-reset') { state.mobileProgressScope = 'active'; state.mobileProgressRisk = 'all'; renderView(); }
       else if (action === 'mobile-progress-open') { state.mobileProgressId = target.dataset.id; state.mobileProgressDetailsOpen = false; state.mobileProgressDetailGroup = 'products'; state.mobileScreen = 'progress-detail'; renderView(); }
-      else if (action === 'mobile-progress-back') { state.mobileScreen = 'list'; state.mobileProgressId = null; state.mobileProgressDetailsOpen = false; renderView(); }
+      else if (action === 'mobile-progress-back') { state.mobileProgressId = null; state.mobileProgressDetailsOpen = false; returnToMobileList(); }
+      else if (action === 'mobile-progress-tasks') {
+        const row = mobileProgressRows.find(item => item.id === target.dataset.id);
+        const tasks = row ? getMobileProgressTasks(row) : [];
+        if (!tasks.length) return;
+        state.mobileScrollTop = document.querySelector('#mobile-task-scroll')?.scrollTop || 0;
+        state.mobileReason = ''; state.mobileError = ''; state.mobileReceipt = null;
+        if (tasks.length === 1) { state.mobileProgressId = null; state.mobileTaskId = tasks[0].id; state.mobileScreen = 'detail'; state.mobileAction = tasks[0].actions?.[0] || 'done'; }
+        else { state.mobileProgressId = row.id; state.mobileProgressDetailsOpen = true; state.mobileProgressDetailGroup = 'tasks'; state.mobileScreen = 'progress-detail'; }
+        renderView();
+      }
+      else if (action === 'mobile-progress-show-tasks') { state.mobileProgressDetailsOpen = true; state.mobileProgressDetailGroup = 'tasks'; renderView(); }
       else if (action === 'mobile-progress-details-toggle') { state.mobileProgressDetailsOpen = !state.mobileProgressDetailsOpen; renderView(); }
       else if (action === 'mobile-progress-detail-group') { state.mobileProgressDetailGroup = target.dataset.value; renderView(); }
       else if (action === 'mobile-open-production-progress') { state.mobileProgressId = 'MP03'; state.mobileProgressDetailsOpen = false; state.mobileProgressDetailGroup = 'products'; renderView(); }
       else if (action === 'mobile-open-linked-task') {
-        state.mobileMain = 'tasks'; state.mobileTaskId = target.dataset.id; state.mobileScreen = 'detail'; state.mobileAction = getMobileTask()?.actions?.[0] || 'done'; renderView();
+        state.mobileTaskId = target.dataset.id; state.mobileScreen = 'detail'; state.mobileAction = getMobileTask()?.actions?.[0] || 'done'; state.mobileReason = ''; state.mobileError = ''; state.mobileReceipt = null; renderView();
       }
       else if (action === 'mobile-theme-mode') { state.mode = target.dataset.value; localStorage.setItem('erp-prototype-v8-mode', state.mode); applyTheme(); renderAll(); }
       else if (action === 'mobile-password') { state.infoModal = { title: '修改密码', html: '<div class="field"><label>当前密码</label><input type="password" /></div><div class="field" style="margin-top:12px"><label>新密码</label><input type="password" /></div><div class="field" style="margin-top:12px"><label>确认新密码</label><input type="password" /></div><p class="data-note">保存后其他登录会话按系统安全规则处理。</p>' }; state.overlay = 'info'; renderFloating(); }

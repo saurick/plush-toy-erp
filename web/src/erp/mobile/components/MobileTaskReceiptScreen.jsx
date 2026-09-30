@@ -68,6 +68,7 @@ function resolveReceiptAction({ action, outcome, task }) {
 
 export default function MobileTaskReceiptScreen({
   action = null,
+  backLabel = null,
   busy = false,
   evidenceRefs = [],
   feedback = '',
@@ -149,7 +150,7 @@ export default function MobileTaskReceiptScreen({
       data-testid="mobile-task-receipt-screen"
     >
       <MobileTaskFlowHeader
-        backLabel="返回任务列表"
+        backLabel={backLabel || '返回任务列表'}
         busy={busy}
         canOpenProcess={typeof onOpenProcess === 'function'}
         canOpenReceipt
@@ -320,7 +321,7 @@ export default function MobileTaskReceiptScreen({
           disabled={busy}
           onClick={onBackToList}
         >
-          {confirmed ? '返回任务列表' : '返回列表'}
+          {backLabel || (confirmed ? '返回任务列表' : '返回列表')}
         </button>
         {canReload ? (
           <button

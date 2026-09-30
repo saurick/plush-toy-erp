@@ -2040,6 +2040,13 @@ export default function MobileRoleTasksPage() {
     actionReceipt,
   ])
 
+  const taskDetailBackLabel =
+    activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
+      ? window.history.state?.mobileProgress?.selection
+        ? '返回进度详情'
+        : '返回进度'
+      : '返回任务列表'
+
   if (
     activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
     selectedTaskID &&
@@ -2052,7 +2059,7 @@ export default function MobileRoleTasksPage() {
         aria-label="关联任务"
       >
         <button type="button" onClick={handleDetailBack}>
-          返回进度详情
+          {taskDetailBackLabel}
         </button>
         <p role={linkedTask?.error ? 'alert' : 'status'}>
           {linkedTask?.error || '正在读取关联任务…'}
@@ -2073,6 +2080,11 @@ export default function MobileRoleTasksPage() {
     return (
       <MobileTaskReceiptScreen
         action={actionReceipt.action}
+        backLabel={
+          activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
+            ? taskDetailBackLabel
+            : null
+        }
         busy={actionBusy}
         evidenceRefs={actionReceipt.evidence_refs}
         feedback={actionReceipt.feedback}
@@ -2166,6 +2178,7 @@ export default function MobileRoleTasksPage() {
     const receiptSnapshotOnly = Boolean(receiptDetailTask && !selectedTask)
     return (
       <MobileTaskDetailScreen
+        backLabel={taskDetailBackLabel}
         actionAccess={
           receiptSnapshotOnly
             ? {

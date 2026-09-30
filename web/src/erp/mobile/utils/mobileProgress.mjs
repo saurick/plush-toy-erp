@@ -1,6 +1,7 @@
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { canMountCustomerRuntime } from '../../utils/adminProfileSync.mjs'
 import { progressQueryFromURL } from '../../utils/businessProgress.mjs'
+import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 
 export function mobileProgressAccess(profile) {
   const allowed = (key) => hasActionPermission(profile, key)
@@ -54,13 +55,26 @@ export function readMobileProgressState(history, scope, defaultView) {
   }
 }
 
-export function mobileProgressTaskOwner(row, roleLabel) {
-  if (!row.open_tasks) return '暂无待处理任务'
-  if (row.open_tasks > 1) return `${row.open_tasks} 项待处理 · 查看关联任务`
-  return (
-    row.attention_owner ||
-    (row.attention_role
-      ? `${roleLabel(row.attention_role)}待领取`
-      : '待分配处理岗位')
-  )
+export function mobileProgressTaskSummary(row, roleLabel) {
+  if (!row.open_tasks) {
+    return { title: '暂无待处理任务', detail: '', taskID: null }
+  }
+  const taskName = getWorkflowTaskDisplayName({ task_name: row.attention_task })
+  const role = row.attention_role ? roleLabel(row.attention_role) : ''
+  const owner = row.attention_owner
+    ? [role, row.attention_owner].filter(Boolean).join(' · ')
+    : role
+      ? `${role}待领取`
+      : '待分配处理岗位'
+  const singleTask = row.open_tasks === 1
+  return {
+    title: singleTask ? `任务：${taskName}` : `${row.open_tasks} 项待处理`,
+    detail: singleTask ? owner : `首要：${taskName} · ${owner}`,
+    taskID:
+      singleTask &&
+      Number.isSafeInteger(row.attention_task_id) &&
+      row.attention_task_id > 0
+        ? row.attention_task_id
+        : null,
+  }
 }

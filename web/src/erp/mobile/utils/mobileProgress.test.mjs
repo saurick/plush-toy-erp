@@ -4,7 +4,7 @@ import {
   mobileProgressAccess,
   mobileProgressDefaultView,
   readMobileProgressState,
-  mobileProgressTaskOwner,
+  mobileProgressTaskSummary,
 } from './mobileProgress.mjs'
 
 const permissions = [
@@ -114,19 +114,59 @@ test('返回和刷新恢复查询与选择，账号、权限或岗位改变不�
     assert.equal(result.scrollTop, 0)
   }
 })
-test('并行任务不虚构唯一处理人，未领取展示责任岗位', () => {
-  assert.equal(
-    mobileProgressTaskOwner(
-      { open_tasks: 2, attention_owner: '甲' },
+test('单任务展示岗位名称并仅用精确关联 ID 直达详情', () => {
+  assert.deepEqual(
+    mobileProgressTaskSummary(
+      {
+        open_tasks: 1,
+        attention_task: 'engineering_data',
+        attention_task_id: 101,
+        attention_role: 'purchase',
+        attention_owner: '甲',
+      },
       () => '采购岗'
     ),
-    '2 项待处理 · 查看关联任务'
+    { title: '任务：工程资料', detail: '采购岗 · 甲', taskID: 101 }
   )
-  assert.equal(
-    mobileProgressTaskOwner(
-      { open_tasks: 1, attention_role: 'purchase' },
+  for (const taskID of [undefined, 0, -1, '101', 1.5]) {
+    assert.equal(
+      mobileProgressTaskSummary(
+        { open_tasks: 1, attention_task_id: taskID },
+        () => '采购岗'
+      ).taskID,
+      null
+    )
+  }
+})
+test('多任务展示首要事项和责任，仍由关联任务列表选择', () => {
+  assert.deepEqual(
+    mobileProgressTaskSummary(
+      {
+        open_tasks: 2,
+        attention_task: '确认面料交期',
+        attention_task_id: 100,
+        attention_role: 'purchase',
+      },
       () => '采购岗'
     ),
-    '采购岗待领取'
+    {
+      title: '2 项待处理',
+      detail: '首要：确认面料交期 · 采购岗待领取',
+      taskID: null,
+    }
+  )
+})
+test('已无待办时不残留上一任务名称或直达 ID', () => {
+  assert.deepEqual(
+    mobileProgressTaskSummary(
+      {
+        open_tasks: 0,
+        attention_task: '确认面料交期',
+        attention_task_id: 100,
+        attention_owner: '甲',
+      },
+      () => '采购岗'
+    ),
+    { title: '暂无待处理任务', detail: '', taskID: null }
   )
 })

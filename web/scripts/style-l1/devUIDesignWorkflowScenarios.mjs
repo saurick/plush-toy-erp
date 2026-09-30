@@ -56,6 +56,47 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
       },
     },
     {
+      name: 'dev-ui-design-mobile-progress-task-entry',
+      path: '/__dev/ui-design',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const frame = await open(page)
+        await frame.locator('[data-action="open-mobile-tasks"]').click()
+        await page.setViewportSize({ width: 390, height: 844 })
+        await frame.locator('[data-action="mobile-main"][data-value="progress"]').click()
+        const emptyEntry = frame.locator('.rm-progress-task.empty')
+        assert.equal(await emptyEntry.innerText(), '暂无待处理任务')
+        assert.equal(await emptyEntry.locator('button, svg').count(), 0)
+        assert.equal(await emptyEntry.evaluate((node) => node.tagName), 'DIV')
+        const single = frame.locator('[data-action="mobile-progress-tasks"][data-id="MP02"]')
+        assert.match(await single.innerText(), /任务：跟进客供包装到仓/)
+        await frame.locator('#mobile-progress-search').fill('品牌吉祥物')
+        await single.click()
+        await frame.getByRole('heading', { name: '跟进客供包装到仓', exact: true }).waitFor()
+        assert.equal(await frame.locator('.rm-business-details').count(), 0)
+        await frame.locator('[data-action="mobile-back"]').click()
+        assert.equal(await frame.locator('#mobile-progress-search').inputValue(), '品牌吉祥物')
+        assert.equal(await frame.locator('[data-action="mobile-main"][data-value="progress"]').getAttribute('aria-current'), 'page')
+        await frame.locator('#mobile-progress-search').fill('')
+        await frame.locator('[data-action="mobile-progress-view"][data-value="production"]').click()
+        const multiple = frame.locator('[data-action="mobile-progress-tasks"][data-id="MP03"]')
+        assert.match(await multiple.innerText(), /2 项待处理.*首要：确认本厂或外发安排/s)
+        await multiple.click()
+        await frame.getByRole('heading', { name: '进度详情', exact: true }).waitFor()
+        assert.equal(await frame.locator('[data-action="mobile-progress-detail-group"][data-value="tasks"]').getAttribute('aria-expanded'), 'true')
+        const linked = frame.locator('[data-action="mobile-open-linked-task"]')
+        assert.equal(await linked.count(), 2)
+        await frame.locator('[data-action="mobile-open-linked-task"][data-id="M13"]').click()
+        await frame.getByRole('heading', { name: '核对包装资料', exact: true }).waitFor()
+        await frame.locator('[data-action="mobile-back"]').click()
+        await frame.getByRole('heading', { name: '进度详情', exact: true }).waitFor()
+        assert.equal(await linked.count(), 2)
+        await shot(page, 'ui-mobile-progress-task-entry')
+        await frame.locator('.rm-action-bar [data-action="mobile-progress-back"]').click()
+        assert.match(await multiple.innerText(), /2 项待处理/)
+      },
+    },
+    {
       name: 'dev-ui-design-mobile-task-recovery',
       path: '/__dev/ui-design',
       viewport: { width: 1440, height: 900 },

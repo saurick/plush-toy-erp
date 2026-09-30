@@ -32,7 +32,7 @@ import {
 import { getWorkflowTaskOwnerRoleLabel } from '../../utils/workflowTaskBoard.mjs'
 import {
   mobileProgressDefaultView,
-  mobileProgressTaskOwner,
+  mobileProgressTaskSummary,
   readMobileProgressState,
 } from '../utils/mobileProgress.mjs'
 import MobileTaskPullRefresh from './MobileTaskPullRefresh'
@@ -526,6 +526,8 @@ export default function MobileProgressPanel({
           >
             {data?.rows.map((row) => {
               const delivery = progressDelivery(row)
+              const taskSummary = mobileProgressTaskSummary(row, roleLabel)
+              const directTaskID = onOpenTask ? taskSummary.taskID : null
               return (
                 <article key={row.id} className="mobile-progress-card">
                   <WorkflowTaskCard
@@ -622,17 +624,36 @@ export default function MobileProgressPanel({
                       </span>
                     )}
                   </WorkflowTaskCard>
-                  {data.access.tasks && (
-                    <button
-                      type="button"
-                      className="mobile-progress-owner"
-                      aria-label={`查看 ${row.order_no} 的关联任务`}
-                      onClick={() => open(row, 'tasks')}
-                    >
-                      {mobileProgressTaskOwner(row, roleLabel)}
-                      <RightOutlined />
-                    </button>
-                  )}
+                  {data.access.tasks &&
+                    (row.open_tasks > 0 ? (
+                      <button
+                        type="button"
+                        className="mobile-progress-task-entry"
+                        aria-label={
+                          directTaskID
+                            ? `查看 ${row.order_no} 的${taskSummary.title}`
+                            : `查看 ${row.order_no} 的关联任务`
+                        }
+                        onClick={() => {
+                          if (directTaskID) {
+                            remember()
+                            onOpenTask(directTaskID)
+                          } else {
+                            open(row, 'tasks')
+                          }
+                        }}
+                      >
+                        <span className="mobile-progress-task-copy">
+                          <strong>{taskSummary.title}</strong>
+                          <span>{taskSummary.detail}</span>
+                        </span>
+                        <RightOutlined aria-hidden="true" />
+                      </button>
+                    ) : (
+                      <p className="mobile-progress-task-entry mobile-progress-task-entry--empty">
+                        {taskSummary.title}
+                      </p>
+                    ))}
                 </article>
               )
             })}

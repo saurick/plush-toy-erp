@@ -72,9 +72,12 @@ export function createMobileProgressScenarios({
     let longDetail = false
     let failRecent = false
     let sparseDetail = false
+    let failLinkedTask = false
+    let hideTaskAccess = false
     let failureCode = RpcErrorCode.INTERNAL
     let heldListResponse = null
     const calls = []
+    const workflowCalls = []
     const imageCalls = []
     const allowed = role !== 'warehouse'
     const permissions = [
@@ -138,24 +141,58 @@ export function createMobileProgressScenarios({
           payload: {},
           block_reason: '面料交期尚未确认',
         },
+        {
+          id: 101,
+          version: 1,
+          task_code: 'TASK-0101',
+          task_name: 'engineering_data',
+          task_group: 'engineering_data',
+          owner_role_key: role,
+          assignee_user_id: 1,
+          assignee_name: '模拟经办人',
+          task_status_key: 'ready',
+          source_type: role === 'pmc' ? 'production_order' : 'sales_order',
+          source_id: 2,
+          source_no: role === 'pmc' ? 'MO-0002' : 'SO-0002',
+          created_at: 1788840000,
+          payload: {},
+        },
       ],
       beforeNavigate: async (page) => {
         page.on('pageerror', (error) =>
           console.error('mobile-progress runtime error:', error.message)
         )
         calls.length = 0
+        workflowCalls.length = 0
         imageCalls.length = 0
         fail = false
         failDetail = false
         longDetail = false
         failRecent = false
         sparseDetail = false
+        failLinkedTask = false
+        hideTaskAccess = false
         failureCode = RpcErrorCode.INTERNAL
         heldListResponse = null
         await page.route('**/rpc/workflow', async (route) => {
-          const { id, method } = route.request().postDataJSON()
-          if (method !== 'list_task_events' || !failRecent)
+          const { id, method, params = {} } = route.request().postDataJSON()
+          workflowCalls.push({ method, params })
+          if (
+            method === 'get_task' &&
+            params.task_id === 101 &&
+            failLinkedTask
+          ) {
+            return route.fulfill({
+              json: {
+                jsonrpc: '2.0',
+                id,
+                result: { code: RpcErrorCode.INTERNAL, message: '读取失败' },
+              },
+            })
+          }
+          if (method !== 'list_task_events' || !failRecent) {
             return route.fallback()
+          }
           return route.fulfill({
             json: {
               jsonrpc: '2.0',
@@ -235,6 +272,32 @@ export function createMobileProgressScenarios({
           const data = progressFixtureData(params, {
             detail: method === 'get_progress',
           })
+          data.access.tasks = !hideTaskAccess
+          for (const row of method === 'get_progress'
+            ? [data.row]
+            : data.rows) {
+            if (row.id === 2) {
+              Object.assign(row, {
+                open_tasks: 1,
+                attention_task_id: 101,
+                attention_task: 'engineering_data',
+                attention_role: role,
+                attention_owner: '模拟经办人',
+              })
+            }
+            if (row.id === 4) {
+              Object.assign(row, {
+                open_tasks: 3,
+                attention_task_id: 100,
+                attention_task:
+                  '确认长名称面料及包装资料的多岗位协同交接与责任归属'.repeat(
+                    3
+                  ),
+                attention_role: 'purchase',
+                attention_owner: '模拟跨区域采购负责人',
+              })
+            }
+          }
           if (method === 'get_progress' && longDetail) {
             Object.assign(data.row, {
               product:
@@ -446,6 +509,216 @@ export function createMobileProgressScenarios({
         await page.screenshot({
           path: path.join(outputDir, `mobile-progress-${role}-overview.png`),
         })
+        const taskEntries = panel.locator('.mobile-progress-task-entry')
+        assert.equal(
+          await taskEntries.nth(0).locator('strong').textContent(),
+          '2 项待处理'
+        )
+        assert(
+          (await taskEntries.nth(0).innerText()).includes(
+            '首要：确认面料交期 · 采购待领取'
+          )
+        )
+        assert.equal(
+          await taskEntries.nth(1).locator('strong').textContent(),
+          '任务：工程资料'
+        )
+        assert((await taskEntries.nth(1).innerText()).includes('模拟经办人'))
+        const emptyEntry = taskEntries.nth(2)
+        assert.equal(await emptyEntry.textContent(), '暂无待处理任务')
+        assert.equal(await emptyEntry.evaluate((node) => node.tagName), 'P')
+        assert.equal(await emptyEntry.locator('button, .anticon').count(), 0)
+
+        const longTaskEntry = taskEntries.nth(3)
+        for (const width of [320, 430]) {
+          await page.setViewportSize({ width, height: 844 })
+          await longTaskEntry.scrollIntoViewIfNeeded()
+          const geometry = await longTaskEntry.evaluate((node) => {
+            const arrow = node.querySelector('.anticon')
+            const box = node.getBoundingClientRect()
+            const arrowBox = arrow.getBoundingClientRect()
+            return {
+              height: box.height,
+              overflow: node.scrollWidth - node.clientWidth,
+              arrowWidth: arrowBox.width,
+              right: box.right - arrowBox.right,
+            }
+          })
+          assert(
+            geometry.height >= 44 &&
+              geometry.overflow <= 1 &&
+              geometry.arrowWidth > 0 &&
+              geometry.right >= -1,
+            JSON.stringify(geometry)
+          )
+          await assertNoHorizontalOverflow(page, `${role}-task-entry-${width}`)
+          await page.screenshot({
+            path: path.join(
+              outputDir,
+              `mobile-progress-${role}-long-task-${width}.png`
+            ),
+          })
+        }
+        await page.setViewportSize({ width: 390, height: 844 })
+        await panel.getByLabel('搜索进度').fill('模拟客户')
+        await page.waitForFunction(
+          () => window.history.state?.mobileProgress?.query.q === '模拟客户'
+        )
+        const singleEntry = panel.getByRole('button', {
+          name: `查看 ${prefix}-0002 的任务：工程资料`,
+          exact: true,
+        })
+        await singleEntry.waitFor()
+        await singleEntry.scrollIntoViewIfNeeded()
+        const beforeDirect = await panel.evaluate((node) => ({
+          query: window.history.state.mobileProgress.query,
+          scrollTop: node.querySelector('.mobile-progress-scroll').scrollTop,
+        }))
+        const progressDetailCalls = calls.filter(
+          ({ method }) => method === 'get_progress'
+        ).length
+        failLinkedTask = true
+        await singleEntry.click()
+        const linkedFeedback = page.getByRole('region', {
+          name: '关联任务',
+          exact: true,
+        })
+        await linkedFeedback.getByRole('alert').waitFor()
+        await linkedFeedback
+          .getByRole('button', { name: '返回进度', exact: true })
+          .waitFor()
+        assert.equal(
+          await page.locator('.erp-progress-drawer--mobile').count(),
+          0
+        )
+        assert.equal(
+          calls.filter(({ method }) => method === 'get_progress').length,
+          progressDetailCalls
+        )
+        assert(
+          workflowCalls.some(
+            ({ method, params }) =>
+              method === 'get_task' && params.task_id === 101
+          )
+        )
+        failLinkedTask = false
+        await linkedFeedback
+          .getByRole('button', { name: '重试', exact: true })
+          .click()
+        const directTask = page.getByTestId('mobile-task-detail-screen')
+        await directTask
+          .getByRole('heading', { name: '工程资料', exact: true })
+          .waitFor()
+        await directTask
+          .getByRole('button', { name: '返回进度', exact: true })
+          .waitFor()
+        if (role === 'pmc') {
+          assert.equal(
+            await directTask
+              .getByRole('button', { name: '处理任务', exact: true })
+              .count(),
+            0
+          )
+        } else {
+          await directTask
+            .getByRole('button', { name: '处理任务', exact: true })
+            .waitFor()
+        }
+        await page.screenshot({
+          path: path.join(outputDir, `mobile-progress-${role}-direct-task.png`),
+        })
+        await directTask
+          .getByRole('button', { name: '返回进度', exact: true })
+          .click()
+        await singleEntry.waitFor()
+        await page.waitForFunction((expected) => {
+          const scroll = document.querySelector(
+            '[data-testid="mobile-progress-panel"] .mobile-progress-scroll'
+          )
+          return scroll && Math.abs(scroll.scrollTop - expected) <= 1
+        }, beforeDirect.scrollTop)
+        assert.deepEqual(
+          await page.evaluate(() => window.history.state.mobileProgress.query),
+          beforeDirect.query
+        )
+        assert.equal(
+          await page.locator('.erp-progress-drawer--mobile').count(),
+          0
+        )
+        assert.equal(
+          await panel.getByLabel('搜索进度').inputValue(),
+          '模拟客户'
+        )
+
+        await panel.getByRole('button', { name: /7天内/ }).click()
+        await singleEntry.waitFor()
+        await singleEntry.click()
+        await directTask
+          .getByRole('heading', { name: '工程资料', exact: true })
+          .waitFor()
+        if (role === 'boss') {
+          await directTask
+            .getByRole('button', { name: '处理任务', exact: true })
+            .click()
+          const directAction = page.getByTestId('mobile-task-action-screen')
+          await directAction.waitFor()
+          await directAction
+            .locator('textarea')
+            .fill('模拟核验：工程资料已经核对完成。')
+          const completed = page.waitForResponse(
+            (response) =>
+              response.url().endsWith('/rpc/workflow') &&
+              response.request().postDataJSON().method ===
+                'complete_task_action' &&
+              response.request().postDataJSON().params.task_id === 101
+          )
+          await directAction.locator('button[type="submit"]').click()
+          assert.equal((await (await completed).json()).result.code, 0)
+          const directReceipt = page.getByTestId('mobile-task-receipt-screen')
+          await directReceipt.waitFor()
+          await directReceipt
+            .getByRole('heading', { name: '任务办理已确认', exact: true })
+            .waitFor()
+          await page.screenshot({
+            path: path.join(
+              outputDir,
+              `mobile-progress-${role}-direct-receipt.png`
+            ),
+          })
+          await directReceipt
+            .locator('.mobile-role-action-bar')
+            .getByRole('button', { name: '返回进度', exact: true })
+            .click()
+        } else {
+          await page.goBack()
+        }
+        await singleEntry.waitFor()
+        assert.equal(
+          await page.evaluate(
+            () => window.history.state.mobileProgress.query.risk
+          ),
+          'due_soon'
+        )
+        assert.equal(await panel.locator('.mobile-progress-card').count(), 1)
+        hideTaskAccess = true
+        await pullToRefresh(page, panel.locator('.mobile-progress-scroll'))
+        await page.waitForFunction(
+          () =>
+            !document.querySelector(
+              '[data-testid="mobile-progress-panel"] .mobile-progress-task-entry'
+            )
+        )
+        assert.equal(
+          await panel.locator('.mobile-progress-task-entry').count(),
+          0
+        )
+        hideTaskAccess = false
+        await pullToRefresh(page, panel.locator('.mobile-progress-scroll'))
+        await singleEntry.waitFor()
+        await panel.getByRole('button', { name: /全部/ }).click()
+        await panel
+          .getByRole('button', { name: '清除搜索', exact: true })
+          .click()
         await panel
           .getByRole('button', {
             name: `查看 ${prefix}-0001 进度`,
@@ -1274,7 +1547,7 @@ export function createMobileProgressScenarios({
           })
           await receipt
             .locator('.mobile-role-action-bar')
-            .getByRole('button', { name: '返回任务列表', exact: true })
+            .getByRole('button', { name: '返回进度详情', exact: true })
             .click()
           await drawer.waitFor()
           const rereadResponse = page.waitForResponse(

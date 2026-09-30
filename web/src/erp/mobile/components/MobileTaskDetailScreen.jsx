@@ -55,6 +55,7 @@ function mobileFactValueText(value) {
 
 export default function MobileTaskDetailScreen({
   actionAccess,
+  backLabel = '返回任务列表',
   onBack,
   processingComplete = false,
   onOpenAction,
@@ -247,6 +248,7 @@ export default function MobileTaskDetailScreen({
       data-testid="mobile-task-detail-screen"
     >
       <MobileTaskFlowHeader
+        backLabel={backLabel}
         canOpenProcess={canOpenProcess}
         canOpenReceipt={canViewReceipt}
         currentStep="detail"
