@@ -920,14 +920,13 @@ function extensionPointCatalogFromPackage(config) {
   const extensionRuntimeBlockers = [
     "no_reviewed_extension_contract",
     "customer_package_handler_forbidden",
-    "registered_deployment_package_required",
   ];
 
   return {
     runtime_enabled: false,
     catalog_status:
       config.extensionPoints.length > 0 ? "contract_preview_only" : "controlled_empty",
-    implementation_source: "registered_deployment_package_required",
+    implementation_source: "not_implemented",
     handler_allowed: false,
     customer_package_handler_allowed: false,
     blocked_reasons: [...extensionRuntimeBlockers],
@@ -936,7 +935,7 @@ function extensionPointCatalogFromPackage(config) {
       label: extensionPoint.label,
       status: extensionPoint.status,
       runtime_enabled: extensionPoint.runtimeEnabled,
-      implementation_source: "registered_deployment_package_required",
+      implementation_source: "not_implemented",
       handler_allowed: false,
       customer_package_handler_allowed: false,
       blocked_reasons: [...extensionRuntimeBlockers],
@@ -1209,8 +1208,8 @@ function validateFlowAndPolicyCatalogs(manifest) {
     "extensionPointCatalog must declare contract_preview_only when extension points are bound",
   );
   assert(
-    extensionPointCatalog.implementation_source === "registered_deployment_package_required",
-    "extensionPointCatalog must require registered deployment packages for implementations",
+    extensionPointCatalog.implementation_source === "not_implemented",
+    "extensionPointCatalog must declare runtime extensions as not implemented",
   );
   assert(
     extensionPointCatalog.handler_allowed === false,
@@ -1223,8 +1222,7 @@ function validateFlowAndPolicyCatalogs(manifest) {
   assert(
     Array.isArray(extensionPointCatalog.blocked_reasons) &&
       extensionPointCatalog.blocked_reasons.includes("no_reviewed_extension_contract") &&
-      extensionPointCatalog.blocked_reasons.includes("customer_package_handler_forbidden") &&
-      extensionPointCatalog.blocked_reasons.includes("registered_deployment_package_required"),
+      extensionPointCatalog.blocked_reasons.includes("customer_package_handler_forbidden"),
     "extensionPointCatalog.blocked_reasons must explain why runtime extensions stay blocked",
   );
   for (const extensionPoint of extensionPointCatalog.extension_points) {
@@ -1232,8 +1230,8 @@ function validateFlowAndPolicyCatalogs(manifest) {
     assert(extensionPoint.handler == null, `${extensionPoint.key} must not publish executable handlers`);
     assert(extensionPoint.module == null, `${extensionPoint.key} must not publish executable modules`);
     assert(
-      extensionPoint.implementation_source === "registered_deployment_package_required",
-      `${extensionPoint.key}.implementation_source must require registered deployment packages`,
+      extensionPoint.implementation_source === "not_implemented",
+      `${extensionPoint.key}.implementation_source must declare runtime extensions as not implemented`,
     );
     assert(extensionPoint.handler_allowed === false, `${extensionPoint.key}.handler_allowed must stay false`);
     assert(
@@ -1243,8 +1241,7 @@ function validateFlowAndPolicyCatalogs(manifest) {
     assert(
       Array.isArray(extensionPoint.blocked_reasons) &&
         extensionPoint.blocked_reasons.includes("no_reviewed_extension_contract") &&
-        extensionPoint.blocked_reasons.includes("customer_package_handler_forbidden") &&
-        extensionPoint.blocked_reasons.includes("registered_deployment_package_required"),
+        extensionPoint.blocked_reasons.includes("customer_package_handler_forbidden"),
       `${extensionPoint.key}.blocked_reasons must explain why runtime extension stays blocked`,
     );
   }

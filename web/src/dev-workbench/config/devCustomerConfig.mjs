@@ -140,7 +140,8 @@ const CATALOG_STATUS_LABELS = Object.freeze({
 
 const IMPLEMENTATION_SOURCE_LABELS = Object.freeze({
   compiled_runtime_manifest: '编译清单结构预览',
-  registered_deployment_package_required: '实现来自已登记部署包',
+  declarative_preview: '仅声明式预览',
+  not_implemented: '当前未实现',
 })
 
 const RUNTIME_ENABLED_LABELS = Object.freeze({
@@ -207,14 +208,13 @@ const EXECUTION_BOUNDARY_LABELS = Object.freeze({
 const EXTENSION_RUNTIME_BLOCKERS = Object.freeze([
   'no_reviewed_extension_contract',
   'customer_package_handler_forbidden',
-  'registered_deployment_package_required',
 ])
 
 const REGISTRY_CHECK_FALLBACK_LABELS = Object.freeze({
   boundary: '配置边界',
   command: '命令绑定',
-  extension: '扩展点绑定',
-  policy: '策略绑定',
+  extension: '扩展边界',
+  policy: '策略预览',
 })
 
 export function isDevCustomerConfigEnabled(env = import.meta.env) {
@@ -428,6 +428,10 @@ function uniqueValues(values = []) {
   return [...new Set(values.filter(Boolean))]
 }
 
+function hasExecutableExtensionBinding(item = {}) {
+  return item.runtimeEnabled === true || Boolean(item.handler || item.module)
+}
+
 const FORBIDDEN_STATE_TRANSITIONS = Object.freeze([
   ['shipped', 'draft'],
   ['settled', 'submitted'],
@@ -498,10 +502,10 @@ function buildCompiledCatalogSummary(config = {}) {
       status: 'preview_only',
       runtimeEnabled: false,
       catalogStatus: 'preview_only',
-      implementationSource: 'registered_deployment_package_required',
+      implementationSource: 'declarative_preview',
       itemCount: processPolicies.length,
       summary: `${processPolicies.length} 条流程策略`,
-      note: '编译后的策略目录只允许已登记策略锚点和参数；策略实现必须来自产品核心、行业模板或已注册部署包。',
+      note: '策略目录只校验已登记的声明和参数，当前仅用于预览，不执行流程策略。',
     }),
     withCatalogLabels({
       key: 'extension-point-catalog',
@@ -509,7 +513,7 @@ function buildCompiledCatalogSummary(config = {}) {
       status: extensionCatalogStatus,
       runtimeEnabled: false,
       catalogStatus: extensionCatalogStatus,
-      implementationSource: 'registered_deployment_package_required',
+      implementationSource: 'not_implemented',
       handlerAllowed: false,
       customerPackageHandlerAllowed: false,
       blockedReasons: [...EXTENSION_RUNTIME_BLOCKERS],
@@ -517,8 +521,8 @@ function buildCompiledCatalogSummary(config = {}) {
       summary:
         extensionPoints.length > 0
           ? `${extensionPoints.length} 个扩展点合同预览`
-          : '当前无扩展点绑定',
-      note: '编译后的扩展点目录明确禁止客户包上传或启用处理器；后续实现只能来自已注册部署包。',
+          : '当前未声明扩展候选',
+      note: '当前没有运行时扩展能力；禁止客户包上传或启用处理器，新增扩展须先完成专项评审。',
     }),
   ]
 }
@@ -694,7 +698,7 @@ export function buildCustomerPackagePreviewSummary(
     (key) => !catalogCommandKeys.has(key)
   ).length
   const unregisteredExtensionBindingCount = extensionPoints.filter(
-    (item) => item.handler
+    hasExecutableExtensionBinding
   ).length
   const boundaries = [
     {
@@ -793,8 +797,8 @@ export function buildCustomerPackagePreviewSummary(
       label: item.label,
       status: item.status,
       runtimeEnabled: item.runtimeEnabled === true,
-      hasCustomerPackageHandler: Boolean(item.handler),
-      registered: !item.handler && item.runtimeEnabled !== true,
+      hasCustomerPackageHandler: Boolean(item.handler || item.module),
+      registered: !hasExecutableExtensionBinding(item),
       guardrail: item.guardrail,
     })),
     strategyRegistryChecks: processPolicies.map((item) => ({
@@ -803,14 +807,12 @@ export function buildCustomerPackagePreviewSummary(
         item.label || catalogPolicyLabels.get(item.key),
         REGISTRY_CHECK_FALLBACK_LABELS.policy
       ),
-      status: catalogPolicyKeys.has(item.key)
-        ? 'registered_binding'
-        : 'blocked',
-      implementationSource: 'registered_deployment_package_required',
+      status: catalogPolicyKeys.has(item.key) ? 'preview_only' : 'blocked',
+      implementationSource: 'declarative_preview',
       implementationSourceLabel:
-        IMPLEMENTATION_SOURCE_LABELS.registered_deployment_package_required,
+        IMPLEMENTATION_SOURCE_LABELS.declarative_preview,
       note: catalogPolicyKeys.has(item.key)
-        ? '只允许绑定已登记策略 key；策略实现不得由客户包上传。'
+        ? '声明已通过目录校验，当前仅预览；策略实现不得由客户包上传。'
         : '策略 key 未登记，必须阻断客户配置发布。',
     })),
     commandBindingChecks: workflowCommandKeys.map((key) => ({
@@ -819,12 +821,12 @@ export function buildCustomerPackagePreviewSummary(
         catalogCommandLabels.get(key),
         REGISTRY_CHECK_FALLBACK_LABELS.command
       ),
-      status: catalogCommandKeys.has(key) ? 'registered_binding' : 'blocked',
-      implementationSource: 'registered_deployment_package_required',
+      status: catalogCommandKeys.has(key) ? 'preview_only' : 'blocked',
+      implementationSource: 'declarative_preview',
       implementationSourceLabel:
-        IMPLEMENTATION_SOURCE_LABELS.registered_deployment_package_required,
+        IMPLEMENTATION_SOURCE_LABELS.declarative_preview,
       note: catalogCommandKeys.has(key)
-        ? '流程节点只绑定已登记命令锚点；运行时执行仍由部署包 / 后端处理器决定。'
+        ? '命令声明已通过目录校验；预览不执行命令，正式流程由产品核心已登记合同决定。'
         : '流程节点命令未登记，必须阻断客户配置发布。',
     })),
     extensionRegistryChecks:
@@ -835,35 +837,33 @@ export function buildCustomerPackagePreviewSummary(
               item.label,
               REGISTRY_CHECK_FALLBACK_LABELS.extension
             ),
-            status:
-              item.runtimeEnabled === true || item.handler
-                ? 'blocked'
-                : 'controlled_empty',
-            implementationSource: 'registered_deployment_package_required',
+            status: hasExecutableExtensionBinding(item)
+              ? 'blocked'
+              : 'contract_preview_only',
+            implementationSource: 'not_implemented',
             implementationSourceLabel:
-              IMPLEMENTATION_SOURCE_LABELS.registered_deployment_package_required,
+              IMPLEMENTATION_SOURCE_LABELS.not_implemented,
             handlerAllowed: false,
             handlerAllowedLabel: CUSTOMER_PACKAGE_HANDLER_FORBIDDEN_LABEL,
             customerPackageHandlerAllowed: false,
             blockedReasons: [...EXTENSION_RUNTIME_BLOCKERS],
-            note:
-              item.runtimeEnabled === true || item.handler
-                ? '客户包不得上传扩展点实现或未登记处理器。'
-                : '扩展点合同只保留绑定位，不发布可执行处理器。',
+            note: hasExecutableExtensionBinding(item)
+              ? '客户包不得上传扩展点实现或启用处理器。'
+              : '仅记录待评审扩展候选，当前没有运行时实现。',
           }))
         : [
             {
               key: 'controlled-empty-extension-catalog',
-              label: '扩展点绑定',
+              label: '扩展边界',
               status: 'controlled_empty',
-              implementationSource: 'registered_deployment_package_required',
+              implementationSource: 'not_implemented',
               implementationSourceLabel:
-                IMPLEMENTATION_SOURCE_LABELS.registered_deployment_package_required,
+                IMPLEMENTATION_SOURCE_LABELS.not_implemented,
               handlerAllowed: false,
               handlerAllowedLabel: CUSTOMER_PACKAGE_HANDLER_FORBIDDEN_LABEL,
               customerPackageHandlerAllowed: false,
               blockedReasons: [...EXTENSION_RUNTIME_BLOCKERS],
-              note: '当前客户包未绑定扩展点；后续如绑定，处理器必须来自已注册部署包。',
+              note: '当前未声明扩展候选，也没有运行时扩展能力；新增扩展须先完成专项评审。',
             },
           ],
     compiledCatalogSummary: buildCompiledCatalogSummary(config),
@@ -1842,13 +1842,13 @@ export function buildCustomerPackageConsoleSummary({
       },
       {
         key: 'unregistered-extension',
-        label: '未注册扩展点',
+        label: '扩展执行边界',
         status: unregisteredExtensionCount > 0 ? 'blocked' : 'passed',
         level: '高',
         note:
           unregisteredExtensionCount > 0
-            ? `${unregisteredExtensionCount} 个扩展点处理器未登记或来自客户包，必须阻断客户配置发布。`
-            : '当前扩展点目录为受控空目录；后续处理器必须来自已注册部署包。',
+            ? `${unregisteredExtensionCount} 项扩展声明包含处理器或启用执行，必须阻断客户配置发布。`
+            : '扩展声明未启用执行；当前没有运行时扩展能力，新增扩展须先完成专项评审。',
       },
       {
         key: 'workflow-closed-loop',
@@ -1947,10 +1947,10 @@ export function buildCustomerPackageConsoleSummary({
       },
       {
         key: 'rule-assets',
-        label: '规则资产',
+        label: '规则预览',
         value: policyBindingCount,
-        status: 'registered_binding',
-        note: '客户包只声明规则 / 策略绑定和参数，不接收策略实现代码。',
+        status: 'preview_only',
+        note: '客户包只保留规则 / 策略声明和参数，当前仅预览，不执行策略。',
       },
       {
         key: 'workflow-assets',
@@ -1964,20 +1964,24 @@ export function buildCustomerPackageConsoleSummary({
       },
       {
         key: 'strategy-bindings',
-        label: '策略绑定',
+        label: '策略 / 命令声明',
         value:
           (customerPackageSummary?.strategyRegistryChecks || []).length +
           (customerPackageSummary?.commandBindingChecks || []).length,
-        status:
-          unregisteredStrategyCount > 0 ? 'blocked' : 'registered_binding',
-        note: '策略 / 命令实现必须来自产品核心、行业模板或客户部署包登记。',
+        status: unregisteredStrategyCount > 0 ? 'blocked' : 'preview_only',
+        note: '此处只校验声明，不执行策略或命令；正式运行由产品核心已登记合同承接。',
       },
       {
         key: 'extension-bindings',
-        label: '扩展点绑定',
+        label: '扩展候选',
         value: extensionPointCount,
-        status: unregisteredExtensionCount > 0 ? 'blocked' : 'controlled_empty',
-        note: '客户包只能绑定扩展点；处理器必须来自已注册部署包。',
+        status:
+          unregisteredExtensionCount > 0
+            ? 'blocked'
+            : extensionPointCount > 0
+              ? 'contract_preview_only'
+              : 'controlled_empty',
+        note: '当前没有运行时扩展能力；候选只供评审，客户包不得携带或启用处理器。',
       },
       {
         key: 'template-assets',

@@ -178,7 +178,6 @@ const STATUS_LABELS = Object.freeze({
   separate_task_required: '需单独专项',
   source_grounded: '真源已登记',
   required: '必需',
-  registered_binding: '已登记绑定',
   controlled_empty: '受控空目录',
   contract_preview_only: '合同预览',
   snapshot_supported: '支持快照',
@@ -234,7 +233,6 @@ function StatusTag({ status }) {
     separate_task_required: 'volcano',
     source_grounded: 'green',
     required: 'gold',
-    registered_binding: 'green',
     controlled_empty: 'blue',
     contract_preview_only: 'cyan',
     snapshot_supported: 'green',
@@ -1394,7 +1392,7 @@ function PreflightPanel({
               type="info"
               showIcon
               message="只读取已登记配置对象，不接收任意代码、SQL 或业务事实"
-              description="本页预检配置、规则、流程编排、策略绑定、扩展点绑定、模板和导入映射；策略实现与扩展点实现必须来自产品核心、行业模板或已登记客户部署包。"
+              description="本页预检已登记配置与声明；流程、策略和命令草案只供预览。当前没有运行时扩展能力，新增扩展须先完成专项评审。"
             />
             <div className="erp-dev-customer-db-targets">
               {consoleSummary.packageAssetScope.map((item) => (
@@ -1520,7 +1518,7 @@ function PreflightPanel({
         <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
           <div className="erp-dev-customer-panel__head">
             <SafetyCertificateOutlined />
-            <Text strong>策略与扩展点登记</Text>
+            <Text strong>策略声明与扩展边界</Text>
           </div>
           <div className="erp-dev-customer-formal-gates">
             {consoleSummary.registryChecks.map((item) => (

@@ -655,30 +655,27 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
   assert.equal(summary.unregisteredExtensionBindingCount, 0)
   assert(
     summary.strategyRegistryChecks.every(
-      (item) => item.status === 'registered_binding'
+      (item) => item.status === 'preview_only'
     )
   )
   assert(
-    summary.commandBindingChecks.every(
-      (item) => item.status === 'registered_binding'
-    )
+    summary.commandBindingChecks.every((item) => item.status === 'preview_only')
   )
   assert.deepEqual(summary.extensionRegistryChecks, [
     {
       key: 'controlled-empty-extension-catalog',
-      label: '扩展点绑定',
+      label: '扩展边界',
       status: 'controlled_empty',
-      implementationSource: 'registered_deployment_package_required',
-      implementationSourceLabel: '实现来自已登记部署包',
+      implementationSource: 'not_implemented',
+      implementationSourceLabel: '当前未实现',
       handlerAllowed: false,
       handlerAllowedLabel: '禁止客户包处理器',
       customerPackageHandlerAllowed: false,
       blockedReasons: [
         'no_reviewed_extension_contract',
         'customer_package_handler_forbidden',
-        'registered_deployment_package_required',
       ],
-      note: '当前客户包未绑定扩展点；后续如绑定，处理器必须来自已注册部署包。',
+      note: '当前未声明扩展候选，也没有运行时扩展能力；新增扩展须先完成专项评审。',
     },
   ])
   assert.deepEqual(
@@ -715,7 +712,7 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
         '运行时关闭',
         'preview_only',
         '预览，不接运行时',
-        '实现来自已登记部署包',
+        '仅声明式预览',
         3,
         '3 条流程策略',
       ],
@@ -727,9 +724,9 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
         '运行时关闭',
         'controlled_empty',
         '受控空目录',
-        '实现来自已登记部署包',
+        '当前未实现',
         0,
-        '当前无扩展点绑定',
+        '当前未声明扩展候选',
       ],
     ]
   )
@@ -742,23 +739,22 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
   assert.deepEqual(compiledExtensionCatalog.blockedReasons, [
     'no_reviewed_extension_contract',
     'customer_package_handler_forbidden',
-    'registered_deployment_package_required',
   ])
   assert.match(compiledExtensionCatalog.note, /禁止客户包上传或启用处理器/)
   assert(
     summary.strategyRegistryChecks.every(
-      (item) => item.implementationSourceLabel === '实现来自已登记部署包'
+      (item) => item.implementationSourceLabel === '仅声明式预览'
     )
   )
   assert(
     summary.commandBindingChecks.every(
-      (item) => item.implementationSourceLabel === '实现来自已登记部署包'
+      (item) => item.implementationSourceLabel === '仅声明式预览'
     )
   )
   assert(
     summary.extensionRegistryChecks.every(
       (item) =>
-        item.implementationSourceLabel === '实现来自已登记部署包' &&
+        item.implementationSourceLabel === '当前未实现' &&
         item.handlerAllowedLabel === '禁止客户包处理器'
     )
   )
@@ -855,6 +851,21 @@ test('devCustomerConfig: 注册检查保留机器 key 但可见 label 不 fallba
         handler: 'customerPackageHandler',
         guardrail: '测试 runtimeEnabled=false 也不能豁免客户包处理器。',
       }),
+      Object.freeze({
+        key: 'module_extension_key',
+        label: '测试扩展模块',
+        status: 'preview_only',
+        runtimeEnabled: false,
+        module: 'customerPackageModule',
+        guardrail: '模块声明同样属于客户包执行代码，必须阻断。',
+      }),
+      Object.freeze({
+        key: 'runtime_extension_key',
+        label: '测试扩展执行开关',
+        status: 'preview_only',
+        runtimeEnabled: true,
+        guardrail: '没有处理器也不能启用扩展执行。',
+      }),
     ]),
   })
 
@@ -869,14 +880,14 @@ test('devCustomerConfig: 注册检查保留机器 key 但可见 label 不 fallba
     (item) => item.key === 'unknown_policy_key'
   )
   assert.equal(unknownPolicy.status, 'blocked')
-  assert.equal(unknownPolicy.label, '策略绑定')
+  assert.equal(unknownPolicy.label, '策略预览')
   assert.notEqual(unknownPolicy.label, unknownPolicy.key)
 
   const unknownExtension = summary.extensionRegistryChecks.find(
     (item) => item.key === 'raw_extension_key'
   )
-  assert.equal(unknownExtension.status, 'controlled_empty')
-  assert.equal(unknownExtension.label, '扩展点绑定')
+  assert.equal(unknownExtension.status, 'contract_preview_only')
+  assert.equal(unknownExtension.label, '扩展边界')
   assert.notEqual(unknownExtension.label, unknownExtension.key)
 
   const handlerExtension = summary.extensionRegistryChecks.find(
@@ -885,13 +896,23 @@ test('devCustomerConfig: 注册检查保留机器 key 但可见 label 不 fallba
   assert.equal(handlerExtension.status, 'blocked')
   assert.equal(handlerExtension.label, '测试扩展点处理器')
   assert.match(handlerExtension.note, /客户包不得上传扩展点实现/)
-  assert.equal(summary.unregisteredExtensionBindingCount, 1)
+  assert.equal(summary.unregisteredExtensionBindingCount, 3)
   const handlerExtensionSummary = summary.extensionPoints.find(
     (item) => item.key === 'handler_extension_key'
   )
   assert.equal(handlerExtensionSummary.hasCustomerPackageHandler, true)
   assert.equal(handlerExtensionSummary.registered, false)
   assert.equal('handler' in handlerExtensionSummary, false)
+  for (const key of ['module_extension_key', 'runtime_extension_key']) {
+    assert.equal(
+      summary.extensionRegistryChecks.find((item) => item.key === key).status,
+      'blocked'
+    )
+    assert.equal(
+      summary.extensionPoints.find((item) => item.key === key).registered,
+      false
+    )
+  }
 
   const unknownBoundary = summary.boundaries.find(
     (item) => item.key === 'rawBoundaryKey'
@@ -1357,7 +1378,7 @@ test('devCustomerConfig: 配置包预检控制台区分本地测试应用与正�
   assert(
     summary.packageAssetScope.some(
       (item) =>
-        item.key === 'strategy-bindings' && item.status === 'registered_binding'
+        item.key === 'strategy-bindings' && item.status === 'preview_only'
     )
   )
   assert(
@@ -1373,7 +1394,7 @@ test('devCustomerConfig: 配置包预检控制台区分本地测试应用与正�
   )
   assert(
     summary.registryChecks.some((item) =>
-      item.note.includes('处理器必须来自已注册部署包')
+      item.note.includes('没有运行时扩展能力')
     )
   )
   const visibleTexts = [

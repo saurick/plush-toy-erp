@@ -737,6 +737,7 @@ test("customer-config-runtime-manifest: flow, policy and extension catalogs stay
   assert.equal(policyCatalog.catalog_status, "preview_only");
   assert(policyCatalog.process_policies.every((item) => item.runtime_enabled === false));
   assert.equal(extensionPointCatalog.runtime_enabled, false);
+  assert.equal(extensionPointCatalog.implementation_source, "not_implemented");
   assert.equal(extensionPointCatalog.handler_allowed, false);
   assert.equal(extensionPointCatalog.customer_package_handler_allowed, false);
   validateRuntimeManifest(manifest);
