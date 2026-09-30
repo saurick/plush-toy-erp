@@ -161,7 +161,9 @@ export function useBusinessColumnOrder({
         ...column,
         title: (
           <span className="erp-module-column-header-text">
-            {getColumnDisplayLabel(column)}
+            {React.isValidElement(column.title)
+              ? column.title
+              : getColumnDisplayLabel(column)}
           </span>
         ),
       }))

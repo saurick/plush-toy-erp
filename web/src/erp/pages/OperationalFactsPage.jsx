@@ -914,6 +914,7 @@ export function OperationalFactWorkspace({
         <PageHeaderCard
           compact
           title={pageTitle}
+          helpKey={toolbarModuleKey}
           viewSwitch={visualizationHeader}
           stats={pageStats}
         />

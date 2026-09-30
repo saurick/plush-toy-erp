@@ -67,3 +67,18 @@ test('runtime Ant tables use the shared alignment entry', () => {
     )
   assert.deepEqual(bypasses, [])
 })
+
+test('表头测量副本保留尺寸且不暴露可聚焦的字段问号', () => {
+  const styles = readFileSync(
+    new URL('./app-table.css', import.meta.url),
+    'utf8'
+  )
+  assert.match(
+    styles,
+    /\.app-table\.ant-table-wrapper \.ant-table-measure-cell-content\s*\{\s*visibility: hidden;\s*\}/u
+  )
+  assert.doesNotMatch(
+    styles,
+    /\.ant-table-measure-cell-content\s*\{[^}]*display: none/u
+  )
+})

@@ -27,3 +27,24 @@ test('column settings move focus inside after the opening transition', () => {
   )
   assert.match(source, /focus\(\{ preventScroll: true \}\)/u)
 })
+
+test('表头保留字段问号等 React 标题，列设置和导出仍使用纯文字名称', () => {
+  const toolbar = readFileSync(
+    new URL('./BusinessListToolbarActions.jsx', import.meta.url),
+    'utf8'
+  )
+  assert.match(
+    toolbar,
+    /React\.isValidElement\(column.title\)\s*\? column.title\s*: getColumnDisplayLabel\(column\)/u
+  )
+  assert.match(
+    toolbar,
+    /exportColumns.map\(\(column\) => getColumnLabel\(column\)\)/u
+  )
+  const help = readFileSync(
+    new URL('../help/BusinessContextHelp.jsx', import.meta.url),
+    'utf8'
+  )
+  assert.match(help, /onClick=\{\(event\) => event.stopPropagation\(\)\}/u)
+  assert.match(help, /event.key === 'Enter' \|\| event.key === ' '/u)
+})

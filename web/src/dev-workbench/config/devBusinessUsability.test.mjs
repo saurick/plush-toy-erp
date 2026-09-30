@@ -24,8 +24,8 @@ test('devBusinessUsability: 只读摘要来自共享业务易用性目录', () =
   assert.equal(DEV_BUSINESS_USABILITY_ROUTE, '/__dev/business-usability')
   assert.equal(DEV_BUSINESS_USABILITY_PAGE_SIZE, 10)
   assert.equal(summary.total, BUSINESS_USABILITY_CATALOG.length)
-  assert.equal(summary.pageHelpCount, 10)
-  assert.equal(summary.covered, 10)
+  assert.equal(summary.pageHelpCount, BUSINESS_USABILITY_CATALOG.length)
+  assert.equal(summary.covered, summary.total)
   assert.equal(
     summary.covered + summary.partial + summary.missing,
     summary.total
@@ -38,7 +38,7 @@ test('devBusinessUsability: 可按覆盖状态、岗位帮助和通俗文字筛�
     filterBusinessUsabilityEntries(BUSINESS_USABILITY_CATALOG, {
       status: BUSINESS_USABILITY_STATUS.COVERED,
     }).length,
-    10
+    BUSINESS_USABILITY_CATALOG.length
   )
   assert(
     filterBusinessUsabilityEntries(BUSINESS_USABILITY_CATALOG, {

@@ -1651,6 +1651,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       {productionRecordsWorkspace ? null : (
         <PageHeaderCard
           title={isProductionExceptionPage ? '生产记录' : moduleItem.title}
+          helpKey={moduleKey}
           stats={headerStats}
           compact
         />

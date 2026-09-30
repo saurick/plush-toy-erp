@@ -1,9 +1,5 @@
 import React, { useState } from 'react'
-import {
-  ArrowRightOutlined,
-  CheckCircleOutlined,
-  QuestionCircleOutlined,
-} from '@ant-design/icons'
+import { ArrowRightOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { Button, Popover, Tag, Typography } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import {
@@ -14,7 +10,7 @@ import {
 
 const { Text, Title } = Typography
 
-function ExplanationDetails({ item }) {
+function ExplanationDetails({ item, showHeading = true }) {
   if (!item) return null
 
   const details = [
@@ -26,10 +22,14 @@ function ExplanationDetails({ item }) {
 
   return (
     <div className="erp-business-help-explanation">
-      <div className="erp-business-help-explanation__heading">
-        <Tag>{BUSINESS_HELP_TYPE_PRESENTATION[item.type]?.label || '说明'}</Tag>
-        <strong>{item.title}</strong>
-      </div>
+      {showHeading ? (
+        <div className="erp-business-help-explanation__heading">
+          <Tag>
+            {BUSINESS_HELP_TYPE_PRESENTATION[item.type]?.label || '说明'}
+          </Tag>
+          <strong>{item.title}</strong>
+        </div>
+      ) : null}
       <p>{item.explanation}</p>
       {details.length > 0 ? (
         <dl>
@@ -93,7 +93,10 @@ function PageGuideContent({ entry }) {
           </Title>
           <div>
             {entry.items.map((item) => (
-              <ExplanationDetails item={item} key={item.key} />
+              <details className="erp-business-page-help__item" key={item.key}>
+                <summary>{item.title}</summary>
+                <ExplanationDetails item={item} showHeading={false} />
+              </details>
             ))}
           </div>
         </section>
@@ -141,12 +144,7 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
             打开帮助中心
             <ArrowRightOutlined />
           </Button>,
-          <Button
-            key="done"
-            type="primary"
-            icon={<CheckCircleOutlined />}
-            onClick={() => setOpen(false)}
-          >
+          <Button key="done" type="primary" onClick={() => setOpen(false)}>
             我知道了
           </Button>,
         ]}
@@ -177,6 +175,12 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '' }) {
           className="erp-business-inline-help-trigger"
           icon={<QuestionCircleOutlined />}
           aria-label={`查看${label}说明`}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.stopPropagation()
+            }
+          }}
         />
       </Popover>
     </span>

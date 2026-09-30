@@ -14,6 +14,7 @@ import {
 import ProductionRecordsNavigation from './ProductionRecordsNavigation.jsx'
 import {
   availableProductionRecordViews,
+  PRODUCTION_RECORD_VIEW_KEYS,
   productionRecordViewPath,
   resolveProductionRecordView,
 } from '../../utils/productionRecordViews.mjs'
@@ -68,6 +69,12 @@ export default function ProductionRecordsLayout() {
       <PageHeaderCard
         compact
         title="生产记录"
+        helpKey={
+          activeKey === PRODUCTION_RECORD_VIEW_KEYS.DECISIONS ||
+          activeKey === PRODUCTION_RECORD_VIEW_KEYS.TASKS
+            ? 'production-exceptions'
+            : 'production-progress'
+        }
         stats={headerStatsByView[activeKey] || []}
         viewSwitch={
           <ProductionRecordsNavigation

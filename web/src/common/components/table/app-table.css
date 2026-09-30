@@ -7,6 +7,11 @@
   height: var(--erp-row-height);
 }
 
+/* 测量副本保留布局尺寸，但不能让内部按钮进入键盘焦点。 */
+.app-table.ant-table-wrapper .ant-table-measure-cell-content {
+  visibility: hidden;
+}
+
 .app-table.ant-table-wrapper .ant-table-thead > tr > .ant-table-cell {
   height: 40px;
   padding: 7px 11px;

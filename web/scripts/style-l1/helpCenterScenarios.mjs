@@ -1,6 +1,10 @@
 import { ROLE_HELP_GUIDES } from '../../src/erp/config/roleHelpContent.mjs'
 import { getRoleHelpScenarios } from '../../src/erp/config/helpScenarios.mjs'
 import {
+  BUSINESS_USABILITY_CATALOG,
+  getBusinessHelpItem,
+} from '../../src/erp/config/businessUsabilityCatalog.mjs'
+import {
   getHelpScenarioPresentation,
   HELP_VISUAL_EXAMPLES,
 } from '../../src/erp/config/helpScenarioPresentation.mjs'
@@ -133,7 +137,279 @@ export function createHelpCenterScenarios({
       .locator('.ant-select-dropdown:visible')
       .waitFor({ state: 'hidden' })
   }
+  const waitForHelpPopoverClosed = (page) =>
+    page.waitForFunction(
+      () =>
+        document.querySelectorAll('.erp-business-inline-help-popover')
+          .length === 0,
+      null,
+      { timeout: 5000 }
+    )
   return [
+    {
+      name: 'business-page-help-all-pages-desktop-light',
+      path: BUSINESS_USABILITY_CATALOG[0].path,
+      auth: 'admin',
+      adminProfile: { is_super_admin: true },
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        for (const entry of BUSINESS_USABILITY_CATALOG) {
+          await page.goto(new URL(entry.path, page.url()).href)
+          const trigger = page.getByRole('button', {
+            name: `查看${entry.title}页面说明`,
+            exact: true,
+          })
+          await trigger.click()
+          const dialog = page.getByRole('dialog', {
+            name: `${entry.title}怎么用`,
+            exact: true,
+          })
+          await dialog.getByText(entry.completion, { exact: true }).waitFor()
+          await dialog.getByText(entry.handoff, { exact: true }).waitFor()
+          const explanations = dialog.locator('.erp-business-page-help__item')
+          assert.equal(await explanations.count(), entry.items.length)
+          assert.equal(
+            await dialog.locator('.erp-business-page-help__item[open]').count(),
+            0
+          )
+          const first = explanations.first()
+          await first.locator('summary').focus()
+          await page.keyboard.press('Enter')
+          await first
+            .getByText(entry.items[0].explanation, { exact: true })
+            .waitFor()
+          await page.keyboard.press('Enter')
+          assert.equal(await first.getAttribute('open'), null)
+          await assertNoHorizontalOverflow(page, `${entry.key} 页内帮助`)
+          await page.keyboard.press('Escape')
+          await dialog.waitFor({ state: 'hidden' })
+          await page.waitForFunction(
+            (name) =>
+              document.activeElement?.getAttribute('aria-label') === name,
+            `查看${entry.title}页面说明`
+          )
+        }
+        // 生产记录共用页头，切到异常时不能保留成品入库说明。
+        await page.goto(new URL('/erp/production/progress', page.url()).href)
+        await page.getByRole('tab', { name: '异常处理', exact: true }).click()
+        await page
+          .getByRole('button', { name: '查看异常处理页面说明', exact: true })
+          .waitFor()
+        assert.equal(
+          await page
+            .getByRole('button', { name: '查看生产记录页面说明', exact: true })
+            .count(),
+          0
+        )
+      },
+    },
+    {
+      name: 'business-page-help-mobile-dark',
+      path: '/erp/finance/receivables',
+      auth: 'admin',
+      adminProfile: { is_super_admin: true },
+      effectiveSession: customerRuntimeEffectiveSession,
+      themeMode: 'dark',
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      verify: async (page) => {
+        const trigger = page.getByRole('button', {
+          name: '查看应收管理页面说明',
+          exact: true,
+        })
+        await trigger.focus()
+        await page.keyboard.press('Enter')
+        const dialog = page.getByRole('dialog', {
+          name: '应收管理怎么用',
+          exact: true,
+        })
+        await dialog.waitFor()
+        const formula = dialog
+          .locator('.erp-business-page-help__item')
+          .filter({ hasText: '月结和到期日期怎么算' })
+        await formula.locator('summary').click()
+        await formula
+          .getByText(
+            getBusinessHelpItem('receivables', 'payment-term').example,
+            { exact: true }
+          )
+          .waitFor()
+        await page.waitForFunction(() => {
+          let element = document.querySelector(
+            '.erp-business-page-help-modal[role="dialog"]'
+          )
+          if (!element) return false
+          for (; element; element = element.parentElement) {
+            if (Number(getComputedStyle(element).opacity) < 0.99) return false
+          }
+          return true
+        })
+        const geometry = await dialog.evaluate((element) => {
+          const rect = element.getBoundingClientRect()
+          const body = element.querySelector('.ant-modal-body')
+          let opaque = true
+          for (let node = element; node; node = node.parentElement) {
+            if (Number(getComputedStyle(node).opacity) < 0.99) opaque = false
+          }
+          const topElement = document.elementFromPoint(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2
+          )
+          return {
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            width: innerWidth,
+            height: innerHeight,
+            modalWidth: rect.width,
+            modalHeight: rect.height,
+            opaque,
+            onTop: element.contains(topElement),
+            scrollable: body.scrollHeight > body.clientHeight,
+          }
+        })
+        assert(
+          geometry.modalWidth > 0 &&
+            geometry.modalHeight > 0 &&
+            geometry.opaque &&
+            geometry.onTop &&
+            geometry.left >= 0 &&
+            geometry.right <= geometry.width &&
+            geometry.top >= 0 &&
+            geometry.bottom <= geometry.height,
+          JSON.stringify(geometry)
+        )
+        assert(geometry.scrollable, '较长帮助在弹窗内滚动，不撑出手机屏幕')
+        await assertNoHorizontalOverflow(page, '手机页内帮助')
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-page-help-mobile-dark-expanded.png'
+          ),
+          fullPage: true,
+        })
+        await dialog
+          .getByRole('button', { name: '我知道了', exact: true })
+          .click()
+        await dialog.waitFor({ state: 'hidden' })
+        await page.waitForFunction(
+          () =>
+            document.activeElement?.getAttribute('aria-label') ===
+            '查看应收管理页面说明'
+        )
+        await trigger.click()
+        await dialog.waitFor()
+        await page.waitForFunction(() =>
+          Boolean(
+            document.activeElement?.closest('.erp-business-page-help-modal')
+          )
+        )
+        assert.equal(
+          await dialog.locator('.erp-business-page-help__item[open]').count(),
+          0,
+          '重新打开不残留上次展开内容'
+        )
+        await page.keyboard.press('Escape')
+        await dialog.waitFor({ state: 'hidden' })
+        await page.waitForFunction(
+          () =>
+            document.activeElement?.getAttribute('aria-label') ===
+            '查看应收管理页面说明'
+        )
+
+        const inline = page.getByRole('button', {
+          name: '查看账期说明',
+          exact: true,
+        })
+        await inline.scrollIntoViewIfNeeded()
+        await inline.focus()
+        const popover = page.locator(
+          '.erp-business-inline-help-popover:visible'
+        )
+        await popover.waitFor()
+        await popover
+          .getByText(
+            getBusinessHelpItem('receivables', 'payment-term').source,
+            { exact: true }
+          )
+          .waitFor()
+        await page.keyboard.press('Tab')
+        await waitForHelpPopoverClosed(page)
+        const measurement = await page
+          .locator('.ant-table-measure-cell-content')
+          .first()
+          .evaluate((element) => ({
+            visibility: getComputedStyle(element).visibility,
+            width: element.scrollWidth,
+          }))
+        assert.equal(measurement.visibility, 'hidden')
+        assert(measurement.width > 0, '隐藏测量副本仍应保留真实列宽')
+        const sortBefore = await inline.evaluate((element) =>
+          element.closest('th')?.getAttribute('aria-sort')
+        )
+        await inline.tap()
+        await popover.waitFor()
+        assert.equal(
+          await inline.evaluate((element) =>
+            element.closest('th')?.getAttribute('aria-sort')
+          ),
+          sortBefore,
+          '打开说明不能顺带改变表格排序'
+        )
+        await popover
+          .getByText(
+            getBusinessHelpItem('receivables', 'payment-term').example,
+            { exact: true }
+          )
+          .waitFor()
+        await page
+          .getByRole('heading', { name: '应收管理', exact: true })
+          .click()
+        await waitForHelpPopoverClosed(page)
+        await assertNoHorizontalOverflow(page, '手机账期问号')
+
+        await page.goto(new URL('/erp/warehouse/inventory', page.url()).href)
+        const inventoryHelp = page.getByRole('button', {
+          name: '查看可用量说明',
+          exact: true,
+        })
+        await inventoryHelp.scrollIntoViewIfNeeded()
+        await inventoryHelp.focus()
+        await popover.waitFor()
+        const inventoryFormula = getBusinessHelpItem(
+          'inventory',
+          'available-quantity'
+        )
+        for (const text of [
+          inventoryFormula.explanation,
+          inventoryFormula.source,
+          inventoryFormula.example,
+        ]) {
+          await popover.getByText(text, { exact: true }).waitFor()
+        }
+        await page.keyboard.press('Tab')
+        await waitForHelpPopoverClosed(page)
+        const inventorySortBefore = await inventoryHelp.evaluate((element) =>
+          element.closest('th')?.getAttribute('aria-sort')
+        )
+        await inventoryHelp.focus()
+        await page.keyboard.press('Enter')
+        await waitForHelpPopoverClosed(page)
+        await page.keyboard.press('Enter')
+        await popover.waitFor()
+        assert.equal(
+          await inventoryHelp.evaluate((element) =>
+            element.closest('th')?.getAttribute('aria-sort')
+          ),
+          inventorySortBefore,
+          '键盘打开公式不能触发表格排序'
+        )
+        await page.keyboard.press('Tab')
+        await waitForHelpPopoverClosed(page)
+      },
+    },
     {
       name: 'help-center-all-scenes-desktop-dark',
       path: '/erp/help-center?role=warehouse&scene=finished-goods',
@@ -484,7 +760,7 @@ export function createHelpCenterScenarios({
           .click()
         await page
           .locator('.erp-help-flow__detail')
-          .getByText('系统记录不等于税控开票已经完成', { exact: false })
+          .getByText('实际开票结果', { exact: false })
           .waitFor()
         await page.getByText('遇到异常', { exact: true }).click()
         await assertFlowFits(page)

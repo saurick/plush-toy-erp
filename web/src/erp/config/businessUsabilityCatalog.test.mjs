@@ -29,7 +29,7 @@ const targetPageSources = Object.freeze({
   'finance-payments': 'web/src/erp/pages/FinancePaymentsPage.jsx',
 })
 
-test('businessUsabilityCatalog: 从正式页面目录派生并完整覆盖十个高频页面', () => {
+test('businessUsabilityCatalog: 从正式页面目录派生并覆盖现有业务页面', () => {
   assert.deepEqual(
     BUSINESS_USABILITY_CATALOG.map((entry) => entry.key),
     businessModuleDefinitions.map((entry) => entry.key)
@@ -41,11 +41,11 @@ test('businessUsabilityCatalog: 从正式页面目录派生并完整覆盖十个
   ])
 
   const targetKeys = getBusinessUsabilityTargetPageKeys()
-  assert.equal(targetKeys.length, 10)
+  assert.equal(targetKeys.length, businessModuleDefinitions.length)
   assert.equal(new Set(targetKeys).size, targetKeys.length)
   assert.deepEqual(
     targetKeys.toSorted(),
-    Object.keys(targetPageSources).toSorted()
+    businessModuleDefinitions.map((entry) => entry.key).toSorted()
   )
 
   targetKeys.forEach((key) => {
@@ -56,6 +56,11 @@ test('businessUsabilityCatalog: 从正式页面目录派生并完整覆盖十个
     assert(entry.completion, key)
     assert(entry.handoff, key)
     assert(entry.flowSteps.length >= 3, key)
+    assert.equal(
+      new Set(entry.items.map((item) => item.key)).size,
+      entry.items.length,
+      key
+    )
     assert(
       entry.requiredHelpTypes.every((type) =>
         entry.helpTypeKeys.includes(type)
@@ -63,6 +68,27 @@ test('businessUsabilityCatalog: 从正式页面目录派生并完整覆盖十个
       key
     )
   })
+})
+
+test('businessUsabilityCatalog: 新页完成条件不把审批、预留或业务登记当成事实完成', () => {
+  const entry = (key) =>
+    BUSINESS_USABILITY_CATALOG.find((item) => item.key === key)
+  assert.match(entry('production-progress').completion, /仓库确认入库/u)
+  assert.match(
+    entry('production-exceptions').flowSteps[2],
+    /审批通过不等于已执行/u
+  )
+  assert.match(entry('shipping-release').completion, /实际发货仍由仓库确认/u)
+  assert.match(entry('outbound').completion, /实际出货另行确认/u)
+  assert.match(entry('reconciliation').completion, /不表示已收款或付款/u)
+  assert.match(entry('invoices').completion, /实际开票结果另行核实/u)
+  for (const key of ['receivables', 'payables']) {
+    const item = getBusinessHelpItem(key, 'payment-term')
+    assert.match(item.explanation, /发生月份月底再加 N 天/u)
+    assert.match(item.explanation, /0 天为发生日到期/u)
+    assert.match(item.updateRule, /不会改写/u)
+    assert.match(entry(key).completion, /正式核销或红冲/u)
+  }
 })
 
 test('businessUsabilityCatalog: 公式说明带来源和例子且金额统一使用当前币种口径', () => {
@@ -92,7 +118,7 @@ test('businessUsabilityCatalog: 公式说明带来源和例子且金额统一使
   })
 })
 
-test('businessUsabilityCatalog: 十个业务页接入同一页内帮助触发器', () => {
+test('businessUsabilityCatalog: 专属与共享页面都接入同一页内帮助触发器', () => {
   Object.entries(targetPageSources).forEach(([key, sourcePath]) => {
     assert.match(read(sourcePath), new RegExp(`helpKey=["']${key}["']`, 'u'))
   })
@@ -103,6 +129,27 @@ test('businessUsabilityCatalog: 十个业务页接入同一页内帮助触发器
   assert.match(layoutSource, /BusinessPageHelpTrigger/u)
   assert.match(layoutSource, /helpKey = ''/u)
   assert.match(layoutSource, /pageKey=\{helpKey\}/u)
+  assert.match(
+    read('web/src/erp/pages/V1MasterDataPage.jsx'),
+    /helpKey=\{isProductCatalogPage \? 'products' : moduleKey\}/u
+  )
+  assert.match(
+    read('web/src/erp/pages/OperationalFactsPage.jsx'),
+    /helpKey=\{toolbarModuleKey\}/u
+  )
+  assert.match(
+    read('web/src/erp/pages/WorkflowBusinessModulePage.jsx'),
+    /helpKey=\{moduleKey\}/u
+  )
+  const productionLayout = read(
+    'web/src/erp/components/production-records/ProductionRecordsLayout.jsx'
+  )
+  assert.match(productionLayout, /PRODUCTION_RECORD_VIEW_KEYS\.DECISIONS/u)
+  assert.match(productionLayout, /PRODUCTION_RECORD_VIEW_KEYS\.TASKS/u)
+  assert.match(
+    productionLayout,
+    /\? 'production-exceptions'\s*: 'production-progress'/u
+  )
 })
 
 test('businessUsabilityCatalog: 关键字段问号可悬停、聚焦和点击且移动弹窗可滚动并恢复焦点', () => {
@@ -119,6 +166,12 @@ test('businessUsabilityCatalog: 关键字段问号可悬停、聚焦和点击且
     /<details className="erp-business-page-help__boundary">/u
   )
   assert.match(componentSource, /<summary>使用限制<\/summary>/u)
+  assert.match(
+    componentSource,
+    /<details className="erp-business-page-help__item" key=\{item.key\}>/u
+  )
+  assert.match(componentSource, /showHeading=\{false\}/u)
+  assert.doesNotMatch(componentSource, /<details[^>]*\bopen(?:=|\s|>)/u)
   assert.doesNotMatch(componentSource, /<Alert|showIcon/u)
 
   const inlineSources = [

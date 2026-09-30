@@ -204,155 +204,54 @@ const supportingScenarios = {
     },
   ],
   '/erp/production/exceptions': [
-    {
-      key: 'production-exceptions',
-      steps: [
-        step(
-          '核对异常来源',
-          '生产 / 品质',
-          ['production', 'quality'],
-          '核对受影响的生产批次、数量和原因，明确是报废、在制让步还是超领申请。'
-        ),
-        step(
-          '提交并等待审批',
-          '经办 / 审批岗位',
-          ['production', 'boss'],
-          '补齐来源和理由后，按页面提供的动作提交申请；审批未通过前暂停受影响的办理。'
-        ),
-        step(
-          '核对执行结果',
-          '生产',
-          ['production'],
-          '按当前审批结果和可用动作执行，回到来源生产记录核对受影响数量与状态。'
-        ),
-      ],
-      completion:
-        '异常来源、原因、审批和执行结果可查，受影响数量与来源记录一致。',
-      handoff:
-        '质量判定交品质，缺料与计划安排交 PMC / 采购，生产按正式结果继续办理。',
-      exception: {
-        trigger: '来源不明确、审批退回或执行结果无法核对。',
-        action:
-          '停止继续推进受影响数量，保留原因和来源记录；由责任岗位补齐依据后重新核对。',
-      },
-    },
+    pageScenario('production-exceptions', [
+      ['核对异常来源', '生产 / 品质', ['production', 'quality']],
+      ['提交并等待审批', '经办 / 审批岗位', ['production', 'boss']],
+      ['核对执行结果', '生产', ['production']],
+    ]),
   ],
   '/erp/production/scheduling': [
-    {
-      key: 'production-scheduling',
-      steps: [
-        step(
-          '找到排产待办',
-          'PMC',
-          ['pmc'],
-          '打开生产订单发布后生成的排产确认事项，核对来源订单和交期。'
-        ),
-        step(
-          '核对可执行条件',
-          'PMC',
-          ['pmc'],
-          '核对工程资料、物料需求、可用库存、采购到料和生产安排。'
-        ),
-        step(
-          '确认并交接生产',
-          'PMC / 生产',
-          ['pmc', 'production'],
-          '条件满足后按当前待办完成排产确认，核对计划、责任人和预计日期。'
-        ),
-      ],
-      completion:
-        '排产结论、计划、责任人和预计日期可查；排产确认不会代替领料或完工。',
-      handoff: '可执行安排交生产；缺料交采购，资料交工程，交期变化反馈销售。',
-      exception: {
-        trigger: '资料、物料或产能无法支持当前交期。',
-        action:
-          '记录缺口、影响订单、责任岗位和处理日期，协调后重新核对，不把风险订单标成可执行。',
-      },
-    },
+    pageScenario('production-scheduling', [
+      ['找到排产待办', 'PMC', ['pmc']],
+      ['核对可执行条件', 'PMC', ['pmc']],
+      ['确认并交接生产', 'PMC / 生产', ['pmc', 'production']],
+    ]),
   ],
 }
 
-function masterScenario(key, owner, role, fields) {
-  return {
-    key,
-    steps: [
-      step(
-        '查找已有资料',
-        owner,
-        [role],
-        '先搜索已有名称和编码，确认是否已经存在，避免重复建立。'
-      ),
-      step(
-        '核对并保存资料',
-        owner,
-        [role],
-        `按页面必填要求核对${fields}，保存后重新打开确认。`
-      ),
-      step(
-        '交给业务引用',
-        owner,
-        [role],
-        '让后续经办岗位在对应业务单据中选择这份资料，并核对本单带出的内容。'
-      ),
-    ],
-    completion: '资料已保存且当前状态可引用，名称、编码和必要内容可查。',
-    handoff: '后续岗位引用同一份资料；本单有差异时仍需在业务单据中核对。',
-    exception: {
-      trigger: '存在重名、关键信息缺失，或修改会影响正在办理的单据。',
-      action:
-        '先联系资料负责人确认适用范围，避免重复新建或直接覆盖；补齐后重新核对引用结果。',
-    },
-  }
+function masterScenario(key, owner, role) {
+  return pageScenario(key, [
+    ['查找已有资料', owner, [role]],
+    ['核对并保存资料', owner, [role]],
+    ['交给业务引用', owner, [role]],
+  ])
 }
 
 const masterScenarios = {
   '/erp/master/partners/customers': masterScenario(
     'customers',
     '销售',
-    'sales',
-    '客户、联系人和默认收货信息'
+    'sales'
   ),
   '/erp/master/partners/suppliers': masterScenario(
     'suppliers',
     '采购',
-    'purchase',
-    '供应商、联系人、付款与开票默认值'
+    'purchase'
   ),
-  '/erp/master/products': masterScenario(
-    'products',
-    '工程',
-    'engineering',
-    '产品图样、规格、颜色、尺码和包装信息'
-  ),
+  '/erp/master/products': masterScenario('products', '工程', 'engineering'),
   '/erp/engineering/processes': masterScenario(
     'processes',
     '工程',
-    'engineering',
-    '加工环节名称和适用说明'
+    'engineering'
   ),
 }
 
-function financeScenario(key, source, result, handoff) {
-  return {
-    key,
-    steps: [
-      step('核对业务来源', '财务', ['finance'], source),
-      step(
-        '核对金额与往来方',
-        '财务',
-        ['finance'],
-        '核对来源单号、往来方、币种、金额和当前状态，不用手工金额掩盖来源差异。'
-      ),
-      step('办理并确认结果', '财务', ['finance'], result),
-    ],
-    completion: result,
-    handoff,
-    exception: {
-      trigger: '往来方、币种、金额或来源无法对应，或办理结果不确定。',
-      action:
-        '暂停过账或重复提交，保留来源单号和差异；交来源岗位核对，处理后回到原记录刷新确认。',
-    },
-  }
+function financeScenario(key) {
+  return pageScenario(key, [
+    ['核对业务来源', '财务', ['finance']],
+    ['核对金额与往来方', '财务', ['finance']],
+    ['办理并确认结果', '财务', ['finance']],
+  ])
 }
 
 const financeScenarios = {
@@ -370,30 +269,10 @@ const financeScenarios = {
       action: getBusinessUsabilityEntry('finance-payments').handoff,
     },
   },
-  '/erp/finance/receivables': financeScenario(
-    'receivables',
-    '从已经实际出货的记录核对应收来源。',
-    '应收记录的来源、金额和状态可查；结清以正式收付款核销或红冲结果为准。',
-    '出货来源差异交销售 / 仓库核对，收款与核销按正式资金记录继续办理。'
-  ),
-  '/erp/finance/payables': financeScenario(
-    'payables',
-    '从已入库采购或合格委外回货核对应付来源。',
-    '应付记录的来源、金额和状态可查；结清以正式收付款核销或红冲结果为准。',
-    '采购来源交采购 / 仓库核对，委外来源交对应经办岗位核对。'
-  ),
-  '/erp/finance/invoices': financeScenario(
-    'invoices',
-    '从已实际出货记录核对本次发票业务来源。',
-    '发票业务记录的来源、往来方、金额和状态可查；系统记录不等于税控开票已经完成。',
-    '来源差异交销售 / 仓库核对，实际开票结果由财务按业务要求核查。'
-  ),
-  '/erp/finance/reconciliation': financeScenario(
-    'reconciliation',
-    '先核对已过账财务记录，明确本次核对的往来方与来源。',
-    '按页面提供的登记、确认和单笔核对动作办理，核对结果和差异可查。',
-    '发现差异时到对账页面记录，并交来源岗位核对；不直接修改余额掩盖差异。'
-  ),
+  '/erp/finance/receivables': financeScenario('receivables'),
+  '/erp/finance/payables': financeScenario('payables'),
+  '/erp/finance/invoices': financeScenario('invoices'),
+  '/erp/finance/reconciliation': financeScenario('reconciliation'),
 }
 
 function roleScenario(guide, key) {

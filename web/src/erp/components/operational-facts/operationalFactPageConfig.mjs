@@ -42,6 +42,7 @@ import {
 } from './OperationalFactForms.jsx'
 import { compareOperationalFactDecimalValues } from './operationalFactDecimal.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 
 export const DEFAULT_OPERATIONAL_FACT_PAGINATION = Object.freeze({
   current: 1,
@@ -529,7 +530,13 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         ),
     },
     payment_term: {
-      title: '账期',
+      title: React.createElement(BusinessHelpLabel, {
+        label: '账期',
+        pageKey:
+          normalizedFinanceFactType === 'PAYABLE' ? 'payables' : 'receivables',
+        itemKey: 'payment-term',
+      }),
+      exportTitle: '账期',
       dataIndex: 'payment_term',
       width: 150,
       sortType: 'text',
@@ -711,7 +718,11 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       {
         align: 'right',
         defaultPriority: 50,
-        title: '预留数量',
+        title: React.createElement(BusinessHelpLabel, {
+          label: '预留数量',
+          pageKey: 'outbound',
+          itemKey: 'reservation-vs-shipment',
+        }),
         exportTitle: '预留数量',
         dataIndex: 'quantity',
         width: 120,

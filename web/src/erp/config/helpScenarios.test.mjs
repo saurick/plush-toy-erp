@@ -53,6 +53,16 @@ test('通用业务场景直接复用页内说明，避免办理文字产生两�
     'processing-contracts',
     'production-orders',
     'shipments',
+    'production-exceptions',
+    'production-scheduling',
+    'customers',
+    'suppliers',
+    'products',
+    'processes',
+    'receivables',
+    'payables',
+    'invoices',
+    'reconciliation',
   ]) {
     const scene = scenes.find((entry) => entry.key === key)
     const page = getBusinessUsabilityEntry(key)

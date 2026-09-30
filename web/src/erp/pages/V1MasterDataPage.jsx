@@ -965,6 +965,7 @@ export default function V1MasterDataPage({ type }) {
       <PageHeaderCard
         compact
         title={config.title}
+        helpKey={isProductCatalogPage ? 'products' : moduleKey}
         stats={
           isProcessDictionaryPage
             ? []

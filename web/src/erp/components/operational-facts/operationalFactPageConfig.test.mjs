@@ -132,13 +132,15 @@ test('stock reservation columns display readable references without exposing tec
     '来源行',
     '产品 / 规格',
     '仓库 / 批次',
-    '预留数量',
     '单位',
     '预留日期',
     '备注',
   ]) {
     assert.match(reservationColumns, new RegExp(`title: '${title}'`, 'u'))
   }
+  assert.match(reservationColumns, /label: '预留数量'/u)
+  assert.match(reservationColumns, /exportTitle: '预留数量'/u)
+  assert.match(reservationColumns, /itemKey: 'reservation-vs-shipment'/u)
   for (const projection of [
     'reservationSalesOrderText',
     'reservationSalesOrderLineText',
@@ -160,4 +162,13 @@ test('stock reservation columns display readable references without exposing tec
   assert.match(source, /record\.product_sku_code/u)
   assert.match(source, /record\.warehouse_name/u)
   assert.match(source, /record\.lot_no/u)
+})
+
+test('账期问号读取对应应收或应付说明，导出仍保留纯文字标题', () => {
+  assert.match(
+    source,
+    /normalizedFinanceFactType === 'PAYABLE' \? 'payables' : 'receivables'/u
+  )
+  assert.match(source, /itemKey: 'payment-term'/u)
+  assert.match(source, /exportTitle: '账期'/u)
 })

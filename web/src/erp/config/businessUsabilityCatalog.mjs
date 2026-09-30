@@ -80,6 +80,518 @@ function guide(definition) {
 }
 
 const GUIDE_BY_PAGE_KEY = Object.freeze({
+  customers: guide({
+    task: '维护客户资料和联系人，供销售选择。',
+    completion: '客户资料已保存，联系人和收货信息核对无误，启用状态可查。',
+    handoff: '销售在订单中选择这个客户；收货信息有变化时，先联系客户核实。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.SOURCE,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '先搜索名称和编号，确认是否已有这个客户。',
+      '核对客户资料，在详情中维护联系人和收货信息。',
+      '保存后重新查看，销售下单时再核对本单带出的内容。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.SOURCE,
+        'customer-defaults',
+        '档案资料和订单资料有什么区别',
+        '档案提供选客户时使用的资料；订单保存后的收货和联系人信息，要在该订单中核对。',
+        { updateRule: '修改客户档案不表示已有订单已经重新确认。' }
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'customer-blocked',
+        '什么情况要先核实',
+        '客户重名、联系人或收货信息不清楚时，先由销售联系客户确认，不重复建档或直接覆盖。'
+      ),
+    ],
+  }),
+  suppliers: guide({
+    task: '维护供应商、加工厂及其交易条件。',
+    completion: '主体类型、联系人和交易条件已核对，资料已保存并可引用。',
+    handoff: '采购或委外经办岗位选择同一份档案；条件有差异先向对方核实。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.TERM,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '搜索已有名称和编号，不为同一个交易主体重复建档。',
+      '核对供应商或加工厂类型、联系人、付款条件和可加工工序。',
+      '保存后在采购或委外单据中核对实际采用的交易条件。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'supplier-terms',
+        '档案付款条件就是本单条件吗',
+        '不是。档案是填写单据的参考，实际付款条件以当前采购或委外单据确认并保存的内容为准。',
+        { updateRule: '修改档案不会改写已有单据的冻结条件。' }
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'supplier-blocked',
+        '什么情况要先核实',
+        '主体类型、联系人或付款条件不清楚时，先由采购或委外经办岗位向对方核实。'
+      ),
+    ],
+  }),
+  products: guide({
+    task: '维护产品基础信息和不同规格。',
+    completion: '产品与规格的归属、单位和启用状态正确，保存后能重新查到。',
+    handoff: '销售、工程、生产和仓库选择对应规格；规格不清楚先找工程核对。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.TERM,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '先搜索产品，在“产品基础信息”和“产品规格”中选择要维护的资料。',
+      '核对所属产品、颜色、尺码、包装、编号和默认单位。',
+      '保存后重新查看，后续单据选择正确规格而不只看产品名称。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'product-sku',
+        '产品和规格（SKU）有什么区别',
+        '产品是基础款，规格是可分别下单和记录库存的具体款式。',
+        { example: '同一款玩偶的红色小号和蓝色大号，分别使用各自的规格。' }
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'default-unit',
+        '默认单位是什么意思',
+        '表示选择产品或规格时优先采用的计量单位，不表示库存已经存在。',
+        {
+          updateRule:
+            '修改单位后重新核对单重；未知单重可以留空，不用填零代替。',
+        }
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'product-blocked',
+        '什么情况要先核实',
+        '规格归属、单位或重复编号不明确时，先找工程核对，不把不同规格合成同一条记录。'
+      ),
+    ],
+  }),
+  materials: guide({
+    task: '维护材料名称、规格和计量单位。',
+    completion: '材料资料已保存，规格、默认单位和启用状态可查。',
+    handoff: '工程、采购和仓库引用同一材料；规格或单位有疑问先核对再使用。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.TERM,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '先搜索名称、编号和规格，避免同料重复建档。',
+      '核对分类、规格、颜色、默认单位及供应商资料。',
+      '保存后重新查看；采购、用料和库存数量到对应页面办理。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'material-unit',
+        '默认单位会改变库存吗',
+        '不会。默认单位是选材料时的参考，库存数量按实际库存记录中的单位查看。',
+        {
+          example: '按米采购的布料不能直接当成按卷记录的数量；先核对单据单位。',
+        }
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'material-blocked',
+        '什么情况要先核实',
+        '材料规格、单位或同料重复资料不明确时，先由工程、采购和仓库核对，再决定使用哪份资料。'
+      ),
+    ],
+  }),
+  processes: guide({
+    task: '维护生产和委外可选择的加工环节。',
+    completion: '环节名称、适用方式、对应生产环节和启用状态已核对并保存。',
+    handoff: '工程或委外经办岗位引用；实际加工顺序回生产路线或合同核对。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.TERM,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '先搜索环节名称和编号，确认是否已有可用资料。',
+      '核对内制、委外适用范围及对应生产环节，填写必要质检参考。',
+      '保存后在生产路线或委外合同中核对引用结果。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'process-reference',
+        '质检参考会自动发起检验吗',
+        '不会。这里的质检参考供人工查看，实际检验仍在质检页面办理。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'process-order',
+        '列表排序就是加工顺序吗',
+        '不是。列表排序方便查找，实际先后顺序由生产路线或委外合同确认。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'process-blocked',
+        '什么情况要先核实',
+        '内制或委外适用范围、对应生产环节不明确时，先找工程核对，不靠名称猜测路线。'
+      ),
+    ],
+  }),
+  'production-scheduling': guide({
+    task: '核对能否按计划生产，再确认排产。',
+    completion:
+      '排产待办已完成，计划、责任人和预计日期可查；不代表已领料或完工。',
+    handoff: '可执行安排交生产；缺料找采购，资料找工程，交期变化反馈销售。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.SOURCE,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '打开生产订单发布后生成的排产待办，核对来源订单和交期。',
+      '核对工程资料、物料需求、库存、采购到料和生产安排。',
+      '条件满足后完成排产确认，核对计划、责任人和预计日期。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.SOURCE,
+        'scheduling-source',
+        '排产待办从哪里来',
+        '由生产订单发布后生成，核对时从该待办打开来源生产订单。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'scheduling-blocked',
+        '什么情况要先停下',
+        '资料、物料或产能不能支持当前交期时，记录缺口并找对应岗位协调，不把有风险的订单标为可执行。'
+      ),
+    ],
+  }),
+  'production-progress': guide({
+    task: '记录实际领料、返工和完工入库。',
+    completion:
+      '对应记录已过账且数量可查；完工报告须由仓库确认入库后才增加库存。',
+    handoff: '完工报告交仓库；缺料找 PMC / 采购，数量差异找来源经办岗位核对。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.TERM,
+      BUSINESS_HELP_TYPES.SOURCE,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '打开来源生产订单，选择本次领料、返工或成品入库记录。',
+      '核对产品或材料、单位、数量、仓库和批次；完工报告交仓库核对实收。',
+      '按当前记录允许的动作确认，再查看过账状态和相关库存变化。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'report-vs-receipt',
+        '完工报告等于已经入库吗',
+        '不等于。生产提交报告后，仓库还要核对实收并确认成品入库。',
+        { effect: '草稿、工序完成和任务完成都不能代替正式库存记录。' }
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.SOURCE,
+        'production-record-source',
+        '数量从哪里核对',
+        '领料核对生产订单物料需求和已领数量；返工核对原完工来源；成品入库核对完工报告和实收数量。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'production-record-blocked',
+        '什么情况不能确认',
+        '库存不足、来源不符或需要超领时先停下；超领到异常处理申请，条件满足后再回原记录办理。'
+      ),
+    ],
+  }),
+  'production-exceptions': guide({
+    task: '申请并跟进报废、在制让步或超领处理。',
+    completion:
+      '来源、原因和审批结果可查；需要执行的处置还须核对正式执行结果。',
+    handoff:
+      '质量判定找品质，缺料与计划找 PMC / 采购；批准后由生产按允许动作执行。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.TERM,
+      BUSINESS_HELP_TYPES.SOURCE,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '核对生产来源、受影响数量和原因，选择报废、在制让步或超领申请。',
+      '补齐依据后提交申请，审批未通过前暂停受影响的办理。',
+      '批准后按允许动作执行，回来源核对数量与状态；审批通过不等于已执行。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'exception-approval',
+        '审批通过后还要做什么',
+        '审批只确认处置意见；生产还要执行获批处置，并核对相应生产或库存结果。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.SOURCE,
+        'exception-source',
+        '异常数量从哪里来',
+        '从对应生产订单、在制批次或物料需求核对，不用其他订单的数量替代。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'exception-blocked',
+        '什么情况要先停下',
+        '来源不明确、审批退回或执行结果无法核对时，保留原因和来源单号，交责任岗位补齐依据。'
+      ),
+    ],
+  }),
+  'shipping-release': guide({
+    task: '财务核对出货单，确认是否允许发货。',
+    completion: '当前出货单版本已获财务放行；实际发货仍由仓库确认。',
+    handoff: '放行后交仓库确认实际出货；金额或客户条件有差异先找销售核对。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.TERM,
+      BUSINESS_HELP_TYPES.SOURCE,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '打开出货单发起的财务审批，核对来源和当前版本。',
+      '核对客户、订单、出货内容与财务条件，不符合时退回并说明原因。',
+      '批准后交仓库确认实物发出；再到出货单核对实际结果。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'release-vs-shipped',
+        '放行就是已经出货吗',
+        '不是。放行表示允许继续发货，只有仓库确认“已出货”才表示实际出货和库存扣减完成。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.SOURCE,
+        'release-source',
+        '这次审批针对哪张单',
+        '针对发起审批的出货单及其版本，不是所有出货单的通用放行。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'release-blocked',
+        '为什么不能继续放行',
+        '审批已退回、出货单版本不匹配或没有办理权限时，回来源单据核对，不沿用旧审批结果。'
+      ),
+    ],
+  }),
+  outbound: guide({
+    task: '查看销售订单锁定的库存，必要时释放预留。',
+    completion:
+      '预留来源、数量和当前状态可查；释放后可用数量恢复，实际出货另行确认。',
+    handoff: '需要发货交仓库到出货页面办理；订单或预留数量有差异先找销售核对。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.TERM,
+      BUSINESS_HELP_TYPES.SOURCE,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '按销售订单查找预留，核对产品、规格、仓库和批次。',
+      '核对预留数量与状态，需要解除占用时确认是否允许释放。',
+      '办理后刷新查看状态；实际发货到出货页面确认，不在这里扣减实物库存。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'reservation-vs-shipment',
+        '预留、释放和出货有什么区别',
+        '预留是为订单占用可用库存；释放是解除占用；出货才是实物发出和库存出库。',
+        {
+          example:
+            '库存 100 个，预留 30 个后还能安排 70 个；释放这 30 个不表示新增入库。',
+        }
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.SOURCE,
+        'reservation-source',
+        '预留对应什么来源',
+        '对应具体销售订单和库存记录，核对时同时查看产品、仓库、单位和批次。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'reservation-blocked',
+        '为什么不能释放',
+        '已释放或已消耗的预留不能重复释放；没有权限时请仓库责任岗位处理。'
+      ),
+    ],
+  }),
+  receivables: guide({
+    task: '从实际出货登记应收，跟进收款结果。',
+    completion:
+      '应收已过账且来源、客户、币种、金额可查；结清以正式核销或红冲结果为准。',
+    handoff: '收款到收付款页面核销；出货、客户或金额不符先交销售 / 仓库核对。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.SOURCE,
+      BUSINESS_HELP_TYPES.FORMULA,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '从“已出货”记录生成应收，核对来源单号。',
+      '核对客户、币种、金额、账期和到期日期，不用手填金额掩盖来源差异。',
+      '确认后过账；收到款项后到收付款页面核销，再查看结清结果。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.SOURCE,
+        'receivable-source',
+        '应收从哪里来',
+        '从仓库已确认实际出货的出货单生成，销售订单或放行审批本身不能代替出货来源。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.FORMULA,
+        'payment-term',
+        '月结和到期日期怎么算',
+        '按来源订单冻结的账期计算：0 天为发生日到期；月结 N 天为发生月份月底再加 N 天。',
+        {
+          source: '本记录发生日期和来源订单确认的付款周期。',
+          example:
+            '发生日期为 4 月 10 日，月结 30 天从 4 月 30 日再加 30 天，到期为 5 月 30 日。',
+          updateRule: '档案后来改了账期，不会改写本记录已冻结的条件。',
+        }
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'receivable-blocked',
+        '为什么不能过账或取消',
+        '来源未实际出货、资料不符或已有核销、红冲、对账关联时，先核对相关记录，按当前允许动作办理。'
+      ),
+    ],
+  }),
+  payables: guide({
+    task: '从正式入库或委外回货登记应付。',
+    completion:
+      '应付已过账且来源、往来方、币种、金额可查；结清以正式核销或红冲结果为准。',
+    handoff:
+      '付款到收付款页面核销；采购差异找采购 / 仓库，委外差异找委外经办岗位。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.SOURCE,
+      BUSINESS_HELP_TYPES.FORMULA,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '从已过账采购入库或符合质检条件的已过账委外回货生成应付。',
+      '核对往来方、币种、金额、来源冻结账期和到期日期。',
+      '确认后过账；实际付款后到收付款页面核销，再查看结清结果。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.SOURCE,
+        'payable-source',
+        '应付从哪里来',
+        '来自已过账采购入库，或质检合格 / 让步接收的已过账委外回货，不直接来自未收货订单。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.FORMULA,
+        'payment-term',
+        '月结和到期日期怎么算',
+        '按来源采购或委外单据冻结的账期计算：0 天为发生日到期；月结 N 天为发生月份月底再加 N 天。',
+        {
+          source: '本记录发生日期和来源单据确认的付款周期。',
+          example:
+            '发生日期为 4 月 10 日，月结 30 天从 4 月 30 日再加 30 天，到期为 5 月 30 日。',
+          updateRule: '档案后来改了账期，不会改写本记录已冻结的条件。',
+        }
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'payable-blocked',
+        '为什么不能过账或取消',
+        '入库未过账、委外回货尚未被质检接收或已有核销、红冲、对账关联时，先核对来源和关联记录。'
+      ),
+    ],
+  }),
+  reconciliation: guide({
+    task: '核对一笔已过账财务记录，保留核对结果。',
+    completion:
+      '当前对账记录已完成核对，来源和核对结果可查；不表示已收款或付款。',
+    handoff: '金额或来源有差异找来源岗位；需要收付款仍到收付款页面办理。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.TERM,
+      BUSINESS_HELP_TYPES.SOURCE,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '从一笔已过账应收、应付或发票记录生成对账草稿。',
+      '核对来源、往来方、币种和金额，填写必要说明后确认过账。',
+      '核对清楚后点“完成核对”；发现差异先联系来源岗位，不直接改余额。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'reconciliation-vs-settlement',
+        '完成核对等于结清吗',
+        '不等于。它只关闭本次核对事项，不会产生收付款或减少应收、应付余额。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.SOURCE,
+        'reconciliation-source',
+        '当前核对多少笔记录',
+        '每张对账记录对应一笔已过账财务来源，不是多单汇总或银行流水自动匹配。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'reconciliation-blocked',
+        '什么时候不能完成核对',
+        '来源未过账、资料有差异或本次记录尚未满足操作条件时，先回来源核实。'
+      ),
+    ],
+  }),
+  invoices: guide({
+    task: '按实际出货登记发票业务记录。',
+    completion:
+      '发票业务记录已过账，来源、客户、币种和金额可查；实际开票结果另行核实。',
+    handoff:
+      '来源差异找销售 / 仓库；财务核查实际开票，不把业务登记当作税控成功。',
+    requiredHelpTypes: [
+      BUSINESS_HELP_TYPES.TERM,
+      BUSINESS_HELP_TYPES.SOURCE,
+      BUSINESS_HELP_TYPES.FLOW,
+      BUSINESS_HELP_TYPES.DISABLED,
+    ],
+    flowSteps: [
+      '从已实际出货记录生成发票业务草稿。',
+      '核对出货来源、客户、币种、金额和发票类别。',
+      '确认后过账并核查实际开票结果；需取消时按当前允许动作办理。',
+    ],
+    items: [
+      helpItem(
+        BUSINESS_HELP_TYPES.TERM,
+        'invoice-business-record',
+        '这里登记后就开好发票了吗',
+        '不是。这里是业务记录，不替代税控平台开票，也不表示已收款。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.SOURCE,
+        'invoice-source',
+        '发票业务来源是什么',
+        '来自已确认实际出货的出货单，核对金额时回看该来源。'
+      ),
+      helpItem(
+        BUSINESS_HELP_TYPES.DISABLED,
+        'invoice-blocked',
+        '什么时候要先停下',
+        '出货来源、客户、币种或金额不符时先找来源岗位核实；取消业务记录不等于税控作废。'
+      ),
+    ],
+  }),
   'sales-orders': guide({
     completion:
       '订单号、客户需求、数量、价格和提交状态都能查到；需要审批的事项已经生成。只有显示“已生效”的订单，才可以继续按已批准订单办理。',
@@ -680,7 +1192,7 @@ export const BUSINESS_USABILITY_CATALOG = Object.freeze(
       sectionTitle: businessModule?.sectionTitle || '',
       title: moduleItem.title,
       path: moduleItem.path,
-      task: moduleItem.description || '',
+      task: pageGuide?.task || moduleItem.description || '',
       boundary: moduleItem.boundary || '',
       completion: pageGuide?.completion || '',
       handoff: pageGuide?.handoff || '',

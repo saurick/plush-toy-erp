@@ -107,8 +107,20 @@
 
 .erp-business-page-help__explanations > div {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
+}
+
+.erp-business-page-help__item {
+  min-width: 0;
+  border-bottom: 1px solid var(--erp-border, #dfe9e1);
+  padding-bottom: 8px;
+}
+
+.erp-business-page-help__item > summary {
+  cursor: pointer;
+  color: var(--erp-text, #1f2937);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
 .erp-business-page-help__boundary {
@@ -123,7 +135,8 @@
   font-weight: 600;
 }
 
-.erp-business-page-help__boundary > summary:focus-visible {
+.erp-business-page-help__boundary > summary:focus-visible,
+.erp-business-page-help__item > summary:focus-visible {
   border-radius: 4px;
   outline: 2px solid var(--erp-primary-soft, #dcefe0);
   outline-offset: 3px;
@@ -140,6 +153,12 @@
   border-radius: 10px;
   background: var(--erp-surface-bg, #fff);
   padding: 12px 14px;
+}
+
+.erp-business-page-help__item .erp-business-help-explanation {
+  border: 0;
+  background: transparent;
+  padding: 8px 0 0;
 }
 
 .erp-business-help-explanation__heading {
@@ -212,8 +231,7 @@
 }
 
 @media (max-width: 767px) {
-  .erp-business-page-help__outcomes,
-  .erp-business-page-help__explanations > div {
+  .erp-business-page-help__outcomes {
     grid-template-columns: minmax(0, 1fr);
   }
 
