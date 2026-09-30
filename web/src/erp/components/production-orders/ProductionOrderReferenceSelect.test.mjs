@@ -23,3 +23,20 @@ test('production order reference select invalidates stale search and filter page
   assert.match(source, /setOptions\(\[\]\)/u)
   assert.match(source, /initialOptions,\s*options/u)
 })
+
+test('production order sales source includes draft planning context and preserves exhausted choices', () => {
+  assert.match(source, /production_order_id: filters\.production_order_id/u)
+  assert.match(source, /filters\.production_order_id,\s*\]/u)
+  assert.match(source, /disabled: option\.selectable === false/u)
+  assert.match(source, /title: option\.reason \|\| option\.label/u)
+  assert.match(source, /virtual=\{salesReference \? false : undefined\}/u)
+  assert.match(source, /min\(520px, calc\(100vw - 24px\)\)/u)
+  assert.match(source, /whiteSpace: 'normal', overflowWrap: 'anywhere'/u)
+  assert.match(source, /shiftX: true/u)
+  assert.doesNotMatch(source, /\.filter\([^\n]*selectable/u)
+})
+
+test('production order reference control retains the form field label association', () => {
+  assert.match(source, /ProductionOrderReferenceSelect\(\{\s*id,/u)
+  assert.match(source, /<Select\s*id=\{id\}/u)
+})

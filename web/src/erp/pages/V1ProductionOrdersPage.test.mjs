@@ -82,6 +82,24 @@ test('production order page hides technical identity and uses readable remote re
   }
 })
 
+test('production order editing uses draft planning context for selected and searchable sales sources', () => {
+  assert.match(
+    page,
+    /async \(items, \{ productionOrderID, \.\.\.options \} = \{\}\)/u
+  )
+  assert.match(page, /type === 'sales_order_item' && productionOrderID/u)
+  assert.match(page, /production_order_id: productionOrderID/u)
+  assert.match(
+    page,
+    /nextAggregate\.order\.status === PRODUCTION_ORDER_STATUS\.DRAFT/u
+  )
+  assert.match(form, /production_order_id: productionOrderID/u)
+  assert.match(
+    form,
+    /!readOnly &&\s*order\?\.status === PRODUCTION_ORDER_STATUS\.DRAFT/u
+  )
+})
+
 test('production order lifecycle keeps backend authority and separates refresh errors', () => {
   assert.match(page, /生产数量尚未全部完成/u)
   assert.match(page, /已有生效生产记录的订单不能直接取消/u)
@@ -223,7 +241,7 @@ test('WIP readers can open production orders without receiving PMC write permiss
   )
   assert.match(
     page,
-    /loadHistoricalOptions\(nextAggregate\.items, \{\s*mode: detailAccess\.mode,\s*\}\)/u
+    /loadHistoricalOptions\(nextAggregate\.items, \{\s*mode: detailAccess\.mode,\s*productionOrderID:\s*nextAggregate\.order\.status === PRODUCTION_ORDER_STATUS\.DRAFT\s*\? nextAggregate\.order\.id\s*: null,\s*\}\)/u
   )
   assert.match(
     page,

@@ -288,6 +288,8 @@ func TestProductionOrderRepoAggregateLifecycleCASAndExactReplay(t *testing.T) {
 func TestProductionOrderRepoReferenceOwnershipAndTransactionRollback(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "production_order_repo_rollback")
+	// Keep capacity available so reference and duplicate-number failures reach their own guards.
+	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetOrderedQuantity(decimal.NewFromInt(120)).SaveX(ctx)
 	otherProduct := createSalesOrderTestProduct(t, ctx, f.client, f.unitID, "production-order-other-product", true)
 	badSKU := createSalesOrderTestProductSKU(t, ctx, f.client, otherProduct.ID, f.unitID, "production-order-other-sku")
 
@@ -411,7 +413,7 @@ func TestProductionOrderRepoGetAndListUseControlledAggregateRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create first: %v", err)
 	}
-	secondDraft := f.draft("MO-READ-002", 20)
+	secondDraft := f.draft("MO-READ-002", 10)
 	secondDraft.Items = append(secondDraft.Items, biz.ProductionOrderDraftItem{
 		LineNo: 2, ProductID: f.productID, UnitID: f.unitID, PlannedQuantity: decimal.NewFromInt(1),
 	})

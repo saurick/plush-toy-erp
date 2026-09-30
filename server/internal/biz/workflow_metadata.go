@@ -71,7 +71,7 @@ var workflowBusinessStates = []WorkflowStateOption{
 	{Key: "project_approved", Label: "立项已放行", Summary: "已通过老板或管理层审批，允许进入资料与采购准备。"},
 	{Key: "engineering_preparing", Label: "资料准备中", Summary: "BOM、色卡、作业指导书和包装要求正在补齐。"},
 	{Key: "material_preparing", Label: "齐套准备中", Summary: "主料、辅包材、委外和关键资料仍在确认或催办。"},
-	{Key: "production_ready", Label: "待排产", Summary: "齐套条件已满足，等待生产经理做排单决策。"},
+	{Key: "production_ready", Label: "待排产", Summary: "生产订单已下达，等待 PMC 排产；物料是否齐套须另行核对。"},
 	{Key: "production_processing", Label: "生产中", Summary: "已进入裁切、车缝、手工、组装或外发执行。"},
 	{Key: "qc_pending", Label: "待检验", Summary: "待做 IQC、过程检验、返工复检或出货前质量确认。"},
 	{Key: "iqc_pending", Label: "IQC 待检", Summary: "采购到货或入库通知已形成，等待品质做来料检验。"},

@@ -17,11 +17,25 @@ import (
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/unit"
 	"server/internal/unitpolicy"
+
+	"github.com/shopspring/decimal"
 )
 
 func (r *productionOrderRepo) ListProductionOrderReferenceOptions(ctx context.Context, filter biz.ProductionOrderReferenceFilter) ([]*biz.ProductionOrderReferenceOption, int, error) {
 	if r == nil || r.data == nil || r.data.postgres == nil {
 		return nil, 0, biz.ErrBadParam
+	}
+	if filter.ProductionOrderID > 0 {
+		order, err := r.data.postgres.ProductionOrder.Get(ctx, filter.ProductionOrderID)
+		if ent.IsNotFound(err) {
+			return nil, 0, biz.ErrProductionOrderNotFound
+		}
+		if err != nil {
+			return nil, 0, err
+		}
+		if order.Status != biz.ProductionOrderStatusDraft {
+			return nil, 0, biz.ErrProductionOrderInvalidState
+		}
 	}
 	switch filter.ReferenceType {
 	case biz.ProductionOrderReferenceProduct:
@@ -192,6 +206,14 @@ func (r *productionOrderRepo) listProductionOrderSalesItemOptions(ctx context.Co
 	if err != nil {
 		return nil, 0, err
 	}
+	ids := make([]int, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	planned, err := readProductionOrderSalesPlanning(ctx, r.data.postgres, ids, filter.ProductionOrderID)
+	if err != nil {
+		return nil, 0, err
+	}
 	options := make([]*biz.ProductionOrderReferenceOption, 0, len(rows))
 	for _, row := range rows {
 		orderRow, productRow, skuRow, unitRow := row.Edges.SalesOrder, row.Edges.Product, row.Edges.ProductSku, row.Edges.Unit
@@ -200,6 +222,16 @@ func (r *productionOrderRepo) listProductionOrderSalesItemOptions(ctx context.Co
 			selectable = selectable && skuRow != nil && skuRow.IsActive
 		}
 		option := &biz.ProductionOrderReferenceOption{ReferenceType: filter.ReferenceType, Value: row.ID, Selectable: selectable, ProductValue: productionOrderIntPtr(row.ProductID), SKUValue: row.ProductSkuID, UnitValue: productionOrderIntPtr(row.UnitID), SalesLineNo: productionOrderIntPtr(row.LineNo), OrderedQuantity: productionOrderStringPtr(row.OrderedQuantity.String()), PlannedDeliveryAt: row.PlannedDeliveryDate, SalesLineStatus: productionOrderStringPtr(row.LineStatus)}
+		remaining := row.OrderedQuantity.Sub(planned[row.ID])
+		if remaining.IsNegative() {
+			remaining = decimal.Zero
+		}
+		option.PlannedProductionQuantity = productionOrderStringPtr(planned[row.ID].String())
+		option.RemainingPlannableQuantity = productionOrderStringPtr(remaining.String())
+		if selectable && !remaining.GreaterThan(decimal.Zero) {
+			option.Selectable = false
+			option.Reason = productionOrderStringPtr("该销售行已无剩余可排产数量，请先调整或取消其他生产单")
+		}
 		if orderRow != nil {
 			option.SalesOrderNo = productionOrderStringPtr(orderRow.OrderNo)
 			option.SalesOrderStatus = productionOrderStringPtr(orderRow.LifecycleStatus)
@@ -214,6 +246,11 @@ func (r *productionOrderRepo) listProductionOrderSalesItemOptions(ctx context.Co
 			setReferenceUnit(option, unitRow)
 		}
 		option.Label = compactProductionOrderReferenceLabel(productionOrderStringValue(option.SalesOrderNo), fmt.Sprintf("第 %d 行", row.LineNo), productionOrderStringValue(option.Name), productionOrderStringValue(option.SKUCode), row.OrderedQuantity.String(), productionOrderStringValue(option.UnitName))
+		plannedLabel := "已计划"
+		if filter.ProductionOrderID > 0 {
+			plannedLabel = "其他单已计划"
+		}
+		option.Label = compactProductionOrderReferenceLabel(option.Label, plannedLabel+" "+planned[row.ID].String(), "可排产 "+remaining.String())
 		markHistoricalReference(option)
 		options = append(options, option)
 	}
@@ -282,7 +319,7 @@ func selectedReferenceTotal(filter biz.ProductionOrderReferenceFilter, total int
 }
 
 func markHistoricalReference(option *biz.ProductionOrderReferenceOption) {
-	if option == nil || option.Selectable {
+	if option == nil || option.Selectable || option.Reason != nil {
 		return
 	}
 	reason := "历史关联，仅供查看"

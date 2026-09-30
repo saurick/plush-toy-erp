@@ -6,6 +6,7 @@ import {
   createProductionOrderReferenceRequestGate,
   mergeProductionOrderReferenceOptions,
   nextProductionOrderReferencePage,
+  selectedProductionOrderReferenceOptions,
 } from './productionOrderReferencePagination.mjs'
 
 function options(offset, count) {
@@ -48,6 +49,44 @@ test('production order reference pages deduplicate while preserving selected his
     merged.find((option) => option.value === selected.value)?.label,
     '历史选项'
   )
+})
+
+test('reference reload retains only the selected label and accepts refreshed eligibility', () => {
+  const selected = { value: 1001, label: '已选来源', selectable: true }
+  const current = [...options(0, 50), selected]
+  const retained = selectedProductionOrderReferenceOptions(
+    current,
+    selected.value
+  )
+  assert.deepEqual(retained, [selected])
+  assert.equal(current.length, 51)
+
+  const reloaded = mergeProductionOrderReferenceOptions(
+    retained,
+    options(0, 50)
+  )
+  assert.equal(
+    reloaded.find((option) => option.value === selected.value),
+    selected
+  )
+
+  const refreshed = {
+    ...selected,
+    label: '已选来源 · 可排产 0',
+    selectable: false,
+    reason: '订单数量已全部安排生产',
+  }
+  const updated = mergeProductionOrderReferenceOptions(retained, [refreshed])
+  assert.equal(updated[0], refreshed)
+  assert.equal(selected.selectable, true)
+
+  assert.deepEqual(
+    selectedProductionOrderReferenceOptions(current, undefined),
+    []
+  )
+  assert.deepEqual(selectedProductionOrderReferenceOptions(current, 2), [
+    current[1],
+  ])
 })
 
 test('production order reference request gate rejects stale search pages', () => {

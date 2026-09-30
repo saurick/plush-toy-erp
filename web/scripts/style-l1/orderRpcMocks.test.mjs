@@ -176,6 +176,28 @@ test('production order list mock accepts the current page filters and returns it
   assert.notEqual(invalid.result.code, 0)
 })
 
+test('production reference mock accepts draft sales planning context without relaxing other references', async () => {
+  const call = await orderMockHarness('**/rpc/production_order')
+  const valid = await call('list_production_order_reference_options', {
+    reference_type: 'sales_order_item',
+    production_order_id: 71,
+    selected_ids: [601],
+  })
+  assert.equal(valid.result.code, 0)
+  for (const productionOrderID of [0, -1, 1.5, '71']) {
+    const invalid = await call('list_production_order_reference_options', {
+      reference_type: 'sales_order_item',
+      production_order_id: productionOrderID,
+    })
+    assert.notEqual(invalid.result.code, 0)
+  }
+  const invalidType = await call('list_production_order_reference_options', {
+    reference_type: 'product',
+    production_order_id: 71,
+  })
+  assert.notEqual(invalidType.result.code, 0)
+})
+
 test('production WIP mock always returns the nullable finished-goods rework lineage contract', async () => {
   const call = await orderMockHarness('**/rpc/production_wip')
   const initial = await call('get_production_wip', {

@@ -501,7 +501,10 @@ func TestProductionOrderPostgresCloseFailsClosedForCorruptOrExcessFacts(t *testi
 func TestProductionOrderPostgresCloseSerializesWithFactPostAndReversal(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderPGFixture(t)
-	for iteration := 0; iteration < 8; iteration++ {
+	const iterations = 8
+	// Each post/reversal race owns a ten-unit plan against this shared sales source.
+	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetOrderedQuantity(decimal.NewFromInt(2 * iterations * 10)).SaveX(ctx)
+	for iteration := 0; iteration < iterations; iteration++ {
 		label := fmt.Sprintf("close-post-race-%d", iteration)
 		order := f.createReleasedOrder(t, ctx, label)
 		input := f.linkedFactInput(order, label, 10)
@@ -541,7 +544,7 @@ func TestProductionOrderPostgresCloseSerializesWithFactPostAndReversal(t *testin
 		}
 	}
 
-	for iteration := 0; iteration < 8; iteration++ {
+	for iteration := 0; iteration < iterations; iteration++ {
 		label := fmt.Sprintf("close-reverse-race-%d", iteration)
 		order := f.createReleasedOrder(t, ctx, label)
 		fact := f.createAndPostLinkedFact(t, ctx, order, 0, label, 10)

@@ -12,6 +12,13 @@ export function mergeProductionOrderReferenceOptions(...groups) {
   return [...merged.values()]
 }
 
+export function selectedProductionOrderReferenceOptions(
+  options,
+  selectedValue
+) {
+  return options.filter((option) => option.value === selectedValue)
+}
+
 export function nextProductionOrderReferencePage(page) {
   const offset = Number(page?.offset)
   const total = Number(page?.total)

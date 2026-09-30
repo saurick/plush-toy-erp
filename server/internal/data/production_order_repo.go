@@ -306,6 +306,9 @@ func (r *productionOrderRepo) CreateProductionOrderDraft(ctx context.Context, in
 	if err != nil {
 		return nil, err
 	}
+	if err := validateProductionOrderSalesPlanning(ctx, client, 0, in.Draft.Items); err != nil {
+		return nil, err
+	}
 	orderCreate := client.ProductionOrder.Create().
 		SetOrderNo(in.Draft.OrderNo).
 		SetStatus(biz.ProductionOrderStatusDraft).
@@ -350,6 +353,9 @@ func (r *productionOrderRepo) SaveProductionOrderDraft(ctx context.Context, in *
 		}
 		snapshots, err := validateProductionOrderDraftReferences(ctx, client, in.Draft.Items)
 		if err != nil {
+			return nil, err
+		}
+		if err := validateProductionOrderSalesPlanning(ctx, client, in.ID, in.Draft.Items); err != nil {
 			return nil, err
 		}
 		affected, err := client.ProductionOrder.Update().
@@ -423,6 +429,9 @@ func (r *productionOrderRepo) ApplyProductionOrderAction(ctx context.Context, in
 				return nil, err
 			}
 			if _, err := validateProductionOrderDraftReferences(ctx, client, items); err != nil {
+				return nil, err
+			}
+			if err := validateProductionOrderSalesPlanning(ctx, client, in.ID, items); err != nil {
 				return nil, err
 			}
 			if err := validateProductionEngineeringRelease(ctx, client, items, r.data.sqlDialect); err != nil {

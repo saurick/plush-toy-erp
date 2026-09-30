@@ -837,6 +837,7 @@ export async function installOrderRpcMocks(page, context) {
     ]),
     list_production_order_reference_options: new Set([
       'reference_type',
+      'production_order_id',
       'keyword',
       'product_id',
       'product_sku_id',
@@ -900,6 +901,13 @@ export async function installOrderRpcMocks(page, context) {
       )
     }
     if (method === 'list_production_order_reference_options') {
+      if (
+        params.production_order_id !== undefined &&
+        (params.reference_type !== 'sales_order_item' ||
+          !positive(params.production_order_id))
+      ) {
+        return false
+      }
       return [
         'product',
         'product_sku',

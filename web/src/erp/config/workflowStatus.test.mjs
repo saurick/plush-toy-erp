@@ -12,6 +12,18 @@ const WORKFLOW_METADATA_PATH = new URL(
   import.meta.url
 )
 
+test('workflowStatus: 待排产只表示已下达，不承诺物料齐套', async () => {
+  const status = BUSINESS_STATUS_OPTIONS.find(
+    (item) => item.key === 'production_ready'
+  )
+  assert(status)
+  assert.equal(status.label, '待排产')
+  assert.match(status.summary, /生产订单已下达/u)
+  assert.match(status.summary, /物料是否齐套须另行核对/u)
+  const backend = await readFile(WORKFLOW_METADATA_PATH, 'utf8')
+  assert(backend.includes(`Summary: "${status.summary}"`))
+})
+
 async function readBackendWorkflowBusinessStatusKeys() {
   const source = await readFile(WORKFLOW_METADATA_PATH, 'utf8')
   const block = source.match(

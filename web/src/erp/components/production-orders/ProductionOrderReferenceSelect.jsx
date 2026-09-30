@@ -10,9 +10,29 @@ import {
   createProductionOrderReferenceRequestGate,
   mergeProductionOrderReferenceOptions,
   nextProductionOrderReferencePage,
+  selectedProductionOrderReferenceOptions,
 } from '../../utils/productionOrderReferencePagination.mjs'
 
+const SALES_REFERENCE_PLACEMENTS = {
+  bottomLeft: {
+    points: ['tl', 'bl'],
+    offset: [0, 4],
+    overflow: { adjustX: true, adjustY: true, shiftX: true, shiftY: true },
+    htmlRegion: 'visible',
+    dynamicInset: true,
+  },
+}
+
+function renderSalesReferenceOption(option) {
+  return (
+    <span style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+      {option.label}
+    </span>
+  )
+}
+
 export default function ProductionOrderReferenceSelect({
+  id,
   referenceType,
   filters = {},
   value,
@@ -48,13 +68,14 @@ export default function ProductionOrderReferenceSelect({
         const data = await listProductionOrderReferenceOptions(
           referenceType,
           {
-            ...(filters.product_id
-              ? { product_id: filters.product_id }
-              : {}),
+            ...(filters.product_id ? { product_id: filters.product_id } : {}),
             ...(filters.product_sku_id
               ? { product_sku_id: filters.product_sku_id }
               : {}),
             ...(filters.unit_id ? { unit_id: filters.unit_id } : {}),
+            ...(filters.production_order_id
+              ? { production_order_id: filters.production_order_id }
+              : {}),
             keyword,
             limit: PRODUCTION_ORDER_REFERENCE_PAGE_SIZE,
             offset,
@@ -64,7 +85,9 @@ export default function ProductionOrderReferenceSelect({
         if (!requestGateRef.current.isCurrent(generation)) return
         setOptions((current) =>
           mergeProductionOrderReferenceOptions(
-            replace ? [] : current,
+            replace
+              ? selectedProductionOrderReferenceOptions(current, value)
+              : current,
             data.options
           )
         )
@@ -91,7 +114,14 @@ export default function ProductionOrderReferenceSelect({
         }
       }
     },
-    [referenceType, filters.product_id, filters.product_sku_id, filters.unit_id]
+    [
+      referenceType,
+      value,
+      filters.product_id,
+      filters.product_sku_id,
+      filters.unit_id,
+      filters.production_order_id,
+    ]
   )
 
   const resetAndLoad = useCallback(
@@ -107,13 +137,15 @@ export default function ProductionOrderReferenceSelect({
         loading: false,
       }
       setLoading(false)
-      setOptions([])
+      setOptions((current) =>
+        selectedProductionOrderReferenceOptions(current, value)
+      )
       timerRef.current = window.setTimeout(
         () => loadPage({ generation, keyword, offset: 0, replace: true }),
         keyword ? 220 : 0
       )
     },
-    [loadPage]
+    [loadPage, value]
   )
 
   useEffect(() => {
@@ -184,8 +216,12 @@ export default function ProductionOrderReferenceSelect({
     }))
   }, [initialOptions, options, value])
 
+  // Sales-source names and capacity wrap; paged options need their actual row height.
+  const salesReference = referenceType === 'sales_order_item'
+
   return (
     <Select
+      id={id}
       showSearch
       filterOption={false}
       allowClear={allowClear}
@@ -193,9 +229,24 @@ export default function ProductionOrderReferenceSelect({
       loading={loading}
       value={value}
       options={renderedOptions}
+      placement={salesReference ? 'bottomLeft' : undefined}
+      builtinPlacements={
+        salesReference ? SALES_REFERENCE_PLACEMENTS : undefined
+      }
+      popupMatchSelectWidth={salesReference ? false : undefined}
+      styles={
+        salesReference
+          ? { popup: { root: { width: 'min(520px, calc(100vw - 24px))' } } }
+          : undefined
+      }
+      virtual={salesReference ? false : undefined}
       listItemHeight={referenceType === 'product' ? 48 : undefined}
       optionRender={
-        referenceType === 'product' ? renderProductOption : undefined
+        referenceType === 'product'
+          ? renderProductOption
+          : salesReference
+            ? renderSalesReferenceOption
+            : undefined
       }
       placeholder={placeholder}
       onSearch={resetAndLoad}

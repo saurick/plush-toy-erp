@@ -396,7 +396,11 @@ const mockBusinessStates = [
     label: '齐套准备中',
     summary: '主料、辅包材或委外仍在确认。',
   },
-  { key: 'production_ready', label: '待排产', summary: '等待 PMC 排单。' },
+  {
+    key: 'production_ready',
+    label: '待排产',
+    summary: '生产订单已下达，等待 PMC 排产；物料是否齐套须另行核对。',
+  },
   {
     key: 'production_processing',
     label: '生产中',
@@ -717,6 +721,7 @@ const mockProductionOrderParamKeys = {
   ]),
   list_production_order_reference_options: new Set([
     'reference_type',
+    'production_order_id',
     'keyword',
     'product_id',
     'product_sku_id',
@@ -788,6 +793,13 @@ function mockProductionOrderParamsValid(method, params) {
     )
   }
   if (method === 'list_production_order_reference_options') {
+    if (
+      params.production_order_id !== undefined &&
+      (params.reference_type !== 'sales_order_item' ||
+        !positive(params.production_order_id))
+    ) {
+      return false
+    }
     return [
       'product',
       'product_sku',

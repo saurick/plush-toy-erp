@@ -192,6 +192,7 @@ function RowReference({
   form,
   optionsByType,
   readOnly,
+  productionOrderID,
   referenceAccess,
   quantityUnitOptions,
   rowRef,
@@ -229,6 +230,9 @@ function RowReference({
             disabled={readOnly || referenceAccess.sales_order_item !== true}
             initialOptions={optionsByType.sales_order_item}
             filters={{
+              ...(productionOrderID
+                ? { production_order_id: productionOrderID }
+                : {}),
               ...(productID ? { product_id: productID } : {}),
               ...(skuID ? { product_sku_id: skuID } : {}),
               ...(unitID ? { unit_id: unitID } : {}),
@@ -574,6 +578,12 @@ export default function ProductionOrderEditor({
                       optionsByType={normalizedOptions}
                       quantityUnitOptions={quantityUnitOptions}
                       readOnly={readOnly}
+                      productionOrderID={
+                        !readOnly &&
+                        order?.status === PRODUCTION_ORDER_STATUS.DRAFT
+                          ? order.id
+                          : null
+                      }
                       referenceAccess={referenceAccess}
                       rowRef={(node) => registerLineItemRow(index, node)}
                       sequence={index + 1}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -12,6 +13,32 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 )
+
+func TestProductionOrderJSONRPCSalesPlanningOptionContract(t *testing.T) {
+	filter, ok := productionOrderReferenceFilterFromParams(map[string]any{
+		"reference_type": biz.ProductionOrderReferenceSalesOrderItem, "production_order_id": float64(17),
+	})
+	if !ok || filter.ProductionOrderID != 17 {
+		t.Fatalf("editing context not parsed: %#v %v", filter, ok)
+	}
+	for _, value := range []any{float64(0), float64(-1), 1.5, "17"} {
+		if _, valid := productionOrderReferenceFilterFromParams(map[string]any{"reference_type": biz.ProductionOrderReferenceSalesOrderItem, "production_order_id": value}); valid {
+			t.Fatalf("invalid editing context accepted: %#v", value)
+		}
+	}
+	planned, remaining := "60", "40"
+	mapped := productionOrderReferenceOptionToMap(&biz.ProductionOrderReferenceOption{
+		PlannedProductionQuantity: &planned, RemainingPlannableQuantity: &remaining,
+	})
+	if mapped["planned_production_quantity"] != "60" || mapped["remaining_plannable_quantity"] != "40" {
+		t.Fatalf("capacity projection missing: %#v", mapped)
+	}
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard))}
+	result := d.mapProductionOrderError(context.Background(), fmt.Errorf("save: %w", biz.ErrProductionOrderPlannedQuantityExceeded))
+	if result.Code != errcode.InvalidParam.Code || result.Message != "该销售订单行的累计生产计划数量超过订单数量，请刷新可排产数量后调整" || errors.Is(biz.ErrProductionOrderPlannedQuantityExceeded, biz.ErrProductionOrderQuantityExceeded) {
+		t.Fatalf("planning errors must not masquerade as completion errors: %#v", result)
+	}
+}
 
 func newProductionOrderJSONRPCTestData(t *testing.T, permissions ...string) (*jsonrpcDispatcher, int, int) {
 	t.Helper()

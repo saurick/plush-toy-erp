@@ -597,7 +597,7 @@ export default function V1ProductionOrdersPage() {
   }, [reasonAction, reasonForm])
 
   const loadHistoricalOptions = useCallback(
-    async (items, options = {}) => {
+    async (items, { productionOrderID, ...options } = {}) => {
       const snapshotOptions = productionReferenceSnapshotOptions(items)
       if (options.mode === 'view') {
         setOptionsByType(snapshotOptions)
@@ -620,7 +620,12 @@ export default function V1ProductionOrdersPage() {
           if (ids.length === 0) return [type, []]
           const data = await listProductionOrderReferenceOptions(
             type,
-            { selected_ids: ids },
+            {
+              selected_ids: ids,
+              ...(type === 'sales_order_item' && productionOrderID
+                ? { production_order_id: productionOrderID }
+                : {}),
+            },
             options
           )
           return [type, data.options]
@@ -650,6 +655,10 @@ export default function V1ProductionOrdersPage() {
       }
       await loadHistoricalOptions(nextAggregate.items, {
         mode: detailAccess.mode,
+        productionOrderID:
+          nextAggregate.order.status === PRODUCTION_ORDER_STATUS.DRAFT
+            ? nextAggregate.order.id
+            : null,
       })
       setAggregate(nextAggregate)
       setSelected(nextAggregate.order)

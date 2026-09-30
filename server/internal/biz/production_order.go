@@ -47,6 +47,7 @@ var (
 	ErrProductionOrderReceiptCorrupt                 = errors.New("production order receipt corrupt")
 	ErrProductionOrderFactSourceInvalid              = errors.New("production order fact source invalid")
 	ErrProductionOrderQuantityExceeded               = errors.New("production order finished quantity exceeded")
+	ErrProductionOrderPlannedQuantityExceeded        = errors.New("production order sales planning quantity exceeded")
 	ErrProductionOrderMaterialRequirementNotFound    = errors.New("production order material requirement not found")
 	ErrProductionOrderMaterialRequirementInvalid     = errors.New("production order material requirement invalid")
 	ErrProductionOrderMaterialRequirementsNeedReview = errors.New("production order material requirements need review")
@@ -221,47 +222,50 @@ type ProductionOrderFilter struct {
 }
 
 type ProductionOrderReferenceFilter struct {
-	ReferenceType string
-	Keyword       string
-	ProductID     int
-	ProductSKUID  int
-	UnitID        int
-	SelectedIDs   []int
-	Limit         int
-	Offset        int
+	ReferenceType     string
+	Keyword           string
+	ProductionOrderID int
+	ProductID         int
+	ProductSKUID      int
+	UnitID            int
+	SelectedIDs       []int
+	Limit             int
+	Offset            int
 }
 
 type ProductionOrderReferenceOption struct {
-	ReferenceType     string
-	Value             int
-	Label             string
-	Selectable        bool
-	Reason            *string
-	ProductValue      *int
-	SKUValue          *int
-	UnitValue         *int
-	Code              *string
-	Name              *string
-	StyleNo           *string
-	CustomerStyleNo   *string
-	SKUCode           *string
-	SKUName           *string
-	Color             *string
-	ColorNo           *string
-	Size              *string
-	PackagingVersion  *string
-	UnitCode          *string
-	UnitName          *string
-	UnitPrecision     *int
-	SalesOrderNo      *string
-	SalesLineNo       *int
-	OrderedQuantity   *string
-	PlannedDeliveryAt *time.Time
-	SalesOrderStatus  *string
-	SalesLineStatus   *string
-	BOMVersion        *string
-	EffectiveFrom     *time.Time
-	EffectiveTo       *time.Time
+	ReferenceType              string
+	Value                      int
+	Label                      string
+	Selectable                 bool
+	Reason                     *string
+	ProductValue               *int
+	SKUValue                   *int
+	UnitValue                  *int
+	Code                       *string
+	Name                       *string
+	StyleNo                    *string
+	CustomerStyleNo            *string
+	SKUCode                    *string
+	SKUName                    *string
+	Color                      *string
+	ColorNo                    *string
+	Size                       *string
+	PackagingVersion           *string
+	UnitCode                   *string
+	UnitName                   *string
+	UnitPrecision              *int
+	SalesOrderNo               *string
+	SalesLineNo                *int
+	OrderedQuantity            *string
+	PlannedProductionQuantity  *string
+	RemainingPlannableQuantity *string
+	PlannedDeliveryAt          *time.Time
+	SalesOrderStatus           *string
+	SalesLineStatus            *string
+	BOMVersion                 *string
+	EffectiveFrom              *time.Time
+	EffectiveTo                *time.Time
 }
 
 type ProductionOrderRepo interface {
@@ -331,6 +335,9 @@ func (uc *ProductionOrderUsecase) ListReferenceOptions(ctx context.Context, filt
 	}
 	filter.ReferenceType = strings.TrimSpace(filter.ReferenceType)
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
+	if filter.ProductionOrderID < 0 || (filter.ProductionOrderID != 0 && filter.ReferenceType != ProductionOrderReferenceSalesOrderItem) {
+		return nil, 0, ErrBadParam
+	}
 	if !validProductionOrderReferenceType(filter.ReferenceType) || filter.Limit < 1 || filter.Limit > 50 || filter.Offset < 0 || len(filter.SelectedIDs) > 50 {
 		return nil, 0, ErrBadParam
 	}

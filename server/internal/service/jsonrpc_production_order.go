@@ -231,7 +231,7 @@ func (d *jsonrpcDispatcher) listProductionOrders(ctx context.Context, pm map[str
 }
 
 func (d *jsonrpcDispatcher) listProductionOrderReferenceOptions(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "reference_type", "keyword", "product_id", "product_sku_id", "unit_id", "selected_ids", "limit", "offset") {
+	if !productionOrderAllowsOnly(pm, "reference_type", "keyword", "product_id", "product_sku_id", "unit_id", "production_order_id", "selected_ids", "limit", "offset") {
 		return invalidParamResult()
 	}
 	if res := d.RequireAdminPermission(ctx, biz.PermissionPMCPlanRead); res != nil {
@@ -281,7 +281,7 @@ func productionOrderReferenceFilterFromParams(pm map[string]any) (biz.Production
 		return biz.ProductionOrderReferenceFilter{}, false
 	}
 	filter := biz.ProductionOrderReferenceFilter{ReferenceType: referenceType, Keyword: keyword, Limit: limit, Offset: offset}
-	for key, target := range map[string]*int{"product_id": &filter.ProductID, "product_sku_id": &filter.ProductSKUID, "unit_id": &filter.UnitID} {
+	for key, target := range map[string]*int{"product_id": &filter.ProductID, "product_sku_id": &filter.ProductSKUID, "unit_id": &filter.UnitID, "production_order_id": &filter.ProductionOrderID} {
 		if raw, exists := pm[key]; exists {
 			value, valid := productionOrderJSONSafeInt(raw)
 			if !valid || value <= 0 {
@@ -323,6 +323,7 @@ func productionOrderReferenceOptionToMap(option *biz.ProductionOrderReferenceOpt
 		"sku_code": optionalStringValue(option.SKUCode), "sku_name": optionalStringValue(option.SKUName), "color": optionalStringValue(option.Color), "color_no": optionalStringValue(option.ColorNo), "size": optionalStringValue(option.Size), "packaging_version": optionalStringValue(option.PackagingVersion),
 		"unit_code": optionalStringValue(option.UnitCode), "unit_name": optionalStringValue(option.UnitName), "unit_precision": optionalIntValue(option.UnitPrecision),
 		"sales_order_no": optionalStringValue(option.SalesOrderNo), "sales_line_no": optionalIntValue(option.SalesLineNo), "ordered_quantity": optionalStringValue(option.OrderedQuantity), "planned_delivery_at": optionalTimeUnix(option.PlannedDeliveryAt),
+		"planned_production_quantity": optionalStringValue(option.PlannedProductionQuantity), "remaining_plannable_quantity": optionalStringValue(option.RemainingPlannableQuantity),
 		"sales_order_status": optionalStringValue(option.SalesOrderStatus), "sales_line_status": optionalStringValue(option.SalesLineStatus), "bom_version": optionalStringValue(option.BOMVersion), "effective_from": optionalTimeUnix(option.EffectiveFrom), "effective_to": optionalTimeUnix(option.EffectiveTo),
 	}
 }
@@ -628,6 +629,8 @@ func (d *jsonrpcDispatcher) mapProductionOrderError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单不存在"}
 	case errors.Is(err, biz.ErrProductionOrderReferenceInvalid), errors.Is(err, biz.ErrProductionOrderFactSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单引用的产品、规格、单位、销售明细或 BOM 已失效，请刷新后检查"}
+	case errors.Is(err, biz.ErrProductionOrderPlannedQuantityExceeded):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该销售订单行的累计生产计划数量超过订单数量，请刷新可排产数量后调整"}
 	case errors.Is(err, biz.ErrProductionOrderHasPostedFacts):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该生产订单已有生效的生产入库记录，不能取消；请先按业务规则冲正或关闭"}
 	case errors.Is(err, biz.ErrProductionOrderFactDependency):

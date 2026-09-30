@@ -22,7 +22,7 @@ export const BUSINESS_STATUS_OPTIONS = Object.freeze([
   {
     key: 'production_ready',
     label: '待排产',
-    summary: '齐套条件已满足，等待生产经理做排单决策。',
+    summary: '生产订单已下达，等待 PMC 排产；物料是否齐套须另行核对。',
   },
   {
     key: 'production_processing',

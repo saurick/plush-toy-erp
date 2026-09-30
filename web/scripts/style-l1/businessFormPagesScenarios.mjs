@@ -5,6 +5,7 @@ import {
 import { createBusinessFormPageDraftScenarios } from './businessFormPageDraftScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { assertBusinessFormSections } from './businessFormSectionAssertions.mjs'
+import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
 
 export function createBusinessFormPagesScenarios(deps) {
   const documents = [
@@ -235,6 +236,249 @@ export function createBusinessFormPagesScenarios(deps) {
   return [
     ...createBusinessFormPageDraftScenarios(deps),
     ...scenarios,
+    ...['create', 'edit'].map((mode) => {
+      const requests = []
+      let quotaRejected = false
+      const name = `business-form-page-production-sales-planning-${mode}`
+      return {
+        ...scenarios.find(
+          (scenario) =>
+            scenario.name === 'business-form-page-production-desktop'
+        ),
+        name,
+        beforeNavigate: async (page) => {
+          await page.route('**/rpc/production_order', async (route) => {
+            const request = route.request().postDataJSON()
+            if (request.method === 'create_production_order') {
+              quotaRejected = true
+              return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: request.id,
+                  result: {
+                    code: RpcErrorCode.INVALID_PARAM,
+                    message:
+                      '该销售订单行的累计生产计划数量超过订单数量，请刷新可排产数量后调整',
+                  },
+                }),
+              })
+            }
+            if (
+              request.method !== 'list_production_order_reference_options' ||
+              request.params.reference_type !== 'sales_order_item'
+            ) {
+              return route.fallback()
+            }
+            const params = request.params
+            requests.push(params)
+            const editing = params.production_order_id === 71
+            const options = [
+              {
+                value: 601,
+                label: `SO-PLAN / 第 1 行 · PROD-STYLE-L1 · ${editing ? '其他单已计划 80 / 可排产 20' : '已计划 100 / 可排产 0'}`,
+                selectable: editing,
+                reason: editing
+                  ? null
+                  : '该销售行已无剩余可排产数量，请先调整或取消其他生产单',
+                planned_production_quantity: editing ? '80' : '100',
+                remaining_plannable_quantity: editing ? '20' : '0',
+                product_value: 301,
+                sku_value: 401,
+                unit_value: 501,
+              },
+              {
+                value: 602,
+                label:
+                  'SO-PLAN / 第 2 行 · PROD-STYLE-L1 · 已计划 60 / 可排产 40',
+                selectable: true,
+                planned_production_quantity: '60',
+                remaining_plannable_quantity: '40',
+                product_value: 301,
+                sku_value: 401,
+                unit_value: 501,
+              },
+            ].filter(
+              (option) =>
+                !params.selected_ids ||
+                params.selected_ids.includes(option.value)
+            )
+            const limit = params.limit || 50
+            const offset = params.offset || 0
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: request.id,
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: {
+                    reference_type: 'sales_order_item',
+                    options: options.slice(offset, offset + limit),
+                    total: options.length,
+                    limit,
+                    offset,
+                  },
+                },
+              }),
+            })
+          })
+        },
+        verify: async (page) => {
+          if (mode === 'edit') {
+            await page
+              .getByText('MO-STYLE-L1-20260713', { exact: true })
+              .click()
+            await page.locator('[data-business-action-key="edit"]').click()
+          } else {
+            await page.getByRole('button', { name: '新建生产订单' }).click()
+          }
+          const editor = page.locator('.erp-business-form-page:not([hidden])')
+          await editor
+            .getByRole('heading', {
+              name: mode === 'edit' ? '编辑生产订单' : '新建生产订单',
+              exact: true,
+            })
+            .waitFor()
+          const row = editor.locator('.erp-production-order-line').first()
+          const source = row.getByLabel('销售订单行（可选）')
+          const sourceControl = row.locator('.ant-select').first()
+          const quantity = row.getByLabel('计划数量', { exact: true })
+          await quantity.fill('7')
+          if (mode === 'edit') {
+            deps.assert(
+              requests.some(
+                (params) =>
+                  params.production_order_id === 71 &&
+                  params.selected_ids?.includes(601)
+              ),
+              '编辑时已选来源的回显请求必须排除本单旧计划'
+            )
+            deps.assert.match(
+              await sourceControl.innerText(),
+              /其他单已计划 80 \/ 可排产 20/u
+            )
+          }
+          for (const width of [1440, 390]) {
+            await page.setViewportSize({ width, height: 900 })
+            await source.focus()
+            await source.press('ArrowDown')
+            const popup = page.locator(
+              '.ant-select-dropdown:not(.ant-select-dropdown-hidden)'
+            )
+            const full = popup.locator('.ant-select-item-option').filter({
+              hasText: 'SO-PLAN / 第 1 行',
+            })
+            await full.waitFor()
+            await page.waitForFunction(
+              (node) =>
+                getComputedStyle(node).opacity === '1' &&
+                node
+                  .getAnimations({ subtree: true })
+                  .every((animation) => animation.playState !== 'running'),
+              await popup.elementHandle()
+            )
+            deps.assert.equal(
+              await full.evaluate((node) =>
+                node.classList.contains('ant-select-item-option-disabled')
+              ),
+              mode === 'create',
+              '排满来源保持可见；新建禁选，编辑按排除本单后的额度判断'
+            )
+            if (mode === 'create') {
+              deps.assert.match(
+                await full.getAttribute('title'),
+                /无剩余可排产/u
+              )
+            }
+            const popupBox = await popup.boundingBox()
+            deps.assert(
+              popupBox.x >= 0 && popupBox.x + popupBox.width <= width + 1,
+              `数量说明不得撑开窄屏选项列表：${JSON.stringify({ popupBox, width })}`
+            )
+            const readable = await full
+              .locator('.ant-select-item-option-content')
+              .evaluate((node) => ({
+                width: node.clientWidth,
+                contentWidth: node.scrollWidth,
+                height: node.clientHeight,
+                contentHeight: node.scrollHeight,
+              }))
+            deps.assert(
+              readable.contentWidth <= readable.width + 1 &&
+                readable.contentHeight <= readable.height + 1,
+              `数量说明必须完整换行，不省略或裁切：${JSON.stringify(readable)}`
+            )
+            await page.screenshot({
+              path: `${deps.outputDir}/${name}-${width}.png`,
+              animations: 'disabled',
+            })
+            await popup
+              .locator('.ant-select-item-option')
+              .filter({ hasText: 'SO-PLAN / 第 2 行' })
+              .click()
+            await sourceControl
+              .locator('.ant-select-selection-item')
+              .filter({ hasText: '可排产 40' })
+              .waitFor()
+            deps.assert.match(await sourceControl.innerText(), /可排产 40/u)
+            deps.assert.equal(await quantity.inputValue(), '7')
+            await sourceControl.hover()
+            await sourceControl.locator('.ant-select-clear').click()
+            deps.assert.doesNotMatch(
+              await sourceControl.innerText(),
+              /SO-PLAN/u
+            )
+            deps.assert.equal(await quantity.inputValue(), '7')
+            await assertBusinessFormPage(page, editor)
+          }
+          if (mode === 'create') {
+            await editor
+              .getByLabel('生产单号', { exact: true })
+              .fill('MO-PLAN-UI-CREATE')
+            await source.focus()
+            await source.press('ArrowDown')
+            await page
+              .locator(
+                '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
+              )
+              .filter({ hasText: 'SO-PLAN / 第 2 行' })
+              .click()
+            await editor
+              .getByRole('button', { name: '创建草稿', exact: true })
+              .click()
+            await page
+              .locator('.ant-message-error')
+              .filter({
+                hasText: '累计生产计划数量超过订单数量',
+              })
+              .waitFor()
+            deps.assert.equal(quotaRejected, true)
+            deps.assert.equal(await quantity.inputValue(), '7')
+            deps.assert.match(
+              await sourceControl.innerText(),
+              /SO-PLAN \/ 第 2 行/u
+            )
+            await editor
+              .getByRole('heading', { name: '新建生产订单', exact: true })
+              .waitFor()
+          }
+          deps.assert(requests.length > 0)
+          deps.assert(
+            requests.every((params) =>
+              mode === 'edit'
+                ? params.production_order_id === 71
+                : params.production_order_id === undefined
+            ),
+            '新建与编辑的来源搜索、回显及筛选请求使用各自的排产上下文'
+          )
+          await closeBusinessFormPage(page, editor)
+        },
+      }
+    }),
     ...[
       'sales',
       'purchase',
