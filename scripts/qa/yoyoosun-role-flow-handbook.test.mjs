@@ -340,8 +340,13 @@ test("trial account checklist fixes public 133 test credentials and current navi
   assert.match(trialAccountChecklist, /`admin`\s*\| `adminadmin`/u);
   assert.match(
     trialAccountChecklist,
-    /常用：`应收管理`、`应付管理`、`发票管理`；更多：`对账管理`、`收付款核销`和来源核对页/u,
+    /`财务管理`中的应收、应付、收付款、对账和发票页签，以及来源核对页/u,
   );
+  assert.match(
+    trialAccountChecklist,
+    /多个财务页面因此共用一个“财务管理”入口/u,
+  );
+  assert.match(trialAccountChecklist, /模块内只显示该账号有权访问的页签/u);
 });
 
 test("customer documentation does not route to the retired delta register", () => {
