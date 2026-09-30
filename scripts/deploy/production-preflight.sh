@@ -100,7 +100,7 @@ validate_absolute_path_without_aliases() {
   esac
 
   # macOS 本机只能静态审查 133 的 /root/deploy 合同；本机没有目标机的该目录，
-  # 不能据此判断目标机存储。在 133/Linux 执行时仍会逐段检查已存在的父路径。
+  # 不能据此判断目标机存储。在 133/Linux 执行时仍会逐段检查所有已存在的父路径。
   if [[ "$(uname -s)" == "Darwin" && "$path" == /root/deploy/plush-toy-erp-*/* && ! -e /root/deploy ]]; then
     return
   fi

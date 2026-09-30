@@ -210,7 +210,7 @@ export function createERPViteConfig(appId) {
           ? `${createDevOrigin(serverPort)}${DEV_DATABASE_MIGRATION_RECOVERY_ROUTE}`
           : createDevOrigin(serverPort),
         hmr: {
-          host: DEV_HOST,
+          host: process.env.ERP_VITE_HMR_HOST?.trim() || DEV_HOST,
           clientPort: hmrClientPort,
         },
         proxy: {
