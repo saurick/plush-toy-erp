@@ -7,16 +7,22 @@ import { createRequire } from 'node:module'
 import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 
-import { loadDevPorts } from '../../scripts/dev-ports.mjs'
+import { isDevPortAvailable, loadDevPorts } from '../../scripts/dev-ports.mjs'
 import {
   LOCAL_RUNTIME_RECOVERY_MODE,
   LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
   LocalRuntimePreflightError,
   isLoopbackAPIOrigin,
   isRecoverableWebRuntimePreflightError,
+  normalizeAPIOrigin,
   runWebRuntimePreflight,
 } from '../../scripts/local-runtime-preflight.mjs'
+import {
+  executeCommand,
+  redactDatabaseMigrationDiagnostic,
+} from '../dev-server/devDatabaseMigrationRuntime.mjs'
 import { resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
+import { resolveDevRuntimeRecoveryRoute } from '../src/dev-workbench/config/devRuntimeRecovery.mjs'
 import {
   isCodexDevSession,
   resolveERPHMRClientPort,
@@ -112,32 +118,111 @@ export function parseStartWebDevArgs(argv, env = process.env) {
   }
 }
 
+export async function startStoppedLocalBackend(
+  options,
+  {
+    execute = executeCommand,
+    isPortAvailable = isDevPortAvailable,
+    writeLine = (line) => process.stderr.write(`${line}\n`),
+    env = process.env,
+  } = {}
+) {
+  if (options.frontendOnly || options.stop) return false
+  const origin = new URL(normalizeAPIOrigin(options.apiOrigin))
+  if (
+    origin.protocol !== 'http:' ||
+    !['127.0.0.1', 'localhost'].includes(origin.hostname) ||
+    Number(origin.port) !== devPorts.http ||
+    !(await isPortAvailable(devPorts.http))
+  ) {
+    return false
+  }
+  writeLine(
+    '[start-web] 本地后端未运行，正在启动当前工作区后端；完成后开放电脑版和手机版'
+  )
+  try {
+    await execute('make', ['run', 'ARGS=--if-stopped'], {
+      cwd: path.join(repoRoot, 'server'),
+      env: {
+        ...env,
+        GIT_OPTIONAL_LOCKS: '0',
+        PLUSH_GITLAB_READ_TOKEN: '',
+        PLUSH_GITLAB_TOKEN: '',
+      },
+      timeout: 600_000,
+      onStdout: (chunk) =>
+        writeLine(redactDatabaseMigrationDiagnostic(chunk).trimEnd()),
+    })
+  } catch (error) {
+    if (error?.diagnostic) {
+      writeLine(redactDatabaseMigrationDiagnostic(error.diagnostic))
+    }
+    throw new LocalRuntimePreflightError(
+      'local_backend_start_failed',
+      '本地后端启动未完成；请在迁移恢复页检查状态，修正后重新启动'
+    )
+  }
+  return true
+}
+
 export async function resolveWebRuntimeStartup(
   options,
   {
     preflight = runWebRuntimePreflight,
+    startBackend = startStoppedLocalBackend,
+    isPortAvailable = isDevPortAvailable,
     timeoutMs = LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
     writeLine = (line) => process.stderr.write(`${line}\n`),
   } = {}
 ) {
   const localBackend = isLoopbackAPIOrigin(options.apiOrigin)
-  const controller = new AbortController()
-  let timer
-  try {
-    const checked = await Promise.race([
-      preflight(options, { signal: controller.signal }),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          reject(
-            new LocalRuntimePreflightError(
-              'local_runtime_preflight_timeout',
-              '本地运行预检超时；可在迁移恢复页重新检查数据库与后端状态'
+  const check = async () => {
+    const controller = new AbortController()
+    let timer
+    try {
+      const stopped =
+        localBackend &&
+        !options.frontendOnly &&
+        !options.stop &&
+        (await isPortAvailable(devPorts.http))
+      return await Promise.race([
+        preflight(options, {
+          signal: controller.signal,
+          endpointTimeoutMs: stopped ? 1000 : undefined,
+        }),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            reject(
+              new LocalRuntimePreflightError(
+                'local_runtime_preflight_timeout',
+                '本地运行预检超时；可在迁移恢复页重新检查数据库与后端状态'
+              )
             )
-          )
-          controller.abort()
-        }, timeoutMs)
-      }),
-    ])
+            controller.abort()
+          }, timeoutMs)
+        }),
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  try {
+    let checked
+    try {
+      checked = await check()
+    } catch (error) {
+      if (
+        !options.frontendOnly &&
+        !options.stop &&
+        localBackend &&
+        error?.code === 'local_backend_unavailable' &&
+        (await startBackend(options, { writeLine }))
+      ) {
+        checked = await check()
+      } else {
+        throw error
+      }
+    }
     return {
       ...checked,
       recoveryMode: '',
@@ -154,7 +239,7 @@ export async function resolveWebRuntimeStartup(
           '本地运行预检未完成；请在迁移恢复页检查数据库配置、迁移状态和后端'
         )
     writeLine(
-      `[start-web] ${recoveryError.message}\n[start-web] 已进入数据库迁移恢复模式；只开放恢复页，普通 ERP 页面与 RPC 暂停`
+      `[start-web] ${recoveryError.message}\n[start-web] 已进入恢复模式：${resolveDevRuntimeRecoveryRoute(recoveryError.code)}；普通 ERP 页面与 RPC 暂停`
     )
     return {
       complete: false,
@@ -163,8 +248,6 @@ export async function resolveWebRuntimeStartup(
       recoveryMode: LOCAL_RUNTIME_RECOVERY_MODE,
       recoveryReason: recoveryError.code,
     }
-  } finally {
-    clearTimeout(timer)
   }
 }
 
@@ -173,6 +256,7 @@ export function createViteChildEnvironment({
   gitlabCredential,
   recoveryMode = '',
   recoveryReason = '',
+  frontendOnly = false,
   env = process.env,
 } = {}) {
   const childEnvironment = {
@@ -182,11 +266,13 @@ export function createViteChildEnvironment({
   }
   delete childEnvironment.ERP_DEV_RECOVERY_MODE
   delete childEnvironment.ERP_DEV_RECOVERY_REASON
+  delete childEnvironment.ERP_DEV_RUNTIME_CHECKS
   delete childEnvironment.PLUSH_GITLAB_READ_TOKEN
   if (recoveryMode) {
     childEnvironment.ERP_DEV_RECOVERY_MODE = recoveryMode
     childEnvironment.ERP_DEV_RECOVERY_REASON = recoveryReason
   }
+  if (!frontendOnly) childEnvironment.ERP_DEV_RUNTIME_CHECKS = '1'
   if (gitlabCredential.token) {
     childEnvironment.PLUSH_GITLAB_READ_TOKEN = gitlabCredential.token
   }
@@ -292,7 +378,7 @@ async function main() {
     )
     return
   }
-  const url = `http://127.0.0.1:${port}${startup.recoveryMode ? '/__dev/database-migration' : '/'}`
+  const url = `http://127.0.0.1:${port}${startup.recoveryMode ? resolveDevRuntimeRecoveryRoute(startup.recoveryReason) : '/'}`
   if (instance.reused) {
     process.stdout.write(
       `[start-web] 已复用本工作区前端（PID ${instance.pid}）：${url}\n[start-web] 服务继续由原终端管理；需要重新加载启动配置时执行 pnpm start --restart\n`

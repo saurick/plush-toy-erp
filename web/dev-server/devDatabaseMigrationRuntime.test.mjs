@@ -3,6 +3,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -66,6 +67,17 @@ test('migration commands return output and preserve failure diagnostics', async 
     ]),
     (error) => error.exitCode === 7 && /failed-check/u.test(error.diagnostic)
   )
+})
+
+test('a cancelled command cannot start a subprocess', async (t) => {
+  const root = createRoot(t)
+  const marker = path.join(root, 'unexpected-command.txt')
+  const controller = new AbortController()
+  controller.abort()
+  await assert.rejects(executeCommand(process.execPath, [
+    '-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`,
+  ], { signal: controller.signal }), { name: 'AbortError' })
+  assert.equal(existsSync(marker), false)
 })
 
 test('migration timeout kills an owned child tree before reporting failure', async (t) => {

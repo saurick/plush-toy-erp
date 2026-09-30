@@ -4,8 +4,8 @@ import { resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
 import {
-  DEV_DATABASE_MIGRATION_RECOVERY_ROUTE,
   normalizeDevRuntimeRecoveryMode,
+  resolveDevRuntimeRecoveryRoute,
 } from './src/dev-workbench/config/devRuntimeRecovery.mjs'
 import { loadDevPorts } from '../scripts/dev-ports.mjs'
 import { normalizeAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
@@ -153,6 +153,8 @@ export function createERPViteConfig(appId) {
             mode,
             projectRoot: PROJECT_ROOT,
             recoveryMode,
+            recoveryReason: process.env.ERP_DEV_RECOVERY_REASON || '',
+            runtimeChecks: process.env.ERP_DEV_RUNTIME_CHECKS === '1',
           })
         : []
 
@@ -207,7 +209,7 @@ export function createERPViteConfig(appId) {
         port: serverPort,
         strictPort: true,
         open: recoveryMode
-          ? `${createDevOrigin(serverPort)}${DEV_DATABASE_MIGRATION_RECOVERY_ROUTE}`
+          ? `${createDevOrigin(serverPort)}${resolveDevRuntimeRecoveryRoute(process.env.ERP_DEV_RECOVERY_REASON)}`
           : createDevOrigin(serverPort),
         hmr: {
           host: process.env.ERP_VITE_HMR_HOST?.trim() || DEV_HOST,

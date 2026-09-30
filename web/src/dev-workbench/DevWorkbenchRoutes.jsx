@@ -27,7 +27,8 @@ import {
 } from './config/devRoutes.mjs'
 import { createDevLazyRoute } from './config/devRouteModules.mjs'
 import {
-  DEV_DATABASE_MIGRATION_RECOVERY_ROUTE,
+  DEV_BACKEND_RECOVERY_ROUTE,
+  getDevRuntimeRecoveryRoute,
   isDevDatabaseMigrationRecoveryActive,
 } from './config/devRuntimeRecovery.mjs'
 import './styles/index.css'
@@ -134,6 +135,7 @@ function DevRouteLoadingFallback() {
 export default function DevWorkbenchRoutes() {
   const location = useLocation()
   const recoveryOnly = isDevDatabaseMigrationRecoveryActive()
+  const recoveryRoute = getDevRuntimeRecoveryRoute()
   const appTitle = import.meta.env.VITE_APP_TITLE || '毛绒玩具管理系统'
   const documentTitle = resolveDevPageTitle(location.pathname, appTitle)
   const faviconHref = resolveDevPageFavicon(location.pathname)
@@ -150,16 +152,14 @@ export default function DevWorkbenchRoutes() {
         </Helmet>
         <Suspense fallback={<DevRouteLoadingFallback />}>
           <Routes>
+            {recoveryRoute === DEV_BACKEND_RECOVERY_ROUTE ? (
+              <Route index element={<DevHubPage />} />
+            ) : null}
             <Route
               path="database-migration"
               element={<DevDatabaseMigrationPage />}
             />
-            <Route
-              path="*"
-              element={
-                <Navigate to={DEV_DATABASE_MIGRATION_RECOVERY_ROUTE} replace />
-              }
-            />
+            <Route path="*" element={<Navigate to={recoveryRoute} replace />} />
           </Routes>
         </Suspense>
       </>

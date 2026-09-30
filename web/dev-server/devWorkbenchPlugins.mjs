@@ -28,10 +28,15 @@ export function createDevWorkbenchServePlugins({
   mode,
   projectRoot,
   recoveryMode = '',
+  recoveryReason = '',
+  runtimeChecks = false,
 } = {}) {
   if (command !== 'serve' || mode !== 'development') return []
   const recovery = createDevDatabaseMigrationRecoveryController({
     mode: recoveryMode,
+    reason: recoveryReason,
+    apiOrigin,
+    runtimeChecks,
   })
   return [
     createDevWebInstancePlugin({ isRecoveryActive: recovery.isActive }),
@@ -46,6 +51,7 @@ export function createDevWorkbenchServePlugins({
       projectRoot,
       apiOrigin,
       onRuntimeReady: recovery.markRuntimeReady,
+      isRuntimeRecoveryActive: recovery.isActive,
     }),
     createDevDataPreparationPlugin({ projectRoot }),
     createDevQaTestingPlugin({ projectRoot }),

@@ -54,7 +54,11 @@ pnpm install
 | 客户热更新 / 静态预览 | `pnpm start:yoyoosun --print-plan`（固定 `15200`）/ `pnpm preview:yoyoosun --print-plan` |
 | 重启客户开发入口 | `pnpm restart:yoyoosun`，固定重启 `15200`；可用 `--port` 指定辅助端口 |
 
-普通启动先只读检查 schema、migration 和后端 health / ready。可恢复的本机预检失败时保留 `/__dev/database-migration`，业务入口继续阻断；修正后重新通过完整检查才恢复，不自动 apply。完整启动、进程保护、端口审计及客户包核对见 [前端脚本](scripts/README.md#本地启动与进程范围)。
+客户入口遇到本工作区的过期 Vite 会核验归属后自动停止并重新启动，继续使用原端口；同配置实例继续复用，其他程序或工作区的占用会阻断。
+
+普通 `pnpm start` 使用通用产品配置；永绅业务开发使用 `pnpm start:yoyoosun` 加载客户公开配置，并读取后端已激活的业务权限与岗位入口。
+
+普通启动先只读检查 schema、migration 和后端 health / ready。登记的本地后端未运行且数据库检查通过时，自动通过现有 `make run` 链路构建、启动并验证当前工作区后端，随后开放电脑版和手机版；已有后端监听进程会保留。后端未就绪时，两端统一进入 `/__dev/` 查看服务提示与恢复入口；数据库或迁移检查失败时进入 `/__dev/database-migration`。已打开页面遇到本机停服也进入同一总览，修正后重新通过完整检查才恢复，不自动 apply 或重放业务请求。完整启动、进程保护、端口审计及客户包核对见 [前端脚本](scripts/README.md#本地启动与进程范围)。
 
 所有开发入口直接加载当前工作区的 React / CSS 源文件并支持热更新，重启后不会用历史固定制品覆盖登录页或业务页。`pnpm restart` 对应主端口 `5175`；使用 `15200` 客户入口时运行 `pnpm restart:yoyoosun`。后端代码需在 `server/` 执行 `make dev_restart` 重新编译。
 

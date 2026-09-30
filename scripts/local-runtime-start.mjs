@@ -2,6 +2,7 @@
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   buildRuntimeBundle,
   readRuntimeSource,
@@ -9,7 +10,8 @@ import {
   WORKSPACE_RUNTIME_SOURCE_CHANGED_CODE,
 } from "./local-runtime-bundle.mjs";
 import { checkLocalDatabaseMigrations } from "./local-runtime-preflight.mjs";
-import { loadDevPorts } from "./dev-ports.mjs";
+import { isDevPortAvailable, loadDevPorts } from "./dev-ports.mjs";
+import { presentRuntimeConsole } from "./local-runtime-console.mjs";
 import {
   createDevDatabaseMigrationRuntime,
   executeCommand,
@@ -25,6 +27,16 @@ const WORKSPACE_RUNTIME_RESTART_PURPOSE = "workspace-runtime-restart";
 const RESTART_LOCK_WAIT_TIMEOUT_MS = 120_000;
 const RESTART_LOCK_WAIT_INTERVAL_MS = 250;
 const SOURCE_CHANGE_RETRY_LIMIT = 5;
+
+function restartOwnerAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (error.code === "ESRCH") return false;
+    throw error;
+  }
+}
 
 function migrationOperationBusyError(error) {
   const blocked = new Error(
@@ -49,16 +61,19 @@ export async function acquireWorkspaceRuntimeRestartLock(
     acquire = acquireDatabaseMigrationExecutionLock,
     read = readDatabaseMigrationExecutionLock,
     releaseWait = (milliseconds) =>
-      new Promise((resolve) => setTimeout(resolve, milliseconds)),
+      delay(milliseconds, undefined, { signal }),
     clock = () => Date.now(),
     timeoutMs = RESTART_LOCK_WAIT_TIMEOUT_MS,
     intervalMs = RESTART_LOCK_WAIT_INTERVAL_MS,
     progress = () => {},
+    processAlive = restartOwnerAlive,
+    signal,
   } = {},
 ) {
   const startedAt = clock();
   let waiting = false;
   while (true) {
+    signal?.throwIfAborted();
     try {
       acquire(store, operationId, {
         purpose: WORKSPACE_RUNTIME_RESTART_PURPOSE,
@@ -78,6 +93,13 @@ export async function acquireWorkspaceRuntimeRestartLock(
       if (!current) continue;
       if (current?.purpose !== WORKSPACE_RUNTIME_RESTART_PURPOSE) {
         throw migrationOperationBusyError(error);
+      }
+      if (!processAlive(current.pid)) {
+        const interrupted = new Error(
+          `之前的重启进程 PID=${current.pid} 已退出，但执行锁仍在；请在迁移恢复页刷新状态、核对中断结果后重试；本次未停止当前后端`,
+        );
+        interrupted.code = "WORKSPACE_RUNTIME_RESTART_INTERRUPTED";
+        throw interrupted;
       }
       if (!waiting) {
         waiting = true;
@@ -106,21 +128,41 @@ export async function startWorkspaceRuntime(
     ports = loadDevPorts,
     source = readRuntimeSource,
     sourceChangeRetryLimit = SOURCE_CHANGE_RETRY_LIMIT,
+    ifStopped = false,
+    isPortAvailable = isDevPortAvailable,
+    signal,
   } = {},
 ) {
   const operationId = randomUUID();
   const store = resolveDatabaseMigrationOperationStore(root);
-  await acquireWorkspaceRuntimeRestartLock(store, operationId, { progress });
+  await acquireWorkspaceRuntimeRestartLock(store, operationId, { progress, signal });
   try {
+    signal?.throwIfAborted();
+    const run = (command, args, options = {}) => execute(command, args, {
+      ...options,
+      signal: signal && options.signal
+        ? AbortSignal.any([signal, options.signal])
+        : signal || options.signal,
+    });
+    const httpPort = ports(root).http;
+    const reuseListener = async () => {
+      if (!ifStopped || (await isPortAvailable(httpPort))) return false;
+      progress("后端端口已有监听进程，本次未重启；前端将重新核对现有后端");
+      return true;
+    };
+    if (await reuseListener()) return { reused: true };
     // Pending migrations and failed builds must leave the running backend intact.
     let candidateId = operationId;
     let sourceChangeRetries = 0;
-    const runtime = createRuntime(root, `http://127.0.0.1:${ports(root).http}`);
+    let started = false;
+    const runtime = createRuntime(root, `http://127.0.0.1:${httpPort}`, { openConsole: false });
     while (true) {
-      await preflight();
+      signal?.throwIfAborted();
+      await preflight({ signal, execFile: run });
+      signal?.throwIfAborted();
       let candidate;
       try {
-        candidate = await build(root, candidateId, execute, progress, {
+        candidate = await build(root, candidateId, run, progress, {
           workspaceVerification: "backend",
         });
       } catch (error) {
@@ -139,10 +181,22 @@ export async function startWorkspaceRuntime(
         candidateId = randomUUID();
         continue;
       }
+      signal?.throwIfAborted();
+      if (!started && (await reuseListener())) {
+        rmSync(runtimeBundleDirectory(root, candidate.id), {
+          recursive: true,
+          force: true,
+        });
+        return { reused: true };
+      }
+      signal?.throwIfAborted();
       progress(
         "候选构建完成，正在切换后端并验证 health / ready / business",
       );
+      // Once cutover starts, finish its validation before allowing another
+      // restart to enter; cancellation must not leave an unverified service.
       const result = await runtime.restart(operationId, candidate.id);
+      started = true;
       progress("后端切换与业务验证通过，正在复核最新后端源码");
       let currentSource;
       try {
@@ -171,19 +225,58 @@ export async function startWorkspaceRuntime(
       candidateId = randomUUID();
     }
   } finally {
-    releaseDatabaseMigrationExecutionLock(store, operationId);
+    try {
+      releaseDatabaseMigrationExecutionLock(store, operationId);
+    } catch (error) {
+      error.code = "WORKSPACE_RUNTIME_RESTART_LOCK_RELEASE_FAILED";
+      throw error;
+    }
   }
 }
 
+export async function runWorkspaceRuntimeCLI(argv, {
+  root = path.resolve(import.meta.dirname, ".."),
+  start = startWorkspaceRuntime,
+  present = presentRuntimeConsole,
+  interactive = Boolean(process.stdout.isTTY),
+  write = console.log,
+  signals = process,
+} = {}) {
+  const controller = new AbortController();
+  const cancel = () => {
+    if (controller.signal.aborted) return;
+    write("[local-runtime] 正在取消本次重启；先结束构建子任务，已开始的服务切换会完成核验后释放锁");
+    controller.abort();
+  };
+  const handledSignals = ["SIGINT", "SIGTERM", "SIGHUP"];
+  for (const signal of handledSignals) signals.on(signal, cancel);
+  let result;
+  try {
+    result = await start(root, { ifStopped: argv.includes("--if-stopped"), signal: controller.signal });
+    controller.signal.throwIfAborted();
+  } catch (error) {
+    if (controller.signal.aborted && error.code !== "WORKSPACE_RUNTIME_RESTART_LOCK_RELEASE_FAILED") {
+      const cancelled = new Error("已取消本次重启；本轮子任务及执行锁已完成清理，可检查服务状态后重试");
+      cancelled.code = "WORKSPACE_RUNTIME_RESTART_CANCELLED";
+      throw cancelled;
+    }
+    throw error;
+  } finally {
+    for (const signal of handledSignals) signals.off(signal, cancel);
+  }
+  if (!result.reused) {
+    write(`[local-runtime] started workspace-source=${result.sourceFingerprint} backend-source=${result.backendSourceFingerprint} bundle=${result.bundleId} migration=${result.activeVersion} health=passed ready=passed business=passed`);
+  }
+  // Log viewing starts after the migration/restart lock has been released.
+  await present(root, { interactive, background: argv.includes("--background") }).catch((error) => {
+    write(`[local-runtime] 后端启动流程已完成，但日志查看不可用：${error.message}；可执行 make dev_logs`);
+  });
+  return result;
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
-  startWorkspaceRuntime(path.resolve(import.meta.dirname, ".."))
-    .then((result) => {
-      console.log(
-        `[local-runtime] started workspace-source=${result.sourceFingerprint} backend-source=${result.backendSourceFingerprint} bundle=${result.bundleId} migration=${result.activeVersion} health=passed ready=passed business=passed`,
-      );
-    })
-    .catch((error) => {
-      console.error(error.message);
-      process.exitCode = 1;
-    });
+  runWorkspaceRuntimeCLI(process.argv.slice(2)).catch((error) => {
+    console.error(error.message);
+    process.exitCode = error.code === "WORKSPACE_RUNTIME_RESTART_CANCELLED" ? 130 : 1;
+  });
 }

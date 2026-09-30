@@ -9,6 +9,7 @@ import {
   parseStartWebDevArgs,
   resolveDevGitlabCredential,
   resolveWebRuntimeStartup,
+  startStoppedLocalBackend,
 } from './startWebDev.mjs'
 import {
   LOCAL_RUNTIME_RECOVERY_MODE,
@@ -73,6 +74,7 @@ test('start web dev: pending migration 启动受限恢复页而不是退出', as
         )
       },
       writeLine: (line) => output.push(line),
+      startBackend: async () => assert.fail('待迁移时不能启动后端'),
     }
   )
 
@@ -139,6 +141,7 @@ test('start web dev: 所有本地数据库预检阻断保留恢复入口', async
           throw new LocalRuntimePreflightError(code, '检查未通过')
         },
         writeLine: () => {},
+        startBackend: async () => false,
       }
     )
     assert.equal(startup.recoveryReason, code)
@@ -158,11 +161,214 @@ test('start web dev: 预检卡住时取消命令并按时开放恢复页', async
         await new Promise(() => {})
       },
       writeLine: () => {},
+      startBackend: async () => assert.fail('预检超时不能启动后端'),
     }
   )
   assert.equal(signal.aborted, true)
   assert.equal(startup.recoveryReason, 'local_runtime_preflight_timeout')
   assert.equal(startup.recoveryMode, LOCAL_RUNTIME_RECOVERY_MODE)
+})
+
+test('start web dev: 冷启动只启动一次后端，再通过完整预检开放业务', async () => {
+  const calls = []
+  let ready = false
+  const startup = await resolveWebRuntimeStartup(
+    { apiOrigin: 'http://127.0.0.1:8300' },
+    {
+      isPortAvailable: async () => !ready,
+      preflight: async (_options, runtime) => {
+        calls.push('preflight')
+        assert.equal(runtime.endpointTimeoutMs, ready ? undefined : 1000)
+        if (!ready)
+          throw new LocalRuntimePreflightError(
+            'local_backend_unavailable',
+            '未启动'
+          )
+        return { complete: true, apiOrigin: 'http://127.0.0.1:8300' }
+      },
+      startBackend: async () => {
+        calls.push('start')
+        ready = true
+        return true
+      },
+    }
+  )
+  assert.deepEqual(calls, ['preflight', 'start', 'preflight'])
+  assert.equal(startup.complete, true)
+  assert.equal(startup.recoveryMode, '')
+})
+
+test('start web dev: 冷启动构建不受只读预检时限截断', async () => {
+  let checks = 0
+  const startup = await resolveWebRuntimeStartup(
+    { apiOrigin: 'http://127.0.0.1:8300' },
+    {
+      timeoutMs: 20,
+      preflight: async () => {
+        checks++
+        if (checks === 1)
+          throw new LocalRuntimePreflightError(
+            'local_backend_unavailable',
+            '未启动'
+          )
+        return { complete: true }
+      },
+      startBackend: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 40))
+        return true
+      },
+    }
+  )
+  assert.equal(startup.complete, true)
+  assert.equal(checks, 2)
+})
+
+test('start web dev: 已运行、仅前端和停止命令不启动后端', async () => {
+  for (const options of [
+    { apiOrigin: 'http://127.0.0.1:8300' },
+    { apiOrigin: 'http://127.0.0.1:8300', frontendOnly: true },
+    { apiOrigin: 'http://127.0.0.1:8300', stop: true },
+  ]) {
+    const startup = await resolveWebRuntimeStartup(options, {
+      preflight: async () => ({ complete: !options.frontendOnly }),
+      startBackend: async () => assert.fail('正常预检不能启动后端'),
+    })
+    assert.equal(startup.recoveryMode, '')
+  }
+})
+
+test('start web dev: 后端启动或复验失败保留恢复页且不自动重试', async () => {
+  for (const startFails of [true, false]) {
+    let starts = 0
+    const startup = await resolveWebRuntimeStartup(
+      { apiOrigin: 'http://127.0.0.1:8300' },
+      {
+        preflight: async () => {
+          throw new LocalRuntimePreflightError(
+            'local_backend_unavailable',
+            '未就绪'
+          )
+        },
+        startBackend: async () => {
+          starts++
+          if (startFails)
+            throw new LocalRuntimePreflightError(
+              'local_backend_start_failed',
+              '启动失败'
+            )
+          return true
+        },
+        writeLine: () => {},
+      }
+    )
+    assert.equal(starts, 1)
+    assert.equal(startup.complete, false)
+    assert.equal(
+      startup.recoveryReason,
+      startFails ? 'local_backend_start_failed' : 'local_backend_unavailable'
+    )
+    assert.equal(startup.recoveryMode, LOCAL_RUNTIME_RECOVERY_MODE)
+  }
+})
+
+test('start web dev: 后端自动启动复用正式 Make 入口并隔离 GitLab 凭据', async () => {
+  const calls = []
+  assert.equal(
+    await startStoppedLocalBackend(
+      { apiOrigin: 'http://localhost:8300' },
+      {
+        isPortAvailable: async () => true,
+        env: {
+          PLUSH_GITLAB_TOKEN: 'private-write-token',
+          PLUSH_GITLAB_READ_TOKEN: 'private-read-token',
+        },
+        execute: async (command, args, options) =>
+          calls.push({ command, args, options }),
+        writeLine: () => {},
+      }
+    ),
+    true
+  )
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].command, 'make')
+  assert.deepEqual(calls[0].args, ['run', 'ARGS=--if-stopped'])
+  assert.match(calls[0].options.cwd, /\/server$/u)
+  assert.equal(calls[0].options.env.GIT_OPTIONAL_LOCKS, '0')
+  assert.equal(calls[0].options.env.PLUSH_GITLAB_TOKEN, '')
+  assert.equal(calls[0].options.env.PLUSH_GITLAB_READ_TOKEN, '')
+  assert.equal(calls[0].options.timeout, 600_000)
+})
+
+test('start web dev: 非登记目标、已有监听和仅前端命令不自动启动共享后端', async () => {
+  for (const options of [
+    { apiOrigin: 'http://127.0.0.1:8301' },
+    { apiOrigin: 'http://example.com:8300' },
+    { apiOrigin: 'https://127.0.0.1:8300' },
+    { apiOrigin: 'http://127.0.0.1:8300', frontendOnly: true },
+    { apiOrigin: 'http://127.0.0.1:8300', stop: true },
+  ]) {
+    assert.equal(
+      await startStoppedLocalBackend(options, {
+        isPortAvailable: async () => true,
+        execute: async () => assert.fail('不能启动后端'),
+      }),
+      false
+    )
+  }
+  assert.equal(
+    await startStoppedLocalBackend(
+      { apiOrigin: 'http://127.0.0.1:8300' },
+      {
+        isPortAvailable: async () => false,
+        execute: async () => assert.fail('不能停止已有监听进程'),
+      }
+    ),
+    false
+  )
+})
+
+test('start web dev: 后端编译失败不透传凭据或原始异常', async () => {
+  const output = []
+  await assert.rejects(
+    startStoppedLocalBackend(
+      { apiOrigin: 'http://127.0.0.1:8300' },
+      {
+        isPortAvailable: async () => true,
+        execute: async () => {
+          throw new Error('postgres://user:secret@private/db')
+        },
+        writeLine: (line) => output.push(line),
+      }
+    ),
+    (error) => {
+      assert.equal(error.code, 'local_backend_start_failed')
+      assert.doesNotMatch(error.message, /secret|postgres/u)
+      return true
+    }
+  )
+  assert.doesNotMatch(output.join('\n'), /secret|postgres/u)
+})
+
+test('start web dev: 正式启动诊断保留编译原因并再次脱敏', async () => {
+  const output = []
+  await assert.rejects(
+    startStoppedLocalBackend(
+      { apiOrigin: 'http://127.0.0.1:8300' },
+      {
+        isPortAvailable: async () => true,
+        execute: async () => {
+          throw Object.assign(new Error('internal failure'), {
+            diagnostic:
+              'compile failed: undefined symbol; postgres://user:private-secret@localhost/db',
+          })
+        },
+        writeLine: (line) => output.push(line),
+      }
+    ),
+    { code: 'local_backend_start_failed' }
+  )
+  assert.match(output.join('\n'), /compile failed: undefined symbol/u)
+  assert.doesNotMatch(output.join('\n'), /user:private-secret/u)
 })
 
 test('start web dev: 远端错误与非法代理配置不获得本地迁移入口', async () => {

@@ -41,6 +41,7 @@ export const LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS = 15_000;
 const RECOVERABLE_WEB_PREFLIGHT_CODES = new Set([
   "database_migration_pending",
   "local_backend_unavailable",
+  "local_backend_start_failed",
   "workspace_migration_invalid",
   "database_config_unavailable",
   "database_status_unavailable",

@@ -24,6 +24,7 @@
 | `dev-ports.mjs`、`dev-listener-stop.sh` | 校验固定端口组，只停止已证明属于本仓库的后端进程 |
 | `dev-process-inspection.mjs` | 前后端共用的有超时进程检查；macOS 从系统端口表定位 PID，再逐个核对工作目录，失败时不停止服务 |
 | `local-runtime-bundle.mjs`、`local-runtime-start.mjs`、`local-runtime-preflight.mjs` | 固定前后端与配置、验证版本和目标库、启动已验证版本；保留迁移恢复页 |
+| `local-runtime-console.mjs` | 跟随已验证后端的实时日志及重启；人工终端常驻，macOS 非交互启动打开日志终端，运行边界见 [服务端入口](../server/README.md#快速开始) |
 | `local-database-roles.mjs`、`local-runtime-rehearsal.mjs` | 复用部署角色策略，使用独立只读账号审计，并在临时恢复库验证固定候选版本 |
 | `local-migration-workflow.mjs`、`local-migration.mjs` | 迁移高层编排与低层受控实现，通过 Make / 迁移页使用 |
 | `seed-role-demo-admins.sh`、`seed-core-demo-data.sh`、`seed-trial-sim-masterdata.sh` | 显式准备模拟账号或主数据；目标、命名、读回与清理见 QA 数据合同 |

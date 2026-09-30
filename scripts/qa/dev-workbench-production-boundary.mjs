@@ -18,6 +18,8 @@ export const productionArtifactForbiddenMarkers = Object.freeze([
   "/__dev",
   "/__dev/quality-gates",
   "__PLUSH_DEV_DATABASE_MIGRATION_RECOVERY_ACTIVE__",
+  "__PLUSH_DEV_RUNTIME_RECOVERY_ROUTE__",
+  "x-plush-dev-recovery-route",
   "dev_runtime_recovery_active",
   "dev-workbench",
   "研发效能工作台",

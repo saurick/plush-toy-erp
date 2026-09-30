@@ -21,10 +21,12 @@ const RUNTIME_SOURCE_PATHS = [
   'web/scripts/devWebInstance.mjs',
   'web/scripts/localPort.mjs',
   'web/scripts/viteParentLifetime.mjs',
+  'web/src/dev-workbench/config/devRuntimeRecovery.mjs',
   'scripts/local-migration.mjs',
   'scripts/local-database-roles.mjs',
   'scripts/local-runtime-bundle.mjs',
   'scripts/local-runtime-rehearsal.mjs',
+  'scripts/local-runtime-console.mjs',
   'scripts/local-runtime-preflight.mjs',
   'scripts/local-runtime-preflight-core.mjs',
   'scripts/qa/database-programmability.mjs',
@@ -185,12 +187,14 @@ export async function prepareWebInstance(
     signature,
     recoveryMode,
     restart,
+    replaceStale = false,
     restartCommand = 'pnpm start --local --restart',
   },
   {
     available = canListenOnPort,
     readInstance = readWebInstance,
     stop = stopWebInstance,
+    writeLine = (line) => process.stdout.write(`${line}\n`),
   } = {}
 ) {
   if (await available(port)) return { reused: false }
@@ -204,6 +208,13 @@ export async function prepareWebInstance(
     instance.recovery === Boolean(recoveryMode)
   ) {
     return { reused: true, pid: instance.pid }
+  }
+  if (replaceStale) {
+    await stop(port, path.join(projectRoot, 'web'))
+    writeLine(
+      `[start-web] 已停止本工作区旧前端，正在用当前配置重新启动（端口 ${port}）`
+    )
+    return { reused: false }
   }
   throw new Error(
     `端口 ${port} 已被占用，现有服务无法确认、启动配置不同或开发服务代码已更新。需要重新加载本工作区前端时执行 ${restartCommand}。未停止任何服务`

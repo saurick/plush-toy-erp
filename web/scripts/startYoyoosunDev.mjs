@@ -112,7 +112,7 @@ function printPlan(options) {
     [
       `[${label}] customer=${options.customer}`,
       `[${label}] port=${options.port}`,
-      `[${label}] port policy=fixed; reuse a matching instance or use pnpm restart:yoyoosun to replace it`,
+      `[${label}] port policy=fixed; reuse a matching instance or automatically replace an outdated Vite from this workspace`,
       `[${label}] url=http://localhost:${options.port}/erp`,
       `[${label}] backend=${options.apiOrigin}`,
       `[${label}] preflight=${
@@ -190,6 +190,7 @@ async function main() {
     projectRoot: repoRoot,
     signature: options.signature,
     restart: options.restart,
+    replaceStale: true,
     restartCommand,
   })
   if (instance.reused) {

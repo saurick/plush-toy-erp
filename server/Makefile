@@ -399,7 +399,7 @@ run: export ERP_CUSTOMER_KEY ?= yoyoosun
 run: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
 run: export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := $(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX)
 run: dev_ports_preflight
-	@node ../scripts/local-runtime-start.mjs
+	@node ../scripts/local-runtime-start.mjs $(ARGS)
 
 # run the local backend with the stable yoyoosun customer context.
 run_yoyoosun: export ERP_CUSTOMER_KEY := yoyoosun
@@ -421,7 +421,12 @@ dev_restart: export ERP_CUSTOMER_KEY ?= yoyoosun
 dev_restart: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
 dev_restart: export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := $(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX)
 dev_restart: dev_ports_preflight
-	@node ../scripts/local-runtime-start.mjs
+	@node ../scripts/local-runtime-start.mjs $(ARGS)
+
+.PHONY: dev_logs
+# Watch the verified backend without holding the migration/restart lock.
+dev_logs: dev_ports_preflight
+	@node ../scripts/local-runtime-console.mjs --follow
 
 .PHONY: dev_database_roles
 # Provision database-specific least-privilege accounts through the deployment policy.

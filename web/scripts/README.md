@@ -57,7 +57,7 @@ pnpm preview:yoyoosun
 - 真实登录 smoke 可能读取本地开发配置中的管理员账号，也可能通过环境变量覆盖账号密码；不要把账号、token 或截图里的敏感信息提交。
 - 真实登录 smoke 的 `REAL_LOGIN_SMOKE_BASE_URL` 和 `REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL` 不得包含 URL 账号密码；账号密码只能走显式环境变量或本地开发配置读取。
 - `smoke:purchase-receipt-real-write` 会用采购入库 RPC 准备带 `PR-BROWSER-*` 前缀的模拟草稿，再到入库管理页完成过账和取消；收尾口径是取消冲正并保留可追踪记录，不物理删除已过账单据。入库管理页本身不提供页面级“新建入库单”，真实业务草稿从采购订单“生成入库”入口产生。
-- `start:yoyoosun` 默认固定使用 `15200`；同配置进程已占用时复用，其他占用明确报错，需要替换本工作区旧服务时使用 `pnpm restart:yoyoosun`。它复用同一 runtime preflight，再检查 `config/customers/yoyoosun/customer-config.example.js` 和 `public-assets/`，通过 dev-only middleware 提供 `/customer-config.js`、`/customer-assets/yoyoosun/*`；客户工程图和来源资料不会公开提供。它保留 HMR，不构建生产包，不调用 `customer_config.validate / publish / activate / rollback`，不写数据库。同 key `builtin_rbac_fallback` 只允许进入带警示的 DEV 桌面预览壳，不升级为 active customer runtime；工作台 / 任务看板不发出 Workflow RPC，客户业务数据页和岗位任务端仍 fail closed。静态包通过不代表后端 active revision 已就绪。
+- `start:yoyoosun` 默认固定使用 `15200`；同配置进程已占用时复用，旧配置、旧代码或没有实例摘要的本工作区 Vite 在归属核验后自动停止并重新启动，其他程序或工作区的占用明确报错。同配置也需要重新启动时使用 `pnpm restart:yoyoosun`。它复用同一 runtime preflight，再检查 `config/customers/yoyoosun/customer-config.example.js` 和 `public-assets/`，通过 dev-only middleware 提供 `/customer-config.js`、`/customer-assets/yoyoosun/*`；客户工程图和来源资料不会公开提供。它保留 HMR，不构建生产包，不调用 `customer_config.validate / publish / activate / rollback`，不写数据库。同 key `builtin_rbac_fallback` 只允许进入带警示的 DEV 桌面预览壳，不升级为 active customer runtime；工作台 / 任务看板不发出 Workflow RPC，客户业务数据页和岗位任务端仍 fail closed。静态包通过不代表后端 active revision 已就绪。
 - 两个 yoyoosun 入口的 `--print-plan` 都会按计划端口输出 `verify customer config` 和 `verify customer asset` 两条 `curl` 命令；客户开发入口的计划端口固定，静态预览入口会探测可用端口。验证通过只证明当前前端端口注入了 yoyoosun 静态配置和资产，不证明后端 active revision、真实 RBAC、真实登录或 release evidence 已完成。
 - `audit:yoyoosun-entry` 默认只读检查主开发保留区 `5175-5179` 与本项目辅助块起点附近 `15200-15204`，汇总每个端口的监听进程 cwd / 命令、`/customer-config.js` 分类、yoyoosun favicon content-type 和 `8300/healthz`。它不启动服务、不登录、不调用 JSON-RPC、不读取密码或 token、不写报告、不写数据库；使用 `pnpm --silent audit:yoyoosun-entry -- --json` 可输出机器可读的本地诊断结果，仍不证明后端 active revision、真实 RBAC、真实登录或 release evidence。
 - 本目录脚本不能绕过后端 RBAC、schema、migration、Workflow / Fact usecase 或客户配置边界。
@@ -95,11 +95,13 @@ pnpm start
 
 本地开发端口由仓库根目录 `config/dev-ports.env` 统一提供。人工终端的 `pnpm start` 固定使用 `5175`，通过同一预检后，若已有同一工作区、后端、客户配置、启动参数、开发服务代码和恢复状态的前端，会输出地址并成功退出，继续使用原服务。实例摘要覆盖 `web/dev-server`、Vite / 启动入口及迁移服务在进程内加载的共享脚本；文档、页面和测试变化不影响复用。其他程序、其他工作区、不同启动配置或旧服务代码的占用会明确阻断并提示重启，保持 `strictPort`，不会自动停止占用者或把主入口顺延。
 
-需要重新加载启动配置或接管遗留的本工作区 Vite 时运行 `pnpm restart` / `pnpm start:restart`（等价于 `pnpm start --local --restart`）。客户辅助入口使用 `pnpm restart:yoyoosun` / `pnpm start:yoyoosun --restart`，重启指定端口（默认 `15200`），不会顺延到新端口。入口先完成预检，再通过共享进程检查连续核对监听 PID、工作目录、Vite 命令和进程启动时间；macOS 从系统端口表定位 PID，避免全机 `lsof` 扫描，逐进程检查均有超时。仅向已确认的本工作区 Vite 发送 `SIGTERM`；归属不明、现场变化或端口未释放时停止，不强制杀进程。
+需要重新加载主入口启动配置或接管遗留的本工作区 Vite 时运行 `pnpm restart` / `pnpm start:restart`（等价于 `pnpm start --local --restart`）。客户辅助入口的 `pnpm start:yoyoosun` 会自动替换过期实例；`pnpm restart:yoyoosun` / `pnpm start:yoyoosun --restart` 也会重启同配置实例。两者都使用指定端口（默认 `15200`），不会顺延到新端口。入口先完成运行预检，客户入口还检查客户配置；随后通过共享进程检查连续核对监听 PID、工作目录、Vite 命令和进程启动时间。macOS 从系统端口表定位 PID，避免全机 `lsof` 扫描；Linux 使用 `lsof` 定位监听 PID 和工作目录。逐进程检查均有超时，仅向已确认的本工作区 Vite 发送 `SIGTERM`；归属不明、现场变化或端口未释放时停止，不强制杀进程。启动竞争失败后的实例查询只允许复用同配置赢家，不触发自动替换。
 
 `pnpm restart` 会先调用包的 `stop` 生命周期，项目将其接到同一启动器的 `--local --stop`：完成预检和进程归属检查后只释放主前端端口。随后 `restart` 生命周期启动当前源码的 Vite，并继续由当前终端管理；中断时返回非零退出码，避免 pnpm 再接续启动。可单独用 `pnpm stop` 停止主前端。
 
 修改迁移页服务端插件或上述启动代码后，交付前须在用户实际使用的端口显式重启并复验；页面热更新和辅助端口验证不会更新已运行进程中的 Node 模块。仅刷新浏览器不能加载这些服务端改动。
+
+本机后端未就绪时，电脑、手机和登录入口统一进入 `/__dev/`，显示服务提示并提供迁移恢复页入口；数据库检查失败继续直接进入迁移恢复页。普通启动会在业务导航或请求时检查本地后端健康，已打开页面的停服响应也会触发跳转；仅前端调试和外部后端保持各自的调试边界。恢复限制只能由恢复页完整检查解除，原业务请求不会自动重放。
 
 主入口和客户辅助入口在每次迁移准备、执行或后端重启请求前，都会核对本进程加载时的开发服务代码摘要。代码已变化或无法读取时，拒绝动作并提示重新启动当前前端；仍允许查看状态和访问已验证的日常业务。Vite 配置热重载不能更新该摘要，必须重新启动前端进程。`make dev_restart` 只恢复后端，不会更新仍在运行的前端开发服务。
 
@@ -114,6 +116,8 @@ Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:y
 `pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查当前工作区 schema / migration 与开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过并核对运行制品身份；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，只开放 `/__dev/database-migration` 恢复页；恢复期间除启动器所需的只读实例摘要外，普通 ERP 页面、其它 DEV API 与 `/rpc`、`/templates` 失败关闭，修正环境后刷新状态，重新通过同一完整启动检查和同目标 health / ready，才能进入完整工作台。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 
 普通业务页和开发工作台均从当前工作区加载，Vite 提供热更新；固定运行制品不会截获开发页面。后端代码通过 `make dev_restart` 重新编译，数据库迁移仍须“检查并准备 → 确认执行”。辅助端口只隔离前端监听，不产生第二个日常数据库。预检或构建失败时保留已有后端，但不会将其标成最新工作区代码。
+
+`pnpm start` 和客户热更新入口在数据库预检通过、登记的本地 HTTP 后端确实未监听时，自动执行一次 `make run ARGS=--if-stopped`，复用后端构建、运行身份和业务验证链路；通过完整预检后才开放电脑版和手机版。此构建阶段独立于 15 秒只读预检，最多等待 10 分钟并在终端显示进度。后端启动链路在共享锁内和构建后再次检查监听状态，保留并核对期间出现的后端；已运行后端不会因前端启动而重启。构建失败、启动后复验失败、预检超时和待迁移状态保留恢复页，不自动重试。停止命令、`--frontend-only`、外部或非登记 `API_ORIGIN` 不会启动共享后端。
 
 开发工作台读取 GitLab CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`；macOS 未显式提供时，`pnpm start` 会自动读取钥匙串 service `plush-toy-erp.gitlab-read-api`，account 使用当前 macOS 登录用户名。该凭据只允许当前项目的最小读取权限，只保存在本机钥匙串和 DEV 服务私有内存；版本中心将它收口到不含发布方法的只读 Provider，不进入浏览器、仓库、日志、质量门禁子进程或部署执行子进程，也不替代创建新发布使用的短期 `PLUSH_GITLAB_TOKEN`。钥匙串未登记时业务开发仍可启动，但 GitLab 服务端证据保持失败关闭，不以本机结果补证。
 
@@ -161,11 +165,11 @@ pnpm start:yoyoosun
 
 本地后端的 `make run`、`make dev` 和 `make dev_restart` 默认使用 `ERP_CUSTOMER_KEY=yoyoosun`，避免未显式携带 customer key 的业务 RPC 回落到 demo；这些本地入口同时显式开放后端 local-test gate，gate 按 pgx 最终连接配置只接受 `192.168.0.133:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，production 配置会拒绝该开关。确需 demo 时使用 `ERP_CUSTOMER_KEY=demo make dev_restart` 显式覆盖。
 
-`start:yoyoosun` 固定使用 `15200`（或显式 `--port`），不会因重复启动而顺延端口；同配置服务会被复用，不同配置或其他程序占用时会报错。它保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition check / activate or rollback / active readback。该操作写入共享开发 PostgreSQL 客户配置控制面，active 切换对其他共享库使用者也可见；默认后端与正式 validator / executor 均拒绝 local-test marker，因此不等于正式 publish / activate、目标环境部署或客户签收。
+`start:yoyoosun` 固定使用 `15200`（或显式 `--port`），不会因重复启动而顺延端口；同配置服务会被复用，过期的本工作区 Vite 会经核验自动替换，其他程序或工作区占用时会报错。它保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition check / activate or rollback / active readback。该操作写入共享开发 PostgreSQL 客户配置控制面，active 切换对其他共享库使用者也可见；默认后端与正式 validator / executor 均拒绝 local-test marker，因此不等于正式 publish / activate、目标环境部署或客户签收。
 
 未显式应用时，后端若只返回同 key 的 `builtin_rbac_fallback`，DEV 桌面端会进入带警示的本地预览壳，避免把成功登录误报成工作台故障；该 fallback 不视为 active revision，工作台 / 任务看板只做零 Workflow RPC 的能力审阅，客户业务数据页和岗位任务端仍 fail closed。页面 / 动作 / 字段是否按永绅 active revision 收窄，仍取决于本地后端 `8300` 当前数据库里的 `customer_config.get_effective_session`；静态包检查通过不等于 active revision 已就绪。
 
-`start:yoyoosun --print-plan` 也会输出同一组按固定端口生成的 `curl` 验证命令；若已有不同配置的旧服务占用该端口，运行 `pnpm restart:yoyoosun` 后再按输出地址验证。
+`start:yoyoosun --print-plan` 只输出同一组按固定端口生成的 `curl` 验证命令，不停止服务。实际启动会自动替换已确认的本工作区过期 Vite，再按输出地址验证；同配置实例需要重新启动时使用 `pnpm restart:yoyoosun`。
 
 
 ## 真实登录与回归参数

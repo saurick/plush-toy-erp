@@ -5,6 +5,7 @@ import path from 'node:path'
 import { Readable } from 'node:stream'
 import test from 'node:test'
 import { LocalRuntimePreflightError } from '../../scripts/local-runtime-preflight.mjs'
+import { createDevDatabaseMigrationRecoveryController } from './devDatabaseMigrationRecoveryPlugin.mjs'
 
 import {
   acquireDatabaseMigrationExecutionLock,
@@ -581,6 +582,61 @@ test('database migration service keeps recovery blocked until the original start
   runtime.verifyReadiness = async () => {}
   assert.equal((await service.summary()).status, 'success')
   assert.equal(opened, 1)
+})
+
+test('已验证的服务再次停服后，完整检查通过才能再次解除恢复限制', async (t) => {
+  const { root, store } = createProject(t)
+  let online = true
+  let reports = 0
+  const recovery = createDevDatabaseMigrationRecoveryController({
+    runtimeChecks: true,
+    fetchImpl: async () =>
+      new Response(online ? 'ok' : 'offline', { status: online ? 200 : 503 }),
+  })
+  let middleware
+  recovery.plugin.configureServer({
+    middlewares: {
+      use: (handler) => {
+        middleware = handler
+      },
+    },
+  })
+  const runtime = dependencies([])
+  runtime.status = async () => target({ pendingFiles: 0 })
+  runtime.verifyReadiness = async () => {
+    if (!online)
+      throw new LocalRuntimePreflightError(
+        'local_backend_unavailable',
+        'fixture offline'
+      )
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    operationStore: store,
+    dependencies: runtime,
+    onRuntimeReady: () => {
+      reports += 1
+      recovery.markRuntimeReady()
+    },
+    isRuntimeRecoveryActive: recovery.isActive,
+  })
+  assert.equal((await service.summary()).status, 'success')
+  assert.equal(reports, 1)
+  online = false
+  await middleware(
+    { method: 'POST', url: '/rpc/admin', headers: {} },
+    { setHeader() {}, end() {} },
+    () => assert.fail('停服时不能开放 RPC')
+  )
+  assert.equal(recovery.isActive(), true)
+  assert.equal((await service.summary()).status, 'blocked')
+  assert.equal(reports, 1)
+  online = true
+  assert.equal((await service.summary()).status, 'success')
+  assert.equal(recovery.isActive(), false)
+  assert.equal(reports, 2)
+  await service.summary()
+  assert.equal(reports, 2)
 })
 
 test('database migration summary distinguishes connection and identity failures from successful workspace checks', async (t) => {

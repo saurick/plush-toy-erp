@@ -30,6 +30,7 @@ import {
   setLocalDatabaseMaintenance,
 } from '../../scripts/local-database-roles.mjs'
 import { verifyRuntimeBusiness } from '../../scripts/local-runtime-rehearsal.mjs'
+import { presentRuntimeConsole } from '../../scripts/local-runtime-console.mjs'
 import {
   LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
   runWebRuntimePreflight,
@@ -45,6 +46,7 @@ export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'scripts/local-migration-workflow.mjs',
   'scripts/local-runtime-preflight-core.mjs',
   'scripts/local-runtime-preflight.mjs',
+  'scripts/local-runtime-console.mjs',
   'scripts/qa/migration-contracts.mjs',
   'scripts/qa/database-programmability.mjs',
   'scripts/qa/populated-upgrade-preflight.sh',
@@ -196,11 +198,15 @@ export async function executeCommand(
     maxBuffer = 16 * 1024 * 1024,
     onStdout,
     killGraceMs = 1000,
+    signal,
   } = {}
 ) {
+  signal?.throwIfAborted()
   let child
   let timer
   let timedOut = false
+  let cancelled = false
+  let onAbort
   const outputFailure = { error: null }
   let cleanup
   const signalGroup = async (signal) => {
@@ -273,10 +279,21 @@ export async function executeCommand(
         timedOut = true
         stop().catch(reject)
       }, timeout)
+      onAbort = () => {
+        cancelled = true
+        stop().catch(reject)
+      }
+      signal?.addEventListener('abort', onAbort, { once: true })
+      if (signal?.aborted) onAbort()
     })
     clearTimeout(timer)
     // A shell can exit while its children survive and still hold output pipes.
-    if (result.error || timedOut || outputFailure.error) await stop()
+    if (result.error || timedOut || cancelled || outputFailure.error) await stop()
+    if (cancelled) {
+      const error = new Error('本次命令已取消，已停止本次命令及其子进程')
+      error.code = 'command_cancelled'
+      throw error
+    }
     if (timedOut) {
       const error = new Error('迁移命令超时，已停止本次命令及其子进程')
       error.code = 'migration_command_timeout'
@@ -294,10 +311,11 @@ export async function executeCommand(
     return { stdout: result.stdout, stderr: result.stderr }
   } catch (error) {
     const failure = commandFailure(error, `${command} 未完成`)
-    if (error.code === 'migration_command_timeout') failure.code = error.code
+    if (['migration_command_timeout', 'command_cancelled'].includes(error.code)) failure.code = error.code
     throw failure
   } finally {
     clearTimeout(timer)
+    if (onAbort) signal?.removeEventListener('abort', onAbort)
   }
 }
 
@@ -589,7 +607,7 @@ function operationLogFile(projectRoot, operationId) {
   return path.join(directory, `${operationId}.log`)
 }
 
-export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
+export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin, { openConsole = true } = {}) {
   const root = path.resolve(projectRoot)
   const serverRoot = path.join(root, 'server')
   let cachedToolReadiness = null
@@ -790,6 +808,7 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
       })
       const logFile = operationLogFile(root, operationId)
       const descriptor = openSync(logFile, 'a', 0o600)
+      const startedAt = new Date().toISOString()
       let child
       try {
         child = spawn(path.join(bundle.directory, 'runtime/server'), [], {
@@ -830,7 +849,17 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin) {
           health: true,
           ready: true,
           business: true,
+          runtime: {
+            pid: child.pid,
+            logFile: path.relative(root, logFile).split(path.sep).join('/'),
+            startedAt,
+          },
         })
+        if (openConsole) {
+          await presentRuntimeConsole(root, { interactive: false }).catch((error) => {
+            console.error(`[local-runtime] 后端已通过验证，但日志终端未能打开：${error.message}；可执行 make dev_logs`)
+          })
+        }
         return {
           ...runtime,
           bundleId: bundle.id,

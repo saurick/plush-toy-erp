@@ -125,6 +125,10 @@ test('start:yoyoosun print-plan describes dev injection without publishing custo
   assert.match(result.stdout, /mode=vite dev server with HMR/u)
   assert.match(
     result.stdout,
+    /reuse a matching instance or automatically replace an outdated Vite from this workspace/u
+  )
+  assert.match(
+    result.stdout,
     /preflight=database migration \+ backend health\/ready; recoverable local blockers open the restricted migration page/u
   )
   assert.match(result.stdout, /ERP_DEV_CUSTOMER_KEY=yoyoosun/u)

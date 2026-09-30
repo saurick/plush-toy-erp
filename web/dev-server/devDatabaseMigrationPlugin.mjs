@@ -383,6 +383,7 @@ export function createDevDatabaseMigrationService({
   dependencies,
   now = () => new Date(),
   onRuntimeReady,
+  isRuntimeRecoveryActive = () => false,
 } = {}) {
   if (!projectRoot) throw new Error('projectRoot is required')
   const root = path.resolve(projectRoot)
@@ -408,7 +409,7 @@ export function createDevDatabaseMigrationService({
     }
     // Recovery must satisfy the same checks that blocked ordinary startup.
     await runtime.verifyReadiness()
-    if (!runtimeReadyReported) {
+    if (!runtimeReadyReported || isRuntimeRecoveryActive()) {
       runtimeReadyReported = true
       runtimeReadyCallback()
     }

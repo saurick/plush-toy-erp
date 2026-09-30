@@ -70,7 +70,7 @@ function isHostPortAvailable(host, port) {
   });
 }
 
-async function isDevAuxPortAvailable(port) {
+export async function isDevPortAvailable(port) {
   if (!(await isHostPortAvailable("127.0.0.1", port))) return false;
   return isHostPortAvailable("0.0.0.0", port);
 }
@@ -80,7 +80,7 @@ export async function findAvailableDevAuxPort(
   {
     startOffset = 0,
     endOffset = auxPortRangeSize - 1,
-    isPortAvailable = isDevAuxPortAvailable,
+    isPortAvailable = isDevPortAvailable,
   } = {},
 ) {
   if (

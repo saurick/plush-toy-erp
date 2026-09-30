@@ -4,11 +4,18 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
+import { spawn } from "node:child_process";
+import { pathToFileURL } from "node:url";
+import { EventEmitter } from "node:events";
 import {
   acquireWorkspaceRuntimeRestartLock,
   startWorkspaceRuntime,
+  runWorkspaceRuntimeCLI,
 } from "./local-runtime-start.mjs";
-import { WORKSPACE_RUNTIME_SOURCE_CHANGED_CODE } from "./local-runtime-bundle.mjs";
+import {
+  runtimeBundleDirectory,
+  WORKSPACE_RUNTIME_SOURCE_CHANGED_CODE,
+} from "./local-runtime-bundle.mjs";
 import {
   acquireDatabaseMigrationExecutionLock,
   readDatabaseMigrationExecutionLock,
@@ -53,6 +60,49 @@ test("a normal restart cannot interrupt a preparation or maintenance operation",
   );
   assert.equal(restarts, 1);
   assert.equal(fs.existsSync(path.join(store, "execution.lock")), false);
+});
+
+test("cold startup preserves an existing listener under the shared runtime lock", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-cold-start-reuse-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const result = await startWorkspaceRuntime(root, {
+    ifStopped: true,
+    ports: () => ({ http: 8300 }),
+    isPortAvailable: async () => false,
+    preflight: async () => assert.fail("existing listeners must not trigger builds"),
+    createRuntime: () => assert.fail("existing listeners must not be stopped"),
+    progress: () => {},
+  });
+  assert.deepEqual(result, { reused: true });
+  assert.equal(readDatabaseMigrationExecutionLock(resolveDatabaseMigrationOperationStore(root)), null);
+});
+
+test("cold startup builds current source when stopped and preserves a listener appearing during build", async (t) => {
+  for (const appeared of [false, true]) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-cold-start-build-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    let probes = 0;
+    let restarts = 0;
+    let candidate;
+    const result = await startWorkspaceRuntime(root, {
+      ifStopped: true,
+      ports: () => ({ http: 8300 }),
+      isPortAvailable: async () => ++probes === 1 || !appeared,
+      preflight: async () => {},
+      build: async (_root, id) => {
+        candidate = runtimeBundleDirectory(root, id);
+        fs.mkdirSync(candidate, { recursive: true });
+        return { id, sourceFingerprint: "current-source" };
+      },
+      source: async () => ({ fingerprint: "current-source" }),
+      createRuntime: () => ({ restart: async () => { restarts++; return { available: true }; } }),
+      progress: () => {},
+    });
+    assert.equal(restarts, appeared ? 0 : 1);
+    assert.equal(probes, 2);
+    assert.equal(result.reused, appeared ? true : undefined);
+    assert.equal(fs.existsSync(candidate), !appeared);
+  }
 });
 
 test("concurrent workspace restarts wait for the active restart instead of reporting a migration conflict", async (t) => {
@@ -124,6 +174,143 @@ test("workspace restart wait is bounded and preserves the active owner", async (
   );
   assert.equal(readDatabaseMigrationExecutionLock(store).operationId, owner);
   releaseDatabaseMigrationExecutionLock(store, owner);
+});
+
+test("an interrupted restart is reported immediately without reclaiming its lock or touching the backend", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-restart-interrupted-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const store = resolveDatabaseMigrationOperationStore(root);
+  const owner = randomUUID();
+  acquireDatabaseMigrationExecutionLock(store, owner, { purpose: "workspace-runtime-restart" });
+  await assert.rejects(acquireWorkspaceRuntimeRestartLock(store, randomUUID(), {
+    processAlive: () => false,
+    releaseWait: () => assert.fail("a dead owner must not be waited on"),
+  }), { code: "WORKSPACE_RUNTIME_RESTART_INTERRUPTED" });
+  assert.equal(readDatabaseMigrationExecutionLock(store).operationId, owner);
+  releaseDatabaseMigrationExecutionLock(store, owner);
+});
+
+test("an interrupted migration is never reclaimed by an ordinary restart", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-restart-migration-owner-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const store = resolveDatabaseMigrationOperationStore(root);
+  const owner = randomUUID();
+  acquireDatabaseMigrationExecutionLock(store, owner);
+  await assert.rejects(acquireWorkspaceRuntimeRestartLock(store, randomUUID(), {
+    processAlive: () => false,
+    releaseWait: () => assert.fail("migration recovery must not be retried here"),
+  }), { code: "DATABASE_MIGRATION_LOCKED" });
+  assert.equal(readDatabaseMigrationExecutionLock(store).operationId, owner);
+  releaseDatabaseMigrationExecutionLock(store, owner);
+});
+
+test("cancelling a queued restart leaves the running owner's lock intact", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-restart-cancel-wait-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const store = resolveDatabaseMigrationOperationStore(root);
+  const owner = randomUUID();
+  acquireDatabaseMigrationExecutionLock(store, owner, { purpose: "workspace-runtime-restart" });
+  const controller = new AbortController();
+  await assert.rejects(acquireWorkspaceRuntimeRestartLock(store, randomUUID(), {
+    signal: controller.signal,
+    progress: () => controller.abort(),
+  }), { name: "AbortError" });
+  assert.equal(readDatabaseMigrationExecutionLock(store).operationId, owner);
+  releaseDatabaseMigrationExecutionLock(store, owner);
+});
+
+test("Ctrl+C ends an owned build tree before releasing the restart lock and leaves the service alive", { timeout: 10_000 }, async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-restart-cancel-build-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const pidFile = path.join(root, "build-pids.json");
+  const service = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  t.after(() => service.kill("SIGKILL"));
+  const childScript = `
+    import fs from 'node:fs';
+    import {spawn} from 'node:child_process';
+    process.on('SIGTERM', () => {});
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {stdio:'inherit'});
+    fs.writeFileSync(${JSON.stringify(pidFile)}, JSON.stringify({parent:process.pid, child:child.pid}));
+    setInterval(() => {}, 1000);
+  `;
+  const module = pathToFileURL(path.join(import.meta.dirname, "local-runtime-start.mjs")).href;
+  const script = `
+    import {runWorkspaceRuntimeCLI,startWorkspaceRuntime} from ${JSON.stringify(module)};
+    await runWorkspaceRuntimeCLI([], {
+      root: ${JSON.stringify(root)},
+      start: (root, options) => startWorkspaceRuntime(root, {
+        ...options,
+        ports: () => ({http:8300}),
+        preflight: async () => {},
+        build: async (_root,_id,execute) => {
+          await execute(process.execPath, ['--input-type=module','-e',${JSON.stringify(childScript)}], {killGraceMs:100});
+          throw new Error('cancelled build must not finish');
+        },
+        createRuntime: () => ({restart: () => {throw new Error('cancelled build must not switch the service');}}),
+      }),
+      present: () => {throw new Error('cancelled build must not present logs');},
+    }).catch(error => { console.error(error.code); process.exitCode=error.code==='WORKSPACE_RUNTIME_RESTART_CANCELLED'?130:1; });
+  `;
+  const cli = spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" } });
+  t.after(() => { if (cli.exitCode === null && cli.signalCode === null) cli.kill("SIGKILL"); });
+  let output = "";
+  cli.stdout.on("data", chunk => { output += chunk; });
+  cli.stderr.on("data", chunk => { output += chunk; });
+  const closed = new Promise(resolve => cli.once("close", (code, signal) => resolve({code,signal})));
+  const deadline = Date.now() + 5000;
+  while (!fs.existsSync(pidFile) && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
+  assert.equal(fs.existsSync(pidFile), true, output);
+  const pids = JSON.parse(fs.readFileSync(pidFile, "utf8"));
+  let buildTreeExited = false;
+  t.after(() => {
+    if (buildTreeExited) return;
+    for (const pid of [pids.parent,pids.child]) {
+      try { process.kill(pid,"SIGKILL"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+    }
+  });
+  assert.equal(readDatabaseMigrationExecutionLock(resolveDatabaseMigrationOperationStore(root)).pid, cli.pid);
+  cli.kill("SIGINT");
+  assert.deepEqual(await closed, { code: 130, signal: null }, output);
+  assert.match(output, /WORKSPACE_RUNTIME_RESTART_CANCELLED/u);
+  assert.equal(readDatabaseMigrationExecutionLock(resolveDatabaseMigrationOperationStore(root)), null);
+  for (const pid of [pids.parent,pids.child]) {
+    assert.throws(() => process.kill(pid,0), {code:"ESRCH"});
+  }
+  buildTreeExited = true;
+  assert.doesNotThrow(() => process.kill(service.pid,0));
+});
+
+test("cancellation during cutover keeps the lock until runtime verification completes", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-restart-cancel-cutover-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const store = resolveDatabaseMigrationOperationStore(root);
+  const signals = new EventEmitter();
+  let verified = false;
+  await assert.rejects(runWorkspaceRuntimeCLI([], {
+    root, signals, write: () => {},
+    present: () => assert.fail("cancelled CLI must return instead of following logs"),
+    start: (directory, options) => startWorkspaceRuntime(directory, {
+      ...options,
+      ports: () => ({http:8300}),
+      preflight: async () => {},
+      build: async (_root,id) => ({id,sourceFingerprint:"current"}),
+      source: async () => ({fingerprint:"current"}),
+      progress: () => {},
+      createRuntime: () => ({restart: async (operationId,id) => {
+        signals.emit("SIGINT");
+        assert.equal(readDatabaseMigrationExecutionLock(store).operationId, operationId);
+        await Promise.resolve();
+        verified = true;
+        assert.equal(readDatabaseMigrationExecutionLock(store).operationId, operationId);
+        return {bundleId:id};
+      }}),
+    }),
+  }), {code:"WORKSPACE_RUNTIME_RESTART_CANCELLED"});
+  assert.equal(verified,true);
+  assert.equal(readDatabaseMigrationExecutionLock(store),null);
+  assert.equal(signals.listenerCount("SIGINT"),0);
 });
 
 test("workspace restart rebuilds the latest source after bounded build-time changes", async (t) => {
@@ -340,4 +527,45 @@ test("restart compiles current source and never substitutes an existing bundle",
       "failed preparation must preserve the running process",
     );
   }
+});
+
+test("the resident log view starts only after the runtime lock is released and startup failures do not open it", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "plush-resident-lock-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const calls = [];
+  const store = resolveDatabaseMigrationOperationStore(root);
+  const start = (directory) => startWorkspaceRuntime(directory, {
+    ports: () => ({ http: 8300 }),
+    preflight: async () => {},
+    build: async (_root, id) => ({ id, sourceFingerprint: "current" }),
+    source: async () => ({ fingerprint: "current" }),
+    progress: () => {},
+    createRuntime: (_root, _origin, options) => {
+      assert.equal(options.openConsole, false);
+      return { restart: async (_operation, id) => ({ bundleId: id, activeVersion: "migration" }) };
+    },
+  });
+  const present = async (_root, options) => {
+    assert.equal(readDatabaseMigrationExecutionLock(store), null);
+    calls.push(options);
+  };
+  await runWorkspaceRuntimeCLI([], { root, start, present, interactive: true, write: () => {} });
+  await runWorkspaceRuntimeCLI(["--background"], { root, start, present, interactive: true, write: () => {} });
+  assert.deepEqual(calls, [{ interactive: true, background: false }, { interactive: true, background: true }]);
+  calls.length = 0;
+  await assert.rejects(runWorkspaceRuntimeCLI([], {
+    root, present, write: () => {}, start: async () => { throw new Error("migration pending"); },
+  }), /migration pending/u);
+  assert.equal(calls.length, 0);
+});
+
+test("Codex and reused startup present the same service without keeping their caller waiting", async () => {
+  const result = { reused: true };
+  const calls = [];
+  assert.equal(await runWorkspaceRuntimeCLI(["--if-stopped"], {
+    start: async (_root, options) => { assert.equal(options.ifStopped, true); return result; },
+    present: async (_root, options) => calls.push(options),
+    interactive: false, write: () => assert.fail("reuse must not claim a new build"),
+  }), result);
+  assert.deepEqual(calls, [{ interactive: false, background: false }]);
 });
