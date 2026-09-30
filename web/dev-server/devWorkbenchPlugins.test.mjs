@@ -161,7 +161,14 @@ test('database migration recovery plugin blocks ERP traffic until verified runti
   recovery.markRuntimeReady()
   const released = await runRecoveryMiddleware(middleware, { url: '/rpc' })
   assert.equal(released.nextCalled, true)
-  assert.match(recovery.plugin.transformIndexHtml()[0].children, /= false;/u)
+  const scripts = recovery.plugin.transformIndexHtml()
+  assert.match(scripts[0].children, /= false;/u)
+  assert.equal(scripts[1].injectTo, 'head-prepend')
+  assert.equal(scripts[1].attrs.type, 'module')
+  assert.match(
+    scripts[1].children,
+    /import \{ installDevRuntimeRecoveryFetch \} from "\/src\/dev-workbench\/config\/devRuntimeRecovery\.mjs"; installDevRuntimeRecoveryFetch\(window\);/u
+  )
 })
 
 test('Vite recovery mode opens the migration page and installs the guard only for development serve', async () => {

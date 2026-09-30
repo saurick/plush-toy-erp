@@ -165,6 +165,13 @@ export function createDevDatabaseMigrationRecoveryController({
               DEV_RUNTIME_RECOVERY_ROUTE_GLOBAL
             )}] = ${JSON.stringify(recoveryRoute())};`,
           },
+          {
+            tag: 'script',
+            attrs: { type: 'module' },
+            injectTo: 'head-prepend',
+            children:
+              'import { installDevRuntimeRecoveryFetch } from "/src/dev-workbench/config/devRuntimeRecovery.mjs"; installDevRuntimeRecoveryFetch(window);',
+          },
         ]
       },
     },

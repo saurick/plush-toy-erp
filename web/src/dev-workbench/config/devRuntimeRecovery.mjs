@@ -35,6 +35,21 @@ export function isDevDatabaseMigrationRecoveryActive(scope = globalThis) {
 }
 
 const redirectingScopes = new WeakSet()
+const monitoredFetchScopes = new WeakSet()
+
+export function installDevRuntimeRecoveryFetch(scope = globalThis) {
+  if (typeof scope?.fetch !== 'function' || monitoredFetchScopes.has(scope)) {
+    return false
+  }
+  const originalFetch = scope.fetch.bind(scope)
+  scope.fetch = async (...args) => {
+    const response = await originalFetch(...args)
+    redirectDevRuntimeRecovery(response, scope)
+    return response
+  }
+  monitoredFetchScopes.add(scope)
+  return true
+}
 
 export function redirectDevRuntimeRecovery(response, scope = globalThis) {
   const route = response.headers?.get(DEV_RUNTIME_RECOVERY_HEADER)

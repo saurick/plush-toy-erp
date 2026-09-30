@@ -125,16 +125,6 @@ export class JsonRpc {
       })
     }
 
-    if (
-      import.meta.env?.DEV &&
-      response.status === 503 &&
-      response.headers.has('x-plush-dev-recovery-route')
-    ) {
-      const { redirectDevRuntimeRecovery } =
-        await import('@/dev-workbench/config/devRuntimeRecovery.mjs')
-      redirectDevRuntimeRecovery(response, window)
-    }
-
     try {
       json = await response.json()
     } catch (e) {
