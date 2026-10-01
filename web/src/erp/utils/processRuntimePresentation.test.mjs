@@ -19,6 +19,9 @@ function context(overrides = {}) {
     process_version: 'v1',
     status: 'active',
     started_at: 1_800_000_000,
+    resolution_kind: null,
+    resolution_reason: null,
+    resolved_at: null,
   }
   const completed = {
     id: 11,
@@ -235,6 +238,7 @@ test('process runtime presentation builds execution trail without inventing futu
     current: 1,
     blocked: 0,
     rejected: 0,
+    withdrawn: 0,
   })
   assert.equal(model.items[1].linked, true)
   assert.equal(model.hasUndecidedRoute, true)
@@ -343,6 +347,8 @@ test('completed rejected process does not present dormant branches as undecided 
     status: 'waiting',
   }
   value.process_instance.status = 'completed'
+  value.process_instance.resolution_kind = 'rejected'
+  value.process_instance.resolved_at = 1_800_000_100
   value.nodes = [value.nodes[0], rejectedNode, dormantBranch]
   value.current_nodes = []
   value.completed_nodes = [value.nodes[0], rejectedNode]
@@ -356,6 +362,119 @@ test('completed rejected process does not present dormant branches as undecided 
   assert.equal(model.handoffLabel, '流程已退回结束。')
   assert.equal(model.handoffKind, 'end')
   assert.equal(model.summaryLabel, '已结束步骤 2 · 当前步骤 0')
+})
+
+test('withdrawn process nodes remain readable without counting as completed or current work', () => {
+  for (const [kind, statusLabel, handoffLabel] of [
+    ['cancelled', '已取消', '来源单据已取消，流程已结束。'],
+    ['compensated', '已补偿结束', '流程已补偿结束。'],
+  ]) {
+    const value = context()
+    const withdrawnNode = {
+      ...value.nodes[1],
+      status: 'withdrawn',
+      outcome: 'source.cancelled_withdrawal',
+      version: 2,
+    }
+    const reason = '来源已终止，撤回尚未办理的任务'
+    value.process_instance = {
+      ...value.process_instance,
+      status: 'completed',
+      resolution_kind: kind,
+      resolution_reason: reason,
+      resolved_at: 1_800_000_100,
+    }
+    value.nodes = [value.nodes[0], withdrawnNode]
+    value.linked_node = withdrawnNode
+    value.current_nodes = []
+    value.current_responsibilities = []
+    const model = buildWorkflowProcessStageModel(value)
+    assert.equal(model.items[1].statusLabel, '已撤回')
+    assert.equal(model.items[1].tone, 'withdrawn')
+    assert.equal(model.items[1].completed, false)
+    assert.equal(model.items[1].current, false)
+    assert.equal(model.items[1].linked, true)
+    assert.deepEqual(model.counts, {
+      completed: 1,
+      current: 0,
+      blocked: 0,
+      rejected: 0,
+      withdrawn: 1,
+    })
+    assert.equal(model.summaryLabel, '已结束步骤 1 · 当前步骤 0 · 已撤回步骤 1')
+    assert.equal(model.statusLabel, statusLabel)
+    assert.equal(model.handoffKind, 'end')
+    assert.equal(model.handoffLabel, `${handoffLabel} 结束原因：${reason}`)
+    assert.equal(model.hasUndecidedRoute, false)
+    assert.doesNotMatch(model.handoffLabel, /责任岗位|等待后续/u)
+  }
+})
+
+test('process resolution uses persisted result instead of previous rejection or a completed status', () => {
+  const value = context()
+  const rejectedNode = {
+    ...value.nodes[1],
+    status: 'completed',
+    outcome: 'rejected',
+  }
+  value.nodes = [value.nodes[0], rejectedNode]
+  value.completed_nodes = [...value.nodes]
+  value.current_nodes = []
+  value.current_responsibilities = []
+  value.process_instance.status = 'completed'
+  value.process_instance.resolution_kind = 'cancelled'
+  value.process_instance.resolved_at = 1_800_000_100
+  assert.equal(buildWorkflowProcessStageModel(value).statusLabel, '已取消')
+  assert.equal(
+    buildWorkflowProcessStageModel(value).handoffLabel,
+    '来源单据已取消，流程已结束。'
+  )
+
+  value.process_instance.resolution_kind = 'succeeded'
+  assert.equal(buildWorkflowProcessStageModel(value).statusLabel, '正常结束')
+  assert.equal(
+    buildWorkflowProcessStageModel(value).handoffLabel,
+    '流程正常结束。'
+  )
+
+  value.process_instance.resolution_kind = null
+  value.process_instance.resolved_at = null
+  const unresolved = buildWorkflowProcessStageModel(value)
+  assert.equal(unresolved.statusLabel, '已结束')
+  assert.equal(unresolved.handoffLabel, '流程已结束，结束结果待确认。')
+  assert.doesNotMatch(unresolved.handoffLabel, /通过|批准|正常|退回/u)
+})
+
+test('process resolution and withdrawn node subsets reject malformed evidence', () => {
+  for (const patch of [
+    { resolution_kind: 'unknown' },
+    { resolution_reason: { message: 'invalid' } },
+    { resolved_at: '1800000100' },
+    { resolved_at: 0 },
+  ]) {
+    const value = context()
+    Object.assign(value.process_instance, { status: 'completed' }, patch)
+    assert.throws(
+      () => requireWorkflowProcessContext(value),
+      /业务轨迹暂时无法确认/u
+    )
+  }
+  const value = context()
+  const withdrawnNode = { ...value.nodes[1], status: 'withdrawn' }
+  value.nodes[1] = withdrawnNode
+  value.current_nodes = []
+  value.current_responsibilities = []
+  value.completed_nodes.push(withdrawnNode)
+  assert.throws(
+    () => requireWorkflowProcessContext(value),
+    /业务轨迹暂时无法确认/u
+  )
+  value.completed_nodes.pop()
+  value.current_nodes = [withdrawnNode]
+  assert.throws(
+    () => requireWorkflowProcessContext(value),
+    /业务轨迹暂时无法确认/u
+  )
 })
 
 test('process runtime presentation reports the next role without exposing a person', () => {

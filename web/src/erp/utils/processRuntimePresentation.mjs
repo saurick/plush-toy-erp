@@ -6,6 +6,20 @@ const PROCESS_STATUS_LABELS = Object.freeze({
   completed: '已结束',
 })
 
+const PROCESS_RESOLUTION_LABELS = Object.freeze({
+  succeeded: '正常结束',
+  rejected: '已退回结束',
+  cancelled: '已取消',
+  compensated: '已补偿结束',
+})
+
+const PROCESS_RESOLUTION_HANDOFF_LABELS = Object.freeze({
+  succeeded: '流程正常结束。',
+  rejected: '流程已退回结束。',
+  cancelled: '来源单据已取消，流程已结束。',
+  compensated: '流程已补偿结束。',
+})
+
 const PROCESS_LABELS = Object.freeze({
   sales_order_acceptance: '销售订单受理',
   material_supply: '采购订单提交与审批',
@@ -20,6 +34,7 @@ const NODE_STATUS_LABELS = Object.freeze({
   active: '办理中',
   blocked: '受阻',
   completed: '已完成',
+  withdrawn: '已撤回',
 })
 
 const NODE_LABELS = Object.freeze({
@@ -67,6 +82,7 @@ const APPROVAL_FORM_PROFILE_KEYS = new Set([
 ])
 
 const PROCESS_STATUS_KEYS = new Set(Object.keys(PROCESS_STATUS_LABELS))
+const PROCESS_RESOLUTION_KEYS = new Set(Object.keys(PROCESS_RESOLUTION_LABELS))
 const PROCESS_KEYS = new Set(Object.keys(PROCESS_LABELS))
 const NODE_STATUS_KEYS = new Set(Object.keys(NODE_STATUS_LABELS))
 const NODE_TYPE_KEYS = new Set([
@@ -84,8 +100,7 @@ function invalidProcessContext() {
 export function isDisplayOnlyWorkflowTask(task = {}) {
   return Boolean(
     task?.payload?.simulated_only === true ||
-      String(task?.source_type || '') ===
-        'simulated-manual-acceptance-task-batch'
+    String(task?.source_type || '') === 'simulated-manual-acceptance-task-batch'
   )
 }
 
@@ -117,6 +132,14 @@ export function requireWorkflowProcessContext(value) {
     !PROCESS_STATUS_KEYS.has(instance.status) ||
     !Number.isSafeInteger(instance.started_at) ||
     instance.started_at <= 0 ||
+    (instance.resolution_kind != null &&
+      (!PROCESS_RESOLUTION_KEYS.has(instance.resolution_kind) ||
+        instance.status !== 'completed')) ||
+    (instance.resolution_reason != null &&
+      typeof instance.resolution_reason !== 'string') ||
+    (instance.resolved_at != null &&
+      (!Number.isSafeInteger(instance.resolved_at) ||
+        instance.resolved_at <= 0)) ||
     !Array.isArray(nodes) ||
     !Array.isArray(currentNodes) ||
     !Array.isArray(completedNodes) ||
@@ -252,6 +275,7 @@ export function getWorkflowTaskDisplayName(task = {}) {
 }
 
 export function getProcessNodeStatusLabel(node = {}) {
+  if (node.status === 'withdrawn') return NODE_STATUS_LABELS.withdrawn
   if (
     [
       'sales_order.submitted_without_approval',
@@ -265,10 +289,16 @@ export function getProcessNodeStatusLabel(node = {}) {
 }
 
 export function getProcessStatusLabel(instance = {}) {
+  if (instance.status === 'completed' && instance.resolution_kind != null) {
+    return (
+      PROCESS_RESOLUTION_LABELS[instance.resolution_kind] || '结束结果待确认'
+    )
+  }
   return PROCESS_STATUS_LABELS[instance.status] || '状态待确认'
 }
 
 function getProcessNodeTone(node = {}) {
+  if (node.status === 'withdrawn') return 'withdrawn'
   if (node.outcome === 'rejected') return 'rejected'
   if (node.status === 'completed') return 'completed'
   if (node.status === 'blocked') return 'blocked'
@@ -310,9 +340,10 @@ export function buildWorkflowProcessStageModel(value) {
       else if (item.current) result.current += 1
       if (item.tone === 'blocked') result.blocked += 1
       if (item.tone === 'rejected') result.rejected += 1
+      if (item.tone === 'withdrawn') result.withdrawn += 1
       return result
     },
-    { completed: 0, current: 0, blocked: 0, rejected: 0 }
+    { completed: 0, current: 0, blocked: 0, rejected: 0, withdrawn: 0 }
   )
   const currentLabels = items
     .filter((item) => item.current)
@@ -368,16 +399,23 @@ export function buildWorkflowProcessStageModel(value) {
     handoffLabel = `系统正在自动处理：${currentSystemLabels.join('、')}。`
   } else if (context.process_instance.status === 'completed') {
     handoffKind = 'end'
-    handoffLabel = counts.rejected > 0 ? '流程已退回结束。' : '流程已结束。'
+    handoffLabel =
+      PROCESS_RESOLUTION_HANDOFF_LABELS[
+        context.process_instance.resolution_kind
+      ] || '流程已结束，结束结果待确认。'
+    const reason = context.process_instance.resolution_reason?.trim()
+    if (reason) handoffLabel += ` 结束原因：${reason}`
   } else {
     handoffLabel = '当前等待后续条件或流程分支确认。'
   }
   const routeNote = hasUndecidedRoute ? ' · 后续路径待流程决定' : ''
+  const withdrawnNote =
+    counts.withdrawn > 0 ? ` · 已撤回步骤 ${counts.withdrawn}` : ''
 
   return {
     processLabel: getProcessLabel(context.process_instance),
     statusLabel: getProcessStatusLabel(context.process_instance),
-    summaryLabel: `已结束步骤 ${counts.completed} · 当前步骤 ${counts.current}${routeNote}`,
+    summaryLabel: `已结束步骤 ${counts.completed} · 当前步骤 ${counts.current}${withdrawnNote}${routeNote}`,
     handoffLabel,
     handoffKind,
     hasUndecidedRoute,

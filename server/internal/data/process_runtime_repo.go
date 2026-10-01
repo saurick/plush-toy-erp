@@ -39,7 +39,6 @@ func NewProcessRuntimeRepo(d *Data, logger log.Logger) *processRuntimeRepo {
 }
 
 var _ biz.ProcessRuntimeRepo = (*processRuntimeRepo)(nil)
-var _ biz.ProcessRuntimeDomainCommandResultRepo = (*processRuntimeRepo)(nil)
 var _ biz.ProcessRuntimeSourceCreateRepo = (*processRuntimeRepo)(nil)
 var _ biz.ProcessRuntimeBusinessRefReadRepo = (*processRuntimeRepo)(nil)
 

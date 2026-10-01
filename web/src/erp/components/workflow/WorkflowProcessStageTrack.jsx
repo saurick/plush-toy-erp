@@ -7,6 +7,7 @@ const STAGE_MARKERS = Object.freeze({
   blocked: '!',
   completed: '✓',
   rejected: '↩',
+  withdrawn: '−',
 })
 
 export default function WorkflowProcessStageTrack({

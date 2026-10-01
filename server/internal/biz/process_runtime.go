@@ -454,6 +454,9 @@ type ProcessRuntimeRepo interface {
 	// ClaimProcessNodeDomainCommand binds one immutable command intent to an
 	// active node without changing its business version.
 	ClaimProcessNodeDomainCommand(ctx context.Context, in *ProcessNodeDomainCommandClaim) (*ProcessNodeInstance, error)
+	GetProcessNodeDomainCommandResult(ctx context.Context, processInstanceID int, processNodeInstanceID int, domainCommandFingerprint string) (*ProcessNodeInstance, bool, error)
+	RecordProcessNodeDomainCommandResult(ctx context.Context, in *ProcessNodeDomainCommandResultRecord, actorID int) (*ProcessNodeInstance, error)
+	MarkProcessNodeDomainCommandCompensated(ctx context.Context, in *ProcessNodeDomainCommandCompensationMark, actorID int) (*ProcessNodeInstance, error)
 	CompleteProcessNodeInstance(ctx context.Context, in *ProcessNodeInstanceComplete, actorID int) (*ProcessNodeInstance, error)
 	CompleteProcessInstance(ctx context.Context, in *ProcessInstanceComplete, actorID int) (*ProcessInstance, error)
 	RecordProcessInstanceLinkedBusinessRef(ctx context.Context, in *ProcessInstanceLinkedBusinessRefRecord, actorID int) (*ProcessInstance, error)
@@ -477,16 +480,6 @@ type ProcessRuntimeBusinessRefReadRepo interface {
 	GetProcessInstanceByBusinessRef(ctx context.Context, processKey, businessRefType string, businessRefID int) (*ProcessInstance, []*ProcessNodeInstance, error)
 }
 
-// ProcessRuntimeDomainCommandResultRepo is intentionally separate from
-// ProcessRuntimeRepo while existing non-persistent test adapters migrate. The
-// production repository implements it; ProcessRuntime never treats an adapter
-// without it as durable result evidence.
-type ProcessRuntimeDomainCommandResultRepo interface {
-	GetProcessNodeDomainCommandResult(ctx context.Context, processInstanceID int, processNodeInstanceID int, domainCommandFingerprint string) (*ProcessNodeInstance, bool, error)
-	RecordProcessNodeDomainCommandResult(ctx context.Context, in *ProcessNodeDomainCommandResultRecord, actorID int) (*ProcessNodeInstance, error)
-	MarkProcessNodeDomainCommandCompensated(ctx context.Context, in *ProcessNodeDomainCommandCompensationMark, actorID int) (*ProcessNodeInstance, error)
-}
-
 type ProcessRuntimeCompensationRecoveryRepo interface {
 	RecoverProcessDomainCommandCompensation(ctx context.Context, in *ProcessDomainCommandRecovery, actorID int) (*ProcessNodeInstance, error)
 }
@@ -500,8 +493,8 @@ type ProcessDomainCommandHandler interface {
 	// currently invalid intent before the runtime binds the immutable fingerprint.
 	ValidateProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) error
 	// Production implementations write their result/effect evidence in the same
-	// domain transaction. Exact-intent replay remains required to recover legacy
-	// side effects that predate durable result evidence.
+	// domain transaction. Exact-intent replay returns the matching stored result
+	// without repeating the domain mutation.
 	ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error)
 }
 
@@ -740,7 +733,7 @@ func (uc *ProcessRuntimeUsecase) GetProcessTaskContext(ctx context.Context, task
 			processContext.CurrentNodes = append(processContext.CurrentNodes, node)
 		case ProcessNodeStatusCompleted:
 			processContext.CompletedNodes = append(processContext.CompletedNodes, node)
-		case ProcessNodeStatusWaiting:
+		case ProcessNodeStatusWaiting, ProcessNodeStatusWithdrawn:
 		default:
 			return nil, ErrBadParam
 		}

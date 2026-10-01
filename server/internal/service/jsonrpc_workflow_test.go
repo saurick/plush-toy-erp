@@ -318,6 +318,90 @@ func TestJsonrpcDispatcher_WorkflowGetTaskProcessContextUsesTaskVisibility(t *te
 	}
 }
 
+func TestWorkflowProcessInstanceSummaryKeepsPersistedResolution(t *testing.T) {
+	for _, kind := range []string{
+		biz.ProcessResolutionSucceeded, biz.ProcessResolutionRejected,
+		biz.ProcessResolutionCancelled, biz.ProcessResolutionCompensated,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			reason := "按来源单据处理结果结束"
+			completedAt := time.Unix(1_800_000_100, 0)
+			resolvedAt := completedAt.Add(time.Minute)
+			data := newDataStruct(map[string]any{
+				"process_instance": workflowProcessInstanceSummaryToMap(&biz.ProcessInstance{
+					ID: 10, ProcessKey: biz.ProcessKeySalesOrderAcceptance, ProcessVersion: "v1",
+					Status: biz.ProcessStatusCompleted, StartedAt: completedAt.Add(-time.Hour),
+					CompletedAt: &completedAt, ResolutionKind: &kind, ResolutionReason: &reason, ResolvedAt: &resolvedAt,
+				}),
+			})
+			instance := data.AsMap()["process_instance"].(map[string]any)
+			if instance["resolution_kind"] != kind || instance["resolution_reason"] != reason ||
+				instance["resolved_at"] != float64(resolvedAt.Unix()) || instance["completed_at"] != float64(completedAt.Unix()) {
+				t.Fatalf("summary must preserve resolution separately from completion: %#v", instance)
+			}
+		})
+	}
+	t.Run("unresolved", func(t *testing.T) {
+		summary := workflowProcessInstanceSummaryToMap(&biz.ProcessInstance{ID: 10, Status: biz.ProcessStatusActive})
+		for _, key := range []string{"resolution_kind", "resolution_reason", "resolved_at"} {
+			if value, exists := summary[key]; !exists || value != nil {
+				t.Fatalf("missing resolution must remain explicit null: %s = %#v, exists=%v", key, value, exists)
+			}
+		}
+	})
+}
+
+func TestJsonrpcDispatcher_WorkflowGetWithdrawnTaskProcessContextUsesTaskVisibility(t *testing.T) {
+	for _, kind := range []string{biz.ProcessResolutionCancelled, biz.ProcessResolutionCompensated} {
+		t.Run(kind, func(t *testing.T) {
+			processID, nodeID := 10, 20
+			configRevision := "2026.06.30.workflow-tasks-enabled"
+			reason := "终止来源流程并撤回后续任务"
+			resolvedAt := time.Unix(1_800_000_100, 0)
+			repo := &stubWorkflowJSONRPCRepo{currentTask: &biz.WorkflowTask{
+				ID: 42, TaskGroup: "order_approval", SourceType: "sales_order", SourceID: 1001,
+				TaskStatusKey: "withdrawn", OwnerRoleKey: biz.BossRoleKey, ConfigRevision: &configRevision,
+				ProcessInstanceID: &processID, ProcessNodeInstanceID: &nodeID, Version: 2,
+			}}
+			processRepo := &stubProcessRuntimeJSONRPCRepo{
+				process: &biz.ProcessInstance{
+					ID: processID, ProcessKey: biz.ProcessKeySalesOrderAcceptance, ProcessVersion: "v1",
+					BusinessRefType: "sales_order", BusinessRefID: 1001, Status: biz.ProcessStatusCompleted,
+					StartedAt: resolvedAt.Add(-time.Hour), CompletedAt: &resolvedAt,
+					ResolutionKind: &kind, ResolutionReason: &reason, ResolvedAt: &resolvedAt,
+				},
+				nodes: []*biz.ProcessNodeInstance{
+					{ID: 19, ProcessInstanceID: processID, NodeKey: "submit_sales_order", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1, Version: 2, Status: biz.ProcessNodeStatusCompleted},
+					{ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval", NodeType: biz.ProcessNodeTypeApproval, Attempt: 1, Version: 2, Status: biz.ProcessNodeStatusWithdrawn},
+				},
+			}
+			j := &jsonrpcDispatcher{
+				log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+				adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionWorkflowTaskRead)},
+				workflowUC:  biz.NewWorkflowUsecase(repo), processRuntimeUC: biz.NewProcessRuntimeUsecase(processRepo, repo),
+				customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+			}
+			params, _ := structpb.NewStruct(map[string]any{"task_id": float64(42)})
+			_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_process_context", "1", params)
+			if err != nil || res == nil || res.Code != errcode.OK.Code {
+				t.Fatalf("withdrawn process context must remain readable: res=%#v err=%v", res, err)
+			}
+			contextMap := res.Data.AsMap()["process_context"].(map[string]any)
+			instance := contextMap["process_instance"].(map[string]any)
+			if instance["resolution_kind"] != kind || instance["resolution_reason"] != reason ||
+				len(contextMap["current_nodes"].([]any)) != 0 || len(contextMap["completed_nodes"].([]any)) != 1 ||
+				contextMap["linked_node"].(map[string]any)["status"] != biz.ProcessNodeStatusWithdrawn {
+				t.Fatalf("unexpected withdrawn context: %#v", contextMap)
+			}
+			j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskRead)}
+			_, denied, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_process_context", "2", params)
+			if err != nil || denied == nil || denied.Code != errcode.PermissionDenied.Code {
+				t.Fatalf("withdrawal must not expand task visibility: res=%#v err=%v", denied, err)
+			}
+		})
+	}
+}
+
 func TestWorkflowProcessTaskContextJSONRPCSerializationKeepsApprovalFormContract(t *testing.T) {
 	t.Parallel()
 
@@ -554,6 +638,8 @@ func (s *stubProcessRuntimeJSONRPCRepo) ClaimProcessNodeDomainCommand(_ context.
 	out := *s.node
 	fingerprint := in.DomainCommandFingerprint
 	out.DomainCommandFingerprint = &fingerprint
+	protocolVersion := biz.ProcessDomainCommandProtocolVersionCurrent
+	out.DomainCommandProtocolVersion = &protocolVersion
 	s.node = &out
 	return &out, nil
 }

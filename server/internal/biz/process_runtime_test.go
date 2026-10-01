@@ -457,6 +457,65 @@ func TestProcessRuntimeUsecaseGetProcessTaskContextRejectsMismatchedSource(t *te
 	}
 }
 
+func TestProcessRuntimeUsecaseGetProcessTaskContextKeepsWithdrawnNodes(t *testing.T) {
+	for _, resolutionKind := range []string{ProcessResolutionCancelled, ProcessResolutionCompensated} {
+		t.Run(resolutionKind, func(t *testing.T) {
+			processID, nodeID := 41, 42
+			reason := "终止来源流程并撤回后续任务"
+			resolvedAt := time.Unix(1_800_000_100, 0)
+			task := &WorkflowTask{
+				ID: 7, SourceType: "sales_order", SourceID: 1001,
+				ProcessInstanceID: &processID, ProcessNodeInstanceID: &nodeID,
+				TaskStatusKey: "withdrawn", OwnerRoleKey: BossRoleKey,
+			}
+			processRepo := &memProcessRuntimeRepo{
+				process: &ProcessInstance{
+					ID: processID, BusinessRefType: "sales_order", BusinessRefID: 1001,
+					Status: ProcessStatusCompleted, CompletedAt: &resolvedAt,
+					ResolutionKind: &resolutionKind, ResolutionReason: &reason, ResolvedAt: &resolvedAt,
+				},
+				nodes: []*ProcessNodeInstance{
+					{ID: 40, ProcessInstanceID: processID, NodeKey: "submit_sales_order", Status: ProcessNodeStatusCompleted},
+					{ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval", NodeType: ProcessNodeTypeApproval, Status: ProcessNodeStatusWithdrawn},
+					{ID: 43, ProcessInstanceID: processID, NodeKey: "end", Status: ProcessNodeStatusWithdrawn},
+				},
+			}
+			uc := NewProcessRuntimeUsecase(processRepo, nil)
+			processContext, err := uc.GetProcessTaskContext(context.Background(), task)
+			if err != nil {
+				t.Fatalf("GetProcessTaskContext after %s: %v", resolutionKind, err)
+			}
+			if len(processContext.Nodes) != 3 || processContext.LinkedNode.Status != ProcessNodeStatusWithdrawn {
+				t.Fatalf("withdrawn nodes must remain readable: %#v", processContext)
+			}
+			if len(processContext.CurrentNodes) != 0 || len(processContext.CurrentResponsibilities) != 0 ||
+				len(processContext.CompletedNodes) != 1 || processContext.CompletedNodes[0].ID != 40 {
+				t.Fatalf("withdrawn nodes must not become current or completed work: %#v", processContext)
+			}
+			if processContext.Instance.ResolutionKind == nil || *processContext.Instance.ResolutionKind != resolutionKind ||
+				processContext.Instance.ResolutionReason == nil || *processContext.Instance.ResolutionReason != reason {
+				t.Fatalf("persisted resolution must remain authoritative: %#v", processContext.Instance)
+			}
+		})
+	}
+}
+
+func TestProcessRuntimeUsecaseGetProcessTaskContextRejectsInvalidNodeStatus(t *testing.T) {
+	processID, nodeID := 41, 42
+	uc := NewProcessRuntimeUsecase(&memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: processID, BusinessRefType: "sales_order", BusinessRefID: 1001},
+		nodes: []*ProcessNodeInstance{
+			{ID: nodeID, ProcessInstanceID: processID, Status: "unknown"},
+		},
+	}, nil)
+	if _, err := uc.GetProcessTaskContext(context.Background(), &WorkflowTask{
+		ID: 7, SourceType: "sales_order", SourceID: 1001,
+		ProcessInstanceID: &processID, ProcessNodeInstanceID: &nodeID,
+	}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("invalid node status must still fail closed: %v", err)
+	}
+}
+
 func (r *memProcessRuntimeRepo) ClaimProcessNodeDomainCommand(ctx context.Context, in *ProcessNodeDomainCommandClaim) (*ProcessNodeInstance, error) {
 	r.claimedDomainCommand = in
 	r.claimCalls++

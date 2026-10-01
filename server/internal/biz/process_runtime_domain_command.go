@@ -56,13 +56,8 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 	if node.Status != ProcessNodeStatusActive {
 		return uc.reconcileSettledDomainCommandNode(ctx, node, normalized.ExpectedVersion, domainCommandFingerprint, actorID)
 	}
-	_, durableResultProtocol := uc.repo.(ProcessRuntimeDomainCommandResultRepo)
-	if durableResultProtocol {
-		if err := validateActiveProcessDomainCommandProtocol(node, domainCommandFingerprint); err != nil {
-			return nil, err
-		}
-	} else if node.DomainCommandFingerprint != nil && *node.DomainCommandFingerprint != domainCommandFingerprint {
-		return nil, ErrIdempotencyConflict
+	if err := validateActiveProcessDomainCommandProtocol(node, domainCommandFingerprint); err != nil {
+		return nil, err
 	}
 	if node.Version != normalized.ExpectedVersion {
 		return nil, ErrProcessNodeInstanceConflict
@@ -109,7 +104,7 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 	if claimedNode.DomainCommandFingerprint == nil || *claimedNode.DomainCommandFingerprint != domainCommandFingerprint {
 		return nil, ErrIdempotencyConflict
 	}
-	if durableResultProtocol && (claimedNode.DomainCommandProtocolVersion == nil || *claimedNode.DomainCommandProtocolVersion != ProcessDomainCommandProtocolVersionCurrent) {
+	if claimedNode.DomainCommandProtocolVersion == nil || *claimedNode.DomainCommandProtocolVersion != ProcessDomainCommandProtocolVersionCurrent {
 		return nil, ErrProcessDomainCommandRecoveryRequired
 	}
 	if claimedNode.Status != ProcessNodeStatusActive {
@@ -129,15 +124,9 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 	}
 	result, err := handler.ExecuteProcessDomainCommand(ctx, commandInput, actorID)
 	if err != nil {
-		// The durable command protocol permits the same immutable intent to be
-		// executed concurrently. A competing executor can commit the source
-		// mutation and the matching result while this executor is blocked inside
-		// its handler. In that case the handler may observe the already-mutated
-		// source and return a stale-state error even though the authoritative
-		// result is now durable. Re-read the result before surfacing the handler
-		// error so both callers converge on the same receipt. A missing result
-		// still fails closed with the original error; source state alone never
-		// proves that this command caused the mutation.
+		// A competing executor can commit this immutable intent while the handler
+		// is waiting. Re-read the matching durable result so both callers converge
+		// on the same receipt; source state alone never proves this mutation.
 		storedNode, found, resultErr := uc.getStoredProcessDomainCommandResult(ctx, node, domainCommandFingerprint)
 		if resultErr != nil {
 			return nil, resultErr
@@ -147,77 +136,21 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 		}
 		return nil, err
 	}
-	if resultRepo, ok := uc.repo.(ProcessRuntimeDomainCommandResultRepo); ok {
-		record, err := processDomainCommandResultRecord(node, nodeCommandKey, domainCommandFingerprint, result)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := resultRepo.RecordProcessNodeDomainCommandResult(ctx, record, actorID); err != nil {
-			return nil, err
-		}
-		storedNode, found, err := resultRepo.GetProcessNodeDomainCommandResult(ctx, node.ProcessInstanceID, node.ID, domainCommandFingerprint)
-		if err != nil {
-			return nil, err
-		}
-		if !found || storedNode == nil {
-			return nil, ErrProcessDomainCommandRecoveryRequired
-		}
-		return uc.settleActiveProcessDomainCommandResult(ctx, storedNode, domainCommandFingerprint, actorID)
-	}
-	outcome := nodeCommandKey
-	if result != nil && strings.TrimSpace(result.Outcome) != "" {
-		outcome = strings.TrimSpace(result.Outcome)
-	}
-	if result != nil && strings.TrimSpace(result.BlockReason) != "" {
-		blockedNode, blockErr := uc.blockActiveProcessNodeInstance(ctx, &ProcessNodeInstanceBlock{
-			ProcessInstanceID:        node.ProcessInstanceID,
-			ProcessNodeInstanceID:    node.ID,
-			ExpectedVersion:          node.Version,
-			Reason:                   strings.TrimSpace(result.BlockReason),
-			Outcome:                  outcome,
-			DomainCommandFingerprint: &domainCommandFingerprint,
-		}, actorID)
-		if blockErr == nil {
-			return blockedNode, nil
-		}
-		return uc.reconcileConcurrentDomainCommandSettlement(
-			ctx, node, ProcessNodeStatusBlocked, outcome, domainCommandFingerprint, blockErr, actorID,
-		)
-	}
-	if result != nil {
-		for _, ref := range result.LinkedBusinessRefs {
-			normalizedRef, err := normalizeProcessBusinessRef(ref)
-			if err != nil {
-				return nil, err
-			}
-			if _, err := uc.repo.RecordProcessInstanceLinkedBusinessRef(ctx, &ProcessInstanceLinkedBusinessRefRecord{
-				ProcessInstanceID: normalized.ProcessInstanceID,
-				RefType:           normalizedRef.RefType,
-				RefID:             normalizedRef.RefID,
-				RefNo:             normalizedRef.RefNo,
-				SourceNodeKey:     node.NodeKey,
-				SourceCommandKey:  nodeCommandKey,
-			}, actorID); err != nil {
-				return nil, err
-			}
-		}
-	}
-	completedNode, err := uc.repo.CompleteProcessNodeInstance(ctx, &ProcessNodeInstanceComplete{
-		ID:                       node.ID,
-		ProcessInstanceID:        node.ProcessInstanceID,
-		ExpectedVersion:          node.Version,
-		Outcome:                  outcome,
-		DomainCommandFingerprint: &domainCommandFingerprint,
-	}, actorID)
+	record, err := processDomainCommandResultRecord(node, nodeCommandKey, domainCommandFingerprint, result)
 	if err != nil {
-		return uc.reconcileConcurrentDomainCommandSettlement(
-			ctx, node, ProcessNodeStatusCompleted, outcome, domainCommandFingerprint, err, actorID,
-		)
-	}
-	if err := uc.advanceAfterNodeCompletion(ctx, completedNode, actorID); err != nil {
 		return nil, err
 	}
-	return completedNode, nil
+	if _, err := uc.repo.RecordProcessNodeDomainCommandResult(ctx, record, actorID); err != nil {
+		return nil, err
+	}
+	storedNode, found, err := uc.repo.GetProcessNodeDomainCommandResult(ctx, node.ProcessInstanceID, node.ID, domainCommandFingerprint)
+	if err != nil {
+		return nil, err
+	}
+	if !found || storedNode == nil {
+		return nil, ErrProcessDomainCommandRecoveryRequired
+	}
+	return uc.settleActiveProcessDomainCommandResult(ctx, storedNode, domainCommandFingerprint, actorID)
 }
 
 func (uc *ProcessRuntimeUsecase) reconcileConcurrentDomainCommandClaim(
@@ -339,11 +272,7 @@ func (uc *ProcessRuntimeUsecase) getStoredProcessDomainCommandResult(
 	if uc == nil || uc.repo == nil || node == nil {
 		return nil, false, ErrBadParam
 	}
-	resultRepo, ok := uc.repo.(ProcessRuntimeDomainCommandResultRepo)
-	if !ok {
-		return nil, false, nil
-	}
-	return resultRepo.GetProcessNodeDomainCommandResult(ctx, node.ProcessInstanceID, node.ID, fingerprint)
+	return uc.repo.GetProcessNodeDomainCommandResult(ctx, node.ProcessInstanceID, node.ID, fingerprint)
 }
 
 func (uc *ProcessRuntimeUsecase) settleActiveProcessDomainCommandResult(
@@ -772,9 +701,6 @@ func (uc *ProcessRuntimeUsecase) reconcileSettledDomainCommandNode(ctx context.C
 	}
 	if node.DomainCommandFingerprint == nil || *node.DomainCommandFingerprint != domainCommandFingerprint {
 		return nil, ErrIdempotencyConflict
-	}
-	if _, durableResultProtocol := uc.repo.(ProcessRuntimeDomainCommandResultRepo); !durableResultProtocol {
-		return nil, ErrProcessDomainCommandRecoveryRequired
 	}
 	if err := validateSettledProcessDomainCommandProtocol(node, domainCommandFingerprint); err != nil {
 		return nil, err

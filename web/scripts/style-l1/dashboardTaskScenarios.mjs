@@ -4,6 +4,7 @@ import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
 import { assertTaskEventTrailMarkers } from './taskEventTrailAssertions.mjs'
 import { createTaskDrawerAppearanceScenarios } from './taskDrawerAppearanceScenarios.mjs'
+import { createProcessRuntimeClosureScenarios } from './processRuntimeClosureScenarios.mjs'
 
 export function createDashboardTaskScenarios({
   expectText,
@@ -24,12 +25,15 @@ export function createDashboardTaskScenarios({
   customerRuntimeEffectiveSession,
   assertNoHorizontalOverflow,
   assertERPThemeMode,
-  assertDarkDashboardLinkButtonsUnboxed,
   assertThemeReadable,
   assertDarkThemeContrast,
   assertDarkThemeNeutralInteractions,
 }) {
   return [
+    ...createProcessRuntimeClosureScenarios({
+      assert,
+      customerRuntimeEffectiveSession,
+    }),
     ...createTaskDrawerAppearanceScenarios({
       assert,
       path,

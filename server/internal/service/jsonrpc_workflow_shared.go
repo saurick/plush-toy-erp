@@ -220,12 +220,15 @@ func workflowProcessInstanceSummaryToMap(instance *biz.ProcessInstance) map[stri
 		return nil
 	}
 	return map[string]any{
-		"id":              instance.ID,
-		"process_key":     instance.ProcessKey,
-		"process_version": instance.ProcessVersion,
-		"status":          instance.Status,
-		"started_at":      instance.StartedAt.Unix(),
-		"completed_at":    workflowUnixValue(instance.CompletedAt),
+		"id":                instance.ID,
+		"process_key":       instance.ProcessKey,
+		"process_version":   instance.ProcessVersion,
+		"status":            instance.Status,
+		"started_at":        instance.StartedAt.Unix(),
+		"completed_at":      workflowUnixValue(instance.CompletedAt),
+		"resolution_kind":   workflowStringValue(instance.ResolutionKind),
+		"resolution_reason": workflowStringValue(instance.ResolutionReason),
+		"resolved_at":       workflowUnixValue(instance.ResolvedAt),
 	}
 }
 
