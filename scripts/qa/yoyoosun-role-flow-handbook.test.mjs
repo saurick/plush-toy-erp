@@ -30,6 +30,30 @@ const trialAccountChecklist = read(
 const customerReadme = read("../../docs/customers/yoyoosun/README.md");
 const rbacSource = read("../../server/internal/biz/rbac.go");
 
+test("customer confirmation separates enforced finance gate, published baseline and pending acceptance", () => {
+  const financeGateRow = customerConfirmation
+    .split("\n")
+    .find((line) => /^\| X10 \|/u.test(line));
+  const financeApprovalRow = customerConfirmation
+    .split("\n")
+    .find((line) => /^\| A05 \|/u.test(line));
+  assert.match(financeGateRow, /当前为强制门禁，未批准不能出货/u);
+  assert.doesNotMatch(financeGateRow, /不是强制门禁/u);
+  assert.match(financeApprovalRow, /真实岗位办理和 C05 业务选择仍待确认/u);
+  assert.match(customerDeliveryMatrix, /最近已保存的目标证据/u);
+  assert.match(customerDeliveryMatrix, /未实时复核目标/u);
+  const statusAppendix = customerConfirmation.split("### 6.2 乙方状态附表")[1];
+  assert.ok(statusAppendix);
+  for (const id of ["P03", "P07", "P08", "P09"]) {
+    const row = statusAppendix
+      .split("\n")
+      .find((line) => line.startsWith(`| ${id} |`));
+    const cells = row.split("|").map((cell) => cell.trim());
+    assert.equal(cells[4], "固定版本已发布；岗位待核验", id);
+    assert.equal(cells[5], "待验收", id);
+  }
+});
+
 const registeredPermissionKeys = new Set(
   [...rbacSource.matchAll(/^\s*Permission\w+\s+=\s+"([^"]+)"/gmu)].map(
     (match) => match[1],
