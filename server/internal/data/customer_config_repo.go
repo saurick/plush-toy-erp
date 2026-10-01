@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -777,8 +778,9 @@ ORDER BY role_key ASC`, customerKey, revision)
 		if err := rows.Scan(&item.RoleKey, &item.DisplayName, &item.Disabled, &bundlesRaw, &revokesRaw); err != nil {
 			return nil, err
 		}
-		item.BundleKeys = decodeStringListJSON(bundlesRaw)
-		item.Revokes = decodeStringListJSON(revokesRaw)
+		if err := decodeRoleProfileJSON(&item, bundlesRaw, revokesRaw); err != nil {
+			return nil, err
+		}
 		out = append(out, item)
 	}
 	return out, rows.Err()
@@ -809,7 +811,10 @@ ORDER BY role_key ASC, capability_key ASC`
 		if err := rows.Scan(&item.RoleKey, &item.CapabilityKey, &item.ScopeType, &item.ScopeValue, &constraintsRaw, &item.Enabled); err != nil {
 			return nil, err
 		}
-		item.Constraints = decodeMapJSON(constraintsRaw)
+		item.Constraints, err = decodeMapJSON(constraintsRaw)
+		if err != nil {
+			return nil, fmt.Errorf("decode access_entitlements.constraints: %w", err)
+		}
 		out = append(out, item)
 	}
 	return out, rows.Err()
@@ -1040,30 +1045,53 @@ func scanCustomerConfigRevision(row customerConfigRevisionScanner) (*biz.Custome
 	); err != nil {
 		return nil, err
 	}
-	item.CompiledSnapshot = decodeMapJSON(snapshotRaw)
+	snapshot, err := decodeMapJSON(snapshotRaw)
+	if err != nil {
+		return nil, fmt.Errorf("decode customer_config_revisions.compiled_snapshot: %w", err)
+	}
+	item.CompiledSnapshot = snapshot
 	return &item, nil
 }
 
-func decodeMapJSON(raw []byte) map[string]any {
+func decodeRoleProfileJSON(item *biz.RoleProfileInput, bundlesRaw, revokesRaw []byte) error {
+	var err error
+	item.BundleKeys, err = decodeStringListJSON(bundlesRaw)
+	if err != nil {
+		return fmt.Errorf("decode role_profiles.bundle_keys: %w", err)
+	}
+	item.Revokes, err = decodeStringListJSON(revokesRaw)
+	if err != nil {
+		return fmt.Errorf("decode role_profiles.revokes: %w", err)
+	}
+	return nil
+}
+
+func decodeMapJSON(raw []byte) (map[string]any, error) {
 	if len(raw) == 0 {
-		return map[string]any{}
+		return map[string]any{}, nil
 	}
 	out := map[string]any{}
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return map[string]any{}
+		return nil, err
 	}
-	return out
+	if out == nil {
+		out = map[string]any{}
+	}
+	return out, nil
 }
 
-func decodeStringListJSON(raw []byte) []string {
+func decodeStringListJSON(raw []byte) ([]string, error) {
 	if len(raw) == 0 {
-		return []string{}
+		return []string{}, nil
 	}
 	out := []string{}
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return []string{}
+		return nil, err
 	}
-	return out
+	if out == nil {
+		out = []string{}
+	}
+	return out, nil
 }
 
 func buildStringInClause(startIndex int, values []string) (string, []any) {

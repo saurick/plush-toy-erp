@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -72,8 +73,10 @@ ORDER BY config_revision ASC, role_key ASC`, customerKey)
 			return nil, err
 		}
 		if target := revisions[strings.TrimSpace(revision)]; target != nil {
-			item.BundleKeys = decodeStringListJSON(bundlesRaw)
-			item.Revokes = decodeStringListJSON(revokesRaw)
+			if err := decodeRoleProfileJSON(&item, bundlesRaw, revokesRaw); err != nil {
+				_ = roleRows.Close()
+				return nil, err
+			}
 			target.RoleProfiles = append(target.RoleProfiles, item)
 		}
 	}
@@ -110,7 +113,11 @@ ORDER BY config_revision ASC, role_key ASC, capability_key ASC`, customerKey)
 			return nil, err
 		}
 		if target := revisions[strings.TrimSpace(revision)]; target != nil {
-			item.Constraints = decodeMapJSON(constraintsRaw)
+			item.Constraints, err = decodeMapJSON(constraintsRaw)
+			if err != nil {
+				_ = entitlementRows.Close()
+				return nil, fmt.Errorf("decode access_entitlements.constraints: %w", err)
+			}
 			target.AccessEntitlements = append(target.AccessEntitlements, item)
 		}
 	}
