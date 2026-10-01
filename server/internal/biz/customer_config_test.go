@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -1930,6 +1931,60 @@ func TestCustomerConfigUsecaseRejectsForbiddenPayloadAndRevisionMutation(t *test
 	changed.CompiledSnapshot["customer"] = map[string]any{"key": "yoyoosun", "name": "永绅新名称"}
 	if _, err := uc.PublishCustomerConfig(ctx, changed, 100); !errors.Is(err, ErrCustomerConfigRevisionImmutable) {
 		t.Fatalf("immutable revision error = %v", err)
+	}
+}
+
+func TestCustomerConfigUsecasePreviewCatalogChangeRequiresNewRevision(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	previous := validCustomerConfigInput()
+	previous.Revision = "yoyoosun-customer-package-v7.runtime-manifest-v1"
+	previous.CompiledSnapshot["extensionPointCatalog"] = map[string]any{
+		"runtime_enabled":       false,
+		"implementation_source": "registered_deployment_package_required",
+		"blocked_reasons": []any{
+			"no_reviewed_extension_contract",
+			"customer_package_handler_forbidden",
+			"registered_deployment_package_required",
+		},
+	}
+	original, err := uc.PublishCustomerConfig(ctx, previous, 99)
+	if err != nil {
+		t.Fatalf("publish original configuration: %v", err)
+	}
+
+	candidate := validCustomerConfigInput()
+	candidate.Revision = previous.Revision
+	candidate.CompiledSnapshot["extensionPointCatalog"] = map[string]any{
+		"runtime_enabled":       false,
+		"implementation_source": "not_implemented",
+		"blocked_reasons": []any{
+			"no_reviewed_extension_contract",
+			"customer_package_handler_forbidden",
+		},
+	}
+	if _, err := uc.PublishCustomerConfig(ctx, candidate, 100); !errors.Is(err, ErrCustomerConfigRevisionImmutable) {
+		t.Fatalf("catalog metadata change at the same revision: %v, want immutable conflict", err)
+	}
+	candidate.Revision = "yoyoosun-customer-package-v8.runtime-manifest-v1"
+	published, err := uc.PublishCustomerConfig(ctx, candidate, 100)
+	if err != nil {
+		t.Fatalf("publish new configuration revision: %v", err)
+	}
+	if published.ConfigHash == original.ConfigHash || published.Status != CustomerConfigStatusPublished {
+		t.Fatalf("new catalog content must have a distinct published identity: %#v", published)
+	}
+	replayed, err := uc.PublishCustomerConfig(ctx, candidate, 101)
+	if err != nil || !reflect.DeepEqual(replayed, published) {
+		t.Fatalf("same content replay must preserve the published record: %#v, %v", replayed, err)
+	}
+	stored, err := repo.GetCustomerConfigRevision(ctx, previous.CustomerKey, previous.Revision)
+	if err != nil || !reflect.DeepEqual(stored, original) {
+		t.Fatalf("old revision and snapshot must remain unchanged: %#v, %v", stored, err)
+	}
+	if _, err := repo.GetActiveCustomerConfigRevision(ctx, candidate.CustomerKey); !errors.Is(err, ErrCustomerConfigNotFound) {
+		t.Fatalf("publishing must not activate a configuration: %v", err)
 	}
 }
 

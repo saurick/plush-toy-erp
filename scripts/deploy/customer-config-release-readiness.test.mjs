@@ -9,7 +9,10 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
 import { writeBaseReleaseEvidenceTestFixture } from "./base-release-evidence-test-fixture.mjs";
-import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixtures.mjs";
+import {
+  releaseReadyYoyoosunCustomerPackage,
+  releaseReadyYoyoosunRevision,
+} from "./customer-config-test-fixtures.mjs";
 import {
   buildCustomerConfigReadbackPreflightReport,
   buildInputTemplate,
@@ -121,7 +124,7 @@ function writeManifestEvidence(root, evidenceDir, manifest) {
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+        revision: releaseReadyYoyoosunRevision,
         manifestSha256: `sha256:${manifestSha256(root, manifest)}`,
         reviewStatus: "approved",
         reviewer: "config-reviewer",
@@ -141,7 +144,7 @@ function writeReleaseEvidence(dir) {
   return writeBaseReleaseEvidenceTestFixture(dir, {
     deploymentTarget: "customer-test-133",
     releaseId: "20260628T2300-config-readiness",
-    customerConfigRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    customerConfigRevision: releaseReadyYoyoosunRevision,
     backendEndpointAlias: "https://erp.example.invalid",
   });
 }
@@ -159,8 +162,8 @@ function buildReleaseReport({ root, manifest, evidenceDir, overrides = {} }) {
           status: "verified",
           method: "get_effective_session",
           customerKey: "yoyoosun",
-          revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
-          configRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+          revision: releaseReadyYoyoosunRevision,
+          configRevision: releaseReadyYoyoosunRevision,
           source: "active_customer_config_revision",
           pageCount: manifestPayload.compiled_snapshot.pages.length,
           actionCount: 1,
@@ -175,8 +178,7 @@ function buildReleaseReport({ root, manifest, evidenceDir, overrides = {} }) {
   return {
     generatedAt: "2026-06-28T23:00:00.000Z",
     customerKey: overrides.customerKey ?? "yoyoosun",
-    revision:
-      overrides.revision ?? "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    revision: overrides.revision ?? releaseReadyYoyoosunRevision,
     executed,
     activate,
     activateOnly: overrides.activateOnly ?? false,
@@ -190,7 +192,7 @@ function buildReleaseReport({ root, manifest, evidenceDir, overrides = {} }) {
     activationGateChecked: Boolean(evidenceDir),
     manifestSummary: {
       customerKey: "yoyoosun",
-      revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      revision: releaseReadyYoyoosunRevision,
     },
     operations: overrides.operations ?? [
       { key: "validate", method: "validate_customer_config" },
@@ -203,8 +205,7 @@ function buildReleaseReport({ root, manifest, evidenceDir, overrides = {} }) {
             {
               key: "publish",
               method: "publish_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "published",
             },
           ]
@@ -372,7 +373,7 @@ test("readback preflight report accepts existing release and target smoke eviden
     assert.deepEqual(report.blockers, []);
     assert.equal(
       report.manifest.revision,
-      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      releaseReadyYoyoosunRevision,
     );
     assert.equal(
       report.releaseReport.effectiveSessionVerification.status,
@@ -471,7 +472,7 @@ test("readback preflight report blocks customer mismatches across report and smo
           status: "verified",
           method: "get_effective_session",
           customerKey: "other-customer",
-          configRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+          configRevision: releaseReadyYoyoosunRevision,
           source: "active_customer_config_revision",
           pageCount: 3,
           fieldPolicySurfaceCount: 3,
@@ -525,7 +526,7 @@ test("接受发布前 readiness：manifest + manifest evidence + release evidenc
     assert.equal(result.customer, "yoyoosun");
     assert.equal(
       result.revision,
-      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      releaseReadyYoyoosunRevision,
     );
     assert.equal(result.manifest, manifest);
     assert.equal(path.isAbsolute(result.manifest), false);
@@ -826,8 +827,7 @@ test("require-activated 要求 activate active 结果", async () => {
             {
               key: "activate",
               method: "activate_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "published",
             },
           ],
@@ -869,8 +869,7 @@ test("require-activated 要求 effective session 验证", async () => {
             {
               key: "activate",
               method: "activate_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "active",
             },
           ],
@@ -938,8 +937,7 @@ test("require-activated 要求目标 smoke 读回 effective session", async () =
             {
               key: "activate",
               method: "activate_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "active",
             },
           ],
@@ -1002,8 +1000,7 @@ test("require-activated 拒绝目标 smoke revision 不匹配", async () => {
             {
               key: "activate",
               method: "activate_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "active",
             },
           ],
@@ -1046,8 +1043,7 @@ test("require-activated 拒绝执行报告与目标 smoke backend 不一致", as
             {
               key: "activate",
               method: "activate_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "active",
             },
           ],
@@ -1093,8 +1089,7 @@ test("require-activated 拒绝带账号密码的目标 smoke backend alias", asy
             {
               key: "activate",
               method: "activate_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "active",
             },
           ],
@@ -1140,15 +1135,13 @@ test("接受已激活报告", async () => {
             {
               key: "publish",
               method: "publish_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "published",
             },
             {
               key: "activate",
               method: "activate_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "active",
             },
           ],
@@ -1170,7 +1163,7 @@ test("接受已激活报告", async () => {
     assert.equal(result.targetSmokeEffectiveSession.status, "verified");
     assert.equal(
       result.targetSmokeEffectiveSession.expectedRevision,
-      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      releaseReadyYoyoosunRevision,
     );
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -1194,8 +1187,7 @@ test("require-rollback 要求 rollback active 结果", async () => {
             {
               key: "rollback",
               method: "rollback_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "published",
             },
           ],
@@ -1237,8 +1229,7 @@ test("require-rollback 拒绝 effective session revision 不匹配", async () =>
             {
               key: "rollback",
               method: "rollback_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "active",
             },
           ],
@@ -1291,8 +1282,7 @@ test("接受已回滚报告", async () => {
             {
               key: "rollback",
               method: "rollback_customer_config",
-              resultRevision:
-                "yoyoosun-customer-package-v7.runtime-manifest-v1",
+              resultRevision: releaseReadyYoyoosunRevision,
               resultStatus: "active",
             },
           ],

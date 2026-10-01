@@ -129,7 +129,7 @@ test("customer-config-runtime-manifest: formal CLI uses only the registered yoyo
     out: "",
   });
   assert.equal(result.manifest.publishable, true);
-  assert.equal(result.manifest.revision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+  assert.equal(result.manifest.revision, "yoyoosun-customer-package-v8.runtime-manifest-v1");
 
   assert.throws(
     () =>
@@ -171,7 +171,7 @@ test("customer-config-runtime-manifest: local test apply is content-addressed an
   assert.equal(first.compiled_snapshot.package.publishEnabled, false);
   assert.match(
     first.revision,
-    /^yoyoosun-customer-package-v7\.local-[a-f0-9]{16}\.runtime-v1$/u,
+    /^yoyoosun-customer-package-v8\.local-[a-f0-9]{16}\.runtime-v1$/u,
   );
   assert.equal(second.revision, first.revision);
   assert(first.revision.length <= 64);
@@ -211,7 +211,7 @@ test("customer-config-runtime-manifest: formal payload publishes versions and se
   assert.equal(manifest.customer_key, "yoyoosun");
   assert.equal(
     manifest.revision,
-    "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    "yoyoosun-customer-package-v8.runtime-manifest-v1",
   );
   assert.equal(manifest.product_version, "local-customer-package");
   assert.equal(manifest.compiled_snapshot.package.status, "release_ready");

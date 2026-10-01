@@ -9,7 +9,10 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
 import { writeBaseReleaseEvidenceTestFixture } from "./base-release-evidence-test-fixture.mjs";
-import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixtures.mjs";
+import {
+  releaseReadyYoyoosunCustomerPackage,
+  releaseReadyYoyoosunRevision,
+} from "./customer-config-test-fixtures.mjs";
 import {
   buildInputTemplate,
   parseCliArgs,
@@ -150,7 +153,7 @@ function writeManifestEvidence(root, evidenceDir, manifest) {
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+        revision: releaseReadyYoyoosunRevision,
         manifestSha256: `sha256:${manifestSha256(root, manifest)}`,
         reviewStatus: "approved",
         redaction: {
@@ -324,7 +327,7 @@ test("默认只生成发布计划报告，不调用真实后端", async () => {
     );
     assert.equal(
       saved.revision,
-      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      releaseReadyYoyoosunRevision,
     );
     assert.equal(saved.manifest, manifest);
     const markdown = await readFile(
@@ -629,7 +632,7 @@ test("execute activate 通过 JSON-RPC 调用 validate、publish、transition ch
     assert.equal(report.effectiveSessionVerification.configHashVersion, 1);
     assert.equal(
       report.effectiveSessionVerification.configRevision,
-      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      releaseReadyYoyoosunRevision,
     );
   } finally {
     globalThis.fetch = originalFetch;

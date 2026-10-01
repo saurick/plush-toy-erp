@@ -9,7 +9,10 @@ import { fileURLToPath } from "node:url";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
 import { writeBaseReleaseEvidenceTestFixture } from "./base-release-evidence-test-fixture.mjs";
 import { validateCustomerConfigActivationGate } from "./customer-config-activation-gate.mjs";
-import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixtures.mjs";
+import {
+  releaseReadyYoyoosunCustomerPackage,
+  releaseReadyYoyoosunRevision,
+} from "./customer-config-test-fixtures.mjs";
 import {
   parseCliArgs,
   writeCustomerConfigManifestEvidence,
@@ -105,7 +108,7 @@ test("生成 manifest evidence 后 activation gate 可通过", async () => {
   });
   assert.equal(
     gate.revision,
-    "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    releaseReadyYoyoosunRevision,
   );
 
   await rm(root, { recursive: true, force: true });
@@ -206,7 +209,7 @@ test("release report hash 不匹配时拒绝", async () => {
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+        revision: releaseReadyYoyoosunRevision,
         manifestSha256:
           "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       },

@@ -9,7 +9,10 @@ import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs
 import { writeBaseReleaseEvidenceTestFixture } from "./base-release-evidence-test-fixture.mjs";
 import { PRODUCTION_PREFLIGHT_CHECKS } from "./production-preflight-receipt.mjs";
 import { validateCustomerConfigActivationGate as validateCustomerConfigActivationGateImpl } from "./customer-config-activation-gate.mjs";
-import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixtures.mjs";
+import {
+  releaseReadyYoyoosunCustomerPackage,
+  releaseReadyYoyoosunRevision,
+} from "./customer-config-test-fixtures.mjs";
 
 const scriptPath = path.resolve(
   new URL("customer-config-activation-gate.mjs", import.meta.url).pathname,
@@ -110,7 +113,7 @@ test("customer config activation gate accepts manifest with filled release evide
   assert.equal(result.customer, "yoyoosun");
   assert.equal(
     result.revision,
-    "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    releaseReadyYoyoosunRevision,
   );
   assert.deepEqual(result.runtimeIdentity, {
     scope: "release-v1",
@@ -225,7 +228,7 @@ test("customer config activation gate does not require acceptance-only PDF proof
 
   assert.equal(
     result.revision,
-    "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    releaseReadyYoyoosunRevision,
   );
 });
 
