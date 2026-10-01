@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 
 import {
   activateRehearsalCustomerConfig,
@@ -45,7 +46,7 @@ const manifest = {
     sequenceSha256: "c".repeat(64),
   },
   customerConfig: {
-    packageKey: "yoyoosun-customer-package-v7",
+    packageKey: yoyoosunCustomerPackage.packageKey,
     sourceSha256: "d".repeat(64),
   },
   sbom: { sha256: "e".repeat(64) },
@@ -308,7 +309,10 @@ test("local release rehearsal environment binds isolated database fixed images a
   assert.equal(built.values.POSTGRES_APP_PASSWORD, "app-password");
   assert.equal(built.values.POSTGRES_MIGRATOR_PASSWORD, "migrator-password");
   assert.equal(built.values.POSTGRES_BACKUP_PASSWORD, "backup-password");
-  assert.equal(built.values.JAEGER_IMAGE, "jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3");
+  assert.equal(
+    built.values.JAEGER_IMAGE,
+    "jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3",
+  );
   assert.equal(built.values.ERP_DEBUG_ENV, "prod");
   assert.equal(built.values.ERP_DEBUG_SEED_ENABLED, "false");
   assert.equal(built.values.BOOTSTRAP_ADMIN_ONCE, "false");
@@ -673,7 +677,10 @@ test("local release rehearsal activates only the content-addressed local-test cu
   );
   assert.match(
     appliedManifest.revision,
-    /^yoyoosun-customer-package-v7\.local-[a-f0-9]{16}\.runtime-v1$/u,
+    new RegExp(
+      `^${RegExp.escape(yoyoosunCustomerPackage.packageKey)}\\.local-[a-f0-9]{16}\\.runtime-v1$`,
+      "u",
+    ),
   );
   assert.equal(result.status, "passed");
   assert.equal(result.writesBusinessFacts, false);

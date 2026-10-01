@@ -16,6 +16,7 @@ const rejectionModal = read(
   '../components/quality-inspections/PurchaseRejectionDispositionModal.jsx'
 )
 const financePaymentsPage = read('./FinancePaymentsPage.jsx')
+const financeCreditSubmission = read('../utils/financeCreditSubmission.mjs')
 const productionExceptionPanel = read(
   '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
 )
@@ -62,10 +63,12 @@ test('finance V1: lists real payments, allocates multiple facts and preserves re
   assert.match(financePaymentsPage, /createBusinessTablePagination/u)
   assert.match(financePaymentsPage, /outstanding_amount/u)
   assert.match(financePaymentsPage, /validateFinanceAllocationDraft/u)
-  assert.match(financePaymentsPage, /validateFinanceCreditDraft/u)
-  assert.match(financePaymentsPage, /compareNumeric20Scale6Values/u)
+  assert.match(financePaymentsPage, /command = buildFinanceCreditCommand\(/u)
+  assert.match(financePaymentsPage, /await executeFinanceCreditCommand\(/u)
+  assert.match(financeCreditSubmission, /validateFinanceCreditDraft/u)
+  assert.match(financeCreditSubmission, /compareNumeric20Scale6Values/u)
   assert.doesNotMatch(
-    financePaymentsPage,
+    financeCreditSubmission,
     /Number\(credit\?\.amount\)\s*===\s*Number\(payload\.amount\)/u
   )
   assert.match(financePaymentsPage, /Form\.List name="allocations"/u)
@@ -83,8 +86,8 @@ test('finance V1: lists real payments, allocates multiple facts and preserves re
   )
   assert.match(financePaymentsPage, /expected_version:/u)
   assert.match(financePaymentsPage, /reverseFinancePayment/u)
-  assert.match(financePaymentsPage, /createFinanceCreditNote/u)
-  assert.match(financePaymentsPage, /reverseFinanceCreditNote/u)
+  assert.match(financeCreditSubmission, /createFinanceCreditNote/u)
+  assert.match(financeCreditSubmission, /reverseFinanceCreditNote/u)
   assert.match(financePaymentsPage, /不(?:会)?删除原记录/u)
   assert.match(financePaymentsPage, /getFinancePaymentApprovalProcess/u)
   assert.match(financePaymentsPage, /startFinancePaymentApprovalProcess/u)

@@ -89,9 +89,10 @@ test('finance credit reversal reads back its own reversal without repeating a wr
   const calls = []
   setRpcResponse(async (method) => {
     calls.push(method)
-    if (method === 'get_finance_credit_note')
+    if (method === 'get_finance_credit_note') {
       return { data: { credit_note: { id: 8, finance_fact_id: 7 } } }
-    if (method === 'list_finance_credit_notes')
+    }
+    if (method === 'list_finance_credit_notes') {
       return {
         data: {
           credit_notes: [
@@ -100,6 +101,7 @@ test('finance credit reversal reads back its own reversal without repeating a wr
           ],
         },
       }
+    }
     return { data: {} }
   })
   const result = await executeFinanceCreditCommand({
