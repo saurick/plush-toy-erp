@@ -42,6 +42,16 @@ function readFunctionSource(file, name) {
   return end < 0 ? rest : rest.slice(0, end);
 }
 
+test("dev flow state observatory: boundary documentation derives coverage instead of freezing counts", () => {
+  const doc = read("docs/architecture/业务链与运行轨迹边界.md");
+  assert.match(doc, /覆盖从当前目录派生/u);
+  assert.match(doc, /覆盖范围从当前目录派生/u);
+  assert.doesNotMatch(
+    doc,
+    /\d+\s*个\s*(?:链路步骤|步骤|合法回归场景|业务状态对象|ProcessRuntime\s*variant|Fact\s*\/\s*Ledger\s*定义|定义)/u,
+  );
+});
+
 test("dev flow state observatory: route and all catalogs stay DEV-only and read-only", () => {
   const catalog = DEV_FLOW_STATE_CATALOG;
   const devRoutes = read("web/src/dev-workbench/config/devRoutes.mjs");
