@@ -1998,26 +1998,6 @@
   white-space: normal;
 }
 
-.erp-role-navigation-preview__subgroups {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  max-height: 320px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
-.erp-role-navigation-preview__subgroup {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
-.erp-role-navigation-preview__subgroup > .ant-typography:first-child {
-  color: var(--erp-text-muted);
-  font-size: 12px;
-}
-
 .erp-sr-only {
   position: absolute;
   width: 1px;

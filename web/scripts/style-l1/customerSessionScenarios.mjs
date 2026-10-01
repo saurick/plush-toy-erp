@@ -1,11 +1,7 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
-import { ERP_DARK_PALETTE } from '../../src/common/theme/erpThemePalette.mjs'
 import { createSessionRecoveryScenarios } from './sessionRecoveryScenarios.mjs'
 import { createModuleCatalogScenarios } from './moduleCatalogScenarios.mjs'
 import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
-import { parseRgb } from './colorAssertions.mjs'
-
-const DARK_TEXT_MUTED_RGB = `rgb(${parseRgb(ERP_DARK_PALETTE.textMuted).join(', ')})`
 
 export function createCustomerSessionScenarios({
   expectHeading,
@@ -48,68 +44,95 @@ export function createCustomerSessionScenarios({
       hiddenItemKeys: Object.freeze([]),
     }),
   })
-  const assertMoreFunctionsPresentation = async (menu, expanded = false) => {
-    const trigger = menu
-      .locator('.ant-menu-submenu-title')
-      .filter({ hasText: '更多功能' })
-    assert.equal((await trigger.innerText()).trim(), '更多功能')
-    assert.equal(await trigger.getAttribute('aria-expanded'), String(expanded))
-    if (expanded) {
-      await menu.page().waitForFunction(() => {
-        const visibleMenu = Array.from(
-          document.querySelectorAll('.erp-admin-menu')
-        ).find((node) => node.getClientRects().length > 0)
-        const submenu = visibleMenu?.querySelector(
-          '.ant-menu-submenu-open > .ant-menu-sub'
-        )
-        return (
-          submenu?.clientHeight > 0 &&
-          submenu.clientHeight >= submenu.scrollHeight - 1
-        )
-      })
-    }
-    const metrics = await trigger.evaluate((node) => {
-      const group = node.closest('.ant-menu-item-group')
-      const icon = node.querySelector('[data-icon="ellipsis"]')
-      const arrow = node.querySelector('[data-icon="right"]')
-      const label = node.querySelector('.ant-menu-title-content')
-      const matrix = new DOMMatrix(getComputedStyle(arrow).transform)
-      const iconRect = icon?.getBoundingClientRect()
-      const labelRange = document.createRange()
-      labelRange.selectNodeContents(label)
-      const labelRect = labelRange.getBoundingClientRect()
-      const arrowRect = arrow?.getBoundingClientRect()
+  const assertDirectRoleNavigation = async (menu, expectedItems) => {
+    assert.equal(
+      await menu.getAttribute('data-navigation-presentation'),
+      'role_guided'
+    )
+    assert.equal(
+      await menu.locator('.ant-menu-submenu').count(),
+      0,
+      '岗位侧栏应直接显示全部入口'
+    )
+    const metrics = await menu.evaluate((node) => {
+      const leaves = Array.from(node.querySelectorAll('.ant-menu-item'))
+      const groupTitles = Array.from(
+        node.querySelectorAll('.ant-menu-item-group-title')
+      )
       const rect = node.getBoundingClientRect()
+      const footer = node
+        .closest('.erp-admin-sider__body')
+        ?.querySelector('.erp-module-catalog-footer')
+        ?.getBoundingClientRect()
       return {
-        groupTitle: group
-          ?.querySelector(':scope > .ant-menu-item-group-title')
-          ?.textContent.trim(),
-        arrowDirection: [matrix.a, matrix.b, matrix.c, matrix.d],
-        boxes: {
-          icon: iconRect?.toJSON(),
-          label: labelRect?.toJSON(),
-          arrow: arrowRect?.toJSON(),
-          trigger: rect.toJSON(),
-        },
-        fits:
-          rect.height >= 38 &&
-          iconRect?.width > 0 &&
-          labelRect?.left >= iconRect.right &&
-          labelRect?.right <= arrowRect?.left + 1 &&
-          arrowRect?.right <= rect.right + 1,
+        items: leaves.map((item) => String(item.textContent || '').trim()),
+        allMounted: leaves.every((item) => item.getClientRects().length > 0),
+        leafBoxesFit: leaves.every((item) => {
+          const box = item.getBoundingClientRect()
+          return (
+            box.height >= 38 &&
+            box.left >= rect.left - 1 &&
+            box.right <= rect.right + 1
+          )
+        }),
+        groupTitles: groupTitles.map((item) =>
+          String(item.textContent || '').trim()
+        ),
+        passiveGroupTitles: groupTitles.every(
+          (item) =>
+            item.tabIndex < 0 && !item.closest('a, button, [role="menuitem"]')
+        ),
+        clientWidth: node.clientWidth,
+        scrollWidth: node.scrollWidth,
+        footerFits: Boolean(footer && rect.bottom <= footer.top + 1),
       }
     })
-    assert.equal(metrics.groupTitle, '按需入口')
-    assert.deepEqual(
-      metrics.arrowDirection,
-      expanded ? [0, 1, -1, 0] : [1, 0, 0, 1],
-      '更多功能箭头应在收起时向右、展开时向下'
-    )
     assert(
-      metrics.fits,
-      `更多功能图标、文字和箭头不应重叠或越界: ${JSON.stringify(metrics)}`
+      metrics.allMounted &&
+        metrics.leafBoxesFit &&
+        metrics.passiveGroupTitles &&
+        metrics.footerFits &&
+        metrics.scrollWidth <= metrics.clientWidth + 1,
+      `岗位侧栏入口或滚动区域越界: ${JSON.stringify(metrics)}`
     )
+    assert.equal(
+      new Set(metrics.items).size,
+      metrics.items.length,
+      '同一模块不能重复占用入口'
+    )
+    assert.equal(metrics.items.at(-1), '帮助中心')
+    if (expectedItems) {
+      assert.deepEqual(metrics.items, expectedItems, '岗位入口及顺序应完整保留')
+    }
+    return metrics
   }
+  const salesRoleItems = [
+    '工作台',
+    '任务看板',
+    '基础资料',
+    '销售管理',
+    '出货管理',
+    '生产管理',
+    '库存管理',
+    '模板打印中心',
+    '历史记录中心',
+    '帮助中心',
+  ]
+  const financeRoleItems = [
+    '工作台',
+    '任务看板',
+    '财务管理',
+    '基础资料',
+    '销售管理',
+    '采购管理',
+    '委外管理',
+    '库存管理',
+    '质检管理',
+    '出货管理',
+    '模板打印中心',
+    '历史记录中心',
+    '帮助中心',
+  ]
   const yoyoosunBrandHomeCustomerConfig = Object.freeze({
     ...roleGuidedCustomerConfig,
     brand: Object.freeze({
@@ -2063,157 +2086,79 @@ export function createCustomerSessionScenarios({
       ),
       viewport: { width: 1280, height: 720 },
       verify: async (page) => {
-        await expectText(page, '工作中心')
-        await expectText(page, '工作台')
-        await expectText(page, '任务看板')
-        await expectText(page, '常用工作')
-        await expectText(page, '基础资料')
-        await expectText(page, '销售管理')
-        await expectText(page, '出货管理')
-        await expectText(page, '更多功能')
-
         const menu = page.locator('.erp-admin-menu')
-        assert.equal(
-          await menu.getAttribute('data-navigation-presentation'),
-          'role_guided'
-        )
-        const visibleLeafCount = await menu.evaluate(
-          (node) =>
-            Array.from(node.querySelectorAll('.ant-menu-item')).filter(
-              (item) => item.getClientRects().length > 0
-            ).length
-        )
-        assert.equal(
-          visibleLeafCount,
-          5,
-          `销售岗位首层应先显示两个看板，再显示三个常用业务，实际 ${visibleLeafCount}`
-        )
-        const visibleLeafTexts = await menu.evaluate((node) =>
-          Array.from(node.querySelectorAll('.ant-menu-item'))
-            .filter((item) => item.getClientRects().length > 0)
-            .map((item) => String(item.textContent || '').trim())
-        )
-        assert.deepEqual(
-          visibleLeafTexts,
-          ['工作台', '任务看板', '基础资料', '销售管理', '出货管理'],
-          `销售岗位导航应按看板、常用工作的顺序展示: ${JSON.stringify(visibleLeafTexts)}`
-        )
-
-        const moreFunctions = menu
-          .locator('.ant-menu-submenu-title')
-          .filter({ hasText: '更多功能' })
-        const moreFunctionsRoot = moreFunctions.locator('..')
-        const readMoreFunctionsState = () =>
-          moreFunctionsRoot.evaluate((node) => {
-            const helpItem = Array.from(
-              node.querySelectorAll('.ant-menu-item')
-            ).find((item) =>
-              String(item.textContent || '').includes('帮助中心')
-            )
-            const submenu = node.querySelector('.ant-menu-sub')
-            return {
-              open: node.classList.contains('ant-menu-submenu-open'),
-              submenuHeight: submenu?.getBoundingClientRect().height || 0,
-              helpHeight: helpItem?.getBoundingClientRect().height || 0,
-              helpSelected:
-                helpItem?.classList.contains('ant-menu-item-selected') === true,
-            }
-          })
-        await assertMoreFunctionsPresentation(menu)
-        await moreFunctions.focus()
-        await page.keyboard.press('Enter')
-        await expectText(page, '库存管理')
-        await expectText(page, '帮助中心')
-        await assertMoreFunctionsPresentation(menu, true)
-        const expandedVisibleLeafCount = await menu.evaluate(
-          (node) =>
-            Array.from(node.querySelectorAll('.ant-menu-item')).filter(
-              (item) => item.getClientRects().length > 0
-            ).length
-        )
-        assert.equal(
-          expandedVisibleLeafCount,
-          visibleLeafCount + 5,
-          '销售岗位展开后应保留全部五个按需入口'
-        )
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'yoyoosun-sales-role-guided-navigation-more-expanded.png'
-          ),
-          fullPage: true,
+        await assertDirectRoleNavigation(menu, salesRoleItems)
+        const helpMenuItem = menu.getByRole('menuitem', {
+          name: '帮助中心',
+          exact: true,
         })
-        const helpMenuItem = menu
-          .locator('.ant-menu-item')
-          .filter({ hasText: '帮助中心' })
-        await helpMenuItem.click()
-        await page.waitForURL((url) => url.pathname === '/erp/help-center')
+        await helpMenuItem.focus()
+        await page.keyboard.press('Enter')
+        await waitForPath(page, '/erp/help-center')
         await expectText(page, '办理概览')
         await page.getByText('完成后', { exact: true }).click()
         await expectText(page, '完成后应看到')
         await page.getByText('遇到异常', { exact: true }).click()
         await expectText(page, '什么时候停下来')
         await page.getByText('怎么做', { exact: true }).click()
-        await helpMenuItem.scrollIntoViewIfNeeded()
-        const activeHelpState = await readMoreFunctionsState()
         assert.equal(
-          activeHelpState.open &&
-            activeHelpState.submenuHeight > 0 &&
-            activeHelpState.helpHeight > 0 &&
-            activeHelpState.helpSelected,
-          true,
-          `进入岗位帮助后更多功能应保持展开并选中帮助入口: ${JSON.stringify(activeHelpState)}`
-        )
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'yoyoosun-sales-role-guided-navigation-help-active.png'
+          (await helpMenuItem.getAttribute('class')).includes(
+            'ant-menu-item-selected'
           ),
-          fullPage: true,
-        })
-
-        await page
-          .reload({ waitUntil: 'domcontentloaded' })
-          .then(() => page.waitForLoadState('networkidle').catch(() => {}))
+          true
+        )
+        await page.reload({ waitUntil: 'domcontentloaded' })
         await expectText(page, '办理概览')
-        await helpMenuItem.waitFor({ state: 'visible', timeout: 10_000 })
-        const reloadedHelpState = await readMoreFunctionsState()
+        await assertDirectRoleNavigation(menu, salesRoleItems)
         assert.equal(
-          reloadedHelpState.open &&
-            reloadedHelpState.submenuHeight > 0 &&
-            reloadedHelpState.helpHeight > 0 &&
-            reloadedHelpState.helpSelected,
-          true,
-          `刷新岗位帮助后更多功能应保持展开并选中帮助入口: ${JSON.stringify(reloadedHelpState)}`
-        )
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'yoyoosun-sales-role-guided-navigation-help-reloaded.png'
+          (await helpMenuItem.getAttribute('class')).includes(
+            'ant-menu-item-selected'
           ),
-          fullPage: true,
-        })
-
+          true,
+          '刷新帮助页后应保留当前入口选中态'
+        )
         await menu
-          .locator('.ant-menu-item')
-          .filter({ hasText: '工作台' })
-          .first()
+          .getByRole('menuitem', { name: '工作台', exact: true })
           .click()
         await waitForPath(page, '/erp/dashboard')
-        await helpMenuItem.waitFor({ state: 'hidden', timeout: 10_000 })
-        const dashboardState = await readMoreFunctionsState()
+        await assertDirectRoleNavigation(menu, salesRoleItems)
+        await page.getByRole('button', { name: '收起侧边菜单' }).click()
+        await page
+          .locator('.erp-admin-sider[data-sidebar-collapsed="true"]')
+          .waitFor({ state: 'visible' })
         assert.equal(
-          dashboardState.open || dashboardState.helpHeight > 0,
-          false,
-          `离开岗位帮助返回看板后更多功能应自动收起: ${JSON.stringify(dashboardState)}`
+          await menu.locator('.ant-menu-item').count(),
+          salesRoleItems.length
         )
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'yoyoosun-sales-role-guided-navigation-help-return-dashboard.png'
-          ),
-          fullPage: true,
-        })
+        await menu
+          .getByRole('menuitem', { name: '库存管理', exact: true })
+          .click()
+        await waitForPath(page, '/erp/warehouse/inventory')
+        await menu
+          .locator('.ant-menu-item-selected')
+          .filter({ hasText: '库存管理' })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await page
+            .locator('.erp-admin-sider')
+            .getAttribute('data-sidebar-collapsed'),
+          'true',
+          '图标入口直达模块时应保留侧栏收起状态'
+        )
+        await page.getByRole('button', { name: '展开侧边菜单' }).click()
+        await menu
+          .locator('.ant-menu-item-selected')
+          .filter({ hasText: '库存管理' })
+          .waitFor({ state: 'visible' })
+        await assertDirectRoleNavigation(menu, salesRoleItems)
+        assert.equal(
+          (
+            await menu
+              .getByRole('menuitem', { name: '库存管理', exact: true })
+              .getAttribute('class')
+          ).includes('ant-menu-item-selected'),
+          true
+        )
         await assertNoHorizontalOverflow(
           page,
           'yoyoosun-sales-role-guided-navigation-help'
@@ -2242,100 +2187,24 @@ export function createCustomerSessionScenarios({
         const drawer = page.locator('.erp-admin-drawer:visible')
         await drawer.waitFor({ state: 'visible', timeout: 10_000 })
         const menu = drawer.locator('.erp-admin-menu')
-        const moreFunctions = menu
-          .locator('.ant-menu-submenu-title')
-          .filter({ hasText: '更多功能' })
-          .first()
-        const moreFunctionsRoot = moreFunctions.locator('..')
-        await assertMoreFunctionsPresentation(menu)
-        await moreFunctions.click()
-        await page.waitForTimeout(250)
-        await assertMoreFunctionsPresentation(menu, true)
-
-        const groupTitles = moreFunctionsRoot.locator(
-          '.erp-role-guided-more-group > .ant-menu-item-group-title'
-        )
-        assert.deepEqual(await groupTitles.allTextContents(), [
+        const metrics = await assertDirectRoleNavigation(menu, salesRoleItems)
+        assert.deepEqual(metrics.groupTitles, [
+          '工作中心',
+          '常用工作',
           '业务模块',
           '工具与查询',
           '系统与帮助',
         ])
-        const groupingMetrics = await moreFunctionsRoot.evaluate((node) => {
-          const groupTitleNodes = Array.from(
-            node.querySelectorAll(
-              '.erp-role-guided-more-group > .ant-menu-item-group-title'
-            )
-          )
-          const leaves = Array.from(node.querySelectorAll('.ant-menu-item'))
-          const menu = node.closest('.erp-admin-menu')
-          return {
-            groupTitleCount: groupTitleNodes.length,
-            leafCount: leaves.length,
-            leafTexts: leaves.map((item) =>
-              String(item.textContent || '').trim()
-            ),
-            interactiveGroupTitleCount: groupTitleNodes.filter(
-              (item) =>
-                item.matches('a, button, [role="menuitem"]') ||
-                item.closest('a, button, [role="menuitem"]')
-            ).length,
-            focusableGroupTitleCount: groupTitleNodes.filter(
-              (item) => item.tabIndex >= 0
-            ).length,
-            groupTitleStyles: groupTitleNodes.map((item) => {
-              const style = window.getComputedStyle(item)
-              return {
-                color: style.color,
-                fontSize: Number.parseFloat(style.fontSize),
-                fontWeight: Number.parseInt(style.fontWeight, 10),
-              }
-            }),
-            menuScrollWidth: menu?.scrollWidth || 0,
-            menuClientWidth: menu?.clientWidth || 0,
-          }
-        })
-        assert(
-          groupingMetrics.groupTitleCount === 3 &&
-            groupingMetrics.leafCount === 5 &&
-            groupingMetrics.leafTexts.at(-1) === '帮助中心' &&
-            groupingMetrics.interactiveGroupTitleCount === 0 &&
-            groupingMetrics.focusableGroupTitleCount === 0 &&
-            groupingMetrics.groupTitleStyles.every(
-              (style) =>
-                style.color === DARK_TEXT_MUTED_RGB &&
-                style.fontSize >= 11 &&
-                style.fontWeight >= 600
-            ) &&
-            groupingMetrics.menuScrollWidth <=
-              groupingMetrics.menuClientWidth + 1,
-          `移动端更多功能分组语义或布局异常: ${JSON.stringify(groupingMetrics)}`
-        )
-
-        const beforeGroupTitleClickURL = page.url()
-        await groupTitles.first().click()
-        assert.equal(
-          page.url(),
-          beforeGroupTitleClickURL,
-          '分组标题不可触发页面跳转'
-        )
-        assert.equal(
-          String(
-            (await moreFunctionsRoot.getAttribute('class')) || ''
-          ).includes('ant-menu-submenu-open'),
-          true,
-          '分组标题不可折叠更多功能'
-        )
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'yoyoosun-sales-role-guided-navigation-mobile-dark-groups-top.png'
-          ),
-          fullPage: false,
-        })
-        const helpItem = moreFunctionsRoot
-          .locator('.ant-menu-item')
-          .filter({ hasText: '帮助中心' })
-        await helpItem.scrollIntoViewIfNeeded()
+        const beforeTitleClickURL = page.url()
+        await menu
+          .locator('.ant-menu-item-group-title')
+          .filter({ hasText: '业务模块' })
+          .click()
+        assert.equal(page.url(), beforeTitleClickURL, '分组标题不能触发导航')
+        await assertDirectRoleNavigation(menu, salesRoleItems)
+        await menu
+          .getByRole('menuitem', { name: '帮助中心', exact: true })
+          .scrollIntoViewIfNeeded()
         await assertThemeReadable(page, {
           scenarioName: 'yoyoosun-sales-role-guided-navigation-mobile-dark',
           selector: '.erp-admin-drawer',
@@ -2343,59 +2212,39 @@ export function createCustomerSessionScenarios({
         await page.screenshot({
           path: path.resolve(
             outputDir,
-            'yoyoosun-sales-role-guided-navigation-mobile-dark-groups-bottom.png'
+            'yoyoosun-sales-role-guided-navigation-mobile-dark-direct-menu.png'
           ),
           fullPage: false,
         })
-
-        const inventoryItem = moreFunctionsRoot
-          .locator('.ant-menu-item')
-          .filter({ hasText: '库存管理' })
-        await inventoryItem.click()
+        await menu
+          .getByRole('menuitem', { name: '库存管理', exact: true })
+          .click()
         await waitForPath(page, '/erp/warehouse/inventory')
+        await drawer.waitFor({ state: 'hidden', timeout: 10_000 })
         await page.getByRole('button', { name: '打开导航菜单' }).click()
         await drawer.waitFor({ state: 'visible', timeout: 10_000 })
-        await page.waitForFunction(() =>
-          Array.from(
-            document.querySelectorAll(
-              '.erp-admin-drawer .ant-menu-item-selected'
-            )
-          ).some((item) => String(item.textContent || '').includes('库存管理'))
+        await assertDirectRoleNavigation(menu, salesRoleItems)
+        assert.equal(
+          (
+            await menu
+              .getByRole('menuitem', { name: '库存管理', exact: true })
+              .getAttribute('class')
+          ).includes('ant-menu-item-selected'),
+          true
         )
-        const selectedState = await moreFunctionsRoot.evaluate((node) => {
-          const selected = node.querySelector('.ant-menu-item-selected')
-          return {
-            open: node.classList.contains('ant-menu-submenu-open'),
-            selectedText: String(selected?.textContent || '').trim(),
-          }
-        })
-        assert.deepEqual(selectedState, {
-          open: true,
-          selectedText: '库存管理',
-        })
-
-        await page
-          .reload({ waitUntil: 'domcontentloaded' })
-          .then(() => page.waitForLoadState('networkidle').catch(() => {}))
+        await page.reload({ waitUntil: 'domcontentloaded' })
         await page.getByRole('button', { name: '打开导航菜单' }).click()
         await drawer.waitFor({ state: 'visible', timeout: 10_000 })
-        await page.waitForFunction(() =>
-          Array.from(
-            document.querySelectorAll(
-              '.erp-admin-drawer .ant-menu-item-selected'
-            )
-          ).some((item) => String(item.textContent || '').includes('库存管理'))
+        await assertDirectRoleNavigation(menu, salesRoleItems)
+        assert.equal(
+          (
+            await menu
+              .getByRole('menuitem', { name: '库存管理', exact: true })
+              .getAttribute('class')
+          ).includes('ant-menu-item-selected'),
+          true,
+          '刷新后重新打开导航应选中当前模块'
         )
-        const reloadedSelectedState = await moreFunctionsRoot.evaluate(
-          (node) => {
-            const selected = node.querySelector('.ant-menu-item-selected')
-            return {
-              open: node.classList.contains('ant-menu-submenu-open'),
-              selectedText: String(selected?.textContent || '').trim(),
-            }
-          }
-        )
-        assert.deepEqual(reloadedSelectedState, selectedState)
         await assertNoHorizontalOverflow(
           page,
           'yoyoosun-sales-role-guided-navigation-mobile-dark'
@@ -2415,54 +2264,37 @@ export function createCustomerSessionScenarios({
       viewport: { width: 1280, height: 720 },
       verify: async (page) => {
         const menu = page.locator('.erp-admin-menu')
-        await expectText(page, '工作中心')
-        await expectText(page, '常用工作')
-        await assertMoreFunctionsPresentation(menu)
-        const visibleLeafTexts = await menu.evaluate((node) =>
-          Array.from(node.querySelectorAll('.ant-menu-item'))
-            .filter((item) => item.getClientRects().length > 0)
-            .map((item) => String(item.textContent || '').trim())
-        )
-        assert.deepEqual(
-          visibleLeafTexts,
-          [
-            '工作台',
-            '任务看板',
-            '进度看板',
-            '销售管理',
-            '采购管理',
-            '委外管理',
-          ],
-          `老板电脑端应有三个看板和三个常用业务: ${JSON.stringify(visibleLeafTexts)}`
-        )
-        const moreFunctionsRoot = menu
-          .locator('.ant-menu-submenu-title')
-          .filter({ hasText: '更多功能' })
-          .first()
-          .locator('..')
-        await moreFunctionsRoot.locator('.ant-menu-submenu-title').click()
-        await expectText(page, '生产管理')
-        await expectText(page, '帮助中心')
-        await assertMoreFunctionsPresentation(menu, true)
-        assert.deepEqual(
-          await moreFunctionsRoot
-            .locator('.erp-role-guided-more-group > .ant-menu-item-group-title')
-            .allTextContents(),
-          [
-            '业务模块',
-            '工具与查询',
-            '系统与帮助',
-          ]
-        )
-        const bossMoreItems = await moreFunctionsRoot
-          .locator('.ant-menu-item')
-          .allTextContents()
-        assert.equal(bossMoreItems.length, 8)
-        assert.equal(String(bossMoreItems.at(-1) || '').trim(), '帮助中心')
+        const expectedItems = [
+          '工作台',
+          '任务看板',
+          '进度看板',
+          '销售管理',
+          '采购管理',
+          '委外管理',
+          '生产管理',
+          '库存管理',
+          '质检管理',
+          '出货管理',
+          '财务管理',
+          '模板打印中心',
+          '历史记录中心',
+          '帮助中心',
+        ]
+        const metrics = await assertDirectRoleNavigation(menu, expectedItems)
+        assert.deepEqual(metrics.groupTitles, [
+          '工作中心',
+          '常用工作',
+          '业务模块',
+          '工具与查询',
+          '系统与帮助',
+        ])
+        await menu
+          .getByRole('menuitem', { name: '帮助中心', exact: true })
+          .scrollIntoViewIfNeeded()
         await page.screenshot({
           path: path.resolve(
             outputDir,
-            'yoyoosun-boss-role-guided-navigation-desktop.png'
+            'yoyoosun-boss-role-guided-navigation-desktop-direct-menu.png'
           ),
           fullPage: true,
         })
@@ -2485,65 +2317,7 @@ export function createCustomerSessionScenarios({
       viewport: { width: 1280, height: 720 },
       verify: async (page) => {
         const menu = page.locator('.erp-admin-menu')
-        const moreFunctions = menu
-          .locator('.ant-menu-submenu-title')
-          .filter({ hasText: '更多功能' })
-          .first()
-        const moreFunctionsRoot = moreFunctions.locator('..')
-        const moreFunctionsIsOpen = async () =>
-          String(
-            (await moreFunctionsRoot.getAttribute('class')) || ''
-          ).includes('ant-menu-submenu-open')
-        assert.equal(
-          await menu.getAttribute('data-navigation-presentation'),
-          'role_guided',
-          '财务后台必须使用岗位导航分层'
-        )
-        assert.equal(
-          await moreFunctionsIsOpen(),
-          false,
-          '财务首次进入工作台时更多功能应保持折叠'
-        )
-        await assertMoreFunctionsPresentation(menu)
-        const menuMetrics = await menu.evaluate((node) => {
-          const menuRect = node.getBoundingClientRect()
-          const moreTitle = Array.from(
-            node.querySelectorAll('.ant-menu-submenu-title')
-          ).find((item) => String(item.textContent || '').includes('更多功能'))
-          const moreTitleRect = moreTitle?.getBoundingClientRect()
-          return {
-            clientWidth: node.clientWidth,
-            scrollWidth: node.scrollWidth,
-            menuRight: menuRect.right,
-            moreTitleHeight: moreTitleRect?.height || 0,
-            moreTitleRight: moreTitleRect?.right || 0,
-          }
-        })
-        assert.equal(
-          menuMetrics.scrollWidth <= menuMetrics.clientWidth + 1,
-          true,
-          `财务侧栏不应产生横向溢出: ${JSON.stringify(menuMetrics)}`
-        )
-        assert.equal(
-          menuMetrics.moreTitleHeight >= 38 &&
-            menuMetrics.moreTitleRight <= menuMetrics.menuRight + 1,
-          true,
-          `更多功能入口应保持可点击且不越界: ${JSON.stringify(menuMetrics)}`
-        )
-        const visibleLeafTexts = await menu.evaluate((node) =>
-          Array.from(node.querySelectorAll('.ant-menu-item'))
-            .filter((item) => item.getClientRects().length > 0)
-            .map((item) => String(item.textContent || '').trim())
-        )
-        assert.deepEqual(
-          visibleLeafTexts,
-          [
-            '工作台',
-            '任务看板',
-            '财务管理',
-          ],
-          `财务系统推荐应突出应收、应付、发票和对账: ${JSON.stringify(visibleLeafTexts)}`
-        )
+        await assertDirectRoleNavigation(menu, financeRoleItems)
         await page.screenshot({
           path: path.resolve(
             outputDir,
@@ -2551,58 +2325,39 @@ export function createCustomerSessionScenarios({
           ),
           fullPage: true,
         })
-        await moreFunctions.click()
-        const customerItem = menu
-          .locator('.ant-menu-item')
-          .filter({ hasText: '基础资料' })
-          .first()
-        await customerItem.waitFor({ state: 'visible', timeout: 10_000 })
+        const customerItem = menu.getByRole('menuitem', {
+          name: '基础资料',
+          exact: true,
+        })
         await customerItem.click()
         await waitForPath(page, '/erp/master/partners/customers')
         await page
           .getByRole('heading', { name: '客户档案', exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
-          await moreFunctionsIsOpen(),
-          true,
-          '访问更多功能里的页面时应保持展开以显示当前位置'
-        )
-        await assertMoreFunctionsPresentation(menu, true)
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'yoyoosun-finance-role-guided-navigation-secondary-active.png'
+          (await customerItem.getAttribute('class')).includes(
+            'ant-menu-item-selected'
           ),
-          fullPage: true,
-        })
-        await page
-          .reload({ waitUntil: 'domcontentloaded' })
-          .then(() => page.waitForLoadState('networkidle').catch(() => {}))
+          true
+        )
+        await page.reload({ waitUntil: 'domcontentloaded' })
         await page
           .getByRole('heading', { name: '客户档案', exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
+        await assertDirectRoleNavigation(menu, financeRoleItems)
         assert.equal(
-          await moreFunctionsIsOpen(),
+          (await customerItem.getAttribute('class')).includes(
+            'ant-menu-item-selected'
+          ),
           true,
-          '刷新更多功能页面后仍应展开并显示当前位置'
+          '刷新模块页面后应保留选中态'
         )
-        await assertMoreFunctionsPresentation(menu, true)
         await menu
-          .locator('.ant-menu-item')
-          .filter({ hasText: '工作台' })
-          .first()
+          .getByRole('menuitem', { name: '工作台', exact: true })
           .click()
         await waitForPath(page, '/erp/dashboard')
-        assert.equal(
-          await moreFunctionsIsOpen(),
-          false,
-          '返回看板或常用工作后更多功能应自动收起'
-        )
-        await assertMoreFunctionsPresentation(menu)
-        await customerItem.waitFor({
-          state: 'hidden',
-          timeout: 10_000,
-        })
+        await assertDirectRoleNavigation(menu, financeRoleItems)
+        await customerItem.waitFor({ state: 'visible', timeout: 10_000 })
         await assertNoHorizontalOverflow(
           page,
           'yoyoosun-finance-role-guided-navigation-desktop'
@@ -2629,28 +2384,26 @@ export function createCustomerSessionScenarios({
       viewport: { width: 1280, height: 720 },
       verify: async (page) => {
         const menu = page.locator('.erp-admin-menu')
-        const visibleLeafTexts = await menu.evaluate((node) =>
-          Array.from(node.querySelectorAll('.ant-menu-item'))
-            .filter((item) => item.getClientRects().length > 0)
-            .map((item) => String(item.textContent || '').trim())
+        const metrics = await assertDirectRoleNavigation(menu)
+        assert.deepEqual(
+          metrics.items.slice(0, 3),
+          ['工作台', '任务看板', '财务管理'],
+          '自定义常用模块应优先排列'
         )
         assert.deepEqual(
-          visibleLeafTexts,
-          ['工作台', '任务看板', '财务管理'],
-          `财务自定义常用入口应按保存顺序显示且不自动补满: ${JSON.stringify(visibleLeafTexts)}`
+          [...metrics.items].sort(),
+          [...financeRoleItems].sort(),
+          '自定义布局不能丢失其他获准模块'
         )
         assert.equal(
-          visibleLeafTexts.includes('收付款与核销'),
+          metrics.items.includes('收付款与核销'),
           false,
-          '菜单名称不应继续显示页面标题“收付款与核销”'
+          '侧栏应显示模块名称'
         )
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'yoyoosun-finance-custom-navigation-desktop.png'
-          ),
-          fullPage: true,
-        })
+        await menu
+          .getByRole('menuitem', { name: '财务管理', exact: true })
+          .click()
+        await waitForPath(page, '/erp/finance/receivables')
         await assertNoHorizontalOverflow(
           page,
           'yoyoosun-finance-custom-navigation-desktop'
@@ -2676,6 +2429,22 @@ export function createCustomerSessionScenarios({
       ),
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
+        await page
+          .getByRole('button', { name: '打开导航菜单', exact: true })
+          .click()
+        const drawer = page.locator('.erp-admin-drawer:visible')
+        const menu = drawer.locator('.erp-admin-menu')
+        await menu.waitFor({ state: 'visible' })
+        const navigation = await assertDirectRoleNavigation(menu)
+        assert(
+          navigation.items.includes('财务管理') &&
+            navigation.items.includes('采购管理'),
+          '兼岗侧栏应保留两个岗位的获准模块'
+        )
+        await menu
+          .getByRole('menuitem', { name: '帮助中心', exact: true })
+          .click()
+        await drawer.waitFor({ state: 'hidden' })
         await expectText(page, '切换这里只查看说明，不改变岗位或权限')
         assert.equal(
           await page.locator('.erp-help-center-page .ant-alert').count(),
@@ -2704,7 +2473,8 @@ export function createCustomerSessionScenarios({
         await page.locator('.erp-help-mobile-picker .ant-select-selector').click()
         await page.locator('.ant-select-item-option').filter({ hasText: '处理对账' }).click()
         await page.getByText('完成后', { exact: true }).click()
-        await expectText(page, '发现差异时到对账页面记录')
+        await expectText(page, '当前对账记录已完成核对，来源和核对结果可查')
+        await expectText(page, '不表示已收款或付款')
         await assertTextAbsent(page, '办理收付款与核销')
         await assertTextAbsent(page, '多笔应收或应付核销')
         await assertNoHorizontalOverflow(

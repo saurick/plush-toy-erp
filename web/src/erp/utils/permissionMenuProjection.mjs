@@ -272,16 +272,14 @@ export function getMenuPlacementMap(placement = {}) {
   ).forEach((item) => {
     if (item?.path) out.set(item.path, '常用工作')
   })
-  const secondaryItems = Array.isArray(placement?.secondaryItems)
-    ? placement.secondaryItems
-    : (Array.isArray(placement?.secondarySections)
-        ? placement.secondarySections
-        : []
-      ).flatMap((section) =>
-        Array.isArray(section?.items) ? section.items : []
-      )
-  secondaryItems.forEach((item) => {
-    if (item?.path) out.set(item.path, '更多功能')
+  const secondarySections = Array.isArray(placement?.secondarySections)
+    ? placement.secondarySections
+    : []
+  secondarySections.forEach((section) => {
+    const items = Array.isArray(section?.items) ? section.items : []
+    items.forEach((item) => {
+      if (item?.path) out.set(item.path, section.title)
+    })
   })
   return out
 }

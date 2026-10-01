@@ -337,11 +337,13 @@ export function createPermissionCenterScenarios({
           if (
             !request.url().includes('/rpc/customer_config') ||
             request.method() !== 'POST'
-          )
+          ) {
             return
+          }
           const body = request.postDataJSON()
-          if (body?.method === 'apply_approval_settings')
+          if (body?.method === 'apply_approval_settings') {
             applied.push(body.params)
+          }
         })
         await expectHeading(page, '权限管理')
         await waitForApprovalResponsibilityInputs(page)
@@ -1036,7 +1038,9 @@ export function createPermissionCenterScenarios({
         await expectText(page, '导航位置预览')
         await expectText(page, '工作中心')
         await expectText(page, '常用工作')
-        await expectText(page, '更多功能')
+        await expectText(page, '工具与查询')
+        await expectText(page, '系统与帮助')
+        await assertTextAbsent(page, '更多功能')
         await expectText(page, '工作台')
         await expectText(page, '任务看板')
         await expectText(page, '基础资料')
@@ -1087,7 +1091,7 @@ export function createPermissionCenterScenarios({
         })
         assert(
           navigationPreviewMetrics.hasPreview &&
-            navigationPreviewMetrics.groupCount === 3 &&
+            navigationPreviewMetrics.groupCount === 5 &&
             navigationPreviewMetrics.columns.split(' ').length === 3 &&
             navigationPreviewMetrics.scrollWidth <=
               navigationPreviewMetrics.clientWidth + 1,
@@ -1107,10 +1111,10 @@ export function createPermissionCenterScenarios({
           .click()
         await page.keyboard.press('Escape')
         await page.waitForTimeout(350)
-        const moveToMore = page.getByRole('button', {
-          name: '移到更多 库存管理',
+        const moveToSecondary = page.getByRole('button', {
+          name: '移到其他 库存管理',
         })
-        await moveToMore.focus()
+        await moveToSecondary.focus()
         await page.keyboard.press('Enter')
         await page.getByRole('button', { name: '移到常用 库存管理' }).focus()
         await page.keyboard.press('Enter')
@@ -1563,8 +1567,15 @@ export function createPermissionCenterScenarios({
           '/erp/finance/payments'
         )
         await page.getByRole('tab', { name: '页面访问', exact: true }).click()
-        const moduleDropdown = await openControlledAntSelectDropdown(page, page.locator('.erp-role-effective-access__toolbar > .ant-select'), '筛选业务模块')
-        await selectVirtualizedAntOption(page, moduleDropdown, { label: '筛选业务模块', optionLabel: '财务管理（5）' })
+        const moduleDropdown = await openControlledAntSelectDropdown(
+          page,
+          page.locator('.erp-role-effective-access__toolbar > .ant-select'),
+          '筛选业务模块'
+        )
+        await selectVirtualizedAntOption(page, moduleDropdown, {
+          label: '筛选业务模块',
+          optionLabel: '财务管理（5）',
+        })
         await page.keyboard.press('Escape')
         assert.equal(
           await page.locator('.erp-role-effective-access__page').count(),
@@ -1583,7 +1594,7 @@ export function createPermissionCenterScenarios({
         await page
           .getByRole('button', { name: '保存岗位设置', exact: true })
           .click()
-        const params = (await save).postDataJSON().params
+        const { params } = (await save).postDataJSON()
         const allPaths = [
           ...params.primary_menu_paths,
           ...params.secondary_menu_paths,
@@ -1645,19 +1656,6 @@ export function createPermissionCenterScenarios({
               title: String(
                 group.querySelector('.ant-typography')?.textContent || ''
               ).trim(),
-              sections: Array.from(
-                group.querySelectorAll('.erp-role-navigation-preview__subgroup')
-              ).map((section) => ({
-                title: String(
-                  section.querySelector('.ant-typography')?.textContent || ''
-                ).trim(),
-                items: Array.from(section.querySelectorAll('.ant-tag')).map(
-                  (item) =>
-                    String(item.textContent || '')
-                      .trim()
-                      .replace(/^\d+\.\s*/u, '')
-                ),
-              })),
               items: Array.from(group.querySelectorAll('.ant-tag')).map(
                 (item) =>
                   String(item.textContent || '')
@@ -1724,10 +1722,10 @@ export function createPermissionCenterScenarios({
           `权限中心双列表桌面布局异常: ${JSON.stringify(customLayoutMetrics)}`
         )
 
-        const moveSalesOrderToMore = page.getByRole('button', {
-          name: '移到更多 销售管理',
+        const moveSalesOrderToSecondary = page.getByRole('button', {
+          name: '移到其他 销售管理',
         })
-        await moveSalesOrderToMore.focus()
+        await moveSalesOrderToSecondary.focus()
         await page.keyboard.press('Enter')
         assert.equal(
           await page
@@ -1735,7 +1733,7 @@ export function createPermissionCenterScenarios({
             .evaluate((node) => node === document.activeElement),
           true
         )
-        await page.getByRole('button', { name: '移到更多 基础资料' }).click()
+        await page.getByRole('button', { name: '移到其他 基础资料' }).click()
         await page.getByRole('button', { name: '上移 基础资料' }).click()
         await page.getByRole('button', { name: '上移 基础资料' }).click()
         await page.getByRole('button', { name: '上移 销售管理' }).click()
@@ -1750,7 +1748,7 @@ export function createPermissionCenterScenarios({
         const draftPreview = await readNavigationPreview()
         assert.deepEqual(
           draftPreview.map((group) => group.title),
-          ['工作中心', '常用工作', '更多功能'],
+          ['工作中心', '常用工作', '业务模块', '工具与查询', '系统与帮助'],
           `权限中心自定义预览分组异常: ${JSON.stringify(draftPreview)}`
         )
         assert.deepEqual(
@@ -1759,27 +1757,13 @@ export function createPermissionCenterScenarios({
           `权限中心常用工作顺序异常: ${JSON.stringify(draftPreview)}`
         )
         assert.deepEqual(
-          draftPreview[2].items,
-          ['基础资料', '销售管理', '出货管理', '历史记录中心', '帮助中心'],
-          `权限中心更多功能顺序异常: ${JSON.stringify(draftPreview)}`
-        )
-        assert.deepEqual(
-          draftPreview[2].sections,
+          draftPreview.slice(2),
           [
-            {
-              title: '业务模块',
-              items: ['基础资料', '销售管理', '出货管理'],
-            },
-            {
-              title: '工具与查询',
-              items: ['历史记录中心'],
-            },
-            {
-              title: '系统与帮助',
-              items: ['帮助中心'],
-            },
+            { title: '业务模块', items: ['基础资料', '销售管理', '出货管理'] },
+            { title: '工具与查询', items: ['历史记录中心'] },
+            { title: '系统与帮助', items: ['帮助中心'] },
           ],
-          `权限中心更多功能必须沿用管理员菜单分组预览: ${JSON.stringify(draftPreview)}`
+          `权限中心其余入口应按同级业务分组预览: ${JSON.stringify(draftPreview)}`
         )
         await page.waitForTimeout(250)
         const accessRequestsBeforeTabSwitch = effectiveAccessRequestCount
@@ -1901,9 +1885,9 @@ export function createPermissionCenterScenarios({
           `重新打开后常用工作顺序未读回: ${JSON.stringify(reopenedPreview)}`
         )
         assert.deepEqual(
-          reopenedPreview[2].items,
-          ['基础资料', '销售管理', '出货管理', '历史记录中心', '帮助中心'],
-          `重新打开后更多功能顺序未读回: ${JSON.stringify(reopenedPreview)}`
+          reopenedPreview,
+          draftPreview,
+          `重新打开后完整导航位置未读回: ${JSON.stringify(reopenedPreview)}`
         )
         await assertNoHorizontalOverflow(
           page,
@@ -2042,7 +2026,9 @@ export function createPermissionCenterScenarios({
         await page.getByRole('tab', { name: '菜单排列' }).click()
         await expectText(page, '设置岗位导航')
         await expectText(page, '导航位置预览')
-        await expectText(page, '更多功能')
+        await expectText(page, '工具与查询')
+        await expectText(page, '系统与帮助')
+        await assertTextAbsent(page, '更多功能')
         await expectText(page, '历史记录中心')
         await expectText(page, '帮助中心')
         await page

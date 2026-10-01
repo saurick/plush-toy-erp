@@ -34,6 +34,19 @@ export default function DevPermissionNavigationOverview({
 }) {
   const unavailable = model?.state === PERMISSION_NAVIGATION_STATE.UNAVAILABLE
   const blocked = model?.state === PERMISSION_NAVIGATION_STATE.BLOCKED
+  const groups = [
+    {
+      key: 'work',
+      title: '工作中心',
+      items: model?.dashboardItems || [],
+    },
+    {
+      key: 'primary',
+      title: '常用工作',
+      items: model?.primaryItems || [],
+    },
+    ...(model?.secondarySections || []),
+  ].filter((group) => group.items.length > 0)
 
   return (
     <section
@@ -93,57 +106,20 @@ export default function DevPermissionNavigationOverview({
           ) : null}
 
           <div className="erp-permission-navigation__grid">
-            <article className="erp-permission-navigation__group">
-              <div className="erp-permission-navigation__group-head">
-                <div>
-                  <Text strong>看板中心</Text>
-                  <Text type="secondary">每天开始工作的统一入口</Text>
+            {groups.map((group) => (
+              <article
+                key={group.key}
+                className="erp-permission-navigation__group"
+              >
+                <div className="erp-permission-navigation__group-head">
+                  <Text strong>{group.title}</Text>
+                  <Tag color={group.key === 'primary' ? 'blue' : undefined}>
+                    {group.items.length}
+                  </Tag>
                 </div>
-                <Tag>{model?.dashboardItems?.length || 0}</Tag>
-              </div>
-              <MenuItems items={model?.dashboardItems} />
-            </article>
-
-            <article className="erp-permission-navigation__group">
-              <div className="erp-permission-navigation__group-head">
-                <div>
-                  <Text strong>常用工作</Text>
-                  <Text type="secondary">岗位高频业务，按实际顺序排列</Text>
-                </div>
-                <Tag color="blue">{model?.primaryItems?.length || 0}</Tag>
-              </div>
-              <MenuItems items={model?.primaryItems} />
-            </article>
-
-            <article className="erp-permission-navigation__group erp-permission-navigation__group--more">
-              <div className="erp-permission-navigation__group-head">
-                <div>
-                  <Text strong>更多功能</Text>
-                  <Text type="secondary">
-                    沿用正式侧栏分组，岗位帮助固定在最后
-                  </Text>
-                </div>
-                <Tag>{model?.secondaryItemCount || 0}</Tag>
-              </div>
-              {model?.secondarySections?.length > 0 ? (
-                <div className="erp-permission-navigation__sections">
-                  {model.secondarySections.map((section) => (
-                    <section
-                      key={section.key}
-                      className="erp-permission-navigation__section"
-                    >
-                      <div className="erp-permission-navigation__section-title">
-                        <Text strong>{section.title}</Text>
-                        <Text type="secondary">{section.items.length} 项</Text>
-                      </div>
-                      <MenuItems items={section.items} />
-                    </section>
-                  ))}
-                </div>
-              ) : (
-                <Text type="secondary">当前没有更多功能</Text>
-              )}
-            </article>
+                <MenuItems items={group.items} />
+              </article>
+            ))}
           </div>
         </>
       )}

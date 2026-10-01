@@ -13,7 +13,6 @@ import {
   BarChartOutlined,
   DatabaseOutlined,
   DownOutlined,
-  EllipsisOutlined,
   FileSearchOutlined,
   HistoryOutlined,
   HomeOutlined,
@@ -28,7 +27,6 @@ import {
   PrinterOutlined,
   QuestionCircleOutlined,
   ReloadOutlined,
-  RightOutlined,
   SafetyCertificateOutlined,
   ScheduleOutlined,
   SettingOutlined,
@@ -137,7 +135,6 @@ const { Content, Header, Sider } = Layout
 const { Paragraph, Text } = Typography
 const PROFILE_SYNC_INTERVAL_MS = 60 * 1000
 const PROFILE_BOOTSTRAP_RETRY_DELAYS_MS = [200, 600]
-const ROLE_GUIDED_MORE_MENU_KEY = 'role-more-functions'
 const ADMIN_AUTH_STORAGE_KEYS = new Set(['admin_access_token', 'admin_user_id'])
 
 const navIconRegistry = {
@@ -388,7 +385,6 @@ export default function ERPLayout({ legalNotice }) {
   const refreshingCurrentPageRef = useRef(false)
   const [pageRefreshHandler, setPageRefreshHandler] = useState(null)
   const [pageLeaveGuard, setPageLeaveGuard] = useState(null)
-  const [roleGuidedOpenKeys, setRoleGuidedOpenKeys] = useState([])
   const runtimeBuildIdentity = useRuntimeBuildIdentity()
 
   const authRpc = useMemo(
@@ -980,11 +976,9 @@ export default function ERPLayout({ legalNotice }) {
       label: item.label,
       title: item.label,
     })
-    const buildMenuGroup = (section, keyPrefix = 'group') => ({
+    const buildMenuGroup = (section) => ({
       type: 'group',
-      key: `${keyPrefix}-${section.key || section.title}`,
-      className:
-        keyPrefix === 'role-more' ? 'erp-role-guided-more-group' : undefined,
+      key: `group-${section.key || section.title}`,
       label: section.title,
       children: section.items.map(buildMenuLeaf),
     })
@@ -1013,23 +1007,11 @@ export default function ERPLayout({ legalNotice }) {
         children: roleGuidedNavigation.primaryItems.map(buildMenuLeaf),
       })
     }
-    if (roleGuidedNavigation.secondaryItemCount > 0) {
-      guidedItems.push({
-        type: 'group',
-        key: 'group-role-secondary',
-        label: '按需入口',
-        children: [
-          {
-            key: ROLE_GUIDED_MORE_MENU_KEY,
-            icon: <EllipsisOutlined aria-hidden />,
-            label: '更多功能',
-            children: groupSidebarNavigationSections(
-              roleGuidedNavigation.secondarySections
-            ).map((section) => buildMenuGroup(section, 'role-more')),
-          },
-        ],
-      })
-    }
+    guidedItems.push(
+      ...roleGuidedNavigation.secondarySections.map((section) =>
+        buildMenuGroup(section)
+      )
+    )
     return guidedItems
   }, [
     roleGuidedNavigation,
@@ -1041,38 +1023,6 @@ export default function ERPLayout({ legalNotice }) {
   const currentSidebarPath = getBusinessModuleSidebarKey(
     currentEntry?.sidebarParentPath || currentNavigationEntry.menuPath
   )
-
-  const roleGuidedSecondaryContainsCurrent = useMemo(
-    () =>
-      roleGuidedNavigation.secondaryItems.some(
-        (item) => (item.sidebarKey || item.path) === currentSidebarPath
-      ),
-    [currentSidebarPath, roleGuidedNavigation.secondaryItems]
-  )
-
-  const roleGuidedSecondaryPaths = useMemo(
-    () =>
-      new Set(
-        roleGuidedNavigation.secondaryItems.map(
-          (item) => item.sidebarKey || item.path
-        )
-      ),
-    [roleGuidedNavigation.secondaryItems]
-  )
-
-  useEffect(() => {
-    if (!useRoleGuidedNavigation) {
-      setRoleGuidedOpenKeys([])
-      return
-    }
-    setRoleGuidedOpenKeys(
-      roleGuidedSecondaryContainsCurrent ? [ROLE_GUIDED_MORE_MENU_KEY] : []
-    )
-  }, [
-    currentNavigationEntry.menuPath,
-    roleGuidedSecondaryContainsCurrent,
-    useRoleGuidedNavigation,
-  ])
 
   const selectedKeys =
     currentNavigationEntry.matched && currentSidebarPath
@@ -1229,18 +1179,7 @@ export default function ERPLayout({ legalNotice }) {
       setMobileNavOpen(false)
       return
     }
-    const nextSidebarKey = getBusinessModuleSidebarKey(
-      nextPath.split(/[?#]/u)[0]
-    )
-
     if (nextPath === location.pathname) {
-      if (useRoleGuidedNavigation) {
-        setRoleGuidedOpenKeys(
-          roleGuidedSecondaryPaths.has(nextSidebarKey)
-            ? [ROLE_GUIDED_MORE_MENU_KEY]
-            : []
-        )
-      }
       setMobileNavOpen(false)
       return
     }
@@ -1249,13 +1188,6 @@ export default function ERPLayout({ legalNotice }) {
       return
     }
 
-    if (useRoleGuidedNavigation) {
-      setRoleGuidedOpenKeys(
-        roleGuidedSecondaryPaths.has(nextSidebarKey)
-          ? [ROLE_GUIDED_MORE_MENU_KEY]
-          : []
-      )
-    }
     navigate(nextPath, navigateOptions)
     setMobileNavOpen(false)
   }
@@ -1352,25 +1284,6 @@ export default function ERPLayout({ legalNotice }) {
         mode="inline"
         inlineCollapsed={collapsed}
         selectedKeys={selectedKeys}
-        openKeys={useRoleGuidedNavigation ? roleGuidedOpenKeys : undefined}
-        expandIcon={
-          useRoleGuidedNavigation ? (
-            <RightOutlined
-              aria-hidden
-              rotate={
-                roleGuidedOpenKeys.includes(ROLE_GUIDED_MORE_MENU_KEY) ? 90 : 0
-              }
-            />
-          ) : undefined
-        }
-        onOpenChange={(nextOpenKeys) => {
-          if (!useRoleGuidedNavigation) return
-          const opensMore = nextOpenKeys.includes(ROLE_GUIDED_MORE_MENU_KEY)
-          if (collapsed && opensMore) {
-            setDesktopNavCollapsed(false)
-          }
-          setRoleGuidedOpenKeys(opensMore ? [ROLE_GUIDED_MORE_MENU_KEY] : [])
-        }}
         items={menuItems}
         onClick={({ key }) => handleModuleMenuNavigate(key)}
         className="erp-admin-menu"
