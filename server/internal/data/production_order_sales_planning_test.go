@@ -86,11 +86,108 @@ func TestProductionOrderSalesPlanningAggregatesRepeatedSourceLines(t *testing.T)
 	}
 }
 
+func TestProductionOrderSalesPlanningIncludesPreShipmentSamples(t *testing.T) {
+	ctx := context.Background()
+	f := openProductionOrderRepoTest(t, "production_sales_plan_samples")
+	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).
+		SetOrderedQuantity(decimal.NewFromInt(100)).SetPreShipmentSampleQuantity(decimal.NewFromInt(5)).SaveX(ctx)
+	create := func(no string, quantities ...int64) (*biz.ProductionOrderAggregate, error) {
+		t.Helper()
+		draft := f.draft(no, quantities[0])
+		for index, quantity := range quantities[1:] {
+			item := draft.Items[0]
+			item.LineNo = index + 2
+			item.PlannedQuantity = decimal.NewFromInt(quantity)
+			draft.Items = append(draft.Items, item)
+		}
+		return f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: draft, ActorID: f.actorID, IdempotencyKey: no})
+	}
+	query := func(orderID int) *biz.ProductionOrderReferenceOption {
+		t.Helper()
+		options, total, err := f.uc.ListReferenceOptions(ctx, biz.ProductionOrderReferenceFilter{
+			ReferenceType: biz.ProductionOrderReferenceSalesOrderItem, ProductionOrderID: orderID, SelectedIDs: []int{f.salesItemID}, Limit: 20,
+		})
+		if err != nil || total != 1 || len(options) != 1 {
+			t.Fatalf("sample capacity option: options=%#v total=%d err=%v", options, total, err)
+		}
+		return options[0]
+	}
+	a, err := create("PLAN-SAMPLE-A", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	available := query(0)
+	if !available.Selectable || *available.OrderedQuantity != "100" || *available.RemainingPlannableQuantity != "5" || !strings.Contains(available.Label, "生产需求 105") {
+		t.Fatalf("samples must remain plannable after ordered goods: %#v", available)
+	}
+	if _, err := create("PLAN-SAMPLE-OVER", 3, 3); !errors.Is(err, biz.ErrProductionOrderPlannedQuantityExceeded) {
+		t.Fatalf("cross-order repeated source total 106 must fail: %v", err)
+	}
+	if f.client.ProductionOrder.Query().Where(productionorder.OrderNo("PLAN-SAMPLE-OVER")).CountX(ctx) != 0 ||
+		f.client.ProductionOrderEvent.Query().Where(productionorderevent.IdempotencyKey("PLAN-SAMPLE-OVER")).CountX(ctx) != 0 {
+		t.Fatal("rejected sample plan left order or receipt")
+	}
+	b, err := create("PLAN-SAMPLE-B", 2, 3)
+	if err != nil {
+		t.Fatalf("cross-order repeated source total 105 must pass: %v", err)
+	}
+	full := query(0)
+	if full.Selectable || full.Reason == nil || *full.PlannedProductionQuantity != "105" || *full.RemainingPlannableQuantity != "0" {
+		t.Fatalf("full sample capacity must be disabled: %#v", full)
+	}
+	edit := query(a.Order.ID)
+	if !edit.Selectable || *edit.PlannedProductionQuantity != "5" || *edit.RemainingPlannableQuantity != "100" {
+		t.Fatalf("sample editing context counted itself: %#v", edit)
+	}
+	saved, err := f.uc.SaveDraft(ctx, &biz.ProductionOrderSave{ID: a.Order.ID, ExpectedVersion: 1, Draft: f.draft("PLAN-SAMPLE-A", 100), ActorID: f.actorID, IdempotencyKey: "PLAN-SAMPLE-SAVE"})
+	if err != nil {
+		t.Fatalf("unchanged sample plan: %v", err)
+	}
+	_, err = f.uc.SaveDraft(ctx, &biz.ProductionOrderSave{ID: a.Order.ID, ExpectedVersion: saved.Order.Version, Draft: f.draft("PLAN-SAMPLE-A", 101), ActorID: f.actorID, IdempotencyKey: "PLAN-SAMPLE-SAVE-OVER"})
+	if !errors.Is(err, biz.ErrProductionOrderPlannedQuantityExceeded) {
+		t.Fatalf("sample edit total 106 must fail: %v", err)
+	}
+	unchanged, err := f.uc.Get(ctx, a.Order.ID)
+	if err != nil || unchanged.Order.Version != saved.Order.Version || !unchanged.Items[0].PlannedQuantity.Equal(decimal.NewFromInt(100)) ||
+		f.client.ProductionOrderEvent.Query().Where(productionorderevent.IdempotencyKey("PLAN-SAMPLE-SAVE-OVER")).CountX(ctx) != 0 {
+		t.Fatalf("rejected sample edit changed draft or receipt: %#v %v", unchanged, err)
+	}
+	// Source corrections must be checked before freezing requirements or tasks.
+	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetPreShipmentSampleQuantity(decimal.NewFromInt(4)).SaveX(ctx)
+	_, err = f.uc.Release(ctx, &biz.ProductionOrderAction{ID: a.Order.ID, ExpectedVersion: saved.Order.Version, ActorID: f.actorID, IdempotencyKey: "PLAN-SAMPLE-RELEASE-OVER"})
+	if !errors.Is(err, biz.ErrProductionOrderPlannedQuantityExceeded) {
+		t.Fatalf("release must reread corrected sample quantity: %v", err)
+	}
+	if f.client.ProductionOrder.GetX(ctx, a.Order.ID).Status != biz.ProductionOrderStatusDraft ||
+		f.client.ProductionOrderEvent.Query().Where(productionorderevent.IdempotencyKey("PLAN-SAMPLE-RELEASE-OVER")).CountX(ctx) != 0 ||
+		f.client.ProductionOrderMaterialRequirement.Query().Where(productionordermaterialrequirement.ProductionOrderID(a.Order.ID)).CountX(ctx) != 0 ||
+		f.client.WorkflowTask.Query().Where(workflowtask.SourceType(biz.WorkflowSourceTaskProductionOrderSourceType), workflowtask.SourceID(a.Order.ID)).CountX(ctx) != 0 {
+		t.Fatal("rejected sample release changed status, snapshot, task or receipt")
+	}
+	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetPreShipmentSampleQuantity(decimal.NewFromInt(5)).SaveX(ctx)
+	cancel := &biz.ProductionOrderAction{ID: b.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "PLAN-SAMPLE-CANCEL", Reason: productionOrderStringPtr("调整船头样计划")}
+	for i := 0; i < 2; i++ {
+		if _, err := f.uc.Cancel(ctx, cancel); err != nil {
+			t.Fatalf("sample cancellation and receipt replay: %v", err)
+		}
+	}
+	if option := query(0); !option.Selectable || *option.RemainingPlannableQuantity != "5" {
+		t.Fatalf("cancelled sample plan still consumes capacity: %#v", option)
+	}
+	c, err := create("PLAN-SAMPLE-C", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay, err := create("PLAN-SAMPLE-C", 5); err != nil || replay.Order.ID != c.Order.ID {
+		t.Fatalf("sample receipt replay at full capacity: %#v %v", replay, err)
+	}
+}
+
 func TestProductionOrderSalesPlanningUsesExactDecimalCapacity(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "production_sales_plan_decimal")
 	f.client.Unit.UpdateOneID(f.unitID).SetPrecision(4).SaveX(ctx)
-	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetOrderedQuantity(decimal.RequireFromString("0.3")).SaveX(ctx)
+	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetOrderedQuantity(decimal.RequireFromString("0.1")).SetPreShipmentSampleQuantity(decimal.RequireFromString("0.2")).SaveX(ctx)
 	for index, quantity := range []string{"0.1", "0.2", "0.0001"} {
 		draft := f.draft("PLAN-DECIMAL-"+quantity, 1)
 		draft.Items[0].PlannedQuantity = decimal.RequireFromString(quantity)

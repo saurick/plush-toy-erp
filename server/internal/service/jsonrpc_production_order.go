@@ -630,7 +630,7 @@ func (d *jsonrpcDispatcher) mapProductionOrderError(ctx context.Context, err err
 	case errors.Is(err, biz.ErrProductionOrderReferenceInvalid), errors.Is(err, biz.ErrProductionOrderFactSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单引用的产品、规格、单位、销售明细或 BOM 已失效，请刷新后检查"}
 	case errors.Is(err, biz.ErrProductionOrderPlannedQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该销售订单行的累计生产计划数量超过订单数量，请刷新可排产数量后调整"}
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该销售订单行的累计生产计划数量超过生产需求数量（订单数量＋船头样），请刷新可排产数量后调整"}
 	case errors.Is(err, biz.ErrProductionOrderHasPostedFacts):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该生产订单已有生效的生产入库记录，不能取消；请先按业务规则冲正或关闭"}
 	case errors.Is(err, biz.ErrProductionOrderFactDependency):

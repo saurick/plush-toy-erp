@@ -113,7 +113,7 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 		if err != nil {
 			return nil, err
 		}
-		productionQuantity := line.OrderedQuantity.Add(line.PreShipmentSampleQuantity)
+		productionQuantity := biz.SalesOrderProductionQuantity(line.OrderedQuantity, line.PreShipmentSampleQuantity)
 		for _, part := range header.Edges.Items {
 			mq := client.Material.Query().Where(material.ID(part.MaterialID)).WithSupplier().WithDefaultUnit()
 			if lock {

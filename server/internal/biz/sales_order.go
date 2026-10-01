@@ -683,6 +683,11 @@ func normalizeSalesOrderItemMutation(in SalesOrderItemMutation) (SalesOrderItemM
 	return in, nil
 }
 
+// SalesOrderProductionQuantity includes samples needed for production, not goods pricing.
+func SalesOrderProductionQuantity(orderedQuantity, preShipmentSampleQuantity decimal.Decimal) decimal.Decimal {
+	return orderedQuantity.Add(preShipmentSampleQuantity)
+}
+
 func normalizeSalesOrderItemFields(in SalesOrderItemMutation) (SalesOrderItemMutation, error) {
 	var err error
 	in.ImportSource, err = normalizeSalesOrderImportSource(in.ImportSource)
@@ -699,7 +704,7 @@ func normalizeSalesOrderItemFields(in SalesOrderItemMutation) (SalesOrderItemMut
 	if in.OrderCategory != "NEW" && in.OrderCategory != "REPEAT" {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}
-	if in.PreShipmentSampleQuantity.IsNegative() || !in.PreShipmentSampleQuantity.Equal(in.PreShipmentSampleQuantity.Truncate(6)) || in.OrderedQuantity.Add(in.PreShipmentSampleQuantity).GreaterThan(maxPositiveNumeric20Scale6) {
+	if in.PreShipmentSampleQuantity.IsNegative() || !in.PreShipmentSampleQuantity.Equal(in.PreShipmentSampleQuantity.Truncate(6)) || SalesOrderProductionQuantity(in.OrderedQuantity, in.PreShipmentSampleQuantity).GreaterThan(maxPositiveNumeric20Scale6) {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}
 	if in.ProductID == 0 {

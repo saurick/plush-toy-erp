@@ -68,7 +68,8 @@ func validateProductionOrderSalesPlanning(ctx context.Context, client *ent.Clien
 		return biz.ErrProductionOrderReferenceInvalid
 	}
 	for _, line := range lines {
-		if planned[line.ID].Add(requested[line.ID]).GreaterThan(line.OrderedQuantity) {
+		productionQuantity := biz.SalesOrderProductionQuantity(line.OrderedQuantity, line.PreShipmentSampleQuantity)
+		if planned[line.ID].Add(requested[line.ID]).GreaterThan(productionQuantity) {
 			return biz.ErrProductionOrderPlannedQuantityExceeded
 		}
 	}

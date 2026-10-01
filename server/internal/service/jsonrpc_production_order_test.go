@@ -26,16 +26,17 @@ func TestProductionOrderJSONRPCSalesPlanningOptionContract(t *testing.T) {
 			t.Fatalf("invalid editing context accepted: %#v", value)
 		}
 	}
-	planned, remaining := "60", "40"
+	ordered, planned, remaining := "100", "100", "5"
 	mapped := productionOrderReferenceOptionToMap(&biz.ProductionOrderReferenceOption{
+		OrderedQuantity: &ordered, Label: "生产需求 105 / 已计划 100 / 可排产 5",
 		PlannedProductionQuantity: &planned, RemainingPlannableQuantity: &remaining,
 	})
-	if mapped["planned_production_quantity"] != "60" || mapped["remaining_plannable_quantity"] != "40" {
+	if mapped["ordered_quantity"] != "100" || mapped["planned_production_quantity"] != "100" || mapped["remaining_plannable_quantity"] != "5" || mapped["label"] != "生产需求 105 / 已计划 100 / 可排产 5" {
 		t.Fatalf("capacity projection missing: %#v", mapped)
 	}
 	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard))}
 	result := d.mapProductionOrderError(context.Background(), fmt.Errorf("save: %w", biz.ErrProductionOrderPlannedQuantityExceeded))
-	if result.Code != errcode.InvalidParam.Code || result.Message != "该销售订单行的累计生产计划数量超过订单数量，请刷新可排产数量后调整" || errors.Is(biz.ErrProductionOrderPlannedQuantityExceeded, biz.ErrProductionOrderQuantityExceeded) {
+	if result.Code != errcode.InvalidParam.Code || result.Message != "该销售订单行的累计生产计划数量超过生产需求数量（订单数量＋船头样），请刷新可排产数量后调整" || errors.Is(biz.ErrProductionOrderPlannedQuantityExceeded, biz.ErrProductionOrderQuantityExceeded) {
 		t.Fatalf("planning errors must not masquerade as completion errors: %#v", result)
 	}
 }

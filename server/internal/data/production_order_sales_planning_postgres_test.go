@@ -16,9 +16,15 @@ import (
 func TestProductionOrderPostgresSalesPlanningConcurrentCreatesSingleWinner(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderPGFixture(t)
+	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetPreShipmentSampleQuantity(decimal.NewFromInt(5)).SaveX(ctx)
+	base := f.draft("PLAN-BASE-" + f.suffix)
+	base.Items[0].PlannedQuantity = decimal.NewFromInt(100)
+	if _, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: base, ActorID: f.actorID, IdempotencyKey: base.OrderNo}); err != nil {
+		t.Fatal(err)
+	}
 	results := runConcurrentProductionOrderPG(2, func(index int) (*biz.ProductionOrderAggregate, error) {
 		draft := f.draft(fmt.Sprintf("PLAN-CREATE-%d-%s", index, f.suffix))
-		draft.Items[0].PlannedQuantity = decimal.NewFromInt(60)
+		draft.Items[0].PlannedQuantity = decimal.NewFromInt(5)
 		return f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: draft, ActorID: f.actorID, IdempotencyKey: draft.OrderNo})
 	})
 	winners, rejected := 0, 0
@@ -38,7 +44,7 @@ func TestProductionOrderPostgresSalesPlanningConcurrentCreatesSingleWinner(t *te
 		}
 	}
 	totals, err := readProductionOrderSalesPlanning(ctx, f.client, []int{f.salesItemID}, 0)
-	if err != nil || winners != 1 || rejected != 1 || !totals[f.salesItemID].Equal(decimal.NewFromInt(60)) {
+	if err != nil || winners != 1 || rejected != 1 || !totals[f.salesItemID].Equal(decimal.NewFromInt(105)) {
 		t.Fatalf("create capacity race: winners=%d rejected=%d totals=%v err=%v", winners, rejected, totals, err)
 	}
 }
@@ -46,6 +52,7 @@ func TestProductionOrderPostgresSalesPlanningConcurrentCreatesSingleWinner(t *te
 func TestProductionOrderPostgresSalesPlanningConcurrentEditsSingleWinner(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderPGFixture(t)
+	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetPreShipmentSampleQuantity(decimal.NewFromInt(5)).SaveX(ctx)
 	orders := make([]*biz.ProductionOrderAggregate, 2)
 	for index := range orders {
 		draft := f.draft(fmt.Sprintf("PLAN-EDIT-%d-%s", index, f.suffix))
@@ -58,7 +65,7 @@ func TestProductionOrderPostgresSalesPlanningConcurrentEditsSingleWinner(t *test
 	}
 	results := runConcurrentProductionOrderPG(2, func(index int) (*biz.ProductionOrderAggregate, error) {
 		draft := f.draft(orders[index].Order.OrderNo)
-		draft.Items[0].PlannedQuantity = decimal.NewFromInt(60)
+		draft.Items[0].PlannedQuantity = decimal.NewFromInt(65)
 		return f.uc.SaveDraft(ctx, &biz.ProductionOrderSave{ID: orders[index].Order.ID, ExpectedVersion: 1, Draft: draft, ActorID: f.actorID, IdempotencyKey: draft.OrderNo + "-SAVE"})
 	})
 	winners, rejected := 0, 0
@@ -77,7 +84,7 @@ func TestProductionOrderPostgresSalesPlanningConcurrentEditsSingleWinner(t *test
 		}
 	}
 	totals, err := readProductionOrderSalesPlanning(ctx, f.client, []int{f.salesItemID}, 0)
-	if err != nil || winners != 1 || rejected != 1 || !totals[f.salesItemID].Equal(decimal.NewFromInt(100)) {
+	if err != nil || winners != 1 || rejected != 1 || !totals[f.salesItemID].Equal(decimal.NewFromInt(105)) {
 		t.Fatalf("edit capacity race: winners=%d rejected=%d totals=%v err=%v", winners, rejected, totals, err)
 	}
 }
@@ -85,8 +92,9 @@ func TestProductionOrderPostgresSalesPlanningConcurrentEditsSingleWinner(t *test
 func TestProductionOrderPostgresSalesPlanningCancelAndReplayCapacity(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderPGFixture(t)
+	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetPreShipmentSampleQuantity(decimal.NewFromInt(5)).SaveX(ctx)
 	draft := f.draft("PLAN-CANCEL-" + f.suffix)
-	draft.Items[0].PlannedQuantity = decimal.NewFromInt(100)
+	draft.Items[0].PlannedQuantity = decimal.NewFromInt(105)
 	a, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: draft, ActorID: f.actorID, IdempotencyKey: draft.OrderNo})
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +118,7 @@ func TestProductionOrderPostgresSalesPlanningCancelAndReplayCapacity(t *testing.
 		}
 	}
 	totals, err := readProductionOrderSalesPlanning(ctx, f.client, []int{f.salesItemID}, 0)
-	if err != nil || !totals[f.salesItemID].Equal(decimal.NewFromInt(100)) {
+	if err != nil || !totals[f.salesItemID].Equal(decimal.NewFromInt(105)) {
 		t.Fatalf("receipt replay changed planning capacity: totals=%v err=%v", totals, err)
 	}
 }

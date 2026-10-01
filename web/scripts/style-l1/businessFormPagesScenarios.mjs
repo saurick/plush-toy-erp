@@ -260,7 +260,7 @@ export function createBusinessFormPagesScenarios(deps) {
                   result: {
                     code: RpcErrorCode.INVALID_PARAM,
                     message:
-                      '该销售订单行的累计生产计划数量超过订单数量，请刷新可排产数量后调整',
+                      '该销售订单行的累计生产计划数量超过生产需求数量（订单数量＋船头样），请刷新可排产数量后调整',
                   },
                 }),
               })
@@ -277,13 +277,14 @@ export function createBusinessFormPagesScenarios(deps) {
             const options = [
               {
                 value: 601,
-                label: `SO-PLAN / 第 1 行 · PROD-STYLE-L1 · ${editing ? '其他单已计划 80 / 可排产 20' : '已计划 100 / 可排产 0'}`,
+                label: `SO-PLAN / 第 1 行 · PROD-STYLE-L1 · 生产需求 105 · ${editing ? '其他单已计划 95 / 可排产 10' : '已计划 105 / 可排产 0'}`,
                 selectable: editing,
                 reason: editing
                   ? null
                   : '该销售行已无剩余可排产数量，请先调整或取消其他生产单',
-                planned_production_quantity: editing ? '80' : '100',
-                remaining_plannable_quantity: editing ? '20' : '0',
+                ordered_quantity: '100',
+                planned_production_quantity: editing ? '95' : '105',
+                remaining_plannable_quantity: editing ? '10' : '0',
                 product_value: 301,
                 sku_value: 401,
                 unit_value: 501,
@@ -291,10 +292,11 @@ export function createBusinessFormPagesScenarios(deps) {
               {
                 value: 602,
                 label:
-                  'SO-PLAN / 第 2 行 · PROD-STYLE-L1 · 已计划 60 / 可排产 40',
+                  'SO-PLAN / 第 2 行 · PROD-STYLE-L1 · 生产需求 105 · 已计划 100 / 可排产 5',
                 selectable: true,
-                planned_production_quantity: '60',
-                remaining_plannable_quantity: '40',
+                ordered_quantity: '100',
+                planned_production_quantity: '100',
+                remaining_plannable_quantity: '5',
                 product_value: 301,
                 sku_value: 401,
                 unit_value: 501,
@@ -359,7 +361,7 @@ export function createBusinessFormPagesScenarios(deps) {
             )
             deps.assert.match(
               await sourceControl.innerText(),
-              /其他单已计划 80 \/ 可排产 20/u
+              /其他单已计划 95 \/ 可排产 10/u
             )
           }
           for (const width of [1440, 390]) {
@@ -422,9 +424,9 @@ export function createBusinessFormPagesScenarios(deps) {
               .click()
             await sourceControl
               .locator('.ant-select-selection-item')
-              .filter({ hasText: '可排产 40' })
+              .filter({ hasText: '可排产 5' })
               .waitFor()
-            deps.assert.match(await sourceControl.innerText(), /可排产 40/u)
+            deps.assert.match(await sourceControl.innerText(), /可排产 5/u)
             deps.assert.equal(await quantity.inputValue(), '7')
             await sourceControl.hover()
             await sourceControl.locator('.ant-select-clear').click()
@@ -453,7 +455,7 @@ export function createBusinessFormPagesScenarios(deps) {
             await page
               .locator('.ant-message-error')
               .filter({
-                hasText: '累计生产计划数量超过订单数量',
+                hasText: '累计生产计划数量超过生产需求数量（订单数量＋船头样）',
               })
               .waitFor()
             deps.assert.equal(quotaRejected, true)

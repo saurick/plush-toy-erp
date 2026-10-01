@@ -222,7 +222,8 @@ func (r *productionOrderRepo) listProductionOrderSalesItemOptions(ctx context.Co
 			selectable = selectable && skuRow != nil && skuRow.IsActive
 		}
 		option := &biz.ProductionOrderReferenceOption{ReferenceType: filter.ReferenceType, Value: row.ID, Selectable: selectable, ProductValue: productionOrderIntPtr(row.ProductID), SKUValue: row.ProductSkuID, UnitValue: productionOrderIntPtr(row.UnitID), SalesLineNo: productionOrderIntPtr(row.LineNo), OrderedQuantity: productionOrderStringPtr(row.OrderedQuantity.String()), PlannedDeliveryAt: row.PlannedDeliveryDate, SalesLineStatus: productionOrderStringPtr(row.LineStatus)}
-		remaining := row.OrderedQuantity.Sub(planned[row.ID])
+		productionQuantity := biz.SalesOrderProductionQuantity(row.OrderedQuantity, row.PreShipmentSampleQuantity)
+		remaining := productionQuantity.Sub(planned[row.ID])
 		if remaining.IsNegative() {
 			remaining = decimal.Zero
 		}
@@ -250,7 +251,7 @@ func (r *productionOrderRepo) listProductionOrderSalesItemOptions(ctx context.Co
 		if filter.ProductionOrderID > 0 {
 			plannedLabel = "其他单已计划"
 		}
-		option.Label = compactProductionOrderReferenceLabel(option.Label, plannedLabel+" "+planned[row.ID].String(), "可排产 "+remaining.String())
+		option.Label = compactProductionOrderReferenceLabel(option.Label, "生产需求 "+productionQuantity.String(), plannedLabel+" "+planned[row.ID].String(), "可排产 "+remaining.String())
 		markHistoricalReference(option)
 		options = append(options, option)
 	}

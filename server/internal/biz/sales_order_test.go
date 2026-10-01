@@ -9,6 +9,21 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func TestSalesOrderProductionQuantity(t *testing.T) {
+	for _, tc := range []struct{ name, ordered, samples, want string }{
+		{"without samples", "100", "0", "100"},
+		{"with samples", "100", "5", "105"},
+		{"exact decimals", "0.1", "0.2", "0.3"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := SalesOrderProductionQuantity(decimal.RequireFromString(tc.ordered), decimal.RequireFromString(tc.samples))
+			if !got.Equal(decimal.RequireFromString(tc.want)) {
+				t.Fatalf("production quantity: got %s want %s", got, tc.want)
+			}
+		})
+	}
+}
+
 type salesOrderRepoStub struct {
 	orders         map[int]*SalesOrder
 	items          map[int]*SalesOrderItem
