@@ -3,19 +3,24 @@ import { createHash } from 'node:crypto'
 import {
   closeSync,
   existsSync,
+  fstatSync,
   lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
+  readSync,
   readdirSync,
+  statSync,
 } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { stopRuntimeListeners } from '../../scripts/local-runtime-control.mjs'
 import { migrationAuditPaths } from '../../scripts/local-migration.mjs'
 import {
   buildRuntimeBundle,
   readRuntimeSource,
   readRuntimeBundle,
+  runtimeServerVersion,
   assertRuntimeEnvironment,
   readActiveRuntimeBundle,
   activateRuntimeBundle,
@@ -288,7 +293,9 @@ export async function executeCommand(
     })
     clearTimeout(timer)
     // A shell can exit while its children survive and still hold output pipes.
-    if (result.error || timedOut || cancelled || outputFailure.error) await stop()
+    if (result.error || timedOut || cancelled || outputFailure.error) {
+      await stop()
+    }
     if (cancelled) {
       const error = new Error('本次命令已取消，已停止本次命令及其子进程')
       error.code = 'command_cancelled'
@@ -311,7 +318,11 @@ export async function executeCommand(
     return { stdout: result.stdout, stderr: result.stderr }
   } catch (error) {
     const failure = commandFailure(error, `${command} 未完成`)
-    if (['migration_command_timeout', 'command_cancelled'].includes(error.code)) failure.code = error.code
+    if (
+      ['migration_command_timeout', 'command_cancelled'].includes(error.code)
+    ) {
+      failure.code = error.code
+    }
     throw failure
   } finally {
     clearTimeout(timer)
@@ -570,29 +581,89 @@ export async function waitForRuntime(
   apiOrigin,
   child,
   timeoutMs,
-  { read = readRuntime, intervalMs = 1000 } = {}
+  {
+    read = readRuntime,
+    intervalMs = 1000,
+    onProgress = () => {},
+    clock = Date.now,
+  } = {}
 ) {
-  const deadline = Date.now() + timeoutMs
+  const startedAt = clock()
+  const deadline = startedAt + timeoutMs
+  let lastState = ''
+  let lastReportAt = -Infinity
+  const checkState = (check) =>
+    check?.status === 'passed'
+      ? '通过'
+      : check?.httpCode
+        ? `HTTP ${check.httpCode}`
+        : '尚未连接'
   let spawnError
   const onError = (error) => {
     spawnError = error
   }
   child.once('error', onError)
   try {
-    while (Date.now() < deadline) {
+    while (clock() < deadline) {
       const runtime = await read(apiOrigin)
       if (spawnError) {
-        throw new Error('本地后端启动命令不可用；请检查 make 与 Go 环境')
+        throw new Error('本地后端启动命令不可用；请检查固定二进制和执行权限')
       }
       if (child.exitCode !== null || child.signalCode) {
-        throw new Error('本地后端启动进程已退出；请查看本次启动日志并重新检查')
+        throw new Error(
+          `本地后端启动进程已退出（${child.signalCode ? `信号=${child.signalCode}` : `退出码=${child.exitCode}`}）；请查看本次启动日志并重新检查`
+        )
       }
-      if (runtime.available) return runtime
+      const elapsed = clock() - startedAt
+      if (runtime.available) {
+        onProgress(
+          `health / ready 均通过；启动就绪耗时 ${(elapsed / 1000).toFixed(1)} 秒`
+        )
+        return runtime
+      }
+      const state = `health=${checkState(runtime.health)} ready=${checkState(runtime.ready)}`
+      if (state !== lastState || elapsed - lastReportAt >= 10_000) {
+        onProgress(
+          `等待本地后端就绪：${state}；已等待 ${(elapsed / 1000).toFixed(1)} 秒（最多 ${timeoutMs / 1000} 秒）`
+        )
+        lastReportAt = elapsed
+        lastState = state
+      }
       await new Promise((resolve) => setTimeout(resolve, intervalMs))
     }
-    throw new Error('本地后端启动超时；请查看本次启动日志并重新检查')
+    throw new Error(
+      `本地后端启动超时；${lastState}；请查看本次启动日志并重新检查`
+    )
   } finally {
     child.removeListener('error', onError)
+  }
+}
+
+export function readRuntimeStartupDiagnostic(logFile, logStartOffset = 0) {
+  const descriptor = openSync(logFile, 'r')
+  try {
+    const { size } = fstatSync(descriptor)
+    const start = Math.max(logStartOffset, size - 16 * 1024)
+    const buffer = Buffer.alloc(size - start)
+    readSync(descriptor, buffer, 0, buffer.length, start)
+    let text = buffer.toString('utf8')
+    if (start > logStartOffset) {
+      const newline = text.indexOf('\n')
+      text = newline === -1 ? '' : text.slice(newline + 1)
+    }
+    const lines = text.split('\n').filter((line) => {
+      if (!line.trim()) return false
+      try {
+        return JSON.parse(line).level !== 'DEBUG'
+      } catch {
+        return true
+      }
+    })
+    return redactDatabaseMigrationDiagnostic(lines.slice(-20).join('\n')).slice(
+      -6000
+    )
+  } finally {
+    closeSync(descriptor)
   }
 }
 
@@ -607,7 +678,11 @@ function operationLogFile(projectRoot, operationId) {
   return path.join(directory, `${operationId}.log`)
 }
 
-export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin, { openConsole = true } = {}) {
+export function createDevDatabaseMigrationRuntime(
+  projectRoot,
+  apiOrigin,
+  { openConsole = true } = {}
+) {
   const root = path.resolve(projectRoot)
   const serverRoot = path.join(root, 'server')
   let cachedToolReadiness = null
@@ -642,11 +717,8 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin, { open
     async sourceIdentity() {
       return readMigrationSourceIdentity(root)
     },
-    async stopRuntime() {
-      await executeCommand('make', ['dev_stop'], {
-        cwd: serverRoot,
-        timeout: 90_000,
-      })
+    async stopRuntime(operationId) {
+      await stopRuntimeListeners(root, operationId, { execute: executeCommand })
     },
     async audit() {
       await executeCommand(
@@ -769,10 +841,10 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin, { open
     async maintenance(enabled) {
       await setLocalDatabaseMaintenance(root, enabled)
     },
-    async restorePrevious(operationId) {
+    async restorePrevious(operationId, options) {
       const active = readActiveRuntimeBundle(root)
       if (!active) return null
-      return this.restart(operationId, active.id)
+      return this.restart(operationId, active.id, options)
     },
     async verifyReadiness() {
       await runWebRuntimePreflight(
@@ -783,7 +855,12 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin, { open
         }
       )
     },
-    async restart(operationId, bundleId) {
+    async restart(
+      operationId,
+      bundleId,
+      { startSource = '迁移恢复', onProgress = () => {} } = {}
+    ) {
+      const startupStartedAt = Date.now()
       const selected = bundleId || readActiveRuntimeBundle(root)?.id
       if (!selected) {
         throw new Error('没有验证通过的固定运行版本；请先检查并准备')
@@ -800,49 +877,63 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin, { open
       const configured = await configuredDatabaseURL(root)
       const roles = readLocalDatabaseRoles(root, configured)
       // Stop the previous process before health checks can accept its response.
+      onProgress('正在核对候选制品与当前数据库兼容性；原后端继续运行')
       await verifyBundleDatabase(root, bundle, roles.audit)
       await setLocalDatabaseMaintenance(root, false)
-      await executeCommand('make', ['dev_stop'], {
-        cwd: serverRoot,
-        timeout: 30_000,
-      })
-      const logFile = operationLogFile(root, operationId)
-      const descriptor = openSync(logFile, 'a', 0o600)
-      const startedAt = new Date().toISOString()
+      onProgress('数据库兼容性核对通过；正在停止本工作区旧后端并释放登记端口')
+      await stopRuntimeListeners(root, operationId, { execute: executeCommand })
       let child
+      let logFile
+      let logStartOffset = 0
       try {
-        child = spawn(path.join(bundle.directory, 'runtime/server'), [], {
-          cwd: path.join(bundle.directory, 'source/server'),
-          env: {
-            ...process.env,
-            ...fixedEnvironment,
-            PLUSH_GITLAB_READ_TOKEN: '',
-            PLUSH_GITLAB_TOKEN: '',
-            GIT_OPTIONAL_LOCKS: '0',
-            GIT_SHA: `local-${bundle.id}`,
-            POSTGRES_DSN: roles.app,
-            ERP_CUSTOMER_KEY: fixedEnvironment.ERP_CUSTOMER_KEY || 'yoyoosun',
-            ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG: '1',
-          },
-          detached: true,
-          stdio: ['ignore', descriptor, descriptor],
-        })
-      } finally {
-        closeSync(descriptor)
-      }
-      child.unref()
-      try {
+        logFile = operationLogFile(root, operationId)
+        const descriptor = openSync(logFile, 'a', 0o600)
+        logStartOffset = fstatSync(descriptor).size
+        const startedAt = new Date().toISOString()
+        try {
+          child = spawn(path.join(bundle.directory, 'runtime/server'), [], {
+            cwd: path.join(bundle.directory, 'source/server'),
+            env: {
+              ...process.env,
+              ...fixedEnvironment,
+              PLUSH_GITLAB_READ_TOKEN: '',
+              PLUSH_GITLAB_TOKEN: '',
+              GIT_OPTIONAL_LOCKS: '0',
+              GIT_SHA: runtimeServerVersion(bundle),
+              POSTGRES_DSN: roles.app,
+              ERP_CUSTOMER_KEY: fixedEnvironment.ERP_CUSTOMER_KEY || 'yoyoosun',
+              ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG: '1',
+            },
+            detached: true,
+            stdio: ['ignore', descriptor, descriptor],
+          })
+        } finally {
+          closeSync(descriptor)
+        }
+        child.unref()
+        onProgress(
+          `已启动候选进程 PID=${child.pid}；地址=${apiOrigin}；启动来源=${startSource}`
+        )
+        onProgress(`本次启动日志：${logFile}`)
         const runtime = await waitForRuntime(
           apiOrigin,
           child,
-          RUNTIME_WAIT_TIMEOUT_MS
+          RUNTIME_WAIT_TIMEOUT_MS,
+          { onProgress }
         )
+        onProgress('正在核对 HTTP 响应的运行版本与候选二进制身份')
         await verifyLocalRuntimeIdentity(bundle, apiOrigin)
+        onProgress('运行版本核对通过；正在验证登录与业务入口')
         await verifyRuntimeBusiness(apiOrigin, {
           username: fixedEnvironment.APP_ADMIN_USERNAME,
           password: fixedEnvironment.APP_ADMIN_PASSWORD,
           customerKey: fixedEnvironment.ERP_CUSTOMER_KEY || 'yoyoosun',
         })
+        const startupDurationMs = Date.now() - startupStartedAt
+        const startupLogEndOffset = statSync(logFile).size
+        onProgress(
+          `业务验证通过；后端切换完成，耗时 ${(startupDurationMs / 1000).toFixed(1)} 秒`
+        )
         activateRuntimeBundle(root, bundle.id, {
           artifactHash: bundle.artifactHash,
           migrationVersion: bundle.migrationVersion,
@@ -853,12 +944,21 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin, { open
             pid: child.pid,
             logFile: path.relative(root, logFile).split(path.sep).join('/'),
             startedAt,
+            startSource,
+            version: runtimeServerVersion(bundle),
+            logStartOffset,
+            startupLogEndOffset,
+            startupDurationMs,
           },
         })
         if (openConsole) {
-          await presentRuntimeConsole(root, { interactive: false }).catch((error) => {
-            console.error(`[local-runtime] 后端已通过验证，但日志终端未能打开：${error.message}；可执行 make dev_logs`)
-          })
+          await presentRuntimeConsole(root, { interactive: false }).catch(
+            (error) => {
+              console.error(
+                `[local-runtime] 后端已通过验证，但日志终端未能打开：${error.message}；可执行 make dev_logs`
+              )
+            }
+          )
         }
         return {
           ...runtime,
@@ -866,11 +966,26 @@ export function createDevDatabaseMigrationRuntime(projectRoot, apiOrigin, { open
           activeVersion: bundle.migrationVersion,
         }
       } catch (error) {
-        if (child.pid && child.exitCode === null && !child.signalCode) {
+        if (child?.pid && child.exitCode === null && !child.signalCode) {
           try {
             process.kill(-child.pid, 'SIGTERM')
           } catch {}
         }
+        if (logFile) {
+          error.runtimeLogFile = path
+            .relative(root, logFile)
+            .split(path.sep)
+            .join('/')
+          try {
+            error.diagnostic = readRuntimeStartupDiagnostic(
+              logFile,
+              logStartOffset
+            )
+          } catch {
+            // Preserve the activation error if its log could not be read.
+          }
+        }
+        error.runtimeCutoverStarted = true
         throw error
       }
     },

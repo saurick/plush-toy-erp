@@ -12,12 +12,13 @@ import {
   createViteChildEnvironment,
   runManagedVite,
   resolveWebRuntimeStartup,
+  stopLocalWebFrontend,
 } from './startWebDev.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const devPorts = loadDevPorts(repoRoot)
 
-function parseArgs(argv) {
+export function parseYoyoosunDevArgs(argv) {
   const options = {
     customer: process.env.ERP_CUSTOMER_KEY || 'yoyoosun',
     port: process.env.PORT || String(devPorts.auxStart),
@@ -25,6 +26,7 @@ function parseArgs(argv) {
     frontendOnly: false,
     printPlan: false,
     restart: false,
+    stop: false,
   }
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -48,6 +50,8 @@ function parseArgs(argv) {
       options.frontendOnly = true
     } else if (arg === '--restart') {
       options.restart = true
+    } else if (arg === '--stop') {
+      options.stop = true
     } else {
       throw new Error(`Unknown argument: ${arg}`)
     }
@@ -55,7 +59,8 @@ function parseArgs(argv) {
 
   options.customer = normalizeDevCustomerKey(options.customer)
   options.port = String(options.port || '').trim()
-  options.apiOrigin = normalizeAPIOrigin(options.apiOrigin)
+  if (!options.stop) options.apiOrigin = normalizeAPIOrigin(options.apiOrigin)
+  if (options.stop && options.restart) throw new Error('停止和重启不能同时指定')
 
   if (!options.customer) {
     throw new Error('customer is required')
@@ -158,13 +163,18 @@ function runVite(options, startup) {
 }
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2))
+  const options = parseYoyoosunDevArgs(process.argv.slice(2))
   const requestedPort = validateDevAuxPort(
     devPorts,
     options.port,
     'start:yoyoosun port'
   )
   options.port = String(requestedPort)
+
+  if (options.stop) {
+    await stopLocalWebFrontend(requestedPort)
+    return
+  }
 
   printPlan(options)
 

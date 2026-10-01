@@ -28,7 +28,7 @@ import {
   resolveERPHMRClientPort,
   selectWebDevPort,
 } from './localPort.mjs'
-import { prepareWebInstance, webInstanceSignature } from './devWebInstance.mjs'
+import { prepareWebInstance, stopWebInstance, webInstanceSignature } from './devWebInstance.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const devPorts = loadDevPorts(repoRoot)
@@ -90,6 +90,9 @@ export function parseStartWebDevArgs(argv, env = process.env) {
   let isolated = isCodexDevSession(env)
   let restart = false
   let stop = false
+  // pnpm restart invokes stop, restart and start. The restart stage owns the
+  // entire operation; its surrounding lifecycle stages must return immediately.
+  const skipLifecycle = env.npm_command === 'restart' && ['start', 'stop'].includes(env.npm_lifecycle_event)
   if (argv.includes('--local') && argv.includes('--isolated')) {
     throw new Error('--local 与 --isolated 不能同时使用')
   }
@@ -108,12 +111,14 @@ export function parseStartWebDevArgs(argv, env = process.env) {
       viteArgs.push(arg)
     }
   }
+  if (stop && restart) throw new Error('停止和重启不能同时指定')
   return {
     apiOrigin: env.API_ORIGIN || `http://127.0.0.1:${devPorts.http}`,
     frontendOnly,
     isolated,
     restart,
     stop,
+    skipLifecycle,
     viteArgs,
   }
 }
@@ -141,7 +146,7 @@ export async function startStoppedLocalBackend(
     '[start-web] 本地后端未运行，正在启动当前工作区后端；完成后开放电脑版和手机版'
   )
   try {
-    await execute('make', ['run', 'ARGS=--if-stopped'], {
+    await execute('make', ['run', 'ARGS=--source=frontend'], {
       cwd: path.join(repoRoot, 'server'),
       env: {
         ...env,
@@ -175,6 +180,7 @@ export async function resolveWebRuntimeStartup(
     writeLine = (line) => process.stderr.write(`${line}\n`),
   } = {}
 ) {
+  if (options.stop) return { complete: false, apiOrigin: options.apiOrigin, recoveryMode: '', recoveryReason: '' }
   const localBackend = isLoopbackAPIOrigin(options.apiOrigin)
   const check = async () => {
     const controller = new AbortController()
@@ -336,8 +342,18 @@ export function runManagedVite(
   })
 }
 
+export async function stopLocalWebFrontend(port, {
+  stop = stopWebInstance,
+  writeLine = (line) => process.stdout.write(`${line}\n`),
+  projectRoot = repoRoot,
+} = {}) {
+  await stop(port, path.join(projectRoot, 'web'))
+  writeLine(`[start-web] 本工作区前端端口 ${port} 已停止或原本空闲；后端独立管理，查看状态使用 cd ../server && make dev_status`)
+}
+
 async function main() {
   const options = parseStartWebDevArgs(process.argv.slice(2))
+  if (options.skipLifecycle) return
   if (
     (options.restart || options.stop) &&
     options.isolated &&
@@ -351,6 +367,10 @@ async function main() {
     ports: devPorts,
     isolated: options.isolated,
   })
+  if (options.stop) {
+    await stopLocalWebFrontend(port)
+    return
+  }
   const hmrClientPort = resolveERPHMRClientPort(
     process.env.ERP_VITE_HMR_CLIENT_PORT,
     port
@@ -372,12 +392,6 @@ async function main() {
     projectRoot: repoRoot,
     restart: options.restart || options.stop,
   })
-  if (options.stop) {
-    process.stdout.write(
-      `[start-web] 本工作区前端端口 ${port} 已停止或原本空闲\n`
-    )
-    return
-  }
   const url = `http://127.0.0.1:${port}/`
   if (instance.reused) {
     process.stdout.write(

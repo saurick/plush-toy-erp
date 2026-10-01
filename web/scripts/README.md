@@ -97,7 +97,7 @@ pnpm start
 
 需要重新加载主入口启动配置或接管遗留的本工作区 Vite 时运行 `pnpm restart` / `pnpm start:restart`（等价于 `pnpm start --local --restart`）。客户辅助入口的 `pnpm start:yoyoosun` 会自动替换过期实例；`pnpm restart:yoyoosun` / `pnpm start:yoyoosun --restart` 也会重启同配置实例。两者都使用指定端口（默认 `15200`），不会顺延到新端口。入口先完成运行预检，客户入口还检查客户配置；随后通过共享进程检查连续核对监听 PID、工作目录、Vite 命令和进程启动时间。macOS 从系统端口表定位 PID，避免全机 `lsof` 扫描；Linux 使用 `lsof` 定位监听 PID 和工作目录。逐进程检查均有超时，仅向已确认的本工作区 Vite 发送 `SIGTERM`；归属不明、现场变化或端口未释放时停止，不强制杀进程。启动竞争失败后的实例查询只允许复用同配置赢家，不触发自动替换。
 
-`pnpm restart` 会先调用包的 `stop` 生命周期，项目将其接到同一启动器的 `--local --stop`：完成预检和进程归属检查后只释放主前端端口。随后 `restart` 生命周期启动当前源码的 Vite，并继续由当前终端管理；中断时返回非零退出码，避免 pnpm 再接续启动。可单独用 `pnpm stop` 停止主前端。
+日常主前端重启使用 `pnpm start:restart`，`pnpm restart` 具有相同的实际行为。pnpm 原生会执行 stop / restart / start 生命周期，启动器仅让 restart 阶段执行完整重启，其前后两个阶段立即返回，防止重复停服或退出后再次启动。`pnpm stop` 停止主前端，`pnpm stop:yoyoosun` 停止客户辅助前端；指定辅助端口可执行 `pnpm start:yoyoosun --stop --port 15201`。停止入口仅检查端口、PID、工作目录、Vite 命令和启动时间，不运行数据库预检、读取客户包或启动后端；数据库故障不阻断停止前端。前端停止后后端仍独立管理，状态与停止命令见 [服务端入口](../../server/README.md#快速开始)。
 
 修改迁移页服务端插件或上述启动代码后，交付前须在用户实际使用的端口显式重启并复验；页面热更新和辅助端口验证不会更新已运行进程中的 Node 模块。仅刷新浏览器不能加载这些服务端改动。
 
@@ -115,9 +115,9 @@ Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:y
 
 `pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查当前工作区 schema / migration 与开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过并核对运行制品身份；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，业务入口在原地址显示服务不可用提示，业务组件和 `/rpc`、`/templates` 保持关闭。受限模式保留 `/__dev/database-migration` 恢复页、固定恢复 API、只读实例摘要与同源 GET `/__dev/api/runtime-status`；其它 DEV API 继续阻断。等待页每次检查结束后等待 3 秒再读取状态，并发读取共用同一检查；健康恢复后重新通过完整启动检查和同目标 health / ready，才能自动继续打开原业务页面。恢复操作仍须显式执行，不自动迁移、启动后端或重放业务请求。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 
-普通业务页和开发工作台均从当前工作区加载，Vite 提供热更新；固定运行制品不会截获开发页面。后端代码通过 `make dev_restart` 重新编译，数据库迁移仍须“检查并准备 → 确认执行”。辅助端口只隔离前端监听，不产生第二个日常数据库。预检或构建失败时保留已有后端，但不会将其标成最新工作区代码。
+普通业务页和开发工作台均从当前工作区加载，Vite 提供热更新；固定运行制品不会截获开发页面。后端代码通过 `make dev_restart` 按需构建并生效；无编译输入变化时复用制品，数据库迁移仍须“检查并准备 → 确认执行”。辅助端口只隔离前端监听，不产生第二个日常数据库。预检或构建失败时保留已有后端，但不会将其标成最新工作区代码。
 
-`pnpm start` 和客户热更新入口在数据库预检通过、登记的本地 HTTP 后端确实未监听时，自动执行一次 `make run ARGS=--if-stopped`，复用后端构建、运行身份和业务验证链路；通过完整预检后才开放电脑版和手机版。此构建阶段独立于 15 秒只读预检，最多等待 10 分钟并在终端显示进度。后端启动链路在共享锁内和构建后再次检查监听状态，保留并核对期间出现的后端；已运行后端不会因前端启动而重启。构建失败、启动后复验失败、预检超时和待迁移状态保留恢复页，不自动重试。停止命令、`--frontend-only`、外部或非登记 `API_ORIGIN` 不会启动共享后端。
+`pnpm start` 和客户热更新入口在数据库预检通过、登记的本地 HTTP 后端确实未监听时，自动执行一次 `make run ARGS=--source=frontend`，复用后端构建、运行身份和业务验证链路，并记录启动来源；通过完整预检后才开放电脑版和手机版。此构建阶段独立于 15 秒只读预检，最多等待 10 分钟并在终端显示进度。后端启动链路在共享锁内和构建后再次检查监听状态，保留并核对期间出现的后端；已运行后端不会因前端启动而重启。构建失败、启动后复验失败、预检超时和待迁移状态保留恢复页，不自动重试。停止命令、`--frontend-only`、外部或非登记 `API_ORIGIN` 不会启动共享后端。
 
 开发工作台读取 GitLab CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`；macOS 未显式提供时，`pnpm start` 会自动读取钥匙串 service `plush-toy-erp.gitlab-read-api`，account 使用当前 macOS 登录用户名。该凭据只允许当前项目的最小读取权限，只保存在本机钥匙串和 DEV 服务私有内存；版本中心将它收口到不含发布方法的只读 Provider，不进入浏览器、仓库、日志、质量门禁子进程或部署执行子进程，也不替代创建新发布使用的短期 `PLUSH_GITLAB_TOKEN`。钥匙串未登记时业务开发仍可启动，但 GitLab 服务端证据保持失败关闭，不以本机结果补证。
 

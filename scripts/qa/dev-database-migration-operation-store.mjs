@@ -38,6 +38,7 @@ const TERMINAL_STATUSES = new Set([
 const EXECUTION_LOCK_PURPOSES = new Set([
   "database-operation",
   "workspace-runtime-restart",
+  "workspace-runtime-stop",
 ]);
 const TRANSITIONS = Object.freeze({
   preparing: new Set([

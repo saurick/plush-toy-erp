@@ -394,12 +394,12 @@ dev_build:
 	@go build -ldflags "-X main.Version=$(VERSION)" -o $(DEV_BIN) $(MAIN_PKG)
 
 .PHONY: run run_yoyoosun
-# compile the current workspace after database checks, then verify and switch
+# ensure a healthy backend exists; source changes are applied by dev_restart
 run: export ERP_CUSTOMER_KEY ?= yoyoosun
 run: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
 run: export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := $(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX)
 run: dev_ports_preflight
-	@node ../scripts/local-runtime-start.mjs $(ARGS)
+	@node ../scripts/local-runtime-start.mjs --ensure $(ARGS)
 
 # run the local backend with the stable yoyoosun customer context.
 run_yoyoosun: export ERP_CUSTOMER_KEY := yoyoosun
@@ -412,16 +412,25 @@ dev: run
 .PHONY: dev_stop
 # stop only listeners whose cwd belongs to this repository; foreign listeners fail closed.
 dev_stop: dev_ports_preflight
-	@echo ">>> stopping dev listeners on: $(DEV_PORTS)"
-	@bash ../scripts/dev-listener-stop.sh .. $(DEV_PORTS)
+	@node ../scripts/local-runtime-control.mjs
 
 .PHONY: dev_restart dev_restart_yoyoosun
-# compile current source before stopping the previous verified backend
+# restart current workspace, reusing matching verified build inputs
 dev_restart: export ERP_CUSTOMER_KEY ?= yoyoosun
 dev_restart: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
 dev_restart: export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := $(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX)
 dev_restart: dev_ports_preflight
 	@node ../scripts/local-runtime-start.mjs $(ARGS)
+
+.PHONY: dev_rebuild dev_status
+dev_rebuild: export ERP_CUSTOMER_KEY ?= yoyoosun
+dev_rebuild: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
+dev_rebuild: export ERP_PDF_ALLOW_LOCAL_NO_SANDBOX := $(DEV_PDF_ALLOW_LOCAL_NO_SANDBOX)
+dev_rebuild: dev_ports_preflight
+	@node ../scripts/local-runtime-start.mjs --rebuild $(ARGS)
+
+dev_status: dev_ports_preflight
+	@node ../scripts/local-runtime-control.mjs --status
 
 .PHONY: dev_logs
 # Watch the verified backend without holding the migration/restart lock.

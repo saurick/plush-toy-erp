@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict'
 import os from 'node:os'
+import fs from 'node:fs'
+import path from 'node:path'
+import { execFile, spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { promisify } from 'node:util'
+import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 
 import { createERPViteConfig } from '../vite.shared.mjs'
@@ -10,7 +16,9 @@ import {
   resolveDevGitlabCredential,
   resolveWebRuntimeStartup,
   startStoppedLocalBackend,
+  stopLocalWebFrontend,
 } from './startWebDev.mjs'
+import { parseYoyoosunDevArgs } from './startYoyoosunDev.mjs'
 import {
   LOCAL_RUNTIME_RECOVERY_MODE,
   LocalRuntimePreflightError,
@@ -23,6 +31,7 @@ test('start web dev: 默认启用共享 runtime preflight', () => {
     isolated: false,
     restart: false,
     stop: false,
+    skipLifecycle: false,
     viteArgs: [],
   })
 })
@@ -37,6 +46,74 @@ test('start web dev: pnpm lifecycle stop is explicit, local and never forwarded 
   assert.deepEqual(options.viteArgs, [])
 })
 
+test('stop skips database, runtime startup and credentials while retaining owned Vite checks', async () => {
+  const startup = await resolveWebRuntimeStartup({ stop: true, apiOrigin: 'unavailable' }, {
+    preflight: () => assert.fail('stop must not inspect the database'),
+    startBackend: () => assert.fail('stop must not start the backend'),
+  })
+  assert.equal(startup.recoveryMode, '')
+  const stops = []
+  const lines = []
+  await stopLocalWebFrontend(15200, { projectRoot: '/fixture', stop: async (port, root) => stops.push({ port, root }), writeLine: (line) => lines.push(line) })
+  assert.deepEqual(stops, [{ port: 15200, root: '/fixture/web' }])
+  assert.match(lines[0], /后端独立管理/u)
+  assert.equal(parseYoyoosunDevArgs(['--stop', '--port', '15201']).stop, true)
+  assert.throws(() => parseYoyoosunDevArgs(['--stop', '--restart']), /不能同时/u)
+})
+
+test('the actual pnpm restart lifecycle performs exactly one restart operation', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'plush-pnpm-restart-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const entry = pathToFileURL(path.join(import.meta.dirname, 'startWebDev.mjs')).href
+  fs.writeFileSync(path.join(root, 'trace.mjs'), `import {parseStartWebDevArgs} from ${JSON.stringify(entry)}; if(!parseStartWebDevArgs(process.argv.slice(2)).skipLifecycle) console.log('ACTUAL_ACTION='+process.env.npm_lifecycle_event);\n`)
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'plush-restart-fixture', version: '1.0.0', scripts: { stop: 'node trace.mjs --local --stop', restart: 'node trace.mjs --local --restart', start: 'node trace.mjs', 'start:restart': 'node trace.mjs --local --restart' } }))
+  const execute = promisify(execFile)
+  for (const command of ['restart', 'start:restart']) {
+    const { stdout } = await execute('pnpm', [command], { cwd: root, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' }, timeout: 30_000 })
+    assert.deepEqual(stdout.match(/ACTUAL_ACTION=\S+/gu), [`ACTUAL_ACTION=${command}`])
+  }
+  for (const command of ['start', 'stop']) {
+    const { stdout } = await execute('pnpm', [command], { cwd: root, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' }, timeout: 30_000 })
+    assert.deepEqual(stdout.match(/ACTUAL_ACTION=\S+/gu), [`ACTUAL_ACTION=${command}`])
+  }
+})
+
+test('real frontend stop needs no database and preserves a foreign Vite process', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'plush-web-stop-'))
+  const children = []
+  t.after(async () => {
+    for (const child of children) {
+      if (child.exitCode === null && !child.signalCode) {
+        child.kill('SIGTERM')
+        await once(child, 'close')
+      }
+    }
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+  const start = async (name) => {
+    const projectRoot = path.join(root, name)
+    const web = path.join(projectRoot, 'web')
+    const entry = path.join(web, 'node_modules/vite/bin/vite.js')
+    fs.mkdirSync(path.dirname(entry), { recursive: true })
+    fs.writeFileSync(entry, "const s=require('node:http').createServer((q,r)=>r.end('fixture'));s.listen(0,'127.0.0.1',()=>console.log('PORT='+s.address().port));\n")
+    const child = spawn(process.execPath, [entry], { cwd: web, stdio: ['ignore', 'pipe', 'pipe'] })
+    children.push(child)
+    const port = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('fixture did not start')), 5000)
+      child.once('error', reject)
+      child.stdout.once('data', (chunk) => { clearTimeout(timer); resolve(Number(String(chunk).match(/PORT=(\d+)/u)?.[1])) })
+    })
+    return { projectRoot, child, port }
+  }
+  const owned = await start('owned')
+  const foreign = await start('foreign')
+  await assert.rejects(stopLocalWebFrontend(foreign.port, { projectRoot: owned.projectRoot, writeLine: () => {} }), /其他程序或工作区/u)
+  await stopLocalWebFrontend(owned.port, { projectRoot: owned.projectRoot, writeLine: () => {} })
+  assert.equal(foreign.child.exitCode, null)
+  assert.equal((await fetch(`http://127.0.0.1:${foreign.port}`)).status, 200)
+  await assert.rejects(fetch(`http://127.0.0.1:${owned.port}`))
+})
+
 test('start web dev: frontend-only 必须显式启用且保留 Vite 参数', () => {
   assert.deepEqual(
     parseStartWebDevArgs(['--', '--frontend-only', '--host', '127.0.0.1'], {
@@ -48,6 +125,7 @@ test('start web dev: frontend-only 必须显式启用且保留 Vite 参数', () 
       isolated: false,
       restart: false,
       stop: false,
+      skipLifecycle: false,
       viteArgs: ['--host', '127.0.0.1'],
     }
   )
@@ -297,7 +375,7 @@ test('start web dev: 后端自动启动复用正式 Make 入口并隔离 GitLab 
   )
   assert.equal(calls.length, 1)
   assert.equal(calls[0].command, 'make')
-  assert.deepEqual(calls[0].args, ['run', 'ARGS=--if-stopped'])
+  assert.deepEqual(calls[0].args, ['run', 'ARGS=--source=frontend'])
   assert.match(calls[0].options.cwd, /\/server$/u)
   assert.equal(calls[0].options.env.GIT_OPTIONAL_LOCKS, '0')
   assert.equal(calls[0].options.env.PLUSH_GITLAB_TOKEN, '')

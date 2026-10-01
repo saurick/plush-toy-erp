@@ -27,6 +27,7 @@ import {
   readDatabaseMigrationToolReadiness,
   redactDatabaseMigrationDiagnostic,
   waitForRuntime,
+  readRuntimeStartupDiagnostic,
 } from './devDatabaseMigrationRuntime.mjs'
 
 test('workspace migration check executes the Make target and preserves failure diagnostics', async (t) => {
@@ -74,9 +75,17 @@ test('a cancelled command cannot start a subprocess', async (t) => {
   const marker = path.join(root, 'unexpected-command.txt')
   const controller = new AbortController()
   controller.abort()
-  await assert.rejects(executeCommand(process.execPath, [
-    '-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`,
-  ], { signal: controller.signal }), { name: 'AbortError' })
+  await assert.rejects(
+    executeCommand(
+      process.execPath,
+      [
+        '-e',
+        `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`,
+      ],
+      { signal: controller.signal }
+    ),
+    { name: 'AbortError' }
+  )
   assert.equal(existsSync(marker), false)
 })
 
@@ -180,6 +189,80 @@ test('database migration runtime stops waiting when backend health cannot be pro
       intervalMs: 1,
     }),
     /启动超时/u
+  )
+})
+
+test('startup progress explains changing health/ready states and reports bounded wait time', async () => {
+  const child = new EventEmitter()
+  child.exitCode = null
+  const messages = []
+  let elapsed = 0
+  const snapshots = [
+    {
+      available: false,
+      health: { status: 'unavailable' },
+      ready: { status: 'unavailable' },
+    },
+    {
+      available: false,
+      health: { status: 'passed', httpCode: 200 },
+      ready: { status: 'failed', httpCode: 503 },
+    },
+    {
+      available: false,
+      health: { status: 'passed', httpCode: 200 },
+      ready: { status: 'failed', httpCode: 503 },
+    },
+    {
+      available: true,
+      health: { status: 'passed', httpCode: 200 },
+      ready: { status: 'passed', httpCode: 200 },
+    },
+  ]
+  await waitForRuntime('http://127.0.0.1:8300', child, 90_000, {
+    read: async () => {
+      elapsed += 1000
+      return snapshots.shift()
+    },
+    clock: () => elapsed,
+    intervalMs: 1,
+    onProgress: (message) => messages.push(message),
+  })
+  assert.equal(messages.length, 3)
+  assert.match(messages[0], /health=尚未连接 ready=尚未连接.*1.0 秒.*90 秒/u)
+  assert.match(messages[1], /health=通过 ready=HTTP 503/u)
+  assert.match(messages[2], /health \/ ready 均通过.*4.0 秒/u)
+  assert.equal(child.listenerCount('error'), 0)
+})
+
+test('startup failures preserve exit status and redact readable diagnostics without showing SQL debug arguments', async (t) => {
+  const root = createRoot(t)
+  const file = path.join(root, 'failure.log')
+  writeFileSync(
+    file,
+    `${JSON.stringify({ level: 'DEBUG', args: 'private-query-value', query: 'sql' })}\n${JSON.stringify({ level: 'ERROR', msg: 'database unavailable', error: 'postgres://app:private-password@localhost/db' })}\npanic: failed database initialization\n`
+  )
+  const diagnostic = readRuntimeStartupDiagnostic(file)
+  assert.match(diagnostic, /database unavailable/u)
+  assert.match(diagnostic, /panic: failed database initialization/u)
+  assert(!diagnostic.includes('private-password'))
+  assert(!diagnostic.includes('private-query-value'))
+  writeFileSync(
+    file,
+    JSON.stringify({ level: 'DEBUG', args: 'private-query-value'.repeat(2000) })
+  )
+  assert.equal(
+    readRuntimeStartupDiagnostic(file),
+    '',
+    'a truncated SQL record must not be printed as plain-text error diagnostics'
+  )
+  const child = new EventEmitter()
+  child.exitCode = 7
+  await assert.rejects(
+    waitForRuntime('http://127.0.0.1:8300', child, 100, {
+      read: async () => ({ available: true }),
+    }),
+    /退出码=7/u
   )
 })
 

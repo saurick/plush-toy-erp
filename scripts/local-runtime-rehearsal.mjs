@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { randomBytes } from "node:crypto";
 import {
   readRuntimeBundle,
+  runtimeServerVersion,
   assertRuntimeEnvironment,
   hashRuntimeBackup,
   verifyLocalRuntimeIdentity,
@@ -107,6 +108,8 @@ export async function rehearseRuntimeBundle(
   env = process.env,
 ) {
   const bundle = readRuntimeBundle(root, id);
+  if (bundle.scope === "backend")
+    throw new Error("迁移演练需要完整候选制品，请重新检查并准备");
   const fixed = JSON.parse(
     fs.readFileSync(
       path.join(bundle.directory, "runtime/environment.json"),
@@ -242,7 +245,7 @@ export async function rehearseRuntimeBundle(
           ...env,
           ...fixed,
           GIT_OPTIONAL_LOCKS: "0",
-          GIT_SHA: `local-${id}`,
+          GIT_SHA: runtimeServerVersion(bundle),
           DEV_HTTP_PORT: String(port),
           PLUSH_GITLAB_READ_TOKEN: "",
           PLUSH_GITLAB_TOKEN: "",

@@ -1326,9 +1326,9 @@ test("dev entry boundary: make dev_restart 先预检再停服并且不自动执�
   const recipe = target.groups.recipe;
   assert.match(recipe, /node \.\.\/scripts\/local-runtime-start\.mjs/u);
   const startup = read("scripts/local-runtime-start.mjs");
-  assert(
-    startup.indexOf("await preflight()") < startup.indexOf("await build("),
-  );
+  const preflightAt = startup.indexOf("await preflight(");
+  const buildAt = startup.indexOf("await build(");
+  assert(preflightAt >= 0 && buildAt > preflightAt);
   assert(
     startup.indexOf("await build(") < startup.indexOf("await runtime.restart("),
   );

@@ -79,6 +79,7 @@
     "start:frontend-only": "node ./scripts/startWebDev.mjs --frontend-only",
     "start:yoyoosun": "node ./scripts/startYoyoosunDev.mjs",
     "restart:yoyoosun": "node ./scripts/startYoyoosunDev.mjs --restart",
+    "stop:yoyoosun": "node ./scripts/startYoyoosunDev.mjs --stop",
     "audit:yoyoosun-entry": "node ./scripts/yoyoosunLocalEntryAudit.mjs",
     "lint": "eslint --ext .js --ext .jsx src/",
     "lint:fix": "eslint --fix --ext .js --ext .jsx src/",

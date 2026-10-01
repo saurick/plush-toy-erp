@@ -60,7 +60,7 @@ pnpm install
 
 普通启动先只读检查 schema、migration 和后端 health / ready。登记的本地后端未运行且数据库检查通过时，自动通过现有 `make run` 链路构建、启动并验证当前工作区后端，随后开放电脑版和手机版；已有后端监听进程会保留。后端未就绪、数据库或迁移检查失败时，电脑版、手机版与登录页保留原地址，在原页显示服务不可用提示，不跳转到开发工作台。页面只读检查服务状态，通过同一完整启动检查后自动继续打开当前页面，路径、查询和锚点保持不变。需要人工恢复时可在新标签打开 `/__dev/database-migration`，不自动 apply 或重放业务请求。完整启动、进程保护、端口审计及客户包核对见 [前端脚本](scripts/README.md#本地启动与进程范围)。
 
-所有开发入口直接加载当前工作区的 React / CSS 源文件并支持热更新，重启后不会用历史固定制品覆盖登录页或业务页。`pnpm restart` 对应主端口 `5175`；使用 `15200` 客户入口时运行 `pnpm restart:yoyoosun`。后端代码需在 `server/` 执行 `make dev_restart` 重新编译。
+所有开发入口直接加载当前工作区的 React / CSS 源文件并支持热更新，重启后不会用历史固定制品覆盖登录页或业务页。`pnpm start:restart` / `pnpm restart` 对应主端口 `5175`；使用 `15200` 客户入口时运行 `pnpm restart:yoyoosun`。停止前端使用 `pnpm stop` / `pnpm stop:yoyoosun`，后端仍独立管理。后端代码在 `server/` 执行 `make dev_restart` 按需构建并生效，输入不变时跳过编译；运行、状态和日志见 [服务端入口](../server/README.md#快速开始)。
 
 ### 岗位任务端本地调试
 

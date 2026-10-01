@@ -1,3 +1,7 @@
+import {
+  readRuntimeBuildInputs,
+  runtimeGoBuildArgs,
+} from "./local-runtime-build-inputs.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -13,7 +17,7 @@ const HASH = /^[a-f0-9]{64}$/u;
 export const WORKSPACE_RUNTIME_SOURCE_CHANGED_CODE =
   "WORKSPACE_RUNTIME_SOURCE_CHANGED";
 const SOURCE_ROOTS = ["server/", "web/", "config/", "scripts/", "deployments/"];
-const BACKEND_SOURCE_ROOTS = ["server/"];
+const BACKEND_SOURCE_ROOTS = ["server/", "config/"];
 const omitted =
   /(?:^|\/)(?:node_modules|\.git|output|logs|\.vite-cache)(?:\/|$)|^(?:web\/build|server\/bin)(?:\/|$)/u;
 const runtimeKeys = [
@@ -189,6 +193,7 @@ export async function verifyRuntimeBackup(root, backup) {
     return false;
   try {
     const bundle = readRuntimeBundle(root, backup.bundleId);
+    if (bundle.scope === "backend") return false;
     const directory = path.join(
       root,
       "output/dev-workbench/database-migration-backups",
@@ -235,7 +240,7 @@ export async function verifyLocalRuntimeIdentity(
       [
         "release-v1",
         database,
-        `local-${bundle.id}`,
+        runtimeServerVersion(bundle),
         bundle.migrationVersion,
       ].join("\n"),
     )
@@ -255,6 +260,10 @@ export async function verifyLocalRuntimeIdentity(
     throw new Error("后端运行身份与固定版本或数据库不一致");
 }
 
+export function runtimeServerVersion(bundle) {
+  return bundle.components?.backend?.version || `local-${bundle.id}`;
+}
+
 export function readRuntimeBundle(root, id) {
   const directory = runtimeBundleDirectory(root, id);
   const manifest = JSON.parse(
@@ -269,6 +278,21 @@ export function readRuntimeBundle(root, id) {
     !HASH.test(manifest.sourceFingerprint) ||
     (manifest.backendSourceFingerprint !== undefined &&
       !HASH.test(manifest.backendSourceFingerprint)) ||
+    (manifest.scope !== undefined &&
+      !["backend", "full"].includes(manifest.scope)) ||
+    (manifest.components !== undefined &&
+      ![
+        "backend",
+        ...(manifest.scope === "backend" ? [] : ["attachment", "web"]),
+      ].every(
+        (component) =>
+          HASH.test(manifest.components?.[component]?.fingerprint) &&
+          (component === "web" ||
+            (manifest.components?.[component]?.version?.startsWith("local-") &&
+              ID.test(manifest.components[component].version.slice(6)))),
+      )) ||
+    manifest.platform !== process.platform ||
+    manifest.arch !== process.arch ||
     !Array.isArray(manifest.files) ||
     manifest.files.some(
       (file) =>
@@ -279,9 +303,10 @@ export function readRuntimeBundle(root, id) {
     JSON.stringify(manifest.files) !== JSON.stringify(actualFiles) ||
     ![
       "runtime/server",
-      "runtime/attachment-storage",
       "runtime/environment.json",
-      "runtime/web/index.html",
+      ...(manifest.scope === "backend"
+        ? []
+        : ["runtime/attachment-storage", "runtime/web/index.html"]),
     ].every((file) => manifest.files.includes(file)) ||
     hashFiles(directory, manifest.files) !== manifest.artifactHash
   ) {
@@ -304,7 +329,11 @@ export function readActiveRuntimeBundle(root) {
   ) {
     throw new Error("日常运行版本与激活记录不一致");
   }
-  return { ...bundle, activatedAt: active.activatedAt };
+  return {
+    ...bundle,
+    activatedAt: active.activatedAt,
+    runtime: active.runtime,
+  };
 }
 
 export function activateRuntimeBundle(root, id, evidence) {
@@ -377,18 +406,58 @@ export async function buildRuntimeBundle(
   id,
   execute,
   progress = () => {},
-  { workspaceVerification = "full" } = {},
+  {
+    workspaceVerification = "full",
+    scope = "full",
+    forceBackendBuild = false,
+  } = {},
 ) {
-  if (!["full", "backend"].includes(workspaceVerification)) {
+  if (
+    !["full", "backend"].includes(workspaceVerification) ||
+    !["full", "backend"].includes(scope)
+  ) {
     throw new Error("固定运行版本的工作区核对范围无效");
   }
   const source = await readRuntimeSource(root);
   assertRuntimeEnvironment(source.environment);
+  const inputs = await readRuntimeBuildInputs(root, source, execute, { scope });
+  let previous;
+  try {
+    previous = readActiveRuntimeBundle(root);
+  } catch {
+    progress(
+      "现有制品完整性核对未通过，正在从当前源码构建；原进程保留到候选通过检查",
+    );
+  }
+  if (
+    scope === "backend" &&
+    !forceBackendBuild &&
+    previous?.backendSourceFingerprint === source.backendFingerprint &&
+    previous.components?.backend?.fingerprint === inputs.backend &&
+    previous.platform === process.platform &&
+    previous.arch === process.arch
+  ) {
+    progress(
+      "构建输入未变化，复用已验证后端制品；跳过编译，继续重启与运行验证",
+    );
+    return { ...previous, reusedBuild: true, reusedBundle: true };
+  }
   const directory = runtimeBundleDirectory(root, id);
   fs.mkdirSync(path.dirname(directory), { recursive: true, mode: 0o700 });
   fs.mkdirSync(directory, { recursive: false, mode: 0o700 });
   const sourceRoot = path.join(directory, "source");
-  for (const file of source.files) {
+  const snapshotFiles = [
+    ...new Set([
+      ...(scope === "backend"
+        ? source.files.filter(
+            (file) => file.startsWith("server/") || file.startsWith("config/"),
+          )
+        : source.files),
+      ...inputs.files,
+    ]),
+  ].sort();
+  const snapshotHash = hashFiles(root, snapshotFiles);
+  for (const file of snapshotFiles) {
     const destination = path.join(sourceRoot, file);
     fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 });
     fs.copyFileSync(
@@ -397,7 +466,7 @@ export async function buildRuntimeBundle(
       fs.constants.COPYFILE_EXCL,
     );
   }
-  if (hashFiles(sourceRoot, source.files) !== source.contentFingerprint)
+  if (hashFiles(sourceRoot, snapshotFiles) !== snapshotHash)
     throw workspaceRuntimeSourceChanged(
       "工作区在固定版本期间发生变化，请重新准备",
     );
@@ -408,75 +477,128 @@ export async function buildRuntimeBundle(
     JSON.stringify(source.environment),
     { mode: 0o600, flag: "wx" },
   );
-  progress(
-    "正在编译后端服务（1/4）；日常后端继续运行，完成前请勿重复执行",
-  );
-  const goArgs = [
-    "build",
-    "-trimpath",
-    "-buildvcs=false",
-    "-ldflags",
-    `-X main.Version=local-${id}`,
-  ];
-  await execute(
-    "go",
-    [...goArgs, "-o", path.join(directory, "runtime/server"), "./cmd/server"],
-    {
-      cwd: path.join(sourceRoot, "server"),
-      env,
-    },
-  );
-  progress("后端服务编译完成，正在编译附件服务（2/4）");
-  await execute(
-    "go",
-    [
-      ...goArgs,
-      "-o",
-      path.join(directory, "runtime/attachment-storage"),
-      "./cmd/attachment-storage",
-    ],
-    {
-      cwd: path.join(sourceRoot, "server"),
-      env,
-    },
-  );
-  progress("附件服务编译完成，正在构建固定页面（3/4）");
-  const modules = path.join(sourceRoot, "web/node_modules");
-  fs.symlinkSync(path.join(root, "web/node_modules"), modules, "dir");
-  try {
-    await execute(
-      process.execPath,
-      [
-        path.join(root, "web/node_modules/vite/bin/vite.js"),
-        "build",
-        "--config",
-        "vite.config.mjs",
-        "--outDir",
-        path.join(directory, "runtime/web"),
-      ],
-      {
-        cwd: path.join(sourceRoot, "web"),
-        env: { ...env, VITE_BASE_URL: "/", NODE_ENV: "production" },
-      },
+  const components = {};
+  let backendBuilt = false;
+  const reuseComponent = (name, target) => {
+    if (
+      !previous ||
+      previous.platform !== process.platform ||
+      previous.arch !== process.arch ||
+      previous.components?.[name]?.fingerprint !== inputs[name]
+    )
+      return false;
+    const from = path.join(previous.directory, target);
+    if (!fs.existsSync(from)) return false;
+    fs.cpSync(from, path.join(directory, target), {
+      recursive: true,
+      errorOnExist: true,
+      force: false,
+    });
+    components[name] = previous.components[name];
+    progress(
+      `${name === "backend" ? "后端" : name === "attachment" ? "附件服务" : "固定页面"}构建输入未变化，复用已有制品`,
     );
-  } finally {
-    fs.unlinkSync(modules);
+    return true;
+  };
+  const goArgs = runtimeGoBuildArgs(`local-${id}`);
+  if (forceBackendBuild || !reuseComponent("backend", "runtime/server")) {
+    progress("正在编译当前后端；原后端继续运行");
+    await execute(
+      "go",
+      [...goArgs, "-o", path.join(directory, "runtime/server"), "./cmd/server"],
+      { cwd: path.join(sourceRoot, "server"), env },
+    );
+    components.backend = {
+      fingerprint: inputs.backend,
+      version: `local-${id}`,
+    };
+    backendBuilt = true;
   }
-  await execute(
-    process.execPath,
-    [
-      path.join(sourceRoot, "scripts/build/apply-customer-web-config.mjs"),
-      "--customer",
-      source.environment.ERP_CUSTOMER_KEY,
-      "--config-root",
-      path.join(sourceRoot, "config"),
-      "--web-build-dir",
-      path.join(directory, "runtime/web"),
-    ],
-    { cwd: sourceRoot, env },
+  if (scope === "full") {
+    if (!reuseComponent("attachment", "runtime/attachment-storage")) {
+      progress("正在编译迁移演练所需的附件服务");
+      await execute(
+        "go",
+        [
+          ...goArgs,
+          "-o",
+          path.join(directory, "runtime/attachment-storage"),
+          "./cmd/attachment-storage",
+        ],
+        { cwd: path.join(sourceRoot, "server"), env },
+      );
+      components.attachment = {
+        fingerprint: inputs.attachment,
+        version: `local-${id}`,
+      };
+    }
+    if (!reuseComponent("web", "runtime/web")) {
+      progress("正在构建迁移演练所需的固定页面");
+      const modules = path.join(sourceRoot, "web/node_modules");
+      fs.symlinkSync(path.join(root, "web/node_modules"), modules, "dir");
+      try {
+        await execute(
+          process.execPath,
+          [
+            path.join(root, "web/node_modules/vite/bin/vite.js"),
+            "build",
+            "--config",
+            "vite.config.mjs",
+            "--outDir",
+            path.join(directory, "runtime/web"),
+          ],
+          {
+            cwd: path.join(sourceRoot, "web"),
+            env: { ...env, VITE_BASE_URL: "/", NODE_ENV: "production" },
+          },
+        );
+      } finally {
+        fs.unlinkSync(modules);
+      }
+      await execute(
+        process.execPath,
+        [
+          path.join(sourceRoot, "scripts/build/apply-customer-web-config.mjs"),
+          "--customer",
+          source.environment.ERP_CUSTOMER_KEY,
+          "--config-root",
+          path.join(sourceRoot, "config"),
+          "--web-build-dir",
+          path.join(directory, "runtime/web"),
+        ],
+        { cwd: sourceRoot, env },
+      );
+      components.web = { fingerprint: inputs.web };
+    }
+  }
+  const snapshotInputs = await readRuntimeBuildInputs(
+    sourceRoot,
+    source,
+    execute,
+    { scope },
   );
-  progress("固定页面构建完成，正在核对候选内容（4/4）");
+  // Installed web dependencies belong to the checkout, outside the snapshot.
+  if (
+    snapshotInputs.backend !== inputs.backend ||
+    (scope === "full" && snapshotInputs.attachment !== inputs.attachment)
+  )
+    throw workspaceRuntimeSourceChanged(
+      "Go 构建输入在固定版本期间发生变化，请重新准备",
+    );
+  progress("正在核对候选制品与当前工作区");
   const after = await readRuntimeSource(root);
+  const currentInputs = await readRuntimeBuildInputs(root, after, execute, {
+    scope,
+  });
+  if (
+    currentInputs.backend !== inputs.backend ||
+    (scope === "full" &&
+      (currentInputs.attachment !== inputs.attachment ||
+        currentInputs.web !== inputs.web))
+  )
+    throw workspaceRuntimeSourceChanged(
+      "构建期间编译输入或工具链发生变化，请重新准备",
+    );
   const changed =
     workspaceVerification === "backend"
       ? after.backendFingerprint !== source.backendFingerprint
@@ -491,6 +613,8 @@ export async function buildRuntimeBundle(
   const manifest = {
     schemaVersion: "plush.local-runtime-bundle/v1",
     id,
+    scope,
+    components,
     sourceFingerprint: source.fingerprint,
     backendSourceFingerprint: source.backendFingerprint,
     artifactHash: hashFiles(directory, files),
@@ -505,5 +629,9 @@ export async function buildRuntimeBundle(
     `${JSON.stringify(manifest, null, 2)}\n`,
     { mode: 0o600, flag: "wx" },
   );
-  return readRuntimeBundle(root, id);
+  return {
+    ...readRuntimeBundle(root, id),
+    reusedBuild: !backendBuilt,
+    reusedBundle: false,
+  };
 }

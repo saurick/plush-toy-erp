@@ -637,7 +637,7 @@ export function createDevDatabaseMigrationService({
       // is required because normal business writes can continue after prepare.
       await runtime.maintenance(true)
       maintenanceEntered = true
-      await runtime.stopRuntime()
+      await runtime.stopRuntime(operationId)
       const finalBackup = await runtime.backup(operationId, before)
       transitionDatabaseMigrationOperation(store, operationId, {
         status: 'applying',
