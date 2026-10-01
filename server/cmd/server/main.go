@@ -76,6 +76,10 @@ func newApp(logger log.Logger, hs *http.Server, processRuntimeUC *biz.ProcessRun
 			return nil
 		}),
 		kratos.BeforeStop(workflowReconciler.Stop),
+		kratos.AfterStop(func(context.Context) error {
+			appserver.CleanupTemplatePDFResources()
+			return nil
+		}),
 		kratos.StopTimeout(30*time.Second),
 	)
 }

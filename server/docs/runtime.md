@@ -56,6 +56,8 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
   - HTML / CSS 只接受静态 allowlist、文档内锚点和受限内嵌位图；Chromium 禁用脚本与缓存、阻断 `data:` / `about:blank` 之外的请求，并为每次渲染创建独立 browser context
   - 最多 32 张内嵌图片，单图解码后最多 5 MiB、全部图片合计最多 16 MiB；HTML 最多 24 MiB、CSS 文本合计最多 4 MiB、DOM 节点最多 20,000 个、请求体最多 32 MiB、生成 PDF 最多 32 MiB，超限在继续分配或渲染前拒绝
   - 使用共享 Headless Chromium 进程生成 PDF；生产镜像默认内置 `/usr/bin/chromium`、以非 root 用户运行且不关闭 sandbox，并精确固定经目标宿主验证的 Debian 包版本。默认并发为 4、等待名额为 2；超过 6 个已接纳请求时立即返回忙碌，不继续读取大请求体。`ERP_PDF_RENDER_CONCURRENCY` 和 `ERP_PDF_QUEUE_CAPACITY` 分别控制执行与等待；正式发布使用 `ERP_PDF_WARMUP=async` 异步执行一次中文合同 PDF 预热，`/readyz` 在预热完成前或失败后保持未就绪。`off` 只用于临时故障隔离，发布 smoke 仍必须用受控管理员 token 真实生成非空 PDF
+  - macOS 本地默认优先使用当前架构已安装的 Playwright `chrome-headless-shell`（选择最高下载修订号），避免 PDF 服务额外启动日常 Google Chrome 应用；没有该引擎时沿用系统 Chrome/Chromium。显式 `ERP_PDF_CHROME_PATH` 始终优先，配置无效则报错；生产 Linux 的内置引擎选择不变
+  - macOS / Linux 的 PDF 浏览器通过独立 DevTools pipe 绑定后端进程，后端异常退出或被强制结束时管道关闭，浏览器随之退出；调试 HTTP 仍只监听 loopback。正常停止会在 HTTP 请求结束后关闭浏览器，最多等待 2 秒，再按本次创建的独立进程组强制回收；不操作日常浏览器或其他服务。停止后的管理器拒绝重新启动浏览器，正常回收后移除本次临时 profile；后端被强制结束时临时目录由系统临时目录策略处理
 
 如果容器内存在静态目录，还会挂载前端静态资源：
 

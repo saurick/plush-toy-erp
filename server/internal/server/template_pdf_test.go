@@ -463,13 +463,13 @@ func TestResolveTemplatePDFChromeExecPathUsesNativeCandidates(t *testing.T) {
 	t.Parallel()
 
 	calls := make([]string, 0, 4)
-	got, err := resolveTemplatePDFChromeExecPath("", func(file string) (string, error) {
+	got, err := resolveTemplatePDFChromeExecPathForPlatform("", func(file string) (string, error) {
 		calls = append(calls, file)
 		if file == "chromium-browser" {
 			return "/usr/bin/chromium-browser", nil
 		}
 		return "", errors.New("not found")
-	})
+	}, runtime.GOOS, runtime.GOARCH, t.TempDir())
 	if err != nil {
 		t.Fatalf("resolveTemplatePDFChromeExecPath() error = %v", err)
 	}
@@ -506,6 +506,81 @@ func TestResolveTemplatePDFPlaywrightChromeExecPath(t *testing.T) {
 	}
 	if got != chromePath {
 		t.Fatalf("resolveTemplatePDFPlaywrightChromeExecPath() = %q, want %q", got, chromePath)
+	}
+}
+
+func TestResolveTemplatePDFChromeExecPathPrefersMacHeadlessShell(t *testing.T) {
+	t.Parallel()
+	home := t.TempDir()
+	for _, arch := range []string{"arm64", "x64"} {
+		for _, revision := range []string{"999", "1000", "1001"} {
+			candidate := filepath.Join(home, "Library", "Caches", "ms-playwright", "chromium_headless_shell-"+revision, "chrome-headless-shell-mac-"+arch, "chrome-headless-shell")
+			if err := os.MkdirAll(filepath.Dir(candidate), 0755); err != nil {
+				t.Fatal(err)
+			}
+			mode := os.FileMode(0755)
+			if revision == "1001" {
+				mode = 0644
+			}
+			if err := os.WriteFile(candidate, []byte("#!/bin/sh\n"), mode); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	lookup := func(candidate string) (string, error) { return "/system/chrome", nil }
+	for _, arch := range []string{"arm64", "amd64"} {
+		got, err := resolveTemplatePDFChromeExecPathForPlatform("", lookup, "darwin", arch, home)
+		if err != nil || !strings.Contains(got, "chromium_headless_shell-1000/") {
+			t.Fatalf("architecture=%s resolved=%q error=%v", arch, got, err)
+		}
+		wantArch := arch
+		if arch == "amd64" {
+			wantArch = "x64"
+		}
+		if !strings.Contains(got, "chrome-headless-shell-mac-"+wantArch) {
+			t.Fatalf("architecture=%s resolved wrong executable: %s", arch, got)
+		}
+	}
+	if got, err := resolveTemplatePDFChromeExecPathForPlatform("/explicit/chrome", lookup, "darwin", "arm64", home); err != nil || got != "/system/chrome" {
+		t.Fatalf("explicit override resolved=%q error=%v", got, err)
+	}
+	if _, err := resolveTemplatePDFChromeExecPathForPlatform("/invalid/chrome", func(string) (string, error) {
+		return "", os.ErrNotExist
+	}, "darwin", "arm64", home); err == nil {
+		t.Fatal("invalid explicit override must fail even when headless shell exists")
+	}
+	if got, err := resolveTemplatePDFChromeExecPathForPlatform("", lookup, "linux", "arm64", home); err != nil || got != "/system/chrome" {
+		t.Fatalf("Linux native engine resolved=%q error=%v", got, err)
+	}
+}
+
+func TestTemplatePDFChromeManagerShutdownCancelsStartupAndRejectsAcquire(t *testing.T) {
+	t.Parallel()
+	started := make(chan struct{})
+	manager := newTemplatePDFChromeManager(func(ctx context.Context, _ string) (*templatePDFChromeRuntime, string, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, "", ctx.Err()
+	})
+	acquired := make(chan error, 1)
+	go func() {
+		_, _, err := manager.Acquire(context.Background(), "/chrome")
+		acquired <- err
+	}()
+	<-started
+	stopped := make(chan struct{})
+	go func() { manager.Shutdown(); close(stopped) }()
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("Shutdown blocked behind browser startup")
+	}
+	if err := <-acquired; !errors.Is(err, context.Canceled) {
+		t.Fatalf("startup error=%v", err)
+	}
+	manager.Close()
+	if _, _, err := manager.Acquire(context.Background(), "/chrome"); !errors.Is(err, errTemplatePDFChromeStopped) {
+		t.Fatalf("Acquire after shutdown error=%v", err)
 	}
 }
 

@@ -57,6 +57,7 @@ const (
 var (
 	errTemplatePDFPayloadTooLarge = errors.New("请求体过大，请精简模板后重试")
 	errTemplatePDFRenderBusy      = errors.New("当前 PDF 预览人数较多，请稍后重试")
+	errTemplatePDFChromeStopped   = errors.New("PDF 渲染服务已停止")
 )
 
 var sharedTemplatePDFChromeManager = newTemplatePDFChromeManager(launchTemplatePDFChrome)
@@ -124,14 +125,18 @@ type templatePDFRenderGate struct {
 type templatePDFChromeLauncher func(ctx context.Context, chromeExecPath string) (*templatePDFChromeRuntime, string, error)
 
 type templatePDFChromeManager struct {
-	mu      sync.Mutex
-	launch  templatePDFChromeLauncher
-	runtime *templatePDFChromeRuntime
-	wsURL   string
+	mu       sync.Mutex
+	launch   templatePDFChromeLauncher
+	lifetime context.Context
+	stop     context.CancelFunc
+	runtime  *templatePDFChromeRuntime
+	wsURL    string
 }
 
 type templatePDFChromeRuntime struct {
 	cmd         *exec.Cmd
+	ownership   *templatePDFChromeOwnership
+	closeOnce   sync.Once
 	exited      chan struct{}
 	userDataDir string
 	waitErrMu   sync.Mutex
@@ -155,12 +160,12 @@ type templatePDFWarmupState struct {
 	done   chan struct{}
 }
 
-// CleanupTemplatePDFResources 在进程退出前显式回收共享 Chromium，避免调试端口和临时目录残留。
+// CleanupTemplatePDFResources 停止共享 Chromium，并阻止退出期间的请求重新创建进程。
 func CleanupTemplatePDFResources() {
+	sharedTemplatePDFChromeManager.Shutdown()
 	ctx, cancel := context.WithTimeout(context.Background(), templatePDFShutdownWaitTimeout)
 	_, _ = sharedTemplatePDFWarmupState.WaitIfRunning(ctx)
 	cancel()
-	sharedTemplatePDFChromeManager.Close()
 }
 
 // StartTemplatePDFWarmupAsync 在服务启动后后台跑通一次 PDF 渲染；readyz 会在预热完成前保持未就绪。
@@ -1006,7 +1011,17 @@ func newTemplatePDFChromeManager(launch templatePDFChromeLauncher) *templatePDFC
 	if launch == nil {
 		launch = launchTemplatePDFChrome
 	}
-	return &templatePDFChromeManager{launch: launch}
+	lifetime, stop := context.WithCancel(context.Background())
+	return &templatePDFChromeManager{launch: launch, lifetime: lifetime, stop: stop}
+}
+
+func (m *templatePDFChromeManager) Shutdown() {
+	if m == nil {
+		return
+	}
+	// Cancel before taking the mutex so a browser still starting cannot delay shutdown.
+	m.stop()
+	m.Close()
 }
 
 func (m *templatePDFChromeManager) Close() {
@@ -1032,6 +1047,12 @@ func (m *templatePDFChromeManager) Acquire(ctx context.Context, chromeExecPath s
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.lifetime.Err() != nil {
+		return nil, "", errTemplatePDFChromeStopped
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
 
 	if m.runtime != nil && !m.runtime.Exited() && strings.TrimSpace(m.wsURL) != "" {
 		return m.runtime, m.wsURL, nil
@@ -1042,9 +1063,17 @@ func (m *templatePDFChromeManager) Acquire(ctx context.Context, chromeExecPath s
 		m.wsURL = ""
 	}
 
-	runtime, wsURL, err := m.launch(ctx, chromeExecPath)
+	launchCtx, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(m.lifetime, cancel)
+	defer stop()
+	defer cancel()
+	runtime, wsURL, err := m.launch(launchCtx, chromeExecPath)
 	if err != nil {
 		return nil, "", err
+	}
+	if m.lifetime.Err() != nil {
+		runtime.Close()
+		return nil, "", errTemplatePDFChromeStopped
 	}
 	m.runtime = runtime
 	m.wsURL = wsURL
@@ -1074,22 +1103,35 @@ func launchTemplatePDFChrome(ctx context.Context, chromeExecPath string) (*templ
 	)
 
 	cmd := exec.Command(chromeExecPath, args...)
+	cmd.WaitDelay = templatePDFShutdownWaitTimeout
 	cmd.Stdout = io.Discard
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
+	ownership, err := prepareTemplatePDFChromeProcess(cmd)
+	if err != nil {
+		_ = os.RemoveAll(userDataDir)
+		return nil, "", fmt.Errorf("创建 Chrome 生命周期管道失败: %w", err)
+	}
 
 	if err := cmd.Start(); err != nil {
+		ownership.Close()
 		_ = os.RemoveAll(userDataDir)
 		return nil, "", fmt.Errorf("启动 Chrome 进程失败: %w", err)
 	}
 
 	runtime := &templatePDFChromeRuntime{
 		cmd:         cmd,
+		ownership:   ownership,
 		exited:      make(chan struct{}),
 		userDataDir: userDataDir,
 	}
+	ownership.Started()
 	go func() {
 		runtime.setWaitErr(cmd.Wait())
+		// Reap helpers immediately while the owned process group still identifies this launch.
+		_ = killTemplatePDFChromeProcess(cmd)
+		ownership.Close()
+		_ = os.RemoveAll(userDataDir)
 		close(runtime.exited)
 	}()
 
@@ -1134,17 +1176,32 @@ func (r *templatePDFChromeRuntime) Close() {
 	if r == nil {
 		return
 	}
-	if r.cmd != nil && r.cmd.Process != nil && !r.Exited() {
-		_ = r.cmd.Process.Kill()
-	}
-	if r.exited != nil {
-		select {
-		case <-r.exited:
-		case <-time.After(2 * time.Second):
+	r.closeOnce.Do(func() {
+		r.ownership.Disconnect()
+		if !r.waitForExit(templatePDFShutdownWaitTimeout) {
+			_ = killTemplatePDFChromeProcess(r.cmd)
+			r.waitForExit(templatePDFShutdownWaitTimeout)
 		}
+		if r.Exited() {
+			r.ownership.Close()
+			if r.userDataDir != "" {
+				_ = os.RemoveAll(r.userDataDir)
+			}
+		}
+	})
+}
+
+func (r *templatePDFChromeRuntime) waitForExit(timeout time.Duration) bool {
+	if r.Exited() {
+		return true
 	}
-	if r.userDataDir != "" {
-		_ = os.RemoveAll(r.userDataDir)
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-r.exited:
+		return true
+	case <-timer.C:
+		return false
 	}
 }
 
@@ -1260,6 +1317,11 @@ func fetchTemplatePDFChromeWebSocketURL(client *stdhttp.Client, endpoint string)
 }
 
 func resolveTemplatePDFChromeExecPath(rawEnv string, lookPath func(file string) (string, error)) (string, error) {
+	homeDir, _ := os.UserHomeDir()
+	return resolveTemplatePDFChromeExecPathForPlatform(rawEnv, lookPath, runtime.GOOS, runtime.GOARCH, homeDir)
+}
+
+func resolveTemplatePDFChromeExecPathForPlatform(rawEnv string, lookPath func(file string) (string, error), goos, goarch, homeDir string) (string, error) {
 	if lookPath == nil {
 		return "", errors.New("浏览器路径解析器未初始化")
 	}
@@ -1272,7 +1334,13 @@ func resolveTemplatePDFChromeExecPath(rawEnv string, lookPath func(file string) 
 		return resolved, nil
 	}
 
-	for _, candidate := range templatePDFChromeExecCandidates(runtime.GOOS) {
+	if goos == "darwin" {
+		if resolved, err := resolveTemplatePDFPlaywrightHeadlessExecPath(homeDir, goarch); err == nil {
+			return resolved, nil
+		}
+	}
+
+	for _, candidate := range templatePDFChromeExecCandidates(goos) {
 		resolved, err := lookPath(candidate)
 		if err == nil && strings.TrimSpace(resolved) != "" {
 			return resolved, nil
@@ -1280,7 +1348,7 @@ func resolveTemplatePDFChromeExecPath(rawEnv string, lookPath func(file string) 
 	}
 
 	// 本地开发兜底：复用 Playwright 已下载的 Linux Chromium，避免要求每台机器额外配置 ERP_PDF_CHROME_PATH。
-	if resolved, err := resolveTemplatePDFPlaywrightChromeExecPath(); err == nil {
+	if resolved, err := resolveTemplatePDFPlaywrightChromeExecPathAt(homeDir); err == nil {
 		return resolved, nil
 	}
 
@@ -1319,6 +1387,43 @@ func resolveTemplatePDFPlaywrightChromeExecPath() (string, error) {
 		return "", errors.New("用户目录不可用")
 	}
 
+	return resolveTemplatePDFPlaywrightChromeExecPathAt(homeDir)
+}
+
+func resolveTemplatePDFPlaywrightHeadlessExecPath(homeDir, goarch string) (string, error) {
+	if strings.TrimSpace(homeDir) == "" {
+		return "", errors.New("用户目录不可用")
+	}
+	arch := "x64"
+	if goarch == "arm64" {
+		arch = "arm64"
+	} else if goarch != "amd64" {
+		return "", errors.New("不支持的 macOS 架构")
+	}
+	pattern := filepath.Join(homeDir, "Library", "Caches", "ms-playwright", "chromium_headless_shell-*", "chrome-headless-shell-mac-"+arch, "chrome-headless-shell")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", err
+	}
+	selected, revision := "", -1
+	for _, candidate := range matches {
+		name := filepath.Base(filepath.Dir(filepath.Dir(candidate)))
+		current, parseErr := strconv.Atoi(strings.TrimPrefix(name, "chromium_headless_shell-"))
+		info, statErr := os.Stat(candidate)
+		if parseErr == nil && current > revision && statErr == nil && !info.IsDir() && info.Mode().Perm()&0111 != 0 {
+			selected, revision = candidate, current
+		}
+	}
+	if selected == "" {
+		return "", errors.New("未找到 Playwright Chrome Headless Shell")
+	}
+	return selected, nil
+}
+
+func resolveTemplatePDFPlaywrightChromeExecPathAt(homeDir string) (string, error) {
+	if strings.TrimSpace(homeDir) == "" {
+		return "", errors.New("用户目录不可用")
+	}
 	pattern := filepath.Join(homeDir, ".cache", "ms-playwright", "chromium-*", "chrome-linux64", "chrome")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
