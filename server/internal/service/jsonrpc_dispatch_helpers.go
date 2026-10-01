@@ -22,50 +22,6 @@ func getString(m map[string]any, key string) string {
 	}
 }
 
-func redactRPCParams(value any) any {
-	switch v := value.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(v))
-		for key, item := range v {
-			if isSensitiveRPCParamKey(key) {
-				out[key] = "<redacted>"
-				continue
-			}
-			out[key] = redactRPCParams(item)
-		}
-		return out
-	case []any:
-		out := make([]any, len(v))
-		for i, item := range v {
-			out[i] = redactRPCParams(item)
-		}
-		return out
-	default:
-		return value
-	}
-}
-
-func isSensitiveRPCParamKey(key string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(key))
-	return strings.Contains(normalized, "password") ||
-		strings.Contains(normalized, "token") ||
-		strings.Contains(normalized, "secret") ||
-		strings.Contains(normalized, "username") ||
-		strings.Contains(normalized, "phone") ||
-		normalized == "reason" ||
-		strings.HasSuffix(normalized, "_reason") ||
-		strings.Contains(normalized, "idempotency_key") ||
-		strings.Contains(normalized, "intent_hash") ||
-		strings.Contains(normalized, "base64") ||
-		normalized == "code" ||
-		normalized == "content" ||
-		normalized == "file_content" ||
-		normalized == "filecontent" ||
-		strings.Contains(normalized, "sms_code") ||
-		strings.Contains(normalized, "captcha") ||
-		strings.Contains(normalized, "verification_code")
-}
-
 func getAuthLoginScope(m map[string]any) (string, error) {
 	scope := strings.ToLower(strings.TrimSpace(getString(m, "scope")))
 	switch scope {

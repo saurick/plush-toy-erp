@@ -30,6 +30,7 @@ const RUNTIME_SOURCE_PATHS = [
   'scripts/local-runtime-start.mjs',
   'scripts/local-runtime-rehearsal.mjs',
   'scripts/local-runtime-console.mjs',
+  'scripts/terminal-log.mjs',
   'scripts/local-runtime-preflight.mjs',
   'scripts/local-runtime-preflight-core.mjs',
   'scripts/qa/database-programmability.mjs',

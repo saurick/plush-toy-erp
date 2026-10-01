@@ -6,6 +6,7 @@ import (
 	"time"
 
 	v1 "server/api/jsonrpc/v1"
+	"server/internal/errcode"
 
 	kratoserrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
@@ -38,7 +39,8 @@ func safeServerLogging(logger log.Logger) middleware.Middleware {
 			if err != nil {
 				level = log.LevelError
 			}
-			log.NewHelper(log.WithContext(ctx, logger)).Log(level,
+			fields := []any{
+				"msg", "request completed",
 				"kind", "server",
 				"component", kind,
 				"operation", operation,
@@ -46,7 +48,21 @@ func safeServerLogging(logger log.Logger) middleware.Middleware {
 				"code", code,
 				"reason", reason,
 				"latency", time.Since(start).Seconds(),
-			)
+			}
+			if _, ok := req.(*v1.PostJsonrpcRequest); ok {
+				response, _ := reply.(*v1.PostJsonrpcReply)
+				outcome := "success"
+				if err != nil || response == nil || response.GetResult() == nil || response.GetError() != "" || response.GetResult().GetCode() >= errcode.Internal.Code {
+					outcome, level = "error", log.LevelError
+				} else if response.GetResult().GetCode() != errcode.OK.Code {
+					outcome, level = "rejected", log.LevelWarn
+				}
+				fields = append(fields, "outcome", outcome)
+				if result := response.GetResult(); result != nil {
+					fields = append(fields, "rpc_result_code", result.GetCode())
+				}
+			}
+			log.NewHelper(log.WithContext(ctx, logger)).Log(level, fields...)
 			return reply, err
 		}
 	}

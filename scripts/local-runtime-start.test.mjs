@@ -785,3 +785,20 @@ test("CLI startup failures show the candidate log and redacted diagnostics witho
   assert(lines.some((line) => line.includes("ERROR database unavailable")));
   assert(!lines.join("\n").includes("private-password"));
 });
+
+test("CLI progress does not claim success until backend verification finishes", async () => {
+  const lines = [];
+  await runWorkspaceRuntimeCLI([], {
+    root: "/test/project",
+    color: true,
+    write: (line) => lines.push(line),
+    start: async (_root, { progress }) => {
+      progress("正在验证候选后端");
+      assert(!lines.join("\n").includes("\u001b[1;32m"));
+      return { bundleId: "verified-bundle", activeVersion: "20261001" };
+    },
+    present: async () => {},
+  });
+  assert(lines.at(-1).startsWith("\u001b[1;32m"));
+  assert(lines.at(-1).includes("health=passed ready=passed business=passed"));
+});

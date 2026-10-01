@@ -66,6 +66,10 @@ pnpm preview:yoyoosun
 
 `startWebDev.mjs` 管理固定主入口、Codex / `--isolated` 辅助端口和重复启动；`devWebInstance.mjs` 校验实例配置摘要与显式重启的进程归属，`viteParentLifetime.mjs` 通过 IPC 处理启动器异常退出。`start:yoyoosun` 复用同一 Vite 子进程生命周期。日常 `pnpm start`、安全重启 `pnpm start:restart` 与临时验证 `pnpm start:isolated` 的完整约定见 [`web/README.md`](../README.md#启动命令)。实例摘要不包含路径或凭据，不承担业务健康或发布证据语义。
 
+前端启动日志复用仓库 `terminal-log.mjs`：访问地址使用青色加粗，预检通过和已验证服务复用使用绿色，迁移恢复或仅前端模式的复用提示使用黄色，启动错误使用红色加粗。非终端输出、设置 `NO_COLOR`、`FORCE_COLOR=0` 或 `TERM=dumb` 时保留纯文本，`--print-plan` 保留原有计划格式。
+
+普通启动用固定摘要显示前端地址、后端 API / RPC 代理、客户配置和正常 / 迁移恢复 / 仅前端模式；未显式注入客户时标注默认配置。可恢复的预检失败显示最多 6000 字符的脱敏诊断，业务入口继续保留恢复页。`start:yoyoosun` 仅在 `--print-plan` 时输出完整计划，日常启动沿用固定摘要。
+
 - 新增浏览器级页面回归时，优先复用 `style-l1/` 下已有 mock、assertion 和 scenario 拆分。
 - 修改 API shape、页面字段映射或业务页主路径时，同步更新对应 mock 和页面级浏览器回归场景（Style L1），避免脚本继续验证旧前端契约。
 - `styleL1.mjs` 只维护服务与浏览器生命周期、场景调度和报告；页面断言放在 `style-l1/*Assertions.mjs`，新增检查按对应职责维护。

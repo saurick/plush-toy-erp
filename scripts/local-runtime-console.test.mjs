@@ -6,6 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { stripVTControlCharacters } from "node:util";
 import {
   readRuntimeConsole,
   showRuntimeConsole,
@@ -13,7 +14,61 @@ import {
   takeOverRuntimeDesktopViewers,
   formatRuntimeLogLine,
   readRuntimeLogPlan,
+  followRuntimeConsole,
 } from "./local-runtime-console.mjs";
+
+test("default viewer hides DEBUG, explicit debug shows it, and startup header is not duplicated", async (t) => {
+  const root = fixture(t);
+  const raw =
+    "DEBUG msg=config-debug-fixture\n" +
+    JSON.stringify({ level: "DEBUG", msg: "private-debug-fixture" }) +
+    "\n" +
+    JSON.stringify({ level: "INFO", msg: "startup-visible" }) +
+    "\n";
+  activate(root, { text: raw });
+  for (const showDebug of [false, true]) {
+    const output = [];
+    const controller = new AbortController();
+    await presentRuntimeConsole(root, {
+      interactive: true,
+      env: {},
+      showDebug,
+      write: (line) => output.push(line),
+      follow: (target, options) =>
+        followRuntimeConsole(target, {
+          ...options,
+          signal: controller.signal,
+          color: false,
+          pause: async () => controller.abort(),
+        }),
+    });
+    const text = output.join("\n");
+    assert.equal(text.includes("private-debug-fixture"), showDebug);
+    assert.equal(text.includes("config-debug-fixture"), showDebug);
+    assert(text.includes("startup-visible"));
+    assert.equal(
+      output.filter((line) => line.includes("后端正在运行；")).length,
+      1,
+    );
+    assert.equal(
+      fs.readFileSync(readRuntimeConsole(root).logFile, "utf8"),
+      raw,
+    );
+  }
+});
+
+test("connection target fields stand out without changing plain output", () => {
+  const record = JSON.stringify({
+    level: "INFO",
+    msg: "postgres connecting",
+    address: "db.example:5432",
+    database: "erp",
+    tls_policy: "required",
+  });
+  const colored = formatRuntimeLogLine(record, { color: true });
+  assert(colored.includes("address=\u001b[1;36mdb.example:5432\u001b[0m"));
+  assert.equal(stripVTControlCharacters(colored), formatRuntimeLogLine(record));
+});
 
 function fixture(t, name = "project") {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "plush-console-"));
@@ -104,6 +159,14 @@ test("Kratos JSON becomes readable logs without losing diagnostics or trace fiel
       "\u001b[31mERROR",
     ),
   );
+  const colored = formatRuntimeLogLine(JSON.stringify(entry), { color: true });
+  assert(colored.includes("\u001b[1;31m连接失败\n  请检查配置\u001b[0m"));
+  assert.equal(stripVTControlCharacters(colored), formatted);
+  const warning = formatRuntimeLogLine(
+    JSON.stringify({ level: "WARN", msg: "服务尚未就绪" }),
+    { color: true },
+  );
+  assert(warning.includes("\u001b[1;33m服务尚未就绪\u001b[0m"));
   for (const line of [
     "panic: startup failed",
     "DEBUG msg=config loaded",

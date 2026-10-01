@@ -29,6 +29,7 @@ import {
   selectWebDevPort,
 } from './localPort.mjs'
 import { prepareWebInstance, stopWebInstance, webInstanceSignature } from './devWebInstance.mjs'
+import { writeTerminalMessage } from '../../scripts/terminal-log.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const devPorts = loadDevPorts(repoRoot)
@@ -128,7 +129,8 @@ export async function startStoppedLocalBackend(
   {
     execute = executeCommand,
     isPortAvailable = isDevPortAvailable,
-    writeLine = (line) => process.stderr.write(`${line}\n`),
+    writeLine = (line, tone = 'info') =>
+      writeTerminalMessage(line, { tone, stream: process.stderr }),
     env = process.env,
   } = {}
 ) {
@@ -160,7 +162,7 @@ export async function startStoppedLocalBackend(
     })
   } catch (error) {
     if (error?.diagnostic) {
-      writeLine(redactDatabaseMigrationDiagnostic(error.diagnostic))
+      writeLine(redactDatabaseMigrationDiagnostic(error.diagnostic), 'error')
     }
     throw new LocalRuntimePreflightError(
       'local_backend_start_failed',
@@ -177,7 +179,8 @@ export async function resolveWebRuntimeStartup(
     startBackend = startStoppedLocalBackend,
     isPortAvailable = isDevPortAvailable,
     timeoutMs = LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
-    writeLine = (line) => process.stderr.write(`${line}\n`),
+    writeLine = (line, tone = 'info') =>
+      writeTerminalMessage(line, { tone, stream: process.stderr }),
   } = {}
 ) {
   if (options.stop) return { complete: false, apiOrigin: options.apiOrigin, recoveryMode: '', recoveryReason: '' }
@@ -245,8 +248,12 @@ export async function resolveWebRuntimeStartup(
           '本地运行预检未完成；请在迁移恢复页检查数据库配置、迁移状态和后端'
         )
     writeLine(
-      `[start-web] ${recoveryError.message}\n[start-web] 业务入口保留原地址，显示服务不可用提示；检查并恢复服务：${DEV_DATABASE_MIGRATION_RECOVERY_ROUTE}；RPC 暂停`
+      `[start-web] ${recoveryError.message}\n[start-web] 业务入口保留原地址，显示服务不可用提示；检查并恢复服务：${DEV_DATABASE_MIGRATION_RECOVERY_ROUTE}；RPC 暂停`,
+      'warning'
     )
+    if (recoveryError.diagnostic) {
+      writeLine(`[start-web] 预检诊断：\n${redactDatabaseMigrationDiagnostic(recoveryError.diagnostic).slice(-6000)}`, 'error')
+    }
     return {
       complete: false,
       frontendOnly: false,
@@ -255,6 +262,16 @@ export async function resolveWebRuntimeStartup(
       recoveryReason: recoveryError.code,
     }
   }
+}
+
+export function writeWebStartupSummary(
+  { startup, port, customerKey = '', isolated = false, label = 'start-web', route = '/' },
+  writeLine = (line, tone = 'info') => writeTerminalMessage(line, { tone })
+) {
+  const mode = startup.recoveryMode ? '迁移恢复' : startup.frontendOnly ? '仅前端' : '正常开发'
+  writeLine(`[${label}] 模式=${mode} 客户=${customerKey || '默认配置'}${isolated ? '（临时验证）' : ''}`, startup.recoveryMode || startup.frontendOnly ? 'warning' : 'info')
+  writeLine(`[${label}] 前端：http://127.0.0.1:${port}${route}`, 'detail')
+  writeLine(`[${label}] 后端 API / RPC 代理：${normalizeAPIOrigin(startup.apiOrigin)}`, 'detail')
 }
 
 export function createViteChildEnvironment({
@@ -344,7 +361,7 @@ export function runManagedVite(
 
 export async function stopLocalWebFrontend(port, {
   stop = stopWebInstance,
-  writeLine = (line) => process.stdout.write(`${line}\n`),
+  writeLine = (line) => writeTerminalMessage(line, { tone: 'success' }),
   projectRoot = repoRoot,
 } = {}) {
   await stop(port, path.join(projectRoot, 'web'))
@@ -393,17 +410,19 @@ async function main() {
     restart: options.restart || options.stop,
   })
   const url = `http://127.0.0.1:${port}/`
+  writeWebStartupSummary({ startup, port, customerKey: process.env.ERP_DEV_CUSTOMER_KEY, isolated: options.isolated })
   if (instance.reused) {
-    process.stdout.write(
-      `[start-web] 已复用本工作区前端（PID ${instance.pid}）：${url}\n[start-web] 服务继续由原终端管理；需要重新加载启动配置时执行 pnpm start --restart\n`
+    writeTerminalMessage(
+      `[start-web] 已复用本工作区前端（PID ${instance.pid}）；需要重新加载启动配置时执行 pnpm start --restart`,
+      { tone: startup.complete ? 'success' : 'warning' }
     )
     return
   }
-  process.stdout.write(
-    `[start-web] ${options.isolated ? '临时验证' : '本地开发'}：${url}\n`
-  )
   if (gitlabCredential.source === 'keychain') {
-    process.stderr.write('[start-web] GitLab 只读凭据已从 macOS 钥匙串加载\n')
+    writeTerminalMessage('[start-web] GitLab 只读凭据已从 macOS 钥匙串加载', {
+      tone: 'muted',
+      stream: process.stderr,
+    })
   }
   const code = await runManagedVite(
     options.viteArgs,
@@ -430,8 +449,9 @@ async function main() {
         restart: false,
       })
       if (winner.reused) {
-        process.stdout.write(
-          `[start-web] 已复用同时启动的本工作区前端：${url}\n`
+        writeTerminalMessage(
+          `[start-web] 已复用同时启动的本工作区前端：${url}`,
+          { tone: startup.complete ? 'success' : 'warning' }
         )
         return
       }
@@ -448,7 +468,10 @@ const isDirectRun =
 
 if (isDirectRun) {
   main().catch((error) => {
-    process.stderr.write(`[start-web] ${error.message}\n`)
+    writeTerminalMessage(`[start-web] ${error.message}`, {
+      tone: 'error',
+      stream: process.stderr,
+    })
     process.exit(1)
   })
 }

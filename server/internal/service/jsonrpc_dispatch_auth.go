@@ -18,7 +18,7 @@ func (d *jsonrpcDispatcher) handleAuth(
 	method, id string,
 	params *structpb.Struct,
 ) (string, *v1.JsonrpcResult, error) {
-	d.log.WithContext(ctx).Infof("[auth] method=%s id=%s", method, id)
+	d.log.WithContext(ctx).Debugf("[auth] method=%s id=%s", method, id)
 
 	pm := map[string]any{}
 	if params != nil {

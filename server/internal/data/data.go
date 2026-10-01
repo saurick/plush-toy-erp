@@ -6,7 +6,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -23,6 +25,7 @@ import (
 	"github.com/XSAM/otelsql"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
+	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -88,6 +91,7 @@ const (
 	defaultPostgresConnMaxIdleTime = 5 * time.Minute
 	defaultPostgresStartupTimeout  = 60 * time.Second
 	postgresRetryInterval          = 2 * time.Second
+	postgresRetryLogInterval       = 10 * time.Second
 )
 
 type postgresPoolSettings struct {
@@ -158,6 +162,8 @@ func waitForPostgresReady(ctx context.Context, pinger pingContexter, interval ti
 
 	attempt := 0
 	var lastErr error
+	var lastLoggedError string
+	var lastLoggedAt time.Time
 	for {
 		attempt++
 		if err := pinger.PingContext(ctx); err == nil {
@@ -167,7 +173,10 @@ func waitForPostgresReady(ctx context.Context, pinger pingContexter, interval ti
 			return nil
 		} else {
 			lastErr = err
-			l.Warnf("postgres not ready yet, attempt=%d err=%v", attempt, err)
+			if attempt == 1 || err.Error() != lastLoggedError || time.Since(lastLoggedAt) >= postgresRetryLogInterval {
+				l.Warnf("postgres not ready yet, attempt=%d err=%v", attempt, err)
+				lastLoggedError, lastLoggedAt = err.Error(), time.Now()
+			}
 		}
 
 		select {
@@ -176,6 +185,36 @@ func waitForPostgresReady(ctx context.Context, pinger pingContexter, interval ti
 		case <-time.After(interval):
 		}
 	}
+}
+
+// Derive the target and TLS policy from the driver's resolved configuration;
+// never log the DSN, credentials or arbitrary connection parameters.
+func postgresLogTarget(c *pgx.ConnConfig) (string, string) {
+	addresses := []string{net.JoinHostPort(c.Host, fmt.Sprint(c.Port))}
+	hasTLS, hasPlaintext := c.TLSConfig != nil, c.TLSConfig == nil
+	for _, fallback := range c.Fallbacks {
+		address := net.JoinHostPort(fallback.Host, fmt.Sprint(fallback.Port))
+		if !slices.Contains(addresses, address) {
+			addresses = append(addresses, address)
+		}
+		hasTLS = hasTLS || fallback.TLSConfig != nil
+		hasPlaintext = hasPlaintext || fallback.TLSConfig == nil
+	}
+	policy := "disabled"
+	if hasTLS {
+		policy = "required"
+		if hasPlaintext {
+			policy = "prefer"
+			if c.TLSConfig == nil {
+				policy = "allow"
+			}
+		} else if c.TLSConfig != nil && !c.TLSConfig.InsecureSkipVerify {
+			policy = "verify-full"
+		} else if c.TLSConfig != nil && c.TLSConfig.VerifyPeerCertificate != nil {
+			policy = "verify-ca"
+		}
+	}
+	return strings.Join(addresses, ","), policy
 }
 
 // SQLDB 返回底层 DB，用于健康检查与原生 SQL 查询。
@@ -206,7 +245,23 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		return nil, nil, errors.New("postgres dsn is required")
 	}
 
-	l.Info("init postgres(otelsql) start...")
+	parsed, err := pgx.ParseConfig(c.Postgres.Dsn)
+	if err != nil {
+		// Driver parse errors may embed the complete DSN.
+		return nil, nil, errors.New("invalid postgres connection configuration; check address, database and TLS settings")
+	}
+	address, tlsPolicy := postgresLogTarget(parsed)
+	source := "config"
+	if envDSN := os.Getenv("POSTGRES_DSN"); envDSN != "" && envDSN == c.Postgres.Dsn {
+		source = "POSTGRES_DSN"
+	}
+	started := time.Now()
+	l.Infow("msg", "postgres connecting", "address", address, "database", parsed.Database,
+		"tls_policy", tlsPolicy, "config_source", source,
+		"max_open_conns", settings.maxOpenConns, "max_idle_conns", settings.maxIdleConns,
+		"conn_max_lifetime_seconds", int64(settings.connMaxLifetime/time.Second),
+		"conn_max_idle_time_seconds", int64(settings.connMaxIdleTime/time.Second),
+		"startup_timeout_seconds", int64(settings.startupTimeout/time.Second))
 	db, err := otelsql.Open(
 		postgresDriverName,
 		c.Postgres.Dsn,
@@ -220,14 +275,6 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	db.SetMaxIdleConns(settings.maxIdleConns)
 	db.SetConnMaxLifetime(settings.connMaxLifetime)
 	db.SetConnMaxIdleTime(settings.connMaxIdleTime)
-	l.Infow(
-		"msg", "postgres pool configured",
-		"max_open_conns", settings.maxOpenConns,
-		"max_idle_conns", settings.maxIdleConns,
-		"conn_max_lifetime_seconds", int64(settings.connMaxLifetime/time.Second),
-		"conn_max_idle_time_seconds", int64(settings.connMaxIdleTime/time.Second),
-		"startup_timeout_seconds", int64(settings.startupTimeout/time.Second),
-	)
 
 	startupCtx, cancelStartup := context.WithTimeout(context.Background(), settings.startupTimeout)
 	defer cancelStartup()
@@ -238,7 +285,8 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		l.Errorf("postgres ping failed: %v", err)
 		return nil, nil, err
 	}
-	l.Info("init postgres(otelsql) done")
+	l.Infow("msg", "postgres connected", "address", address, "database", parsed.Database,
+		"elapsed_ms", time.Since(started).Milliseconds())
 
 	trialConfigEnabled, err := customertrialconfig.ResolveGate(c.Postgres.Dsn, os.Getenv)
 	if err != nil {

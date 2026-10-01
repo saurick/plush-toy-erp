@@ -8,6 +8,13 @@ import { pathToFileURL } from "node:url";
 import { stripVTControlCharacters } from "node:util";
 import { loadDevPorts } from "./dev-ports.mjs";
 import { runProcessInspection } from "./dev-process-inspection.mjs";
+import {
+  formatTerminalMessage,
+  highlightTerminalText,
+  terminalColorEnabled,
+  writeTerminalMessage,
+  redactPostgresCredentials,
+} from "./terminal-log.mjs";
 
 const UUID =
   /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u;
@@ -15,23 +22,41 @@ const LOG_DIRECTORY = "output/dev-workbench/database-migration-runtime";
 const ACTIVE_FILE = "output/dev-workbench/runtime-bundles/active.json";
 const writeLine = (line) => process.stdout.write(`${line}\n`);
 
-export function writeRuntimeProgress(message, write = writeLine) {
+export function writeRuntimeProgress(
+  message,
+  write = writeLine,
+  { color = terminalColorEnabled() } = {},
+) {
   write(
-    `[local-runtime] ${new Date().toLocaleTimeString("zh-CN", { hour12: false })} ${message}`,
+    formatTerminalMessage(
+      `[local-runtime] ${new Date().toLocaleTimeString("zh-CN", { hour12: false })} ${message}`,
+      { color },
+    ),
   );
 }
 
 const LEVEL_COLORS = { DEBUG: 90, INFO: 36, WARN: 33, ERROR: 31, FATAL: 31 };
 const SERVICE_FIELDS = ["service.id", "service.name", "service.version"];
+const TARGET_FIELDS = new Set([
+  "address",
+  "database",
+  "tls_policy",
+  "config_source",
+  "customer_key",
+  "endpoint",
+  "bucket",
+  "log_debug",
+  "sql_debug",
+  "mode",
+]);
 
 function plainText(value) {
-  return stripVTControlCharacters(String(value))
-    .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/gu, "")
-    .replace(
-      /\bpostgres(?:ql)?:\/\/[^:\s/@]+:[^@\s]+@/giu,
-      "postgres://<redacted>@",
-    )
-    .replace(/\bpassword=[^\s&]+/giu, "password=<redacted>");
+  return redactPostgresCredentials(
+    stripVTControlCharacters(String(value)).replace(
+      /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/gu,
+      "",
+    ),
+  );
 }
 
 function logEntry(line) {
@@ -54,7 +79,17 @@ export function formatRuntimeLogLine(line, { color = false } = {}) {
     ? `\u001b[${LEVEL_COLORS[entry.level]}m${entry.level.padEnd(5)}\u001b[0m`
     : entry.level.padEnd(5);
   const caller = entry.caller ? ` [${plainText(entry.caller)}]` : "";
-  const message = plainText(entry.msg || "").replaceAll("\n", "\n  ");
+  const messageTone =
+    entry.level === "WARN"
+      ? "warning"
+      : ["ERROR", "FATAL"].includes(entry.level)
+        ? "error"
+        : "";
+  const message = highlightTerminalText(
+    plainText(entry.msg || "").replaceAll("\n", "\n  "),
+    messageTone,
+    { color },
+  );
   const details = Object.entries(entry)
     .filter(
       ([key, value]) =>
@@ -68,21 +103,29 @@ export function formatRuntimeLogLine(line, { color = false } = {}) {
       const text = plainText(
         typeof value === "object" ? JSON.stringify(value) : value,
       );
-      return `${plainText(key)}=${text.replaceAll("\n", "\n    ")}`;
+      const displayValue = text.replaceAll("\n", "\n    ");
+      return `${plainText(key)}=${TARGET_FIELDS.has(key) ? highlightTerminalText(displayValue, "detail", { color }) : displayValue}`;
     });
   return `${time ? `${time} ` : ""}${level}${caller} ${message}${details.length ? `\n  ${details.join("\n  ")}` : ""}`;
 }
 
-function createLogWriter(write, color) {
+function createLogWriter(write, color, showDebug) {
   let previousService = "";
   return (line) => {
     const entry = logEntry(line);
+    if (!showDebug && (entry?.level === "DEBUG" || /^DEBUG msg=/u.test(line)))
+      return;
     if (entry) {
       const service = SERVICE_FIELDS.filter((key) => entry[key])
         .map((key) => `${key}=${plainText(entry[key])}`)
         .join(" ");
       if (service && service !== previousService) {
-        write(`[local-runtime] ${service}`);
+        write(
+          formatTerminalMessage(`[local-runtime] ${service}`, {
+            tone: "detail",
+            color,
+          }),
+        );
         previousService = service;
       }
     }
@@ -215,14 +258,31 @@ function processExists(pid) {
   }
 }
 
-function reportRuntime(root, runtime, write, running) {
+function reportRuntime(
+  root,
+  runtime,
+  write,
+  running,
+  { color = terminalColorEnabled() } = {},
+) {
   write(
-    `[local-runtime] 后端${running ? "正在运行" : "已停止"}；端口=${loadDevPorts(root).http} PID=${runtime.pid} 启动时间=${new Date(runtime.startedAt).toLocaleString("zh-CN", { hour12: false })}`,
+    formatTerminalMessage(
+      `[local-runtime] 后端${running ? "正在运行" : "已停止"}；端口=${loadDevPorts(root).http} PID=${runtime.pid} 启动时间=${new Date(runtime.startedAt).toLocaleString("zh-CN", { hour12: false })}`,
+      { tone: running ? "success" : "warning", color },
+    ),
   );
   write(
-    `[local-runtime] 运行版本=${runtime.version || `local-${runtime.bundleId}`} 制品=${runtime.bundleId} 启动来源=${runtime.startSource || "未记录"} migration=${runtime.migrationVersion}`,
+    formatTerminalMessage(
+      `[local-runtime] 运行版本=${runtime.version || `local-${runtime.bundleId}`} 制品=${runtime.bundleId} 启动来源=${runtime.startSource || "未记录"} migration=${runtime.migrationVersion}`,
+      { tone: "detail", color },
+    ),
   );
-  write(`[local-runtime] 日志：${runtime.logFile}`);
+  write(
+    formatTerminalMessage(`[local-runtime] 日志：${runtime.logFile}`, {
+      tone: "detail",
+      color,
+    }),
+  );
   if (Number.isFinite(runtime.startupDurationMs))
     write(
       `[local-runtime] 本次启动验证耗时 ${(runtime.startupDurationMs / 1000).toFixed(1)} 秒`,
@@ -235,8 +295,8 @@ export async function followRuntimeConsole(
     signal,
     read = readRuntimeConsole,
     running = processExists,
-    color = Boolean(process.stdout.isTTY) &&
-      !Object.hasOwn(process.env, "NO_COLOR"),
+    color = terminalColorEnabled(),
+    showDebug = false,
     spawnTail = (file, start) =>
       spawn("tail", ["-c", `+${start + 1}`, "-F", file], {
         detached: true,
@@ -250,17 +310,22 @@ export async function followRuntimeConsole(
   let previous = "";
   let tailError;
   let lines;
-  const logWrite = createLogWriter(write, color);
+  const logWrite = createLogWriter(write, color, showDebug);
   const stopTail = () => {
     if (tail) tail.kill("SIGTERM");
     lines?.close();
     lines = null;
     tail = null;
   };
-  write(`\u001b]0;${path.basename(root)} · 后端日志\u0007`);
+  if (process.stdout.isTTY)
+    write(`\u001b]0;${path.basename(root)} · 后端日志\u0007`);
   write(
     "[local-runtime] 持续显示当前后端日志；Ctrl+C 退出查看，后端继续运行。退出后可执行 make dev_restart 或 make dev_stop。",
   );
+  if (!showDebug)
+    write(
+      "[local-runtime] 默认显示 INFO 及以上；包含 DEBUG：make dev_logs ARGS=--debug。完整日志保存在文件中。",
+    );
   try {
     while (!signal?.aborted) {
       if (tailError) throw tailError;
@@ -269,7 +334,7 @@ export async function followRuntimeConsole(
       const key = `${runtime.bundleId}:${runtime.pid}:${runtime.logFile}:${alive}`;
       if (key !== previous) {
         stopTail();
-        reportRuntime(root, runtime, write, alive);
+        reportRuntime(root, runtime, write, alive, { color });
         if (alive) {
           const plan = readRuntimeLogPlan(runtime);
           await replayStartupLogs(runtime, plan, logWrite, signal);
@@ -317,11 +382,16 @@ export async function findRuntimeDesktopViewers(
   inspect = runProcessInspection,
 ) {
   const script = path.join(root, "scripts/local-runtime-console.mjs");
-  const suffix = ` ${script} --follow --desktop`;
+  const suffixes = [
+    ` ${script} --follow --desktop`,
+    ` ${script} --follow --desktop --debug`,
+  ];
   const { stdout } = await inspect("ps", ["-axo", "pid=,command="]);
   return stdout.split("\n").flatMap((line) => {
     const match = line.match(/^\s*(\d+)\s+(.+)$/u);
-    if (!match || !match[2].endsWith(suffix)) return [];
+    if (!match) return [];
+    const suffix = suffixes.find((value) => match[2].endsWith(value));
+    if (!suffix) return [];
     const executable = match[2].slice(0, -suffix.length);
     const pid = Number(match[1]);
     return pid > 1 && path.basename(executable) === "node"
@@ -379,6 +449,7 @@ export async function showRuntimeConsole(
     exists = fs.existsSync,
     executable = process.execPath,
     write = writeLine,
+    showDebug = false,
   } = {},
 ) {
   if (platform !== "darwin" || env.CI || env.SSH_CONNECTION || env.SSH_TTY) {
@@ -406,7 +477,7 @@ export async function showRuntimeConsole(
     "#!/bin/sh",
     "trap ':' INT",
     `cd ${shellQuote(path.join(root, "server"))} || exit 1`,
-    `${shellQuote(executable)} ${shellQuote(script)} --follow --desktop 2>>${shellQuote(errorFile)}`,
+    `${shellQuote(executable)} ${shellQuote(script)} --follow --desktop${showDebug ? " --debug" : ""} 2>>${shellQuote(errorFile)}`,
     'exec "${SHELL:-/bin/zsh}" -l',
     "",
   ].join("\n");
@@ -439,14 +510,17 @@ export async function presentRuntimeConsole(
     running = processExists,
     env = process.env,
     desktop = false,
+    showDebug = false,
     takeOver = takeOverRuntimeDesktopViewers,
     spawnConsole = spawn,
   } = {},
 ) {
   const runtime = readRuntimeConsole(root);
-  reportRuntime(root, runtime, write, running(runtime.pid));
-  if (background) return;
-  if (!interactive) return show(root, { write });
+  if (background || !interactive) {
+    reportRuntime(root, runtime, write, running(runtime.pid));
+    if (background) return;
+    return show(root, { write, showDebug });
+  }
   // Keep a visible manual restart discoverable after leaving the original
   // desktop viewer, so a later Codex startup reuses this terminal too.
   if (
@@ -471,6 +545,7 @@ export async function presentRuntimeConsole(
         path.join(root, "scripts/local-runtime-console.mjs"),
         "--follow",
         "--desktop",
+        ...(showDebug ? ["--debug"] : []),
       ],
       { stdio: "inherit" },
     );
@@ -488,7 +563,7 @@ export async function presentRuntimeConsole(
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"])
     process.once(signal, stop);
   try {
-    return await follow(root, { signal: controller.signal, write });
+    return await follow(root, { signal: controller.signal, write, showDebug });
   } finally {
     for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"])
       process.off(signal, stop);
@@ -504,9 +579,11 @@ if (
   presentRuntimeConsole(root, {
     interactive: follow || Boolean(process.stdout.isTTY),
     desktop: process.argv.includes("--desktop"),
+    showDebug: process.argv.includes("--debug"),
   }).catch((error) => {
-    process.stderr.write(
-      `[local-runtime] 日志查看失败：${error.message}；未停止后端服务\n`,
+    writeTerminalMessage(
+      `[local-runtime] 日志查看失败：${error.message}；未停止后端服务`,
+      { tone: "error", stream: process.stderr },
     );
     process.exitCode = 1;
   });

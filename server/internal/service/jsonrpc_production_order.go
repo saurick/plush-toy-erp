@@ -439,22 +439,6 @@ func productionOrderAllowsOnly(pm map[string]any, keys ...string) bool {
 	return true
 }
 
-func productionOrderRPCLogSummary(pm map[string]any) map[string]any {
-	out := map[string]any{}
-	for _, key := range []string{"production_order_id", "expected_version", "status", "date_field", "sort_by", "sort_direction", "limit", "offset"} {
-		if value, ok := pm[key]; ok {
-			out[key] = value
-		}
-	}
-	if items, ok := pm["items"].([]any); ok {
-		out["item_count"] = len(items)
-	}
-	if _, ok := pm["idempotency_key"]; ok {
-		out["idempotency_key"] = "<redacted>"
-	}
-	return out
-}
-
 func productionOrderRequiredString(pm map[string]any, key string, maxLen int) (string, bool) {
 	raw, exists := pm[key]
 	value, ok := raw.(string)

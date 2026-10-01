@@ -466,18 +466,3 @@ func TestMapProductionOrderErrorUsesSharedVersionConflict(t *testing.T) {
 		t.Fatalf("active WIP=%#v", wipResult)
 	}
 }
-
-func TestProductionOrderRPCLogSummaryExcludesBusinessText(t *testing.T) {
-	summary := productionOrderRPCLogSummary(map[string]any{
-		"production_order_id": float64(12), "expected_version": float64(3), "order_no": "MO-SECRET", "note": "客户业务备注",
-		"keyword": "客户关键词", "idempotency_key": "secret-key", "items": []any{map[string]any{"note": "行备注"}},
-	})
-	if summary["production_order_id"] != float64(12) || summary["expected_version"] != float64(3) || summary["item_count"] != 1 || summary["idempotency_key"] != "<redacted>" {
-		t.Fatalf("summary identifiers=%#v", summary)
-	}
-	for _, forbidden := range []string{"order_no", "note", "keyword", "items"} {
-		if _, exists := summary[forbidden]; exists {
-			t.Fatalf("summary leaked %s: %#v", forbidden, summary)
-		}
-	}
-}

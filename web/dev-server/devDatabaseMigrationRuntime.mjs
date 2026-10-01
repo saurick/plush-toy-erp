@@ -36,6 +36,7 @@ import {
 } from '../../scripts/local-database-roles.mjs'
 import { verifyRuntimeBusiness } from '../../scripts/local-runtime-rehearsal.mjs'
 import { presentRuntimeConsole } from '../../scripts/local-runtime-console.mjs'
+import { redactPostgresCredentials } from '../../scripts/terminal-log.mjs'
 import {
   LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
   runWebRuntimePreflight,
@@ -52,6 +53,7 @@ export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'scripts/local-runtime-preflight-core.mjs',
   'scripts/local-runtime-preflight.mjs',
   'scripts/local-runtime-console.mjs',
+  'scripts/terminal-log.mjs',
   'scripts/qa/migration-contracts.mjs',
   'scripts/qa/database-programmability.mjs',
   'scripts/qa/populated-upgrade-preflight.sh',
@@ -170,12 +172,7 @@ export async function readDatabaseMigrationToolReadiness({
 }
 
 export function redactDatabaseMigrationDiagnostic(value) {
-  return String(value || '')
-    .replace(
-      /\bpostgres(?:ql)?:\/\/[^:\s/@]+:[^@\s]+@/giu,
-      'postgres://<redacted>@'
-    )
-    .replace(/\bpassword=[^\s&]+/giu, 'password=<redacted>')
+  return redactPostgresCredentials(value || '')
     .replace(
       /\b(?:TRUST_SHARED_DEV_DATABASE|APPLY_DEV_MIGRATIONS|SHARED_DEV_MAINTENANCE_READY):[A-Za-z0-9_-]+/gu,
       '<confirmation-redacted>'
