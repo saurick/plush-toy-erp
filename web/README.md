@@ -29,11 +29,11 @@ pnpm install
 ## 目录结构（简版）
 
 | 路径                 | 职责                                                                                        |
-| --- | --- |
+| -------------------- | ------------------------------------------------------------------------------------------- |
 | `src/common/`        | 通用认证、组件、hooks、状态、常量与工具函数                                                 |
 | `src/erp/`           | 毛绒 ERP 桌面后台、业务页、岗位任务端页面和打印工作台                                       |
 | `src/erp/qa/`        | 字段联动等前端 QA catalog 与报告生成依赖                                                    |
-| `src/dev-workbench/` | `/__dev` 浏览器端页面、配置、组件和样式，不进入 production build                            |
+| `src/dev-workbench/` | DEV 恢复边界、`/__dev` 浏览器端页面、配置、组件和样式，不进入 production build              |
 | `src/pages/`         | 根路由重定向、登录、注册、管理员登录                                                        |
 | `dev-server/`        | Node/Vite development-serve Bridge、operation 适配器及合同测试，详见 `dev-server/README.md` |
 | `scripts/`           | 前端本地服务、浏览器级回归和 smoke 脚本，详见 `scripts/README.md`                           |
@@ -41,18 +41,20 @@ pnpm install
 
 `src/erp/utils/` 中，`sourcePartySnapshots.mjs` 管理往来方快照，`sourceOrderLineValues.mjs` 管理明细来源带值和清空，`masterDataParams.mjs` / `sourceOrderParams.mjs` 管理提交映射，`purchaseOrderPrintDraft.mjs` 管理采购打印输入；`masterDataOrderView.mjs` 保留展示、生命周期和表单行基础规则。页面状态和动作的职责见 [ERP 组件入口](./src/erp/components/README.md)。
 
+产品路由只在 `import.meta.env.DEV` 下动态加载 `DevWorkbenchBridge.jsx` 这一处 DEV 入口。该入口包裹业务路由的停服恢复边界，并在进入 `/__dev` 时按需加载工作台页面；App 不直接引用 DEV 模块。
+
 ## 启动命令
 
 在 `web/` 执行 `pnpm start`。人工终端默认 `http://127.0.0.1:5175`；Codex 会话自动使用 `15200-15299` 辅助端口，以终端输出 URL 为准。端口、后端和 HMR 共用 `config/dev-ports.env`；只复用同工作区、同配置服务，未知占用会阻断。
 
-| 场景 | 入口 |
-| --- | --- |
-| 日常开发 | `pnpm start` |
-| 重新加载本工作区服务 | `pnpm restart` / `pnpm start:restart`，先预检并核对进程归属 |
-| 独立前端验证 | `pnpm start:isolated`，自动选择辅助端口 |
-| 只调布局，不登录或调用 RPC | `pnpm start:frontend-only`，明确为降级模式 |
-| 客户热更新 / 静态预览 | `pnpm start:yoyoosun --print-plan`（固定 `15200`）/ `pnpm preview:yoyoosun --print-plan` |
-| 重启客户开发入口 | `pnpm restart:yoyoosun`，固定重启 `15200`；可用 `--port` 指定辅助端口 |
+| 场景                       | 入口                                                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| 日常开发                   | `pnpm start`                                                                             |
+| 重新加载本工作区服务       | `pnpm restart` / `pnpm start:restart`，先预检并核对进程归属                              |
+| 独立前端验证               | `pnpm start:isolated`，自动选择辅助端口                                                  |
+| 只调布局，不登录或调用 RPC | `pnpm start:frontend-only`，明确为降级模式                                               |
+| 客户热更新 / 静态预览      | `pnpm start:yoyoosun --print-plan`（固定 `15200`）/ `pnpm preview:yoyoosun --print-plan` |
+| 重启客户开发入口           | `pnpm restart:yoyoosun`，固定重启 `15200`；可用 `--port` 指定辅助端口                    |
 
 客户入口遇到本工作区的过期 Vite 会核验归属后自动停止并重新启动，继续使用原端口；同配置实例继续复用，其他程序或工作区的占用会阻断。
 
@@ -120,15 +122,15 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 ## 前端文档入口边界
 
-| 主题 | 维护入口 |
-| --- | --- |
-| 登录、菜单、权限与岗位帮助 | [菜单与正式入口合同](../docs/product/菜单与正式入口合同.md) |
-| 页面状态、表单、主题与共享控件 | [页面动作与生命周期](../docs/product/业务数据生命周期与页面动作规则.md) |
-| 字段带值、清空与输出真源 | [业务数据流向与字段来源](../docs/product/业务主链路数据流向与字段来源规则.md) |
-| 打印渲染与安全 | [打印模板实现原理](../docs/打印模板实现原理.md) |
-| 打印字段与可编辑行为 | [打印字段与编辑清单](../docs/打印模板字段与编辑行为清单.md) |
-| `/__dev` 页面、证据和操作边界 | [研发工作台](../docs/engineering/研发效能工作台与CI-CD设计.md#本地开发入口-dev-only-surfaces) |
-| Node / Vite Bridge | [开发服务](dev-server/README.md) |
+| 主题                           | 维护入口                                                                                      |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| 登录、菜单、权限与岗位帮助     | [菜单与正式入口合同](../docs/product/菜单与正式入口合同.md)                                   |
+| 页面状态、表单、主题与共享控件 | [页面动作与生命周期](../docs/product/业务数据生命周期与页面动作规则.md)                       |
+| 字段带值、清空与输出真源       | [业务数据流向与字段来源](../docs/product/业务主链路数据流向与字段来源规则.md)                 |
+| 打印渲染与安全                 | [打印模板实现原理](../docs/打印模板实现原理.md)                                               |
+| 打印字段与可编辑行为           | [打印字段与编辑清单](../docs/打印模板字段与编辑行为清单.md)                                   |
+| `/__dev` 页面、证据和操作边界  | [研发工作台](../docs/engineering/研发效能工作台与CI-CD设计.md#本地开发入口-dev-only-surfaces) |
+| Node / Vite Bridge             | [开发服务](dev-server/README.md)                                                              |
 
 正式岗位帮助使用 `roleHelpContent.mjs`；仓库 Markdown 留在仓库与 DEV viewer，不复制到 ERP 运行时。
 

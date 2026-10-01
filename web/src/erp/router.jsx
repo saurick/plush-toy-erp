@@ -89,8 +89,8 @@ const MobileAppLayout = lazyRoute(() => import('./mobile/MobileAppLayout'))
 const MobileRoleTasksPage = lazyRoute(
   () => import('./mobile/pages/MobileRoleTasksPage')
 )
-const DevWorkbenchRoutes = import.meta.env.DEV
-  ? lazyRoute(() => import('@/dev-workbench/DevWorkbenchRoutes.jsx'))
+const DevWorkbenchBridge = import.meta.env.DEV
+  ? lazyRoute(() => import('@/dev-workbench/DevWorkbenchBridge.jsx'))
   : null
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
@@ -218,7 +218,11 @@ function RouteRuntimeBoundary({ children }) {
 
   return (
     <RouteRuntimeErrorBoundary resetKey={buildLocationPath(location)}>
-      {children}
+      {DevWorkbenchBridge ? (
+        <DevWorkbenchBridge>{children}</DevWorkbenchBridge>
+      ) : (
+        children
+      )}
     </RouteRuntimeErrorBoundary>
   )
 }
@@ -290,8 +294,8 @@ export default function ERPRouter() {
     <RouteRuntimeBoundary>
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
-          {DevWorkbenchRoutes ? (
-            <Route path="/__dev/*" element={<DevWorkbenchRoutes />} />
+          {DevWorkbenchBridge ? (
+            <Route path="/__dev/*" element={<DevWorkbenchBridge />} />
           ) : null}
           <Route path="/" element={<RootEntryRedirect />} />
           <Route path="/admin-login" element={<AdminLoginPage />} />
@@ -341,7 +345,9 @@ export default function ERPRouter() {
             />
             <Route
               path="master/products"
-              element={<V1MasterDataPage key="product_skus" type="product_skus" />}
+              element={
+                <V1MasterDataPage key="product_skus" type="product_skus" />
+              }
             />
             <Route
               path="sales/project-orders/sales-orders"

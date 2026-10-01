@@ -24,11 +24,6 @@ import '@/common/components/empty/empty-state.css'
 dayjs.locale('zh-cn')
 
 const ERPRouter = lazyWithDynamicImportRetry(() => import('@/erp/router'))
-const DevRuntimeRecoveryBoundary = import.meta.env.DEV
-  ? lazyWithDynamicImportRetry(
-      () => import('@/dev-workbench/components/DevRuntimeRecoveryBoundary.jsx')
-    )
-  : null
 
 function AppContent() {
   const location = useLocation()
@@ -37,7 +32,6 @@ function AppContent() {
   const activeBrand = getActiveERPBrand()
   const isDevWorkbenchRoute =
     import.meta.env.DEV && /^\/__dev(?:\/|$)/u.test(location.pathname)
-  const routes = <ERPRouter />
 
   useEffect(() => {
     return authBus.onUnauthorized(({ from, message, loginPath }) => {
@@ -102,11 +96,7 @@ function AppContent() {
         </Helmet>
       ) : null}
       <Suspense fallback={null}>
-        {DevRuntimeRecoveryBoundary ? (
-          <DevRuntimeRecoveryBoundary>{routes}</DevRuntimeRecoveryBoundary>
-        ) : (
-          routes
-        )}
+        <ERPRouter />
       </Suspense>
     </>
   )

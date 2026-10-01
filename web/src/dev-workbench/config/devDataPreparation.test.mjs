@@ -1153,11 +1153,11 @@ test('data preparation route stays outside formal menu, seedData and RBAC projec
 
   assert.match(
     routerSource,
-    /const DevWorkbenchRoutes\s*=\s*import\.meta\.env\.DEV/u
+    /const DevWorkbenchBridge\s*=\s*import\.meta\.env\.DEV/u
   )
   assert.match(
     routerSource,
-    /<Route path="\/__dev\/\*" element=\{<DevWorkbenchRoutes \/>\}/u
+    /<Route path="\/__dev\/\*" element=\{<DevWorkbenchBridge \/>\}/u
   )
   formalSources.forEach((source) => {
     assert.doesNotMatch(source, /data-preparation|测试数据准备中心/u)

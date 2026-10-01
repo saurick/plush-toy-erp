@@ -38,11 +38,15 @@ test("dev workbench boundary: product app keeps one DEV-only dynamic bridge", ()
     if (file === bridgePath) {
       assert.match(
         source,
-        /const DevWorkbenchRoutes\s*=\s*import\.meta\.env\.DEV[\s\S]{0,180}?import\(['"]@\/dev-workbench\/DevWorkbenchRoutes\.jsx['"]\)/u,
+        /const DevWorkbenchBridge\s*=\s*import\.meta\.env\.DEV[\s\S]{0,180}?import\(['"]@\/dev-workbench\/DevWorkbenchBridge\.jsx['"]\)/u,
       );
       assert.match(
         source,
-        /<Route path="\/__dev\/\*" element=\{<DevWorkbenchRoutes \/>\}/u,
+        /<Route path="\/__dev\/\*" element=\{<DevWorkbenchBridge \/>\}/u,
+      );
+      assert.match(
+        source,
+        /<DevWorkbenchBridge>\{children\}<\/DevWorkbenchBridge>/u,
       );
       assert.equal(
         source.match(/@\/dev-workbench\//gu)?.length,
@@ -57,6 +61,15 @@ test("dev workbench boundary: product app keeps one DEV-only dynamic bridge", ()
       `${file} must not import the DEV-only workbench`,
     );
   }
+
+  const bridge = read("web/src/dev-workbench/DevWorkbenchBridge.jsx");
+  assert.match(bridge, /if \(children !== undefined\)/u);
+  assert.match(
+    bridge,
+    /<DevRuntimeRecoveryBoundary>\{children\}<\/DevRuntimeRecoveryBoundary>/u,
+  );
+  assert.equal(bridge.match(/<DevRuntimeRecoveryBoundary>/gu)?.length, 1);
+  assert.match(bridge, /import\(['"]\.\/DevWorkbenchRoutes\.jsx['"]\)/u);
 });
 
 test("dev workbench boundary: source and styles live outside product directories", () => {

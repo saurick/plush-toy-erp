@@ -74,7 +74,7 @@ test("dev flow state observatory: route and all catalogs stay DEV-only and read-
   );
   assert.match(
     router,
-    /import\.meta\.env\.DEV[\s\S]{0,220}?DevWorkbenchRoutes/u,
+    /import\.meta\.env\.DEV[\s\S]{0,220}?DevWorkbenchBridge/u,
   );
   assert.doesNotMatch(formalMenus, /\/__dev\/status-flows/u);
 
