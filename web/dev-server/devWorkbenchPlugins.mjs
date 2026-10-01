@@ -8,6 +8,10 @@ import { createDevQaCoveragePlugin } from './devQaCoveragePlugin.mjs'
 import { createDevQaTestingPlugin } from './devQaTestingPlugin.mjs'
 import { createDevQualityGatePlugin } from './devQualityGatePlugin.mjs'
 import { createDevWebInstancePlugin } from './devWebInstancePlugin.mjs'
+import {
+  LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
+  runWebRuntimePreflight,
+} from '../../scripts/local-runtime-preflight.mjs'
 
 export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
   'plush-dev-web-instance',
@@ -37,6 +41,14 @@ export function createDevWorkbenchServePlugins({
     reason: recoveryReason,
     apiOrigin,
     runtimeChecks,
+    verifyReadiness: () =>
+      runWebRuntimePreflight(
+        { apiOrigin },
+        {
+          signal: AbortSignal.timeout(LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS),
+          writeLine: () => {},
+        }
+      ),
   })
   return [
     createDevWebInstancePlugin({ isRecoveryActive: recovery.isActive }),

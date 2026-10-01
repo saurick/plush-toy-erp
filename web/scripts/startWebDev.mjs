@@ -22,7 +22,7 @@ import {
   redactDatabaseMigrationDiagnostic,
 } from '../dev-server/devDatabaseMigrationRuntime.mjs'
 import { resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
-import { resolveDevRuntimeRecoveryRoute } from '../src/dev-workbench/config/devRuntimeRecovery.mjs'
+import { DEV_DATABASE_MIGRATION_RECOVERY_ROUTE } from '../src/dev-workbench/config/devRuntimeRecovery.mjs'
 import {
   isCodexDevSession,
   resolveERPHMRClientPort,
@@ -239,7 +239,7 @@ export async function resolveWebRuntimeStartup(
           '本地运行预检未完成；请在迁移恢复页检查数据库配置、迁移状态和后端'
         )
     writeLine(
-      `[start-web] ${recoveryError.message}\n[start-web] 已进入恢复模式：${resolveDevRuntimeRecoveryRoute(recoveryError.code)}；普通 ERP 页面与 RPC 暂停`
+      `[start-web] ${recoveryError.message}\n[start-web] 业务入口保留原地址，显示服务不可用提示；检查并恢复服务：${DEV_DATABASE_MIGRATION_RECOVERY_ROUTE}；RPC 暂停`
     )
     return {
       complete: false,
@@ -378,7 +378,7 @@ async function main() {
     )
     return
   }
-  const url = `http://127.0.0.1:${port}${startup.recoveryMode ? resolveDevRuntimeRecoveryRoute(startup.recoveryReason) : '/'}`
+  const url = `http://127.0.0.1:${port}/`
   if (instance.reused) {
     process.stdout.write(
       `[start-web] 已复用本工作区前端（PID ${instance.pid}）：${url}\n[start-web] 服务继续由原终端管理；需要重新加载启动配置时执行 pnpm start --restart\n`

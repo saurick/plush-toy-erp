@@ -14,7 +14,7 @@
 | `devQualityGatePlugin.mjs`          | 复用正式 full / strict runner 与回执，自动选择显式 loopback base 或本机托管 PostgreSQL，提供异步运行、取消、超时、清理读回和只读治理 |
 | `devDataPreparationPlugin.mjs`      | 提供单一数据准备 operation 真源；同一 Scenario profile 显式绑定本地或 133，冻结当前数据合同、release、数据库、migration、客户配置与回滚点，长期数据与隔离验收不互相替代 |
 | `devDatabaseMigrationPlugin.mjs`    | 提供本地共享开发库迁移的受控 operation service 和 HTTP 层，供页面与高层 CLI 复用                                                     |
-| `devDatabaseMigrationRecoveryPlugin.mjs` | 本地预检失败或超时时保留迁移恢复页与固定 API，阻断 ERP / RPC；同一完整启动检查和同目标 health / ready 通过后解除 |
+| `devDatabaseMigrationRecoveryPlugin.mjs` | 本地预检失败或停服时在原业务地址显示等待页，保留迁移恢复页与固定 API；本机只读状态检查通过完整启动检查后解除 ERP / RPC 限制 |
 | `devDatabaseMigrationRuntime.mjs`   | 执行迁移 status、plan、备份恢复、apply、读回和重启                                                                                   |
 | `devDeliveryBridgePlugin.mjs`       | 提供不可变版本、固定目标 promotion 和受控 rollback Bridge                                                                            |
 | `devServerSecurity.mjs`             | 集中维护 loopback remote address 与 Host 校验                                                                                        |

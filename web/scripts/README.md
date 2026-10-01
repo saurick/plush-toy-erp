@@ -101,7 +101,7 @@ pnpm start
 
 修改迁移页服务端插件或上述启动代码后，交付前须在用户实际使用的端口显式重启并复验；页面热更新和辅助端口验证不会更新已运行进程中的 Node 模块。仅刷新浏览器不能加载这些服务端改动。
 
-本机后端未就绪时，电脑、手机和登录入口统一进入 `/__dev/`，显示服务提示并提供迁移恢复页入口；数据库检查失败继续直接进入迁移恢复页。普通启动会在业务导航或请求时检查本地后端健康，已打开页面的停服响应也会触发跳转；仅前端调试和外部后端保持各自的调试边界。恢复限制只能由恢复页完整检查解除，原业务请求不会自动重放。
+本机后端未就绪时保留业务页地址与迁移恢复入口；等待与恢复行为见下文 runtime preflight 说明。恢复仍须通过完整检查，原业务请求不会自动重放。
 
 主入口和客户辅助入口在每次迁移准备、执行或后端重启请求前，都会核对本进程加载时的开发服务代码摘要。代码已变化或无法读取时，拒绝动作并提示重新启动当前前端；仍允许查看状态和访问已验证的日常业务。Vite 配置热重载不能更新该摘要，必须重新启动前端进程。`make dev_restart` 只恢复后端，不会更新仍在运行的前端开发服务。
 
@@ -113,7 +113,7 @@ Codex 会话通过 `CODEX_THREAD_ID` / `CODEX_CI` 自动选择辅助端口；人
 
 Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:yoyoosun` 通过同一受管浏览器入口打开页面。它只在 Chrome、Edge 或 Brave 中检查标题属于本项目的候选标签，并在地址栏精确匹配 `127.0.0.1` / `localhost` 与实际端口后激活、刷新该标签；窗口保持原有最大化或普通状态，只有已最小化时才恢复。未命中或 Windows UI Automation 不可用时回退到系统默认的新标签页。它不会输出浏览地址、关闭历史重复标签或读取其他标题标签的地址栏；显式 `BROWSER=none` 或自定义 `BROWSER` 始终优先。macOS 与有图形桌面的原生 Linux 保留 Vite 的平台默认打开行为；无图形桌面的 Linux 只输出访问地址，不调用 `xdg-open`。
 
-`pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查当前工作区 schema / migration 与开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过并核对运行制品身份；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，只开放 `/__dev/database-migration` 恢复页；恢复期间除启动器所需的只读实例摘要外，普通 ERP 页面、其它 DEV API 与 `/rpc`、`/templates` 失败关闭，修正环境后刷新状态，重新通过同一完整启动检查和同目标 health / ready，才能进入完整工作台。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
+`pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查当前工作区 schema / migration 与开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过并核对运行制品身份；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，业务入口在原地址显示服务不可用提示，业务组件和 `/rpc`、`/templates` 保持关闭。受限模式保留 `/__dev/database-migration` 恢复页、固定恢复 API、只读实例摘要与同源 GET `/__dev/api/runtime-status`；其它 DEV API 继续阻断。等待页每次检查结束后等待 3 秒再读取状态，并发读取共用同一检查；健康恢复后重新通过完整启动检查和同目标 health / ready，才能自动继续打开原业务页面。恢复操作仍须显式执行，不自动迁移、启动后端或重放业务请求。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 
 普通业务页和开发工作台均从当前工作区加载，Vite 提供热更新；固定运行制品不会截获开发页面。后端代码通过 `make dev_restart` 重新编译，数据库迁移仍须“检查并准备 → 确认执行”。辅助端口只隔离前端监听，不产生第二个日常数据库。预检或构建失败时保留已有后端，但不会将其标成最新工作区代码。
 

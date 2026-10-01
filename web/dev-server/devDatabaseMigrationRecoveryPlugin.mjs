@@ -2,11 +2,10 @@ import {
   DEV_DATABASE_MIGRATION_RECOVERY_GLOBAL,
   DEV_DATABASE_MIGRATION_RECOVERY_MODE,
   DEV_DATABASE_MIGRATION_RECOVERY_ROUTE,
-  DEV_BACKEND_RECOVERY_ROUTE,
   DEV_RUNTIME_RECOVERY_HEADER,
-  DEV_RUNTIME_RECOVERY_ROUTE_GLOBAL,
+  DEV_RUNTIME_STATUS_API_PATH,
+  DEV_RUNTIME_STATUS_SCHEMA,
   normalizeDevRuntimeRecoveryMode,
-  resolveDevRuntimeRecoveryRoute,
 } from '../src/dev-workbench/config/devRuntimeRecovery.mjs'
 import {
   isLoopbackAPIOrigin,
@@ -30,41 +29,40 @@ function setRecoveryHeaders(response) {
   response.setHeader('referrer-policy', 'no-referrer')
 }
 
-function sendRecoveryBlocked(response, route) {
+function sendRecoveryBlocked(response) {
   response.statusCode = 503
   setRecoveryHeaders(response)
   response.setHeader('content-type', 'application/json; charset=utf-8')
-  response.setHeader(DEV_RUNTIME_RECOVERY_HEADER, route)
+  response.setHeader(
+    DEV_RUNTIME_RECOVERY_HEADER,
+    DEV_DATABASE_MIGRATION_RECOVERY_ROUTE
+  )
   response.end(
     JSON.stringify({
       status: 'blocked',
       code: 'dev_runtime_recovery_active',
-      message:
-        route === DEV_BACKEND_RECOVERY_ROUTE
-          ? '本地后端未就绪，请在效能工作台检查并恢复服务'
-          : '数据库恢复尚未完成，普通 ERP 请求暂不可用',
+      message: '本地服务尚未就绪，业务请求暂不可用',
     })
   )
 }
 
 export function createDevDatabaseMigrationRecoveryController({
   mode = '',
-  reason = '',
   apiOrigin = 'http://127.0.0.1:8300',
   runtimeChecks = false,
   fetchImpl = globalThis.fetch,
+  verifyReadiness,
 } = {}) {
   const normalizedMode = normalizeDevRuntimeRecoveryMode(mode)
   let active = normalizedMode === DEV_DATABASE_MIGRATION_RECOVERY_MODE
-  let recoveryReason = reason
   let backendCheck
+  let readinessCheck
   const monitorBackend = runtimeChecks && isLoopbackAPIOrigin(apiOrigin)
   const backendOrigin = monitorBackend ? normalizeAPIOrigin(apiOrigin) : ''
 
-  const recoveryRoute = () => resolveDevRuntimeRecoveryRoute(recoveryReason)
-  const checkBackendAvailability = async () => {
-    if (!monitorBackend || active) return
-    // Concurrent page RPCs share a probe; checks only run on business traffic.
+  const checkBackendAvailability = async ({ probeRecovery = false } = {}) => {
+    if (!monitorBackend || (active && !probeRecovery)) return false
+    // Concurrent business requests and recovery reads share a health probe.
     if (!backendCheck) {
       backendCheck = (async () => {
         try {
@@ -75,15 +73,17 @@ export function createDevDatabaseMigrationRecoveryController({
           if (!response.ok || (await response.text()).trim() !== 'ok') {
             throw new Error('local backend unavailable')
           }
+          return true
         } catch {
           active = true
-          recoveryReason = 'local_backend_unavailable'
+          return false
         }
       })()
     }
     const currentCheck = backendCheck
-    await currentCheck
+    const available = await currentCheck
     if (backendCheck === currentCheck) backendCheck = null
+    return available
   }
 
   const controller = {
@@ -92,7 +92,6 @@ export function createDevDatabaseMigrationRecoveryController({
     },
     markRuntimeReady() {
       active = false
-      recoveryReason = ''
     },
   }
 
@@ -108,6 +107,51 @@ export function createDevDatabaseMigrationRecoveryController({
       configureServer(server) {
         server.middlewares.use(async (request, response, next) => {
           const pathname = requestPath(request)
+          if (pathname === DEV_RUNTIME_STATUS_API_PATH) {
+            setRecoveryHeaders(response)
+            response.setHeader(
+              'content-type',
+              'application/json; charset=utf-8'
+            )
+            // The availability result is public to frontend clients, including
+            // LAN phones; diagnostics and recovery actions remain loopback-only.
+            if (request.method !== 'GET') {
+              response.statusCode = 405
+              response.setHeader('allow', 'GET')
+              response.end(JSON.stringify({ status: 'blocked' }))
+              return
+            }
+            if (!readinessCheck) {
+              readinessCheck = (async () => {
+                const available = await checkBackendAvailability({
+                  probeRecovery: true,
+                })
+                if (
+                  active &&
+                  available &&
+                  typeof verifyReadiness === 'function'
+                ) {
+                  try {
+                    await verifyReadiness()
+                    controller.markRuntimeReady()
+                  } catch {
+                    active = true
+                  }
+                }
+              })()
+            }
+            const currentCheck = readinessCheck
+            await currentCheck
+            if (readinessCheck === currentCheck) readinessCheck = null
+            response.statusCode = 200
+            response.end(
+              JSON.stringify({
+                schemaVersion: DEV_RUNTIME_STATUS_SCHEMA,
+                status: active ? 'blocked' : 'ready',
+              })
+            )
+            return
+          }
           const acceptsHtml = String(request.headers?.accept || '').includes(
             'text/html'
           )
@@ -135,22 +179,11 @@ export function createDevDatabaseMigrationRecoveryController({
             return
           }
           if (isBusinessRequest || pathname.startsWith('/__dev/api/')) {
-            sendRecoveryBlocked(response, recoveryRoute())
+            sendRecoveryBlocked(response)
             return
           }
-          const isRecoveryDocument =
-            pathname === DEV_DATABASE_MIGRATION_RECOVERY_ROUTE ||
-            pathname === `${DEV_DATABASE_MIGRATION_RECOVERY_ROUTE}/` ||
-            (recoveryRoute() === DEV_BACKEND_RECOVERY_ROUTE &&
-              (pathname === '/__dev' ||
-                pathname === DEV_BACKEND_RECOVERY_ROUTE))
-          if (request.method === 'GET' && acceptsHtml && !isRecoveryDocument) {
-            response.statusCode = 302
-            setRecoveryHeaders(response)
-            response.setHeader('location', recoveryRoute())
-            response.end()
-            return
-          }
+          // Serve the application at its original URL; the DEV boundary blocks
+          // business routes while the migration page remains directly reachable.
           next()
         })
       },
@@ -161,9 +194,7 @@ export function createDevDatabaseMigrationRecoveryController({
             injectTo: 'head-prepend',
             children: `window[${JSON.stringify(
               DEV_DATABASE_MIGRATION_RECOVERY_GLOBAL
-            )}] = ${active ? 'true' : 'false'}; window[${JSON.stringify(
-              DEV_RUNTIME_RECOVERY_ROUTE_GLOBAL
-            )}] = ${JSON.stringify(recoveryRoute())};`,
+            )}] = ${active ? 'true' : 'false'};`,
           },
           {
             tag: 'script',

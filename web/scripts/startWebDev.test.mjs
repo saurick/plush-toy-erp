@@ -81,7 +81,10 @@ test('start web dev: pending migration 启动受限恢复页而不是退出', as
   assert.equal(startup.complete, false)
   assert.equal(startup.recoveryMode, LOCAL_RUNTIME_RECOVERY_MODE)
   assert.equal(startup.recoveryReason, 'database_migration_pending')
-  assert.match(output.join('\n'), /恢复模式.*普通 ERP 页面与 RPC 暂停/u)
+  assert.match(
+    output.join('\n'),
+    /业务入口保留原地址.*服务不可用提示.*RPC 暂停/u
+  )
 })
 
 test('start web dev: 未分类的本地预检错误仍可进入恢复页且不泄露原始错误', async () => {
@@ -179,11 +182,12 @@ test('start web dev: 冷启动只启动一次后端，再通过完整预检开�
       preflight: async (_options, runtime) => {
         calls.push('preflight')
         assert.equal(runtime.endpointTimeoutMs, ready ? undefined : 1000)
-        if (!ready)
+        if (!ready) {
           throw new LocalRuntimePreflightError(
             'local_backend_unavailable',
             '未启动'
           )
+        }
         return { complete: true, apiOrigin: 'http://127.0.0.1:8300' }
       },
       startBackend: async () => {
@@ -206,11 +210,12 @@ test('start web dev: 冷启动构建不受只读预检时限截断', async () =>
       timeoutMs: 20,
       preflight: async () => {
         checks++
-        if (checks === 1)
+        if (checks === 1) {
           throw new LocalRuntimePreflightError(
             'local_backend_unavailable',
             '未启动'
           )
+        }
         return { complete: true }
       },
       startBackend: async () => {
@@ -251,11 +256,12 @@ test('start web dev: 后端启动或复验失败保留恢复页且不自动重�
         },
         startBackend: async () => {
           starts++
-          if (startFails)
+          if (startFails) {
             throw new LocalRuntimePreflightError(
               'local_backend_start_failed',
               '启动失败'
             )
+          }
           return true
         },
         writeLine: () => {},

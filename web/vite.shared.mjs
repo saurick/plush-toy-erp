@@ -3,10 +3,7 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
-import {
-  normalizeDevRuntimeRecoveryMode,
-  resolveDevRuntimeRecoveryRoute,
-} from './src/dev-workbench/config/devRuntimeRecovery.mjs'
+import { normalizeDevRuntimeRecoveryMode } from './src/dev-workbench/config/devRuntimeRecovery.mjs'
 import { loadDevPorts } from '../scripts/dev-ports.mjs'
 import { normalizeAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
 import {
@@ -208,9 +205,7 @@ export function createERPViteConfig(appId) {
         host: '0.0.0.0',
         port: serverPort,
         strictPort: true,
-        open: recoveryMode
-          ? `${createDevOrigin(serverPort)}${resolveDevRuntimeRecoveryRoute(process.env.ERP_DEV_RECOVERY_REASON)}`
-          : createDevOrigin(serverPort),
+        open: createDevOrigin(serverPort),
         hmr: {
           host: process.env.ERP_VITE_HMR_HOST?.trim() || DEV_HOST,
           clientPort: hmrClientPort,

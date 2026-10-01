@@ -24,6 +24,11 @@ import '@/common/components/empty/empty-state.css'
 dayjs.locale('zh-cn')
 
 const ERPRouter = lazyWithDynamicImportRetry(() => import('@/erp/router'))
+const DevRuntimeRecoveryBoundary = import.meta.env.DEV
+  ? lazyWithDynamicImportRetry(
+      () => import('@/dev-workbench/components/DevRuntimeRecoveryBoundary.jsx')
+    )
+  : null
 
 function AppContent() {
   const location = useLocation()
@@ -32,6 +37,7 @@ function AppContent() {
   const activeBrand = getActiveERPBrand()
   const isDevWorkbenchRoute =
     import.meta.env.DEV && /^\/__dev(?:\/|$)/u.test(location.pathname)
+  const routes = <ERPRouter />
 
   useEffect(() => {
     return authBus.onUnauthorized(({ from, message, loginPath }) => {
@@ -96,7 +102,11 @@ function AppContent() {
         </Helmet>
       ) : null}
       <Suspense fallback={null}>
-        <ERPRouter />
+        {DevRuntimeRecoveryBoundary ? (
+          <DevRuntimeRecoveryBoundary>{routes}</DevRuntimeRecoveryBoundary>
+        ) : (
+          routes
+        )}
       </Suspense>
     </>
   )
@@ -147,17 +157,11 @@ function ThemedApp() {
           colorBgBase: isDark ? ERP_DARK_PALETTE.page : '#ffffff',
           colorBgLayout: isDark ? ERP_DARK_PALETTE.page : '#f2f5f3',
           colorBgContainer: isDark ? ERP_DARK_PALETTE.surface : '#ffffff',
-          colorBgElevated: isDark
-            ? ERP_DARK_PALETTE.surfaceRaised
-            : '#ffffff',
+          colorBgElevated: isDark ? ERP_DARK_PALETTE.surfaceRaised : '#ffffff',
           colorBorder: isDark ? ERP_DARK_PALETTE.border : '#dce4df',
-          colorBorderSecondary: isDark
-            ? ERP_DARK_PALETTE.border
-            : '#dce4df',
+          colorBorderSecondary: isDark ? ERP_DARK_PALETTE.border : '#dce4df',
           colorText: isDark ? ERP_DARK_PALETTE.text : '#1f2a24',
-          colorTextSecondary: isDark
-            ? ERP_DARK_PALETTE.textMuted
-            : '#4d5d53',
+          colorTextSecondary: isDark ? ERP_DARK_PALETTE.textMuted : '#4d5d53',
         },
       }}
     >

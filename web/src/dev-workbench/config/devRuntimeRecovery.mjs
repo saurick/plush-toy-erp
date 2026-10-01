@@ -1,26 +1,11 @@
 export const DEV_DATABASE_MIGRATION_RECOVERY_MODE = 'database-migration'
 export const DEV_DATABASE_MIGRATION_RECOVERY_ROUTE = '/__dev/database-migration'
-export const DEV_BACKEND_RECOVERY_ROUTE = '/__dev/'
 export const DEV_DATABASE_MIGRATION_RECOVERY_GLOBAL =
   '__PLUSH_DEV_DATABASE_MIGRATION_RECOVERY_ACTIVE__'
-export const DEV_RUNTIME_RECOVERY_ROUTE_GLOBAL =
-  '__PLUSH_DEV_RUNTIME_RECOVERY_ROUTE__'
 export const DEV_RUNTIME_RECOVERY_HEADER = 'x-plush-dev-recovery-route'
-
-export function resolveDevRuntimeRecoveryRoute(reason = '') {
-  return ['local_backend_unavailable', 'local_backend_start_failed'].includes(
-    reason
-  )
-    ? DEV_BACKEND_RECOVERY_ROUTE
-    : DEV_DATABASE_MIGRATION_RECOVERY_ROUTE
-}
-
-export function getDevRuntimeRecoveryRoute(scope = globalThis) {
-  return scope?.[DEV_RUNTIME_RECOVERY_ROUTE_GLOBAL] ===
-    DEV_BACKEND_RECOVERY_ROUTE
-    ? DEV_BACKEND_RECOVERY_ROUTE
-    : DEV_DATABASE_MIGRATION_RECOVERY_ROUTE
-}
+export const DEV_RUNTIME_RECOVERY_EVENT = 'plush:dev-runtime-recovery'
+export const DEV_RUNTIME_STATUS_API_PATH = '/__dev/api/runtime-status'
+export const DEV_RUNTIME_STATUS_SCHEMA = 'plush.dev-runtime-status/v1'
 
 export function normalizeDevRuntimeRecoveryMode(value = '') {
   const normalized = String(value || '').trim()
@@ -34,7 +19,6 @@ export function isDevDatabaseMigrationRecoveryActive(scope = globalThis) {
   return scope?.[DEV_DATABASE_MIGRATION_RECOVERY_GLOBAL] === true
 }
 
-const redirectingScopes = new WeakSet()
 const monitoredFetchScopes = new WeakSet()
 
 export function installDevRuntimeRecoveryFetch(scope = globalThis) {
@@ -44,28 +28,66 @@ export function installDevRuntimeRecoveryFetch(scope = globalThis) {
   const originalFetch = scope.fetch.bind(scope)
   scope.fetch = async (...args) => {
     const response = await originalFetch(...args)
-    redirectDevRuntimeRecovery(response, scope)
+    activateDevRuntimeRecovery(response, scope)
     return response
   }
   monitoredFetchScopes.add(scope)
   return true
 }
 
-export function redirectDevRuntimeRecovery(response, scope = globalThis) {
+export function activateDevRuntimeRecovery(response, scope = globalThis) {
   const route = response.headers?.get(DEV_RUNTIME_RECOVERY_HEADER)
   if (
     response.status !== 503 ||
-    ![
-      DEV_BACKEND_RECOVERY_ROUTE,
-      DEV_DATABASE_MIGRATION_RECOVERY_ROUTE,
-    ].includes(route) ||
+    route !== DEV_DATABASE_MIGRATION_RECOVERY_ROUTE ||
     !scope.location ||
     /^\/__dev(?:\/|$)/u.test(scope.location.pathname) ||
-    redirectingScopes.has(scope)
+    isDevDatabaseMigrationRecoveryActive(scope)
   ) {
     return false
   }
-  redirectingScopes.add(scope)
-  scope.location.replace(route)
+  scope[DEV_DATABASE_MIGRATION_RECOVERY_GLOBAL] = true
+  scope.dispatchEvent?.(new Event(DEV_RUNTIME_RECOVERY_EVENT))
   return true
+}
+
+export function startDevRuntimeRecoveryMonitor(
+  onReady,
+  { scope = globalThis, intervalMs = 3000 } = {}
+) {
+  let stopped = false
+  let timer
+  const controller = new AbortController()
+  const check = async () => {
+    try {
+      const response = await scope.fetch(DEV_RUNTIME_STATUS_API_PATH, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(20_000),
+        ]),
+      })
+      const result = response.ok ? await response.json() : null
+      if (
+        !stopped &&
+        result?.schemaVersion === DEV_RUNTIME_STATUS_SCHEMA &&
+        result.status === 'ready'
+      ) {
+        stopped = true
+        scope[DEV_DATABASE_MIGRATION_RECOVERY_GLOBAL] = false
+        onReady()
+      }
+    } catch {
+      // Only the read-only status probe is repeated; business requests are not.
+    } finally {
+      if (!stopped) timer = scope.setTimeout(check, intervalMs)
+    }
+  }
+  check()
+  return () => {
+    stopped = true
+    scope.clearTimeout(timer)
+    controller.abort()
+  }
 }

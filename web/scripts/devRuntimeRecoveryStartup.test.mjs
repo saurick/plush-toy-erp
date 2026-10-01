@@ -20,11 +20,11 @@ test('普通启动启用停服检查，仅前端调试清除遗留的检查开�
   )
 })
 
-test('无法启动的后端明确提示总览恢复入口，数据库阻断仍提示迁移页', async () => {
-  for (const [reason, route] of [
-    ['local_backend_unavailable', '/__dev/'],
-    ['local_backend_start_failed', '/__dev/'],
-    ['database_migration_pending', '/__dev/database-migration'],
+test('无法启动的后端和数据库阻断保留业务地址，仅提供显式恢复入口', async () => {
+  for (const reason of [
+    'local_backend_unavailable',
+    'local_backend_start_failed',
+    'database_migration_pending',
   ]) {
     const output = []
     await resolveWebRuntimeStartup(
@@ -38,6 +38,11 @@ test('无法启动的后端明确提示总览恢复入口，数据库阻断仍�
         writeLine: (line) => output.push(line),
       }
     )
-    assert.ok(output.join('\n').includes(`恢复模式：${route}；`))
+    assert.match(output.join('\n'), /业务入口保留原地址/u)
+    assert.match(
+      output.join('\n'),
+      /检查并恢复服务：\/__dev\/database-migration/u
+    )
+    assert.doesNotMatch(output.join('\n'), /恢复模式：\/__dev\//u)
   }
 })

@@ -13,7 +13,7 @@ import {
   RightOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Empty, Select, Tag, Tooltip, Typography } from 'antd'
+import { Button, Empty, Select, Tag, Tooltip, Typography } from 'antd'
 import { Link } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import DevEntrySourceDetails from '../components/DevEntrySourceDetails.jsx'
@@ -30,12 +30,10 @@ import {
 } from '../config/devHub.mjs'
 import {
   DEV_DELIVERY_ROUTE,
-  DEV_DATABASE_MIGRATION_ROUTE,
   DEV_PRODUCT_ENGINEERING_ROUTE,
   DEV_QUALITY_ROUTE,
   DEV_WORKBENCH_AREA_KEYS,
 } from '../config/devRoutes.mjs'
-import { isDevDatabaseMigrationRecoveryActive } from '../config/devRuntimeRecovery.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -223,7 +221,6 @@ function OverviewToolRow({ item, pinned = false, onTogglePinned }) {
 }
 
 export default function DevHubPage() {
-  const recoveryActive = isDevDatabaseMigrationRecoveryActive()
   const [keyword, setKeyword] = useState('')
   const [group, setGroup] = useState(DEV_HUB_ALL_GROUP)
   const [pinnedRoutes, setPinnedRoutes] = useState(readPinnedRoutes)
@@ -247,7 +244,7 @@ export default function DevHubPage() {
 
   return (
     <div className="erp-dev-hub-page erp-dev-hub-page--index erp-dev-overview-page erp-dev-workspace-page">
-      {recoveryActive ? null : <DevPageNav />}
+      <DevPageNav />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
           <ExperimentOutlined className="erp-dev-hub-header__icon" />
@@ -255,9 +252,7 @@ export default function DevHubPage() {
             研发效能工作台
           </Title>
           <Text className="erp-dev-hub-summary">
-            {recoveryActive
-              ? '先恢复本地服务，再进入电脑版或手机版业务页面。'
-              : '按改动、验证和交付的顺序选择下一步；只在需要时再查具体工具。'}
+            按改动、验证和交付的顺序选择下一步；只在需要时再查具体工具。
           </Text>
           <details className="erp-dev-overview-boundary">
             <summary>查看开发态边界</summary>
@@ -270,131 +265,109 @@ export default function DevHubPage() {
       </header>
 
       <main className="erp-dev-hub-shell">
-        {recoveryActive ? (
-          <Alert
-            type="warning"
-            showIcon
-            message="后端服务未启动或尚未就绪"
-            description={
-              <>
-                <Paragraph>
-                  电脑版和手机版暂时不可用，恢复服务后重新打开业务页面。
-                </Paragraph>
-                <Button type="primary" href={DEV_DATABASE_MIGRATION_ROUTE}>
-                  检查并恢复服务
-                </Button>
-              </>
-            }
-          />
-        ) : (
-          <>
+        <section
+          className="erp-dev-overview-start"
+          aria-labelledby="dev-overview-start-title"
+        >
+          <div className="erp-dev-overview-start__head">
+            <div>
+              <Text className="erp-dev-overview-start__eyebrow">当前任务</Text>
+              <Title level={2} id="dev-overview-start-title">
+                你现在要完成什么？
+              </Title>
+            </div>
+            <Text type="secondary">
+              通常从第一步开始；已经明确目标时，也可以直接进入对应阶段。
+            </Text>
+          </div>
+
+          {pinnedItems.length > 0 ? (
             <section
-              className="erp-dev-overview-start"
-              aria-labelledby="dev-overview-start-title"
+              className="erp-dev-overview-pinned"
+              aria-label="常用开发入口"
             >
-              <div className="erp-dev-overview-start__head">
-                <div>
-                  <Text className="erp-dev-overview-start__eyebrow">
-                    当前任务
-                  </Text>
-                  <Title level={2} id="dev-overview-start-title">
-                    你现在要完成什么？
-                  </Title>
-                </div>
-                <Text type="secondary">
-                  通常从第一步开始；已经明确目标时，也可以直接进入对应阶段。
-                </Text>
+              <div className="erp-dev-overview-pinned__head">
+                <Text strong>常用入口</Text>
+                <Text type="secondary">只保存在当前浏览器</Text>
               </div>
-
-              {pinnedItems.length > 0 ? (
-                <section
-                  className="erp-dev-overview-pinned"
-                  aria-label="常用开发入口"
-                >
-                  <div className="erp-dev-overview-pinned__head">
-                    <Text strong>常用入口</Text>
-                    <Text type="secondary">只保存在当前浏览器</Text>
-                  </div>
-                  <div className="erp-dev-overview-pinned__list">
-                    {pinnedItems.map((item) => (
-                      <PinnedShortcut
-                        key={item.key}
-                        item={item}
-                        onTogglePinned={handleTogglePinned}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              <ol className="erp-dev-overview-stage-list">
-                {OVERVIEW_STAGES.map((stage, index) => (
-                  <OverviewStage key={stage.key} stage={stage} index={index} />
+              <div className="erp-dev-overview-pinned__list">
+                {pinnedItems.map((item) => (
+                  <PinnedShortcut
+                    key={item.key}
+                    item={item}
+                    onTogglePinned={handleTogglePinned}
+                  />
                 ))}
-              </ol>
+              </div>
+            </section>
+          ) : null}
+
+          <ol className="erp-dev-overview-stage-list">
+            {OVERVIEW_STAGES.map((stage, index) => (
+              <OverviewStage key={stage.key} stage={stage} index={index} />
+            ))}
+          </ol>
+        </section>
+
+        <details className="erp-dev-overview-tools">
+          <summary>
+            <span>
+              <strong>需要找特定工具？查看全部入口</strong>
+              <small>支持搜索、分类和本地置顶</small>
+            </span>
+            <span>{DEV_HUB_ITEMS.length} 个入口</span>
+          </summary>
+          <div className="erp-dev-overview-tools__content">
+            <section
+              className="erp-dev-hub-toolbar"
+              aria-label="全部开发工具筛选"
+            >
+              <SearchInput
+                allowClear
+                aria-label="搜索全部开发工具"
+                placeholder="搜索具体工具或路径"
+                searchHint="可搜索工具名称、用途、路径、来源或边界"
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+              />
+              <Select
+                aria-label="全部开发工具分组"
+                className="erp-dev-hub-group-filter"
+                value={group}
+                options={groupOptions}
+                onChange={setGroup}
+              />
+              <Text className="erp-dev-hub-toolbar__note">
+                {keyword.trim() || group !== DEV_HUB_ALL_GROUP
+                  ? `匹配 ${items.length} 个入口`
+                  : `全部 ${items.length} 个入口`}
+              </Text>
             </section>
 
-            <details className="erp-dev-overview-tools">
-              <summary>
-                <span>
-                  <strong>需要找特定工具？查看全部入口</strong>
-                  <small>支持搜索、分类和本地置顶</small>
-                </span>
-                <span>{DEV_HUB_ITEMS.length} 个入口</span>
-              </summary>
-              <div className="erp-dev-overview-tools__content">
-                <section
-                  className="erp-dev-hub-toolbar"
-                  aria-label="全部开发工具筛选"
-                >
-                  <SearchInput
-                    allowClear
-                    aria-label="搜索全部开发工具"
-                    placeholder="搜索具体工具或路径"
-                    searchHint="可搜索工具名称、用途、路径、来源或边界"
-                    value={keyword}
-                    onChange={(event) => setKeyword(event.target.value)}
+            {items.length > 0 ? (
+              <section
+                className="erp-dev-overview-tool-list"
+                aria-label="全部开发工具"
+              >
+                {items.map((item) => (
+                  <OverviewToolRow
+                    key={item.key}
+                    item={item}
+                    pinned={pinnedRouteSet.has(item.route)}
+                    onTogglePinned={handleTogglePinned}
                   />
-                  <Select
-                    aria-label="全部开发工具分组"
-                    className="erp-dev-hub-group-filter"
-                    value={group}
-                    options={groupOptions}
-                    onChange={setGroup}
-                  />
-                  <Text className="erp-dev-hub-toolbar__note">
-                    {keyword.trim() || group !== DEV_HUB_ALL_GROUP
-                      ? `匹配 ${items.length} 个入口`
-                      : `全部 ${items.length} 个入口`}
-                  </Text>
-                </section>
-
-                {items.length > 0 ? (
-                  <section
-                    className="erp-dev-overview-tool-list"
-                    aria-label="全部开发工具"
-                  >
-                    {items.map((item) => (
-                      <OverviewToolRow
-                        key={item.key}
-                        item={item}
-                        pinned={pinnedRouteSet.has(item.route)}
-                        onTogglePinned={handleTogglePinned}
-                      />
-                    ))}
-                  </section>
-                ) : (
-                  <div className="erp-dev-overview-empty">
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="没有匹配的工具，请清空搜索或切换分类"
-                    />
-                  </div>
-                )}
+                ))}
+              </section>
+            ) : (
+              <div className="erp-dev-overview-empty">
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="没有匹配的工具，请清空搜索或切换分类"
+                />
               </div>
-            </details>
-          </>
-        )}
+            )}
+          </div>
+        </details>
       </main>
     </div>
   )
