@@ -73,43 +73,43 @@ func loadBusinessProgressRows(ctx context.Context, tx *stdsql.Tx, q biz.Business
 	}()
 	out = []*biz.BusinessProgressRow{}
 	for rows.Next() {
-		x := &biz.BusinessProgressRow{View: q.View}
+		progressRow := &biz.BusinessProgressRow{View: q.View}
 		var due, updated, ordered, shipped, completed stdsql.NullString
-		err = rows.Scan(&x.ID, &x.OrderNo, &x.Status, &x.Customer, &x.Product, &x.ProductCount, &x.ProductID, &x.SalesOwner, &due, &updated,
-			&x.Active, &x.Unlinked, &x.Unit, &ordered, &shipped, &x.DeliveryKnown, &x.EngineeringTotal, &x.EngineeringReady,
-			&x.Overdue, &x.DueSoon, &x.Blocked, &x.ProductionOrders, &x.ProductionClosed, &x.MaterialTotal, &x.MaterialPending,
-			&x.InProgressBatches, &x.OutsourcedBatches, &x.WaitingBatches, &x.RejectedBatches, &x.PlannedBatches, &x.OpenTasks, &x.BlockedTasks,
-			&x.UnassignedTasks, &x.AttentionTaskID, &x.AttentionTask, &x.AttentionReason, &x.AttentionOwner, &x.AttentionRole, &completed, &x.CurrentOperation, &x.OperationCount)
+		err = rows.Scan(&progressRow.ID, &progressRow.OrderNo, &progressRow.Status, &progressRow.Customer, &progressRow.Product, &progressRow.ProductCount, &progressRow.ProductID, &progressRow.SalesOwner, &due, &updated,
+			&progressRow.Active, &progressRow.Unlinked, &progressRow.Unit, &ordered, &shipped, &progressRow.DeliveryKnown, &progressRow.EngineeringTotal, &progressRow.EngineeringReady,
+			&progressRow.Overdue, &progressRow.DueSoon, &progressRow.Blocked, &progressRow.ProductionOrders, &progressRow.ProductionClosed, &progressRow.MaterialTotal, &progressRow.MaterialPending,
+			&progressRow.InProgressBatches, &progressRow.OutsourcedBatches, &progressRow.WaitingBatches, &progressRow.RejectedBatches, &progressRow.PlannedBatches, &progressRow.OpenTasks, &progressRow.BlockedTasks,
+			&progressRow.UnassignedTasks, &progressRow.AttentionTaskID, &progressRow.AttentionTask, &progressRow.AttentionReason, &progressRow.AttentionOwner, &progressRow.AttentionRole, &completed, &progressRow.CurrentOperation, &progressRow.OperationCount)
 		if err != nil {
 			return nil, err
 		}
-		x.DueDate = progressDate(due.String)
-		x.UpdatedAt = updated.String
+		progressRow.DueDate = progressDate(due.String)
+		progressRow.UpdatedAt = updated.String
 		if ordered.Valid {
-			v, e := decimal.NewFromString(ordered.String)
-			if e != nil {
-				return nil, e
+			quantity, parseErr := decimal.NewFromString(ordered.String)
+			if parseErr != nil {
+				return nil, parseErr
 			}
-			s := v.String()
-			x.OrderedQuantity = &s
+			quantityText := quantity.String()
+			progressRow.OrderedQuantity = &quantityText
 		}
 		if shipped.Valid {
-			v, e := decimal.NewFromString(shipped.String)
-			if e != nil {
-				return nil, e
+			quantity, parseErr := decimal.NewFromString(shipped.String)
+			if parseErr != nil {
+				return nil, parseErr
 			}
-			s := v.String()
-			x.ShippedQuantity = &s
+			quantityText := quantity.String()
+			progressRow.ShippedQuantity = &quantityText
 		}
 		if completed.Valid {
-			v, e := decimal.NewFromString(completed.String)
-			if e != nil {
-				return nil, e
+			quantity, parseErr := decimal.NewFromString(completed.String)
+			if parseErr != nil {
+				return nil, parseErr
 			}
-			s := v.String()
-			x.CompletedQuantity = &s
+			quantityText := quantity.String()
+			progressRow.CompletedQuantity = &quantityText
 		}
-		out = append(out, x)
+		out = append(out, progressRow)
 	}
 	return out, rows.Err()
 }

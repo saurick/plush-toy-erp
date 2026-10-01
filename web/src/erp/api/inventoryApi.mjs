@@ -1,6 +1,10 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
-import { JsonRpc } from '@/common/utils/jsonRpc'
+import {
+  JsonRpc,
+  requireRpcEntity,
+  requireRpcPage,
+} from '@/common/utils/jsonRpc'
 import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const inventoryRpc = new JsonRpc({
@@ -9,17 +13,17 @@ const inventoryRpc = new JsonRpc({
   authScope: AUTH_SCOPE.ADMIN,
 })
 
-function dataOf(result) {
-  return result?.data || {}
-}
-
 export async function listInventoryBalances(params = {}, options = {}) {
   const result = await inventoryRpc.call(
     'list_inventory_balances',
     params,
     options
   )
-  return dataOf(result)
+  return requireRpcPage(
+    result,
+    'inventory_balances',
+    '库存余额数据不完整，请重新读取'
+  )
 }
 
 export async function listAllInventoryBalances(params = {}, options = {}) {
@@ -36,7 +40,11 @@ export async function listAllInventoryBalances(params = {}, options = {}) {
 
 export async function listInventoryLots(params = {}, options = {}) {
   const result = await inventoryRpc.call('list_inventory_lots', params, options)
-  return dataOf(result)
+  return requireRpcPage(
+    result,
+    'inventory_lots',
+    '库存批次数据不完整，请重新读取'
+  )
 }
 
 export async function listAllInventoryLots(params = {}, options = {}) {
@@ -53,7 +61,11 @@ export async function listAllInventoryLots(params = {}, options = {}) {
 
 export async function listInventoryTxns(params = {}, options = {}) {
   const result = await inventoryRpc.call('list_inventory_txns', params, options)
-  return dataOf(result)
+  return requireRpcPage(
+    result,
+    'inventory_txns',
+    '库存流水数据不完整，请重新读取'
+  )
 }
 
 export async function listAllInventoryTxns(params = {}, options = {}) {
@@ -70,7 +82,11 @@ export async function listAllInventoryTxns(params = {}, options = {}) {
 
 export async function createInventoryOperation(params = {}) {
   const result = await inventoryRpc.call('create_inventory_operation', params)
-  return dataOf(result)?.inventory_operation || null
+  return requireRpcEntity(
+    result,
+    'inventory_operation',
+    '库存操作创建结果不完整，请重新读取'
+  )
 }
 
 export async function saveInventoryOperationDraft(params = {}) {
@@ -78,17 +94,29 @@ export async function saveInventoryOperationDraft(params = {}) {
     'save_inventory_operation_draft',
     params
   )
-  return dataOf(result)?.inventory_operation || null
+  return requireRpcEntity(
+    result,
+    'inventory_operation',
+    '库存操作保存结果不完整，请重新读取'
+  )
 }
 
 export async function postInventoryOperation(params = {}) {
   const result = await inventoryRpc.call('post_inventory_operation', params)
-  return dataOf(result)?.inventory_operation || null
+  return requireRpcEntity(
+    result,
+    'inventory_operation',
+    '库存操作过账结果不完整，请重新读取'
+  )
 }
 
 export async function cancelInventoryOperation(params = {}) {
   const result = await inventoryRpc.call('cancel_inventory_operation', params)
-  return dataOf(result)?.inventory_operation || null
+  return requireRpcEntity(
+    result,
+    'inventory_operation',
+    '库存操作取消结果不完整，请重新读取'
+  )
 }
 
 export async function getInventoryOperation(params = {}, options = {}) {
@@ -97,7 +125,11 @@ export async function getInventoryOperation(params = {}, options = {}) {
     params,
     options
   )
-  return dataOf(result)?.inventory_operation || null
+  return requireRpcEntity(
+    result,
+    'inventory_operation',
+    '库存操作详情不完整，请重新读取'
+  )
 }
 
 export async function listInventoryOperations(params = {}, options = {}) {
@@ -106,5 +138,9 @@ export async function listInventoryOperations(params = {}, options = {}) {
     params,
     options
   )
-  return dataOf(result)
+  return requireRpcPage(
+    result,
+    'inventory_operations',
+    '库存操作列表不完整，请重新读取'
+  )
 }

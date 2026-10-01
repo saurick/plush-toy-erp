@@ -246,7 +246,7 @@ test('outsourcing page delegates complete paginated datasets to listAll contract
 
 test('outsourcing order source actions submit only source-owned form values', () => {
   const actionSource = sourceFactActions.slice(
-    sourceFactActions.indexOf('const submitOutsourcingSourceFact'),
+    sourceFactActions.indexOf('const saveOutsourcingSourceFactDraft'),
     sourceFactActions.lastIndexOf('return {')
   )
   assert.match(actionSource, /buildOutsourcingSourceFactPayload/u)

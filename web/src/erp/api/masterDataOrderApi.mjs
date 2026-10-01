@@ -1,6 +1,6 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
-import { JsonRpc } from '@/common/utils/jsonRpc'
+import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
 
 import {
   listAllSourceDocumentItems,
@@ -66,10 +66,6 @@ const outsourcingOrderRpc = new JsonRpc({
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
-
-function dataOf(result) {
-  return result?.data || {}
-}
 
 function invalidSourceDocumentMutationResponse() {
   const error = new Error('服务器返回的单据信息不完整，请核对后重试')

@@ -7,6 +7,7 @@ export function SalesOrderImportImage({
   image,
   attachment,
   ownerID,
+  attachmentLoadState = 'ready',
   name = '订单产品',
 }) {
   const [src, setSrc] = useState('')
@@ -46,6 +47,13 @@ export function SalesOrderImportImage({
       if (url) URL.revokeObjectURL(url)
     }
   }, [image, attachment?.id, ownerID])
+  let placeholder = '原表无可读取图片'
+  if (attachmentLoadState === 'error') {
+    placeholder = '订单附件加载失败，请重试读取附件'
+  } else if (attachmentLoadState === 'loading' || attachment) {
+    placeholder = '图片加载中'
+  }
+  if (error) placeholder = '图片加载失败，请到订单附件重试'
   return src ? (
     <Image
       width={64}
@@ -55,13 +63,7 @@ export function SalesOrderImportImage({
       alt={`${name}原表图片`}
     />
   ) : (
-    <Typography.Text type="secondary">
-      {error
-        ? '图片加载失败，请到订单附件重试'
-        : attachment
-          ? '图片加载中'
-          : '原表无可读取图片'}
-    </Typography.Text>
+    <Typography.Text type="secondary">{placeholder}</Typography.Text>
   )
 }
 
@@ -70,6 +72,7 @@ export default function SalesOrderSourceEvidence({
   images = [],
   attachments = [],
   ownerID,
+  attachmentLoadState = 'ready',
 }) {
   if (!value?.row_number) return null
   return (
@@ -118,6 +121,7 @@ export default function SalesOrderSourceEvidence({
                     (item) => item.file_name === file && !item.withdrawn_at
                   )}
                   ownerID={ownerID}
+                  attachmentLoadState={attachmentLoadState}
                 />
               ))}
             </div>

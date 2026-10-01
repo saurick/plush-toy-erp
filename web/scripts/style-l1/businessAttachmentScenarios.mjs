@@ -2,8 +2,12 @@ import { readFileSync } from 'node:fs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 
-const PNG =
-  readFileSync(new URL('../../../scripts/qa/fixtures/manual-acceptance-image.png', import.meta.url)).toString('base64')
+const PNG = readFileSync(
+  new URL(
+    '../../../scripts/qa/fixtures/manual-acceptance-image.png',
+    import.meta.url
+  )
+).toString('base64')
 const LONG_NAME = `${'客户确认包装唛头与交付资料'.repeat(12)}.pdf`
 
 async function expandInlineAttachments(container) {
@@ -326,7 +330,9 @@ export function createBusinessAttachmentScenarios({
         })
         if (width <= 640) {
           files = []
-          await modal.getByRole('button', { name: '刷新列表', exact: true }).click()
+          await modal
+            .getByRole('button', { name: '刷新列表', exact: true })
+            .click()
           await modal.getByText('暂无附件', { exact: true }).waitFor()
           await geometry()
           await modal.screenshot({
@@ -341,13 +347,25 @@ export function createBusinessAttachmentScenarios({
         const imageRow = modal
           .locator('.business-attachment-panel__row')
           .filter({ hasText: '产品正面图.png' })
-        await imageRow.locator('.business-attachment-panel__thumbnail img').dispatchEvent('error')
-        await imageRow.locator('.business-attachment-panel__thumbnail').getByText('加载失败', { exact: true }).waitFor()
-        const thumbnailFits = await imageRow.locator('.business-attachment-panel__thumbnail').evaluate((box) => {
-          const status = box.querySelector('.erp-image-placeholder').getBoundingClientRect()
-          const bounds = box.getBoundingClientRect()
-          return status.width <= bounds.width + 1 && status.height <= bounds.height + 1
-        })
+        await imageRow
+          .locator('.business-attachment-panel__thumbnail img')
+          .dispatchEvent('error')
+        await imageRow
+          .locator('.business-attachment-panel__thumbnail')
+          .getByText('加载失败', { exact: true })
+          .waitFor()
+        const thumbnailFits = await imageRow
+          .locator('.business-attachment-panel__thumbnail')
+          .evaluate((box) => {
+            const status = box
+              .querySelector('.erp-image-placeholder')
+              .getBoundingClientRect()
+            const bounds = box.getBoundingClientRect()
+            return (
+              status.width <= bounds.width + 1 &&
+              status.height <= bounds.height + 1
+            )
+          })
         assert(thumbnailFits, '缩略图错误提示不能被裁切')
         await imageRow.getByRole('button', { name: '预览附件' }).click()
         const preview = page.getByRole('dialog', {
@@ -749,8 +767,16 @@ export function createBusinessAttachmentScenarios({
       await legacyBoundaryRow
         .getByRole('button', { name: '移除待上传附件' })
         .click()
-      assert.equal(await summary.isDisabled(), false, '移除待处理文件后恢复收起')
-      assert.equal(await summary.getAttribute('aria-expanded'), 'true', '文件行操作不收起附件')
+      assert.equal(
+        await summary.isDisabled(),
+        false,
+        '移除待处理文件后恢复收起'
+      )
+      assert.equal(
+        await summary.getAttribute('aria-expanded'),
+        'true',
+        '文件行操作不收起附件'
+      )
       await input.setInputFiles({
         name: '表单上传.txt',
         mimeType: 'text/plain',
@@ -969,8 +995,17 @@ export function createBusinessAttachmentScenarios({
           .getByRole('heading', { name: '查看 BOM 版本', exact: true })
           .waitFor()
         await panel.getByText('附件列表加载失败', { exact: true }).waitFor()
-        assert(await panel.locator('.business-attachment-panel__compact-summary').isDisabled())
-        assert.equal(await panel.locator('.business-attachment-panel__compact-summary').getAttribute('aria-expanded'), 'true')
+        assert(
+          await panel
+            .locator('.business-attachment-panel__compact-summary')
+            .isDisabled()
+        )
+        assert.equal(
+          await panel
+            .locator('.business-attachment-panel__compact-summary')
+            .getAttribute('aria-expanded'),
+          'true'
+        )
         await assertSettled()
         await panel
           .getByRole('button', { name: '重试加载', exact: true })
@@ -993,10 +1028,191 @@ export function createBusinessAttachmentScenarios({
       }
     },
   }
+  let recoverOrderAttachments = false
+  const orderAttachmentRecoveryScenario = {
+    name: 'sales-order-attachment-read-recovery',
+    path: '/erp/sales/project-orders/sales-orders',
+    auth: 'admin',
+    effectiveSession: customerRuntimeEffectiveSession,
+    viewport: { width: 1440, height: 900 },
+    beforeNavigate: async (page) => {
+      recoverOrderAttachments = false
+      await page.route('**/rpc/sales_order', async (route) => {
+        const { id, method, params = {} } = route.request().postDataJSON()
+        if (method !== 'list_sales_order_items') return route.fallback()
+        const line = {
+          id: 1,
+          sales_order_id: 1,
+          line_no: 1,
+          product_id: 1,
+          product_sku_id: 1,
+          product_code_snapshot: 'PROD-STYLE-L1',
+          product_name_snapshot: '样式产品',
+          sku_code_snapshot: 'SKU-STYLE-L1',
+          unit_id: 1,
+          unit_name_snapshot: '只',
+          ordered_quantity: '10',
+          unit_price: '12.50',
+          amount: '125.00',
+          line_status: 'open',
+          import_source: {
+            file_name: '模拟订单.xlsx',
+            sheet_name: '订单',
+            row_number: 2,
+            cells: [{ column: 'A', label: '设计师', value: '模拟设计师' }],
+            image_files: ['模拟产品.png'],
+          },
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              code: 0,
+              data: {
+                sales_order_items: [line],
+                total: 1,
+                source_version: 1,
+                limit: Number(params.limit || 50),
+                offset: Number(params.offset || 0),
+              },
+            },
+          }),
+        })
+      })
+      await page.route('**/rpc/attachment', async (route) => {
+        const { id, method, params = {} } = route.request().postDataJSON()
+        const attachment = {
+          id: 8822,
+          owner_type: 'sales_order',
+          owner_id: 1,
+          file_name: '模拟产品.png',
+          mime_type: 'image/png',
+          content_base64: PNG,
+        }
+        let data
+        if (
+          method === 'list_attachments' &&
+          params.owner_type === 'sales_order'
+        ) {
+          data = recoverOrderAttachments ? { attachments: [attachment] } : {}
+        } else if (
+          method === 'download_attachment' &&
+          params.id === attachment.id
+        ) {
+          data = { attachment }
+        } else {
+          return route.fallback()
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id,
+            result: { code: 0, data },
+          }),
+        })
+      })
+    },
+    verify: async (page) => {
+      await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
+      const editAction = page
+        .locator('[data-business-action-key="edit"]:visible')
+        .first()
+      if ((await editAction.count()) === 0) {
+        await page.getByRole('button', { name: /^更多操作，共/u }).click()
+      }
+      await page
+        .locator('[data-business-action-key="edit"]:visible')
+        .first()
+        .click()
+      const editor = page
+        .locator('.erp-business-form-page:not([hidden])')
+        .filter({ hasText: '编辑销售订单' })
+        .last()
+      await editor.getByText('订单附件加载失败', { exact: true }).waitFor()
+      const errorLayout = await editor
+        .locator('.ant-alert')
+        .filter({ hasText: '订单附件加载失败' })
+        .evaluate((node) => {
+          const alert = node.getBoundingClientRect()
+          const parent = node.parentElement.getBoundingClientRect()
+          const style = getComputedStyle(node.parentElement)
+          return {
+            alertWidth: alert.width,
+            parentWidth: parent.width,
+            display: style.display,
+            columns: style.gridTemplateColumns,
+          }
+        })
+      assert(
+        errorLayout.alertWidth >= errorLayout.parentWidth - 2,
+        JSON.stringify(errorLayout)
+      )
+      const sourceButton = editor.getByRole('button', {
+        name: '核对原表：订单 第 2 行',
+        exact: true,
+      })
+      await sourceButton.click()
+      const evidence = page.locator('.ant-popover:not(.ant-popover-hidden)')
+      await evidence
+        .getByText('订单附件加载失败，请重试读取附件', { exact: true })
+        .waitFor()
+      assert.equal(
+        await evidence.getByText('原表无可读取图片', { exact: true }).count(),
+        0
+      )
+      await sourceButton.click()
+      await editor.screenshot({
+        path: path.join(outputDir, 'sales-order-attachment-read-failed.png'),
+      })
+      recoverOrderAttachments = true
+      await editor
+        .getByRole('button', { name: '重试读取附件', exact: true })
+        .click()
+      await editor
+        .getByText('订单附件加载失败', { exact: true })
+        .waitFor({ state: 'hidden' })
+      await sourceButton.click()
+      await evidence.locator('img[alt="订单产品原表图片"]').waitFor()
+      await page.setViewportSize({ width: 390, height: 844 })
+      const bounds = await evidence.evaluate((node) => ({
+        width: node.clientWidth,
+        scrollWidth: node.scrollWidth,
+      }))
+      assert(bounds.scrollWidth <= bounds.width + 1, JSON.stringify(bounds))
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await sourceButton.click()
+      await editor
+        .getByRole('button', { name: '返回列表', exact: true })
+        .click()
+      await editor.waitFor({ state: 'hidden' })
+      await page.getByRole('button', { name: /新建订单/u }).click()
+      const newEditor = page
+        .locator('.erp-business-form-page:not([hidden])')
+        .filter({ hasText: '新建销售订单' })
+        .last()
+      await newEditor.waitFor()
+      assert.equal(
+        await newEditor
+          .getByRole('button', { name: '重试读取附件', exact: true })
+          .count(),
+        0
+      )
+    },
+  }
   return [
     ...managerScenarios,
     formBusyScenario,
-    { ...formBusyScenario, name: 'business-attachment-form-busy-dark', themeMode: 'dark' },
+    {
+      ...formBusyScenario,
+      name: 'business-attachment-form-busy-dark',
+      themeMode: 'dark',
+    },
     ownerLifecycleScenario,
+    orderAttachmentRecoveryScenario,
   ]
 }

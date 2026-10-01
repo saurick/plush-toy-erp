@@ -126,19 +126,10 @@ test('modal uses only canonical batch statuses and operation snapshot fields', (
 test('assignment, split and rework preserve quantity and external-contract boundaries', () => {
   assert.match(source, /PRODUCTION_WIP_ACTION\.SPLIT_BATCH/u)
   assert.match(source, /拆分数量必须小于当前批次数量/u)
-  assert.match(source, /buildProductionWipConservingSplits/u)
-  assert.match(
-    source,
-    /buildProductionWipConservingSplits\(\s*selectedBatch\.quantity,\s*values\.quantity\s*\)/u
-  )
+  assert.match(source, /buildProductionWipFormPayload/u)
+  assert.match(source, /batch: selectedBatch/u)
+  assert.match(source, /materialRequirements: fabricMaterialRequirements/u)
   assert.doesNotMatch(source, /batch_no/u)
-  assert.match(source, /outsourcing_allocations/u)
-  assert.match(
-    source,
-    /outsourcing_order_item_id:\s*values\.outsourcing_order_item_id/u
-  )
-  assert.match(source, /production_order_material_requirement_id/u)
-  assert.match(source, /fabricMaterialRequirements\.map/u)
   assert.match(source, /布料加工合同/u)
   assert.match(source, /同一份合同/u)
   assert.match(source, /外发开工前还必须把合同对应材料发料过账/u)
@@ -160,14 +151,7 @@ test('assignment, split and rework preserve quantity and external-contract bound
 
 test('packaging confirmation is item-level and shows only business evidence', () => {
   assert.match(source, /productionWipPackagingConfirmationForBatch/u)
-  assert.match(
-    source,
-    /production_order_item_id:\s*selectedBatch\.production_order_item_id/u
-  )
-  assert.match(
-    source,
-    /expected_version:\s*selectedPackagingConfirmation\?\.version/u
-  )
+  assert.match(source, /packagingConfirmation: selectedPackagingConfirmation/u)
   assert.match(source, /packaging_version_snapshot/u)
   assert.match(source, /包装版本/u)
   assert.match(source, /请填写已确认的包装版本/u)

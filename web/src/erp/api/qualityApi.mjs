@@ -1,6 +1,6 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
-import { JsonRpc } from '@/common/utils/jsonRpc'
+import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
 import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const qualityRpc = new JsonRpc({
@@ -8,10 +8,6 @@ const qualityRpc = new JsonRpc({
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
-
-function dataOf(result) {
-  return result?.data || {}
-}
 
 export async function listQualityInspections(params = {}, options = {}) {
   const result = await qualityRpc.call(

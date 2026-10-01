@@ -146,7 +146,7 @@ export async function loadBusinessCollaborationTasksForSource({
       )
       if (!requestIsCurrent()) return { status: 'stale' }
 
-      const nextTasks = Array.isArray(data?.tasks) ? data.tasks : []
+      const nextTasks = data.tasks
       setTasks(nextTasks)
       setLoadState('ready')
       return { status: 'ready', tasks: nextTasks }

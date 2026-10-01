@@ -6,7 +6,24 @@ import {
   JsonRpc,
   isRpcAbortError,
   pauseAuthenticatedRpcCalls,
+  requireRpcData,
 } from './jsonRpc.js'
+
+test('required RPC data distinguishes malformed payloads from valid empty objects', () => {
+  for (const result of [
+    undefined,
+    {},
+    { data: null },
+    { data: [] },
+    { data: 'value' },
+  ]) {
+    assert.throws(
+      () => requireRpcData(result),
+      (error) => error.isInvalidResponse === true
+    )
+  }
+  assert.deepEqual(requireRpcData({ data: {} }), {})
+})
 
 function memoryStorage(initial = {}) {
   const values = new Map(Object.entries(initial))

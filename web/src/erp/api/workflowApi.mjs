@@ -1,6 +1,6 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
-import { JsonRpc } from '@/common/utils/jsonRpc'
+import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
 import { requireWorkflowProcessContext } from '../utils/processRuntimePresentation.mjs'
 import { requireWorkflowTaskMutationParams } from '../utils/workflowTaskMutation.mjs'
 import { requireWorkflowTaskBoardResponse } from '../utils/workflowTaskBoardContract.mjs'
@@ -96,10 +96,6 @@ const WORKFLOW_WORKBENCH_RESPONSE_KEYS = Object.freeze(
 const WORKFLOW_WORKBENCH_COUNT_KEYS = Object.freeze(
   ['actionable', 'approval', 'risk'].sort()
 )
-
-function dataOf(result) {
-  return result?.data || {}
-}
 
 function reportWorkflowProcessContextContractFailure() {
   console.warn('[workflow] 响应合同校验失败', {

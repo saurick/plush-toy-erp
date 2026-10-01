@@ -1,17 +1,16 @@
 import { normalizeApprovalCondition } from '../utils/approvalCondition.mjs'
 import { AUTH_SCOPE } from '../../common/auth/auth.js'
 import { ADMIN_BASE_PATH } from '../../common/utils/adminRpc.js'
-import { JsonRpc } from '../../common/utils/jsonRpc.js'
+import {
+  JsonRpc,
+  requireRpcData as dataOf,
+} from '../../common/utils/jsonRpc.js'
 
 const customerConfigRpc = new JsonRpc({
   url: 'customer_config',
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
-
-function dataOf(result) {
-  return result?.data || {}
-}
 
 function invalidApprovalSettingsResponse(message) {
   const error = new Error(message)
@@ -112,7 +111,9 @@ export function buildApprovalSettingsRevisionPayload(input = {}) {
 
 export async function getApprovalSettings(params = {}) {
   const result = await customerConfigRpc.call('get_approval_settings', params)
-  return requireApprovalSettings(dataOf(result)?.approval_settings)
+  return requireApprovalSettings(
+    dataOf(result, '审批责任数据不完整，请刷新后重试').approval_settings
+  )
 }
 
 export async function previewApprovalSettings(input = {}) {
@@ -120,7 +121,9 @@ export async function previewApprovalSettings(input = {}) {
     'preview_approval_settings',
     buildApprovalSettingsRevisionPayload(input)
   )
-  return requireApprovalSettings(dataOf(result)?.approval_settings)
+  return requireApprovalSettings(
+    dataOf(result, '审批责任数据不完整，请刷新后重试').approval_settings
+  )
 }
 
 export async function publishApprovalSettings(input = {}) {
@@ -128,7 +131,9 @@ export async function publishApprovalSettings(input = {}) {
     'publish_approval_settings',
     buildApprovalSettingsRevisionPayload(input)
   )
-  return requirePublishedRevision(dataOf(result)?.revision)
+  return requirePublishedRevision(
+    dataOf(result, '审批责任发布结果不完整，请刷新后重试').revision
+  )
 }
 
 export async function applyApprovalSettings(input = {}) {
@@ -136,5 +141,7 @@ export async function applyApprovalSettings(input = {}) {
     'apply_approval_settings',
     buildApprovalSettingsRevisionPayload(input)
   )
-  return requireAppliedRevision(dataOf(result)?.revision)
+  return requireAppliedRevision(
+    dataOf(result, '审批责任生效回执不完整，请重新确认').revision
+  )
 }

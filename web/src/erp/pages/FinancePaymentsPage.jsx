@@ -16,16 +16,13 @@ import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import BusinessFormSectionTitle from '../components/business-list/BusinessFormSectionTitle.jsx'
 import {
   cancelFinancePayment,
-  createFinanceCreditNote,
   createFinancePayment,
-  getFinanceCreditNote,
   getFinancePayment,
   listAllFinanceCreditNotes,
   listAllFinanceFacts,
   listAllFinancePayments,
   listFinanceCreditNotes,
   listFinancePayments,
-  reverseFinanceCreditNote,
   reverseFinancePayment,
 } from '../api/operationalFactApi.mjs'
 import {
@@ -79,15 +76,15 @@ import {
   sourceBusinessActionUUID,
 } from '../utils/sourceBusinessAction.mjs'
 import {
-  compareNumeric20Scale6Values,
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../utils/numeric20Scale6.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
-  validateFinanceAllocationDraft,
-  validateFinanceCreditDraft,
-} from '../utils/financePaymentAllocation.mjs'
+  buildFinanceCreditCommand,
+  executeFinanceCreditCommand,
+} from '../utils/financeCreditSubmission.mjs'
+import { validateFinanceAllocationDraft } from '../utils/financePaymentAllocation.mjs'
 import { resolveFinancePaymentActionAvailability } from '../utils/operationalActionAvailability.mjs'
 
 const PAYMENT_STORAGE_PREFIX = 'plush-erp:finance-payment:last:v1:'
@@ -873,98 +870,54 @@ export default function FinancePaymentsPage() {
     const source = financeFacts.find(
       (fact) => Number(fact.id) === Number(values.finance_fact_id)
     )
-    const payload = reverse
-      ? {
-          ...(customerKey ? { customer_key: customerKey } : {}),
-          credit_note_id: currentCredit.id,
-          credit_note_no: trimOptional(values.credit_note_no),
-          reason: trimOptional(values.reason),
-        }
-      : {
-          ...(customerKey ? { customer_key: customerKey } : {}),
-          credit_note_no: trimOptional(values.credit_note_no),
-          finance_fact_id: Number(values.finance_fact_id),
-          amount: String(values.amount).trim(),
-          reason: trimOptional(values.reason),
-        }
-    if (!reverse) {
-      const creditCheck = validateFinanceCreditDraft({
-        amount: payload.amount,
-        outstandingAmount: source?.outstanding_amount,
+    let command
+    try {
+      command = buildFinanceCreditCommand({
+        reverse,
+        values,
+        source,
+        currentCredit,
+        customerKey,
       })
-      if (!source || creditCheck.reason === 'SOURCE_CHANGED') {
-        message.error('来源应收或应付的未核销金额无法确认，请重新选择')
-        return
-      }
-      if (creditCheck.reason === 'EXCEEDS_OUTSTANDING') {
-        message.warning('红冲金额不能超过来源记录的当前未核销金额')
-        return
-      }
+    } catch (error) {
+      message[error.isCreditAmountWarning ? 'warning' : 'error'](
+        getActionErrorMessage(error, '准备红冲记录')
+      )
+      return
     }
-    const scope = `${reverse ? 'reverse-credit' : 'credit'}:${
-      reverse ? currentCredit.id : payload.finance_fact_id
-    }`
-    const attempt = attemptsRef.current.prepare(scope, payload)
     setLoading(true)
     try {
-      const credit = reverse
-        ? await reverseFinanceCreditNote(attempt.params)
-        : await createFinanceCreditNote(attempt.params)
-      const validCreate =
-        !reverse &&
-        Number(credit?.finance_fact_id) === Number(payload.finance_fact_id) &&
-        credit?.status === 'POSTED' &&
-        compareNumeric20Scale6Values(credit?.amount, payload.amount) === 0
-      const validReverse =
-        reverse &&
-        Number(credit?.reversal_of_credit_note_id) ===
-          Number(currentCredit?.id) &&
-        credit?.status === 'REVERSED'
-      if (!credit?.id || (!validCreate && !validReverse)) {
-        throw Object.assign(new Error('红冲结果暂时无法确认'), {
-          isInvalidResponse: true,
-        })
+      const result = await executeFinanceCreditCommand({
+        command,
+        attemptStore: attemptsRef.current,
+      })
+      if (result.outcome === 'unconfirmed') {
+        message[result.retained ? 'warning' : 'error'](
+          result.retained
+            ? '红冲结果暂时无法确认，请保持内容不变后重试'
+            : getActionErrorMessage(
+                result.error,
+                reverse ? '冲销红冲记录' : '登记红冲'
+              )
+        )
+        return
       }
-      attemptsRef.current.settle(scope, attempt, null)
       setCurrentCredit({
-        ...credit,
+        ...result.credit,
         source_no: source?.fact_no || currentCredit?.source_no,
       })
       setCreditOpen(false)
       await loadReferences()
-      message.success(reverse ? '红冲记录已冲销' : '红冲已登记')
+      message.success(
+        result.recovered
+          ? '已重新读取红冲冲销结果'
+          : reverse
+            ? '红冲记录已冲销'
+            : '红冲已登记'
+      )
     } catch (error) {
-      const retained = attemptsRef.current.settle(scope, attempt, error)
-      if (retained && reverse && currentCredit?.id) {
-        try {
-          const sourceCredit = await getFinanceCreditNote({
-            id: currentCredit.id,
-          })
-          const history = await listFinanceCreditNotes({
-            finance_fact_id: sourceCredit?.finance_fact_id,
-            limit: 50,
-            offset: 0,
-          })
-          const reversal = (history?.credit_notes || []).find(
-            (item) =>
-              Number(item?.reversal_of_credit_note_id) ===
-              Number(currentCredit.id)
-          )
-          if (reversal?.status === 'REVERSED') {
-            attemptsRef.current.settle(scope, attempt, null)
-            setCurrentCredit(reversal)
-            setCreditOpen(false)
-            message.success('已重新读取红冲冲销结果')
-            return
-          }
-        } catch {
-          // Keep the frozen intent for an exact retry when readback is unavailable.
-        }
-      }
-      message[retained ? 'warning' : 'error'](
-        retained
-          ? '红冲结果暂时无法确认，请保持内容不变后重试'
-          : getActionErrorMessage(error, reverse ? '冲销红冲记录' : '登记红冲')
+      message.error(
+        getActionErrorMessage(error, reverse ? '冲销红冲记录' : '登记红冲')
       )
     } finally {
       setLoading(false)

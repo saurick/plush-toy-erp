@@ -1,6 +1,6 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
-import { JsonRpc } from '@/common/utils/jsonRpc'
+import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
 import {
   positiveSafeInteger,
   requireProductionOrderKey,
@@ -15,10 +15,6 @@ const rpc = new JsonRpc({
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
-
-function dataOf(result) {
-  return result?.data || {}
-}
 
 function requireMutation(params, { id = false, version = false } = {}) {
   if (!params || typeof params !== 'object' || Array.isArray(params)) {

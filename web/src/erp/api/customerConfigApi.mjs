@@ -1,6 +1,6 @@
 import { AUTH_SCOPE } from '../../common/auth/auth.js'
 import { ADMIN_BASE_PATH } from '../../common/utils/adminRpc.js'
-import { JsonRpc } from '../../common/utils/jsonRpc.js'
+import { JsonRpc, requireRpcData as dataOf } from '../../common/utils/jsonRpc.js'
 import { buildCustomerConfigMutationPayload } from './customerConfigTransition.mjs'
 
 const customerConfigRpc = new JsonRpc({
@@ -8,10 +8,6 @@ const customerConfigRpc = new JsonRpc({
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
-
-function dataOf(result) {
-  return result?.data || {}
-}
 
 export async function getEffectiveSession(params = {}) {
   const result = await customerConfigRpc.call('get_effective_session', params)

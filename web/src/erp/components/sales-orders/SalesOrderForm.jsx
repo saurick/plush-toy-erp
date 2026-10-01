@@ -629,6 +629,7 @@ export function SalesOrderItemsFormSection({
   unitOptions = [],
   importImages = [],
   orderAttachments = [],
+  orderAttachmentLoadState = 'ready',
   orderID,
 }) {
   const [lineOrderOpen, setLineOrderOpen] = useState(false)
@@ -764,6 +765,7 @@ export function SalesOrderItemsFormSection({
                           <SalesOrderSourceEvidence
                             images={importImages}
                             attachments={orderAttachments}
+                            attachmentLoadState={orderAttachmentLoadState}
                             ownerID={orderID}
                           />
                         </Form.Item>

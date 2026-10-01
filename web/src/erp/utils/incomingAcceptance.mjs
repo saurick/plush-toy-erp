@@ -6,10 +6,10 @@ import {
 } from './numeric20Scale6.mjs'
 
 export function arrivalDifference(actual, declared) {
-  const a = numeric20Scale6Units(actual)
-  const d = numeric20Scale6Units(declared)
-  if (a === null || d === null) return '未比较'
-  const delta = BigInt(a) - BigInt(d)
+  const actualUnits = numeric20Scale6Units(actual)
+  const declaredUnits = numeric20Scale6Units(declared)
+  if (actualUnits === null || declaredUnits === null) return '未比较'
+  const delta = BigInt(actualUnits) - BigInt(declaredUnits)
   if (delta === BigInt(0)) return '一致'
   return `${delta < 0 ? '少' : '多'} ${numeric20Scale6TextFromUnits(
     (delta < 0 ? -delta : delta).toString()

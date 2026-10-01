@@ -43,16 +43,13 @@ import {
   listAllInventoryLots,
   listAllInventoryTxns,
   listInventoryBalances,
-  cancelInventoryOperation,
   createInventoryOperation,
   getInventoryOperation,
   listInventoryLots,
   listInventoryTxns,
-  postInventoryOperation,
   saveInventoryOperationDraft,
 } from '../api/inventoryApi.mjs'
 import {
-  executeInventoryAdjustmentPost,
   executeInventoryAdjustmentSubmit,
   findExceptionProcessActiveNode,
   getInventoryAdjustmentApprovalProcess,
@@ -86,6 +83,7 @@ import InventoryDistributionOverview from '../components/business-visualizations
 import { BusinessViewSwitch } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
 import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
+import { executeInventoryOperationTransition } from '../utils/inventoryOperationTransition.mjs'
 import InventoryOperationRecordsModal from '../components/inventory/InventoryOperationRecordsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import {
@@ -146,42 +144,6 @@ const INVENTORY_OPERATION_STATUS_LABELS = Object.freeze({
   POSTED: '已过账',
   CANCELLED: '已取消',
 })
-
-const INVENTORY_OPERATION_MUTATION_RECEIPTS = Object.freeze({
-  submit: {
-    status: 'SUBMITTED',
-    actorField: 'submitted_by',
-  },
-  post: {
-    status: 'POSTED',
-    actorField: 'posted_by',
-  },
-  cancel: {
-    status: 'CANCELLED',
-    actorField: 'cancelled_by',
-    reasonField: 'cancel_reason',
-  },
-})
-
-function inventoryOperationMutationReceiptMatches(
-  item,
-  previous,
-  action,
-  reason,
-  actorID
-) {
-  const receipt = INVENTORY_OPERATION_MUTATION_RECEIPTS[action]
-  return Boolean(
-    receipt &&
-      item?.id &&
-      Number(item.id) === Number(previous?.id) &&
-      Number(item.version) === Number(previous?.version) + 1 &&
-      item.status === receipt.status &&
-      Number(item[receipt.actorField]) === Number(actorID) &&
-      (!receipt.reasonField ||
-        String(item[receipt.reasonField] || '').trim() === reason.trim())
-  )
-}
 
 const VIEW_ITEMS = [
   { key: VIEW_BALANCES, label: '库存余额', children: null },
@@ -380,12 +342,12 @@ function relationRef(label, value) {
 
 function getRowsFromData(view, data) {
   if (view === VIEW_LOTS) {
-    return Array.isArray(data?.inventory_lots) ? data.inventory_lots : []
+    return data.inventory_lots
   }
   if (view === VIEW_TXNS) {
-    return Array.isArray(data?.inventory_txns) ? data.inventory_txns : []
+    return data.inventory_txns
   }
-  return Array.isArray(data?.inventory_balances) ? data.inventory_balances : []
+  return data.inventory_balances
 }
 
 function selectedLabelFor(view, row) {
@@ -792,7 +754,13 @@ export default function V1InventoryLedgerPage() {
       setDateFilterEnd('')
       resetCurrentPage()
     },
-    [resetCurrentPage, setActiveView, setBalanceDisplay, setDateFilterEnd, setDateFilterStart]
+    [
+      resetCurrentPage,
+      setActiveView,
+      setBalanceDisplay,
+      setDateFilterEnd,
+      setDateFilterStart,
+    ]
   )
 
   const activeLabel = VIEW_LABELS[activeView]
@@ -1273,138 +1241,33 @@ export default function V1InventoryLedgerPage() {
       if (!operation?.id || !operation?.version) return
       setOperationLoading(true)
       try {
-        const params = {
-          id: operation.id,
-          expected_version: operation.version,
-          ...(reason ? { reason: reason.trim() } : {}),
+        const result = await executeInventoryOperationTransition({
+          action,
+          reason,
+          operation,
+          customerKey,
+          actorID: Number(adminProfile?.id || 0),
+        })
+        if (!result) return
+        rememberInventoryOperation(result.operation)
+        if (result.outcome === 'changed') {
+          await loadRows()
+          message.warning('库存作业状态已被其他操作更新，请核对后重试')
+          return
         }
-        let next
-        if (
-          operation.operation_type === 'MANUAL_ADJUSTMENT' &&
-          (action === 'submit' || action === 'post')
-        ) {
-          let processData
-          if (action === 'submit') {
-            try {
-              processData = await startInventoryAdjustmentApprovalProcess({
-                ...(customerKey ? { customer_key: customerKey } : {}),
-                inventory_operation_id: operation.id,
-                idempotency_key: `inventory-adjustment-approval/${operation.id}`,
-              })
-            } catch (error) {
-              if (!isSourceBusinessActionResultUnknown(error)) throw error
-              processData = await getInventoryAdjustmentApprovalProcess({
-                ...(customerKey ? { customer_key: customerKey } : {}),
-                inventory_operation_id: operation.id,
-              })
-              if (!processData?.process_context) throw error
-            }
-          } else {
-            processData = await getInventoryAdjustmentApprovalProcess({
-              ...(customerKey ? { customer_key: customerKey } : {}),
-              inventory_operation_id: operation.id,
-            })
-          }
-          if (
-            action === 'submit' &&
-            processData.source_readback?.status !== 'DRAFT'
-          ) {
-            next = processData.source_readback
-          } else {
-            const nodeKey =
-              action === 'submit'
-                ? 'submit_inventory_adjustment'
-                : 'post_inventory_adjustment'
-            const node = findExceptionProcessActiveNode(processData, nodeKey)
-            const execute =
-              action === 'submit'
-                ? executeInventoryAdjustmentSubmit
-                : executeInventoryAdjustmentPost
-            const execution = await execute({
-              ...(customerKey ? { customer_key: customerKey } : {}),
-              process_instance_id:
-                processData.process_context.process_instance.id,
-              process_node_instance_id: node.id,
-              expected_version: node.version,
-              inventory_operation_id: operation.id,
-              idempotency_key: `inventory-adjustment-${action}/${operation.id}/${node.id}`,
-            })
-            next = execution.source_readback
-          }
-        } else {
-          const transition =
-            action === 'post'
-              ? postInventoryOperation
-              : action === 'cancel'
-                ? cancelInventoryOperation
-                : null
-          if (!transition) return
-          next = await transition(params)
-        }
-        if (
-          !inventoryOperationMutationReceiptMatches(
-            next,
-            operation,
-            action,
-            reason,
-            Number(adminProfile?.id || 0)
-          )
-        ) {
-          throw Object.assign(new Error('库存作业结果暂时无法确认'), {
-            isInvalidResponse: true,
-          })
-        }
-        rememberInventoryOperation(next)
         setOperationCancelOpen(false)
         setOperationCancelReason('')
         await loadRows()
         message.success(
-          {
-            submit: '人工库存调整已提交审批',
-            post: '库存作业已过账',
-            cancel: '库存作业已取消',
-          }[action] || '库存作业已更新'
+          result.recovered
+            ? '已重新读取库存作业结果'
+            : {
+                submit: '人工库存调整已提交审批',
+                post: '库存作业已过账',
+                cancel: '库存作业已取消',
+              }[action]
         )
       } catch (error) {
-        if (isSourceBusinessActionResultUnknown(error)) {
-          let recovered = null
-          if (
-            operation.operation_type === 'MANUAL_ADJUSTMENT' &&
-            (action === 'submit' || action === 'post')
-          ) {
-            recovered = await getInventoryAdjustmentApprovalProcess({
-              ...(customerKey ? { customer_key: customerKey } : {}),
-              inventory_operation_id: operation.id,
-            })
-              .then((data) => data.source_readback)
-              .catch(() => null)
-          }
-          if (!recovered) {
-            recovered = await getInventoryOperation({
-              id: operation.id,
-            }).catch(() => null)
-          }
-          if (
-            inventoryOperationMutationReceiptMatches(
-              recovered,
-              operation,
-              action,
-              reason,
-              Number(adminProfile?.id || 0)
-            )
-          ) {
-            rememberInventoryOperation(recovered)
-            await loadRows()
-            message.success('已重新读取库存作业结果')
-            return
-          }
-          if (recovered?.id) {
-            rememberInventoryOperation(recovered)
-            await loadRows()
-            message.warning('库存作业状态已被其他操作更新，请核对后重试')
-            return
-          }
-        }
         message.error(getActionErrorMessage(error, '处理库存作业'))
       } finally {
         setOperationLoading(false)
@@ -1418,6 +1281,7 @@ export default function V1InventoryLedgerPage() {
       rememberInventoryOperation,
     ]
   )
+
   const renderSubjectReference = useCallback(
     (value, record) => {
       if (record?.subject_type === 'PRODUCT') {
@@ -1974,21 +1838,21 @@ export default function V1InventoryLedgerPage() {
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
-      subjectType ||
-      stockCategory ||
-      subjectID ||
-      productSkuID ||
-      warehouseID ||
-      lotID ||
-      lotStatus ||
-      txnType ||
-      sourceType ||
-      dateFilterStart ||
-      dateFilterEnd ||
-      routeSourceID ||
-      routeSourceType ||
-      routeLotID ||
-      linkedKeyword
+    subjectType ||
+    stockCategory ||
+    subjectID ||
+    productSkuID ||
+    warehouseID ||
+    lotID ||
+    lotStatus ||
+    txnType ||
+    sourceType ||
+    dateFilterStart ||
+    dateFilterEnd ||
+    routeSourceID ||
+    routeSourceType ||
+    routeLotID ||
+    linkedKeyword
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -2004,7 +1868,21 @@ export default function V1InventoryLedgerPage() {
     setDateFilterStart('')
     setDateFilterEnd('')
     clearRouteContext()
-  }, [clearRouteContext, setDateFilterEnd, setDateFilterStart, setKeyword, setLotID, setLotStatus, setProductSkuID, setSourceType, setStockCategory, setSubjectID, setSubjectType, setTxnType, setWarehouseID])
+  }, [
+    clearRouteContext,
+    setDateFilterEnd,
+    setDateFilterStart,
+    setKeyword,
+    setLotID,
+    setLotStatus,
+    setProductSkuID,
+    setSourceType,
+    setStockCategory,
+    setSubjectID,
+    setSubjectType,
+    setTxnType,
+    setWarehouseID,
+  ])
   const openOperationCancellation = async () => {
     if (!currentOperation?.id) return
     if (

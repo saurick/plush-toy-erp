@@ -73,6 +73,17 @@ const EMPTY_SOURCE_FACT_CONTEXT = Object.freeze({
   facts: [],
 })
 
+const SOURCE_FACT_SUCCESS_TEXT = Object.freeze({
+  [OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE]: {
+    created: '委外发料草稿已生成，可在委外记录中继续办理',
+    recovered: '已重新读取并确认委外发料草稿，可在委外记录中继续办理',
+  },
+  [OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT]: {
+    created: '委外回货草稿已生成，可在委外记录中继续办理',
+    recovered: '已重新读取并确认委外回货草稿，可在委外记录中继续办理',
+  },
+})
+
 export function useOutsourcingSourceFacts({
   canReadOutsourcingFacts,
   canReadQualityInspection,
@@ -883,76 +894,61 @@ export function useOutsourcingSourceFacts({
     []
   )
 
-  const submitOutsourcingSourceFact = useCallback(
+  const saveOutsourcingSourceFactDraft = useCallback(
     async (values) => {
-      if (
-        sourceFactInFlightRef.current ||
-        !sourceFactContext.order ||
-        !sourceFactContext.item
-      ) {
-        return
-      }
-      const { actionType, order, item, facts, mode, record } = sourceFactContext
-      const canCreateAction =
+      const { actionType, order, record } = sourceFactContext
+      const action =
         actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
-          ? canCreateMaterialIssue
-          : actionType === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
-            ? canCreateReturnReceipt
-            : false
-      if (!canCreateAction) {
-        message.warning('当前账号没有办理该委外业务的权限')
+          ? OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_MATERIAL_ISSUE
+          : OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_RETURN_RECEIPT
+      let request
+      try {
+        request = {
+          ...buildOperationalFactDraftSavePayload(action, values, record),
+          ...(activeCustomerKey ? { customer_key: activeCustomerKey } : {}),
+        }
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '准备委外草稿'))
         return
       }
-
-      if (mode === 'edit') {
-        const action =
-          actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
-            ? OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_MATERIAL_ISSUE
-            : OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_RETURN_RECEIPT
-        let request
+      const save =
+        actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+          ? saveOutsourcingMaterialIssueDraft
+          : saveOutsourcingReturnReceiptDraft
+      sourceFactInFlightRef.current = true
+      setSourceFactLoading(true)
+      try {
         try {
-          request = {
-            ...buildOperationalFactDraftSavePayload(action, values, record),
-            ...(activeCustomerKey ? { customer_key: activeCustomerKey } : {}),
-          }
+          await save(request, record)
         } catch (error) {
-          message.error(getActionErrorMessage(error, '准备委外草稿'))
-          return
+          if (!isSourceBusinessActionResultUnknown(error)) throw error
+          const currentFacts = await loadRelatedOutsourcingFacts(order.id)
+          const confirmed = findOperationalFactDraftSaveResult(
+            currentFacts,
+            request,
+            record,
+            action
+          )
+          if (!confirmed) throw error
         }
-        const save =
-          actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
-            ? saveOutsourcingMaterialIssueDraft
-            : saveOutsourcingReturnReceiptDraft
-        sourceFactInFlightRef.current = true
-        setSourceFactLoading(true)
-        try {
-          try {
-            await save(request, record)
-          } catch (error) {
-            if (!isSourceBusinessActionResultUnknown(error)) throw error
-            const currentFacts = await loadRelatedOutsourcingFacts(order.id)
-            const confirmed = findOperationalFactDraftSaveResult(
-              currentFacts,
-              request,
-              record,
-              action
-            )
-            if (!confirmed) throw error
-          }
-          const refreshed = await loadRelatedOutsourcingFacts(order.id)
-          setRelatedReturnFacts(refreshed)
-          setSourceFactOpen(false)
-          setSourceFactContext(EMPTY_SOURCE_FACT_CONTEXT)
-          message.success('委外草稿已保存，请核对后再过账')
-        } catch (error) {
-          message.error(getActionErrorMessage(error, '保存委外草稿'))
-        } finally {
-          sourceFactInFlightRef.current = false
-          setSourceFactLoading(false)
-        }
-        return
+        const refreshed = await loadRelatedOutsourcingFacts(order.id)
+        setRelatedReturnFacts(refreshed)
+        setSourceFactOpen(false)
+        setSourceFactContext(EMPTY_SOURCE_FACT_CONTEXT)
+        message.success('委外草稿已保存，请核对后再过账')
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '保存委外草稿'))
+      } finally {
+        sourceFactInFlightRef.current = false
+        setSourceFactLoading(false)
       }
+    },
+    [activeCustomerKey, loadRelatedOutsourcingFacts, sourceFactContext]
+  )
 
+  const createOutsourcingSourceFact = useCallback(
+    async (values) => {
+      const { actionType, order, item, facts } = sourceFactContext
       let scope
       let attempt
       let params
@@ -1043,24 +1039,47 @@ export function useOutsourcingSourceFacts({
         setSourceFactOpen(false)
         setSourceFactContext(EMPTY_SOURCE_FACT_CONTEXT)
         message.success(
-          confirmedByReread
-            ? actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
-              ? '已重新读取并确认委外发料草稿，可在委外记录中继续办理'
-              : '已重新读取并确认委外回货草稿，可在委外记录中继续办理'
-            : actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
-              ? '委外发料草稿已生成，可在委外记录中继续办理'
-              : '委外回货草稿已生成，可在委外记录中继续办理'
+          SOURCE_FACT_SUCCESS_TEXT[actionType][
+            confirmedByReread ? 'recovered' : 'created'
+          ]
         )
       } finally {
         sourceFactInFlightRef.current = false
         setSourceFactLoading(false)
       }
     },
+    [activeCustomerKey, loadRelatedOutsourcingFacts, sourceFactContext]
+  )
+
+  const submitOutsourcingSourceFact = useCallback(
+    async (values) => {
+      if (
+        sourceFactInFlightRef.current ||
+        !sourceFactContext.order ||
+        !sourceFactContext.item
+      ) {
+        return
+      }
+      const { actionType, mode } = sourceFactContext
+      const permissions = {
+        [OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE]: canCreateMaterialIssue,
+        [OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT]: canCreateReturnReceipt,
+      }
+      if (!permissions[actionType]) {
+        message.warning('当前账号没有办理该委外业务的权限')
+        return
+      }
+      if (mode === 'edit') {
+        await saveOutsourcingSourceFactDraft(values)
+      } else {
+        await createOutsourcingSourceFact(values)
+      }
+    },
     [
-      activeCustomerKey,
       canCreateMaterialIssue,
       canCreateReturnReceipt,
-      loadRelatedOutsourcingFacts,
+      createOutsourcingSourceFact,
+      saveOutsourcingSourceFactDraft,
       sourceFactContext,
     ]
   )

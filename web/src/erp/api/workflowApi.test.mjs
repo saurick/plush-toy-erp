@@ -36,8 +36,9 @@ async function loadWorkflowApi(call) {
       "const ADMIN_BASE_PATH = '/admin'"
     )
     .replace(
-      "import { JsonRpc } from '@/common/utils/jsonRpc'",
-      `class JsonRpc {
+      "import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'",
+      `import { requireRpcData as dataOf } from '${new URL('../../common/utils/jsonRpc.js', import.meta.url).href}'
+      class JsonRpc {
         async call(method, params, options) {
           return globalThis.__workflowApiTestCall(method, params, options)
         }

@@ -41,7 +41,6 @@ import {
   PRODUCTION_WIP_FLOW_TYPE,
   PRODUCTION_WIP_QUANTITY_MAX_LENGTH,
   PRODUCTION_WIP_ROUTE_CODE,
-  buildProductionWipConservingSplits,
   buildProductionWipFabricContractOptions,
   buildProductionWipOutsourcingCandidateOptions,
   compareProductionWipQuantity,
@@ -65,6 +64,7 @@ import {
   productionWipUUID,
 } from '../../utils/productionWipModel.mjs'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import { buildProductionWipFormPayload } from '../../utils/productionWipFormPayload.mjs'
 
 const { Text, Title } = Typography
 
@@ -658,71 +658,16 @@ export default function ProductionRouteExecutionModal({
       if (error?.errorFields) return
       throw error
     }
-    const payload =
-      activeAction === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL
-        ? {
-            production_order_id: orderID,
-            production_order_item_id: selectedBatch.production_order_item_id,
-            expected_version: selectedPackagingConfirmation?.version,
-            packaging_version_snapshot: values.packaging_version_snapshot,
-            note: values.note,
-          }
-        : {
-            production_order_id: orderID,
-            production_wip_batch_id: selectedBatch.id,
-            expected_version: selectedBatch.version,
-            ...(activeAction === PRODUCTION_WIP_ACTION.SPLIT_BATCH
-              ? {
-                  splits: buildProductionWipConservingSplits(
-                    selectedBatch.quantity,
-                    values.quantity
-                  ),
-                }
-              : {}),
-            ...([
-              PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION,
-              PRODUCTION_WIP_ACTION.REWORK,
-            ].includes(activeAction)
-              ? {
-                  quantity:
-                    activeAction ===
-                    PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION
-                      ? selectedBatch.quantity
-                      : values.quantity,
-                }
-              : {}),
-            ...(activeAction === PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION
-              ? {
-                  execution_mode: values.execution_mode,
-                  outsourcing_allocations:
-                    values.execution_mode ===
-                    PRODUCTION_WIP_EXECUTION_MODE.OUTSOURCED
-                      ? isNormalFabricBatch
-                        ? fabricMaterialRequirements.map((requirement) => ({
-                            outsourcing_order_item_id:
-                              values.fabric_outsourcing_item_ids?.[
-                                String(requirement.id)
-                              ],
-                            production_order_material_requirement_id:
-                              requirement.id,
-                          }))
-                        : positiveSafeInteger(values.outsourcing_order_item_id)
-                          ? [
-                              {
-                                outsourcing_order_item_id:
-                                  values.outsourcing_order_item_id,
-                              },
-                            ]
-                          : []
-                      : [],
-                }
-              : {}),
-            target_operation_id:
-              activeAction === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION
-                ? nextOperation?.id
-                : values.target_operation_id,
-            reason: values.reason,
-          }
+    const payload = buildProductionWipFormPayload({
+      action: activeAction,
+      values,
+      orderID,
+      batch: selectedBatch,
+      nextOperation,
+      packagingConfirmation: selectedPackagingConfirmation,
+      isNormalFabricBatch,
+      materialRequirements: fabricMaterialRequirements,
+    })
     const signature = JSON.stringify({ action: activeAction, payload })
     if (actionAttemptRef.current?.signature !== signature) {
       actionAttemptRef.current = {

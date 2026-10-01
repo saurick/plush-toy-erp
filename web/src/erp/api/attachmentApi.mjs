@@ -1,6 +1,11 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
-import { JsonRpc } from '@/common/utils/jsonRpc'
+import {
+  JsonRpc,
+  requireRpcData as dataOf,
+  requireRpcArray,
+  requireRpcEntity,
+} from '@/common/utils/jsonRpc'
 import { assertBusinessAttachmentUploadParams } from '../utils/businessAttachmentContract.mjs'
 import { notifyProductImagesChanged } from '../utils/productImageReferences.mjs'
 
@@ -10,29 +15,37 @@ const attachmentRpc = new JsonRpc({
   authScope: AUTH_SCOPE.ADMIN,
 })
 
-function dataOf(result) {
-  return result?.data || {}
-}
-
 export async function listBusinessAttachments(params = {}) {
   const result = await attachmentRpc.call('list_attachments', params)
-  return dataOf(result)?.attachments || []
+  return requireRpcArray(
+    result,
+    'attachments',
+    '附件列表数据不完整，请重新读取'
+  )
 }
 
 export async function uploadBusinessAttachment(params = {}) {
   assertBusinessAttachmentUploadParams(params)
   const result = await attachmentRpc.call('upload_attachment', params)
-  return dataOf(result)?.attachment || null
+  return requireRpcEntity(
+    result,
+    'attachment',
+    '附件上传结果不完整，请重新读取'
+  )
 }
 
 export async function downloadBusinessAttachment(params = {}) {
   const result = await attachmentRpc.call('download_attachment', params)
-  return dataOf(result)?.attachment || null
+  return requireRpcEntity(result, 'attachment', '附件下载结果不完整，请重试')
 }
 
 export async function withdrawBusinessAttachment(params = {}) {
   const result = await attachmentRpc.call('withdraw_attachment', params)
-  return dataOf(result)?.attachment || null
+  return requireRpcEntity(
+    result,
+    'attachment',
+    '附件撤回结果不完整，请重新读取'
+  )
 }
 
 export async function listProductImages(params = {}) {
@@ -49,7 +62,7 @@ export async function listProductImageReferences(params = {}) {
     'list_product_image_references',
     params
   )
-  return dataOf(result)?.images || []
+  return requireRpcArray(result, 'images', '产品图片数据不完整，请重新读取')
 }
 
 export async function uploadProductImage(params = {}) {
@@ -70,6 +83,12 @@ export async function clearProductImage(params = {}) {
     ...rest,
     owner_id: productID,
   })
-  if (dataOf(result)?.cleared === true) notifyProductImagesChanged(productID)
-  return dataOf(result)?.cleared === true
+  const data = dataOf(result, '产品图片清除结果不完整，请重新读取')
+  if (data.cleared !== true) {
+    const error = new Error('产品图片清除结果不完整，请重新读取')
+    error.isInvalidResponse = true
+    throw error
+  }
+  notifyProductImagesChanged(productID)
+  return true
 }

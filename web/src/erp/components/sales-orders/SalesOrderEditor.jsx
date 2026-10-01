@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Form } from 'antd'
+import { Alert, Button, Form } from 'antd'
+import { getActionErrorMessage } from '../../../common/utils/errorMessage.js'
 import { listBusinessAttachments } from '../../api/attachmentApi.mjs'
 
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
@@ -37,14 +38,36 @@ export default function SalesOrderEditor({
   onPaymentConditionBlur,
 }) {
   const [attachments, setAttachments] = useState([])
+  const [attachmentLoadState, setAttachmentLoadState] = useState('ready')
+  const [attachmentLoadError, setAttachmentLoadError] = useState('')
+  const [attachmentRetry, setAttachmentRetry] = useState(0)
   useEffect(() => {
     let active = true
     setAttachments([])
-    if (open && editingOrder?.id) listBusinessAttachments({ owner_type: 'sales_order', owner_id: editingOrder.id }).then((items) => { if (active) setAttachments(items) }).catch(() => { if (active) setAttachments([]) })
+    setAttachmentLoadError('')
+    if (open && editingOrder?.id) {
+      setAttachmentLoadState('loading')
+      listBusinessAttachments({
+        owner_type: 'sales_order',
+        owner_id: editingOrder.id,
+      })
+        .then((items) => {
+          if (!active) return
+          setAttachments(items)
+          setAttachmentLoadState('ready')
+        })
+        .catch((error) => {
+          if (!active) return
+          setAttachmentLoadError(getActionErrorMessage(error, '加载订单附件'))
+          setAttachmentLoadState('error')
+        })
+    } else {
+      setAttachmentLoadState('ready')
+    }
     return () => {
       active = false
     }
-  }, [open, editingOrder?.id])
+  }, [open, editingOrder?.id, attachmentRetry])
   return (
     <BusinessFormPage
       form={form}
@@ -58,7 +81,27 @@ export default function SalesOrderEditor({
       <Form form={form} layout="vertical" className="erp-business-action-form">
         <SalesOrderFormFields
           itemsSection={
-            <BusinessFormSection title="订货明细" showHeading={false}>
+            <BusinessFormSection
+              title="订货明细"
+              showHeading={false}
+              layout="content"
+            >
+              {attachmentLoadState === 'error' ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  message="订单附件加载失败"
+                  description={attachmentLoadError}
+                  action={
+                    <Button
+                      onClick={() => setAttachmentRetry((retry) => retry + 1)}
+                    >
+                      重试读取附件
+                    </Button>
+                  }
+                />
+              ) : null}
               <SalesOrderItemsFormSection
                 form={form}
                 canCreateItem={canCreateItem}
@@ -68,6 +111,7 @@ export default function SalesOrderEditor({
                 unitOptions={unitOptions}
                 orderID={editingOrder?.id}
                 orderAttachments={attachments}
+                orderAttachmentLoadState={attachmentLoadState}
               />
             </BusinessFormSection>
           }

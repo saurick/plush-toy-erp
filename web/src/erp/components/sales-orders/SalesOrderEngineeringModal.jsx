@@ -63,9 +63,9 @@ function EngineeringRow({ field, form, context }) {
               placeholder="选择工程建立的产品"
               listItemHeight={48}
               optionRender={renderProductOption}
-              options={(context?.products || []).map((p) => ({
-                value: p.id,
-                label: `${p.code} / ${p.name}`,
+              options={(context?.products || []).map((product) => ({
+                value: product.id,
+                label: `${product.code} / ${product.name}`,
               }))}
               onChange={() => {
                 form.setFieldValue(

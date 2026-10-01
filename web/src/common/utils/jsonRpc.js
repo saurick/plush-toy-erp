@@ -41,6 +41,57 @@ function invalidSuccessResponse(httpStatus) {
   })
 }
 
+export function requireRpcData(
+  result,
+  message = '服务器返回的数据不完整，请刷新后重试'
+) {
+  const data = result?.data
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new RpcError(message, { isInvalidResponse: true })
+  }
+  return data
+}
+
+export function requireRpcArray(result, key, message) {
+  const data = requireRpcData(result, message)
+  if (!Array.isArray(data[key])) {
+    throw new RpcError(message, { isInvalidResponse: true })
+  }
+  return data[key]
+}
+
+export function requireRpcEntity(result, key, message) {
+  const value = requireRpcData(result, message)[key]
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    !Number.isSafeInteger(value.id) ||
+    value.id <= 0
+  ) {
+    throw new RpcError(message, { isInvalidResponse: true })
+  }
+  return value
+}
+
+export function requireRpcPage(result, key, message) {
+  const data = requireRpcData(result, message)
+  if (
+    !Array.isArray(data[key]) ||
+    !Number.isSafeInteger(data.total) ||
+    data.total < 0 ||
+    !Number.isSafeInteger(data.limit) ||
+    data.limit <= 0 ||
+    !Number.isSafeInteger(data.offset) ||
+    data.offset < 0 ||
+    data[key].length > data.limit ||
+    data[key].length > data.total
+  ) {
+    throw new RpcError(message, { isInvalidResponse: true })
+  }
+  return data
+}
+
 function validateSuccessResponse(json, expectedId, httpStatus) {
   if (
     !json ||
