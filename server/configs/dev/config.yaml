@@ -20,8 +20,8 @@ trace:
 data:
   # 主数据库，保存核心数据
   postgres:
-    # if true output sql
-    debug: true
+    # 日常开发关闭全量 SQL；数据库调试时可在 config.local.yaml 显式开启。
+    debug: false
     # dev 默认直连共享 PG `192.168.0.133:5432/plush_erp`；若你本机使用其他账号（如 zos_test_user），请通过 POSTGRES_DSN 或 config.local.yaml 覆盖。
     dsn: "postgres://test_user:change-this-shared-postgres-password@192.168.0.133:5432/plush_erp?sslmode=disable"
     maxOpenConns: 20

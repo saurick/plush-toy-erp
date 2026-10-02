@@ -682,8 +682,16 @@ test("the resident log view starts only after the runtime lock is released and s
     write: () => {},
   });
   assert.deepEqual(calls, [
-    { interactive: true, background: false },
-    { interactive: true, background: true },
+    {
+      interactive: true,
+      background: false,
+      logOptions: { level: "INFO", match: "", full: false },
+    },
+    {
+      interactive: true,
+      background: true,
+      logOptions: { level: "INFO", match: "", full: false },
+    },
   ]);
   calls.length = 0;
   await assert.rejects(
@@ -715,7 +723,54 @@ test("Codex and reused startup present the same service without keeping their ca
     }),
     result,
   );
-  assert.deepEqual(calls, [{ interactive: false, background: false }]);
+  assert.deepEqual(calls, [
+    {
+      interactive: false,
+      background: false,
+      logOptions: { level: "INFO", match: "", full: false },
+    },
+  ]);
+});
+
+test("dev restart passes log filters to the resident view and rejects invalid filters before runtime changes", async () => {
+  let starts = 0;
+  let viewed;
+  const dependencies = {
+    interactive: true,
+    write: () => {},
+    start: async () => {
+      starts++;
+      return {};
+    },
+    present: async (_root, options) => {
+      viewed = options;
+    },
+  };
+  await runWorkspaceRuntimeCLI(
+    [
+      "--restart",
+      "--log-level=WARN",
+      "--log-match=process_runtime",
+      "--log-full",
+    ],
+    dependencies,
+  );
+  assert.deepEqual(viewed, {
+    interactive: true,
+    background: false,
+    logOptions: { level: "WARN", match: "process_runtime", full: true },
+  });
+  for (const args of [
+    ["--log-level=bad"],
+    ["--log-match="],
+    ["--log-level"],
+    ["--unknown"],
+  ])
+    await assert.rejects(
+      runWorkspaceRuntimeCLI(args, dependencies),
+      /日志|不支持/u,
+    );
+  assert.equal(starts, 1);
 });
 
 test("a failed cutover restores the verified version under the same lock without claiming new source success", async (t) => {
@@ -764,7 +819,7 @@ test("CLI startup failures show the candidate log and redacted diagnostics witho
     error: "postgres://app:private-password@localhost/db",
   });
   await assert.rejects(
-    runWorkspaceRuntimeCLI([], {
+    runWorkspaceRuntimeCLI(["--log-level=FATAL", "--log-match=unrelated"], {
       root: "/test/project",
       write: (line) => lines.push(line),
       start: async () => {

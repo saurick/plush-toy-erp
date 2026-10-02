@@ -6,6 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { PassThrough } from "node:stream";
 import {
   readRuntimeConsole,
   showRuntimeConsole,
@@ -13,6 +14,8 @@ import {
   takeOverRuntimeDesktopViewers,
   formatRuntimeLogLine,
   readRuntimeLogPlan,
+  followRuntimeConsole,
+  parseRuntimeLogOptions,
 } from "./local-runtime-console.mjs";
 
 function fixture(t, name = "project") {
@@ -121,6 +124,190 @@ test("Kratos JSON becomes readable logs without losing diagnostics or trace fiel
   assert(!hostile.includes("private-password"));
   assert(!hostile.includes("\u001b"));
   assert(!hostile.includes("clipboard"));
+});
+
+test("routine logs stay compact while full views and warning/error stacks retain every field", () => {
+  const detail = `${"字段🙂".repeat(100)}诊断末尾`;
+  const entry = {
+    level: "INFO",
+    "logger.name": "data",
+    caller: "data/data.go:209",
+    msg: "数据库已连接",
+    request_id: "req-42",
+    "trace.id": "trace-42",
+    "span.id": "span-42",
+    trace_link_id: "trace-42",
+    trace_sampled: true,
+    detail,
+  };
+  const line = JSON.stringify(entry);
+  const compact = formatRuntimeLogLine(line);
+  assert(compact.includes("INFO  [data] 数据库已连接 request_id=req-42"));
+  assert(!compact.includes("\n"));
+  assert(!compact.includes("诊断末尾"));
+  assert(!compact.includes("\ufffd"));
+  assert(compact.includes("省略"));
+  assert(!compact.includes("logger.name="));
+  assert(compact.includes("trace.id=trace-42"));
+  assert(!compact.includes("span.id="));
+  assert(!compact.includes("trace_link_id="));
+  assert(!compact.includes("trace_sampled="));
+  const full = formatRuntimeLogLine(line, { full: true });
+  assert(full.includes(detail));
+  assert(full.includes(entry.caller));
+  assert(full.includes("span.id=span-42"));
+  assert(full.includes("trace_link_id=trace-42"));
+  assert(full.includes("trace_sampled=true"));
+  assert(
+    formatRuntimeLogLine(
+      JSON.stringify({
+        level: "INFO",
+        module: "service.jsonrpc",
+        msg: "请求完成",
+      }),
+    ).includes("[service.jsonrpc] 请求完成"),
+  );
+  for (const level of ["WARN", "ERROR", "FATAL"]) {
+    const diagnostic = formatRuntimeLogLine(
+      JSON.stringify({
+        ...entry,
+        level,
+        msg: `失败\n${detail}`,
+        stack: `stack\n${detail}`,
+      }),
+    );
+    assert(diagnostic.includes(`失败\n  ${detail}`));
+    assert(diagnostic.includes(`stack\n    ${detail}`));
+    assert(!diagnostic.includes("省略"));
+  }
+});
+
+test("log options accept literal keywords and reject invalid input before starting a service", () => {
+  assert.deepEqual(parseRuntimeLogOptions([]), {
+    args: [],
+    logOptions: { level: "INFO", match: "", full: false },
+  });
+  assert.deepEqual(
+    parseRuntimeLogOptions([
+      "--restart",
+      "--log-level=warn",
+      "--log-match=request_id=req-42",
+      "--log-full",
+    ]),
+    {
+      args: ["--restart"],
+      logOptions: { level: "WARN", match: "request_id=req-42", full: true },
+    },
+  );
+  for (const args of [
+    ["--log-level=verbose"],
+    ["--log-level="],
+    ["--log-match= "],
+    ["--log-match=bad\nkeyword"],
+  ])
+    assert.throws(() => parseRuntimeLogOptions(args), /日志/u);
+});
+
+test("startup replay and continuous output share filters without hiding ordinary text or panic", async (t) => {
+  const startup =
+    [
+      { level: "DEBUG", msg: "startup-debug" },
+      { level: "INFO", msg: "startup-info" },
+      { level: "ERROR", msg: "startup-error", request_id: "req-42" },
+    ]
+      .map(JSON.stringify)
+      .join("\n") + "\npanic: ordinary diagnostic\n";
+  for (const argv of [
+    [],
+    ["--log-level=ERROR", "--log-match=request_id=req-42"],
+    ["--log-level=DEBUG", "--log-full"],
+  ]) {
+    const root = fixture(t);
+    activate(root, { text: startup });
+    const controller = new AbortController();
+    const output = [];
+    let stopped = false;
+    const tail = new EventEmitter();
+    tail.stdout = new PassThrough();
+    tail.stderr = new PassThrough();
+    tail.kill = (signal) => {
+      assert.equal(signal, "SIGTERM");
+      stopped = true;
+      tail.stdout.end();
+      tail.stderr.end();
+    };
+    const { logOptions } = parseRuntimeLogOptions(argv);
+    await followRuntimeConsole(root, {
+      logOptions,
+      signal: controller.signal,
+      color: false,
+      write: (line) => output.push(line),
+      spawnTail: () => tail,
+      pause: async () => {
+        tail.stdout.write(
+          [
+            { level: "DEBUG", msg: "live-debug" },
+            { level: "INFO", msg: "live-info" },
+            { level: "ERROR", msg: "live-error", request_id: "req-42" },
+            { level: "ERROR", msg: "unrelated-error", request_id: "req-other" },
+          ]
+            .map(JSON.stringify)
+            .join("\n") + "\nraw stack continuation\n",
+        );
+        await new Promise((resolve) => setImmediate(resolve));
+        controller.abort();
+      },
+    });
+    const rendered = output.join("\n");
+    assert(rendered.includes("startup-error"));
+    assert(rendered.includes("live-error"));
+    assert(rendered.includes("panic: ordinary diagnostic"));
+    assert(rendered.includes("raw stack continuation"));
+    assert.equal(
+      rendered.includes("startup-debug"),
+      logOptions.level === "DEBUG",
+    );
+    assert.equal(rendered.includes("live-debug"), logOptions.level === "DEBUG");
+    assert.equal(
+      rendered.includes("startup-info"),
+      logOptions.level !== "ERROR",
+    );
+    assert.equal(rendered.includes("live-info"), logOptions.level !== "ERROR");
+    assert.equal(rendered.includes("unrelated-error"), !logOptions.match);
+    assert(stopped);
+    assert.doesNotThrow(() => process.kill(process.pid, 0));
+  }
+});
+
+test("keyword matching searches the full message before summary truncation", async (t) => {
+  const root = fixture(t);
+  activate(root, {
+    text:
+      JSON.stringify({
+        level: "INFO",
+        msg: "matched-log",
+        detail: `${"前缀".repeat(200)}literal .* keyword`,
+      }) + "\n",
+  });
+  const controller = new AbortController();
+  const output = [];
+  const tail = new EventEmitter();
+  tail.stdout = new PassThrough();
+  tail.stderr = new PassThrough();
+  tail.kill = () => {
+    tail.stdout.end();
+    tail.stderr.end();
+  };
+  await followRuntimeConsole(root, {
+    signal: controller.signal,
+    color: false,
+    logOptions: parseRuntimeLogOptions(["--log-match=literal .* keyword"])
+      .logOptions,
+    write: (line) => output.push(line),
+    spawnTail: () => tail,
+    pause: async () => controller.abort(),
+  });
+  assert(output.some((line) => line.includes("matched-log")));
 });
 
 test("opening a long-running service replays its full startup and recent output without repeating hours of SQL", (t) => {
@@ -272,6 +459,91 @@ test("CI and SSH never open a desktop terminal; explicit background never follow
   });
 });
 
+test("desktop launch safely preserves log keywords and replaces a viewer with different filters", async (t) => {
+  const root = fixture(t);
+  const script = path.join(root, "scripts/local-runtime-console.mjs");
+  const logOptions = {
+    level: "WARN",
+    match: "literal $(false) `false` ' keyword",
+    full: true,
+  };
+  const args = [
+    "--log-level=WARN",
+    `--log-match=${logOptions.match}`,
+    "--log-full",
+  ];
+  let commandFile;
+  let retired = 0;
+  await showRuntimeConsole(root, {
+    platform: "darwin",
+    env: {},
+    logOptions,
+    executable: "/bin/echo",
+    exists: () => true,
+    write: () => {},
+    takeOver: async (receivedRoot) => {
+      assert.equal(receivedRoot, root);
+      retired++;
+    },
+    inspect: async (command, receivedArgs) => {
+      if (command === "/usr/bin/open") {
+        commandFile = receivedArgs[2];
+        return { stdout: "" };
+      }
+      return {
+        stdout: `321 node ${script}${commandFile ? ` ${args.join(" ")}` : ""} --follow --desktop\n`,
+      };
+    },
+  });
+  assert.equal(retired, 1);
+  const stdout = execFileSync("/bin/sh", [commandFile], {
+    env: { SHELL: "/usr/bin/true" },
+    encoding: "utf8",
+  });
+  assert.equal(stdout.trim(), `${script} ${args.join(" ")} --follow --desktop`);
+});
+
+test("manual restart carries filters into both desktop and SSH log viewers", async (t) => {
+  const root = fixture(t);
+  activate(root);
+  const logOptions = { level: "DEBUG", match: "req-42", full: true };
+  await presentRuntimeConsole(root, {
+    interactive: true,
+    env: { TERM_PROGRAM: "Apple_Terminal" },
+    logOptions,
+    write: () => {},
+    takeOver: async () => ({ stopped: 0 }),
+    spawnConsole: (_command, args) => {
+      assert.deepEqual(args, [
+        path.join(root, "scripts/local-runtime-console.mjs"),
+        "--log-level=DEBUG",
+        "--log-match=req-42",
+        "--log-full",
+        "--follow",
+        "--desktop",
+      ]);
+      const child = new EventEmitter();
+      queueMicrotask(() => child.emit("close", 0, null));
+      return child;
+    },
+  });
+  await presentRuntimeConsole(root, {
+    interactive: true,
+    env: {},
+    logOptions,
+    write: () => {},
+    follow: async (_root, options) =>
+      assert.deepEqual(options.logOptions, logOptions),
+  });
+  await presentRuntimeConsole(root, {
+    interactive: false,
+    logOptions,
+    write: () => {},
+    show: async (_root, options) =>
+      assert.deepEqual(options.logOptions, logOptions),
+  });
+});
+
 test("a manual restart in a desktop terminal remains discoverable for later Codex startups", async (t) => {
   const root = fixture(t);
   activate(root);
@@ -370,7 +642,7 @@ test("failed log takeover still follows in the current terminal without touching
 
 test("log takeover verifies exact project command and start time before SIGTERM", async (t) => {
   const root = fixture(t);
-  const command = `node ${path.join(root, "scripts/local-runtime-console.mjs")} --follow --desktop`;
+  const command = `node ${path.join(root, "scripts/local-runtime-console.mjs")} --log-level=WARN --log-match=process runtime --follow --desktop`;
   const killed = [];
   await takeOverRuntimeDesktopViewers(root, {
     inspect: async (_, args) => ({
@@ -473,6 +745,7 @@ test(
     };
     await waitFor("first-service-log");
     await waitFor("boot-progress-79");
+    assert.equal(output.split("运行版本=").length - 1, 1);
     assert.equal(output.split("first-service-log").length - 1, 1);
     fs.appendFileSync(
       path.join(root, first.runtime.logFile),

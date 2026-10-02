@@ -13,6 +13,7 @@ import { checkLocalDatabaseMigrations } from "./local-runtime-preflight.mjs";
 import { isDevPortAvailable, loadDevPorts } from "./dev-ports.mjs";
 import {
   formatRuntimeLogLine,
+  parseRuntimeLogOptions,
   presentRuntimeConsole,
   writeRuntimeProgress,
 } from "./local-runtime-console.mjs";
@@ -237,7 +238,8 @@ export async function runWorkspaceRuntimeCLI(
     signals = process,
   } = {},
 ) {
-  for (const arg of argv) {
+  const { args, logOptions } = parseRuntimeLogOptions(argv);
+  for (const arg of args) {
     if (
       ![
         "--ensure",
@@ -298,7 +300,7 @@ export async function runWorkspaceRuntimeCLI(
       for (const line of redactDatabaseMigrationDiagnostic(error.diagnostic)
         .trim()
         .split("\n"))
-        write(formatRuntimeLogLine(line, { color: interactive }));
+        write(formatRuntimeLogLine(line, { color: interactive, full: true }));
     }
     throw error;
   } finally {
@@ -313,6 +315,7 @@ export async function runWorkspaceRuntimeCLI(
   await present(root, {
     interactive,
     background: argv.includes("--background"),
+    logOptions,
   }).catch((error) => {
     write(
       `[local-runtime] 后端启动流程已完成，但日志查看不可用：${error.message}；可执行 make dev_logs`,

@@ -435,7 +435,7 @@ dev_status: dev_ports_preflight
 .PHONY: dev_logs
 # Watch the verified backend without holding the migration/restart lock.
 dev_logs: dev_ports_preflight
-	@node ../scripts/local-runtime-console.mjs --follow
+	@node ../scripts/local-runtime-console.mjs --follow $(ARGS)
 
 .PHONY: dev_database_roles
 # Provision database-specific least-privilege accounts through the deployment policy.

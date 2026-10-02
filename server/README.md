@@ -57,7 +57,19 @@ make run
 
 启动进度显示时间、数据库与迁移检查、构建或复用、旧进程停止、候选 PID / 地址 / 日志文件、health / ready 等待状态、运行版本核对、业务验证及耗时。等待期间状态变化或每 10 秒报告一次，后端就绪检查最多等待 90 秒；启动进程退出时报告退出码或信号，失败时显示脱敏诊断和本次候选日志位置，恢复原版本后仍保留失败日志供检查。
 
-后端使用 Kratos `log.Logger` 与项目 logger；输出重定向到文件后保留 JSON，终端将其转换为时间、带颜色的级别、调用位置、消息和非空字段，服务身份只在变化时显示，请求 / trace / task 标识保留。配置加载等普通文本与 panic 原样可读，数据库连接密码和终端控制字符不进入展示。日志查看先回放本次启动至 health / ready / business 验证完成的记录，再显示最近 50 行及实时输出；长时间运行的中间历史标明省略范围，完整内容保存在原始日志文件。升级查看器时已有进程缺少启动范围记录，会先展示文件开头；下次重启记录完整启动范围。
+后端使用 Kratos `log.Logger` 与项目 logger；输出重定向到文件后保留 JSON。启动 / 重启后的日志终端默认显示 `INFO` 及以上，将时间、带颜色的级别、模块或调用位置、消息和主要字段紧凑排版，服务身份只在变化时显示，请求 / trace / task 标识保留。普通消息与字段超过 160 字时显示摘要，span、trace 跳转和采样元数据在完整视图中显示；`WARN / ERROR / FATAL` 及其堆栈保留完整内容，`--log-full` 可展开全部字段。未展示或省略的内容仍保存在原始文件。配置加载等普通文本与 panic 不受级别或关键词筛选影响，数据库连接密码和终端控制字符不进入展示。日志查看先回放本次启动至 health / ready / business 验证完成的记录，再显示最近 50 行原始记录中符合筛选的日志及实时输出；长时间运行的中间历史标明省略范围。已有进程缺少启动范围记录时会先展示文件开头，下次重启记录完整启动范围。
+
+日常使用 `make dev_restart` 即可完成重启并持续查看日志。日志参数只控制启动成功后的回放与实时视图，启动检查、进度及失败诊断始终显示；关键词按字面匹配完整记录和可读字段，不作为正则表达式。以下参数也可传给 `make run`、`make dev_rebuild` 和 `make dev_logs`，不同查看器使用相同排版和筛选：
+
+```bash
+make dev_restart
+make dev_restart ARGS='--log-level=WARN'
+make dev_restart ARGS='--log-match=process_runtime'
+make dev_restart ARGS='--log-level=DEBUG --log-full'
+make dev_restart ARGS='--log-match="request_id=req-42"'
+```
+
+开发配置默认关闭 `data.postgres.debug`，避免后台查询持续输出整条 SQL；普通 debug 仍写入原始文件。排查数据库时可在 `config.local.yaml` 的现有 `data.postgres` 下显式设置 `debug: true`，执行重启后用 `--log-level=DEBUG` 查看；该选项不改变 SQL trace 的脱敏边界。
 
 首次使用先执行 `make dev_database_roles`；有待执行迁移时通过迁移页或 `make migrate` 完成检查、恢复演练及确认，启动入口不自动 apply。
 

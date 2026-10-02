@@ -23,6 +23,46 @@ export function writeRuntimeProgress(message, write = writeLine) {
 
 const LEVEL_COLORS = { DEBUG: 90, INFO: 36, WARN: 33, ERROR: 31, FATAL: 31 };
 const SERVICE_FIELDS = ["service.id", "service.name", "service.version"];
+const LEVELS = Object.keys(LEVEL_COLORS);
+const DEFAULT_LOG_OPTIONS = Object.freeze({
+  level: "INFO",
+  match: "",
+  full: false,
+});
+const SUMMARY_CHARACTERS = 160;
+
+export function parseRuntimeLogOptions(argv) {
+  const logOptions = { ...DEFAULT_LOG_OPTIONS };
+  const args = [];
+  for (const arg of argv) {
+    if (arg.startsWith("--log-level=")) {
+      const level = arg.slice("--log-level=".length).toUpperCase();
+      if (!LEVELS.includes(level))
+        throw new Error("日志级别必须为 DEBUG、INFO、WARN、ERROR 或 FATAL");
+      logOptions.level = level;
+    } else if (arg.startsWith("--log-match=")) {
+      const match = arg.slice("--log-match=".length);
+      if (!match.trim() || /[\u0000-\u001f\u007f]/u.test(match))
+        throw new Error("日志关键词不能为空或包含控制字符");
+      logOptions.match = match;
+    } else if (arg === "--log-full") {
+      logOptions.full = true;
+    } else {
+      args.push(arg);
+    }
+  }
+  return { args, logOptions };
+}
+
+function runtimeLogOptionArgs({ level, match, full } = DEFAULT_LOG_OPTIONS) {
+  return [
+    ...(level && level !== DEFAULT_LOG_OPTIONS.level
+      ? [`--log-level=${level}`]
+      : []),
+    ...(match ? [`--log-match=${match}`] : []),
+    ...(full ? ["--log-full"] : []),
+  ];
+}
 
 function plainText(value) {
   return stripVTControlCharacters(String(value))
@@ -43,9 +83,21 @@ function logEntry(line) {
   }
 }
 
-export function formatRuntimeLogLine(line, { color = false } = {}) {
+function summarizeLogValue(value) {
+  const characters = Array.from(value.replace(/\s+/gu, " "));
+  return characters.length > SUMMARY_CHARACTERS
+    ? `${characters.slice(0, SUMMARY_CHARACTERS).join("")}…（省略 ${characters.length - SUMMARY_CHARACTERS} 字）`
+    : characters.join("");
+}
+
+export function formatRuntimeLogLine(
+  line,
+  { color = false, full = false } = {},
+) {
   const entry = logEntry(line);
   if (!entry) return plainText(line);
+  const expanded =
+    full || LEVELS.indexOf(entry.level) >= LEVELS.indexOf("WARN");
   const timestamp = Date.parse(entry.ts);
   const time = Number.isFinite(timestamp)
     ? new Date(timestamp).toLocaleTimeString("zh-CN", { hour12: false })
@@ -53,31 +105,60 @@ export function formatRuntimeLogLine(line, { color = false } = {}) {
   const level = color
     ? `\u001b[${LEVEL_COLORS[entry.level]}m${entry.level.padEnd(5)}\u001b[0m`
     : entry.level.padEnd(5);
-  const caller = entry.caller ? ` [${plainText(entry.caller)}]` : "";
-  const message = plainText(entry.msg || "").replaceAll("\n", "\n  ");
+  const moduleKey = ["logger.name", "module", "component"].find(
+    (key) => entry[key],
+  );
+  const module = moduleKey ? entry[moduleKey] : "";
+  const location = module || entry.caller;
+  const context = location ? ` [${plainText(location)}]` : "";
+  const caller =
+    expanded && module && entry.caller ? ` [${plainText(entry.caller)}]` : "";
+  const text = plainText(entry.msg || "");
+  const message = expanded
+    ? text.replaceAll("\n", "\n  ")
+    : summarizeLogValue(text);
   const details = Object.entries(entry)
     .filter(
       ([key, value]) =>
-        !["ts", "level", "caller", "msg", ...SERVICE_FIELDS].includes(key) &&
+        ![
+          "ts",
+          "level",
+          "caller",
+          "msg",
+          moduleKey,
+          ...SERVICE_FIELDS,
+        ].includes(key) &&
         value !== "" &&
         value !== null &&
         value !== undefined &&
+        (expanded ||
+          !["span.id", "trace_link_id", "trace_sampled"].includes(key)) &&
         !(key === "trace_sampled" && value === false),
     )
     .map(([key, value]) => {
       const text = plainText(
         typeof value === "object" ? JSON.stringify(value) : value,
       );
-      return `${plainText(key)}=${text.replaceAll("\n", "\n    ")}`;
+      return `${plainText(key)}=${expanded ? text.replaceAll("\n", "\n    ") : summarizeLogValue(text)}`;
     });
-  return `${time ? `${time} ` : ""}${level}${caller} ${message}${details.length ? `\n  ${details.join("\n  ")}` : ""}`;
+  const separator = expanded ? "\n  " : " ";
+  return `${time ? `${time} ` : ""}${level}${context}${caller} ${message}${details.length ? `${separator}${details.join(separator)}` : ""}`;
 }
 
-function createLogWriter(write, color) {
+function createLogWriter(write, color, logOptions) {
   let previousService = "";
   return (line) => {
     const entry = logEntry(line);
     if (entry) {
+      if (
+        LEVELS.indexOf(entry.level) < LEVELS.indexOf(logOptions.level) ||
+        (logOptions.match &&
+          !plainText(line).includes(logOptions.match) &&
+          !formatRuntimeLogLine(line, { full: true }).includes(
+            logOptions.match,
+          ))
+      )
+        return;
       const service = SERVICE_FIELDS.filter((key) => entry[key])
         .map((key) => `${key}=${plainText(entry[key])}`)
         .join(" ");
@@ -86,7 +167,7 @@ function createLogWriter(write, color) {
         previousService = service;
       }
     }
-    write(formatRuntimeLogLine(line, { color }));
+    write(formatRuntimeLogLine(line, { color, full: logOptions.full }));
   };
 }
 
@@ -233,6 +314,7 @@ export async function followRuntimeConsole(
   root,
   {
     signal,
+    logOptions = DEFAULT_LOG_OPTIONS,
     read = readRuntimeConsole,
     running = processExists,
     color = Boolean(process.stdout.isTTY) &&
@@ -250,7 +332,7 @@ export async function followRuntimeConsole(
   let previous = "";
   let tailError;
   let lines;
-  const logWrite = createLogWriter(write, color);
+  const logWrite = createLogWriter(write, color, logOptions);
   const stopTail = () => {
     if (tail) tail.kill("SIGTERM");
     lines?.close();
@@ -260,6 +342,9 @@ export async function followRuntimeConsole(
   write(`\u001b]0;${path.basename(root)} · 后端日志\u0007`);
   write(
     "[local-runtime] 持续显示当前后端日志；Ctrl+C 退出查看，后端继续运行。退出后可执行 make dev_restart 或 make dev_stop。",
+  );
+  write(
+    `[local-runtime] 日志视图：${logOptions.level} 及以上${logOptions.match ? `；关键词=${plainText(logOptions.match)}` : ""}；${logOptions.full ? "完整字段" : "长内容显示摘要，--log-full 查看完整字段"}；普通文本和 panic 始终显示。`,
   );
   try {
     while (!signal?.aborted) {
@@ -317,12 +402,15 @@ export async function findRuntimeDesktopViewers(
   inspect = runProcessInspection,
 ) {
   const script = path.join(root, "scripts/local-runtime-console.mjs");
-  const suffix = ` ${script} --follow --desktop`;
+  const marker = ` ${script} `;
+  const suffix = " --follow --desktop";
   const { stdout } = await inspect("ps", ["-axo", "pid=,command="]);
   return stdout.split("\n").flatMap((line) => {
     const match = line.match(/^\s*(\d+)\s+(.+)$/u);
     if (!match || !match[2].endsWith(suffix)) return [];
-    const executable = match[2].slice(0, -suffix.length);
+    const scriptOffset = match[2].indexOf(marker);
+    if (scriptOffset < 1) return [];
+    const executable = match[2].slice(0, scriptOffset);
     const pid = Number(match[1]);
     return pid > 1 && path.basename(executable) === "node"
       ? [{ pid, command: match[2] }]
@@ -379,20 +467,29 @@ export async function showRuntimeConsole(
     exists = fs.existsSync,
     executable = process.execPath,
     write = writeLine,
+    logOptions = DEFAULT_LOG_OPTIONS,
+    takeOver = takeOverRuntimeDesktopViewers,
   } = {},
 ) {
   if (platform !== "darwin" || env.CI || env.SSH_CONNECTION || env.SSH_TTY) {
     write(
-      "[local-runtime] 查看实时日志：在本项目 server 目录执行 make dev_logs",
+      `[local-runtime] 查看实时日志：在本项目 server 目录执行 make dev_logs${runtimeLogOptionArgs(logOptions).length ? ` ARGS=${shellQuote(runtimeLogOptionArgs(logOptions).map(shellQuote).join(" "))}` : ""}`,
     );
     return { opened: false };
   }
   const script = path.join(root, "scripts/local-runtime-console.mjs");
-  const viewerExists = () => hasRuntimeDesktopViewer(root, inspect);
-  if (await viewerExists()) {
+  const optionArgs = runtimeLogOptionArgs(logOptions);
+  const suffix = ` ${script}${optionArgs.length ? ` ${optionArgs.join(" ")}` : ""} --follow --desktop`;
+  const viewers = await findRuntimeDesktopViewers(root, inspect);
+  const viewerExists = async () =>
+    (await findRuntimeDesktopViewers(root, inspect)).some(({ command }) =>
+      command.endsWith(suffix),
+    );
+  if (viewers.some(({ command }) => command.endsWith(suffix))) {
     write("[local-runtime] 已有常驻日志终端，后续输出与重启会在同一终端显示");
     return { opened: false, reused: true };
   }
+  if (viewers.length) await takeOver(root, { inspect });
   const app = exists("/Applications/iTerm.app")
     ? "/Applications/iTerm.app"
     : "/System/Applications/Utilities/Terminal.app";
@@ -406,7 +503,7 @@ export async function showRuntimeConsole(
     "#!/bin/sh",
     "trap ':' INT",
     `cd ${shellQuote(path.join(root, "server"))} || exit 1`,
-    `${shellQuote(executable)} ${shellQuote(script)} --follow --desktop 2>>${shellQuote(errorFile)}`,
+    `${[executable, script, ...optionArgs].map(shellQuote).join(" ")} --follow --desktop 2>>${shellQuote(errorFile)}`,
     'exec "${SHELL:-/bin/zsh}" -l',
     "",
   ].join("\n");
@@ -441,12 +538,14 @@ export async function presentRuntimeConsole(
     desktop = false,
     takeOver = takeOverRuntimeDesktopViewers,
     spawnConsole = spawn,
+    logOptions = DEFAULT_LOG_OPTIONS,
   } = {},
 ) {
   const runtime = readRuntimeConsole(root);
-  reportRuntime(root, runtime, write, running(runtime.pid));
+  if (background || !interactive)
+    reportRuntime(root, runtime, write, running(runtime.pid));
   if (background) return;
-  if (!interactive) return show(root, { write });
+  if (!interactive) return show(root, { write, logOptions });
   // Keep a visible manual restart discoverable after leaving the original
   // desktop viewer, so a later Codex startup reuses this terminal too.
   if (
@@ -469,6 +568,7 @@ export async function presentRuntimeConsole(
       process.execPath,
       [
         path.join(root, "scripts/local-runtime-console.mjs"),
+        ...runtimeLogOptionArgs(logOptions),
         "--follow",
         "--desktop",
       ],
@@ -488,7 +588,7 @@ export async function presentRuntimeConsole(
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"])
     process.once(signal, stop);
   try {
-    return await follow(root, { signal: controller.signal, write });
+    return await follow(root, { signal: controller.signal, write, logOptions });
   } finally {
     for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"])
       process.off(signal, stop);
@@ -500,14 +600,24 @@ if (
   pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
 ) {
   const root = path.resolve(import.meta.dirname, "..");
-  const follow = process.argv.includes("--follow");
-  presentRuntimeConsole(root, {
-    interactive: follow || Boolean(process.stdout.isTTY),
-    desktop: process.argv.includes("--desktop"),
-  }).catch((error) => {
-    process.stderr.write(
-      `[local-runtime] 日志查看失败：${error.message}；未停止后端服务\n`,
-    );
-    process.exitCode = 1;
-  });
+  Promise.resolve()
+    .then(() => {
+      const { args, logOptions } = parseRuntimeLogOptions(
+        process.argv.slice(2),
+      );
+      for (const arg of args)
+        if (!["--follow", "--desktop"].includes(arg))
+          throw new Error(`不支持的参数：${arg}`);
+      return presentRuntimeConsole(root, {
+        interactive: args.includes("--follow") || Boolean(process.stdout.isTTY),
+        desktop: args.includes("--desktop"),
+        logOptions,
+      });
+    })
+    .catch((error) => {
+      process.stderr.write(
+        `[local-runtime] 日志查看失败：${error.message}；未停止后端服务\n`,
+      );
+      process.exitCode = 1;
+    });
 }
