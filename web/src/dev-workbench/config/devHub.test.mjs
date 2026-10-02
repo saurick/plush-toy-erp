@@ -20,11 +20,16 @@ import {
   DEV_SECONDARY_NAV_ITEMS,
   DEV_WORKBENCH_AREA_KEYS,
   DEV_WORKSPACE_NAV_ITEMS,
+  getDevSecondaryNavItems,
   resolveDevPageFavicon,
   resolveDevPageTitle,
   resolveDevWorkbenchAreaKey,
 } from './devRoutes.mjs'
 
+const devToolTableSource = readFileSync(
+  new URL('../components/DevToolTable.jsx', import.meta.url),
+  'utf8'
+)
 const devPageSources = [
   'DevHubPage.jsx',
   'DevProductCorePage.jsx',
@@ -50,10 +55,6 @@ const devPageNavSource = readFileSync(
 )
 const devEnvironmentEvidencePanelSource = readFileSync(
   new URL('../components/DevEnvironmentEvidencePanel.jsx', import.meta.url),
-  'utf8'
-)
-const devEntrySourceDetailsSource = readFileSync(
-  new URL('../components/DevEntrySourceDetails.jsx', import.meta.url),
   'utf8'
 )
 const devHubPageSource = readFileSync(
@@ -101,7 +102,7 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   )
   assert.equal(
     resolveDevPageTitle('/__dev/business-usability', 'Plush Toy ERP'),
-    '业务易用性 · Plush Toy ERP'
+    '页面说明检查 · Plush Toy ERP'
   )
   assert.equal(
     resolveDevPageTitle('/__dev/quality', 'Plush Toy ERP'),
@@ -172,7 +173,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       ['product-engineering', '权限关系'],
       ['product-engineering', '改动指南'],
       ['product-engineering', '业务链观察'],
-      ['product-engineering', '业务易用性'],
+      ['quality', '页面说明检查'],
       ['product-engineering', '开发文档'],
       ['product-engineering', 'UI 交互设计'],
       ['quality', '改动验证'],
@@ -218,8 +219,17 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
   )
   assert.equal(
     resolveDevWorkbenchAreaKey('/__dev/business-usability'),
-    'product-engineering'
+    'quality'
   )
+  assert.equal(
+    getDevSecondaryNavItems('quality').some(
+      (item) => item.route === '/__dev/business-usability'
+    ),
+    false,
+    '页面说明检查保留登记和深链，通过改动验证按需进入'
+  )
+  assert.equal(getDevSecondaryNavItems('product-engineering').length, 6)
+  assert.equal(getDevSecondaryNavItems('quality').length, 3)
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/testing'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/quality-gates'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/data-preparation'), 'quality')
@@ -233,7 +243,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/unknown'), '')
   assert.match(
     devPageNavSource,
-    /const secondaryItems = getDevSecondaryNavItems\(currentAreaKey\)/u
+    /getDevSecondaryNavItems\(area.key\)/u
   )
   assert.doesNotMatch(
     devPageNavSource,
@@ -242,29 +252,36 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
   )
 })
 
-test('devHub: quality area remains a task landing instead of skipping to one gate', () => {
+test('devHub: quality area offers the change validation path and registered tool comparison', () => {
   assert.doesNotMatch(devWorkbenchAreaPageSource, /<Navigate/u)
-  assert.match(devWorkbenchAreaPageSource, /先选要完成的事情/u)
-  assert.match(devWorkbenchAreaPageSource, /<QualityTaskEntry/u)
-  assert.match(devWorkbenchAreaPageSource, /'quality-gates': Object[.]freeze/u)
-  assert.match(devWorkbenchAreaPageSource, /运行完整或严格门禁/u)
-  assert.match(devWorkbenchAreaPageSource, /entryPresentation/u)
+  assert.match(devWorkbenchAreaPageSource, /开始验证/u)
+  assert.match(devWorkbenchAreaPageSource, /<DevToolTable/u)
+  assert.match(devWorkbenchAreaPageSource, /DEV_TESTING_ROUTE/u)
 })
 
-test('devHub: product questions stay parallel and relationship view names cross-area evidence', () => {
+test('devHub: product engineering directly compares registered tools without a view selector', () => {
   assert.match(
     devWorkbenchAreaPageSource,
-    /<ul className="erp-dev-product-task-list">/u
+    /getDevSecondaryNavItems\(areaKey\)/u
+  )
+  assert.match(
+    devWorkbenchAreaPageSource,
+    /item\.areaKey === areaKey && visibleRoutes\.has\(item\.route\)/u
+  )
+  assert.match(devWorkbenchAreaPageSource, /<DevToolTable/u)
+  assert.match(
+    devWorkbenchAreaPageSource,
+    /\{isDelivery \? \([\s\S]*?<DevTaskNav/u
   )
   assert.doesNotMatch(
     devWorkbenchAreaPageSource,
-    /erp-dev-product-task__index/u
+    /devRelationshipPerspectives|产品工程查看方式/u
   )
-  assert.match(devWorkbenchAreaPageSource, /项目图视角还会关联质量与交付证据/u)
-  assert.doesNotMatch(devWorkbenchAreaPageSource, /同一组已有工具/u)
+  assert.match(devToolTableSource, /DEV_PAGE_TITLE_BY_ROUTE\[item.route\]/u)
+  assert.match(devToolTableSource, /<th scope="col">使用时机<\/th>/u)
 })
 
-test('devHub: every tool has one registered area and the overview derives stages from it', () => {
+test('devHub: tools share one area registry without duplicate overview stage inventories', () => {
   const toolAreaKeys = [
     DEV_WORKBENCH_AREA_KEYS.productEngineering,
     DEV_WORKBENCH_AREA_KEYS.quality,
@@ -307,7 +324,11 @@ test('devHub: every tool has one registered area and the overview derives stages
     /itemKeys/u,
     'overview stages must not maintain a second tool-key list'
   )
-  assert.match(devHubPageSource, /item\.areaKey === stage\.key/u)
+  assert.match(devHubPageSource, /filterDevHubItems\(source/u)
+  assert.doesNotMatch(
+    devHubPageSource,
+    /stageItems|erp-dev-overview-stage__details|这一阶段包含什么/u
+  )
 })
 
 test('devHub: fifteen dev pages share the backend-style workspace shell', () => {
@@ -320,18 +341,18 @@ test('devHub: fifteen dev pages share the backend-style workspace shell', () => 
 
 test('devHub: delivery overview owns the local, demo, test, and isolated evidence comparison', () => {
   assert.doesNotMatch(devPageNavSource, /DevEnvironmentEvidencePanel/u)
-  assert.match(devPageNavSource, /控制端：本地 DEV-only/u)
+  assert.match(devPageNavSource, /开发工具仅供维护使用/u)
   assert.match(
     devWorkbenchAreaPageSource,
     /import DevEnvironmentEvidencePanel from '..\/components\/DevEnvironmentEvidencePanel\.jsx'/u
   )
   assert.match(
     devWorkbenchAreaPageSource,
-    /const isDeliveryArea = areaKey === DEV_WORKBENCH_AREA_KEYS\.delivery/u
+    /const isDelivery = areaKey === DEV_WORKBENCH_AREA_KEYS\.delivery/u
   )
   assert.match(
     devWorkbenchAreaPageSource,
-    /\{isDeliveryArea \? <DevEnvironmentEvidencePanel \/> : null\}/u
+    /activeView === 'environments' \? \([\s\S]*?<DevEnvironmentEvidencePanel \/>/u
   )
   assert.match(devEnvironmentEvidencePanelSource, /环境与验收事实/u)
   assert.match(devEnvironmentEvidencePanelSource, /sharedSummaryResources/u)
@@ -355,28 +376,18 @@ test('devHub: delivery overview owns the local, demo, test, and isolated evidenc
   )
 })
 
-test('devHub: entry cards keep technical paths behind an accessible disclosure', () => {
-  assert.match(
-    devEntrySourceDetailsSource,
-    /<details className="erp-dev-entry-source-details">/u
-  )
-  assert.match(
-    devEntrySourceDetailsSource,
-    /<summary>查看路径与维护来源<\/summary>/u
-  )
-  assert.match(devEntrySourceDetailsSource, /<dt>页面路径<\/dt>/u)
-  assert.match(devEntrySourceDetailsSource, /<dt>维护来源<\/dt>/u)
-
+test('devHub: tool tables keep technical paths behind an accessible disclosure', () => {
   for (const pageSource of [devHubPageSource, devWorkbenchAreaPageSource]) {
-    assert.match(
-      pageSource,
-      /<DevEntrySourceDetails route=\{item\.route\} source=\{item\.source\} \/>/u
-    )
+    assert.match(pageSource, /<DevToolTable/u)
     assert.doesNotMatch(
       pageSource,
       /<Text className="erp-dev-hub-card__(?:route|source)">/u
     )
   }
+  assert.match(devToolTableSource, /aria-label=\{`查看\$\{title\}来源与边界`\}/u)
+  assert.match(devToolTableSource, /item\.source/u)
+  assert.match(devToolTableSource, /item\.truthSource/u)
+  assert.match(devToolTableSource, /item\.guardrails\.map/u)
 })
 
 test('devHub: lists existing dev-only entry routes without backend assumptions', () => {
@@ -462,7 +473,10 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     businessUsabilityItem?.guardrails?.join(' ') || '',
     /不复制权限与岗位责任/u
   )
-  assert.match(businessUsabilityItem?.description || '', /不代表实际权限/u)
+  assert.match(
+    businessUsabilityItem?.guardrails?.join(' ') || '',
+    /不代表实际权限/u
+  )
 
   const testingItem = DEV_HUB_ITEMS.find((item) => item.key === 'testing')
   assert.equal(

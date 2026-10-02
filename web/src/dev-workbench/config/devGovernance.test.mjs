@@ -56,7 +56,7 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
   assert.match(devPageNavSource, /location\.hash/)
   assert.match(
     devPageNavSource,
-    /navigator\.clipboard\s*\.writeText\(currentDeepLink\)/
+    /copyTextToClipboard\(currentDeepLink\)/
   )
   assert.match(devPageNavSource, /DEV_WORKSPACE_NAV_ITEMS\.map/)
   assert.match(devPageNavSource, /resolveDevWorkbenchAreaKey/)
@@ -66,15 +66,15 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
     /function normalizePathname\(pathname\)[\s\S]*pathname\.replace\(\/\\\/\+\$\/, ''\)/
   )
   assert.match(devPageNavSource, /normalizePathname\(location\.pathname\)/)
-  assert.match(devPageNavSource, /aria-current=\{isExact \? 'page'/)
+  assert.match(devPageNavSource, /currentPathname === area\.route \? 'page'/)
   assert.match(devPageNavSource, /aria-current=\{isActive \? 'page'/)
-  assert.match(devPageNavSource, /erp-dev-workspace-nav__route--context/)
+  assert.match(devPageNavSource, /erp-dev-workspace-nav__group/)
   assert.doesNotMatch(devPageNavSource, /currentWorkspaceItem\s*\?\s*\[\]/u)
   assert.match(devPageNavSource, /scrollIntoView/)
   assert.match(devPageNavSource, /href=\{sourceHref\}/)
   assert.match(devPageNavSource, /aria-label="开发工作台页面"/)
 
-  for (const accessibleName of ['复制当前开发页深链', '在开发文档中打开来源']) {
+  for (const accessibleName of ['复制当前页面链接', '在开发文档中打开来源']) {
     assert.equal(
       devPageNavSource.split(accessibleName).length - 1,
       1,
@@ -243,11 +243,11 @@ test('devGovernance: parses explicit task-first routing without guessing relatio
 })
 
 test('devGovernance: default page is task-first and keeps internal terminology collapsed', () => {
-  assert.match(governancePageSource, /这次改动该怎么做？/)
-  assert.match(governancePageSource, /你这次准备做什么？/)
-  assert.match(governancePageSource, /title="先看这些"/)
+  assert.match(governancePageSource, /改动指南/)
+  assert.match(governancePageSource, /改动类型/)
+  assert.match(governancePageSource, /title="参考依据"/)
   assert.match(governancePageSource, /title="同时检查"/)
-  assert.match(governancePageSource, /title="不要误判"/)
+  assert.match(governancePageSource, /title="适用边界"/)
   assert.match(
     governancePageSource,
     /<details className="erp-dev-governance-reference-details">/

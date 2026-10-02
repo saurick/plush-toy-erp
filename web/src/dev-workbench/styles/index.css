@@ -15,26 +15,6 @@
 @import './dev-customer-config.css';
 @import './dev-customer-scope.css';
 @import './dev-quality-workflow.css';
-@import './dev-product-engineering-workflow.css';
 @import './dev-overview-workflow.css';
 @import './dev-workbench-density.css';
-
-@media (min-width: 981px) {
-  .erp-dev-workspace-page {
-    column-gap: 12px;
-    padding-inline: 0 12px;
-  }
-
-  .erp-dev-workspace-page > :not(.erp-dev-workspace-nav) {
-    max-width: none;
-    margin-inline: 0;
-  }
-
-  .erp-dev-workspace-nav__routes {
-    padding-inline: 6px;
-  }
-
-  .erp-dev-workspace-nav__secondary {
-    padding-inline: 0;
-  }
-}
+@import './dev-workbench-layout.css';

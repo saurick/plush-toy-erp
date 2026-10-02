@@ -1,11 +1,7 @@
 /* stylelint-disable no-descending-specificity -- scoped state variants intentionally follow base components */
 
 .erp-dev-flow-state-page {
-  min-height: 100vh;
-  padding: 18px;
   overflow-x: clip;
-  color: var(--erp-text);
-  background: var(--erp-page-bg, #f3f7f2);
 }
 
 .erp-dev-flow-state-page,
@@ -2373,9 +2369,6 @@
 }
 
 @media (max-width: 760px) {
-  .erp-dev-flow-state-page {
-    padding: 10px;
-  }
 
   .erp-dev-flow-chain-projection-context {
     display: grid;

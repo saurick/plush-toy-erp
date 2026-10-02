@@ -30,7 +30,7 @@ export function createDevFlowStateObservatoryScenarios({
         startNoWriteAudit(page, writeRequestsByPage)
       },
       verify: async (page) => {
-        await expectText(page, '业务链与运行观察台')
+        await expectText(page, '业务链观察')
         const root = page.locator('[data-dev-flow-state-observatory]')
         await root.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(

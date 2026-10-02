@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   InfoCircleOutlined,
   PartitionOutlined,
-  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Empty, Popover, Space, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
@@ -15,7 +14,6 @@ import {
   BusinessChainView,
 } from '../components/flow-state/BusinessChainViews.jsx'
 import {
-  Paragraph,
   Text,
   Title,
   VIEW_ITEMS,
@@ -978,32 +976,14 @@ export default function DevFlowStateObservatoryPage() {
     >
       <DevPageNav sourcePath={SOURCE_PATH} />
       <header className="erp-dev-flow-header">
-        <div className="erp-dev-flow-header__primary">
-          <div className="erp-dev-flow-header__intro">
-            <Space align="center" wrap>
-              <PartitionOutlined className="erp-dev-flow-header__icon" />
-              <Title level={1}>业务链与运行观察台</Title>
-              <Tag color="green">仅开发环境 · 只读</Tag>
-            </Space>
-            <Paragraph>
-              先看客户、产品等基础信息和销售、采购等业务单据怎样沿 11
-              条业务链，经过责任协同、流程运行和受控业务动作形成事实台账与计算结果；状态规则、权限、客户配置与审计贯穿全程。
-            </Paragraph>
-          </div>
-          <div className="erp-dev-flow-readonly">
-            <SafetyCertificateOutlined />
-            <span>
-              <strong>不执行真实业务动作</strong>
-              <small>无过账 · 无付款 · 无冲正 · 无流程推进</small>
-            </span>
-          </div>
-        </div>
+        <Space align="center">
+          <PartitionOutlined className="erp-dev-flow-header__icon" />
+          <Title level={1}>业务链观察</Title>
+        </Space>
         <details className="erp-dev-flow-concepts">
           <summary>
             <span>概念解释</span>
-            <small>
-              资料、单据、人、路、动作、账、规则和横切控制各自负责什么
-            </small>
+
           </summary>
           <MemoryStrip />
         </details>
@@ -1066,12 +1046,6 @@ export default function DevFlowStateObservatoryPage() {
         </details>
       ) : null}
       <section className="erp-dev-flow-nav">
-        <div className="erp-dev-flow-nav__intro">
-          <Text strong>你现在想看什么？</Text>
-          <Text type="secondary">
-            默认看业务总图；点击一条链看细节，需要责任、运行、事实或状态时再切换。
-          </Text>
-        </div>
         <DevTaskNav
           compact
           level="primary"

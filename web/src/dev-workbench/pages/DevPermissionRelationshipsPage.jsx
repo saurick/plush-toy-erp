@@ -556,13 +556,8 @@ export default function DevPermissionRelationshipsPage() {
             <SafetyCertificateOutlined />
           </span>
           <div>
-            <Text className="erp-dev-permission-relationships-eyebrow">
-              权限核对 · 当前运行投影 · 只读
-            </Text>
-            <Title level={1}>权限关系 / Effective Access</Title>
-            <Paragraph>
-              按岗位或账号查看最终可用功能、页面、实际菜单、仓库数据范围和审批责任，定位“为什么能用、从哪里进入、为什么受限”。
-            </Paragraph>
+            <Title level={1}>权限关系</Title>
+
           </div>
         </div>
         <Space

@@ -35,8 +35,7 @@ test('drill recovery page leads with the operational conclusion and evidence bou
 })
 
 test('drill recovery page exposes business labels and keeps high-risk actions disabled', () => {
-  assert.match(page, /演练与恢复中心/u)
-  assert.match(page, /先看当前结论和下一步/u)
+  assert.match(page, /演练与恢复/u)
   assert.match(page, /return <Button disabled>\{action\.label\}<\/Button>/u)
   assert.match(page, /普通成功部署不自动算作演练/u)
   assert.match(page, /禁止对当前试用或正式环境临时注入故障/u)

@@ -82,9 +82,10 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'business-usability',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_BUSINESS_USABILITY_ROUTE,
-    label: '业务易用性',
+    label: '页面说明检查',
+    showInNavigation: false,
   }),
   Object.freeze({
     key: 'docs',
@@ -195,7 +196,9 @@ export function resolveDevWorkbenchAreaKey(pathname = '') {
 }
 
 export function getDevSecondaryNavItems(areaKey = '') {
-  return DEV_SECONDARY_NAV_ITEMS.filter((item) => item.areaKey === areaKey)
+  return DEV_SECONDARY_NAV_ITEMS.filter(
+    (item) => item.areaKey === areaKey && item.showInNavigation !== false
+  )
 }
 
 export function resolveDevPageTitle(pathname, appTitle) {

@@ -1,10 +1,3 @@
-.erp-dev-governance-page {
-  min-height: 100vh;
-  background: var(--erp-page-bg);
-  color: var(--erp-text);
-  padding: 18px;
-}
-
 .erp-dev-governance-header,
 .erp-dev-governance-shell,
 .erp-dev-governance-reference-details {
@@ -15,12 +8,10 @@
 .erp-dev-governance-header {
   margin-bottom: 14px;
   border: 1px solid var(--erp-border);
-  border-radius: 16px;
+  border-radius: 10px;
   background: var(--erp-surface-bg);
   padding: 18px 20px;
-  box-shadow:
-    0 1px 2px rgb(15 23 42 / 0.04),
-    0 12px 28px rgb(15 23 42 / 0.06);
+
 }
 
 .erp-dev-governance-header__copy {
@@ -55,7 +46,7 @@
 
 .erp-dev-governance-shell {
   display: grid;
-  grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
   align-items: start;
   gap: 14px;
   min-height: 560px;
@@ -65,11 +56,9 @@
 .erp-dev-governance-decision {
   min-width: 0;
   border: 1px solid var(--erp-border);
-  border-radius: 16px;
+  border-radius: 10px;
   background: var(--erp-surface-bg);
-  box-shadow:
-    0 1px 2px rgb(15 23 42 / 0.04),
-    0 12px 28px rgb(15 23 42 / 0.06);
+
 }
 
 .erp-dev-governance-sidebar {
@@ -182,7 +171,7 @@
 
 .erp-dev-governance-decision__head h2.ant-typography {
   margin: 3px 0 0;
-  font-size: clamp(21px, 1.8vw, 26px);
+  font-size: 18px;
   line-height: 1.25;
 }
 
@@ -207,14 +196,14 @@
 
 .erp-dev-governance-decision-step {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
   border: 1px solid var(--erp-border);
-  border-inline-start-width: 4px;
-  border-radius: 13px;
-  background: var(--erp-surface-bg-soft);
-  padding: 14px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background: transparent;
+  padding: 14px 0;
 }
 
 .erp-dev-governance-decision-step--primary {
@@ -375,11 +364,9 @@
 .erp-dev-governance-reference-details {
   margin-top: 14px;
   border: 1px solid var(--erp-border);
-  border-radius: 16px;
+  border-radius: 10px;
   background: var(--erp-surface-bg);
-  box-shadow:
-    0 1px 2px rgb(15 23 42 / 0.04),
-    0 12px 28px rgb(15 23 42 / 0.06);
+
 }
 
 .erp-dev-governance-reference-details > summary {
@@ -587,7 +574,7 @@
   min-height: 360px;
   place-items: center;
   border: 1px solid var(--erp-border);
-  border-radius: 16px;
+  border-radius: 10px;
   background: var(--erp-surface-bg);
 }
 
@@ -764,9 +751,6 @@
 }
 
 @media (max-width: 600px) {
-  .erp-dev-governance-page {
-    padding: 10px;
-  }
 
   .erp-dev-governance-header,
   .erp-dev-governance-sidebar,

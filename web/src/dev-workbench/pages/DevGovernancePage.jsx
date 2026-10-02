@@ -1,12 +1,8 @@
 import React, { useEffect, useMemo } from 'react'
 import {
-  CheckCircleOutlined,
   CopyOutlined,
   FileMarkdownOutlined,
   LinkOutlined,
-  PartitionOutlined,
-  ReadOutlined,
-  SafetyCertificateOutlined,
   SyncOutlined,
 } from '@ant-design/icons'
 import { Button, Empty, Space, Tag, Typography } from 'antd'
@@ -130,21 +126,10 @@ export function TaskNav({ tasks = [], selectedKey = '', onSelect }) {
   )
 }
 
-function DecisionStep({ index, icon, title, tone, children }) {
+function DecisionStep({ title, children }) {
   return (
-    <section
-      className={`erp-dev-governance-decision-step erp-dev-governance-decision-step--${tone}`}
-    >
-      <div
-        className="erp-dev-governance-decision-step__marker"
-        aria-hidden="true"
-      >
-        {icon}
-      </div>
+    <section className="erp-dev-governance-decision-step">
       <div className="erp-dev-governance-decision-step__body">
-        <Text className="erp-dev-governance-decision-step__eyebrow">
-          第 {index} 步
-        </Text>
         <Title level={3}>{title}</Title>
         {children}
       </div>
@@ -171,42 +156,24 @@ function TaskDecision({ task }) {
     >
       <div className="erp-dev-governance-decision__head">
         <div>
-          <Text className="erp-dev-governance-eyebrow">当前选择</Text>
           <Title level={2} id={`governance-task-${task.key}`}>
             {task.task}
           </Title>
-          <Paragraph>
-            按下面三步核对即可；内部术语和完整关系放在页面底部，需要维护规则时再展开。
-          </Paragraph>
+
         </div>
       </div>
 
       <div className="erp-dev-governance-decision-list">
-        <DecisionStep
-          index="1"
-          icon={<ReadOutlined />}
-          title="先看这些"
-          tone="primary"
-        >
+        <DecisionStep title="参考依据">
           <SourceLinks links={task.firstHopLinks} />
         </DecisionStep>
 
-        <DecisionStep
-          index="2"
-          icon={<CheckCircleOutlined />}
-          title="同时检查"
-          tone="check"
-        >
+        <DecisionStep title="同时检查">
           <p>{task.syncCheck}</p>
           <SourceLinks links={task.syncCheckLinks} />
         </DecisionStep>
 
-        <DecisionStep
-          index="3"
-          icon={<SafetyCertificateOutlined />}
-          title="不要误判"
-          tone="boundary"
-        >
+        <DecisionStep title="适用边界">
           <p>{task.boundary}</p>
         </DecisionStep>
       </div>
@@ -357,27 +324,18 @@ export default function DevGovernancePage() {
 
       <header className="erp-dev-governance-header">
         <div className="erp-dev-governance-header__copy">
-          <Space size={8} wrap className="erp-dev-governance-kicker">
-            <PartitionOutlined aria-hidden="true" />
-            <Text>项目治理地图</Text>
-          </Space>
           <Space align="center" size={10} wrap>
             <Title level={1} className="erp-dev-governance-title">
-              这次改动该怎么做？
+              改动指南
             </Title>
-            <Tag color="green">开发辅助 · 只读</Tag>
           </Space>
-          <Paragraph className="erp-dev-governance-summary">
-            选择最接近的一项，直接看第一份依据、同时要检查的内容和最容易误判的边界。
-          </Paragraph>
         </div>
       </header>
 
       <main className="erp-dev-governance-shell">
         <aside className="erp-dev-governance-sidebar">
           <div className="erp-dev-governance-sidebar__intro">
-            <Title level={2}>你这次准备做什么？</Title>
-            <Text type="secondary">不用先记住项目里的专业分类。</Text>
+            <Title level={2}>改动类型</Title>
           </div>
           <TaskNav
             tasks={tasks}

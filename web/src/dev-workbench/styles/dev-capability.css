@@ -1,10 +1,3 @@
-.erp-dev-customer-page {
-  min-height: 100vh;
-  background: #f3f7f2;
-  color: var(--erp-text);
-  padding: 16px;
-}
-
 .erp-dev-customer-header {
   display: flex;
   align-items: flex-start;
@@ -156,7 +149,6 @@
 
 .erp-dev-customer-panel__head,
 .erp-dev-customer-console,
-.erp-dev-customer-decision-card__head,
 .erp-dev-customer-menu-group__title,
 .erp-dev-customer-review-item__head,
 .erp-dev-customer-source-ref,
@@ -271,14 +263,6 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-customer-decision-card__head {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .erp-dev-customer-field-list,
 .erp-dev-customer-numbering-list,
 .erp-dev-customer-tool-list,
@@ -293,7 +277,6 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
-.erp-dev-customer-decision-card,
 .erp-dev-customer-field,
 .erp-dev-customer-numbering,
 .erp-dev-customer-review-item,
@@ -311,21 +294,6 @@
   padding: 12px;
 }
 
-.erp-dev-customer-decision-card {
-  display: grid;
-  gap: 8px;
-  background: var(--erp-surface-bg);
-  box-shadow: inset 3px 0 0 var(--erp-border);
-  cursor: default;
-}
-
-.erp-dev-customer-decision-card strong {
-  color: var(--erp-text);
-  font-size: 22px;
-  line-height: 1.15;
-}
-
-.erp-dev-customer-decision-card .ant-typography,
 .erp-dev-customer-review-item .ant-typography,
 .erp-dev-customer-source-ref .ant-typography {
   overflow-wrap: anywhere;
@@ -786,13 +754,6 @@
 
 .erp-dev-customer-command .ant-btn {
   color: #bbf7d0;
-}
-
-.erp-dev-hub-page {
-  min-height: 100vh;
-  background: #f5f7f8;
-  color: var(--erp-text);
-  padding: 16px;
 }
 
 .erp-dev-hub-header {

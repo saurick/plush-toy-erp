@@ -13,7 +13,6 @@ import {
   DEV_QUALITY_ROUTE,
   DEV_SECONDARY_NAV_ITEMS,
   DEV_STATUS_FLOWS_ROUTE,
-  DEV_TESTING_ROUTE,
   DEV_VERSION_CENTER_ROUTE,
   DEV_WORKSPACE_NAV_ITEMS,
 } from '../../src/dev-workbench/config/devRoutes.mjs'
@@ -85,17 +84,12 @@ test('ordinary DEV desktop smokes honor route-specific landing contracts', async
     {
       route: DEV_GOVERNANCE_ROUTE,
       finalRoute: DEV_GOVERNANCE_ROUTE,
-      heading: '这次改动该怎么做？',
-    },
-    {
-      route: DEV_TESTING_ROUTE,
-      finalRoute: DEV_TESTING_ROUTE,
-      heading: '质量验证工作台',
+      heading: '改动指南',
     },
     {
       route: DEV_DATA_PREPARATION_ROUTE,
       finalRoute: DEV_DATA_PREPARATION_ROUTE,
-      heading: '准备回归数据',
+      heading: '测试数据',
     },
   ]
   const observedHeadings = new Map()
@@ -115,13 +109,13 @@ test('ordinary DEV desktop smokes honor route-specific landing contracts', async
     const page = {
       locator: (selector) => ({
         count: async () => {
-          if (selector === '.erp-dev-quality-task') return 3
+          if (selector === '.erp-dev-tool-table tbody tr') return 3
           if (
-            selector === '.erp-dev-quality-task a[href="/__dev/quality-gates"]'
+            selector ===
+            '[data-tool-key="quality-gates"] a[href="/__dev/quality-gates"]'
           ) {
             return 1
           }
-          if (selector === '.erp-dev-product-task') return 7
           if (selector === '.erp-dev-product-task__index') return 0
           return 1
         },
@@ -140,10 +134,9 @@ test('ordinary DEV desktop smokes honor route-specific landing contracts', async
 test('product and quality area smokes enforce their complete landing contracts', async () => {
   const counts = new Map([
     ['.erp-dev-workspace-page', 1],
-    ['.erp-dev-product-task', 7],
     ['.erp-dev-product-task__index', 0],
-    ['.erp-dev-quality-task', 3],
-    ['.erp-dev-quality-task a[href="/__dev/quality-gates"]', 1],
+    ['.erp-dev-tool-table tbody tr', 3],
+    ['[data-tool-key="quality-gates"] a[href="/__dev/quality-gates"]', 1],
   ])
   const scenarios = createDevWorkbenchDesktopScenarios({
     assert,
@@ -155,8 +148,17 @@ test('product and quality area smokes enforce their complete landing contracts',
     const scenario = scenarios.find(({ path }) => path === route)
     assert(scenario)
     await scenario.verify({
+      getByRole: (role, options) => {
+        assert.equal(role, 'tablist')
+        assert.deepEqual(options, { name: '产品工程查看方式' })
+        return { count: async () => 0 }
+      },
       locator: (selector) => ({
-        count: async () => counts.get(selector) ?? 0,
+        count: async () =>
+          selector === '.erp-dev-tool-table tbody tr' &&
+          route === DEV_PRODUCT_ENGINEERING_ROUTE
+            ? 6
+            : (counts.get(selector) ?? 0),
         waitFor: async () => {},
       }),
       url: () => `http://127.0.0.1${route}`,

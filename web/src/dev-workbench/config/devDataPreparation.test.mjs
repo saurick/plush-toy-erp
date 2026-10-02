@@ -1018,7 +1018,7 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert.match(pageSource, /profiles\.map/u)
   assert.match(pageSource, /生成业务场景测试数据/u)
   assert.match(pageSource, /确认生成业务场景测试数据/u)
-  assert.match(pageSource, /准备回归数据/u)
+  assert.match(pageSource, /测试数据/u)
   assert.match(pageSource, /确认完整回归能否开始/u)
   assert.match(pageSource, /核对最新业务链与数据范围/u)
   assert.match(pageSource, /准备并确认新批次/u)

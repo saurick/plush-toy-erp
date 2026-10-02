@@ -61,7 +61,7 @@ test('dev navigation shows the latest route intent while a lazy route is pending
   assert.match(devPageNavSource, /aria-busy=\{routePending \|\| undefined\}/u)
   assert.equal(
     devPageNavSource.match(
-      /onClick=\{\(event\) => handleRouteIntent\(event, item\.route\)\}/gu
+      /onClick=\{\(event\) =>\s*handleRouteIntent\(event, (?:item|area)\.route\)\s*\}/gu
     )?.length,
     2
   )
@@ -109,13 +109,13 @@ test('dev navigation preloads visible routes at idle and on direct interaction',
   assert.match(devPageNavSource, /timeout: 350/u)
   assert.equal(
     devPageNavSource.match(
-      /onPointerEnter=\{\(\) => handleRoutePreload\(item\.route\)\}/gu
+      /onPointerEnter=\{\(\) => handleRoutePreload\((?:item|area)\.route\)\}/gu
     )?.length,
     2
   )
   assert.equal(
     devPageNavSource.match(
-      /onFocus=\{\(\) => handleRoutePreload\(item\.route\)\}/gu
+      /onFocus=\{\(\) => handleRoutePreload\((?:item|area)\.route\)\}/gu
     )?.length,
     2
   )

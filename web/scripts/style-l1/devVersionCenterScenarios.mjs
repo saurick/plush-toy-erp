@@ -501,7 +501,7 @@ export function createDevVersionCenterScenarios({
         })
       },
       verify: async (page) => {
-        await expectHeading(page, '版本发布与部署中心')
+        await expectHeading(page, '版本发布')
         await waitForView(page, 'versions')
         await page.waitForURL(
           (url) =>

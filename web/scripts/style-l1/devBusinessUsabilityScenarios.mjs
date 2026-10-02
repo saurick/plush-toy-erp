@@ -9,17 +9,29 @@ export function createDevBusinessUsabilityScenarios({
       path: '/__dev/business-usability?status=unknown&role=unknown&legacy=1',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '员工能不能看懂、能不能自己完成？')
+        await expectHeading(page, '页面说明检查')
         await page.waitForURL((url) => url.search === '')
+        assert.match(
+          await page
+            .locator('.erp-dev-workspace-nav__route[href="/__dev/quality"]')
+            .getAttribute('class'),
+          /erp-dev-workspace-nav__route--context/u,
+          '页面说明检查应归属质量验证'
+        )
         assert.equal(
           await page
-            .getByRole('link', { name: '业务易用性', exact: true })
-            .getAttribute('aria-current'),
-          'page',
-          '产品工程菜单必须明确标记当前业务易用性入口'
+            .locator(
+              '.erp-dev-workspace-nav__secondary-route[href="/__dev/business-usability"]'
+            )
+            .count(),
+          0,
+          '辅助检查通过改动验证进入，不再占据常驻导航'
         )
         await page
-          .getByText('推荐岗位不是权限，覆盖状态也不是客户验收', {
+          .locator('.erp-dev-business-usability-boundary > summary')
+          .click()
+        await page
+          .getByText('推荐岗位不是权限，覆盖状态也不是客户验收。', {
             exact: true,
           })
           .waitFor()
@@ -45,7 +57,7 @@ export function createDevBusinessUsabilityScenarios({
         )
 
         const search = page.getByRole('textbox', {
-          name: '搜索业务易用性说明',
+          name: '搜索页面说明',
         })
         await search.fill('可用量')
         await page.getByText('当前显示 1 个页面', { exact: true }).waitFor()

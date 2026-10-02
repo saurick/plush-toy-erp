@@ -1,373 +1,208 @@
 import React, { useMemo, useState } from 'react'
-import {
-  ApartmentOutlined,
-  AppstoreOutlined,
-  CodeOutlined,
-  DatabaseOutlined,
-  DeploymentUnitOutlined,
-  ExperimentOutlined,
-  FileSearchOutlined,
-  PushpinFilled,
-  PushpinOutlined,
-  QuestionCircleOutlined,
-  RightOutlined,
-  SafetyCertificateOutlined,
-} from '@ant-design/icons'
-import { Button, Empty, Select, Tag, Tooltip, Typography } from 'antd'
-import { Link } from 'react-router-dom'
+import { BookOutlined } from '@ant-design/icons'
+import { Button, Select, Typography } from 'antd'
+import { Link, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
-import DevEntrySourceDetails from '../components/DevEntrySourceDetails.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevTaskNav from '../components/DevTaskNav.jsx'
+import DevToolTable from '../components/DevToolTable.jsx'
 import {
-  DEV_HUB_ALL_GROUP,
   DEV_HUB_ITEMS,
   DEV_HUB_PINNED_STORAGE_KEY,
   buildDevHubPinnedItems,
   filterDevHubItems,
-  getDevHubGroupOptions,
   normalizeDevHubPinnedRoutes,
   toggleDevHubPinnedRoute,
 } from '../config/devHub.mjs'
-import {
-  DEV_DELIVERY_ROUTE,
-  DEV_PRODUCT_ENGINEERING_ROUTE,
-  DEV_QUALITY_ROUTE,
-  DEV_WORKBENCH_AREA_KEYS,
-} from '../config/devRoutes.mjs'
+import { DEV_WORKSPACE_NAV_ITEMS } from '../config/devRoutes.mjs'
+import { DEV_WORKBENCH_GUIDE } from '../config/devWorkbenchFlow.mjs'
 
-const { Paragraph, Text, Title } = Typography
-
-const OVERVIEW_STAGES = Object.freeze([
-  Object.freeze({
-    key: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    eyebrow: '先决定怎么改',
-    title: '先弄清楚怎么改',
-    description:
-      '先找到正式依据，确认规则、业务链和页面方案，再开始实现，避免边做边猜。',
-    boundary: '只做判断和阅读，不在总览页创建第二套规则或运行真源',
-    action: '进入产品工程',
-    route: DEV_PRODUCT_ENGINEERING_ROUTE,
-  }),
-  Object.freeze({
-    key: DEV_WORKBENCH_AREA_KEYS.quality,
-    eyebrow: '再证明改动没问题',
-    title: '验证这次改动没有越界',
-    description:
-      '按影响面选择固定检查并保留每项证据；只有用例缺少前置条件时才准备测试数据。',
-    boundary: '逐项保留结果，不把局部绿色合并成完整交付结论',
-    action: '开始验证',
-    route: DEV_QUALITY_ROUTE,
-  }),
-  Object.freeze({
-    key: DEV_WORKBENCH_AREA_KEYS.delivery,
-    eyebrow: '最后准备交付',
-    title: '确认配置、数据库和版本可以安全落地',
-    description:
-      '依次核对客户配置、数据库迁移和固定版本；涉及写入时仍先准备、再确认、最后读回。',
-    boundary: '受控写入和发布继续经过明确确认、操作回执与终态读回',
-    action: '准备交付',
-    route: DEV_DELIVERY_ROUTE,
-  }),
-])
-
-const ICON_BY_KEY = {
-  governance: <ExperimentOutlined />,
-  docs: <FileSearchOutlined />,
-  testing: <SafetyCertificateOutlined />,
-  'data-preparation': <DatabaseOutlined />,
-  'ui-design': <AppstoreOutlined />,
-  'customer-config': <DeploymentUnitOutlined />,
-  'status-flows': <ApartmentOutlined />,
-  'business-usability': <QuestionCircleOutlined />,
-  'database-migration': <DatabaseOutlined />,
-  'version-center': <DeploymentUnitOutlined />,
-  'drill-recovery': <ExperimentOutlined />,
-}
+const { Text, Title } = Typography
+const VIEW_ITEMS = [
+  { value: 'tools', label: '全部工具' },
+  { value: 'pinned', label: '常用工具' },
+  { value: 'path', label: '使用指南' },
+]
+const GROUP_OPTIONS = [
+  { value: 'all', label: '全部领域' },
+  ...DEV_WORKSPACE_NAV_ITEMS.filter((item) => item.key !== 'overview').map(
+    (item) => ({ value: item.key, label: item.label })
+  ),
+]
 
 function readPinnedRoutes() {
   try {
-    const raw = window.localStorage?.getItem(DEV_HUB_PINNED_STORAGE_KEY)
-    return normalizeDevHubPinnedRoutes(JSON.parse(raw || '[]'))
+    return normalizeDevHubPinnedRoutes(
+      JSON.parse(
+        window.localStorage?.getItem(DEV_HUB_PINNED_STORAGE_KEY) || '[]'
+      )
+    )
   } catch {
     return []
   }
 }
 
-function writeLocalRoutes(storageKey, routes = []) {
-  try {
-    window.localStorage?.setItem(storageKey, JSON.stringify(routes))
-  } catch {
-    // 本地开发偏好是 best-effort，不影响入口跳转。
-  }
-}
-
-function writePinnedRoutes(routes = []) {
-  writeLocalRoutes(DEV_HUB_PINNED_STORAGE_KEY, routes)
-}
-
-function OverviewStage({ stage, index }) {
-  const stageItems = DEV_HUB_ITEMS.filter((item) => item.areaKey === stage.key)
-
-  return (
-    <li className="erp-dev-overview-stage">
-      <span className="erp-dev-overview-stage__index" aria-hidden="true">
-        {String(index + 1).padStart(2, '0')}
-      </span>
-      <div className="erp-dev-overview-stage__copy">
-        <Text className="erp-dev-overview-stage__eyebrow">{stage.eyebrow}</Text>
-        <Title level={3}>{stage.title}</Title>
-        <Paragraph>{stage.description}</Paragraph>
-        <Text type="secondary" className="erp-dev-overview-stage__boundary">
-          {stage.boundary}
-        </Text>
-        <details className="erp-dev-overview-stage__details">
-          <summary>
-            <span>这一阶段包含什么</span>
-            <span>{stageItems.length} 个入口</span>
-          </summary>
-          <div className="erp-dev-overview-stage__links">
-            {stageItems.map((item) => (
-              <Link
-                key={item.key}
-                to={item.route}
-                className="erp-dev-overview-stage__link"
-              >
-                <span>
-                  <strong>{item.title}</strong>
-                  <small>{item.status}</small>
-                </span>
-                <RightOutlined aria-hidden="true" />
-              </Link>
-            ))}
-          </div>
-        </details>
-      </div>
-      <Link
-        to={stage.route}
-        className="erp-dev-overview-stage__action"
-        aria-label={`${stage.action}：${stage.title}`}
-      >
-        <span>{stage.action}</span>
-        <RightOutlined aria-hidden="true" />
-      </Link>
-    </li>
-  )
-}
-
-function PinnedShortcut({ item, onTogglePinned }) {
-  return (
-    <article className="erp-dev-overview-pinned__item">
-      <Link to={item.route} className="erp-dev-overview-pinned__link">
-        <strong>{item.title}</strong>
-        <small>{item.status}</small>
-      </Link>
-      <Tooltip title="取消置顶">
-        <Button
-          aria-label={`取消置顶${item.title}`}
-          className="erp-dev-overview-pinned__remove"
-          icon={<PushpinFilled />}
-          size="small"
-          type="text"
-          aria-pressed="true"
-          onClick={() => onTogglePinned?.(item.route)}
-        />
-      </Tooltip>
-    </article>
-  )
-}
-
-function OverviewToolRow({ item, pinned = false, onTogglePinned }) {
-  return (
-    <article className="erp-dev-overview-tool">
-      <div className="erp-dev-overview-tool__icon" aria-hidden="true">
-        {ICON_BY_KEY[item.key] || <CodeOutlined />}
-      </div>
-      <div className="erp-dev-overview-tool__copy">
-        <div className="erp-dev-overview-tool__head">
-          <Title level={4}>{item.title}</Title>
-          <div className="erp-dev-overview-tool__meta">
-            <Tag>{item.group}</Tag>
-            <Tooltip title={pinned ? '取消置顶' : '置顶入口'}>
-              <Button
-                aria-label={`${pinned ? '取消置顶' : '置顶'}${item.title}`}
-                className="erp-dev-overview-tool__pin"
-                icon={pinned ? <PushpinFilled /> : <PushpinOutlined />}
-                size="small"
-                type="text"
-                aria-pressed={pinned}
-                onClick={() => onTogglePinned?.(item.route)}
-              />
-            </Tooltip>
-          </div>
-        </div>
-        <Text type="secondary" className="erp-dev-overview-tool__description">
-          {item.description}
-        </Text>
-        <DevEntrySourceDetails route={item.route} source={item.source} />
-      </div>
-      <div className="erp-dev-overview-tool__actions">
-        <Text type="secondary">{item.status}</Text>
-        <Link
-          to={item.route}
-          className="erp-dev-overview-tool__open"
-          aria-label={`打开${item.title}`}
-        >
-          <span>打开</span>
-          <RightOutlined aria-hidden="true" />
-        </Link>
-      </div>
-    </article>
-  )
-}
-
 export default function DevHubPage() {
-  const [keyword, setKeyword] = useState('')
-  const [group, setGroup] = useState(DEV_HUB_ALL_GROUP)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeView = VIEW_ITEMS.some(
+    (item) => item.value === searchParams.get('view')
+  )
+    ? searchParams.get('view')
+    : 'tools'
+  const keyword = searchParams.get('q') || ''
+  const group = GROUP_OPTIONS.some(
+    (item) => item.value === searchParams.get('group')
+  )
+    ? searchParams.get('group')
+    : 'all'
   const [pinnedRoutes, setPinnedRoutes] = useState(readPinnedRoutes)
-  const groupOptions = useMemo(() => getDevHubGroupOptions(DEV_HUB_ITEMS), [])
-  const items = useMemo(
-    () => filterDevHubItems(DEV_HUB_ITEMS, { keyword, group }),
-    [group, keyword]
-  )
-  const pinnedItems = useMemo(
-    () => buildDevHubPinnedItems(DEV_HUB_ITEMS, pinnedRoutes),
-    [pinnedRoutes]
-  )
-  const pinnedRouteSet = useMemo(() => new Set(pinnedRoutes), [pinnedRoutes])
-  const handleTogglePinned = (route) => {
-    setPinnedRoutes((currentRoutes) => {
-      const nextRoutes = toggleDevHubPinnedRoute(route, currentRoutes)
-      writePinnedRoutes(nextRoutes)
-      return nextRoutes
+  const items = useMemo(() => {
+    const source =
+      activeView === 'pinned'
+        ? buildDevHubPinnedItems(DEV_HUB_ITEMS, pinnedRoutes)
+        : DEV_WORKSPACE_NAV_ITEMS.flatMap((area) =>
+            DEV_HUB_ITEMS.filter((item) => item.areaKey === area.key)
+          )
+    return filterDevHubItems(source, { keyword }).filter(
+      (item) => group === 'all' || item.areaKey === group
+    )
+  }, [activeView, group, keyword, pinnedRoutes])
+  const selectParam = (key, value, replace = false) => {
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set(key, value)
+    else next.delete(key)
+    setSearchParams(next, { replace })
+  }
+  const handleTogglePinned = (route) =>
+    setPinnedRoutes((current) => {
+      const next = toggleDevHubPinnedRoute(route, current)
+      try {
+        window.localStorage?.setItem(
+          DEV_HUB_PINNED_STORAGE_KEY,
+          JSON.stringify(next)
+        )
+      } catch {
+        /* 浏览器偏好不可写时，入口仍可正常使用。 */
+      }
+      return next
     })
+  const resetFilters = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('q')
+    next.delete('group')
+    setSearchParams(next, { replace: true })
   }
 
   return (
     <div className="erp-dev-hub-page erp-dev-hub-page--index erp-dev-overview-page erp-dev-workspace-page">
       <DevPageNav />
       <header className="erp-dev-hub-header">
-        <div className="erp-dev-hub-header__copy">
-          <ExperimentOutlined className="erp-dev-hub-header__icon" />
-          <Title level={1} className="erp-dev-hub-title">
-            研发效能工作台
-          </Title>
-          <Text className="erp-dev-hub-summary">
-            按改动、验证和交付的顺序选择下一步；只在需要时再查具体工具。
-          </Text>
-          <details className="erp-dev-overview-boundary">
-            <summary>查看开发态边界</summary>
-            <Paragraph>
-              仅本地开发态，不进入正式菜单或生产构建；受控写操作继续经过本机系统边界、明确确认和结果读回，不冒充
-              ERP RBAC。
-            </Paragraph>
-          </details>
-        </div>
+        <Title level={1} className="erp-dev-hub-title">
+          总览
+        </Title>
+        <Text type="secondary">开发工具</Text>
       </header>
-
       <main className="erp-dev-hub-shell">
-        <section
-          className="erp-dev-overview-start"
-          aria-labelledby="dev-overview-start-title"
-        >
-          <div className="erp-dev-overview-start__head">
-            <div>
-              <Text className="erp-dev-overview-start__eyebrow">当前任务</Text>
-              <Title level={2} id="dev-overview-start-title">
-                你现在要完成什么？
-              </Title>
-            </div>
-            <Text type="secondary">
-              通常从第一步开始；已经明确目标时，也可以直接进入对应阶段。
-            </Text>
+        <section className="erp-dev-overview-library">
+          <div className="erp-dev-overview-library__navigation">
+            <DevTaskNav
+              className="erp-dev-overview-view-tabs"
+              ariaLabel="总览视图"
+              idPrefix="dev-overview"
+              compact
+              items={VIEW_ITEMS}
+              value={activeView}
+              onChange={(value) => selectParam('view', value)}
+            />
           </div>
-
-          {pinnedItems.length > 0 ? (
-            <section
-              className="erp-dev-overview-pinned"
-              aria-label="常用开发入口"
-            >
-              <div className="erp-dev-overview-pinned__head">
-                <Text strong>常用入口</Text>
-                <Text type="secondary">只保存在当前浏览器</Text>
-              </div>
-              <div className="erp-dev-overview-pinned__list">
-                {pinnedItems.map((item) => (
-                  <PinnedShortcut
-                    key={item.key}
-                    item={item}
-                    onTogglePinned={handleTogglePinned}
-                  />
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          <ol className="erp-dev-overview-stage-list">
-            {OVERVIEW_STAGES.map((stage, index) => (
-              <OverviewStage key={stage.key} stage={stage} index={index} />
-            ))}
-          </ol>
-        </section>
-
-        <details className="erp-dev-overview-tools">
-          <summary>
-            <span>
-              <strong>需要找特定工具？查看全部入口</strong>
-              <small>支持搜索、分类和本地置顶</small>
-            </span>
-            <span>{DEV_HUB_ITEMS.length} 个入口</span>
-          </summary>
-          <div className="erp-dev-overview-tools__content">
-            <section
-              className="erp-dev-hub-toolbar"
-              aria-label="全部开发工具筛选"
-            >
+          <section
+            id={`dev-overview-panel-${activeView === 'pinned' ? 'pinned' : 'tools'}`}
+            role="tabpanel"
+            aria-labelledby={`dev-overview-tab-${activeView === 'pinned' ? 'pinned' : 'tools'}`}
+            hidden={activeView === 'path'}
+          >
+            <div className="erp-dev-overview-library__toolbar">
               <SearchInput
                 allowClear
                 aria-label="搜索全部开发工具"
-                placeholder="搜索具体工具或路径"
-                searchHint="可搜索工具名称、用途、路径、来源或边界"
+                placeholder="搜索工具名称或用途"
                 value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
+                onChange={(event) => selectParam('q', event.target.value, true)}
               />
               <Select
                 aria-label="全部开发工具分组"
-                className="erp-dev-hub-group-filter"
                 value={group}
-                options={groupOptions}
-                onChange={setGroup}
+                options={GROUP_OPTIONS}
+                onChange={(value) => selectParam('group', value, true)}
               />
-              <Text className="erp-dev-hub-toolbar__note">
-                {keyword.trim() || group !== DEV_HUB_ALL_GROUP
-                  ? `匹配 ${items.length} 个入口`
-                  : `全部 ${items.length} 个入口`}
-              </Text>
-            </section>
-
-            {items.length > 0 ? (
-              <section
-                className="erp-dev-overview-tool-list"
-                aria-label="全部开发工具"
+              {keyword || group !== 'all' ? (
+                <Button onClick={resetFilters}>清除筛选</Button>
+              ) : null}
+              <Text
+                type="secondary"
+                className="erp-dev-overview-library__count"
+                aria-live="polite"
               >
-                {items.map((item) => (
-                  <OverviewToolRow
-                    key={item.key}
-                    item={item}
-                    pinned={pinnedRouteSet.has(item.route)}
-                    onTogglePinned={handleTogglePinned}
-                  />
-                ))}
-              </section>
-            ) : (
-              <div className="erp-dev-overview-empty">
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="没有匹配的工具，请清空搜索或切换分类"
-                />
-              </div>
-            )}
-          </div>
-        </details>
+                {items.length} 个工具
+              </Text>
+            </div>
+            {activeView !== 'path' ? (
+              <DevToolTable
+                ariaLabel={
+                  activeView === 'pinned' ? '常用开发工具' : '全部开发工具'
+                }
+                items={items}
+                showGroup
+                pinnedRoutes={pinnedRoutes}
+                onTogglePinned={handleTogglePinned}
+                onReset={keyword || group !== 'all' ? resetFilters : undefined}
+                emptyDescription={
+                  activeView === 'pinned' && !keyword && group === 'all'
+                    ? '还没有常用工具，在全部工具中点击图钉即可添加。'
+                    : undefined
+                }
+              />
+            ) : null}
+          </section>
+          <section
+            id="dev-overview-panel-path"
+            role="tabpanel"
+            aria-labelledby="dev-overview-tab-path"
+            hidden={activeView !== 'path'}
+          >
+            <div className="erp-dev-overview-guide-intro">
+              <BookOutlined />
+              <Text type="secondary">
+                按当前任务选择工具，运行结果以工具内的实际记录为准。
+              </Text>
+            </div>
+            <div className="erp-dev-tool-table-wrap">
+              <table
+                className="erp-dev-tool-table"
+                aria-label="开发工具使用指南"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">任务</th>
+                    <th scope="col">检查重点</th>
+                    <th scope="col">工具入口</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {DEV_WORKBENCH_GUIDE.map((step) => (
+                    <tr key={step.value}>
+                      <th scope="row">{step.label}</th>
+                      <td>{step.completion}</td>
+                      <td>
+                        <Link to={step.route}>{step.action}</Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
       </main>
     </div>
   )

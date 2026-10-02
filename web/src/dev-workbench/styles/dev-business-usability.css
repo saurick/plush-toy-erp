@@ -1,9 +1,5 @@
 .erp-dev-business-usability-page {
-  min-height: 100vh;
   overflow-x: hidden;
-  background: var(--erp-page-bg);
-  color: var(--erp-text);
-  padding: 18px;
 }
 
 .erp-dev-business-usability-header,
@@ -32,6 +28,37 @@
 .erp-dev-business-usability-header h1.ant-typography {
   margin: 0;
   font-size: clamp(24px, 2.5vw, 32px);
+}
+
+.erp-dev-business-usability-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  min-width: 0;
+}
+
+.erp-dev-business-usability-boundary {
+  padding: 10px 14px;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-dev-business-usability-boundary > summary {
+  width: fit-content;
+  color: var(--erp-text-muted);
+  cursor: pointer;
+}
+
+.erp-dev-business-usability-boundary > summary:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 3px;
+}
+
+.erp-dev-business-usability-boundary > .ant-typography {
+  margin: 10px 0 0;
 }
 
 .erp-dev-business-usability-header p.ant-typography {
@@ -195,9 +222,6 @@
 }
 
 @media (max-width: 767px) {
-  .erp-dev-business-usability-page {
-    padding: 10px;
-  }
 
   .erp-dev-business-usability-summary,
   .erp-dev-business-usability-filters .ant-card-body {

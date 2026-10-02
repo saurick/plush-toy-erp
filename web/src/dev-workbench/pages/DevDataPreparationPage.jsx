@@ -1304,7 +1304,7 @@ export default function DevDataPreparationPage() {
               测试数据准备中心
             </Text>
             <Title level={1} className="erp-dev-hub-title">
-              准备回归数据
+              测试数据
             </Title>
             <Paragraph className="erp-dev-hub-summary">
               默认按最新业务链合同建立完整回归新批次；先看已登记步骤和场景合同，再确认执行并查看真实耗时。页面不接收自定义目标、命令或凭据。

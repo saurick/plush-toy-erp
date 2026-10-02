@@ -1,10 +1,3 @@
-.erp-dev-permission-relationships-page {
-  min-height: 100vh;
-  background: #f3f7f2;
-  color: var(--erp-text);
-  padding: 16px;
-}
-
 .erp-dev-permission-relationships-header,
 .erp-dev-permission-relationships-shell {
   width: min(1480px, 100%);
@@ -656,9 +649,6 @@
 }
 
 @media (max-width: 760px) {
-  .erp-dev-permission-relationships-page {
-    padding: 8px;
-  }
 
   .erp-dev-permission-relationships-header {
     display: grid;

@@ -1346,7 +1346,7 @@ test('devTesting: 覆盖接口缺失、失败和错误 schema 均 fail closed', 
 test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界', () => {
   assert.match(testingPageSource, /const VIEW_CLOSEOUT = 'closeout'/)
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
-  assert.match(testingPageSource, /质量验证工作台/)
+  assert.match(testingPageSource, /改动验证/)
   assert.match(testingPageSource, /\{ label: '本轮验证', value: VIEW_TIERS \}/)
   assert.match(
     testingPageSource,
@@ -1374,12 +1374,8 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /createDevCoverageOperationClient/)
   assert.match(testingPageSource, /createDevTestingOperationClient/)
   assert.match(testingPageSource, /生成本轮验证计划/)
-  assert.match(testingPageSource, /本轮验证三步判断路径/)
-  assert.match(testingPageSource, /生成建议/)
-  assert.match(testingPageSource, /匹配检查/)
-  assert.match(testingPageSource, /核对独立证据/)
-  assert.match(testingPageSource, /data-parallel-checks="true"/)
-  assert.match(testingPageSource, /不合成总通过/)
+  assert.match(testingPageSource, /可运行检查/)
+  assert.doesNotMatch(testingPageSource, /<ValidationJourney/)
   assert.match(testingPageSource, /DEV_TESTING_FIXED_ACTIONS\.map/)
   assert.match(testingPageSource, /改动到验证建议的映射/)
   assert.match(testingPageSource, /T0–T8 只表示选测范围/)

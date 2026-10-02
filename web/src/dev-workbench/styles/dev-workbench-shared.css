@@ -249,13 +249,6 @@
   place-items: center;
 }
 
-.erp-dev-testing-page {
-  min-height: 100vh;
-  background: var(--erp-page-bg);
-  color: var(--erp-text);
-  padding: 18px;
-}
-
 .erp-dev-testing-header {
   display: flex;
   align-items: flex-start;

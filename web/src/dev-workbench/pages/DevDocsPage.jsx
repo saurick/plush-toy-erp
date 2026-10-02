@@ -862,13 +862,10 @@ export default function DevDocsPage() {
           <Space align="center" size={10} wrap>
             <BookOutlined className="erp-dev-docs-header__icon" />
             <Title level={1} className="erp-dev-docs-title">
-              开发文档查看器 / Dev Docs Viewer
+              开发文档
             </Title>
             <Tag color="green">仅开发环境 / DEV ONLY</Tag>
           </Space>
-          <Paragraph className="erp-dev-docs-summary">
-            默认只看当前合同；评审参考与历史证据分层浏览，避免旧结论混入当前搜索。
-          </Paragraph>
           <details className="erp-dev-docs-boundary-details">
             <summary>查看收录范围与维护边界</summary>
             <Paragraph>

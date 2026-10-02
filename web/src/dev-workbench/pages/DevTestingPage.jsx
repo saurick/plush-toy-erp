@@ -32,7 +32,6 @@ import {
   DEV_TESTING_COVERAGE_COLLECT_COMMAND,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
   buildDevTestingDocs,
-  buildDevTestingSummary,
   filterDevTestingCommandBlocks,
   filterDevTestingDocs,
   formatDevTestingCoverageMetric,
@@ -741,50 +740,13 @@ function CoverageOperationPanel({ operation, error }) {
   )
 }
 
-function ValidationJourney() {
-  return (
-    <ol
-      className="erp-dev-testing-validation-journey"
-      aria-label="本轮验证三步判断路径"
-    >
-      <li>
-        <span className="erp-dev-testing-validation-journey__number">1</span>
-        <div>
-          <strong>生成建议</strong>
-          <small>只读分析改动，得到本轮选测范围</small>
-        </div>
-      </li>
-      <li data-parallel-checks="true">
-        <span className="erp-dev-testing-validation-journey__number">2</span>
-        <div>
-          <strong>匹配检查</strong>
-          <small>三项固定检查按改动独立选择，不是顺序关卡</small>
-          <div className="erp-dev-testing-validation-journey__branches">
-            {DEV_TESTING_FIXED_ACTIONS.map((action) => (
-              <span key={action.key}>{action.label}</span>
-            ))}
-          </div>
-        </div>
-      </li>
-      <li>
-        <span className="erp-dev-testing-validation-journey__number">3</span>
-        <div>
-          <strong>核对独立证据</strong>
-          <small>逐项看回执、缺口和边界，不合成总通过</small>
-        </div>
-      </li>
-    </ol>
-  )
-}
-
 function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
   const shortCommit = plan?.repository?.commit?.slice(0, 12) || '未生成'
   return (
     <section className="erp-dev-testing-validation-plan">
       <div className="erp-dev-testing-validation-plan__head">
         <div>
-          <Tag color="blue">验证计划</Tag>
-          <Title level={3}>先判断本轮需要验证什么</Title>
+          <Title level={3}>验证计划</Title>
           <Paragraph>
             只读分析当前改动，给出建议检查和待补证据；不会运行测试或写入数据。
           </Paragraph>
@@ -1018,19 +980,6 @@ function ValidationWorkspace({
       className="erp-dev-testing-validation"
       aria-label="本轮验证固定动作"
     >
-      <div className="erp-dev-testing-validation__title">
-        <div>
-          <Text className="erp-dev-testing-validation__eyebrow">
-            推荐主路径
-          </Text>
-          <Title level={2}>本轮验证</Title>
-          <Paragraph>
-            先生成建议，再只运行与改动匹配的检查。每项独立出结果，不合成“全系统已通过”。
-          </Paragraph>
-        </div>
-        {summaryError ? <Tag color="red">状态读取失败</Tag> : null}
-      </div>
-      <ValidationJourney />
       <ValidationPlanPanel
         plan={plan}
         loading={planLoading}
@@ -1048,12 +997,11 @@ function ValidationWorkspace({
       ) : null}
       <div className="erp-dev-testing-validation__action-intro">
         <div>
-          <Text strong>运行匹配的固定检查</Text>
+          <Text strong>可运行检查</Text>
           <Text type="secondary">
             三项检查互相独立；若不匹配本轮改动，可以不运行。
           </Text>
         </div>
-        <Tag>固定白名单</Tag>
       </div>
       <DevCustomerScopeSelector
         scope={customerScope}
@@ -1366,10 +1314,6 @@ export default function DevTestingPage() {
   const tiers = useMemo(
     () => parseDevTestingStrategyTiers(strategySource),
     [strategySource]
-  )
-  const summary = useMemo(
-    () => buildDevTestingSummary({ tiers, docs }),
-    [docs, tiers]
   )
   const documentRoleOptions = useMemo(
     () => getDevTestingDocumentRoleOptions(docs),
@@ -1907,31 +1851,16 @@ export default function DevTestingPage() {
       <DevPageNav sourcePath={DEV_TESTING_STRATEGY_SOURCE_PATH} />
       <header className="erp-dev-testing-header">
         <div className="erp-dev-testing-header__copy">
-          <Text className="erp-dev-testing-header__eyebrow">
-            本机开发工具 · Quality validation
-          </Text>
           <Space align="center" size={10}>
             <SafetyCertificateOutlined className="erp-dev-testing-header__icon" />
             <Title level={1} className="erp-dev-testing-title">
-              质量验证工作台
+              {isCloseoutView
+                ? 'Git 收口检查'
+                : view === VIEW_COMMANDS
+                  ? '专项检查命令'
+                  : '改动验证'}
             </Title>
           </Space>
-          <Paragraph className="erp-dev-testing-summary">
-            先判断本轮要验证什么，再运行固定检查并核对结果。页面不接受自定义命令、路径或凭据。
-          </Paragraph>
-        </div>
-        <div className="erp-dev-testing-header__context">
-          <div>
-            <Text strong>默认只看下一步</Text>
-            <Text type="secondary">验证范围和复制命令放在下方按需展开。</Text>
-          </div>
-          <details>
-            <summary>查看来源规模</summary>
-            <Text type="secondary">
-              {summary.tierCount} 个验证范围 · {summary.docCount} 个当前来源 ·{' '}
-              {summary.commandBlockCount} 个命令块
-            </Text>
-          </details>
         </div>
       </header>
 

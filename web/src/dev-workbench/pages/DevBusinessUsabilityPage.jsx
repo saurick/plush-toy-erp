@@ -4,16 +4,7 @@ import {
   CheckCircleOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Select,
-  Space,
-  Tag,
-  Typography,
-} from 'antd'
+import { Button, Card, Empty, Select, Space, Tag, Typography } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
@@ -24,6 +15,11 @@ import {
   BUSINESS_USABILITY_STATUS_PRESENTATION,
 } from '../../erp/config/businessUsabilityCatalog.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
+import {
+  DEV_BUSINESS_USABILITY_ROUTE,
+  DEV_PAGE_TITLE_BY_ROUTE,
+  DEV_TESTING_ROUTE,
+} from '../config/devRoutes.mjs'
 import {
   DEV_BUSINESS_USABILITY_PAGE_SIZE,
   DEV_BUSINESS_USABILITY_ROLE_OPTIONS,
@@ -191,29 +187,31 @@ export default function DevBusinessUsabilityPage() {
           <QuestionCircleOutlined aria-hidden="true" />
           <Text className="erp-dev-business-usability-kicker">只读检查</Text>
         </Space>
-        <Title level={1}>员工能不能看懂、能不能自己完成？</Title>
+        <div className="erp-dev-business-usability-heading">
+          <Title level={1}>
+            {DEV_PAGE_TITLE_BY_ROUTE[DEV_BUSINESS_USABILITY_ROUTE]}
+          </Title>
+          <Link to={DEV_TESTING_ROUTE}>返回改动验证</Link>
+        </div>
         <Paragraph>
-          把正式业务页面、页内说明和岗位帮助放在一起核对。这里只看说明是否够用，不修改业务数据，也不建立第二套权限、岗位责任或业务链。
+          核对各业务页面的任务说明、完成标准、交接和字段解释。
         </Paragraph>
       </header>
 
       <main className="erp-dev-business-usability-shell">
-        <Alert
-          showIcon
-          type="info"
-          message="推荐岗位不是权限，覆盖状态也不是客户验收"
-          description={
-            <span>
-              岗位标签只表示该页面被哪些岗位帮助列为常用入口；实际能否进入和操作仍以正式权限为准。业务上下游继续到
-              <Link to="/__dev/status-flows">业务链观察</Link>
-              核对。
-            </span>
-          }
-        />
+        <details className="erp-dev-business-usability-boundary">
+          <summary>检查说明与边界</summary>
+          <Paragraph>推荐岗位不是权限，覆盖状态也不是客户验收。</Paragraph>
+          <Paragraph>
+            岗位标签只表示该页面被哪些岗位帮助列为常用入口；实际能否进入和操作仍以正式权限为准。业务上下游继续到
+            <Link to="/__dev/status-flows">业务链观察</Link>
+            核对。
+          </Paragraph>
+        </details>
 
         <section
           className="erp-dev-business-usability-summary"
-          aria-label="业务易用性覆盖摘要"
+          aria-label="页面说明覆盖摘要"
         >
           {[
             ['正式业务页', summary.total],
@@ -233,7 +231,7 @@ export default function DevBusinessUsabilityPage() {
             allowClear
             value={keyword}
             placeholder="搜索页面、任务、公式、来源或岗位"
-            aria-label="搜索业务易用性说明"
+            aria-label="搜索页面说明"
             onChange={(event) => updateQuery({ keyword: event.target.value })}
           />
           <Select

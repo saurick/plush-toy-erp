@@ -98,7 +98,7 @@ test('permission graph loads on the dev page and hides technical source on rende
   assert.match(navigationComponentSource, /不会随“功能范围”筛选缩小/u)
   assert.match(navigationComponentSource, /菜单位置只影响查找顺序/u)
   assert.match(source, /erp-dev-workspace-page/u)
-  assert.match(source, /权限关系 \/ Effective Access/u)
+  assert.match(source, /权限关系/u)
   assert.match(source, /href="\/erp\/system\/permissions"/u)
   assert.doesNotMatch(source, /<Modal\b|permissionRelationshipOpen/u)
 })
@@ -110,7 +110,7 @@ test('permission graph exposes only permission-adjacent relationships', () => {
     '功能',
     '页面',
     '实际菜单',
-    '仓库数据范围',
+    '仓库范围',
     '审批责任',
   ]) {
     assert.match(source + modelSource, new RegExp(label, 'u'))

@@ -19,7 +19,6 @@ const DEV_LAYOUT_CONTRACT_TESTS = Object.freeze([
   "web/src/dev-workbench/styles/dev-quality-gates.test.mjs",
   "web/src/dev-workbench/styles/dev-version-center.test.mjs",
   "web/src/dev-workbench/config/devHub.test.mjs",
-  "web/src/dev-workbench/config/devRelationshipPerspectives.test.mjs",
 ]);
 const SPECIALIZED_DESKTOP_CONTRACTS = Object.freeze([
   Object.freeze({

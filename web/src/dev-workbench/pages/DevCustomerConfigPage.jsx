@@ -255,25 +255,6 @@ function StatusTag({ status }) {
   )
 }
 
-function CustomerViewIntro({ activeView, primaryStatus }) {
-  const activeIndex = VIEW_OPTIONS.findIndex(
-    (item) => item.value === activeView
-  )
-  const item = VIEW_OPTIONS[activeIndex] || VIEW_OPTIONS[0]
-  const stepLabel = `第 ${activeIndex + 1} 步，共 ${VIEW_OPTIONS.length} 步`
-
-  return (
-    <section className="erp-dev-customer-view-intro" aria-live="polite">
-      <div className="erp-dev-customer-view-intro__step">{stepLabel}</div>
-      <div className="erp-dev-customer-view-intro__copy">
-        <Text strong>{item.displayLabel}</Text>
-        <Text type="secondary">{item.guidance}</Text>
-      </div>
-      {activeIndex === 0 ? <StatusTag status={primaryStatus} /> : null}
-    </section>
-  )
-}
-
 function resolveMenuItemPresentation(itemKey) {
   const normalizedKey = String(itemKey || '').trim()
   const item =
@@ -293,20 +274,6 @@ function MenuPreviewItem({ itemKey }) {
       <Text strong>{item.label}</Text>
       <code>{item.key}</code>
     </div>
-  )
-}
-
-function DecisionCard({ item }) {
-  return (
-    <article className="erp-dev-customer-decision-card">
-      <div className="erp-dev-customer-decision-card__head">
-        <Text type="secondary">{item.label}</Text>
-        <StatusTag status={item.status} />
-      </div>
-      <strong>{item.outcome}</strong>
-      <Text>{item.note}</Text>
-      <Text type="secondary">{item.nextAction}</Text>
-    </article>
   )
 }
 
@@ -1045,7 +1012,7 @@ function OverviewPanel({ overview, onNavigate }) {
     <div className="erp-dev-customer-overview" data-dev-customer-view="总览">
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-console">
         <div>
-          <Text type="secondary">当前配置包 / Current Package</Text>
+          <Text type="secondary">当前配置包</Text>
           <Title level={2}>{consoleSummary.packageLabel}</Title>
           <Text strong>{consoleSummary.reviewDecision.title}</Text>
           <Text type="secondary">{consoleSummary.reviewDecision.summary}</Text>
@@ -1061,19 +1028,20 @@ function OverviewPanel({ overview, onNavigate }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <ExclamationCircleOutlined />
-          <Text strong>决策卡 / Decision Cards</Text>
+          <Text strong>可用操作</Text>
         </div>
-        <div className="erp-dev-customer-decision-grid">
-          {consoleSummary.decisionCards.map((item) => (
-            <DecisionCard item={item} key={item.key} />
-          ))}
+        <div className="erp-dev-tool-table-wrap">
+          <table className="erp-dev-tool-table" aria-label="客户配置可用操作">
+            <thead><tr><th scope="col">操作</th><th scope="col">状态</th><th scope="col">范围与后续处理</th></tr></thead>
+            <tbody>{consoleSummary.decisionCards.map((item) => <tr key={item.key}><th scope="row">{item.label}</th><td><StatusTag status={item.status} /><span>{item.outcome}</span></td><td>{item.note}<p className="erp-dev-customer-panel__hint">{item.nextAction}</p></td></tr>)}</tbody>
+          </table>
         </div>
       </section>
 
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <CheckCircleOutlined />
-          <Text strong>下一步 / Next</Text>
+          <Text strong>相关工具</Text>
         </div>
         <div className="erp-dev-customer-quick-actions">
           <QuickAction
@@ -2804,7 +2772,6 @@ export default function DevCustomerConfigPage() {
       />
     ),
   }[activeView]
-  const primaryStatus = overview.packageConsoleSummary?.primaryStatus
 
   return (
     <main className="erp-dev-customer-page erp-dev-workspace-page">
@@ -2813,43 +2780,16 @@ export default function DevCustomerConfigPage() {
       />
       <header className="erp-dev-customer-header">
         <div className="erp-dev-customer-header__copy">
-          <Text className="erp-dev-customer-eyebrow">交付运行 · 客户配置</Text>
           <Space align="center" size={10}>
             <SettingOutlined className="erp-dev-customer-header__icon" />
-            <Title
-              aria-label="客户配置包预检与发布控制台 / Package Preflight & Release Console"
-              className="erp-dev-customer-title"
-              level={1}
-            >
-              <span>客户配置发布工作台</span>
-              <small aria-hidden="true">Package Preflight &amp; Release</small>
+            <Title className="erp-dev-customer-title" level={1}>
+              客户配置
             </Title>
           </Space>
-          <Text className="erp-dev-customer-summary">
-            选择客户包后，先看结论，再按“检查配置包 → 查看变化 → 页面配置预览 →
-            试跑与发布”推进。本页只读取已登记配置，不接收任意代码、SQL 或脚本。
-          </Text>
-          <CustomerPackageSelector
-            overview={overview}
-            onChange={handleCustomerChange}
-            disabled={isMutationRunning}
-          />
-          {isMissingCustomer ? null : (
-            <DevTaskNav
-              compact
-              level="primary"
-              className="erp-dev-customer-view-switch erp-dev-customer-journey"
-              ariaLabel="客户配置工作任务"
-              items={VIEW_NAV_OPTIONS}
-              value={activeView}
-              onChange={handleViewChange}
-              disabled={isMutationRunning}
-            />
-          )}
         </div>
         <details className="erp-dev-customer-source">
           <summary>
-            <Text type="secondary">当前 URL customer / Query</Text>
+            <Text type="secondary">当前配置包</Text>
             <Text strong>{overview.requestedCustomerKey}</Text>
           </summary>
           <Text type="secondary">
@@ -2858,17 +2798,31 @@ export default function DevCustomerConfigPage() {
         </details>
       </header>
 
+      <section className="erp-dev-customer-tools">
+        <CustomerPackageSelector
+          overview={overview}
+          onChange={handleCustomerChange}
+          disabled={isMutationRunning}
+        />
+        {isMissingCustomer ? null : (
+          <DevTaskNav
+            compact
+            level="primary"
+            className="erp-dev-customer-view-switch erp-dev-customer-journey"
+            ariaLabel="客户配置工作任务"
+            items={VIEW_NAV_OPTIONS}
+            value={activeView}
+            onChange={handleViewChange}
+            disabled={isMutationRunning}
+          />
+        )}
+      </section>
+
       <section className="erp-dev-customer-workspace">
         {isMissingCustomer ? (
           <MissingCustomerPanel overview={overview} />
         ) : (
-          <>
-            <CustomerViewIntro
-              activeView={activeView}
-              primaryStatus={primaryStatus}
-            />
-            {panel}
-          </>
+          panel
         )}
       </section>
     </main>

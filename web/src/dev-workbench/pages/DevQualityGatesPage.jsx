@@ -3033,10 +3033,6 @@ export default function DevQualityGatesPage() {
               质量门禁
             </Title>
           </Space>
-          <Paragraph>
-            先核对当前提交的 GitLab exact-SHA CI，再按需使用本机 full / strict
-            诊断未提交改动；两类证据分开记录。
-          </Paragraph>
         </div>
         <Button
           type="primary"

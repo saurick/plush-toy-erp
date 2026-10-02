@@ -17,7 +17,7 @@ import {
 } from '../config/devProductCore.mjs'
 import '../styles/dev-product-core.css'
 
-const { Paragraph, Text, Title } = Typography
+const { Text, Title } = Typography
 
 const STATUS_COLOR_BY_MEMBERSHIP = Object.freeze({
   entered: 'success',
@@ -154,13 +154,7 @@ export default function DevProductCorePage() {
             <AppstoreOutlined />
           </span>
           <div>
-            <Text className="erp-dev-product-core-eyebrow">
-              当前产品能力事实 · 只读
-            </Text>
-            <Title level={1}>产品内核 / Product Core</Title>
-            <Paragraph>
-              一张表查看哪些能力已进入内核、哪些部分可用、哪些当前不纳入，以及每项当前边界。
-            </Paragraph>
+            <Title level={1}>产品内核</Title>
           </div>
         </div>
 
@@ -175,7 +169,7 @@ export default function DevProductCorePage() {
             <span>项已进入内核</span>
           </div>
           <Button icon={<FileTextOutlined />} href={DEV_PRODUCT_CORE_DOCS_HREF}>
-            打开唯一台账
+            查看能力台账
           </Button>
         </div>
       </header>
@@ -186,9 +180,9 @@ export default function DevProductCorePage() {
             type="error"
             showIcon
             message="暂时无法读取产品能力台账"
-            description="页面没有解析到能力状态。请打开唯一台账核对 Markdown 表格结构，不要在页面里补造状态。"
+            description="页面没有解析到能力状态。请查看能力台账核对 Markdown 表格结构，不要在页面里补造状态。"
             action={
-              <Button href={DEV_PRODUCT_CORE_DOCS_HREF}>打开唯一台账</Button>
+              <Button href={DEV_PRODUCT_CORE_DOCS_HREF}>查看能力台账</Button>
             }
           />
         ) : (

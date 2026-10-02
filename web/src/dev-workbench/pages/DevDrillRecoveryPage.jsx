@@ -344,7 +344,7 @@ export default function DevDrillRecoveryPage() {
             <ExperimentOutlined aria-hidden="true" />
           </span>
           <Title level={1} className="erp-dev-hub-title">
-            演练与恢复中心
+            演练与恢复
           </Title>
           <Paragraph className="erp-dev-hub-summary">
             先看当前结论和下一步；需要时再展开演练证据与安全边界。

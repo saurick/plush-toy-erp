@@ -15,6 +15,7 @@ import {
   DEV_VERSION_CENTER_ROUTE,
   DEV_WORKSPACE_NAV_ITEMS,
 } from '../../src/dev-workbench/config/devRoutes.mjs'
+import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 
 const SPECIALIZED_ROUTES = new Set([
   DEV_BUSINESS_USABILITY_ROUTE,
@@ -25,9 +26,10 @@ const SPECIALIZED_ROUTES = new Set([
 ])
 
 const DESKTOP_HEADING_BY_ROUTE = Object.freeze({
-  [DEV_GOVERNANCE_ROUTE]: '这次改动该怎么做？',
-  [DEV_TESTING_ROUTE]: '质量验证工作台',
-  [DEV_DATA_PREPARATION_ROUTE]: '准备回归数据',
+  '/__dev': '总览',
+  [DEV_GOVERNANCE_ROUTE]: '改动指南',
+  [DEV_TESTING_ROUTE]: '改动验证',
+  [DEV_DATA_PREPARATION_ROUTE]: '测试数据',
 })
 
 const ORDINARY_DEV_ROUTES = Object.freeze(
@@ -56,6 +58,13 @@ export function createDevWorkbenchDesktopScenarios({
     path: item.route,
     mockAdminRpc: item.route === DEV_PERMISSION_RELATIONSHIPS_ROUTE,
     viewport: { width: 1440, height: 900 },
+    ...(item.route === DEV_TESTING_ROUTE
+      ? {
+          expectedConsoleErrorPatterns: [
+            /console error.*net::ERR_FAILED.*\/__dev\/api\/qa\/coverage/u,
+          ],
+        }
+      : {}),
     verify: async (page) => {
       await expectHeading(page, item.title)
       const root = page.locator('.erp-dev-workspace-page')
@@ -70,27 +79,171 @@ export function createDevWorkbenchDesktopScenarios({
         item.expectedRoute.replace(/\/+$/u, '') || '/',
         `${item.route} 桌面 smoke 必须落到登记页面`
       )
+      if (item.route === '/__dev') {
+        const nav = page.locator('.erp-dev-workspace-nav')
+        for (const entry of DEV_SECONDARY_NAV_ITEMS.filter(
+          (entry) => entry.showInNavigation !== false
+        )) {
+          assert.equal(
+            await nav.locator(`a[href="${entry.route}"]`).count(),
+            1,
+            `${entry.label} 应可直接进入`
+          )
+        }
+        const search = page.getByRole('textbox', { name: '搜索全部开发工具' })
+        await search.fill('质量门禁')
+        await page
+          .locator('table[aria-label="全部开发工具"] tbody tr')
+          .first()
+          .waitFor()
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              'table[aria-label="全部开发工具"] tbody tr'
+            ).length === 1
+        )
+        assert.equal(
+          await page
+            .locator('table[aria-label="全部开发工具"] tbody tr')
+            .count(),
+          1
+        )
+        await page
+          .getByRole('button', { name: '置顶质量门禁', exact: true })
+          .click()
+        await page.reload()
+        await search.waitFor()
+        assert.equal(await search.inputValue(), '质量门禁')
+        assert.equal(
+          await page
+            .getByRole('button', { name: '取消置顶质量门禁', exact: true })
+            .getAttribute('aria-pressed'),
+          'true'
+        )
+        await page
+          .getByRole('button', { name: '清除筛选', exact: true })
+          .click()
+        await verifySlidingMotion(
+          page,
+          assert,
+          '.erp-dev-overview-view-tabs',
+          1
+        )
+        assert.equal(
+          await page
+            .locator('table[aria-label="常用开发工具"] tbody tr')
+            .count(),
+          1
+        )
+        await page
+          .getByRole('button', { name: '取消置顶质量门禁', exact: true })
+          .click()
+        await page
+          .getByText('还没有常用工具，在全部工具中点击图钉即可添加。')
+          .waitFor()
+        await verifySlidingMotion(
+          page,
+          assert,
+          '.erp-dev-overview-view-tabs',
+          2,
+          true
+        )
+        await page.getByRole('table', { name: '开发工具使用指南' }).waitFor()
+        await verifySlidingMotion(
+          page,
+          assert,
+          '.erp-dev-overview-view-tabs',
+          0
+        )
+        await search.fill('不存在的工具名称')
+        await page.getByText('没有匹配的工具', { exact: true }).waitFor()
+        await page
+          .getByRole('button', { name: '清除筛选', exact: true })
+          .first()
+          .click()
+        await page
+          .getByRole('button', { name: '查看质量门禁来源与边界', exact: true })
+          .click()
+        await page
+          .locator('.ant-popover-inner')
+          .getByText('质量门禁 · 来源与边界', { exact: true })
+          .waitFor()
+        await page
+          .getByRole('button', { name: '查看质量门禁来源与边界', exact: true })
+          .press('Escape')
+        await page.locator('.ant-popover-inner').waitFor({ state: 'hidden' })
+        await page
+          .locator('.erp-dev-overview-library__toolbar .ant-select-selector')
+          .click()
+        await page.locator('.ant-select-dropdown [title="质量验证"]').click()
+        assert.equal(new URL(page.url()).searchParams.get('group'), 'quality')
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              'table[aria-label="全部开发工具"] tbody tr'
+            ).length === 4
+        )
+        assert.equal(
+          await page
+            .locator('table[aria-label="全部开发工具"] tbody tr')
+            .count(),
+          4
+        )
+        await page.reload()
+        await page
+          .locator('table[aria-label="全部开发工具"] tbody tr')
+          .first()
+          .waitFor()
+        assert.equal(
+          await page
+            .locator('table[aria-label="全部开发工具"] tbody tr')
+            .count(),
+          4
+        )
+        await page
+          .getByRole('table', { name: '全部开发工具' })
+          .getByRole('link', { name: '质量门禁', exact: true })
+          .click()
+        await page.waitForURL('**/__dev/quality-gates')
+        await page.goBack()
+        await page.getByRole('table', { name: '全部开发工具' }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('group'), 'quality')
+        assert.equal(
+          await page
+            .getByRole('table', { name: '全部开发工具' })
+            .locator('tbody tr')
+            .count(),
+          4
+        )
+      }
       if (item.route === DEV_PRODUCT_ENGINEERING_ROUTE) {
         assert.equal(
-          await page.locator('.erp-dev-product-task').count(),
-          7,
-          '产品工程问题视角应完整显示七个并列入口'
+          await page.locator('.erp-dev-tool-table tbody tr').count(),
+          6,
+          '产品工程应完整显示六个工具入口'
         )
         assert.equal(
           await page.locator('.erp-dev-product-task__index').count(),
           0,
-          '并列产品问题不能显示为虚假的执行序号'
+          '并列工具不能显示为虚假的执行序号'
+        )
+        assert.equal(
+          await page.getByRole('tablist', { name: '产品工程查看方式' }).count(),
+          0,
+          '产品工程工具应直接显示，不再要求选择查看方式'
         )
       }
       if (item.route === DEV_QUALITY_ROUTE) {
         assert.equal(
-          await page.locator('.erp-dev-quality-task').count(),
+          await page.locator('.erp-dev-tool-table tbody tr').count(),
           3,
           '质量验证首页应完整显示改动验证、质量门禁和测试数据'
         )
         assert.equal(
           await page
-            .locator('.erp-dev-quality-task a[href="/__dev/quality-gates"]')
+            .locator(
+              '[data-tool-key="quality-gates"] a[href="/__dev/quality-gates"]'
+            )
             .count(),
           1,
           '质量验证首页应提供质量门禁入口'

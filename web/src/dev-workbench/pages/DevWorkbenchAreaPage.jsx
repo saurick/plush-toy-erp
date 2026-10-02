@@ -1,506 +1,151 @@
-import React, { useCallback, useEffect, useMemo } from 'react'
+import React from 'react'
 import {
   BuildOutlined,
   CheckCircleOutlined,
   DeploymentUnitOutlined,
-  RightOutlined,
 } from '@ant-design/icons'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Tag, Typography } from 'antd'
-import DevEntrySourceDetails from '../components/DevEntrySourceDetails.jsx'
+import { Button, Typography } from 'antd'
 import DevEnvironmentEvidencePanel from '../components/DevEnvironmentEvidencePanel.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import DevToolTable from '../components/DevToolTable.jsx'
 import { DEV_HUB_ITEMS } from '../config/devHub.mjs'
 import {
-  DEV_PRODUCT_ENGINEERING_GRAPH_VIEW_COPY,
-  DEV_PRODUCT_ENGINEERING_VIEW,
-  DEV_PRODUCT_ENGINEERING_VIEW_ITEMS,
-  DEV_RELATIONSHIP_PERSPECTIVES,
-  buildDevProductEngineeringSearch,
-  parseDevProductEngineeringSearch,
-} from '../config/devRelationshipPerspectives.mjs'
-import { DEV_WORKBENCH_AREA_KEYS } from '../config/devRoutes.mjs'
+  DEV_PAGE_TITLE_BY_ROUTE,
+  DEV_DELIVERY_ROUTE,
+  DEV_PRODUCT_ENGINEERING_ROUTE,
+  DEV_QUALITY_ROUTE,
+  DEV_TESTING_ROUTE,
+  DEV_VERSION_CENTER_ROUTE,
+  DEV_WORKBENCH_AREA_KEYS,
+  getDevSecondaryNavItems,
+} from '../config/devRoutes.mjs'
 
-const { Paragraph, Text, Title } = Typography
-
-const AREA_PRESENTATION = Object.freeze({
-  [DEV_WORKBENCH_AREA_KEYS.productEngineering]: Object.freeze({
-    title: '产品工程 / Product Engineering',
-    description:
-      '从正式文档、代码合同和客户配置叠加层观察产品边界，不在工作台复制业务真源。',
-    icon: <BuildOutlined aria-hidden="true" />,
-  }),
-  [DEV_WORKBENCH_AREA_KEYS.quality]: Object.freeze({
-    title: '质量验证 / Quality Assurance',
-    description:
-      '选择与本轮影响面匹配的静态、单元、集成、浏览器和发布门禁，并保留可核验回执。',
-    icon: <CheckCircleOutlined aria-hidden="true" />,
-  }),
-  [DEV_WORKBENCH_AREA_KEYS.delivery]: Object.freeze({
-    title: '交付运行 / Delivery Operations',
-    description:
-      '核对客户配置、发布前置、制品身份和回滚边界；工作台只编排证据，不替代正式发布流程。',
-    icon: <DeploymentUnitOutlined aria-hidden="true" />,
-  }),
-})
-
-const QUALITY_ENTRY_PRESENTATION = Object.freeze({
-  testing: Object.freeze({
-    eyebrow: '建议从这里开始',
-    title: '检查本轮改动',
-    description:
-      '先让系统只读判断影响范围，再运行与本轮改动匹配的固定检查；每项结果独立保留。',
-    action: '开始验证',
-    boundary: '只读计划 · 固定检查 · 独立证据',
-  }),
-  'quality-gates': Object.freeze({
-    eyebrow: '需要正式门禁时',
-    title: '运行完整或严格门禁',
-    description:
-      '通过固定 full / strict 动作运行正式门禁，分别核对阶段、耗时和回执，不把局部绿色当成完整结论。',
-    action: '进入质量门禁',
-    boundary: '固定动作 · 回执真源 · 不接受任意命令',
-  }),
-  'data-preparation': Object.freeze({
-    eyebrow: '用例缺少前置数据时',
-    title: '准备测试数据',
-    description:
-      '只从三种固定数据范围中选择。系统会先检查目标，写入前仍需核对计划并确认。',
-    action: '选择数据范围',
-    boundary: '固定范围 · 写前确认 · 终态读回',
-  }),
-})
-
-const PRODUCT_ENGINEERING_ENTRY_PRESENTATION = Object.freeze({
-  'product-core': Object.freeze({
-    eyebrow: '当前产品事实',
-    title: '哪些能力已经进入产品内核？',
-    description:
-      '完整查看已进入、部分进入和当前不纳入的产品能力，并继续核对可用范围与当前边界。',
-    action: '查看产品内核',
-    boundary: '适合查当前产品事实；不能推出已发布或客户已验收',
-  }),
-  'permission-relationships': Object.freeze({
-    eyebrow: '权限核对',
-    title: '账号为什么能使用这些功能？',
-    description:
-      '按岗位或账号汇聚最终可用功能、页面、实际侧栏、仓库范围和审批责任，查看每条结果来自哪里。',
-    action: '核对权限关系',
-    boundary: '只读读取当前权限与菜单投影；不修改权限，不代表发布或验收',
-  }),
-  governance: Object.freeze({
-    eyebrow: '规则与边界',
-    title: '这件事该按哪条规则做？',
-    description:
-      '选择当前问题，先看结论、边界和第一份依据，再决定还要同步检查什么。',
-    action: '判断规则',
-    boundary: '适合方案分流、职责边界和正式真源定位',
-  }),
-  'status-flows': Object.freeze({
-    eyebrow: '业务衔接',
-    title: '这一步做完，业务真的完成了吗？',
-    description:
-      '沿一条业务链查看来源单据、协同任务、运行路径、事实结果和状态规则怎样衔接。',
-    action: '查看业务链',
-    boundary: '适合查当前节点、责任、事实与状态差异',
-  }),
-  'business-usability': Object.freeze({
-    eyebrow: '员工易用性',
-    title: '员工能不能看懂、能不能自己完成？',
-    description:
-      '查看高频业务页是否说明了当前任务、完成标准、交接对象、专业名词、公式和字段来源。',
-    action: '检查业务易用性',
-    boundary: '只读复用页面说明；推荐岗位不是权限，覆盖状态不是客户验收',
-  }),
-  docs: Object.freeze({
-    eyebrow: '正式说明',
-    title: '这项能力的正式说明写在哪里？',
-    description:
-      '按业务词、标题、路径或正文搜索，直接阅读当前工作区里的正式 Markdown。',
-    action: '搜索文档',
-    boundary: '适合核对口径、操作说明和维护边界',
-  }),
-  'ui-design': Object.freeze({
-    eyebrow: '交互设计',
-    title: '页面应该怎样组织才更易用？',
-    description:
-      '操作唯一的最新 HTML，阅读设计说明与设计依据，核对完整操作路径。',
-    action: '查看 UI 交互设计',
-    boundary: '适合评审交互层级，不代表功能已经实现',
-  }),
-})
-
-function entryPresentation(item, presentation, fallbackEyebrow) {
-  return (
-    presentation[item.key] || {
-      eyebrow: fallbackEyebrow,
-      title: item.title,
-      description: item.description,
-      action: '打开工具',
-      boundary: item.status,
-    }
-  )
+const { Text, Title } = Typography
+const AREA_PRESENTATION = {
+  [DEV_WORKBENCH_AREA_KEYS.productEngineering]: {
+    title: DEV_PAGE_TITLE_BY_ROUTE[DEV_PRODUCT_ENGINEERING_ROUTE],
+    description: '查规则、核对权限与业务链，查看页面方案。',
+    icon: <BuildOutlined />,
+  },
+  [DEV_WORKBENCH_AREA_KEYS.quality]: {
+    title: DEV_PAGE_TITLE_BY_ROUTE[DEV_QUALITY_ROUTE],
+    description: '按本轮改动选择检查，逐项核对证据。',
+    icon: <CheckCircleOutlined />,
+  },
+  [DEV_WORKBENCH_AREA_KEYS.delivery]: {
+    title: DEV_PAGE_TITLE_BY_ROUTE[DEV_DELIVERY_ROUTE],
+    description: '先核对版本、目标与恢复点，再准备具体计划。',
+    icon: <DeploymentUnitOutlined />,
+  },
 }
-
-function ProductEngineeringTaskEntry({ item }) {
-  const copy = entryPresentation(
-    item,
-    PRODUCT_ENGINEERING_ENTRY_PRESENTATION,
-    '产品工程入口'
-  )
-
-  return (
-    <li className="erp-dev-product-task">
-      <div className="erp-dev-product-task__copy">
-        <Text className="erp-dev-product-task__eyebrow">{copy.eyebrow}</Text>
-        <Title level={3}>{copy.title}</Title>
-        <Paragraph>{copy.description}</Paragraph>
-        <Text type="secondary" className="erp-dev-product-task__boundary">
-          {copy.boundary}
-        </Text>
-        <details className="erp-dev-product-task__details">
-          <summary>查看工具名称与技术边界</summary>
-          <dl>
-            <div>
-              <dt>工具</dt>
-              <dd>{item.title}</dd>
-            </div>
-            <div>
-              <dt>页面路径</dt>
-              <dd>{item.route}</dd>
-            </div>
-            <div>
-              <dt>维护来源</dt>
-              <dd>{item.source}</dd>
-            </div>
-            <div>
-              <dt>依据</dt>
-              <dd>{item.truthSource}</dd>
-            </div>
-          </dl>
-          <ul>
-            {item.guardrails.map((guardrail) => (
-              <li key={guardrail}>{guardrail}</li>
-            ))}
-          </ul>
-        </details>
-      </div>
-      <Link
-        to={item.route}
-        className="erp-dev-product-task__action"
-        aria-label={`${copy.action}：${copy.title}`}
-      >
-        <span>{copy.action}</span>
-        <RightOutlined aria-hidden="true" />
-      </Link>
-    </li>
-  )
-}
-
-function RelationshipPerspectiveEntry({ perspective }) {
-  return (
-    <li className="erp-dev-relationship-item">
-      <span className="erp-dev-relationship-item__shape">
-        {perspective.shape}
-      </span>
-      <div className="erp-dev-relationship-item__copy">
-        <Title level={3}>{perspective.title}</Title>
-        <Text strong className="erp-dev-relationship-item__question">
-          {perspective.question}
-        </Text>
-        <Paragraph>{perspective.relationship}</Paragraph>
-        <Text type="secondary" className="erp-dev-relationship-item__boundary">
-          边界：{perspective.boundary}
-        </Text>
-      </div>
-      <div
-        className="erp-dev-relationship-item__links"
-        aria-label={`${perspective.title}相关入口`}
-      >
-        {perspective.destinations.map((destination) => (
-          <Link
-            key={destination.route}
-            to={destination.route}
-            className="erp-dev-relationship-item__link"
-          >
-            <span>{destination.label}</span>
-            <RightOutlined aria-hidden="true" />
-          </Link>
-        ))}
-      </div>
-    </li>
-  )
-}
-
-function ProductEngineeringWorkspace({ items }) {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const parsedView = useMemo(
-    () => parseDevProductEngineeringSearch(searchParams),
-    [searchParams]
-  )
-
-  useEffect(() => {
-    if (parsedView.canonical) return
-    const nextSearch = buildDevProductEngineeringSearch(parsedView.view)
-    setSearchParams(new URLSearchParams(nextSearch.slice(1)), {
-      replace: true,
-    })
-  }, [parsedView.canonical, parsedView.view, setSearchParams])
-
-  const selectView = useCallback(
-    (nextView) => {
-      if (nextView === parsedView.view && parsedView.canonical) return
-      const nextSearch = buildDevProductEngineeringSearch(nextView)
-      setSearchParams(new URLSearchParams(nextSearch.slice(1)))
-    },
-    [parsedView.canonical, parsedView.view, setSearchParams]
-  )
-
-  const panelId = `dev-product-engineering-view-panel-${parsedView.view}`
-  const tabId = `dev-product-engineering-view-tab-${parsedView.view}`
-
-  return (
-    <section
-      className="erp-dev-product-workspace"
-      aria-labelledby="dev-product-view-switcher-title"
-    >
-      <div className="erp-dev-product-view-switcher">
-        <DevTaskNav
-          compact
-          level="primary"
-          idPrefix="dev-product-engineering-view"
-          ariaLabel="产品工程查看方式"
-          items={DEV_PRODUCT_ENGINEERING_VIEW_ITEMS}
-          value={parsedView.view}
-          onChange={selectView}
-          className="erp-dev-product-view-tabs"
-        />
-        <div className="erp-dev-product-view-switcher__copy">
-          <Text strong id="dev-product-view-switcher-title">
-            选择查看方式
-          </Text>
-          <Text type="secondary">
-            按问题找入口聚焦七个产品工程工具；项目图视角还会关联质量与交付证据，但不复制这些页面的真源。
-          </Text>
-        </div>
-      </div>
-
-      {parsedView.view === DEV_PRODUCT_ENGINEERING_VIEW.QUESTIONS ? (
-        <section
-          id={panelId}
-          role="tabpanel"
-          aria-labelledby={tabId}
-          tabIndex={0}
-          className="erp-dev-product-start"
-        >
-          <div className="erp-dev-product-start__head">
-            <div>
-              <Text className="erp-dev-product-start__eyebrow">
-                当前要解决的问题
-              </Text>
-              <Title level={2}>先选你想弄清楚的事情</Title>
-            </div>
-            <Text type="secondary">
-              每个入口先给答案或可读内容；工具名称、路径和维护来源需要时再展开。
-            </Text>
-          </div>
-          <ul className="erp-dev-product-task-list">
-            {items.map((item) => (
-              <ProductEngineeringTaskEntry key={item.key} item={item} />
-            ))}
-          </ul>
-        </section>
-      ) : (
-        <section
-          id={panelId}
-          role="tabpanel"
-          aria-labelledby={tabId}
-          tabIndex={0}
-          className="erp-dev-relationship-guide"
-        >
-          <div className="erp-dev-relationship-guide__head">
-            <div>
-              <Text className="erp-dev-product-start__eyebrow">
-                {DEV_PRODUCT_ENGINEERING_GRAPH_VIEW_COPY.eyebrow}
-              </Text>
-              <Title level={2}>
-                {DEV_PRODUCT_ENGINEERING_GRAPH_VIEW_COPY.title}
-              </Title>
-            </div>
-            <Text type="secondary">
-              {DEV_PRODUCT_ENGINEERING_GRAPH_VIEW_COPY.description}
-            </Text>
-          </div>
-          <ul className="erp-dev-relationship-list">
-            {DEV_RELATIONSHIP_PERSPECTIVES.map((perspective) => (
-              <RelationshipPerspectiveEntry
-                key={perspective.key}
-                perspective={perspective}
-              />
-            ))}
-          </ul>
-          <Text
-            type="secondary"
-            className="erp-dev-relationship-guide__boundary"
-          >
-            {DEV_PRODUCT_ENGINEERING_GRAPH_VIEW_COPY.boundary}
-          </Text>
-        </section>
-      )}
-    </section>
-  )
-}
-
-function QualityTaskEntry({ item }) {
-  const copy = entryPresentation(
-    item,
-    QUALITY_ENTRY_PRESENTATION,
-    '质量验证入口'
-  )
-
-  return (
-    <article className="erp-dev-quality-task">
-      <div className="erp-dev-quality-task__copy">
-        <Text className="erp-dev-quality-task__eyebrow">{copy.eyebrow}</Text>
-        <Title level={3}>{copy.title}</Title>
-        <Paragraph>{copy.description}</Paragraph>
-        <Text type="secondary" className="erp-dev-quality-task__boundary">
-          {copy.boundary}
-        </Text>
-        <details className="erp-dev-quality-task__details">
-          <summary>查看技术来源与边界</summary>
-          <dl>
-            <div>
-              <dt>页面路径</dt>
-              <dd>{item.route}</dd>
-            </div>
-            <div>
-              <dt>维护来源</dt>
-              <dd>{item.source}</dd>
-            </div>
-            <div>
-              <dt>证据真源</dt>
-              <dd>{item.truthSource}</dd>
-            </div>
-          </dl>
-          <ul>
-            {item.guardrails.map((guardrail) => (
-              <li key={guardrail}>{guardrail}</li>
-            ))}
-          </ul>
-        </details>
-      </div>
-      <Link
-        to={item.route}
-        className="erp-dev-quality-task__action"
-        aria-label={`${copy.action}：${copy.title}`}
-      >
-        <span>{copy.action}</span>
-        <RightOutlined aria-hidden="true" />
-      </Link>
-    </article>
-  )
-}
-
-function WorkbenchEntryCard({ item }) {
-  return (
-    <article className="erp-dev-hub-card erp-dev-hub-card--without-icon">
-      <div className="erp-dev-hub-card__body">
-        <div className="erp-dev-hub-card__head">
-          <div>
-            <Title level={4} className="erp-dev-hub-card__title">
-              {item.title}
-            </Title>
-          </div>
-          <Tag>{item.status}</Tag>
-        </div>
-        <Text type="secondary" className="erp-dev-hub-card__description">
-          {item.description}
-        </Text>
-        <DevEntrySourceDetails route={item.route} source={item.source} />
-        <div className="erp-dev-hub-card__foot">
-          <span>{item.truthSource}</span>
-          <Link
-            to={item.route}
-            className="erp-dev-hub-card__link"
-            aria-label={`进入${item.title}`}
-          >
-            <span>进入</span>
-            <RightOutlined aria-hidden="true" />
-          </Link>
-        </div>
-      </div>
-    </article>
-  )
-}
+const DELIVERY_VIEWS = [
+  { value: 'prepare', label: '准备交付' },
+  { value: 'environments', label: '环境证据' },
+]
 
 export default function DevWorkbenchAreaPage({ areaKey }) {
+  const [searchParams, setSearchParams] = useSearchParams()
   const presentation = AREA_PRESENTATION[areaKey]
-  const items = DEV_HUB_ITEMS.filter((item) => item.areaKey === areaKey)
-  const isQualityArea = areaKey === DEV_WORKBENCH_AREA_KEYS.quality
-  const isProductEngineeringArea =
-    areaKey === DEV_WORKBENCH_AREA_KEYS.productEngineering
-  const isDeliveryArea = areaKey === DEV_WORKBENCH_AREA_KEYS.delivery
-
+  const visibleRoutes = new Set(
+    getDevSecondaryNavItems(areaKey).map((item) => item.route)
+  )
+  const items = DEV_HUB_ITEMS.filter(
+    (item) => item.areaKey === areaKey && visibleRoutes.has(item.route)
+  )
+  const isQuality = areaKey === DEV_WORKBENCH_AREA_KEYS.quality
+  const isDelivery = areaKey === DEV_WORKBENCH_AREA_KEYS.delivery
+  const activeView =
+    isDelivery && searchParams.get('view') === 'environments'
+      ? 'environments'
+      : 'prepare'
   if (!presentation) {
     throw new Error(`unknown dev workbench area: ${String(areaKey || '')}`)
   }
 
   return (
-    <div
-      className={`erp-dev-hub-page erp-dev-hub-page--area erp-dev-workspace-page${
-        isQualityArea ? ' erp-dev-quality-page' : ''
-      }${isProductEngineeringArea ? ' erp-dev-product-engineering-page' : ''}`}
-    >
+    <div className="erp-dev-hub-page erp-dev-hub-page--area erp-dev-workspace-page erp-dev-area-page">
       <DevPageNav />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
-          <span className="erp-dev-hub-header__icon">{presentation.icon}</span>
+          <span className="erp-dev-hub-header__icon" aria-hidden="true">
+            {presentation.icon}
+          </span>
           <Title level={1} className="erp-dev-hub-title">
             {presentation.title}
           </Title>
-          <Paragraph className="erp-dev-hub-summary">
-            {presentation.description}
-          </Paragraph>
         </div>
-      </header>
-
-      <main className="erp-dev-hub-shell">
-        {isDeliveryArea ? <DevEnvironmentEvidencePanel /> : null}
-        {isProductEngineeringArea ? (
-          <ProductEngineeringWorkspace items={items} />
-        ) : isQualityArea ? (
-          <section
-            className="erp-dev-quality-start"
-            aria-labelledby="dev-quality-start-title"
+        {isQuality || isDelivery ? (
+          <Button
+            type="primary"
+            href={isQuality ? DEV_TESTING_ROUTE : DEV_VERSION_CENTER_ROUTE}
           >
-            <div className="erp-dev-quality-start__head">
-              <div>
-                <Text className="erp-dev-quality-start__eyebrow">当前任务</Text>
-                <Title level={2} id="dev-quality-start-title">
-                  先选要完成的事情
-                </Title>
-              </div>
+            {isQuality ? '开始验证' : '版本发布'}
+          </Button>
+        ) : null}
+      </header>
+      <main className="erp-dev-hub-shell">
+        {isDelivery ? (
+          <DevTaskNav
+            compact
+            idPrefix="dev-delivery"
+            ariaLabel="交付运行视图"
+            items={DELIVERY_VIEWS}
+            value={activeView}
+            onChange={(value) => {
+              const next = new URLSearchParams(searchParams)
+              next.set('view', value)
+              setSearchParams(next)
+            }}
+          />
+        ) : null}
+        <div
+          hidden={isDelivery && activeView !== 'prepare'}
+          id={isDelivery ? 'dev-delivery-panel-prepare' : undefined}
+          role={isDelivery ? 'tabpanel' : undefined}
+          aria-labelledby={isDelivery ? 'dev-delivery-tab-prepare' : undefined}
+        >
+          <section
+            className="erp-dev-area-tools"
+            aria-label={`${presentation.title}工具`}
+          >
+            <div className="erp-dev-area-tools__heading">
+              <strong>
+                {isQuality
+                  ? '按需要选择检查'
+                  : isDelivery
+                    ? '交付工具'
+                    : '产品工程工具'}
+              </strong>
+              <Text type="secondary">{items.length} 个工具</Text>
+            </div>
+            <DevToolTable
+              ariaLabel={`${presentation.title}工具清单`}
+              items={items}
+            />
+          </section>
+          {isDelivery ? (
+            <div className="erp-dev-delivery-checks">
+              <Link to={`${DEV_TESTING_ROUTE}?view=closeout`}>
+                核对 Git 收口
+              </Link>
               <Text type="secondary">
-                测试数据不是每次都要准备；先判断本轮改动，再按需要进入数据准备。
+                Hook 接线、提交与推送职责在同一页核对。
               </Text>
             </div>
-            <div className="erp-dev-quality-task-list">
-              {items.map((item) => (
-                <QualityTaskEntry key={item.key} item={item} />
-              ))}
-            </div>
-          </section>
-        ) : null}
-        {isDeliveryArea ? (
+          ) : null}
+        </div>
+        {isDelivery ? (
           <section
-            className="erp-dev-hub-grid"
-            aria-label={`${presentation.title}入口`}
+            hidden={activeView !== 'environments'}
+            id="dev-delivery-panel-environments"
+            role="tabpanel"
+            aria-labelledby="dev-delivery-tab-environments"
           >
-            {items.map((item) => (
-              <WorkbenchEntryCard key={item.key} item={item} />
-            ))}
+            {activeView === 'environments' ? (
+              <DevEnvironmentEvidencePanel />
+            ) : null}
           </section>
         ) : null}
       </main>

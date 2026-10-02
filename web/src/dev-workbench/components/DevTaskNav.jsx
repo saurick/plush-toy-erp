@@ -79,6 +79,11 @@ export default function DevTaskNav({
             aria-controls={
               idPrefix ? `${idPrefix}-panel-${item.value}` : undefined
             }
+            title={
+              compact && typeof item.description === 'string'
+                ? item.description
+                : undefined
+            }
             tabIndex={isActive ? 0 : -1}
             disabled={disabled}
             onClick={() => onChange(item.value)}
@@ -94,7 +99,9 @@ export default function DevTaskNav({
             ) : (
               <span>{item.label}</span>
             )}
-            {item.description ? <small>{item.description}</small> : null}
+            {item.description && !compact ? (
+              <small>{item.description}</small>
+            ) : null}
           </button>
         )
       })}

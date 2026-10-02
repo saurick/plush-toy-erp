@@ -1,0 +1,289 @@
+.erp-dev-tool-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.erp-dev-tool-table {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.erp-dev-tool-table__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+.erp-dev-tool-table__open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.erp-dev-tool-table__details {
+  margin-top: 5px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-dev-testing-validation__actions {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+}
+.erp-dev-data-profile-table-control {
+  display: block;
+  width: 100%;
+}
+.erp-dev-data-pending,
+.erp-dev-migration-pending {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: var(--erp-surface-bg);
+}
+.erp-dev-data-step-actions {
+  display: flex;
+  gap: 10px;
+  margin-block: 14px;
+}
+.erp-dev-data-contract-disclosure {
+  min-width: 0;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-dev-migration-overview {
+  overflow: hidden;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
+}
+.erp-dev-migration-flow-details {
+  min-width: 0;
+  margin-top: 10px;
+}
+.erp-dev-environment-evidence__table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+.erp-dev-environment-evidence__table {
+  width: 100%;
+  min-width: 1000px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.erp-dev-version-facts-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.erp-dev-version-facts {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.erp-dev-area-tools__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 16px;
+}
+.erp-dev-tool-table th,
+.erp-dev-tool-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--erp-border);
+  text-align: left;
+  vertical-align: middle;
+}
+.erp-dev-tool-table__details summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.erp-dev-tool-table__details p {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.erp-dev-tool-table__details ul {
+  margin: 8px 0 0;
+  padding-inline-start: 18px;
+}
+.erp-dev-testing-validation-row p {
+  margin: 6px 0 0;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.erp-dev-data-contract-disclosure > summary,
+.erp-dev-migration-flow-details > summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.erp-dev-migration-overview p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.erp-dev-environment-evidence__table th,
+.erp-dev-environment-evidence__table td {
+  width: 16.6%;
+  border-bottom: 1px solid var(--erp-border);
+  padding: 14px;
+  text-align: left;
+  vertical-align: top;
+}
+.erp-dev-environment-evidence__table small {
+  display: block;
+  margin: 5px 0;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.erp-dev-environment-evidence__table p {
+  margin: 5px 0;
+  font-size: 12px;
+  color: var(--erp-text-muted);
+}
+.erp-dev-environment-evidence__table summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.erp-dev-environment-evidence__table dl {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.erp-dev-environment-evidence__table dt {
+  color: var(--erp-text-muted);
+}
+.erp-dev-environment-evidence__table dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.erp-dev-version-facts th,
+.erp-dev-version-facts td {
+  border-bottom: 1px solid var(--erp-border);
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+.erp-dev-recovery-table small {
+  display: block;
+  margin-top: 5px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.erp-dev-tool-table thead th {
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.erp-dev-tool-table tbody th {
+  width: 180px;
+  font-weight: 600;
+}
+.erp-dev-testing-validation-row details summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.erp-dev-environment-evidence__table thead th {
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-dev-version-facts thead th {
+  background: var(--erp-surface-bg-soft);
+  font-size: 12px;
+  color: var(--erp-text-muted);
+}
+.erp-dev-version-facts tbody th {
+  min-width: 140px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.erp-dev-recovery-table tbody th {
+  width: 30%;
+  min-width: 260px;
+}
+.erp-dev-tool-table .erp-dev-testing-validation-row th {
+  width: 38%;
+}
+.erp-dev-tool-table tbody th a {
+  color: var(--erp-text);
+}
+
+.erp-dev-data-page [hidden],
+.erp-dev-database-migration-page [hidden] {
+  display: none;
+}
+.erp-dev-migration-overview .ant-list-item {
+  padding: 6px 0;
+}
+.erp-dev-version-page .erp-dev-version-overview__scope {
+  padding: 12px 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+}
+.erp-dev-area-page .erp-dev-hub-shell {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.erp-dev-area-page [hidden] {
+  display: none;
+}
+.erp-dev-area-tools__heading .ant-typography {
+  font-size: 12px;
+}
+.erp-dev-area-page .erp-dev-delivery-checks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 4px;
+  font-size: 12px;
+}
+.erp-dev-tool-table .erp-dev-tool-table__pin {
+  width: 56px;
+}
+.erp-dev-data-contract-disclosure[open] > summary {
+  margin-bottom: 12px;
+}
+.erp-dev-version-facts td > .ant-typography {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.erp-dev-tool-table tbody tr:hover {
+  background: var(--erp-surface-bg-soft);
+}
+.erp-dev-tool-table .erp-dev-tool-table__usage {
+  width: 168px;
+}
+.erp-dev-recovery-table td:nth-last-child(2) {
+  width: 220px;
+}
+.erp-dev-tool-table tbody th a:hover {
+  color: var(--erp-primary);
+}
+.erp-dev-migration-overview .erp-dev-tool-table td:last-child {
+  width: auto;
+}
+.erp-dev-version-page .erp-dev-version-overview__scope h2.ant-typography {
+  font-size: 17px;
+}

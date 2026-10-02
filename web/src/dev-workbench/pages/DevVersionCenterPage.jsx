@@ -2017,11 +2017,8 @@ export default function DevVersionCenterPage() {
             <DeploymentUnitOutlined aria-hidden="true" />
           </span>
           <Title level={1} className="erp-dev-hub-title">
-            版本发布与部署中心
+            版本发布
           </Title>
-          <Paragraph className="erp-dev-hub-summary">
-            从固定版本完成制品发布、目标部署与回滚；代码推送不会自动部署，任何未证明状态都会停用写操作。
-          </Paragraph>
         </div>
         <div className="erp-dev-version-header-actions">
           <Space wrap>
@@ -2258,6 +2255,7 @@ export default function DevVersionCenterPage() {
                     style={{ maxWidth: 360 }}
                   >
                     <Text strong>先发布制品，不会直接部署到任一目标</Text>
+                    <Text>代码推送不会自动部署；部署前需另行核对具体目标与计划。</Text>
                     <Text>
                       系统会将当前干净提交的 exact SHA 交给
                       {deliveryProviderName}

@@ -37,8 +37,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '产品事实不等于发布或验收 / Product fact is not release or UAT',
       '不进生产构建 / No prod build',
     ]),
-    description:
-      '完整查看哪些能力已进入 Product Core、哪些只完成一部分，以及当前不纳入内核的范围；all status and boundaries derive from the current capability ledger.',
+    description: '查看产品能力的当前范围、完成程度与边界。',
   }),
   Object.freeze({
     key: 'permission-relationships',
@@ -56,8 +55,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不在本页写权限 / No permission writes',
       '不进生产构建 / No prod build',
     ]),
-    description:
-      '按岗位或账号查看最终可用功能、页面、实际侧栏、仓库数据范围和审批责任，定位为什么能用、从哪里进入或为什么受限；配置仍回到正式权限页维护。',
+    description: '核对岗位或账号的可用功能、实际侧栏、仓库范围与审批责任。',
   }),
   Object.freeze({
     key: 'governance',
@@ -73,8 +71,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不新增规则 / No new rules',
       '不进生产构建 / No prod build',
     ]),
-    description:
-      '按这次要做的改动，直接找到第一份依据、同步检查项和容易误判的边界；task-first guidance without creating a second truth source.',
+    description: '按改动类型查找正式依据、同步检查项和边界。',
   }),
   Object.freeze({
     key: 'status-flows',
@@ -91,14 +88,13 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '禁止通用改状态 / No generic status write',
       '不进生产构建 / No prod build',
     ]),
-    description:
-      '从 11 条业务链总图下钻来源单据、责任任务、运行路径、事实台账和状态规则；只读观察，不创建第二套运行真源。',
+    description: '从业务链图核对单据、岗位交接、运行路径和已生效结果。',
   }),
   Object.freeze({
     key: 'business-usability',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '业务易用性 / Business Usability',
-    group: '产品治理 / Product Governance',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
+    title: '页面说明检查 / Page Help Check',
+    group: '验证治理 / QA',
     route: DEV_BUSINESS_USABILITY_ROUTE,
     source: 'web/src/erp/config/businessUsabilityCatalog.mjs',
     truthSource: '正式业务页面目录、业务链目录与岗位帮助内容',
@@ -106,11 +102,12 @@ export const DEV_HUB_ITEMS = Object.freeze([
     guardrails: Object.freeze([
       '统一解释目录 / Shared explanation catalog',
       '不复制权限与岗位责任 / No duplicate access or role truth',
+      '岗位推荐不代表实际权限 / Help recommendations do not grant access',
       '不写业务状态 / No business writes',
       '不进生产构建 / No prod build',
     ]),
     description:
-      '查看员工在各业务页面能否直接看懂任务、完成标准、办理顺序、字段来源和计算口径；岗位只用于帮助内容推荐，不代表实际权限。',
+      '核对业务页面的任务说明、完成标准、交接、字段解释和岗位帮助覆盖。',
   }),
   Object.freeze({
     key: 'docs',
@@ -126,8 +123,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不接 RBAC / No RBAC',
       '不进生产构建 / No prod build',
     ]),
-    description:
-      '按真实目录树浏览当前工作区内的 Markdown；browse workspace Markdown by real directory tree.',
+    description: '搜索并阅读当前工作区的正式文档。',
   }),
   Object.freeze({
     key: 'testing',
@@ -144,8 +140,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不索引历史参考 / No reference commands',
       '不进生产构建 / No prod build',
     ]),
-    description:
-      '按本轮影响面选择验证计划、固定检查和覆盖证据；不把局部绿色合并成完整交付结论。',
+    description: '生成本轮验证建议，运行固定检查并核对独立证据。',
   }),
   Object.freeze({
     key: 'quality-gates',
@@ -163,8 +158,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不接受命令、路径、凭据或任意目标 / No arbitrary input',
       '不进生产构建 / No prod build',
     ]),
-    description:
-      '运行完整或严格门禁，查看真实阶段、耗时和结果，并只读分析门禁复杂度与当前改动覆盖缺口。',
+    description: '核对固定版本 CI、运行本机门禁，查看阶段与覆盖缺口。',
   }),
   Object.freeze({
     key: 'data-preparation',
@@ -184,7 +178,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description:
-      '先预检固定目标，再准备不可变计划并输入 exact confirmation；共享基础数据稳定 upsert，业务场景固定批次精确复用且长期保留，完整验收使用隔离库并自动清理。',
+      '准备固定数据计划，确认后执行并读回；业务场景固定批次长期保留，完整回归使用隔离库。',
   }),
   Object.freeze({
     key: 'ui-design',
@@ -216,8 +210,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不做真实导入 / No real import',
       '不写核心规则 / No core rules',
     ]),
-    description:
-      '读取已登记的 yoyoosun 客户配置包，完成预检、差异、Dry Run、当前代理后端测试应用和指定证据批次门禁；正式写入交给统一发布执行器。',
+    description: '核对已登记客户配置包，预检差异、试运行并测试应用。',
   }),
   Object.freeze({
     key: 'database-migration',
@@ -237,7 +230,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description:
-      '用一次检查与准备收口 status、plan、备份恢复验证，再经明确确认执行一次 apply、读回和本地后端重启；无关工作区变化不会触发整套重建。',
+      '检查计划与备份恢复，确认后迁移并读回；无关工作区变化不触发重建。',
   }),
   Object.freeze({
     key: 'version-center',
@@ -255,8 +248,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '终态不重试 / No terminal retry',
       '不进生产构建 / No prod build',
     ]),
-    description:
-      '选择 exact-SHA 版本、分别查看 demo / test 容量与运行身份、准备显式版本提升并追踪幂等操作；浏览器不能传入命令、路径、SSH 或任意目标。',
+    description: '核对版本与目标，准备发布、部署或回滚计划，并追踪操作回执。',
   }),
   Object.freeze({
     key: 'drill-recovery',
