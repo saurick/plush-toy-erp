@@ -134,7 +134,6 @@ function printPlan(options) {
       [
         `ERP_DEV_CUSTOMER_KEY=${options.customer}`,
         `ERP_VITE_PORT=${options.port}`,
-        `ERP_VITE_HMR_CLIENT_PORT=${options.port}`,
         `API_ORIGIN=${options.apiOrigin}`,
         'pnpm start:yoyoosun',
       ].join(' '),
@@ -155,7 +154,6 @@ function runVite(options, startup) {
       }),
       ERP_DEV_CUSTOMER_KEY: options.customer,
       ERP_VITE_PORT: options.port,
-      ERP_VITE_HMR_CLIENT_PORT: options.port,
       API_ORIGIN: options.apiOrigin,
       ERP_DEV_START_SIGNATURE: options.signature,
     }

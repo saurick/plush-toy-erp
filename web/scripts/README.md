@@ -107,9 +107,9 @@ pnpm start
 
 Codex 会话通过 `CODEX_THREAD_ID` / `CODEX_CI` 自动选择辅助端口；人工临时验证可用 `pnpm start:isolated`。辅助端口只从 `15200-15299` 中选取，终端输出实际 URL，HMR 与监听端口同步；耗尽时阻断。启动器直接管理 Vite 子进程，通过信号和 IPC 在中断、终端关闭或启动器被强制结束后释放其监听端口；不会清理其他会话的服务。直接运行 Vite 时也会按 Codex 环境选择并固定辅助端口，生命周期由调用方管理。
 
-明确需要固定辅助端口时，把 `ERP_VITE_PORT` 与 `ERP_VITE_HMR_CLIENT_PORT` 设为同一个值；显式端口优先于自动分配。只覆盖 Vite CLI 的 `--port` 会在启动期被拒绝，避免 HMR 连接旧端口后形成自动重载循环。`API_ORIGIN` 仍可显式覆盖，否则代理从同一清单的 HTTP `8300` 推导。
+明确需要固定辅助端口时，设置 `ERP_VITE_PORT`；显式端口优先于自动分配。只覆盖 Vite CLI 的 `--port` 会在启动期被拒绝，避免监听端口脱离启动器选定的端口。`API_ORIGIN` 仍可显式覆盖，否则代理从同一清单的 HTTP `8300` 推导。
 
-从另一台机器访问开发前端时，可设置 `ERP_VITE_HMR_HOST` 为该机器可连接的服务器主机名或 IP；未设置时仍使用本机 `127.0.0.1`。
+HMR 默认跟随浏览器加载页面模块的协议、主机和端口，因此从服务器 IP、域名或转发端口访问时无需单独配置；端口转发或反向代理须同时转发 WebSocket upgrade。需要显式覆盖时可设置 `ERP_VITE_HMR_HOST` 和 `ERP_VITE_HMR_CLIENT_PORT`；显式客户端端口仍须与 `ERP_VITE_PORT` 一致。普通和客户开发启动器只固定监听端口，不自动注入 HMR 地址。
 
 Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:yoyoosun` 通过同一受管浏览器入口打开页面。它只在 Chrome、Edge 或 Brave 中检查标题属于本项目的候选标签，并在地址栏精确匹配 `127.0.0.1` / `localhost` 与实际端口后激活、刷新该标签；窗口保持原有最大化或普通状态，只有已最小化时才恢复。未命中或 Windows UI Automation 不可用时回退到系统默认的新标签页。它不会输出浏览地址、关闭历史重复标签或读取其他标题标签的地址栏；显式 `BROWSER=none` 或自定义 `BROWSER` 始终优先。macOS 与有图形桌面的原生 Linux 保留 Vite 的平台默认打开行为；无图形桌面的 Linux 只输出访问地址，不调用 `xdg-open`。
 

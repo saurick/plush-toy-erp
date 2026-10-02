@@ -371,7 +371,7 @@ async function main() {
     await stopLocalWebFrontend(port)
     return
   }
-  const hmrClientPort = resolveERPHMRClientPort(
+  resolveERPHMRClientPort(
     process.env.ERP_VITE_HMR_CLIENT_PORT,
     port
   )
@@ -412,7 +412,6 @@ async function main() {
     {
       ...process.env,
       ERP_VITE_PORT: String(port),
-      ERP_VITE_HMR_CLIENT_PORT: String(hmrClientPort),
       ERP_DEV_START_SIGNATURE: signature,
       ...(isCodexDevSession() && !process.env.BROWSER
         ? { BROWSER: 'none' }

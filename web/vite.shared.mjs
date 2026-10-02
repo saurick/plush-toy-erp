@@ -88,11 +88,16 @@ const createDevLocalhostOriginNormalizer = (port) => ({
   },
 })
 
-const createDevResolvedPortGuard = () => ({
+const createDevResolvedPortGuard = (serverPort) => ({
   name: 'plush-dev-resolved-port-guard',
   apply: 'serve',
   configResolved(config) {
     const resolvedServerPort = config.server.port
+    if (resolvedServerPort !== serverPort) {
+      throw new Error(
+        `resolved Vite listener ${String(resolvedServerPort)} must match configured ERP_VITE_PORT=${serverPort}; set ERP_VITE_PORT instead of overriding only --port`
+      )
+    }
     const resolvedHmrClientPort =
       typeof config.server.hmr === 'object' &&
       Number.isInteger(config.server.hmr.clientPort)
@@ -127,10 +132,12 @@ export function createERPViteConfig(appId) {
     ) {
       process.env.ERP_VITE_PORT = String(serverPort)
     }
-    const hmrClientPort = resolveERPHMRClientPort(
-      process.env.ERP_VITE_HMR_CLIENT_PORT,
-      serverPort
-    )
+    const hmrClientPort = process.env.ERP_VITE_HMR_CLIENT_PORT?.trim()
+      ? resolveERPHMRClientPort(
+          process.env.ERP_VITE_HMR_CLIENT_PORT,
+          serverPort
+        )
+      : undefined
     const env = loadEnv(mode, process.cwd(), '')
     const isProd = mode === 'production'
     const isDev = mode === 'development'
@@ -160,7 +167,7 @@ export function createERPViteConfig(appId) {
       plugins: [
         // 本机开发统一用 IPv4 origin，避免 localhost 解析或代理链路导致源模块加载抖动。
         isDev ? createDevLocalhostOriginNormalizer(serverPort) : null,
-        isDev ? createDevResolvedPortGuard() : null,
+        isDev ? createDevResolvedPortGuard(serverPort) : null,
         react(),
         ...devWorkbenchServePlugins,
       ].filter(Boolean),
@@ -206,8 +213,9 @@ export function createERPViteConfig(appId) {
         port: serverPort,
         strictPort: true,
         open: createDevOrigin(serverPort),
+        // 默认跟随浏览器加载模块的地址，让远程访问和端口转发共用同源 HMR。
         hmr: {
-          host: process.env.ERP_VITE_HMR_HOST?.trim() || DEV_HOST,
+          host: process.env.ERP_VITE_HMR_HOST?.trim() || undefined,
           clientPort: hmrClientPort,
         },
         proxy: {
