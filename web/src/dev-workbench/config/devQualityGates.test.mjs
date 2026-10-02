@@ -144,6 +144,8 @@ function summary(overrides = {}) {
           durationMs: 2_000,
           queueMs: 500,
           attemptCount: 1,
+          startedAt: null,
+          finishedAt: null,
           role: 'terminal',
           group: 'pipeline',
           url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/390',
@@ -185,6 +187,8 @@ function summary(overrides = {}) {
               durationMs: 2_000,
               queueMs: 500,
               attemptCount: 1,
+              startedAt: null,
+              finishedAt: null,
               role: 'terminal',
               group: 'pipeline',
               url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/390',
@@ -210,6 +214,8 @@ function summary(overrides = {}) {
               durationMs: 120_000,
               queueMs: 2_000,
               attemptCount: 1,
+              startedAt: null,
+              finishedAt: null,
               role: 'aggregate',
               group: 'web',
               url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/380',
@@ -890,6 +896,8 @@ test('quality gates config: GitLab CI history separates execution limits from fa
       aggregateMs: 35_000,
       prepareQueueMs: 40_000,
       attemptCount: 2,
+      startedAt: null,
+      finishedAt: null,
     },
     {
       id: 43,
@@ -898,6 +906,8 @@ test('quality gates config: GitLab CI history separates execution limits from fa
       aggregateMs: 22_000,
       prepareQueueMs: 4_000,
       attemptCount: 1,
+      startedAt: null,
+      finishedAt: null,
     },
     {
       id: 42,
@@ -906,6 +916,8 @@ test('quality gates config: GitLab CI history separates execution limits from fa
       aggregateMs: 20_000,
       prepareQueueMs: 3_000,
       attemptCount: 1,
+      startedAt: null,
+      finishedAt: null,
     },
     {
       id: 41,
@@ -914,6 +926,8 @@ test('quality gates config: GitLab CI history separates execution limits from fa
       aggregateMs: 18_000,
       prepareQueueMs: 2_000,
       attemptCount: 1,
+      startedAt: null,
+      finishedAt: null,
       failed: true,
     },
   ].map((run) => ({
@@ -1227,4 +1241,19 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.doesNotMatch(pageSource, /Fixed quality evidence/u)
   assert.match(taskNavSource, /aria-controls/u)
   assert.match(taskNavSource, /-panel-/u)
+})
+
+
+test('server Job timestamp contract accepts missing records and rejects reversed intervals', () => {
+  const payload = summary()
+  const job = payload.serverEvidence.jobs[0]
+  job.startedAt = '2026-08-09T07:59:58.000Z'
+  job.finishedAt = NOW
+  assert.equal(normalizeDevQualityGateSummary(payload).serverEvidence.jobs[0].startedAt, job.startedAt)
+  job.finishedAt = '2026-08-09T07:59:57.000Z'
+  assert.throws(() => normalizeDevQualityGateSummary(payload), /quality server evidence job is invalid/u)
+  job.finishedAt = null
+  assert.equal(normalizeDevQualityGateSummary(payload).serverEvidence.jobs[0].finishedAt, null)
+  job.startedAt = 'invalid'
+  assert.throws(() => normalizeDevQualityGateSummary(payload), /quality server evidence job is invalid/u)
 })

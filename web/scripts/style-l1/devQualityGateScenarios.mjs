@@ -110,7 +110,13 @@ function serverCiTopologyJob(name) {
     return {
       name,
       stage: 'quality',
-      needs: ['plan', 'prepare', 'quality_web_build'],
+      needs: [
+        'plan',
+        'prepare',
+        'quality_web_build',
+        'quality_server_upgrade',
+        'quality_server_critical_postgres',
+      ],
     }
   }
   return { name, stage: 'quality', needs: ['plan', 'prepare'] }
@@ -125,23 +131,43 @@ const SERVER_CI_TOPOLOGY_EDGE_COUNT = SERVER_CI_TOPOLOGY.reduce(
 )
 
 function serverHistoryJobs(pipelineId, durationOffset = 0, failureJob = '') {
+  const originByPipeline = {
+    41: '2026-08-09T07:53:15.000Z',
+    40: '2026-08-09T06:48:00.000Z',
+    39: '2026-08-09T05:50:00.000Z',
+  }
+  const offsets = {
+    plan: 0,
+    prepare: 6_000,
+    'quality_browser 1/2': 156_000,
+    'quality_browser 2/2': 237_000,
+    quality_aggregate: 245_000,
+    'CI Gate': 254_000,
+  }
   return SERVER_JOB_TIMINGS.map(
-    ([name, durationMs, queueMs, role, group, attemptCount], index) => ({
-      id: pipelineId * 100 + index,
-      name,
-      status: 'completed',
-      conclusion: name === failureJob ? 'failure' : 'success',
-      durationMs: Math.max(1_000, durationMs + durationOffset),
-      queueMs,
-      attemptCount,
-      role,
-      group,
-      url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/${String(
-        pipelineId * 100 + index
-      )}`,
-    })
+    ([name, durationMs, queueMs, role, group, attemptCount], index) => {
+      const start =
+        Date.parse(originByPipeline[pipelineId]) +
+        (offsets[name] ?? (role === 'execution' ? 24_000 : 160_000))
+      const elapsed = Math.max(1_000, durationMs + durationOffset)
+      return {
+        id: pipelineId * 100 + index,
+        name,
+        status: 'completed',
+        conclusion: name === failureJob ? 'failure' : 'success',
+        durationMs: elapsed,
+        queueMs,
+        startedAt: new Date(start).toISOString(),
+        finishedAt: new Date(start + elapsed).toISOString(),
+        attemptCount,
+        role,
+        group,
+        url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/${String(pipelineId * 100 + index)}`,
+      }
+    }
   )
 }
+
 const SERVER_CI_HISTORY = Object.freeze([
   Object.freeze({
     id: 41,
@@ -438,22 +464,7 @@ function createServerEvidence(status = 'passed') {
       durationMs: 405_000,
       finishedAt: NOW,
     },
-    jobs: SERVER_JOB_TIMINGS.map(
-      ([name, durationMs, queueMs, role, group, attemptCount], index) => ({
-        id: 4_100 + index,
-        name,
-        status: 'completed',
-        conclusion: 'success',
-        durationMs,
-        queueMs,
-        attemptCount,
-        role,
-        group,
-        url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/${String(
-          4_100 + index
-        )}`,
-      })
-    ),
+    jobs: serverHistoryJobs(41),
     jobGuides: projectCiJobGuides(SERVER_JOB_TIMINGS.map(([name]) => name)),
     topology: {
       status: 'available',
@@ -841,7 +852,8 @@ export function createDevQualityGateScenarios({
         await expectHeading(page, '质量门禁')
         await page.getByText('GitLab 普通 CI 已通过', { exact: true }).waitFor()
         assert.equal(
-          await page.getByRole('region', { name: '质量门禁操作区' })
+          await page
+            .getByRole('region', { name: '质量门禁操作区' })
             .evaluate((node) => getComputedStyle(node).backgroundColor),
           'rgb(255, 255, 255)',
           '质量门禁导航和视图说明由同一白色操作区承载'
@@ -922,6 +934,20 @@ export function createDevQualityGateScenarios({
             '聚合与终态',
           ]
         )
+        const nodePhase = serverPanel
+          .locator('.erp-dev-quality-server-pipeline__phase')
+          .filter({ hasText: 'Node 合同' })
+        await nodePhase.locator('summary').click()
+        assert.equal(await nodePhase.evaluate((node) => node.open), false)
+        assert.equal(
+          await nodePhase
+            .locator('.erp-dev-quality-server-pipeline__nodes')
+            .isVisible(),
+          false
+        )
+        await nodePhase.locator('summary').click()
+        assert.equal(await nodePhase.evaluate((node) => node.open), true)
+
         const viewSwitch = serverPanel.locator('[aria-label="服务器门禁详情"]')
         await viewSwitch.getByText('Job 性能', { exact: true }).click()
         await page.waitForFunction(
@@ -933,6 +959,30 @@ export function createDevQualityGateScenarios({
           name: '历史 Job 性能',
         })
         await performance.waitFor()
+        const timeline = serverPanel.locator('.erp-dev-ci-timeline')
+        assert.equal(await timeline.evaluate((node) => node.open), false)
+        await timeline.locator('summary').click()
+        const timelineTable = timeline.getByRole('table', {
+          name: '本次 CI Job 运行时间轴',
+        })
+        await timelineTable.waitFor()
+        assert.equal(
+          await timelineTable.locator('tbody tr').count(),
+          SERVER_JOB_TIMINGS.length
+        )
+        await timeline
+          .getByText('已完成记录最大重叠', { exact: false })
+          .waitFor()
+        assert.equal(
+          await timelineTable
+            .getByRole('img', {
+              name: 'plan：起点后 0 秒 开始，实际运行 6 秒',
+              exact: true,
+            })
+            .count(),
+          1
+        )
+        await timeline.locator('summary').click()
         await performance.getByText('超过 120 秒', { exact: true }).waitFor()
         await performance
           .getByText('超过 90 秒', { exact: true })
@@ -1037,6 +1087,78 @@ export function createDevQualityGateScenarios({
         await jobGuideDrawer
           .getByText('先看阶段，再按需查看单个 Job', { exact: false })
           .waitFor()
+        const workflowGuide = jobGuideDrawer.getByRole('region', {
+          name: 'CI/CD 流程与原理',
+        })
+        await workflowGuide
+          .locator('[data-section="overview"] [data-mermaid-status="rendered"]')
+          .waitFor()
+        assert.equal(
+          await workflowGuide.locator('.erp-markdown-mermaid').count(),
+          1,
+          '仅展开的原理图参与渲染'
+        )
+        const parallelHeader = workflowGuide.getByRole('button', {
+          name: 'collapsed Job 并行、汇总与等待',
+          exact: true,
+        })
+        await parallelHeader.click()
+        const parallelDiagram = workflowGuide.locator(
+          '[data-section="parallel"]'
+        )
+        await parallelDiagram
+          .locator('[data-mermaid-status="rendered"]')
+          .waitFor()
+        const parallelGeometry = await parallelDiagram.evaluate((node) => {
+          const viewport = node.querySelector('.erp-markdown-mermaid__viewport')
+          const svg = node.querySelector('.erp-markdown-mermaid__canvas > svg')
+          const text = svg.querySelector('text')
+          return {
+            localScroll: viewport.scrollWidth > viewport.clientWidth,
+            renderedFont:
+              (parseFloat(getComputedStyle(text).fontSize) *
+                svg.getBoundingClientRect().width) /
+              svg.viewBox.baseVal.width,
+          }
+        })
+        assert(parallelGeometry.localScroll, JSON.stringify(parallelGeometry))
+        assert(
+          parallelGeometry.renderedFont >= 12,
+          JSON.stringify(parallelGeometry)
+        )
+        const parallelCanvas = parallelDiagram.locator('.erp-markdown-mermaid__canvas')
+        assert.equal(await parallelCanvas.getAttribute('data-mermaid-zoom'), '200')
+        await parallelDiagram.getByRole('button', {
+          name: '适配Job 并行、汇总与等待原理图宽度',
+          exact: true,
+        }).click()
+        assert.equal(await parallelCanvas.getAttribute('data-mermaid-zoom'), '100')
+        assert.equal(
+          await parallelDiagram.locator('.erp-markdown-mermaid__viewport').evaluate(
+            (node) => node.scrollWidth <= node.clientWidth
+          ),
+          true,
+          '适配宽度应恢复完整图的概览'
+        )
+        const fullscreenButton = parallelDiagram.getByRole('button', {
+          name: '全屏查看Job 并行、汇总与等待原理图',
+          exact: true,
+        })
+        await fullscreenButton.click()
+        await parallelDiagram.locator('.erp-markdown-mermaid--fullscreen').waitFor()
+        await parallelDiagram.getByRole('button', {
+          name: '退出Job 并行、汇总与等待原理图全屏',
+          exact: true,
+        }).click()
+        await parallelDiagram.locator('.erp-markdown-mermaid--fullscreen').waitFor({ state: 'hidden' })
+        await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '全屏查看Job 并行、汇总与等待原理图')
+        await workflowGuide
+          .getByRole('button', {
+            name: 'expanded Job 并行、汇总与等待',
+            exact: true,
+          })
+          .click()
+        await parallelDiagram.waitFor({ state: 'hidden' })
         assert.deepEqual(
           await jobGuideDrawer
             .locator('.erp-dev-quality-job-guide-drawer__group-heading strong')
@@ -1121,6 +1243,51 @@ export function createDevQualityGateScenarios({
           drawerGeometry.right <= drawerGeometry.viewportWidth + 1,
           JSON.stringify(drawerGeometry)
         )
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-quality-gates-desktop-light'
+        )
+        await jobGuideDrawer.locator('.ant-drawer-close').click()
+        await jobGuideDrawer.waitFor({ state: 'hidden' })
+        await page.unroute('**/__dev/api/qa/quality-gates**')
+        await installQualityRoutes(
+          page,
+          'idle',
+          { summary: 0, governance: 0, gaps: 0 },
+          { serverStatus: 'missing' }
+        )
+        await page.reload()
+        await expectHeading(page, '质量门禁')
+        const trigger = page.getByRole('button', {
+          name: '流程与原理',
+          exact: true,
+        })
+        await trigger.click()
+        const drawer = page.getByRole('dialog', {
+          name: 'Job 说明',
+          exact: true,
+        })
+        const guide = drawer.getByRole('region', { name: 'CI/CD 流程与原理' })
+        await guide
+          .locator('[data-section="overview"] [data-mermaid-status="rendered"]')
+          .waitFor()
+        assert.equal(await guide.locator('.ant-collapse-header').count(), 4)
+        await drawer
+          .getByText('实际执行结果请查看本次流水线和目标回执。', {
+            exact: false,
+          })
+          .waitFor()
+        await drawer.locator('.ant-drawer-close').click()
+        await drawer.waitFor({ state: 'hidden' })
+        await page.waitForFunction(() =>
+          document.activeElement?.textContent?.includes('流程与原理')
+        )
+        const panel = page.getByRole('region', { name: 'GitLab CI 质量证据' })
+        await panel.getByText('Job 性能', { exact: true }).click()
+        const missingTimeline = panel.locator('.erp-dev-ci-timeline')
+        await missingTimeline.locator('summary').click()
+        await missingTimeline.getByText('本次尚无已结束且包含完整起止时间的 Job，时间轴等待实际记录', { exact: true }).waitFor()
+        assert.equal(await missingTimeline.locator('.erp-dev-ci-timeline__bar').count(), 0)
         await assertNoHorizontalOverflow(
           page,
           'dev-quality-gates-desktop-light'

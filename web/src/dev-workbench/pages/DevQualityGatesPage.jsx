@@ -30,6 +30,8 @@ import { message, modal } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
+import DevCiWorkflowGuide from '../components/DevCiWorkflowGuide.jsx'
+import DevCiJobTimeline from '../components/DevCiJobTimeline.jsx'
 import {
   DEFAULT_SERVER_VIEW,
   DEFAULT_VIEW,
@@ -830,7 +832,12 @@ function ServerJobPerformanceTable({ rows, label }) {
 function ServerJobPerformance({ evidence }) {
   const performance = buildQualityGateServerPerformance(evidence)
   if (!performance.rows.length) {
-    return <Empty description="最近普通 push CI 尚无可比较的 Job 数据" />
+    return (
+      <>
+        <DevCiJobTimeline jobs={evidence.jobs} />
+        <Empty description="最近普通 push CI 尚无可比较的 Job 数据" />
+      </>
+    )
   }
   const highlightedNames = new Set(
     performance.rows
@@ -882,6 +889,7 @@ function ServerJobPerformance({ evidence }) {
           ) : null}
         </Space>
       </div>
+      <DevCiJobTimeline jobs={evidence.jobs} />
       <ServerJobPerformanceTable
         rows={highlighted}
         label="需要关注的历史 Job 性能"
@@ -1157,6 +1165,7 @@ function ServerJobGuideDrawer({
         </div>
       ) : (
         <div className="erp-dev-quality-job-guide-drawer__catalog">
+          <DevCiWorkflowGuide />
           <Text type="secondary">
             先看阶段，再按需查看单个 Job；依赖、状态与耗时仍以当前 GitLab
             流水线为准。
@@ -1286,15 +1295,16 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
         {timing.flowGroups.length ? (
           <div className="erp-dev-quality-server-pipeline__track">
             {timing.flowGroups.map((group) => (
-              <section
+              <details
                 key={group.key}
                 className="erp-dev-quality-server-pipeline__phase"
                 data-phase={group.key}
+                open
               >
-                <div className="erp-dev-quality-server-pipeline__phase-heading">
+                <summary className="erp-dev-quality-server-pipeline__phase-heading">
                   <Text strong>{SERVER_JOB_GROUP[group.key] || group.key}</Text>
                   <Tag>{group.jobs.length} 个</Tag>
-                </div>
+                </summary>
                 <div className="erp-dev-quality-server-pipeline__nodes">
                   {group.jobs.map((job) => (
                     <article
@@ -1353,7 +1363,7 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
                     </article>
                   ))}
                 </div>
-              </section>
+              </details>
             ))}
           </div>
         ) : (
@@ -1551,6 +1561,14 @@ function ServerCiEvidencePanel({ summary, serverView, onServerViewChange }) {
           }}
         />
         <Text type="secondary">{SERVER_VIEW_HELP[selectedServerView]}</Text>
+        <Button
+          aria-label="流程与原理"
+          size="small"
+          icon={<InfoCircleOutlined />}
+          onClick={(event) => openJobGuide('', event.currentTarget)}
+        >
+          流程与原理
+        </Button>
         {evidence.jobGuides.length ? (
           <Button
             size="small"

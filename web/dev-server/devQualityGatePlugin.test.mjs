@@ -1218,3 +1218,25 @@ test('Vite development config registers the quality gate plugin', async () => {
     )
   )
 })
+
+
+test('server Job timeline preserves upstream timestamps for the latest retry', () => {
+  const startedAt = '2026-10-02T00:00:00.000Z'
+  const finishedAt = '2026-10-02T00:00:05.000Z'
+  const result = projectDevQualityGateServerEvidence({
+    schemaVersion: 'plush.delivery-pipeline-timings/v1',
+    runs: [{
+      id: 91, workflow: 'ci', event: 'push', gitSha: REPOSITORY.commit,
+      status: 'completed', conclusion: 'success',
+      jobs: [
+        { id: 1, name: 'quality_node_core', status: 'completed', conclusion: 'failure', startedAt: '2026-10-01T00:00:00.000Z', finishedAt: '2026-10-01T00:00:01.000Z' },
+        { id: 2, name: 'quality_node_core', status: 'completed', conclusion: 'success', startedAt, finishedAt },
+      ],
+    }],
+  }, REPOSITORY)
+  assert.equal(result.jobs.length, 1)
+  assert.equal(result.jobs[0].attemptCount, 2)
+  assert.equal(result.jobs[0].startedAt, startedAt)
+  assert.equal(result.jobs[0].finishedAt, finishedAt)
+  assert.equal(result.history[0].jobs[0].startedAt, startedAt)
+})

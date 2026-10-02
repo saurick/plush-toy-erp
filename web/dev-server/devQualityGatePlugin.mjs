@@ -705,6 +705,8 @@ function projectServerJob(job, attemptCount) {
     conclusion: job.conclusion,
     durationMs: Number.isSafeInteger(job.durationMs) ? job.durationMs : null,
     queueMs: Number.isSafeInteger(job.queueMs) ? job.queueMs : null,
+    startedAt: job.startedAt ?? null,
+    finishedAt: job.finishedAt ?? null,
     attemptCount,
     role,
     group,

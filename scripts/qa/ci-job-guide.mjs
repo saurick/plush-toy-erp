@@ -141,7 +141,7 @@ const RAW_CI_JOB_GUIDES = [
   {
     name: "quality_browser 1/2",
     label: "浏览器主路径检查",
-    summary: "复用同一 SHA 的 Web 构建，验证入口、响应式边界和打印中心主路径。",
+    summary: "复用同一 SHA 的 Web 构建；等待升级与关键 PostgreSQL Job 清理，避免 Docker 网络拆除干扰本机请求，再验证入口、响应式边界和打印主路径。",
     checks: ["桌面与移动入口", "打印中心预览", "浏览器与端口清理"],
     outcome: "生成 Browser 场景分片回执。",
   },
@@ -149,14 +149,14 @@ const RAW_CI_JOB_GUIDES = [
     name: "quality_node",
     label: "Node 汇总",
     summary:
-      "核对四条 Node 分片，并完成 secrets 与 shared 收口；不会重跑分片测试。",
-    checks: ["四条 Node 分片回执", "严格敏感信息扫描", "共享基础检查"],
+      "核对全部 Node 分片，并完成 secrets 与 shared 收口；不会重跑分片测试。",
+    checks: ["全部 Node 分片回执", "严格敏感信息扫描", "共享基础检查"],
     outcome: "形成唯一 Node 领域回执，供总聚合读取。",
   },
   {
     name: "quality_resource",
     label: "资源敏感汇总",
-    summary: "核对资源合同与运行两条分片属于同一提交且完整通过。",
+    summary: "核对全部资源合同与运行分片属于同一提交且完整通过。",
     checks: ["资源合同分片", "资源运行分片", "清理与零跳过读回"],
     outcome: "形成唯一资源敏感领域回执。",
   },

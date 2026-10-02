@@ -603,6 +603,22 @@ export function createDevVersionCenterScenarios({
         const takeoverDialog = page.getByRole('dialog', {
           name: '手动与应急发布指引',
         })
+        const ciGuide = takeoverDialog.getByRole('region', {
+          name: 'CI/CD 流程与原理',
+        })
+        await ciGuide
+          .locator('[data-section="delivery"] [data-mermaid-status="rendered"]')
+          .waitFor()
+        assert.equal(await ciGuide.locator('.erp-markdown-mermaid').count(), 1)
+        assert.equal(
+          await ciGuide
+            .getByRole('button', {
+              name: 'expanded 制品发布、部署与恢复',
+              exact: true,
+            })
+            .getAttribute('aria-expanded'),
+          'true'
+        )
         const automationSection = takeoverDialog.getByRole('region', {
           name: '自动续办怎么交接',
         })

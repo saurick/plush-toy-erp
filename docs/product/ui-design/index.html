@@ -2459,6 +2459,10 @@
     .dev-git-lock-flow__branches article:first-child { border-color: var(--danger); }
     .dev-git-lock-flow__branches article:last-child { border-color: var(--brand); }
     .dev-git-lock-flow__branches span { color: var(--text-2); overflow-wrap: anywhere; }
+    .dev-ci-guide-preview > details { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+    .dev-ci-guide-preview summary { cursor: pointer; font-weight: 600; }
+    .dev-ci-guide-preview .dev-git-lock-flow { margin-top: 12px; }
+    .dev-ci-guide-preview .dev-git-lock-flow__branches article { border-color: var(--line); }
     @media (max-width: 980px) { .dev-design-grid { grid-template-columns: 1fr; } }
     @media (max-width: 620px) { .dev-git-lock-flow__branches { grid-template-columns: 1fr; } }
     @media (prefers-reduced-motion: reduce) { .dev-design-tabs::before { transition: none; } .line-item--appended { animation-duration: 1ms; } }
@@ -4027,13 +4031,23 @@
       {key:'docs', area:'engineering', title:'开发文档', source:'仓库当前正式文档', status:'已核对', detail:'按关键词查找正式文档，保留目录、标题与当前来源路径。', path:'/__dev/docs'},
       {key:'design', area:'engineering', title:'UI 交互设计', source:'同一份可交互 HTML', status:'已核对', detail:'业务界面、手机界面、登录、帮助与效能工作台在同一设计稿核对。', path:'docs/product/ui-design/index.html'},
       {key:'affected', area:'quality', title:'改动验证', source:'当前改动的受影响范围', status:'已核对', detail:'样例：空状态样式、手机任务列表和设计查看器；检查组件、页面恢复与窄屏。', path:'scripts/qa/affected.sh'},
-      {key:'gates', area:'quality', title:'质量门禁', source:'固定版本的 CI 结果', status:'待核对', detail:'样例版本尚缺完整 CI 终态。局部测试通过不代表发布资格。', path:'/__dev/quality-gates'},
+      {key:'gates', area:'quality', title:'质量门禁', source:'固定版本的 CI 结果', status:'待核对', detail:'流程与并发原理可按需展开；样例版本尚缺完整 CI 终态，局部测试通过不代表发布资格。', path:'/__dev/quality-gates'},
       {key:'data', area:'quality', title:'数据准备', source:'隔离样例与验证资料', status:'已核对', detail:'选择已有样例，核对范围、用途与清理边界；样例不代表真实客户事实。', path:'/__dev/data-preparation'},
       {key:'config', area:'delivery', title:'客户配置', source:'配置快照与固定版本', status:'已核对', detail:'核对客户配置和当前版本的关系；不把配置选择当成部署完成。', path:'/__dev/customer-config'},
       {key:'versions', area:'delivery', title:'版本发布', source:'不可变制品与目标读回', status:'待核对', detail:'选择版本后核对目标、门禁与回滚点。未完成目标读回前，保持未证明。', path:'/__dev/version-center'},
       {key:'migration', area:'delivery', title:'数据库迁移', source:'迁移计划、备份与恢复验证', status:'待核对', detail:'计划准备就绪后才允许确认；失败保留恢复入口，不自动执行或重试迁移。', path:'/__dev/database-migration'},
       {key:'recovery', area:'delivery', title:'演练与恢复', source:'恢复点与演练回执', status:'待核对', detail:'先核对可用恢复点和演练结果，真实回滚仍走版本中心的受控确认。', path:'/__dev/drill-recovery'}
     ];
+    function renderDevCiGuidePreview(initialSection='overview') {
+      const flow=(label,nodes)=>`<div class="dev-git-lock-flow" role="img" aria-label="${label}">${nodes.map((node,index)=>`${index?'<span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span>':''}<div class="dev-git-lock-flow__node">${node}</div>`).join('')}</div>`;
+      const sections=[
+        {key:'overview',title:'从提交到部署',html:flow('提交、CI、制品与部署机制示意',['提交并推送 GitLab main','plan 确定范围 → prepare 准备依赖','按依赖并行检查 → 汇总回执 → 固定提交的 CI Gate','显式发布不可变制品','准备并确认目标部署 → 运行检查与恢复点'])},
+        {key:'parallel',title:'Job 并行、汇总与等待',html:`<div class="dev-git-lock-flow" role="img" aria-label="依赖就绪、分组并行与汇总机制示意"><div class="dev-git-lock-flow__node">plan → prepare → 依赖就绪</div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__branches"><article><strong>Node 与资源分片</strong><span>分片并行执行；全部回执形成各自领域结论。</span></article><article><strong>Web 与 Server 检查</strong><span>检查与构建并行；各领域独立汇总。</span></article><article><strong>静态与安全检查</strong><span>按本次提交的实际依赖进入执行。</span></article><article><strong>浏览器执行</strong><span>等待 Web 构建与两个 PostgreSQL Job 清理，避免网络拆除干扰请求。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">领域回执 → 总聚合 → CI Gate</div></div><p>就绪后仍可能等待 Runner 空槽或资源锁；各 Job 耗时不能相加为流水线耗时。</p>`},
+        {key:'resources',title:'四层并发与共享资源',html:flow('流水线、Job 槽位、内部并发与资源锁机制示意',['多条 Pipeline 共用 Runner 就绪队列','Job 槽位由 concurrent / limit 控制','单个 Job 内：Go 运行、包构建与 Node 测试文件并发','资源锁与任务隔离约束共享数据库、端口、缓存和输出'])+'<p>内部并发参数不是服务器 CPU 硬配额；提高并发也可能增加 CPU、内存和磁盘争用。</p>'},
+        {key:'delivery',title:'制品发布、部署与恢复',html:flow('固定版本发布、部署确认与运行恢复机制示意',['同一提交的 CI Gate','显式发布 → 构建、演练并登记不可变 Release','选择固定版本和目标 → 核对制品、容量与恢复点','确认部署 → 备份、向前迁移、加载制品与启动','health / ready 与业务 smoke 读回','需要恢复时，检查并确认正式回滚'])}
+      ];
+      return `<section class="dev-ci-guide-preview" aria-label="CI/CD 流程与原理"><h3>CI/CD 流程与原理</h3><p class="data-note">机制示意；真实 Job 依赖、时间轴、配置与结果在对应工作台核对。</p>${sections.map(section=>`<details${section.key===initialSection?' open':''}><summary>${section.title}</summary>${section.html}</details>`).join('')}</section>`;
+    }
     function devDesignEmpty(label, action = '') {
       return `<div class="empty"><span>${escapeHTML(label)}</span>${action}</div>`;
     }
@@ -4109,7 +4123,7 @@
         state.devState='data';renderDevWorkbench(document.querySelector('#view'));
       } else if (action==='dev-evidence') {
         const row=devDesignRecords.find(item=>item.key===target.dataset.value);if(!row)return true;
-        state.infoModal={title:`${row.title} · 证据详情`,html:`<dl class="dev-design-evidence"><dt>来源</dt><dd>${row.source}</dd><dt>样例状态</dt><dd>${row.status}</dd><dt>核对入口</dt><dd>${row.path}</dd><dt>判断边界</dt><dd>${row.detail}</dd><dt>版本 / 时间</dt><dd>DEMO-a1b2c3d / 2026-09-26 10:30 +08:00</dd></dl><p class="data-note">这是固定样例，不证明当前代码、真实部署或客户验收。</p>`,confirmAction:'dev-close',confirmLabel:'返回工作台'};state.overlay='info';renderFloating();
+        state.infoModal={title:`${row.title} · 证据详情`,html:`<dl class="dev-design-evidence"><dt>来源</dt><dd>${row.source}</dd><dt>样例状态</dt><dd>${row.status}</dd><dt>核对入口</dt><dd>${row.path}</dd><dt>判断边界</dt><dd>${row.detail}</dd><dt>版本 / 时间</dt><dd>DEMO-a1b2c3d / 2026-09-26 10:30 +08:00</dd></dl>${row.key==='gates'||row.key==='versions'?renderDevCiGuidePreview(row.key==='versions'?'delivery':'overview'):''}<p class="data-note">这是固定样例，不证明当前代码、真实部署或客户验收。</p>`,confirmAction:'dev-close',confirmLabel:'返回工作台'};state.overlay='info';renderFloating();
       } else if (action==='dev-automation-flow') {
         state.infoModal={title:'自动续办交接流程',html:`<div class="dev-git-lock-flow" role="img" aria-label="等待心跳移除与执行阶段交接流程"><div class="dev-git-lock-flow__node">等待其他项目会话结束</div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">全部会话结束且后台 writer 已停止？</div><div class="dev-git-lock-flow__branches"><article><strong>尚未满足</strong><span>每 10 分钟只读重查，不改共享文件、不操作 Git、不造数或部署。</span></article><article><strong>条件满足</strong><span>先删除本次等待心跳，并读回删除结果。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">删除结果为 deleted？</div><div class="dev-git-lock-flow__branches"><article><strong>删除失败</strong><span>执行阶段保持未开始，报告自动化生命周期阻塞。</span></article><article><strong>删除成功</strong><span>同一次续办进入实现、验证、造数、Git 与部署。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">执行期间不重建同目的心跳；只有用户后来再次要求等待，才创建新的心跳。</div></div><p class="data-note">实际版本中心使用可缩放、可全屏的 Mermaid；本设计样例只说明生命周期，不调度 Codex 会话或自动化。</p>`,confirmAction:'dev-close',confirmLabel:'返回版本发布'};state.overlay='info';renderFloating();
       } else if (action==='dev-lock-flow') {

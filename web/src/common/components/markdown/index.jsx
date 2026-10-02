@@ -114,17 +114,21 @@ export function MermaidDiagram({
   showSourceOnError = true,
   themeMode,
   flowchartHtmlLabels = true,
+  initialZoom = MERMAID_ZOOM.defaultValue,
 }) {
   const currentTheme = useCurrentERPTheme()
   const theme =
     themeMode === 'light' || themeMode === 'dark' ? themeMode : currentTheme
   const useFlowchartHtmlLabels = flowchartHtmlLabels !== false
+  const startingZoom = Number.isFinite(initialZoom)
+    ? Math.min(MERMAID_ZOOM.max, Math.max(MERMAID_ZOOM.min, initialZoom))
+    : MERMAID_ZOOM.defaultValue
   const displayLabel = String(label || '').trim() || '图表'
   const diagramId = useMemo(() => {
     mermaidRenderSequence += 1
     return `erp-markdown-mermaid-${mermaidRenderSequence}`
   }, [])
-  const [zoom, setZoom] = useState(MERMAID_ZOOM.defaultValue)
+  const [zoom, setZoom] = useState(startingZoom)
   const [fullscreenZoom, setFullscreenZoom] = useState(
     MERMAID_ZOOM.defaultValue
   )
@@ -152,10 +156,10 @@ export function MermaidDiagram({
   const zoomPercent = Math.round(activeZoom * 100)
 
   useEffect(() => {
-    setZoom(MERMAID_ZOOM.defaultValue)
+    setZoom(startingZoom)
     setFullscreenZoom(MERMAID_ZOOM.defaultValue)
     setFullscreenOpen(false)
-  }, [chart])
+  }, [chart, startingZoom])
 
   useEffect(() => {
     if (!fullscreenOpen || typeof document === 'undefined') {

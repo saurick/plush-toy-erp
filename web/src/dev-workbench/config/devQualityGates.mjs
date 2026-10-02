@@ -493,11 +493,13 @@ function normalizeServerEvidenceJob(job) {
       'attemptCount',
       'conclusion',
       'durationMs',
+      'finishedAt',
       'group',
       'id',
       'name',
       'queueMs',
       'role',
+      'startedAt',
       'status',
       'url',
     ],
@@ -512,6 +514,11 @@ function normalizeServerEvidenceJob(job) {
     !PIPELINE_CONCLUSIONS.includes(job.conclusion) ||
     !SERVER_JOB_ROLES.includes(job.role) ||
     !SERVER_JOB_GROUPS.includes(job.group) ||
+    (job.startedAt !== null && !isIsoDate(job.startedAt)) ||
+    (job.finishedAt !== null && !isIsoDate(job.finishedAt)) ||
+    (job.startedAt !== null &&
+      job.finishedAt !== null &&
+      Date.parse(job.finishedAt) < Date.parse(job.startedAt)) ||
     job.url !==
       `https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/${String(job.id)}`
   ) {

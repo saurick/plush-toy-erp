@@ -33,6 +33,7 @@ import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevDeliveryTimestamp from '../components/DevDeliveryTimestamp.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevCiWorkflowGuide from '../components/DevCiWorkflowGuide.jsx'
 import DevPipelineTimingPanel, {
   DevPipelineStatusStrip,
   DevTimingBars,
@@ -270,6 +271,7 @@ const MANUAL_TAKEOVER_STEPS = [
 function ManualTakeoverGuide() {
   return (
     <div className="erp-dev-version-takeover-guide">
+      <DevCiWorkflowGuide initialSection="delivery" />
       <Alert
         type="info"
         showIcon
