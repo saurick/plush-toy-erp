@@ -5,6 +5,7 @@ import {
   ROLE_HELP_GUIDES,
   getRoleHelpGuide,
 } from './roleHelpContent.mjs'
+import { BUSINESS_USABILITY_CATALOG } from './businessUsabilityCatalog.mjs'
 import { getRoleHelpScenarios } from './helpScenarios.mjs'
 import {
   HELP_OVERVIEW_LAYOUTS,
@@ -19,7 +20,9 @@ const sceneFor = (role, key) =>
 test('每个岗位场景的编号、图解热点和异常去向均有有效目标', () => {
   const keys = new Set()
   for (const role of ROLE_HELP_GUIDES) {
-    for (const scenario of getRoleHelpScenarios(role)) {
+    for (const scenario of getRoleHelpScenarios(role, {
+      allowedMenuPaths: BUSINESS_USABILITY_CATALOG.map((entry) => entry.path),
+    })) {
       keys.add(scenario.key)
       const model = getHelpScenarioPresentation(scenario, role.key)
       const label = `${role.key}:${scenario.key}`

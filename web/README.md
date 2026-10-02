@@ -138,6 +138,10 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 前端负责展示与交互，领域事实、状态、权限和幂等由后端决定。详细读取与写后恢复合同见 [页面规则](../docs/product/业务数据生命周期与页面动作规则.md#前端实现与读取边界) 和 [API 合同](../server/docs/api.md)。
 
+## 在线帮助与参考手册
+
+`/erp/help-center` 提供岗位操作图解与文字参考，统一搜索和可收起目录；地址中的 `role / scene / view / ref / q` 保存岗位、场景、内容、词条和关键词。所选岗位统一限定目录、搜索、正文与手机选择器，菜单权限只控制办理入口；切换岗位保留搜索词和手册类型并清理旧章节。业务页帮助与字段问号直达相应章节 / 词条，未指定岗位时在当前账号的帮助岗位中选择关联岗位。内容来自 `businessUsabilityCatalog.mjs` 和 `engineeringMaterialHelp.mjs`，`helpManualCatalog.mjs` 负责索引与查找；不维护第二套规则。现有 24 个业务页及工程用料专题已接入，教学示例不表示真实业务进度，打印 / 离线版本未实现。
+
 ## 桌面业务编辑与弹窗约定
 
 共用表单、明细、附件、图片、焦点和滚动约定见 [桌面业务编辑](../docs/product/业务数据生命周期与页面动作规则.md#桌面业务编辑与弹窗约定)。

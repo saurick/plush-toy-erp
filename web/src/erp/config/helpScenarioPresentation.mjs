@@ -1,5 +1,28 @@
 // 仅定义帮助的图形表达与标明的教学示例；正式步骤、完成条件和入口读取 helpScenarios。
 export const HELP_OVERVIEW_LAYOUTS = {
+  'engineering-material-request': {
+    kind: 'chain',
+    pointMap: [0, 1, 2, 2],
+    exception: {
+      from: 's3',
+      back: 's1',
+      label: '资料不足或审批退回',
+      title: '工程修订并重新提交',
+      owner: '工程',
+    },
+  },
+  materials: { kind: 'steps' },
+  'shipping-release': {
+    kind: 'chain',
+    exception: {
+      from: 's2',
+      back: 's1',
+      label: '审批退回',
+      title: '回来源核对本单版本',
+      owner: '销售 / 财务',
+    },
+  },
+  outbound: { kind: 'steps' },
   approvals: {
     kind: 'chain',
     exception: {
@@ -242,6 +265,47 @@ export const HELP_OVERVIEW_LAYOUTS = {
 }
 
 export const HELP_VISUAL_EXAMPLES = {
+  'engineering-material-request': {
+    title: '工程用料审批与采购生成',
+    description: '核对用料，提交老板审核；财务批准后按厂商生成采购订单。',
+    entry: '销售订单 · 材料汇总',
+    points: [
+      [
+        '核对订单与用料来源',
+        '先确认订单已生效、样品已确认、BOM 已启用，核对本轮产品和厂商。',
+      ],
+      [
+        '分清总用数量与库存参考',
+        '应需按生产数量、单位用量和损耗计算；库存参考不自动抵扣采购数量。',
+      ],
+      [
+        '按岗位办理并核对结果',
+        '工程提交、老板交财务、另一位财务批准生成采购单；采购继续补充价格和到货安排。',
+      ],
+    ],
+    boundary:
+      '教学示例：总用数量 214.2 米、库存参考 30 米，生成采购数量仍为 214.2 米。',
+    before: '用料预览',
+    after: '已提交老板审核',
+    delta: '冻结本轮依据',
+    resultTitle: '工程提交结果 · 示例',
+    resultRows: [
+      ['来源订单', 'SO-DEMO-001'],
+      ['总用数量', '214.2 米'],
+      ['下一岗位', '老板审核 → 另一位财务审核人'],
+    ],
+    exceptionTitle: 'BOM 用量需要修订',
+    exceptionTo: '工程',
+    exceptionBack: '本单用料预览',
+    exceptionRows: [
+      ['退回原因', '请核对短毛绒单位用量'],
+      ['工程处理', '修订资料，读取当前预览，再提交'],
+    ],
+    exceptionNote:
+      '退回必须写明原因；新资料重新提交后开始新审批轮次，保留原审批和退回历史。',
+    exceptionResume:
+      '提交结果不确定时，先重新读取同一申请并核对状态、轮次与采购单，避免连续提交。',
+  },
   'finished-goods': {
     title: '成品入库',
     description: '核对完工报告与实物，确认入库后再检查库存。',

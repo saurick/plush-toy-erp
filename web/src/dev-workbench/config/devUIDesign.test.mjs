@@ -6,6 +6,7 @@ import standardUnits from '../../../../server/internal/unitpolicy/units.json' wi
 import { getBusinessUsabilityEntry } from '../../erp/config/businessUsabilityCatalog.mjs'
 import { getRoleHelpScenarios } from '../../erp/config/helpScenarios.mjs'
 import { ROLE_HELP_GUIDES } from '../../erp/config/roleHelpContent.mjs'
+import { HELP_REFERENCE_PAGES } from '../../erp/config/helpManualCatalog.mjs'
 import {
   DEV_UI_DESIGN_ROUTE,
   UI_DESIGN_ASSET,
@@ -27,7 +28,11 @@ test('quantity design snapshot follows the canonical unit labels and precision',
   const saved = helpDefinition('quantityUnits')
   assert.deepEqual(
     saved,
-    standardUnits.map(({ code, name, precision }) => ({ code, name, precision }))
+    standardUnits.map(({ code, name, precision }) => ({
+      code,
+      name,
+      precision,
+    }))
   )
 })
 
@@ -78,6 +83,28 @@ test('payment example follows its formal page help', () => {
     current.items.find((item) => item.type === 'disabled').explanation
   )
   assert.equal(saved.exception.action, current.handoff)
+})
+
+test('reference design snapshot shares the formal chapters, items and engineering rules', () => {
+  const fields = [
+    'key',
+    'title',
+    'sectionTitle',
+    'task',
+    'path',
+    'flowSteps',
+    'roleHelpKeys',
+    'completion',
+    'handoff',
+    'boundary',
+    'items',
+  ]
+  assert.deepEqual(
+    helpDefinition('helpReferencePages'),
+    HELP_REFERENCE_PAGES.map((page) =>
+      Object.fromEntries(fields.map((field) => [field, page[field]]))
+    )
+  )
 })
 
 test('every help scenario has an overview and valid exception return steps', () => {

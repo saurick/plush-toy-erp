@@ -8,6 +8,10 @@ import {
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
+import {
+  BusinessHelpLabel,
+  BusinessPageHelpTrigger,
+} from '../help/BusinessContextHelp.jsx'
 import { bomLossRateToPercent } from '../../utils/bomMaterialGroups.mjs'
 import {
   formatMaterialQuantity as quantity,
@@ -222,7 +226,13 @@ export default function EngineeringMaterialSummarySheet({
     },
     { title: '单位', dataIndex: 'unit_name', width: 65 },
     {
-      title: '总用数量',
+      title: (
+        <BusinessHelpLabel
+          label="总用数量"
+          pageKey="engineering-material-request"
+          itemKey="total-quantity"
+        />
+      ),
       key: 'required',
       width: 125,
       align: 'right',
@@ -231,7 +241,13 @@ export default function EngineeringMaterialSummarySheet({
       ),
     },
     {
-      title: '当前库存',
+      title: (
+        <BusinessHelpLabel
+          label="当前库存"
+          pageKey="engineering-material-request"
+          itemKey="stock-reference"
+        />
+      ),
       key: 'stock',
       width: 125,
       align: 'right',
@@ -348,6 +364,7 @@ export default function EngineeringMaterialSummarySheet({
       <p className="erp-material-sheet__purchase-basis">
         <strong>采购口径：</strong>
         财务批准后，采购订单按本表总用数量生成；当前库存仅供参考，未自动抵扣。
+        <BusinessPageHelpTrigger pageKey="engineering-material-request" />
       </p>
       {mobile && mobileView === 'cards' ? (
         <div className="erp-material-cards">
@@ -371,11 +388,23 @@ export default function EngineeringMaterialSummarySheet({
               </p>
               <dl>
                 <div>
-                  <dt>总用数量</dt>
+                  <dt>
+                    <BusinessHelpLabel
+                      label="总用数量"
+                      pageKey="engineering-material-request"
+                      itemKey="total-quantity"
+                    />
+                  </dt>
                   <dd>{displayQuantity(item.required_quantity)}</dd>
                 </div>
                 <div>
-                  <dt>当前库存</dt>
+                  <dt>
+                    <BusinessHelpLabel
+                      label="当前库存"
+                      pageKey="engineering-material-request"
+                      itemKey="stock-reference"
+                    />
+                  </dt>
                   <dd>{stock(item)}</dd>
                 </div>
               </dl>

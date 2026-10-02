@@ -4,6 +4,7 @@ import {
 } from './businessModules.mjs'
 import { getBusinessPageLineage } from './businessPageLineage.mjs'
 import { ROLE_HELP_GUIDES } from './roleHelpContent.mjs'
+import { ENGINEERING_MATERIAL_HELP } from './engineeringMaterialHelp.mjs'
 
 export const BUSINESS_HELP_TYPES = Object.freeze({
   TERM: 'term',
@@ -1136,12 +1137,25 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
   }),
 })
 
+// 岗位优先入口之外的资料维护与交接章节也归入相应岗位，供图解和参考共用。
+const additionalHelpRolesByPath = {
+  '/erp/master/materials': ['engineering', 'purchase', 'warehouse'],
+  '/erp/warehouse/shipping-release': ['finance', 'warehouse'],
+  '/erp/warehouse/outbound': ['sales', 'warehouse'],
+  '/erp/finance/payments': ['finance'],
+}
+
 function roleHelpKeysForPath(path = '') {
-  return ROLE_HELP_GUIDES.filter(
-    (guideItem) =>
-      guideItem.key !== 'admin' &&
-      guideItem.priorities.some((priority) => priority.path === path)
-  ).map((guideItem) => guideItem.key)
+  return [
+    ...new Set([
+      ...ROLE_HELP_GUIDES.filter(
+        (guideItem) =>
+          guideItem.key !== 'admin' &&
+          guideItem.priorities.some((priority) => priority.path === path)
+      ).map((guideItem) => guideItem.key),
+      ...(additionalHelpRolesByPath[path] || []),
+    ]),
+  ]
 }
 
 function pageLabels(pageKeys = []) {
@@ -1214,7 +1228,7 @@ export const BUSINESS_USABILITY_CATALOG = Object.freeze(
 )
 
 const BUSINESS_USABILITY_BY_KEY = new Map(
-  BUSINESS_USABILITY_CATALOG.map((entry) => [entry.key, entry])
+  [...BUSINESS_USABILITY_CATALOG, ENGINEERING_MATERIAL_HELP].map((entry) => [entry.key, entry])
 )
 
 export function getBusinessUsabilityEntry(pageKey = '') {

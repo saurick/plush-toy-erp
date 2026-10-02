@@ -834,6 +834,7 @@ async function runScenario(browser, scenario) {
 async function runScenarioOnce(browser, scenario) {
   const context = await browser.newContext({
     viewport: scenario.viewport,
+    deviceScaleFactor: scenario.deviceScaleFactor ?? 1,
     hasTouch: scenario.hasTouch ?? false,
   })
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], {

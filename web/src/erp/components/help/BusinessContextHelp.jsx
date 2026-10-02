@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { ArrowRightOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { Button, Popover, Tag, Typography } from 'antd'
+import { Link, useNavigate } from 'react-router-dom'
+import { getHelpCenterHref } from '../../config/helpManualCatalog.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import {
   BUSINESS_HELP_TYPE_PRESENTATION,
@@ -10,7 +12,7 @@ import {
 
 const { Text, Title } = Typography
 
-function ExplanationDetails({ item, showHeading = true }) {
+function ExplanationDetails({ item, pageKey, showHeading = true }) {
   if (!item) return null
 
   const details = [
@@ -40,6 +42,11 @@ function ExplanationDetails({ item, showHeading = true }) {
             </React.Fragment>
           ))}
         </dl>
+      ) : null}
+      {pageKey ? (
+        <Link to={getHelpCenterHref({ pageKey, itemKey: item.key })}>
+          查看完整参考词条 →
+        </Link>
       ) : null}
     </div>
   )
@@ -95,7 +102,11 @@ function PageGuideContent({ entry }) {
             {entry.items.map((item) => (
               <details className="erp-business-page-help__item" key={item.key}>
                 <summary>{item.title}</summary>
-                <ExplanationDetails item={item} showHeading={false} />
+                <ExplanationDetails
+                  item={item}
+                  pageKey={entry.key}
+                  showHeading={false}
+                />
               </details>
             ))}
           </div>
@@ -112,6 +123,7 @@ function PageGuideContent({ entry }) {
 
 export function BusinessPageHelpTrigger({ pageKey = '' }) {
   const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
   const entry = getBusinessUsabilityEntry(pageKey)
 
   if (!entry?.hasPageHelp) return null
@@ -140,9 +152,24 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
         title={`${entry.title}怎么用`}
         onCancel={() => setOpen(false)}
         footer={[
-          <Button key="role-help" href="/erp/help-center">
-            打开帮助中心
+          <Button
+            key="role-help"
+            onClick={() => {
+              setOpen(false)
+              navigate(getHelpCenterHref({ pageKey, view: 'guide' }))
+            }}
+          >
+            查看本页操作图解
             <ArrowRightOutlined />
+          </Button>,
+          <Button
+            key="reference-help"
+            onClick={() => {
+              setOpen(false)
+              navigate(getHelpCenterHref({ pageKey }))
+            }}
+          >
+            查阅本页参考手册
           </Button>,
           <Button key="done" type="primary" onClick={() => setOpen(false)}>
             我知道了
@@ -156,6 +183,9 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
 }
 
 export function BusinessHelpLabel({ label, pageKey = '', itemKey = '' }) {
+  const [open, setOpen] = useState(false)
+  const triggerRef = useRef(null)
+  const contentRef = useRef(null)
   const item = getBusinessHelpItem(pageKey, itemKey)
   if (!item) return label
 
@@ -164,21 +194,75 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '' }) {
       <span>{label}</span>
       <Popover
         destroyOnHidden
-        trigger={['hover', 'focus', 'click']}
+        trigger={['hover', 'click']}
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (
+            nextOpen ||
+            !contentRef.current?.contains(document.activeElement)
+          ) {
+            setOpen(nextOpen)
+          }
+        }}
         placement="top"
         classNames={{ root: 'erp-business-inline-help-popover' }}
-        content={<ExplanationDetails item={item} />}
+        content={
+          <div
+            ref={contentRef}
+            onBlur={(event) => {
+              if (
+                !event.currentTarget.contains(event.relatedTarget) &&
+                event.relatedTarget !== triggerRef.current
+              ) {
+                setOpen(false)
+              }
+            }}
+            onKeyDown={(event) => {
+              if (
+                event.key === 'Escape' ||
+                (event.key === 'Tab' && event.shiftKey)
+              ) {
+                event.preventDefault()
+                event.stopPropagation()
+                triggerRef.current?.focus()
+                if (event.key === 'Escape') setOpen(false)
+              }
+            }}
+          >
+            <ExplanationDetails item={item} pageKey={pageKey} />
+          </div>
+        }
       >
         <Button
+          ref={triggerRef}
           type="text"
           size="small"
           className="erp-business-inline-help-trigger"
           icon={<QuestionCircleOutlined />}
           aria-label={`查看${label}说明`}
+          aria-expanded={open}
+          onFocus={(event) => {
+            // 键盘聚焦打开说明；触控留给点击，避免同一手势先打开再关闭。
+            if (event.currentTarget.matches(':focus-visible')) setOpen(true)
+          }}
+          onBlur={(event) => {
+            if (!contentRef.current?.contains(event.relatedTarget)) {
+              setOpen(false)
+            }
+          }}
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.stopPropagation()
+            } else if (event.key === 'Tab' && !event.shiftKey && open) {
+              const link = contentRef.current?.querySelector('a')
+              if (link) {
+                event.preventDefault()
+                link.focus()
+              }
+            } else if (event.key === 'Escape') {
+              event.stopPropagation()
+              setOpen(false)
             }
           }}
         />

@@ -32,6 +32,7 @@ export default function HelpScenarioIllustration({
   visual,
   point,
   onSelect,
+  roleKey,
 }) {
   const area = (index, children) => (
     <div className="erp-help-example__area" data-active={point === index}>
@@ -49,6 +50,54 @@ export default function HelpScenarioIllustration({
   )
   let content
   switch (scenarioKey) {
+    case 'engineering-material-request':
+      content = (
+        <>
+          {area(
+            0,
+            <>
+              <div className="erp-help-example__row">
+                <strong>订单 SO-DEMO-001</strong>
+                <span className="erp-help-example__status">教学示例</span>
+              </div>
+              <p>示例公仔 · BOM V1 · 示例布料厂</p>
+              <span className="erp-help-muted">
+                订单已生效 · 样品已确认 · BOM 已启用
+              </span>
+            </>
+          )}
+          {area(
+            1,
+            <>
+              <strong>短毛绒 · 单位：米</strong>
+              <ExampleTable
+                headings={['生产数量', '单位用量', '损耗', '总用数量']}
+                rows={[['1,020 件', '0.20 米', '5%', '214.2 米']]}
+              />
+              <div className="erp-help-example__row">
+                <span>当前库存参考 30 米</span>
+                <strong>采购数量 214.2 米</strong>
+              </div>
+              <p className="erp-help-muted">库存仅供参考，不自动抵扣。</p>
+            </>
+          )}
+          {area(
+            2,
+            <div className="erp-help-example__row">
+              <span className="erp-help-muted">按本岗位核对并办理</span>
+              <span className="erp-help-example__action">
+                {{
+                  engineering: '提交老板审核',
+                  boss: '确认通过，交财务',
+                  finance: '批准并生成采购订单',
+                  purchase: '查看生成的采购订单',
+                }[roleKey] || '查看本轮申请'}
+              </span>
+            </div>
+          )}
+        </>
+      )
+      break
     case 'finished-goods':
       content = (
         <>

@@ -10,6 +10,13 @@ import {
 import { getRoleHelpScenarios, resolveHelpScenario } from './helpScenarios.mjs'
 
 test('每个现有岗位按独立场景提供责任、步骤、结果与异常恢复', () => {
+  const extraPages = {
+    engineering: ['materials'],
+    purchase: ['materials'],
+    warehouse: ['materials', 'shipping-release', 'outbound'],
+    finance: ['shipping-release'],
+    sales: ['outbound'],
+  }
   for (const role of ROLE_HELP_GUIDES) {
     const scenes = getRoleHelpScenarios(role, { isSuperAdmin: true })
     assert.equal(
@@ -21,7 +28,12 @@ test('每个现有岗位按独立场景提供责任、步骤、结果与异常�
       new Set(scenes.map((scene) => scene.path)),
       new Set([
         ...role.priorities.map((entry) => entry.path),
+        ...(extraPages[role.key] || []).map((key) => getBusinessUsabilityEntry(key).path),
         ...(role.key === 'finance' ? ['/erp/finance/payments'] : []),
+        ...(role.key === 'finance' ? ['/erp/task-board'] : []),
+        ...(role.key === 'engineering'
+          ? ['/erp/sales/project-orders/sales-orders']
+          : []),
       ]),
       role.key
     )
@@ -80,7 +92,7 @@ test('仓库的材料入库、成品入库、库存查询和出货互相独立',
   const scenes = getRoleHelpScenarios(getRoleHelpGuide('warehouse'))
   assert.deepEqual(
     scenes.map((scene) => scene.key),
-    ['inbound', 'finished-goods', 'inventory-query', 'shipments']
+    ['inbound', 'finished-goods', 'inventory-query', 'shipments', 'materials', 'shipping-release', 'outbound']
   )
   const finished = scenes.find((scene) => scene.key === 'finished-goods')
   assert.deepEqual(

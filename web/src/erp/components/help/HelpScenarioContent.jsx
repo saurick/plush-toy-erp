@@ -331,6 +331,7 @@ export default function HelpScenarioContent({ scenario, roleKey }) {
                       visual={visual}
                       point={selected.point}
                       onSelect={selectPoint}
+                      roleKey={roleKey}
                     />
                     <div className="erp-help-notes">
                       {visual.points.map(([title, description], index) => (

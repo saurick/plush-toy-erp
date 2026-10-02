@@ -12,13 +12,75 @@
 .erp-help-center-workspace {
   display: grid;
   min-width: 0;
-  grid-template-columns: 180px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
+}
+
+.erp-help-center-workspace[data-directory-open='true'] {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.erp-help-center-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.erp-help-center-toolbar > .ant-input-search {
+  min-width: 0;
+  max-width: 680px;
+  flex: 1;
+}
+
+:where(.erp-help-center-toolbar) > .erp-help-center-role-picker,
+:where(.erp-help-center-toolbar) > .erp-help-current-role {
+  min-width: 0;
+  flex: 0 0 180px;
+}
+
+.erp-help-center-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 12px 0 20px;
+  border-bottom: 1px solid var(--erp-border);
+}
+
+.erp-help-center-nav > .ant-tabs {
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 0 auto;
+}
+
+.erp-help-center-nav > .ant-btn {
+  flex: none;
+}
+
+.erp-help-center-nav .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.erp-help-center-nav .ant-tabs-content-holder {
+  display: none;
+}
+
+.erp-help-role-note {
+  margin: -12px 0 16px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
 }
 
 .erp-help-sidebar {
   min-width: 0;
   padding: 4px 0;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  align-self: start;
+}
+
+.erp-help-sidebar[hidden] {
+  display: none;
 }
 
 .erp-help-center-role-picker,
@@ -37,7 +99,7 @@
 }
 
 .erp-help-current-role > strong {
-  font-size: 18px;
+  font-size: 14px;
 }
 
 .erp-help-mobile-picker {
@@ -45,7 +107,19 @@
 }
 
 .erp-help-topics {
-  margin-top: 24px;
+  margin-top: 0;
+}
+
+.erp-help-topics :where(details > summary) {
+  padding: 8px;
+  color: var(--erp-text-muted);
+  cursor: pointer;
+}
+
+.erp-help-topic--entry {
+  width: calc(100% - 12px);
+  margin-left: 12px;
+  font-size: 12px;
 }
 
 .erp-help-topics h2 {
@@ -111,6 +185,160 @@
   min-width: 0;
   container-type: inline-size;
   overflow-wrap: anywhere;
+}
+
+.erp-help-article--reference {
+  max-width: 960px;
+}
+
+.erp-help-reference-content {
+  padding: 20px 28px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius, 10px);
+  background: var(--erp-surface-bg);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.erp-help-reference-content section {
+  padding-top: 16px;
+  border-top: 1px solid var(--erp-border);
+  margin-top: 20px;
+}
+
+.erp-help-reference-content h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.erp-help-reference-content p {
+  margin: 8px 0 16px;
+}
+
+.erp-help-reference-content :where(li + li) {
+  margin-top: 8px;
+}
+
+.erp-help-reference-details {
+  margin: 0;
+}
+
+.erp-help-reference-details > div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 14px;
+  padding: 10px 0;
+}
+
+.erp-help-reference-details dt {
+  color: var(--erp-text-muted);
+}
+
+.erp-help-reference-details dd {
+  margin: 0;
+}
+
+.erp-help-reference-index,
+.erp-help-reference-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  padding: 14px 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-help-reference-index {
+  margin-top: 14px;
+}
+
+.erp-help-reference-index > strong {
+  width: 100%;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-reference-index button,
+.erp-help-reference-links button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--erp-primary-strong);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.erp-help-reference-index a,
+.erp-help-reference-links a,
+.erp-help-reference-content h4 a {
+  color: var(--erp-primary-strong);
+}
+
+.erp-help-reference-index :where(button:hover),
+.erp-help-reference-links :where(button:hover),
+.erp-help-reference-content a:hover {
+  text-decoration: underline;
+}
+
+.erp-help-search-results {
+  min-width: 0;
+}
+
+.erp-help-search-results h3 {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.erp-help-search-results > p {
+  margin: 0 0 16px;
+  color: var(--erp-text-muted);
+}
+
+.erp-help-search-results ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.erp-help-search-results :where(li + li) {
+  margin-top: 10px;
+}
+
+.erp-help-search-results :where(button) {
+  display: grid;
+  width: 100%;
+  padding: 16px 20px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius, 10px);
+  gap: 6px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  cursor: pointer;
+  font: inherit;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.erp-help-search-results :where(button:hover) {
+  border-color: var(--erp-primary);
+}
+
+.erp-help-search-results strong {
+  color: var(--erp-primary-strong);
+  font-size: 15px;
+}
+
+.erp-help-search-results__kind {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-help-search-results :where(button > span:last-child) {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .erp-help-article__heading {
@@ -826,6 +1054,15 @@
   outline-offset: 2px;
 }
 
+.erp-help-reference-content a:focus-visible,
+.erp-help-reference-index button:focus-visible,
+.erp-help-reference-links button:focus-visible,
+.erp-help-search-results button:focus-visible,
+.erp-help-topics > details > summary:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
 .erp-help-topic:hover,
 .erp-help-flow__step:hover,
 .erp-help-note:hover {
@@ -946,24 +1183,63 @@
 }
 
 @media (max-width: 760px) {
-  .erp-help-center-workspace {
+  .erp-help-center-workspace,
+  .erp-help-center-workspace[data-directory-open='true'] {
     grid-template-columns: minmax(0, 1fr);
     gap: 18px;
   }
 
   .erp-help-sidebar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
-    align-items: end;
-    gap: 12px;
+    max-height: 50vh;
+  }
+
+  .erp-help-center-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .erp-help-center-toolbar > .ant-input-search {
+    width: 100%;
+    max-width: none;
+    flex: none;
+  }
+
+  :where(.erp-help-center-toolbar) > .erp-help-center-role-picker,
+  :where(.erp-help-center-toolbar) > .erp-help-current-role {
+    width: 100%;
+    flex: none;
+  }
+
+  .erp-help-current-role {
+    display: flex;
+    align-items: baseline;
+  }
+
+  .erp-help-center-nav {
+    gap: 8px;
+  }
+
+  .erp-help-center-nav .ant-tabs-tab + .ant-tabs-tab {
+    margin-left: 16px;
+  }
+
+  .erp-help-reference-content {
+    padding: 16px;
+  }
+
+  .erp-help-reference-details > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
   }
 
   .erp-help-mobile-picker {
     display: grid;
+    margin-bottom: 16px;
   }
 
   .erp-help-topics {
-    display: none;
+    display: block;
   }
 
   .erp-help-sidebar__footer {

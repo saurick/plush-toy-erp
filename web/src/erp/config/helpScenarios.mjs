@@ -1,4 +1,8 @@
-import { getBusinessUsabilityEntry } from './businessUsabilityCatalog.mjs'
+import {
+  BUSINESS_USABILITY_CATALOG,
+  getBusinessUsabilityEntry,
+} from './businessUsabilityCatalog.mjs'
+import { ENGINEERING_MATERIAL_HELP } from './engineeringMaterialHelp.mjs'
 import { filterRoleHelpPriorities } from './roleHelpContent.mjs'
 
 const step = (title, owner, roles, description) => ({
@@ -14,6 +18,7 @@ function pageScenario(pageKey, nodes) {
   const blocked = entry.items.find((item) => item.type === 'disabled')
   return {
     key: pageKey,
+    pageKey,
     steps: nodes.map(([title, owner, roles], index) =>
       step(title, owner, roles, entry.flowSteps[index])
     ),
@@ -239,6 +244,11 @@ const masterScenarios = {
     'purchase'
   ),
   '/erp/master/products': masterScenario('products', '工程', 'engineering'),
+  '/erp/master/materials': masterScenario(
+    'materials',
+    '工程 / 采购 / 仓库',
+    'engineering'
+  ),
   '/erp/engineering/processes': masterScenario(
     'processes',
     '工程',
@@ -360,6 +370,21 @@ function scenariosForPriority(guide, priority) {
       ),
     ]
   }
+  const page = BUSINESS_USABILITY_CATALOG.find((entry) => entry.path === path)
+  if (page) {
+    return [
+      pageScenario(
+        page.key,
+        page.flowSteps.map((_, index) => [
+          ['核对来源与准备', '核对资料与条件', '办理并核对结果', '确认交接'][
+            index
+          ] || '继续核对',
+          guide.label,
+          [guide.key],
+        ])
+      ),
+    ]
+  }
   return [
     workScenario(
       'work-priority',
@@ -383,6 +408,22 @@ export function getRoleHelpScenarios(guide, access = {}) {
         path: '',
         available: false,
       },
+      ...BUSINESS_USABILITY_CATALOG.filter((page) =>
+        access.allowedMenuPaths?.includes(page.path)
+      ).flatMap((page) => {
+        const priority = {
+          title: page.title,
+          description: page.task,
+          path: page.path,
+          actionLabel: `打开${page.title}`,
+          available: true,
+        }
+        return scenariosForPriority(guide, priority).map((scenario) => ({
+          ...priority,
+          ...scenario,
+          pageKey: page.key,
+        }))
+      }),
     ]
   }
   // 收付款有独立页内说明，在帮助中可直接选择；不改变岗位首页的优先入口。
@@ -399,13 +440,97 @@ export function getRoleHelpScenarios(guide, access = {}) {
           ...guide.priorities,
         ]
       : guide.priorities
-  return filterRoleHelpPriorities({ ...guide, priorities }, access).flatMap(
-    (priority) =>
-      scenariosForPriority(guide, priority).map((scenario) => ({
+  const scenes = filterRoleHelpPriorities(
+    { ...guide, priorities },
+    access
+  ).flatMap((priority) =>
+    scenariosForPriority(guide, priority).map((scenario) => ({
+      ...priority,
+      ...scenario,
+      pageKey:
+        scenario.pageKey ||
+        BUSINESS_USABILITY_CATALOG.find((entry) => entry.path === priority.path)
+          ?.key ||
+        '',
+    }))
+  )
+  if (ENGINEERING_MATERIAL_HELP.roleHelpKeys.includes(guide.key)) {
+    const path = ['boss', 'finance'].includes(guide.key)
+      ? '/erp/task-board'
+      : guide.key === 'purchase'
+        ? '/erp/purchase/accessories'
+        : ENGINEERING_MATERIAL_HELP.path
+    const [entry] = filterRoleHelpPriorities(
+      {
+        priorities: [
+          {
+            title: ENGINEERING_MATERIAL_HELP.title,
+            description: ENGINEERING_MATERIAL_HELP.task,
+            path,
+            actionLabel: ['boss', 'finance'].includes(guide.key)
+              ? '打开审核待办'
+              : guide.key === 'purchase'
+                ? '打开采购订单'
+                : '打开销售订单用料',
+          },
+        ],
+      },
+      access
+    )
+    scenes.push({
+      ...entry,
+      ...pageScenario(ENGINEERING_MATERIAL_HELP.key, [
+        ['核对用料并提交', '工程', ['engineering']],
+        ['老板审核', '老板', ['boss']],
+        ['财务批准并生成采购', '另一位财务审核人', ['finance']],
+        ['采购核对生成订单', '采购', ['purchase']],
+      ]),
+      exception: {
+        trigger: ENGINEERING_MATERIAL_HELP.items.find(
+          (item) => item.key === 'prerequisites'
+        ).explanation,
+        action:
+          ENGINEERING_MATERIAL_HELP.items.find(
+            (item) => item.key === 'rejection'
+          ).explanation +
+          ENGINEERING_MATERIAL_HELP.items.find(
+            (item) => item.key === 'uncertain-result'
+          ).explanation +
+          ENGINEERING_MATERIAL_HELP.items.find(
+            (item) => item.key === 'uncertain-result'
+          ).effect,
+      },
+    })
+  }
+  // 岗位优先事项保留原顺序；补充同岗位章节，菜单权限只决定办理入口是否可用。
+  const coveredPaths = new Set(scenes.map((scene) => scene.path))
+  for (const page of BUSINESS_USABILITY_CATALOG) {
+    if (
+      coveredPaths.has(page.path) ||
+      !page.roleHelpKeys.includes(guide.key)
+    ) {
+      continue
+    }
+    const [priority] = filterRoleHelpPriorities(
+      {
+        priorities: [{
+          title: page.title,
+          description: page.task,
+          path: page.path,
+          actionLabel: `打开${page.title}`,
+        }],
+      },
+      access
+    )
+    scenes.push(
+      ...scenariosForPriority(guide, priority).map((scenario) => ({
         ...priority,
         ...scenario,
+        pageKey: page.key,
       }))
-  )
+    )
+  }
+  return scenes
 }
 
 export function resolveHelpScenario(scenarios, requestedKey = '') {
