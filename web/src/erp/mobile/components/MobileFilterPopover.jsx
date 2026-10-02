@@ -41,7 +41,7 @@ export default function MobileFilterPopover({
       trigger={[]}
       placement="bottomRight"
       arrow={false}
-      autoAdjustOverflow
+      autoAdjustOverflow={{ shiftX: true }}
       open={open}
       zIndex={token.zIndexPopupBase + 1}
       onOpenChange={onOpenChange}

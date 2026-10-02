@@ -2,7 +2,10 @@ import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { assertMobileSearchAffordance } from './controlAffordanceAssertions.mjs'
-import { assertMobileFilterOutsideDismissal } from './mobileFilterPopoverAssertions.mjs'
+import {
+  assertMobileFilterEdgePositions,
+  assertMobileFilterOutsideDismissal,
+} from './mobileFilterPopoverAssertions.mjs'
 
 export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
   const baseTime = 1_788_840_000
@@ -186,6 +189,12 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
           'none',
           '快捷筛选不使用粗底边或阴影'
         )
+        await assertMobileFilterEdgePositions({
+          page,
+          assert,
+          trigger: filterTrigger,
+          dialog: page.getByRole('dialog', { name: '筛选任务', exact: true }),
+        })
       }
       await page.setViewportSize({ width: 390, height: 844 })
 
