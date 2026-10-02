@@ -1136,7 +1136,42 @@ async function assertVisibleDateFilterGeometry(page, scenarioName) {
   )
 }
 
+async function assertMobileEditableInputSize(page, scenarioName) {
+  const metrics = await page.evaluate(() =>
+    [...document.querySelectorAll('input, textarea, select')]
+      .filter((element) => {
+        const rect = element.getBoundingClientRect()
+        const style = getComputedStyle(element)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.visibility === 'visible' &&
+          !element.disabled &&
+          !element.readOnly &&
+          !element.matches(
+            'input[type="hidden"], input[type="radio"], input[type="checkbox"], input[type="file"], input[type="range"], input[type="button"], input[type="submit"]'
+          )
+        )
+      })
+      .map((element) => ({
+        tag: element.tagName,
+        id: element.id,
+        placeholder: element.getAttribute('placeholder'),
+        fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+        focused: document.activeElement === element,
+      }))
+  )
+  const undersized = metrics.filter((metric) => metric.fontSize < 16)
+  assert.deepEqual(
+    undersized,
+    [],
+    `${scenarioName} 手机可编辑输入框字号须至少 16px，避免 iPhone 聚焦时自动缩放: ${JSON.stringify(undersized)}`
+  )
+  return metrics
+}
+
 export {
+  assertMobileEditableInputSize,
   assertVisibleDateFilterGeometry,
   assertVisibleAffixInputIsolation,
   assertVisibleInputControlRadius,

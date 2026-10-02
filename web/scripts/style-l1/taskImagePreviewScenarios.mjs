@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { buildWorkflowTaskBoardMock } from '../../src/mocks/workflowTaskBoardMock.mjs'
+import { createMobileTouchSession } from './mobileGestureAssertions.mjs'
 
 const productName = '图片预览模拟长耳兔抱枕（可拆卸围巾礼盒款）'
 const previewButtonName = `查看${productName}大图`
@@ -161,17 +162,7 @@ async function assertPreview(
   ).length
   await button.focus()
   if (touch) {
-    const box = await button.boundingBox()
-    await page.__previewTouchSession.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [
-        { id: 1, x: box.x + box.width / 2, y: box.y + box.height / 2 },
-      ],
-    })
-    await page.__previewTouchSession.send('Input.dispatchTouchEvent', {
-      type: 'touchEnd',
-      touchPoints: [],
-    })
+    await button.tap()
   } else await button.press('Enter')
   await waitImage(page)
   assert.equal(await details.count(), detailCount, '点图不改变任务详情')
@@ -449,12 +440,7 @@ export function createTaskImagePreviewScenarios({
       themeMode: 'dark',
       beforeNavigate: async (page) => {
         await installPreviewImage(page)
-        const cdp = await page.context().newCDPSession(page)
-        await cdp.send('Emulation.setTouchEmulationEnabled', {
-          enabled: true,
-          maxTouchPoints: 2,
-        })
-        page.__previewTouchSession = cdp
+        page.__previewTouchSession = await createMobileTouchSession(page)
       },
       verify: async (page) => {
         const button = page

@@ -60,6 +60,11 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       payload: {},
     })),
     verify: async (page) => {
+      assert.equal(
+        page.context().browser().browserType().name(),
+        'chromium',
+        '此场景验证原生触摸滚动，仅支持 Chromium；WebKit 事件模拟不能证明原生滚动行为'
+      )
       const scroll = page.getByTestId('mobile-role-scroll')
       const indicator = page.getByTestId('mobile-task-pull-refresh')
       const rows = page.locator('.erp-mobile-list-item')
@@ -92,6 +97,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         enabled: true,
         maxTouchPoints: 2,
       })
+      page.__styleL1TouchBackend = 'chromium-native-cdp'
       await rows.first().waitFor({ state: 'visible' })
       const requests = []
       let nextResponse = 'normal'

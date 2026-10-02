@@ -119,7 +119,12 @@
   gap: 12px;
 }
 .erp-appearance-settings--mobile fieldset {
+  display: block;
   margin: 0;
+}
+.erp-appearance-settings--mobile legend {
+  width: 100%;
+  max-width: 100%;
 }
 .erp-appearance-settings--mobile .erp-appearance-swatches {
   grid-template-columns: repeat(6, minmax(0, 1fr));

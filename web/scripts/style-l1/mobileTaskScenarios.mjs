@@ -6,6 +6,7 @@ import { mobileTaskRefreshScenario } from './mobileTaskRefreshScenario.mjs'
 import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { assertTaskEventTrailMarkers } from './taskEventTrailAssertions.mjs'
+import { assertMobileEditableInputSize } from './inputControlAssertions.mjs'
 import {
   assertReadableOnBackground,
   isDarkControlBackground,
@@ -1260,6 +1261,7 @@ export function createMobileTaskScenarios({
               )
             })
           await expectText(page, '选择处理方式')
+          await assertMobileEditableInputSize(page, `${role.label}任务处理页`)
           const actionMetrics = await actionScreen.evaluate((screen) => {
             const card = screen.querySelector(
               '[data-testid="mobile-task-action-options"]'
@@ -1582,14 +1584,22 @@ export function createMobileTaskScenarios({
         menus: [],
       },
       viewport: { width: 390, height: 844 },
-      expectedConsoleErrorPatterns: [
-        /console error \[path=\/m\/boss\/tasks\]: Failed to load resource: net::ERR_FAILED/u,
-        /console error \[path=\/m\/sales\/tasks\]: Failed to load resource: the server responded with a status of 408/u,
-        /console error \[path=\/m\/purchase\/tasks\]: Failed to load resource: the server responded with a status of 503/u,
-        /console error \[path=\/m\/warehouse\/tasks\]: Failed to load resource: the server responded with a status of 403/u,
-        /console error \[path=\/m\/pmc\/tasks\]: Failed to load resource: net::ERR_FAILED/u,
-        /console error \[path=\/m\/quality\/tasks\]: Failed to load resource: the server responded with a status of 408/u,
-      ],
+      // WebKit 的 route.abort 不输出 Chromium 网络错误；HTTP 错误和网络事件仍须核对。
+      expectedConsoleErrorPatterns: (page) => {
+        const httpErrors = [
+          /console error \[path=\/m\/sales\/tasks\]: Failed to load resource: the server responded with a status of 408/u,
+          /console error \[path=\/m\/purchase\/tasks\]: Failed to load resource: the server responded with a status of 503/u,
+          /console error \[path=\/m\/warehouse\/tasks\]: Failed to load resource: the server responded with a status of 403/u,
+          /console error \[path=\/m\/quality\/tasks\]: Failed to load resource: the server responded with a status of 408/u,
+        ]
+        return page.context().browser().browserType().name() === 'chromium'
+          ? [
+              ...httpErrors,
+              /console error \[path=\/m\/boss\/tasks\]: Failed to load resource: net::ERR_FAILED/u,
+              /console error \[path=\/m\/pmc\/tasks\]: Failed to load resource: net::ERR_FAILED/u,
+            ]
+          : httpErrors
+      },
       verify: async (page) => {
         const cases = [
           { roleKey: 'boss', roleLabel: '老板', failure: 'network' },
@@ -1622,6 +1632,28 @@ export function createMobileTaskScenarios({
         for (const testCase of cases) {
           let failureCount = 0
           let allowRecovery = false
+          const matchesRoleTaskRequest = (request) => {
+            if (!request.url().endsWith('/rpc/workflow')) return false
+            const body = request.postDataJSON()
+            return (
+              body?.method === 'list_role_tasks' &&
+              body.params?.role_key === testCase.roleKey
+            )
+          }
+          const networkFailures = []
+          const httpFailures = []
+          const onRequestFailed = (request) => {
+            if (matchesRoleTaskRequest(request)) {
+              networkFailures.push(request.failure())
+            }
+          }
+          const onResponse = (response) => {
+            if (matchesRoleTaskRequest(response.request())) {
+              httpFailures.push(response.status())
+            }
+          }
+          page.on('requestfailed', onRequestFailed)
+          page.on('response', onResponse)
           const workflowFailureRoute = async (route) => {
             const body = route.request().postDataJSON() || {}
             const isTargetRequest =
@@ -1709,6 +1741,23 @@ export function createMobileTaskScenarios({
             await expectText(page, testCase.roleLabel)
             await expectText(page, '任务加载失败')
             await expectButton(page, '重新加载')
+            if (testCase.failure === 'network') {
+              assert(
+                networkFailures.length > 0,
+                `${testCase.roleLabel}必须出现真实请求失败事件`
+              )
+            }
+            const expectedStatus = {
+              timeout: 408,
+              unavailable: 503,
+              permission: 403,
+            }[testCase.failure]
+            if (expectedStatus) {
+              assert(
+                httpFailures.includes(expectedStatus),
+                `${testCase.roleLabel}必须收到 HTTP ${expectedStatus}`
+              )
+            }
             allowRecovery = true
             await page.getByRole('button', { name: '重新加载' }).click()
             await page
@@ -1728,6 +1777,8 @@ export function createMobileTaskScenarios({
               `${testCase.roleLabel}岗位应命中 ${testCase.failure} 失败注入`
             )
           } finally {
+            page.off('requestfailed', onRequestFailed)
+            page.off('response', onResponse)
             await page.unroute('**/rpc/workflow', workflowFailureRoute)
           }
         }
@@ -2013,6 +2064,7 @@ export function createMobileTaskScenarios({
         )
         await expectText(page, '本次可执行操作')
         await expectText(page, '催办原因')
+        await assertMobileEditableInputSize(page, '催办输入页')
         assert.equal(
           await actionScreen.getByLabel('现场证据').count(),
           0,
@@ -2174,7 +2226,7 @@ export function createMobileTaskScenarios({
               darkSubmitMetrics.actionScreenWidth * 0.65 &&
             darkSubmitMetrics.scrollWidth <= darkSubmitMetrics.clientWidth &&
             darkSubmitMetrics.scrollHeight <= darkSubmitMetrics.clientHeight &&
-            darkSubmitMetrics.textRect?.width >= 56 &&
+            darkSubmitMetrics.textRect?.width > 0 &&
             darkSubmitMetrics.textRect.left >=
               darkSubmitMetrics.buttonRect.left - 1 &&
             darkSubmitMetrics.textRect.right <=

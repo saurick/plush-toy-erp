@@ -56,6 +56,8 @@ test('mobile recovery Style L1 fails only role-task reads and proves explicit re
   assert.match(scenario, /expectButton\(page, '重新加载'\)/u)
   assert.match(scenario, /state: 'hidden'/u)
   assert.match(scenario, /expectedConsoleErrorPatterns/u)
+  assert.match(scenario, /networkFailures\.length > 0/u)
+  assert.match(scenario, /httpFailures\.includes\(expectedStatus\)/u)
   assert.match(scenario, /path=\\\/m\\\/boss\\\/tasks/u)
   assert.match(scenario, /status of 408/u)
   assert.match(scenario, /status of 503/u)
