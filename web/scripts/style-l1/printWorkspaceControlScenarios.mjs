@@ -62,14 +62,15 @@ export function createPrintWorkspaceControlScenarios({
             )
           )
           const report = { key: template.key, fields: count, states: [] }
+          const zoomControl = page.locator(
+            '.erp-print-shell__zoom-control select'
+          )
+          // 非编辑控件承接真实焦点和失焦事件，避免自动滚回工具栏或恢复编辑焦点。
+          const blurEditor = () =>
+            zoomControl.evaluate((node) => node.focus({ preventScroll: true }))
           for (const scale of ['1', '0.75', '1.25', '1.5']) {
-            await page
-              .locator('.erp-print-shell__zoom-control select')
-              .selectOption(scale)
+            await zoomControl.selectOption(scale)
             await assertEditorInventory(`${scale} 缩放清空前`)
-            const blurTarget = page.locator(
-              '.erp-print-shell__toolbar-copy > strong'
-            )
             for (let index = 0; index < count; index += 1) {
               const editor = editors.nth(index)
               // 每个字段都实际清空，不能按 display / align 抽样漏掉收缩的日期等字段。
@@ -81,7 +82,7 @@ export function createPrintWorkspaceControlScenarios({
                 state: 'focused',
                 ...(await measureEmptyEditorHints(editor))[0],
               })
-              await blurTarget.click()
+              await blurEditor()
               report.states.push({
                 scale,
                 index,
@@ -97,7 +98,7 @@ export function createPrintWorkspaceControlScenarios({
                   `${template.key} 字段 ${index} 清空失焦后应能点击并重新填写`
                 )
                 await editor.fill('')
-                await blurTarget.click()
+                await blurEditor()
               }
             }
             await assertEditorInventory(`${scale} 缩放清空后`)

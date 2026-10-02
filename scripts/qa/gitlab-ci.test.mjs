@@ -334,9 +334,11 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   )?.[0];
   assert.ok(securityBlock);
   assert.match(
-    securityBlock,
-    /variables:\n(?:    #[^\n]*\n)+    GOMAXPROCS: "10"\n    GOGC: "25"/u,
+    workflow,
+    /^variables:\n[\s\S]+?\n  GOMAXPROCS: "4"\n  GOFLAGS: "-p=4"\n/mu,
   );
+  assert.match(securityBlock, /variables:\n(?:    #[^\n]*\n)+    GOGC: "25"/u);
+  assert.doesNotMatch(securityBlock, /GOMAXPROCS|GOFLAGS/u);
   assert.match(securityBlock, /ci-quality-shard[.]mjs --shard security/u);
   assert.doesNotMatch(
     securityBlock,
@@ -406,9 +408,13 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   assert.match(
     workflow,
     new RegExp(
-      `^[.]browser_cache_pull: &browser_cache_pull\\n  cache:\\n    - \\*pnpm_cache_entry\\n    - &playwright_cache_entry\\n      key:\\n        prefix: plush-ci-node-${nodeVersion}-playwright-v3\\n        files:\\n          - scripts/qa/ci-playwright-runtime[.]mjs\\n          - web/pnpm-lock[.]yaml\\n      paths:\\n        - output/cache/gitlab/playwright-runtime/\\n      policy: pull`,
+      `^[.]playwright_cache_pull: &playwright_cache_pull\\n  cache:\\n    - &playwright_cache_entry\\n      key:\\n        prefix: plush-ci-node-${nodeVersion}-playwright-v3\\n        files:\\n          - scripts/qa/ci-playwright-runtime[.]mjs\\n          - web/pnpm-lock[.]yaml\\n      paths:\\n        - output/cache/gitlab/playwright-runtime/\\n      policy: pull`,
       "mu",
     ),
+  );
+  assert.match(
+    workflow,
+    /^[.]browser_cache_pull: &browser_cache_pull\n  cache:\n    - \*pnpm_cache_entry\n    - \*playwright_cache_entry\n/mu,
   );
   assert.match(
     workflow,
@@ -437,7 +443,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   }
   assert.match(
     workflow,
-    /^quality_server_test_build:\n  <<: \[\*quality_shard, \*browser_cache_pull\]/mu,
+    /^quality_server_test_build:\n  <<: \[\*quality_shard, \*playwright_cache_pull\]/mu,
   );
   for (const { job } of Object.values(CI_BROWSER_QUALITY_LANES)) {
     assert.match(

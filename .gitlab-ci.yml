@@ -48,6 +48,9 @@ variables:
   PNPM_INSTALL_REGISTRY: "https://registry.npmmirror.com"
   GIT_STRATEGY: fetch
   GIT_DEPTH: "0"
+  # Shell jobs share the VM; bound both Go runtime and package compilation.
+  GOMAXPROCS: "4"
+  GOFLAGS: "-p=4"
 
 .pnpm_cache_pull: &pnpm_cache_pull
   cache:
@@ -60,9 +63,8 @@ variables:
         - output/cache/gitlab/pnpm-store/
       policy: pull
 
-.browser_cache_pull: &browser_cache_pull
+.playwright_cache_pull: &playwright_cache_pull
   cache:
-    - *pnpm_cache_entry
     - &playwright_cache_entry
       key:
         prefix: plush-ci-node-24.21.0-playwright-v3
@@ -72,6 +74,11 @@ variables:
       paths:
         - output/cache/gitlab/playwright-runtime/
       policy: pull
+
+.browser_cache_pull: &browser_cache_pull
+  cache:
+    - *pnpm_cache_entry
+    - *playwright_cache_entry
 
 .main_quality_rules: &main_quality_rules
   rules:
@@ -430,7 +437,7 @@ quality_server_upgrade:
       - output/ci/server-lanes/upgrade.json
 
 quality_server_test_build:
-  <<: [*quality_shard, *browser_cache_pull]
+  <<: [*quality_shard, *playwright_cache_pull]
   needs:
     - job: plan
       artifacts: true
@@ -596,9 +603,7 @@ quality_node:
 quality_security:
   <<: *quality_shard
   variables:
-    # Preserve symbol-level coverage while bounding this whole-program
-    # analysis job's transient heap and parallel GC work.
-    GOMAXPROCS: "10"
+    # Bound the whole-program analysis heap without changing symbol coverage.
     GOGC: "25"
   needs:
     - job: plan

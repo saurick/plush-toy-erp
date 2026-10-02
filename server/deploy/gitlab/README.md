@@ -33,7 +33,7 @@ Runner 的工作区、Go/pnpm 缓存和 Docker 层继续在 SSD。每台 Runner 
 
 Runner VM 的 vCPU、内存和系统盘不是仓库常量，而是 `runner-vm.sh` 创建/重建时彼此独立的必填参数；脚本不设置与工作负载脱节的固定内存下限。`runner-capacity.sh --evidence` 只读回在线 vCPU、MemTotal、swap、根文件系统和槽位配置，证明当前配置身份一致，不把开机快照冒充负载容量结论。Runner slot 的唯一显式参数名是 `RUNNER_CONCURRENT_SLOTS`，不能由 `nproc` 自动派生；注册、重建与后续 live 调整都复用 `runner-capacity.sh`，它只在 Runner 空闲、配置身份和旧值精确匹配时原子更新全局 `concurrent` 与唯一 project runner `limit`，失败恢复旧配置并读回。
 
-当前 canonical 质量 Pipeline 的全局稳定安全并发上限只在 `runner-capacity.env` 保存，DAG 只调度已经就绪的 Job，空槽不预留 CPU 或内存。`concurrent=limit` 把多 Pipeline 即使短暂重叠时的总资源使用也限制在同一个全局上限内；普通完整质量只接受 protected main 的自然 push，新的 commit 自动取消可中断的旧 Pipeline。Job 内 Node 并发仍为 1，PostgreSQL、Docker、Chromium、浏览器锁和 resource-sensitive lane 继续按既有资源边界串行或隔离。只有 VM 资源规格变化，或出现 OOM、swap、持续 iowait、资源残留或清理污染证据时，才重新评估安全上限；不得通过跳过测试保速。
+当前 canonical 质量 Pipeline 的全局稳定安全并发上限只在 `runner-capacity.env` 保存，DAG 只调度已经就绪的 Job，空槽不预留 CPU 或内存。`concurrent=limit` 把多 Pipeline 即使短暂重叠时的总资源使用也限制在同一个全局上限内；普通完整质量只接受 protected main 的自然 push，新的 commit 自动取消可中断的旧 Pipeline。Job 内 Node 并发仍为 1；`.gitlab-ci.yml` 统一设置 `GOMAXPROCS=4` 与 `GOFLAGS=-p=4`，限制每个 Go 进程的运行并发和包编译并发，避免每个并行 Job 都按 VM 全部 vCPU 展开。govulncheck 继续完整扫描符号调用路径，并保留 `GOGC=25` 的堆预算。语言并发参数不是宿主 CPU 硬配额，实际 CPU 峰值与整条关键路径仍须分别实测。PostgreSQL、Docker、Chromium、浏览器锁和 resource-sensitive lane 继续按既有资源边界串行或隔离。只有 VM 资源规格变化，或出现 OOM、swap、持续 iowait、资源残留或清理污染证据时，才重新评估安全上限；不得通过跳过测试保速。
 
 GitLab quality 中的 `server-upgrade` 与 `server-postgres` 各自把 PostgreSQL 官方 volume 根目录挂载为独立、上限 1 GiB 的 tmpfs，使临时表数据和 WAL 不再与 Git checkout、编译缓存及 Docker 写层争用 Runner 系统盘。容器启动后必须从 Docker inspect 读回精确 tmpfs 参数，并确认镜像 `PGDATA` 位于该挂载内；缺失、漂移或越界一律在测试前失败。tmpfs 上限不是预留内存，两座数据库仍保持独立容器和完整清理读回，不能以此放宽 Runner 的内存、swap、OOM 或 PSI 观察。
 
