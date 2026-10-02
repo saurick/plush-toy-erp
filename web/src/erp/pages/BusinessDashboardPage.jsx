@@ -26,6 +26,7 @@ import {
   progressDelivery,
   progressStages,
 } from '../utils/businessProgress.mjs'
+import useBusinessStatistics from '../components/business-visualizations/useBusinessStatistics.jsx'
 import BusinessProgressDrawer from '../components/business-visualizations/BusinessProgressDrawer.jsx'
 import BusinessProgressSummary, {
   ProgressBadges,
@@ -75,6 +76,7 @@ export default function BusinessDashboardPage() {
   const adminProfile = outlet?.adminProfile || null
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
+  const statisticsActive = params.get('view') === 'statistics'
   const queryKey = JSON.stringify(progressQueryFromURL(params))
   const query = useMemo(() => JSON.parse(queryKey), [queryKey])
   const [owner, setOwner] = useState(query.owner)
@@ -90,7 +92,7 @@ export default function BusinessDashboardPage() {
       ? state.data
       : null
   const view =
-    query.view ||
+    (statisticsActive ? 'statistics' : query.view) ||
     (data && !data.access.sales && data.access.production
       ? 'production'
       : 'orders')
@@ -119,7 +121,8 @@ export default function BusinessDashboardPage() {
   })
   const load = useCallback(async () => {
     const request = begin('business-progress')
-    if (!adminProfile?.id) {
+    if (statisticsActive || !adminProfile?.id) {
+      setLoading(false)
       request.finish()
       return false
     }
@@ -144,7 +147,7 @@ export default function BusinessDashboardPage() {
         request.finish()
       }
     }
-  }, [adminProfile, begin, query, queryKey])
+  }, [adminProfile, begin, query, queryKey, statisticsActive])
   useEffect(() => {
     load()
   }, [load])
@@ -153,7 +156,10 @@ export default function BusinessDashboardPage() {
       update({ page: Math.ceil(data.total / query.limit) })
     }
   }, [data, query.offset, query.limit, update])
-  useEffect(() => outlet?.registerPageRefresh?.(load), [load, outlet])
+  useEffect(() => {
+    if (!statisticsActive) return outlet?.registerPageRefresh?.(load)
+    return undefined
+  }, [load, outlet, statisticsActive])
   useEffect(() => {
     setOwner(query.owner)
   }, [query.owner])
@@ -191,6 +197,16 @@ export default function BusinessDashboardPage() {
     },
     [adminProfile, outlet?.allowedMenuPaths]
   )
+  const statistics = useBusinessStatistics({
+    active: statisticsActive,
+    adminProfile,
+    outlet,
+    params,
+    setParams,
+    onOpenOrder: openDetail,
+    canOpen,
+    navigate,
+  })
   const metrics = [
     {
       key: 'all',
@@ -253,7 +269,10 @@ export default function BusinessDashboardPage() {
     }
   }, [selectedKey, selectedID])
   return (
-    <section className="erp-progress-board" aria-label="进度看板">
+    <section
+      className={`erp-progress-board${statisticsActive ? ' erp-progress-board--statistics' : ''}`}
+      aria-label="进度看板"
+    >
       <div className="erp-progress-controls">
         <div className="erp-progress-toolbar">
           <SlidingSegmented
@@ -261,6 +280,11 @@ export default function BusinessDashboardPage() {
             value={view}
             onChange={(next) => update({ view: next, risk: 'all' })}
             options={[
+              {
+                label: '经营统计',
+                value: 'statistics',
+                disabled: !statistics.canUse,
+              },
               {
                 label: '订单交付',
                 value: 'orders',
@@ -273,167 +297,181 @@ export default function BusinessDashboardPage() {
               },
             ]}
           />
-          <SearchInput
-            className="erp-progress-search"
-            aria-label="搜索订单、客户或产品"
-            placeholder="搜单号、客户、产品"
-            value={progressSearch.value}
-            allowClear
-            maxLength={100}
-            onChange={progressSearch.onChange}
-            onCompositionStart={progressSearch.onCompositionStart}
-            onCompositionEnd={progressSearch.onCompositionEnd}
-            onPressEnter={progressSearch.onPressEnter}
-          />
-          <Select
-            aria-label="记录范围"
-            value={query.scope}
-            options={SCOPES}
-            onChange={(value) => update({ scope: value })}
-            className="erp-progress-scope"
-          />
-          <Popover
-            trigger="click"
-            open={moreOpen}
-            onOpenChange={setMoreOpen}
-            placement="bottom"
-            content={
-              <div className="erp-progress-filters">
-                <label htmlFor="progress-owner">处理人或业务负责人</label>
-                <SearchInput
-                  id="progress-owner"
-                  value={owner}
-                  placeholder="输入姓名"
-                  allowClear
-                  onChange={(event) => setOwner(event.target.value)}
-                  onPressEnter={(event) => {
-                    update({ owner: event.target.value.trim() })
-                    setMoreOpen(false)
-                  }}
-                  suffix={
-                    <Button
-                      type="text"
-                      size="small"
-                      onClick={() => {
-                        update({ owner: owner.trim() })
+          {statisticsActive ? (
+            statistics.toolbar
+          ) : (
+            <>
+              <SearchInput
+                className="erp-progress-search"
+                aria-label="搜索订单、客户或产品"
+                placeholder="搜单号、客户、产品"
+                value={progressSearch.value}
+                allowClear
+                maxLength={100}
+                onChange={progressSearch.onChange}
+                onCompositionStart={progressSearch.onCompositionStart}
+                onCompositionEnd={progressSearch.onCompositionEnd}
+                onPressEnter={progressSearch.onPressEnter}
+              />
+              <Select
+                aria-label="记录范围"
+                value={query.scope}
+                options={SCOPES}
+                onChange={(value) => update({ scope: value })}
+                className="erp-progress-scope"
+              />
+              <Popover
+                trigger="click"
+                open={moreOpen}
+                onOpenChange={setMoreOpen}
+                placement="bottom"
+                content={
+                  <div className="erp-progress-filters">
+                    <label htmlFor="progress-owner">处理人或业务负责人</label>
+                    <SearchInput
+                      id="progress-owner"
+                      value={owner}
+                      placeholder="输入姓名"
+                      allowClear
+                      onChange={(event) => setOwner(event.target.value)}
+                      onPressEnter={(event) => {
+                        update({ owner: event.target.value.trim() })
                         setMoreOpen(false)
                       }}
-                    >
-                      应用
-                    </Button>
-                  }
-                  maxLength={100}
+                      suffix={
+                        <Button
+                          type="text"
+                          size="small"
+                          onClick={() => {
+                            update({ owner: owner.trim() })
+                            setMoreOpen(false)
+                          }}
+                        >
+                          应用
+                        </Button>
+                      }
+                      maxLength={100}
+                    />
+                    <span>交期范围</span>
+                    <DateRangeFilter
+                      startValue={query.date_from}
+                      endValue={query.date_to}
+                      onStartChange={(value) => update({ from: value })}
+                      onEndChange={(value) => update({ to: value })}
+                    />
+                    {view === 'production' && (
+                      <Button
+                        onClick={() => {
+                          update({ risk: 'unlinked' })
+                          setMoreOpen(false)
+                        }}
+                      >
+                        查看未关联销售的生产单
+                      </Button>
+                    )}
+                  </div>
+                }
+              >
+                <Button icon={<FilterOutlined />} aria-label="筛选">
+                  筛选{extraFilters.length ? ` · ${extraFilters.length}` : ''}
+                </Button>
+              </Popover>
+              {canOpen('/erp/task-board') && (
+                <Button type="text" onClick={() => navigate('/erp/task-board')}>
+                  全部任务
+                </Button>
+              )}
+              <Popover
+                trigger="click"
+                title="进度如何计算"
+                content={
+                  <div className="erp-progress-help">
+                    <p>
+                      出货进度按已实际出货数量计算，取消的出货不计入。不同单位分开查看。
+                    </p>
+                    <p>
+                      领料按计划用量与已登记领料核对，不代表库存齐套。生产和质检展示批次状态，有效完工会扣除已登记返工量。
+                    </p>
+                    <p>
+                      顶部统计对应当前搜索及范围，风险分类可重叠；关联任务仅包含当前账号可见内容。
+                    </p>
+                  </div>
+                }
+              >
+                <Button
+                  type="text"
+                  icon={<InfoCircleOutlined />}
+                  aria-label="查看进度计算说明"
                 />
-                <span>交期范围</span>
-                <DateRangeFilter
-                  startValue={query.date_from}
-                  endValue={query.date_to}
-                  onStartChange={(value) => update({ from: value })}
-                  onEndChange={(value) => update({ to: value })}
-                />
-                {view === 'production' && (
-                  <Button
-                    onClick={() => {
-                      update({ risk: 'unlinked' })
-                      setMoreOpen(false)
-                    }}
-                  >
-                    查看未关联销售的生产单
-                  </Button>
-                )}
-              </div>
-            }
-          >
-            <Button icon={<FilterOutlined />} aria-label="筛选">
-              筛选{extraFilters.length ? ` · ${extraFilters.length}` : ''}
-            </Button>
-          </Popover>
-          {canOpen('/erp/task-board') && (
-            <Button type="text" onClick={() => navigate('/erp/task-board')}>
-              全部任务
-            </Button>
+              </Popover>
+            </>
           )}
-          <Popover
-            trigger="click"
-            title="进度如何计算"
-            content={
-              <div className="erp-progress-help">
-                <p>
-                  出货进度按已实际出货数量计算，取消的出货不计入。不同单位分开查看。
-                </p>
-                <p>
-                  领料按计划用量与已登记领料核对，不代表库存齐套。生产和质检展示批次状态，有效完工会扣除已登记返工量。
-                </p>
-                <p>
-                  顶部统计对应当前搜索及范围，风险分类可重叠；关联任务仅包含当前账号可见内容。
-                </p>
+        </div>
+        {statisticsActive ? (
+          statistics.controls
+        ) : (
+          <>
+            <div
+              className="erp-progress-metric-row"
+              role="group"
+              aria-label="按风险筛选进度"
+            >
+              {metrics.map((metric) => (
+                <FilterChip
+                  className="erp-progress-metric"
+                  key={metric.key}
+                  selected={query.risk === metric.key}
+                  count={count(loading ? undefined : metric.number)}
+                  disabled={
+                    loading ||
+                    !data ||
+                    (metric.key === 'blocked' && access?.tasks === false)
+                  }
+                  onClick={() => update({ risk: metric.key })}
+                >
+                  {metric.label}
+                </FilterChip>
+              ))}
+              <div className="erp-progress-freshness">
+                {data
+                  ? `更新于 ${dayjs(data.snapshot_at).format('HH:mm')}`
+                  : loading
+                    ? '正在查询…'
+                    : '等待查询'}
               </div>
-            }
-          >
-            <Button
-              type="text"
-              icon={<InfoCircleOutlined />}
-              aria-label="查看进度计算说明"
-            />
-          </Popover>
-        </div>
-        <div
-          className="erp-progress-metric-row"
-          role="group"
-          aria-label="按风险筛选进度"
-        >
-          {metrics.map((metric) => (
-            <FilterChip
-              className="erp-progress-metric"
-              key={metric.key}
-              selected={query.risk === metric.key}
-              count={count(loading ? undefined : metric.number)}
-              disabled={
-                loading ||
-                !data ||
-                (metric.key === 'blocked' && access?.tasks === false)
-              }
-              onClick={() => update({ risk: metric.key })}
-            >
-              {metric.label}
-            </FilterChip>
-          ))}
-          <div className="erp-progress-freshness">
-            {data
-              ? `更新于 ${dayjs(data.snapshot_at).format('HH:mm')}`
-              : loading
-                ? '正在查询…'
-                : '等待查询'}
-          </div>
-        </div>
-        {(extraFilters.length > 0 || hasFilters) && (
-          <div className="erp-progress-active-filters">
-            {query.keyword && <Tag>搜索：{query.keyword}</Tag>}
-            {extraFilters.map((item) => (
-              <Tag key={item}>{item}</Tag>
-            ))}
-            {query.risk === 'unlinked' && <Tag>含未关联销售的生产明细</Tag>}
-            <Button
-              type="link"
-              size="small"
-              onClick={() => {
-                setOwner('')
-                update({
-                  q: '',
-                  owner: '',
-                  from: '',
-                  to: '',
-                  risk: '',
-                  scope: '',
-                })
-              }}
-            >
-              清空筛选
-            </Button>
-          </div>
+            </div>
+            {(extraFilters.length > 0 || hasFilters) && (
+              <div className="erp-progress-active-filters">
+                {query.keyword && <Tag>搜索：{query.keyword}</Tag>}
+                {extraFilters.map((item) => (
+                  <Tag key={item}>{item}</Tag>
+                ))}
+                {query.risk === 'unlinked' && <Tag>含未关联销售的生产明细</Tag>}
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => {
+                    setOwner('')
+                    update({
+                      q: '',
+                      owner: '',
+                      from: '',
+                      to: '',
+                      risk: '',
+                      scope: '',
+                    })
+                  }}
+                >
+                  清空筛选
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
-      {error ? (
+      {statisticsActive ? (
+        statistics.content
+      ) : error ? (
         <Alert
           className="erp-progress-error"
           type="error"

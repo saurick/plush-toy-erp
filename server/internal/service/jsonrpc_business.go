@@ -26,6 +26,9 @@ func (d *jsonrpcDispatcher) handleBusiness(
 	case "list_progress", "get_progress":
 		return d.handleBusinessProgress(ctx, method, id, params)
 
+	case "get_delivery_statistics", "list_delivery_statistics_sources", "get_receivable_statistics", "list_receivable_statistics_sources":
+		return d.handleBusinessStatistics(ctx, method, id, params)
+
 	default:
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.UnknownMethod.Code,

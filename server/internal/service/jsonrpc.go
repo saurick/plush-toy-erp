@@ -39,6 +39,7 @@ func NewJsonrpcService(
 	customerConfigUC *biz.CustomerConfigUsecase,
 	adminReader biz.AdminAccountReader,
 	businessProgressUC *biz.BusinessProgressUsecase,
+	businessStatisticsUC *biz.BusinessStatisticsUsecase,
 ) *JsonrpcService {
 	service := &JsonrpcService{
 		dispatcher: newJSONRPCDispatcher(
@@ -63,6 +64,7 @@ func NewJsonrpcService(
 		log: log.NewHelper(log.With(logger, "module", "service.jsonrpc.transport")),
 	}
 	service.dispatcher.businessProgressUC = businessProgressUC
+	service.dispatcher.businessStatisticsUC = businessStatisticsUC
 	return service
 }
 

@@ -12,7 +12,7 @@ async function verifyProgressMotion(page, assert, reduced) {
   }
   const result = await root.evaluate(async (root) => {
     const group = root.querySelector('.ant-segmented-group')
-    const target = group.querySelectorAll('.ant-segmented-item')[1]
+    const target = [...group.querySelectorAll('.ant-segmented-item')].find((item) => item.textContent.includes('生产执行'))
     const before = root.getBoundingClientRect()
     const read = () => {
       const style = getComputedStyle(group, '::before')

@@ -253,7 +253,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "workbench-summary-list", "按来源权限查看汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary", "list_engineering_material_requests"), businessUsageConditions),
 	)
 	add(PermissionERPBusinessDashboardRead,
-		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "进度看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "list_progress", "get_progress"), businessUsageConditions),
+		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "进度看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "list_progress", "get_progress", "get_delivery_statistics", "list_delivery_statistics_sources", "get_receivable_statistics", "list_receivable_statistics_sources"), businessUsageConditions),
 	)
 	addMenu(PermissionERPPrintTemplateRead, "print-center", "print-templates", "打印模板", "print-template-list", "模板打印中心", permissionControlPage, "允许进入并查看", nil, businessUsageConditions)
 	addBackend(PermissionERPBusinessChainDebugRead, permissionMethods("debug", "capabilities", "config"), debugUsageConditions)

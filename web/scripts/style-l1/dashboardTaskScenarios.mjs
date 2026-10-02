@@ -1,3 +1,4 @@
+import { createBusinessStatisticsScenarios } from './businessStatisticsScenarios.mjs'
 import { createBusinessProgressScenarios } from './businessProgressScenarios.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
@@ -2188,6 +2189,7 @@ export function createDashboardTaskScenarios({
         })
       },
     },
+    ...createBusinessStatisticsScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession, outputDir }),
     ...createBusinessProgressScenarios({
       assert,
       assertNoHorizontalOverflow,

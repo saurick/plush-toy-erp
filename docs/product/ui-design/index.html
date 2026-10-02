@@ -2437,6 +2437,358 @@
     @media (max-width: 980px) { .dev-design-grid { grid-template-columns: 1fr; } }
     @media (max-width: 620px) { .dev-git-lock-flow__branches { grid-template-columns: 1fr; } }
     @media (prefers-reduced-motion: reduce) { .dev-design-tabs::before { transition: none; } .line-item--appended { animation-duration: 1ms; } }
+:root {
+  --erp-tab-motion-duration: 220ms;
+  --erp-tab-motion-easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+    .progress-navigation-tabs,.statistics-display-tabs {position:relative;isolation:isolate;}
+    .progress-navigation-tabs::before,.statistics-display-tabs::before {position:absolute;content:'';z-index:0;top:0;left:0;width:var(--erp-slider-width,0px);height:var(--erp-slider-height,0px);transform:translate(var(--erp-slider-x,0px),var(--erp-slider-y,0px));background:var(--brand-soft);border-radius:6px;box-shadow:inset 0 0 0 1px var(--line);pointer-events:none;}
+    .progress-navigation-tabs[data-sliding-ready=true]::before,.statistics-display-tabs[data-sliding-ready=true]::before {transition:transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),width var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);}
+    .segment.progress-navigation-tabs button,.segment.statistics-display-tabs button {position:relative;z-index:1;background:transparent;box-shadow:none;}
+    @media(prefers-reduced-motion:reduce){:root{--erp-tab-motion-duration:0ms;}}
+
+    .statistics-design {--erp-primary:var(--brand);--erp-primary-strong:var(--brand-strong);--erp-text:var(--text);--erp-text-muted:var(--text-2);--erp-text-subtle:var(--text-3);--erp-border:var(--line);--erp-border-strong:var(--line-strong);--erp-surface-bg:var(--surface);--erp-surface-bg-muted:var(--surface-muted);--erp-danger:var(--danger);font-size:13px;}
+    .statistics-spacer{flex:1;min-width:6px;}
+    .statistics-design .navigation-row{gap:8px;flex-wrap:wrap;}
+    .statistics-design select,.statistics-design input[type=date]{height:34px;border-radius:8px;padding:0 10px;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--line-strong);}
+    .statistics-design .search{flex:0 1 250px;}
+    .statistics-design .filter-chip{display:flex;align-items:baseline;gap:9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);padding:2px 12px;margin-right:6px;color:var(--text-2);}
+    .statistics-design .filter-chip[aria-pressed=true]{background:var(--brand-soft);border-color:var(--brand);color:var(--brand-strong);}
+    .statistics-design.statistics-report{display:flex;flex:1;min-height:0;flex-direction:column;padding:0;overflow:hidden;}
+    .statistics-table-wrap{overflow:auto;padding:0 12px 8px;}
+    .statistics-design-table{width:100%;border-collapse:collapse;font-size:13px;}
+    .statistics-design-table td,.statistics-design-table th{border:1px solid var(--line);padding:10px 12px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+    .statistics-design-table td:first-child,.statistics-design-table th:first-child{text-align:left;min-width:200px;}
+    .statistics-design-table th,.statistics-design-table tfoot{background:var(--surface-muted);font-weight:600;}
+    .statistics-design-table .text-btn{font-size:13px;}
+.erp-statistics-toolbar-spacer {
+  flex: 1;
+  min-width: 6px;
+}
+.erp-statistics-meta {
+  display: inline-grid;
+  flex: 0 0 auto;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Reserve the full timestamp width during loading and retries. */
+.erp-statistics-meta::before {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  content: '截至 0000-00-00 00:00';
+}
+.erp-statistics-meta > span {
+  grid-area: 1 / 1;
+}
+.erp-statistics-help {
+  max-width: 440px;
+  color: var(--erp-text-muted);
+  font-size: 13px;
+}
+.erp-statistics-help p {
+  margin: 0 0 8px;
+}
+.erp-statistics-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 9px 0;
+}
+.erp-statistics-filters > .ant-select {
+  min-width: 114px;
+}
+.erp-statistics-filters > .ant-input-affix-wrapper {
+  width: 250px;
+}
+.erp-statistics-metrics {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--erp-border);
+  gap: 0;
+}
+.erp-statistics-metrics > .erp-filter-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 2px 12px;
+  margin-right: 6px;
+}
+.erp-statistics-metrics strong {
+  color: var(--erp-text);
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.erp-statistics-metrics small {
+  font-size: 12px;
+}
+.erp-statistics-metrics > .erp-filter-chip:disabled {
+  cursor: default;
+}
+.erp-statistics-total-amount {
+  margin-left: auto;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-total-amount strong {
+  font-size: 14px;
+}
+.erp-statistics-results {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+.erp-statistics-result-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.erp-statistics-result-head > strong {
+  min-width: 0;
+  overflow: hidden;
+  max-width: 45%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.erp-statistics-result-head > strong::before {
+  display: inline-block;
+  width: 3px;
+  height: 15px;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: var(--erp-primary);
+  content: '';
+  vertical-align: -2px;
+}
+.erp-statistics-result-head small {
+  margin-left: 9px;
+  color: var(--erp-text-muted);
+  font-weight: 400;
+}
+.erp-statistics-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.erp-statistics-chart {
+  padding: 2px 14px 12px;
+}
+.erp-statistics-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px 15px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-legend > span:first-child {
+  margin-right: auto;
+}
+.erp-statistics-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 1px;
+}
+.erp-statistics-plot {
+  display: grid;
+  grid-template-columns: repeat(var(--statistics-columns), minmax(86px, 1fr));
+  padding: 12px 14px 0;
+  overflow-x: auto;
+}
+.erp-statistics-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+}
+.erp-statistics-bar-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: 120px;
+  border-bottom: 1px solid var(--erp-border);
+  background: repeating-linear-gradient(
+    to top,
+    transparent 0,
+    transparent 23px,
+    var(--erp-border) 24px
+  );
+}
+.erp-statistics-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  width: 54px;
+  max-width: 65%;
+}
+.erp-statistics-stack button {
+  flex-shrink: 0;
+  min-height: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+.erp-statistics-stack button:hover {
+  filter: brightness(0.9);
+}
+.erp-statistics-stack button:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+.erp-statistics-chart .ant-btn {
+  height: auto;
+  padding: 3px 0;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-chart-number {
+  font-variant-numeric: tabular-nums;
+}
+.erp-statistics-chart .erp-statistics-chart-name {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.erp-statistics-tone-done,
+.erp-statistics-tone-not_due {
+  background: var(--erp-primary);
+}
+.erp-statistics-tone-pending_not_late {
+  background: var(--erp-border-strong);
+}
+.erp-statistics-tone-overdue,
+.erp-statistics-tone-late_7 {
+  background: #c47575;
+}
+.erp-statistics-tone-late_30 {
+  background: #ad6060;
+}
+.erp-statistics-tone-late_60 {
+  background: #964e4e;
+}
+.erp-statistics-tone-late_more {
+  background: #773c3c;
+}
+.erp-statistics-tone-closed {
+  background: var(--erp-text-muted);
+}
+.erp-statistics-tone-unknown,
+.erp-statistics-tone-unknown_due {
+  background: var(--erp-text-subtle);
+}
+.erp-statistics-context {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--erp-border);
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-table {
+  padding: 0 12px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.erp-statistics-table .ant-table-cell {
+  white-space: nowrap;
+}
+.erp-statistics-table .ant-btn-link {
+  padding: 0;
+  height: auto;
+  font-size: 13px;
+}
+.erp-statistics-table .erp-statistics-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.erp-statistics-table .ant-table-summary {
+  background: var(--erp-surface-bg-muted);
+  font-weight: 600;
+}
+.erp-statistics-table .ant-table-summary .ant-table-cell {
+  font-size: 13px;
+}
+.erp-statistics-danger,
+.erp-statistics-metrics .erp-statistics-danger,
+.erp-statistics-table .erp-statistics-danger {
+  color: var(--erp-danger, #bd3838);
+}
+    .statistics-pagination {position:sticky;bottom:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;min-width:0;padding:12px;border:1px solid var(--erp-border);border-radius:10px;background:var(--erp-surface-bg);box-shadow:0 -4px 16px rgb(15 23 42 / 6%);}
+    .statistics-pagination .erp-task-pagination__summary {display:flex;flex-wrap:wrap;align-items:center;gap:12px;color:var(--erp-text-muted);font-size:13px;font-variant-numeric:tabular-nums;}
+    .statistics-pagination .erp-task-pagination__summary select {width:112px;height:36px;}
+    .statistics-pagination .statistics-pager {display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
+    .statistics-pagination .statistics-pager .btn {min-width:36px;height:36px;padding:0 10px;}
+    .statistics-pagination .statistics-pager .is-current {border-color:var(--erp-primary);color:var(--erp-primary);}
+    @media(max-width:767px){.statistics-pagination {padding:10px;}.statistics-pagination .erp-task-pagination__summary {flex:1 0 100%;justify-content:space-between;gap:8px;}.statistics-pagination .erp-task-pagination__summary select {height:44px;}.statistics-pagination .statistics-pager {flex:1;justify-content:space-between;}.statistics-pagination .statistics-pager .btn {height:44px;}}
+.erp-statistics-source-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-state {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  color: var(--erp-text-muted);
+}
+.erp-statistics-missing {
+  margin: 6px 12px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-body > .ant-alert,
+.erp-statistics-body > .ant-empty {
+  margin: 14px;
+}
+@media (width <= 900px) {
+  .erp-statistics-filters > .ant-input-affix-wrapper {
+    flex: 1;
+    min-width: 180px;
+  }
+  .erp-statistics-result-head > strong {
+    max-width: 100%;
+  }
+  .erp-statistics-metrics {
+    row-gap: 8px;
+  }
+  .erp-statistics-metrics > .erp-filter-chip {
+    padding: 0 10px;
+  }
+  .erp-statistics-metrics strong {
+    font-size: 20px;
+  }
+  .erp-statistics-total-amount {
+    width: 100%;
+    margin-top: 8px;
+  }
+}
+
   </style>
 </head>
 <body data-mode="light" data-density="standard">
@@ -4450,14 +4802,90 @@
       return `${operation}<section class="surface simple-workbench"><header class="workbench-queue-head"><div class="workbench-queue-tabs">${[['todo','待我处理'],['approval','待我审批'],['risk','阻塞 / 到期']].map(([key,label])=>`<button class="${state.dashboardQueue===key?'active':''}" data-action="dashboard-queue" data-value="${key}">${label}<b>${counts[key]}</b></button>`).join('')}</div></header><div class="workbench-task-table"><table><thead><tr><th>任务与来源</th><th>当前岗位</th><th>时限</th><th>状态</th></tr></thead><tbody>${rows.map(renderWorkbenchTaskRow).join('')}</tbody></table></div><footer class="summary-footnote"><span>任务只记录责任与协同；入库、出货、生产和财务事实仍回对应业务单据确认。</span><button class="btn" data-action="nav" data-page="tasks">查看全部任务</button></footer></section>`;
     }
 
+    const statisticsDemo=(()=>{
+const clients=[['晨星礼品',10,3,2,4],['海棠商贸',8,3,2,3],['远帆玩具',7,3,1,2],['麦芽文创',6,2,1,1],['星河礼品',5,2,0,1],['晴川商贸',4,2,0,1],['青鸟文创',3,1,0,0],['山间礼物',2,1,0,0],['时光百货',2,1,0,0],['鹿鸣玩具',1,0,0,0]];
+const products=['坐姿小熊','长耳兔','企鹅公仔','南瓜抱枕','围巾熊','小象公仔'];
+const orders=[];let serial=101;
+clients.forEach(([customer,total,done,overdue,soon],ci)=>{
+ for(let i=0;i<total;i++){
+  const status=i<done?'done':i<done+overdue?'overdue':'pending';
+  const near=status==='pending'&&i<done+overdue+soon;
+  const quantity=(3+(ci+i)%6)*500;
+  const shipped=status==='done'?quantity:(ci+i)%3===0?0:quantity/5*((ci+i)%3);
+  const due=status==='overdue'?'2026-10-01':near?'2026-10-'+String(3+(ci+i)%6).padStart(2,'0'):'2026-10-'+String(10+(ci*2+i)%20).padStart(2,'0');
+  const price=900+((ci+i)%7)*125;
+  orders.push({no:'SO-2609-'+String(serial++).padStart(4,'0'),customer,product:products[(ci+i)%products.length],variant:['棕色 / 25cm','米白 / 30cm','黑白 / 18cm','橙色 / 35cm','灰色 / 20cm','蓝色 / 22cm'][(ci+i)%6],status,due,near,quantity,shipped,unit:'只',amount:quantity*price,shippedAmount:shipped*price,owner:['陈敏','李静','周林','刘芳'][ci%4],attention:status==='done'?'已实际交齐':status==='overdue'?(ci%2?'尾批待包装':'面料未到齐'):near?'按交期跟进':'按计划执行'});
+ }
+});
+const financeCustomers=clients.map(([name],ci)=>({name,records:3+(ci%3),notDue:1800000+ci*110000,late7:[2800000,3600000,1200000,800000,600000,0,0,0,0,0][ci],late30:[1400000,0,1260000,0,0,0,0,0,0,0][ci],late60:ci===0?1200000:0,lateMore:0,owner:['陈敏','李静','李悦'][ci%3]}));
+financeCustomers.forEach(c=>{c.records=['notDue','late7','late30','late60','lateMore'].filter(k=>c[k]>0).length+2;});
+return {orders,financeCustomers};})();
+    const statisticsDesignState = { report:'delivery',group:'customer',period:'month',from:'2026-10-01',to:'2026-10-31',keyword:'',status:'all',display:'combined',selected:'',sourceStatus:'all',currency:'CNY',scroll:0,sort:'count',page:1,pageSize:8,sourcePage:1,sourcePageSize:8 };
+    const statisticsAges=[['not_due','未到期'],['late_7','逾期 1–7 天'],['late_30','逾期 8–30 天'],['late_60','逾期 31–60 天'],['late_more','逾期 60 天以上'],['undated','未定到期日']];
+    const statisticsLabels={all:'全部',done:'已交齐',pending:'待交付',overdue:'当前逾期',soon:'7 天内交付',pending_not_late:'待交付（未逾期）',...Object.fromEntries(statisticsAges)};
+    function renderProgressTabs() {
+      return `<div class="segment progress-navigation-tabs" role="tablist" aria-label="进度查看方式">${[['statistics','经营统计'],['orders','订单交付'],['production','生产执行']].map(([key,label])=>`<button role="tab" aria-selected="${state.progressView===key}" class="${state.progressView===key?'active':''}" data-action="progress-view" data-value="${key}">${label}</button>`).join('')}</div>`;
+    }
+    const statisticsFormat=(value,money=false)=>Number(value).toLocaleString('zh-CN',{minimumFractionDigits:money?2:0,maximumFractionDigits:2});
+    function statisticsDesignRecords() {
+      const s=statisticsDesignState;
+      let rows=s.report==='delivery'?statisticsDemo.orders.map(o=>({...o,amount:o.amount/100,shippedAmount:o.shippedAmount/100})):statisticsDemo.financeCustomers.flatMap((c,ci)=>statisticsAges.slice(0,5).filter(([key])=>c[{not_due:'notDue',late_7:'late7',late_30:'late30',late_60:'late60',late_more:'lateMore'}[key]]>0).map(([key],i)=>({no:`AR-2610-${String(ci*5+i+1).padStart(4,'0')}`,customer:c.name,amount:c[{not_due:'notDue',late_7:'late7',late_30:'late30',late_60:'late60',late_more:'lateMore'}[key]]/100,status:key,due:key==='not_due'?'2026-10-15':'2026-09-25',source:`SHP-2609-${String(ci*5+i+1).padStart(4,'0')}`})));
+      if(s.currency!=='CNY')return [];
+      return rows.filter(o=>(!s.keyword||(s.group==='product'?o.product:o.customer).includes(s.keyword))&&(s.report!=='delivery'||s.period==='all'||(!s.from||o.due>=s.from)&&(!s.to||o.due<=s.to)));
+    }
+    function statisticsMatches(o,key) { return key==='all'||key==='pending'&&['pending','overdue'].includes(o.status)||key==='pending_not_late'&&o.status==='pending'||key==='overdue'&&(o.status==='overdue'||o.status.startsWith('late_'))||key==='soon'&&o.near||o.status===key; }
+    function renderStatisticsPager(total) {
+      if(!total)return '';
+      const s=statisticsDesignState,source=!!s.selected,size=source?s.sourcePageSize:s.pageSize,page=source?s.sourcePage:s.page,pages=Math.max(1,Math.ceil(total/size)),label=source?(s.report==='receivables'?'应收来源':'来源订单'):'统计汇总',unit=source?(s.report==='receivables'?'笔':'单'):'项';
+      return `<nav class="statistics-design statistics-pagination erp-task-pagination" aria-label="${label}分页"><div class="erp-task-pagination__summary"><span role="status">第 ${(page-1)*size+1}–${Math.min(page*size,total)} ${unit}，共 ${total} ${unit}</span><select id="statistics-page-size" aria-label="每页${label}数">${[8,20,50].map(value=>`<option value="${value}" ${size===value?'selected':''}>${value} ${unit} / 页</option>`).join('')}</select></div><div class="statistics-pager"><button class="btn" data-action="statistics-page" data-value="${page-1}" aria-label="上一页" ${page===1?'disabled':''}>← 上一页</button>${pagerItems(pages,page).map(value=>value==='gap'?'<span aria-hidden="true">…</span>':`<button class="btn ${value===page?'is-current':''}" data-action="statistics-page" data-value="${value}" aria-label="第 ${value} 页" ${value===page?'aria-current="page"':''}>${value}</button>`).join('')}<button class="btn" data-action="statistics-page" data-value="${page+1}" aria-label="下一页" ${page===pages?'disabled':''}>下一页 →</button></div></nav>`;
+    }
+    function renderStatisticsPage() {
+      const s=statisticsDesignState,ages=s.report==='receivables',base=statisticsDesignRecords(),rows=base.filter(o=>statisticsMatches(o,s.status));
+      const map=new Map();for(const row of rows){const name=s.group==='product'?row.product:row.customer;if(!map.has(name))map.set(name,[]);map.get(name).push(row);}
+      const grouped=[...map].map(([name,records])=>({name,records,count:records.length,done:records.filter(o=>o.status==='done').length,pending:records.filter(o=>['pending','overdue'].includes(o.status)).length,overdue:records.filter(o=>statisticsMatches(o,'overdue')).length,soon:records.filter(o=>o.near).length,amount:records.reduce((n,o)=>n+o.amount,0),shipped_amount:records.reduce((n,o)=>n+(o.shippedAmount||0),0),...Object.fromEntries(statisticsAges.map(([key])=>[key,records.filter(o=>o.status===key).reduce((n,o)=>n+o.amount,0)]))})).sort((a,b)=>s.sort==='name'?a.name.localeCompare(b.name,'zh-CN'):b[s.sort]-a[s.sort]);
+      s.page=Math.max(1,Math.min(s.page,Math.ceil(grouped.length/s.pageSize)||1));
+      const pagedGroups=grouped.slice((s.page-1)*s.pageSize,s.page*s.pageSize);
+      const sum=(records)=>records.reduce((n,o)=>n+o.amount,0),metric=ages?[['all','未结应收',sum(base)],['overdue','逾期未结',sum(base.filter(o=>statisticsMatches(o,'overdue')))],['not_due','未到期',sum(base.filter(o=>o.status==='not_due'))],['undated','未定到期日',0]]:[['all','订单总数',base.length],['done','已交齐',base.filter(o=>o.status==='done').length],['pending','待交付',base.filter(o=>['pending','overdue'].includes(o.status)).length],['overdue','当前逾期',base.filter(o=>o.status==='overdue').length]];
+      const select=(id,value,options,label)=>`<select id="${id}" aria-label="${label||''}">${options.map(([key,text])=>`<option value="${key}" ${key===value?'selected':''}>${text}</option>`).join('')}</select>`;
+      const operation=`<section class="page-navigation statistics-design"><div class="navigation-row">${renderProgressTabs()}<span class="statistics-spacer"></span><span class="data-note">统计内容</span>${select('statistics-report',s.report,[['delivery','订单交付'],['receivables','应收账龄']],'统计内容')}<span class="erp-statistics-meta"><span>截至 2026-10-02 09:30</span></span><button class="btn icon" data-action="statistics-help" aria-label="统计口径">${icon('info')}</button></div><div class="navigation-row">${!ages?`<span class="data-note">订单交期</span>${select('statistics-period',s.period,[['month','本月'],['soon','未来 7 天'],['all','全部交期'],['custom','自定义']],'订单交期')}<input id="statistics-from" type="date" aria-label="交期开始日期" value="${s.period==='all'?'':s.from}"/><span class="data-note">至</span><input id="statistics-to" type="date" aria-label="交期结束日期" value="${s.period==='all'?'':s.to}"/>`:''}<label class="search">${icon('search')}<input id="statistics-search" value="${escapeHTML(s.keyword)}" placeholder="${s.group==='product'?'搜索产品':'搜索客户'}"/></label><span class="statistics-spacer"></span><span class="data-note">${ages?'当前已过账未结余额':'交付以实际出货为准'}</span>${select('statistics-currency',s.currency,[['CNY','币种 CNY'],['USD','币种 USD'],['HKD','币种 HKD']],'统计币种')}</div><div class="erp-statistics-metrics">${metric.map(([key,label,value])=>`<button class="filter-chip" data-action="statistics-filter" data-value="${key}" aria-pressed="${s.status===key}"><span>${label}</span><strong class="${key==='overdue'?'erp-statistics-danger':''}">${statisticsFormat(value,ages)}</strong>${ages?'':'<small>单</small>'}</button>`).join('')}<span class="statistics-spacer"></span>${!ages?`<span class="data-note">${s.group==='product'?'货品金额':'合同金额'} <b>${statisticsFormat(sum(rows),true)}</b> ${s.currency}</span>`:''}</div></section>`;
+      const title=s.selected?`${escapeHTML(s.selected)} · ${ages?'应收来源':'来源订单'}`:ages?'客户应收账龄':s.group==='product'?'产品交付汇总':'客户交付汇总';
+      const display=`<div class="segment statistics-display-tabs" role="tablist" aria-label="统计展示方式">${[['combined','图表与表格'],['table','表格'],['chart','图表']].map(([key,label])=>`<button role="tab" aria-selected="${s.display===key}" class="${s.display===key?'active':''}" data-action="statistics-display" data-value="${key}">${label}</button>`).join('')}</div>`;
+      const header=`<div class="erp-statistics-result-head">${s.selected?'<button class="btn" data-action="statistics-back" aria-label="返回汇总">← 返回汇总</button>':''}<strong>${title}</strong><span class="statistics-spacer"></span>${s.selected?select('statistics-source-status',s.sourceStatus,[['all','全部'],['overdue','当前逾期'],...(ages?statisticsAges:[['done','已交齐'],['pending','待交付'],['soon','7 天内交付']])],'来源状态'):`${!ages?select('statistics-group',s.group,[['customer','按客户'],['product','按产品']],'汇总维度'):''}${select('statistics-sort',s.sort,[['count','按单数 ↓'],['overdue','按逾期 ↓'],['amount','按金额 ↓'],['name','按名称 ↑']],'统计排序')}${display}`}</div>`;
+      if(state.previewState!=='data')return operation+`<section class="surface statistics-design">${header}${renderDataState({title:'经营统计'})}</section>`;
+      if(s.from&&s.to&&s.from>s.to&&s.period!=='all'&&!ages)return operation+`<section class="surface statistics-design">${header}<p class="erp-statistics-state">开始日期不能晚于结束日期，请调整交期范围。</p></section>`;
+      const cellLink=(g,key)=>`<button class="text-btn" data-action="statistics-drill" data-name="${escapeHTML(g.name)}" data-status="${key==='count'||key==='amount'?'all':key}">${statisticsFormat(g[key],ages&&key!=='count')}</button>`;
+      const columns=ages?[['count','未结笔数'],['amount',`未结金额 · ${s.currency}`],...statisticsAges]:[['count','订单数'],['done','已交齐'],['pending','待交付'],['overdue','当前逾期'],['soon','7 天内交付'],['amount',`${s.group==='product'?'货品':'订单'}金额 · ${s.currency}`],['shipped_amount',`已出货金额 · ${s.currency}`]];
+      const summaryTable=`<div class="statistics-table-wrap"><table class="statistics-design-table"><thead><tr><th>${s.group==='product'?'产品':'客户'}</th>${columns.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${pagedGroups.map(g=>`<tr><td><button class="text-btn" data-action="statistics-drill" data-name="${escapeHTML(g.name)}">${escapeHTML(g.name)}</button></td>${columns.map(([key])=>`<td class="${key==='overdue'?'erp-statistics-danger':''}">${['amount','shipped_amount'].includes(key)&&!ages?statisticsFormat(g[key],true):cellLink(g,key)}</td>`).join('')}</tr>`).join('')}</tbody><tfoot><tr><td>全部筛选合计</td>${columns.map(([key])=>`<td>${statisticsFormat(grouped.reduce((n,g)=>n+g[key],0),['amount','shipped_amount',...statisticsAges.map(([key])=>key)].includes(key))}</td>`).join('')}</tr></tfoot></table></div>`;
+      const selected=map.get(s.selected)||[],sources=selected.filter(o=>statisticsMatches(o,s.sourceStatus));
+      s.sourcePage=Math.max(1,Math.min(s.sourcePage,Math.ceil(sources.length/s.sourcePageSize)||1));
+      const pagedSources=sources.slice((s.sourcePage-1)*s.sourcePageSize,s.sourcePage*s.sourcePageSize);
+      const sourceTable=`<div class="statistics-table-wrap"><table class="statistics-design-table"><thead><tr>${(ages?['应收编号','客户','来源出货','到期日','账龄',`未结金额 · ${s.currency}`]:['销售单号','客户','产品','订单数量','已出货','交期','交付状态',`订单金额 · ${s.currency}`,'业务负责人']).map(label=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${pagedSources.map(o=>`<tr><td><button class="text-btn" data-action="statistics-source" data-number="${o.no}">${o.no}</button></td><td>${o.customer}</td>${ages?`<td>${o.source}</td><td>${o.due}</td><td>${statisticsLabels[o.status]}</td><td>${statisticsFormat(o.amount,true)}</td>`:`<td>${o.product}</td><td>${statisticsFormat(o.quantity)} ${o.unit}</td><td>${statisticsFormat(o.shipped)} ${o.unit}</td><td>${o.due}</td><td class="${o.status==='overdue'?'erp-statistics-danger':''}">${statisticsLabels[o.status]}</td><td>${statisticsFormat(o.amount,true)}</td><td>${o.owner}</td>`}</tr>`).join('')}</tbody></table></div>`;
+      const segments=ages?statisticsAges:[['done','已交齐'],['pending_not_late','待交付（未逾期）'],['overdue','逾期未交齐']],max=Math.max(1,...pagedGroups.map(g=>ages?g.amount:g.count));
+      const chart=`<div class="erp-statistics-chart"><div class="erp-statistics-legend"><span>${ages?'未结金额':'订单数 · 单'} · 当前页</span>${segments.map(([key,label])=>`<span><i class="erp-statistics-tone-${key}"></i>${label}</span>`).join('')}</div><div class="erp-statistics-plot" style="--statistics-columns:${Math.max(1,pagedGroups.length)}">${pagedGroups.map(g=>`<div class="erp-statistics-column"><span class="erp-statistics-chart-number">${statisticsFormat(ages?g.amount:g.count)}</span><div class="erp-statistics-bar-track"><div class="erp-statistics-stack" style="height:${(ages?g.amount:g.count)/max*100}%">${segments.map(([key,label])=>{const value=key==='pending_not_late'?g.pending-g.overdue:g[key];return value?`<button class="erp-statistics-tone-${key}" style="height:${value/(ages?g.amount:g.count)*100}%" title="${g.name} · ${label}" aria-label="${g.name} · ${label}" data-action="statistics-drill" data-name="${g.name}" data-status="${key}"></button>`:''}).join('')}</div></div><button class="text-btn erp-statistics-chart-name" data-action="statistics-drill" data-name="${g.name}">${g.name}</button></div>`).join('')}</div></div>`;
+      return operation+`<section class="surface statistics-design statistics-report">${header}<div class="erp-statistics-body" id="statistics-result-body">${!(s.selected?sources.length:grouped.length)?'<p class="erp-statistics-state">当前筛选暂无记录</p>':s.selected?sourceTable:`${s.display!=='table'?chart:''}<div class="erp-statistics-context"><span>当前范围：${ages?'当前未结应收':s.period==='all'?'全部交期':s.from+' 至 '+s.to} · ${statisticsLabels[s.status]} · 合计覆盖完整筛选</span><span>点击数字查看来源 · 虚构样例</span></div>${s.display!=='chart'?summaryTable:''}`}</div></section>${renderStatisticsPager(s.selected?sources.length:grouped.length)}`;
+    }
+    function bindStatisticsDesignInputs() {
+      const s=statisticsDesignState;
+      const fields={'statistics-report':'report','statistics-group':'group','statistics-period':'period','statistics-from':'from','statistics-to':'to','statistics-currency':'currency','statistics-sort':'sort','statistics-source-status':'sourceStatus'};
+      for(const [id,key] of Object.entries(fields)){const input=document.getElementById(id);if(input)input.addEventListener('change',()=>{s[key]=input.value;if(key==='report'){s.group='customer';s.status='all';s.sourceStatus='all';s.sort='count';}if(key==='period'){if(input.value==='month'){s.from='2026-10-01';s.to='2026-10-31';}if(input.value==='soon'){s.from='2026-10-02';s.to='2026-10-08';}}if(['from','to'].includes(key))s.period='custom';if(key==='sourceStatus')s.sourcePage=1;else{s.selected='';s.page=1;s.sourcePage=1;s.scroll=0;}renderView();});}
+      const search=document.getElementById('statistics-search');if(search)search.addEventListener('input',()=>{s.keyword=search.value;s.selected='';s.page=1;s.sourcePage=1;s.scroll=0;const start=search.selectionStart;renderView();const next=document.getElementById('statistics-search');next?.focus({preventScroll:true});next?.setSelectionRange(start,start);});
+      const pageSize=document.getElementById('statistics-page-size');if(pageSize)pageSize.addEventListener('change',()=>{if(s.selected){s.sourcePageSize=Number(pageSize.value);s.sourcePage=1;}else{s.pageSize=Number(pageSize.value);s.page=1;s.scroll=0;}renderView();});
+      const body=document.getElementById('statistics-result-body');if(body&&!s.selected){body.scrollTop=s.scroll;body.addEventListener('scroll',()=>{s.scroll=body.scrollTop;},{passive:true});}
+    }
+    function preserveProgressDesignTabs(view,saved) {
+      for(const [selector,old] of saved){const next=view.querySelector(selector);if(!next||!old)continue;for(const button of old.querySelectorAll('button')){const selected=selector==='.progress-navigation-tabs'?button.dataset.value===state.progressView:button.dataset.value===statisticsDesignState.display;button.classList.toggle('active',selected);button.setAttribute('aria-selected',String(selected));}next.replaceWith(old);}
+      for(const tabs of view.querySelectorAll('.progress-navigation-tabs,.statistics-display-tabs')){const selected=tabs.querySelector('.active');if(!selected)continue;tabs.style.setProperty('--erp-slider-x',`${selected.offsetLeft}px`);tabs.style.setProperty('--erp-slider-y',`${selected.offsetTop}px`);tabs.style.setProperty('--erp-slider-width',`${selected.offsetWidth}px`);tabs.style.setProperty('--erp-slider-height',`${selected.offsetHeight}px`);requestAnimationFrame(()=>{tabs.dataset.slidingReady='true';});}
+    }
+
     function renderProgressPage() {
+      if(state.progressView==='statistics')return renderStatisticsPage();
       const q = state.progressSearch.trim().toLowerCase();
       const viewRows = mobileProgressRows.filter(row => row.view === state.progressView);
       const rows = viewRows.filter(row => (state.progressRisk === 'all' || row.risk === state.progressRisk) && (!q || Object.values(row).join(' ').toLowerCase().includes(q)));
       const selected = rows.find(row => row.id === state.progressSelected) || rows[0];
       state.progressSelected = selected?.id || '';
       const queryRows = viewRows.filter(row => !q || Object.values(row).join(' ').toLowerCase().includes(q));
-      const operation = `<section class="page-navigation"><div class="navigation-row"><div class="segment">${[['orders','订单交付',mobileProgressRows.filter(row=>row.view==='orders').length],['production','生产执行',mobileProgressRows.filter(row=>row.view==='production').length]].map(([key,label,count])=>`<button class="${state.progressView===key?'active':''}" data-action="progress-view" data-value="${key}">${label}${count===null?'':`<b>${count}</b>`}</button>`).join('')}</div><label class="search">${icon('search')}<input id="progress-search" value="${escapeHTML(state.progressSearch)}" placeholder="搜索订单、客户、产品、负责人" /></label><div class="command-actions"><button class="btn" data-action="export">${icon('export')}导出</button></div></div><div class="navigation-row"><div class="segment">${[['all','全部',queryRows.length],['overdue','已逾期',queryRows.filter(row=>row.risk==='overdue').length],['due','7 天内到期',queryRows.filter(row=>row.risk==='due').length],['normal','正常',queryRows.filter(row=>row.risk==='normal').length]].map(([key,label,count])=>`<button class="${state.progressRisk===key?'active':''}" data-action="progress-risk" data-value="${key}">${label}${count===null?'':`<b>${count}</b>`}</button>`).join('')}</div><span class="data-note" style="margin-left:auto">进度只读汇总，业务动作回到对应单据或任务办理</span></div></section>`;
+      const operation = `<section class="page-navigation"><div class="navigation-row">${renderProgressTabs()}<label class="search">${icon('search')}<input id="progress-search" value="${escapeHTML(state.progressSearch)}" placeholder="搜索订单、客户、产品、负责人" /></label><div class="command-actions"><button class="btn" data-action="export">${icon('export')}导出</button></div></div><div class="navigation-row"><div class="segment">${[['all','全部',queryRows.length],['overdue','已逾期',queryRows.filter(row=>row.risk==='overdue').length],['due','7 天内到期',queryRows.filter(row=>row.risk==='due').length],['normal','正常',queryRows.filter(row=>row.risk==='normal').length]].map(([key,label,count])=>`<button class="${state.progressRisk===key?'active':''}" data-action="progress-risk" data-value="${key}">${label}${count===null?'':`<b>${count}</b>`}</button>`).join('')}</div><span class="data-note" style="margin-left:auto">进度只读汇总，业务动作回到对应单据或任务办理</span></div></section>`;
       if (state.previewState !== 'data') return `${operation}${renderDataState({title:'进度看板'})}`;
       return `${operation}<section class="progress-layout"><section class="surface progress-list">${rows.length ? rows.map((row,index)=>`<article class="progress-row interactive-image-row${selected?.id===row.id?' is-selected':''}"><button type="button" class="interactive-image-row__open" aria-pressed="${selected?.id===row.id}" data-action="progress-select" data-id="${row.id}" aria-label="查看 ${row.no} 进度摘要"></button><div class="interactive-image-row__content"><div class="progress-row-head"><strong class="entity-link">${row.no}</strong><span class="badge ${row.badge}">${row.status}</span></div><div class="progress-row-copy product-cell">${renderProductThumb(index,row.product)}<span><strong>${escapeHTML(row.product)}</strong><span>${escapeHTML(row.customer)}</span><span>${row.due} 交付</span></span></div><div class="progress-bar"><i style="width:${row.percent}%"></i></div><div class="progress-row-foot"><strong>${row.stage}</strong><span>${row.quantity}</span><span class="progress-row-arrow">${icon('chevron')}</span></div></div></article>`).join('') : '<div class="empty"><div><strong>当前筛选没有进度记录</strong><span>调整搜索或风险条件后重试</span></div></div>'}</section><aside class="surface progress-summary">${selected?`<h2>${selected.no}</h2><div class="product-cell">${renderProductThumb(Math.max(0,rows.indexOf(selected)),selected.product)}<span><strong>${escapeHTML(selected.product)}</strong><span class="data-note">${escapeHTML(selected.customer)}</span></span></div><div style="margin-top:12px;display:flex;align-items:center;gap:8px"><span class="badge ${selected.badge}">${selected.status}</span><strong>${selected.percent}%</strong><span class="data-note">${selected.due} 交付</span></div><div class="stage-list" style="margin-top:16px">${selected.stages.map(([label,value])=>`<div class="stage-row"><span>${label}</span><div class="progress-bar"><i style="width:${value}%"></i></div><strong>${value}%</strong></div>`).join('')}</div><section class="detail-section" style="margin-top:16px"><h3>当前关注</h3><p style="margin:0;line-height:1.6;color:var(--text-2)">${selected.task}</p></section><button class="btn primary" style="margin-top:12px;width:100%" data-action="progress-open-detail" data-id="${selected.id}">查看完整进度</button>`:'<div class="empty">当前没有可查看的阶段摘要</div>'}</aside></section>`;
     }
@@ -7397,6 +7825,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderView() {
       roleHelpPreview.unmount();
       const view = document.querySelector('#view');
+      const progressTabs=state.page==='progress'?['.progress-navigation-tabs','.statistics-display-tabs'].map(selector=>[selector,view.querySelector(selector)]):[];
       if (state.page === 'dev-workbench') { renderDevWorkbench(view); return; }
       if (moduleHubs[state.page]) view.innerHTML = renderModuleHub(state.page);
       else if (state.page === 'audit') view.innerHTML = renderAuditLog();
@@ -7422,6 +7851,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       else view.innerHTML = renderDataState({title:titleForPage()});
       view.querySelectorAll('[data-permission-mixed]').forEach(input=>{input.indeterminate=input.dataset.permissionMixed==='true';});
+      if(state.page==='progress'){preserveProgressDesignTabs(view,progressTabs);bindStatisticsDesignInputs();}
       restoreFormValues();
       updateFormSectionNavigation();
       updateLineComputedValues();
@@ -8486,6 +8916,13 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'status') { state.status = target.dataset.value; state.pageNo = 1; state.selected.clear(); renderView(); }
       else if (action === 'board-status') { state.boardStatus = target.dataset.value; renderView(); }
       else if (action === 'progress-view') { state.progressView = target.dataset.value; state.progressRisk='all'; state.progressSelected=''; renderView(); }
+      else if (action === 'statistics-filter') { statisticsDesignState.status=target.dataset.value; statisticsDesignState.selected=''; statisticsDesignState.page=1; statisticsDesignState.sourcePage=1; statisticsDesignState.scroll=0; renderView(); }
+      else if (action === 'statistics-display') { statisticsDesignState.display=target.dataset.value;renderView(); }
+      else if (action === 'statistics-drill') { statisticsDesignState.selected=target.dataset.name;statisticsDesignState.sourceStatus=target.dataset.status||'all';statisticsDesignState.sourcePage=1;statisticsDesignState.sourcePageSize=statisticsDesignState.pageSize;renderView(); }
+      else if (action === 'statistics-page') { const s=statisticsDesignState;if(s.selected)s.sourcePage=Number(target.dataset.value);else{s.page=Number(target.dataset.value);s.scroll=0;}renderView(); }
+      else if (action === 'statistics-back') { statisticsDesignState.selected='';renderView(); }
+      else if (action === 'statistics-help') { state.infoModal={title:'统计口径',html:'<p>交付按有效订单明细与实际出货计算；关闭、未定交期和资料缺失单列。客户金额取冻结订单总额，产品金额取明细货品金额；缺失快照显示 —。应收按已过账未结余额及到期日分组，核销和红冲按原记录与冲正计算，币种分开查看。产品订单合计去重，图表与表格使用同一筛选，完整汇总由服务端计算。</p>'};state.overlay='info';renderFloating(); }
+      else if (action === 'statistics-source') { const record=statisticsDemo.orders.find(o=>o.no===target.dataset.number);state.infoModal={title:target.dataset.number+' · 来源明细',html:record?`<dl class="detail-grid"><dt>客户</dt><dd>${record.customer}</dd><dt>产品</dt><dd>${record.product}</dd><dt>实际出货</dt><dd>${record.shipped} / ${record.quantity} ${record.unit}</dd><dt>交期</dt><dd>${record.due}</dd></dl>`:'<p>当前应收记录来源于已实际出货单据；这是隔离交互样例。</p>'};state.overlay='info';renderFloating(); }
       else if (action === 'progress-risk') { state.progressRisk = target.dataset.value; renderView(); }
       else if (action === 'progress-select') { state.progressSelected = target.dataset.id; renderView(); }
       else if (action === 'progress-open-detail') {

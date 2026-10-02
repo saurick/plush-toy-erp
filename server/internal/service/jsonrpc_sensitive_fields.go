@@ -117,6 +117,13 @@ func sensitiveFieldBusinessURL(url string) bool {
 
 func sensitiveCommercialDomain(url, method string) string {
 	switch strings.TrimSpace(url) {
+	case "business":
+		switch method {
+		case "get_delivery_statistics", "list_delivery_statistics_sources":
+			return "sales"
+		case "get_receivable_statistics", "list_receivable_statistics_sources":
+			return "finance"
+		}
 	case "sales_order":
 		if strings.HasSuffix(method, "engineering_material_request") {
 			return "procurement"

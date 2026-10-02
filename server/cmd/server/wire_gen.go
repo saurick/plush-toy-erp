@@ -73,7 +73,9 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger, tr
 	businessAttachmentUsecase := biz.NewBusinessAttachmentUsecase(businessAttachmentRepo)
 	businessProgressRepo := data.NewBusinessProgressRepo(dataData)
 	businessProgressUsecase := biz.NewBusinessProgressUsecase(businessProgressRepo)
-	jsonrpcService := service.NewJsonrpcService(confData, logger, adminAuthUsecase, adminManageUsecase, workflowUsecase, processRuntimeUsecase, debugUsecase, masterDataUsecase, salesOrderUsecase, purchaseOrderUsecase, productionOrderUsecase, outsourcingOrderUsecase, inventoryUsecase, operationalFactUsecase, businessAttachmentUsecase, customerConfigUsecase, adminAuthRepo, businessProgressUsecase)
+	businessStatisticsRepo := data.NewBusinessStatisticsRepo(dataData)
+	businessStatisticsUsecase := biz.NewBusinessStatisticsUsecase(businessStatisticsRepo)
+	jsonrpcService := service.NewJsonrpcService(confData, logger, adminAuthUsecase, adminManageUsecase, workflowUsecase, processRuntimeUsecase, debugUsecase, masterDataUsecase, salesOrderUsecase, purchaseOrderUsecase, productionOrderUsecase, outsourcingOrderUsecase, inventoryUsecase, operationalFactUsecase, businessAttachmentUsecase, customerConfigUsecase, adminAuthRepo, businessProgressUsecase, businessStatisticsUsecase)
 	httpServer := server.NewHTTPServer(confServer, logger, jsonrpcService, tracerProvider, dataData, customerConfigUsecase, adminAuthUsecase, confData)
 	app := newApp(logger, httpServer, processRuntimeUsecase)
 	return app, func() {
