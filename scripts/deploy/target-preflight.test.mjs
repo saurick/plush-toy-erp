@@ -26,6 +26,18 @@ import { getDeploymentTarget } from "./deployment-targets.mjs";
 
 const SHA = "a".repeat(40);
 const BACKUP_HASH = "b".repeat(64);
+const LOCAL_IDENTITY = {
+  platform: "linux",
+  hostname: "r740xd",
+  username: "root",
+  addresses: ["192.168.0.133"],
+};
+const REMOTE_IDENTITY = {
+  platform: "darwin",
+  hostname: "developer-mac",
+  username: "developer",
+  addresses: ["192.168.0.20"],
+};
 const RETENTION_CANDIDATE_SHAS = Array.from({ length: 9 }, (_, index) =>
   (index + 1).toString(16).repeat(40),
 );
@@ -360,6 +372,7 @@ test("target preflight uses only fixed SSH destination and streamed script", () 
   let invocation;
   const report = runTargetPreflight("demo-133", {
     now: "2026-07-29T02:00:00.000Z",
+    localIdentity: REMOTE_IDENTITY,
     runCommand: (command, args, options) => {
       invocation = { command, args, options };
       return { status: 0, stdout: remoteReport(), stderr: "" };
@@ -389,7 +402,9 @@ test("target preflight uses only fixed SSH destination and streamed script", () 
 test("async target preflight keeps the dev server event loop non-blocking and bounded", async () => {
   let streamedInput = "";
   let killed = false;
-  const spawnCommand = () => {
+  let invocation;
+  const spawnCommand = (command, args) => {
+    invocation = { command, args };
     const child = new EventEmitter();
     child.stdout = new PassThrough();
     child.stderr = new PassThrough();
@@ -408,16 +423,20 @@ test("async target preflight keeps the dev server event loop non-blocking and bo
   };
   const report = await runTargetPreflightAsync("demo-133", {
     spawnCommand,
+    localIdentity: LOCAL_IDENTITY,
     now: "2026-08-08T03:00:00.000Z",
     timeoutMs: 100,
   });
   assert.equal(report.status, "passed");
+  assert.equal(invocation.command, "bash");
+  assert.deepEqual(invocation.args, ["-s"]);
   assert.equal(streamedInput, REMOTE_TARGET_PREFLIGHT_SCRIPT);
   assert.equal(killed, false);
 
   await assert.rejects(
     runTargetPreflightAsync("demo-133", {
       timeoutMs: 5,
+      localIdentity: REMOTE_IDENTITY,
       spawnCommand: () => {
         const child = new EventEmitter();
         child.stdout = new PassThrough();
@@ -444,16 +463,16 @@ test("target preflight CLI reports current disk blocker without mutation", () =>
     CAPACITY_STATUS: "blocked",
     BLOCKERS: "target_disk_capacity_low",
   });
-  writeFileSync(
-    fakeSSH,
-    `#!/bin/sh
+  const fakeTransportScript = `#!/bin/sh
 set -eu
 cat >/dev/null
 : > "$TARGET_PREFLIGHT_FAKE_SSH_MARKER"
 printf '%s' "$TARGET_PREFLIGHT_FAKE_SSH_REPORT"
-`,
-  );
-  chmodSync(fakeSSH, 0o755);
+`;
+  for (const command of [fakeSSH, path.join(fixtureRoot, "bash")]) {
+    writeFileSync(command, fakeTransportScript);
+    chmodSync(command, 0o755);
+  }
   try {
     const result = spawnSync(
       process.execPath,
@@ -530,7 +549,11 @@ test("Atlas version check consumes delayed output and preserves CLI failures", (
         timeout: 10_000,
       });
       assert.equal(result.status, 0, result.stderr);
-      assert.equal(result.stdout, expectedBlocker, `${version}, exit ${exitCode}`);
+      assert.equal(
+        result.stdout,
+        expectedBlocker,
+        `${version}, exit ${exitCode}`,
+      );
     }
   } finally {
     rmSync(fixtureRoot, { force: true, recursive: true });

@@ -201,6 +201,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/deploy/source-archive-release-check.test.mjs",
     "scripts/deploy/target-initialization-preflight.test.mjs",
     "scripts/deploy/target-preflight.test.mjs",
+    "scripts/deploy/target-readonly-execution.test.mjs",
     "scripts/deploy/target-release-cache.test.mjs",
     "scripts/deploy/target-release-fetch.test.mjs",
     "scripts/qa/capacity-customer-config.test.mjs",

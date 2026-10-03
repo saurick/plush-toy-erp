@@ -1,7 +1,7 @@
 import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
 
-import { getDeploymentTarget } from "./deployment-targets.mjs";
+import { resolveTargetReadOnlyExecution } from "./target-readonly-execution.mjs";
 
 export const TARGET_INITIALIZATION_PREFLIGHT_CONTRACT =
   "plush.target-initialization-preflight/v1";
@@ -179,10 +179,7 @@ function targetPorts(target) {
     target.publicEntry.hostPort,
     ...Object.entries(target.runtime.jaeger.ports)
       .filter(
-        ([key]) =>
-          !["agentThriftCompact", "agentThriftBinary"].includes(
-            key,
-          ),
+        ([key]) => !["agentThriftCompact", "agentThriftBinary"].includes(key),
       )
       .map(([, port]) => port),
   ];
@@ -322,22 +319,6 @@ export function parseRemoteTargetInitializationPreflight(raw, target) {
   return report;
 }
 
-function sshArgs(target) {
-  return [
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=8",
-    "-o",
-    "StrictHostKeyChecking=yes",
-    "-p",
-    String(target.ssh.port),
-    `${target.ssh.user}@${target.ssh.host}`,
-    "bash",
-    "-s",
-  ];
-}
-
 function publicReport(target, remote, generatedAt) {
   return {
     schemaVersion: TARGET_INITIALIZATION_PREFLIGHT_CONTRACT,
@@ -368,10 +349,14 @@ export function runTargetInitializationPreflight(
     runCommand = spawnSync,
     timeoutMs = 30_000,
     now = new Date().toISOString(),
+    localIdentity,
   } = {},
 ) {
-  const target = getDeploymentTarget(targetKey);
-  const result = runCommand("ssh", sshArgs(target), {
+  const execution = resolveTargetReadOnlyExecution(targetKey, {
+    localIdentity,
+  });
+  const { target } = execution;
+  const result = runCommand(execution.command, execution.args, {
     input: buildRemoteTargetInitializationPreflightScript(target),
     encoding: "utf8",
     timeout: timeoutMs,
@@ -380,7 +365,7 @@ export function runTargetInitializationPreflight(
   });
   if (result.error || result.status !== 0) {
     throw new Error(
-      `target initialization preflight SSH failed: ${result.error?.message || result.status}`,
+      `target initialization preflight ${execution.transport} failed: ${result.error?.message || result.status}`,
     );
   }
   return publicReport(
@@ -399,10 +384,14 @@ export async function runTargetInitializationPreflightAsync(
     spawnCommand = spawn,
     timeoutMs = 30_000,
     now = new Date().toISOString(),
+    localIdentity,
   } = {},
 ) {
-  const target = getDeploymentTarget(targetKey);
-  const child = spawnCommand("ssh", sshArgs(target), {
+  const execution = resolveTargetReadOnlyExecution(targetKey, {
+    localIdentity,
+  });
+  const { target } = execution;
+  const child = spawnCommand(execution.command, execution.args, {
     env: process.env,
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -436,7 +425,9 @@ export async function runTargetInitializationPreflightAsync(
     child.on("error", (error) =>
       finish(() =>
         reject(
-          new Error(`initialization preflight SSH failed: ${error.message}`),
+          new Error(
+            `initialization preflight ${execution.transport} failed: ${error.message}`,
+          ),
         ),
       ),
     );
@@ -444,7 +435,9 @@ export async function runTargetInitializationPreflightAsync(
       finish(() => {
         if (code !== 0) {
           reject(
-            new Error(`initialization preflight SSH failed: ${String(code)}`),
+            new Error(
+              `initialization preflight ${execution.transport} failed: ${String(code)}`,
+            ),
           );
           return;
         }

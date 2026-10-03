@@ -17,12 +17,15 @@
 
 `erp` 是未来生产环境，尚未登记为可执行 target；`yoyoosun.net` 临时 `302` 跳转到 `https://erp.yoyoosun.net` 也不改变这一点。`admin.yoyoosun.net` 退役后仍不能进入 target registry、环境变量映射、数据清理、preflight、健康检查、release、promotion、smoke 或 rollback。`customer-trial-133` 只是 `demo-133` 内部模拟数据合同，不是第三个部署 target。
 
+运行与初始化的只读预检共用 `target-readonly-execution.mjs`。只有 Linux 平台、短主机名、运行用户和本机 IPv4 地址同时匹配 target registry，才在登记宿主机直接执行同一份固定 stdin 脚本；其它入口使用 `BatchMode`、固定地址/端口和 `StrictHostKeyChecking` 的 SSH。SSH 失败不切换本地执行。此选择不改变部署、迁移、重建或恢复写操作的执行合同。
+
 ## 常用入口
 
 | 入口 | 职责 | 写入边界 |
 | --- | --- | --- |
 | `deployment-targets.mjs` | 读取两个固定 target 的脱敏投影 | 只读 |
 | `target-preflight.mjs` | 读回容量、Compose、端口、数据库、当前 SHA、锁、rollback point 与对应公网入口 | 只读，不创建备份或切换版本 |
+| `target-readonly-execution.mjs` | 按登记身份选择同机只读执行或严格 SSH；由运行与初始化预检共用 | 不执行部署、迁移、初始化或恢复写入 |
 | `production-preflight.sh` | 校验 runtime env、固定镜像、Compose、migration、健康与目标身份；验收档追加 SMS、PDF、Chromium | 默认只读；`--runtime` 仍只核对 |
 | `release-artifact-bundle.mjs` | 从 clean committed archive 构建一次 `linux/amd64` Server/Web 制品、SBOM 与 manifest | `--execute` 才构建本机制品 |
 | `release-artifact-verify.mjs` | 校验 manifest、SBOM、image tar 与内置 release identity | 默认只读；`--load` 会加载本地镜像 |

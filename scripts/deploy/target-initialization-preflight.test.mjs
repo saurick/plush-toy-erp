@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import test from "node:test";
 
 import { getDeploymentTarget } from "./deployment-targets.mjs";
@@ -7,6 +9,7 @@ import {
   buildRemoteTargetInitializationPreflightScript,
   parseRemoteTargetInitializationPreflight,
   runTargetInitializationPreflight,
+  runTargetInitializationPreflightAsync,
 } from "./target-initialization-preflight.mjs";
 
 function remoteReport(overrides = {}) {
@@ -51,7 +54,7 @@ test("initialization preflight source binds only the registered target and parse
   assert.match(script, /postgres:18.6/u);
   assert.match(
     script,
-    /jaegertracing\/jaeger:2\.21\.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3/u
+    /jaegertracing\/jaeger:2\.21\.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3/u,
   );
   assert.doesNotMatch(script, /admin\.yoyoosun\.net/u);
   assert.doesNotMatch(script, /__[A-Z0-9_]+__/u);
@@ -91,6 +94,12 @@ test("synchronous initialization preflight returns only the redacted public cont
   let invocation;
   const report = runTargetInitializationPreflight("demo-133", {
     now: "2026-08-31T00:00:00.000Z",
+    localIdentity: {
+      platform: "darwin",
+      hostname: "developer-mac",
+      username: "developer",
+      addresses: ["192.168.0.20"],
+    },
     runCommand(command, args, options) {
       invocation = { command, args, options };
       return { status: 0, stdout: serialize(remoteReport()), stderr: "" };
@@ -103,4 +112,34 @@ test("synchronous initialization preflight returns only the redacted public cont
   assert.equal(report.redaction.containsSecrets, false);
   assert.doesNotMatch(JSON.stringify(report), /192\.168\.0\.133/u);
   assert.match(invocation.options.input, /plush-toy-erp-demo-v1/u);
+});
+
+test("async initialization preflight uses the same registered local execution boundary", async () => {
+  let invocation;
+  const report = await runTargetInitializationPreflightAsync("demo-133", {
+    localIdentity: {
+      platform: "linux",
+      hostname: "r740xd",
+      username: "root",
+      addresses: ["192.168.0.133"],
+    },
+    spawnCommand(command, args) {
+      invocation = { command, args };
+      const child = new EventEmitter();
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+      child.stdin = new EventEmitter();
+      child.stdin.end = () =>
+        queueMicrotask(() => {
+          child.stdout.write(serialize(remoteReport()));
+          child.emit("close", 0);
+        });
+      child.kill = () => {};
+      return child;
+    },
+  });
+  assert.equal(invocation.command, "bash");
+  assert.deepEqual(invocation.args, ["-s"]);
+  assert.equal(report.status, "eligible");
+  assert.equal(report.redaction.containsCredentials, false);
 });

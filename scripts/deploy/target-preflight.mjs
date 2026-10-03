@@ -4,6 +4,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { getDeploymentTarget } from "./deployment-targets.mjs";
+import { resolveTargetReadOnlyExecution } from "./target-readonly-execution.mjs";
 
 export const TARGET_PREFLIGHT_CONTRACT = "plush.target-preflight/v1";
 export const REMOTE_TARGET_PREFLIGHT_CONTRACT =
@@ -1086,23 +1087,6 @@ export function parseRemoteTargetPreflight(
   return report;
 }
 
-function targetSshArgs(target) {
-  const sshDestination = `${target.ssh.user}@${target.ssh.host}`;
-  return [
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=8",
-    "-o",
-    "StrictHostKeyChecking=yes",
-    "-p",
-    String(target.ssh.port),
-    sshDestination,
-    "bash",
-    "-s",
-  ];
-}
-
 function publicTargetPreflight(target, remote, now) {
   return {
     schemaVersion: TARGET_PREFLIGHT_CONTRACT,
@@ -1141,11 +1125,14 @@ export function runTargetPreflight(
     runCommand = spawnSync,
     timeoutMs = 30_000,
     now = new Date().toISOString(),
+    localIdentity,
   } = {},
 ) {
-  const target = getDeploymentTarget(targetKey);
-  const args = targetSshArgs(target);
-  const result = runCommand("ssh", args, {
+  const execution = resolveTargetReadOnlyExecution(targetKey, {
+    localIdentity,
+  });
+  const { target } = execution;
+  const result = runCommand(execution.command, execution.args, {
     input: buildRemoteTargetPreflightScript(target),
     encoding: "utf8",
     timeout: timeoutMs,
@@ -1154,12 +1141,12 @@ export function runTargetPreflight(
   });
   if (result.error) {
     throw new Error(
-      `target preflight SSH could not start: ${result.error.message}`,
+      `target preflight ${execution.transport} could not start: ${result.error.message}`,
     );
   }
   if (result.status !== 0) {
     throw new Error(
-      `target preflight SSH failed with exit ${String(result.status)}`,
+      `target preflight ${execution.transport} failed with exit ${String(result.status)}`,
     );
   }
   const remote = parseRemoteTargetPreflight(
@@ -1175,10 +1162,14 @@ export async function runTargetPreflightAsync(
     spawnCommand = spawn,
     timeoutMs = 30_000,
     now = new Date().toISOString(),
+    localIdentity,
   } = {},
 ) {
-  const target = getDeploymentTarget(targetKey);
-  const child = spawnCommand("ssh", targetSshArgs(target), {
+  const execution = resolveTargetReadOnlyExecution(targetKey, {
+    localIdentity,
+  });
+  const { target } = execution;
+  const child = spawnCommand(execution.command, execution.args, {
     env: process.env,
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -1210,7 +1201,9 @@ export async function runTargetPreflightAsync(
     child.on("error", (error) => {
       finish(() =>
         reject(
-          new Error(`target preflight SSH could not start: ${error.message}`),
+          new Error(
+            `target preflight ${execution.transport} could not start: ${error.message}`,
+          ),
         ),
       );
     });
@@ -1218,7 +1211,9 @@ export async function runTargetPreflightAsync(
       finish(() => {
         if (code !== 0) {
           reject(
-            new Error(`target preflight SSH failed with exit ${String(code)}`),
+            new Error(
+              `target preflight ${execution.transport} failed with exit ${String(code)}`,
+            ),
           );
           return;
         }
@@ -1238,13 +1233,17 @@ export async function runTargetPreflightAsync(
     child.stdin.on("error", (error) => {
       finish(() =>
         reject(
-          new Error(`target preflight SSH input failed: ${error.message}`),
+          new Error(
+            `target preflight ${execution.transport} input failed: ${error.message}`,
+          ),
         ),
       );
     });
     timer = setTimeout(() => {
       child.kill("SIGTERM");
-      finish(() => reject(new Error("target preflight SSH timed out")));
+      finish(() =>
+        reject(new Error(`target preflight ${execution.transport} timed out`)),
+      );
     }, timeoutMs);
     child.stdin.end(buildRemoteTargetPreflightScript(target));
   });
