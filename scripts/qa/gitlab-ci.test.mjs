@@ -170,6 +170,14 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   }
   for (const lane of Object.keys(CI_RESOURCE_TEST_LANES)) {
     assert.match(workflow, new RegExp(`^quality_resource_${lane}:`, "mu"));
+    const job = yamlJobBlock(`quality_resource_${lane}`);
+    for (const dependency of ["quality_web", "quality_server"]) {
+      assert.match(
+        job,
+        new RegExp(`job: ${dependency}\\n      artifacts: false`, "u"),
+        "Bootstrap fixtures must run after the build and database jobs release resources",
+      );
+    }
     assert.match(
       workflow,
       new RegExp(`ci-resource-test-lane[.]mjs --lane ${lane}`, "u"),

@@ -322,6 +322,10 @@ quality_resource_contract_a:
       artifacts: true
     - job: prepare
       artifacts: false
+    - job: quality_web
+      artifacts: false
+    - job: quality_server
+      artifacts: false
   script:
     - node scripts/qa/ci-resource-test-lane.mjs --lane contract_a
   artifacts:
@@ -336,6 +340,10 @@ quality_resource_contract_b:
     - job: plan
       artifacts: true
     - job: prepare
+      artifacts: false
+    - job: quality_web
+      artifacts: false
+    - job: quality_server
       artifacts: false
   script:
     - node scripts/qa/ci-resource-test-lane.mjs --lane contract_b
@@ -352,6 +360,10 @@ quality_resource_runtime_a:
       artifacts: true
     - job: prepare
       artifacts: false
+    - job: quality_web
+      artifacts: false
+    - job: quality_server
+      artifacts: false
   script:
     - node scripts/qa/ci-resource-test-lane.mjs --lane runtime_a
   artifacts:
@@ -366,6 +378,10 @@ quality_resource_runtime_b:
     - job: plan
       artifacts: true
     - job: prepare
+      artifacts: false
+    - job: quality_web
+      artifacts: false
+    - job: quality_server
       artifacts: false
   script:
     - node scripts/qa/ci-resource-test-lane.mjs --lane runtime_b

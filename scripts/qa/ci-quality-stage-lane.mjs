@@ -618,8 +618,7 @@ async function assertBrowserPortAvailable(port) {
 }
 
 export function parseCiBrowserScenarioTimings(output, expectedScenarios) {
-  const timings = [];
-  const seen = new Set();
+  const timings = new Map();
   for (const match of String(output).matchAll(
     /^\[style:l1:scenario\] id=([a-z][a-z0-9-]{1,127}) status=passed durationMs=(\d+) attempts=(\d+)$/gmu,
   )) {
@@ -627,7 +626,7 @@ export function parseCiBrowserScenarioTimings(output, expectedScenarios) {
     const durationMs = Number(match[2]);
     const attempts = Number(match[3]);
     if (
-      seen.has(id) ||
+      timings.has(id) ||
       !Number.isSafeInteger(durationMs) ||
       durationMs < 0 ||
       !Number.isSafeInteger(attempts) ||
@@ -636,16 +635,17 @@ export function parseCiBrowserScenarioTimings(output, expectedScenarios) {
     ) {
       throw new Error("browser quality scenario timing is ambiguous");
     }
-    seen.add(id);
-    timings.push(Object.freeze({ id, status: "passed", durationMs, attempts }));
+    timings.set(id, Object.freeze({ id, status: "passed", durationMs, attempts }));
   }
   if (
-    JSON.stringify(timings.map(({ id }) => id)) !==
-    JSON.stringify(expectedScenarios)
+    new Set(expectedScenarios).size !== expectedScenarios.length ||
+    timings.size !== expectedScenarios.length ||
+    expectedScenarios.some((id) => !timings.has(id))
   ) {
     throw new Error("browser quality scenario inventory is incomplete");
   }
-  return Object.freeze(timings);
+  // Style L1 runs selected scenarios in catalog order; receipts use plan order.
+  return Object.freeze(expectedScenarios.map((id) => timings.get(id)));
 }
 
 function verifyConsumedWebBuild(root, env, plan) {

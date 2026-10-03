@@ -313,6 +313,27 @@ test("Browser scenario evidence is exact, bounded-retry and duplicate closed", (
       { id: "root-redirect-mobile", attempts: 1 },
     ],
   );
+  assert.deepEqual(
+    parseCiBrowserScenarioTimings(output.split("\n").reverse().join("\n"), [
+      "root-redirect-desktop",
+      "root-redirect-mobile",
+    ]),
+    [
+      { id: "root-redirect-desktop", status: "passed", durationMs: 12, attempts: 1 },
+      { id: "root-redirect-mobile", status: "passed", durationMs: 9, attempts: 1 },
+    ],
+  );
+  for (const expected of [
+    ["root-redirect-desktop"],
+    ["root-redirect-desktop", "root-redirect-mobile", "material-summary-task-light"],
+    ["root-redirect-desktop", "material-summary-task-light"],
+    ["root-redirect-desktop", "root-redirect-desktop"],
+  ]) {
+    assert.throws(
+      () => parseCiBrowserScenarioTimings(output, expected),
+      /inventory is incomplete/u,
+    );
+  }
   assert.throws(
     () =>
       parseCiBrowserScenarioTimings(
