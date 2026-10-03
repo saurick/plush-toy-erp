@@ -330,14 +330,14 @@ func TestJsonrpcDispatcher_AdminLoginIdentityFailuresUseSingleExternalContract(t
 	}
 }
 
-func TestJsonrpcDispatcher_AdminPasswordLoginFailuresUsePreciseExternalContract(t *testing.T) {
+func TestJsonrpcDispatcher_AdminPasswordLoginFailuresUseCredentialSafeExternalContract(t *testing.T) {
 	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard))}
 	tests := []struct {
 		err  error
 		want errcode.Definition
 	}{
-		{err: biz.ErrUserNotFound, want: errcode.AuthUserNotFound},
-		{err: biz.ErrInvalidPassword, want: errcode.AuthInvalidPassword},
+		{err: biz.ErrUserNotFound, want: errcode.AuthLoginRejected},
+		{err: biz.ErrInvalidPassword, want: errcode.AuthLoginRejected},
 		{err: biz.ErrUserDisabled, want: errcode.AuthUserDisabled},
 		{err: biz.ErrUserRevoked, want: errcode.AuthAccountRevoked},
 		{err: biz.ErrAuthVersionStale, want: errcode.AuthCredentialsChanged},
@@ -353,6 +353,27 @@ func TestJsonrpcDispatcher_AdminPasswordLoginFailuresUsePreciseExternalContract(
 	result := d.mapAdminPasswordLoginError(context.Background(), storageErr)
 	if result.Code != errcode.Internal.Code || result.Message != errcode.Internal.Message {
 		t.Fatalf("storage error must remain internal: %#v", result)
+	}
+}
+
+func TestAdminPasswordLoginAccountEnumerationAndLegitimateControl(t *testing.T) {
+	repo := newMemAdminAuthRepoForData()
+	if err := repo.putAdmin("security-control", "13800138000", "valid-password", false); err != nil {
+		t.Fatal(err)
+	}
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard)), adminAuthUC: newAdminAuthUsecaseForTest(repo)}
+	for _, username := range []string{"missing-account", "security-control"} {
+		_, result, err := d.handleAuth(context.Background(), "admin_login", "1", mustAuthStruct(t, map[string]any{"username": username, "password": "wrong-password"}))
+		if err != nil || result.Code != errcode.AuthLoginRejected.Code || result.Message != errcode.AuthLoginRejected.Message || result.Data != nil {
+			t.Fatalf("username=%s result=%#v err=%v", username, result, err)
+		}
+	}
+	if len(repo.sessions) != 0 {
+		t.Fatal("failed credentials issued a session")
+	}
+	_, result, err := d.handleAuth(context.Background(), "admin_login", "1", mustAuthStruct(t, map[string]any{"username": "security-control", "password": "valid-password"}))
+	if err != nil || result.Code != errcode.OK.Code || result.Data == nil || len(repo.sessions) != 1 {
+		t.Fatalf("legitimate login result=%#v err=%v", result, err)
 	}
 }
 

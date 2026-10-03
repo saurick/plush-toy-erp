@@ -56,7 +56,11 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		if !inventoryOperationAllowsOnly(pm, "id", "expected_version") {
 			return id, invalidParamResult(), nil
 		}
-		operationID := getInt(pm, "id", 0)
+		operationID, idOK := getRequiredJSONRPCPositiveInt(pm, "id")
+		expectedVersion, versionOK := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+		if !idOK || !versionOK {
+			return id, invalidParamResult(), nil
+		}
 		current, err := d.getInventoryOperationForScope(ctx, operationID, scope)
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
@@ -64,29 +68,45 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		if current.OperationType == biz.InventoryOperationManualAdjustment {
 			return id, inventoryAdjustmentProcessRequiredResult(), nil
 		}
-		item, err := d.inventoryUC.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operationID, ExpectedVersion: getInt(pm, "expected_version", 0), ActorID: actorID})
+		item, err := d.inventoryUC.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operationID, ExpectedVersion: expectedVersion, ActorID: actorID})
 		return id, inventoryOperationResult(ctx, d, item, err), nil
 	case "cancel_inventory_operation":
 		if !inventoryOperationAllowsOnly(pm, "id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
-		operationID := getInt(pm, "id", 0)
+		operationID, idOK := getRequiredJSONRPCPositiveInt(pm, "id")
+		expectedVersion, versionOK := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+		if !idOK || !versionOK {
+			return id, invalidParamResult(), nil
+		}
 		if _, err := d.getInventoryOperationForScope(ctx, operationID, scope); err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}
-		item, err := d.inventoryUC.CancelInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operationID, ExpectedVersion: getInt(pm, "expected_version", 0), ActorID: actorID, Reason: getString(pm, "reason")})
+		item, err := d.inventoryUC.CancelInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operationID, ExpectedVersion: expectedVersion, ActorID: actorID, Reason: getString(pm, "reason")})
 		return id, inventoryOperationResult(ctx, d, item, err), nil
 	case "get_inventory_operation":
 		if !inventoryOperationAllowsOnly(pm, "id") {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.getInventoryOperationForScope(ctx, getInt(pm, "id", 0), scope)
+		operationID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.getInventoryOperationForScope(ctx, operationID, scope)
 		return id, inventoryOperationResult(ctx, d, item, err), nil
 	case "list_inventory_operations":
 		if !inventoryOperationAllowsOnly(pm, "operation_type", "status", "created_by", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.inventoryUC.ListInventoryOperationsForAccess(ctx, biz.InventoryOperationFilter{OperationType: getString(pm, "operation_type"), Status: getString(pm, "status"), CreatedBy: getInt(pm, "created_by", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}, scope)
+		createdBy, ok := getOptionalJSONRPCNonNegativeInt(pm, "created_by")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		creatorID := 0
+		if createdBy != nil {
+			creatorID = *createdBy
+		}
+		items, total, err := d.inventoryUC.ListInventoryOperationsForAccess(ctx, biz.InventoryOperationFilter{OperationType: getString(pm, "operation_type"), Status: getString(pm, "status"), CreatedBy: creatorID, Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}, scope)
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}
@@ -187,10 +207,17 @@ func inventoryOperationCreateFromParams(pm map[string]any, actorID int) (*biz.In
 		counted, ok2 := getOptionalJSONRPCDecimalString(m, "counted_quantity")
 		adjustment, ok3 := getOptionalInventoryOperationDecimal(m, "adjustment_quantity")
 		note, ok4 := optionalJSONRPCString(m, "note")
-		if !ok1 || !ok2 || !ok3 || !ok4 {
+		subjectID, subjectOK := getRequiredJSONRPCPositiveInt(m, "subject_id")
+		fromWarehouseID, warehouseOK := getRequiredJSONRPCPositiveInt(m, "from_warehouse_id")
+		unitID, unitOK := getRequiredJSONRPCPositiveInt(m, "unit_id")
+		productSkuID, skuOK := getOptionalInventoryOperationPositiveInt(m, "product_sku_id")
+		fromLotID, fromLotOK := getOptionalInventoryOperationPositiveInt(m, "from_lot_id")
+		toWarehouseID, toWarehouseOK := getOptionalInventoryOperationPositiveInt(m, "to_warehouse_id")
+		toLotID, toLotOK := getOptionalInventoryOperationPositiveInt(m, "to_lot_id")
+		if !ok1 || !ok2 || !ok3 || !ok4 || !subjectOK || !warehouseOK || !unitOK || !skuOK || !fromLotOK || !toWarehouseOK || !toLotOK {
 			return nil, false
 		}
-		item := biz.InventoryOperationItemCreate{LineNo: getString(m, "line_no"), SubjectType: getString(m, "subject_type"), SubjectID: getInt(m, "subject_id", 0), ProductSkuID: optionalPositiveInt(m, "product_sku_id"), FromWarehouseID: getInt(m, "from_warehouse_id", 0), FromLotID: optionalPositiveInt(m, "from_lot_id"), ToWarehouseID: optionalPositiveInt(m, "to_warehouse_id"), ToLotID: optionalPositiveInt(m, "to_lot_id"), UnitID: getInt(m, "unit_id", 0), ExpectedQuantity: expected, CountedQuantity: counted, AdjustmentQuantity: adjustment, Note: note}
+		item := biz.InventoryOperationItemCreate{LineNo: getString(m, "line_no"), SubjectType: getString(m, "subject_type"), SubjectID: subjectID, ProductSkuID: productSkuID, FromWarehouseID: fromWarehouseID, FromLotID: fromLotID, ToWarehouseID: toWarehouseID, ToLotID: toLotID, UnitID: unitID, ExpectedQuantity: expected, CountedQuantity: counted, AdjustmentQuantity: adjustment, Note: note}
 		in.Items = append(in.Items, item)
 	}
 	return in, true
@@ -256,13 +283,6 @@ func optionalJSONRPCString(pm map[string]any, key string) (*string, bool) {
 		return nil, false
 	}
 	return &s, true
-}
-func optionalPositiveInt(pm map[string]any, key string) *int {
-	v := getInt(pm, key, 0)
-	if v <= 0 {
-		return nil
-	}
-	return &v
 }
 func getOptionalInventoryOperationDecimal(pm map[string]any, key string) (decimal.Decimal, bool) {
 	if _, ok := pm[key]; !ok {

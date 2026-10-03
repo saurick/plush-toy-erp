@@ -190,6 +190,9 @@ func (d *jsonrpcDispatcher) handleAuth(
 func (d *jsonrpcDispatcher) mapAdminPasswordLoginError(ctx context.Context, err error) *v1.JsonrpcResult {
 	logger := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrUserNotFound), errors.Is(err, biz.ErrInvalidPassword):
+		logger.Warn("[auth] admin password login rejected reason=invalid_credentials")
+		return &v1.JsonrpcResult{Code: errcode.AuthLoginRejected.Code, Message: errcode.AuthLoginRejected.Message}
 	case errors.Is(err, biz.ErrUserRevoked):
 		logger.Warn("[auth] admin password login rejected reason=account_revoked")
 		return &v1.JsonrpcResult{Code: errcode.AuthAccountRevoked.Code, Message: errcode.AuthAccountRevoked.Message}

@@ -348,6 +348,15 @@ func (r *purchaseReceiptActorCaptureRepo) CancelPostedPurchaseReceiptWithActor(c
 	return repo.CancelPostedPurchaseReceiptWithActor(ctx, receiptID, actorID)
 }
 
+func (r *purchaseReceiptActorCaptureRepo) PostPurchaseReceiptForAccess(ctx context.Context, receiptID int, scope biz.WarehouseDataScope) (*biz.PurchaseReceipt, error) {
+	return r.InventoryRepo.(biz.PurchaseReceiptAccessRepo).PostPurchaseReceiptForAccess(ctx, receiptID, scope)
+}
+
+func (r *purchaseReceiptActorCaptureRepo) CancelPostedPurchaseReceiptForAccess(ctx context.Context, receiptID, actorID int, scope biz.WarehouseDataScope) (*biz.PurchaseReceipt, error) {
+	r.actorID = actorID
+	return r.InventoryRepo.(biz.PurchaseReceiptAccessRepo).CancelPostedPurchaseReceiptForAccess(ctx, receiptID, actorID, scope)
+}
+
 type purchaseReceiptSourceCaptureRepo struct {
 	biz.InventoryRepo
 	createFromOrderCalls int

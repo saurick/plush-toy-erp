@@ -196,6 +196,7 @@ func purchaseReceiptCreateFromProcessCommandInput(in *ProcessDomainCommandInput)
 		ReceivedAt:      receivedAt,
 		Note:            processCommandOptionalStringPtrFromPayload(in.Payload, purchaseReceiptProcessCommandPayloadNote),
 		IdempotencyKey:  strings.TrimSpace(in.IdempotencyKey),
+		WarehouseScope:  in.WarehouseScope,
 	}, nil
 }
 

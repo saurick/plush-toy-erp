@@ -72,6 +72,7 @@ type PurchaseReceiptOrderLine struct {
 }
 
 type PurchaseReceiptFromPurchaseOrderCreate struct {
+	WarehouseScope         *WarehouseDataScope `json:"-"`
 	Lines                  []PurchaseReceiptOrderLine
 	AllRemaining           bool
 	ItemWarehouses         map[int]int
@@ -85,6 +86,7 @@ type PurchaseReceiptFromPurchaseOrderCreate struct {
 }
 
 type PurchaseReceiptItemCreate struct {
+	WarehouseScope         *WarehouseDataScope `json:"-"`
 	ReceiptID              int
 	MaterialID             int
 	WarehouseID            int
@@ -103,6 +105,7 @@ type PurchaseReceiptItemCreate struct {
 }
 
 type PurchaseReceiptFilter struct {
+	WarehouseScope      *WarehouseDataScope `json:"-"`
 	Status              string
 	Keyword             string
 	SupplierID          int

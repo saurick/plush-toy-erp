@@ -268,6 +268,7 @@ type ProcessDomainCommandExecution struct {
 	CommandKey            string
 	IdempotencyKey        string
 	Payload               map[string]any
+	WarehouseScope        *WarehouseDataScope `json:"-"`
 }
 
 type ProcessBusinessRef struct {
@@ -320,6 +321,7 @@ type ProcessDomainCommandInput struct {
 	CommandKey      string
 	IdempotencyKey  string
 	Payload         map[string]any
+	WarehouseScope  *WarehouseDataScope `json:"-"`
 }
 
 type ProcessDomainCommandResult struct {

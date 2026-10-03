@@ -288,6 +288,9 @@ func (d *jsonrpcDispatcher) requireCustomerConfigProcessDomainCommandAllowed(
 			return "", d.mapCustomerConfigError(ctx, biz.ErrForbidden)
 		}
 	}
+	if res := d.requirePurchaseReceiptProcessWarehouseAccess(ctx, in, instance, targetNode); res != nil {
+		return "", res
+	}
 	return instance.ConfigRevision, nil
 }
 

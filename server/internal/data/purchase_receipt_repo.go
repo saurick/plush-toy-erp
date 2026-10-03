@@ -443,6 +443,9 @@ func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.Purc
 	if err := lockPurchaseReceipt(ctx, tx, in.ReceiptID); err != nil {
 		return nil, err
 	}
+	if err := validatePurchaseReceiptWarehouseScope(ctx, tx.client, in.ReceiptID, in.WarehouseScope); err != nil {
+		return nil, err
+	}
 	if replayed, found, err := resolvePurchaseReceiptItemReplay(ctx, tx.client, in); err != nil {
 		return nil, err
 	} else if found {
@@ -509,7 +512,12 @@ func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.Purc
 
 func (r *inventoryRepo) PostPurchaseReceipt(ctx context.Context, receiptID int) (_ *biz.PurchaseReceipt, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
-	return r.postPurchaseReceipt(ctx, receiptID, nil, nil, 0)
+	return r.postPurchaseReceipt(ctx, receiptID, nil, nil, 0, nil)
+}
+
+func (r *inventoryRepo) PostPurchaseReceiptForAccess(ctx context.Context, receiptID int, scope biz.WarehouseDataScope) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
+	return r.postPurchaseReceipt(ctx, receiptID, nil, nil, 0, &scope)
 }
 
 func (r *inventoryRepo) PostPurchaseReceiptForProcessCommand(
@@ -523,7 +531,7 @@ func (r *inventoryRepo) PostPurchaseReceiptForProcessCommand(
 	if command == nil || result == nil {
 		return nil, biz.ErrBadParam
 	}
-	return r.postPurchaseReceipt(ctx, receiptID, command, result, actorID)
+	return r.postPurchaseReceipt(ctx, receiptID, command, result, actorID, command.WarehouseScope)
 }
 
 func (r *inventoryRepo) postPurchaseReceipt(
@@ -532,6 +540,7 @@ func (r *inventoryRepo) postPurchaseReceipt(
 	command *biz.ProcessDomainCommandInput,
 	result *biz.ProcessDomainCommandResult,
 	actorID int,
+	scope *biz.WarehouseDataScope,
 ) (*biz.PurchaseReceipt, error) {
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
@@ -540,6 +549,9 @@ func (r *inventoryRepo) postPurchaseReceipt(
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
 
 	if err := lockPurchaseReceipt(ctx, tx, receiptID); err != nil {
+		return nil, err
+	}
+	if err := validatePurchaseReceiptWarehouseScope(ctx, tx.client, receiptID, scope); err != nil {
 		return nil, err
 	}
 	receipt, err := tx.client.PurchaseReceipt.Get(ctx, receiptID)
@@ -717,7 +729,7 @@ func verifyPurchaseReceiptInboundEvidence(ctx context.Context, tx *inventoryDBTx
 
 func (r *inventoryRepo) CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (_ *biz.PurchaseReceipt, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
-	return r.cancelPostedPurchaseReceipt(ctx, receiptID, 0, nil)
+	return r.cancelPostedPurchaseReceipt(ctx, receiptID, 0, nil, false)
 }
 
 func (r *inventoryRepo) CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (_ *biz.PurchaseReceipt, resultErr error) {
@@ -725,7 +737,15 @@ func (r *inventoryRepo) CancelPostedPurchaseReceiptWithActor(ctx context.Context
 	if actorID <= 0 {
 		return nil, biz.ErrBadParam
 	}
-	return r.cancelPostedPurchaseReceipt(ctx, receiptID, actorID, nil)
+	return r.cancelPostedPurchaseReceipt(ctx, receiptID, actorID, nil, false)
+}
+
+func (r *inventoryRepo) CancelPostedPurchaseReceiptForAccess(ctx context.Context, receiptID, actorID int, scope biz.WarehouseDataScope) (_ *biz.PurchaseReceipt, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
+	if receiptID <= 0 || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	return r.cancelPostedPurchaseReceipt(ctx, receiptID, actorID, &scope, false)
 }
 
 func (r *inventoryRepo) CancelPurchaseReceiptDraft(ctx context.Context, receiptID, actorID int, scope biz.WarehouseDataScope) (_ *biz.PurchaseReceipt, resultErr error) {
@@ -733,10 +753,10 @@ func (r *inventoryRepo) CancelPurchaseReceiptDraft(ctx context.Context, receiptI
 	if receiptID <= 0 || actorID <= 0 {
 		return nil, biz.ErrBadParam
 	}
-	return r.cancelPostedPurchaseReceipt(ctx, receiptID, actorID, &scope)
+	return r.cancelPostedPurchaseReceipt(ctx, receiptID, actorID, &scope, true)
 }
 
-func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receiptID int, actorID int, draftScope *biz.WarehouseDataScope) (*biz.PurchaseReceipt, error) {
+func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receiptID int, actorID int, scope *biz.WarehouseDataScope, draftOnly bool) (*biz.PurchaseReceipt, error) {
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -754,19 +774,11 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 		return nil, err
 	}
 	// Check under the same receipt lock used by posting, including cancelled replays.
-	if draftScope != nil && (receipt.PostedAt != nil || (receipt.Status != biz.PurchaseReceiptStatusDraft && receipt.Status != biz.PurchaseReceiptStatusCancelled)) {
+	if draftOnly && (receipt.PostedAt != nil || (receipt.Status != biz.PurchaseReceiptStatusDraft && receipt.Status != biz.PurchaseReceiptStatusCancelled)) {
 		return nil, biz.ErrBadParam
 	}
-	if draftScope != nil {
-		items, err := tx.client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receipt.ID)).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, item := range items {
-			if err := biz.ValidateWarehouseDataScopeAccess(*draftScope, item.WarehouseID); err != nil {
-				return nil, err
-			}
-		}
+	if err := validatePurchaseReceiptWarehouseScope(ctx, tx.client, receiptID, scope); err != nil {
+		return nil, err
 	}
 	hasActiveRejectionDisposition, err := tx.client.PurchaseRejectionDisposition.Query().
 		Where(
@@ -1148,6 +1160,18 @@ func (r *inventoryRepo) GetPurchaseReceipt(ctx context.Context, id int) (_ *biz.
 func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.PurchaseReceiptFilter) (_ []*biz.PurchaseReceipt, _ int, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	query := r.data.postgres.PurchaseReceipt.Query()
+	if filter.WarehouseScope != nil {
+		scope := biz.NormalizeWarehouseDataScope(*filter.WarehouseScope)
+		switch scope.Mode {
+		case biz.DataScopeModeNone:
+			return []*biz.PurchaseReceipt{}, 0, nil
+		case biz.DataScopeModeAssigned:
+			query = query.Where(
+				purchasereceipt.HasItems(),
+				purchasereceipt.Not(purchasereceipt.HasItemsWith(purchasereceiptitem.WarehouseIDNotIn(scope.WarehouseIDs...))),
+			)
+		}
+	}
 	if filter.Status != "" {
 		query = query.Where(purchasereceipt.Status(filter.Status))
 	}
@@ -1220,6 +1244,11 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 			return nil, 0, err
 		}
 		item := entPurchaseReceiptToBiz(row, items)
+		if filter.WarehouseScope != nil {
+			if err := biz.ValidatePurchaseReceiptWarehouseAccess(*filter.WarehouseScope, item.Items); err != nil {
+				return nil, 0, err
+			}
+		}
 		if err := projectPurchaseReceiptPurchaseOrderReference(item, items); err != nil {
 			return nil, 0, err
 		}
@@ -1517,6 +1546,9 @@ func resolvePurchaseReceiptFromPurchaseOrderReplay(
 	if receipt.IdempotencyPayloadHash == nil || *receipt.IdempotencyPayloadHash != in.IdempotencyPayloadHash {
 		return nil, true, biz.ErrIdempotencyConflict
 	}
+	if err := validatePurchaseReceiptWarehouseScope(ctx, client, receipt.ID, in.WarehouseScope); err != nil {
+		return nil, true, err
+	}
 	order, err := client.PurchaseOrder.Get(ctx, in.PurchaseOrderID)
 	if ent.IsNotFound(err) {
 		return nil, true, biz.ErrIdempotencyConflict
@@ -1562,6 +1594,12 @@ func resolvePurchaseReceiptItemReplay(
 ) (*biz.PurchaseReceiptItem, bool, error) {
 	if client == nil || in == nil || in.ReceiptID <= 0 || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
 		return nil, false, biz.ErrBadParam
+	}
+	if in.WarehouseScope != nil && !biz.NormalizeWarehouseDataScope(*in.WarehouseScope).Allows(in.WarehouseID) {
+		return nil, false, biz.ErrDataScopeForbidden
+	}
+	if err := validatePurchaseReceiptWarehouseScope(ctx, client, in.ReceiptID, in.WarehouseScope); err != nil {
+		return nil, false, err
 	}
 	item, err := client.PurchaseReceiptItem.Query().Where(
 		purchasereceiptitem.ReceiptID(in.ReceiptID),
@@ -1656,6 +1694,9 @@ func (r *inventoryRepo) applyInventoryTxnAndUpdateBalanceInTx(ctx context.Contex
 		}, nil
 	}
 	if err != nil && !ent.IsNotFound(err) {
+		return nil, err
+	}
+	if err := lockInventoryTxnLot(ctx, tx, in.LotID); err != nil {
 		return nil, err
 	}
 	if err := validateInventoryTxnReferences(ctx, tx.client, in); err != nil {
@@ -2177,6 +2218,9 @@ func validatePurchaseReceiptLineWarehouses(ctx context.Context, client *ent.Clie
 		item := valid[line.PurchaseOrderItemID]
 		if item == nil || !remaining[item.ID].IsPositive() || !line.Quantity.IsPositive() {
 			return biz.ErrBadParam
+		}
+		if in.WarehouseScope != nil && !biz.NormalizeWarehouseDataScope(*in.WarehouseScope).Allows(line.WarehouseID) {
+			return biz.ErrDataScopeForbidden
 		}
 		if err := validateIncomingWarehouse(ctx, client, line.WarehouseID, biz.InventorySubjectMaterial, item.MaterialID); err != nil {
 			return err

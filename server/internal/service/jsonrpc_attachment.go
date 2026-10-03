@@ -60,7 +60,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 	case "list_attachments":
 		ownerType := biz.NormalizeBusinessAttachmentOwnerType(getString(pm, "owner_type"))
 		ownerID := getInt(pm, "owner_id", 0)
-		if res := d.requireBusinessAttachmentOwnerPermission(ctx, ownerType, false); res != nil {
+		if res := d.requireBusinessAttachmentOwnerAccess(ctx, ownerType, ownerID, false); res != nil {
 			return id, res, nil
 		}
 		if _, res := d.authorizeWorkflowAttachmentTaskAccess(ctx, ownerType, ownerID, 0, false); res != nil {
@@ -80,7 +80,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if ownerType == biz.BusinessAttachmentOwnerWorkflowTask && !expectedVersionOK {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireBusinessAttachmentOwnerPermission(ctx, ownerType, true); res != nil {
+		if res := d.requireBusinessAttachmentOwnerAccess(ctx, ownerType, ownerID, true); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), ownerType); res != nil {
@@ -161,7 +161,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
 		}
 		if item.WithdrawnAt != nil {
-			if res := d.requireBusinessAttachmentOwnerPermission(ctx, item.OwnerType, false); res != nil {
+			if res := d.requireBusinessAttachmentOwnerAccess(ctx, item.OwnerType, item.OwnerID, false); res != nil {
 				return id, res, nil
 			}
 			if _, res := d.authorizeWorkflowAttachmentTaskAccess(ctx, item.OwnerType, item.OwnerID, 0, false); res != nil {
@@ -189,7 +189,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if item.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask && !expectedVersionOK {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireBusinessAttachmentOwnerPermission(ctx, item.OwnerType, true); res != nil {
+		if res := d.requireBusinessAttachmentOwnerAccess(ctx, item.OwnerType, item.OwnerID, true); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), item.OwnerType); res != nil {
@@ -253,7 +253,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
 		}
-		if res := d.requireBusinessAttachmentOwnerPermission(ctx, item.OwnerType, false); res != nil {
+		if res := d.requireBusinessAttachmentOwnerAccess(ctx, item.OwnerType, item.OwnerID, false); res != nil {
 			return id, res, nil
 		}
 		if _, res := d.authorizeWorkflowAttachmentTaskAccess(ctx, item.OwnerType, item.OwnerID, 0, false); res != nil {
@@ -387,9 +387,33 @@ func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerModuleEnabled(ctx cont
 	return d.requireCustomerConfigModulesEnabled(ctx, customerKey, moduleKeys...)
 }
 
+func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerAccess(ctx context.Context, ownerType string, ownerID int, write bool) *v1.JsonrpcResult {
+	if ownerType != biz.BusinessAttachmentOwnerFinanceFact {
+		return d.requireBusinessAttachmentOwnerPermission(ctx, ownerType, write)
+	}
+	if d.operationalFactUC == nil {
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+	var scope biz.FinanceFactAccessScope
+	var res *v1.JsonrpcResult
+	if write {
+		scope, res = d.financeFactConfirmAccessScope(ctx)
+	} else {
+		scope, res = d.financeFactReadAccessScope(ctx)
+	}
+	if res != nil {
+		return res
+	}
+	return d.requireFinanceFactAccess(ctx, ownerID, scope)
+}
+
 func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerPermission(ctx context.Context, ownerType string, write bool) *v1.JsonrpcResult {
 	if !biz.IsBusinessAttachmentOwnerTypeAllowed(ownerType) {
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	// Finance attachments require the persisted owner's type, not a permission union.
+	if ownerType == biz.BusinessAttachmentOwnerFinanceFact {
+		return financeFactPermissionDeniedResult()
 	}
 	if ownerType == biz.BusinessAttachmentOwnerWorkflowTask {
 		permission := biz.PermissionWorkflowTaskRead
@@ -449,8 +473,6 @@ func businessAttachmentReadPermissions(ownerType string) []string {
 		return []string{biz.PermissionQualityInspectionRead}
 	case biz.BusinessAttachmentOwnerShipment:
 		return []string{biz.PermissionShipmentRead}
-	case biz.BusinessAttachmentOwnerFinanceFact:
-		return []string{biz.PermissionFinancePayableRead, biz.PermissionFinanceReceivableRead, biz.PermissionFinanceReportRead}
 	case biz.BusinessAttachmentOwnerProductionFact:
 		return []string{biz.PermissionProductionFactRead}
 	case biz.BusinessAttachmentOwnerOutsourcingFact:
@@ -482,8 +504,6 @@ func businessAttachmentWritePermissions(ownerType string) []string {
 		return []string{biz.PermissionQualityInspectionCreate, biz.PermissionQualityInspectionUpdate, biz.PermissionQualityExceptionHandle}
 	case biz.BusinessAttachmentOwnerShipment:
 		return []string{biz.PermissionShipmentCreate, biz.PermissionShipmentUpdate, biz.PermissionShipmentShip}
-	case biz.BusinessAttachmentOwnerFinanceFact:
-		return []string{biz.PermissionFinancePayableConfirm, biz.PermissionFinanceReceivableConfirm}
 	case biz.BusinessAttachmentOwnerProductionFact:
 		return []string{biz.PermissionProductionCompletionCreate, biz.PermissionProductionFactPost, biz.PermissionProductionFactCancel}
 	case biz.BusinessAttachmentOwnerOutsourcingFact:

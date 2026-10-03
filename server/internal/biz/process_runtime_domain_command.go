@@ -76,6 +76,7 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 		CommandKey:      nodeCommandKey,
 		IdempotencyKey:  normalized.IdempotencyKey,
 		Payload:         normalized.Payload,
+		WarehouseScope:  normalized.WarehouseScope,
 	}
 	if err := handler.ValidateProcessDomainCommand(ctx, commandInput, actorID); err != nil {
 		return nil, err

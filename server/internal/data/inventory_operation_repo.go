@@ -103,6 +103,11 @@ func (r *inventoryRepo) SaveInventoryOperationDraft(ctx context.Context, in *biz
 	for _, requested := range in.Items {
 		requestedByID[requested.ID] = requested
 	}
+	if row.OperationType == biz.InventoryOperationCycleCount {
+		if err := lockInventoryOperationResources(ctx, tx, inventoryOperationBalanceKeys(items)); err != nil {
+			return nil, err
+		}
+	}
 	for _, current := range items {
 		requested, exists := requestedByID[current.ID]
 		if !exists {
@@ -520,6 +525,9 @@ func (r *inventoryRepo) postInventoryOperation(
 		}
 		return nil, err
 	}
+	if err := lockInventoryOperationResources(ctx, tx, inventoryOperationBalanceKeys(items)); err != nil {
+		return nil, err
+	}
 	for _, item := range items {
 		if err := r.postInventoryOperationItem(ctx, tx, row, item, in.ActorID); err != nil {
 			return nil, err
@@ -626,6 +634,13 @@ func (r *inventoryRepo) CancelInventoryOperation(ctx context.Context, in *biz.In
 		if err != nil {
 			return nil, err
 		}
+		keys := make([]biz.InventoryBalanceKey, 0, len(txns))
+		for _, original := range txns {
+			keys = append(keys, inventoryBalanceKeyFromEntTxn(original))
+		}
+		if err := lockInventoryOperationResources(ctx, tx, keys); err != nil {
+			return nil, err
+		}
 		sort.Slice(txns, func(i, j int) bool {
 			if txns[i].Direction != txns[j].Direction {
 				return txns[i].Direction > txns[j].Direction
@@ -713,17 +728,27 @@ func (r *inventoryRepo) ListInventoryOperationsForAccess(ctx context.Context, fi
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Desc(inventoryoperation.FieldUpdatedAt), ent.Desc(inventoryoperation.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.Order(ent.Desc(inventoryoperation.FieldUpdatedAt), ent.Desc(inventoryoperation.FieldID)).
+		Limit(filter.Limit).Offset(filter.Offset).
+		WithItems(func(q *ent.InventoryOperationItemQuery) { q.Order(ent.Asc(inventoryoperationitem.FieldID)) }).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	materialIDs := []int{}
+	for _, row := range rows {
+		for _, item := range row.Edges.Items {
+			if item.SubjectType == biz.InventorySubjectMaterial {
+				materialIDs = append(materialIDs, item.SubjectID)
+			}
+		}
+	}
+	categories, err := loadInventoryMaterialStockCategories(ctx, r.data.postgres, materialIDs)
 	if err != nil {
 		return nil, 0, err
 	}
 	out := make([]*biz.InventoryOperation, 0, len(rows))
 	for _, row := range rows {
-		item, err := inventoryOperationByID(ctx, r.data.postgres, row.ID)
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, item)
+		out = append(out, inventoryOperationToBiz(row, categories))
 	}
 	return out, total, nil
 }
@@ -745,7 +770,6 @@ func inventoryOperationByID(ctx context.Context, client *ent.Client, id int) (*b
 	if err != nil {
 		return nil, err
 	}
-	out := &biz.InventoryOperation{ID: row.ID, OperationNo: row.OperationNo, OperationType: row.OperationType, Status: row.Status, Reason: row.Reason, Version: row.Version, SubmittedAt: row.SubmittedAt, SubmittedBy: row.SubmittedBy, ApprovedAt: row.ApprovedAt, ApprovedBy: row.ApprovedBy, RejectedAt: row.RejectedAt, RejectedBy: row.RejectedBy, RejectReason: row.RejectReason, PostedAt: row.PostedAt, PostedBy: row.PostedBy, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelReason: row.CancelReason, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 	materialIDs := []int{}
 	for _, item := range row.Edges.Items {
 		if item.SubjectType == biz.InventorySubjectMaterial {
@@ -756,10 +780,15 @@ func inventoryOperationByID(ctx context.Context, client *ent.Client, id int) (*b
 	if err != nil {
 		return nil, err
 	}
+	return inventoryOperationToBiz(row, categories), nil
+}
+
+func inventoryOperationToBiz(row *ent.InventoryOperation, categories map[int]string) *biz.InventoryOperation {
+	out := &biz.InventoryOperation{ID: row.ID, OperationNo: row.OperationNo, OperationType: row.OperationType, Status: row.Status, Reason: row.Reason, Version: row.Version, SubmittedAt: row.SubmittedAt, SubmittedBy: row.SubmittedBy, ApprovedAt: row.ApprovedAt, ApprovedBy: row.ApprovedBy, RejectedAt: row.RejectedAt, RejectedBy: row.RejectedBy, RejectReason: row.RejectReason, PostedAt: row.PostedAt, PostedBy: row.PostedBy, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelReason: row.CancelReason, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 	for _, item := range row.Edges.Items {
 		out.Items = append(out.Items, &biz.InventoryOperationItem{StockCategory: inventoryItemMaterialCategory(item.SubjectType, item.SubjectID, categories), ID: item.ID, OperationID: item.OperationID, LineNo: item.LineNo, SubjectType: item.SubjectType, SubjectID: item.SubjectID, ProductSkuID: item.ProductSkuID, FromWarehouseID: item.FromWarehouseID, FromLotID: item.FromLotID, ToWarehouseID: item.ToWarehouseID, ToLotID: item.ToLotID, UnitID: item.UnitID, ExpectedQuantity: item.ExpectedQuantity, CountedQuantity: item.CountedQuantity, AdjustmentQuantity: item.AdjustmentQuantity, Note: item.Note})
 	}
-	return out, nil
+	return out
 }
 
 func (r *inventoryRepo) beginLockedInventoryOperation(ctx context.Context, id int) (*inventoryDBTx, *ent.InventoryOperation, error) {
@@ -795,15 +824,8 @@ func lockInventoryOperation(ctx context.Context, tx *inventoryDBTx, id int) erro
 }
 func lockAndReadInventoryOperationBalance(ctx context.Context, tx *inventoryDBTx, key biz.InventoryBalanceKey) (decimal.Decimal, error) {
 	if tx.dialect == dialect.Postgres {
-		lockErr := lockInventoryBalanceRow(ctx, tx, key)
-		if lockErr != nil && !errors.Is(lockErr, biz.ErrInventoryInsufficientStock) {
-			return decimal.Zero, lockErr
-		}
-		if errors.Is(lockErr, biz.ErrInventoryInsufficientStock) {
-			var id int
-			if err := tx.sqlTx.QueryRowContext(ctx, `SELECT id FROM warehouses WHERE id=$1 FOR UPDATE`, key.WarehouseID).Scan(&id); err != nil {
-				return decimal.Zero, err
-			}
+		if err := lockInventoryOperationBalance(ctx, tx, key); err != nil {
+			return decimal.Zero, err
 		}
 	}
 	row, err := getInventoryBalance(ctx, tx.client.InventoryBalance.Query(), key)
@@ -814,6 +836,80 @@ func lockAndReadInventoryOperationBalance(ctx context.Context, tx *inventoryDBTx
 		return decimal.Zero, err
 	}
 	return row.Quantity, nil
+}
+
+func inventoryOperationBalanceKeys(items []*ent.InventoryOperationItem) []biz.InventoryBalanceKey {
+	keys := make([]biz.InventoryBalanceKey, 0, len(items)*2)
+	for _, item := range items {
+		key := biz.InventoryBalanceKey{SubjectType: item.SubjectType, SubjectID: item.SubjectID, ProductSkuID: item.ProductSkuID, WarehouseID: item.FromWarehouseID, LotID: item.FromLotID, UnitID: item.UnitID}
+		keys = append(keys, key)
+		if item.ToWarehouseID != nil {
+			key.WarehouseID, key.LotID = *item.ToWarehouseID, item.ToLotID
+			keys = append(keys, key)
+		}
+	}
+	return keys
+}
+
+// All lots precede all balances. The total order is independent of line order,
+// transfer direction and whether a destination balance already exists.
+func lockInventoryOperationResources(ctx context.Context, tx *inventoryDBTx, keys []biz.InventoryBalanceKey) error {
+	if tx.dialect != dialect.Postgres {
+		return nil
+	}
+	lotIDs := map[int]struct{}{}
+	balances := map[string]biz.InventoryBalanceKey{}
+	value := func(id *int) int {
+		if id == nil {
+			return 0
+		}
+		return *id
+	}
+	for _, key := range keys {
+		if key.LotID != nil {
+			lotIDs[*key.LotID] = struct{}{}
+		}
+		name := fmt.Sprintf("%s:%020d:%020d:%020d:%020d:%020d", key.SubjectType, key.SubjectID, value(key.ProductSkuID), key.WarehouseID, value(key.LotID), key.UnitID)
+		balances[name] = key
+	}
+	orderedLots := make([]int, 0, len(lotIDs))
+	for id := range lotIDs {
+		orderedLots = append(orderedLots, id)
+	}
+	sort.Ints(orderedLots)
+	for _, id := range orderedLots {
+		if err := lockInventoryTxnLot(ctx, tx, &id); err != nil {
+			return err
+		}
+	}
+	orderedBalances := make([]string, 0, len(balances))
+	for name := range balances {
+		orderedBalances = append(orderedBalances, name)
+	}
+	sort.Strings(orderedBalances)
+	for _, name := range orderedBalances {
+		if err := lockInventoryOperationBalance(ctx, tx, balances[name]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func lockInventoryOperationBalance(ctx context.Context, tx *inventoryDBTx, key biz.InventoryBalanceKey) error {
+	err := lockInventoryBalanceRow(ctx, tx, key)
+	if !errors.Is(err, biz.ErrInventoryInsufficientStock) {
+		return err
+	}
+	// A zero row coordinates first writers without locking an entire warehouse.
+	// It belongs to this transaction and disappears if posting rolls back.
+	_, err = tx.sqlTx.ExecContext(ctx, `INSERT INTO inventory_balances
+		(subject_type, subject_id, product_sku_id, warehouse_id, lot_id, unit_id, quantity, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, 0, $7) ON CONFLICT DO NOTHING`,
+		key.SubjectType, key.SubjectID, key.ProductSkuID, key.WarehouseID, key.LotID, key.UnitID, time.Now())
+	if err != nil {
+		return err
+	}
+	return lockInventoryBalanceRow(ctx, tx, key)
 }
 
 func inventoryItemMaterialCategory(subjectType string, subjectID int, categories map[int]string) string {

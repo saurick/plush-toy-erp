@@ -357,18 +357,21 @@ func (r *inventoryRepo) CreateInventoryTxn(ctx context.Context, in *biz.Inventor
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, err
 	}
-	tx, err := r.data.postgres.Tx(ctx)
+	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackEntTx(ctx, tx, r.log) }()
-	if err := validateInventoryTxnReferences(ctx, tx.Client(), in); err != nil {
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockInventoryTxnLot(ctx, tx, in.LotID); err != nil {
+		return nil, err
+	}
+	if err := validateInventoryTxnReferences(ctx, tx.client, in); err != nil {
 		return nil, err
 	}
 
-	row, err := createInventoryTxn(ctx, tx.InventoryTxn.Create(), in)
+	row, err := createInventoryTxn(ctx, tx.client.InventoryTxn.Create(), in)
 	if err != nil {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+		if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil {
 			return nil, rollbackErr
 		}
 		tx = nil
@@ -390,7 +393,7 @@ func (r *inventoryRepo) CreateInventoryTxn(ctx context.Context, in *biz.Inventor
 		}
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx = nil
@@ -426,6 +429,9 @@ func (r *inventoryRepo) ApplyInventoryTxnAndUpdateBalance(ctx context.Context, i
 		}, nil
 	}
 	if err != nil && !ent.IsNotFound(err) {
+		return nil, err
+	}
+	if err := lockInventoryTxnLot(ctx, tx, in.LotID); err != nil {
 		return nil, err
 	}
 	if err := validateInventoryTxnReferences(ctx, tx.client, in); err != nil {
@@ -1189,6 +1195,20 @@ func inventoryLotHasPositiveBalance(ctx context.Context, client *ent.Client, lot
 			inventorybalance.QuantityGT(decimal.Zero),
 		).
 		Exist(ctx)
+}
+
+// Posting shares the lot lock until commit: concurrent postings may proceed,
+// while a status change must finish before validation or wait for the posting.
+func lockInventoryTxnLot(ctx context.Context, tx *inventoryDBTx, lotID *int) error {
+	if lotID == nil || tx.dialect != dialect.Postgres {
+		return nil
+	}
+	var id int
+	err := tx.sqlTx.QueryRowContext(ctx, `SELECT id FROM inventory_lots WHERE id=$1 FOR SHARE`, *lotID).Scan(&id)
+	if errors.Is(err, stdsql.ErrNoRows) {
+		return biz.ErrInventoryLotNotFound
+	}
+	return err
 }
 
 func lockInventoryLot(ctx context.Context, tx *inventoryDBTx, lotID int) error {
