@@ -3,11 +3,11 @@ package data
 import (
 	"context"
 	"fmt"
-	"github.com/go-kratos/kratos/v2/log"
 	"io"
 	"testing"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -23,7 +23,7 @@ func statisticsDeliveryFixture(t *testing.T, data *Data, client *ent.Client) {
 	due := time.Date(2026, 10, 1, 16, 0, 0, 0, time.UTC) // October 2 in China.
 	for i := 0; i < 3; i++ {
 		customer := createSalesOrderTestCustomer(t, ctx, client, fmt.Sprintf("STAT-%d", i), true)
-		client.Customer.UpdateOneID(customer.ID).SetName("同名客户").SaveX(ctx)
+		client.Customer.UpdateOneID(customer.ID).SetName("STAT-同名客户").SaveX(ctx)
 		order := client.SalesOrder.Create().SetOrderNo(fmt.Sprintf("STAT-SO-%d", i)).SetCustomerID(customer.ID).SetOrderDate(due).SetPlannedDeliveryDate(due).SetLifecycleStatus("active").SetCurrency("CNY").SetOrderTotal(decimal.RequireFromString("100.01")).SaveX(ctx)
 		line := client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetProductID(product.ID).SetUnitID(unit.ID).SetOrderedQuantity(decimal.NewFromInt(10)).SetAmount(decimal.RequireFromString("80.01")).SaveX(ctx)
 		switch i {
@@ -31,7 +31,7 @@ func statisticsDeliveryFixture(t *testing.T, data *Data, client *ent.Client) {
 			shipment := client.Shipment.Create().SetShipmentNo("STAT-SHIPPED").SetSalesOrderID(order.ID).SetStatus("SHIPPED").SetIdempotencyKey("stat-shipped").SaveX(ctx)
 			client.ShipmentItem.Create().SetShipmentID(shipment.ID).SetSalesOrderItemID(line.ID).SetProductID(product.ID).SetWarehouseID(warehouse.ID).SetUnitID(unit.ID).SetQuantity(decimal.NewFromInt(10)).SetAmountSnapshot(decimal.RequireFromString("80.01")).SetCurrencySnapshot("CNY").SaveX(ctx)
 		case 1:
-			client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(2).SetRequestedProductName("未建档产品").SetUnitID(box.ID).SetOrderedQuantity(decimal.NewFromInt(2)).SaveX(ctx)
+			client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(2).SetRequestedProductName("STAT-未建档产品").SetUnitID(box.ID).SetOrderedQuantity(decimal.NewFromInt(2)).SaveX(ctx)
 			shipment := client.Shipment.Create().SetShipmentNo("STAT-CANCELLED").SetSalesOrderID(order.ID).SetStatus("CANCELLED").SetIdempotencyKey("stat-cancelled").SaveX(ctx)
 			client.ShipmentItem.Create().SetShipmentID(shipment.ID).SetSalesOrderItemID(line.ID).SetProductID(product.ID).SetWarehouseID(warehouse.ID).SetUnitID(unit.ID).SetQuantity(decimal.NewFromInt(10)).SaveX(ctx)
 		default:
@@ -40,18 +40,18 @@ func statisticsDeliveryFixture(t *testing.T, data *Data, client *ent.Client) {
 	}
 }
 
-func assertStatisticsDelivery(t *testing.T, data *Data, client *ent.Client) {
+func assertStatisticsDelivery(t *testing.T, data *Data, client *ent.Client, keyword string) {
 	t.Helper()
 	statisticsDeliveryFixture(t, data, client)
 	ctx := context.Background()
 	uc := biz.NewBusinessStatisticsUsecase(NewBusinessStatisticsRepo(data))
-	q := biz.BusinessStatisticsQuery{Period: "all", Limit: 1, SnapshotAt: time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC), Access: biz.BusinessStatisticsAccess{Sales: true, SalesAmounts: true}}
+	q := biz.BusinessStatisticsQuery{Period: "all", Keyword: keyword, Limit: 1, SnapshotAt: time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC), Access: biz.BusinessStatisticsAccess{Sales: true, SalesAmounts: true}}
 	board, err := uc.Board(ctx, q)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if board.Total != 3 || len(board.Groups) != 1 || board.Totals.Count != 3 || board.Totals.Done != 1 || board.Totals.Pending != 1 || board.Totals.Closed != 1 || board.Totals.Overdue != 1 || board.Totals.Amount == nil || *board.Totals.Amount != "300.03" || *board.Totals.ShippedAmount != "80.01" {
-		t.Fatalf("board=%+v metrics=%+v amount=%v shipped=%v", board, board.Totals, *board.Totals.Amount, *board.Totals.ShippedAmount)
+		t.Fatalf("board=%+v metrics=%+v amount=%v shipped=%v", board, board.Totals, board.Totals.Amount, board.Totals.ShippedAmount)
 	}
 	q.Status = "overdue"
 	board, err = uc.Board(ctx, q)
@@ -88,7 +88,7 @@ func assertStatisticsDelivery(t *testing.T, data *Data, client *ent.Client) {
 	if err != nil || board.Total != 0 {
 		t.Fatalf("literal search=%+v %v", board, err)
 	}
-	q.Keyword = ""
+	q.Keyword = keyword
 	q.Period = "custom"
 	q.DateFrom = "2026-10-02"
 	q.DateTo = "2026-10-02"
@@ -100,15 +100,16 @@ func assertStatisticsDelivery(t *testing.T, data *Data, client *ent.Client) {
 
 func TestBusinessStatisticsDelivery(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "business_statistics")
-	assertStatisticsDelivery(t, data, client)
+	assertStatisticsDelivery(t, data, client, "")
 }
 
 func TestBusinessDocumentSearchPostgresStatisticsDelivery(t *testing.T) {
 	data, client := openInventoryPostgresTestData(t)
-	assertStatisticsDelivery(t, data, client)
+	// PostgreSQL 矩阵共用迁移库，按本场景单号限定统计范围。
+	assertStatisticsDelivery(t, data, client, "STAT-")
 }
 
-func assertStatisticsReceivableAging(t *testing.T, data *Data, client *ent.Client) {
+func assertStatisticsReceivableAging(t *testing.T, data *Data, client *ent.Client, keyword string) {
 	t.Helper()
 	ctx := context.Background()
 	customer := createSalesOrderTestCustomer(t, ctx, client, "STAT-FIN", true)
@@ -118,7 +119,7 @@ func assertStatisticsReceivableAging(t *testing.T, data *Data, client *ent.Clien
 		days   int
 		status string
 	}{{0, "not_due"}, {1, "late_7"}, {7, "late_7"}, {8, "late_30"}, {30, "late_30"}, {31, "late_60"}, {60, "late_60"}, {61, "late_more"}} {
-		q := biz.BusinessStatisticsQuery{Report: "receivables", Status: test.status, SnapshotAt: fact.DueAt.AddDate(0, 0, test.days), Access: biz.BusinessStatisticsAccess{Receivables: true}}
+		q := biz.BusinessStatisticsQuery{Report: "receivables", Keyword: keyword, Status: test.status, SnapshotAt: fact.DueAt.AddDate(0, 0, test.days), Access: biz.BusinessStatisticsAccess{Receivables: true}}
 		board, err := uc.Board(ctx, q)
 		if err != nil || board.Total != 1 || board.Totals.Balance == nil || *board.Totals.Balance != "100" {
 			t.Fatalf("bucket %s=%+v %v", test.status, board, err)
@@ -136,7 +137,7 @@ func assertStatisticsReceivableAging(t *testing.T, data *Data, client *ent.Clien
 	if err != nil {
 		t.Fatal(err)
 	}
-	q := biz.BusinessStatisticsQuery{Report: "receivables", SnapshotAt: fact.DueAt.AddDate(0, 0, 2), Access: biz.BusinessStatisticsAccess{Receivables: true}}
+	q := biz.BusinessStatisticsQuery{Report: "receivables", Keyword: keyword, SnapshotAt: fact.DueAt.AddDate(0, 0, 2), Access: biz.BusinessStatisticsAccess{Receivables: true}}
 	board, err := uc.Board(ctx, q)
 	if err != nil || *board.Totals.Balance != "99.7" || *board.Totals.Late7 != "99.7" {
 		t.Fatalf("credit=%+v %v", board, err)
@@ -181,9 +182,9 @@ func assertStatisticsReceivableAging(t *testing.T, data *Data, client *ent.Clien
 
 func TestBusinessStatisticsReceivableAging(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "statistics_receivable")
-	assertStatisticsReceivableAging(t, data, client)
+	assertStatisticsReceivableAging(t, data, client, "")
 }
 func TestBusinessDocumentSearchPostgresStatisticsReceivable(t *testing.T) {
 	data, client := openInventoryPostgresTestData(t)
-	assertStatisticsReceivableAging(t, data, client)
+	assertStatisticsReceivableAging(t, data, client, "STAT-FIN")
 }

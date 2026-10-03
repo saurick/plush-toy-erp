@@ -26,9 +26,14 @@
   gap: 16px;
 }
 
-.erp-help-center-toolbar > .ant-input-search {
+.erp-help-center-toolbar > .erp-help-center-search {
   min-width: 0;
   max-width: 680px;
+  flex: 1;
+}
+
+.erp-help-center-search > .erp-search-input {
+  min-width: 0;
   flex: 1;
 }
 
@@ -1199,7 +1204,7 @@
     gap: 10px;
   }
 
-  .erp-help-center-toolbar > .ant-input-search {
+  .erp-help-center-toolbar > .erp-help-center-search {
     width: 100%;
     max-width: none;
     flex: none;

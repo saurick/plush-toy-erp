@@ -108,7 +108,7 @@ test("dev flow state observatory: five-view information architecture explains pe
   );
   assert.match(page, /moduleValue\?\.DEV_FLOW_STATE_CATALOG/u);
   for (const copy of [
-    "业务链与运行观察台",
+    "业务链观察",
     "Workflow 管“人”",
     "ProcessRuntime 管“路”",
     "Fact / Ledger 管“账”",

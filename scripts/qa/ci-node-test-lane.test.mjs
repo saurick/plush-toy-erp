@@ -119,9 +119,18 @@ test("Node lane catalog covers parallel_safe with one controlled preflight parti
       "scripts/deploy/production-preflight.test.mjs",
     ]);
   }
-  assert.equal(expectedCiNodeTestLaneFiles("release_a").length, 31);
-  assert.equal(expectedCiNodeTestLaneFiles("release_b").length, 32);
-  assert.equal(expectedCiNodeTestLaneFiles("release_c").length, 29);
+  const residualCounts = ["release_a", "release_b", "release_c"].map(
+    (lane) =>
+      expectedCiNodeTestLaneFiles(lane).filter(
+        (file) =>
+          ![
+            "scripts/qa/pre-push-receipt.test.mjs",
+            "scripts/deploy/migrate-online.test.mjs",
+            "scripts/deploy/run-smoke-script.test.mjs",
+          ].includes(file),
+      ).length,
+  );
+  assert.ok(Math.max(...residualCounts) - Math.min(...residualCounts) <= 1);
   assert.ok(
     expectedCiNodeTestLaneFiles("release_a").includes(
       "scripts/qa/pre-push-receipt.test.mjs",

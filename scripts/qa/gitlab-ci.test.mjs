@@ -676,7 +676,7 @@ test("GitLab definitions pin identity, separate SSD data and require exact execu
   assert.match(compose, /^name: plush-gitlab-control$/mu);
   assert.match(
     compose,
-    /gitlab\/gitlab-ce@sha256:05453dd1d9aba27c2c487613141596868409b4d03247647f7d66cb0b36f321b8/u,
+    /gitlab\/gitlab-ce@sha256:8c6ede6b1334738123feba0d248e81a14fc3db7065dc6e1f0a753c0d0332fee8/u,
   );
   assert.match(compose, /127[.]0[.]0[.]1:\$\{GITLAB_HTTP_PORT:-8929\}:8929/u);
   assert.match(compose, /\/srv\/gitlab\/data/u);

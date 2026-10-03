@@ -101,15 +101,20 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
   assert.match(finance, /message="当前没有可核销的应收或应付记录"/u)
 })
 
-test('DEV passive information is compact while warnings and errors stay prominent', () => {
+test('DEV passive guidance is collapsed while warnings and errors stay prominent', () => {
   const densityCSS = read(
     'web/src/dev-workbench/styles/dev-workbench-density.css'
   )
+  const guidance = read(
+    'web/src/dev-workbench/components/DevStaticGuidance.jsx'
+  )
+  assert.match(guidance, /<details className="erp-dev-static-guidance">/u)
+  assert.doesNotMatch(guidance, /<details\b[^>]*\bopen\b/u)
+  assert.doesNotMatch(guidance, /<Alert\b/u)
   assert.match(
     densityCSS,
-    /\.erp-dev-workspace-page :is\(\.ant-alert-info, \.ant-alert-success\)/u
+    /\.erp-dev-static-guidance > summary\s*\{[\s\S]*?font-size: 13px;/u
   )
-  assert.match(densityCSS, /\.ant-alert-icon[\s\S]*display: none/u)
   assert.doesNotMatch(
     densityCSS,
     /:is\([^)]*\.ant-alert-warning[^)]*\)[\s\S]{0,120}display: none/u

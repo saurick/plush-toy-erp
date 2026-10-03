@@ -9,9 +9,8 @@ import {
   ArrowRightOutlined,
   BookOutlined,
   MobileOutlined,
-  SearchOutlined,
 } from '@ant-design/icons'
-import { Button, Input, Select, Typography } from 'antd'
+import { Button, Select, Space, Typography } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -31,6 +30,7 @@ import { HELP_VISUAL_EXAMPLES } from '../config/helpScenarioPresentation.mjs'
 import HelpScenarioContent from '../components/help/HelpScenarioContent'
 import HelpReferenceContent from '../components/help/HelpReferenceContent'
 import SlidingTabs from '../../common/components/navigation/SlidingTabs'
+import SearchInput from '../../common/components/SearchInput'
 import {
   getHelpDocumentKindLabel,
   getHelpReferenceDocuments,
@@ -65,7 +65,8 @@ export default function HelpCenterPage() {
   const selectedGuide = resolveHelpGuide(
     guides,
     requestedRoleKey,
-    searchParams.get('page') || String(searchParams.get('ref') || '').split(':')[0]
+    searchParams.get('page') ||
+      String(searchParams.get('ref') || '').split(':')[0]
   )
   const scenarios = useMemo(
     () =>
@@ -152,6 +153,12 @@ export default function HelpCenterPage() {
     next.delete('page')
     setSearchParams(next)
   }
+  const handleQueryChange = (nextQuery) => {
+    const next = readHelpLocation()
+    if (nextQuery) next.set('q', nextQuery)
+    else next.delete('q')
+    setSearchParams(next, { replace: true })
+  }
   const handleScenarioChange = (scenarioKey) => {
     const next = readHelpLocation()
     next.set('scene', scenarioKey)
@@ -222,21 +229,21 @@ export default function HelpCenterPage() {
             </>
           )}
         </div>
-        <Input.Search
-          aria-label="搜索操作图解和参考手册"
-          placeholder="搜任务、字段、状态，或直接输入问题"
-          prefix={<SearchOutlined aria-hidden="true" />}
-          value={query}
-          maxLength={200}
-          allowClear
-          enterButton="搜索"
-          onChange={(event) => {
-            const next = readHelpLocation()
-            if (event.target.value) next.set('q', event.target.value)
-            else next.delete('q')
-            setSearchParams(next, { replace: true })
-          }}
-        />
+        <Space.Compact className="erp-help-center-search">
+          <SearchInput
+            type="search"
+            aria-label="搜索操作图解和参考手册"
+            placeholder="搜任务、字段、状态，或直接输入问题"
+            value={query}
+            maxLength={200}
+            allowClear
+            onChange={(event) => handleQueryChange(event.target.value)}
+            onPressEnter={() => handleQueryChange(query)}
+          />
+          <Button onClick={() => handleQueryChange(query)}>
+            搜索
+          </Button>
+        </Space.Compact>
       </div>
       <div className="erp-help-center-nav">
         <SlidingTabs

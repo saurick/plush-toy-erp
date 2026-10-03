@@ -49,6 +49,8 @@ func runPurchaseReceiptWarehouseAccessReadWriteAndReplay(t *testing.T, data *Dat
 	allowed := create("PR-ACCESS-ALLOWED", f.warehouseID)
 	outside := create("PR-ACCESS-OUTSIDE", otherWarehouse.ID)
 	mixed := create("PR-ACCESS-MIXED", f.warehouseID, otherWarehouse.ID)
+	initialTxnCount := client.InventoryTxn.Query().CountX(ctx)
+	initialItemCount := client.PurchaseReceiptItem.Query().CountX(ctx)
 	for _, scope := range []biz.WarehouseDataScope{assigned, none, {Mode: "unknown"}} {
 		for _, receipt := range []*biz.PurchaseReceipt{outside, mixed} {
 			if got, err := uc.GetPurchaseReceiptForAccess(ctx, receipt.ID, scope); !errors.Is(err, biz.ErrDataScopeForbidden) || got != nil {
@@ -72,7 +74,7 @@ func runPurchaseReceiptWarehouseAccessReadWriteAndReplay(t *testing.T, data *Dat
 			}
 		}
 	}
-	if client.InventoryTxn.Query().CountX(ctx) != 0 || client.PurchaseReceiptItem.Query().CountX(ctx) != 4 {
+	if client.InventoryTxn.Query().CountX(ctx) != initialTxnCount || client.PurchaseReceiptItem.Query().CountX(ctx) != initialItemCount {
 		t.Fatal("denied writes changed inventory or lines")
 	}
 	for _, warehouseFilter := range []int{0, f.warehouseID, otherWarehouse.ID} {
@@ -135,7 +137,7 @@ func runPurchaseReceiptWarehouseAccessReadWriteAndReplay(t *testing.T, data *Dat
 			t.Fatal(err)
 		}
 	}
-	if client.InventoryTxn.Query().CountX(ctx) != 4 {
+	if client.InventoryTxn.Query().CountX(ctx) != initialTxnCount+4 {
 		t.Fatal("post/cancel replay duplicated inventory effects")
 	}
 	if client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(allowed.ID)).CountX(ctx) != 2 {

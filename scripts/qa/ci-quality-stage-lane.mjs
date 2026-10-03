@@ -1287,7 +1287,7 @@ export async function runCiQualityStageLane({
       consumedWebBuildDigest = verifyConsumedWebBuild(root, env, plan);
       invariants.webBuildReceipt = "passed";
     }
-    if (definition.pnpm || definition.chromium) {
+    if (definition.pnpm) {
       await runProcess(
         "pnpm",
         ["--dir", "web", "install", "--frozen-lockfile", "--offline"],

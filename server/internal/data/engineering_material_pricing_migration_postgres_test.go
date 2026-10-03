@@ -45,9 +45,14 @@ func TestSourceDocumentPostgresRemoveEngineeringMaterialPricing(t *testing.T) {
 	_, err = data.sqldb.ExecContext(ctx, `ALTER TABLE engineering_material_request_items
 		ADD COLUMN purchase_quantity numeric(20,6), ADD COLUMN unit_price numeric(20,6),
 		ADD COLUMN expected_arrival_date timestamptz, ADD COLUMN note varchar(255),
-		ADD CONSTRAINT engineering_material_request_items_price_valid CHECK (unit_price IS NULL OR unit_price >= 0);
-		UPDATE engineering_material_request_items SET purchase_quantity = required_quantity + 1,
-		unit_price = 9.5, expected_arrival_date = CURRENT_TIMESTAMP, note = '模拟核价填写';`)
+		ADD CONSTRAINT engineering_material_request_items_price_valid CHECK (unit_price IS NULL OR unit_price >= 0);`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = data.sqldb.ExecContext(ctx, `UPDATE engineering_material_request_items
+		SET purchase_quantity = required_quantity + 1, unit_price = 9.5,
+		expected_arrival_date = CURRENT_TIMESTAMP, note = '模拟核价填写'
+		WHERE request_id = $1`, request.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

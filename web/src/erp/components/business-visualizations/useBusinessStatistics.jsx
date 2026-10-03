@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Empty, Popover, Select, Table, Tag } from 'antd'
+import { Alert, Button, Empty, Popover, Select, Tag } from 'antd'
 import { ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import SearchInput from '@/common/components/SearchInput'
+import Table from '@/common/components/table/AppTable'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {

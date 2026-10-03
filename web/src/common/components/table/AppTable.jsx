@@ -59,5 +59,6 @@ const AppTable = React.forwardRef(
 )
 
 AppTable.displayName = 'AppTable'
+AppTable.Summary = Table.Summary
 
 export default AppTable
