@@ -19,12 +19,42 @@ import {
   resolveWebRuntimeStartup,
   startStoppedLocalBackend,
   stopLocalWebFrontend,
+  writeWebStartupSummary,
 } from './startWebDev.mjs'
 import { parseYoyoosunDevArgs } from './startYoyoosunDev.mjs'
 import {
   LOCAL_RUNTIME_RECOVERY_MODE,
   LocalRuntimePreflightError,
 } from '../../scripts/local-runtime-preflight.mjs'
+
+test('startup summary identifies frontend, backend, customer and actual mode', () => {
+  for (const mode of ['normal', 'recovery', 'frontend-only']) {
+    const output = []
+    writeWebStartupSummary({
+      startup: { apiOrigin: 'http://127.0.0.1:8300/', frontendOnly: mode === 'frontend-only', recoveryMode: mode === 'recovery' ? 'database-migration' : '' },
+      port: 15200, customerKey: 'demo',
+    }, (line, tone) => output.push({line, tone}))
+    assert.match(output[0].line, /客户=demo/u)
+    assert.match(output[0].line, new RegExp(mode === 'normal' ? '模式=正常开发' : mode === 'recovery' ? '模式=迁移恢复' : '模式=仅前端'))
+    assert.equal(output[0].tone, mode === 'normal' ? 'info' : 'warning')
+    assert.match(output[1].line, /前端：http:\/\/127\.0\.0\.1:15200\//u)
+    assert.match(output[2].line, /后端 API \/ RPC 代理：http:\/\/127\.0\.0\.1:8300$/u)
+  }
+})
+
+test('recoverable startup failure displays bounded redacted diagnostics', async () => {
+  const output = []
+  const error = new LocalRuntimePreflightError('workspace_migration_invalid', '工作区规则检查失败')
+  error.diagnostic = 'old-output'.repeat(900) + "\n[qa:db-guard] missing migration\npostgres://user:private-password@db.example/erp\npassword='private spaced password'"
+  const startup = await resolveWebRuntimeStartup({apiOrigin: 'http://127.0.0.1:8300', frontendOnly: false}, {
+    preflight: async () => {throw error},
+    writeLine: (line) => output.push(line),
+  })
+  assert.equal(startup.recoveryReason, 'workspace_migration_invalid')
+  assert.match(output.join('\n'), /\[qa:db-guard\] missing migration/u)
+  assert.doesNotMatch(output.join('\n'), /private-password|private spaced password/u)
+  assert(output.at(-1).length < 6100)
+})
 
 test('start web dev: 默认启用共享 runtime preflight', () => {
   assert.deepEqual(parseStartWebDevArgs([], {}), {

@@ -83,6 +83,38 @@ body
   font: inherit;
 }
 
+/* 手机输入与组合外壳保持同一字号，防止 iPhone 聚焦时缩放页面。 */
+@media (max-width: 640px) {
+  #root
+    :is(
+      .ant-input,
+      .ant-input-affix-wrapper,
+      .ant-input-number,
+      .ant-input-number-input,
+      .ant-picker-input > input,
+      input:not([type]),
+      input[type='text'],
+      input[type='search'],
+      input[type='password'],
+      input[type='email'],
+      input[type='tel'],
+      input[type='number'],
+      textarea,
+      select
+    ),
+  body
+    :is(.erp-business-modal, .app-modal)
+    :is(
+      .ant-input,
+      .ant-input-affix-wrapper,
+      .ant-input-number-input,
+      textarea,
+      select
+    ) {
+    font-size: 16px;
+  }
+}
+
 /* 组合搜索框只保留外侧圆角，避免基础控件圆角破坏输入与按钮的连接语义。 */
 body
   :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)

@@ -373,7 +373,6 @@ function NavigationPlacementOverview({
     primaryMenuPaths,
     secondaryMenuPaths,
   })
-  const moreItems = placement.secondaryItems
   const groups = [
     {
       key: 'dashboards',
@@ -387,19 +386,11 @@ function NavigationPlacementOverview({
       description: '岗位高频业务',
       items: placement.primaryItems,
     },
-    {
-      key: 'more',
-      title: '更多功能',
-      description: '按业务模块、工具与查询、系统与帮助分类',
-      items: moreItems,
-      sections: placement.secondarySections,
-    },
-  ]
-  const moreItemOrder = new Map(
-    placement.secondarySections
-      .flatMap((section) => section.items)
-      .map((item, index) => [item.path, index + 1])
-  )
+    ...placement.secondarySections.map((section) => ({
+      ...section,
+      description: '侧栏直接显示',
+    })),
+  ].filter((group) => group.items.length > 0)
 
   return (
     <div className="erp-role-navigation-preview">
@@ -407,7 +398,7 @@ function NavigationPlacementOverview({
         <div>
           <Text strong>导航位置预览</Text>
           <Paragraph type="secondary">
-            工作中心固定在最前；每个业务模块只显示一个入口，模块内保留该岗位获准的页面。
+            工作中心固定在最前，常用工作优先排列，其余入口按业务分组直接显示；模块内保留该岗位获准的页面。
           </Paragraph>
         </div>
         <Tag
@@ -430,41 +421,27 @@ function NavigationPlacementOverview({
       ) : null}
       <div className="erp-role-navigation-preview__grid">
         {groups.map((group) => (
-          <div key={group.key} className="erp-role-navigation-preview__group">
+          <div
+            key={group.key}
+            className="erp-role-navigation-preview__group"
+            data-navigation-section={group.key}
+          >
             <Text strong>{group.title}</Text>
             <Text type="secondary">{group.description}</Text>
-            {group.key === 'more' && group.sections.length > 0 ? (
-              <div className="erp-role-navigation-preview__subgroups">
-                {group.sections.map((section) => (
-                  <div
-                    key={section.key}
-                    className="erp-role-navigation-preview__subgroup"
-                    data-navigation-section={section.key}
-                  >
-                    <Text strong>{section.title}</Text>
-                    <div className="erp-role-navigation-preview__items">
-                      {section.items.map((item) => (
-                        <Tag key={item.path}>
-                          {moreItemOrder.get(item.path)}. {item.label}
-                        </Tag>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="erp-role-navigation-preview__items">
-                {group.items.length > 0 ? (
-                  group.items.map((item, index) => (
-                    <Tag key={item.path} color="blue">
-                      {index + 1}. {item.label}
-                    </Tag>
-                  ))
-                ) : (
-                  <Text type="secondary">当前没有可显示页面</Text>
-                )}
-              </div>
-            )}
+            <div className="erp-role-navigation-preview__items">
+              {group.items.map((item, index) => (
+                <Tag
+                  key={item.path}
+                  color={
+                    group.key === 'dashboards' || group.key === 'primary'
+                      ? 'blue'
+                      : undefined
+                  }
+                >
+                  {index + 1}. {item.label}
+                </Tag>
+              ))}
+            </div>
           </div>
         ))}
       </div>

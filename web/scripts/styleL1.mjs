@@ -5,7 +5,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
-import { chromium } from 'playwright'
+import { chromium, webkit } from 'playwright'
 import { createBusinessActionAssertions } from './style-l1/businessActionAssertions.mjs'
 import { createBusinessListAssertions } from './style-l1/businessListAssertions.mjs'
 import {
@@ -64,6 +64,7 @@ import {
   assertVisibleInputTextVerticalRhythm,
   assertVisibleBusinessFormControlHeight,
   assertVisibleDateFilterGeometry,
+  assertMobileEditableInputSize,
 } from './style-l1/inputControlAssertions.mjs'
 
 import {
@@ -97,6 +98,7 @@ const devServerPort = Number(process.env.STYLE_L1_PORT || devPorts.style)
 const externalBaseURL = String(process.env.STYLE_L1_BASE_URL || '').trim()
 const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
 const headless = process.env.HEADED !== '1'
+const browserName = resolveStyleL1BrowserName(process.env.STYLE_L1_BROWSER)
 const scenarioFilter = new Set(
   String(process.env.STYLE_L1_SCENARIOS || '')
     .split(',')
@@ -107,6 +109,32 @@ const scenarioStartAt = String(process.env.STYLE_L1_START_AT || '').trim()
 const scenarioMaxAttempts = resolveStyleL1ScenarioMaxAttempts(
   process.env.STYLE_L1_SCENARIO_MAX_ATTEMPTS
 )
+
+export function resolveStyleL1BrowserName(value) {
+  const name = String(value || 'chromium').trim()
+  assert(
+    name === 'chromium' || name === 'webkit',
+    '[style:l1] STYLE_L1_BROWSER 只能是 chromium 或 webkit'
+  )
+  return name
+}
+
+export function getStyleL1ContextOptions(scenario, env = process.env) {
+  const phoneViewport = scenario.viewport?.width <= 600
+  const options = {
+    viewport: scenario.viewport,
+    deviceScaleFactor: scenario.deviceScaleFactor ?? 1,
+    isMobile: scenario.isMobile ?? phoneViewport,
+    hasTouch: scenario.hasTouch ?? phoneViewport,
+  }
+  if (scenario.path?.startsWith('/__dev') && env.PLUSH_DEV_OPERATOR_USERNAME && env.PLUSH_DEV_OPERATOR_PASSWORD) {
+    options.httpCredentials = {
+      username: env.PLUSH_DEV_OPERATOR_USERNAME,
+      password: env.PLUSH_DEV_OPERATOR_PASSWORD,
+    }
+  }
+  return options
+}
 
 export function resolveStyleL1ScenarioMaxAttempts(value) {
   const normalized = String(value || '').trim()
@@ -410,25 +438,35 @@ async function main() {
       console.log(`[style:l1] target=external base_url=${externalBaseURL}`)
     }
 
-    activeBrowser = await chromium.launch({
+    console.log(`[style:l1] browser=${browserName}`)
+    activeBrowser = await { chromium, webkit }[browserName].launch({
       headless,
-      args: [
-        '--no-proxy-server',
-        '--proxy-bypass-list=<-loopback>',
-        // Route-fulfilled fixture documents have no trustworthy IP address
-        // space in Chrome 153, so their same-runner Vite socket is blocked.
-        '--disable-features=LocalNetworkAccessChecks',
-      ],
+      args:
+        browserName === 'chromium'
+          ? [
+              '--no-proxy-server',
+              '--proxy-bypass-list=<-loopback>',
+              // Route-fulfilled fixture documents have no trustworthy IP address
+              // space in Chrome 153, so their same-runner Vite socket is blocked.
+              '--disable-features=LocalNetworkAccessChecks',
+            ]
+          : [],
     })
     const results = []
     for (const scenario of selectedScenarios) {
       try {
-        await runScenario(activeBrowser, scenario)
-        results.push({ name: scenario.name, status: 'passed' })
+        const gestureEvidence = await runScenario(activeBrowser, scenario)
+        results.push({
+          name: scenario.name,
+          browser: browserName,
+          ...gestureEvidence,
+          status: 'passed',
+        })
         console.log(`[style:l1] passed ${scenario.name}`)
       } catch (error) {
         results.push({
           name: scenario.name,
+          browser: browserName,
           status: 'failed',
           error: String(error.stack || error),
         })
@@ -800,14 +838,14 @@ async function runScenario(browser, scenario) {
 
   for (let attempt = 1; attempt <= scenarioMaxAttempts; attempt += 1) {
     try {
-      await runScenarioOnce(browser, scenario)
+      const gestureEvidence = await runScenarioOnce(browser, scenario)
       console.log(
         `[style:l1:scenario] id=${scenario.name} status=passed durationMs=${Math.max(
           0,
           Date.now() - startedAt
         )} attempts=${attempt}`
       )
-      return
+      return gestureEvidence
     } catch (error) {
       lastError = error
       if (
@@ -832,17 +870,13 @@ async function runScenario(browser, scenario) {
 }
 
 async function runScenarioOnce(browser, scenario) {
-  const context = await browser.newContext({
-    httpCredentials: scenario.path?.startsWith('/__dev') && process.env.PLUSH_DEV_OPERATOR_USERNAME && process.env.PLUSH_DEV_OPERATOR_PASSWORD
-      ? { username: process.env.PLUSH_DEV_OPERATOR_USERNAME, password: process.env.PLUSH_DEV_OPERATOR_PASSWORD }
-      : undefined,
-    viewport: scenario.viewport,
-    deviceScaleFactor: scenario.deviceScaleFactor ?? 1,
-    hasTouch: scenario.hasTouch ?? false,
-  })
-  await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
-    origin: baseURL,
-  })
+  const context = await browser.newContext(getStyleL1ContextOptions(scenario))
+  // WebKit cannot grant clipboard-write; copy scenarios use their controlled probe.
+  if (browserName === 'chromium') {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
+      origin: baseURL,
+    })
+  }
   const page = await context.newPage()
   const errors = []
 
@@ -1050,6 +1084,9 @@ async function runScenarioOnce(browser, scenario) {
     }
 
     await scenario.verify(page)
+    if (page.viewportSize()?.width <= 600) {
+      await assertMobileEditableInputSize(page, scenario.name)
+    }
     await assertVisibleDateFilterGeometry(page, scenario.name)
     await assertVisibleAffixInputIsolation(page, scenario.name)
     await assertVisibleInputControlRadius(page, scenario.name)
@@ -1059,10 +1096,12 @@ async function runScenarioOnce(browser, scenario) {
     await assertVisibleSearchPlaceholdersFit(page, scenario.name)
     await assertVisibleBusinessFormControlHeight(page, scenario.name)
     await assertNoHorizontalOverflow(page, scenario.name)
-    const expectedConsoleErrorPatterns = Array.isArray(
-      scenario.expectedConsoleErrorPatterns
-    )
-      ? scenario.expectedConsoleErrorPatterns
+    const consoleErrorContract =
+      typeof scenario.expectedConsoleErrorPatterns === 'function'
+        ? scenario.expectedConsoleErrorPatterns(page)
+        : scenario.expectedConsoleErrorPatterns
+    const expectedConsoleErrorPatterns = Array.isArray(consoleErrorContract)
+      ? consoleErrorContract
       : []
     for (const pattern of expectedConsoleErrorPatterns) {
       assert(
@@ -1083,6 +1122,9 @@ async function runScenarioOnce(browser, scenario) {
 
     const screenshotPath = path.resolve(outputDir, `${scenario.name}.png`)
     await page.screenshot({ path: screenshotPath, fullPage: true })
+    return {
+      gestureDriver: page.__styleL1TouchBackend || null,
+    }
   } catch (error) {
     await page
       .screenshot({

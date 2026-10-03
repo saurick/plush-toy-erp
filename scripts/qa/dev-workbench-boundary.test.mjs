@@ -255,7 +255,11 @@ const allowedERPImportsByFile = new Map([
   ],
   [
     "web/src/dev-workbench/config/devPermissionNavigation.mjs",
-    new Set(["config/seedData.mjs", "config/roleGuidedNavigation.mjs"]),
+    new Set([
+      "config/seedData.mjs",
+      "config/roleGuidedNavigation.mjs",
+      "utils/businessModuleGroups.mjs",
+    ]),
   ],
   [
     "web/src/dev-workbench/components/flow-state/WorkflowView.jsx",

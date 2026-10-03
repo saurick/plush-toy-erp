@@ -3,7 +3,6 @@ package service
 
 import (
 	"context"
-	"time"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -70,15 +69,7 @@ func NewJsonrpcService(
 
 // PostJsonrpc 对应 POST /rpc/{url}
 func (s *JsonrpcService) PostJsonrpc(ctx context.Context, req *v1.PostJsonrpcRequest) (*v1.PostJsonrpcReply, error) {
-	start := time.Now()
-	defer func() {
-		s.log.WithContext(ctx).Infof(
-			"PostJsonrpc: done url=%s method=%s id=%s cost=%s",
-			req.GetUrl(), req.GetMethod(), req.GetId(), time.Since(start),
-		)
-	}()
-
-	s.log.WithContext(ctx).Infof(
+	s.log.WithContext(ctx).Debugf(
 		"PostJsonrpc: url=%s jsonrpc=%s method=%s id=%s",
 		req.GetUrl(), req.GetJsonrpc(), req.GetMethod(), req.GetId(),
 	)

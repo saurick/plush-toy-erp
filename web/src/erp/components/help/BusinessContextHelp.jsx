@@ -124,6 +124,7 @@ function PageGuideContent({ entry }) {
 export function BusinessPageHelpTrigger({ pageKey = '' }) {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
+  const trigger = useRef(null)
   const entry = getBusinessUsabilityEntry(pageKey)
 
   if (!entry?.hasPageHelp) return null
@@ -131,6 +132,7 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
   return (
     <>
       <Button
+        ref={trigger}
         type="text"
         size="small"
         className="erp-business-page-help-trigger"
@@ -151,6 +153,7 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
         open={open}
         title={`${entry.title}怎么用`}
         onCancel={() => setOpen(false)}
+        afterClose={() => trigger.current?.focus({ preventScroll: true })}
         footer={[
           <Button
             key="role-help"

@@ -145,6 +145,7 @@ function MobileWorkflowTaskActionScreen({
   const screenRef = useRef(null)
   const actionChoiceRef = useRef(null)
   const reasonRef = useRef(null)
+  const quantityRef = useRef(null)
   const [validationErrors, setValidationErrors] = useState({
     action: '',
     approvedQuantity: '',
@@ -316,6 +317,7 @@ function MobileWorkflowTaskActionScreen({
     setValidationErrors((current) => ({
       ...current,
       reason: '',
+      approvedQuantity: '',
     }))
     onActionChange(action)
   }
@@ -340,7 +342,10 @@ function MobileWorkflowTaskActionScreen({
       reasonRef.current?.focus()
       return
     }
-    if (errors.approvedQuantity) return
+    if (errors.approvedQuantity) {
+      quantityRef.current?.focus()
+      return
+    }
     onSubmit({
       action: effectiveAction,
       approvedQuantity: String(approvedQuantity || '').trim(),
@@ -631,10 +636,17 @@ function MobileWorkflowTaskActionScreen({
                     </span>
                   </div>
                   <input
+                    ref={quantityRef}
                     id={`${fieldID}-approved-quantity`}
                     className="mobile-task-action-input min-h-[48px]"
                     inputMode="decimal"
                     disabled={busy}
+                    aria-invalid={Boolean(validationErrors.approvedQuantity)}
+                    aria-describedby={
+                      validationErrors.approvedQuantity
+                        ? `${fieldID}-approved-quantity-error`
+                        : undefined
+                    }
                     placeholder="留空表示按申请数量批准"
                     value={approvedQuantity}
                     onChange={(event) => {
@@ -644,6 +656,7 @@ function MobileWorkflowTaskActionScreen({
                   />
                   {validationErrors.approvedQuantity ? (
                     <p
+                      id={`${fieldID}-approved-quantity-error`}
                       className="mt-2 text-sm font-medium text-red-600"
                       role="alert"
                     >

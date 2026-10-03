@@ -307,9 +307,11 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       },
       { timeout: 10_000 }
     )
-    await pullToRefresh(page, page.getByTestId('mobile-role-scroll'))
-    const refreshRequestBody =
-      (await refreshRequestPromise).postDataJSON() || {}
+    const [refreshRequest] = await Promise.all([
+      refreshRequestPromise,
+      pullToRefresh(page, page.getByTestId('mobile-role-scroll')),
+    ])
+    const refreshRequestBody = refreshRequest.postDataJSON() || {}
     assert(
       !String(refreshRequestBody?.params?.cursor || '').trim(),
       `${scenarioName} 任务刷新应重新获取最新快照，不应携带续页游标: ${JSON.stringify(refreshRequestBody)}`

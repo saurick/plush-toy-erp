@@ -60,6 +60,7 @@ func NewSMSLoginCodeProvider(c *conf.Data, logger log.Logger) (biz.SMSLoginCodeP
 		mode = strings.ToLower(strings.TrimSpace(c.Auth.Sms.Mode))
 	}
 	if mode != "provider" {
+		log.NewHelper(logger).Infow("msg", "auth sms provider initialized", "mode", "local")
 		return biz.NewLocalSMSLoginCodeProvider("admin"), nil
 	}
 
@@ -71,7 +72,7 @@ func NewSMSLoginCodeProvider(c *conf.Data, logger log.Logger) (biz.SMSLoginCodeP
 	if err != nil {
 		return nil, err
 	}
-	log.NewHelper(log.With(logger, "module", "data.aliyun_sms")).Infof("auth sms provider initialized provider=%s endpoint=%s sign_name=%s template_code=%s", authSMSProviderAliyun, cfg.Endpoint, cfg.SignName, cfg.TemplateCode)
+	log.NewHelper(log.With(logger, "module", "data.aliyun_sms")).Infow("msg", "auth sms provider initialized", "mode", "provider", "provider", authSMSProviderAliyun)
 	return newAliyunSMSLoginProvider(client, cfg), nil
 }
 

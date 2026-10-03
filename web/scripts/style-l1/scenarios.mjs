@@ -15,6 +15,7 @@ import { createTabMotionScenarios } from './tabMotionScenarios.mjs'
 import { createTableAlignmentScenarios } from './tableAlignmentScenarios.mjs'
 import { createBusinessTableScrollScenarios } from './businessTableScrollScenarios.mjs'
 import { createMobileTaskScenarios } from './mobileTaskScenarios.mjs'
+import { createMobileInputScenarios } from './mobileInputScenarios.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
 import { createTaskImagePreviewScenarios } from './taskImagePreviewScenarios.mjs'
 import { createProductIdentityScenarios } from './productIdentityScenarios.mjs'
@@ -455,6 +456,7 @@ export function createStyleL1Scenarios(deps) {
       path,
     }),
     ...createTabMotionScenarios({ outputDir }),
+    ...createMobileInputScenarios(),
     ...createTableAlignmentScenarios({
       outputDir,
       customerRuntimeEffectiveSession,

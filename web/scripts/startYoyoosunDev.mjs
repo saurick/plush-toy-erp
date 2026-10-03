@@ -8,11 +8,13 @@ import { normalizeDevCustomerKey } from '../dev-server/devCustomerConfigPlugin.m
 import { loadDevPorts, validateDevAuxPort } from '../../scripts/dev-ports.mjs'
 import { prepareWebInstance, webInstanceSignature } from './devWebInstance.mjs'
 import { normalizeAPIOrigin } from '../../scripts/local-runtime-preflight.mjs'
+import { writeTerminalMessage } from '../../scripts/terminal-log.mjs'
 import {
   runManagedVite,
   resolveDevGitlabCredential,
   resolveWebRuntimeStartup,
   stopLocalWebFrontend,
+  writeWebStartupSummary,
 } from './startWebDev.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
@@ -171,9 +173,8 @@ async function main() {
     return
   }
 
-  printPlan(options)
-
   if (options.printPlan) {
+    printPlan(options)
     return
   }
 
@@ -201,14 +202,17 @@ async function main() {
     replaceStale: true,
     restartCommand,
   })
+  writeWebStartupSummary({ startup, port: options.port, customerKey: options.customer, label: 'start-yoyoosun', route: '/erp' })
   if (instance.reused) {
-    process.stdout.write(
-      `[start-yoyoosun] 已复用本工作区前端（PID ${instance.pid}）：http://127.0.0.1:${options.port}/erp\n`
+    writeTerminalMessage(
+      `[start-yoyoosun] 已复用本工作区前端（PID ${instance.pid}）：http://127.0.0.1:${options.port}/erp`,
+      { tone: startup.complete ? 'success' : 'warning' }
     )
     return
   }
-  process.stdout.write(
-    `[start-yoyoosun] 客户配置与公开资源预检通过：${options.customer}\n`
+  writeTerminalMessage(
+    `[start-yoyoosun] 客户配置与公开资源预检通过：${options.customer}`,
+    { tone: 'success' }
   )
   if (['file', 'keychain'].includes(gitlabCredential.source)) {
     process.stderr.write(
@@ -227,8 +231,9 @@ async function main() {
         restart: false,
       })
       if (winner.reused) {
-        process.stdout.write(
-          `[start-yoyoosun] 已复用同时启动的本工作区前端（PID ${winner.pid}）：http://127.0.0.1:${options.port}/erp\n`
+        writeTerminalMessage(
+          `[start-yoyoosun] 已复用同时启动的本工作区前端（PID ${winner.pid}）：http://127.0.0.1:${options.port}/erp`,
+          { tone: startup.complete ? 'success' : 'warning' }
         )
         return
       }
@@ -245,7 +250,10 @@ const isDirectRun =
 
 if (isDirectRun) {
   main().catch((error) => {
-    process.stderr.write(`[start-yoyoosun] ${error.message}\n`)
+    writeTerminalMessage(`[start-yoyoosun] ${error.message}`, {
+      tone: 'error',
+      stream: process.stderr,
+    })
     process.exit(1)
   })
 }

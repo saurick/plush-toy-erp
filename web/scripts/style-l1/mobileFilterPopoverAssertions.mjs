@@ -1,3 +1,65 @@
+export async function assertMobileFilterEdgePositions({
+  page,
+  assert,
+  trigger,
+  dialog,
+}) {
+  const { width } = page.viewportSize()
+  const bounds = await trigger.boundingBox()
+  const originalStyle = await trigger.getAttribute('style')
+
+  try {
+    for (const left of [
+      12,
+      (width - bounds.width) / 2,
+      width - bounds.width - 12,
+    ]) {
+      await trigger.evaluate(
+        (node, position) => {
+          Object.assign(node.style, {
+            position: 'fixed',
+            left: `${position.left}px`,
+            top: `${position.top}px`,
+            right: 'auto',
+          })
+        },
+        { left, top: bounds.y }
+      )
+      await trigger.click()
+      await dialog.waitFor({ state: 'visible' })
+      await page.waitForFunction(() =>
+        document.activeElement?.classList.contains('mobile-filter-panel')
+      )
+      const geometry = await dialog.evaluate((node) => {
+        const rect = (element) => element?.getBoundingClientRect().toJSON()
+        return {
+          viewportWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          popup: rect(node.closest('.mobile-filter-popover')),
+          close: rect(node.querySelector('[aria-label="关闭筛选"]')),
+        }
+      })
+      assert(
+        geometry.popup.left >= 0 &&
+          geometry.popup.right <= geometry.viewportWidth + 1 &&
+          geometry.close.left >= 0 &&
+          geometry.close.right <= geometry.viewportWidth + 1 &&
+          geometry.scrollWidth <= geometry.viewportWidth + 1,
+        `筛选入口靠左、居中或靠右时，弹层及关闭按钮均在视口内：${JSON.stringify(geometry)}`
+      )
+      await dialog
+        .getByRole('button', { name: '关闭筛选', exact: true })
+        .click()
+      await dialog.waitFor({ state: 'hidden' })
+    }
+  } finally {
+    await trigger.evaluate((node, style) => {
+      if (style === null) node.removeAttribute('style')
+      else node.setAttribute('style', style)
+    }, originalStyle)
+  }
+}
+
 export async function assertMobileFilterOutsideDismissal({
   page,
   assert,

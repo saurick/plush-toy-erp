@@ -1,4 +1,4 @@
-import React, { useId, useRef } from 'react'
+import React, { useCallback, useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, Popover, theme } from 'antd'
 import { CloseOutlined, FilterOutlined } from '@ant-design/icons'
@@ -19,20 +19,29 @@ export default function MobileFilterPopover({
   const trigger = useRef(null)
   const panel = useRef(null)
   const close = () => onOpenChange(false)
-  const onKeyDown = (event) => {
-    if (event.defaultPrevented || !open) return
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      close()
-    }
-  }
+  const onKeyDown = useCallback(
+    (event) => {
+      if (event.defaultPrevented || !open) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        onOpenChange(false)
+      }
+    },
+    [onOpenChange, open]
+  )
+  useEffect(() => {
+    if (!open) return undefined
+    // Safari 点击按钮后可能仍聚焦 body；开场动画完成前也应能关闭浮层。
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onKeyDown, open])
   const popover = (
     <Popover
       trigger={[]}
       placement="bottomRight"
       arrow={false}
-      autoAdjustOverflow
+      autoAdjustOverflow={{ shiftX: true }}
       open={open}
       zIndex={token.zIndexPopupBase + 1}
       onOpenChange={onOpenChange}
@@ -117,6 +126,12 @@ export default function MobileFilterPopover({
             tabIndex={-1}
             // 完整点击结束后再撤掉遮罩，避免触摸抬起时落到底层控件。
             onPointerDown={(event) => event.preventDefault()}
+            onTouchEnd={(event) => {
+              // 取消 Safari 的兼容点击，关闭遮罩后不能点中底层导航。
+              event.preventDefault()
+              event.stopPropagation()
+              close()
+            }}
             onClick={(event) => {
               event.stopPropagation()
               close()

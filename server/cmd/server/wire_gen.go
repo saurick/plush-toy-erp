@@ -64,7 +64,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger, tr
 	inventoryUsecase := biz.NewInventoryUsecase(inventoryRepo)
 	operationalFactRepo := data.NewOperationalFactRepo(dataData, logger)
 	operationalFactUsecase := biz.NewOperationalFactUsecase(operationalFactRepo)
-	store, err := attachmentstore.NewFromEnv()
+	store, err := attachmentstore.NewFromEnv(logger)
 	if err != nil {
 		cleanup()
 		return nil, nil, err

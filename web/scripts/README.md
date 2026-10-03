@@ -41,6 +41,10 @@ pnpm preview:yoyoosun
 
 `STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归；`STYLE_L1_SCENARIO_MAX_ATTEMPTS` 只接受 `1` 或 `2`，CI 固定为一次；`STYLE_L1_OUTPUT_DIR` 只接受仓库 `output/` 下的受管目录。默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
 
+`STYLE_L1_BROWSER=chromium|webkit` 选择浏览器引擎，默认 `chromium`，结果 JSON 标记实际引擎。宽度不超过 600px 的场景默认启用移动设备和触摸模拟，可由场景显式覆盖。WebKit 首次运行前执行 `pnpm exec playwright install webkit`；剪贴板场景使用既有受控探针，不能据此确认 iPhone 系统剪贴板权限。共享下拉刷新和图片多指处理在 Chromium 使用原生 CDP 触摸，在 WebKit 使用 DOM 事件验证处理逻辑；报告的 `gestureDriver` 分别标记 `chromium-native-cdp` / `webkit-dom-touch-events`。`mobile-task-touch-refresh` 另有原生滚动、手势竞争与取消断言，只能在 Chromium 运行，WebKit 选择场景时须排除它。WebKit 桌面引擎的移动模拟不替代 iPhone Safari / Chrome 真机、软键盘、浏览器工具栏或系统文件选择器验收；两种引擎的报告分别使用不同输出目录。
+
+`mobile-input-controls-light` / `mobile-input-controls-dark` 通过现有 fixture 入口加载真实移动任务处理组件和样式，拦截流程上下文读取，验证多行输入、聚焦字号、必填提示、批准数量的六位小数和可选清空、错误后的焦点与提示关联、动作切换，以及缩小视口后的提交区。fixture 的提交仅写组件本地状态，不写业务数据库；缩小视口的结果不能替代 iPhone 软键盘实测。
+
 受管前端脚本的默认辅助端口按用途分开：共享真实登录 `15210`、采购合同 `15211`、委外合同 `15212`、采购入库 E2E `15213`、移动认证 `15220`、试用浏览器 `15230`、移动 Workflow `15240`，CI Browser 三条隔离 lane 使用 `15250`、`15251`、`15252`。`start:yoyoosun` 固定使用 `15200`，可用 `--port` 指定辅助块内其他固定端口；`preview:yoyoosun` 从 `15200` 起探测，但不会越过 `15299`。所有 Vite 入口的统一配置会拒绝主前端 `5175`、样式 `6175` 和本项目辅助块之外的受管监听端口。
 
 ## 写入和输出边界
@@ -65,6 +69,10 @@ pnpm preview:yoyoosun
 ## 维护规则
 
 `startWebDev.mjs` 管理固定主入口、Codex / `--isolated` 辅助端口和重复启动；`devWebInstance.mjs` 校验实例配置摘要与显式重启的进程归属，`viteParentLifetime.mjs` 通过 IPC 处理启动器异常退出。`start:yoyoosun` 复用同一 Vite 子进程生命周期。日常 `pnpm start`、安全重启 `pnpm start:restart` 与临时验证 `pnpm start:isolated` 的完整约定见 [`web/README.md`](../README.md#启动命令)。实例摘要不包含路径或凭据，不承担业务健康或发布证据语义。
+
+前端启动日志复用仓库 `terminal-log.mjs`：访问地址使用青色加粗，预检通过和已验证服务复用使用绿色，迁移恢复或仅前端模式的复用提示使用黄色，启动错误使用红色加粗。非终端输出、设置 `NO_COLOR`、`FORCE_COLOR=0` 或 `TERM=dumb` 时保留纯文本，`--print-plan` 保留原有计划格式。
+
+普通启动用固定摘要显示前端地址、后端 API / RPC 代理、客户配置和正常 / 迁移恢复 / 仅前端模式；未显式注入客户时标注默认配置。可恢复的预检失败显示最多 6000 字符的脱敏诊断，业务入口继续保留恢复页。`start:yoyoosun` 仅在 `--print-plan` 时输出完整计划，日常启动沿用固定摘要。
 
 - 新增浏览器级页面回归时，优先复用 `style-l1/` 下已有 mock、assertion 和 scenario 拆分。
 - 修改 API shape、页面字段映射或业务页主路径时，同步更新对应 mock 和页面级浏览器回归场景（Style L1），避免脚本继续验证旧前端契约。

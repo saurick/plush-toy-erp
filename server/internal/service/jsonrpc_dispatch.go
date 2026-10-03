@@ -3,7 +3,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -234,21 +233,10 @@ func (d *jsonrpcDispatcher) Handle(
 		jsonrpc = "2.0"
 	}
 	ctx = withAdminPermissionCache(ctx)
-	d.log.WithContext(ctx).Infof(
+	d.log.WithContext(ctx).Debugf(
 		"[jsonrpc] handle url=%s jsonrpc=%s method=%s id=%s",
 		url, jsonrpc, method, id,
 	)
-
-	if params == nil {
-		d.log.WithContext(ctx).Info("[jsonrpc] params=<nil>")
-	} else {
-		logParams := redactRPCParams(params.AsMap())
-		if url == "production_order" {
-			logParams = productionOrderRPCLogSummary(params.AsMap())
-		}
-		b, _ := json.MarshalIndent(logParams, "", "  ")
-		d.log.WithContext(ctx).Infof("[jsonrpc] params=%s", string(b))
-	}
 
 	if !d.isPublic(url, method) {
 		if _, res := d.requireLogin(ctx); res != nil {
@@ -319,12 +307,12 @@ func (r *jsonrpcDispatcher) handleSystem(
 	_ *structpb.Struct,
 ) (string, *v1.JsonrpcResult, error) {
 	logger := r.log.WithContext(ctx)
-	logger.Info("Jsonrpc.system: start", "method", method, "id", id)
+	logger.Debugw("msg", "Jsonrpc.system: start", "method", method, "id", id)
 
 	switch method {
 	case "ping":
 		data := newDataStruct(map[string]any{"pong": "pong"})
-		logger.Info("Jsonrpc.system.ping: success", "id", id)
+		logger.Debugw("msg", "Jsonrpc.system.ping: success", "id", id)
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: data}, nil
 	case "version":
 		data := newDataStruct(map[string]any{
@@ -334,7 +322,7 @@ func (r *jsonrpcDispatcher) handleSystem(
 			"git_sha_short":   r.buildIdentity.GitSHAShort(),
 			"formal":          r.buildIdentity.IsFormal(),
 		})
-		logger.Info("Jsonrpc.system.version: success", "id", id)
+		logger.Debugw("msg", "Jsonrpc.system.version: success", "id", id)
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: data}, nil
 	default:
 		logger.Warn("Jsonrpc.system: unknown method", "method", method, "id", id)

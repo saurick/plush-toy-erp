@@ -21,6 +21,7 @@ import {
   getPermissionRelationshipRoleKeys,
 } from './devPermissionRelationshipGraph.mjs'
 import { formatAdminIdentity } from '../../erp/utils/adminIdentity.mjs'
+import { projectRoleGuidedModuleNavigation } from '../../erp/utils/businessModuleGroups.mjs'
 
 export const PERMISSION_NAVIGATION_STATE = Object.freeze({
   READY: 'ready',
@@ -295,14 +296,16 @@ function buildAccountNavigationModel({
     navigationSections,
     effectivePaths
   )
-  const placement = buildRoleGuidedNavigation({
-    visibleSections,
-    adminProfile: {
-      is_super_admin: false,
-      roles: selectedRoles,
-      effective_session: { roles: roleKeys },
-    },
-  })
+  const placement = projectRoleGuidedModuleNavigation(
+    buildRoleGuidedNavigation({
+      visibleSections,
+      adminProfile: {
+        is_super_admin: false,
+        roles: selectedRoles,
+        effective_session: { roles: roleKeys },
+      },
+    })
+  )
   const accountStatus = getAdminAccountStatus(account)
   const blocked = accountStatus !== ADMIN_ACCOUNT_STATUS.ACTIVE
   const singleRoleSettings =

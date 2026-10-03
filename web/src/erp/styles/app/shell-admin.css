@@ -284,33 +284,10 @@
   text-transform: uppercase;
 }
 
-.erp-admin-menu.ant-menu
-  .erp-role-guided-more-group
-  > .ant-menu-item-group-title {
-  padding: 8px 12px 2px 44px;
-  color: var(--erp-text-muted, #647067);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: none;
-}
-
-.erp-admin-menu.ant-menu
-  .erp-role-guided-more-group:first-child
-  > .ant-menu-item-group-title {
-  padding-top: 4px;
-}
-
 .erp-admin-sider[data-sidebar-collapsed='true']
   .erp-admin-menu.ant-menu-inline-collapsed
   .ant-menu-item-group-title {
   display: none;
-}
-
-.erp-admin-menu.ant-menu
-  .erp-role-guided-more-group
-  > .ant-menu-item-group-list {
-  margin: 0;
 }
 
 .erp-admin-menu.ant-menu .ant-menu-item,

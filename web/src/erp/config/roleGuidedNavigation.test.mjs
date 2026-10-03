@@ -34,7 +34,7 @@ const sections = [
   },
 ]
 
-test('roleGuidedNavigation: 历史查询和帮助均为保留工具，只追加到更多功能末尾', () => {
+test('roleGuidedNavigation: 历史查询和帮助均为保留工具，只追加到其他入口末尾', () => {
   const result = buildRoleGuidedNavigation({
     visibleSections: [
       ...sections.slice(0, 1),
@@ -72,7 +72,7 @@ test('roleGuidedNavigation: 历史查询和帮助均为保留工具，只追加�
   )
 })
 
-test('roleGuidedNavigation: 看板统一前置，常用只保留三个业务且帮助进入更多功能', () => {
+test('roleGuidedNavigation: 看板统一前置，常用只保留三个业务且帮助进入其他入口', () => {
   const result = buildRoleGuidedNavigation({
     visibleSections: sections,
     adminProfile: { roles: [{ role_key: 'sales' }] },
@@ -164,7 +164,7 @@ test('roleGuidedNavigation: 岗位自定义顺序只消费已授权页面且不�
   )
 })
 
-test('roleGuidedNavigation: 自定义常用全部失效时不擅自恢复推荐且页面仍留在更多', () => {
+test('roleGuidedNavigation: 自定义常用全部失效时不擅自恢复推荐且页面仍留在其他入口', () => {
   const result = buildRoleGuidedNavigation({
     visibleSections: sections,
     adminProfile: {
@@ -194,7 +194,7 @@ test('roleGuidedNavigation: 自定义常用全部失效时不擅自恢复推荐�
   )
 })
 
-test('roleGuidedNavigation: 单岗位自定义常用与更多都保持保存顺序并将帮助置底', () => {
+test('roleGuidedNavigation: 单岗位自定义常用与其他入口都保持保存顺序并将帮助置底', () => {
   const result = buildRoleGuidedNavigation({
     visibleSections: sections,
     adminProfile: {
@@ -229,7 +229,7 @@ test('roleGuidedNavigation: 单岗位自定义常用与更多都保持保存顺�
   )
 })
 
-test('roleGuidedNavigation: 双列表标准化拒绝跨组重复并把新增有效页追加到更多', () => {
+test('roleGuidedNavigation: 双列表标准化拒绝跨组重复并把新增有效页追加到其他入口', () => {
   assert.equal(
     normalizeRoleNavigationSettings({
       navigation_mode: 'custom',
@@ -373,7 +373,7 @@ test('roleGuidedNavigation: 未知岗位使用安全回退且不丢失其他页�
   assert.equal(result.secondaryItemCount, 2)
 })
 
-test('roleGuidedNavigation: 权限中心预览只使用最终可进入页面并将岗位帮助放入更多功能', () => {
+test('roleGuidedNavigation: 权限中心预览只使用最终可进入页面并将岗位帮助放入其他入口', () => {
   const result = buildRoleGuidedNavigationPreview({
     navigationSections: sections,
     effectiveAccess: {
@@ -449,7 +449,7 @@ test('roleGuidedNavigation: 权限中心预览使用尚未保存的自定义顺�
   )
 })
 
-test('roleGuidedNavigation: 更多功能沿用 Admin 菜单分组且保留原始配置成员合同', () => {
+test('roleGuidedNavigation: 其他入口沿用 Admin 菜单分组且保留原始配置成员合同', () => {
   const groupedSections = [
     {
       key: 'master',
@@ -594,7 +594,7 @@ test('roleGuidedNavigation: 更多功能沿用 Admin 菜单分组且保留原始
   assert.equal(groupedPaths.at(-1), '/erp/help-center')
 })
 
-test('roleGuidedNavigation: 权限调整后页面进入对应更多分组且空分组消失', () => {
+test('roleGuidedNavigation: 权限调整后页面进入对应其他分组且空分组消失', () => {
   const navigationSections = [
     {
       key: 'master',

@@ -34,7 +34,7 @@ func NewAdminTokenGenerator(c *conf.Data, logger log.Logger) biz.AdminTokenGener
 	l.Infof("admin token generator init ok, expire=%s", exp)
 
 	return func(input biz.AdminTokenInput) (string, time.Time, error) {
-		l.Infof("gen admin token uid=%d", input.UserID)
+		l.Debugf("gen admin token uid=%d", input.UserID)
 		return jwtutil.NewToken(cfg, input.UserID, input.SessionKey, input.AuthVersion, input.IssuedAt, input.ExpiresAt)
 	}
 }

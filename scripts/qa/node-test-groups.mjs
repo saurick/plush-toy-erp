@@ -108,6 +108,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/workflow-ui-action-boundary.test.mjs",
     "scripts/qa/yoyoosun-role-business-action-projection.test.mjs",
     "scripts/qa/yoyoosun-role-jsonrpc-access.test.mjs",
+    "scripts/terminal-log.test.mjs",
   ]),
   database: Object.freeze([
     "scripts/local-database-roles.test.mjs",

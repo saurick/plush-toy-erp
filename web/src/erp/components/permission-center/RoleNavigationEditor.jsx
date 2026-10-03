@@ -95,7 +95,7 @@ function RoleNavigationEditor({
       primary
         ? [...secondaryItems, item]
         : secondaryItems.filter((entry) => entry.key !== item.key),
-      `${item.label}已移到${primary ? '更多功能' : '常用工作'}`
+      `${item.label}已移到${primary ? '其他入口' : '常用工作'}`
     )
   }
   const changeDefault = (item, path) => {
@@ -119,7 +119,7 @@ function RoleNavigationEditor({
   const renderColumn = (primary) => {
     const items = primary ? primaryItems : secondaryItems
     const sections = primary ? [{ key: 'primary', items }] : secondarySections
-    const title = primary ? '常用工作' : '更多功能'
+    const title = primary ? '常用工作' : '其他入口'
     return (
       <section
         className="erp-role-navigation-editor__column"
@@ -202,7 +202,7 @@ function RoleNavigationEditor({
                       </Button>
                       <Button
                         size="small"
-                        aria-label={`移到${primary ? '更多' : '常用'} ${item.label}`}
+                        aria-label={`移到${primary ? '其他' : '常用'} ${item.label}`}
                         data-navigation-action="placement"
                         disabled={
                           disabled ||
@@ -213,7 +213,7 @@ function RoleNavigationEditor({
                         }
                         onClick={() => changePlacement(item, primary)}
                       >
-                        移到{primary ? '更多' : '常用'}
+                        移到{primary ? '其他' : '常用'}
                       </Button>
                     </Space>
                   </div>
@@ -237,7 +237,7 @@ function RoleNavigationEditor({
         <div>
           <Text strong>设置岗位导航</Text>
           <Paragraph type="secondary">
-            每个业务模块只占一个入口；默认页面从已获准页面中选择，再次进入仍会恢复最近访问页。
+            所有获准入口在侧栏直接显示，每个业务模块只占一个入口；默认页面从已获准页面中选择，再次进入仍会恢复最近访问页。
           </Paragraph>
         </div>
         <Select

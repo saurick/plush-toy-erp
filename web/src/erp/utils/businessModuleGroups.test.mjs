@@ -85,7 +85,7 @@ test('出货页签只呈现获准页面，保留仅放行或仅预留岗位入�
   )
 })
 
-test('岗位优先放行时合并后保留该入口，更多功能不重复出货模块', () => {
+test('岗位优先放行时合并后保留该入口，其他入口不重复出货模块', () => {
   const navigation = projectRoleGuidedModuleNavigation({
     dashboardItems: [],
     primaryItems: section('shipping-release').items,
@@ -198,7 +198,7 @@ test('模块入口只归并已有可访问页面，默认路径仍是已授权�
   )
 })
 
-test('岗位常用入口优先，更多功能中不重复同一模块，保留其他入口', () => {
+test('岗位常用入口优先，其他入口中不重复同一模块，保留其他入口', () => {
   const navigation = projectRoleGuidedModuleNavigation({
     dashboardItems: [],
     primaryItems: section('payables', 'receivables').items,
@@ -397,7 +397,7 @@ test('客户菜单顺序与产品分类一致，默认入口从获准页面按�
   )
 })
 
-test('岗位指定的材料和库存台账入口继续优先，模块不会在更多功能重复', () => {
+test('岗位指定的材料和库存台账入口继续优先，模块不会在其他入口重复', () => {
   const result = projectRoleGuidedModuleNavigation({
     dashboardItems: [],
     primaryItems: section('materials', 'inventory').items,

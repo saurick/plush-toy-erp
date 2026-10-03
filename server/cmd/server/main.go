@@ -742,6 +742,13 @@ func main() {
 	if err := validateCustomerTrialConfigRuntime(dataCfg, os.Getenv); err != nil {
 		panic(err)
 	}
+	customerKey := biz.NormalizeCustomerKey(os.Getenv("ERP_CUSTOMER_KEY"))
+	if customerKey == "" {
+		customerKey = biz.DefaultCustomerKey
+	}
+	log.NewHelper(logger).Infow("msg", "runtime configuration",
+		"config_path", confPath, "local_config_path", resolveLocalConfPath(confPath),
+		"log_debug", debug, "sql_debug", dataCfg.Postgres.Debug, "customer_key", customerKey)
 
 	// ===== 6. 组装应用（wireApp） =====
 	// 这里 wireApp 里用到的 TracerProvider 类型要记得是 *tracesdk.TracerProvider

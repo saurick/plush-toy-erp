@@ -18,6 +18,11 @@ import {
   writeRuntimeProgress,
 } from "./local-runtime-console.mjs";
 import {
+  formatTerminalMessage,
+  terminalColorEnabled,
+  writeTerminalMessage,
+} from "./terminal-log.mjs";
+import {
   createDevDatabaseMigrationRuntime,
   executeCommand,
   redactDatabaseMigrationDiagnostic,
@@ -234,11 +239,14 @@ export async function runWorkspaceRuntimeCLI(
     start = startWorkspaceRuntime,
     present = presentRuntimeConsole,
     interactive = Boolean(process.stdout.isTTY),
+    color = terminalColorEnabled(),
     write = console.log,
     signals = process,
   } = {},
 ) {
   const { args, logOptions } = parseRuntimeLogOptions(argv);
+  const output = (message, tone = "info") =>
+    write(formatTerminalMessage(message, { tone, color }));
   for (const arg of args) {
     if (
       ![
@@ -259,8 +267,9 @@ export async function runWorkspaceRuntimeCLI(
   const controller = new AbortController();
   const cancel = () => {
     if (controller.signal.aborted) return;
-    write(
+    output(
       "[local-runtime] 正在取消本次重启；先结束构建子任务，已开始的服务切换会完成核验后释放锁",
+      "warning",
     );
     controller.abort();
   };
@@ -277,7 +286,7 @@ export async function runWorkspaceRuntimeCLI(
           ? "Codex"
           : "终端",
       signal: controller.signal,
-      progress: (message) => writeRuntimeProgress(message, write),
+      progress: (message) => writeRuntimeProgress(message, write, { color }),
     });
     controller.signal.throwIfAborted();
   } catch (error) {
@@ -292,23 +301,25 @@ export async function runWorkspaceRuntimeCLI(
       throw cancelled;
     }
     if (error.runtimeLogFile)
-      write(
+      output(
         `[local-runtime] 本次失败启动的日志：${path.join(root, error.runtimeLogFile)}`,
+        "detail",
       );
     if (error.diagnostic) {
-      write("[local-runtime] 启动失败诊断：");
+      output("[local-runtime] 启动失败诊断：", "error");
       for (const line of redactDatabaseMigrationDiagnostic(error.diagnostic)
         .trim()
         .split("\n"))
-        write(formatRuntimeLogLine(line, { color: interactive, full: true }));
+        write(formatRuntimeLogLine(line, { color, full: true }));
     }
     throw error;
   } finally {
     for (const signal of handledSignals) signals.off(signal, cancel);
   }
   if (!result.reused) {
-    write(
+    output(
       `[local-runtime] started bundle=${result.bundleId} migration=${result.activeVersion} health=passed ready=passed business=passed；当前后端源码已生效${result.reusedBuild ? "，已跳过编译" : ""}${Number.isFinite(result.durationMs) ? `；总耗时 ${(result.durationMs / 1000).toFixed(1)} 秒` : ""}`,
+      "success",
     );
   }
   // Log viewing starts after the migration/restart lock has been released.
@@ -317,8 +328,9 @@ export async function runWorkspaceRuntimeCLI(
     background: argv.includes("--background"),
     logOptions,
   }).catch((error) => {
-    write(
+    output(
       `[local-runtime] 后端启动流程已完成，但日志查看不可用：${error.message}；可执行 make dev_logs`,
+      "warning",
     );
   });
   return result;
@@ -326,7 +338,10 @@ export async function runWorkspaceRuntimeCLI(
 
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
   runWorkspaceRuntimeCLI(process.argv.slice(2)).catch((error) => {
-    console.error(error.message);
+    writeTerminalMessage(error.message, {
+      tone: "error",
+      stream: process.stderr,
+    });
     process.exitCode =
       error.code === "WORKSPACE_RUNTIME_RESTART_CANCELLED" ? 130 : 1;
   });

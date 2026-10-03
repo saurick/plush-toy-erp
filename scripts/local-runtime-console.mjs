@@ -8,6 +8,13 @@ import { pathToFileURL } from "node:url";
 import { stripVTControlCharacters } from "node:util";
 import { loadDevPorts } from "./dev-ports.mjs";
 import { runProcessInspection } from "./dev-process-inspection.mjs";
+import {
+  formatTerminalMessage,
+  highlightTerminalText,
+  terminalColorEnabled,
+  writeTerminalMessage,
+  redactPostgresCredentials,
+} from "./terminal-log.mjs";
 
 const UUID =
   /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u;
@@ -15,14 +22,33 @@ const LOG_DIRECTORY = "output/dev-workbench/database-migration-runtime";
 const ACTIVE_FILE = "output/dev-workbench/runtime-bundles/active.json";
 const writeLine = (line) => process.stdout.write(`${line}\n`);
 
-export function writeRuntimeProgress(message, write = writeLine) {
+export function writeRuntimeProgress(
+  message,
+  write = writeLine,
+  { color = terminalColorEnabled() } = {},
+) {
   write(
-    `[local-runtime] ${new Date().toLocaleTimeString("zh-CN", { hour12: false })} ${message}`,
+    formatTerminalMessage(
+      `[local-runtime] ${new Date().toLocaleTimeString("zh-CN", { hour12: false })} ${message}`,
+      { color },
+    ),
   );
 }
 
 const LEVEL_COLORS = { DEBUG: 90, INFO: 36, WARN: 33, ERROR: 31, FATAL: 31 };
 const SERVICE_FIELDS = ["service.id", "service.name", "service.version"];
+const TARGET_FIELDS = new Set([
+  "address",
+  "database",
+  "tls_policy",
+  "config_source",
+  "customer_key",
+  "endpoint",
+  "bucket",
+  "log_debug",
+  "sql_debug",
+  "mode",
+]);
 const LEVELS = Object.keys(LEVEL_COLORS);
 const DEFAULT_LOG_OPTIONS = Object.freeze({
   level: "INFO",
@@ -65,13 +91,12 @@ function runtimeLogOptionArgs({ level, match, full } = DEFAULT_LOG_OPTIONS) {
 }
 
 function plainText(value) {
-  return stripVTControlCharacters(String(value))
-    .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/gu, "")
-    .replace(
-      /\bpostgres(?:ql)?:\/\/[^:\s/@]+:[^@\s]+@/giu,
-      "postgres://<redacted>@",
-    )
-    .replace(/\bpassword=[^\s&]+/giu, "password=<redacted>");
+  return redactPostgresCredentials(
+    stripVTControlCharacters(String(value)).replace(
+      /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/gu,
+      "",
+    ),
+  );
 }
 
 function logEntry(line) {
@@ -114,9 +139,17 @@ export function formatRuntimeLogLine(
   const caller =
     expanded && module && entry.caller ? ` [${plainText(entry.caller)}]` : "";
   const text = plainText(entry.msg || "");
-  const message = expanded
-    ? text.replaceAll("\n", "\n  ")
-    : summarizeLogValue(text);
+  const messageTone =
+    entry.level === "WARN"
+      ? "warning"
+      : ["ERROR", "FATAL"].includes(entry.level)
+        ? "error"
+        : "";
+  const message = highlightTerminalText(
+    expanded ? text.replaceAll("\n", "\n  ") : summarizeLogValue(text),
+    messageTone,
+    { color },
+  );
   const details = Object.entries(entry)
     .filter(
       ([key, value]) =>
@@ -139,7 +172,10 @@ export function formatRuntimeLogLine(
       const text = plainText(
         typeof value === "object" ? JSON.stringify(value) : value,
       );
-      return `${plainText(key)}=${expanded ? text.replaceAll("\n", "\n    ") : summarizeLogValue(text)}`;
+      const displayValue = expanded
+        ? text.replaceAll("\n", "\n    ")
+        : summarizeLogValue(text);
+      return `${plainText(key)}=${TARGET_FIELDS.has(key) ? highlightTerminalText(displayValue, "detail", { color }) : displayValue}`;
     });
   const separator = expanded ? "\n  " : " ";
   return `${time ? `${time} ` : ""}${level}${context}${caller} ${message}${details.length ? `${separator}${details.join(separator)}` : ""}`;
@@ -149,6 +185,13 @@ function createLogWriter(write, color, logOptions) {
   let previousService = "";
   return (line) => {
     const entry = logEntry(line);
+    // Kratos configuration messages use a plain DEBUG prefix before JSON
+    // logging is configured. Other plain diagnostics remain unfiltered.
+    if (
+      /^DEBUG msg=/u.test(line) &&
+      LEVELS.indexOf(logOptions.level) > LEVELS.indexOf("DEBUG")
+    )
+      return;
     if (entry) {
       if (
         LEVELS.indexOf(entry.level) < LEVELS.indexOf(logOptions.level) ||
@@ -163,7 +206,12 @@ function createLogWriter(write, color, logOptions) {
         .map((key) => `${key}=${plainText(entry[key])}`)
         .join(" ");
       if (service && service !== previousService) {
-        write(`[local-runtime] ${service}`);
+        write(
+          formatTerminalMessage(`[local-runtime] ${service}`, {
+            tone: "detail",
+            color,
+          }),
+        );
         previousService = service;
       }
     }
@@ -296,14 +344,31 @@ function processExists(pid) {
   }
 }
 
-function reportRuntime(root, runtime, write, running) {
+function reportRuntime(
+  root,
+  runtime,
+  write,
+  running,
+  { color = terminalColorEnabled() } = {},
+) {
   write(
-    `[local-runtime] 后端${running ? "正在运行" : "已停止"}；端口=${loadDevPorts(root).http} PID=${runtime.pid} 启动时间=${new Date(runtime.startedAt).toLocaleString("zh-CN", { hour12: false })}`,
+    formatTerminalMessage(
+      `[local-runtime] 后端${running ? "正在运行" : "已停止"}；端口=${loadDevPorts(root).http} PID=${runtime.pid} 启动时间=${new Date(runtime.startedAt).toLocaleString("zh-CN", { hour12: false })}`,
+      { tone: running ? "success" : "warning", color },
+    ),
   );
   write(
-    `[local-runtime] 运行版本=${runtime.version || `local-${runtime.bundleId}`} 制品=${runtime.bundleId} 启动来源=${runtime.startSource || "未记录"} migration=${runtime.migrationVersion}`,
+    formatTerminalMessage(
+      `[local-runtime] 运行版本=${runtime.version || `local-${runtime.bundleId}`} 制品=${runtime.bundleId} 启动来源=${runtime.startSource || "未记录"} migration=${runtime.migrationVersion}`,
+      { tone: "detail", color },
+    ),
   );
-  write(`[local-runtime] 日志：${runtime.logFile}`);
+  write(
+    formatTerminalMessage(`[local-runtime] 日志：${runtime.logFile}`, {
+      tone: "detail",
+      color,
+    }),
+  );
   if (Number.isFinite(runtime.startupDurationMs))
     write(
       `[local-runtime] 本次启动验证耗时 ${(runtime.startupDurationMs / 1000).toFixed(1)} 秒`,
@@ -317,8 +382,7 @@ export async function followRuntimeConsole(
     logOptions = DEFAULT_LOG_OPTIONS,
     read = readRuntimeConsole,
     running = processExists,
-    color = Boolean(process.stdout.isTTY) &&
-      !Object.hasOwn(process.env, "NO_COLOR"),
+    color = terminalColorEnabled(),
     spawnTail = (file, start) =>
       spawn("tail", ["-c", `+${start + 1}`, "-F", file], {
         detached: true,
@@ -339,7 +403,8 @@ export async function followRuntimeConsole(
     lines = null;
     tail = null;
   };
-  write(`\u001b]0;${path.basename(root)} · 后端日志\u0007`);
+  if (process.stdout.isTTY)
+    write(`\u001b]0;${path.basename(root)} · 后端日志\u0007`);
   write(
     "[local-runtime] 持续显示当前后端日志；Ctrl+C 退出查看，后端继续运行。退出后可执行 make dev_restart 或 make dev_stop。",
   );
@@ -354,7 +419,7 @@ export async function followRuntimeConsole(
       const key = `${runtime.bundleId}:${runtime.pid}:${runtime.logFile}:${alive}`;
       if (key !== previous) {
         stopTail();
-        reportRuntime(root, runtime, write, alive);
+        reportRuntime(root, runtime, write, alive, { color });
         if (alive) {
           const plan = readRuntimeLogPlan(runtime);
           await replayStartupLogs(runtime, plan, logWrite, signal);
@@ -615,8 +680,9 @@ if (
       });
     })
     .catch((error) => {
-      process.stderr.write(
-        `[local-runtime] 日志查看失败：${error.message}；未停止后端服务\n`,
+      writeTerminalMessage(
+        `[local-runtime] 日志查看失败：${error.message}；未停止后端服务`,
+        { tone: "error", stream: process.stderr },
       );
       process.exitCode = 1;
     });

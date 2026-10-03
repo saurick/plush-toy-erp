@@ -88,10 +88,9 @@ export function createPermissionUnifiedScenarios({
           ? { width: 390, height: 844 }
           : { width: 1486, height: 1000 },
       verify: async (page) => {
-        if (themeMode === 'dark')
-          await page
-            .getByRole('button', { name: /全屏预览/ })
-            .click()
+        if (themeMode === 'dark') {
+          await page.getByRole('button', { name: /全屏预览/ }).click()
+        }
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame
           .getByRole('button', { name: '外观设置', exact: true })
@@ -104,8 +103,9 @@ export function createPermissionUnifiedScenarios({
           themeMode
         )
         await frame.getByRole('button', { name: '完成', exact: true }).click()
-        if (themeMode === 'dark')
+        if (themeMode === 'dark') {
           await frame.locator('[data-action="open-nav"]').click()
+        }
         await frame
           .getByRole('button', { name: '全部模块', exact: true })
           .click()
@@ -127,7 +127,7 @@ export function createPermissionUnifiedScenarios({
         assert.equal(await defaultPage.locator('option').count(), 5)
         await defaultPage.selectOption('payments')
         await frame
-          .getByRole('button', { name: '移到更多 财务管理', exact: true })
+          .getByRole('button', { name: '移到其他 财务管理', exact: true })
           .click()
         await frame
           .getByRole('button', { name: '移到常用 财务管理', exact: true })
@@ -404,11 +404,12 @@ export function createPermissionUnifiedScenarios({
           }
         })
         assert.equal(geometry.columns, 5)
-        if (variant.viewport.width >= 800)
+        if (variant.viewport.width >= 800) {
           assert(
             geometry.alignment.every((offset) => offset < 1),
             JSON.stringify(geometry)
           )
+        }
         assert.equal(
           geometry.display,
           variant.viewport.width < 800 ? 'grid' : 'table-row'

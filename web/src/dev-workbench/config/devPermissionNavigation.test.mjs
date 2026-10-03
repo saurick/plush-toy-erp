@@ -220,10 +220,10 @@ test('employee menu projection merges multiple roles once and marks an inactive 
   assert.equal(model.effectivePageCount, 7)
   assert.deepEqual(
     model.primaryItems.map((item) => item.label),
-    ['客户档案', '应收管理', '销售订单', '出货单', '库存台账']
+    ['基础资料', '财务管理', '销售管理', '出货管理', '库存管理']
   )
   assert.equal(
-    model.primaryItems.filter((item) => item.label === '出货单').length,
+    model.primaryItems.filter((item) => item.label === '出货管理').length,
     1
   )
   assert.deepEqual(

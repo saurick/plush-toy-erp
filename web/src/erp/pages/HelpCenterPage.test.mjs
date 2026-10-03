@@ -57,26 +57,17 @@ test('HelpCenterPage: 通用帮助由登录壳追加且不依赖业务权限项'
   assert.match(layoutSource, /getCustomerNavigationPresentation/u)
   assert.match(layoutSource, /buildRoleGuidedNavigation/u)
   assert.match(layoutSource, /label: '常用工作'/u)
-  assert.match(layoutSource, /更多功能/u)
+  assert.match(layoutSource, /roleGuidedNavigation\.secondarySections\.map/u)
   assert.match(layoutSource, /data-navigation-presentation/u)
-  assert.match(layoutSource, /openKeys=\{useRoleGuidedNavigation/u)
-  assert.match(layoutSource, /onOpenChange=\{\(nextOpenKeys\)/u)
-  assert.match(
+  assert.doesNotMatch(
     layoutSource,
-    /roleGuidedSecondaryContainsCurrent[\s\S]*setRoleGuidedOpenKeys/u
+    /ROLE_GUIDED_MORE_MENU_KEY|setRoleGuidedOpenKeys|更多功能/u
   )
   assert.match(
     layoutSource,
     /currentEntry\?\.sidebarParentPath \|\| currentNavigationEntry\.menuPath/u
   )
-  assert.match(
-    layoutSource,
-    /\(item\.sidebarKey \|\| item\.path\) === currentSidebarPath/u
-  )
-  assert.doesNotMatch(
-    layoutSource,
-    /roleGuidedNavigation\.secondaryItems\.some\([\s\S]*item\.path === currentMenuPath/u
-  )
+  assert.match(layoutSource, /\?\s*\[currentSidebarPath\]\s*:\s*\[\]/u)
   assert.doesNotMatch(layoutSource, /defaultOpenKeys=/u)
   assert.match(
     layoutSource,

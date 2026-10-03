@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   buildLocalPermissionDraftAccess,
+  getMenuPlacementMap,
   getMissingMenuPermissionKeys,
   getPrimaryPermissionMenuKey,
   menuRequirementsSatisfied,
@@ -71,6 +72,28 @@ const permissions = [
     usage: { pages: [{ key: 'payables' }, { key: 'inbound' }] },
   },
 ]
+
+test('permission menu projection: 导航位置按直接显示的业务分组标注', () => {
+  const placement = getMenuPlacementMap({
+    dashboardItems: [{ path: '/erp/dashboard' }],
+    primaryItems: [{ path: '/erp/finance/receivables' }],
+    secondarySections: [
+      { title: '业务模块', items: [{ path: '/erp/warehouse/inventory' }] },
+      { title: '工具与查询', items: [{ path: '/erp/history-center' }] },
+      { title: '系统与帮助', items: [{ path: '/erp/help-center' }] },
+    ],
+  })
+  assert.deepEqual(
+    [...placement],
+    [
+      ['/erp/dashboard', '工作中心'],
+      ['/erp/finance/receivables', '常用工作'],
+      ['/erp/warehouse/inventory', '业务模块'],
+      ['/erp/history-center', '工具与查询'],
+      ['/erp/help-center', '系统与帮助'],
+    ]
+  )
+})
 
 test('permission menu projection: 菜单入口合同保留 any/all 语义', () => {
   const normalized = normalizePermissionMenuOptions(menus)

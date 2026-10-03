@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 )
 
@@ -49,7 +50,17 @@ func ConfigFromEnv() Config {
 		SecretKey: os.Getenv("ATTACHMENT_S3_SECRET_ACCESS_KEY")}
 }
 
-func NewFromEnv() (Store, error) { return New(ConfigFromEnv()) }
+func NewFromEnv(logger log.Logger) (Store, error) {
+	cfg := ConfigFromEnv()
+	store, err := New(cfg)
+	if err != nil {
+		return nil, err
+	}
+	log.NewHelper(logger).Infow("msg", "attachment storage configured",
+		"endpoint", strings.TrimRight(cfg.Endpoint, "/"), "bucket", cfg.Bucket,
+		"region", store.client.Options().Region)
+	return store, nil
+}
 
 type S3 struct {
 	client *s3.Client
