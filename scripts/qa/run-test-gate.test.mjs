@@ -282,3 +282,25 @@ test("summary mode identifies a failed Go test without emitting its captured bod
   assert.match(result.stderr, /failedTests=\["example.invalid\/storage:TestBucketReady"\]/u);
   assert.doesNotMatch(result.stdout + result.stderr, /private fixture body/u);
 });
+
+test("summary mode identifies a failed Node test without emitting its captured body", () => {
+  const output = [
+    "TAP version 13",
+    "not ok 1 - Vite ownership probe",
+    "  ---",
+    "  error: private fixture body",
+    "  ...",
+    "1..1",
+    "# tests 1", "# pass 0", "# fail 1", "# cancelled 0", "# skipped 0", "# todo 0",
+  ].join("\n");
+  const childScript = `console.log(${JSON.stringify(output)}); process.exit(1);`;
+  const result = spawnSync(process.execPath, [
+    new URL("./run-test-gate.mjs", import.meta.url).pathname,
+    "--kind", "node", "--label", "web-all", "--output-mode", "summary", "--",
+    process.execPath, "--eval", childScript,
+  ], { encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /tests=1 pass=0 fail=1 cancelled=0 skipped=0 todo=0/u);
+  assert.match(result.stderr, /failedTests=\["Vite ownership probe"\]/u);
+  assert.doesNotMatch(result.stdout + result.stderr, /private fixture body/u);
+});

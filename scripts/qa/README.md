@@ -2,7 +2,7 @@
 
 本文是 `scripts/qa/` 的目录入口。仓库级脚本总览仍在 [scripts/README.md](../README.md)；测试选择和验证层级真源仍在 [docs/product/自动化测试策略.md](../../docs/product/自动化测试策略.md)。
 
-附件存储的真实 PostgreSQL / S3 迁移与恢复验证使用 `bash scripts/qa/attachment-storage-integration.sh`；固定 SeaweedFS 镜像，一次性本地容器，包含导出摘要门禁、私有访问、完整性、PG 加文件恢复和附件并发回归。测试前同时核对 PostgreSQL、集群健康与签名 S3 存储桶访问，就绪超时直接失败。该入口不触碰登记数据库。Go 测试摘要在失败时保留有界的用例名称，捕获的测试正文仍不进入摘要日志。
+附件存储的真实 PostgreSQL / S3 迁移与恢复验证使用 `bash scripts/qa/attachment-storage-integration.sh`；固定 SeaweedFS 镜像，一次性本地容器，包含导出摘要门禁、私有访问、完整性、PG 加文件恢复和附件并发回归。测试前同时核对 PostgreSQL、集群健康与签名 S3 存储桶访问，就绪超时直接失败。该入口不触碰登记数据库。Node 与 Go 测试摘要在失败时保留有界的用例名称，捕获的测试正文仍不进入摘要日志。Web 测试文件固定最多 4 个并发，避免高核数机器同时启动大量真实 Vite 监控器；HMR 文件更新与连接测试仍完整执行。
 
 该演练也包含管理界面验证；单独运行 `node scripts/qa/attachment-console-integration.mjs` 可验证正式 Compose 的原生登录、只读浏览、服务端写入拒绝和退出登录。只在一次性测试覆盖中开放随机本机端口，结束后精确清理测试容器、网络和目录。
 

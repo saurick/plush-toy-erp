@@ -93,7 +93,7 @@
     "smoke:processing-contract-real-login": "node ./scripts/processingContractRealLoginSmoke.mjs",
     "serve:prod": "node ./scripts/serveStaticApp.mjs",
     "preview:yoyoosun": "node ./scripts/previewYoyoosun.mjs",
-    "test": "node --test",
+    "test": "node --test --test-concurrency=4",
     "gen:error-codes": "node ../scripts/gen-error-codes.mjs",
     "prebuild": "node ../scripts/gen-error-codes.mjs",
     "pretest": "node ../scripts/gen-error-codes.mjs"

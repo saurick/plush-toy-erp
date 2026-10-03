@@ -42,9 +42,15 @@ export function evaluateTestGate({
   return { ok: result.ok, reason: result.ok ? "complete" : "invalid-summary", result };
 }
 
-export function formatIncompleteSummary(kind, result) {
+export function formatIncompleteSummary(kind, result, output = "") {
   if (kind === "node") {
-    return `tests=${result.tests ?? "missing"} pass=${result.pass ?? "missing"} fail=${result.fail ?? "missing"} cancelled=${result.cancelled ?? "missing"} skipped=${result.skipped ?? "missing"} todo=${result.todo ?? "missing"}`;
+    const failedTests = [...String(output).matchAll(/^\s*not ok \d+ - ([^\r\n]+)/gmu)]
+      .slice(0, 20)
+      .map((match) => match[1].slice(0, 512));
+    const failures = failedTests.length
+      ? ` failedTests=${JSON.stringify(failedTests)}`
+      : "";
+    return `tests=${result.tests ?? "missing"} pass=${result.pass ?? "missing"} fail=${result.fail ?? "missing"} cancelled=${result.cancelled ?? "missing"} skipped=${result.skipped ?? "missing"} todo=${result.todo ?? "missing"}${failures}`;
   }
   if (kind === "go") {
     const failedTests = (result.failedTests || [])
@@ -163,7 +169,7 @@ async function main() {
   });
   if (!outcome.ok) {
     const summary = outcome.result
-      ? ` ${formatIncompleteSummary(options.kind, outcome.result)}`
+      ? ` ${formatIncompleteSummary(options.kind, outcome.result, child.stdout)}`
       : "";
     console.error(
       `[qa:test-gate] label=${options.label} status=incomplete reason=${outcome.reason}${summary}`,
