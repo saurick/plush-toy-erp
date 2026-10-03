@@ -2,7 +2,7 @@ name: plush-gitlab-control
 
 services:
   gitlab:
-    image: gitlab/gitlab-ce@sha256:05453dd1d9aba27c2c487613141596868409b4d03247647f7d66cb0b36f321b8
+    image: gitlab/gitlab-ce@sha256:8c6ede6b1334738123feba0d248e81a14fc3db7065dc6e1f0a753c0d0332fee8
     container_name: plush-gitlab
     hostname: ${GITLAB_HOSTNAME:-gitlab.saurick.me}
     restart: unless-stopped

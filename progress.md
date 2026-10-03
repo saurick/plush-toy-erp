@@ -150,6 +150,7 @@
 
 | 事项 | 当前结论 | 详细证据 |
 | --- | --- | --- |
+| GitLab 紧急安全补丁（2026-10-02） | `r740xd` 的 `plush-gitlab` 已从 CE `19.3.2` 升级到官方固定 digest 的 `19.3.3`；公网版本、健康/就绪、自检、SSH 仓库读取和 Release manifest 下载校验通过，2331 项迁移均为 up，Runner 已恢复接单且在线 | 服务器回执 `/srv/host-control/gitlab-upgrade-20261002-19.3.3.json`；新鲜 29.4 GB 应用备份、配置/密钥包及 SHA-256 配对校验通过，原镜像与恢复输入保留于 `/srv/raid5/gitlab-upgrade-recovery/20261002T123518Z-19.3.2-to-19.3.3`；11 项相关定向测试通过；完整恢复演练未执行，异机备份沿用既有暂缓决定，本轮未 commit/push |
 | CI/CD 与双测试环境发布（2026-09-30） | `2026.09.30-1` 已部署到 demo 与 test，server / web / 公网均绑定 `3f3a412c96552cd4980e8455d4df15fa063b0f58`；新鲜备份恢复检查、运行读回及业务 smoke 通过 | GitLab pipelines `#238` / `#239`、两目标 promotion 终态回执、16:51 独立 `target-preflight`；详见本页同日记录 |
 | 测试环境全量升级（2026-09-26） | `2026.09.26-1` 已发布并升级 `demo-133`、`customer-test-133`；应用、PostgreSQL、Jaeger、备份恢复检查、migration 与公网入口读回通过；外部附件存储未纳入目标写操作 | GitLab pipelines `#222` / `#223`、两目标 promotion 终态回执、发布后 `target-preflight` |
 | 文档治理（2026-09-26） | 统一 GitHub 与产品查看器标题锚点，显式别名采用受限安全渲染并加入真实 DOM 回归；将 `progress.md` 与归档 README 纳入当前链接检查，冻结归档正文保持豁免；归档压缩过程记录、收窄根 README，并将历史逐文件清单下沉到归档索引 | 当前 diff、`docs/文档清单.md`、`docs/archive/README.md`、Markdown 组件与文档守卫测试 |
