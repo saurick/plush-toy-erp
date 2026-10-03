@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 import { measureEmptyEditorHints } from './printEmptyEditorAssertions.mjs'
+import { createMockAdminSessionToken } from '../mockAdminSessionToken.mjs'
 
 export function createPrintWorkspaceControlScenarios({
   assert,
@@ -9,6 +10,149 @@ export function createPrintWorkspaceControlScenarios({
   gotoScenarioPath,
 }) {
   return [
+    {
+      name: 'print-workspace-session-isolation',
+      path: '/print-window-shell.html?state=retired-window',
+      mockAdminRpc: true,
+      viewport: { width: 3840, height: 2160 },
+      verify: async (page) => {
+        const { origin } = new URL(page.url())
+        const authModuleURL = new URL('/src/common/auth/auth.js', origin).href
+        const workspacePath =
+          '/erp/print-workspace/processing-contract?state=session-isolation&config_revision=session-review'
+        const selector =
+          '.erp-processing-contract-table tbody td [contenteditable="true"]'
+        const marker = '账号A私有打印字段'
+        const tokenA = createMockAdminSessionToken({
+          userID: 41,
+          sessionKey: 'print-account-A',
+        })
+        const tokenB = createMockAdminSessionToken({
+          userID: 42,
+          sessionKey: 'print-account-B',
+        })
+        const signIn = async (target, token) =>
+          target.evaluate(
+            async ({ accessToken, moduleURL }) => {
+              const { persistAuth } = await import(moduleURL)
+              persistAuth({ access_token: accessToken })
+            },
+            { accessToken: token, moduleURL: authModuleURL }
+          )
+        await page.evaluate(async () => {
+          localStorage.setItem(
+            '__plush_erp_print_window_state__:retired-window',
+            JSON.stringify({
+              version: 1,
+              updatedAt: Date.now(),
+              templateKey: 'processing-contract',
+              workspaceURL:
+                '/erp/print-workspace/processing-contract?state=retired-window',
+              windowHTML: '<p>退役缓存敏感字段</p>',
+            })
+          )
+          const db = await new Promise((resolve) => {
+            const request = indexedDB.open(
+              '__plush_erp_print_window_state_db__',
+              1
+            )
+            request.onupgradeneeded = () =>
+              request.result.createObjectStore('states', { keyPath: 'stateID' })
+            request.onsuccess = () => resolve(request.result)
+          })
+          await new Promise((resolve) => {
+            const tx = db.transaction('states', 'readwrite')
+            tx.objectStore('states').put({
+              stateID: 'retired-window',
+              windowHTML: '<p>退役缓存敏感字段</p>',
+            })
+            tx.oncomplete = resolve
+          })
+          db.close()
+        })
+        await page.reload()
+        assert.equal(await page.getByText('退役缓存敏感字段').count(), 0)
+        await page
+          .getByRole('heading', { name: '请重新打开打印窗口' })
+          .waitFor()
+        await gotoScenarioPath(
+          page,
+          '/erp/print-workspace/processing-contract?state=retired-window'
+        )
+        await page.waitForURL('**/admin-login')
+        await signIn(page, tokenA)
+        await gotoScenarioPath(page, workspacePath)
+        await page.locator('.erp-print-shell--ready').waitFor()
+        const editor = page.locator(selector).first()
+        await editor.fill(marker)
+        await editor.press('Tab')
+        await page.locator('[data-print-draft-save-status="saved"]').waitFor()
+        await page.reload()
+        await page.locator('.erp-print-shell--ready').waitFor()
+        assert.equal(await page.locator(selector).first().textContent(), marker)
+        await page.screenshot({
+          path: path.join(outputDir, 'print-session-account-A.png'),
+        })
+
+        const controller = await page.context().newPage()
+        try {
+          await controller.goto(`${origin}/print-window-shell.html`)
+          await signIn(controller, tokenB)
+          await page.waitForFunction(
+            (value) => !document.body.textContent.includes(value),
+            marker
+          )
+          await page.locator('.erp-print-shell--ready').waitFor()
+          assert.equal(await page.getByText(marker, { exact: true }).count(), 0)
+          await page.reload()
+          await page.locator('.erp-print-shell--ready').waitFor()
+          assert.equal(await page.getByText(marker, { exact: true }).count(), 0)
+          await controller.evaluate(async (moduleURL) => {
+            const { logout } = await import(moduleURL)
+            logout()
+          }, authModuleURL)
+          await page.waitForURL('**/admin-login')
+          await gotoScenarioPath(page, workspacePath)
+          await page.waitForURL('**/admin-login')
+        } finally {
+          await controller.close()
+        }
+        await signIn(page, tokenA)
+        await gotoScenarioPath(page, workspacePath)
+        await page.locator('.erp-print-shell--ready').waitFor()
+        assert.equal(await page.locator(selector).first().textContent(), marker)
+        const expiresAt = Math.floor(Date.now() / 1000) + 2
+        await signIn(
+          page,
+          createMockAdminSessionToken({
+            userID: 41,
+            sessionKey: 'print-short-session',
+            expiresAt,
+          })
+        )
+        await page.waitForURL('**/admin-login', { timeout: 5000 })
+        assert.equal(await page.getByText(marker, { exact: true }).count(), 0)
+        assert.equal(
+          await page.evaluate(() =>
+            localStorage.getItem(
+              '__plush_erp_print_window_state__:retired-window'
+            )
+          ),
+          null
+        )
+        assert.equal(
+          await page.evaluate(async () =>
+            (await indexedDB.databases()).some(
+              (db) => db.name === '__plush_erp_print_window_state_db__'
+            )
+          ),
+          false
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'print-session-expired.png'),
+        })
+      },
+    },
     {
       name: 'print-workspace-all-empty-fields',
       path: '/erp/print-workspace/material-purchase-contract?draft=fresh',

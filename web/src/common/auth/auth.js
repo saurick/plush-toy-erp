@@ -1,5 +1,17 @@
 import { jwtDecode } from 'jwt-decode'
 import { isValidAdminSessionClaims } from './adminTokenContract.mjs'
+import { clearRetiredPrintWindowState } from './printWindowStorageCleanup.mjs'
+
+export const AUTH_SESSION_CHANGED_EVENT = 'plush:auth-session-changed'
+
+function notifySessionChanged() {
+  if (
+    typeof window !== 'undefined' &&
+    typeof window.dispatchEvent === 'function'
+  ) {
+    window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT))
+  }
+}
 
 export const AUTH_SCOPE = {
   ADMIN: 'admin',
@@ -71,6 +83,8 @@ export function getToken(scope = AUTH_SCOPE.ADMIN) {
 export function setToken(token, scope = AUTH_SCOPE.ADMIN) {
   const normalizedScope = normalizeScope(scope)
   setStorageItem(localStorage, TOKEN_KEYS[normalizedScope], token)
+  clearRetiredPrintWindowState()
+  notifySessionChanged()
 }
 
 function setScopedMeta(scope, data) {
@@ -134,8 +148,11 @@ export function getLoginPath(_scope = AUTH_SCOPE.ADMIN) {
 
 export function logout(scope = AUTH_SCOPE.ADMIN) {
   const normalizedScope = normalizeScope(scope)
+  const hadToken = Boolean(getToken(normalizedScope))
   removeStorageItem(localStorage, TOKEN_KEYS[normalizedScope])
   clearScopedMeta(normalizedScope)
+  clearRetiredPrintWindowState()
+  if (hadToken) notifySessionChanged()
 
   try {
     sessionStorage.clear()

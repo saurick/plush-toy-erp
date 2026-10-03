@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   PrintToolButton,
@@ -51,7 +51,6 @@ import {
   PRINT_WORKSPACE_DRAFT_MODE,
   PRINT_WORKSPACE_ENTRY_SOURCE,
   buildPrintWorkspaceDraftStorageKey,
-  buildRestorablePrintWorkspaceURL,
   readInitialPrintWorkspaceDraftFromWindowName,
   readPrintWorkspaceDraftSnapshot,
   resolvePrintWorkspaceDraftMode,
@@ -62,7 +61,6 @@ import {
   syncPrintPageMarginForPaper,
   watchPrintPageMarginForPaper,
 } from '../utils/printPageMargin.mjs'
-import usePrintWorkspaceWindowState from '../utils/usePrintWorkspaceWindowState.js'
 import { preparePrintWorkspaceSnapshot } from '../utils/printWorkspaceOutput.mjs'
 import {
   useFlushPrintWorkspaceDraftOnPageExit,
@@ -324,7 +322,9 @@ function loadDraft({
 
   const initialDraft = readInitialPrintWorkspaceDraftFromWindowName(
     templateKey,
-    workspaceStateID
+    workspaceStateID,
+    window,
+    storageKey
   )
   if (initialDraft) {
     return createEngineeringPrintDraft(templateKey, initialDraft)
@@ -359,17 +359,6 @@ export default function EngineeringPrintWorkspacePage() {
         accountKey,
         configRevision,
       })
-  const workspaceURL = useMemo(() => {
-    if (!workspaceStateID || typeof window === 'undefined') {
-      return ''
-    }
-    return buildRestorablePrintWorkspaceURL(templateKey, {
-      entrySource,
-      customerKey,
-      configRevision,
-      stateID: workspaceStateID,
-    })
-  }, [configRevision, customerKey, entrySource, templateKey, workspaceStateID])
   const paperRef = useRef(null)
   const stageWrapRef = useRef(null)
   const pdfPreviewPreloadRef = useRef(null)
@@ -461,12 +450,6 @@ export default function EngineeringPrintWorkspacePage() {
       paperContinuedClass: 'erp-engineering-print-paper--continued',
     })
   }, [])
-
-  usePrintWorkspaceWindowState({
-    stateID: workspaceStateID,
-    templateKey,
-    workspaceURL,
-  })
 
   useEffect(() => {
     if (!pdfAction || typeof window === 'undefined') return undefined

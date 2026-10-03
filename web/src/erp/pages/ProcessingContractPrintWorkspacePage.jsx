@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { PrintToolButton } from '../components/print/PrintWorkspaceTools.jsx'
 import usePrintWorkspaceFeedback from '../utils/usePrintWorkspaceFeedback.js'
@@ -36,7 +36,6 @@ import {
   updateProcessingContractLineCell,
 } from '../utils/processingContractEditor.mjs'
 import {
-  buildRestorablePrintWorkspaceURL,
   buildPrintWorkspaceDraftStorageKey,
   PRINT_WORKSPACE_DRAFT_MODE,
   PRINT_WORKSPACE_ENTRY_SOURCE,
@@ -55,7 +54,6 @@ import {
   watchPrintPageMarginForPaper,
 } from '../utils/printPageMargin.mjs'
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
-import usePrintWorkspaceWindowState from '../utils/usePrintWorkspaceWindowState.js'
 import { preparePrintWorkspaceSnapshot } from '../utils/printWorkspaceOutput.mjs'
 import {
   useFlushPrintWorkspaceDraftOnPageExit,
@@ -82,7 +80,9 @@ function loadDraft({
 
   const initialDraft = readInitialPrintWorkspaceDraftFromWindowName(
     PROCESSING_CONTRACT_TEMPLATE_KEY,
-    workspaceStateID
+    workspaceStateID,
+    window,
+    storageKey
   )
   if (initialDraft) {
     return businessInput
@@ -137,18 +137,6 @@ export default function ProcessingContractPrintWorkspacePage() {
         accountKey,
         configRevision,
       })
-  const workspaceURL = useMemo(() => {
-    if (!workspaceStateID || typeof window === 'undefined') {
-      return ''
-    }
-
-    return buildRestorablePrintWorkspaceURL(PROCESSING_CONTRACT_TEMPLATE_KEY, {
-      entrySource,
-      customerKey,
-      configRevision,
-      stateID: workspaceStateID,
-    })
-  }, [configRevision, customerKey, entrySource, workspaceStateID])
   const [
     contract,
     setContract,
@@ -222,12 +210,6 @@ export default function ProcessingContractPrintWorkspacePage() {
       paperContinuedClass: 'erp-processing-contract-paper--continued',
     })
   }, [])
-
-  usePrintWorkspaceWindowState({
-    stateID: workspaceStateID,
-    templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
-    workspaceURL,
-  })
 
   useEffect(() => {
     if (!busyAction || typeof window === 'undefined') {

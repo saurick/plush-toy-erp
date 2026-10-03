@@ -40,7 +40,6 @@ import {
   syncPrintPageMarginForPaper,
   watchPrintPageMarginForPaper,
 } from '../../utils/printPageMargin.mjs'
-import usePrintWorkspaceWindowState from '../../utils/usePrintWorkspaceWindowState.js'
 import { preparePrintWorkspaceSnapshot } from '../../utils/printWorkspaceOutput.mjs'
 import {
   useFlushPrintWorkspaceDraftOnPageExit,
@@ -75,7 +74,9 @@ function loadDraft(template, storageKey, options = {}) {
   }
   const initialDraft = readInitialPrintWorkspaceDraftFromWindowName(
     template?.key,
-    workspaceStateID
+    workspaceStateID,
+    window,
+    storageKey
   )
   if (initialDraft) {
     return buildDraft(initialDraft)
@@ -94,7 +95,6 @@ export default function MaterialPurchaseContractWorkbench({
   draftStorageKey = '',
   resetDraftOnOpen = false,
   workspaceStateID = '',
-  workspaceURL = '',
   sourceTag = '使用默认模板',
   businessInput = false,
   customerKey = '',
@@ -163,12 +163,6 @@ export default function MaterialPurchaseContractWorkbench({
       paperContinuedClass: 'erp-material-contract-paper--continued',
     })
   }, [])
-
-  usePrintWorkspaceWindowState({
-    stateID: workspaceStateID,
-    templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-    workspaceURL,
-  })
 
   useEffect(() => {
     if (!pdfAction || typeof window === 'undefined') {

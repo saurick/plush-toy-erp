@@ -6,20 +6,11 @@ export const MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY =
   'material-purchase-contract'
 export { PROCESSING_CONTRACT_TEMPLATE_KEY }
 
-const PRINT_WORKSPACE_WINDOW_STATE_STORAGE_KEY_PREFIX =
-  '__plush_erp_print_window_state__:'
-const PRINT_WORKSPACE_WINDOW_STATE_VERSION = 1
-const PRINT_WORKSPACE_WINDOW_STATE_DB_NAME =
-  '__plush_erp_print_window_state_db__'
-const PRINT_WORKSPACE_WINDOW_STATE_DB_VERSION = 1
-const PRINT_WORKSPACE_WINDOW_STATE_DB_STORE_NAME = 'states'
 const PRINT_WORKSPACE_STATE_QUERY_KEY = 'state'
-const PRINT_WORKSPACE_WINDOW_STATE_TTL_MS = 24 * 60 * 60 * 1000
 const PRINT_WORKSPACE_DRAFT_SNAPSHOT_VERSION = 1
 const PRINT_WORKSPACE_DRAFT_SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000
 const PRINT_WORKSPACE_DRAFT_STORAGE_KEY_PREFIX =
   '__plush_erp_print_workspace_draft__:v3'
-const PRINT_WORKSPACE_SHELL_PATH = '/print-window-shell.html'
 const PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_PREFIX =
   '__plush_erp_print_initial_draft__:'
 const PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_VERSION = 1
@@ -125,10 +116,6 @@ export function createPrintWorkspaceStateID() {
   return `${Date.now()}_${Math.random().toString(36).slice(2)}`
 }
 
-export function buildPrintWorkspaceWindowStateStorageKey(stateID = '') {
-  return `${PRINT_WORKSPACE_WINDOW_STATE_STORAGE_KEY_PREFIX}${normalizeStateID(stateID)}`
-}
-
 export function buildPrintWorkspaceDraftStorageKey(
   templateKey,
   stateID = '',
@@ -157,7 +144,12 @@ export function buildPrintWorkspaceDraftStorageKey(
   return `${PRINT_WORKSPACE_DRAFT_STORAGE_KEY_PREFIX}:${customerScope}:${accountScope}:${configRevisionScope}:${templateScope}:${stateScope}`
 }
 
-function buildInitialDraftWindowNamePayload(templateKey, stateID, draft) {
+function buildInitialDraftWindowNamePayload(
+  templateKey,
+  stateID,
+  draft,
+  storageKey
+) {
   const normalizedTemplateKey = normalizeTemplateKey(templateKey)
   const normalizedStateID = normalizeStateID(stateID)
   if (!normalizedTemplateKey || !normalizedStateID) {
@@ -168,6 +160,7 @@ function buildInitialDraftWindowNamePayload(templateKey, stateID, draft) {
     version: PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_VERSION,
     templateKey: normalizedTemplateKey,
     stateID: normalizedStateID,
+    storageKey,
     draft,
   })}`
 }
@@ -175,17 +168,23 @@ function buildInitialDraftWindowNamePayload(templateKey, stateID, draft) {
 export function readInitialPrintWorkspaceDraftFromWindowName(
   templateKey,
   stateID,
-  windowLike
+  windowLike,
+  storageKey
 ) {
   const targetWindow =
     windowLike || (typeof window !== 'undefined' ? window : null)
   const normalizedTemplateKey = normalizeTemplateKey(templateKey)
   const normalizedStateID = normalizeStateID(stateID)
-  if (!targetWindow || !normalizedTemplateKey || !normalizedStateID) {
+  if (
+    !targetWindow ||
+    !normalizedTemplateKey ||
+    !normalizedStateID ||
+    !storageKey
+  ) {
     return null
   }
 
-  const cacheKey = `${normalizedTemplateKey}:${normalizedStateID}`
+  const cacheKey = storageKey
   const cachedDrafts = initialPrintWorkspaceDraftCache.get(targetWindow)
   if (cachedDrafts?.has(cacheKey)) {
     return cachedDrafts.get(cacheKey)
@@ -206,6 +205,7 @@ export function readInitialPrintWorkspaceDraftFromWindowName(
         PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_VERSION ||
       normalizeTemplateKey(payload?.templateKey) !== normalizedTemplateKey ||
       normalizeStateID(payload?.stateID) !== normalizedStateID ||
+      payload?.storageKey !== storageKey ||
       !Object.prototype.hasOwnProperty.call(payload, 'draft')
     ) {
       return null
@@ -274,249 +274,6 @@ export function buildRestorablePrintWorkspaceURL(
     ...options,
     draftMode: PRINT_WORKSPACE_DRAFT_MODE.RESTORE,
   })
-}
-
-export function buildPrintWorkspaceShellURL(stateID = '') {
-  const shellURL = new URL(PRINT_WORKSPACE_SHELL_PATH, window.location.origin)
-  const normalizedStateID = normalizeStateID(stateID)
-  if (normalizedStateID) {
-    shellURL.searchParams.set(
-      PRINT_WORKSPACE_STATE_QUERY_KEY,
-      normalizedStateID
-    )
-  }
-  return shellURL.toString()
-}
-
-export function persistPrintWorkspaceWindowState(stateID, payload = {}) {
-  const normalizedStateID = normalizeStateID(stateID)
-  if (
-    typeof window === 'undefined' ||
-    !window.localStorage ||
-    !normalizedStateID
-  ) {
-    return false
-  }
-
-  try {
-    window.localStorage.setItem(
-      buildPrintWorkspaceWindowStateStorageKey(normalizedStateID),
-      JSON.stringify({
-        version: PRINT_WORKSPACE_WINDOW_STATE_VERSION,
-        updatedAt: Date.now(),
-        ...payload,
-      })
-    )
-    return true
-  } catch {
-    return false
-  }
-}
-
-function buildPrintWorkspaceWindowStateRecord(stateID, payload = {}) {
-  const normalizedStateID = normalizeStateID(stateID)
-  if (!normalizedStateID) {
-    return null
-  }
-
-  return {
-    version: PRINT_WORKSPACE_WINDOW_STATE_VERSION,
-    stateID: normalizedStateID,
-    updatedAt: Date.now(),
-    ...payload,
-  }
-}
-
-let printWorkspaceWindowStateDatabasePromise = null
-
-function openPrintWorkspaceWindowStateDatabase(indexedDBLike) {
-  const indexedDB = indexedDBLike || window.indexedDB
-  if (!indexedDB || typeof indexedDB.open !== 'function') {
-    return Promise.resolve(null)
-  }
-  if (printWorkspaceWindowStateDatabasePromise) {
-    return printWorkspaceWindowStateDatabasePromise
-  }
-
-  printWorkspaceWindowStateDatabasePromise = new Promise((resolve) => {
-    try {
-      const request = indexedDB.open(
-        PRINT_WORKSPACE_WINDOW_STATE_DB_NAME,
-        PRINT_WORKSPACE_WINDOW_STATE_DB_VERSION
-      )
-      request.onupgradeneeded = () => {
-        const database = request.result
-        if (
-          !database.objectStoreNames.contains(
-            PRINT_WORKSPACE_WINDOW_STATE_DB_STORE_NAME
-          )
-        ) {
-          database.createObjectStore(
-            PRINT_WORKSPACE_WINDOW_STATE_DB_STORE_NAME,
-            {
-              keyPath: 'stateID',
-            }
-          )
-        }
-      }
-      request.onsuccess = () => {
-        const database = request.result
-        database.onversionchange = () => {
-          try {
-            database.close()
-          } catch {
-            // 忽略关闭失败，继续保留 localStorage 兜底。
-          }
-        }
-        resolve(database)
-      }
-      request.onerror = () => resolve(null)
-      request.onblocked = () => resolve(null)
-    } catch {
-      resolve(null)
-    }
-  })
-
-  return printWorkspaceWindowStateDatabasePromise
-}
-
-function persistPrintWorkspaceWindowStateRecordToIndexedDB(
-  stateID,
-  indexedDBLike,
-  payload = {}
-) {
-  const record = buildPrintWorkspaceWindowStateRecord(stateID, payload)
-  if (!record) {
-    return Promise.resolve(false)
-  }
-
-  return openPrintWorkspaceWindowStateDatabase(indexedDBLike).then(
-    (database) => {
-      if (!database) {
-        return false
-      }
-
-      return new Promise((resolve) => {
-        try {
-          const transaction = database.transaction(
-            PRINT_WORKSPACE_WINDOW_STATE_DB_STORE_NAME,
-            'readwrite'
-          )
-          const request = transaction
-            .objectStore(PRINT_WORKSPACE_WINDOW_STATE_DB_STORE_NAME)
-            .put(record)
-          let settled = false
-          const finalize = (saved) => {
-            if (settled) {
-              return
-            }
-            settled = true
-            resolve(saved)
-          }
-          request.onsuccess = () => finalize(true)
-          request.onerror = () => finalize(false)
-          transaction.oncomplete = () => finalize(true)
-          transaction.onerror = () => finalize(false)
-          transaction.onabort = () => finalize(false)
-        } catch {
-          resolve(false)
-        }
-      })
-    }
-  )
-}
-
-export function persistPrintWorkspaceWindowHTML(stateID, payload = {}) {
-  const normalizedStateID = normalizeStateID(stateID)
-  if (!normalizedStateID) {
-    return Promise.resolve(false)
-  }
-
-  const record = buildPrintWorkspaceWindowStateRecord(
-    normalizedStateID,
-    payload
-  )
-  if (!record) {
-    return Promise.resolve(false)
-  }
-
-  let savedToStorage = false
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      window.localStorage.setItem(
-        buildPrintWorkspaceWindowStateStorageKey(normalizedStateID),
-        JSON.stringify(record)
-      )
-      savedToStorage = true
-    } catch {
-      savedToStorage = false
-    }
-  }
-
-  if (savedToStorage) {
-    persistPrintWorkspaceWindowStateRecordToIndexedDB(
-      normalizedStateID,
-      undefined,
-      payload
-    ).catch(() => {})
-    return Promise.resolve(true)
-  }
-
-  return persistPrintWorkspaceWindowStateRecordToIndexedDB(
-    normalizedStateID,
-    undefined,
-    payload
-  )
-}
-
-export function readPrintWorkspaceWindowState(stateID, storageLike) {
-  const normalizedStateID = normalizeStateID(stateID)
-  const storage =
-    storageLike || (typeof window !== 'undefined' ? window.localStorage : null)
-  if (!storage || !normalizedStateID) {
-    return null
-  }
-
-  try {
-    const raw = storage.getItem(
-      buildPrintWorkspaceWindowStateStorageKey(normalizedStateID)
-    )
-    if (!raw) {
-      return null
-    }
-    const payload = JSON.parse(raw)
-    const updatedAt = Number(payload?.updatedAt)
-    if (Number(payload?.version) !== PRINT_WORKSPACE_WINDOW_STATE_VERSION) {
-      return null
-    }
-    if (
-      Number.isFinite(updatedAt) &&
-      updatedAt > 0 &&
-      Date.now() - updatedAt > PRINT_WORKSPACE_WINDOW_STATE_TTL_MS
-    ) {
-      storage.removeItem(
-        buildPrintWorkspaceWindowStateStorageKey(normalizedStateID)
-      )
-      return null
-    }
-    return payload
-  } catch {
-    return null
-  }
-}
-
-export function canOpenPrintWorkspaceFromWindowState(
-  templateKey,
-  searchParamsLike,
-  storageLike
-) {
-  const stateID = resolvePrintWorkspaceStateID(searchParamsLike)
-  const payload = readPrintWorkspaceWindowState(stateID, storageLike)
-
-  return (
-    normalizeTemplateKey(payload?.templateKey) ===
-      normalizeTemplateKey(templateKey) && Boolean(payload?.workspaceURL)
-  )
 }
 
 export function persistPrintWorkspaceDraftSnapshot(
@@ -596,36 +353,6 @@ export function readPrintWorkspaceDraftSnapshot(storageKey, storageLike) {
   }
 }
 
-export function syncPrintWorkspaceShellHistory(stateID) {
-  if (
-    typeof window === 'undefined' ||
-    !window.history ||
-    typeof window.history.replaceState !== 'function'
-  ) {
-    return false
-  }
-
-  const normalizedStateID = normalizeStateID(stateID)
-  if (!normalizedStateID) {
-    return false
-  }
-
-  const shellURL = new URL(buildPrintWorkspaceShellURL(normalizedStateID))
-  if (
-    window.location.pathname === shellURL.pathname &&
-    window.location.search === shellURL.search
-  ) {
-    return false
-  }
-
-  window.history.replaceState(
-    null,
-    '',
-    `${shellURL.pathname}${shellURL.search}${shellURL.hash}`
-  )
-  return true
-}
-
 export function openPrintWorkspaceWindow(
   templateKey = PROCESSING_CONTRACT_TEMPLATE_KEY,
   options = {}
@@ -664,11 +391,14 @@ export function openPrintWorkspaceWindow(
           window
         )
       ) {
+        const storageKey = initialDraftStorageKey
+        if (!storageKey) throw new Error('missing account scope')
         initialDraftStorageKey = ''
         initialDraftWindowNamePayload = buildInitialDraftWindowNamePayload(
           templateKey,
           stateID,
-          initialDraft
+          initialDraft,
+          storageKey
         )
         if (!initialDraftWindowNamePayload) {
           throw new Error('empty draft payload')
@@ -681,10 +411,6 @@ export function openPrintWorkspaceWindow(
   const workspaceURL = buildRestorablePrintWorkspaceURL(templateKey, {
     ...workspaceOptions,
     stateID,
-  })
-  persistPrintWorkspaceWindowState(stateID, {
-    templateKey: normalizeTemplateKey(templateKey),
-    workspaceURL,
   })
   const popupURL = workspaceURL
   const popup = initialDraftWindowNamePayload

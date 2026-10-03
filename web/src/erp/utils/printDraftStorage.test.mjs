@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { IDBFactory } from 'fake-indexeddb'
+import { readPrintWorkspaceDraftSnapshot } from './printWorkspace.js'
 import {
   createPrintDraftWriter,
   preparePrintDraftStorage,
@@ -10,14 +11,21 @@ import {
   PRINT_DRAFT_TTL_MS,
 } from './printDraftStorage.mjs'
 
-test('草稿事务提交后才能报告保存，并从 IndexedDB 恢复当前窗口', async () => {
+test('FL_print_workspace_window_draft__restores_current_structured_draft 草稿事务提交后恢复本窗口字段和图片', async () => {
   const removed = []
   const windowLike = {
     indexedDB: new IDBFactory(),
     localStorage: { removeItem: (key) => removed.push(key) },
   }
   assert.equal(
-    await writePrintDraft('account:a:window:1', { value: '甲' }, windowLike),
+    await writePrintDraft(
+      'account:a:window:1',
+      {
+        value: '甲',
+        appendixImages: [{ dataURL: 'data:image/png;base64,AAAA' }],
+      },
+      windowLike
+    ),
     true
   )
   assert.equal(
@@ -27,6 +35,7 @@ test('草稿事务提交后才能报告保存，并从 IndexedDB 恢复当前窗
   await preparePrintDraftStorage('account:a:window:1', windowLike)
   assert.deepEqual(readPreparedPrintDraft('account:a:window:1'), {
     value: '甲',
+    appendixImages: [{ dataURL: 'data:image/png;base64,AAAA' }],
   })
   await preparePrintDraftStorage('account:b:window:2', windowLike)
   assert.deepEqual(readPreparedPrintDraft('account:b:window:2'), {
@@ -49,6 +58,78 @@ test('存储不可用时保留旧草稿且不冒充保存成功', async () => {
   assert.equal(await writePrintDraft('disabled', {}, windowLike), false)
   await preparePrintDraftStorage('disabled', windowLike)
   assert.equal(readPreparedPrintDraft('disabled'), undefined)
+})
+
+test('put 请求成功后事务中止，必须报告未保存并保留原草稿', async () => {
+  const factory = new IDBFactory()
+  const originalOpen = factory.open.bind(factory)
+  factory.open = (...args) => {
+    const request = originalOpen(...args)
+    request.addEventListener('success', () => {
+      const db = request.result
+      const transaction = db.transaction.bind(db)
+      db.transaction = (...txArgs) => {
+        const tx = transaction(...txArgs)
+        const objectStore = tx.objectStore.bind(tx)
+        tx.objectStore = (name) => {
+          const store = objectStore(name)
+          const put = store.put.bind(store)
+          store.put = (...putArgs) => {
+            const writing = put(...putArgs)
+            writing.addEventListener('success', () => tx.abort())
+            return writing
+          }
+          return store
+        }
+        return tx
+      }
+    })
+    return request
+  }
+  let removed = false
+  const runtime = {
+    indexedDB: factory,
+    localStorage: {
+      removeItem() {
+        removed = true
+      },
+    },
+  }
+  assert.equal(
+    await writePrintDraft('abort-after-put', { text: '新内容' }, runtime),
+    false
+  )
+  assert.equal(removed, false)
+  await preparePrintDraftStorage('abort-after-put', runtime)
+  assert.equal(readPreparedPrintDraft('abort-after-put'), undefined)
+})
+
+test('新草稿提交 IndexedDB 后刷新恢复新版本，旧 localStorage 草稿不遮挡', async () => {
+  const key = 'account:a:current-draft'
+  const store = new Map([
+    [
+      key,
+      JSON.stringify({
+        version: 1,
+        updatedAt: Date.now(),
+        draft: { text: '旧内容' },
+      }),
+    ],
+  ])
+  const runtime = {
+    indexedDB: new IDBFactory(),
+    localStorage: {
+      getItem: (storageKey) => store.get(storageKey) || null,
+      setItem() {
+        throw new DOMException('quota exceeded', 'QuotaExceededError')
+      },
+      removeItem: (storageKey) => store.delete(storageKey),
+    },
+  }
+  assert.equal(await writePrintDraft(key, { text: '新内容' }, runtime), true)
+  assert.equal(store.has(key), false)
+  await preparePrintDraftStorage(key, runtime)
+  assert.deepEqual(readPrintWorkspaceDraftSnapshot(key), { text: '新内容' })
 })
 
 test('临时拒绝打开数据库后可重试，不缓存失败连接', async () => {

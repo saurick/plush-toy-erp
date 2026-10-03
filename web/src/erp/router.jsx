@@ -26,7 +26,6 @@ import {
   resolveDefaultEntryTarget,
 } from './config/entryConfig.mjs'
 import { getAllowedMobileRoleKeys } from './utils/mobileRolePermissions.mjs'
-import { canOpenPrintWorkspaceFromWindowState } from './utils/printWorkspace.js'
 
 const lazyRoute = lazyWithDynamicImportRetry
 
@@ -228,17 +227,6 @@ function RouteRuntimeBoundary({ children }) {
 }
 
 function PrintWorkspaceRoute() {
-  const { templateKey } = useParams()
-  const location = useLocation()
-  const canRestoreFromWindowState = canOpenPrintWorkspaceFromWindowState(
-    templateKey,
-    location.search
-  )
-
-  if (canRestoreFromWindowState) {
-    return <PrintWorkspacePage />
-  }
-
   return (
     <AuthGuard requireAdmin>
       <PrintWorkspacePage />

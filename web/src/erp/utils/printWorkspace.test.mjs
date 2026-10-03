@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { createMockAdminSessionToken } from '../../../scripts/mockAdminSessionToken.mjs'
 import { getPrintWorkspaceDraftScope } from './printWorkspaceScope.mjs'
@@ -13,14 +12,8 @@ import {
   buildPrintWorkspaceDraftStorageKey,
   buildPrintWorkspacePath,
   buildRestorablePrintWorkspaceURL,
-  buildPrintWorkspaceShellURL,
-  buildPrintWorkspaceWindowStateStorageKey,
-  canOpenPrintWorkspaceFromWindowState,
-  persistPrintWorkspaceWindowHTML,
-  persistPrintWorkspaceWindowState,
   persistPrintWorkspaceDraftSnapshot,
   readPrintWorkspaceDraftSnapshot,
-  readPrintWorkspaceWindowState,
   readInitialPrintWorkspaceDraftFromWindowName,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceEntrySource,
@@ -125,25 +118,7 @@ test('printWorkspace: 未显式声明时默认恢复草稿模式，业务入口�
   )
 })
 
-test('printWorkspace: 壳页 URL、窗口状态 key 与草稿 key 统一收口', () => {
-  const originalWindow = globalThis.window
-  globalThis.window = {
-    location: { origin: 'http://127.0.0.1:4173' },
-  }
-
-  try {
-    assert.equal(
-      buildPrintWorkspaceShellURL('window-3'),
-      'http://127.0.0.1:4173/print-window-shell.html?state=window-3'
-    )
-  } finally {
-    globalThis.window = originalWindow
-  }
-
-  assert.equal(
-    buildPrintWorkspaceWindowStateStorageKey('window-3'),
-    '__plush_erp_print_window_state__:window-3'
-  )
+test('printWorkspace: 草稿 key 统一收口', () => {
   assert.equal(
     buildPrintWorkspaceDraftStorageKey(
       MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
@@ -233,175 +208,6 @@ test('printWorkspace: 缺少已验证账号 ID 时不生成草稿 key 或写入�
   assert.deepEqual(writes, [])
 })
 
-test('printWorkspace: 窗口状态持久化后可按 TTL 读取，过期时自动失效', () => {
-  const storage = new Map()
-  const originalWindow = globalThis.window
-  const originalNow = Date.now
-  const fakeWindow = {
-    localStorage: {
-      setItem(key, value) {
-        storage.set(key, value)
-      },
-      getItem(key) {
-        return storage.get(key) || null
-      },
-      removeItem(key) {
-        storage.delete(key)
-      },
-    },
-  }
-
-  globalThis.window = fakeWindow
-  Date.now = () => 1_000
-
-  try {
-    assert.equal(
-      persistPrintWorkspaceWindowState('window-4', {
-        workspaceURL:
-          'http://127.0.0.1:4173/erp/print-workspace/processing-contract?state=window-4',
-      }),
-      true
-    )
-
-    assert.deepEqual(readPrintWorkspaceWindowState('window-4'), {
-      version: 1,
-      updatedAt: 1_000,
-      workspaceURL:
-        'http://127.0.0.1:4173/erp/print-workspace/processing-contract?state=window-4',
-    })
-
-    Date.now = () => 24 * 60 * 60 * 1000 + 1_001
-    assert.equal(readPrintWorkspaceWindowState('window-4'), null)
-    assert.equal(
-      storage.has(buildPrintWorkspaceWindowStateStorageKey('window-4')),
-      false
-    )
-  } finally {
-    Date.now = originalNow
-    globalThis.window = originalWindow
-  }
-})
-
-test('printWorkspace: 窗口 HTML 写入 localStorage 后不等待 IndexedDB', async () => {
-  const originalWindow = globalThis.window
-  const storage = new Map()
-  globalThis.window = {
-    indexedDB: {
-      open: () => ({}),
-    },
-    localStorage: {
-      setItem(key, value) {
-        storage.set(String(key), String(value))
-      },
-    },
-  }
-
-  try {
-    const saved = await Promise.race([
-      persistPrintWorkspaceWindowHTML('window-local-first', {
-        windowHTML: '<!doctype html><html><body>打印窗口</body></html>',
-      }),
-      new Promise((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('窗口状态持久化不应等待 IndexedDB'))
-        }, 50)
-      }),
-    ])
-
-    assert.equal(saved, true)
-    assert.equal(storage.size, 1)
-  } finally {
-    if (typeof originalWindow === 'undefined') {
-      delete globalThis.window
-    } else {
-      globalThis.window = originalWindow
-    }
-  }
-})
-
-test('printWorkspace: 打印窗口壳页恢复时优先读取 localStorage，再回退 IndexedDB', async () => {
-  const shellHTML = await readFile(
-    new URL('../../../public/print-window-shell.html', import.meta.url),
-    'utf8'
-  )
-  const storageReadIndex = shellHTML.indexOf(
-    'const storagePayload = readPersistedStateFromStorage()'
-  )
-  const indexedDBReadIndex = shellHTML.indexOf(
-    'return readPersistedStateFromIndexedDB()'
-  )
-
-  assert.ok(storageReadIndex > 0)
-  assert.ok(indexedDBReadIndex > storageReadIndex)
-})
-
-test('printWorkspace: 独立编辑页仅允许匹配本地窗口状态绕过登录守卫', () => {
-  const storage = new Map()
-  const originalNow = Date.now
-  Date.now = () => 1_000
-  const storageLike = {
-    setItem(key, value) {
-      storage.set(key, value)
-    },
-    getItem(key) {
-      return storage.get(key) || null
-    },
-    removeItem(key) {
-      storage.delete(key)
-    },
-  }
-
-  storageLike.setItem(
-    buildPrintWorkspaceWindowStateStorageKey('window-guard-1'),
-    JSON.stringify({
-      version: 1,
-      updatedAt: 1_000,
-      templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
-      workspaceURL:
-        'http://127.0.0.1:4173/erp/print-workspace/processing-contract?state=window-guard-1',
-    })
-  )
-
-  try {
-    assert.equal(
-      canOpenPrintWorkspaceFromWindowState(
-        PROCESSING_CONTRACT_TEMPLATE_KEY,
-        '?state=window-guard-1',
-        storageLike
-      ),
-      true
-    )
-    assert.equal(
-      canOpenPrintWorkspaceFromWindowState(
-        MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-        '?state=window-guard-1',
-        storageLike
-      ),
-      false
-    )
-    assert.equal(
-      canOpenPrintWorkspaceFromWindowState(
-        PROCESSING_CONTRACT_TEMPLATE_KEY,
-        '',
-        storageLike
-      ),
-      false
-    )
-
-    Date.now = () => 24 * 60 * 60 * 1000 + 1_001
-    assert.equal(
-      canOpenPrintWorkspaceFromWindowState(
-        PROCESSING_CONTRACT_TEMPLATE_KEY,
-        '?state=window-guard-1',
-        storageLike
-      ),
-      false
-    )
-  } finally {
-    Date.now = originalNow
-  }
-})
-
 test('printWorkspace: 草稿写入 localStorage 满额时不抛异常', () => {
   const storageLike = {
     setItem() {
@@ -465,44 +271,7 @@ test('printWorkspace: 草稿只读取当前版本且超过 24 小时自动失效
   }
 })
 
-test('FL_print_workspace_window_snapshot__persists_current_html_snapshot printWorkspace: 工作台可把整窗 HTML 快照落到窗口状态里', async () => {
-  const storage = new Map()
-  const originalWindow = globalThis.window
-  globalThis.window = {
-    localStorage: {
-      setItem(key, value) {
-        storage.set(key, value)
-      },
-      getItem(key) {
-        return storage.get(key) || null
-      },
-      removeItem(key) {
-        storage.delete(key)
-      },
-    },
-  }
-
-  try {
-    const saved = await persistPrintWorkspaceWindowHTML('window-6', {
-      templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
-      workspaceURL:
-        'http://127.0.0.1:4173/erp/print-workspace/processing-contract?state=window-6',
-      windowHTML: '<!doctype html><html><body>snapshot</body></html>',
-    })
-
-    assert.equal(saved, true)
-    const payload = readPrintWorkspaceWindowState('window-6')
-    assert.equal(payload?.templateKey, PROCESSING_CONTRACT_TEMPLATE_KEY)
-    assert.equal(
-      payload?.windowHTML,
-      '<!doctype html><html><body>snapshot</body></html>'
-    )
-  } finally {
-    globalThis.window = originalWindow
-  }
-})
-
-test('printWorkspace: 从打印中心打开时直达可恢复工作台 URL，并落当前窗口状态', () => {
+test('printWorkspace: 从打印中心打开时直达可恢复工作台 URL，且不保存无作用域窗口快照', () => {
   const storage = new Map()
   const popup = {
     focusCalled: false,
@@ -549,14 +318,7 @@ test('printWorkspace: 从打印中心打开时直达可恢复工作台 URL，并
       popup.openedURL,
       'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?state=window-5'
     )
-    const payload = readPrintWorkspaceWindowState('window-5')
-    assert.equal(payload?.version, 1)
-    assert.equal(payload?.templateKey, 'material-purchase-contract')
-    assert.equal(
-      payload?.workspaceURL,
-      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?state=window-5'
-    )
-    assert.equal(Number.isFinite(Number(payload?.updatedAt)), true)
+    assert.equal(storage.size, 0)
   } finally {
     globalThis.window = originalWindow
   }
@@ -627,10 +389,6 @@ test('printWorkspace: 业务页打开时会先写入当前窗口专属打印草�
       ),
       initialDraft
     )
-    assert.equal(
-      readPrintWorkspaceWindowState('business-window-1')?.workspaceURL,
-      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?source=business&customer_key=yoyoosun&config_revision=revision-7&state=business-window-1'
-    )
   } finally {
     globalThis.window = originalWindow
   }
@@ -699,7 +457,12 @@ test('printWorkspace: localStorage 无法写草稿时使用当前弹窗一次性
       readInitialPrintWorkspaceDraftFromWindowName(
         MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
         'business-window-fallback',
-        popup
+        popup,
+        buildPrintWorkspaceDraftStorageKey(
+          MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+          'business-window-fallback',
+          { accountKey: '42' }
+        )
       ),
       initialDraft
     )
@@ -708,7 +471,12 @@ test('printWorkspace: localStorage 无法写草稿时使用当前弹窗一次性
       readInitialPrintWorkspaceDraftFromWindowName(
         MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
         'business-window-fallback',
-        popup
+        popup,
+        buildPrintWorkspaceDraftStorageKey(
+          MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+          'business-window-fallback',
+          { accountKey: '42' }
+        )
       ),
       initialDraft,
       'React 初始化和挂载 effect 重复读取时必须保留同一窗口草稿'
@@ -734,7 +502,12 @@ test('printWorkspace: localStorage 无法写草稿时使用当前弹窗一次性
       readInitialPrintWorkspaceDraftFromWindowName(
         MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
         'business-window-fallback',
-        popup
+        popup,
+        buildPrintWorkspaceDraftStorageKey(
+          MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+          'business-window-fallback',
+          { accountKey: '42' }
+        )
       ),
       initialDraft,
       '持久化仍失败时必须保留初始化桥接缓存'
@@ -766,7 +539,12 @@ test('printWorkspace: localStorage 无法写草稿时使用当前弹窗一次性
       readInitialPrintWorkspaceDraftFromWindowName(
         MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
         'business-window-fallback',
-        popup
+        popup,
+        buildPrintWorkspaceDraftStorageKey(
+          MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+          'business-window-fallback',
+          { accountKey: '42' }
+        )
       ),
       null,
       '当前草稿成功持久化后，初始化桥接缓存不得遮挡新草稿'
@@ -790,11 +568,60 @@ test('printWorkspace: 一次性草稿只匹配当前模板和窗口 state', () =
     readInitialPrintWorkspaceDraftFromWindowName(
       PROCESSING_CONTRACT_TEMPLATE_KEY,
       'window-name-1',
-      windowLike
+      windowLike,
+      'account:42'
     ),
     null
   )
   assert.equal(windowLike.name, '')
+})
+
+test('printWorkspace: 一次性草稿及初始化缓存不能跨账号恢复', () => {
+  const draft = { contractNo: 'account-A-private-contract' }
+  const windowLike = {
+    name: `__plush_erp_print_initial_draft__:${JSON.stringify({
+      version: 1,
+      templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      stateID: 'account-isolation',
+      storageKey: 'account-A',
+      draft,
+    })}`,
+  }
+  assert.equal(
+    readInitialPrintWorkspaceDraftFromWindowName(
+      MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      'account-isolation',
+      windowLike,
+      'account-B'
+    ),
+    null
+  )
+  assert.equal(windowLike.name, '')
+  windowLike.name = `__plush_erp_print_initial_draft__:${JSON.stringify({
+    version: 1,
+    templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+    stateID: 'account-isolation',
+    storageKey: 'account-A',
+    draft,
+  })}`
+  assert.deepEqual(
+    readInitialPrintWorkspaceDraftFromWindowName(
+      MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      'account-isolation',
+      windowLike,
+      'account-A'
+    ),
+    draft
+  )
+  assert.equal(
+    readInitialPrintWorkspaceDraftFromWindowName(
+      MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      'account-isolation',
+      windowLike,
+      'account-B'
+    ),
+    null
+  )
 })
 
 test('printWorkspace: 业务页弹窗被拦截时会清理本次临时打印草稿', () => {

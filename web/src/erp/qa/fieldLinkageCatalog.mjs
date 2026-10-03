@@ -61,8 +61,8 @@ export const FIELD_LINKAGE_SCENARIO_CATALOG = [
     label: '合并覆盖格会清空旧值',
   },
   {
-    key: 'print_window_snapshot_retained',
-    label: '打印窗口快照持久化',
+    key: 'print_window_draft_retained',
+    label: '打印窗口结构化草稿持久化',
   },
   {
     key: 'default_sample_uses_generic_party_values',
@@ -329,7 +329,7 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '附件 / 资料层字段',
     risk: 'P1',
     docLabels: ['图片 / 附件'],
-    requiredScenarioKeys: ['print_window_snapshot_retained'],
+    requiredScenarioKeys: ['print_window_draft_retained'],
   },
   {
     fieldKey: 'returnDate',
@@ -466,12 +466,12 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     requiredScenarioKeys: ['merge_clears_covered_cells'],
   },
   {
-    fieldKey: 'printWindowHtml',
-    fieldLabel: '打印窗口 HTML 快照',
+    fieldKey: 'printWindowDraft',
+    fieldLabel: '打印窗口结构化草稿',
     category: '打印快照字段',
     risk: 'P0',
-    docLabels: ['打印窗口 HTML 快照'],
-    requiredScenarioKeys: ['print_window_snapshot_retained'],
+    docLabels: ['打印窗口结构化草稿'],
+    requiredScenarioKeys: ['print_window_draft_retained'],
   },
 ]
 
@@ -1143,12 +1143,12 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId:
-      'FL_print_workspace_window_snapshot__persists_current_html_snapshot',
-    title: '打印工作台会把整窗 HTML 快照落到窗口状态',
-    fieldKeys: ['attachmentSnapshot', 'printWindowHtml'],
-    scenarioKey: 'print_window_snapshot_retained',
+      'FL_print_workspace_window_draft__restores_current_structured_draft',
+    title: '打印工作台恢复本窗口结构化草稿及图片',
+    fieldKeys: ['attachmentSnapshot', 'printWindowDraft'],
+    scenarioKey: 'print_window_draft_retained',
     layer: 'web',
-    testFile: 'web/src/erp/utils/printWorkspace.test.mjs',
+    testFile: 'web/src/erp/utils/printDraftStorage.test.mjs',
   },
   {
     caseId:

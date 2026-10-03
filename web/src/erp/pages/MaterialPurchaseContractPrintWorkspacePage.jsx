@@ -6,7 +6,6 @@ import MaterialPurchaseContractWorkbench from '../components/print/MaterialPurch
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import { isMaterialPurchaseContractBatchDraft } from '../utils/materialPurchaseContractBatch.mjs'
 import {
-  buildRestorablePrintWorkspaceURL,
   buildPrintWorkspaceDraftStorageKey,
   PRINT_WORKSPACE_DRAFT_MODE,
   PRINT_WORKSPACE_ENTRY_SOURCE,
@@ -38,18 +37,6 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
         accountKey,
         configRevision,
       })
-  const workspaceURL = useMemo(() => {
-    if (!workspaceStateID || typeof window === 'undefined') {
-      return ''
-    }
-
-    return buildRestorablePrintWorkspaceURL('material-purchase-contract', {
-      entrySource,
-      customerKey,
-      configRevision,
-      stateID: workspaceStateID,
-    })
-  }, [configRevision, customerKey, entrySource, workspaceStateID])
   const initialWorkspaceDraft = useMemo(() => {
     if (resetDraftOnOpen) {
       return null
@@ -57,7 +44,9 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
     return (
       readInitialPrintWorkspaceDraftFromWindowName(
         'material-purchase-contract',
-        workspaceStateID
+        workspaceStateID,
+        window,
+        draftStorageKey
       ) || readPrintWorkspaceDraftSnapshot(draftStorageKey)
     )
   }, [draftStorageKey, resetDraftOnOpen, workspaceStateID])
@@ -79,8 +68,6 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
         template={template}
         initialBatchDraft={batchDraft}
         draftStorageKey={draftStorageKey}
-        workspaceStateID={workspaceStateID}
-        workspaceURL={workspaceURL}
         customerKey={customerKey}
       />
     )
@@ -92,7 +79,6 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
       draftStorageKey={draftStorageKey}
       resetDraftOnOpen={resetDraftOnOpen}
       workspaceStateID={workspaceStateID}
-      workspaceURL={workspaceURL}
       businessInput={entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS}
       customerKey={customerKey}
       sourceTag={

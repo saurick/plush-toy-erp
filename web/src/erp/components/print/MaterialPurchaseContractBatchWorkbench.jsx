@@ -37,7 +37,6 @@ import {
   usePersistentPrintWorkspaceDraft,
 } from '../../utils/usePersistentPrintWorkspaceDraft.js'
 import usePrintWorkspaceFeedback from '../../utils/usePrintWorkspaceFeedback.js'
-import usePrintWorkspaceWindowState from '../../utils/usePrintWorkspaceWindowState.js'
 import MaterialPurchaseContractPaper from './MaterialPurchaseContractPaper.jsx'
 import PrintWorkspaceShell from './PrintWorkspaceShell.jsx'
 import { PrintToolButton } from './PrintWorkspaceTools.jsx'
@@ -63,8 +62,6 @@ export default function MaterialPurchaseContractBatchWorkbench({
   template,
   initialBatchDraft,
   draftStorageKey = '',
-  workspaceStateID = '',
-  workspaceURL = '',
   customerKey = '',
 }) {
   const normalizedInitialDraft = useMemo(
@@ -153,11 +150,6 @@ export default function MaterialPurchaseContractBatchWorkbench({
   }, [clearFeedback, normalizedInitialDraft, setBatchDraft])
 
   useFlushPrintWorkspaceDraftOnPageExit(flushDraft)
-  usePrintWorkspaceWindowState({
-    stateID: workspaceStateID,
-    templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-    workspaceURL,
-  })
 
   const syncBatchPrintPageMargin = useCallback(() => {
     const root = batchRootRef.current

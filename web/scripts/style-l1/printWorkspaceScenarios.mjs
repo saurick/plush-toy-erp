@@ -9,6 +9,7 @@ import { createMaterialDetailInteractionScenario } from './materialDetailInterac
 import { createColorCardInteractionScenario } from './colorCardInteractionScenario.mjs'
 import { createWorkInstructionInteractionScenario } from './workInstructionInteractionScenario.mjs'
 import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
+import { buildPrintWorkspaceDraftStorageKey } from '../../src/erp/utils/printWorkspace.js'
 import { createPrintPolishScenarios } from './printPolishScenarios.mjs'
 import { createPrintWorkspaceControlScenarios } from './printWorkspaceControlScenarios.mjs'
 import { createPrintWorkspaceFeedbackScenarios } from './printWorkspaceFeedbackScenarios.mjs'
@@ -18,6 +19,18 @@ import {
   assertEmptyEditorCaret,
   collectEmptyEditorSamples,
 } from './printEmptyEditorAssertions.mjs'
+
+const bridgeDraftScope = {
+  customerKey: 'product-core',
+  accountKey: '1',
+  configRevision: 'style-l1',
+}
+const bridgeDraftKey = (stateID) =>
+  buildPrintWorkspaceDraftStorageKey(
+    'material-purchase-contract',
+    stateID,
+    bridgeDraftScope
+  )
 
 export function createPrintWorkspaceScenarios({
   expectHeading,
@@ -1052,9 +1065,7 @@ export function createPrintWorkspaceScenarios({
         await expectText(page, '加工项目')
         await expectText(page, '面*1')
         const totalRow = page.locator('.erp-print-table__total')
-        const totalValues = totalRow.locator(
-          '.erp-contract-table__total-value'
-        )
+        const totalValues = totalRow.locator('.erp-contract-table__total-value')
         assert.equal(
           (await totalValues.nth(0).innerText()).trim(),
           '',
@@ -2060,7 +2071,7 @@ export function createPrintWorkspaceScenarios({
     },
     {
       name: 'print-workspace-material-supplier-group',
-      path: '/erp/print-workspace/material-purchase-contract?source=business&state=material-supplier-group-l1',
+      path: '/erp/print-workspace/material-purchase-contract?source=business&customer_key=product-core&config_revision=style-l1&state=material-supplier-group-l1',
       auth: 'admin',
       viewport: { width: 1600, height: 1100 },
       beforeNavigate: async (page) => {
@@ -2092,11 +2103,17 @@ export function createPrintWorkspaceScenarios({
             }))
           )
         )
-        await page.addInitScript((initial) => {
-          if (sessionStorage.getItem('material-supplier-group-loaded')) return
-          sessionStorage.setItem('material-supplier-group-loaded', 'true')
-          window.name = `__plush_erp_print_initial_draft__:${JSON.stringify({ version: 1, templateKey: 'material-purchase-contract', stateID: 'material-supplier-group-l1', draft: initial })}`
-        }, draft)
+        await page.addInitScript(
+          ({ initial, storageKey }) => {
+            if (sessionStorage.getItem('material-supplier-group-loaded')) return
+            sessionStorage.setItem('material-supplier-group-loaded', 'true')
+            window.name = `__plush_erp_print_initial_draft__:${JSON.stringify({ version: 1, templateKey: 'material-purchase-contract', stateID: 'material-supplier-group-l1', storageKey, draft: initial })}`
+          },
+          {
+            initial: draft,
+            storageKey: bridgeDraftKey('material-supplier-group-l1'),
+          }
+        )
       },
       verify: async (page) => {
         await page
@@ -2156,16 +2173,22 @@ export function createPrintWorkspaceScenarios({
           'print-workspace-material-supplier-group'
         )
         await page.emulateMedia({ media: 'print' })
-        const printGeometry = await group.locator('.erp-material-contract-paper').evaluate((element) => ({
-          minHeight: getComputedStyle(element).minHeight,
-          paddingBottom: getComputedStyle(element).paddingBottom,
-        }))
-        assert.deepEqual(printGeometry, { minHeight: '0px', paddingBottom: '0px' })
+        const printGeometry = await group
+          .locator('.erp-material-contract-paper')
+          .evaluate((element) => ({
+            minHeight: getComputedStyle(element).minHeight,
+            paddingBottom: getComputedStyle(element).paddingBottom,
+          }))
+        assert.deepEqual(printGeometry, {
+          minHeight: '0px',
+          paddingBottom: '0px',
+        })
         await page.emulateMedia({ media: 'screen' })
         const payloads = []
         const capture = (request) => {
-          if (request.url().includes('/templates/render-pdf'))
+          if (request.url().includes('/templates/render-pdf')) {
             payloads.push(request.postDataJSON())
+          }
         }
         page.on('request', capture)
         try {
@@ -2178,8 +2201,9 @@ export function createPrintWorkspaceScenarios({
           page.off('request', capture)
         }
         assert.equal(payloads.length, 1)
-        for (let index = 1; index <= 3; index += 1)
+        for (let index = 1; index <= 3; index += 1) {
           assert.match(payloads[0].html, new RegExp(`PO-GROUP-${index}`, 'u'))
+        }
         assert.doesNotMatch(payloads[0].html, /PO-GROUP-4/u)
         await page.screenshot({
           path: path.join(
@@ -2192,7 +2216,7 @@ export function createPrintWorkspaceScenarios({
     },
     {
       name: 'print-workspace-material-purchase-batch',
-      path: '/erp/print-workspace/material-purchase-contract?source=business&state=material-purchase-batch-l1',
+      path: '/erp/print-workspace/material-purchase-contract?source=business&customer_key=product-core&config_revision=style-l1&state=material-purchase-batch-l1',
       auth: 'admin',
       viewport: { width: 1600, height: 1100 },
       beforeNavigate: async (page) => {
@@ -2238,17 +2262,25 @@ export function createPrintWorkspaceScenarios({
             },
           ],
         }
-        await page.addInitScript((draft) => {
-          if (sessionStorage.getItem('material-purchase-batch-l1-loaded'))
-            return
-          sessionStorage.setItem('material-purchase-batch-l1-loaded', 'true')
-          window.name = `__plush_erp_print_initial_draft__:${JSON.stringify({
-            version: 1,
-            templateKey: 'material-purchase-contract',
-            stateID: 'material-purchase-batch-l1',
-            draft,
-          })}`
-        }, initialDraft)
+        await page.addInitScript(
+          ({ draft, storageKey }) => {
+            if (sessionStorage.getItem('material-purchase-batch-l1-loaded')) {
+              return
+            }
+            sessionStorage.setItem('material-purchase-batch-l1-loaded', 'true')
+            window.name = `__plush_erp_print_initial_draft__:${JSON.stringify({
+              version: 1,
+              templateKey: 'material-purchase-contract',
+              stateID: 'material-purchase-batch-l1',
+              storageKey,
+              draft,
+            })}`
+          },
+          {
+            draft: initialDraft,
+            storageKey: bridgeDraftKey('material-purchase-batch-l1'),
+          }
+        )
       },
       verify: async (page) => {
         await page.locator('.erp-material-contract-batch').waitFor({
@@ -2270,8 +2302,9 @@ export function createPrintWorkspaceScenarios({
           .waitFor({ state: 'visible' })
         let rejectedPdfRequests = 0
         const countRejectedPdf = (request) => {
-          if (request.url().includes('/templates/render-pdf'))
+          if (request.url().includes('/templates/render-pdf')) {
             rejectedPdfRequests += 1
+          }
         }
         page.on('request', countRejectedPdf)
         await page
@@ -2389,17 +2422,18 @@ export function createPrintWorkspaceScenarios({
     },
     {
       name: 'print-workspace-material-purchase-multiple-batches',
-      path: '/erp/print-workspace/material-purchase-contract?source=business&state=material-purchase-many-l1',
+      path: '/erp/print-workspace/material-purchase-contract?source=business&customer_key=product-core&config_revision=style-l1&state=material-purchase-many-l1',
       auth: 'admin',
       viewport: { width: 1600, height: 1100 },
       beforeNavigate: async (page) => {
-        await page.addInitScript(() => {
+        await page.addInitScript((storageKey) => {
           if (sessionStorage.getItem('material-purchase-many-l1-loaded')) return
           sessionStorage.setItem('material-purchase-many-l1-loaded', 'true')
           window.name = `__plush_erp_print_initial_draft__:${JSON.stringify({
             version: 1,
             templateKey: 'material-purchase-contract',
             stateID: 'material-purchase-many-l1',
+            storageKey,
             draft: {
               kind: 'material-purchase-contract-batch',
               version: 1,
@@ -2423,7 +2457,7 @@ export function createPrintWorkspaceScenarios({
               })),
             },
           })}`
-        })
+        }, bridgeDraftKey('material-purchase-many-l1'))
       },
       verify: async (page) => {
         await page
@@ -2456,8 +2490,9 @@ export function createPrintWorkspaceScenarios({
         assert.equal(Number((await price.innerText()).trim()), 3.5)
         const renderPayloads = []
         const capture = (request) => {
-          if (request.url().includes('/templates/render-pdf'))
+          if (request.url().includes('/templates/render-pdf')) {
             renderPayloads.push(request.postDataJSON())
+          }
         }
         page.on('request', capture)
         try {
