@@ -20,6 +20,10 @@ test("capacity SQL stays simulated, fixed-size, and leaves Fact rows draft", () 
     taskSourceType: "capacity_fixture",
   });
   assert.match(sql, /SIM-CAP-V1-/u);
+  assert.doesNotMatch(sql, /'OTHER'/u);
+  assert.match(sql, /'CUSTOMER'/u);
+  assert.match(sql, /'DUE_ON_OCCURRENCE'/u);
+  assert.match(sql, /due_at/u);
   assert.match(sql, /'simulated_only', true/u);
   assert.match(sql, /'real_customer_data', false/u);
   assert.match(sql, /'DRAFT'/u);

@@ -7,7 +7,6 @@ export const DEV_QUALITY_ROUTE = '/__dev/quality'
 export const DEV_DELIVERY_ROUTE = '/__dev/delivery'
 
 export const DEV_DOCS_ROUTE = '/__dev/docs'
-export const DEV_GOVERNANCE_ROUTE = '/__dev/governance'
 export const DEV_STATUS_FLOWS_ROUTE = '/__dev/status-flows'
 export const DEV_BUSINESS_USABILITY_ROUTE = '/__dev/business-usability'
 export const DEV_UI_DESIGN_ROUTE = '/__dev/ui-design'
@@ -39,7 +38,7 @@ export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
     key: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_PRODUCT_ENGINEERING_ROUTE,
     label: '产品工程',
-    description: '内核、权限、规则与业务链',
+    description: '内核、权限、业务链与开发文档',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.quality,
@@ -67,12 +66,6 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_PERMISSION_RELATIONSHIPS_ROUTE,
     label: '权限关系',
-  }),
-  Object.freeze({
-    key: 'governance',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    route: DEV_GOVERNANCE_ROUTE,
-    label: '改动指南',
   }),
   Object.freeze({
     key: 'status-flows',
@@ -139,7 +132,7 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     key: 'drill-recovery',
     areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
     route: DEV_DRILL_RECOVERY_ROUTE,
-    label: '演练与恢复',
+    label: '安全与恢复',
   }),
 ])
 
@@ -168,7 +161,6 @@ export const DEV_PAGE_FAVICON_BY_ROUTE = Object.freeze({
   [DEV_PERMISSION_RELATIONSHIPS_ROUTE]: '/favicon-dev.svg',
   [DEV_QUALITY_ROUTE]: '/favicon-dev.svg',
   [DEV_DELIVERY_ROUTE]: '/favicon-dev.svg',
-  [DEV_GOVERNANCE_ROUTE]: '/favicon-governance.svg',
   [DEV_STATUS_FLOWS_ROUTE]: '/favicon-dev.svg',
   [DEV_BUSINESS_USABILITY_ROUTE]: '/favicon-dev.svg',
   [DEV_DOCS_ROUTE]: '/favicon-docs.svg',

@@ -6,7 +6,8 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { canListenOnPort } from './localPort.mjs'
-import { checkDevCustomerPackage } from './startYoyoosunDev.mjs'
+import { checkDevCustomerPackage, runYoyoosunVite } from './startYoyoosunDev.mjs'
+import { createViteChildEnvironment } from './startWebDev.mjs'
 import {
   buildYoyoosunLocalEntryAudit,
   classifyAssetResponse,
@@ -16,6 +17,47 @@ import {
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const webRoot = path.join(repoRoot, 'web')
+
+test('customer development entry carries the resolved read credential through the shared Vite environment', () => {
+  const credential = { source: 'file', token: 'fixture-read-only-token' }
+  let captured
+  const result = runYoyoosunVite(
+    {
+      customer: 'yoyoosun',
+      port: '15200',
+      apiOrigin: 'http://127.0.0.1:8300',
+      signature: 'fixture-signature',
+    },
+    { apiOrigin: 'http://127.0.0.1:8300' },
+    credential,
+    {
+      env: { PLUSH_GITLAB_READ_TOKEN_FILE: '/fixture/protected-token' },
+      run(args, startup, gitlabCredential, env) {
+        captured = {
+          args,
+          gitlabCredential,
+          env: createViteChildEnvironment({
+            ...startup,
+            gitlabCredential,
+            env,
+          }),
+        }
+        return 0
+      },
+    }
+  )
+  assert.equal(result, 0)
+  assert.equal(captured.gitlabCredential, credential)
+  assert.deepEqual(captured.args, [])
+  assert.equal(captured.env.PLUSH_GITLAB_READ_TOKEN, credential.token)
+  assert.equal(
+    Object.hasOwn(captured.env, 'PLUSH_GITLAB_READ_TOKEN_FILE'),
+    false
+  )
+  assert.equal(captured.env.ERP_DEV_CUSTOMER_KEY, 'yoyoosun')
+  assert.equal(captured.env.ERP_VITE_PORT, '15200')
+  assert.equal(captured.env.ERP_DEV_START_SIGNATURE, 'fixture-signature')
+})
 
 test('macOS listener lookup reads process identity without filesystem scans', () => {
   const output = [

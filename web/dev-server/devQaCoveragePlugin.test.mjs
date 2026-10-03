@@ -9,6 +9,7 @@ import test from 'node:test'
 import {
   DEV_QA_COVERAGE_ACTION_API_PATH,
   DEV_QA_COVERAGE_API_PATH,
+  DEV_QA_COVERAGE_SNAPSHOT_API_PATH,
   DEV_QA_COVERAGE_OPERATION_API_PREFIX,
   DEV_QA_COVERAGE_SESSION_API_PATH,
   QA_COVERAGE_REPORT_SCHEMA,
@@ -18,6 +19,7 @@ import {
   createDevQaCoverageService,
   resolveCoverageFreshness,
   resolveDevQaCoverageReportPath,
+  resolveDevQaCoverageSnapshotPath,
   validateDevQaCoverageAction,
 } from './devQaCoveragePlugin.mjs'
 import { createERPViteConfig } from '../vite.shared.mjs'
@@ -676,4 +678,35 @@ test('ERP Vite config installs coverage middleware only for development serve', 
     pluginNames(productionBuild).includes('plush-dev-qa-coverage'),
     false
   )
+})
+
+
+test('isolated snapshot stays independent when the workspace report is absent', async (t) => {
+  const root = await createProject(t)
+  const snapshotPath = resolveDevQaCoverageSnapshotPath(root)
+  await mkdir(path.dirname(snapshotPath), { recursive: true })
+  await writeFile(snapshotPath, JSON.stringify(buildReport({ snapshot: { kind: 'isolated' } })))
+  const middleware = createDevQaCoverageMiddleware({ projectRoot: root, readRepositoryState: async () => REPOSITORY })
+  assert.equal((await requestMiddleware(middleware)).statusCode, 404)
+  const response = await requestMiddleware(middleware, { url: DEV_QA_COVERAGE_SNAPSHOT_API_PATH })
+  assert.equal(response.statusCode, 200)
+  assert.equal(response.headers['cache-control'], 'no-store')
+  assert.equal(JSON.parse(response.body).status, 'snapshot')
+  assert.deepEqual(JSON.parse(response.body).report.repository, REPOSITORY)
+  assert.equal((await requestMiddleware(middleware, { url: DEV_QA_COVERAGE_SNAPSHOT_API_PATH + '?path=private.json' })).statusCode, 400)
+  assert.equal((await requestMiddleware(middleware, { url: DEV_QA_COVERAGE_SNAPSHOT_API_PATH, method: 'POST' })).statusCode, 405)
+})
+
+test('snapshot reader rejects missing markers, unsafe content and oversized reports', async (t) => {
+  const root = await createProject(t)
+  const reportPath = resolveDevQaCoverageSnapshotPath(root)
+  await mkdir(path.dirname(reportPath), { recursive: true })
+  const middleware = createDevQaCoverageMiddleware({ projectRoot: root, maxReportBytes: 2048 })
+  assert.equal((await requestMiddleware(middleware, { url: DEV_QA_COVERAGE_SNAPSHOT_API_PATH })).statusCode, 404)
+  for (const report of [buildReport(), buildReport({ snapshot: { kind: 'isolated' }, password: 'fixture-secret' }), buildReport({ snapshot: { kind: 'isolated' }, padding: 'x'.repeat(3000) })]) {
+    await writeFile(reportPath, JSON.stringify(report))
+    const response = await requestMiddleware(middleware, { url: DEV_QA_COVERAGE_SNAPSHOT_API_PATH })
+    assert.equal(response.statusCode, 500)
+    assert.doesNotMatch(response.body, /fixture-secret|padding/u)
+  }
 })

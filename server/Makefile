@@ -6,6 +6,7 @@ GOHOSTOS:=$(shell go env GOHOSTOS)
 GOPATH:=$(shell go env GOPATH)
 ATLAS_BIN ?= atlas
 ATLAS_VERSION ?= v1.3.0
+LOCAL_MIGRATION_LOCK := $(shell if command -v lockf >/dev/null 2>&1; then printf 'lockf -t 0'; else printf 'flock -n'; fi)
 
 # ========================
 # Git 信息（兼容在子目录执行 & 没有提交的情况）
@@ -203,7 +204,7 @@ migrate_plan:
 		LOCK_FILE="$$(git rev-parse --git-path plush-local-migration.lock)"; \
 		mkdir -p "$$(dirname "$$LOCK_FILE")"; \
 		LOCAL_MIGRATION_TARGET_CONFIRM="$(MIGRATE_TARGET_CONFIRM_FROM_COMMAND_ENV)" \
-			lockf -t 0 "$$LOCK_FILE" node ../scripts/local-migration.mjs plan; \
+			$(LOCAL_MIGRATION_LOCK) "$$LOCK_FILE" node ../scripts/local-migration.mjs plan; \
 	fi
 
 # 兼容旧习惯：裸目标在 TTY 中恢复 ready operation；完整低层确认只供 operation service 使用。
@@ -218,7 +219,7 @@ migrate_apply:
 		mkdir -p "$$(dirname "$$LOCK_FILE")"; \
 		LOCAL_MIGRATION_CONFIRM="$(MIGRATE_CONFIRM_FROM_COMMAND_ENV)" \
 			LOCAL_MIGRATION_MAINTENANCE_CONFIRM="$(MIGRATE_MAINTENANCE_CONFIRM_FROM_COMMAND_ENV)" \
-			lockf -t 0 "$$LOCK_FILE" node ../scripts/local-migration.mjs apply; \
+			$(LOCAL_MIGRATION_LOCK) "$$LOCK_FILE" node ../scripts/local-migration.mjs apply; \
 	fi
 
 .PHONY: print_db_url

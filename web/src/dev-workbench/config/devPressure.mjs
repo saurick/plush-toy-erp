@@ -1,0 +1,216 @@
+import { DEV_PRESSURE_REPORTS_API_PATH } from './devTestingOperation.mjs'
+
+export const DEV_PRESSURE_PHASES = Object.freeze({
+  build: '构建候选',
+  containers: '隔离环境',
+  migration: '迁移核验',
+  backend: '服务就绪',
+  seed: '岗位初始化',
+  'read-dataset-config': '查询造数',
+  'read-pressure': '查询基线',
+  'engineering-data': '业务造数',
+  'engineering-pressure': '业务负载与对账',
+  cleanup: '资源清理',
+})
+export const DEV_PRESSURE_LEVELS = Object.freeze({
+  ramp: '升压',
+  capacity: '主段',
+  recovery: '恢复',
+})
+export const DEV_PRESSURE_STATUS = Object.freeze({
+  passed: { label: '该次通过', color: 'green' },
+  failed: { label: '该次未通过', color: 'red' },
+  incomplete: { label: '证据不完整', color: 'orange' },
+})
+export const DEV_PRESSURE_FRESHNESS = Object.freeze({
+  matched: { label: '压测范围源码一致', color: 'blue' },
+  changed: { label: '历史候选 · 源码已变化', color: 'orange' },
+  unknown: { label: '历史候选 · 身份证据不足', color: 'default' },
+})
+export const DEV_PRESSURE_FINGERPRINTS = Object.freeze({
+  commit: '提交版本',
+  build: '后端构建',
+  data: '业务数据合同',
+  verification: '业务断言',
+  load: '负载模型',
+  lifecycle: '隔离生命周期',
+})
+export const DEV_PRESSURE_CHECKS = Object.freeze({
+  competition: '同单竞争',
+  staleVersionRejected: '过期版本被拒绝',
+  unauthorizedRejected: '越权被拒绝',
+  singleSupplierResult: '每供应商仅一份采购结果',
+  replyReplay: '丢失回复后重放一致',
+  databaseConsistency: '数据库权威对账',
+  recovery: '降载恢复',
+  cleanup: '隔离资源清理',
+})
+export const DEV_PRESSURE_LEDGER = Object.freeze({
+  approvedRequests: '审批通过的用料需求',
+  purchaseOrders: '来源采购单',
+  purchaseItems: '来源采购明细',
+  duplicateSupplierResults: '重复供应商结果',
+  partialSupplierResults: '部分采购结果',
+  invalidPurchaseLines: '非法采购明细',
+  inventoryTxns: '库存事务',
+  postedReceipts: '已过账收货',
+  productionFacts: '生产草稿',
+  financeFacts: '财务草稿',
+})
+
+const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/u
+export function isDevPressureReportID(value) {
+  return typeof value === 'string' && ID.test(value)
+}
+const HASH = /^[0-9a-f]{64}$/u
+const isNumber = (value) =>
+  value === null || (Number.isFinite(value) && value >= 0)
+const isDate = (value) =>
+  typeof value === 'string' && Number.isFinite(Date.parse(value))
+function invalid() {
+  throw new Error('压力测试报告暂时无法读取，请重新读取或检查开发服务。')
+}
+function summary(value) {
+  if (
+    !ID.test(value?.id) ||
+    !['quick', 'capacity'].includes(value.profile) ||
+    !isDate(value.startedAt) ||
+    !isDate(value.completedAt) ||
+    !Object.hasOwn(DEV_PRESSURE_STATUS, value.status) ||
+    !Object.hasOwn(DEV_PRESSURE_FRESHNESS, value.freshness)
+  ) {
+    invalid()
+  }
+  return value
+}
+function metrics(value) {
+  if (
+    !value ||
+    ![
+      'requests',
+      'successes',
+      'failures',
+      'successfulRps',
+      'p95Ms',
+      'p99Ms',
+    ].every((key) => isNumber(value[key]))
+  ) {
+    invalid()
+  }
+}
+export function normalizeDevPressureReports(value) {
+  if (
+    value?.schemaVersion !== 'plush.dev-pressure-reports/v1' ||
+    !Array.isArray(value.reports) ||
+    value.reports.length > 61 ||
+    !Number.isSafeInteger(value.invalidCount) ||
+    value.invalidCount < 0
+  ) {
+    invalid()
+  }
+  value.reports.forEach(summary)
+  if (value.report !== null) {
+    const report = summary(value.report)
+    if (
+      !report.candidate ||
+      !report.checks ||
+      !report.database ||
+      !report.runtime ||
+      !report.environment ||
+      !Array.isArray(report.steps) ||
+      report.steps.length > 12 ||
+      !['changed', 'unknown'].every(
+        (key) =>
+          Array.isArray(report[key]) &&
+          report[key].every((name) =>
+            Object.hasOwn(DEV_PRESSURE_FINGERPRINTS, name)
+          )
+      )
+    ) {
+      invalid()
+    }
+    for (const [key, fingerprint] of Object.entries(
+      report.candidate.fingerprints || {}
+    )) {
+      if (
+        !Object.hasOwn(DEV_PRESSURE_FINGERPRINTS, key) ||
+        (fingerprint !== null && !HASH.test(fingerprint))
+      ) {
+        invalid()
+      }
+    }
+    for (const detail of [report.engineering, report.reads]) {
+      if (!detail) continue
+      if (
+        !Array.isArray(detail.levels) ||
+        detail.levels.length > 3 ||
+        typeof detail.passed !== 'boolean'
+      ) {
+        invalid()
+      }
+      for (const level of detail.levels) {
+        if (
+          !Object.hasOwn(DEV_PRESSURE_LEVELS, level.key) ||
+          !isNumber(level.elapsedMs) ||
+          !Array.isArray(level.methods) ||
+          level.methods.length > 40 ||
+          !level.limits
+        ) {
+          invalid()
+        }
+        metrics(level.operations)
+        metrics(level.rpc)
+        metrics(level.flows)
+        level.methods.forEach((method) => {
+          if (!/^[a-z_]+\.[a-z_]+$/u.test(method.name)) invalid()
+          metrics(method)
+        })
+      }
+    }
+  }
+  if (
+    value.progress !== null &&
+    (!Object.hasOwn(DEV_PRESSURE_PHASES, value.progress?.phase) ||
+      !['running', 'completed', 'failed'].includes(value.progress.status) ||
+      !isDate(value.progress.updatedAt) ||
+      !Array.isArray(value.progress.completedSteps) ||
+      !value.progress.completedSteps.every((key) =>
+        Object.hasOwn(DEV_PRESSURE_PHASES, key)
+      ))
+  ) {
+    invalid()
+  }
+  return value
+}
+
+export async function readDevPressureReports({
+  id = '',
+  signal,
+  fetchImpl = (...args) => globalThis.fetch(...args),
+} = {}) {
+  if (id && !ID.test(id)) invalid()
+  const response = await fetchImpl(
+    `${DEV_PRESSURE_REPORTS_API_PATH}${id ? `?id=${encodeURIComponent(id)}` : ''}`,
+    {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal,
+    }
+  )
+  if (!response.ok) invalid()
+  return normalizeDevPressureReports(await response.json())
+}
+export function formatPressureNumber(value, digits = 0) {
+  return Number.isFinite(value)
+    ? new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits }).format(
+        value
+      )
+    : '—'
+}
+export function pressureMainLevel(report, kind = 'engineering') {
+  return (
+    report?.[kind]?.levels?.find((level) => level.key === 'capacity') || null
+  )
+}

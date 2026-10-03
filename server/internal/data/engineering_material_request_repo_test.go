@@ -13,6 +13,7 @@ import (
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/purchaseorder"
+	"server/internal/data/model/ent/workflowtaskevent"
 	"strings"
 	"sync"
 	"testing"
@@ -25,6 +26,11 @@ type materialRequestFixture struct {
 	order *ent.SalesOrder
 	line  *ent.SalesOrderItem
 	bom   *ent.BOMHeader
+}
+
+type materialRequestDemand struct {
+	ordered, samples, usage, loss string
+	precision                     int
 }
 
 func prepareProductionEngineeringFixture(t *testing.T, ctx context.Context, data *Data, itemID, bomID int) {
@@ -69,21 +75,28 @@ func prepareProductionEngineeringFixture(t *testing.T, ctx context.Context, data
 
 func prepareMaterialRequestFixture(t *testing.T, ctx context.Context, data *Data, key string) materialRequestFixture {
 	t.Helper()
+	return prepareMaterialRequestFixtureWithDemand(t, ctx, data, key, materialRequestDemand{
+		ordered: "1000", samples: "12", usage: "0.1", loss: "0.1", precision: 6,
+	})
+}
+
+func prepareMaterialRequestFixtureWithDemand(t *testing.T, ctx context.Context, data *Data, key string, demand materialRequestDemand) materialRequestFixture {
+	t.Helper()
 	client := data.postgres
 	repo := NewSalesOrderRepo(data, log.NewStdLogger(io.Discard))
 	uc := biz.NewSalesOrderUsecase(repo)
 	customer := createSalesOrderTestCustomer(t, ctx, client, key+"-C", true)
 	unit := createSalesOrderTestUnit(t, ctx, client, key+"-U", true)
-	materialUnit := client.Unit.Create().SetCode(key + "-LENGTH").SetName("码").SetPrecision(6).SaveX(ctx)
+	materialUnit := client.Unit.Create().SetCode(key + "-LENGTH").SetName("码").SetPrecision(demand.precision).SaveX(ctx)
 	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, key+"-P", true)
 	order := client.SalesOrder.Create().SetOrderNo(key).SetCustomerID(customer.ID).SetOrderDate(time.Now()).SetCurrency("CNY").SaveX(ctx)
-	line := client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetUnitID(unit.ID).SetCustomerProductNo(key + "-STYLE").SetRequestedProductName("定制玩偶").SetOrderedQuantity(decimal.NewFromInt(1000)).SetPreShipmentSampleQuantity(decimal.NewFromInt(12)).SaveX(ctx)
+	line := client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetUnitID(unit.ID).SetCustomerProductNo(key + "-STYLE").SetRequestedProductName("定制玩偶").SetOrderedQuantity(decimal.RequireFromString(demand.ordered)).SetPreShipmentSampleQuantity(decimal.RequireFromString(demand.samples)).SaveX(ctx)
 	bom := client.BOMHeader.Create().SetProductID(product.ID).SetVersion("V1").SaveX(ctx)
 	for i := 0; i < 2; i++ {
 		vendor := client.Supplier.Create().SetCode(fmt.Sprintf("%s-V%d", key, i)).SetName(fmt.Sprintf("材料厂%d", i)).SetDefaultPaymentMethod("货到付款").SetDefaultInvoiceRequired(false).SaveX(ctx)
 		material := client.Material.Create().SetCode(fmt.Sprintf("%s-M%d", key, i)).SetName("短绒").SetDefaultUnitID(materialUnit.ID).SetSupplierID(vendor.ID).SetSupplierItemNo("A10").SetColor("01").SaveX(ctx)
 		for j := 0; j < 2-i; j++ {
-			client.BOMItem.Create().SetBomHeaderID(bom.ID).SetMaterialID(material.ID).SetUnitID(materialUnit.ID).SetPosition(fmt.Sprintf("部位%d", j)).SetNote(fmt.Sprintf("按样核对部位%d", j)).SetPieceCount("2").SetQuantity(decimal.RequireFromString("0.1")).SetLossRate(decimal.RequireFromString("0.1")).SaveX(ctx)
+			client.BOMItem.Create().SetBomHeaderID(bom.ID).SetMaterialID(material.ID).SetUnitID(materialUnit.ID).SetPosition(fmt.Sprintf("部位%d", j)).SetNote(fmt.Sprintf("按样核对部位%d", j)).SetPieceCount("2").SetQuantity(decimal.RequireFromString(demand.usage)).SetLossRate(decimal.RequireFromString(demand.loss)).SaveX(ctx)
 		}
 	}
 	client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerProduct).SetOwnerID(product.ID).SetAttachmentType(biz.BusinessAttachmentTypeProductImage).SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("sample.png").SetMimeType("image/png").SetFileSize(1).SetObjectKey(attachmentstore.NewKey()).SetSha256(strings.Repeat("a", 64)).SaveX(ctx)
@@ -153,29 +166,8 @@ func TestEngineeringMaterialRequestApprovalAndPurchaseGeneration(t *testing.T) {
 	if approved.Status != biz.MaterialRequestApproved || len(approved.PurchaseOrders) != 2 {
 		t.Fatalf("approval result: %+v", approved)
 	}
-	for _, po := range approved.PurchaseOrders {
-		row := client.PurchaseOrder.GetX(ctx, po.ID)
-		if row.LifecycleStatus != biz.PurchaseOrderStatusApproved || row.EngineeringMaterialRequestID == nil || *row.EngineeringMaterialRequestID != request.ID {
-			t.Fatalf("purchase trace: %+v", row)
-		}
-		if row.ExpectedArrivalDate != nil {
-			t.Fatal("approval invented an arrival date")
-		}
-		lines := row.QueryItems().AllX(ctx)
-		if len(lines) != 1 {
-			t.Fatalf("expected one grouped material per supplier: %+v", lines)
-		}
-		for _, line := range lines {
-			if line.UnitPrice != nil || line.Amount != nil || line.ExpectedArrivalDate != nil {
-				t.Fatal("approval invented price, amount or arrival date")
-			}
-			for _, source := range request.Items {
-				if source.MaterialID == line.MaterialID && !source.RequiredQuantity.Equal(line.PurchasedQuantity) {
-					t.Fatalf("purchase quantity differs from frozen demand: %s != %s", line.PurchasedQuantity, source.RequiredQuantity)
-				}
-			}
-		}
-	}
+	assertMaterialPurchaseResult(t, ctx, client, request)
+
 	again, err := f.uc.ReviewEngineeringMaterialRequest(ctx, in)
 	if err != nil || again.ID != approved.ID || client.PurchaseOrder.Query().CountX(ctx) != 2 {
 		t.Fatalf("approval replay duplicated orders: %v", err)
@@ -259,12 +251,19 @@ func TestSourceDocumentPostgresEngineeringMaterialConcurrentApproval(t *testing.
 		t.Fatal(err)
 	}
 	in := financeMaterialRequestInput(boss)
+	task := materialWorkflowTask(t, ctx, data.postgres, biz.WorkflowMaterialFinanceReviewGroup, request.ID, "ready")
+	beforeEvents := data.postgres.WorkflowTaskEvent.Query().Where(workflowtaskevent.TaskID(task.ID)).CountX(ctx)
+	results := make([]*biz.EngineeringMaterialRequest, 2)
 	start := make(chan struct{})
 	var wg sync.WaitGroup
 	errs := make([]error, 2)
 	for i := range errs {
 		wg.Add(1)
-		go func(i int) { defer wg.Done(); <-start; _, errs[i] = f.uc.ReviewEngineeringMaterialRequest(ctx, in) }(i)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			results[i], errs[i] = f.uc.ReviewEngineeringMaterialRequest(ctx, in)
+		}(i)
 	}
 	close(start)
 	wg.Wait()
@@ -273,9 +272,35 @@ func TestSourceDocumentPostgresEngineeringMaterialConcurrentApproval(t *testing.
 			t.Fatal(err)
 		}
 	}
-	if count := data.postgres.PurchaseOrder.Query().Where(purchaseorder.EngineeringMaterialRequestID(request.ID)).CountX(ctx); count != 2 {
-		t.Fatalf("concurrent approval created %d orders", count)
+	assertMaterialPurchaseResult(t, ctx, data.postgres, request)
+	current, err := f.uc.GetEngineeringMaterialRequestByID(ctx, f.order.ID, request.ID)
+	if err != nil || current.Status != biz.MaterialRequestApproved || current.Version != boss.Version+1 {
+		t.Fatalf("concurrent approval version/status: %+v %v", current, err)
 	}
+	persisted := data.postgres.PurchaseOrder.Query().Where(purchaseorder.EngineeringMaterialRequestID(request.ID)).AllX(ctx)
+	for _, result := range results {
+		if result.Status != current.Status || result.Version != current.Version || len(result.PurchaseOrders) != len(current.PurchaseOrders) {
+			t.Fatalf("concurrent replay returned a different result: %+v", result)
+		}
+		wantIDs := make(map[int]int, len(persisted))
+		for _, row := range persisted {
+			wantIDs[row.ID] = row.SupplierID
+		}
+		for _, po := range result.PurchaseOrders {
+			if supplierID, ok := wantIDs[po.ID]; !ok || supplierID != po.SupplierID {
+				t.Fatal("replay returned a duplicate or incorrect supplier purchase")
+			}
+			delete(wantIDs, po.ID)
+		}
+		if len(wantIDs) != 0 {
+			t.Fatal("replay omitted part of the purchase result set")
+		}
+	}
+	done := materialWorkflowTask(t, ctx, data.postgres, biz.WorkflowMaterialFinanceReviewGroup, request.ID, "done")
+	if done.Version != task.Version+1 || data.postgres.WorkflowTaskEvent.Query().Where(workflowtaskevent.TaskID(task.ID)).CountX(ctx) != beforeEvents+1 {
+		t.Fatal("concurrent approval duplicated task completion or audit event")
+	}
+
 }
 
 func TestProductionReleaseRequiresMaterialApprovalAndCurrentSample(t *testing.T) {

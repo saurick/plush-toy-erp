@@ -21,6 +21,8 @@ export const DEV_TESTING_ACTIONS = Object.freeze([
   "fast",
   "role-access",
   "field-linkage",
+  "pressure-quick",
+  "pressure-capacity",
 ]);
 export const DEV_TESTING_OPERATION_ACTIVE_STATUSES = Object.freeze([
   "queued",
@@ -42,7 +44,7 @@ export const DEV_TESTING_OPERATION_STAGES = Object.freeze([
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u;
+  /^testing:(fast|role-access|field-linkage|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const MAX_RECORD_BYTES = 64 * 1024;
 const STAGE_INDEX = new Map(
@@ -285,6 +287,9 @@ export function createOrReuseDevTestingOperation(
     now = new Date().toISOString(),
   },
 ) {
+  if (!DEV_TESTING_ACTIONS.includes(action) || IDEMPOTENCY_PATTERN.exec(String(idempotencyKey || ""))?.[1] !== action) {
+    throw new Error("testing operation intent is invalid");
+  }
   const existing = readDevTestingOperationByIdempotencyKey(
     store,
     idempotencyKey,

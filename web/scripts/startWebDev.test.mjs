@@ -11,6 +11,8 @@ import test from 'node:test'
 import { createERPViteConfig } from '../vite.shared.mjs'
 import {
   DEV_GITLAB_KEYCHAIN,
+  devGitlabCredentialFilePath,
+  readGitlabTokenFromFile,
   createViteChildEnvironment,
   parseStartWebDevArgs,
   resolveDevGitlabCredential,
@@ -66,7 +68,8 @@ test('the actual pnpm restart lifecycle performs exactly one restart operation',
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   const entry = pathToFileURL(path.join(import.meta.dirname, 'startWebDev.mjs')).href
   fs.writeFileSync(path.join(root, 'trace.mjs'), `import {parseStartWebDevArgs} from ${JSON.stringify(entry)}; if(!parseStartWebDevArgs(process.argv.slice(2)).skipLifecycle) console.log('ACTUAL_ACTION='+process.env.npm_lifecycle_event);\n`)
-  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'plush-restart-fixture', version: '1.0.0', scripts: { stop: 'node trace.mjs --local --stop', restart: 'node trace.mjs --local --restart', start: 'node trace.mjs', 'start:restart': 'node trace.mjs --local --restart' } }))
+  const { packageManager } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'plush-restart-fixture', version: '1.0.0', packageManager, scripts: { stop: 'node trace.mjs --local --stop', restart: 'node trace.mjs --local --restart', start: 'node trace.mjs', 'start:restart': 'node trace.mjs --local --restart' } }))
   const execute = promisify(execFile)
   for (const command of ['restart', 'start:restart']) {
     const { stdout } = await execute('pnpm', [command], { cwd: root, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' }, timeout: 30_000 })
@@ -514,6 +517,7 @@ test('start web dev: 非 macOS 或缺少钥匙串凭据时安全降级', async (
   const nonMac = await resolveDevGitlabCredential({
     env: {},
     platform: 'linux',
+    readCredentialFile: async () => '',
     readKeychain: async () => {
       keychainReads += 1
       return 'must-not-read'
@@ -530,6 +534,75 @@ test('start web dev: 非 macOS 或缺少钥匙串凭据时安全降级', async (
   assert.deepEqual(nonMac, { source: 'missing', token: '' })
   assert.deepEqual(missing, { source: 'missing', token: '' })
   assert.equal(keychainReads, 0)
+})
+
+test('start web dev: Linux 从受控文件加载只读凭据且不读取钥匙串', async () => {
+  let requestedPath
+  const credential = await resolveDevGitlabCredential({
+    env: {},
+    platform: 'linux',
+    readCredentialFile: async ({ filePath }) => {
+      requestedPath = filePath
+      return 'fixture-read-token\n'
+    },
+    readKeychain: async () => {
+      throw new Error('must not read keychain')
+    },
+  })
+  assert.equal(requestedPath, devGitlabCredentialFilePath())
+  assert.deepEqual(credential, { source: 'file', token: 'fixture-read-token' })
+  const explicit = await resolveDevGitlabCredential({
+    env: { PLUSH_GITLAB_READ_TOKEN: 'environment-read-token' },
+    platform: 'linux',
+    readCredentialFile: async () => {
+      throw new Error('must not read file')
+    },
+  })
+  assert.equal(explicit.source, 'environment')
+})
+
+test('start web dev: 凭据文件拒绝共享权限、软链接、错误 owner 和超长内容', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'plush-gitlab-read-file-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const filePath = path.join(root, 'read-token')
+  fs.writeFileSync(filePath, 'fixture-read-token', { mode: 0o600 })
+  assert.equal(
+    await readGitlabTokenFromFile({ filePath }),
+    'fixture-read-token'
+  )
+  await assert.rejects(
+    readGitlabTokenFromFile({ filePath, ownerId: os.userInfo().uid + 1 }),
+    /服务用户/u
+  )
+  fs.chmodSync(filePath, 0o644)
+  await assert.rejects(readGitlabTokenFromFile({ filePath }), /服务用户/u)
+  fs.chmodSync(filePath, 0o600)
+  const link = path.join(root, 'linked-token')
+  fs.symlinkSync(filePath, link)
+  await assert.rejects(readGitlabTokenFromFile({ filePath: link }), /安全读取/u)
+  fs.writeFileSync(filePath, 'x'.repeat(1025))
+  await assert.rejects(readGitlabTokenFromFile({ filePath }), /服务用户/u)
+  assert.equal(
+    await readGitlabTokenFromFile({ filePath: path.join(root, 'missing') }),
+    ''
+  )
+  await assert.rejects(
+    readGitlabTokenFromFile({ filePath: 'relative-token' }),
+    /绝对路径/u
+  )
+})
+
+test('start web dev: 受控凭据文件路径不进入 Vite 子进程', () => {
+  const environment = createViteChildEnvironment({
+    apiOrigin: 'http://127.0.0.1:8300',
+    gitlabCredential: { source: 'file', token: 'fixture-read-token' },
+    env: { PLUSH_GITLAB_READ_TOKEN_FILE: '/private/read-token' },
+  })
+  assert.equal(environment.PLUSH_GITLAB_READ_TOKEN, 'fixture-read-token')
+  assert.equal(
+    Object.hasOwn(environment, 'PLUSH_GITLAB_READ_TOKEN_FILE'),
+    false
+  )
 })
 
 test('start web dev: preflight 地址与 Vite RPC/template 代理使用同一 API_ORIGIN', async () => {

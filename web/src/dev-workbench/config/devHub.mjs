@@ -5,7 +5,6 @@ import {
   DEV_DATA_PREPARATION_ROUTE,
   DEV_DOCS_ROUTE,
   DEV_DRILL_RECOVERY_ROUTE,
-  DEV_GOVERNANCE_ROUTE,
   DEV_HUB_ROUTE,
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_PRODUCT_CORE_ROUTE,
@@ -56,22 +55,6 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description: '核对岗位或账号的可用功能、实际侧栏、仓库范围与审批责任。',
-  }),
-  Object.freeze({
-    key: 'governance',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '改动指南 / Change Guide',
-    group: '文档治理 / Docs',
-    route: DEV_GOVERNANCE_ROUTE,
-    source: 'docs/项目治理地图.md',
-    truthSource: '治理地图 Markdown / Governance Markdown',
-    status: '只读可视化 / Read-only map',
-    guardrails: Object.freeze([
-      '只读派生 / Derived only',
-      '不新增规则 / No new rules',
-      '不进生产构建 / No prod build',
-    ]),
-    description: '按改动类型查找正式依据、同步检查项和边界。',
   }),
   Object.freeze({
     key: 'status-flows',
@@ -253,11 +236,11 @@ export const DEV_HUB_ITEMS = Object.freeze([
   Object.freeze({
     key: 'drill-recovery',
     areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
-    title: '演练与恢复 / Drills & Recovery',
+    title: '安全与恢复 / Security & Recovery',
     group: '交付治理 / Delivery',
     route: DEV_DRILL_RECOVERY_ROUTE,
-    source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
-    truthSource: '固定目标预检、不可变 Release 与部署 / 回滚 operation 回执',
+    source: 'docs/security/运维安全与勒索恢复.md',
+    truthSource: '应用安全合同、固定目标预检与恢复 / operation 回执',
     status: '只读目录与受控入口 / Read-only catalog',
     guardrails: Object.freeze([
       '复用 operation 真源 / Reuse operation truth',
@@ -268,7 +251,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description:
-      '按 P0、P1、P2 查看目标核验、幂等、回滚前滚、隔离恢复、新目标切换和未来故障演练；只读复用已有状态与记录，高风险能力未满足前置条件时保持关闭。',
+      '核对防入侵、备份隔离与恢复证据；缺少运行回执的安全项保持未核验。',
   }),
 ])
 

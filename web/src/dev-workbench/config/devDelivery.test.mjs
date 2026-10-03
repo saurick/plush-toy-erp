@@ -17,11 +17,13 @@ import {
   DEV_VERSION_CENTER_ROUTE,
   DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
   DEV_VERSION_CENTER_VIEW_HISTORY,
+  DEV_VERSION_CENTER_VIEW_OVERVIEW,
   DEV_VERSION_CENTER_VIEW_PIPELINE,
   DEV_VERSION_CENTER_VIEW_VERSIONS,
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
   deliveryOperationMessagePresentation,
+  deliveryReadOnlyReleasePresentation,
   deliveryOperationDetailPresentation,
   deliveryIdempotencyPresentation,
   deliveryPipelinePresentation,
@@ -73,6 +75,41 @@ function response(payload, ok = true) {
     },
   }
 }
+
+test('read-only release status does not claim unread versions or pipeline evidence is available', () => {
+  const issue = {
+    code: 'gitlab_provider_unavailable',
+    message: '当前服务未登记 GitLab 只读凭据，版本与流水线尚未读取',
+  }
+  const unread = deliveryReadOnlyReleasePresentation({
+    ...summaryFixture(),
+    issues: [issue],
+  })
+  assert.equal(unread.color, 'warning')
+  assert.equal(unread.label, '读取未就绪')
+  assert.equal(unread.description, issue.message)
+  assert.doesNotMatch(unread.title, /可查看/u)
+
+  const versionOnly = deliveryReadOnlyReleasePresentation(summaryFixture())
+  assert.equal(versionOnly.color, 'blue')
+  assert.match(versionOnly.title, /版本可查看/u)
+  assert.doesNotMatch(versionOnly.title, /流水线可查看/u)
+  assert.match(versionOnly.description, /部署资格见目标预检/u)
+
+  const read = deliveryReadOnlyReleasePresentation({
+    ...summaryFixture(),
+    timings: { pipelines: [] },
+  })
+  assert.match(read.title, /版本与流水线可查看/u)
+  assert.doesNotMatch(read.description, /部署.*不受影响/u)
+  assert.equal(
+    deliveryReadOnlyReleasePresentation({
+      ...summaryFixture(),
+      releaseVersionPolicy: null,
+    }).color,
+    'warning'
+  )
+})
 
 function summaryFixture() {
   return {
@@ -1256,16 +1293,13 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /afterClose=\{\(\) =>/u)
   assert.match(
     source,
-    /手动操作指引[\s\S]*?<\/header>[\s\S]*?erp-dev-version-overview[\s\S]*?发布当前版本制品[\s\S]*?查看发布当前版本制品说明/u
+    /aria-label="查看发布当前版本制品说明"/u
   )
-  assert.doesNotMatch(
-    source,
-    /<header[\s\S]*?发布当前版本制品[\s\S]*?<\/header>/u
-  )
+  assert.equal(source.match(/onClick=\{\(\) => setReleaseModalOpen\(true\)\}/gu)?.length, 1)
   assert.match(source, /当前结论 \/ 下一步/u)
   assert.match(source, /summary[?][.]boundaries[?][.]releaseDispatchAllowed/u)
-  assert.match(source, /版本与流水线可查看，当前不能创建新发布/u)
-  assert.match(source, /当前只加载 GitLab 只读凭据/u)
+  assert.match(source, /deliveryReadOnlyReleasePresentation\(summary\)/u)
+  assert.doesNotMatch(source, /当前只加载 GitLab 只读凭据/u)
   assert.match(source, /aria-label="切换当前操作目标"/u)
   assert.match(source, /selectedTargetDefinition[.]dataBoundary/u)
   assert.doesNotMatch(source, /erp-dev-version-target-selector__boundaries/u)
@@ -1288,6 +1322,10 @@ test('version center keeps critical state visible and uses stable tab pagination
   assert.equal(
     resolveDevVersionCenterView('unexpected'),
     DEV_VERSION_CENTER_VIEW_VERSIONS
+  )
+  assert.equal(
+    resolveDevVersionCenterView(DEV_VERSION_CENTER_VIEW_OVERVIEW),
+    DEV_VERSION_CENTER_VIEW_OVERVIEW
   )
   assert.equal(
     resolveDevVersionCenterView(DEV_VERSION_CENTER_VIEW_PIPELINE),
@@ -1396,7 +1434,22 @@ test('version center keeps critical state visible and uses stable tab pagination
   )
   assert.match(
     versionCenterPageSource,
-    /未结束操作始终保持可见[\s\S]*openOperations[.]map[\s\S]*DevPipelineStatusStrip[\s\S]*<Tabs/u
+    /未结束操作始终保持可见[\s\S]*openOperations[.]map[\s\S]*<Tabs/u
+  )
+})
+
+test('version center separates deployment decisions from pipeline timing', () => {
+  assert.match(
+    versionCenterPageSource,
+    /key: DEV_VERSION_CENTER_VIEW_OVERVIEW[\s\S]*?\{versionOverview\}/u
+  )
+  assert.match(
+    versionCenterPageSource,
+    /key: DEV_VERSION_CENTER_VIEW_PIPELINE[\s\S]*?<DevPipelineStatusStrip/u
+  )
+  assert.match(
+    versionCenterPageSource,
+    /<table[\s\S]*?aria-label="发布状态摘要"/u
   )
 })
 
@@ -1467,6 +1520,10 @@ test('delivery pages keep cached summaries visible while rechecking and gate wri
   )
   assert.match(
     databaseMigrationPageSource,
-    /disabled=\{!summaryFresh \|\| Boolean\(actionKey\)\}/u
+    /disabled=\{readOnly \|\| !summaryFresh \|\| Boolean\(actionKey\)\}/u
+  )
+  assert.match(
+    databaseMigrationPageSource,
+    /summaryRef\.current\?\.readOnly === true/u
   )
 })

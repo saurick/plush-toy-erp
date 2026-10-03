@@ -215,6 +215,12 @@ test("Web, Server and Browser internal lane catalogs partition canonical work on
   assert.equal(CI_SERVER_QUALITY_LANES.critical_postgres.makeData, false);
   assert.equal(CI_SERVER_QUALITY_LANES.critical_postgres.chromium, false);
   assert.equal(validateCiBrowserQualityLaneRegistry(), true);
+  for (const scenario of [
+    "sales-order-demand-and-material-approval-desktop",
+    "material-summary-task-light",
+  ]) {
+    assert(CI_BROWSER_QUALITY_SCENARIOS.includes(scenario), scenario);
+  }
   assert.deepEqual(
     Object.values(CI_BROWSER_QUALITY_LANES)
       .flatMap(({ browserScenarios }) => browserScenarios)

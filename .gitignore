@@ -17,6 +17,7 @@ server/configs/dev/database-roles.local.json
 web/node_modules/
 web/build/
 web/.vite-cache/
+web/.env.development.local
 web/tmp/
 
 server/bin/

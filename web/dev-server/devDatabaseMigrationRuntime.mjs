@@ -88,7 +88,7 @@ const MIGRATION_TOOL_CHECKS = Object.freeze([
     key: 'supporting_commands',
     label: '基础命令',
     blockedMessage:
-      '备份恢复所需基础命令未就绪（Go、lockf、Bash 4+、curl、jq、Python 3、sha256sum 等）',
+      '备份恢复所需基础命令未就绪（Go、lockf 或 flock、Bash 4+、curl、jq、Python 3、sha256sum 等）',
   },
 ])
 
@@ -142,7 +142,7 @@ export async function readDatabaseMigrationToolReadiness({
         'bash',
         [
           '-c',
-          'type mapfile >/dev/null 2>&1 || exit 1; for tool in go lockf curl sha256sum wc awk date jq python3; do command -v "$tool" >/dev/null 2>&1 || exit 1; done',
+          'type mapfile >/dev/null 2>&1 || exit 1; for tool in go curl sha256sum wc awk date jq python3; do command -v "$tool" >/dev/null 2>&1 || exit 1; done; command -v lockf >/dev/null 2>&1 || command -v flock >/dev/null 2>&1',
         ],
         env,
         () => true

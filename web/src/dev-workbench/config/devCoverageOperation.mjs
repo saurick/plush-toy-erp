@@ -1,3 +1,5 @@
+import { createDevOperationUUID } from './devOperationIdentity.mjs'
+
 export const DEV_COVERAGE_API_PATH = '/__dev/api/qa/coverage'
 export const DEV_COVERAGE_SESSION_API_PATH = `${DEV_COVERAGE_API_PATH}/session`
 export const DEV_COVERAGE_ACTION_API_PATH = `${DEV_COVERAGE_API_PATH}/actions`
@@ -275,7 +277,7 @@ async function readJsonResponse(response) {
 }
 
 export function createDevCoverageIdempotencyKey({
-  randomUUID = () => globalThis.crypto.randomUUID(),
+  randomUUID = () => createDevOperationUUID(),
 } = {}) {
   const value = randomUUID()
   if (!UUID_PATTERN.test(value)) {

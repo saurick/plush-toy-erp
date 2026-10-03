@@ -1085,7 +1085,7 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert.doesNotMatch(pageSource, /<label\b/u)
   assert.match(
     pageSource,
-    /function ProfileOption[\s\S]*?<div[\s\S]*?<Radio value=\{profile\.key\}>/u
+    /function ProfileOption[\s\S]*?<tr[\s\S]*?<Radio value=\{profile\.key\}/u
   )
   assert.match(pageSource, /cancelButtonProps=\{\{ disabled: executing \}\}/u)
   assert.match(pageSource, /closable=\{!executing\}/u)

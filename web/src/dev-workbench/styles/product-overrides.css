@@ -162,11 +162,6 @@
     height: auto;
   }
 
-  .erp-dev-governance-shell {
-    grid-template-columns: 1fr;
-    height: auto;
-  }
-
   .erp-dev-ui-design-shell {
     grid-template-columns: 1fr;
     height: auto;
@@ -179,8 +174,6 @@
 
   .erp-dev-docs-sidebar,
   .erp-dev-docs-reader,
-  .erp-dev-governance-sidebar,
-  .erp-dev-governance-main,
   .erp-dev-ui-design-sidebar,
   .erp-dev-ui-design-reader,
   .erp-dev-testing-reader {
@@ -238,10 +231,6 @@
   .erp-dev-docs-header,
   .erp-dev-docs-sidebar,
   .erp-dev-docs-reader,
-  .erp-dev-governance-header,
-  .erp-dev-governance-sidebar,
-  .erp-dev-governance-decision,
-  .erp-dev-governance-reference-details,
   .erp-dev-ui-design-header,
   .erp-dev-ui-design-sidebar,
   .erp-dev-ui-design-reader,
@@ -254,19 +243,12 @@
   .erp-dev-hub-toolbar,
   .erp-dev-testing-header,
   .erp-dev-testing-reader__toolbar,
-  .erp-dev-governance-header,
-  .erp-dev-governance-decision__head,
-  .erp-dev-governance-reference-section__head,
   .erp-dev-ui-design-header,
   .erp-dev-ui-design-reader__toolbar,
   .erp-dev-ui-design-reader__info,
   .erp-dev-ui-design-fullscreen__bar {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .erp-dev-governance-source-card .ant-btn {
-    width: 100%;
   }
 
   .erp-dev-hub-toolbar .ant-input-search {
@@ -497,14 +479,12 @@
 
 @media screen and (max-width: 768px) {
   .erp-dev-hub-page,
-  .erp-dev-governance-page,
   .erp-dev-testing-page,
   .erp-dev-ui-design-page {
     padding: 12px;
   }
 
   .erp-dev-hub-page *,
-  .erp-dev-governance-page *,
   .erp-dev-testing-page *,
   .erp-dev-ui-design-page * {
     min-width: 0;
@@ -527,7 +507,6 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-governance-header,
   .erp-dev-testing-header,
   .erp-dev-ui-design-header {
     align-items: stretch;
@@ -537,20 +516,15 @@
     padding: 12px;
   }
 
-  .erp-dev-governance-header__metrics,
   .erp-dev-testing-header__stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     min-width: 0;
     width: 100%;
   }
 
-  .erp-dev-governance-metric,
   .erp-dev-testing-metric {
     gap: 6px;
     padding: 8px;
-  }
-
-  .erp-dev-testing-metric {
     grid-template-columns: 30px minmax(0, 1fr);
   }
 
@@ -561,12 +535,10 @@
     font-size: 15px;
   }
 
-  .erp-dev-governance-metric__note,
   .erp-dev-testing-metric__note {
     display: none;
   }
 
-  .erp-dev-governance-metric__value,
   .erp-dev-testing-metric__value {
     font-size: 20px;
   }

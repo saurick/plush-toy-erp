@@ -1,18 +1,21 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { COVERAGE_REPORT_SCHEMA, validateCoverageReport } from "./lib/coverage-report-contract.mjs";
 
 import {
   buildRepositoryFingerprint,
   readRepositoryIdentity,
 } from "./lib/repository-identity.mjs";
 
-export const SCHEMA_VERSION = "plush-test-coverage-report/v1";
+export const SCHEMA_VERSION = COVERAGE_REPORT_SCHEMA;
 export const OUTPUT_RELATIVE_PATH = "output/qa/coverage/latest.json";
+export const SNAPSHOT_OUTPUT_RELATIVE_PATH = "output/qa/coverage/snapshot.latest.json";
 export const FIELD_LINKAGE_RELATIVE_PATH =
   "output/qa/coverage/field-linkage.latest.json";
 
@@ -799,7 +802,8 @@ function artifactTimestamp(artifact) {
   return Number.isFinite(value) ? value : 0;
 }
 
-function withEvidence(record, evidence, note = record.note) {
+function withEvidence(record, evidence, scopeNote = "") {
+  const note = [...new Set([record.note, scopeNote].filter((value) => typeof value === "string" && value.trim()))].join(" ");
   return { ...record, note, evidence: [evidence] };
 }
 
@@ -828,6 +832,35 @@ function pickCandidate(candidates) {
       return right.generatedAt - left.generatedAt;
     return left.evidence.localeCompare(right.evidence);
   })[0];
+}
+
+export function normalizeCoverageScenarios(entry, current = true) {
+  if (!Array.isArray(entry?.scenarios)) return [];
+  return entry.scenarios.filter(isPlainObject).map((scenario, index) => {
+    const matchedTests = Array.isArray(scenario.matchedTests)
+      ? [...new Set(scenario.matchedTests.filter((test) => typeof test === "string" && test.trim()))]
+      : [];
+    let status = current ? scenario.status : "stale";
+    if (!["passed", "failed", "skipped", "blocked", "missing", "stale"].includes(status)) status = "missing";
+    if (status === "passed" && matchedTests.length === 0) status = "missing";
+    return {
+      id: String(scenario.id || "scenario-" + (index + 1)),
+      label: String(scenario.label || scenario.id || "场景 " + (index + 1)),
+      status,
+      package: typeof scenario.package === "string" ? scenario.package : "",
+      testPrefix: typeof scenario.testPrefix === "string" ? scenario.testPrefix : "",
+      note: typeof scenario.note === "string" ? scenario.note : "",
+      matchedTests,
+    };
+  });
+}
+
+function executionWithScenarios(record, entry, current) {
+  const scenarios = normalizeCoverageScenarios(entry, current);
+  if (record.status === "passed" && scenarios.some((scenario) => scenario.status !== "passed")) {
+    return { ...record, status: scenarios.some((scenario) => scenario.status === "failed") ? "failed" : "partial", note: ["场景明细包含失败或缺失，不能判定整项通过。", typeof entry.note === "string" ? entry.note : ""].filter(Boolean).join(" "), scenarios };
+  }
+  return { ...record, scenarios };
 }
 
 function normalizeArtifactCoverage(entry, evidence, freshness) {
@@ -878,7 +911,8 @@ function normalizeArtifactCoverage(entry, evidence, freshness) {
   const output = {
     status,
     metrics,
-    note:
+    scenarios: normalizeCoverageScenarios(entry),
+    note: [
       status === "collected"
         ? "已从当前 repository identity 制品采集 coverage；未据此推断 gate 通过。"
         : testExecution && testExecution.status !== "passed"
@@ -886,6 +920,8 @@ function normalizeArtifactCoverage(entry, evidence, freshness) {
           : hasExplicitStatus && !CODE_COVERAGE_STATUSES.has(explicitStatus)
             ? "coverage 状态不受支持，不能作为已采集证据。"
             : "制品包含 coverage，但其显式状态不完整。",
+      typeof entry.note === "string" ? entry.note : "",
+    ].filter(Boolean).join(" "),
     evidence: [evidence],
   };
   if (testExecution) output.testExecution = testExecution;
@@ -1133,9 +1169,12 @@ export function assembleCoverageReport({
       if (!key || !isPlainObject(entry)) continue;
       if (key === "frontend") hasFrontendDomain = true;
       const record = current
-        ? withEvidence(normalizeExecutionRecord(entry), evidence)
+        ? withEvidence(normalizeExecutionRecord(entry), evidence, entry.note)
         : staleRecord(evidence, freshness.note);
-      domainCandidates.get(key).push({ ...base, record });
+      domainCandidates.get(key).push({
+        ...base,
+        record: executionWithScenarios(record, entry, current),
+      });
     }
     if (!hasFrontendDomain) {
       const fieldLinkageRecord = fieldLinkageFrontendRecord(
@@ -1161,6 +1200,7 @@ export function assembleCoverageReport({
         ? withEvidence(
             normalizeExecutionRecord(entry, { allowNotApplicable: true }),
             evidence,
+            entry.note,
           )
         : staleRecord(evidence, freshness.note);
       gateCandidates.get(level).push({ ...base, record });
@@ -1173,9 +1213,12 @@ export function assembleCoverageReport({
       const key = acceptanceKey(rawKey);
       if (!key || !isPlainObject(entry)) continue;
       const record = current
-        ? withEvidence(normalizeExecutionRecord(entry), evidence)
+        ? withEvidence(normalizeExecutionRecord(entry), evidence, entry.note)
         : staleRecord(evidence, freshness.note);
-      acceptanceCandidates.get(key).push({ ...base, record });
+      acceptanceCandidates.get(key).push({
+        ...base,
+        record: executionWithScenarios(record, entry, current),
+      });
     }
 
     for (const key of ["go", "web"]) {
@@ -1265,6 +1308,7 @@ export function resolveGeneratedAt(
 export function parseArgs(argv) {
   const options = {
     write: false,
+    snapshot: false,
     help: false,
     generatedAt: "",
     goCoverprofile: "",
@@ -1296,6 +1340,11 @@ export function parseArgs(argv) {
       options.artifacts.push(value);
       continue;
     }
+    if (arg === "--snapshot") {
+      if (options.snapshot) throw new Error("--snapshot may only be specified once");
+      options.snapshot = true;
+      continue;
+    }
     if (singleValueArgs.has(arg)) {
       const canonical = arg === "--web-coverage-json" ? "--web-coverage" : arg;
       if (seen.has(canonical))
@@ -1311,6 +1360,9 @@ export function parseArgs(argv) {
     }
     throw new Error(`unsupported argument: ${arg}`);
   }
+  if (options.snapshot && (options.write || options.artifacts.length === 0 || options.goCoverprofile || options.webCoverage)) {
+    throw new Error("--snapshot requires explicit bound --artifact inputs and cannot combine with --write or bare coverage");
+  }
   return options;
 }
 
@@ -1322,7 +1374,7 @@ async function discoverArtifactPaths(projectRoot, explicitPaths) {
       if (
         entry.isFile() &&
         entry.name.endsWith(".json") &&
-        entry.name !== "latest.json"
+        !["latest.json", "snapshot.latest.json"].includes(entry.name)
       ) {
         discovered.push(path.join(coverageDir, entry.name));
       }
@@ -1463,9 +1515,42 @@ export async function writeCoverageReport(projectRoot, report) {
   return outputPath;
 }
 
+export async function writeCoverageSnapshot(projectRoot, report) {
+  if (report.schemaVersion !== SCHEMA_VERSION || !/^[0-9a-f]{40,64}$/u.test(report.repository?.commit || "") ||
+      !/^[0-9a-f]{64}$/u.test(report.repository?.fingerprint || "") || typeof report.repository?.dirty !== "boolean") {
+    throw new Error("snapshot requires a report bound to its source repository identity");
+  }
+  const outputPath = path.join(projectRoot, SNAPSHOT_OUTPUT_RELATIVE_PATH);
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  const candidate = outputPath + "." + randomUUID() + ".tmp";
+  const snapshot = { ...report, snapshot: { kind: "isolated", note: "仅证明记录的源码快照；不替代当前工作区、提交后 CI 或目标环境验收。" } };
+  validateCoverageReport(snapshot);
+  await writeFile(candidate, JSON.stringify(snapshot, null, 2) + "\n", { encoding: "utf8", flag: "wx", mode: 0o600 });
+  const saved = JSON.parse(await readFile(candidate, "utf8"));
+  if (JSON.stringify(saved) !== JSON.stringify(snapshot)) throw new Error("snapshot readback failed");
+  await rename(candidate, outputPath);
+  return outputPath;
+}
+
+export async function buildCoverageSnapshot({ projectRoot, artifactPaths, generatedAt }) {
+  if (!artifactPaths?.length) throw new Error("snapshot requires explicit bound artifacts");
+  const paths = artifactPaths.map((input) => path.resolve(projectRoot, input));
+  const inputs = await Promise.all(paths.map(async (artifactPath) => {
+    const relative = path.relative(projectRoot, artifactPath);
+    if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) throw new Error("snapshot evidence must remain in the project");
+    return JSON.parse(await readFile(artifactPath, "utf8"));
+  }));
+  const repository = inputs[0].repository;
+  if (inputs.some((input) => evaluateArtifactFreshness(input, repository).status !== "current")) {
+    throw new Error("snapshot inputs must share one complete source repository identity");
+  }
+  return buildCoverageReport({ projectRoot, repository, generatedAt, artifactPaths: paths });
+}
+
 export function usage() {
   return `用法:
   node scripts/qa/test-coverage-report.mjs [--write]
+    [--snapshot --artifact <bound-evidence-json>]...
     [--go-coverprofile <file>]
     [--web-coverage <node-coverage-stdout-or-json>]
     [--artifact <json>]...
@@ -1473,6 +1558,8 @@ export function usage() {
 
 默认只聚合 output/qa/coverage/*.json（排除 latest.json）并输出 JSON 到 stdout；
 --write 固定写入 ${OUTPUT_RELATIVE_PATH}，不会运行测试。
+--snapshot 按显式制品共同的源码身份聚合，写入 ${SNAPSHOT_OUTPUT_RELATIVE_PATH}；
+它仅归档隔离验证，不改写当前工作区身份或 latest.json，也不运行测试。
 裸 --go-coverprofile/--web-coverage 不含 repository identity，只作 stale 诊断；
 当前代码证据须使用含 repository identity 的 --artifact。`;
 }
@@ -1491,6 +1578,11 @@ async function main() {
     return;
   }
   const projectRoot = findProjectRoot(process.cwd());
+  if (options.snapshot) {
+    const report = await buildCoverageSnapshot({ projectRoot, generatedAt: resolveGeneratedAt(options.generatedAt), artifactPaths: options.artifacts });
+    process.stdout.write(evidencePath(projectRoot, await writeCoverageSnapshot(projectRoot, report)) + "\n");
+    return;
+  }
   const repository = await collectRepositoryState(projectRoot);
   const artifactPaths = await discoverArtifactPaths(
     projectRoot,

@@ -1010,7 +1010,6 @@ test('devCustomerConfig: 主工作任务与执行动作保持单一层级', asyn
 
   assert.match(source, /label: '界面投影'/u)
   assert.match(source, /label: '执行与发布门禁'/u)
-  assert.match(source, /title="进入执行与发布门禁"/u)
   assert.match(source, /level="primary"/u)
   assert.doesNotMatch(source, /label: '界面配置'/u)
   assert.doesNotMatch(source, /label: '执行发布'/u)

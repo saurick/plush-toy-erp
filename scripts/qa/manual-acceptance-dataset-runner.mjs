@@ -106,6 +106,8 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
     task: Object.freeze(["scripts/qa/manual-acceptance-task-data.mjs"]),
     facts: Object.freeze([
       "scripts/qa/manual-acceptance-fact-data.mjs",
+      "scripts/qa/manual-acceptance-engineering-data.mjs",
+      "scripts/qa/manual-acceptance-attachment-data.mjs",
       "scripts/qa/manual-acceptance-fact-report-contract.mjs",
       "scripts/qa/manual-acceptance-source-driven-facts.mjs",
     ]),

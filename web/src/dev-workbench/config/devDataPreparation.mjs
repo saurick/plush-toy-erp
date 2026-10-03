@@ -1,3 +1,4 @@
+import { createDevOperationUUID } from './devOperationIdentity.mjs'
 import { DEV_DATA_PREPARATION_ROUTE } from './devRoutes.mjs'
 import { buildDevCustomerScopeSearch } from './devCustomerScope.mjs'
 import manualAcceptanceContract from '../../../../server/internal/manualacceptance/contract.json' with { type: 'json' }
@@ -1437,7 +1438,7 @@ export function createDevDataPreparationClient({
 export function createDataPreparationIdempotencyKey(
   profileKey,
   targetKey,
-  randomUuid = () => globalThis.crypto.randomUUID()
+  randomUuid = () => createDevOperationUUID()
 ) {
   if (!PROFILE_TARGET_KEYS[profileKey]?.includes(targetKey)) {
     throw new Error('data preparation profile target is invalid')

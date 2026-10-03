@@ -292,7 +292,7 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
     /path="database-migration"[\s\S]{0,100}?<DevDatabaseMigrationPage/u,
     "the fixed database migration page must remain under the DEV-only router",
   );
-  assert.match(drillRecoveryItem?.title || "", /演练与恢复/u);
+  assert.match(drillRecoveryItem?.title || "", /安全与恢复/u);
   assert(
     (drillRecoveryItem?.guardrails || []).some((guardrail) =>
       String(guardrail).includes("No arbitrary target or shell"),
@@ -459,7 +459,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
       "mobile-workflow-smoke",
       "customer-config-dev-console",
       "dev-ui-design",
-      "dev-doc-governance",
+      "dev-docs",
       "customer-config-package-runtime",
       "customer-import-tooling",
       "frontend-customer-config-projection",
@@ -876,43 +876,38 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "不改正式菜单",
     "UI design viewer preset",
   );
-  const devDocGovernancePreset = DEV_TESTING_COPY_PRESETS.find(
-    (item) => item.key === "dev-doc-governance",
+  const devDocsPreset = DEV_TESTING_COPY_PRESETS.find(
+    (item) => item.key === "dev-docs",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernancePreset),
+    buildDevTestingCopyPresetSource(devDocsPreset),
     "devDocs.test.mjs",
-    "dev docs governance preset",
+    "dev docs preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernancePreset),
-    "devGovernance.test.mjs",
-    "dev docs governance preset",
+    buildDevTestingCopyPresetSource(devDocsPreset),
+    "devHub.test.mjs",
+    "dev docs preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernancePreset),
+    buildDevTestingCopyPresetSource(devDocsPreset),
     "dev-page-overview-desktop-light",
-    "dev docs governance preset",
+    "dev docs preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernancePreset),
+    buildDevTestingCopyPresetSource(devDocsPreset),
     "dev-page-docs-desktop-light",
-    "dev docs governance preset",
+    "dev docs preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernancePreset),
-    "dev-page-governance-desktop-light",
-    "dev docs governance preset",
-  );
-  assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernancePreset),
+    buildDevTestingCopyPresetSource(devDocsPreset),
     "不改正式文档真源",
-    "dev docs governance preset",
+    "dev docs preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernancePreset),
+    buildDevTestingCopyPresetSource(devDocsPreset),
     "不进入正式菜单",
-    "dev docs governance preset",
+    "dev docs preset",
   );
   const customerConfigRuntimePreset = DEV_TESTING_COPY_PRESETS.find(
     (item) => item.key === "customer-config-package-runtime",
@@ -1154,9 +1149,9 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   const pageSource = read(
     "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
   );
-  assertIncludes(
+  assert.match(
     pageSource,
-    "客户配置包预检与发布控制台",
+    /<Title\s+className="erp-dev-customer-title"\s+level=\{1\}>\s*客户配置\s*<\/Title>/u,
     "customer config console heading",
   );
   assertIncludes(
@@ -1382,5 +1377,6 @@ test("dev entry boundary: Product Core 与客户开发入口共用同一 web pre
 
   const customerStart = read("web/scripts/startYoyoosunDev.mjs");
   assert.match(customerStart, /resolveWebRuntimeStartup/u);
-  assert.match(customerStart, /createViteChildEnvironment/u);
+  assert.match(customerStart, /runManagedVite/u);
+  assert.match(sharedStart, /createViteChildEnvironment/u);
 });

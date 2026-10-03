@@ -40,18 +40,18 @@ test('devProductCore: route and source stay inside the DEV-only workbench', () =
   )
 })
 
-test('devProductCore: all 16 capability rows derive from the unique ledger', () => {
+test('devProductCore: all 17 capability rows derive from the unique ledger', () => {
   const capabilities = parseProductCoreCapabilities(ledgerSource)
   const summary = buildProductCoreSummary(capabilities)
 
-  assert.equal(capabilities.length, 16)
-  assert.equal(new Set(capabilities.map((item) => item.key)).size, 16)
+  assert.equal(capabilities.length, 17)
+  assert.equal(new Set(capabilities.map((item) => item.key)).size, 17)
   assert.deepEqual(summary.counts, {
-    entered: 11,
+    entered: 12,
     partial: 3,
     excluded: 2,
   })
-  assert.equal(summary.total, 16)
+  assert.equal(summary.total, 17)
   assert.equal(summary.readOnly, true)
   assert.match(summary.boundary, /不能推出目标环境已发布/u)
   assert(
@@ -83,7 +83,7 @@ test('devProductCore: filters distinguish membership and readable keywords', () 
     filterProductCoreCapabilities(capabilities, {
       membership: 'entered',
     }).length,
-    11
+    12
   )
   assert.deepEqual(
     filterProductCoreCapabilities(capabilities, {

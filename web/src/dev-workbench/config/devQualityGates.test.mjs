@@ -1243,7 +1243,6 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(taskNavSource, /-panel-/u)
 })
 
-
 test('server Job timestamp contract accepts missing records and rejects reversed intervals', () => {
   const payload = summary()
   const job = payload.serverEvidence.jobs[0]

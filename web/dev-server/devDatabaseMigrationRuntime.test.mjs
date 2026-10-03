@@ -494,13 +494,19 @@ test('database migration runtime accepts platform-neutral compatible tooling', a
 })
 
 test('database migration runtime requires every supporting command before preparation', async (t) => {
-  for (const missing of ['go', 'lockf', 'jq', null]) {
+  for (const [missing, lockCommand] of [
+    ['go', 'lockf'],
+    ['lockf', 'lockf'],
+    ['jq', 'lockf'],
+    [null, 'lockf'],
+    [null, 'flock'],
+  ]) {
     const root = createRoot(t)
     const bin = path.join(root, 'bin')
     mkdirSync(bin)
     for (const command of [
       'go',
-      'lockf',
+      lockCommand,
       'curl',
       'sha256sum',
       'wc',

@@ -13,6 +13,11 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import { assertDisposableDatabaseTarget } from "./database-target.mjs";
+import { pressureLogicFingerprint } from "./pressure-runtime.mjs";
+
+export function capacityDatasetLogicFingerprint() {
+  return pressureLogicFingerprint(["scripts/qa/capacity-dataset.mjs", "server/cmd/seed-capacity-attachments/main.go", "server/internal/data/model/schema/finance_fact.go", "server/internal/data/model/schema/production_fact.go"]);
+}
 
 export const CAPACITY_DATASET_SCHEMA = "plush-capacity-dataset/v1";
 export const CAPACITY_DATASET_VERSION = "capacity-read-model-v1";
@@ -39,7 +44,7 @@ function redact(value) {
 
 function psql(databaseURL, sql) {
   const result = spawnSync(
-    "/opt/homebrew/opt/libpq/bin/psql",
+    String(process.env.PSQL_BIN || "psql").trim() || "psql",
     [
       databaseURL,
       "-X",
@@ -52,6 +57,7 @@ function psql(databaseURL, sql) {
     ],
     {
       encoding: "utf8",
+      timeout: 30000,
       maxBuffer: 64 * 1024 * 1024,
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -263,6 +269,7 @@ BEGIN
     source_line_id,
     idempotency_key,
     occurred_at,
+    due_at,
     occurred_at_specified,
     posted_at,
     posted_by,
@@ -280,20 +287,21 @@ BEGIN
     'RECEIVABLE',
     'DRAFT',
     1,
-    'OTHER',
+    'CUSTOMER',
     NULL,
     1,
     0,
     'CNY',
     NULL,
-    NULL,
-    NULL,
+    'DUE_ON_OCCURRENCE',
+    0,
     NULL,
     NULL,
     NULL,
     NULL,
     'sim-cap-ff-' || series.value,
-    clock_timestamp(),
+    transaction_timestamp(),
+    transaction_timestamp(),
     true,
     NULL,
     NULL,
@@ -376,10 +384,10 @@ export function runCapacityDataset({
   const before = readCounts();
   execute(sql);
   const uploadAttachments = runtime.attachments || (() => {
-    const result = spawnSync("go", ["run", "./cmd/seed-capacity-attachments",
+    const result = spawnSync("go", ["run", "-mod=readonly", "-p", "4", "./cmd/seed-capacity-attachments",
       "-database", databaseName, "-execute", "-confirm", `LOAD_CAPACITY_ATTACHMENTS:${databaseName}`], {
       cwd: new URL("../../server", import.meta.url),
-      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", POSTGRES_DSN: databaseURL },
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", GOMAXPROCS: "4", POSTGRES_DSN: databaseURL },
       encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
     });
     if (result.status !== 0) throw new Error(`capacity attachment upload failed: ${redact(result.stderr || result.error?.message || "")}`);
@@ -406,6 +414,7 @@ export function runCapacityDataset({
     generatedAt: new Date(generatedAt).toISOString(),
     datasetVersion: CAPACITY_DATASET_VERSION,
     datasetHash: sha256(sql),
+    logicFingerprint: capacityDatasetLogicFingerprint(),
     databaseName,
     databaseRunIdentity: target.databaseRunIdentity,
     databaseTargetFingerprint: target.targetFingerprint,

@@ -38,7 +38,9 @@ import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservator
 import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs'
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 import { createDevWorkbenchDesktopScenarios } from './devWorkbenchDesktopScenarios.mjs'
+import { createDevPressureScenarios } from './devPressureScenarios.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
+import { createDevDeliveryWorkspaceScenarios } from './devDeliveryWorkspaceScenarios.mjs'
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
 import { createBusinessModuleNavigationScenarios } from './businessModuleNavigationScenarios.mjs'
 import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliveryScenarios.mjs'
@@ -391,6 +393,7 @@ export function createStyleL1Scenarios(deps) {
       assertNoHorizontalOverflow,
       expectHeading,
     }),
+    ...createDevPressureScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevUIDesignDetailScenarios(deps),
     ...createDevUIDesignWorkflowScenarios(deps),
     ...createDevQualityGateScenarios({
@@ -408,6 +411,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
+    ...createDevDeliveryWorkspaceScenarios({ assert, assertNoHorizontalOverflow, expectHeading }),
     ...createDevDrillRecoveryScenarios({
       assert,
       assertNoHorizontalOverflow,

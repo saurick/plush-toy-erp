@@ -149,6 +149,8 @@ export const CI_BROWSER_QUALITY_SCENARIOS = Object.freeze([
   "root-redirect-mobile",
   "print-workspace-all-empty-fields",
   "print-center-engineering-preview-tablet",
+  "sales-order-demand-and-material-approval-desktop",
+  "material-summary-task-light",
 ]);
 
 export const CI_BROWSER_QUALITY_LANES = Object.freeze({
@@ -171,6 +173,8 @@ export const CI_BROWSER_QUALITY_LANES = Object.freeze({
       "root-redirect-mobile",
       "print-workspace-all-empty-fields",
       "print-center-engineering-preview-tablet",
+      "sales-order-demand-and-material-approval-desktop",
+      "material-summary-task-light",
     ]),
   }),
 });

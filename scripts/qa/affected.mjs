@@ -58,10 +58,10 @@ const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-page-delivery-desktop-light",
   "dev-page-product-core-desktop-light",
   "dev-page-permission-relationships-desktop-light",
-  "dev-page-governance-desktop-light",
   "dev-page-docs-desktop-light",
   "dev-page-ui-design-desktop-light",
   "dev-page-testing-desktop-light",
+  "dev-pressure-desktop",
   "dev-page-data-preparation-desktop-light",
   "dev-page-customer-config-desktop-light",
   "dev-page-database-migration-desktop-light",
@@ -519,7 +519,7 @@ function isDevPageGovernancePath(file) {
     /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
       file,
     ) ||
-    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageNav|PipelineTimingPanel|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FlowState|Governance|Hub|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
+    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageNav|PipelineTimingPanel|PressurePanel|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FlowState|Hub|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
       file,
     ) ||
     /^web\/scripts\/style-l1\/(?:scenarios|dev[A-Z][^/]*)\.mjs$/u.test(file)
@@ -527,7 +527,7 @@ function isDevPageGovernancePath(file) {
 }
 
 function isPrivilegedDevServerPath(file) {
-  return /^web\/dev-server\/dev(?:CustomerImportDryRun|DataPreparation|DatabaseMigration|DeliveryBridge|QualityGate|ServerSecurity)/u.test(
+  return /^web\/dev-server\/dev(?:CustomerImportDryRun|DataPreparation|DatabaseMigration|DeliveryBridge|QaTesting|QaPressureReports|QualityGate|ServerSecurity)/u.test(
     file,
   );
 }
@@ -561,10 +561,13 @@ function devBrowserScenarioNames(file) {
       /PermissionRelationship|permission-relationships/u,
       ["dev-page-permission-relationships-desktop-light"],
     ],
-    [/Governance|governance/u, ["dev-page-governance-desktop-light"]],
     [/DevDocs|devDocs|dev-docs/u, ["dev-page-docs-desktop-light"]],
     [/UIDesign|ui-design/u, ["dev-page-ui-design-desktop-light"]],
-    [/DevTesting|devTesting/u, ["dev-page-testing-desktop-light"]],
+    [/DevPressure|devPressure|dev-pressure/u, ["dev-pressure-desktop"]],
+    [
+      /DevTesting|devTesting/u,
+      ["dev-page-testing-desktop-light", "dev-pressure-desktop"],
+    ],
     [
       /DataPreparation|data-preparation/u,
       ["dev-page-data-preparation-desktop-light"],
@@ -636,7 +639,7 @@ function isCustomerPrivateSourcePath(file) {
 function isBusinessFactPath(file) {
   return (
     /^server\/internal\/(?:biz|data)\//u.test(file) &&
-    /(?:inventory|purchase|quality|shipment|finance|operational_fact|process_runtime|process_domain_command|sales_order|stock_reservation|production|outsourcing|finished_goods|workflow|customer_config|source_document)/u.test(
+    /(?:inventory|purchase|quality|shipment|finance|operational_fact|process_runtime|process_domain_command|sales_order|engineering_material|unit_quantity|stock_reservation|production|outsourcing|finished_goods|workflow|customer_config|source_document)/u.test(
       file,
     )
   );
@@ -1027,6 +1030,13 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       file === "scripts/qa/fixtures/net-weight-kg-to-g-20260714165115.sql"
     ) {
       directTests.add("scripts/qa/critical-postgres-gate.test.mjs");
+      continue;
+    }
+
+    if (file === "scripts/qa/lib/coverage-report-contract.mjs") {
+      addSyntaxCheck(state, file);
+      directTests.add("scripts/qa/test-coverage-report.test.mjs");
+      directTests.add("web/dev-server/devQaCoveragePlugin.test.mjs");
       continue;
     }
 

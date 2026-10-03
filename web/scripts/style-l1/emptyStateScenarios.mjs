@@ -158,34 +158,65 @@ export function createEmptyStateScenarios({
           0,
           '效能工作台内容区拥有主标题时，顶栏不应重复当前页面名称'
         )
-        await frame
-          .getByRole('button', { name: '查看质量验证', exact: true })
+        const table = frame.getByRole('table', { name: '开发工具对照' })
+        await table.waitFor()
+        for (const title of ['客户配置', '数据库迁移', '版本发布', '安全与恢复']) {
+          assert.equal(await table.getByRole('button', { name: title, exact: true }).count(), 1)
+        }
+        await table
+          .getByRole('button', { name: '置顶质量门禁', exact: true })
           .click()
-        await frame.getByRole('tab', { name: '执行记录', exact: true }).click()
-        await frame.getByRole('button', { name: '查看质量门禁证据' }).click()
+        await frame.getByRole('tab', { name: '常用工具', exact: true }).click()
+        assert.equal(await table.locator('tbody tr').count(), 1)
+        await table
+          .getByRole('button', { name: '质量门禁', exact: true })
+          .click()
         await frame
           .getByRole('dialog', { name: '质量门禁 · 证据详情' })
           .waitFor()
         await page.keyboard.press('Escape')
-        assert.equal(
-          await frame.locator(':focus').getAttribute('aria-label'),
-          '查看质量门禁证据'
-        )
-        await frame
-          .getByRole('button', { name: '产品工程', exact: true })
+        assert.equal(await frame.locator(':focus').textContent(), '质量门禁')
+        await table
+          .getByRole('button', { name: '取消置顶质量门禁', exact: true })
           .click()
+        await frame.getByText('没有匹配的工具', { exact: true }).waitFor()
+        await frame.getByRole('tab', { name: '使用指南', exact: true }).click()
+        await frame.getByRole('table', { name: '开发工具使用指南' }).waitFor()
+        await frame.getByRole('tab', { name: '全部工具', exact: true }).click()
         await frame
           .getByRole('textbox', { name: '搜索工作台条目' })
           .fill('不存在的条目')
-        await frame.getByText('当前范围暂无记录', { exact: true }).waitFor()
-        await frame.getByRole('button', { name: '清除当前筛选' }).click()
-        await frame.getByRole('button', { name: '查看权限关系证据' }).waitFor()
+        await frame.getByText('没有匹配的工具', { exact: true }).waitFor()
         await frame
+          .getByRole('button', { name: '清除筛选', exact: true })
+          .click()
+        await table
+          .getByRole('button', { name: '权限关系', exact: true })
+          .waitFor()
+        const sidebar = frame.locator('#sidebar')
+        await sidebar
           .getByRole('button', { name: '交付运行', exact: true })
           .click()
+        for (const task of [
+          { tab: '客户配置', expected: '试跑与发布' },
+          { tab: '数据库迁移', summary: '正式页面的任务标签', expected: '运行检查' },
+          { tab: '版本发布', summary: '正式页面的任务标签', expected: '发布检查' },
+          { tab: '安全与恢复', summary: '安全核验、恢复演练与应急指引', expected: '应急指引' },
+        ]) {
+          await frame.getByRole('tab', { name: task.tab, exact: true }).click()
+          if (task.summary) {
+            await frame.locator('.dev-design-settings > summary').filter({ hasText: task.summary }).click()
+          }
+          await frame.getByRole('table', { name: '正式交付页面任务' }).getByRole('row', { name: new RegExp(task.expected, 'u') }).waitFor()
+        }
+        await frame.getByRole('tab', { name: '版本发布', exact: true }).click()
         assert.ok(
           await frame.getByRole('button', { name: '核对并准备' }).isDisabled()
         )
+        await frame
+          .locator('.dev-design-settings > summary')
+          .filter({ hasText: '其他操作说明' })
+          .click()
         const lockFlowTrigger = frame.getByRole('button', {
           name: '查看 Git 索引锁流程',
           exact: true,
@@ -246,7 +277,8 @@ export function createEmptyStateScenarios({
         assert.ok(
           samples.some(
             (sample) =>
-              sample.left > first.left + 1 && sample.left < last.left - 1
+              sample.left > Math.min(first.left, last.left) + 1 &&
+              sample.left < Math.max(first.left, last.left) - 1
           ),
           '滑块应经过真实中间位置'
         )
@@ -266,17 +298,40 @@ export function createEmptyStateScenarios({
           .press('End')
         assert.equal(
           await frame
-            .getByRole('tab', { name: '演练与恢复', exact: true })
+            .getByRole('tab', { name: '安全与恢复', exact: true })
             .getAttribute('aria-selected'),
           'true'
         )
         await frame
-          .getByRole('tab', { name: '演练与恢复', exact: true })
+          .getByRole('tab', { name: '安全与恢复', exact: true })
           .press('ArrowLeft')
         await page.emulateMedia({ reducedMotion: 'no-preference' })
+        await frame.getByRole('tab', { name: '数据库迁移', exact: true }).click()
+        await sidebar
+          .getByRole('button', { name: '质量验证', exact: true })
+          .click()
         await frame
-          .getByRole('combobox', { name: '前置证据样例' })
-          .selectOption('ready')
+          .getByRole('button', { name: '演示本轮验证', exact: true })
+          .click()
+        await frame.getByRole('tab', { name: '执行记录', exact: true }).click()
+        await frame
+          .getByText('定向页面检查 · 样例完成', { exact: true })
+          .waitFor()
+        await sidebar
+          .getByRole('button', { name: '交付运行', exact: true })
+          .click()
+        assert.ok(
+          await frame.getByRole('button', { name: '核对并准备' }).isDisabled()
+        )
+        await frame
+          .getByRole('button', { name: '核对交付条件', exact: true })
+          .click()
+        await frame
+          .getByRole('dialog', { name: '核对交付条件 · 演示' })
+          .waitFor()
+        await frame
+          .getByRole('button', { name: '确认样例条件齐备', exact: true })
+          .click()
         await frame.getByRole('button', { name: '核对并准备' }).click()
         await frame
           .getByRole('dialog', { name: '核对数据库迁移计划' })
@@ -294,9 +349,13 @@ export function createEmptyStateScenarios({
           await frame.getByRole('button', { name: '核对并准备' }).isDisabled()
         )
         await frame
-          .getByRole('tab', { name: '演练与恢复', exact: true })
+          .getByRole('tab', { name: '安全与恢复', exact: true })
           .click()
         await frame.getByRole('button', { name: '读取演示结果' }).waitFor()
+        await frame
+          .locator('.dev-design-settings > summary')
+          .filter({ hasText: '演示设置与边界' })
+          .click()
         await frame
           .getByRole('combobox', { name: '工作台状态预览' })
           .selectOption('error')
@@ -309,7 +368,7 @@ export function createEmptyStateScenarios({
         await frame
           .getByRole('button', { name: '重新读取', exact: true })
           .click()
-        await frame.getByRole('button', { name: '总览', exact: true }).click()
+        await sidebar.getByRole('button', { name: '总览', exact: true }).click()
         await frame.getByRole('button', { name: '读取演示结果' }).click()
         await frame.getByRole('dialog', { name: '演示操作回执' }).waitFor()
         await frame

@@ -8,9 +8,13 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import { assertDisposableDatabaseTarget } from "./database-target.mjs";
+import { DEFAULT_PRESSURE_LIMITS, normalizePressureURL, pressureLogicFingerprint, pressureRPC as rpc, runPressureLevel as runLevel, verifyPressureRuntime } from "./pressure-runtime.mjs";
+import { capacityDatasetLogicFingerprint } from "./capacity-dataset.mjs";
+
+const READ_PRESSURE_LOGIC_FILES = ["scripts/qa/manual-acceptance-capacity-pressure.mjs", "scripts/qa/pressure-runtime.mjs"];
+const importedReadPressureFingerprint = pressureLogicFingerprint(READ_PRESSURE_LOGIC_FILES);
 
 export const CONFIRM_PHRASE = "RUN_ISOLATED_MANUAL_ACCEPTANCE_PRESSURE";
-const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const execFileAsync = promisify(execFile);
 const RUNTIME_METRIC_NAMES = Object.freeze([
   "plush_erp_go_goroutines",
@@ -43,6 +47,11 @@ export const PRESSURE_PROFILES = Object.freeze({
       cooldownBeforeMs: 5000,
       pacingMs: 200,
     }),
+  ]),
+  sustained: Object.freeze([
+    Object.freeze({ key: "ramp", concurrency: 5, requests: 100 }),
+    Object.freeze({ key: "sustained", concurrency: 20, durationMs: 600000, pacingMs: 400 }),
+    Object.freeze({ key: "recovery", concurrency: 5, requests: 100, cooldownBeforeMs: 5000, pacingMs: 200 }),
   ]),
   saturation: Object.freeze([
     Object.freeze({ key: "ramp", concurrency: 20, requests: 500 }),
@@ -90,7 +99,7 @@ function sha256(value) {
   return createHash("sha256").update(String(value)).digest("hex");
 }
 
-async function readExecutionIdentity() {
+export async function readExecutionIdentity() {
   const [{ stdout: commit }, { stdout: status }] = await Promise.all([
     execFileAsync("git", ["rev-parse", "HEAD"]),
     execFileAsync("git", ["status", "--porcelain=v1", "--untracked-files=no"], {
@@ -120,20 +129,7 @@ export function percentile(values, ratio) {
   ];
 }
 
-export function normalizeLoopbackURL(value) {
-  const url = new URL(String(value || "http://127.0.0.1:8300"));
-  if (
-    url.protocol !== "http:" ||
-    !LOCAL_HOSTS.has(url.hostname) ||
-    url.username ||
-    url.password
-  ) {
-    throw new Error(
-      "pressure target must be loopback HTTP without credentials",
-    );
-  }
-  return url.origin;
-}
+export function normalizeLoopbackURL(value) { return normalizePressureURL(value); }
 
 export function resolvePsqlBin(env = process.env) {
   return String(env?.PSQL_BIN || "psql").trim() || "psql";
@@ -167,42 +163,32 @@ async function readRuntimeMetrics(baseURL) {
   return parseRuntimeMetrics(await response.text());
 }
 
-function startRuntimeMetricsSampler(baseURL) {
-  const samples = [];
-  let stopped = false;
-  const run = async (force = false) => {
-    if (stopped && !force) return;
+function startSampler(read, names) {
+  let stopped = false, timer, pending, stopResult;
+  let sampleCount = 0, sampleErrors = 0, first = null, last = null;
+  const maximum = Object.fromEntries(names.map((name) => [name, 0]));
+  const sample = async () => {
+    sampleCount++;
     try {
-      samples.push({
-        at: new Date().toISOString(),
-        ...(await readRuntimeMetrics(baseURL)),
-      });
-    } catch (error) {
-      samples.push({ at: new Date().toISOString(), error: error.message });
-    }
+      const result = { at: new Date().toISOString(), ...await read() };
+      first ||= result; last = result;
+      for (const name of names) maximum[name] = Math.max(maximum[name], Number(result[name] || 0));
+    } catch { sampleErrors++; }
   };
-  const timer = setInterval(run, 1000);
-  timer.unref();
-  void run();
-  return async () => {
-    stopped = true;
-    clearInterval(timer);
-    await run(true);
-    const valid = samples.filter((item) => !item.error);
-    const maximum = Object.fromEntries(
-      RUNTIME_METRIC_NAMES.map((name) => [
-        name,
-        Math.max(0, ...valid.map((item) => Number(item[name] || 0))),
-      ]),
-    );
-    return {
-      sampleCount: samples.length,
-      sampleErrors: samples.filter((item) => item.error).length,
-      first: valid.at(0) || null,
-      last: valid.at(-1) || null,
-      maximum,
-    };
+  const run = () => {
+    pending = sample().finally(() => {
+      if (!stopped) { timer = setTimeout(run, 1000); timer.unref(); }
+    });
   };
+  run();
+  return () => stopResult ||= (async () => {
+    stopped = true; clearTimeout(timer); await pending; await sample();
+    return { sampleCount, sampleErrors, first, last, maximum };
+  })();
+}
+
+export function startRuntimeMetricsSampler(baseURL) {
+  return startSampler(() => readRuntimeMetrics(baseURL), RUNTIME_METRIC_NAMES);
 }
 
 export function selectCapacityIdempotencyTask(
@@ -231,7 +217,7 @@ export function selectCapacityIdempotencyTask(
   );
 }
 
-async function readDatabaseStats(databaseURL) {
+export async function readDatabaseStats(databaseURL) {
   const { stdout } = await execFileAsync(
     resolvePsqlBin(),
     [
@@ -239,7 +225,7 @@ async function readDatabaseStats(databaseURL) {
       "-Atc",
       "select json_build_object('workflow_tasks',(select count(*) from workflow_tasks),'workflow_task_version_sum',(select coalesce(sum(version),0) from workflow_tasks),'workflow_task_events',(select count(*) from workflow_task_events),'production_facts',(select count(*) from production_facts),'finance_facts',(select count(*) from finance_facts),'attachments',(select count(*) from business_attachments),'backends',numbackends,'conflicts',conflicts,'deadlocks',deadlocks,'temp_files',temp_files,'temp_bytes',temp_bytes,'active_queries',(select count(*) from pg_stat_activity where datname=current_database() and state='active'),'lock_waiters',(select count(*) from pg_stat_activity where datname=current_database() and wait_event_type='Lock')) from pg_stat_database where datname=current_database()",
     ],
-    { maxBuffer: 1024 * 1024 },
+    { maxBuffer: 1024 * 1024, timeout: 4000 },
   );
   return JSON.parse(stdout.trim());
 }
@@ -261,111 +247,18 @@ async function readIdempotencyReceipt(databaseURL, taskID, idempotencyKey) {
       where task_id = ${Number(taskID)}
         and idempotency_key = '${String(idempotencyKey).replaceAll("'", "''")}'`,
     ],
-    { maxBuffer: 1024 * 1024 },
+    { maxBuffer: 1024 * 1024, timeout: 4000 },
   );
   return JSON.parse(stdout.trim());
 }
 
-function startDatabaseSampler(databaseURL) {
-  const samples = [];
-  let stopped = false;
-  const run = async (force = false) => {
-    if (stopped && !force) return;
-    try {
-      samples.push({
-        at: new Date().toISOString(),
-        ...(await readDatabaseStats(databaseURL)),
-      });
-    } catch (error) {
-      samples.push({ at: new Date().toISOString(), error: error.message });
-    }
-  };
-  const timer = setInterval(run, 1000);
-  timer.unref();
-  void run();
+export function startDatabaseSampler(databaseURL) {
+  const stop = startSampler(() => readDatabaseStats(databaseURL), ["backends", "active_queries", "lock_waiters", "deadlocks", "conflicts"]);
   return async () => {
-    stopped = true;
-    clearInterval(timer);
-    await run(true);
-    const valid = samples.filter((item) => !item.error);
-    return {
-      sampleCount: samples.length,
-      sampleErrors: samples.filter((item) => item.error).length,
-      maxBackends: Math.max(
-        0,
-        ...valid.map((item) => Number(item.backends || 0)),
-      ),
-      maxActiveQueries: Math.max(
-        0,
-        ...valid.map((item) => Number(item.active_queries || 0)),
-      ),
-      maxLockWaiters: Math.max(
-        0,
-        ...valid.map((item) => Number(item.lock_waiters || 0)),
-      ),
-      maxDeadlocks: Math.max(
-        0,
-        ...valid.map((item) => Number(item.deadlocks || 0)),
-      ),
-      maxConflicts: Math.max(
-        0,
-        ...valid.map((item) => Number(item.conflicts || 0)),
-      ),
-    };
+    const result = await stop();
+    return { ...result, maxBackends: result.maximum.backends, maxActiveQueries: result.maximum.active_queries,
+      maxLockWaiters: result.maximum.lock_waiters, maxDeadlocks: result.maximum.deadlocks, maxConflicts: result.maximum.conflicts };
   };
-}
-
-async function rpc({ baseURL, domain, method, params = {}, token = "" }) {
-  const started = performance.now();
-  try {
-    const response = await fetch(`${baseURL}/rpc/${domain}`, {
-      method: "POST",
-      redirect: "error",
-      headers: {
-        "content-type": "application/json",
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: `pressure-${Date.now()}-${Math.random()}`,
-        method,
-        params,
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-    const body = await response.json();
-    const durationMs = performance.now() - started;
-    if (!response.ok || body?.result?.code !== 0) {
-      const status = Number(response.status);
-      const code = Number(body?.result?.code);
-      const errorClass =
-        status === 429 || code === 429
-          ? "rate_limited"
-          : status === 503 || code === 503
-            ? "overloaded"
-            : status >= 500
-              ? "server_error"
-              : "application_error";
-      return {
-        ok: false,
-        durationMs,
-        errorClass,
-        error: `${domain}.${method}:${body?.result?.code ?? response.status}:${body?.result?.message || "failed"}`,
-      };
-    }
-    return { ok: true, durationMs, data: body.result.data || {} };
-  } catch (error) {
-    const errorClass =
-      error?.name === "TimeoutError" || error?.name === "AbortError"
-        ? "timeout"
-        : "transport_error";
-    return {
-      ok: false,
-      durationMs: performance.now() - started,
-      errorClass,
-      error: `${domain}.${method}:transport:${error.message}`,
-    };
-  }
 }
 
 async function login(baseURL, username, password) {
@@ -381,99 +274,6 @@ async function login(baseURL, username, password) {
   return { token, profile: result.data };
 }
 
-async function runLevel({ level, requestFactory }) {
-  if (Number(level.cooldownBeforeMs || 0) > 0) {
-    await new Promise((resolve) =>
-      setTimeout(resolve, Number(level.cooldownBeforeMs)),
-    );
-  }
-  const results = new Array(level.requests);
-  let cursor = 0;
-  const started = performance.now();
-  await Promise.all(
-    Array.from({ length: level.concurrency }, async (_, workerIndex) => {
-      if (Number(level.pacingMs || 0) > 0 && workerIndex > 0) {
-        await new Promise((resolve) =>
-          setTimeout(
-            resolve,
-            Math.floor(
-              (Number(level.pacingMs) * workerIndex) / level.concurrency,
-            ),
-          ),
-        );
-      }
-      while (true) {
-        const index = cursor++;
-        if (index >= level.requests) return;
-        if (Number(level.pacingMs || 0) > 0) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, Number(level.pacingMs)),
-          );
-        }
-        results[index] = await requestFactory(index);
-      }
-    }),
-  );
-  const elapsedMs = performance.now() - started;
-  const successes = results.filter((item) => item.ok);
-  const durations = results.map((item) => item.durationMs);
-  const errors = Object.fromEntries(
-    [
-      ...new Set(results.filter((item) => !item.ok).map((item) => item.error)),
-    ].map((error) => [
-      error,
-      results.filter((item) => item.error === error).length,
-    ]),
-  );
-  const errorClasses = Object.fromEntries(
-    [
-      ...new Set(
-        results.filter((item) => !item.ok).map((item) => item.errorClass),
-      ),
-    ].map((errorClass) => [
-      errorClass,
-      results.filter((item) => item.errorClass === errorClass).length,
-    ]),
-  );
-  const allowedErrorClasses = new Set(level.allowedErrorClasses || []);
-  const failuresAllowed =
-    failuresAreAllowed(level) &&
-    results
-      .filter((item) => !item.ok)
-      .every((item) => allowedErrorClasses.has(item.errorClass));
-  return {
-    key: level.key,
-    concurrency: level.concurrency,
-    requests: level.requests,
-    cooldownBeforeMs: Number(level.cooldownBeforeMs || 0),
-    pacingMs: Number(level.pacingMs || 0),
-    successes: successes.length,
-    failures: results.length - successes.length,
-    successRate: successes.length / results.length,
-    elapsedMs: Number(elapsedMs.toFixed(2)),
-    throughputRps: Number((results.length / (elapsedMs / 1000)).toFixed(2)),
-    latencyMs: {
-      p50: Number(percentile(durations, 0.5).toFixed(2)),
-      p95: Number(percentile(durations, 0.95).toFixed(2)),
-      p99: Number(percentile(durations, 0.99).toFixed(2)),
-      max: Number(Math.max(...durations).toFixed(2)),
-    },
-    errors,
-    errorClasses,
-    acceptance:
-      results.length > 0 &&
-      (results.length === successes.length ||
-        (failuresAllowed && successes.length > 0)),
-  };
-}
-
-function failuresAreAllowed(level) {
-  return (
-    Array.isArray(level.allowedErrorClasses) &&
-    level.allowedErrorClasses.length > 0
-  );
-}
-
 export async function runIsolatedPressure({
   baseURL,
   adminUsername = "demo_admin",
@@ -487,6 +287,10 @@ export async function runIsolatedPressure({
   profile = "capacity",
   taskSourceType,
   taskSourceID,
+  expectedCommit,
+  expectedMigration,
+  limits = DEFAULT_PRESSURE_LIMITS,
+  signal,
 }) {
   baseURL = normalizeLoopbackURL(baseURL);
   if (confirm !== CONFIRM_PHRASE)
@@ -520,6 +324,8 @@ export async function runIsolatedPressure({
   if (
     !datasetReceipt ||
     datasetReceipt.status !== "passed" ||
+    datasetReceipt.logicFingerprint !== capacityDatasetLogicFingerprint() ||
+    datasetReceipt.databaseTargetFingerprint !== databaseTarget.targetFingerprint ||
     datasetReceipt.databaseName !== databaseName ||
     datasetReceipt.taskSourceType !== taskSourceType ||
     Number(datasetReceipt.taskSourceID) !== taskSourceID ||
@@ -536,6 +342,10 @@ export async function runIsolatedPressure({
   const capacityAttachmentOwnerID = Number(
     datasetReceipt.after.capacityAttachmentOwnerID,
   );
+  if (importedReadPressureFingerprint !== pressureLogicFingerprint(READ_PRESSURE_LOGIC_FILES)) throw new Error("read pressure logic changed after loading; restart required");
+  const runtimeBefore = await verifyPressureRuntime({ baseURL, databaseName, commit: expectedCommit, migration: expectedMigration, signal });
+  const sourceFingerprint = pressureLogicFingerprint(READ_PRESSURE_LOGIC_FILES);
+  const startedAt = new Date().toISOString();
   const admin = await login(baseURL, adminUsername, password);
   const adminRoleKeys = new Set(
     (admin.profile.roles || []).map((role) => role?.role_key),
@@ -586,6 +396,7 @@ export async function runIsolatedPressure({
       method: "list_tasks",
       token: accounts.pmc.token,
       params: (index) => ({ limit: 50, offset: (index * 50) % 4950 }),
+      validate: (data) => Array.isArray(data.tasks) && Number.isSafeInteger(data.total),
     },
     {
       key: "production",
@@ -593,6 +404,7 @@ export async function runIsolatedPressure({
       method: "list_production_facts",
       token: accounts.production.token,
       params: (index) => ({ limit: 50, offset: (index * 50) % 1950 }),
+      validate: (data) => Array.isArray(data.production_facts) && Number.isSafeInteger(data.total),
     },
     {
       key: "finance",
@@ -600,9 +412,11 @@ export async function runIsolatedPressure({
       method: "list_finance_facts",
       token: accounts.finance.token,
       params: (index) => ({ limit: 50, offset: (index * 50) % 1950 }),
+      validate: (data) => Array.isArray(data.finance_facts) && Number.isSafeInteger(data.total),
     },
     {
       key: "attachments",
+      validate: (data) => Array.isArray(data.attachments),
       domain: "attachment",
       method: "list_attachments",
       token: accounts.pmc.token,
@@ -629,18 +443,20 @@ export async function runIsolatedPressure({
   const stopDatabaseSampler = startDatabaseSampler(databaseURL);
   const stopRuntimeMetricsSampler = startRuntimeMetricsSampler(baseURL);
   const levels = [];
+  try {
   for (const level of levelsToRun) {
     levels.push(
       await runLevel({
-        level,
-        requestFactory: (index) => {
+        level, limits, signal,
+        expectedMethods: probes.map((probe) => `${probe.domain}.${probe.method}`),
+        requestFactory: (index, observe, activeSignal) => {
           const probe = probes[index % probes.length];
           return rpc({
             baseURL,
             domain: probe.domain,
             method: probe.method,
             token: probe.token,
-            params: probe.params(index),
+            params: probe.params(index), validate: probe.validate, observe, signal: activeSignal,
           });
         },
       }),
@@ -683,7 +499,7 @@ export async function runIsolatedPressure({
         idempotency_key: idempotencyKey,
         action: "urge_task",
         reason: "【容量测试】并发重复催办只应形成一次处理结果。",
-        payload: { surface_key: "capacity_pressure" },
+        payload: {},
       },
     });
   const idempotencyInitialResults = await Promise.all(
@@ -736,6 +552,8 @@ export async function runIsolatedPressure({
   const runtimeSampling = await stopRuntimeMetricsSampler();
   const databaseAfter = await readDatabaseStats(databaseURL);
   const execution = await readExecutionIdentity();
+  const runtimeAfter = await verifyPressureRuntime({ baseURL, databaseName, commit: expectedCommit, migration: expectedMigration, signal });
+  if (sourceFingerprint !== pressureLogicFingerprint(READ_PRESSURE_LOGIC_FILES)) throw new Error("pressure source changed during execution");
   const expectedDatabaseDelta =
     Number(databaseAfter.workflow_task_events) -
       Number(databaseBefore.workflow_task_events) ===
@@ -745,7 +563,11 @@ export async function runIsolatedPressure({
       1;
   const recovery = levels.at(-1);
   return {
+    schemaVersion: "plush-pressure-report/v2",
     scope: "manual-acceptance-isolated-capacity-pressure",
+    startedAt, completedAt: new Date().toISOString(),
+    runtimeIdentity: { before: runtimeBefore, after: runtimeAfter },
+    sourceFingerprint, limits, loadModel: "closed-loop-paced",
     profile,
     execution,
     databaseName,
@@ -820,12 +642,22 @@ export async function runIsolatedPressure({
       Number(databaseBefore.finance_facts) >= 2000 &&
       Number(databaseBefore.attachments) >= 1000,
   };
+  } catch (error) {
+    error.pressureReport = { schemaVersion: "plush-pressure-report/v2", passed: false, profile, databaseName,
+      sourceFingerprint, levels: [...levels, ...(error.pressureLevel ? [error.pressureLevel] : [])], failure: "execution_failed" };
+    throw error;
+  } finally { await Promise.all([stopDatabaseSampler(), stopRuntimeMetricsSampler()]); }
 }
 
 async function main() {
   const args = new Map(
     process.argv.slice(2).map((value, index, all) => [value, all[index + 1]]),
   );
+  if (args.has("--help") || args.has("--plan")) {
+    process.stdout.write(JSON.stringify({ usage: "--base-url --database-name --dataset-receipt --commit --migration --profile --out", profiles: PRESSURE_PROFILES,
+      limits: DEFAULT_PRESSURE_LIMITS, env: ["MANUAL_ACCEPTANCE_PRESSURE_DATABASE_URL", "MANUAL_ACCEPTANCE_ADMIN_PASSWORD", "MANUAL_ACCEPTANCE_ROLE_PASSWORD", "MANUAL_ACCEPTANCE_PRESSURE_CONFIRM"] }, null, 2) + "\n");
+    return;
+  }
   const datasetReceiptPath = args.get("--dataset-receipt");
   if (!datasetReceiptPath) {
     throw new Error("--dataset-receipt is required");
@@ -845,6 +677,7 @@ async function main() {
       process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     confirm: process.env.MANUAL_ACCEPTANCE_PRESSURE_CONFIRM,
     datasetReceipt,
+    expectedCommit: args.get("--commit"), expectedMigration: args.get("--migration"),
     profile: args.get("--profile") || "capacity",
     taskSourceType: args.get("--task-source-type"),
     taskSourceID: args.get("--task-source-id"),
@@ -862,8 +695,10 @@ async function main() {
 
 if (process.argv[1]?.endsWith("manual-acceptance-capacity-pressure.mjs"))
   main().catch((error) => {
-    console.error(
-      `[qa:manual-acceptance-capacity-pressure][fatal] ${error.stack || error}`,
-    );
+    const outIndex = process.argv.indexOf("--out");
+    const out = (outIndex >= 0 && process.argv[outIndex + 1]) || "output/qa/manual-acceptance/capacity-pressure/report.json";
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, JSON.stringify(error.pressureReport || { passed: false, failure: "preflight_or_execution_failed" }, null, 2) + "\n");
+    console.error("[qa:manual-acceptance-capacity-pressure] failed; see report", out);
     process.exitCode = 1;
   });

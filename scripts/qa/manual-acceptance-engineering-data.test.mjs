@@ -178,3 +178,13 @@ test("a changed sample image or an unapproved read-only run cannot manufacture c
     /not approved/,
   );
 });
+
+
+test("pressure preparation confirms samples and keeps the material request unsubmitted", async () => {
+  const f = fixture();
+  const result = await prepareManualAcceptanceEngineering({ ...f, materialMode: "preview" });
+  assert.equal(result.materialRequests[0].status, "PREVIEW");
+  assert.equal(result.materialRequests[0].confirmedLineCount, 1);
+  assert.equal(f.calls.filter((call) => /submit_|review_/u.test(call.method)).length, 0);
+  await assert.rejects(prepareManualAcceptanceEngineering({ ...f, materialMode: "skip" }), /unsupported/u);
+});

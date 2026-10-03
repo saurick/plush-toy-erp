@@ -63,6 +63,6 @@
 - 高频业务页的“这页怎么用”和字段问号说明统一来自 `web/src/erp/config/businessUsabilityCatalog.mjs`，用于补充页面任务、完成标准、交接、公式和字段来源，不恢复第二个帮助中心，也不替代权限、岗位责任或业务链真源。`/__dev/business-usability` 只读检查这份目录的覆盖情况，不进入正式菜单或生产构建。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness`、`/erp/mobile-workbenches` 和 `/erp/roles/*` 路径不再注册运行时路由、重定向或权限别名。
 - 正式文档继续保留在 `docs/`、`server/docs/`、`web/README.md`、`server/README.md` 等仓库文档入口，不复制或镜像到前端运行时页面。
-- 本地开发态可通过 `/__dev/governance` 按常见改动只读浏览 [项目治理地图](项目治理地图.md) 的第一份依据、同步检查和误判边界；内部分类与完整关系按需展开。该入口不进入 ERP 正式菜单，也不替代 Markdown 真源。
+- [项目治理地图](项目治理地图.md) 提供常见改动的参考依据、同步检查和误判边界；本地开发态可在 `/__dev/docs` 搜索或打开这份文档。
 
 未来若新增长文档或开发验收入口，必须先设计 registry、导航、权限、路由、渲染代码和测试断言；不要把仓库正式文档镜像进岗位帮助，也不临时恢复旧 docs registry。

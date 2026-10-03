@@ -164,7 +164,6 @@ test("DEV testing presets reference only the affected desktop scene names", () =
     "dev-page-ui-design-desktop-light",
     "dev-page-overview-desktop-light",
     "dev-page-docs-desktop-light",
-    "dev-page-governance-desktop-light",
   ]);
   assert.doesNotMatch(scenarioLists.join(","), /mobile|dark/u);
 });

@@ -9,7 +9,8 @@ function requireValue(condition, message) {
 
 // Production depends on confirmed samples for every open sales line, including
 // lines that are not themselves selected as production quantity specimens.
-export async function prepareManualAcceptanceEngineering({ plan, sourceReport, rpc, apply = true }) {
+export async function prepareManualAcceptanceEngineering({ plan, sourceReport, rpc, apply = true, materialMode = "approved" }) {
+  requireValue(["approved", "preview"].includes(materialMode), "unsupported material preparation mode");
   const refs = sourceReport.referenceRecords;
   const products = new Map(refs.products.map((item) => [Number(item.id), item]));
   const activeBOMs = new Map(refs.bomVersions.filter((item) => item.status === "ACTIVE").map((item) => [Number(item.productId), item]));
@@ -105,6 +106,12 @@ export async function prepareManualAcceptanceEngineering({ plan, sourceReport, r
     }
     let request = await call("engineering", "sales_order", "get_engineering_material_request", { sales_order_id: orderID });
     requireValue(Number(request.sales_order_id) === orderID, `${source.orderNo} material request points to another order`);
+    if (materialMode === "preview") {
+      requireValue(request.status === "PREVIEW" && request.issues?.length === 0 && request.items?.length > 0, `${source.orderNo} is not an unsubmitted material preview`);
+      requests.push({ salesOrderId: orderID, orderNo: source.orderNo, status: request.status, confirmedLineCount: lines.length,
+        sourceOrderVersion: request.source_order_version, sourceHash: request.source_hash });
+      continue;
+    }
     if (request.status === "PREVIEW") {
       requireValue(apply && request.issues?.length === 0 && request.items?.length > 0, `${source.orderNo} material request is not ready: ${(request.issues || []).join("; ")}`);
       request = await call("engineering", "sales_order", "submit_engineering_material_request", { sales_order_id: orderID, expected_version: request.source_order_version, expected_source_hash: request.source_hash });

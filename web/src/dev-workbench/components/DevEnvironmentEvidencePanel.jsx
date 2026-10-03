@@ -53,105 +53,67 @@ function shortIdentity(value, length = 12) {
   return value.length > length ? value.slice(0, length) : value
 }
 
-function EnvironmentCard({ card, loading }) {
+function EnvironmentRow({ card, loading }) {
   const status = devEnvironmentEvidenceStatusPresentation(card.status)
   return (
-    <article
-      className={`erp-dev-environment-card erp-dev-environment-card--${card.accent}`}
-      aria-labelledby={`dev-environment-${card.key}`}
-    >
-      <header>
-        <div>
-          <strong id={`dev-environment-${card.key}`}>{card.label}</strong>
-          <small className="erp-dev-environment-card__scope">
-            {card.scope}
-          </small>
-        </div>
+    <tr data-environment={card.key}>
+      <th scope="row">
+        <strong>{card.label}</strong>
+        <small>{card.scope}</small>
         <Tag color={loading ? 'processing' : status.color}>
           {loading ? '读取中' : status.label}
         </Tag>
-      </header>
-      {loading && card.readbackAt === '' ? (
-        <Skeleton active paragraph={{ rows: 2 }} title={false} />
-      ) : (
-        <>
-          <div className="erp-dev-environment-card__result">
-            <Text strong>{card.datasetEvidence}</Text>
-            <DevTimestamp
-              value={card.readbackAt}
-              action="权威读回于"
-              missing="权威读回时间未证明"
-            />
-          </div>
-          <ul
-            className="erp-dev-environment-card__dimensions"
-            aria-label={`${card.label}证据维度`}
-          >
-            {card.evidenceDimensions.map((dimension) => {
-              const dimensionStatus = devEnvironmentEvidenceStatusPresentation(
-                dimension.status
-              )
-              return (
-                <li key={dimension.key}>
-                  <span className="erp-dev-environment-card__dimension-copy">
-                    <strong>{dimension.label}</strong>
-                    <small>{dimension.detail}</small>
-                  </span>
-                  <Tag color={dimensionStatus.color}>
-                    {dimensionStatus.label}
-                  </Tag>
-                </li>
-              )
-            })}
-          </ul>
-          <details>
-            <summary>身份与边界</summary>
-            <div className="erp-dev-environment-card__details-body">
-              <dl>
-                <div>
-                  <dt>Release / SHA</dt>
-                  <dd title={card.releaseSha}>
-                    {shortIdentity(card.releaseSha)}
-                  </dd>
-                </div>
-                <div>
-                  <dt>数据库</dt>
-                  <dd>{card.databaseName}</dd>
-                </div>
-                <div>
-                  <dt>Migration</dt>
-                  <dd>{card.migrationVersion}</dd>
-                </div>
-                <div>
-                  <dt>客户配置 revision</dt>
-                  <dd>{card.customerConfigRevision}</dd>
-                </div>
-                <div>
-                  <dt>数据版本 / run</dt>
-                  <dd>
-                    {card.datasetVersion} / {card.datasetRunId}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Semantic digest</dt>
-                  <dd title={card.semanticDigest}>
-                    {shortIdentity(card.semanticDigest)}
-                  </dd>
-                </div>
-              </dl>
-              <Text type="secondary">{card.health}</Text>
-              <Text type="secondary">{card.rollbackBoundary}</Text>
-            </div>
-          </details>
-          <footer>
-            <span className="erp-dev-environment-card__next-label">
-              当前下一步
-            </span>
-            <strong>{card.nextAction}</strong>
-          </footer>
-        </>
-      )}
-    </article>
+      </th>
+      {['runtime', 'candidate', 'dataset', 'acceptance'].map((key) => {
+        const dimension = card.evidenceDimensions.find(
+          (item) => item.key === key
+        )
+        const dimensionStatus = devEnvironmentEvidenceStatusPresentation(
+          dimension?.status || 'not_proven'
+        )
+        return (
+          <td key={key}>
+            <Tag color={loading ? 'processing' : dimensionStatus.color}>
+              {loading ? '读取中' : dimensionStatus.label}
+            </Tag>
+            <small>{dimension?.detail || '该维度尚无证据'}</small>
+          </td>
+        )
+      })}
+      <td>
+        <strong>当前下一步</strong>
+        <p>{card.nextAction}</p>
+        <details>
+          <summary>身份、读回与边界</summary>
+          <dl>
+            {[
+              ['Release / SHA', card.releaseSha],
+              ['数据库', card.databaseName],
+              ['Migration', card.migrationVersion],
+              ['客户配置 revision', card.customerConfigRevision],
+              [
+                '数据版本 / run',
+                `${card.datasetVersion} / ${card.datasetRunId}`,
+              ],
+              ['Semantic digest', card.semanticDigest],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd title={value}>{shortIdentity(value, 40)}</dd>
+              </div>
+            ))}
+          </dl>
+          <p>{card.datasetEvidence}</p>
+          <p>{card.health}</p>
+          <p>{card.rollbackBoundary}</p>
+          <DevTimestamp
+            value={card.readbackAt}
+            action="权威读回于"
+            missing="权威读回时间未证明"
+          />
+        </details>
+      </td>
+    </tr>
   )
 }
 
@@ -352,25 +314,41 @@ export default function DevEnvironmentEvidencePanel() {
         error={state.deliveryError}
         loading={state.deliveryLoading}
       />
-      <div
-        className="erp-dev-environment-evidence__grid"
-        role="region"
-        aria-label="本地开发、demo 项目演练造数、test 甲方测试环境与隔离完整验收的环境与验收事实"
-        // 横向事实对比区需要键盘焦点，才能在窄屏使用方向键滚动。
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-        tabIndex={0}
-      >
-        {evidence.cards.map((card) => (
-          <EnvironmentCard
-            key={card.key}
-            card={card}
-            loading={
-              ['demo-133', 'customer-test-133'].includes(card.key)
-                ? state.dataLoading || state.deliveryLoading
-                : state.dataLoading
-            }
-          />
-        ))}
+      <div className="erp-dev-environment-evidence__table-wrap">
+        <table
+          className="erp-dev-environment-evidence__table"
+          aria-label="环境证据对照表"
+        >
+          <thead>
+            <tr>
+              {[
+                '环境',
+                '运行目标',
+                '代码候选',
+                '数据合同',
+                '人工验收',
+                '下一步与详情',
+              ].map((label) => (
+                <th scope="col" key={label}>
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {evidence.cards.map((card) => (
+              <EnvironmentRow
+                key={card.key}
+                card={card}
+                loading={
+                  ['demo-133', 'customer-test-133'].includes(card.key)
+                    ? state.dataLoading || state.deliveryLoading
+                    : state.dataLoading
+                }
+              />
+            ))}
+          </tbody>
+        </table>
       </div>
     </section>
   )

@@ -9,7 +9,7 @@ export default function DevStaticGuidance({ title, hint, children }) {
         <span>{title}</span>
         <small>{hint}</small>
       </summary>
-      <p>{children}</p>
+      <div className="erp-dev-static-guidance__content">{children}</div>
     </details>
   )
 }

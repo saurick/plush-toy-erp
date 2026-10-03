@@ -1,7 +1,42 @@
 import { DEV_VERSION_CENTER_ROUTE } from './devRoutes.mjs'
 
 export const DEV_DRILL_RECOVERY_SOURCE_PATH =
-  'docs/engineering/研发效能工作台与CI-CD设计.md'
+  'docs/security/运维安全与勒索恢复.md'
+
+const SECURITY_CHECKS = Object.freeze([
+  Object.freeze({
+    key: 'application',
+    title: '应用与依赖安全',
+    evidence: '本页尚未接入与当前运行版本绑定的安全审计回执。',
+    next: '核对应用审计、秘密检查和依赖检查的范围及未完成项。',
+    guidePath: 'docs/security/应用安全与验证边界.md',
+    guideAnchor: '',
+  }),
+  Object.freeze({
+    key: 'access',
+    title: '入口与运维身份',
+    evidence: '本页尚未接入端口暴露、访问限制及运维多因素认证的核验回执。',
+    next: '核对数据库、附件存储、远程管理入口和特权身份隔离。',
+    guidePath: DEV_DRILL_RECOVERY_SOURCE_PATH,
+    guideAnchor: 'access-boundary',
+  }),
+  Object.freeze({
+    key: 'monitoring',
+    title: '账号与异常监测',
+    evidence: '尚未接入登录、权限变更及异常下载的告警证据。',
+    next: '核对账号与会话控制、主机外日志及告警是否能通知到人。',
+    guidePath: DEV_DRILL_RECOVERY_SOURCE_PATH,
+    guideAnchor: 'security-monitoring',
+  }),
+  Object.freeze({
+    key: 'backup',
+    title: '备份隔离与完整恢复',
+    evidence: '数据库与附件的共同恢复点、备份隔离及删除权限尚未核验。',
+    next: '核对配套附件、离线或不可变副本，并在隔离目标恢复验证。',
+    guidePath: DEV_DRILL_RECOVERY_SOURCE_PATH,
+    guideAnchor: 'ransomware-backup',
+  }),
+])
 
 export const DEV_DRILL_PRIORITIES = Object.freeze({
   p0: 'P0',
@@ -507,6 +542,25 @@ export function buildDevRecoveryOverview(
       (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
     )
     .slice(0, 6)
+  const databaseRestore = drills.find(
+    (drill) => drill.key === 'backup-restore-isolated'
+  )
+  const securityChecks = SECURITY_CHECKS.map((check) => {
+    const databaseVerified =
+      check.key === 'backup' && databaseRestore.status === 'current'
+    return Object.freeze({
+      ...check,
+      status: databaseVerified ? 'partial' : 'not_checked',
+      statusLabel: databaseVerified ? '仅数据库恢复已核验' : '未核验',
+      evidence: databaseVerified
+        ? '数据库隔离恢复回执有效；附件、离线或不可变副本及删除权限仍未核验。'
+        : check.evidence,
+      verifiedAt: databaseVerified ? databaseRestore.evidenceState.at : '',
+      evidenceId: databaseVerified
+        ? databaseRestore.evidenceState.operationId
+        : '',
+    })
+  })
   return Object.freeze({
     target: resolveDevRecoveryTarget(summary),
     targetStatus: summary?.target?.status || 'unknown',
@@ -517,6 +571,7 @@ export function buildDevRecoveryOverview(
     publicEntry: summary?.target?.remote?.publicEntry || null,
     next,
     drills: Object.freeze(drills),
+    securityChecks: Object.freeze(securityChecks),
     operations: Object.freeze(operations),
   })
 }

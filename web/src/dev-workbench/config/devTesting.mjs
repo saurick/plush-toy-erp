@@ -1,10 +1,20 @@
 export { DEV_TESTING_ROUTE } from './devRoutes.mjs'
 export const DEV_TESTING_STRATEGY_SOURCE_PATH = 'docs/product/自动化测试策略.md'
 export const DEV_TESTING_COVERAGE_API_PATH = '/__dev/api/qa/coverage'
+export const DEV_TESTING_COVERAGE_SNAPSHOT_API_PATH = `${DEV_TESTING_COVERAGE_API_PATH}/snapshot`
 export const DEV_TESTING_COVERAGE_REPORT_SCHEMA =
   'plush-test-coverage-report/v1'
 export const DEV_TESTING_COVERAGE_COLLECT_COMMAND =
   'node scripts/qa/test-coverage-collect.mjs --profile baseline --write'
+export const DEV_TESTING_COVERAGE_SECTION_QUERY_KEY = 'coverage'
+export const DEV_TESTING_COMMAND_PAGE_QUERY_KEY = 'commandsPage'
+export const DEV_TESTING_COMMAND_PAGE_SIZE = 10
+export const DEV_TESTING_COVERAGE_SECTIONS = Object.freeze([
+  Object.freeze({ value: 'code', label: '代码覆盖' }),
+  Object.freeze({ value: 'business', label: '业务场景' }),
+  Object.freeze({ value: 'gates', label: '验证门禁' }),
+  Object.freeze({ value: 'acceptance', label: '运行与验收' }),
+])
 // 保留既有导出名；该命令只聚合采集器已经生成的证据。
 export const DEV_TESTING_COVERAGE_WRITE_COMMAND =
   'node scripts/qa/test-coverage-report.mjs --write'
@@ -19,6 +29,72 @@ export const DEV_TESTING_COVERAGE_ACCEPTANCE_ITEMS = Object.freeze([
   }),
   Object.freeze({ key: 'uat', label: '客户验收 / UAT' }),
 ])
+
+export function parseDevTestingCoverageSection(searchParams) {
+  const values = searchParams.getAll(DEV_TESTING_COVERAGE_SECTION_QUERY_KEY)
+  return values.length === 1 &&
+    DEV_TESTING_COVERAGE_SECTIONS.some(({ value }) => value === values[0])
+    ? values[0]
+    : 'code'
+}
+
+export function buildDevTestingCommandPage(blocks, searchParams) {
+  const values = searchParams.getAll(DEV_TESTING_COMMAND_PAGE_QUERY_KEY)
+  const requestedPage =
+    values.length === 1 && /^[1-9]\d*$/u.test(values[0]) ? Number(values[0]) : 1
+  const total = blocks.length
+  const pageCount = Math.max(
+    1,
+    Math.ceil(total / DEV_TESTING_COMMAND_PAGE_SIZE)
+  )
+  const page = Number.isSafeInteger(requestedPage)
+    ? Math.min(requestedPage, pageCount)
+    : 1
+  const offset = (page - 1) * DEV_TESTING_COMMAND_PAGE_SIZE
+  return {
+    page,
+    total,
+    from: total > 0 ? offset + 1 : 0,
+    to: Math.min(offset + DEV_TESTING_COMMAND_PAGE_SIZE, total),
+    items: blocks.slice(offset, offset + DEV_TESTING_COMMAND_PAGE_SIZE),
+  }
+}
+
+export function buildDevTestingCoverageSectionSummaries(report) {
+  const groups = {
+    code: [report?.codeCoverage?.go, report?.codeCoverage?.web],
+    business: [
+      report?.businessCoverage,
+      ...(report?.businessCoverage?.domains || []),
+    ],
+    gates: report?.gates || [],
+    acceptance: DEV_TESTING_COVERAGE_ACCEPTANCE_ITEMS.map(
+      ({ key }) => report?.acceptance?.[key]
+    ),
+  }
+  return DEV_TESTING_COVERAGE_SECTIONS.map((section) => {
+    const statuses = groups[section.value]
+      .map((item) => item?.status || 'not_collected')
+      .filter((status) => status !== 'not_applicable')
+    let status = 'not_collected'
+    if (statuses.length > 0) {
+      status =
+        ['failed', 'blocked', 'stale', 'skipped'].find((value) =>
+          statuses.includes(value)
+        ) ||
+        (statuses.every((value) => value === 'passed')
+          ? 'passed'
+          : statuses.every((value) => value === 'collected')
+            ? 'collected'
+            : statuses.every((value) => value === 'not_collected')
+              ? 'not_collected'
+              : 'partial')
+    } else if (groups[section.value].length > 0) {
+      status = 'not_applicable'
+    }
+    return { ...section, status }
+  })
+}
 
 const COVERAGE_STATUS_META = Object.freeze({
   current: Object.freeze({ label: '当前报告 / Current', tone: 'success' }),
@@ -256,14 +332,14 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     ],
   },
   {
-    key: 'dev-doc-governance',
-    label: '文档与治理地图 / Docs & Governance',
+    key: 'dev-docs',
+    label: '开发文档查看器 / Dev Docs',
     description:
-      '仓库 Markdown 查看器或项目治理地图改动时复制；只证明 dev-only 导航与只读查看，不改正式文档真源、不进入正式菜单。',
+      '仓库 Markdown 文档或开发文档查看器改动时复制；只证明 dev-only 导航与只读查看，不改正式文档真源、不进入正式菜单。',
     commands: [
       CURRENT_CHECKOUT_ROOT_COMMAND,
-      'node --test web/src/dev-workbench/config/devDocs.test.mjs web/src/dev-workbench/config/devGovernance.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
-      'STYLE_L1_SCENARIOS=dev-page-overview-desktop-light,dev-page-docs-desktop-light,dev-page-governance-desktop-light pnpm --dir web style:l1',
+      'node --test web/src/dev-workbench/config/devDocs.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
+      'STYLE_L1_SCENARIOS=dev-page-overview-desktop-light,dev-page-docs-desktop-light pnpm --dir web style:l1',
     ],
   },
   {
@@ -925,9 +1001,46 @@ function normalizeCoverageItem(
 ) {
   const source =
     value && typeof value === 'object' && !Array.isArray(value) ? value : {}
-  const counts = normalizeCoverageCounts(source)
+  const counts = normalizeCoverageCounts(
+    source.testExecution && typeof source.testExecution === 'object'
+      ? source.testExecution
+      : source
+  )
+  const scenarios = Array.isArray(source.scenarios)
+    ? source.scenarios.map((scenario, index) => {
+        const matchedTests = Array.isArray(scenario?.matchedTests)
+          ? [
+              ...new Set(
+                scenario.matchedTests.map(coverageText).filter(Boolean)
+              ),
+            ]
+          : []
+        let scenarioStatus = normalizeCoverageStatus(scenario?.status)
+        if (scenarioStatus === 'passed' && matchedTests.length === 0) {
+          scenarioStatus = 'missing'
+        }
+        return {
+          key: coverageText(scenario?.id) || `scenario-${index + 1}`,
+          label:
+            coverageText(scenario?.label || scenario?.id) ||
+            `场景 ${index + 1}`,
+          status: scenarioStatus,
+          note: coverageText(scenario?.note),
+          package: coverageText(scenario?.package),
+          matchedTests,
+        }
+      })
+    : []
   let metrics = normalizeCoverageMetrics(source.metrics, expectedMetricKeys)
   let status = protectCoverageEvidenceStatus(source.status, counts)
+  if (
+    status === 'passed' &&
+    scenarios.some((scenario) => scenario.status !== 'passed')
+  ) {
+    status = scenarios.some((scenario) => scenario.status === 'failed')
+      ? 'failed'
+      : 'partial'
+  }
   if (
     status === 'not_applicable' &&
     (!allowNotApplicable || source.required !== false)
@@ -953,6 +1066,7 @@ function normalizeCoverageItem(
     evidence: normalizeCoverageEvidence(source.evidence || source.evidences),
     metrics,
     counts,
+    scenarios,
   }
 }
 
@@ -1123,4 +1237,22 @@ export function normalizeDevTestingCoverageEnvelope(
     message,
     report: normalizeCoverageReport(reportSource),
   }
+}
+
+export function normalizeDevTestingCoverageSnapshot(payload, options = {}) {
+  if (payload?.status !== 'snapshot') {
+    return normalizeDevTestingCoverageEnvelope(payload, options)
+  }
+  if (payload.report?.snapshot?.kind !== 'isolated') {
+    return {
+      status: 'failed',
+      message: '隔离验证报告缺少来源标记',
+      report: null,
+    }
+  }
+  const normalized = normalizeDevTestingCoverageEnvelope(
+    { ...payload, status: 'stale' },
+    options
+  )
+  return normalized.report ? { ...normalized, status: 'snapshot' } : normalized
 }

@@ -25,6 +25,8 @@ export const DEV_QA_EXECUTION_PROFILES = Object.freeze([
   "fast",
   "role-access",
   "field-linkage",
+  "pressure-quick",
+  "pressure-capacity",
   "full",
   "strict",
 ]);
@@ -57,7 +59,7 @@ function validateKindProfile(kind, profile) {
   const valid =
     (kind === "coverage" && profile === "baseline") ||
     (kind === "testing" &&
-      ["fast", "role-access", "field-linkage"].includes(profile)) ||
+      ["fast", "role-access", "field-linkage", "pressure-quick", "pressure-capacity"].includes(profile)) ||
     (kind === "quality" && ["full", "strict"].includes(profile));
   if (!valid) throw new Error("QA execution lock kind/profile is invalid");
 }

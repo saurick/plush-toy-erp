@@ -329,6 +329,45 @@ test('devRecovery: 当前版本的近期隔离恢复回执显示为最近证据'
   )
 })
 
+test('devRecovery: 健康目标和发布成功不能证明应用、身份、监测或备份安全', () => {
+  const overview = buildDevRecoveryOverview(
+    summary({
+      operations: [
+        operation({
+          id: '40000000-0000-4000-8000-000000000004',
+          action: 'promote',
+          gitSha: CURRENT_SHA,
+          updatedAt: '2026-08-14T14:56:26.000Z',
+        }),
+      ],
+    }),
+    { nowMs: Date.parse('2026-08-15T00:48:03+08:00') }
+  )
+  assert.equal(overview.targetStatus, 'passed')
+  assert.deepEqual(
+    overview.securityChecks.map((check) => [check.status, check.verifiedAt]),
+    Array.from({ length: 4 }, () => ['not_checked', ''])
+  )
+})
+
+test('devRecovery: 数据库恢复回执只补齐数据库证据，不代替完整抗勒索核验', () => {
+  const overview = buildDevRecoveryOverview(
+    summary({ recoveryReceipt: backupRestoreReceipt() }),
+    { nowMs: Date.parse('2026-08-15T00:48:03+08:00') }
+  )
+  const backup = overview.securityChecks.find((check) => check.key === 'backup')
+  assert.equal(backup.status, 'partial')
+  assert.equal(backup.statusLabel, '仅数据库恢复已核验')
+  assert.equal(backup.verifiedAt, backupRestoreReceipt().verifiedAt)
+  assert.equal(backup.evidenceId, backupRestoreReceipt().backupId)
+  assert.match(backup.evidence, /附件、离线或不可变副本及删除权限仍未核验/u)
+  assert(
+    overview.securityChecks
+      .filter((check) => check.key !== 'backup')
+      .every((check) => check.status === 'not_checked')
+  )
+})
+
 test('devRecovery: 错误版本、目标、过期、失败和缺失回执均不冒充最近证据', () => {
   const cases = [
     {
@@ -364,6 +403,12 @@ test('devRecovery: 错误版本、目标、过期、失败和缺失回执均不�
     )
     assert.equal(drill.status, 'guarded')
     assert.match(drill.evidenceState.note, item.note)
+    const backup = overview.securityChecks.find(
+      (check) => check.key === 'backup'
+    )
+    assert.equal(backup.status, 'not_checked')
+    assert.equal(backup.verifiedAt, '')
+    assert.equal(backup.evidenceId, '')
   }
 })
 
@@ -417,6 +462,7 @@ test('devRecovery: 页面只读消费版本摘要，不创建第二套写动作'
     /loadDevSummarySnapshot\(\s*DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY/u,
     '演练状态缓存必须按甲方隔离'
   )
-  assert.match(source, /当前没有可冒充演练结果的正式回执/u)
+  assert.match(source, /普通成功部署不自动算作演练/u)
+  assert.match(source, /drill\.evidenceState\.note/u)
   assert.match(source, /禁止对当前试用或正式环境临时注入故障/u)
 })

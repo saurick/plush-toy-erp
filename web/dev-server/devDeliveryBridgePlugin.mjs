@@ -39,8 +39,7 @@ import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity
 import {
   isSameOriginRequest,
   readJsonBody,
-  isLoopbackHostHeader,
-  isLoopbackRemoteAddress,
+  isDevWorkbenchRequest,
 } from './devServerSecurity.mjs'
 import { readLatestBackupRestoreEvidence } from './devRecoveryEvidence.mjs'
 
@@ -738,6 +737,11 @@ export function createDevDeliveryService({
   const providerKey =
     deliveryProvider.provider === 'github' ? 'github' : 'gitlab'
   const providerName = providerKey === 'gitlab' ? 'GitLab' : 'GitHub'
+  const readCredentialConfigured = Boolean(
+    provider ||
+      readProvider ||
+      providerEnvironments.readEnvironment.PLUSH_GITLAB_TOKEN
+  )
   const children = new Map()
   const preflightCache = new Map()
   const initializationPreflightCache = new Map()
@@ -963,7 +967,9 @@ export function createDevDeliveryService({
     if (versionsResult.status === 'rejected') {
       issues.push(
         providerIssue(
-          `${providerName} 版本列表不可用；请检查服务端凭据和网络`,
+          providerKey === 'gitlab' && !readCredentialConfigured
+            ? '当前服务未登记 GitLab 只读凭据，版本与流水线尚未读取'
+            : `${providerName} 版本读取失败，请检查服务端凭据和网络`,
           providerKey
         )
       )
@@ -1010,19 +1016,14 @@ export function createDevDeliveryService({
         initializationPreflight,
       }
     })
-    if (timingsResult.status === 'rejected') {
+    if (
+      timingsResult.status === 'rejected' &&
+      versionsResult.status === 'fulfilled'
+    ) {
       issues.push({
         code: 'pipeline_timings_unavailable',
         level: 'warning',
         message: `${providerName} 流水线耗时暂不可用；发布与部署状态仍可独立核对`,
-      })
-    }
-    if (!releaseDispatchAllowed) {
-      issues.push({
-        code: 'release_dispatch_credential_unavailable',
-        level: 'warning',
-        message:
-          'GitLab 只读证据可继续查看；未加载短期发布凭据，发布当前版本制品已停用',
       })
     }
     let backupRestoreEvidence = null
@@ -2050,13 +2051,10 @@ export function createDevDeliveryMiddleware({
       next()
       return
     }
-    if (
-      !isLoopbackRemoteAddress(request.socket?.remoteAddress) ||
-      !isLoopbackHostHeader(request.headers?.host)
-    ) {
+    if (!isDevWorkbenchRequest(request)) {
       sendJson(response, 403, {
         status: 'failed',
-        message: '该版本控制接口仅允许本机访问',
+        message: '版本控制只允许通过当前开发服务的本机或内网地址访问',
       })
       return
     }

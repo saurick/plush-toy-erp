@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { execFile, spawn } from 'node:child_process'
+import { constants as fsConstants } from 'node:fs'
+import { open } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
@@ -65,13 +67,62 @@ async function readGitlabTokenFromKeychain() {
   return stdout
 }
 
+export function devGitlabCredentialFilePath() {
+  return path.join(
+    os.homedir(),
+    '.config',
+    'plush-toy-erp',
+    'dev-gitlab-read-token'
+  )
+}
+
+export async function readGitlabTokenFromFile({
+  filePath = devGitlabCredentialFilePath(),
+  ownerId = os.userInfo().uid,
+} = {}) {
+  if (!path.isAbsolute(filePath)) {
+    throw new Error('GitLab 只读凭据文件必须使用受控绝对路径')
+  }
+  let handle
+  try {
+    handle = await open(filePath, fsConstants.O_RDONLY + fsConstants.O_NOFOLLOW)
+  } catch (error) {
+    if (error.code === 'ENOENT') return ''
+    throw new Error('GitLab 只读凭据文件无法安全读取')
+  }
+  try {
+    const info = await handle.stat()
+    if (
+      !info.isFile() ||
+      info.uid !== ownerId ||
+      ![0o400, 0o600].includes(info.mode % 0o1000) ||
+      info.size > 1024
+    ) {
+      throw new Error('GitLab 只读凭据文件必须仅由当前服务用户读取')
+    }
+    return await handle.readFile('utf8')
+  } finally {
+    await handle.close()
+  }
+}
+
 export async function resolveDevGitlabCredential({
   env = process.env,
   platform = process.platform,
   readKeychain = readGitlabTokenFromKeychain,
+  readCredentialFile = readGitlabTokenFromFile,
 } = {}) {
   const inherited = normalizeGitlabToken(env.PLUSH_GITLAB_READ_TOKEN)
   if (inherited) return { source: 'environment', token: inherited }
+  if (platform === 'linux') {
+    const token = normalizeGitlabToken(
+      await readCredentialFile({
+        filePath:
+          env.PLUSH_GITLAB_READ_TOKEN_FILE || devGitlabCredentialFilePath(),
+      })
+    )
+    return token ? { source: 'file', token } : { source: 'missing', token: '' }
+  }
   if (platform !== 'darwin') return { source: 'missing', token: '' }
   try {
     const token = normalizeGitlabToken(await readKeychain())
@@ -274,6 +325,7 @@ export function createViteChildEnvironment({
   delete childEnvironment.ERP_DEV_RECOVERY_REASON
   delete childEnvironment.ERP_DEV_RUNTIME_CHECKS
   delete childEnvironment.PLUSH_GITLAB_READ_TOKEN
+  delete childEnvironment.PLUSH_GITLAB_READ_TOKEN_FILE
   if (recoveryMode) {
     childEnvironment.ERP_DEV_RECOVERY_MODE = recoveryMode
     childEnvironment.ERP_DEV_RECOVERY_REASON = recoveryReason
@@ -404,6 +456,9 @@ async function main() {
   )
   if (gitlabCredential.source === 'keychain') {
     process.stderr.write('[start-web] GitLab 只读凭据已从 macOS 钥匙串加载\n')
+  }
+  if (gitlabCredential.source === 'file') {
+    process.stderr.write('[start-web] GitLab 只读凭据已从受控服务端文件加载\n')
   }
   const code = await runManagedVite(
     options.viteArgs,

@@ -52,6 +52,18 @@ test("global QA lock is shared by coverage and fixed testing actions", async (t)
   );
 });
 
+test("pressure profiles share the existing QA lock with coverage and quality gates", async (t) => {
+  const target = await stores(t);
+  for (const profile of ["pressure-quick", "pressure-capacity"]) {
+    acquireDevQaExecutionLock(target.testing, { kind: "testing", profile, operationId: TESTING_ID });
+    assert.equal(readDevQaExecutionLock(target.quality).profile, profile);
+    assert.throws(() => acquireDevQaExecutionLock(target.coverage, {
+      kind: "coverage", profile: "baseline", operationId: COVERAGE_ID,
+    }), (error) => error.code === "DEV_QA_EXECUTION_LOCKED");
+    releaseDevQaExecutionLock(target.testing, { kind: "testing", profile, operationId: TESTING_ID });
+  }
+});
+
 test("global QA lock serializes full and strict with other local QA work", async (t) => {
   const store = await stores(t);
   acquireDevQaExecutionLock(store.quality, {

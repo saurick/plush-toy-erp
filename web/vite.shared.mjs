@@ -146,11 +146,16 @@ export function createERPViteConfig(appId) {
       console.log(`[vite] erp app=${app.id} command=${command} mode=${mode}`)
     }
 
-    const devWorkbenchServePlugins =
+    const devWorkbenchModule =
       isDev && command === 'serve'
-        ? (
-            await import(DEV_WORKBENCH_PLUGIN_MODULE)
-          ).createDevWorkbenchServePlugins({
+        ? await import(DEV_WORKBENCH_PLUGIN_MODULE)
+        : null
+    const workbenchHttpsOrigin = devWorkbenchModule
+      ? devWorkbenchModule.normalizeDevHttpsOrigin(env.PLUSH_DEV_HTTPS_ORIGIN)
+      : ''
+    const devWorkbenchServePlugins =
+      devWorkbenchModule
+        ? devWorkbenchModule.createDevWorkbenchServePlugins({
             apiOrigin,
             command,
             devCustomerKey: process.env.ERP_DEV_CUSTOMER_KEY || '',
@@ -159,6 +164,8 @@ export function createERPViteConfig(appId) {
             recoveryMode,
             recoveryReason: process.env.ERP_DEV_RECOVERY_REASON || '',
             runtimeChecks: process.env.ERP_DEV_RUNTIME_CHECKS === '1',
+            workbenchAccess: env.PLUSH_DEV_WORKBENCH_ACCESS,
+            workbenchHttpsOrigin,
           })
         : []
 
@@ -210,6 +217,9 @@ export function createERPViteConfig(appId) {
       cacheDir: resolveERPViteCacheDir(ROOT_DIR, app.id, mode, serverPort),
       server: {
         host: '0.0.0.0',
+        allowedHosts: workbenchHttpsOrigin
+          ? [new URL(workbenchHttpsOrigin).hostname]
+          : [],
         port: serverPort,
         strictPort: true,
         open: createDevOrigin(serverPort),

@@ -4,6 +4,7 @@ import {
   CopyOutlined,
   FileSearchOutlined,
   FileTextOutlined,
+  LeftOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
@@ -11,36 +12,52 @@ import {
 import {
   Alert,
   Button,
+  Checkbox,
   Empty,
+  Pagination,
   Progress,
+  Select,
   Skeleton,
   Space,
   Tag,
   Typography,
 } from 'antd'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
+import DevTaskNav from '../components/DevTaskNav.jsx'
+import DevPressurePanel from '../components/DevPressurePanel.jsx'
 import {
   DEV_TESTING_COPY_PRESETS,
+  DEV_TESTING_COMMAND_PAGE_QUERY_KEY,
+  DEV_TESTING_COMMAND_PAGE_SIZE,
   DEV_TESTING_COVERAGE_ACCEPTANCE_ITEMS,
   DEV_TESTING_COVERAGE_API_PATH,
+  DEV_TESTING_COVERAGE_SNAPSHOT_API_PATH,
   DEV_TESTING_COVERAGE_COLLECT_COMMAND,
+  DEV_TESTING_COVERAGE_SECTION_QUERY_KEY,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
   buildDevTestingDocs,
+  buildDevTestingCommandPage,
+  buildDevTestingSummary,
+  buildDevTestingCoverageSectionSummaries,
   filterDevTestingCommandBlocks,
   filterDevTestingDocs,
   formatDevTestingCoverageMetric,
   getDevTestingDocumentRoleOptions,
   getDevTestingCoverageStatusMeta,
   normalizeDevTestingCoverageEnvelope,
+  normalizeDevTestingCoverageSnapshot,
   parseDevTestingStrategyTiers,
+  parseDevTestingCoverageSection,
 } from '../config/devTesting.mjs'
 import {
+  DEV_BUSINESS_USABILITY_ROUTE,
+  DEV_DELIVERY_ROUTE,
   DEV_DOCS_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
 } from '../config/devRoutes.mjs'
@@ -71,23 +88,29 @@ const VIEW_TIERS = 'tiers'
 const VIEW_COMMANDS = 'commands'
 const VIEW_CLOSEOUT = 'closeout'
 const VIEW_COVERAGE = 'coverage'
+const VIEW_PRESSURE = 'pressure'
 const VIEW_QUERY_KEY = 'view'
 const DOCUMENT_ROLE_QUERY_KEY = 'role'
 const COMMAND_QUERY_KEY = 'q'
 
 const VIEW_OPTIONS = [
   { label: '本轮验证', value: VIEW_TIERS },
-  { label: '专项检查库', value: VIEW_COMMANDS },
-  { label: 'Git 收口', value: VIEW_CLOSEOUT },
   { label: '证据与覆盖', value: VIEW_COVERAGE },
+  { label: '压力测试', value: VIEW_PRESSURE },
 ]
-const VIEW_VALUES = new Set(VIEW_OPTIONS.map((option) => option.value))
+const AUXILIARY_VIEW_VALUES = new Set([VIEW_COMMANDS, VIEW_CLOSEOUT])
+const VIEW_VALUES = new Set([
+  ...VIEW_OPTIONS.map((option) => option.value),
+  ...AUXILIARY_VIEW_VALUES,
+])
 
 const COPY_MESSAGE_KEY = 'dev-testing-command-copy'
 const EMPTY_TESTING_OPERATIONS = Object.freeze({
   fast: null,
   'role-access': null,
   'field-linkage': null,
+  'pressure-quick': null,
+  'pressure-capacity': null,
 })
 
 const markdownModules = import.meta.glob(
@@ -314,6 +337,11 @@ function CoverageStatusTag({ status }) {
 }
 
 function CoverageEvidenceCard({ item }) {
+  const [onlyIncomplete, setOnlyIncomplete] = useState(false)
+  const scenarios = item?.scenarios || []
+  const visibleScenarios = onlyIncomplete
+    ? scenarios.filter((scenario) => scenario.status !== 'passed')
+    : scenarios
   const metrics = Object.entries(item?.metrics || {})
   const counts = Object.entries(item?.counts || {}).filter(
     ([, value]) => value !== null
@@ -335,6 +363,13 @@ function CoverageEvidenceCard({ item }) {
               <span key={key}>
                 <small>{COVERAGE_METRIC_LABELS[key] || key}</small>
                 <b>{formatDevTestingCoverageMetric(metric)}</b>
+                {metric.collected && metric.percentage !== null ? (
+                  <Progress
+                    percent={metric.percentage}
+                    size="small"
+                    showInfo={false}
+                  />
+                ) : null}
               </span>
             ))}
           </div>
@@ -378,6 +413,67 @@ function CoverageEvidenceCard({ item }) {
           </small>
         )}
       </div>
+      {scenarios.length > 0 ? (
+        <details
+          className="erp-dev-testing-coverage-scenarios"
+          open={
+            item.key === 'go' && item.status === 'failed' ? true : undefined
+          }
+        >
+          <summary>查看 {scenarios.length} 个场景明细</summary>
+          <Checkbox
+            checked={onlyIncomplete}
+            onChange={(event) => setOnlyIncomplete(event.target.checked)}
+          >
+            仅看未通过场景
+          </Checkbox>
+          {visibleScenarios.length > 0 ? (
+            <div className="erp-dev-testing-coverage-scenarios__table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>规则 / 场景</th>
+                    <th>结果</th>
+                    <th>执行记录</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleScenarios.map((scenario) => (
+                    <tr key={scenario.key}>
+                      <td>
+                        <strong>{scenario.label}</strong>
+                        {scenario.note ? <p>{scenario.note}</p> : null}
+                      </td>
+                      <td>
+                        <CoverageStatusTag status={scenario.status} />
+                      </td>
+                      <td>
+                        <details>
+                          <summary>
+                            {scenario.matchedTests.length} 条记录
+                          </summary>
+                          {scenario.package ? (
+                            <code>{scenario.package}</code>
+                          ) : null}
+                          <ul>
+                            {scenario.matchedTests.map((test) => (
+                              <li key={test}>
+                                <code>{test}</code>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p>没有未通过场景。</p>
+          )}
+        </details>
+      ) : null}
     </article>
   )
 }
@@ -629,6 +725,14 @@ function GitCloseoutView({ hooks, loading, error, onReload }) {
 }
 
 function coverageReportAlert(state) {
+  if (state?.status === 'snapshot') {
+    return {
+      type: 'info',
+      title: '正在查看最近一次隔离验证',
+      description:
+        '结果仅对应下方记录的源码快照；当前工作区、提交后 CI 和目标环境仍需各自核验。',
+    }
+  }
   if (state?.status === 'current') {
     return {
       type: 'success',
@@ -878,13 +982,7 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
   )
 }
 
-function ValidationActionCard({
-  action,
-  operation,
-  disabled,
-  starting,
-  onRun,
-}) {
+function ValidationActionRow({ action, operation, disabled, starting, onRun }) {
   const presentation = getDevTestingOperationPresentation(operation)
   const tagColor = {
     primary: 'blue',
@@ -893,39 +991,26 @@ function ValidationActionCard({
     danger: 'red',
   }[presentation.tone]
   return (
-    <article
-      className={`erp-dev-testing-validation-action erp-dev-testing-validation-action--${presentation.tone}`}
-      data-action-key={action.key}
-    >
-      <div className="erp-dev-testing-validation-action__copy">
-        <div className="erp-dev-testing-validation-action__head">
-          <div>
-            <Tag color={action.priority === 'P0' ? 'blue' : 'cyan'}>
-              {action.priority === 'P0' ? '优先' : '按需'}
-            </Tag>
-            <Tag color={tagColor}>{presentation.label}</Tag>
-          </div>
-        </div>
-        <Title level={3}>{action.label}</Title>
+    <tr className="erp-dev-testing-validation-row" data-action-key={action.key}>
+      <th scope="row">
+        <strong>{action.label}</strong>
         <p>{action.description}</p>
-        {operation?.message ? (
-          <p className="erp-dev-testing-validation-action__message">
-            {operation.message}
-          </p>
-        ) : null}
-        <details className="erp-dev-testing-validation-action__details">
-          <summary>查看证据边界与时间</summary>
-          <small className="erp-dev-testing-validation-action__boundary">
-            {action.priority} · {action.boundary}
-          </small>
+      </th>
+      <td>
+        <Tag color={action.priority === 'P0' ? 'blue' : 'default'}>
+          {action.priority === 'P0' ? '优先' : '按需'}
+        </Tag>
+        <Tag color={tagColor}>{presentation.label}</Tag>
+        {operation?.message ? <p role="status">{operation.message}</p> : null}
+      </td>
+      <td>
+        <details className="erp-dev-testing-validation-row__details">
+          <summary>证据与时间</summary>
+          <p>{action.boundary}</p>
           {operation ? (
-            <Space
-              className="erp-dev-testing-validation-action__timestamps"
-              direction="vertical"
-              size={2}
-            >
+            <Space direction="vertical" size={2}>
               <DevTimestamp
-                value={operation?.createdAt}
+                value={operation.createdAt}
                 action="开始于"
                 missing="开始时间未证明"
               />
@@ -935,19 +1020,23 @@ function ValidationActionCard({
                 missing="更新时间未证明"
               />
             </Space>
-          ) : null}
+          ) : (
+            <p>尚无本项执行回执</p>
+          )}
         </details>
-      </div>
-      <Button
-        type={action.priority === 'P0' ? 'primary' : 'default'}
-        icon={<PlayCircleOutlined />}
-        loading={starting || presentation.active}
-        disabled={disabled || presentation.active}
-        onClick={() => onRun(action.key)}
-      >
-        {presentation.active ? '运行中…' : action.label}
-      </Button>
-    </article>
+      </td>
+      <td>
+        <Button
+          icon={<PlayCircleOutlined />}
+          loading={starting || presentation.active}
+          disabled={disabled || presentation.active}
+          aria-label={action.label}
+          onClick={() => onRun(action.key)}
+        >
+          {presentation.active ? '运行中…' : '运行检查'}
+        </Button>
+      </td>
+    </tr>
   )
 }
 
@@ -1011,20 +1100,32 @@ function ValidationWorkspace({
         note="仅“岗位权限与任务可见性巡检”按甲方选择；当前永绅对应固定 yoyoosun 九岗位检查。"
         invalidDescription="岗位权限与任务可见性巡检已停止；开发门禁与字段联动专项仍可独立运行。"
       />
-      <div className="erp-dev-testing-validation__actions">
-        {DEV_TESTING_FIXED_ACTIONS.map((action) => (
-          <ValidationActionCard
-            key={action.key}
-            action={action}
-            operation={operations[action.key]}
-            disabled={
-              actionsDisabled ||
-              (action.key === 'role-access' && !customerReady)
-            }
-            starting={actionStarting === action.key}
-            onRun={onRunAction}
-          />
-        ))}
+      <div className="erp-dev-testing-validation__actions erp-dev-tool-table-wrap">
+        <table className="erp-dev-tool-table" aria-label="固定检查与独立证据">
+          <thead>
+            <tr>
+              <th scope="col">检查与用途</th>
+              <th scope="col">选择与状态</th>
+              <th scope="col">证据</th>
+              <th scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {DEV_TESTING_FIXED_ACTIONS.map((action) => (
+              <ValidationActionRow
+                key={action.key}
+                action={action}
+                operation={operations[action.key]}
+                disabled={
+                  actionsDisabled ||
+                  (action.key === 'role-access' && !customerReady)
+                }
+                starting={actionStarting === action.key}
+                onRun={onRunAction}
+              />
+            ))}
+          </tbody>
+        </table>
       </div>
     </section>
   )
@@ -1032,6 +1133,9 @@ function ValidationWorkspace({
 
 function CoverageReportView({
   state,
+  snapshotState,
+  section,
+  onSectionChange,
   loading,
   operation,
   operationError,
@@ -1041,8 +1145,24 @@ function CoverageReportView({
   onCollect,
   onReload,
 }) {
-  const alert = coverageReportAlert(state)
-  const report = state?.report || null
+  const [requestedSource, setRequestedSource] = useState('')
+  const [requestedDomain, setRequestedDomain] = useState('')
+  const source =
+    requestedSource ||
+    (!state?.report && snapshotState?.report ? 'snapshot' : 'workspace')
+  React.useEffect(() => {
+    if (requestedSource || loading || (!state && !snapshotState)) return
+    // 自动选择只用于首次读取；刷新失败时留在原来源，保证错误仍可见。
+    setRequestedSource(
+      !state?.report && snapshotState?.report ? 'snapshot' : 'workspace'
+    )
+  }, [loading, requestedSource, snapshotState, state])
+  const activeState = source === 'snapshot' ? snapshotState : state
+  const alert = coverageReportAlert(activeState)
+  const report = activeState?.report || null
+  const sections = buildDevTestingCoverageSectionSummaries(report)
+  const domains = report?.businessCoverage.domains || []
+  const selectedDomain = domains.find((item) => item.key === requestedDomain)
   const operationPresentation = getDevCoverageOperationPresentation(operation)
   const repository = report?.repository || {}
   const shortCommit = repository.commit
@@ -1061,13 +1181,58 @@ function CoverageReportView({
             证据分层，不合并总分
           </Text>
           <Title level={2}>证据与覆盖</Title>
-          <Paragraph>
-            先看报告是否新鲜，再逐层核对读数、缺口与证据边界。
-          </Paragraph>
+          <Paragraph>按证据类型查看读数、缺口与执行结果。</Paragraph>
         </div>
         <Tag>分项判断</Tag>
       </div>
       <div className="erp-dev-testing-coverage-overview">
+        <div className="erp-dev-testing-coverage-toolbar">
+          <Segmented
+            aria-label="覆盖报告来源"
+            className="erp-dev-testing-coverage-source"
+            value={source}
+            onChange={setRequestedSource}
+            options={[
+              { label: '当前工作区', value: 'workspace' },
+              { label: '最近隔离验证', value: 'snapshot' },
+            ]}
+          />
+          <div className="erp-dev-testing-coverage-actions">
+            <Button
+              type="primary"
+              icon={<PlayCircleOutlined aria-hidden="true" />}
+              loading={operationStarting || operationPresentation.active}
+              disabled={
+                operationPresentation.active || qaBusy?.active || !qaReady
+              }
+              onClick={() => {
+                setRequestedSource('workspace')
+                onCollect()
+              }}
+            >
+              {operationPresentation.active
+                ? '采集中…'
+                : qaBusy?.active
+                  ? '已有验证在运行'
+                  : !qaReady
+                    ? '正在核对任务状态'
+                    : '采集本地覆盖基线'}
+            </Button>
+            <Button
+              icon={<ReloadOutlined aria-hidden="true" />}
+              loading={loading}
+              onClick={onReload}
+            >
+              重新读取
+            </Button>
+            <Button
+              icon={<CopyOutlined aria-hidden="true" />}
+              onClick={() => runCopy(DEV_TESTING_COVERAGE_COLLECT_COMMAND)}
+            >
+              复制备用命令
+            </Button>
+          </div>
+        </div>
         <Alert
           showIcon
           type={alert.type}
@@ -1075,56 +1240,24 @@ function CoverageReportView({
           description={alert.description}
         />
         <CoverageOperationPanel operation={operation} error={operationError} />
-        <div className="erp-dev-testing-coverage-actions">
-          <Button
-            type="primary"
-            icon={<PlayCircleOutlined />}
-            loading={operationStarting || operationPresentation.active}
-            disabled={
-              operationPresentation.active || qaBusy?.active || !qaReady
-            }
-            onClick={onCollect}
-          >
-            {operationPresentation.active
-              ? '采集中…'
-              : qaBusy?.active
-                ? '已有验证在运行'
-                : !qaReady
-                  ? '正在核对任务状态'
-                  : '采集本地覆盖基线'}
-          </Button>
-          <Button
-            icon={<ReloadOutlined />}
-            loading={loading}
-            onClick={onReload}
-          >
-            重新读取
-          </Button>
-          <Button
-            icon={<CopyOutlined />}
-            onClick={() => runCopy(DEV_TESTING_COVERAGE_COLLECT_COMMAND)}
-          >
-            复制备用命令
-          </Button>
-        </div>
-        <div className="erp-dev-testing-coverage-scope-map">
-          <section>
-            <strong>本页证明</strong>
-            <ul>
-              <li>报告是否绑定当前仓库身份</li>
-              <li>各层证据的状态、读数与缺口</li>
-            </ul>
-          </section>
-          <section>
-            <strong>本页不证明</strong>
-            <ul>
-              <li>未采集的数据库、浏览器或目标环境结果</li>
-              <li>发布、恢复可用或客户 UAT 已完成</li>
-            </ul>
-          </section>
-        </div>
         <details className="erp-dev-testing-coverage-boundary">
-          <summary>查看采集与判定规则</summary>
+          <summary>查看采集、覆盖目标与判定规则</summary>
+          <div className="erp-dev-testing-coverage-scope-map">
+            <section>
+              <strong>本页证明</strong>
+              <ul>
+                <li>报告是否绑定当前仓库身份</li>
+                <li>各层证据的状态、读数与缺口</li>
+              </ul>
+            </section>
+            <section>
+              <strong>本页不证明</strong>
+              <ul>
+                <li>未采集的数据库、浏览器或目标环境结果</li>
+                <li>发布、恢复可用或客户 UAT 已完成</li>
+              </ul>
+            </section>
+          </div>
           <Paragraph>
             空值表示未采集，不是 0%。采集本地覆盖基线固定运行真实本地 baseline
             测试并自动聚合报告，但不会执行数据库写入、真实业务浏览器、目标环境部署或客户
@@ -1134,143 +1267,253 @@ function CoverageReportView({
             {DEV_TESTING_COVERAGE_COLLECT_COMMAND}{' '}
             用于开发接口不可用时手工执行同一采集器。
           </Paragraph>
+          {report?.policy.length > 0 ? (
+            <div className="erp-dev-testing-coverage-policy-list">
+              {report.policy.map((item) => (
+                <article key={item.key}>
+                  <strong>{item.label}</strong>
+                  <p>{item.note}</p>
+                </article>
+              ))}
+            </div>
+          ) : null}
         </details>
       </div>
 
-      {loading && !report ? (
-        <section
-          className="erp-dev-testing-coverage-loading"
-          aria-label="覆盖报告加载中"
-        >
-          <Skeleton active paragraph={{ rows: 8 }} />
-        </section>
-      ) : null}
-
-      {!loading && !report ? (
-        <div className="erp-dev-testing-coverage-empty">
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="尚未采集可展示的覆盖证据；空值不是 0% / No coverage evidence collected"
-          />
-        </div>
-      ) : null}
-
-      {report ? (
-        <>
-          <section className="erp-dev-testing-coverage-identity">
-            <span>
-              <small>报告状态</small>
-              <CoverageStatusTag status={state.status} />
-            </span>
-            <span>
-              <small>生成时间</small>
-              <DevTimestamp
-                value={report.generatedAt}
-                missing="生成时间未证明"
-                strong
-              />
-            </span>
-            <span>
-              <small>Commit</small>
-              <code>{shortCommit}</code>
-            </span>
-            <span>
-              <small>工作区</small>
-              <b>
-                {repository.dirty === null
-                  ? '未记录'
-                  : repository.dirty
-                    ? 'Dirty'
-                    : 'Clean'}
-              </b>
-            </span>
-            <details className="erp-dev-testing-coverage-identity__details">
-              <summary>查看完整报告身份</summary>
-              <span>
-                <small>Fingerprint</small>
-                <code>{repository.fingerprint || '未记录'}</code>
-              </span>
-            </details>
+      <DevTaskNav
+        idPrefix="dev-testing-coverage"
+        ariaLabel="覆盖证据类型"
+        className="erp-dev-testing-coverage-tabs"
+        compact
+        items={sections.map(({ value, label, status }) => ({
+          value,
+          label: (
+            <>
+              {label}
+              <Tag
+                color={coverageTagColor(
+                  getDevTestingCoverageStatusMeta(status).tone
+                )}
+              >
+                {getDevTestingCoverageStatusMeta(status).label.split(' / ')[0]}
+              </Tag>
+            </>
+          ),
+        }))}
+        value={section}
+        onChange={onSectionChange}
+      />
+      <div
+        id={`dev-testing-coverage-panel-${section}`}
+        role="tabpanel"
+        aria-labelledby={`dev-testing-coverage-tab-${section}`}
+        className="erp-dev-testing-coverage-panel"
+        tabIndex={0}
+      >
+        {loading && !report ? (
+          <section
+            className="erp-dev-testing-coverage-loading"
+            aria-label="覆盖报告加载中"
+          >
+            <Skeleton active paragraph={{ rows: 8 }} />
           </section>
+        ) : null}
 
-          {report.policy.length > 0 ? (
-            <CoverageSection
-              title="报告策略 / Policy"
-              description="只展示报告携带的目标和门禁策略，不由页面推断达标。"
-              matrix={false}
-            >
-              <div className="erp-dev-testing-coverage-policy-list">
-                {report.policy.map((item) => (
-                  <article key={item.key}>
-                    <strong>{item.label}</strong>
-                    <p>{item.note}</p>
-                  </article>
-                ))}
-              </div>
-            </CoverageSection>
-          ) : null}
+        {!loading && !report ? (
+          <div className="erp-dev-testing-coverage-empty">
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="尚未采集可展示的覆盖证据；空值不是 0% / No coverage evidence collected"
+            />
+          </div>
+        ) : null}
 
-          <CoverageSection
-            title="代码覆盖 / Code Coverage"
-            description="后端与前端分开统计；空值表示未采集，不是 0%，不显示推测百分比。"
-          >
-            <div className="erp-dev-testing-coverage-grid erp-dev-testing-coverage-grid--code">
-              <CoverageEvidenceCard item={report.codeCoverage.go} />
-              <CoverageEvidenceCard item={report.codeCoverage.web} />
-            </div>
-          </CoverageSection>
+        {report ? (
+          <>
+            <section className="erp-dev-testing-coverage-identity">
+              <span>
+                <small>报告状态</small>
+                {source === 'snapshot' ? (
+                  <Tag color="blue">隔离源码快照</Tag>
+                ) : (
+                  <CoverageStatusTag status={activeState.status} />
+                )}
+              </span>
+              <span>
+                <small>生成时间</small>
+                <DevTimestamp
+                  value={report.generatedAt}
+                  missing="生成时间未证明"
+                  strong
+                />
+              </span>
+              <span>
+                <small>Commit</small>
+                <code>{shortCommit}</code>
+              </span>
+              <span>
+                <small>验证源码</small>
+                <b>
+                  {repository.dirty === null
+                    ? '未记录'
+                    : repository.dirty
+                      ? 'Dirty'
+                      : 'Clean'}
+                </b>
+              </span>
+              <details className="erp-dev-testing-coverage-identity__details">
+                <summary>查看完整报告身份</summary>
+                <span>
+                  <small>Fingerprint</small>
+                  <code>{repository.fingerprint || '未记录'}</code>
+                </span>
+              </details>
+            </section>
 
-          <CoverageSection
-            title="业务合同与关键场景 / Business Coverage"
-            description="按业务域看适用合同、关键场景和模块覆盖，不以代码行覆盖替代。"
-            status={report.businessCoverage.status}
-          >
-            {report.businessCoverage.domains.length > 0 ? (
-              <div className="erp-dev-testing-coverage-grid">
-                {report.businessCoverage.domains.map((item) => (
-                  <CoverageEvidenceCard key={item.key} item={item} />
-                ))}
-              </div>
-            ) : (
-              <CoverageEvidenceCard item={report.businessCoverage} />
-            )}
-          </CoverageSection>
+            {section === 'code' ? (
+              <CoverageSection
+                title="代码覆盖 / Code Coverage"
+                description="Go 全包语句可能包含生成物；Web 只统计实际加载模块。两者不等于本轮改动覆盖，空值表示未采集。"
+              >
+                <div className="erp-dev-testing-coverage-grid erp-dev-testing-coverage-grid--code">
+                  <CoverageEvidenceCard item={report.codeCoverage.go} />
+                  <CoverageEvidenceCard item={report.codeCoverage.web} />
+                </div>
+              </CoverageSection>
+            ) : null}
 
-          <CoverageSection
-            title="本轮 T0-T8 门禁 / Required Gates"
-            description="只对报告声明的本轮 required gates 判断执行结果；没有回执就是未采集。"
-          >
-            {report.gates.length > 0 ? (
-              <div className="erp-dev-testing-coverage-grid">
-                {report.gates.map((item) => (
-                  <CoverageEvidenceCard key={item.key} item={item} />
-                ))}
-              </div>
-            ) : (
-              <CoverageEvidenceCard
-                item={{
-                  label: 'T0-T8',
-                  status: 'not_collected',
-                  metrics: {},
-                  counts: {},
-                  evidence: [],
-                }}
-              />
-            )}
-          </CoverageSection>
+            {section === 'business' ? (
+              <CoverageSection
+                title="业务合同与关键场景 / Business Coverage"
+                description="按业务域看适用合同、关键场景和模块覆盖，不以代码行覆盖替代。"
+                status={report.businessCoverage.status}
+                matrix={false}
+              >
+                {domains.length > 0 ? (
+                  <>
+                    <div className="erp-dev-testing-coverage-domain-picker">
+                      <label htmlFor="dev-testing-coverage-domain">
+                        查看业务域
+                      </label>
+                      <Select
+                        id="dev-testing-coverage-domain"
+                        value={selectedDomain?.key || ''}
+                        onChange={setRequestedDomain}
+                        options={[
+                          { value: '', label: '全部业务域总览' },
+                          ...domains.map(({ key, label }) => ({
+                            value: key,
+                            label,
+                          })),
+                        ]}
+                      />
+                      {selectedDomain ? (
+                        <Button onClick={() => setRequestedDomain('')}>
+                          返回业务域总览
+                        </Button>
+                      ) : null}
+                    </div>
+                    {selectedDomain ? (
+                      <CoverageEvidenceCard item={selectedDomain} />
+                    ) : (
+                      <div className="erp-dev-testing-coverage-domain-table-wrap">
+                        <table
+                          className="erp-dev-testing-coverage-domain-table"
+                          aria-label="业务域覆盖总览"
+                        >
+                          <thead>
+                            <tr>
+                              <th scope="col">业务域</th>
+                              <th scope="col">状态</th>
+                              <th scope="col">执行 / 声明</th>
+                              <th scope="col">通过</th>
+                              <th scope="col">失败 / 跳过 / 受阻 / 缺失</th>
+                              <th scope="col">场景与证据</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {domains.map((item) => (
+                              <tr key={item.key}>
+                                <th scope="row">{item.label}</th>
+                                <td>
+                                  <CoverageStatusTag status={item.status} />
+                                </td>
+                                <td>
+                                  {item.counts.executed ?? '—'} /{' '}
+                                  {item.counts.total ?? '—'}
+                                </td>
+                                <td>{item.counts.passed ?? '—'}</td>
+                                <td>
+                                  {item.counts.failed ?? '—'} /{' '}
+                                  {item.counts.skipped ?? '—'} /{' '}
+                                  {item.counts.blocked ?? '—'} /{' '}
+                                  {item.counts.missing ?? '—'}
+                                </td>
+                                <td>
+                                  <Button
+                                    size="small"
+                                    aria-label={`查看 ${item.label} 场景与证据`}
+                                    onClick={() => setRequestedDomain(item.key)}
+                                  >
+                                    查看详情
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <CoverageEvidenceCard item={report.businessCoverage} />
+                )}
+              </CoverageSection>
+            ) : null}
 
-          <CoverageSection
-            title="运行态与验收 / Runtime & Acceptance"
-            description="PostgreSQL、浏览器、readiness、目标环境与 UAT 各自独立，不由本地绿色替代。"
-          >
-            <div className="erp-dev-testing-coverage-grid">
-              {DEV_TESTING_COVERAGE_ACCEPTANCE_ITEMS.map(({ key }) => (
-                <CoverageEvidenceCard key={key} item={report.acceptance[key]} />
-              ))}
-            </div>
-          </CoverageSection>
-        </>
-      ) : null}
+            {section === 'gates' ? (
+              <CoverageSection
+                title="本轮 T0-T8 门禁 / Required Gates"
+                description="只对报告声明的本轮 required gates 判断执行结果；没有回执就是未采集。"
+              >
+                {report.gates.length > 0 ? (
+                  <div className="erp-dev-testing-coverage-grid">
+                    {report.gates.map((item) => (
+                      <CoverageEvidenceCard key={item.key} item={item} />
+                    ))}
+                  </div>
+                ) : (
+                  <CoverageEvidenceCard
+                    item={{
+                      label: 'T0-T8',
+                      status: 'not_collected',
+                      metrics: {},
+                      counts: {},
+                      evidence: [],
+                    }}
+                  />
+                )}
+              </CoverageSection>
+            ) : null}
+
+            {section === 'acceptance' ? (
+              <CoverageSection
+                title="运行态与验收 / Runtime & Acceptance"
+                description="PostgreSQL、浏览器、readiness、目标环境与 UAT 各自独立，不由本地绿色替代。"
+              >
+                <div className="erp-dev-testing-coverage-grid">
+                  {DEV_TESTING_COVERAGE_ACCEPTANCE_ITEMS.map(({ key }) => (
+                    <CoverageEvidenceCard
+                      key={key}
+                      item={report.acceptance[key]}
+                    />
+                  ))}
+                </div>
+              </CoverageSection>
+            ) : null}
+          </>
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -1295,6 +1538,7 @@ export default function DevTestingPage() {
   const [coverageReloadKey, setCoverageReloadKey] = useState(0)
   const [coverageLoading, setCoverageLoading] = useState(false)
   const [coverageState, setCoverageState] = useState(null)
+  const [coverageSnapshotState, setCoverageSnapshotState] = useState(null)
   const [coverageOperation, setCoverageOperation] = useState(null)
   const [coverageOperationError, setCoverageOperationError] = useState('')
   const [coverageOperationStarting, setCoverageOperationStarting] =
@@ -1315,6 +1559,10 @@ export default function DevTestingPage() {
     () => parseDevTestingStrategyTiers(strategySource),
     [strategySource]
   )
+  const summary = useMemo(
+    () => buildDevTestingSummary({ tiers, docs }),
+    [docs, tiers]
+  )
   const documentRoleOptions = useMemo(
     () => getDevTestingDocumentRoleOptions(docs),
     [docs]
@@ -1325,6 +1573,7 @@ export default function DevTestingPage() {
   )
   const requestedView = searchParams.get(VIEW_QUERY_KEY) || ''
   const view = VIEW_VALUES.has(requestedView) ? requestedView : VIEW_TIERS
+  const coverageSection = parseDevTestingCoverageSection(searchParams)
   const customerScope = useDevCustomerScope({
     searchParams,
     setSearchParams,
@@ -1333,6 +1582,7 @@ export default function DevTestingPage() {
   const customerReady = customerScope.status === 'ready'
   const isCloseoutView = view === VIEW_CLOSEOUT
   const isCoverageView = view === VIEW_COVERAGE
+  const isAuxiliaryView = AUXILIARY_VIEW_VALUES.has(view)
   const requestedDocumentRole =
     searchParams.get(DOCUMENT_ROLE_QUERY_KEY) || 'all'
   const documentRole = documentRoleValues.has(requestedDocumentRole)
@@ -1354,6 +1604,10 @@ export default function DevTestingPage() {
   const matchedSourceCount = new Set(
     allCommandBlocks.map((block) => block.sourcePath)
   ).size
+  const commandPage = useMemo(
+    () => buildDevTestingCommandPage(allCommandBlocks, searchParams),
+    [allCommandBlocks, searchParams]
+  )
   const coverageOperationId = coverageOperation?.id || ''
   const coverageOperationIsActive =
     isDevCoverageOperationActive(coverageOperation)
@@ -1486,8 +1740,8 @@ export default function DevTestingPage() {
     setCoverageLoading(true)
 
     const loadCoverage = async () => {
-      try {
-        const response = await fetch(DEV_TESTING_COVERAGE_API_PATH, {
+      const readReport = async (apiPath) => {
+        const response = await fetch(apiPath, {
           method: 'GET',
           headers: { Accept: 'application/json' },
           cache: 'no-store',
@@ -1502,19 +1756,54 @@ export default function DevTestingPage() {
             message: '覆盖报告接口没有返回有效 JSON',
           }
         }
-        if (
-          controller.signal.aborted ||
-          requestSequence !== coverageRequestSequence.current
-        ) {
-          return
-        }
-        setCoverageState(
-          normalizeDevTestingCoverageEnvelope(payload, {
-            httpStatus: response.status,
-          })
+        return { payload, httpStatus: response.status }
+      }
+      const [workspace, snapshot] = await Promise.allSettled([
+        readReport(DEV_TESTING_COVERAGE_API_PATH),
+        readReport(DEV_TESTING_COVERAGE_SNAPSHOT_API_PATH),
+      ])
+      if (
+        controller.signal.aborted ||
+        requestSequence !== coverageRequestSequence.current
+      ) {
+        return
+      }
+      const workspaceResult =
+        workspace.status === 'fulfilled'
+          ? workspace.value
+          : {
+              payload: {
+                status: 'failed',
+                message: '覆盖报告读取失败，请检查本地开发接口',
+              },
+              httpStatus: 500,
+            }
+      const snapshotResult =
+        snapshot.status === 'fulfilled'
+          ? snapshot.value
+          : {
+              payload: {
+                status: 'failed',
+                message: '隔离验证报告读取失败，请检查本地开发接口',
+              },
+              httpStatus: 500,
+            }
+      setCoverageState(
+        normalizeDevTestingCoverageEnvelope(
+          workspaceResult.payload,
+          workspaceResult
         )
+      )
+      setCoverageSnapshotState(
+        normalizeDevTestingCoverageSnapshot(
+          snapshotResult.payload,
+          snapshotResult
+        )
+      )
+      // A failed read cannot erase an operation whose execution is still known.
+      if (workspace.status === 'fulfilled') {
         const incomingOperation = normalizeOptionalDevCoverageOperation(
-          payload?.operation
+          workspaceResult.payload?.operation
         )
         setCoverageOperation((current) => {
           if (
@@ -1527,30 +1816,8 @@ export default function DevTestingPage() {
           }
           return incomingOperation
         })
-      } catch (_error) {
-        if (
-          controller.signal.aborted ||
-          requestSequence !== coverageRequestSequence.current
-        ) {
-          return
-        }
-        setCoverageState(
-          normalizeDevTestingCoverageEnvelope(
-            {
-              status: 'failed',
-              message: '覆盖报告读取失败，请检查本地开发接口',
-            },
-            { httpStatus: 500 }
-          )
-        )
-      } finally {
-        if (
-          !controller.signal.aborted &&
-          requestSequence === coverageRequestSequence.current
-        ) {
-          setCoverageLoading(false)
-        }
       }
+      setCoverageLoading(false)
     }
 
     loadCoverage()
@@ -1629,11 +1896,22 @@ export default function DevTestingPage() {
       requestedDocumentRole !== documentRole ||
       (documentRole === 'all' && searchParams.has(DOCUMENT_ROLE_QUERY_KEY))
     const hasEmptyKeyword = searchParams.has(COMMAND_QUERY_KEY) && !keyword
+    const hasNonCanonicalCoverage =
+      searchParams.has(DEV_TESTING_COVERAGE_SECTION_QUERY_KEY) &&
+      coverageSection === 'code'
+    const hasNonCanonicalCommandPage =
+      searchParams.has(DEV_TESTING_COMMAND_PAGE_QUERY_KEY) &&
+      (commandPage.page === 1 ||
+        searchParams.getAll(DEV_TESTING_COMMAND_PAGE_QUERY_KEY).length !== 1 ||
+        searchParams.get(DEV_TESTING_COMMAND_PAGE_QUERY_KEY) !==
+          String(commandPage.page))
     if (
       requestedView === view &&
       !obsoleteDocKey &&
       !hasNonCanonicalRole &&
-      !hasEmptyKeyword
+      !hasEmptyKeyword &&
+      !hasNonCanonicalCoverage &&
+      !hasNonCanonicalCommandPage
     ) {
       return
     }
@@ -1647,8 +1925,23 @@ export default function DevTestingPage() {
       nextParams.set(DOCUMENT_ROLE_QUERY_KEY, documentRole)
     }
     if (!keyword) nextParams.delete(COMMAND_QUERY_KEY)
+    if (hasNonCanonicalCoverage) {
+      nextParams.delete(DEV_TESTING_COVERAGE_SECTION_QUERY_KEY)
+    }
+    if (hasNonCanonicalCommandPage) {
+      if (commandPage.page === 1) {
+        nextParams.delete(DEV_TESTING_COMMAND_PAGE_QUERY_KEY)
+      } else {
+        nextParams.set(
+          DEV_TESTING_COMMAND_PAGE_QUERY_KEY,
+          String(commandPage.page)
+        )
+      }
+    }
     setSearchParams(nextParams, { replace: true })
   }, [
+    coverageSection,
+    commandPage.page,
     documentRole,
     keyword,
     obsoleteDocKey,
@@ -1669,8 +1962,18 @@ export default function DevTestingPage() {
     setSearchParams(nextParams)
   }
 
+  const selectCoverageSection = (nextSection) => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(DEV_TESTING_COVERAGE_SECTION_QUERY_KEY, nextSection)
+    if (parseDevTestingCoverageSection(nextParams) === 'code') {
+      nextParams.delete(DEV_TESTING_COVERAGE_SECTION_QUERY_KEY)
+    }
+    setSearchParams(nextParams)
+  }
+
   const selectDocumentRole = (nextDocumentRole) => {
     const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete(DEV_TESTING_COMMAND_PAGE_QUERY_KEY)
     if (
       nextDocumentRole === 'all' ||
       !documentRoleValues.has(nextDocumentRole)
@@ -1684,12 +1987,20 @@ export default function DevTestingPage() {
 
   const setCommandKeyword = (nextKeyword) => {
     const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete(DEV_TESTING_COMMAND_PAGE_QUERY_KEY)
     if (nextKeyword) {
       nextParams.set(COMMAND_QUERY_KEY, nextKeyword)
     } else {
       nextParams.delete(COMMAND_QUERY_KEY)
     }
     setSearchParams(nextParams, { replace: true })
+  }
+
+  const selectCommandPage = (nextPage) => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (nextPage === 1) nextParams.delete(DEV_TESTING_COMMAND_PAGE_QUERY_KEY)
+    else nextParams.set(DEV_TESTING_COMMAND_PAGE_QUERY_KEY, String(nextPage))
+    setSearchParams(nextParams)
   }
 
   const openSourceDoc = (sourcePath) => {
@@ -1837,15 +2148,6 @@ export default function DevTestingPage() {
     : testingSummary?.hooks
       ? `${hookReadyCount}/${hookCheckCount} 项接线完整`
       : '正在读取 Hook 接线…'
-  const toolbarContext =
-    view === VIEW_COMMANDS
-      ? `${matchedSourceCount} 个来源 · ${allCommandBlocks.length} 个命令块`
-      : isCloseoutView
-        ? closeoutToolbarText
-        : isCoverageView
-          ? coverageToolbarText
-          : DEV_TESTING_STRATEGY_SOURCE_PATH
-
   return (
     <div className="erp-dev-testing-page erp-dev-workspace-page">
       <DevPageNav sourcePath={DEV_TESTING_STRATEGY_SOURCE_PATH} />
@@ -1867,13 +2169,43 @@ export default function DevTestingPage() {
       <main className="erp-dev-testing-shell">
         <section className="erp-dev-testing-reader">
           <div className="erp-dev-testing-reader__toolbar">
-            <Segmented
-              aria-label="质量验证工作区主视图"
-              options={VIEW_OPTIONS}
-              value={view}
-              onChange={selectView}
-            />
-            <Text type="secondary">{toolbarContext}</Text>
+            <div
+              className="erp-dev-testing-primary-nav"
+              hidden={isAuxiliaryView}
+            >
+              <Segmented
+                aria-label="质量验证工作区主视图"
+                options={VIEW_OPTIONS}
+                value={isAuxiliaryView ? VIEW_TIERS : view}
+                onChange={selectView}
+              />
+              {isCoverageView ? (
+                <Text type="secondary">当前工作区：{coverageToolbarText}</Text>
+              ) : null}
+            </div>
+            <div
+              className="erp-dev-testing-auxiliary-nav"
+              hidden={!isAuxiliaryView}
+            >
+              {isCloseoutView ? (
+                <Link to={DEV_DELIVERY_ROUTE}>
+                  <LeftOutlined aria-hidden="true" /> 返回交付运行
+                </Link>
+              ) : (
+                <Button
+                  type="link"
+                  icon={<LeftOutlined aria-hidden="true" />}
+                  onClick={() => selectView(VIEW_TIERS)}
+                >
+                  返回本轮验证
+                </Button>
+              )}
+              <Text type="secondary">
+                {isCloseoutView
+                  ? closeoutToolbarText
+                  : `找到 ${allCommandBlocks.length} 项命令`}
+              </Text>
+            </div>
           </div>
 
           {view === VIEW_TIERS ? (
@@ -1890,25 +2222,21 @@ export default function DevTestingPage() {
                 onGeneratePlan={generateTestingPlan}
                 onRunAction={runTestingAction}
               />
-              <Alert
-                className="erp-dev-testing-quality-gate-link"
-                type="info"
-                showIcon
-                message="需要完整或严格门禁？"
-                description="full / strict 的主操作、正式回执、真实耗时和覆盖缺口已统一放在质量门禁。终端命令仍可在策略文档详情中查阅。"
-                action={
-                  <Button
-                    type="link"
-                    onClick={() =>
-                      navigate(
-                        `${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`
-                      )
-                    }
+              <details className="erp-dev-testing-disclosure erp-dev-testing-disclosure--tools">
+                <summary>更多检查</summary>
+                <Space wrap size={16}>
+                  <Link to={DEV_BUSINESS_USABILITY_ROUTE}>页面说明检查</Link>
+                  <Link
+                    to={`${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`}
                   >
-                    前往质量门禁
+                    完整或严格门禁
+                  </Link>
+                  <Button type="link" onClick={() => selectView(VIEW_COMMANDS)}>
+                    查专项命令
                   </Button>
-                }
-              />
+                </Space>
+              </details>
+
               <details className="erp-dev-testing-disclosure erp-dev-testing-disclosure--presets">
                 <summary>
                   <span>
@@ -1981,6 +2309,23 @@ export default function DevTestingPage() {
                   ))}
                 </div>
               </div>
+              <nav
+                className="erp-dev-testing-command-pagination"
+                aria-label="专项检查命令分页"
+              >
+                <Text type="secondary" role="status">
+                  显示 {commandPage.from}–{commandPage.to} 项，共{' '}
+                  {commandPage.total} 项命令
+                </Text>
+                <Pagination
+                  current={commandPage.page}
+                  pageSize={DEV_TESTING_COMMAND_PAGE_SIZE}
+                  total={commandPage.total}
+                  showSizeChanger={false}
+                  hideOnSinglePage
+                  onChange={selectCommandPage}
+                />
+              </nav>
               <div className="erp-dev-testing-command-matrix__head" aria-hidden>
                 <span>用途</span>
                 <span>当前来源</span>
@@ -1989,7 +2334,7 @@ export default function DevTestingPage() {
               </div>
               <div className="erp-dev-testing-command-list">
                 {allCommandBlocks.length > 0 ? (
-                  allCommandBlocks.map((block) => (
+                  commandPage.items.map((block) => (
                     <CommandBlock
                       key={block.key}
                       block={block}
@@ -2019,7 +2364,10 @@ export default function DevTestingPage() {
 
           {view === VIEW_COVERAGE ? (
             <CoverageReportView
+              section={coverageSection}
+              onSectionChange={selectCoverageSection}
               state={coverageState}
+              snapshotState={coverageSnapshotState}
               loading={coverageLoading}
               operation={coverageOperation}
               operationError={coverageOperationError}
@@ -2030,6 +2378,35 @@ export default function DevTestingPage() {
               onReload={reloadCoverage}
             />
           ) : null}
+          {view === VIEW_PRESSURE ? (
+            <DevPressurePanel
+              summary={testingSummary}
+              summaryError={testingSummaryError}
+              actionStarting={testingActionStarting}
+              onRun={runTestingAction}
+              onReloadTesting={reloadTestingSummary}
+              onOpenDocs={() => navigate(`${DEV_DOCS_ROUTE}?path=${encodeURIComponent('scripts/qa/README.md')}#pressure-testing`)}
+            />
+          ) : null}
+          <details className="erp-dev-testing-disclosure erp-dev-testing-disclosure--help">
+            <summary>工具说明与来源</summary>
+            <Paragraph>
+              本机开发工具只接受固定检查，不接受自定义命令、路径或凭据。验证范围和命令需要时再查阅。
+            </Paragraph>
+            <Paragraph>
+              {summary.tierCount} 个验证范围 · {summary.docCount} 个当前来源 ·{' '}
+              {summary.commandBlockCount} 个命令块
+              {view === VIEW_COMMANDS
+                ? `；当前筛选涉及 ${matchedSourceCount} 个来源。`
+                : '。'}
+            </Paragraph>
+            <Button
+              type="link"
+              onClick={() => openSourceDoc(DEV_TESTING_STRATEGY_SOURCE_PATH)}
+            >
+              查看验证策略
+            </Button>
+          </details>
         </section>
       </main>
     </div>

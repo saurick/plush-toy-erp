@@ -5,7 +5,6 @@ import SlidingSegmented from '../../src/common/components/navigation/SlidingSegm
 import SlidingTabList from '../../src/common/components/navigation/SlidingTabList'
 import Tabs from '../../src/common/components/navigation/SlidingTabs'
 import DevTaskNav from '../../src/dev-workbench/components/DevTaskNav'
-import { TaskNav as GovernanceTaskNav } from '../../src/dev-workbench/pages/DevGovernancePage'
 import { SelectionActionBar } from '../../src/erp/components/business-list/BusinessListLayout'
 import 'antd/dist/reset.css'
 import '../../src/erp/styles/app.css'
@@ -79,7 +78,6 @@ function ActionBarMountFixture() {
 function Fixture() {
   const [value, setValue] = useState(options[0])
   const [journeyValue, setJourneyValue] = useState(options[0])
-  const [governanceValue, setGovernanceValue] = useState(options[0])
   const [visible, setVisible] = useState(true)
   const [dark, setDark] = useState(false)
   const [calls, setCalls] = useState(0)
@@ -183,13 +181,6 @@ function Fixture() {
           className="erp-business-collaboration-task-panel__tabs"
           itemClass="erp-business-collaboration-task-panel__tab"
         />
-        <section id="governance">
-          <GovernanceTaskNav
-            tasks={options.map((task) => ({ task, key: task }))}
-            selectedKey={governanceValue}
-            onSelect={setGovernanceValue}
-          />
-        </section>
         <CustomTabs
           id="workflow"
           className="erp-task-action-drawer__guide-steps"

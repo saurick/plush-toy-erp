@@ -1,0 +1,220 @@
+.erp-dev-pressure-panel {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: 18px 14px;
+}
+
+.erp-dev-pressure-heading,
+.erp-dev-pressure-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px 20px;
+  min-width: 0;
+}
+
+.erp-dev-pressure-panel .ant-typography {
+  margin-bottom: 6px;
+}
+
+.erp-dev-pressure-actions,
+.erp-dev-pressure-report,
+.erp-dev-pressure-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.erp-dev-pressure-operation,
+.erp-dev-pressure-guide,
+.erp-dev-pressure-section {
+  padding: 14px;
+  border: 1px solid var(--erp-border, #dce4e8);
+  border-radius: 10px;
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-dev-pressure-panel summary {
+  width: fit-content;
+  color: var(--erp-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.erp-dev-pressure-panel details[open] > summary {
+  margin-bottom: 12px;
+}
+
+.erp-dev-pressure-panel code,
+.erp-dev-pressure-panel dd {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-pressure-panel p,
+.erp-dev-pressure-panel small {
+  line-height: 1.6;
+}
+
+.erp-dev-pressure-note,
+.erp-dev-pressure-metric > span,
+.erp-dev-pressure-metric small {
+  margin: 0;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-dev-pressure-report-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.erp-dev-pressure-report-select .ant-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.erp-dev-pressure-identity > details {
+  flex: 1 1 340px;
+  max-width: 680px;
+}
+
+.erp-dev-pressure-identity dl {
+  display: grid;
+  grid-template-columns: 105px minmax(0, 1fr);
+  gap: 5px 10px;
+  font-size: 12px;
+}
+
+.erp-dev-pressure-identity dd {
+  margin: 0;
+}
+
+.erp-dev-pressure-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.erp-dev-pressure-metric {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--erp-border, #dce4e8);
+  border-radius: 10px;
+}
+
+.erp-dev-pressure-metric > strong {
+  color: var(--erp-text-primary);
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-dev-pressure-chart,
+.erp-dev-pressure-bars {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.erp-dev-pressure-chart-row {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.erp-dev-pressure-chart-row strong > small {
+  display: block;
+  color: var(--erp-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.erp-dev-pressure-bar-line {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) 75px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.erp-dev-pressure-bar-line b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-dev-pressure-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-dev-pressure-bar {
+  display: block;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.erp-dev-pressure-bar--operations {
+  background: var(--erp-primary, #1677ff);
+}
+
+.erp-dev-pressure-bar--rpc {
+  background: var(--erp-success, #16826a);
+}
+
+.erp-dev-pressure-methods {
+  table-layout: fixed;
+}
+
+.erp-dev-pressure-methods th:first-child {
+  width: 40%;
+}
+
+.erp-dev-pressure-methods th:nth-child(3) {
+  width: 22%;
+}
+
+.erp-dev-pressure-latency-bars {
+  display: grid;
+  gap: 4px;
+  min-width: 60px;
+}
+
+.erp-dev-pressure-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 24px;
+}
+
+.erp-dev-pressure-checks > div,
+.erp-dev-pressure-lifecycle li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-dev-pressure-lifecycle li + li {
+  margin-top: 7px;
+}
+
+.erp-dev-pressure-guide li + li {
+  margin-top: 7px;
+}
+
+.erp-dev-pressure-over-limit {
+  color: var(--erp-danger, #c43838);
+  font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+  .erp-dev-pressure-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

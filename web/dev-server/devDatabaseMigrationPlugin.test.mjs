@@ -15,7 +15,9 @@ import {
 } from '../../scripts/qa/dev-database-migration-operation-store.mjs'
 import {
   DEV_DATABASE_MIGRATION_ACTION_API_PATH,
+  DEV_DATABASE_MIGRATION_OPERATION_API_PREFIX,
   DEV_DATABASE_MIGRATION_SESSION_API_PATH,
+  DEV_DATABASE_MIGRATION_SUMMARY_API_PATH,
   createDevDatabaseMigrationMiddleware,
   createDevDatabaseMigrationService,
   parseMigrationPlanOutput,
@@ -604,11 +606,12 @@ test('已验证的服务再次停服后，完整检查通过才能再次解除�
   const runtime = dependencies([])
   runtime.status = async () => target({ pendingFiles: 0 })
   runtime.verifyReadiness = async () => {
-    if (!online)
+    if (!online) {
       throw new LocalRuntimePreflightError(
         'local_backend_unavailable',
         'fixture offline'
       )
+    }
   }
   const service = createDevDatabaseMigrationService({
     projectRoot: root,
@@ -1186,13 +1189,15 @@ function requestMiddleware(
     method = 'GET',
     body = '',
     remoteAddress = '127.0.0.1',
+    localAddress = '127.0.0.1',
+    localPort = 5175,
     headers = {},
   } = {}
 ) {
   const request = Readable.from(body ? [body] : [])
   request.url = url
   request.method = method
-  request.socket = { remoteAddress }
+  request.socket = { remoteAddress, localAddress, localPort }
   request.headers = {
     host: '127.0.0.1:5175',
     ...headers,
@@ -1221,7 +1226,7 @@ function requestMiddleware(
   }))
 }
 
-test('database migration middleware is loopback, same-origin, CSRF, and fixed-action only', async () => {
+test('database migration writes are loopback, same-origin, CSRF, and fixed-action only', async () => {
   const calls = []
   const middleware = createDevDatabaseMigrationMiddleware({
     service: {
@@ -1281,6 +1286,78 @@ test('database migration middleware is loopback, same-origin, CSRF, and fixed-ac
     url: '/assets/application.js',
   })
   assert.equal(unrelated.nextCalled, true)
+})
+
+test('LAN can read migration state and obtain a session while invalid writes remain rejected', async () => {
+  const calls = []
+  const middleware = createDevDatabaseMigrationMiddleware({
+    service: {
+      async summary() {
+        calls.push('summary')
+        return { status: 'success' }
+      },
+      readOperation(id) {
+        calls.push('operation')
+        return { id }
+      },
+      async act() {
+        calls.push('write')
+        return { accepted: true }
+      },
+    },
+    csrfToken: 'fixed-csrf-token',
+  })
+  const lan = {
+    remoteAddress: '192.168.0.66',
+    localAddress: '192.168.0.133',
+    localPort: 15200,
+    headers: {
+      host: '192.168.0.133:15200',
+      'sec-fetch-site': 'same-origin',
+    },
+  }
+  const summary = await requestMiddleware(middleware, {
+    ...lan,
+    url: DEV_DATABASE_MIGRATION_SUMMARY_API_PATH,
+  })
+  assert.equal(summary.statusCode, 200)
+  assert.equal(JSON.parse(summary.body).readOnly, false)
+  assert.equal(summary.headers['cache-control'], 'no-store')
+  const operationId = '11111111-1111-4111-8111-111111111111'
+  const detail = await requestMiddleware(middleware, {
+    ...lan,
+    url: `${DEV_DATABASE_MIGRATION_OPERATION_API_PREFIX}/${operationId}`,
+  })
+  assert.equal(detail.statusCode, 200)
+  assert.equal(JSON.parse(detail.body).operation.id, operationId)
+  assert.equal((await requestMiddleware(middleware, lan)).statusCode, 200)
+  for (const action of ['prepare', 'execute', 'restart']) {
+    const response = await requestMiddleware(middleware, {
+      ...lan,
+      url: DEV_DATABASE_MIGRATION_ACTION_API_PATH,
+      method: 'POST',
+      body: JSON.stringify({ action }),
+      headers: {
+        ...lan.headers,
+        origin: 'http://192.168.0.133:15200',
+        'content-type': 'application/json',
+        'x-csrf-token': 'fixed-csrf-token',
+      },
+    })
+    assert.equal(response.statusCode, 400)
+  }
+  const foreign = await requestMiddleware(middleware, {
+    ...lan,
+    url: DEV_DATABASE_MIGRATION_SUMMARY_API_PATH,
+    headers: { ...lan.headers, origin: 'http://evil.test' },
+  })
+  assert.equal(foreign.statusCode, 403)
+  const local = await requestMiddleware(middleware, {
+    url: DEV_DATABASE_MIGRATION_SUMMARY_API_PATH,
+  })
+  assert.equal(local.statusCode, 200)
+  assert.equal(JSON.parse(local.body).readOnly, false)
+  assert.deepEqual(calls, ['summary', 'operation', 'summary'])
 })
 
 test('database migration action rejects arbitrary targets, commands, and fields', () => {

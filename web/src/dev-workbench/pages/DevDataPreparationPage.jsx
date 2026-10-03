@@ -30,6 +30,7 @@ import { MermaidDiagram } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
   DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
@@ -49,6 +50,12 @@ import {
 import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 
 const { Paragraph, Text, Title } = Typography
+const DATA_VIEW_ITEMS = [
+  { value: 'preflight', label: '1 · 核对条件' },
+  { value: 'scope', label: '2 · 选择范围' },
+  { value: 'confirm', label: '3 · 确认计划' },
+  { value: 'receipts', label: '4 · 回执与耗时' },
+]
 const POLL_INTERVAL_MS = 1500
 const POLL_RECOVERY_INTERVAL_MS = 3000
 
@@ -468,48 +475,39 @@ function DatasetEnvironmentContract({ summary }) {
   )
 }
 
-function ProfileOption({ profile, selected, disabled, onSelect }) {
+function ProfileOption({ profile, selected, disabled }) {
   const copy = DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
-  const className = [
-    'erp-dev-data-profile',
-    selected ? 'erp-dev-data-profile--selected' : '',
-    profile.key === DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
-      ? 'erp-dev-data-profile--primary'
-      : 'erp-dev-data-profile--secondary',
-  ]
-    .filter(Boolean)
-    .join(' ')
   return (
-    <div
-      className={className}
-      onClick={() => {
-        if (!disabled) onSelect(profile.key)
-      }}
+    <tr
+      className={
+        selected
+          ? 'erp-dev-data-profile-row is-selected'
+          : 'erp-dev-data-profile-row'
+      }
     >
-      <Radio value={profile.key}>
-        <span className="erp-dev-data-profile__radio-label">{copy.title}</span>
-      </Radio>
-      <div className="erp-dev-data-profile__head">
-        <Text type="secondary">{copy.shortTitle}</Text>
+      <th scope="row">
+        <Radio value={profile.key} disabled={disabled}>
+          {copy.title}
+        </Radio>
+      </th>
+      <td>{copy.purpose}</td>
+      <td>
         <Tag color={copy.badgeColor}>{copy.badgeLabel}</Tag>
-      </div>
-      <Text>{copy.purpose}</Text>
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- native disclosure clicks must not select the surrounding profile card. */}
-      <details
-        className="erp-dev-data-profile__details"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <summary>查看数据范围与退出方式</summary>
-        <Text type="secondary">数据范围：{copy.scope}</Text>
-        <Text type="secondary">{copy.retention}</Text>
-        <Text type="secondary">{copy.cleanup}</Text>
-        <div className="erp-dev-data-profile__requirements">
-          {profile.requiredEnvironment.map((requirement) => (
-            <Tag key={requirement}>{requirement}</Tag>
-          ))}
-        </div>
-      </details>
-    </div>
+        <small>{copy.retention}</small>
+      </td>
+      <td>
+        <details>
+          <summary>范围与退出方式</summary>
+          <p>{copy.scope}</p>
+          <p>{copy.cleanup}</p>
+          <div>
+            {profile.requiredEnvironment.map((requirement) => (
+              <Tag key={requirement}>{requirement}</Tag>
+            ))}
+          </div>
+        </details>
+      </td>
+    </tr>
   )
 }
 
@@ -934,6 +932,17 @@ function OperationDetail({ operation, acceptancePlan, compact = false }) {
 export default function DevDataPreparationPage() {
   const { token } = theme.useToken()
   const [searchParams, setSearchParams] = useSearchParams()
+  const dataView = DATA_VIEW_ITEMS.some(
+    (item) => item.value === searchParams.get('view')
+  )
+    ? searchParams.get('view')
+    : 'preflight'
+  const selectDataView = (value) =>
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.set('view', value)
+      return next
+    })
   const client = useMemo(() => createDevDataPreparationClient(), [])
   const requestVersionRef = useRef(0)
   const refreshAbortRef = useRef(null)
@@ -1207,6 +1216,7 @@ export default function DevDataPreparationPage() {
         intent.idempotencyKey
       )
       updateOperation(result.operation)
+      selectDataView('confirm')
       prepareIntentRef.current = null
       message.success(
         result.reused ? '已读回复用的不可变计划' : '不可变计划已准备'
@@ -1306,9 +1316,6 @@ export default function DevDataPreparationPage() {
             <Title level={1} className="erp-dev-hub-title">
               测试数据
             </Title>
-            <Paragraph className="erp-dev-hub-summary">
-              默认按最新业务链合同建立完整回归新批次；先看已登记步骤和场景合同，再确认执行并查看真实耗时。页面不接收自定义目标、命令或凭据。
-            </Paragraph>
           </div>
         </div>
         <Space direction="vertical" align="end" size={4}>
@@ -1386,361 +1393,451 @@ export default function DevDataPreparationPage() {
 
         {summary ? (
           <div className="erp-dev-data-workflow">
-            <DatasetEnvironmentContract summary={summary} />
-            <WorkflowStep
-              number="1"
-              title="确认完整回归能否开始"
-              description="先看完整回归的 clean commit 与隔离库结论；其他联调目标只作次要参考。"
-              extra={
-                <Tag>
+            <DevTaskNav
+              compact
+              idPrefix="dev-data"
+              ariaLabel="数据准备步骤"
+              items={DATA_VIEW_ITEMS}
+              value={dataView}
+              onChange={selectDataView}
+            />
+            {currentOperation && !currentOperation.terminal ? (
+              <div className="erp-dev-data-pending" role="status">
+                <Text strong>
+                  当前计划：
                   {
-                    Object.values(summary.target).filter(
-                      (target) => target.status === 'available'
-                    ).length
-                  }{' '}
-                  / {Object.keys(summary.target).length} 个登记目标可用
-                </Tag>
-              }
-            >
-              <div
-                className="erp-dev-data-preflight-list"
-                aria-label="数据准备预检摘要"
-              >
-                <div className="erp-dev-data-preflight-row">
-                  <div>
-                    <Text strong>当前代码现场</Text>
-                    <Text type="secondary">
-                      完整验收必须绑定干净且精确的提交；其他档位仍按各自固定边界执行。
-                    </Text>
-                  </div>
-                  {summary.repository ? (
-                    <Tag
-                      color={summary.repository.dirty ? 'warning' : 'success'}
-                    >
-                      {summary.repository.dirty ? '有未提交改动' : '干净现场'}
-                    </Tag>
-                  ) : (
-                    <Tag color="error">身份未证明</Tag>
-                  )}
-                  <details>
-                    <summary>查看提交身份</summary>
-                    <Text code>{shortHash(summary.repository?.commit)}</Text>
-                  </details>
-                </div>
-                {profiles.map((profile) => {
-                  const copy = DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
-                  const target = summary.target[copy.targetKey]
-                  return (
-                    <div
-                      className="erp-dev-data-preflight-row"
-                      key={profile.key}
-                    >
-                      <div>
-                        <Text strong>{copy.targetTitle}</Text>
-                        <Text type="secondary">{copy.purpose}</Text>
-                      </div>
-                      <StatusTag status={target.status} />
-                      <details>
-                        <summary>查看目标身份</summary>
-                        <Text>{target.safeTarget}</Text>
-                        <Text>数据库：{target.databaseName}</Text>
-                        <Text>Migration：{target.migrationVersion}</Text>
-                        <Text>客户配置：{target.customerConfigRevision}</Text>
-                        <Text code>{shortHash(target.targetFingerprint)}</Text>
-                      </details>
-                    </div>
-                  )
-                })}
-                <div className="erp-dev-data-preflight-row">
-                  <div>
-                    <Text strong>demo 模拟场景目标</Text>
-                    <Text type="secondary">
-                      当前页面只保存登记身份；点击准备后才做权威 target
-                      preflight，不会自动创建写操作。
-                    </Text>
-                  </div>
-                  <StatusTag status={summary.target.scenarioDemo133.status} />
-                  <details>
-                    <summary>查看登记目标</summary>
-                    <Text>{summary.target.scenarioDemo133.safeTarget}</Text>
-                    <Text>
-                      数据库：{summary.target.scenarioDemo133.databaseName}
-                    </Text>
-                    <Text>
-                      最低 Migration：
-                      {summary.target.scenarioDemo133.migrationVersion}
-                    </Text>
-                    <Text>
-                      期望客户配置：
-                      {summary.target.scenarioDemo133.customerConfigRevision}
-                    </Text>
-                  </details>
-                </div>
-              </div>
-            </WorkflowStep>
-
-            <WorkflowStep
-              number="2"
-              title="核对最新业务链与数据范围"
-              description="选择业务链，展开步骤绑定的责任、状态、动作、结果和 Fact；只查看已登记场景合同及其证据绑定。"
-              extra={<Text type="secondary">不支持自定义参数</Text>}
-            >
-              <AcceptancePlanReview
-                plan={summary.acceptancePlan}
-                selectedChainKey={selectedChainKey}
-                onSelectChain={setSelectedChainKey}
-              />
-              <div className="erp-dev-data-profile-heading">
-                <div>
-                  <Text strong>选择本次准备方式</Text>
-                  <Text type="secondary">
-                    完整回归每次建立新隔离批次；共享基础和长期场景只用于日常联调。
-                  </Text>
-                </div>
-                <Tag color="green">完整回归优先</Tag>
-              </div>
-              <Radio.Group
-                className="erp-dev-data-profile-group"
-                value={selectedProfileKey}
-                disabled={preparing || executing}
-                onChange={(event) => selectProfile(event.target.value)}
-              >
-                {profiles.map((profile) => (
-                  <ProfileOption
-                    key={profile.key}
-                    profile={profile}
-                    selected={selectedProfileKey === profile.key}
-                    disabled={preparing || executing}
-                    onSelect={selectProfile}
-                  />
-                ))}
-              </Radio.Group>
-              {selectedIsScenarioDemo ? (
-                <Space
-                  direction="vertical"
-                  size={12}
-                  className="erp-dev-data-target-choice"
-                >
-                  <div className="erp-dev-data-target-choice__heading">
-                    <Text strong>选择本次固定目标</Text>
-                    <Text type="secondary">
-                      这只绑定当前 Scenario
-                      operation，不会静默改变其他页面或操作的写入目标。
-                    </Text>
-                  </div>
-                  <Radio.Group
-                    value={selectedScenarioTargetKey}
-                    disabled={preparing || executing}
-                    onChange={(event) =>
-                      selectScenarioTarget(event.target.value)
-                    }
-                    options={[
-                      {
-                        value:
-                          DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
-                        label: '本地开发',
-                      },
-                      {
-                        value:
-                          DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
-                        label: 'demo 项目演练造数',
-                      },
-                    ]}
-                  />
-                  <DevCustomerScopeSelector
-                    scope={customerScope}
-                    onChange={customerScope.selectCustomer}
-                    disabled={preparing || executing}
-                    label="业务场景甲方"
-                    note="仅业务场景模拟数据按甲方选择；永绅使用当前数据合同登记的固定场景批次。"
-                    invalidDescription="当前甲方没有登记固定场景数据；业务场景的准备与执行已停止，其他数据准备方式不受影响。"
-                  />
-                </Space>
-              ) : null}
-              <div className="erp-dev-data-prepare-actions">
-                <div>
-                  <Text strong>{selectedProfileCopy.title}</Text>
-                  <Text type="secondary">
-                    {prepareBlockingReason ||
-                      selectedProfileCopy.prepareDescription}
-                  </Text>
-                </div>
-                <Button
-                  type="primary"
-                  icon={
-                    selectedIsScenarioDemo ? (
-                      <PlayCircleOutlined />
-                    ) : (
-                      <FileDoneOutlined />
-                    )
+                    DEV_DATA_PREPARATION_PROFILE_COPY[
+                      currentOperation.profileKey
+                    ].title
                   }
-                  disabled={!canPrepare}
-                  loading={preparing}
-                  onClick={handlePrepare}
-                >
-                  {selectedProfileCopy.prepareButtonLabel}
+                </Text>
+                <StatusTag status={currentOperation.status} />
+                <Button onClick={() => selectDataView('confirm')}>
+                  查看当前计划
                 </Button>
               </div>
-            </WorkflowStep>
+            ) : null}
+            <section
+              hidden={dataView !== 'preflight'}
+              id="dev-data-panel-preflight"
+              role="tabpanel"
+              aria-labelledby="dev-data-tab-preflight"
+            >
+              <WorkflowStep
+                number="1"
+                title="确认完整回归能否开始"
+                description="先看完整回归的 clean commit 与隔离库结论；其他联调目标只作次要参考。"
+                extra={
+                  <Tag>
+                    {
+                      Object.values(summary.target).filter(
+                        (target) => target.status === 'available'
+                      ).length
+                    }{' '}
+                    / {Object.keys(summary.target).length} 个登记目标可用
+                  </Tag>
+                }
+              >
+                <div
+                  className="erp-dev-data-preflight-list"
+                  aria-label="数据准备预检摘要"
+                >
+                  <div className="erp-dev-data-preflight-row">
+                    <div>
+                      <Text strong>当前代码现场</Text>
+                      <Text type="secondary">
+                        完整验收必须绑定干净且精确的提交；其他档位仍按各自固定边界执行。
+                      </Text>
+                    </div>
+                    {summary.repository ? (
+                      <Tag
+                        color={summary.repository.dirty ? 'warning' : 'success'}
+                      >
+                        {summary.repository.dirty ? '有未提交改动' : '干净现场'}
+                      </Tag>
+                    ) : (
+                      <Tag color="error">身份未证明</Tag>
+                    )}
+                    <details>
+                      <summary>查看提交身份</summary>
+                      <Text code>{shortHash(summary.repository?.commit)}</Text>
+                    </details>
+                  </div>
+                  {profiles.map((profile) => {
+                    const copy = DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
+                    const target = summary.target[copy.targetKey]
+                    return (
+                      <div
+                        className="erp-dev-data-preflight-row"
+                        key={profile.key}
+                      >
+                        <div>
+                          <Text strong>{copy.targetTitle}</Text>
+                          <Text type="secondary">{copy.purpose}</Text>
+                        </div>
+                        <StatusTag status={target.status} />
+                        <details>
+                          <summary>查看目标身份</summary>
+                          <Text>{target.safeTarget}</Text>
+                          <Text>数据库：{target.databaseName}</Text>
+                          <Text>Migration：{target.migrationVersion}</Text>
+                          <Text>客户配置：{target.customerConfigRevision}</Text>
+                          <Text code>
+                            {shortHash(target.targetFingerprint)}
+                          </Text>
+                        </details>
+                      </div>
+                    )
+                  })}
+                  <div className="erp-dev-data-preflight-row">
+                    <div>
+                      <Text strong>demo 模拟场景目标</Text>
+                      <Text type="secondary">
+                        当前页面只保存登记身份；点击准备后才做权威 target
+                        preflight，不会自动创建写操作。
+                      </Text>
+                    </div>
+                    <StatusTag status={summary.target.scenarioDemo133.status} />
+                    <details>
+                      <summary>查看登记目标</summary>
+                      <Text>{summary.target.scenarioDemo133.safeTarget}</Text>
+                      <Text>
+                        数据库：{summary.target.scenarioDemo133.databaseName}
+                      </Text>
+                      <Text>
+                        最低 Migration：
+                        {summary.target.scenarioDemo133.migrationVersion}
+                      </Text>
+                      <Text>
+                        期望客户配置：
+                        {summary.target.scenarioDemo133.customerConfigRevision}
+                      </Text>
+                    </details>
+                  </div>
+                </div>
+              </WorkflowStep>
 
-            <WorkflowStep
-              number="3"
-              title="准备并确认新批次"
-              description="完整回归计划同时绑定当前业务链摘要、clean exact commit 和隔离目标；只有确认后才会写入。"
-              extra={
-                currentOperation?.status === 'ready' ? (
+              <Button onClick={() => selectDataView('scope')}>
+                下一步 · 选择范围
+              </Button>
+            </section>
+            <section
+              hidden={dataView !== 'scope'}
+              id="dev-data-panel-scope"
+              role="tabpanel"
+              aria-labelledby="dev-data-tab-scope"
+            >
+              <WorkflowStep
+                number="2"
+                title="核对最新业务链与数据范围"
+                description="选择业务链，展开步骤绑定的责任、状态、动作、结果和 Fact；只查看已登记场景合同及其证据绑定。"
+                extra={<Text type="secondary">不支持自定义参数</Text>}
+              >
+                <details className="erp-dev-data-scope-details">
+                  <summary>
+                    查看业务链与场景范围 · {summary.acceptancePlan.chainCount}{' '}
+                    条业务链 / {summary.acceptancePlan.scenarioCount} 项场景
+                  </summary>
+                  <AcceptancePlanReview
+                    plan={summary.acceptancePlan}
+                    selectedChainKey={selectedChainKey}
+                    onSelectChain={setSelectedChainKey}
+                  />
+                </details>
+                <div className="erp-dev-data-profile-heading">
+                  <div>
+                    <Text strong>选择本次准备方式</Text>
+                    <Text type="secondary">
+                      完整回归每次建立新隔离批次；共享基础和长期场景只用于日常联调。
+                    </Text>
+                  </div>
+                  <Tag color="green">完整回归优先</Tag>
+                </div>
+                <Radio.Group
+                  className="erp-dev-data-profile-table-control"
+                  value={selectedProfileKey}
+                  disabled={preparing || executing}
+                  onChange={(event) => selectProfile(event.target.value)}
+                >
+                  <div className="erp-dev-tool-table-wrap">
+                    <table
+                      className="erp-dev-tool-table erp-dev-data-profile-table"
+                      aria-label="数据准备方式"
+                    >
+                      <thead>
+                        <tr>
+                          <th scope="col">选择方式</th>
+                          <th scope="col">用途</th>
+                          <th scope="col">保留策略</th>
+                          <th scope="col">范围与边界</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {profiles.map((profile) => (
+                          <ProfileOption
+                            key={profile.key}
+                            profile={profile}
+                            selected={selectedProfileKey === profile.key}
+                            disabled={preparing || executing}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Radio.Group>
+                {selectedIsScenarioDemo ? (
+                  <Space
+                    direction="vertical"
+                    size={12}
+                    className="erp-dev-data-target-choice"
+                  >
+                    <div className="erp-dev-data-target-choice__heading">
+                      <Text strong>选择本次固定目标</Text>
+                      <Text type="secondary">
+                        这只绑定当前 Scenario
+                        operation，不会静默改变其他页面或操作的写入目标。
+                      </Text>
+                    </div>
+                    <Radio.Group
+                      value={selectedScenarioTargetKey}
+                      disabled={preparing || executing}
+                      onChange={(event) =>
+                        selectScenarioTarget(event.target.value)
+                      }
+                      options={[
+                        {
+                          value:
+                            DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
+                          label: '本地开发',
+                        },
+                        {
+                          value:
+                            DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
+                          label: 'demo 项目演练造数',
+                        },
+                      ]}
+                    />
+                    <DevCustomerScopeSelector
+                      scope={customerScope}
+                      onChange={customerScope.selectCustomer}
+                      disabled={preparing || executing}
+                      label="业务场景甲方"
+                      note="仅业务场景模拟数据按甲方选择；永绅使用当前数据合同登记的固定场景批次。"
+                      invalidDescription="当前甲方没有登记固定场景数据；业务场景的准备与执行已停止，其他数据准备方式不受影响。"
+                    />
+                  </Space>
+                ) : null}
+                <div className="erp-dev-data-prepare-actions">
+                  <div>
+                    <Text strong>{selectedProfileCopy.title}</Text>
+                    <Text type="secondary">
+                      {prepareBlockingReason ||
+                        selectedProfileCopy.prepareDescription}
+                    </Text>
+                  </div>
                   <Button
                     type="primary"
-                    danger={!currentIsScenarioDemo}
-                    icon={<PlayCircleOutlined />}
-                    disabled={!canExecuteCurrent}
-                    title={
-                      canExecuteCurrent
-                        ? currentIsScenarioDemo
-                          ? '核对固定目标后确认生成'
-                          : '输入 exact confirmation 后执行'
-                        : '当前目标或仓库预检已阻断'
-                    }
-                    onClick={() => {
-                      setConfirmation(
-                        currentIsScenarioDemo
-                          ? currentOperation.confirmationRequired
-                          : ''
+                    icon={
+                      selectedIsScenarioDemo ? (
+                        <PlayCircleOutlined />
+                      ) : (
+                        <FileDoneOutlined />
                       )
-                      setConfirmOpen(true)
-                    }}
+                    }
+                    disabled={!canPrepare}
+                    loading={preparing}
+                    onClick={handlePrepare}
                   >
-                    {currentIsScenarioDemo
-                      ? '确认并生成'
-                      : '输入 exact confirmation 执行'}
+                    {selectedProfileCopy.prepareButtonLabel}
                   </Button>
-                ) : null
-              }
+                </div>
+              </WorkflowStep>
+            </section>
+            <section
+              hidden={dataView !== 'confirm'}
+              id="dev-data-panel-confirm"
+              role="tabpanel"
+              aria-labelledby="dev-data-tab-confirm"
             >
-              {currentOperation ? (
-                <>
-                  <OperationDetail
-                    key={`${currentOperation.id}:${currentOperation.status}`}
-                    operation={currentOperation}
-                    acceptancePlan={summary.acceptancePlan}
-                    compact
-                  />
-                  {currentOperation.terminal &&
-                  currentOperation.status !== 'passed' ? (
-                    <Alert
-                      className="erp-dev-data-recovery"
-                      type="warning"
-                      showIcon
-                      message="已保留终态回执，不会自动重试"
-                      description="先在页面外处理阻断，再刷新预检并准备新计划；不得复用旧 plan hash 或确认文本。"
-                    />
-                  ) : null}
-                  {currentOperation.status === 'passed' ? (
-                    <Alert
-                      className="erp-dev-data-recovery"
-                      type="success"
-                      showIcon
-                      icon={<CheckCircleOutlined />}
-                      message="数据准备已完成"
-                      description={
-                        DEV_DATA_PREPARATION_PROFILE_COPY[
-                          currentOperation.profileKey
-                        ].successDescription
+              <WorkflowStep
+                number="3"
+                title="准备并确认新批次"
+                description="完整回归计划同时绑定当前业务链摘要、clean exact commit 和隔离目标；只有确认后才会写入。"
+                extra={
+                  currentOperation?.status === 'ready' ? (
+                    <Button
+                      type="primary"
+                      danger={!currentIsScenarioDemo}
+                      icon={<PlayCircleOutlined />}
+                      disabled={!canExecuteCurrent}
+                      title={
+                        canExecuteCurrent
+                          ? currentIsScenarioDemo
+                            ? '核对固定目标后确认生成'
+                            : '输入 exact confirmation 后执行'
+                          : '当前目标或仓库预检已阻断'
                       }
+                      onClick={() => {
+                        setConfirmation(
+                          currentIsScenarioDemo
+                            ? currentOperation.confirmationRequired
+                            : ''
+                        )
+                        setConfirmOpen(true)
+                      }}
+                    >
+                      {currentIsScenarioDemo
+                        ? '确认并生成'
+                        : '输入 exact confirmation 执行'}
+                    </Button>
+                  ) : null
+                }
+              >
+                {currentOperation ? (
+                  <>
+                    <OperationDetail
+                      key={`${currentOperation.id}:${currentOperation.status}`}
+                      operation={currentOperation}
+                      acceptancePlan={summary.acceptancePlan}
+                      compact
                     />
-                  ) : null}
-                </>
-              ) : (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="核对业务链并准备新批次后，在这里确认目标、固定步骤和阻断。"
-                />
-              )}
-            </WorkflowStep>
+                    {currentOperation.terminal &&
+                    currentOperation.status !== 'passed' ? (
+                      <Alert
+                        className="erp-dev-data-recovery"
+                        type="warning"
+                        showIcon
+                        message="已保留终态回执，不会自动重试"
+                        description="先在页面外处理阻断，再刷新预检并准备新计划；不得复用旧 plan hash 或确认文本。"
+                      />
+                    ) : null}
+                    {currentOperation.status === 'passed' ? (
+                      <Alert
+                        className="erp-dev-data-recovery"
+                        type="success"
+                        showIcon
+                        icon={<CheckCircleOutlined />}
+                        message="数据准备已完成"
+                        description={
+                          DEV_DATA_PREPARATION_PROFILE_COPY[
+                            currentOperation.profileKey
+                          ].successDescription
+                        }
+                      />
+                    ) : null}
+                  </>
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="核对业务链并准备新批次后，在这里确认目标、固定步骤和阻断。"
+                  />
+                )}
+              </WorkflowStep>
 
-            <WorkflowStep
-              number="4"
-              title="查看回执与耗时"
-              description="查看实际执行总耗时、完整回归的 9 个造数阶段耗时和自动清理读回；旧回执只证明对应旧计划。"
-              extra={
-                <Tag>
-                  {historyItems.length} 条当前回执
-                  {historicalOperationReferences.length > 0
-                    ? ` · ${historicalOperationReferences.length} 条旧合同记录`
-                    : ''}
-                </Tag>
-              }
+              <div className="erp-dev-data-step-actions">
+                <Button onClick={() => selectDataView('scope')}>
+                  返回选择范围
+                </Button>
+                <Button onClick={() => selectDataView('receipts')}>
+                  查看回执与耗时
+                </Button>
+              </div>
+            </section>
+            <section
+              hidden={dataView !== 'receipts'}
+              id="dev-data-panel-receipts"
+              role="tabpanel"
+              aria-labelledby="dev-data-tab-receipts"
             >
-              {currentOperation?.terminal ? (
-                <section
-                  className="erp-dev-data-latest-result"
-                  aria-label="本次回执"
-                >
-                  <Text strong>本次回执</Text>
-                  <OperationDetail
-                    operation={currentOperation}
-                    acceptancePlan={summary.acceptancePlan}
+              <WorkflowStep
+                number="4"
+                title="查看回执与耗时"
+                description="查看实际执行总耗时、完整回归的 9 个造数阶段耗时和自动清理读回；旧回执只证明对应旧计划。"
+                extra={
+                  <Tag>
+                    {historyItems.length} 条当前回执
+                    {historicalOperationReferences.length > 0
+                      ? ` · ${historicalOperationReferences.length} 条旧合同记录`
+                      : ''}
+                  </Tag>
+                }
+              >
+                {currentOperation?.terminal ? (
+                  <section
+                    className="erp-dev-data-latest-result"
+                    aria-label="本次回执"
+                  >
+                    <Text strong>本次回执</Text>
+                    <OperationDetail
+                      operation={currentOperation}
+                      acceptancePlan={summary.acceptancePlan}
+                    />
+                  </section>
+                ) : null}
+                {historyItems.length > 0 ? (
+                  <details className="erp-dev-data-history">
+                    <summary>展开历史回执（{historyItems.length}）</summary>
+                    <Collapse items={historyItems} />
+                  </details>
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="尚无数据准备回执"
                   />
-                </section>
-              ) : null}
-              {historyItems.length > 0 ? (
-                <details className="erp-dev-data-history">
-                  <summary>展开历史回执（{historyItems.length}）</summary>
-                  <Collapse items={historyItems} />
-                </details>
-              ) : (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="尚无数据准备回执"
-                />
-              )}
-              {historicalOperationReferences.length > 0 ? (
-                <details className="erp-dev-data-history">
-                  <summary>
-                    展开旧合同与未识别合同记录（
-                    {historicalOperationReferences.length}）
-                  </summary>
-                  <Alert
-                    type="info"
-                    showIcon
-                    message="这些记录只用于追溯"
-                    description="旧数据合同和无法识别版本的历史记录不会参与当前数据合同的执行、恢复选择或环境就绪判断。"
-                  />
-                  <List
-                    size="small"
-                    dataSource={historicalOperationReferences}
-                    renderItem={(operation) => (
-                      <List.Item>
-                        <Space wrap>
-                          <Text>
-                            {
-                              DEV_DATA_PREPARATION_PROFILE_COPY[
-                                operation.profileKey
-                              ].title
-                            }
-                          </Text>
-                          <StatusTag status={operation.status} />
-                          <Tag>
-                            {operation.contract.classification === 'historical'
-                              ? '旧合同'
-                              : '合同未识别'}
-                          </Tag>
-                          <Text type="secondary">
-                            {operation.contract.dataVersion || '版本未记录'} ·{' '}
-                            {operation.contract.datasetRunId || '批次未记录'}
-                          </Text>
-                          <DevTimestamp
-                            value={operation.updatedAt}
-                            action="最后记录于"
-                            missing="时间未证明"
-                          />
-                        </Space>
-                      </List.Item>
-                    )}
-                  />
-                </details>
-              ) : null}
-            </WorkflowStep>
+                )}
+                {historicalOperationReferences.length > 0 ? (
+                  <details className="erp-dev-data-history">
+                    <summary>
+                      展开旧合同与未识别合同记录（
+                      {historicalOperationReferences.length}）
+                    </summary>
+                    <Alert
+                      type="info"
+                      showIcon
+                      message="这些记录只用于追溯"
+                      description="旧数据合同和无法识别版本的历史记录不会参与当前数据合同的执行、恢复选择或环境就绪判断。"
+                    />
+                    <List
+                      size="small"
+                      dataSource={historicalOperationReferences}
+                      renderItem={(operation) => (
+                        <List.Item>
+                          <Space wrap>
+                            <Text>
+                              {
+                                DEV_DATA_PREPARATION_PROFILE_COPY[
+                                  operation.profileKey
+                                ].title
+                              }
+                            </Text>
+                            <StatusTag status={operation.status} />
+                            <Tag>
+                              {operation.contract.classification ===
+                              'historical'
+                                ? '旧合同'
+                                : '合同未识别'}
+                            </Tag>
+                            <Text type="secondary">
+                              {operation.contract.dataVersion || '版本未记录'} ·{' '}
+                              {operation.contract.datasetRunId || '批次未记录'}
+                            </Text>
+                            <DevTimestamp
+                              value={operation.updatedAt}
+                              action="最后记录于"
+                              missing="时间未证明"
+                            />
+                          </Space>
+                        </List.Item>
+                      )}
+                    />
+                  </details>
+                ) : null}
+              </WorkflowStep>
+            </section>
+            <details className="erp-dev-data-contract-disclosure">
+              <summary>环境与数据合同</summary>
+              <DatasetEnvironmentContract summary={summary} />
+            </details>
           </div>
         ) : null}
       </main>

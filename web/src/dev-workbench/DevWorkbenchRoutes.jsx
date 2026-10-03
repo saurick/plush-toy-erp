@@ -10,7 +10,6 @@ import {
   DEV_DELIVERY_ROUTE,
   DEV_DOCS_ROUTE,
   DEV_DRILL_RECOVERY_ROUTE,
-  DEV_GOVERNANCE_ROUTE,
   DEV_HUB_ROUTE,
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_PRODUCT_CORE_ROUTE,
@@ -71,10 +70,6 @@ const DevPermissionRelationshipsPage = createDevLazyRoute(
 const DevDocsPage = createDevLazyRoute(
   DEV_DOCS_ROUTE,
   () => import('./pages/DevDocsPage.jsx')
-)
-const DevGovernancePage = createDevLazyRoute(
-  DEV_GOVERNANCE_ROUTE,
-  () => import('./pages/DevGovernancePage.jsx')
 )
 const DevFlowStateObservatoryPage = createDevLazyRoute(
   DEV_STATUS_FLOWS_ROUTE,
@@ -196,7 +191,6 @@ export default function DevWorkbenchRoutes() {
             path="permission-relationships"
             element={<DevPermissionRelationshipsPage />}
           />
-          <Route path="governance" element={<DevGovernancePage />} />
           <Route
             path="status-flows"
             element={<DevFlowStateObservatoryPage />}

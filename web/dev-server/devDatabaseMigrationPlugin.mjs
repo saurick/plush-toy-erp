@@ -20,8 +20,7 @@ import {
 import {
   isSameOriginRequest,
   readJsonBody,
-  isLoopbackHostHeader,
-  isLoopbackRemoteAddress,
+  isDevWorkbenchRequest,
 } from './devServerSecurity.mjs'
 import {
   createDevDatabaseMigrationRuntime,
@@ -1003,13 +1002,11 @@ export function createDevDatabaseMigrationMiddleware({
       next()
       return
     }
-    if (
-      !isLoopbackRemoteAddress(request.socket?.remoteAddress) ||
-      !isLoopbackHostHeader(request.headers?.host)
-    ) {
+    const operationMatch = OPERATION_PATH_PATTERN.exec(requestPath)
+    if (!isDevWorkbenchRequest(request)) {
       sendJson(response, 403, {
         status: 'failed',
-        message: '该数据库迁移接口仅允许本机访问',
+        message: '此入口只允许通过当前开发服务的本机或内网地址访问',
       })
       return
     }
@@ -1029,10 +1026,12 @@ export function createDevDatabaseMigrationMiddleware({
         request.method === 'GET' &&
         requestPath === DEV_DATABASE_MIGRATION_SUMMARY_API_PATH
       ) {
-        sendJson(response, 200, await migrationService.summary())
+        sendJson(response, 200, {
+          ...(await migrationService.summary()),
+          readOnly: false,
+        })
         return
       }
-      const operationMatch = OPERATION_PATH_PATTERN.exec(requestPath)
       if (request.method === 'GET' && operationMatch) {
         if (!OPERATION_ID_PATTERN.test(operationMatch[1])) {
           throw new Error('operation id is invalid')

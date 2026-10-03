@@ -121,7 +121,6 @@ test("dev workbench boundary: source and styles live outside product directories
 
   const forbiddenProductStyleMarkers = [
     ".erp-dev-docs",
-    ".erp-dev-governance",
     ".erp-dev-capability",
     ".erp-dev-ui-design",
     ".erp-dev-hub",
@@ -219,7 +218,7 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
-  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 14);
+  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 13);
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>
@@ -248,7 +247,7 @@ const allowedERPImports = new Set([
 const allowedERPImportsByFile = new Map([
   [
     "web/src/dev-workbench/config/devUIDesign.test.mjs",
-    new Set(["config/helpScenarios.mjs"]),
+    new Set(["config/helpScenarios.mjs", "config/helpManualCatalog.mjs"]),
   ],
   [
     "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",

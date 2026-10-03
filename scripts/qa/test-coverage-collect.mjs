@@ -76,8 +76,8 @@ export const BUSINESS_DOMAIN_KEYS = Object.freeze([
   "import",
 ]);
 
-const goScenario = (id, packageName, testPrefix) =>
-  Object.freeze({ id, package: packageName, testPrefix });
+const goScenario = (id, packageName, testPrefix, label = id) =>
+  Object.freeze({ id, label, package: packageName, testPrefix });
 
 export const GO_BUSINESS_SCENARIOS = Object.freeze({
   "master-data": Object.freeze([
@@ -112,6 +112,54 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
       "bom-lifecycle-contract",
       "server/internal/biz",
       "TestBOMStatusContractOnlyKnowsCurrentLifecycle",
+    ),
+    goScenario(
+      "material-demand-group-rounding",
+      "server/internal/data",
+      "TestEngineeringMaterialCalculationGroupsBeforeRounding",
+      "生产量、损耗与材料归并后取整",
+    ),
+    goScenario(
+      "material-demand-overflow",
+      "server/internal/data",
+      "TestEngineeringMaterialCalculationRejectsGroupedOverflow",
+      "归并数量溢出拒绝",
+    ),
+    goScenario(
+      "material-inventory-reference-only",
+      "server/internal/data",
+      "TestEngineeringMaterialInventoryDoesNotReduceDemand",
+      "库存与在途仅作参考",
+    ),
+    goScenario(
+      "material-source-readiness",
+      "server/internal/data",
+      "TestEngineeringMaterialSubmissionRequiresReadySources",
+      "供应商、BOM 与单位前置检查",
+    ),
+    goScenario(
+      "material-stale-preview",
+      "server/internal/data",
+      "TestEngineeringMaterialSubmissionRejectsStalePreview",
+      "来源变化后拒绝旧预览",
+    ),
+    goScenario(
+      "material-approval-purchase-result",
+      "server/internal/data",
+      "TestEngineeringMaterialRequestApprovalAndPurchaseGeneration",
+      "审批后按供应商生成采购结果",
+    ),
+    goScenario(
+      "material-source-change-rejection",
+      "server/internal/data",
+      "TestEngineeringMaterialRequestSourceChangeAndRejection",
+      "来源变化与审批驳回",
+    ),
+    goScenario(
+      "material-frozen-source-snapshot",
+      "server/internal/data",
+      "TestEngineeringMaterialSummaryPreservesSourceHeaderAndNotes",
+      "冻结来源与备注快照",
     ),
   ]),
   "fact-inventory": Object.freeze([
@@ -264,6 +312,30 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
       "server/internal/data",
       "TestWorkflowRepo_ShipmentReleaseBlockedAndRejectedPreserveReasonPayload",
     ),
+    goScenario(
+      "material-review-handoff-replay",
+      "server/internal/data",
+      "TestEngineeringMaterialWorkflowApprovalHandoffAndReplay",
+      "审批交接与同意图重放",
+    ),
+    goScenario(
+      "material-review-rejection-history",
+      "server/internal/data",
+      "TestEngineeringMaterialWorkflowRejectResubmitKeepsHistory",
+      "驳回、重提与审批历史",
+    ),
+    goScenario(
+      "material-review-stale-assigned-task",
+      "server/internal/data",
+      "TestEngineeringMaterialWorkflowRejectsStaleOrAssignedTaskAndRollsBack",
+      "旧版本与任务责任边界",
+    ),
+    goScenario(
+      "material-review-task-identity",
+      "server/internal/data",
+      "TestEngineeringMaterialWorkflowRequiresExistingMatchingTask",
+      "任务与业务来源一致",
+    ),
   ]),
   "rbac-api": Object.freeze([
     goScenario(
@@ -285,6 +357,18 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
       "jwt-session-invalid-states",
       "server/internal/server",
       "TestAuthClaimsMiddlewareRealJWTSessionChainRejectsInvalidStates",
+    ),
+    goScenario(
+      "material-review-api-permissions",
+      "server/internal/service",
+      "TestEngineeringMaterialJSONRPCSeparatesReviewersAndRejectsSourceOverrides",
+      "工程、老板和财务权限边界",
+    ),
+    goScenario(
+      "material-stock-reference-access",
+      "server/internal/service",
+      "TestEngineeringMaterialStockReferenceRespectsAccessAndCanSerialize",
+      "库存参考的读取权限",
     ),
   ]),
   print: Object.freeze([
@@ -320,7 +404,7 @@ export const FIELD_LINKAGE_PRINT_CASE_IDS = Object.freeze([
   "FL_processing_contract_print_lines__filters_canceled_outsourcing_items",
   "FL_processing_contract_print_party_defaults__uses_customer_config_party_defaults_only",
   "FL_processing_contract_print_party_snapshot__order_snapshot_overrides_customer_defaults",
-  "FL_print_workspace_window_snapshot__persists_current_html_snapshot",
+  "FL_print_workspace_window_draft__restores_current_structured_draft",
   "FL_print_templates_sample__uses_generic_sample_values_without_customer_identity",
   "FL_print_templates_contract__declares_field_requirements_and_pdf_module_guard",
   "FL_print_templates_processing_preview__uses_processing_signature_and_totals",
@@ -344,7 +428,7 @@ function readCriticalPostgresTestPattern() {
 
 export const CRITICAL_POSTGRES_TEST_PATTERN =
   readCriticalPostgresTestPattern();
-export const BASELINE_GO_SKIP_PATTERN = `${CRITICAL_POSTGRES_TEST_PATTERN}|^TestTemplatePDFChromiumSecurityIntegration$`;
+export const BASELINE_GO_SKIP_PATTERN = `${CRITICAL_POSTGRES_TEST_PATTERN}|^TestTemplatePDFChromium(?:Security|Lifecycle)Integration$`;
 
 const IMPORT_TEST_FILES = Object.freeze([
   "scripts/import/customerImportDryRun.test.mjs",
@@ -625,12 +709,15 @@ export function goCommandExecution(result, note = "") {
       parsed.failed += 1;
       parsed.executed += 1;
     }
-    return normalizeExecutionCounts({
-      ...parsed,
-      total: parsed.executed,
-      status: "failed",
-      note,
-    });
+    return {
+      ...normalizeExecutionCounts({
+        ...parsed,
+        total: parsed.executed,
+        status: "failed",
+        note,
+      }),
+      scenarios: goFailureScenarios(result.stdout),
+    };
   }
   return normalizeExecutionCounts({
     ...parsed,
@@ -718,6 +805,35 @@ function parseGoTestTerminals(content) {
   );
 }
 
+export function goFailureScenarios(content) {
+  let terminals;
+  try { terminals = parseGoTestTerminals(content); } catch { return []; }
+  const resourceFailures = new Set();
+  for (const line of String(content).split(/\r?\n/u)) {
+    try {
+      const event = JSON.parse(line);
+      if (/too many open files/iu.test(String(event.Output || ""))) {
+        resourceFailures.add(event.Package + ":" + event.Test);
+      }
+    } catch {
+      // Parsing terminals already decides whether the execution log is valid.
+    }
+  }
+  return terminals.filter((entry) => entry.terminal === "fail").map((entry) => {
+    return {
+      id: entry.package + ":" + entry.test,
+      label: entry.test,
+      package: entry.package,
+      testPrefix: entry.test,
+      status: "failed",
+      note: resourceFailures.has(entry.package + ":" + entry.test)
+        ? "文件监听或文件描述符资源不足（too many open files）。"
+        : "该用例执行失败，请核对对应测试日志。",
+      matchedTests: [entry.test],
+    };
+  });
+}
+
 export function classifyGoBusinessDomains(
   content,
   globalExecution,
@@ -752,6 +868,7 @@ export function classifyGoBusinessDomains(
     }
     return {
       id: scenario.id,
+      label: scenario.label || scenario.id,
       package: scenario.package,
       testPrefix: scenario.testPrefix,
       status,
@@ -814,19 +931,22 @@ export function fieldLinkageCoverageRecords({
     );
   }
   const summary = artifact.summary || {};
+  const notApplicableScenarios = summary.notApplicableScenarios ?? 0;
   const scenarioValues = [
     summary.totalScenarios,
     summary.passedScenarios,
     summary.failedScenarios,
     summary.skippedScenarios,
     summary.missingScenarios,
+    notApplicableScenarios,
   ];
   if (
     scenarioValues.some((value) => !Number.isSafeInteger(value) || value < 0) ||
     summary.passedScenarios +
       summary.failedScenarios +
       summary.skippedScenarios +
-      summary.missingScenarios !==
+      summary.missingScenarios +
+      notApplicableScenarios !==
       summary.totalScenarios
   ) {
     return fieldLinkageFailureRecords("字段联动专项 summary 不完整。");
@@ -840,8 +960,8 @@ export function fieldLinkageCoverageRecords({
       summary.passedScenarios +
       summary.failedScenarios +
       summary.skippedScenarios,
-    total: summary.totalScenarios,
-    note: "字段联动专项按声明场景计数，不代表完整 Web source baseline。",
+    total: summary.totalScenarios - notApplicableScenarios,
+    note: `字段联动专项共声明 ${summary.totalScenarios} 个场景，${notApplicableScenarios} 个不适用场景不计入执行与适用分母；不代表完整 Web source baseline。`,
   });
 
   if (!Array.isArray(artifact.cases)) {
@@ -1220,15 +1340,18 @@ export function buildCoverageEvidence({
       },
     },
     codeCoverage: {
-      go: codeCoverageRecord(
-        goCoverage,
-        stageExecutions.go,
-        "Go baseline 覆盖 go test ./... 中非 PostgreSQL测试实际加载的 package scope。",
-      ),
+      go: {
+        ...codeCoverageRecord(
+          goCoverage,
+          stageExecutions.go,
+          "Go baseline 统计 go test ./... 非 PostgreSQL测试的语句覆盖；Go 原生 coverprofile 不提供分支覆盖。",
+        ),
+        scenarios: stageExecutions.go.scenarios || [],
+      },
       web: codeCoverageRecord(
         webCoverage,
         stageExecutions.web,
-        "Web baseline 覆盖 Node test 实际加载模块，不冒充完整 JSX/browser baseline。",
+        "Web baseline 统计 Node test 实际加载模块的行、分支和函数覆盖；未加载模块不在分母中，不等于全仓 JSX 或浏览器覆盖。",
       ),
     },
     businessCoverage: {

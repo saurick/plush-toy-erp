@@ -7,6 +7,7 @@
 | 理解 CI / 发布架构和完成标准 | [工作台与 CI/CD 设计](研发效能工作台与CI-CD设计.md)、[验收证据](研发效能工作台与CI-CD设计.md#验收证据-acceptance-evidence) |
 | 查看 DEV 页面与受控操作边界 | [本地开发入口](研发效能工作台与CI-CD设计.md#本地开发入口-dev-only-surfaces) |
 | 选择验证与执行脚本 | [测试策略](../product/自动化测试策略.md)、[QA 脚本](../../scripts/qa/README.md) |
+| 核对安全控制、扫描范围与未闭环风险 | [应用安全与验证边界](../security/应用安全与验证边界.md) |
 | 安装 GitLab / Runner、备份和恢复 | [GitLab 运维](../../server/deploy/gitlab/README.md) |
 | 发布与目标运行 | [部署约定](../部署约定.md)、[部署脚本](../../scripts/deploy/README.md) |
 

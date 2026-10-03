@@ -40,6 +40,8 @@ function invoke(
     body,
     headers = {},
     remoteAddress = '127.0.0.1',
+    localAddress = '127.0.0.1',
+    localPort = 5175,
   } = {}
 ) {
   return new Promise((resolve, reject) => {
@@ -60,7 +62,7 @@ function invoke(
         : {}),
       ...headers,
     }
-    req.socket = { remoteAddress }
+    req.socket = { remoteAddress, localAddress, localPort }
     req.on('error', reject)
     const responseHeaders = {}
     const res = {
@@ -249,7 +251,7 @@ test('operation recovery scans the complete store and oversized results cannot r
   )
 })
 
-test('middleware rejects LAN callers and requires same-origin CSRF for every POST bridge', async () => {
+test('middleware limits sessions and every POST bridge to loopback with same-origin CSRF', async () => {
   let actions = 0
   const middleware = createDevCustomerConfigMiddleware({
     csrfToken: CSRF_TOKEN,
@@ -292,6 +294,92 @@ test('middleware rejects LAN callers and requires same-origin CSRF for every POS
   })
   assert.equal(missingCsrf.statusCode, 403)
   assert.equal(actions, 0)
+})
+
+test('LAN history and fixed actions share the protected workbench session', async () => {
+  let actions = 0
+  const customers = []
+  const middleware = createDevCustomerConfigMiddleware({
+    csrfToken: CSRF_TOKEN,
+    service: {
+      async releaseBatches(customerKey) {
+        customers.push(customerKey)
+        return ['2026-07-11']
+      },
+      operations(customerKey) {
+        customers.push(customerKey)
+        return [{ id: 'safe-operation', status: 'passed' }]
+      },
+      async act() {
+        actions += 1
+        return { statusCode: 200, payload: { status: 'success' } }
+      },
+    },
+  })
+  const lan = {
+    remoteAddress: '192.168.0.20',
+    localAddress: '::ffff:192.168.0.133',
+    localPort: 15200,
+    headers: {
+      host: '192.168.0.133:15200',
+      referer:
+        'http://192.168.0.133:15200/__dev/customer-config?customer=yoyoosun',
+    },
+  }
+  for (const endpoint of ['operations', 'release-batches']) {
+    const result = await invoke(middleware, {
+      ...lan,
+      url: `/__dev/api/customer-config/${endpoint}?customerKey=yoyoosun`,
+    })
+    assert.equal(result.statusCode, 200, endpoint)
+    assert.equal(result.headers['cache-control'], 'no-store')
+    assert.equal(result.body.status, 'success')
+  }
+  assert.deepEqual(customers, ['yoyoosun', 'yoyoosun'])
+  const session = await invoke(middleware, {
+    ...lan,
+    url: '/__dev/api/customer-config/session',
+  })
+  assert.equal(session.statusCode, 200)
+  assert.equal(session.body.csrfToken, CSRF_TOKEN)
+  for (const endpoint of [
+    '/__dev/api/customer-import/dry-run',
+    '/__dev/api/customer-config/runtime-manifest',
+    '/__dev/api/customer-config/release-readiness',
+    '/__dev/api/customer-config/operations',
+  ]) {
+    const result = await invoke(middleware, {
+      ...lan,
+      method: 'POST',
+      url: endpoint,
+      headers: {
+        ...lan.headers,
+        origin: 'http://192.168.0.133:15200',
+        'sec-fetch-site': 'same-origin',
+        'x-csrf-token': CSRF_TOKEN,
+        'content-type': 'application/json',
+      },
+      body: { customerKey: 'yoyoosun', idempotencyKey: IDEMPOTENCY.dryRun },
+    })
+    assert.equal(
+      result.statusCode,
+      endpoint.endsWith('/operations') ? 405 : 200,
+      endpoint
+    )
+  }
+  assert.equal(actions, 3)
+  const crossOrigin = await invoke(middleware, {
+    ...lan,
+    url: '/__dev/api/customer-config/operations?customerKey=yoyoosun',
+    headers: { ...lan.headers, origin: 'http://evil.example' },
+  })
+  assert.equal(crossOrigin.statusCode, 403)
+  const invalidQuery = await invoke(middleware, {
+    ...lan,
+    url: '/__dev/api/customer-config/operations?customerKey=yoyoosun&customerKey=other',
+  })
+  assert.equal(invalidQuery.statusCode, 400)
+  assert.deepEqual(customers, ['yoyoosun', 'yoyoosun'])
 })
 
 test('release readiness requires a registered batch and persists a terminal operation', async (t) => {

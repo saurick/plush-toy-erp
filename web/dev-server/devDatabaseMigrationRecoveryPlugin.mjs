@@ -113,8 +113,8 @@ export function createDevDatabaseMigrationRecoveryController({
               'content-type',
               'application/json; charset=utf-8'
             )
-            // The availability result is public to frontend clients, including
-            // LAN phones; diagnostics and recovery actions remain loopback-only.
+            // Frontend clients can read availability; detailed diagnostics and
+            // recovery actions use the trusted DEV access guard.
             if (request.method !== 'GET') {
               response.statusCode = 405
               response.setHeader('allow', 'GET')

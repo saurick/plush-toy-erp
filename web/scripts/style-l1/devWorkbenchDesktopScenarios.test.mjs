@@ -6,7 +6,6 @@ import {
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_DATA_PREPARATION_ROUTE,
   DEV_DRILL_RECOVERY_ROUTE,
-  DEV_GOVERNANCE_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_PRODUCT_ENGINEERING_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
@@ -82,11 +81,6 @@ test('ordinary DEV desktop smokes honor route-specific landing contracts', async
       heading: DEV_PAGE_TITLE_BY_ROUTE[DEV_QUALITY_ROUTE],
     },
     {
-      route: DEV_GOVERNANCE_ROUTE,
-      finalRoute: DEV_GOVERNANCE_ROUTE,
-      heading: '改动指南',
-    },
-    {
       route: DEV_DATA_PREPARATION_ROUTE,
       finalRoute: DEV_DATA_PREPARATION_ROUTE,
       heading: '测试数据',
@@ -157,7 +151,7 @@ test('product and quality area smokes enforce their complete landing contracts',
         count: async () =>
           selector === '.erp-dev-tool-table tbody tr' &&
           route === DEV_PRODUCT_ENGINEERING_ROUTE
-            ? 6
+            ? 5
             : (counts.get(selector) ?? 0),
         waitFor: async () => {},
       }),

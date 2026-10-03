@@ -19,8 +19,9 @@ export async function verifyMobileNavigationMotion(
   const result = await control.evaluate(async (root, index) => {
     const segmented = root.querySelector('.ant-segmented-group')
     const group = segmented || root
+    const antdTabs = group.matches('.ant-tabs-nav-list')
     const target = group.querySelectorAll(
-      segmented ? '.ant-segmented-item' : '[role="tab"]'
+      segmented ? '.ant-segmented-item' : antdTabs ? '.ant-tabs-tab' : '[role="tab"]'
     )[index]
     const before = root.getBoundingClientRect()
     const read = () => {
@@ -54,7 +55,9 @@ export async function verifyMobileNavigationMotion(
       heightDelta: after.height - before.height,
       selected: segmented
         ? target.querySelector('input').checked
-        : target.getAttribute('aria-selected') === 'true',
+        : antdTabs
+          ? target.classList.contains('ant-tabs-tab-active')
+          : target.getAttribute('aria-selected') === 'true',
     }
   }, targetIndex)
   assert(result.mounted && result.selected, JSON.stringify(result))

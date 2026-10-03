@@ -28,14 +28,15 @@ test('drill recovery page leads with the operational conclusion and evidence bou
   assert.match(page, /变化时触发/u)
   assert.match(page, /完成证据/u)
   assert.match(page, /erp-dev-recovery-row__purpose/u)
-  assert.match(
-    page,
-    /const recentOperations = overview\.operations\.slice\(0, 3\)/u
-  )
+  assert.doesNotMatch(page, /recentOperations|最近交付记录/u)
+  assert.match(page, /查看交付记录/u)
+  assert.match(page, /DEV_VERSION_CENTER_VIEW_HISTORY/u)
+  assert.match(page, /<details className="erp-dev-recovery-emergency">/u)
 })
 
 test('drill recovery page exposes business labels and keeps high-risk actions disabled', () => {
-  assert.match(page, /演练与恢复/u)
+  assert.match(page, /安全与恢复/u)
+  assert.match(page, /overview.next/u)
   assert.match(page, /return <Button disabled>\{action\.label\}<\/Button>/u)
   assert.match(page, /普通成功部署不自动算作演练/u)
   assert.match(page, /禁止对当前试用或正式环境临时注入故障/u)

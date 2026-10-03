@@ -51,6 +51,7 @@ import {
   DEV_VERSION_CENTER_HISTORY_RESULT_PASSED,
   DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
   DEV_VERSION_CENTER_VIEW_HISTORY,
+  DEV_VERSION_CENTER_VIEW_OVERVIEW,
   DEV_VERSION_CENTER_VIEW_PIPELINE,
   DEV_VERSION_CENTER_VIEW_QUERY_KEY,
   DEV_VERSION_CENTER_VIEW_VERSIONS,
@@ -59,6 +60,7 @@ import {
   deliveryIdempotencyPresentation,
   deliveryOperationDetailPresentation,
   deliveryOperationMessagePresentation,
+  deliveryReadOnlyReleasePresentation,
   deliveryRetryPresentation,
   deliveryStatusPresentation,
   deliveryTargetCachePresentation,
@@ -343,7 +345,8 @@ function ManualTakeoverGuide() {
           />
         </div>
         <Text type="secondary">
-          本页只解释生命周期规则，不创建、删除或调度 Codex 会话与自动化；删除失败时不得开始写入、Git 或部署动作。
+          本页只解释生命周期规则，不创建、删除或调度 Codex
+          会话与自动化；删除失败时不得开始写入、Git 或部署动作。
         </Text>
       </section>
 
@@ -977,7 +980,7 @@ export default function DevVersionCenterPage() {
         : !releaseDispatchAllowed
           ? summary?.boundaries?.provider === 'github'
             ? 'GitHub Provider 只读取历史 Release，不能创建新发布'
-            : '当前只加载 GitLab 只读凭据；查看不受影响，创建新发布需要短期发布凭据'
+            : deliveryReadOnlyReleasePresentation(summary).description
           : repository?.dirty
             ? '当前工作树有改动，不能创建 exact-SHA 发布'
             : !releaseVersion
@@ -1072,13 +1075,7 @@ export default function DevVersionCenterPage() {
                     description: `无需重复发布，请在下方版本列表核对并准备部署到${selectedTargetDefinition.shortLabel}。`,
                   }
                 : !releaseDispatchAllowed
-                  ? {
-                      color: 'blue',
-                      label: '只读模式',
-                      title: '版本与流水线可查看，当前不能创建新发布',
-                      description:
-                        '未加载短期 GitLab 发布凭据；部署已有不可变版本不受影响。',
-                    }
+                  ? deliveryReadOnlyReleasePresentation(summary)
                   : {
                       color: 'warning',
                       label: '暂不可发布',
@@ -1789,6 +1786,264 @@ export default function DevVersionCenterPage() {
     },
   ]
 
+  const versionOverview = (
+    <Card className="erp-dev-version-overview">
+      <div className="erp-dev-version-overview__main">
+        <div className="erp-dev-version-facts-wrap">
+          <table className="erp-dev-version-facts" aria-label="发布状态摘要">
+            <thead>
+              <tr>
+                <th scope="col">核对项</th>
+                <th scope="col">当前值与证据</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="erp-dev-version-fact" data-kind="local">
+                <th scope="row">本地候选</th>
+                <td>
+                  <div className="erp-dev-version-fact__primary">
+                    <Text code>{shortGitSha(repository?.commit)}</Text>
+                    {repository ? (
+                      <Tag color={repository.dirty ? 'warning' : 'success'}>
+                        {repository.dirty ? '工作树有改动' : '工作树干净'}
+                      </Tag>
+                    ) : (
+                      <Tag color="error">身份未证明</Tag>
+                    )}
+                  </div>
+                  <Text type="secondary">
+                    只有 clean HEAD 才能触发 exact-SHA 发布。
+                  </Text>
+                </td>
+              </tr>
+              <tr className="erp-dev-version-fact" data-kind="release">
+                <th scope="row">{deliveryProviderName}不可变版本</th>
+                <td>
+                  <div className="erp-dev-version-fact__primary">
+                    <Text strong>{versions[0]?.version || '尚无可用版本'}</Text>
+                    <Text code>{shortGitSha(versions[0]?.gitSha)}</Text>
+                  </div>
+                  <DevDeliveryTimestamp
+                    value={versions[0]?.publishedAt}
+                    action="发布于"
+                    missing="发布时间未证明"
+                    className="erp-dev-latest-version-published-at"
+                  />
+                  <Text type="secondary">
+                    {versions[0]?.completeAssets
+                      ? versions[0]?.promotionEligible
+                        ? 'v2 七资产齐全，演练回执已绑定'
+                        : versions[0]?.assets.includes('release-rehearsal.json')
+                          ? 'v2 七资产存在，但演练证据未闭合'
+                          : 'v1 六资产齐全，仅保留读取与旧版回滚'
+                      : '等待完整 release assets'}
+                  </Text>
+                </td>
+              </tr>
+              <tr className="erp-dev-version-fact" data-kind="target">
+                <th scope="row">
+                  {selectedTargetDefinition.shortLabel}运行状态
+                </th>
+                <td>
+                  <div className="erp-dev-version-fact__primary">
+                    <Text code>{shortGitSha(currentTargetSha)}</Text>
+                    <Tag
+                      color={
+                        targetPassed
+                          ? 'success'
+                          : initializationReady
+                            ? 'processing'
+                            : 'warning'
+                      }
+                    >
+                      {targetPassed
+                        ? '运行态只读预检通过'
+                        : initializationReady
+                          ? '首次部署预检通过'
+                          : '目标预检阻断'}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">
+                    可用空间{' '}
+                    {formatDeliveryBytes(
+                      target?.remote?.capacity?.availableBytes ??
+                        initializationPreflight?.remote?.capacity
+                          ?.availableBytes
+                    )}
+                    {' / '}最低要求{' '}
+                    {formatDeliveryBytes(
+                      target?.remote?.capacity?.minimumAvailableBytes ??
+                        initializationPreflight?.remote?.capacity
+                          ?.minimumAvailableBytes
+                    )}
+                  </Text>
+                </td>
+              </tr>
+              <tr className="erp-dev-version-fact" data-kind="public-entry">
+                <th scope="row">公网入口</th>
+                <td>
+                  <div className="erp-dev-version-fact__primary">
+                    <Text code>{shortGitSha(publicEntry?.gitSha)}</Text>
+                    <Tag
+                      color={
+                        publicEntry?.status === 'passed' ? 'success' : 'warning'
+                      }
+                    >
+                      {publicEntry?.status === 'passed'
+                        ? `入口与${selectedTargetDefinition.shortLabel}版本一致`
+                        : '入口未完成证明'}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">
+                    页面健康{' '}
+                    {publicEntry?.health === 'passed' ? '通过' : '未通过'}
+                    {' · '}短信 Provider{' '}
+                    {publicEntry?.provider === 'passed' ? '通过' : '未通过'}
+                  </Text>
+                  <Link
+                    href={
+                      publicEntry?.endpoint || selectedTargetDefinition.endpoint
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    打开公网页面
+                  </Link>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <aside
+        className="erp-dev-version-next"
+        data-decision={releaseDecision.color}
+        aria-label="当前发布结论与下一步"
+      >
+        <Tag color={releaseDecision.color}>{releaseDecision.label}</Tag>
+        <Text type="secondary">当前结论 / 下一步</Text>
+        <Title level={3}>{releaseDecision.title}</Title>
+        <Paragraph>{releaseDecision.description}</Paragraph>
+        <div className="erp-dev-version-next__actions">
+          <Popover
+            placement="bottomRight"
+            trigger={['hover', 'click']}
+            content={
+              <Space direction="vertical" size={4} style={{ maxWidth: 360 }}>
+                <Text strong>先发布制品，不会直接部署到任一目标</Text>
+                <Text>代码推送不会自动部署；部署前需另行核对具体目标与计划。</Text>
+                <Text>
+                  系统会将当前干净提交的 exact SHA 交给
+                  {deliveryProviderName}
+                  ，执行严格质量门禁并生成不可变镜像、Release manifest、checksum
+                  和 SBOM。
+                </Text>
+                <Text type="secondary">
+                  制品发布完成后，仍需在版本列表中依次执行“准备部署”和“确认部署”。
+                </Text>
+              </Space>
+            }
+          >
+            <Button
+              type="link"
+              icon={<QuestionCircleOutlined />}
+              aria-label="查看发布当前版本制品说明"
+            >
+              发布说明
+            </Button>
+          </Popover>
+        </div>
+
+        <section
+          className="erp-dev-version-quality-gate-summary"
+          aria-label="当前发布 SHA 严格门禁摘要"
+        >
+          <Space wrap size={6}>
+            <Text strong>当前发布 SHA 严格门禁</Text>
+            <Tag
+              color={
+                strictProof?.releaseEligible && qualityGateIdentityCurrent
+                  ? 'success'
+                  : 'warning'
+              }
+            >
+              {strictSummaryLabel}
+            </Tag>
+          </Space>
+          <Text type="secondary">
+            实际耗时{' '}
+            {formatQualityGateDuration(strictProof?.receipt?.durationMs)}
+            {' · '}
+            {strictProof?.reused ? '可信复用' : '本地新执行或尚未执行'}
+          </Text>
+          <DevDeliveryTimestamp
+            value={strictProof?.receipt?.finishedAt}
+            action="完成于"
+            missing="完成时间未证明"
+            className="erp-dev-quality-gate-finished-at"
+          />
+          <RouterLink to={`${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`}>
+            查看质量门禁详情
+          </RouterLink>
+        </section>
+      </aside>
+    </Card>
+  )
+
+  const databaseRebuildPanel =
+    selectedTargetKey === 'customer-test-133' ? (
+      <Card
+        className="erp-dev-version-table-card"
+        title="test 数据方式"
+        extra={<Tag color="blue">与版本部署分开</Tag>}
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="普通部署默认保留现有数据"
+            description="发布和部署新版本只做备份、向前迁移、版本切换与运行核验，不会自动清空 test。没有新版本时，也可以单独清空并重建当前 exact SHA 的测试数据。"
+          />
+          <Space wrap>
+            <Tooltip
+              title={
+                customerTestRebuildEligible
+                  ? '先做只读资格检查，不会立即清空数据'
+                  : customerTestRebuildExplanation
+              }
+            >
+              <Button
+                danger
+                icon={<ToolOutlined />}
+                disabled={!customerTestRebuildEligible}
+                loading={actionKey === 'prepare:customer-test-rebuild'}
+                onClick={() =>
+                  performAction(
+                    'prepare:customer-test-rebuild',
+                    'prepare-database-rebuild',
+                    {
+                      gitSha: currentTargetRelease.gitSha,
+                      version: currentTargetRelease.version,
+                      target: 'customer-test-133',
+                      idempotencyKey:
+                        createDeliveryIdempotencyKey('rebuild-database'),
+                    }
+                  )
+                }
+              >
+                清空并重建测试数据
+              </Button>
+            </Tooltip>
+            <Text type="secondary">
+              固定当前运行版本 {shortGitSha(currentTargetSha)}
+              ；资格通过后仍需二次确认。
+            </Text>
+          </Space>
+        </Space>
+      </Card>
+    ) : null
+
   const workspaceItems = [
     {
       key: DEV_VERSION_CENTER_VIEW_VERSIONS,
@@ -1822,13 +2077,27 @@ export default function DevVersionCenterPage() {
               locale={{
                 emptyText: (
                   <Empty
-                    description={`尚无完整${deliveryProviderName}不可变发布版本`}
+                    description={
+                      summary?.releaseVersionPolicy
+                        ? `尚无完整${deliveryProviderName}不可变发布版本`
+                        : deliveryReadOnlyReleasePresentation(summary).title
+                    }
                   />
                 ),
               }}
               scroll={{ x: 1120 }}
             />
           </Card>
+        </section>
+      ),
+    },
+    {
+      key: DEV_VERSION_CENTER_VIEW_OVERVIEW,
+      label: '发布检查',
+      children: (
+        <section className="erp-dev-version-tab erp-dev-version-tab--overview" aria-label="发布检查">
+          {versionOverview}
+          {databaseRebuildPanel}
         </section>
       ),
     },
@@ -1840,6 +2109,12 @@ export default function DevVersionCenterPage() {
           className="erp-dev-version-tab erp-dev-version-tab--pipeline"
           aria-label="流水线耗时"
         >
+          <DevPipelineStatusStrip
+            timings={summary?.timings}
+            versions={versions}
+            operations={operations}
+            onOpenDetails={openPipelineDetails}
+          />
           <DevPipelineTimingPanel
             timings={summary?.timings}
             versions={versions}
@@ -2009,7 +2284,7 @@ export default function DevVersionCenterPage() {
   ]
 
   return (
-    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-version-page">
+    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-version-page erp-dev-delivery-workspace">
       <DevPageNav sourcePath={DEV_DELIVERY_SOURCE_PATH} />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
@@ -2022,6 +2297,16 @@ export default function DevVersionCenterPage() {
         </div>
         <div className="erp-dev-version-header-actions">
           <Space wrap>
+            <Tooltip title={canDispatch ? '' : dispatchExplanation}>
+              <Button
+                type="primary"
+                icon={<CloudUploadOutlined />}
+                disabled={!canDispatch}
+                onClick={() => setReleaseModalOpen(true)}
+              >
+                发布当前版本制品
+              </Button>
+            </Tooltip>
             <Button
               icon={<ReloadOutlined />}
               loading={refreshBusy}
@@ -2044,13 +2329,33 @@ export default function DevVersionCenterPage() {
         </div>
       </header>
 
-      <DevCustomerScopeSelector
-        scope={customerScope}
-        onChange={customerScope.selectCustomer}
-        disabled={isMutationRunning}
-        note="版本、部署与回滚仅作用于永绅登记的 demo / test 固定目标；admin 不是部署环境。"
-        invalidDescription="当前甲方没有登记发布目标；版本、部署、回滚与目标状态读取均已停止。"
-      />
+      <section className="erp-dev-delivery-context erp-dev-version-context" aria-label="版本发布范围">
+        <DevCustomerScopeSelector
+          compact
+          scope={customerScope}
+          onChange={customerScope.selectCustomer}
+          disabled={isMutationRunning}
+          note="只操作已登记的交付目标。"
+          invalidDescription="当前甲方没有登记发布目标；版本、部署、回滚与目标状态读取均已停止。"
+        />
+
+        <div className="erp-dev-version-target-context">
+          <Text strong>部署目标</Text>
+          <Segmented
+            aria-label="切换当前操作目标"
+            value={selectedTargetKey}
+            disabled={isMutationRunning}
+            options={DEV_DELIVERY_TARGETS.map((item) => ({
+              label: item.label,
+              value: item.key,
+            }))}
+            onChange={setSelectedTargetKey}
+          />
+          <Text type="secondary" className="erp-dev-delivery-context__note">
+            {selectedTargetDefinition.dataBoundary}
+          </Text>
+        </div>
+      </section>
 
       <main className="erp-dev-hub-shell erp-dev-version-shell">
         {loadError ? (
@@ -2084,289 +2389,6 @@ export default function DevVersionCenterPage() {
             description={`${operationPollError}；页面会继续有界重试，也可手动刷新状态。`}
           />
         ) : null}
-        <Card className="erp-dev-version-overview">
-          <div className="erp-dev-version-overview__main">
-            <div className="erp-dev-version-overview__scope">
-              <div className="erp-dev-version-overview__scope-copy">
-                <Text className="erp-dev-version-overview__eyebrow">
-                  当前操作目标
-                </Text>
-                <Space wrap size={8}>
-                  <Title level={2}>{selectedTargetDefinition.label}</Title>
-                  <Text code>{selectedTargetKey}</Text>
-                </Space>
-                <Text type="secondary">
-                  {selectedTargetDefinition.dataBoundary}
-                </Text>
-              </div>
-              <Segmented
-                aria-label="切换当前操作目标"
-                value={selectedTargetKey}
-                options={DEV_DELIVERY_TARGETS.map((item) => ({
-                  label: item.label,
-                  value: item.key,
-                }))}
-                onChange={setSelectedTargetKey}
-              />
-            </div>
-
-            <dl className="erp-dev-version-facts" aria-label="发布状态摘要">
-              <div className="erp-dev-version-fact" data-kind="local">
-                <dt>本地候选</dt>
-                <dd>
-                  <div className="erp-dev-version-fact__primary">
-                    <Text code>{shortGitSha(repository?.commit)}</Text>
-                    {repository ? (
-                      <Tag color={repository.dirty ? 'warning' : 'success'}>
-                        {repository.dirty ? '工作树有改动' : '工作树干净'}
-                      </Tag>
-                    ) : (
-                      <Tag color="error">身份未证明</Tag>
-                    )}
-                  </div>
-                  <Text type="secondary">
-                    只有 clean HEAD 才能触发 exact-SHA 发布。
-                  </Text>
-                </dd>
-              </div>
-              <div className="erp-dev-version-fact" data-kind="release">
-                <dt>{deliveryProviderName}不可变版本</dt>
-                <dd>
-                  <div className="erp-dev-version-fact__primary">
-                    <Text strong>{versions[0]?.version || '尚无可用版本'}</Text>
-                    <Text code>{shortGitSha(versions[0]?.gitSha)}</Text>
-                  </div>
-                  <DevDeliveryTimestamp
-                    value={versions[0]?.publishedAt}
-                    action="发布于"
-                    missing="发布时间未证明"
-                    className="erp-dev-latest-version-published-at"
-                  />
-                  <Text type="secondary">
-                    {versions[0]?.completeAssets
-                      ? versions[0]?.promotionEligible
-                        ? 'v2 七资产齐全，演练回执已绑定'
-                        : versions[0]?.assets.includes('release-rehearsal.json')
-                          ? 'v2 七资产存在，但演练证据未闭合'
-                          : 'v1 六资产齐全，仅保留读取与旧版回滚'
-                      : '等待完整 release assets'}
-                  </Text>
-                </dd>
-              </div>
-              <div className="erp-dev-version-fact" data-kind="target">
-                <dt>{selectedTargetDefinition.shortLabel}运行状态</dt>
-                <dd>
-                  <div className="erp-dev-version-fact__primary">
-                    <Text code>{shortGitSha(currentTargetSha)}</Text>
-                    <Tag
-                      color={
-                        targetPassed
-                          ? 'success'
-                          : initializationReady
-                            ? 'processing'
-                            : 'warning'
-                      }
-                    >
-                      {targetPassed
-                        ? '运行态只读预检通过'
-                        : initializationReady
-                          ? '首次部署预检通过'
-                          : '目标预检阻断'}
-                    </Tag>
-                  </div>
-                  <Text type="secondary">
-                    可用空间{' '}
-                    {formatDeliveryBytes(
-                      target?.remote?.capacity?.availableBytes ??
-                        initializationPreflight?.remote?.capacity
-                          ?.availableBytes
-                    )}
-                    {' / '}最低要求{' '}
-                    {formatDeliveryBytes(
-                      target?.remote?.capacity?.minimumAvailableBytes ??
-                        initializationPreflight?.remote?.capacity
-                          ?.minimumAvailableBytes
-                    )}
-                  </Text>
-                </dd>
-              </div>
-              <div className="erp-dev-version-fact" data-kind="public-entry">
-                <dt>公网入口</dt>
-                <dd>
-                  <div className="erp-dev-version-fact__primary">
-                    <Text code>{shortGitSha(publicEntry?.gitSha)}</Text>
-                    <Tag
-                      color={
-                        publicEntry?.status === 'passed' ? 'success' : 'warning'
-                      }
-                    >
-                      {publicEntry?.status === 'passed'
-                        ? `入口与${selectedTargetDefinition.shortLabel}版本一致`
-                        : '入口未完成证明'}
-                    </Tag>
-                  </div>
-                  <Text type="secondary">
-                    页面健康{' '}
-                    {publicEntry?.health === 'passed' ? '通过' : '未通过'}
-                    {' · '}短信 Provider{' '}
-                    {publicEntry?.provider === 'passed' ? '通过' : '未通过'}
-                  </Text>
-                  <Link
-                    href={
-                      publicEntry?.endpoint || selectedTargetDefinition.endpoint
-                    }
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    打开公网页面
-                  </Link>
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          <aside
-            className="erp-dev-version-next"
-            data-decision={releaseDecision.color}
-            aria-label="当前发布结论与下一步"
-          >
-            <Tag color={releaseDecision.color}>{releaseDecision.label}</Tag>
-            <Text type="secondary">当前结论 / 下一步</Text>
-            <Title level={3}>{releaseDecision.title}</Title>
-            <Paragraph>{releaseDecision.description}</Paragraph>
-            <div className="erp-dev-version-next__actions">
-              <Tooltip title={canDispatch ? '' : dispatchExplanation}>
-                <Button
-                  type="primary"
-                  icon={<CloudUploadOutlined />}
-                  disabled={!canDispatch}
-                  onClick={() => setReleaseModalOpen(true)}
-                >
-                  发布当前版本制品
-                </Button>
-              </Tooltip>
-              <Popover
-                placement="bottomRight"
-                trigger={['hover', 'click']}
-                content={
-                  <Space
-                    direction="vertical"
-                    size={4}
-                    style={{ maxWidth: 360 }}
-                  >
-                    <Text strong>先发布制品，不会直接部署到任一目标</Text>
-                    <Text>代码推送不会自动部署；部署前需另行核对具体目标与计划。</Text>
-                    <Text>
-                      系统会将当前干净提交的 exact SHA 交给
-                      {deliveryProviderName}
-                      ，执行严格质量门禁并生成不可变镜像、Release
-                      manifest、checksum 和 SBOM。
-                    </Text>
-                    <Text type="secondary">
-                      制品发布完成后，仍需在版本列表中依次执行“准备部署”和“确认部署”。
-                    </Text>
-                  </Space>
-                }
-              >
-                <Button
-                  type="link"
-                  icon={<QuestionCircleOutlined />}
-                  aria-label="查看发布当前版本制品说明"
-                >
-                  发布说明
-                </Button>
-              </Popover>
-            </div>
-
-            <section
-              className="erp-dev-version-quality-gate-summary"
-              aria-label="当前发布 SHA 严格门禁摘要"
-            >
-              <Space wrap size={6}>
-                <Text strong>当前发布 SHA 严格门禁</Text>
-                <Tag
-                  color={
-                    strictProof?.releaseEligible && qualityGateIdentityCurrent
-                      ? 'success'
-                      : 'warning'
-                  }
-                >
-                  {strictSummaryLabel}
-                </Tag>
-              </Space>
-              <Text type="secondary">
-                实际耗时{' '}
-                {formatQualityGateDuration(strictProof?.receipt?.durationMs)}
-                {' · '}
-                {strictProof?.reused ? '可信复用' : '本地新执行或尚未执行'}
-              </Text>
-              <DevDeliveryTimestamp
-                value={strictProof?.receipt?.finishedAt}
-                action="完成于"
-                missing="完成时间未证明"
-                className="erp-dev-quality-gate-finished-at"
-              />
-              <RouterLink
-                to={`${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`}
-              >
-                查看质量门禁详情
-              </RouterLink>
-            </section>
-          </aside>
-        </Card>
-
-        {selectedTargetKey === 'customer-test-133' ? (
-          <Card
-            className="erp-dev-version-table-card"
-            title="test 数据方式"
-            extra={<Tag color="blue">与版本部署分开</Tag>}
-          >
-            <Space direction="vertical" size={12} style={{ width: '100%' }}>
-              <Alert
-                type="info"
-                showIcon
-                message="普通部署默认保留现有数据"
-                description="发布和部署新版本只做备份、向前迁移、版本切换与运行核验，不会自动清空 test。没有新版本时，也可以单独清空并重建当前 exact SHA 的测试数据。"
-              />
-              <Space wrap>
-                <Tooltip
-                  title={
-                    customerTestRebuildEligible
-                      ? '先做只读资格检查，不会立即清空数据'
-                      : customerTestRebuildExplanation
-                  }
-                >
-                  <Button
-                    danger
-                    icon={<ToolOutlined />}
-                    disabled={!customerTestRebuildEligible}
-                    loading={actionKey === 'prepare:customer-test-rebuild'}
-                    onClick={() =>
-                      performAction(
-                        'prepare:customer-test-rebuild',
-                        'prepare-database-rebuild',
-                        {
-                          gitSha: currentTargetRelease.gitSha,
-                          version: currentTargetRelease.version,
-                          target: 'customer-test-133',
-                          idempotencyKey:
-                            createDeliveryIdempotencyKey('rebuild-database'),
-                        }
-                      )
-                    }
-                  >
-                    清空并重建测试数据
-                  </Button>
-                </Tooltip>
-                <Text type="secondary">
-                  固定当前运行版本 {shortGitSha(currentTargetSha)}
-                  ；资格通过后仍需二次确认。
-                </Text>
-              </Space>
-            </Space>
-          </Card>
-        ) : null}
-
         {openOperations.length > 0 ? (
           <Card
             title="当前操作"
@@ -2435,36 +2457,29 @@ export default function DevVersionCenterPage() {
           </Card>
         ) : null}
 
-        <DevPipelineStatusStrip
-          timings={summary?.timings}
-          versions={versions}
-          operations={operations}
-          onOpenDetails={openPipelineDetails}
-        />
-
-        <DevStaticGuidance title="固定边界" hint="发布职责与安全限制">
-          GitLab 负责代码真源、CI 与不可变制品；GitHub 仅接收单向审查镜像；本地
-          Bridge 只接受固定动作；demo 与 test
-          均不构建、不接受浏览器传入的命令、目录、仓库或 SSH
-          目标。两个目标共享不可变版本，但数据库、附件、运行资源、备份与回滚点相互隔离。
-        </DevStaticGuidance>
-
         <section
           ref={workspaceRef}
           className="erp-dev-version-workspace"
           aria-label="版本发布工作区"
         >
-          <p className="erp-dev-version-workspace__evidence-note">
-            <strong>CI/CD 证据分两处查看：</strong>
-            流水线耗时看 GitLab 的 CI
-            检查、构建和制品发布耗时；操作记录看工作台发起的发布、目标部署、回滚和数据重建结果。
-          </p>
           <Tabs
             activeKey={activeView}
             items={workspaceItems}
             onChange={selectView}
           />
         </section>
+        <DevStaticGuidance title="证据与运行边界" hint="发布职责与安全限制">
+          <Paragraph>
+            <strong>CI/CD 证据分两处查看：</strong>
+            流水线耗时看 GitLab 的 CI
+            检查、构建和制品发布耗时；操作记录看工作台发起的发布、目标部署、回滚和数据重建结果。
+          </Paragraph>
+
+          GitLab 负责代码真源、CI 与不可变制品；GitHub 仅接收单向审查镜像；本地
+          Bridge 只接受固定动作；demo 与 test
+          均不构建、不接受浏览器传入的命令、目录、仓库或 SSH
+          目标。两个目标共享不可变版本，但数据库、附件、运行资源、备份与回滚点相互隔离。
+        </DevStaticGuidance>
       </main>
 
       <Modal

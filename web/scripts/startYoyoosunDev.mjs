@@ -9,8 +9,8 @@ import { loadDevPorts, validateDevAuxPort } from '../../scripts/dev-ports.mjs'
 import { prepareWebInstance, webInstanceSignature } from './devWebInstance.mjs'
 import { normalizeAPIOrigin } from '../../scripts/local-runtime-preflight.mjs'
 import {
-  createViteChildEnvironment,
   runManagedVite,
+  resolveDevGitlabCredential,
   resolveWebRuntimeStartup,
   stopLocalWebFrontend,
 } from './startWebDev.mjs'
@@ -142,22 +142,19 @@ function printPlan(options) {
   )
 }
 
-function runVite(options, startup) {
-  return runManagedVite(
-    [],
-    startup,
-    { source: 'missing', token: '' },
-    {
-      ...createViteChildEnvironment({
-        ...startup,
-        gitlabCredential: { source: 'missing', token: '' },
-      }),
-      ERP_DEV_CUSTOMER_KEY: options.customer,
-      ERP_VITE_PORT: options.port,
-      API_ORIGIN: options.apiOrigin,
-      ERP_DEV_START_SIGNATURE: options.signature,
-    }
-  )
+export function runYoyoosunVite(
+  options,
+  startup,
+  gitlabCredential,
+  { run = runManagedVite, env = process.env } = {}
+) {
+  return run([], startup, gitlabCredential, {
+    ...env,
+    ERP_DEV_CUSTOMER_KEY: options.customer,
+    ERP_VITE_PORT: options.port,
+    API_ORIGIN: options.apiOrigin,
+    ERP_DEV_START_SIGNATURE: options.signature,
+  })
 }
 
 async function main() {
@@ -181,6 +178,9 @@ async function main() {
   }
 
   const startup = await resolveWebRuntimeStartup(options)
+  const gitlabCredential = startup.recoveryMode
+    ? { source: 'missing', token: '' }
+    : await resolveDevGitlabCredential()
   checkDevCustomerPackage(options.customer)
   options.signature = webInstanceSignature({
     ...options,
@@ -210,7 +210,12 @@ async function main() {
   process.stdout.write(
     `[start-yoyoosun] 客户配置与公开资源预检通过：${options.customer}\n`
   )
-  const code = await runVite(options, startup)
+  if (['file', 'keychain'].includes(gitlabCredential.source)) {
+    process.stderr.write(
+      '[start-yoyoosun] GitLab 只读凭据已从受控服务端存储加载\n'
+    )
+  }
+  const code = await runYoyoosunVite(options, startup, gitlabCredential)
   // 同时启动时，只有一个 Vite 能占用固定端口；失败者复用已启动的同配置实例。
   if (code === 1 && !options.restart) {
     try {

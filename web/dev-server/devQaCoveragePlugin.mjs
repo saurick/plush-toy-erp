@@ -4,6 +4,11 @@ import { accessSync, constants, readFileSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+import {
+  COVERAGE_REPORT_SCHEMA as QA_COVERAGE_REPORT_SCHEMA,
+  validateCoverageReport as validateQaCoverageReport,
+} from '../../scripts/qa/lib/coverage-report-contract.mjs'
+import { SNAPSHOT_OUTPUT_RELATIVE_PATH } from '../../scripts/qa/test-coverage-report.mjs'
 
 import {
   buildRepositoryFingerprint,
@@ -33,17 +38,18 @@ import {
 import {
   isSameOriginRequest,
   readJsonBody,
-  isLoopbackHostHeader,
-  isLoopbackRemoteAddress,
+  isDevWorkbenchRequest,
 } from './devServerSecurity.mjs'
 
 export { buildRepositoryFingerprint }
 
 export const DEV_QA_COVERAGE_API_PATH = '/__dev/api/qa/coverage'
+export const DEV_QA_COVERAGE_SNAPSHOT_API_PATH =
+  DEV_QA_COVERAGE_API_PATH + '/snapshot'
 export const DEV_QA_COVERAGE_SESSION_API_PATH = `${DEV_QA_COVERAGE_API_PATH}/session`
 export const DEV_QA_COVERAGE_ACTION_API_PATH = `${DEV_QA_COVERAGE_API_PATH}/actions`
 export const DEV_QA_COVERAGE_OPERATION_API_PREFIX = `${DEV_QA_COVERAGE_API_PATH}/operations`
-export const QA_COVERAGE_REPORT_SCHEMA = 'plush-test-coverage-report/v1'
+export { QA_COVERAGE_REPORT_SCHEMA, validateQaCoverageReport }
 export const QA_COVERAGE_PUBLIC_OPERATION_SCHEMA =
   'plush.dev-qa-coverage-operation-public/v1'
 export const MAX_QA_COVERAGE_REPORT_BYTES = 2 * 1024 * 1024
@@ -104,31 +110,6 @@ export function resolveProjectNodeRuntime(projectRoot) {
   throw new Error('repository-pinned Node runtime is unavailable')
 }
 
-const FORBIDDEN_REPORT_KEYS = new Set([
-  'accesstoken',
-  'authorization',
-  'cookie',
-  'generatedby',
-  'gitremote',
-  'overallcoverage',
-  'overallpercent',
-  'password',
-  'refreshtoken',
-  'remote',
-  'remoteaddress',
-  'remoteurl',
-  'reporoot',
-  'repositoryurl',
-  'token',
-  'totalcoveragepercent',
-  'username',
-])
-
-const normalizeKey = (value) =>
-  String(value || '')
-    .replace(/[^a-z0-9]/giu, '')
-    .toLowerCase()
-
 export function resolveDevQaCoverageReportPath(projectRoot) {
   return path.join(
     path.resolve(projectRoot || process.cwd()),
@@ -136,6 +117,13 @@ export function resolveDevQaCoverageReportPath(projectRoot) {
     'qa',
     'coverage',
     'latest.json'
+  )
+}
+
+export function resolveDevQaCoverageSnapshotPath(projectRoot) {
+  return path.join(
+    path.resolve(projectRoot || process.cwd()),
+    SNAPSHOT_OUTPUT_RELATIVE_PATH
   )
 }
 
@@ -150,71 +138,6 @@ export function resolveCoverageFreshness(report, currentRepository) {
     repository?.fingerprint === currentRepository?.fingerprint
     ? 'current'
     : 'stale'
-}
-
-const containsSensitiveString = (value) => {
-  const text = String(value || '')
-  if (
-    /(?:^|[\s"'=])(Bearer\s+|ghp_|github_pat_|sk-[A-Za-z0-9]|xox[baprs]-)/iu.test(
-      text
-    )
-  ) {
-    return true
-  }
-  if (/(?:^|[\s"'=])(?:[A-Za-z]:[\\/]|\\\\)/u.test(text)) return true
-  if (path.isAbsolute(text)) return true
-  if (/(?:^|[\s"'=])\/(?:Users|home|private|var|tmp)(?:\/|$)/u.test(text)) {
-    return true
-  }
-
-  if (/(?:^|[\s"'=])[a-z][a-z0-9+.-]*:\/\//iu.test(text)) return true
-  if (/(?:^|[\s"'=])[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:.+/u.test(text)) {
-    return true
-  }
-  return false
-}
-
-const assertSafeReportValue = (value, key = '', depth = 0) => {
-  if (depth > 64) throw new Error('report nesting exceeds limit')
-  if (typeof value === 'string') {
-    if (containsSensitiveString(value)) {
-      throw new Error('report contains restricted data')
-    }
-    return
-  }
-  if (value === null || typeof value !== 'object') return
-  if (Array.isArray(value)) {
-    value.forEach((item) => assertSafeReportValue(item, key, depth + 1))
-    return
-  }
-  for (const [childKey, childValue] of Object.entries(value)) {
-    if (FORBIDDEN_REPORT_KEYS.has(normalizeKey(childKey))) {
-      throw new Error('report contains restricted data')
-    }
-    assertSafeReportValue(childValue, childKey, depth + 1)
-  }
-}
-
-export function validateQaCoverageReport(report) {
-  if (!report || typeof report !== 'object' || Array.isArray(report)) {
-    throw new Error('report must be an object')
-  }
-  if (report.schemaVersion !== QA_COVERAGE_REPORT_SCHEMA) {
-    throw new Error('report schema is unsupported')
-  }
-  const { repository } = report
-  if (
-    !repository ||
-    typeof repository !== 'object' ||
-    Array.isArray(repository) ||
-    !/^[0-9a-f]{40,64}$/u.test(repository.commit || '') ||
-    typeof repository.dirty !== 'boolean' ||
-    !/^[0-9a-f]{64}$/u.test(repository.fingerprint || '')
-  ) {
-    throw new Error('report repository state is invalid')
-  }
-  assertSafeReportValue(report)
-  return report
 }
 
 export async function readQaCoverageReport(
@@ -767,13 +690,10 @@ export function createDevQaCoverageMiddleware({
       return
     }
 
-    if (
-      !isLoopbackRemoteAddress(request.socket?.remoteAddress) ||
-      !isLoopbackHostHeader(request.headers?.host)
-    ) {
+    if (!isDevWorkbenchRequest(request)) {
       sendJson(response, 403, {
         status: 'failed',
-        message: '该开发接口仅允许本机访问',
+        message: '开发工具只允许通过当前开发服务的本机或内网地址访问',
       })
       return
     }
@@ -857,6 +777,37 @@ export function createDevQaCoverageMiddleware({
             status: 'failed',
             message: '覆盖率报告不可用，请重新生成',
             operation,
+          })
+        }
+        return
+      }
+
+      if (
+        request.method === 'GET' &&
+        requestPath === DEV_QA_COVERAGE_SNAPSHOT_API_PATH
+      ) {
+        if (requestUrl.search) {
+          sendJson(response, 400, {
+            status: 'failed',
+            message: '隔离验证接口不接受路径或参数',
+          })
+          return
+        }
+        try {
+          const report = await readReport(
+            resolveDevQaCoverageSnapshotPath(root),
+            maxReportBytes
+          )
+          if (report.snapshot?.kind !== 'isolated')
+            throw new Error('isolated snapshot marker is required')
+          sendJson(response, 200, { status: 'snapshot', report })
+        } catch (error) {
+          sendJson(response, error?.code === 'ENOENT' ? 404 : 500, {
+            status: error?.code === 'ENOENT' ? 'missing' : 'failed',
+            message:
+              error?.code === 'ENOENT'
+                ? '尚未归档隔离验证结果'
+                : '隔离验证报告不可用，请核对归档证据',
           })
         }
         return

@@ -72,6 +72,8 @@ test('testing summary keeps fixed results and Git Hook wiring independent', () =
       fast: operation(),
       'role-access': null,
       'field-linkage': null,
+      'pressure-quick': null,
+      'pressure-capacity': null,
     },
   })
   assert.equal(summary.busy.profile, 'fast')
@@ -106,6 +108,8 @@ test('testing summary recognizes a quality gate holding the shared QA lock', () 
       fast: null,
       'role-access': null,
       'field-linkage': null,
+      'pressure-quick': null,
+      'pressure-capacity': null,
     },
   })
 
@@ -217,6 +221,8 @@ test('testing client posts only action and idempotency key', async () => {
             fast: operation(),
             'role-access': null,
             'field-linkage': null,
+      'pressure-quick': null,
+      'pressure-capacity': null,
           },
         })
       }

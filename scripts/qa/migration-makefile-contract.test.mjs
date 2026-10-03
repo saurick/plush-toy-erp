@@ -43,8 +43,9 @@ test("migration make targets keep the guarded low-level plan and apply wrapper",
   assert.match(apply, /MIGRATE_MAINTENANCE_CONFIRM_FROM_COMMAND_ENV/u);
   for (const body of [plan, apply]) {
     assert.match(body, /git rev-parse --git-path plush-local-migration\.lock/u);
-    assert.match(body, /lockf -t 0/u);
+    assert.match(body, /\$\(LOCAL_MIGRATION_LOCK\)/u);
   }
+  assert.match(source, /LOCAL_MIGRATION_LOCK :=.*command -v lockf.*lockf -t 0.*flock -n/u);
   assert.ok(
     source.indexOf("MIGRATE_CONFIRM_FROM_COMMAND_ENV :=") <
       source.indexOf("include $(ENV_FILE)"),

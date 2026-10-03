@@ -1,5 +1,4 @@
 @import './dev-docs.css';
-@import './dev-governance.css';
 @import './dev-capability.css';
 @import './dev-navigation.css';
 @import './dev-workbench-shared.css';
@@ -18,3 +17,5 @@
 @import './dev-overview-workflow.css';
 @import './dev-workbench-density.css';
 @import './dev-workbench-layout.css';
+@import './dev-delivery-workspace.css';
+@import './dev-pressure.css';

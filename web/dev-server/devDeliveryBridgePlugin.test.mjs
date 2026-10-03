@@ -169,8 +169,9 @@ test('read-only GitLab evidence does not authorize release dispatch', async (t) 
     summary.issues.some(
       (issue) => issue.code === 'release_dispatch_credential_unavailable'
     ),
-    true
+    false
   )
+  assert.equal(summary.status, 'success')
   assert.equal(Object.hasOwn(environment, 'PLUSH_GITLAB_READ_TOKEN'), false)
   await assert.rejects(
     service.act({
@@ -184,6 +185,66 @@ test('read-only GitLab evidence does not authorize release dispatch', async (t) 
     /credential is unavailable/u
   )
   assert.equal(listDeliveryOperations(store, { limit: 10 }).length, 0)
+})
+
+test('missing GitLab credentials produce one actionable read issue while target evidence remains available', async (t) => {
+  const { root, store } = createProject(t)
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    env: {},
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
+    runPreflight: (target) => ({ status: 'passed', target }),
+    readRecoveryEvidence: () => null,
+  })
+  const summary = await service.summary()
+  assert.equal(summary.status, 'partial')
+  assert.deepEqual(
+    summary.issues.map((issue) => issue.code),
+    ['gitlab_provider_unavailable']
+  )
+  assert.match(summary.issues[0].message, /未登记 GitLab 只读凭据/u)
+  assert(
+    summary.targets.every((target) => target.preflight.status === 'passed')
+  )
+  assert.equal(summary.boundaries.releaseDispatchAllowed, false)
+  assert.equal(summary.releaseVersionPolicy, null)
+  assert.equal(summary.timings, null)
+})
+
+test('a separate pipeline timing failure stays visible after a successful version read', async (t) => {
+  const { root, store } = createProject(t)
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    env: { PLUSH_GITLAB_READ_TOKEN: 'fixture-read-token' },
+    readProvider: {
+      provider: 'gitlab',
+      listVersions: () => [],
+      listPipelineTimings: () => {
+        throw new Error('timing read failed')
+      },
+      getReleaseStatus: () => ({ status: 'missing', release: null }),
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
+    runPreflight: (target) => ({ status: 'passed', target }),
+    readRecoveryEvidence: () => null,
+  })
+  const summary = await service.summary()
+  assert.deepEqual(
+    summary.issues.map((issue) => issue.code),
+    ['pipeline_timings_unavailable']
+  )
+  assert(summary.releaseVersionPolicy)
+  assert.equal(summary.timings, null)
 })
 
 function createProject(t) {

@@ -15,6 +15,7 @@ import { pathToFileURL } from "node:url";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import { buildRuntimePreviewManifest } from "./customer-config-runtime-manifest.mjs";
 import { assertDisposableDatabaseTarget } from "./database-target.mjs";
+import { verifyPressureRuntime } from "./pressure-runtime.mjs";
 
 export const CAPACITY_CONFIG_SCHEMA = "plush-capacity-customer-config/v1";
 export const CAPACITY_CONFIG_DATABASE_URL_ENV =
@@ -141,6 +142,7 @@ export async function applyCapacityCustomerConfig({
   databaseURL,
   datasetReceipt,
   commit,
+  migration,
 }) {
   backendURL = normalizeCapacityBackendURL(backendURL);
   const target = assertDisposableDatabaseTarget({
@@ -160,6 +162,7 @@ export async function applyCapacityCustomerConfig({
   if (!adminUsername || !adminPassword) {
     throw new Error("capacity customer config super-admin credential is required");
   }
+  await verifyPressureRuntime({ baseURL: backendURL, databaseName, commit, migration });
   const manifest = buildCapacityCustomerConfigManifest({
     commit,
     datasetReceipt,
@@ -404,7 +407,7 @@ if (isDirectRun) {
       databaseName: options.databaseName,
       databaseURL,
       datasetReceipt,
-      commit,
+      commit, migration: process.env.CAPACITY_CONFIG_EXPECTED_MIGRATION,
     });
     const outPath = writeReport(options.out, report);
     process.stdout.write(

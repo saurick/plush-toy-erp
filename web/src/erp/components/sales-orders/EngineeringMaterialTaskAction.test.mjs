@@ -94,6 +94,7 @@ async function setup(t, { stage = 'boss', mobile = false } = {}) {
   const calls = []
   let nextMutation
   let mutationResult
+  let nextRead
   let readFailure = false
   let receipt
   const original = JsonRpc.prototype.call
@@ -104,6 +105,11 @@ async function setup(t, { stage = 'boss', mobile = false } = {}) {
     }
     if (method === 'get_engineering_material_request') {
       if (readFailure) throw new Error('read failed')
+      if (nextRead) {
+        const pending = nextRead
+        nextRead = null
+        return { data: await pending }
+      }
       return {
         data: {
           ...request,
@@ -240,6 +246,9 @@ async function setup(t, { stage = 'boss', mobile = false } = {}) {
     },
     set readFailure(value) {
       readFailure = value
+    },
+    set read(value) {
+      nextRead = value
     },
   }
 }
@@ -638,4 +647,80 @@ test('a restored material draft belongs to the exact task and source version', a
   ui.task.version = 5
   await ui.render()
   assert.equal(document.querySelector('textarea').value, '')
+})
+
+for (const outcome of ['success', 'failure']) {
+  test(`switching material tasks ignores a late ${outcome} from the previous source`, async (t) => {
+    const ui = await setup(t, { mobile: true })
+    const previous = { ...ui.request }
+    let finishRead
+    let failRead
+    ui.read = new Promise((resolve, reject) => {
+      finishRead = resolve
+      failRead = reject
+    })
+    await ui.render()
+    const previousCall = ui.calls.find(
+      ({ method }) => method === 'get_engineering_material_request'
+    )
+    assert.equal(ui.button('确认通过，交财务'), undefined)
+
+    Object.assign(ui.task, {
+      id: 9,
+      version: 1,
+      source_id: 4,
+      task_code: 'source-material-boss-review-4',
+      payload: {
+        ...ui.task.payload,
+        sales_order_id: 88,
+        engineering_material_request_id: 4,
+      },
+    })
+    Object.assign(ui.request, { id: 4, sales_order_id: 88, version: 1 })
+    await ui.render()
+    assert.equal(previousCall.options.signal.aborted, true)
+    await ui.fill('textarea', '当前订单的审核意见')
+    await act(async () => {
+      if (outcome === 'success') finishRead(previous)
+      else failRead(new Error('previous source unavailable'))
+    })
+    assert.equal(document.querySelector('textarea').value, '当前订单的审核意见')
+    assert.equal(ui.button('重试'), undefined)
+    await ui.click(ui.button('确认通过，交财务'))
+    const write = ui.calls.find(
+      ({ method }) => method === 'boss_review_engineering_material_request'
+    )
+    assert.deepEqual(write.params, {
+      id: 4,
+      expected_version: 1,
+      action: 'BOSS_APPROVE',
+      task_id: 9,
+      expected_task_version: 1,
+      note: '当前订单的审核意见',
+    })
+    assert.equal(ui.receipt.value.sales_order_id, 88)
+  })
+}
+
+test('finance keeps the draft when an approval request fails and retries the same frozen version', async (t) => {
+  const ui = await setup(t, { stage: 'finance', mobile: true })
+  await ui.render()
+  await ui.fill('textarea', '已核对两家厂商的用量')
+  let failMutation
+  ui.mutation = new Promise((_, reject) => {
+    failMutation = reject
+  })
+  await ui.click(ui.button('批准并生成采购订单'))
+  await act(async () => failMutation(new Error('finance persistence failed')))
+  assert.equal(ui.receipt, undefined)
+  assert.equal(document.querySelector('textarea').value, '已核对两家厂商的用量')
+  ui.mutation = null
+  await ui.click(ui.button('批准并生成采购订单'))
+  const writes = ui.calls.filter(
+    ({ method }) => method === 'finance_review_engineering_material_request'
+  )
+  assert.equal(writes.length, 2)
+  assert.deepEqual(writes[1].params, writes[0].params)
+  assert.equal(ui.receipt.value.status, 'APPROVED')
+  assert.equal(ui.draftRef.current, null)
 })

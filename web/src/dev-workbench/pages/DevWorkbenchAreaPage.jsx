@@ -17,7 +17,6 @@ import {
   DEV_PRODUCT_ENGINEERING_ROUTE,
   DEV_QUALITY_ROUTE,
   DEV_TESTING_ROUTE,
-  DEV_VERSION_CENTER_ROUTE,
   DEV_WORKBENCH_AREA_KEYS,
   getDevSecondaryNavItems,
 } from '../config/devRoutes.mjs'
@@ -41,9 +40,15 @@ const AREA_PRESENTATION = {
   },
 }
 const DELIVERY_VIEWS = [
-  { value: 'prepare', label: '准备交付' },
+  { value: 'prepare', label: '交付任务' },
   { value: 'environments', label: '环境证据' },
 ]
+const DELIVERY_TASK_SCOPE = {
+  'customer-config': { scope: '所选客户配置包', action: '检查客户配置' },
+  'database-migration': { scope: '本地共享开发库', action: '检查数据库升级' },
+  'version-center': { scope: '已登记的 demo / test 目标', action: '管理版本与部署' },
+  'drill-recovery': { scope: '已登记目标 · 只读核验', action: '核对安全与恢复' },
+}
 
 export default function DevWorkbenchAreaPage({ areaKey }) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -65,7 +70,7 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
   }
 
   return (
-    <div className="erp-dev-hub-page erp-dev-hub-page--area erp-dev-workspace-page erp-dev-area-page">
+    <div className={`erp-dev-hub-page erp-dev-hub-page--area erp-dev-workspace-page erp-dev-area-page${isDelivery ? ' erp-dev-delivery-workspace' : ''}`}>
       <DevPageNav />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
@@ -76,12 +81,12 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             {presentation.title}
           </Title>
         </div>
-        {isQuality || isDelivery ? (
+        {isQuality ? (
           <Button
             type="primary"
-            href={isQuality ? DEV_TESTING_ROUTE : DEV_VERSION_CENTER_ROUTE}
+            href={DEV_TESTING_ROUTE}
           >
-            {isQuality ? '开始验证' : '版本发布'}
+            开始验证
           </Button>
         ) : null}
       </header>
@@ -89,6 +94,8 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
         {isDelivery ? (
           <DevTaskNav
             compact
+            level="primary"
+            className="erp-dev-delivery-taskbar"
             idPrefix="dev-delivery"
             ariaLabel="交付运行视图"
             items={DELIVERY_VIEWS}
@@ -115,15 +122,35 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
                 {isQuality
                   ? '按需要选择检查'
                   : isDelivery
-                    ? '交付工具'
+                    ? '按任务准备与核对'
                     : '产品工程工具'}
               </strong>
               <Text type="secondary">{items.length} 个工具</Text>
             </div>
-            <DevToolTable
-              ariaLabel={`${presentation.title}工具清单`}
-              items={items}
-            />
+            {isDelivery ? (
+              <div className="erp-dev-tool-table-wrap">
+                <table className="erp-dev-tool-table erp-dev-delivery-task-table" aria-label="交付运行任务">
+                  <thead>
+                    <tr><th scope="col">任务</th><th scope="col">作用范围</th><th scope="col">核对与结果</th><th scope="col">入口</th></tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, index) => (
+                      <tr key={item.key}>
+                        <th scope="row"><span className="erp-dev-delivery-task-number">{index + 1}</span>{item.title.split(' / ')[0]}</th>
+                        <td>{DELIVERY_TASK_SCOPE[item.key].scope}</td>
+                        <td>{item.description}</td>
+                        <td><Link to={item.route}>{DELIVERY_TASK_SCOPE[item.key].action}</Link></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <DevToolTable
+                ariaLabel={`${presentation.title}工具清单`}
+                items={items}
+              />
+            )}
           </section>
           {isDelivery ? (
             <div className="erp-dev-delivery-checks">
@@ -131,7 +158,7 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
                 核对 Git 收口
               </Link>
               <Text type="secondary">
-                Hook 接线、提交与推送职责在同一页核对。
+                交付前核对当前改动的检查与提交证据。环境运行状态在“环境证据”中查看。
               </Text>
             </div>
           ) : null}

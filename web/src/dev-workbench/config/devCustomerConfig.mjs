@@ -1,3 +1,4 @@
+import { createDevOperationUUID } from './devOperationIdentity.mjs'
 import { yoyoosunFieldNumberingConfig } from '../../../../config/customers/yoyoosun/fieldNumberingConfig.mjs'
 import { yoyoosunCustomerPackage } from '../../../../config/customers/yoyoosun/customerPackage.mjs'
 import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
@@ -57,7 +58,7 @@ export const DEV_CUSTOMER_CONFIG_RELEASE_READINESS_TEMPLATE_COMMAND =
 export function createDevCustomerConfigIdempotencyKey(
   action,
   customerKey,
-  randomUuid = () => globalThis.crypto.randomUUID()
+  randomUuid = () => createDevOperationUUID()
 ) {
   if (!['dry-run', 'runtime-manifest', 'release-readiness'].includes(action)) {
     throw new Error('customer config operation action is invalid')

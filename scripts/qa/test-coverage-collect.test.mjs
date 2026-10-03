@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   BASELINE_STAGE_KEYS,
+  BASELINE_GO_SKIP_PATTERN,
   BUSINESS_DOMAIN_KEYS,
   FIELD_LINKAGE_PRINT_CASE_IDS,
   GO_BUSINESS_SCENARIOS,
@@ -24,6 +25,7 @@ import {
   classifyGoBusinessDomains,
   fieldLinkageCoverageRecords,
   goCommandExecution,
+  goFailureScenarios,
   nodeCommandExecution,
   parseArgs,
   publishBaselineEvidence,
@@ -125,6 +127,15 @@ test("baseline command plan checks generated error codes and bypasses mutating p
     "--test-reporter=tap",
   ]);
   assert.equal(commands.web.cwd, path.join(ROOT, "web"));
+});
+
+test("baseline excludes the opt-in PostgreSQL and real Chromium integration families", () => {
+  const excluded = new RegExp(BASELINE_GO_SKIP_PATTERN, "u");
+  assert.match("TestSourceDocumentPostgresEngineeringMaterialConcurrentApproval", excluded);
+  assert.match("TestTemplatePDFChromiumSecurityIntegration", excluded);
+  assert.match("TestTemplatePDFChromiumLifecycleIntegration", excluded);
+  assert.doesNotMatch("TestEngineeringMaterialCalculationGroupsBeforeRounding", excluded);
+  assert.doesNotMatch("TestTemplatePDFResourceBudgetContract", excluded);
 });
 
 test("coverage publish stages candidates and exposes only canonical evidence paths", async (t) => {
@@ -507,6 +518,41 @@ test("generic aggregate receipts cannot fabricate runtime acceptance", () => {
   ]);
 });
 
+test("field linkage excludes declared inapplicable scenarios without hiding missing, skipped or invalid evidence", () => {
+  for (const tc of [
+    { passed: 2, skipped: 0, missing: 0, excluded: 1, total: 3, status: "passed", applicable: 2 },
+    { passed: 1, skipped: 0, missing: 1, excluded: 1, total: 3, status: "partial", applicable: 2 },
+    { passed: 1, skipped: 1, missing: 0, excluded: 1, total: 3, status: "skipped", applicable: 2 },
+    { passed: 0, skipped: 0, missing: 0, excluded: 1, total: 1, status: "missing", applicable: 0 },
+    { passed: 2, skipped: 0, missing: 0, excluded: -1, total: 1, status: "failed", applicable: 1 },
+    { passed: 2, skipped: 0, missing: 0, excluded: 1, total: 2, status: "failed", applicable: 1 },
+  ]) {
+    const result = fieldLinkageCoverageRecords({
+      artifact: {
+        repository: REPOSITORY,
+        summary: {
+          totalScenarios: tc.total,
+          passedScenarios: tc.passed,
+          failedScenarios: 0,
+          skippedScenarios: tc.skipped,
+          missingScenarios: tc.missing,
+          notApplicableScenarios: tc.excluded,
+        },
+        cases: [],
+      },
+      commandResult: { error: "", status: 0 },
+      repository: REPOSITORY,
+    });
+    assert.equal(result.frontend.status, tc.status, JSON.stringify(tc));
+    assert.equal(result.frontend.total, tc.applicable);
+    assert.equal(result.frontend.requiredCount, tc.applicable);
+    if (tc.status !== "failed") {
+      assert.equal(result.frontend.executed, tc.passed + tc.skipped);
+      assert.equal(result.frontend.missing, tc.missing);
+    }
+  }
+});
+
 test("coverage evidence freezes affected scopes and leaves unexecuted gates open", () => {
   const stageExecutions = Object.fromEntries(
     BASELINE_STAGE_KEYS.map((key) => [key, passedExecution(key)]),
@@ -574,6 +620,9 @@ test("coverage evidence freezes affected scopes and leaves unexecuted gates open
   assert.equal(evidence.gates.T3.required, false);
   assert.equal(evidence.gates.T7.status, "missing");
   assert.equal(evidence.gates.T8.status, "missing");
+  assert.equal(evidence.codeCoverage.go.metrics.branches, undefined);
+  assert.match(evidence.codeCoverage.go.note, /不提供分支覆盖/u);
+  assert.match(evidence.codeCoverage.web.note, /未加载模块不在分母/u);
   assert.equal(evidence.collector.affectedPlan.changedFileCount, 2);
   assert.deepEqual(evidence.collector.affectedPlan.affectedScopes, [
     "T0",
@@ -592,4 +641,23 @@ test("coverage evidence freezes affected scopes and leaves unexecuted gates open
   );
   assert.equal(frontend.total, 1);
   assert.match(frontend.note, /field linkage/u);
+});
+
+test("Go failure details retain leaf failures and restrict diagnostics", () => {
+  const Package = "server/cmd/server";
+  const events = [
+    { Action: "run", Package, Test: "TestConfig" },
+    { Action: "run", Package, Test: "TestConfig/dev" },
+    { Action: "output", Package, Test: "TestConfig/dev", Output: "load: too many open files; fixture-secret" },
+    { Action: "fail", Package, Test: "TestConfig/dev" },
+    { Action: "run", Package, Test: "TestConfig/prod" },
+    { Action: "fail", Package, Test: "TestConfig/prod" },
+    { Action: "fail", Package, Test: "TestConfig" },
+  ];
+  const scenarios = goFailureScenarios(events.map((event) => JSON.stringify(event)).join("\n"));
+  assert.equal(scenarios.length, 2);
+  assert(scenarios.every((scenario) => scenario.status === "failed"));
+  assert.match(scenarios[0].note, /too many open files/u);
+  assert.doesNotMatch(JSON.stringify(scenarios), /fixture-secret/u);
+  assert.deepEqual(goFailureScenarios("invalid json"), []);
 });

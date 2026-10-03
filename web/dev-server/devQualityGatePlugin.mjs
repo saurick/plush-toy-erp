@@ -30,8 +30,7 @@ import {
 import {
   isSameOriginRequest,
   readJsonBody,
-  isLoopbackHostHeader,
-  isLoopbackRemoteAddress,
+  isDevWorkbenchRequest,
 } from './devServerSecurity.mjs'
 import { resolveProjectNodeRuntime } from './devQaCoveragePlugin.mjs'
 
@@ -1876,13 +1875,10 @@ export function createDevQualityGateMiddleware({
       next()
       return
     }
-    if (
-      !isLoopbackRemoteAddress(request.socket?.remoteAddress) ||
-      !isLoopbackHostHeader(request.headers?.host)
-    ) {
+    if (!isDevWorkbenchRequest(request)) {
       sendJson(response, 403, {
         status: 'failed',
-        message: '该开发接口仅允许本机访问',
+        message: '开发工具只允许通过当前开发服务的本机或内网地址访问',
       })
       return
     }

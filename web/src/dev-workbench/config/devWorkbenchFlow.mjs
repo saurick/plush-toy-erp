@@ -1,5 +1,5 @@
 import {
-  DEV_GOVERNANCE_ROUTE,
+  DEV_DOCS_ROUTE,
   DEV_UI_DESIGN_ROUTE,
   DEV_TESTING_ROUTE,
   DEV_DELIVERY_ROUTE,
@@ -13,8 +13,8 @@ export const DEV_WORKBENCH_GUIDE = Object.freeze(
       value: '1',
       label: '明确改动',
       completion: '目标、范围、依据和完成标准明确。',
-      action: '查看改动指南',
-      route: DEV_GOVERNANCE_ROUTE,
+      action: '查阅改动规则',
+      route: `${DEV_DOCS_ROUTE}?path=${encodeURIComponent('docs/项目治理地图.md')}`,
     },
     {
       value: '2',
@@ -57,7 +57,6 @@ export const DEV_WORKBENCH_GUIDE = Object.freeze(
 export const DEV_TOOL_USAGE = Object.freeze({
   'product-core': '确认能力范围',
   'permission-relationships': '核对岗位与权限',
-  governance: '实现前查规则',
   'status-flows': '核对业务交接',
   docs: '查正式依据',
   'ui-design': '实现前走操作',
@@ -68,5 +67,5 @@ export const DEV_TOOL_USAGE = Object.freeze({
   'customer-config': '核对客户差异',
   'database-migration': '数据库结构变化时',
   'version-center': '发布、部署与读回',
-  'drill-recovery': '演练或恢复时',
+  'drill-recovery': '安全核验、演练或恢复时',
 })

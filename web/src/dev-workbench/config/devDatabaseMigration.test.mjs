@@ -36,6 +36,16 @@ test('preparation is available only for known pending migrations and a ready idl
   assert.equal(databaseMigrationPreparationAvailable(value), false)
 })
 
+test('LAN access preserves readable state but cannot prepare migrations', () => {
+  const value = { ...summary(), readOnly: true }
+  assert.equal(validateDatabaseMigrationSummary(value), value)
+  assert.equal(databaseMigrationPreparationAvailable(value), false)
+  value.readOnly = false
+  assert.equal(databaseMigrationPreparationAvailable(value), true)
+  value.readOnly = 'false'
+  assert.throws(() => validateDatabaseMigrationSummary(value), /返回结构无效/u)
+})
+
 test('a rejected preparation leaves the completed upgrade path visible without hiding unknown execution outcomes', () => {
   const value = summary()
   const completed = {

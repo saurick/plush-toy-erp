@@ -119,7 +119,9 @@ Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:y
 
 `pnpm start` 和客户热更新入口在数据库预检通过、登记的本地 HTTP 后端确实未监听时，自动执行一次 `make run ARGS=--source=frontend`，复用后端构建、运行身份和业务验证链路，并记录启动来源；通过完整预检后才开放电脑版和手机版。此构建阶段独立于 15 秒只读预检，最多等待 10 分钟并在终端显示进度。后端启动链路在共享锁内和构建后再次检查监听状态，保留并核对期间出现的后端；已运行后端不会因前端启动而重启。构建失败、启动后复验失败、预检超时和待迁移状态保留恢复页，不自动重试。停止命令、`--frontend-only`、外部或非登记 `API_ORIGIN` 不会启动共享后端。
 
-开发工作台读取 GitLab CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`；macOS 未显式提供时，`pnpm start` 会自动读取钥匙串 service `plush-toy-erp.gitlab-read-api`，account 使用当前 macOS 登录用户名。该凭据只允许当前项目的最小读取权限，只保存在本机钥匙串和 DEV 服务私有内存；版本中心将它收口到不含发布方法的只读 Provider，不进入浏览器、仓库、日志、质量门禁子进程或部署执行子进程，也不替代创建新发布使用的短期 `PLUSH_GITLAB_TOKEN`。钥匙串未登记时业务开发仍可启动，但 GitLab 服务端证据保持失败关闭，不以本机结果补证。
+开发工作台读取 GitLab CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`。普通与客户开发入口（`pnpm start`、`pnpm start:yoyoosun`）共用凭据加载逻辑。macOS 未显式提供时读取固定钥匙串 service `plush-toy-erp.gitlab-read-api`，account 为当前登录用户名。Linux 读取当前服务用户的 `~/.config/plush-toy-erp/dev-gitlab-read-token`，也可用 `PLUSH_GITLAB_READ_TOKEN_FILE` 指定受控绝对路径；文件须属于当前用户、为普通文件、权限为 `0600` 或 `0400`，不得使用软链接。显式 `PLUSH_GITLAB_READ_TOKEN` 优先于两种存储来源，缺失时继续业务开发并明确显示读取未就绪。
+
+凭据只授予本项目的最小读取权限，保存在操作系统钥匙串或受控服务端文件及 DEV 服务私有内存。版本中心将它映射给不含发布方法的只读 Provider；凭据值和文件路径不进入浏览器、仓库、日志、质量门禁或部署子进程。Linux 服务无法读取访问者 Mac 的钥匙串。创建新发布仍需独立短期 `PLUSH_GITLAB_TOKEN`；缺少写凭据只停用发布按钮，不把已正常取得的只读证据显示成全局故障。
 
 ## 客户前端调试与预览
 

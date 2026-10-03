@@ -13,6 +13,7 @@ import {
 import { resolveDevTestingOperationStore } from '../../scripts/qa/dev-testing-operation-store.mjs'
 import {
   buildDevQaTestingCommand,
+  DEV_QA_PRESSURE_REPORTS_API_PATH,
   createDevQaTestingMiddleware,
   createDevQaTestingPlugin,
   createDevQaTestingService,
@@ -301,6 +302,46 @@ test('testing service rejects overlap with coverage global lock', async (t) => {
   )
 })
 
+test('pressure actions map to the isolated lifecycle and cannot supply target or command overrides', () => {
+  for (const [action, profile] of [['pressure-quick', 'quick'], ['pressure-capacity', 'capacity']]) {
+    const spec = buildDevQaTestingCommand({ action, nodeRuntime: '/runtime/node', operationId: ID, projectRoot: '/project' })
+    assert.deepEqual(spec.args, ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', profile, '--out', `output/qa/pressure/workbench-${ID}/lifecycle.json`])
+    assert.equal(validateDevQaTestingAction({ action, payload: { idempotencyKey: `testing:${action}:${ID}` } }).action, action)
+    assert.throws(() => validateDevQaTestingAction({ action, payload: { idempotencyKey: `testing:${action}:${ID}`, databaseURL: 'shared' } }), /unsupported/u)
+  }
+})
+
+test('pressure process exit zero needs a complete report and cleanup before the operation can pass', async (t) => {
+  for (const status of ['passed', 'incomplete']) {
+    const root = await project(t), completion = deferred()
+    const service = createDevQaTestingService({ projectRoot: root, randomOperationId: () => ID,
+      readRepositoryState: async () => REPOSITORY, resolveNodeRuntime: () => '/runtime/node',
+      readPressureReports: () => ({ report: { status, profile: 'quick' } }),
+      launchProcess: () => ({ pid: process.pid, completion: completion.promise }) })
+    const intent = { action: 'pressure-quick', payload: { idempotencyKey: `testing:pressure-quick:${ID}` } }
+    const first = await service.act(intent), repeated = await service.act(intent)
+    assert.equal(first.operation.status, 'running'); assert.equal(repeated.reused, true)
+    completion.resolve({ code: 0 }); await new Promise((resolve) => setImmediate(resolve))
+    assert.equal(service.readOperation(ID).status, status === 'passed' ? 'completed' : 'failed')
+    assert.equal(service.summary().busy.active, false)
+  }
+})
+
+test('pressure report endpoint accepts only a report identifier and preserves no-store reads', async () => {
+  const calls = []
+  const middleware = createDevQaTestingMiddleware({ service: { pressureReports: async (id) => { calls.push(id); return { reports: [] } } } })
+  async function request(url) {
+    const response = { headers: {}, setHeader(name, value) { this.headers[name] = value }, end(body) { this.body = body } }
+    await middleware({ url, method: 'GET', headers: { host: 'localhost:5175' }, socket: { remoteAddress: '127.0.0.1' } }, response, () => {})
+    return response
+  }
+  const result = await request(`${DEV_QA_PRESSURE_REPORTS_API_PATH}?id=run-one`)
+  assert.equal(result.statusCode, 200); assert.equal(result.headers['Cache-Control'], 'no-store'); assert.deepEqual(calls, ['run-one'])
+  assert.equal((await request(`${DEV_QA_PRESSURE_REPORTS_API_PATH}?path=../../private`)).statusCode, 400)
+  assert.equal((await request(`${DEV_QA_PRESSURE_REPORTS_API_PATH}?id=one&id=two`)).statusCode, 400)
+  assert.equal(calls.length, 1)
+})
+
 test('Vite development config bundles and registers the testing plugin', async () => {
   const webRoot = fileURLToPath(new URL('../', import.meta.url))
   const loaded = await loadConfigFromFile(
@@ -335,6 +376,8 @@ test('testing middleware is loopback-only and plugin is serve-only', async () =>
           fast: null,
           'role-access': null,
           'field-linkage': null,
+      'pressure-quick': null,
+      'pressure-capacity': null,
         },
       }),
     },

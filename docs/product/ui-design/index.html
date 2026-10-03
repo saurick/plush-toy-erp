@@ -2426,12 +2426,18 @@
     .empty::before, .rm-empty::before { content: ''; display: block; flex: 0 0 40px; width: 64px; height: 40px; margin-bottom: 10px; background: var(--text-3); opacity: .45; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 41'%3E%3Cg fill='none' stroke='black'%3E%3Cpath d='M9 14L20 1h24l11 13v20a3 3 0 0 1-3 3H12a3 3 0 0 1-3-3z'/%3E%3Cpath d='M9 14h11c4 0 2 6 6 6h12c4 0 2-6 6-6h11'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; }
     .empty strong, .rm-empty strong { margin: 0; color: var(--text-2); font-size: 14px; font-weight: 400; }
     .empty .btn, .rm-empty .btn { margin-top: 12px; }
-    .dev-design { min-width: 0; display: grid; gap: 9px; }
+    .dev-nav-group { margin-bottom:10px; }
+    .dev-nav-tool.nav-item { min-height:30px; padding:4px 12px 4px 38px; font-size:13px; }
+    .dev-tool-link.btn { border:0; padding:0; background:transparent; font-weight:600; }
+    .dev-design-toolbar .search { flex:0 1 340px; }
+    .dev-design { min-width: 0; display: grid; gap: 12px; }
+    body[data-page="dev-workbench"] .main { overflow: auto; }
+    body[data-page="dev-workbench"] .view { height: auto; min-height: 100%; }
     .dev-design-context, .dev-design-toolbar, .dev-design-heading, .dev-design-operation { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
     .dev-design-context, .dev-design-toolbar, .dev-design-section { padding: 12px; }
     .dev-design-context { color: var(--text-2); font-size: 12px; }
     .dev-design-context strong { color: var(--text); }
-    .dev-design-heading h1 { margin: 0; font-size: 17px; }
+    .dev-design-heading h1 { margin: 0; font-size: 16px; }
     .dev-design-section p { margin: 5px 0 0; color: var(--text-2); line-height: 1.6; }
     .dev-design-tabs { position: relative; isolation: isolate; }
     .dev-design-tabs::before { content: ''; position: absolute; z-index: -1; top: 3px; height: 30px; left: var(--dev-tab-left, 3px); width: var(--dev-tab-width, 80px); border-radius: 6px; background: var(--brand-soft); box-shadow: inset 0 0 0 1px var(--line); transition: left 220ms var(--ease), width 220ms var(--ease); }
@@ -2450,6 +2456,41 @@
     .dev-design-evidence { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; line-height: 1.6; }
     .dev-design-evidence dt { color: var(--text-3); }
     .dev-design-evidence dd { margin: 0; overflow-wrap: anywhere; }
+    .dev-design-heading-copy, .dev-design-heading-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .dev-design-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; color: var(--text-3); font-size: 12px; }
+    .dev-design-meta strong { color: var(--text-2); font-weight: 500; }
+    .dev-design .module-tabs-row { padding: 0; border: 0; background: transparent; }
+    .dev-design-panel[hidden], .dev-design [hidden] { display: none; }
+    .dev-check-list { padding: 0; margin: 0; list-style: none; border-top: 1px solid var(--line); }
+    .dev-check-list li { display: flex; gap: 12px; align-items: center; min-height: 66px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .dev-check-marker { flex: 0 0 auto; display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--line-strong); border-radius: 50%; font-size: 12px; color: var(--text-3); }
+    .dev-check-marker.is-complete { color: var(--success); border-color: color-mix(in srgb, var(--success) 35%, var(--line)); background: var(--success-soft); }
+    .dev-check-copy { flex: 1; min-width: 0; display: grid; gap: 4px; }
+    .dev-check-copy strong { font-size: 13px; font-weight: 600; }
+    .dev-check-copy small { color: var(--text-3); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+    .dev-check-status { flex: 0 0 auto; font-size: 12px; color: var(--text-3); }
+    .dev-check-status.is-complete { color: var(--success); }
+    .dev-step-actions { margin-top: 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .dev-step-actions .primary { min-width: 140px; }
+    .dev-tool-library { min-width: 0; overflow: hidden; }
+    .dev-tool-library .dev-design-toolbar { border-bottom: 1px solid var(--line); padding: 12px 16px; }
+    .dev-tool-library .search { flex: 1; min-width: 160px; }
+    .dev-tool-library .search input { width: 100%; }
+    .dev-tool-list { overflow-x: auto; }
+    .dev-tool-table { width: 100%; min-width: 640px; border-collapse: collapse; text-align: left; }
+    .dev-tool-table th, .dev-tool-table td { padding: 13px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .dev-tool-table thead th { background: var(--surface-muted); color: var(--text-2); font-size: 12px; font-weight: 500; white-space: nowrap; }
+    .dev-tool-table tbody th { width: 180px; font-size: 13px; font-weight: 500; }
+    .dev-tool-table td { font-size: 12px; line-height: 1.65; }
+    .dev-tool-table td:last-child { width: 90px; }
+    .dev-tool-table tbody tr:last-child > * { border-bottom: 0; }
+    .dev-tool-copy { display: grid; gap: 5px; min-width: 0; }
+    .dev-tool-copy small { color: var(--text-3); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+    .dev-design-settings { padding: 0 2px; color: var(--text-3); font-size: 12px; }
+    .dev-design-settings summary { width: fit-content; cursor: pointer; padding: 4px 0; }
+    .dev-design-settings-content { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 0; }
+    .dev-design-settings-content select { min-height: 30px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
+    .dev-design-settings-content p { width: 100%; margin: 0; line-height: 1.7; }
     .dev-git-lock-flow { display: grid; justify-items: center; gap: 8px; min-width: 0; }
     .dev-git-lock-flow__node, .dev-git-lock-flow__decision { width: min(100%, 460px); padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface-muted); color: var(--text); text-align: center; line-height: 1.55; }
     .dev-git-lock-flow__decision { border-radius: 999px; background: var(--brand-softer); }
@@ -3765,7 +3806,8 @@
       loginBusy: false, loginInvalid: [], loginCapsLock: false, loginDialog: null,
       loginSmsSending: false, loginSmsPhone: '', loginSmsDeadline: 0, loginSmsExpires: 0, loginSmsHint: '',
       page: window.__ERP_UI_DESIGN_ENTRY__ === 'workbench' ? 'dev-workbench' : window.__ERP_UI_DESIGN_ENTRY__ === 'help' ? 'help' : 'dashboard', status: 'all', search: '', selected: new Set(), sortKey: 'date', sortDir: 'asc', pageNo: 1,
-      devArea: 'overview', devViews: { overview: 'next', engineering: 'sources', quality: 'plan', delivery: 'versions' }, devSearch: {}, devFilter: {}, devState: 'data', devEvidence: 'missing', devOperation: null, devPrepared: null,
+      devArea: 'overview', devViews: { overview: 'evidence', quality: 'plan', delivery: 'versions' }, devSearch: {}, devFilter: {}, devPinned: [], devState: 'data', devEvidence: 'missing', devOperation: null, devPrepared: null,
+      devQualityChecked: false, devPressurePreview: null,
       density: localStorage.getItem('erp-prototype-v8-density') || 'standard',
       mode: localStorage.getItem('erp-prototype-v8-mode') || 'system',
       accent: localStorage.getItem('erp-prototype-v8-accent') || 'blue',
@@ -4017,26 +4059,25 @@
 
 
     const devDesignAreas = {
-      overview: {label:'总览', icon:'home', description:'先定位需要处理的阻塞，再进入对应任务。', views:[['next','下一步'],['evidence','证据范围']]},
-      engineering: {label:'产品工程', icon:'engineering', description:'从产品真源定位规则、权限与业务链。', views:[['sources','真源与入口'],['rules','边界与规则']]},
-      quality: {label:'质量验证', icon:'shield', description:'按当前改动选择验证，结果绑定具体版本与环境。', views:[['plan','验证计划'],['runs','执行记录']]},
-      delivery: {label:'交付运行', icon:'shipping', description:'先核对版本、目标与恢复点，再准备受控操作。', views:[['versions','版本发布'],['migration','数据库迁移'],['recovery','演练与恢复']]}
+      overview: {label:'总览', icon:'home', description:'开发工具', views:[['evidence','全部工具'],['pinned','常用工具'],['next','使用指南']]},
+      engineering: {label:'产品工程', icon:'engineering', description:'从产品真源定位规则、权限与业务链。', views:[]},
+      quality: {label:'质量验证', icon:'shield', description:'按当前改动选择验证，结果绑定具体版本与环境。', views:[['plan','验证计划'],['runs','执行记录'],['pressure','压力测试']]},
+      delivery: {label:'交付运行', icon:'shipping', description:'按作用范围进入配置、迁移、发布与恢复任务。', views:[['config','客户配置'],['migration','数据库迁移'],['versions','版本发布'],['recovery','安全与恢复']]}
     };
     const devDesignRecords = [
       {key:'core', area:'engineering', title:'产品内核', source:'产品能力与领域边界', status:'已核对', detail:'主数据、采购、库存、质检、生产、出货和财务分别保留唯一事实真源。', path:'docs/architecture/'},
       {key:'permissions', area:'engineering', title:'权限关系', source:'岗位、账号与正式菜单', status:'已核对', detail:'选择岗位或账号，核对实际菜单、功能与数据范围；配置变更回正式权限管理。', path:'/__dev/permission-relationships'},
       {key:'flows', area:'engineering', title:'业务链观察', source:'流程定义与运行实例', status:'待核对', detail:'先选择任务或来源单据，再查看协同节点与事实边界；未查询运行实例不能判断事实完成。', path:'/__dev/status-flows'},
-      {key:'guide', area:'engineering', title:'改动指南', source:'实现边界与验证入口', status:'已核对', detail:'按改动类型定位代码、正式文档与最小充分验证。', path:'/__dev/governance'},
-      {key:'usability', area:'engineering', title:'业务易用性', source:'岗位任务与交互合同', status:'已核对', detail:'从页面主任务检查入口、状态反馈、返回路径与恢复动作。', path:'/__dev/business-usability'},
+      {key:'usability', area:'quality', title:'页面说明检查', source:'业务页面说明目录', status:'已核对', detail:'只读核对任务说明、完成标准、交接和字段解释；说明覆盖不代表员工体验或客户验收。', path:'/__dev/business-usability'},
       {key:'docs', area:'engineering', title:'开发文档', source:'仓库当前正式文档', status:'已核对', detail:'按关键词查找正式文档，保留目录、标题与当前来源路径。', path:'/__dev/docs'},
       {key:'design', area:'engineering', title:'UI 交互设计', source:'同一份可交互 HTML', status:'已核对', detail:'业务界面、手机界面、登录、帮助与效能工作台在同一设计稿核对。', path:'docs/product/ui-design/index.html'},
       {key:'affected', area:'quality', title:'改动验证', source:'当前改动的受影响范围', status:'已核对', detail:'样例：空状态样式、手机任务列表和设计查看器；检查组件、页面恢复与窄屏。', path:'scripts/qa/affected.sh'},
       {key:'gates', area:'quality', title:'质量门禁', source:'固定版本的 CI 结果', status:'待核对', detail:'流程与并发原理可按需展开；样例版本尚缺完整 CI 终态，局部测试通过不代表发布资格。', path:'/__dev/quality-gates'},
-      {key:'data', area:'quality', title:'数据准备', source:'隔离样例与验证资料', status:'已核对', detail:'选择已有样例，核对范围、用途与清理边界；样例不代表真实客户事实。', path:'/__dev/data-preparation'},
+      {key:'data', area:'quality', title:'测试数据', source:'隔离样例与验证资料', status:'已核对', detail:'选择已有样例，核对范围、用途与清理边界；样例不代表真实客户事实。', path:'/__dev/data-preparation'},
       {key:'config', area:'delivery', title:'客户配置', source:'配置快照与固定版本', status:'已核对', detail:'核对客户配置和当前版本的关系；不把配置选择当成部署完成。', path:'/__dev/customer-config'},
       {key:'versions', area:'delivery', title:'版本发布', source:'不可变制品与目标读回', status:'待核对', detail:'选择版本后核对目标、门禁与回滚点。未完成目标读回前，保持未证明。', path:'/__dev/version-center'},
       {key:'migration', area:'delivery', title:'数据库迁移', source:'迁移计划、备份与恢复验证', status:'待核对', detail:'计划准备就绪后才允许确认；失败保留恢复入口，不自动执行或重试迁移。', path:'/__dev/database-migration'},
-      {key:'recovery', area:'delivery', title:'演练与恢复', source:'恢复点与演练回执', status:'待核对', detail:'先核对可用恢复点和演练结果，真实回滚仍走版本中心的受控确认。', path:'/__dev/drill-recovery'}
+      {key:'recovery', area:'delivery', title:'安全与恢复', source:'安全合同、恢复点与演练回执', status:'未核验', detail:'只读核对应用、入口身份、异常监测及备份隔离；数据库恢复不能代替完整抗勒索核验。', path:'/__dev/drill-recovery'}
     ];
     function renderDevCiGuidePreview(initialSection='overview') {
       const flow=(label,nodes)=>`<div class="dev-git-lock-flow" role="img" aria-label="${label}">${nodes.map((node,index)=>`${index?'<span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span>':''}<div class="dev-git-lock-flow__node">${node}</div>`).join('')}</div>`;
@@ -4048,72 +4089,154 @@
       ];
       return `<section class="dev-ci-guide-preview" aria-label="CI/CD 流程与原理"><h3>CI/CD 流程与原理</h3><p class="data-note">机制示意；真实 Job 依赖、时间轴、配置与结果在对应工作台核对。</p>${sections.map(section=>`<details${section.key===initialSection?' open':''}><summary>${section.title}</summary>${section.html}</details>`).join('')}</section>`;
     }
+    const devDesignGuide = [
+      {title:'明确改动', completion:'目标、范围、依据和完成标准明确。', tool:'guide'},
+      {title:'对照设计', completion:'默认页面、关键操作和返回路径清楚。', tool:'design'},
+      {title:'验证改动', completion:'影响范围内的检查有结果、有来源。', tool:'affected'},
+      {title:'准备交付', completion:'版本、目标、配置、迁移与恢复证据齐备。', tool:'config'},
+      {title:'发布版本', completion:'具体计划已确认并留下操作回执。', tool:'versions'},
+      {title:'核对结果', completion:'回执、版本、目标一致，健康与业务入口分别读回。', tool:'recovery'}
+    ];
     function devDesignEmpty(label, action = '') {
       return `<div class="empty"><span>${escapeHTML(label)}</span>${action}</div>`;
     }
     function renderDevSidebar() {
       const collapsed = state.sidebarCollapsed && !window.matchMedia('(max-width: 880px)').matches;
       document.body.classList.toggle('sidebar-collapsed', collapsed);
-      document.querySelector('#sidebar').innerHTML = `<div class="brand"><button class="brand-home" data-action="dev-area" data-value="overview" aria-label="返回效能总览"><span class="brand-mark">D</span><span class="brand-copy">研发效能工作台</span></button><button class="btn icon-btn" data-action="toggle-sidebar" aria-label="${collapsed?'展开':'收起'}侧边菜单">${icon('sidebar')}</button></div><nav class="nav-scroll" aria-label="效能工作台主导航"><div class="nav-group"><div class="nav-label">研发工作</div>${Object.entries(devDesignAreas).map(([key,area])=>`<button class="nav-item ${state.devArea===key?'active':''}" data-action="dev-area" data-value="${key}" aria-current="${state.devArea===key?'page':'false'}" title="${area.label}">${icon(area.icon)}<span>${area.label}</span></button>`).join('')}</div></nav><div class="sidebar-footer"><button class="nav-item" data-action="nav" data-page="dashboard">${icon('dashboard')}<span>业务界面</span></button></div>`;
+      document.querySelector('#sidebar').innerHTML = `<div class="brand"><button class="brand-home" data-action="dev-area" data-value="overview" aria-label="返回效能总览"><span class="brand-mark">D</span><span class="brand-copy">研发效能工作台</span></button><button class="btn icon-btn" data-action="toggle-sidebar" aria-label="${collapsed?'展开':'收起'}侧边菜单">${icon('sidebar')}</button></div><nav class="nav-scroll" aria-label="效能工作台主导航"><div class="nav-group">${Object.entries(devDesignAreas).map(([key,area])=>`<div class="dev-nav-group"><button class="nav-item ${state.devArea===key?'active':''}" data-action="dev-area" data-value="${key}" aria-current="${state.devArea===key?'page':'false'}" title="${area.label}">${icon(area.icon)}<span>${area.label}</span></button>${key==='overview'?'':devDesignRecords.filter(row=>row.area===key&&row.key!=='usability').map(row=>`<button class="nav-item dev-nav-tool" data-action="dev-evidence" data-value="${row.key}"><span>${row.title}</span></button>`).join('')}</div>`).join('')}</div></nav><div class="sidebar-footer"><button class="nav-item" data-action="nav" data-page="dashboard">${icon('dashboard')}<span>业务界面</span></button></div>`;
     }
     function renderDevTopbar() {
       document.querySelector('#topbar').innerHTML = `<button class="btn icon-btn mobile-menu" data-action="open-nav" aria-label="打开导航">${icon('menu')}</button>${renderTopbarPageTitle()}<div class="topbar-actions"><button class="btn" data-action="dev-refresh">${icon('refresh')}刷新演示</button><button class="btn icon-btn" data-action="open-theme" aria-label="外观设置">${icon('theme')}</button></div>`;
     }
     function updateDevDesignTabs() {
-      const tabs = document.querySelector('.dev-design-tabs');
-      if (!tabs) return;
-      for (const button of tabs.querySelectorAll('[data-action="dev-view"]')) {
-        const active = button.dataset.value === state.devViews[state.devArea];
-        button.classList.toggle('active', active);
-        button.setAttribute('aria-selected', String(active));
-        button.tabIndex = active ? 0 : -1;
-        if (active) {
-          tabs.style.setProperty('--dev-tab-left', `${button.offsetLeft}px`);
-          tabs.style.setProperty('--dev-tab-width', `${button.offsetWidth}px`);
+      for (const tabs of document.querySelectorAll('.dev-design-tabs')) {
+        for (const button of tabs.querySelectorAll('[role="tab"]')) {
+          const active = button.dataset.value === state.devViews[state.devArea];
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-selected', String(active));
+          button.tabIndex = active ? 0 : -1;
+          if (active) {
+            tabs.style.setProperty('--dev-tab-left', `${button.offsetLeft}px`);
+            tabs.style.setProperty('--dev-tab-width', `${button.offsetWidth}px`);
+            tabs.style.setProperty('--dev-tab-top', `${button.offsetTop}px`);
+            tabs.style.setProperty('--dev-tab-height', `${button.offsetHeight}px`);
+          }
         }
       }
     }
+    const devDesignTabObserver = new ResizeObserver(updateDevDesignTabs);
+    function devDesignReadState() {
+      if (state.devState === 'loading') return '<section class="dev-design-section" role="status"><h3>正在读取样例证据…</h3><p>当前页面和操作现场已保留。</p><button class="btn" data-action="dev-refresh">完成读取演示</button></section>';
+      if (state.devState === 'error') return '<section class="dev-design-section" role="alert"><h3>证据暂时无法读取</h3><p>当前页面、筛选与未完成操作已保留。</p><button class="btn" data-action="dev-refresh">重新读取</button></section>';
+      if (state.devState === 'empty') return devDesignEmpty('当前范围暂无样例证据', '<button class="btn" data-action="dev-refresh">恢复样例</button>');
+      return '';
+    }
     function renderDevWorkbench(view) {
+      devDesignTabObserver.disconnect();
       const area = devDesignAreas[state.devArea];
       if (view.dataset.devArea !== state.devArea || !view.querySelector('.dev-design')) {
         view.dataset.devArea = state.devArea;
-        view.innerHTML = `<div class="dev-design"><section class="surface dev-design-context" aria-label="演示工作区"><strong>版本 DEMO-a1b2c3d · main</strong><span>本地工作区：有未提交改动</span><span>目标：隔离演示环境</span><span>样例读取：2026-09-26 10:30 +08:00</span></section><div id="dev-design-pending"></div><header class="dev-design-heading"><h1>${area.label}</h1><label>状态预览 <select id="dev-design-state" aria-label="工作台状态预览">${[['data','正常'],['empty','空结果'],['error','读取失败'],['loading','加载中']].map(([key,label])=>`<option value="${key}" ${state.devState===key?'selected':''}>${label}</option>`).join('')}</select></label></header><div class="module-tabs-row"><div class="segment dev-design-tabs" role="tablist" aria-label="${area.label}视图">${area.views.map(([key,label])=>`<button type="button" role="tab" id="dev-tab-${key}" aria-controls="dev-design-panel" data-action="dev-view" data-value="${key}">${label}</button>`).join('')}</div></div><div class="dev-design-panel" id="dev-design-panel" role="tabpanel"></div></div>`;
-        document.querySelector('#dev-design-state').addEventListener('change',event=>{state.devState=event.target.value;renderDevWorkbench(view);});
+        view.innerHTML = `<div class="dev-design"><header class="dev-design-heading"><h1>${area.label}</h1></header><div id="dev-design-pending"></div>${area.views.length ? `<div class="module-tabs-row"><div class="segment dev-design-tabs" role="tablist" aria-label="${area.label}视图">${area.views.map(([key,label])=>`<button type="button" role="tab" id="dev-tab-${key}" aria-controls="dev-design-panel" data-action="dev-view" data-value="${key}">${label}</button>`).join('')}</div></div>` : ''}<div class="dev-design-panel" id="dev-design-panel" role="tabpanel"></div><details class="dev-design-settings"><summary>演示设置与边界</summary><div class="dev-design-settings-content"><label>状态预览 <select id="dev-design-state" aria-label="工作台状态预览">${[['data','正常'],['empty','空结果'],['error','读取失败'],['loading','加载中']].map(([key,label])=>`<option value="${key}" ${state.devState===key?'selected':''}>${label}</option>`).join('')}</select></label><p>操作只改变本页样例；真实代码、CI、发布、迁移和客户验收分别核对。重置演示可在预览工具栏操作。</p></div></details></div>`;
+        document.querySelector('#dev-design-state').addEventListener('change', event => {
+          state.devState = event.target.value;
+          renderDevWorkbench(view);
+        });
       }
-      updateDevDesignTabs();
       document.querySelector('#dev-design-state').value = state.devState;
       const pending = state.devOperation;
-      document.querySelector('#dev-design-pending').innerHTML = pending ? `<section class="dev-design-pending" aria-label="操作结果" role="status"><div><strong>${pending.label} · ${pending.status==='running'?'执行中，等待读回':'演示回执已读回'}</strong><p class="data-note">${pending.version} · ${pending.target} · ${pending.status==='running'?'切换页面后继续保留此操作':'仅说明交互路径；真实目标状态未证明'}</p></div><button class="btn" data-action="dev-result">${pending.status==='running'?'读取演示结果':'查看演示回执'}</button></section>` : '';
+      document.querySelector('#dev-design-pending').innerHTML = pending ? `<section class="dev-design-pending" aria-label="操作结果" role="status"><div><strong>${pending.label} · ${pending.status === 'running' ? '演示执行中，等待读回' : '演示回执已读回'}</strong><p class="data-note">${pending.version} · ${pending.target}</p></div><button class="btn" data-action="dev-result" ${state.devState !== 'data' ? 'disabled' : ''}>${pending.status === 'running' ? '读取演示结果' : '查看演示回执'}</button></section>` : '';
       const panel = document.querySelector('#dev-design-panel');
-      panel.setAttribute('aria-labelledby', `dev-tab-${state.devViews[state.devArea]}`);
+      if (area.views.length) {
+        panel.setAttribute('role', 'tabpanel');
+        panel.setAttribute('aria-labelledby', `dev-tab-${state.devViews[state.devArea]}`);
+        panel.removeAttribute('aria-label');
+      } else {
+        panel.setAttribute('role', 'region');
+        panel.setAttribute('aria-label', `${area.label}工具`);
+        panel.removeAttribute('aria-labelledby');
+      }
       panel.setAttribute('aria-busy', String(state.devState === 'loading'));
-      if (state.devState === 'loading') { panel.innerHTML='<section class="surface dev-design-section" role="status">正在读取样例证据… <button class="btn" data-action="dev-refresh">完成读取演示</button></section>'; return; }
-      if (state.devState === 'error') { panel.innerHTML='<section class="surface dev-design-section" role="alert"><h3>证据暂时无法读取</h3><p>当前版本、筛选与未完成操作已保留。</p><button class="btn" data-action="dev-refresh">重新读取</button></section>'; return; }
-      panel.innerHTML = renderDevDesignContent();
-      const search = document.querySelector('#dev-design-search');
-      search?.addEventListener('input',event=>{const position=event.target.selectionStart;state.devSearch[state.devArea]=event.target.value;renderDevWorkbench(view);const next=document.querySelector('#dev-design-search');next.focus();next.setSelectionRange(position,position);});
-      document.querySelector('#dev-design-evidence')?.addEventListener('change',event=>{state.devEvidence=event.target.value;renderDevWorkbench(view);document.querySelector('#dev-design-evidence')?.focus();});
+      if (state.devArea === 'overview' && state.devViews.overview === 'next') {
+        panel.innerHTML = devDesignReadState() || `<section class="surface dev-tool-library"><div class="dev-design-toolbar">按当前任务选择工具，运行结果以工具内的实际记录为准。</div><div class="dev-tool-list"><table class="dev-tool-table" aria-label="开发工具使用指南"><thead><tr><th>任务</th><th>检查重点</th><th>工具入口</th></tr></thead><tbody>${devDesignGuide.map(step=>`<tr><th>${step.title}</th><td>${step.completion}</td><td><button class="btn" data-action="dev-evidence" data-value="${step.tool}">查看相关工具</button></td></tr>`).join('')}</tbody></table></div></section>`;
+      } else if (state.devArea === 'overview') {
+        panel.innerHTML = devDesignReadState() || renderDevToolLibrary();
+      } else {
+        panel.innerHTML = devDesignReadState() || renderDevDesignContent();
+      }
+      updateDevDesignTabs();
+      for (const tabs of document.querySelectorAll('.dev-design-tabs')) devDesignTabObserver.observe(tabs);
+      const search = document.querySelector('#dev-design-search:not([hidden])');
+      if (search?.closest('[hidden]')) return;
+      search?.addEventListener('input', event => {
+        if (event.isComposing) return;
+        const position = event.target.selectionStart;
+        state.devSearch[state.devArea] = event.target.value;
+        renderDevWorkbench(view);
+        const next = document.querySelector('#dev-design-search');
+        next.focus();
+        next.setSelectionRange(position, position);
+      });
+    }
+    function devDesignRecordState(row) {
+      if (row.key === 'gates' && state.devEvidence === 'ready') return {...row, status:'已核对', detail:'样例固定版本 CI 终态已核对；仅用于交互演示，不证明真实 CI。'};
+      if (row.key === 'affected' && state.devQualityChecked) return {...row, status:'已核对', detail:'样例默认界面、操作返回和异常恢复检查已完成；固定版本 CI 另行核对。'};
+      if (['versions','migration'].includes(row.key) && state.devOperation?.kind === row.key && state.devOperation.status === 'complete') return {...row, status:'已核对', detail:'本页演示回执已读回；真实发布或迁移结果未证明。'};
+      return row;
+    }
+    function renderDevToolLibrary() {
+      const area = state.devArea;
+      const query = state.devSearch[area] || '', filter = state.devFilter[area] || 'all';
+      const records = Object.keys(devDesignAreas).flatMap(key => devDesignRecords.filter(row => row.area === key)).filter(row => (area === 'overview' || row.area === area) && (state.devViews.overview !== 'pinned' || area !== 'overview' || state.devPinned.includes(row.key)));
+      const rows = records.filter(row => (filter === 'all' || row.area === filter) && `${row.title}${row.source}${row.detail}`.toLowerCase().includes(query.trim().toLowerCase()));
+      return `<section class="surface dev-tool-library" aria-label="工作台工具库"><div class="dev-design-toolbar"><label class="search">${icon('search')}<input id="dev-design-search" aria-label="搜索工作台条目" placeholder="搜索工具名称或用途" value="${escapeHTML(query)}" /></label><div class="filter-chips">${[['all','全部领域'],['engineering','产品工程'],['quality','质量验证'],['delivery','交付运行']].filter(([key])=>area==='overview'||key==='all').map(([key,label])=>`<button class="btn ${filter===key?'active':''}" data-action="dev-filter" data-value="${key}">${label}</button>`).join('')}</div><span class="data-note">${rows.length} 个工具</span></div><div class="dev-tool-list">${rows.length ? `<table class="dev-tool-table" aria-label="开发工具对照"><thead><tr><th scope="col">工具</th><th scope="col">所属领域</th><th scope="col">用途</th><th scope="col">常用</th></tr></thead><tbody>${rows.map(row=>`<tr><th scope="row"><button class="btn dev-tool-link" data-action="dev-evidence" data-value="${row.key}">${row.title}</button></th><td>${devDesignAreas[row.area].label}</td><td>${row.detail}</td><td><button class="btn icon-btn" data-action="dev-pin" data-value="${row.key}" aria-label="${state.devPinned.includes(row.key)?'取消置顶':'置顶'}${row.title}" aria-pressed="${state.devPinned.includes(row.key)}">${state.devPinned.includes(row.key)?'★':'☆'}</button></td></tr>`).join('')}</tbody></table>` : devDesignEmpty('没有匹配的工具', '<button class="btn" data-action="dev-clear">清除筛选</button>')}</div></section>`;
+    }
+    function renderDevDeliveryTaskMap(view) {
+      const tasks = {
+        config: [['总览','比较可用操作与配置结论'],['检查配置包','按包结构、运行投影、流程策略和证据核对'],['查看变化','比较当前值、候选值与影响范围'],['页面配置预览','按需查看菜单、字段、编号和打印'],['试跑与发布','先看操作和结果，再展开流程与边界']],
+        migration: [['数据库升级','核对候选、准备计划并明确确认'],['运行检查','核对后端健康、恢复入口与开发工具'],['操作记录','查看独立的迁移与恢复证据']],
+        versions: [['版本与部署','直接查看分页版本清单，准备部署或回滚'],['发布检查','核对候选、制品、目标、门禁及 test 数据方式'],['流水线耗时','查看流水线各环节时间'],['操作记录','按动作、目标和结果查看回执']],
+        recovery: [['安全核验','默认查看四类安全证据，缺失保持未核验'],['恢复演练','查看下一步建议与六项演练'],['应急指引','按场景展开处置与接管步骤']]
+      };
+      return `<table class="dev-tool-table" aria-label="正式交付页面任务"><thead><tr><th scope="col">任务标签</th><th scope="col">主要内容</th></tr></thead><tbody>${tasks[view].map(([label,detail])=>`<tr><th scope="row">${label}</th><td>${detail}</td></tr>`).join('')}</tbody></table><p class="data-note">正式页面保留客户或目标范围、当前操作与真实错误；切换任务只更新内容，地址可恢复。此处只展示页面组织，不读取或执行真实操作。</p>`;
     }
     function renderDevDesignContent() {
       const area = state.devArea, view = state.devViews[area];
-      const query = state.devSearch[area] || '', filter = state.devFilter[area] || 'all';
-      let records = devDesignRecords.filter(row=>area==='overview'||row.area===area);
-      if (area==='engineering' && view==='rules') records=records.filter(row=>['core','permissions','flows'].includes(row.key));
-      if (area==='quality' && view==='runs') records=records.filter(row=>row.key==='gates');
-      if (area==='delivery') records=records.filter(row=>row.key===view || (view==='versions'&&row.key==='config'));
-      const rows = state.devState === 'empty' ? [] : records.filter(row=>(filter==='all'||row.status==='待核对')&&`${row.title}${row.source}${row.detail}`.toLowerCase().includes(query.trim().toLowerCase()));
-      const next = area==='overview'&&view==='next' ? `<section class="surface dev-design-section dev-design-next"><h3>下一步：补齐固定版本的质量证据</h3><p>样例版本的目标部署尚未证明。先查看质量门禁，再决定是否准备发布。</p><button class="btn primary" data-action="dev-area" data-value="quality">查看质量验证</button></section><div class="dev-design-grid">${[['engineering','查规则与业务链'],['delivery','核对交付与恢复']].map(([key,label])=>`<section class="surface dev-design-section"><h3>${label}</h3><p>${devDesignAreas[key].description}</p><button class="btn" data-action="dev-area" data-value="${key}">进入${devDesignAreas[key].label}</button></section>`).join('')}</div>` : '';
-      const scope = area==='overview'&&view==='evidence' ? '<section class="surface dev-design-section"><h3>证据只证明自己的范围</h3><p>本地检查、固定版本 CI、不可变制品、目标读回与使用验收分别核对；缺失保持“待核对”。</p></section>' : '';
-      const operation = area==='delivery' ? `<section class="surface"><div class="dev-design-section"><h3>${view==='versions'?'版本发布':view==='migration'?'数据库迁移':'恢复演练'}的操作路径</h3><ol class="dev-design-steps"><li>核对版本与目标</li><li>准备并确认具体计划</li><li>执行后读取回执</li></ol><label>前置证据样例 <select id="dev-design-evidence" aria-label="前置证据样例"><option value="missing" ${state.devEvidence==='missing'?'selected':''}>证据缺失</option><option value="ready" ${state.devEvidence==='ready'?'selected':''}>准备就绪</option></select></label></div><div class="dev-design-operation"><span>${state.devEvidence==='missing'?'尚缺固定版本、备份或目标核验；先补证据。':'候选 DEMO-a1b2c3d · 隔离演示环境 · 恢复点 DEMO-r1'}</span><div class="record-actions">${view==='versions'?'<button class="btn" data-action="dev-automation-flow">查看自动续办交接流程</button><button class="btn" data-action="dev-lock-flow">查看 Git 索引锁流程</button>':''}<button class="btn primary" data-action="dev-prepare" ${state.devEvidence!=='ready'||state.devOperation?.status==='running'?'disabled':''}>核对并准备</button></div></div></section>` : '';
-      return `${next}${scope}<section class="surface dev-design-toolbar"><label class="search">${icon('search')}<input id="dev-design-search" aria-label="搜索工作台条目" placeholder="搜索条目、来源或说明" value="${escapeHTML(query)}" /></label><div class="filter-chips"><button class="btn ${filter==='all'?'active':''}" aria-pressed="${filter==='all'}" data-action="dev-filter" data-value="all">全部 ${records.length}</button><button class="btn ${filter==='missing'?'active':''}" aria-pressed="${filter==='missing'}" data-action="dev-filter" data-value="missing">待核对 ${records.filter(row=>row.status==='待核对').length}</button></div></section><section class="surface"><div class="table-wrap"><table class="dev-design-table"><thead><tr><th>事项</th><th>来源与判断</th><th>证据状态</th><th>下一步</th></tr></thead><tbody>${rows.length?rows.map(row=>`<tr><td><strong>${row.title}</strong></td><td>${row.source}<small>${row.detail}</small></td><td><span class="badge ${row.status==='待核对'?'warning':''}">${row.status}</span></td><td><button class="btn" data-action="dev-evidence" data-value="${row.key}" aria-label="查看${row.title}证据">查看证据</button></td></tr>`).join(''):`<tr><td colspan="4">${devDesignEmpty('当前范围暂无记录',query||filter!=='all'?'<button class="btn" data-action="dev-clear">清除当前筛选</button>':'')}</td></tr>`}</tbody></table></div></section>${operation}`;
+      if (area === 'engineering') return renderDevToolLibrary();
+      if (area === 'quality') {
+        if (view === 'pressure') return `<section class="surface dev-design-section"><h3>核心业务压力测试 · 交互样例</h3><p>用料计算 → 提交 → 审批 → 采购读回；正式入口每次使用新隔离环境与订单池。</p><div class="dev-step-actions"><button class="btn primary" data-action="dev-pressure-preview" data-value="quick">短档回归演示</button><button class="btn" data-action="dev-pressure-preview" data-value="capacity">10 分钟容量演示</button></div>${state.devPressurePreview ? `<p><span class="badge">${state.devPressurePreview === 'capacity' ? '容量' : '短档'}样例</span> <span class="badge warning">历史候选 · 当前源码未验证</span></p><svg viewBox="0 0 500 90" role="img" aria-label="样例混合操作和实际 API 有效吞吐对比" style="width:100%;max-width:720px"><text x="0" y="22" fill="currentColor">混合操作 3.2 次/秒</text><rect x="160" y="8" width="180" height="16" rx="3" fill="var(--brand)"/><text x="0" y="68" fill="currentColor">实际 API 5.8 次/秒</text><rect x="160" y="54" width="326" height="16" rx="3" fill="#16826a"/></svg><table class="dev-tool-table"><thead><tr><th>指标</th><th>样例读数</th><th>判断范围</th></tr></thead><tbody><tr><th>单次 API 延迟</th><td>p95 520 ms / p99 610 ms</td><td>门限只针对单次 API</td></tr><tr><th>完整业务流程</th><td>主段 200 条</td><td>与 API 和混合操作分别计数</td></tr><tr><th>业务正确性</th><td>竞争、重放、对账、恢复和清理</td><td>正式页面以实际报告判断</td></tr></tbody></table>` : devDesignEmpty('尚未演示压力报告')}<details><summary>范围与维护说明</summary><p>正式压测不抵扣库存；构建、造数和清理时间另计。数据、断言、负载和生命周期分别登记摘要，业务变化后更新对应合同并复跑。样例不证明生产硬件容量、长时稳定性或客户验收。</p></details><p class="data-note">所有数字为交互样例，点击不会创建容器或运行测试。</p></section>`;
+        if (view === 'plan') return `<section class="surface dev-design-section"><div class="dev-design-toolbar"><strong>验证计划</strong><button class="btn primary" data-action="dev-validate">演示本轮验证</button></div><p>${state.devQualityChecked?'样例检查已完成；固定版本 CI 单独核对。':'按本轮改动选择检查，每项结果独立记录。'}</p><details class="dev-design-settings"><summary>覆盖证据的查看方式</summary><p class="data-note">正式工作台按四类标签查看，每个标签保留失败、受阻或未采集状态；切换只更新下方内容，子视图可从网址恢复。</p><table class="dev-tool-table" aria-label="覆盖证据分类"><thead><tr><th scope="col">标签</th><th scope="col">查看内容</th></tr></thead><tbody><tr><th scope="row">代码覆盖</th><td>Go 与 Web 的读数、执行计数和失败明细</td></tr><tr><th scope="row">业务场景</th><td>业务域总览，选择一个业务域查看场景与证据，再返回总览</td></tr><tr><th scope="row">验证门禁</th><td>本轮声明的检查与独立执行结果</td></tr><tr><th scope="row">运行与验收</th><td>PostgreSQL、浏览器、就绪、目标环境和客户验收的各自证据</td></tr></tbody></table><p class="data-note">采集及判定规则按需展开；来源、源码身份与失败原因继续可见。本说明不读取覆盖报告，也不证明当前测试或验收通过。</p><p class="data-note">专项检查命令沿用搜索与来源职责筛选，每页展示 10 项；页码可从网址恢复，改变筛选回到第一页。</p></details></section>${renderDevToolLibrary()}`;
+        return `<section class="surface dev-design-section"><h3>本轮样例执行记录</h3>${state.devQualityChecked ? '<ul class="dev-check-list"><li><span class="dev-check-marker is-complete" aria-hidden="true">✓</span><div class="dev-check-copy"><strong>定向页面检查 · 样例完成</strong><small>DEMO-a1b2c3d · 默认界面、操作返回、异常恢复；未运行真实测试。</small></div><button class="btn" data-action="dev-evidence" data-value="affected">查看范围</button></li></ul>' : devDesignEmpty('尚未演示本轮验证', '<button class="btn primary" data-action="dev-view" data-value="plan">查看验证计划</button>')}</section>`;
+      }
+      if (view === 'config') return `<section class="surface dev-design-section"><h2>客户配置 · 任务预览</h2>${renderDevDeliveryTaskMap(view)}<button class="btn" data-action="dev-evidence" data-value="config">查看配置依据</button></section>`;
+      if (view === 'recovery') return `<section class="surface dev-design-section"><h2>安全与恢复 · 只读核验</h2><details class="dev-design-settings"><summary>安全核验、恢复演练与应急指引</summary>${renderDevDeliveryTaskMap(view)}</details><p class="data-note">样例目标与版本未证明；交付预检通过不能替代安全回执。</p><div class="dev-tool-list"><table class="dev-tool-table" aria-label="安全检查样例"><thead><tr><th scope="col">检查项</th><th scope="col">核验状态</th><th scope="col">所需证据</th></tr></thead><tbody>${[['应用与依赖安全','当前版本审计及工具覆盖'],['入口与运维身份','访问来源限制、独立身份与多因素认证'],['账号与异常监测','主机外日志与告警送达'],['备份隔离与完整恢复','数据库与附件共同恢复点、离线或不可变副本及恢复演练']].map(([title,evidence])=>`<tr><th scope="row">${title}</th><td><span class="badge">未核验</span></td><td>${evidence}</td></tr>`).join('')}</tbody></table></div><p>有效数据库回执只证明数据库恢复；附件与备份隔离仍需核验。</p><button class="btn" data-action="dev-evidence" data-value="recovery">查看核验依据</button><details class="dev-design-settings"><summary>疑似入侵或勒索时的处置</summary><ol><li>保留证据并按受控流程隔离受影响主机与账号。</li><li>使用可信终端撤销会话并轮换受影响凭据。</li><li>从攻击前的可信数据库与附件副本在隔离目标恢复验证。</li><li>修复入口、核对丢失数据并批准恢复方案后切回业务。</li></ol></details><p class="data-note">此设计样例不采集运行证据，不执行配置、事件处置或恢复。</p></section>`;
+      const label = view === 'versions' ? '版本发布' : '数据库迁移';
+      return `<section class="surface dev-design-section"><div class="dev-design-toolbar"><strong>${label}</strong><button class="btn primary" data-action="dev-prepare" ${state.devEvidence !== 'ready' || state.devOperation?.status === 'running' ? 'disabled' : ''}>核对并准备${label}</button></div><table class="dev-tool-table" aria-label="交付条件"><tbody><tr><th>候选版本</th><td>DEMO-a1b2c3d</td><td>${state.devEvidence === 'ready' ? '样例固定版本 CI 已核对' : '待核对固定版本 CI'}</td></tr><tr><th>目标环境</th><td>隔离演示环境</td><td>配置与迁移计划分别核对</td></tr><tr><th>恢复点</th><td>DEMO-r1</td><td>保留备份与恢复验证</td></tr></tbody></table><div class="dev-design-toolbar"><span class="data-note">${state.devEvidence === 'ready' ? '样例条件已齐备；确认计划后执行，执行后读回。' : state.devQualityChecked ? '验证样例已完成，请核对交付条件。' : '先在质量验证完成验证样例，再核对交付条件。'}</span>${!state.devQualityChecked ? '<button class="btn" data-action="dev-area" data-value="quality">去质量验证</button>' : `<button class="btn" data-action="dev-preflight" ${state.devOperation?.status === 'running' ? 'disabled' : ''}>核对交付条件</button>`}<button class="btn" data-action="dev-evidence" data-value="${view}">查看${label}依据</button></div>${view === 'versions' ? '<details class="dev-design-settings"><summary>其他操作说明</summary><button class="btn" data-action="dev-automation-flow">查看自动续办交接流程</button><button class="btn" data-action="dev-lock-flow">查看 Git 索引锁流程</button></details>' : ''}<details class="dev-design-settings"><summary>正式页面的任务标签</summary>${renderDevDeliveryTaskMap(view)}</details></section>`;
     }
     function handleDevDesignAction(action,target) {
       if (!action.startsWith('dev-')) return false;
+      if (action==='dev-pin') {
+        const key=target.dataset.value;
+        state.devPinned=state.devPinned.includes(key)?state.devPinned.filter(value=>value!==key):[key,...state.devPinned].slice(0,5);
+        renderDevWorkbench(document.querySelector('#view'));return true;
+      }
       if (action==='dev-area') {
         if (!devDesignAreas[target.dataset.value]) return true;
-        state.devArea=target.dataset.value; state.page='dev-workbench'; state.overlay=null;setNavigationOpen(false);renderAll();
+        state.devArea=target.dataset.value; state.page='dev-workbench'; state.overlay=null;state.devPrepared=null;setNavigationOpen(false);renderAll();
+      } else if (action==='dev-validate') {
+        state.devQualityChecked=true;renderDevWorkbench(document.querySelector('#view'));
+        document.querySelector('[data-action="dev-prepare"], [data-action="dev-validate"]')?.focus();
+      } else if (action==='dev-preflight') {
+        if (!state.devQualityChecked || state.devOperation?.status === 'running') return true;
+        state.infoModal={title:'核对交付条件 · 演示',html:'<dl class="dev-design-evidence"><dt>候选版本</dt><dd>DEMO-a1b2c3d · 样例固定版本 CI 已核对</dd><dt>目标与配置</dt><dd>隔离演示环境 · 配置与迁移计划已核对</dd><dt>恢复点</dt><dd>DEMO-r1 · 样例备份与恢复验证已完成</dd></dl><p class="data-note">确认只把样例设置为证据齐备，不读取真实 CI，也不执行发布或迁移。</p>',confirmAction:'dev-ready',confirmLabel:'确认样例条件齐备'};state.overlay='info';renderFloating();
+      } else if (action==='dev-ready') {
+        if (!state.devQualityChecked || state.devOperation?.status === 'running') return true;
+        state.devEvidence='ready';state.overlay=null;renderFloating();renderDevWorkbench(document.querySelector('#view'));
+        document.querySelector('[data-action="dev-prepare"], [data-action="dev-validate"]')?.focus();
+      } else if (action==='dev-pressure-preview') {
+        state.devPressurePreview=target.dataset.value==='capacity'?'capacity':'quick';renderDevWorkbench(document.querySelector('#view'));
       } else if (action==='dev-view') {
-        state.devViews[state.devArea]=target.dataset.value;renderDevWorkbench(document.querySelector('#view'));
+        if (!devDesignAreas[state.devArea].views.some(([key]) => key === target.dataset.value)) return true;
+        state.devViews[state.devArea]=target.dataset.value;state.devPrepared=null;renderDevWorkbench(document.querySelector('#view'));
       } else if (action==='dev-filter'||action==='dev-clear') {
         state.devFilter[state.devArea]=action==='dev-clear'?'all':target.dataset.value;
         if (action==='dev-clear') state.devSearch[state.devArea]='';
@@ -4122,7 +4245,8 @@
       } else if (action==='dev-refresh') {
         state.devState='data';renderDevWorkbench(document.querySelector('#view'));
       } else if (action==='dev-evidence') {
-        const row=devDesignRecords.find(item=>item.key===target.dataset.value);if(!row)return true;
+        const source=devDesignRecords.find(item=>item.key===target.dataset.value);if(!source)return true;
+        const row=devDesignRecordState(source);
         state.infoModal={title:`${row.title} · 证据详情`,html:`<dl class="dev-design-evidence"><dt>来源</dt><dd>${row.source}</dd><dt>样例状态</dt><dd>${row.status}</dd><dt>核对入口</dt><dd>${row.path}</dd><dt>判断边界</dt><dd>${row.detail}</dd><dt>版本 / 时间</dt><dd>DEMO-a1b2c3d / 2026-09-26 10:30 +08:00</dd></dl>${row.key==='gates'||row.key==='versions'?renderDevCiGuidePreview(row.key==='versions'?'delivery':'overview'):''}<p class="data-note">这是固定样例，不证明当前代码、真实部署或客户验收。</p>`,confirmAction:'dev-close',confirmLabel:'返回工作台'};state.overlay='info';renderFloating();
       } else if (action==='dev-automation-flow') {
         state.infoModal={title:'自动续办交接流程',html:`<div class="dev-git-lock-flow" role="img" aria-label="等待心跳移除与执行阶段交接流程"><div class="dev-git-lock-flow__node">等待其他项目会话结束</div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">全部会话结束且后台 writer 已停止？</div><div class="dev-git-lock-flow__branches"><article><strong>尚未满足</strong><span>每 10 分钟只读重查，不改共享文件、不操作 Git、不造数或部署。</span></article><article><strong>条件满足</strong><span>先删除本次等待心跳，并读回删除结果。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">删除结果为 deleted？</div><div class="dev-git-lock-flow__branches"><article><strong>删除失败</strong><span>执行阶段保持未开始，报告自动化生命周期阻塞。</span></article><article><strong>删除成功</strong><span>同一次续办进入实现、验证、造数、Git 与部署。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">执行期间不重建同目的心跳；只有用户后来再次要求等待，才创建新的心跳。</div></div><p class="data-note">实际版本中心使用可缩放、可全屏的 Mermaid；本设计样例只说明生命周期，不调度 Codex 会话或自动化。</p>`,confirmAction:'dev-close',confirmLabel:'返回版本发布'};state.overlay='info';renderFloating();
@@ -4130,14 +4254,14 @@
         state.infoModal={title:'Git 索引锁恢复流程',html:`<div class="dev-git-lock-flow" role="img" aria-label="Git index.lock 检查与恢复流程"><div class="dev-git-lock-flow__node">准备暂存或提交</div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">index.lock 是否存在？</div><div class="dev-git-lock-flow__branches"><article><strong>没有锁</strong><span>按精确文件或 hunk 受控写入 index，并启用 PID 旁车。</span></article><article><strong>发现锁</strong><span>只读核对 HEAD、当前 index、PID owner、仓库 Git 进程与打开句柄。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">owner 已结束且现场稳定？</div><div class="dev-git-lock-flow__branches"><article><strong>活动或漂移</strong><span>保留原现场，只停止 Git 动作。</span></article><article><strong>稳定陈旧</strong><span>备份当前 index，同盘隔离旧锁与旁车，并写恢复回执。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">候选不同或损坏时先复核隔离内容与精确暂存范围；HEAD 和当前 index 读回未变后，沿用已有授权继续收口。</div></div><p class="data-note">实际版本中心使用可缩放、可全屏的 Mermaid；本设计样例只展示相同的决策层级，不执行 Git。</p>`,confirmAction:'dev-close',confirmLabel:'返回版本发布'};state.overlay='info';renderFloating();
       } else if (action==='dev-prepare') {
         if (state.devEvidence!=='ready'||state.devOperation?.status==='running')return true;
-        const key=state.devViews.delivery;const label=key==='versions'?'版本发布':key==='migration'?'数据库迁移':'恢复演练';
-        state.devPrepared={label,version:'DEMO-a1b2c3d',target:'隔离演示环境',restore:'DEMO-r1'};
+        const key=state.devArea==='overview'?'versions':state.devViews.delivery;if(!['versions','migration'].includes(key))return true;const label=key==='versions'?'版本发布':'数据库迁移';
+        state.devPrepared={kind:key,label,version:'DEMO-a1b2c3d',target:'隔离演示环境',restore:'DEMO-r1'};
         state.infoModal={title:`核对${label}计划`,html:`<dl class="dev-design-evidence"><dt>候选版本</dt><dd>DEMO-a1b2c3d</dd><dt>目标</dt><dd>隔离演示环境</dd><dt>当前基线</dt><dd>DEMO-a0b0c0d</dd><dt>恢复点</dt><dd>DEMO-r1 · 样例恢复验证已完成</dd><dt>执行范围</dt><dd>${label}的计划、确认、等待与读回</dd></dl><p>确认只推进本地演示状态，不执行真实发布、迁移或回滚。</p>`,confirmAction:'dev-execute',confirmLabel:'确认演示'};state.overlay='info';renderFloating();
       } else if (action==='dev-execute') {
         if(!state.devPrepared||state.devEvidence!=='ready'||state.devOperation?.status==='running')return true;
         state.devOperation={...state.devPrepared,status:'running'};state.devPrepared=null;state.overlay=null;renderFloating();renderDevWorkbench(document.querySelector('#view'));
       } else if (action==='dev-result') {
-        if(!state.devOperation)return true;state.devOperation.status='complete';renderDevWorkbench(document.querySelector('#view'));
+        if(!state.devOperation||state.devState!=='data')return true;state.devOperation.status='complete';renderDevWorkbench(document.querySelector('#view'));
         state.infoModal={title:'演示操作回执',html:`<dl class="dev-design-evidence"><dt>操作</dt><dd>${state.devOperation.label}</dd><dt>版本 / 目标</dt><dd>${state.devOperation.version} / ${state.devOperation.target}</dd><dt>演示结果</dt><dd>计划已确认 → 已执行 → 回执已读回</dd><dt>恢复点</dt><dd>${state.devOperation.restore}</dd><dt>真实状态</dt><dd>未证明；需在正式工作台核对实际操作与目标读回。</dd></dl>`,confirmAction:'dev-close',confirmLabel:'返回工作台'};state.overlay='info';renderFloating();
       } else if (action==='dev-close') {state.overlay=null;state.devPrepared=null;renderFloating();}
       return true;
@@ -4153,6 +4277,7 @@
 
     function renderSidebar() {
       if (state.page === 'dev-workbench') { renderDevSidebar(); return; }
+      devDesignTabObserver.disconnect();
       const nav = [
         ['工作中心', [['dashboard','home','工作台', ''], ['tasks','task','任务看板', '3'], ['progress','chart','进度看板', '']]],
         ['业务模块', [['master-hub','database','基础资料',''], ['sales','shopping','销售管理',''], ['engineering-hub','engineering','产品工程',''], ['purchase','purchase','采购管理',''], ['outsourcing','outsourcing','委外管理',''], ['production-hub','production','生产管理',''], ['warehouse-hub','warehouse','库存管理',''], ['quality','shield','质检管理',''], ['shipping-hub','shipping','出货管理',''], ['finance-hub','finance','财务管理','']]],

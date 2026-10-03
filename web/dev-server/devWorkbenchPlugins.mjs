@@ -8,12 +8,15 @@ import { createDevQaCoveragePlugin } from './devQaCoveragePlugin.mjs'
 import { createDevQaTestingPlugin } from './devQaTestingPlugin.mjs'
 import { createDevQualityGatePlugin } from './devQualityGatePlugin.mjs'
 import { createDevWebInstancePlugin } from './devWebInstancePlugin.mjs'
+import { createDevOperatorAuthPlugin } from './devOperatorAuthPlugin.mjs'
+export { normalizeDevHttpsOrigin } from './devServerSecurity.mjs'
 import {
   LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
   runWebRuntimePreflight,
 } from '../../scripts/local-runtime-preflight.mjs'
 
 export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
+  'plush-dev-operator-auth',
   'plush-dev-web-instance',
   'plush-dev-customer-import-dry-run-api',
   'plush-dev-customer-config',
@@ -34,6 +37,8 @@ export function createDevWorkbenchServePlugins({
   recoveryMode = '',
   recoveryReason = '',
   runtimeChecks = false,
+  workbenchAccess = 'operator',
+  workbenchHttpsOrigin = '',
 } = {}) {
   if (command !== 'serve' || mode !== 'development') return []
   const recovery = createDevDatabaseMigrationRecoveryController({
@@ -51,6 +56,10 @@ export function createDevWorkbenchServePlugins({
       ),
   })
   return [
+    createDevOperatorAuthPlugin({
+      readAccessMode: () => workbenchAccess,
+      httpsOrigin: workbenchHttpsOrigin,
+    }),
     createDevWebInstancePlugin({ isRecoveryActive: recovery.isActive }),
     recovery.plugin,
     createDevCustomerImportDryRunPlugin({

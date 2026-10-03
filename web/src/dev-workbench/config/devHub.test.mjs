@@ -34,7 +34,6 @@ const devPageSources = [
   'DevHubPage.jsx',
   'DevProductCorePage.jsx',
   'DevPermissionRelationshipsPage.jsx',
-  'DevGovernancePage.jsx',
   'DevFlowStateObservatoryPage.jsx',
   'DevBusinessUsabilityPage.jsx',
   'DevDocsPage.jsx',
@@ -119,10 +118,6 @@ test('devHub: every dev route exposes a distinct browser title', () => {
     '/favicon-testing.svg'
   )
   assert.equal(
-    resolveDevPageFavicon('/__dev/governance/'),
-    '/favicon-governance.svg'
-  )
-  assert.equal(
     resolveDevPageFavicon('/__dev/customer-config'),
     '/favicon-customer-config.svg'
   )
@@ -132,7 +127,7 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   )
   assert.equal(
     resolveDevPageTitle('/__dev/drill-recovery', 'Plush Toy ERP'),
-    '演练与恢复 · Plush Toy ERP'
+    '安全与恢复 · Plush Toy ERP'
   )
   assert.equal(
     resolveDevPageTitle('/__dev/data-preparation', 'Plush Toy ERP'),
@@ -171,7 +166,6 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
     [
       ['product-engineering', '产品内核'],
       ['product-engineering', '权限关系'],
-      ['product-engineering', '改动指南'],
       ['product-engineering', '业务链观察'],
       ['quality', '页面说明检查'],
       ['product-engineering', '开发文档'],
@@ -182,7 +176,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       ['delivery', '客户配置'],
       ['delivery', '数据库迁移'],
       ['delivery', '版本发布'],
-      ['delivery', '演练与恢复'],
+      ['delivery', '安全与恢复'],
     ]
   )
   const hubTitleByKey = new Map(
@@ -228,7 +222,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
     false,
     '页面说明检查保留登记和深链，通过改动验证按需进入'
   )
-  assert.equal(getDevSecondaryNavItems('product-engineering').length, 6)
+  assert.equal(getDevSecondaryNavItems('product-engineering').length, 5)
   assert.equal(getDevSecondaryNavItems('quality').length, 3)
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/testing'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/quality-gates'), 'quality')
@@ -331,8 +325,8 @@ test('devHub: tools share one area registry without duplicate overview stage inv
   )
 })
 
-test('devHub: fifteen dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 15)
+test('devHub: fourteen dev pages share the backend-style workspace shell', () => {
+  assert.equal(devPageSources.length, 14)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -396,7 +390,6 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     [
       '/__dev/product-core',
       '/__dev/permission-relationships',
-      '/__dev/governance',
       '/__dev/status-flows',
       '/__dev/business-usability',
       '/__dev/docs',
@@ -542,20 +535,20 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
   const drillRecoveryItem = DEV_HUB_ITEMS.find(
     (item) => item.key === 'drill-recovery'
   )
-  assert.match(drillRecoveryItem?.title || '', /演练与恢复/)
+  assert.match(drillRecoveryItem?.title || '', /安全与恢复/)
   assert.match(drillRecoveryItem?.truthSource || '', /operation 回执/)
   assert.match(drillRecoveryItem?.guardrails?.join(' ') || '', /Risk-tiered/)
   assert.match(
     drillRecoveryItem?.guardrails?.join(' ') || '',
     /Fault injection disabled/
   )
-  assert.match(drillRecoveryItem?.description || '', /P0、P1、P2/)
+  assert.match(drillRecoveryItem?.description || '', /未核验/)
 })
 
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 14)
+  assert.equal(summary.entryCount, 13)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)
@@ -597,9 +590,9 @@ test('devHub: filters by governance group and keyword together', () => {
       'all',
       '产品治理 / Product Governance',
       '权限治理 / Access Governance',
-      '文档治理 / Docs',
       '业务链治理 / Business Chain Governance',
       '验证治理 / QA',
+      '文档治理 / Docs',
       '产品设计 / Product Design',
       '客户治理 / Customer Governance',
       '交付治理 / Delivery',
@@ -625,7 +618,7 @@ test('devHub: pinned routes keep valid unique dev entries up to the pin limit', 
   assert.deepEqual(
     normalizeDevHubPinnedRoutes([
       '/__dev/testing',
-      '/__dev/governance',
+      '/__dev/product-core',
       '/__dev/docs',
       '/__dev/customer-config',
       '/__dev/ui-design',
@@ -634,7 +627,7 @@ test('devHub: pinned routes keep valid unique dev entries up to the pin limit', 
     ]),
     [
       '/__dev/testing',
-      '/__dev/governance',
+      '/__dev/product-core',
       '/__dev/docs',
       '/__dev/customer-config',
       '/__dev/ui-design',

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  CheckCircleOutlined,
   DatabaseOutlined,
   HistoryOutlined,
   ReloadOutlined,
@@ -23,10 +22,12 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
+import { useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import DevDatabaseMigrationFlow from '../components/DevDatabaseMigrationFlow.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
@@ -52,6 +53,11 @@ import {
 import { isDevDatabaseMigrationRecoveryActive } from '../config/devRuntimeRecovery.mjs'
 
 const { Paragraph, Text, Title } = Typography
+const MIGRATION_VIEW_ITEMS = [
+  { value: 'migration', label: '数据库升级' },
+  { value: 'runtime', label: '运行检查' },
+  { value: 'history', label: '操作记录' },
+]
 const OPERATION_POLL_INTERVAL_MS = 1500
 const DATABASE_MIGRATION_SNAPSHOT_KEY = 'database-migration'
 
@@ -118,6 +124,17 @@ function toolReadinessPresentation(tools) {
 }
 
 export default function DevDatabaseMigrationPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeView =
+    MIGRATION_VIEW_ITEMS.some((item) => item.value === searchParams.get('view'))
+      ? searchParams.get('view')
+      : 'migration'
+  const selectView = (value) =>
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.set('view', value)
+      return next
+    })
   const recoveryActive = isDevDatabaseMigrationRecoveryActive()
   const client = useMemo(() => createDevDatabaseMigrationClient(), [])
   const initialSnapshot = useMemo(
@@ -233,7 +250,13 @@ export default function DevDatabaseMigrationPage() {
   }, [client, pollingOperation, refresh, updateSummary])
 
   const performAction = async (key, action) => {
-    if (!summaryFresh || mutationInFlightRef.current) return null
+    if (
+      !summaryFresh ||
+      summaryRef.current?.readOnly === true ||
+      mutationInFlightRef.current
+    ) {
+      return null
+    }
     mutationInFlightRef.current = true
     setSummaryFresh(false)
     setActionKey(key)
@@ -275,6 +298,7 @@ export default function DevDatabaseMigrationPage() {
   const target = summary?.target
   const runtime = summary?.runtime
   const tools = summary?.tools
+  const readOnly = summary?.readOnly === true
   const runtimeState = runtimePresentation(runtime)
   const toolState = toolReadinessPresentation(tools)
   const pendingFiles = target?.pendingFiles
@@ -291,6 +315,7 @@ export default function DevDatabaseMigrationPage() {
     summaryFresh && !actionKey && databaseMigrationPreparationAvailable(summary)
   const canRestart =
     summaryFresh &&
+    !readOnly &&
     !actionKey &&
     summary?.status === 'success' &&
     (isLatest || runtime?.bundleId) &&
@@ -376,8 +401,70 @@ export default function DevDatabaseMigrationPage() {
     },
   ]
 
+  const migrationFlow = (
+    <div className="erp-dev-database-migration-flow">
+      <Steps
+        responsive
+        size="small"
+        labelPlacement="vertical"
+        items={[
+                  {
+                    title: '固定候选版本',
+                    description: '核对目标，固定代码、配置与迁移计划',
+                    status: pathStatuses[0],
+                  },
+                  {
+                    title: '恢复演练',
+                    description: '临时库升级、附件恢复与候选业务验证',
+                    status: pathStatuses[1],
+                  },
+                  {
+                    title: '停写与恢复点',
+                    description: '确认后暂停写入，验证最新成套备份',
+                    status: pathStatuses[2],
+                  },
+                  {
+                    title: '原库迁移事务',
+                    description:
+                      pathOperation?.target?.pendingFiles === 0
+                        ? '本次无待执行迁移，跳过此步'
+                        : 'BEGIN → 迁移 SQL → COMMIT',
+                    status: pathStatuses[3],
+                  },
+                  {
+                    title: '业务验证',
+                    description: '读回原库，验证新后端、登录与业务',
+                    status: pathStatuses[4],
+                  },
+                  {
+                    title: '切换日常版本',
+                    description: '验证通过后更新固定运行版本',
+                    status: pathStatuses[5],
+                  },
+                ]}
+      />
+      <Text type="secondary">
+        仅点亮已有完成证据的节点，具体进展见操作记录。数据库事务只覆盖原库迁移，不包含恢复演练、业务验证和版本切换。
+      </Text>
+      {pathOperation ? (
+        <Text>{databaseMigrationExecutionText(pathOperation)}</Text>
+              ) : null}
+      {pathOperation?.backup ? (
+        <Text type="secondary">
+          演练范围（{pathOperation.backup.migrationBefore} →{' '}
+          {pathOperation.backup.migrationAfter}）：
+          {databaseMigrationDataScopeText(pathOperation.backup)}
+        </Text>
+              ) : null}
+      <details className="erp-dev-migration-flow-details">
+        <summary>查看事务与恢复边界</summary>
+        <DevDatabaseMigrationFlow />
+      </details>
+    </div>
+  )
+
   return (
-    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-database-migration-page">
+    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-database-migration-page erp-dev-delivery-workspace">
       <DevPageNav sourcePath={DEV_DATABASE_MIGRATION_SOURCE_PATH} />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
@@ -387,15 +474,11 @@ export default function DevDatabaseMigrationPage() {
           <Title level={1} className="erp-dev-hub-title">
             数据库迁移
           </Title>
-          <Paragraph className="erp-dev-hub-summary">
-            面向登记的共享开发库，把 status、plan、真实备份恢复、apply、读回和
-            本地后端重启收口为一次可追踪操作。不会自动迁移，也不会自动重试。
-          </Paragraph>
         </div>
         <Space direction="vertical" size={4}>
           <Space wrap>
             <Button
-              icon={<ReloadOutlined />}
+              icon={<ReloadOutlined aria-hidden="true" />}
               loading={refreshBusy}
               onClick={refresh}
             >
@@ -409,16 +492,18 @@ export default function DevDatabaseMigrationPage() {
                     ? '正在核对最新状态；上次结果只供查看'
                     : isLatest
                       ? '没有待执行迁移；如需重新核对，请使用“刷新状态”'
-                      : tools?.status !== 'ready'
-                        ? '迁移准备环境未就绪，请按下方检查项处理后刷新'
-                        : hasRunningOperation
-                          ? '已有操作正在执行'
-                          : '当前目标或 migration 状态未通过检查'
+                      : readOnly
+                        ? '局域网入口只读，请在运行开发服务的本机准备迁移'
+                        : tools?.status !== 'ready'
+                          ? '迁移准备环境未就绪，请按下方检查项处理后刷新'
+                          : hasRunningOperation
+                            ? '已有操作正在执行'
+                            : '当前目标或 migration 状态未通过检查'
               }
             >
               <Button
                 type="primary"
-                icon={<SafetyCertificateOutlined />}
+                icon={<SafetyCertificateOutlined aria-hidden="true" />}
                 disabled={!canPrepare}
                 loading={actionKey === 'prepare'}
                 onClick={() =>
@@ -472,6 +557,14 @@ export default function DevDatabaseMigrationPage() {
             />
           )
         ) : null}
+        {readOnly ? (
+          <Alert
+            type="info"
+            showIcon
+            message="局域网只读查看"
+            description="可刷新状态和查看操作记录；准备迁移、升级与重启须在运行开发服务的本机执行。"
+          />
+        ) : null}
         {loadError ? (
           <Alert
             type={summary ? 'warning' : 'error'}
@@ -492,256 +585,266 @@ export default function DevDatabaseMigrationPage() {
             description={issueText(summary.issues)}
           />
         ) : null}
-        {summary ? (
-          <Alert
-            type={summaryFresh ? upgradeState.type : 'info'}
-            showIcon
-            message={upgradeState.label}
-            description={upgradeState.description}
-          />
+        <section className="erp-dev-delivery-context" aria-label="数据库迁移范围">
+          <dl className="erp-dev-delivery-facts">
+            <div><dt>目标</dt><dd><Text strong>共享开发库</Text></dd></div>
+            <div><dt>当前版本</dt><dd><Text code>{target?.currentVersion || '未证明'}</Text></dd></div>
+            <div><dt>候选版本</dt><dd><Text code>{target?.latestVersion || '未证明'}</Text></dd></div>
+            <div><dt>待执行迁移</dt><dd><Tag color={isLatest ? 'success' : 'warning'}>{Number.isSafeInteger(pendingFiles) ? `${pendingFiles} 条` : '未证明'}</Tag></dd></div>
+          </dl>
+        </section>
+        {activeOperation ? (
+          <div className="erp-dev-migration-pending" role="status">
+            <Text strong>
+              {activeOperation.kind === 'migration'
+                ? '当前数据库升级'
+                : '当前后端恢复'}
+            </Text>
+            <StatusTag
+              status={activeOperation.status}
+              issues={activeOperation.issues}
+            />
+            <Button onClick={() => selectView('migration')}>
+              查看当前操作
+            </Button>
+          </div>
         ) : null}
-        <DevStaticGuidance title="固定安全边界" hint="数据库目标与执行限制">
-          仅允许本机 DEV 页面和登记的
-          shared-dev；浏览器不能提交数据库地址、账号、SQL、命令、路径或生产目标。准备与执行分开，中断后只记录结果待核对，禁止自动重试。
-        </DevStaticGuidance>
-
+        <DevTaskNav
+          compact
+          idPrefix="dev-migration"
+          ariaLabel="数据库迁移视图"
+          className="erp-dev-delivery-taskbar"
+          items={MIGRATION_VIEW_ITEMS}
+          value={activeView}
+          onChange={selectView}
+        />
         <section
-          className="erp-dev-database-migration-summary"
-          aria-label="数据库迁移状态摘要"
+          hidden={activeView !== 'migration'}
+          id="dev-migration-panel-migration"
+          role="tabpanel"
+          aria-labelledby="dev-migration-tab-migration"
         >
-          <Card title="共享开发库">
-            <Space direction="vertical" size={8}>
-              <Text code>{target?.safeTarget || '目标未证明'}</Text>
-              <Tag color={isLatest ? 'success' : 'warning'}>
-                {Number.isSafeInteger(pendingFiles)
-                  ? isLatest
-                    ? '已是最新版本'
-                    : `${pendingFiles} 条待执行`
-                  : '状态未证明'}
-              </Tag>
-              <Text type="secondary">
-                当前 {target?.currentVersion || 'none'} · 最新{' '}
-                {target?.latestVersion || 'none'}
-              </Text>
-            </Space>
+          {summary ? (
+            <Alert
+              type={summaryFresh ? upgradeState.type : 'info'}
+              showIcon
+              message={upgradeState.label}
+              description={upgradeState.description}
+            />
+        ) : null}
+
+          <Card
+            title="本次升级路径"
+            extra={
+              pathOperation ? (
+                <Space size={8} wrap>
+                  <Text type="secondary">
+                    {activeOperation?.kind === 'migration'
+                      ? '当前升级'
+                      : '最近一次升级'}
+                    {pathOperation.target?.latestVersion
+                      ? ` · 目标 ${pathOperation.target.latestVersion}`
+                      : ''}
+                  </Text>
+                  <StatusTag
+                    status={pathOperation.status}
+                    issues={pathOperation.issues}
+                  />
+                </Space>
+              ) : (
+                <Text type="secondary">流程示意</Text>
+              )
+            }
+          >
+            {pathOperation ? migrationFlow : (
+              <div className="erp-dev-migration-start">
+                <Paragraph type="secondary">
+                  {isLatest
+                    ? '当前没有待执行迁移。进入运行检查核对后端健康与开发工具。'
+                    : '先检查候选版本、备份恢复和业务验证，生成计划后再确认升级。'}
+                </Paragraph>
+                <Button onClick={() => selectView('runtime')}>查看运行检查</Button>
+                <DevStaticGuidance title="查看升级步骤" hint="准备、确认与事务边界">
+                  {migrationFlow}
+                </DevStaticGuidance>
+              </div>
+            )}
+            {readyOperation ? (
+              <div className="erp-dev-database-migration-ready">
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="计划与备份恢复验证已完成，等待你的明确确认"
+                  description={`将从 ${readyOperation.target?.currentVersion} 升级到 ${readyOperation.target?.latestVersion}；备份 ${readyOperation.backup?.id} 已在隔离 PostgreSQL 中恢复并验证。`}
+                  action={
+                    <Button
+                      type="primary"
+                      danger
+                      disabled={readOnly || !summaryFresh || Boolean(actionKey)}
+                      onClick={() => {
+                        setConfirmationOperation(readyOperation)
+                        setConfirmationText('')
+                      }}
+                    >
+                      确认升级并重启
+                    </Button>
+                  }
+                />
+              </div>
+            ) : null}
           </Card>
-          <Card title="日常运行">
-            <Space direction="vertical" size={8}>
-              <Text strong>
-                {!summaryFresh
-                  ? '状态待刷新核对'
-                  : runtime?.available
-                    ? '本地服务可用'
-                    : '本地服务未恢复'}
-              </Text>
-              <Tag color={runtimeState.color}>{runtimeState.label}</Tag>
-              <Text type="secondary">
-                health {runtime?.health?.httpCode || '—'} · ready{' '}
-                {runtime?.ready?.httpCode || '—'}
-              </Text>
-              {runtime?.activeVersion ? (
-                <Text>运行迁移版本：{runtime.activeVersion}</Text>
-              ) : null}
-              {runtime?.bundleId ? (
-                <Text type="secondary">运行制品：{runtime.bundleId}</Text>
-              ) : null}
-              {summaryFresh &&
-              runtime?.available &&
-              (!recoveryActive || isLatest) ? (
-                <Button type="primary" href="/erp">
-                  进入业务系统
-                </Button>
-              ) : null}
-              <Button
-                icon={<SyncOutlined />}
-                disabled={!canRestart}
-                loading={actionKey === 'restart'}
-                onClick={() =>
-                  performAction('restart', {
-                    action: 'restart',
-                    idempotencyKey:
-                      createDatabaseMigrationIdempotencyKey('restart'),
-                  })
-                }
-              >
-                恢复已验证后端
-              </Button>
-            </Space>
-          </Card>
-          <Card title="执行策略">
-            <Space direction="vertical" size={8}>
-              <Tag color="blue">一次准备 · 一次执行</Tag>
-              <Text>固定后端、页面、迁移及目标数据库身份</Text>
-              <Text type="secondary">
-                准备期间保留日常版本；候选代码变化后必须重新验证。
-              </Text>
-              <Text type="secondary">
-                开发前端加载当前源码；后端代码修改后运行 make dev_restart。
-              </Text>
-            </Space>
-          </Card>
-          <Card title="迁移准备环境">
-            <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              <Tag color={toolState.color}>{toolState.label}</Tag>
-              <List
-                size="small"
-                dataSource={tools?.checks || []}
-                locale={{ emptyText: '工具状态未证明' }}
-                renderItem={(check) => (
-                  <List.Item>
-                    <Space direction="vertical" size={2}>
-                      <Space size={6}>
-                        <Text>{check.label}</Text>
-                        <Tag
-                          color={
-                            check.status === 'passed' ? 'success' : 'error'
-                          }
-                        >
-                          {check.status === 'passed' ? '已就绪' : '需处理'}
-                        </Tag>
-                      </Space>
-                      {check.status === 'blocked' ? (
-                        <Text type="secondary">{check.message}</Text>
+        </section>
+        <section
+          hidden={activeView !== 'runtime'}
+          id="dev-migration-panel-runtime"
+          role="tabpanel"
+          aria-labelledby="dev-migration-tab-runtime"
+        >
+          <section
+            className="erp-dev-migration-overview"
+            aria-label="数据库迁移状态摘要"
+          >
+            <div className="erp-dev-tool-table-wrap">
+              <table className="erp-dev-tool-table">
+                <thead>
+                  <tr>
+                    <th scope="col">核对项</th>
+                    <th scope="col">当前状态</th>
+                    <th scope="col">证据与处理</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">共享开发库</th>
+                    <td>
+                      <Tag color={isLatest ? 'success' : 'warning'}>
+                        {Number.isSafeInteger(pendingFiles)
+                        ? isLatest
+                          ? '已是最新版本'
+                          : `${pendingFiles} 条待执行`
+                        : '状态未证明'}
+                      </Tag>
+                    </td>
+                    <td>
+                      <Text code>{target?.safeTarget || '目标未证明'}</Text>
+                      <p>
+                        当前 {target?.currentVersion || '未证明'} · 最新{' '}
+                        {target?.latestVersion || '未证明'}
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">日常运行</th>
+                    <td>
+                      <Text strong>
+                        {!summaryFresh
+                        ? '状态待刷新核对'
+                        : runtime?.available
+                          ? '本地服务可用'
+                          : '本地服务未恢复'}
+                      </Text>
+                      <div>
+                        <Tag color={runtimeState.color}>{runtimeState.label}</Tag>
+                      </div>
+                    </td>
+                    <td>
+                      <p>
+                        health {runtime?.health?.httpCode || '—'} · ready{' '}
+                        {runtime?.ready?.httpCode || '—'}
+                        {runtime?.activeVersion
+                        ? ` · 迁移版本 ${runtime.activeVersion}`
+                        : ''}
+                      </p>
+                      {runtime?.bundleId ? (
+                        <p>运行制品：{runtime.bundleId}</p>
+                    ) : null}
+                      <Space wrap>
+                        {summaryFresh &&
+                      runtime?.available &&
+                      (!recoveryActive || isLatest) ? (
+                        <Button href="/erp">进入业务系统</Button>
                       ) : null}
-                    </Space>
-                  </List.Item>
-                )}
-              />
-            </Space>
+                        <Button
+                          icon={<SyncOutlined aria-hidden="true" />}
+                          disabled={!canRestart}
+                          loading={actionKey === 'restart'}
+                          onClick={() =>
+                          performAction('restart', {
+                            action: 'restart',
+                            idempotencyKey:
+                              createDatabaseMigrationIdempotencyKey('restart'),
+                          })
+                        }
+                        >
+                          恢复已验证后端
+                        </Button>
+                      </Space>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">迁移准备环境</th>
+                    <td>
+                      <Tag color={toolState.color}>{toolState.label}</Tag>
+                    </td>
+                    <td>
+                      <List
+                        size="small"
+                        dataSource={tools?.checks || []}
+                        locale={{ emptyText: '工具状态未证明' }}
+                        renderItem={(check) => (
+                          <List.Item>
+                            <div>
+                              <Text>{check.label}</Text>{' '}
+                              <Tag
+                                color={
+                                check.status === 'passed' ? 'success' : 'error'
+                              }
+                              >
+                                {check.status === 'passed' ? '已就绪' : '需处理'}
+                              </Tag>
+                              {check.status === 'blocked' ? (
+                                <p>{check.message}</p>
+                            ) : null}
+                            </div>
+                          </List.Item>
+                      )}
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+        <section
+          hidden={activeView !== 'history'}
+          id="dev-migration-panel-history"
+          role="tabpanel"
+          aria-labelledby="dev-migration-tab-history"
+        >
+          <Card
+            title="历史操作记录"
+            extra={<HistoryOutlined aria-hidden="true" />}
+          >
+            <Table
+              rowKey="id"
+              columns={columns}
+              dataSource={operations}
+              loading={initialLoading}
+              pagination={{ pageSize: 8, hideOnSinglePage: true }}
+              locale={{
+                emptyText: <Empty description="尚无数据库迁移操作" />,
+              }}
+              scroll={{ x: 760 }}
+            />
           </Card>
         </section>
 
-        <Card
-          title="本次升级路径"
-          extra={
-            pathOperation ? (
-              <Space size={8} wrap>
-                <Text type="secondary">
-                  {activeOperation?.kind === 'migration'
-                    ? '当前升级'
-                    : '最近一次升级'}
-                  {pathOperation.target?.latestVersion
-                    ? ` · 目标 ${pathOperation.target.latestVersion}`
-                    : ''}
-                </Text>
-                <StatusTag
-                  status={pathOperation.status}
-                  issues={pathOperation.issues}
-                />
-              </Space>
-            ) : (
-              <Text type="secondary">流程示意</Text>
-            )
-          }
-        >
-          <div className="erp-dev-database-migration-flow">
-            <Steps
-              responsive
-              size="small"
-              labelPlacement="vertical"
-              items={[
-                {
-                  title: '固定候选版本',
-                  description: '核对目标，固定代码、配置与迁移计划',
-                  status: pathStatuses[0],
-                },
-                {
-                  title: '恢复演练',
-                  description: '临时库升级、附件恢复与候选业务验证',
-                  status: pathStatuses[1],
-                },
-                {
-                  title: '停写与恢复点',
-                  description: '确认后暂停写入，验证最新成套备份',
-                  status: pathStatuses[2],
-                },
-                {
-                  title: '原库迁移事务',
-                  description:
-                    pathOperation?.target?.pendingFiles === 0
-                      ? '本次无待执行迁移，跳过此步'
-                      : 'BEGIN → 迁移 SQL → COMMIT',
-                  status: pathStatuses[3],
-                },
-                {
-                  title: '业务验证',
-                  description: '读回原库，验证新后端、登录与业务',
-                  status: pathStatuses[4],
-                },
-                {
-                  title: '切换日常版本',
-                  description: '验证通过后更新固定运行版本',
-                  status: pathStatuses[5],
-                },
-              ]}
-            />
-            <Text type="secondary">
-              仅点亮已有完成证据的节点，具体进展见操作记录。数据库事务只覆盖原库迁移，不包含恢复演练、业务验证和版本切换。
-            </Text>
-            {pathOperation ? (
-              <Text>{databaseMigrationExecutionText(pathOperation)}</Text>
-            ) : null}
-            {pathOperation?.backup ? (
-              <Text type="secondary">
-                演练范围（{pathOperation.backup.migrationBefore} →{' '}
-                {pathOperation.backup.migrationAfter}）：
-                {databaseMigrationDataScopeText(pathOperation.backup)}
-              </Text>
-            ) : null}
-            <DevDatabaseMigrationFlow />
-          </div>
-          {readyOperation ? (
-            <div className="erp-dev-database-migration-ready">
-              <Alert
-                type="warning"
-                showIcon
-                message="计划与备份恢复验证已完成，等待你的明确确认"
-                description={`将从 ${readyOperation.target?.currentVersion} 升级到 ${readyOperation.target?.latestVersion}；备份 ${readyOperation.backup?.id} 已在隔离 PostgreSQL 中恢复并验证。`}
-                action={
-                  <Button
-                    type="primary"
-                    danger
-                    disabled={!summaryFresh || Boolean(actionKey)}
-                    onClick={() => {
-                      setConfirmationOperation(readyOperation)
-                      setConfirmationText('')
-                    }}
-                  >
-                    确认升级并重启
-                  </Button>
-                }
-              />
-            </div>
-          ) : null}
-          {!activeOperation && isLatest ? (
-            <div className="erp-dev-database-migration-ready">
-              <Alert
-                type="success"
-                showIcon
-                icon={<CheckCircleOutlined />}
-                message="数据库已经是最新版本"
-                description="前端使用当前源码并支持热更新；后端代码变化后执行 make dev_restart，先编译验证再替换运行进程。"
-              />
-            </div>
-          ) : null}
-        </Card>
+        <DevStaticGuidance title="固定安全边界" hint="数据库目标与执行限制">
+          仅允许开发服务的本机或内网 DEV 页面和登记的
+          shared-dev；浏览器不能提交数据库地址、账号、SQL、命令、路径或生产目标。准备与执行分开，中断后只记录结果待核对，禁止自动重试。
+        </DevStaticGuidance>
 
-        <Card
-          title="历史操作记录"
-          extra={<HistoryOutlined aria-hidden="true" />}
-        >
-          <Table
-            rowKey="id"
-            columns={columns}
-            dataSource={operations}
-            loading={initialLoading}
-            pagination={{ pageSize: 8, hideOnSinglePage: true }}
-            locale={{
-              emptyText: <Empty description="尚无数据库迁移操作" />,
-            }}
-            scroll={{ x: 760 }}
-          />
-        </Card>
       </main>
 
       <Modal
@@ -764,6 +867,7 @@ export default function DevDatabaseMigrationPage() {
           danger: true,
           disabled:
             !summaryFresh ||
+            readOnly ||
             !confirmationOperation ||
             confirmationText !== confirmationOperation.confirmationPrompt,
         }}

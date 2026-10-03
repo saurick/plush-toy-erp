@@ -17,6 +17,7 @@ import { RpcErrorCode } from '@/common/consts/errorCodes.js'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
@@ -274,25 +275,6 @@ function MenuPreviewItem({ itemKey }) {
       <Text strong>{item.label}</Text>
       <code>{item.key}</code>
     </div>
-  )
-}
-
-function QuickAction({ icon, title, note, status, onClick }) {
-  return (
-    <button
-      className="erp-dev-customer-quick-action"
-      type="button"
-      onClick={onClick}
-    >
-      <span className="erp-dev-customer-quick-action__icon" aria-hidden="true">
-        {icon}
-      </span>
-      <span className="erp-dev-customer-quick-action__copy">
-        <span>{title}</span>
-        <small>{note}</small>
-      </span>
-      <StatusTag status={status} />
-    </button>
   )
 }
 
@@ -947,18 +929,6 @@ function CustomerPackageSelector({ overview, onChange, disabled = false }) {
   )
 }
 
-function GateRow({ item }) {
-  return (
-    <article className="erp-dev-customer-gate" key={item.key}>
-      <div className="erp-dev-customer-gate__main">
-        <Text strong>{item.label}</Text>
-        <Text type="secondary">{item.note}</Text>
-      </div>
-      <StatusTag status={item.status} />
-    </article>
-  )
-}
-
 function AssetTile({ item }) {
   return (
     <article className="erp-dev-customer-asset" key={item.key}>
@@ -1005,22 +975,20 @@ function MissingCustomerPanel({ overview }) {
   )
 }
 
-function OverviewPanel({ overview, onNavigate }) {
+function OverviewPanel({ overview }) {
   const consoleSummary = overview.packageConsoleSummary
 
   return (
     <div className="erp-dev-customer-overview" data-dev-customer-view="总览">
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-console">
         <div>
-          <Text type="secondary">当前配置包</Text>
-          <Title level={2}>{consoleSummary.packageLabel}</Title>
-          <Text strong>{consoleSummary.reviewDecision.title}</Text>
+          <Title level={2}>{consoleSummary.reviewDecision.title}</Title>
           <Text type="secondary">{consoleSummary.reviewDecision.summary}</Text>
         </div>
         <div className="erp-dev-customer-console__status">
           <StatusTag status={consoleSummary.primaryStatus} />
           <Text type="secondary">
-            {consoleSummary.reviewDecision.nextAction}
+            下一步：{consoleSummary.reviewDecision.nextAction}
           </Text>
         </div>
       </section>
@@ -1038,35 +1006,6 @@ function OverviewPanel({ overview, onNavigate }) {
         </div>
       </section>
 
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <CheckCircleOutlined />
-          <Text strong>相关工具</Text>
-        </div>
-        <div className="erp-dev-customer-quick-actions">
-          <QuickAction
-            icon={<SafetyCertificateOutlined />}
-            title="看预检"
-            note="结构、禁止项、Workflow 边界"
-            status="passed"
-            onClick={() => onNavigate(VIEW_PREFLIGHT)}
-          />
-          <QuickAction
-            icon={<ApartmentOutlined />}
-            title="看差异"
-            note="当前值、候选配置、影响范围"
-            status="preview_only"
-            onClick={() => onNavigate(VIEW_DIFF)}
-          />
-          <QuickAction
-            icon={<DatabaseOutlined />}
-            title="进入执行与发布门禁"
-            note="试跑、测试配置应用与正式发布门禁"
-            status="blocked_by_design"
-            onClick={() => onNavigate(VIEW_IMPORT)}
-          />
-        </div>
-      </section>
     </div>
   )
 }
@@ -1292,16 +1231,15 @@ function PreflightPanel({
   activeSection,
   onSectionChange,
 }) {
+  const boundaryIssueCount = customerPackageSummary.boundaries.filter(
+    (item) => !item.ok
+  ).length
   return (
     <div
       className="erp-dev-customer-panel-grid"
       data-dev-customer-view="包预检"
     >
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-section-nav">
-        <div className="erp-dev-customer-panel__head">
-          <ApartmentOutlined />
-          <Text strong>当前核对任务</Text>
-        </div>
         <DevTaskNav
           compact
           ariaLabel="配置预检任务"
@@ -1311,55 +1249,77 @@ function PreflightPanel({
         />
       </section>
       {activeSection === PREFLIGHT_SECTION_PACKAGE ? (
-        <>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-package-guards">
-            <div className="erp-dev-customer-panel__head">
-              <SafetyCertificateOutlined />
-              <Text strong>包边界 / Package Guards</Text>
+        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-package-checks">
+          <div className="erp-dev-customer-panel__head">
+            <CheckCircleOutlined aria-hidden="true" />
+            <Text strong>预检步骤</Text>
+          </div>
+          <div className="erp-dev-tool-table-wrap">
+            <table className="erp-dev-tool-table" aria-label="客户配置预检步骤">
+              <thead>
+                <tr>
+                  <th scope="col">核对项</th>
+                  <th scope="col">说明与后续处理</th>
+                  <th scope="col">结果</th>
+                </tr>
+              </thead>
+              <tbody>
+                {consoleSummary.preflightStages.map((item) => (
+                  <tr key={item.key}>
+                    <th scope="row">{item.label}</th>
+                    <td>{item.note}</td>
+                    <td>
+                      <StatusTag status={item.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {boundaryIssueCount > 0 ? (
+            <Alert
+              type="error"
+              showIcon
+              message={`配置包存在 ${boundaryIssueCount} 项边界问题`}
+              description="展开配置包边界查看具体项，处理后再继续试跑或发布检查。"
+            />
+          ) : null}
+          <DevStaticGuidance
+            title="配置包边界"
+            hint={`${customerPackageSummary.boundaries.length} 项声明与检查命令`}
+          >
+            <div className="erp-dev-customer-package-guards">
+              <div className="erp-dev-customer-guard-list">
+                {customerPackageSummary.boundaries.map((item) => (
+                  <div className="erp-dev-customer-guard" key={item.key}>
+                    <Text>{guardItemLabel(item, '客户配置包边界')}</Text>
+                    <Tag color={item.ok ? 'green' : 'red'}>
+                      {item.ok ? item.expectedLabel : item.valueLabel}
+                    </Tag>
+                  </div>
+                ))}
+              </div>
+              <CommandBlock command={customerPackageSummary.qaCommand} />
             </div>
-            <div className="erp-dev-customer-guard-list">
-              {customerPackageSummary.boundaries.map((item) => (
-                <div className="erp-dev-customer-guard" key={item.key}>
-                  <Text>{guardItemLabel(item, '客户配置包边界')}</Text>
-                  <Tag color={item.ok ? 'green' : 'red'}>
-                    {item.ok ? item.expectedLabel : item.valueLabel}
-                  </Tag>
-                </div>
-              ))}
-            </div>
-            <CommandBlock command={customerPackageSummary.qaCommand} />
-          </section>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
-              <CheckCircleOutlined />
-              <Text strong>预检步骤 / Preflight Gates</Text>
-            </div>
-            <div className="erp-dev-customer-gate-list">
-              {consoleSummary.preflightStages.map((item) => (
-                <GateRow item={item} key={item.key} />
-              ))}
-            </div>
-          </section>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
-              <DatabaseOutlined />
-              <Text strong>客户包资产范围 / Package Asset Scope</Text>
-            </div>
+          </DevStaticGuidance>
+          <DevStaticGuidance
+            title="客户包资产范围"
+            hint={`${consoleSummary.assetSummary.length} 类配置`}
+          >
             <div className="erp-dev-customer-asset-grid">
               {consoleSummary.assetSummary.map((item) => (
                 <AssetTile item={item} key={item.key} />
               ))}
             </div>
-          </section>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
-              <DatabaseOutlined />
-              <Text strong>客户包对象 / Package Objects</Text>
-            </div>
+          </DevStaticGuidance>
+          <DevStaticGuidance
+            title="客户包对象"
+            hint={`${consoleSummary.packageAssetScope.length} 类对象与执行边界`}
+          >
             <Alert
               type="info"
               showIcon
-              message="只读取已登记配置对象，不接收任意代码、SQL 或业务事实"
+              message="只读取已登记配置对象，不提供原始包上传，不接收任意代码、SQL 或业务事实"
               description="本页预检已登记配置与声明；流程、策略和命令草案只供预览。当前没有运行时扩展能力，新增扩展须先完成专项评审。"
             />
             <div className="erp-dev-customer-db-targets">
@@ -1367,8 +1327,8 @@ function PreflightPanel({
                 <ImportAssetScopeItem item={item} key={item.key} />
               ))}
             </div>
-          </section>
-        </>
+          </DevStaticGuidance>
+        </section>
       ) : null}
       {activeSection === PREFLIGHT_SECTION_RUNTIME ? (
         <>
@@ -1690,72 +1650,26 @@ function ImportPanel({
   onReleaseBatchChange,
   activeAction,
   onActionChange,
+  disabled = false,
 }) {
   return (
     <div
       className="erp-dev-customer-panel-grid"
       data-dev-customer-view="预检与发布"
     >
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-import-hero">
-        <div className="erp-dev-customer-panel__head">
-          <DeploymentUnitOutlined />
-          <Text strong>配置预检与发布 / Config Preflight & Release</Text>
-        </div>
-        <div className="erp-dev-customer-import-hero__copy">
-          <Text strong>
-            {importSummary.canApplyTestConfig
-              ? '当前页支持测试版试跑和当前 Vite 代理后端应用；正式发布只交给统一执行器。'
-              : '当前配置只支持预览和试跑；当前不会发布或激活。'}
-          </Text>
-          <Text type="secondary">
-            {importSummary.canApplyTestConfig
-              ? '当前工作台只从已登记 customer package 读取配置，执行结构预检、差异预览、Dry Run 证据、当前代理后端配置应用和发布门禁复核；不提供原始包上传，也不把配置发布写成业务数据导入。'
-              : '当前工作台只从已登记 customer package 读取配置，执行结构预检、差异预览、Dry Run 证据和发布门禁复核；当前配置包未达到应用门禁，不提供原始包上传或后端写入。'}
-          </Text>
-        </div>
-        <Alert
-          type={importSummary.canApplyTestConfig ? 'info' : 'warning'}
-          showIcon
-          message={
-            importSummary.canApplyTestConfig
-              ? '当前代理后端应用只写客户配置控制面'
-              : '当前配置包未开放后端应用'
-          }
-          description={
-            importSummary.canApplyTestConfig
-              ? '页面试跑不写数据库；应用操作只通过当前 Vite /rpc 代理调用客户配置校验、发布和激活。真实客户业务数据导入与正式发布仍是单独专项。'
-              : '页面仅可生成预览和试跑证据；完成正式评审并开放运行时、发布与激活前，不会调用客户配置写接口。'
-          }
-        />
-      </section>
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-section-nav">
-        <div className="erp-dev-customer-panel__head">
-          <DeploymentUnitOutlined />
-          <Text strong>选择当前操作</Text>
-        </div>
         <DevTaskNav
           compact
           ariaLabel="配置执行任务"
           items={IMPORT_ACTION_OPTIONS}
           value={activeAction}
           onChange={onActionChange}
+          disabled={disabled}
         />
+        <Text type="secondary" className="erp-dev-customer-panel__hint">
+          试跑只生成本地证据；测试应用写当前后端配置；正式发布由统一执行器完成。
+        </Text>
       </section>
-      {activeAction === IMPORT_ACTION_DRY_RUN ? (
-        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-          <div className="erp-dev-customer-panel__head">
-            <CheckCircleOutlined />
-            <Text strong>
-              配置预检与发布流程 / Config Preflight & Release Flow
-            </Text>
-          </div>
-          <div className="erp-dev-customer-import-flow">
-            {importSummary.importFlow.map((step) => (
-              <ImportFlowStep item={step} key={step.key} />
-            ))}
-          </div>
-        </section>
-      ) : null}
       {activeAction === IMPORT_ACTION_DRY_RUN ? (
         <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
           <div className="erp-dev-customer-panel__head">
@@ -1776,6 +1690,16 @@ function ImportPanel({
               : '运行测试试跑'}
           </Button>
           <DryRunSummary dryRunState={dryRunState} />
+          <details className="erp-dev-customer-disclosure erp-dev-customer-flow-guide">
+            <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
+              <Text strong>查看配置预检与发布流程</Text>
+            </summary>
+            <div className="erp-dev-customer-disclosure__body erp-dev-customer-import-flow">
+              {importSummary.importFlow.map((step) => (
+                <ImportFlowStep item={step} key={step.key} />
+              ))}
+            </div>
+          </details>
         </section>
       ) : null}
       {activeAction === IMPORT_ACTION_TEST_APPLY ? (
@@ -1908,58 +1832,64 @@ function ImportPanel({
               ))}
             </div>
           </section>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
+          <details className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure">
+            <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
               <SafetyCertificateOutlined />
               <Text strong>版本快照 / 回滚 / 审计</Text>
-            </div>
-            <Alert
-              type="info"
-              showIcon
-              message="回滚只恢复配置版本，不删除业务事实"
-              description="客户配置版本写入配置控制面；发布 / 激活 / 回滚会记录脱敏运行审计。已产生的库存、出货、财务和业务单据必须走对应业务补偿，不能由配置回滚抹除。"
-            />
-            <div className="erp-dev-customer-formal-gates">
-              {importSummary.versionAuditSupport.map((item) => (
-                <FormalGateItem item={item} key={item.key} />
+            </summary>
+            <div className="erp-dev-customer-disclosure__body">
+              <Alert
+                type="info"
+                showIcon
+                message="回滚只恢复配置版本，不删除业务事实"
+                description="客户配置版本写入配置控制面；发布 / 激活 / 回滚会记录脱敏运行审计。已产生的库存、出货、财务和业务单据必须走对应业务补偿，不能由配置回滚抹除。"
+              />
+              <div className="erp-dev-customer-formal-gates">
+                {importSummary.versionAuditSupport.map((item) => (
+                  <FormalGateItem item={item} key={item.key} />
               ))}
+              </div>
             </div>
-          </section>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
+          </details>
+          <details className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure">
+            <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
               <DatabaseOutlined />
               <Text strong>执行边界 / Execution Boundary</Text>
-            </div>
-            <div className="erp-dev-customer-import-flags">
-              {importSummary.executionFlagSummary.map((item) => (
-                <div key={item.key}>
-                  <Text type="secondary">{item.label}</Text>
-                  <Tag color={item.value === true ? 'blue' : 'red'}>
-                    {item.valueLabel}
-                  </Tag>
-                </div>
+            </summary>
+            <div className="erp-dev-customer-disclosure__body">
+              <div className="erp-dev-customer-import-flags">
+                {importSummary.executionFlagSummary.map((item) => (
+                  <div key={item.key}>
+                    <Text type="secondary">{item.label}</Text>
+                    <Tag color={item.value === true ? 'blue' : 'red'}>
+                      {item.valueLabel}
+                    </Tag>
+                  </div>
               ))}
+              </div>
+              <CommandBlock command={importSummary.qaCommand} />
             </div>
-            <CommandBlock command={importSummary.qaCommand} />
-          </section>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
+          </details>
+          <details className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure">
+            <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
               <DeploymentUnitOutlined />
               <Text strong>备用命令 / Command Fallback</Text>
-            </div>
-            <div className="erp-dev-customer-tool-list">
-              {importSummary.tools.map((tool) => (
-                <article className="erp-dev-customer-tool" key={tool.key}>
-                  <div className="erp-dev-customer-tool__head">
-                    <Text strong>{tool.title}</Text>
-                    <StatusTag status={tool.status} />
-                  </div>
-                  {tool.note ? <Text type="secondary">{tool.note}</Text> : null}
-                  <CommandBlock command={tool.command} />
-                </article>
+            </summary>
+            <div className="erp-dev-customer-disclosure__body">
+              <div className="erp-dev-customer-tool-list">
+                {importSummary.tools.map((tool) => (
+                  <article className="erp-dev-customer-tool" key={tool.key}>
+                    <div className="erp-dev-customer-tool__head">
+                      <Text strong>{tool.title}</Text>
+                      <StatusTag status={tool.status} />
+                    </div>
+                    {tool.note ? <Text type="secondary">{tool.note}</Text> : null}
+                    <CommandBlock command={tool.command} />
+                  </article>
               ))}
+              </div>
             </div>
-          </section>
+          </details>
         </>
       ) : null}
     </div>
@@ -2379,6 +2309,7 @@ export default function DevCustomerConfigPage() {
   }
 
   const handleImportActionChange = (nextAction) => {
+    if (isMutationRunning) return
     const normalizedAction = IMPORT_ACTION_VALUES.has(nextAction)
       ? nextAction
       : IMPORT_ACTION_DRY_RUN
@@ -2424,7 +2355,7 @@ export default function DevCustomerConfigPage() {
         return
       }
       if (!response.ok) {
-        throw new Error('试跑生成失败')
+        throw new Error('未能生成试跑结果，请查看开发服务日志，修复后重新试跑。')
       }
       setDryRunState({ status: 'success', result: payload })
       message.success('试跑证据已生成')
@@ -2437,7 +2368,9 @@ export default function DevCustomerConfigPage() {
       }
       setDryRunState({
         status: 'error',
-        error: getActionErrorMessage(error, '试跑生成失败'),
+        error: getActionErrorMessage(error, '生成试跑结果', {
+          suffix: '请查看开发服务日志，修复后重新试跑',
+        }),
       })
       message.error('试跑生成失败')
     }
@@ -2769,12 +2702,13 @@ export default function DevCustomerConfigPage() {
         onReleaseBatchChange={handleReleaseBatchChange}
         activeAction={activeImportAction}
         onActionChange={handleImportActionChange}
+        disabled={isMutationRunning}
       />
     ),
   }[activeView]
 
   return (
-    <main className="erp-dev-customer-page erp-dev-workspace-page">
+    <main className="erp-dev-customer-page erp-dev-workspace-page erp-dev-delivery-workspace">
       <DevPageNav
         sourcePath={overview.sourcePath || DEV_CUSTOMER_CONFIG_SOURCE_PATH}
       />
@@ -2787,38 +2721,41 @@ export default function DevCustomerConfigPage() {
             </Title>
           </Space>
         </div>
-        <details className="erp-dev-customer-source">
-          <summary>
-            <Text type="secondary">当前配置包</Text>
-            <Text strong>{overview.requestedCustomerKey}</Text>
-          </summary>
-          <Text type="secondary">
-            {overview.sourceLabel || '未登记客户配置包'}
-          </Text>
-        </details>
       </header>
 
-      <section className="erp-dev-customer-tools">
+      <section className="erp-dev-delivery-context erp-dev-customer-context" aria-label="客户配置范围">
         <CustomerPackageSelector
           overview={overview}
           onChange={handleCustomerChange}
           disabled={isMutationRunning}
         />
-        {isMissingCustomer ? null : (
-          <DevTaskNav
-            compact
-            level="primary"
-            className="erp-dev-customer-view-switch erp-dev-customer-journey"
-            ariaLabel="客户配置工作任务"
-            items={VIEW_NAV_OPTIONS}
-            value={activeView}
-            onChange={handleViewChange}
-            disabled={isMutationRunning}
-          />
-        )}
+        <details className="erp-dev-customer-source">
+          <summary>配置来源</summary>
+          <Text type="secondary">
+            {overview.sourceLabel || '未登记客户配置包'}
+          </Text>
+        </details>
       </section>
+      {isMissingCustomer ? null : (
+        <DevTaskNav
+          compact
+          level="primary"
+          idPrefix="dev-customer"
+          className="erp-dev-delivery-taskbar erp-dev-customer-view-switch erp-dev-customer-journey"
+          ariaLabel="客户配置工作任务"
+          items={VIEW_NAV_OPTIONS}
+          value={activeView}
+          onChange={handleViewChange}
+          disabled={isMutationRunning}
+        />
+      )}
 
-      <section className="erp-dev-customer-workspace">
+      <section
+        className="erp-dev-customer-workspace"
+        id={isMissingCustomer ? undefined : `dev-customer-panel-${activeView}`}
+        role={isMissingCustomer ? undefined : 'tabpanel'}
+        aria-labelledby={isMissingCustomer ? undefined : `dev-customer-tab-${activeView}`}
+      >
         {isMissingCustomer ? (
           <MissingCustomerPanel overview={overview} />
         ) : (

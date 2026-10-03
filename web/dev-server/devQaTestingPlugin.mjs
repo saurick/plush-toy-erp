@@ -27,16 +27,17 @@ import {
 import {
   isSameOriginRequest,
   readJsonBody,
-  isLoopbackHostHeader,
-  isLoopbackRemoteAddress,
+  isDevWorkbenchRequest,
 } from './devServerSecurity.mjs'
 import { resolveProjectNodeRuntime } from './devQaCoveragePlugin.mjs'
+import { readCurrentPressureSource, readDevPressureReports } from './devQaPressureReports.mjs'
 
 export const DEV_QA_TESTING_API_PATH = '/__dev/api/qa/testing'
 export const DEV_QA_TESTING_SESSION_API_PATH = `${DEV_QA_TESTING_API_PATH}/session`
 export const DEV_QA_TESTING_PLAN_API_PATH = `${DEV_QA_TESTING_API_PATH}/plan`
 export const DEV_QA_TESTING_ACTION_API_PATH = `${DEV_QA_TESTING_API_PATH}/actions`
 export const DEV_QA_TESTING_OPERATION_API_PREFIX = `${DEV_QA_TESTING_API_PATH}/operations`
+export const DEV_QA_PRESSURE_REPORTS_API_PATH = `${DEV_QA_TESTING_API_PATH}/pressure-reports`
 export const DEV_QA_TESTING_PUBLIC_OPERATION_SCHEMA =
   'plush.dev-qa-testing-operation-public/v1'
 export const MAX_QA_TESTING_REQUEST_BYTES = 4 * 1024
@@ -46,7 +47,7 @@ const OPERATION_PATH_PATTERN = new RegExp(
   'u'
 )
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage):[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+  /^testing:(fast|role-access|field-linkage|pressure-quick|pressure-capacity):[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const ACTION_MESSAGES = Object.freeze({
   fast: Object.freeze({
     running: '正在运行开发门禁',
@@ -63,6 +64,16 @@ const ACTION_MESSAGES = Object.freeze({
     running: '正在运行字段联动专项',
     passed: '字段联动专项完成，新报告已原子发布',
     failed: '字段联动专项未通过，上一份报告保持不变',
+  }),
+  'pressure-quick': Object.freeze({
+    running: '正在构建隔离环境并运行短档业务压力测试',
+    passed: '短档压力测试完成，业务对账、恢复与资源清理通过',
+    failed: '短档压力测试未通过，请查看压力测试报告',
+  }),
+  'pressure-capacity': Object.freeze({
+    running: '正在构建隔离环境并运行十分钟容量压力测试',
+    passed: '容量压力测试完成，业务对账、恢复与资源清理通过',
+    failed: '容量压力测试未通过，请查看压力测试报告',
   }),
 })
 
@@ -231,6 +242,10 @@ export function buildDevQaTestingCommand({
       'output/qa/yoyoosun-role-jsonrpc-access/report.json',
     ],
     'field-linkage': ['scripts/qa/erp-field-linkage.mjs'],
+    'pressure-quick': ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', 'quick', '--out',
+      `output/qa/pressure/workbench-${operationId}/lifecycle.json`],
+    'pressure-capacity': ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', 'capacity', '--out',
+      `output/qa/pressure/workbench-${operationId}/lifecycle.json`],
   }
   if (!DEV_TESTING_ACTIONS.includes(action)) {
     throw new Error('testing command action is not allowlisted')
@@ -324,6 +339,8 @@ export function createDevQaTestingService({
   resolveNodeRuntime = resolveProjectNodeRuntime,
   collectPlan = collectAffectedValidationPlan,
   readHookGovernance = readDevQaGitHookGovernance,
+  readPressureReports = readDevPressureReports,
+  readPressureSource = readCurrentPressureSource,
   launchProcess = (spec) => startFixedProcess(spec),
   now = () => new Date(),
 } = {}) {
@@ -421,6 +438,13 @@ export function createDevQaTestingService({
           now: now().toISOString(),
         })
         return
+      }
+      if (code === 0 && operation.action.startsWith('pressure-')) {
+        const evidence = readPressureReports(root, { id: `workbench-${operation.id}` })
+        if (evidence.report?.status !== 'passed' ||
+          evidence.report?.profile !== operation.action.slice('pressure-'.length)) {
+          code = 1
+        }
       }
       if (code === 0) {
         transitionDevTestingOperation(store, operation.id, {
@@ -615,6 +639,18 @@ export function createDevQaTestingService({
       recoverInterruptedOperation()
       return publicOperation(readDevTestingOperation(store, operationId))
     },
+    async pressureReports(id = '') {
+      const repository = await readRepositoryState(root)
+      const currentSource = readPressureSource(root, repository.commit)
+      const result = readPressureReports(root, { id, currentSource })
+      const after = await readRepositoryState(root)
+      if (!repositoryIdentitiesEqual(repository, after)) {
+        const error = new Error('repository changed while reading pressure reports')
+        error.code = 'DEV_QA_REPOSITORY_CHANGED'
+        throw error
+      }
+      return result
+    },
     async act(value) {
       const action = validateDevQaTestingAction(value)
       return start(action.action, action.payload)
@@ -655,13 +691,10 @@ export function createDevQaTestingMiddleware({
       next()
       return
     }
-    if (
-      !isLoopbackRemoteAddress(request.socket?.remoteAddress) ||
-      !isLoopbackHostHeader(request.headers?.host)
-    ) {
+    if (!isDevWorkbenchRequest(request)) {
       sendJson(response, 403, {
         status: 'failed',
-        message: '该开发接口仅允许本机访问',
+        message: '开发工具只允许通过当前开发服务的本机或内网地址访问',
       })
       return
     }
@@ -688,6 +721,13 @@ export function createDevQaTestingMiddleware({
         return
       }
       const operationMatch = OPERATION_PATH_PATTERN.exec(requestPath)
+      if (request.method === 'GET' && requestPath === DEV_QA_PRESSURE_REPORTS_API_PATH) {
+        if ([...requestUrl.searchParams.keys()].some((key) => key !== 'id') || requestUrl.searchParams.getAll('id').length > 1) {
+          throw new Error('pressure report query is unsupported')
+        }
+        sendJson(response, 200, await testingService.pressureReports(requestUrl.searchParams.get('id') || ''))
+        return
+      }
       if (request.method === 'GET' && operationMatch) {
         sendJson(response, 200, {
           schemaVersion: 'plush.dev-qa-testing-operation-result/v1',

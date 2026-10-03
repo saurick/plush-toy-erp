@@ -115,6 +115,14 @@ test("stage logic fingerprints are deterministic and isolate declared component 
     projectRoot,
     readFileImpl: (filePath) => readDependency(filePath),
   });
+  const engineeringChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
+    projectRoot,
+    readFileImpl: (filePath) => Buffer.from(path.relative(projectRoot, filePath) +
+      (filePath.endsWith("manual-acceptance-engineering-data.mjs") ? ":changed" : ":current")),
+  });
+  assert.notEqual(engineeringChanged.get("facts"), first.get("facts"));
+  for (const stageKey of MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter((key) => key !== "facts"))
+    assert.equal(engineeringChanged.get(stageKey), first.get(stageKey));
   const factDataChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
     projectRoot,
     readFileImpl: (filePath) => readDependency(filePath, true),

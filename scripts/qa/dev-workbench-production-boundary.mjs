@@ -27,7 +27,6 @@ export const productionArtifactForbiddenMarkers = Object.freeze([
   "研发效能工作台",
   "Engineering Delivery Workbench",
   "erp-dev-docs",
-  "erp-dev-governance",
   "erp-dev-capability",
   "erp-dev-ui-design",
   "erp-dev-hub",

@@ -10,9 +10,11 @@ import {
   BUSINESS_DOMAINS,
   GATE_LEVELS,
   OUTPUT_RELATIVE_PATH,
+  SNAPSHOT_OUTPUT_RELATIVE_PATH,
   SCHEMA_VERSION,
   assembleCoverageReport,
   buildCoverageReport,
+  buildCoverageSnapshot,
   evidencePath,
   evaluateArtifactFreshness,
   normalizeCoverageMetrics,
@@ -26,6 +28,7 @@ import {
   resolveGeneratedAt,
   usage,
   writeCoverageReport,
+  writeCoverageSnapshot,
 } from "./test-coverage-report.mjs";
 
 const THIS_FILE = fileURLToPath(import.meta.url);
@@ -925,6 +928,7 @@ test("argument parsing and generated time are deterministic and fail closed", ()
     ]),
     {
       write: true,
+      snapshot: false,
       help: false,
       generatedAt: GENERATED_AT,
       goCoverprofile: "go.out",
@@ -1095,4 +1099,57 @@ test("CLI --write uses repository root, fixed ignored path and emits no absolute
   });
   assert.notEqual(invalid.status, 0);
   assert.match(invalid.stderr, /unsupported argument/u);
+});
+
+
+test("scenario details preserve execution proof and expose incomplete records", () => {
+  const make = (current, matchedTests) => assembleCoverageReport({
+    repository: REPOSITORY, generatedAt: GENERATED_AT,
+    artifacts: [{ evidence: "output/qa/baseline.json", freshness: { status: current ? "current" : "stale" }, artifact: {
+      repository: REPOSITORY, generatedAt: GENERATED_AT,
+      businessCoverage: { domains: [{ key: "source-documents", status: "passed", total: 1, executed: 1, passed: 1,
+        scenarios: [{ id: "material-rounding", label: "材料归并后取整", status: "passed", matchedTests }] }] },
+    } }],
+  });
+  const domain = make(true, ["TestQuantity/rounding"]).businessCoverage.domains.find((item) => item.key === "source-documents");
+  assert.equal(domain.status, "passed");
+  assert.equal(domain.scenarios[0].label, "材料归并后取整");
+  assert.deepEqual(domain.scenarios[0].matchedTests, ["TestQuantity/rounding"]);
+  assert.equal(make(true, []).businessCoverage.domains.find((item) => item.key === "source-documents").status, "partial");
+  assert.equal(make(false, ["TestQuantity/rounding"]).businessCoverage.domains.find((item) => item.key === "source-documents").scenarios[0].status, "stale");
+});
+
+test("snapshot publication retains its source identity and canonical report", async (t) => {
+  const root = await temporaryDirectory(t, "plush-coverage-snapshot-");
+  const input = { schemaVersion: "plush-test-coverage-evidence/v1", repository: REPOSITORY, generatedAt: GENERATED_AT,
+    acceptance: { postgres: { status: "passed", total: 1, executed: 1, passed: 1, note: "用料专项，不证明 critical gate 全集。",
+      scenarios: [{ id: "quantity", status: "passed", matchedTests: ["TestQuantity/exact"] }] } } };
+  await writeFile(path.join(root, "evidence.json"), JSON.stringify(input));
+  const report = await buildCoverageSnapshot({ projectRoot: root, artifactPaths: ["evidence.json"], generatedAt: GENERATED_AT });
+  await writeCoverageReport(root, { preserve: "current-workspace" });
+  const output = await writeCoverageSnapshot(root, report);
+  assert.equal(output, path.join(root, SNAPSHOT_OUTPUT_RELATIVE_PATH));
+  const saved = JSON.parse(await readFile(output, "utf8"));
+  assert.deepEqual(saved.repository, REPOSITORY);
+  assert.equal(saved.snapshot.kind, "isolated");
+  assert.equal(saved.acceptance.postgres.status, "passed");
+  assert.match(saved.acceptance.postgres.note, /不证明 critical gate 全集/u);
+  assert.equal(saved.acceptance.postgres.scenarios[0].id, "quantity");
+  assert.deepEqual(JSON.parse(await readFile(path.join(root, OUTPUT_RELATIVE_PATH), "utf8")), { preserve: "current-workspace" });
+  await assert.rejects(writeCoverageSnapshot(root, { ...report, password: "fixture-secret" }), /restricted data/u);
+  assert.deepEqual(JSON.parse(await readFile(output, "utf8")), saved);
+});
+
+test("snapshot inputs reject mixed versions and unbound evidence", async (t) => {
+  const root = await temporaryDirectory(t, "plush-coverage-snapshot-invalid-");
+  await writeFile(path.join(root, "a.json"), JSON.stringify({ repository: REPOSITORY }));
+  await writeFile(path.join(root, "b.json"), JSON.stringify({ repository: { ...REPOSITORY, fingerprint: "b".repeat(64) } }));
+  await writeFile(path.join(root, "unbound.json"), JSON.stringify({ codeCoverage: {} }));
+  for (const paths of [["a.json", "b.json"], ["unbound.json"]]) {
+    await assert.rejects(buildCoverageSnapshot({ projectRoot: root, artifactPaths: paths, generatedAt: GENERATED_AT }), /complete source repository identity/u);
+  }
+  await assert.rejects(buildCoverageSnapshot({ projectRoot: root, artifactPaths: ["../outside.json"] }), /remain in the project/u);
+  assert.throws(() => parseArgs(["--snapshot"]), /requires explicit/u);
+  assert.throws(() => parseArgs(["--snapshot", "--artifact", "a.json", "--write"]), /cannot combine/u);
+  assert.equal(parseArgs(["--snapshot", "--artifact", "a.json"]).snapshot, true);
 });

@@ -106,7 +106,9 @@ export default function TableScrollControls({
         isAntTable ? 'tbody > tr.ant-table-row' : 'tbody > tr'
       )
       const enabled = maxLeft > 2 && row && scroller.clientWidth
-      scroller.classList.toggle('app-table-scroll-enhanced', Boolean(enabled))
+      // Keep native scrollbar geometry stable for the lifetime of the binding.
+      // Toggling it with overflow makes near-fit nested tables oscillate.
+      scroller.classList.add('app-table-scroll-enhanced')
       contentHeight = loadingContainer?.scrollHeight || 0
       if (!enabled) {
         setPosition(null)
@@ -226,7 +228,7 @@ export default function TableScrollControls({
       refresh: measure,
     }
     measure()
-  }, [tableRef, revision, useToolbar, id, busy, hosts, position])
+  }, [tableRef, revision, useToolbar, id, busy])
 
   useLayoutEffect(
     () => () => {

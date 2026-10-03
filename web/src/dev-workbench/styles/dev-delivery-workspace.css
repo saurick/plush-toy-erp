@@ -1,0 +1,132 @@
+.erp-dev-delivery-context {
+  display: grid;
+  align-items: center;
+  min-width: 0;
+  gap: 10px 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-dev-delivery-workspace > .erp-dev-delivery-context {
+  margin-block: 0;
+}
+
+.erp-dev-delivery-context__note,
+.erp-dev-delivery-boundary {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.erp-dev-delivery-facts {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 14px 28px;
+  margin: 0;
+}
+
+.erp-dev-delivery-facts > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.erp-dev-delivery-facts dt {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-dev-delivery-facts dd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.erp-dev-delivery-workspace .erp-dev-delivery-taskbar {
+  --erp-slider-radius: 6px;
+  --erp-slider-shadow: inset 0 0 0 1px var(--erp-primary);
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-dev-delivery-taskbar .erp-dev-task-nav__item {
+  border: 0;
+  border-radius: 6px;
+}
+
+.erp-dev-delivery-workspace [hidden] {
+  display: none;
+}
+
+.erp-dev-delivery-workspace [role='tabpanel'] {
+  min-width: 0;
+}
+
+.erp-dev-delivery-task-table th:first-child {
+  width: 18%;
+}
+
+.erp-dev-delivery-task-table td:nth-child(2) {
+  width: 22%;
+}
+
+.erp-dev-delivery-task-table td:last-child {
+  width: 160px;
+  white-space: nowrap;
+}
+
+.erp-dev-delivery-task-number {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  margin-inline-end: 10px;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary);
+  font-weight: 600;
+}
+
+.erp-dev-version-context {
+  grid-template-columns: minmax(360px, 0.85fr) minmax(0, 1.15fr);
+}
+
+.erp-dev-version-target-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+  padding-inline-start: 20px;
+  border-inline-start: 1px solid var(--erp-border);
+}
+
+.erp-dev-version-context .erp-dev-customer-scope__note {
+  grid-column: 1 / -1;
+}
+
+.erp-dev-version-target-context > .erp-dev-delivery-context__note {
+  flex-basis: 100%;
+}
+
+@media (max-width: 1200px) {
+  .erp-dev-version-context {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .erp-dev-version-target-context {
+    padding-block-start: 10px;
+    padding-inline-start: 0;
+    border-block-start: 1px solid var(--erp-border);
+    border-inline-start: 0;
+  }
+}

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 
 import {
   DEV_WORKBENCH_SERVE_PLUGIN_NAMES,
@@ -17,6 +20,70 @@ import {
   DEV_RUNTIME_STATUS_SCHEMA,
 } from '../src/dev-workbench/config/devRuntimeRecovery.mjs'
 
+test('Vite loads personal-network access from the local development env, with environment override', async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'plush-workbench-access-'))
+  const previousCwd = process.cwd()
+  const previousAccess = process.env.PLUSH_DEV_WORKBENCH_ACCESS
+  t.after(async () => {
+    process.chdir(previousCwd)
+    if (previousAccess === undefined) delete process.env.PLUSH_DEV_WORKBENCH_ACCESS
+    else process.env.PLUSH_DEV_WORKBENCH_ACCESS = previousAccess
+    await rm(directory, { recursive: true, force: true })
+  })
+  await writeFile(path.join(directory, '.env.development.local'), 'PLUSH_DEV_WORKBENCH_ACCESS=private-network\n')
+  process.chdir(directory)
+  delete process.env.PLUSH_DEV_WORKBENCH_ACCESS
+  const invokeAccess = async () => {
+    const config = await createERPViteConfig('desktop')({ command: 'serve', mode: 'development' })
+    let middleware
+    config.plugins.find((plugin) => plugin.name === 'plush-dev-operator-auth')
+      .configureServer({ middlewares: { use(value) { middleware = value } } })
+    let passed = false
+    const response = { statusCode: 200, setHeader() {}, end() {} }
+    middleware({
+      url: '/__dev/api/delivery/session', method: 'GET',
+      headers: { host: '192.168.0.133:15200' },
+      socket: { remoteAddress: '192.168.0.66', localAddress: '192.168.0.133', localPort: 15200 },
+    }, response, () => { passed = true })
+    return { passed, status: response.statusCode }
+  }
+  assert.deepEqual(await invokeAccess(), { passed: true, status: 200 })
+  process.env.PLUSH_DEV_WORKBENCH_ACCESS = 'operator'
+  assert.deepEqual(await invokeAccess(), { passed: false, status: 403 })
+  process.env.PLUSH_DEV_WORKBENCH_ACCESS = 'public'
+  assert.deepEqual(await invokeAccess(), { passed: false, status: 503 })
+})
+
+test('Vite scopes HTTPS proxy configuration to development serving and the exact allowed domain', async (t) => {
+  const previousOrigin = process.env.PLUSH_DEV_HTTPS_ORIGIN
+  t.after(() => {
+    if (previousOrigin === undefined) delete process.env.PLUSH_DEV_HTTPS_ORIGIN
+    else process.env.PLUSH_DEV_HTTPS_ORIGIN = previousOrigin
+  })
+  process.env.PLUSH_DEV_HTTPS_ORIGIN = 'https://dev.example.test:8443'
+  const factory = createERPViteConfig('desktop')
+  const config = await factory({ command: 'serve', mode: 'development' })
+  assert.deepEqual(config.server.allowedHosts, ['dev.example.test'])
+  assert.equal(config.server.hmr.clientPort, undefined)
+  const middlewares = []
+  config.plugins.find((plugin) => plugin.name === 'plush-dev-operator-auth')
+    .configureServer({ middlewares: { use: (middleware) => middlewares.push(middleware) } })
+  const request = {
+    method: 'GET',
+    headers: { host: 'dev.example.test:8443', 'x-forwarded-proto': 'https', 'x-forwarded-for': '192.168.0.66' },
+    socket: { localAddress: '127.0.0.1', remoteAddress: '127.0.0.1' },
+  }
+  middlewares[0](request, {}, () => {})
+  const { isDevWorkbenchRequest } = await import('./devServerSecurity.mjs')
+  assert.equal(isDevWorkbenchRequest(request), true)
+  process.env.PLUSH_DEV_HTTPS_ORIGIN = 'http://invalid.example.test'
+  await assert.rejects(factory({ command: 'serve', mode: 'development' }), /PLUSH_DEV_HTTPS_ORIGIN/u)
+  for (const mode of ['development', 'production']) {
+    const build = await factory({ command: 'build', mode })
+    assert.deepEqual(build.server.allowedHosts, [])
+  }
+})
+
 test('development serve registry is exact with and without a customer, and absent from all builds', async (t) => {
   const previousCustomerKey = process.env.ERP_DEV_CUSTOMER_KEY
   t.after(() => {
@@ -27,6 +94,7 @@ test('development serve registry is exact with and without a customer, and absen
     }
   })
   assert.deepEqual(DEV_WORKBENCH_SERVE_PLUGIN_NAMES, [
+    'plush-dev-operator-auth',
     'plush-dev-web-instance',
     'plush-dev-customer-import-dry-run-api',
     'plush-dev-customer-config',
@@ -74,6 +142,7 @@ test('development serve registry is exact with and without a customer, and absen
       DEV_WORKBENCH_SERVE_PLUGIN_NAMES.includes(name)
     )
     assert.deepEqual(installedServePlugins, [
+      'plush-dev-operator-auth',
       'plush-dev-web-instance',
       'plush-dev-customer-import-dry-run-api',
       ...(customerKey ? ['plush-dev-customer-config'] : []),

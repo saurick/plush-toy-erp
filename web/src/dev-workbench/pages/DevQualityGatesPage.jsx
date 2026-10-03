@@ -21,7 +21,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
-import { useSearchParams } from 'react-router-dom'
+import { Link as RouterLink, useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
@@ -32,6 +32,7 @@ import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevCiWorkflowGuide from '../components/DevCiWorkflowGuide.jsx'
 import DevCiJobTimeline from '../components/DevCiJobTimeline.jsx'
+import { DEV_DOCS_ROUTE } from '../config/devDocs.mjs'
 import {
   DEFAULT_SERVER_VIEW,
   DEFAULT_VIEW,
@@ -62,6 +63,7 @@ import {
 const { Link, Paragraph, Text, Title } = Typography
 const POLL_INTERVAL_MS = 1500
 const SOURCE_PATH = 'scripts/qa/README.md'
+const SECURITY_GUIDE_HREF = `${DEV_DOCS_ROUTE}?path=${encodeURIComponent('docs/security/应用安全与验证边界.md')}`
 const EMPTY_VIEW_STATE = Object.freeze({
   server: Object.freeze({ serverView: DEFAULT_SERVER_VIEW }),
   run: Object.freeze({ profile: '', operation: '' }),
@@ -2438,6 +2440,15 @@ function RunView({
   )
 }
 
+function SecurityGuideLink() {
+  return (
+    <Paragraph type="secondary">
+      查看<RouterLink to={SECURITY_GUIDE_HREF}>应用安全与验证边界</RouterLink>：
+      核对权限控制、扫描范围和带日期的审计摘要。
+    </Paragraph>
+  )
+}
+
 function GovernanceView({ data, loading, error, values, onSearch, onFilter }) {
   const [draft, setDraft] = useState(values.q || '')
   useEffect(() => setDraft(values.q || ''), [values.q])
@@ -2525,6 +2536,7 @@ function GovernanceView({ data, loading, error, values, onSearch, onFilter }) {
           onChange={onFilter}
         />
       </div>
+      <SecurityGuideLink />
       {error ? (
         <Alert
           type="error"
@@ -2606,6 +2618,7 @@ function GapsView({ data, loading, error, values, onRange, onRisk }) {
           onChange={onRisk}
         />
       </div>
+      <SecurityGuideLink />
       {error ? (
         <Alert
           type="error"
@@ -3033,6 +3046,7 @@ export default function DevQualityGatesPage() {
               质量门禁
             </Title>
           </Space>
+
         </div>
         <Button
           type="primary"

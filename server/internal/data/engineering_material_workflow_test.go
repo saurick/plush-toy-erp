@@ -8,6 +8,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
 )
@@ -242,5 +243,77 @@ func TestEngineeringMaterialWorkflowFinanceAuditFailureRollsBackPurchaseOrders(t
 	materialWorkflowTask(t, ctx, client, biz.WorkflowMaterialFinanceReviewGroup, request.ID, "ready")
 	if client.PurchaseOrder.Query().CountX(ctx) != 0 || client.PurchaseOrderItem.Query().CountX(ctx) != 0 {
 		t.Fatal("failed finance approval left purchase commitments")
+	}
+}
+
+func TestSourceDocumentPostgresEngineeringMaterialFinanceFailureAndRetry(t *testing.T) {
+	for _, phase := range []string{"purchase_item", "audit_event"} {
+		t.Run(phase, func(t *testing.T) {
+			data, client := openPurchaseReceiptPostgresTestData(t)
+			ctx := context.Background()
+			f := prepareMaterialRequestFixture(t, ctx, data, "PG-MR-RETRY-"+postgresTestSuffix())
+			request := submitMaterialRequestFixture(t, ctx, f)
+			boss, err := f.uc.ReviewEngineeringMaterialRequest(ctx, &biz.EngineeringMaterialReview{
+				ID: request.ID, ExpectedVersion: request.Version, ActorID: 22, Action: "BOSS_APPROVE",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			task := materialWorkflowTask(t, ctx, client, biz.WorkflowMaterialFinanceReviewGroup, request.ID, "ready")
+			beforeEvents := client.WorkflowTaskEvent.Query().CountX(ctx)
+			beforeTasks := client.WorkflowTask.Query().CountX(ctx)
+			beforeLines := client.PurchaseOrderItem.Query().CountX(ctx)
+			in := financeMaterialRequestInput(boss)
+			in.WorkflowTaskID, in.ExpectedTaskVersion = task.ID, task.Version
+			injected := errors.New("injected material finance persistence failure")
+			failing := true
+			writes := 0
+			hook := func(next ent.Mutator) ent.Mutator {
+				return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+					writes++
+					if failing && (phase == "audit_event" || writes == 2) {
+						return nil, injected
+					}
+					return next.Mutate(ctx, m)
+				})
+			}
+			if phase == "purchase_item" {
+				client.PurchaseOrderItem.Use(hook)
+			} else {
+				client.WorkflowTaskEvent.Use(hook)
+			}
+			if _, err := f.uc.ReviewEngineeringMaterialRequest(ctx, in); !errors.Is(err, injected) {
+				t.Fatalf("expected injected transaction failure: %v", err)
+			}
+			current, err := f.uc.GetEngineeringMaterialRequestByID(ctx, f.order.ID, request.ID)
+			if err != nil || current.Status != boss.Status || current.Version != boss.Version || current.FinanceReviewedBy != nil {
+				t.Fatalf("finance state survived rollback: %+v %v", current, err)
+			}
+			ready := materialWorkflowTask(t, ctx, client, biz.WorkflowMaterialFinanceReviewGroup, request.ID, "ready")
+			if ready.Version != task.Version || client.WorkflowTaskEvent.Query().CountX(ctx) != beforeEvents || client.WorkflowTask.Query().CountX(ctx) != beforeTasks {
+				t.Fatal("failed approval persisted task transitions or audit events")
+			}
+			if client.PurchaseOrder.Query().Where(purchaseorder.EngineeringMaterialRequestID(request.ID)).CountX(ctx) != 0 || client.PurchaseOrderItem.Query().CountX(ctx) != beforeLines {
+				t.Fatal("failed approval left a partial supplier purchase result")
+			}
+			failing = false
+			approved, err := f.uc.ReviewEngineeringMaterialRequest(ctx, in)
+			if err != nil || approved.Status != biz.MaterialRequestApproved || approved.Version != boss.Version+1 {
+				t.Fatalf("retry did not complete approval: %+v %v", approved, err)
+			}
+			assertMaterialPurchaseResult(t, ctx, client, request)
+			done := materialWorkflowTask(t, ctx, client, biz.WorkflowMaterialFinanceReviewGroup, request.ID, "done")
+			afterEvents := client.WorkflowTaskEvent.Query().CountX(ctx)
+			if done.Version != task.Version+1 {
+				t.Fatal("retry completed the task more than once")
+			}
+			if _, err := f.uc.ReviewEngineeringMaterialRequest(ctx, in); err != nil {
+				t.Fatal(err)
+			}
+			assertMaterialPurchaseResult(t, ctx, client, request)
+			if client.WorkflowTaskEvent.Query().CountX(ctx) != afterEvents {
+				t.Fatal("retry replay duplicated audit events")
+			}
+		})
 	}
 }

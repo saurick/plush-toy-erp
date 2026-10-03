@@ -1,3 +1,4 @@
+import { createDevOperationUUID } from './devOperationIdentity.mjs'
 import { DEV_QUALITY_GATES_ROUTE } from './devRoutes.mjs'
 
 export { DEV_QUALITY_GATES_ROUTE }
@@ -374,6 +375,8 @@ function normalizeBusy(busy) {
           'fast',
           'role-access',
           'field-linkage',
+          'pressure-quick',
+          'pressure-capacity',
           'full',
           'strict',
         ].includes(busy.profile))) ||
@@ -1160,7 +1163,7 @@ export function buildQualityGateViewSearch(view, values = {}) {
 
 export function createQualityGateIdempotencyKey(
   profile,
-  { randomUUID = () => globalThis.crypto.randomUUID() } = {}
+  { randomUUID = () => createDevOperationUUID() } = {}
 ) {
   if (!DEV_QUALITY_GATE_PROFILES.includes(profile)) {
     throw new Error('质量门禁类型无效')

@@ -31,7 +31,7 @@ async function sampleMotion(
       )
       const items = [
         ...group.querySelectorAll(
-          '.ant-segmented-item, [role="tab"], .erp-dev-governance-task-nav__item'
+          '.ant-segmented-item, [role="tab"]'
         ),
       ]
       const read = () => {
@@ -242,7 +242,6 @@ export function createTabMotionScenarios({ outputDir }) {
           'dev-reader',
           'dev-nav',
           'dev-journey',
-          'governance',
           'collaboration',
           'workflow',
           'images',
@@ -262,7 +261,7 @@ export function createTabMotionScenarios({ outputDir }) {
           )
           await page
             .locator(
-              `#${id} .ant-segmented-item, #${id} [role="tab"], #${id} .erp-dev-governance-task-nav__item`
+              `#${id} .ant-segmented-item, #${id} [role="tab"]`
             )
             .first()
             .click()

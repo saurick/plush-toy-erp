@@ -86,6 +86,16 @@ async function withTempGitRepo(callback) {
   }
 }
 
+test("affected: shared coverage contract selects its publishing and API consumers", () => {
+  const plan = buildAffectedPlan(["scripts/qa/lib/coverage-report-contract.mjs"], { root: ROOT });
+  assert.equal(plan.localGate, "focused");
+  assert.deepEqual(selectedTests(plan), [
+    "scripts/qa/test-coverage-report.test.mjs",
+    "web/dev-server/devQaCoveragePlugin.test.mjs",
+  ]);
+  assert(!ids(plan).includes("full"));
+});
+
 test("affected: docs-only changes stay at T1", () => {
   const plan = buildAffectedPlan(["docs/product/自动化测试策略.md"], {
     root: ROOT,
@@ -496,6 +506,26 @@ test("affected: DEV 页面改动只选择聚焦合同与受影响桌面 smoke", 
       "web/src/dev-workbench/pages/DevProductCorePage.jsx",
       "dev-page-product-core-desktop-light",
     ],
+    [
+      "web/src/dev-workbench/components/DevPressurePanel.jsx",
+      "dev-pressure-desktop",
+    ],
+    [
+      "web/src/dev-workbench/config/devPressure.mjs",
+      "dev-pressure-desktop",
+    ],
+    [
+      "web/src/dev-workbench/styles/dev-pressure.css",
+      "dev-pressure-desktop",
+    ],
+    [
+      "web/scripts/style-l1/devPressureScenarios.mjs",
+      "dev-pressure-desktop",
+    ],
+    [
+      "web/src/dev-workbench/pages/DevTestingPage.jsx",
+      "dev-pressure-desktop",
+    ],
   ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const governanceCommand = plan.commands.find((item) =>
@@ -530,6 +560,7 @@ test("affected: shared DEV navigation expands only to the canonical desktop scen
   assert.match(browser.text, /dev-page-overview-desktop-light/u);
   assert.match(browser.text, /dev-quality-gates-desktop-light/u);
   assert.match(browser.text, /dev-version-center-tabs-pagination-desktop/u);
+  assert.match(browser.text, /dev-pressure-desktop/u);
   assert.doesNotMatch(browser.text, /mobile|dark/u);
 });
 
@@ -581,6 +612,20 @@ test("affected: DEV server ordinary plugins stay focused while privileged bridge
       ),
     ),
   );
+});
+
+test("affected: pressure bridges select their report and action contracts plus operation boundaries", () => {
+  for (const file of [
+    "web/dev-server/devQaTestingPlugin.mjs",
+    "web/dev-server/devQaPressureReports.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const tests = selectedTests(plan);
+    assert(tests.includes(file.replace(/\.mjs$/u, ".test.mjs")), file);
+    assert(tests.includes("web/dev-server/devServerSecurity.test.mjs"), file);
+    assert(plan.followUps.some((item) => item.id === "dev-operation-boundary"), file);
+    assert.equal(ids(plan).includes("full"), false, file);
+  }
 });
 
 test("affected: combined direct-test command keeps a bounded stable id", () => {
@@ -704,6 +749,22 @@ test("affected: transactional workflow and customer repositories select critical
     assert(ids(plan).includes("critical-pg-create"), file);
     assert(ids(plan).includes("critical-pg-migrate"), file);
     assert(ids(plan).includes("critical-pg-test"), file);
+  }
+});
+
+test("affected: material approval and shared unit rounding select PostgreSQL proof", () => {
+  for (const file of [
+    "server/internal/data/engineering_material_request_repo.go",
+    "server/internal/data/engineering_material_calculation_test.go",
+    "server/internal/biz/engineering_material_request.go",
+    "server/internal/biz/unit_quantity.go",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    assert(ids(plan).includes("server-domain"), file);
+    assert(ids(plan).includes("critical-pg-create"), file);
+    assert(ids(plan).includes("critical-pg-migrate"), file);
+    assert(ids(plan).includes("critical-pg-test"), file);
+    assert.equal(plan.maxAffectedScope, "T7", file);
   }
 });
 

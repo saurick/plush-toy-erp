@@ -4,7 +4,7 @@
 
 本项目采用一条主链：
 
-**GitLab 代码真源与 CI/CD + 独立 KVM Runner VM + GitHub 单向 GPT Review 镜像 + GHCR digest 镜像 + GitLab Release 可移植制品 + 本地 loopback Bridge + 固定目标 operation。**
+**GitLab 代码真源与 CI/CD + 独立 KVM Runner VM + GitHub 单向 GPT Review 镜像 + GHCR digest 镜像 + GitLab Release 可移植制品 + 开发态同源 Bridge + 固定目标 operation。**
 
 GitLab 独立承担 main CI。GitLab 负责 protected main、merge request、七分片 exact-SHA aggregate、`CI Gate`、Generic Package 与 Release；GitHub main 只接收 protected-main push mirror，供 GPT 审查、外部只读浏览和历史 Release 读取，不运行仓库 CI，也不保留发布写路径。工作台读取 GitLab 证据，不复制一套 CI 状态机。
 
@@ -20,7 +20,7 @@ flowchart LR
   G -->|protected push mirror| H["GitHub<br/>GPT Review mirror"]
   R -->|image by digest| C["GHCR"]
   R -->|v2 seven immutable assets| P["GitLab Package + Release"]
-  W["DEV-only version center"] -->|loopback fixed API| B["Delivery Bridge"]
+  W["DEV-only version center"] -->|development same-origin fixed API| B["Delivery Bridge"]
   B -->|read/dispatch| G
   B -->|download exact assets| P
   B -->|confirmed operation| T["demo-133 / customer-test-133"]
@@ -90,7 +90,7 @@ Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。重试时
 
 `scripts/deploy/gitlab-delivery-provider.mjs` 是默认 Provider，固定 GitLab base URL、项目、Generic Package、release tag、pipeline API 和本地下载根。它从服务端环境读取 `PLUSH_GITLAB_TOKEN`，限制 JSON 大小、asset 名、文件大小、URL、SHA、版本和符号链接路径，返回值不含 token。
 
-质量门禁与版本中心读取 GitLab pipeline / job、不可变版本目录、发布状态和控制制品时使用独立的 `PLUSH_GITLAB_READ_TOKEN`，不复用发布与部署写凭据。macOS 本地 `pnpm start` 可从固定钥匙串项自动加载该令牌；服务端只把它映射给不暴露发布方法的只读 GitLab Provider，浏览器、本机质量门禁进程和部署执行子进程均不得继承。创建新发布仍只使用短期 `PLUSH_GITLAB_TOKEN`；未加载时只停用该动作，不影响已有版本与流水线证据读取。实例强制的最大有效期届满前需要按同一最小权限重新登记，不能以扩大为写权限换取自动轮换。
+质量门禁与版本中心读取 GitLab pipeline / job、不可变版本目录、发布状态和控制制品时使用独立的 `PLUSH_GITLAB_READ_TOKEN`，不复用发布与部署写凭据。macOS 本地启动从固定钥匙串项加载；Linux 从当前服务用户的受控凭据文件加载，来源与权限合同见 [前端启动脚本](../../web/scripts/README.md)。服务端只把令牌映射给不暴露发布方法的只读 GitLab Provider，浏览器、本机质量门禁和部署子进程均不得继承。创建新发布仍只使用短期 `PLUSH_GITLAB_TOKEN`；缺失时停用该按钮并在发布区说明，不作为全局读取故障。读取凭据缺失、API 失败或目录未通过核对时，页面明确显示读取未就绪；版本与流水线分别按实际取得的证据展示。实例强制的最大有效期届满前需要按同一最小权限重新登记，不能以扩大为写权限换取自动轮换。
 
 `scripts/deploy/github-delivery-provider.mjs` 继续读取 GitHub 历史 Release，并把 v1 六资产投影为只读、可回滚但不可用于显式版本提升（Explicit Promotion）。仓库不保留 GitHub Actions workflow、发布 publisher 或 strict 复用 writer；adapter 的发布方法在调用 `gh` 前固定拒绝。恢复 GitHub 写路径必须重新专项评审 canonical v2 七资产、同一演练回执、Provider 并发与凭据边界。浏览器不知道 token，也不能选择 Provider。
 
@@ -208,19 +208,20 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 
 ## 本地开发入口 Dev-only surfaces
 
-下列页面只在开发构建中可访问，不进入侧栏、`seedData`、RBAC、产品内文档 registry、生产构建或 ERP 正式菜单。除本机 loopback Bridge 明确登记的客户配置、版本交付、测试数据和共享开发库迁移操作外，页面不直接写后端业务。
+开发工作台页面、会话、状态读取和全部执行 / 取消 API 先检查访问模式。默认 `operator` 使用独立运维身份，身份缺失失败关闭，远程仅通过受控 SSH 隧道、真实 TLS 私网连接或显式配置的本机 HTTPS 代理；个人受控内网可显式配置 `PLUSH_DEV_WORKBENCH_ACCESS=private-network`，直接打开数字内网地址且无需额外工作台登录。HTTPS 域名使用单个 `PLUSH_DEV_HTTPS_ORIGIN` 和只允许内网客户端的本机 TLS 代理，Vite 仅放行指定域名，HMR 跟随页面使用 WSS。两种模式均保留网络、同源、CSRF、确认和预检，业务权限仍由后端控制。配置、边界与可用性端点例外见 [开发服务 Bridge](../../web/dev-server/README.md#边界)。
+
+下列页面只在开发构建中可访问，不进入侧栏、`seedData`、RBAC、产品内文档 registry、生产构建或 ERP 正式菜单。除开发态同源 Bridge 明确登记的客户配置、版本交付、测试数据和共享开发库迁移操作外，页面不直接写后端业务。
 
 | 路径 | 职责 | 维护真源 |
 | --- | --- | --- |
-| `/__dev` | 搜索、筛选、置顶开发工具，并按需查看使用指南 | `web/src/dev-workbench/config/devHub.mjs`、`devWorkbenchFlow.mjs` |
-| `/__dev/product-engineering` | 对照产品内核、权限、规则、业务链、文档和 UI 交互设计入口 | `web/src/dev-workbench/config/devHub.mjs` |
+| `/__dev` | 工具检索、常用工具与使用指南 | `web/src/dev-workbench/config/devWorkbenchFlow.mjs`、`devHub.mjs` |
+| `/__dev/product-engineering` | 直接进入内核、权限、规则、业务链、文档和 UI 交互设计 | `web/src/dev-workbench/config/devHub.mjs` |
 | `/__dev/product-core` | 当前 Product Core 能力、归属、范围和边界 | `docs/product/产品能力进度台账.md` |
 | `/__dev/permission-relationships` | 当前账号、岗位、最终功能、页面、仓库范围和审批责任 | 现有后台只读接口与已启用客户配置 |
-| `/__dev/governance` | 项目治理地图只读可视化 | `docs/项目治理地图.md` |
 | `/__dev/status-flows` | 业务链、协同、运行、事实与状态规则只读观察 | 代码合同、三类 dev-only 配置目录与正式架构文档 |
 | `/__dev/business-usability` | 页面说明检查；从改动验证按需进入 | `web/src/erp/config/businessUsabilityCatalog.mjs` |
 | `/__dev/docs` | 当前工作区 Markdown 查看器 | 仓库 Markdown 文件本身 |
-| `/__dev/testing` | 本轮验证、专项检查、Git 收口和证据覆盖 | `docs/product/自动化测试策略.md` |
+| `/__dev/testing` | 本轮验证与证据覆盖；专项命令、页面说明和 Git 收口按需进入 | `docs/product/自动化测试策略.md` |
 | `/__dev/quality` | 质量验证任务入口；按本轮目标进入改动验证、质量门禁或测试数据 | `web/src/dev-workbench/config/devHub.mjs` |
 | `/__dev/quality-gates` | full / strict 运行、结果、耗时、治理与覆盖缺口 | 正式 QA runner、门禁回执、affected 与本地 operation |
 | `/__dev/data-preparation` | 固定数据范围检查、计划确认、执行与回执 | 既有 Core seed、统一本地验收 lifecycle 与 operation store |
@@ -229,29 +230,34 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 | `/__dev/ui-design` | 最新 HTML 交互稿、设计说明与设计依据 | `docs/product/ui-design/**` |
 | `/__dev/customer-config` | 已登记客户配置包预检、测试应用与发布门禁 | `config/customers/<customer-key>/*` 及 customer config 脚本 |
 | `/__dev/version-center` | exact-SHA 发布、固定 133 部署与回滚 | GitLab Release、固定目标预检与 operation 回执 |
-| `/__dev/drill-recovery` | 演练优先级、周期、证据状态与安全接管入口 | 固定目标预检、不可变 Release 与部署 / 回滚 operation 回执 |
+| `/__dev/drill-recovery` | 安全核验要求、演练周期、恢复证据与事件处置指引 | 应用安全合同、固定目标预检与恢复 / operation 回执 |
 
 ### 开发导航 `/__dev`
 
-首页默认展示十四个已登记工具的二维表，名称直接进入页面；搜索、领域筛选、结果数量和常用标记集中在同一操作区。“全部工具 / 常用工具 / 使用指南”使用共享 Tab，选择与筛选写入 URL；常用只保存当前浏览器偏好。来源和边界通过具名按钮按需查看，完整工作指南按需进入，不把教程步骤当成任务状态。
+- 首页默认展示工具表，包含名称、所属领域、用途、使用时机与常用标记。搜索、领域筛选、结果数量放在同一操作行；工具名称直接进入页面，来源与边界通过具名信息按钮按需查看。
+- “全部工具 / 常用工具 / 使用指南”使用保持挂载的共享 Tab。`view=tools|pinned|path`、`q` 和 `group` 写入 URL，刷新与前进后退恢复选择；未识别的视图回到全部工具。常用工具复用当前浏览器的置顶偏好，最多五项；没有常用工具时给出添加方法。
+- 使用指南以任务、核对重点和工具入口组成简表，不设置步骤进度或推断已完成状态。工具独立使用，具体执行结果以版本、环境和回执为准。
+- 左侧常驻总览及三个责任区，并在各责任区下直接列出工具。页面使用与 ERP 桌面一致的主题、16px 主标题、34px 控件和紧凑表格；页头保留当前页面与操作，不再重复教程、英文副标题或说明卡。只读说明、来源与使用帮助按需查看；真实异常、未完成操作和确认条件仍就近可见。
 
-四个一级路由与任务路由共用分组侧栏、当前页高亮、复制页面链接和来源文档入口。一级菜单按责任域命名为“总览、产品工程、质量验证、交付运行”；常驻二级入口按任务名称显示。页面说明检查属于质量验证，可从改动验证进入，仍保留独立深链，不占常驻侧栏。开发工具仅供维护使用，运行、发布与目标状态以各工具真实回执为准。
-
-| 一级菜单 | 常驻二级入口 |
+| 一级菜单 | 二级菜单 |
 | --- | --- |
-| 产品工程 | 产品内核、权限关系、改动指南、业务链观察、开发文档、UI 交互设计 |
+| 产品工程 | 产品内核、权限关系、业务链观察、开发文档、UI 交互设计 |
 | 质量验证 | 改动验证、质量门禁、测试数据 |
-| 交付运行 | 客户配置、数据库迁移、版本发布、演练与恢复 |
+| 交付运行 | 客户配置、数据库迁移、版本发布、安全与恢复 |
 
-“产品工程”和“质量验证”一级页直接对照对应工具的用途与使用时机；交付运行默认提供工具对照，并可切换到环境证据。环境结果只在选择该视图后读取，不以静态状态代替运行回执。各工具页保留已有权限、确认、异常恢复和操作历史，不把并列入口编号成强制步骤。窄屏菜单可滚动，保持单一当前页语义。
+“质量验证”一级页直接以工具表提供改动验证、质量门禁和测试数据入口，页头提供开始验证。“交付运行”一级页分为“准备交付 / 环境证据”两个 Tab，默认比较四个交付工具，页头提供版本发布；选择环境证据后才挂载四类环境对照，默认视图不读取环境证据摘要。Git 收口由“核对 Git 收口”按需进入。两者都不复制子页的详细 operation 历史；full / strict 运行结果、阶段和历史统一在“质量门禁”核对，当前 SHA 的 strict 发布资格统一在“版本发布”核对。
+
+移动端全局菜单允许横向滚动，并保持单一当前页语义。
 
 #### 工作台入口变更门禁
 
-新入口在 `DEV_HUB_ITEMS.areaKey` 登记唯一责任区域，首页、分类页与侧栏沿用同一份路由和入口登记。根据使用频率决定是否进入常驻导航；辅助工具可由任务页按需进入。调整入口时核对 key、路由、标题、用途、使用时机、来源、状态和边界，并验证桌面默认、筛选、返回、异常与相邻页面。
+- 新入口先归入“产品工程、质量验证、交付运行”之一，并在 `DEV_HUB_ITEMS.areaKey` 维护唯一归属；分类页和全部入口使用该登记，不在总览阶段重复列工具。
+- 新能力默认进入对应责任区域和“全部工具”；辅助工具可由任务页按需进入，不强制列入常驻导航。常驻导航按使用频率与责任归属调整；不为每个入口增加教程或重复快捷方式。
+- 新增或调整入口时，同步核对入口 key、路由、标题、用途、维护来源、状态与边界，并运行配置单测及受影响的 Style L1 浅色桌面默认态、交互态、恢复态与相邻页面检查。仅在外部行为变化时更新本节。
 
 ### 产品工程入口 `/__dev/product-engineering`
 
-该页直接比较六个已登记工具的名称、用途、使用时机和打开动作，不再要求先选择“问题”或“项目图”视角。具体权限关系图、业务链图及运行证据仍在各自工具中展示；技术来源和边界按需展开。页面说明检查从改动验证进入。
+该页直接列出产品内核、权限关系、业务链观察、开发文档和 UI 交互设计五个工具。入口名称复用正式开发导航，以工具、用途、使用时机和操作组成二维对照表；技术来源与证据边界按需展开。页面不维护视角选择或其 URL 状态，也不把并列工具编号为执行步骤。业务链、权限和质量页面内部的实际关系图、运行查询和证据继续由各自页面维护。
 
 ### 产品内核 `/__dev/product-core`
 
@@ -261,9 +267,9 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 
 该页动态读取当前后端返回的员工账号、岗位、最终功能解释、可进入页面、仓库数据范围和已启用审批责任，并复用正式前端菜单目录投影完整的“看板中心 / 常用工作 / 更多功能”实际侧栏；它不是截图里的静态样例，也不是实时订阅，进入页面或点击刷新时才重新读取。默认打开“实际菜单”Tab，“关系图”和“明细核对”各自提供功能模块筛选；顶部摘要始终按所选岗位或账号的全部模块计算，“岗位已选但受限”只统计岗位已选择、但被当前配置限制的功能，不混入产品权限全集中尚未授予的功能。“明细核对”可切换到“包含未授予”，逐项列出正式权限目录中该岗位没有选择的功能。岗位视角读取已保存的系统推荐或自定义布局，员工视角按账号岗位顺序合并；超级管理员缺少独立有效会话、任一岗位最终结果未完整读取或账号 / 岗位已停用时会明确失败关闭或标记当前不可使用，不从前端样例猜测菜单。`mode / target / tab / module / scope` 写入 URL，可刷新、分享并使用前进后退恢复；页面并列显示结果终局性、权限来源、客户配置版本、产品版本、岗位版本、审批设置版本和最近读取时间，审批受阻时使用业务原因而不是内部代码。页面只读取现有后台接口，不保存岗位、员工或客户配置，不创建新的权限真源；任务、单据、Workflow / ProcessRuntime 运行状态、Fact / Ledger，以及某张记录在当前状态是否可操作都不进入本页。正式配置仍在 `/erp/system/permissions` 办理，保存后返回本页刷新核对；该页及其路由、文案、样式和代码块必须随研发效能工作台一起排除在生产构建之外。
 
-### 项目治理地图 `/__dev/governance`
+### 改动规则速查
 
-该页只读解析 `docs/项目治理地图.md`，主标题使用“这次改动该怎么做？”。默认按八类常见改动进入，不要求先理解架构层级、测试内部键或中英文工程术语；选中后只展示“先看这些、同时检查、不要误判”三步。任务名称、稳定 `task` 键、内部范围、依据、同步检查和边界均由 Markdown 明确维护，页面不再根据共享文档路径或关键词猜测相关任务。内部范围、个人 ToB 五步交付循环、治理维度解释、完整 Mermaid 关系图和维护来源统一放进“完整工作方式和内部说明”，默认折叠。`task` 写入 URL，可刷新、前进后退和分享；旧 `axis` / `scope` 参数会被清理，非法值回到第一项。该页继续保持 dev-only、只读和单一 Markdown 真源，不新增后端、数据库、RBAC 或正式菜单能力。
+`docs/项目治理地图.md` 作为开发文档中的速查资料，按常见改动列出参考依据、同步检查和误判边界。需要时从 `/__dev/docs` 搜索或直接打开；总览使用指南中的“明确改动”也直接链接这份文档。规则选择、影响范围判断和最小充分验证由 Codex 按当前任务、代码及项目 Skills 执行，不要求开发者每次先浏览分类。
 
 ### 业务链与运行观察台 `/__dev/status-flows`
 
@@ -279,7 +285,7 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 
 ### 页面说明检查 `/__dev/business-usability`
 
-- 从改动验证的按需入口进入，也可使用原有深链；不占常驻侧栏。
+- 从改动验证的“更多检查”进入，不占据产品工程或质量验证的常驻二级导航。检查说明与边界默认折叠，页面保留返回改动验证入口。
 - 页面只读消费正式业务页面目录、现有业务链目录、岗位帮助和 `businessUsabilityCatalog.mjs`，按页面检查“当前要做什么、做到什么算完成、完成后交给谁、办理顺序、名词、公式、字段来源和禁用原因”是否齐全；不复制权限、岗位责任或业务链矩阵。
 - `已覆盖 / 部分覆盖 / 缺失` 只表示说明目录的完整程度，不表示页面已发布、客户已验收或员工已经会用。岗位标签只是岗位帮助中的常用入口推荐，实际页面与动作仍以后端权限和当前账号投影为准。
 - 页面支持按覆盖状态、岗位帮助和通俗文字筛选，并可回到正式业务页、帮助中心或业务链观察继续核对；它不调用业务写接口，不保存覆盖状态，也不建立 CMS、审批流或培训统计。
@@ -299,6 +305,8 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 效能工作台与业务端共用 206px 贴边侧栏、48px 紧凑顶栏、中性底色和蓝色主题，质量验证与交付入口也使用同一控件样式。页面名称由内容区唯一主标题承载，顶栏只保留全局操作，不重复同名标题。外观与密度在当前浏览器保存，深色与窄屏必须分别验证。
 
 该页只展示 `docs/product/ui-design/index.html` 这一份最新可交互稿。稳定页签切换交互稿、设计说明和设计依据，切回预览保留演示现场；重置演示显式恢复样例。支持下载单文件 HTML 和全屏预览，使用隔离 sandbox、内存存储及网络限制。全屏圈定焦点，Escape 关闭后恢复触发按钮。设计稿不访问业务接口，也不作为菜单、权限、流程或事实真源。
+
+工作台总览的“UI 交互设计”进入设计查看器，可切换效能工作台预览（`?page=workbench`）。正式总览使用工具表、常用工具和使用指南，分组侧栏直达各工具；交互稿演示相同的导航、筛选及按需帮助，并保留验证、计划确认和结果读回。样例状态只留在隔离预览中，正式页面消费真实证据。
 
 <a id="interaction-controls"></a>
 
@@ -322,33 +330,41 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 
 机械防回退由现有 ESLint 与 Stylelint 承担：禁止直接使用 AntD Tabs / Segmented、自写原生 `tablist`，阻止页面覆盖共享 Tab / FilterChip 的选中色与边框。浏览器回归 `global-tab-sliding-light/dark`、`dev-control-standards` 与移动进度场景同时检查实际边界和文字对比度、选中标记、键盘、禁用、稳定盒模型、动画中间帧及减少动态效果。样例或动画测试绿色不替代具体业务页面检查。
 
+<a id="pressure-workbench"></a>
+
 ### 测试入口 `/__dev/testing`
 
-- 该页只读解析自动化测试策略、`scripts/README.md`、`web/scripts/README.md`、前后端 README 和部署说明等 9 份当前白名单文档，主视图按任务命名为“本轮验证”“专项检查库”“Git 收口”和“证据与覆盖”，稳定 `view=tiers|commands|closeout|coverage`。Git 收口只读展示 `core.hooksPath`、固定 Hook 文件与可执行权限，解释 pre-commit、commit-msg、prepare-push 和 pre-push 的职责；页面只能复制固定核对/准备命令，不执行、不暂存、不提交或推送。默认只展开“生成验证计划—运行匹配检查”主路径；17 组复制预设与内部 T0–T8 验证范围按需展开，T0–T8 不是完成进度或逐级验收。full / strict 不再作为主复制预设，页面以“前往质量门禁”深链进入固定 profile，终端入口仍在策略与脚本文档详情中保留。完整 Markdown 继续由独立的 `/__dev/docs` 查看器负责，不在测试入口复制第二个文档阅读器。
+- 该页只读解析自动化测试策略、`scripts/README.md`、`web/scripts/README.md`、前后端 README 和部署说明等 9 份当前白名单文档，主 Tab 为“本轮验证”“证据与覆盖”和“压力测试”。“更多检查”按需进入页面说明检查、专项检查命令或完整 / 严格门禁，交付运行的“核对 Git 收口”进入 Git 收口；两个辅助视图提供返回入口，主 Tab 保持挂载，稳定 `view=tiers|commands|closeout|coverage|pressure`。来源规模与工具边界收进“工具说明与来源”，真实错误和阻塞继续直接展示。Git 收口只读展示 `core.hooksPath`、固定 Hook 文件与可执行权限，解释 pre-commit、commit-msg、prepare-push 和 pre-push 的职责；页面只能复制固定核对/准备命令，不执行、不暂存、不提交或推送。默认只展开“生成验证计划—运行匹配检查”主路径；17 组复制预设与内部 T0–T8 验证范围按需展开，T0–T8 不是完成进度或逐级验收。full / strict 不再作为主复制预设，页面以“完整或严格门禁”深链进入固定 profile，终端入口仍在策略与脚本文档详情中保留。完整 Markdown 继续由独立的 `/__dev/docs` 查看器负责，不在测试入口复制第二个文档阅读器。
 - `docs/archive/**` 不进入可复制命令来源，避免把历史命令写成当前测试入口；其他项目或 GPT/ChatGPT 原文不保存在仓库。
-- “执行命令”只按同一条文档职责轴筛选来源：策略与口径、工程说明、执行脚本、部署与发布；搜索是独立的命令块关键词条件，“全部来源”只负责复位职责筛选。主视图、职责和关键词分别写入 `view`、`role`、`q` query，刷新、前进后退和从来源文档返回时可恢复。每个命令块可打开对应来源文档，文档职责、前后端技术域、脚本类型和部署阶段不再混成同一级分类。
+- “执行命令”只按同一条文档职责轴筛选来源：策略与口径、工程说明、执行脚本、部署与发布；搜索是独立的命令块关键词条件，“全部来源”只负责复位职责筛选。主视图、职责和关键词分别写入 `view`、`role`、`q` query，专项命令每页最多展示 10 项，页码写入 `commandsPage`，第一页省略；刷新、前进后退和从来源文档返回时可恢复。改变来源职责或关键词回到第一页，空结果及越界页码规范化为第一页或最后可用页。每个命令块可打开对应来源文档，文档职责、前后端技术域、脚本类型和部署阶段不再混成同一级分类。
 - 多行命令会保留完整续行参数；不完整且以反斜杠结尾的命令不会进入复制结果。命令区按内容高度展示，不再被网格压缩裁切；验证层级和覆盖证据视图不显示对当前内容无效的命令来源筛选。
-- “本轮验证”按收益优先展示五项独立能力：只读生成本轮 affected 验证计划、运行带稳定仓库身份回执的 fast 开发门禁、九岗位权限与任务可见性巡检、字段联动专项，以及“证据与覆盖”中的本地覆盖基线。页面把 P0/P1、命令来源和证据边界降为追踪信息，先显示用户下一步；计划可随时重生，执行动作和覆盖基线共同使用全局 QA 锁，同一时间只允许一项运行。各项状态与终态独立展示，不合成为“全系统已通过”。
-- 固定动作通过 development-only `/__dev/api/qa/testing` 的 summary / plan / action / operation 合同运行。浏览器只能提交 `fast / role-access / field-linkage + idempotencyKey`，不能传 shell、参数、路径、环境变量、URL 或凭据；服务端固定映射仓库脚本，前后核对 repository identity，页面刷新后从私有 ignored operation store 恢复。岗位巡检只有本地后端与九岗位演示账号凭据就绪时才真实登录，凭据只从 Vite 服务端进程环境继承且不会返回浏览器；其预期业务写入为零，也不等于完整角色协同闭环。
-- 覆盖视图从 dev-only `GET /__dev/api/qa/coverage` 读取固定 `output/qa/coverage/latest.json`，按 Go、Web、业务域、验证范围（内部键 T0-T8）、PostgreSQL、浏览器、readiness、目标环境和 UAT 分栏；未采集、过期、失败、跳过、阻塞和零执行不会折算为通过，也不会合并成一个总百分比。
-- 报告与操作接口仅在 development serve 且请求来源与 Host 都是 loopback 时可用，返回 `no-store` 脱敏摘要；生产 build 不包含 `output/qa/**`，也不再从 `public/qa` 携带本机路径或覆盖报告。
+- “本轮验证”按收益优先展示五项独立能力：只读生成本轮 affected 验证计划、运行带稳定仓库身份回执的 fast 开发门禁、九岗位权限与任务可见性巡检、字段联动专项，以及“证据与覆盖”中的本地覆盖基线。页面把 P0/P1、命令来源和证据边界降为追踪信息，先显示用户下一步；计划可随时重生，执行动作和覆盖基线共同使用全局 QA 锁，同一时间只允许一项运行。三个固定执行检查以检查、适用条件 / 状态、证据 / 时间、操作组成二维表。各项状态与终态独立展示，不合成为“全系统已通过”。
+- 固定动作通过 development-only `/__dev/api/qa/testing` 的 summary / plan / action / operation 合同运行。浏览器只能提交 `fast / role-access / field-linkage / pressure-quick / pressure-capacity + idempotencyKey`，不能传 shell、参数、路径、环境变量、URL 或凭据；服务端固定映射仓库脚本，前后核对 repository identity，页面刷新后从私有 ignored operation store 恢复。岗位巡检只有本地后端与九岗位演示账号凭据就绪时才真实登录，凭据只从 Vite 服务端进程环境继承且不会返回浏览器；其预期业务写入为零，也不等于完整角色协同闭环。
+- 覆盖视图使用常驻的共享分段控件切换“当前工作区”和“最近隔离验证”。前者从 dev-only `GET /__dev/api/qa/coverage` 读取固定 `output/qa/coverage/latest.json` 并核对实时源码身份；后者从固定 `/__dev/api/qa/coverage/snapshot` 读取 `snapshot.latest.json`，保留验证时的 commit / dirty / fingerprint，始终标为隔离快照。首次读取时没有当前报告而隔离报告可读，默认显示隔离结果；后续点击“重新读取”保持已选来源，失败时不自动换成另一来源；两个请求分别处理失败、支持重新读取，并共用取消及旧响应保护。归档入口与共同源码身份要求见 [QA 输出与写入边界](../../scripts/qa/README.md#输出与写入边界)。
+- 压力测试视图 `/__dev/testing?view=pressure` 复用同一固定任务 store、幂等请求与全局 QA 锁，提供短档与 10 分钟容量档；服务端固定调用 `pressure-isolated-lifecycle.mjs`，每次创建专属 loopback PostgreSQL、S3、后端和模拟订单池。主段、构建、造数和清理分别计时，切换页面后任务继续；刷新读回已有 operation，不重复启动。生命周期配置 45 分钟总取消时限与各调用超时，终态成功还须读回该次完整报告与清理结果，进程退出零不能单独成为通过。
+- `GET /__dev/api/qa/testing/pressure-reports` 只扫描固定 `output/qa/pressure/` 下的有界目录，浏览器只提交报告标识，拒绝任意路径、符号链接和超限文件。CLI 与工作台产生的同合同报告均可读取；报告选择写入 `report` query。吞吐图、API 方法延迟、完整流程耗时、竞争/重放、数据库前后对账、资源采样、恢复与清理均来自脱敏投影，不复制业务算法。混合操作、实际 API 与完整流程分别计数，API 延迟门限不能套到完整流程耗时上。
+- 报告同时显示该次结果与当前源码匹配状态，核对候选提交、后端构建、数据、断言、负载和生命周期摘要；变化或缺失身份时保留历史结果，不能表述为当前版本容量通过。实时阶段来自同目录原子发布的 `progress.json`，进度按已完成阶段计数，不估算剩余时间；未完成、读取失败、缺失与损坏报告分别显示，旧请求离开视图后不覆盖新状态。公开接口不返回凭据、DSN、原始异常、私有临时路径、PID 或原始终端输出。档位、验收门限、范围和后续业务逻辑改动的维护说明集中在 [核心业务压力测试](../../scripts/qa/README.md#pressure-testing)。
+- 覆盖视图按“代码覆盖、业务场景、验证门禁、运行与验收”四个常驻标签展示，切换只替换下方内容，不重新读取报告。各标签始终显示本类证据的汇总状态，失败、受阻、过期或未采集不能因收起内容而变绿；只有全部适用项通过才显示通过。`coverage=business|gates|acceptance` 保存子视图，默认代码覆盖省略该参数，刷新及前进后退恢复所选类型。业务场景默认用业务域总览表比较状态、执行与声明、通过、失败、跳过、受阻和缺失，再选择单个业务域查看原有场景及证据，返回总览继续比较。采集、目标与判定说明合并为一个折叠区，来源、源码身份、失败诊断和专项范围继续可见。
+- Go、Web、业务域、验证范围（内部键 T0-T8）、PostgreSQL、浏览器、readiness、目标环境和 UAT 按对应标签独立展示。代码覆盖用读数与进度条呈现，执行计数独立显示；业务规则、失败叶子用例和运行专项支持场景明细、未通过筛选及测试标识展开。中文规则标签来自现有采集器登记，聚合器保留专项范围与诊断，页面不复制业务算法或测试名映射。Go 全包语句可能含生成物，Web 指标只包含实际加载模块，不能当作本轮改动覆盖；未采集、过期、失败、跳过、阻塞和零执行不会折算为通过，也不合并总百分比。少量数据库或浏览器专项通过不能补成完整 gate、真实业务闭环、固定提交 CI 或客户 UAT。
+- 报告与操作接口仅在 development serve 可用，支持本机或开发服务的私有 IPv4 内网入口；数字入口的 Host 与端口绑定实际监听连接，HTTPS 域名入口遵循指定本机代理合同；两者拒绝公网及跨来源。返回 `no-store` 脱敏摘要；生产 build 不包含 `output/qa/**`，也不再从 `public/qa` 携带本机路径或覆盖报告。
 - 「采集本地覆盖基线」通过 dev-only session / action / operation API 发起异步固定 baseline。浏览器只提交 `collect + idempotencyKey`，不能传 shell、参数、路径、环境变量或 profile；服务端校验本机 Host、同源、CSRF、JSON 合同，解析项目锁定的 Node / pnpm，以持久化幂等索引和全局 QA 锁串行运行 `node scripts/qa/test-coverage-collect.mjs --profile baseline --write`。页面显示 11 个脱敏阶段，其中先以 error-code `--check` 证明生成物无漂移，再直接使用项目 Node 做 Web native coverage，不触发会改写 tracked 生成物的 package `pretest`。切换视图不取消后台任务，回到页面后可恢复读回；按钮在运行期间原位禁用，终态自动刷新报告。
 - 运行期仓库变化、启动/服务中断或终态读回无法证明时 fail closed，上一份报告继续展示；字段联动 TAP 与报告也先写 staging，只有测试、builder 和仓库身份复核均通过才原子替换，失败时保留上一份。真实 baseline 测试完成但存在失败、缺失或零执行时会发布绑定当前身份的 issues 报告，防止旧绿色遮蔽。页面“重新读取”只读取报告，“复制备用命令”只在 DEV 操作接口不可用时供手工执行。覆盖基线适合代码基本稳定、其它写任务结束的检查点，不必每次编辑后运行；它不写 PostgreSQL、不运行真实业务浏览器、不部署或做客户 UAT，未实际采集的值显示为空而不是 `0%`。`docs/product/自动化测试策略.md` 仍是测试选择和覆盖门槛真源。
 
 ### 质量门禁 `/__dev/quality-gates`
 
-- 一级“质量验证”入口 `/__dev/quality` 直接比较改动验证、质量门禁和测试数据；它不读取或复制服务器门禁结果。需要核对正式轨道时再进入 `/__dev/quality-gates?view=server`。
+- 一级“质量验证”入口 `/__dev/quality` 保留为任务首页，先让使用者在“判断本轮改动、运行正式门禁、准备测试数据”之间选择；它不读取或复制服务器门禁结果。需要核对正式轨道时再进入 `/__dev/quality-gates?view=server`。
 - 页面首屏优先读取当前 committed SHA 的 GitLab 普通 push CI，始终按正式合同展示 `plan → prepare → 质量检查 → aggregate → CI Gate` 执行轨道；质量检查最终汇入七个固定分片，其中 Node 核心 / 发布测试先行汇合，浏览器分片等待 Web 构建。服务器门禁在轨道前使用一张七行对照表，集中展示本机 strict 步骤、检查名称与对应 CI Job；本机诊断不重复显示 CI 标签。阶段编号按当前 runner 顺序动态计算，映射由 CI shard 合同测试守住。取得当前流水线证据后，再把真实状态与耗时填入十一个主路径节点，并展示墙钟时间、排队耗时、最长主路径 job 和相对耗时条。耗时条以最长主路径 job 为基准，不把可重叠的并行 job 相加成墙钟时间。该服务器证据只覆盖对应提交，不覆盖 Local dirty。未登记只读 token 或 API 不可达时明确标记“GitLab 读取失败”；凭据与 API 已读通但当前 SHA 尚无普通 push CI 时，分别显示“GitLab 读取正常”和“当前提交未产生 CI 记录”；流水线已形成但对应 job 尚未启动时标记“等待运行”。三者均保留完整轨道，且不使用本机回执或静态结构补造绿色结果与耗时。当前证据之后只读列出同一次 GitLab 查询中最近取得的最多 8 条 `main` 普通 push CI，展示结果、short SHA、真实事件时间、墙钟耗时、失败环节和 GitLab 详情链接；历史行不写本地缓存、不触发或重跑 CI，也不升级为当前 SHA 的通过证据。
 - 页面内部只保留 `server / run / governance / gaps` 四个 URL-backed 一级视图，对外分别命名为“服务器门禁 / 本机诊断 / 门禁治理 / 覆盖缺口”；默认进入服务器门禁，服务器证据和本机操作不再同时铺开，也不叠加第二组 Tab。四视图复用 `DevTaskNav` 的 roving tabIndex、方向键、Home / End、焦点与主题合同。每个视图只接受固定 query；未知、重复、过期或跨视图参数 fail closed。切换视图会清理无关 query，不启动、不取消或清空 operation；公共仓库身份与当前 operation 摘要由页面级唯一状态源读取，只有活动 operation 启用一个 polling，治理与缺口请求在切换时取消并以请求序号防止旧结果覆盖。
 - “本机诊断”只在定位工作区问题时，通过固定 `full / strict + idempotencyKey` 动作异步调用正式 runner，不替代 GitLab exact-SHA CI。显式 loopback database base 仍受支持，没有显式 base 时自动使用本机已有的固定 `postgres:18.6` 创建本次专用容器、随机凭据和动态 loopback 端口，正式回执、内部临时数据库、容器与进程组清理全部读回后才可通过。浏览器不能提交 DSN、凭据、镜像、命令或路径，也不会清理外部容器。本机历史与 GitLab 流水线分开记录；页面支持刷新恢复、精确取消、有界超时、中文阶段、正式回执、可比环境耗时和最近 20 次脱敏本机记录。当前版本回执优先于旧本机历史，dirty 结果不会升级成发布证明，样本不足时不估算剩余时间，终态不再显示“预计剩余”。诊断执行轨道直接消费服务端 `profiles` 阶段序列与 operation `stageTimings`，自动分出 strict 附加检查和 full 共用主路径；运行前、运行中和终态原位展示阶段状态、第一失败、最长阶段、正式回执与清理读回，回执和清理不计入 runner 阶段。共享基础检查与 Web 阶段的固定子步骤也只从 runner 登记表投影，不在页面复制命令或推测子步骤实时状态；已记录阶段耗时按阶段耗时之和归一化，并明确标注可并行阶段不能相加推算墙钟时间。只有至少 3 个 profile、环境指纹和 dirty / clean 状态相同的正式通过回执才绘制零基线耗时趋势，精确历史表始终保留。技术 ID、完整 SHA、指纹和原始 stage key 默认折叠。
 - 本机托管数据库只提供一张默认折叠、展开后才加载的静态 Mermaid 生命周期图，并同步提供有序文字说明；它解释“登记环境或创建本次专用环境—运行正式门禁—精确清理—回执与清理读回”的固定边界，不承担实时运行状态。实时状态仍只读取当前 environment、operation 和正式回执，页面不为每种门禁重复绘制 Mermaid。
 - “门禁治理”只读登记风险、触发条件、正式来源引用、唯一证据与退出条件；不复制命令或测试列表，不提供新增、编辑、跳过、禁用或删除。“覆盖缺口”复用 affected 与七类风险边界，按当前或 staged 改动展示应运行门禁、当前结果和仍缺证据，并以语义化“风险 × 门禁”矩阵支持横向比较；原有逐类风险、原因和证据详情继续保留。本地门禁通过不证明目标发布、回滚、客户 UAT 或签收。
+- 两个视图均提供[应用安全与验证边界](../security/应用安全与验证边界.md)的开发文档入口，用于核对权限控制、扫描范围与带日期的审计摘要；文档不生成当前安全状态，当前门禁结果继续以正式回执为准。
 - 页面及 `/__dev/api/qa/quality-gates` 仅在 development serve 存在，生产构建和正式部署不包含路由、页面 chunk、operation bridge、本地回执或 DEV 文案。测试数据仍由独立测试数据页管理，版本发布只读当前 exact SHA 的 strict 摘要与深链，不复制阶段、历史、治理或缺口。
 
 ### 测试数据中心 `/__dev/data-preparation`
 
-- 页面默认按“确认完整回归能否开始 → 核对最新业务链与数据范围 → 准备并确认新批次 → 查看回执与耗时”组织为一条连续工作流。主路径直接读取业务链与造数的同一合同，显示当前 11 条业务链、62 个步骤、66 个场景合同、9 个现有造数阶段和 51 个页面目标；选择业务链只展开责任岗位、前置状态、允许动作、结果状态、Fact 与该步骤已登记场景，不创建局部造数入口。安全结论、阻断和主动作保持可见；SHA、目标指纹、plan hash、run id、固定步骤及历史事件按需展开。
-- 页面只通过 development serve 的 loopback Bridge 使用三个固定 profile，不接受 shell、SQL、脚本路径、DSN、后端地址、密码或自定义环境变量。写入口的信任边界是本机开发进程、Host / Origin / `Sec-Fetch-Site`、CSRF 和 operation 确认，不冒充 ERP RBAC。
+- 页面默认按“确认完整回归能否开始 → 核对最新业务链与数据范围 → 准备并确认新批次 → 查看回执与耗时”组织为四个编号 Tab，`view=preflight|scope|confirm|receipts` 写入 URL，切换保留范围和确认状态。准备成功自动进入确认计划，未终态当前计划在 Tab 外始终可见；准备方式使用 Radio 对照表，业务链范围、环境与数据合同默认折叠。主路径直接读取业务链与造数的同一合同，显示当前 11 条业务链、62 个步骤、66 个场景合同、9 个现有造数阶段和 51 个页面目标；选择业务链只展开责任岗位、前置状态、允许动作、结果状态、Fact 与该步骤已登记场景，不创建局部造数入口。安全结论、阻断和主动作保持可见；SHA、目标指纹、plan hash、run id、固定步骤及历史事件按需展开。
+- 页面通过 development serve 的受控 Bridge 使用三个固定 profile，支持本机与私有 IPv4 内网入口；不接受 shell、SQL、脚本路径、DSN、后端地址、密码或自定义环境变量。写入口校验真实连接、精确同源 Origin、CSRF 和 operation 确认；HTTP 内网缺少 Fetch Metadata 时仍必须通过前述校验，有该头时拒绝跨源，不冒充 ERP RBAC。
 - `本地长期基础数据 / core-demo` 只允许登记的 `192.168.0.133:5432/plush_erp` 或 `plush_erp_*_dev`，先确认 migration 已到 head，再顺序准备十个演示账号、当前 V8 的 8 个标准单位与 4 个仓库。它不生成材料、产品、工艺、BOM、客户、订单、Workflow 或 Fact；这些版本化业务数据由 `scenario-demo` 接续准备，避免两套基础资料和生产工序语义并存。稳定 upsert 不等于跨入口事务，也不提供按 operation 删除。
 - `业务场景演示数据 / scenario-demo` 固定使用 `yoyoosun-manual-acceptance / 2026.09.27-v8 / 20260927-V8`，只允许 `127.0.0.1:8300` 对应的登记 133 长期开发库。用户确认后先稳定准备本地岗位账号与至少 30 条由真实控制面操作产生的审计样例，再通过正式 `validate / publish / transition check / activate or rollback / effective-session readback` 对齐当前跟踪的 yoyoosun 本地测试配置，之后才准备 Source Document、已登记的 ProcessRuntime、模拟岗位任务和来源驱动 Fact。同批只允许精确创建或读回；半批、字段或身份漂移直接阻断，不提供清理或重置。收付款覆盖已批准、两笔已过账和已冲销，红冲覆盖一条有效红冲与一组原红冲 / 反向红冲。岗位到期时间是固定批次快照，不保证长期维持“今天 / 本周”相对语义；数据前置不替代浏览器验证和岗位人工验收。
 - `按最新业务链完整回归 / full-acceptance` 是默认推荐入口，只接受 clean exact commit 和服务端已有的 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`。每次执行都复用统一 lifecycle 建立新的同批专用库，按当前合同运行全部已登记场景合同、migration、正式 Source / ProcessRuntime / Fact 数据、51 项只读页面验收和收付款、库存人工调整、生产超领三条真实写流程；成功或失败都必须停服、删库并读回零残留。页面记录 operation 实际墙钟时间，并从同一 dataset 回执展示 9 个现有造数阶段的开始、结束和耗时。旧回执只证明对应旧计划，不会被当作最新代码已经回归。
@@ -393,6 +409,12 @@ flowchart TD
 
 ### 数据库迁移 `/__dev/database-migration`
 
+- 页面按“数据库升级、运行检查、操作记录”三个常驻标签组织。顶部用紧凑事实区显示固定开发库、当前版本、候选版本和待执行数量，当前操作与恢复、只读、读取失败提示保持可见。升级视图只展示候选结论、准备与确认；运行检查集中核对日常后端、业务入口及迁移工具，历史记录独立分页。没有升级操作时，六步路径与事务说明按需展开；有完成证据时才显示实际节点进度。
+
+- 开发服务的私有 IPv4 内网入口支持状态读取、会话及固定迁移动作，内网 Mac 可使用当前页面。数字入口的 Host、端口和协议绑定实际监听连接，HTTPS 域名入口遵循指定本机代理合同；两者拒绝跨源、伪造域名和公网来源；写动作必须携带精确同源 Origin、CSRF 与原有精确确认。HTTP 内网缺少 Fetch Metadata 时不误拒绝，有该头时继续校验；操作 UUID 使用 Web Crypto 安全字节生成。执行仍在开发服务主机完成，数据库目标、固定制品与迁移门禁不变。
+
+- 共享开发库、日常运行和迁移准备环境集中在状态对照表；下方“迁移与运行 / 操作记录”共享 Tab 保持挂载，`view=migration|history` 写入 URL。未终态操作始终可见；升级路径以六个节点表达，补充边界图按需展开，确认升级与重启仍使用原有明确确认合同。
+
 - 页面只操作登记的共享开发库，不接受浏览器传入 DSN、SQL、脚本路径、凭据或自定义目标。保持一个日常开发库；验证使用一次性恢复库，完成后移除。
 - 日常前端使用当前工作区和 Vite 热更新，`pnpm restart` 重启主入口，`pnpm restart:yoyoosun` 重启客户辅助入口；历史静态制品不覆盖开发页面。`make dev_restart` 核对当前工作区迁移并构建新后端制品，构建成功后才停止原进程，完成运行身份、health / ready 与业务验证后更新制品指针。预检或构建失败保留原进程，不以旧版本可用代替最新代码已运行。
 - 后端验证通过后，在同一已激活制品指针记录 PID、启动时间和本次日志路径。人工启动终端持续显示日志；Codex、前端冷启动和迁移恢复等非交互入口在 macOS 打开并复用可见日志终端。日志查看跟随重启后的新日志，退出查看不停止后端，不占用迁移执行锁，也不启动、重建或自动迁移数据库；操作入口与 CI / SSH 边界见 `server/README.md`。
@@ -410,11 +432,11 @@ flowchart TD
 
 - 页面通过 `customer`、`view`、`section`、`action`、`release` query 和客户包选择器读取 dev-only registry，当前只登记 `yoyoosun`。直接进入页面或传入单个空白 customer 时规范化为当前登记的 `yoyoosun`；显式未登记或重复 customer 不 fallback，只显示状态与已登记列表。视图、当前任务和证据批次均可通过 URL 恢复。
 - 页面一级任务的用户可见名称为总览、检查配置包、查看变化、页面配置预览和试跑与发布；稳定 `view` 值仍保持 `overview|preflight|diff|assets|import`。配置预检不再一次渲染全部对象，而是通过 `section=package|runtime|flow|evidence` 分成包结构、运行投影、流程策略和验证证据；执行发布通过 `action=dry-run|test-apply|release` 分开试跑证据、测试配置应用和正式发布检查。默认值省略 query，非法或跨视图残留参数会被清理。
-- 配置预检和执行发布的当前任务导航在长页面滚动时保持可见；每次只渲染当前任务对应模块，避免把边界、模块、流程、命令和发布操作堆在同一阅读流中。
+- 客户选择、配置来源与常驻主任务栏分别组织。配置预检和执行发布的子任务导航在长页面滚动时保持可见；每次只渲染当前任务对应模块。执行任务先展示操作、范围和结果，六步流程、版本审计、执行边界与备用命令按需展开；试跑或配置写操作进行中，客户、主任务和执行子任务均锁定。
 - 页面配置预览先按业务名称展示品牌和菜单目录，菜单内部键降为展开后的追踪信息；页面配置边界、字段候选、编号规则和打印模板使用互斥展开区，一次只阅读一类明细。
 - 页面只读取已登记 customer package，不提供 raw package、任意代码、SQL 或脚本上传。可视内容包括品牌 / 桌面菜单 runtime、字段和编号草案、流程 preview、`moduleStates`、打印模板字段、差异与版本门禁。
 - Dry Run、runtime manifest 与 release readiness 统一通过持久化 operation store 执行：动作、customer 与幂等键共同确定一次意图，全局排他锁避免并发脚本写同一输出；Vite 重启时遗留的 `running` 会转成 `not_proven`，仍由存活进程持锁的操作除外。每次 Dry Run 使用独立 operation 输出目录，manifest 先写临时文件再原子替换，历史可在页面恢复但不会冒充当前包已发布。
-- Bridge 的所有路由都校验 loopback remote 与 Host；POST 额外要求同源 Origin / `Sec-Fetch-Site`、CSRF、JSON content type 和有界 body。客户列表来自 registry，不在 Bridge 复制 allowlist；浏览器不接收原始 stdout / stderr，发布诊断先按允许字段投影并脱敏。
+- Bridge 的操作历史、已登记发布批次、会话和固定执行路由共用开发服务的本机 / 私有 IPv4 内网入口：数字入口的 Host、端口和协议绑定实际监听连接，HTTPS 域名入口遵循指定本机代理合同；两者拒绝跨来源 Origin / Referer / Fetch Metadata；无记录返回空列表。POST 要求精确同源 Origin、CSRF、JSON content type 和有界 body；HTTP 内网缺少 Fetch Metadata 时仍保留上述验证。客户列表来自 registry，不在 Bridge 复制 allowlist；浏览器不接收原始 stdout / stderr，发布诊断先按允许字段投影并脱敏。
 - UI Dry Run 只调用 `scripts/import/customerImportDryRun.mjs` 生成 ignored `output/customers/<customer-key>/ui-import-dry-run/<operation-id>` 证据，不写数据库。当前登记的 yoyoosun 原始包仍是 draft / preview-only，`runtimeEnabled / publishEnabled / activateEnabled` 均未开放；`localTestApplyEnabled=true` 只允许匹配的 loopback 开发入口编译本地测试 manifest 并应用到当前代理后端，不会把 preview manifest 升级成正式配置，也不产生正式发布资格。
 - “测试配置应用”使用当前管理员登录态，通过 Vite `/rpc` 固定代理 `http://127.0.0.1:8300` 调用后端校验、发布、切换检查、激活和有效配置读回接口；正式 readiness 则只从独立 `releasePackage.mjs` 编译 `release_ready` manifest，并要求 runtime / publish / activate 门禁及所选证据批次同时成立。两条路径都不直写业务数据、不导入真实客户业务数据，也不绕过后端 RBAC；后端以 canonical hash 判断同 revision 幂等或冲突，前端不吞发布错误，并把同一 hash、产品版本和观测到的 active revision 作为 CAS 条件提交，最后按 customer、revision、hash、hash version 和来源读回确认。写入期间客户包和视图会锁定，离开页面不代表已发请求被撤销。
 - `moduleStates` 只是控制面输入预览，不安装或卸载模块。`printTemplateDefaults` 只声明甲方 / 委托方默认字段；当前正式消费方是采购订单 `material-purchase-contract` 和委外订单 `processing-contract`，不覆盖供应商 / 加工方业务快照，也不启用销售订单打印模板。
@@ -424,15 +446,20 @@ flowchart TD
 
 ### 交付运行总览 `/__dev/delivery`
 
-- 总览只读汇合数据准备摘要与 Delivery Bridge 摘要，横向展示“本地开发、demo 项目演练造数、test 甲方测试环境、隔离完整验收”四张事实卡；每张卡分别列运行状态、候选版本、数据基线和验收结果，不把四类证据压成一个绿色状态。
+- 默认“交付任务”按客户配置、开发库迁移、版本发布、安全与恢复列出用途、作用范围和唯一入口；不使用静态顺序推定完成状态。Git 收口从同一区域进入。“环境证据”独立查看运行、候选、数据与验收结果，两个标签始终保持挂载。
+- 总览只读汇合数据准备摘要与 Delivery Bridge 摘要，横向展示“本地开发、demo 项目演练造数、test 甲方测试环境、隔离完整验收”四行环境对照表；每行分别列运行状态、候选版本、数据基线和验收结果，不把四类证据压成一个绿色状态。
 - demo 只有运行、当前候选、migration / 客户配置和当前数据合同 场景回执同时对齐才可显示数据已读回。test 即使 health / ready / 公网入口和当前候选都对齐，甲方验收仍保持“未证明”；运行正常不等于数据干净，也不等于 UAT。
 - test 的“干净基线”只接受同一运行 SHA、逻辑数据库、fresh physical generation、重建 fingerprint / receipt、migration 读回、上一代保留和有效备份 hash / size 都齐全的 passed 重建回执；重建后如果又发生当前场景数据写入，干净基线立即失效。普通 promotion 继续保留现有数据。
-- 卡片时间只取各真源的 operation / target 事件时间，不使用页面加载时间或汇总生成时间冒充环境读回；详细写操作和历史仍回到对应子页办理。
+- 环境时间只取各真源的 operation / target 事件时间，不使用页面加载时间或汇总生成时间冒充环境读回；详细写操作和历史仍回到对应子页办理。
 
 ### 版本发布与部署中心 `/__dev/version-center`
 
+- 两个固定目标的运行与初始化预检共用身份校验：Linux、短主机名、用户和本机 IPv4 同时匹配 registry 时直接在登记宿主机执行同一只读脚本，远端开发机继续使用严格 SSH。该选择不扩大目标或写操作合同。GitLab 版本与耗时同因读取失败只给出一次可处理的问题；只有独立耗时读取失败时才单独提示，不使用未加载发布写凭据制造全局告警。
+
+- 客户与固定目标选择收口为紧凑范围栏；真实错误和未终态操作位于常驻 Tab 上方，切换后仍可核对。“版本与部署”默认直接进入分页版本清单；“发布检查”集中展示本地候选、不可变版本、目标与公网摘要、严格门禁、发布说明和 test 数据管理；“流水线耗时”展示状态轨道与时间；“操作记录”独立筛选回执。发布当前版本制品入口位于页头，证据与固定运行边界按需展开。
+
 - 页面只在 development serve 中存在，展示当前 HEAD/dirty、GitLab 不可变版本、`demo-133` 与 `customer-test-133` 的当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或验收合并成一个绿色结论；根域临时跳转不启用 `erp` target，退役的 `admin.yoyoosun.net` 也不是部署 target。
-- 页面顶部先用一张主卡展示所选目标、当前结论与唯一下一步；本地候选、不可变版本、目标运行和公网入口收口为两列事实区，目标切换只显示当前目标的数据边界，不再同时平铺 demo / test 两张重复说明卡。严格门禁、发布动作和发布说明放在同一下一步区域；未结束 operation 与“最近发布与部署”继续常驻。下方以 URL 可恢复的 `版本与部署 / 流水线耗时 / 操作记录` 三个视图分流阅读。最近最多 20 个不可变版本固定每页 6 条，已结束操作每页 10 条；切换视图不重新请求摘要，也不会停止未结束 operation 的轮询。
+- 四个视图通过 `view=versions|overview|pipeline|history` 恢复；切换只改变内容，未结束 operation 始终可见。目标切换只展示当前目标的数据边界，写请求进行中锁定客户与目标。最近最多 20 个不可变版本固定每页 6 条，已结束操作每页 10 条；切换视图不重新请求摘要，也不会停止未结束 operation 的轮询。
 - 顶部“手动操作指引”只解释 AI 不可用或用户亲自操作时如何沿用同一正式链路：Codex / 本地终端负责验证和中文提交，GitLab 负责代码真源、CI 与不可变 Release，GitHub 只接收 GPT Review 镜像，当前页面负责发布制品、部署、回滚和查看回执。说明会先区分可继续与必须停止的证据，再给出固定顺序和禁止捷径；它不创建 commit、push、tag、凭据输入、后台调度或第二套发布动作。自动续办 Mermaid 固定“等待心跳只读重查 → 全部会话与 writer 结束 → 先删除并读回心跳 → 同一次续办进入执行”的交接；删除失败不得开始实现、造数、Git 或部署，执行阶段也不重建同目的心跳，只有用户后来再次要求等待才新建。Git 收口遇到 `index.lock` 时，指引用 Mermaid 展示活动 owner 判定、当前 index 备份、旧候选隔离、读回与继续条件；空锁和非空锁走同一证据流程，非空候选不会被直接删除或覆盖当前 index，已有提交 / 锁恢复授权也不会因候选非空重复询问。
 - “流水线耗时”直接读取固定 GitLab 项目最近 pipeline、job 与时间；GitLab Jobs API 不提供 GitHub 式 step 时间时，界面保持 job 级证据，不伪造步骤。页面分别显示统计读取时间及最近一次流水线、最近一次制品发布和构建制品的事件时间，并默认展示可见关键路径、最长可见环节和建议复核点；全部任务与步骤按需展开，不自动并发、重跑或复制 GitLab 状态。目标部署仍以工作台 operation 独立计时和读回。
 - 发布只允许当前 clean exact SHA；GitLab adapter 固定 `gitlab.saurick.me/saurick/plush-toy-erp`、受保护 main、Generic Package 和 `yoyoosun`。版本目录、流水线耗时、发布状态与控制制品下载使用只读 Provider；只有创建新发布调用 GitLab 写 Provider，未加载短期 `PLUSH_GITLAB_TOKEN` 时页面保持可读并停用该动作。显式 `PLUSH_DELIVERY_PROVIDER=github` 只启用 GitHub 历史只读 adapter，其发布方法固定拒绝。
@@ -442,10 +469,11 @@ flowchart TD
 - 效能工作台的质量门禁、测试、数据准备、数据库迁移和客户配置执行证据统一展示真源提供的统计读取、开始、完成、阶段、事件、计划、备份验证、发布或激活时间；ISO 值必须自带时区，后端 Unix 时间只在字段合同明确为秒时转换。缺失或非法值显示“时间未证明”，静态目录和没有权威快照时间的页面不使用页面加载时间冒充更新时间。
 - 远端基础回执当前只证明制品、备份恢复检查、migration、Compose、health、ready、Web health 与运行 SHA；带凭据岗位矩阵、PDF、客户 UAT 和签收仍需独立完成。
 
-### 演练与恢复中心 `/__dev/drill-recovery`
+### 安全与恢复 `/__dev/drill-recovery`
 
 - 页面只读复用版本中心同一份摘要、固定目标 preflight、不可变 Release 和 promotion / rollback operation，不新增 Bridge action、后台任务、数据库或第二套状态真源。刷新只会重新读取固定目标状态；目标写入仍回到版本中心按既有准备、确认和读回合同办理。
-- 信息层级固定为“当前恢复结论与唯一下一步 → 六项紧凑清单 → 最近交付与应急接管”。桌面只默认展开当前建议，窄屏从全部折叠态开始；目的、触发、证据和安全边界按需展开，不平铺成卡片墙。
+- 页面先显示客户、固定目标、运行版本和公网证据，再由“安全核验、恢复演练、应急指引”常驻标签分流，`view=security|drills|emergency` 恢复当前任务。安全核验默认显示四类证据；演练建议与六项清单只在恢复演练展示；应急步骤按场景展开。未接入专门回执的项目保持“未核验”。有效数据库回执只显示“仅数据库恢复已核验”，不替代附件、离线或不可变副本及删除权限核验。指引与证据口径集中在[运维安全与勒索恢复](../security/运维安全与勒索恢复.md)，交付预检与安全判断分开。
+- 交付记录直接进入版本中心的操作记录并保留甲方范围，不在恢复页重复列历史。六项演练使用优先级、演练、状态 / 风险、频率和操作二维表，当前建议仅标记；“查看要点”打开只读侧栏，以编号列出完成证据，关闭后焦点回到原入口。高风险动作仍禁用。疑似入侵或勒索的应急说明只提供保留证据、受控隔离、撤销身份、隔离恢复及批准后切回的步骤，不执行事件处置。
 - 演练按风险和优先级组织：P0 是目标身份与健康、相同 SHA 幂等、兼容回滚与再前滚；P1 是隔离数据库备份恢复及新服务器 / 正式环境切换；P2 是未来故障注入。普通成功部署不会自动冒充演练；相同 SHA 证据必须是 35 天内、时间不超前、明确 no-target-write 且仍绑定当前运行 SHA 的幂等回执。回滚 / 再前滚证据必须在 100 天内，由同一 `recoveryDrillId`、回滚 operation id、回滚 SHA 和最终当前 SHA 组成完整且有先后顺序的 lineage。
 - 回滚准备会从本次幂等请求的 UUID 生成 `recoveryDrillId`；随后再前滚到回滚前 SHA 时，Delivery Bridge 自动绑定同一目标最近已通过的回滚 operation，并把 lineage 写入 promotion metadata。缺少、过期、跨目标或字段不一致的链路只保留历史，不显示为“最近证据可用”。
 - 每项同时展示建议频率、变化触发条件、完成证据和安全边界。稳定期不要求每次发布都跑完整演练：目标预检仍是每次发布门禁，幂等与隔离恢复建议每月或相关脚本变化后执行，回滚 / 前滚建议每季度及 migration 合同变化后执行。

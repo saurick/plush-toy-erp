@@ -8,7 +8,7 @@
 .erp-dev-version-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  gap: 12px;
   border: 0;
   background: transparent;
   padding: 0;
@@ -20,9 +20,11 @@
 }
 
 .erp-dev-version-header-actions {
-  display: grid;
-  justify-items: end;
-  gap: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 12px;
   flex: 0 0 auto;
 }
 
@@ -100,34 +102,6 @@
   flex: 0 0 auto;
 }
 
-.erp-dev-version-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 18px 0 0;
-  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-  border-left: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-}
-
-.erp-dev-version-fact {
-  min-width: 0;
-  padding: 12px 14px;
-  border-right: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-  border-bottom: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-}
-
-.erp-dev-version-fact dt {
-  margin-bottom: 7px;
-  color: var(--ant-color-text-secondary, var(--erp-text-muted));
-  font-size: 12px;
-}
-
-.erp-dev-version-fact dd {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-  margin: 0;
-}
-
 .erp-dev-version-fact__primary {
   display: flex;
   flex-wrap: wrap;
@@ -136,13 +110,11 @@
   min-width: 0;
 }
 
-.erp-dev-version-fact .ant-tag,
 .erp-dev-version-next > .ant-tag {
   width: fit-content;
   margin-inline-end: 0;
 }
 
-.erp-dev-version-fact .ant-typography,
 .erp-dev-version-next .ant-typography {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -262,10 +234,10 @@
   gap: 16px;
   align-items: center;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-  border-radius: 10px;
-  background: var(--ant-color-fill-quaternary, #fafafa);
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .erp-dev-version-current-operation__detail {
@@ -722,7 +694,6 @@
 
 :root[data-erp-theme='dark'] .erp-dev-pipeline-status-strip__metrics > div,
 :root[data-erp-theme='dark'] .erp-dev-pipeline-timing__summary > div,
-:root[data-erp-theme='dark'] .erp-dev-version-fact,
 :root[data-erp-theme='dark'] .erp-dev-version-next,
 :root[data-erp-theme='dark'] .erp-dev-version-current-operation__item,
 :root[data-erp-theme='dark'] .erp-dev-operation-history-filters,
@@ -733,7 +704,6 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
-:root[data-erp-theme='dark'] .erp-dev-version-facts,
 :root[data-erp-theme='dark'] .erp-dev-version-quality-gate-summary {
   border-color: rgba(255, 255, 255, 0.16);
 }
@@ -886,7 +856,6 @@
     flex-direction: column;
   }
 
-  .erp-dev-version-facts,
   .erp-dev-pipeline-status-strip__metrics,
   .erp-dev-pipeline-timing__summary,
   .erp-dev-operation-metrics,
@@ -924,11 +893,6 @@
     white-space: normal;
   }
 
-  .erp-dev-version-facts {
-    margin-top: 14px;
-  }
-
-  .erp-dev-version-fact,
   .erp-dev-version-next {
     padding: 12px;
   }

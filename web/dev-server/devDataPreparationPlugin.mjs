@@ -49,8 +49,7 @@ import { runTargetPreflightAsync } from '../../scripts/deploy/target-preflight.m
 import {
   isSameOriginRequest,
   readJsonBody,
-  isLoopbackHostHeader,
-  isLoopbackRemoteAddress,
+  isDevWorkbenchRequest,
 } from './devServerSecurity.mjs'
 
 export const DEV_DATA_PREPARATION_API_PREFIX = '/__dev/api/data-preparation'
@@ -2214,13 +2213,10 @@ export function createDevDataPreparationMiddleware({
       next()
       return
     }
-    if (
-      !isLoopbackRemoteAddress(request.socket?.remoteAddress) ||
-      !isLoopbackHostHeader(request.headers?.host)
-    ) {
+    if (!isDevWorkbenchRequest(request)) {
       sendJson(response, 403, {
         status: 'failed',
-        message: '该数据准备接口仅允许本机访问',
+        message: '数据准备只允许通过当前开发服务的本机或内网地址访问',
       })
       return
     }

@@ -1,3 +1,4 @@
+import { createDevOperationUUID } from './devOperationIdentity.mjs'
 import { DEV_VERSION_CENTER_ROUTE } from './devRoutes.mjs'
 
 export { DEV_VERSION_CENTER_ROUTE }
@@ -12,6 +13,7 @@ export const DEV_DELIVERY_SOURCE_PATH =
   'docs/engineering/研发效能工作台与CI-CD设计.md'
 export const DEV_VERSION_CENTER_VIEW_QUERY_KEY = 'view'
 export const DEV_VERSION_CENTER_VIEW_VERSIONS = 'versions'
+export const DEV_VERSION_CENTER_VIEW_OVERVIEW = 'overview'
 export const DEV_VERSION_CENTER_VIEW_PIPELINE = 'pipeline'
 export const DEV_VERSION_CENTER_VIEW_HISTORY = 'history'
 export const DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS = Object.freeze({
@@ -49,6 +51,7 @@ const DEV_DELIVERY_TARGET_KEYS = Object.freeze(
 
 const DEV_VERSION_CENTER_VIEW_VALUES = new Set([
   DEV_VERSION_CENTER_VIEW_VERSIONS,
+  DEV_VERSION_CENTER_VIEW_OVERVIEW,
   DEV_VERSION_CENTER_VIEW_PIPELINE,
   DEV_VERSION_CENTER_VIEW_HISTORY,
 ])
@@ -917,6 +920,43 @@ function validateReleaseVersionPolicy(value) {
   return value
 }
 
+export function deliveryReadOnlyReleasePresentation(summary) {
+  const provider =
+    summary?.boundaries?.provider === 'github' ? 'GitHub' : 'GitLab'
+  const readIssue = summary?.issues?.find((issue) =>
+    [
+      'gitlab_provider_unavailable',
+      'github_provider_unavailable',
+      'release_version_catalog_invalid',
+    ].includes(issue.code)
+  )
+  if (!summary?.releaseVersionPolicy || readIssue) {
+    return {
+      color: 'warning',
+      label: '读取未就绪',
+      title: `${provider} 版本尚未读取`,
+      description:
+        readIssue?.message || '先取得正式版本目录，再核对发布与部署资格。',
+    }
+  }
+  const timingsAvailable =
+    Boolean(summary.timings) &&
+    !summary.issues.some(
+      (issue) => issue.code === 'pipeline_timings_unavailable'
+    )
+  return {
+    color: 'blue',
+    label: '只读模式',
+    title: timingsAvailable
+      ? '版本与流水线可查看，当前不能创建新发布'
+      : '版本可查看，流水线耗时尚未取得',
+    description:
+      provider === 'GitHub'
+        ? '当前 Provider 读取历史版本；目标部署资格见预检结果。'
+        : '创建新发布需要短期 GitLab 发布凭据；已有版本的部署资格见目标预检结果。',
+  }
+}
+
 export function validateDevDeliverySummary(summary) {
   assertObject(summary, 'delivery summary')
   validatePipelineTimestamp(summary.generatedAt, 'delivery summary generation')
@@ -1179,7 +1219,7 @@ export function createDevDeliveryClient({ fetchImpl = globalThis.fetch } = {}) {
 
 export function createDeliveryIdempotencyKey(
   action,
-  randomUuid = () => globalThis.crypto.randomUUID()
+  randomUuid = () => createDevOperationUUID()
 ) {
   if (!['release', 'promote', 'rollback', 'retry'].includes(action)) {
     throw new Error('delivery idempotency action is invalid')

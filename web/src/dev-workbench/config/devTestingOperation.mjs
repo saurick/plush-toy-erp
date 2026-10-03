@@ -1,8 +1,11 @@
+import { createDevOperationUUID } from './devOperationIdentity.mjs'
+
 export const DEV_TESTING_OPERATION_API_PATH = '/__dev/api/qa/testing'
 export const DEV_TESTING_OPERATION_SESSION_API_PATH = `${DEV_TESTING_OPERATION_API_PATH}/session`
 export const DEV_TESTING_OPERATION_PLAN_API_PATH = `${DEV_TESTING_OPERATION_API_PATH}/plan`
 export const DEV_TESTING_OPERATION_ACTION_API_PATH = `${DEV_TESTING_OPERATION_API_PATH}/actions`
 export const DEV_TESTING_OPERATION_API_PREFIX = `${DEV_TESTING_OPERATION_API_PATH}/operations`
+export const DEV_PRESSURE_REPORTS_API_PATH = `${DEV_TESTING_OPERATION_API_PATH}/pressure-reports`
 export const DEV_TESTING_OPERATION_SCHEMA =
   'plush.dev-qa-testing-operation-public/v1'
 
@@ -32,6 +35,16 @@ export const DEV_TESTING_FIXED_ACTIONS = Object.freeze([
       '验证字段来源、覆盖、清空、列表回显及打印合同，并原子更新专项报告。',
     boundary: '不连接数据库、不启动真实业务浏览器，也不代替端到端验收。',
   }),
+])
+export const DEV_PRESSURE_ACTIONS = Object.freeze([
+  Object.freeze({ key: 'pressure-quick',
+label: '运行短档回归',
+profile: 'quick',
+    description: '42 张模拟订单，验证负载、竞争、对账和清理。' }),
+  Object.freeze({ key: 'pressure-capacity',
+label: '运行 10 分钟容量',
+profile: 'capacity',
+    description: '主段持续 10 分钟；构建、造数与清理另计。' }),
 ])
 
 export const DEV_TESTING_GIT_HOOK_PATH_COMMAND =
@@ -142,7 +155,7 @@ export const DEV_TESTING_OPERATION_TERMINAL_STATUSES = Object.freeze([
   'not_proven',
 ])
 
-const ACTION_KEYS = DEV_TESTING_FIXED_ACTIONS.map((action) => action.key)
+const ACTION_KEYS = [...DEV_TESTING_FIXED_ACTIONS, ...DEV_PRESSURE_ACTIONS].map((action) => action.key)
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const COMMIT_PATTERN = /^[0-9a-f]{40,64}$/u
@@ -151,7 +164,7 @@ const AFFECTED_SCOPE_PATTERN = /^T[0-8]$/u
 const PLAN_COMMAND_SCOPE_PATTERN = /^(?:T[0-8]|LOCAL_FULL)$/u
 const LOCAL_GATE_VALUES = Object.freeze(['focused', 'full'])
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
+  /^testing:(fast|role-access|field-linkage|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
 const STATUS_META = Object.freeze({
   queued: Object.freeze({ label: '等待启动', tone: 'primary' }),
   running: Object.freeze({ label: '运行中', tone: 'primary' }),
@@ -505,7 +518,7 @@ async function readJsonResponse(response) {
 
 export function createDevTestingIdempotencyKey(
   action,
-  { randomUUID = () => globalThis.crypto.randomUUID() } = {}
+  { randomUUID = () => createDevOperationUUID() } = {}
 ) {
   if (!ACTION_KEYS.includes(action)) {
     throw new Error('固定验证动作无效')

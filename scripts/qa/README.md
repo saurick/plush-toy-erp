@@ -29,6 +29,7 @@
 | `node scripts/qa/erp-field-linkage.mjs` | 运行字段联动专项，前后绑定同一仓库指纹，并把脱敏结构化证据写入 `output/qa/coverage/field-linkage.latest.json`；只证明该专项，不代表整仓覆盖 | 修改字段来源、映射、回显或打印链路后 |
 | `node scripts/qa/test-coverage-collect.mjs --profile baseline --write` | 在同一仓库身份下运行非数据库 baseline，采集 Go / Web 代码覆盖、显式业务场景、字段联动、导入合同和受影响验证范围（内部键 T0-T8），再原子写入证据并聚合 latest；运行期身份变化即失败 | 刷新开发工作台真实覆盖证据前 |
 | `node scripts/qa/test-coverage-report.mjs --write` | 聚合当前 commit / worktree 指纹、真实代码覆盖制品、业务场景、验证范围（内部键 T0-T8）与验收状态到 `output/qa/coverage/latest.json`；缺制品写 `missing`，不自动运行全量测试 | 刷新开发工作台覆盖状态前 |
+| `node scripts/qa/test-coverage-report.mjs --snapshot --artifact <bound-evidence.json>` | 按显式制品共同的完整源码身份聚合到 `output/qa/coverage/snapshot.latest.json`，原子写入并读回；不覆盖当前工作区报告 | 展示已完成的隔离验证证据时 |
 | `bash scripts/qa/strict.sh` | full 的真实覆盖超集：先运行独有 shell / YAML 检查，再以 strict profile 单次运行 full；扩展视口、零 warning 和严格 govulncheck 各执行一次；各阶段输出统一耗时标记 | 发版前 / 大改后 |
 | `bash scripts/qa/full.sh` | 完整本地检查；一次运行五个显式 Node 测试组，不复跑会由 Web / server 全集覆盖的 fast 子集；资源敏感发布合同在 shared / Web / server 汇合后单独执行；另含 secrets、Chromium、根入口浏览器 smoke、存量升级、当前 schema PostgreSQL、前后端测试 / 构建和 govulncheck；DEV 页面与共享布局桌面 smoke 由 affected 选择，不进入默认场景集 | 独立完整诊断、prepare-push 或 strict 内部 |
 | `node scripts/qa/run-gate-with-receipt.mjs --gate <full\|strict>` | 执行正式门禁并写入同一脱敏回执；passed 必须具备完整阶段耗时、非零测试、零失败、零 skip 和运行前后仓库身份一致，工作台据此展示总耗时与瓶颈 | 需要可核验效能证据时 |
@@ -133,12 +134,15 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 ## 输出与写入边界
 
 - 脱敏报告和模拟 evidence 默认写到 `output/**` 或调用方显式指定的 ignored 目录。
-- 覆盖报告固定留在 `output/qa/coverage/**`，不得放入 `web/public/**`、生产构建或长期 Markdown。DEV 接口的 GET 只返固定 latest，POST 只接受固定 `collect + idempotencyKey`，拒绝调用方命令、参数、路径、环境变量、profile 和 query；接口仅本机、同源且带本次 DEV 会话 CSRF token。
+- 覆盖报告固定留在 `output/qa/coverage/**`，不得放入 `web/public/**`、生产构建或长期 Markdown。DEV 接口分别通过固定 GET `/__dev/api/qa/coverage` 和 `/__dev/api/qa/coverage/snapshot` 读取当前工作区与隔离报告；POST 只接受固定 `collect + idempotencyKey`，拒绝调用方命令、参数、路径、环境变量、profile 和 query。访问沿用开发工作台网络及运维身份边界，执行动作另需同源与本次 DEV 会话 CSRF token。
 - 覆盖基线操作状态固定留在私有 ignored 目录 `output/dev-workbench/coverage-operations/**`；开发测试固定动作状态留在 `output/dev-workbench/testing-operations/**`。两者只公开脱敏阶段投影，不保存或返回 stdout、stderr、PID、命令、幂等 key、环境变量或凭据。同 key 重试复用同一操作，且共同使用 `output/dev-workbench/qa-execution.lock`；覆盖基线、fast、岗位巡检和字段联动同一时间只能有一项运行，避免争用仓库身份和 canonical evidence。
 - 数据库迁移操作状态固定留在私有 ignored 目录 `output/dev-workbench/database-migration-operations/**`，备份恢复制品固定留在 `output/dev-workbench/database-migration-backups/**`。公开 operation 不返回底层目标 / apply / 维护确认值、PID、命令、DSN 或真实路径；CLI 与页面执行器只允许登记共享开发库，使用幂等索引和跨进程排他锁，同一计划只 apply 一次，并在 apply 前重新验证准备阶段的备份文件身份。进程中断或提交结果不明确时先读回而不自动重试；非交互 prepare 的 exit 0 只表示 `ready / writes=0`，execute 读回通过才表示迁移完成。
 - baseline 采集器先冻结仓库 identity 与 `affected` 层级，使用仓库锁定的 Node 与 pnpm，先以 `node scripts/gen-error-codes.mjs --check` 证明错误码生成物无漂移，再直接用项目 Node 执行 Web native coverage，避免 `pnpm test` 的 `pretest` 在采集中改写 tracked 文件。完成 Go / Web / import / field-linkage 后再次核对同一 identity 并自动聚合；字段联动 runner 也先在同目录 staging 生成 TAP 与报告，只有测试、builder 和身份复核均通过才最后提升 canonical 报告，失败时保留上一份。baseline evidence 和 candidate latest 同样先写 `output/qa/coverage/.staging/<uuid>/**`，候选 schema / repository / staging 泄漏检查和读回通过后，才按 evidence、字段联动和 latest 的顺序提升；latest 提升后的 identity 复核失败会恢复旧 latest。它不写 PostgreSQL、不运行真实业务浏览器、不探测 readiness、不部署、不做 UAT。受影响但未执行的层级必须保留 `missing`，只有未受影响层可写 `not_applicable`。
 - 采集进程完成且仓库身份一致时，退出码 `0` 记为 `passed`，测试存在失败、缺失或零执行的退出码 `2` 记为 `issues` 并发布当前失败报告，避免旧绿色遮蔽当前结果；启动失败、进程/服务中断、报告读回失败或身份变化记为 `failed / not_proven`，不得替换上一份可读报告。当前版本不提供取消按钮，避免固定制品写到一半形成含糊终态；页面离开只停止轮询，不停止后台任务。
-- Go 业务域与字段联动打印域使用脚本内显式 `scenario id -> package/test prefix`、`caseId` 注册表；不得以测试名、目录、退出码或文件数量推断领域完成。通用 full / strict 回执不能拆成 PostgreSQL、浏览器或目标验收通过。
+- Go 业务域与字段联动打印域使用脚本内显式 `scenario id -> package/test prefix`、`caseId` 注册表；不得以测试名、目录、退出码或文件数量推断领域完成。字段联动已声明的不适用场景排除出适用分母，不能计为执行或通过；缺失、失败、跳过和零执行仍分别报告。通用 full / strict 回执不能拆成 PostgreSQL、浏览器或目标验收通过。
+- “证据与覆盖”保留两个独立来源：当前工作区按实时 commit / dirty / fingerprint 判定新鲜度，最近隔离验证保留原源码身份并始终标为 `snapshot`。当前报告缺失且隔离报告可读时默认展示隔离结果；两类读取独立失败，重新读取和快速切换会丢弃已取消或过期响应。Go / Web 执行计数、业务规则、失败叶子用例与数据库 / 浏览器场景可分别展开，支持“仅看未通过场景”。专项通过不补成完整 gate、真实前后端闭环、exact-SHA CI 或 UAT 通过；来源的范围说明必须随结果保留。
+- 隔离归档必须显式列出项目内的 `--artifact` JSON，且全部携带相同的完整 repository identity；不能混入当前工作区身份、裸 coverage 或 `--write`。写入器与 DEV 读取器共用 `lib/coverage-report-contract.mjs` 的 schema / 身份 / 脱敏校验；归档不参与默认当前报告扫描。后续业务规则变化只维护采集器原有场景登记、中文标签和对应测试，页面按统一场景结构渲染；失败明细只保留测试标识及安全诊断，不透传原始日志。
+- 工程用料链路复用 Source Documents、Workflow 和 RBAC/API 的显式场景登记；公式、冻结、权限、重试与维护方式见[测试策略](../../docs/product/自动化测试策略.md#核心用料链路与测试维护--material-chain-test-maintenance)。`engineering_material` 与共享 `unit_quantity` 的领域改动选择现有 critical PostgreSQL gate；`TestSourceDocumentPostgresEngineeringMaterial*` 不计入无数据库 baseline，通过真实数据库的执行日志独立证明。
 - 字段联动报告只能由顶层 `erp-field-linkage.mjs` runner 生成，底层 builder 要求 runner 传入完整 repository identity，不是手工入口。裸 `--go-coverprofile` / `--web-coverage` 参数没有 repository identity，聚合器只能将其作为 `stale` 诊断；要记为当前代码证据，必须提供携带当前仓库指纹的 `--artifact` JSON。
 - `output-retention-preview.mjs` 只扫描登记的 managed roots，按每组最近数量、最近 passed / failed / not_proven、显式 SHA 与 operation 引用给出 `keep / review_delete`；5GiB 是复核预算，不是自动删除阈值。未登记目录、符号链接和无效 metadata 均不得成为删除授权。
 - 脚本不得把真实密码、token、完整 DSN、URL userinfo、原始客户文件内容或未脱敏输出写入仓库。
@@ -507,6 +511,54 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
 ```
 
 手工验收数据不是压测数据。容量和压力入口只能使用一次性隔离数据库；共享开发库与 demo-133 演练造数库都不得拿来压测。容量幂等探针必须通过 `--task-source-type / --task-source-id` 绑定同批 `trial_pmc_work` 模拟任务，并校验 `simulated_only / trial_task` 标记；不得借用正式来源生成任务。ignored 本地报告也不等于目标服务器的发布证据。
+
+<a id="pressure-testing"></a>
+
+## 核心业务压力测试 / Pressure
+
+工作台提供同一入口：**改动验证 → 压力测试**（`/__dev/testing?view=pressure`）。先运行短档回归，代码稳定后按需要运行 10 分钟容量档；运行阶段、报告选择、阶段吞吐、单次 API 延迟、完整业务流程、竞争与重放、数据库对账、恢复和清理在同一页查看。“使用说明”直达本节。报告选择保存在 `report` query；“重新读取报告”只读证据，切换页面或刷新不会重复启动任务。需要重启开发服务加载新的服务端插件；运维身份继续使用工作台既有认证合同。
+
+浏览器固定动作仅为 `pressure-quick / pressure-capacity + idempotencyKey`，不传目标、路径或环境变量。两档共用已有 QA 锁，与开发门禁、覆盖采集、full / strict 互斥；工作台报告固定写入 `output/qa/pressure/workbench-<operation>/`。阶段进度通过同目录 `progress.json` 原子发布，按完成阶段计数，不代表剩余时间。CLI 的同合同报告也可在页面选择；合同损坏、符号链接或超限文件被拒绝，原始文件保留。公开投影只携带允许的指标、判定和摘要，不输出凭据、私有路径或原始诊断。
+
+使用 `pressure-isolated-lifecycle.mjs` 复跑当前工作区的读性能和工程主链路。默认只输出计划；`--run` 创建本轮专属的 PostgreSQL、S3、后端、账号和模拟数据，结束后停止后端并移除本轮容器及卷。需要 Node、Go、Atlas、psql、Docker Compose。当前档位专测业务 API，使用既有 `ERP_PDF_WARMUP=0` 配置，并在报告明确未验证打印/PDF；数据库 readiness 与运行身份仍必须通过。Linux root runner 使用临时目录与独立低权限 UID，避免与编辑器共用文件监听额度，不新增系统账号或修改全局额度。
+
+```bash
+node scripts/qa/pressure-isolated-lifecycle.mjs --plan --profile capacity
+node scripts/qa/pressure-isolated-lifecycle.mjs --run --profile quick
+node scripts/qa/pressure-isolated-lifecycle.mjs --run --profile capacity
+```
+
+报告默认写入 `output/qa/pressure/<run>/`；可用 `--out <directory>/lifecycle.json` 指定本轮目录。`lifecycle.json` 同时绑定隔离生命周期脚本摘要，并汇总构建、迁移、身份、实际容器镜像及资源限制、运行与清理结果；源码摘要包含迁移 SQL、Atlas 配置与校验文件，迁移变化后旧报告失效。`read-pressure.json` 和 `engineering-pressure.json` 分开保存容量与业务正确性证据；两份 dataset 回执绑定库、批次和逻辑指纹。凭据由入口随机生成，临时配置为 `0600`，不写入报告。业务失败的 `failureDetail / flowFailures` 保留阶段、方法、错误类别和断言键，过滤任意异常正文；生命周期失败保留阶段及私有诊断位置。清理失败使整体失败，并保留本轮目录供精确恢复。`PRESSURE_S3_IMAGE` 可显式指定附件存储镜像，`PSQL_BIN` 可指定 psql 路径；镜像选择不能当作目标生产配置。
+
+需要拆分执行时，配置入口 `capacity-customer-config.mjs` 还要求 `CAPACITY_CONFIG_EXPECTED_MIGRATION`，读压力入口要求 `--commit / --migration`，都必须来自本轮实际后端。常规复跑使用上述生命周期入口，由它绑定源码快照、迁移及目标身份并传入各阶段。
+
+| 档位 / 入口 | 负载与用途 | 可证明的范围 |
+| --- | --- | --- |
+| 隔离入口 `quick` | 原读基线 + 42 张工程订单池、短时升压/主阶段/恢复 | 业务场景与报告的快速回归，不证明持续忙时容量 |
+| 隔离入口 `capacity` | 原读基线 + 262 张工程订单池；主阶段 4 worker、每次操作间隔 1 秒、持续 10 分钟，随后降压恢复 | 此候选版本、此隔离环境、此负载下的持续表现 |
+| 读入口 `capacity` / `sustained` | 1000 次主段基线 / 10 分钟持续读；任务 5000、生产草稿 2000、财务草稿 2000、附件 1000 | 查询与本批催办幂等；不外推到采购审批幂等 |
+| 读入口 `saturation` / `soak` | 固定高 worker 与允许的保护错误 / 至少约 30 分钟读观察 | 保护与短时稳定性；不自动证明饱和点或全天稳定性 |
+
+工程操作按起始序号混合约 90% 查询、10% 不同单据的完整办理。两类订单分别覆盖普通 BOM 与 8 条订单明细 × 24 部位 BOM；固定独立预期用量包含船头样、损耗、材料归并、六位展示精度、目标单位取整和两个厂商。数据经现有 API 与工程准备 helper 构造，先确认样品并保留 `PREVIEW`，计时场景再执行计算读回、提交、老板审核、财务审核、采购权威读回；采购数量、厂商、材料、单位及来源必须一致，单价、金额、到货日期保持空。压测不自动抵扣库存，不制造收货、库存或财务事实。
+
+同单据竞争单独运行：20 路提交、老板审核、财务审核；分别检查版本不匹配、实际旧版本、错误审批顺序、无权岗位和同意图重放。明细来源必须具备有效的订单行和 BOM 明细 ID，行号与部位一一对应，材料、单位、规格、样品、单位用量、损耗和展示数量符合独立配方。未知结果检查在后端实际回复后扣留客户端响应直到超时，再权威读回并以原输入重试；这证明丢失回复恢复，不证明服务端任意超时或断电恢复。数据库最终检查冻结明细、厂商分组、来源关联、数量、重复与部分采购结果，以及无意外 Fact 写入。
+
+通过条件包括 HTTP 与 JSON-RPC 业务成功、结果结构和业务读回、各方法样本、成功吞吐、延迟、目标持续时长、恢复、采样和最终一致性。默认每个方法至少 5 个成功样本，成功操作吞吐至少 1/s，各方法成功请求 p95 ≤ 1000 ms、p99 ≤ 2000 ms；它们是初始回归门限，须结合岗位实际目标调整，不代表客户已确认的 SLA。门限集中在 `DEFAULT_PRESSURE_LIMITS`，单方法例外使用 `level.methodLimits`，不得为了通过而临时放宽。
+
+`requests / successfulRps` 在工程报告中统计混合操作；`rpc` 与 `methods` 统计实际 API 请求；`businessFlows` 与 `completedBusinessFlows` 只统计完成全部审批并通过采购读回的流程。延迟分别报告所有请求和成功请求。长测使用有界直方图，以桶上界保守计算分位数（≤1s 为 1ms、≤10s 为 10ms、≤60s 为 100ms，再按秒）；不保留响应、token 或每次请求的样本。保护档的 `overloadProtectionPassed` 和正常容量的 `capacityPassed` 分开，允许限流不等于达到容量门限。
+
+### 维护与扩展 / Maintenance
+
+| 变更类型 | 唯一维护位置 | 数据与证据处理 |
+| --- | --- | --- |
+| 数据配方、前置、来源及单位/数量业务合同 | `pressure-engineering-data.mjs`、现有工程 helper；维护 `ENGINEERING_DATA_FILES` 与所属验收阶段指纹 | 数据指纹变化先重造；不复用已消耗的待审批订单池 |
+| API、岗位、状态和采购读回断言 | `pressure-engineering-scenario.mjs` 的 adapter / checker；维护 `ENGINEERING_VERIFICATION_FILES` | 更新验证指纹与针对性测试；已有数据仍符合配方时重验，旧报告不代表新合同已通过 |
+| worker、操作间隔、时长、比例和门限 | `engineering-pressure.mjs` 的 profiles / mix、`pressure-runtime.mjs` | 更新负载指纹，保留数据语义，重新出具性能报告 |
+| 环境与生命周期 | `pressure-isolated-lifecycle.mjs`；维护 `PRESSURE_LIFECYCLE_FILES` | 绑定源码快照、二进制 hash、迁移和后端身份；只清理拥有的资源 |
+
+工程准备 helper 默认仍完成原有人工验收审批，只有明确 `materialMode: "preview"` 才保留未提交状态。新增场景先复用现有 API/helper，补独立预期和读回；登记影响数据的依赖文件，不另造通用 ERP 平台。业务口径变更时先核对正式公式、状态及权限合同，再更新配方与独立预期；不要从接口返回结果生成预期值。相关单测登记在 `node-test-groups.mjs`；affected 会为压力页、配置、样式与浏览器场景选择 `dev-pressure-desktop`，为报告和执行 Bridge 选择同名测试及操作边界核对。持续压测必须显式运行，不加入日常 fast/CI 默认长任务。运行前后检查逻辑指纹和实际 `/readyz/runtime-identity`，脚本加载后发生变化须重新启动入口，拒绝库、release 或 migration 不匹配；工作区存在未提交改动时，报告明确标为 dirty 候选构建，不宣称 exact-commit 发布证明。
+
+当前模型是等待上次操作完成后再发下一次的闭合循环。需要证明固定业务到达率、梯度饱和点、数小时稳定性或目标生产容量时，按该问题补 k6 arrival-rate / 更长 soak / 同配置目标演练，并继续复用业务断言和读回；这些结果不能从本次绿色推导。
 
 ## 按影响面选择 / Affected Tests
 

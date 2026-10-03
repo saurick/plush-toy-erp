@@ -17,6 +17,7 @@ import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
+import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
@@ -720,7 +721,7 @@ export default function DevDocsPage() {
       return
     }
     try {
-      await navigator.clipboard.writeText(selectedDoc.path)
+      await copyTextToClipboard(selectedDoc.path)
       message.success('已复制文档路径')
     } catch {
       message.error('复制失败，请手动选中文档路径')

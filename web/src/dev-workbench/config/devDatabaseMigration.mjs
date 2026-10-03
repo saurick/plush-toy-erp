@@ -1,3 +1,4 @@
+import { createDevOperationUUID } from './devOperationIdentity.mjs'
 import { DEV_DATABASE_MIGRATION_ROUTE } from './devRoutes.mjs'
 import { isDevTimestamp } from './devTimestamp.mjs'
 
@@ -189,6 +190,8 @@ export function validateDatabaseMigrationSummary(summary) {
   if (
     summary.schemaVersion !== 'plush.dev-database-migration-summary/v1' ||
     !['success', 'blocked'].includes(summary.status) ||
+    (Object.hasOwn(summary, 'readOnly') &&
+      typeof summary.readOnly !== 'boolean') ||
     !Array.isArray(summary.operations) ||
     !Array.isArray(summary.issues)
   ) {
@@ -255,10 +258,7 @@ export function createDatabaseMigrationIdempotencyKey(kind) {
   if (!['prepare', 'restart'].includes(kind)) {
     throw new Error('不支持的迁移操作类型')
   }
-  if (typeof globalThis.crypto?.randomUUID !== 'function') {
-    throw new Error('当前浏览器不能生成安全的操作标识')
-  }
-  return `database-migration:${kind}:${globalThis.crypto.randomUUID()}`
+  return `database-migration:${kind}:${createDevOperationUUID()}`
 }
 
 export function createDevDatabaseMigrationClient({
@@ -389,6 +389,7 @@ export function selectActiveDatabaseMigrationOperation(operations = []) {
 export function databaseMigrationPreparationAvailable(summary) {
   return (
     summary?.status === 'success' &&
+    summary.readOnly !== true &&
     summary.target?.key === 'shared-dev' &&
     Number.isSafeInteger(summary.target.pendingFiles) &&
     summary.target.pendingFiles > 0 &&

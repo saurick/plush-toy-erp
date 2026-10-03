@@ -28,8 +28,7 @@ import {
   transitionDevCustomerConfigOperation,
 } from '../../scripts/qa/dev-customer-config-operation-store.mjs'
 import {
-  isLoopbackHostHeader,
-  isLoopbackRemoteAddress,
+  isDevWorkbenchRequest,
   isSameOriginRequest,
   readJsonBody,
 } from './devServerSecurity.mjs'
@@ -626,13 +625,15 @@ export function createDevCustomerConfigMiddleware({
       next()
       return
     }
-    if (
-      !isLoopbackRemoteAddress(request.socket?.remoteAddress) ||
-      !isLoopbackHostHeader(request.headers?.host)
-    ) {
+    const isReadOnlyQuery =
+      request.method === 'GET' &&
+      [OPERATIONS_API_PATH, RELEASE_BATCHES_API_PATH].includes(
+        requestURL.pathname
+      )
+    if (!isDevWorkbenchRequest(request)) {
       sendJson(response, 403, {
         status: 'failed',
-        message: '该客户配置工具接口仅允许本机访问',
+        message: '客户配置工具只允许通过当前开发服务的本机或内网地址访问',
       })
       return
     }
@@ -648,12 +649,7 @@ export function createDevCustomerConfigMiddleware({
         })
         return
       }
-      if (
-        request.method === 'GET' &&
-        [OPERATIONS_API_PATH, RELEASE_BATCHES_API_PATH].includes(
-          requestURL.pathname
-        )
-      ) {
+      if (isReadOnlyQuery) {
         if (
           [...requestURL.searchParams.keys()].some(
             (key) => key !== 'customerKey'

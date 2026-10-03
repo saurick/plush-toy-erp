@@ -1,5 +1,6 @@
 import { validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
 import { createQualityGateStyleSummary } from './devQualityGateScenarios.mjs'
+import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 
 const ASSETS = [
   'checksums.sha256',
@@ -519,23 +520,19 @@ export function createDevVersionCenterScenarios({
           'rgb(255, 255, 255)',
           '版本中心导航使用完整白色操作区'
         )
-        const evidenceNote = page.locator(
-          '.erp-dev-version-workspace__evidence-note'
-        )
-        await evidenceNote.waitFor({ state: 'visible', timeout: 10_000 })
-        assert.equal(
-          (await evidenceNote.textContent())?.replace(/\s+/gu, ' ').trim(),
-          'CI/CD 证据分两处查看：流水线耗时看 GitLab 的 CI 检查、构建和制品发布耗时；操作记录看工作台发起的发布、目标部署、回滚和数据重建结果。'
-        )
-        const evidenceNoteBox = await evidenceNote.boundingBox()
+        const versionTableBox = await page
+          .locator('.erp-dev-version-tab--versions .ant-card-head')
+          .boundingBox()
         const tabNavigationBox = await page
           .locator('.erp-dev-version-workspace .ant-tabs-nav')
           .boundingBox()
-        assert(evidenceNoteBox && tabNavigationBox)
+        assert(versionTableBox && tabNavigationBox)
         assert(
-          evidenceNoteBox.y + evidenceNoteBox.height <= tabNavigationBox.y + 1,
-          'CI/CD 说明不得覆盖页签'
+          versionTableBox.y >= tabNavigationBox.y + tabNavigationBox.height &&
+            versionTableBox.y < 500,
+          '版本清单应紧邻任务栏并在首屏出现'
         )
+        assert.equal(await page.getByRole('table', { name: '发布状态摘要' }).isVisible(), false)
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
           0
@@ -547,6 +544,8 @@ export function createDevVersionCenterScenarios({
         await targetSelector
           .getByText('test 甲方测试验收', { exact: true })
           .click()
+        await verifySlidingMotion(page, assert, '.erp-dev-version-workspace .ant-tabs-nav-list', 1)
+        await waitForView(page, 'overview')
         await page.getByText('test 数据方式', { exact: true }).waitFor()
         await page
           .getByText('普通部署默认保留现有数据', { exact: true })
@@ -564,11 +563,11 @@ export function createDevVersionCenterScenarios({
         await page
           .locator('.erp-dev-version-tab--history')
           .waitFor({ state: 'visible' })
-        assert.equal(await evidenceNote.isVisible(), true)
+        assert.equal(await page.locator('.erp-dev-version-current-operation').isVisible(), true)
 
         await page.getByRole('tab', { name: '流水线耗时' }).click()
         await waitForView(page, 'pipeline')
-        assert.equal(await evidenceNote.isVisible(), true)
+        assert.equal(await page.locator('.erp-dev-version-current-operation').isVisible(), true)
         const timingDetails = page.locator('.erp-dev-pipeline-timing__details')
         await timingDetails.waitFor({ state: 'visible' })
         assert.equal(
@@ -686,7 +685,9 @@ export function createDevVersionCenterScenarios({
         await page
           .locator('.erp-dev-pipeline-timing')
           .waitFor({ state: 'visible' })
-        assert.equal(await evidenceNote.isVisible(), true)
+        await verifySlidingMotion(page, assert, '.erp-dev-version-workspace .ant-tabs-nav-list', 3, true)
+        await waitForView(page, 'history')
+        assert.equal(await page.locator('.erp-dev-version-current-operation').isVisible(), true)
         await assertNoHorizontalOverflow(
           page,
           'dev-version-center-tabs-pagination-desktop-pipeline'

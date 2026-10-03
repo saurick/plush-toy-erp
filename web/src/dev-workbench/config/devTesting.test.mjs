@@ -9,6 +9,7 @@ import {
   DEV_TESTING_COVERAGE_API_PATH,
   DEV_TESTING_COVERAGE_COLLECT_COMMAND,
   DEV_TESTING_COVERAGE_REPORT_SCHEMA,
+  DEV_TESTING_COVERAGE_SECTIONS,
   DEV_TESTING_COVERAGE_WRITE_COMMAND,
   DEV_TESTING_CURRENT_DOC_PATHS,
   DEV_TESTING_ROUTE,
@@ -16,6 +17,8 @@ import {
   buildDevTestingCopyText,
   buildDevTestingDocs,
   buildDevTestingSummary,
+  buildDevTestingCommandPage,
+  buildDevTestingCoverageSectionSummaries,
   extractDevTestingCommandBlocks,
   filterDevTestingCommandBlocks,
   filterDevTestingDocs,
@@ -24,7 +27,9 @@ import {
   getDevTestingCoverageStatusMeta,
   isDevTestingEnabled,
   normalizeDevTestingCoverageEnvelope,
+  normalizeDevTestingCoverageSnapshot,
   parseDevTestingStrategyTiers,
+  parseDevTestingCoverageSection,
 } from './devTesting.mjs'
 
 const strategyMarkdown = `
@@ -210,7 +215,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
       'mobile-workflow-smoke',
       'customer-config-dev-console',
       'dev-ui-design',
-      'dev-doc-governance',
+      'dev-docs',
       'customer-config-package-runtime',
       'customer-import-tooling',
       'frontend-customer-config-projection',
@@ -232,7 +237,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   assert.match(getPresetCopyText('frontend'), /pnpm style:l1/)
   assert.equal(presetsByKey.has('full-local-gate'), false)
   assert.equal(presetsByKey.has('release'), false)
-  assert.match(testingPageSource, /前往质量门禁/u)
+  assert.match(testingPageSource, /完整或严格门禁/u)
   assert.match(testingPageSource, /view=run&profile=strict/u)
   assert.match(
     getPresetCopyText('workflow-backend-actions'),
@@ -541,25 +546,17 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     /只证明 dev-only 交互设计查看器/
   )
   assert.match(getPreset('dev-ui-design').description, /不改正式菜单/)
-  assert.match(getPresetCopyText('dev-doc-governance'), /devDocs\.test\.mjs/)
+  assert.match(getPresetCopyText('dev-docs'), /devDocs\.test\.mjs/)
   assert.match(
-    getPresetCopyText('dev-doc-governance'),
-    /devGovernance\.test\.mjs/
-  )
-  assert.match(
-    getPresetCopyText('dev-doc-governance'),
+    getPresetCopyText('dev-docs'),
     /dev-page-overview-desktop-light/
   )
   assert.match(
-    getPresetCopyText('dev-doc-governance'),
+    getPresetCopyText('dev-docs'),
     /dev-page-docs-desktop-light/
   )
-  assert.match(
-    getPresetCopyText('dev-doc-governance'),
-    /dev-page-governance-desktop-light/
-  )
-  assert.match(getPreset('dev-doc-governance').description, /不改正式文档真源/)
-  assert.match(getPreset('dev-doc-governance').description, /不进入正式菜单/)
+  assert.match(getPreset('dev-docs').description, /不改正式文档真源/)
+  assert.match(getPreset('dev-docs').description, /不进入正式菜单/)
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),
     /customer-package-lint\.test\.mjs/
@@ -1348,14 +1345,12 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
   assert.match(testingPageSource, /改动验证/)
   assert.match(testingPageSource, /\{ label: '本轮验证', value: VIEW_TIERS \}/)
-  assert.match(
+  assert.doesNotMatch(
     testingPageSource,
-    /\{ label: '专项检查库', value: VIEW_COMMANDS \}/
+    /\{ label: '(?:专项检查库|Git 收口)', value: VIEW_(?:COMMANDS|CLOSEOUT) \}/
   )
-  assert.match(
-    testingPageSource,
-    /\{ label: 'Git 收口', value: VIEW_CLOSEOUT \}/
-  )
+  assert.match(testingPageSource, /查专项命令/)
+  assert.match(testingPageSource, /页面说明检查/)
   assert.match(
     testingPageSource,
     /\{ label: '证据与覆盖', value: VIEW_COVERAGE \}/
@@ -1375,6 +1370,7 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /createDevTestingOperationClient/)
   assert.match(testingPageSource, /生成本轮验证计划/)
   assert.match(testingPageSource, /可运行检查/)
+  assert.match(testingPageSource, /固定检查与独立证据/)
   assert.doesNotMatch(testingPageSource, /<ValidationJourney/)
   assert.match(testingPageSource, /DEV_TESTING_FIXED_ACTIONS\.map/)
   assert.match(testingPageSource, /改动到验证建议的映射/)
@@ -1413,7 +1409,7 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /本页证明/)
   assert.match(testingPageSource, /本页不证明/)
   assert.match(testingPageSource, /证据分层，不合并总分/)
-  assert.match(testingPageSource, /查看采集与判定规则/)
+  assert.match(testingPageSource, /查看采集、覆盖目标与判定规则/)
   assert.match(testingPageSource, /erp-dev-testing-coverage-matrix__head/)
   assert.match(testingPageSource, /查看完整报告身份/)
   assert.match(testingPageSource, /erp-dev-testing-coverage-policy-list/)
@@ -1429,4 +1425,227 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /method: 'GET'/)
   assert.doesNotMatch(testingPageSource, /error\?\.message/)
   assert.doesNotMatch(testingPageSource, /child_process|exec\(|spawn\(/)
+})
+
+test('command pagination covers every result once and bounds the last page', () => {
+  const blocks = Array.from({ length: 23 }, (_, index) => ({
+    key: String(index),
+  }))
+  const pages = [1, 2, 3].map((page) =>
+    buildDevTestingCommandPage(
+      blocks,
+      new URLSearchParams({ commandsPage: String(page) })
+    )
+  )
+  assert.deepEqual(
+    pages.map(({ items }) => items.length),
+    [10, 10, 3]
+  )
+  assert.deepEqual(
+    pages.flatMap(({ items }) => items),
+    blocks
+  )
+  assert.deepEqual(
+    pages.map(({ from, to }) => [from, to]),
+    [
+      [1, 10],
+      [11, 20],
+      [21, 23],
+    ]
+  )
+  assert(pages.every(({ total }) => total === 23))
+  assert.equal(
+    buildDevTestingCommandPage(blocks, new URLSearchParams('commandsPage=99'))
+      .page,
+    3
+  )
+  const filtered = buildDevTestingCommandPage(
+    blocks.slice(0, 2),
+    new URLSearchParams('commandsPage=3')
+  )
+  assert.equal(filtered.page, 1)
+  assert.deepEqual(filtered.items, blocks.slice(0, 2))
+})
+
+test('command pagination fails closed for malformed queries and handles empty results', () => {
+  const blocks = Array.from({ length: 12 }, (_, key) => ({ key }))
+  for (const value of [
+    '0',
+    '-1',
+    '01',
+    '1.5',
+    'unknown',
+    '',
+    '9007199254740992',
+  ]) {
+    assert.equal(
+      buildDevTestingCommandPage(
+        blocks,
+        new URLSearchParams({ commandsPage: value })
+      ).page,
+      1
+    )
+  }
+  assert.equal(
+    buildDevTestingCommandPage(
+      blocks,
+      new URLSearchParams('commandsPage=2&commandsPage=2')
+    ).page,
+    1
+  )
+  assert.deepEqual(
+    buildDevTestingCommandPage([], new URLSearchParams('commandsPage=99')),
+    {
+      page: 1,
+      total: 0,
+      from: 0,
+      to: 0,
+      items: [],
+    }
+  )
+})
+
+test('coverage section URL parsing rejects unknown and repeated values', () => {
+  for (const { value } of DEV_TESTING_COVERAGE_SECTIONS) {
+    assert.equal(
+      parseDevTestingCoverageSection(new URLSearchParams({ coverage: value })),
+      value
+    )
+  }
+  for (const query of [
+    '',
+    'coverage=unknown',
+    'coverage=',
+    'coverage=business&coverage=business',
+    'coverage=business&coverage=gates',
+  ]) {
+    assert.equal(
+      parseDevTestingCoverageSection(new URLSearchParams(query)),
+      'code'
+    )
+  }
+})
+
+test('coverage tabs expose failures in hidden groups and do not infer success from counts', () => {
+  const statuses = (report) =>
+    Object.fromEntries(
+      buildDevTestingCoverageSectionSummaries(report).map(
+        ({ value, status }) => [value, status]
+      )
+    )
+  assert.deepEqual(statuses(null), {
+    code: 'not_collected',
+    business: 'not_collected',
+    gates: 'not_collected',
+    acceptance: 'not_collected',
+  })
+  assert.deepEqual(
+    statuses({
+      codeCoverage: { go: { status: 'passed' }, web: { status: 'failed' } },
+      businessCoverage: { status: 'passed', domains: [{ status: 'blocked' }] },
+      gates: [{ status: 'passed' }, { status: 'skipped' }],
+      acceptance: {
+        postgres: { status: 'passed' },
+        browser: { status: 'stale' },
+      },
+    }),
+    {
+      code: 'failed',
+      business: 'blocked',
+      gates: 'skipped',
+      acceptance: 'stale',
+    }
+  )
+  assert.equal(
+    statuses({ codeCoverage: { go: { status: 'passed' } } }).code,
+    'partial'
+  )
+  assert.equal(
+    statuses({ acceptance: { postgres: { status: 'passed' } } }).acceptance,
+    'partial'
+  )
+  assert.equal(
+    statuses({ businessCoverage: { total: 2, executed: 2, passed: 2 } })
+      .business,
+    'not_collected'
+  )
+})
+
+test('coverage tabs distinguish collected, applicable passes, missing evidence and unknown states', () => {
+  const summarizeCode = (go, web) =>
+    buildDevTestingCoverageSectionSummaries({
+      codeCoverage: { go: { status: go }, web: { status: web } },
+    })[0].status
+  assert.equal(summarizeCode('passed', 'not_applicable'), 'passed')
+  assert.equal(
+    summarizeCode('not_applicable', 'not_applicable'),
+    'not_applicable'
+  )
+  assert.equal(summarizeCode('collected', 'collected'), 'collected')
+  assert.equal(summarizeCode('passed', 'collected'), 'partial')
+  assert.equal(summarizeCode('passed', 'missing'), 'partial')
+  assert.equal(summarizeCode('passed', 'unknown'), 'partial')
+  assert.equal(summarizeCode('blocked', 'failed'), 'failed')
+})
+
+test('coverage tabs inherit normalized fail-closed evidence rather than raw success labels', () => {
+  const item = { status: 'passed', total: 1, executed: 1, passed: 1 }
+  const state = normalizeDevTestingCoverageSnapshot({
+    status: 'snapshot',
+    report: {
+      schemaVersion: DEV_TESTING_COVERAGE_REPORT_SCHEMA,
+      snapshot: { kind: 'isolated' },
+      codeCoverage: { go: { ...item, executed: 0, passed: 0 }, web: item },
+      businessCoverage: {
+        ...item,
+        domains: [
+          {
+            ...item,
+            scenarios: [
+              {
+                id: 'missing-proof',
+                status: 'passed',
+                matchedTests: [],
+              },
+            ],
+          },
+        ],
+      },
+      gates: [{ ...item, skipped: 1 }],
+      acceptance: { postgres: item },
+    },
+  })
+  const statuses = Object.fromEntries(
+    buildDevTestingCoverageSectionSummaries(state.report).map(
+      ({ value, status }) => [value, status]
+    )
+  )
+  assert.deepEqual(statuses, {
+    code: 'partial',
+    business: 'partial',
+    gates: 'skipped',
+    acceptance: 'partial',
+  })
+})
+
+test('isolated coverage normalizes a snapshot without asserting current workspace freshness', () => {
+  const report = { schemaVersion: DEV_TESTING_COVERAGE_REPORT_SCHEMA,
+snapshot: { kind: 'isolated' },
+    repository: { commit: 'a'.repeat(40), dirty: true, fingerprint: 'b'.repeat(64) },
+    acceptance: { postgres: { status: 'passed',
+total: 1,
+executed: 1,
+passed: 1,
+      scenarios: [{ id: 'precision', label: '六位精度持久化', status: 'passed', matchedTests: ['TestPrecision/exact'] }] } } }
+  const snapshot = normalizeDevTestingCoverageSnapshot({ status: 'snapshot', report })
+  assert.equal(snapshot.status, 'snapshot')
+  assert.equal(snapshot.report.acceptance.postgres.status, 'passed')
+  assert.equal(snapshot.report.acceptance.postgres.scenarios[0].label, '六位精度持久化')
+  assert.equal(normalizeDevTestingCoverageSnapshot({ status: 'snapshot', report: { ...report, snapshot: null } }).status, 'failed')
+  const incomplete = normalizeDevTestingCoverageSnapshot({ status: 'snapshot',
+report: { ...report,
+    acceptance: { postgres: { ...report.acceptance.postgres, scenarios: [{ id: 'precision', status: 'passed', matchedTests: [] }] } } } })
+  assert.equal(incomplete.report.acceptance.postgres.status, 'partial')
+  assert.equal(incomplete.report.acceptance.postgres.scenarios[0].status, 'missing')
+  assert.equal(normalizeDevTestingCoverageEnvelope({ status: 'missing' }).report, null)
 })

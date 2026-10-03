@@ -8,6 +8,7 @@ export default function DevCustomerScopeSelector({
   scope,
   onChange,
   disabled = false,
+  compact = false,
   note = '选择只更新当前开发页地址，不会创建租户或切换任意目标。',
   label = '当前甲方',
   invalidDescription = '当前地址中的甲方未登记；客户相关读取与操作已停止，请选择已登记甲方。',
@@ -27,7 +28,7 @@ export default function DevCustomerScopeSelector({
 
   return (
     <section
-      className="erp-dev-customer-scope"
+      className={`erp-dev-customer-scope${compact ? ' erp-dev-customer-scope--compact' : ''}`}
       data-customer-scope-status={scope?.status || 'invalid'}
       data-customer-key={scope?.customerKey || ''}
       style={{
@@ -40,16 +41,18 @@ export default function DevCustomerScopeSelector({
       aria-label={`${label}选择`}
     >
       <div className="erp-dev-customer-scope__main">
-        <span className="erp-dev-customer-scope__icon" aria-hidden="true">
-          <TeamOutlined />
-        </span>
+        {!compact ? (
+          <span className="erp-dev-customer-scope__icon" aria-hidden="true">
+            <TeamOutlined />
+          </span>
+        ) : null}
         <div className="erp-dev-customer-scope__copy">
           <div className="erp-dev-customer-scope__title">
             <Text strong>{label}</Text>
             {ready && scope.defaulted ? <Tag color="green">默认</Tag> : null}
             {!ready ? <Tag color="warning">{invalidTag}</Tag> : null}
           </div>
-          <Text type="secondary">{note}</Text>
+          {!compact ? <Text type="secondary">{note}</Text> : null}
         </div>
         <Select
           aria-label={`${label}选择`}
@@ -59,6 +62,11 @@ export default function DevCustomerScopeSelector({
           disabled={disabled}
           onChange={onChange}
         />
+        {compact ? (
+          <Text type="secondary" className="erp-dev-customer-scope__note">
+            {note}
+          </Text>
+        ) : null}
       </div>
       {!ready ? (
         <Alert

@@ -113,7 +113,7 @@ test('timing labels keep Chinese-first trace titles', () => {
 test('version decisions and target evidence remain source-backed', () => {
   assert.match(versionPage, /aria-label="当前发布结论与下一步"/u)
   assert.match(versionPage, /boundaries[?][.]releaseDispatchAllowed/u)
-  assert.match(versionPage, /版本与流水线可查看，当前不能创建新发布/u)
+  assert.match(versionPage, /disabled=\{!canDispatch\}/u)
   assert.match(versionPage, /aria-label="切换当前操作目标"/u)
   assert.match(versionPage, /data-kind="local"/u)
   assert.match(versionPage, /data-kind="release"/u)

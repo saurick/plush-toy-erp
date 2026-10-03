@@ -72,6 +72,15 @@ test("testing operation persists, transitions and reuses one intent", async (t) 
   );
 });
 
+test("pressure intents persist in the same store and cannot reuse a key for a different profile", async (t) => {
+  const target = await store(t), key = `testing:pressure-quick:${ID}`;
+  const operation = createOrReuseDevTestingOperation(target, { action: "pressure-quick", idempotencyKey: key,
+    repository: REPOSITORY, operationId: ID }).operation;
+  assert.equal(readDevTestingOperation(target, operation.id).action, "pressure-quick");
+  assert.throws(() => createOrReuseDevTestingOperation(target, { action: "pressure-capacity",
+    idempotencyKey: key, repository: REPOSITORY }), /invalid/u);
+});
+
 test("testing operation represents role preconditions as blocked", async (t) => {
   const target = await store(t);
   const roleKey = `testing:role-access:${ID}`;

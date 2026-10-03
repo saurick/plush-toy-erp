@@ -833,6 +833,9 @@ async function runScenario(browser, scenario) {
 
 async function runScenarioOnce(browser, scenario) {
   const context = await browser.newContext({
+    httpCredentials: scenario.path?.startsWith('/__dev') && process.env.PLUSH_DEV_OPERATOR_USERNAME && process.env.PLUSH_DEV_OPERATOR_PASSWORD
+      ? { username: process.env.PLUSH_DEV_OPERATOR_USERNAME, password: process.env.PLUSH_DEV_OPERATOR_PASSWORD }
+      : undefined,
     viewport: scenario.viewport,
     deviceScaleFactor: scenario.deviceScaleFactor ?? 1,
     hasTouch: scenario.hasTouch ?? false,
