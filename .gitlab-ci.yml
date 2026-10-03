@@ -437,7 +437,7 @@ quality_server_upgrade:
       - output/ci/server-lanes/upgrade.json
 
 quality_server_test_build:
-  <<: [*quality_shard, *playwright_cache_pull]
+  <<: [*quality_shard, *browser_cache_pull]
   needs:
     - job: plan
       artifacts: true

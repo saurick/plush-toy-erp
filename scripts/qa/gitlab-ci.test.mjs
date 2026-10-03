@@ -443,7 +443,7 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
   }
   assert.match(
     workflow,
-    /^quality_server_test_build:\n  <<: \[\*quality_shard, \*playwright_cache_pull\]/mu,
+    /^quality_server_test_build:\n  <<: \[\*quality_shard, \*browser_cache_pull\]/mu,
   );
   for (const { job } of Object.values(CI_BROWSER_QUALITY_LANES)) {
     assert.match(

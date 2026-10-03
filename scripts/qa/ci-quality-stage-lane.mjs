@@ -119,7 +119,7 @@ export const CI_SERVER_QUALITY_LANES = Object.freeze({
     stages: Object.freeze(["server"]),
     substeps: Object.freeze([]),
     requiresTests: true,
-    pnpm: false,
+    pnpm: true,
     chromium: true,
     postgres: false,
     makeData: false,

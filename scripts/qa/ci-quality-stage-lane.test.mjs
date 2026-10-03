@@ -211,7 +211,7 @@ test("Web, Server and Browser internal lane catalogs partition canonical work on
   assert.equal(CI_SERVER_QUALITY_LANES.test_build.postgres, false);
   assert.equal(CI_SERVER_QUALITY_LANES.test_build.makeData, false);
   assert.equal(CI_SERVER_QUALITY_LANES.test_build.chromium, true);
-  assert.equal(CI_SERVER_QUALITY_LANES.test_build.pnpm, false);
+  assert.equal(CI_SERVER_QUALITY_LANES.test_build.pnpm, true);
   assert.equal(CI_SERVER_QUALITY_LANES.critical_postgres.postgres, true);
   assert.equal(CI_SERVER_QUALITY_LANES.critical_postgres.makeData, false);
   assert.equal(CI_SERVER_QUALITY_LANES.critical_postgres.chromium, false);
