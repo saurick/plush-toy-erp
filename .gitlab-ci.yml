@@ -424,6 +424,7 @@ quality_web_build:
 
 quality_server_schema:
   <<: *quality_shard
+  resource_group: quality-server-heavy
   needs:
     - job: plan
       artifacts: true
@@ -439,6 +440,7 @@ quality_server_schema:
 
 quality_server_upgrade:
   <<: *quality_shard
+  resource_group: quality-server-heavy
   needs:
     - job: plan
       artifacts: true
@@ -454,6 +456,7 @@ quality_server_upgrade:
 
 quality_server_test_build:
   <<: [*quality_shard, *browser_cache_pull]
+  resource_group: quality-server-heavy
   needs:
     - job: plan
       artifacts: true
@@ -469,6 +472,7 @@ quality_server_test_build:
 
 quality_server_critical_postgres:
   <<: *quality_shard
+  resource_group: quality-server-heavy
   needs:
     - job: plan
       artifacts: true

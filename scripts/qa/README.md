@@ -577,7 +577,7 @@ bash scripts/qa/affected.sh --file web/src/erp/utils/dateRange.mjs --run
 
 `affected` 是开发期快速反馈和非标准目标的保守执行入口；默认 `origin/main` 的 `prepare-push` 会在 clean HEAD 和真实 aggregate range 上独立重算风险，但只签发 `server-ci` 短门禁回执，不在 Mac 执行 affected/full。显式 `--full` 只作本地完整诊断；随后必须按准备时相同 remote/ref push，hook 复核短期回执、真实 stdin/range、clean HEAD、gate/environment/TTL，并实时运行 `git log --check` 与逐 range 严格 secrets。推送后必须由 GitLab exact-SHA CI Gate 终态成功才能发布、提升制品或进入受保护部署；目标 migration、health/smoke、备份恢复及回滚 evidence 仍独立取得。
 
-GitLab 的四个 Bootstrap 资源敏感分片在 `quality_web` 和 `quality_server` 完成后运行，避开依赖安装、构建和数据库测试的磁盘读写峰值；夹具的进程超时、短 marker deadline、身份校验与清理断言保持独立约束。浏览器回执按计划顺序保存每个场景的真实耗时和重试次数，执行日志可以采用场景目录顺序，但场景集合必须与计划完全一致且不得重复。
+GitLab 的四个服务端执行 Job 共享 `quality-server-heavy` resource group，在同一 Runner 内串行执行生成、编译和真实 PostgreSQL 检查，避免多个 Go 编译器和隔离数据库同时争用内存与磁盘。四个 Bootstrap 资源敏感分片在 `quality_web` 和 `quality_server` 完成后运行，避开依赖安装、构建和数据库测试的磁盘读写峰值；夹具的进程超时、短 marker deadline、身份校验与清理断言保持独立约束。浏览器回执按计划顺序保存每个场景的真实耗时和重试次数，执行日志可以采用场景目录顺序，但场景集合必须与计划完全一致且不得重复。
 
 ## 角色演示账号与登录核验
 
