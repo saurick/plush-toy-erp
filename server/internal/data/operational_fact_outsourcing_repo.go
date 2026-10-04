@@ -753,7 +753,7 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, in *biz.O
 		if !cancel {
 			return nil, biz.ErrOutsourcingOrderFactSourceInvalid
 		}
-		return r.postLegacyOutsourcingFact(ctx, in, cancel)
+		return r.cancelSourceLessOutsourcingFact(ctx, in)
 	}
 	orderID, itemID, err := outsourcingOrderSourceIDsFromFact(preview)
 	if err != nil {
@@ -934,9 +934,9 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, in *biz.O
 	return commitOutsourcingFact(ctx, tx, row)
 }
 
-// postLegacyOutsourcingFact only reverses historical posted rows that predate
-// source-driven creation. New source-less drafts fail closed before this path.
-func (r *operationalFactRepo) postLegacyOutsourcingFact(ctx context.Context, in *biz.OperationalFactStatusMutation, cancel bool) (*biz.OutsourcingFact, error) {
+// cancelSourceLessOutsourcingFact only reverses already-posted facts without
+// source links. It cannot create or post a source-less fact.
+func (r *operationalFactRepo) cancelSourceLessOutsourcingFact(ctx context.Context, in *biz.OperationalFactStatusMutation) (*biz.OutsourcingFact, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -952,61 +952,30 @@ func (r *operationalFactRepo) postLegacyOutsourcingFact(ctx context.Context, in 
 		}
 		return nil, err
 	}
-	if cancel {
-		replay, err := versionedOperationalFactCancellationReplay(
-			row.Status,
-			row.Version,
-			row.CancelledBy,
-			row.CancelReason,
-			in,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if replay {
-			return commitOutsourcingFact(ctx, tx, row)
-		}
-		if row.Status != biz.OperationalFactStatusPosted {
-			return nil, biz.ErrBadParam
-		}
-		if err := r.applyOutsourcingFactInventory(ctx, tx, row, in, true); err != nil {
-			return nil, err
-		}
-		if err := updateVersionedOperationalFactCancellation(
-			ctx, tx, "outsourcing_facts", in.ID, in.ExpectedVersion,
-			row.Status, in.ActorID, in.Reason, time.Now(),
-		); err != nil {
-			return nil, err
-		}
-	} else {
-		replay, err := versionedOperationalFactTransitionReplay(
-			row.Status,
-			row.Version,
-			in.ExpectedVersion,
-			biz.OperationalFactStatusPosted,
-			row.PostedBy,
-			in.ActorID,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if replay {
-			return commitOutsourcingFact(ctx, tx, row)
-		}
-		if row.Status != biz.OperationalFactStatusDraft {
-			return nil, biz.ErrBadParam
-		}
-		if err := r.applyOutsourcingFactInventory(ctx, tx, row, in, false); err != nil {
-			return nil, err
-		}
-		now := time.Now()
-		if err := updateVersionedOperationalFactStatus(
-			ctx, tx, "outsourcing_facts", in.ID, in.ExpectedVersion,
-			biz.OperationalFactStatusDraft, biz.OperationalFactStatusPosted, "posted_at", now,
-			"posted_by", in.ActorID,
-		); err != nil {
-			return nil, err
-		}
+	replay, err := versionedOperationalFactCancellationReplay(
+		row.Status,
+		row.Version,
+		row.CancelledBy,
+		row.CancelReason,
+		in,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if replay {
+		return commitOutsourcingFact(ctx, tx, row)
+	}
+	if row.Status != biz.OperationalFactStatusPosted {
+		return nil, biz.ErrBadParam
+	}
+	if err := r.applyOutsourcingFactInventory(ctx, tx, row, in, true); err != nil {
+		return nil, err
+	}
+	if err := updateVersionedOperationalFactCancellation(
+		ctx, tx, "outsourcing_facts", in.ID, in.ExpectedVersion,
+		row.Status, in.ActorID, in.Reason, time.Now(),
+	); err != nil {
+		return nil, err
 	}
 	row, err = tx.client.OutsourcingFact.Query().Where(outsourcingfact.ID(in.ID)).WithPoster().WithCanceller().Only(ctx)
 	if err != nil {

@@ -686,7 +686,7 @@ func TestOperationalFactRepo_StockReservationIdempotencyRequiresSamePayload(t *t
 	}
 }
 
-func TestOperationalFactRepo_SourceLessOutsourcingDraftCannotPost(t *testing.T) {
+func TestOperationalFactRepo_SourceLessOutsourcingCannotPostButPostedFactCanReverse(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_outsourcing")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
@@ -725,6 +725,55 @@ func TestOperationalFactRepo_SourceLessOutsourcingDraftCannotPost(t *testing.T) 
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.OutsourcingFactSourceType)).CountX(ctx); count != 0 {
 		t.Fatalf("source-less outsourcing post wrote %d inventory txns", count)
+	}
+	if _, err := repo.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "不可冲正未过账事实")); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("source-less draft reversal error = %v", err)
+	}
+
+	// This isolated SQLite fixture represents a persisted posted record. The
+	// production creation hook and source-less posting guard remain enabled.
+	if _, err := data.sqldb.ExecContext(ctx,
+		"UPDATE outsourcing_facts SET status = ?, version = ?, posted_at = ?, posted_by = ? WHERE id = ?",
+		biz.OperationalFactStatusPosted, 2, time.Now(), actor.ID, fact.ID,
+	); err != nil {
+		t.Fatalf("prepare persisted posted fixture: %v", err)
+	}
+	posted := client.OutsourcingFact.GetX(ctx, fact.ID)
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.productWarehouseID,
+		TxnType:        biz.InventoryTxnOut,
+		Direction:      -1,
+		Quantity:       decimal.NewFromInt(2),
+		UnitID:         fixtures.unitID,
+		SourceType:     biz.OutsourcingFactSourceType,
+		SourceID:       &posted.ID,
+		SourceLineID:   &posted.ID,
+		IdempotencyKey: biz.OperationalFactInventoryIdempotencyKey(biz.OutsourcingFactSourceType, posted.ID, posted.ID, "POST"),
+	}); err != nil {
+		t.Fatalf("seed posted stock issue: %v", err)
+	}
+	request := operationalFactStatusMutation(posted.ID, posted.Version, actor.ID, "冲正存量委外事实")
+	for attempt := 0; attempt < 2; attempt++ {
+		cancelled, err := repo.CancelPostedOutsourcingFact(ctx, request)
+		if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled || cancelled.Version != posted.Version+1 {
+			t.Fatalf("reversal attempt %d: fact=%#v error=%v", attempt, cancelled, err)
+		}
+	}
+	stored := client.OutsourcingFact.GetX(ctx, posted.ID)
+	if stored.CancelledBy == nil || *stored.CancelledBy != actor.ID || stored.CancelReason == nil || *stored.CancelReason != request.Reason {
+		t.Fatalf("reversal must preserve actor and reason: %#v", stored)
+	}
+	balance, err := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
+		WarehouseID: fixtures.productWarehouseID, UnitID: fixtures.unitID,
+	})
+	if err != nil || !balance.Quantity.Equal(decimal.NewFromInt(5)) {
+		t.Fatalf("reversal must restore inventory exactly once: balance=%#v error=%v", balance, err)
+	}
+	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.OutsourcingFactSourceType), inventorytxn.SourceID(posted.ID)).CountX(ctx); count != 2 {
+		t.Fatalf("expected one posted issue and one reversal after replay, got %d", count)
 	}
 }
 
